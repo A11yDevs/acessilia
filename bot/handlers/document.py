@@ -25,6 +25,7 @@ router = Router()
 OUTPUT_DIR = settings.temp_dir / "output"
 
 user_modes: dict[int, str] = {}
+user_emails: dict[int, str] = {}
 
 
 async def _send_with_retry(
@@ -170,10 +171,18 @@ async def process_file(
                 [txt_path, docx_path, pdf_path, html_path, mp3_path],
             )
 
-            await tracker("Enviando pacote acessivel...")
-
-            caption = "Pacote acessivel gerado (.zip)."
-            await _send_doc_with_retry(message, zip_path, caption)
+            # Verifica se há e-mail registrado para este chat
+            target_email = user_emails.pop(message.chat.id, None)
+            
+            if target_email:
+                await tracker(f"Enviando para e-mail: {target_email}...")
+                from web.services.email_service import send_result_email
+                await send_result_email(target_email, filename, zip_path)
+                await message.answer(f"✅ Arquivo enviado para {target_email}!")
+            else:
+                await tracker("Enviando pacote acessivel...")
+                caption = "Pacote acessivel gerado (.zip)."
+                await _send_doc_with_retry(message, zip_path, caption)
 
             await tracker.finish(success=True)
 

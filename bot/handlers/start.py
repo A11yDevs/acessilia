@@ -3,12 +3,25 @@ from aiogram.filters import CommandStart, Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message
+from bot.handlers.document import user_modes, user_emails
 
 router = Router()
 
 
 class FeedbackStates(StatesGroup):
     waiting_feedback = State()
+
+
+@router.message(Command("email"))
+async def cmd_email(message: Message) -> None:
+    args = message.text.split(maxsplit=1)
+    if len(args) < 2:
+        await message.answer("Por favor, informe o e-mail: /email seu@email.com")
+        return
+    
+    email = args[1].strip()
+    user_emails[message.chat.id] = email
+    await message.answer(f"E-mail {email} configurado! Agora envie o documento para ser enviado para este e-mail.")
 
 
 @router.message(CommandStart())
