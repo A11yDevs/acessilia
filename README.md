@@ -11,6 +11,8 @@ Arquitetura canônica em 4 etapas: extração/normalização determinística -> 
 - Processa página a página com cache local e modo configurável
 - Usa um JSON canônico validável como fonte principal da verdade do documento
 - Valida o canônico com JSON Schema e validadores de consistência
+- Painel Web acessível para envio de arquivos com entrega via e-mail
+- Geração de audiodescrição em áudio (MP3) com voz neural brasileira
 - Converte o canônico para uma AST intermediária compatível com Pandoc
 - Renderiza de forma determinística para TXT, DOCX, PDF e HTML
 - Aplica perfis de saída para controlar verbosidade, interatividade e auditoria
@@ -37,9 +39,25 @@ Copie `.env.example` para `.env` e configure o `BOT_TOKEN`.
 
 ### 3. Executar
 
+Para rodar o bot do Telegram:
 ```bash
 python run.py
 ```
+
+Para rodar o Painel Web:
+```bash
+python run_web.py
+```
+
+## Painel Web
+
+O Painel Web permite o uso do sistema sem a necessidade do Telegram. 
+1. Acesse o painel (padrão: `http://localhost:8000`).
+2. Digite seu e-mail e anexe o arquivo.
+3. Você receberá uma confirmação imediata por e-mail.
+4. O arquivo processado (ZIP contendo TXT, DOCX, PDF, HTML e MP3) será enviado para o seu e-mail assim que finalizado.
+
+Configurações SMTP devem ser definidas no arquivo `.env`.
 
 ## Configuração
 

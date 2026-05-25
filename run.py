@@ -66,8 +66,20 @@ async def startup():
     if settings.ai_client == "opencode":
         await ensure_opencode_running()
 
-    logger.info("Iniciando bot...")
-    await start_polling()
+    # Importa a app web aqui para evitar dependência circular se houver
+    from web.app import app
+    import uvicorn
+
+    config = uvicorn.Config(app, host="0.0.0.0", port=8000, log_level=settings.log_level.lower())
+    server = uvicorn.Server(config)
+
+    logger.info("Iniciando bot e painel web acessível (http://localhost:8000)...")
+    
+    # Roda ambos simultaneamente
+    await asyncio.gather(
+        start_polling(),
+        server.serve()
+    )
 
 
 if __name__ == "__main__":

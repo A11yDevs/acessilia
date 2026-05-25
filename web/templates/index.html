@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Acessibilidade - Bot Acess</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            color: #212529;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .container {
+            max-width: 600px;
+            margin-top: 50px;
+        }
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .card-header {
+            background-color: #0d6efd;
+            color: white;
+            border-radius: 15px 15px 0 0 !important;
+            padding: 20px;
+            text-align: center;
+        }
+        .btn-primary {
+            padding: 12px;
+            font-weight: bold;
+            border-radius: 8px;
+        }
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+        /* Acessibilidade: Contraste e Focus */
+        :focus {
+            outline: 3px solid #ffc107 !important;
+            outline-offset: 2px;
+        }
+    </style>
+</head>
+<body>
+    <main class="container" role="main">
+        <div class="card">
+            <header class="card-header">
+                <h1 class="h3 mb-0">Bot Acess - Gerador de Acessibilidade</h1>
+            </header>
+            <div class="card-body p-4">
+                <p class="mb-4">Converta seus documentos em formatos acessíveis e receba-os por e-mail.</p>
+                
+                {% if message %}
+                <div class="alert alert-success" role="alert">
+                    {{ message }}
+                </div>
+                {% endif %}
+
+                {% if error %}
+                <div class="alert alert-danger" role="alert">
+                    {{ error }}
+                </div>
+                {% endif %}
+
+                <form action="/process" method="post" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Seu E-mail</label>
+                        <input type="email" class="form-control" id="email" name="email" required 
+                               placeholder="exemplo@email.com" aria-describedby="emailHelp">
+                        <div id="emailHelp" class="form-text">Enviaremos o arquivo final para este endereço.</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="file" class="form-label">Anexar Documento (PDF ou Imagem)</label>
+                        <input type="file" class="form-control" id="file" name="file" required
+                               accept=".pdf,.png,.jpg,.jpeg,.tiff">
+                    </div>
+
+                    <div class="d-grid gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary btn-lg">Tornar Acessível</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <footer class="footer">
+            <p>&copy; 2026 Bot Acess - Tecnologia para Inclusão</p>
+        </footer>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

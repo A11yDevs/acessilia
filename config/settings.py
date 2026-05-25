@@ -49,6 +49,14 @@ class Settings:
         os.getenv("PYMUPDF_TEXT_THRESHOLD", "100")
     )
 
+    # SMTP Settings
+    smtp_server: str = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+    smtp_port: int = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user: str = os.getenv("SMTP_USER", "")
+    smtp_password: str = os.getenv("SMTP_PASSWORD", "")
+    smtp_from: str = os.getenv("SMTP_FROM", "")
+    smtp_name: str = os.getenv("SMTP_NAME", "Bot Acess")
+
     def __post_init__(self) -> None:
         self.temp_dir.mkdir(parents=True, exist_ok=True)
         self.data_dir.mkdir(parents=True, exist_ok=True)
