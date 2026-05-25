@@ -13,6 +13,7 @@ from bot.agents.state_manager import TaskCancelledError
 from bot.exporters.txt_exporter import export_txt
 from bot.exporters.docx_exporter import export_docx
 from bot.exporters.pdf_exporter import export_pdf
+from bot.exporters.audio_exporter import export_mp3
 from bot.utils.logger import logger
 from bot.utils.validators import validate_file
 from bot.utils.status_tracker import StatusTracker
@@ -138,6 +139,7 @@ async def process_file(
             docx_path = OUTPUT_DIR / f"{base_name}.docx"
             pdf_path = OUTPUT_DIR / f"{base_name}.pdf"
             html_path = OUTPUT_DIR / f"{base_name}.html"
+            mp3_path = OUTPUT_DIR / f"{base_name}.mp3"
 
             export_txt(canonical_document, txt_path, filename)
             export_docx(canonical_document, docx_path, filename)
@@ -149,11 +151,23 @@ async def process_file(
                 title=base_name,
                 profile_name="html",
             )
+            
+            # Gera MP3 usando texto limpo do arquivo TXT com progresso fiel
+            try:
+                if txt_path.exists():
+                    clean_text = txt_path.read_text(encoding="utf-8")
+                    
+                    async def audio_progress(percent: int):
+                        await tracker(f"Gerando áudio (MP3)... {percent}%")
+                    
+                    await export_mp3(clean_text, mp3_path, progress_callback=audio_progress)
+            except Exception as e:
+                logger.error("Falha ao gerar MP3: {}", e)
 
             zip_path = OUTPUT_DIR / f"{base_name}_acessivel.zip"
             _build_zip_package(
                 zip_path,
-                [txt_path, docx_path, pdf_path, html_path],
+                [txt_path, docx_path, pdf_path, html_path, mp3_path],
             )
 
             await tracker("Enviando pacote acessivel...")

@@ -18,11 +18,19 @@ class StatusTracker:
         return f"[{bar}] {percent}%"
 
     def _format_message(self, msg: str) -> str:
+        # Padrão para páginas
         match = re.search(r"pagina (\d+) de (\d+)", msg, re.IGNORECASE)
         if match:
             current = int(match.group(1))
             total = int(match.group(2))
             percent = int((current / total) * 100)
+            bar = self._build_progress_bar(percent)
+            return f"📄 *{self.filename}*\n\n{msg}\n{bar}"
+        
+        # Padrão para áudio (ex: "Gerando áudio (MP3)... 50%")
+        audio_match = re.search(r"Gerando áudio.* (\d+)%", msg, re.IGNORECASE)
+        if audio_match:
+            percent = int(audio_match.group(1))
             bar = self._build_progress_bar(percent)
             return f"📄 *{self.filename}*\n\n{msg}\n{bar}"
 

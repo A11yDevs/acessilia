@@ -12,6 +12,7 @@ pytesseract>=0.3.10
 playwright>=1.40.0
 opencv-python>=4.9.0
 numpy>=1.26.0
+edge-tts>=7.2.0
 
 # Development
 pytest>=8.0.0
