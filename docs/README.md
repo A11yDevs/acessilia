@@ -1,7 +1,7 @@
 # a11y-devs-describer Project Documentation
 
 ## Purpose
-This documentation describes the project architecture, modules, classes, use cases, and principles aligned with the current codebase.
+This documentation describes the current canonical document architecture, the modular pipeline, the deterministic renderers, and the operational runtime around the Telegram bot.
 
 ## Navigation
 1. [Architectural Constitution](constitution.md)
@@ -15,15 +15,18 @@ This documentation describes the project architecture, modules, classes, use cas
 ## UML Diagrams (PlantUML)
 1. Use cases: [docs/use_cases/use_cases.puml](use_cases/use_cases.puml)
 2. Architecture: [docs/architecture/architecture.puml](architecture/architecture.puml)
-3. Processing sequence: [docs/sequence/document_processing_sequence.puml](sequence/document_processing_sequence.puml)
-4. Task state machine: [docs/state_machine/task_state_machine.puml](state_machine/task_state_machine.puml)
+3. Layers: [docs/architecture/layers.puml](architecture/layers.puml)
+4. Processing sequence: [docs/sequence/document_processing_sequence.puml](sequence/document_processing_sequence.puml)
+5. Task state machine: [docs/state_machine/task_state_machine.puml](state_machine/task_state_machine.puml)
 
 ## Covered Scope
 - Main Telegram bot runtime (aiogram) and startup flow.
-- File processing flow, orchestration, and fallback behavior.
-- AI agent, OpenCode/OpenRouter clients, and prompts.
+- File processing flow, orchestration, hybrid extraction, and fallback behavior.
+- Canonical JSON document model, schema validation, and Pandoc-style AST build step.
+- Hybrid extraction agent (PyMuPDF local-first + AI vision when needed), OpenCode/OpenRouter clients, and prompts.
 - SQLite persistence for history and filesystem cache.
-- Export pipeline for accessible TXT, DOCX, and PDF.
+- Export pipeline for accessible TXT, DOCX, PDF, and HTML.
+- Deterministic renderers and output profiles.
 - Validations, middlewares, status tracking, and image/PDF/text utilities.
 - Operational, debug, extraction scripts, and automated tests.
 
@@ -34,6 +37,7 @@ This documentation describes the project architecture, modules, classes, use cas
 - Test strategy and coverage: [tests.md](tests.md)
 
 ## Key Decisions Observed in Code
-- The project supports cross-platform temporary directories using tempfile/gettempdir configuration.
-- The active AI client is selected through AI_CLIENT (opencode by default).
-- There is a conditional browser client branch in the agent that depends on a module not present in the current repository. This is documented as a technical risk in patterns.md and modules.md.
+- The canonical accessible document is the source of truth for exports and validations.
+- Output formats are rendered from the canonical document through deterministic format-specific renderers.
+- Output profiles control verbosity and audit metadata inclusion per format.
+- Temporary directories, cache and history paths remain centralized in config/settings.py.

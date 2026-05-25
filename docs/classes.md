@@ -20,8 +20,8 @@ Catalog concrete classes in the repository and their responsibilities to support
 
 ## AgenteUnico
 - File: [bot/agents/agente_unico.py](../bot/agents/agente_unico.py)
-- Responsibility: page-by-page pipeline, image preprocessing, AI client invocation, and result aggregation.
-- Collaborators: cache, image_converter, image_enhancer, pdf_splitter, selected AI client.
+- Responsibility: page-by-page hybrid extraction pipeline, local PDF text extraction, conditional AI vision invocation, and result aggregation.
+- Collaborators: cache, fitz/PyMuPDF, image_converter, image_enhancer, pdf_splitter, selected AI client.
 
 ## StateManager
 - File: [bot/agents/state_manager.py](../bot/agents/state_manager.py)
@@ -39,11 +39,11 @@ Catalog concrete classes in the repository and their responsibilities to support
 
 ## OpenCodeClient
 - File: [bot/clients/opencode.py](../bot/clients/opencode.py)
-- Responsibility: OpenCode session management, multimodal message sending, retries, and response text extraction.
+- Responsibility: OpenCode session management, multimodal message sending, retries, and response text extraction for AI-assisted pages.
 
 ## OpenRouterClient
 - File: [bot/clients/openrouter.py](../bot/clients/openrouter.py)
-- Responsibility: OpenRouter API calls (multimodal chat completions) with retries and partial response handling.
+- Responsibility: OpenRouter API calls (multimodal chat completions) with retries and partial response handling for AI-assisted pages.
 
 ## Telegram interface
 
@@ -63,19 +63,21 @@ Catalog concrete classes in the repository and their responsibilities to support
 
 ## Document export
 
-## _OutlineDocTemplate
-- File: [bot/exporters/pdf_exporter.py](../bot/exporters/pdf_exporter.py)
+## _DocTemplate
+- File: [renderers/pdf_renderer.py](../renderers/pdf_renderer.py)
 - Inheritance: SimpleDocTemplate
 - Responsibility: create accessible bookmark/outline structure in final PDF.
 
+## Module-oriented pipeline
+- The canonical builder, validators, filters, AST builder, and renderers are organized as pure-function modules instead of stateful classes.
+- Main files: [pipeline](../pipeline), [filters](../filters), [renderers](../renderers), [exporters/pandoc_exporter.py](../exporters/pandoc_exporter.py)
+
 ## Relationship between classes (simplified view)
 1. Settings is a global configuration dependency.
-2. AgenteUnico depends on OpenCodeClient/OpenRouterClient and image/PDF utilities.
+2. AgenteUnico performs local extraction first and depends on OpenCodeClient/OpenRouterClient only for pages that require vision inference.
 3. StateManager and ProcessingQueue support execution control.
 4. StatusTracker and PauseMiddleware extend aiogram runtime behavior.
-5. Exporters run after AgenteUnico pipeline completion.
+5. Exporters run after the canonical document pipeline completes.
 
 ## Missing classes expected by runtime condition
-- Observed reference: [bot.clients.browser_client](../bot/clients) (in [bot/agents/agente_unico.py](../bot/agents/agente_unico.py))
-- Current status: module/class not found in this repository.
-- Impact: setting AI_CLIENT=browser is likely to fail at import time.
+- No additional public classes are required by the new canonical pipeline.

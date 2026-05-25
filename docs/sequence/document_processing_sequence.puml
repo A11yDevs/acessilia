@@ -1,4 +1,4 @@
-@startuml
+@startuml document_processing_sequence
 skinparam shadowing false
 
 actor User
@@ -9,8 +9,12 @@ participant "state_manager" as State
 participant "history_service" as History
 participant "cache" as Cache
 participant "AgenteUnico" as Agent
+participant "PyMuPDF (local)" as LocalOCR
+participant "canonical_builder" as Builder
+participant "validators / filters" as Checks
+participant "pandoc_exporter" as Export
 participant "AI client" as AI
-participant "exporters" as Exp
+participant "renderers" as Renderers
 
 User -> TG: sends document/photo
 TG -> Handler: update com file_id
@@ -20,28 +24,43 @@ Handler -> Master: process(input_path, callback, mode)
 
 Master -> Cache: get_cached(file)
 alt cache hit
-  Cache --> Master: ready text
+  Cache --> Master: canonical payload
 else cache miss
   Master -> State: criar_tarefa()
   Master -> History: registrar_conversao()
   Master -> Agent: executar(file_path, tmpdir, callback, mode)
 
   loop for each page
-    Agent -> AI: send_message(prompt, imagem)
-    AI --> Agent: page text
+    Agent -> LocalOCR: extract_page_text_and_images()
+    alt page has enough local text
+      LocalOCR --> Agent: extracted text (+ embedded images)
+      opt embedded image descriptions
+        Agent -> AI: send_message(image_prompt, embedded_image)
+        AI --> Agent: short description
+      end
+    else scanned/no-text page or image input
+      Agent -> AI: send_message(prompt, page_image)
+      AI --> Agent: page text + structured blocks
+    end
     Agent -> Cache: set_cache(page)
   end
 
-  Agent --> Master: consolidated text
-  Master -> Master: merge_broken_paragraphs()
+  Agent --> Master: consolidated structured payload
+  Master -> Builder: build_canonical_document()
+  Builder --> Master: canonical document
+  Master -> Checks: validate_canonical_document()
+  Checks --> Master: ok
   Master -> State: finalizar()
   Master -> Cache: set_cache(file)
   Master -> History: finalizar_conversao(done)
 end
 
-Master --> Handler: extracted text
-Handler -> Exp: export_txt/docx/pdf
-Exp --> Handler: output file paths
+Master --> Handler: canonical document
+Handler -> Export: export_accessible_document()
+Export -> Checks: validate_export_profile()
+Export -> Renderers: render_txt/docx/pdf/html()
+Renderers --> Export: output file paths
+Export --> Handler: output file paths
 Handler -> TG: sends accessible files
 Handler -> TG: status final
 

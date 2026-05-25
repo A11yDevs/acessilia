@@ -66,3 +66,10 @@ Quando houver dúvida, use expressões como:
 10. NÃO ECONOMIZE TOKENS.
 - Priorize COMPLETUDE do conteúdo textual e visual.
 - A resposta pode ser longa.
+
+FORMATO DE SAÍDA (OBRIGATÓRIO):
+- Responda em TEXTO PURO.
+- NÃO use Markdown.
+- NÃO use títulos com #, negrito com **, itálico com *, listas com -, *, + ou 1.
+- NÃO use blocos de código com ```.
+- Organize a resposta em linhas e parágrafos simples, mantendo ordem de leitura.

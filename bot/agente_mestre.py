@@ -1,15 +1,22 @@
 import asyncio
+import json
 import time
 from pathlib import Path
-from typing import Callable, Coroutine
+from typing import Any, Callable, Coroutine
 
 from bot.agents.agente_unico import AgenteUnico
 from bot.agents.state_manager import TaskCancelledError, state_manager
 from bot.services.cache import get_cached, set_cache
-from bot.services.history_service import finalizar_conversao, limpar_orfas, registrar_conversao
+from bot.services.history_service import (
+    finalizar_conversao,
+    limpar_orfas,
+    registrar_conversao,
+)
 from bot.services.queue_service import QueueItem, processing_queue
 from bot.utils.logger import logger
 from bot.utils.text_processor import merge_broken_paragraphs
+from pipeline.canonical_builder import build_canonical_document
+from pipeline.verbosity_manager import verbosity_for_mode
 
 agente = AgenteUnico()
 CACHE_VERSION = "opencode-v1"
@@ -26,11 +33,21 @@ async def process(
     file_path: Path,
     status_callback: Callable[[str], Coroutine] | None = None,
     mode: str = "normal",
-) -> str:
+) -> dict[str, Any]:
     cached = await get_cached(file_path, CACHE_VERSION)
     if cached is not None:
         logger.info("Cache hit para {}", file_path.name)
-        return cached
+        if isinstance(cached, dict):
+            return cached
+        return build_canonical_document(
+            str(cached),
+            title=file_path.stem,
+            language="pt-BR",
+            verbosity=verbosity_for_mode(mode),
+            source_name=file_path.name,
+            source_path=str(file_path),
+            audience=["reader"],
+        )
 
     task_id = state_manager.criar_tarefa(file_path)
     inicio = time.time()
@@ -43,38 +60,70 @@ async def process(
     )
 
     try:
-        state_manager.atualizar(task_id, etapa="Preparando arquivo", progresso=0.1)
+        state_manager.atualizar(
+            task_id,
+            etapa="Preparando arquivo",
+            progresso=0.1,
+        )
         state_manager.verificar_cancelamento(task_id)
 
         if status_callback:
             await status_callback("📄 Analisando arquivo...")
 
-        state_manager.atualizar(task_id, etapa="Processando com IA", progresso=0.3)
+        state_manager.atualizar(
+            task_id,
+            etapa="Processando com IA",
+            progresso=0.3,
+        )
         state_manager.verificar_cancelamento(task_id)
 
-        resultado = await agente.executar(file_path, file_path.parent, status_callback, mode=mode)
-        
+        resultado = await agente.executar(
+            file_path,
+            file_path.parent,
+            status_callback,
+            mode=mode,
+            structured_output=True,
+        )
+
+        if isinstance(resultado, dict):
+            raw_text = resultado["text"]
+        else:
+            raw_text = resultado
+
         # Novo: Une parágrafos quebrados entre páginas
-        resultado = merge_broken_paragraphs(resultado)
+        raw_text = merge_broken_paragraphs(raw_text)
 
         state_manager.verificar_cancelamento(task_id)
-        if not resultado.strip():
+        if not raw_text.strip():
             raise RuntimeError("Resposta vazia do agente")
 
-        state_manager.finalizar(task_id, resultado)
-        await set_cache(file_path, resultado, CACHE_VERSION)
+        canonical_document = build_canonical_document(
+            resultado,
+            title=file_path.stem,
+            language="pt-BR",
+            verbosity=verbosity_for_mode(mode),
+            source_name=file_path.name,
+            source_path=str(file_path),
+            audience=["reader"],
+        )
+
+        state_manager.finalizar(
+            task_id,
+            json.dumps(canonical_document, ensure_ascii=False),
+        )
+        await set_cache(file_path, canonical_document, CACHE_VERSION)
 
         await finalizar_conversao(
             task_id=task_id,
             status="done",
             pipeline="opencode-unico",
-            resultado_resumo=resultado[:200],
+            resultado_resumo=canonical_document["title"][:200],
             tempo_segundos=time.time() - inicio,
         )
 
         if status_callback:
             await status_callback("✅ Processamento finalizado com sucesso!")
-        return resultado
+        return canonical_document
 
     except TaskCancelledError:
         logger.info("Tarefa {} cancelada pelo usuario", task_id)
@@ -91,7 +140,7 @@ async def process(
         state_manager.errar(task_id, str(e))
         fallback = _fallback_texto_simples(file_path)
         state_manager.atualizar(task_id, resultado=fallback)
-        # Removido set_cache aqui para permitir nova tentativa real pelo usuario
+        # Mantemos o cache fora do bloco de erro para permitir nova tentativa.
 
         await finalizar_conversao(
             task_id=task_id,
@@ -103,7 +152,15 @@ async def process(
 
         if status_callback:
             await status_callback("❌ Nao foi possivel processar o arquivo.")
-        return fallback
+        return build_canonical_document(
+            fallback,
+            title=file_path.stem,
+            language="pt-BR",
+            verbosity=verbosity_for_mode(mode),
+            source_name=file_path.name,
+            source_path=str(file_path),
+            audience=["reader"],
+        )
 
 
 async def process_with_queue(
@@ -112,7 +169,7 @@ async def process_with_queue(
     user_id: int = 0,
     chat_id: int = 0,
     mode: str = "normal",
-) -> str:
+) -> dict[str, Any]:
     task_id = state_manager.criar_tarefa(file_path)
     item = QueueItem(
         user_id=user_id,
@@ -134,12 +191,15 @@ async def process_with_queue(
             if task_id in processing_queue._processing:
                 break
             can_process = (
-                processing_queue.em_processamento() < processing_queue._max_concurrent
+                processing_queue.em_processamento()
+                < processing_queue._max_concurrent
                 and processing_queue._queue
                 and processing_queue._queue[0].task_id == task_id
             )
             if can_process:
-                processing_queue._processing[task_id] = processing_queue._queue.popleft()
+                processing_queue._processing[task_id] = (
+                    processing_queue._queue.popleft()
+                )
                 break
         await asyncio.sleep(1)
 

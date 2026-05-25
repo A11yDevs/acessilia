@@ -6,17 +6,19 @@ skinparam actorStyle awesome
 
 actor User as user
 actor Operator as ops
-actor "AI Service\n(OpenCode/OpenRouter)" as ai
+actor "AI Service\n(OpenCode/OpenRouter, conditional)" as ai
 
 rectangle "A11y Devs Describer Bot" {
   usecase "Submit document/photo" as UC1
+  usecase "Extract text locally\n(PyMuPDF)" as UC10
+  usecase "Use AI vision\nwhen needed" as UC11
   usecase "Select description\nmode" as UC2
   usecase "Check status" as UC3
   usecase "Cancel task" as UC4
   usecase "Deactivate/Reactivate\nchat" as UC5
   usecase "Check health" as UC6
   usecase "Submit feedback" as UC7
-  usecase "Generate\nTXT/DOCX/PDF outputs" as UC8
+  usecase "Generate\nTXT/DOCX/PDF/HTML outputs" as UC8
   usecase "Persist history\nand cache" as UC9
 }
 
@@ -30,7 +32,8 @@ ops --> UC6
 
 UC1 --> UC8
 UC1 --> UC9
-UC8 --> ai
-UC9 --> ai
+UC1 --> UC10
+UC1 --> UC11
+UC11 --> ai
 
 @enduml

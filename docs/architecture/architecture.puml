@@ -1,4 +1,4 @@
-@startuml
+@startuml architecture
 skinparam componentStyle rectangle
 skinparam shadowing false
 
@@ -10,14 +10,19 @@ node "Python Runtime" {
   component "PauseMiddleware" as Middleware
   component "Orchestrator\nbot/agente_mestre.py" as Master
   component "AgenteUnico\nbot/agents/agente_unico.py" as Agent
+  component "Local Text Extractor\nPyMuPDF (fitz)" as LocalExtract
   component "AI Clients\nopencode.py/openrouter.py" as Clients
-  component "Exporters\ntxt/docx/pdf" as Exporters
+  component "Canonical Builder\npipeline/canonical_builder.py" as Builder
+  component "Validators/Profiles\npipeline/validators.py\npipeline/verbosity_manager.py" as PipeChecks
+  component "AST + Renderers\npipeline/pandoc_ast_builder.py\nrenderers/*" as Renderers
+  component "Export Coordinator\nexporters/pandoc_exporter.py" as Exporters
   component "StatusTracker" as Tracker
 }
 
 database "SQLite\ndata/history.db" as DB
 folder "Cache\ntemp/cache" as Cache
 folder "Temp/Output" as Temp
+folder "Schemas\nschemas/" as Schemas
 cloud "OpenCode ou OpenRouter" as AI
 cloud "Telegram Bot API" as Telegram
 
@@ -31,6 +36,12 @@ Master --> Agent
 Master --> DB
 Master --> Cache
 Agent --> Clients
+Agent --> LocalExtract
+Agent --> Builder
+Builder --> Schemas
+Builder --> PipeChecks
+Exporters --> PipeChecks
+Exporters --> Renderers
 Clients --> AI
 Master --> Exporters
 Exporters --> Temp

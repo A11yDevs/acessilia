@@ -1,0 +1,93 @@
+@startuml layers
+top to bottom direction
+skinparam shadowing false
+skinparam packageStyle rectangle
+
+actor "Telegram User" as User
+
+rectangle "1. Interface and Entrypoints" as L1 {
+  component "bot/main.py" as Main
+  component "handlers/*" as Handlers
+  component "middlewares/*" as Middleware
+}
+
+rectangle "2. Application Orchestration" as L2 {
+  component "bot/agente_mestre.py" as Master
+  component "agents/state_manager.py" as StateManager
+  component "services/queue_service.py" as Queue
+}
+
+rectangle "3. Extraction and AI Integration" as L3 {
+  component "agents/agente_unico.py" as Agent
+  component "clients/opencode.py" as OpenCode
+  component "clients/openrouter.py" as OpenRouter
+  component "prompts/*" as Prompts
+  component "pipeline/structure_parser.py" as Parser
+}
+
+rectangle "4. Canonical Document Layer" as L4 {
+  component "pipeline/canonical_builder.py" as Builder
+  component "pipeline/sanitizer.py" as Sanitizer
+  component "pipeline/validators.py" as Validators
+  component "pipeline/verbosity_manager.py" as Verbosity
+  component "pipeline/pandoc_ast_builder.py" as AstBuilder
+  component "schemas/accessible_document.schema.json" as Schema
+}
+
+rectangle "5. Output and Rendering" as L5 {
+  component "exporters/pandoc_exporter.py" as Exporter
+  component "renderers/*" as Renderers
+  component "bot/exporters/*" as CompatExporters
+}
+
+rectangle "6. Infrastructure and Persistence" as L6 {
+  component "services/cache.py" as Cache
+  component "services/history_service.py" as History
+  component "services/file_service.py" as FileService
+  component "services/cleanup_service.py" as Cleanup
+  component "services/opencode_launcher.py" as Launcher
+  component "config/settings.py" as Settings
+}
+
+rectangle "7. Cross-cutting Utilities" as L7 {
+  component "utils/logger.py" as Logger
+  component "utils/status_tracker.py" as Tracker
+  component "utils/validators.py" as FileValidators
+  component "utils/pdf_splitter.py" as PdfSplitter
+  component "utils/image_*" as ImageUtils
+  component "utils/text_processor.py" as TextProcessor
+}
+
+User --> L1
+L1 --> L2
+L2 --> L3
+L3 --> L4
+L2 --> L5
+L4 --> L5
+
+L2 --> L6
+L3 --> L6
+L5 --> L6
+
+L1 ..> L7
+L2 ..> L7
+L3 ..> L7
+L4 ..> L7
+L5 ..> L7
+
+note right of L2
+Coordinates workflow,
+cache, history and status.
+end note
+
+note right of L5
+bot/exporters remains
+a compatibility wrapper.
+end note
+
+note right of L4
+Canonical document is the
+source of truth for output.
+end note
+
+@enduml

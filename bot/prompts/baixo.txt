@@ -28,3 +28,10 @@ Para cada imagem:
 
 6. NÃO RESUMA O TEXTO.
 - O conteúdo textual deve ser extraído integralmente.
+
+FORMATO DE SAÍDA (OBRIGATÓRIO):
+- Responda em TEXTO PURO.
+- NÃO use Markdown.
+- NÃO use títulos com #, negrito com **, itálico com *, listas com -, *, + ou 1.
+- NÃO use blocos de código com ```.
+- Use frases e linhas simples, em ordem de leitura.

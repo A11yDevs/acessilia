@@ -47,6 +47,39 @@ async def test_send_message_rate_limit_retry(openrouter_client):
     
     assert result == "Sucesso após retry"
 
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_send_message_none_content_retry(openrouter_client):
+    route = respx.post("https://openrouter.ai/api/v1/chat/completions")
+    route.side_effect = [
+        httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": None,
+                        }
+                    }
+                ]
+            },
+        ),
+        httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {"message": {"content": "Resposta valida"}}
+                ]
+            },
+        ),
+    ]
+
+    with patch("asyncio.sleep", new_callable=AsyncMock):
+        result = await openrouter_client.send_message("Olá")
+
+    assert result == "Resposta valida"
+
 @pytest.mark.asyncio
 async def test_send_message_no_api_key():
     settings.openrouter_api_key = ""

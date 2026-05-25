@@ -123,3 +123,10 @@ Quando houver dúvida, use expressões como:
 - dobras;
 - carimbos;
 - falhas de OCR.
+
+FORMATO DE SAÍDA (OBRIGATÓRIO):
+- Responda em TEXTO PURO.
+- NÃO use Markdown.
+- NÃO use títulos com #, negrito com **, itálico com *, listas com -, *, + ou 1.
+- NÃO use blocos de código com ```.
+- Use parágrafos e linhas simples, preservando a ordem da leitura visual.

@@ -92,7 +92,21 @@ class OpenRouterClient:
                     
                     choice = choices[0]
                     finish_reason = choice.get("finish_reason")
-                    result = choice.get("message", {}).get("content", "").strip()
+                    message = choice.get("message") or {}
+                    content = message.get("content")
+
+                    if isinstance(content, str):
+                        result = content.strip()
+                    elif isinstance(content, list):
+                        text_parts = []
+                        for part in content:
+                            if isinstance(part, dict) and part.get("type") == "text":
+                                part_text = part.get("text")
+                                if isinstance(part_text, str):
+                                    text_parts.append(part_text)
+                        result = "\n".join(text_parts).strip()
+                    else:
+                        result = ""
                     
                     # Se a IA parou por limite de tokens, tentamos de novo para obter o texto completo
                     if finish_reason == "length":

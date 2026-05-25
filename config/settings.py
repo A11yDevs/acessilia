@@ -45,6 +45,9 @@ class Settings:
         "OPENROUTER_MODEL",
         "nvidia/nemotron-nano-12b-v2-vl:free",
     )
+    pymupdf_text_threshold: int = int(
+        os.getenv("PYMUPDF_TEXT_THRESHOLD", "100")
+    )
 
     def __post_init__(self) -> None:
         self.temp_dir.mkdir(parents=True, exist_ok=True)

@@ -10,6 +10,25 @@ Document the automated tests available in the repository, what they validate, an
 
 ## Current coverage
 
+## 0. Canonical pipeline and renderers
+- Files:
+  - [tests/test_pandoc_filters.py](../tests/test_pandoc_filters.py)
+  - [tests/test_renderers.py](../tests/test_renderers.py)
+  - [tests/test_pipeline_validation.py](../tests/test_pipeline_validation.py)
+  - [tests/test_structure_parser.py](../tests/test_structure_parser.py)
+- Scope:
+  - canonical document filtering
+  - output profiles
+  - text-to-block parsing
+  - deterministic TXT/HTML/DOCX/PDF rendering
+  - canonical and output-text validation
+- Covered code:
+  - [filters/pandoc_filters.py](../filters/pandoc_filters.py)
+  - [pipeline/verbosity_manager.py](../pipeline/verbosity_manager.py)
+  - [pipeline/validators.py](../pipeline/validators.py)
+  - [pipeline/structure_parser.py](../pipeline/structure_parser.py)
+  - [renderers](../renderers)
+
 ## 1. Validators
 - File: [tests/test_validators.py](../tests/test_validators.py)
 - Scope:
@@ -28,6 +47,7 @@ Document the automated tests available in the repository, what they validate, an
   - PDF export
   - empty text export
 - Covered code:
+  - [exporters/pandoc_exporter.py](../exporters/pandoc_exporter.py)
   - [bot/exporters/txt_exporter.py](../bot/exporters/txt_exporter.py)
   - [bot/exporters/docx_exporter.py](../bot/exporters/docx_exporter.py)
   - [bot/exporters/pdf_exporter.py](../bot/exporters/pdf_exporter.py)
@@ -54,13 +74,20 @@ Document the automated tests available in the repository, what they validate, an
 3. No direct tests yet for [bot/handlers/document.py](../bot/handlers/document.py).
 4. No direct tests yet for [bot/handlers/start.py](../bot/handlers/start.py).
 5. No direct tests yet for [bot/services/cache.py](../bot/services/cache.py), [bot/services/history_service.py](../bot/services/history_service.py), or [bot/services/queue_service.py](../bot/services/queue_service.py).
+6. No direct tests for hybrid branch coverage in AgenteUnico:
+  - local text extraction path (PyMuPDF threshold reached),
+  - AI vision path for scanned/no-text pages,
+  - embedded image description behavior.
+7. No tests asserting that Tesseract configuration is currently unused by runtime extraction.
 
 ## Recommended next tests
 1. Conversion pipeline happy path with mocked AI client.
-2. Fallback path when the AI client raises an exception.
-3. Task cancellation flow via state_manager.
-4. Telegram handler integration for document uploads.
-5. Cache hit/miss behavior for file and page caches.
+2. Hybrid extraction branch tests in AgenteUnico (local-first and AI fallback).
+3. Fallback path when the AI client raises an exception.
+4. Task cancellation flow via state_manager.
+5. Telegram handler integration for document uploads.
+6. Cache hit/miss behavior for file and page caches.
+7. Orchestrator integration with canonical document export.
 
 ## How to run
 ```bash

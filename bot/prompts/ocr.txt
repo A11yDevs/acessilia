@@ -1,1 +1,7 @@
 Extraia APENAS o texto visível nesta imagem. Não faça descrições visuais. Preserve a estrutura original do texto quando possível. Se algo estiver ilegível, indique como "[texto ilegível]".
+
+FORMATO DE SAÍDA (OBRIGATÓRIO):
+- Responda em TEXTO PURO.
+- NÃO use Markdown.
+- NÃO use títulos com #, negrito com **, itálico com *, listas com -, *, + ou 1.
+- NÃO use blocos de código com ```.

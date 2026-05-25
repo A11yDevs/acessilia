@@ -2,7 +2,7 @@ import hashlib
 import json
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Any
 
 import aiofiles
 import aiofiles.os
@@ -33,7 +33,7 @@ def _cache_path(key: str) -> Path:
     return CACHE_DIR / f"{key}.json"
 
 
-async def get_cached(path: Path, extra: str = "", ttl: int = 3600) -> Optional[str]:
+async def get_cached(path: Path, extra: str = "", ttl: int = 3600) -> Any:
     _ensure_cache_dir()
     key = _cache_key(path, extra)
     cp = _cache_path(key)
@@ -50,7 +50,9 @@ async def get_cached(path: Path, extra: str = "", ttl: int = 3600) -> Optional[s
             await aiofiles.os.remove(str(cp))
             return None
         logger.debug("Cache hit: {}", key)
-        return data["text"]
+        if "payload" in data:
+            return data["payload"]
+        return data.get("text")
     except Exception:
         try:
             await aiofiles.os.remove(str(cp))
@@ -59,12 +61,14 @@ async def get_cached(path: Path, extra: str = "", ttl: int = 3600) -> Optional[s
         return None
 
 
-async def set_cache(path: Path, text: str, extra: str = "") -> None:
+async def set_cache(path: Path, payload: Any, extra: str = "") -> None:
     _ensure_cache_dir()
     key = _cache_key(path, extra)
     cp = _cache_path(key)
     try:
-        data = {"timestamp": time.time(), "text": text}
+        data = {"timestamp": time.time(), "payload": payload}
+        if isinstance(payload, str):
+            data["text"] = payload
         async with aiofiles.open(str(cp), "w", encoding="utf-8") as f:
             await f.write(json.dumps(data, ensure_ascii=False))
         logger.debug("Cache set: {}", key)
