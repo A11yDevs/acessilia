@@ -1,0 +1,48 @@
+@startuml
+skinparam shadowing false
+
+actor User
+participant "Telegram" as TG
+participant "document.py" as Handler
+participant "agente_mestre.py" as Master
+participant "state_manager" as State
+participant "history_service" as History
+participant "cache" as Cache
+participant "AgenteUnico" as Agent
+participant "AI client" as AI
+participant "exporters" as Exp
+
+User -> TG: sends document/photo
+TG -> Handler: update com file_id
+Handler -> Handler: validate_file()
+Handler -> TG: initial status message
+Handler -> Master: process(input_path, callback, mode)
+
+Master -> Cache: get_cached(file)
+alt cache hit
+  Cache --> Master: ready text
+else cache miss
+  Master -> State: criar_tarefa()
+  Master -> History: registrar_conversao()
+  Master -> Agent: executar(file_path, tmpdir, callback, mode)
+
+  loop for each page
+    Agent -> AI: send_message(prompt, imagem)
+    AI --> Agent: page text
+    Agent -> Cache: set_cache(page)
+  end
+
+  Agent --> Master: consolidated text
+  Master -> Master: merge_broken_paragraphs()
+  Master -> State: finalizar()
+  Master -> Cache: set_cache(file)
+  Master -> History: finalizar_conversao(done)
+end
+
+Master --> Handler: extracted text
+Handler -> Exp: export_txt/docx/pdf
+Exp --> Handler: output file paths
+Handler -> TG: sends accessible files
+Handler -> TG: status final
+
+@enduml

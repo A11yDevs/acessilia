@@ -1,0 +1,28 @@
+@startuml
+skinparam shadowing false
+
+[*] --> processing : criar_tarefa()
+
+processing --> done : finalizar(resultado)
+processing --> error : errar(excecao)
+processing --> cancelled : cancelar()
+
+error --> [*]
+done --> [*]
+cancelled --> [*]
+
+note right of processing
+Relevant fields:
+- progresso
+- etapa_atual
+- erros
+- resultado
+- inicio/fim
+end note
+
+note right of cancelled
+Cooperative cancellation
+via verificar_cancelamento()
+end note
+
+@enduml

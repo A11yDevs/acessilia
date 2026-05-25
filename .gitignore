@@ -12,3 +12,5 @@ build/
 *.db
 bot.lock
 data/
+.venv/
+venv/

@@ -1,4 +1,4 @@
 from bot.clients.opencode import OpenCodeClient
-from bot.clients.browser_client import GeminiBrowserClient
+from bot.clients.openrouter import OpenRouterClient
 
-__all__ = ["OpenCodeClient", "GeminiBrowserClient"]
+__all__ = ["OpenCodeClient", "OpenRouterClient"]

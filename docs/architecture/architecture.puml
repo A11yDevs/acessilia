@@ -1,0 +1,39 @@
+@startuml
+skinparam componentStyle rectangle
+skinparam shadowing false
+
+actor "Telegram User" as User
+
+node "Python Runtime" {
+  component "aiogram Dispatcher\nbot/main.py" as Main
+  component "Handlers\nstart.py/document.py/errors.py" as Handlers
+  component "PauseMiddleware" as Middleware
+  component "Orchestrator\nbot/agente_mestre.py" as Master
+  component "AgenteUnico\nbot/agents/agente_unico.py" as Agent
+  component "AI Clients\nopencode.py/openrouter.py" as Clients
+  component "Exporters\ntxt/docx/pdf" as Exporters
+  component "StatusTracker" as Tracker
+}
+
+database "SQLite\ndata/history.db" as DB
+folder "Cache\ntemp/cache" as Cache
+folder "Temp/Output" as Temp
+cloud "OpenCode ou OpenRouter" as AI
+cloud "Telegram Bot API" as Telegram
+
+User --> Telegram
+Telegram --> Main
+Main --> Middleware
+Main --> Handlers
+Handlers --> Tracker
+Handlers --> Master
+Master --> Agent
+Master --> DB
+Master --> Cache
+Agent --> Clients
+Clients --> AI
+Master --> Exporters
+Exporters --> Temp
+Handlers --> Temp
+
+@enduml
