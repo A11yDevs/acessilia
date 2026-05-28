@@ -2,19 +2,19 @@ import pytest
 import respx
 import httpx
 from unittest.mock import patch, AsyncMock
-from bot.clients.openrouter import OpenRouterClient
+from bot.clients.ollama import OllamaClient
 from config.settings import settings
 
 @pytest.fixture
-def openrouter_client():
-    settings.openrouter_api_key = "test_key"
-    settings.openrouter_model = "test_model"
-    return OpenRouterClient()
+def ollama_client():
+    settings.ollama_api_key = "test_key"
+    settings.ollama_model = "test_model"
+    return OllamaClient()
 
 @respx.mock
 @pytest.mark.asyncio
-async def test_send_message_success(openrouter_client):
-    respx.post("https://openrouter.ai/api/v1/chat/completions").mock(
+async def test_send_message_success(ollama_client):
+    respx.post("http://172.16.109.33:11434/v1/chat/completions").mock(
         return_value=httpx.Response(200, json={
             "choices": [
                 {
@@ -26,14 +26,14 @@ async def test_send_message_success(openrouter_client):
         })
     )
 
-    result = await openrouter_client.send_message("Olá", images=[b"dummy_image"])
+    result = await ollama_client.send_message("Olá", images=[b"dummy_image"])
     assert result == "Teste de resposta"
 
 @respx.mock
 @pytest.mark.asyncio
-async def test_send_message_rate_limit_retry(openrouter_client):
+async def test_send_message_rate_limit_retry(ollama_client):
     # Mock first call as 429, then success
-    route = respx.post("https://openrouter.ai/api/v1/chat/completions")
+    route = respx.post("http://172.16.109.33:11434/v1/chat/completions")
     route.side_effect = [
         httpx.Response(429),
         httpx.Response(200, json={
@@ -43,15 +43,15 @@ async def test_send_message_rate_limit_retry(openrouter_client):
 
     # Patch asyncio.sleep to avoid waiting in tests
     with patch("asyncio.sleep", new_callable=AsyncMock):
-        result = await openrouter_client.send_message("Olá")
+        result = await ollama_client.send_message("Olá")
     
     assert result == "Sucesso após retry"
 
 
 @respx.mock
 @pytest.mark.asyncio
-async def test_send_message_none_content_retry(openrouter_client):
-    route = respx.post("https://openrouter.ai/api/v1/chat/completions")
+async def test_send_message_none_content_retry(ollama_client):
+    route = respx.post("http://172.16.109.33:11434/v1/chat/completions")
     route.side_effect = [
         httpx.Response(
             200,
@@ -76,13 +76,13 @@ async def test_send_message_none_content_retry(openrouter_client):
     ]
 
     with patch("asyncio.sleep", new_callable=AsyncMock):
-        result = await openrouter_client.send_message("Olá")
+        result = await ollama_client.send_message("Olá")
 
     assert result == "Resposta valida"
 
 @pytest.mark.asyncio
 async def test_send_message_no_api_key():
-    settings.openrouter_api_key = ""
-    client = OpenRouterClient()
-    with pytest.raises(RuntimeError, match="OPENROUTER_API_KEY"):
+    settings.ollama_api_key = ""
+    client = OllamaClient()
+    with pytest.raises(RuntimeError, match="OLLAMA_API_KEY"):
         await client.send_message("Olá")

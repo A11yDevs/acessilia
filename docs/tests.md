@@ -52,14 +52,14 @@ Document the automated tests available in the repository, what they validate, an
   - [bot/exporters/docx_exporter.py](../bot/exporters/docx_exporter.py)
   - [bot/exporters/pdf_exporter.py](../bot/exporters/pdf_exporter.py)
 
-## 3. OpenRouter client
-- File: [tests/test_openrouter_client.py](../tests/test_openrouter_client.py)
+## 3. Ollama client
+- File: [tests/test_ollama_client.py](../tests/test_ollama_client.py)
 - Scope:
   - successful multimodal request
   - retry after rate limit (429)
   - missing API key error
 - Covered code:
-  - [bot/clients/openrouter.py](../bot/clients/openrouter.py)
+  - [bot/clients/ollama.py](../bot/clients/ollama.py)
   - [config/settings.py](../config/settings.py)
 
 ## Test design principles already present
@@ -97,4 +97,4 @@ pytest tests/
 ## Related documentation
 - [Architecture](architecture.md)
 - [Use Cases](use_cases.md)
-- [Modules](modules.md)
+- [Modules](modules.md).md)ules.md).md)

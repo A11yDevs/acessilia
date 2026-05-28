@@ -20,7 +20,7 @@ rectangle "2. Application Orchestration" as L2 {
 rectangle "3. Extraction and AI Integration" as L3 {
   component "agents/agente_unico.py" as Agent
   component "clients/opencode.py" as OpenCode
-  component "clients/openrouter.py" as OpenRouter
+  component "clients/ollama.py" as Ollama
   component "prompts/*" as Prompts
   component "pipeline/structure_parser.py" as Parser
 }

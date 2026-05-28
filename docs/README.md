@@ -23,7 +23,7 @@ This documentation describes the current canonical document architecture, the mo
 - Main Telegram bot runtime (aiogram) and startup flow.
 - File processing flow, orchestration, hybrid extraction, and fallback behavior.
 - Canonical JSON document model, schema validation, and Pandoc-style AST build step.
-- Hybrid extraction agent (PyMuPDF local-first + AI vision when needed), OpenCode/OpenRouter clients, and prompts.
+- Hybrid extraction agent (PyMuPDF local-first + AI vision when needed), OpenCode/Ollama clients, and prompts.
 - SQLite persistence for history and filesystem cache.
 - Export pipeline for accessible TXT, DOCX, PDF, and HTML.
 - Deterministic renderers and output profiles.

@@ -3,7 +3,7 @@
 ## Actors
 1. Telegram end user.
 2. Operator/Architect (environment setup and diagnostics).
-3. AI service (OpenCode or OpenRouter), used conditionally.
+3. AI service (OpenCode or Ollama), used conditionally.
 4. Local filesystem and SQLite database.
 
 ## Main use cases
@@ -90,7 +90,7 @@
   - simple extraction fallback in [bot/agente_mestre.py](../bot/agente_mestre.py), with canonical export still available.
 3. Text-based PDF page
   - page is extracted locally and does not require AI call for main text.
-4. Telegram/AI backend rate-limit (OpenRouter or OpenCode)
+4. Telegram/AI backend rate-limit (Ollama or OpenCode)
    - retries with incremental wait.
 5. Task cancellation
    - state marked as cancelled and processing interrupted.
@@ -103,3 +103,4 @@
 
 ## UML Diagram
 - [Use cases PlantUML](use_cases/use_cases.puml)
+l)

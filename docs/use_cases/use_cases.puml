@@ -6,7 +6,7 @@ skinparam actorStyle awesome
 
 actor User as user
 actor Operator as ops
-actor "AI Service\n(OpenCode/OpenRouter, conditional)" as ai
+actor "AI Service\n(OpenCode/Ollama, conditional)" as ai
 
 rectangle "A11y Devs Describer Bot" {
   usecase "Submit document/photo" as UC1

@@ -21,7 +21,7 @@ The system is an asynchronous Telegram bot for converting documents into accessi
      - calls AI vision only for scanned/no-text pages or direct image inputs,
      - optionally describes embedded images in text-based PDFs.
    - [bot/clients/opencode.py](../bot/clients/opencode.py): HTTP client for OpenCode server with session and retry.
-   - [bot/clients/openrouter.py](../bot/clients/openrouter.py): HTTP client for OpenRouter API with exponential backoff.
+   - [bot/clients/ollama.py](../bot/clients/ollama.py): HTTP client for Ollama API with exponential backoff.
    - [bot/prompts](../bot/prompts): prompts by detail mode.
    - [pipeline/structure_parser.py](../pipeline/structure_parser.py): shared text-to-block parser used by the agent and canonical builder.
 
@@ -75,7 +75,7 @@ The system is an asynchronous Telegram bot for converting documents into accessi
 ## External dependencies
 - Telegram Bot API (via aiogram).
 - Local OpenCode (when AI_CLIENT=opencode).
-- OpenRouter API (when AI_CLIENT=openrouter).
+- Ollama API (when AI_CLIENT=ollama).
 - Processing libraries: PyMuPDF, Pillow, opencv-python, reportlab, python-docx.
 - Tesseract command is configurable in Settings, but not used in the current runtime extraction path.
 
@@ -103,3 +103,4 @@ The system is an asynchronous Telegram bot for converting documents into accessi
 - [Layers PlantUML](architecture/layers.puml)
 - [Sequence PlantUML](sequence/document_processing_sequence.puml)
 - [State PlantUML](state_machine/task_state_machine.puml)
+hine.puml)

@@ -41,9 +41,9 @@ Catalog concrete classes in the repository and their responsibilities to support
 - File: [bot/clients/opencode.py](../bot/clients/opencode.py)
 - Responsibility: OpenCode session management, multimodal message sending, retries, and response text extraction for AI-assisted pages.
 
-## OpenRouterClient
-- File: [bot/clients/openrouter.py](../bot/clients/openrouter.py)
-- Responsibility: OpenRouter API calls (multimodal chat completions) with retries and partial response handling for AI-assisted pages.
+## OllamaClient
+- File: [bot/clients/ollama.py](../bot/clients/ollama.py)
+- Responsibility: Ollama API calls (multimodal chat completions) with retries and partial response handling for AI-assisted pages.
 
 ## Telegram interface
 
@@ -74,10 +74,13 @@ Catalog concrete classes in the repository and their responsibilities to support
 
 ## Relationship between classes (simplified view)
 1. Settings is a global configuration dependency.
-2. AgenteUnico performs local extraction first and depends on OpenCodeClient/OpenRouterClient only for pages that require vision inference.
+2. AgenteUnico performs local extraction first and depends on OpenCodeClient/OllamaClient only for pages that require vision inference.
 3. StateManager and ProcessingQueue support execution control.
 4. StatusTracker and PauseMiddleware extend aiogram runtime behavior.
 5. Exporters run after the canonical document pipeline completes.
 
 ## Missing classes expected by runtime condition
 - No additional public classes are required by the new canonical pipeline.
+e.
+eline.
+e.

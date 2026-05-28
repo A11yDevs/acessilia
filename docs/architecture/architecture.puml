@@ -11,7 +11,7 @@ node "Python Runtime" {
   component "Orchestrator\nbot/agente_mestre.py" as Master
   component "AgenteUnico\nbot/agents/agente_unico.py" as Agent
   component "Local Text Extractor\nPyMuPDF (fitz)" as LocalExtract
-  component "AI Clients\nopencode.py/openrouter.py" as Clients
+  component "AI Clients\nopencode.py/ollama.py" as Clients
   component "Canonical Builder\npipeline/canonical_builder.py" as Builder
   component "Validators/Profiles\npipeline/validators.py\npipeline/verbosity_manager.py" as PipeChecks
   component "AST + Renderers\npipeline/pandoc_ast_builder.py\nrenderers/*" as Renderers
@@ -23,7 +23,7 @@ database "SQLite\ndata/history.db" as DB
 folder "Cache\ntemp/cache" as Cache
 folder "Temp/Output" as Temp
 folder "Schemas\nschemas/" as Schemas
-cloud "OpenCode ou OpenRouter" as AI
+cloud "OpenCode ou Ollama" as AI
 cloud "Telegram Bot API" as Telegram
 
 User --> Telegram
@@ -48,3 +48,4 @@ Exporters --> Temp
 Handlers --> Temp
 
 @enduml
+ml

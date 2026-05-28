@@ -1,0 +1,9 @@
+model_list:
+
+  - model_name: vision-model
+    litellm_params:
+      model: ollama/qwen25vl:latest
+      api_base: http://IP-DA-VPS:11434
+
+general_settings:
+  master_key: sk-minhachave

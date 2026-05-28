@@ -40,9 +40,9 @@ class Settings:
     browser_headless: bool = (
         os.getenv("BROWSER_HEADLESS", "true").lower() == "true"
     )
-    openrouter_api_key: str = os.getenv("OPENROUTER_API_KEY", "")
-    openrouter_model: str = os.getenv(
-        "OPENROUTER_MODEL",
+    ollama_api_key: str = os.getenv("OLLAMA_API_KEY", "")
+    ollama_model: str = os.getenv(
+        "OLLAMA_MODEL",
         "nvidia/nemotron-nano-12b-v2-vl:free",
     )
     pymupdf_text_threshold: int = int(

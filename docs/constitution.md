@@ -34,7 +34,7 @@ Deliver document and image conversion to accessible formats, focused on high-qua
 6. Renderers must only consume validated canonical data.
 
 ## 5. Resilience and operational safety
-1. Network retry for external channels (Telegram/OpenCode/OpenRouter).
+1. Network retry for external channels (Telegram/OpenCode/Ollama).
 2. Process lock in [run.py](../run.py) to prevent multiple instances on the same host.
 3. Periodic temporary file cleanup to avoid uncontrolled disk growth.
 4. Consistent shutdown with task status and history updates.

@@ -5,13 +5,13 @@ from typing import Optional
 from bot.utils.logger import logger
 from config.settings import settings
 
-class OpenRouterClient:
-    """Cliente para a API do OpenRouter."""
+class OllamaClient:
+    """Cliente para a API do Ollama."""
 
     def __init__(self):
-        self.api_key = settings.openrouter_api_key
-        self.model = settings.openrouter_model
-        self.base_url = "https://openrouter.ai/api/v1/chat/completions"
+        self.api_key = settings.ollama_api_key
+        self.model = settings.ollama_model
+        self.base_url = "http://172.16.109.33:11434/v1/chat/completions"
         self.timeout = settings.request_timeout
 
     async def send_message(
@@ -21,7 +21,7 @@ class OpenRouterClient:
         max_retries: int = 5,
     ) -> str:
         if not self.api_key:
-            raise RuntimeError("OPENROUTER_API_KEY nao configurada")
+            raise RuntimeError("OLLAMA_API_KEY nao configurada")
 
         messages = []
         content = []
@@ -61,7 +61,7 @@ class OpenRouterClient:
         for attempt in range(max_retries):
             try:
                 async with httpx.AsyncClient(timeout=self.timeout) as client:
-                    logger.debug("Enviando requisição para OpenRouter (tentativa {}/{}): modelo={}, image_count={}", 
+                    logger.debug("Enviando requisição para Ollama (tentativa {}/{}): modelo={}, image_count={}", 
                                  attempt + 1, max_retries, self.model, len(images or []))
                     response = await client.post(
                         self.base_url,
@@ -71,24 +71,24 @@ class OpenRouterClient:
                     
                     if response.status_code in (429, 502, 503, 504):
                         delay = (2 ** attempt) + 2
-                        logger.warning("OpenRouter erro temporário ({}), aguardando {}s...", response.status_code, delay)
+                        logger.warning("Ollama erro temporário ({}), aguardando {}s...", response.status_code, delay)
                         await asyncio.sleep(delay)
                         continue
 
                     if response.status_code != 200:
                         error_text = response.text
-                        logger.error("OpenRouter error ({}): {}", response.status_code, error_text)
+                        logger.error("Ollama error ({}): {}", response.status_code, error_text)
                         
                     response.raise_for_status()
                     data = response.json()
                     
                     choices = data.get("choices", [])
                     if not choices:
-                        logger.warning("OpenRouter retornou resposta sem choices (tentativa {}/{}): {}", attempt + 1, max_retries, data)
+                        logger.warning("Ollama retornou resposta sem choices (tentativa {}/{}): {}", attempt + 1, max_retries, data)
                         if attempt < max_retries - 1:
                             await asyncio.sleep(2)
                             continue
-                        return "[Erro: OpenRouter retornou resposta sem conteúdo]"
+                        return "[Erro: Ollama retornou resposta sem conteúdo]"
                     
                     choice = choices[0]
                     finish_reason = choice.get("finish_reason")
@@ -118,22 +118,22 @@ class OpenRouterClient:
                     if result:
                         return result
                     
-                    logger.warning("OpenRouter respondeu vazio (tentativa {}/{})", attempt + 1, max_retries)
+                    logger.warning("Ollama respondeu vazio (tentativa {}/{})", attempt + 1, max_retries)
                     if attempt < max_retries - 1:
                         await asyncio.sleep(2)
                     
             except Exception as e:
-                logger.error("OpenRouter error (tentativa {}/{}): {}", attempt + 1, max_retries, e)
+                logger.error("Ollama error (tentativa {}/{}): {}", attempt + 1, max_retries, e)
                 if attempt < max_retries - 1:
                     delay = (2 ** attempt) + 1
                     await asyncio.sleep(delay)
                 else:
                     raise
 
-        return "[Erro: OpenRouter falhou após todas as tentativas de recuperação]"
+        return "[Erro: Ollama falhou após todas as tentativas de recuperação]"
 
     def reset_session(self):
-        # OpenRouter client is stateless for now
+        # Ollama client is stateless for now
         pass
 
-client = OpenRouterClient()
+client = OllamaClient()

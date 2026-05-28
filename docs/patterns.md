@@ -16,7 +16,7 @@
 - Implementation: [bot/agents/agente_unico.py](../bot/agents/agente_unico.py) selects client by [config/settings.py](../config/settings.py) settings.ai_client.
 - Strategies:
    - [bot/clients/opencode.py](../bot/clients/opencode.py)
-   - [bot/clients/openrouter.py](../bot/clients/openrouter.py)
+   - [bot/clients/ollama.py](../bot/clients/ollama.py)
 - Benefit: backend can be switched without changing the main flow.
 
 ## 4. Local-first extraction strategy
@@ -34,7 +34,7 @@
 ## 6. Retry with backoff
 - Implementation:
    - [bot/handlers/document.py](../bot/handlers/document.py) (Telegram sending)
-   - [bot/clients/openrouter.py](../bot/clients/openrouter.py) (429/5xx)
+   - [bot/clients/ollama.py](../bot/clients/ollama.py) (429/5xx)
    - [bot/clients/opencode.py](../bot/clients/opencode.py) (500/read/connect)
 - Benefit: stronger resilience against transient failures.
 

@@ -40,8 +40,8 @@ Map all Python modules in the project by functional area, including main respons
 ## 5. AI clients
 1. [bot/clients/opencode.py](../bot/clients/opencode.py)
    - Session-based OpenCode client used when AI_CLIENT=opencode.
-2. [bot/clients/openrouter.py](../bot/clients/openrouter.py)
-   - Stateless OpenRouter client used when AI_CLIENT=openrouter.
+2. [bot/clients/ollama.py](../bot/clients/ollama.py)
+   - Stateless Ollama client used when AI_CLIENT=ollama.
 3. [bot/clients/__init__.py](../bot/clients/__init__.py)
    - Re-exports available clients.
 
@@ -115,30 +115,17 @@ Map all Python modules in the project by functional area, including main respons
 3. [tests/test_pipeline_validation.py](../tests/test_pipeline_validation.py)
 4. [tests/test_structure_parser.py](../tests/test_structure_parser.py)
 5. [tests/test_validators.py](../tests/test_validators.py)
-6. [tests/test_exporters.py](../tests/test_exporters.py)
-7. [tests/test_openrouter_client.py](../tests/test_openrouter_client.py)
-
+2. [bot/clients/ollama.py](../bot/clients/ollama.py)
+   - Stateless Ollama client used when AI_CLIENT=ollama.
+7. [tests/test_ollama_client.py](../tests/test_ollama_client.py)
 ## 13. Support and diagnostic scripts (root)
-1. [check_api.py](../check_api.py)
-2. [check_doc.py](../check_doc.py)
-3. [check_doc2.py](../check_doc2.py)
-4. [extract_api.py](../extract_api.py)
-5. [extract_full.py](../extract_full.py)
-6. [extract_paths.py](../extract_paths.py)
-7. [full_extract.py](../full_extract.py)
-8. [generate_api_doc.py](../generate_api_doc.py)
-9. [list_openrouter_models.py](../list_openrouter_models.py)
-10. [list_sections.py](../list_sections.py)
-11. [test_opencode_client.py](../test_opencode_client.py)
-12. [test_openrouter_direct.py](../test_openrouter_direct.py)
-
+1. [list_sections.py](../list_sections.py)
 ## 14. Root configuration/documentation artifacts
 1. [requirements.txt](../requirements.txt)
 2. [README.md](../README.md)
-3. [opencode_api_doc.txt](../opencode_api_doc.txt)
-4. [prompt.txt](../prompt.txt)
 
 ## Coverage and alignment
 - Functional coverage: runtime, AI pipeline, canonical document pipeline, persistence, exports, utilities, tests, and support scripts.
 - The export path now depends on the canonical builder, filters, AST builder, and deterministic renderers.
 - Runtime extraction path is hybrid: local text extraction for text-based PDFs, AI vision for scanned/no-text pages and image inputs.
+ image inputs.

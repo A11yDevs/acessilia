@@ -26,7 +26,7 @@ In practice, the codebase can be understood as a layered architecture with contr
 3. Extraction and AI integration
    - ../../bot/agents/agente_unico.py
    - ../../bot/clients/opencode.py
-   - ../../bot/clients/openrouter.py
+   - ../../bot/clients/ollama.py
    - ../../bot/prompts/
    - ../../pipeline/structure_parser.py
 
