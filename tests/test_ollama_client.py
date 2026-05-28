@@ -31,6 +31,24 @@ async def test_send_message_success(ollama_client):
 
 @respx.mock
 @pytest.mark.asyncio
+async def test_send_message_payload_config(ollama_client):
+    def check_payload(request):
+        import json
+        payload = json.loads(request.content)
+        assert payload.get("temperature") == 0
+        assert payload.get("seed") == 42
+        assert payload.get("max_tokens") == 300
+        assert payload.get("num_predict") == 300
+        return httpx.Response(200, json={
+            "choices": [{"message": {"content": "OK"}}]
+        })
+
+    respx.post("http://172.16.109.33:11434/v1/chat/completions").mock(side_effect=check_payload)
+
+    await ollama_client.send_message("Olá")
+
+@respx.mock
+@pytest.mark.asyncio
 async def test_send_message_rate_limit_retry(ollama_client):
     # Mock first call as 429, then success
     route = respx.post("http://172.16.109.33:11434/v1/chat/completions")

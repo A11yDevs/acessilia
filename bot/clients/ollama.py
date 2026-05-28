@@ -49,6 +49,10 @@ class OllamaClient:
         payload = {
             "model": self.model,
             "messages": messages,
+            "temperature": 0,
+            "seed": 42,
+            "max_tokens": 300,
+            "num_predict": 300
         }
 
         headers = {
