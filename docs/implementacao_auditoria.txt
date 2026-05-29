@@ -1,0 +1,18 @@
+# Implementação da Auditoria Determinística e Estratégia Híbrida
+
+## O que foi feito
+Implementamos uma camada de auditoria determinística antes da renderização de documentos, garantindo que a estrutura gerada pela IA (JSON canônico) esteja em conformidade com requisitos rigorosos de acessibilidade e consistência, antes de produzir os artefatos finais (PDF, DOCX, etc.).
+
+### Mudanças Técnicas
+1. **Pipeline de Validação (`pipeline/validators.py`)**:
+   - Adicionada a função `audit_canonical_document`. Ela avalia a estrutura do documento e classifica falhas em `BLOCKER` (erros críticos de estrutura/acessibilidade) e `WARNING` (alertas de qualidade).
+   - Mantida a função `_walk_sections` para garantir a recursividade na validação de documentos com seções aninhadas.
+
+2. **Gatekeeper na Exportação (`exporters/pandoc_exporter.py`)**:
+   - Integração da auditoria no fluxo de exportação. Se a auditoria retornar qualquer erro classificado como `BLOCKER`, a renderização é interrompida imediatamente, impedindo a geração de documentos mal estruturados.
+
+3. **Refinamento de Sanitização (`pipeline/sanitizer.py`)**:
+   - Atualizados os padrões de detecção de artefatos de Markdown (`MARKDOWN_ARTIFACT_PATTERNS`) para garantir que conteúdos que não deveriam conter marcação sejam detectados e bloqueados pela auditoria.
+
+### Por que isso é importante
+Esta implementação concretiza a estratégia híbrida de usar a IA para flexibilidade de interpretação, mas utilizar ferramentas determinísticas (código rígido) para garantir a estrutura final. Isso reduz drasticamente a chance de entrega de documentos acessíveis malformados, protegendo a qualidade da saída para o usuário final.

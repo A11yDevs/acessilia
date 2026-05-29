@@ -108,6 +108,33 @@ def validate_output_text(text: str, profile_name: str) -> list[str]:
     return errors
 
 
+def audit_canonical_document(document: dict[str, Any]) -> dict[str, list[str]]:
+    """Realiza uma auditoria estrutural detalhada com níveis de severidade."""
+    report = {"BLOCKER": [], "WARNING": []}
+    
+    # Validação base (mantendo a lógica original como BLOCKER)
+    base_errors = validate_canonical_document(document)
+    if base_errors:
+        report["BLOCKER"].extend(base_errors)
+    
+    # Auditoria de Acessibilidade (Exemplo de Warning adicional)
+    sections = document.get("sections", [])
+    if not sections:
+        report["BLOCKER"].append("Documento sem seções.")
+    
+    # Exemplo: Verificar se há alt-text em imagens (se o schema suportar)
+    def check_accessibility(blocks: list[dict[str, Any]]) -> None:
+        for block in blocks:
+            if block.get("type") == "image" and not block.get("metadata", {}).get("alt"):
+                report["WARNING"].append(f"Imagem {block.get('id')} sem alt-text.")
+    
+    for section in sections:
+        check_accessibility(section.get("blocks", []))
+        _walk_sections(section.get("children", []), check_accessibility)
+        
+    return report
+
+
 def _walk_sections(sections: list[dict[str, Any]], callback) -> None:
     for section in sections:
         callback(section.get("blocks", []))
