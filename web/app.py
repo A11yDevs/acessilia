@@ -141,22 +141,22 @@ async def run_pipeline_task(email: str, file_path: Path, filename: str):
 async def handle_upload(
     request: Request,
     email: str = Form(...),
-    file: UploadFile = File(...)
+    document_file: UploadFile = File(...)
 ):
     try:
         UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-        file_path = UPLOAD_DIR / file.filename
+        file_path = UPLOAD_DIR / document_file.filename
         
         with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+            shutil.copyfileobj(document_file.file, buffer)
             
         # Adiciona na Fila Unificada
         item = QueueItem(
             file_path=file_path,
-            filename=file.filename,
+            filename=document_file.filename,
             source="web",
             callback=run_pipeline_task,
-            callback_args={"email": email, "file_path": file_path, "filename": file.filename}
+            callback_args={"email": email, "file_path": file_path, "filename": document_file.filename}
         )
         pos = await unified_queue.enqueue(item)
         
