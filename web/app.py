@@ -20,11 +20,22 @@ from exporters.pandoc_exporter import export_accessible_document
 from config.settings import settings
 from web.services.email_service import send_confirmation_email, send_result_email
 
+import asyncio
+import concurrent.futures
+from bot.services.queue_service import unified_queue, QueueItem
+
 app = FastAPI(title="Bot Acess Web Panel")
+
+executor = concurrent.futures.ThreadPoolExecutor(max_workers=3)
 
 # Garante caminho absoluto para os templates para evitar erros de localização
 BASE_WEB_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_WEB_DIR / "templates"))
+
+@app.on_event("startup")
+async def startup_event():
+    """Inicia o worker da fila unificada no startup do app."""
+    unified_queue.start_worker()
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -60,19 +71,19 @@ async def index(request: Request):
         request=request, name="index.html", context={}
     )
 
-async def run_pipeline(email: str, file_path: Path, filename: str):
-    """Executa o pipeline completo em background."""
+async def run_pipeline_task(email: str, file_path: Path, filename: str):
+    """Lógica de processamento para a Web executada pelo Worker da Fila."""
     try:
         # 1. Envia confirmação
         await send_confirmation_email(email, filename)
         
         # 2. Processa o arquivo (IA)
         async def silent_status(msg: str):
-            logger.debug("Web Pipeline Status: {}", msg)
+            logger.debug("Web Pipeline Status [{}]: {}", filename, msg)
             
         canonical_doc = await process(file_path, status_callback=silent_status)
         
-        # 3. Gera exportações
+        # 3. Gera exportações (Rodar em thread para não travar o loop de eventos)
         base_name = file_path.stem
         task_output_dir = OUTPUT_DIR / base_name
         task_output_dir.mkdir(parents=True, exist_ok=True)
@@ -83,15 +94,19 @@ async def run_pipeline(email: str, file_path: Path, filename: str):
         html_path = task_output_dir / f"{base_name}.html"
         mp3_path = task_output_dir / f"{base_name}.mp3"
         
-        export_txt(canonical_doc, txt_path, filename)
-        export_docx(canonical_doc, docx_path, filename)
-        export_pdf(canonical_doc, pdf_path, filename)
-        export_accessible_document(
-            canonical_doc,
-            html_path,
-            format_name="html",
-            title=base_name,
-            profile_name="html",
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(executor, export_txt, canonical_doc, txt_path, filename)
+        await loop.run_in_executor(executor, export_docx, canonical_doc, docx_path, filename)
+        await loop.run_in_executor(executor, export_pdf, canonical_doc, pdf_path, filename)
+        await loop.run_in_executor(
+            executor, 
+            lambda: export_accessible_document(
+                canonical_doc, 
+                html_path, 
+                format_name="html", 
+                title=base_name, 
+                profile_name="html"
+            )
         )
         
         # Gera áudio
@@ -103,10 +118,13 @@ async def run_pipeline(email: str, file_path: Path, filename: str):
         zip_path = task_output_dir / f"{base_name}_acessivel.zip"
         files_to_zip = [txt_path, docx_path, pdf_path, html_path, mp3_path]
         
-        with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-            for f_path in files_to_zip:
-                if f_path.exists():
-                    archive.write(f_path, arcname=f_path.name)
+        def create_zip():
+            with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+                for f_path in files_to_zip:
+                    if f_path.exists():
+                        archive.write(f_path, arcname=f_path.name)
+        
+        await loop.run_in_executor(executor, create_zip)
                     
         # 5. Envia resultado por e-mail
         await send_result_email(email, filename, zip_path)
@@ -122,29 +140,32 @@ async def run_pipeline(email: str, file_path: Path, filename: str):
 @app.post("/process", response_class=HTMLResponse)
 async def handle_upload(
     request: Request,
-    background_tasks: BackgroundTasks,
     email: str = Form(...),
     file: UploadFile = File(...)
 ):
     try:
-        # Garante que os diretórios existam no momento do upload
         UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-        
         file_path = UPLOAD_DIR / file.filename
-        
-        # Log para depuração
-        logger.info("Recebendo upload: {} -> {}", file.filename, file_path)
         
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
             
-        background_tasks.add_task(run_pipeline, email, file_path, file.filename)
+        # Adiciona na Fila Unificada
+        item = QueueItem(
+            file_path=file_path,
+            filename=file.filename,
+            source="web",
+            callback=run_pipeline_task,
+            callback_args={"email": email, "file_path": file_path, "filename": file.filename}
+        )
+        pos = await unified_queue.enqueue(item)
+        
+        msg = f"Sucesso! Seu arquivo está na fila única (Posição: {pos}). O resultado será enviado para {email}."
         
         return templates.TemplateResponse(
             request=request, 
             name="index.html", 
-            context={"message": f"Sucesso! Recebemos seu arquivo. Verifique seu e-mail ({email}) para a confirmação."}
+            context={"message": msg}
         )
     except Exception as e:
         logger.error("Erro no upload web: {}", e)

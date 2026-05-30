@@ -1,83 +1,75 @@
 import asyncio
 import time
+import uuid
 from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Coroutine
+from typing import Callable, Coroutine, Any
 
 from bot.utils.logger import logger
 
-
 @dataclass
 class QueueItem:
-    user_id: int
-    chat_id: int
     file_path: Path
-    mode: str
-    status_callback: Callable[[str], Coroutine] | None = None
-    task_id: str = ""
+    filename: str
+    source: str  # "web" ou "telegram"
+    callback: Callable[..., Coroutine]  # A função que executa o processamento real
+    callback_args: dict[str, Any] = field(default_factory=dict)
+    task_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     added_at: float = field(default_factory=time.time)
 
-
-class ProcessingQueue:
+class UnifiedQueue:
     def __init__(self, max_concurrent: int = 1):
         self._queue: deque[QueueItem] = deque()
-        self._processing: dict[str, QueueItem] = {}
+        self._processing_count = 0
         self._max_concurrent = max_concurrent
         self._lock = asyncio.Lock()
-        self._cancel_events: dict[str, asyncio.Event] = {}
+        self._worker_task: asyncio.Task | None = None
 
-    async def enqueue(self, item: QueueItem) -> str:
+    def start_worker(self):
+        """Inicia o worker se ele não estiver rodando."""
+        if self._worker_task is None or self._worker_task.done():
+            self._worker_task = asyncio.create_task(self._worker())
+            logger.info("Worker da Fila Unificada iniciado.")
+
+    async def enqueue(self, item: QueueItem) -> int:
+        """Adiciona um item na fila e retorna a posição."""
         async with self._lock:
             self._queue.append(item)
-            logger.info(
-                "Fila: {} enfileirado (fila: {})",
-                item.file_path.name,
-                len(self._queue),
-            )
-        return item.task_id
+            pos = len(self._queue)
+            logger.info("Fila Unificada: {} enfileirado de {} (Posição: {})", 
+                        item.filename, item.source, pos)
+            return pos
 
-    async def process_next(self, processor: Callable) -> None:
-        async with self._lock:
-            if len(self._processing) >= self._max_concurrent:
-                return
-            if not self._queue:
-                return
-            item = self._queue.popleft()
-            self._processing[item.task_id] = item
+    async def _worker(self):
+        while True:
+            item = None
+            async with self._lock:
+                if self._queue and self._processing_count < self._max_concurrent:
+                    item = self._queue.popleft()
+                    self._processing_count += 1
+            
+            if item:
+                try:
+                    logger.info("Worker: Iniciando tarefa {} de {}", item.filename, item.source)
+                    await item.callback(**item.callback_args)
+                except Exception as e:
+                    logger.error("Erro no Worker ao processar {}: {}", item.filename, e)
+                finally:
+                    async with self._lock:
+                        self._processing_count -= 1
+                    logger.info("Worker: Tarefa concluída: {}. Aguardando próximo...", item.filename)
+            
+            await asyncio.sleep(0.5)  # Evita loop infinito agressivo se a fila estiver vazia
 
-        if item.status_callback:
-            pos = self._queue_position(item.task_id)
-            if pos > 0:
-                await item.status_callback(f"⏳ Voce esta na fila. Posicao: {pos}")
-
-    def _queue_position(self, task_id: str) -> int:
+    def get_position(self, task_id: str) -> int:
         for i, item in enumerate(self._queue):
             if item.task_id == task_id:
                 return i + 1
         return 0
 
-    def cancelar(self, task_id: str) -> bool:
-        self._queue = deque(
-            item for item in self._queue if item.task_id != task_id
-        )
-        if task_id in self._processing:
-            del self._processing[task_id]
-            return True
-        return False
-
-    def is_processing(self, task_id: str) -> bool:
-        return task_id in self._processing
-
-    def fila_tamanho(self) -> int:
+    def qsize(self) -> int:
         return len(self._queue)
 
-    def em_processamento(self) -> int:
-        return len(self._processing)
-
-    async def marcar_concluido(self, task_id: str) -> None:
-        async with self._lock:
-            self._processing.pop(task_id, None)
-
-
-processing_queue = ProcessingQueue(max_concurrent=1)
+# Instância única global
+unified_queue = UnifiedQueue(max_concurrent=1)
