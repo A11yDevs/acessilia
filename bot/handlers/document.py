@@ -1,6 +1,8 @@
 import asyncio
 import tempfile
 import zipfile
+import uuid
+import shutil
 from pathlib import Path
 
 from aiogram import Router, F
@@ -108,6 +110,8 @@ async def handle_photo(message: Message) -> None:
     await process_file(message, photo.file_id, "imagem.png", mode=mode)
 
 
+from bot.services.queue_service import unified_queue, QueueItem
+
 async def process_file(
     message: Message,
     file_id: str,
@@ -115,83 +119,98 @@ async def process_file(
     mode: str = "normal",
 ) -> None:
     tracker = StatusTracker(message.bot, message.chat.id, filename)
-
+    
+    # Prepara o download inicial para pegar o path, mas o processamento real vai para a fila
     with tempfile.TemporaryDirectory(dir=settings.temp_dir) as tmpdir:
-        try:
-            input_path = Path(tmpdir) / filename
+        input_path = Path(tmpdir) / filename
+        await tracker("Baixando arquivo...")
+        await download_file(message.bot, file_id, input_path)
+        
+        # Criamos uma cópia persistente temporária para o worker processar depois
+        # Já que o tmpdir atual vai sumir quando a função sair
+        persistent_tmp = settings.temp_dir / f"task_{uuid.uuid4().hex}"
+        persistent_tmp.mkdir(parents=True, exist_ok=True)
+        task_path = persistent_tmp / filename
+        shutil.copy2(input_path, task_path)
 
-            await tracker("Baixando arquivo...")
-            await download_file(message.bot, file_id, input_path)
-
-            canonical_document = await process(
-                input_path,
-                status_callback=tracker,
-                mode=mode,
-            )
-
-            await tracker(
-                "Conteudo extraido com sucesso! Preparando exportacao..."
-            )
-
-            OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-
-            base_name = Path(filename).stem
-            txt_path = OUTPUT_DIR / f"{base_name}.txt"
-            docx_path = OUTPUT_DIR / f"{base_name}.docx"
-            pdf_path = OUTPUT_DIR / f"{base_name}.pdf"
-            html_path = OUTPUT_DIR / f"{base_name}.html"
-            mp3_path = OUTPUT_DIR / f"{base_name}.mp3"
-
-            export_txt(canonical_document, txt_path, filename)
-            export_docx(canonical_document, docx_path, filename)
-            export_pdf(canonical_document, pdf_path, filename)
-            export_accessible_document(
-                canonical_document,
-                html_path,
-                format_name="html",
-                title=base_name,
-                profile_name="html",
-            )
-            
-            # Gera MP3 usando texto limpo do arquivo TXT com progresso fiel
+        # Encapsula o resto da lógica original em uma função para o worker
+        async def task_callback(path: Path, t_filename: str, t_mode: str, t_tracker: StatusTracker, cleanup_dir: Path):
             try:
-                if txt_path.exists():
-                    clean_text = txt_path.read_text(encoding="utf-8")
-                    
-                    async def audio_progress(percent: int):
-                        await tracker(f"Gerando áudio (MP3)... {percent}%")
-                    
-                    await export_mp3(clean_text, mp3_path, progress_callback=audio_progress)
+                canonical_document = await process(
+                    path,
+                    status_callback=t_tracker,
+                    mode=t_mode,
+                )
+
+                await t_tracker("Conteudo extraido com sucesso! Preparando exportacao...")
+                OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+                base_name = path.stem
+                txt_path = OUTPUT_DIR / f"{base_name}.txt"
+                docx_path = OUTPUT_DIR / f"{base_name}.docx"
+                pdf_path = OUTPUT_DIR / f"{base_name}.pdf"
+                html_path = OUTPUT_DIR / f"{base_name}.html"
+                mp3_path = OUTPUT_DIR / f"{base_name}.mp3"
+
+                export_txt(canonical_document, txt_path, t_filename)
+                export_docx(canonical_document, docx_path, t_filename)
+                export_pdf(canonical_document, pdf_path, t_filename)
+                export_accessible_document(
+                    canonical_document,
+                    html_path,
+                    format_name="html",
+                    title=base_name,
+                    profile_name="html",
+                )
+                
+                try:
+                    if txt_path.exists():
+                        clean_text = txt_path.read_text(encoding="utf-8")
+                        async def audio_progress(percent: int):
+                            await t_tracker(f"Gerando áudio (MP3)... {percent}%")
+                        await export_mp3(clean_text, mp3_path, progress_callback=audio_progress)
+                except Exception as e:
+                    logger.error("Falha ao gerar MP3: {}", e)
+
+                zip_path = OUTPUT_DIR / f"{base_name}_acessivel.zip"
+                _build_zip_package(zip_path, [txt_path, docx_path, pdf_path, html_path, mp3_path])
+
+                # Recupera o email se houver
+                target_email = user_emails.pop(message.chat.id, None)
+                if target_email:
+                    await t_tracker(f"Enviando para e-mail: {target_email}...")
+                    from web.services.email_service import send_result_email
+                    await send_result_email(target_email, t_filename, zip_path)
+                    await message.answer(f"✅ Arquivo enviado para {target_email}!")
+                else:
+                    await t_tracker("Enviando pacote acessivel...")
+                    await _send_doc_with_retry(message, zip_path, "Pacote acessivel gerado (.zip).")
+
+                await t_tracker.finish(success=True)
             except Exception as e:
-                logger.error("Falha ao gerar MP3: {}", e)
+                logger.exception("Erro no processamento da fila (Bot)")
+                await t_tracker.finish(success=False)
+            finally:
+                if cleanup_dir.exists():
+                    shutil.rmtree(cleanup_dir)
 
-            zip_path = OUTPUT_DIR / f"{base_name}_acessivel.zip"
-            _build_zip_package(
-                zip_path,
-                [txt_path, docx_path, pdf_path, html_path, mp3_path],
-            )
-
-            # Verifica se há e-mail registrado para este chat
-            target_email = user_emails.pop(message.chat.id, None)
-            
-            if target_email:
-                await tracker(f"Enviando para e-mail: {target_email}...")
-                from web.services.email_service import send_result_email
-                await send_result_email(target_email, filename, zip_path)
-                await message.answer(f"✅ Arquivo enviado para {target_email}!")
-            else:
-                await tracker("Enviando pacote acessivel...")
-                caption = "Pacote acessivel gerado (.zip)."
-                await _send_doc_with_retry(message, zip_path, caption)
-
-            await tracker.finish(success=True)
-
-        except TaskCancelledError:
-            await tracker("Processamento cancelado.")
-            await tracker.finish(success=False)
-        except Exception:
-            logger.exception("Erro ao processar arquivo")
-            await tracker.finish(success=False)
+        # Adiciona na fila única
+        queue_item = QueueItem(
+            file_path=task_path,
+            filename=filename,
+            source="telegram",
+            callback=task_callback,
+            callback_args={
+                "path": task_path,
+                "t_filename": filename,
+                "t_mode": mode,
+                "t_tracker": tracker,
+                "cleanup_dir": persistent_tmp
+            }
+        )
+        pos = await unified_queue.enqueue(queue_item)
+        if pos > 1:
+            await message.answer(f"⏳ Você está na fila única (Posição: {pos}).")
 
 
 def _build_zip_package(zip_path: Path, out_paths: list[Path]) -> None:

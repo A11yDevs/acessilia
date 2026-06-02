@@ -16,9 +16,13 @@ from bot.middlewares.pause_middleware import PauseMiddleware
 from config.settings import settings
 
 
+from bot.services.queue_service import unified_queue
+
+
 async def on_startup(bot: Bot) -> None:
     init_db()
     asyncio.create_task(periodic_cleanup())
+    unified_queue.start_worker()
     logger.info("Bot iniciado")
 
 

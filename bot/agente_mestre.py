@@ -12,7 +12,6 @@ from bot.services.history_service import (
     limpar_orfas,
     registrar_conversao,
 )
-from bot.services.queue_service import QueueItem, processing_queue
 from bot.utils.logger import logger
 from bot.utils.text_processor import merge_broken_paragraphs
 from pipeline.canonical_builder import build_canonical_document
@@ -161,53 +160,6 @@ async def process(
             source_path=str(file_path),
             audience=["reader"],
         )
-
-
-async def process_with_queue(
-    file_path: Path,
-    status_callback: Callable[[str], Coroutine] | None = None,
-    user_id: int = 0,
-    chat_id: int = 0,
-    mode: str = "normal",
-) -> dict[str, Any]:
-    task_id = state_manager.criar_tarefa(file_path)
-    item = QueueItem(
-        user_id=user_id,
-        chat_id=chat_id,
-        file_path=file_path,
-        mode=mode,
-        status_callback=status_callback,
-        task_id=task_id,
-    )
-
-    async with processing_queue._lock:
-        processing_queue._queue.append(item)
-
-    while True:
-        if state_manager.foi_cancelada(task_id):
-            await processing_queue.cancelar(task_id)
-            raise TaskCancelledError(f"Tarefa {task_id} cancelada na fila")
-        async with processing_queue._lock:
-            if task_id in processing_queue._processing:
-                break
-            can_process = (
-                processing_queue.em_processamento()
-                < processing_queue._max_concurrent
-                and processing_queue._queue
-                and processing_queue._queue[0].task_id == task_id
-            )
-            if can_process:
-                processing_queue._processing[task_id] = (
-                    processing_queue._queue.popleft()
-                )
-                break
-        await asyncio.sleep(1)
-
-    try:
-        result = await process(file_path, status_callback, mode)
-        return result
-    finally:
-        await processing_queue.marcar_concluido(task_id)
 
 
 def _fallback_texto_simples(file_path: Path) -> str:

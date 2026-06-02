@@ -10,7 +10,7 @@ from filters.pandoc_filters import strip_internal_audit_blocks
 from pipeline.canonical_builder import build_canonical_document
 from pipeline.canonical_builder import sanitize_canonical_document
 from pipeline.pandoc_ast_builder import build_pandoc_ast
-from pipeline.validators import validate_canonical_document
+from pipeline.validators import audit_canonical_document
 from pipeline.validators import validate_export_profile
 from renderers.docx_renderer import render_docx
 from renderers.html_renderer import render_html
@@ -61,9 +61,12 @@ def export_accessible_document(
     filename: str = "",
 ) -> Path:
     document = _ensure_document(source_text_or_document, title=title)
-    errors = validate_canonical_document(document)
-    if errors:
-        raise ValueError("; ".join(errors))
+    
+    # Nova auditoria determinística
+    audit_report = audit_canonical_document(document)
+    if audit_report["BLOCKER"]:
+        raise ValueError(f"Auditoria falhou: {'; '.join(audit_report['BLOCKER'])}")
+        
     profile = profile_name or format_name
     filtered = strip_internal_audit_blocks(document, profile)
     profile_errors = validate_export_profile(profile, filtered)
