@@ -7,12 +7,10 @@ from PIL import Image
 
 from config.settings import settings
 
-if settings.ai_client == "browser":
-    from bot.clients.browser_client import client as opencode_client
-elif settings.ai_client == "ollama":
-    from bot.clients.ollama import client as opencode_client
+if settings.ai_client == "openrouter":
+    from bot.clients.openrouter import client as ai_client
 else:
-    from bot.clients.opencode import client as opencode_client
+    from bot.clients.ollama import client as ai_client
 
 from bot.services.cache import get_cached, set_cache
 from bot.utils.image_converter import convert_pdf_to_png
@@ -140,7 +138,7 @@ def _page_prompt(
 
 
 class AgenteUnico:
-    """Agente unico que processa PDF/imagem pagina por pagina via OpenCode."""
+    """Agente unico que processa PDF/imagem pagina por pagina via IA."""
 
     def __init__(self, mode: str = "medio"):
         self.mode = mode
@@ -238,7 +236,7 @@ class AgenteUnico:
                     descriptions: list[str] = []
                     for img_bytes in page_images[:3]:
                         try:
-                            desc = await opencode_client.send_message(
+                            desc = await ai_client.send_message(
                                 text=image_prompt,
                                 images=[img_bytes],
                             )
@@ -317,10 +315,10 @@ class AgenteUnico:
                     )
 
                     logger.debug(
-                        "[pag {}] chamando opencode_client.send_message()",
+                        "[pag {}] chamando ai_client.send_message()",
                         page_num,
                     )
-                    response = await opencode_client.send_message(
+                    response = await ai_client.send_message(
                         text=page_prompt,
                         images=[jpg_bytes],
                     )

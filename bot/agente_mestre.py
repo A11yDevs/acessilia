@@ -18,7 +18,7 @@ from pipeline.canonical_builder import build_canonical_document
 from pipeline.verbosity_manager import verbosity_for_mode
 
 agente = AgenteUnico()
-CACHE_VERSION = "opencode-v1"
+CACHE_VERSION = "ollama-v1"
 
 
 def _limpar_tarefas_orfas():
@@ -115,7 +115,7 @@ async def process(
         await finalizar_conversao(
             task_id=task_id,
             status="done",
-            pipeline="opencode-unico",
+            pipeline="ollama-unico",
             resultado_resumo=canonical_document["title"][:200],
             tempo_segundos=time.time() - inicio,
         )

@@ -8,7 +8,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from bot.main import start_polling
-from bot.services.opencode_launcher import ensure_opencode_running
 from bot.utils.logger import setup_logger, logger
 from config.settings import settings
 
@@ -62,9 +61,6 @@ async def startup():
     if not settings.bot_token_valid:
         logger.critical("BOT_TOKEN nao configurado")
         sys.exit(1)
-
-    if settings.ai_client == "opencode":
-        await ensure_opencode_running()
 
     # Importa a app web aqui para evitar dependência circular se houver
     from web.app import app

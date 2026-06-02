@@ -24,8 +24,6 @@ class Settings:
     logs_dir: Path = field(
         default_factory=lambda: _path_from_env("LOGS_DIR", BASE_DIR / "logs")
     )
-    opencode_url: str = os.getenv("OPENCODE_URL", "http://127.0.0.1:4096")
-    opencode_model: str = os.getenv("OPENCODE_MODEL", "qwen3.6-plus-free")
     request_timeout: int = int(os.getenv("REQUEST_TIMEOUT", "3600"))
     log_level: str = os.getenv("LOG_LEVEL", "INFO")
     allowed_extensions: set[str] = field(
@@ -35,15 +33,24 @@ class Settings:
     max_page_width: int = int(os.getenv("MAX_PAGE_WIDTH", "1600"))
     jpg_quality: int = int(os.getenv("JPG_QUALITY", "85"))
     pdf_split_dpi: int = int(os.getenv("PDF_SPLIT_DPI", "150"))
-    ai_client: str = os.getenv("AI_CLIENT", "opencode")
-    gemini_url: str = os.getenv("GEMINI_URL", "https://gemini.google.com/app")
-    browser_headless: bool = (
-        os.getenv("BROWSER_HEADLESS", "true").lower() == "true"
-    )
+    ai_client: str = os.getenv("AI_CLIENT", "ollama")
     ollama_api_key: str = os.getenv("OLLAMA_API_KEY", "")
     ollama_model: str = os.getenv(
         "OLLAMA_MODEL",
         "nvidia/nemotron-nano-12b-v2-vl:free",
+    )
+    ollama_base_url: str = os.getenv(
+        "OLLAMA_BASE_URL",
+        "http://172.16.109.33:11434/v1/chat/completions",
+    )
+    openrouter_api_key: str = os.getenv("OPENROUTER_API_KEY", "")
+    openrouter_model: str = os.getenv(
+        "OPENROUTER_MODEL",
+        "qwen/qwen2.5-vl-72b-instruct:free",
+    )
+    openrouter_base_url: str = os.getenv(
+        "OPENROUTER_BASE_URL",
+        "https://openrouter.ai/api/v1/chat/completions",
     )
     pymupdf_text_threshold: int = int(
         os.getenv("PYMUPDF_TEXT_THRESHOLD", "100")

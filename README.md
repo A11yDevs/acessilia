@@ -64,9 +64,8 @@ Configurações SMTP devem ser definidas no arquivo `.env`.
 | Variável | Descrição | Padrão |
 |---|---|---|
 | `BOT_TOKEN` | Token do bot Telegram | obrigatório |
-| `AI_CLIENT` | Cliente de IA ativo | `opencode` |
+| `AI_CLIENT` | Cliente de IA ativo | `ollama` |
 | `OLLAMA_API_KEY` | Chave do Ollama, quando usado | vazio |
-| `OPENCODE_URL` | URL do backend OpenCode, quando usado | configurado em runtime |
 | `MAX_FILE_SIZE_MB` | Tamanho máximo de upload | 50 |
 | `MAX_PAGES` | Número máximo de páginas | 50 |
 | `AI_TIMEOUT` | Timeout por página/solicitação (segundos) | 300 |

@@ -171,17 +171,20 @@ async def cmd_health(message: Message) -> None:
 
     try:
         async with httpx.AsyncClient(timeout=10) as client:
-            r = await client.get(f"{settings.opencode_url}/global/health")
+            tags_url = settings.ollama_base_url.replace(
+                "/v1/chat/completions", "/api/tags"
+            )
+            r = await client.get(tags_url)
             if r.status_code == 200:
                 data = r.json()
-                version = data.get("version", "unknown")
-                checks.append(f"✅ OpenCode: online (v{version})")
+                models = [m.get("name", "?") for m in data.get("models", [])]
+                checks.append(f"✅ Ollama: online ({len(models)} modelos)")
             else:
-                checks.append(f"⚠️ OpenCode: resposta inesperada ({r.status_code})")
+                checks.append(f"⚠️ Ollama: resposta inesperada ({r.status_code})")
     except Exception as e:
-        checks.append(f"❌ OpenCode: offline ({e})")
+        checks.append(f"❌ Ollama: offline ({e})")
 
-    checks.append(f"🤖 Modelo: {settings.opencode_model}")
+    checks.append(f"🤖 Modelo: {settings.ollama_model}")
 
     temp_dir = settings.temp_dir
     if temp_dir.exists():

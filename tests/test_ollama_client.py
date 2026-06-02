@@ -5,16 +5,21 @@ from unittest.mock import patch, AsyncMock
 from bot.clients.ollama import OllamaClient
 from config.settings import settings
 
+TEST_OLLAMA_URL = "http://test-ollama:11434/v1/chat/completions"
+
+
 @pytest.fixture
 def ollama_client():
     settings.ollama_api_key = "test_key"
     settings.ollama_model = "test_model"
+    settings.ollama_base_url = TEST_OLLAMA_URL
     return OllamaClient()
+
 
 @respx.mock
 @pytest.mark.asyncio
 async def test_send_message_success(ollama_client):
-    respx.post("http://172.16.109.33:11434/v1/chat/completions").mock(
+    respx.post(ollama_client.base_url).mock(
         return_value=httpx.Response(200, json={
             "choices": [
                 {
@@ -28,6 +33,7 @@ async def test_send_message_success(ollama_client):
 
     result = await ollama_client.send_message("Olá", images=[b"dummy_image"])
     assert result == "Teste de resposta"
+
 
 @respx.mock
 @pytest.mark.asyncio
@@ -43,15 +49,15 @@ async def test_send_message_payload_config(ollama_client):
             "choices": [{"message": {"content": "OK"}}]
         })
 
-    respx.post("http://172.16.109.33:11434/v1/chat/completions").mock(side_effect=check_payload)
+    respx.post(ollama_client.base_url).mock(side_effect=check_payload)
 
     await ollama_client.send_message("Olá")
+
 
 @respx.mock
 @pytest.mark.asyncio
 async def test_send_message_rate_limit_retry(ollama_client):
-    # Mock first call as 429, then success
-    route = respx.post("http://172.16.109.33:11434/v1/chat/completions")
+    route = respx.post(ollama_client.base_url)
     route.side_effect = [
         httpx.Response(429),
         httpx.Response(200, json={
@@ -59,7 +65,6 @@ async def test_send_message_rate_limit_retry(ollama_client):
         })
     ]
 
-    # Patch asyncio.sleep to avoid waiting in tests
     with patch("asyncio.sleep", new_callable=AsyncMock):
         result = await ollama_client.send_message("Olá")
     
@@ -69,7 +74,7 @@ async def test_send_message_rate_limit_retry(ollama_client):
 @respx.mock
 @pytest.mark.asyncio
 async def test_send_message_none_content_retry(ollama_client):
-    route = respx.post("http://172.16.109.33:11434/v1/chat/completions")
+    route = respx.post(ollama_client.base_url)
     route.side_effect = [
         httpx.Response(
             200,
@@ -97,6 +102,7 @@ async def test_send_message_none_content_retry(ollama_client):
         result = await ollama_client.send_message("Olá")
 
     assert result == "Resposta valida"
+
 
 @pytest.mark.asyncio
 async def test_send_message_no_api_key():
