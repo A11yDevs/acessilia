@@ -3,9 +3,6 @@ import asyncio
 import os
 import subprocess
 import sys
-from dotenv import load_dotenv
-
-load_dotenv()
 
 from core.utils.logger import setup_logger, logger
 from config.settings import settings
@@ -33,10 +30,16 @@ def acquire_lock() -> None:
             with open(LOCK_FILE, "r") as f:
                 pid = int(f.read().strip())
             if _is_process_running(pid):
-                logger.critical("Outra instancia do bot ja esta rodando (PID={})", pid)
+                logger.critical(
+                    "Outra instancia do bot ja esta rodando (PID={})",
+                    pid,
+                )
                 sys.exit(1)
             else:
-                logger.warning("Lock file stale (PID {} nao existe), removendo...", pid)
+                logger.warning(
+                    "Lock file stale (PID {} nao existe), removendo...",
+                    pid,
+                )
                 os.remove(LOCK_FILE)
         except ValueError:
             os.remove(LOCK_FILE)

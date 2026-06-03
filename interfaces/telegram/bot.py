@@ -16,7 +16,11 @@ from interfaces.telegram.middlewares.pause_middleware import PauseMiddleware
 from config.settings import settings
 
 
+<<<<<<< HEAD:interfaces/telegram/bot.py
 from core.services.queue_service import unified_queue
+=======
+from bot.services.queue_service import unified_queue
+>>>>>>> main:bot/main.py
 
 
 async def on_startup(bot: Bot) -> None:

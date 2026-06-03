@@ -3,6 +3,11 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+
+load_dotenv()
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -46,11 +51,19 @@ class Settings:
     openrouter_api_key: str = os.getenv("OPENROUTER_API_KEY", "")
     openrouter_model: str = os.getenv(
         "OPENROUTER_MODEL",
-        "qwen/qwen2.5-vl-72b-instruct:free",
+        "nvidia/nemotron-nano-12b-v2-vl:free",
+    )
+    openrouter_max_tokens: int = int(
+        os.getenv("OPENROUTER_MAX_TOKENS", "300")
     )
     openrouter_base_url: str = os.getenv(
         "OPENROUTER_BASE_URL",
         "https://openrouter.ai/api/v1/chat/completions",
+    )
+    openrouter_site_url: str = os.getenv("OPENROUTER_SITE_URL", "")
+    openrouter_app_name: str = os.getenv(
+        "OPENROUTER_APP_NAME",
+        "a11y-devs-describer",
     )
     pymupdf_text_threshold: int = int(
         os.getenv("PYMUPDF_TEXT_THRESHOLD", "100")
