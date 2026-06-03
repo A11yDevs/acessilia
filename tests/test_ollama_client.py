@@ -2,7 +2,7 @@ import pytest
 import respx
 import httpx
 from unittest.mock import patch, AsyncMock
-from bot.clients.ollama import OllamaClient
+from core.ai.ollama import OllamaClient
 from config.settings import settings
 
 TEST_OLLAMA_URL = "http://test-ollama:11434/v1/chat/completions"

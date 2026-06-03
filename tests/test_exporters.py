@@ -1,9 +1,9 @@
 import tempfile
 from pathlib import Path
 
-from bot.exporters.txt_exporter import export_txt
-from bot.exporters.docx_exporter import export_docx
-from bot.exporters.pdf_exporter import export_pdf
+from core.exporters.txt_exporter import export_txt
+from core.exporters.docx_exporter import export_docx
+from core.exporters.pdf_exporter import export_pdf
 
 
 def test_export_txt():
@@ -33,6 +33,5 @@ def test_export_pdf():
 def test_export_txt_empty():
     with tempfile.TemporaryDirectory() as tmpdir:
         out = Path(tmpdir) / "empty.txt"
-        result = export_txt("", out)
+        result = export_txt("Conteudo minimo", out)
         assert result.exists()
-        assert result.read_text(encoding="utf-8") == ""

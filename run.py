@@ -7,8 +7,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from bot.main import start_polling
-from bot.utils.logger import setup_logger, logger
+from core.utils.logger import setup_logger, logger
 from config.settings import settings
 
 LOCK_FILE = os.path.join(os.path.dirname(__file__), "bot.lock")
@@ -57,25 +56,31 @@ def release_lock() -> None:
 
 async def startup():
     setup_logger()
+    
+    enabled = [i.strip() for i in settings.enabled_interfaces.split(",")]
+    tasks = []
 
-    if not settings.bot_token_valid:
-        logger.critical("BOT_TOKEN nao configurado")
+    if "telegram" in enabled and settings.bot_token_valid:
+        from interfaces.telegram.bot import start_polling
+        tasks.append(start_polling())
+        logger.info("Interface Telegram habilitada")
+    elif "telegram" in enabled and not settings.bot_token_valid:
+        logger.warning("Interface Telegram habilitada mas BOT_TOKEN nao configurado")
+
+    if "web" in enabled:
+        from interfaces.web.app import app
+        import uvicorn
+        config = uvicorn.Config(app, host="0.0.0.0", port=8000, log_level=settings.log_level.lower())
+        server = uvicorn.Server(config)
+        tasks.append(server.serve())
+        logger.info("Interface Web habilitada (http://localhost:8000)")
+
+    if not tasks:
+        logger.critical("Nenhuma interface habilitada. Configure ENABLED_INTERFACES no .env")
         sys.exit(1)
 
-    # Importa a app web aqui para evitar dependência circular se houver
-    from web.app import app
-    import uvicorn
-
-    config = uvicorn.Config(app, host="0.0.0.0", port=8000, log_level=settings.log_level.lower())
-    server = uvicorn.Server(config)
-
-    logger.info("Iniciando bot e painel web acessível (http://localhost:8000)...")
-    
-    # Roda ambos simultaneamente
-    await asyncio.gather(
-        start_polling(),
-        server.serve()
-    )
+    logger.info("Iniciando com interfaces: {}", settings.enabled_interfaces)
+    await asyncio.gather(*tasks)
 
 
 if __name__ == "__main__":

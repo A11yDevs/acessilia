@@ -2,7 +2,7 @@ import pytest
 import respx
 import httpx
 from unittest.mock import patch, AsyncMock
-from bot.clients.openrouter import OpenRouterClient
+from core.ai.openrouter import OpenRouterClient
 from config.settings import settings
 
 TEST_OPENROUTER_URL = "https://test-openrouter.ai/api/v1/chat/completions"

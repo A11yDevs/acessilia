@@ -56,6 +56,12 @@ class Settings:
         os.getenv("PYMUPDF_TEXT_THRESHOLD", "100")
     )
 
+    # Interface Settings
+    enabled_interfaces: str = os.getenv("ENABLED_INTERFACES", "telegram,web")
+
+    # Web URL (for download links in emails)
+    web_url: str = os.getenv("WEB_URL", "http://localhost:8000")
+
     # SMTP Settings
     smtp_server: str = os.getenv("SMTP_SERVER", "smtp.gmail.com")
     smtp_port: int = int(os.getenv("SMTP_PORT", "587"))

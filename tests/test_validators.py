@@ -1,4 +1,4 @@
-from bot.utils.validators import is_extension_allowed, is_file_size_allowed, validate_file
+from core.utils.validators import is_extension_allowed, is_file_size_allowed, validate_file
 
 
 def test_valid_extension():
