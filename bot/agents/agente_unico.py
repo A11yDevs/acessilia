@@ -9,6 +9,8 @@ from config.settings import settings
 
 if settings.ai_client == "browser":
     from bot.clients.browser_client import client as opencode_client
+elif settings.ai_client == "openrouter":
+    from bot.clients.openrouter import client as opencode_client
 elif settings.ai_client == "ollama":
     from bot.clients.ollama import client as opencode_client
 else:

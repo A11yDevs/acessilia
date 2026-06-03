@@ -3,9 +3,6 @@ import asyncio
 import os
 import subprocess
 import sys
-from dotenv import load_dotenv
-
-load_dotenv()
 
 from bot.main import start_polling
 from bot.services.opencode_launcher import ensure_opencode_running
@@ -13,6 +10,7 @@ from bot.utils.logger import setup_logger, logger
 from config.settings import settings
 
 LOCK_FILE = os.path.join(os.path.dirname(__file__), "bot.lock")
+VALID_AI_CLIENTS = {"openrouter", "opencode", "browser", "ollama"}
 
 
 def _is_process_running(pid: int) -> bool:
@@ -35,10 +33,16 @@ def acquire_lock() -> None:
             with open(LOCK_FILE, "r") as f:
                 pid = int(f.read().strip())
             if _is_process_running(pid):
-                logger.critical("Outra instancia do bot ja esta rodando (PID={})", pid)
+                logger.critical(
+                    "Outra instancia do bot ja esta rodando (PID={})",
+                    pid,
+                )
                 sys.exit(1)
             else:
-                logger.warning("Lock file stale (PID {} nao existe), removendo...", pid)
+                logger.warning(
+                    "Lock file stale (PID {} nao existe), removendo...",
+                    pid,
+                )
                 os.remove(LOCK_FILE)
         except ValueError:
             os.remove(LOCK_FILE)
@@ -63,6 +67,16 @@ async def startup():
         logger.critical("BOT_TOKEN nao configurado")
         sys.exit(1)
 
+    if settings.ai_client not in VALID_AI_CLIENTS:
+        logger.critical(
+            "AI_CLIENT invalido: '{}'. Valores aceitos: {}",
+            settings.ai_client,
+            ", ".join(sorted(VALID_AI_CLIENTS)),
+        )
+        sys.exit(1)
+
+    logger.info("AI_CLIENT ativo: {}", settings.ai_client)
+
     if settings.ai_client == "opencode":
         await ensure_opencode_running()
 
@@ -70,11 +84,19 @@ async def startup():
     from web.app import app
     import uvicorn
 
-    config = uvicorn.Config(app, host="0.0.0.0", port=8000, log_level=settings.log_level.lower())
+    config = uvicorn.Config(
+        app,
+        host="0.0.0.0",
+        port=8000,
+        log_level=settings.log_level.lower(),
+    )
     server = uvicorn.Server(config)
 
-    logger.info("Iniciando bot e painel web acessível (http://localhost:8000)...")
-    
+    logger.info(
+        "Iniciando bot e painel web acessível "
+        "(http://localhost:8000)..."
+    )
+
     # Roda ambos simultaneamente
     await asyncio.gather(
         start_polling(),

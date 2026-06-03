@@ -64,13 +64,18 @@ Configurações SMTP devem ser definidas no arquivo `.env`.
 | Variável | Descrição | Padrão |
 |---|---|---|
 | `BOT_TOKEN` | Token do bot Telegram | obrigatório |
-| `AI_CLIENT` | Cliente de IA ativo | `opencode` |
+| `AI_CLIENT` | Cliente de IA ativo (`openrouter`, `opencode`, `browser`, `ollama`) | `openrouter` |
+| `OPENROUTER_API_KEY` | Chave do OpenRouter, quando usado | vazio |
+| `OPENROUTER_MODEL` | Modelo no OpenRouter | `nvidia/nemotron-nano-12b-v2-vl:free` |
+| `OPENROUTER_BASE_URL` | Endpoint base da API OpenRouter | `https://openrouter.ai/api/v1` |
 | `OLLAMA_API_KEY` | Chave do Ollama, quando usado | vazio |
 | `OPENCODE_URL` | URL do backend OpenCode, quando usado | configurado em runtime |
 | `MAX_FILE_SIZE_MB` | Tamanho máximo de upload | 50 |
 | `MAX_PAGES` | Número máximo de páginas | 50 |
-| `AI_TIMEOUT` | Timeout por página/solicitação (segundos) | 300 |
+| `REQUEST_TIMEOUT` | Timeout por solicitação (segundos) | 3600 |
 | `LOG_LEVEL` | Nível de logging | `INFO` |
+
+Quando `AI_CLIENT=opencode`, o startup valida o backend OpenCode local (`opencode serve`). Se o executável não existir no `PATH`, o processo encerra com mensagem de erro amigável no log.
 
 ## Estrutura
 
