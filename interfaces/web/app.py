@@ -26,15 +26,10 @@ import asyncio
 import concurrent.futures
 from core.services.queue_service import unified_queue, QueueItem
 
-import asyncio
-import concurrent.futures
-from bot.services.queue_service import unified_queue, QueueItem
-
 app = FastAPI(title="Bot Acess Web Panel")
 
 executor = concurrent.futures.ThreadPoolExecutor(max_workers=3)
 
-<<<<<<< HEAD:interfaces/web/app.py
 BASE_WEB_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_WEB_DIR / "templates"))
 
@@ -44,16 +39,6 @@ async def startup_event():
     unified_queue.start_worker()
     await limpar_tokens_expirados()
 
-=======
-# Garante caminho absoluto para os templates para evitar erros de localização
-BASE_WEB_DIR = Path(__file__).resolve().parent
-templates = Jinja2Templates(directory=str(BASE_WEB_DIR / "templates"))
-
-@app.on_event("startup")
-async def startup_event():
-    """Inicia o worker da fila unificada no startup do app."""
-    unified_queue.start_worker()
->>>>>>> main:web/app.py
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -90,71 +75,54 @@ async def index(request: Request):
         request=request, name="index.html", context={}
     )
 
-<<<<<<< HEAD:interfaces/web/app.py
 
 async def run_pipeline_task(email: str, file_path: Path, filename: str):
-=======
-async def run_pipeline_task(email: str, file_path: Path, filename: str):
-    """Lógica de processamento para a Web executada pelo Worker da Fila."""
->>>>>>> main:web/app.py
     try:
         await send_confirmation_email(email, filename)
-        
+
         async def silent_status(msg: str):
             logger.debug("Web Pipeline Status [{}]: {}", filename, msg)
-            
+
         canonical_doc = await process(file_path, status_callback=silent_status)
-        
-<<<<<<< HEAD:interfaces/web/app.py
-=======
-        # 3. Gera exportações (Rodar em thread para não travar o loop de eventos)
->>>>>>> main:web/app.py
+
         base_name = file_path.stem
         task_output_dir = OUTPUT_DIR / base_name
         task_output_dir.mkdir(parents=True, exist_ok=True)
-        
+
         txt_path = task_output_dir / f"{base_name}.txt"
         docx_path = task_output_dir / f"{base_name}.docx"
         pdf_path = task_output_dir / f"{base_name}.pdf"
         html_path = task_output_dir / f"{base_name}.html"
         mp3_path = task_output_dir / f"{base_name}.mp3"
-        
+
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(executor, export_txt, canonical_doc, txt_path, filename)
         await loop.run_in_executor(executor, export_docx, canonical_doc, docx_path, filename)
         await loop.run_in_executor(executor, export_pdf, canonical_doc, pdf_path, filename)
         await loop.run_in_executor(
-            executor, 
+            executor,
             lambda: export_accessible_document(
-                canonical_doc, 
-                html_path, 
-                format_name="html", 
-                title=base_name, 
+                canonical_doc,
+                html_path,
+                format_name="html",
+                title=base_name,
                 profile_name="html"
             )
         )
-        
+
         if txt_path.exists():
             clean_text = txt_path.read_text(encoding="utf-8")
             await export_mp3(clean_text, mp3_path)
-            
+
         zip_path = task_output_dir / f"{base_name}_acessivel.zip"
         files_to_zip = [txt_path, docx_path, pdf_path, html_path, mp3_path]
-        
+
         def create_zip():
             with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
                 for f_path in files_to_zip:
                     if f_path.exists():
                         archive.write(f_path, arcname=f_path.name)
-<<<<<<< HEAD:interfaces/web/app.py
-=======
-        
-        await loop.run_in_executor(executor, create_zip)
-                    
-        # 5. Envia resultado por e-mail
-        await send_result_email(email, filename, zip_path)
->>>>>>> main:web/app.py
-        
+
         await loop.run_in_executor(executor, create_zip)
 
         token = await criar_token(zip_path)
@@ -162,7 +130,7 @@ async def run_pipeline_task(email: str, file_path: Path, filename: str):
         await send_result_email(email, filename, download_url=download_url)
 
         logger.info("Web Task concluída para {}. E-mail enviado.", email)
-        
+
     except Exception as e:
         logger.exception("Erro no processamento via Web para {}: {}", email, e)
     finally:
@@ -192,14 +160,10 @@ async def handle_upload(
     try:
         UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
         file_path = UPLOAD_DIR / document_file.filename
-        
+
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(document_file.file, buffer)
-            
-<<<<<<< HEAD:interfaces/web/app.py
-=======
-        # Adiciona na Fila Unificada
->>>>>>> main:web/app.py
+
         item = QueueItem(
             file_path=file_path,
             filename=document_file.filename,
@@ -208,18 +172,18 @@ async def handle_upload(
             callback_args={"email": email, "file_path": file_path, "filename": document_file.filename}
         )
         pos = await unified_queue.enqueue(item)
-        
+
         msg = f"Sucesso! Seu arquivo está na fila única (Posição: {pos}). O resultado será enviado para {email}."
-        
+
         return templates.TemplateResponse(
-            request=request, 
-            name="index.html", 
+            request=request,
+            name="index.html",
             context={"message": msg}
         )
     except Exception as e:
         logger.error("Erro no upload web: {}", e)
         return templates.TemplateResponse(
-            request=request, 
-            name="index.html", 
+            request=request,
+            name="index.html",
             context={"error": "Ocorreu um erro ao processar o upload. Tente novamente."}
         )
