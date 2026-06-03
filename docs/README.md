@@ -1,7 +1,7 @@
 # a11y-devs-describer Project Documentation
 
 ## Purpose
-This documentation describes the current canonical document architecture, the modular pipeline, the deterministic renderers, and the operational runtime around the Telegram bot.
+This documentation describes the modular architecture: an interface-agnostic **core/** package containing all business logic, and **interfaces/** containing pluggable front-ends (Telegram bot, Web panel).
 
 ## Navigation
 1. [Architectural Constitution](constitution.md)
@@ -20,15 +20,15 @@ This documentation describes the current canonical document architecture, the mo
 5. Task state machine: [docs/state_machine/task_state_machine.puml](state_machine/task_state_machine.puml)
 
 ## Covered Scope
-- Main Telegram bot runtime (aiogram) and startup flow.
-- File processing flow, orchestration, hybrid extraction, and fallback behavior.
-- Canonical JSON document model, schema validation, and Pandoc-style AST build step.
-- Hybrid extraction agent (PyMuPDF local-first + AI vision when needed), OpenCode/Ollama clients, and prompts.
-- SQLite persistence for history and filesystem cache.
-- Export pipeline for accessible TXT, DOCX, PDF, and HTML.
-- Deterministic renderers and output profiles.
-- Validations, middlewares, status tracking, and image/PDF/text utilities.
-- Operational, debug, extraction scripts, and automated tests.
+- **core/** — Interface-agnostic orchestrator, AI clients (Ollama/OpenRouter), state manager, cache, history, queue, email service, utilities (logger, validators, image processing, text processing), and thin exporter wrappers.
+- **interfaces/telegram/** — aiogram Bot/Dispatcher, handlers, middlewares, adapters (status tracker, file service), and AI prompts.
+- **interfaces/web/** — FastAPI application with upload form and email delivery.
+- **pipeline/** — Canonical document pipeline (builder, sanitizer, structure parser, validators, verbosity manager, Pandoc AST builder).
+- **exporters/** — Export coordinator and format-specific renderers (TXT, DOCX, PDF, HTML).
+- **renderers/** — Deterministic format renderers.
+- **filters/** — Profile-based block filtering and audit stripping.
+- **config/** — Centralized settings with environment variable bindings.
+- **tests/** — Automated tests for pipeline, validators, renderers, and AI client.
 
 ## Traceability Matrix
 - Use cases to implementation: [use_cases.md](use_cases.md)
@@ -38,6 +38,8 @@ This documentation describes the current canonical document architecture, the mo
 
 ## Key Decisions Observed in Code
 - The canonical accessible document is the source of truth for exports and validations.
+- **core/** has zero dependencies on any interface-specific library (no aiogram, no FastAPI).
+- Each interface in **interfaces/** imports only from **core/**, never from another interface.
+- `ENABLED_INTERFACES` environment variable controls which front-ends start at runtime.
 - Output formats are rendered from the canonical document through deterministic format-specific renderers.
-- Output profiles control verbosity and audit metadata inclusion per format.
 - Temporary directories, cache and history paths remain centralized in config/settings.py.

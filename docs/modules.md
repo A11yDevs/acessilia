@@ -5,127 +5,142 @@ Map all Python modules in the project by functional area, including main respons
 
 ## 1. Main runtime
 1. [run.py](../run.py)
-   - Application bootstrap, process lock, startup, and shutdown.
-2. [bot/main.py](../bot/main.py)
-   - Creates bot/dispatcher, registers routers and middlewares, runs polling.
-3. [bot/__main__.py](../bot/__main__.py)
-   - Alternative entry point to run bot as a package.
-4. [bot/__init__.py](../bot/__init__.py), [config/__init__.py](../config/__init__.py), [tests/__init__.py](../tests/__init__.py), and other __init__.py files
-   - Package markers and export points.
+   - Application bootstrap, process lock, startup, and shutdown. Reads `ENABLED_INTERFACES` to decide which interfaces to start.
 
 ## 2. Configuration
 1. [config/settings.py](../config/settings.py)
-   - Settings definition, cross-platform paths, and global parameters.
+   - Centralized `Settings` dataclass with environment variable bindings. Includes `enabled_interfaces`, `bot_token`, AI client config, SMTP settings, and paths.
 
-## 3. Handlers and middleware
-1. [bot/handlers/start.py](../bot/handlers/start.py)
-   - UX and operation commands (/start, /help, /status, /health, /feedback, etc).
-2. [bot/handlers/document.py](../bot/handlers/document.py)
-   - Document/photo input, validation, processing, and output delivery.
-3. [bot/handlers/errors.py](../bot/handlers/errors.py)
-   - Global exception handling in routing.
-4. [bot/middlewares/pause_middleware.py](../bot/middlewares/pause_middleware.py)
-   - Paused/active chat control.
+## 3. Core — Interface-agnostic business logic (`core/`)
 
-## 4. Orchestration and agents
-1. [bot/agente_mestre.py](../bot/agente_mestre.py)
-   - Orchestrates full conversion lifecycle and fallback.
-2. [bot/agents/agente_unico.py](../bot/agents/agente_unico.py)
+### 3.1. Orchestration
+1. [core/orchestrator.py](../core/orchestrator.py)
+   - Coordinates full conversion lifecycle: cache lookup, task state, history, AI processing, fallback, and status callbacks.
+2. [core/agents/__init__.py](../core/agents/__init__.py)
+3. [core/agents/agente_unico.py](../core/agents/agente_unico.py)
    - Page-by-page hybrid extraction pipeline (local PyMuPDF first, multimodal AI when needed).
-3. [bot/agents/state_manager.py](../bot/agents/state_manager.py)
-   - Task state and cooperative cancellation.
-4. [bot/agents/__init__.py](../bot/agents/__init__.py)
-   - Agent package initialization.
+4. [core/agents/state_manager.py](../core/agents/state_manager.py)
+   - In-memory task state machine with cooperative cancellation.
 
-## 5. AI clients
-1. [bot/clients/opencode.py](../bot/clients/opencode.py)
-   - Session-based OpenCode client used when AI_CLIENT=opencode.
-2. [bot/clients/ollama.py](../bot/clients/ollama.py)
-   - Stateless Ollama client used when AI_CLIENT=ollama.
-3. [bot/clients/__init__.py](../bot/clients/__init__.py)
-   - Re-exports available clients.
+### 3.2. AI clients
+1. [core/ai/__init__.py](../core/ai/__init__.py)
+2. [core/ai/base.py](../core/ai/base.py)
+   - Abstract `AIClient` protocol that all AI clients implement.
+3. [core/ai/ollama.py](../core/ai/ollama.py)
+   - Stateless Ollama HTTP client used when `AI_CLIENT=ollama`.
+4. [core/ai/openrouter.py](../core/ai/openrouter.py)
+   - Stateless OpenRouter HTTP client used when `AI_CLIENT=openrouter`.
 
-## 6. Infrastructure services
-1. [bot/services/file_service.py](../bot/services/file_service.py)
-   - File download/upload in Telegram context.
-2. [bot/services/cache.py](../bot/services/cache.py)
-   - Local file-hash-based cache.
-3. [bot/services/history_service.py](../bot/services/history_service.py)
-   - SQLite persistence for conversions and OCR audit tables.
-4. [bot/services/cleanup_service.py](../bot/services/cleanup_service.py)
-   - Periodic temporary file cleanup.
-5. [bot/services/queue_service.py](../bot/services/queue_service.py)
-   - Processing queue with concurrency limit.
-6. [bot/services/opencode_launcher.py](../bot/services/opencode_launcher.py)
-   - OpenCode startup and availability checks.
-7. [bot/services/__init__.py](../bot/services/__init__.py)
-   - Package initialization.
+### 3.3. Infrastructure services
+1. [core/services/__init__.py](../core/services/__init__.py)
+2. [core/services/cache.py](../core/services/cache.py)
+   - Local file-hash-based cache (JSON in `temp/cache`).
+3. [core/services/history_service.py](../core/services/history_service.py)
+   - SQLite persistence for conversions and OCR audit tables (`data/history.db`).
+4. [core/services/cleanup_service.py](../core/services/cleanup_service.py)
+   - Periodic temporary file cleanup (hourly, files older than 30 min).
+5. [core/services/queue_service.py](../core/services/queue_service.py)
+   - Unified async processing queue with concurrency limit (`max_concurrent=1`).
+6. [core/services/email_service.py](../core/services/email_service.py)
+   - Async SMTP email sender (confirmation + result with ZIP attachment).
 
-## 7. Exporters
-1. [exporters/pandoc_exporter.py](../exporters/pandoc_exporter.py)
-   - Canonical export coordinator, validation gate, AST build, and renderer dispatch.
-1. [bot/exporters/txt_exporter.py](../bot/exporters/txt_exporter.py)
-2. [bot/exporters/docx_exporter.py](../bot/exporters/docx_exporter.py)
-3. [bot/exporters/pdf_exporter.py](../bot/exporters/pdf_exporter.py)
-4. [bot/exporters/__init__.py](../bot/exporters/__init__.py)
+### 3.4. Core exporters (thin wrappers)
+1. [core/exporters/__init__.py](../core/exporters/__init__.py)
+2. [core/exporters/txt_exporter.py](../core/exporters/txt_exporter.py)
+3. [core/exporters/docx_exporter.py](../core/exporters/docx_exporter.py)
+4. [core/exporters/pdf_exporter.py](../core/exporters/pdf_exporter.py)
+5. [core/exporters/audio_exporter.py](../core/exporters/audio_exporter.py)
+   - Delegates to `exporters.pandoc_exporter.export_accessible_document()` (txt/docx/pdf) or generates MP3 via edge-tts.
 
-## 8. Canonical pipeline
+### 3.5. Core utilities
+1. [core/utils/__init__.py](../core/utils/__init__.py)
+2. [core/utils/logger.py](../core/utils/logger.py)
+   - loguru setup with file rotation and stderr output.
+3. [core/utils/validators.py](../core/utils/validators.py)
+   - File extension and size validation against settings.
+4. [core/utils/pdf_splitter.py](../core/utils/pdf_splitter.py)
+   - Splits multi-page PDF into single-page PDFs using pypdf.
+5. [core/utils/image_converter.py](../core/utils/image_converter.py)
+   - PDF page to PNG via PyMuPDF.
+6. [core/utils/image_enhancer.py](../core/utils/image_enhancer.py)
+   - OpenCV deskew, CLAHE contrast, denoise for scanned images.
+7. [core/utils/text_processor.py](../core/utils/text_processor.py)
+   - Paragraph merging, Markdown and description parsing.
+
+## 4. Telegram Interface (`interfaces/telegram/`)
+
+1. [interfaces/telegram/__init__.py](../interfaces/telegram/__init__.py)
+2. [interfaces/telegram/bot.py](../interfaces/telegram/bot.py)
+   - Creates aiogram Bot/Dispatcher, registers routers, middlewares, lifecycle hooks.
+3. [interfaces/telegram/handlers/__init__.py](../interfaces/telegram/handlers/__init__.py)
+4. [interfaces/telegram/handlers/start.py](../interfaces/telegram/handlers/start.py)
+   - UX and operation commands (/start, /help, /status, /health, /feedback, /detalhado, /medio, /baixo, /ocr, /cancelar, /desativar, /ativar, /limpar, /email).
+5. [interfaces/telegram/handlers/document.py](../interfaces/telegram/handlers/document.py)
+   - Document/photo input, validation, processing, ZIP generation, and output delivery via Telegram.
+6. [interfaces/telegram/handlers/errors.py](../interfaces/telegram/handlers/errors.py)
+   - Global exception handling in aiogram routing.
+7. [interfaces/telegram/middlewares/__init__.py](../interfaces/telegram/middlewares/__init__.py)
+8. [interfaces/telegram/middlewares/pause_middleware.py](../interfaces/telegram/middlewares/pause_middleware.py)
+   - Paused/active chat control.
+9. [interfaces/telegram/adapters/__init__.py](../interfaces/telegram/adapters/__init__.py)
+10. [interfaces/telegram/adapters/status_tracker.py](../interfaces/telegram/adapters/status_tracker.py)
+    - Telegram-specific progress bar with inline keyboard and message editing.
+11. [interfaces/telegram/adapters/file_service.py](../interfaces/telegram/adapters/file_service.py)
+    - Telegram file download and document upload helpers.
+12. [interfaces/telegram/prompts/](../interfaces/telegram/prompts/)
+    - AI system prompts by mode: [baixo.txt](../interfaces/telegram/prompts/baixo.txt), [medio.txt](../interfaces/telegram/prompts/medio.txt), [detalhado.txt](../interfaces/telegram/prompts/detalhado.txt), [ocr.txt](../interfaces/telegram/prompts/ocr.txt).
+
+## 5. Web Interface (`interfaces/web/`)
+
+1. [interfaces/web/__init__.py](../interfaces/web/__init__.py)
+2. [interfaces/web/app.py](../interfaces/web/app.py)
+   - FastAPI application: GET `/` renders upload form, POST `/process` accepts file + email, enqueues processing, sends result via email.
+3. [interfaces/web/templates/index.html](../interfaces/web/templates/index.html)
+   - Bootstrap-based single-page upload form.
+
+## 6. Canonical pipeline (shared, no interface dependency)
 1. [pipeline/canonical_builder.py](../pipeline/canonical_builder.py)
    - Builds the canonical document from raw text or structured payloads.
 2. [pipeline/structure_parser.py](../pipeline/structure_parser.py)
-   - Shared text-to-block parser used by the agent and fallback builder path.
+   - Shared text-to-block parser.
 3. [pipeline/sanitizer.py](../pipeline/sanitizer.py)
-   - Removes prompt leaks, Markdown artifacts, and normalizes text.
+   - Removes prompt leaks, Markdown artifacts, normalizes text.
 4. [pipeline/validators.py](../pipeline/validators.py)
    - Validates canonical shape, export profiles, and output text.
 5. [pipeline/verbosity_manager.py](../pipeline/verbosity_manager.py)
    - Maps modes to verbosity and filters blocks for each profile.
 6. [pipeline/pandoc_ast_builder.py](../pipeline/pandoc_ast_builder.py)
-   - Builds the intermediate AST consumed by renderers.
+   - Builds the intermediate Pandoc-compatible AST consumed by renderers.
 7. [filters/pandoc_filters.py](../filters/pandoc_filters.py)
    - Strips internal audit data and applies profile-level block filtering.
 8. [schemas/accessible_document.schema.json](../schemas/accessible_document.schema.json)
    - JSON Schema for the canonical document.
 
-## 9. Renderers
-1. [renderers/txt_renderer.py](../renderers/txt_renderer.py)
-2. [renderers/docx_renderer.py](../renderers/docx_renderer.py)
-3. [renderers/pdf_renderer.py](../renderers/pdf_renderer.py)
-4. [renderers/html_renderer.py](../renderers/html_renderer.py)
+## 7. Export pipeline (shared, no interface dependency)
+1. [exporters/pandoc_exporter.py](../exporters/pandoc_exporter.py)
+   - Canonical export coordinator, validation gate, AST build, and renderer dispatch.
+2. [renderers/txt_renderer.py](../renderers/txt_renderer.py)
+3. [renderers/docx_renderer.py](../renderers/docx_renderer.py)
+4. [renderers/pdf_renderer.py](../renderers/pdf_renderer.py)
+5. [renderers/html_renderer.py](../renderers/html_renderer.py)
 
-## 10. Utilities
-1. [bot/utils/logger.py](../bot/utils/logger.py)
-2. [bot/utils/validators.py](../bot/utils/validators.py)
-3. [bot/utils/status_tracker.py](../bot/utils/status_tracker.py)
-4. [bot/utils/pdf_splitter.py](../bot/utils/pdf_splitter.py)
-5. [bot/utils/image_converter.py](../bot/utils/image_converter.py)
-6. [bot/utils/image_enhancer.py](../bot/utils/image_enhancer.py)
-7. [bot/utils/text_processor.py](../bot/utils/text_processor.py)
-8. [bot/utils/__init__.py](../bot/utils/__init__.py)
-
-## 11. AI prompts
-1. [bot/prompts/baixo.txt](../bot/prompts/baixo.txt)
-2. [bot/prompts/medio.txt](../bot/prompts/medio.txt)
-3. [bot/prompts/detalhado.txt](../bot/prompts/detalhado.txt)
-4. [bot/prompts/ocr.txt](../bot/prompts/ocr.txt)
-
-## 12. Automated tests (pytest)
+## 8. Automated tests (pytest)
 1. [tests/test_pandoc_filters.py](../tests/test_pandoc_filters.py)
 2. [tests/test_renderers.py](../tests/test_renderers.py)
 3. [tests/test_pipeline_validation.py](../tests/test_pipeline_validation.py)
 4. [tests/test_structure_parser.py](../tests/test_structure_parser.py)
 5. [tests/test_validators.py](../tests/test_validators.py)
-2. [bot/clients/ollama.py](../bot/clients/ollama.py)
-   - Stateless Ollama client used when AI_CLIENT=ollama.
-7. [tests/test_ollama_client.py](../tests/test_ollama_client.py)
-## 13. Support and diagnostic scripts (root)
-1. [list_sections.py](../list_sections.py)
-## 14. Root configuration/documentation artifacts
+6. [tests/test_ollama_client.py](../tests/test_ollama_client.py)
+
+## 9. Root configuration/documentation artifacts
 1. [requirements.txt](../requirements.txt)
 2. [README.md](../README.md)
+3. [.env.example](../.env.example)
+4. [config.yaml](../config.yaml)
 
 ## Coverage and alignment
-- Functional coverage: runtime, AI pipeline, canonical document pipeline, persistence, exports, utilities, tests, and support scripts.
-- The export path now depends on the canonical builder, filters, AST builder, and deterministic renderers.
-- Runtime extraction path is hybrid: local text extraction for text-based PDFs, AI vision for scanned/no-text pages and image inputs.
- image inputs.
+- **core/** contains all business logic (AI, orchestration, services, utilities) with zero interface dependencies.
+- **interfaces/** contains only interface-specific adapters (Telegram aiogram, FastAPI web).
+- No interface imports from another interface; all share `core/` as the single dependency.
+- Adding a new interface (Discord, WhatsApp, CLI) requires only a new folder under `interfaces/` and wiring it in `run.py`.
+- The canonical document is the source of truth for exports and validations.
