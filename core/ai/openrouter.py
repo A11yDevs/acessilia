@@ -57,8 +57,6 @@ class OpenRouterClient:
         if self.app_name:
             headers["X-Title"] = self.app_name
 
-        endpoint = f"{self.base_url}/chat/completions"
-
         for attempt in range(max_retries):
             try:
                 async with httpx.AsyncClient(timeout=self.timeout) as client:
@@ -71,7 +69,7 @@ class OpenRouterClient:
                         len(images or []),
                     )
                     response = await client.post(
-                        endpoint,
+                        self.base_url,
                         json=payload,
                         headers=headers,
                     )

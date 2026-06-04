@@ -76,14 +76,25 @@ async def index(request: Request):
     )
 
 
-async def run_pipeline_task(email: str, file_path: Path, filename: str):
+@app.get("/advanced", response_class=HTMLResponse)
+async def advanced_page(request: Request):
+    return templates.TemplateResponse(
+        request=request, name="advanced.html", context={}
+    )
+
+
+async def run_pipeline_task(email: str, file_path: Path, filename: str, custom_prompt: str | None = None):
     try:
         await send_confirmation_email(email, filename)
 
         async def silent_status(msg: str):
             logger.debug("Web Pipeline Status [{}]: {}", filename, msg)
 
-        canonical_doc = await process(file_path, status_callback=silent_status)
+        canonical_doc = await process(
+            file_path,
+            status_callback=silent_status,
+            custom_prompt=custom_prompt,
+        )
 
         base_name = file_path.stem
         task_output_dir = OUTPUT_DIR / base_name
@@ -185,5 +196,57 @@ async def handle_upload(
         return templates.TemplateResponse(
             request=request,
             name="index.html",
+            context={"error": "Ocorreu um erro ao processar o upload. Tente novamente."}
+        )
+
+
+@app.post("/advanced/process", response_class=HTMLResponse)
+async def handle_advanced_upload(
+    request: Request,
+    email: str = Form(...),
+    document_file: UploadFile = File(...),
+    custom_prompt: str = Form(""),
+):
+    try:
+        UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+        file_path = UPLOAD_DIR / document_file.filename
+
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(document_file.file, buffer)
+
+        prompt = custom_prompt.strip()
+        if len(prompt) > 6000:
+            return templates.TemplateResponse(
+                request=request,
+                name="advanced.html",
+                context={"error": "Prompt personalizado excede o limite de 6000 caracteres."}
+            )
+
+        item = QueueItem(
+            file_path=file_path,
+            filename=document_file.filename,
+            source="web",
+            callback=run_pipeline_task,
+            callback_args={
+                "email": email,
+                "file_path": file_path,
+                "filename": document_file.filename,
+                "custom_prompt": prompt or None,
+            }
+        )
+        pos = await unified_queue.enqueue(item)
+
+        msg = f"Sucesso! Seu arquivo está na fila única (Posição: {pos}). O resultado será enviado para {email}."
+
+        return templates.TemplateResponse(
+            request=request,
+            name="advanced.html",
+            context={"message": msg}
+        )
+    except Exception as e:
+        logger.error("Erro no upload advanced web: {}", e)
+        return templates.TemplateResponse(
+            request=request,
+            name="advanced.html",
             context={"error": "Ocorreu um erro ao processar o upload. Tente novamente."}
         )

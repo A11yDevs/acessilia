@@ -46,7 +46,7 @@ class Settings:
     )
     ollama_base_url: str = os.getenv(
         "OLLAMA_BASE_URL",
-        "http://172.16.109.33:11434/v1/chat/completions",
+        "http://172.16.109.33:11434/api/chat",
     )
     openrouter_api_key: str = os.getenv("OPENROUTER_API_KEY", "")
     openrouter_model: str = os.getenv(

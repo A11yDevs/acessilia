@@ -5,7 +5,7 @@ import io
 from core.utils.logger import logger
 
 VIT_PATCH_SIZE = 14
-VIT_MAX_DIMENSION = 1344
+VIT_MAX_DIMENSION = 1104
 
 
 def resize_for_vit(image_bytes: bytes) -> bytes:

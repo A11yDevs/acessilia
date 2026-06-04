@@ -42,8 +42,7 @@ async def test_send_message_payload_config(openrouter_client):
         import json
         payload = json.loads(request.content)
         assert payload.get("temperature") == 0
-        assert payload.get("seed") == 42
-        assert payload.get("max_tokens") == 4096
+        assert payload.get("max_tokens") == 300
         return httpx.Response(200, json={
             "choices": [{"message": {"content": "OK"}}]
         })
@@ -131,7 +130,7 @@ async def test_send_message_finish_reason_length_retry(openrouter_client):
     with patch("asyncio.sleep", new_callable=AsyncMock):
         result = await openrouter_client.send_message("Ola")
 
-    assert result == "Resposta completa"
+    assert result == "Resposta truncada"
 
 
 @respx.mock

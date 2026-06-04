@@ -143,9 +143,13 @@ class AgenteUnico:
         status_callback: Callable[[str], Coroutine] | None = None,
         mode: str | None = None,
         structured_output: bool = False,
+        custom_prompt: str | None = None,
     ) -> str | dict[str, Any]:
         effective_mode = mode or self.mode
-        system_prompt = _load_system_prompt(effective_mode)
+        if custom_prompt:
+            system_prompt = custom_prompt
+        else:
+            system_prompt = _load_system_prompt(effective_mode)
         is_pdf = file_path.suffix.lower() == ".pdf"
 
         if is_pdf:
@@ -207,38 +211,13 @@ class AgenteUnico:
                     page_path
                 )
 
-            if is_pdf and len(page_text) >= _MIN_TEXT_CHARS:
+            if is_pdf and len(page_text) >= _MIN_TEXT_CHARS and not page_images:
                 logger.info(
-                    "[pag {}] PyMuPDF: {} chars extraídos (sem IA de visão)",
+                    "[pag {}] PyMuPDF: {} chars extraídos (sem IA de visão, sem imagens)",
                     page_num,
                     len(page_text),
                 )
                 response = page_text
-
-                if page_images:
-                    image_prompt = (
-                        "Forneça uma audiodescrição curta e objetiva desta "
-                        "imagem, em português, para ser inserida em documento "
-                        "acessível. Use o formato: [Descrição: ...]"
-                    )
-                    descriptions: list[str] = []
-                    for img_bytes in page_images[:3]:
-                        try:
-                            desc = await ai_client.send_message(
-                                text=image_prompt,
-                                images=[img_bytes],
-                            )
-                            if desc.strip():
-                                descriptions.append(desc.strip())
-                        except Exception as err:
-                            logger.warning(
-                                "[pag {}] Falha ao descrever imagem: {}",
-                                page_num,
-                                err,
-                            )
-                    if descriptions:
-                        response += "\n" + "\n".join(descriptions)
-
                 await set_cache(page_path, response, page_cache_key)
 
             else:

@@ -172,7 +172,7 @@ async def cmd_health(message: Message) -> None:
     try:
         async with httpx.AsyncClient(timeout=10) as client:
             tags_url = settings.ollama_base_url.replace(
-                "/v1/chat/completions", "/api/tags"
+                "/api/chat", "/api/tags"
             )
             r = await client.get(tags_url)
             if r.status_code == 200:

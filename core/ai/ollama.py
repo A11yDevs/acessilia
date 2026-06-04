@@ -23,110 +23,93 @@ class OllamaClient:
         if not self.api_key:
             raise RuntimeError("OLLAMA_API_KEY nao configurada")
 
-        messages = []
-        content = []
-
+        message: dict = {"role": "user", "content": text}
         if images:
-            for img_bytes in images:
-                b64_image = base64.b64encode(img_bytes).decode("utf-8")
-                content.append({
-                    "type": "image_url",
-                    "image_url": {
-                        "url": f"data:image/jpeg;base64,{b64_image}"
-                    }
-                })
-
-        content.append({
-            "type": "text",
-            "text": text
-        })
-
-        messages.append({
-            "role": "user",
-            "content": content
-        })
+            message["images"] = [
+                base64.b64encode(img_bytes).decode("utf-8")
+                for img_bytes in images
+            ]
 
         payload = {
             "model": self.model,
-            "messages": messages,
-            "temperature": 0,
-            "seed": 42,
-            "max_tokens": 4096,
-            "num_predict": 4096
+            "messages": [message],
+            "stream": False,
+            "options": {
+                "num_ctx": 4098,
+                "temperature": 0,
+                "seed": 42,
+                "think": False,
+            },
+            "keep_alive": -1,
         }
 
         headers = {
             "Authorization": f"Bearer {self.api_key}",
-            "HTTP-Referer": "https://github.com/bot-acess",
-            "X-Title": "Bot Acess Accessibility",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
         }
 
         for attempt in range(max_retries):
             try:
                 async with httpx.AsyncClient(timeout=self.timeout) as client:
-                    logger.debug("Enviando requisição para Ollama (tentativa {}/{}): modelo={}, image_count={}", 
-                                 attempt + 1, max_retries, self.model, len(images or []))
+                    logger.debug(
+                        "Enviando requisição para Ollama (tentativa {}/{}): "
+                        "modelo={}, image_count={}",
+                        attempt + 1, max_retries, self.model, len(images or []),
+                    )
                     response = await client.post(
                         self.base_url,
                         json=payload,
-                        headers=headers
+                        headers=headers,
                     )
-                    
+
                     if response.status_code in (429, 502, 503, 504):
                         delay = (2 ** attempt) + 2
-                        logger.warning("Ollama erro temporário ({}), aguardando {}s...", response.status_code, delay)
+                        logger.warning(
+                            "Ollama erro temporário ({}), aguardando {}s...",
+                            response.status_code, delay,
+                        )
                         await asyncio.sleep(delay)
                         continue
 
                     if response.status_code != 200:
                         error_text = response.text
-                        logger.error("Ollama error ({}): {}", response.status_code, error_text)
-                        
+                        logger.error(
+                            "Ollama error ({}): {}",
+                            response.status_code, error_text,
+                        )
+
                     response.raise_for_status()
                     data = response.json()
-                    
-                    choices = data.get("choices", [])
-                    if not choices:
-                        logger.warning("Ollama retornou resposta sem choices (tentativa {}/{}): {}", attempt + 1, max_retries, data)
-                        if attempt < max_retries - 1:
-                            await asyncio.sleep(2)
-                            continue
-                        return "[Erro: Ollama retornou resposta sem conteúdo]"
-                    
-                    choice = choices[0]
-                    finish_reason = choice.get("finish_reason")
-                    message = choice.get("message") or {}
-                    content = message.get("content")
 
-                    if isinstance(content, str):
-                        result = content.strip()
-                    elif isinstance(content, list):
-                        text_parts = []
-                        for part in content:
-                            if isinstance(part, dict) and part.get("type") == "text":
-                                part_text = part.get("text")
-                                if isinstance(part_text, str):
-                                    text_parts.append(part_text)
-                        result = "\n".join(text_parts).strip()
-                    else:
-                        result = ""
-                    
-                    if finish_reason == "length":
-                        logger.warning("IA cortou a resposta por tamanho (length). Tentando novamente...")
+                    message = data.get("message") or {}
+                    result = (message.get("content") or "").strip()
+
+                    done_reason = data.get("done_reason")
+
+                    if done_reason == "length":
+                        logger.warning(
+                            "IA cortou a resposta por tamanho (length). "
+                            "Tentando novamente..."
+                        )
                         if attempt < max_retries - 1:
                             await asyncio.sleep(2)
                             continue
 
                     if result:
                         return result
-                    
-                    logger.warning("Ollama respondeu vazio (tentativa {}/{})", attempt + 1, max_retries)
+
+                    logger.warning(
+                        "Ollama respondeu vazio (tentativa {}/{})",
+                        attempt + 1, max_retries,
+                    )
                     if attempt < max_retries - 1:
                         await asyncio.sleep(2)
-                    
+
             except Exception as e:
-                logger.error("Ollama error (tentativa {}/{}): {}", attempt + 1, max_retries, e)
+                logger.error(
+                    "Ollama error (tentativa {}/{}): {}",
+                    attempt + 1, max_retries, e,
+                )
                 if attempt < max_retries - 1:
                     delay = (2 ** attempt) + 1
                     await asyncio.sleep(delay)

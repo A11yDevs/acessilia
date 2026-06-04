@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Painel de Acessibilidade - Acessilia</title>
+    <title>Modo Avançado - Acessilia</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body {
@@ -21,7 +21,7 @@
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
         }
         .card-header {
-            background-color: #0d6efd;
+            background-color: #6f42c1;
             color: white;
             border-radius: 15px 15px 0 0 !important;
             padding: 20px;
@@ -38,10 +38,12 @@
             font-size: 0.9em;
             color: #6c757d;
         }
-        /* Acessibilidade: Contraste e Focus */
         :focus {
             outline: 3px solid #ffc107 !important;
             outline-offset: 2px;
+        }
+        textarea {
+            resize: vertical;
         }
     </style>
 </head>
@@ -49,11 +51,12 @@
     <main class="container" role="main">
         <div class="card">
             <header class="card-header">
-                <h1 class="h3 mb-0">Bot Acess - Gerador de Acessibilidade</h1>
+                <h1 class="h3 mb-0">Modo Avançado</h1>
+                <p class="mb-0 mt-1 small">Prompt personalizado</p>
             </header>
             <div class="card-body p-4">
-                <p class="mb-4">Converta seus documentos em formatos acessíveis e receba-os por e-mail.</p>
-                
+                <p class="mb-4">Personalize o prompt enviado ao modelo de IA.</p>
+
                 {% if message %}
                 <div class="alert alert-success" role="alert">
                     {{ message }}
@@ -66,26 +69,39 @@
                 </div>
                 {% endif %}
 
-                <form action="/process" method="post" enctype="multipart/form-data">
+                <form action="/advanced/process" method="post" enctype="multipart/form-data">
                     <div class="mb-3">
                         <label for="email" class="form-label">Seu E-mail</label>
-                        <input type="email" class="form-control" id="email" name="email" required 
+                        <input type="email" class="form-control" id="email" name="email" required
                                placeholder="exemplo@email.com" aria-describedby="emailHelp">
                         <div id="emailHelp" class="form-text">Enviaremos o arquivo final para este endereço.</div>
                     </div>
-                    
+
                     <div class="mb-3">
                         <label for="document_file" class="form-label">Anexar Documento (PDF ou Imagem)</label>
                         <input type="file" class="form-control" id="document_file" name="document_file" required
                                accept="application/pdf,.pdf,image/*">
                     </div>
 
+                    <div class="mb-3">
+                        <label for="custom_prompt" class="form-label">Prompt Personalizado</label>
+                        <textarea class="form-control" id="custom_prompt" name="custom_prompt"
+                                  rows="6" maxlength="6000"
+                                  placeholder="Digite seu prompt personalizado aqui. Ele substituirá completamente o prompt padrão do sistema."
+                                  aria-describedby="promptHelp"></textarea>
+                        <div id="promptHelp" class="form-text">
+                            Máximo de 6000 caracteres. Texto puro apenas (sem formatação).
+                            Este prompt substitui o prompt padrão do sistema para todas as páginas.
+                        </div>
+                    </div>
+
                     <div class="d-grid gap-2 mt-4">
                         <button type="submit" class="btn btn-primary btn-lg">Tornar Acessível</button>
                     </div>
                 </form>
+
                 <div class="text-center mt-3">
-                    <a href="/advanced" class="btn btn-outline-secondary">Modo Avançado</a>
+                    <a href="/" class="btn btn-outline-secondary btn-sm">Voltar ao modo normal</a>
                 </div>
             </div>
         </div>
