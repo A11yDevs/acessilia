@@ -14,7 +14,7 @@ else:
 
 from core.services.cache import get_cached, set_cache
 from core.utils.image_converter import convert_pdf_to_png
-from core.utils.image_enhancer import enhance_image_for_ocr, resize_for_vit
+from core.utils.image_enhancer import enhance_image_for_ocr, resize_image
 from core.utils.logger import logger
 from core.utils.pdf_splitter import split_pdf
 from pipeline.structure_parser import parse_text_to_blocks
@@ -144,12 +144,15 @@ class AgenteUnico:
         mode: str | None = None,
         structured_output: bool = False,
         custom_prompt: str | None = None,
+        thinking_mode: bool = False,
     ) -> str | dict[str, Any]:
         effective_mode = mode or self.mode
         if custom_prompt:
             system_prompt = custom_prompt
         else:
             system_prompt = _load_system_prompt(effective_mode)
+        if thinking_mode:
+            system_prompt = "<|think|>\n" + system_prompt
         is_pdf = file_path.suffix.lower() == ".pdf"
 
         if is_pdf:
@@ -265,7 +268,7 @@ class AgenteUnico:
                         len(jpg_bytes),
                     )
 
-                    jpg_bytes = resize_for_vit(jpg_bytes)
+                    jpg_bytes = resize_image(jpg_bytes)
                     logger.debug(
                         "[pag {}] JPG após resize_for_vit: {} bytes",
                         page_num,

@@ -35,10 +35,11 @@ class OllamaClient:
             "messages": [message],
             "stream": False,
             "options": {
-                "num_ctx": 4098,
-                "temperature": 0,
+                "temperature": 1.0,
+                "top_p": 0.95,
+                "top_k": 64,
+                "vision_budget": 560,
                 "seed": 42,
-                "think": False,
             },
             "keep_alive": -1,
         }

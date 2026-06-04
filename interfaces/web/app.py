@@ -83,7 +83,7 @@ async def advanced_page(request: Request):
     )
 
 
-async def run_pipeline_task(email: str, file_path: Path, filename: str, custom_prompt: str | None = None):
+async def run_pipeline_task(email: str, file_path: Path, filename: str, custom_prompt: str | None = None, thinking_mode: bool = False):
     try:
         await send_confirmation_email(email, filename)
 
@@ -94,6 +94,7 @@ async def run_pipeline_task(email: str, file_path: Path, filename: str, custom_p
             file_path,
             status_callback=silent_status,
             custom_prompt=custom_prompt,
+            thinking_mode=thinking_mode,
         )
 
         base_name = file_path.stem
@@ -206,6 +207,7 @@ async def handle_advanced_upload(
     email: str = Form(...),
     document_file: UploadFile = File(...),
     custom_prompt: str = Form(""),
+    thinking_mode: bool = Form(False),
 ):
     try:
         UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -232,6 +234,7 @@ async def handle_advanced_upload(
                 "file_path": file_path,
                 "filename": document_file.filename,
                 "custom_prompt": prompt or None,
+                "thinking_mode": thinking_mode,
             }
         )
         pos = await unified_queue.enqueue(item)

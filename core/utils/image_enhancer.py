@@ -4,11 +4,10 @@ from PIL import Image
 import io
 from core.utils.logger import logger
 
-VIT_PATCH_SIZE = 14
-VIT_MAX_DIMENSION = 1104
+VIT_MAX_DIMENSION = 1344
 
 
-def resize_for_vit(image_bytes: bytes) -> bytes:
+def resize_image(image_bytes: bytes) -> bytes:
     img = Image.open(io.BytesIO(image_bytes))
     if img.mode != "RGB":
         img = img.convert("RGB")
@@ -16,16 +15,11 @@ def resize_for_vit(image_bytes: bytes) -> bytes:
 
     if w > VIT_MAX_DIMENSION or h > VIT_MAX_DIMENSION:
         ratio = VIT_MAX_DIMENSION / max(w, h)
-        w, h = int(w * ratio), int(h * ratio)
-
-    new_w = (w // VIT_PATCH_SIZE) * VIT_PATCH_SIZE
-    new_h = (h // VIT_PATCH_SIZE) * VIT_PATCH_SIZE
-
-    if (new_w, new_h) != (w, h):
+        new_w, new_h = int(w * ratio), int(h * ratio)
         img = img.resize((new_w, new_h), Image.LANCZOS)
         buf = io.BytesIO()
         img.save(buf, format="JPEG", quality=95)
-        logger.debug("Imagem redimensionada para ViT: {}x{} -> {}x{}", w, h, new_w, new_h)
+        logger.debug("Imagem redimensionada: {}x{} -> {}x{}", w, h, new_w, new_h)
         return buf.getvalue()
 
     return image_bytes

@@ -33,6 +33,7 @@ async def process(
     status_callback: Callable[[str], Coroutine] | None = None,
     mode: str = "normal",
     custom_prompt: str | None = None,
+    thinking_mode: bool = False,
 ) -> dict[str, Any]:
     cached = await get_cached(file_path, CACHE_VERSION)
     if cached is not None:
@@ -84,6 +85,7 @@ async def process(
             mode=mode,
             structured_output=True,
             custom_prompt=custom_prompt,
+            thinking_mode=thinking_mode,
         )
 
         if isinstance(resultado, dict):

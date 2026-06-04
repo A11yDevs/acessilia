@@ -45,8 +45,10 @@ async def test_send_message_payload_config(ollama_client):
         assert payload.get("stream") is False
         assert payload.get("keep_alive") == -1
         options = payload.get("options", {})
-        assert options.get("num_ctx") == 4098
-        assert options.get("temperature") == 0
+        assert options.get("temperature") == 1.0
+        assert options.get("top_p") == 0.95
+        assert options.get("top_k") == 64
+        assert options.get("vision_budget") == 560
         assert options.get("seed") == 42
         return httpx.Response(200, json={
             "model": "test_model",
