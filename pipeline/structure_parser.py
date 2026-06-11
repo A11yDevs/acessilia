@@ -35,6 +35,12 @@ def parse_text_to_blocks(text: str) -> list[dict[str, Any]]:
             blocks.append(plain_heading)
             i += 1
             continue
+        marker_block = _try_parse_marker_block(lines, i)
+        if marker_block is not None:
+            block, consumed = marker_block
+            blocks.append(block)
+            i = consumed
+            continue
         if re.match(r"^(?:[-*+]\s+)", stripped):
             blocks.append(
                 {
@@ -110,7 +116,7 @@ def _extract_plain_heading(
     prefixed = re.match(
         (
             r"^(?:titulo|t[ií]tulo|secao|se[cç][aã]o|"
-            r"capitulo|cap[ií]tulo)\s*:\s*(.+)$"
+            r"capitulo|cap[ií]tulo(?:\s+\d+)?)\s*:\s*(.+)$"
         ),
         line,
         re.IGNORECASE,
@@ -131,6 +137,61 @@ def _extract_plain_heading(
             "level": level,
             "text": sanitize_block_text(line),
         }
+    return None
+
+
+def _try_parse_marker_block(
+    lines: list[str],
+    i: int,
+) -> tuple[dict[str, Any], int] | None:
+    stripped = lines[i].strip()
+    m = re.match(r"^In[íi]cio de (.+):$", stripped, re.IGNORECASE)
+    if not m:
+        return None
+
+    type_name = m.group(1).strip()
+    end_marker = f"Fim de {type_name}"
+
+    content_lines: list[str] = []
+    j = i + 1
+    while j < len(lines):
+        if lines[j].strip() == end_marker:
+            j += 1
+            break
+        content_lines.append(lines[j])
+        j += 1
+
+    type_key = type_name.lower().replace(" ", "-")
+
+    if type_key in ("lista",):
+        items = []
+        for cl in content_lines:
+            cl_stripped = cl.strip()
+            if cl_stripped:
+                item_text = re.sub(r"^[-*+]\s+", "", cl_stripped).strip()
+                items.append(sanitize_block_text(item_text))
+        return {"type": "list", "ordered": False, "items": items}, j
+
+    if type_key in ("código-fonte", "codigo-fonte"):
+        code_text = "\n".join(cl.rstrip("\n") for cl in content_lines).strip()
+        return {"type": "code", "text": code_text}, j
+
+    if type_key == "imagem":
+        text = sanitize_block_text(
+            "\n".join(cl.strip() for cl in content_lines if cl.strip())
+        )
+        return {"type": "image", "text": text}, j
+
+    callout_types = {
+        "nota", "citação", "citacao", "barra lateral",
+        "aviso", "dica", "importante", "box",
+    }
+    if type_key in callout_types:
+        text = sanitize_block_text(
+            "\n".join(cl.strip() for cl in content_lines if cl.strip())
+        )
+        return {"type": "callout", "text": text, "callout_type": type_name}, j
+
     return None
 
 

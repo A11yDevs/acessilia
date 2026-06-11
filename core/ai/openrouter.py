@@ -45,7 +45,6 @@ class OpenRouterClient:
             "model": self.model,
             "messages": [{"role": "user", "content": content}],
             "temperature": 0,
-            "max_tokens": settings.openrouter_max_tokens,
         }
 
         headers = {

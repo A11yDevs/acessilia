@@ -1,0 +1,66 @@
+
+[0;34m[*][0m === CORRECAO DO ARCH_CONFIG.YAML ===
+
+[0;34m[*][0m 1. Localizando rapidocr...
+[0;32m[OK][0m rapidocr em: /home/jonathan/bot-acess/venv/lib/python3.13/site-packages/rapidocr
+
+[0;34m[*][0m 2. Modelos .pth disponiveis:
+   ch_PP-OCRv4_det_mobile
+
+[0;34m[*][0m 3. Montando arch_config.yaml...
+[0;32m[OK][0m Backup salvo: /home/jonathan/bot-acess/venv/lib/python3.13/site-packages/rapidocr/inference_engine/pytorch/networks/arch_config.yaml.bak.20260610_165554
+   ch_PP-OCRv4_det_mobile -> model_type: det
+
+[0;32m[OK][0m Arquivo gerado: /home/jonathan/bot-acess/venv/lib/python3.13/site-packages/rapidocr/inference_engine/pytorch/networks/arch_config.yaml
+
+[0;34m[*][0m 4. Validando arch_config.yaml...
+   ch_PP-OCRv4_det_mobile: model_type=det
+[0;32m[OK][0m Sintaxe valida!
+
+[0;34m[*][0m 5. Testando RapidOCR com pytorch...
+[32m[INFO] 2026-06-10 16:55:54,897 [RapidOCR] base.py:22: Using engine_name: onnxruntime[0m
+Traceback (most recent call last):
+  File "<string>", line 5, in <module>
+    ocr = RapidOCR()
+  File "/home/jonathan/bot-acess/venv/lib/python3.13/site-packages/rapidocr/main.py", line 46, in __init__
+    self._initialize(cfg)
+    ~~~~~~~~~~~~~~~~^^^^^
+  File "/home/jonathan/bot-acess/venv/lib/python3.13/site-packages/rapidocr/main.py", line 71, in _initialize
+    self.text_det = TextDetector(cfg.Det)
+                    ~~~~~~~~~~~~^^^^^^^^^
+  File "/home/jonathan/bot-acess/venv/lib/python3.13/site-packages/rapidocr/ch_ppocr_det/main.py", line 47, in __init__
+    self.session = get_engine(cfg.engine_type)(cfg)
+                   ~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/jonathan/bot-acess/venv/lib/python3.13/site-packages/rapidocr/inference_engine/base.py", line 26, in get_engine
+    raise ImportError(f"{engine_type.value} is not installed.")
+ImportError: onnxruntime is not installed.
+[0;31m[FALHA][0m RapidOCR ainda falha
+   Detalhes:
+[32m[INFO] 2026-06-10 16:55:55,287 [RapidOCR] base.py:22: Using engine_name: onnxruntime[0m
+Traceback (most recent call last):
+  File "<string>", line 5, in <module>
+    r = RapidOCR()
+  File "/home/jonathan/bot-acess/venv/lib/python3.13/site-packages/rapidocr/main.py", line 46, in __init__
+    self._initialize(cfg)
+    ~~~~~~~~~~~~~~~~^^^^^
+  File "/home/jonathan/bot-acess/venv/lib/python3.13/site-packages/rapidocr/main.py", line 71, in _initialize
+    self.text_det = TextDetector(cfg.Det)
+                    ~~~~~~~~~~~~^^^^^^^^^
+  File "/home/jonathan/bot-acess/venv/lib/python3.13/site-packages/rapidocr/ch_ppocr_det/main.py", line 47, in __init__
+    self.session = get_engine(cfg.engine_type)(cfg)
+                   ~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/jonathan/bot-acess/venv/lib/python3.13/site-packages/rapidocr/inference_engine/base.py", line 26, in get_engine
+    raise ImportError(f"{engine_type.value} is not installed.")
+ImportError: onnxruntime is not installed.
+
+----------------------------------------
+
+[0;34m[*][0m === RESUMO ===
+
+  Arquivo: /home/jonathan/bot-acess/venv/lib/python3.13/site-packages/rapidocr/inference_engine/pytorch/networks/arch_config.yaml
+  Backup:  /home/jonathan/bot-acess/venv/lib/python3.13/site-packages/rapidocr/inference_engine/pytorch/networks/arch_config.yaml.bak.20260610_165554
+  Modelos: 1 configurados
+  Log:     /home/jonathan/bot-acess/scripts/corrigir_rapidocr_2026-06-10_16-55-54.txt
+
+[0;31m[FALHA][0m CORRECAO INCOMPLETA
+[0;34m[*][0m === FIM ===

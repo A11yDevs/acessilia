@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import json
 import time
 from pathlib import Path
@@ -12,13 +13,17 @@ from core.services.history_service import (
     limpar_orfas,
     registrar_conversao,
 )
+from config.settings import settings
 from core.utils.logger import logger
 from core.utils.text_processor import merge_broken_paragraphs
 from pipeline.canonical_builder import build_canonical_document
 from pipeline.verbosity_manager import verbosity_for_mode
 
 agente = AgenteUnico()
-CACHE_VERSION = "ollama-v1"
+
+
+def _cache_version() -> str:
+    return f"{settings.ai_client}-v1"
 
 
 def _limpar_tarefas_orfas():
@@ -28,6 +33,22 @@ def _limpar_tarefas_orfas():
 _limpar_tarefas_orfas()
 
 
+def _salvar_json_canonico(canonical_document: dict, source_name: str) -> None:
+    try:
+        base = Path("output") / "canonical"
+        ts = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        out_dir = base / ts
+        out_dir.mkdir(parents=True, exist_ok=True)
+        stem = Path(source_name).stem
+        path = out_dir / f"{stem}.json"
+        path.write_text(
+            json.dumps(canonical_document, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+    except Exception as e:
+        logger.warning("Nao foi possivel salvar JSON canonico: {}", e)
+
+
 async def process(
     file_path: Path,
     status_callback: Callable[[str], Coroutine] | None = None,
@@ -35,7 +56,7 @@ async def process(
     custom_prompt: str | None = None,
     thinking_mode: bool = False,
 ) -> dict[str, Any]:
-    cached = await get_cached(file_path, CACHE_VERSION)
+    cached = await get_cached(file_path, _cache_version())
     if cached is not None:
         logger.info("Cache hit para {}", file_path.name)
         if isinstance(cached, dict):
@@ -113,7 +134,8 @@ async def process(
             task_id,
             json.dumps(canonical_document, ensure_ascii=False),
         )
-        await set_cache(file_path, canonical_document, CACHE_VERSION)
+        await set_cache(file_path, canonical_document, _cache_version())
+        _salvar_json_canonico(canonical_document, file_path.name)
 
         await finalizar_conversao(
             task_id=task_id,

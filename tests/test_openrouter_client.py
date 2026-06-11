@@ -42,7 +42,6 @@ async def test_send_message_payload_config(openrouter_client):
         import json
         payload = json.loads(request.content)
         assert payload.get("temperature") == 0
-        assert payload.get("max_tokens") == 300
         return httpx.Response(200, json={
             "choices": [{"message": {"content": "OK"}}]
         })

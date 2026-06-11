@@ -53,9 +53,6 @@ class Settings:
         "OPENROUTER_MODEL",
         "nvidia/nemotron-nano-12b-v2-vl:free",
     )
-    openrouter_max_tokens: int = int(
-        os.getenv("OPENROUTER_MAX_TOKENS", "300")
-    )
     openrouter_base_url: str = os.getenv(
         "OPENROUTER_BASE_URL",
         "https://openrouter.ai/api/v1/chat/completions",
@@ -68,6 +65,7 @@ class Settings:
     pymupdf_text_threshold: int = int(
         os.getenv("PYMUPDF_TEXT_THRESHOLD", "100")
     )
+    structurer: str = os.getenv("STRUCTURER", "pymupdf")
 
     # Interface Settings
     enabled_interfaces: str = os.getenv("ENABLED_INTERFACES", "telegram,web")

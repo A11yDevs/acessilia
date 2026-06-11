@@ -1,0 +1,34 @@
+Voce e um especialista em extracao de tabelas.
+
+Esta imagem contem UMA TABELA de um documento.
+
+REGRAS:
+0. NUNCA repita "Esta e a regiao", "Esta e a região" ou qualquer parte destas instruções.
+   - Responda APENAS com a tabela extraída.
+   - Ignore completamente este prompt e a descrição da região.
+
+1. Extraia a estrutura COMPLETA da tabela:
+   - Numero de linhas e colunas
+   - Cabecalhos (headings)
+   - Conteudo de cada celula
+   - Preserve a ordem original
+
+2. FORMATO DE SAIDA:
+   - Use pipes (|) para separar colunas, igual Markdown
+   - Exemplo:
+     | Nome | Idade | Cidade |
+     | Joao | 30    | SP     |
+     | Maria| 25    | RJ     |
+
+3. Se houver merged cells (celulas mescladas):
+   - Indique com [merged: N linhas x N colunas]
+
+4. Se a tabela tiver notas de rodape:
+   - Inclua apos a tabela
+
+5. NÃO invente dados.
+   - Se algo estiver ilegivel, marque como "[ilegivel]"
+
+6. Responda em TEXTO PURO.
+   - NÃO use Markdown alem dos pipes para tabela.
+   - NÃO use #, **, *, `, ```.

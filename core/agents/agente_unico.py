@@ -12,7 +12,15 @@ if settings.ai_client == "openrouter":
 else:
     from core.ai.ollama import client as ai_client
 
+from core.region_classifier import (
+    classify_region,
+    region_has_markers,
+    region_needs_vision,
+    region_prompt_key,
+)
+from core.region_extractor import Region
 from core.services.cache import get_cached, set_cache
+from core.structurer import BaseStructurer, get_structurer
 from core.utils.image_converter import convert_pdf_to_png
 from core.utils.image_enhancer import enhance_image_for_ocr, resize_image
 from core.utils.logger import logger
@@ -21,27 +29,6 @@ from pipeline.structure_parser import parse_text_to_blocks
 
 PROMPTS_DIR = Path(__file__).resolve().parent.parent.parent / "interfaces" / "telegram" / "prompts"
 
-_MIN_TEXT_CHARS = settings.pymupdf_text_threshold
-
-
-def _extract_page_text_and_images(
-    page_path: Path,
-) -> tuple[str, list[bytes]]:
-    doc = fitz.open(page_path)
-    try:
-        page = doc[0]
-        text = page.get_text().strip()
-        images: list[bytes] = []
-        for img_info in page.get_images(full=True):
-            xref = img_info[0]
-            base_image = doc.extract_image(xref)
-            if base_image and base_image.get("image"):
-                images.append(base_image["image"])
-        return text, images
-    finally:
-        doc.close()
-
-
 MODE_MAP = {
     "detalhado": "detalhado.txt",
     "medio": "medio.txt",
@@ -49,6 +36,75 @@ MODE_MAP = {
     "baixo": "baixo.txt",
     "ocr": "ocr.txt",
 }
+
+REGION_PROMPT_MAP = {
+    "regiao_imagem": "regiao_imagem.txt",
+    "regiao_texto_escaneado": "regiao_texto_escaneado.txt",
+    "regiao_tabela": "regiao_tabela.txt",
+    "regiao_formula": "regiao_formula.txt",
+}
+
+REGION_MARKERS: dict[str, tuple[str, str]] = {
+    "code_block": ("Início de código-fonte:", "Fim de código-fonte"),
+    "list_block": ("Início de lista:", "Fim de lista"),
+    "callout_box": ("Início de box:", "Fim de box"),
+    "embedded_image": ("Início de imagem:", "Fim de imagem"),
+}
+
+CALLOUT_LABEL_MAP: dict[str, str] = {
+    "note": "nota",
+    "quote": "citação",
+    "sidebar": "barra lateral",
+    "warning": "aviso",
+    "tip": "dica",
+    "important": "importante",
+}
+
+def _apply_marker(text: str, classification: str, region: Region) -> str:
+    markers = REGION_MARKERS.get(classification)
+    if not markers:
+        return text
+    start, end = markers
+    lab = region.metadata.get("docling_label", "")
+    custom = CALLOUT_LABEL_MAP.get(lab)
+    if custom:
+        start = f"Início de {custom}:"
+        end = f"Fim de {custom}"
+    return f"{start}\n{text}\n{end}"
+
+
+def _overlaps_clean(
+    bbox: tuple[float, float, float, float],
+    clean_bboxes: list[tuple[float, float, float, float]],
+    threshold: float = 0.3,
+) -> bool:
+    x0, y0, x1, y1 = bbox
+    area = max((x1 - x0) * (y1 - y0), 1)
+    for cb in clean_bboxes:
+        ox0 = max(x0, cb[0])
+        oy0 = max(y0, cb[1])
+        ox1 = min(x1, cb[2])
+        oy1 = min(y1, cb[3])
+        if ox0 < ox1 and oy0 < oy1:
+            overlap = (ox1 - ox0) * (oy1 - oy0)
+            if overlap / area >= threshold:
+                return True
+    return False
+
+
+def _content_fingerprint(text: str) -> int:
+    clean = " ".join(text.lower().split())
+    return hash(clean)
+
+
+_structurer: BaseStructurer | None = None
+
+
+def _get_structurer() -> BaseStructurer:
+    global _structurer
+    if _structurer is None:
+        _structurer = get_structurer()
+    return _structurer
 
 
 def _load_system_prompt(mode: str = "medio") -> str:
@@ -71,6 +127,16 @@ def _load_system_prompt(mode: str = "medio") -> str:
         "brasileiro. Descreva elementos visuais e extraia todo o texto "
         "presente."
     )
+
+
+def _load_region_prompt(region_type: str) -> str:
+    filename = REGION_PROMPT_MAP.get(region_type)
+    if not filename:
+        return ""
+    prompt_path = PROMPTS_DIR / filename
+    if prompt_path.exists():
+        return prompt_path.read_text(encoding="utf-8")
+    return ""
 
 
 def _compress_to_jpg(
@@ -135,6 +201,7 @@ class AgenteUnico:
     def __init__(self, mode: str = "medio"):
         self.mode = mode
         self.system_prompt = _load_system_prompt(mode)
+        self.structurer = _get_structurer()
 
     async def executar(
         self,
@@ -169,9 +236,10 @@ class AgenteUnico:
             raise RuntimeError("Nenhuma pagina gerada a partir do arquivo")
 
         logger.info(
-            "Processando {} pagina(s) para {}",
+            "Processando {} pagina(s) para {} com structurer={}",
             total_pages,
             file_path.name,
+            self.structurer.name,
         )
 
         results: list[str] = []
@@ -180,9 +248,7 @@ class AgenteUnico:
         for index, page_path in enumerate(page_pdfs):
             page_num = index + 1
             if status_callback:
-                label = (
-                    f"📷 Processando pagina {page_num} de {total_pages}..."
-                )
+                label = f"📷 Processando pagina {page_num} de {total_pages}..."
                 await status_callback(label)
 
             page_cache_key = f"page_{page_num}_{effective_mode}"
@@ -205,133 +271,16 @@ class AgenteUnico:
                 )
                 continue
 
-            response: str = ""
-
-            page_text: str = ""
-            page_images: list[bytes] = []
-            if is_pdf:
-                page_text, page_images = _extract_page_text_and_images(
-                    page_path
-                )
-
-            if is_pdf and len(page_text) >= _MIN_TEXT_CHARS and not page_images:
-                logger.info(
-                    "[pag {}] PyMuPDF: {} chars extraídos (sem IA de visão, sem imagens)",
-                    page_num,
-                    len(page_text),
-                )
-                response = page_text
-                await set_cache(page_path, response, page_cache_key)
-
-            else:
-                try:
-                    if is_pdf:
-                        logger.debug(
-                            "[pag {}] convert_pdf_to_png: {}",
-                            page_num,
-                            page_path,
-                        )
-                        png_bytes = convert_pdf_to_png(
-                            page_path,
-                            settings.pdf_split_dpi,
-                        )
-                        logger.debug(
-                            "[pag {}] PNG gerado: {} bytes",
-                            page_num,
-                            len(png_bytes),
-                        )
-                    else:
-                        logger.debug(
-                            "[pag {}] lendo imagem: {}",
-                            page_num,
-                            page_path,
-                        )
-                        with open(page_path, "rb") as file_handle:
-                            raw_bytes = file_handle.read()
-                        logger.debug(
-                            "[pag {}] imagem lida: {} bytes",
-                            page_num,
-                            len(raw_bytes),
-                        )
-                        png_bytes = raw_bytes
-
-                    logger.debug("[pag {}] comprimindo para JPG...", page_num)
-                    jpg_bytes = _compress_to_jpg(png_bytes)
-                    logger.debug(
-                        "[pag {}] aplicando melhoria de imagem (OpenCV)...",
-                        page_num,
-                    )
-                    jpg_bytes = enhance_image_for_ocr(jpg_bytes)
-                    logger.debug(
-                        "[pag {}] JPG final: {} bytes",
-                        page_num,
-                        len(jpg_bytes),
-                    )
-
-                    jpg_bytes = resize_image(jpg_bytes)
-                    logger.debug(
-                        "[pag {}] JPG após resize_for_vit: {} bytes",
-                        page_num,
-                        len(jpg_bytes),
-                    )
-
-                    logger.info(
-                        "Enviando pagina {} para IA de visão ({} bytes)",
-                        page_num,
-                        len(jpg_bytes),
-                    )
-
-                    page_prompt = _page_prompt(
-                        system_prompt,
-                        total_pages,
-                        page_num,
-                        is_pdf,
-                    )
-
-                    logger.debug(
-                        "[pag {}] chamando ai_client.send_message()",
-                        page_num,
-                    )
-                    response = await ai_client.send_message(
-                        text=page_prompt,
-                        images=[jpg_bytes],
-                    )
-                    logger.debug(
-                        "[pag {}] resposta recebida: {} chars",
-                        page_num,
-                        len(response),
-                    )
-
-                    await set_cache(page_path, response, page_cache_key)
-
-                except UnicodeDecodeError as error:
-                    import traceback
-                    tb = traceback.format_exc()
-                    logger.critical(
-                        "[pag {}] UnicodeDecodeError: {} | Traceback:\n{}",
-                        page_num,
-                        error,
-                        tb,
-                    )
-                    raise
-                except Exception as error:
-                    import traceback
-                    tb = traceback.format_exc()
-                    logger.critical(
-                        "[pag {}] Erro inesperado: tipo={} | msg={} | "
-                        "Traceback:\n{}",
-                        page_num,
-                        type(error).__name__,
-                        error,
-                        tb,
-                    )
-                    raise
+            response = await self._process_page(
+                page_path, page_num, total_pages, is_pdf,
+                system_prompt, effective_mode, status_callback,
+            )
 
             if not response.strip():
                 logger.warning("Resposta vazia para pagina {}", page_num)
-                response = (
-                    f"[Pagina {page_num}: resposta vazia do modelo]"
-                )
+                response = f"[Pagina {page_num}: resposta vazia do modelo]"
+
+            await set_cache(page_path, response, page_cache_key)
 
             output_file = tmpdir / f"imagen{page_num:03d}.txt"
             output_file.write_text(response, encoding="utf-8")
@@ -373,3 +322,295 @@ class AgenteUnico:
             }
 
         return texto_final
+
+    async def _process_page(
+        self,
+        page_path: Path,
+        page_num: int,
+        total_pages: int,
+        is_pdf: bool,
+        system_prompt: str,
+        effective_mode: str,
+        status_callback: Callable[[str], Coroutine] | None,
+    ) -> str:
+        if is_pdf:
+            return await self._process_pdf_page(
+                page_path, page_num, total_pages, system_prompt,
+                effective_mode, status_callback,
+            )
+
+        return await self._process_image_page(
+            page_path, page_num, total_pages, system_prompt, status_callback,
+        )
+
+    async def _process_pdf_page(
+        self,
+        page_path: Path,
+        page_num: int,
+        total_pages: int,
+        system_prompt: str,
+        effective_mode: str,
+        status_callback: Callable[[str], Coroutine] | None,
+    ) -> str:
+        doc = fitz.open(page_path)
+        try:
+            page = doc[0]
+            regions = self.structurer.extract_page_regions(page)
+        finally:
+            doc.close()
+
+        if not regions:
+            return ""
+
+        logger.info(
+            "[pag {}] Extraidas {} regioes na pagina (structurer={})",
+            page_num,
+            len(regions),
+            self.structurer.name,
+        )
+
+        all_text_clean = True
+        for r in regions:
+            classification = classify_region(r)
+            if classification != "text_clean" and classification != "ignore":
+                all_text_clean = False
+                break
+
+        if all_text_clean:
+            text_parts: list[str] = []
+            clean_fps: set[int] = set()
+            for region in regions:
+                classification = classify_region(region)
+                if classification == "text_clean" and region.text.strip():
+                    fp = _content_fingerprint(region.text)
+                    if fp not in clean_fps:
+                        clean_fps.add(fp)
+                        text_parts.append(region.text)
+                elif region_has_markers(classification) and region.text.strip():
+                    fp = _content_fingerprint(region.text)
+                    if fp not in clean_fps:
+                        clean_fps.add(fp)
+                        text_parts.append(_apply_marker(region.text, classification, region))
+            full_text = "\n\n".join(text_parts)
+
+            if len(full_text) >= 20:
+                logger.info(
+                    "[pag {}] {} regioes de texto limpo (sem IA de visao)",
+                    page_num,
+                    len(text_parts),
+                )
+                return full_text
+
+        return await self._process_with_vision_by_regions(
+            page_path, page_num, total_pages, system_prompt, status_callback,
+        )
+
+    async def _process_with_vision_by_regions(
+        self,
+        page_path: Path,
+        page_num: int,
+        total_pages: int,
+        system_prompt: str,
+        status_callback: Callable[[str], Coroutine] | None,
+    ) -> str:
+        doc = fitz.open(page_path)
+        try:
+            page = doc[0]
+            regions = self.structurer.extract_page_regions(page)
+        finally:
+            doc.close()
+
+        text_parts: list[str] = []
+        vision_count = 0
+        clean_bboxes: list[tuple[float, float, float, float]] = []
+        content_fingerprints: set[int] = set()
+
+        for region in regions:
+            classification = classify_region(region)
+
+            if classification == "ignore":
+                continue
+
+            if classification == "text_clean" and region.text.strip():
+                fp = _content_fingerprint(region.text)
+                if fp not in content_fingerprints:
+                    content_fingerprints.add(fp)
+                    text_parts.append(region.text)
+                    clean_bboxes.append(region.bbox)
+                continue
+
+            if region_has_markers(classification) and region.text.strip():
+                fp = _content_fingerprint(region.text)
+                if fp not in content_fingerprints:
+                    content_fingerprints.add(fp)
+                    text_parts.append(_apply_marker(region.text, classification, region))
+                    clean_bboxes.append(region.bbox)
+                continue
+
+            if region_needs_vision(classification):
+                if classification in ("unknown", "text_scanned") and _overlaps_clean(
+                    region.bbox, clean_bboxes
+                ):
+                    if region.text.strip():
+                        fp = _content_fingerprint(region.text)
+                        if fp not in content_fingerprints:
+                            content_fingerprints.add(fp)
+                            text_parts.append(region.text)
+                    continue
+                vision_count += 1
+                logger.info(
+                    "[pag {}] Regiao {} - tipo={}, bbox={}",
+                    page_num,
+                    len(text_parts) + vision_count,
+                    classification,
+                    region.bbox,
+                )
+
+                region_desc = await self._process_region_with_vision(
+                    page_path, region, classification, page_num,
+                    total_pages, system_prompt, status_callback,
+                )
+                if region_desc.strip():
+                    fp = _content_fingerprint(region_desc)
+                    if fp not in content_fingerprints:
+                        content_fingerprints.add(fp)
+                        if region_has_markers(classification):
+                            region_desc = _apply_marker(region_desc, classification, region)
+                        text_parts.append(region_desc)
+
+        if not text_parts:
+            logger.warning(
+                "[pag {}] Nenhum texto extraido por regioes, "
+                "fallback para pagina inteira",
+                page_num,
+            )
+            return await self._fallback_whole_page(
+                page_path, page_num, total_pages, system_prompt,
+                status_callback,
+            )
+
+        logger.info(
+            "[pag {}] {} regioes ({}, {} visao sequencial)",
+            page_num,
+            len(text_parts),
+            len(text_parts) - vision_count,
+            vision_count,
+        )
+
+        return "\n\n".join(text_parts)
+
+    async def _process_region_with_vision(
+        self,
+        page_path: Path,
+        region: Region,
+        classification: str,
+        page_num: int,
+        total_pages: int,
+        system_prompt: str,
+        status_callback: Callable[[str], Coroutine] | None,
+    ) -> str:
+        prompt_key = region_prompt_key(classification)
+        base_prompt = _load_region_prompt(prompt_key)
+
+        if not base_prompt:
+            base_prompt = system_prompt
+
+        region_prompt = base_prompt
+
+        try:
+            doc = fitz.open(page_path)
+            try:
+                page = doc[0]
+                region_png = self.structurer.crop_region(page, region.bbox, dpi=200)
+            finally:
+                doc.close()
+
+            jpg_bytes = _compress_to_jpg(region_png)
+            jpg_bytes = enhance_image_for_ocr(jpg_bytes)
+            jpg_bytes = resize_image(jpg_bytes)
+
+            logger.debug(
+                "[pag {}] Enviando regiao para visao ({} bytes, tipo={})",
+                page_num,
+                len(jpg_bytes),
+                classification,
+            )
+
+            result = await ai_client.send_message(
+                text=region_prompt,
+                images=[jpg_bytes],
+            )
+
+            return result.strip()
+
+        except Exception as error:
+            import traceback
+            tb = traceback.format_exc()
+            logger.critical(
+                "[pag {}] Erro na regiao {}: {} | Traceback:\n{}",
+                page_num,
+                classification,
+                error,
+                tb,
+            )
+            if region.text.strip():
+                return region.text
+            return ""
+
+    async def _fallback_whole_page(
+        self,
+        page_path: Path,
+        page_num: int,
+        total_pages: int,
+        system_prompt: str,
+        status_callback: Callable[[str], Coroutine] | None,
+    ) -> str:
+        logger.info(
+            "[pag {}] Fallback: enviando pagina inteira para IA de visao",
+            page_num,
+        )
+
+        png_bytes = convert_pdf_to_png(page_path, settings.pdf_split_dpi)
+        jpg_bytes = _compress_to_jpg(png_bytes)
+        jpg_bytes = enhance_image_for_ocr(jpg_bytes)
+        jpg_bytes = resize_image(jpg_bytes)
+
+        prompt = _page_prompt(system_prompt, total_pages, page_num, is_pdf=True)
+
+        result = await ai_client.send_message(
+            text=prompt,
+            images=[jpg_bytes],
+        )
+
+        return result.strip()
+
+    async def _process_image_page(
+        self,
+        page_path: Path,
+        page_num: int,
+        total_pages: int,
+        system_prompt: str,
+        status_callback: Callable[[str], Coroutine] | None,
+    ) -> str:
+        logger.debug("[pag {}] lendo imagem: {}", page_num, page_path)
+        with open(page_path, "rb") as file_handle:
+            raw_bytes = file_handle.read()
+
+        jpg_bytes = _compress_to_jpg(raw_bytes)
+        jpg_bytes = enhance_image_for_ocr(jpg_bytes)
+        jpg_bytes = resize_image(jpg_bytes)
+
+        logger.info(
+            "Enviando pagina {} para IA de visao ({} bytes)",
+            page_num,
+            len(jpg_bytes),
+        )
+
+        prompt = _page_prompt(system_prompt, total_pages, page_num, is_pdf=False)
+
+        result = await ai_client.send_message(
+            text=prompt,
+            images=[jpg_bytes],
+        )
+
+        return result.strip()

@@ -1,9 +1,21 @@
+from datetime import datetime
+from pathlib import Path
+
+import httpx
+import shutil
+
 from aiogram import Router
 from aiogram.filters import CommandStart, Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message
+
+from config.settings import settings
+from core.agents.state_manager import state_manager
+from core.services.cache import clear_cache
+from core.utils.logger import logger
 from interfaces.telegram.handlers.document import user_modes, user_emails
+from interfaces.telegram.middlewares.pause_middleware import get_paused_chats
 
 router = Router()
 
@@ -85,7 +97,6 @@ async def cmd_formats(message: Message) -> None:
 
 @router.message(Command("ocr"))
 async def cmd_ocr(message: Message) -> None:
-    from interfaces.telegram.handlers.document import user_modes
     user_modes[message.chat.id] = "ocr"
     text = (
         "📄 Modo OCR ativado!\n\n"
@@ -97,7 +108,6 @@ async def cmd_ocr(message: Message) -> None:
 
 @router.message(Command("detalhado"))
 async def cmd_detailed(message: Message) -> None:
-    from interfaces.telegram.handlers.document import user_modes
     user_modes[message.chat.id] = "detalhado"
     text = (
         "🔍 Modo Detalhado ativado!\n\n"
@@ -110,7 +120,6 @@ async def cmd_detailed(message: Message) -> None:
 
 @router.message(Command("medio"))
 async def cmd_medium(message: Message) -> None:
-    from interfaces.telegram.handlers.document import user_modes
     user_modes[message.chat.id] = "medio"
     text = (
         "📋 Modo Medio ativado!\n\n"
@@ -122,7 +131,6 @@ async def cmd_medium(message: Message) -> None:
 
 @router.message(Command("baixo"))
 async def cmd_low(message: Message) -> None:
-    from interfaces.telegram.handlers.document import user_modes
     user_modes[message.chat.id] = "baixo"
     text = (
         "⚡ Modo Baixo ativado!\n\n"
@@ -134,7 +142,6 @@ async def cmd_low(message: Message) -> None:
 
 @router.message(Command("normal"))
 async def cmd_normal(message: Message) -> None:
-    from interfaces.telegram.handlers.document import user_modes
     user_modes[message.chat.id] = "medio"
     text = (
         "📋 Modo Normal ativado (equivalente ao Medio).\n\n"
@@ -145,7 +152,6 @@ async def cmd_normal(message: Message) -> None:
 
 @router.message(Command("status"))
 async def cmd_status(message: Message) -> None:
-    from core.agents.state_manager import state_manager
     all_tasks = state_manager.listar_tarefas()
     tasks = [t for t in all_tasks if t.get("status") in ("processing",)]
     if not tasks:
@@ -164,9 +170,6 @@ async def cmd_status(message: Message) -> None:
 
 @router.message(Command("health"))
 async def cmd_health(message: Message) -> None:
-    import httpx
-    from config.settings import settings
-
     checks = []
 
     try:
@@ -193,7 +196,6 @@ async def cmd_health(message: Message) -> None:
         checks.append(f"⚠️ Temp dir: inexistente")
 
     try:
-        import shutil
         usage = shutil.disk_usage(temp_dir.anchor or "/")
         free_gb = usage.free / (1024**3)
         checks.append(f"💾 Disco livre: {free_gb:.1f} GB")
@@ -205,14 +207,12 @@ async def cmd_health(message: Message) -> None:
 
 @router.message(Command("limpar"))
 async def cmd_limpar(message: Message) -> None:
-    from core.services.cache import clear_cache
     count = await clear_cache()
     await message.answer(f"\U0001f9f9 Cache limpo! {count} arquivo(s) removido(s).")
 
 
 @router.message(Command("cancelar"))
 async def cmd_cancel(message: Message) -> None:
-    from core.agents.state_manager import state_manager
     tasks = state_manager.listar_tarefas_processing()
     if not tasks:
         await message.answer("Nenhuma tarefa em processamento para cancelar.")
@@ -224,7 +224,6 @@ async def cmd_cancel(message: Message) -> None:
 
 @router.message(Command("desativar"))
 async def cmd_desativar(message: Message) -> None:
-    from interfaces.telegram.middlewares.pause_middleware import get_paused_chats
     paused = get_paused_chats()
     paused.add(message.chat.id)
     await message.answer("Bot desativado neste chat. Use /ativar para reativar.")
@@ -232,7 +231,6 @@ async def cmd_desativar(message: Message) -> None:
 
 @router.message(Command("ativar"))
 async def cmd_ativar(message: Message) -> None:
-    from interfaces.telegram.middlewares.pause_middleware import get_paused_chats
     paused = get_paused_chats()
     paused.discard(message.chat.id)
     await message.answer("Bot reativado! Envie um documento para começar.")
@@ -255,17 +253,12 @@ async def cmd_feedback(message: Message, state: FSMContext) -> None:
 
 @router.message(StateFilter(FeedbackStates.waiting_feedback))
 async def handle_feedback_text(message: Message, state: FSMContext) -> None:
-    from core.utils.logger import logger
-    from datetime import datetime
-
     feedback = message.text or ""
     user = message.from_user
     user_info = f"{user.username or user.id}" if user else "unknown"
 
     logger.info("FEEDBACK de {}: {}", user_info, feedback)
 
-    from pathlib import Path
-    from config.settings import settings
     feedback_file = settings.temp_dir / "feedback.txt"
     feedback_file.parent.mkdir(parents=True, exist_ok=True)
 
