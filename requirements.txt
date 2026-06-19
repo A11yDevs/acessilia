@@ -21,7 +21,12 @@ aiosmtplib>=3.0.1
 
 # Docling (opcional - ~2-4GB, lento em CPU) - estruturador documental avancado
 # Para ativar: STRUCTURER=docling no .env
-docling>=2.0
+opencv-python>=4.9.0,<4.13
+numpy>=1.26.0,<2.0.0
+docling==2.0.0
+docling-core==2.0.0
+docling-parse==1.6.0
+docling-ibm-models==2.0.8
 
 # Development
 pytest>=8.0.0
