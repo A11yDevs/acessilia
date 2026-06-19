@@ -13,6 +13,13 @@ class OllamaClient:
         self.model = settings.ollama_model
         self.base_url = settings.ollama_base_url
         self.timeout = settings.request_timeout
+        self._client = httpx.AsyncClient(
+            timeout=self.timeout,
+            limits=httpx.Limits(
+                max_keepalive_connections=5,
+                max_connections=10,
+            ),
+        )
 
     async def send_message(
         self,
@@ -51,60 +58,59 @@ class OllamaClient:
 
         for attempt in range(max_retries):
             try:
-                async with httpx.AsyncClient(timeout=self.timeout) as client:
-                    logger.debug(
-                        "Enviando requisição para Ollama (tentativa {}/{}): "
-                        "modelo={}, image_count={}",
-                        attempt + 1, max_retries, self.model, len(images or []),
-                    )
-                    response = await client.post(
-                        self.base_url,
-                        json=payload,
-                        headers=headers,
-                    )
+                logger.debug(
+                    "Enviando requisição para Ollama (tentativa {}/{}): "
+                    "modelo={}, image_count={}",
+                    attempt + 1, max_retries, self.model, len(images or []),
+                )
+                response = await self._client.post(
+                    self.base_url,
+                    json=payload,
+                    headers=headers,
+                )
 
-                    if response.status_code in (429, 502, 503, 504):
-                        delay = (2 ** attempt) + 2
-                        logger.warning(
-                            "Ollama erro temporário ({}), aguardando {}s...",
-                            response.status_code, delay,
-                        )
-                        await asyncio.sleep(delay)
-                        continue
-
-                    if response.status_code != 200:
-                        error_text = response.text
-                        logger.error(
-                            "Ollama error ({}): {}",
-                            response.status_code, error_text,
-                        )
-
-                    response.raise_for_status()
-                    data = response.json()
-
-                    message = data.get("message") or {}
-                    result = (message.get("content") or "").strip()
-
-                    done_reason = data.get("done_reason")
-
-                    if done_reason == "length":
-                        logger.warning(
-                            "IA cortou a resposta por tamanho (length). "
-                            "Tentando novamente..."
-                        )
-                        if attempt < max_retries - 1:
-                            await asyncio.sleep(2)
-                            continue
-
-                    if result:
-                        return result
-
+                if response.status_code in (429, 502, 503, 504):
+                    delay = (2 ** attempt) + 2
                     logger.warning(
-                        "Ollama respondeu vazio (tentativa {}/{})",
-                        attempt + 1, max_retries,
+                        "Ollama erro temporário ({}), aguardando {}s...",
+                        response.status_code, delay,
+                    )
+                    await asyncio.sleep(delay)
+                    continue
+
+                if response.status_code != 200:
+                    error_text = response.text
+                    logger.error(
+                        "Ollama error ({}): {}",
+                        response.status_code, error_text,
+                    )
+
+                response.raise_for_status()
+                data = response.json()
+
+                message = data.get("message") or {}
+                result = (message.get("content") or "").strip()
+
+                done_reason = data.get("done_reason")
+
+                if done_reason == "length":
+                    logger.warning(
+                        "IA cortou a resposta por tamanho (length). "
+                        "Tentando novamente..."
                     )
                     if attempt < max_retries - 1:
                         await asyncio.sleep(2)
+                        continue
+
+                if result:
+                    return result
+
+                logger.warning(
+                    "Ollama respondeu vazio (tentativa {}/{})",
+                    attempt + 1, max_retries,
+                )
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(2)
 
             except Exception as e:
                 logger.error(
@@ -121,6 +127,9 @@ class OllamaClient:
 
     def reset_session(self):
         pass
+
+    async def close(self):
+        await self._client.aclose()
 
 
 client = OllamaClient()

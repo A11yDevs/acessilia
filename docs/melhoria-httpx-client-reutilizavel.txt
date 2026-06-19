@@ -1,0 +1,136 @@
+MELHORIA #3: REUTILIZACAO DO HTTPX CLIENT
+============================================
+
+PROBLEMA ATUAL:
+----------------
+Tanto OllamaClient.send_message() quanto OpenRouterClient.send_message()
+criam um novo httpx.AsyncClient() a cada chamada ao modelo de IA.
+
+Isso significa que:
+- A cada request, uma nova conexao TCP e estabelecida (3-way handshake)
+- Nao ha reaproveitamento de conexoes (connection pooling)
+- Mais latencia em cada chamada (~50-200ms extras em conexoes HTTPS)
+- Mais descritores de socket abertos e fechados desnecessariamente
+
+Codigo atual (problematico):
+    async def send_message(self, text, images=None):
+        ...
+        for attempt in range(max_retries):
+            try:
+                async with httpx.AsyncClient(timeout=self.timeout) as client:
+                    response = await client.post(self.base_url, ...)
+
+SOLUCAO:
+---------
+Criar um unico cliente HTTPX no __init__ da classe e reutiliza-lo
+em todas as chamadas de send_message(), com cleanup no shutdown.
+
+MUDANCAS NECESSARIAS:
+---------------------
+
+1. ARQUIVO: core/ai/ollama.py
+   - Adicionar self._client no __init__
+   - Substituir async with httpx.AsyncClient() por self._client
+   - Adicionar metodo close()
+
+   Antes:
+       class OllamaClient:
+           def __init__(self):
+               self.api_key = settings.ollama_api_key
+               self.model = settings.ollama_model
+               self.base_url = settings.ollama_base_url
+               self.timeout = settings.request_timeout
+
+           async def send_message(self, text, images=None, max_retries=5):
+               ...
+               for attempt in range(max_retries):
+                   try:
+                       async with httpx.AsyncClient(timeout=self.timeout) as client:
+                           response = await client.post(self.base_url, ...)
+
+   Depois:
+       class OllamaClient:
+           def __init__(self):
+               self.api_key = settings.ollama_api_key
+               self.model = settings.ollama_model
+               self.base_url = settings.ollama_base_url
+               self.timeout = settings.request_timeout
+               self._client = httpx.AsyncClient(
+                   timeout=self.timeout,
+                   limits=httpx.Limits(
+                       max_keepalive_connections=5,
+                       max_connections=10,
+                   ),
+               )
+
+           async def send_message(self, text, images=None, max_retries=5):
+               ...
+               for attempt in range(max_retries):
+                   try:
+                       response = await self._client.post(self.base_url, ...)
+
+           async def close(self):
+               await self._client.aclose()
+
+2. ARQUIVO: core/ai/openrouter.py
+   - Mesma alteracao descrita acima para o OllamaClient
+
+3. ARQUIVO: run.py
+   - Garantir cleanup dos clients no shutdown
+
+   Antes:
+       if __name__ == "__main__":
+           acquire_lock()
+           try:
+               asyncio.run(startup())
+           except KeyboardInterrupt:
+               logger.info("Bot interrompido pelo usuario")
+           except Exception:
+               logger.exception("Erro fatal no bot")
+               sys.exit(1)
+           finally:
+               release_lock()
+
+   Depois:
+       if __name__ == "__main__":
+           acquire_lock()
+           try:
+               asyncio.run(startup())
+           except KeyboardInterrupt:
+               logger.info("Bot interrompido pelo usuario")
+           except Exception:
+               logger.exception("Erro fatal no bot")
+               sys.exit(1)
+           finally:
+               from core.ai.ollama import client as ollama_cli
+               from core.ai.openrouter import client as or_cli
+               import asyncio
+               try:
+                   asyncio.run(ollama_cli.close())
+                   asyncio.run(or_cli.close())
+               except Exception:
+                   pass
+               release_lock()
+
+BENEFICIOS:
+-----------
+- Pool de conexoes TCP reutilizado
+- ~50-200ms de latencia economizada por request
+- Menos descritores de socket abertos/fechados
+- Codigo mais limpo (sem async with aninhado)
+- Configuracao centralizada de timeouts e limites
+
+RISCOS E MITIGACOES:
+--------------------
+- Conexao pode ficar stale se houver mudanca de DNS/proxy
+  -> Mitigacao: limits=httpx.Limits(max_keepalive_connections=5) limita o pool
+
+- Cliente nunca e fechado se o shutdown for abrupto (SIGKILL)
+  -> Mitigacao: isso e aceitavel, o SO limpa os sockets
+
+IMPACTO ESTIMADO:
+-----------------
+- Arquivos modificados: 3 (ollama.py, openrouter.py, run.py)
+- Linhas adicionadas: ~10
+- Linhas removidas: ~2
+- Risco: Baixo (mudanca contida e bem encapsulada)

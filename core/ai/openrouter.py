@@ -16,6 +16,13 @@ class OpenRouterClient:
         self.timeout = settings.request_timeout
         self.site_url = settings.openrouter_site_url
         self.app_name = settings.openrouter_app_name
+        self._client = httpx.AsyncClient(
+            timeout=self.timeout,
+            limits=httpx.Limits(
+                max_keepalive_connections=5,
+                max_connections=10,
+            ),
+        )
 
     async def send_message(
         self,
@@ -58,72 +65,71 @@ class OpenRouterClient:
 
         for attempt in range(max_retries):
             try:
-                async with httpx.AsyncClient(timeout=self.timeout) as client:
-                    logger.debug(
-                        "Enviando requisicao para OpenRouter "
-                        "(tentativa {}/{}): modelo={}, image_count={}",
-                        attempt + 1,
-                        max_retries,
-                        self.model,
-                        len(images or []),
-                    )
-                    response = await client.post(
-                        self.base_url,
-                        json=payload,
-                        headers=headers,
-                    )
+                logger.debug(
+                    "Enviando requisicao para OpenRouter "
+                    "(tentativa {}/{}): modelo={}, image_count={}",
+                    attempt + 1,
+                    max_retries,
+                    self.model,
+                    len(images or []),
+                )
+                response = await self._client.post(
+                    self.base_url,
+                    json=payload,
+                    headers=headers,
+                )
 
-                    if response.status_code in (429, 502, 503, 504):
-                        delay = (2**attempt) + 2
-                        logger.warning(
-                            "OpenRouter erro temporario ({}), "
-                            "aguardando {}s...",
-                            response.status_code,
-                            delay,
-                        )
-                        await asyncio.sleep(delay)
-                        continue
-
-                    if response.status_code != 200:
-                        logger.error(
-                            "OpenRouter error ({}): {}",
-                            response.status_code,
-                            response.text,
-                        )
-
-                    response.raise_for_status()
-                    data = response.json()
-
-                    choices = data.get("choices", [])
-                    if not choices:
-                        logger.warning(
-                            "OpenRouter retornou resposta sem choices "
-                            "(tentativa {}/{}): {}",
-                            attempt + 1,
-                            max_retries,
-                            data,
-                        )
-                        if attempt < max_retries - 1:
-                            await asyncio.sleep(2)
-                            continue
-                        return (
-                            "[Erro: OpenRouter retornou resposta "
-                            "sem conteudo]"
-                        )
-
-                    message = choices[0].get("message") or {}
-                    result = (message.get("content") or "").strip()
-
-                    if result:
-                        return result
-
+                if response.status_code in (429, 502, 503, 504):
+                    delay = (2**attempt) + 2
                     logger.warning(
-                        "OpenRouter respondeu vazio (tentativa {}/{})",
+                        "OpenRouter erro temporario ({}), "
+                        "aguardando {}s...",
+                        response.status_code,
+                        delay,
+                    )
+                    await asyncio.sleep(delay)
+                    continue
+
+                if response.status_code != 200:
+                    logger.error(
+                        "OpenRouter error ({}): {}",
+                        response.status_code,
+                        response.text,
+                    )
+
+                response.raise_for_status()
+                data = response.json()
+
+                choices = data.get("choices", [])
+                if not choices:
+                    logger.warning(
+                        "OpenRouter retornou resposta sem choices "
+                        "(tentativa {}/{}): {}",
                         attempt + 1,
                         max_retries,
+                        data,
                     )
                     if attempt < max_retries - 1:
                         await asyncio.sleep(2)
+                        continue
+                    return (
+                        "[Erro: OpenRouter retornou resposta "
+                        "sem conteudo]"
+                    )
+
+                message = choices[0].get("message") or {}
+                result = (message.get("content") or "").strip()
+
+                if result:
+                    return result
+
+                logger.warning(
+                    "OpenRouter respondeu vazio (tentativa {}/{})",
+                    attempt + 1,
+                    max_retries,
+                )
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(2)
 
             except Exception as e:
                 logger.error(
@@ -145,6 +151,9 @@ class OpenRouterClient:
 
     def reset_session(self):
         pass
+
+    async def close(self):
+        await self._client.aclose()
 
 
 client = OpenRouterClient()

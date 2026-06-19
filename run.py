@@ -86,6 +86,19 @@ async def startup():
     await asyncio.gather(*tasks)
 
 
+async def _cleanup_http_clients():
+    from core.ai.ollama import client as ollama_cli
+    from core.ai.openrouter import client as or_cli
+    try:
+        await ollama_cli.close()
+    except Exception:
+        pass
+    try:
+        await or_cli.close()
+    except Exception:
+        pass
+
+
 if __name__ == "__main__":
     acquire_lock()
     try:
@@ -97,3 +110,7 @@ if __name__ == "__main__":
         sys.exit(1)
     finally:
         release_lock()
+        try:
+            asyncio.run(_cleanup_http_clients())
+        except Exception:
+            pass
