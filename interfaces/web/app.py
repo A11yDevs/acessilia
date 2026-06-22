@@ -171,7 +171,10 @@ async def handle_upload(
 ):
     try:
         UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-        file_path = UPLOAD_DIR / document_file.filename
+        original_filename = document_file.filename
+        # Preserve only the basename to avoid directory traversal
+        safe_name = f"{uuid.uuid4().hex}{Path(original_filename).suffix}"
+        file_path = UPLOAD_DIR / safe_name
 
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(document_file.file, buffer)
@@ -211,7 +214,10 @@ async def handle_advanced_upload(
 ):
     try:
         UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-        file_path = UPLOAD_DIR / document_file.filename
+        original_filename = document_file.filename
+        # Preserve only the basename to avoid directory traversal
+        safe_name = f"{uuid.uuid4().hex}{Path(original_filename).suffix}"
+        file_path = UPLOAD_DIR / safe_name
 
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(document_file.file, buffer)
