@@ -14,7 +14,8 @@ def _is_process_running(pid: int) -> bool:
     if sys.platform == "win32":
         result = subprocess.run(
             ["tasklist", "/FI", f"PID eq {pid}", "/NH", "/FO", "CSV"],
-            capture_output=True, text=True
+            capture_output=True,
+            text=True,
         )
         return str(pid) in result.stdout
     try:
@@ -59,12 +60,13 @@ def release_lock() -> None:
 
 async def startup():
     setup_logger()
-    
+
     enabled = [i.strip() for i in settings.enabled_interfaces.split(",")]
     tasks = []
 
     if "telegram" in enabled and settings.bot_token_valid:
         from interfaces.telegram.bot import start_polling
+
         tasks.append(start_polling())
         logger.info("Interface Telegram habilitada")
     elif "telegram" in enabled and not settings.bot_token_valid:
@@ -73,13 +75,18 @@ async def startup():
     if "web" in enabled:
         from interfaces.web.app import app
         import uvicorn
-        config = uvicorn.Config(app, host="0.0.0.0", port=8000, log_level=settings.log_level.lower())
+
+        config = uvicorn.Config(
+            app, host="0.0.0.0", port=8000, log_level=settings.log_level.lower()
+        )
         server = uvicorn.Server(config)
         tasks.append(server.serve())
         logger.info("Interface Web habilitada (http://localhost:8000)")
 
     if not tasks:
-        logger.critical("Nenhuma interface habilitada. Configure ENABLED_INTERFACES no .env")
+        logger.critical(
+            "Nenhuma interface habilitada. Configure ENABLED_INTERFACES no .env"
+        )
         sys.exit(1)
 
     logger.info("Iniciando com interfaces: {}", settings.enabled_interfaces)
@@ -89,6 +96,7 @@ async def startup():
 async def _cleanup_http_clients():
     from core.ai.ollama import client as ollama_cli
     from core.ai.openrouter import client as or_cli
+
     try:
         await ollama_cli.close()
     except Exception:

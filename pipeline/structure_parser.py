@@ -23,9 +23,7 @@ def parse_text_to_blocks(text: str) -> list[dict[str, Any]]:
                 {
                     "type": "heading",
                     "level": len(heading_match.group(1)),
-                    "text": sanitize_block_text(
-                        heading_match.group(2).strip()
-                    ),
+                    "text": sanitize_block_text(heading_match.group(2).strip()),
                 }
             )
             i += 1
@@ -183,8 +181,14 @@ def _try_parse_marker_block(
         return {"type": "image", "text": text}, j
 
     callout_types = {
-        "nota", "citação", "citacao", "barra lateral",
-        "aviso", "dica", "importante", "box",
+        "nota",
+        "citação",
+        "citacao",
+        "barra lateral",
+        "aviso",
+        "dica",
+        "importante",
+        "box",
     }
     if type_key in callout_types:
         text = sanitize_block_text(
@@ -220,8 +224,7 @@ def _parse_table_rows(
         if not _looks_like_table_row(stripped):
             break
         cells = [
-            sanitize_block_text(cell.strip())
-            for cell in stripped.strip("|").split("|")
+            sanitize_block_text(cell.strip()) for cell in stripped.strip("|").split("|")
         ]
         if cells and all(set(cell) <= {"-", ":"} for cell in cells):
             i += 1

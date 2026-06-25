@@ -7,7 +7,6 @@ from config.settings import settings
 
 
 class OllamaClient:
-
     def __init__(self):
         self.api_key = settings.ollama_api_key
         self.model = settings.ollama_model
@@ -33,8 +32,7 @@ class OllamaClient:
         message: dict = {"role": "user", "content": text}
         if images:
             message["images"] = [
-                base64.b64encode(img_bytes).decode("utf-8")
-                for img_bytes in images
+                base64.b64encode(img_bytes).decode("utf-8") for img_bytes in images
             ]
 
         payload = {
@@ -61,7 +59,10 @@ class OllamaClient:
                 logger.debug(
                     "Enviando requisição para Ollama (tentativa {}/{}): "
                     "modelo={}, image_count={}",
-                    attempt + 1, max_retries, self.model, len(images or []),
+                    attempt + 1,
+                    max_retries,
+                    self.model,
+                    len(images or []),
                 )
                 response = await self._client.post(
                     self.base_url,
@@ -70,10 +71,11 @@ class OllamaClient:
                 )
 
                 if response.status_code in (429, 502, 503, 504):
-                    delay = (2 ** attempt) + 2
+                    delay = (2**attempt) + 2
                     logger.warning(
                         "Ollama erro temporário ({}), aguardando {}s...",
-                        response.status_code, delay,
+                        response.status_code,
+                        delay,
                     )
                     await asyncio.sleep(delay)
                     continue
@@ -82,7 +84,8 @@ class OllamaClient:
                     error_text = response.text
                     logger.error(
                         "Ollama error ({}): {}",
-                        response.status_code, error_text,
+                        response.status_code,
+                        error_text,
                     )
 
                 response.raise_for_status()
@@ -107,7 +110,8 @@ class OllamaClient:
 
                 logger.warning(
                     "Ollama respondeu vazio (tentativa {}/{})",
-                    attempt + 1, max_retries,
+                    attempt + 1,
+                    max_retries,
                 )
                 if attempt < max_retries - 1:
                     await asyncio.sleep(2)
@@ -115,10 +119,12 @@ class OllamaClient:
             except Exception as e:
                 logger.error(
                     "Ollama error (tentativa {}/{}): {}",
-                    attempt + 1, max_retries, e,
+                    attempt + 1,
+                    max_retries,
+                    e,
                 )
                 if attempt < max_retries - 1:
-                    delay = (2 ** attempt) + 1
+                    delay = (2**attempt) + 1
                     await asyncio.sleep(delay)
                 else:
                     raise

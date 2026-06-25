@@ -1,9 +1,5 @@
 import asyncio
 import sqlite3
-import json
-import time
-from pathlib import Path
-from datetime import datetime
 from core.utils.logger import logger
 from config.settings import settings
 
@@ -63,8 +59,12 @@ def _criar_tabelas(conn: sqlite3.Connection) -> None:
         )
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_ocr_raw_task ON ocr_raw(task_id)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_ocr_revised_task ON ocr_revised(task_id)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_ocr_translated_task ON ocr_translated(task_id)")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_ocr_revised_task ON ocr_revised(task_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_ocr_translated_task ON ocr_translated(task_id)"
+    )
     conn.commit()
 
 
@@ -165,7 +165,9 @@ async def listar_ocr_raw(task_id: str) -> list[dict]:
         return [dict(r) for r in rows]
 
 
-async def salvar_ocr_revised(task_id: str, page_number: int, text: str, modelo: str = "qwen2.5:3b"):
+async def salvar_ocr_revised(
+    task_id: str, page_number: int, text: str, modelo: str = "qwen2.5:3b"
+):
     async with _connection_lock:
         conn = get_connection()
         conn.execute(
@@ -179,12 +181,15 @@ async def listar_ocr_revised(task_id: str) -> list[dict]:
     async with _connection_lock:
         conn = get_connection()
         rows = conn.execute(
-            "SELECT * FROM ocr_revised WHERE task_id = ? ORDER BY page_number", (task_id,)
+            "SELECT * FROM ocr_revised WHERE task_id = ? ORDER BY page_number",
+            (task_id,),
         ).fetchall()
         return [dict(r) for r in rows]
 
 
-async def salvar_ocr_translated(task_id: str, page_number: int, text: str, modelo: str = "qwen2.5:1.5b"):
+async def salvar_ocr_translated(
+    task_id: str, page_number: int, text: str, modelo: str = "qwen2.5:1.5b"
+):
     async with _connection_lock:
         conn = get_connection()
         conn.execute(
@@ -198,7 +203,8 @@ async def listar_ocr_translated(task_id: str) -> list[dict]:
     async with _connection_lock:
         conn = get_connection()
         rows = conn.execute(
-            "SELECT * FROM ocr_translated WHERE task_id = ? ORDER BY page_number", (task_id,)
+            "SELECT * FROM ocr_translated WHERE task_id = ? ORDER BY page_number",
+            (task_id,),
         ).fetchall()
         return [dict(r) for r in rows]
 
@@ -222,9 +228,12 @@ async def estatisticas() -> dict:
         erros = conn.execute(
             "SELECT COUNT(*) FROM conversoes WHERE status='error'"
         ).fetchone()[0]
-        tempo_medio = conn.execute(
-            "SELECT AVG(tempo_segundos) FROM conversoes WHERE status='done'"
-        ).fetchone()[0] or 0
+        tempo_medio = (
+            conn.execute(
+                "SELECT AVG(tempo_segundos) FROM conversoes WHERE status='done'"
+            ).fetchone()[0]
+            or 0
+        )
         return {
             "total": total,
             "sucesso": sucesso,

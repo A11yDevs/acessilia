@@ -1,5 +1,5 @@
 from aiogram import BaseMiddleware
-from aiogram.types import Message
+from aiogram.types import Message, TelegramObject
 from typing import Any, Awaitable, Callable, Dict
 
 _paused_chats: set[int] = set()
@@ -12,8 +12,8 @@ def get_paused_chats() -> set[int]:
 class PauseMiddleware(BaseMiddleware):
     async def __call__(
         self,
-        handler: Callable[[Message, Dict[str, Any]], Awaitable[Any]],
-        event: Message,
+        handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
         data: Dict[str, Any],
     ) -> Any:
         if not isinstance(event, Message):
@@ -24,7 +24,9 @@ class PauseMiddleware(BaseMiddleware):
             if text.strip().lower() == "/ativar":
                 return await handler(event, data)
 
-            await event.answer("Bot está desativado neste chat. Use /ativar para reativar.")
+            await event.answer(
+                "Bot está desativado neste chat. Use /ativar para reativar."
+            )
             return None
 
         return await handler(event, data)

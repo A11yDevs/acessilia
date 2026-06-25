@@ -27,7 +27,12 @@ from core.utils.logger import logger
 from core.utils.pdf_splitter import split_pdf
 from pipeline.structure_parser import parse_text_to_blocks
 
-PROMPTS_DIR = Path(__file__).resolve().parent.parent.parent / "interfaces" / "telegram" / "prompts"
+PROMPTS_DIR = (
+    Path(__file__).resolve().parent.parent.parent
+    / "interfaces"
+    / "telegram"
+    / "prompts"
+)
 
 MODE_MAP = {
     "detalhado": "detalhado.txt",
@@ -59,6 +64,7 @@ CALLOUT_LABEL_MAP: dict[str, str] = {
     "tip": "dica",
     "important": "importante",
 }
+
 
 def _apply_marker(text: str, classification: str, region: Region) -> str:
     markers = REGION_MARKERS.get(classification)
@@ -163,7 +169,7 @@ def _compress_to_jpg(
     if width > max_width:
         ratio = max_width / width
         new_height = int(height * ratio)
-        img = img.resize((max_width, new_height), Image.LANCZOS)
+        img = img.resize((max_width, new_height), Image.Resampling.LANCZOS)
 
     output = io.BytesIO()
     img.save(output, format="JPEG", quality=quality, optimize=True)
@@ -272,8 +278,13 @@ class AgenteUnico:
                 continue
 
             response = await self._process_page(
-                page_path, page_num, total_pages, is_pdf,
-                system_prompt, effective_mode, status_callback,
+                page_path,
+                page_num,
+                total_pages,
+                is_pdf,
+                system_prompt,
+                effective_mode,
+                status_callback,
             )
 
             if not response.strip():
@@ -302,8 +313,7 @@ class AgenteUnico:
             )
 
         texto_final = "\n\n".join(
-            f"=== Pagina {i + 1} ===\n{response}"
-            for i, response in enumerate(results)
+            f"=== Pagina {i + 1} ===\n{response}" for i, response in enumerate(results)
         )
 
         logger.info(
@@ -335,12 +345,20 @@ class AgenteUnico:
     ) -> str:
         if is_pdf:
             return await self._process_pdf_page(
-                page_path, page_num, total_pages, system_prompt,
-                effective_mode, status_callback,
+                page_path,
+                page_num,
+                total_pages,
+                system_prompt,
+                effective_mode,
+                status_callback,
             )
 
         return await self._process_image_page(
-            page_path, page_num, total_pages, system_prompt, status_callback,
+            page_path,
+            page_num,
+            total_pages,
+            system_prompt,
+            status_callback,
         )
 
     async def _process_pdf_page(
@@ -390,7 +408,9 @@ class AgenteUnico:
                     fp = _content_fingerprint(region.text)
                     if fp not in clean_fps:
                         clean_fps.add(fp)
-                        text_parts.append(_apply_marker(region.text, classification, region))
+                        text_parts.append(
+                            _apply_marker(region.text, classification, region)
+                        )
             full_text = "\n\n".join(text_parts)
 
             if len(full_text) >= 20:
@@ -402,7 +422,11 @@ class AgenteUnico:
                 return full_text
 
         return await self._process_with_vision_by_regions(
-            page_path, page_num, total_pages, system_prompt, status_callback,
+            page_path,
+            page_num,
+            total_pages,
+            system_prompt,
+            status_callback,
         )
 
     async def _process_with_vision_by_regions(
@@ -443,7 +467,9 @@ class AgenteUnico:
                 fp = _content_fingerprint(region.text)
                 if fp not in content_fingerprints:
                     content_fingerprints.add(fp)
-                    text_parts.append(_apply_marker(region.text, classification, region))
+                    text_parts.append(
+                        _apply_marker(region.text, classification, region)
+                    )
                     clean_bboxes.append(region.bbox)
                 continue
 
@@ -467,15 +493,22 @@ class AgenteUnico:
                 )
 
                 region_desc = await self._process_region_with_vision(
-                    page_path, region, classification, page_num,
-                    total_pages, system_prompt, status_callback,
+                    page_path,
+                    region,
+                    classification,
+                    page_num,
+                    total_pages,
+                    system_prompt,
+                    status_callback,
                 )
                 if region_desc.strip():
                     fp = _content_fingerprint(region_desc)
                     if fp not in content_fingerprints:
                         content_fingerprints.add(fp)
                         if region_has_markers(classification):
-                            region_desc = _apply_marker(region_desc, classification, region)
+                            region_desc = _apply_marker(
+                                region_desc, classification, region
+                            )
                         text_parts.append(region_desc)
 
         if not text_parts:
@@ -485,7 +518,10 @@ class AgenteUnico:
                 page_num,
             )
             return await self._fallback_whole_page(
-                page_path, page_num, total_pages, system_prompt,
+                page_path,
+                page_num,
+                total_pages,
+                system_prompt,
                 status_callback,
             )
 
@@ -545,6 +581,7 @@ class AgenteUnico:
 
         except Exception as error:
             import traceback
+
             tb = traceback.format_exc()
             logger.critical(
                 "[pag {}] Erro na regiao {}: {} | Traceback:\n{}",

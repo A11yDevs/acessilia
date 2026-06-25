@@ -45,9 +45,7 @@ def _render_with_pandoc(
         timeout=60,
     )
     if result.returncode != 0:
-        raise RuntimeError(
-            f"pandoc falhou ({to_format}): {result.stderr.decode()}"
-        )
+        raise RuntimeError(f"pandoc falhou ({to_format}): {result.stderr.decode()}")
     return output_path
 
 
@@ -61,12 +59,12 @@ def export_accessible_document(
     filename: str = "",
 ) -> Path:
     document = _ensure_document(source_text_or_document, title=title)
-    
+
     # Nova auditoria determinística
     audit_report = audit_canonical_document(document)
     if audit_report["BLOCKER"]:
         raise ValueError(f"Auditoria falhou: {'; '.join(audit_report['BLOCKER'])}")
-        
+
     profile = profile_name or format_name
     filtered = strip_internal_audit_blocks(document, profile)
     profile_errors = validate_export_profile(profile, filtered)
@@ -76,7 +74,9 @@ def export_accessible_document(
     pandoc = _pandoc_bin()
     if format_name == "html":
         if pandoc:
-            return _render_with_pandoc(ast, output_path, "html5", extra_args=["--toc", "--standalone"])
+            return _render_with_pandoc(
+                ast, output_path, "html5", extra_args=["--toc", "--standalone"]
+            )
         return render_html(filtered, output_path, profile_name=profile)
     if format_name == "docx":
         if pandoc:

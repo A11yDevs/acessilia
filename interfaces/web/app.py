@@ -1,12 +1,18 @@
 import shutil
 import zipfile
-import os
 import uuid
 import traceback
 from pathlib import Path
-from typing import List
 
-from fastapi import FastAPI, File, UploadFile, Form, BackgroundTasks, Request, HTTPException
+from fastapi import (
+    FastAPI,
+    File,
+    UploadFile,
+    Form,
+    BackgroundTasks,
+    Request,
+    HTTPException,
+)
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, FileResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -20,7 +26,11 @@ from core.utils.logger import logger
 from exporters.pandoc_exporter import export_accessible_document
 from config.settings import settings
 from core.services.email_service import send_confirmation_email, send_result_email
-from core.services.download_token_service import criar_token, consumir_token, limpar_tokens_expirados
+from core.services.download_token_service import (
+    criar_token,
+    consumir_token,
+    limpar_tokens_expirados,
+)
 
 import asyncio
 import concurrent.futures
@@ -48,19 +58,22 @@ async def global_exception_handler(request: Request, exc: Exception):
         request=request,
         name="index.html",
         context={"error": f"Erro interno no servidor: {str(exc)}"},
-        status_code=500
+        status_code=500,
     )
 
 
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
-    logger.warning("HTTP Exception no Painel Web: {} | Path: {}", exc.detail, request.url.path)
+    logger.warning(
+        "HTTP Exception no Painel Web: {} | Path: {}", exc.detail, request.url.path
+    )
     return templates.TemplateResponse(
         request=request,
         name="index.html",
         context={"error": exc.detail},
-        status_code=exc.status_code
+        status_code=exc.status_code,
     )
+
 
 OUTPUT_DIR = settings.temp_dir / "web_output"
 UPLOAD_DIR = settings.temp_dir / "uploads"
@@ -71,19 +84,21 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse(
-        request=request, name="index.html", context={}
-    )
+    return templates.TemplateResponse(request=request, name="index.html", context={})
 
 
 @app.get("/advanced", response_class=HTMLResponse)
 async def advanced_page(request: Request):
-    return templates.TemplateResponse(
-        request=request, name="advanced.html", context={}
-    )
+    return templates.TemplateResponse(request=request, name="advanced.html", context={})
 
 
-async def run_pipeline_task(email: str, file_path: Path, filename: str, custom_prompt: str | None = None, thinking_mode: bool = False):
+async def run_pipeline_task(
+    email: str,
+    file_path: Path,
+    filename: str,
+    custom_prompt: str | None = None,
+    thinking_mode: bool = False,
+):
     try:
         await send_confirmation_email(email, filename)
 
@@ -108,9 +123,15 @@ async def run_pipeline_task(email: str, file_path: Path, filename: str, custom_p
         mp3_path = task_output_dir / f"{base_name}.mp3"
 
         loop = asyncio.get_event_loop()
-        await loop.run_in_executor(executor, export_txt, canonical_doc, txt_path, filename)
-        await loop.run_in_executor(executor, export_docx, canonical_doc, docx_path, filename)
-        await loop.run_in_executor(executor, export_pdf, canonical_doc, pdf_path, filename)
+        await loop.run_in_executor(
+            executor, export_txt, canonical_doc, txt_path, filename
+        )
+        await loop.run_in_executor(
+            executor, export_docx, canonical_doc, docx_path, filename
+        )
+        await loop.run_in_executor(
+            executor, export_pdf, canonical_doc, pdf_path, filename
+        )
         await loop.run_in_executor(
             executor,
             lambda: export_accessible_document(
@@ -118,8 +139,8 @@ async def run_pipeline_task(email: str, file_path: Path, filename: str, custom_p
                 html_path,
                 format_name="html",
                 title=base_name,
-                profile_name="html"
-            )
+                profile_name="html",
+            ),
         )
 
         if txt_path.exists():
@@ -130,7 +151,9 @@ async def run_pipeline_task(email: str, file_path: Path, filename: str, custom_p
         files_to_zip = [txt_path, docx_path, pdf_path, html_path, mp3_path]
 
         def create_zip():
-            with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            with zipfile.ZipFile(
+                zip_path, "w", compression=zipfile.ZIP_DEFLATED
+            ) as archive:
                 for f_path in files_to_zip:
                     if f_path.exists():
                         archive.write(f_path, arcname=f_path.name)
@@ -165,9 +188,7 @@ async def download_file(token: str, background_tasks: BackgroundTasks):
 
 @app.post("/process", response_class=HTMLResponse)
 async def handle_upload(
-    request: Request,
-    email: str = Form(...),
-    document_file: UploadFile = File(...)
+    request: Request, email: str = Form(...), document_file: UploadFile = File(...)
 ):
     try:
         UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -184,23 +205,27 @@ async def handle_upload(
             filename=document_file.filename,
             source="web",
             callback=run_pipeline_task,
-            callback_args={"email": email, "file_path": file_path, "filename": document_file.filename}
+            callback_args={
+                "email": email,
+                "file_path": file_path,
+                "filename": document_file.filename,
+            },
         )
         pos = await unified_queue.enqueue(item)
 
         msg = f"Sucesso! Seu arquivo está na fila única (Posição: {pos}). O resultado será enviado para {email}."
 
         return templates.TemplateResponse(
-            request=request,
-            name="index.html",
-            context={"message": msg}
+            request=request, name="index.html", context={"message": msg}
         )
     except Exception as e:
         logger.error("Erro no upload web: {}", e)
         return templates.TemplateResponse(
             request=request,
             name="index.html",
-            context={"error": "Ocorreu um erro ao processar o upload. Tente novamente."}
+            context={
+                "error": "Ocorreu um erro ao processar o upload. Tente novamente."
+            },
         )
 
 
@@ -227,7 +252,9 @@ async def handle_advanced_upload(
             return templates.TemplateResponse(
                 request=request,
                 name="advanced.html",
-                context={"error": "Prompt personalizado excede o limite de 6000 caracteres."}
+                context={
+                    "error": "Prompt personalizado excede o limite de 6000 caracteres."
+                },
             )
 
         item = QueueItem(
@@ -241,21 +268,21 @@ async def handle_advanced_upload(
                 "filename": document_file.filename,
                 "custom_prompt": prompt or None,
                 "thinking_mode": thinking_mode,
-            }
+            },
         )
         pos = await unified_queue.enqueue(item)
 
         msg = f"Sucesso! Seu arquivo está na fila única (Posição: {pos}). O resultado será enviado para {email}."
 
         return templates.TemplateResponse(
-            request=request,
-            name="advanced.html",
-            context={"message": msg}
+            request=request, name="advanced.html", context={"message": msg}
         )
     except Exception as e:
         logger.error("Erro no upload advanced web: {}", e)
         return templates.TemplateResponse(
             request=request,
             name="advanced.html",
-            context={"error": "Ocorreu um erro ao processar o upload. Tente novamente."}
+            context={
+                "error": "Ocorreu um erro ao processar o upload. Tente novamente."
+            },
         )

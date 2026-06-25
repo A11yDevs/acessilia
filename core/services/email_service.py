@@ -5,7 +5,9 @@ from core.utils.logger import logger
 from config.settings import settings
 
 
-async def send_email_notification(to_email: str, subject: str, body: str, attachment_path: Path | None = None):
+async def send_email_notification(
+    to_email: str, subject: str, body: str, attachment_path: Path | None = None
+):
     if not settings.smtp_user or not settings.smtp_password:
         logger.warning("SMTP não configurado. E-mail para {} não enviado.", to_email)
         return
@@ -23,7 +25,7 @@ async def send_email_notification(to_email: str, subject: str, body: str, attach
                 file_data,
                 maintype="application",
                 subtype="zip",
-                filename=attachment_path.name
+                filename=attachment_path.name,
             )
 
     try:

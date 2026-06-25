@@ -31,9 +31,7 @@ class Settings:
     )
     request_timeout: int = int(os.getenv("REQUEST_TIMEOUT", "3600"))
     log_level: str = os.getenv("LOG_LEVEL", "INFO")
-    allowed_extensions: set[str] = field(
-        default_factory=lambda: _default_extensions()
-    )
+    allowed_extensions: set[str] = field(default_factory=lambda: _default_extensions())
     tesseract_cmd: str = os.getenv("TESSERACT_CMD", "tesseract")
     max_page_width: int = int(os.getenv("MAX_PAGE_WIDTH", "1600"))
     jpg_quality: int = int(os.getenv("JPG_QUALITY", "85"))
@@ -62,9 +60,7 @@ class Settings:
         "OPENROUTER_APP_NAME",
         "a11y-devs-describer",
     )
-    pymupdf_text_threshold: int = int(
-        os.getenv("PYMUPDF_TEXT_THRESHOLD", "100")
-    )
+    pymupdf_text_threshold: int = int(os.getenv("PYMUPDF_TEXT_THRESHOLD", "100"))
     structurer: str = os.getenv("STRUCTURER", "pymupdf")
 
     # Interface Settings
@@ -101,8 +97,17 @@ class Settings:
 
 def _default_extensions() -> set[str]:
     return {
-        ".pdf", ".png", ".jpg", ".jpeg", ".tiff", ".tif",
-        ".bmp", ".gif", ".webp", ".docx", ".html",
+        ".pdf",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".tiff",
+        ".tif",
+        ".bmp",
+        ".gif",
+        ".webp",
+        ".docx",
+        ".html",
     }
 
 

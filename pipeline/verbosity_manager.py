@@ -51,8 +51,4 @@ def filter_blocks_for_profile(
     profile_name: str,
 ) -> list[dict]:
     allowed = set(normalize_profile(profile_name)["verbosity"])
-    return [
-        block
-        for block in blocks
-        if block.get("verbosity", "basic") in allowed
-    ]
+    return [block for block in blocks if block.get("verbosity", "basic") in allowed]

@@ -31,7 +31,10 @@ def classify_region(region: Region) -> str:
             return result
 
     if region.type == "image":
-        if region.image_bytes is not None and region.confidence >= IMAGE_CONFIDENCE_THRESHOLD:
+        if (
+            region.image_bytes is not None
+            and region.confidence >= IMAGE_CONFIDENCE_THRESHOLD
+        ):
             return "embedded_image"
         if _region_area(region) > UNKNOWN_MIN_AREA:
             return "unknown"
@@ -62,7 +65,10 @@ def classify_region(region: Region) -> str:
             if line_count >= 2 or total_chars >= 50:
                 return "list_block"
 
-        if total_chars >= TEXT_CLEAN_MIN_CHARS and text_density >= TEXT_CLEAN_MIN_DENSITY:
+        if (
+            total_chars >= TEXT_CLEAN_MIN_CHARS
+            and text_density >= TEXT_CLEAN_MIN_DENSITY
+        ):
             return "text_clean"
 
         if total_chars > 5 and text_density >= SCANNED_MAX_DENSITY:
@@ -82,11 +88,22 @@ def classify_region(region: Region) -> str:
 
 
 def region_needs_vision(classification: str) -> bool:
-    return classification in ("text_scanned", "embedded_image", "unknown", "table", "formula")
+    return classification in (
+        "text_scanned",
+        "embedded_image",
+        "unknown",
+        "table",
+        "formula",
+    )
 
 
 def region_has_markers(classification: str) -> bool:
-    return classification in ("code_block", "callout_box", "list_block", "embedded_image")
+    return classification in (
+        "code_block",
+        "callout_box",
+        "list_block",
+        "embedded_image",
+    )
 
 
 def region_prompt_key(classification: str) -> str:

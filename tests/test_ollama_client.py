@@ -20,15 +20,18 @@ def ollama_client():
 @pytest.mark.asyncio
 async def test_send_message_success(ollama_client):
     respx.post(ollama_client.base_url).mock(
-        return_value=httpx.Response(200, json={
-            "model": "test_model",
-            "message": {
-                "role": "assistant",
-                "content": "Teste de resposta",
+        return_value=httpx.Response(
+            200,
+            json={
+                "model": "test_model",
+                "message": {
+                    "role": "assistant",
+                    "content": "Teste de resposta",
+                },
+                "done_reason": "stop",
+                "done": True,
             },
-            "done_reason": "stop",
-            "done": True,
-        })
+        )
     )
 
     result = await ollama_client.send_message("Olá", images=[b"dummy_image"])
@@ -40,6 +43,7 @@ async def test_send_message_success(ollama_client):
 async def test_send_message_payload_config(ollama_client):
     def check_payload(request):
         import json
+
         payload = json.loads(request.content)
         assert payload.get("model") == "test_model"
         assert payload.get("stream") is False
@@ -50,12 +54,15 @@ async def test_send_message_payload_config(ollama_client):
         assert options.get("top_k") == 64
         assert options.get("vision_budget") == 560
         assert options.get("seed") == 42
-        return httpx.Response(200, json={
-            "model": "test_model",
-            "message": {"role": "assistant", "content": "OK"},
-            "done_reason": "stop",
-            "done": True,
-        })
+        return httpx.Response(
+            200,
+            json={
+                "model": "test_model",
+                "message": {"role": "assistant", "content": "OK"},
+                "done_reason": "stop",
+                "done": True,
+            },
+        )
 
     respx.post(ollama_client.base_url).mock(side_effect=check_payload)
 
@@ -68,12 +75,15 @@ async def test_send_message_rate_limit_retry(ollama_client):
     route = respx.post(ollama_client.base_url)
     route.side_effect = [
         httpx.Response(429),
-        httpx.Response(200, json={
-            "model": "test_model",
-            "message": {"role": "assistant", "content": "Sucesso após retry"},
-            "done_reason": "stop",
-            "done": True,
-        }),
+        httpx.Response(
+            200,
+            json={
+                "model": "test_model",
+                "message": {"role": "assistant", "content": "Sucesso após retry"},
+                "done_reason": "stop",
+                "done": True,
+            },
+        ),
     ]
 
     with patch("asyncio.sleep", new_callable=AsyncMock):
@@ -87,18 +97,24 @@ async def test_send_message_rate_limit_retry(ollama_client):
 async def test_send_message_none_content_retry(ollama_client):
     route = respx.post(ollama_client.base_url)
     route.side_effect = [
-        httpx.Response(200, json={
-            "model": "test_model",
-            "message": {"role": "assistant", "content": None},
-            "done_reason": "stop",
-            "done": True,
-        }),
-        httpx.Response(200, json={
-            "model": "test_model",
-            "message": {"role": "assistant", "content": "Resposta valida"},
-            "done_reason": "stop",
-            "done": True,
-        }),
+        httpx.Response(
+            200,
+            json={
+                "model": "test_model",
+                "message": {"role": "assistant", "content": None},
+                "done_reason": "stop",
+                "done": True,
+            },
+        ),
+        httpx.Response(
+            200,
+            json={
+                "model": "test_model",
+                "message": {"role": "assistant", "content": "Resposta valida"},
+                "done_reason": "stop",
+                "done": True,
+            },
+        ),
     ]
 
     with patch("asyncio.sleep", new_callable=AsyncMock):

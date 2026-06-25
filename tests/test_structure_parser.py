@@ -36,9 +36,7 @@ def test_parse_text_to_blocks_keeps_code_fence_marker():
 
 
 def test_parse_text_to_blocks_parses_simple_table():
-    blocks = parse_text_to_blocks(
-        "| Coluna A | Coluna B |\n| --- | --- |\n| 1 | 2 |"
-    )
+    blocks = parse_text_to_blocks("| Coluna A | Coluna B |\n| --- | --- |\n| 1 | 2 |")
 
     assert blocks[0]["type"] == "table"
     assert blocks[0]["rows"] == [

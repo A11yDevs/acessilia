@@ -56,12 +56,9 @@ def test_strip_internal_audit_blocks_recursive_copy():
 
     filtered = strip_internal_audit_blocks(document, "txt")
 
-    assert [block["id"] for block in filtered["sections"][0]["blocks"]] == [
-        "blk-1"
-    ]
+    assert [block["id"] for block in filtered["sections"][0]["blocks"]] == ["blk-1"]
     assert [
-        block["id"]
-        for block in filtered["sections"][0]["children"][0]["blocks"]
+        block["id"] for block in filtered["sections"][0]["children"][0]["blocks"]
     ] == ["blk-3"]
     assert [block["id"] for block in document["sections"][0]["blocks"]] == [
         "blk-1",

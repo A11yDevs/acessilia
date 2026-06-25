@@ -82,8 +82,7 @@ class OpenRouterClient:
                 if response.status_code in (429, 502, 503, 504):
                     delay = (2**attempt) + 2
                     logger.warning(
-                        "OpenRouter erro temporario ({}), "
-                        "aguardando {}s...",
+                        "OpenRouter erro temporario ({}), aguardando {}s...",
                         response.status_code,
                         delay,
                     )
@@ -112,10 +111,7 @@ class OpenRouterClient:
                     if attempt < max_retries - 1:
                         await asyncio.sleep(2)
                         continue
-                    return (
-                        "[Erro: OpenRouter retornou resposta "
-                        "sem conteudo]"
-                    )
+                    return "[Erro: OpenRouter retornou resposta sem conteudo]"
 
                 message = choices[0].get("message") or {}
                 result = (message.get("content") or "").strip()
@@ -144,10 +140,7 @@ class OpenRouterClient:
                 else:
                     raise
 
-        return (
-            "[Erro: OpenRouter falhou apos todas as "
-            "tentativas de recuperacao]"
-        )
+        return "[Erro: OpenRouter falhou apos todas as tentativas de recuperacao]"
 
     def reset_session(self):
         pass

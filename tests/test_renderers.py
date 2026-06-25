@@ -93,9 +93,9 @@ def test_render_html_includes_toc_table_and_metadata():
         result = render_html(_sample_document(), output, profile_name="html")
 
         html = result.read_text(encoding="utf-8")
-        assert "<nav class=\"toc\"" in html
-        assert "<table id=\"blk-4\">" in html
-        assert "<aside class=\"meta\"" in html
+        assert '<nav class="toc"' in html
+        assert '<table id="blk-4">' in html
+        assert '<aside class="meta"' in html
         assert "Observacao" in html
 
 

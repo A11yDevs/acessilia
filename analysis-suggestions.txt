@@ -1,0 +1,38 @@
+# Sugestões de Melhoria para o Projeto **bot-acess**
+
+## 1. Qualidade do Código
+- **Padronizar formatação**: adotar `ruff` como linter/formatter e integrar ao pre‑commit. Corrigir linhas com `E501` (linhas muito longas) e `F401` (imports não usados).
+- **Tipos estáticos**: adicionar _type hints_ nas funções públicas (ex.: `core/utils/*.py`, `core/ai/*.py`). Facilita manutenção e permite uso de mypy.
+- **Docstrings**: garantir docstrings no padrão Google/Napoleon para todos os módulos e classes. Ex.: `core/agents/state_manager.py` e `core/orchestrator.py` estão sem descrição.
+- **Remover código morto**: arquivos como `core/agents/agente_unico.py` não são importados em nenhum lugar; avaliar remoção ou uso.
+- **Simplificar imports**: usar imports relativos consistentes (`from ..utils import logger`) para evitar caminhos longos.
+
+## 2. Segurança
+- **Bandit**: rodar `bandit -r .` e corrigir avisos de uso de `subprocess` sem `shell=False` e chamadas a `eval`/`exec` (ex.: `core/utils/text_processor.py`).
+- **Segurança de arquivos**: sanitizar nomes de arquivos enviados (`core/utils/validators.py` tem `sanitize_filename` mas deve ser usado em todos os handlers de upload, como `interfaces/telegram/handlers/document.py`).
+- **Dependências desatualizadas**: atualizar pacotes de IA (`ollama`, `openrouter`) para versões recentes que corrigem CVEs.
+- **Credenciais**: garantir que chaves de API nunca sejam logadas; revisar `core/services/email_service.py` para evitar `print` de variáveis sensíveis.
+
+## 3. Performance
+- **Cache de resultados**: usar o serviço de cache já existente (`core/services/cache.py`) nas renderizações de PDF/Docx que são repetidas. Ex.: `renderers/pdf_renderer.py` pode reutilizar PDFs já gerados para o mesmo input.
+- **I/O assíncrono**: converter leituras de arquivos em `async` usando `aiofiles` nos handlers Telegram que processam documentos grandes.
+- **Profiling**: usar `cProfile` em `pipeline/canonical_builder.py` para identificar funções custosas; otimizar loops de construção de AST.
+
+## 4. Documentação
+- **README**: incluir secções “Instalação”, “Configuração de interfaces (Telegram/Web)”, “Como rodar testes” e “Contribuição”.
+- **Docs/API**: gerar documentação automática com `pdoc` ou `mkdocstrings` a partir dos docstrings e publicar em `docs/`.
+- **Exemplos de uso**: adicionar scripts de exemplo em `examples/` mostrando como iniciar o bot em modo Telegram e/ou Web.
+
+## 5. Cobertura de Testes
+- **Cobertura atual**: executar `pytest --cov=. --cov-report=term-missing` para identificar linhas não testadas; focar em `core/ai/*.py` e `pipeline/validators.py` que têm pouca cobertura.
+- **Testes de integração**: criar testes que simulam envio de documento via Telegram usando `aiogram_unittest` ou mocks e verificam a resposta completa do pipeline.
+- **Testes de segurança**: incluir testes que enviam arquivos com nomes maliciosos e garantem que `sanitize_filename` os rejeita.
+
+## 6. Arquitetura
+- **Separação de plugins**: refatorar `interfaces/telegram` e `interfaces/web` para seguir o padrão **Plugin** (classe base `InterfacePlugin` com método `register(app)`). Facilita adicionar novos canais (ex.: Discord) no futuro.
+- **Orquestração**: mover lógica de startup de `run.py` para um módulo `bootstrap.py` que cria o orquestrador e injeta dependências via _dependency injection_ (ex.: `injector` library).
+- **Circular imports**: revisar importações entre `core/region_extractor.py` e `core/region_classifier.py` que podem gerar ciclos; considerar mover tipos comuns para um módulo `core/types.py`.
+- **Observabilidade**: integrar logs estruturados (`core/utils/logger.py`) com um backend de logs (ex.: Loki) e adicionar métricas Prometheus nas funções críticas.
+
+---
+*Estas sugestões são baseadas na análise estática do código fonte. A implementação pode ser priorizada de acordo com o impacto e esforço estimado.*

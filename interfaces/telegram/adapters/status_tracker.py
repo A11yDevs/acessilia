@@ -25,7 +25,7 @@ class StatusTracker:
             percent = int((current / total) * 100)
             bar = self._build_progress_bar(percent)
             return f"📄 *{self.filename}*\n\n{msg}\n{bar}"
-        
+
         audio_match = re.search(r"Gerando áudio.* (\d+)%", msg, re.IGNORECASE)
         if audio_match:
             percent = int(audio_match.group(1))
@@ -74,7 +74,10 @@ class StatusTracker:
         else:
             try:
                 await self.bot.edit_message_text(
-                    text, chat_id=self.chat_id, message_id=self.message_id, parse_mode="Markdown"
+                    text,
+                    chat_id=self.chat_id,
+                    message_id=self.message_id,
+                    parse_mode="Markdown",
                 )
             except TelegramAPIError as e:
                 logger.debug("Falha ao editar mensagem de status: {}", e)
@@ -90,7 +93,10 @@ class StatusTracker:
             else:
                 text = f"📄 *{self.filename}*\n\n❌ Erro no processamento."
             await self.bot.edit_message_text(
-                text, chat_id=self.chat_id, message_id=self.message_id, parse_mode="Markdown"
+                text,
+                chat_id=self.chat_id,
+                message_id=self.message_id,
+                parse_mode="Markdown",
             )
         except Exception:
             pass

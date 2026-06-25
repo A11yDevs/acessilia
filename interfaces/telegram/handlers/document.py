@@ -11,7 +11,6 @@ from aiogram.exceptions import TelegramRetryAfter
 
 from interfaces.telegram.adapters.file_service import download_file
 from core.orchestrator import process
-from core.agents.state_manager import TaskCancelledError
 from core.exporters.txt_exporter import export_txt
 from core.exporters.docx_exporter import export_docx
 from core.exporters.pdf_exporter import export_pdf
@@ -120,18 +119,24 @@ async def process_file(
     mode: str = "normal",
 ) -> None:
     tracker = StatusTracker(message.bot, message.chat.id, filename)
-    
+
     with tempfile.TemporaryDirectory(dir=settings.temp_dir) as tmpdir:
         input_path = Path(tmpdir) / filename
         await tracker("Baixando arquivo...")
         await download_file(message.bot, file_id, input_path)
-        
+
         persistent_tmp = settings.temp_dir / f"task_{uuid.uuid4().hex}"
         persistent_tmp.mkdir(parents=True, exist_ok=True)
         task_path = persistent_tmp / filename
         shutil.copy2(input_path, task_path)
 
-        async def task_callback(path: Path, t_filename: str, t_mode: str, t_tracker: StatusTracker, cleanup_dir: Path):
+        async def task_callback(
+            path: Path,
+            t_filename: str,
+            t_mode: str,
+            t_tracker: StatusTracker,
+            cleanup_dir: Path,
+        ):
             try:
                 canonical_document = await process(
                     path,
@@ -139,7 +144,9 @@ async def process_file(
                     mode=t_mode,
                 )
 
-                await t_tracker("Conteudo extraido com sucesso! Preparando exportacao...")
+                await t_tracker(
+                    "Conteudo extraido com sucesso! Preparando exportacao..."
+                )
                 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
                 base_name = path.stem
@@ -159,31 +166,40 @@ async def process_file(
                     title=base_name,
                     profile_name="html",
                 )
-                
+
                 try:
                     if txt_path.exists():
                         clean_text = txt_path.read_text(encoding="utf-8")
+
                         async def audio_progress(percent: int):
                             await t_tracker(f"Gerando áudio (MP3)... {percent}%")
-                        await export_mp3(clean_text, mp3_path, progress_callback=audio_progress)
+
+                        await export_mp3(
+                            clean_text, mp3_path, progress_callback=audio_progress
+                        )
                 except Exception as e:
                     logger.error("Falha ao gerar MP3: {}", e)
 
                 zip_path = OUTPUT_DIR / f"{base_name}_acessivel.zip"
-                _build_zip_package(zip_path, [txt_path, docx_path, pdf_path, html_path, mp3_path])
+                _build_zip_package(
+                    zip_path, [txt_path, docx_path, pdf_path, html_path, mp3_path]
+                )
 
                 target_email = user_emails.pop(message.chat.id, None)
                 if target_email:
                     await t_tracker(f"Enviando para e-mail: {target_email}...")
                     from core.services.email_service import send_result_email
+
                     await send_result_email(target_email, t_filename, zip_path)
                     await message.answer(f"✅ Arquivo enviado para {target_email}!")
                 else:
                     await t_tracker("Enviando pacote acessivel...")
-                    await _send_doc_with_retry(message, zip_path, "Pacote acessivel gerado (.zip).")
+                    await _send_doc_with_retry(
+                        message, zip_path, "Pacote acessivel gerado (.zip)."
+                    )
 
                 await t_tracker.finish(success=True)
-            except Exception as e:
+            except Exception:
                 logger.exception("Erro no processamento da fila (Bot)")
                 await t_tracker.finish(success=False)
             finally:
@@ -200,8 +216,8 @@ async def process_file(
                 "t_filename": filename,
                 "t_mode": mode,
                 "t_tracker": tracker,
-                "cleanup_dir": persistent_tmp
-            }
+                "cleanup_dir": persistent_tmp,
+            },
         )
         pos = await unified_queue.enqueue(queue_item)
         if pos > 1:

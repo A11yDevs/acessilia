@@ -10,7 +10,12 @@ from docx.shared import Pt
 from pipeline.verbosity_manager import filter_blocks_for_profile
 
 
-def render_docx(document: dict[str, Any], output_path: Path, profile_name: str = "docx", filename: str = "") -> Path:
+def render_docx(
+    document: dict[str, Any],
+    output_path: Path,
+    profile_name: str = "docx",
+    filename: str = "",
+) -> Path:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     doc = Document()
     style = doc.styles["Normal"]
@@ -37,7 +42,10 @@ def _render_section(doc: Document, section: dict[str, Any], profile_name: str) -
 def _render_block(doc: Document, block: dict[str, Any]) -> None:
     block_type = block.get("type")
     if block_type == "heading":
-        doc.add_heading(block.get("title", block.get("text", "")), level=min(block.get("level", 1), 9))
+        doc.add_heading(
+            block.get("title", block.get("text", "")),
+            level=min(block.get("level", 1), 9),
+        )
     elif block_type == "paragraph":
         doc.add_paragraph(block.get("text", ""))
     elif block_type == "code":

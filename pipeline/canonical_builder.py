@@ -133,24 +133,17 @@ def _sanitize_structured_blocks(
         if isinstance(clean.get("alt_text"), str):
             clean["alt_text"] = sanitize_block_text(clean["alt_text"])
         if isinstance(clean.get("long_description"), str):
-            clean["long_description"] = sanitize_block_text(
-                clean["long_description"]
-            )
+            clean["long_description"] = sanitize_block_text(clean["long_description"])
 
         if block_type == "list" and isinstance(clean.get("items"), list):
-            clean["items"] = [
-                sanitize_block_text(str(item))
-                for item in clean["items"]
-            ]
+            clean["items"] = [sanitize_block_text(str(item)) for item in clean["items"]]
 
         if block_type == "table" and isinstance(clean.get("rows"), list):
             rows: list[list[str]] = []
             for row in clean["rows"]:
                 if not isinstance(row, list):
                     continue
-                rows.append(
-                    [sanitize_block_text(str(cell)) for cell in row]
-                )
+                rows.append([sanitize_block_text(str(cell)) for cell in row])
             clean["rows"] = rows
 
         children = clean.get("children")
@@ -194,9 +187,7 @@ def _build_sections(blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "id": heading.get("id", f"section-{generated_count}"),
             "title": heading.get("text", ""),
             "level": heading.get("level", 1),
-            "source_location": deepcopy(
-                heading.get("source_location", {})
-            ),
+            "source_location": deepcopy(heading.get("source_location", {})),
             "metadata": deepcopy(heading.get("metadata", {})),
             "blocks": [],
             "children": [],
@@ -224,9 +215,7 @@ def _build_sections(blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     "id": block.get("id", f"sectionless-{generated_count}"),
                     "title": "",
                     "level": 1,
-                    "source_location": deepcopy(
-                        block.get("source_location", {})
-                    ),
+                    "source_location": deepcopy(block.get("source_location", {})),
                     "metadata": {},
                     "blocks": [block],
                     "children": [],

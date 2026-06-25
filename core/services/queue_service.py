@@ -37,8 +37,12 @@ class UnifiedQueue:
         async with self._lock:
             self._queue.append(item)
             pos = len(self._queue)
-            logger.info("Fila Unificada: {} enfileirado de {} (Posição: {})", 
-                        item.filename, item.source, pos)
+            logger.info(
+                "Fila Unificada: {} enfileirado de {} (Posição: {})",
+                item.filename,
+                item.source,
+                pos,
+            )
             return pos
 
     async def _worker(self):
@@ -48,18 +52,23 @@ class UnifiedQueue:
                 if self._queue and self._processing_count < self._max_concurrent:
                     item = self._queue.popleft()
                     self._processing_count += 1
-            
+
             if item:
                 try:
-                    logger.info("Worker: Iniciando tarefa {} de {}", item.filename, item.source)
+                    logger.info(
+                        "Worker: Iniciando tarefa {} de {}", item.filename, item.source
+                    )
                     await item.callback(**item.callback_args)
                 except Exception as e:
                     logger.error("Erro no Worker ao processar {}: {}", item.filename, e)
                 finally:
                     async with self._lock:
                         self._processing_count -= 1
-                    logger.info("Worker: Tarefa concluída: {}. Aguardando próximo...", item.filename)
-            
+                    logger.info(
+                        "Worker: Tarefa concluída: {}. Aguardando próximo...",
+                        item.filename,
+                    )
+
             await asyncio.sleep(0.5)
 
     def get_position(self, task_id: str) -> int:

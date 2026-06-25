@@ -14,7 +14,10 @@ def is_file_size_allowed(file_size: int) -> bool:
 
 def validate_file(filename: str, file_size: int) -> tuple[bool, str]:
     if not is_extension_allowed(filename):
-        return False, "Formato de arquivo não suportado. Envie PDF, DOCX, HTML, PNG, JPG, TIFF, BMP ou WEBP."
+        return (
+            False,
+            "Formato de arquivo não suportado. Envie PDF, DOCX, HTML, PNG, JPG, TIFF, BMP ou WEBP.",
+        )
     if not is_file_size_allowed(file_size):
         return False, f"Arquivo muito grande. Limite: {settings.max_file_size_mb} MB."
     return True, ""

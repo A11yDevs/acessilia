@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any
 
 import fitz
@@ -19,16 +18,37 @@ class Region:
 
 
 MONOSPACE_FONTS = {
-    "courier", "consolas", "monaco", "menlo", "monospace",
-    "dejavu sans mono", "liberation mono", "courier new",
-    "lucida console", "source code pro", "fira code",
-    "sf mono", "jetbrains mono", "cascadia code", "droid sans mono",
-    "ubuntu mono", "inconsolata", "anonymous pro",
+    "courier",
+    "consolas",
+    "monaco",
+    "menlo",
+    "monospace",
+    "dejavu sans mono",
+    "liberation mono",
+    "courier new",
+    "lucida console",
+    "source code pro",
+    "fira code",
+    "sf mono",
+    "jetbrains mono",
+    "cascadia code",
+    "droid sans mono",
+    "ubuntu mono",
+    "inconsolata",
+    "anonymous pro",
 }
 
 LIST_LINE_PATTERNS = (
-    "- ", "* ", "+ ", "• ", "‣ ", "⁃ ",
-    "o ", "§ ", "→ ", "⇒ ",
+    "- ",
+    "* ",
+    "+ ",
+    "• ",
+    "‣ ",
+    "⁃ ",
+    "o ",
+    "§ ",
+    "→ ",
+    "⇒ ",
 )
 
 
@@ -38,7 +58,9 @@ def extract_regions(page: fitz.Page) -> list[Region]:
 
     image_map = _build_image_map(page)
 
-    blocks = page.get_text("dict", flags=fitz.TEXT_PRESERVE_WHITESPACE).get("blocks", [])
+    blocks = page.get_text("dict", flags=fitz.TEXT_PRESERVE_WHITESPACE).get(
+        "blocks", []
+    )
 
     for block in blocks:
         bbox = tuple(block.get("bbox", (0, 0, 0, 0)))
@@ -84,7 +106,12 @@ def _starts_with_list_marker(text: str) -> bool:
         if len(stripped) > 2 and stripped[2].isdigit():
             return False
         return True
-    if len(stripped) > 2 and stripped[0].isalpha() and stripped[1] in (".", ")") and stripped[2] == " ":
+    if (
+        len(stripped) > 2
+        and stripped[0].isalpha()
+        and stripped[1] in (".", ")")
+        and stripped[2] == " "
+    ):
         return True
     return False
 
@@ -193,14 +220,16 @@ def _fill_gaps_with_unknown(
     page_h = page_rect.height
 
     if not regions:
-        regions.append(Region(
-            bbox=(0, 0, page_w, page_h),
-            type="unknown",
-            text="",
-            image_bytes=None,
-            confidence=0.0,
-            page_num=page_num,
-        ))
+        regions.append(
+            Region(
+                bbox=(0, 0, page_w, page_h),
+                type="unknown",
+                text="",
+                image_bytes=None,
+                confidence=0.0,
+                page_num=page_num,
+            )
+        )
         return
 
     covered = _merge_bboxes([r.bbox for r in regions])
@@ -239,7 +268,9 @@ def _add_unknown_gaps(
         if gap_height < 20:
             continue
 
-        gap_x_stops = sorted({0} | {c[2] for c in covered if c[1] < y1 and c[3] > y0} | {page_w})
+        gap_x_stops = sorted(
+            {0} | {c[2] for c in covered if c[1] < y1 and c[3] > y0} | {page_w}
+        )
         for j in range(len(gap_x_stops) - 1):
             x0 = gap_x_stops[j]
             x1 = gap_x_stops[j + 1]
@@ -251,17 +282,21 @@ def _add_unknown_gaps(
             if gap_area < 500:
                 continue
 
-            regions.append(Region(
-                bbox=(x0, y0, x1, y1),
-                type="unknown",
-                text="",
-                image_bytes=None,
-                confidence=0.0,
-                page_num=page_num,
-            ))
+            regions.append(
+                Region(
+                    bbox=(x0, y0, x1, y1),
+                    type="unknown",
+                    text="",
+                    image_bytes=None,
+                    confidence=0.0,
+                    page_num=page_num,
+                )
+            )
 
 
-def crop_region_to_image(page: fitz.Page, bbox: tuple[float, float, float, float], dpi: int = 200) -> bytes:
+def crop_region_to_image(
+    page: fitz.Page, bbox: tuple[float, float, float, float], dpi: int = 200
+) -> bytes:
     clip = fitz.Rect(bbox)
     pix = page.get_pixmap(dpi=dpi, clip=clip)
     return pix.tobytes("png")

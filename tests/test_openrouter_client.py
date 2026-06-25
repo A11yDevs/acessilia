@@ -20,15 +20,9 @@ def openrouter_client():
 @pytest.mark.asyncio
 async def test_send_message_success(openrouter_client):
     respx.post(openrouter_client.base_url).mock(
-        return_value=httpx.Response(200, json={
-            "choices": [
-                {
-                    "message": {
-                        "content": "Teste de resposta"
-                    }
-                }
-            ]
-        })
+        return_value=httpx.Response(
+            200, json={"choices": [{"message": {"content": "Teste de resposta"}}]}
+        )
     )
 
     result = await openrouter_client.send_message("Ola", images=[b"dummy_image"])
@@ -40,11 +34,10 @@ async def test_send_message_success(openrouter_client):
 async def test_send_message_payload_config(openrouter_client):
     def check_payload(request):
         import json
+
         payload = json.loads(request.content)
         assert payload.get("temperature") == 0
-        return httpx.Response(200, json={
-            "choices": [{"message": {"content": "OK"}}]
-        })
+        return httpx.Response(200, json={"choices": [{"message": {"content": "OK"}}]})
 
     respx.post(openrouter_client.base_url).mock(side_effect=check_payload)
     await openrouter_client.send_message("Ola")
@@ -56,9 +49,9 @@ async def test_send_message_rate_limit_retry(openrouter_client):
     route = respx.post(openrouter_client.base_url)
     route.side_effect = [
         httpx.Response(429),
-        httpx.Response(200, json={
-            "choices": [{"message": {"content": "Sucesso apos retry"}}]
-        })
+        httpx.Response(
+            200, json={"choices": [{"message": {"content": "Sucesso apos retry"}}]}
+        ),
     ]
 
     with patch("asyncio.sleep", new_callable=AsyncMock):
@@ -86,11 +79,7 @@ async def test_send_message_none_content_retry(openrouter_client):
         ),
         httpx.Response(
             200,
-            json={
-                "choices": [
-                    {"message": {"content": "Resposta valida"}}
-                ]
-            },
+            json={"choices": [{"message": {"content": "Resposta valida"}}]},
         ),
     ]
 
@@ -111,18 +100,14 @@ async def test_send_message_finish_reason_length_retry(openrouter_client):
                 "choices": [
                     {
                         "finish_reason": "length",
-                        "message": {"content": "Resposta truncada"}
+                        "message": {"content": "Resposta truncada"},
                     }
                 ]
             },
         ),
         httpx.Response(
             200,
-            json={
-                "choices": [
-                    {"message": {"content": "Resposta completa"}}
-                ]
-            },
+            json={"choices": [{"message": {"content": "Resposta completa"}}]},
         ),
     ]
 
@@ -138,9 +123,9 @@ async def test_send_message_server_error_retry(openrouter_client):
     route = respx.post(openrouter_client.base_url)
     route.side_effect = [
         httpx.Response(502),
-        httpx.Response(200, json={
-            "choices": [{"message": {"content": "Recuperado apos 502"}}]
-        })
+        httpx.Response(
+            200, json={"choices": [{"message": {"content": "Recuperado apos 502"}}]}
+        ),
     ]
 
     with patch("asyncio.sleep", new_callable=AsyncMock):

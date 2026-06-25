@@ -1,5 +1,4 @@
 from datetime import datetime
-from pathlib import Path
 
 import httpx
 import shutil
@@ -30,10 +29,12 @@ async def cmd_email(message: Message) -> None:
     if len(args) < 2:
         await message.answer("Por favor, informe o e-mail: /email seu@email.com")
         return
-    
+
     email = args[1].strip()
     user_emails[message.chat.id] = email
-    await message.answer(f"E-mail {email} configurado! Agora envie o documento para ser enviado para este e-mail.")
+    await message.answer(
+        f"E-mail {email} configurado! Agora envie o documento para ser enviado para este e-mail."
+    )
 
 
 @router.message(CommandStart())
@@ -160,7 +161,12 @@ async def cmd_status(message: Message) -> None:
     lines = ["📊 **Tarefas em andamento:**"]
     for t in tasks[:5]:
         pct = t.get("progresso", 0) * 100
-        status_icon = {"processing": "⏳", "done": "✅", "error": "❌", "cancelled": "🚫"}.get(t.get("status", ""), "❓")
+        status_icon = {
+            "processing": "⏳",
+            "done": "✅",
+            "error": "❌",
+            "cancelled": "🚫",
+        }.get(t.get("status", ""), "❓")
         lines.append(
             f"{status_icon} `{t['task_id']}` - {t.get('arquivo', '?')} "
             f"- {pct:.0f}% - {t.get('etapa_atual', '')}"
@@ -174,9 +180,7 @@ async def cmd_health(message: Message) -> None:
 
     try:
         async with httpx.AsyncClient(timeout=10) as client:
-            tags_url = settings.ollama_base_url.replace(
-                "/api/chat", "/api/tags"
-            )
+            tags_url = settings.ollama_base_url.replace("/api/chat", "/api/tags")
             r = await client.get(tags_url)
             if r.status_code == 200:
                 data = r.json()
@@ -191,9 +195,9 @@ async def cmd_health(message: Message) -> None:
 
     temp_dir = settings.temp_dir
     if temp_dir.exists():
-        checks.append(f"✅ Temp dir: ok")
+        checks.append("✅ Temp dir: ok")
     else:
-        checks.append(f"⚠️ Temp dir: inexistente")
+        checks.append("⚠️ Temp dir: inexistente")
 
     try:
         usage = shutil.disk_usage(temp_dir.anchor or "/")

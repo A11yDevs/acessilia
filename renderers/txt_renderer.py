@@ -6,7 +6,9 @@ from typing import Any
 from pipeline.verbosity_manager import filter_blocks_for_profile
 
 
-def render_txt(document: dict[str, Any], output_path: Path, profile_name: str = "txt") -> Path:
+def render_txt(
+    document: dict[str, Any], output_path: Path, profile_name: str = "txt"
+) -> Path:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     lines: list[str] = []
     for section in document.get("sections", []):

@@ -19,7 +19,11 @@ def _filter_sections(sections: list[dict], profile_name: str) -> list[dict]:
     result: list[dict] = []
     for section in sections:
         new_section = deepcopy(section)
-        new_section["blocks"] = filter_blocks_for_profile(section.get("blocks", []), profile_name)
-        new_section["children"] = _filter_sections(section.get("children", []), profile_name)
+        new_section["blocks"] = filter_blocks_for_profile(
+            section.get("blocks", []), profile_name
+        )
+        new_section["children"] = _filter_sections(
+            section.get("children", []), profile_name
+        )
         result.append(new_section)
     return result

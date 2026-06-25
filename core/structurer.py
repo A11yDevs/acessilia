@@ -13,6 +13,7 @@ from core.utils.logger import logger
 DOCLING_AVAILABLE = False
 try:
     from docling.document_converter import DocumentConverter
+
     DOCLING_AVAILABLE = True
 except ImportError:
     pass
@@ -22,7 +23,9 @@ class BaseStructurer:
     def extract_page_regions(self, page: fitz.Page) -> list[Region]:
         raise NotImplementedError
 
-    def crop_region(self, page: fitz.Page, bbox: tuple[float, float, float, float], dpi: int = 200) -> bytes:
+    def crop_region(
+        self, page: fitz.Page, bbox: tuple[float, float, float, float], dpi: int = 200
+    ) -> bytes:
         return crop_region_to_image(page, bbox, dpi)
 
     @property
@@ -78,7 +81,8 @@ class DoclingStructurer(BaseStructurer):
         except Exception as e:
             logger.warning(
                 "Docling falhou na pagina {} ({}), fallback PyMuPDF",
-                page_num, e,
+                page_num,
+                e,
             )
             return extract_regions(page)
 
@@ -102,22 +106,24 @@ class DoclingStructurer(BaseStructurer):
         for item in page_items:
             region = self._docling_item_to_region(item, page_num)
             if region:
-                l, t, r, b = region.bbox
-                if t > b:
-                    t, b = page_h - t, page_h - b
-                    region.bbox = (l, t, r, b)
+                left, top, right, bottom = region.bbox
+                if top > bottom:
+                    top, bottom = page_h - top, page_h - bottom
+                    region.bbox = (left, top, right, bottom)
                 regions.append(region)
 
         if not regions:
-            regions.append(Region(
-                bbox=(0, 0, page_w, page_h),
-                type="unknown",
-                text="",
-                image_bytes=None,
-                confidence=0.0,
-                page_num=page_num,
-                metadata={"docling_empty": True},
-            ))
+            regions.append(
+                Region(
+                    bbox=(0, 0, page_w, page_h),
+                    type="unknown",
+                    text="",
+                    image_bytes=None,
+                    confidence=0.0,
+                    page_num=page_num,
+                    metadata={"docling_empty": True},
+                )
+            )
 
         regions.sort(key=lambda r: (r.bbox[1], r.bbox[0]))
         return regions
@@ -153,7 +159,12 @@ class DoclingStructurer(BaseStructurer):
                     return (float(bbox.l), float(bbox.t), float(bbox.r), float(bbox.b))
                 except Exception:
                     try:
-                        return (float(bbox[0]), float(bbox[1]), float(bbox[2]), float(bbox[3]))
+                        return (
+                            float(bbox[0]),
+                            float(bbox[1]),
+                            float(bbox[2]),
+                            float(bbox[3]),
+                        )
                     except Exception:
                         pass
 
@@ -170,7 +181,12 @@ class DoclingStructurer(BaseStructurer):
 
     def _docling_label(self, item: Any) -> str:
         label = str(getattr(item, "label", "")).lower()
-        if "figure" in label or "picture" in label or "image" in label or "photo" in label:
+        if (
+            "figure" in label
+            or "picture" in label
+            or "image" in label
+            or "photo" in label
+        ):
             return "image"
         if "table" in label:
             return "table"
@@ -182,7 +198,12 @@ class DoclingStructurer(BaseStructurer):
             return "list"
         if "code" in label or "source" in label or "terminal" in label:
             return "code"
-        if "note" in label or "callout" in label or "sidebar" in label or "quote" in label:
+        if (
+            "note" in label
+            or "callout" in label
+            or "sidebar" in label
+            or "quote" in label
+        ):
             return "callout"
         if "caption" in label or "legend" in label:
             return "caption"

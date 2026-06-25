@@ -70,9 +70,7 @@ def test_export_accessible_document_txt_and_html():
             title="Titulo",
         )
 
-        assert txt_result.read_text(encoding="utf-8") == (
-            "Titulo\nParagrafo simples."
-        )
+        assert txt_result.read_text(encoding="utf-8") == ("Titulo\nParagrafo simples.")
         assert html_result.exists()
         html_content = html_result.read_text(encoding="utf-8")
         assert "<nav" in html_content

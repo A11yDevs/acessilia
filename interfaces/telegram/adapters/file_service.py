@@ -14,6 +14,8 @@ async def download_file(bot: Bot, file_id: str, destination: Path) -> Path:
     return destination
 
 
-async def send_output_file(bot: Bot, chat_id: int, file_path: Path, caption: str) -> None:
+async def send_output_file(
+    bot: Bot, chat_id: int, file_path: Path, caption: str
+) -> None:
     input_file = FSInputFile(file_path)
     await bot.send_document(chat_id=chat_id, document=input_file, caption=caption)

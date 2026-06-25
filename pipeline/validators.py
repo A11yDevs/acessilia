@@ -35,17 +35,13 @@ def validate_canonical_document(document: dict[str, Any]) -> list[str]:
             if block.get("type") == "paragraph":
                 text = block.get("text", "")
                 if contains_prompt_leak(text):
-                    errors.append(
-                        f"Possivel vazamento de prompt em {block_id}"
-                    )
+                    errors.append(f"Possivel vazamento de prompt em {block_id}")
                 if contains_markdown_artifacts(text):
                     errors.append(f"Markdown indevido em {block_id}")
             if block.get("type") == "code":
                 code_text = block.get("text", "")
                 if _indentation_lost(code_text):
-                    errors.append(
-                        f"Indentacao de codigo inconsistente em {block_id}"
-                    )
+                    errors.append(f"Indentacao de codigo inconsistente em {block_id}")
             if block.get("type") == "table" and not block.get("rows"):
                 errors.append(f"Tabela vazia em {block_id}")
             internal_links.extend(_extract_internal_links(block))
@@ -80,8 +76,7 @@ def validate_export_profile(
         for block in blocks:
             if block.get("verbosity", "basic") not in allowed:
                 errors.append(
-                    f"Bloco {block.get('id')} nao permitido no perfil "
-                    f"{profile_name}"
+                    f"Bloco {block.get('id')} nao permitido no perfil {profile_name}"
                 )
             for child in block.get("children", []) or []:
                 if isinstance(child, dict):
@@ -111,27 +106,29 @@ def validate_output_text(text: str, profile_name: str) -> list[str]:
 def audit_canonical_document(document: dict[str, Any]) -> dict[str, list[str]]:
     """Realiza uma auditoria estrutural detalhada com níveis de severidade."""
     report = {"BLOCKER": [], "WARNING": []}
-    
+
     # Validação base (mantendo a lógica original como BLOCKER)
     base_errors = validate_canonical_document(document)
     if base_errors:
         report["BLOCKER"].extend(base_errors)
-    
+
     # Auditoria de Acessibilidade (Exemplo de Warning adicional)
     sections = document.get("sections", [])
     if not sections:
         report["BLOCKER"].append("Documento sem seções.")
-    
+
     # Exemplo: Verificar se há alt-text em imagens (se o schema suportar)
     def check_accessibility(blocks: list[dict[str, Any]]) -> None:
         for block in blocks:
-            if block.get("type") == "image" and not block.get("metadata", {}).get("alt"):
+            if block.get("type") == "image" and not block.get("metadata", {}).get(
+                "alt"
+            ):
                 report["WARNING"].append(f"Imagem {block.get('id')} sem alt-text.")
-    
+
     for section in sections:
         check_accessibility(section.get("blocks", []))
         _walk_sections(section.get("children", []), check_accessibility)
-        
+
     return report
 
 
