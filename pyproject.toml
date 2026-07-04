@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "bot-acess"
+version = "0.2.0"
+description = "Bot para extração e acessibilidade de documentos."
+authors = ["Jhonata"]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "core"}, {include = "adapters"}, {include = "interfaces"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.115"
+uvicorn = "^0.30"
+aiogram = "^3.13"
+pymupdf = "^1.24"
+pillow = "^10.4"
+httpx = "^0.27"
+reportlab = "^4.2"
+python-dotenv = "^1.0"
+
+[tool.poetry.scripts]
+bot-acess = "interfaces.cli.run:main"

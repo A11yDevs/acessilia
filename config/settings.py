@@ -15,7 +15,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 @dataclass
 class Settings:
     bot_token: str = field(default_factory=lambda: os.getenv("BOT_TOKEN", ""))
-    max_file_size_mb: int = int(os.getenv("MAX_FILE_SIZE_MB", "50"))
+    max_file_size_mb: int = 50
     max_pages: int = int(os.getenv("MAX_PAGES", "50"))
     temp_dir: Path = field(
         default_factory=lambda: _path_from_env(

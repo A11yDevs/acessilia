@@ -6,7 +6,9 @@ from core.utils.logger import logger
 from config.settings import settings
 
 
-class OllamaClient:
+from core.ai.base import BaseLLMClient
+
+class OllamaClient(BaseLLMClient):
     def __init__(self):
         self.api_key = settings.ollama_api_key
         self.model = settings.ollama_model

@@ -31,7 +31,7 @@ async def cmd_email(message: Message) -> None:
         return
 
     email = args[1].strip()
-    user_emails[message.chat.id] = email
+    user_emails[(message.chat.id, message.message_thread_id)] = email
     await message.answer(
         f"E-mail {email} configurado! Agora envie o documento para ser enviado para este e-mail."
     )
@@ -98,7 +98,7 @@ async def cmd_formats(message: Message) -> None:
 
 @router.message(Command("ocr"))
 async def cmd_ocr(message: Message) -> None:
-    user_modes[message.chat.id] = "ocr"
+    user_modes[(message.chat.id, message.message_thread_id)] = "ocr"
     text = (
         "📄 Modo OCR ativado!\n\n"
         "Envie um PDF ou imagem e extrairei APENAS o texto, "
@@ -109,7 +109,7 @@ async def cmd_ocr(message: Message) -> None:
 
 @router.message(Command("detalhado"))
 async def cmd_detailed(message: Message) -> None:
-    user_modes[message.chat.id] = "detalhado"
+    user_modes[(message.chat.id, message.message_thread_id)] = "detalhado"
     text = (
         "🔍 Modo Detalhado ativado!\n\n"
         "Descricao com maximo nivel de detalhe: tipografia, "
@@ -121,7 +121,7 @@ async def cmd_detailed(message: Message) -> None:
 
 @router.message(Command("medio"))
 async def cmd_medium(message: Message) -> None:
-    user_modes[message.chat.id] = "medio"
+    user_modes[(message.chat.id, message.message_thread_id)] = "medio"
     text = (
         "📋 Modo Medio ativado!\n\n"
         "Texto completo e descricao clara de imagens. "
@@ -132,7 +132,7 @@ async def cmd_medium(message: Message) -> None:
 
 @router.message(Command("baixo"))
 async def cmd_low(message: Message) -> None:
-    user_modes[message.chat.id] = "baixo"
+    user_modes[(message.chat.id, message.message_thread_id)] = "baixo"
     text = (
         "⚡ Modo Baixo ativado!\n\n"
         "Foco no conteudo: extracao completa de texto e "
@@ -143,7 +143,7 @@ async def cmd_low(message: Message) -> None:
 
 @router.message(Command("normal"))
 async def cmd_normal(message: Message) -> None:
-    user_modes[message.chat.id] = "medio"
+    user_modes[(message.chat.id, message.message_thread_id)] = "medio"
     text = (
         "📋 Modo Normal ativado (equivalente ao Medio).\n\n"
         "Texto completo e descricao clara de imagens."

@@ -5,10 +5,11 @@ from core.utils.logger import logger
 
 
 class StatusTracker:
-    def __init__(self, bot: Bot, chat_id: int, filename: str):
+    def __init__(self, bot: Bot, chat_id: int, filename: str, message_thread_id: int | None = None):
         self.bot = bot
         self.chat_id = chat_id
         self.filename = filename
+        self.message_thread_id = message_thread_id
         self.message_id: int | None = None
         self._last_text: str = ""
 
@@ -61,13 +62,17 @@ class StatusTracker:
         if self.message_id is None:
             try:
                 sent = await self.bot.send_message(
-                    self.chat_id, text, parse_mode="Markdown"
+                    self.chat_id, text, parse_mode="Markdown",
+                    message_thread_id=self.message_thread_id,
                 )
                 self.message_id = sent.message_id
             except Exception as e:
                 logger.warning("Falha ao enviar mensagem de status: {}", e)
                 try:
-                    sent = await self.bot.send_message(self.chat_id, msg)
+                    sent = await self.bot.send_message(
+                        self.chat_id, msg,
+                        message_thread_id=self.message_thread_id,
+                    )
                     self.message_id = sent.message_id
                 except Exception:
                     pass

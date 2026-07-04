@@ -8,7 +8,9 @@ from core.utils.logger import logger
 from config.settings import settings
 
 
-class OpenRouterClient:
+from core.ai.base import BaseLLMClient
+
+class OpenRouterClient(BaseLLMClient):
     def __init__(self):
         self.api_key = settings.openrouter_api_key
         self.model = settings.openrouter_model

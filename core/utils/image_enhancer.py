@@ -57,7 +57,7 @@ def enhance_image_for_ocr(image_bytes: bytes) -> bytes:
         lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
         L, a, b = cv2.split(lab)
         clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
-        cl = clahe.apply(l)
+        cl = clahe.apply(L)
         limg = cv2.merge((cl, a, b))
         img = cv2.cvtColor(limg, cv2.COLOR_LAB2BGR)
 

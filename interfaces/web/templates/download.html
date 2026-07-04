@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Download - Acessilia</title>
+    <link rel="icon" type="image/png" href="/static/logo.png">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            color: #212529;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .container {
+            max-width: 650px;
+            margin-top: 50px;
+        }
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .card-header {
+            background-color: #0d6efd;
+            color: white;
+            border-radius: 15px 15px 0 0 !important;
+            padding: 20px;
+            text-align: center;
+        }
+        .format-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .format-list li {
+            margin-bottom: 8px;
+        }
+        .format-list a {
+            display: flex;
+            align-items: center;
+            padding: 14px 18px;
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 10px;
+            text-decoration: none;
+            color: #212529;
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .format-list a:hover {
+            background: #f0f4ff;
+            border-color: #0d6efd;
+        }
+        .format-list .icon {
+            font-size: 1.6rem;
+            margin-right: 14px;
+            flex-shrink: 0;
+        }
+        .format-list .info {
+            flex: 1;
+        }
+        .format-list .info .name {
+            font-weight: 600;
+            font-size: 1rem;
+        }
+        .format-list .info .size {
+            font-size: 0.85rem;
+            color: #6c757d;
+        }
+        .format-list .arrow {
+            font-size: 1.2rem;
+            color: #0d6efd;
+            margin-left: 10px;
+        }
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+        :focus {
+            outline: 3px solid #ffc107 !important;
+            outline-offset: 2px;
+        }
+        .divider {
+            border-top: 1px solid #dee2e6;
+            margin: 16px 0;
+        }
+    </style>
+</head>
+<body>
+    <main class="container" role="main">
+        <div class="card">
+            <header class="card-header">
+                <h1 class="h4 mb-1">Download</h1>
+                <p class="mb-0 small opacity-75">Escolha o formato desejado</p>
+            </header>
+            <div class="card-body p-4">
+                <p class="mb-3 fw-semibold">{{ filename }}</p>
+
+                {% if not formats %}
+                <div class="alert alert-warning" role="alert">
+                    Nenhum formato disponível para este documento. O link pode ter expirado.
+                </div>
+                {% else %}
+                <ul class="format-list">
+                    {% for f in formats %}
+                    <li>
+                        <a href="{{ f.url }}" download>
+                            <span class="icon">
+                                {% if f.ext == "txt" %}📝
+                                {% elif f.ext == "docx" %}📘
+                                {% elif f.ext == "pdf" %}📕
+                                {% elif f.ext == "html" %}🌐
+                                {% elif f.ext == "mp3" %}🎵
+                                {% elif f.ext == "zip" %}📦
+                                {% else %}📄
+                                {% endif %}
+                            </span>
+                            <span class="info">
+                                <span class="name">
+                                    {% if f.ext == "txt" %}Texto (TXT)
+                                    {% elif f.ext == "docx" %}Documento Word (DOCX)
+                                    {% elif f.ext == "pdf" %}PDF Acessível
+                                    {% elif f.ext == "html" %}Página Web (HTML)
+                                    {% elif f.ext == "mp3" %}Audiodescrição (MP3)
+                                    {% elif f.ext == "zip" %}Pacote completo (ZIP)
+                                    {% else %}{{ f.ext | upper }}
+                                    {% endif %}
+                                </span>
+                                <br><span class="size">{{ f.size }}</span>
+                            </span>
+                            <span class="arrow">&#8595;</span>
+                        </a>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+
+                <p class="text-muted small mt-3 mb-0">
+                    Link válido por 7 dias.
+                </p>
+            </div>
+        </div>
+        <footer class="footer">
+            <p>&copy; 2026 Acessilia - Tecnologia para Inclusão</p>
+        </footer>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

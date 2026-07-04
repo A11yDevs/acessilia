@@ -44,12 +44,12 @@ async def send_email_notification(
 
 
 async def send_confirmation_email(to_email: str, filename: str):
-    subject = "Recebemos seu arquivo - Bot Acess"
+    subject = "Recebemos seu arquivo - Acessilia"
     body = (
         f"Olá!\n\nRecebemos o arquivo '{filename}' e já estamos trabalhando para torná-lo acessível.\n"
         "Este processo envolve análise por inteligência artificial e geração de audiodescrição em áudio.\n\n"
         "Assim que estiver pronto, você receberá um novo e-mail com o pacote acessível em anexo.\n\n"
-        "Atenciosamente,\nEquipe Bot Acess"
+        "Atenciosamente,\nEquipe Acessilia"
     )
     await send_email_notification(to_email, subject, body)
 
@@ -60,15 +60,17 @@ async def send_result_email(
     zip_path: Path | None = None,
     download_url: str | None = None,
 ):
-    subject = "Seu arquivo acessível está pronto! - Bot Acess"
+    subject = "Seu arquivo acessível está pronto! - Acessilia"
 
     if download_url:
         body = (
             f"Olá!\n\nO processamento do arquivo '{filename}' foi concluído com sucesso.\n\n"
-            f"Clique no link abaixo para baixar seu pacote acessível "
-            f"(válido para um único download):\n\n{download_url}\n\n"
-            f"O link expira após o primeiro acesso.\n\n"
-            f"Atenciosamente,\nEquipe Bot Acess"
+            f"Acesse o link abaixo para visualizar e baixar os formatos disponíveis:\n\n"
+            f"{download_url}\n\n"
+            f"Formatos disponíveis: Texto (TXT), Documento Word (DOCX), "
+            f"PDF Acessível, Página Web (HTML) e Audiodescrição em Áudio (MP3).\n\n"
+            f"O link expira em 7 dias.\n\n"
+            f"Atenciosamente,\nEquipe Acessilia"
         )
         await send_email_notification(to_email, subject, body)
     else:
@@ -80,6 +82,6 @@ async def send_result_email(
             "- PDF Acessível (.pdf)\n"
             "- Página Web (.html)\n"
             "- Audiodescrição em Áudio (.mp3)\n\n"
-            "Atenciosamente,\nEquipe Bot Acess"
+            "Atenciosamente,\nEquipe Acessilia"
         )
         await send_email_notification(to_email, subject, body, attachment_path=zip_path)

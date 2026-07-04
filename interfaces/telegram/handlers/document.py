@@ -6,7 +6,7 @@ import shutil
 from pathlib import Path
 
 from aiogram import Router, F
-from aiogram.types import FSInputFile, Message, Document, PhotoSize
+from aiogram.types import Message, Document, PhotoSize
 from aiogram.exceptions import TelegramRetryAfter
 
 from interfaces.telegram.adapters.file_service import download_file
@@ -25,19 +25,20 @@ router = Router()
 
 OUTPUT_DIR = settings.temp_dir / "output"
 
-user_modes: dict[int, str] = {}
-user_emails: dict[int, str] = {}
+user_modes: dict[tuple[int, int | None], str] = {}
+user_emails: dict[tuple[int, int | None], str] = {}
 
 
 async def _send_with_retry(
     bot,
     chat_id: int,
     msg: str,
+    message_thread_id: int | None = None,
     max_retries: int = 3,
 ) -> None:
     for attempt in range(max_retries):
         try:
-            await bot.send_message(chat_id, msg)
+            await bot.send_message(chat_id, msg, message_thread_id=message_thread_id)
             return
         except TelegramRetryAfter as e:
             wait = e.retry_after + attempt * 5
@@ -48,35 +49,6 @@ async def _send_with_retry(
             )
             await asyncio.sleep(wait)
     logger.error("Falha apos {} tentativas para enviar mensagem", max_retries)
-
-
-async def _send_doc_with_retry(
-    message: Message,
-    out_path: Path,
-    caption: str,
-    max_retries: int = 3,
-) -> bool:
-    for attempt in range(max_retries):
-        try:
-            await message.answer_document(
-                document=FSInputFile(out_path),
-                caption=caption,
-            )
-            return True
-        except TelegramRetryAfter as e:
-            wait = e.retry_after + attempt * 5
-            logger.warning(
-                "Telegram rate limit no envio de {}, aguardando {}s",
-                out_path.name,
-                wait,
-            )
-            await asyncio.sleep(wait)
-    logger.error(
-        "Falha apos {} tentativas para enviar {}",
-        max_retries,
-        out_path.name,
-    )
-    return False
 
 
 @router.message(F.document)
@@ -93,7 +65,7 @@ async def handle_document(message: Message) -> None:
         await message.answer(error_msg)
         return
 
-    mode = user_modes.pop(message.chat.id, "normal")
+    mode = user_modes.pop((message.chat.id, message.message_thread_id), "normal")
     await message.answer("📄 Arquivo recebido!")
     await process_file(message, document.file_id, filename, mode=mode)
 
@@ -104,7 +76,7 @@ async def handle_photo(message: Message) -> None:
     if photo is None:
         return
 
-    mode = user_modes.pop(message.chat.id, "normal")
+    mode = user_modes.pop((message.chat.id, message.message_thread_id), "normal")
     await message.answer("📷 Foto recebida!")
     await process_file(message, photo.file_id, "imagem.png", mode=mode)
 
@@ -118,7 +90,8 @@ async def process_file(
     filename: str,
     mode: str = "normal",
 ) -> None:
-    tracker = StatusTracker(message.bot, message.chat.id, filename)
+    message_thread_id = message.message_thread_id
+    tracker = StatusTracker(message.bot, message.chat.id, filename, message_thread_id=message_thread_id)
 
     with tempfile.TemporaryDirectory(dir=settings.temp_dir) as tmpdir:
         input_path = Path(tmpdir) / filename
@@ -185,17 +158,33 @@ async def process_file(
                     zip_path, [txt_path, docx_path, pdf_path, html_path, mp3_path]
                 )
 
-                target_email = user_emails.pop(message.chat.id, None)
+                target_email = user_emails.pop((message.chat.id, message.message_thread_id), None)
+                from core.services.download_token_service import criar_token
+
+                token = await criar_token(OUTPUT_DIR, base_name)
+                download_url = (
+                    f"{settings.web_url.rstrip('/')}/download/{token}"
+                )
+
                 if target_email:
-                    await t_tracker(f"Enviando para e-mail: {target_email}...")
+                    await t_tracker(
+                        f"Enviando link para e-mail: {target_email}..."
+                    )
                     from core.services.email_service import send_result_email
 
-                    await send_result_email(target_email, t_filename, zip_path)
-                    await message.answer(f"✅ Arquivo enviado para {target_email}!")
+                    await send_result_email(
+                        target_email, t_filename, download_url=download_url
+                    )
+                    await message.answer(
+                        f"✅ Link de download enviado para {target_email}!"
+                    )
                 else:
-                    await t_tracker("Enviando pacote acessivel...")
-                    await _send_doc_with_retry(
-                        message, zip_path, "Pacote acessivel gerado (.zip)."
+                    await t_tracker("Link de download gerado!")
+                    await _send_with_retry(
+                        message.bot,
+                        message.chat.id,
+                        f"✅ Pacote acessível gerado!\n\n📥 Link para download (válido por 7 dias):\n{download_url}",
+                        message_thread_id=message_thread_id,
                     )
 
                 await t_tracker.finish(success=True)
@@ -219,6 +208,11 @@ async def process_file(
                 "cleanup_dir": persistent_tmp,
             },
         )
+        confirmation_email = user_emails.get((message.chat.id, message.message_thread_id))
+        if confirmation_email:
+            from core.services.email_service import send_confirmation_email
+            asyncio.create_task(send_confirmation_email(confirmation_email, filename))
+
         pos = await unified_queue.enqueue(queue_item)
         if pos > 1:
             await message.answer(f"⏳ Você está na fila única (Posição: {pos}).")
