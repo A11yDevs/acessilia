@@ -21,10 +21,10 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 from core.orchestrator import process
-from core.exporters.txt_exporter import export_txt
-from core.exporters.docx_exporter import export_docx
-from core.exporters.pdf_exporter import export_pdf
-from core.exporters.audio_exporter import export_mp3
+
+
+
+
 from adapters.exporters import export_txt, export_docx, export_pdf, export_mp3
 from core.utils.logger import logger
 from exporters.pandoc_exporter import export_accessible_document

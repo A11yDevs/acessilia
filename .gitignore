@@ -1,18 +1,4 @@
-.env
-temp/
-logs/*.log
-__pycache__/
-*.pyc
-*.egg-info/
-dist/
-build/
-.tensorflow/
-.coverage
-.pytest_cache/
-*.db
-bot.lock
-data/
-.venv/
-venv/
-.DS_Store
-output/
+# Output artifacts that should be ignored
+Roberto_DaMatta_-_O_que_faz_o_brasil__Brasil.*
+find_is_file_size_allowed.py
+print_settings.py

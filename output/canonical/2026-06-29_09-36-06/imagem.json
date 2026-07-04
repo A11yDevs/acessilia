@@ -1,0 +1,246 @@
+{
+  "schema_version": "1.0.0",
+  "id": "doc-f23b0499276c",
+  "title": "imagem",
+  "language": "pt-BR",
+  "verbosity": "detailed",
+  "audience": [
+    "reader"
+  ],
+  "metadata": {
+    "page_count": 1,
+    "mode": "normal",
+    "pages": [
+      {
+        "page_number": 1,
+        "file_path": "/tmp/a11y-devs-describer/temp/task_5a4f144ce64549f2b4ccd0dfb4825166/imagem.png",
+        "text": "O logotipo da empresa é composto por um círculo azul escuro com uma silhueta de perfil humano em azul mais claro, voltado para a direita. Dentro do círculo, há uma representação de um documento com dobras no canto superior direito, contendo um ícone de imagem com montanha e sol, e três linhas horizontais em azul escuro. Abaixo do documento, há uma tabela com seis caixas brancas em uma grade de duas linhas e três colunas, com bordas em azul claro. Dois semicírculos azuis claros estão posicionados abaixo do círculo principal, sugerindo movimento ou som. \n\nAbaixo do logotipo, o nome da empresa \"acessilia\" é escrito em duas partes: \"acessil\" em azul escuro e \"ia\" em azul claro. Uma linha horizontal azul escura com pontos azuis claros nos extremos está posicionada abaixo do nome. \n\nO texto principal, em português, está dividido em duas linhas: \"TRANSFORMANDO DOCUMENTOS.\" em azul escuro e \"GERANDO ACESSIBILIDADE.\" em azul claro. \n\nAbaixo do texto, há quatro ícones alinhados horizontalmente: \n1. Um quadrado com seis pontos dispostos em duas linhas de três colunas (representando Braille).\n2. Um ícone de alto-falante com duas linhas curvas sugerindo som.\n3. Um ícone de olho com pupilas detalhadas.\n4. Um ícone de documento com três linhas horizontais, sugerindo texto.\n\nTodos os elementos são em azul escuro, exceto o texto \"ia\" e a linha horizontal, que são em azul claro. O fundo é branco.",
+        "blocks": [
+          {
+            "type": "paragraph",
+            "text": "O logotipo da empresa é composto por um círculo azul escuro com uma silhueta de perfil humano em azul mais claro, voltado para a direita. Dentro do círculo, há uma representação de um documento com dobras no canto superior direito, contendo um ícone de imagem com montanha e sol, e três linhas horizontais em azul escuro. Abaixo do documento, há uma tabela com seis caixas brancas em uma grade de duas linhas e três colunas, com bordas em azul claro. Dois semicírculos azuis claros estão posicionados abaixo do círculo principal, sugerindo movimento ou som.",
+            "id": "blk-ecc285d8c7-1"
+          },
+          {
+            "type": "paragraph",
+            "text": "Abaixo do logotipo, o nome da empresa \"acessilia\" é escrito em duas partes: \"acessil\" em azul escuro e \"ia\" em azul claro. Uma linha horizontal azul escura com pontos azuis claros nos extremos está posicionada abaixo do nome.",
+            "id": "blk-f0d8a516a6-2"
+          },
+          {
+            "type": "paragraph",
+            "text": "O texto principal, em português, está dividido em duas linhas: \"TRANSFORMANDO DOCUMENTOS.\" em azul escuro e \"GERANDO ACESSIBILIDADE.\" em azul claro.",
+            "id": "blk-fcdc747f24-3"
+          },
+          {
+            "type": "paragraph",
+            "text": "Abaixo do texto, há quatro ícones alinhados horizontalmente:",
+            "id": "blk-74e23536df-4"
+          },
+          {
+            "type": "list",
+            "ordered": true,
+            "items": [
+              "Um quadrado com seis pontos dispostos em duas linhas de três colunas (representando Braille)."
+            ],
+            "id": "blk-fb5d40ba74-5"
+          },
+          {
+            "type": "list",
+            "ordered": true,
+            "items": [
+              "Um ícone de alto-falante com duas linhas curvas sugerindo som."
+            ],
+            "id": "blk-1bfd5081f2-6"
+          },
+          {
+            "type": "list",
+            "ordered": true,
+            "items": [
+              "Um ícone de olho com pupilas detalhadas."
+            ],
+            "id": "blk-faeeaa0e91-7"
+          },
+          {
+            "type": "list",
+            "ordered": true,
+            "items": [
+              "Um ícone de documento com três linhas horizontais, sugerindo texto."
+            ],
+            "id": "blk-2bb28ed5ea-8"
+          },
+          {
+            "type": "paragraph",
+            "text": "Todos os elementos são em azul escuro, exceto o texto \"ia\" e a linha horizontal, que são em azul claro. O fundo é branco.",
+            "id": "blk-bd1eb21104-9"
+          }
+        ],
+        "cached": false
+      }
+    ]
+  },
+  "source": {
+    "name": "imagem.png",
+    "path": "/tmp/a11y-devs-describer/temp/task_5a4f144ce64549f2b4ccd0dfb4825166/imagem.png",
+    "type": ".png"
+  },
+  "accessibility": {
+    "navigation": true,
+    "semantic_headings": true,
+    "internal_links": true
+  },
+  "technical_warnings": [],
+  "audit": {
+    "generated_by": "canonical_builder",
+    "input_length": 5,
+    "block_count": 9
+  },
+  "sections": [
+    {
+      "id": "blk-ecc285d8c7-1",
+      "title": "",
+      "level": 1,
+      "source_location": {},
+      "metadata": {},
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "O logotipo da empresa é composto por um círculo azul escuro com uma silhueta de perfil humano em azul mais claro, voltado para a direita. Dentro do círculo, há uma representação de um documento com dobras no canto superior direito, contendo um ícone de imagem com montanha e sol, e três linhas horizontais em azul escuro. Abaixo do documento, há uma tabela com seis caixas brancas em uma grade de duas linhas e três colunas, com bordas em azul claro. Dois semicírculos azuis claros estão posicionados abaixo do círculo principal, sugerindo movimento ou som.",
+          "id": "blk-ecc285d8c7-1"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "blk-f0d8a516a6-2",
+      "title": "",
+      "level": 1,
+      "source_location": {},
+      "metadata": {},
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Abaixo do logotipo, o nome da empresa \"acessilia\" é escrito em duas partes: \"acessil\" em azul escuro e \"ia\" em azul claro. Uma linha horizontal azul escura com pontos azuis claros nos extremos está posicionada abaixo do nome.",
+          "id": "blk-f0d8a516a6-2"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "blk-fcdc747f24-3",
+      "title": "",
+      "level": 1,
+      "source_location": {},
+      "metadata": {},
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "O texto principal, em português, está dividido em duas linhas: \"TRANSFORMANDO DOCUMENTOS.\" em azul escuro e \"GERANDO ACESSIBILIDADE.\" em azul claro.",
+          "id": "blk-fcdc747f24-3"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "blk-74e23536df-4",
+      "title": "",
+      "level": 1,
+      "source_location": {},
+      "metadata": {},
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Abaixo do texto, há quatro ícones alinhados horizontalmente:",
+          "id": "blk-74e23536df-4"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "blk-fb5d40ba74-5",
+      "title": "",
+      "level": 1,
+      "source_location": {},
+      "metadata": {},
+      "blocks": [
+        {
+          "type": "list",
+          "ordered": true,
+          "items": [
+            "Um quadrado com seis pontos dispostos em duas linhas de três colunas (representando Braille)."
+          ],
+          "id": "blk-fb5d40ba74-5"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "blk-1bfd5081f2-6",
+      "title": "",
+      "level": 1,
+      "source_location": {},
+      "metadata": {},
+      "blocks": [
+        {
+          "type": "list",
+          "ordered": true,
+          "items": [
+            "Um ícone de alto-falante com duas linhas curvas sugerindo som."
+          ],
+          "id": "blk-1bfd5081f2-6"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "blk-faeeaa0e91-7",
+      "title": "",
+      "level": 1,
+      "source_location": {},
+      "metadata": {},
+      "blocks": [
+        {
+          "type": "list",
+          "ordered": true,
+          "items": [
+            "Um ícone de olho com pupilas detalhadas."
+          ],
+          "id": "blk-faeeaa0e91-7"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "blk-2bb28ed5ea-8",
+      "title": "",
+      "level": 1,
+      "source_location": {},
+      "metadata": {},
+      "blocks": [
+        {
+          "type": "list",
+          "ordered": true,
+          "items": [
+            "Um ícone de documento com três linhas horizontais, sugerindo texto."
+          ],
+          "id": "blk-2bb28ed5ea-8"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "blk-bd1eb21104-9",
+      "title": "",
+      "level": 1,
+      "source_location": {},
+      "metadata": {},
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Todos os elementos são em azul escuro, exceto o texto \"ia\" e a linha horizontal, que são em azul claro. O fundo é branco.",
+          "id": "blk-bd1eb21104-9"
+        }
+      ],
+      "children": []
+    }
+  ]
+}

@@ -20,7 +20,7 @@ class BaseLLMClient(ABC):
     """
 
     @abstractmethod
-    async def send_message(self, prompt: str, **kwargs: Any) -> str:
+    async def send_message(self, text: str, **kwargs: Any) -> str:
         """Enviar um prompt ao modelo e receber a resposta.
 
         Args:

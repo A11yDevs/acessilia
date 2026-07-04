@@ -7,6 +7,8 @@ instead of importing ``core.exporters`` directly.
 
 from pathlib import Path
 from typing import Mapping, Any
+from core.utils.logger import logger
+from core.utils.logger import logger
 
 # Import the legacy implementation functions
 from core.exporters.txt_exporter import export_txt as _export_txt
@@ -16,16 +18,24 @@ from core.exporters.audio_exporter import export_mp3 as _export_mp3
 
 # Simple functional wrappers that keep the same signature used by the web UI
 def export_txt(canonical_doc: Mapping[str, Any], output_path: Path, source_name: str) -> Path:
+    logger.debug("Exportando TXT para %s", output_path)
+    logger.debug("Exportando TXT para %s", output_path)
     return _export_txt(canonical_doc, output_path, source_name)
 
 def export_docx(canonical_doc: Mapping[str, Any], output_path: Path, source_name: str) -> Path:
+    logger.debug("Exportando DOCX para %s", output_path)
+    logger.debug("Exportando DOCX para %s", output_path)
     return _export_docx(canonical_doc, output_path, source_name)
 
 def export_pdf(canonical_doc: Mapping[str, Any], output_path: Path, source_name: str) -> Path:
+    logger.debug("Exportando PDF para %s", output_path)
+    logger.debug("Exportando PDF para %s", output_path)
     return _export_pdf(canonical_doc, output_path, source_name)
 
-def export_mp3(text_content: str, output_path: Path) -> Path:
-    return _export_mp3(text_content, output_path)
+async def export_mp3(text_content: str, output_path: Path, **kwargs) -> Path:
+    logger.debug("Exportando MP3 para %s", output_path)
+    logger.debug("Exportando MP3 para %s", output_path)
+    return await _export_mp3(text_content, output_path)
 
 # Factory helper – useful for the UI when the format is dynamic
 _EXPORTER_MAP = {

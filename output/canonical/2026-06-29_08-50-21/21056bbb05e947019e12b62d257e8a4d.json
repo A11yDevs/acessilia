@@ -1,0 +1,3288 @@
+{
+  "schema_version": "1.0.0",
+  "id": "doc-6cdda7ad3ee3",
+  "title": "21056bbb05e947019e12b62d257e8a4d",
+  "language": "pt-BR",
+  "verbosity": "detailed",
+  "audience": [
+    "reader"
+  ],
+  "metadata": {
+    "page_count": 42,
+    "mode": "normal",
+    "pages": [
+      {
+        "page_number": 1,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_001.pdf",
+        "text": "Grandezas e Medidas\n\nInício de imagem:\nO diagrama ilustra uma escala de tamanho que vai de átomos a células, com exemplos de objetos em cada nível. A escala é representada por uma linha azul horizontal com setas apontando para a esquerda e direita. Os exemplos incluem: átomo (1 Å), DNA (1 nm), proteínas (10 nm), vírus (100 nm), nanotubos (1 μm), transistores de 2003 (10 μm) e transistores de 1970 (10 μm). Cada exemplo é acompanhado de uma ilustração colorida ou em escala de cinza. O diagrama também mostra a resolução litográfica e o tamanho dos transistores em diferentes épocas. A parte inferior do diagrama tem uma escala de cores que vai do nanométrico (Nano) ao microscópico (Micro), indicando a transição entre esses níveis de escala.\nFim de imagem",
+        "blocks": [
+          {
+            "type": "paragraph",
+            "text": "Grandezas e Medidas",
+            "id": "blk-7a991f1f97-1"
+          },
+          {
+            "type": "image",
+            "text": "O diagrama ilustra uma escala de tamanho que vai de átomos a células, com exemplos de objetos em cada nível. A escala é representada por uma linha azul horizontal com setas apontando para a esquerda e direita. Os exemplos incluem: átomo (1 Å), DNA (1 nm), proteínas (10 nm), vírus (100 nm), nanotubos (1 μm), transistores de 2003 (10 μm) e transistores de 1970 (10 μm). Cada exemplo é acompanhado de uma ilustração colorida ou em escala de cinza. O diagrama também mostra a resolução litográfica e o tamanho dos transistores em diferentes épocas. A parte inferior do diagrama tem uma escala de cores que vai do nanométrico (Nano) ao microscópico (Micro), indicando a transição entre esses níveis de escala.",
+            "id": "blk-0eddb5ed38-2"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 2,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_002.pdf",
+        "text": "Início de lista:\nObservações qualitativas: cor, aparência, liberação ou não de calor em uma transformação química, processo rápido ou lento, formação de um gás numa reação química, etc...\nFim de lista\n\nInício de lista:\nObservações quantitativas: informação numérica da propriedade observada, por exemplo: quanto de produto foi formado em uma reação química, quanto calor foi liberado no processo, etc...\nFim de lista\n\nInício de imagem:\nA imagem apresenta um símbolo de seta em formato de seta, com ponta para baixo. A seta é de cor verde, com uma tonalidade uniforme e sem gradientes ou variações de cor. O contorno da seta é mais escuro, criando um efeito de sombra que destaca a forma. A seta é centralizada na imagem, sem outros elementos ou fundos. Não há texto, pessoas, objetos ou ações representadas. A imagem é simples e direta, com foco exclusivo no símbolo da seta.\nFim de imagem",
+        "blocks": [
+          {
+            "type": "list",
+            "ordered": false,
+            "items": [
+              "Observações qualitativas: cor, aparência, liberação ou não de calor em uma transformação química, processo rápido ou lento, formação de um gás numa reação química, etc..."
+            ],
+            "id": "blk-826b5d3662-1"
+          },
+          {
+            "type": "list",
+            "ordered": false,
+            "items": [
+              "Observações quantitativas: informação numérica da propriedade observada, por exemplo: quanto de produto foi formado em uma reação química, quanto calor foi liberado no processo, etc..."
+            ],
+            "id": "blk-d103164544-2"
+          },
+          {
+            "type": "image",
+            "text": "A imagem apresenta um símbolo de seta em formato de seta, com ponta para baixo. A seta é de cor verde, com uma tonalidade uniforme e sem gradientes ou variações de cor. O contorno da seta é mais escuro, criando um efeito de sombra que destaca a forma. A seta é centralizada na imagem, sem outros elementos ou fundos. Não há texto, pessoas, objetos ou ações representadas. A imagem é simples e direta, com foco exclusivo no símbolo da seta.",
+            "id": "blk-0ede769d85-3"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 3,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_003.pdf",
+        "text": "SISTEMA INTERNACIONAL DE UNIDADES (SI)\n\nGrandezas e Unidades de Base\n\n| Grandeza física de base (símbolo) | Unidade de base (símbolo) | Definição da unidade de base |\n|---|---|---|\n| comprimento (l) | metro (m) | 1 m é o comprimento do trajecto da luz, no vazio, no tempo de 1/299792458 s (1983). |\n| massa (m) | quilograma (kg) | 1 kg é a massa do protótipo internacional do quilograma (1901). |\n| tempo (t) | segundo (s) | 1 s é a duração de 9192631770 períodos da radiação da transição entre 2 níveis hiperfinos do estado fundamental do Cs (1967). |\n| intensidade de corrente eléctrica (I) | ampere (A) | A é a intensidade de uma corrente constante que mantida em 2 condutores paralelos, rectilíneos, de comprimento infinito, de secção circular desprezível e à distância de 1 m no vazio produz uma força de 2x10 Nm (1948). |\n| temperatura (T) | kelvin (K) | 1 K é 1/273,16 da temperatura termodinâmica do ponto triplo da água (1967). |\n| quantidade de matéria (n) | mole (mol) | a mole é a quantidade de matéria de um sistema contendo tantas entidades elementares quanto os átomos que existem em 0,012 kg de C (1971). |\n| intensidade luminosa (Iv) | candela (cd) | 1 cd é a intensidade luminosa numa dada direcção de fonte que emite radiação monocromática de frequência 540x10 Hz e cuja intensidade nessa direcção é 1/683 W.sr (1979). |",
+        "blocks": [
+          {
+            "type": "heading",
+            "level": 1,
+            "text": "SISTEMA INTERNACIONAL DE UNIDADES (SI)",
+            "id": "blk-51a9467bf0-1"
+          },
+          {
+            "type": "paragraph",
+            "text": "Grandezas e Unidades de Base",
+            "id": "blk-e3539369e6-2"
+          },
+          {
+            "type": "table",
+            "rows": [
+              [
+                "Grandeza física de base (símbolo)",
+                "Unidade de base (símbolo)",
+                "Definição da unidade de base"
+              ],
+              [
+                "comprimento (l)",
+                "metro (m)",
+                "1 m é o comprimento do trajecto da luz, no vazio, no tempo de 1/299792458 s (1983)."
+              ],
+              [
+                "massa (m)",
+                "quilograma (kg)",
+                "1 kg é a massa do protótipo internacional do quilograma (1901)."
+              ],
+              [
+                "tempo (t)",
+                "segundo (s)",
+                "1 s é a duração de 9192631770 períodos da radiação da transição entre 2 níveis hiperfinos do estado fundamental do Cs (1967)."
+              ],
+              [
+                "intensidade de corrente eléctrica (I)",
+                "ampere (A)",
+                "A é a intensidade de uma corrente constante que mantida em 2 condutores paralelos, rectilíneos, de comprimento infinito, de secção circular desprezível e à distância de 1 m no vazio produz uma força de 2x10 Nm (1948)."
+              ],
+              [
+                "temperatura (T)",
+                "kelvin (K)",
+                "1 K é 1/273,16 da temperatura termodinâmica do ponto triplo da água (1967)."
+              ],
+              [
+                "quantidade de matéria (n)",
+                "mole (mol)",
+                "a mole é a quantidade de matéria de um sistema contendo tantas entidades elementares quanto os átomos que existem em 0,012 kg de C (1971)."
+              ],
+              [
+                "intensidade luminosa (Iv)",
+                "candela (cd)",
+                "1 cd é a intensidade luminosa numa dada direcção de fonte que emite radiação monocromática de frequência 540x10 Hz e cuja intensidade nessa direcção é 1/683 W.sr (1979)."
+              ]
+            ],
+            "id": "blk-4a9ef6ed2a-3"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 4,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_004.pdf",
+        "text": "Tabela 1.2 - Grandezas derivadas do Sistema Internacional de Unidades (SI)\n\n| Grandeza | Definição | Unidade SI |\n| Área |  | m2 |\n| Volume |  | m3 |\n| Velocidade | Distância/tempo | m s-1 |\n| Aceleração | Velocidade/tempo | m s-2 |\n| Força | Massa x aceleração | N (Newton) = kg m s-2 |\n| Pressão | Força/área | Pa (Pascal) = N m-2 |\n| Energia | Força x distância | J (Joule) = N m |\n| Potência | Energia/tempo | W (Watt) = J s-1 |",
+        "blocks": [
+          {
+            "type": "paragraph",
+            "text": "Tabela 1.2 - Grandezas derivadas do Sistema Internacional de Unidades (SI)",
+            "id": "blk-657c6396a8-1"
+          },
+          {
+            "type": "table",
+            "rows": [
+              [
+                "Grandeza",
+                "Definição",
+                "Unidade SI"
+              ],
+              [
+                "Área",
+                "",
+                "m2"
+              ],
+              [
+                "Volume",
+                "",
+                "m3"
+              ],
+              [
+                "Velocidade",
+                "Distância/tempo",
+                "m s-1"
+              ],
+              [
+                "Aceleração",
+                "Velocidade/tempo",
+                "m s-2"
+              ],
+              [
+                "Força",
+                "Massa x aceleração",
+                "N (Newton) = kg m s-2"
+              ],
+              [
+                "Pressão",
+                "Força/área",
+                "Pa (Pascal) = N m-2"
+              ],
+              [
+                "Energia",
+                "Força x distância",
+                "J (Joule) = N m"
+              ],
+              [
+                "Potência",
+                "Energia/tempo",
+                "W (Watt) = J s-1"
+              ]
+            ],
+            "id": "blk-bd52bdfab7-2"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 5,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_005.pdf",
+        "text": "SISTEMA INTERNACIONAL DE UNIDADES (SI) Prefixos dos Múltiplos e Submúltiplos das Unidades\n\nMúltiplos\n\nSubmúltiplos\n\n| Prefixo | símbolo | potência |\n| --- | --- | --- |\n| deci | d | 10^-1 |\n| centi | c | 10^-2 |\n| mili | m | 10^-3 |\n| micro | μ | 10^-6 |\n| nano | n | 10^-9 |\n| pico | p | 10^-12 |\n| femto | f | 10^-15 |\n| ato | a | 10^-18 |\n| zepto | z | 10^-21 |\n| yocto | y | 10^-24 |\n\n| Prefixo | símbolo | potência |\n| --- | --- | --- |\n| yota | Y | 10^24 |\n| zeta | Z | 10^21 |\n| exa | E | 10^18 |\n| peta | P | 10^15 |\n| tera | T | 10^12 |\n| giga | G | 10^9 |\n| mega | M | 10^6 |\n| kilo | k | 10^3 |\n| hecto | h | 10^2 |\n| deca | da | 10^1 |",
+        "blocks": [
+          {
+            "type": "paragraph",
+            "text": "SISTEMA INTERNACIONAL DE UNIDADES (SI) Prefixos dos Múltiplos e Submúltiplos das Unidades",
+            "id": "blk-06de98e597-1"
+          },
+          {
+            "type": "paragraph",
+            "text": "Múltiplos",
+            "id": "blk-b68de20710-2"
+          },
+          {
+            "type": "paragraph",
+            "text": "Submúltiplos",
+            "id": "blk-94f5e44dad-3"
+          },
+          {
+            "type": "table",
+            "rows": [
+              [
+                "Prefixo",
+                "símbolo",
+                "potência"
+              ],
+              [
+                "deci",
+                "d",
+                "10^-1"
+              ],
+              [
+                "centi",
+                "c",
+                "10^-2"
+              ],
+              [
+                "mili",
+                "m",
+                "10^-3"
+              ],
+              [
+                "micro",
+                "μ",
+                "10^-6"
+              ],
+              [
+                "nano",
+                "n",
+                "10^-9"
+              ],
+              [
+                "pico",
+                "p",
+                "10^-12"
+              ],
+              [
+                "femto",
+                "f",
+                "10^-15"
+              ],
+              [
+                "ato",
+                "a",
+                "10^-18"
+              ],
+              [
+                "zepto",
+                "z",
+                "10^-21"
+              ],
+              [
+                "yocto",
+                "y",
+                "10^-24"
+              ]
+            ],
+            "id": "blk-e707a6cfba-4"
+          },
+          {
+            "type": "table",
+            "rows": [
+              [
+                "Prefixo",
+                "símbolo",
+                "potência"
+              ],
+              [
+                "yota",
+                "Y",
+                "10^24"
+              ],
+              [
+                "zeta",
+                "Z",
+                "10^21"
+              ],
+              [
+                "exa",
+                "E",
+                "10^18"
+              ],
+              [
+                "peta",
+                "P",
+                "10^15"
+              ],
+              [
+                "tera",
+                "T",
+                "10^12"
+              ],
+              [
+                "giga",
+                "G",
+                "10^9"
+              ],
+              [
+                "mega",
+                "M",
+                "10^6"
+              ],
+              [
+                "kilo",
+                "k",
+                "10^3"
+              ],
+              [
+                "hecto",
+                "h",
+                "10^2"
+              ],
+              [
+                "deca",
+                "da",
+                "10^1"
+              ]
+            ],
+            "id": "blk-a2db574174-5"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 6,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_006.pdf",
+        "text": "ORDENS DE GRANDEZA\n\nAlguns Exemplos\n\nDistâncias\n\n| Ordem de Grandeza (m) | Facto |\n| --- | --- |\n| 10^-15 m | raio de um núcleo atómico |\n| 10^-10 m | raio de um átomo |\n| 10^-7 m | dimensão de um vírus |\n| 10^-5 m | dimensão de um grão de sal |\n| 1 m | altura de uma criança |\n| 10^3 m | altitude da Serra da Estrela |\n| 10^8 m | distância da Terra à Lua |\n| 10^12 m | distância da Terra ao Sol |\n| 10^17 m | distância da Terra à estrela mais próxima |\n| 10^20 m | distância da Terra ao centro da Via Láctea |\n| 10^22 m | distância da Terra à galáxia mais próxima |\n| 10^26 m | dimensão do universo |",
+        "blocks": [
+          {
+            "type": "heading",
+            "level": 1,
+            "text": "ORDENS DE GRANDEZA",
+            "id": "blk-d25ef4d385-1"
+          },
+          {
+            "type": "paragraph",
+            "text": "Alguns Exemplos",
+            "id": "blk-4c494c0d5f-2"
+          },
+          {
+            "type": "paragraph",
+            "text": "Distâncias",
+            "id": "blk-d9fab744fc-3"
+          },
+          {
+            "type": "table",
+            "rows": [
+              [
+                "Ordem de Grandeza (m)",
+                "Facto"
+              ],
+              [
+                "10^-15 m",
+                "raio de um núcleo atómico"
+              ],
+              [
+                "10^-10 m",
+                "raio de um átomo"
+              ],
+              [
+                "10^-7 m",
+                "dimensão de um vírus"
+              ],
+              [
+                "10^-5 m",
+                "dimensão de um grão de sal"
+              ],
+              [
+                "1 m",
+                "altura de uma criança"
+              ],
+              [
+                "10^3 m",
+                "altitude da Serra da Estrela"
+              ],
+              [
+                "10^8 m",
+                "distância da Terra à Lua"
+              ],
+              [
+                "10^12 m",
+                "distância da Terra ao Sol"
+              ],
+              [
+                "10^17 m",
+                "distância da Terra à estrela mais próxima"
+              ],
+              [
+                "10^20 m",
+                "distância da Terra ao centro da Via Láctea"
+              ],
+              [
+                "10^22 m",
+                "distância da Terra à galáxia mais próxima"
+              ],
+              [
+                "10^26 m",
+                "dimensão do universo"
+              ]
+            ],
+            "id": "blk-dcb89de68c-4"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 7,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_007.pdf",
+        "text": "Início de imagem:\nO gráfico apresenta um diagrama de barras ilustrando a densidade de diversos metais, medidos em gramas por centímetro cúbico. O eixo horizontal lista os metais, incluindo Alumínio, Cádmio, Cromo, Cobalto, Cobre, Ouro, Íron, Chumbo, Magnésio, Manganês, Mercúrio, Molibdênio, Níquel, Platina, Prata, Titânio, Tungstênio, Urano e Zinco. O eixo vertical indica a densidade, variando de 0 a 25 gramas/cm³. As barras representam valores específicos para cada metal, com destaque para Ouro (19,30), Platina (21,45), Tungstênio (19,25) e Urano (19,10), que possuem as maiores densidades. Valores menores são observados em Magnésio (1,74) e Titânio (4,51). O gráfico utiliza uma paleta de cores neutras, com barras em tons de cinza sobre um fundo claro. O título \"Metals: Density\" está posicionado no topo, e os rótulos dos eixos são claramente legíveis. Não há elementos adicionais ou interações visuais além das barras e dos rótulos.\nFim de imagem",
+        "blocks": [
+          {
+            "type": "image",
+            "text": "O gráfico apresenta um diagrama de barras ilustrando a densidade de diversos metais, medidos em gramas por centímetro cúbico. O eixo horizontal lista os metais, incluindo Alumínio, Cádmio, Cromo, Cobalto, Cobre, Ouro, Íron, Chumbo, Magnésio, Manganês, Mercúrio, Molibdênio, Níquel, Platina, Prata, Titânio, Tungstênio, Urano e Zinco. O eixo vertical indica a densidade, variando de 0 a 25 gramas/cm³. As barras representam valores específicos para cada metal, com destaque para Ouro (19,30), Platina (21,45), Tungstênio (19,25) e Urano (19,10), que possuem as maiores densidades. Valores menores são observados em Magnésio (1,74) e Titânio (4,51). O gráfico utiliza uma paleta de cores neutras, com barras em tons de cinza sobre um fundo claro. O título \"Metals: Density\" está posicionado no topo, e os rótulos dos eixos são claramente legíveis. Não há elementos adicionais ou interações visuais além das barras e dos rótulos.",
+            "id": "blk-80679ba46f-1"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 8,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_008.pdf",
+        "text": "Table 12-9\n\nExperimental Bond Lengths (in nanometers)\n\n| Molecule | Bond | Length |\n| --- | --- | --- |\n| BCl3 | B-Cl | 0.174 |\n| B2H6 | B-H | 0.132 |\n| Diamond | C-C | 0.154 |\n| CH4 | C-H | 0.110 |\n| CH3I | C-H | 0.110 |\n| C-I | C-I | 0.221 |\n| CIBr | Cl-Br | 0.214 |\n| HF | H-F | 0.092 |\n| H2O | H-O | 0.096 |\n| NH3 | N-H | 0.101 |\n| OF2 | O-F | 0.141 |\n| O3 | O-O | 0.128 |\n| H2SAIBr3 | S-Al | 0.243 |\n| (H3Si)2NN(SiH3)2 | Si-N | 0.173 |",
+        "blocks": [
+          {
+            "type": "paragraph",
+            "text": "Table 12-9",
+            "id": "blk-63d19d06bf-1"
+          },
+          {
+            "type": "paragraph",
+            "text": "Experimental Bond Lengths (in nanometers)",
+            "id": "blk-b8ba2e0817-2"
+          },
+          {
+            "type": "table",
+            "rows": [
+              [
+                "Molecule",
+                "Bond",
+                "Length"
+              ],
+              [
+                "BCl3",
+                "B-Cl",
+                "0.174"
+              ],
+              [
+                "B2H6",
+                "B-H",
+                "0.132"
+              ],
+              [
+                "Diamond",
+                "C-C",
+                "0.154"
+              ],
+              [
+                "CH4",
+                "C-H",
+                "0.110"
+              ],
+              [
+                "CH3I",
+                "C-H",
+                "0.110"
+              ],
+              [
+                "C-I",
+                "C-I",
+                "0.221"
+              ],
+              [
+                "CIBr",
+                "Cl-Br",
+                "0.214"
+              ],
+              [
+                "HF",
+                "H-F",
+                "0.092"
+              ],
+              [
+                "H2O",
+                "H-O",
+                "0.096"
+              ],
+              [
+                "NH3",
+                "N-H",
+                "0.101"
+              ],
+              [
+                "OF2",
+                "O-F",
+                "0.141"
+              ],
+              [
+                "O3",
+                "O-O",
+                "0.128"
+              ],
+              [
+                "H2SAIBr3",
+                "S-Al",
+                "0.243"
+              ],
+              [
+                "(H3Si)2NN(SiH3)2",
+                "Si-N",
+                "0.173"
+              ]
+            ],
+            "id": "blk-f1979b061d-3"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 9,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_009.pdf",
+        "text": "O que é importante:\n\nInício de lista:\nToda grandeza física tem sua unidade.\nFim de lista\n\nInício de lista:\nConhecer as unidades fundamentais do SI\nFim de lista\n\nInício de lista:\nInterconverter unidades\nFim de lista\n\nInício de lista:\nUsar a notação científica (exponencial..... x 10 n )\nFim de lista\n\nInício de lista:\nExpressar corretamente o número de algarismos significativos de medidas experimentais e quando fizer operações matemáticas.\nFim de lista",
+        "blocks": [
+          {
+            "type": "paragraph",
+            "text": "O que é importante:",
+            "id": "blk-ef211c8fb1-1"
+          },
+          {
+            "type": "list",
+            "ordered": false,
+            "items": [
+              "Toda grandeza física tem sua unidade."
+            ],
+            "id": "blk-755e5cba33-2"
+          },
+          {
+            "type": "list",
+            "ordered": false,
+            "items": [
+              "Conhecer as unidades fundamentais do SI"
+            ],
+            "id": "blk-e2d91e9c30-3"
+          },
+          {
+            "type": "list",
+            "ordered": false,
+            "items": [
+              "Interconverter unidades"
+            ],
+            "id": "blk-64d6d745a2-4"
+          },
+          {
+            "type": "list",
+            "ordered": false,
+            "items": [
+              "Usar a notação científica (exponencial..... x 10 n )"
+            ],
+            "id": "blk-248b4adde9-5"
+          },
+          {
+            "type": "list",
+            "ordered": false,
+            "items": [
+              "Expressar corretamente o número de algarismos significativos de medidas experimentais e quando fizer operações matemáticas."
+            ],
+            "id": "blk-9f14bee21f-6"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 10,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_010.pdf",
+        "text": "Número Atômico / Número de Massa / Massa Atômica relativa/Massa Molar\n\n✓ Átomo : prótons, nêutrons e elétrons\n\nTabela 1.1. Partículas subatômicas de relevância à química\n\n| Partícula | Símbolo | Massa/u* | Nº massa | Carga/e+ | Spin |\n| --- | --- | --- | --- | --- | --- |\n| Elétron | e- | 5,486x10-4 | 0 | -1 | 1/2 |\n| Próton | p | 1,0078 | 1 | +1 | 1/2 |\n| Nêutron | n | 1,0087 | 1 | 0 | 1/2 |\n\nInício de box:\nMassas expressas em unidades de massa atômica, u, com 1u = 1,6605 x 10-27 Kg ★\nFim de box\n\nInício de box:\n† A carga elementar e é 1,602 x 10-19 C\nFim de box\n\nFonte: Química Inorgânica - Shiver e Atkins 3ª Ed.\n\n1u = corresponde a 1/12 da massa de um átomo de Carbono-12 Massa de 1 átomo de carbono (6 prótons e 6 nêutrons) = 12,000 u",
+        "blocks": [
+          {
+            "type": "paragraph",
+            "text": "Número Atômico / Número de Massa / Massa Atômica relativa/Massa Molar",
+            "id": "blk-7fb4791383-1"
+          },
+          {
+            "type": "paragraph",
+            "text": "✓ Átomo : prótons, nêutrons e elétrons",
+            "id": "blk-0cda25cfac-2"
+          },
+          {
+            "type": "paragraph",
+            "text": "Tabela 1.1. Partículas subatômicas de relevância à química",
+            "id": "blk-f04609f975-3"
+          },
+          {
+            "type": "table",
+            "rows": [
+              [
+                "Partícula",
+                "Símbolo",
+                "Massa/u*",
+                "Nº massa",
+                "Carga/e+",
+                "Spin"
+              ],
+              [
+                "Elétron",
+                "e-",
+                "5,486x10-4",
+                "0",
+                "-1",
+                "1/2"
+              ],
+              [
+                "Próton",
+                "p",
+                "1,0078",
+                "1",
+                "+1",
+                "1/2"
+              ],
+              [
+                "Nêutron",
+                "n",
+                "1,0087",
+                "1",
+                "0",
+                "1/2"
+              ]
+            ],
+            "id": "blk-a57cff4ec6-4"
+          },
+          {
+            "type": "callout",
+            "text": "Massas expressas em unidades de massa atômica, u, com 1u = 1,6605 x 10-27 Kg ★",
+            "callout_type": "box",
+            "id": "blk-2a404bda06-5"
+          },
+          {
+            "type": "callout",
+            "text": "† A carga elementar e é 1,602 x 10-19 C",
+            "callout_type": "box",
+            "id": "blk-0d4b56e99c-6"
+          },
+          {
+            "type": "paragraph",
+            "text": "Fonte: Química Inorgânica - Shiver e Atkins 3ª Ed.",
+            "id": "blk-97704e92a0-7"
+          },
+          {
+            "type": "paragraph",
+            "text": "1u = corresponde a 1/12 da massa de um átomo de Carbono-12 Massa de 1 átomo de carbono (6 prótons e 6 nêutrons) = 12,000 u",
+            "id": "blk-06bb7f59a4-8"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 11,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_011.pdf",
+        "text": "https://physics.nist.gov/cgi-bin/cuu/Results?search_for=mass\n\nInício de imagem:\nO documento mostra uma página da web com um título \"The NIST Reference on Constants, Units, and Uncertainty\". O layout inclui um menu lateral com categorias como \"Constants\", \"Topics\", \"Values\", \"Equations\", \"Searchable Bibliography\", e \"Background\". O conteúdo principal exibe resultados de pesquisa relacionados a \"mass\", com termos como \"alpha particle mass\", \"atomic mass constant\", e \"atomic mass unit\". O texto é em inglês, com links em roxo. O fundo é branco, e o menu lateral tem um design com cores verde e azul. Não há imagens ou gráficos visíveis.\nFim de imagem",
+        "blocks": [
+          {
+            "type": "paragraph",
+            "text": "https://physics.nist.gov/cgi-bin/cuu/Results?search_for=mass",
+            "id": "blk-9c8cb55727-1"
+          },
+          {
+            "type": "image",
+            "text": "O documento mostra uma página da web com um título \"The NIST Reference on Constants, Units, and Uncertainty\". O layout inclui um menu lateral com categorias como \"Constants\", \"Topics\", \"Values\", \"Equations\", \"Searchable Bibliography\", e \"Background\". O conteúdo principal exibe resultados de pesquisa relacionados a \"mass\", com termos como \"alpha particle mass\", \"atomic mass constant\", e \"atomic mass unit\". O texto é em inglês, com links em roxo. O fundo é branco, e o menu lateral tem um design com cores verde e azul. Não há imagens ou gráficos visíveis.",
+            "id": "blk-0e9f8a33ee-2"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 12,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_012.pdf",
+        "text": "Início de imagem:\nEsta imagem é uma ilustração de uma lâmpada estilizada. A lâmpada tem um corpo amarelo com um contorno preto e uma base azul. Dentro da lâmpada, há um desenho que se parece com um coração ou uma figura semelhante a um \"8\" em preto, que pode representar o filamento. A base da lâmpada é composta por três espirais azuis, que indicam o soquete. A imagem não contém pessoas, roupas, expressões, posturas, idade, cenário, ações, relações espaciais, gráficos, diagramas, texto embutido ou qualquer outro elemento além da lâmpada descrita. As cores principais são o amarelo e o azul, com o preto sendo usado para os contornos e detalhes internos.\nFim de imagem\n\nRecordando\n\nA E Z\n\nZ = número atômico do elemento = número de prótons = carga nuclear\n\nA = número de massa = nº de prótons + nº de nêutrons = número de núcleons",
+        "blocks": [
+          {
+            "type": "image",
+            "text": "Esta imagem é uma ilustração de uma lâmpada estilizada. A lâmpada tem um corpo amarelo com um contorno preto e uma base azul. Dentro da lâmpada, há um desenho que se parece com um coração ou uma figura semelhante a um \"8\" em preto, que pode representar o filamento. A base da lâmpada é composta por três espirais azuis, que indicam o soquete. A imagem não contém pessoas, roupas, expressões, posturas, idade, cenário, ações, relações espaciais, gráficos, diagramas, texto embutido ou qualquer outro elemento além da lâmpada descrita. As cores principais são o amarelo e o azul, com o preto sendo usado para os contornos e detalhes internos.",
+            "id": "blk-c8a42d725d-1"
+          },
+          {
+            "type": "paragraph",
+            "text": "Recordando",
+            "id": "blk-311e535e6c-2"
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "A E Z",
+            "id": "blk-077a900a1b-3"
+          },
+          {
+            "type": "paragraph",
+            "text": "Z = número atômico do elemento = número de prótons = carga nuclear",
+            "id": "blk-ece02603f3-4"
+          },
+          {
+            "type": "paragraph",
+            "text": "A = número de massa = nº de prótons + nº de nêutrons = número de núcleons",
+            "id": "blk-e075fa19ef-5"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 13,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_013.pdf",
+        "text": "Massa atômica\n\nA massa de um átomo, medida em unidades de massa atômica, corresponde a quantas vezes esse átomo é mais pesado que 1/12 do isótopo 12 do carbono. Corresponde, portanto, a quantas vezes o átomo em questão é mais pesado que o padrão (1/12 do isótopo 12 do carbono). Quando dizemos que um átomo de enxofre tem massa 32 u, estamos dizendo que sua massa é 32 vezes maior que 1/12 da massa do isótopo 12 do carbono.",
+        "blocks": [
+          {
+            "type": "paragraph",
+            "text": "Massa atômica",
+            "id": "blk-4a1c471b00-1"
+          },
+          {
+            "type": "paragraph",
+            "text": "A massa de um átomo, medida em unidades de massa atômica, corresponde a quantas vezes esse átomo é mais pesado que 1/12 do isótopo 12 do carbono. Corresponde, portanto, a quantas vezes o átomo em questão é mais pesado que o padrão (1/12 do isótopo 12 do carbono). Quando dizemos que um átomo de enxofre tem massa 32 u, estamos dizendo que sua massa é 32 vezes maior que 1/12 da massa do isótopo 12 do carbono.",
+            "id": "blk-1f3ce2453e-2"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 14,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_014.pdf",
+        "text": "Início de imagem:\nO gráfico mostra a tabela periódica dos elementos, com colunas numeradas de 1 a 18 e linhas numeradas de 1 a 7. Cada célula contém o símbolo do elemento, seu número atômico e seu nome. A tabela é organizada em blocos, com destaque para os elementos metálicos, não metálicos e gases nobres. No canto superior esquerdo, há uma representação visual de dois átomos de hidrogênio (H) e dois de oxigênio (O), dispostos em uma estrutura molecular. No lado direito, há uma nuvem de átomos de hidrogênio e oxigênio interagindo, com cores vibrantes de azul, laranja e vermelho, sugerindo uma reação química. O texto \"Há isótopos.....\" está em destaque no topo da imagem, indicando a relação entre os elementos e seus isótopos. A tabela periódica é detalhada, com legendas e números que indicam as propriedades dos elementos.\nFim de imagem",
+        "blocks": [
+          {
+            "type": "image",
+            "text": "O gráfico mostra a tabela periódica dos elementos, com colunas numeradas de 1 a 18 e linhas numeradas de 1 a 7. Cada célula contém o símbolo do elemento, seu número atômico e seu nome. A tabela é organizada em blocos, com destaque para os elementos metálicos, não metálicos e gases nobres. No canto superior esquerdo, há uma representação visual de dois átomos de hidrogênio (H) e dois de oxigênio (O), dispostos em uma estrutura molecular. No lado direito, há uma nuvem de átomos de hidrogênio e oxigênio interagindo, com cores vibrantes de azul, laranja e vermelho, sugerindo uma reação química. O texto \"Há isótopos.....\" está em destaque no topo da imagem, indicando a relação entre os elementos e seus isótopos. A tabela periódica é detalhada, com legendas e números que indicam as propriedades dos elementos.",
+            "id": "blk-a6ced6a43b-1"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 15,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_015.pdf",
+        "text": "Deve-se lembrar que elemento químico é o conjunto de átomos que possuem mesmo número atômico. Dentro desse conjunto, existem isótopos, ou seja, átomos que apresentam igual número atômico mas diferente massa atômica. Por exemplo, o elemento cloro, de número atômico 17, existem dois isótopos, um com número de massa 35 e outro com 37.\n\nInício de imagem:\nO diagrama ilustra as propriedades do elemento cloro da tabela periódica. A caixa central é retangular, com fundo gradiente de rosa claro a escuro. No topo, o número atômico \"17\" é exibido em preto, com uma seta apontando para a legenda \"Número Atômico\". Abaixo, o símbolo químico \"Cl\" está em destaque, seguido da palavra \"CLORO\" em letras maiúsculas roxas. No fundo, a massa atômica \"35.453\" aparece em preto, com uma seta direcionando-se para a legenda \"Massa Atômica\". Em destaque, o texto \"A massa atômica do cloro é aproximadamente 35,5u.\" está posicionado na parte inferior. O diagrama utiliza setas para conectar os valores aos seus respectivos conceitos, mantendo uma estrutura clara e educativa.\nFim de imagem\n\n| Isotopes | Atomic Mass of the Isotope (u) | Natural Abundance (%) |\n| 35Cl | 34.97 | 75.76 |\n| 37Cl | 36.97 | 24.24 |",
+        "blocks": [
+          {
+            "type": "paragraph",
+            "text": "Deve-se lembrar que elemento químico é o conjunto de átomos que possuem mesmo número atômico. Dentro desse conjunto, existem isótopos, ou seja, átomos que apresentam igual número atômico mas diferente massa atômica. Por exemplo, o elemento cloro, de número atômico 17, existem dois isótopos, um com número de massa 35 e outro com 37.",
+            "id": "blk-8e9ab0e5b5-1"
+          },
+          {
+            "type": "image",
+            "text": "O diagrama ilustra as propriedades do elemento cloro da tabela periódica. A caixa central é retangular, com fundo gradiente de rosa claro a escuro. No topo, o número atômico \"17\" é exibido em preto, com uma seta apontando para a legenda \"Número Atômico\". Abaixo, o símbolo químico \"Cl\" está em destaque, seguido da palavra \"CLORO\" em letras maiúsculas roxas. No fundo, a massa atômica \"35.453\" aparece em preto, com uma seta direcionando-se para a legenda \"Massa Atômica\". Em destaque, o texto \"A massa atômica do cloro é aproximadamente 35,5u.\" está posicionado na parte inferior. O diagrama utiliza setas para conectar os valores aos seus respectivos conceitos, mantendo uma estrutura clara e educativa.",
+            "id": "blk-d6ad74911b-2"
+          },
+          {
+            "type": "table",
+            "rows": [
+              [
+                "Isotopes",
+                "Atomic Mass of the Isotope (u)",
+                "Natural Abundance (%)"
+              ],
+              [
+                "35Cl",
+                "34.97",
+                "75.76"
+              ],
+              [
+                "37Cl",
+                "36.97",
+                "24.24"
+              ]
+            ],
+            "id": "blk-e576eda5da-3"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 16,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_016.pdf",
+        "text": "Espectrometria de massas\n\nInício de imagem:\nO diagrama ilustra o funcionamento de um espectrômetro de massa, um instrumento utilizado para analisar a composição de substâncias. A imagem é dividida em duas seções principais: a fonte de íons e o detector. Na fonte de íons, um aquecedor vaporiza uma amostra, gerando uma nuvem de partículas. Essas partículas são então ionizadas por um feixe de elétrons, resultando em íons positivos. Os íons são acelerados por um campo elétrico e entram em uma região com um campo magnético. Dentro do campo magnético, os íons são desviados em trajetórias curvas, com a curvatura dependendo de sua carga e massa. Íons com diferentes cargas/massas seguem trajetórias distintas, sendo separados e direcionados para o detector. O detector registra a presença dos íons, permitindo a identificação das partículas presentes na amostra. O diagrama utiliza cores para diferenciar os componentes: o aquecedor é vermelho, o feixe de elétrons é azul, o campo magnético é roxo e o detector é cinza. O texto embutido na imagem descreve cada parte do espectrômetro, explicando seu papel no processo de análise.\nFim de imagem",
+        "blocks": [
+          {
+            "type": "paragraph",
+            "text": "Espectrometria de massas",
+            "id": "blk-9b32ffef6f-1"
+          },
+          {
+            "type": "image",
+            "text": "O diagrama ilustra o funcionamento de um espectrômetro de massa, um instrumento utilizado para analisar a composição de substâncias. A imagem é dividida em duas seções principais: a fonte de íons e o detector. Na fonte de íons, um aquecedor vaporiza uma amostra, gerando uma nuvem de partículas. Essas partículas são então ionizadas por um feixe de elétrons, resultando em íons positivos. Os íons são acelerados por um campo elétrico e entram em uma região com um campo magnético. Dentro do campo magnético, os íons são desviados em trajetórias curvas, com a curvatura dependendo de sua carga e massa. Íons com diferentes cargas/massas seguem trajetórias distintas, sendo separados e direcionados para o detector. O detector registra a presença dos íons, permitindo a identificação das partículas presentes na amostra. O diagrama utiliza cores para diferenciar os componentes: o aquecedor é vermelho, o feixe de elétrons é azul, o campo magnético é roxo e o detector é cinza. O texto embutido na imagem descreve cada parte do espectrômetro, explicando seu papel no processo de análise.",
+            "id": "blk-5b02f257bb-2"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 17,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_017.pdf",
+        "text": "Início de imagem:\nO gráfico apresenta um espectro de massa do cloro (Cl₂). O eixo vertical, rotulado como \"relative intensity\", varia de 0 a 100, enquanto o eixo horizontal, marcado como \"m/z\", abrange valores de 30 a 80. No canto superior direito, um recuadro amarelo contém o título \"The mass spectrum of chlorine Cl₂\" e a informação \"Relative molecular mass 35.45\". O gráfico destaca cinco picos principais: dois íons monatômicos ([³⁵Cl]⁺ e [³⁷Cl]⁺) com intensidades de 80 e 30, respectivamente, e três íons moleculares ([³⁵Cl³⁵Cl]⁺, [³⁵Cl³⁷Cl]⁺ e [³⁷Cl³⁷Cl]⁺) com intensidades de 60, 40 e 20. Valores de m/z correspondentes são 35, 37, 70, 72 e 74. O texto central indica \"five main peaks\" e \"three molecular ion peaks\", ignorando outros isótopos. As cores dominantes são azul, vermelho e preto, com linhas verticais marcando os picos.\nFim de imagem",
+        "blocks": [
+          {
+            "type": "image",
+            "text": "O gráfico apresenta um espectro de massa do cloro (Cl₂). O eixo vertical, rotulado como \"relative intensity\", varia de 0 a 100, enquanto o eixo horizontal, marcado como \"m/z\", abrange valores de 30 a 80. No canto superior direito, um recuadro amarelo contém o título \"The mass spectrum of chlorine Cl₂\" e a informação \"Relative molecular mass 35.45\". O gráfico destaca cinco picos principais: dois íons monatômicos ([³⁵Cl]⁺ e [³⁷Cl]⁺) com intensidades de 80 e 30, respectivamente, e três íons moleculares ([³⁵Cl³⁵Cl]⁺, [³⁵Cl³⁷Cl]⁺ e [³⁷Cl³⁷Cl]⁺) com intensidades de 60, 40 e 20. Valores de m/z correspondentes são 35, 37, 70, 72 e 74. O texto central indica \"five main peaks\" e \"three molecular ion peaks\", ignorando outros isótopos. As cores dominantes são azul, vermelho e preto, com linhas verticais marcando os picos.",
+            "id": "blk-ce3a3478c4-1"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 18,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_018.pdf",
+        "text": "O valor mais recente da massa atômica para o carbono obtido por espectrometria de massas (MS, do inglês: Mass Spectrometry ) e aceito pela IUPAC é 12,0107 ± 8 com a incerteza no ultimo dígito.\n\nInício de imagem:\nEsta imagem apresenta quatro representações do elemento químico carbono, cada uma com variações na notação e na fonte de referência. As representações são dispostas em uma linha horizontal, com cada uma contendo um quadrado central que destaca o símbolo químico \"C\" e o número atômico \"6\". Abaixo de cada quadrado, há a palavra \"Carbono\" ou \"Carbon\", acompanhada de valores numéricos em vermelho, indicando a massa atômica. As fontes mencionadas incluem \"Tabela Periódica SBQ 2010\", \"CRC Handbook of Chemistry, 3ª ed.\", \"Chang e Goldsby Química, 11ª ed.\" e \"IUPAC 2016\". As cores principais são o preto para o texto e o vermelho para os valores numéricos. Não há pessoas, ações ou cenários representados, apenas informações científicas sobre o elemento carbono.\nFim de imagem",
+        "blocks": [
+          {
+            "type": "paragraph",
+            "text": "O valor mais recente da massa atômica para o carbono obtido por espectrometria de massas (MS, do inglês: Mass Spectrometry ) e aceito pela IUPAC é 12,0107 ± 8 com a incerteza no ultimo dígito.",
+            "id": "blk-60e4b291b9-1"
+          },
+          {
+            "type": "image",
+            "text": "Esta imagem apresenta quatro representações do elemento químico carbono, cada uma com variações na notação e na fonte de referência. As representações são dispostas em uma linha horizontal, com cada uma contendo um quadrado central que destaca o símbolo químico \"C\" e o número atômico \"6\". Abaixo de cada quadrado, há a palavra \"Carbono\" ou \"Carbon\", acompanhada de valores numéricos em vermelho, indicando a massa atômica. As fontes mencionadas incluem \"Tabela Periódica SBQ 2010\", \"CRC Handbook of Chemistry, 3ª ed.\", \"Chang e Goldsby Química, 11ª ed.\" e \"IUPAC 2016\". As cores principais são o preto para o texto e o vermelho para os valores numéricos. Não há pessoas, ações ou cenários representados, apenas informações científicas sobre o elemento carbono.",
+            "id": "blk-0c9708cf25-2"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 19,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_019.pdf",
+        "text": "O conceito de MOL\n\nInício de lista:\nUm mol é a quantidade de substância (ou matéria) que possui um número de unidades fundamentais (átomos, moléculas ou outras partículas) igual ao número de átomos presentem em exatamente 12 g do isótopo carbono -12.\nFim de lista\n\nInício de lista:\n1 mol contém sempre o mesmo número de partículas (entidades), não importa de qual substância\nFim de lista\n\nInício de lista:\nConstante (número) de Avogadro = 6,02214076 x 10 23\nFim de lista",
+        "blocks": [
+          {
+            "type": "paragraph",
+            "text": "O conceito de MOL",
+            "id": "blk-7424f64807-1"
+          },
+          {
+            "type": "list",
+            "ordered": false,
+            "items": [
+              "Um mol é a quantidade de substância (ou matéria) que possui um número de unidades fundamentais (átomos, moléculas ou outras partículas) igual ao número de átomos presentem em exatamente 12 g do isótopo carbono -12."
+            ],
+            "id": "blk-2ea5b8baa6-2"
+          },
+          {
+            "type": "list",
+            "ordered": false,
+            "items": [
+              "1 mol contém sempre o mesmo número de partículas (entidades), não importa de qual substância"
+            ],
+            "id": "blk-21055b9e33-3"
+          },
+          {
+            "type": "list",
+            "ordered": false,
+            "items": [
+              "Constante (número) de Avogadro = 6,02214076 x 10 23"
+            ],
+            "id": "blk-b44de07027-4"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 20,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_020.pdf",
+        "text": "Novo conceito de mol\n\nDefinition of the mole\n\n(IUPAC Recommendation 2017)\n\nPure Appl. Chem. 2018; 90(1): 175 - 180\n\nA quantidade de B, n (B), é proporcional ao número de entidades de B, N (B), com\n\nn (B)= ( N A ) -1 N (B)\n\nN A = 6.022 140 76  10 23 mol -1 (número de Avogadro)\n\nInício de lista:\n-D. B. Newell, F. Cabiati, J. Fischer, K. Fujii, S. G. Karshenboim, H. S. Margolis, E. de Mirandes, P. J. Mohr, F. Nez, K. Pachucki, T. J. Quinn, B. N. Taylor, M. Wang, B. Wood, Z. Zhang. 'The CODATA 2017 Values of h , e , k , and N A for the Revision of the SI,' Metrologia , accepted, online 20 Oct 2017, https://doi.org/10.1088/1681-7575/aa950a (2017).\nFim de lista\n\nInício de lista:\nKuramoto N, Mizushima S, Zhang L, Fujita K, Azuma Y, Kurokawa A, Okubo S, Inaba H and Fujii K. A new 28Si single crystal: counting the atoms for the new kilogram definition Metrologia 54 716 (2017)\nFim de lista",
+        "blocks": [
+          {
+            "type": "paragraph",
+            "text": "Novo conceito de mol",
+            "id": "blk-e87b62fcf6-1"
+          },
+          {
+            "type": "paragraph",
+            "text": "Definition of the mole",
+            "id": "blk-48342b8160-2"
+          },
+          {
+            "type": "paragraph",
+            "text": "(IUPAC Recommendation 2017)",
+            "id": "blk-7c28e834ec-3"
+          },
+          {
+            "type": "paragraph",
+            "text": "Pure Appl. Chem. 2018; 90(1): 175 - 180",
+            "id": "blk-f5547be9b0-4"
+          },
+          {
+            "type": "paragraph",
+            "text": "A quantidade de B, n (B), é proporcional ao número de entidades de B, N (B), com",
+            "id": "blk-636d87ad9f-5"
+          },
+          {
+            "type": "paragraph",
+            "text": "n (B)= ( N A ) -1 N (B)",
+            "id": "blk-c00bc3bc8d-6"
+          },
+          {
+            "type": "paragraph",
+            "text": "N A = 6.022 140 76  10 23 mol -1 (número de Avogadro)",
+            "id": "blk-76485ead69-7"
+          },
+          {
+            "type": "list",
+            "ordered": false,
+            "items": [
+              "-D. B. Newell, F. Cabiati, J. Fischer, K. Fujii, S. G. Karshenboim, H. S. Margolis, E. de Mirandes, P. J. Mohr, F. Nez, K. Pachucki, T. J. Quinn, B. N. Taylor, M. Wang, B. Wood, Z. Zhang. 'The CODATA 2017 Values of h , e , k , and N A for the Revision of the SI,' Metrologia , accepted, online 20 Oct 2017, https://doi.org/10.1088/1681-7575/aa950a (2017)."
+            ],
+            "id": "blk-efcc045e87-8"
+          },
+          {
+            "type": "list",
+            "ordered": false,
+            "items": [
+              "Kuramoto N, Mizushima S, Zhang L, Fujita K, Azuma Y, Kurokawa A, Okubo S, Inaba H and Fujii K. A new 28Si single crystal: counting the atoms for the new kilogram definition Metrologia 54 716 (2017)"
+            ],
+            "id": "blk-2880653abb-9"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 21,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_021.pdf",
+        "text": "O conceito de Massa Molar\n\nInício de lista:\nÉ a massa em gramas de 1 mol de átomos de qualquer elemento ou 1 mol de moléculas de qualquer substância...\nFim de lista\n\nInício de lista:\nÉ a quantidade em gramas numericamente igual à massa atômica ou molecular.\nFim de lista\n\nn=    massa Massa molar\n\nn (B)= M (B) -1 m (B)",
+        "blocks": [
+          {
+            "type": "paragraph",
+            "text": "O conceito de Massa Molar",
+            "id": "blk-a558241b97-1"
+          },
+          {
+            "type": "list",
+            "ordered": false,
+            "items": [
+              "É a massa em gramas de 1 mol de átomos de qualquer elemento ou 1 mol de moléculas de qualquer substância..."
+            ],
+            "id": "blk-219409feae-2"
+          },
+          {
+            "type": "list",
+            "ordered": false,
+            "items": [
+              "É a quantidade em gramas numericamente igual à massa atômica ou molecular."
+            ],
+            "id": "blk-cbc5ece4ea-3"
+          },
+          {
+            "type": "paragraph",
+            "text": "n=    massa Massa molar",
+            "id": "blk-3d8202ec64-4"
+          },
+          {
+            "type": "paragraph",
+            "text": "n (B)= M (B) -1 m (B)",
+            "id": "blk-f89e7f8f76-5"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 22,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_022.pdf",
+        "text": "mu é a constante de massa atômica = massa atômica do Carbono-12 dividido por 12 mu= ma ( 12 C)/12\n\nMu= constante de massa molar = N A mu\n\n1 M u = 1 g mol -1\n\nMassa molar da substância B\n\nM (B)= N A ma (B)= NA Ar (B) mu\n\nAr (B) é massa atômica relativa de B\n\nQuantas vezes a massa de B é maior que 1/12 da massa do Carbono-12",
+        "blocks": [
+          {
+            "type": "paragraph",
+            "text": "mu é a constante de massa atômica = massa atômica do Carbono-12 dividido por 12 mu= ma ( 12 C)/12",
+            "id": "blk-706969e669-1"
+          },
+          {
+            "type": "paragraph",
+            "text": "Mu= constante de massa molar = N A mu",
+            "id": "blk-f5becca458-2"
+          },
+          {
+            "type": "paragraph",
+            "text": "1 M u = 1 g mol -1",
+            "id": "blk-aec6a67694-3"
+          },
+          {
+            "type": "paragraph",
+            "text": "Massa molar da substância B",
+            "id": "blk-7026b0d855-4"
+          },
+          {
+            "type": "paragraph",
+            "text": "M (B)= N A ma (B)= NA Ar (B) mu",
+            "id": "blk-2a7a5d7deb-5"
+          },
+          {
+            "type": "paragraph",
+            "text": "Ar (B) é massa atômica relativa de B",
+            "id": "blk-e7aa382ec8-6"
+          },
+          {
+            "type": "paragraph",
+            "text": "Quantas vezes a massa de B é maior que 1/12 da massa do Carbono-12",
+            "id": "blk-111cedd640-7"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 23,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_023.pdf",
+        "text": "Início de imagem:\nO documento apresenta uma tabela periódica dos elementos químicos, organizada em sete linhas horizontais e dezesseis colunas verticais. Cada célula contém o símbolo do elemento, seu número atômico, massa atômica e nome. A tabela é dividida em quatro blocos coloridos: laranja para elementos representativos, verde para elementos de transição, amarelo para lantânidos e rosa para actinídios. No canto superior esquerdo, há um título em português: \"Tabela Periódica dos Elementos Químicos\". No canto inferior esquerdo, há uma legenda explicando os blocos coloridos e grupos IUPAC 1990. O fundo da tabela é azul claro, com bordas brancas e preta. O texto embutido inclui nomes dos elementos, símbolos, números atômicos e massas atômicas. Não há pessoas, ações ou relações espaciais além da estrutura da tabela.\nFim de imagem",
+        "blocks": [
+          {
+            "type": "image",
+            "text": "O documento apresenta uma tabela periódica dos elementos químicos, organizada em sete linhas horizontais e dezesseis colunas verticais. Cada célula contém o símbolo do elemento, seu número atômico, massa atômica e nome. A tabela é dividida em quatro blocos coloridos: laranja para elementos representativos, verde para elementos de transição, amarelo para lantânidos e rosa para actinídios. No canto superior esquerdo, há um título em português: \"Tabela Periódica dos Elementos Químicos\". No canto inferior esquerdo, há uma legenda explicando os blocos coloridos e grupos IUPAC 1990. O fundo da tabela é azul claro, com bordas brancas e preta. O texto embutido inclui nomes dos elementos, símbolos, números atômicos e massas atômicas. Não há pessoas, ações ou relações espaciais além da estrutura da tabela.",
+            "id": "blk-4a3c485061-1"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 24,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_024.pdf",
+        "text": "Fórmulas, moléculas e íons\n\nNaCl(s)\n\nH2 SO 4 (l)\n\nInício de lista:\nSiC (s)\nFim de lista\n\nSi (s)\n\nInício de imagem:\nEsta imagem apresenta uma coleção de cubos transparentes, variando em tamanho e opacidade, dispostos em um padrão irregular. Os cubos são predominantemente brancos e cinzas, com tons mais claros e escuros, criando uma sensação de profundidade e textura. A superfície de cada cubo reflete luz, destacando detalhes como linhas finas e irregularidades. O fundo é escuro, contrastando com a luminosidade dos cubos e realçando sua estrutura. A composição sugere uma perspectiva microscópica, com os cubos ocupando a maior parte do espaço visual. No canto inferior esquerdo, há um logotipo estilizado com círculos concêntricos e o texto \"RichWhiddon\" em fonte simples. Não há ações, personagens ou elementos narrativos presentes. A imagem foca exclusivamente na textura e organização dos cubos, sem relações espaciais complexas ou elementos adicionais.\nFim de imagem\n\nInício de imagem:\nA imagem mostra um foguete modelo posicionado em um suporte circular sobre um piso de madeira clara. O foguete é cilíndrico, com uma ponta afiada e uma base que se estreita ligeiramente em direção ao topo. Sua superfície é metálica, com reflexos de luz que criam padrões de linhas horizontais e verticais, sugerindo um acabamento polido. A cor principal do foguete é dourada, com tons de bronze e prata devido aos reflexos. O suporte é composto por duas estruturas triangulares que se estendem para fora, sustentando o foguete no centro. No fundo, há um armário de exibição com vitrines que contêm objetos não claramente identificáveis, e ao lado, um suporte de exibição com itens que parecem ser modelos ou instrumentos científicos. O cenário sugere um ambiente de exposição, possivelmente em um museu ou instituição técnica. Não há pessoas ou ações em andamento na imagem.\nFim de imagem\n\nInício de imagem:\nNa imagem, há dois objetos principais sobre um fundo escuro. À esquerda, um frasco de vidro escuro com tampa branca, contendo um líquido escuro. A etiqueta do frasco é branca com bordas vermelhas e contém o texto \"Ácido Sulfúrico\" em preto, além de outras informações não legíveis. À direita, um frasco de vidro transparente com um tubo de vidro inserido, que parece conter uma solução clara. O tubo tem uma ponta branca e está conectado ao frasco por um mecanismo de sucção. Os objetos estão posicionados verticalmente, com o frasco de ácido à esquerda e o frasco com tubo à direita, mantendo uma distância moderada entre eles. Não há pessoas, ações ou cenários adicionais na imagem.\nFim de imagem\n\nInício de imagem:\nA imagem apresenta uma montanha de material granular, com cor predominantemente escura, variando de preto a cinza. A textura é irregular, com partículas de diferentes tamanhos que formam uma superfície não uniforme. A montanha tem um formato cônico, com o topo mais alto e as laterais mais largas, sugerindo uma acumulação natural ou artificial. Não há elementos adicionais, como pessoas, objetos ou cenários, que possam ser identificados. O fundo é branco e uniforme, sem detalhes que possam ser descritos. Não há ações ou relações espaciais a serem observadas, pois o foco está exclusivamente no material em si.\nFim de imagem\n\nTartrazina (s)\n\nInício de imagem:\nA imagem apresenta uma superfície coberta por uma camada de partículas metálicas com cor dourada-alaranjada, possivelmente cobre ou outro material com tonalidade semelhante. As partículas são irregulares em forma e variam em tamanho, desde pequenos fragmentos até pedaços maiores, dispostos de maneira aleatória e densa, criando uma textura visualmente complexa. A superfície subjacente é clara e lisa, contrastando com a irregularidade das partículas. A iluminação é uniforme, destacando os reflexos e as sombras entre as partículas, o que intensifica a percepção de profundidade e volume. Não há elementos identificáveis como pessoas, objetos específicos ou ações dinâmicas. O foco está exclusivamente na composição e na interação entre as partículas e a superfície.\nFim de imagem\n\nInício de imagem:\nA imagem apresenta um close de uma superfície com textura irregular, dominada por tons de amarelo e dourado. No centro, há uma área mais clara e homogênea, com destaque para uma cor dourada intensa. Nas bordas, a textura se torna mais granulosa, com partículas menores e uma mistura de cores que incluem marrom escuro e dourado. À direita, há uma estrutura com formas redondas e escuras, que parecem ser aglomerados ou partículas maiores, com uma tonalidade marrom-escura. A superfície ao redor delas é mais clara, com um fundo cinza e branco, que contrasta com as cores quentes do centro. Não há elementos que indiquem movimento ou ações, e não há texto ou legendas visíveis. A composição sugere uma estrutura natural ou mineral, com detalhes que podem ser observados em um contexto microscópico ou de alta ampliação.\nFim de imagem\n\nCu (s)\n\nC16 H 9 N4 Na 3 O9S2",
+        "blocks": [
+          {
+            "type": "paragraph",
+            "text": "Fórmulas, moléculas e íons",
+            "id": "blk-d905c60dd6-1"
+          },
+          {
+            "type": "paragraph",
+            "text": "NaCl(s)",
+            "id": "blk-5ed2d360d3-2"
+          },
+          {
+            "type": "paragraph",
+            "text": "H2 SO 4 (l)",
+            "id": "blk-657967d077-3"
+          },
+          {
+            "type": "list",
+            "ordered": false,
+            "items": [
+              "SiC (s)"
+            ],
+            "id": "blk-71a1a39728-4"
+          },
+          {
+            "type": "paragraph",
+            "text": "Si (s)",
+            "id": "blk-c91f2754df-5"
+          },
+          {
+            "type": "image",
+            "text": "Esta imagem apresenta uma coleção de cubos transparentes, variando em tamanho e opacidade, dispostos em um padrão irregular. Os cubos são predominantemente brancos e cinzas, com tons mais claros e escuros, criando uma sensação de profundidade e textura. A superfície de cada cubo reflete luz, destacando detalhes como linhas finas e irregularidades. O fundo é escuro, contrastando com a luminosidade dos cubos e realçando sua estrutura. A composição sugere uma perspectiva microscópica, com os cubos ocupando a maior parte do espaço visual. No canto inferior esquerdo, há um logotipo estilizado com círculos concêntricos e o texto \"RichWhiddon\" em fonte simples. Não há ações, personagens ou elementos narrativos presentes. A imagem foca exclusivamente na textura e organização dos cubos, sem relações espaciais complexas ou elementos adicionais.",
+            "id": "blk-00c059f30d-6"
+          },
+          {
+            "type": "image",
+            "text": "A imagem mostra um foguete modelo posicionado em um suporte circular sobre um piso de madeira clara. O foguete é cilíndrico, com uma ponta afiada e uma base que se estreita ligeiramente em direção ao topo. Sua superfície é metálica, com reflexos de luz que criam padrões de linhas horizontais e verticais, sugerindo um acabamento polido. A cor principal do foguete é dourada, com tons de bronze e prata devido aos reflexos. O suporte é composto por duas estruturas triangulares que se estendem para fora, sustentando o foguete no centro. No fundo, há um armário de exibição com vitrines que contêm objetos não claramente identificáveis, e ao lado, um suporte de exibição com itens que parecem ser modelos ou instrumentos científicos. O cenário sugere um ambiente de exposição, possivelmente em um museu ou instituição técnica. Não há pessoas ou ações em andamento na imagem.",
+            "id": "blk-14dcf15b0f-7"
+          },
+          {
+            "type": "image",
+            "text": "Na imagem, há dois objetos principais sobre um fundo escuro. À esquerda, um frasco de vidro escuro com tampa branca, contendo um líquido escuro. A etiqueta do frasco é branca com bordas vermelhas e contém o texto \"Ácido Sulfúrico\" em preto, além de outras informações não legíveis. À direita, um frasco de vidro transparente com um tubo de vidro inserido, que parece conter uma solução clara. O tubo tem uma ponta branca e está conectado ao frasco por um mecanismo de sucção. Os objetos estão posicionados verticalmente, com o frasco de ácido à esquerda e o frasco com tubo à direita, mantendo uma distância moderada entre eles. Não há pessoas, ações ou cenários adicionais na imagem.",
+            "id": "blk-6738b0d03b-8"
+          },
+          {
+            "type": "image",
+            "text": "A imagem apresenta uma montanha de material granular, com cor predominantemente escura, variando de preto a cinza. A textura é irregular, com partículas de diferentes tamanhos que formam uma superfície não uniforme. A montanha tem um formato cônico, com o topo mais alto e as laterais mais largas, sugerindo uma acumulação natural ou artificial. Não há elementos adicionais, como pessoas, objetos ou cenários, que possam ser identificados. O fundo é branco e uniforme, sem detalhes que possam ser descritos. Não há ações ou relações espaciais a serem observadas, pois o foco está exclusivamente no material em si.",
+            "id": "blk-7ada802ab5-9"
+          },
+          {
+            "type": "paragraph",
+            "text": "Tartrazina (s)",
+            "id": "blk-d4f027da93-10"
+          },
+          {
+            "type": "image",
+            "text": "A imagem apresenta uma superfície coberta por uma camada de partículas metálicas com cor dourada-alaranjada, possivelmente cobre ou outro material com tonalidade semelhante. As partículas são irregulares em forma e variam em tamanho, desde pequenos fragmentos até pedaços maiores, dispostos de maneira aleatória e densa, criando uma textura visualmente complexa. A superfície subjacente é clara e lisa, contrastando com a irregularidade das partículas. A iluminação é uniforme, destacando os reflexos e as sombras entre as partículas, o que intensifica a percepção de profundidade e volume. Não há elementos identificáveis como pessoas, objetos específicos ou ações dinâmicas. O foco está exclusivamente na composição e na interação entre as partículas e a superfície.",
+            "id": "blk-9e1823e5a5-11"
+          },
+          {
+            "type": "image",
+            "text": "A imagem apresenta um close de uma superfície com textura irregular, dominada por tons de amarelo e dourado. No centro, há uma área mais clara e homogênea, com destaque para uma cor dourada intensa. Nas bordas, a textura se torna mais granulosa, com partículas menores e uma mistura de cores que incluem marrom escuro e dourado. À direita, há uma estrutura com formas redondas e escuras, que parecem ser aglomerados ou partículas maiores, com uma tonalidade marrom-escura. A superfície ao redor delas é mais clara, com um fundo cinza e branco, que contrasta com as cores quentes do centro. Não há elementos que indiquem movimento ou ações, e não há texto ou legendas visíveis. A composição sugere uma estrutura natural ou mineral, com detalhes que podem ser observados em um contexto microscópico ou de alta ampliação.",
+            "id": "blk-0b76edec25-12"
+          },
+          {
+            "type": "paragraph",
+            "text": "Cu (s)",
+            "id": "blk-a508ab1d67-13"
+          },
+          {
+            "type": "paragraph",
+            "text": "C16 H 9 N4 Na 3 O9S2",
+            "id": "blk-2b40207b4d-14"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 25,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_025.pdf",
+        "text": "Início de imagem:\nO diagrama representa uma estrutura molecular composta por átomos conectados por ligações. No centro, há um átomo verde, que parece ser o átomo de carbono, conectado a quatro outros átomos. Três desses átomos são vermelhos, representando átomos de oxigênio, e um é cinza, representando um átomo de hidrogênio. As ligações entre os átomos são ilustradas por barras cinzas que conectam as esferas. A estrutura sugere uma molécula de acetato, com o átomo de carbono central ligado a dois átomos de oxigênio e um átomo de hidrogênio, além de outro átomo de oxigênio conectado a um dos átomos de oxigênio. O diagrama é apresentado em uma perspectiva tridimensional, com as esferas posicionadas em ângulos que indicam a geometria espacial da molécula.\nFim de imagem\n\nInício de imagem:\nO diagrama representa uma estrutura molecular tridimensional. No centro, há uma esfera verde que simboliza um átomo de enxofre (S). Esta esfera está conectada a três esferas brancas, que representam átomos de hidrogênio (H), e a três esferas vermelhas, que indicam átomos de oxigênio (O). As esferas brancas estão posicionadas em ângulos de aproximadamente 120 graus em relação ao átomo central, enquanto as esferas vermelhas estão dispostas em ângulos semelhantes, mas em um plano diferente, criando uma estrutura piramidal. A cor verde é vibrante e central, enquanto as cores vermelha e branca são mais opacas, destacando a hierarquia dos átomos. O diagrama não contém legendas, eixos ou escalas, focando apenas na representação visual das ligações químicas e da geometria molecular.\nFim de imagem\n\nInício de imagem:\nO diagrama ilustra a estrutura molecular de um composto químico. No centro, um átomo de enxofre (S) está conectado a três átomos de oxigênio (O). Dois dos átomos de oxigênio estão ligados ao enxofre por ligações duplas, representadas por duas linhas paralelas. O terceiro átomo de oxigênio está ligado ao enxofre por uma ligação simples, indicada por uma única linha. Este átomo de oxigênio também está conectado a um átomo de hidrogênio (H), formando um grupo hidroxila (OH). A ligação entre o enxofre e o grupo hidroxila é representada por uma linha pontilhada, sugerindo uma ligação fraca ou interação específica. O diagrama utiliza símbolos químicos padronizados e não contém cores, texturas ou elementos adicionais.\nFim de imagem\n\nFórmulas estrutural\n\nMolécula",
+        "blocks": [
+          {
+            "type": "image",
+            "text": "O diagrama representa uma estrutura molecular composta por átomos conectados por ligações. No centro, há um átomo verde, que parece ser o átomo de carbono, conectado a quatro outros átomos. Três desses átomos são vermelhos, representando átomos de oxigênio, e um é cinza, representando um átomo de hidrogênio. As ligações entre os átomos são ilustradas por barras cinzas que conectam as esferas. A estrutura sugere uma molécula de acetato, com o átomo de carbono central ligado a dois átomos de oxigênio e um átomo de hidrogênio, além de outro átomo de oxigênio conectado a um dos átomos de oxigênio. O diagrama é apresentado em uma perspectiva tridimensional, com as esferas posicionadas em ângulos que indicam a geometria espacial da molécula.",
+            "id": "blk-498c1e4a10-1"
+          },
+          {
+            "type": "image",
+            "text": "O diagrama representa uma estrutura molecular tridimensional. No centro, há uma esfera verde que simboliza um átomo de enxofre (S). Esta esfera está conectada a três esferas brancas, que representam átomos de hidrogênio (H), e a três esferas vermelhas, que indicam átomos de oxigênio (O). As esferas brancas estão posicionadas em ângulos de aproximadamente 120 graus em relação ao átomo central, enquanto as esferas vermelhas estão dispostas em ângulos semelhantes, mas em um plano diferente, criando uma estrutura piramidal. A cor verde é vibrante e central, enquanto as cores vermelha e branca são mais opacas, destacando a hierarquia dos átomos. O diagrama não contém legendas, eixos ou escalas, focando apenas na representação visual das ligações químicas e da geometria molecular.",
+            "id": "blk-a294de2f1f-2"
+          },
+          {
+            "type": "image",
+            "text": "O diagrama ilustra a estrutura molecular de um composto químico. No centro, um átomo de enxofre (S) está conectado a três átomos de oxigênio (O). Dois dos átomos de oxigênio estão ligados ao enxofre por ligações duplas, representadas por duas linhas paralelas. O terceiro átomo de oxigênio está ligado ao enxofre por uma ligação simples, indicada por uma única linha. Este átomo de oxigênio também está conectado a um átomo de hidrogênio (H), formando um grupo hidroxila (OH). A ligação entre o enxofre e o grupo hidroxila é representada por uma linha pontilhada, sugerindo uma ligação fraca ou interação específica. O diagrama utiliza símbolos químicos padronizados e não contém cores, texturas ou elementos adicionais.",
+            "id": "blk-a726343bc4-3"
+          },
+          {
+            "type": "paragraph",
+            "text": "Fórmulas estrutural",
+            "id": "blk-66bb12aac6-4"
+          },
+          {
+            "type": "paragraph",
+            "text": "Molécula",
+            "id": "blk-65285b4161-5"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 26,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_026.pdf",
+        "text": "PET\n\nTartrazina\n\nInício de imagem:\nO diagrama representa uma estrutura molecular composta por vários componentes. No centro, há um anel hexagonais com ligações simples e duplas, conectado a outros anéis e grupos funcionais. À esquerda, um anel hexagonais está ligado a um átomo de enxofre (S), que por sua vez está conectado a dois átomos de oxigênio (O) e um íon sódio (Na⁺). No meio, há um anel com dois átomos de nitrogênio (N), um dos quais está ligado a um grupo hidroxila (OH). À direita, outro anel hexagonais está conectado a um átomo de enxofre (S) duplamente ligado a um oxigênio (O), com um íon sódio (Na⁺) associado. A estrutura é simétrica, com ligações químicas indicadas por linhas retas e duplas, e grupos funcionais como grupos carboxila e amida. O diagrama é desenhado em linhas pretas sobre fundo branco, sem cores ou sombras.\nFim de imagem\n\nInício de imagem:\nO diagrama representa uma estrutura molecular composta por átomos de carbono (C), hidrogênio (H) e oxigênio (O). No centro, há um anel hexagonal com seis átomos de carbono, cada um conectado a um átomo de hidrogênio. Dois átomos de oxigênio estão ligados ao anel por ligações duplas, indicadas por linhas grossas. A estrutura se estende linearmente a partir do anel, com átomos de carbono conectados a átomos de oxigênio por ligações simples. Os átomos de hidrogênio estão distribuídos ao longo da cadeia, com dois átomos de hidrogênio em cada carbono da cadeia linear. A estrutura é terminada por um átomo de oxigênio na extremidade direita, conectado a um carbono. A notação \"n\" indica uma cadeia repetitiva ou polimerização. O diagrama utiliza linhas retas para ligações simples, linhas duplas para ligações duplas e círculos vermelhos para átomos de oxigênio. O texto \"n\" está posicionado no canto inferior direito do diagrama.\nFim de imagem\n\nMolécula\n\nmacromolécula",
+        "blocks": [
+          {
+            "type": "heading",
+            "level": 1,
+            "text": "PET",
+            "id": "blk-bf5e92b826-1"
+          },
+          {
+            "type": "paragraph",
+            "text": "Tartrazina",
+            "id": "blk-d292b892b7-2"
+          },
+          {
+            "type": "image",
+            "text": "O diagrama representa uma estrutura molecular composta por vários componentes. No centro, há um anel hexagonais com ligações simples e duplas, conectado a outros anéis e grupos funcionais. À esquerda, um anel hexagonais está ligado a um átomo de enxofre (S), que por sua vez está conectado a dois átomos de oxigênio (O) e um íon sódio (Na⁺). No meio, há um anel com dois átomos de nitrogênio (N), um dos quais está ligado a um grupo hidroxila (OH). À direita, outro anel hexagonais está conectado a um átomo de enxofre (S) duplamente ligado a um oxigênio (O), com um íon sódio (Na⁺) associado. A estrutura é simétrica, com ligações químicas indicadas por linhas retas e duplas, e grupos funcionais como grupos carboxila e amida. O diagrama é desenhado em linhas pretas sobre fundo branco, sem cores ou sombras.",
+            "id": "blk-7d4a918fcb-3"
+          },
+          {
+            "type": "image",
+            "text": "O diagrama representa uma estrutura molecular composta por átomos de carbono (C), hidrogênio (H) e oxigênio (O). No centro, há um anel hexagonal com seis átomos de carbono, cada um conectado a um átomo de hidrogênio. Dois átomos de oxigênio estão ligados ao anel por ligações duplas, indicadas por linhas grossas. A estrutura se estende linearmente a partir do anel, com átomos de carbono conectados a átomos de oxigênio por ligações simples. Os átomos de hidrogênio estão distribuídos ao longo da cadeia, com dois átomos de hidrogênio em cada carbono da cadeia linear. A estrutura é terminada por um átomo de oxigênio na extremidade direita, conectado a um carbono. A notação \"n\" indica uma cadeia repetitiva ou polimerização. O diagrama utiliza linhas retas para ligações simples, linhas duplas para ligações duplas e círculos vermelhos para átomos de oxigênio. O texto \"n\" está posicionado no canto inferior direito do diagrama.",
+            "id": "blk-b218125de0-4"
+          },
+          {
+            "type": "paragraph",
+            "text": "Molécula",
+            "id": "blk-5a2169bb7c-5"
+          },
+          {
+            "type": "paragraph",
+            "text": "macromolécula",
+            "id": "blk-e8f39ab80e-6"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 27,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_027.pdf",
+        "text": "Início de imagem:\nNa imagem, uma pessoa está segurando um frasco de vidro com uma cor púrpura intensa. O frasco tem um formato esférico com um pescoço estreito e é sustentado por uma haste de metal. A pessoa está usando luvas brancas, sugerindo que está manipulando o frasco com cuidado. A cor do frasco é a mais vibrante da imagem, com reflexos claros que indicam uma superfície lisa e brilhante. O fundo é desfocado, mas é possível identificar um ambiente que parece ser um laboratório, com outras estruturas de vidro e metal. A pessoa está em uma postura que sugere que está demonstrando ou manipulando o frasco, possivelmente para fins científicos ou experimentais. Não há texto embutido na imagem.\nFim de imagem\n\nI 2 (s) molecular\n\nInício de imagem:\nEm um prato de vidro transparente, há uma montanha de grãos de café moído. Os grãos são de diferentes tamanhos e texturas, variando de partículas finas a grãos mais grossos. A cor dos grãos é escura, com nuances de preto e marrom, e há pequenos pontos brancos que podem ser resíduos de óleo ou açúcar. O prato está posicionado centralmente na imagem, e a superfície do café moído é irregular, com alguns grãos soltos na borda do prato. Não há outros objetos ou pessoas na imagem, e o fundo é branco e sem detalhes.\nFim de imagem",
+        "blocks": [
+          {
+            "type": "image",
+            "text": "Na imagem, uma pessoa está segurando um frasco de vidro com uma cor púrpura intensa. O frasco tem um formato esférico com um pescoço estreito e é sustentado por uma haste de metal. A pessoa está usando luvas brancas, sugerindo que está manipulando o frasco com cuidado. A cor do frasco é a mais vibrante da imagem, com reflexos claros que indicam uma superfície lisa e brilhante. O fundo é desfocado, mas é possível identificar um ambiente que parece ser um laboratório, com outras estruturas de vidro e metal. A pessoa está em uma postura que sugere que está demonstrando ou manipulando o frasco, possivelmente para fins científicos ou experimentais. Não há texto embutido na imagem.",
+            "id": "blk-8679e999f2-1"
+          },
+          {
+            "type": "paragraph",
+            "text": "I 2 (s) molecular",
+            "id": "blk-abe57638f5-2"
+          },
+          {
+            "type": "image",
+            "text": "Em um prato de vidro transparente, há uma montanha de grãos de café moído. Os grãos são de diferentes tamanhos e texturas, variando de partículas finas a grãos mais grossos. A cor dos grãos é escura, com nuances de preto e marrom, e há pequenos pontos brancos que podem ser resíduos de óleo ou açúcar. O prato está posicionado centralmente na imagem, e a superfície do café moído é irregular, com alguns grãos soltos na borda do prato. Não há outros objetos ou pessoas na imagem, e o fundo é branco e sem detalhes.",
+            "id": "blk-0de33364b9-3"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 28,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_028.pdf",
+        "text": "Início de imagem:\nO documento apresenta quatro imagens dispostas em uma grade 2x2, todas em escala de cinza. A imagem superior esquerda mostra uma estrutura molecular composta por átomos de carbono e hidrogênio dispostos em uma cadeia linear, com ligações simples entre os átomos. A imagem superior direita é uma representação difusa de uma estrutura semelhante, com gradientes de intensidade indicando densidade ou concentração. A imagem inferior esquerda apresenta uma estrutura mais alongada e difusa, com áreas de maior e menor intensidade, sugerindo uma representação de difração ou interferência. A imagem inferior direita mostra uma série de partículas alinhadas em uma orientação paralela, com formas alongadas e bordas definidas, possivelmente representando moléculas ou estruturas nanométricas. As imagens não contêm texto embutido, e as escalas de escala são visíveis nas bordas de cada imagem.\nFim de imagem\n\nSTM and AFM imaging of pentacene on Cu(111).\n\nImagem da molécula de pentaceno imobilizada numa superfície resfriada próximo do zero absoluto (L. Gross, F. Mohn, N. Moll, P. Liljeroth e G. Meyer, The Chemical Structure of a Molecule Resolved by Atomic Force Microscopy , Science (2009), 325 (5944), 1110-1114; DOI: 10.1126/science.1176210)",
+        "blocks": [
+          {
+            "type": "image",
+            "text": "O documento apresenta quatro imagens dispostas em uma grade 2x2, todas em escala de cinza. A imagem superior esquerda mostra uma estrutura molecular composta por átomos de carbono e hidrogênio dispostos em uma cadeia linear, com ligações simples entre os átomos. A imagem superior direita é uma representação difusa de uma estrutura semelhante, com gradientes de intensidade indicando densidade ou concentração. A imagem inferior esquerda apresenta uma estrutura mais alongada e difusa, com áreas de maior e menor intensidade, sugerindo uma representação de difração ou interferência. A imagem inferior direita mostra uma série de partículas alinhadas em uma orientação paralela, com formas alongadas e bordas definidas, possivelmente representando moléculas ou estruturas nanométricas. As imagens não contêm texto embutido, e as escalas de escala são visíveis nas bordas de cada imagem.",
+            "id": "blk-4f9759c805-1"
+          },
+          {
+            "type": "paragraph",
+            "text": "STM and AFM imaging of pentacene on Cu(111).",
+            "id": "blk-428f23d673-2"
+          },
+          {
+            "type": "paragraph",
+            "text": "Imagem da molécula de pentaceno imobilizada numa superfície resfriada próximo do zero absoluto (L. Gross, F. Mohn, N. Moll, P. Liljeroth e G. Meyer, The Chemical Structure of a Molecule Resolved by Atomic Force Microscopy , Science (2009), 325 (5944), 1110-1114; DOI: 10.1126/science.1176210)",
+            "id": "blk-496d39c30d-3"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 29,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_029.pdf",
+        "text": "iônico\n\nInício de imagem:\nO diagrama ilustra a estrutura cristalina do cloreto de sódio (NaCl) em uma grade tridimensional. A estrutura é representada por um cubo com linhas que conectam os vértices, formando uma malha. Os íons de cloro (Cl⁻) são indicados por círculos azuis, enquanto os íons de sódio (Na⁺) são representados por círculos vermelhos. Os íons azuis estão posicionados nos vértices do cubo e em pontos intermediários das arestas, enquanto os íons vermelhos ocupam as posições centrais das faces e os pontos centrais da grade interna. A legenda no lado direito do diagrama identifica as cores: azul para Cl⁻ e vermelho para Na⁺. Na parte inferior do diagrama, o texto \"NaCl\" está presente, indicando o composto químico representado. O diagrama utiliza uma cor de fundo azul claro para destacar a estrutura cristalina.\nFim de imagem\n\nInício de imagem:\nO diagrama ilustra a estrutura de uma rede cristalina composta por átomos de cloreto e sódio. Os átomos são representados por esferas coloridas, onde as esferas verdes indicam cloreto e as esferas roxas representam sódio. A estrutura é organizada em uma grade tridimensional, com os átomos de cloreto formando uma rede de cubo e os átomos de sódio posicionados nos espaços intersticiais entre os átomos de cloreto. A legenda no diagrama identifica as cores correspondentes a cada tipo de átomo: \"Cloreto\" associado à cor verde e \"Sódio\" associado à cor roxa. O diagrama não apresenta texto embutido adicional ou elementos gráficos além da representação das esferas e da legenda.\nFim de imagem\n\nCela unitária - agrupamento mínimo de  íons ou átomos que representa a estrutura",
+        "blocks": [
+          {
+            "type": "paragraph",
+            "text": "iônico",
+            "id": "blk-ce31e6da8f-1"
+          },
+          {
+            "type": "image",
+            "text": "O diagrama ilustra a estrutura cristalina do cloreto de sódio (NaCl) em uma grade tridimensional. A estrutura é representada por um cubo com linhas que conectam os vértices, formando uma malha. Os íons de cloro (Cl⁻) são indicados por círculos azuis, enquanto os íons de sódio (Na⁺) são representados por círculos vermelhos. Os íons azuis estão posicionados nos vértices do cubo e em pontos intermediários das arestas, enquanto os íons vermelhos ocupam as posições centrais das faces e os pontos centrais da grade interna. A legenda no lado direito do diagrama identifica as cores: azul para Cl⁻ e vermelho para Na⁺. Na parte inferior do diagrama, o texto \"NaCl\" está presente, indicando o composto químico representado. O diagrama utiliza uma cor de fundo azul claro para destacar a estrutura cristalina.",
+            "id": "blk-7874e221fd-2"
+          },
+          {
+            "type": "image",
+            "text": "O diagrama ilustra a estrutura de uma rede cristalina composta por átomos de cloreto e sódio. Os átomos são representados por esferas coloridas, onde as esferas verdes indicam cloreto e as esferas roxas representam sódio. A estrutura é organizada em uma grade tridimensional, com os átomos de cloreto formando uma rede de cubo e os átomos de sódio posicionados nos espaços intersticiais entre os átomos de cloreto. A legenda no diagrama identifica as cores correspondentes a cada tipo de átomo: \"Cloreto\" associado à cor verde e \"Sódio\" associado à cor roxa. O diagrama não apresenta texto embutido adicional ou elementos gráficos além da representação das esferas e da legenda.",
+            "id": "blk-9edd4009a0-3"
+          },
+          {
+            "type": "paragraph",
+            "text": "Cela unitária - agrupamento mínimo de  íons ou átomos que representa a estrutura",
+            "id": "blk-18b23af640-4"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 30,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_030.pdf",
+        "text": "Início de imagem:\nO diagrama ilustra a estrutura molecular de um composto químico. No centro, há um átomo de enxofre (S), representado por um círculo com uma letra \"S\" dentro. Este átomo está conectado a quatro átomos de oxigênio (O), cada um representado por círculos com a letra \"O\". Três dos átomos de oxigênio estão ligados ao enxofre por linhas simples, indicando ligações simples. O quarto átomo de oxigênio está ligado ao enxofre por duas linhas paralelas, representando uma ligação dupla. Além disso, há uma seta preta apontando para um dos átomos de oxigênio, com uma linha pontilhada que se estende do átomo de enxofre até o oxigênio, sugerindo uma interação ou ligação parcial. O diagrama é simples, sem fundos ou elementos adicionais, e não contém texto embutido.\nFim de imagem\n\nInício de imagem:\nO diagrama ilustra a estrutura de uma rede cristalina composta por íons sulfato e cobre. No lado esquerdo, há uma representação tridimensional de uma estrutura cúbica formada por bolas coloridas. As bolas amarelas representam o enxofre, as vermelhas indicam o oxigênio e as rosas simbolizam o hidrogênio, enquanto as bolas amarelas maiores no centro de cada grupo representam o íon sulfato (SO4^2-). As bolas vermelhas menores, conectadas às amarelas, representam os átomos de oxigênio ligados ao sulfato. As bolas vermelhas maiores, isoladas, representam os íons cobre (Cu^2+), que estão distribuídos na estrutura. No lado direito, há uma legenda explicando os símbolos: uma estrutura com três bolas vermelhas e uma amarela no centro, rotulada como \"Sulfato\", e uma única bola vermelha rotulada como \"Cobre\". No canto inferior direito, há o texto \"Íon Cu^2+\", indicando a carga do íon cobre. O diagrama utiliza cores vibrantes para diferenciar os elementos e mostra a organização espacial dos íons na rede cristalina.\nFim de imagem\n\nInício de imagem:\nA imagem apresenta um símbolo de seta, com design simples e direto. A seta é de cor amarela, com uma tonalidade uniforme e brilhante, e possui uma borda escura que a contorna, criando um efeito de sombra. O formato da seta é simétrico, com uma base triangular que se estreita para um ponto na parte inferior, e duas linhas verticais que conectam os lados da base, formando um retângulo. A seta está centralizada na imagem, sem outros elementos ou detalhes adicionais. Não há texto, pessoas, objetos ou cenário representado. A imagem é estática, sem ações ou relações espaciais a serem descritas.\nFim de imagem\n\nIônico SO4 -Íon sulfato Íon poliatômico Íon molecular",
+        "blocks": [
+          {
+            "type": "image",
+            "text": "O diagrama ilustra a estrutura molecular de um composto químico. No centro, há um átomo de enxofre (S), representado por um círculo com uma letra \"S\" dentro. Este átomo está conectado a quatro átomos de oxigênio (O), cada um representado por círculos com a letra \"O\". Três dos átomos de oxigênio estão ligados ao enxofre por linhas simples, indicando ligações simples. O quarto átomo de oxigênio está ligado ao enxofre por duas linhas paralelas, representando uma ligação dupla. Além disso, há uma seta preta apontando para um dos átomos de oxigênio, com uma linha pontilhada que se estende do átomo de enxofre até o oxigênio, sugerindo uma interação ou ligação parcial. O diagrama é simples, sem fundos ou elementos adicionais, e não contém texto embutido.",
+            "id": "blk-6ce474cab7-1"
+          },
+          {
+            "type": "image",
+            "text": "O diagrama ilustra a estrutura de uma rede cristalina composta por íons sulfato e cobre. No lado esquerdo, há uma representação tridimensional de uma estrutura cúbica formada por bolas coloridas. As bolas amarelas representam o enxofre, as vermelhas indicam o oxigênio e as rosas simbolizam o hidrogênio, enquanto as bolas amarelas maiores no centro de cada grupo representam o íon sulfato (SO4^2-). As bolas vermelhas menores, conectadas às amarelas, representam os átomos de oxigênio ligados ao sulfato. As bolas vermelhas maiores, isoladas, representam os íons cobre (Cu^2+), que estão distribuídos na estrutura. No lado direito, há uma legenda explicando os símbolos: uma estrutura com três bolas vermelhas e uma amarela no centro, rotulada como \"Sulfato\", e uma única bola vermelha rotulada como \"Cobre\". No canto inferior direito, há o texto \"Íon Cu^2+\", indicando a carga do íon cobre. O diagrama utiliza cores vibrantes para diferenciar os elementos e mostra a organização espacial dos íons na rede cristalina.",
+            "id": "blk-658edd93d0-2"
+          },
+          {
+            "type": "image",
+            "text": "A imagem apresenta um símbolo de seta, com design simples e direto. A seta é de cor amarela, com uma tonalidade uniforme e brilhante, e possui uma borda escura que a contorna, criando um efeito de sombra. O formato da seta é simétrico, com uma base triangular que se estreita para um ponto na parte inferior, e duas linhas verticais que conectam os lados da base, formando um retângulo. A seta está centralizada na imagem, sem outros elementos ou detalhes adicionais. Não há texto, pessoas, objetos ou cenário representado. A imagem é estática, sem ações ou relações espaciais a serem descritas.",
+            "id": "blk-b1c4055c57-3"
+          },
+          {
+            "type": "paragraph",
+            "text": "Iônico SO4 -Íon sulfato Íon poliatômico Íon molecular",
+            "id": "blk-e034a6ea8e-4"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 31,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_031.pdf",
+        "text": "Início de imagem:\nO gráfico é uma tabela periódica dos elementos químicos. A tabela é organizada em linhas e colunas, com cada célula contendo o símbolo do elemento, seu número atômico e sua configuração eletrônica. A coluna mais à esquerda, destacada em amarelo, contém os metais alcalinos (H, Li, Na, K, Rb, Cs). A coluna à direita, em roxo, representa os gases nobres (H). As colunas intermediárias são coloridas em tons de azul, verde e rosa, indicando diferentes grupos de elementos. Na parte inferior, há uma linha separada com os metais de transição (La, Ce, Nd, Pm, Sm, Eu, Gd, Tb) e lantanídeos (Ac). O fundo da tabela é branco, com bordas em preto. Não há ações ou relações espaciais dinâmicas, apenas a estrutura estática da tabela periódica.\nFim de imagem",
+        "blocks": [
+          {
+            "type": "image",
+            "text": "O gráfico é uma tabela periódica dos elementos químicos. A tabela é organizada em linhas e colunas, com cada célula contendo o símbolo do elemento, seu número atômico e sua configuração eletrônica. A coluna mais à esquerda, destacada em amarelo, contém os metais alcalinos (H, Li, Na, K, Rb, Cs). A coluna à direita, em roxo, representa os gases nobres (H). As colunas intermediárias são coloridas em tons de azul, verde e rosa, indicando diferentes grupos de elementos. Na parte inferior, há uma linha separada com os metais de transição (La, Ce, Nd, Pm, Sm, Eu, Gd, Tb) e lantanídeos (Ac). O fundo da tabela é branco, com bordas em preto. Não há ações ou relações espaciais dinâmicas, apenas a estrutura estática da tabela periódica.",
+            "id": "blk-3d6b6d338a-1"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 32,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_032.pdf",
+        "text": "HALOGÊNIOS\n\n| F- | Fluoreto |\n| Cl- | Cloreto |\n| Br- | Brometo |\n| I- | Iodeto |\n| ClO- | Hipoclorito |\n| ClO2- | Clorito |\n| ClO3- | Clorato |\n| ClO4- | Perclorato |\n| BrO- | Hipobromito |\n| BrO3- | Bromato |\n| IO- | Hipoiodito |\n| IO3- | Iodato |\n| IO4- | Periodato |\n\n| FÓSFORO |  |\n| PO3- | Metafosfato |\n| H2PO2- | Hipofosfito |\n| HPO32- | Fosfito |\n| PO43- | Ortofosfato |\n| P3- | Fosfeto |\n| P2O74- | Pirofosfato |\n| P2O64- | Hipofosfato |",
+        "blocks": [
+          {
+            "type": "heading",
+            "level": 1,
+            "text": "HALOGÊNIOS",
+            "id": "blk-f520053033-1"
+          },
+          {
+            "type": "table",
+            "rows": [
+              [
+                "F-",
+                "Fluoreto"
+              ],
+              [
+                "Cl-",
+                "Cloreto"
+              ],
+              [
+                "Br-",
+                "Brometo"
+              ],
+              [
+                "I-",
+                "Iodeto"
+              ],
+              [
+                "ClO-",
+                "Hipoclorito"
+              ],
+              [
+                "ClO2-",
+                "Clorito"
+              ],
+              [
+                "ClO3-",
+                "Clorato"
+              ],
+              [
+                "ClO4-",
+                "Perclorato"
+              ],
+              [
+                "BrO-",
+                "Hipobromito"
+              ],
+              [
+                "BrO3-",
+                "Bromato"
+              ],
+              [
+                "IO-",
+                "Hipoiodito"
+              ],
+              [
+                "IO3-",
+                "Iodato"
+              ],
+              [
+                "IO4-",
+                "Periodato"
+              ]
+            ],
+            "id": "blk-db0db10bf8-2"
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "| FÓSFORO |  |",
+            "id": "blk-c245479e06-3"
+          },
+          {
+            "type": "table",
+            "rows": [
+              [
+                "PO3-",
+                "Metafosfato"
+              ],
+              [
+                "H2PO2-",
+                "Hipofosfito"
+              ],
+              [
+                "HPO32-",
+                "Fosfito"
+              ],
+              [
+                "PO43-",
+                "Ortofosfato"
+              ],
+              [
+                "P3-",
+                "Fosfeto"
+              ],
+              [
+                "P2O74-",
+                "Pirofosfato"
+              ],
+              [
+                "P2O64-",
+                "Hipofosfato"
+              ]
+            ],
+            "id": "blk-dcd31f2b52-4"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 33,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_033.pdf",
+        "text": "| ENXOFRE |  |\n| S2- | Sulfito |\n| SO42- | Sulfato |\n| SO32- | Sulfito |\n| S2O32- | Tiossulfato |\n| S2O82- | Persulfato |\n| S4O62- | Tetrationato |\n\n| NITROGÊNIO |  |\n|---|---|\n| NO₂⁻ | Nitrito |\n| NO₃⁻ | Nitrato |\n| N₃⁻ | Azida |\n| N³⁻ | Nitreto |",
+        "blocks": [
+          {
+            "type": "heading",
+            "level": 1,
+            "text": "| ENXOFRE |  |",
+            "id": "blk-582b819419-1"
+          },
+          {
+            "type": "table",
+            "rows": [
+              [
+                "S2-",
+                "Sulfito"
+              ],
+              [
+                "SO42-",
+                "Sulfato"
+              ],
+              [
+                "SO32-",
+                "Sulfito"
+              ],
+              [
+                "S2O32-",
+                "Tiossulfato"
+              ],
+              [
+                "S2O82-",
+                "Persulfato"
+              ],
+              [
+                "S4O62-",
+                "Tetrationato"
+              ]
+            ],
+            "id": "blk-ef55aff5e2-2"
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "| NITROGÊNIO |  |",
+            "id": "blk-ca1e41b16b-3"
+          },
+          {
+            "type": "table",
+            "rows": [
+              [
+                "NO₂⁻",
+                "Nitrito"
+              ],
+              [
+                "NO₃⁻",
+                "Nitrato"
+              ],
+              [
+                "N₃⁻",
+                "Azida"
+              ],
+              [
+                "N³⁻",
+                "Nitreto"
+              ]
+            ],
+            "id": "blk-670eeb68c6-4"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 34,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_034.pdf",
+        "text": "Início de imagem:\nO diagrama ilustra a estrutura do carbeto de silício e compara-a com a estrutura metálica do ferro. No lado esquerdo, há um modelo de bolas conectadas por linhas, representando átomos de silício (círculos azuis) e carbono (círculos laranja) em uma rede covalente estendida. O título \"Silicon carbide structure\" está acima do modelo, e \"Figure 11\" está abaixo. No lado direito, há três imagens: uma esfera cinza rotulada \"Ferro\", uma estrutura metálica com esferas cinzas conectadas por linhas, e uma estrutura com esferas vermelhas agrupadas. O texto \"metálico\" está abaixo da estrutura metálica. A legenda \"REDE Covalente estendida\" está no canto inferior esquerdo. As cores principais são azul, laranja, cinza e vermelho. O diagrama usa formas geométricas para representar átomos e suas conexões.\nFim de imagem",
+        "blocks": [
+          {
+            "type": "image",
+            "text": "O diagrama ilustra a estrutura do carbeto de silício e compara-a com a estrutura metálica do ferro. No lado esquerdo, há um modelo de bolas conectadas por linhas, representando átomos de silício (círculos azuis) e carbono (círculos laranja) em uma rede covalente estendida. O título \"Silicon carbide structure\" está acima do modelo, e \"Figure 11\" está abaixo. No lado direito, há três imagens: uma esfera cinza rotulada \"Ferro\", uma estrutura metálica com esferas cinzas conectadas por linhas, e uma estrutura com esferas vermelhas agrupadas. O texto \"metálico\" está abaixo da estrutura metálica. A legenda \"REDE Covalente estendida\" está no canto inferior esquerdo. As cores principais são azul, laranja, cinza e vermelho. O diagrama usa formas geométricas para representar átomos e suas conexões.",
+            "id": "blk-5c23e38bfc-1"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 35,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_035.pdf",
+        "text": "Determinação da fórmula química\n\nfórmulas empíricas : menor relação dos átomos contidos em um composto. Os compostos iônicos, metálicos e de rede covalente estendida são geralmente representados por fórmulas empíricas. NaCl ; C ; Na ; Fe; Al 2 O3 ; Fe 3O4 CaCO3\n\nfórmulas moleculares: descreve o número exato de átomos de cada elemento de uma molécula.\n\nH2O2, porém sua fórmula empírica ou fórmula mínima é HO.",
+        "blocks": [
+          {
+            "type": "paragraph",
+            "text": "Determinação da fórmula química",
+            "id": "blk-1370f5713c-1"
+          },
+          {
+            "type": "paragraph",
+            "text": "fórmulas empíricas : menor relação dos átomos contidos em um composto. Os compostos iônicos, metálicos e de rede covalente estendida são geralmente representados por fórmulas empíricas. NaCl ; C ; Na ; Fe; Al 2 O3 ; Fe 3O4 CaCO3",
+            "id": "blk-69d802ab50-2"
+          },
+          {
+            "type": "paragraph",
+            "text": "fórmulas moleculares: descreve o número exato de átomos de cada elemento de uma molécula.",
+            "id": "blk-5413af3bff-3"
+          },
+          {
+            "type": "paragraph",
+            "text": "H2O2, porém sua fórmula empírica ou fórmula mínima é HO.",
+            "id": "blk-345ba8ecf6-4"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 36,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_036.pdf",
+        "text": "Composição percentual em massa\n\n$\\% elemento = \\frac{n \\times massa molar do elemento}{massa molar do composto} \\times 100\\%$\n\nn é o número de mols de elemento em 1 mol de composto.\n\nEx:  1 mol de CaCO 3 tem 1mol de Ca, 1 mol de C e 3 mols de O",
+        "blocks": [
+          {
+            "type": "paragraph",
+            "text": "Composição percentual em massa",
+            "id": "blk-ba93be65f9-1"
+          },
+          {
+            "type": "paragraph",
+            "text": "$\\% elemento = \\frac{n \\times massa molar do elemento}{massa molar do composto} \\times 100\\%$",
+            "id": "blk-d98cda860d-2"
+          },
+          {
+            "type": "paragraph",
+            "text": "n é o número de mols de elemento em 1 mol de composto.",
+            "id": "blk-2f35545d44-3"
+          },
+          {
+            "type": "paragraph",
+            "text": "Ex:  1 mol de CaCO 3 tem 1mol de Ca, 1 mol de C e 3 mols de O",
+            "id": "blk-da9ae3daa4-4"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 37,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_037.pdf",
+        "text": "Sobre a vitamina C, calcule o que se pede: (dado: fórmula molecular da vitamina C, C 6 H8 O 6 )\n\nInício de lista:\nfórmula mínima da vitamina C\nFim de lista\n\nInício de lista:\ncomposição percentual em massa da fórmula mínima\nFim de lista\n\nInício de lista:\ncomposição percentual em massa da fórmula molecular\nFim de lista\n\nInício de imagem:\nO diagrama representa a estrutura molecular de um composto químico. A estrutura central é um anel pentagonal com dois átomos de oxigênio conectados por uma ligação dupla. Dois átomos de hidrogênio estão ligados a um dos vértices do anel, enquanto outro átomo de hidrogênio está conectado a um átomo de oxigênio no anel. Uma cadeia lateral composta por dois átomos de carbono e dois átomos de hidrogênio está ligada ao anel. A estrutura é desenhada com linhas sólidas para ligações simples e linhas duplas para ligações duplas. O diagrama utiliza notação química padrão, com átomos de carbono implícitos nos vértices e átomos de hidrogênio mostrados explicitamente. Não há cores, imagens ou elementos visuais além da estrutura molecular.\nFim de imagem\n\nvitamina C\n\nFigura 1: molécula do ácido ascórbico Fórmula estrutural",
+        "blocks": [
+          {
+            "type": "paragraph",
+            "text": "Sobre a vitamina C, calcule o que se pede: (dado: fórmula molecular da vitamina C, C 6 H8 O 6 )",
+            "id": "blk-1630aa8d35-1"
+          },
+          {
+            "type": "list",
+            "ordered": false,
+            "items": [
+              "fórmula mínima da vitamina C"
+            ],
+            "id": "blk-7c88afb2cf-2"
+          },
+          {
+            "type": "list",
+            "ordered": false,
+            "items": [
+              "composição percentual em massa da fórmula mínima"
+            ],
+            "id": "blk-bd301b3d4e-3"
+          },
+          {
+            "type": "list",
+            "ordered": false,
+            "items": [
+              "composição percentual em massa da fórmula molecular"
+            ],
+            "id": "blk-4904a7eb1d-4"
+          },
+          {
+            "type": "image",
+            "text": "O diagrama representa a estrutura molecular de um composto químico. A estrutura central é um anel pentagonal com dois átomos de oxigênio conectados por uma ligação dupla. Dois átomos de hidrogênio estão ligados a um dos vértices do anel, enquanto outro átomo de hidrogênio está conectado a um átomo de oxigênio no anel. Uma cadeia lateral composta por dois átomos de carbono e dois átomos de hidrogênio está ligada ao anel. A estrutura é desenhada com linhas sólidas para ligações simples e linhas duplas para ligações duplas. O diagrama utiliza notação química padrão, com átomos de carbono implícitos nos vértices e átomos de hidrogênio mostrados explicitamente. Não há cores, imagens ou elementos visuais além da estrutura molecular.",
+            "id": "blk-c41405c13f-5"
+          },
+          {
+            "type": "paragraph",
+            "text": "vitamina C",
+            "id": "blk-4d68d0b331-6"
+          },
+          {
+            "type": "paragraph",
+            "text": "Figura 1: molécula do ácido ascórbico Fórmula estrutural",
+            "id": "blk-95417fcde7-7"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 38,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_038.pdf",
+        "text": "Na verdade, ocorre o contrário, ou seja, a determinação da fórmula molecular de um composto começa pela medida da massa percentual de cada elemento presente na amostra. Calculado por meio da seguinte expressão:\n\n$$Massa percentual do elemento=\\frac{massa do elemento na amostra}{massa total da amostra}\\times 100\\%$$\n\nPor exemplo, uma amostra de 8 g vitamina C, quando analisada, possui os seguintes valores:\n\nCarbono 3,270 g\n\nHidrogênio 0,366 g\n\nOxigênio 4,360 g",
+        "blocks": [
+          {
+            "type": "paragraph",
+            "text": "Na verdade, ocorre o contrário, ou seja, a determinação da fórmula molecular de um composto começa pela medida da massa percentual de cada elemento presente na amostra. Calculado por meio da seguinte expressão:",
+            "id": "blk-8a9842f3bd-1"
+          },
+          {
+            "type": "paragraph",
+            "text": "$$Massa percentual do elemento=\\frac{massa do elemento na amostra}{massa total da amostra}\\times 100\\%$$",
+            "id": "blk-3b50bfdd1d-2"
+          },
+          {
+            "type": "paragraph",
+            "text": "Por exemplo, uma amostra de 8 g vitamina C, quando analisada, possui os seguintes valores:",
+            "id": "blk-4972974cae-3"
+          },
+          {
+            "type": "paragraph",
+            "text": "Carbono 3,270 g",
+            "id": "blk-2ccd77c3d2-4"
+          },
+          {
+            "type": "paragraph",
+            "text": "Hidrogênio 0,366 g",
+            "id": "blk-a1aca4b863-5"
+          },
+          {
+            "type": "paragraph",
+            "text": "Oxigênio 4,360 g",
+            "id": "blk-4b4b8ee3ae-6"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 39,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_039.pdf",
+        "text": "Início de lista:\n1- Calcular a massa de cada em elemento para 100 g de amostra\nFim de lista\n\nInício de lista:\n2O número de mols é calculado por meio da seguinte expressão:\nFim de lista\n\nn = massa do elemento em 100 g de amostra massa molar 𝑑𝑜 𝑒𝑙𝑒𝑚𝑒𝑛𝑡𝑜",
+        "blocks": [
+          {
+            "type": "list",
+            "ordered": false,
+            "items": [
+              "1- Calcular a massa de cada em elemento para 100 g de amostra"
+            ],
+            "id": "blk-19f06e329f-1"
+          },
+          {
+            "type": "list",
+            "ordered": false,
+            "items": [
+              "2O número de mols é calculado por meio da seguinte expressão:"
+            ],
+            "id": "blk-5974a2048e-2"
+          },
+          {
+            "type": "paragraph",
+            "text": "n = massa do elemento em 100 g de amostra massa molar 𝑑𝑜 𝑒𝑙𝑒𝑚𝑒𝑛𝑡𝑜",
+            "id": "blk-9db478c2a1-3"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 40,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_040.pdf",
+        "text": "o número de mols é proporcional ao número de átomos, nós conhecemos agora quantos átomos de cada elemento estão presentes na vitamina C:\n\n3,41 mol de  átomos de C,\n\nEm 100 gramas\n\n4,54 mol de átomos de H\n\n3,41 mol de átomos de O\n\nrazão molar de 3,41C : 4,54H : 3,41O\n\nDesse modo, somos capaz de escrever a seguinte fórmula empírica para a vitamina C:\n\n\\(O_{3,41} C_3H_4O_3???\\)\n\nC3,41 H4,54",
+        "blocks": [
+          {
+            "type": "paragraph",
+            "text": "o número de mols é proporcional ao número de átomos, nós conhecemos agora quantos átomos de cada elemento estão presentes na vitamina C:",
+            "id": "blk-58bdc194ce-1"
+          },
+          {
+            "type": "paragraph",
+            "text": "3,41 mol de  átomos de C,",
+            "id": "blk-8c177b54c0-2"
+          },
+          {
+            "type": "paragraph",
+            "text": "Em 100 gramas",
+            "id": "blk-401dc0d91e-3"
+          },
+          {
+            "type": "paragraph",
+            "text": "4,54 mol de átomos de H",
+            "id": "blk-5db11f56cd-4"
+          },
+          {
+            "type": "paragraph",
+            "text": "3,41 mol de átomos de O",
+            "id": "blk-5495265bd4-5"
+          },
+          {
+            "type": "paragraph",
+            "text": "razão molar de 3,41C : 4,54H : 3,41O",
+            "id": "blk-255dc6cc0b-6"
+          },
+          {
+            "type": "paragraph",
+            "text": "Desse modo, somos capaz de escrever a seguinte fórmula empírica para a vitamina C:",
+            "id": "blk-f16fb4f567-7"
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "\\(O_{3,41} C_3H_4O_3???\\)",
+            "id": "blk-42a7fb10e5-8"
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "C3,41 H4,54",
+            "id": "blk-4ece48b654-9"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 41,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_041.pdf",
+        "text": "A fórmula química encontrada para a vitamina C nesse procedimento é sua fórmula empírica. A mesma fórmula empírica seria obtida das seguintes composições, C6H8O6, C9H12O9, C12H16O12 ou qualquer outro múltiplo da fórmula empírica.",
+        "blocks": [
+          {
+            "type": "paragraph",
+            "text": "A fórmula química encontrada para a vitamina C nesse procedimento é sua fórmula empírica. A mesma fórmula empírica seria obtida das seguintes composições, C6H8O6, C9H12O9, C12H16O12 ou qualquer outro múltiplo da fórmula empírica.",
+            "id": "blk-0cfac83dd1-1"
+          }
+        ],
+        "cached": false
+      },
+      {
+        "page_number": 42,
+        "file_path": "/tmp/a11y-devs-describer/temp/uploads/pagina_042.pdf",
+        "text": "Para chegarmos a fórmula molecular da vitamina C é preciso conhecer a massa molar da substância.\n\nAmassa molar da vitamina C obtida por espectrometria de massa é 176,14 g mol -1 , enquanto a calculada a partir da sua fórmula empírica é 88,06 g mol -1 . Por inspeção simples, é fácil observar que a massa molar determinada é duas vezes a massa calculada pela fórmula empírica.\n\n$\\frac{176,14\\ g\\ mol^{-1}}{88,06\\ g\\ mol^{-1}} = 2,000$\n\nassim, a fórmula molecular da vitamina C é 2 x (C 3 H4 O 3 ) ou melhor C 6 H8 O 6 .",
+        "blocks": [
+          {
+            "type": "paragraph",
+            "text": "Para chegarmos a fórmula molecular da vitamina C é preciso conhecer a massa molar da substância.",
+            "id": "blk-dac546c5c4-1"
+          },
+          {
+            "type": "paragraph",
+            "text": "Amassa molar da vitamina C obtida por espectrometria de massa é 176,14 g mol -1 , enquanto a calculada a partir da sua fórmula empírica é 88,06 g mol -1 . Por inspeção simples, é fácil observar que a massa molar determinada é duas vezes a massa calculada pela fórmula empírica.",
+            "id": "blk-2defd77bce-2"
+          },
+          {
+            "type": "paragraph",
+            "text": "$\\frac{176,14\\ g\\ mol^{-1}}{88,06\\ g\\ mol^{-1}} = 2,000$",
+            "id": "blk-70c0bc60b9-3"
+          },
+          {
+            "type": "paragraph",
+            "text": "assim, a fórmula molecular da vitamina C é 2 x (C 3 H4 O 3 ) ou melhor C 6 H8 O 6 .",
+            "id": "blk-ee6a326365-4"
+          }
+        ],
+        "cached": false
+      }
+    ]
+  },
+  "source": {
+    "name": "21056bbb05e947019e12b62d257e8a4d.pdf",
+    "path": "/tmp/a11y-devs-describer/temp/uploads/21056bbb05e947019e12b62d257e8a4d.pdf",
+    "type": ".pdf"
+  },
+  "accessibility": {
+    "navigation": true,
+    "semantic_headings": true,
+    "internal_links": true
+  },
+  "technical_warnings": [],
+  "audit": {
+    "generated_by": "canonical_builder",
+    "input_length": 5,
+    "block_count": 168
+  },
+  "sections": [
+    {
+      "id": "blk-7a991f1f97-1",
+      "title": "",
+      "level": 1,
+      "source_location": {},
+      "metadata": {},
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Grandezas e Medidas",
+          "id": "blk-7a991f1f97-1"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "blk-0eddb5ed38-2",
+      "title": "",
+      "level": 1,
+      "source_location": {},
+      "metadata": {},
+      "blocks": [
+        {
+          "type": "image",
+          "text": "O diagrama ilustra uma escala de tamanho que vai de átomos a células, com exemplos de objetos em cada nível. A escala é representada por uma linha azul horizontal com setas apontando para a esquerda e direita. Os exemplos incluem: átomo (1 Å), DNA (1 nm), proteínas (10 nm), vírus (100 nm), nanotubos (1 μm), transistores de 2003 (10 μm) e transistores de 1970 (10 μm). Cada exemplo é acompanhado de uma ilustração colorida ou em escala de cinza. O diagrama também mostra a resolução litográfica e o tamanho dos transistores em diferentes épocas. A parte inferior do diagrama tem uma escala de cores que vai do nanométrico (Nano) ao microscópico (Micro), indicando a transição entre esses níveis de escala.",
+          "id": "blk-0eddb5ed38-2"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "blk-826b5d3662-1",
+      "title": "",
+      "level": 1,
+      "source_location": {},
+      "metadata": {},
+      "blocks": [
+        {
+          "type": "list",
+          "ordered": false,
+          "items": [
+            "Observações qualitativas: cor, aparência, liberação ou não de calor em uma transformação química, processo rápido ou lento, formação de um gás numa reação química, etc..."
+          ],
+          "id": "blk-826b5d3662-1"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "blk-d103164544-2",
+      "title": "",
+      "level": 1,
+      "source_location": {},
+      "metadata": {},
+      "blocks": [
+        {
+          "type": "list",
+          "ordered": false,
+          "items": [
+            "Observações quantitativas: informação numérica da propriedade observada, por exemplo: quanto de produto foi formado em uma reação química, quanto calor foi liberado no processo, etc..."
+          ],
+          "id": "blk-d103164544-2"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "blk-0ede769d85-3",
+      "title": "",
+      "level": 1,
+      "source_location": {},
+      "metadata": {},
+      "blocks": [
+        {
+          "type": "image",
+          "text": "A imagem apresenta um símbolo de seta em formato de seta, com ponta para baixo. A seta é de cor verde, com uma tonalidade uniforme e sem gradientes ou variações de cor. O contorno da seta é mais escuro, criando um efeito de sombra que destaca a forma. A seta é centralizada na imagem, sem outros elementos ou fundos. Não há texto, pessoas, objetos ou ações representadas. A imagem é simples e direta, com foco exclusivo no símbolo da seta.",
+          "id": "blk-0ede769d85-3"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "blk-51a9467bf0-1",
+      "title": "SISTEMA INTERNACIONAL DE UNIDADES (SI)",
+      "level": 1,
+      "source_location": {},
+      "metadata": {},
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Grandezas e Unidades de Base",
+          "id": "blk-e3539369e6-2"
+        },
+        {
+          "type": "table",
+          "rows": [
+            [
+              "Grandeza física de base (símbolo)",
+              "Unidade de base (símbolo)",
+              "Definição da unidade de base"
+            ],
+            [
+              "comprimento (l)",
+              "metro (m)",
+              "1 m é o comprimento do trajecto da luz, no vazio, no tempo de 1/299792458 s (1983)."
+            ],
+            [
+              "massa (m)",
+              "quilograma (kg)",
+              "1 kg é a massa do protótipo internacional do quilograma (1901)."
+            ],
+            [
+              "tempo (t)",
+              "segundo (s)",
+              "1 s é a duração de 9192631770 períodos da radiação da transição entre 2 níveis hiperfinos do estado fundamental do Cs (1967)."
+            ],
+            [
+              "intensidade de corrente eléctrica (I)",
+              "ampere (A)",
+              "A é a intensidade de uma corrente constante que mantida em 2 condutores paralelos, rectilíneos, de comprimento infinito, de secção circular desprezível e à distância de 1 m no vazio produz uma força de 2x10 Nm (1948)."
+            ],
+            [
+              "temperatura (T)",
+              "kelvin (K)",
+              "1 K é 1/273,16 da temperatura termodinâmica do ponto triplo da água (1967)."
+            ],
+            [
+              "quantidade de matéria (n)",
+              "mole (mol)",
+              "a mole é a quantidade de matéria de um sistema contendo tantas entidades elementares quanto os átomos que existem em 0,012 kg de C (1971)."
+            ],
+            [
+              "intensidade luminosa (Iv)",
+              "candela (cd)",
+              "1 cd é a intensidade luminosa numa dada direcção de fonte que emite radiação monocromática de frequência 540x10 Hz e cuja intensidade nessa direcção é 1/683 W.sr (1979)."
+            ]
+          ],
+          "id": "blk-4a9ef6ed2a-3"
+        },
+        {
+          "type": "paragraph",
+          "text": "Tabela 1.2 - Grandezas derivadas do Sistema Internacional de Unidades (SI)",
+          "id": "blk-657c6396a8-1"
+        },
+        {
+          "type": "table",
+          "rows": [
+            [
+              "Grandeza",
+              "Definição",
+              "Unidade SI"
+            ],
+            [
+              "Área",
+              "",
+              "m2"
+            ],
+            [
+              "Volume",
+              "",
+              "m3"
+            ],
+            [
+              "Velocidade",
+              "Distância/tempo",
+              "m s-1"
+            ],
+            [
+              "Aceleração",
+              "Velocidade/tempo",
+              "m s-2"
+            ],
+            [
+              "Força",
+              "Massa x aceleração",
+              "N (Newton) = kg m s-2"
+            ],
+            [
+              "Pressão",
+              "Força/área",
+              "Pa (Pascal) = N m-2"
+            ],
+            [
+              "Energia",
+              "Força x distância",
+              "J (Joule) = N m"
+            ],
+            [
+              "Potência",
+              "Energia/tempo",
+              "W (Watt) = J s-1"
+            ]
+          ],
+          "id": "blk-bd52bdfab7-2"
+        },
+        {
+          "type": "paragraph",
+          "text": "SISTEMA INTERNACIONAL DE UNIDADES (SI) Prefixos dos Múltiplos e Submúltiplos das Unidades",
+          "id": "blk-06de98e597-1"
+        },
+        {
+          "type": "paragraph",
+          "text": "Múltiplos",
+          "id": "blk-b68de20710-2"
+        },
+        {
+          "type": "paragraph",
+          "text": "Submúltiplos",
+          "id": "blk-94f5e44dad-3"
+        },
+        {
+          "type": "table",
+          "rows": [
+            [
+              "Prefixo",
+              "símbolo",
+              "potência"
+            ],
+            [
+              "deci",
+              "d",
+              "10^-1"
+            ],
+            [
+              "centi",
+              "c",
+              "10^-2"
+            ],
+            [
+              "mili",
+              "m",
+              "10^-3"
+            ],
+            [
+              "micro",
+              "μ",
+              "10^-6"
+            ],
+            [
+              "nano",
+              "n",
+              "10^-9"
+            ],
+            [
+              "pico",
+              "p",
+              "10^-12"
+            ],
+            [
+              "femto",
+              "f",
+              "10^-15"
+            ],
+            [
+              "ato",
+              "a",
+              "10^-18"
+            ],
+            [
+              "zepto",
+              "z",
+              "10^-21"
+            ],
+            [
+              "yocto",
+              "y",
+              "10^-24"
+            ]
+          ],
+          "id": "blk-e707a6cfba-4"
+        },
+        {
+          "type": "table",
+          "rows": [
+            [
+              "Prefixo",
+              "símbolo",
+              "potência"
+            ],
+            [
+              "yota",
+              "Y",
+              "10^24"
+            ],
+            [
+              "zeta",
+              "Z",
+              "10^21"
+            ],
+            [
+              "exa",
+              "E",
+              "10^18"
+            ],
+            [
+              "peta",
+              "P",
+              "10^15"
+            ],
+            [
+              "tera",
+              "T",
+              "10^12"
+            ],
+            [
+              "giga",
+              "G",
+              "10^9"
+            ],
+            [
+              "mega",
+              "M",
+              "10^6"
+            ],
+            [
+              "kilo",
+              "k",
+              "10^3"
+            ],
+            [
+              "hecto",
+              "h",
+              "10^2"
+            ],
+            [
+              "deca",
+              "da",
+              "10^1"
+            ]
+          ],
+          "id": "blk-a2db574174-5"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "blk-d25ef4d385-1",
+      "title": "ORDENS DE GRANDEZA",
+      "level": 1,
+      "source_location": {},
+      "metadata": {},
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Alguns Exemplos",
+          "id": "blk-4c494c0d5f-2"
+        },
+        {
+          "type": "paragraph",
+          "text": "Distâncias",
+          "id": "blk-d9fab744fc-3"
+        },
+        {
+          "type": "table",
+          "rows": [
+            [
+              "Ordem de Grandeza (m)",
+              "Facto"
+            ],
+            [
+              "10^-15 m",
+              "raio de um núcleo atómico"
+            ],
+            [
+              "10^-10 m",
+              "raio de um átomo"
+            ],
+            [
+              "10^-7 m",
+              "dimensão de um vírus"
+            ],
+            [
+              "10^-5 m",
+              "dimensão de um grão de sal"
+            ],
+            [
+              "1 m",
+              "altura de uma criança"
+            ],
+            [
+              "10^3 m",
+              "altitude da Serra da Estrela"
+            ],
+            [
+              "10^8 m",
+              "distância da Terra à Lua"
+            ],
+            [
+              "10^12 m",
+              "distância da Terra ao Sol"
+            ],
+            [
+              "10^17 m",
+              "distância da Terra à estrela mais próxima"
+            ],
+            [
+              "10^20 m",
+              "distância da Terra ao centro da Via Láctea"
+            ],
+            [
+              "10^22 m",
+              "distância da Terra à galáxia mais próxima"
+            ],
+            [
+              "10^26 m",
+              "dimensão do universo"
+            ]
+          ],
+          "id": "blk-dcb89de68c-4"
+        },
+        {
+          "type": "image",
+          "text": "O gráfico apresenta um diagrama de barras ilustrando a densidade de diversos metais, medidos em gramas por centímetro cúbico. O eixo horizontal lista os metais, incluindo Alumínio, Cádmio, Cromo, Cobalto, Cobre, Ouro, Íron, Chumbo, Magnésio, Manganês, Mercúrio, Molibdênio, Níquel, Platina, Prata, Titânio, Tungstênio, Urano e Zinco. O eixo vertical indica a densidade, variando de 0 a 25 gramas/cm³. As barras representam valores específicos para cada metal, com destaque para Ouro (19,30), Platina (21,45), Tungstênio (19,25) e Urano (19,10), que possuem as maiores densidades. Valores menores são observados em Magnésio (1,74) e Titânio (4,51). O gráfico utiliza uma paleta de cores neutras, com barras em tons de cinza sobre um fundo claro. O título \"Metals: Density\" está posicionado no topo, e os rótulos dos eixos são claramente legíveis. Não há elementos adicionais ou interações visuais além das barras e dos rótulos.",
+          "id": "blk-80679ba46f-1"
+        },
+        {
+          "type": "paragraph",
+          "text": "Table 12-9",
+          "id": "blk-63d19d06bf-1"
+        },
+        {
+          "type": "paragraph",
+          "text": "Experimental Bond Lengths (in nanometers)",
+          "id": "blk-b8ba2e0817-2"
+        },
+        {
+          "type": "table",
+          "rows": [
+            [
+              "Molecule",
+              "Bond",
+              "Length"
+            ],
+            [
+              "BCl3",
+              "B-Cl",
+              "0.174"
+            ],
+            [
+              "B2H6",
+              "B-H",
+              "0.132"
+            ],
+            [
+              "Diamond",
+              "C-C",
+              "0.154"
+            ],
+            [
+              "CH4",
+              "C-H",
+              "0.110"
+            ],
+            [
+              "CH3I",
+              "C-H",
+              "0.110"
+            ],
+            [
+              "C-I",
+              "C-I",
+              "0.221"
+            ],
+            [
+              "CIBr",
+              "Cl-Br",
+              "0.214"
+            ],
+            [
+              "HF",
+              "H-F",
+              "0.092"
+            ],
+            [
+              "H2O",
+              "H-O",
+              "0.096"
+            ],
+            [
+              "NH3",
+              "N-H",
+              "0.101"
+            ],
+            [
+              "OF2",
+              "O-F",
+              "0.141"
+            ],
+            [
+              "O3",
+              "O-O",
+              "0.128"
+            ],
+            [
+              "H2SAIBr3",
+              "S-Al",
+              "0.243"
+            ],
+            [
+              "(H3Si)2NN(SiH3)2",
+              "Si-N",
+              "0.173"
+            ]
+          ],
+          "id": "blk-f1979b061d-3"
+        },
+        {
+          "type": "paragraph",
+          "text": "O que é importante:",
+          "id": "blk-ef211c8fb1-1"
+        },
+        {
+          "type": "list",
+          "ordered": false,
+          "items": [
+            "Toda grandeza física tem sua unidade."
+          ],
+          "id": "blk-755e5cba33-2"
+        },
+        {
+          "type": "list",
+          "ordered": false,
+          "items": [
+            "Conhecer as unidades fundamentais do SI"
+          ],
+          "id": "blk-e2d91e9c30-3"
+        },
+        {
+          "type": "list",
+          "ordered": false,
+          "items": [
+            "Interconverter unidades"
+          ],
+          "id": "blk-64d6d745a2-4"
+        },
+        {
+          "type": "list",
+          "ordered": false,
+          "items": [
+            "Usar a notação científica (exponencial..... x 10 n )"
+          ],
+          "id": "blk-248b4adde9-5"
+        },
+        {
+          "type": "list",
+          "ordered": false,
+          "items": [
+            "Expressar corretamente o número de algarismos significativos de medidas experimentais e quando fizer operações matemáticas."
+          ],
+          "id": "blk-9f14bee21f-6"
+        },
+        {
+          "type": "paragraph",
+          "text": "Número Atômico / Número de Massa / Massa Atômica relativa/Massa Molar",
+          "id": "blk-7fb4791383-1"
+        },
+        {
+          "type": "paragraph",
+          "text": "✓ Átomo : prótons, nêutrons e elétrons",
+          "id": "blk-0cda25cfac-2"
+        },
+        {
+          "type": "paragraph",
+          "text": "Tabela 1.1. Partículas subatômicas de relevância à química",
+          "id": "blk-f04609f975-3"
+        },
+        {
+          "type": "table",
+          "rows": [
+            [
+              "Partícula",
+              "Símbolo",
+              "Massa/u*",
+              "Nº massa",
+              "Carga/e+",
+              "Spin"
+            ],
+            [
+              "Elétron",
+              "e-",
+              "5,486x10-4",
+              "0",
+              "-1",
+              "1/2"
+            ],
+            [
+              "Próton",
+              "p",
+              "1,0078",
+              "1",
+              "+1",
+              "1/2"
+            ],
+            [
+              "Nêutron",
+              "n",
+              "1,0087",
+              "1",
+              "0",
+              "1/2"
+            ]
+          ],
+          "id": "blk-a57cff4ec6-4"
+        },
+        {
+          "type": "callout",
+          "text": "Massas expressas em unidades de massa atômica, u, com 1u = 1,6605 x 10-27 Kg ★",
+          "callout_type": "box",
+          "id": "blk-2a404bda06-5"
+        },
+        {
+          "type": "callout",
+          "text": "† A carga elementar e é 1,602 x 10-19 C",
+          "callout_type": "box",
+          "id": "blk-0d4b56e99c-6"
+        },
+        {
+          "type": "paragraph",
+          "text": "Fonte: Química Inorgânica - Shiver e Atkins 3ª Ed.",
+          "id": "blk-97704e92a0-7"
+        },
+        {
+          "type": "paragraph",
+          "text": "1u = corresponde a 1/12 da massa de um átomo de Carbono-12 Massa de 1 átomo de carbono (6 prótons e 6 nêutrons) = 12,000 u",
+          "id": "blk-06bb7f59a4-8"
+        },
+        {
+          "type": "paragraph",
+          "text": "https://physics.nist.gov/cgi-bin/cuu/Results?search_for=mass",
+          "id": "blk-9c8cb55727-1"
+        },
+        {
+          "type": "image",
+          "text": "O documento mostra uma página da web com um título \"The NIST Reference on Constants, Units, and Uncertainty\". O layout inclui um menu lateral com categorias como \"Constants\", \"Topics\", \"Values\", \"Equations\", \"Searchable Bibliography\", e \"Background\". O conteúdo principal exibe resultados de pesquisa relacionados a \"mass\", com termos como \"alpha particle mass\", \"atomic mass constant\", e \"atomic mass unit\". O texto é em inglês, com links em roxo. O fundo é branco, e o menu lateral tem um design com cores verde e azul. Não há imagens ou gráficos visíveis.",
+          "id": "blk-0e9f8a33ee-2"
+        },
+        {
+          "type": "image",
+          "text": "Esta imagem é uma ilustração de uma lâmpada estilizada. A lâmpada tem um corpo amarelo com um contorno preto e uma base azul. Dentro da lâmpada, há um desenho que se parece com um coração ou uma figura semelhante a um \"8\" em preto, que pode representar o filamento. A base da lâmpada é composta por três espirais azuis, que indicam o soquete. A imagem não contém pessoas, roupas, expressões, posturas, idade, cenário, ações, relações espaciais, gráficos, diagramas, texto embutido ou qualquer outro elemento além da lâmpada descrita. As cores principais são o amarelo e o azul, com o preto sendo usado para os contornos e detalhes internos.",
+          "id": "blk-c8a42d725d-1"
+        },
+        {
+          "type": "paragraph",
+          "text": "Recordando",
+          "id": "blk-311e535e6c-2"
+        }
+      ],
+      "children": [
+        {
+          "id": "blk-077a900a1b-3",
+          "title": "A E Z",
+          "level": 2,
+          "source_location": {},
+          "metadata": {},
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Z = número atômico do elemento = número de prótons = carga nuclear",
+              "id": "blk-ece02603f3-4"
+            },
+            {
+              "type": "paragraph",
+              "text": "A = número de massa = nº de prótons + nº de nêutrons = número de núcleons",
+              "id": "blk-e075fa19ef-5"
+            },
+            {
+              "type": "paragraph",
+              "text": "Massa atômica",
+              "id": "blk-4a1c471b00-1"
+            },
+            {
+              "type": "paragraph",
+              "text": "A massa de um átomo, medida em unidades de massa atômica, corresponde a quantas vezes esse átomo é mais pesado que 1/12 do isótopo 12 do carbono. Corresponde, portanto, a quantas vezes o átomo em questão é mais pesado que o padrão (1/12 do isótopo 12 do carbono). Quando dizemos que um átomo de enxofre tem massa 32 u, estamos dizendo que sua massa é 32 vezes maior que 1/12 da massa do isótopo 12 do carbono.",
+              "id": "blk-1f3ce2453e-2"
+            },
+            {
+              "type": "image",
+              "text": "O gráfico mostra a tabela periódica dos elementos, com colunas numeradas de 1 a 18 e linhas numeradas de 1 a 7. Cada célula contém o símbolo do elemento, seu número atômico e seu nome. A tabela é organizada em blocos, com destaque para os elementos metálicos, não metálicos e gases nobres. No canto superior esquerdo, há uma representação visual de dois átomos de hidrogênio (H) e dois de oxigênio (O), dispostos em uma estrutura molecular. No lado direito, há uma nuvem de átomos de hidrogênio e oxigênio interagindo, com cores vibrantes de azul, laranja e vermelho, sugerindo uma reação química. O texto \"Há isótopos.....\" está em destaque no topo da imagem, indicando a relação entre os elementos e seus isótopos. A tabela periódica é detalhada, com legendas e números que indicam as propriedades dos elementos.",
+              "id": "blk-a6ced6a43b-1"
+            },
+            {
+              "type": "paragraph",
+              "text": "Deve-se lembrar que elemento químico é o conjunto de átomos que possuem mesmo número atômico. Dentro desse conjunto, existem isótopos, ou seja, átomos que apresentam igual número atômico mas diferente massa atômica. Por exemplo, o elemento cloro, de número atômico 17, existem dois isótopos, um com número de massa 35 e outro com 37.",
+              "id": "blk-8e9ab0e5b5-1"
+            },
+            {
+              "type": "image",
+              "text": "O diagrama ilustra as propriedades do elemento cloro da tabela periódica. A caixa central é retangular, com fundo gradiente de rosa claro a escuro. No topo, o número atômico \"17\" é exibido em preto, com uma seta apontando para a legenda \"Número Atômico\". Abaixo, o símbolo químico \"Cl\" está em destaque, seguido da palavra \"CLORO\" em letras maiúsculas roxas. No fundo, a massa atômica \"35.453\" aparece em preto, com uma seta direcionando-se para a legenda \"Massa Atômica\". Em destaque, o texto \"A massa atômica do cloro é aproximadamente 35,5u.\" está posicionado na parte inferior. O diagrama utiliza setas para conectar os valores aos seus respectivos conceitos, mantendo uma estrutura clara e educativa.",
+              "id": "blk-d6ad74911b-2"
+            },
+            {
+              "type": "table",
+              "rows": [
+                [
+                  "Isotopes",
+                  "Atomic Mass of the Isotope (u)",
+                  "Natural Abundance (%)"
+                ],
+                [
+                  "35Cl",
+                  "34.97",
+                  "75.76"
+                ],
+                [
+                  "37Cl",
+                  "36.97",
+                  "24.24"
+                ]
+              ],
+              "id": "blk-e576eda5da-3"
+            },
+            {
+              "type": "paragraph",
+              "text": "Espectrometria de massas",
+              "id": "blk-9b32ffef6f-1"
+            },
+            {
+              "type": "image",
+              "text": "O diagrama ilustra o funcionamento de um espectrômetro de massa, um instrumento utilizado para analisar a composição de substâncias. A imagem é dividida em duas seções principais: a fonte de íons e o detector. Na fonte de íons, um aquecedor vaporiza uma amostra, gerando uma nuvem de partículas. Essas partículas são então ionizadas por um feixe de elétrons, resultando em íons positivos. Os íons são acelerados por um campo elétrico e entram em uma região com um campo magnético. Dentro do campo magnético, os íons são desviados em trajetórias curvas, com a curvatura dependendo de sua carga e massa. Íons com diferentes cargas/massas seguem trajetórias distintas, sendo separados e direcionados para o detector. O detector registra a presença dos íons, permitindo a identificação das partículas presentes na amostra. O diagrama utiliza cores para diferenciar os componentes: o aquecedor é vermelho, o feixe de elétrons é azul, o campo magnético é roxo e o detector é cinza. O texto embutido na imagem descreve cada parte do espectrômetro, explicando seu papel no processo de análise.",
+              "id": "blk-5b02f257bb-2"
+            },
+            {
+              "type": "image",
+              "text": "O gráfico apresenta um espectro de massa do cloro (Cl₂). O eixo vertical, rotulado como \"relative intensity\", varia de 0 a 100, enquanto o eixo horizontal, marcado como \"m/z\", abrange valores de 30 a 80. No canto superior direito, um recuadro amarelo contém o título \"The mass spectrum of chlorine Cl₂\" e a informação \"Relative molecular mass 35.45\". O gráfico destaca cinco picos principais: dois íons monatômicos ([³⁵Cl]⁺ e [³⁷Cl]⁺) com intensidades de 80 e 30, respectivamente, e três íons moleculares ([³⁵Cl³⁵Cl]⁺, [³⁵Cl³⁷Cl]⁺ e [³⁷Cl³⁷Cl]⁺) com intensidades de 60, 40 e 20. Valores de m/z correspondentes são 35, 37, 70, 72 e 74. O texto central indica \"five main peaks\" e \"three molecular ion peaks\", ignorando outros isótopos. As cores dominantes são azul, vermelho e preto, com linhas verticais marcando os picos.",
+              "id": "blk-ce3a3478c4-1"
+            },
+            {
+              "type": "paragraph",
+              "text": "O valor mais recente da massa atômica para o carbono obtido por espectrometria de massas (MS, do inglês: Mass Spectrometry ) e aceito pela IUPAC é 12,0107 ± 8 com a incerteza no ultimo dígito.",
+              "id": "blk-60e4b291b9-1"
+            },
+            {
+              "type": "image",
+              "text": "Esta imagem apresenta quatro representações do elemento químico carbono, cada uma com variações na notação e na fonte de referência. As representações são dispostas em uma linha horizontal, com cada uma contendo um quadrado central que destaca o símbolo químico \"C\" e o número atômico \"6\". Abaixo de cada quadrado, há a palavra \"Carbono\" ou \"Carbon\", acompanhada de valores numéricos em vermelho, indicando a massa atômica. As fontes mencionadas incluem \"Tabela Periódica SBQ 2010\", \"CRC Handbook of Chemistry, 3ª ed.\", \"Chang e Goldsby Química, 11ª ed.\" e \"IUPAC 2016\". As cores principais são o preto para o texto e o vermelho para os valores numéricos. Não há pessoas, ações ou cenários representados, apenas informações científicas sobre o elemento carbono.",
+              "id": "blk-0c9708cf25-2"
+            },
+            {
+              "type": "paragraph",
+              "text": "O conceito de MOL",
+              "id": "blk-7424f64807-1"
+            },
+            {
+              "type": "list",
+              "ordered": false,
+              "items": [
+                "Um mol é a quantidade de substância (ou matéria) que possui um número de unidades fundamentais (átomos, moléculas ou outras partículas) igual ao número de átomos presentem em exatamente 12 g do isótopo carbono -12."
+              ],
+              "id": "blk-2ea5b8baa6-2"
+            },
+            {
+              "type": "list",
+              "ordered": false,
+              "items": [
+                "1 mol contém sempre o mesmo número de partículas (entidades), não importa de qual substância"
+              ],
+              "id": "blk-21055b9e33-3"
+            },
+            {
+              "type": "list",
+              "ordered": false,
+              "items": [
+                "Constante (número) de Avogadro = 6,02214076 x 10 23"
+              ],
+              "id": "blk-b44de07027-4"
+            },
+            {
+              "type": "paragraph",
+              "text": "Novo conceito de mol",
+              "id": "blk-e87b62fcf6-1"
+            },
+            {
+              "type": "paragraph",
+              "text": "Definition of the mole",
+              "id": "blk-48342b8160-2"
+            },
+            {
+              "type": "paragraph",
+              "text": "(IUPAC Recommendation 2017)",
+              "id": "blk-7c28e834ec-3"
+            },
+            {
+              "type": "paragraph",
+              "text": "Pure Appl. Chem. 2018; 90(1): 175 - 180",
+              "id": "blk-f5547be9b0-4"
+            },
+            {
+              "type": "paragraph",
+              "text": "A quantidade de B, n (B), é proporcional ao número de entidades de B, N (B), com",
+              "id": "blk-636d87ad9f-5"
+            },
+            {
+              "type": "paragraph",
+              "text": "n (B)= ( N A ) -1 N (B)",
+              "id": "blk-c00bc3bc8d-6"
+            },
+            {
+              "type": "paragraph",
+              "text": "N A = 6.022 140 76  10 23 mol -1 (número de Avogadro)",
+              "id": "blk-76485ead69-7"
+            },
+            {
+              "type": "list",
+              "ordered": false,
+              "items": [
+                "-D. B. Newell, F. Cabiati, J. Fischer, K. Fujii, S. G. Karshenboim, H. S. Margolis, E. de Mirandes, P. J. Mohr, F. Nez, K. Pachucki, T. J. Quinn, B. N. Taylor, M. Wang, B. Wood, Z. Zhang. 'The CODATA 2017 Values of h , e , k , and N A for the Revision of the SI,' Metrologia , accepted, online 20 Oct 2017, https://doi.org/10.1088/1681-7575/aa950a (2017)."
+              ],
+              "id": "blk-efcc045e87-8"
+            },
+            {
+              "type": "list",
+              "ordered": false,
+              "items": [
+                "Kuramoto N, Mizushima S, Zhang L, Fujita K, Azuma Y, Kurokawa A, Okubo S, Inaba H and Fujii K. A new 28Si single crystal: counting the atoms for the new kilogram definition Metrologia 54 716 (2017)"
+              ],
+              "id": "blk-2880653abb-9"
+            },
+            {
+              "type": "paragraph",
+              "text": "O conceito de Massa Molar",
+              "id": "blk-a558241b97-1"
+            },
+            {
+              "type": "list",
+              "ordered": false,
+              "items": [
+                "É a massa em gramas de 1 mol de átomos de qualquer elemento ou 1 mol de moléculas de qualquer substância..."
+              ],
+              "id": "blk-219409feae-2"
+            },
+            {
+              "type": "list",
+              "ordered": false,
+              "items": [
+                "É a quantidade em gramas numericamente igual à massa atômica ou molecular."
+              ],
+              "id": "blk-cbc5ece4ea-3"
+            },
+            {
+              "type": "paragraph",
+              "text": "n=    massa Massa molar",
+              "id": "blk-3d8202ec64-4"
+            },
+            {
+              "type": "paragraph",
+              "text": "n (B)= M (B) -1 m (B)",
+              "id": "blk-f89e7f8f76-5"
+            },
+            {
+              "type": "paragraph",
+              "text": "mu é a constante de massa atômica = massa atômica do Carbono-12 dividido por 12 mu= ma ( 12 C)/12",
+              "id": "blk-706969e669-1"
+            },
+            {
+              "type": "paragraph",
+              "text": "Mu= constante de massa molar = N A mu",
+              "id": "blk-f5becca458-2"
+            },
+            {
+              "type": "paragraph",
+              "text": "1 M u = 1 g mol -1",
+              "id": "blk-aec6a67694-3"
+            },
+            {
+              "type": "paragraph",
+              "text": "Massa molar da substância B",
+              "id": "blk-7026b0d855-4"
+            },
+            {
+              "type": "paragraph",
+              "text": "M (B)= N A ma (B)= NA Ar (B) mu",
+              "id": "blk-2a7a5d7deb-5"
+            },
+            {
+              "type": "paragraph",
+              "text": "Ar (B) é massa atômica relativa de B",
+              "id": "blk-e7aa382ec8-6"
+            },
+            {
+              "type": "paragraph",
+              "text": "Quantas vezes a massa de B é maior que 1/12 da massa do Carbono-12",
+              "id": "blk-111cedd640-7"
+            },
+            {
+              "type": "image",
+              "text": "O documento apresenta uma tabela periódica dos elementos químicos, organizada em sete linhas horizontais e dezesseis colunas verticais. Cada célula contém o símbolo do elemento, seu número atômico, massa atômica e nome. A tabela é dividida em quatro blocos coloridos: laranja para elementos representativos, verde para elementos de transição, amarelo para lantânidos e rosa para actinídios. No canto superior esquerdo, há um título em português: \"Tabela Periódica dos Elementos Químicos\". No canto inferior esquerdo, há uma legenda explicando os blocos coloridos e grupos IUPAC 1990. O fundo da tabela é azul claro, com bordas brancas e preta. O texto embutido inclui nomes dos elementos, símbolos, números atômicos e massas atômicas. Não há pessoas, ações ou relações espaciais além da estrutura da tabela.",
+              "id": "blk-4a3c485061-1"
+            },
+            {
+              "type": "paragraph",
+              "text": "Fórmulas, moléculas e íons",
+              "id": "blk-d905c60dd6-1"
+            },
+            {
+              "type": "paragraph",
+              "text": "NaCl(s)",
+              "id": "blk-5ed2d360d3-2"
+            },
+            {
+              "type": "paragraph",
+              "text": "H2 SO 4 (l)",
+              "id": "blk-657967d077-3"
+            },
+            {
+              "type": "list",
+              "ordered": false,
+              "items": [
+                "SiC (s)"
+              ],
+              "id": "blk-71a1a39728-4"
+            },
+            {
+              "type": "paragraph",
+              "text": "Si (s)",
+              "id": "blk-c91f2754df-5"
+            },
+            {
+              "type": "image",
+              "text": "Esta imagem apresenta uma coleção de cubos transparentes, variando em tamanho e opacidade, dispostos em um padrão irregular. Os cubos são predominantemente brancos e cinzas, com tons mais claros e escuros, criando uma sensação de profundidade e textura. A superfície de cada cubo reflete luz, destacando detalhes como linhas finas e irregularidades. O fundo é escuro, contrastando com a luminosidade dos cubos e realçando sua estrutura. A composição sugere uma perspectiva microscópica, com os cubos ocupando a maior parte do espaço visual. No canto inferior esquerdo, há um logotipo estilizado com círculos concêntricos e o texto \"RichWhiddon\" em fonte simples. Não há ações, personagens ou elementos narrativos presentes. A imagem foca exclusivamente na textura e organização dos cubos, sem relações espaciais complexas ou elementos adicionais.",
+              "id": "blk-00c059f30d-6"
+            },
+            {
+              "type": "image",
+              "text": "A imagem mostra um foguete modelo posicionado em um suporte circular sobre um piso de madeira clara. O foguete é cilíndrico, com uma ponta afiada e uma base que se estreita ligeiramente em direção ao topo. Sua superfície é metálica, com reflexos de luz que criam padrões de linhas horizontais e verticais, sugerindo um acabamento polido. A cor principal do foguete é dourada, com tons de bronze e prata devido aos reflexos. O suporte é composto por duas estruturas triangulares que se estendem para fora, sustentando o foguete no centro. No fundo, há um armário de exibição com vitrines que contêm objetos não claramente identificáveis, e ao lado, um suporte de exibição com itens que parecem ser modelos ou instrumentos científicos. O cenário sugere um ambiente de exposição, possivelmente em um museu ou instituição técnica. Não há pessoas ou ações em andamento na imagem.",
+              "id": "blk-14dcf15b0f-7"
+            },
+            {
+              "type": "image",
+              "text": "Na imagem, há dois objetos principais sobre um fundo escuro. À esquerda, um frasco de vidro escuro com tampa branca, contendo um líquido escuro. A etiqueta do frasco é branca com bordas vermelhas e contém o texto \"Ácido Sulfúrico\" em preto, além de outras informações não legíveis. À direita, um frasco de vidro transparente com um tubo de vidro inserido, que parece conter uma solução clara. O tubo tem uma ponta branca e está conectado ao frasco por um mecanismo de sucção. Os objetos estão posicionados verticalmente, com o frasco de ácido à esquerda e o frasco com tubo à direita, mantendo uma distância moderada entre eles. Não há pessoas, ações ou cenários adicionais na imagem.",
+              "id": "blk-6738b0d03b-8"
+            },
+            {
+              "type": "image",
+              "text": "A imagem apresenta uma montanha de material granular, com cor predominantemente escura, variando de preto a cinza. A textura é irregular, com partículas de diferentes tamanhos que formam uma superfície não uniforme. A montanha tem um formato cônico, com o topo mais alto e as laterais mais largas, sugerindo uma acumulação natural ou artificial. Não há elementos adicionais, como pessoas, objetos ou cenários, que possam ser identificados. O fundo é branco e uniforme, sem detalhes que possam ser descritos. Não há ações ou relações espaciais a serem observadas, pois o foco está exclusivamente no material em si.",
+              "id": "blk-7ada802ab5-9"
+            },
+            {
+              "type": "paragraph",
+              "text": "Tartrazina (s)",
+              "id": "blk-d4f027da93-10"
+            },
+            {
+              "type": "image",
+              "text": "A imagem apresenta uma superfície coberta por uma camada de partículas metálicas com cor dourada-alaranjada, possivelmente cobre ou outro material com tonalidade semelhante. As partículas são irregulares em forma e variam em tamanho, desde pequenos fragmentos até pedaços maiores, dispostos de maneira aleatória e densa, criando uma textura visualmente complexa. A superfície subjacente é clara e lisa, contrastando com a irregularidade das partículas. A iluminação é uniforme, destacando os reflexos e as sombras entre as partículas, o que intensifica a percepção de profundidade e volume. Não há elementos identificáveis como pessoas, objetos específicos ou ações dinâmicas. O foco está exclusivamente na composição e na interação entre as partículas e a superfície.",
+              "id": "blk-9e1823e5a5-11"
+            },
+            {
+              "type": "image",
+              "text": "A imagem apresenta um close de uma superfície com textura irregular, dominada por tons de amarelo e dourado. No centro, há uma área mais clara e homogênea, com destaque para uma cor dourada intensa. Nas bordas, a textura se torna mais granulosa, com partículas menores e uma mistura de cores que incluem marrom escuro e dourado. À direita, há uma estrutura com formas redondas e escuras, que parecem ser aglomerados ou partículas maiores, com uma tonalidade marrom-escura. A superfície ao redor delas é mais clara, com um fundo cinza e branco, que contrasta com as cores quentes do centro. Não há elementos que indiquem movimento ou ações, e não há texto ou legendas visíveis. A composição sugere uma estrutura natural ou mineral, com detalhes que podem ser observados em um contexto microscópico ou de alta ampliação.",
+              "id": "blk-0b76edec25-12"
+            },
+            {
+              "type": "paragraph",
+              "text": "Cu (s)",
+              "id": "blk-a508ab1d67-13"
+            },
+            {
+              "type": "paragraph",
+              "text": "C16 H 9 N4 Na 3 O9S2",
+              "id": "blk-2b40207b4d-14"
+            },
+            {
+              "type": "image",
+              "text": "O diagrama representa uma estrutura molecular composta por átomos conectados por ligações. No centro, há um átomo verde, que parece ser o átomo de carbono, conectado a quatro outros átomos. Três desses átomos são vermelhos, representando átomos de oxigênio, e um é cinza, representando um átomo de hidrogênio. As ligações entre os átomos são ilustradas por barras cinzas que conectam as esferas. A estrutura sugere uma molécula de acetato, com o átomo de carbono central ligado a dois átomos de oxigênio e um átomo de hidrogênio, além de outro átomo de oxigênio conectado a um dos átomos de oxigênio. O diagrama é apresentado em uma perspectiva tridimensional, com as esferas posicionadas em ângulos que indicam a geometria espacial da molécula.",
+              "id": "blk-498c1e4a10-1"
+            },
+            {
+              "type": "image",
+              "text": "O diagrama representa uma estrutura molecular tridimensional. No centro, há uma esfera verde que simboliza um átomo de enxofre (S). Esta esfera está conectada a três esferas brancas, que representam átomos de hidrogênio (H), e a três esferas vermelhas, que indicam átomos de oxigênio (O). As esferas brancas estão posicionadas em ângulos de aproximadamente 120 graus em relação ao átomo central, enquanto as esferas vermelhas estão dispostas em ângulos semelhantes, mas em um plano diferente, criando uma estrutura piramidal. A cor verde é vibrante e central, enquanto as cores vermelha e branca são mais opacas, destacando a hierarquia dos átomos. O diagrama não contém legendas, eixos ou escalas, focando apenas na representação visual das ligações químicas e da geometria molecular.",
+              "id": "blk-a294de2f1f-2"
+            },
+            {
+              "type": "image",
+              "text": "O diagrama ilustra a estrutura molecular de um composto químico. No centro, um átomo de enxofre (S) está conectado a três átomos de oxigênio (O). Dois dos átomos de oxigênio estão ligados ao enxofre por ligações duplas, representadas por duas linhas paralelas. O terceiro átomo de oxigênio está ligado ao enxofre por uma ligação simples, indicada por uma única linha. Este átomo de oxigênio também está conectado a um átomo de hidrogênio (H), formando um grupo hidroxila (OH). A ligação entre o enxofre e o grupo hidroxila é representada por uma linha pontilhada, sugerindo uma ligação fraca ou interação específica. O diagrama utiliza símbolos químicos padronizados e não contém cores, texturas ou elementos adicionais.",
+              "id": "blk-a726343bc4-3"
+            },
+            {
+              "type": "paragraph",
+              "text": "Fórmulas estrutural",
+              "id": "blk-66bb12aac6-4"
+            },
+            {
+              "type": "paragraph",
+              "text": "Molécula",
+              "id": "blk-65285b4161-5"
+            }
+          ],
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "blk-bf5e92b826-1",
+      "title": "PET",
+      "level": 1,
+      "source_location": {},
+      "metadata": {},
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Tartrazina",
+          "id": "blk-d292b892b7-2"
+        },
+        {
+          "type": "image",
+          "text": "O diagrama representa uma estrutura molecular composta por vários componentes. No centro, há um anel hexagonais com ligações simples e duplas, conectado a outros anéis e grupos funcionais. À esquerda, um anel hexagonais está ligado a um átomo de enxofre (S), que por sua vez está conectado a dois átomos de oxigênio (O) e um íon sódio (Na⁺). No meio, há um anel com dois átomos de nitrogênio (N), um dos quais está ligado a um grupo hidroxila (OH). À direita, outro anel hexagonais está conectado a um átomo de enxofre (S) duplamente ligado a um oxigênio (O), com um íon sódio (Na⁺) associado. A estrutura é simétrica, com ligações químicas indicadas por linhas retas e duplas, e grupos funcionais como grupos carboxila e amida. O diagrama é desenhado em linhas pretas sobre fundo branco, sem cores ou sombras.",
+          "id": "blk-7d4a918fcb-3"
+        },
+        {
+          "type": "image",
+          "text": "O diagrama representa uma estrutura molecular composta por átomos de carbono (C), hidrogênio (H) e oxigênio (O). No centro, há um anel hexagonal com seis átomos de carbono, cada um conectado a um átomo de hidrogênio. Dois átomos de oxigênio estão ligados ao anel por ligações duplas, indicadas por linhas grossas. A estrutura se estende linearmente a partir do anel, com átomos de carbono conectados a átomos de oxigênio por ligações simples. Os átomos de hidrogênio estão distribuídos ao longo da cadeia, com dois átomos de hidrogênio em cada carbono da cadeia linear. A estrutura é terminada por um átomo de oxigênio na extremidade direita, conectado a um carbono. A notação \"n\" indica uma cadeia repetitiva ou polimerização. O diagrama utiliza linhas retas para ligações simples, linhas duplas para ligações duplas e círculos vermelhos para átomos de oxigênio. O texto \"n\" está posicionado no canto inferior direito do diagrama.",
+          "id": "blk-b218125de0-4"
+        },
+        {
+          "type": "paragraph",
+          "text": "Molécula",
+          "id": "blk-5a2169bb7c-5"
+        },
+        {
+          "type": "paragraph",
+          "text": "macromolécula",
+          "id": "blk-e8f39ab80e-6"
+        },
+        {
+          "type": "image",
+          "text": "Na imagem, uma pessoa está segurando um frasco de vidro com uma cor púrpura intensa. O frasco tem um formato esférico com um pescoço estreito e é sustentado por uma haste de metal. A pessoa está usando luvas brancas, sugerindo que está manipulando o frasco com cuidado. A cor do frasco é a mais vibrante da imagem, com reflexos claros que indicam uma superfície lisa e brilhante. O fundo é desfocado, mas é possível identificar um ambiente que parece ser um laboratório, com outras estruturas de vidro e metal. A pessoa está em uma postura que sugere que está demonstrando ou manipulando o frasco, possivelmente para fins científicos ou experimentais. Não há texto embutido na imagem.",
+          "id": "blk-8679e999f2-1"
+        },
+        {
+          "type": "paragraph",
+          "text": "I 2 (s) molecular",
+          "id": "blk-abe57638f5-2"
+        },
+        {
+          "type": "image",
+          "text": "Em um prato de vidro transparente, há uma montanha de grãos de café moído. Os grãos são de diferentes tamanhos e texturas, variando de partículas finas a grãos mais grossos. A cor dos grãos é escura, com nuances de preto e marrom, e há pequenos pontos brancos que podem ser resíduos de óleo ou açúcar. O prato está posicionado centralmente na imagem, e a superfície do café moído é irregular, com alguns grãos soltos na borda do prato. Não há outros objetos ou pessoas na imagem, e o fundo é branco e sem detalhes.",
+          "id": "blk-0de33364b9-3"
+        },
+        {
+          "type": "image",
+          "text": "O documento apresenta quatro imagens dispostas em uma grade 2x2, todas em escala de cinza. A imagem superior esquerda mostra uma estrutura molecular composta por átomos de carbono e hidrogênio dispostos em uma cadeia linear, com ligações simples entre os átomos. A imagem superior direita é uma representação difusa de uma estrutura semelhante, com gradientes de intensidade indicando densidade ou concentração. A imagem inferior esquerda apresenta uma estrutura mais alongada e difusa, com áreas de maior e menor intensidade, sugerindo uma representação de difração ou interferência. A imagem inferior direita mostra uma série de partículas alinhadas em uma orientação paralela, com formas alongadas e bordas definidas, possivelmente representando moléculas ou estruturas nanométricas. As imagens não contêm texto embutido, e as escalas de escala são visíveis nas bordas de cada imagem.",
+          "id": "blk-4f9759c805-1"
+        },
+        {
+          "type": "paragraph",
+          "text": "STM and AFM imaging of pentacene on Cu(111).",
+          "id": "blk-428f23d673-2"
+        },
+        {
+          "type": "paragraph",
+          "text": "Imagem da molécula de pentaceno imobilizada numa superfície resfriada próximo do zero absoluto (L. Gross, F. Mohn, N. Moll, P. Liljeroth e G. Meyer, The Chemical Structure of a Molecule Resolved by Atomic Force Microscopy , Science (2009), 325 (5944), 1110-1114; DOI: 10.1126/science.1176210)",
+          "id": "blk-496d39c30d-3"
+        },
+        {
+          "type": "paragraph",
+          "text": "iônico",
+          "id": "blk-ce31e6da8f-1"
+        },
+        {
+          "type": "image",
+          "text": "O diagrama ilustra a estrutura cristalina do cloreto de sódio (NaCl) em uma grade tridimensional. A estrutura é representada por um cubo com linhas que conectam os vértices, formando uma malha. Os íons de cloro (Cl⁻) são indicados por círculos azuis, enquanto os íons de sódio (Na⁺) são representados por círculos vermelhos. Os íons azuis estão posicionados nos vértices do cubo e em pontos intermediários das arestas, enquanto os íons vermelhos ocupam as posições centrais das faces e os pontos centrais da grade interna. A legenda no lado direito do diagrama identifica as cores: azul para Cl⁻ e vermelho para Na⁺. Na parte inferior do diagrama, o texto \"NaCl\" está presente, indicando o composto químico representado. O diagrama utiliza uma cor de fundo azul claro para destacar a estrutura cristalina.",
+          "id": "blk-7874e221fd-2"
+        },
+        {
+          "type": "image",
+          "text": "O diagrama ilustra a estrutura de uma rede cristalina composta por átomos de cloreto e sódio. Os átomos são representados por esferas coloridas, onde as esferas verdes indicam cloreto e as esferas roxas representam sódio. A estrutura é organizada em uma grade tridimensional, com os átomos de cloreto formando uma rede de cubo e os átomos de sódio posicionados nos espaços intersticiais entre os átomos de cloreto. A legenda no diagrama identifica as cores correspondentes a cada tipo de átomo: \"Cloreto\" associado à cor verde e \"Sódio\" associado à cor roxa. O diagrama não apresenta texto embutido adicional ou elementos gráficos além da representação das esferas e da legenda.",
+          "id": "blk-9edd4009a0-3"
+        },
+        {
+          "type": "paragraph",
+          "text": "Cela unitária - agrupamento mínimo de  íons ou átomos que representa a estrutura",
+          "id": "blk-18b23af640-4"
+        },
+        {
+          "type": "image",
+          "text": "O diagrama ilustra a estrutura molecular de um composto químico. No centro, há um átomo de enxofre (S), representado por um círculo com uma letra \"S\" dentro. Este átomo está conectado a quatro átomos de oxigênio (O), cada um representado por círculos com a letra \"O\". Três dos átomos de oxigênio estão ligados ao enxofre por linhas simples, indicando ligações simples. O quarto átomo de oxigênio está ligado ao enxofre por duas linhas paralelas, representando uma ligação dupla. Além disso, há uma seta preta apontando para um dos átomos de oxigênio, com uma linha pontilhada que se estende do átomo de enxofre até o oxigênio, sugerindo uma interação ou ligação parcial. O diagrama é simples, sem fundos ou elementos adicionais, e não contém texto embutido.",
+          "id": "blk-6ce474cab7-1"
+        },
+        {
+          "type": "image",
+          "text": "O diagrama ilustra a estrutura de uma rede cristalina composta por íons sulfato e cobre. No lado esquerdo, há uma representação tridimensional de uma estrutura cúbica formada por bolas coloridas. As bolas amarelas representam o enxofre, as vermelhas indicam o oxigênio e as rosas simbolizam o hidrogênio, enquanto as bolas amarelas maiores no centro de cada grupo representam o íon sulfato (SO4^2-). As bolas vermelhas menores, conectadas às amarelas, representam os átomos de oxigênio ligados ao sulfato. As bolas vermelhas maiores, isoladas, representam os íons cobre (Cu^2+), que estão distribuídos na estrutura. No lado direito, há uma legenda explicando os símbolos: uma estrutura com três bolas vermelhas e uma amarela no centro, rotulada como \"Sulfato\", e uma única bola vermelha rotulada como \"Cobre\". No canto inferior direito, há o texto \"Íon Cu^2+\", indicando a carga do íon cobre. O diagrama utiliza cores vibrantes para diferenciar os elementos e mostra a organização espacial dos íons na rede cristalina.",
+          "id": "blk-658edd93d0-2"
+        },
+        {
+          "type": "image",
+          "text": "A imagem apresenta um símbolo de seta, com design simples e direto. A seta é de cor amarela, com uma tonalidade uniforme e brilhante, e possui uma borda escura que a contorna, criando um efeito de sombra. O formato da seta é simétrico, com uma base triangular que se estreita para um ponto na parte inferior, e duas linhas verticais que conectam os lados da base, formando um retângulo. A seta está centralizada na imagem, sem outros elementos ou detalhes adicionais. Não há texto, pessoas, objetos ou cenário representado. A imagem é estática, sem ações ou relações espaciais a serem descritas.",
+          "id": "blk-b1c4055c57-3"
+        },
+        {
+          "type": "paragraph",
+          "text": "Iônico SO4 -Íon sulfato Íon poliatômico Íon molecular",
+          "id": "blk-e034a6ea8e-4"
+        },
+        {
+          "type": "image",
+          "text": "O gráfico é uma tabela periódica dos elementos químicos. A tabela é organizada em linhas e colunas, com cada célula contendo o símbolo do elemento, seu número atômico e sua configuração eletrônica. A coluna mais à esquerda, destacada em amarelo, contém os metais alcalinos (H, Li, Na, K, Rb, Cs). A coluna à direita, em roxo, representa os gases nobres (H). As colunas intermediárias são coloridas em tons de azul, verde e rosa, indicando diferentes grupos de elementos. Na parte inferior, há uma linha separada com os metais de transição (La, Ce, Nd, Pm, Sm, Eu, Gd, Tb) e lantanídeos (Ac). O fundo da tabela é branco, com bordas em preto. Não há ações ou relações espaciais dinâmicas, apenas a estrutura estática da tabela periódica.",
+          "id": "blk-3d6b6d338a-1"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "blk-f520053033-1",
+      "title": "HALOGÊNIOS",
+      "level": 1,
+      "source_location": {},
+      "metadata": {},
+      "blocks": [
+        {
+          "type": "table",
+          "rows": [
+            [
+              "F-",
+              "Fluoreto"
+            ],
+            [
+              "Cl-",
+              "Cloreto"
+            ],
+            [
+              "Br-",
+              "Brometo"
+            ],
+            [
+              "I-",
+              "Iodeto"
+            ],
+            [
+              "ClO-",
+              "Hipoclorito"
+            ],
+            [
+              "ClO2-",
+              "Clorito"
+            ],
+            [
+              "ClO3-",
+              "Clorato"
+            ],
+            [
+              "ClO4-",
+              "Perclorato"
+            ],
+            [
+              "BrO-",
+              "Hipobromito"
+            ],
+            [
+              "BrO3-",
+              "Bromato"
+            ],
+            [
+              "IO-",
+              "Hipoiodito"
+            ],
+            [
+              "IO3-",
+              "Iodato"
+            ],
+            [
+              "IO4-",
+              "Periodato"
+            ]
+          ],
+          "id": "blk-db0db10bf8-2"
+        }
+      ],
+      "children": [
+        {
+          "id": "blk-c245479e06-3",
+          "title": "| FÓSFORO |  |",
+          "level": 2,
+          "source_location": {},
+          "metadata": {},
+          "blocks": [
+            {
+              "type": "table",
+              "rows": [
+                [
+                  "PO3-",
+                  "Metafosfato"
+                ],
+                [
+                  "H2PO2-",
+                  "Hipofosfito"
+                ],
+                [
+                  "HPO32-",
+                  "Fosfito"
+                ],
+                [
+                  "PO43-",
+                  "Ortofosfato"
+                ],
+                [
+                  "P3-",
+                  "Fosfeto"
+                ],
+                [
+                  "P2O74-",
+                  "Pirofosfato"
+                ],
+                [
+                  "P2O64-",
+                  "Hipofosfato"
+                ]
+              ],
+              "id": "blk-dcd31f2b52-4"
+            }
+          ],
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "blk-582b819419-1",
+      "title": "| ENXOFRE |  |",
+      "level": 1,
+      "source_location": {},
+      "metadata": {},
+      "blocks": [
+        {
+          "type": "table",
+          "rows": [
+            [
+              "S2-",
+              "Sulfito"
+            ],
+            [
+              "SO42-",
+              "Sulfato"
+            ],
+            [
+              "SO32-",
+              "Sulfito"
+            ],
+            [
+              "S2O32-",
+              "Tiossulfato"
+            ],
+            [
+              "S2O82-",
+              "Persulfato"
+            ],
+            [
+              "S4O62-",
+              "Tetrationato"
+            ]
+          ],
+          "id": "blk-ef55aff5e2-2"
+        }
+      ],
+      "children": [
+        {
+          "id": "blk-ca1e41b16b-3",
+          "title": "| NITROGÊNIO |  |",
+          "level": 2,
+          "source_location": {},
+          "metadata": {},
+          "blocks": [
+            {
+              "type": "table",
+              "rows": [
+                [
+                  "NO₂⁻",
+                  "Nitrito"
+                ],
+                [
+                  "NO₃⁻",
+                  "Nitrato"
+                ],
+                [
+                  "N₃⁻",
+                  "Azida"
+                ],
+                [
+                  "N³⁻",
+                  "Nitreto"
+                ]
+              ],
+              "id": "blk-670eeb68c6-4"
+            },
+            {
+              "type": "image",
+              "text": "O diagrama ilustra a estrutura do carbeto de silício e compara-a com a estrutura metálica do ferro. No lado esquerdo, há um modelo de bolas conectadas por linhas, representando átomos de silício (círculos azuis) e carbono (círculos laranja) em uma rede covalente estendida. O título \"Silicon carbide structure\" está acima do modelo, e \"Figure 11\" está abaixo. No lado direito, há três imagens: uma esfera cinza rotulada \"Ferro\", uma estrutura metálica com esferas cinzas conectadas por linhas, e uma estrutura com esferas vermelhas agrupadas. O texto \"metálico\" está abaixo da estrutura metálica. A legenda \"REDE Covalente estendida\" está no canto inferior esquerdo. As cores principais são azul, laranja, cinza e vermelho. O diagrama usa formas geométricas para representar átomos e suas conexões.",
+              "id": "blk-5c23e38bfc-1"
+            },
+            {
+              "type": "paragraph",
+              "text": "Determinação da fórmula química",
+              "id": "blk-1370f5713c-1"
+            },
+            {
+              "type": "paragraph",
+              "text": "fórmulas empíricas : menor relação dos átomos contidos em um composto. Os compostos iônicos, metálicos e de rede covalente estendida são geralmente representados por fórmulas empíricas. NaCl ; C ; Na ; Fe; Al 2 O3 ; Fe 3O4 CaCO3",
+              "id": "blk-69d802ab50-2"
+            },
+            {
+              "type": "paragraph",
+              "text": "fórmulas moleculares: descreve o número exato de átomos de cada elemento de uma molécula.",
+              "id": "blk-5413af3bff-3"
+            },
+            {
+              "type": "paragraph",
+              "text": "H2O2, porém sua fórmula empírica ou fórmula mínima é HO.",
+              "id": "blk-345ba8ecf6-4"
+            },
+            {
+              "type": "paragraph",
+              "text": "Composição percentual em massa",
+              "id": "blk-ba93be65f9-1"
+            },
+            {
+              "type": "paragraph",
+              "text": "$\\% elemento = \\frac{n \\times massa molar do elemento}{massa molar do composto} \\times 100\\%$",
+              "id": "blk-d98cda860d-2"
+            },
+            {
+              "type": "paragraph",
+              "text": "n é o número de mols de elemento em 1 mol de composto.",
+              "id": "blk-2f35545d44-3"
+            },
+            {
+              "type": "paragraph",
+              "text": "Ex:  1 mol de CaCO 3 tem 1mol de Ca, 1 mol de C e 3 mols de O",
+              "id": "blk-da9ae3daa4-4"
+            },
+            {
+              "type": "paragraph",
+              "text": "Sobre a vitamina C, calcule o que se pede: (dado: fórmula molecular da vitamina C, C 6 H8 O 6 )",
+              "id": "blk-1630aa8d35-1"
+            },
+            {
+              "type": "list",
+              "ordered": false,
+              "items": [
+                "fórmula mínima da vitamina C"
+              ],
+              "id": "blk-7c88afb2cf-2"
+            },
+            {
+              "type": "list",
+              "ordered": false,
+              "items": [
+                "composição percentual em massa da fórmula mínima"
+              ],
+              "id": "blk-bd301b3d4e-3"
+            },
+            {
+              "type": "list",
+              "ordered": false,
+              "items": [
+                "composição percentual em massa da fórmula molecular"
+              ],
+              "id": "blk-4904a7eb1d-4"
+            },
+            {
+              "type": "image",
+              "text": "O diagrama representa a estrutura molecular de um composto químico. A estrutura central é um anel pentagonal com dois átomos de oxigênio conectados por uma ligação dupla. Dois átomos de hidrogênio estão ligados a um dos vértices do anel, enquanto outro átomo de hidrogênio está conectado a um átomo de oxigênio no anel. Uma cadeia lateral composta por dois átomos de carbono e dois átomos de hidrogênio está ligada ao anel. A estrutura é desenhada com linhas sólidas para ligações simples e linhas duplas para ligações duplas. O diagrama utiliza notação química padrão, com átomos de carbono implícitos nos vértices e átomos de hidrogênio mostrados explicitamente. Não há cores, imagens ou elementos visuais além da estrutura molecular.",
+              "id": "blk-c41405c13f-5"
+            },
+            {
+              "type": "paragraph",
+              "text": "vitamina C",
+              "id": "blk-4d68d0b331-6"
+            },
+            {
+              "type": "paragraph",
+              "text": "Figura 1: molécula do ácido ascórbico Fórmula estrutural",
+              "id": "blk-95417fcde7-7"
+            },
+            {
+              "type": "paragraph",
+              "text": "Na verdade, ocorre o contrário, ou seja, a determinação da fórmula molecular de um composto começa pela medida da massa percentual de cada elemento presente na amostra. Calculado por meio da seguinte expressão:",
+              "id": "blk-8a9842f3bd-1"
+            },
+            {
+              "type": "paragraph",
+              "text": "$$Massa percentual do elemento=\\frac{massa do elemento na amostra}{massa total da amostra}\\times 100\\%$$",
+              "id": "blk-3b50bfdd1d-2"
+            },
+            {
+              "type": "paragraph",
+              "text": "Por exemplo, uma amostra de 8 g vitamina C, quando analisada, possui os seguintes valores:",
+              "id": "blk-4972974cae-3"
+            },
+            {
+              "type": "paragraph",
+              "text": "Carbono 3,270 g",
+              "id": "blk-2ccd77c3d2-4"
+            },
+            {
+              "type": "paragraph",
+              "text": "Hidrogênio 0,366 g",
+              "id": "blk-a1aca4b863-5"
+            },
+            {
+              "type": "paragraph",
+              "text": "Oxigênio 4,360 g",
+              "id": "blk-4b4b8ee3ae-6"
+            },
+            {
+              "type": "list",
+              "ordered": false,
+              "items": [
+                "1- Calcular a massa de cada em elemento para 100 g de amostra"
+              ],
+              "id": "blk-19f06e329f-1"
+            },
+            {
+              "type": "list",
+              "ordered": false,
+              "items": [
+                "2O número de mols é calculado por meio da seguinte expressão:"
+              ],
+              "id": "blk-5974a2048e-2"
+            },
+            {
+              "type": "paragraph",
+              "text": "n = massa do elemento em 100 g de amostra massa molar 𝑑𝑜 𝑒𝑙𝑒𝑚𝑒𝑛𝑡𝑜",
+              "id": "blk-9db478c2a1-3"
+            },
+            {
+              "type": "paragraph",
+              "text": "o número de mols é proporcional ao número de átomos, nós conhecemos agora quantos átomos de cada elemento estão presentes na vitamina C:",
+              "id": "blk-58bdc194ce-1"
+            },
+            {
+              "type": "paragraph",
+              "text": "3,41 mol de  átomos de C,",
+              "id": "blk-8c177b54c0-2"
+            },
+            {
+              "type": "paragraph",
+              "text": "Em 100 gramas",
+              "id": "blk-401dc0d91e-3"
+            },
+            {
+              "type": "paragraph",
+              "text": "4,54 mol de átomos de H",
+              "id": "blk-5db11f56cd-4"
+            },
+            {
+              "type": "paragraph",
+              "text": "3,41 mol de átomos de O",
+              "id": "blk-5495265bd4-5"
+            },
+            {
+              "type": "paragraph",
+              "text": "razão molar de 3,41C : 4,54H : 3,41O",
+              "id": "blk-255dc6cc0b-6"
+            },
+            {
+              "type": "paragraph",
+              "text": "Desse modo, somos capaz de escrever a seguinte fórmula empírica para a vitamina C:",
+              "id": "blk-f16fb4f567-7"
+            }
+          ],
+          "children": []
+        },
+        {
+          "id": "blk-42a7fb10e5-8",
+          "title": "\\(O_{3,41} C_3H_4O_3???\\)",
+          "level": 2,
+          "source_location": {},
+          "metadata": {},
+          "blocks": [],
+          "children": []
+        },
+        {
+          "id": "blk-4ece48b654-9",
+          "title": "C3,41 H4,54",
+          "level": 2,
+          "source_location": {},
+          "metadata": {},
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "A fórmula química encontrada para a vitamina C nesse procedimento é sua fórmula empírica. A mesma fórmula empírica seria obtida das seguintes composições, C6H8O6, C9H12O9, C12H16O12 ou qualquer outro múltiplo da fórmula empírica.",
+              "id": "blk-0cfac83dd1-1"
+            },
+            {
+              "type": "paragraph",
+              "text": "Para chegarmos a fórmula molecular da vitamina C é preciso conhecer a massa molar da substância.",
+              "id": "blk-dac546c5c4-1"
+            },
+            {
+              "type": "paragraph",
+              "text": "Amassa molar da vitamina C obtida por espectrometria de massa é 176,14 g mol -1 , enquanto a calculada a partir da sua fórmula empírica é 88,06 g mol -1 . Por inspeção simples, é fácil observar que a massa molar determinada é duas vezes a massa calculada pela fórmula empírica.",
+              "id": "blk-2defd77bce-2"
+            },
+            {
+              "type": "paragraph",
+              "text": "$\\frac{176,14\\ g\\ mol^{-1}}{88,06\\ g\\ mol^{-1}} = 2,000$",
+              "id": "blk-70c0bc60b9-3"
+            },
+            {
+              "type": "paragraph",
+              "text": "assim, a fórmula molecular da vitamina C é 2 x (C 3 H4 O 3 ) ou melhor C 6 H8 O 6 .",
+              "id": "blk-ee6a326365-4"
+            }
+          ],
+          "children": []
+        }
+      ]
+    }
+  ]
+}

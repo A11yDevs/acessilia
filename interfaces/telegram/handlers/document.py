@@ -11,15 +11,17 @@ from aiogram.exceptions import TelegramRetryAfter
 
 from interfaces.telegram.adapters.file_service import download_file
 from core.orchestrator import process
-from core.exporters.txt_exporter import export_txt
-from core.exporters.docx_exporter import export_docx
-from core.exporters.pdf_exporter import export_pdf
-from core.exporters.audio_exporter import export_mp3
+
+
+
+
 from core.utils.logger import logger
 from core.utils.validators import validate_file
 from interfaces.telegram.adapters.status_tracker import StatusTracker
 from exporters.pandoc_exporter import export_accessible_document
 from config.settings import settings
+
+from adapters.exporters import export_txt, export_docx, export_pdf, export_mp3
 
 router = Router()
 
@@ -144,8 +146,8 @@ async def process_file(
                     if txt_path.exists():
                         clean_text = txt_path.read_text(encoding="utf-8")
 
-                        async def audio_progress(percent: int):
-                            await t_tracker(f"Gerando áudio (MP3)... {percent}%")
+
+
 
                         await export_mp3(
                             clean_text, mp3_path, progress_callback=audio_progress

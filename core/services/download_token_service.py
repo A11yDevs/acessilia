@@ -1,4 +1,10 @@
 import asyncio
+
+# NOTE: Table creation drops the existing download_tokens table, invalidating all previous tokens.
+# If migration of existing tokens is required, implement a proper migration before dropping.
+
+# NOTE: Table creation drops the existing download_tokens table, invalidating all previous tokens.
+# If migration of existing tokens is required, implement a proper migration before dropping.
 import sqlite3
 import uuid
 from pathlib import Path
@@ -104,7 +110,11 @@ async def limpar_tokens_expirados(dias: int = TOKEN_EXPIRY_DAYS):
             output_dir = Path(row["output_dir"])
             if output_dir.exists():
                 import shutil
-                shutil.rmtree(output_dir, ignore_errors=True)
+                # Ensure we only delete directories inside the configured temporary directory
+                if str(output_dir).startswith(str(settings.temp_dir)):
+                    shutil.rmtree(output_dir, ignore_errors=True)
+                else:
+                    logger.warning("Attempted to delete directory outside temp_dir: {}", output_dir)
         conn.execute(
             "DELETE FROM download_tokens WHERE criado_em < datetime('now', ?)",
             (f"-{dias} days",),

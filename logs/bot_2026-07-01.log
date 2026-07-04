@@ -1,0 +1,390 @@
+2026-07-01 07:30:20 | WARNING  | interfaces.web.app:http_exception_handler:74 - HTTP Exception no Painel Web: Not Found | Path: /owa/auth/logon.aspx
+2026-07-01 08:19:54 | WARNING  | interfaces.web.app:http_exception_handler:74 - HTTP Exception no Painel Web: Not Found | Path: /.git/config
+2026-07-01 08:22:57 | WARNING  | interfaces.web.app:http_exception_handler:74 - HTTP Exception no Painel Web: Method Not Allowed | Path: /
+2026-07-01 09:03:07 | WARNING  | interfaces.web.app:http_exception_handler:74 - HTTP Exception no Painel Web: Method Not Allowed | Path: /
+2026-07-01 09:16:16 | WARNING  | interfaces.web.app:http_exception_handler:74 - HTTP Exception no Painel Web: Not Found | Path: /admin/config.php
+2026-07-01 09:18:41 | WARNING  | interfaces.web.app:http_exception_handler:74 - HTTP Exception no Painel Web: Not Found | Path: /robots.txt
+2026-07-01 09:42:48 | WARNING  | interfaces.web.app:http_exception_handler:74 - HTTP Exception no Painel Web: Not Found | Path: /developmentserver/metadatauploader
+2026-07-01 09:44:53 | WARNING  | interfaces.web.app:http_exception_handler:74 - HTTP Exception no Painel Web: Not Found | Path: /epa/scripts/win/nsepa_setup.exe
+2026-07-01 10:18:23 | WARNING  | interfaces.web.app:http_exception_handler:74 - HTTP Exception no Painel Web: Method Not Allowed | Path: /
+2026-07-01 12:01:53 | WARNING  | interfaces.web.app:http_exception_handler:74 - HTTP Exception no Painel Web: Not Found | Path: /robots.txt
+2026-07-01 12:12:18 | INFO     | interfaces.telegram.bot:on_shutdown:30 - Bot desligando
+2026-07-01 12:12:18 | INFO     | __main__:release_lock:56 - Lock released
+2026-07-01 12:12:25 | INFO     | core.utils.logger:setup_logger:30 - Logger configured - level: INFO
+2026-07-01 12:12:31 | INFO     | core.structurer:get_structurer:235 - Usando structurer: Docling (com fallback PyMuPDF)
+2026-07-01 12:12:31 | INFO     | core.services.history_service:limpar_orfas:94 - Tarefas orfas limpas
+2026-07-01 12:12:31 | INFO     | __main__:startup:71 - Interface Telegram habilitada
+2026-07-01 12:12:31 | INFO     | __main__:startup:84 - Interface Web habilitada (http://localhost:8000)
+2026-07-01 12:12:31 | INFO     | __main__:startup:92 - Iniciando com interfaces: telegram,web
+2026-07-01 12:12:31 | INFO     | interfaces.telegram.bot:start_polling:54 - Iniciando polling
+2026-07-01 12:12:31 | INFO     | core.services.queue_service:start_worker:34 - Worker da Fila Unificada iniciado.
+2026-07-01 12:12:31 | INFO     | interfaces.telegram.bot:on_startup:26 - Bot iniciado
+2026-07-01 12:14:37 | INFO     | core.services.cache:clear_cache:86 - Cache limpo: 169 arquivos removidos
+2026-07-01 12:15:09 | DEBUG    | interfaces.telegram.adapters.file_service:download_file:11 - Downloading file: photos/file_57.jpg -> imagem.png
+2026-07-01 12:15:10 | INFO     | interfaces.telegram.adapters.file_service:download_file:13 - File downloaded: imagem.png (136891 bytes)
+2026-07-01 12:15:10 | INFO     | core.services.queue_service:enqueue:40 - Fila Unificada: imagem.png enfileirado de telegram (Posição: 1)
+2026-07-01 12:15:11 | INFO     | core.services.queue_service:_worker:58 - Worker: Iniciando tarefa imagem.png de telegram
+2026-07-01 12:15:11 | INFO     | core.agents.agente_unico:executar:244 - Processando 1 pagina(s) para imagem.png com structurer=DoclingStructurer
+2026-07-01 12:15:12 | DEBUG    | core.agents.agente_unico:_process_image_page:632 - [pag 1] lendo imagem: /tmp/a11y-devs-describer/temp/task_798ba9e208f54b58993c40fcb178ec14/imagem.png
+2026-07-01 12:15:13 | INFO     | core.agents.agente_unico:_process_image_page:640 - Enviando pagina 1 para IA de visao (202671 bytes)
+2026-07-01 12:15:13 | DEBUG    | core.ai.openrouter:send_message:68 - Enviando requisicao para OpenRouter (tentativa 1/5): modelo=nvidia/nemotron-nano-12b-v2-vl, image_count=1
+2026-07-01 12:15:25 | DEBUG    | core.services.cache:set_cache:74 - Cache set: e4b06bae3b15eeee_page_1_normal
+2026-07-01 12:15:25 | INFO     | core.agents.agente_unico:executar:298 - Resposta da pagina 1 salva em imagen001.txt
+2026-07-01 12:15:25 | INFO     | core.agents.agente_unico:executar:319 - AgenteUnico: 1 paginas processadas, 1492 chars no total
+2026-07-01 12:15:25 | DEBUG    | core.services.cache:set_cache:74 - Cache set: e4b06bae3b15eeee_openrouter-v1
+2026-07-01 12:15:26 | DEBUG    | core.exporters.txt_exporter:export_txt:20 - TXT exportado: /tmp/a11y-devs-describer/temp/output/imagem.txt
+2026-07-01 12:15:26 | DEBUG    | core.exporters.docx_exporter:export_docx:21 - DOCX exportado: /tmp/a11y-devs-describer/temp/output/imagem.docx
+2026-07-01 12:15:26 | DEBUG    | core.exporters.pdf_exporter:export_pdf:20 - PDF exportado com bookmarks e numeracao: /tmp/a11y-devs-describer/temp/output/imagem.pdf
+2026-07-01 12:15:26 | DEBUG    | core.exporters.audio_exporter:export_mp3:15 - Iniciando geração de áudio granular (TTS): pt-BR-ThalitaNeural -> /tmp/a11y-devs-describer/temp/output/imagem.mp3
+2026-07-01 12:16:09 | INFO     | core.exporters.audio_exporter:process_chunk:47 - Gerando áudio (TTS): 1/1 blocos concluídos (100%)
+2026-07-01 12:16:09 | INFO     | core.exporters.audio_exporter:export_mp3:67 - Áudio (MP3) granular exportado com sucesso: /tmp/a11y-devs-describer/temp/output/imagem.mp3
+2026-07-01 12:16:09 | DEBUG    | core.services.download_token_service:criar_token:58 - Token de download criado: a61bcae9-e93a-47bc-9b05-8a89a0c8eb83 -> imagem
+2026-07-01 12:16:11 | INFO     | core.services.queue_service:_worker:67 - Worker: Tarefa concluída: imagem.png. Aguardando próximo...
+2026-07-01 12:18:32 | WARNING  | interfaces.web.app:http_exception_handler:74 - HTTP Exception no Painel Web: Method Not Allowed | Path: /
+2026-07-01 12:18:53 | WARNING  | interfaces.web.app:http_exception_handler:74 - HTTP Exception no Painel Web: Not Found | Path: /.env.orig
+2026-07-01 12:18:54 | WARNING  | interfaces.web.app:http_exception_handler:74 - HTTP Exception no Painel Web: Not Found | Path: /env
+2026-07-01 12:18:54 | WARNING  | interfaces.web.app:http_exception_handler:74 - HTTP Exception no Painel Web: Not Found | Path: /public/.env
+2026-07-01 12:22:23 | DEBUG    | interfaces.telegram.adapters.file_service:download_file:11 - Downloading file: documents/file_58.pdf -> grandezas-e-medidas-pg7-42.pdf
+2026-07-01 12:22:25 | INFO     | interfaces.telegram.adapters.file_service:download_file:13 - File downloaded: grandezas-e-medidas-pg7-42.pdf (642162 bytes)
+2026-07-01 12:22:25 | INFO     | core.services.queue_service:enqueue:40 - Fila Unificada: grandezas-e-medidas-pg7-42.pdf enfileirado de telegram (Posição: 1)
+2026-07-01 12:22:25 | INFO     | core.services.queue_service:_worker:58 - Worker: Iniciando tarefa grandezas-e-medidas-pg7-42.pdf de telegram
+2026-07-01 12:22:26 | INFO     | core.utils.pdf_splitter:split_pdf:12 - PDF tem 1 paginas, processando 1
+2026-07-01 12:22:26 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 1 salva: pagina_001.pdf
+2026-07-01 12:22:26 | INFO     | core.utils.pdf_splitter:split_pdf:24 - 1 paginas extraidas para /tmp/a11y-devs-describer/temp/task_b4104a4aaead4a109a0854dc96218553
+2026-07-01 12:22:26 | INFO     | core.agents.agente_unico:executar:244 - Processando 1 pagina(s) para grandezas-e-medidas-pg7-42.pdf com structurer=DoclingStructurer
+2026-07-01 12:22:30 | INFO     | core.structurer:_process_document:70 - Docling processou pagina_001.pdf em 3.8s
+2026-07-01 12:22:30 | INFO     | core.agents.agente_unico:_process_pdf_page:383 - [pag 1] Extraidas 1 regioes na pagina (structurer=DoclingStructurer)
+2026-07-01 12:22:30 | INFO     | core.agents.agente_unico:_process_with_vision_by_regions:487 - [pag 1] Regiao 1 - tipo=embedded_image, bbox=(45.59795379638672, 64.40074157714844, 919.7005615234375, 510.0963439941406)
+2026-07-01 12:22:32 | DEBUG    | core.utils.image_enhancer:resize_image:22 - Imagem redimensionada: 1600x816 -> 1344x685
+2026-07-01 12:22:32 | DEBUG    | core.agents.agente_unico:_process_region_with_vision:568 - [pag 1] Enviando regiao para visao (162740 bytes, tipo=embedded_image)
+2026-07-01 12:22:32 | DEBUG    | core.ai.openrouter:send_message:68 - Enviando requisicao para OpenRouter (tentativa 1/5): modelo=nvidia/nemotron-nano-12b-v2-vl, image_count=1
+2026-07-01 12:22:41 | INFO     | core.agents.agente_unico:_process_with_vision_by_regions:528 - [pag 1] 1 regioes (0, 1 visao sequencial)
+2026-07-01 12:22:41 | DEBUG    | core.services.cache:set_cache:74 - Cache set: 6bfe6260e26f96a2_page_1_normal
+2026-07-01 12:22:41 | INFO     | core.agents.agente_unico:executar:298 - Resposta da pagina 1 salva em imagen001.txt
+2026-07-01 12:22:41 | INFO     | core.agents.agente_unico:executar:319 - AgenteUnico: 1 paginas processadas, 902 chars no total
+2026-07-01 12:22:41 | DEBUG    | core.services.cache:set_cache:74 - Cache set: 6480e5093b894dd0_openrouter-v1
+2026-07-01 12:22:42 | DEBUG    | core.exporters.txt_exporter:export_txt:20 - TXT exportado: /tmp/a11y-devs-describer/temp/output/grandezas-e-medidas-pg7-42.txt
+2026-07-01 12:22:42 | DEBUG    | core.exporters.docx_exporter:export_docx:21 - DOCX exportado: /tmp/a11y-devs-describer/temp/output/grandezas-e-medidas-pg7-42.docx
+2026-07-01 12:22:42 | DEBUG    | core.exporters.pdf_exporter:export_pdf:20 - PDF exportado com bookmarks e numeracao: /tmp/a11y-devs-describer/temp/output/grandezas-e-medidas-pg7-42.pdf
+2026-07-01 12:22:42 | DEBUG    | core.exporters.audio_exporter:export_mp3:15 - Iniciando geração de áudio granular (TTS): pt-BR-ThalitaNeural -> /tmp/a11y-devs-describer/temp/output/grandezas-e-medidas-pg7-42.mp3
+2026-07-01 12:23:16 | INFO     | core.exporters.audio_exporter:process_chunk:47 - Gerando áudio (TTS): 1/1 blocos concluídos (100%)
+2026-07-01 12:23:17 | INFO     | core.exporters.audio_exporter:export_mp3:67 - Áudio (MP3) granular exportado com sucesso: /tmp/a11y-devs-describer/temp/output/grandezas-e-medidas-pg7-42.mp3
+2026-07-01 12:23:17 | DEBUG    | core.services.download_token_service:criar_token:58 - Token de download criado: 6bfef884-e740-4c35-9205-041e4bcc3dfe -> grandezas-e-medidas-pg7-42
+2026-07-01 12:23:21 | INFO     | core.services.email_service:send_email_notification:41 - E-mail enviado para marceloakira@ufg.br com sucesso.
+2026-07-01 12:23:23 | INFO     | core.services.queue_service:_worker:67 - Worker: Tarefa concluída: grandezas-e-medidas-pg7-42.pdf. Aguardando próximo...
+2026-07-01 12:28:35 | DEBUG    | interfaces.telegram.adapters.file_service:download_file:11 - Downloading file: documents/file_59.pdf -> Roberto_DaMatta_-_O_que_faz_o_brasil__Brasil.pdf
+2026-07-01 12:28:36 | INFO     | interfaces.telegram.adapters.file_service:download_file:13 - File downloaded: Roberto_DaMatta_-_O_que_faz_o_brasil__Brasil.pdf (1706123 bytes)
+2026-07-01 12:28:36 | INFO     | core.services.queue_service:enqueue:40 - Fila Unificada: Roberto_DaMatta_-_O_que_faz_o_brasil__Brasil.pdf enfileirado de telegram (Posição: 1)
+2026-07-01 12:28:36 | INFO     | core.services.queue_service:_worker:58 - Worker: Iniciando tarefa Roberto_DaMatta_-_O_que_faz_o_brasil__Brasil.pdf de telegram
+2026-07-01 12:28:37 | INFO     | core.utils.pdf_splitter:split_pdf:12 - PDF tem 111 paginas, processando 111
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 1 salva: pagina_001.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 2 salva: pagina_002.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 3 salva: pagina_003.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 4 salva: pagina_004.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 5 salva: pagina_005.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 6 salva: pagina_006.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 7 salva: pagina_007.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 8 salva: pagina_008.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 9 salva: pagina_009.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 10 salva: pagina_010.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 11 salva: pagina_011.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 12 salva: pagina_012.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 13 salva: pagina_013.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 14 salva: pagina_014.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 15 salva: pagina_015.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 16 salva: pagina_016.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 17 salva: pagina_017.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 18 salva: pagina_018.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 19 salva: pagina_019.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 20 salva: pagina_020.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 21 salva: pagina_021.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 22 salva: pagina_022.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 23 salva: pagina_023.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 24 salva: pagina_024.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 25 salva: pagina_025.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 26 salva: pagina_026.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 27 salva: pagina_027.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 28 salva: pagina_028.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 29 salva: pagina_029.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 30 salva: pagina_030.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 31 salva: pagina_031.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 32 salva: pagina_032.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 33 salva: pagina_033.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 34 salva: pagina_034.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 35 salva: pagina_035.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 36 salva: pagina_036.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 37 salva: pagina_037.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 38 salva: pagina_038.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 39 salva: pagina_039.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 40 salva: pagina_040.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 41 salva: pagina_041.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 42 salva: pagina_042.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 43 salva: pagina_043.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 44 salva: pagina_044.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 45 salva: pagina_045.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 46 salva: pagina_046.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 47 salva: pagina_047.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 48 salva: pagina_048.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 49 salva: pagina_049.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 50 salva: pagina_050.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 51 salva: pagina_051.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 52 salva: pagina_052.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 53 salva: pagina_053.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 54 salva: pagina_054.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 55 salva: pagina_055.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 56 salva: pagina_056.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 57 salva: pagina_057.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 58 salva: pagina_058.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 59 salva: pagina_059.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 60 salva: pagina_060.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 61 salva: pagina_061.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 62 salva: pagina_062.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 63 salva: pagina_063.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 64 salva: pagina_064.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 65 salva: pagina_065.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 66 salva: pagina_066.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 67 salva: pagina_067.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 68 salva: pagina_068.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 69 salva: pagina_069.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 70 salva: pagina_070.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 71 salva: pagina_071.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 72 salva: pagina_072.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 73 salva: pagina_073.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 74 salva: pagina_074.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 75 salva: pagina_075.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 76 salva: pagina_076.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 77 salva: pagina_077.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 78 salva: pagina_078.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 79 salva: pagina_079.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 80 salva: pagina_080.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 81 salva: pagina_081.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 82 salva: pagina_082.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 83 salva: pagina_083.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 84 salva: pagina_084.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 85 salva: pagina_085.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 86 salva: pagina_086.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 87 salva: pagina_087.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 88 salva: pagina_088.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 89 salva: pagina_089.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 90 salva: pagina_090.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 91 salva: pagina_091.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 92 salva: pagina_092.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 93 salva: pagina_093.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 94 salva: pagina_094.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 95 salva: pagina_095.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 96 salva: pagina_096.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 97 salva: pagina_097.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 98 salva: pagina_098.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 99 salva: pagina_099.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 100 salva: pagina_100.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 101 salva: pagina_101.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 102 salva: pagina_102.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 103 salva: pagina_103.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 104 salva: pagina_104.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 105 salva: pagina_105.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 106 salva: pagina_106.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 107 salva: pagina_107.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 108 salva: pagina_108.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 109 salva: pagina_109.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 110 salva: pagina_110.pdf
+2026-07-01 12:28:37 | DEBUG    | core.utils.pdf_splitter:split_pdf:22 - Pagina 111 salva: pagina_111.pdf
+2026-07-01 12:28:37 | INFO     | core.utils.pdf_splitter:split_pdf:24 - 111 paginas extraidas para /tmp/a11y-devs-describer/temp/task_a7e7ea653fdb4ad0accdad83122c1b87
+2026-07-01 12:28:37 | INFO     | core.agents.agente_unico:executar:244 - Processando 111 pagina(s) para Roberto_DaMatta_-_O_que_faz_o_brasil__Brasil.pdf com structurer=DoclingStructurer
+2026-07-01 12:28:39 | INFO     | core.structurer:_process_document:70 - Docling processou pagina_001.pdf em 1.7s
+2026-07-01 12:28:39 | INFO     | core.agents.agente_unico:_process_pdf_page:383 - [pag 1] Extraidas 2 regioes na pagina (structurer=DoclingStructurer)
+2026-07-01 12:28:39 | INFO     | core.agents.agente_unico:_process_with_vision_by_regions:487 - [pag 1] Regiao 1 - tipo=embedded_image, bbox=(81.74440002441406, 102.81055450439453, 511.15673828125, 691.5455932617188)
+2026-07-01 12:28:42 | DEBUG    | core.utils.image_enhancer:resize_image:22 - Imagem redimensionada: 1193x1636 -> 980x1344
+2026-07-01 12:28:42 | DEBUG    | core.agents.agente_unico:_process_region_with_vision:568 - [pag 1] Enviando regiao para visao (182701 bytes, tipo=embedded_image)
+2026-07-01 12:28:42 | DEBUG    | core.ai.openrouter:send_message:68 - Enviando requisicao para OpenRouter (tentativa 1/5): modelo=nvidia/nemotron-nano-12b-v2-vl, image_count=1
+2026-07-01 12:28:50 | INFO     | core.agents.agente_unico:_process_with_vision_by_regions:487 - [pag 1] Regiao 3 - tipo=embedded_image, bbox=(382.0860290527344, 678.402099609375, 443.2290344238281, 701.3701171875)
+2026-07-01 12:28:50 | DEBUG    | core.agents.agente_unico:_process_region_with_vision:568 - [pag 1] Enviando regiao para visao (3046 bytes, tipo=embedded_image)
+2026-07-01 12:28:50 | DEBUG    | core.ai.openrouter:send_message:68 - Enviando requisicao para OpenRouter (tentativa 1/5): modelo=nvidia/nemotron-nano-12b-v2-vl, image_count=1
+2026-07-01 12:28:53 | INFO     | core.agents.agente_unico:_process_with_vision_by_regions:528 - [pag 1] 2 regioes (0, 2 visao sequencial)
+2026-07-01 12:28:53 | DEBUG    | core.services.cache:set_cache:74 - Cache set: 92e1a1a3419f6d31_page_1_normal
+2026-07-01 12:28:53 | INFO     | core.agents.agente_unico:executar:298 - Resposta da pagina 1 salva em imagen001.txt
+2026-07-01 12:28:56 | INFO     | core.structurer:_process_document:70 - Docling processou pagina_002.pdf em 2.4s
+2026-07-01 12:28:56 | INFO     | core.agents.agente_unico:_process_pdf_page:383 - [pag 2] Extraidas 4 regioes na pagina (structurer=DoclingStructurer)
+2026-07-01 12:28:56 | INFO     | core.agents.agente_unico:_process_pdf_page:417 - [pag 2] 4 regioes de texto limpo (sem IA de visao)
+2026-07-01 12:28:56 | DEBUG    | core.services.cache:set_cache:74 - Cache set: d3c3e7ccbace1a5c_page_2_normal
+2026-07-01 12:28:56 | INFO     | core.agents.agente_unico:executar:298 - Resposta da pagina 2 salva em imagen002.txt
+2026-07-01 12:28:57 | INFO     | core.structurer:_process_document:70 - Docling processou pagina_003.pdf em 0.7s
+2026-07-01 12:28:57 | INFO     | core.agents.agente_unico:_process_pdf_page:383 - [pag 3] Extraidas 1 regioes na pagina (structurer=DoclingStructurer)
+2026-07-01 12:28:57 | INFO     | core.agents.agente_unico:_process_pdf_page:417 - [pag 3] 1 regioes de texto limpo (sem IA de visao)
+2026-07-01 12:28:57 | DEBUG    | core.services.cache:set_cache:74 - Cache set: bcdfb27a131a26c4_page_3_normal
+2026-07-01 12:28:57 | INFO     | core.agents.agente_unico:executar:298 - Resposta da pagina 3 salva em imagen003.txt
+2026-07-01 12:28:58 | INFO     | core.structurer:_process_document:70 - Docling processou pagina_004.pdf em 0.7s
+2026-07-01 12:28:58 | INFO     | core.agents.agente_unico:_process_pdf_page:383 - [pag 4] Extraidas 2 regioes na pagina (structurer=DoclingStructurer)
+2026-07-01 12:28:58 | INFO     | core.agents.agente_unico:_process_pdf_page:417 - [pag 4] 2 regioes de texto limpo (sem IA de visao)
+2026-07-01 12:28:58 | DEBUG    | core.services.cache:set_cache:74 - Cache set: dd9b6bad0e2545c7_page_4_normal
+2026-07-01 12:28:58 | INFO     | core.agents.agente_unico:executar:298 - Resposta da pagina 4 salva em imagen004.txt
+2026-07-01 12:28:59 | INFO     | core.structurer:_process_document:70 - Docling processou pagina_005.pdf em 0.7s
+2026-07-01 12:28:59 | INFO     | core.agents.agente_unico:_process_pdf_page:383 - [pag 5] Extraidas 17 regioes na pagina (structurer=DoclingStructurer)
+2026-07-01 12:28:59 | INFO     | core.agents.agente_unico:_process_with_vision_by_regions:528 - [pag 5] 17 regioes (17, 0 visao sequencial)
+2026-07-01 12:28:59 | DEBUG    | core.services.cache:set_cache:74 - Cache set: a36bc2fbf57e6eaf_page_5_normal
+2026-07-01 12:28:59 | INFO     | core.agents.agente_unico:executar:298 - Resposta da pagina 5 salva em imagen005.txt
+2026-07-01 12:29:00 | INFO     | core.structurer:_process_document:70 - Docling processou pagina_006.pdf em 0.7s
+2026-07-01 12:29:00 | INFO     | core.agents.agente_unico:_process_pdf_page:383 - [pag 6] Extraidas 2 regioes na pagina (structurer=DoclingStructurer)
+2026-07-01 12:29:00 | INFO     | core.agents.agente_unico:_process_pdf_page:417 - [pag 6] 2 regioes de texto limpo (sem IA de visao)
+2026-07-01 12:29:00 | DEBUG    | core.services.cache:set_cache:74 - Cache set: c21fb597773786c6_page_6_normal
+2026-07-01 12:29:00 | INFO     | core.agents.agente_unico:executar:298 - Resposta da pagina 6 salva em imagen006.txt
+2026-07-01 12:29:01 | INFO     | core.structurer:_process_document:70 - Docling processou pagina_007.pdf em 0.7s
+2026-07-01 12:29:01 | INFO     | core.agents.agente_unico:_process_pdf_page:383 - [pag 7] Extraidas 2 regioes na pagina (structurer=DoclingStructurer)
+2026-07-01 12:29:01 | INFO     | core.agents.agente_unico:_process_pdf_page:417 - [pag 7] 2 regioes de texto limpo (sem IA de visao)
+2026-07-01 12:29:01 | DEBUG    | core.services.cache:set_cache:74 - Cache set: fc0d584c4ea2971f_page_7_normal
+2026-07-01 12:29:01 | INFO     | core.agents.agente_unico:executar:298 - Resposta da pagina 7 salva em imagen007.txt
+2026-07-01 12:29:03 | INFO     | core.structurer:_process_document:70 - Docling processou pagina_008.pdf em 1.1s
+2026-07-01 12:29:03 | INFO     | core.agents.agente_unico:_process_pdf_page:383 - [pag 8] Extraidas 3 regioes na pagina (structurer=DoclingStructurer)
+2026-07-01 12:29:03 | INFO     | core.agents.agente_unico:_process_with_vision_by_regions:487 - [pag 8] Regiao 1 - tipo=embedded_image, bbox=(273.3639831542969, 68.89507293701172, 320.7884826660156, 135.68824768066406)
+2026-07-01 12:29:03 | DEBUG    | core.agents.agente_unico:_process_region_with_vision:568 - [pag 8] Enviando regiao para visao (6794 bytes, tipo=embedded_image)
+2026-07-01 12:29:03 | DEBUG    | core.ai.openrouter:send_message:68 - Enviando requisicao para OpenRouter (tentativa 1/5): modelo=nvidia/nemotron-nano-12b-v2-vl, image_count=1
+2026-07-01 12:29:07 | INFO     | core.agents.agente_unico:_process_with_vision_by_regions:487 - [pag 8] Regiao 4 - tipo=embedded_image, bbox=(157.81756591796875, 254.54898071289062, 436.5433349609375, 548.0853881835938)
+2026-07-01 12:29:08 | DEBUG    | core.agents.agente_unico:_process_region_with_vision:568 - [pag 8] Enviando regiao para visao (68424 bytes, tipo=embedded_image)
+2026-07-01 12:29:08 | DEBUG    | core.ai.openrouter:send_message:68 - Enviando requisicao para OpenRouter (tentativa 1/5): modelo=nvidia/nemotron-nano-12b-v2-vl, image_count=1
+2026-07-01 12:29:16 | INFO     | core.agents.agente_unico:_process_with_vision_by_regions:528 - [pag 8] 3 regioes (1, 2 visao sequencial)
+2026-07-01 12:29:16 | DEBUG    | core.services.cache:set_cache:74 - Cache set: 5f7c46367e66c5ab_page_8_normal
+2026-07-01 12:29:16 | INFO     | core.agents.agente_unico:executar:298 - Resposta da pagina 8 salva em imagen008.txt
+2026-07-01 12:29:17 | INFO     | core.structurer:_process_document:70 - Docling processou pagina_009.pdf em 0.8s
+2026-07-01 12:29:17 | INFO     | core.agents.agente_unico:_process_pdf_page:383 - [pag 9] Extraidas 1 regioes na pagina (structurer=DoclingStructurer)
+2026-07-01 12:29:17 | INFO     | core.agents.agente_unico:_process_pdf_page:417 - [pag 9] 1 regioes de texto limpo (sem IA de visao)
+2026-07-01 12:29:17 | DEBUG    | core.services.cache:set_cache:74 - Cache set: a28f1b4f782102d4_page_9_normal
+2026-07-01 12:29:17 | INFO     | core.agents.agente_unico:executar:298 - Resposta da pagina 9 salva em imagen009.txt
+2026-07-01 12:29:18 | INFO     | core.structurer:_process_document:70 - Docling processou pagina_010.pdf em 1.0s
+2026-07-01 12:29:18 | INFO     | core.agents.agente_unico:_process_pdf_page:383 - [pag 10] Extraidas 1 regioes na pagina (structurer=DoclingStructurer)
+2026-07-01 12:29:18 | INFO     | core.agents.agente_unico:_process_pdf_page:417 - [pag 10] 1 regioes de texto limpo (sem IA de visao)
+2026-07-01 12:29:18 | DEBUG    | core.services.cache:set_cache:74 - Cache set: c7bcc7d6ccb05c3a_page_10_normal
+2026-07-01 12:29:18 | INFO     | core.agents.agente_unico:executar:298 - Resposta da pagina 10 salva em imagen010.txt
+2026-07-01 12:29:20 | INFO     | core.structurer:_process_document:70 - Docling processou pagina_011.pdf em 0.7s
+2026-07-01 12:29:20 | INFO     | core.agents.agente_unico:_process_pdf_page:383 - [pag 11] Extraidas 1 regioes na pagina (structurer=DoclingStructurer)
+2026-07-01 12:29:20 | INFO     | core.agents.agente_unico:_process_pdf_page:417 - [pag 11] 1 regioes de texto limpo (sem IA de visao)
+2026-07-01 12:29:20 | DEBUG    | core.services.cache:set_cache:74 - Cache set: 82993126ff560322_page_11_normal
+2026-07-01 12:29:20 | INFO     | core.agents.agente_unico:executar:298 - Resposta da pagina 11 salva em imagen011.txt
+2026-07-01 12:29:21 | INFO     | core.structurer:_process_document:70 - Docling processou pagina_012.pdf em 0.8s
+2026-07-01 12:29:21 | INFO     | core.agents.agente_unico:_process_pdf_page:383 - [pag 12] Extraidas 1 regioes na pagina (structurer=DoclingStructurer)
+2026-07-01 12:29:21 | INFO     | core.agents.agente_unico:_process_pdf_page:417 - [pag 12] 1 regioes de texto limpo (sem IA de visao)
+2026-07-01 12:29:21 | DEBUG    | core.services.cache:set_cache:74 - Cache set: d27b100204eeb3ee_page_12_normal
+2026-07-01 12:29:21 | INFO     | core.agents.agente_unico:executar:298 - Resposta da pagina 12 salva em imagen012.txt
+2026-07-01 12:29:22 | INFO     | core.structurer:_process_document:70 - Docling processou pagina_013.pdf em 0.8s
+2026-07-01 12:29:22 | INFO     | core.agents.agente_unico:_process_pdf_page:383 - [pag 13] Extraidas 1 regioes na pagina (structurer=DoclingStructurer)
+2026-07-01 12:29:22 | INFO     | core.agents.agente_unico:_process_pdf_page:417 - [pag 13] 1 regioes de texto limpo (sem IA de visao)
+2026-07-01 12:29:22 | DEBUG    | core.services.cache:set_cache:74 - Cache set: 3323e627429760f3_page_13_normal
+2026-07-01 12:29:22 | INFO     | core.agents.agente_unico:executar:298 - Resposta da pagina 13 salva em imagen013.txt
+2026-07-01 12:29:23 | INFO     | core.structurer:_process_document:70 - Docling processou pagina_014.pdf em 0.7s
+2026-07-01 12:29:23 | INFO     | core.agents.agente_unico:_process_pdf_page:383 - [pag 14] Extraidas 1 regioes na pagina (structurer=DoclingStructurer)
+2026-07-01 12:29:23 | INFO     | core.agents.agente_unico:_process_pdf_page:417 - [pag 14] 1 regioes de texto limpo (sem IA de visao)
+2026-07-01 12:29:23 | DEBUG    | core.services.cache:set_cache:74 - Cache set: e56189ae0dc132b0_page_14_normal
+2026-07-01 12:29:23 | INFO     | core.agents.agente_unico:executar:298 - Resposta da pagina 14 salva em imagen014.txt
+2026-07-01 12:29:24 | INFO     | core.structurer:_process_document:70 - Docling processou pagina_015.pdf em 0.8s
+2026-07-01 12:29:24 | INFO     | core.agents.agente_unico:_process_pdf_page:383 - [pag 15] Extraidas 1 regioes na pagina (structurer=DoclingStructurer)
+2026-07-01 12:29:24 | INFO     | core.agents.agente_unico:_process_pdf_page:417 - [pag 15] 1 regioes de texto limpo (sem IA de visao)
+2026-07-01 12:29:24 | DEBUG    | core.services.cache:set_cache:74 - Cache set: 4c25a433cfbca7e3_page_15_normal
+2026-07-01 12:29:24 | INFO     | core.agents.agente_unico:executar:298 - Resposta da pagina 15 salva em imagen015.txt
+2026-07-01 12:29:25 | INFO     | core.structurer:_process_document:70 - Docling processou pagina_016.pdf em 0.8s
+2026-07-01 12:29:25 | INFO     | core.agents.agente_unico:_process_pdf_page:383 - [pag 16] Extraidas 1 regioes na pagina (structurer=DoclingStructurer)
+2026-07-01 12:29:25 | INFO     | core.agents.agente_unico:_process_pdf_page:417 - [pag 16] 1 regioes de texto limpo (sem IA de visao)
+2026-07-01 12:29:25 | DEBUG    | core.services.cache:set_cache:74 - Cache set: 82dcbe39f6a3a78c_page_16_normal
+2026-07-01 12:29:25 | INFO     | core.agents.agente_unico:executar:298 - Resposta da pagina 16 salva em imagen016.txt
+2026-07-01 12:29:27 | INFO     | core.structurer:_process_document:70 - Docling processou pagina_017.pdf em 0.9s
+2026-07-01 12:29:27 | INFO     | core.agents.agente_unico:_process_pdf_page:383 - [pag 17] Extraidas 1 regioes na pagina (structurer=DoclingStructurer)
+2026-07-01 12:29:27 | INFO     | core.agents.agente_unico:_process_pdf_page:417 - [pag 17] 1 regioes de texto limpo (sem IA de visao)
+2026-07-01 12:29:27 | DEBUG    | core.services.cache:set_cache:74 - Cache set: 046b71f75bf1cae7_page_17_normal
+2026-07-01 12:29:27 | INFO     | core.agents.agente_unico:executar:298 - Resposta da pagina 17 salva em imagen017.txt
+2026-07-01 12:29:34 | INFO     | core.structurer:_process_document:70 - Docling processou pagina_018.pdf em 1.0s
+2026-07-01 12:29:34 | INFO     | core.agents.agente_unico:_process_pdf_page:383 - [pag 18] Extraidas 3 regioes na pagina (structurer=DoclingStructurer)
+2026-07-01 12:29:34 | INFO     | core.agents.agente_unico:_process_with_vision_by_regions:487 - [pag 18] Regiao 1 - tipo=embedded_image, bbox=(263.37664794921875, 68.27626037597656, 332.1377868652344, 143.66065979003906)
+2026-07-01 12:29:34 | DEBUG    | core.agents.agente_unico:_process_region_with_vision:568 - [pag 18] Enviando regiao para visao (13059 bytes, tipo=embedded_image)
+2026-07-01 12:29:34 | DEBUG    | core.ai.openrouter:send_message:68 - Enviando requisicao para OpenRouter (tentativa 1/5): modelo=nvidia/nemotron-nano-12b-v2-vl, image_count=1
+2026-07-01 12:29:39 | INFO     | core.agents.agente_unico:_process_with_vision_by_regions:487 - [pag 18] Regiao 4 - tipo=embedded_image, bbox=(136.16424560546875, 239.0340118408203, 458.0189208984375, 499.046875)
+2026-07-01 12:29:40 | DEBUG    | core.agents.agente_unico:_process_region_with_vision:568 - [pag 18] Enviando regiao para visao (131088 bytes, tipo=embedded_image)
+2026-07-01 12:29:40 | DEBUG    | core.ai.openrouter:send_message:68 - Enviando requisicao para OpenRouter (tentativa 1/5): modelo=nvidia/nemotron-nano-12b-v2-vl, image_count=1
+2026-07-01 12:29:51 | INFO     | core.agents.agente_unico:_process_with_vision_by_regions:528 - [pag 18] 3 regioes (1, 2 visao sequencial)
+2026-07-01 12:29:51 | DEBUG    | core.services.cache:set_cache:74 - Cache set: 01337ba50ec77e13_page_18_normal
+2026-07-01 12:29:51 | INFO     | core.agents.agente_unico:executar:298 - Resposta da pagina 18 salva em imagen018.txt
+2026-07-01 12:29:52 | INFO     | core.structurer:_process_document:70 - Docling processou pagina_019.pdf em 0.8s
+2026-07-01 12:29:52 | INFO     | core.agents.agente_unico:_process_pdf_page:383 - [pag 19] Extraidas 1 regioes na pagina (structurer=DoclingStructurer)
+2026-07-01 12:29:52 | INFO     | core.agents.agente_unico:_process_pdf_page:417 - [pag 19] 1 regioes de texto limpo (sem IA de visao)
+2026-07-01 12:29:52 | DEBUG    | core.services.cache:set_cache:74 - Cache set: eb0a438242e83b04_page_19_normal
+2026-07-01 12:29:52 | INFO     | core.agents.agente_unico:executar:298 - Resposta da pagina 19 salva em imagen019.txt
+2026-07-01 12:29:53 | INFO     | core.structurer:_process_document:70 - Docling processou pagina_020.pdf em 0.7s
+2026-07-01 12:29:53 | INFO     | core.agents.agente_unico:_process_pdf_page:383 - [pag 20] Extraidas 1 regioes na pagina (structurer=DoclingStructurer)
+2026-07-01 12:29:53 | INFO     | core.agents.agente_unico:_process_pdf_page:417 - [pag 20] 1 regioes de texto limpo (sem IA de visao)
+2026-07-01 12:29:53 | DEBUG    | core.services.cache:set_cache:74 - Cache set: 6b4b05abcef001df_page_20_normal
+2026-07-01 12:29:53 | INFO     | core.agents.agente_unico:executar:298 - Resposta da pagina 20 salva em imagen020.txt
+2026-07-01 12:29:54 | INFO     | core.structurer:_process_document:70 - Docling processou pagina_021.pdf em 0.8s
+2026-07-01 12:29:54 | INFO     | core.agents.agente_unico:_process_pdf_page:383 - [pag 21] Extraidas 4 regioes na pagina (structurer=DoclingStructurer)
+2026-07-01 12:29:54 | INFO     | core.agents.agente_unico:_process_with_vision_by_regions:487 - [pag 21] Regiao 2 - tipo=embedded_image, bbox=(163.05014038085938, 157.01121520996094, 431.654296875, 426.6972351074219)
+2026-07-01 12:29:55 | DEBUG    | core.agents.agente_unico:_process_region_with_vision:568 - [pag 21] Enviando regiao para visao (116311 bytes, tipo=embedded_image)
+2026-07-01 12:29:55 | DEBUG    | core.ai.openrouter:send_message:68 - Enviando requisicao para OpenRouter (tentativa 1/5): modelo=nvidia/nemotron-nano-12b-v2-vl, image_count=1
+2026-07-01 12:30:03 | INFO     | core.agents.agente_unico:_process_with_vision_by_regions:528 - [pag 21] 4 regioes (3, 1 visao sequencial)
+2026-07-01 12:30:03 | DEBUG    | core.services.cache:set_cache:74 - Cache set: 75ccec28a4713050_page_21_normal
+2026-07-01 12:30:03 | INFO     | core.agents.agente_unico:executar:298 - Resposta da pagina 21 salva em imagen021.txt
+2026-07-01 12:30:04 | INFO     | core.structurer:_process_document:70 - Docling processou pagina_022.pdf em 0.8s
+2026-07-01 12:30:04 | INFO     | core.agents.agente_unico:_process_pdf_page:383 - [pag 22] Extraidas 1 regioes na pagina (structurer=DoclingStructurer)
+2026-07-01 12:30:04 | INFO     | core.agents.agente_unico:_process_pdf_page:417 - [pag 22] 1 regioes de texto limpo (sem IA de visao)
+2026-07-01 12:30:04 | DEBUG    | core.services.cache:set_cache:74 - Cache set: 8d9789f0a0e120e3_page_22_normal
+2026-07-01 12:30:04 | INFO     | core.agents.agente_unico:executar:298 - Resposta da pagina 22 salva em imagen022.txt
+2026-07-01 12:30:05 | INFO     | core.structurer:_process_document:70 - Docling processou pagina_023.pdf em 0.8s
+2026-07-01 12:30:05 | INFO     | core.agents.agente_unico:_process_pdf_page:383 - [pag 23] Extraidas 1 regioes na pagina (structurer=DoclingStructurer)
+2026-07-01 12:30:05 | INFO     | core.agents.agente_unico:_process_pdf_page:417 - [pag 23] 1 regioes de texto limpo (sem IA de visao)
+2026-07-01 12:30:05 | DEBUG    | core.services.cache:set_cache:74 - Cache set: fda979075fca9983_page_23_normal
+2026-07-01 12:30:05 | INFO     | core.agents.agente_unico:executar:298 - Resposta da pagina 23 salva em imagen023.txt
+2026-07-01 12:30:07 | INFO     | core.structurer:_process_document:70 - Docling processou pagina_024.pdf em 0.8s
+2026-07-01 12:30:07 | INFO     | core.agents.agente_unico:_process_pdf_page:383 - [pag 24] Extraidas 1 regioes na pagina (structurer=DoclingStructurer)
+2026-07-01 12:30:07 | INFO     | core.agents.agente_unico:_process_pdf_page:417 - [pag 24] 1 regioes de texto limpo (sem IA de visao)
+2026-07-01 12:30:07 | DEBUG    | core.services.cache:set_cache:74 - Cache set: deca96ca237001de_page_24_normal
+2026-07-01 12:30:07 | INFO     | core.agents.agente_unico:executar:298 - Resposta da pagina 24 salva em imagen024.txt
+2026-07-01 12:30:08 | INFO     | core.structurer:_process_document:70 - Docling processou pagina_025.pdf em 0.7s
+2026-07-01 12:30:08 | INFO     | core.agents.agente_unico:_process_pdf_page:383 - [pag 25] Extraidas 1 regioes na pagina (structurer=DoclingStructurer)
+2026-07-01 12:30:08 | INFO     | core.agents.agente_unico:_process_pdf_page:417 - [pag 25] 1 regioes de texto limpo (sem IA de visao)
+2026-07-01 12:30:08 | DEBUG    | core.services.cache:set_cache:74 - Cache set: db1e737354cc757d_page_25_normal
+2026-07-01 12:30:08 | INFO     | core.agents.agente_unico:executar:298 - Resposta da pagina 25 salva em imagen025.txt
+2026-07-01 12:30:09 | INFO     | core.structurer:_process_document:70 - Docling processou pagina_026.pdf em 0.7s
+2026-07-01 12:30:09 | INFO     | core.agents.agente_unico:_process_pdf_page:383 - [pag 26] Extraidas 1 regioes na pagina (structurer=DoclingStructurer)
+2026-07-01 12:30:09 | INFO     | core.agents.agente_unico:_process_pdf_page:417 - [pag 26] 1 regioes de texto limpo (sem IA de visao)
+2026-07-01 12:30:09 | DEBUG    | core.services.cache:set_cache:74 - Cache set: 532893c2f1159827_page_26_normal
+2026-07-01 12:30:09 | INFO     | core.agents.agente_unico:executar:298 - Resposta da pagina 26 salva em imagen026.txt
+2026-07-01 12:30:10 | INFO     | core.structurer:_process_document:70 - Docling processou pagina_027.pdf em 0.7s
+2026-07-01 12:30:10 | INFO     | core.agents.agente_unico:_process_pdf_page:383 - [pag 27] Extraidas 1 regioes na pagina (structurer=DoclingStructurer)
+2026-07-01 12:30:10 | INFO     | core.agents.agente_unico:_process_pdf_page:417 - [pag 27] 1 regioes de texto limpo (sem IA de visao)
+2026-07-01 12:30:10 | DEBUG    | core.services.cache:set_cache:74 - Cache set: 7d88325eda15e87d_page_27_normal
+2026-07-01 12:30:10 | INFO     | core.agents.agente_unico:executar:298 - Resposta da pagina 27 salva em imagen027.txt
+2026-07-01 12:30:11 | INFO     | core.structurer:_process_document:70 - Docling processou pagina_028.pdf em 0.7s
+2026-07-01 12:30:11 | INFO     | core.agents.agente_unico:_process_pdf_page:383 - [pag 28] Extraidas 1 regioes na pagina (structurer=DoclingStructurer)
+2026-07-01 12:30:11 | INFO     | core.agents.agente_unico:_process_pdf_page:417 - [pag 28] 1 regioes de texto limpo (sem IA de visao)
+2026-07-01 12:30:11 | DEBUG    | core.services.cache:set_cache:74 - Cache set: 61566b21ca0d264d_page_28_normal
+2026-07-01 12:30:11 | INFO     | core.agents.agente_unico:executar:298 - Resposta da pagina 28 salva em imagen028.txt
+2026-07-01 12:30:13 | INFO     | core.structurer:_process_document:70 - Docling processou pagina_029.pdf em 1.1s
+2026-07-01 12:30:13 | INFO     | core.agents.agente_unico:_process_pdf_page:383 - [pag 29] Extraidas 3 regioes na pagina (structurer=DoclingStructurer)
+2026-07-01 12:30:13 | INFO     | core.agents.agente_unico:_process_with_vision_by_regions:487 - [pag 29] Regiao 1 - tipo=embedded_image, bbox=(265.9256896972656, 68.1575927734375, 328.4128723144531, 138.25352478027344)
+2026-07-01 12:30:13 | DEBUG    | core.agents.agente_unico:_process_region_with_vision:568 - [pag 29] Enviando regiao para visao (12198 bytes, tipo=embedded_image)
+2026-07-01 12:30:13 | DEBUG    | core.ai.openrouter:send_message:68 - Enviando requisicao para OpenRouter (tentativa 1/5): modelo=nvidia/nemotron-nano-12b-v2-vl, image_count=1
+2026-07-01 12:30:16 | INFO     | core.agents.agente_unico:_process_with_vision_by_regions:487 - [pag 29] Regiao 4 - tipo=embedded_image, bbox=(117.51749420166016, 257.36993408203125, 490.397705078125, 531.527587890625)
+2026-07-01 12:30:17 | DEBUG    | core.agents.agente_unico:_process_region_with_vision:568 - [pag 29] Enviando regiao para visao (109795 bytes, tipo=embedded_image)
+2026-07-01 12:30:17 | DEBUG    | core.ai.openrouter:send_message:68 - Enviando requisicao para OpenRouter (tentativa 1/5): modelo=nvidia/nemotron-nano-12b-v2-vl, image_count=1
+2026-07-01 12:30:25 | INFO     | core.agents.agente_unico:_process_with_vision_by_regions:528 - [pag 29] 3 regioes (1, 2 visao sequencial)
+2026-07-01 12:30:25 | DEBUG    | core.services.cache:set_cache:74 - Cache set: 0145438099683201_page_29_normal
+2026-07-01 12:30:25 | INFO     | core.agents.agente_unico:executar:298 - Resposta da pagina 29 salva em imagen029.txt
+2026-07-01 12:30:27 | INFO     | core.structurer:_process_document:70 - Docling processou pagina_030.pdf em 0.8s
+2026-07-01 12:30:27 | INFO     | core.agents.agente_unico:_process_pdf_page:383 - [pag 30] Extraidas 1 regioes na pagina (structurer=DoclingStructurer)
+2026-07-01 12:30:27 | INFO     | core.agents.agente_unico:_process_pdf_page:417 - [pag 30] 1 regioes de texto limpo (sem IA de visao)
+2026-07-01 12:30:27 | DEBUG    | core.services.cache:set_cache:74 - Cache set: c0b252644250c8c8_page_30_normal
+2026-07-01 12:30:27 | INFO     | core.agents.agente_unico:executar:298 - Resposta da pagina 30 salva em imagen030.txt
+2026-07-01 12:30:28 | INFO     | core.structurer:_process_document:70 - Docling processou pagina_031.pdf em 0.7s
+2026-07-01 12:30:28 | INFO     | core.agents.agente_unico:_process_pdf_page:383 - [pag 31] Extraidas 1 regioes na pagina (structurer=DoclingStructurer)
+2026-07-01 12:30:28 | INFO     | core.agents.agente_unico:_process_pdf_page:417 - [pag 31] 1 regioes de texto limpo (sem IA de visao)
+2026-07-01 12:30:28 | DEBUG    | core.services.cache:set_cache:74 - Cache set: 8c8c4f949c9c1485_page_31_normal
+2026-07-01 12:30:28 | INFO     | core.agents.agente_unico:executar:298 - Resposta da pagina 31 salva em imagen031.txt
+2026-07-01 12:30:29 | INFO     | core.structurer:_process_document:70 - Docling processou pagina_032.pdf em 0.8s
+2026-07-01 12:30:29 | INFO     | core.agents.agente_unico:_process_pdf_page:383 - [pag 32] Extraidas 1 regioes na pagina (structurer=DoclingStructurer)
+2026-07-01 12:30:29 | INFO     | core.agents.agente_unico:_process_pdf_page:417 - [pag 32] 1 regioes de texto limpo (sem IA de visao)
+2026-07-01 12:30:29 | DEBUG    | core.services.cache:set_cache:74 - Cache set: 9253ea50f3be2616_page_32_normal
+2026-07-01 12:30:29 | INFO     | core.agents.agente_unico:executar:298 - Resposta da pagina 32 salva em imagen032.txt
+2026-07-01 12:30:30 | INFO     | core.structurer:_process_document:70 - Docling processou pagina_033.pdf em 1.0s
+2026-07-01 12:30:30 | INFO     | core.agents.agente_unico:_process_pdf_page:383 - [pag 33] Extraidas 1 regioes na pagina (structurer=DoclingStructurer)
+2026-07-01 12:30:30 | INFO     | core.agents.agente_unico:_process_pdf_page:417 - [pag 33] 1 regioes de texto limpo (sem IA de visao)
+2026-07-01 12:30:30 | DEBUG    | core.services.cache:set_cache:74 - Cache set: 46e2becff80a29fa_page_33_normal
+2026-07-01 12:30:30 | INFO     | core.agents.agente_unico:executar:298 - Resposta da pagina 33 salva em imagen033.txt
+2026-07-01 12:30:32 | INFO     | core.structurer:_process_document:70 - Docling processou pagina_034.pdf em 1.1s
+2026-07-01 12:30:32 | INFO     | core.agents.agente_unico:_process_pdf_page:383 - [pag 34] Extraidas 2 regioes na pagina (structurer=DoclingStructurer)
+2026-07-01 12:30:32 | INFO     | core.agents.agente_unico:_process_with_vision_by_regions:487 - [pag 34] Regiao 1 - tipo=embedded_image, bbox=(118.5748062133789, 74.14476776123047, 480.2160339355469, 385.69305419921875)
+2026-07-01 12:30:33 | DEBUG    | core.agents.agente_unico:_process_region_with_vision:568 - [pag 34] Enviando regiao para visao (113351 bytes, tipo=embedded_image)
+2026-07-01 12:30:33 | DEBUG    | core.ai.openrouter:send_message:68 - Enviando requisicao para OpenRouter (tentativa 1/5): modelo=nvidia/nemotron-nano-12b-v2-vl, image_count=1

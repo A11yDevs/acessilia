@@ -1,41 +1,41 @@
 # acessilia
 
-**acessilia** is an open‑source project that extracts, classifies and makes documents (PDF, DOCX, TXT, etc.) accessible using LLMs (Ollama, OpenRouter) and a modular pipeline.
+**acessilia** é um projeto de código‑aberto que extrai, classifica e torna documentos (PDF, DOCX, TXT, etc.) acessíveis usando LLMs (Ollama, OpenRouter) e um pipeline modular.
 
-## Architecture (modular)
+## Arquitetura (modular)
 
-- **core** – domain logic (agents, AI clients, services, utilities, pipeline).
-- **adapters** – concrete implementations that adapt the domain to external tools (exporters, renderers, filters).
-- **interfaces** – entry points (Web UI via FastAPI, Telegram bot, CLI).
-- **tests** – unit‑test suite covering most modules.
+- **core** – lógica de domínio (agentes, clientes de IA, serviços, utilitários, pipeline).
+- **adapters** – implementações concretas que adaptam o domínio a ferramentas externas (exportadores, renderizadores, filtros).
+- **interfaces** – pontos de entrada (Web UI via FastAPI, bot do Telegram, CLI).
+- **tests** – suíte de testes unitários cobrindo a maioria dos módulos.
 
-The project now follows a *Domain → Application → Interface* layering, making it easier to:
-- Replace the LLM client (add new providers).
-- Add new export formats (just implement ``AbstractExporter``).
-- Swap the web framework or add a new interface without touching core logic.
+O projeto segue a caminha *Domínio → Aplicação → Interface*, facilitando:
+- Substituir o cliente de LLM (adicionar novos provedores).
+- Adicionar novos formatos de exportação (implementar ``AbstractExporter``).
+- Trocar o framework web ou adicionar uma nova interface sem tocar na lógica de domínio.
 
-## Installation
+## Instalação
 
 ```bash
-# using Poetry (recommended)
+# usando Poetry (recomendado)
 poetry install
-poetry run acessilia   # runs the CLI / starts enabled interfaces
+poetry run acessilia   # executa a CLI / inicia as interfaces habilitadas
 ```
 
-## Running
+## Execução
 
 - **CLI**: `poetry run acessilia`
-- **Web**: enable `web` in `ENABLED_INTERFACES` and visit `http://localhost:8000`.
-- **Telegram**: enable `telegram` and provide a valid `BOT_TOKEN`.
+- **Web**: habilite `web` em `ENABLED_INTERFACES` e acesse `http://localhost:8000`.
+- **Telegram**: habilite `telegram` e forneça um `BOT_TOKEN` válido.
 
-## Contributing
+## Contribuindo
 
-1. Fork the repository.
-2. Create a feature branch.
-3. Write tests for new functionality.
-4. Run `pytest` – ensure coverage stays high.
-5. Submit a pull request.
+1. Fork o repositório.
+2. Crie uma branch de feature.
+3. Escreva testes para a nova funcionalidade.
+4. Rode `pytest` – garanta que a cobertura permaneça alta.
+5. Envie um pull request.
 
-## License
+## Licença
 
-MIT © 2024‑2026 AAIF (Agentic AI Foundation)
+MIT © 2026 Jhonata Fernandes Cordeiro
