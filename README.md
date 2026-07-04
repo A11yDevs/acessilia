@@ -1,6 +1,6 @@
-# Bot Acess
+# acessilia
 
-**Bot‑Acess** is an open‑source project that extracts, classifies and makes documents (PDF, DOCX, TXT, etc.) accessible using LLMs (Ollama, OpenRouter) and a modular pipeline.
+**acessilia** is an open‑source project that extracts, classifies and makes documents (PDF, DOCX, TXT, etc.) accessible using LLMs (Ollama, OpenRouter) and a modular pipeline.
 
 ## Architecture (modular)
 
@@ -19,12 +19,12 @@ The project now follows a *Domain → Application → Interface* layering, makin
 ```bash
 # using Poetry (recommended)
 poetry install
-poetry run bot-acess   # runs the CLI / starts enabled interfaces
+poetry run acessilia   # runs the CLI / starts enabled interfaces
 ```
 
 ## Running
 
-- **CLI**: `poetry run bot-acess`
+- **CLI**: `poetry run acessilia`
 - **Web**: enable `web` in `ENABLED_INTERFACES` and visit `http://localhost:8000`.
 - **Telegram**: enable `telegram` and provide a valid `BOT_TOKEN`.
 
