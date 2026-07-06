@@ -33,4 +33,6 @@ COPY . .
 EXPOSE 8000
 
 # Definir ponto de entrada
+
+VOLUME /app/output
 CMD ["python", "run.py", "--host", "0.0.0.0", "--port", "8000"]
