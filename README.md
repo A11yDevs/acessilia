@@ -16,11 +16,22 @@ O projeto segue a caminha *Domínio → Aplicação → Interface*, facilitando:
 
 ## Instalação
 
+### Usando Poetry (recomendado)
 ```bash
-# usando Poetry (recomendado)
 poetry install
 poetry run acessilia   # executa a CLI / inicia as interfaces habilitadas
 ```
+
+### Usando Docker
+```bash
+# Build da imagem Docker (executar na raiz do projeto)
+docker build -t acessilia:latest .
+
+# Executar o container, expondo a porta 8000 (FastAPI) e montando um volume para persistir arquivos de saída
+docker run -d -p 8000:8000 -v $(pwd)/output:/app/output --name acessilia-instance acessilia:latest
+```
+
+Acesse a aplicação em `http://localhost:8000/`.
 
 ## Execução
 
