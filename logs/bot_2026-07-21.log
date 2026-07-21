@@ -1,0 +1,43 @@
+2026-07-21 15:36:14 | INFO     | core.utils.logger:setup_logger:30 - Logger configured - level: INFO
+2026-07-21 15:36:28 | INFO     | core.structurer:get_structurer:235 - Usando structurer: Docling (com fallback PyMuPDF)
+2026-07-21 15:36:28 | INFO     | core.services.history_service:limpar_orfas:94 - Tarefas orfas limpas
+2026-07-21 15:36:28 | INFO     | __main__:startup:71 - Interface Telegram habilitada
+2026-07-21 15:36:29 | INFO     | __main__:startup:84 - Interface Web habilitada (http://localhost:8000)
+2026-07-21 15:36:29 | INFO     | __main__:startup:92 - Iniciando com interfaces: telegram,web
+2026-07-21 15:36:29 | INFO     | interfaces.telegram.bot:start_polling:54 - Iniciando polling
+2026-07-21 15:36:29 | INFO     | core.services.queue_service:start_worker:34 - Worker da Fila Unificada iniciado.
+2026-07-21 15:36:29 | INFO     | interfaces.telegram.bot:on_startup:26 - Bot iniciado
+2026-07-21 15:37:03 | INFO     | core.services.queue_service:enqueue:40 - Fila Unificada: ft_70kb.jpg enfileirado de web (Posição: 1)
+2026-07-21 15:37:03 | INFO     | core.services.queue_service:_worker:58 - Worker: Iniciando tarefa ft_70kb.jpg de web
+2026-07-21 15:37:07 | INFO     | core.services.email_service:send_email_notification:41 - E-mail enviado para fjhonata14@gmail.com com sucesso.
+2026-07-21 15:37:07 | DEBUG    | interfaces.web.app:silent_status:131 - Web Pipeline Status [ft_70kb.jpg]: 📄 Analisando arquivo...
+2026-07-21 15:37:07 | DEBUG    | interfaces.web.app:silent_status:131 - Web Pipeline Status [ft_70kb.jpg]: 🖼️ Preparando imagem...
+2026-07-21 15:37:07 | INFO     | core.agents.agente_unico:executar:244 - Processando 1 pagina(s) para ec1b551225904ddca948c0e1ed4fbe4e.jpg com structurer=DoclingStructurer
+2026-07-21 15:37:07 | DEBUG    | interfaces.web.app:silent_status:131 - Web Pipeline Status [ft_70kb.jpg]: 📷 Processando pagina 1 de 1...
+2026-07-21 15:37:07 | DEBUG    | core.agents.agente_unico:_process_image_page:632 - [pag 1] lendo imagem: /tmp/a11y-devs-describer/temp/uploads/ec1b551225904ddca948c0e1ed4fbe4e.jpg
+2026-07-21 15:37:09 | DEBUG    | core.utils.image_enhancer:resize_image:22 - Imagem redimensionada: 1152x2048 -> 756x1344
+2026-07-21 15:37:09 | INFO     | core.agents.agente_unico:_process_image_page:640 - Enviando pagina 1 para IA de visao (237230 bytes)
+2026-07-21 15:37:09 | DEBUG    | core.ai.openrouter:send_message:70 - Enviando requisicao para OpenRouter (tentativa 1/5): modelo=nvidia/nemotron-nano-12b-v2-vl, image_count=1
+2026-07-21 15:37:16 | DEBUG    | core.services.cache:set_cache:74 - Cache set: 5e9e16be8029c0f7_page_1_normal
+2026-07-21 15:37:16 | INFO     | core.agents.agente_unico:executar:298 - Resposta da pagina 1 salva em imagen001.txt
+2026-07-21 15:37:16 | INFO     | core.agents.agente_unico:executar:319 - AgenteUnico: 1 paginas processadas, 847 chars no total
+2026-07-21 15:37:16 | DEBUG    | core.services.cache:set_cache:74 - Cache set: 5e9e16be8029c0f7_openrouter-v1
+2026-07-21 15:37:16 | DEBUG    | interfaces.web.app:silent_status:131 - Web Pipeline Status [ft_70kb.jpg]: ✅ Processamento finalizado com sucesso!
+2026-07-21 15:37:16 | DEBUG    | adapters.exporters:export_txt:21 - Exportando TXT para %s
+2026-07-21 15:37:16 | DEBUG    | adapters.exporters:export_txt:22 - Exportando TXT para %s
+2026-07-21 15:37:16 | DEBUG    | core.exporters.txt_exporter:export_txt:20 - TXT exportado: /tmp/a11y-devs-describer/temp/web_output/ec1b551225904ddca948c0e1ed4fbe4e/ec1b551225904ddca948c0e1ed4fbe4e.txt
+2026-07-21 15:37:16 | DEBUG    | adapters.exporters:export_docx:26 - Exportando DOCX para %s
+2026-07-21 15:37:16 | DEBUG    | adapters.exporters:export_docx:27 - Exportando DOCX para %s
+2026-07-21 15:37:16 | DEBUG    | core.exporters.docx_exporter:export_docx:21 - DOCX exportado: /tmp/a11y-devs-describer/temp/web_output/ec1b551225904ddca948c0e1ed4fbe4e/ec1b551225904ddca948c0e1ed4fbe4e.docx
+2026-07-21 15:37:16 | DEBUG    | adapters.exporters:export_pdf:31 - Exportando PDF para %s
+2026-07-21 15:37:16 | DEBUG    | adapters.exporters:export_pdf:32 - Exportando PDF para %s
+2026-07-21 15:37:16 | DEBUG    | core.exporters.pdf_exporter:export_pdf:20 - PDF exportado com bookmarks e numeracao: /tmp/a11y-devs-describer/temp/web_output/ec1b551225904ddca948c0e1ed4fbe4e/ec1b551225904ddca948c0e1ed4fbe4e.pdf
+2026-07-21 15:37:16 | DEBUG    | adapters.exporters:export_mp3:36 - Exportando MP3 para %s
+2026-07-21 15:37:16 | DEBUG    | adapters.exporters:export_mp3:37 - Exportando MP3 para %s
+2026-07-21 15:37:16 | DEBUG    | core.exporters.audio_exporter:export_mp3:15 - Iniciando geração de áudio granular (TTS): pt-BR-ThalitaNeural -> /tmp/a11y-devs-describer/temp/web_output/ec1b551225904ddca948c0e1ed4fbe4e/ec1b551225904ddca948c0e1ed4fbe4e.mp3
+2026-07-21 15:37:34 | INFO     | core.exporters.audio_exporter:process_chunk:47 - Gerando áudio (TTS): 1/1 blocos concluídos (100%)
+2026-07-21 15:37:34 | INFO     | core.exporters.audio_exporter:export_mp3:67 - Áudio (MP3) granular exportado com sucesso: /tmp/a11y-devs-describer/temp/web_output/ec1b551225904ddca948c0e1ed4fbe4e/ec1b551225904ddca948c0e1ed4fbe4e.mp3
+2026-07-21 15:37:34 | DEBUG    | core.services.download_token_service:criar_token:64 - Token de download criado: 46ada8c7-2adb-4d27-b347-25bfc8226bdf -> ft_70kb.jpg
+2026-07-21 15:37:38 | INFO     | core.services.email_service:send_email_notification:41 - E-mail enviado para fjhonata14@gmail.com com sucesso.
+2026-07-21 15:37:38 | INFO     | interfaces.web.app:run_pipeline_task:192 - Web Task concluída para fjhonata14@gmail.com. E-mail enviado.
+2026-07-21 15:37:38 | INFO     | core.services.queue_service:_worker:67 - Worker: Tarefa concluída: ft_70kb.jpg. Aguardando próximo...

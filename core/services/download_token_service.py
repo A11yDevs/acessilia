@@ -1,10 +1,4 @@
 import asyncio
-
-# NOTE: Table creation drops the existing download_tokens table, invalidating all previous tokens.
-# If migration of existing tokens is required, implement a proper migration before dropping.
-
-# NOTE: Table creation drops the existing download_tokens table, invalidating all previous tokens.
-# If migration of existing tokens is required, implement a proper migration before dropping.
 import sqlite3
 import uuid
 from pathlib import Path
@@ -35,9 +29,8 @@ def _get_connection() -> sqlite3.Connection:
         conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("DROP TABLE IF EXISTS download_tokens")
         conn.execute("""
-            CREATE TABLE download_tokens (
+            CREATE TABLE IF NOT EXISTS download_tokens (
                 token TEXT PRIMARY KEY,
                 output_dir TEXT NOT NULL,
                 filename TEXT NOT NULL,
