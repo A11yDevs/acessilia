@@ -32,14 +32,22 @@ def _get_connection() -> sqlite3.Connection:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS download_tokens (
                 token TEXT PRIMARY KEY,
-                output_dir TEXT NOT NULL,
-                filename TEXT NOT NULL,
+                output_dir TEXT NOT NULL DEFAULT '',
+                filename TEXT NOT NULL DEFAULT '',
                 criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_download_tokens_token ON download_tokens(token)"
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_download_tokens_token ON download_tokens(token)"
         )
+        # Migration: add missing columns if table already existed
+        try:
+            conn.execute("ALTER TABLE download_tokens ADD COLUMN output_dir TEXT NOT NULL DEFAULT ''")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+        try:
+            conn.execute("ALTER TABLE download_tokens ADD COLUMN filename TEXT NOT NULL DEFAULT ''")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
         conn.commit()
         _connection = conn
     return _connection
