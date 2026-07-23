@@ -35,6 +35,7 @@ def _get_connection():
         _connection.row_factory = sqlite3.Row
         cursor = _connection.cursor()
         try:
+            # Create table if not exists
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS download_tokens (
                     token TEXT PRIMARY KEY,
@@ -44,6 +45,12 @@ def _get_connection():
                     formats TEXT NULL DEFAULT '[]'
                 )
             """)
+            # Migration: ensure formats column exists for older DBs
+            cursor.execute("PRAGMA table_info(download_tokens)")
+            columns = [row[1] for row in cursor.fetchall()]
+            if 'formats' not in columns:
+                cursor.execute("ALTER TABLE download_tokens ADD COLUMN formats TEXT NULL DEFAULT '[]'")
+            # Create index if not exists
             try:
                 cursor.execute("CREATE INDEX idx_download_tokens_token ON download_tokens(token)")
             except sqlite3.OperationalError as e:
