@@ -1,7 +1,7 @@
 import asyncio
 import json
 import os
-import pymysql
+import sqlite3
 import uuid
 import threading
 import shutil
@@ -29,17 +29,12 @@ FORMAT_EXTENSIONS = {
 def _get_connection():
     global _connection
     if _connection is None:
-        _connection = pymysql.connect(
-            host=os.getenv('MYSQL_HOST', 'mariadb'),
-            port=int(os.getenv('MYSQL_PORT', 3306)),
-            user=os.getenv('MYSQL_USER', 'acessilia'),
-            password=os.getenv('MYSQL_PASSWORD', 'password'),
-            database=os.getenv('MYSQL_DB', 'acessilia'),
-            cursorclass=pymysql.cursors.DictCursor,
-            autocommit=False
-        )
-        with _connection.cursor() as cursor:
-            # Create table if not exists
+        db_path = settings.db_path
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        _connection = sqlite3.connect(str(db_path))
+        _connection.row_factory = sqlite3.Row
+        cursor = _connection.cursor()
+        try:
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS download_tokens (
                     token TEXT PRIMARY KEY,
@@ -49,13 +44,14 @@ def _get_connection():
                     formats TEXT NULL DEFAULT '[]'
                 )
             """)
-            # Create index if not exists (ignore if duplicate key name)
             try:
                 cursor.execute("CREATE INDEX idx_download_tokens_token ON download_tokens(token)")
-            except pymysql.err.OperationalError as e:
-                if e.args[0] != 1061:  # Duplicate key name
+            except sqlite3.OperationalError as e:
+                if "already exists" not in str(e).lower():
                     raise
             _connection.commit()
+        finally:
+            cursor.close()
     return _connection
 
 
@@ -64,12 +60,15 @@ async def criar_token(output_dir: Path, filename: str, formats: list = None) -> 
     formats_json = json.dumps(formats) if formats else '[]'
     with _connection_lock:
         conn = _get_connection()
-        with conn.cursor() as cursor:
+        cursor = conn.cursor()
+        try:
             cursor.execute(
-                "INSERT INTO download_tokens (token, output_dir, filename, formats) VALUES (%s, %s, %s, %s)",
+                "INSERT INTO download_tokens (token, output_dir, filename, formats) VALUES (?, ?, ?, ?)",
                 (token, str(output_dir), filename, formats_json)
             )
-        conn.commit()
+            conn.commit()
+        finally:
+            cursor.close()
     logger.debug("Token de download criado: {} -> {}", token, filename)
     return token
 
@@ -77,12 +76,15 @@ async def criar_token(output_dir: Path, filename: str, formats: list = None) -> 
 async def obter_info_token(token: str) -> dict | None:
     with _connection_lock:
         conn = _get_connection()
-        with conn.cursor() as cursor:
+        cursor = conn.cursor()
+        try:
             cursor.execute(
-                "SELECT output_dir, filename, formats FROM download_tokens WHERE token = %s",
+                "SELECT output_dir, filename, formats FROM download_tokens WHERE token = ?",
                 (token,)
             )
             row = cursor.fetchone()
+        finally:
+            cursor.close()
     if row is None:
         return None
     output_dir = Path(row["output_dir"])
@@ -114,22 +116,25 @@ async def obter_info_token(token: str) -> dict | None:
 async def limpar_tokens_expirados(dias: int = TOKEN_EXPIRY_DAYS):
     with _connection_lock:
         conn = _get_connection()
-        with conn.cursor() as cursor:
+        cursor = conn.cursor()
+        try:
             cursor.execute(
-                "SELECT output_dir FROM download_tokens WHERE criado_em < DATE_SUB(NOW(), INTERVAL %s DAY)",
-                (dias,)
+                "SELECT output_dir FROM download_tokens WHERE criado_em < datetime('now', '-{} days')".format(dias)
             )
             rows = cursor.fetchall()
+        finally:
+            cursor.close()
         for row in rows:
             output_dir = Path(row["output_dir"])
             if output_dir.exists():
-                # Only delete directories inside configured temp directory
                 if str(output_dir).startswith(str(settings.temp_dir)):
                     shutil.rmtree(output_dir, ignore_errors=True)
                     logger.debug("Diretório temporário removido: {}", output_dir)
-        with conn.cursor() as cursor:
+        cursor = conn.cursor()
+        try:
             cursor.execute(
-                "DELETE FROM download_tokens WHERE criado_em < DATE_SUB(NOW(), INTERVAL %s DAY)",
-                (dias,)
+                "DELETE FROM download_tokens WHERE criado_em < datetime('now', '-{} days')".format(dias)
             )
-        conn.commit()
+            conn.commit()
+        finally:
+            cursor.close()
