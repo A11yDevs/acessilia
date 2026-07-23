@@ -86,7 +86,7 @@ async def obter_info_token(token: str) -> dict | None:
         cursor = conn.cursor()
         try:
             cursor.execute(
-                "SELECT output_dir, filename, formats FROM download_tokens WHERE token = ?",
+                "SELECT output_dir, filename, formats, criado_em FROM download_tokens WHERE token = ?",
                 (token,)
             )
             row = cursor.fetchone()
