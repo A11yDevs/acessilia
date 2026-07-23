@@ -1,10 +1,6 @@
 import asyncio
+import json
 
-# NOTE: Table creation drops the existing download_tokens table, invalidating all previous tokens.
-# If migration of existing tokens is required, implement a proper migration before dropping.
-
-# NOTE: Table creation drops the existing download_tokens table, invalidating all previous tokens.
-# If migration of existing tokens is required, implement a proper migration before dropping.
 import sqlite3
 import uuid
 from pathlib import Path

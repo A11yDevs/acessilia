@@ -185,7 +185,7 @@ async def run_pipeline_task(
 
         await loop.run_in_executor(executor, create_zip)
 
-        token = await criar_token(task_output_dir, filename)
+        token = await criar_token(task_output_dir, base_name)
         download_url = f"{settings.web_url.rstrip('/')}/download/{token}"
         await send_result_email(email, filename, download_url=download_url)
 

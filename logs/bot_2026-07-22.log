@@ -1,0 +1,171 @@
+2026-07-22 15:54:15 | INFO     | core.utils.logger:setup_logger:30 - Logger configured - level: INFO
+2026-07-22 15:54:15 | ERROR    | __main__:<module>:117 - Erro fatal no bot
+Traceback (most recent call last):
+
+> File "C:\Users\JHONATA\bot-acess\run.py", line 113, in <module>
+    asyncio.run(startup())
+    │       │   └ <function startup at 0x00000156937DFE20>
+    │       └ <function run at 0x0000015692D26770>
+    └ <module 'asyncio' from 'C:\\Python314\\Lib\\asyncio\\__init__.py'>
+
+  File "C:\Python314\Lib\asyncio\runners.py", line 204, in run
+    return runner.run(main)
+           │      │   └ <coroutine object startup at 0x00000156937A9EA0>
+           │      └ <function Runner.run at 0x0000015692D26B90>
+           └ <asyncio.runners.Runner object at 0x00000156937D4590>
+  File "C:\Python314\Lib\asyncio\runners.py", line 127, in run
+    return self._loop.run_until_complete(task)
+           │    │                        └ <Task finished name='Task-1' coro=<startup() done, defined at C:\Users\JHONATA\bot-acess\run.py:61> exception=ModuleNotFoundE...
+           │    └ None
+           └ <asyncio.runners.Runner object at 0x00000156937D4590>
+  File "C:\Python314\Lib\asyncio\base_events.py", line 719, in run_until_complete
+    return future.result()
+           │      └ <method 'result' of '_asyncio.Task' objects>
+           └ <Task finished name='Task-1' coro=<startup() done, defined at C:\Users\JHONATA\bot-acess\run.py:61> exception=ModuleNotFoundE...
+
+  File "C:\Users\JHONATA\bot-acess\run.py", line 68, in startup
+    from interfaces.telegram.bot import start_polling
+
+  File "C:\Users\JHONATA\bot-acess\interfaces\telegram\bot.py", line 4, in <module>
+    from aiogram import Bot, Dispatcher
+
+ModuleNotFoundError: No module named 'aiogram'
+2026-07-22 15:54:15 | INFO     | __main__:release_lock:56 - Lock released
+2026-07-22 15:54:40 | INFO     | core.utils.logger:setup_logger:30 - Logger configured - level: INFO
+2026-07-22 15:54:45 | ERROR    | __main__:<module>:117 - Erro fatal no bot
+Traceback (most recent call last):
+
+> File "C:\Users\JHONATA\bot-acess\run.py", line 113, in <module>
+    asyncio.run(startup())
+    │       │   └ <function startup at 0x0000020648583E20>
+    │       └ <function run at 0x0000020647A8A770>
+    └ <module 'asyncio' from 'C:\\Python314\\Lib\\asyncio\\__init__.py'>
+
+  File "C:\Python314\Lib\asyncio\runners.py", line 204, in run
+    return runner.run(main)
+           │      │   └ <coroutine object startup at 0x00000206485496C0>
+           │      └ <function Runner.run at 0x0000020647A8AB90>
+           └ <asyncio.runners.Runner object at 0x00000206485742F0>
+  File "C:\Python314\Lib\asyncio\runners.py", line 127, in run
+    return self._loop.run_until_complete(task)
+           │    │                        └ <Task finished name='Task-1' coro=<startup() done, defined at C:\Users\JHONATA\bot-acess\run.py:61> exception=ModuleNotFoundE...
+           │    └ None
+           └ <asyncio.runners.Runner object at 0x00000206485742F0>
+  File "C:\Python314\Lib\asyncio\base_events.py", line 719, in run_until_complete
+    return future.result()
+           │      └ <method 'result' of '_asyncio.Task' objects>
+           └ <Task finished name='Task-1' coro=<startup() done, defined at C:\Users\JHONATA\bot-acess\run.py:61> exception=ModuleNotFoundE...
+
+  File "C:\Users\JHONATA\bot-acess\run.py", line 68, in startup
+    from interfaces.telegram.bot import start_polling
+
+  File "C:\Users\JHONATA\bot-acess\interfaces\telegram\bot.py", line 9, in <module>
+    from interfaces.telegram.handlers.start import router as start_router
+
+  File "C:\Users\JHONATA\bot-acess\interfaces\telegram\handlers\start.py", line 16, in <module>
+    from interfaces.telegram.handlers.document import user_modes, user_emails
+
+  File "C:\Users\JHONATA\bot-acess\interfaces\telegram\handlers\document.py", line 13, in <module>
+    from core.orchestrator import process
+
+  File "C:\Users\JHONATA\bot-acess\core\orchestrator.py", line 7, in <module>
+    from core.agents.agente_unico import AgenteUnico
+
+  File "C:\Users\JHONATA\bot-acess\core\agents\agente_unico.py", line 5, in <module>
+    import fitz
+
+ModuleNotFoundError: No module named 'fitz'
+2026-07-22 15:54:45 | INFO     | __main__:release_lock:56 - Lock released
+2026-07-22 15:55:40 | INFO     | core.utils.logger:setup_logger:30 - Logger configured - level: INFO
+2026-07-22 15:55:46 | ERROR    | __main__:<module>:117 - Erro fatal no bot
+Traceback (most recent call last):
+
+> File "C:\Users\JHONATA\bot-acess\run.py", line 113, in <module>
+    asyncio.run(startup())
+    │       │   └ <function startup at 0x000002A0B7993E20>
+    │       └ <function run at 0x000002A0B6EA2770>
+    └ <module 'asyncio' from 'C:\\Python314\\Lib\\asyncio\\__init__.py'>
+
+  File "C:\Python314\Lib\asyncio\runners.py", line 204, in run
+    return runner.run(main)
+           │      │   └ <coroutine object startup at 0x000002A0B79596C0>
+           │      └ <function Runner.run at 0x000002A0B6EA2B90>
+           └ <asyncio.runners.Runner object at 0x000002A0B79842F0>
+  File "C:\Python314\Lib\asyncio\runners.py", line 127, in run
+    return self._loop.run_until_complete(task)
+           │    │                        └ <Task finished name='Task-1' coro=<startup() done, defined at C:\Users\JHONATA\bot-acess\run.py:61> exception=ModuleNotFoundE...
+           │    └ None
+           └ <asyncio.runners.Runner object at 0x000002A0B79842F0>
+  File "C:\Python314\Lib\asyncio\base_events.py", line 719, in run_until_complete
+    return future.result()
+           │      └ <method 'result' of '_asyncio.Task' objects>
+           └ <Task finished name='Task-1' coro=<startup() done, defined at C:\Users\JHONATA\bot-acess\run.py:61> exception=ModuleNotFoundE...
+
+  File "C:\Users\JHONATA\bot-acess\run.py", line 68, in startup
+    from interfaces.telegram.bot import start_polling
+
+  File "C:\Users\JHONATA\bot-acess\interfaces\telegram\bot.py", line 9, in <module>
+    from interfaces.telegram.handlers.start import router as start_router
+
+  File "C:\Users\JHONATA\bot-acess\interfaces\telegram\handlers\start.py", line 16, in <module>
+    from interfaces.telegram.handlers.document import user_modes, user_emails
+
+  File "C:\Users\JHONATA\bot-acess\interfaces\telegram\handlers\document.py", line 13, in <module>
+    from core.orchestrator import process
+
+  File "C:\Users\JHONATA\bot-acess\core\orchestrator.py", line 7, in <module>
+    from core.agents.agente_unico import AgenteUnico
+
+  File "C:\Users\JHONATA\bot-acess\core\agents\agente_unico.py", line 6, in <module>
+    from PIL import Image
+
+ModuleNotFoundError: No module named 'PIL'
+2026-07-22 15:55:46 | INFO     | __main__:release_lock:56 - Lock released
+2026-07-22 15:56:00 | INFO     | core.utils.logger:setup_logger:30 - Logger configured - level: INFO
+2026-07-22 15:56:07 | ERROR    | __main__:<module>:117 - Erro fatal no bot
+Traceback (most recent call last):
+
+> File "C:\Users\JHONATA\bot-acess\run.py", line 113, in <module>
+    asyncio.run(startup())
+    │       │   └ <function startup at 0x0000028523CA3E20>
+    │       └ <function run at 0x00000285231AE770>
+    └ <module 'asyncio' from 'C:\\Python314\\Lib\\asyncio\\__init__.py'>
+
+  File "C:\Python314\Lib\asyncio\runners.py", line 204, in run
+    return runner.run(main)
+           │      │   └ <coroutine object startup at 0x0000028523C696C0>
+           │      └ <function Runner.run at 0x00000285231AEB90>
+           └ <asyncio.runners.Runner object at 0x0000028523C942F0>
+  File "C:\Python314\Lib\asyncio\runners.py", line 127, in run
+    return self._loop.run_until_complete(task)
+           │    │                        └ <Task finished name='Task-1' coro=<startup() done, defined at C:\Users\JHONATA\bot-acess\run.py:61> exception=ModuleNotFoundE...
+           │    └ None
+           └ <asyncio.runners.Runner object at 0x0000028523C942F0>
+  File "C:\Python314\Lib\asyncio\base_events.py", line 719, in run_until_complete
+    return future.result()
+           │      └ <method 'result' of '_asyncio.Task' objects>
+           └ <Task finished name='Task-1' coro=<startup() done, defined at C:\Users\JHONATA\bot-acess\run.py:61> exception=ModuleNotFoundE...
+
+  File "C:\Users\JHONATA\bot-acess\run.py", line 68, in startup
+    from interfaces.telegram.bot import start_polling
+
+  File "C:\Users\JHONATA\bot-acess\interfaces\telegram\bot.py", line 9, in <module>
+    from interfaces.telegram.handlers.start import router as start_router
+
+  File "C:\Users\JHONATA\bot-acess\interfaces\telegram\handlers\start.py", line 16, in <module>
+    from interfaces.telegram.handlers.document import user_modes, user_emails
+
+  File "C:\Users\JHONATA\bot-acess\interfaces\telegram\handlers\document.py", line 13, in <module>
+    from core.orchestrator import process
+
+  File "C:\Users\JHONATA\bot-acess\core\orchestrator.py", line 7, in <module>
+    from core.agents.agente_unico import AgenteUnico
+
+  File "C:\Users\JHONATA\bot-acess\core\agents\agente_unico.py", line 25, in <module>
+    from core.utils.image_enhancer import enhance_image_for_ocr, resize_image
+
+  File "C:\Users\JHONATA\bot-acess\core\utils\image_enhancer.py", line 1, in <module>
+    import cv2
+
+ModuleNotFoundError: No module named 'cv2'
+2026-07-22 15:56:07 | INFO     | __main__:release_lock:56 - Lock released
