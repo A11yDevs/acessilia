@@ -1,9 +1,9 @@
 import tempfile
 from pathlib import Path
 
-from core.exporters.txt_exporter import export_txt
-from core.exporters.docx_exporter import export_docx
-from core.exporters.pdf_exporter import export_pdf
+from backend.export.exporters.txt_exporter import export_txt
+from backend.export.exporters.docx_exporter import export_docx
+from backend.export.exporters.pdf_exporter import export_pdf
 
 
 def test_export_txt():

@@ -6,9 +6,8 @@ authors = ["Jhonata"]
 license = "MIT"
 readme = "README.md"
 packages = [
-    { include = "core" },
-    { include = "adapters" },
-    { include = "interfaces" }
+    { include = "backend" },
+    { include = "frontend" }
 ]
 
 [tool.poetry.dependencies]
@@ -38,7 +37,8 @@ ollama = "^0.6.2"
 pytest = "^9.1.1"
 respx = "^0.23.1"
 pytest-asyncio = "^1.4.0"
+sqlalchemy = "^2.0.51"
 
 
 [tool.poetry.scripts]
-bot-acess = "interfaces.cli.run:main"
+bot-acess = "frontend.cli.run:main"

@@ -1,4 +1,4 @@
-from core.tools.validators import (
+from backend.tools.validators import (
     is_extension_allowed,
     is_file_size_allowed,
     validate_file,

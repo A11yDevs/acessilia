@@ -16,3 +16,12 @@ __pycache__/
 .coverage
 htmlcov/
 output/
+
+# Runtime, temporary and cache directories
+var/
+trash/
+temp/
+*.db
+*.sqlite
+*.sqlite3
+*.log

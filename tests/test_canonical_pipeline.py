@@ -1,10 +1,10 @@
 import tempfile
 from pathlib import Path
 
-from exporters.pandoc_exporter import export_accessible_document
-from pipeline.canonical_builder import build_canonical_document
-from pipeline.validators import validate_canonical_document
-from pipeline.validators import validate_output_text
+from backend.export.pandoc_exporter import export_accessible_document
+from backend.pipeline.canonical_builder import build_canonical_document
+from backend.pipeline.validators import validate_canonical_document
+from backend.pipeline.validators import validate_output_text
 
 
 def test_build_canonical_document_creates_sections_and_ids():

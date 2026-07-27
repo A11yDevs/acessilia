@@ -1,0 +1,54 @@
+"""Exporters public API.
+
+We expose thin wrappers around the existing core.exporters implementations
+so that the rest of the codebase can depend on this ``adapters`` layer
+instead of importing ``core.exporters`` directly.
+"""
+
+from pathlib import Path
+from typing import Mapping, Any
+from backend.tools.logger import logger
+from backend.tools.logger import logger
+
+# Import the legacy implementation functions
+from backend.export.exporters.txt_exporter import export_txt as _export_txt
+from backend.export.exporters.docx_exporter import export_docx as _export_docx
+from backend.export.exporters.pdf_exporter import export_pdf as _export_pdf
+from backend.export.exporters.audio_exporter import export_mp3 as _export_mp3
+
+# Simple functional wrappers that keep the same signature used by the web UI
+def export_txt(canonical_doc: Mapping[str, Any], output_path: Path, source_name: str) -> Path:
+    logger.debug("Exportando TXT para %s", output_path)
+    logger.debug("Exportando TXT para %s", output_path)
+    return _export_txt(canonical_doc, output_path, source_name)
+
+def export_docx(canonical_doc: Mapping[str, Any], output_path: Path, source_name: str) -> Path:
+    logger.debug("Exportando DOCX para %s", output_path)
+    logger.debug("Exportando DOCX para %s", output_path)
+    return _export_docx(canonical_doc, output_path, source_name)
+
+def export_pdf(canonical_doc: Mapping[str, Any], output_path: Path, source_name: str) -> Path:
+    logger.debug("Exportando PDF para %s", output_path)
+    logger.debug("Exportando PDF para %s", output_path)
+    return _export_pdf(canonical_doc, output_path, source_name)
+
+async def export_mp3(text_content: str, output_path: Path, **kwargs) -> Path:
+    logger.debug("Exportando MP3 para %s", output_path)
+    logger.debug("Exportando MP3 para %s", output_path)
+    return await _export_mp3(text_content, output_path)
+
+# Factory helper – useful for the UI when the format is dynamic
+_EXPORTER_MAP = {
+    "txt": export_txt,
+    "docx": export_docx,
+    "pdf": export_pdf,
+    "mp3": export_mp3,
+}
+
+
+def get_exporter(fmt: str):
+    """Return the export function matching ``fmt`` (e.g., ``"pdf"``).
+
+    Raises ``KeyError`` if the format is unknown.
+    """
+    return _EXPORTER_MAP[fmt]
