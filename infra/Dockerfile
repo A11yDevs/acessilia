@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         poppler-utils \
         tesseract-ocr \
         ffmpeg \
+        mariadb-client \
     && rm -rf /var/lib/apt/lists/*
 
 # Definir diretório de trabalho
@@ -24,7 +25,8 @@ COPY pyproject.toml poetry.lock* ./
 # Instalar Poetry e dependências do projeto
 RUN pip install --no-cache-dir "poetry==$POETRY_VERSION" && \
     poetry config virtualenvs.create false && \
-    poetry install --no-root --no-interaction --no-ansi
+    poetry install --no-root --no-interaction --no-ansi && \
+    pip install pymysql
 
 # Copiar todo o código da aplicação
 COPY . .

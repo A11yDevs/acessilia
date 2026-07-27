@@ -46,7 +46,7 @@ def _clean_temp_directory() -> None:
 
     now = time.time()
     for item in temp_dir.iterdir():
-        if item.name == "output" or item.name == "cache":
+        if item.name in ("output", "cache", "web_output"):
             continue
         if _is_stale(item, now, FILE_MAX_AGE):
             try:
