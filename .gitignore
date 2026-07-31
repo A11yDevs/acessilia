@@ -5,6 +5,7 @@ print_settings.py
 commit_changes.py
 
 .env
+.venv
 report.txt
 
 # Python cache and temporary files
@@ -18,6 +19,7 @@ htmlcov/
 output/
 
 # Runtime, temporary and cache directories
+data/
 var/
 trash/
 temp/

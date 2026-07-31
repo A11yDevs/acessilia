@@ -142,13 +142,12 @@ async def process_file(
                     profile_name="html",
                 )
 
+                async def audio_progress(percent: int) -> None:
+                    await t_tracker(f"Gerando áudio... {percent}%")
+
                 try:
                     if txt_path.exists():
                         clean_text = txt_path.read_text(encoding="utf-8")
-
-
-
-
                         await export_mp3(
                             clean_text, mp3_path, progress_callback=audio_progress
                         )
