@@ -36,14 +36,12 @@ class DoclingManifestExtractor:
             raise FileNotFoundError(f"Documento não encontrado: {source_path}")
 
         if self._structurer is None:
-            from core.structurer import DoclingStructurer
-
-            structurer = DoclingStructurer(converter=self._create_converter())
+            structurer = self._build_structurer()
         else:
             structurer = self._structurer
         started_at = datetime.now(timezone.utc)
         started_clock = perf_counter()
-        document = structurer.convert_document(source_path)
+        document = self._convert_document(structurer, source_path)
         duration_ms = round((perf_counter() - started_clock) * 1000)
         completed_at = datetime.now(timezone.utc)
 
@@ -61,7 +59,10 @@ class DoclingManifestExtractor:
         )
 
     def _create_converter(self) -> Any:
-        from core.structurer import DOCLING_AVAILABLE
+        try:
+            from core.structurer import DOCLING_AVAILABLE
+        except ModuleNotFoundError:
+            from backend.tools.structurer import DOCLING_AVAILABLE
 
         if not DOCLING_AVAILABLE:
             raise RuntimeError(
@@ -83,6 +84,33 @@ class DoclingManifestExtractor:
             format_options={
                 InputFormat.PDF: PdfFormatOption(pipeline_options=pdf_options),
             }
+        )
+
+    def _build_structurer(self) -> Any:
+        # Compatibilidade com estrutura PMV original (core) e estrutura atual (backend).
+        try:
+            from core.structurer import DoclingStructurer
+
+            return DoclingStructurer(converter=self._create_converter())
+        except ModuleNotFoundError:
+            from backend.tools.structurer import DOCLING_AVAILABLE, DoclingStructurer
+
+            if not DOCLING_AVAILABLE:
+                raise RuntimeError(
+                    "Docling não está instalado. Execute `poetry install` ou "
+                    "`pip install docling`."
+                )
+
+            return DoclingStructurer()
+
+    @staticmethod
+    def _convert_document(structurer: Any, source_path: Path) -> Any:
+        if hasattr(structurer, "convert_document"):
+            return structurer.convert_document(source_path)
+        if hasattr(structurer, "_process_document"):
+            return structurer._process_document(source_path)
+        raise RuntimeError(
+            "Structurer incompatível: esperado convert_document() ou _process_document()."
         )
 
 
