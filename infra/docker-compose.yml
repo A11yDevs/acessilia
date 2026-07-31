@@ -1,19 +1,4 @@
-version: '3.8'
-
 services:
-  mariadb:
-    image: mariadb:latest
-    container_name: mariadb
-    environment:
-      MYSQL_ROOT_PASSWORD: example
-      MYSQL_DATABASE: acessilia
-      MYSQL_USER: acessilia
-      MYSQL_PASSWORD: password
-    volumes:
-      - mariadb_data:/var/lib/mysql
-    ports:
-      - "3306:3306"
-
   acessilia:
     build:
       context: ..
@@ -22,25 +7,15 @@ services:
     container_name: acessilia-instance
     ports:
       - "8000:8000"
-    depends_on:
-      - mariadb
-    environment:
-      - MYSQL_HOST=mariadb
-      - MYSQL_PORT=3306
-      - MYSQL_USER=acessilia
-      - MYSQL_PASSWORD=password
-      - MYSQL_DB=acessilia
+      - "8001:8001"
     volumes:
       - ../var:/app/var
     env_file:
       - ../.env
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
-
-volumes:
-  mariadb_data:

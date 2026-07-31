@@ -64,10 +64,13 @@ class Settings:
     structurer: str = os.getenv("STRUCTURER", "pymupdf")
 
     # Interface Settings
-    enabled_interfaces: str = os.getenv("ENABLED_INTERFACES", "telegram,web")
+    enabled_interfaces: str = os.getenv("ENABLED_INTERFACES", "api,telegram,web")
 
-    # Web URL (for download links in emails)
-    web_url: str = os.getenv("WEB_URL", "http://localhost:8000")
+    # API Settings
+    api_host: str = os.getenv("API_HOST", "0.0.0.0")
+    api_port: int = int(os.getenv("API_PORT", "8000"))
+    api_base_url: str = os.getenv("API_BASE_URL", "http://localhost:8000")
+    web_port: int = int(os.getenv("WEB_PORT", "8001"))
 
     # SMTP Settings
     smtp_server: str = os.getenv("SMTP_SERVER", "smtp.gmail.com")

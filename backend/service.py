@@ -54,6 +54,7 @@ async def process(
     mode: str = "normal",
     custom_prompt: str | None = None,
     thinking_mode: bool = False,
+    task_id: str | None = None,
 ) -> dict[str, Any]:
     cached = await get_cached(file_path, _cache_version())
     if cached is not None:
@@ -70,7 +71,7 @@ async def process(
             audience=["reader"],
         )
 
-    task_id = state_manager.criar_tarefa(file_path)
+    task_id = state_manager.criar_tarefa(file_path, task_id=task_id)
     inicio = time.time()
     await registrar_conversao(
         task_id=task_id,

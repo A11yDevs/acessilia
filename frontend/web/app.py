@@ -1,61 +1,45 @@
 import shutil
-import zipfile
-import uuid
 import traceback
+import uuid
 from pathlib import Path
 
 from fastapi import (
     FastAPI,
     File,
-    UploadFile,
     Form,
     Request,
+    UploadFile,
     HTTPException,
 )
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
-from backend.service import process
-
-
-
-
-from backend.adapters.exporters import export_txt, export_docx, export_pdf, export_mp3
-from backend.tools.logger import logger
-from backend.export.pandoc_exporter import export_accessible_document
 from backend.config.settings import settings
-from backend.services.email_service import send_confirmation_email, send_result_email
-from backend.services.download_token_service import (
-    criar_token,
-    obter_info_token,
-    limpar_tokens_expirados,
-)
-
-import asyncio
-import concurrent.futures
-from backend.services.queue_service import unified_queue, QueueItem
+from backend.tools.logger import logger
+from frontend.clients.api_client import ApiClient, ApiError
+from frontend.clients import default_client
 
 app = FastAPI(title="Bot Acess Web Panel")
 
 limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
 app.state.limiter = limiter
 
-executor = concurrent.futures.ThreadPoolExecutor(max_workers=3)
-
 BASE_WEB_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_WEB_DIR / "templates"))
 app.mount("/static", StaticFiles(directory=str(BASE_WEB_DIR / "static")), name="static")
 
+API_BASE = settings.api_base_url.rstrip("/")
+client = default_client
 
-@app.on_event("startup")
-async def startup_event():
-    unified_queue.start_worker()
-    await limpar_tokens_expirados()
+WEB_UPLOAD_DIR = settings.temp_dir / "web_uploads"
+WEB_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+MAX_CUSTOM_PROMPT_CHARS = 6000
 
 
 @app.exception_handler(Exception)
@@ -98,11 +82,20 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
     )
 
 
-OUTPUT_DIR = settings.temp_dir / "web_output"
-UPLOAD_DIR = settings.temp_dir / "uploads"
+def _save_upload(upload: UploadFile) -> Path:
+    WEB_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    safe_name = f"{uuid.uuid4().hex}{Path(upload.filename or '').suffix.lower()}"
+    file_path = WEB_UPLOAD_DIR / safe_name
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(upload.file, buffer)
+    return file_path
 
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+def _remove_file(file_path: Path) -> None:
+    try:
+        file_path.unlink(missing_ok=True)
+    except OSError:
+        pass
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -117,127 +110,53 @@ async def advanced_page(request: Request):
     return templates.TemplateResponse(request=request, name="advanced.html", context={})
 
 
-async def run_pipeline_task(
+async def _submit_via_api(
+    request: Request,
+    template_name: str,
+    document_file: UploadFile,
     email: str,
-    file_path: Path,
-    filename: str,
+    mode: str,
     custom_prompt: str | None = None,
     thinking_mode: bool = False,
 ):
+    file_path = _save_upload(document_file)
     try:
-        await send_confirmation_email(email, filename)
-
-        async def silent_status(msg: str):
-            logger.debug("Web Pipeline Status [{}]: {}", filename, msg)
-
-        canonical_doc = await process(
+        result = await client.submit_job(
             file_path,
-            status_callback=silent_status,
+            document_file.filename or "documento",
+            mode=mode,
             custom_prompt=custom_prompt,
             thinking_mode=thinking_mode,
+            email=email,
+            source="web",
         )
-
-        base_name = file_path.stem
-        task_output_dir = OUTPUT_DIR / base_name
-        task_output_dir.mkdir(parents=True, exist_ok=True)
-
-        txt_path = task_output_dir / f"{base_name}.txt"
-        docx_path = task_output_dir / f"{base_name}.docx"
-        pdf_path = task_output_dir / f"{base_name}.pdf"
-        html_path = task_output_dir / f"{base_name}.html"
-        mp3_path = task_output_dir / f"{base_name}.mp3"
-
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(
-            executor, export_txt, canonical_doc, txt_path, filename
+    except ApiError as e:
+        logger.warning(
+            "API retornou erro no upload web: {} - {}", e.status_code, e.detail
         )
-        await loop.run_in_executor(
-            executor, export_docx, canonical_doc, docx_path, filename
+        return templates.TemplateResponse(
+            request=request,
+            name=template_name,
+            context={"error": f"Erro da API ({e.status_code}): {e.detail}"},
         )
-        await loop.run_in_executor(
-            executor, export_pdf, canonical_doc, pdf_path, filename
-        )
-        await loop.run_in_executor(
-            executor,
-            lambda: export_accessible_document(
-                canonical_doc,
-                html_path,
-                format_name="html",
-                title=base_name,
-                profile_name="html",
-            ),
-        )
-
-        if txt_path.exists():
-            clean_text = txt_path.read_text(encoding="utf-8")
-            await export_mp3(clean_text, mp3_path)
-
-        zip_path = task_output_dir / f"{base_name}_acessivel.zip"
-        files_to_zip = [txt_path, docx_path, pdf_path, html_path, mp3_path]
-
-        def create_zip():
-            with zipfile.ZipFile(
-                zip_path, "w", compression=zipfile.ZIP_DEFLATED
-            ) as archive:
-                for f_path in files_to_zip:
-                    if f_path.exists():
-                        archive.write(f_path, arcname=f_path.name)
-
-        await loop.run_in_executor(executor, create_zip)
-
-        token = await criar_token(task_output_dir, base_name)
-        download_url = f"{settings.web_url.rstrip('/')}/download/{token}"
-        await send_result_email(email, filename, download_url=download_url)
-
-        logger.info("Web Task concluída para {}. E-mail enviado.", email)
-
     except Exception as e:
-        logger.exception("Erro no processamento via Web para {}: {}", email, e)
+        logger.error("Erro no upload via web: {}", e)
+        return templates.TemplateResponse(
+            request=request,
+            name=template_name,
+            context={
+                "error": "Ocorreu um erro ao enviar o arquivo para a API. Tente novamente."
+            },
+        )
     finally:
-        if file_path.exists():
-            file_path.unlink()
+        _remove_file(file_path)
 
-
-@app.get("/download/{token}")
-@limiter.limit("10/minute")
-async def download_page(request: Request, token: str):
-    info = await obter_info_token(token)
-    if info is None:
-        raise HTTPException(status_code=404, detail="Link inválido ou expirado")
-    return templates.TemplateResponse(
-        request=request,
-        name="download.html",
-        context={"filename": info["filename"], "formats": info["formats"]},
+    msg = (
+        f"Sucesso! Seu arquivo entrou na fila (Posição: {result['position']}). "
+        f"O resultado será enviado para {email}."
     )
-
-
-@app.get("/download/{token}/{format}")
-@limiter.limit("20/minute")
-async def download_file(request: Request, token: str, format: str):
-    if format not in ("txt", "docx", "pdf", "html", "mp3", "zip"):
-        raise HTTPException(status_code=400, detail="Formato inválido")
-    info = await obter_info_token(token)
-    if info is None:
-        raise HTTPException(status_code=404, detail="Link inválido ou expirado")
-    file_path = None
-    for f in info["formats"]:
-        if f["ext"] == format:
-            file_path = Path(f["file_path"])
-            break
-    if file_path is None or not file_path.exists():
-        raise HTTPException(status_code=404, detail="Arquivo não encontrado")
-    media_types = {
-        "txt": "text/plain; charset=utf-8",
-        "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "pdf": "application/pdf",
-        "html": "text/html; charset=utf-8",
-        "mp3": "audio/mpeg",
-        "zip": "application/zip",
-    }
-    return FileResponse(
-        path=file_path,
-        filename=file_path.name,
-        media_type=media_types.get(format, "application/octet-stream"),
+    return templates.TemplateResponse(
+        request=request, name=template_name, context={"message": msg}
     )
 
 
@@ -246,43 +165,13 @@ async def download_file(request: Request, token: str, format: str):
 async def handle_upload(
     request: Request, email: str = Form(...), document_file: UploadFile = File(...)
 ):
-    try:
-        UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-        original_filename = document_file.filename
-        # Preserve only the basename to avoid directory traversal
-        safe_name = f"{uuid.uuid4().hex}{Path(original_filename).suffix}"
-        file_path = UPLOAD_DIR / safe_name
-
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(document_file.file, buffer)
-
-        item = QueueItem(
-            file_path=file_path,
-            filename=document_file.filename,
-            source="web",
-            callback=run_pipeline_task,
-            callback_args={
-                "email": email,
-                "file_path": file_path,
-                "filename": document_file.filename,
-            },
-        )
-        pos = await unified_queue.enqueue(item)
-
-        msg = f"Sucesso! Seu arquivo está na fila única (Posição: {pos}). O resultado será enviado para {email}."
-
-        return templates.TemplateResponse(
-            request=request, name="index.html", context={"message": msg}
-        )
-    except Exception as e:
-        logger.error("Erro no upload web: {}", e)
-        return templates.TemplateResponse(
-            request=request,
-            name="index.html",
-            context={
-                "error": "Ocorreu um erro ao processar o upload. Tente novamente."
-            },
-        )
+    return await _submit_via_api(
+        request,
+        template_name="index.html",
+        document_file=document_file,
+        email=email,
+        mode="normal",
+    )
 
 
 @app.post("/advanced/process", response_class=HTMLResponse)
@@ -294,52 +183,40 @@ async def handle_advanced_upload(
     custom_prompt: str = Form(""),
     thinking_mode: bool = Form(False),
 ):
-    try:
-        UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-        original_filename = document_file.filename
-        # Preserve only the basename to avoid directory traversal
-        safe_name = f"{uuid.uuid4().hex}{Path(original_filename).suffix}"
-        file_path = UPLOAD_DIR / safe_name
-
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(document_file.file, buffer)
-
-        prompt = custom_prompt.strip()
-        if len(prompt) > 6000:
-            return templates.TemplateResponse(
-                request=request,
-                name="advanced.html",
-                context={
-                    "error": "Prompt personalizado excede o limite de 6000 caracteres."
-                },
-            )
-
-        item = QueueItem(
-            file_path=file_path,
-            filename=document_file.filename,
-            source="web",
-            callback=run_pipeline_task,
-            callback_args={
-                "email": email,
-                "file_path": file_path,
-                "filename": document_file.filename,
-                "custom_prompt": prompt or None,
-                "thinking_mode": thinking_mode,
-            },
-        )
-        pos = await unified_queue.enqueue(item)
-
-        msg = f"Sucesso! Seu arquivo está na fila única (Posição: {pos}). O resultado será enviado para {email}."
-
-        return templates.TemplateResponse(
-            request=request, name="advanced.html", context={"message": msg}
-        )
-    except Exception as e:
-        logger.error("Erro no upload advanced web: {}", e)
+    prompt = custom_prompt.strip()
+    if len(prompt) > MAX_CUSTOM_PROMPT_CHARS:
         return templates.TemplateResponse(
             request=request,
             name="advanced.html",
             context={
-                "error": "Ocorreu um erro ao processar o upload. Tente novamente."
+                "error": "Prompt personalizado excede o limite de 6000 caracteres."
             },
         )
+    return await _submit_via_api(
+        request,
+        template_name="advanced.html",
+        document_file=document_file,
+        email=email,
+        mode="normal",
+        custom_prompt=prompt or None,
+        thinking_mode=thinking_mode,
+    )
+
+
+@app.get("/download/{token}")
+@limiter.limit("10/minute")
+async def download_page(request: Request, token: str):
+    try:
+        info = await client.get_download_info(token)
+    except ApiError as e:
+        if e.status_code == 404:
+            raise HTTPException(status_code=404, detail="Link inválido ou expirado")
+        logger.warning("Falha ao consultar download na API: {} - {}", e.status_code, e.detail)
+        raise HTTPException(status_code=502, detail="Serviço de download indisponível")
+    for f in info["formats"]:
+        f["url"] = f"{API_BASE}/api/v1{f['url']}"
+    return templates.TemplateResponse(
+        request=request,
+        name="download.html",
+        context={"filename": info["filename"], "formats": info["formats"]},
+    )

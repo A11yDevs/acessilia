@@ -1,8 +1,6 @@
 import asyncio
 import tempfile
-import zipfile
-import uuid
-import shutil
+import time
 from pathlib import Path
 
 from aiogram import Router, F
@@ -10,25 +8,23 @@ from aiogram.types import Message, Document, PhotoSize
 from aiogram.exceptions import TelegramRetryAfter
 
 from frontend.telegram.adapters.file_service import download_file
-from backend.service import process
-
-
-
+from frontend.clients.api_client import ApiError
+from frontend.clients import default_client
 
 from backend.tools.logger import logger
 from backend.tools.validators import validate_file
 from frontend.telegram.adapters.status_tracker import StatusTracker
-from backend.export.pandoc_exporter import export_accessible_document
 from backend.config.settings import settings
-
-from backend.adapters.exporters import export_txt, export_docx, export_pdf, export_mp3
 
 router = Router()
 
-OUTPUT_DIR = settings.temp_dir / "output"
+client = default_client
 
 user_modes: dict[tuple[int, int | None], str] = {}
 user_emails: dict[tuple[int, int | None], str] = {}
+user_task_ids: dict[tuple[int, int | None], str] = {}
+
+POLL_INTERVAL_SECONDS = 3.0
 
 
 async def _send_with_retry(
@@ -83,9 +79,6 @@ async def handle_photo(message: Message) -> None:
     await process_file(message, photo.file_id, "imagem.png", mode=mode)
 
 
-from backend.services.queue_service import unified_queue, QueueItem
-
-
 async def process_file(
     message: Message,
     file_id: str,
@@ -93,138 +86,136 @@ async def process_file(
     mode: str = "normal",
 ) -> None:
     message_thread_id = message.message_thread_id
-    tracker = StatusTracker(message.bot, message.chat.id, filename, message_thread_id=message_thread_id)
+    tracker = StatusTracker(
+        message.bot, message.chat.id, filename, message_thread_id=message_thread_id
+    )
+    email = user_emails.get((message.chat.id, message.message_thread_id))
 
-    with tempfile.TemporaryDirectory(dir=settings.temp_dir) as tmpdir:
-        input_path = Path(tmpdir) / filename
-        await tracker("Baixando arquivo...")
-        await download_file(message.bot, file_id, input_path)
+    try:
+        with tempfile.TemporaryDirectory(dir=settings.temp_dir) as tmpdir:
+            input_path = Path(tmpdir) / filename
+            await tracker("Baixando arquivo...")
+            await download_file(message.bot, file_id, input_path)
 
-        persistent_tmp = settings.temp_dir / f"task_{uuid.uuid4().hex}"
-        persistent_tmp.mkdir(parents=True, exist_ok=True)
-        task_path = persistent_tmp / filename
-        shutil.copy2(input_path, task_path)
-
-        async def task_callback(
-            path: Path,
-            t_filename: str,
-            t_mode: str,
-            t_tracker: StatusTracker,
-            cleanup_dir: Path,
-        ):
             try:
-                canonical_document = await process(
-                    path,
-                    status_callback=t_tracker,
-                    mode=t_mode,
+                result = await client.submit_job(
+                    input_path,
+                    filename,
+                    mode=mode,
+                    email=email,
+                    source="telegram",
                 )
-
-                await t_tracker(
-                    "Conteudo extraido com sucesso! Preparando exportacao..."
+            except ApiError as e:
+                logger.warning(
+                    "API recusou job do Telegram: {} - {}", e.status_code, e.detail
                 )
-                OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-
-                base_name = path.stem
-                txt_path = OUTPUT_DIR / f"{base_name}.txt"
-                docx_path = OUTPUT_DIR / f"{base_name}.docx"
-                pdf_path = OUTPUT_DIR / f"{base_name}.pdf"
-                html_path = OUTPUT_DIR / f"{base_name}.html"
-                mp3_path = OUTPUT_DIR / f"{base_name}.mp3"
-
-                export_txt(canonical_document, txt_path, t_filename)
-                export_docx(canonical_document, docx_path, t_filename)
-                export_pdf(canonical_document, pdf_path, t_filename)
-                export_accessible_document(
-                    canonical_document,
-                    html_path,
-                    format_name="html",
-                    title=base_name,
-                    profile_name="html",
+                await tracker.finish(success=False)
+                await message.answer(
+                    f"❌ Erro ao enviar o arquivo para processamento ({e.status_code}): {e.detail}"
                 )
-
-                async def audio_progress(percent: int) -> None:
-                    await t_tracker(f"Gerando áudio... {percent}%")
-
-                try:
-                    if txt_path.exists():
-                        clean_text = txt_path.read_text(encoding="utf-8")
-                        await export_mp3(
-                            clean_text, mp3_path, progress_callback=audio_progress
-                        )
-                except Exception as e:
-                    logger.error("Falha ao gerar MP3: {}", e)
-
-                zip_path = OUTPUT_DIR / f"{base_name}_acessivel.zip"
-                _build_zip_package(
-                    zip_path, [txt_path, docx_path, pdf_path, html_path, mp3_path]
+                return
+            except Exception as e:
+                logger.exception("Falha ao contactar API pelo Telegram")
+                await tracker.finish(success=False)
+                await message.answer(
+                    "❌ Não foi possível contatar o servidor de processamento. Tente novamente."
                 )
+                return
 
-                target_email = user_emails.pop((message.chat.id, message.message_thread_id), None)
-                from backend.services.download_token_service import criar_token
+        user_emails.pop((message.chat.id, message.message_thread_id), None)
+        task_id = result["task_id"]
+        position = result.get("position", 1)
+        user_task_ids[(message.chat.id, message.message_thread_id)] = task_id
 
-                token = await criar_token(OUTPUT_DIR, base_name)
-                download_url = (
-                    f"{settings.web_url.rstrip('/')}/download/{token}"
-                )
+        await tracker(f"Tarefa {task_id} enfileirada...")
+        if position > 1:
+            await message.answer(f"⏳ Você está na fila única (Posição: {position}).")
 
-                if target_email:
-                    await t_tracker(
-                        f"Enviando link para e-mail: {target_email}..."
-                    )
-                    from backend.services.email_service import send_result_email
+        await _poll_job(message, tracker, task_id, email)
+    except Exception as e:
+        logger.exception("Erro ao processar arquivo via Telegram")
+        await tracker.finish(success=False)
+        await message.answer("❌ Erro ao processar o arquivo. Tente novamente.")
 
-                    await send_result_email(
-                        target_email, t_filename, download_url=download_url
-                    )
+
+async def _poll_job(
+    message: Message,
+    tracker: StatusTracker,
+    task_id: str,
+    email: str | None,
+) -> None:
+    message_thread_id = message.message_thread_id
+    deadline = time.time() + max(settings.request_timeout, 60)
+    last_etapa = ""
+    last_pct = -1
+
+    while time.time() < deadline:
+        try:
+            status = await client.get_job_status(task_id)
+        except Exception as e:
+            logger.warning("Erro ao consultar status do job {}: {}", task_id, e)
+            await asyncio.sleep(POLL_INTERVAL_SECONDS)
+            continue
+
+        st = status.get("status", "queued")
+        etapa = status.get("etapa_atual") or ""
+        pct = int((status.get("progresso") or 0.0) * 100)
+
+        if etapa != last_etapa or pct != last_pct:
+            if st == "queued":
+                await tracker(f"Aguardando na fila... {etapa}")
+            elif etapa:
+                await tracker(etapa)
+            last_etapa = etapa
+            last_pct = pct
+
+        if st == "done":
+            await tracker.finish(success=True)
+            url = status.get("download_url")
+            if url:
+                if email:
                     await message.answer(
-                        f"✅ Link de download enviado para {target_email}!"
+                        f"✅ Link de download enviado para {email}!"
                     )
                 else:
-                    await t_tracker("Link de download gerado!")
                     await _send_with_retry(
                         message.bot,
                         message.chat.id,
-                        f"✅ Pacote acessível gerado!\n\n📥 Link para download (válido por 7 dias):\n{download_url}",
+                        f"✅ Pacote acessível gerado!\n\n📥 Link para download (válido por 7 dias):\n{url}",
                         message_thread_id=message_thread_id,
                     )
+            return
 
-                await t_tracker.finish(success=True)
-            except Exception:
-                logger.exception("Erro no processamento da fila (Bot)")
-                await t_tracker.finish(success=False)
-            finally:
-                if cleanup_dir.exists():
-                    shutil.rmtree(cleanup_dir)
+        if st == "error":
+            await tracker.finish(success=False)
+            erros = status.get("erros") or []
+            msg = "❌ Erro no processamento."
+            if erros:
+                msg += f"\n{erros[0]}"
+            await _send_with_retry(
+                message.bot,
+                message.chat.id,
+                msg,
+                message_thread_id=message_thread_id,
+            )
+            return
 
-        queue_item = QueueItem(
-            file_path=task_path,
-            filename=filename,
-            source="telegram",
-            callback=task_callback,
-            callback_args={
-                "path": task_path,
-                "t_filename": filename,
-                "t_mode": mode,
-                "t_tracker": tracker,
-                "cleanup_dir": persistent_tmp,
-            },
-        )
-        confirmation_email = user_emails.get((message.chat.id, message.message_thread_id))
-        if confirmation_email:
-            from backend.services.email_service import send_confirmation_email
-            asyncio.create_task(send_confirmation_email(confirmation_email, filename))
+        if st == "cancelled":
+            await tracker.finish(success=False)
+            await _send_with_retry(
+                message.bot,
+                message.chat.id,
+                "🚫 Tarefa cancelada.",
+                message_thread_id=message_thread_id,
+            )
+            return
 
-        pos = await unified_queue.enqueue(queue_item)
-        if pos > 1:
-            await message.answer(f"⏳ Você está na fila única (Posição: {pos}).")
+        await asyncio.sleep(POLL_INTERVAL_SECONDS)
 
-
-def _build_zip_package(zip_path: Path, out_paths: list[Path]) -> None:
-    with zipfile.ZipFile(
-        zip_path,
-        "w",
-        compression=zipfile.ZIP_DEFLATED,
-    ) as archive:
-        for out_path in out_paths:
-            if out_path.exists():
-                archive.write(out_path, arcname=out_path.name)
+    await tracker.finish(success=False)
+    await _send_with_retry(
+        message.bot,
+        message.chat.id,
+        "⏰ O processamento demorou mais que o esperado. Use /status para acompanhar.",
+        message_thread_id=message_thread_id,
+    )

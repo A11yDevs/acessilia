@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         poppler-utils \
         tesseract-ocr \
         ffmpeg \
-        mariadb-client \
+        curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Definir diretório de trabalho
@@ -25,14 +25,14 @@ COPY pyproject.toml poetry.lock* ./
 # Instalar Poetry e dependências do projeto
 RUN pip install --no-cache-dir "poetry==$POETRY_VERSION" && \
     poetry config virtualenvs.create false && \
-    poetry install --no-root --no-interaction --no-ansi && \
-    pip install pymysql
+    poetry install --no-root --no-interaction --no-ansi
 
 # Copiar todo o código da aplicação
 COPY . .
 
-# Expor a porta da API FastAPI
+# Expor a API (8000) e o painel web (8001)
 EXPOSE 8000
+EXPOSE 8001
 
 # Definir ponto de entrada
 
