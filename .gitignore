@@ -29,6 +29,7 @@ temp/
 *.sqlite
 *.sqlite3
 *.log
+*.lock
 
 # PDFs temporarios gerados durante benchmark em fixtures
 tests/fixtures/tutorials/pagina_*.pdf

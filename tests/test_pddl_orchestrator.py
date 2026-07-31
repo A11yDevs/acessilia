@@ -45,6 +45,7 @@ def _sample_manifest() -> ProcessingManifest:
                 id="el-1",
                 type="heading",
                 raw_label="heading",
+                source_ref="#/texts/0",
                 reading_order=1,
                 hierarchy_level=1,
                 text="Introducao",
@@ -133,3 +134,5 @@ def test_build_pddl_structured_payload_is_compatible_with_canonical_builder():
 
     assert canonical["sections"]
     assert canonical["metadata"]["pipeline_engine"] == "pddl"
+    block_metadata = payload["pages"][0]["blocks"][0].get("metadata", {})
+    assert block_metadata.get("source_ref") == "/texts/0"

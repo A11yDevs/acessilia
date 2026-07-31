@@ -236,6 +236,7 @@ def _element_to_block(element: ManifestElement) -> dict[str, Any]:
     }
     if element.metadata:
         metadata.update(element.metadata)
+    metadata = _normalize_metadata_links(metadata)
 
     source_location: dict[str, Any] = {}
     if provenance is not None:
@@ -298,6 +299,19 @@ def _element_to_block(element: ManifestElement) -> dict[str, Any]:
         block.update({"type": "paragraph", "text": text or element.raw_label})
 
     return block
+
+
+def _normalize_metadata_links(metadata: dict[str, Any]) -> dict[str, Any]:
+    def normalize_value(value: Any) -> Any:
+        if isinstance(value, str) and value.startswith("#/"):
+            return value[1:]
+        if isinstance(value, list):
+            return [normalize_value(item) for item in value]
+        if isinstance(value, dict):
+            return {key: normalize_value(item) for key, item in value.items()}
+        return value
+
+    return {key: normalize_value(value) for key, value in metadata.items()}
 
 
 def _render_text_from_blocks(blocks: list[dict[str, Any]]) -> str:
