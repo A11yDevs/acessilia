@@ -6,6 +6,7 @@ commit_changes.py
 
 .env
 .venv
+.vscode
 report.txt
 
 # Python cache and temporary files

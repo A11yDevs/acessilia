@@ -7,7 +7,11 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from pipeline.sanitizer import sanitize_text
+try:
+    # Compatibilidade com a estrutura original PMV.
+    from pipeline.sanitizer import sanitize_text
+except ModuleNotFoundError:  # pragma: no cover - fallback de integração
+    from backend.pipeline.sanitizer import sanitize_text
 
 from core.manifest.docling_extractor import DoclingExtraction
 from core.manifest.models import (
