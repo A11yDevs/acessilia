@@ -14,8 +14,8 @@ Referencia remota: https://github.com/marceloakira/acessilia
 - [x] Changelogs importados e commitados
 - [x] Bloco 1 importado (artefatos estaticos)
 - [x] Bloco 2 importado (manifesto estrutural)
-- [ ] Bloco 3 importado (planejamento PDDL)
-- [ ] Bloco 4 importado (execucao/Agno)
+- [x] Bloco 3 importado (planejamento PDDL)
+- [x] Bloco 4 importado (execucao/Agno)
 - [ ] Consolidacao e hardening
 
 ## Registro de Execucao
@@ -26,6 +26,13 @@ Referencia remota: https://github.com/marceloakira/acessilia
 	- arquivos importados: `core/manifest/*`, `core/agno_support.py`, `core/agents/informational_structural.py`, scripts de schema e teste dedicado;
 	- validacao: compilacao sintatica Python aprovada para todos os arquivos importados;
 	- limitacao de ambiente: teste dedicado depende de stack Python 3.10+ com pacotes nao instalados no ambiente corrente de execucao.
+- Bloco 3:
+	- arquivos importados: `core/planning/*`, `interfaces/cli/pmv.py`, `tests/test_pddl_planning.py`;
+	- validacao: compilacao sintatica Python aprovada para todos os arquivos importados.
+- Bloco 4:
+	- arquivos importados: `core/execution/*`, `interfaces/cli/manifest.py`, `interfaces/cli/run.py`, `tests/test_agno_executor.py`;
+	- validacao: compilacao sintatica Python aprovada para todos os arquivos importados;
+	- regressao rapida do nucleo existente permanece aprovada (`16 passed`).
 
 ## Estrategia de Incorporacao
 ### Bloco 1 — Artefatos estaticos e documentacao
