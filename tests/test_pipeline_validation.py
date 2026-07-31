@@ -1,9 +1,9 @@
-from pipeline.validators import validate_canonical_document
-from pipeline.validators import validate_export_profile
-from pipeline.validators import validate_output_text
-from pipeline.verbosity_manager import filter_blocks_for_profile
-from pipeline.verbosity_manager import normalize_profile
-from pipeline.verbosity_manager import verbosity_for_mode
+from backend.pipeline.validators import validate_canonical_document
+from backend.pipeline.validators import validate_export_profile
+from backend.pipeline.validators import validate_output_text
+from backend.pipeline.verbosity_manager import filter_blocks_for_profile
+from backend.pipeline.verbosity_manager import normalize_profile
+from backend.pipeline.verbosity_manager import verbosity_for_mode
 
 
 def _sample_document() -> dict:

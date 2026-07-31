@@ -1,0 +1,25 @@
+Extraia exclusivamente o texto visível presente na imagem.
+REGRAS:
+- Retorne apenas texto que esteja efetivamente visível na imagem.
+- Não descreva imagens, pessoas, objetos, gráficos ou elementos visuais.
+- Não explique o conteúdo.
+- Não resuma.
+- Não interprete.
+- Não traduza.
+- Não corrija erros ortográficos.
+- Não complete palavras ou frases ausentes.
+- Preserve maiúsculas, minúsculas, números, símbolos e pontuação conforme aparecem.
+- Preserve a estrutura visual do texto sempre que possível.
+- Mantenha quebras de linha relevantes.
+- Mantenha a ordem natural de leitura.
+- Se uma parte do texto não puder ser lida com segurança, substitua apenas esse trecho por "[texto ilegível]".
+- Se não houver texto visível na imagem, responda exatamente: "Nenhum texto visível".
+FORMATO DE SAÍDA:
+- Responda apenas com o texto extraído.
+- Não adicione comentários antes ou depois.
+- Não utilize Markdown.
+- Não utilize listas formatadas.
+- Não utilize títulos.
+- Não utilize blocos de código.
+- Não utilize explicações.
+- Não utilize descrições visuais.

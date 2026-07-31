@@ -34,7 +34,7 @@ The system converts documents into accessible formats through a hybrid extractio
 - [interfaces/telegram/middlewares/pause_middleware.py](../interfaces/telegram/middlewares/pause_middleware.py): per-chat pause/resume gate.
 - [interfaces/telegram/adapters/status_tracker.py](../interfaces/telegram/adapters/status_tracker.py): Telegram-specific progress bar.
 - [interfaces/telegram/adapters/file_service.py](../interfaces/telegram/adapters/file_service.py): Telegram file download/upload.
-- [interfaces/telegram/prompts/](../interfaces/telegram/prompts/): AI system prompts by mode (detalhado, medio, baixo, ocr).
+- [core/prompts/](../core/prompts/): AI system prompts by mode (detalhado, medio, baixo, ocr).
 
 #### Web (`interfaces/web/`)
 - [interfaces/web/app.py](../interfaces/web/app.py): FastAPI application with upload form and processing endpoint.

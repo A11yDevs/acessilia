@@ -1,4 +1,4 @@
-from pipeline.structure_parser import parse_text_to_blocks
+from backend.pipeline.structure_parser import parse_text_to_blocks
 
 
 def test_parse_text_to_blocks_assigns_ids_and_sanitizes_text():

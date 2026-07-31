@@ -87,8 +87,8 @@ Map all Python modules in the project by functional area, including main respons
     - Telegram-specific progress bar with inline keyboard and message editing.
 11. [interfaces/telegram/adapters/file_service.py](../interfaces/telegram/adapters/file_service.py)
     - Telegram file download and document upload helpers.
-12. [interfaces/telegram/prompts/](../interfaces/telegram/prompts/)
-    - AI system prompts by mode: [baixo.txt](../interfaces/telegram/prompts/baixo.txt), [medio.txt](../interfaces/telegram/prompts/medio.txt), [detalhado.txt](../interfaces/telegram/prompts/detalhado.txt), [ocr.txt](../interfaces/telegram/prompts/ocr.txt).
+12. [core/prompts/](../core/prompts/)
+    - AI system prompts by mode: [baixo.md](../core/prompts/baixo.md), [medio.md](../core/prompts/medio.md), [detalhado.md](../core/prompts/detalhado.md), [ocr.md](../core/prompts/ocr.md).
 
 ## 5. Web Interface (`interfaces/web/`)
 

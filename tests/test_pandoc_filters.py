@@ -1,5 +1,5 @@
-from filters.pandoc_filters import apply_output_profile_filter
-from filters.pandoc_filters import strip_internal_audit_blocks
+from backend.export.filters.pandoc_filters import apply_output_profile_filter
+from backend.export.filters.pandoc_filters import strip_internal_audit_blocks
 
 
 def _sample_document() -> dict:

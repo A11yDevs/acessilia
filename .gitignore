@@ -5,6 +5,25 @@ print_settings.py
 commit_changes.py
 
 .env
+.venv
 report.txt
 
-.env
+# Python cache and temporary files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+output/
+
+# Runtime, temporary and cache directories
+data/
+var/
+trash/
+temp/
+*.db
+*.sqlite
+*.sqlite3
+*.log

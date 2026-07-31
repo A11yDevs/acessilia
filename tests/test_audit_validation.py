@@ -1,4 +1,4 @@
-from pipeline.validators import audit_canonical_document
+from backend.pipeline.validators import audit_canonical_document
 
 
 def _sample_valid_document() -> dict:
