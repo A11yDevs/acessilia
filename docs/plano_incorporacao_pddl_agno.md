@@ -12,11 +12,20 @@ Referencia remota: https://github.com/marceloakira/acessilia
 - [x] Branch de trabalho criada: feat/arquitetura-pddl-agno
 - [x] Remoto adicionado: marceloakira
 - [x] Changelogs importados e commitados
-- [ ] Bloco 1 importado (artefatos estaticos)
-- [ ] Bloco 2 importado (manifesto estrutural)
+- [x] Bloco 1 importado (artefatos estaticos)
+- [x] Bloco 2 importado (manifesto estrutural)
 - [ ] Bloco 3 importado (planejamento PDDL)
 - [ ] Bloco 4 importado (execucao/Agno)
 - [ ] Consolidacao e hardening
+
+## Registro de Execucao
+- Bloco 1:
+	- arquivos importados: `docs/pmv_agno_pddl.md`, `schemas/*.json`, `core/planning/domains/domain_v2.2.pddl`;
+	- validacao: schemas JSON validos; testes focados sem dependencia externa aprovaram (`16 passed`).
+- Bloco 2:
+	- arquivos importados: `core/manifest/*`, `core/agno_support.py`, `core/agents/informational_structural.py`, scripts de schema e teste dedicado;
+	- validacao: compilacao sintatica Python aprovada para todos os arquivos importados;
+	- limitacao de ambiente: teste dedicado depende de stack Python 3.10+ com pacotes nao instalados no ambiente corrente de execucao.
 
 ## Estrategia de Incorporacao
 ### Bloco 1 — Artefatos estaticos e documentacao

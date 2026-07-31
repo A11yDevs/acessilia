@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/schemas/accessible_document.schema.json",
+  "title": "AccessibleDocument",
+  "type": "object",
+  "required": ["schema_version", "id", "title", "language", "sections"],
+  "properties": {
+    "schema_version": {"type": "string"},
+    "id": {"type": "string", "minLength": 1},
+    "title": {"type": "string", "minLength": 1},
+    "language": {"type": "string", "minLength": 2},
+    "verbosity": {"type": "string", "enum": ["basic", "detailed", "technical"]},
+    "audience": {
+      "type": "array",
+      "items": {"type": "string", "enum": ["reader", "maintainer", "auditor"]}
+    },
+    "metadata": {"type": "object"},
+    "source": {"type": "object"},
+    "accessibility": {"type": "object"},
+    "technical_warnings": {"type": "array", "items": {"type": "string"}},
+    "audit": {"type": "object"},
+    "sections": {"type": "array", "items": {"$ref": "#/$defs/section"}}
+  },
+  "$defs": {
+    "section": {
+      "type": "object",
+      "required": ["id", "title", "level", "blocks"],
+      "properties": {
+        "id": {"type": "string"},
+        "title": {"type": "string"},
+        "level": {"type": "integer", "minimum": 1, "maximum": 6},
+        "source_location": {"type": "object"},
+        "metadata": {"type": "object"},
+        "blocks": {"type": "array", "items": {"$ref": "#/$defs/block"}},
+        "children": {"type": "array", "items": {"$ref": "#/$defs/section"}}
+      }
+    },
+    "block": {
+      "type": "object",
+      "required": ["id", "type"],
+      "properties": {
+        "id": {"type": "string"},
+        "type": {
+          "type": "string",
+          "enum": ["heading", "paragraph", "list", "table", "image", "code", "math", "quote", "details", "note", "warning"]
+        },
+        "text": {"type": "string"},
+        "level": {"type": "integer", "minimum": 1, "maximum": 6},
+        "title": {"type": "string"},
+        "language": {"type": "string"},
+        "verbosity": {"type": "string", "enum": ["basic", "detailed", "technical"]},
+        "audience": {"type": "array", "items": {"type": "string", "enum": ["reader", "maintainer", "auditor"]}},
+        "source_location": {"type": "object"},
+        "alt_text": {"type": "string"},
+        "long_description": {"type": "string"},
+        "children": {"type": "array"},
+        "items": {"type": "array"},
+        "rows": {"type": "array"},
+        "metadata": {"type": "object"}
+      }
+    }
+  }
+}

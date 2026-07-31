@@ -1,0 +1,200 @@
+{
+  "$defs": {
+    "ExecutionStepResult": {
+      "additionalProperties": false,
+      "properties": {
+        "index": {
+          "minimum": 0,
+          "title": "Index",
+          "type": "integer"
+        },
+        "action": {
+          "minLength": 1,
+          "title": "Action",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "succeeded",
+            "failed",
+            "simulated",
+            "skipped"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "obligation_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Obligation Id"
+        },
+        "method": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Method"
+        },
+        "started_at": {
+          "format": "date-time",
+          "title": "Started At",
+          "type": "string"
+        },
+        "completed_at": {
+          "format": "date-time",
+          "title": "Completed At",
+          "type": "string"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Message"
+        },
+        "artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Artifact Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "index",
+        "action",
+        "status",
+        "started_at",
+        "completed_at"
+      ],
+      "title": "ExecutionStepResult",
+      "type": "object"
+    }
+  },
+  "$id": "urn:a11y-devs:schema:execution-report:1.0.0",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Relatório da execução confirmada ou simulada de um plano nominal.",
+  "properties": {
+    "$schema": {
+      "default": "urn:a11y-devs:schema:execution-report:1.0.0",
+      "title": "$Schema",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0.0",
+      "default": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "execution_id": {
+      "minLength": 1,
+      "title": "Execution Id",
+      "type": "string"
+    },
+    "plan_id": {
+      "minLength": 1,
+      "title": "Plan Id",
+      "type": "string"
+    },
+    "manifest_id": {
+      "minLength": 1,
+      "title": "Manifest Id",
+      "type": "string"
+    },
+    "manifest_revision_before": {
+      "minimum": 1,
+      "title": "Manifest Revision Before",
+      "type": "integer"
+    },
+    "manifest_revision_after": {
+      "minimum": 1,
+      "title": "Manifest Revision After",
+      "type": "integer"
+    },
+    "started_at": {
+      "format": "date-time",
+      "title": "Started At",
+      "type": "string"
+    },
+    "completed_at": {
+      "format": "date-time",
+      "title": "Completed At",
+      "type": "string"
+    },
+    "mode": {
+      "enum": [
+        "live",
+        "dry-run"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "completed",
+        "failed",
+        "dry-run-completed",
+        "replan-required"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "replan_required": {
+      "title": "Replan Required",
+      "type": "boolean"
+    },
+    "failed_step_index": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Failed Step Index"
+    },
+    "steps": {
+      "items": {
+        "$ref": "#/$defs/ExecutionStepResult"
+      },
+      "title": "Steps",
+      "type": "array"
+    }
+  },
+  "required": [
+    "execution_id",
+    "plan_id",
+    "manifest_id",
+    "manifest_revision_before",
+    "manifest_revision_after",
+    "started_at",
+    "completed_at",
+    "mode",
+    "status",
+    "replan_required",
+    "steps"
+  ],
+  "title": "ExecutionReport",
+  "type": "object"
+}
