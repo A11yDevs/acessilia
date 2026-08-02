@@ -3,84 +3,91 @@
 ## Objective
 Catalog concrete classes in the repository and their responsibilities to support architectural evolution.
 
-## Configuration and domain classes
+---
 
-## Settings
-- File: [config/settings.py](../config/settings.py)
+## Configuration and Domain Classes
+
+### Settings
+- File: [backend/config/settings.py](../backend/config/settings.py)
 - Type: dataclass
-- Responsibility: centralize environment variables, directories, and processing limits.
-- Relationships: used by nearly all runtime modules.
+- Responsibility: centralize environment variables, directories, processing limits, and interface toggles.
+- Relationships: used across backend services, agents, and frontend bootstrap scripts.
 
-## QueueItem
-- File: [bot/services/queue_service.py](../bot/services/queue_service.py)
+### QueueItem
+- File: [backend/services/queue_service.py](../backend/services/queue_service.py)
 - Type: dataclass
-- Responsibility: represent queue items with user/chat/task metadata.
+- Responsibility: represent queued conversion requests with user, chat, and task metadata.
 
-## Runtime and orchestration classes
+---
 
-## AgenteUnico
-- File: [bot/agents/agente_unico.py](../bot/agents/agente_unico.py)
-- Responsibility: page-by-page hybrid extraction pipeline, local PDF text extraction, conditional AI vision invocation, and result aggregation.
-- Collaborators: cache, fitz/PyMuPDF, image_converter, image_enhancer, pdf_splitter, selected AI client.
+## Multi-Agent and Orchestration Classes
 
-## StateManager
-- File: [bot/agents/state_manager.py](../bot/agents/state_manager.py)
+### AccessibilityOrchestrator
+- File: [backend/agents/orchestrator.py](../backend/agents/orchestrator.py)
+- Responsibility: coordinates multi-agent conversion lifecycle, cache checking, history logging, agent dispatching, and fallback mechanisms.
+- Collaborators: `ReaderAgent`, `VisionAgent`, `DataAgent`, `EditorAgent`, `StateManager`, `ProcessingQueue`.
+
+### ReaderAgent
+- File: [backend/agents/reader_agent.py](../backend/agents/reader_agent.py)
+- Responsibility: local-first PDF/image structural parsing (via PyMuPDF or Docling), page splitting, and region classification (`RegionTask`).
+
+### VisionAgent
+- File: [backend/agents/vision_agent.py](../backend/agents/vision_agent.py)
+- Responsibility: Agno `Agent` wrapper for multimodal AI vision tasks, generating detailed alt-text and audio descriptions for visual content.
+
+### DataAgent
+- File: [backend/agents/data_agent.py](../backend/agents/data_agent.py)
+- Responsibility: Agno `Agent` wrapper for complex data processing, converting tables and mathematical formulas into Markdown and LaTeX.
+
+### EditorAgent
+- File: [backend/agents/editor_agent.py](../backend/agents/editor_agent.py)
+- Responsibility: content sanitization, MD5 fingerprint deduplication, and accessibility tag placement in the final document.
+
+### StateManager
+- File: [backend/agents/state_manager.py](../backend/agents/state_manager.py)
 - Responsibility: create, update, finalize, cancel, and query in-memory task states.
 
-## TaskCancelledError
-- File: [bot/agents/state_manager.py](../bot/agents/state_manager.py)
-- Responsibility: signal cancellation during processing.
+### TaskCancelledError
+- File: [backend/agents/state_manager.py](../backend/agents/state_manager.py)
+- Responsibility: exception signaling task cancellation during execution.
 
-## ProcessingQueue
-- File: [bot/services/queue_service.py](../bot/services/queue_service.py)
-- Responsibility: control queue and processing concurrency.
+### ProcessingQueue
+- File: [backend/services/queue_service.py](../backend/services/queue_service.py)
+- Responsibility: queue management and async concurrency control.
 
-## External API integration
+---
 
-## OpenCodeClient
-- File: [bot/clients/opencode.py](../bot/clients/opencode.py)
-- Responsibility: OpenCode session management, multimodal message sending, retries, and response text extraction for AI-assisted pages.
+## Frontend & Interface Classes
 
-## OllamaClient
-- File: [bot/clients/ollama.py](../bot/clients/ollama.py)
-- Responsibility: Ollama API calls (multimodal chat completions) with retries and partial response handling for AI-assisted pages.
+### FeedbackStates
+- File: [frontend/telegram/handlers/start.py](../frontend/telegram/handlers/start.py)
+- Inheritance: `StatesGroup` (aiogram)
+- Responsibility: control FSM state during user feedback collection.
 
-## Telegram interface
+### PauseMiddleware
+- File: [frontend/telegram/middlewares/pause_middleware.py](../frontend/telegram/middlewares/pause_middleware.py)
+- Inheritance: `BaseMiddleware` (aiogram)
+- Responsibility: gate messages in paused Telegram chats.
 
-## FeedbackStates
-- File: [bot/handlers/start.py](../bot/handlers/start.py)
-- Inheritance: StatesGroup
-- Responsibility: control FSM state for feedback collection.
+### StatusTracker
+- File: [frontend/telegram/adapters/status_tracker.py](../frontend/telegram/adapters/status_tracker.py)
+- Responsibility: publish and update Telegram progress bars and status messages.
 
-## PauseMiddleware
-- File: [bot/middlewares/pause_middleware.py](../bot/middlewares/pause_middleware.py)
-- Inheritance: BaseMiddleware
-- Responsibility: block messages in paused chats, except reactivation command.
+---
 
-## StatusTracker
-- File: [bot/utils/status_tracker.py](../bot/utils/status_tracker.py)
-- Responsibility: publish/edit Telegram progress messages during processing.
+## Document Export Classes
 
-## Document export
+### _DocTemplate
+- File: [backend/export/renderers/pdf_renderer.py](../backend/export/renderers/pdf_renderer.py)
+- Inheritance: `SimpleDocTemplate` (reportlab)
+- Responsibility: generate accessible bookmarks and outline hierarchy in exported PDF files.
 
-## _DocTemplate
-- File: [renderers/pdf_renderer.py](../renderers/pdf_renderer.py)
-- Inheritance: SimpleDocTemplate
-- Responsibility: create accessible bookmark/outline structure in final PDF.
+---
 
-## Module-oriented pipeline
-- The canonical builder, validators, filters, AST builder, and renderers are organized as pure-function modules instead of stateful classes.
-- Main files: [pipeline](../pipeline), [filters](../filters), [renderers](../renderers), [exporters/pandoc_exporter.py](../exporters/pandoc_exporter.py)
+## Relationships Between Classes (Simplified View)
 
-## Relationship between classes (simplified view)
-1. Settings is a global configuration dependency.
-2. AgenteUnico performs local extraction first and depends on OpenCodeClient/OllamaClient only for pages that require vision inference.
-3. StateManager and ProcessingQueue support execution control.
-4. StatusTracker and PauseMiddleware extend aiogram runtime behavior.
-5. Exporters run after the canonical document pipeline completes.
-
-## Missing classes expected by runtime condition
-- No additional public classes are required by the new canonical pipeline.
-e.
-eline.
-e.
+1. `Settings` is a global configuration dependency.
+2. `AccessibilityOrchestrator` coordinates `ReaderAgent` for local structural parsing first, then dispatches `VisionAgent` and `DataAgent` for AI inference, and finishes with `EditorAgent` for consolidation.
+3. `StateManager` and `ProcessingQueue` manage execution control and concurrency.
+4. `StatusTracker` and `PauseMiddleware` extend Telegram interface runtime behavior.
+5. Export renderers run after the canonical document pipeline validates the output.

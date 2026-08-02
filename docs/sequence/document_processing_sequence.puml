@@ -2,66 +2,46 @@
 skinparam shadowing false
 
 actor User
-participant "Telegram" as TG
-participant "document.py" as Handler
-participant "agente_mestre.py" as Master
-participant "state_manager" as State
-participant "history_service" as History
-participant "cache" as Cache
-participant "AgenteUnico" as Agent
-participant "PyMuPDF (local)" as LocalOCR
-participant "canonical_builder" as Builder
-participant "validators / filters" as Checks
-participant "pandoc_exporter" as Export
-participant "AI client" as AI
-participant "renderers" as Renderers
+participant "Frontend\n(Web/Telegram/CLI)" as Front
+participant "AccessibilityOrchestrator\nbackend/agents/orchestrator.py" as Orchestrator
+participant "ReaderAgent\n(Função Determinística)" as Reader
+participant "VisionAgent\n(Agno LLM)" as Vision
+participant "DataAgent\n(Agno LLM)" as Data
+participant "EditorAgent\n(Função Determinística)" as Editor
+participant "Canonical Builder\nbackend/pipeline" as Builder
+participant "Renderers\nbackend/export" as Export
 
-User -> TG: sends document/photo
-TG -> Handler: update com file_id
-Handler -> Handler: validate_file()
-Handler -> TG: initial status message
-Handler -> Master: process(input_path, callback, mode)
+User -> Front: Envia documento (PDF/imagem)
+Front -> Orchestrator: process(input_path, mode)
 
-Master -> Cache: get_cached(file)
-alt cache hit
-  Cache --> Master: canonical payload
-else cache miss
-  Master -> State: criar_tarefa()
-  Master -> History: registrar_conversao()
-  Master -> Agent: executar(file_path, tmpdir, callback, mode)
+Orchestrator -> Reader: extract_regions(document)
+Reader -> Reader: PyMuPDF / Docling (divisão & classificação)
+Reader --> Orchestrator: Regiões estruturadas (Texto, Imagens, Tabelas, Fórmulas)
 
-  loop for each page
-    Agent -> LocalOCR: extract_page_text_and_images()
-    alt page has enough local text
-      LocalOCR --> Agent: extracted text (+ embedded images)
-      opt embedded image descriptions
-        Agent -> AI: send_message(image_prompt, embedded_image)
-        AI --> Agent: short description
-      end
-    else scanned/no-text page or image input
-      Agent -> AI: send_message(prompt, page_image)
-      AI --> Agent: page text + structured blocks
-    end
-    Agent -> Cache: set_cache(page)
-  end
+note over Orchestrator, Data
+  <b>Processamento Paralelo (asyncio.gather ×N):</b>
+  Orquestração atual executa visão e dados em paralelo.
+  <i>Evolução Futura:</i> Orquestrador Dinâmico selecionará dinamicamente
+  os modelos e grau de paralelismo por região.
+end note
 
-  Agent --> Master: consolidated structured payload
-  Master -> Builder: build_canonical_document()
-  Builder --> Master: canonical document
-  Master -> Checks: validate_canonical_document()
-  Checks --> Master: ok
-  Master -> State: finalizar()
-  Master -> Cache: set_cache(file)
-  Master -> History: finalizar_conversao(done)
+par Processar Regiões Visuais
+  Orchestrator -> Vision: process_image_region(region)
+  Vision --> Orchestrator: Alt-text & Audiodescrição
+and Processar Tabelas / Fórmulas
+  Orchestrator -> Data: process_data_region(region)
+  Data --> Orchestrator: Estrutura Markdown / LaTeX
 end
 
-Master --> Handler: canonical document
-Handler -> Export: export_accessible_document()
-Export -> Checks: validate_export_profile()
-Export -> Renderers: render_txt/docx/pdf/html()
-Renderers --> Export: output file paths
-Export --> Handler: output file paths
-Handler -> TG: sends accessible files
-Handler -> TG: status final
+Orchestrator -> Editor: consolidate_and_tag(regions)
+Editor -> Editor: Sanitização, Deduplicação MD5 & Tags de Acessibilidade
+Editor --> Orchestrator: Payload consolidado
+
+Orchestrator -> Builder: build_canonical_document()
+Builder --> Orchestrator: Documento Canônico Validado
+
+Orchestrator -> Export: render_all(canonical_doc)
+Export --> Front: Arquivos acessíveis (TXT, DOCX, PDF, HTML, MP3)
+Front --> User: Entrega do documento acessível
 
 @enduml

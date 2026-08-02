@@ -5,63 +5,65 @@ The project is organized predominantly in layers, with a clear runtime flow from
 
 It is not a strict layered architecture in the classic sense because some runtime and compatibility concerns cross layer boundaries for pragmatic reasons:
 - the orchestrator coordinates both processing and infrastructure services;
-- backward-compatible wrappers still exist under bot/exporters;
+- backward-compatible wrappers still exist under backend/adapters/exporters;
 - some utilities are shared across multiple layers.
 
 In practice, the codebase can be understood as a layered architecture with controlled cross-cutting services.
 
 ## Layer Map
 1. Interface and entrypoints
-   - ../../bot/main.py
-   - ../../bot/handlers/start.py
-   - ../../bot/handlers/document.py
-   - ../../bot/handlers/errors.py
-   - ../../bot/middlewares/pause_middleware.py
+   - ../../frontend/run.py
+   - ../../frontend/telegram/handlers/start.py
+   - ../../frontend/telegram/handlers/document.py
+   - ../../frontend/telegram/handlers/errors.py
+   - ../../frontend/telegram/middlewares/pause_middleware.py
 
 2. Application orchestration
-   - ../../bot/agente_mestre.py
-   - ../../bot/agents/state_manager.py
-   - ../../bot/services/queue_service.py
+   - ../../backend/service.py
+   - ../../backend/agents/orchestrator.py
+   - ../../backend/agents/state_manager.py
+   - ../../backend/services/queue_service.py
 
 3. Extraction and AI integration
-   - ../../bot/agents/agente_unico.py
-   - ../../bot/clients/opencode.py
-   - ../../bot/clients/ollama.py
-   - ../../bot/prompts/
-   - ../../pipeline/structure_parser.py
+   - ../../backend/agents/reader_agent.py
+   - ../../backend/agents/vision_agent.py
+   - ../../backend/agents/data_agent.py
+   - ../../backend/agents/editor_agent.py
+   - ../../backend/ai/models/ai_client.py
+   - ../../backend/ai/prompts/
+   - ../../backend/pipeline/structure_parser.py
 
 4. Canonical document layer
-   - ../../pipeline/canonical_builder.py
-   - ../../pipeline/sanitizer.py
-   - ../../pipeline/validators.py
-   - ../../pipeline/verbosity_manager.py
-   - ../../pipeline/pandoc_ast_builder.py
-   - ../../schemas/accessible_document.schema.json
+   - ../../backend/pipeline/canonical_builder.py
+   - ../../backend/pipeline/sanitizer.py
+   - ../../backend/pipeline/validators.py
+   - ../../backend/pipeline/verbosity_manager.py
+   - ../../backend/pipeline/pandoc_ast_builder.py
+   - ../schemas/accessible_document.schema.json
 
 5. Output and rendering
-   - ../../exporters/pandoc_exporter.py
-   - ../../renderers/txt_renderer.py
-   - ../../renderers/docx_renderer.py
-   - ../../renderers/pdf_renderer.py
-   - ../../renderers/html_renderer.py
-   - ../../bot/exporters/
+   - ../../backend/export/pandoc_exporter.py
+   - ../../backend/export/renderers/txt_renderer.py
+   - ../../backend/export/renderers/docx_renderer.py
+   - ../../backend/export/renderers/pdf_renderer.py
+   - ../../backend/export/renderers/html_renderer.py
+   - ../../backend/export/exporters/
 
 6. Infrastructure and persistence
-   - ../../bot/services/cache.py
-   - ../../bot/services/history_service.py
-   - ../../bot/services/cleanup_service.py
-   - ../../bot/services/file_service.py
-   - ../../bot/services/opencode_launcher.py
-   - ../../config/settings.py
+   - ../../backend/services/cache.py
+   - ../../backend/services/history_service.py
+   - ../../backend/services/cleanup_service.py
+   - ../../frontend/telegram/adapters/file_service.py
+   - ../../backend/config/settings.py
 
 7. Cross-cutting utilities
-   - ../../bot/utils/logger.py
-   - ../../bot/utils/status_tracker.py
-   - ../../bot/utils/validators.py
-   - ../../bot/utils/pdf_splitter.py
-   - ../../bot/utils/image_converter.py
-   - ../../bot/utils/image_enhancer.py
-   - ../../bot/utils/text_processor.py
+   - ../../backend/tools/logger.py
+   - ../../frontend/telegram/adapters/status_tracker.py
+   - ../../backend/tools/validators.py
+   - ../../backend/tools/pdf_splitter.py
+   - ../../backend/tools/image_converter.py
+   - ../../backend/tools/image_enhancer.py
+   - ../../backend/tools/text_processor.py
 
 ## Intended Dependency Direction
 The preferred dependency direction is top-down:
@@ -77,8 +79,8 @@ Infrastructure and utilities support multiple layers but should not own business
 - Output generation depends on the canonical representation rather than raw extraction text.
 
 ## Current Exceptions
-1. bot/exporters still acts as a compatibility surface while the main export pipeline lives in ../../exporters/pandoc_exporter.py.
-2. agente_mestre coordinates both application flow and infrastructure concerns such as cache/history access.
+1. backend/adapters/exporters still acts as a compatibility surface while the main export pipeline lives in ../../backend/export/pandoc_exporter.py.
+2. The orchestrator (backend/service.py) coordinates both application flow and infrastructure concerns such as cache/history access.
 3. Utility modules are shared broadly instead of being owned by a single layer.
 
 ## Architectural Conclusion

@@ -3,91 +3,71 @@ top to bottom direction
 skinparam shadowing false
 skinparam packageStyle rectangle
 
-actor "Telegram User" as User
+actor "Usuário (Web / Telegram / CLI)" as User
 
-rectangle "1. Interface and Entrypoints" as L1 {
-  component "bot/main.py" as Main
-  component "handlers/*" as Handlers
-  component "middlewares/*" as Middleware
+rectangle "1. Frontend Layer (Interfaces)" as L1 {
+  component "frontend/web/ (FastAPI)" as WebUI
+  component "frontend/telegram/ (aiogram)" as TelegramBot
+  component "frontend/cli/ (Runner)" as CLI
 }
 
-rectangle "2. Application Orchestration" as L2 {
-  component "bot/agente_mestre.py" as Master
-  component "agents/state_manager.py" as StateManager
-  component "services/queue_service.py" as Queue
+rectangle "2. Application Orchestration Layer" as L2 {
+  component "backend/agents/orchestrator.py\n(AccessibilityOrchestrator)" as Orchestrator
+  component "backend/agents/state_manager.py\n(StateManager)" as StateManager
+  component "backend/services/queue_service.py\n(ProcessingQueue)" as Queue
 }
 
-rectangle "3. Extraction and AI Integration" as L3 {
-  component "agents/agente_unico.py" as Agent
-  component "clients/opencode.py" as OpenCode
-  component "clients/ollama.py" as Ollama
-  component "prompts/*" as Prompts
-  component "pipeline/structure_parser.py" as Parser
+rectangle "3. Multi-Agent & AI Layer (Agno)" as L3 {
+  component "ReaderAgent\n[Função-step Determinístico]" as Reader
+  component "VisionAgent & DataAgent\n[Agentes LLM em asyncio.gather]" as AgentsLLM
+  component "EditorAgent\n[Função-step Determinístico]" as Editor
+  component "backend/ai/ai_client.py\n(get_agno_model - Ollama/OpenRouter)" as AIClient
 }
 
 rectangle "4. Canonical Document Layer" as L4 {
-  component "pipeline/canonical_builder.py" as Builder
-  component "pipeline/sanitizer.py" as Sanitizer
-  component "pipeline/validators.py" as Validators
-  component "pipeline/verbosity_manager.py" as Verbosity
-  component "pipeline/pandoc_ast_builder.py" as AstBuilder
+  component "backend/pipeline/canonical_builder.py" as Builder
+  component "backend/pipeline/sanitizer.py" as Sanitizer
+  component "backend/pipeline/validators.py" as Validators
   component "schemas/accessible_document.schema.json" as Schema
 }
 
-rectangle "5. Output and Rendering" as L5 {
-  component "exporters/pandoc_exporter.py" as Exporter
-  component "renderers/*" as Renderers
-  component "bot/exporters/*" as CompatExporters
+rectangle "5. Output and Rendering Layer" as L5 {
+  component "backend/export/pandoc_exporter.py" as Exporter
+  component "backend/export/renderers/*\n(TXT / DOCX / PDF / HTML / MP3)" as Renderers
 }
 
-rectangle "6. Infrastructure and Persistence" as L6 {
-  component "services/cache.py" as Cache
-  component "services/history_service.py" as History
-  component "services/file_service.py" as FileService
-  component "services/cleanup_service.py" as Cleanup
-  component "services/opencode_launcher.py" as Launcher
-  component "config/settings.py" as Settings
-}
-
-rectangle "7. Cross-cutting Utilities" as L7 {
-  component "utils/logger.py" as Logger
-  component "utils/status_tracker.py" as Tracker
-  component "utils/validators.py" as FileValidators
-  component "utils/pdf_splitter.py" as PdfSplitter
-  component "utils/image_*" as ImageUtils
-  component "utils/text_processor.py" as TextProcessor
+rectangle "6. Infrastructure & Persistence" as L6 {
+  component "backend/services/cache.py" as Cache
+  component "backend/services/history_service.py\n(MariaDB / SQLite)" as History
+  component "backend/services/cleanup_service.py" as Cleanup
+  component "backend/config/settings.py" as Settings
 }
 
 User --> L1
 L1 --> L2
 L2 --> L3
 L3 --> L4
-L2 --> L5
 L4 --> L5
+L5 --> User
 
 L2 --> L6
 L3 --> L6
 L5 --> L6
 
-L1 ..> L7
-L2 ..> L7
-L3 ..> L7
-L4 ..> L7
-L5 ..> L7
-
 note right of L2
-Coordinates workflow,
-cache, history and status.
+  Coordena o workflow,
+  gerenciando a fila e estados.
+  Futuro: Orquestrador Dinâmico (Smart Router).
 end note
 
-note right of L5
-bot/exporters remains
-a compatibility wrapper.
+note right of L3
+  Pipeline de agentes:
+  Reader -> (Vision/Data em paralelo) -> Editor.
 end note
 
 note right of L4
-Canonical document is the
-source of truth for output.
+  O Documento Canônico é a
+  única fonte da verdade para saída.
 end note
 
 @enduml

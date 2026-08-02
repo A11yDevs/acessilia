@@ -1,109 +1,110 @@
 # Architecture
 
 ## Overview
-The system converts documents into accessible formats through a hybrid extraction flow (local-first with PyMuPDF plus conditional AI vision), a canonical document pipeline, deterministic validation, and format-specific renderers. The architecture is modular: **core/** contains all business logic independent of any interface, and **interfaces/** contains pluggable front-ends (Telegram, Web).
+The system converts documents into accessible formats through a multi-agent extraction pipeline (local-first structural extraction with PyMuPDF/Docling plus Agno-powered multimodal AI vision and data agents), a canonical document pipeline, deterministic validation, and format-specific renderers. The architecture is modular: **backend/** contains all business logic independent of any interface, **frontend/** contains pluggable user interfaces (Telegram, Web, CLI), and **infra/** manages containerization with Docker.
+
+---
 
 ## Layers
 
-### 0. Core (`core/`) — Interface-agnostic business logic
-- [core/orchestrator.py](../core/orchestrator.py): coordinates cache, task state, history, fallback, and status callback.
-- [core/agents/state_manager.py](../core/agents/state_manager.py): in-memory task state machine with cooperative cancellation.
-- [core/agents/agente_unico.py](../core/agents/agente_unico.py): processes PDF/image page by page — hybrid strategy: local PyMuPDF extraction when text is available, AI vision for scanned/no-text pages. Optionally describes embedded images.
-- [core/ai/ollama.py](../core/ai/ollama.py): HTTP client for Ollama API with exponential backoff.
-- [core/ai/openrouter.py](../core/ai/openrouter.py): HTTP client for OpenRouter API.
-- [core/ai/base.py](../core/ai/base.py): abstract `AIClient` protocol implemented by all AI clients.
-- [core/services/cache.py](../core/services/cache.py): file-hash-based text cache in `temp/cache`.
-- [core/services/history_service.py](../core/services/history_service.py): SQLite persistence in `data/history.db`.
-- [core/services/queue_service.py](../core/services/queue_service.py): unified async processing queue.
-- [core/services/cleanup_service.py](../core/services/cleanup_service.py): periodic cleanup of temporary files.
-- [core/services/email_service.py](../core/services/email_service.py): async SMTP email sender (confirmation + result).
-- [core/utils/logger.py](../core/utils/logger.py): centralised loguru logger.
-- [core/utils/validators.py](../core/utils/validators.py): file extension and size validation.
-- [core/utils/pdf_splitter.py](../core/utils/pdf_splitter.py): single-page PDF splitter.
-- [core/utils/image_converter.py](../core/utils/image_converter.py): PDF page to PNG conversion.
-- [core/utils/image_enhancer.py](../core/utils/image_enhancer.py): OpenCV deskew, CLAHE, denoise.
-- [core/utils/text_processor.py](../core/utils/text_processor.py): paragraph merging and Markdown parsing.
+### 0. Backend (`backend/`) — Interface-agnostic business logic and AI pipeline
 
-### 1. Interfaces (`interfaces/`) — Pluggable front-ends
+#### 0.1. Multi-Agent Pipeline & Orchestration (`backend/agents/`)
+- [backend/agents/orchestrator.py](../backend/agents/orchestrator.py): `AccessibilityOrchestrator` coordinates the multi-agent execution pipeline, cache lookup, task state, history, and status callbacks.
+- [backend/agents/reader_agent.py](../backend/agents/reader_agent.py): `ReaderAgent` performs local-first PDF/image structural parsing (via PyMuPDF or Docling), splits pages, and classifies content regions (image, table, formula, text).
+- [backend/agents/vision_agent.py](../backend/agents/vision_agent.py): `VisionAgent` utilizes Agno (`agno.agent.Agent`) and LLM multimodal capabilities (`agno.media.Image`) to produce detailed alt-text and audio descriptions for visual elements and scanned pages.
+- [backend/agents/data_agent.py](../backend/agents/data_agent.py): `DataAgent` utilizes Agno (`agno.agent.Agent`) and LLM capabilities to convert complex tables and mathematical formulas into structured Markdown and LaTeX representations.
+- [backend/agents/editor_agent.py](../backend/agents/editor_agent.py): `EditorAgent` sanitizes content, applies semantic/temporal deduplication via MD5 fingerprints, and inserts accessibility tags into the final document structure.
+- [backend/agents/state_manager.py](../backend/agents/state_manager.py): in-memory task state machine with cooperative cancellation support.
+- [backend/agents/types.py](../backend/agents/types.py): shared data contracts and task types (`RegionTask`).
 
-#### Telegram (`interfaces/telegram/`)
-- [interfaces/telegram/bot.py](../interfaces/telegram/bot.py): creates aiogram Bot/Dispatcher, registers routers, middlewares, and lifecycle hooks.
-- [interfaces/telegram/handlers/start.py](../interfaces/telegram/handlers/start.py): control commands, modes, status, health, feedback.
-- [interfaces/telegram/handlers/document.py](../interfaces/telegram/handlers/document.py): receives files/photos, validates, triggers processing, sends outputs.
-- [interfaces/telegram/handlers/errors.py](../interfaces/telegram/handlers/errors.py): global exception handling.
-- [interfaces/telegram/middlewares/pause_middleware.py](../interfaces/telegram/middlewares/pause_middleware.py): per-chat pause/resume gate.
-- [interfaces/telegram/adapters/status_tracker.py](../interfaces/telegram/adapters/status_tracker.py): Telegram-specific progress bar.
-- [interfaces/telegram/adapters/file_service.py](../interfaces/telegram/adapters/file_service.py): Telegram file download/upload.
-- [core/prompts/](../core/prompts/): AI system prompts by mode (detalhado, medio, baixo, ocr).
+#### 0.2. AI Client Integration (`backend/ai/`)
+- [backend/ai/ai_client.py](../backend/ai/ai_client.py): central `get_agno_model()` initializer that instantiates Agno Model wrappers for Ollama or OpenRouter based on environment settings.
 
-#### Web (`interfaces/web/`)
-- [interfaces/web/app.py](../interfaces/web/app.py): FastAPI application with upload form and processing endpoint.
-- [interfaces/web/templates/index.html](../interfaces/web/templates/index.html): Bootstrap-based single-page upload form.
+#### 0.3. Infrastructure Services (`backend/services/`)
+- [backend/services/cache.py](../backend/services/cache.py): file-hash-based text cache in `temp/cache`.
+- [backend/services/history_service.py](../backend/services/history_service.py): MariaDB/SQLite persistence for conversions and audit logs in `data/history.db`.
+- [backend/services/queue_service.py](../backend/services/queue_service.py): unified async processing queue with concurrency limits.
+- [backend/services/cleanup_service.py](../backend/services/cleanup_service.py): periodic cleanup of temporary files.
+- [backend/services/email_service.py](../backend/services/email_service.py): async SMTP email sender (confirmation + result with ZIP attachments).
+- [backend/services/download_token_service.py](../backend/services/download_token_service.py): token generation for secure Web download links.
 
-### 2. Canonical document pipeline (shared, no interface dependency)
-- [pipeline/canonical_builder.py](../pipeline/canonical_builder.py): builds the canonical document and sections tree.
-- [pipeline/sanitizer.py](../pipeline/sanitizer.py): cleans raw text, removes prompt leaks and Markdown artifacts.
-- [pipeline/structure_parser.py](../pipeline/structure_parser.py): shared text-to-block parser.
-- [pipeline/validators.py](../pipeline/validators.py): validates schema, heading hierarchy, links, and output text.
-- [pipeline/verbosity_manager.py](../pipeline/verbosity_manager.py): defines output profiles and block filtering rules.
-- [pipeline/pandoc_ast_builder.py](../pipeline/pandoc_ast_builder.py): creates the intermediate Pandoc-compatible AST.
-- [schemas/accessible_document.schema.json](../schemas/accessible_document.schema.json): JSON Schema for the canonical document.
+#### 0.4. Domain Tools & Utilities (`backend/tools/`)
+- [backend/tools/logger.py](../backend/tools/logger.py): centralized loguru logger setup.
+- [backend/tools/validators.py](../backend/tools/validators.py): file extension and size validation.
+- [backend/tools/pdf_splitter.py](../backend/tools/pdf_splitter.py): single-page PDF splitter.
+- [backend/tools/image_converter.py](../backend/tools/image_converter.py): PDF page to PNG conversion.
+- [backend/tools/image_enhancer.py](../backend/tools/image_enhancer.py): OpenCV deskew, CLAHE contrast, and denoise for scanned pages.
+- [backend/tools/text_processor.py](../backend/tools/text_processor.py): text normalization and Markdown parsing.
+- [backend/tools/image_tools.py](../backend/tools/image_tools.py): image cropping and region extraction.
+- [backend/tools/prompt_tools.py](../backend/tools/prompt_tools.py): prompt loader and template resolver.
 
-### 3. Export pipeline (shared, no interface dependency)
-- [exporters/pandoc_exporter.py](../exporters/pandoc_exporter.py): single export coordinator for validation, filtering, AST build, and renderer dispatch.
-- [filters/pandoc_filters.py](../filters/pandoc_filters.py): strips internal audit data and applies profile-level block filtering.
-- [renderers/txt_renderer.py](../renderers/txt_renderer.py)
-- [renderers/docx_renderer.py](../renderers/docx_renderer.py)
-- [renderers/pdf_renderer.py](../renderers/pdf_renderer.py)
-- [renderers/html_renderer.py](../renderers/html_renderer.py)
+---
 
-### 4. Thin wrapper exporters (`core/exporters/`)
-- [core/exporters/txt_exporter.py](../core/exporters/txt_exporter.py)
-- [core/exporters/docx_exporter.py](../core/exporters/docx_exporter.py)
-- [core/exporters/pdf_exporter.py](../core/exporters/pdf_exporter.py)
-- [core/exporters/audio_exporter.py](../core/exporters/audio_exporter.py)
+### 1. Frontend (`frontend/`) — Pluggable User Interfaces
 
-### 5. Configuration
-- [config/settings.py](../config/settings.py): centralized configuration with environment variable bindings, including `ENABLED_INTERFACES` to select which interfaces run at startup.
+#### Telegram Bot (`frontend/telegram/`)
+- [frontend/telegram/bot.py](../frontend/telegram/bot.py): initializes aiogram Bot/Dispatcher, registers routers, middlewares, and lifecycle hooks.
+- [frontend/telegram/handlers/start.py](../frontend/telegram/handlers/start.py): control commands (/start, /help, /status, /health, /feedback, modes, /cancelar).
+- [frontend/telegram/handlers/document.py](../frontend/telegram/handlers/document.py): receives files/photos, validates, triggers processing, sends outputs.
+- [frontend/telegram/handlers/errors.py](../frontend/telegram/handlers/errors.py): global exception handling.
+- [frontend/telegram/adapters/status_tracker.py](../frontend/telegram/adapters/status_tracker.py): Telegram-specific progress bar.
+- [frontend/telegram/adapters/file_service.py](../frontend/telegram/adapters/file_service.py): Telegram file download/upload helpers.
 
-## Main processing flow
-1. User sends a document via Telegram or Web upload.
-2. Interface handler validates extension and size.
-3. File is saved and enqueued in `UnifiedQueue` (source: "telegram" or "web").
-4. Worker dequeues and calls `core.orchestrator.process()`:
-   - Creates task in state manager, registers history, checks cache.
-   - `AgenteUnico` processes page by page: splits PDF, extracts local text, calls AI vision when needed, stores per-page results.
-   - Structured output is combined into the canonical document.
-5. Canonical validators check schema, heading hierarchy, links, and output safety.
-6. Canonical document is converted to a Pandoc-like AST and rendered by format-specific renderers.
-7. Output files are zipped and delivered (via Telegram message or email).
+#### Web Interface & API (`frontend/web/`)
+- [frontend/web/app.py](../frontend/web/app.py): FastAPI application with file upload forms, REST API endpoints, and processing status endpoints.
 
-## Interface activation
-The `ENABLED_INTERFACES` environment variable controls which interfaces start:
+#### Command Line Interface (`frontend/cli/`)
+- [frontend/cli/run.py](../frontend/cli/run.py): CLI entrypoint for batch processing and standalone execution.
+
+---
+
+### 2. Canonical Document & Export Pipeline (`backend/pipeline/`, `backend/export/`)
+
+- [backend/pipeline/canonical_builder.py](../backend/pipeline/canonical_builder.py): builds the canonical document and sections tree.
+- [backend/pipeline/sanitizer.py](../backend/pipeline/sanitizer.py): cleans raw text, removes prompt leaks and Markdown artifacts.
+- [backend/pipeline/structure_parser.py](../backend/pipeline/structure_parser.py): shared text-to-block parser.
+- [backend/pipeline/validators.py](../backend/pipeline/validators.py): validates schema, heading hierarchy, links, and output text; `audit_canonical_document` classifies structural and accessibility issues as `BLOCKER` or `WARNING`.
+- [backend/export/pandoc_exporter.py](../backend/export/pandoc_exporter.py): single export coordinator for validation, filtering, AST build, and renderer dispatch; acts as a deterministic gatekeeper that halts export when the audit returns any `BLOCKER`.
+- [backend/export/renderers/](../backend/export/renderers/): renderers for TXT, DOCX, PDF, HTML, and MP3 Audio (via edge-tts).
+
+---
+
+## Main Processing Flow
+
+1. User submits a document via Telegram, Web UI, or CLI.
+2. The interface handler validates the file extension and size.
+3. The file is saved and enqueued in `ProcessingQueue`.
+4. The worker dequeues the task and invokes `AccessibilityOrchestrator.process()`:
+   - Registers task in `StateManager` and checks local text cache.
+   - **`ReaderAgent`** splits pages, extracts local text (PyMuPDF/Docling), and classifies regions (images, tables, formulas, text).
+   - **`VisionAgent`** and **`DataAgent`** run in parallel to describe visual elements and structure data using Agno `Agent` instances.
+   - **`EditorAgent`** sanitizes results, applies deduplicação via fingerprints, and inserts accessibility tags into the final canonical structure.
+5. Canonical validators verify schema adherence, heading hierarchy, and output safety.
+6. Format renderers build output artifacts (TXT, DOCX, PDF, HTML, MP3).
+7. Output files are packaged and delivered to the user (via Telegram message, Web download link, or email).
+
+---
+
+## Interface Activation
+
+The `ENABLED_INTERFACES` environment variable controls which interfaces start at boot:
 - `"telegram,web"` (default): starts both Telegram polling and Web server.
-- `"web"`: starts only the Web server (no BOT_TOKEN required).
+- `"web"`: starts only the FastAPI Web server.
 - `"telegram"`: starts only the Telegram bot.
 
-## External dependencies
-- Telegram Bot API (via aiogram) — only when `telegram` interface is enabled.
-- Ollama API or OpenRouter API (configurable via `AI_CLIENT`).
-- Processing libraries: PyMuPDF, Pillow, opencv-python, reportlab, python-docx, pypdf.
+---
 
-## Storage
-1. Temporary: `settings.temp_dir` with `output/` subfolder for final artifacts.
-2. Cache: `temp/cache/`.
-3. History: `data/history.db` (SQLite).
-4. Logs: `logs/bot_YYYY-MM-DD.log` and colorized stderr.
+## External Dependencies
 
-## Key architectural decisions
-1. `core/` has zero dependencies on any interface-specific library (no aiogram, no FastAPI).
-2. Each interface in `interfaces/` only imports from `core/`, never from another interface.
-3. Adding a new interface (Discord, CLI, etc.) means creating a new folder under `interfaces/` and connecting it to `core/`.
-4. The canonical document is the source of truth; renderers should not infer structure from raw Markdown.
+- **Agno Framework:** multi-agent orchestration and unified multimodal LLM interface.
+- **AI Providers:** Ollama API (local models like LLaVA/Qwen-VL) or OpenRouter API (cloud models like Claude/GPT-4o).
+- **Processing Libraries:** PyMuPDF, Docling, Pillow, OpenCV, reportlab, python-docx, pypdf, edge-tts, aiogram, FastAPI.
 
-## Related diagrams
-- [Architecture PlantUML](architecture/architecture.puml)
-- [Layered Architecture](architecture/layers.md)
-- [Layers PlantUML](architecture/layers.puml)
-- [Sequence PlantUML](sequence/document_processing_sequence.puml)
-- [State PlantUML](state_machine/task_state_machine.puml)
+---
+
+## Key Architectural Decisions
+
+1. **`backend/` Interface Independence:** `backend/` has zero dependencies on interface-specific frameworks (no aiogram, no FastAPI).
+2. **Modular Multi-Agent Architecture:** Separates structural reading, visual description, data formatting, and text editing into distinct agents.
+3. **Canonical Document Source of Truth:** All renderers consume the validated canonical document schema to guarantee screen reader compatibility.

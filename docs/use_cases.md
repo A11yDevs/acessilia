@@ -3,7 +3,7 @@
 ## Actors
 1. Telegram end user.
 2. Operator/Architect (environment setup and diagnostics).
-3. AI service (OpenCode or Ollama), used conditionally.
+3. AI service (OpenRouter or Ollama), used conditionally.
 4. Local filesystem and SQLite database.
 
 ## Main use cases
@@ -12,66 +12,66 @@
 - Primary actor: End user.
 - Goal: convert PDF/image/document into accessible outputs.
 - Input: supported file.
-- Output: TXT, DOCX, PDF, and HTML delivered in chat or as files.
+- Output: TXT, DOCX, PDF, HTML, and MP3 delivered in chat or as files.
 - Implementation:
-  - input/validation: [bot/handlers/document.py](../bot/handlers/document.py), [bot/utils/validators.py](../bot/utils/validators.py)
-  - processing: [bot/agente_mestre.py](../bot/agente_mestre.py), [bot/agents/agente_unico.py](../bot/agents/agente_unico.py), [pipeline/canonical_builder.py](../pipeline/canonical_builder.py)
-  - export: [exporters/pandoc_exporter.py](../exporters/pandoc_exporter.py), [bot/exporters](../bot/exporters), [renderers](../renderers)
+  - input/validation: [frontend/telegram/handlers/document.py](../frontend/telegram/handlers/document.py), [backend/tools/validators.py](../backend/tools/validators.py)
+  - processing: [backend/service.py](../backend/service.py), [backend/agents/orchestrator.py](../backend/agents/orchestrator.py), [backend/pipeline/canonical_builder.py](../backend/pipeline/canonical_builder.py)
+  - export: [backend/export/pandoc_exporter.py](../backend/export/pandoc_exporter.py), [backend/export/exporters](../backend/export/exporters), [backend/export/renderers](../backend/export/renderers)
 
 ## UC-02 Select description level
 - Primary actor: End user.
 - Goal: define detailed/medium/low/ocr mode.
 - Implementation:
-  - commands: [bot/handlers/start.py](../bot/handlers/start.py)
-  - prompts by mode: [bot/prompts](../bot/prompts)
-  - application in processing: [bot/agents/agente_unico.py](../bot/agents/agente_unico.py)
+  - commands: [frontend/telegram/handlers/start.py](../frontend/telegram/handlers/start.py)
+  - prompts by mode: [backend/ai/prompts](../backend/ai/prompts)
+  - application in processing: [backend/agents/vision_agent.py](../backend/agents/vision_agent.py)
 
 ## UC-03 Check status and cancel
 - Primary actor: End user.
 - Goal: monitor progress and interrupt task.
 - Implementation:
-  - /status and /cancelar commands: [bot/handlers/start.py](../bot/handlers/start.py)
-  - state/cancellation: [bot/agents/state_manager.py](../bot/agents/state_manager.py)
+  - /status and /cancelar commands: [frontend/telegram/handlers/start.py](../frontend/telegram/handlers/start.py)
+  - state/cancellation: [backend/agents/state_manager.py](../backend/agents/state_manager.py)
 
 ## UC-04 Deactivate/reactivate bot per chat
 - Primary actor: End user.
 - Goal: pause service in one chat without shutting down process.
 - Implementation:
-  - /desativar and /ativar commands: [bot/handlers/start.py](../bot/handlers/start.py)
-  - control: [bot/middlewares/pause_middleware.py](../bot/middlewares/pause_middleware.py)
+  - /desativar and /ativar commands: [frontend/telegram/handlers/start.py](../frontend/telegram/handlers/start.py)
+  - control: [frontend/telegram/middlewares/pause_middleware.py](../frontend/telegram/middlewares/pause_middleware.py)
 
 ## UC-05 Operational health check
 - Primary actor: Operator.
 - Goal: verify AI backend availability and local resources.
 - Implementation:
-  - /health command: [bot/handlers/start.py](../bot/handlers/start.py)
-  - launcher/check: [bot/services/opencode_launcher.py](../bot/services/opencode_launcher.py)
+  - /health command: [frontend/telegram/handlers/start.py](../frontend/telegram/handlers/start.py)
+  - AI backend client: [backend/ai/models/ai_client.py](../backend/ai/models/ai_client.py)
 
 ## UC-06 Submit feedback
 - Primary actor: End user.
 - Goal: send conversion quality feedback.
 - Implementation:
-  - FSM and /feedback command: [bot/handlers/start.py](../bot/handlers/start.py)
+  - FSM and /feedback command: [frontend/telegram/handlers/start.py](../frontend/telegram/handlers/start.py)
   - simplified local persistence: feedback.txt in temp_dir
 
 ## UC-07 Persist conversion history
 - Primary actor: System.
 - Goal: store conversion and OCR audit trail.
 - Implementation:
-  - history lifecycle: [bot/services/history_service.py](../bot/services/history_service.py)
-  - flow calls: [bot/agente_mestre.py](../bot/agente_mestre.py)
+  - history lifecycle: [backend/services/history_service.py](../backend/services/history_service.py)
+  - flow calls: [backend/service.py](../backend/service.py)
 
 ## UC-08 Reuse cache for performance
 - Primary actor: System.
 - Goal: avoid repeated file/page processing.
 - Implementation:
-  - cache service: [bot/services/cache.py](../bot/services/cache.py)
-  - usage in flow: [bot/agente_mestre.py](../bot/agente_mestre.py) and [bot/agents/agente_unico.py](../bot/agents/agente_unico.py)
+  - cache service: [backend/services/cache.py](../backend/services/cache.py)
+  - usage in flow: [backend/service.py](../backend/service.py) and [backend/agents/orchestrator.py](../backend/agents/orchestrator.py)
 
 ## UC-09 Safe single-instance operation
 - Primary actor: Operator.
 - Goal: prevent unintended concurrent local execution.
-- Implementation: [run.py](../run.py)
+- Implementation: [frontend/run.py](../frontend/run.py)
 
 ## Main flow summary
 1. User submits file.
@@ -87,10 +87,10 @@
 1. Invalid extension or oversized file
    - immediate user-friendly error response (validators + handler).
 2. AI backend failure
-  - simple extraction fallback in [bot/agente_mestre.py](../bot/agente_mestre.py), with canonical export still available.
+  - simple extraction fallback in [backend/service.py](../backend/service.py), with canonical export still available.
 3. Text-based PDF page
   - page is extracted locally and does not require AI call for main text.
-4. Telegram/AI backend rate-limit (Ollama or OpenCode)
+4. Telegram/AI backend rate-limit (Ollama or OpenRouter)
    - retries with incremental wait.
 5. Task cancellation
    - state marked as cancelled and processing interrupted.
@@ -103,4 +103,3 @@
 
 ## UML Diagram
 - [Use cases PlantUML](use_cases/use_cases.puml)
-l)

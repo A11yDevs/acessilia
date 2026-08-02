@@ -15,7 +15,9 @@ services:
       - "3306:3306"
 
   acessilia:
-    build: .
+    build:
+      context: .
+      dockerfile: infra/Dockerfile
     image: acessilia:latest
     container_name: acessilia-instance
     ports:
