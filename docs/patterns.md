@@ -13,7 +13,7 @@
 - Benefit: centralizes business rules and isolates step responsibilities.
 
 ### 3. Strategy & Model Abstraction for AI (Agno)
-- Implementation: [backend/ai/ai_client.py](../backend/ai/ai_client.py) (`get_agno_model()`)
+- Implementation: [backend/ai/models/ai_client.py](../backend/ai/models/ai_client.py) (`get_agno_model()`)
 - Strategies:
   - Ollama (local open-weights models like LLaVA/Qwen-VL)
   - OpenRouter (cloud API models like Claude/GPT-4o)

@@ -44,6 +44,6 @@ Deliver document and image conversion to accessible formats, focused on high-qua
 2. Adding a new AI provider requires:
    - configuration in Settings,
    - model setup in [backend/ai/models/ai_client.py](../backend/ai/models/ai_client.py),
-   - updates in [modules.md](modules.md), [classes.md](classes.md), and [architecture.puml](architecture/architecture.puml).
-3. Changing the canonical schema or renderers requires updates in [README.md](../README.md), [modules.md](modules.md), [tests/README.md](../tests/README.md), and the PlantUML diagrams.
+   - updates in [architecture.md](architecture.md) and [architecture.puml](architecture/architecture.puml).
+3. Changing the canonical schema or renderers requires updates in [README.md](../README.md), [architecture.md](architecture.md), [tests/README.md](../tests/README.md), and the PlantUML diagrams.
 4. Accessibility regression is treated as a critical defect.

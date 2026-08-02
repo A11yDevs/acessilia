@@ -11,19 +11,18 @@ This documentation details the architecture of **Acessília**, a modular multi-a
 2. [Architecture Specification](architecture.md)
 3. [Design & Integration Patterns](patterns.md)
 4. [Use Cases](use_cases.md)
-5. [Modules Overview](modules.md)
-6. [Classes Catalog](classes.md)
-7. [Automated Test Suite](../tests/README.md)
+5. [Automated Test Suite](../tests/README.md)
 
 ---
 
 ## UML Diagrams (PlantUML)
 
-1. **Architecture & Multi-Agent Pipeline:** [docs/architecture/architecture.puml](architecture/architecture.puml)
-2. **Layered Architecture:** [docs/architecture/layers.puml](architecture/layers.puml)
-3. **Processing Sequence (Gather & Agents):** [docs/sequence/document_processing_sequence.puml](sequence/document_processing_sequence.puml)
-4. **Task State Machine:** [docs/state_machine/task_state_machine.puml](state_machine/task_state_machine.puml)
-5. **Use Cases:** [docs/use_cases/use_cases.puml](use_cases/use_cases.puml)
+Each diagram is a visual aid; the linked description summarizes its content in text.
+
+1. **Architecture & Multi-Agent Pipeline:** [architecture/architecture.puml](architecture/architecture.puml) — component and package structure of the backend/frontend pipeline.
+2. **Processing Sequence:** [sequence/document_processing_sequence.puml](sequence/document_processing_sequence.puml) — step-by-step flow of a document conversion, including the parallel vision/data agents.
+3. **Task State Machine:** [state_machine/task_state_machine.puml](state_machine/task_state_machine.puml) — lifecycle of a processing task (processing, done, error, cancelled).
+4. **Use Cases:** [use_cases/use_cases.puml](use_cases/use_cases.puml) — actors and the main user-facing operations.
 
 ---
 
@@ -39,7 +38,5 @@ This documentation details the architecture of **Acessília**, a modular multi-a
 ## Traceability Matrix
 
 - **Use Cases to Implementation:** [use_cases.md](use_cases.md)
-- **Implementation by Module:** [modules.md](modules.md)
-- **Objects and Responsibilities:** [classes.md](classes.md)
 - **Design & Evolution Patterns:** [patterns.md](patterns.md)
 - **Test Strategy & Coverage:** [../tests/README.md](../tests/README.md)

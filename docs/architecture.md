@@ -19,7 +19,7 @@ The system converts documents into accessible formats through a multi-agent extr
 - [backend/agents/types.py](../backend/agents/types.py): shared data contracts and task types (`RegionTask`).
 
 #### 0.2. AI Client Integration (`backend/ai/`)
-- [backend/ai/ai_client.py](../backend/ai/ai_client.py): central `get_agno_model()` initializer that instantiates Agno Model wrappers for Ollama or OpenRouter based on environment settings.
+- [backend/ai/models/ai_client.py](../backend/ai/models/ai_client.py): central `get_agno_model()` initializer that instantiates Agno Model wrappers for Ollama or OpenRouter based on environment settings.
 
 #### 0.3. Infrastructure Services (`backend/services/`)
 - [backend/services/cache.py](../backend/services/cache.py): file-hash-based text cache in `temp/cache`.
@@ -67,6 +67,12 @@ The system converts documents into accessible formats through a multi-agent extr
 - [backend/pipeline/validators.py](../backend/pipeline/validators.py): validates schema, heading hierarchy, links, and output text; `audit_canonical_document` classifies structural and accessibility issues as `BLOCKER` or `WARNING`.
 - [backend/export/pandoc_exporter.py](../backend/export/pandoc_exporter.py): single export coordinator for validation, filtering, AST build, and renderer dispatch; acts as a deterministic gatekeeper that halts export when the audit returns any `BLOCKER`.
 - [backend/export/renderers/](../backend/export/renderers/): renderers for TXT, DOCX, PDF, HTML, and MP3 Audio (via edge-tts).
+
+---
+
+## Layering & Dependency Direction
+
+The codebase follows a pragmatic layered architecture with a top-down flow: Interface → Orchestration → Extraction → Canonical Document → Output. Infrastructure services and shared tools support multiple layers but do not own business decisions. A few controlled exceptions exist: `backend/adapters/exporters` is a thin compatibility wrapper over `backend/export`, and the orchestrator coordinates both processing and infrastructure concerns (cache, history).
 
 ---
 
