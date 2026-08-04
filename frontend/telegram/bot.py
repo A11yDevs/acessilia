@@ -9,21 +9,13 @@ from aiogram.enums import ParseMode
 from frontend.telegram.handlers.start import router as start_router
 from frontend.telegram.handlers.document import router as document_router
 from frontend.telegram.handlers.errors import router as error_router
-from backend.services.cleanup_service import periodic_cleanup
-from backend.services.history_service import init_db
 from backend.tools.logger import setup_logger, logger
 from frontend.telegram.middlewares.pause_middleware import PauseMiddleware
 from backend.config.settings import settings
 
 
-from backend.services.queue_service import unified_queue
-
-
 async def on_startup(bot: Bot) -> None:
-    init_db()
-    asyncio.create_task(periodic_cleanup())
-    unified_queue.start_worker()
-    logger.info("Bot iniciado")
+    logger.info("Bot iniciado (cliente da API Acessilia)")
 
 
 async def on_shutdown(bot: Bot) -> None:

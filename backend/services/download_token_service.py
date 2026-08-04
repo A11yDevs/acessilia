@@ -30,7 +30,7 @@ def _get_connection():
     if _connection is None:
         db_path = settings.db_path
         db_path.parent.mkdir(parents=True, exist_ok=True)
-        _connection = sqlite3.connect(str(db_path))
+        _connection = sqlite3.connect(str(db_path), check_same_thread=False)
         _connection.row_factory = sqlite3.Row
         cursor = _connection.cursor()
         try:

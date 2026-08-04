@@ -1,60 +1,82 @@
 # acessilia
 
-**acessilia** é um projeto de código‑aberto que extrai, classifica e torna documentos (PDF, DOCX, TXT, etc.) acessíveis usando LLMs (Ollama, OpenRouter) e um pipeline modular.
+**acessilia** é um projeto de código‑aberto que extrai, classifica e torna documentos (PDF, DOCX, imagens, etc.) acessíveis usando LLMs (Ollama, OpenRouter) e um pipeline modular.
 
-## Arquitetura (modular)
+## Arquitetura
 
-- **core** – lógica de domínio (agentes, clientes de IA, serviços, utilitários, pipeline).
-- **adapters** – implementações concretas que adaptam o domínio a ferramentas externas (exportadores, renderizadores, filtros).
-- **interfaces** – pontos de entrada (Web UI via FastAPI, bot do Telegram, CLI).
+O projeto segue a camada *Domínio → Aplicação → Interface*:
+
+- **backend** – lógica de domínio (agentes, clientes de IA, pipeline, exportadores) e a **API REST** (núcleo).
+- **frontend** – clientes da API: painel web, bot do Telegram e CLI.
 - **tests** – suíte de testes unitários cobrindo a maioria dos módulos.
 
-O projeto segue a caminha *Domínio → Aplicação → Interface*, facilitando:
-- Substituir o cliente de LLM (adicionar novos provedores).
-- Adicionar novos formatos de exportação (implementar ``AbstractExporter``).
-- Trocar o framework web ou adicionar uma nova interface sem tocar na lógica de domínio.
+### API standalone
+
+A **API** (`http://localhost:8000`) é o núcleo: recebe o arquivo, coloca na fila, processa com o LLM, exporta os formatos acessíveis (TXT, DOCX, PDF, HTML, MP3, ZIP) e disponibiliza o download via token. Os frontends (web, Telegram, CLI) consomem tudo por HTTP usando o cliente compartilhado `frontend.clients.api_client.ApiClient`.
+
+Principais endpoints (`/api/v1`):
+
+| Método | Rota | Descrição |
+|---|---|---|
+| `POST` | `/jobs` | Envia arquivo para a fila (retorna `task_id` e posição) |
+| `GET` | `/jobs/{task_id}` | Status/progresso da tarefa |
+| `POST` | `/jobs/{task_id}/cancel` | Cancela a tarefa |
+| `GET` | `/download/{token}` | Lista formatos disponíveis de um token |
+| `GET` | `/download/{token}/{format}` | Baixa o arquivo (txt/docx/pdf/html/mp3/zip) |
+| `GET` | `/history?limit=20` | Histórico de conversões |
+| `GET` | `/stats` | Estatísticas agregadas |
+| `GET` | `/health` | Status do servidor e do modelo de IA |
+
+> **Nota:** a fila e o estado das tarefas vivem em memória na API; jobs são perdidos se a API reiniciar. Tokens de download e histórico persistem em SQLite.
 
 ## Instalação
 
 ### Usando Poetry (recomendado)
+
 ```bash
 poetry install
-poetry run acessilia   # executa a CLI / inicia as interfaces habilitadas
+cp .env.example .env   # configure as chaves (AI, SMTP, Telegram)
 ```
-
-### Usando Docker
-
-```bash
-# Build da imagem Docker (executar na raiz do projeto)
-docker build -t acessilia:latest .
-
-# Executar o container com todos os volumes necessários para persistência
-docker run -d -p 8000:8000 \
-  -v $(pwd)/data:/app/data \
-  -v $(pwd)/logs:/app/logs \
-  -v $(pwd)/output:/app/output \
-  -v $(pwd)/temp:/app/temp \
-  --name acessilia-instance acessilia:latest
-```
-
-Acesse a aplicação em `http://localhost:8000/`.
-
-**Volumes montados e sua finalidade:**
-
-| Diretório no host | Caminho no container | Conteúdo persistido |
-|---|---|---|
-| `./data` | `/app/data` | Banco SQLite (`history.db`) — histórico de conversões, OCR e tokens de download |
-| `./logs` | `/app/logs` | Logs diários com rotação automática (retenção de 30 dias) |
-| `./output` | `/app/output` | JSON canônico de cada documento processado |
-| `./temp` | `/app/temp` | Cache de processamento AI, arquivos exportados (txt, docx, pdf, html, mp3, zip), uploads e feedback |
-
-> **Nota:** `./data` e `./temp` são críticos para persistência. Sem eles, o banco de histórico e todos os arquivos gerados para download são perdidos ao reiniciar o container.
 
 ## Execução
 
-- **CLI**: `poetry run acessilia`
-- **Web**: habilite `web` em `ENABLED_INTERFACES` e acesse `http://localhost:8000`.
-- **Telegram**: habilite `telegram` e forneça um `BOT_TOKEN` válido.
+### Tudo em um comando (API + web + Telegram)
+
+```bash
+poetry run python -m frontend.run
+# ou: poetry run bot-acess
+```
+
+Inicia as interfaces listadas em `ENABLED_INTERFACES` (default: `api,telegram,web`):
+- API em `http://localhost:8000`
+- Painel web em `http://localhost:8001`
+- Telegram (requer `BOT_TOKEN`)
+
+### API isolada (para deploy de múltiplos processos)
+
+```bash
+poetry run python -m backend.api.run
+```
+
+Depois, o painel web e o Telegram apontam para `API_BASE_URL` (default `http://localhost:8000`).
+
+### Somente web ou somente Telegram
+
+Edite `ENABLED_INTERFACES` em `.env`, ex.: `api,web`. A API deve sempre estar habilitada (ou rodando em outro processo) para os clientes funcionarem.
+
+## Testes
+
+```bash
+poetry run pytest
+```
+
+## Docker
+
+```bash
+docker compose up -d --build
+```
+
+O container expõe `8000` (API) e `8001` (web), persiste tudo em `./var` e roda o healthcheck em `/api/v1/health`.
 
 ## Contribuindo
 

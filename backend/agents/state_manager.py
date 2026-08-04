@@ -9,8 +9,8 @@ class StateManager:
         self._tasks: dict[str, dict] = {}
         self._cancel_events: dict[str, asyncio.Event] = {}
 
-    def criar_tarefa(self, file_path: Path) -> str:
-        task_id = str(uuid.uuid4())[:8]
+    def criar_tarefa(self, file_path: Path, task_id: str | None = None) -> str:
+        task_id = task_id or str(uuid.uuid4())[:8]
         self._tasks[task_id] = {
             "task_id": task_id,
             "arquivo": file_path.name,
@@ -90,6 +90,11 @@ class StateManager:
     def verificar_cancelamento(self, task_id: str) -> None:
         if self.foi_cancelada(task_id):
             raise TaskCancelledError(f"Tarefa {task_id} cancelada pelo usuario")
+
+    def registrar_download_url(self, task_id: str, url: str) -> None:
+        task = self._tasks.get(task_id)
+        if task:
+            task["download_url"] = url
 
 
 class TaskCancelledError(Exception):

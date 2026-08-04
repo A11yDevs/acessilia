@@ -10,13 +10,16 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message
 
 from backend.config.settings import settings
-from backend.agents.state_manager import state_manager
 from backend.services.cache import clear_cache
 from backend.tools.logger import logger
-from frontend.telegram.handlers.document import user_modes, user_emails
+from frontend.clients.api_client import ApiError
+from frontend.clients import default_client
+from frontend.telegram.handlers.document import user_modes, user_emails, user_task_ids
 from frontend.telegram.middlewares.pause_middleware import get_paused_chats
 
 router = Router()
+
+client = default_client
 
 
 class FeedbackStates(StatesGroup):
@@ -153,25 +156,27 @@ async def cmd_normal(message: Message) -> None:
 
 @router.message(Command("status"))
 async def cmd_status(message: Message) -> None:
-    all_tasks = state_manager.listar_tarefas()
-    tasks = [t for t in all_tasks if t.get("status") in ("processing",)]
-    if not tasks:
-        await message.answer("Nenhuma tarefa em processamento no momento.")
+    task_id = user_task_ids.get((message.chat.id, message.message_thread_id))
+    if not task_id:
+        await message.answer("Nenhuma tarefa registrada neste chat ainda.")
         return
-    lines = ["📊 **Tarefas em andamento:**"]
-    for t in tasks[:5]:
-        pct = t.get("progresso", 0) * 100
-        status_icon = {
-            "processing": "⏳",
-            "done": "✅",
-            "error": "❌",
-            "cancelled": "🚫",
-        }.get(t.get("status", ""), "❓")
-        lines.append(
-            f"{status_icon} `{t['task_id']}` - {t.get('arquivo', '?')} "
-            f"- {pct:.0f}% - {t.get('etapa_atual', '')}"
-        )
-    await message.answer("\n".join(lines))
+    try:
+        status = await client.get_job_status(task_id)
+    except ApiError as e:
+        await message.answer(f"❌ Tarefa não encontrada na API ({e.status_code}).")
+        return
+    pct = int((status.get("progresso") or 0.0) * 100)
+    status_icon = {
+        "queued": "⏳",
+        "processing": "⏳",
+        "done": "✅",
+        "error": "❌",
+        "cancelled": "🚫",
+    }.get(status.get("status", ""), "❓")
+    await message.answer(
+        f"{status_icon} Tarefa `{task_id}` - {status.get('arquivo', '?')}\n"
+        f"{pct}% - {status.get('etapa_atual', '')}"
+    )
 
 
 @router.message(Command("health"))
@@ -217,13 +222,17 @@ async def cmd_limpar(message: Message) -> None:
 
 @router.message(Command("cancelar"))
 async def cmd_cancel(message: Message) -> None:
-    tasks = state_manager.listar_tarefas_processing()
-    if not tasks:
-        await message.answer("Nenhuma tarefa em processamento para cancelar.")
+    task_id = user_task_ids.get((message.chat.id, message.message_thread_id))
+    if not task_id:
+        await message.answer("Nenhuma tarefa registrada neste chat para cancelar.")
         return
-    for t in tasks:
-        state_manager.cancelar(t["task_id"])
-    await message.answer(f"✅ {len(tasks)} tarefa(s) cancelada(s).")
+    try:
+        result = await client.cancel_job(task_id)
+    except ApiError as e:
+        await message.answer(f"❌ Não foi possível cancelar ({e.status_code}): {e.detail}")
+        return
+    user_task_ids.pop((message.chat.id, message.message_thread_id), None)
+    await message.answer(f"✅ Tarefa {result.get('task_id', task_id)} cancelada.")
 
 
 @router.message(Command("desativar"))
