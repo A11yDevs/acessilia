@@ -4,6 +4,7 @@ import re
 from typing import Any
 from uuid import uuid4
 
+from backend.pipeline.semantic_rules import extract_plain_heading
 from backend.pipeline.sanitizer import sanitize_block_text
 
 
@@ -111,29 +112,13 @@ def _extract_plain_heading(
     line: str,
     current_blocks: int,
 ) -> dict[str, Any] | None:
-    prefixed = re.match(
-        (
-            r"^(?:titulo|t[ií]tulo|secao|se[cç][aã]o|"
-            r"capitulo|cap[ií]tulo(?:\s+\d+)?)\s*:\s*(.+)$"
-        ),
-        line,
-        re.IGNORECASE,
-    )
-    if prefixed:
-        keyword = line.split(":", 1)[0].strip().lower()
-        level = 1 if "titulo" in keyword or "título" in keyword else 2
+    heading = extract_plain_heading(line, current_blocks)
+    if heading is not None:
+        level, heading_text = heading
         return {
             "type": "heading",
             "level": level,
-            "text": sanitize_block_text(prefixed.group(1).strip()),
-        }
-
-    if _looks_like_upper_heading(line):
-        level = 1 if current_blocks == 0 else 2
-        return {
-            "type": "heading",
-            "level": level,
-            "text": sanitize_block_text(line),
+            "text": sanitize_block_text(heading_text),
         }
     return None
 
@@ -197,19 +182,6 @@ def _try_parse_marker_block(
         return {"type": "callout", "text": text, "callout_type": type_name}, j
 
     return None
-
-
-def _looks_like_upper_heading(line: str) -> bool:
-    has_letter = any(ch.isalpha() for ch in line)
-    if not has_letter:
-        return False
-    if len(line) > 90:
-        return False
-    if line.endswith((".", ";", "!", "?")):
-        return False
-    if ":" in line:
-        return False
-    return line == line.upper()
 
 
 def _parse_table_rows(
