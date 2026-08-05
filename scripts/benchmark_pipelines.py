@@ -80,11 +80,11 @@ def _summarize_document(document: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-async def _run_legacy(file_path: Path, mode: str) -> dict[str, Any]:
+async def _run_legacy(file_path: Path, mode: str, tmpdir: Path) -> dict[str, Any]:
     orchestrator = AccessibilityOrchestrator(mode=mode)
     structured = await orchestrator.executar(
         file_path=file_path,
-        tmpdir=file_path.parent,
+        tmpdir=tmpdir,
         structured_output=True,
         mode=mode,
     )
@@ -100,7 +100,7 @@ async def _run_legacy(file_path: Path, mode: str) -> dict[str, Any]:
     return {"structured": structured, "canonical": canonical}
 
 
-async def _run_pddl(file_path: Path) -> dict[str, Any]:
+async def _run_pddl(file_path: Path, tmpdir: Path) -> dict[str, Any]:
     orchestrator = PddlAccessibilityOrchestrator(
         planner_backend="internal",
         preferred_plan="internal",
@@ -109,7 +109,7 @@ async def _run_pddl(file_path: Path) -> dict[str, Any]:
     )
     structured = await orchestrator.executar(
         file_path=file_path,
-        tmpdir=file_path.parent,
+        tmpdir=tmpdir,
         structured_output=True,
     )
     canonical_metadata = structured.get("canonical_metadata")
@@ -142,9 +142,12 @@ async def run_benchmark(file_path: Path, output_dir: Path, mode: str) -> Path:
         "comparison": {},
     }
 
+    tmpdir = output_dir / "tmp"
+    tmpdir.mkdir(parents=True, exist_ok=True)
+
     legacy_start = time.perf_counter()
     try:
-        legacy = await _run_legacy(file_path, mode)
+        legacy = await _run_legacy(file_path, mode, tmpdir)
         legacy_elapsed = round((time.perf_counter() - legacy_start) * 1000)
         legacy_canonical_path = output_dir / "legacy.canonical.json"
         legacy_canonical_path.write_text(
@@ -166,7 +169,7 @@ async def run_benchmark(file_path: Path, output_dir: Path, mode: str) -> Path:
 
     pddl_start = time.perf_counter()
     try:
-        pddl = await _run_pddl(file_path)
+        pddl = await _run_pddl(file_path, tmpdir)
         pddl_elapsed = round((time.perf_counter() - pddl_start) * 1000)
         pddl_canonical_path = output_dir / "pddl.canonical.json"
         pddl_canonical_path.write_text(
@@ -185,6 +188,10 @@ async def run_benchmark(file_path: Path, output_dir: Path, mode: str) -> Path:
             "error_type": type(exc).__name__,
             "error": str(exc),
         }
+
+    # limpar tmpdir após benchmark
+    import shutil
+    shutil.rmtree(tmpdir, ignore_errors=True)
 
     legacy_summary = report["engines"].get("legacy", {}).get("summary")
     pddl_summary = report["engines"].get("pddl", {}).get("summary")

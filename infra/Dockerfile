@@ -44,5 +44,5 @@ CMD ["python", "-m", "frontend.run"]
 
 # --- Target de teste: inclui dependências de dev (pytest, respx) ---
 FROM base AS test
-RUN poetry install --with dev --no-root --no-interaction --no-ansi
-CMD ["poetry", "run", "pytest", "tests/", "-v"]
+RUN pip install pytest pytest-asyncio respx pytest-metadata pytest-html jsonschema
+CMD ["pytest", "tests/", "-v"]
