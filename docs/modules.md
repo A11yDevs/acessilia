@@ -133,7 +133,7 @@ Map all Python modules in the project by functional area, including main respons
 6. [tests/test_ollama_client.py](../tests/test_ollama_client.py)
 
 ## 9. Root configuration/documentation artifacts
-1. [requirements.txt](../requirements.txt)
+1. [pyproject.toml](../pyproject.toml)
 2. [README.md](../README.md)
 3. [.env.example](../.env.example)
 4. [config.yaml](../config.yaml)

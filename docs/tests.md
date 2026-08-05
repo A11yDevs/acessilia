@@ -4,9 +4,9 @@
 Document the automated tests available in the repository, what they validate, and which runtime behavior they cover.
 
 ## Test stack
-1. [pytest](../requirements.txt)
-2. [pytest-asyncio](../requirements.txt)
-3. [respx](../requirements.txt)
+1. [pytest](../pyproject.toml)
+2. [pytest-asyncio](../pyproject.toml)
+3. [respx](../pyproject.toml)
 
 ## Current coverage
 
