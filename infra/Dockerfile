@@ -22,12 +22,18 @@ RUN apt-get update \
         tesseract-ocr \
     && rm -rf /var/lib/apt/lists/*
 
+ARG POETRY_EXTRAS=""
+
 COPY pyproject.toml poetry.lock* ./
 
 RUN pip install --upgrade pip \
     && pip install "poetry==$POETRY_VERSION" \
     && poetry config virtualenvs.create false \
-    && poetry install --only main --no-root --no-interaction --no-ansi
+    && if [ -n "$POETRY_EXTRAS" ]; then \
+         poetry install --only main --extras "$POETRY_EXTRAS" --no-root --no-interaction --no-ansi; \
+       else \
+         poetry install --only main --no-root --no-interaction --no-ansi; \
+       fi
 
 COPY . .
 
@@ -35,3 +41,8 @@ EXPOSE 8000 8001
 
 VOLUME /app/var
 CMD ["python", "-m", "frontend.run"]
+
+# --- Target de teste: inclui dependências de dev (pytest, respx) ---
+FROM base AS test
+RUN poetry install --with dev --no-root --no-interaction --no-ansi
+CMD ["poetry", "run", "pytest", "tests/", "-v"]
