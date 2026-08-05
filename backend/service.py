@@ -43,6 +43,7 @@ def _build_orchestrator():
             fast_downward_alias=alias,
             fast_downward_search=settings.pddl_fast_downward_search,
             enable_ocr=settings.structurer.lower() == "docling",
+            extractor_backend=settings.structurer,
         )
     return AccessibilityOrchestrator()
 

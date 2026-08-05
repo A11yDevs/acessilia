@@ -8,6 +8,7 @@ from core.agents.informational_structural import InformationalStructuralAgent
 from core.execution.executor import ExecutorAgent, MethodRegistry
 from core.execution.models import ExecutionReport
 from core.manifest.docling_extractor import DoclingManifestExtractor
+from core.manifest.pymupdf_extractor import PyMuPDFManifestExtractor
 from core.manifest.models import ManifestElement, ProcessingManifest
 from core.planning.models import NominalPlan, PlanningComparison
 from core.planning.planner_agent import PlannerAgent
@@ -28,6 +29,7 @@ class PddlAccessibilityOrchestrator:
         fast_downward_alias: str | None = None,
         fast_downward_search: str = "astar(blind())",
         enable_ocr: bool = True,
+        extractor_backend: str = "docling",
     ) -> None:
         self.planner_backend = planner_backend
         self.preferred_plan = preferred_plan
@@ -35,9 +37,19 @@ class PddlAccessibilityOrchestrator:
         self.fast_downward = fast_downward
         self.fast_downward_alias = fast_downward_alias
         self.fast_downward_search = fast_downward_search
+        self.extractor_backend = extractor_backend.strip().lower()
+
+        if self.extractor_backend == "pymupdf":
+            extractor = PyMuPDFManifestExtractor(include_images=True)
+        elif self.extractor_backend == "docling":
+            extractor = DoclingManifestExtractor(enable_ocr=enable_ocr)
+        else:
+            raise ValueError(
+                "extractor_backend inválido; use 'docling' ou 'pymupdf'"
+            )
 
         self.information_structural = InformationalStructuralAgent(
-            DoclingManifestExtractor(enable_ocr=enable_ocr)
+            extractor
         )
         self.planner = PlannerAgent()
         self.executor = ExecutorAgent(

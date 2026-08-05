@@ -12,10 +12,6 @@ from backend.pipeline.canonical_builder import sanitize_canonical_document
 from backend.pipeline.pandoc_ast_builder import build_pandoc_ast
 from backend.pipeline.validators import audit_canonical_document
 from backend.pipeline.validators import validate_export_profile
-from backend.export.renderers.docx_renderer import render_docx
-from backend.export.renderers.html_renderer import render_html
-from backend.export.renderers.pdf_renderer import render_pdf
-from backend.export.renderers.txt_renderer import render_txt
 
 
 def _pandoc_bin() -> str | None:
@@ -77,10 +73,14 @@ def export_accessible_document(
             return _render_with_pandoc(
                 ast, output_path, "html5", extra_args=["--toc", "--standalone"]
             )
+        from backend.export.renderers.html_renderer import render_html
+
         return render_html(filtered, output_path, profile_name=profile)
     if format_name == "docx":
         if pandoc:
             return _render_with_pandoc(ast, output_path, "docx")
+        from backend.export.renderers.docx_renderer import render_docx
+
         return render_docx(
             filtered,
             output_path,
@@ -88,6 +88,8 @@ def export_accessible_document(
             filename=filename,
         )
     if format_name == "pdf":
+        from backend.export.renderers.pdf_renderer import render_pdf
+
         return render_pdf(
             filtered,
             output_path,
@@ -95,6 +97,8 @@ def export_accessible_document(
             title=title,
         )
     if format_name == "txt":
+        from backend.export.renderers.txt_renderer import render_txt
+
         return render_txt(filtered, output_path, profile_name=profile)
     raise ValueError(f"Formato de exportacao nao suportado: {format_name}")
 

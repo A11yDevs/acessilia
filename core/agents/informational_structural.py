@@ -14,7 +14,7 @@ class InformationalStructuralAgent:
 
     def __init__(
         self,
-        extractor: DoclingManifestExtractor | None = None,
+        extractor: Any | None = None,
         *,
         model: Any | None = None,
     ) -> None:
