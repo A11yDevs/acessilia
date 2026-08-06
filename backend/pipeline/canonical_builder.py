@@ -31,6 +31,12 @@ def build_canonical_document(
     cleaned = sanitize_text(str(raw_text))
     parsed_blocks = _parse_structured_blocks(source_payload, cleaned)
     sections = _build_sections(parsed_blocks)
+    technical_warnings_list = list(technical_warnings or [])
+    if not sections and _is_non_textual_structured_payload(source_payload, cleaned):
+        sections = _build_minimal_non_textual_sections(title=title)
+        technical_warnings_list.append(
+            "Documento sem texto extraivel; seção mínima gerada para manter exportação acessível."
+        )
     source_type = Path(source_path).suffix.lower() if source_path else ""
     source_metadata = {
         "page_count": source_payload.get("page_count"),
@@ -55,7 +61,7 @@ def build_canonical_document(
             "semantic_headings": True,
             "internal_links": True,
         },
-        "technical_warnings": technical_warnings or [],
+        "technical_warnings": technical_warnings_list,
         "audit": {
             "generated_by": "canonical_builder",
             "input_length": len(source_text),
@@ -63,6 +69,48 @@ def build_canonical_document(
         },
         "sections": sections,
     }
+
+
+def _is_non_textual_structured_payload(
+    source_payload: dict[str, Any],
+    cleaned_text: str,
+) -> bool:
+    pages = source_payload.get("pages")
+    if not isinstance(pages, list) or not pages:
+        return False
+    if cleaned_text.strip():
+        return False
+    return True
+
+
+def _build_minimal_non_textual_sections(*, title: str) -> list[dict[str, Any]]:
+    section_id = f"section-fallback-{uuid4().hex[:8]}"
+    block_id = f"blk-fallback-{uuid4().hex[:8]}"
+    section_title = title or "Conteúdo visual"
+    return [
+        {
+            "id": section_id,
+            "title": section_title,
+            "level": 1,
+            "source_location": {},
+            "metadata": {
+                "generated": True,
+                "reason": "non_textual_payload",
+            },
+            "blocks": [
+                {
+                    "id": block_id,
+                    "type": "paragraph",
+                    "text": (
+                        "Este documento não possui texto extraível. "
+                        "O conteúdo é predominantemente visual e pode requerer "
+                        "audiodescrição manual."
+                    ),
+                }
+            ],
+            "children": [],
+        }
+    ]
 
 
 def _infer_title(blocks: list[dict[str, Any]]) -> str:

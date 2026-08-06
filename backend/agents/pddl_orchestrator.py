@@ -165,6 +165,21 @@ async def _enrich_picture_descriptions(
         for element in manifest.elements
         if element.type == "picture" and not (element.text or "").strip()
     ]
+    if not pictures and _is_mostly_visual_manifest(manifest):
+        pictures = [
+            element
+            for element in manifest.elements
+            if _is_placeholder_visual_element(element)
+        ]
+
+    if (
+        not pictures
+        and _is_mostly_visual_manifest(manifest)
+        and len(manifest.pages) == 1
+        and manifest.elements
+    ):
+        pictures = [manifest.elements[0]]
+
     if not pictures:
         return
 
@@ -173,10 +188,15 @@ async def _enrich_picture_descriptions(
     enriched = 0
 
     for element in pictures:
+        fallback_page_number = element.page_number
+        if fallback_page_number is None and len(manifest.pages) == 1:
+            fallback_page_number = manifest.pages[0].page_number
+
         image_bytes, page_number = await asyncio.to_thread(
             _extract_picture_bytes,
             source_file,
             element,
+            fallback_page_number,
         )
         if not image_bytes:
             continue
@@ -190,6 +210,12 @@ async def _enrich_picture_descriptions(
         )
         if description and description.strip():
             element.text = description.strip()
+            if element.type != "picture":
+                element.metadata["original_type"] = element.type
+                element.type = "picture"
+                element.raw_label = "picture"
+            if element.page_number is None and page_number >= 1:
+                element.page_number = page_number
             enriched += 1
 
     if enriched:
@@ -202,12 +228,10 @@ async def _enrich_picture_descriptions(
 def _extract_picture_bytes(
     source_file: Path,
     element: ManifestElement,
+    fallback_page_number: int | None,
 ) -> tuple[bytes | None, int]:
     provenance = element.provenance[0] if element.provenance else None
-    if provenance is None:
-        return None, 0
-
-    page_number = provenance.page_number
+    page_number = provenance.page_number if provenance is not None else (fallback_page_number or 0)
     if page_number < 1:
         return None, 0
 
@@ -254,6 +278,28 @@ def _clip_rect_from_provenance(page: fitz.Page, provenance: Any) -> fitz.Rect:
     if rect.width < 4 or rect.height < 4:
         return page.rect
     return rect
+
+
+def _is_mostly_visual_manifest(manifest: ProcessingManifest) -> bool:
+    for element in manifest.elements:
+        if element.type in {"heading", "title", "paragraph", "list_item", "table", "code", "formula"}:
+            text = (element.text or "").strip()
+            if text and not _is_placeholder_text(text):
+                return False
+    return True
+
+
+def _is_placeholder_visual_element(element: ManifestElement) -> bool:
+    if element.type not in {"group", "unknown", "paragraph"}:
+        return False
+    text = (element.text or "").strip()
+    raw_label = (element.raw_label or "").strip().lower()
+    return (not text) or _is_placeholder_text(text) or raw_label in {"body", "unspecified", "group"}
+
+
+def _is_placeholder_text(text: str) -> bool:
+    normalized = text.strip().lower()
+    return normalized in {"body", "_root_", "root", "unspecified", "group"}
 
 
 def build_pddl_structured_payload(
@@ -318,6 +364,14 @@ def _manifest_pages_to_payload(manifest: ProcessingManifest) -> list[dict[str, A
                 for element_id in page.element_ids
                 if element_id in elements_by_id
             ]
+            if not block_elements:
+                # Alguns extratores podem preencher pages sem element_ids; nesse
+                # caso, fazemos fallback por page_number para não perder conteúdo.
+                block_elements = [
+                    element
+                    for element in manifest.elements
+                    if (element.page_number or 1) == page.page_number
+                ]
             block_elements.sort(key=lambda item: item.reading_order)
             blocks = [_element_to_block(item) for item in block_elements]
             pages.append(

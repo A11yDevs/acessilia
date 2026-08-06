@@ -46,6 +46,32 @@ def test_build_canonical_document_accepts_structured_payload():
     assert document["sections"]
 
 
+def test_build_canonical_document_creates_fallback_for_non_textual_payload():
+    payload = {
+        "text": "",
+        "page_count": 1,
+        "mode": "pddl-internal",
+        "pages": [
+            {
+                "page_number": 1,
+                "text": "",
+                "blocks": [],
+            }
+        ],
+    }
+
+    document = build_canonical_document(payload, title="sunset-skyline")
+
+    assert document["sections"]
+    first_section = document["sections"][0]
+    assert first_section["level"] == 1
+    assert first_section["blocks"]
+    assert first_section["blocks"][0]["type"] == "paragraph"
+    assert "não possui texto extraível" in first_section["blocks"][0]["text"]
+    assert any("seção mínima" in warning for warning in document["technical_warnings"])
+    assert validate_canonical_document(document) == []
+
+
 def test_validate_output_text_flags_markdown_leaks():
     errors = validate_output_text("Texto com **marcacao** e `codigo`.", "pdf")
 

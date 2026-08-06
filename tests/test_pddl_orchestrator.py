@@ -107,6 +107,52 @@ def _sample_plan() -> NominalPlan:
     )
 
 
+def _sample_manifest_without_page_element_ids() -> ProcessingManifest:
+    now = datetime(2026, 7, 31, tzinfo=timezone.utc)
+    return ProcessingManifest(
+        manifest_id="manifest-integration-2",
+        created_at=now,
+        source=SourceDocument(
+            document_id="doc-image-only",
+            filename="imagem.jpeg",
+            path="/tmp/imagem.jpeg",
+            media_type="image/jpeg",
+            byte_size=1,
+            sha256="f" * 64,
+        ),
+        extractor=ExtractorRun(
+            version="2.0.0",
+            started_at=now,
+            completed_at=now,
+            duration_ms=1,
+            configuration={"ocr": False},
+        ),
+        title="Imagem sem element_ids",
+        language="pt-BR",
+        pages=[PageDescriptor(page_number=1, element_ids=[])],
+        elements=[
+            ManifestElement(
+                id="el-img-1",
+                type="picture",
+                raw_label="picture",
+                source_ref="#/pictures/0",
+                reading_order=1,
+                hierarchy_level=1,
+                text="Céu alaranjado ao pôr do sol sobre a cidade.",
+                page_number=1,
+            ),
+        ],
+        obligations=[],
+        summary=ManifestSummary(
+            page_count=1,
+            element_count=1,
+            observation_count=0,
+            obligation_count=0,
+            element_types={"picture": 1},
+        ),
+    )
+
+
 def test_build_pddl_structured_payload_is_compatible_with_canonical_builder():
     payload = build_pddl_structured_payload(
         file_path=Path("/tmp/amostra.pdf"),
@@ -136,3 +182,21 @@ def test_build_pddl_structured_payload_is_compatible_with_canonical_builder():
     assert canonical["metadata"]["pipeline_engine"] == "pddl"
     block_metadata = payload["pages"][0]["blocks"][0].get("metadata", {})
     assert block_metadata.get("source_ref") == "/texts/0"
+
+
+def test_build_pddl_structured_payload_falls_back_to_page_number_when_element_ids_missing():
+    payload = build_pddl_structured_payload(
+        file_path=Path("/tmp/imagem.jpeg"),
+        manifest=_sample_manifest_without_page_element_ids(),
+        plan=_sample_plan(),
+        planner_backend="internal",
+        execution_report=None,
+        comparison=None,
+    )
+
+    assert payload["pages"]
+    assert payload["pages"][0]["blocks"]
+    first_block = payload["pages"][0]["blocks"][0]
+    assert first_block["type"] == "image"
+    assert "Céu alaranjado" in first_block["alt_text"]
+    assert payload["pages"][0]["text"]
