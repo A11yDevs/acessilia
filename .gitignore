@@ -23,6 +23,8 @@ output/
 # Runtime, temporary and cache directories
 data/
 var/
+var/cache/rapidocr/
+cache/
 trash/
 temp/
 *.db

@@ -78,6 +78,30 @@ docker compose up -d --build
 
 O container expõe `8000` (API) e `8001` (web), persiste tudo em `./var` e roda o healthcheck em `/api/v1/health`.
 
+### Cache offline do RapidOCR
+
+Quando o fluxo com `Docling` é usado pela primeira vez, o `RapidOCR` pode baixar pesos de OCR em tempo de execução. Para evitar downloads recorrentes em benchmarks e execuções seguintes, o projeto agora persiste esses arquivos em um cache local.
+
+- Variável de ambiente: `RAPIDOCR_CACHE_DIR`
+- Valor padrão: `var/cache/rapidocr`
+
+Comportamento:
+
+- Na primeira execução com Docling, os pesos são baixados e copiados para o cache local.
+- Nas execuções seguintes, os arquivos são restaurados automaticamente antes de inicializar o `RapidOCR`.
+
+Exemplo:
+
+```bash
+export RAPIDOCR_CACHE_DIR=var/cache/rapidocr
+docker run --rm -e STRUCTURER=docling -v "$PWD:/app" -w /app acessilia:test-docling \
+	python scripts/benchmark_pipelines.py tests/fixtures/tutorials/java-oo-3pgs.pdf \
+	-o temp/output/regression-bench/java-oo-3pgs-offline/docling \
+	--mode normal --export-formats txt,pdf --pddl-extractor-backend docling
+```
+
+Se quiser embutir os modelos já na imagem Docker, o `infra/Dockerfile` também inclui um passo de preload no build quando a imagem é reconstruída com acesso à rede.
+
 ## Contribuindo
 
 1. Fork o repositório.

@@ -35,6 +35,55 @@ RUN pip install --upgrade pip \
          poetry install --only main --no-root --no-interaction --no-ansi; \
        fi
 
+RUN python - <<'PY'
+from pathlib import Path
+import tempfile
+
+try:
+    import rapidocr
+    from rapidocr.utils.download_models import download_models
+except ImportError:
+    print("RapidOCR nao instalado; preload de modelos ignorado.")
+    raise SystemExit(0)
+
+root_dir = Path(rapidocr.__file__).resolve().parent
+cfg_path = Path(tempfile.gettempdir()) / "rapidocr-preload.yaml"
+cfg_path.write_text(
+    f"""
+Global:
+    model_root_dir: {root_dir / 'models'}
+    use_det: true
+    use_cls: true
+    use_rec: true
+
+Det:
+    engine_type: torch
+    lang_type: ch
+    model_type: small
+    ocr_version: PP-OCRv6
+    task_type: det
+
+Cls:
+    engine_type: torch
+    lang_type: ch
+    model_type: mobile
+    ocr_version: PP-OCRv4
+    task_type: cls
+
+Rec:
+    engine_type: torch
+    lang_type: ch
+    model_type: small
+    ocr_version: PP-OCRv6
+    task_type: rec
+""".strip()
+    + "\n",
+    encoding="utf-8",
+)
+download_models(cfg_path)
+print(f"RapidOCR models preloaded at {root_dir / 'models'}")
+PY
+
 COPY . .
 
 EXPOSE 8000 8001

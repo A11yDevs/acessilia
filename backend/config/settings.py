@@ -29,6 +29,12 @@ class Settings:
     logs_dir: Path = field(
         default_factory=lambda: _path_from_env("LOGS_DIR", BASE_DIR / "var" / "logs")
     )
+    rapidocr_cache_dir: Path = field(
+        default_factory=lambda: _path_from_env(
+            "RAPIDOCR_CACHE_DIR",
+            BASE_DIR / "var" / "cache" / "rapidocr",
+        )
+    )
     request_timeout: int = int(os.getenv("REQUEST_TIMEOUT", "3600"))
     log_level: str = os.getenv("LOG_LEVEL", "INFO")
     allowed_extensions: set[str] = field(default_factory=lambda: _default_extensions())
@@ -121,6 +127,7 @@ class Settings:
         self.temp_dir.mkdir(parents=True, exist_ok=True)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.logs_dir.mkdir(parents=True, exist_ok=True)
+        self.rapidocr_cache_dir.mkdir(parents=True, exist_ok=True)
 
     # Aliases retroativos para configuração antiga com prefixo PMV.
     @property
