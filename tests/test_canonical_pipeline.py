@@ -46,6 +46,33 @@ def test_build_canonical_document_accepts_structured_payload():
     assert document["sections"]
 
 
+def test_build_canonical_document_prefers_composed_heading_title_over_filename():
+    payload = {
+        "text": "# CAPÍTULO 9\n## HERANÇA, REESCRITA E POLIMORFISMO\n### 9.1 REPETINDO CÓDIGO?",
+        "page_count": 1,
+        "mode": "pddl-internal",
+        "pages": [
+            {
+                "page_number": 1,
+                "text": "# CAPÍTULO 9\n## HERANÇA, REESCRITA E POLIMORFISMO\n### 9.1 REPETINDO CÓDIGO?",
+                "blocks": [
+                    {"type": "heading", "level": 1, "text": "CAPÍTULO 9"},
+                    {
+                        "type": "heading",
+                        "level": 2,
+                        "text": "HERANÇA, REESCRITA E POLIMORFISMO",
+                    },
+                    {"type": "heading", "level": 3, "text": "9.1 REPETINDO CÓDIGO?"},
+                ],
+            }
+        ],
+    }
+
+    document = build_canonical_document(payload, title="java-oo-3pgs")
+
+    assert document["title"] == "CAPÍTULO 9 - HERANÇA, REESCRITA E POLIMORFISMO"
+
+
 def test_build_canonical_document_creates_fallback_for_non_textual_payload():
     payload = {
         "text": "",

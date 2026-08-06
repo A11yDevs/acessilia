@@ -374,6 +374,7 @@ def _manifest_pages_to_payload(manifest: ProcessingManifest) -> list[dict[str, A
                 ]
             block_elements.sort(key=lambda item: item.reading_order)
             blocks = [_element_to_block(item) for item in block_elements]
+            _dedupe_callout_titles(blocks)
             pages.append(
                 {
                     "page_number": page.page_number,
@@ -395,6 +396,7 @@ def _manifest_pages_to_payload(manifest: ProcessingManifest) -> list[dict[str, A
             key=lambda item: item.reading_order,
         )
         blocks = [_element_to_block(item) for item in page_elements]
+        _dedupe_callout_titles(blocks)
         pages.append(
             {
                 "page_number": page_number,
@@ -432,11 +434,26 @@ def _element_to_block(element: ManifestElement) -> dict[str, Any]:
             }
 
     text = element.text or ""
+    callout_id = metadata.get("callout_id")
+    callout_role = str(metadata.get("callout_role", "")).lower()
+    callout_type = str(metadata.get("callout_type", "note")).lower()
+    callout_title = str(metadata.get("callout_title", "")).strip()
+    callout_block_type = "warning" if callout_type in {"warning", "aviso", "importante", "caution"} else "note"
     block: dict[str, Any] = {
         "id": element.id,
         "source_location": source_location,
         "metadata": metadata,
     }
+
+    if callout_id and callout_role != "title":
+        block.update(
+            {
+                "type": callout_block_type,
+                "title": callout_title,
+                "text": text,
+            }
+        )
+        return block
 
     if element.type in {"title", "heading"}:
         block.update(
@@ -481,6 +498,21 @@ def _element_to_block(element: ManifestElement) -> dict[str, Any]:
         block.update({"type": "paragraph", "text": text or element.raw_label})
 
     return block
+
+
+def _dedupe_callout_titles(blocks: list[dict[str, Any]]) -> None:
+    seen_callout_ids: set[str] = set()
+    for block in blocks:
+        metadata = block.get("metadata") or {}
+        callout_id = str(metadata.get("callout_id") or "").strip()
+        if not callout_id:
+            continue
+        if block.get("type") not in {"note", "warning"}:
+            continue
+        if callout_id in seen_callout_ids:
+            block.pop("title", None)
+            continue
+        seen_callout_ids.add(callout_id)
 
 
 def _normalize_metadata_links(metadata: dict[str, Any]) -> dict[str, Any]:

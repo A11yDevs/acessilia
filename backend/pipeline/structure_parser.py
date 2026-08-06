@@ -179,7 +179,17 @@ def _try_parse_marker_block(
         text = sanitize_block_text(
             "\n".join(cl.strip() for cl in content_lines if cl.strip())
         )
-        return {"type": "callout", "text": text, "callout_type": type_name}, j
+        warning_types = {"aviso", "importante"}
+        block_type = "warning" if type_key in warning_types else "note"
+        return {
+            "type": block_type,
+            "title": type_name.capitalize(),
+            "text": text,
+            "metadata": {
+                "callout_type": type_name,
+                "source": "legacy-marker",
+            },
+        }, j
 
     return None
 

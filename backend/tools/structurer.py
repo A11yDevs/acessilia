@@ -150,8 +150,16 @@ class DoclingStructurer(BaseStructurer):
                 "source": "docling",
                 "docling_type": item_type,
                 "docling_label": str(getattr(item, "label", "")),
+                "docling_label_kind": self._normalized_docling_label(item),
+                "subtype": "callout" if item_type == "callout" else "",
             },
         )
+
+    def _normalized_docling_label(self, item: Any) -> str:
+        raw = str(getattr(item, "label", "")).strip().lower()
+        raw = raw.removeprefix("docitemlabel.").removeprefix("grouplabel.")
+        raw = raw.replace(" ", "_")
+        return raw
 
     def _docling_bbox(self, item: Any) -> tuple[float, float, float, float] | None:
         prov = getattr(item, "prov", []) or []
@@ -206,6 +214,11 @@ class DoclingStructurer(BaseStructurer):
             or "callout" in label
             or "sidebar" in label
             or "quote" in label
+            or "admonition" in label
+            or "warning" in label
+            or "caution" in label
+            or "tip" in label
+            or "important" in label
         ):
             return "callout"
         if "caption" in label or "legend" in label:

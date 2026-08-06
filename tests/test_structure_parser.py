@@ -68,3 +68,32 @@ def test_parse_text_to_blocks_parses_plain_ordered_list_with_parenthesis():
     assert blocks[1]["type"] == "list"
     assert blocks[1]["ordered"] is True
     assert blocks[1]["items"] == ["Segundo item"]
+
+
+def test_parse_text_to_blocks_maps_callout_marker_to_note():
+    text = (
+        "Início de nota:\n"
+        "Este conteúdo está em uma caixa interna.\n"
+        "Fim de nota"
+    )
+
+    blocks = parse_text_to_blocks(text)
+
+    assert blocks[0]["type"] == "note"
+    assert blocks[0]["title"] == "Nota"
+    assert "caixa interna" in blocks[0]["text"]
+    assert blocks[0]["metadata"]["source"] == "legacy-marker"
+
+
+def test_parse_text_to_blocks_maps_callout_marker_to_warning():
+    text = (
+        "Início de aviso:\n"
+        "Use equipamento de segurança.\n"
+        "Fim de aviso"
+    )
+
+    blocks = parse_text_to_blocks(text)
+
+    assert blocks[0]["type"] == "warning"
+    assert blocks[0]["title"] == "Aviso"
+    assert "equipamento de segurança" in blocks[0]["text"]

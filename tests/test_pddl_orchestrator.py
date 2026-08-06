@@ -200,3 +200,149 @@ def test_build_pddl_structured_payload_falls_back_to_page_number_when_element_id
     assert first_block["type"] == "image"
     assert "Céu alaranjado" in first_block["alt_text"]
     assert payload["pages"][0]["text"]
+
+
+def test_build_pddl_structured_payload_maps_callout_metadata_to_note_block():
+    now = datetime(2026, 7, 31, tzinfo=timezone.utc)
+    manifest = ProcessingManifest(
+        manifest_id="manifest-callout",
+        created_at=now,
+        source=SourceDocument(
+            document_id="doc-callout",
+            filename="callout.pdf",
+            path="/tmp/callout.pdf",
+            media_type="application/pdf",
+            byte_size=1,
+            sha256="1" * 64,
+        ),
+        extractor=ExtractorRun(
+            version="2.0.0",
+            started_at=now,
+            completed_at=now,
+            duration_ms=1,
+            configuration={"ocr": False},
+        ),
+        title="Callout",
+        language="pt-BR",
+        pages=[PageDescriptor(page_number=1, element_ids=["el-1"])],
+        elements=[
+            ManifestElement(
+                id="el-1",
+                type="paragraph",
+                raw_label="paragraph",
+                reading_order=1,
+                hierarchy_level=1,
+                text="Conteúdo da caixa de atenção.",
+                page_number=1,
+                metadata={
+                    "callout_id": "callout-p1-g1",
+                    "callout_role": "content",
+                    "callout_type": "warning",
+                    "callout_title": "Atenção",
+                },
+            )
+        ],
+        obligations=[],
+        summary=ManifestSummary(
+            page_count=1,
+            element_count=1,
+            observation_count=0,
+            obligation_count=0,
+            element_types={"paragraph": 1},
+        ),
+    )
+
+    payload = build_pddl_structured_payload(
+        file_path=Path("/tmp/callout.pdf"),
+        manifest=manifest,
+        plan=_sample_plan(),
+        planner_backend="internal",
+        execution_report=None,
+        comparison=None,
+    )
+
+    block = payload["pages"][0]["blocks"][0]
+    assert block["type"] == "warning"
+    assert block["title"] == "Atenção"
+    assert "caixa de atenção" in block["text"]
+
+
+def test_build_pddl_structured_payload_keeps_callout_title_only_once():
+    now = datetime(2026, 7, 31, tzinfo=timezone.utc)
+    manifest = ProcessingManifest(
+        manifest_id="manifest-callout-repeat",
+        created_at=now,
+        source=SourceDocument(
+            document_id="doc-callout-repeat",
+            filename="callout-repeat.pdf",
+            path="/tmp/callout-repeat.pdf",
+            media_type="application/pdf",
+            byte_size=1,
+            sha256="2" * 64,
+        ),
+        extractor=ExtractorRun(
+            version="2.0.0",
+            started_at=now,
+            completed_at=now,
+            duration_ms=1,
+            configuration={"ocr": False},
+        ),
+        title="Callout Repeat",
+        language="pt-BR",
+        pages=[PageDescriptor(page_number=1, element_ids=["el-1", "el-2"])],
+        elements=[
+            ManifestElement(
+                id="el-1",
+                type="paragraph",
+                raw_label="paragraph",
+                reading_order=1,
+                hierarchy_level=1,
+                text="Primeiro parágrafo da caixa.",
+                page_number=1,
+                metadata={
+                    "callout_id": "callout-p1-g1",
+                    "callout_role": "content",
+                    "callout_type": "note",
+                    "callout_title": "Precisa mesmo?",
+                },
+            ),
+            ManifestElement(
+                id="el-2",
+                type="paragraph",
+                raw_label="paragraph",
+                reading_order=2,
+                hierarchy_level=1,
+                text="Segundo parágrafo da caixa.",
+                page_number=1,
+                metadata={
+                    "callout_id": "callout-p1-g1",
+                    "callout_role": "content",
+                    "callout_type": "note",
+                    "callout_title": "Precisa mesmo?",
+                },
+            ),
+        ],
+        obligations=[],
+        summary=ManifestSummary(
+            page_count=1,
+            element_count=2,
+            observation_count=0,
+            obligation_count=0,
+            element_types={"paragraph": 2},
+        ),
+    )
+
+    payload = build_pddl_structured_payload(
+        file_path=Path("/tmp/callout-repeat.pdf"),
+        manifest=manifest,
+        plan=_sample_plan(),
+        planner_backend="internal",
+        execution_report=None,
+        comparison=None,
+    )
+
+    blocks = payload["pages"][0]["blocks"]
+    assert blocks[0]["type"] == "note"
+    assert blocks[0].get("title") == "Precisa mesmo?"
+    assert blocks[1]["type"] == "note"
+    assert "title" not in blocks[1]

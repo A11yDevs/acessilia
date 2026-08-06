@@ -30,6 +30,7 @@ def build_canonical_document(
     raw_text = source_payload.get("text", source_text)
     cleaned = sanitize_text(str(raw_text))
     parsed_blocks = _parse_structured_blocks(source_payload, cleaned)
+    inferred_title = _infer_title(parsed_blocks).strip()
     sections = _build_sections(parsed_blocks)
     technical_warnings_list = list(technical_warnings or [])
     if not sections and _is_non_textual_structured_payload(source_payload, cleaned):
@@ -46,7 +47,7 @@ def build_canonical_document(
     return {
         "schema_version": "1.0.0",
         "id": f"doc-{uuid4().hex[:12]}",
-        "title": title or _infer_title(parsed_blocks) or "Documento acessível",
+        "title": inferred_title or title or "Documento acessível",
         "language": language,
         "verbosity": verbosity,
         "audience": audience or ["reader"],
@@ -114,10 +115,27 @@ def _build_minimal_non_textual_sections(*, title: str) -> list[dict[str, Any]]:
 
 
 def _infer_title(blocks: list[dict[str, Any]]) -> str:
-    for block in blocks:
-        if block.get("type") == "heading" and block.get("level") == 1:
-            return block.get("text", "")
-    return ""
+    headings = [
+        {
+            "level": int(block.get("level", 1)),
+            "text": str(block.get("text", "")).strip(),
+        }
+        for block in blocks
+        if block.get("type") == "heading" and str(block.get("text", "")).strip()
+    ]
+    if not headings:
+        return ""
+    first_heading = headings[0]["text"]
+    if _looks_like_chapter_heading(first_heading):
+        for candidate in headings[1:]:
+            if candidate["level"] <= 2:
+                return f"{first_heading} - {candidate['text']}"
+    return first_heading
+
+
+def _looks_like_chapter_heading(text: str) -> bool:
+    normalized = text.strip().upper()
+    return bool(re.match(r"^CAP[ÍI]TULO\s+\d+", normalized))
 
 
 def _parse_structured_blocks(

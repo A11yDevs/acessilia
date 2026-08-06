@@ -123,3 +123,156 @@ def test_manifest_rejects_unknown_target(tmp_path: Path):
     errors = validate_manifest(payload)
 
     assert any("alvos inexistentes" in error for error in errors)
+
+
+def test_manifest_demotes_heading_inside_indented_callout_group(tmp_path: Path):
+    class CalloutDocument:
+        def __init__(self) -> None:
+            self.pages = {
+                1: SimpleNamespace(size=SimpleNamespace(width=600, height=800))
+            }
+            self.items = [
+                (
+                    SimpleNamespace(
+                        label=None,
+                        name="body",
+                        self_ref="#/body",
+                        parent=None,
+                    ),
+                    0,
+                ),
+                (
+                    SimpleNamespace(
+                        label=SimpleNamespace(value="heading"),
+                        text="CAPÍTULO 1",
+                        level=1,
+                        prov=[
+                            SimpleNamespace(
+                                page_no=1,
+                                bbox=SimpleNamespace(
+                                    l=40,
+                                    t=20,
+                                    r=560,
+                                    b=52,
+                                    coord_origin=SimpleNamespace(value="TOPLEFT"),
+                                ),
+                                charspan=(0, 10),
+                            )
+                        ],
+                        self_ref="#/texts/0",
+                        parent=SimpleNamespace(cref="#/body"),
+                        content_layer=SimpleNamespace(value="body"),
+                    ),
+                    1,
+                ),
+                (
+                    SimpleNamespace(
+                        label=SimpleNamespace(value="heading"),
+                        text="Atenção",
+                        level=2,
+                        prov=[
+                            SimpleNamespace(
+                                page_no=1,
+                                bbox=SimpleNamespace(
+                                    l=120,
+                                    t=120,
+                                    r=480,
+                                    b=146,
+                                    coord_origin=SimpleNamespace(value="TOPLEFT"),
+                                ),
+                                charspan=(0, 7),
+                            )
+                        ],
+                        self_ref="#/texts/1",
+                        parent=SimpleNamespace(cref="#/body"),
+                        content_layer=SimpleNamespace(value="body"),
+                    ),
+                    1,
+                ),
+                (
+                    SimpleNamespace(
+                        label=SimpleNamespace(value="paragraph"),
+                        text="Parágrafo 1 do callout.",
+                        prov=[
+                            SimpleNamespace(
+                                page_no=1,
+                                bbox=SimpleNamespace(
+                                    l=120,
+                                    t=150,
+                                    r=480,
+                                    b=176,
+                                    coord_origin=SimpleNamespace(value="TOPLEFT"),
+                                ),
+                                charspan=(0, 24),
+                            )
+                        ],
+                        self_ref="#/texts/2",
+                        parent=SimpleNamespace(cref="#/body"),
+                        content_layer=SimpleNamespace(value="body"),
+                    ),
+                    1,
+                ),
+                (
+                    SimpleNamespace(
+                        label=SimpleNamespace(value="paragraph"),
+                        text="Parágrafo 2 do callout.",
+                        prov=[
+                            SimpleNamespace(
+                                page_no=1,
+                                bbox=SimpleNamespace(
+                                    l=120,
+                                    t=182,
+                                    r=480,
+                                    b=208,
+                                    coord_origin=SimpleNamespace(value="TOPLEFT"),
+                                ),
+                                charspan=(0, 24),
+                            )
+                        ],
+                        self_ref="#/texts/3",
+                        parent=SimpleNamespace(cref="#/body"),
+                        content_layer=SimpleNamespace(value="body"),
+                    ),
+                    1,
+                ),
+            ]
+
+        def iterate_items(self, **_: object):
+            return iter(self.items)
+
+        def num_pages(self) -> int:
+            return 1
+
+    class CalloutExtractor:
+        def extract(self, _: Path) -> DoclingExtraction:
+            timestamp = datetime(2026, 7, 27, tzinfo=timezone.utc)
+            return DoclingExtraction(
+                document=CalloutDocument(),
+                started_at=timestamp,
+                completed_at=timestamp,
+                duration_ms=7,
+                version="2.test",
+                configuration={"ocr": False},
+            )
+
+    source = tmp_path / "sample.pdf"
+    source.write_bytes(b"%PDF-test")
+    manifest = InformationalStructuralAgent(
+        extractor=CalloutExtractor()  # type: ignore[arg-type]
+    ).process(source)
+
+    heading_like = [
+        e for e in manifest.elements if (e.text or "").strip().lower() == "atenção"
+    ]
+    assert heading_like
+    callout_title = heading_like[0]
+    assert callout_title.type == "paragraph"
+    assert callout_title.metadata.get("demoted_from_heading") is True
+    assert callout_title.metadata.get("is_callout_title") is True
+
+    linked_content = [
+        e
+        for e in manifest.elements
+        if e.metadata.get("callout_id") == callout_title.metadata.get("callout_id")
+    ]
+    assert len(linked_content) >= 3

@@ -92,6 +92,16 @@ DEFAULT_METHOD_COSTS = {
     "human-review": 100,
 }
 
+CALL_OUT_MIN_GROUP_SIZE = 3
+CALL_OUT_MIN_INDENT_PX = 8.0
+CALL_OUT_MIN_INDENT_RATIO = 0.015
+CALL_OUT_MAX_WIDTH_RATIO = 0.9
+CALL_OUT_MAX_VERTICAL_GAP = 28.0
+KNOWN_CALLOUT_TITLES = {
+    "precisamos mesmo de outra classe?",
+    "super e sub classe",
+}
+
 
 def build_processing_manifest(
     source_path: Path,
@@ -101,7 +111,9 @@ def build_processing_manifest(
 ) -> ProcessingManifest:
     source_path = source_path.resolve()
     digest = _sha256(source_path)
-    elements = _build_elements(extraction.document)
+    extractor_name = str(extraction.configuration.get("extractor", "")).strip().lower()
+    enable_callouts = extractor_name != "pymupdf"
+    elements = _build_elements(extraction.document, enable_callouts=enable_callouts)
     pages = _build_pages(extraction.document, elements)
     title = _infer_title(source_path, elements)
     observations, obligations = _derive_processing_needs(elements)
@@ -144,7 +156,7 @@ def build_processing_manifest(
     )
 
 
-def _build_elements(document: Any) -> list[ManifestElement]:
+def _build_elements(document: Any, *, enable_callouts: bool = True) -> list[ManifestElement]:
     elements: list[ManifestElement] = []
     try:
         iterator = document.iterate_items(with_groups=True, traverse_pictures=True)
@@ -182,7 +194,286 @@ def _build_elements(document: Any) -> list[ManifestElement]:
     for element in elements:
         if element.parent_ref is not None:
             element.parent_id = by_source_ref.get(element.parent_ref)
+    if enable_callouts:
+        _normalize_callout_groups(elements)
     return elements
+
+
+def _normalize_callout_groups(elements: list[ManifestElement]) -> None:
+    by_page: dict[int, list[ManifestElement]] = {}
+    for element in elements:
+        if element.page_number is None:
+            continue
+        by_page.setdefault(element.page_number, []).append(element)
+
+    for page_elements in by_page.values():
+        _normalize_page_callouts(page_elements)
+
+
+def _normalize_page_callouts(page_elements: list[ManifestElement]) -> None:
+    _tag_known_title_callouts(page_elements)
+
+    text_like = [
+        element
+        for element in page_elements
+        if element.type in {"heading", "paragraph", "list_item", "group", "unknown"}
+        and _element_bbox(element) is not None
+        and (element.text or "").strip()
+        and not element.metadata.get("callout_id")
+    ]
+    if len(text_like) < CALL_OUT_MIN_GROUP_SIZE:
+        return
+
+    main_left, main_right = _estimate_main_text_band(text_like)
+    if main_right <= main_left:
+        return
+
+    band_width = main_right - main_left
+    indent_threshold = max(CALL_OUT_MIN_INDENT_PX, band_width * CALL_OUT_MIN_INDENT_RATIO)
+
+    candidates: list[ManifestElement] = []
+    for element in sorted(text_like, key=lambda item: item.reading_order):
+        bbox = _element_bbox(element)
+        if bbox is None:
+            continue
+        left, top, right, bottom = bbox
+        width = max(1.0, right - left)
+        left_indent = left - main_left
+        right_indent = main_right - right
+
+        combined_indent = max(0.0, left_indent) + max(0.0, right_indent)
+        if (
+            max(left_indent, right_indent) < indent_threshold
+            and combined_indent < (indent_threshold * 1.35)
+        ):
+            continue
+        if width > band_width * CALL_OUT_MAX_WIDTH_RATIO:
+            continue
+        if top >= bottom:
+            continue
+        candidates.append(element)
+
+    if len(candidates) < CALL_OUT_MIN_GROUP_SIZE:
+        return
+
+    groups: list[list[ManifestElement]] = []
+    current: list[ManifestElement] = [candidates[0]]
+    for element in candidates[1:]:
+        prev = current[-1]
+        if _is_same_callout_cluster(prev, element):
+            current.append(element)
+        else:
+            groups.append(current)
+            current = [element]
+    groups.append(current)
+
+    for group_index, group in enumerate(groups, start=1):
+        if len(group) < CALL_OUT_MIN_GROUP_SIZE:
+            continue
+        title = group[0]
+        if not _is_callout_title_candidate(title):
+            continue
+        body_count = sum(
+            1
+            for item in group[1:]
+            if item.type in {"paragraph", "list_item", "group", "unknown"}
+            and (item.text or "").strip()
+        )
+        min_body_count = 1 if _is_known_callout_title(title.text or "") else 2
+        if body_count < min_body_count:
+            continue
+
+        _apply_callout_group(title, group, callout_id=f"callout-p{title.page_number}-g{group_index}")
+
+
+def _tag_known_title_callouts(page_elements: list[ManifestElement]) -> None:
+    ordered = sorted(page_elements, key=lambda item: item.reading_order)
+    main_left, main_right = _estimate_main_text_band(ordered)
+    band_width = max(0.0, main_right - main_left)
+    indent_threshold = max(CALL_OUT_MIN_INDENT_PX, band_width * CALL_OUT_MIN_INDENT_RATIO)
+    anchor_count = 0
+    for index, title in enumerate(ordered):
+        if title.metadata.get("callout_id"):
+            continue
+        if not _is_known_callout_title(title.text or ""):
+            continue
+        title_bbox = _element_bbox(title)
+        if title_bbox is None:
+            continue
+
+        group: list[ManifestElement] = [title]
+        previous = title
+        for candidate in ordered[index + 1 :]:
+            if candidate.metadata.get("callout_id"):
+                continue
+            if candidate.type in {"heading", "title"} and not _is_known_callout_title(candidate.text or ""):
+                break
+            if candidate.type not in {"paragraph", "list_item", "group", "unknown"}:
+                if candidate.type == "code":
+                    break
+                continue
+            if not (candidate.text or "").strip():
+                continue
+            if not _is_known_callout_body_candidate(
+                candidate,
+                main_left,
+                main_right,
+                indent_threshold,
+            ):
+                break
+            if not _is_same_callout_cluster(previous, candidate):
+                break
+            group.append(candidate)
+            previous = candidate
+            if len(group) >= 8:
+                break
+
+        if len(group) < 2:
+            continue
+
+        anchor_count += 1
+        _apply_callout_group(
+            title,
+            group,
+            callout_id=f"callout-p{title.page_number}-anchor{anchor_count}",
+        )
+
+
+def _apply_callout_group(
+    title: ManifestElement,
+    group: list[ManifestElement],
+    *,
+    callout_id: str,
+) -> None:
+    if title.type == "heading":
+        original_type = title.type
+        title.type = "paragraph"
+        title.metadata["original_type"] = original_type
+        title.metadata["demoted_from_heading"] = True
+    title.metadata["is_callout_title"] = True
+    title.metadata["callout_id"] = callout_id
+    title.metadata["callout_role"] = "title"
+    title.metadata["callout_type"] = "note"
+    title.metadata["callout_title"] = title.text or ""
+
+    for item in group[1:]:
+        item.metadata["callout_id"] = callout_id
+        item.metadata["callout_role"] = "content"
+        item.metadata.setdefault("callout_type", "note")
+        item.metadata.setdefault("callout_title", title.text or "")
+
+
+def _estimate_main_text_band(elements: list[ManifestElement]) -> tuple[float, float]:
+    wide = []
+    all_boxes = []
+    for element in elements:
+        bbox = _element_bbox(element)
+        if bbox is None:
+            continue
+        left, _, right, _ = bbox
+        width = right - left
+        all_boxes.append((left, right, width))
+
+    if not all_boxes:
+        return (0.0, 0.0)
+
+    max_width = max(width for _, _, width in all_boxes)
+    for left, right, width in all_boxes:
+        if width >= max_width * 0.75:
+            wide.append((left, right))
+
+    reference = wide or [(left, right) for left, right, _ in all_boxes]
+    main_left = min(left for left, _ in reference)
+    main_right = max(right for _, right in reference)
+    return (main_left, main_right)
+
+
+def _is_same_callout_cluster(previous: ManifestElement, current: ManifestElement) -> bool:
+    prev_bbox = _element_bbox(previous)
+    curr_bbox = _element_bbox(current)
+    if prev_bbox is None or curr_bbox is None:
+        return False
+
+    _, prev_top, _, prev_bottom = prev_bbox
+    _, curr_top, _, _ = curr_bbox
+    vertical_gap = curr_top - prev_bottom
+    if vertical_gap > CALL_OUT_MAX_VERTICAL_GAP:
+        return False
+
+    prev_left, _, prev_right, _ = prev_bbox
+    curr_left, _, curr_right, _ = curr_bbox
+    overlap_left = max(prev_left, curr_left)
+    overlap_right = min(prev_right, curr_right)
+    overlap_width = max(0.0, overlap_right - overlap_left)
+    min_width = max(1.0, min(prev_right - prev_left, curr_right - curr_left))
+    return (overlap_width / min_width) >= 0.55
+
+
+def _element_bbox(element: ManifestElement) -> tuple[float, float, float, float] | None:
+    if not element.provenance:
+        return None
+    bbox = element.provenance[0].bbox
+    if bbox is None:
+        return None
+    return (bbox.left, bbox.top, bbox.right, bbox.bottom)
+
+
+def _is_callout_title_candidate(element: ManifestElement) -> bool:
+    if element.type == "heading":
+        return True
+    if element.type != "paragraph":
+        return False
+    text = (element.text or "").strip()
+    if not text:
+        return False
+    if _is_known_callout_title(text):
+        return True
+    if len(text) > 95:
+        return False
+    upper_ratio = _uppercase_ratio(text)
+    if upper_ratio >= 0.55:
+        return True
+    return text.endswith(("?", ":"))
+
+
+def _uppercase_ratio(text: str) -> float:
+    letters = [ch for ch in text if ch.isalpha()]
+    if not letters:
+        return 0.0
+    uppers = [ch for ch in letters if ch.isupper()]
+    return len(uppers) / len(letters)
+
+
+def _normalize_text_key(text: str) -> str:
+    normalized = re.sub(r"\s+", " ", text.strip().lower())
+    return normalized
+
+
+def _is_known_callout_title(text: str) -> bool:
+    return _normalize_text_key(text) in KNOWN_CALLOUT_TITLES
+
+
+def _is_known_callout_body_candidate(
+    element: ManifestElement,
+    main_left: float,
+    main_right: float,
+    indent_threshold: float,
+) -> bool:
+    bbox = _element_bbox(element)
+    if bbox is None:
+        return False
+    left, _, right, bottom = bbox
+    width = right - left
+    band_width = max(1.0, main_right - main_left)
+    left_indent = left - main_left
+    right_indent = main_right - right
+    if bottom <= 0:
+        return False
+    if width > band_width * 0.98:
+        return False
+    if right_indent < 4.0:
+        return False
+    return (left_indent >= indent_threshold) or (right_indent >= indent_threshold)
 
 
 def _build_pages(document: Any, elements: list[ManifestElement]) -> list[PageDescriptor]:
@@ -417,13 +708,29 @@ def _safe_metadata(item: Any) -> dict[str, Any]:
 
 
 def _infer_title(source_path: Path, elements: list[ManifestElement]) -> str:
-    for element in elements:
-        if element.type == "title" and element.text:
-            return element.text
-    for element in elements:
-        if element.type == "heading" and element.text:
-            return element.text
+    titles = [
+        (element.text or "").strip()
+        for element in elements
+        if element.type == "title" and (element.text or "").strip()
+    ]
+    if titles:
+        return titles[0]
+
+    headings = [
+        (element.text or "").strip()
+        for element in elements
+        if element.type == "heading" and (element.text or "").strip()
+    ]
+    if len(headings) >= 2 and _looks_like_chapter_heading(headings[0]):
+        return f"{headings[0]} - {headings[1]}"
+    if headings:
+        return headings[0]
     return source_path.stem
+
+
+def _looks_like_chapter_heading(text: str) -> bool:
+    normalized = text.strip().upper()
+    return bool(re.match(r"^CAP[ÍI]TULO\s+\d+", normalized))
 
 
 def _page_count(document: Any) -> int:

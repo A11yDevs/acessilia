@@ -205,7 +205,14 @@ def _render_block(story, block: dict[str, Any], styles) -> None:
             or block.get("alt_text")
             or block.get("text", "")
         )
-        story.append(Paragraph(text, styles["A11yBody"]))
+        if block_type in {"note", "warning"}:
+            label = "Aviso" if block_type == "warning" else "Nota"
+            if text:
+                story.append(Paragraph(f"<b>{label}:</b> {text}", styles["A11yBody"]))
+            else:
+                story.append(Paragraph(f"<b>{label}</b>", styles["A11yBody"]))
+        else:
+            story.append(Paragraph(text, styles["A11yBody"]))
     else:
         text = block.get("text", "")
         if _looks_like_code_text(text):
