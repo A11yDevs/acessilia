@@ -113,3 +113,33 @@ def test_filter_blocks_for_profile_hides_technical_blocks_in_txt():
 
     assert [block["id"] for block in filtered_txt] == ["blk-1"]
     assert [block["id"] for block in filtered_html] == ["blk-1", "blk-2"]
+
+
+def test_validate_canonical_document_allows_short_multiline_code_block():
+    document = _sample_document()
+    document["sections"][0]["blocks"].append(
+        {
+            "id": "blk-code-short",
+            "type": "code",
+            "text": "public interface ContaTributavel extends Conta, Tributavel {\n}",
+        }
+    )
+
+    errors = validate_canonical_document(document)
+
+    assert not any("blk-code-short" in error for error in errors)
+
+
+def test_validate_canonical_document_flags_flattened_multiline_code_without_indent():
+    document = _sample_document()
+    document["sections"][0]["blocks"].append(
+        {
+            "id": "blk-code-flat",
+            "type": "code",
+            "text": "public class A {\nprivate String nome;\nprivate String cpf;\n}",
+        }
+    )
+
+    errors = validate_canonical_document(document)
+
+    assert any("blk-code-flat" in error for error in errors)

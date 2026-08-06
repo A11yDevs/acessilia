@@ -162,7 +162,22 @@ def _heading_skips_levels(levels: list[int]) -> bool:
 
 
 def _indentation_lost(text: str) -> bool:
-    lines = text.splitlines()
+    lines = [line for line in text.splitlines() if line.strip()]
     if len(lines) <= 1:
         return False
-    return not any(line.startswith((" ", "\t")) for line in lines)
+
+    # Não exigir indentação quando o bloco só tem assinatura e fechamento,
+    # ex.: "public interface X {" + "}".
+    candidate_lines: list[str] = []
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+        if index == 0:
+            continue
+        if stripped in {"}", "};", "{"}:
+            continue
+        candidate_lines.append(line)
+
+    if not candidate_lines:
+        return False
+
+    return not any(line.startswith((" ", "\t")) for line in candidate_lines)
