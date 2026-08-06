@@ -7,6 +7,7 @@ from typing import Any
 import fitz
 
 from backend.config.settings import settings
+from backend.tools.code_tools import normalize_code_text
 from backend.tools.region_extractor import Region, crop_region_to_image, extract_regions
 from backend.tools.logger import logger
 
@@ -135,6 +136,8 @@ class DoclingStructurer(BaseStructurer):
 
         item_type = self._docling_label(item)
         text = self._docling_text(item)
+        if item_type == "code":
+            text = normalize_code_text(text)
 
         return Region(
             bbox=bbox,

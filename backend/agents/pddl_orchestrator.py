@@ -16,6 +16,7 @@ from core.planning.models import NominalPlan, PlanningComparison
 from core.planning.planner_agent import PlannerAgent
 
 from backend.agents.vision_agent import VisionAgent
+from backend.tools.code_tools import normalize_code_text
 from backend.tools.logger import logger
 
 
@@ -414,7 +415,7 @@ def _element_to_block(element: ManifestElement) -> dict[str, Any]:
             }
         )
     elif element.type == "code":
-        block.update({"type": "code", "text": text})
+        block.update({"type": "code", "text": normalize_code_text(text)})
     elif element.type == "formula":
         block.update(
             {
