@@ -4,6 +4,8 @@ import asyncio
 from pathlib import Path
 from typing import Any, Callable, Coroutine
 
+import fitz
+
 from core.agents.informational_structural import InformationalStructuralAgent
 from core.execution.executor import ExecutorAgent, MethodRegistry
 from core.execution.models import ExecutionReport
@@ -13,6 +15,7 @@ from core.manifest.models import ManifestElement, ProcessingManifest
 from core.planning.models import NominalPlan, PlanningComparison
 from core.planning.planner_agent import PlannerAgent
 
+from backend.agents.vision_agent import VisionAgent
 from backend.tools.logger import logger
 
 
@@ -67,7 +70,9 @@ class PddlAccessibilityOrchestrator:
         custom_prompt: str | None = None,
         thinking_mode: bool = False,
     ) -> str | dict[str, Any]:
-        del tmpdir, mode
+        del tmpdir
+
+        effective_mode = mode or "medio"
 
         if custom_prompt or thinking_mode:
             logger.warning(
@@ -81,6 +86,14 @@ class PddlAccessibilityOrchestrator:
             self.information_structural.process,
             file_path.resolve(),
             language="pt-BR",
+        )
+
+        if status_callback:
+            await status_callback("Enriquecendo descrições de imagens...")
+        await _enrich_picture_descriptions(
+            manifest,
+            file_path.resolve(),
+            mode=effective_mode,
         )
 
         if status_callback:
@@ -138,6 +151,108 @@ class PddlAccessibilityOrchestrator:
             fast_downward_search=self.fast_downward_search,
         )
         return plan, None
+
+
+async def _enrich_picture_descriptions(
+    manifest: ProcessingManifest,
+    source_file: Path,
+    *,
+    mode: str,
+) -> None:
+    pictures = [
+        element
+        for element in manifest.elements
+        if element.type == "picture" and not (element.text or "").strip()
+    ]
+    if not pictures:
+        return
+
+    vision = VisionAgent(mode=mode)
+    total_pages = len(manifest.pages)
+    enriched = 0
+
+    for element in pictures:
+        image_bytes, page_number = await asyncio.to_thread(
+            _extract_picture_bytes,
+            source_file,
+            element,
+        )
+        if not image_bytes:
+            continue
+
+        description = await vision.describe_region(
+            image_bytes=image_bytes,
+            classification="embedded_image",
+            page_num=page_number,
+            total_pages=total_pages,
+            mode=mode,
+        )
+        if description and description.strip():
+            element.text = description.strip()
+            enriched += 1
+
+    if enriched:
+        logger.info(
+            "Pipeline PDDL: {} imagem(ns) enriquecida(s) com descrição visual",
+            enriched,
+        )
+
+
+def _extract_picture_bytes(
+    source_file: Path,
+    element: ManifestElement,
+) -> tuple[bytes | None, int]:
+    provenance = element.provenance[0] if element.provenance else None
+    if provenance is None:
+        return None, 0
+
+    page_number = provenance.page_number
+    if page_number < 1:
+        return None, 0
+
+    doc = fitz.open(source_file)
+    try:
+        page = doc.load_page(page_number - 1)
+        rect = _clip_rect_from_provenance(page, provenance)
+        pixmap = page.get_pixmap(clip=rect, dpi=160, alpha=False)
+        return pixmap.tobytes("png"), page_number
+    except Exception:
+        logger.exception(
+            "Falha ao extrair recorte de imagem para elemento {}",
+            element.id,
+        )
+        return None, page_number
+    finally:
+        doc.close()
+
+
+def _clip_rect_from_provenance(page: fitz.Page, provenance: Any) -> fitz.Rect:
+    bbox = getattr(provenance, "bbox", None)
+    if bbox is None:
+        return page.rect
+
+    left = float(bbox.left)
+    right = float(bbox.right)
+    top = float(bbox.top)
+    bottom = float(bbox.bottom)
+
+    if getattr(bbox, "coord_origin", "UNKNOWN") == "BOTTOMLEFT":
+        page_height = float(page.rect.height)
+        top_from_top = page_height - top
+        bottom_from_top = page_height - bottom
+        y0 = min(top_from_top, bottom_from_top)
+        y1 = max(top_from_top, bottom_from_top)
+    else:
+        y0 = min(top, bottom)
+        y1 = max(top, bottom)
+
+    x0 = min(left, right)
+    x1 = max(left, right)
+
+    rect = fitz.Rect(x0, y0, x1, y1) & page.rect
+    if rect.width < 4 or rect.height < 4:
+        return page.rect
+    return rect
 
 
 def build_pddl_structured_payload(
