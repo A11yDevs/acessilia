@@ -173,7 +173,7 @@ def _build_elements(document: Any, *, enable_callouts: bool = True) -> list[Mani
                 raw_label=raw_label,
                 reading_order=reading_order,
                 hierarchy_level=hierarchy_level,
-                text=_item_text(item),
+                text=_item_text(item, element_type),
                 source_ref=_reference(getattr(item, "self_ref", None)),
                 parent_ref=_reference(getattr(item, "parent", None)),
                 page_number=page_number,
@@ -610,10 +610,12 @@ def _fallback_type(item: Any, raw_label: str) -> str:
     return "unknown"
 
 
-def _item_text(item: Any) -> str | None:
+def _item_text(item: Any, element_type: str) -> str | None:
     for attribute in ("text", "orig", "name"):
         value = getattr(item, attribute, None)
         if isinstance(value, str) and value.strip():
+            if element_type == "code":
+                return value.replace("\r\n", "\n").replace("\r", "\n")
             cleaned = sanitize_text(value)
             return cleaned or None
     return None

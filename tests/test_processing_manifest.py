@@ -276,3 +276,84 @@ def test_manifest_demotes_heading_inside_indented_callout_group(tmp_path: Path):
         if e.metadata.get("callout_id") == callout_title.metadata.get("callout_id")
     ]
     assert len(linked_content) >= 3
+
+
+def test_manifest_preserves_code_text_without_sanitizer_side_effects(tmp_path: Path):
+    class CodeDocument:
+        def __init__(self) -> None:
+            self.pages = {
+                1: SimpleNamespace(size=SimpleNamespace(width=600, height=800))
+            }
+            self.items = [
+                (
+                    SimpleNamespace(
+                        label=None,
+                        name="body",
+                        self_ref="#/body",
+                        parent=None,
+                    ),
+                    0,
+                ),
+                (
+                    SimpleNamespace(
+                        label=SimpleNamespace(value="code"),
+                        text=(
+                            "def demo():\r\n"
+                            "    system: keep literal\r\n"
+                            "    prompt: keep literal\r\n"
+                            "    note = 'chain of thought'\r\n"
+                            "    return note\r\n"
+                        ),
+                        prov=[
+                            SimpleNamespace(
+                                page_no=1,
+                                bbox=SimpleNamespace(
+                                    l=80,
+                                    t=120,
+                                    r=520,
+                                    b=260,
+                                    coord_origin=SimpleNamespace(value="TOPLEFT"),
+                                ),
+                                charspan=(0, 100),
+                            )
+                        ],
+                        self_ref="#/code/0",
+                        parent=SimpleNamespace(cref="#/body"),
+                    ),
+                    1,
+                ),
+            ]
+
+        def iterate_items(self, **_: object):
+            return iter(self.items)
+
+        def num_pages(self) -> int:
+            return 1
+
+    class CodeExtractor:
+        def extract(self, _: Path) -> DoclingExtraction:
+            timestamp = datetime(2026, 7, 27, tzinfo=timezone.utc)
+            return DoclingExtraction(
+                document=CodeDocument(),
+                started_at=timestamp,
+                completed_at=timestamp,
+                duration_ms=7,
+                version="2.test",
+                configuration={"ocr": False},
+            )
+
+    source = tmp_path / "sample.pdf"
+    source.write_bytes(b"%PDF-test")
+    manifest = InformationalStructuralAgent(
+        extractor=CodeExtractor()  # type: ignore[arg-type]
+    ).process(source)
+
+    code_elements = [e for e in manifest.elements if e.type == "code"]
+    assert code_elements
+    code_text = code_elements[0].text
+    assert code_text is not None
+    assert "\r" not in code_text
+    assert "    system: keep literal" in code_text
+    assert "    prompt: keep literal" in code_text
+    assert "chain of thought" in code_text
+    assert "[conteudo removido]" not in code_text
