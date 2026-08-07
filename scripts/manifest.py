@@ -6,12 +6,12 @@ import json
 import sys
 from pathlib import Path
 
-from core.agents.informational_structural import InformationalStructuralAgent
-from core.manifest.docling_extractor import DoclingManifestExtractor
-from core.manifest.schema import validate_manifest
+from backend.core.agents.informational_structural import InformationalStructuralAgent
+from backend.core.manifest.docling_extractor import DoclingManifestExtractor
+from backend.core.manifest.schema import validate_manifest
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SCHEMA = PROJECT_ROOT / "schemas" / "processing_manifest.schema.json"
 
 

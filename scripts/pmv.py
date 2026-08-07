@@ -8,21 +8,21 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from core.agents.informational_structural import InformationalStructuralAgent
-from core.execution.executor import ExecutorAgent, MethodRegistry
-from core.manifest.docling_extractor import DoclingManifestExtractor
-from core.manifest.models import ProcessingManifest
-from core.manifest.schema import validate_manifest
-from core.planning.domain_bundle import (
+from backend.core.agents.informational_structural import InformationalStructuralAgent
+from backend.core.execution.executor import ExecutorAgent, MethodRegistry
+from backend.core.manifest.docling_extractor import DoclingManifestExtractor
+from backend.core.manifest.models import ProcessingManifest
+from backend.core.manifest.schema import validate_manifest
+from backend.core.planning.domain_bundle import (
     DEFAULT_DESCRIPTION_PATH,
     DEFAULT_DOMAIN_PATH,
     DomainBundle,
 )
-from core.planning.models import NominalPlan
-from core.planning.planner_agent import PlannerAgent
+from backend.core.planning.models import NominalPlan
+from backend.core.planning.planner_agent import PlannerAgent
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MANIFEST_SCHEMA = (
     PROJECT_ROOT / "schemas" / "processing_manifest.schema.json"
 )
