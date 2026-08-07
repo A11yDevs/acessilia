@@ -55,7 +55,76 @@
         "long_description": {"type": "string"},
         "children": {"type": "array"},
         "items": {"type": "array"},
-        "rows": {"type": "array"},
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {"type": "string"}
+          }
+        },
+        "table_ast": {"$ref": "#/$defs/table_ast"},
+        "metadata": {"type": "object"}
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"type": {"const": "table"}},
+            "required": ["type"]
+          },
+          "then": {
+            "anyOf": [
+              {"required": ["rows"]},
+              {"required": ["table_ast"]}
+            ]
+          }
+        }
+      ]
+    },
+    "table_cell": {
+      "type": "object",
+      "required": ["text"],
+      "properties": {
+        "text": {"type": "string"},
+        "header": {"type": "boolean"},
+        "scope": {
+          "type": "string",
+          "enum": ["none", "row", "col", "rowgroup", "colgroup"]
+        },
+        "rowspan": {"type": "integer", "minimum": 1},
+        "colspan": {"type": "integer", "minimum": 1},
+        "metadata": {"type": "object"}
+      }
+    },
+    "table_row": {
+      "type": "object",
+      "required": ["cells"],
+      "properties": {
+        "cells": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/table_cell"}
+        },
+        "metadata": {"type": "object"}
+      }
+    },
+    "table_ast": {
+      "type": "object",
+      "required": ["body"],
+      "properties": {
+        "caption": {"type": "string"},
+        "header": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/table_row"}
+        },
+        "body": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/table_row"}
+        },
+        "footer": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/table_row"}
+        },
         "metadata": {"type": "object"}
       }
     }

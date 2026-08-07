@@ -77,6 +77,54 @@ def test_validate_canonical_document_rejects_empty_table_rows():
     assert any("Tabela vazia" in error for error in errors)
 
 
+def test_validate_canonical_document_accepts_table_ast_only():
+    document = _sample_document()
+    document["sections"][0]["blocks"].append(
+        {
+            "id": "blk-table-ast",
+            "type": "table",
+            "table_ast": {
+                "body": [
+                    {
+                        "cells": [
+                            {"text": "Coluna A"},
+                            {"text": "Coluna B"},
+                        ]
+                    },
+                    {
+                        "cells": [
+                            {"text": "Valor 1"},
+                            {"text": "Valor 2"},
+                        ]
+                    },
+                ]
+            },
+        }
+    )
+
+    errors = validate_canonical_document(document)
+
+    assert not any("blk-table-ast" in error for error in errors)
+
+
+def test_validate_canonical_document_detects_table_row_inconsistency():
+    document = _sample_document()
+    document["sections"][0]["blocks"].append(
+        {
+            "id": "blk-table-bad",
+            "type": "table",
+            "rows": [
+                ["A", "B"],
+                ["C"],
+            ],
+        }
+    )
+
+    errors = validate_canonical_document(document)
+
+    assert any("colunas inconsistentes" in error for error in errors)
+
+
 def test_validate_export_profile_detects_profile_mismatch():
     document = _sample_document()
 

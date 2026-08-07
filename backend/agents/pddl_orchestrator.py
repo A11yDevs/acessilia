@@ -472,10 +472,17 @@ def _element_to_block(element: ManifestElement) -> dict[str, Any]:
             }
         )
     elif element.type == "table":
+        table_ast = _table_ast_from_metadata(metadata)
+        rows = _rows_from_table_ast(table_ast) if table_ast else None
+        if not rows:
+            rows = [[text]] if text else [["Tabela detectada"]]
+            if table_ast is None:
+                table_ast = _table_ast_from_rows(rows)
         block.update(
             {
                 "type": "table",
-                "rows": [[text]] if text else [["Tabela detectada"]],
+                "rows": rows,
+                "table_ast": table_ast,
             }
         )
     elif element.type == "picture":
@@ -540,7 +547,10 @@ def _render_text_from_blocks(blocks: list[dict[str, Any]]) -> str:
             for item in block.get("items", []):
                 lines.append(f"- {str(item).strip()}")
         elif block_type == "table":
-            for row in block.get("rows", []):
+            rows = block.get("rows")
+            if not rows and isinstance(block.get("table_ast"), dict):
+                rows = _rows_from_table_ast(block["table_ast"])
+            for row in rows or []:
                 if isinstance(row, list):
                     lines.append(" | ".join(str(cell).strip() for cell in row))
         elif block_type == "image":
@@ -560,6 +570,101 @@ def _render_text_from_pages(pages: list[dict[str, Any]]) -> str:
         if text:
             chunks.append(f"=== Pagina {page_number} ===\n{text}")
     return "\n\n".join(chunks)
+
+
+def _table_ast_from_metadata(metadata: dict[str, Any]) -> dict[str, Any] | None:
+    raw = metadata.get("table_ast")
+    if not isinstance(raw, dict):
+        return None
+
+    table_ast: dict[str, Any] = {}
+    caption = raw.get("caption")
+    if isinstance(caption, str) and caption.strip():
+        table_ast["caption"] = caption.strip()
+
+    for section_name in ("header", "body", "footer"):
+        section = raw.get(section_name)
+        if not isinstance(section, list):
+            continue
+        normalized_rows: list[dict[str, Any]] = []
+        for row in section:
+            if not isinstance(row, dict):
+                continue
+            cells = row.get("cells")
+            if not isinstance(cells, list):
+                continue
+            normalized_cells: list[dict[str, Any]] = []
+            for cell in cells:
+                if not isinstance(cell, dict):
+                    continue
+                text = str(cell.get("text", "")).strip()
+                if not text:
+                    continue
+                normalized_cell: dict[str, Any] = {"text": text}
+                if isinstance(cell.get("header"), bool):
+                    normalized_cell["header"] = cell["header"]
+                scope = cell.get("scope")
+                if isinstance(scope, str) and scope in {
+                    "none",
+                    "row",
+                    "col",
+                    "rowgroup",
+                    "colgroup",
+                }:
+                    normalized_cell["scope"] = scope
+                for span_key in ("rowspan", "colspan"):
+                    span = cell.get(span_key)
+                    if isinstance(span, int) and span >= 1:
+                        normalized_cell[span_key] = span
+                normalized_cells.append(normalized_cell)
+            if normalized_cells:
+                normalized_rows.append({"cells": normalized_cells})
+        if normalized_rows:
+            table_ast[section_name] = normalized_rows
+
+    metadata_obj = raw.get("metadata")
+    if isinstance(metadata_obj, dict):
+        table_ast["metadata"] = metadata_obj
+
+    return table_ast if table_ast.get("body") else None
+
+
+def _table_ast_from_rows(rows: list[list[str]]) -> dict[str, Any]:
+    body: list[dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, list):
+            continue
+        cells = []
+        for cell in row:
+            text = str(cell).strip()
+            if text:
+                cells.append({"text": text})
+        if cells:
+            body.append({"cells": cells})
+    return {"body": body}
+
+
+def _rows_from_table_ast(table_ast: dict[str, Any]) -> list[list[str]]:
+    rows: list[list[str]] = []
+    for section_name in ("header", "body", "footer"):
+        section = table_ast.get(section_name)
+        if not isinstance(section, list):
+            continue
+        for row in section:
+            if not isinstance(row, dict):
+                continue
+            cells = row.get("cells")
+            if not isinstance(cells, list):
+                continue
+            row_values = [
+                str(cell.get("text", "")).strip()
+                for cell in cells
+                if isinstance(cell, dict)
+            ]
+            row_values = [value for value in row_values if value]
+            if row_values:
+                rows.append(row_values)
+    return rows
 
 
 # Compatibilidade retroativa com nomenclatura PMV.

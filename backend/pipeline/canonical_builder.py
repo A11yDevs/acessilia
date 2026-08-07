@@ -211,6 +211,15 @@ def _sanitize_structured_blocks(
                     continue
                 rows.append([sanitize_block_text(str(cell)) for cell in row])
             clean["rows"] = rows
+            if rows and not isinstance(clean.get("table_ast"), dict):
+                clean["table_ast"] = _table_ast_from_rows(rows)
+
+        if block_type == "table" and isinstance(clean.get("table_ast"), dict):
+            table_ast = _sanitize_table_ast(clean["table_ast"])
+            if table_ast:
+                clean["table_ast"] = table_ast
+                if not clean.get("rows"):
+                    clean["rows"] = _rows_from_table_ast(table_ast)
 
         children = clean.get("children")
         if isinstance(children, list):
@@ -218,6 +227,88 @@ def _sanitize_structured_blocks(
 
         sanitized_blocks.append(clean)
     return sanitized_blocks
+
+
+def _sanitize_table_ast(raw: dict[str, Any]) -> dict[str, Any]:
+    table_ast: dict[str, Any] = {}
+
+    caption = raw.get("caption")
+    if isinstance(caption, str) and caption.strip():
+        table_ast["caption"] = sanitize_block_text(caption)
+
+    for section_name in ("header", "body", "footer"):
+        section = raw.get(section_name)
+        if not isinstance(section, list):
+            continue
+        normalized_rows: list[dict[str, Any]] = []
+        for row in section:
+            if not isinstance(row, dict):
+                continue
+            cells = row.get("cells")
+            if not isinstance(cells, list):
+                continue
+            normalized_cells: list[dict[str, Any]] = []
+            for cell in cells:
+                if not isinstance(cell, dict):
+                    continue
+                text = sanitize_block_text(str(cell.get("text", "")))
+                if not text:
+                    continue
+                normalized_cell: dict[str, Any] = {"text": text}
+                if isinstance(cell.get("header"), bool):
+                    normalized_cell["header"] = cell["header"]
+                scope = cell.get("scope")
+                if isinstance(scope, str) and scope in {
+                    "none",
+                    "row",
+                    "col",
+                    "rowgroup",
+                    "colgroup",
+                }:
+                    normalized_cell["scope"] = scope
+                for span_key in ("rowspan", "colspan"):
+                    span_value = cell.get(span_key)
+                    if isinstance(span_value, int) and span_value >= 1:
+                        normalized_cell[span_key] = span_value
+                normalized_cells.append(normalized_cell)
+            if normalized_cells:
+                normalized_rows.append({"cells": normalized_cells})
+        if normalized_rows:
+            table_ast[section_name] = normalized_rows
+
+    metadata = raw.get("metadata")
+    if isinstance(metadata, dict):
+        table_ast["metadata"] = metadata
+
+    return table_ast
+
+
+def _table_ast_from_rows(rows: list[list[str]]) -> dict[str, Any]:
+    body = []
+    for row in rows:
+        cells = [{"text": sanitize_block_text(str(cell))} for cell in row if str(cell).strip()]
+        if cells:
+            body.append({"cells": cells})
+    return {"body": body}
+
+
+def _rows_from_table_ast(table_ast: dict[str, Any]) -> list[list[str]]:
+    rows: list[list[str]] = []
+    for section_name in ("header", "body", "footer"):
+        section = table_ast.get(section_name)
+        if not isinstance(section, list):
+            continue
+        for row in section:
+            if not isinstance(row, dict):
+                continue
+            cells = row.get("cells")
+            if not isinstance(cells, list):
+                continue
+            row_values = [str(cell.get("text", "")).strip() for cell in cells if isinstance(cell, dict)]
+            row_values = [value for value in row_values if value]
+            if row_values:
+                rows.append(row_values)
+    return rows
 
 
 def _make_id(prefix: str, text: str, counter: int) -> str:
