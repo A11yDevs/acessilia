@@ -4,7 +4,7 @@ from pathlib import Path
 
 import fitz
 
-from core.manifest.pymupdf_extractor import PyMuPDFManifestExtractor
+from backend.core.manifest.pymupdf_extractor import PyMuPDFManifestExtractor
 
 
 def _make_sample_pdf(path: Path) -> None:

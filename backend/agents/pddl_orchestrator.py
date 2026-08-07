@@ -6,14 +6,14 @@ from typing import Any, Callable, Coroutine
 
 import fitz
 
-from core.agents.informational_structural import InformationalStructuralAgent
-from core.execution.executor import ExecutorAgent, MethodRegistry
-from core.execution.models import ExecutionReport
-from core.manifest.docling_extractor import DoclingManifestExtractor
-from core.manifest.pymupdf_extractor import PyMuPDFManifestExtractor
-from core.manifest.models import ManifestElement, ProcessingManifest
-from core.planning.models import NominalPlan, PlanningComparison
-from core.planning.planner_agent import PlannerAgent
+from backend.core.agents.informational_structural import InformationalStructuralAgent
+from backend.core.execution.executor import ExecutorAgent, MethodRegistry
+from backend.core.execution.models import ExecutionReport
+from backend.core.manifest.docling_extractor import DoclingManifestExtractor
+from backend.core.manifest.pymupdf_extractor import PyMuPDFManifestExtractor
+from backend.core.manifest.models import ManifestElement, ProcessingManifest
+from backend.core.planning.models import NominalPlan, PlanningComparison
+from backend.core.planning.planner_agent import PlannerAgent
 
 from backend.agents.vision_agent import VisionAgent
 from backend.tools.code_tools import normalize_code_text

@@ -6,7 +6,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from core.manifest.schema import write_processing_manifest_schema
+from backend.core.manifest.schema import write_processing_manifest_schema
 
 
 if __name__ == "__main__":

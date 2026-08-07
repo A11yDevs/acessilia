@@ -79,7 +79,7 @@ def test_build_orchestrator_returns_pddl_when_configured(monkeypatch):
 
 def test_build_orchestrator_pddl_with_docling_enables_ocr(monkeypatch):
     from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
-    from core.manifest.docling_extractor import DoclingManifestExtractor
+    from backend.core.manifest.docling_extractor import DoclingManifestExtractor
 
     monkeypatch.setattr(settings, "structurer", "docling")
     monkeypatch.setattr(settings, "pddl_fast_downward", "")
@@ -94,7 +94,7 @@ def test_build_orchestrator_pddl_with_docling_enables_ocr(monkeypatch):
 
 def test_build_orchestrator_pddl_with_structurer_pymupdf_uses_pymupdf_extractor(monkeypatch):
     from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
-    from core.manifest.pymupdf_extractor import PyMuPDFManifestExtractor
+    from backend.core.manifest.pymupdf_extractor import PyMuPDFManifestExtractor
 
     monkeypatch.setattr(settings, "structurer", "pymupdf")
     monkeypatch.setattr(settings, "pddl_fast_downward", "")

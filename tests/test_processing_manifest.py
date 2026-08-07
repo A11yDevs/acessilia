@@ -4,9 +4,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
-from core.agents.informational_structural import InformationalStructuralAgent
-from core.manifest.docling_extractor import DoclingExtraction
-from core.manifest.schema import processing_manifest_schema, validate_manifest
+from backend.core.agents.informational_structural import InformationalStructuralAgent
+from backend.core.manifest.docling_extractor import DoclingExtraction
+from backend.core.manifest.schema import processing_manifest_schema, validate_manifest
 
 
 SCHEMA_PATH = (

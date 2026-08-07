@@ -5,7 +5,7 @@ from pathlib import Path
 
 from backend.agents.pddl_orchestrator import build_pddl_structured_payload
 from backend.pipeline.canonical_builder import build_canonical_document
-from core.manifest.models import (
+from backend.core.manifest.models import (
     ExtractorRun,
     ManifestElement,
     ManifestSummary,
@@ -14,7 +14,7 @@ from core.manifest.models import (
     ProcessingManifest,
     SourceDocument,
 )
-from core.planning.models import DomainIdentity, NominalPlan, PlanStep
+from backend.core.planning.models import DomainIdentity, NominalPlan, PlanStep
 
 
 def _sample_manifest() -> ProcessingManifest:

@@ -8,9 +8,9 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from core.execution.schema import write_execution_report_schema
-from core.manifest.schema import write_processing_manifest_schema
-from core.planning.schema import (
+from backend.core.execution.schema import write_execution_report_schema
+from backend.core.manifest.schema import write_processing_manifest_schema
+from backend.core.planning.schema import (
     write_nominal_plan_schema,
     write_planning_comparison_schema,
 )

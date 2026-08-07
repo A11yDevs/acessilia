@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from core.manifest.models import (
+from backend.core.manifest.models import (
     ExtractorRun,
     ManifestElement,
     ManifestSummary,
@@ -14,8 +14,8 @@ from core.manifest.models import (
     ProcessingManifest,
     SourceDocument,
 )
-from core.planning.domain_bundle import DomainBundle
-from core.planning.planner_agent import PlannerAgent
+from backend.core.planning.domain_bundle import DomainBundle
+from backend.core.planning.planner_agent import PlannerAgent
 from interfaces.cli.pmv import main
 
 

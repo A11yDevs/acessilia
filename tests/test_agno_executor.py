@@ -4,9 +4,9 @@ from importlib.util import find_spec
 
 import pytest
 
-from core.execution.executor import ExecutorAgent, MethodRegistry
-from core.execution.models import MethodResult
-from core.planning.planner_agent import PlannerAgent
+from backend.core.execution.executor import ExecutorAgent, MethodRegistry
+from backend.core.execution.models import MethodResult
+from backend.core.planning.planner_agent import PlannerAgent
 from tests.test_pddl_planning import make_manifest
 
 
