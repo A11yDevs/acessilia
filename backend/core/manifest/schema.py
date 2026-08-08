@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from jsonschema import Draft202012Validator
 from pydantic import ValidationError
 
 from backend.core.manifest.models import ProcessingManifest
@@ -40,22 +41,14 @@ def validate_manifest(
         )
 
     if schema_path is not None:
-        try:
-            from jsonschema import Draft202012Validator
-        except ImportError:
-            errors.append(
-                "A dependência jsonschema não está instalada; "
-                "não foi possível validar o arquivo de schema."
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+        Draft202012Validator.check_schema(schema)
+        validator = Draft202012Validator(schema)
+        errors.extend(
+            f"{'.'.join(map(str, error.absolute_path)) or '$'}: {error.message}"
+            for error in sorted(
+                validator.iter_errors(payload),
+                key=lambda item: list(item.absolute_path),
             )
-        else:
-            schema = json.loads(schema_path.read_text(encoding="utf-8"))
-            Draft202012Validator.check_schema(schema)
-            validator = Draft202012Validator(schema)
-            errors.extend(
-                f"{'.'.join(map(str, error.absolute_path)) or '$'}: {error.message}"
-                for error in sorted(
-                    validator.iter_errors(payload),
-                    key=lambda item: list(item.absolute_path),
-                )
-            )
+        )
     return errors
