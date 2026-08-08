@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -397,10 +396,6 @@ class ExecutorAgent:
 
 
 def _json_sha256(payload: dict) -> str:
-    canonical = json.dumps(
-        payload,
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(",", ":"),
-    )
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    from backend.core.hashing import json_sha256
+
+    return json_sha256(payload)

@@ -687,4 +687,4 @@ def _text_sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-from backend.core.execution.executor import _json_sha256 as _json_sha256
+from backend.core.hashing import json_sha256 as _json_sha256
