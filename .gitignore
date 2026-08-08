@@ -31,7 +31,6 @@ temp/
 *.sqlite
 *.sqlite3
 *.log
-*.lock
 
 # LaTeX build artifacts
 *.aux
