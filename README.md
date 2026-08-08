@@ -12,7 +12,7 @@ O projeto segue a camada *Domínio → Aplicação → Interface*:
 
 ### API standalone
 
-A **API** (`http://localhost:8000`) é o núcleo: recebe o arquivo, coloca na fila, processa com o LLM, exporta os formatos acessíveis (TXT, DOCX, PDF, HTML, MP3, ZIP) e disponibiliza o download via token. Os frontends (web, Telegram, CLI) consomem tudo por HTTP usando o cliente compartilhado `frontend.clients.api_client.ApiClient`.
+A **API** (`http://localhost:8000`) é o núcleo: recebe o arquivo, coloca na fila, processa com o LLM, exporta os formatos acessíveis (TXT, DOCX, PDF, PDF/UA, HTML, MP3, ZIP) e disponibiliza o download via token. Os frontends (web, Telegram, CLI) consomem tudo por HTTP usando o cliente compartilhado `frontend.clients.api_client.ApiClient`.
 
 Principais endpoints (`/api/v1`):
 
@@ -22,7 +22,7 @@ Principais endpoints (`/api/v1`):
 | `GET` | `/jobs/{task_id}` | Status/progresso da tarefa |
 | `POST` | `/jobs/{task_id}/cancel` | Cancela a tarefa |
 | `GET` | `/download/{token}` | Lista formatos disponíveis de um token |
-| `GET` | `/download/{token}/{format}` | Baixa o arquivo (txt/docx/pdf/html/mp3/zip) |
+| `GET` | `/download/{token}/{format}` | Baixa o arquivo (txt/docx/pdf/pdf_ua/html/mp3/zip) |
 | `GET` | `/history?limit=20` | Histórico de conversões |
 | `GET` | `/stats` | Estatísticas agregadas |
 | `GET` | `/health` | Status do servidor e do modelo de IA |
@@ -77,6 +77,30 @@ docker compose up -d --build
 ```
 
 O container expõe `8000` (API) e `8001` (web), persiste tudo em `./var` e roda o healthcheck em `/api/v1/health`.
+
+### Cache offline do RapidOCR
+
+Quando o fluxo com `Docling` é usado pela primeira vez, o `RapidOCR` pode baixar pesos de OCR em tempo de execução. Para evitar downloads recorrentes em benchmarks e execuções seguintes, o projeto agora persiste esses arquivos em um cache local.
+
+- Variável de ambiente: `RAPIDOCR_CACHE_DIR`
+- Valor padrão: `var/cache/rapidocr`
+
+Comportamento:
+
+- Na primeira execução com Docling, os pesos são baixados e copiados para o cache local.
+- Nas execuções seguintes, os arquivos são restaurados automaticamente antes de inicializar o `RapidOCR`.
+
+Exemplo:
+
+```bash
+export RAPIDOCR_CACHE_DIR=var/cache/rapidocr
+docker run --rm -e STRUCTURER=docling -v "$PWD:/app" -w /app acessilia:test-docling \
+	python scripts/benchmark_pipelines.py tests/fixtures/tutorials/java-oo-3pgs.pdf \
+	-o temp/output/regression-bench/java-oo-3pgs-offline/docling \
+	--mode normal --export-formats txt,pdf,pdf_ua --pddl-extractor-backend docling
+```
+
+Se quiser embutir os modelos já na imagem Docker, o `infra/Dockerfile` também inclui um passo de preload no build quando a imagem é reconstruída com acesso à rede.
 
 ## Contribuindo
 

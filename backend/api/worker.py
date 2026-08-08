@@ -13,6 +13,7 @@ from backend.config.settings import settings
 from backend.export.exporters.audio_exporter import export_mp3
 from backend.export.exporters.docx_exporter import export_docx
 from backend.export.exporters.pdf_exporter import export_pdf
+from backend.export.exporters.pdf_exporter import export_pdf_ua
 from backend.export.exporters.txt_exporter import export_txt
 from backend.export.pandoc_exporter import export_accessible_document
 from backend.services.download_token_service import criar_token
@@ -120,6 +121,19 @@ class JobExecutor:
             pdf_path = out_dir / f"{base}.pdf"
             await self._run_in_executor(export_pdf, canonical, pdf_path, job.filename)
 
+            state_manager.atualizar(task_id, etapa="Exportando PDF/UA...", progresso=0.92)
+            pdf_ua_path = out_dir / f"{base}.pdf_ua.pdf"
+            try:
+                await self._run_in_executor(
+                    export_pdf_ua,
+                    canonical,
+                    pdf_ua_path,
+                    job.filename,
+                )
+            except Exception as exc:
+                logger.warning("Falha ao gerar PDF/UA: {}", exc)
+                pdf_ua_path = None
+
             state_manager.atualizar(task_id, etapa="Exportando HTML...", progresso=0.93)
             html_path = out_dir / f"{base}.html"
             await self._run_in_executor(
@@ -148,10 +162,14 @@ class JobExecutor:
                     logger.error("Falha ao gerar MP3: {}", e)
 
             zip_path = out_dir / f"{base}_acessivel.zip"
+            package_paths = [txt_path, docx_path, pdf_path, html_path, mp3_path]
+            if isinstance(pdf_ua_path, Path):
+                package_paths.append(pdf_ua_path)
+
             await self._run_in_executor(
                 _build_zip_package,
                 zip_path,
-                [txt_path, docx_path, pdf_path, html_path, mp3_path],
+                package_paths,
             )
 
             token = await criar_token(out_dir, base)

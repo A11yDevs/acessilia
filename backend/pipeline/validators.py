@@ -42,8 +42,8 @@ def validate_canonical_document(document: dict[str, Any]) -> list[str]:
                 code_text = block.get("text", "")
                 if _indentation_lost(code_text):
                     errors.append(f"Indentacao de codigo inconsistente em {block_id}")
-            if block.get("type") == "table" and not block.get("rows"):
-                errors.append(f"Tabela vazia em {block_id}")
+            if block.get("type") == "table":
+                errors.extend(_validate_table_block(block))
             internal_links.extend(_extract_internal_links(block))
 
     for section in document.get("sections", []):
@@ -124,6 +124,22 @@ def audit_canonical_document(document: dict[str, Any]) -> dict[str, list[str]]:
                 "alt"
             ):
                 report["WARNING"].append(f"Imagem {block.get('id')} sem alt-text.")
+            if block.get("type") == "table":
+                table_id = block.get("id") or "(sem-id)"
+                table_ast = block.get("table_ast")
+                if isinstance(table_ast, dict):
+                    header = table_ast.get("header")
+                    body = table_ast.get("body")
+                    if (not isinstance(header, list) or not header) and isinstance(body, list) and len(body) > 1:
+                        report["WARNING"].append(
+                            f"Tabela {table_id} sem header explicito; revisar inferencia de cabecalhos."
+                        )
+                elif block.get("rows"):
+                    rows = block.get("rows")
+                    if isinstance(rows, list) and len(rows) > 1:
+                        report["WARNING"].append(
+                            f"Tabela {table_id} sem table_ast; usando fallback legado por linhas."
+                        )
 
     for section in sections:
         check_accessibility(section.get("blocks", []))
@@ -162,7 +178,116 @@ def _heading_skips_levels(levels: list[int]) -> bool:
 
 
 def _indentation_lost(text: str) -> bool:
-    lines = text.splitlines()
+    lines = [line for line in text.splitlines() if line.strip()]
     if len(lines) <= 1:
         return False
-    return not any(line.startswith((" ", "\t")) for line in lines)
+
+    # Não exigir indentação quando o bloco só tem assinatura e fechamento,
+    # ex.: "public interface X {" + "}".
+    candidate_lines: list[str] = []
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+        if index == 0:
+            continue
+        if stripped in {"}", "};", "{"}:
+            continue
+        candidate_lines.append(line)
+
+    if not candidate_lines:
+        return False
+
+    return not any(line.startswith((" ", "\t")) for line in candidate_lines)
+
+
+def _validate_table_block(block: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    block_id = block.get("id") or "(sem-id)"
+
+    rows = block.get("rows")
+    table_ast = block.get("table_ast")
+
+    if not rows and not table_ast:
+        return [f"Tabela vazia em {block_id}"]
+
+    if rows is not None:
+        if not isinstance(rows, list) or not rows:
+            errors.append(f"Tabela com rows invalidas em {block_id}")
+        else:
+            expected_columns: int | None = None
+            for row_index, row in enumerate(rows):
+                if not isinstance(row, list) or not row:
+                    errors.append(
+                        f"Tabela com linha invalida em {block_id} (row {row_index})"
+                    )
+                    continue
+                if expected_columns is None:
+                    expected_columns = len(row)
+                elif len(row) != expected_columns:
+                    errors.append(
+                        f"Tabela com colunas inconsistentes em {block_id} (row {row_index})"
+                    )
+                for col_index, cell in enumerate(row):
+                    if not isinstance(cell, str):
+                        errors.append(
+                            f"Tabela com celula nao textual em {block_id} (row {row_index}, col {col_index})"
+                        )
+                        continue
+                    if not cell.strip():
+                        errors.append(
+                            f"Tabela com celula vazia em {block_id} (row {row_index}, col {col_index})"
+                        )
+
+    if table_ast is not None:
+        if not isinstance(table_ast, dict):
+            errors.append(f"table_ast invalido em {block_id}")
+            return errors
+
+        if not isinstance(table_ast.get("body"), list) or not table_ast.get("body"):
+            errors.append(f"table_ast sem body em {block_id}")
+
+        for section_name in ("header", "body", "footer"):
+            section = table_ast.get(section_name)
+            if section is None:
+                continue
+            if not isinstance(section, list):
+                errors.append(f"table_ast.{section_name} invalido em {block_id}")
+                continue
+            expected_width: int | None = None
+            for row_index, row in enumerate(section):
+                if not isinstance(row, dict):
+                    errors.append(
+                        f"table_ast.{section_name}[{row_index}] invalido em {block_id}"
+                    )
+                    continue
+                cells = row.get("cells")
+                if not isinstance(cells, list) or not cells:
+                    errors.append(
+                        f"table_ast.{section_name}[{row_index}] sem cells em {block_id}"
+                    )
+                    continue
+                row_effective_width = 0
+                for col_index, cell in enumerate(cells):
+                    if not isinstance(cell, dict):
+                        errors.append(
+                            f"table_ast celula invalida em {block_id} ({section_name} {row_index}:{col_index})"
+                        )
+                        continue
+                    text = cell.get("text")
+                    if not isinstance(text, str) or not text.strip():
+                        errors.append(
+                            f"table_ast celula sem texto em {block_id} ({section_name} {row_index}:{col_index})"
+                        )
+                    colspan = cell.get("colspan")
+                    if isinstance(colspan, int) and colspan >= 1:
+                        row_effective_width += colspan
+                    else:
+                        row_effective_width += 1
+
+                if expected_width is None:
+                    expected_width = row_effective_width
+                elif row_effective_width != expected_width:
+                    errors.append(
+                        f"table_ast.{section_name} com largura inconsistente em {block_id} (row {row_index})"
+                    )
+
+    return errors

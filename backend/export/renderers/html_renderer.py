@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import Any
 
 from backend.export.filters.pandoc_filters import apply_output_profile_filter
+from backend.pipeline.table_ast import split_header_and_body
+from backend.pipeline.table_ast import table_ast_from_block
 from backend.pipeline.verbosity_manager import normalize_profile
 
 
@@ -114,21 +116,32 @@ def _render_block(block: dict[str, Any], profile: dict[str, Any]) -> str:
         )
         return f'<{tag} id="{block_id}">{items}</{tag}>'
     if block_type == "table":
-        rows = block.get("rows", [])
-        if not rows:
+        table_ast = table_ast_from_block(block)
+        if table_ast is None:
             return ""
-        header = rows[0]
-        body_rows = rows[1:] or []
-        thead = (
-            "<tr>"
-            + "".join(f"<th>{escape(str(cell))}</th>" for cell in header)
-            + "</tr>"
+        header_rows, body_rows, footer_rows = split_header_and_body(table_ast)
+
+        caption = table_ast.get("caption")
+        caption_html = (
+            f"<caption>{escape(str(caption))}</caption>"
+            if isinstance(caption, str) and caption.strip()
+            else ""
         )
-        tbody = "".join(
-            "<tr>" + "".join(f"<td>{escape(str(cell))}</td>" for cell in row) + "</tr>"
-            for row in body_rows
-        )
-        return f'<table id="{block_id}"><thead>{thead}</thead><tbody>{tbody}</tbody></table>'
+
+        thead = ""
+        if header_rows:
+            thead_rows = "".join(_render_html_table_row(row, header=True) for row in header_rows)
+            thead = f"<thead>{thead_rows}</thead>"
+
+        tbody_rows = "".join(_render_html_table_row(row, header=False) for row in body_rows)
+        tbody = f"<tbody>{tbody_rows}</tbody>" if tbody_rows else ""
+
+        tfoot = ""
+        if footer_rows:
+            tfoot_rows = "".join(_render_html_table_row(row, header=False) for row in footer_rows)
+            tfoot = f"<tfoot>{tfoot_rows}</tfoot>"
+
+        return f'<table id="{block_id}">{caption_html}{thead}{tbody}{tfoot}</table>'
     if block_type == "image":
         alt = escape(block.get("alt_text", block.get("text", "")))
         desc = escape(block.get("long_description", ""))
@@ -147,3 +160,37 @@ def _render_block(block: dict[str, Any], profile: dict[str, Any]) -> str:
             return f'<details id="{block_id}"><summary>{summary}</summary><p>{content}</p></details>'
         return f'<section id="{block_id}"><h2>{summary}</h2><p>{content}</p></section>'
     return f'<p id="{block_id}">{escape(block.get("text", ""))}</p>'
+
+
+def _render_html_table_row(row: dict[str, Any], *, header: bool) -> str:
+    cells = row.get("cells", []) if isinstance(row, dict) else []
+    tag = "th" if header else "td"
+    rendered_cells: list[str] = []
+    for cell in cells:
+        if not isinstance(cell, dict):
+            continue
+        text = escape(str(cell.get("text", "")).strip())
+        if not text:
+            continue
+
+        attrs: list[str] = []
+        if tag == "th":
+            scope = cell.get("scope")
+            if isinstance(scope, str) and scope in {"row", "col", "rowgroup", "colgroup"}:
+                attrs.append(f'scope="{scope}"')
+            else:
+                attrs.append('scope="col"')
+
+        rowspan = cell.get("rowspan")
+        if isinstance(rowspan, int) and rowspan > 1:
+            attrs.append(f'rowspan="{rowspan}"')
+        colspan = cell.get("colspan")
+        if isinstance(colspan, int) and colspan > 1:
+            attrs.append(f'colspan="{colspan}"')
+
+        attrs_text = f" {' '.join(attrs)}" if attrs else ""
+        rendered_cells.append(f"<{tag}{attrs_text}>{text}</{tag}>")
+
+    if not rendered_cells:
+        return ""
+    return "<tr>" + "".join(rendered_cells) + "</tr>"

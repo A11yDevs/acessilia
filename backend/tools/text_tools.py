@@ -1,4 +1,5 @@
 """Ferramentas auxiliares de processamento de texto."""
+from backend.tools.code_tools import normalize_code_text
 from backend.tools.region_extractor import Region
 
 REGION_MARKERS = {
@@ -11,13 +12,17 @@ REGION_MARKERS = {
 CALLOUT_LABEL_MAP = {
     "note": "nota", "quote": "citação", "sidebar": "barra lateral",
     "warning": "aviso", "tip": "dica", "important": "importante",
+    "admonition": "aviso", "caution": "aviso",
 }
 
 def apply_marker(text: str, classification: str, region: Region) -> str:
     markers = REGION_MARKERS.get(classification)
     if not markers: return text
+    if classification == "code_block":
+        text = normalize_code_text(text)
     start, end = markers
-    lab = region.metadata.get("docling_label", "")
+    lab = region.metadata.get("docling_label_kind") or region.metadata.get("docling_label", "")
+    lab = str(lab).strip().lower().removeprefix("docitemlabel.").removeprefix("grouplabel.")
     custom = CALLOUT_LABEL_MAP.get(lab)
     if custom:
         start = f"Início de {custom}:"

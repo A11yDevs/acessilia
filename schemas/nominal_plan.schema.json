@@ -1,0 +1,211 @@
+{
+  "$defs": {
+    "DomainIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        },
+        "domain_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Domain Sha256",
+          "type": "string"
+        },
+        "description_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Description Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version",
+        "domain_sha256",
+        "description_sha256"
+      ],
+      "title": "DomainIdentity",
+      "type": "object"
+    },
+    "PlanStep": {
+      "additionalProperties": false,
+      "properties": {
+        "index": {
+          "minimum": 0,
+          "title": "Index",
+          "type": "integer"
+        },
+        "action": {
+          "enum": [
+            "start-job",
+            "execute-obligation",
+            "complete-job"
+          ],
+          "title": "Action",
+          "type": "string"
+        },
+        "obligation_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Obligation Id"
+        },
+        "obligation_kind": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Obligation Kind"
+        },
+        "method": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Method"
+        },
+        "expected_cost": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Expected Cost",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "index",
+        "action"
+      ],
+      "title": "PlanStep",
+      "type": "object"
+    }
+  },
+  "$id": "urn:a11y-devs:schema:nominal-plan:1.0.0",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Plano nominal gerado a partir do manifesto e do domínio PDDL Acessília. Efeitos só são confirmados pelo Executor.",
+  "properties": {
+    "$schema": {
+      "default": "urn:a11y-devs:schema:nominal-plan:1.0.0",
+      "title": "$Schema",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0.0",
+      "default": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "plan_id": {
+      "minLength": 1,
+      "title": "Plan Id",
+      "type": "string"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "status": {
+      "const": "nominal",
+      "default": "nominal",
+      "title": "Status",
+      "type": "string"
+    },
+    "manifest_id": {
+      "minLength": 1,
+      "title": "Manifest Id",
+      "type": "string"
+    },
+    "manifest_revision": {
+      "minimum": 1,
+      "title": "Manifest Revision",
+      "type": "integer"
+    },
+    "manifest_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Manifest Sha256",
+      "type": "string"
+    },
+    "domain": {
+      "$ref": "#/$defs/DomainIdentity"
+    },
+    "problem_name": {
+      "minLength": 1,
+      "title": "Problem Name",
+      "type": "string"
+    },
+    "problem_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Problem Sha256",
+      "type": "string"
+    },
+    "planner": {
+      "minLength": 1,
+      "title": "Planner",
+      "type": "string"
+    },
+    "metric": {
+      "const": "minimize-total-cost",
+      "default": "minimize-total-cost",
+      "title": "Metric",
+      "type": "string"
+    },
+    "selected_obligations": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Selected Obligations",
+      "type": "array"
+    },
+    "expected_total_cost": {
+      "minimum": 0,
+      "title": "Expected Total Cost",
+      "type": "integer"
+    },
+    "steps": {
+      "items": {
+        "$ref": "#/$defs/PlanStep"
+      },
+      "title": "Steps",
+      "type": "array"
+    }
+  },
+  "required": [
+    "plan_id",
+    "generated_at",
+    "manifest_id",
+    "manifest_revision",
+    "manifest_sha256",
+    "domain",
+    "problem_name",
+    "problem_sha256",
+    "planner",
+    "selected_obligations",
+    "expected_total_cost",
+    "steps"
+  ],
+  "title": "NominalPlan",
+  "type": "object"
+}

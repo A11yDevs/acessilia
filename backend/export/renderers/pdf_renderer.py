@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 from typing import Any
 
 from reportlab.lib.enums import TA_CENTER
@@ -16,7 +17,9 @@ from reportlab.platypus import (
     Spacer,
 )
 
+from backend.pipeline.table_ast import linearize_table_for_text
 from backend.pipeline.verbosity_manager import filter_blocks_for_profile
+from backend.tools.code_tools import normalize_code_text
 
 
 class _DocTemplate(SimpleDocTemplate):
@@ -86,6 +89,18 @@ def render_pdf(
     )
     styles.add(
         ParagraphStyle("A11yBody", parent=styles["BodyText"], leading=14, spaceAfter=6)
+    )
+    styles.add(
+        ParagraphStyle(
+            "A11yCode",
+            parent=styles["Code"],
+            fontName="Courier",
+            fontSize=9,
+            leading=11,
+            leftIndent=10,
+            spaceBefore=3,
+            spaceAfter=6,
+        )
     )
     doc = _DocTemplate(
         str(output_path),
@@ -169,8 +184,9 @@ def _render_block(story, block: dict[str, Any], styles) -> None:
     elif block_type == "paragraph":
         story.append(Paragraph(block.get("text", ""), styles["A11yBody"]))
     elif block_type == "code":
+        code_text = normalize_code_text(block.get("text", ""))
         story.append(
-            Preformatted(block.get("text", ""), styles["A11yBody"], dedent=False)
+            Preformatted(code_text, styles["A11yCode"], dedent=False)
         )
     elif block_type == "list":
         items = [
@@ -180,16 +196,50 @@ def _render_block(story, block: dict[str, Any], styles) -> None:
             ListFlowable(items, bulletType="1" if block.get("ordered") else "bullet")
         )
     elif block_type == "table":
-        for row in block.get("rows", []):
-            story.append(
-                Paragraph(" | ".join(str(cell) for cell in row), styles["A11yBody"])
-            )
+        for line in linearize_table_for_text(block):
+            story.append(Paragraph(line, styles["A11yBody"]))
     elif block_type in {"details", "note", "warning", "quote", "image", "math"}:
         text = (
             block.get("long_description")
             or block.get("alt_text")
             or block.get("text", "")
         )
-        story.append(Paragraph(text, styles["A11yBody"]))
+        if block_type in {"note", "warning"}:
+            label = "Aviso" if block_type == "warning" else "Nota"
+            if text:
+                story.append(Paragraph(f"<b>{label}:</b> {text}", styles["A11yBody"]))
+            else:
+                story.append(Paragraph(f"<b>{label}</b>", styles["A11yBody"]))
+        else:
+            story.append(Paragraph(text, styles["A11yBody"]))
     else:
-        story.append(Paragraph(block.get("text", ""), styles["A11yBody"]))
+        text = block.get("text", "")
+        if _looks_like_code_text(text):
+            story.append(
+                Preformatted(
+                    normalize_code_text(text),
+                    styles["A11yCode"],
+                    dedent=False,
+                )
+            )
+        else:
+            story.append(Paragraph(text, styles["A11yBody"]))
+
+
+def _looks_like_code_text(text: str) -> bool:
+    if not isinstance(text, str) or not text.strip():
+        return False
+    if "\n" not in text and len(text) < 90:
+        return False
+    java_tokens = (
+        "class ",
+        "public ",
+        "private ",
+        "protected ",
+        "return ",
+        "if (",
+        "else",
+    )
+    score = sum(1 for token in java_tokens if token in text)
+    has_code_marks = bool(re.search(r"[{};()]", text))
+    return score >= 2 and has_code_marks

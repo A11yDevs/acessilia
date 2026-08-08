@@ -29,6 +29,12 @@ class Settings:
     logs_dir: Path = field(
         default_factory=lambda: _path_from_env("LOGS_DIR", BASE_DIR / "var" / "logs")
     )
+    rapidocr_cache_dir: Path = field(
+        default_factory=lambda: _path_from_env(
+            "RAPIDOCR_CACHE_DIR",
+            BASE_DIR / "var" / "cache" / "rapidocr",
+        )
+    )
     request_timeout: int = int(os.getenv("REQUEST_TIMEOUT", "3600"))
     log_level: str = os.getenv("LOG_LEVEL", "INFO")
     allowed_extensions: set[str] = field(default_factory=lambda: _default_extensions())
@@ -62,6 +68,43 @@ class Settings:
     )
     pymupdf_text_threshold: int = int(os.getenv("PYMUPDF_TEXT_THRESHOLD", "100"))
     structurer: str = os.getenv("STRUCTURER", "pymupdf")
+    pipeline_engine: str = os.getenv("PIPELINE_ENGINE", "legacy")
+    pddl_execute_dry_run: bool = field(
+        default_factory=lambda: _bool_from_env_alias(
+            ("PDDL_EXECUTE_DRY_RUN", "PMV_EXECUTE_DRY_RUN"),
+            True,
+        )
+    )
+    pddl_planner_backend: str = field(
+        default_factory=lambda: _str_from_env_alias(
+            ("PDDL_PLANNER_BACKEND", "PMV_PLANNER_BACKEND"),
+            "internal",
+        )
+    )
+    pddl_preferred_plan: str = field(
+        default_factory=lambda: _str_from_env_alias(
+            ("PDDL_PREFERRED_PLAN", "PMV_PREFERRED_PLAN"),
+            "internal",
+        )
+    )
+    pddl_fast_downward: str = field(
+        default_factory=lambda: _str_from_env_alias(
+            ("PDDL_FAST_DOWNWARD", "PMV_FAST_DOWNWARD"),
+            "",
+        )
+    )
+    pddl_fast_downward_alias: str = field(
+        default_factory=lambda: _str_from_env_alias(
+            ("PDDL_FAST_DOWNWARD_ALIAS", "PMV_FAST_DOWNWARD_ALIAS"),
+            "",
+        )
+    )
+    pddl_fast_downward_search: str = field(
+        default_factory=lambda: _str_from_env_alias(
+            ("PDDL_FAST_DOWNWARD_SEARCH", "PMV_FAST_DOWNWARD_SEARCH"),
+            "astar(blind())",
+        )
+    )
 
     # Interface Settings
     enabled_interfaces: str = os.getenv("ENABLED_INTERFACES", "api,telegram,web")
@@ -84,6 +127,32 @@ class Settings:
         self.temp_dir.mkdir(parents=True, exist_ok=True)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.logs_dir.mkdir(parents=True, exist_ok=True)
+        self.rapidocr_cache_dir.mkdir(parents=True, exist_ok=True)
+
+    # Aliases retroativos para configuração antiga com prefixo PMV.
+    @property
+    def pmv_execute_dry_run(self) -> bool:
+        return self.pddl_execute_dry_run
+
+    @property
+    def pmv_planner_backend(self) -> str:
+        return self.pddl_planner_backend
+
+    @property
+    def pmv_preferred_plan(self) -> str:
+        return self.pddl_preferred_plan
+
+    @property
+    def pmv_fast_downward(self) -> str:
+        return self.pddl_fast_downward
+
+    @property
+    def pmv_fast_downward_alias(self) -> str:
+        return self.pddl_fast_downward_alias
+
+    @property
+    def pmv_fast_downward_search(self) -> str:
+        return self.pddl_fast_downward_search
 
     @property
     def bot_token_valid(self) -> bool:
@@ -120,6 +189,30 @@ def _path_from_env(env_var: str, default: Path) -> Path:
     if not path.is_absolute():
         path = BASE_DIR / path
     return path
+
+
+
+
+def _str_from_env_alias(env_vars: tuple[str, ...], default: str) -> str:
+    for env_var in env_vars:
+        raw_value = os.getenv(env_var)
+        if raw_value is not None:
+            return raw_value
+    return default
+
+
+def _bool_from_env_alias(env_vars: tuple[str, ...], default: bool) -> bool:
+    for env_var in env_vars:
+        raw_value = os.getenv(env_var)
+        if raw_value is not None:
+            return raw_value.strip().lower() in {
+                "1",
+                "true",
+                "yes",
+                "on",
+                "sim",
+            }
+    return default
 
 
 settings = Settings()

@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from backend.pipeline.table_ast import linearize_table_for_text
 from backend.pipeline.verbosity_manager import filter_blocks_for_profile
 
 
@@ -43,7 +44,7 @@ def _render_block(block: dict[str, Any]) -> list[str]:
         prefix = "1." if block.get("ordered") else "-"
         return [f"{prefix} {item}" for item in block.get("items", [])]
     if block_type == "table":
-        return [" | ".join(str(cell) for cell in row) for row in block.get("rows", [])]
+        return linearize_table_for_text(block)
     if block_type == "image":
         return [block.get("alt_text") or block.get("text", "")]
     if block_type == "math":
