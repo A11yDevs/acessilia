@@ -19,6 +19,29 @@ def _pandoc_bin() -> str | None:
     return shutil.which("pandoc")
 
 
+def _xelatex_bin() -> str | None:
+    """Retorna o caminho do binário xelatex, ou None se não disponível."""
+    return shutil.which("xelatex")
+
+
+def _lualatex_bin() -> str | None:
+    """Retorna o caminho do binário lualatex, ou None se não disponível."""
+    return shutil.which("lualatex")
+
+
+def _pdf_ua_engine() -> str | None:
+    """Seleciona engine LaTeX para PDF/UA (prefere XeLaTeX)."""
+    if _xelatex_bin() is not None:
+        return "xelatex"
+    if _lualatex_bin() is not None:
+        return "lualatex"
+    return None
+
+
+def _pdf_ua_template_path() -> Path:
+    return Path(__file__).resolve().parent / "templates" / "pdf_ua.tex"
+
+
 def _render_with_pandoc(
     ast: dict[str, Any],
     output_path: Path,
@@ -43,6 +66,37 @@ def _render_with_pandoc(
     if result.returncode != 0:
         raise RuntimeError(f"pandoc falhou ({to_format}): {result.stderr.decode()}")
     return output_path
+
+
+def _render_pdf_ua_with_pandoc(ast: dict[str, Any], output_path: Path) -> Path:
+    pandoc = _pandoc_bin()
+    if pandoc is None:
+        raise RuntimeError(
+            "pandoc não encontrado no PATH. O formato pdf_ua exige pandoc + engine LaTeX."
+        )
+    engine = _pdf_ua_engine()
+    if engine is None:
+        raise RuntimeError(
+            "Nenhuma engine LaTeX encontrada no PATH. O formato pdf_ua exige lualatex ou xelatex."
+        )
+
+    template_path = _pdf_ua_template_path()
+    if not template_path.exists():
+        raise RuntimeError(f"Template PDF/UA não encontrado: {template_path}")
+
+    return _render_with_pandoc(
+        ast,
+        output_path,
+        "pdf",
+        extra_args=[
+            "--standalone",
+            "--no-highlight",
+            f"--pdf-engine={engine}",
+            f"--template={template_path}",
+            "-V",
+            "lang=pt-BR",
+        ],
+    )
 
 
 def export_accessible_document(
@@ -96,6 +150,8 @@ def export_accessible_document(
             profile_name=profile,
             title=title,
         )
+    if format_name == "pdf_ua":
+        return _render_pdf_ua_with_pandoc(ast, output_path)
     if format_name == "txt":
         from backend.export.renderers.txt_renderer import render_txt
 

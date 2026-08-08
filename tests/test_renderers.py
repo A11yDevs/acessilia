@@ -40,7 +40,25 @@ def _sample_document() -> dict:
                     {
                         "id": "blk-4",
                         "type": "table",
-                        "rows": [["Coluna A", "Coluna B"], ["1", "2"]],
+                        "table_ast": {
+                            "caption": "Resumo de valores",
+                            "header": [
+                                {
+                                    "cells": [
+                                        {"text": "Coluna A", "scope": "col"},
+                                        {"text": "Coluna B", "scope": "col"},
+                                    ]
+                                }
+                            ],
+                            "body": [
+                                {
+                                    "cells": [
+                                        {"text": "1"},
+                                        {"text": "2"},
+                                    ]
+                                }
+                            ],
+                        },
                         "verbosity": "basic",
                     },
                     {
@@ -82,7 +100,8 @@ def test_render_txt_filters_technical_blocks_and_renders_tables():
         assert "Conteudo tecnico." not in text
         assert "Paragrafo simples." in text
         assert "- Item 1" in text
-        assert "Coluna A | Coluna B" in text
+        assert "Tabela: Resumo de valores" in text
+        assert "Linha 1: Coluna A: 1; Coluna B: 2" in text
         assert "Filho da seção." in text
 
 
@@ -95,6 +114,9 @@ def test_render_html_includes_toc_table_and_metadata():
         html = result.read_text(encoding="utf-8")
         assert '<nav class="toc"' in html
         assert '<table id="blk-4">' in html
+        assert "<caption>Resumo de valores</caption>" in html
+        assert '<th scope="col">Coluna A</th>' in html
+        assert "<tbody><tr><td>1</td><td>2</td></tr></tbody>" in html
         assert '<aside class="meta"' in html
         assert "Observacao" in html
 

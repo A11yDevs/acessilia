@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from pathlib import Path
 from typing import Any, Callable, Coroutine
 
 import fitz
 
+from backend.agents.data_agent import DataAgent
 from backend.core.agents.informational_structural import InformationalStructuralAgent
 from backend.core.execution.executor import ExecutorAgent, MethodRegistry
 from backend.core.execution.models import ExecutionReport
@@ -95,6 +97,13 @@ class PddlAccessibilityOrchestrator:
             manifest,
             file_path.resolve(),
             mode=effective_mode,
+        )
+
+        if status_callback:
+            await status_callback("Enriquecendo tabelas com OCR (fallback)...")
+        await _enrich_table_structures(
+            manifest,
+            file_path.resolve(),
         )
 
         if status_callback:
@@ -223,6 +232,190 @@ async def _enrich_picture_descriptions(
             "Pipeline PDDL: {} imagem(ns) enriquecida(s) com descrição visual",
             enriched,
         )
+
+
+async def _enrich_table_structures(
+    manifest: ProcessingManifest,
+    source_file: Path,
+) -> None:
+    table_elements = [
+        element
+        for element in manifest.elements
+        if element.type == "table" and not _table_element_has_structured_content(element)
+    ]
+    if not table_elements:
+        return
+
+    data_agent = DataAgent()
+    enriched = 0
+    for element in table_elements:
+        if _backfill_table_from_existing_text(element):
+            enriched += 1
+            continue
+
+        fallback_page_number = element.page_number
+        if fallback_page_number is None and len(manifest.pages) == 1:
+            fallback_page_number = manifest.pages[0].page_number
+
+        image_bytes, page_number = await asyncio.to_thread(
+            _extract_picture_bytes,
+            source_file,
+            element,
+            fallback_page_number,
+        )
+        if not image_bytes:
+            continue
+
+        ocr_text = await data_agent.process_region(
+            image_bytes=image_bytes,
+            classification="table",
+            page_num=page_number,
+            fallback_text=element.text or "",
+        )
+        if not isinstance(ocr_text, str) or not ocr_text.strip():
+            continue
+
+        rows = _rows_from_visual_table_text(ocr_text)
+        if not rows:
+            continue
+
+        table_ast = _table_ast_from_rows(rows)
+        if table_ast is None:
+            continue
+
+        element.metadata["table_ast"] = table_ast
+        element.metadata["table_linearization_hint"] = "ocr-visual-fallback"
+        element.metadata["table_row_count"] = len(rows)
+        element.metadata["table_column_count"] = max((len(row) for row in rows), default=0)
+        element.metadata["table_has_header"] = bool(rows and len(rows[0]) >= 2)
+        element.text = ""
+        if element.page_number is None and page_number >= 1:
+            element.page_number = page_number
+        enriched += 1
+
+    if enriched:
+        logger.info(
+            "Pipeline PDDL: {} tabela(s) enriquecida(s) com OCR/reconstrução",
+            enriched,
+        )
+
+
+def _table_element_has_structured_content(element: ManifestElement) -> bool:
+    metadata = element.metadata or {}
+    table_ast = metadata.get("table_ast")
+    if not isinstance(table_ast, dict):
+        return False
+
+    rows = _rows_from_table_ast(table_ast)
+    if not rows:
+        return False
+
+    width = max((len(row) for row in rows), default=0)
+    if len(rows) >= 2 and width >= 2:
+        return True
+
+    return not _rows_look_like_placeholder(rows)
+
+
+def _backfill_table_from_existing_text(element: ManifestElement) -> bool:
+    text = (element.text or "").strip()
+    if not text:
+        return False
+
+    rows = _rows_from_visual_table_text(text)
+    if not rows:
+        return False
+
+    table_ast = _table_ast_from_rows(rows)
+    if table_ast is None:
+        return False
+
+    element.metadata["table_ast"] = table_ast
+    element.metadata["table_linearization_hint"] = "text-heuristic"
+    element.metadata["table_row_count"] = len(rows)
+    element.metadata["table_column_count"] = max((len(row) for row in rows), default=0)
+    element.metadata["table_has_header"] = bool(rows and len(rows[0]) >= 2)
+    element.text = ""
+    return True
+
+
+def _rows_from_visual_table_text(raw_text: str) -> list[list[str]]:
+    text = raw_text.strip()
+    if not text:
+        return []
+
+    rows = _rows_from_pipe_table(text)
+    if rows:
+        return rows
+
+    rows = _rows_from_delimited_lines(text, delimiter="\t")
+    if rows:
+        return rows
+
+    semicolon_rows = _rows_from_delimited_lines(text, delimiter=";")
+    comma_rows = _rows_from_delimited_lines(text, delimiter=",")
+    if _score_rows(semicolon_rows) >= _score_rows(comma_rows):
+        return semicolon_rows
+    return comma_rows
+
+
+def _rows_from_pipe_table(text: str) -> list[list[str]]:
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    rows: list[list[str]] = []
+    for line in lines:
+        if "|" not in line:
+            continue
+        if _looks_like_markdown_separator(line):
+            continue
+        cleaned = line.strip().strip("|")
+        cells = [cell.strip() for cell in cleaned.split("|")]
+        cells = [cell for cell in cells if cell]
+        if len(cells) >= 2:
+            rows.append(cells)
+    if _score_rows(rows) >= 4:
+        return rows
+    return []
+
+
+def _rows_from_delimited_lines(text: str, *, delimiter: str) -> list[list[str]]:
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    rows: list[list[str]] = []
+    for line in lines:
+        if delimiter not in line:
+            continue
+        if "|" in line and delimiter != "|":
+            continue
+        cells = [cell.strip() for cell in line.split(delimiter)]
+        cells = [cell for cell in cells if cell]
+        if len(cells) >= 2:
+            rows.append(cells)
+    if _score_rows(rows) >= 4:
+        return rows
+    return []
+
+
+def _looks_like_markdown_separator(line: str) -> bool:
+    cleaned = line.strip().strip("|").replace(" ", "")
+    if not cleaned:
+        return False
+    parts = cleaned.split("|")
+    if not parts:
+        return False
+    return all(re.fullmatch(r":?-{2,}:?", part or "") for part in parts)
+
+
+def _score_rows(rows: list[list[str]]) -> int:
+    if not rows:
+        return 0
+    row_count = len(rows)
+    width = max((len(row) for row in rows), default=0)
+    return row_count * width
+
+
+def _rows_look_like_placeholder(rows: list[list[str]]) -> bool:
+    if len(rows) != 1 or len(rows[0]) != 1:
+        return False
+    return rows[0][0].strip().lower() == "tabela detectada"
 
 
 def _extract_picture_bytes(

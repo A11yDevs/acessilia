@@ -15,6 +15,7 @@ MEDIA_TYPES = {
     "txt": "text/plain; charset=utf-8",
     "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "pdf": "application/pdf",
+    "pdf_ua": "application/pdf",
     "html": "text/html; charset=utf-8",
     "mp3": "audio/mpeg",
     "zip": "application/zip",

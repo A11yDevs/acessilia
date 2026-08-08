@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Any
 
 from backend.pipeline.sanitizer import sanitize_text
+from backend.pipeline.table_ast import normalize_table_ast
+from backend.pipeline.table_ast import rows_from_table_ast
 
 from backend.core.manifest.docling_extractor import DoclingExtraction
 from backend.core.manifest.models import (
@@ -165,7 +167,7 @@ def _build_elements(document: Any, *, enable_callouts: bool = True) -> list[Mani
         provenance = _provenance(item)
         page_number = provenance[0].page_number if provenance else None
         hierarchy_level = _hierarchy_level(item, element_type, tree_level)
-        metadata = _safe_metadata(item)
+        metadata = _safe_metadata(item, element_type=element_type)
         elements.append(
             ManifestElement(
                 id=f"element-{reading_order:06d}",
@@ -691,7 +693,7 @@ def _confidence(item: Any) -> float | None:
     return None
 
 
-def _safe_metadata(item: Any) -> dict[str, Any]:
+def _safe_metadata(item: Any, *, element_type: str | None = None) -> dict[str, Any]:
     metadata: dict[str, Any] = {"docling_class": item.__class__.__name__}
     content_layer = getattr(item, "content_layer", None)
     if content_layer is not None:
@@ -702,7 +704,66 @@ def _safe_metadata(item: Any) -> dict[str, Any]:
     marker = getattr(item, "marker", None)
     if isinstance(marker, str) and marker:
         metadata["marker"] = marker
+
+    if element_type == "table":
+        table_ast = _extract_table_ast(item)
+        if table_ast is not None:
+            metadata["table_ast"] = table_ast
+            rows = rows_from_table_ast(table_ast)
+            if rows:
+                metadata["table_row_count"] = len(rows)
+                metadata["table_column_count"] = max((len(row) for row in rows), default=0)
+            metadata["table_has_header"] = bool(table_ast.get("header"))
+            metadata["table_linearization_hint"] = "docling-structured"
     return metadata
+
+
+def _extract_table_ast(item: Any) -> dict[str, Any] | None:
+    raw_candidates: list[Any] = []
+    for attr_name in (
+        "table_ast",
+        "table",
+        "table_data",
+        "grid",
+        "rows",
+        "cells",
+    ):
+        value = getattr(item, attr_name, None)
+        if value is not None:
+            raw_candidates.append(value)
+
+    for method_name in ("model_dump", "to_dict", "export_to_dict"):
+        method = getattr(item, method_name, None)
+        if not callable(method):
+            continue
+        try:
+            payload = method()
+        except TypeError:
+            try:
+                payload = method(mode="json")
+            except Exception:
+                continue
+        except Exception:
+            continue
+        if isinstance(payload, dict):
+            raw_candidates.append(payload)
+            for nested_key in (
+                "table_ast",
+                "table",
+                "table_data",
+                "grid",
+                "rows",
+                "cells",
+            ):
+                nested = payload.get(nested_key)
+                if nested is not None:
+                    raw_candidates.append(nested)
+
+    for candidate in raw_candidates:
+        table_ast = normalize_table_ast(candidate)
+        if table_ast is not None:
+            return table_ast
+    return None
 
 
 def _infer_title(source_path: Path, elements: list[ManifestElement]) -> str:

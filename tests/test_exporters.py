@@ -4,6 +4,7 @@ from pathlib import Path
 from backend.export.exporters.txt_exporter import export_txt
 from backend.export.exporters.docx_exporter import export_docx
 from backend.export.exporters.pdf_exporter import export_pdf
+from backend.export.exporters.pdf_exporter import export_pdf_ua
 
 
 def test_export_txt():
@@ -35,3 +36,25 @@ def test_export_txt_empty():
         out = Path(tmpdir) / "empty.txt"
         result = export_txt("Conteudo minimo", out)
         assert result.exists()
+
+
+def test_export_pdf_ua_calls_accessible_exporter(monkeypatch):
+    called = {}
+
+    def _fake_export_accessible_document(text, output_path, **kwargs):
+        called["format_name"] = kwargs.get("format_name")
+        called["profile_name"] = kwargs.get("profile_name")
+        output_path.write_text("ok", encoding="utf-8")
+        return output_path
+
+    monkeypatch.setattr(
+        "backend.export.exporters.pdf_exporter.export_accessible_document",
+        _fake_export_accessible_document,
+    )
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        out = Path(tmpdir) / "test.pdf_ua.pdf"
+        result = export_pdf_ua("Texto exemplo", out, "test.pdf")
+        assert result.exists()
+        assert called["format_name"] == "pdf_ua"
+        assert called["profile_name"] == "pdf_ua"

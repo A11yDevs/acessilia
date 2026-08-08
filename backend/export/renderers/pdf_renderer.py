@@ -17,6 +17,7 @@ from reportlab.platypus import (
     Spacer,
 )
 
+from backend.pipeline.table_ast import linearize_table_for_text
 from backend.pipeline.verbosity_manager import filter_blocks_for_profile
 from backend.tools.code_tools import normalize_code_text
 
@@ -195,10 +196,8 @@ def _render_block(story, block: dict[str, Any], styles) -> None:
             ListFlowable(items, bulletType="1" if block.get("ordered") else "bullet")
         )
     elif block_type == "table":
-        for row in block.get("rows", []):
-            story.append(
-                Paragraph(" | ".join(str(cell) for cell in row), styles["A11yBody"])
-            )
+        for line in linearize_table_for_text(block):
+            story.append(Paragraph(line, styles["A11yBody"]))
     elif block_type in {"details", "note", "warning", "quote", "image", "math"}:
         text = (
             block.get("long_description")

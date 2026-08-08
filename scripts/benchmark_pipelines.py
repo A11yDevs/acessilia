@@ -153,8 +153,12 @@ def _export_outputs(
     export_errors: list[str] = []
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    output_suffix = {
+        "pdf_ua": "pdf_ua.pdf",
+    }
+
     for fmt in export_formats:
-        output_path = output_dir / f"{engine_name}.{fmt}"
+        output_path = output_dir / f"{engine_name}.{output_suffix.get(fmt, fmt)}"
         try:
             if fmt == "pdf":
                 export_pdf = getattr(
@@ -162,6 +166,16 @@ def _export_outputs(
                     "export_pdf",
                 )
                 export_pdf(canonical, output_path, title=canonical.get("title", engine_name))
+            elif fmt == "pdf_ua":
+                export_pdf_ua = getattr(
+                    import_module("backend.export.exporters.pdf_exporter"),
+                    "export_pdf_ua",
+                )
+                export_pdf_ua(
+                    canonical,
+                    output_path,
+                    title=canonical.get("title", engine_name),
+                )
             elif fmt == "txt":
                 export_txt = getattr(
                     import_module("backend.export.exporters.txt_exporter"),
@@ -330,7 +344,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--export-formats",
         default="pdf",
-        help="Formatos de saida por metodo, separados por virgula (ex.: pdf,txt,docx).",
+        help="Formatos de saida por metodo, separados por virgula (ex.: pdf,pdf_ua,txt,docx).",
     )
     parser.add_argument(
         "--pddl-extractor-backend",

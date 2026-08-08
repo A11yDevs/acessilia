@@ -1,6 +1,8 @@
 import tempfile
 from pathlib import Path
 
+import pytest
+
 from backend.export.pandoc_exporter import export_accessible_document
 from backend.pipeline.canonical_builder import build_canonical_document
 from backend.pipeline.validators import validate_canonical_document
@@ -205,3 +207,35 @@ def test_export_accessible_document_sanitizes_legacy_block_markdown():
         assert "Capitulo" in content
         assert "Item A" in content
         assert "Item B" in content
+
+
+def test_export_accessible_document_pdf_ua_requires_pandoc(monkeypatch):
+    monkeypatch.setattr("backend.export.pandoc_exporter._pandoc_bin", lambda: None)
+    monkeypatch.setattr("backend.export.pandoc_exporter._xelatex_bin", lambda: "/usr/bin/xelatex")
+    monkeypatch.setattr("backend.export.pandoc_exporter._lualatex_bin", lambda: "/usr/bin/lualatex")
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        out = Path(tmpdir) / "saida.pdf_ua.pdf"
+        with pytest.raises(RuntimeError, match="pandoc"):
+            export_accessible_document(
+                "# Titulo\n\nParagrafo simples.",
+                out,
+                format_name="pdf_ua",
+                title="Titulo",
+            )
+
+
+def test_export_accessible_document_pdf_ua_requires_latex_engine(monkeypatch):
+    monkeypatch.setattr("backend.export.pandoc_exporter._pandoc_bin", lambda: "/usr/bin/pandoc")
+    monkeypatch.setattr("backend.export.pandoc_exporter._xelatex_bin", lambda: None)
+    monkeypatch.setattr("backend.export.pandoc_exporter._lualatex_bin", lambda: None)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        out = Path(tmpdir) / "saida.pdf_ua.pdf"
+        with pytest.raises(RuntimeError, match="lualatex ou xelatex"):
+            export_accessible_document(
+                "# Titulo\n\nParagrafo simples.",
+                out,
+                format_name="pdf_ua",
+                title="Titulo",
+            )

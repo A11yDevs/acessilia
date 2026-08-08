@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from backend.agents.pddl_orchestrator import build_pddl_structured_payload
+from backend.agents.pddl_orchestrator import _rows_from_visual_table_text
+from backend.agents.pddl_orchestrator import _table_element_has_structured_content
 from backend.pipeline.canonical_builder import build_canonical_document
 from backend.core.manifest.models import (
     ExtractorRun,
@@ -486,3 +488,57 @@ def test_build_pddl_structured_payload_preserves_table_ast_from_metadata():
     assert block["table_ast"]["caption"] == "Resumo"
     assert block["rows"][0] == ["Coluna", "Valor"]
     assert block["rows"][1] == ["Taxa", "10%"]
+
+
+def test_rows_from_visual_table_text_parses_markdown_table() -> None:
+    ocr_text = """
+    | Coluna | Valor |
+    | --- | --- |
+    | Taxa | 10% |
+    | Juros | 2% |
+    """
+
+    rows = _rows_from_visual_table_text(ocr_text)
+
+    assert rows == [
+        ["Coluna", "Valor"],
+        ["Taxa", "10%"],
+        ["Juros", "2%"],
+    ]
+
+
+def test_rows_from_visual_table_text_parses_delimited_lines() -> None:
+    ocr_text = "Nome;Nota\nAna;9,5\nBeto;8,0"
+
+    rows = _rows_from_visual_table_text(ocr_text)
+
+    assert rows == [
+        ["Nome", "Nota"],
+        ["Ana", "9,5"],
+        ["Beto", "8,0"],
+    ]
+
+
+def test_table_element_has_structured_content_rejects_placeholder_table_ast() -> None:
+    element = ManifestElement(
+        id="el-table-1",
+        type="table",
+        raw_label="table",
+        reading_order=1,
+        hierarchy_level=1,
+        text="",
+        page_number=1,
+        metadata={
+            "table_ast": {
+                "body": [
+                    {
+                        "cells": [
+                            {"text": "Tabela detectada"},
+                        ]
+                    }
+                ]
+            }
+        },
+    )
+
+    assert _table_element_has_structured_content(element) is False

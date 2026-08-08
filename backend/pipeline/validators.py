@@ -124,6 +124,22 @@ def audit_canonical_document(document: dict[str, Any]) -> dict[str, list[str]]:
                 "alt"
             ):
                 report["WARNING"].append(f"Imagem {block.get('id')} sem alt-text.")
+            if block.get("type") == "table":
+                table_id = block.get("id") or "(sem-id)"
+                table_ast = block.get("table_ast")
+                if isinstance(table_ast, dict):
+                    header = table_ast.get("header")
+                    body = table_ast.get("body")
+                    if (not isinstance(header, list) or not header) and isinstance(body, list) and len(body) > 1:
+                        report["WARNING"].append(
+                            f"Tabela {table_id} sem header explicito; revisar inferencia de cabecalhos."
+                        )
+                elif block.get("rows"):
+                    rows = block.get("rows")
+                    if isinstance(rows, list) and len(rows) > 1:
+                        report["WARNING"].append(
+                            f"Tabela {table_id} sem table_ast; usando fallback legado por linhas."
+                        )
 
     for section in sections:
         check_accessibility(section.get("blocks", []))
@@ -236,6 +252,7 @@ def _validate_table_block(block: dict[str, Any]) -> list[str]:
             if not isinstance(section, list):
                 errors.append(f"table_ast.{section_name} invalido em {block_id}")
                 continue
+            expected_width: int | None = None
             for row_index, row in enumerate(section):
                 if not isinstance(row, dict):
                     errors.append(
@@ -248,6 +265,7 @@ def _validate_table_block(block: dict[str, Any]) -> list[str]:
                         f"table_ast.{section_name}[{row_index}] sem cells em {block_id}"
                     )
                     continue
+                row_effective_width = 0
                 for col_index, cell in enumerate(cells):
                     if not isinstance(cell, dict):
                         errors.append(
@@ -259,5 +277,17 @@ def _validate_table_block(block: dict[str, Any]) -> list[str]:
                         errors.append(
                             f"table_ast celula sem texto em {block_id} ({section_name} {row_index}:{col_index})"
                         )
+                    colspan = cell.get("colspan")
+                    if isinstance(colspan, int) and colspan >= 1:
+                        row_effective_width += colspan
+                    else:
+                        row_effective_width += 1
+
+                if expected_width is None:
+                    expected_width = row_effective_width
+                elif row_effective_width != expected_width:
+                    errors.append(
+                        f"table_ast.{section_name} com largura inconsistente em {block_id} (row {row_index})"
+                    )
 
     return errors

@@ -357,3 +357,99 @@ def test_manifest_preserves_code_text_without_sanitizer_side_effects(tmp_path: P
     assert "    prompt: keep literal" in code_text
     assert "chain of thought" in code_text
     assert "[conteudo removido]" not in code_text
+
+
+def test_manifest_extracts_table_ast_metadata_for_table_elements(tmp_path: Path):
+    class TableDocument:
+        def __init__(self) -> None:
+            self.pages = {
+                1: SimpleNamespace(size=SimpleNamespace(width=600, height=800))
+            }
+            self.items = [
+                (
+                    SimpleNamespace(
+                        label=None,
+                        name="body",
+                        self_ref="#/body",
+                        parent=None,
+                    ),
+                    0,
+                ),
+                (
+                    SimpleNamespace(
+                        label=SimpleNamespace(value="table"),
+                        text="",
+                        rows=[["Nome", "Valor"], ["Taxa", "10%"]],
+                        table={
+                            "caption": "Resumo",
+                            "header": [
+                                {
+                                    "cells": [
+                                        {"text": "Nome", "scope": "col"},
+                                        {"text": "Valor", "scope": "col"},
+                                    ]
+                                }
+                            ],
+                            "body": [
+                                {
+                                    "cells": [
+                                        {"text": "Taxa"},
+                                        {"text": "10%"},
+                                    ]
+                                }
+                            ],
+                        },
+                        prov=[
+                            SimpleNamespace(
+                                page_no=1,
+                                bbox=SimpleNamespace(
+                                    l=80,
+                                    t=120,
+                                    r=520,
+                                    b=260,
+                                    coord_origin=SimpleNamespace(value="TOPLEFT"),
+                                ),
+                                charspan=(0, 10),
+                            )
+                        ],
+                        self_ref="#/tables/0",
+                        parent=SimpleNamespace(cref="#/body"),
+                    ),
+                    1,
+                ),
+            ]
+
+        def iterate_items(self, **_: object):
+            return iter(self.items)
+
+        def num_pages(self) -> int:
+            return 1
+
+    class TableExtractor:
+        def extract(self, _: Path) -> DoclingExtraction:
+            timestamp = datetime(2026, 7, 27, tzinfo=timezone.utc)
+            return DoclingExtraction(
+                document=TableDocument(),
+                started_at=timestamp,
+                completed_at=timestamp,
+                duration_ms=7,
+                version="2.test",
+                configuration={"ocr": False},
+            )
+
+    source = tmp_path / "sample.pdf"
+    source.write_bytes(b"%PDF-test")
+    manifest = InformationalStructuralAgent(
+        extractor=TableExtractor()  # type: ignore[arg-type]
+    ).process(source)
+
+    table_elements = [e for e in manifest.elements if e.type == "table"]
+    assert table_elements
+    table_metadata = table_elements[0].metadata
+
+    assert "table_ast" in table_metadata
+    assert table_metadata["table_ast"]["caption"] == "Resumo"
+    assert table_metadata["table_ast"]["header"][0]["cells"][0]["text"] == "Nome"
+    assert table_metadata["table_row_count"] == 2
+    assert table_metadata["table_column_count"] == 2
+    assert table_metadata["table_has_header"] is True
