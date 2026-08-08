@@ -191,11 +191,6 @@ def _path_from_env(env_var: str, default: Path) -> Path:
     return path
 
 
-def _bool_from_env(env_var: str, default: bool) -> bool:
-    raw_value = os.getenv(env_var)
-    if raw_value is None:
-        return default
-    return raw_value.strip().lower() in {"1", "true", "yes", "on", "sim"}
 
 
 def _str_from_env_alias(env_vars: tuple[str, ...], default: str) -> str:

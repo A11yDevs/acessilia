@@ -94,8 +94,6 @@ class PddlAccessibilityOrchestrator:
         custom_prompt: str | None = None,
         thinking_mode: bool = False,
     ) -> str | dict[str, Any]:
-        del tmpdir
-
         effective_mode = mode or "medio"
 
         if custom_prompt or thinking_mode:
@@ -594,7 +592,6 @@ def _manifest_pages_to_payload(manifest: ProcessingManifest) -> list[dict[str, A
                     "page_number": page.page_number,
                     "text": _render_text_from_blocks(blocks),
                     "blocks": blocks,
-                    "cached": False,
                 }
             )
         return pages
@@ -616,7 +613,6 @@ def _manifest_pages_to_payload(manifest: ProcessingManifest) -> list[dict[str, A
                 "page_number": page_number,
                 "text": _render_text_from_blocks(blocks),
                 "blocks": blocks,
-                "cached": False,
             }
         )
 

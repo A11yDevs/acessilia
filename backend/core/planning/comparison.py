@@ -8,6 +8,7 @@ from backend.core.manifest.models import ProcessingManifest
 from backend.core.planning.domain_bundle import DomainBundle
 from backend.core.planning.models import (
     ComparisonDetails,
+    DomainIdentity,
     NominalPlan,
     PlannerOutcome,
     PlanningComparison,
@@ -126,12 +127,12 @@ def build_planning_comparison(
         manifest_id=manifest.manifest_id,
         manifest_revision=manifest.revision,
         manifest_sha256=compiled.manifest_sha256,
-        domain={
-            "name": domain.name,
-            "version": domain.version,
-            "domain_sha256": domain.domain_sha256,
-            "description_sha256": domain.description_sha256,
-        },
+        domain=DomainIdentity(
+            name=domain.name,
+            version=domain.version,
+            domain_sha256=domain.domain_sha256,
+            description_sha256=domain.description_sha256,
+        ),
         problem_name=compiled.projection.problem_name,
         problem_sha256=compiled.sha256,
         outcomes=outcomes,

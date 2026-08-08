@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://example.local/schemas/accessible_document.schema.json",
+  "$id": "urn:a11y-devs:schema:accessible-document:1.0.0",
   "title": "AccessibleDocument",
   "type": "object",
   "required": ["schema_version", "id", "title", "language", "sections"],
