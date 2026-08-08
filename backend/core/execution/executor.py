@@ -159,6 +159,28 @@ class ExecutorAgent:
         )
         return returned_manifest, report
 
+    def _record_obligation_attempt(
+        self,
+        *,
+        obligation,
+        method: str,
+        started_at: datetime,
+        completed_at: datetime,
+        status: str,
+        message: str | None,
+        artifact_ids: list[str],
+    ) -> None:
+        obligation.attempts.append(
+            ObligationAttempt(
+                method=method,
+                status=status,
+                started_at=started_at,
+                completed_at=completed_at,
+                message=message,
+                artifact_ids=artifact_ids,
+            )
+        )
+
     def _validate_binding(
         self,
         plan: NominalPlan,
@@ -246,18 +268,40 @@ class ExecutorAgent:
                             f"Nenhum handler registrado para {step.method}"
                         )
                     attempt_started = datetime.now(timezone.utc)
-                    result = handler(state.manifest, obligation.id)
-                    attempt_completed = datetime.now(timezone.utc)
-                    artifact_ids = [artifact.id for artifact in result.artifacts]
-                    obligation.attempts.append(
-                        ObligationAttempt(
+                    try:
+                        result = handler(state.manifest, obligation.id)
+                    except Exception as exc:
+                        attempt_completed = datetime.now(timezone.utc)
+                        self._record_obligation_attempt(
+                            obligation=obligation,
                             method=step.method,
-                            status="succeeded" if result.success else "failed",
                             started_at=attempt_started,
                             completed_at=attempt_completed,
-                            message=result.message,
-                            artifact_ids=artifact_ids,
+                            status="failed",
+                            message=f"{type(exc).__name__}: {exc}",
+                            artifact_ids=[],
                         )
+                        alternatives = set(obligation.admissible_methods) - {
+                            attempt.method
+                            for attempt in obligation.attempts
+                            if attempt.status in {"failed", "rejected"}
+                        }
+                        obligation.status = "pending" if alternatives else "failed"
+                        state.replan_required = bool(alternatives)
+                        raise RuntimeError(
+                            f"{type(exc).__name__}: {exc}"
+                        ) from exc
+
+                    attempt_completed = datetime.now(timezone.utc)
+                    artifact_ids = [artifact.id for artifact in result.artifacts]
+                    self._record_obligation_attempt(
+                        obligation=obligation,
+                        method=step.method,
+                        started_at=attempt_started,
+                        completed_at=attempt_completed,
+                        status="succeeded" if result.success else "failed",
+                        message=result.message,
+                        artifact_ids=artifact_ids,
                     )
                     existing_artifacts = {
                         artifact.id for artifact in state.manifest.artifacts

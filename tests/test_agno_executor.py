@@ -77,3 +77,37 @@ def test_failed_method_is_recorded_and_replanning_uses_alternative():
         if step.obligation_id == "o-describe"
     ]
     assert methods == ["human-review"]
+
+
+@pytest.mark.skipif(find_spec("agno") is None, reason="Agno não instalado")
+def test_handler_exception_is_recorded_as_failed_attempt_and_replan_is_requested():
+    manifest = make_manifest()
+    _, plan = PlannerAgent().plan(
+        manifest,
+        selected_roots=["o-describe"],
+    )
+    registry = MethodRegistry()
+    registry.register(
+        "docling",
+        lambda _manifest, _obligation: MethodResult(
+            success=True,
+            validated=True,
+        ),
+    )
+
+    def failing_handler(_manifest, _obligation):
+        raise RuntimeError("falha inesperada")
+
+    registry.register("vision", failing_handler)
+
+    updated, report = ExecutorAgent(registry).execute(plan, manifest)
+
+    assert report.status == "replan-required"
+    described = next(
+        item for item in updated.obligations if item.id == "o-describe"
+    )
+    assert described.status == "pending"
+    assert len(described.attempts) == 1
+    assert described.attempts[0].method == "vision"
+    assert described.attempts[0].status == "failed"
+    assert described.attempts[0].message == "RuntimeError: falha inesperada"
