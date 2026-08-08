@@ -33,5 +33,11 @@ temp/
 *.log
 *.lock
 
+# LaTeX build artifacts
+*.aux
+*.fdb_latexmk
+*.fls
+*.synctex.gz
+
 # PDFs temporarios gerados durante benchmark em fixtures
 tests/fixtures/tutorials/pagina_*.pdf
