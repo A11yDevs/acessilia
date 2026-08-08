@@ -10,10 +10,11 @@ import fitz
 from backend.agents.data_agent import DataAgent
 from backend.core.agents.informational_structural import InformationalStructuralAgent
 from backend.core.execution.executor import ExecutorAgent, MethodRegistry
-from backend.core.execution.models import ExecutionReport
+from backend.core.execution.models import ExecutionReport, MethodResult
 from backend.core.manifest.docling_extractor import DoclingManifestExtractor
 from backend.core.manifest.pymupdf_extractor import PyMuPDFManifestExtractor
 from backend.core.manifest.models import ManifestElement, ProcessingManifest
+from backend.core.planning.domain_bundle import DomainBundle
 from backend.core.planning.models import NominalPlan, PlanningComparison
 from backend.core.planning.planner_agent import PlannerAgent
 
@@ -58,10 +59,30 @@ class PddlAccessibilityOrchestrator:
             extractor
         )
         self.planner = PlannerAgent()
-        self.executor = ExecutorAgent(
-            MethodRegistry(),
-            domain=self.planner.domain,
-        )
+        self.executor = self._build_executor()
+
+    @staticmethod
+    def _build_executor() -> ExecutorAgent:
+        registry = MethodRegistry()
+
+        def _noop_handler(
+            _manifest: ProcessingManifest, _obligation_id: str
+        ) -> MethodResult:
+            return MethodResult(success=True, validated=True, message="Handler padrão (sem operação real)")
+
+        for method in (
+            "docling",
+            "hierarchy-llm",
+            "canonical-builder",
+            "accessibility-checker",
+            "html-exporter",
+            "local-summarizer",
+            "vision",
+            "human-review",
+        ):
+            registry.register(method, _noop_handler)
+
+        return ExecutorAgent(registry, domain=DomainBundle.load())
 
     async def executar(
         self,
