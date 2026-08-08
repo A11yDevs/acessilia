@@ -439,7 +439,10 @@ class FastDownwardPlanner:
                 timeout=self.timeout_seconds,
                 check=False,
             )
-            plan_paths = sorted(workdir.glob("sas_plan*"))
+            plan_paths = sorted(
+                workdir.glob("sas_plan*"),
+                key=lambda p: int(p.suffix[1:]) if p.suffix and p.suffix[1:].isdigit() else 0,
+            )
             if completed.returncode != 0 or not plan_paths:
                 detail = (completed.stderr or completed.stdout).strip()
                 raise RuntimeError(
