@@ -28,6 +28,26 @@ from backend.core.planning.pddl_processor import (
 )
 
 
+_SANDBOX_BASE = (Path(__file__).resolve().parent.parent.parent.parent / "temp" / "pddl-sandbox").resolve()
+
+
+def _sandbox_path(user_path: str) -> Path:
+    """Resolve um caminho fornecido pelo modelo dentro do diretório sandbox.
+
+    O diretório sandbox é <repo>/temp/pddl-sandbox/. Qualquer tentativa de
+    escapar para fora do sandbox levanta ValueError.
+    """
+    resolved = (Path(user_path).expanduser()).resolve()
+    try:
+        resolved.relative_to(_SANDBOX_BASE)
+    except ValueError:
+        raise ValueError(
+            f"O caminho '{user_path}' está fora do diretório sandbox "
+            f"permitido ({_SANDBOX_BASE})."
+        )
+    return resolved
+
+
 class PlannerAgent:
     """Agente Planejador Agno com ferramentas PDDL determinísticas."""
 
@@ -78,14 +98,15 @@ class PlannerAgent:
         selected_roots: list[str] | None = None,
     ) -> dict[str, str]:
         """Compila um manifesto JSON validado em um problem.pddl."""
+        safe_manifest = _sandbox_path(manifest_path)
         manifest = ProcessingManifest.model_validate_json(
-            Path(manifest_path).read_text(encoding="utf-8")
+            safe_manifest.read_text(encoding="utf-8")
         )
         compiled = self.compile_problem(
             manifest,
             selected_roots=selected_roots,
         )
-        destination = Path(problem_path)
+        destination = _sandbox_path(problem_path)
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(compiled.text, encoding="utf-8")
         return {
@@ -103,15 +124,16 @@ class PlannerAgent:
         preferred_backend: str = "internal",
     ) -> dict[str, str]:
         """Gera problema, plano(s) e comparação opcional."""
+        safe_manifest = _sandbox_path(manifest_path)
         manifest = ProcessingManifest.model_validate_json(
-            Path(manifest_path).read_text(encoding="utf-8")
+            safe_manifest.read_text(encoding="utf-8")
         )
-        destination = Path(output_directory)
+        destination = _sandbox_path(output_directory)
         destination.mkdir(parents=True, exist_ok=True)
         problem_path = destination / "problem.pddl"
         plan_path = destination / "nominal-plan.json"
         fast_downward = (
-            Path(fast_downward_path) if fast_downward_path else None
+            _sandbox_path(fast_downward_path) if fast_downward_path else None
         )
         comparison_path: Path | None = None
         if backend == "both":
