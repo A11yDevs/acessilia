@@ -9,11 +9,13 @@ actor "Usuário (Web / Telegram / CLI)" as User
 
 package "Infraestrutura (Docker Container)" {
   
-  package "Frontend (Interfaces)" {
-    component "Web UI / API (FastAPI)\nfrontend/web" as WebUI
+  package "Frontend (Clientes)" {
+    component "Web Panel (HTML)\nfrontend/web" as WebUI
     component "Telegram Bot (aiogram)\nfrontend/telegram" as TelegramBot
     component "CLI Runner\nfrontend/cli" as CLI
   }
+
+  component "REST API (FastAPI)\nbackend/api" as API
 
   package "Workflow Acessília" {
     component "AccessibilityOrchestrator\nbackend/agents/orchestrator.py" as Orchestrator
@@ -40,20 +42,22 @@ package "Infraestrutura (Docker Container)" {
 cloud "Ollama (Local) / OpenRouter (Cloud)\nvia Agno Framework (get_agno_model)" as AI
 
 note bottom of Orchestrator
-  <b>Orquestração Atual & Futura:</b>
-  - <i>Atual:</i> Orquestração determinística via asyncio.gather.
-  - <i>Evolução Futura:</i> Implementação de um <b>Orquestrador Dinâmico (Smart Router)</b>
-    para roteamento inteligente de tarefas entre modelos leves locais (Ollama) e
-    modelos robustos em nuvem (OpenRouter), escalando agentes conforme complexidade e SLA.
+  <b>Motores de pipeline (PIPELINE_ENGINE):</b>
+  - <i>legacy</i> (padrão): fluxo mostrado aqui — Reader, Vision/Data em paralelo, Editor.
+  - <i>pddl</i>: extrai um manifesto, gera e valida um plano PDDL e executa via Agno Workflow
+    (backend/core + backend/agents/pddl_orchestrator.py). Converge no mesmo documento canônico.
+  - <i>Futuro:</i> um Orquestrador Dinâmico que roteia tarefas por complexidade, custo e SLA.
 end note
 
 User --> WebUI
 User --> TelegramBot
 User --> CLI
+User --> API : REST direto
 
-WebUI --> Orchestrator
-TelegramBot --> Orchestrator
-CLI --> Orchestrator
+WebUI --> API
+TelegramBot --> API
+CLI --> API
+API --> Orchestrator
 
 Orchestrator --> DB
 Orchestrator --> Cache

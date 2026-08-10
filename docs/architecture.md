@@ -1,7 +1,14 @@
 # Architecture
 
 ## Overview
-The system converts documents into accessible formats through a multi-agent extraction pipeline (local-first structural extraction with PyMuPDF/Docling plus Agno-powered multimodal AI vision and data agents), a canonical document pipeline, deterministic validation, and format-specific renderers. The architecture is modular: **backend/** contains all business logic independent of any interface, **frontend/** contains pluggable user interfaces (Telegram, Web, CLI), and **infra/** manages containerization with Docker.
+The system converts documents into accessible formats through a multi-agent extraction pipeline (local-first structural extraction with PyMuPDF/Docling plus Agno-powered multimodal AI vision and data agents), a canonical document pipeline, deterministic validation, and format-specific renderers. The architecture is modular: **backend/** contains all business logic independent of any interface, **frontend/** contains the interface clients (Telegram, Web, CLI) that talk to the REST API, and **infra/** manages containerization with Docker.
+
+The system combines **deterministic planning with AI-driven execution**: deterministic functions (extraction, PDDL problem generation, contract validation) are the source of truth, and LLMs provide interpretation and description. Two pipeline engines coexist, selected by the `PIPELINE_ENGINE` setting:
+
+- **`legacy`** (default): the direct orchestrated pipeline — `AccessibilityOrchestrator` runs Reader → Vision/Data → Editor.
+- **`pddl`**: the planning-based pipeline — a processing manifest is extracted, a PDDL plan is generated and validated, and an Agno Workflow executor applies it. See [pmv_agno_pddl.md](pmv_agno_pddl.md).
+
+Both engines converge on the same canonical document and the same renderers.
 
 ---
 
@@ -39,9 +46,20 @@ The system converts documents into accessible formats through a multi-agent extr
 - [backend/tools/image_tools.py](../backend/tools/image_tools.py): image cropping and region extraction.
 - [backend/tools/prompt_tools.py](../backend/tools/prompt_tools.py): prompt loader and template resolver.
 
+#### 0.5. Planning Layer (`backend/core/`) — PDDL engine
+
+Used when `PIPELINE_ENGINE=pddl`. It turns document structure into an explicit plan before any AI runs, so task ordering and dependencies are deterministic and auditable.
+
+- `backend/core/manifest/`: the Informational-Structural agent extracts a `processing-manifest.json` from the document (regions, types, and processing obligations) via Docling or PyMuPDF extractors.
+- `backend/core/planning/`: the `PlannerAgent` compiles the manifest plus a PDDL domain into a problem, generates a `nominal-plan.json` (internal planner or Fast Downward backend), and validates it. PDDL problem generation is deterministic — no LLM writes PDDL.
+- `backend/core/execution/`: the Executor applies the validated plan as an Agno Workflow, invoking the Vision/Data agents where the plan requires them, and produces an `execution-report.json`.
+- `backend/agents/pddl_orchestrator.py`: coordinates the manifest → plan → execution phases, with fallback to deterministic extraction if planning fails.
+
+The PDDL domain and JSON schemas (manifest, plan, execution report) live under `backend/core/planning/domains/` and `docs/schemas/`.
+
 ---
 
-### 1. Frontend (`frontend/`) — Pluggable User Interfaces
+### 1. Frontend (`frontend/`) — Interface Clients and Runtimes
 
 #### Telegram Bot (`frontend/telegram/`)
 - [frontend/telegram/bot.py](../frontend/telegram/bot.py): initializes aiogram Bot/Dispatcher, registers routers, middlewares, and lifecycle hooks.
@@ -51,11 +69,17 @@ The system converts documents into accessible formats through a multi-agent extr
 - [frontend/telegram/adapters/status_tracker.py](../frontend/telegram/adapters/status_tracker.py): Telegram-specific progress bar.
 - [frontend/telegram/adapters/file_service.py](../frontend/telegram/adapters/file_service.py): Telegram file download/upload helpers.
 
-#### Web Interface & API (`frontend/web/`)
-- [frontend/web/app.py](../frontend/web/app.py): FastAPI application with file upload forms, REST API endpoints, and processing status endpoints.
+#### Web Panel (`frontend/web/`)
+- [frontend/web/app.py](../frontend/web/app.py): server-rendered HTML panel. It is a thin client of the REST API — upload, status, and download are delegated to `backend/api` via `frontend/clients/api_client.py`.
 
 #### Command Line Interface (`frontend/cli/`)
 - [frontend/cli/run.py](../frontend/cli/run.py): CLI entrypoint for batch processing and standalone execution.
+
+#### REST API (`backend/api/`)
+- The standalone JSON API that all interfaces consume: job submission and status, download, history, and health. It owns the processing queue and the pipeline. The Telegram bot and the Web panel are clients of it. Full endpoint reference in [endpoints.md](endpoints.md).
+
+#### AgentOS runtime (`frontend/agent_os.py`)
+- An optional Agno runtime that exposes the Vision and Data agents for inspection (chat, sessions, memory, metrics, traces) via the AgentOS panel or agent-ui. It does not run the pipeline; see [endpoints.md](endpoints.md).
 
 ---
 
@@ -78,10 +102,10 @@ The codebase follows a pragmatic layered architecture with a top-down flow: Inte
 
 ## Main Processing Flow
 
-1. User submits a document via Telegram, Web UI, or CLI.
+1. User submits a document via the REST API directly, or through the Telegram bot, Web panel, or CLI (which call the API).
 2. The interface handler validates the file extension and size.
 3. The file is saved and enqueued in `ProcessingQueue`.
-4. The worker dequeues the task and invokes `AccessibilityOrchestrator.process()`:
+4. The worker dequeues the task and runs the pipeline for the active engine (`PIPELINE_ENGINE`): the `legacy` orchestrator (`AccessibilityOrchestrator.process()`, described below) or the `pddl` orchestrator (manifest → plan → execution). Both produce the same canonical document. The legacy flow:
    - Registers task in `StateManager` and checks local text cache.
    - **`ReaderAgent`** splits pages, extracts local text (PyMuPDF/Docling), and classifies regions (images, tables, formulas, text).
    - **`VisionAgent`** and **`DataAgent`** run in parallel to describe visual elements and structure data using Agno `Agent` instances.
@@ -94,10 +118,12 @@ The codebase follows a pragmatic layered architecture with a top-down flow: Inte
 
 ## Interface Activation
 
-The `ENABLED_INTERFACES` environment variable controls which interfaces start at boot:
-- `"telegram,web"` (default): starts both Telegram polling and Web server.
-- `"web"`: starts only the FastAPI Web server.
-- `"telegram"`: starts only the Telegram bot.
+The `ENABLED_INTERFACES` environment variable controls which surfaces start at boot (default `"api,telegram,web"`):
+- `api`: the REST API (`backend/api`) on `API_PORT` (default 8000) — the pipeline and queue live here.
+- `telegram`: the Telegram bot (a client of the API).
+- `web`: the HTML Web panel (`frontend/web`) on `WEB_PORT` (default 8001), also a client of the API.
+
+The AgentOS runtime is not part of `ENABLED_INTERFACES`; it is started separately with `python -m frontend.agent_os`.
 
 ---
 

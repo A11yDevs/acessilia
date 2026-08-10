@@ -1,7 +1,7 @@
 # Use Cases
 
 ## Actors
-1. Telegram end user.
+1. End user, via the REST API directly or through the Telegram bot or Web panel (both clients of the API). The Telegram-specific commands below (status, cancel, pause, feedback) apply to the bot interface.
 2. Operator/Architect (environment setup and diagnostics).
 3. AI service (OpenRouter or Ollama), used conditionally.
 4. Local filesystem and SQLite database.
@@ -15,7 +15,7 @@
 - Output: TXT, DOCX, PDF, HTML, and MP3 delivered in chat or as files.
 - Implementation:
   - input/validation: [frontend/telegram/handlers/document.py](../frontend/telegram/handlers/document.py), [backend/tools/validators.py](../backend/tools/validators.py)
-  - processing: [backend/service.py](../backend/service.py), [backend/agents/orchestrator.py](../backend/agents/orchestrator.py), [backend/pipeline/canonical_builder.py](../backend/pipeline/canonical_builder.py)
+  - processing: [backend/service.py](../backend/service.py) selects the engine (`PIPELINE_ENGINE`): the legacy orchestrator [backend/agents/orchestrator.py](../backend/agents/orchestrator.py) or the PDDL orchestrator [backend/agents/pddl_orchestrator.py](../backend/agents/pddl_orchestrator.py); both feed [backend/pipeline/canonical_builder.py](../backend/pipeline/canonical_builder.py)
   - export: [backend/export/pandoc_exporter.py](../backend/export/pandoc_exporter.py), [backend/export/exporters](../backend/export/exporters), [backend/export/renderers](../backend/export/renderers)
 
 ## UC-02 Select description level

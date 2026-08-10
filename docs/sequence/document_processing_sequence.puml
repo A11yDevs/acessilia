@@ -1,8 +1,15 @@
 @startuml document_processing_sequence
 skinparam shadowing false
 
+title Sequência de Processamento — motor legacy (PIPELINE_ENGINE=legacy, padrão)
+
+note over User
+  Este diagrama mostra o motor legacy (padrão).
+  O motor pddl (manifesto -> plano -> execução) está em docs/pmv_agno_pddl.md.
+end note
+
 actor User
-participant "Frontend\n(Web/Telegram/CLI)" as Front
+participant "Frontend\n(Web/Telegram/CLI, via REST API)" as Front
 participant "AccessibilityOrchestrator\nbackend/agents/orchestrator.py" as Orchestrator
 participant "ReaderAgent\n(Função Determinística)" as Reader
 participant "VisionAgent\n(Agno LLM)" as Vision
