@@ -92,10 +92,10 @@ jobs:
 
           report = Path("test-results.xml")
           root = ElementTree.parse(report).getroot()
-            skipped = sum(
+          skipped = sum(
               int(suite.attrib.get("skipped", "0"))
               for suite in root.iter("testsuite")
-            )
+          )
           if skipped:
               raise SystemExit(
                   f"CI incompleto: {skipped} teste(s) foram pulado(s). "

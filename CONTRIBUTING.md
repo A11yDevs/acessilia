@@ -125,7 +125,14 @@ Abra o pull request, selecione o check `CI / tests (Python 3.11)` e expanda a pr
 
 ## CI e CD
 
-Esta automação implementa **integração contínua (CI)**: cada mudança é instalada e testada automaticamente antes do merge. Ela ainda não publica versões nem realiza deploy. Uma futura etapa de **entrega ou implantação contínua (CD)** deve ser criada em workflow separado, com ambientes, aprovações e credenciais próprias.
+O workflow **CI** implementa integração contínua: cada mudança é instalada e testada automaticamente antes do merge. Depois que o CI de um push na `main` passa, o workflow **Delivery** constrói o target de produção do Dockerfile e publica a imagem no GitHub Container Registry.
+
+São publicadas duas referências:
+
+- `ghcr.io/marcospaulo429/acessilia:main`, atualizada a cada integração válida;
+- `ghcr.io/marcospaulo429/acessilia:sha-<commit>`, imutável e indicada para reprodução e rollback.
+
+Isso é **entrega contínua**: há um artefato pronto para uso, mas nenhum servidor é alterado automaticamente. Uma futura implantação contínua deve ficar em workflow separado e só será necessária quando existir um ambiente de hospedagem.
 
 ## Proteção da `main`
 
