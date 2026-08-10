@@ -1,5 +1,7 @@
 # acessilia
 
+[![CI](https://github.com/marcospaulo429/acessilia/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/marcospaulo429/acessilia/actions/workflows/ci.yml)
+
 **acessilia** é um projeto de código‑aberto que extrai, classifica e torna documentos (PDF, DOCX, imagens, etc.) acessíveis usando LLMs (Ollama, OpenRouter) e um pipeline modular.
 
 ## Arquitetura
@@ -66,9 +68,19 @@ Edite `ENABLED_INTERFACES` em `.env`, ex.: `api,web`. A API deve sempre estar ha
 
 ## Testes
 
+Instale as dependências de desenvolvimento e os extras usados pelo CI:
+
+```bash
+poetry install --with dev --extras docling
+```
+
+Execute a suíte completa da pasta `tests/`:
+
 ```bash
 poetry run pytest
 ```
+
+O GitHub Actions repete essa validação em Python 3.11 para todo pull request direcionado à `main` e rejeita falhas, erros e testes pulados. Consulte o [guia de contribuição](CONTRIBUTING.md) para preparar o ambiente e entender o fluxo de revisão.
 
 ## Docker
 
@@ -107,8 +119,10 @@ Se quiser embutir os modelos já na imagem Docker, o `infra/Dockerfile` também 
 1. Fork o repositório.
 2. Crie uma branch de feature.
 3. Escreva testes para a nova funcionalidade.
-4. Rode `pytest` – garanta que a cobertura permaneça alta.
+4. Rode `poetry run pytest` e corrija falhas, erros ou skips.
 5. Envie um pull request.
+
+As regras detalhadas estão em [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Licença
 

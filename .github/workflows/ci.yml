@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: tests (Python 3.11)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      POETRY_VERSION: 1.8.3
+      POETRY_NO_INTERACTION: "1"
+      POETRY_VIRTUALENVS_IN_PROJECT: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.11"
+
+      - name: Restore dependency cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.cache/pypoetry
+            .venv
+          key: poetry-${{ runner.os }}-py3.11-${{ hashFiles('poetry.lock') }}
+          restore-keys: |
+            poetry-${{ runner.os }}-py3.11-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            build-essential \
+            ffmpeg \
+            fonts-dejavu-core \
+            libgl1 \
+            libglib2.0-0 \
+            libmagic1 \
+            pandoc \
+            poppler-utils \
+            tesseract-ocr \
+            texlive-xetex
+
+      - name: Install Poetry
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "poetry==${POETRY_VERSION}"
+          poetry --version
+
+      - name: Validate dependency lock
+        run: poetry check --lock
+
+      - name: Install project dependencies
+        run: poetry install --with dev --extras docling --no-interaction --no-ansi
+
+      - name: Collect complete test suite
+        run: poetry run pytest --collect-only -q
+
+      - name: Run complete test suite
+        run: poetry run pytest --junitxml=test-results.xml
+
+      - name: Reject unexpected skipped tests
+        run: |
+          poetry run python - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree
+
+          report = Path("test-results.xml")
+          root = ElementTree.parse(report).getroot()
+            skipped = sum(
+              int(suite.attrib.get("skipped", "0"))
+              for suite in root.iter("testsuite")
+            )
+          if skipped:
+              raise SystemExit(
+                  f"CI incompleto: {skipped} teste(s) foram pulado(s). "
+                  "Consulte os motivos exibidos pelo pytest."
+              )
+          print("Relatorio JUnit validado: nenhum teste foi pulado.")
+          PY
