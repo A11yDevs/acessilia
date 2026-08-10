@@ -75,17 +75,36 @@ RUN set -eux \
     && rm -rf /tmp/verapdf-installer /tmp/verapdf-installer.zip
 
 ARG POETRY_EXTRAS="docling"
+ARG TORCH_VERSION=2.7.1
+ARG TORCHVISION_VERSION=0.22.1
 
 COPY pyproject.toml poetry.lock* ./
 
 RUN pip install --upgrade pip \
     && pip install "poetry==$POETRY_VERSION" \
-    && poetry config virtualenvs.create false \
+    && pip install \
+        --index-url https://download.pytorch.org/whl/cpu \
+        "torch==${TORCH_VERSION}+cpu" \
+        "torchvision==${TORCHVISION_VERSION}+cpu" \
     && if [ -n "$POETRY_EXTRAS" ]; then \
-         poetry install --only main --extras "$POETRY_EXTRAS" --no-root --no-interaction --no-ansi; \
+                 poetry export --only main --extras "$POETRY_EXTRAS" --without-hashes --format requirements.txt --output /tmp/requirements.txt; \
        else \
-         poetry install --only main --no-root --no-interaction --no-ansi; \
-       fi
+                 poetry export --only main --without-hashes --format requirements.txt --output /tmp/requirements.txt; \
+             fi \
+        && python - <<'PY'
+from pathlib import Path
+
+requirements_path = Path("/tmp/requirements.txt")
+excluded = ("nvidia-", "torch==", "torchvision==", "triton==")
+requirements = [
+        line
+        for line in requirements_path.read_text(encoding="utf-8").splitlines()
+        if not line.lower().startswith(excluded)
+]
+requirements_path.write_text("\n".join(requirements) + "\n", encoding="utf-8")
+PY
+RUN pip install --requirement /tmp/requirements.txt \
+        && rm /tmp/requirements.txt
 
 RUN python - <<'PY'
 from pathlib import Path

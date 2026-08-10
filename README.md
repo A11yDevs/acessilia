@@ -1,5 +1,8 @@
 # acessilia
 
+[![CI](https://github.com/marcospaulo429/acessilia/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/marcospaulo429/acessilia/actions/workflows/ci.yml)
+[![Delivery](https://github.com/marcospaulo429/acessilia/actions/workflows/delivery.yml/badge.svg?branch=main)](https://github.com/marcospaulo429/acessilia/actions/workflows/delivery.yml)
+
 **acessilia** é um projeto de código‑aberto que extrai, classifica e torna documentos (PDF, DOCX, imagens, etc.) acessíveis usando LLMs (Ollama, OpenRouter) e um pipeline modular.
 
 ## Arquitetura
@@ -66,11 +69,39 @@ Edite `ENABLED_INTERFACES` em `.env`, ex.: `api,web`. A API deve sempre estar ha
 
 ## Testes
 
+Instale as dependências de desenvolvimento e os extras usados pelo CI:
+
+```bash
+poetry install --with dev --extras docling
+```
+
+Execute a suíte completa da pasta `tests/`:
+
 ```bash
 poetry run pytest
 ```
 
+O GitHub Actions repete essa validação em Python 3.11 para todo pull request direcionado à `main` e rejeita falhas, erros e testes pulados. Consulte o [guia de contribuição](CONTRIBUTING.md) para preparar o ambiente e entender o fluxo de revisão.
+
 ## Docker
+
+### Usando a imagem pronta
+
+Depois que o CI da `main` passa, o GitHub Actions publica automaticamente uma imagem Linux amd64 no GitHub Container Registry:
+
+```bash
+docker pull ghcr.io/marcospaulo429/acessilia:main
+docker run --rm \
+	--env-file .env \
+	-p 8000:8000 \
+	-p 8001:8001 \
+	-v "$PWD/var:/app/var" \
+	ghcr.io/marcospaulo429/acessilia:main
+```
+
+A tag `main` aponta para a versão integrada mais recente. Para reproduzir uma versão exata, use a tag imutável `sha-<commit>` mostrada na execução do workflow **Delivery**.
+
+### Construindo localmente
 
 ```bash
 docker compose up -d --build
@@ -107,8 +138,10 @@ Se quiser embutir os modelos já na imagem Docker, o `infra/Dockerfile` também 
 1. Fork o repositório.
 2. Crie uma branch de feature.
 3. Escreva testes para a nova funcionalidade.
-4. Rode `pytest` – garanta que a cobertura permaneça alta.
+4. Rode `poetry run pytest` e corrija falhas, erros ou skips.
 5. Envie um pull request.
+
+As regras detalhadas estão em [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Licença
 
