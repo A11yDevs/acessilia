@@ -6,6 +6,7 @@ commit_changes.py
 
 .env
 .venv
+.vscode
 report.txt
 
 # Python cache and temporary files
@@ -22,9 +23,20 @@ output/
 # Runtime, temporary and cache directories
 data/
 var/
+var/cache/rapidocr/
+cache/
 trash/
 temp/
 *.db
 *.sqlite
 *.sqlite3
 *.log
+
+# LaTeX build artifacts
+*.aux
+*.fdb_latexmk
+*.fls
+*.synctex.gz
+
+# PDFs temporarios gerados durante benchmark em fixtures
+tests/fixtures/tutorials/pagina_*.pdf

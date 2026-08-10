@@ -19,9 +19,14 @@ FORMAT_EXTENSIONS = {
     "txt": "texto",
     "docx": "word",
     "pdf": "pdf",
+    "pdf_ua": "pdf/ua",
     "html": "html",
     "mp3": "audio",
     "zip": "completo",
+}
+
+FORMAT_OUTPUT_SUFFIX = {
+    "pdf_ua": "pdf_ua.pdf",
 }
 
 
@@ -30,7 +35,7 @@ def _get_connection():
     if _connection is None:
         db_path = settings.db_path
         db_path.parent.mkdir(parents=True, exist_ok=True)
-        _connection = sqlite3.connect(str(db_path))
+        _connection = sqlite3.connect(str(db_path), check_same_thread=False)
         _connection.row_factory = sqlite3.Row
         cursor = _connection.cursor()
         try:
@@ -96,7 +101,8 @@ async def obter_info_token(token: str) -> dict | None:
     formats_list = json.loads(row["formats"]) if row["formats"] else []
     formats = []
     for ext, label in FORMAT_EXTENSIONS.items():
-        file_path = output_dir / f"{Path(row['filename']).stem}.{ext}"
+        suffix = FORMAT_OUTPUT_SUFFIX.get(ext, ext)
+        file_path = output_dir / f"{Path(row['filename']).stem}.{suffix}"
         if file_path.exists():
             size_kb = file_path.stat().st_size / 1024
             size_str = f"{size_kb:.0f} KB" if size_kb < 1024 else f"{size_kb / 1024:.1f} MB"

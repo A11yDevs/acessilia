@@ -15,6 +15,12 @@ OUTPUT_PROFILES = {
         "collapsible": False,
         "include_audit": False,
     },
+    "pdf_ua": {
+        "verbosity": ["basic", "detailed"],
+        "interactive": False,
+        "collapsible": False,
+        "include_audit": False,
+    },
     "docx": {
         "verbosity": ["basic", "detailed"],
         "interactive": False,

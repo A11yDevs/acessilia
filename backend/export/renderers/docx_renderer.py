@@ -7,6 +7,8 @@ from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Pt
 
+from backend.pipeline.table_ast import rows_from_table_ast
+from backend.pipeline.table_ast import table_ast_from_block
 from backend.pipeline.verbosity_manager import filter_blocks_for_profile
 
 
@@ -59,8 +61,12 @@ def _render_block(doc: Document, block: dict[str, Any]) -> None:
         for item in block.get("items", []):
             doc.add_paragraph(str(item), style=style)
     elif block_type == "table":
-        rows = block.get("rows", [])
+        table_ast = table_ast_from_block(block)
+        rows = rows_from_table_ast(table_ast) if table_ast else block.get("rows", [])
         if rows:
+            caption = table_ast.get("caption") if isinstance(table_ast, dict) else None
+            if isinstance(caption, str) and caption.strip():
+                doc.add_paragraph(f"Tabela: {caption.strip()}")
             table = doc.add_table(rows=len(rows), cols=max(len(row) for row in rows))
             table.style = "Table Grid"
             for i, row in enumerate(rows):

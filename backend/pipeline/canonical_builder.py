@@ -30,7 +30,14 @@ def build_canonical_document(
     raw_text = source_payload.get("text", source_text)
     cleaned = sanitize_text(str(raw_text))
     parsed_blocks = _parse_structured_blocks(source_payload, cleaned)
+    inferred_title = _infer_title(parsed_blocks).strip()
     sections = _build_sections(parsed_blocks)
+    technical_warnings_list = list(technical_warnings or [])
+    if not sections and _is_non_textual_structured_payload(source_payload, cleaned):
+        sections = _build_minimal_non_textual_sections(title=title)
+        technical_warnings_list.append(
+            "Documento sem texto extraivel; seção mínima gerada para manter exportação acessível."
+        )
     source_type = Path(source_path).suffix.lower() if source_path else ""
     source_metadata = {
         "page_count": source_payload.get("page_count"),
@@ -40,7 +47,7 @@ def build_canonical_document(
     return {
         "schema_version": "1.0.0",
         "id": f"doc-{uuid4().hex[:12]}",
-        "title": title or _infer_title(parsed_blocks) or "Documento acessível",
+        "title": inferred_title or title or "Documento acessível",
         "language": language,
         "verbosity": verbosity,
         "audience": audience or ["reader"],
@@ -55,7 +62,7 @@ def build_canonical_document(
             "semantic_headings": True,
             "internal_links": True,
         },
-        "technical_warnings": technical_warnings or [],
+        "technical_warnings": technical_warnings_list,
         "audit": {
             "generated_by": "canonical_builder",
             "input_length": len(source_text),
@@ -65,11 +72,70 @@ def build_canonical_document(
     }
 
 
+def _is_non_textual_structured_payload(
+    source_payload: dict[str, Any],
+    cleaned_text: str,
+) -> bool:
+    pages = source_payload.get("pages")
+    if not isinstance(pages, list) or not pages:
+        return False
+    if cleaned_text.strip():
+        return False
+    return True
+
+
+def _build_minimal_non_textual_sections(*, title: str) -> list[dict[str, Any]]:
+    section_id = f"section-fallback-{uuid4().hex[:8]}"
+    block_id = f"blk-fallback-{uuid4().hex[:8]}"
+    section_title = title or "Conteúdo visual"
+    return [
+        {
+            "id": section_id,
+            "title": section_title,
+            "level": 1,
+            "source_location": {},
+            "metadata": {
+                "generated": True,
+                "reason": "non_textual_payload",
+            },
+            "blocks": [
+                {
+                    "id": block_id,
+                    "type": "paragraph",
+                    "text": (
+                        "Este documento não possui texto extraível. "
+                        "O conteúdo é predominantemente visual e pode requerer "
+                        "audiodescrição manual."
+                    ),
+                }
+            ],
+            "children": [],
+        }
+    ]
+
+
 def _infer_title(blocks: list[dict[str, Any]]) -> str:
-    for block in blocks:
-        if block.get("type") == "heading" and block.get("level") == 1:
-            return block.get("text", "")
-    return ""
+    headings = [
+        {
+            "level": int(block.get("level", 1)),
+            "text": str(block.get("text", "")).strip(),
+        }
+        for block in blocks
+        if block.get("type") == "heading" and str(block.get("text", "")).strip()
+    ]
+    if not headings:
+        return ""
+    first_heading = headings[0]["text"]
+    if _looks_like_chapter_heading(first_heading):
+        for candidate in headings[1:]:
+            if candidate["level"] <= 2:
+                return f"{first_heading} - {candidate['text']}"
+    return first_heading
+
+
+def _looks_like_chapter_heading(text: str) -> bool:
+    normalized = text.strip().upper()
+    return bool(re.match(r"^CAP[ÍI]TULO\s+\d+", normalized))
 
 
 def _parse_structured_blocks(
@@ -145,6 +211,15 @@ def _sanitize_structured_blocks(
                     continue
                 rows.append([sanitize_block_text(str(cell)) for cell in row])
             clean["rows"] = rows
+            if rows and not isinstance(clean.get("table_ast"), dict):
+                clean["table_ast"] = _table_ast_from_rows(rows)
+
+        if block_type == "table" and isinstance(clean.get("table_ast"), dict):
+            table_ast = _sanitize_table_ast(clean["table_ast"])
+            if table_ast:
+                clean["table_ast"] = table_ast
+                if not clean.get("rows"):
+                    clean["rows"] = _rows_from_table_ast(table_ast)
 
         children = clean.get("children")
         if isinstance(children, list):
@@ -152,6 +227,88 @@ def _sanitize_structured_blocks(
 
         sanitized_blocks.append(clean)
     return sanitized_blocks
+
+
+def _sanitize_table_ast(raw: dict[str, Any]) -> dict[str, Any]:
+    table_ast: dict[str, Any] = {}
+
+    caption = raw.get("caption")
+    if isinstance(caption, str) and caption.strip():
+        table_ast["caption"] = sanitize_block_text(caption)
+
+    for section_name in ("header", "body", "footer"):
+        section = raw.get(section_name)
+        if not isinstance(section, list):
+            continue
+        normalized_rows: list[dict[str, Any]] = []
+        for row in section:
+            if not isinstance(row, dict):
+                continue
+            cells = row.get("cells")
+            if not isinstance(cells, list):
+                continue
+            normalized_cells: list[dict[str, Any]] = []
+            for cell in cells:
+                if not isinstance(cell, dict):
+                    continue
+                text = sanitize_block_text(str(cell.get("text", "")))
+                if not text:
+                    continue
+                normalized_cell: dict[str, Any] = {"text": text}
+                if isinstance(cell.get("header"), bool):
+                    normalized_cell["header"] = cell["header"]
+                scope = cell.get("scope")
+                if isinstance(scope, str) and scope in {
+                    "none",
+                    "row",
+                    "col",
+                    "rowgroup",
+                    "colgroup",
+                }:
+                    normalized_cell["scope"] = scope
+                for span_key in ("rowspan", "colspan"):
+                    span_value = cell.get(span_key)
+                    if isinstance(span_value, int) and span_value >= 1:
+                        normalized_cell[span_key] = span_value
+                normalized_cells.append(normalized_cell)
+            if normalized_cells:
+                normalized_rows.append({"cells": normalized_cells})
+        if normalized_rows:
+            table_ast[section_name] = normalized_rows
+
+    metadata = raw.get("metadata")
+    if isinstance(metadata, dict):
+        table_ast["metadata"] = metadata
+
+    return table_ast
+
+
+def _table_ast_from_rows(rows: list[list[str]]) -> dict[str, Any]:
+    body = []
+    for row in rows:
+        cells = [{"text": sanitize_block_text(str(cell))} for cell in row if str(cell).strip()]
+        if cells:
+            body.append({"cells": cells})
+    return {"body": body}
+
+
+def _rows_from_table_ast(table_ast: dict[str, Any]) -> list[list[str]]:
+    rows: list[list[str]] = []
+    for section_name in ("header", "body", "footer"):
+        section = table_ast.get(section_name)
+        if not isinstance(section, list):
+            continue
+        for row in section:
+            if not isinstance(row, dict):
+                continue
+            cells = row.get("cells")
+            if not isinstance(cells, list):
+                continue
+            row_values = [str(cell.get("text", "")).strip() for cell in cells if isinstance(cell, dict)]
+            row_values = [value for value in row_values if value]
+            if row_values:
+                rows.append(row_values)
+    return rows
 
 
 def _make_id(prefix: str, text: str, counter: int) -> str:

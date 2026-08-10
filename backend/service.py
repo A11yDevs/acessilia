@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Callable, Coroutine
 
 from backend.agents.orchestrator import AccessibilityOrchestrator
+from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
 from backend.agents.state_manager import TaskCancelledError, state_manager
 from backend.services.cache import get_cached, set_cache
 from backend.services.history_service import (
@@ -18,11 +19,41 @@ from backend.tools.text_processor import merge_broken_paragraphs
 from backend.pipeline.canonical_builder import build_canonical_document
 from backend.pipeline.verbosity_manager import verbosity_for_mode
 
-agente = AccessibilityOrchestrator()
+
+def _normalized_engine() -> str:
+    engine = settings.pipeline_engine.strip().lower()
+    if engine in {"pddl", "pmv"}:
+        return "pddl"
+    return "legacy"
+
+
+def _build_orchestrator():
+    if _normalized_engine() == "pddl":
+        fast_downward = (
+            Path(settings.pddl_fast_downward).expanduser()
+            if settings.pddl_fast_downward.strip()
+            else None
+        )
+        alias = settings.pddl_fast_downward_alias.strip() or None
+        return PddlAccessibilityOrchestrator(
+            planner_backend=settings.pddl_planner_backend,
+            preferred_plan=settings.pddl_preferred_plan,
+            execute_dry_run=settings.pddl_execute_dry_run,
+            fast_downward=fast_downward,
+            fast_downward_alias=alias,
+            fast_downward_search=settings.pddl_fast_downward_search,
+            enable_ocr=settings.structurer.lower() == "docling",
+            extractor_backend=settings.structurer,
+        )
+    return AccessibilityOrchestrator()
+
+
+agente = _build_orchestrator()
 
 
 def _cache_version() -> str:
-    return f"{settings.ai_client}-v1"
+    engine = _normalized_engine()
+    return f"{settings.ai_client}-{engine}-v1"
 
 
 def _limpar_tarefas_orfas():
@@ -54,6 +85,7 @@ async def process(
     mode: str = "normal",
     custom_prompt: str | None = None,
     thinking_mode: bool = False,
+    task_id: str | None = None,
 ) -> dict[str, Any]:
     cached = await get_cached(file_path, _cache_version())
     if cached is not None:
@@ -70,7 +102,7 @@ async def process(
             audience=["reader"],
         )
 
-    task_id = state_manager.criar_tarefa(file_path)
+    task_id = state_manager.criar_tarefa(file_path, task_id=task_id)
     inicio = time.time()
     await registrar_conversao(
         task_id=task_id,
@@ -108,8 +140,16 @@ async def process(
             thinking_mode=thinking_mode,
         )
 
+        canonical_metadata: dict[str, Any] | None = None
+        technical_warnings: list[str] | None = None
         if isinstance(resultado, dict):
             raw_text = resultado["text"]
+            payload_metadata = resultado.get("canonical_metadata")
+            if isinstance(payload_metadata, dict):
+                canonical_metadata = payload_metadata
+            payload_warnings = resultado.get("technical_warnings")
+            if isinstance(payload_warnings, list):
+                technical_warnings = [str(item) for item in payload_warnings]
         else:
             raw_text = resultado
 
@@ -127,6 +167,8 @@ async def process(
             source_name=file_path.name,
             source_path=str(file_path),
             audience=["reader"],
+            metadata=canonical_metadata,
+            technical_warnings=technical_warnings,
         )
 
         state_manager.finalizar(
@@ -139,7 +181,7 @@ async def process(
         await finalizar_conversao(
             task_id=task_id,
             status="done",
-            pipeline="ollama-unico",
+            pipeline=f"{settings.ai_client}-{_normalized_engine()}",
             resultado_resumo=canonical_document["title"][:200],
             tempo_segundos=time.time() - inicio,
         )

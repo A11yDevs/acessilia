@@ -1,0 +1,65 @@
+\DocumentMetadata{
+  pdfversion=1.7,
+  lang=pt-BR,
+  pdfstandard=ua-1,
+  testphase={phase-III,firstaid}
+}
+\documentclass[$if(fontsize)$$fontsize$$else$11pt$endif$]{article}
+
+\usepackage{iftex}
+\ifPDFTeX
+  \errmessage{PDF/UA template requer XeLaTeX ou LuaLaTeX}
+\fi
+
+\usepackage{fontspec}
+\defaultfontfeatures{Ligatures=TeX}
+\setmainfont{DejaVu Sans}
+\setsansfont{DejaVu Sans}
+\setmonofont{DejaVu Sans Mono}
+
+\usepackage{tagpdf}
+\tagpdfsetup{activate-all,uncompress}
+\usepackage{latex-lab-testphase-table}
+
+\usepackage{geometry}
+\geometry{margin=2.2cm}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.5em}
+
+\usepackage{hyperref}
+\usepackage{bookmark}
+\hypersetup{
+  hidelinks,
+  pdfcreator={Acessilia},
+  pdfdisplaydoctitle=true,
+$if(title)$
+  pdftitle={$title$}
+$else$
+  pdftitle={Documento acessível}
+$endif$
+}
+
+\usepackage{longtable,booktabs,array}
+\usepackage{caption}
+\captionsetup[table]{position=above}
+
+$if(title)$
+\title{$title$}
+$endif$
+$if(author)$
+\author{$for(author)$$author$$sep$\\$endfor$}
+$endif$
+$if(date)$
+\date{$date$}
+$else$
+\date{}
+$endif$
+
+\begin{document}
+$if(title)$
+\maketitle
+$endif$
+
+$body$
+
+\end{document}

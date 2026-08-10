@@ -64,6 +64,23 @@ async def startup():
     enabled = [i.strip() for i in settings.enabled_interfaces.split(",")]
     tasks = []
 
+    if "api" in enabled:
+        from backend.api.app import app as api_app
+        import uvicorn
+
+        api_config = uvicorn.Config(
+            api_app,
+            host=settings.api_host,
+            port=settings.api_port,
+            log_level=settings.log_level.lower(),
+        )
+        api_server = uvicorn.Server(api_config)
+        tasks.append(api_server.serve())
+        logger.info(
+            "Interface API habilitada (http://localhost:{})",
+            settings.api_port,
+        )
+
     if "telegram" in enabled and settings.bot_token_valid:
         from frontend.telegram.bot import start_polling
 
@@ -77,11 +94,14 @@ async def startup():
         import uvicorn
 
         config = uvicorn.Config(
-            app, host="0.0.0.0", port=8000, log_level=settings.log_level.lower()
+            app, host="0.0.0.0", port=settings.web_port, log_level=settings.log_level.lower()
         )
         server = uvicorn.Server(config)
         tasks.append(server.serve())
-        logger.info("Interface Web habilitada (http://localhost:8000)")
+        logger.info(
+            "Interface Web habilitada (http://localhost:{})",
+            settings.web_port,
+        )
 
     if not tasks:
         logger.critical(

@@ -1,6 +1,8 @@
 import tempfile
 from pathlib import Path
 
+import pytest
+
 from backend.export.pandoc_exporter import export_accessible_document
 from backend.pipeline.canonical_builder import build_canonical_document
 from backend.pipeline.validators import validate_canonical_document
@@ -44,6 +46,59 @@ def test_build_canonical_document_accepts_structured_payload():
     assert document["metadata"]["page_count"] == 2
     assert document["metadata"]["mode"] == "normal"
     assert document["sections"]
+
+
+def test_build_canonical_document_prefers_composed_heading_title_over_filename():
+    payload = {
+        "text": "# CAPÍTULO 9\n## HERANÇA, REESCRITA E POLIMORFISMO\n### 9.1 REPETINDO CÓDIGO?",
+        "page_count": 1,
+        "mode": "pddl-internal",
+        "pages": [
+            {
+                "page_number": 1,
+                "text": "# CAPÍTULO 9\n## HERANÇA, REESCRITA E POLIMORFISMO\n### 9.1 REPETINDO CÓDIGO?",
+                "blocks": [
+                    {"type": "heading", "level": 1, "text": "CAPÍTULO 9"},
+                    {
+                        "type": "heading",
+                        "level": 2,
+                        "text": "HERANÇA, REESCRITA E POLIMORFISMO",
+                    },
+                    {"type": "heading", "level": 3, "text": "9.1 REPETINDO CÓDIGO?"},
+                ],
+            }
+        ],
+    }
+
+    document = build_canonical_document(payload, title="java-oo-3pgs")
+
+    assert document["title"] == "CAPÍTULO 9 - HERANÇA, REESCRITA E POLIMORFISMO"
+
+
+def test_build_canonical_document_creates_fallback_for_non_textual_payload():
+    payload = {
+        "text": "",
+        "page_count": 1,
+        "mode": "pddl-internal",
+        "pages": [
+            {
+                "page_number": 1,
+                "text": "",
+                "blocks": [],
+            }
+        ],
+    }
+
+    document = build_canonical_document(payload, title="sunset-skyline")
+
+    assert document["sections"]
+    first_section = document["sections"][0]
+    assert first_section["level"] == 1
+    assert first_section["blocks"]
+    assert first_section["blocks"][0]["type"] == "paragraph"
+    assert "não possui texto extraível" in first_section["blocks"][0]["text"]
+    assert any("seção mínima" in warning for warning in document["technical_warnings"])
+    assert validate_canonical_document(document) == []
 
 
 def test_validate_output_text_flags_markdown_leaks():
@@ -152,3 +207,35 @@ def test_export_accessible_document_sanitizes_legacy_block_markdown():
         assert "Capitulo" in content
         assert "Item A" in content
         assert "Item B" in content
+
+
+def test_export_accessible_document_pdf_ua_requires_pandoc(monkeypatch):
+    monkeypatch.setattr("backend.export.pandoc_exporter._pandoc_bin", lambda: None)
+    monkeypatch.setattr("backend.export.pandoc_exporter._xelatex_bin", lambda: "/usr/bin/xelatex")
+    monkeypatch.setattr("backend.export.pandoc_exporter._lualatex_bin", lambda: "/usr/bin/lualatex")
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        out = Path(tmpdir) / "saida.pdf_ua.pdf"
+        with pytest.raises(RuntimeError, match="pandoc"):
+            export_accessible_document(
+                "# Titulo\n\nParagrafo simples.",
+                out,
+                format_name="pdf_ua",
+                title="Titulo",
+            )
+
+
+def test_export_accessible_document_pdf_ua_requires_latex_engine(monkeypatch):
+    monkeypatch.setattr("backend.export.pandoc_exporter._pandoc_bin", lambda: "/usr/bin/pandoc")
+    monkeypatch.setattr("backend.export.pandoc_exporter._xelatex_bin", lambda: None)
+    monkeypatch.setattr("backend.export.pandoc_exporter._lualatex_bin", lambda: None)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        out = Path(tmpdir) / "saida.pdf_ua.pdf"
+        with pytest.raises(RuntimeError, match="lualatex ou xelatex"):
+            export_accessible_document(
+                "# Titulo\n\nParagrafo simples.",
+                out,
+                format_name="pdf_ua",
+                title="Titulo",
+            )

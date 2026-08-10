@@ -1,0 +1,418 @@
+{
+  "$defs": {
+    "ComparisonDetails": {
+      "additionalProperties": false,
+      "properties": {
+        "verdict": {
+          "enum": [
+            "identical",
+            "equivalent",
+            "different",
+            "inconclusive"
+          ],
+          "title": "Verdict",
+          "type": "string"
+        },
+        "both_solved": {
+          "title": "Both Solved",
+          "type": "boolean"
+        },
+        "same_expected_total_cost": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Same Expected Total Cost"
+        },
+        "cost_delta_fast_downward_minus_internal": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cost Delta Fast Downward Minus Internal"
+        },
+        "same_selected_obligations": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Same Selected Obligations"
+        },
+        "same_executed_obligations": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Same Executed Obligations"
+        },
+        "same_method_selection": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Same Method Selection"
+        },
+        "same_action_multiset": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Same Action Multiset"
+        },
+        "same_action_sequence": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Same Action Sequence"
+        },
+        "internal_only_steps": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Internal Only Steps",
+          "type": "array"
+        },
+        "fast_downward_only_steps": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Fast Downward Only Steps",
+          "type": "array"
+        },
+        "notes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Notes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "verdict",
+        "both_solved"
+      ],
+      "title": "ComparisonDetails",
+      "type": "object"
+    },
+    "DomainIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        },
+        "domain_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Domain Sha256",
+          "type": "string"
+        },
+        "description_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Description Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version",
+        "domain_sha256",
+        "description_sha256"
+      ],
+      "title": "DomainIdentity",
+      "type": "object"
+    },
+    "PlannerOutcome": {
+      "additionalProperties": false,
+      "description": "Resultado observável de uma execução de backend.",
+      "properties": {
+        "backend": {
+          "enum": [
+            "internal",
+            "fast-downward"
+          ],
+          "title": "Backend",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "solved",
+            "failed"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "planner": {
+          "title": "Planner",
+          "type": "string"
+        },
+        "runtime_ms": {
+          "minimum": 0,
+          "title": "Runtime Ms",
+          "type": "integer"
+        },
+        "plan_file": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Plan File"
+        },
+        "plan_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Plan Id"
+        },
+        "expected_total_cost": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Total Cost"
+        },
+        "step_count": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Step Count"
+        },
+        "execution_step_count": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Execution Step Count"
+        },
+        "validation_passed": {
+          "default": false,
+          "title": "Validation Passed",
+          "type": "boolean"
+        },
+        "statistics": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "boolean"
+              }
+            ]
+          },
+          "title": "Statistics",
+          "type": "object"
+        },
+        "error_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error Type"
+        },
+        "error_message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error Message"
+        }
+      },
+      "required": [
+        "backend",
+        "status",
+        "planner",
+        "runtime_ms"
+      ],
+      "title": "PlannerOutcome",
+      "type": "object"
+    }
+  },
+  "$id": "urn:a11y-devs:schema:planning-comparison:1.0.0",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Comparação normalizada das execuções do planejador interno e do Fast Downward sobre o mesmo domínio e problem.pddl.",
+  "properties": {
+    "$schema": {
+      "default": "urn:a11y-devs:schema:planning-comparison:1.0.0",
+      "title": "$Schema",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0.0",
+      "default": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "comparison_id": {
+      "minLength": 1,
+      "title": "Comparison Id",
+      "type": "string"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "requested_planner": {
+      "const": "both",
+      "default": "both",
+      "title": "Requested Planner",
+      "type": "string"
+    },
+    "preferred_backend": {
+      "enum": [
+        "internal",
+        "fast-downward"
+      ],
+      "title": "Preferred Backend",
+      "type": "string"
+    },
+    "manifest_id": {
+      "minLength": 1,
+      "title": "Manifest Id",
+      "type": "string"
+    },
+    "manifest_revision": {
+      "minimum": 1,
+      "title": "Manifest Revision",
+      "type": "integer"
+    },
+    "manifest_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Manifest Sha256",
+      "type": "string"
+    },
+    "domain": {
+      "$ref": "#/$defs/DomainIdentity"
+    },
+    "problem_name": {
+      "minLength": 1,
+      "title": "Problem Name",
+      "type": "string"
+    },
+    "problem_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Problem Sha256",
+      "type": "string"
+    },
+    "outcomes": {
+      "additionalProperties": {
+        "$ref": "#/$defs/PlannerOutcome"
+      },
+      "propertyNames": {
+        "enum": [
+          "internal",
+          "fast-downward"
+        ]
+      },
+      "title": "Outcomes",
+      "type": "object"
+    },
+    "comparison": {
+      "$ref": "#/$defs/ComparisonDetails"
+    }
+  },
+  "required": [
+    "comparison_id",
+    "generated_at",
+    "preferred_backend",
+    "manifest_id",
+    "manifest_revision",
+    "manifest_sha256",
+    "domain",
+    "problem_name",
+    "problem_sha256",
+    "outcomes",
+    "comparison"
+  ],
+  "title": "PlanningComparison",
+  "type": "object"
+}
