@@ -53,3 +53,6 @@ bot-acess = "frontend.cli.run:main"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--strict-config --strict-markers -ra"
+markers = [
+    "docling: requires the optional Docling stack and its model downloads",
+]

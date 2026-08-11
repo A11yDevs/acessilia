@@ -6,7 +6,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     POETRY_VERSION=1.8.3 \
     POETRY_VIRTUALENVS_CREATE=false \
-    PYTHONPATH=/app
+    PYTHONPATH=/app \
+    HF_HOME=/app/var/cache/huggingface \
+    RAPIDOCR_CACHE_DIR=/app/var/cache/rapidocr
 
 WORKDIR /app
 
@@ -74,86 +76,29 @@ RUN set -eux \
     && test -x /usr/local/bin/verapdf \
     && rm -rf /tmp/verapdf-installer /tmp/verapdf-installer.zip
 
-ARG POETRY_EXTRAS="docling"
+ARG WITH_DOCLING=true
 ARG TORCH_VERSION=2.7.1
 ARG TORCHVISION_VERSION=0.22.1
 
 COPY pyproject.toml poetry.lock* ./
+COPY scripts/filter_accelerator_requirements.py /tmp/filter_accelerator_requirements.py
 
 RUN pip install --upgrade pip \
     && pip install "poetry==$POETRY_VERSION" \
-    && pip install \
-        --index-url https://download.pytorch.org/whl/cpu \
-        "torch==${TORCH_VERSION}+cpu" \
-        "torchvision==${TORCHVISION_VERSION}+cpu" \
-    && if [ -n "$POETRY_EXTRAS" ]; then \
-                 poetry export --only main --extras "$POETRY_EXTRAS" --without-hashes --format requirements.txt --output /tmp/requirements.txt; \
+    && if [ "$WITH_DOCLING" = "true" ]; then \
+                 pip install \
+                     --index-url https://download.pytorch.org/whl/cpu \
+                     "torch==${TORCH_VERSION}+cpu" \
+                     "torchvision==${TORCHVISION_VERSION}+cpu"; \
+                 poetry export --only main --extras docling --without-hashes --format requirements.txt --output /tmp/requirements.txt; \
        else \
                  poetry export --only main --without-hashes --format requirements.txt --output /tmp/requirements.txt; \
-             fi \
-        && python - <<'PY'
-from pathlib import Path
-
-requirements_path = Path("/tmp/requirements.txt")
-excluded = ("nvidia-", "torch==", "torchvision==", "triton==")
-requirements = [
-        line
-        for line in requirements_path.read_text(encoding="utf-8").splitlines()
-        if not line.lower().startswith(excluded)
-]
-requirements_path.write_text("\n".join(requirements) + "\n", encoding="utf-8")
-PY
+       fi \
+    && python /tmp/filter_accelerator_requirements.py \
+        /tmp/requirements.txt /tmp/requirements-filtered.txt \
+    && mv /tmp/requirements-filtered.txt /tmp/requirements.txt
 RUN pip install --requirement /tmp/requirements.txt \
-        && rm /tmp/requirements.txt
-
-RUN python - <<'PY'
-from pathlib import Path
-import tempfile
-
-try:
-    import rapidocr
-    from rapidocr.utils.download_models import download_models
-except ImportError:
-    print("RapidOCR nao instalado; preload de modelos ignorado.")
-    raise SystemExit(0)
-
-root_dir = Path(rapidocr.__file__).resolve().parent
-cfg_path = Path(tempfile.gettempdir()) / "rapidocr-preload.yaml"
-cfg_path.write_text(
-    f"""
-Global:
-    model_root_dir: {root_dir / 'models'}
-    use_det: true
-    use_cls: true
-    use_rec: true
-
-Det:
-    engine_type: torch
-    lang_type: ch
-    model_type: small
-    ocr_version: PP-OCRv6
-    task_type: det
-
-Cls:
-    engine_type: torch
-    lang_type: ch
-    model_type: mobile
-    ocr_version: PP-OCRv4
-    task_type: cls
-
-Rec:
-    engine_type: torch
-    lang_type: ch
-    model_type: small
-    ocr_version: PP-OCRv6
-    task_type: rec
-""".strip()
-    + "\n",
-    encoding="utf-8",
-)
-download_models(cfg_path)
-print(f"RapidOCR models preloaded at {root_dir / 'models'}")
-PY
+    && rm /tmp/requirements.txt /tmp/filter_accelerator_requirements.py
 
 COPY . .
 

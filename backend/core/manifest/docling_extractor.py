@@ -68,12 +68,16 @@ class DoclingManifestExtractor:
             )
 
         from docling.datamodel.base_models import InputFormat
-        from docling.datamodel.pipeline_options import PdfPipelineOptions
+        from docling.datamodel.pipeline_options import (
+            PdfPipelineOptions,
+            RapidOcrOptions,
+        )
         from docling.document_converter import DocumentConverter, PdfFormatOption
 
         pdf_options = PdfPipelineOptions()
         pdf_options.do_ocr = self.enable_ocr
         pdf_options.do_table_structure = True
+        pdf_options.ocr_options = RapidOcrOptions(backend="torch")
         # Algumas versões do Docling não expõem este campo; manter compatibilidade.
         if hasattr(pdf_options, "enable_remote_services"):
             pdf_options.enable_remote_services = False

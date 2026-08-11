@@ -79,17 +79,18 @@ O workflow também roda após pushes na `main`, oferecendo uma verificação fin
 
 ## Como o CI decide se o PR está válido
 
-O job obrigatório realiza estas etapas:
+Dois jobs de variante realizam estas etapas:
 
 1. Prepara um runner Ubuntu limpo e Python 3.11.
 2. Restaura caches compatíveis com o `poetry.lock`.
-3. Instala ferramentas de sistema, Poetry 1.8.3 e todas as dependências.
+3. Instala ferramentas de sistema, Poetry 1.8.3 e as dependências da variante slim ou Docling.
 4. Valida que o lockfile continua consistente.
 5. Coleta explicitamente a suíte inteira.
 6. Executa o pytest e gera um relatório JUnit.
-7. Analisa o relatório e falha se algum teste tiver sido pulado.
+7. Na variante Docling, converte um PDF real com PyTorch CPU e sem pacotes CUDA.
+8. Analisa o relatório e falha se algum teste tiver sido pulado.
 
-A política de zero skips é intencional: FastAPI e Agno são dependências obrigatórias. Um skip no ambiente completo indicaria instalação incompleta ou um teste que não foi realmente exercitado.
+A variante slim exclui por marker apenas o teste que requer o extra Docling; isso aparece como teste desmarcado, não como skip. Um job agregador publica o status estável `CI / tests (Python 3.11)` somente quando as duas variantes passam.
 
 ## Solução de problemas
 
@@ -125,12 +126,18 @@ Abra o pull request, selecione o check `CI / tests (Python 3.11)` e expanda a pr
 
 ## CI e CD
 
-O workflow **CI** implementa integração contínua: cada mudança é instalada e testada automaticamente antes do merge. Depois que o CI de um push na `main` passa, o workflow **Delivery** constrói o target de produção do Dockerfile e publica a imagem no GitHub Container Registry.
+O workflow **CI** implementa integração contínua: cada mudança é instalada e testada automaticamente antes do merge. Depois que o CI de um push na `main` passa, o workflow **Delivery** constrói, testa e publica duas variantes no GitHub Container Registry.
 
-São publicadas duas referências:
+São publicadas quatro referências:
 
-- `ghcr.io/marcospaulo429/acessilia:main`, atualizada a cada integração válida;
-- `ghcr.io/marcospaulo429/acessilia:sha-<commit>`, imutável e indicada para reprodução e rollback.
+- `ghcr.io/a11ydevs/acessilia:main`, Docling atualizado a cada integração válida;
+- `ghcr.io/a11ydevs/acessilia:sha-<commit>`, Docling imutável;
+- `ghcr.io/a11ydevs/acessilia:main-slim`, variante sem Docling;
+- `ghcr.io/a11ydevs/acessilia:sha-<commit>-slim`, slim imutável.
+
+O Delivery comprova que as imagens não contêm modelos pré-carregados. Na variante Docling, uma conversão sem OCR baixa os modelos estruturais para um volume temporário e a segunda repete a conversão sem rede. O CI separado executa a conversão real com RapidOCR e PyTorch CPU. Os caches de produção ficam em `/app/var/cache/huggingface` e `/app/var/cache/rapidocr`, portanto `/app/var` deve ser um volume persistente.
+
+Antes e depois do push, o workflow mede o tamanho total e a maior camada. O guardrail do projeto é 9 GB; o limite oficial relevante do GHCR é 10 GB por camada e o upload deve concluir em até 10 minutos.
 
 Isso é **entrega contínua**: há um artefato pronto para uso, mas nenhum servidor é alterado automaticamente. Uma futura implantação contínua deve ficar em workflow separado e só será necessária quando existir um ambiente de hospedagem.
 

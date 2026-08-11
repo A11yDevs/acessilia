@@ -23,10 +23,23 @@ env:
 
 jobs:
   publish:
-    name: publish image to GHCR
+    name: publish ${{ matrix.variant }} image to GHCR
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: docling
+            with_docling: "true"
+            tag_suffix: ""
+          - variant: slim
+            with_docling: "false"
+            tag_suffix: -slim
+
+    env:
+      LOCAL_IMAGE: acessilia:delivery-${{ matrix.variant }}
 
     steps:
       - name: Check out tested commit
@@ -51,14 +64,98 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=main
-            type=sha,prefix=sha-,format=long
+            type=raw,value=main${{ matrix.tag_suffix }}
+            type=sha,prefix=sha-,suffix=${{ matrix.tag_suffix }},format=long
           labels: |
             org.opencontainers.image.title=acessilia
             org.opencontainers.image.description=Pipeline para extracao e acessibilidade de documentos
             org.opencontainers.image.licenses=MIT
 
-      - name: Build and publish production image
+      - name: Build production image for verification
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: infra/Dockerfile
+          target: base
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: ${{ env.LOCAL_IMAGE }}
+          build-args: |
+            WITH_DOCLING=${{ matrix.with_docling }}
+          cache-from: type=gha,scope=production-${{ matrix.variant }}
+          cache-to: type=gha,mode=max,scope=production-${{ matrix.variant }}
+
+      - name: Verify installed variant and empty model caches
+        env:
+          VARIANT: ${{ matrix.variant }}
+        run: |
+          docker run --rm --interactive \
+            --env VARIANT \
+            "$LOCAL_IMAGE" \
+            python - <<'PY'
+          import os
+          from importlib.metadata import distributions
+
+          installed = {
+              distribution.metadata["Name"].lower().replace("_", "-")
+              for distribution in distributions()
+              if distribution.metadata["Name"]
+          }
+          if os.environ["VARIANT"] == "slim":
+              unexpected = {"docling", "rapidocr", "torch", "torchvision"} & installed
+              if unexpected:
+                  raise SystemExit(f"Pacotes inesperados na imagem slim: {unexpected}")
+          else:
+              import torch
+
+              if torch.version.cuda is not None:
+                  raise SystemExit(f"Torch CUDA detectado: {torch.version.cuda}")
+              accelerators = {"triton"} & installed
+              accelerators |= {name for name in installed if name.startswith("nvidia-")}
+              if accelerators:
+                  raise SystemExit(f"Aceleradores inesperados: {accelerators}")
+          PY
+          docker run --rm "$LOCAL_IMAGE" sh -c \
+            'test -z "$(find /app/var/cache -type f 2>/dev/null)"'
+
+      - name: Smoke test API health
+        run: |
+          container_id=$(docker run --detach --rm \
+            --env ENABLED_INTERFACES=api \
+            --publish 127.0.0.1::8000 \
+            "$LOCAL_IMAGE" \
+            python -m uvicorn backend.api.app:app --host 0.0.0.0 --port 8000)
+          trap 'docker rm --force "$container_id" >/dev/null 2>&1 || true' EXIT
+          port=$(docker port "$container_id" 8000/tcp | awk -F: '{print $NF}')
+          curl --fail --silent --show-error \
+            --retry 20 --retry-all-errors --retry-connrefused --retry-delay 2 \
+            "http://127.0.0.1:${port}/api/v1/health"
+
+      - name: Verify Docling first-use and offline model cache
+        if: matrix.variant == 'docling'
+        run: |
+          cache_volume="acessilia-models-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          docker volume create "$cache_volume" >/dev/null
+          trap 'docker volume rm --force "$cache_volume" >/dev/null 2>&1 || true' EXIT
+          conversion='from pathlib import Path; from backend.core.manifest.docling_extractor import DoclingManifestExtractor; result = DoclingManifestExtractor(enable_ocr=False).extract(Path("tests/fixtures/tutorials/java-oo-3pgs.pdf")); assert result.document.export_to_markdown().strip()'
+          docker run --rm \
+            --volume "$cache_volume:/app/var" \
+            "$LOCAL_IMAGE" python -c "$conversion"
+          docker run --rm \
+            --volume "$cache_volume:/app/var" \
+            "$LOCAL_IMAGE" sh -c \
+            'test -n "$(find /app/var/cache/huggingface -type f 2>/dev/null)"'
+          docker run --rm --network none \
+            --env HF_HUB_OFFLINE=1 \
+            --env TRANSFORMERS_OFFLINE=1 \
+            --volume "$cache_volume:/app/var" \
+            "$LOCAL_IMAGE" python -c "$conversion"
+
+      - name: Enforce local image size guardrail
+        run: python scripts/check_image_size.py local "$LOCAL_IMAGE" --limit-gb 9
+
+      - name: Publish verified production image
         id: publish
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
@@ -69,8 +166,23 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=production-image
-          cache-to: type=gha,mode=max,scope=production-image
+          build-args: |
+            WITH_DOCLING=${{ matrix.with_docling }}
+          cache-from: type=gha,scope=production-${{ matrix.variant }}
+
+      - name: Enforce published image size guardrail
+        env:
+          DIGEST: ${{ steps.publish.outputs.digest }}
+        run: |
+          python scripts/check_image_size.py remote \
+            "${REGISTRY}/${IMAGE_NAME}@${DIGEST}" --limit-gb 9 | tee image-size.txt
+          {
+            echo "### ${{ matrix.variant }} image"
+            echo '```text'
+            cat image-size.txt
+            echo '```'
+            echo "digest=${DIGEST}"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Show immutable image reference
         env:
