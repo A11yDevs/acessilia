@@ -62,8 +62,23 @@ class DoclingStructurer(BaseStructurer):
         if self._converter is None:
             if not DOCLING_AVAILABLE or DocumentConverter is None:
                 raise RuntimeError("Docling não está disponível no ambiente atual.")
+            from docling.datamodel.base_models import InputFormat
+            from docling.datamodel.pipeline_options import (
+                PdfPipelineOptions,
+                RapidOcrOptions,
+            )
+            from docling.document_converter import PdfFormatOption
+
             _hydrate_rapidocr_models()
-            self._converter = DocumentConverter()
+            pipeline_options = PdfPipelineOptions()
+            pipeline_options.ocr_options = RapidOcrOptions(backend="torch")
+            self._converter = DocumentConverter(
+                format_options={
+                    InputFormat.PDF: PdfFormatOption(
+                        pipeline_options=pipeline_options
+                    ),
+                }
+            )
         return self._converter
 
     def _process_document(self, file_path: Path) -> Any:

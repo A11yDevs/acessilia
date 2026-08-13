@@ -1690,7 +1690,7 @@ dev = ["Sphinx (==8.1.3)", "build (==1.2.2)", "colorama (==0.4.5)", "colorama (=
 name = "lxml"
 version = "6.1.1"
 description = "Powerful and Pythonic XML processing library combining libxml2/libxslt with the ElementTree API."
-optional = true
+optional = false
 python-versions = ">=3.8"
 files = [
     {file = "lxml-6.1.1-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:09dd5b7075dc2f7709654a46543ba1ea3c2e217b2ed8fbd413a8a945a0f40f60"},
@@ -3492,7 +3492,7 @@ six = ">=1.5"
 name = "python-docx"
 version = "1.2.0"
 description = "Create, read, and update Microsoft Word .docx files."
-optional = true
+optional = false
 python-versions = ">=3.9"
 files = [
     {file = "python_docx-1.2.0-py3-none-any.whl", hash = "sha256:3fd478f3250fbbbfd3b94fe1e985955737c145627498896a8a6bf81f4baf66c7"},
@@ -5243,4 +5243,4 @@ docling = ["docling", "rapidocr"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "192bb23657f56223a7fd076558d94c4d5237ca5d6c6dc91c98d2e8b60d8d9666"
+content-hash = "67d7f428730dd79009192f5fb2e04649779b88b34e42ba8a2dc182473427db9c"
