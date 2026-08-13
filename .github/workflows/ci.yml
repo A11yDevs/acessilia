@@ -99,11 +99,11 @@ jobs:
               --index-url https://download.pytorch.org/whl/cpu \
               "torch==2.7.1+cpu" \
               "torchvision==0.22.1+cpu"
-            poetry export --only main --with dev --extras docling \
+            poetry export --with dev --extras docling \
               --without-hashes --format requirements.txt \
               --output /tmp/requirements.txt
           else
-            poetry export --only main --with dev \
+            poetry export --with dev \
               --without-hashes --format requirements.txt \
               --output /tmp/requirements.txt
           fi
@@ -137,7 +137,8 @@ jobs:
 
               if torch.version.cuda is not None:
                   raise SystemExit(f"Torch CUDA detectado: {torch.version.cuda}")
-              forbidden = {"triton"} | {
+              forbidden = {"triton"} & installed
+              forbidden |= {
                   name for name in installed if name.startswith("nvidia-")
               }
               if forbidden:
