@@ -85,6 +85,7 @@ def test_build_orchestrator_pddl_with_docling_enables_ocr(monkeypatch):
     monkeypatch.setattr(settings, "pddl_fast_downward", "")
     monkeypatch.setattr(settings, "pddl_fast_downward_alias", "")
     svc = _reimport_service(monkeypatch, "pddl")
+    monkeypatch.setattr(svc, "DOCLING_AVAILABLE", True)
     orchestrator = svc._build_orchestrator()
     assert isinstance(orchestrator, PddlAccessibilityOrchestrator)
     extractor = orchestrator.information_structural.extractor
@@ -100,6 +101,22 @@ def test_build_orchestrator_pddl_with_structurer_pymupdf_uses_pymupdf_extractor(
     monkeypatch.setattr(settings, "pddl_fast_downward", "")
     monkeypatch.setattr(settings, "pddl_fast_downward_alias", "")
     svc = _reimport_service(monkeypatch, "pddl")
+    orchestrator = svc._build_orchestrator()
+    assert isinstance(orchestrator, PddlAccessibilityOrchestrator)
+    extractor = orchestrator.information_structural.extractor
+    assert isinstance(extractor, PyMuPDFManifestExtractor)
+    assert orchestrator.extractor_backend == "pymupdf"
+
+
+def test_build_orchestrator_pddl_without_docling_falls_back_to_pymupdf(monkeypatch):
+    from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
+    from backend.core.manifest.pymupdf_extractor import PyMuPDFManifestExtractor
+
+    monkeypatch.setattr(settings, "structurer", "docling")
+    monkeypatch.setattr(settings, "pddl_fast_downward", "")
+    monkeypatch.setattr(settings, "pddl_fast_downward_alias", "")
+    svc = _reimport_service(monkeypatch, "pddl")
+    monkeypatch.setattr(svc, "DOCLING_AVAILABLE", False)
     orchestrator = svc._build_orchestrator()
     assert isinstance(orchestrator, PddlAccessibilityOrchestrator)
     extractor = orchestrator.information_structural.extractor
