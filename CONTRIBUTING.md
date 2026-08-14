@@ -127,19 +127,20 @@ git push origin develop
 
 ### 6. Hotfix (correção crítica)
 
+Hotfixes seguem o mesmo fluxo de PR, não push direto. A CI cria a tag e release automaticamente.
+
 ```bash
 git checkout main
 git checkout -b hotfix/crash-upload
 # faz a correção
 git commit -m "fix: corrige crash ao fazer upload de PDF corrompido"
-git checkout main
-git merge hotfix/crash-upload
-git tag -a v0.2.1 -m "v0.2.1: hotfix crash upload"
-git push origin main --tags
+git push origin hotfix/crash-upload
+# Abra um Pull Request de hotfix/crash-upload → main no GitHub
+# Após aprovação e merge, a CI/CD cria a tag e release automaticamente
 
-# Mergeia também na develop
+# Propaga para develop
 git checkout develop
-git merge hotfix/crash-upload
+git merge main
 git push origin develop
 git branch -d hotfix/crash-upload
 ```
