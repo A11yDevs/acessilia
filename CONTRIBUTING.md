@@ -1,158 +1,252 @@
-# Contribuindo com o acessilia
+# Contribuindo para acessilia
 
-Este guia descreve o mesmo fluxo de validação usado pelo GitHub Actions. Execute-o antes de abrir um pull request para reduzir diferenças entre o ambiente local e o CI.
+Obrigado por considerar contribuir! Este documento define as diretrizes do projeto baseadas em um **Git Flow simplificado**, pensado para manter a agilidade típica de projetos open source.
 
-## Pré-requisitos
+## Modelo de branches
 
-- Python 3.11
-- Poetry 1.8.3
-- Git
-- Pandoc
-- XeLaTeX
-- Dependências de sistema usadas por OCR e processamento de documentos
-
-No Ubuntu/Debian, instale as dependências de sistema com:
-
-```bash
-sudo apt-get update
-sudo apt-get install --yes --no-install-recommends \
-  build-essential ffmpeg fonts-dejavu-core libgl1 libglib2.0-0 libmagic1 \
-  pandoc poppler-utils tesseract-ocr texlive-xetex
+```
+main  ──────────────●──────────────────●──  (versões estáveis)
+   \              / \                /
+    develop ─────●───●──────────────●────  (integração)
+        \        /      \          /
+         feat/* ──       fix/* ────
 ```
 
-No macOS, uma opção é usar Homebrew e MacTeX:
+### Branches eternas
+
+| Branch | Finalidade |
+|--------|------------|
+| `main` | **Produção.** Código estável e revisado. Apenas merges vindos de `develop` ou `hotfix/*`. |
+| `develop` | **Integração.** Onde as funcionalidades em desenvolvimento se encontram. Branch padrão para colaboração. |
+
+### Papéis e permissões
+
+| Papel | Quem | Permissões |
+|-------|------|------------|
+| **Mantenedores** | [@marceloakira](https://github.com/marceloakira) e [@jhonata192](https://github.com/jhonata192) | Únicos autorizados a mesclar `develop → main` e criar releases. |
+| **Colaboradores** | Todos os demais | Podem abrir PRs para `develop` e revisar. |
+
+> **Importante:** branches temporárias devem ser deletadas após o merge.
+
+### Branches temporárias
+
+| Prefixo | Finalidade | Nasce de | Mergeia em |
+|---------|------------|----------|------------|
+| `feat/*` | Nova funcionalidade | `develop` | `develop` |
+| `fix/*` | Correção de bug | `develop` | `develop` |
+| `docs/*` | Documentação | `develop` | `develop` |
+| `refactor/*` | Refatoração | `develop` | `develop` |
+| `chore/*` | Manutenção (deps, CI, config) | `develop` | `develop` |
+| `hotfix/*` | Correção crítica em produção | `main` | `main` e `develop` |
+
+> **Importante:** Branches temporárias devem ser deletadas após o merge.
+
+## Fluxo de trabalho diário
+
+### 1. Iniciar uma tarefa
 
 ```bash
-brew install pandoc ffmpeg libmagic poppler tesseract
-brew install --cask mactex-no-gui
+# Sincronizar com a develop
+git checkout develop
+git pull
+
+# Criar branch para a tarefa
+git checkout -b feat/minha-feature
 ```
 
-Depois da instalação do MacTeX, pode ser necessário abrir um novo terminal para que `xelatex` seja encontrado no `PATH`.
+### 2. Desenvolver
 
-## Preparar o ambiente
-
-Instale a versão de Poetry usada pelo projeto e todas as dependências, incluindo o grupo de desenvolvimento e os extras Docling/RapidOCR:
+Faça commits atômicos seguindo a [convenção de commits](#convenção-de-commits).
 
 ```bash
-python3.11 -m pip install "poetry==1.8.3"
-poetry install --with dev --extras docling
+git add .
+git commit -m "feat(api): adiciona endpoint de exportação EPUB"
 ```
 
-O CI usa o [poetry.lock](poetry.lock) sem atualizar versões. Mudanças em dependências devem atualizar `pyproject.toml` e o lockfile no mesmo pull request.
+### 3. Manter sincronizado
 
-Nenhuma chave de API, token do Telegram ou credencial SMTP é necessária para executar a suíte atual.
-
-## Executar os testes
-
-O diretório `tests/` está configurado como raiz canônica da suíte. Portanto, o comando abaixo coleta e executa todos os testes:
+Sempre faça rebase com a `develop` para evitar conflitos grandes:
 
 ```bash
+git fetch origin
+git rebase origin/develop
+```
+
+### 4. Enviar para revisão
+
+Antes de abrir o Pull Request, garanta que os testes estão passando:
+
+```bash
+poetry run pytest tests/ -v
+```
+
+A esteira de CI rodará automaticamente os testes no GitHub. O PR só poderá ser revisado se **todos os testes estiverem verdes**.
+
+```bash
+# Opção A — via GitHub (recomendado)
+git push origin feat/minha-feature
+# Abra um Pull Request de feat/minha-feature → develop
+
+# Opção B — merge local (para mudanças simples)
+git checkout develop
+git merge feat/minha-feature
+git push origin develop
+git branch -d feat/minha-feature
+```
+
+### 5. Release (develop → main)
+
+Apenas mantenedores ([@marceloakira](https://github.com/marceloakira) e [@jhonata192](https://github.com/jhonata192)) podem mesclar `develop → main`.
+
+1. Abra um Pull Request de `develop` para `main` no GitHub.
+2. Solicite revisão de outro mantenedor.
+3. Após aprovação, faça o merge (preferencialmente "Create a merge commit").
+4. A **CI/CD** dispara automaticamente:
+   - Testes são executados.
+   - Uma nova imagem Docker é built e publicada em `ghcr.io/A11yDevs/acessilia` com as tags `latest` e `v<versão>`.
+   - Uma **Release** é criada no GitHub com as notas de versão geradas automaticamente.
+   - Uma **tag semântica** (`v<versão>`) é criada no repositório.
+
+> A versão é lida automaticamente do campo `version` no `pyproject.toml`.
+
+```bash
+# Fluxo manual (alternativa)
+git checkout main
+git merge develop
+git push origin main
+# O CI/CD fará o resto automaticamente
+```
+
+Depois do release, mergeie a tag de volta para `develop`:
+
+```bash
+git checkout develop
+git merge v0.2.0
+git push origin develop
+```
+
+### 6. Hotfix (correção crítica)
+
+```bash
+git checkout main
+git checkout -b hotfix/crash-upload
+# faz a correção
+git commit -m "fix: corrige crash ao fazer upload de PDF corrompido"
+git checkout main
+git merge hotfix/crash-upload
+git tag -a v0.2.1 -m "v0.2.1: hotfix crash upload"
+git push origin main --tags
+
+# Mergeia também na develop
+git checkout develop
+git merge hotfix/crash-upload
+git push origin develop
+git branch -d hotfix/crash-upload
+```
+
+## Convenção de commits
+
+Usamos [Conventional Commits](https://www.conventionalcommits.org/):
+
+```
+<tipo>(<escopo opcional>): <descrição>
+
+[corpo opcional]
+```
+
+### Tipos
+
+| Tipo | Uso |
+|------|-----|
+| `feat` | Nova funcionalidade |
+| `fix` | Correção de bug |
+| `docs` | Documentação |
+| `refactor` | Refatoração sem mudar comportamento |
+| `test` | Testes |
+| `chore` | Manutenção (deps, CI, config) |
+| `style` | Formatação, lint |
+| `perf` | Melhoria de performance |
+
+### Exemplos
+
+```
+feat(api): adiciona endpoint de exportação em EPUB
+fix(telegram): corrige timeout em arquivos grandes (>10MB)
+docs(readme): atualiza exemplos de uso da API
+refactor(agents): extrai lógica de OCR para serviço separado
+test(pipeline): adiciona teste para fluxo PDDL com Docling
+chore(deps): atualiza fastapi para 0.115
+perf(ocr): reduz uso de memória no RapidOCR
+```
+
+## Versionamento
+
+Seguimos [Semantic Versioning](https://semver.org/):
+
+```
+vMAJOR.MINOR.PATCH
+```
+
+- **MAJOR**: mudança incompatível na API pública
+- **MINOR**: nova funcionalidade compatível com versões anteriores
+- **PATCH**: correção de bug compatível
+
+## Regras do time
+
+1. **Nunca commitar direto na `main`** — sempre usar branches + PR.
+2. **Nunca commitar direto na `develop`** — exceto merges de branches temporárias.
+3. **Sempre fazer rebase** antes do merge para manter histórico linear.
+4. **Branches são temporárias** — duram apenas o necessário para a tarefa.
+5. **PRs pequenos e focados** — mais fáceis de revisar e com menos conflitos.
+6. **Commits atômicos** — um commit = uma mudança lógica completa.
+7. **Testes obrigatórios** — toda `feat` ou `fix` deve incluir ou atualizar testes.
+8. **Rodar `pytest` antes do push** — garantir que nada está quebrado.
+
+## Setup do ambiente
+
+```bash
+# Clone e instale dependências
+git clone git@github.com:A11yDevs/acessilia.git
+cd acessilia
+poetry install
+
+# Configure as variáveis de ambiente
+cp .env.example .env
+
+# Execute os testes para verificar se está tudo ok
 poetry run pytest
 ```
 
-Para verificar somente a descoberta, sem executar os casos:
+## Pull Requests
 
-```bash
-poetry run pytest --collect-only -q
-```
+1. Certifique-se de que sua branch está atualizada com a `develop` (`git rebase origin/develop`).
+2. Execute `poetry run pytest` e veja se todos os testes passam.
+3. Descreva claramente o que o PR faz e qual problema resolve.
+4. Referencie issues relacionadas (ex.: `Closes #42`).
+5. Aguarde a revisão e ajuste se necessário.
 
-A quantidade de testes pode crescer ou diminuir conforme o projeto evolui. O importante é que todos os arquivos e casos coletados terminem sem falhas, erros ou skips.
+## Integração contínua (CI/CD)
 
-Para reproduzir o relatório usado pelo CI:
+A esteira de CI/CD está definida em dois workflows:
 
-```bash
-poetry run pytest --junitxml=test-results.xml
-```
+- **`.github/workflows/ci.yml`** — executa os testes em duas variantes (`slim` e `docling`) para todo PR direcionado à `main` e após pushes na `main`.
+- **`.github/workflows/delivery.yml`** — após o CI passar na `main`, constrói, testa e publica as imagens Docker no GitHub Container Registry.
 
-## Fluxo de pull request
+| Workflow | Evento | Ação |
+|----------|--------|------|
+| **CI** | PR para `main` | Testa as variantes slim e docling |
+| **CI** | Push na `main` | Testa as variantes slim e docling |
+| **Delivery** | CI concluído na `main` | Build, teste e push das imagens para o GHCR |
 
-1. Atualize sua branch a partir da `main`.
-2. Implemente a mudança e os testes correspondentes.
-3. Execute `poetry run pytest` localmente.
-4. Envie sua branch para o GitHub e abra um pull request para `main`.
-5. Aguarde o status `CI / tests (Python 3.11)`.
-6. Corrija eventuais falhas e envie novos commits. Execuções antigas do mesmo PR serão canceladas automaticamente.
-7. Resolva as conversas da revisão e obtenha pelo menos uma aprovação.
-8. Faça o merge somente quando todas as regras estiverem satisfeitas.
+São publicadas quatro referências no `ghcr.io/A11yDevs/acessilia`:
 
-O workflow também roda após pushes na `main`, oferecendo uma verificação final do commit integrado. Ele pode ser executado manualmente na aba **Actions** por meio de `workflow_dispatch`.
+- `main` — imagem completa com Docling, RapidOCR e PyTorch CPU
+- `main-slim` — variante sem Docling
+- `sha-<commit>` — imagem Docling imutável
+- `sha-<commit>-slim` — slim imutável
 
-## Como o CI decide se o PR está válido
+Nenhum modelo é embutido nas imagens. Os modelos são baixados em tempo de execução e persistidos no volume `/app/var`. O Delivery verifica isso antes de publicar.
 
-Dois jobs de variante realizam estas etapas:
+## Dúvidas?
 
-1. Prepara um runner Ubuntu limpo e Python 3.11.
-2. Restaura caches compatíveis com o `poetry.lock`.
-3. Instala ferramentas de sistema, Poetry 1.8.3 e as dependências da variante slim ou Docling.
-4. Valida que o lockfile continua consistente.
-5. Coleta explicitamente a suíte inteira.
-6. Executa o pytest e gera um relatório JUnit.
-7. Na variante Docling, converte um PDF real com PyTorch CPU e sem pacotes CUDA.
-8. Analisa o relatório e falha se algum teste tiver sido pulado.
-
-A variante slim exclui por marker apenas o teste que requer o extra Docling; isso aparece como teste desmarcado, não como skip. Um job agregador publica o status estável `CI / tests (Python 3.11)` somente quando as duas variantes passam.
-
-## Solução de problemas
-
-### `pandoc não encontrado`
-
-Confirme a instalação:
-
-```bash
-pandoc --version
-```
-
-### `lualatex ou xelatex não encontrado`
-
-Confirme que um engine LaTeX está acessível:
-
-```bash
-xelatex --version
-```
-
-### Erros de importação
-
-Confirme a versão do Python e reinstale o ambiente a partir do lockfile:
-
-```bash
-python --version
-poetry env info
-poetry install --with dev --extras docling
-```
-
-### O CI passou localmente, mas falhou no GitHub
-
-Abra o pull request, selecione o check `CI / tests (Python 3.11)` e expanda a primeira etapa com erro. O runner começa limpo, então falhas que só aparecem no GitHub geralmente revelam arquivo não versionado, dependência implícita ou estado local reaproveitado.
-
-## CI e CD
-
-O workflow **CI** implementa integração contínua: cada mudança é instalada e testada automaticamente antes do merge. Depois que o CI de um push na `main` passa, o workflow **Delivery** constrói, testa e publica duas variantes no GitHub Container Registry.
-
-São publicadas quatro referências:
-
-- `ghcr.io/a11ydevs/acessilia:main`, Docling atualizado a cada integração válida;
-- `ghcr.io/a11ydevs/acessilia:sha-<commit>`, Docling imutável;
-- `ghcr.io/a11ydevs/acessilia:main-slim`, variante sem Docling;
-- `ghcr.io/a11ydevs/acessilia:sha-<commit>-slim`, slim imutável.
-
-O Delivery comprova que as imagens não contêm modelos pré-carregados. Na variante Docling, uma conversão sem OCR baixa os modelos estruturais para um volume temporário e a segunda repete a conversão sem rede. O CI separado executa a conversão real com RapidOCR e PyTorch CPU. Os caches de produção ficam em `/app/var/cache/huggingface` e `/app/var/cache/rapidocr`, portanto `/app/var` deve ser um volume persistente.
-
-Antes e depois do push, o workflow mede o tamanho total e a maior camada. O guardrail do projeto é 9 GB; o limite oficial relevante do GHCR é 10 GB por camada e o upload deve concluir em até 10 minutos.
-
-Isso é **entrega contínua**: há um artefato pronto para uso, mas nenhum servidor é alterado automaticamente. Uma futura implantação contínua deve ficar em workflow separado e só será necessária quando existir um ambiente de hospedagem.
-
-## Proteção da `main`
-
-A proteção é configurada no GitHub, não no arquivo do workflow. Depois que o CI executar ao menos uma vez na `main`:
-
-1. Abra **Settings > Rules > Rulesets**.
-2. Importe [`.github/rulesets/main.json`](.github/rulesets/main.json) ou crie um **New branch ruleset** com estado **Active**.
-3. Use a default branch `main` como alvo.
-4. Não adicione bypass rotineiro.
-5. Ative **Require a pull request before merging**.
-6. Exija uma aprovação e descarte aprovações antigas quando novos commits forem enviados.
-7. Ative a resolução obrigatória das conversas.
-8. Ative **Require status checks to pass** e selecione `CI / tests (Python 3.11)`.
-9. Ative **Require branches to be up to date before merging**.
-
-Teste o ruleset com um pull request: o botão de merge deve permanecer bloqueado durante o CI, quando houver falha e enquanto faltar aprovação.
+Abra uma [issue](https://github.com/A11yDevs/acessilia/issues) ou inicie uma [discussão](https://github.com/A11yDevs/acessilia/discussions).
