@@ -20,16 +20,16 @@ Definida em [backend/api/app.py](../backend/api/app.py), com as rotas em [backen
 
 | Método | Rota | O que faz | Retorno | Limite |
 |--------|------|-----------|---------|--------|
-| POST | `/api/v1/jobs` | Envia um documento para processar. Campos do form: `document_file`, `mode` (`normal` etc.), `custom_prompt` (teto de caracteres), `thinking_mode`, `email`, `source`. Valida extensão/tamanho e enfileira. | `202` com `task_id` e mensagem. `400` se arquivo ou prompt inválidos. | 5/min |
-| GET | `/api/v1/jobs/{task_id}` | Consulta o estado de um job. | JSON `JobStatus`: `task_id`, `arquivo`, `status`, `progresso` (0–1), `etapa_atual`, `erros[]`, `download_url` (quando pronto), `criado_em`, `fim`. | — |
-| POST | `/api/v1/jobs/{task_id}/cancel` | Cancela um job em andamento. | JSON `{task_id, status}`. | — |
+| POST | `/api/v1/jobs` | Envia um documento para processar. Campos do form: `document_file`, `mode` (`detalhado`, `medio`, `normal`, `baixo` ou `ocr`; padrão `normal`), `custom_prompt` (até 6000 caracteres), `thinking_mode`, `email`, `source`. Valida extensão/tamanho e enfileira. | `202` com `task_id` e mensagem. `400` se arquivo ou prompt inválidos. | 5/min |
+| GET | `/api/v1/jobs/{task_id}` | Consulta o estado de um job. | JSON `JobStatus`: `task_id`, `arquivo`, `status`, `progresso` (0–1), `etapa_atual`, `erros[]`, `download_url` (quando pronto), `criado_em`, `fim`. | 60/min |
+| POST | `/api/v1/jobs/{task_id}/cancel` | Cancela um job em andamento. | JSON `{task_id, status}`. | 10/min |
 
 ### Download (resultado pronto)
 
 | Método | Rota | O que faz | Retorno | Limite |
 |--------|------|-----------|---------|--------|
 | GET | `/api/v1/download/{token}` | Metadados do resultado de uma tarefa concluída. O `token` sai no `download_url` do job. | JSON `DownloadInfo`: `filename`, `stem`, `criado_em`, `formats[]` (cada um com `ext`, `label`, `size`, `url`). `404` se o token for inválido/expirado. | 10/min |
-| GET | `/api/v1/download/{token}/{format}` | Baixa de fato um formato: `txt`, `docx`, `pdf`, `html`, `mp3` ou `zip`. | O arquivo em si. `400` formato inválido, `404` token/arquivo inexistente. | 20/min |
+| GET | `/api/v1/download/{token}/{format}` | Baixa de fato um formato: `txt`, `docx`, `pdf`, `pdf_ua`, `html`, `mp3` ou `zip` (o pacote com tudo). | O arquivo em si. `400` formato inválido, `404` token/arquivo inexistente. | 20/min |
 
 ### Histórico e saúde
 
@@ -66,7 +66,7 @@ Ou seja: o Painel Web é a **cara** para humanos, a API REST é o **motor**. Um 
 
 ## Parte 3 — AgentOS (gerado pelo Agno)
 
-Ao instanciar o `AgentOS(...)` em [frontend/agent_os.py](../frontend/agent_os.py), o Agno **monta sozinho ~116 rotas REST em JSON** — o painel do Agno (os.agno.com) e o agent-ui consomem essas rotas. Nós não escrevemos nenhuma; vêm de brinde. Ele é ferramenta de **desenvolvimento/inspeção**: serve para conversar com cada agente isolado e ver sessões, memória, métricas e traces. **Não roda o pipeline** de acessibilidade.
+Ao instanciar o `AgentOS(...)` em [frontend/agent_os.py](../frontend/agent_os.py), o Agno **monta sozinho uma centena de rotas REST em JSON** — o painel do Agno (os.agno.com) e o agent-ui consomem essas rotas. Nós não escrevemos nenhuma; vêm de brinde. A lista exata varia com a versão do Agno e com o que está registrado, então a fonte da verdade é o `openapi.json` do runtime (veja "Como conferir você mesmo", no fim). Ele é ferramenta de **desenvolvimento/inspeção**: serve para conversar com cada agente isolado e ver sessões, memória, métricas e traces. **Não roda o pipeline** de acessibilidade.
 
 O ponto importante: muitas dessas rotas existem sempre, mas só respondem algo útil se o recurso correspondente estiver configurado. No nosso setup registramos **dois agentes** (`VisionAgent` e `DataAgent`), com um SQLite de sessões (`agentos.db`), e nada de teams, workflows ou base de conhecimento. Daí quatro grupos:
 

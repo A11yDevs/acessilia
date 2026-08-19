@@ -12,10 +12,9 @@ Deliver document and image conversion to accessible formats through:
 2. Accessibility first: all outputs must support screen readers and semantic structure.
 3. Fault tolerance: the system must degrade gracefully with textual fallback when AI fails.
 4. Local and configurable operation: behavior must be driven by environment variables and local folders.
-5. Minimum observability: logs, conversion history, and task status must be available.
-6. Local-first extraction: text-based PDFs should prefer deterministic local extraction before invoking AI.
-7. Hybrid determinism and intelligence: the system combines deterministic planning (PDDL processing, manifesto generation) with AI-driven execution to ensure reliability and flexibility. Deterministic functions are the source of truth; LLMs provide interpretation and description.
-8. Container-first validation: test suite must pass in Docker container (production-equivalent environment) before merge. Native environment testing is secondary and environment-specific.
+5. Local-first extraction: text-based PDFs should prefer deterministic local extraction before invoking AI.
+6. Hybrid determinism and intelligence: the system combines deterministic planning (PDDL processing, manifesto generation) with AI-driven execution to ensure reliability and flexibility. Deterministic functions are the source of truth; LLMs provide interpretation and description.
+7. Container-first validation: test suite must pass in Docker container (production-equivalent environment) before merge. Native environment testing is secondary and environment-specific.
 
 ## 3. Architectural quality rules
 1. Layer separation (updated for PDDL + Agno multiagent architecture):
@@ -62,13 +61,13 @@ Deliver document and image conversion to accessible formats through:
    - **Planning Phase:** manifesto + domain constraints → PlannerAgent → nominal-plan.json
    - **Execution Phase:** plan + manifesto → Executor (Agno Workflow) → execution-report.json
    - **Canonical Generation:** execution results → canonical document (accessible)
-   - **Export Phase:** canonical document → renderers → output artifacts (txt/docx/pdf/html)
+   - **Export Phase:** canonical document → renderers and export adapters → output artifacts (txt/docx/pdf/pdf_ua/html/mp3), packaged as a zip
 2. Processing manifest and plan contracts:
    - Processing manifest (1.1+) defines regions, types, and processing obligations
    - PDDL domain (v2.2+) encodes task dependencies and ordering constraints
    - Plan is deterministic output from planner (internal or fast-downward backend)
    - Execution report validates plan adherence and records task outcomes
-3. Processing mode (detailed, medium, low, ocr) changes prompt and verbosity behavior.
+3. Processing mode changes prompt and verbosity behavior. The accepted values are `detalhado`, `medio` (with `normal` as an alias), `baixo` and `ocr`; an unknown value falls back to `medio`. They map to prompts in `backend/ai/prompts` and to verbosity profiles in `backend/pipeline/verbosity_manager.py`.
 4. Extraction is hybrid: local PDF text extraction first, then AI vision for scanned/no-text pages and image inputs.
 5. Page and file cache are optimizations, not source of truth.
 6. Renderers must only consume validated canonical data.

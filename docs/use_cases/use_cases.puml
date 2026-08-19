@@ -18,7 +18,7 @@ rectangle "A11y Devs Describer Bot" {
   usecase "Deactivate/Reactivate\nchat" as UC5
   usecase "Check health" as UC6
   usecase "Submit feedback" as UC7
-  usecase "Generate\nTXT/DOCX/PDF/HTML/MP3 outputs" as UC8
+  usecase "Generate\nTXT/DOCX/PDF/PDF-UA/HTML/MP3 outputs" as UC8
   usecase "Persist history\nand cache" as UC9
 }
 

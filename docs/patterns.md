@@ -36,7 +36,7 @@
 - Benefit: clean separation of concerns and parallel execution (`asyncio.gather`).
 
 ### 6. Export Adapters & Renderers
-- Implementation: [backend/export/pandoc_exporter.py](../backend/export/pandoc_exporter.py) and renderers in `backend/export/renderers/` (TXT, DOCX, PDF, HTML, MP3 Audio via edge-tts).
+- Implementation: [backend/export/pandoc_exporter.py](../backend/export/pandoc_exporter.py) with renderers in `backend/export/renderers/` (TXT, DOCX, PDF, HTML) and export adapters in `backend/export/exporters/` (MP3 via edge-tts, and the PDF/UA variant).
 - Benefit: identical canonical document produces multiple output formats cleanly.
 
 ### 7. In-Memory State Machine & Cooperative Cancellation

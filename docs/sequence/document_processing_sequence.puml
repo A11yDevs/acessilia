@@ -48,7 +48,7 @@ Orchestrator -> Builder: build_canonical_document()
 Builder --> Orchestrator: Documento Canônico Validado
 
 Orchestrator -> Export: render_all(canonical_doc)
-Export --> Front: Arquivos acessíveis (TXT, DOCX, PDF, HTML, MP3)
+Export --> Front: Arquivos acessíveis (TXT, DOCX, PDF, PDF/UA, HTML, MP3)
 Front --> User: Entrega do documento acessível
 
 @enduml

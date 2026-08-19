@@ -1,7 +1,7 @@
 # Architecture
 
 ## Overview
-The system converts documents into accessible formats through a multi-agent extraction pipeline (local-first structural extraction with PyMuPDF/Docling plus Agno-powered multimodal AI vision and data agents), a canonical document pipeline, deterministic validation, and format-specific renderers. The architecture is modular: **backend/** contains all business logic independent of any interface, **frontend/** contains the interface clients (Telegram, Web, CLI) that talk to the REST API, and **infra/** manages containerization with Docker.
+The system converts documents into accessible formats through a multi-agent extraction pipeline (local-first structural extraction with PyMuPDF/Docling plus Agno-powered multimodal AI vision and data agents), a canonical document pipeline, deterministic validation, and format-specific renderers. The architecture is modular: **backend/** holds the domain logic plus the REST API that exposes it, **frontend/** holds the interface clients (Telegram, Web, CLI) that talk to that API, and **infra/** holds the Dockerfile (the Compose file sits at the repository root).
 
 The system combines **deterministic planning with AI-driven execution**: deterministic functions (extraction, PDDL problem generation, contract validation) are the source of truth, and LLMs provide interpretation and description. Two pipeline engines coexist, selected by the `PIPELINE_ENGINE` setting:
 
@@ -21,7 +21,7 @@ Both engines converge on the same canonical document and the same renderers.
 - [backend/agents/reader_agent.py](../backend/agents/reader_agent.py): `ReaderAgent` performs local-first PDF/image structural parsing (via PyMuPDF or Docling), splits pages, and classifies content regions (image, table, formula, text).
 - [backend/agents/vision_agent.py](../backend/agents/vision_agent.py): `VisionAgent` utilizes Agno (`agno.agent.Agent`) and LLM multimodal capabilities (`agno.media.Image`) to produce detailed alt-text and audio descriptions for visual elements and scanned pages.
 - [backend/agents/data_agent.py](../backend/agents/data_agent.py): `DataAgent` utilizes Agno (`agno.agent.Agent`) and LLM capabilities to convert complex tables and mathematical formulas into structured Markdown and LaTeX representations.
-- [backend/agents/editor_agent.py](../backend/agents/editor_agent.py): `EditorAgent` sanitizes content, applies semantic/temporal deduplication via MD5 fingerprints, and inserts accessibility tags into the final document structure.
+- [backend/agents/editor_agent.py](../backend/agents/editor_agent.py): `EditorAgent` sanitizes content and deduplicates repeated passages via content fingerprints (`content_fingerprint` in [backend/tools/text_tools.py](../backend/tools/text_tools.py), which normalizes the text before hashing). The current implementation uses Python's built-in `hash()` and should be swapped for a stable hash later; `ReaderAgent` uses the same fingerprints to drop regions repeated across pages.
 - [backend/agents/state_manager.py](../backend/agents/state_manager.py): in-memory task state machine with cooperative cancellation support.
 - [backend/agents/types.py](../backend/agents/types.py): shared data contracts and task types (`RegionTask`).
 
@@ -29,8 +29,8 @@ Both engines converge on the same canonical document and the same renderers.
 - [backend/ai/models/ai_client.py](../backend/ai/models/ai_client.py): central `get_agno_model()` initializer that instantiates Agno Model wrappers for Ollama or OpenRouter based on environment settings.
 
 #### 0.3. Infrastructure Services (`backend/services/`)
-- [backend/services/cache.py](../backend/services/cache.py): file-hash-based text cache in `temp/cache`.
-- [backend/services/history_service.py](../backend/services/history_service.py): MariaDB/SQLite persistence for conversions and audit logs in `data/history.db`.
+- [backend/services/cache.py](../backend/services/cache.py): file-hash-based text cache in `var/temp/cache`.
+- [backend/services/history_service.py](../backend/services/history_service.py): SQLite persistence (WAL mode) for conversions and audit logs, in `var/data/history.db`.
 - [backend/services/queue_service.py](../backend/services/queue_service.py): unified async processing queue with concurrency limits.
 - [backend/services/cleanup_service.py](../backend/services/cleanup_service.py): periodic cleanup of temporary files.
 - [backend/services/email_service.py](../backend/services/email_service.py): async SMTP email sender (confirmation + result with ZIP attachments).
@@ -55,7 +55,7 @@ Used when `PIPELINE_ENGINE=pddl`. It turns document structure into an explicit p
 - `backend/core/execution/`: the Executor applies the validated plan as an Agno Workflow, invoking the Vision/Data agents where the plan requires them, and produces an `execution-report.json`.
 - `backend/agents/pddl_orchestrator.py`: coordinates the manifest → plan → execution phases, with fallback to deterministic extraction if planning fails.
 
-The PDDL domain and JSON schemas (manifest, plan, execution report) live under `backend/core/planning/domains/` and `docs/schemas/`.
+The PDDL domain lives under `backend/core/planning/domains/`. The JSON schemas (manifest, plan, comparison, execution report) live in `schemas/` at the repository root and are generated by `scripts/generate_pmv_schemas.py`.
 
 ---
 
@@ -90,7 +90,8 @@ The PDDL domain and JSON schemas (manifest, plan, execution report) live under `
 - [backend/pipeline/structure_parser.py](../backend/pipeline/structure_parser.py): shared text-to-block parser.
 - [backend/pipeline/validators.py](../backend/pipeline/validators.py): validates schema, heading hierarchy, links, and output text; `audit_canonical_document` classifies structural and accessibility issues as `BLOCKER` or `WARNING`.
 - [backend/export/pandoc_exporter.py](../backend/export/pandoc_exporter.py): single export coordinator for validation, filtering, AST build, and renderer dispatch; acts as a deterministic gatekeeper that halts export when the audit returns any `BLOCKER`.
-- [backend/export/renderers/](../backend/export/renderers/): renderers for TXT, DOCX, PDF, HTML, and MP3 Audio (via edge-tts).
+- [backend/export/renderers/](../backend/export/renderers/): renderers for TXT, DOCX, PDF and HTML.
+- [backend/export/exporters/](../backend/export/exporters/): the export adapters called by the worker, including `audio_exporter.py`, which produces the MP3 via edge-tts, and `pdf_exporter.py`, which produces both the regular PDF and the PDF/UA variant.
 
 ---
 
@@ -111,7 +112,7 @@ The codebase follows a pragmatic layered architecture with a top-down flow: Inte
    - **`VisionAgent`** and **`DataAgent`** run in parallel to describe visual elements and structure data using Agno `Agent` instances.
    - **`EditorAgent`** sanitizes results, applies deduplicação via fingerprints, and inserts accessibility tags into the final canonical structure.
 5. Canonical validators verify schema adherence, heading hierarchy, and output safety.
-6. Format renderers build output artifacts (TXT, DOCX, PDF, HTML, MP3).
+6. Renderers and export adapters build the output artifacts (TXT, DOCX, PDF, PDF/UA, HTML, MP3).
 7. Output files are packaged and delivered to the user (via Telegram message, Web download link, or email).
 
 ---
@@ -137,6 +138,6 @@ The AgentOS runtime is not part of `ENABLED_INTERFACES`; it is started separatel
 
 ## Key Architectural Decisions
 
-1. **`backend/` Interface Independence:** `backend/` has zero dependencies on interface-specific frameworks (no aiogram, no FastAPI).
+1. **Interface-independent domain:** the domain packages — `backend/agents`, `ai`, `core`, `pipeline`, `export`, `services` and `tools` — have no dependency on interface frameworks (no aiogram, no FastAPI). The single exception is `backend/api`, which is the FastAPI layer that exposes the domain over HTTP; everything in `frontend/` is a client of that API. Keeping the boundary there means a new interface never requires touching the domain.
 2. **Modular Multi-Agent Architecture:** Separates structural reading, visual description, data formatting, and text editing into distinct agents.
 3. **Canonical Document Source of Truth:** All renderers consume the validated canonical document schema to guarantee screen reader compatibility.

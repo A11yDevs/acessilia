@@ -12,7 +12,7 @@
 - Primary actor: End user.
 - Goal: convert PDF/image/document into accessible outputs.
 - Input: supported file.
-- Output: TXT, DOCX, PDF, HTML, and MP3 delivered in chat or as files.
+- Output: TXT, DOCX, PDF, PDF/UA, HTML and MP3, delivered in chat, as a download link, or by email.
 - Implementation:
   - input/validation: [frontend/telegram/handlers/document.py](../frontend/telegram/handlers/document.py), [backend/tools/validators.py](../backend/tools/validators.py)
   - processing: [backend/service.py](../backend/service.py) selects the engine (`PIPELINE_ENGINE`): the legacy orchestrator [backend/agents/orchestrator.py](../backend/agents/orchestrator.py) or the PDDL orchestrator [backend/agents/pddl_orchestrator.py](../backend/agents/pddl_orchestrator.py); both feed [backend/pipeline/canonical_builder.py](../backend/pipeline/canonical_builder.py)
@@ -20,7 +20,7 @@
 
 ## UC-02 Select description level
 - Primary actor: End user.
-- Goal: define detailed/medium/low/ocr mode.
+- Goal: pick the description level — `detalhado`, `medio` (alias `normal`), `baixo` or `ocr`.
 - Implementation:
   - commands: [frontend/telegram/handlers/start.py](../frontend/telegram/handlers/start.py)
   - prompts by mode: [backend/ai/prompts](../backend/ai/prompts)

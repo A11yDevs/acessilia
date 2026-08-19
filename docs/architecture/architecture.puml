@@ -32,11 +32,11 @@ package "Infraestrutura (Docker Container)" {
 
   package "Pipeline Canônico & Exporters" {
     component "Canonical Builder & Sanitizer\nbackend/pipeline" as Pipeline
-    component "Renderers (TXT/DOCX/PDF/HTML/MP3)\nbackend/export" as Exporters
+    component "Renderers & Exporters\n(TXT/DOCX/PDF/PDF-UA/HTML/MP3)\nbackend/export" as Exporters
   }
 
-  database "MariaDB / SQLite\ndata/history.db" as DB
-  folder "Cache\ntemp/cache" as Cache
+  database "SQLite (WAL)\nvar/data/history.db" as DB
+  folder "Cache\nvar/temp/cache" as Cache
 }
 
 cloud "Ollama (Local) / OpenRouter (Cloud)\nvia Agno Framework (get_agno_model)" as AI
