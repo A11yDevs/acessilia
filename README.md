@@ -81,6 +81,8 @@ Execute a suíte completa da pasta `tests/`:
 poetry run pytest
 ```
 
+Testes de carga ficam em [observability/](observability/), junto do resto da parte de medição.
+
 O GitHub Actions repete essa validação em Python 3.11 nas instalações slim e Docling para todo pull request direcionado à `main`. A variante Docling também converte um PDF real. Falhas, erros e testes pulados são rejeitados. Consulte o [guia de contribuição](CONTRIBUTING.md) para preparar o ambiente e entender o fluxo de revisão.
 
 ## Docker
@@ -111,6 +113,16 @@ docker compose up -d --build
 ```
 
 O container expõe `8000` (API) e `8001` (web), persiste tudo em `./var` e roda o healthcheck em `/api/v1/health`.
+
+## Observabilidade
+
+Desligada por padrão. Para subir Prometheus, Grafana, Loki e Promtail localmente:
+
+```bash
+docker compose --profile monitoring up -d
+```
+
+O Grafana abre em http://localhost:3000 já com o dashboard pronto. Como ligar na aplicação e onde cada número aparece: [observability/README.md](observability/README.md).
 
 Para construir somente a variante slim:
 

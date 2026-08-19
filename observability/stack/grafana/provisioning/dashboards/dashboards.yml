@@ -1,0 +1,11 @@
+# Carrega os dashboards do diretório no boot, para o Grafana já subir com painel
+# em vez de uma tela em branco.
+apiVersion: 1
+
+providers:
+  - name: Acessilia
+    type: file
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: false

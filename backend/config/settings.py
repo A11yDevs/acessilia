@@ -123,6 +123,31 @@ class Settings:
     smtp_from: str = os.getenv("SMTP_FROM", "")
     smtp_name: str = os.getenv("SMTP_NAME", "Bot Acess")
 
+    # Observability Settings
+    # Tudo desligado por padrão: sem estas variáveis o runtime não carrega nenhuma
+    # biblioteca de tracing nem abre porta extra.
+    observability_enabled: bool = field(
+        default_factory=lambda: _bool_from_env_alias(("OBSERVABILITY_ENABLED",), False)
+    )
+    enable_tracing: bool = field(
+        default_factory=lambda: _observability_bool_from_env_alias(
+            ("ENABLE_TRACING",), False
+        )
+    )
+    enable_metrics: bool = field(
+        default_factory=lambda: _observability_bool_from_env_alias(
+            ("ENABLE_METRICS",), False
+        )
+    )
+    log_json: bool = field(
+        default_factory=lambda: _observability_bool_from_env_alias(("LOG_JSON",), False)
+    )
+    otel_service_name: str = os.getenv("OTEL_SERVICE_NAME", "acessilia")
+    otlp_endpoint: str = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+    otlp_headers: str = os.getenv("OTEL_EXPORTER_OTLP_HEADERS", "")
+    langfuse_public_key: str = os.getenv("LANGFUSE_PUBLIC_KEY", "")
+    langfuse_secret_key: str = os.getenv("LANGFUSE_SECRET_KEY", "")
+
     def __post_init__(self) -> None:
         self.temp_dir.mkdir(parents=True, exist_ok=True)
         self.data_dir.mkdir(parents=True, exist_ok=True)
@@ -212,6 +237,30 @@ def _bool_from_env_alias(env_vars: tuple[str, ...], default: bool) -> bool:
                 "on",
                 "sim",
             }
+    return default
+
+
+def _observability_bool_from_env_alias(env_vars: tuple[str, ...], default: bool) -> bool:
+    """Lê flags da observabilidade com suporte ao switch mestre.
+
+    Quando OBSERVABILITY_ENABLED=true, flags específicas herdam o valor ligado se
+    não tiverem sido definidas explicitamente. Se a flag específica existir, ela
+    continua mandando.
+    """
+    for env_var in env_vars:
+        raw_value = os.getenv(env_var)
+        if raw_value is not None:
+            return raw_value.strip().lower() in {
+                "1",
+                "true",
+                "yes",
+                "on",
+                "sim",
+            }
+
+    if _bool_from_env_alias(("OBSERVABILITY_ENABLED",), False):
+        return True
+
     return default
 
 

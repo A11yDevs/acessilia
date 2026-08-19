@@ -42,21 +42,35 @@ jsonschema = "^4.20"
 openai = "^2.45.0"
 ollama = "^0.6.2"
 sqlalchemy = "^2.0.51"
+opentelemetry-sdk = { version = "^1.30", optional = true }
+opentelemetry-exporter-otlp-proto-http = { version = "^1.30", optional = true }
+openinference-instrumentation-agno = { version = "^0.1.16", optional = true }
+prometheus-fastapi-instrumentator = { version = "^7.0", optional = true }
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.1.1"
 respx = "^0.23.1"
 pytest-asyncio = "^1.4.0"
+locust = "^2.32"
 
 [tool.poetry.extras]
 docling = ["docling", "rapidocr"]
+observability = [
+    "opentelemetry-sdk",
+    "opentelemetry-exporter-otlp-proto-http",
+    "openinference-instrumentation-agno",
+    "prometheus-fastapi-instrumentator",
+]
 
 
 [tool.poetry.scripts]
 bot-acess = "frontend.cli.run:main"
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+# observability/ tem testes próprios (instrumentacao/), por isso entra aqui.
+# testes_de_carga roda pelo Locust e precisa do servidor no ar; fica de fora.
+testpaths = ["tests", "observability"]
+norecursedirs = ["observability/testes_de_carga", "observability/stack", "tests/fixtures"]
 addopts = "--strict-config --strict-markers -ra"
 markers = [
     "docling: requires the optional Docling stack and its model downloads",

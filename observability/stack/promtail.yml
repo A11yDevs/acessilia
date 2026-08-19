@@ -1,0 +1,43 @@
+# Lê os arquivos que o loguru já escreve em var/logs e envia para o Loki. O logger
+# da aplicação não muda: o Promtail é um processo à parte que só acompanha os
+# arquivos.
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  # Marca até onde cada arquivo já foi lido, para não reenviar tudo a cada restart.
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # Log estruturado (LOG_JSON=true). Preferível: os campos chegam prontos no Loki,
+  # então dá para filtrar por nível ou módulo sem regex.
+  - job_name: acessilia-json
+    static_configs:
+      - targets: ["localhost"]
+        labels:
+          job: acessilia
+          format: json
+          __path__: /var/log/acessilia/*.json.log
+    pipeline_stages:
+      - json:
+          expressions:
+            level: record.level.name
+            module: record.name
+            message: text
+      - labels:
+          level:
+      - output:
+          source: message
+
+  # Log legível, sempre presente. Serve de fallback quando LOG_JSON está desligado.
+  - job_name: acessilia-text
+    static_configs:
+      - targets: ["localhost"]
+        labels:
+          job: acessilia
+          format: text
+          __path__: /var/log/acessilia/bot_*.log

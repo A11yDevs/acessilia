@@ -27,4 +27,17 @@ def setup_logger() -> None:
         compression="zip",
     )
 
+    if settings.log_json:
+        # Arquivo separado, em JSON, para o Promtail entregar ao Loki com os campos
+        # já estruturados (nível, módulo, linha) em vez de regex sobre texto. Fica à
+        # parte do .log humano de propósito: quem abre log no terminal continua
+        # lendo o formato legível.
+        logger.add(
+            logs_dir / "acessilia_{time:YYYY-MM-DD}.json.log",
+            level="DEBUG",
+            rotation="1 day",
+            retention="30 days",
+            serialize=True,
+        )
+
     logger.info("Logger configured - level: {}", settings.log_level)

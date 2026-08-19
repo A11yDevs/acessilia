@@ -1,0 +1,20 @@
+# Datasources provisionados no boot: o Grafana já sobe com Prometheus e Loki
+# ligados, sem precisar cadastrar nada pela interface.
+#
+# Os uid são fixos porque o dashboard em ../dashboards/acessilia.json referencia
+# os datasources por uid; sem isso os painéis sobem sem fonte de dados.
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+
+  - name: Loki
+    uid: loki
+    type: loki
+    access: proxy
+    url: http://loki:3100

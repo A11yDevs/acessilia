@@ -21,3 +21,78 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+
+  # Serviços de observabilidade. Ficam em profiles para que `docker compose up`
+  # continue subindo só a aplicação; use `--profile monitoring` quando for medir.
+  prometheus:
+    profiles: ["monitoring"]
+    image: prom/prometheus:v3.1.0
+    container_name: acessilia-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/stack/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    restart: unless-stopped
+
+  # CPU, memória e disco da máquina. Sem ele o Prometheus só enxerga as métricas
+  # de request da API, e as consultas de máquina em observability/config.py saem vazias.
+  node-exporter:
+    profiles: ["monitoring"]
+    image: prom/node-exporter:v1.8.2
+    container_name: acessilia-node-exporter
+    command:
+      - "--path.rootfs=/host"
+    pid: host
+    volumes:
+      - /:/host:ro,rslave
+    restart: unless-stopped
+
+  loki:
+    profiles: ["monitoring"]
+    image: grafana/loki:3.3.2
+    container_name: acessilia-loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - loki-data:/loki
+    restart: unless-stopped
+
+  promtail:
+    profiles: ["monitoring"]
+    image: grafana/promtail:3.3.2
+    container_name: acessilia-promtail
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - ./observability/stack/promtail.yml:/etc/promtail/config.yml:ro
+      # Mesmo diretório que o loguru escreve, montado só para leitura.
+      - ./var/logs:/var/log/acessilia:ro
+    depends_on:
+      - loki
+    restart: unless-stopped
+
+  grafana:
+    profiles: ["monitoring"]
+    image: grafana/grafana:11.5.1
+    container_name: acessilia-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      # Sem login na stack local; é uma ferramenta de desenvolvimento e exigir
+      # senha aqui só atrapalha. Não exponha esta porta fora da máquina.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Admin"
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+    volumes:
+      - ./observability/stack/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+      - loki
+    restart: unless-stopped
+
+volumes:
+  prometheus-data:
+  loki-data:
+  grafana-data:
