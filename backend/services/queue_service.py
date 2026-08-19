@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Coroutine, Any
 
+from backend.observability import set_queue_size
 from backend.tools.logger import logger
 
 
@@ -43,6 +44,7 @@ class UnifiedQueue:
                 item.source,
                 pos,
             )
+            set_queue_size(len(self._queue))
             return pos
 
     async def _worker(self):
@@ -52,6 +54,7 @@ class UnifiedQueue:
                 if self._queue and self._processing_count < self._max_concurrent:
                     item = self._queue.popleft()
                     self._processing_count += 1
+                    set_queue_size(len(self._queue))
 
             if item:
                 try:
@@ -64,6 +67,7 @@ class UnifiedQueue:
                 finally:
                     async with self._lock:
                         self._processing_count -= 1
+                        set_queue_size(len(self._queue))
                     logger.info(
                         "Worker: Tarefa concluída: {}. Aguardando próximo...",
                         item.filename,

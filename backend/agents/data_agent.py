@@ -1,5 +1,13 @@
 """DataAgent – Conversão de tabelas e fórmulas matemáticas em texto estruturado."""
 
+import time
+
+from backend.observability import (
+    record_llm_call,
+    record_llm_duration,
+    record_llm_failure,
+    record_llm_response,
+)
 from backend.tools.logger import logger
 from backend.tools.prompt_tools import load_region_prompt
 from backend.ai.models.ai_client import get_agno_model
@@ -50,14 +58,29 @@ class DataAgent:
                 telemetry=False,
             )
 
+            started_at = time.perf_counter()
+            record_llm_call("DataAgent")
             response = await agent.arun(
                 input=prompt,
                 images=[Image(content=image_bytes)],
+            )
+            record_llm_response("DataAgent", response, prompt=prompt)
+            record_llm_duration(
+                "DataAgent",
+                "success",
+                time.perf_counter() - started_at,
             )
 
             return response.content.strip()
 
         except Exception as error:
+            record_llm_failure("DataAgent")
+            if "started_at" in locals():
+                record_llm_duration(
+                    "DataAgent",
+                    "error",
+                    time.perf_counter() - started_at,
+                )
             import traceback
             tb = traceback.format_exc()
             logger.critical(

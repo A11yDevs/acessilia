@@ -1,0 +1,992 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Acessília Observabilidade</title>
+    <script>
+      if (window.location.protocol === "file:") {
+        window.location.replace("http://localhost:8010/");
+      }
+    </script>
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body>
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Acessília</p>
+        <h1>Observabilidade</h1>
+        <p class="lede">Métricas, logs, traces e anotações da stack local.</p>
+      </div>
+      <div class="hero-actions">
+        <a href="{{ links.grafana }}" target="_blank" rel="noreferrer">Grafana</a>
+        <a href="{{ links.prometheus }}" target="_blank" rel="noreferrer">Prometheus</a>
+        <a href="{{ links.langfuse }}" target="_blank" rel="noreferrer">Langfuse</a>
+      </div>
+    </header>
+
+    <main class="shell">
+      <section class="stack-status" aria-label="Status dos serviços">
+        <div class="status-heading">
+          <div>
+            <span class="eyebrow-mini">Status da stack</span>
+            <strong>Serviços monitorados</strong>
+          </div>
+          <div class="updated" id="updated-at">Atualizando...</div>
+        </div>
+        <div class="status-grid">
+          <div class="status-card" data-service="api">
+            <span class="status-dot"></span>
+            <div>
+              <strong>API</strong>
+              <small class="status-state">verificando...</small>
+            </div>
+          </div>
+          <div class="status-card" data-service="prometheus">
+            <span class="status-dot"></span>
+            <div>
+              <strong>Prometheus</strong>
+              <small class="status-state">verificando...</small>
+            </div>
+          </div>
+          <div class="status-card" data-service="loki">
+            <span class="status-dot"></span>
+            <div>
+              <strong>Loki</strong>
+              <small class="status-state">verificando...</small>
+            </div>
+          </div>
+          <div class="status-card" data-service="langfuse">
+            <span class="status-dot"></span>
+            <div>
+              <strong>Langfuse</strong>
+              <small class="status-state">verificando...</small>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <nav class="tabs" aria-label="Seções">
+        <button class="tab active" data-tab="overview">Visão geral</button>
+        <button class="tab" data-tab="pipeline">Pipeline</button>
+        <button class="tab" data-tab="detailed">Métricas detalhadas</button>
+        <button class="tab" data-tab="logs">Logs</button>
+        <button class="tab" data-tab="infra">Infra</button>
+        <button class="tab" data-tab="llm">LLM</button>
+        <button class="tab" data-tab="annotations">Anotações</button>
+      </nav>
+
+      <section class="panel active" id="overview">
+        <article class="card card-wide live-board">
+          <div class="card-heading">
+            <div>
+              <p class="eyebrow-mini">Atualização rápida</p>
+              <h2>Tempo real</h2>
+            </div>
+            <span class="polling-pill" id="realtime-updated">Atualiza a cada 1s</span>
+          </div>
+          <p class="muted"><code>Req/s usuários</code> exclui <code>/metrics</code>, healthcheck, stats e histórico para não misturar tráfego real com observabilidade.</p>
+          <div class="live-metrics" id="realtime-metrics"></div>
+          <div class="chart-grid">
+            <article class="chart-card">
+              <div class="chart-heading">
+                <h3>Requisições</h3>
+                <small>usuários x interno</small>
+              </div>
+              <canvas class="chart-canvas" data-chart="requests"></canvas>
+              <div class="chart-legend" data-legend="requests"></div>
+            </article>
+            <article class="chart-card">
+              <div class="chart-heading">
+                <h3>HTTP</h3>
+                <small>4xx e 5xx</small>
+              </div>
+              <canvas class="chart-canvas" data-chart="http"></canvas>
+              <div class="chart-legend" data-legend="http"></div>
+            </article>
+            <article class="chart-card">
+              <div class="chart-heading">
+                <h3>Infra</h3>
+                <small>CPU e RAM</small>
+              </div>
+              <canvas class="chart-canvas" data-chart="infra"></canvas>
+              <div class="chart-legend" data-legend="infra"></div>
+            </article>
+            <article class="chart-card">
+              <div class="chart-heading">
+                <h3>Pipeline</h3>
+                <small>fila e jobs</small>
+              </div>
+              <canvas class="chart-canvas" data-chart="pipeline"></canvas>
+              <div class="chart-legend" data-legend="pipeline"></div>
+            </article>
+          </div>
+        </article>
+        <div class="grid metrics" data-group="overview"></div>
+        <div class="grid split">
+          <article class="card">
+            <h2>API</h2>
+            <dl class="facts" id="api-health"></dl>
+          </article>
+          <article class="card">
+            <h2>Histórico recente</h2>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Arquivo</th>
+                    <th>Status</th>
+                    <th>Modo</th>
+                    <th>Tempo</th>
+                  </tr>
+                </thead>
+                <tbody id="history-body"></tbody>
+              </table>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel" id="pipeline">
+        <article class="card card-wide live-board">
+          <div class="card-heading">
+            <div>
+              <p class="eyebrow-mini">Fluxo da fila</p>
+              <h2>Pipeline em tempo real</h2>
+            </div>
+            <span class="polling-pill">Séries de 5min</span>
+          </div>
+          <div class="chart-grid">
+            <article class="chart-card">
+              <div class="chart-heading">
+                <h3>Fila e jobs</h3>
+                <small>volume atual</small>
+              </div>
+              <canvas class="chart-canvas" data-chart="pipeline"></canvas>
+              <div class="chart-legend" data-legend="pipeline"></div>
+            </article>
+            <article class="chart-card">
+              <div class="chart-heading">
+                <h3>Jobs/min</h3>
+                <small>sucesso x erro</small>
+              </div>
+              <canvas class="chart-canvas" data-chart="pipeline_jobs"></canvas>
+              <div class="chart-legend" data-legend="pipeline_jobs"></div>
+            </article>
+            <article class="chart-card">
+              <div class="chart-heading">
+                <h3>Erros de pipeline</h3>
+                <small>falhas por minuto</small>
+              </div>
+              <canvas class="chart-canvas" data-chart="pipeline_errors"></canvas>
+              <div class="chart-legend" data-legend="pipeline_errors"></div>
+            </article>
+            <article class="chart-card">
+              <div class="chart-heading">
+                <h3>Duração</h3>
+                <small>conversão média</small>
+              </div>
+              <canvas class="chart-canvas" data-chart="conversion_latency"></canvas>
+              <div class="chart-legend" data-legend="conversion_latency"></div>
+            </article>
+          </div>
+        </article>
+        <div class="grid metrics" data-group="pipeline"></div>
+      </section>
+
+      <section class="panel" id="detailed">
+        <article class="card card-wide live-board">
+          <div class="card-heading">
+            <div>
+              <p class="eyebrow-mini">Saídas geradas</p>
+              <h2>Exportações e outputs</h2>
+            </div>
+            <span class="polling-pill">Prometheus + domínio</span>
+          </div>
+          <div class="chart-grid">
+            <article class="chart-card">
+              <div class="chart-heading">
+                <h3>Exportações</h3>
+                <small>arquivos/min</small>
+              </div>
+              <canvas class="chart-canvas" data-chart="exports"></canvas>
+              <div class="chart-legend" data-legend="exports"></div>
+            </article>
+            <article class="chart-card">
+              <div class="chart-heading">
+                <h3>Tamanho dos outputs</h3>
+                <small>bytes/s</small>
+              </div>
+              <canvas class="chart-canvas" data-chart="outputs"></canvas>
+              <div class="chart-legend" data-legend="outputs"></div>
+            </article>
+          </div>
+        </article>
+        <div class="grid metrics" data-group="detailed"></div>
+      </section>
+
+      <section class="panel" id="logs">
+        <article class="card card-wide">
+          <div class="card-heading">
+            <h2>Logs recentes</h2>
+            <a href="{{ links.loki }}" target="_blank" rel="noreferrer">Abrir Loki</a>
+          </div>
+          <div class="log-list" id="log-list"></div>
+        </article>
+      </section>
+
+      <section class="panel" id="infra">
+        <article class="card card-wide live-board">
+          <div class="card-heading">
+            <div>
+              <p class="eyebrow-mini">Máquina local</p>
+              <h2>Infra em tempo real</h2>
+            </div>
+            <span class="polling-pill">node-exporter</span>
+          </div>
+          <div class="chart-grid">
+            <article class="chart-card">
+              <div class="chart-heading">
+                <h3>CPU e RAM</h3>
+                <small>uso percentual</small>
+              </div>
+              <canvas class="chart-canvas" data-chart="infra"></canvas>
+              <div class="chart-legend" data-legend="infra"></div>
+            </article>
+            <article class="chart-card">
+              <div class="chart-heading">
+                <h3>Disco</h3>
+                <small>partição raiz</small>
+              </div>
+              <canvas class="chart-canvas" data-chart="disk"></canvas>
+              <div class="chart-legend" data-legend="disk"></div>
+            </article>
+            <article class="chart-card">
+              <div class="chart-heading">
+                <h3>Rede</h3>
+                <small>entrada x saída</small>
+              </div>
+              <canvas class="chart-canvas" data-chart="network"></canvas>
+              <div class="chart-legend" data-legend="network"></div>
+            </article>
+            <article class="chart-card">
+              <div class="chart-heading">
+                <h3>GPU</h3>
+                <small>DCGM quando disponível</small>
+              </div>
+              <canvas class="chart-canvas" data-chart="gpu"></canvas>
+              <div class="chart-legend" data-legend="gpu"></div>
+            </article>
+          </div>
+        </article>
+        <div class="grid metrics" data-group="infra"></div>
+      </section>
+
+      <section class="panel" id="llm">
+        <article class="card card-wide live-board">
+          <div class="card-heading">
+            <div>
+              <p class="eyebrow-mini">Agno e modelos</p>
+              <h2>LLM em tempo real</h2>
+            </div>
+            <span class="polling-pill">Tokens, TTFT e custo</span>
+          </div>
+          <p class="muted">O painel mostra métricas agregadas seguras. Prompt, resposta e trace completo continuam no Langfuse.</p>
+          <div class="chart-grid">
+            <article class="chart-card">
+              <div class="chart-heading">
+                <h3>Chamadas</h3>
+                <small>volume e falhas</small>
+              </div>
+              <canvas class="chart-canvas" data-chart="llm_calls"></canvas>
+              <div class="chart-legend" data-legend="llm_calls"></div>
+            </article>
+            <article class="chart-card">
+              <div class="chart-heading">
+                <h3>Latência</h3>
+                <small>duração x TTFT</small>
+              </div>
+              <canvas class="chart-canvas" data-chart="llm_latency"></canvas>
+              <div class="chart-legend" data-legend="llm_latency"></div>
+            </article>
+            <article class="chart-card">
+              <div class="chart-heading">
+                <h3>Tokens</h3>
+                <small>input, output e reasoning</small>
+              </div>
+              <canvas class="chart-canvas" data-chart="llm_tokens"></canvas>
+              <div class="chart-legend" data-legend="llm_tokens"></div>
+            </article>
+            <article class="chart-card">
+              <div class="chart-heading">
+                <h3>Custo</h3>
+                <small>quando o provedor reportar</small>
+              </div>
+              <canvas class="chart-canvas" data-chart="llm_cost"></canvas>
+              <div class="chart-legend" data-legend="llm_cost"></div>
+            </article>
+            <article class="chart-card">
+              <div class="chart-heading">
+                <h3>Cache</h3>
+                <small>tokens reaproveitados</small>
+              </div>
+              <canvas class="chart-canvas" data-chart="llm_cache"></canvas>
+              <div class="chart-legend" data-legend="llm_cache"></div>
+            </article>
+          </div>
+        </article>
+        <div class="grid metrics" data-group="llm"></div>
+        <article class="card card-wide">
+          <div class="card-heading">
+            <h2>Traces</h2>
+            <a href="{{ links.langfuse }}" target="_blank" rel="noreferrer">Abrir Langfuse</a>
+          </div>
+          <p class="muted">Os traces detalhados de prompt, resposta, tokens e duração ficam no Langfuse quando `ENABLE_TRACING=true`.</p>
+        </article>
+      </section>
+
+      <section class="panel" id="annotations">
+        <div class="grid split">
+          <article class="card">
+            <h2>Nova anotação</h2>
+            <form id="annotation-form" class="annotation-form">
+              <label>
+                Alvo
+                <input name="target_id" value="observability" maxlength="160">
+              </label>
+              <label>
+                Tipo
+                <select name="target_type">
+                  <option value="geral">Geral</option>
+                  <option value="pipeline">Pipeline</option>
+                  <option value="logs">Logs</option>
+                  <option value="infra">Infra</option>
+                  <option value="llm">LLM</option>
+                </select>
+              </label>
+              <label>
+                Severidade
+                <select name="severity">
+                  <option value="note">Nota</option>
+                  <option value="warning">Atenção</option>
+                  <option value="incident">Incidente</option>
+                </select>
+              </label>
+              <label>
+                Tags
+                <input name="tags" placeholder="ex.: regressão, revisão, pr" maxlength="240">
+              </label>
+              <label class="full">
+                Anotação
+                <textarea name="note" rows="6" required maxlength="4000"></textarea>
+              </label>
+              <button type="submit">Salvar anotação</button>
+            </form>
+          </article>
+          <article class="card">
+            <h2>Anotações recentes</h2>
+            <div class="annotations" id="annotation-list"></div>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <template id="metric-template">
+      <article class="card metric-card">
+        <h2></h2>
+        <div class="metric-value"></div>
+        <div class="metric-items"></div>
+      </article>
+    </template>
+
+    <script>
+      const SNAPSHOT_INTERVAL_MS = 10000;
+      const REALTIME_INTERVAL_MS = 1000;
+      const TIMESERIES_INTERVAL_MS = 10000;
+      const LIVE_RANGE_SECONDS = 300;
+
+      const state = {
+        snapshot: null,
+        series: new Map(),
+      };
+
+      const realtimeDescriptions = {
+        req_user: "Sem healthcheck, /metrics, stats e histórico",
+        req_internal: "Observabilidade e verificações internas",
+        req_total: "Tudo que chega na API",
+        http_4xx: "Erro de cliente ou validação",
+        http_5xx: "Erro de servidor",
+        queue: "Jobs aguardando",
+        jobs_active: "Jobs em processamento",
+        cpu: "Uso médio da máquina",
+        ram: "Memória em uso",
+        llm_calls_per_min: "Chamadas de agente por minuto",
+        llm_total_tokens_rate: "Tokens totais por segundo",
+        llm_ttft_avg: "Tempo até o primeiro token",
+      };
+
+      const chartConfigs = {
+        requests: {
+          unit: "rps",
+          keys: [
+            { key: "req_user", label: "Usuários", color: "#1f5c4a" },
+            { key: "req_internal", label: "Interno", color: "#bb7a1f" },
+            { key: "req_total", label: "Total", color: "#37607a" },
+          ],
+        },
+        http: {
+          unit: "percent",
+          keys: [
+            { key: "http_4xx", label: "4xx", color: "#bb7a1f" },
+            { key: "http_5xx", label: "5xx", color: "#9a3f2f" },
+          ],
+        },
+        infra: {
+          unit: "percent",
+          keys: [
+            { key: "cpu", label: "CPU", color: "#37607a" },
+            { key: "ram", label: "RAM", color: "#1f5c4a" },
+          ],
+        },
+        pipeline: {
+          unit: "count",
+          keys: [
+            { key: "queue", label: "Fila", color: "#bb7a1f" },
+            { key: "jobs_active", label: "Jobs ativos", color: "#1f5c4a" },
+          ],
+        },
+        pipeline_jobs: {
+          unit: "per_minute",
+          keys: [
+            { key: "jobs_done_per_min", label: "Sucesso", color: "#1f5c4a" },
+            { key: "jobs_error_per_min", label: "Erro", color: "#9a3f2f" },
+          ],
+        },
+        pipeline_errors: {
+          unit: "per_minute",
+          keys: [
+            { key: "pipeline_errors_per_min", label: "Erros", color: "#9a3f2f" },
+          ],
+        },
+        conversion_latency: {
+          unit: "seconds",
+          keys: [
+            { key: "conversion_avg", label: "Conversão média", color: "#37607a" },
+          ],
+        },
+        exports: {
+          unit: "per_minute",
+          keys: [
+            { key: "exports_per_min", label: "Exportações", color: "#1f5c4a" },
+          ],
+        },
+        outputs: {
+          unit: "bytes_per_second",
+          keys: [
+            { key: "output_bytes_rate", label: "Outputs", color: "#37607a" },
+          ],
+        },
+        disk: {
+          unit: "percent",
+          keys: [
+            { key: "disk_root", label: "Disco /", color: "#bb7a1f" },
+          ],
+        },
+        network: {
+          unit: "bytes_per_second",
+          keys: [
+            { key: "net_rx", label: "Entrada", color: "#1f5c4a" },
+            { key: "net_tx", label: "Saída", color: "#37607a" },
+          ],
+        },
+        gpu: {
+          unit: "percent",
+          keys: [
+            { key: "gpu_util", label: "Uso", color: "#37607a" },
+            { key: "gpu_vram", label: "VRAM", color: "#bb7a1f" },
+          ],
+        },
+        llm_calls: {
+          unit: "per_minute",
+          keys: [
+            { key: "llm_calls_per_min", label: "Chamadas", color: "#1f5c4a" },
+            { key: "llm_failures_per_min", label: "Falhas", color: "#9a3f2f" },
+          ],
+        },
+        llm_latency: {
+          unit: "seconds",
+          keys: [
+            { key: "llm_duration_avg", label: "Duração", color: "#37607a" },
+            { key: "llm_ttft_avg", label: "TTFT", color: "#bb7a1f" },
+          ],
+        },
+        llm_tokens: {
+          unit: "tokens_per_second",
+          keys: [
+            { key: "llm_input_tokens_rate", label: "Input", color: "#37607a" },
+            { key: "llm_output_tokens_rate", label: "Output", color: "#1f5c4a" },
+            { key: "llm_reasoning_tokens_rate", label: "Reasoning", color: "#bb7a1f" },
+          ],
+        },
+        llm_cost: {
+          unit: "currency_per_minute",
+          keys: [
+            { key: "llm_cost_per_min", label: "Custo", color: "#9a3f2f" },
+          ],
+        },
+        llm_cache: {
+          unit: "tokens_per_second",
+          keys: [
+            { key: "llm_cache_read_tokens_rate", label: "Cache read", color: "#1f5c4a" },
+            { key: "llm_cache_write_tokens_rate", label: "Cache write", color: "#bb7a1f" },
+          ],
+        },
+      };
+
+      const formatters = {
+        count: (value) => Number(value).toLocaleString("pt-BR", { maximumFractionDigits: 0 }),
+        rps: (value) => `${Number(value).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}/s`,
+        percent: (value) => `${Number(value).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`,
+        seconds: (value) => `${Number(value).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}s`,
+        bytes: (value) => formatBytes(Number(value)),
+        bytes_per_second: (value) => `${formatBytes(Number(value))}/s`,
+        chars: (value) => `${Number(value).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} chars`,
+        currency: (value) => formatCurrency(Number(value)),
+        currency_per_minute: (value) => `${formatCurrency(Number(value))}/min`,
+        per_minute: (value) => `${Number(value).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}/min`,
+        tokens: (value) => `${Number(value).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} tokens`,
+        tokens_per_second: (value) => `${Number(value).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} tok/s`,
+        watts: (value) => `${Number(value).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} W`,
+        celsius: (value) => `${Number(value).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} °C`,
+        state: (value) => Number(value) >= 1 ? "online" : "offline",
+      };
+
+      document.querySelectorAll(".tab").forEach((button) => {
+        button.addEventListener("click", () => {
+          document.querySelectorAll(".tab").forEach((item) => item.classList.remove("active"));
+          document.querySelectorAll(".panel").forEach((item) => item.classList.remove("active"));
+          button.classList.add("active");
+          document.getElementById(button.dataset.tab).classList.add("active");
+          drawCharts();
+        });
+      });
+
+      document.getElementById("annotation-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const payload = Object.fromEntries(new FormData(form).entries());
+        const response = await fetch("/api/annotations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (response.ok) {
+          form.note.value = "";
+          await loadSnapshot();
+        }
+      });
+
+      async function loadSnapshot() {
+        try {
+          const response = await fetch("/api/snapshot", { cache: "no-store" });
+          state.snapshot = await response.json();
+          render(state.snapshot);
+        } catch {
+          document.getElementById("updated-at").textContent = "Snapshot indisponível";
+        }
+      }
+
+      async function loadRealtime() {
+        try {
+          const response = await fetch("/api/realtime", { cache: "no-store" });
+          const payload = await response.json();
+          appendRealtime(payload.metrics || [], payload.generated_at);
+          renderRealtime(payload.metrics || [], payload.generated_at);
+          drawCharts();
+        } catch {
+          document.getElementById("realtime-updated").textContent = "Realtime indisponível";
+        }
+      }
+
+      async function loadTimeseries() {
+        try {
+          const response = await fetch(`/api/timeseries?range_seconds=${LIVE_RANGE_SECONDS}&step_seconds=1`, { cache: "no-store" });
+          const payload = await response.json();
+          replaceSeries(payload.series || []);
+          drawCharts();
+        } catch {
+          drawCharts();
+        }
+      }
+
+      function render(snapshot) {
+        renderServices(snapshot.services || {});
+        renderGroups(snapshot.metrics || {});
+        renderApi(snapshot.api || {});
+        renderHistory(snapshot.api?.history || []);
+        renderLogs(snapshot.logs || []);
+        renderAnnotations(snapshot.annotations || []);
+        document.getElementById("updated-at").textContent = `Atualizado em ${formatDate(snapshot.generated_at)}`;
+      }
+
+      function renderServices(services) {
+        document.querySelectorAll(".status-card").forEach((card) => {
+          const online = Boolean(services[card.dataset.service]);
+          card.classList.toggle("online", online);
+          card.classList.toggle("offline", !online);
+          const stateLabel = card.querySelector(".status-state");
+          if (stateLabel) stateLabel.textContent = online ? "online" : "offline";
+        });
+      }
+
+      function renderGroups(groups) {
+        document.querySelectorAll("[data-group]").forEach((container) => {
+          const group = groups[container.dataset.group] || [];
+          container.replaceChildren(...group.map(metricCard));
+        });
+      }
+
+      function metricCard(metric) {
+        const node = document.getElementById("metric-template").content.cloneNode(true);
+        node.querySelector("h2").textContent = metric.label;
+        const value = node.querySelector(".metric-value");
+        const items = node.querySelector(".metric-items");
+
+        if (metric.items && metric.items.length) {
+          value.textContent = `${metric.items.length} séries`;
+          items.replaceChildren(...metric.items.map((item) => {
+            const row = document.createElement("div");
+            row.className = "metric-row";
+            row.innerHTML = `<span>${escapeHtml(item.label)}</span><strong>${formatMetric(item.value, metric.unit)}</strong>`;
+            return row;
+          }));
+        } else {
+          value.textContent = metric.value === null || metric.value === undefined
+            ? "sem dado"
+            : formatMetric(metric.value, metric.unit);
+        }
+        return node;
+      }
+
+      function renderRealtime(metrics, generatedAt) {
+        const container = document.getElementById("realtime-metrics");
+        if (!metrics.length) {
+          container.innerHTML = '<p class="muted">Sem métricas de tempo real ainda.</p>';
+          return;
+        }
+        container.replaceChildren(...metrics.map((metric) => {
+          const card = document.createElement("article");
+          card.className = "live-card";
+          const label = document.createElement("span");
+          label.textContent = metric.label;
+          const value = document.createElement("strong");
+          value.textContent = formatMetric(metric.value, metric.unit);
+          const hint = document.createElement("small");
+          hint.textContent = realtimeDescriptions[metric.key] || "Atualizado pelo Prometheus";
+          card.append(label, value, hint);
+          return card;
+        }));
+        document.getElementById("realtime-updated").textContent = `Tempo real: ${formatTime(generatedAt)}`;
+      }
+
+      function appendRealtime(metrics, generatedAt) {
+        const timestamp = generatedAt ? new Date(generatedAt).getTime() / 1000 : Date.now() / 1000;
+        metrics.forEach((metric) => {
+          if (!metric.key || metric.value === null || metric.value === undefined) return;
+          const value = Number(metric.value);
+          if (!Number.isFinite(value)) return;
+          const current = state.series.get(metric.key) || [];
+          current.push({ time: timestamp, value });
+          state.series.set(
+            metric.key,
+            current.filter((point) => point.time >= timestamp - LIVE_RANGE_SECONDS),
+          );
+        });
+      }
+
+      function replaceSeries(series) {
+        series.forEach((item) => {
+          const points = (item.points || [])
+            .map((point) => ({ time: Number(point.time), value: Number(point.value) }))
+            .filter((point) => Number.isFinite(point.time) && Number.isFinite(point.value));
+          state.series.set(item.key, points);
+        });
+      }
+
+      function drawCharts() {
+        Object.entries(chartConfigs).forEach(([key, config]) => {
+          document.querySelectorAll(`[data-chart="${key}"]`).forEach((canvas) => {
+            drawChart(canvas, config);
+          });
+          document.querySelectorAll(`[data-legend="${key}"]`).forEach((legend) => {
+            renderLegend(legend, config);
+          });
+        });
+      }
+
+      function drawChart(canvas, config) {
+        if (!canvas) return;
+        const rect = canvas.getBoundingClientRect();
+        const width = Math.max(320, rect.width || canvas.parentElement.clientWidth);
+        const height = 220;
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = Math.floor(width * dpr);
+        canvas.height = Math.floor(height * dpr);
+        canvas.style.height = `${height}px`;
+
+        const ctx = canvas.getContext("2d");
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, width, height);
+
+        const padding = { top: 18, right: 16, bottom: 28, left: 42 };
+        const plotWidth = width - padding.left - padding.right;
+        const plotHeight = height - padding.top - padding.bottom;
+        const allPoints = config.keys.flatMap((item) => state.series.get(item.key) || []);
+
+        ctx.fillStyle = "rgba(255, 253, 247, 0.54)";
+        roundRect(ctx, 0, 0, width, height, 18);
+        ctx.fill();
+
+        ctx.strokeStyle = "rgba(216, 205, 187, 0.74)";
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= 4; i += 1) {
+          const y = padding.top + (plotHeight / 4) * i;
+          ctx.beginPath();
+          ctx.moveTo(padding.left, y);
+          ctx.lineTo(width - padding.right, y);
+          ctx.stroke();
+        }
+
+        if (!allPoints.length) {
+          ctx.fillStyle = "#68756f";
+          ctx.font = "600 14px Aptos, sans-serif";
+          ctx.fillText("Aguardando dados do Prometheus", padding.left, height / 2);
+          return;
+        }
+
+        const maxTime = Math.max(...allPoints.map((point) => point.time));
+        const minTime = maxTime - LIVE_RANGE_SECONDS;
+        const visibleValues = allPoints
+          .filter((point) => point.time >= minTime)
+          .map((point) => point.value);
+        let maxValue = Math.max(...visibleValues, config.unit === "percent" ? 100 : 1);
+        if (!Number.isFinite(maxValue) || maxValue <= 0) maxValue = 1;
+
+        ctx.fillStyle = "#68756f";
+        ctx.font = "600 11px Aptos, sans-serif";
+        for (let i = 0; i <= 4; i += 1) {
+          const value = maxValue - (maxValue / 4) * i;
+          const y = padding.top + (plotHeight / 4) * i + 4;
+          ctx.fillText(shortMetric(value, config.unit), 6, y);
+        }
+
+        config.keys.forEach((item) => {
+          const points = (state.series.get(item.key) || []).filter((point) => point.time >= minTime);
+          if (!points.length) return;
+          ctx.strokeStyle = item.color;
+          ctx.lineWidth = 2.4;
+          ctx.beginPath();
+          points.forEach((point, index) => {
+            const x = padding.left + ((point.time - minTime) / LIVE_RANGE_SECONDS) * plotWidth;
+            const y = padding.top + plotHeight - (point.value / maxValue) * plotHeight;
+            if (index === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          });
+          ctx.stroke();
+
+          const last = points.at(-1);
+          if (last) {
+            const x = padding.left + ((last.time - minTime) / LIVE_RANGE_SECONDS) * plotWidth;
+            const y = padding.top + plotHeight - (last.value / maxValue) * plotHeight;
+            ctx.fillStyle = item.color;
+            ctx.beginPath();
+            ctx.arc(x, y, 4, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        });
+      }
+
+      function renderLegend(container, config) {
+        if (!container) return;
+        container.replaceChildren(...config.keys.map((item) => {
+          const row = document.createElement("span");
+          row.className = "legend-item";
+          const dot = document.createElement("i");
+          dot.className = "legend-dot";
+          dot.style.background = item.color;
+          const label = document.createElement("span");
+          label.textContent = `${item.label}: ${formatMetric(latestValue(item.key), config.unit)}`;
+          row.append(dot, label);
+          return row;
+        }));
+      }
+
+      function latestValue(key) {
+        const points = state.series.get(key) || [];
+        for (let index = points.length - 1; index >= 0; index -= 1) {
+          if (Number.isFinite(points[index].value)) return points[index].value;
+        }
+        return null;
+      }
+
+      function renderApi(api) {
+        const health = api.health || {};
+        const stats = api.stats || {};
+        const facts = [
+          ["Status", health.status || "sem dado"],
+          ["Modelo", health.model_name || "sem dado"],
+          ["Cliente", health.model_client || "sem dado"],
+          ["Modelo acessível", health.model_reachable ? "sim" : "não"],
+          ["Fila", health.queue_size ?? "sem dado"],
+          ["Conversões", stats.total ?? "sem dado"],
+          ["Sucessos", stats.sucesso ?? "sem dado"],
+          ["Erros", stats.erros ?? "sem dado"],
+          ["Tempo médio", stats.tempo_medio_segundos === null || stats.tempo_medio_segundos === undefined ? "sem dado" : `${stats.tempo_medio_segundos}s`],
+        ];
+        document.getElementById("api-health").replaceChildren(...facts.map(([key, val]) => {
+          const wrapper = document.createElement("div");
+          wrapper.innerHTML = `<dt>${escapeHtml(key)}</dt><dd>${escapeHtml(String(val))}</dd>`;
+          return wrapper;
+        }));
+      }
+
+      function renderHistory(rows) {
+        const body = document.getElementById("history-body");
+        if (!rows.length) {
+          body.innerHTML = '<tr><td colspan="4">Sem histórico recente.</td></tr>';
+          return;
+        }
+        body.replaceChildren(...rows.map((row) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${escapeHtml(row.arquivo || "")}</td>
+            <td><span class="badge">${escapeHtml(row.status || "")}</span></td>
+            <td>${escapeHtml(row.modo || "")}</td>
+            <td>${formatMetric(row.tempo_segundos || 0, "seconds")}</td>
+          `;
+          return tr;
+        }));
+      }
+
+      function renderLogs(logs) {
+        const list = document.getElementById("log-list");
+        if (!logs.length) {
+          list.innerHTML = '<p class="muted">Sem logs disponíveis.</p>';
+          return;
+        }
+        list.replaceChildren(...logs.map((entry) => {
+          const row = document.createElement("div");
+          row.className = "log-row";
+          row.innerHTML = `
+            <time>${formatDate(entry.time)}</time>
+            <span class="badge">${escapeHtml(entry.level || entry.format || "log")}</span>
+            <code>${escapeHtml(entry.line || "")}</code>
+          `;
+          return row;
+        }));
+      }
+
+      function renderAnnotations(items) {
+        const list = document.getElementById("annotation-list");
+        if (!items.length) {
+          list.innerHTML = '<p class="muted">Sem anotações ainda.</p>';
+          return;
+        }
+        list.replaceChildren(...items.map((item) => {
+          const card = document.createElement("div");
+          card.className = "annotation";
+          card.innerHTML = `
+            <div>
+              <strong>${escapeHtml(item.target_id)}</strong>
+              <span class="badge">${escapeHtml(item.severity)}</span>
+            </div>
+            <p>${escapeHtml(item.note)}</p>
+            <small>${escapeHtml(item.target_type)} · ${escapeHtml(item.tags || "sem tags")} · ${formatDate(item.created_at)}</small>
+            <button data-delete="${item.id}" type="button">Remover</button>
+          `;
+          card.querySelector("button").addEventListener("click", async () => {
+            await fetch(`/api/annotations/${item.id}`, { method: "DELETE" });
+            await loadSnapshot();
+          });
+          return card;
+        }));
+      }
+
+      function formatMetric(value, unit) {
+        if (value === null || value === undefined || Number.isNaN(Number(value))) return "sem dado";
+        return (formatters[unit] || formatters.count)(value);
+      }
+
+      function shortMetric(value, unit) {
+        if (unit === "currency_per_minute" || unit === "currency") return formatCurrency(value);
+        if (unit === "percent") return `${Math.round(value)}%`;
+        if (unit === "rps") return Number(value).toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+        if (unit === "bytes_per_second") return formatBytes(value);
+        if (unit === "tokens_per_second" || unit === "per_minute") return Number(value).toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+        return Number(value).toLocaleString("pt-BR", { maximumFractionDigits: 0 });
+      }
+
+      function formatBytes(bytes) {
+        if (!Number.isFinite(bytes)) return "sem dado";
+        const units = ["B", "KB", "MB", "GB", "TB"];
+        let value = bytes;
+        let index = 0;
+        while (value >= 1024 && index < units.length - 1) {
+          value /= 1024;
+          index += 1;
+        }
+        return `${value.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} ${units[index]}`;
+      }
+
+      function formatCurrency(value) {
+        if (!Number.isFinite(value)) return "sem dado";
+        return value.toLocaleString("pt-BR", {
+          style: "currency",
+          currency: "USD",
+          maximumFractionDigits: value < 1 ? 4 : 2,
+        });
+      }
+
+      function formatDate(value) {
+        if (!value) return "sem data";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return value;
+        return date.toLocaleString("pt-BR");
+      }
+
+      function formatTime(value) {
+        if (!value) return "agora";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return "agora";
+        return date.toLocaleTimeString("pt-BR");
+      }
+
+      function roundRect(ctx, x, y, width, height, radius) {
+        ctx.beginPath();
+        ctx.moveTo(x + radius, y);
+        ctx.arcTo(x + width, y, x + width, y + height, radius);
+        ctx.arcTo(x + width, y + height, x, y + height, radius);
+        ctx.arcTo(x, y + height, x, y, radius);
+        ctx.arcTo(x, y, x + width, y, radius);
+        ctx.closePath();
+      }
+
+      function escapeHtml(value) {
+        return String(value)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      loadSnapshot();
+      loadTimeseries();
+      loadRealtime();
+      setInterval(loadSnapshot, SNAPSHOT_INTERVAL_MS);
+      setInterval(loadTimeseries, TIMESERIES_INTERVAL_MS);
+      setInterval(loadRealtime, REALTIME_INTERVAL_MS);
+      window.addEventListener("resize", drawCharts);
+    </script>
+  </body>
+</html>

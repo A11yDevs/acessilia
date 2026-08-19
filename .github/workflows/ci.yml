@@ -99,11 +99,11 @@ jobs:
               --index-url https://download.pytorch.org/whl/cpu \
               "torch==2.7.1+cpu" \
               "torchvision==0.22.1+cpu"
-            poetry export --with dev --extras docling \
+            poetry export --with dev --extras docling --extras observability \
               --without-hashes --format requirements.txt \
               --output /tmp/requirements.txt
           else
-            poetry export --with dev \
+            poetry export --with dev --extras observability \
               --without-hashes --format requirements.txt \
               --output /tmp/requirements.txt
           fi
@@ -127,6 +127,10 @@ jobs:
               for distribution in distributions()
               if distribution.metadata["Name"]
           }
+          if importlib.util.find_spec("prometheus_fastapi_instrumentator") is None:
+              raise SystemExit("Extra observability nao foi instalado")
+          if importlib.util.find_spec("opentelemetry.sdk") is None:
+              raise SystemExit("OpenTelemetry SDK nao foi instalado")
           if variant == "slim":
               forbidden = {"docling", "rapidocr", "torch", "torchvision"}
               unexpected = forbidden & installed

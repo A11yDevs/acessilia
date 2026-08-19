@@ -7,6 +7,7 @@ from typing import Any, Callable, Coroutine
 from backend.agents.orchestrator import AccessibilityOrchestrator
 from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
 from backend.agents.state_manager import TaskCancelledError, state_manager
+from backend.observability import record_pipeline_error
 from backend.services.cache import get_cached, set_cache
 from backend.services.history_service import (
     finalizar_conversao,
@@ -214,6 +215,7 @@ async def process(
 
     except Exception as e:
         logger.error("Erro no pipeline: {}: {}", type(e).__name__, e)
+        record_pipeline_error("pipeline", mode=mode)
         state_manager.errar(task_id, str(e))
         fallback = _fallback_texto_simples(file_path)
         state_manager.atualizar(task_id, resultado=fallback)

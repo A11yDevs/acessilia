@@ -117,11 +117,75 @@
       }
     },
     {
+      "type": "stat",
+      "title": "Fila e jobs ativos",
+      "description": "Métricas de domínio do Acessília.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 13 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "acessilia_queue_size",
+          "legendFormat": "Fila"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(acessilia_jobs_active)",
+          "legendFormat": "Ativos"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short" },
+        "overrides": []
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Jobs por status",
+      "description": "Volume acumulado de jobs por status na execução atual.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 9, "x": 6, "y": 13 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (status) (acessilia_jobs_total)",
+          "legendFormat": "{{status}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short", "custom": { "fillOpacity": 10 } },
+        "overrides": []
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "LLM por agente",
+      "description": "Chamadas e falhas de LLM acumuladas na execução atual.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 9, "x": 15, "y": 13 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (agent) (acessilia_llm_calls_total)",
+          "legendFormat": "{{agent}} chamadas"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (agent) (acessilia_llm_failures_total)",
+          "legendFormat": "{{agent}} falhas"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short", "custom": { "fillOpacity": 10 } },
+        "overrides": []
+      }
+    },
+    {
       "type": "logs",
       "title": "Logs da aplicação",
-      "description": "Vem do Loki via Promtail. Erros e avisos do loguru.",
+      "description": "Vem do Loki via Alloy. Erros e avisos do loguru.",
       "datasource": { "type": "loki", "uid": "loki" },
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 13 },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 18 },
       "targets": [{ "refId": "A", "expr": "{job=\"acessilia\"}" }],
       "options": { "showTime": true, "sortOrder": "Descending", "wrapLogMessage": true }
     }

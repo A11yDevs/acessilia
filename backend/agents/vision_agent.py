@@ -1,5 +1,13 @@
 """VisionAgent – Geração de audiodescrições acessíveis de imagens."""
 
+import time
+
+from backend.observability import (
+    record_llm_call,
+    record_llm_duration,
+    record_llm_failure,
+    record_llm_response,
+)
 from backend.tools.region_classifier import region_prompt_key
 from backend.tools.logger import logger
 
@@ -55,14 +63,29 @@ class VisionAgent:
                 telemetry=False,
             )
 
+            started_at = time.perf_counter()
+            record_llm_call("VisionAgent")
             response = await agent.arun(
                 input=prompt,
                 images=[Image(content=image_bytes)],
+            )
+            record_llm_response("VisionAgent", response, prompt=prompt)
+            record_llm_duration(
+                "VisionAgent",
+                "success",
+                time.perf_counter() - started_at,
             )
 
             return response.content.strip()
 
         except Exception as error:
+            record_llm_failure("VisionAgent")
+            if "started_at" in locals():
+                record_llm_duration(
+                    "VisionAgent",
+                    "error",
+                    time.perf_counter() - started_at,
+                )
             import traceback
             tb = traceback.format_exc()
             logger.critical(

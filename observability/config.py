@@ -88,6 +88,27 @@ METRICAS_API = {
     ),
 }
 
+METRICAS_PIPELINE = {
+    "Fila": "acessilia_queue_size",
+    "Jobs ativos": "sum(acessilia_jobs_active)",
+    "Jobs acumulados": "sum(acessilia_jobs_total)",
+    "Erros pipeline acumulados": "sum(acessilia_pipeline_errors_total)",
+    "Duração média (s)": (
+        "sum(acessilia_conversion_duration_seconds_sum) "
+        "/ clamp_min(sum(acessilia_conversion_duration_seconds_count), 1)"
+    ),
+    "Exportações acumuladas": "sum(acessilia_exports_total)",
+}
+
+METRICAS_LLM = {
+    "Chamadas LLM acumuladas": "sum(acessilia_llm_calls_total)",
+    "Falhas LLM acumuladas": "sum(acessilia_llm_failures_total)",
+    "Duração LLM média (s)": (
+        "sum(acessilia_llm_duration_seconds_sum) "
+        "/ clamp_min(sum(acessilia_llm_duration_seconds_count), 1)"
+    ),
+}
+
 METRICAS_MAQUINA = {  # node-exporter
     "CPU %": '100 - (avg(rate(node_cpu_seconds_total{mode="idle"}[1m])) * 100)',
     "RAM %": "avg((1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100)",

@@ -72,7 +72,7 @@ Edite `ENABLED_INTERFACES` em `.env`, ex.: `api,web`. A API deve sempre estar ha
 Instale as dependências de desenvolvimento e os extras usados pelo CI:
 
 ```bash
-poetry install --with dev --extras docling
+poetry install --with dev --extras "docling observability"
 ```
 
 Execute a suíte completa da pasta `tests/`:
@@ -116,7 +116,7 @@ O container expõe `8000` (API) e `8001` (web), persiste tudo em `./var` e roda 
 
 ## Observabilidade
 
-Desligada por padrão. Para subir Prometheus, Grafana, Loki e Promtail localmente:
+Desligada por padrão. Para usar a stack local, ajuste `OBSERVABILITY_ENABLED=true` no `.env` e suba Prometheus, Grafana, Loki, Alloy, Langfuse e o painel próprio:
 
 ```bash
 docker compose --profile monitoring up -d

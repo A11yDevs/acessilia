@@ -59,6 +59,8 @@ def main() -> int:
     try:
         with httpx.Client(base_url=config.PROMETHEUS, timeout=10) as cliente:
             tabela(cliente, "API", config.METRICAS_API)
+            tabela(cliente, "Pipeline", config.METRICAS_PIPELINE)
+            tabela(cliente, "LLM", config.METRICAS_LLM)
             tabela(cliente, "Máquina", config.METRICAS_MAQUINA)
     except httpx.HTTPError as erro:
         print(f"Prometheus inacessível em {config.PROMETHEUS}: {erro}")

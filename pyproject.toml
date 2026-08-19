@@ -7,7 +7,8 @@ license = "MIT"
 readme = "README.md"
 packages = [
     { include = "backend" },
-    { include = "frontend" }
+    { include = "frontend" },
+    { include = "observability" }
 ]
 
 [build-system]
@@ -42,16 +43,16 @@ jsonschema = "^4.20"
 openai = "^2.45.0"
 ollama = "^0.6.2"
 sqlalchemy = "^2.0.51"
-opentelemetry-sdk = { version = "^1.30", optional = true }
-opentelemetry-exporter-otlp-proto-http = { version = "^1.30", optional = true }
-openinference-instrumentation-agno = { version = "^0.1.16", optional = true }
-prometheus-fastapi-instrumentator = { version = "^7.0", optional = true }
+opentelemetry-sdk = { version = "^1.44.0", optional = true }
+opentelemetry-exporter-otlp-proto-http = { version = "^1.44.0", optional = true }
+openinference-instrumentation-agno = { version = "^1.0.3", optional = true, python = ">=3.11,<3.15" }
+prometheus-fastapi-instrumentator = { version = "^7.1.0", optional = true }
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.1.1"
 respx = "^0.23.1"
 pytest-asyncio = "^1.4.0"
-locust = "^2.32"
+locust = "^2.46.3"
 
 [tool.poetry.extras]
 docling = ["docling", "rapidocr"]

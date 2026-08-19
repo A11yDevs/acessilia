@@ -24,6 +24,9 @@ output/
 data/
 var/
 var/cache/rapidocr/
+!observability/data/
+observability/data/*
+!observability/data/.gitkeep
 cache/
 trash/
 temp/

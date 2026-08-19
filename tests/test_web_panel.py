@@ -53,9 +53,10 @@ class _FakeApiClient:
 
 
 @pytest.fixture()
-def web_client(monkeypatch):
+def web_client(monkeypatch, tmp_path):
     fake = _FakeApiClient()
     monkeypatch.setattr(web_module, "client", fake)
+    monkeypatch.setattr(web_module, "WEB_UPLOAD_DIR", tmp_path / "web_uploads")
     web_module.limiter.enabled = False
     with TestClient(web_module.app) as c:
         c.fake = fake

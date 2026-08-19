@@ -1,0 +1,59 @@
+logging {
+  level  = "info"
+  format = "logfmt"
+}
+
+local.file_match "acessilia_json" {
+  path_targets = [{
+    __path__ = "/var/log/acessilia/*.json.log",
+    job      = "acessilia",
+    format   = "json",
+  }]
+}
+
+loki.process "acessilia_json" {
+  forward_to = [loki.write.default.receiver]
+
+  stage.json {
+    expressions = {
+      level   = "record.level.name",
+      module  = "record.name",
+      message = "text",
+    }
+  }
+
+  stage.labels {
+    values = {
+      level  = "",
+      module = "",
+    }
+  }
+
+  stage.output {
+    source = "message"
+  }
+}
+
+loki.source.file "acessilia_json" {
+  targets    = local.file_match.acessilia_json.targets
+  forward_to = [loki.process.acessilia_json.receiver]
+}
+
+local.file_match "acessilia_text" {
+  path_targets = [{
+    __path__ = "/var/log/acessilia/bot_*.log",
+    job      = "acessilia",
+    format   = "text",
+  }]
+}
+
+loki.source.file "acessilia_text" {
+  targets    = local.file_match.acessilia_text.targets
+  forward_to = [loki.write.default.receiver]
+}
+
+loki.write "default" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

@@ -11,6 +11,7 @@ o estado padrão e o que roda em produção hoje.
 from __future__ import annotations
 
 import base64
+from types import SimpleNamespace
 
 import pytest
 
@@ -26,8 +27,10 @@ def _reset_tracing_state():
     um teste contaminaria o seguinte.
     """
     observability._tracing_active = False
+    observability._domain_metrics = None
     yield
     observability._tracing_active = False
+    observability._domain_metrics = None
 
 
 # ---------------------------------------------------------------------------
@@ -168,3 +171,100 @@ def test_metrics_degrades_when_dependency_missing(monkeypatch):
 
     assert observability.setup_metrics(app) is False
     assert _metrics_route_exists(app) is False
+
+
+def test_domain_metrics_are_noop_when_disabled(monkeypatch):
+    monkeypatch.setattr(settings, "enable_metrics", False)
+
+    observability.set_queue_size(3)
+    observability.record_job_status("queued", source="api", mode="normal")
+    observability.record_job_started(source="api", mode="normal")
+    observability.record_job_finished(
+        "done",
+        source="api",
+        mode="normal",
+        duration_seconds=1.2,
+    )
+    observability.record_pipeline_error("pipeline", source="api", mode="normal")
+    observability.record_export("txt", 1024, source="api", mode="normal")
+    observability.record_llm_call("VisionAgent")
+    observability.record_llm_failure("VisionAgent")
+    observability.record_llm_duration("VisionAgent", "error", 0.5)
+    observability.record_llm_response(
+        "VisionAgent",
+        SimpleNamespace(metrics=None, content="resultado"),
+        prompt="prompt",
+    )
+
+    assert observability._domain_metrics is None
+
+
+def test_domain_metrics_register_when_enabled(monkeypatch):
+    prometheus_client = pytest.importorskip(
+        "prometheus_client",
+        reason="extra observability não instalado",
+    )
+    registry = prometheus_client.CollectorRegistry()
+    counter = prometheus_client.Counter
+    gauge = prometheus_client.Gauge
+    histogram = prometheus_client.Histogram
+
+    def _counter(*args, **kwargs):
+        kwargs.setdefault("registry", registry)
+        return counter(*args, **kwargs)
+
+    def _gauge(*args, **kwargs):
+        kwargs.setdefault("registry", registry)
+        return gauge(*args, **kwargs)
+
+    def _histogram(*args, **kwargs):
+        kwargs.setdefault("registry", registry)
+        return histogram(*args, **kwargs)
+
+    monkeypatch.setattr(prometheus_client, "Counter", _counter)
+    monkeypatch.setattr(prometheus_client, "Gauge", _gauge)
+    monkeypatch.setattr(prometheus_client, "Histogram", _histogram)
+    monkeypatch.setattr(settings, "enable_metrics", True)
+
+    observability.set_queue_size(2)
+    observability.record_job_started(source="api", mode="normal")
+    observability.record_job_finished(
+        "done",
+        source="api",
+        mode="normal",
+        duration_seconds=2.4,
+    )
+    observability.record_export("zip", 2048, source="api", mode="normal")
+    observability.record_llm_call("DataAgent")
+    observability.record_llm_response(
+        "DataAgent",
+        SimpleNamespace(
+            model_provider="ollama",
+            model="modelo-local",
+            content="resposta",
+            metrics=SimpleNamespace(
+                input_tokens=10,
+                output_tokens=5,
+                total_tokens=15,
+                reasoning_tokens=2,
+                cache_read_tokens=3,
+                cache_write_tokens=0,
+                audio_input_tokens=0,
+                audio_output_tokens=0,
+                audio_total_tokens=0,
+                cost=0.0123,
+                time_to_first_token=0.42,
+                details=None,
+            ),
+        ),
+        prompt="prompt de teste",
+    )
+
+    assert observability._domain_metrics is not None
+    output = prometheus_client.generate_latest(registry).decode()
+    assert "acessilia_llm_tokens_total" in output
+    assert 'token_type="total"' in output
+    assert 'token_type="reasoning"' in output
+    assert "acessilia_llm_cost_total" in output
+    assert "acessilia_llm_time_to_first_token_seconds" in output
+    assert "acessilia_llm_content_chars" in output

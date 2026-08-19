@@ -10,6 +10,12 @@ from backend.config.settings import settings
 pytest.importorskip("fastapi.testclient")
 
 from backend.api.app import app  # noqa: E402
+from backend.api.worker import (  # noqa: E402
+    JobExecutor,
+    _mark_queued_job_finished,
+    _mark_queued_job_running,
+    queued_jobs,
+)
 
 
 @pytest.fixture(scope="session")
@@ -31,6 +37,9 @@ def _isolate_paths(api_paths, monkeypatch):
     monkeypatch.setattr(settings, "data_dir", data_dir)
     monkeypatch.setattr(settings, "logs_dir", api_paths / "logs")
 
+    if hs._connection is not None:
+        hs._connection.close()
+    hs.DB_PATH = settings.db_path
     dts._connection = None
     hs._connection = None
     limiter.enabled = False
@@ -178,6 +187,56 @@ def test_download_full_flow(client, api_paths):
 
     resp = client.get(f"/api/v1/download/{token}/pdf")
     assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_job_executor_accepts_keyword_arguments():
+    executor = JobExecutor()
+
+    def _format_result(value: str, *, suffix: str) -> str:
+        return f"{value}-{suffix}"
+
+    try:
+        result = await executor._run_in_executor(
+            _format_result,
+            "ok",
+            suffix="html",
+        )
+    finally:
+        executor._executor.shutdown(wait=True)
+
+    assert result == "ok-html"
+
+
+def test_queued_job_status_updates_when_worker_finishes_without_state_manager():
+    queued_jobs.clear()
+    queued_jobs["cached1"] = {
+        "task_id": "cached1",
+        "arquivo": "doc.pdf",
+        "source": "pytest",
+        "modo": "normal",
+        "status": "queued",
+        "progresso": 0.0,
+        "etapa_atual": "Aguardando na fila",
+        "erros": [],
+        "download_url": None,
+        "inicio": 1.0,
+        "fim": None,
+    }
+
+    _mark_queued_job_running("cached1")
+    assert queued_jobs["cached1"]["status"] == "processing"
+    assert queued_jobs["cached1"]["progresso"] == 0.05
+
+    _mark_queued_job_finished(
+        "cached1",
+        "done",
+        download_url="http://localhost/download/token",
+    )
+    assert queued_jobs["cached1"]["status"] == "done"
+    assert queued_jobs["cached1"]["progresso"] == 1.0
+    assert queued_jobs["cached1"]["download_url"] == "http://localhost/download/token"
+    assert queued_jobs["cached1"]["fim"] is not None
 
 
 def test_job_executor_records_job(client, monkeypatch):

@@ -90,9 +90,9 @@ RUN pip install --upgrade pip \
                      --index-url https://download.pytorch.org/whl/cpu \
                      "torch==${TORCH_VERSION}+cpu" \
                      "torchvision==${TORCHVISION_VERSION}+cpu"; \
-                 poetry export --only main --extras docling --without-hashes --format requirements.txt --output /tmp/requirements.txt; \
+                 poetry export --only main --extras docling --extras observability --without-hashes --format requirements.txt --output /tmp/requirements.txt; \
        else \
-                 poetry export --only main --without-hashes --format requirements.txt --output /tmp/requirements.txt; \
+                 poetry export --only main --extras observability --without-hashes --format requirements.txt --output /tmp/requirements.txt; \
        fi \
     && python /tmp/filter_accelerator_requirements.py \
         /tmp/requirements.txt /tmp/requirements-filtered.txt \
@@ -111,3 +111,8 @@ CMD ["python", "-m", "frontend.run"]
 FROM base AS test
 RUN pip install pytest pytest-asyncio respx pytest-metadata pytest-html jsonschema
 CMD ["pytest", "tests/", "-v"]
+
+# --- Imagem padrão de runtime ---
+# Mantém `docker build -f infra/Dockerfile ...` apontando para a aplicação,
+# não para o target de teste.
+FROM base AS runtime

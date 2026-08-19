@@ -91,7 +91,7 @@ async def submit_job(
         callback_args={"job": job},
     )
     position = await unified_queue.enqueue(item)
-    register_queued_job(task_id, filename, position, source)
+    register_queued_job(task_id, filename, position, source, mode)
     logger.info("API: job {} enfileirado (source={})", task_id, source)
     return UploadResponse(
         task_id=task_id,

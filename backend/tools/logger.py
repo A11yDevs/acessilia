@@ -28,7 +28,7 @@ def setup_logger() -> None:
     )
 
     if settings.log_json:
-        # Arquivo separado, em JSON, para o Promtail entregar ao Loki com os campos
+        # Arquivo separado, em JSON, para o Alloy entregar ao Loki com os campos
         # já estruturados (nível, módulo, linha) em vez de regex sobre texto. Fica à
         # parte do .log humano de propósito: quem abre log no terminal continua
         # lendo o formato legível.
