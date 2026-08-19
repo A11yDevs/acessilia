@@ -1,45 +1,59 @@
-# a11y-devs-describer Project Documentation
+# Acessília Project Documentation
 
 ## Purpose
-This documentation describes the modular architecture: an interface-agnostic **core/** package containing all business logic, and **interfaces/** containing pluggable front-ends (Telegram bot, Web panel).
+This documentation details the architecture of **Acessília**, a document accessibility system that combines **deterministic planning** (PDDL-based task ordering and validation) with **Agno-coordinated multi-agent AI** for vision, data, and description tasks. Deterministic functions are the source of truth; LLMs provide interpretation and description.
+
+The system runs in one of two pipeline engines, selected by the `PIPELINE_ENGINE` setting: `legacy` (the direct orchestrated pipeline, default) or `pddl` (the manifest → plan → execution flow). See [architecture.md](architecture.md).
+
+---
 
 ## Navigation
-1. [Architectural Constitution](constitution.md)
-2. [Architecture](architecture.md)
-3. [Design and Integration Patterns](patterns.md)
-4. [Tests](tests.md)
-5. [Use Cases](use_cases.md)
-6. [Modules](modules.md)
-7. [Classes](classes.md)
+
+1. [Architectural Constitution](constitution.md) — non-negotiable principles and quality rules.
+2. [Architecture Specification](architecture.md) — layers, both pipeline engines, and processing flow.
+3. [Design & Integration Patterns](patterns.md) — recurring patterns and their rationale.
+4. [Use Cases](use_cases.md) — actors and user-facing operations.
+5. [Endpoints & APIs](endpoints.md) — the REST API, the Web panel, and the AgentOS runtime.
+6. [Automated Test Suite](../tests/README.md) — test strategy and coverage.
+
+---
+
+## PDDL + Agno Architecture
+
+The planning-based pipeline and its incorporation are documented separately:
+
+1. [PMV — Agno, manifest, PDDL and nominal execution](pmv_agno_pddl.md) — the minimal cycle `document → manifest → PDDL plan → execution report → canonical document`, and how Agno coordinates the deterministic tools.
+2. [PDDL + Agno incorporation plan](plano_incorporacao_pddl_agno.md) — the block-by-block plan used to bring the planning layer into the codebase.
+
+---
 
 ## UML Diagrams (PlantUML)
-1. Use cases: [docs/use_cases/use_cases.puml](use_cases/use_cases.puml)
-2. Architecture: [docs/architecture/architecture.puml](architecture/architecture.puml)
-3. Layers: [docs/architecture/layers.puml](architecture/layers.puml)
-4. Processing sequence: [docs/sequence/document_processing_sequence.puml](sequence/document_processing_sequence.puml)
-5. Task state machine: [docs/state_machine/task_state_machine.puml](state_machine/task_state_machine.puml)
+
+Each diagram is a visual aid; the linked description summarizes its content in text.
+
+1. **Architecture & Multi-Agent Pipeline:** [architecture/architecture.puml](architecture/architecture.puml) — component and package structure of the backend/frontend pipeline.
+2. **Processing Sequence:** [sequence/document_processing_sequence.puml](sequence/document_processing_sequence.puml) — step-by-step flow of a document conversion, including the parallel vision/data agents.
+3. **Task State Machine:** [state_machine/task_state_machine.puml](state_machine/task_state_machine.puml) — lifecycle of a processing task (processing, done, error, cancelled).
+4. **Use Cases:** [use_cases/use_cases.puml](use_cases/use_cases.puml) — actors and the main user-facing operations.
+
+---
 
 ## Covered Scope
-- **core/** — Interface-agnostic orchestrator, AI clients (Ollama/OpenRouter), state manager, cache, history, queue, email service, utilities (logger, validators, image processing, text processing), and thin exporter wrappers.
-- **interfaces/telegram/** — aiogram Bot/Dispatcher, handlers, middlewares, adapters (status tracker, file service), and AI prompts.
-- **interfaces/web/** — FastAPI application with upload form and email delivery.
-- **pipeline/** — Canonical document pipeline (builder, sanitizer, structure parser, validators, verbosity manager, Pandoc AST builder).
-- **exporters/** — Export coordinator and format-specific renderers (TXT, DOCX, PDF, HTML).
-- **renderers/** — Deterministic format renderers.
-- **filters/** — Profile-based block filtering and audit stripping.
-- **config/** — Centralized settings with environment variable bindings.
-- **tests/** — Automated tests for pipeline, validators, renderers, and AI client.
+
+- **`backend/`** — Interface-agnostic business logic.
+  - `core/` — the planning layer: `manifest/` (Informational-Structural extraction via Docling/PyMuPDF → `processing-manifest.json`), `planning/` (PlannerAgent → PDDL problem and `nominal-plan.json`), `execution/` (Executor via Agno Workflow → `execution-report.json`).
+  - `agents/` — the pipeline agents (`ReaderAgent`, `VisionAgent`, `DataAgent`, `EditorAgent`) and the legacy and PDDL orchestrators.
+  - `api/` — the standalone REST API (jobs, download, history, health).
+  - `pipeline/` + `export/` — canonical document construction, validation, and format renderers.
+  - `ai/`, `services/`, `tools/` — Agno model registry and prompts, infrastructure services (cache, queue, history, cleanup, email, tokens), and shared utilities.
+- **`frontend/`** — Clients of the API: Telegram bot (`frontend/telegram/`), Web panel (`frontend/web/`), CLI (`frontend/cli/`), the shared `frontend/clients/api_client.py`, and the AgentOS runtime (`frontend/agent_os.py`).
+- **`infra/`** — Dockerfile and Docker Compose configurations.
+- **`tests/`** — Unit and integration test suite (`pytest`).
+
+---
 
 ## Traceability Matrix
-- Use cases to implementation: [use_cases.md](use_cases.md)
-- Implementation by module: [modules.md](modules.md)
-- Objects and responsibilities: [classes.md](classes.md)
-- Test strategy and coverage: [tests.md](tests.md)
 
-## Key Decisions Observed in Code
-- The canonical accessible document is the source of truth for exports and validations.
-- **core/** has zero dependencies on any interface-specific library (no aiogram, no FastAPI).
-- Each interface in **interfaces/** imports only from **core/**, never from another interface.
-- `ENABLED_INTERFACES` environment variable controls which front-ends start at runtime.
-- Output formats are rendered from the canonical document through deterministic format-specific renderers.
-- Temporary directories, cache and history paths remain centralized in config/settings.py.
+- **Use Cases to Implementation:** [use_cases.md](use_cases.md)
+- **Design & Evolution Patterns:** [patterns.md](patterns.md)
+- **Test Strategy & Coverage:** [../tests/README.md](../tests/README.md)

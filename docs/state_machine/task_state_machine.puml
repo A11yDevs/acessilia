@@ -1,5 +1,7 @@
-@startuml
+@startuml task_state_machine
 skinparam shadowing false
+
+title Máquina de Estados de Tarefas — Acessília
 
 [*] --> processing : criar_tarefa()
 
@@ -12,17 +14,24 @@ done --> [*]
 cancelled --> [*]
 
 note right of processing
-Relevant fields:
-- progresso
-- etapa_atual
-- erros
-- resultado
-- inicio/fim
+  <b>Campos Relevantes:</b>
+  - progresso (0-100%)
+  - etapa_atual (Reader, Vision/Data, Editor)
+  - erros / falhas
+  - resultado (Documento Canônico)
+  - inicio / fim
 end note
 
 note right of cancelled
-Cooperative cancellation
-via verificar_cancelamento()
+  Cancelamento cooperativo via
+  verificar_cancelamento()
+end note
+
+note bottom of processing
+  <b>Roteamento & Estado:</b>
+  O Estado gerencia o ciclo de vida dos 4 Agentes.
+  No futuro Orquestrador Dinâmico, registrará também
+  o histórico de transições de modelos (Ollama <-> OpenRouter).
 end note
 
 @enduml
