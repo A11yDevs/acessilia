@@ -9,6 +9,11 @@ from uuid import uuid4
 from backend.pipeline.sanitizer import sanitize_block_text
 from backend.pipeline.sanitizer import sanitize_text
 from backend.pipeline.structure_parser import parse_text_to_blocks
+from backend.tools.formula_tools import (
+    latex_to_mathml,
+    normalize_latex,
+    verbalize_latex_fallback,
+)
 
 
 def build_canonical_document(
@@ -32,6 +37,7 @@ def build_canonical_document(
     parsed_blocks = _parse_structured_blocks(source_payload, cleaned)
     inferred_title = _infer_title(parsed_blocks).strip()
     sections = _build_sections(parsed_blocks)
+    _enrich_math_blocks(sections)
     technical_warnings_list = list(technical_warnings or [])
     if not sections and _is_non_textual_structured_payload(source_payload, cleaned):
         sections = _build_minimal_non_textual_sections(title=title)
@@ -70,6 +76,22 @@ def build_canonical_document(
         },
         "sections": sections,
     }
+
+
+def _enrich_math_blocks(sections: list[dict[str, Any]]) -> None:
+    """Normaliza LaTeX e adiciona MathML + verbalização acessível aos blocos math."""
+    for section in sections:
+        for block in section.get("blocks", []):
+            if block.get("type") != "math":
+                continue
+            latex = normalize_latex(block.get("text", ""))
+            block["text"] = latex
+            mathml = latex_to_mathml(latex)
+            if mathml:
+                block.setdefault("metadata", {})["mathml"] = mathml
+            if not block.get("alt_text"):
+                block["alt_text"] = verbalize_latex_fallback(latex)
+        _enrich_math_blocks(section.get("children", []))
 
 
 def _is_non_textual_structured_payload(

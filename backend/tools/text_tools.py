@@ -2,6 +2,9 @@
 from backend.tools.code_tools import normalize_code_text
 from backend.tools.region_extractor import Region
 
+# Sentinela devolvido pelo VisionAgent quando a imagem é uma fórmula matemática
+FORMULA_SENTINEL = "[FORMULA]"
+
 REGION_MARKERS = {
     "code_block": ("Início de código-fonte:", "Fim de código-fonte"),
     "list_block": ("Início de lista:", "Fim de lista"),

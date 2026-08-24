@@ -68,6 +68,18 @@ class Settings:
     )
     pymupdf_text_threshold: int = int(os.getenv("PYMUPDF_TEXT_THRESHOLD", "100"))
     structurer: str = os.getenv("STRUCTURER", "docling")
+    docling_formula_enrichment: bool = field(
+        default_factory=lambda: _bool_from_env_alias(
+            ("DOCLING_FORMULA_ENRICHMENT",),
+            True,
+        )
+    )
+    formula_image_cascade: bool = field(
+        default_factory=lambda: _bool_from_env_alias(
+            ("FORMULA_IMAGE_CASCADE",),
+            True,
+        )
+    )
     pipeline_engine: str = os.getenv("PIPELINE_ENGINE", "legacy")
     pddl_execute_dry_run: bool = field(
         default_factory=lambda: _bool_from_env_alias(

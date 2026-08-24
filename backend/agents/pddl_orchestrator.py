@@ -20,7 +20,87 @@ from backend.core.planning.planner_agent import PlannerAgent
 
 from backend.agents.vision_agent import VisionAgent
 from backend.tools.code_tools import normalize_code_text
+from backend.tools.formula_tools import (
+    latex_to_mathml,
+    normalize_latex,
+    verbalize_latex_fallback,
+)
 from backend.tools.logger import logger
+
+
+def _formula_elements_for_obligation(
+    manifest: ProcessingManifest, obligation_id: str
+) -> list[ManifestElement]:
+    obligation = next(
+        (o for o in manifest.obligations if o.id == obligation_id), None
+    )
+    if obligation is None:
+        return []
+    targets = set(obligation.target_ids)
+    return [
+        el for el in manifest.elements if el.id in targets and el.type == "formula"
+    ]
+
+
+def _handle_mathml_method(
+    manifest: ProcessingManifest, obligation_id: str
+) -> MethodResult:
+    """Converte o LaTeX das fórmulas alvo em MathML (metadata.mathml)."""
+    elements = _formula_elements_for_obligation(manifest, obligation_id)
+    if not elements:
+        return MethodResult(
+            success=False,
+            validated=False,
+            message="Nenhuma fórmula encontrada para a obrigação",
+        )
+    converted = 0
+    for element in elements:
+        mathml = latex_to_mathml(element.text or "")
+        if mathml:
+            element.metadata["mathml"] = mathml
+            converted += 1
+    if converted == len(elements):
+        return MethodResult(
+            success=True,
+            validated=True,
+            message=f"MathML gerado para {converted} fórmula(s)",
+        )
+    return MethodResult(
+        success=False,
+        validated=False,
+        message=f"MathML gerado para {converted}/{len(elements)} fórmula(s)",
+    )
+
+
+def _handle_latex_verbalizer_method(
+    manifest: ProcessingManifest, obligation_id: str
+) -> MethodResult:
+    """Gera verbalização pt-BR determinística das fórmulas (metadata.verbalization)."""
+    elements = _formula_elements_for_obligation(manifest, obligation_id)
+    if not elements:
+        return MethodResult(
+            success=False,
+            validated=False,
+            message="Nenhuma fórmula encontrada para a obrigação",
+        )
+    verbalized = 0
+    for element in elements:
+        latex = normalize_latex(element.text or "")
+        spoken = verbalize_latex_fallback(latex) if latex else ""
+        if spoken:
+            element.metadata["verbalization"] = spoken
+            verbalized += 1
+    if verbalized == len(elements):
+        return MethodResult(
+            success=True,
+            validated=True,
+            message=f"Verbalização gerada para {verbalized} fórmula(s)",
+        )
+    return MethodResult(
+        success=False,
+        validated=False,
+        message=f"Verbalização gerada para {verbalized}/{len(elements)} fórmula(s)",
+    )
 
 
 class PddlAccessibilityOrchestrator:
@@ -81,6 +161,9 @@ class PddlAccessibilityOrchestrator:
             "human-review",
         ):
             registry.register(method, _noop_handler)
+
+        registry.register("mathml", _handle_mathml_method)
+        registry.register("latex-verbalizer", _handle_latex_verbalizer_method)
 
         return ExecutorAgent(registry, domain=DomainBundle.load())
 
