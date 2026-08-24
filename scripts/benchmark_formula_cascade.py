@@ -48,6 +48,16 @@ REMOTE_IMAGES = [
         "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Python-logo-notext.svg/250px-Python-logo-notext.svg.png",
         False,
     ),
+    (
+        "circuito_eletronico",
+        "https://commons.wikimedia.org/wiki/Special:FilePath/Circuit_diagram_6.jpg",
+        False,
+    ),
+    (
+        "partitura_musical",
+        "https://commons.wikimedia.org/wiki/Special:FilePath/Alcina_-_Beginn_der_Arie_%22Verdi_prati%22.png",
+        False,
+    ),
 ]
 
 
