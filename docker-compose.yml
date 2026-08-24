@@ -129,6 +129,10 @@ services:
       PUBLIC_PROMETHEUS_URL: http://localhost:9090
       PUBLIC_LOKI_URL: http://localhost:3100
       PUBLIC_LANGFUSE_URL: http://localhost:3001
+      AGNO_OS_URL: ${AGNO_OS_URL:-http://host.docker.internal:7777}
+      AGNO_OS_SECURITY_KEY: ${AGNO_OS_SECURITY_KEY:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - acessilia
       - prometheus

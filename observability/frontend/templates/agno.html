@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Acessília Console Agno</title>
+    <script>
+      if (window.location.protocol === "file:") {
+        window.location.replace("http://localhost:8010/agno");
+      }
+    </script>
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body>
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Acessília</p>
+        <h1>Console Agno</h1>
+        <p class="lede">Converse diretamente com agentes detectados pelo AgentOS, sem passar pela pipeline completa.</p>
+      </div>
+      <div class="hero-actions">
+        <a href="/">Observabilidade</a>
+        <a href="{{ links.langfuse }}" target="_blank" rel="noreferrer">Langfuse</a>
+        <a href="{{ links.grafana }}" target="_blank" rel="noreferrer">Grafana</a>
+      </div>
+    </header>
+
+    <main class="shell agno-shell" data-agno-endpoint="{{ agno_endpoint }}">
+      <section class="stack-status" aria-label="Status do AgentOS">
+        <div class="status-heading">
+          <div>
+            <span class="eyebrow-mini">AgentOS</span>
+            <strong>Conexão com entidades Agno</strong>
+          </div>
+          <div class="updated" id="agno-updated-at">Atualizando...</div>
+        </div>
+        <div class="status-grid agno-status-grid">
+          <div class="status-card" id="agno-status-card">
+            <span class="status-dot"></span>
+            <div>
+              <strong>AgentOS</strong>
+              <small class="status-state">verificando...</small>
+            </div>
+          </div>
+          <div class="status-card passive">
+            <span class="status-dot"></span>
+            <div>
+              <strong>Endpoint</strong>
+              <small>{{ agno_endpoint }}</small>
+            </div>
+          </div>
+          <div class="status-card passive">
+            <span class="status-dot"></span>
+            <div>
+              <strong>Agentes</strong>
+              <small id="agno-agent-count">aguardando...</small>
+            </div>
+          </div>
+          <div class="status-card passive">
+            <span class="status-dot"></span>
+            <div>
+              <strong>Próximas entidades</strong>
+              <small>workflows e step functions</small>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="agno-console">
+        <aside class="card agno-sidebar">
+          <div class="card-heading">
+            <div>
+              <p class="eyebrow-mini">Descoberta automática</p>
+              <h2>Entidades</h2>
+            </div>
+            <button class="ghost-button" id="agno-refresh" type="button">Atualizar</button>
+          </div>
+          <p class="muted">A lista vem de <code>/agents</code> e <code>/teams</code> do AgentOS configurado.</p>
+          <div class="entity-group">
+            <h3>Agentes</h3>
+            <div class="entity-list" id="agno-agent-list"></div>
+          </div>
+          <div class="entity-group">
+            <h3>Times</h3>
+            <div class="entity-list" id="agno-team-list"></div>
+          </div>
+          <div class="entity-group entity-group-muted">
+            <h3>Em preparação</h3>
+            <div class="entity-placeholder">Workflows e step functions entram na próxima etapa.</div>
+          </div>
+        </aside>
+
+        <section class="card agno-chat-card">
+          <div class="card-heading agno-chat-heading">
+            <div>
+              <p class="eyebrow-mini">Chat direto</p>
+              <h2 id="agno-selected-title">Selecione um agente</h2>
+            </div>
+            <span class="polling-pill" id="agno-session-pill">Sem sessão</span>
+          </div>
+          <p class="muted" id="agno-selected-details">As respostas passam pelo proxy local do painel para evitar CORS e preparar coleta de métricas por conversa.</p>
+          <div class="agno-chat" id="agno-chat-log" aria-live="polite">
+            <div class="agno-empty">
+              <h3>Escolha um agente para começar</h3>
+              <p>Quando o AgentOS estiver ativo, os agentes aparecem automaticamente na lateral. A conversa aqui não dispara a pipeline completa.</p>
+            </div>
+          </div>
+          <form class="agno-input" id="agno-chat-form">
+            <textarea id="agno-message" rows="3" placeholder="Envie uma mensagem direta para o agente selecionado" disabled></textarea>
+            <button type="submit" disabled>Enviar</button>
+          </form>
+        </section>
+
+        <aside class="card agno-inspector">
+          <div class="card-heading">
+            <div>
+              <p class="eyebrow-mini">Preparado para métricas</p>
+              <h2>Execução</h2>
+            </div>
+          </div>
+          <dl class="facts agno-run-facts" id="agno-run-facts"></dl>
+          <div class="event-list" id="agno-event-list"></div>
+        </aside>
+      </section>
+    </main>
+
+    <script src="/static/agno.js"></script>
+  </body>
+</html>

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import httpx
+import respx
 from fastapi.testclient import TestClient
 
 from observability.frontend.app import create_app
@@ -66,6 +68,111 @@ def test_frontend_index_renders(monkeypatch, tmp_path):
     assert "Pipeline em tempo real" in response.text
     assert "LLM em tempo real" in response.text
     assert "Tokens, TTFT e custo" in response.text
+    assert "Console Agno" in response.text
+
+
+def test_agno_console_renders(monkeypatch, tmp_path):
+    monkeypatch.setenv("OBSERVABILITY_DB_PATH", str(tmp_path / "agno.db"))
+    monkeypatch.setenv("AGNO_OS_URL", "http://agent-os.local")
+    app = create_app()
+    client = TestClient(app)
+
+    response = client.get("/agno")
+
+    assert response.status_code == 200
+    assert "Acessília Console Agno" in response.text
+    assert "Descoberta automática" in response.text
+    assert "Chat direto" in response.text
+    assert "http://agent-os.local" in response.text
+
+
+def test_agno_entities_degrades_when_agentos_is_down(monkeypatch, tmp_path):
+    monkeypatch.setenv("OBSERVABILITY_DB_PATH", str(tmp_path / "agno-down.db"))
+    monkeypatch.setenv("AGNO_OS_URL", "http://127.0.0.1:9")
+    app = create_app()
+    client = TestClient(app)
+
+    response = client.get("/api/agno/entities")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"]["available"] is False
+    assert payload["entities"]["agents"] == []
+    assert payload["entities"]["teams"] == []
+    assert payload["capabilities"]["workflows"] is False
+
+
+def test_agno_entities_reads_agents_and_teams(monkeypatch, tmp_path):
+    monkeypatch.setenv("OBSERVABILITY_DB_PATH", str(tmp_path / "agno-ok.db"))
+    monkeypatch.setenv("AGNO_OS_URL", "http://agent-os.test")
+    app = create_app()
+    client = TestClient(app)
+
+    with respx.mock:
+        respx.get("http://agent-os.test/health").mock(
+            return_value=httpx.Response(200, json={"status": "ok"})
+        )
+        respx.get("http://agent-os.test/agents").mock(
+            return_value=httpx.Response(
+                200,
+                json=[
+                    {
+                        "id": "vision",
+                        "name": "Vision Agent",
+                        "db_id": "db-vision",
+                        "model": {"provider": "openai", "model": "gpt-test"},
+                    }
+                ],
+            )
+        )
+        respx.get("http://agent-os.test/teams").mock(
+            return_value=httpx.Response(
+                200,
+                json=[{"id": "review", "name": "Review Team"}],
+            )
+        )
+
+        response = client.get("/api/agno/entities")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"]["available"] is True
+    assert payload["entities"]["agents"][0]["id"] == "vision"
+    assert payload["entities"]["agents"][0]["model"]["model"] == "gpt-test"
+    assert payload["entities"]["teams"][0]["id"] == "review"
+
+
+def test_agno_run_proxies_agent_stream(monkeypatch, tmp_path):
+    monkeypatch.setenv("OBSERVABILITY_DB_PATH", str(tmp_path / "agno-run.db"))
+    monkeypatch.setenv("AGNO_OS_URL", "http://agent-os.test")
+    app = create_app()
+    client = TestClient(app)
+
+    with respx.mock:
+        route = respx.post("http://agent-os.test/agents/vision/runs").mock(
+            return_value=httpx.Response(
+                200,
+                content=(
+                    b'{"event":"RunStarted","session_id":"s1","created_at":1}'
+                    b'{"event":"RunContent","content":"ok","created_at":2}'
+                ),
+            )
+        )
+
+        response = client.post(
+            "/api/agno/runs",
+            json={
+                "entity_type": "agent",
+                "entity_id": "vision",
+                "message": "teste",
+                "session_id": "",
+            },
+        )
+
+    assert response.status_code == 200
+    assert route.called
+    assert '"RunStarted"' in response.text
+    assert '"RunContent"' in response.text
 
 
 def test_snapshot_degrades_when_stack_is_down(monkeypatch, tmp_path):

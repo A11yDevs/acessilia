@@ -1,6 +1,6 @@
 # Observabilidade
 
-A observabilidade do Acessilia e opt-in. A aplicacao continua leve no uso normal e nao sobe Prometheus, Grafana, Loki, Alloy, Langfuse nem o painel proprio quando o Docker e iniciado sem o profile de monitoramento.
+A observabilidade do Acessilia é opt-in. A aplicacao continua leve no uso normal e nao sobe Prometheus, Grafana, Loki, Alloy, Langfuse nem o painel proprio quando o Docker e iniciado sem o profile de monitoramento.
 
 Para ligar a stack completa, duas coisas precisam estar ativas:
 
@@ -35,6 +35,7 @@ Quando `OBSERVABILITY_ENABLED=true`, essas tres flags herdam `true` se nao estiv
 | Loki | http://localhost:3100 | Logs brutos |
 | Langfuse | http://localhost:3001 | Traces de LLM, prompts, respostas, tokens e latencia |
 | API | http://localhost:8000 | Aplicacao principal e endpoint `/metrics` |
+| Console Agno | http://localhost:8010/agno | Chat direto com agentes detectados pelo AgentOS |
 
 Essas portas sao para uso local. Nao exponha Grafana, Prometheus, Loki ou Langfuse publicamente sem autenticacao e rede adequada.
 
@@ -82,6 +83,34 @@ O painel em http://localhost:8010 centraliza os dados mais importantes para revi
 | Anotacoes | notas locais de revisao, incidente, teste ou acompanhamento de PR |
 
 As anotacoes ficam em `observability/data/observability.db`. Esse banco pertence ao painel de observabilidade e nao interfere nos bancos principais da aplicacao. O arquivo `.db` nao deve ser versionado.
+
+## Console Agno
+
+O Console Agno fica em http://localhost:8010/agno e permite conversar diretamente com agentes detectados pelo AgentOS, sem passar pela pipeline completa.
+
+Configuracao local:
+
+```dotenv
+AGNO_OS_URL=http://host.docker.internal:7777
+AGNO_OS_SECURITY_KEY=
+```
+
+Esse valor atende o caso comum de painel no Docker e AgentOS rodando no host. Se o painel estiver rodando fora do Docker, use `AGNO_OS_URL=http://localhost:7777`. Se o AgentOS estiver em outro container ou em outra maquina, ajuste `AGNO_OS_URL` no `.env`.
+
+O painel usa `AGNO_OS_URL` para consultar `/health`, `/agents` e `/teams`. Quando `AGNO_OS_SECURITY_KEY` estiver preenchido, o proxy local envia `Authorization: Bearer ...` para o AgentOS.
+
+Nesta etapa, o console:
+
+| Recurso | Estado |
+|---------|--------|
+| Descoberta de agentes | ativo |
+| Descoberta de times | ativo |
+| Chat direto com agente | ativo |
+| Chat direto com time | ativo |
+| Workflows | preparado na interface, ainda sem execucao |
+| Step functions | preparado na interface, ainda sem execucao |
+
+As chamadas passam pelo backend do painel para evitar problema de CORS e deixar pronto o ponto unico de coleta de metricas por conversa.
 
 ## Atualizacao em tempo real
 

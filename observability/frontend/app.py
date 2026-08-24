@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import time
 from datetime import datetime, timezone
@@ -10,11 +11,12 @@ from typing import Any
 import httpx
 import uvicorn
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
+from observability.frontend.agno_client import AgnoClient
 from observability.frontend.store import (
     DEFAULT_DB_PATH,
     create_annotation,
@@ -207,6 +209,13 @@ class AnnotationPayload(BaseModel):
     tags: str = Field(default="", max_length=240)
 
 
+class AgnoRunPayload(BaseModel):
+    entity_type: str = Field(pattern="^(agent|team)$")
+    entity_id: str = Field(min_length=1, max_length=200)
+    message: str = Field(min_length=1, max_length=12000)
+    session_id: str = Field(default="", max_length=200)
+
+
 def create_app() -> FastAPI:
     app = FastAPI(title="Acessilia Observability", version="1.0.0")
     app.mount(
@@ -219,6 +228,8 @@ def create_app() -> FastAPI:
     app.state.prometheus_url = _env_url("PROMETHEUS_URL", "http://localhost:9090")
     app.state.loki_url = _env_url("LOKI_URL", "http://localhost:3100")
     app.state.langfuse_url = _env_url("LANGFUSE_URL", "http://localhost:3001")
+    app.state.agno_os_url = _env_url("AGNO_OS_URL", "http://localhost:7777")
+    app.state.agno_os_security_key = os.getenv("AGNO_OS_SECURITY_KEY", "").strip()
     app.state.db_path = Path(
         os.getenv("OBSERVABILITY_DB_PATH", str(DEFAULT_DB_PATH))
     ).expanduser()
@@ -228,6 +239,7 @@ def create_app() -> FastAPI:
         "prometheus": _env_url("PUBLIC_PROMETHEUS_URL", "http://localhost:9090"),
         "loki": _env_url("PUBLIC_LOKI_URL", "http://localhost:3100"),
         "langfuse": _env_url("PUBLIC_LANGFUSE_URL", "http://localhost:3001"),
+        "agno": "/agno",
     }
 
     @app.get("/", response_class=HTMLResponse)
@@ -237,6 +249,77 @@ def create_app() -> FastAPI:
             "index.html",
             {"links": app.state.public_links},
         )
+
+    @app.get("/agno", response_class=HTMLResponse)
+    async def agno_console(request: Request) -> HTMLResponse:
+        return TEMPLATES.TemplateResponse(
+            request,
+            "agno.html",
+            {
+                "links": app.state.public_links,
+                "agno_endpoint": app.state.agno_os_url,
+            },
+        )
+
+    @app.get("/api/agno/status")
+    async def agno_status() -> dict[str, Any]:
+        timeout = httpx.Timeout(5.0, connect=2.0)
+        agno = AgnoClient(
+            app.state.agno_os_url,
+            app.state.agno_os_security_key,
+        )
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            return await agno.health(client)
+
+    @app.get("/api/agno/entities")
+    async def agno_entities() -> dict[str, Any]:
+        timeout = httpx.Timeout(8.0, connect=2.0)
+        agno = AgnoClient(
+            app.state.agno_os_url,
+            app.state.agno_os_security_key,
+        )
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            status, entities = await asyncio.gather(
+                agno.health(client),
+                agno.entities(client),
+            )
+        return {
+            "endpoint": app.state.agno_os_url,
+            "status": status,
+            "entities": entities,
+            "capabilities": {
+                "agents": True,
+                "teams": True,
+                "workflows": False,
+                "step_functions": False,
+            },
+        }
+
+    @app.post("/api/agno/runs")
+    async def agno_run(payload: AgnoRunPayload) -> StreamingResponse:
+        agno = AgnoClient(
+            app.state.agno_os_url,
+            app.state.agno_os_security_key,
+        )
+
+        async def stream() -> Any:
+            try:
+                async for chunk in agno.stream_run(
+                    entity_type=payload.entity_type,
+                    entity_id=payload.entity_id,
+                    message=payload.message,
+                    session_id=payload.session_id,
+                ):
+                    yield chunk
+            except Exception as exc:
+                error = {
+                    "event": "RunError",
+                    "content": str(exc),
+                    "created_at": int(time.time()),
+                }
+                yield json.dumps(error).encode("utf-8")
+
+        return StreamingResponse(stream(), media_type="application/json")
 
     @app.get("/api/snapshot")
     async def snapshot() -> dict[str, Any]:
