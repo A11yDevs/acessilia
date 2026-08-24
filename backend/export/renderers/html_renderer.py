@@ -152,7 +152,14 @@ def _render_block(block: dict[str, Any], profile: dict[str, Any]) -> str:
         )
         return f'<figure id="{block_id}"><img alt="{alt}" src="{escape(block.get("metadata", {}).get("src", ""))}">{details}</figure>'
     if block_type == "math":
-        return f'<p id="{block_id}"><math>{escape(block.get("text", ""))}</math></p>'
+        alt = escape(block.get("alt_text", ""))
+        mathml = (block.get("metadata") or {}).get("mathml", "")
+        if mathml:
+            return f'<div id="{block_id}" role="math" aria-label="{alt}">{mathml}</div>'
+        return (
+            f'<p id="{block_id}" role="math" aria-label="{alt}">'
+            f'{escape(block.get("text", ""))}</p>'
+        )
     if block_type in {"details", "note", "warning", "quote"}:
         summary = escape(block.get("title", block_type.title()))
         content = escape(block.get("text", ""))

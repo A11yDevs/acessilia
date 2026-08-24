@@ -4,7 +4,8 @@ from backend.tools.region_classifier import region_has_markers
 from backend.tools.logger import logger
 
 from backend.agents.types import RegionTask
-from backend.tools.text_tools import apply_marker, content_fingerprint
+from backend.tools.formula_tools import ensure_math_delimiters
+from backend.tools.text_tools import FORMULA_SENTINEL, apply_marker, content_fingerprint
 
 
 class EditorAgent:
@@ -36,8 +37,16 @@ class EditorAgent:
                 continue
             content_fingerprints.add(fp)
 
+            # Imagem identificada pela visao como formula → mantem so o LaTeX
+            if task.agent_target != "editor" and text.startswith(FORMULA_SENTINEL):
+                text = ensure_math_delimiters(text[len(FORMULA_SENTINEL):].strip())
+                if not text:
+                    continue
+            # Resultado de fórmula do DataAgent → delimita p/ virar bloco math
+            elif task.agent_target == "data" and task.classification == "formula":
+                text = ensure_math_delimiters(text)
             # Aplica marcadores se necessário (para resultados de visão/dados)
-            if task.agent_target != "editor" and region_has_markers(task.classification):
+            elif task.agent_target != "editor" and region_has_markers(task.classification):
                 if task.region is not None:
                     text = apply_marker(text, task.classification, task.region)
 

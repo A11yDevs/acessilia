@@ -48,7 +48,7 @@ def _render_block(block: dict[str, Any]) -> list[str]:
     if block_type == "image":
         return [block.get("alt_text") or block.get("text", "")]
     if block_type == "math":
-        return [block.get("text", "")]
+        return [block.get("alt_text") or f"Fórmula: {block.get('text', '')}"]
     if block_type in {"details", "note", "warning", "quote"}:
         return [block.get("text", "")]
     return [block.get("text", "")]
