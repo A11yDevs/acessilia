@@ -16,6 +16,7 @@ from backend.log_messages import (
 )
 from backend.tools.region_classifier import (
     classify_region,
+    formula_already_extracted,
     region_has_markers,
     region_needs_vision,
 )
@@ -24,6 +25,10 @@ from backend.tools.logger import logger
 from backend.tools.pdf_splitter import split_pdf
 
 from backend.agents.types import RegionTask
+from backend.tools.formula_tools import (
+    ensure_math_delimiters,
+    try_extract_formula_locally,
+)
 from backend.tools.text_tools import apply_marker, content_fingerprint, overlaps_clean
 from backend.tools.image_tools import crop_region_image, prepare_image_bytes, render_full_page
 from backend.tools.structurer import get_structurer as get_structurer_instance
@@ -209,6 +214,26 @@ class ReaderAgent:
                     clean_bboxes.append(region.bbox)
                 continue
 
+            # Formula with LaTeX already extracted by Docling (CodeFormula) → editor directly
+            if classification == "formula" and formula_already_extracted(region):
+                latex = ensure_math_delimiters(region.text)
+                fp = content_fingerprint(latex)
+                if fp not in content_fingerprints:
+                    content_fingerprints.add(fp)
+                    logger.info(
+                        "[pag {}] Formula ja enriquecida pelo Docling (sem LLM)",
+                        page_num,
+                    )
+                    tasks.append(RegionTask(
+                        agent_target="editor",
+                        classification=classification,
+                        text=latex,
+                        region=region,
+                        page_num=page_num,
+                    ))
+                    clean_bboxes.append(region.bbox)
+                continue
+
             # Regions that need a vision pass
             if region_needs_vision(classification):
                 if classification in ("unknown", "text_scanned") and overlaps_clean(
@@ -233,6 +258,33 @@ class ReaderAgent:
                 image_bytes = crop_region_image(
                     self.structurer, page_path, region,
                 )
+
+                # Local cascade: image that is actually a formula → OCR + CodeFormula
+                if (
+                    classification == "embedded_image"
+                    and settings.formula_image_cascade
+                ):
+                    latex = try_extract_formula_locally(image_bytes)
+                    if latex:
+                        latex = ensure_math_delimiters(latex)
+                        vision_count -= 1
+                        fp = content_fingerprint(latex)
+                        if fp in content_fingerprints:
+                            continue
+                        content_fingerprints.add(fp)
+                        logger.info(
+                            "[pag {}] Imagem identificada como formula pela "
+                            "cascata local (sem LLM)",
+                            page_num,
+                        )
+                        tasks.append(RegionTask(
+                            agent_target="editor",
+                            classification="formula",
+                            text=latex,
+                            region=region,
+                            page_num=page_num,
+                        ))
+                        continue
 
                 # Decide which agent will process the task
                 if classification in ("table",):
