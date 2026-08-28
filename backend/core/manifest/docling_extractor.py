@@ -58,35 +58,6 @@ class DoclingManifestExtractor:
             },
         )
 
-    def _create_converter(self) -> Any:
-        from backend.tools.structurer import DOCLING_AVAILABLE
-
-        if not DOCLING_AVAILABLE:
-            raise RuntimeError(
-                "Docling não está instalado. Execute `poetry install` ou "
-                "`pip install docling`."
-            )
-
-        from docling.datamodel.base_models import InputFormat
-        from docling.datamodel.pipeline_options import (
-            PdfPipelineOptions,
-            RapidOcrOptions,
-        )
-        from docling.document_converter import DocumentConverter, PdfFormatOption
-
-        pdf_options = PdfPipelineOptions()
-        pdf_options.do_ocr = self.enable_ocr
-        pdf_options.do_table_structure = True
-        pdf_options.ocr_options = RapidOcrOptions(backend="torch")
-        # Algumas versões do Docling não expõem este campo; manter compatibilidade.
-        if hasattr(pdf_options, "enable_remote_services"):
-            pdf_options.enable_remote_services = False
-        return DocumentConverter(
-            format_options={
-                InputFormat.PDF: PdfFormatOption(pipeline_options=pdf_options),
-            }
-        )
-
     def _build_structurer(self) -> Any:
         from backend.tools.structurer import DOCLING_AVAILABLE, DoclingStructurer
 
@@ -96,7 +67,7 @@ class DoclingManifestExtractor:
                 "`pip install docling`."
             )
 
-        return DoclingStructurer()
+        return DoclingStructurer(enable_ocr=self.enable_ocr)
 
     @staticmethod
     def _convert_document(structurer: Any, source_path: Path) -> Any:

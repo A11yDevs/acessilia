@@ -54,9 +54,10 @@ class PyMuPDFStructurer(BaseStructurer):
 
 
 class DoclingStructurer(BaseStructurer):
-    def __init__(self) -> None:
+    def __init__(self, enable_ocr: bool = True) -> None:
         self._converter: Any = None
         self._doc_cache: dict[str, Any] = {}
+        self.enable_ocr = enable_ocr
 
     def _get_converter(self) -> Any:
         if self._converter is None:
@@ -71,6 +72,7 @@ class DoclingStructurer(BaseStructurer):
 
             _hydrate_rapidocr_models()
             pipeline_options = PdfPipelineOptions()
+            pipeline_options.do_ocr = self.enable_ocr
             pipeline_options.ocr_options = RapidOcrOptions(backend="torch")
             self._converter = DocumentConverter(
                 format_options={
