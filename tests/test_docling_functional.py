@@ -32,3 +32,35 @@ def test_docling_converts_real_pdf_with_cpu_only_torch() -> None:
         "remote_services": False,
     }
     assert extraction.document.export_to_markdown().strip()
+
+
+@pytest.mark.docling
+def test_docling_respects_enable_ocr_flag() -> None:
+    """Verifica que enable_ocr é propagado para o structurer e pipeline_options."""
+    from backend.core.manifest.docling_extractor import DoclingManifestExtractor
+    from backend.tools.structurer import DoclingStructurer
+
+    # Cria structurer manualmente para inspecionar o flag
+    structurer = DoclingStructurer(enable_ocr=False)
+    assert structurer.enable_ocr is False
+
+    structurer_with_ocr = DoclingStructurer(enable_ocr=True)
+    assert structurer_with_ocr.enable_ocr is True
+
+    # Verifica que o flag é propagado via _build_structurer
+    extractor = DoclingManifestExtractor(enable_ocr=False)
+    built = extractor._build_structurer()
+    assert built.enable_ocr is False
+
+    extractor_with_ocr = DoclingManifestExtractor(enable_ocr=True)
+    built_with_ocr = extractor_with_ocr._build_structurer()
+    assert built_with_ocr.enable_ocr is True
+
+
+@pytest.mark.docling
+def test_docling_removed_create_converter() -> None:
+    """Verifica que _create_converter foi removido (código morto)."""
+    from backend.core.manifest.docling_extractor import DoclingManifestExtractor
+
+    extractor = DoclingManifestExtractor(enable_ocr=True)
+    assert not hasattr(extractor, "_create_converter")
