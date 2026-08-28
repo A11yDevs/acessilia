@@ -203,6 +203,22 @@ vMAJOR.MINOR.PATCH
 7. **Testes obrigatórios** — toda `feat` ou `fix` deve incluir ou atualizar testes.
 8. **Rodar `pytest` antes do push** — garantir que nada está quebrado.
 
+## Rulesets (proteção de branches)
+
+O repositório utiliza **GitHub Rulesets** para proteger a branch `main` contra deleção, force-push e merges sem revisão. Rulesets são configurados **via API REST**, não por arquivos no repositório.
+
+O arquivo `.github/rulesets/main.json.example` contém o modelo da configuração atual. Para aplicar ou atualizar os rulesets, execute:
+
+```bash
+# Aplica/atualiza os rulesets via GitHub API
+./scripts/setup-rulesets.sh
+
+# Apenas visualiza o payload sem modificar nada
+DRY_RUN=1 ./scripts/setup-rulesets.sh
+```
+
+> **Importante:** O ruleset permite bypass para administradores do repositório (`RepositoryRole`), para que mantenedores possam gerenciar a branch sem bloqueios.
+
 ## Setup do ambiente
 
 ```bash
