@@ -10,7 +10,7 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 concurrency:
@@ -65,6 +65,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=main${{ matrix.tag_suffix }}
+            type=raw,value=latest${{ matrix.tag_suffix }}
             type=sha,prefix=sha-,suffix=${{ matrix.tag_suffix }},format=long
           labels: |
             org.opencontainers.image.title=acessilia
@@ -188,3 +189,65 @@ jobs:
         env:
           DIGEST: ${{ steps.publish.outputs.digest }}
         run: echo "${REGISTRY}/${IMAGE_NAME}@${DIGEST}"
+
+      - name: Tag image with version (docling only)
+        if: matrix.variant == 'docling'
+        env:
+          DIGEST: ${{ steps.publish.outputs.digest }}
+        run: |
+          VERSION="v$(grep -m1 '^version = ' pyproject.toml | cut -d'"' -f2)"
+          echo "Tagging ${DIGEST} as ${VERSION}"
+          docker buildx imagetools create \
+            --tag "${REGISTRY}/${IMAGE_NAME}:${VERSION}" \
+            "${REGISTRY}/${IMAGE_NAME}@${DIGEST}"
+
+      - name: Tag slim image with version
+        if: matrix.variant == 'slim'
+        env:
+          DIGEST: ${{ steps.publish.outputs.digest }}
+        run: |
+          VERSION="v$(grep -m1 '^version = ' pyproject.toml | cut -d'"' -f2)"
+          echo "Tagging ${DIGEST} as ${VERSION}-slim"
+          docker buildx imagetools create \
+            --tag "${REGISTRY}/${IMAGE_NAME}:${VERSION}-slim" \
+            "${REGISTRY}/${IMAGE_NAME}@${DIGEST}"
+
+  release:
+    name: create GitHub Release
+    needs: publish
+    if: ${{ always() && github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out tested commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      - name: Extract version from pyproject.toml
+        id: version
+        run: |
+          VERSION="v$(grep -m1 '^version = ' pyproject.toml | cut -d'"' -f2)"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Version: ${VERSION}"
+
+      - name: Create git tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ steps.version.outputs.version }}" \
+            -m "Release ${{ steps.version.outputs.version }}" \
+            ${{ github.event.workflow_run.head_sha }}
+          git push origin "${{ steps.version.outputs.version }}"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.version.outputs.version }}" \
+            --repo "${{ github.repository }}" \
+            --title "${{ steps.version.outputs.version }}" \
+            --generate-notes \
+            --verify-tag

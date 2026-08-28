@@ -117,11 +117,11 @@ git push origin main
 # O CI/CD fará o resto automaticamente
 ```
 
-Depois do release, mergeie a tag de volta para `develop`:
+Depois do release, mergeie `main` de volta para `develop`:
 
 ```bash
 git checkout develop
-git merge v0.2.0
+git merge main
 git push origin develop
 ```
 
