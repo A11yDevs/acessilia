@@ -15,6 +15,7 @@ from backend.services.history_service import (
 )
 from backend.config.settings import settings
 from backend.tools.logger import logger
+from backend.tools.structurer import DOCLING_AVAILABLE
 from backend.tools.text_processor import merge_broken_paragraphs
 from backend.pipeline.canonical_builder import build_canonical_document
 from backend.pipeline.verbosity_manager import verbosity_for_mode
@@ -27,8 +28,19 @@ def _normalized_engine() -> str:
     return "legacy"
 
 
+def _resolved_structurer() -> str:
+    structurer = settings.structurer.strip().lower()
+    if structurer == "docling" and not DOCLING_AVAILABLE:
+        logger.warning(
+            "STRUCTURER=docling mas docling nao instalado. Usando PyMuPDF."
+        )
+        return "pymupdf"
+    return structurer
+
+
 def _build_orchestrator():
     if _normalized_engine() == "pddl":
+        structurer = _resolved_structurer()
         fast_downward = (
             Path(settings.pddl_fast_downward).expanduser()
             if settings.pddl_fast_downward.strip()
@@ -42,8 +54,8 @@ def _build_orchestrator():
             fast_downward=fast_downward,
             fast_downward_alias=alias,
             fast_downward_search=settings.pddl_fast_downward_search,
-            enable_ocr=settings.structurer.lower() == "docling",
-            extractor_backend=settings.structurer,
+            enable_ocr=structurer == "docling",
+            extractor_backend=structurer,
         )
     return AccessibilityOrchestrator()
 

@@ -3,6 +3,8 @@ services:
     build:
       context: .
       dockerfile: infra/Dockerfile
+      args:
+        WITH_DOCLING: "true"
     image: acessilia:latest
     container_name: acessilia-instance
     ports:

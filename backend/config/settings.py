@@ -67,7 +67,7 @@ class Settings:
         "a11y-devs-describer",
     )
     pymupdf_text_threshold: int = int(os.getenv("PYMUPDF_TEXT_THRESHOLD", "100"))
-    structurer: str = os.getenv("STRUCTURER", "pymupdf")
+    structurer: str = os.getenv("STRUCTURER", "docling")
     pipeline_engine: str = os.getenv("PIPELINE_ENGINE", "legacy")
     pddl_execute_dry_run: bool = field(
         default_factory=lambda: _bool_from_env_alias(

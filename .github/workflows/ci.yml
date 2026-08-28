@@ -1,0 +1,206 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  variant-tests:
+    name: tests (${{ matrix.variant }}, Python 3.11)
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ matrix.variant == 'docling' && 60 || 30 }}
+    strategy:
+      fail-fast: false
+      matrix:
+        variant:
+          - slim
+          - docling
+
+    env:
+      POETRY_VERSION: 1.8.3
+      POETRY_NO_INTERACTION: "1"
+      POETRY_VIRTUALENVS_IN_PROJECT: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+      HF_HOME: ${{ github.workspace }}/var/cache/huggingface
+      RAPIDOCR_CACHE_DIR: ${{ github.workspace }}/var/cache/rapidocr
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.11"
+
+      - name: Restore dependency cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.cache/pypoetry
+            .venv
+          key: poetry-${{ matrix.variant }}-${{ runner.os }}-py3.11-${{ hashFiles('poetry.lock') }}
+          restore-keys: |
+            poetry-${{ matrix.variant }}-${{ runner.os }}-py3.11-
+
+      - name: Restore Docling model cache
+        if: matrix.variant == 'docling'
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: var/cache
+          key: docling-models-${{ runner.os }}-py3.11-${{ hashFiles('poetry.lock') }}
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            build-essential \
+            ffmpeg \
+            fonts-dejavu-core \
+            libgl1 \
+            libglib2.0-0 \
+            libmagic1 \
+            pandoc \
+            poppler-utils \
+            tesseract-ocr \
+            texlive-xetex
+
+      - name: Install Poetry
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "poetry==${POETRY_VERSION}"
+          poetry --version
+
+      - name: Validate dependency lock
+        run: poetry check --lock
+
+      - name: Install project dependencies
+        env:
+          VARIANT: ${{ matrix.variant }}
+        run: |
+          if [ "$VARIANT" = "docling" ]; then
+            python -m pip install \
+              --index-url https://download.pytorch.org/whl/cpu \
+              "torch==2.7.1+cpu" \
+              "torchvision==0.22.1+cpu"
+            poetry export --with dev --extras docling \
+              --without-hashes --format requirements.txt \
+              --output /tmp/requirements.txt
+          else
+            poetry export --with dev \
+              --without-hashes --format requirements.txt \
+              --output /tmp/requirements.txt
+          fi
+          python scripts/filter_accelerator_requirements.py \
+            /tmp/requirements.txt /tmp/requirements-filtered.txt
+          python -m pip install --requirement /tmp/requirements-filtered.txt
+          python -m pip install --no-deps --editable .
+
+      - name: Verify variant dependencies
+        env:
+          VARIANT: ${{ matrix.variant }}
+        run: |
+          python - <<'PY'
+          import importlib.util
+          import os
+          from importlib.metadata import distributions
+
+          variant = os.environ["VARIANT"]
+          installed = {
+              distribution.metadata["Name"].lower().replace("_", "-")
+              for distribution in distributions()
+              if distribution.metadata["Name"]
+          }
+          if variant == "slim":
+              forbidden = {"docling", "rapidocr", "torch", "torchvision"}
+              unexpected = forbidden & installed
+              if unexpected:
+                  raise SystemExit(f"Pacotes inesperados na variante slim: {unexpected}")
+          else:
+              import torch
+
+              if torch.version.cuda is not None:
+                  raise SystemExit(f"Torch CUDA detectado: {torch.version.cuda}")
+              forbidden = {"triton"} & installed
+              forbidden |= {
+                  name for name in installed if name.startswith("nvidia-")
+              }
+              if forbidden:
+                  raise SystemExit(f"Aceleradores inesperados: {forbidden}")
+              if importlib.util.find_spec("docling") is None:
+                  raise SystemExit("Docling nao foi instalado")
+          print(f"Dependencias da variante {variant} validadas.")
+          PY
+
+      - name: Collect complete test suite
+        env:
+          VARIANT: ${{ matrix.variant }}
+        run: |
+          if [ "$VARIANT" = "slim" ]; then
+            python -m pytest --collect-only -q -m "not docling"
+          else
+            python -m pytest --collect-only -q
+          fi
+
+      - name: Run complete test suite
+        env:
+          VARIANT: ${{ matrix.variant }}
+        run: |
+          if [ "$VARIANT" = "slim" ]; then
+            python -m pytest -m "not docling" --junitxml=test-results.xml
+          else
+            python -m pytest --junitxml=test-results.xml
+          fi
+
+      - name: Reject unexpected skipped tests
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree
+
+          report = Path("test-results.xml")
+          root = ElementTree.parse(report).getroot()
+          skipped = sum(
+              int(suite.attrib.get("skipped", "0"))
+              for suite in root.iter("testsuite")
+          )
+          if skipped:
+              raise SystemExit(
+                  f"CI incompleto: {skipped} teste(s) foram pulado(s). "
+                  "Consulte os motivos exibidos pelo pytest."
+              )
+          print("Relatorio JUnit validado: nenhum teste foi pulado.")
+          PY
+
+  tests:
+    name: tests (Python 3.11)
+    if: always()
+    needs:
+      - variant-tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every CI variant
+        env:
+          VARIANT_RESULT: ${{ needs.variant-tests.result }}
+        run: |
+          if [ "$VARIANT_RESULT" != "success" ]; then
+            echo "Uma ou mais variantes falharam: $VARIANT_RESULT"
+            exit 1
+          fi
+          echo "As variantes slim e docling passaram."
