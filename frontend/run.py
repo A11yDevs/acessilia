@@ -61,6 +61,10 @@ def release_lock() -> None:
 async def startup():
     setup_logger()
 
+    from backend.services.database import init_db
+
+    init_db()
+
     enabled = [i.strip() for i in settings.enabled_interfaces.split(",")]
     tasks = []
 

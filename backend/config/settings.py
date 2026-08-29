@@ -2,6 +2,7 @@ import os
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.parse import quote_plus
 
 from dotenv import load_dotenv
 
@@ -123,6 +124,13 @@ class Settings:
     smtp_from: str = os.getenv("SMTP_FROM", "")
     smtp_name: str = os.getenv("SMTP_NAME", "Bot Acess")
 
+    # Database Settings (MySQL/MariaDB via SQLAlchemy)
+    db_host: str = os.getenv("DB_HOST", "")
+    db_port: int = int(os.getenv("DB_PORT", "3306"))
+    db_user: str = os.getenv("DB_USER", "")
+    db_password: str = os.getenv("DB_PASSWORD", "")
+    db_name: str = os.getenv("DB_NAME", "")
+
     def __post_init__(self) -> None:
         self.temp_dir.mkdir(parents=True, exist_ok=True)
         self.data_dir.mkdir(parents=True, exist_ok=True)
@@ -165,6 +173,22 @@ class Settings:
     @property
     def db_path(self) -> Path:
         return self.data_dir / "history.db"
+
+    @property
+    def db_backend(self) -> str:
+        if self.db_host and self.db_name:
+            return "mysql"
+        return "sqlite"
+
+    @property
+    def database_url(self) -> str:
+        if self.db_backend == "mysql":
+            password = quote_plus(self.db_password)
+            return (
+                f"mysql+pymysql://{self.db_user}:{password}"
+                f"@{self.db_host}:{self.db_port}/{self.db_name}?charset=utf8mb4"
+            )
+        return f"sqlite:///{self.db_path}"
 
 
 def _default_extensions() -> set[str]:

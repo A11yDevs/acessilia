@@ -3272,6 +3272,21 @@ files = [
 ]
 
 [[package]]
+name = "pymysql"
+version = "1.2.0"
+description = "Pure Python MySQL Driver"
+optional = false
+python-versions = ">=3.9"
+files = [
+    {file = "pymysql-1.2.0-py3-none-any.whl", hash = "sha256:62169ce6d5510f08e140c5e7990ee884a9764024e4a9a27b2cc11f1099322ae0"},
+    {file = "pymysql-1.2.0.tar.gz", hash = "sha256:6c7b17ca686988104d7426c27895b455cdeea3e9d3ceb1270f0c3704fead8c33"},
+]
+
+[package.extras]
+ed25519 = ["PyNaCl (>=1.6.2)"]
+rsa = ["cryptography (>=46.0.7)"]
+
+[[package]]
 name = "pyobjc-core"
 version = "12.2.1"
 description = "Python<->ObjC Interoperability Module"
@@ -5243,4 +5258,4 @@ docling = ["docling", "rapidocr"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "67d7f428730dd79009192f5fb2e04649779b88b34e42ba8a2dc182473427db9c"
+content-hash = "fed1af1220f6de400b83b5d3bca633c021e96209d875a2404a6f4fc0ff70bd14"

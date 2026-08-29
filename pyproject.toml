@@ -42,6 +42,7 @@ jsonschema = "^4.20"
 openai = "^2.45.0"
 ollama = "^0.6.2"
 sqlalchemy = "^2.0.51"
+pymysql = "^1.1.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.1.1"

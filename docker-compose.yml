@@ -7,6 +7,9 @@ services:
         WITH_DOCLING: "true"
     image: acessilia:latest
     container_name: acessilia-instance
+    depends_on:
+      mariadb:
+        condition: service_healthy
     ports:
       - "8000:8000"
       - "8001:8001"
@@ -21,3 +24,29 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+
+  # Banco de dados MySQL/MariaDB opcional para desenvolvimento.
+  # Para usá-lo, preencha DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME no .env
+  # (DB_HOST deve ser "mariadb" dentro desta rede) e rode `docker compose up`.
+  mariadb:
+    image: mariadb:11
+    container_name: acessilia-mariadb
+    environment:
+      MARIADB_ROOT_PASSWORD: root
+      MARIADB_DATABASE: acessilia
+      MARIADB_USER: acessilia
+      MARIADB_PASSWORD: acessilia
+    ports:
+      - "3306:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "healthcheck.sh --connect --innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  mariadb_data:
