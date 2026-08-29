@@ -23,6 +23,8 @@
         <a href="{{ links.grafana }}" target="_blank" rel="noreferrer">Grafana</a>
         <a href="{{ links.prometheus }}" target="_blank" rel="noreferrer">Prometheus</a>
         <a href="{{ links.langfuse }}" target="_blank" rel="noreferrer">Langfuse</a>
+        <a href="{{ links.tempo }}" target="_blank" rel="noreferrer">Tempo</a>
+        <a href="{{ links.locust }}" target="_blank" rel="noreferrer">Locust</a>
       </div>
     </header>
 
@@ -61,6 +63,20 @@
             <span class="status-dot"></span>
             <div>
               <strong>Langfuse</strong>
+              <small class="status-state">verificando...</small>
+            </div>
+          </div>
+          <div class="status-card" data-service="tempo">
+            <span class="status-dot"></span>
+            <div>
+              <strong>Tempo</strong>
+              <small class="status-state">verificando...</small>
+            </div>
+          </div>
+          <div class="status-card" data-service="locust">
+            <span class="status-dot"></span>
+            <div>
+              <strong>Locust</strong>
               <small class="status-state">verificando...</small>
             </div>
           </div>
@@ -340,9 +356,12 @@
         <article class="card card-wide">
           <div class="card-heading">
             <h2>Traces</h2>
-            <a href="{{ links.langfuse }}" target="_blank" rel="noreferrer">Abrir Langfuse</a>
+            <div class="toolbar-links">
+              <a href="{{ links.langfuse }}" target="_blank" rel="noreferrer">Langfuse</a>
+              <a href="{{ links.tempo }}" target="_blank" rel="noreferrer">Tempo</a>
+            </div>
           </div>
-          <p class="muted">Os traces detalhados de prompt, resposta, tokens e duração ficam no Langfuse quando `ENABLE_TRACING=true`.</p>
+          <p class="muted">Os traces de prompt, resposta, tokens e duração ficam no Langfuse. O Tempo complementa a investigação com tracing distribuído da infraestrutura quando o OpenTelemetry está ativo.</p>
         </article>
       </section>
 

@@ -135,7 +135,7 @@ h2 {
 .status-grid {
   display: grid;
   gap: 0.75rem;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
 }
 
 .status-card {
@@ -185,6 +185,13 @@ h2 {
   color: var(--muted);
   font-weight: 650;
   text-align: right;
+}
+
+.toolbar-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  justify-content: flex-end;
 }
 
 .tabs {
@@ -885,4 +892,366 @@ textarea {
     align-items: flex-start;
     flex-direction: column;
   }
+}
+
+/* --- ESTILOS DO CONSOLE AGNO (ETAPAS 2A & 2B) --- */
+
+.agno-tabs-nav {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  border-bottom: 1px solid rgba(216, 205, 187, 0.8);
+  padding-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.agno-tab-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 750;
+  padding: 0.55rem 1.1rem;
+  transition: all 160ms ease;
+}
+
+.agno-tab-btn:hover {
+  background: rgba(19, 35, 29, 0.05);
+  color: var(--ink);
+}
+
+.agno-tab-btn.active {
+  background: var(--pine);
+  border-color: var(--pine);
+  color: #fffaf0;
+}
+
+.agno-console-view {
+  display: none;
+}
+
+.agno-console-view.active {
+  display: block;
+  animation: rise 220ms ease;
+}
+
+/* Sessões na Barra Lateral */
+.agno-sessions-group {
+  border-top: 1px solid rgba(216, 205, 187, 0.72);
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+}
+
+.sessions-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.7rem;
+}
+
+.sessions-header h3 {
+  margin-bottom: 0;
+}
+
+.ghost-button-mini {
+  background: rgba(19, 35, 29, 0.05);
+  border: 1px solid rgba(216, 205, 187, 0.72);
+  border-radius: 999px;
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 750;
+  padding: 0.25rem 0.65rem;
+  transition: all 140ms ease;
+}
+
+.ghost-button-mini:hover {
+  border-color: var(--pine);
+  background: rgba(31, 92, 74, 0.08);
+}
+
+.sessions-list {
+  display: grid;
+  gap: 0.45rem;
+  max-height: 18rem;
+  overflow-y: auto;
+}
+
+.session-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255, 253, 247, 0.85);
+  border: 1px solid rgba(216, 205, 187, 0.7);
+  border-radius: 0.75rem;
+  padding: 0.55rem 0.75rem;
+  cursor: pointer;
+  transition: all 140ms ease;
+}
+
+.session-item:hover {
+  border-color: var(--pine);
+  background: #fff;
+}
+
+.session-item.active {
+  border-color: var(--pine);
+  background: rgba(31, 92, 74, 0.12);
+}
+
+.session-info {
+  display: grid;
+  gap: 0.15rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.session-info strong {
+  font-size: 0.84rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-info small {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.session-del-btn {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 1.1rem;
+  padding: 0 0.35rem;
+  line-height: 1;
+  border-radius: 0.25rem;
+}
+
+.session-del-btn:hover {
+  color: var(--rust);
+  background: rgba(154, 63, 47, 0.1);
+}
+
+/* Chat Header Actions */
+.chat-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+/* Mensagens do Chat com Blocos Estruturados */
+.message-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.25rem;
+  font-size: 0.78rem;
+}
+
+.message-author {
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.message-time {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.message-body {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.message-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.2rem;
+}
+
+.metric-badge {
+  background: rgba(19, 35, 29, 0.05);
+  border: 1px solid rgba(216, 205, 187, 0.75);
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 750;
+  padding: 0.15rem 0.55rem;
+  color: var(--ink);
+}
+
+.metric-badge.highlight {
+  background: rgba(31, 92, 74, 0.12);
+  border-color: rgba(31, 92, 74, 0.45);
+  color: var(--pine);
+}
+
+.metric-badge.muted-badge {
+  color: var(--muted);
+  border-style: dashed;
+}
+
+/* Details drawers for Tools & Reasoning */
+.tools-drawer,
+.reasoning-drawer {
+  background: rgba(19, 35, 29, 0.03);
+  border: 1px solid rgba(216, 205, 187, 0.7);
+  border-radius: 0.65rem;
+  padding: 0.45rem 0.7rem;
+  font-size: 0.82rem;
+}
+
+.tools-drawer summary,
+.reasoning-drawer summary {
+  cursor: pointer;
+  font-weight: 750;
+  color: var(--ink);
+  user-select: none;
+}
+
+.tools-body,
+.reasoning-body {
+  margin-top: 0.45rem;
+  display: grid;
+  gap: 0.35rem;
+  border-top: 1px solid rgba(216, 205, 187, 0.5);
+  padding-top: 0.45rem;
+}
+
+.tool-item,
+.reasoning-step {
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+/* KPI Cards Grid */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 1rem;
+  margin: 1.25rem 0;
+}
+
+.kpi-card {
+  background:
+    linear-gradient(145deg, rgba(255, 253, 247, 0.88), rgba(246, 241, 232, 0.76));
+  border: 1px solid rgba(216, 205, 187, 0.8);
+  border-radius: 1rem;
+  padding: 1.1rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.kpi-label {
+  font-size: 0.82rem;
+  color: var(--muted);
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.kpi-value {
+  font-size: 1.85rem;
+  font-weight: 900;
+  color: var(--ink);
+  line-height: 1.1;
+}
+
+.kpi-sub {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+/* Tables */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  margin-top: 1rem;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.88rem;
+}
+
+.data-table th {
+  background: rgba(19, 35, 29, 0.04);
+  border-bottom: 2px solid rgba(216, 205, 187, 0.9);
+  padding: 0.75rem 0.85rem;
+  font-weight: 850;
+  color: var(--ink);
+}
+
+.data-table td {
+  border-bottom: 1px solid rgba(216, 205, 187, 0.6);
+  padding: 0.75rem 0.85rem;
+  vertical-align: middle;
+}
+
+.data-table tr:hover td {
+  background: rgba(19, 35, 29, 0.02);
+}
+
+.text-center {
+  text-align: center;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.status-badge.badge-ok {
+  background: rgba(31, 92, 74, 0.15);
+  color: var(--pine);
+}
+
+.status-badge.badge-error {
+  background: rgba(154, 63, 47, 0.15);
+  color: var(--rust);
+}
+
+/* Report Code Block */
+.report-code-block {
+  background: rgba(19, 35, 29, 0.04);
+  border: 1px solid rgba(216, 205, 187, 0.85);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  font-family: "JetBrains Mono", "Cascadia Code", monospace;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 36rem;
+  overflow: auto;
+}
+
+.primary-button {
+  background: var(--pine);
+  border: 1px solid var(--pine);
+  border-radius: 999px;
+  color: #fffaf0;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 750;
+  padding: 0.65rem 1.15rem;
+  transition: all 160ms ease;
+}
+
+.primary-button:hover {
+  opacity: 0.92;
+  transform: translateY(-1px);
 }

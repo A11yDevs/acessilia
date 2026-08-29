@@ -16,11 +16,12 @@
       <div>
         <p class="eyebrow">Acessília</p>
         <h1>Console Agno</h1>
-        <p class="lede">Converse diretamente com agentes detectados pelo AgentOS, sem passar pela pipeline completa.</p>
+        <p class="lede">Converse diretamente com agentes detectados pelo AgentOS, acompanhe métricas por resposta e compare performance.</p>
       </div>
       <div class="hero-actions">
         <a href="/">Observabilidade</a>
         <a href="{{ links.langfuse }}" target="_blank" rel="noreferrer">Langfuse</a>
+        <a href="{{ links.tempo }}" target="_blank" rel="noreferrer">Tempo</a>
         <a href="{{ links.grafana }}" target="_blank" rel="noreferrer">Grafana</a>
       </div>
     </header>
@@ -59,68 +60,225 @@
           <div class="status-card passive">
             <span class="status-dot"></span>
             <div>
-              <strong>Próximas entidades</strong>
-              <small>workflows e step functions</small>
+              <strong>Persistência</strong>
+              <small>SQLite local (sessões &amp; métricas)</small>
             </div>
           </div>
         </div>
       </section>
 
-      <section class="agno-console">
-        <aside class="card agno-sidebar">
+      <!-- BARRA DE ABAS DO CONSOLE -->
+      <nav class="agno-tabs-nav" aria-label="Abas do Console">
+        <button class="agno-tab-btn active" id="tab-btn-chat" type="button" data-target="view-chat">
+          Chat Direto
+        </button>
+        <button class="agno-tab-btn" id="tab-btn-metrics" type="button" data-target="view-metrics">
+          Métricas do Agente
+        </button>
+        <button class="agno-tab-btn" id="tab-btn-compare" type="button" data-target="view-compare">
+          Comparativo
+        </button>
+        <button class="agno-tab-btn" id="tab-btn-report" type="button" data-target="view-report">
+          Relatório PR
+        </button>
+      </nav>
+
+      <!-- SEÇÃO PRINCIPAL (CHAT) -->
+      <section class="agno-console-view active" id="view-chat">
+        <div class="agno-console">
+          <aside class="card agno-sidebar">
+            <div class="card-heading">
+              <div>
+                <p class="eyebrow-mini">Descoberta automática</p>
+                <h2>Entidades</h2>
+              </div>
+              <button class="ghost-button" id="agno-refresh" type="button">Atualizar</button>
+            </div>
+            <p class="muted">Lista de agentes e times detectados no AgentOS.</p>
+            <div class="entity-group">
+              <h3>Agentes</h3>
+              <div class="entity-list" id="agno-agent-list"></div>
+            </div>
+            <div class="entity-group">
+              <h3>Times</h3>
+              <div class="entity-list" id="agno-team-list"></div>
+            </div>
+
+            <div class="entity-group agno-sessions-group">
+              <div class="sessions-header">
+                <h3>Sessões Salvas</h3>
+                <button class="ghost-button-mini" id="agno-new-session" type="button">+ Nova</button>
+              </div>
+              <div class="sessions-list" id="agno-sessions-list">
+                <div class="entity-placeholder">Selecione uma entidade para ver o histórico.</div>
+              </div>
+            </div>
+          </aside>
+
+          <section class="card agno-chat-card">
+            <div class="card-heading agno-chat-heading">
+              <div>
+                <p class="eyebrow-mini">Conversa Direta</p>
+                <h2 id="agno-selected-title">Selecione um agente</h2>
+              </div>
+              <div class="chat-actions">
+                <span class="polling-pill" id="agno-session-pill">Sem sessão</span>
+                <button class="ghost-button-mini" id="agno-clear-chat-btn" type="button" title="Limpar conversa na tela">Limpar tela</button>
+              </div>
+            </div>
+            <p class="muted" id="agno-selected-details">As respostas passam pelo proxy local para registrar métricas, TTFT, tokens e eventos sem passar pela pipeline.</p>
+            <div class="agno-chat" id="agno-chat-log" aria-live="polite">
+              <div class="agno-empty">
+                <h3>Escolha um agente para começar</h3>
+                <p>Quando o AgentOS estiver ativo, os agentes aparecem automaticamente na lateral. As mensagens e métricas ficam salvas localmente.</p>
+              </div>
+            </div>
+            <form class="agno-input" id="agno-chat-form">
+              <textarea id="agno-message" rows="3" placeholder="Envie uma mensagem direta para o agente selecionado..." disabled></textarea>
+              <button type="submit" disabled>Enviar</button>
+            </form>
+          </section>
+
+          <aside class="card agno-inspector">
+            <div class="card-heading">
+              <div>
+                <p class="eyebrow-mini">Métricas da Execução</p>
+                <h2>Métricas &amp; Eventos</h2>
+              </div>
+            </div>
+            <dl class="facts agno-run-facts" id="agno-run-facts"></dl>
+            <div class="event-list" id="agno-event-list"></div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- SEÇÃO DE MÉTRICAS DO AGENTE (ETAPA 2B) -->
+      <section class="agno-console-view" id="view-metrics">
+        <div class="card agno-metrics-view">
           <div class="card-heading">
             <div>
-              <p class="eyebrow-mini">Descoberta automática</p>
-              <h2>Entidades</h2>
+              <p class="eyebrow-mini">Desempenho Consolidado</p>
+              <h2 id="metrics-agent-title">Métricas do Agente</h2>
             </div>
-            <button class="ghost-button" id="agno-refresh" type="button">Atualizar</button>
+            <div class="metrics-controls">
+              <select id="metrics-days-select" class="form-select">
+                <option value="7">Últimos 7 dias</option>
+                <option value="30" selected>Últimos 30 dias</option>
+                <option value="90">Últimos 90 dias</option>
+              </select>
+              <button class="ghost-button" id="metrics-refresh-btn" type="button">Recarregar</button>
+            </div>
           </div>
-          <p class="muted">A lista vem de <code>/agents</code> e <code>/teams</code> do AgentOS configurado.</p>
-          <div class="entity-group">
-            <h3>Agentes</h3>
-            <div class="entity-list" id="agno-agent-list"></div>
-          </div>
-          <div class="entity-group">
-            <h3>Times</h3>
-            <div class="entity-list" id="agno-team-list"></div>
-          </div>
-          <div class="entity-group entity-group-muted">
-            <h3>Em preparação</h3>
-            <div class="entity-placeholder">Workflows e step functions entram na próxima etapa.</div>
-          </div>
-        </aside>
 
-        <section class="card agno-chat-card">
-          <div class="card-heading agno-chat-heading">
-            <div>
-              <p class="eyebrow-mini">Chat direto</p>
-              <h2 id="agno-selected-title">Selecione um agente</h2>
+          <div class="kpi-grid" id="agent-kpis-grid">
+            <div class="kpi-card">
+              <span class="kpi-label">Total de Execuções</span>
+              <strong class="kpi-value" id="kpi-total-runs">-</strong>
+              <small class="kpi-sub" id="kpi-success-rate">-</small>
             </div>
-            <span class="polling-pill" id="agno-session-pill">Sem sessão</span>
-          </div>
-          <p class="muted" id="agno-selected-details">As respostas passam pelo proxy local do painel para evitar CORS e preparar coleta de métricas por conversa.</p>
-          <div class="agno-chat" id="agno-chat-log" aria-live="polite">
-            <div class="agno-empty">
-              <h3>Escolha um agente para começar</h3>
-              <p>Quando o AgentOS estiver ativo, os agentes aparecem automaticamente na lateral. A conversa aqui não dispara a pipeline completa.</p>
+            <div class="kpi-card">
+              <span class="kpi-label">Latência Média</span>
+              <strong class="kpi-value" id="kpi-avg-duration">-</strong>
+              <small class="kpi-sub" id="kpi-p95-duration">p95: -</small>
+            </div>
+            <div class="kpi-card">
+              <span class="kpi-label">TTFT Médio</span>
+              <strong class="kpi-value" id="kpi-avg-ttft">-</strong>
+              <small class="kpi-sub" id="kpi-p95-ttft">p95: -</small>
+            </div>
+            <div class="kpi-card">
+              <span class="kpi-label">Tokens Médios / Run</span>
+              <strong class="kpi-value" id="kpi-avg-tokens">-</strong>
+              <small class="kpi-sub" id="kpi-total-tokens">total: -</small>
+            </div>
+            <div class="kpi-card">
+              <span class="kpi-label">Custo Acumulado</span>
+              <strong class="kpi-value" id="kpi-total-cost">-</strong>
+              <small class="kpi-sub">Reportado pelo provedor</small>
             </div>
           </div>
-          <form class="agno-input" id="agno-chat-form">
-            <textarea id="agno-message" rows="3" placeholder="Envie uma mensagem direta para o agente selecionado" disabled></textarea>
-            <button type="submit" disabled>Enviar</button>
-          </form>
-        </section>
 
-        <aside class="card agno-inspector">
+          <div class="metrics-runs-section">
+            <h3>Histórico Recente de Execuções</h3>
+            <div class="table-responsive">
+              <table class="data-table" id="agent-runs-table">
+                <thead>
+                  <tr>
+                    <th>Data/Hora</th>
+                    <th>Status</th>
+                    <th>Modelo</th>
+                    <th>Duração</th>
+                    <th>TTFT</th>
+                    <th>Tokens (In/Out/Total)</th>
+                    <th>Custo</th>
+                  </tr>
+                </thead>
+                <tbody id="agent-runs-tbody">
+                  <tr><td colspan="7" class="text-center muted">Selecione um agente ou execute uma conversa para ver dados.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SEÇÃO COMPARATIVA (ETAPA 2B) -->
+      <section class="agno-console-view" id="view-compare">
+        <div class="card agno-compare-view">
           <div class="card-heading">
             <div>
-              <p class="eyebrow-mini">Preparado para métricas</p>
-              <h2>Execução</h2>
+              <p class="eyebrow-mini">Benchmarking &amp; Análise</p>
+              <h2>Comparativo de Performance</h2>
+            </div>
+            <div class="metrics-controls">
+              <select id="compare-group-select" class="form-select">
+                <option value="agent" selected>Comparar por Agente</option>
+                <option value="model">Comparar por Modelo</option>
+              </select>
+              <button class="ghost-button" id="compare-refresh-btn" type="button">Atualizar</button>
             </div>
           </div>
-          <dl class="facts agno-run-facts" id="agno-run-facts"></dl>
-          <div class="event-list" id="agno-event-list"></div>
-        </aside>
+
+          <p class="muted">Compare latência, TTFT, volume de tokens, custos e taxa de sucesso entre diferentes agentes ou modelos.</p>
+
+          <div class="table-responsive">
+            <table class="data-table" id="compare-table">
+              <thead>
+                <tr>
+                  <th id="compare-col-header">Entidade</th>
+                  <th>Provedor</th>
+                  <th>Chamadas</th>
+                  <th>Sucesso (%)</th>
+                  <th>Duração Média</th>
+                  <th>TTFT Médio</th>
+                  <th>Tokens Médios</th>
+                  <th>Custo Total</th>
+                </tr>
+              </thead>
+              <tbody id="compare-tbody">
+                <tr><td colspan="8" class="text-center muted">Carregando comparativo...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- SEÇÃO DE RELATÓRIO PR (ETAPA 2B) -->
+      <section class="agno-console-view" id="view-report">
+        <div class="card agno-report-view">
+          <div class="card-heading">
+            <div>
+              <p class="eyebrow-mini">Documentação &amp; Pull Request</p>
+              <h2>Relatório de Observabilidade</h2>
+            </div>
+            <div class="metrics-controls">
+              <button class="primary-button" id="report-copy-btn" type="button">📋 Copiar Markdown</button>
+              <button class="ghost-button" id="report-refresh-btn" type="button">Recarregar</button>
+            </div>
+          </div>
+          <p class="muted">Relatório formatado em Markdown pronto para ser anexado na descrição ou comentários de Pull Requests.</p>
+          <pre class="report-code-block" id="report-markdown-preview">Gerando relatório...</pre>
+        </div>
       </section>
     </main>
 

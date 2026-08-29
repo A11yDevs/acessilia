@@ -109,28 +109,43 @@ services:
       target: runtime
       args:
         WITH_DOCLING: "true"
-    command: python -m observability.frontend.app
+    command: python -m observability.src.app
     ports:
       - "8010:8010"
     volumes:
       - ./var:/app/var
       - ./observability/data:/app/observability/data
+      - ./observability/src:/app/observability/src:ro
+      - ./observability/frontend:/app/observability/frontend:ro
     env_file:
       - .env
     environment:
       OBSERVABILITY_FRONTEND_HOST: 0.0.0.0
       OBSERVABILITY_FRONTEND_PORT: 8010
+      OBSERVABILITY_PROJECT_NAME: ${OBSERVABILITY_PROJECT_NAME:-Acessilia}
+      OBSERVABILITY_METRIC_PREFIX: ${OBSERVABILITY_METRIC_PREFIX:-acessilia}
+      OBSERVABILITY_PROMETHEUS_API_JOB: ${OBSERVABILITY_PROMETHEUS_API_JOB:-acessilia-api}
+      OBSERVABILITY_LOKI_QUERY: ${OBSERVABILITY_LOKI_QUERY:-'{job="acessilia"}'}
       ACESSILIA_API_URL: http://acessilia:8000
       PROMETHEUS_URL: http://prometheus:9090
       LOKI_URL: http://loki:3100
       LANGFUSE_URL: http://langfuse-web:3000
+      TEMPO_URL: ${TEMPO_URL:-http://host.docker.internal:3200}
+      LOCUST_URL: ${LOCUST_URL:-http://host.docker.internal:8089}
       PUBLIC_ACESSILIA_API_URL: http://localhost:8000
       PUBLIC_GRAFANA_URL: http://localhost:3000
       PUBLIC_PROMETHEUS_URL: http://localhost:9090
       PUBLIC_LOKI_URL: http://localhost:3100
       PUBLIC_LANGFUSE_URL: http://localhost:3001
+      PUBLIC_TEMPO_URL: ${PUBLIC_TEMPO_URL:-http://localhost:3200}
+      PUBLIC_LOCUST_URL: ${PUBLIC_LOCUST_URL:-http://localhost:8089}
+      OBSERVABILITY_FRONTEND_TRACING: ${OBSERVABILITY_FRONTEND_TRACING:-false}
+      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-acessilia-observability}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OTEL_EXPORTER_OTLP_HEADERS: ${OTEL_EXPORTER_OTLP_HEADERS:-}
       AGNO_OS_URL: ${AGNO_OS_URL:-http://host.docker.internal:7777}
       AGNO_OS_SECURITY_KEY: ${AGNO_OS_SECURITY_KEY:-}
+      AGNO_CONSOLE_STORE_REASONING: ${AGNO_CONSOLE_STORE_REASONING:-false}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
