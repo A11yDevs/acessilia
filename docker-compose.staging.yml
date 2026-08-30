@@ -1,0 +1,33 @@
+services:
+  acessilia:
+    image: ghcr.io/a11ydevs/acessilia:develop
+    container_name: acessilia-staging
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+    volumes:
+      - ./var:/app/var
+    env_file:
+      - .env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "if echo \"$ENABLED_INTERFACES\" | grep -q 'api'; then curl -fsS http://localhost:8000/api/v1/health; else curl -fsS http://localhost:8001/; fi"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower-staging
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ~/.docker/config.json:/config.json
+    environment:
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_POLL_INTERVAL=60
+      - WATCHTOWER_INCLUDE_STOPPED=true
+      - WATCHTOWER_REVIVE_STOPPED=false
+      - WATCHTOWER_NO_STARTUP_MESSAGE=false
+    command: acessilia-staging
+    restart: unless-stopped

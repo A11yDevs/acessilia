@@ -8,18 +8,19 @@ on:
       - completed
     branches:
       - main
+      - develop
 
 permissions:
-  contents: write
+  contents: read
   packages: write
 
 concurrency:
-  group: delivery-main
-  cancel-in-progress: false
+  group: delivery-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: ${{ github.event.workflow_run.head_branch == 'develop' }}
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  IMAGE_NAME: a11ydevs/acessilia
 
 jobs:
   publish:
@@ -58,19 +59,22 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Generate image metadata
-        id: meta
-        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=raw,value=main${{ matrix.tag_suffix }}
-            type=raw,value=latest${{ matrix.tag_suffix }}
-            type=sha,prefix=sha-,suffix=${{ matrix.tag_suffix }},format=long
-          labels: |
-            org.opencontainers.image.title=acessilia
-            org.opencontainers.image.description=Pipeline para extracao e acessibilidade de documentos
-            org.opencontainers.image.licenses=MIT
+      - name: Generate image tags
+        id: tags
+        run: |
+          BRANCH="${{ github.event.workflow_run.head_branch }}"
+          SHA="${{ github.event.workflow_run.head_sha }}"
+          SUFFIX="${{ matrix.tag_suffix }}"
+
+          TAGS="${REGISTRY}/${IMAGE_NAME}:${BRANCH}${SUFFIX}"
+          TAGS="${TAGS},${REGISTRY}/${IMAGE_NAME}:sha-${SHA:0:7}${SUFFIX}"
+
+          if [ "$BRANCH" = "main" ]; then
+            TAGS="${TAGS},${REGISTRY}/${IMAGE_NAME}:latest${SUFFIX}"
+          fi
+
+          echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
+          echo "branch=${BRANCH}" >> "$GITHUB_OUTPUT"
 
       - name: Build production image for verification
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
@@ -165,8 +169,12 @@ jobs:
           target: base
           platforms: linux/amd64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.tags.outputs.tags }}
+          labels: |
+            org.opencontainers.image.title=acessilia
+            org.opencontainers.image.description=Pipeline para extracao e acessibilidade de documentos
+            org.opencontainers.image.licenses=MIT
+            org.opencontainers.image.revision=${{ github.event.workflow_run.head_sha }}
           build-args: |
             WITH_DOCLING=${{ matrix.with_docling }}
           cache-from: type=gha,scope=production-${{ matrix.variant }}
@@ -190,64 +198,20 @@ jobs:
           DIGEST: ${{ steps.publish.outputs.digest }}
         run: echo "${REGISTRY}/${IMAGE_NAME}@${DIGEST}"
 
-      - name: Tag image with version (docling only)
-        if: matrix.variant == 'docling'
+      - name: Trigger staging redeploy
+        if: ${{ steps.tags.outputs.branch == 'develop' }}
         env:
-          DIGEST: ${{ steps.publish.outputs.digest }}
+          STAGING_WEBHOOK_URL: ${{ secrets.STAGING_WEBHOOK_URL }}
         run: |
-          VERSION="v$(grep -m1 '^version = ' pyproject.toml | cut -d'"' -f2)"
-          echo "Tagging ${DIGEST} as ${VERSION}"
-          docker buildx imagetools create \
-            --tag "${REGISTRY}/${IMAGE_NAME}:${VERSION}" \
-            "${REGISTRY}/${IMAGE_NAME}@${DIGEST}"
-
-      - name: Tag slim image with version
-        if: matrix.variant == 'slim'
-        env:
-          DIGEST: ${{ steps.publish.outputs.digest }}
-        run: |
-          VERSION="v$(grep -m1 '^version = ' pyproject.toml | cut -d'"' -f2)"
-          echo "Tagging ${DIGEST} as ${VERSION}-slim"
-          docker buildx imagetools create \
-            --tag "${REGISTRY}/${IMAGE_NAME}:${VERSION}-slim" \
-            "${REGISTRY}/${IMAGE_NAME}@${DIGEST}"
-
-  release:
-    name: create GitHub Release
-    needs: publish
-    if: ${{ always() && github.event.workflow_run.conclusion == 'success' }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Check out tested commit
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
-          fetch-depth: 0
-
-      - name: Extract version from pyproject.toml
-        id: version
-        run: |
-          VERSION="v$(grep -m1 '^version = ' pyproject.toml | cut -d'"' -f2)"
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "Version: ${VERSION}"
-
-      - name: Create git tag
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "${{ steps.version.outputs.version }}" \
-            -m "Release ${{ steps.version.outputs.version }}" \
-            ${{ github.event.workflow_run.head_sha }}
-          git push origin "${{ steps.version.outputs.version }}"
-
-      - name: Create GitHub Release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release create "${{ steps.version.outputs.version }}" \
-            --repo "${{ github.repository }}" \
-            --title "${{ steps.version.outputs.version }}" \
-            --generate-notes \
-            --verify-tag
+          if [ -n "$STAGING_WEBHOOK_URL" ]; then
+            curl --fail --silent --show-error -X POST \
+              -H "Content-Type: application/json" \
+              -d '{
+                "digest": "${{ steps.publish.outputs.digest }}",
+                "tag": "ghcr.io/a11ydevs/acessilia:develop",
+                "repository": "a11ydevs/acessilia"
+              }' "$STAGING_WEBHOOK_URL"
+            echo "Staging redeploy triggered."
+          else
+            echo "STAGING_WEBHOOK_URL not set; redeploy via Watchtower."
+          fi
