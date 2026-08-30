@@ -1,11 +1,7 @@
 name: Delivery
 
 on:
-  workflow_run:
-    workflows:
-      - CI
-    types:
-      - completed
+  push:
     branches:
       - main
       - develop
@@ -15,8 +11,8 @@ permissions:
   packages: write
 
 concurrency:
-  group: delivery-${{ github.event.workflow_run.head_branch }}
-  cancel-in-progress: ${{ github.event.workflow_run.head_branch == 'develop' }}
+  group: delivery-${{ github.ref_name }}
+  cancel-in-progress: ${{ github.ref_name == 'develop' }}
 
 env:
   REGISTRY: ghcr.io
@@ -25,7 +21,6 @@ env:
 jobs:
   publish:
     name: publish ${{ matrix.variant }} image to GHCR
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
     strategy:
@@ -46,7 +41,7 @@ jobs:
       - name: Check out tested commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
 
       - name: Set up Docker Buildx
@@ -62,8 +57,8 @@ jobs:
       - name: Generate image tags
         id: tags
         run: |
-          BRANCH="${{ github.event.workflow_run.head_branch }}"
-          SHA="${{ github.event.workflow_run.head_sha }}"
+          BRANCH="${{ github.ref_name }}"
+          SHA="${{ github.sha }}"
           SUFFIX="${{ matrix.tag_suffix }}"
 
           TAGS="${REGISTRY}/${IMAGE_NAME}:${BRANCH}${SUFFIX}"
@@ -174,7 +169,7 @@ jobs:
             org.opencontainers.image.title=acessilia
             org.opencontainers.image.description=Pipeline para extracao e acessibilidade de documentos
             org.opencontainers.image.licenses=MIT
-            org.opencontainers.image.revision=${{ github.event.workflow_run.head_sha }}
+            org.opencontainers.image.revision=${{ github.sha }}
           build-args: |
             WITH_DOCLING=${{ matrix.with_docling }}
           cache-from: type=gha,scope=production-${{ matrix.variant }}
