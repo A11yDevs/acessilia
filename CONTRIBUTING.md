@@ -23,7 +23,7 @@ main  ──────────────●─────────�
 
 | Papel | Quem | Permissões |
 |-------|------|------------|
-| **Mantenedores** | [@marceloakira](https://github.com/marceloakira) e [@jhonata192](https://github.com/jhonata192) | Únicos autorizados a mesclar `develop → main` e criar releases. |
+| **Mantenedores** | [@marceloakira](https://github.com/marceloakira), [@jhonata192](https://github.com/jhonata192) e [@fragaeduardo](https://github.com/fragaeduardo) | Únicos autorizados a mesclar `develop → main` e criar releases. |
 | **Colaboradores** | Todos os demais | Podem abrir PRs para `develop` e revisar. |
 
 > **Importante:** branches temporárias devem ser deletadas após o merge.
@@ -94,27 +94,60 @@ git push origin develop
 git branch -d feat/minha-feature
 ```
 
-### 5. Release (develop → main)
+### 5. Homologação (QA)
 
-Apenas mantenedores ([@marceloakira](https://github.com/marceloakira) e [@jhonata192](https://github.com/jhonata192)) podem mesclar `develop → main`.
+Após o merge de um PR na `develop`, a **esteira de CD** (`.github/workflows/delivery.yml`)
+constrói automaticamente uma imagem Docker e a publica no GHCR com as tags
+`develop` e `sha-<commit>`.
 
-1. Abra um Pull Request de `develop` para `main` no GitHub.
-2. Solicite revisão de outro mantenedor.
-3. Após aprovação, faça o merge (preferencialmente "Create a merge commit").
-4. A **CI/CD** dispara automaticamente:
-   - Testes são executados.
-   - Uma nova imagem Docker é built e publicada em `ghcr.io/A11yDevs/acessilia` com as tags `latest` e `v<versão>`.
-   - Uma **Release** é criada no GitHub com as notas de versão geradas automaticamente.
-   - Uma **tag semântica** (`v<versão>`) é criada no repositório.
-
-> A versão é lida automaticamente do campo `version` no `pyproject.toml`.
+O ambiente de homologação usa **Watchtower** para detectar a nova imagem e
+atualizar o container automaticamente (a cada 60s). O time de QA pode
+identificar exatamente qual versão está rodando:
 
 ```bash
-# Fluxo manual (alternativa)
-git checkout main
-git merge develop
-git push origin main
-# O CI/CD fará o resto automaticamente
+# Consultar qual imagem está no ar (via API de health)
+curl http://homologacao:8000/api/v1/health | jq .
+
+# Ou puxar manualmente uma imagem específica para testar
+ docker pull ghcr.io/a11ydevs/acessilia:sha-abc1234
+
+# Verificar qual tag está rodando no container
+docker inspect acessilia-staging | jq '.[0].Config.Image'
+```
+
+O setup completo do ambiente de homologação está em:
+
+- `docker-compose.staging.yml` — define o container + Watchtower
+- `scripts/setup-homologacao.sh` — script de configuração inicial
+
+### 6. Release (develop → main)
+
+Apenas mantenedores ([@marceloakira](https://github.com/marceloakira),
+[@jhonata192](https://github.com/jhonata192) e
+[@fragaeduardo](https://github.com/fragaeduardo)) podem mesclar `develop → main`.
+
+1. **QA homologou?** → siga em frente.
+2. Abra um Pull Request de `develop` para `main` no GitHub.
+3. Solicite revisão de outro mantenedor.
+4. Após aprovação, faça o merge (preferencialmente "Create a merge commit").
+5. A **esteira de CD** na `main` publica as tags `main`, `latest` e `sha-<commit>`.
+
+Para criar uma **Release oficial** com versão semântica:
+
+```bash
+# 1. Atualize a versão no pyproject.toml
+#    (ex: bump de "0.2.0" para "0.3.0")
+git checkout main && git pull
+# edite pyproject.toml
+git add pyproject.toml
+git commit -m "chore(release): bump to 0.3.0"
+
+# 2. Crie a tag semântica
+git tag v0.3.0
+git push origin main --tags
+
+# 3. O workflow Release (release.yml) builda, publica v0.3.0 no GHCR
+#    e cria a GitHub Release com changelog automático
 ```
 
 Depois do release, mergeie `main` de volta para `develop`:
@@ -125,7 +158,7 @@ git merge main
 git push origin develop
 ```
 
-### 6. Hotfix (correção crítica)
+### 7. Hotfix (correção crítica)
 
 Hotfixes seguem o mesmo fluxo de PR, não push direto. A CI cria a tag e release automaticamente.
 
@@ -136,7 +169,10 @@ git checkout -b hotfix/crash-upload
 git commit -m "fix: corrige crash ao fazer upload de PDF corrompido"
 git push origin hotfix/crash-upload
 # Abra um Pull Request de hotfix/crash-upload → main no GitHub
-# Após aprovação e merge, a CI/CD cria a tag e release automaticamente
+# Após aprovação e merge, a CI cria a imagem main + sha-xxx
+
+# Se for crítica a ponto de merecer release imediata:
+git tag v0.3.1 && git push origin v0.3.1
 
 # Propaga para develop
 git checkout develop
@@ -244,25 +280,29 @@ poetry run pytest
 
 ## Integração contínua (CI/CD)
 
-A esteira de CI/CD está definida em dois workflows:
+A esteira de CI/CD está definida em três workflows:
 
-- **`.github/workflows/ci.yml`** — executa os testes em duas variantes (`slim` e `docling`) para todo PR direcionado à `main` e após pushes na `main`.
-- **`.github/workflows/delivery.yml`** — após o CI passar na `main`, constrói, testa e publica as imagens Docker no GitHub Container Registry.
+- **`.github/workflows/ci.yml`** — executa os testes em duas variantes (`slim` e `docling`) para todo PR direcionado à `main` ou `develop`, e após pushes nessas branches.
+- **`.github/workflows/delivery.yml`** — após o CI passar, constrói e publica imagens Docker no GHCR.
+- **`.github/workflows/release.yml`** — quando um mantenedor cria uma tag `v*`, builda, publica e cria GitHub Release.
 
 | Workflow | Evento | Ação |
 |----------|--------|------|
-| **CI** | PR para `main` | Testa as variantes slim e docling |
-| **CI** | Push na `main` | Testa as variantes slim e docling |
-| **Delivery** | CI concluído na `main` | Build, teste e push das imagens para o GHCR |
+| **CI** | PR para `main` ou `develop` | Testa as variantes slim e docling |
+| **CI** | Push na `main` ou `develop` | Testa as variantes slim e docling |
+| **Delivery** | CI concluído na `main` | Build, smoke test + push: `main`, `latest`, `sha-xxx`, `main-slim`, `sha-xxx-slim` |
+| **Delivery** | CI concluído na `develop` | Build, smoke test + push: `develop`, `sha-xxx`, `develop-slim`, `sha-xxx-slim` |
+| **Release** | Tag `v*` criada no git | Build, smoke test + push: `vX.Y.Z`, `vX.Y.Z-slim` + GitHub Release |
 
-São publicadas quatro referências no `ghcr.io/A11yDevs/acessilia`:
+São publicadas as seguintes referências no `ghcr.io/a11ydevs/acessilia`:
 
-- `main` — imagem completa com Docling, RapidOCR e PyTorch CPU
-- `main-slim` — variante sem Docling
-- `sha-<commit>` — imagem Docling imutável
-- `sha-<commit>-slim` — slim imutável
-
-Nenhum modelo é embutido nas imagens. Os modelos são baixados em tempo de execução e persistidos no volume `/app/var`. O Delivery verifica isso antes de publicar.
+| Tag | Branch de origem | Finalidade |
+|-----|-----------------|------------|
+| `develop` / `develop-slim` | `develop` | Homologação (atualizada via Watchtower) |
+| `main` / `main-slim` | `main` | Produção (CD) |
+| `latest` / `latest-slim` | `main` | Produção (aponta pro último) |
+| `sha-<commit>` / `sha-<commit>-slim` | `main` ou `develop` | Referência imutável |
+| `vX.Y.Z` / `vX.Y.Z-slim` | Tag git `v*` | Release oficial |
 
 ## Dúvidas?
 
