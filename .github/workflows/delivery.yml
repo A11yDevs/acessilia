@@ -197,21 +197,3 @@ jobs:
         env:
           DIGEST: ${{ steps.publish.outputs.digest }}
         run: echo "${REGISTRY}/${IMAGE_NAME}@${DIGEST}"
-
-      - name: Trigger staging redeploy
-        if: ${{ steps.tags.outputs.branch == 'develop' }}
-        env:
-          STAGING_WEBHOOK_URL: ${{ secrets.STAGING_WEBHOOK_URL }}
-        run: |
-          if [ -n "$STAGING_WEBHOOK_URL" ]; then
-            curl --fail --silent --show-error -X POST \
-              -H "Content-Type: application/json" \
-              -d '{
-                "digest": "${{ steps.publish.outputs.digest }}",
-                "tag": "ghcr.io/a11ydevs/acessilia:develop",
-                "repository": "a11ydevs/acessilia"
-              }' "$STAGING_WEBHOOK_URL"
-            echo "Staging redeploy triggered."
-          else
-            echo "STAGING_WEBHOOK_URL not set; redeploy via Watchtower."
-          fi

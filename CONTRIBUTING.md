@@ -100,9 +100,16 @@ Após o merge de um PR na `develop`, a **esteira de CD** (`.github/workflows/del
 constrói automaticamente uma imagem Docker e a publica no GHCR com as tags
 `develop` e `sha-<commit>`.
 
-O ambiente de homologação usa **Watchtower** para detectar a nova imagem e
-atualizar o container automaticamente (a cada 60s). O time de QA pode
-identificar exatamente qual versão está rodando:
+O ambiente de homologação usa um **timer systemd** (`staging-update.timer`) que
+verifica a cada 60s se há uma nova imagem e reinicia o container automaticamente.
+Veja [docs/homologacao-systemd.md](docs/homologacao-systemd.md) para instruções
+detalhadas de instalação e gerenciamento.
+
+O setup completo do ambiente de homologação está em:
+
+- `docker-compose.staging.yml` — define o container
+- `scripts/staging-update.sh` — script de atualização
+- `scripts/setup-homologacao.sh` — script de configuração inicial
 
 ```bash
 # Consultar qual imagem está no ar (via API de health)
@@ -298,7 +305,7 @@ São publicadas as seguintes referências no `ghcr.io/a11ydevs/acessilia`:
 
 | Tag | Branch de origem | Finalidade |
 |-----|-----------------|------------|
-| `develop` / `develop-slim` | `develop` | Homologação (atualizada via Watchtower) |
+| `develop` / `develop-slim` | `develop` | Homologação (atualizada via systemd timer) |
 | `main` / `main-slim` | `main` | Produção (CD) |
 | `latest` / `latest-slim` | `main` | Produção (aponta pro último) |
 | `sha-<commit>` / `sha-<commit>-slim` | `main` ou `develop` | Referência imutável |

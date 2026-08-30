@@ -16,18 +16,3 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-
-  watchtower:
-    image: containrrr/watchtower
-    container_name: watchtower-staging
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ~/.docker/config.json:/config.json
-    environment:
-      - WATCHTOWER_CLEANUP=true
-      - WATCHTOWER_POLL_INTERVAL=60
-      - WATCHTOWER_INCLUDE_STOPPED=true
-      - WATCHTOWER_REVIVE_STOPPED=false
-      - WATCHTOWER_NO_STARTUP_MESSAGE=false
-    command: acessilia-staging
-    restart: unless-stopped

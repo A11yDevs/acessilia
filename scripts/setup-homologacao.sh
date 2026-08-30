@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# setup-homologacao.sh — Prepara o servidor de homologação com Watchtower
+# setup-homologacao.sh — Prepara o servidor de homologação com systemd timer
 #
 # Uso:
 #   ./scripts/setup-homologacao.sh          # Setup interativo
@@ -13,6 +13,7 @@
 #   2. Configura o Docker para autenticar no ghcr.io
 #   3. Cria o .env a partir do .env.example se não existir
 #   4. Sobe os containers com docker compose -f docker-compose.staging.yml
+#   5. Instala o timer systemd para atualização automática
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -83,14 +84,51 @@ fi
 # 4. Subir containers
 # ──────────────────────────────────────────────
 echo ""
-echo "[4/4] Iniciando containers de homologação..."
-
-echo "  Imagem: ghcr.io/a11ydevs/acessilia:develop"
-echo "  Watchtower checa a cada 60s por atualizações."
-echo ""
+echo "[4/4] Configurando update automático via systemd timer..."
 
 docker compose -f docker-compose.staging.yml pull acessilia
 docker compose -f docker-compose.staging.yml up -d
+
+SCRIPTS_DIR="$(pwd)/scripts"
+
+# Cria o diretório para os scripts se não existir
+sudo mkdir -p /opt/acessilia/scripts
+sudo cp "$SCRIPTS_DIR/staging-update.sh" /opt/acessilia/scripts/
+sudo chmod +x /opt/acessilia/scripts/staging-update.sh
+
+# Cria o service unit
+sudo tee /etc/systemd/system/staging-update.service > /dev/null << 'SERVICE'
+[Unit]
+Description=Update acessilia staging container
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/acessilia/scripts/staging-update.sh
+User=root
+Group=root
+SERVICE
+
+# Cria o timer unit
+sudo tee /etc/systemd/system/staging-update.timer > /dev/null << 'TIMER'
+[Unit]
+Description=Check acessilia staging updates every 60 seconds
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=60s
+
+[Install]
+WantedBy=timers.target
+TIMER
+
+sudo systemctl daemon-reload
+sudo systemctl enable --now staging-update.timer
+
+echo "  ✅ Timer systemd instalado e ativo."
+echo "  ⏱   Checa a cada 60s por novas imagens em ghcr.io/a11ydevs/acessilia:develop"
+echo ""
 
 echo ""
 echo "=== Setup concluído! ==="
