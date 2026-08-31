@@ -106,6 +106,11 @@ class JobExecutor:
             )
             state_manager.verificar_cancelamento(task_id)
 
+            # service.py já marcou como "done", mas as exportações
+            # (ZIP, token, download_url) ainda não foram feitas.
+            # Reverte para "processing" até tudo estar pronto.
+            state_manager.atualizar(task_id, status="processing")
+
             base = Path(job.filename).stem
             out_dir = job.output_dir or (settings.temp_dir / "output" / task_id)
             out_dir.mkdir(parents=True, exist_ok=True)
@@ -177,7 +182,8 @@ class JobExecutor:
             download_url = f"{settings.api_base_url.rstrip('/')}/api/v1/download/{token}"
             state_manager.registrar_download_url(task_id, download_url)
             state_manager.atualizar(
-                task_id, etapa="Processamento concluido", progresso=1.0
+                task_id, etapa="Processamento concluido", progresso=1.0,
+                status="done",
             )
 
             if job.email:
