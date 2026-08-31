@@ -106,6 +106,12 @@ class JobExecutor:
             )
             state_manager.verificar_cancelamento(task_id)
 
+            # Garante que a task existe no state_manager mesmo se
+            # service.py retornou de cache sem criar a tarefa
+            task = state_manager.obter(task_id)
+            if task is None:
+                state_manager.criar_tarefa(job.file_path, task_id=task_id)
+
             # service.py já marcou como "done", mas as exportações
             # (ZIP, token, download_url) ainda não foram feitas.
             # Reverte para "processing" até tudo estar pronto.
