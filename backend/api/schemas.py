@@ -70,3 +70,5 @@ class HealthResponse(BaseModel):
     model_name: str
     model_reachable: bool
     queue_size: int
+    git_commit: str = ""
+    image_tag: str = ""

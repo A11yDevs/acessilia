@@ -39,4 +39,6 @@ async def health(request: Request):
         model_name=model_name,
         model_reachable=await _check_model_reachable(),
         queue_size=unified_queue.qsize(),
+        git_commit=settings.git_commit,
+        image_tag=settings.image_tag,
     )

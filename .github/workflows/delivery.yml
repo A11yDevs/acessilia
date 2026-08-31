@@ -83,6 +83,8 @@ jobs:
           tags: ${{ env.LOCAL_IMAGE }}
           build-args: |
             WITH_DOCLING=${{ matrix.with_docling }}
+            GIT_COMMIT=${{ github.sha }}
+            IMAGE_TAG=${{ steps.tags.outputs.branch }}${{ matrix.tag_suffix }}
           cache-from: type=gha,scope=production-${{ matrix.variant }}
           cache-to: type=gha,mode=max,scope=production-${{ matrix.variant }}
 
@@ -172,6 +174,8 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
           build-args: |
             WITH_DOCLING=${{ matrix.with_docling }}
+            GIT_COMMIT=${{ github.sha }}
+            IMAGE_TAG=${{ steps.tags.outputs.branch }}${{ matrix.tag_suffix }}
           cache-from: type=gha,scope=production-${{ matrix.variant }}
 
       - name: Enforce published image size guardrail
