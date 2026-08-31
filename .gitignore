@@ -8,6 +8,8 @@ commit_changes.py
 .venv
 .vscode
 report.txt
+.opencode/
+revisao_pr_24.txt
 
 # Python cache and temporary files
 __pycache__/
@@ -19,6 +21,7 @@ __pycache__/
 .DS_Store
 htmlcov/
 output/
+test-results.xml
 
 # Runtime, temporary and cache directories
 data/

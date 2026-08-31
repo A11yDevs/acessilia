@@ -1,16 +1,18 @@
 import asyncio
 import json
-import sqlite3
-import uuid
 import threading
+import uuid
 import shutil
+from datetime import datetime, timedelta
 from pathlib import Path
 
-from backend.tools.logger import logger
+from sqlalchemy import delete, select
+
 from backend.config.settings import settings
+from backend.services import database
+from backend.tools.logger import logger
 
 # Database connection configuration
-_connection = None
 _connection_lock = threading.Lock()
 
 TOKEN_EXPIRY_DAYS = 7
@@ -30,71 +32,39 @@ FORMAT_OUTPUT_SUFFIX = {
 }
 
 
-def _get_connection():
-    global _connection
-    if _connection is None:
-        db_path = settings.db_path
-        db_path.parent.mkdir(parents=True, exist_ok=True)
-        _connection = sqlite3.connect(str(db_path), check_same_thread=False)
-        _connection.row_factory = sqlite3.Row
-        cursor = _connection.cursor()
-        try:
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS download_tokens (
-                    token TEXT PRIMARY KEY,
-                    output_dir TEXT NOT NULL DEFAULT '',
-                    filename TEXT NOT NULL DEFAULT '',
-                    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    formats TEXT NULL DEFAULT '[]'
-                )
-            """)
-            cursor.execute("PRAGMA table_info(download_tokens)")
-            columns = [row[1] for row in cursor.fetchall()]
-            if 'formats' not in columns:
-                cursor.execute("ALTER TABLE download_tokens ADD COLUMN formats TEXT NULL DEFAULT '[]'")
-            try:
-                cursor.execute("CREATE INDEX idx_download_tokens_token ON download_tokens(token)")
-            except sqlite3.OperationalError as e:
-                if "already exists" not in str(e).lower():
-                    raise
-            _connection.commit()
-        finally:
-            cursor.close()
-    return _connection
-
-
 async def criar_token(output_dir: Path, filename: str, formats: list = None) -> str:
     token = str(uuid.uuid4())
     formats_json = json.dumps(formats) if formats else '[]'
     with _connection_lock:
-        conn = _get_connection()
-        cursor = conn.cursor()
-        try:
-            cursor.execute(
-                "INSERT INTO download_tokens (token, output_dir, filename, formats) VALUES (?, ?, ?, ?)",
-                (token, str(output_dir), filename, formats_json)
+        engine = database.get_engine()
+        with engine.begin() as conn:
+            conn.execute(
+                database.download_tokens.insert().values(
+                    token=token,
+                    output_dir=str(output_dir),
+                    filename=filename,
+                    formats=formats_json,
+                )
             )
-            conn.commit()
-        finally:
-            cursor.close()
     logger.debug("Token de download criado: {} -> {}", token, filename)
     return token
 
 
 async def obter_info_token(token: str) -> dict | None:
     with _connection_lock:
-        conn = _get_connection()
-        cursor = conn.cursor()
-        try:
-            cursor.execute(
-                "SELECT output_dir, filename, formats, criado_em FROM download_tokens WHERE token = ?",
-                (token,)
-            )
-            row = cursor.fetchone()
-        finally:
-            cursor.close()
+        engine = database.get_engine()
+        with engine.connect() as conn:
+            row = conn.execute(
+                select(
+                    database.download_tokens.c.output_dir,
+                    database.download_tokens.c.filename,
+                    database.download_tokens.c.formats,
+                    database.download_tokens.c.criado_em,
+                ).where(database.download_tokens.c.token == token)
+            ).first()
     if row is None:
         return None
+    row = row._mapping
     output_dir = Path(row["output_dir"])
     if not output_dir.exists():
         return None
@@ -117,33 +87,37 @@ async def obter_info_token(token: str) -> dict | None:
         "filename": row["filename"],
         "stem": Path(row["filename"]).stem,
         "output_dir": str(output_dir),
-        "criado_em": row["criado_em"],
+        "criado_em": _serializar_criado_em(row["criado_em"]),
         "formats": formats,
     }
 
 
+def _serializar_criado_em(valor) -> str | None:
+    if isinstance(valor, datetime):
+        return valor.strftime("%Y-%m-%d %H:%M:%S")
+    return valor
+
+
 async def limpar_tokens_expirados(dias: int = TOKEN_EXPIRY_DAYS):
+    cutoff = datetime.utcnow() - timedelta(days=dias)
     with _connection_lock:
-        conn = _get_connection()
-        cursor = conn.cursor()
-        try:
-            cursor.execute(
-                "SELECT output_dir FROM download_tokens WHERE criado_em < datetime('now', '-{} days')".format(dias)
+        engine = database.get_engine()
+        with engine.connect() as conn:
+            rows = conn.execute(
+                select(database.download_tokens.c.output_dir).where(
+                    database.download_tokens.c.criado_em < cutoff
+                )
             )
-            rows = cursor.fetchall()
-        finally:
-            cursor.close()
-        for row in rows:
-            output_dir = Path(row["output_dir"])
-            if output_dir.exists():
-                if str(output_dir).startswith(str(settings.temp_dir)):
-                    shutil.rmtree(output_dir, ignore_errors=True)
-                    logger.debug("Diretório temporário removido: {}", output_dir)
-        cursor = conn.cursor()
-        try:
-            cursor.execute(
-                "DELETE FROM download_tokens WHERE criado_em < datetime('now', '-{} days')".format(dias)
+            output_dirs = [row._mapping["output_dir"] for row in rows]
+        for output_dir in output_dirs:
+            path = Path(output_dir)
+            if path.exists():
+                if str(path).startswith(str(settings.temp_dir)):
+                    shutil.rmtree(path, ignore_errors=True)
+                    logger.debug("Diretório temporário removido: {}", path)
+        with engine.begin() as conn:
+            conn.execute(
+                delete(database.download_tokens).where(
+                    database.download_tokens.c.criado_em < cutoff
+                )
             )
-            conn.commit()
-        finally:
-            cursor.close()

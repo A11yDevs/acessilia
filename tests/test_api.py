@@ -19,8 +19,7 @@ def api_paths(tmp_path_factory):
 
 @pytest.fixture(autouse=True)
 def _isolate_paths(api_paths, monkeypatch):
-    import backend.services.download_token_service as dts
-    import backend.services.history_service as hs
+    import backend.services.database as db
 
     temp_dir = api_paths / "temp"
     data_dir = api_paths / "data"
@@ -31,8 +30,8 @@ def _isolate_paths(api_paths, monkeypatch):
     monkeypatch.setattr(settings, "data_dir", data_dir)
     monkeypatch.setattr(settings, "logs_dir", api_paths / "logs")
 
-    dts._connection = None
-    hs._connection = None
+    db.dispose()
+    db.init_db()
     limiter.enabled = False
 
 

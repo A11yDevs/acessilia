@@ -12,6 +12,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from backend.api.limiter import limiter
 from backend.api.routes import download, health, history, jobs
 from backend.services.cleanup_service import periodic_cleanup
+from backend.services.database import init_db
 from backend.services.download_token_service import limpar_tokens_expirados
 from backend.services.queue_service import unified_queue
 from backend.tools.logger import logger, setup_logger
@@ -20,6 +21,7 @@ from backend.tools.logger import logger, setup_logger
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
     setup_logger()
+    init_db()
     unified_queue.start_worker()
     await limpar_tokens_expirados()
     cleanup_task = asyncio.create_task(periodic_cleanup())
