@@ -41,6 +41,14 @@ main  ──────────────●─────────�
 
 > **Importante:** Branches temporárias devem ser deletadas após o merge.
 
+## Executar localmente com Docker
+
+Para instruções detalhadas sobre como subir a Acessília com Docker — tanto com
+build local quanto com imagens pré-publicadas do GHCR (sem precisar do código-fonte) —
+consulte o guia dedicado:
+
+📄 [`docs/docker-compose.md`](docs/docker-compose.md)
+
 ## Fluxo de trabalho diário
 
 ### 1. Iniciar uma tarefa
