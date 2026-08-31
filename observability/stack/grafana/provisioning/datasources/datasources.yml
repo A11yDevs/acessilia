@@ -18,3 +18,21 @@ datasources:
     type: loki
     access: proxy
     url: http://loki:3100
+
+  - name: Tempo
+    uid: tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    jsonData:
+      httpMethod: GET
+      nodeGraph:
+        enabled: true
+      serviceMap:
+        datasourceUid: prometheus
+      tracesToLogsV2:
+        datasourceUid: loki
+        filterByTraceID: true
+        filterBySpanID: false
+        spanStartTimeShift: -5m
+        spanEndTimeShift: 5m

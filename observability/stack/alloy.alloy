@@ -16,9 +16,8 @@ loki.process "acessilia_json" {
 
   stage.json {
     expressions = {
-      level   = "record.level.name",
-      module  = "record.name",
-      message = "text",
+      level  = "record.level.name",
+      module = "record.name",
     }
   }
 
@@ -29,27 +28,11 @@ loki.process "acessilia_json" {
     }
   }
 
-  stage.output {
-    source = "message"
-  }
 }
 
 loki.source.file "acessilia_json" {
   targets    = local.file_match.acessilia_json.targets
   forward_to = [loki.process.acessilia_json.receiver]
-}
-
-local.file_match "acessilia_text" {
-  path_targets = [{
-    __path__ = "/var/log/acessilia/bot_*.log",
-    job      = "acessilia",
-    format   = "text",
-  }]
-}
-
-loki.source.file "acessilia_text" {
-  targets    = local.file_match.acessilia_text.targets
-  forward_to = [loki.write.default.receiver]
 }
 
 loki.write "default" {

@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import asyncio
+import json
+
 import httpx
 import respx
 from fastapi.testclient import TestClient
 
 from observability.src.app import create_app
+from observability.src.integrations.loki import LokiLogsProvider
 from observability.src.storage.sqlite import (
     create_annotation,
     delete_annotation,
@@ -62,13 +66,12 @@ def test_frontend_index_renders(monkeypatch, tmp_path):
 
     assert response.status_code == 200
     assert "Acessília Observabilidade" in response.text
-    assert "Tempo real" in response.text
-    assert "Status da stack" in response.text
-    assert "Req/s usuários" in response.text
-    assert "Pipeline em tempo real" in response.text
-    assert "LLM em tempo real" in response.text
-    assert "Tokens, TTFT e custo" in response.text
+    assert "Indicadores principais" in response.text
+    assert "Processamentos recentes" in response.text
+    assert "Execuções" in response.text
+    assert "LLM e agentes" in response.text
     assert "Console Agno" in response.text
+    assert 'type="module" src="/static/dashboard.js' in response.text
 
 
 def test_agno_console_renders(monkeypatch, tmp_path):
@@ -81,9 +84,28 @@ def test_agno_console_renders(monkeypatch, tmp_path):
 
     assert response.status_code == 200
     assert "Acessília Console Agno" in response.text
-    assert "Descoberta automática" in response.text
-    assert "Chat Direto" in response.text
+    assert "Runtime integrado" in response.text
+    assert "Agentes e times" in response.text
+    assert "Comparativo" in response.text
     assert "http://agent-os.local" in response.text
+    assert 'type="module" src="/static/agno.js' in response.text
+
+
+def test_panel_health_reports_local_telemetry_state(monkeypatch, tmp_path):
+    monkeypatch.setenv("OBSERVABILITY_DB_PATH", str(tmp_path / "health.db"))
+    monkeypatch.setenv("OBSERVABILITY_FRONTEND_TRACING", "false")
+    monkeypatch.setenv("OTEL_SERVICE_NAME", "acessilia-observability")
+    app = create_app()
+    client = TestClient(app)
+
+    response = client.get("/api/health")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "ok",
+        "service": "acessilia-observability",
+        "otel_enabled": False,
+    }
 
 
 def test_agno_entities_degrades_when_agentos_is_down(monkeypatch, tmp_path):
@@ -120,7 +142,12 @@ def test_agno_entities_reads_agents_and_teams(monkeypatch, tmp_path):
                         "id": "vision",
                         "name": "Vision Agent",
                         "db_id": "db-vision",
-                        "model": {"provider": "openai", "model": "gpt-test"},
+                        "model": {
+                            "provider": "openai",
+                            "model": "gpt-test",
+                            "api_key": "must-not-leak",
+                            "headers": {"Authorization": "secret"},
+                        },
                     }
                 ],
             )
@@ -139,6 +166,8 @@ def test_agno_entities_reads_agents_and_teams(monkeypatch, tmp_path):
     assert payload["status"]["available"] is True
     assert payload["entities"]["agents"][0]["id"] == "vision"
     assert payload["entities"]["agents"][0]["model"]["model"] == "gpt-test"
+    assert "api_key" not in payload["entities"]["agents"][0]["model"]
+    assert "headers" not in payload["entities"]["agents"][0]["model"]
     assert payload["entities"]["teams"][0]["id"] == "review"
 
 
@@ -208,6 +237,19 @@ def test_agno_run_proxies_agent_stream(monkeypatch, tmp_path):
     rep = client.get("/api/agno/metrics/report")
     assert rep.status_code == 200
     assert "Relatório de Observabilidade Agno" in rep.json()["markdown"]
+
+    # Navegação correlacionada no painel principal
+    runs = client.get("/api/investigations/runs?search=vision")
+    assert runs.status_code == 200
+    assert len(runs.json()["items"]) == 1
+    investigated_run = runs.json()["items"][0]
+    assert investigated_run["source"] == "agno"
+    assert investigated_run["event_count"] == 3
+
+    details = client.get(f"/api/investigations/runs/{investigated_run['run_id']}")
+    assert details.status_code == 200
+    assert details.json()["run"]["trace_id"]
+    assert len(details.json()["messages"]) == 2
 
     # Deleta sessão
     del_res = client.delete("/api/agno/sessions/s1")
@@ -318,6 +360,8 @@ def test_snapshot_degrades_when_stack_is_down(monkeypatch, tmp_path):
     monkeypatch.setenv("LANGFUSE_URL", "http://127.0.0.1:9")
     monkeypatch.setenv("TEMPO_URL", "http://127.0.0.1:9")
     monkeypatch.setenv("LOCUST_URL", "http://127.0.0.1:9")
+    monkeypatch.setenv("OTEL_COLLECTOR_HEALTH_URL", "http://127.0.0.1:9")
+    monkeypatch.setenv("AGNO_OS_URL", "http://127.0.0.1:9")
     app = create_app()
     client = TestClient(app)
 
@@ -332,9 +376,145 @@ def test_snapshot_degrades_when_stack_is_down(monkeypatch, tmp_path):
         "langfuse": False,
         "tempo": False,
         "locust": False,
+        "otel": False,
+        "agno": False,
     }
+    assert all(item["state"] == "offline" for item in payload["service_details"].values())
+    assert payload["sources"]["metrics"]["state"] == "offline"
+    assert payload["sources"]["logs"]["state"] == "offline"
     assert payload["logs"] == []
     assert payload["annotations"] == []
+
+
+def test_loki_provider_reports_ready_without_log_entries():
+    provider = LokiLogsProvider(base_url="http://loki.test", query='{job="acessilia"}')
+
+    with respx.mock:
+        respx.get("http://loki.test/ready").mock(return_value=httpx.Response(200, text="ready"))
+        respx.get("http://loki.test/loki/api/v1/query_range").mock(
+            return_value=httpx.Response(200, json={"data": {"result": []}})
+        )
+
+        async def run_provider():
+            async with httpx.AsyncClient() as client:
+                return await provider.entries(client)
+
+        result = asyncio.run(run_provider())
+
+    assert result["available"] is True
+    assert result["query_available"] is True
+    assert result["entries"] == []
+    assert result["probe"]["status_code"] == 200
+
+
+def test_loki_provider_keeps_ready_status_when_query_fails():
+    provider = LokiLogsProvider(base_url="http://loki.test", query='{job="acessilia"}')
+
+    with respx.mock:
+        respx.get("http://loki.test/ready").mock(return_value=httpx.Response(200, text="ready"))
+        respx.get("http://loki.test/loki/api/v1/query_range").mock(
+            return_value=httpx.Response(500, text="temporary query failure")
+        )
+
+        async def run_provider():
+            async with httpx.AsyncClient() as client:
+                return await provider.entries(client)
+
+        result = asyncio.run(run_provider())
+
+    assert result["available"] is True
+    assert result["query_available"] is False
+    assert result["entries"] == []
+    assert "500 Internal Server Error" in result["error"]
+
+
+def test_loki_provider_escapes_search_in_logql():
+    provider = LokiLogsProvider(base_url="http://loki.test", query='{job="acessilia"}')
+
+    with respx.mock:
+        respx.get("http://loki.test/ready").mock(
+            return_value=httpx.Response(200, text="ready")
+        )
+        query_route = respx.get("http://loki.test/loki/api/v1/query_range").mock(
+            return_value=httpx.Response(
+                200,
+                json={"status": "success", "data": {"result": []}},
+            )
+        )
+
+        async def run_provider():
+            async with httpx.AsyncClient() as client:
+                return await provider.entries(client, search='trace "abc"')
+
+        result = asyncio.run(run_provider())
+
+    assert result["query_available"] is True
+    assert query_route.calls.last.request.url.params["query"] == (
+        '{job="acessilia"} |= "trace \\"abc\\""'
+    )
+
+
+def test_loki_provider_extracts_correlation_from_json_log():
+    provider = LokiLogsProvider(base_url="http://loki.test", query='{job="acessilia"}')
+    serialized_log = {
+        "text": "formatted message\n",
+        "record": {
+            "message": "run completed",
+            "name": "backend.pipeline",
+            "level": {"name": "INFO"},
+            "extra": {
+                "trace_id": "a" * 32,
+                "span_id": "b" * 16,
+                "run_id": "run-1",
+                "session_id": "session-1",
+            },
+        },
+    }
+
+    with respx.mock:
+        respx.get("http://loki.test/ready").mock(
+            return_value=httpx.Response(200, text="ready")
+        )
+        respx.get("http://loki.test/loki/api/v1/query_range").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "status": "success",
+                    "data": {
+                        "result": [
+                            {
+                                "stream": {"job": "acessilia", "format": "json"},
+                                "values": [["1788127723000000000", json.dumps(serialized_log)]],
+                            }
+                        ]
+                    },
+                },
+            )
+        )
+
+        async def run_provider():
+            async with httpx.AsyncClient() as client:
+                return await provider.entries(client)
+
+        result = asyncio.run(run_provider())
+
+    entry = result["entries"][0]
+    assert entry["line"] == "run completed"
+    assert entry["level"] == "INFO"
+    assert entry["module"] == "backend.pipeline"
+    assert entry["trace_id"] == "a" * 32
+    assert entry["span_id"] == "b" * 16
+    assert entry["run_id"] == "run-1"
+    assert entry["session_id"] == "session-1"
+
+
+def test_investigation_query_validation(monkeypatch, tmp_path):
+    monkeypatch.setenv("OBSERVABILITY_DB_PATH", str(tmp_path / "validation.db"))
+    client = TestClient(create_app())
+
+    assert client.get("/api/investigations/runs?status=unknown").status_code == 422
+    assert client.get("/api/investigations/runs?limit=0").status_code == 422
+    assert client.get("/api/logs?limit=501").status_code == 422
 
 
 def test_realtime_degrades_when_prometheus_is_down(monkeypatch, tmp_path):

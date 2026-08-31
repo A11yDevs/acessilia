@@ -5,11 +5,26 @@ from loguru import logger
 from backend.config.settings import settings
 
 
+def _add_trace_context(record: dict) -> None:
+    """Add the active OpenTelemetry context without requiring telemetry at runtime."""
+    try:
+        from opentelemetry import trace
+
+        context = trace.get_current_span().get_span_context()
+        if not context.is_valid:
+            return
+        record["extra"].setdefault("trace_id", f"{context.trace_id:032x}")
+        record["extra"].setdefault("span_id", f"{context.span_id:016x}")
+    except Exception:
+        return
+
+
 def setup_logger() -> None:
     logs_dir = settings.logs_dir
     logs_dir.mkdir(parents=True, exist_ok=True)
 
     logger.remove()
+    logger.configure(patcher=_add_trace_context)
 
     logger.add(
         sys.stderr,

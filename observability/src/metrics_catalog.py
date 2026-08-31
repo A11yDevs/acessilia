@@ -21,6 +21,7 @@ def build_metrics_catalog(
     *,
     metric_prefix: str = "acessilia",
     api_job_name: str = "acessilia-api",
+    observability_job_name: str = "acessilia-observability",
     internal_handler_re: str = DEFAULT_INTERNAL_HANDLER_RE,
 ) -> MetricsCatalog:
     def selector(extra: str = "") -> str:
@@ -135,6 +136,35 @@ def build_metrics_catalog(
         f'sum(rate({metric("llm_tokens_total")}{{token_type="cache_write"}}[1m]))'
     )
     llm_cost_per_min_query = zero(f"sum(rate({metric('llm_cost_total')}[5m])) * 60")
+    agno_calls_per_min_query = zero(
+        f"sum(rate({metric('agno_chat_calls_total')}[1m])) * 60"
+    )
+    agno_failures_per_min_query = zero(
+        f"sum(rate({metric('agno_chat_failures_total')}[1m])) * 60"
+    )
+    agno_duration_avg_query = zero(
+        f"sum(rate({metric('agno_chat_duration_seconds_sum')}[5m])) "
+        f"/ clamp_min(sum(rate({metric('agno_chat_duration_seconds_count')}[5m])), 1)"
+    )
+    agno_ttft_avg_query = zero(
+        f"sum(rate({metric('agno_chat_ttft_seconds_sum')}[5m])) "
+        f"/ clamp_min(sum(rate({metric('agno_chat_ttft_seconds_count')}[5m])), 1)"
+    )
+    agno_input_tokens_rate_query = zero(
+        f'sum(rate({metric("agno_chat_tokens_total")}{{token_type="input"}}[1m]))'
+    )
+    agno_output_tokens_rate_query = zero(
+        f'sum(rate({metric("agno_chat_tokens_total")}{{token_type="output"}}[1m]))'
+    )
+    agno_reasoning_tokens_rate_query = zero(
+        f'sum(rate({metric("agno_chat_tokens_total")}{{token_type="reasoning"}}[1m]))'
+    )
+    agno_cost_per_min_query = zero(
+        f"sum(rate({metric('agno_chat_cost_total')}[5m])) * 60"
+    )
+    agno_tool_calls_per_min_query = zero(
+        f"sum(rate({metric('agno_chat_tool_calls_total')}[1m])) * 60"
+    )
 
     realtime = (
         MetricDefinition("Req/s usuários", req_user, "rps", key="req_user"),
@@ -159,6 +189,12 @@ def build_metrics_catalog(
             key="llm_total_tokens_rate",
         ),
         MetricDefinition("LLM TTFT", llm_ttft_avg_query, "seconds", key="llm_ttft_avg"),
+        MetricDefinition(
+            "Runs Agno/min",
+            agno_calls_per_min_query,
+            "per_minute",
+            key="agno_calls_per_min",
+        ),
     )
 
     timeseries = (
@@ -180,6 +216,15 @@ def build_metrics_catalog(
         MetricDefinition("Cache read tokens/s", llm_cache_read_tokens_rate_query, "tokens_per_second", key="llm_cache_read_tokens_rate"),
         MetricDefinition("Cache write tokens/s", llm_cache_write_tokens_rate_query, "tokens_per_second", key="llm_cache_write_tokens_rate"),
         MetricDefinition("LLM custo/min", llm_cost_per_min_query, "currency_per_minute", key="llm_cost_per_min"),
+        MetricDefinition("Runs Agno/min", agno_calls_per_min_query, "per_minute", key="agno_calls_per_min"),
+        MetricDefinition("Falhas Agno/min", agno_failures_per_min_query, "per_minute", key="agno_failures_per_min"),
+        MetricDefinition("Duração Agno", agno_duration_avg_query, "seconds", key="agno_duration_avg"),
+        MetricDefinition("TTFT Agno", agno_ttft_avg_query, "seconds", key="agno_ttft_avg"),
+        MetricDefinition("Input Agno tokens/s", agno_input_tokens_rate_query, "tokens_per_second", key="agno_input_tokens_rate"),
+        MetricDefinition("Output Agno tokens/s", agno_output_tokens_rate_query, "tokens_per_second", key="agno_output_tokens_rate"),
+        MetricDefinition("Reasoning Agno tokens/s", agno_reasoning_tokens_rate_query, "tokens_per_second", key="agno_reasoning_tokens_rate"),
+        MetricDefinition("Custo Agno/min", agno_cost_per_min_query, "currency_per_minute", key="agno_cost_per_min"),
+        MetricDefinition("Tools Agno/min", agno_tool_calls_per_min_query, "per_minute", key="agno_tool_calls_per_min"),
         MetricDefinition("GPU uso", gpu_util_query, "percent", key="gpu_util"),
         MetricDefinition("GPU VRAM", gpu_vram_query, "percent", key="gpu_vram"),
         MetricDefinition("GPU watts", gpu_watts_query, "watts", key="gpu_watts"),
@@ -247,6 +292,11 @@ def build_metrics_catalog(
             MetricDefinition("Rede saída", net_tx_query, "bytes_per_second"),
             MetricDefinition("Prometheus targets", "sum(up)", "count"),
             MetricDefinition("Alloy up", 'up{job="alloy"}', "state"),
+            MetricDefinition(
+                "Painel de observabilidade up",
+                f'up{{job="{observability_job_name}"}}',
+                "state",
+            ),
             MetricDefinition("GPU uso", gpu_util_query, "percent"),
             MetricDefinition("GPU VRAM", gpu_vram_query, "percent"),
             MetricDefinition("GPU watts", gpu_watts_query, "watts"),
@@ -317,6 +367,29 @@ def build_metrics_catalog(
                 "Modelos observados",
                 metric("llm_model_info"),
                 "state",
+                kind="vector",
+            ),
+            MetricDefinition("Runs diretos Agno/min", agno_calls_per_min_query, "per_minute"),
+            MetricDefinition("Falhas diretas Agno/min", agno_failures_per_min_query, "per_minute"),
+            MetricDefinition("Duração direta Agno", agno_duration_avg_query, "seconds"),
+            MetricDefinition("TTFT direto Agno", agno_ttft_avg_query, "seconds"),
+            MetricDefinition("Custo direto Agno/min", agno_cost_per_min_query, "currency_per_minute"),
+            MetricDefinition(
+                "Runs diretos por entidade",
+                f"sum by (entity_type, entity_id, status) ({metric('agno_chat_calls_total')})",
+                "count",
+                kind="vector",
+            ),
+            MetricDefinition(
+                "Tokens diretos por entidade/tipo",
+                f"sum by (entity_id, token_type) ({metric('agno_chat_tokens_total')})",
+                "tokens",
+                kind="vector",
+            ),
+            MetricDefinition(
+                "Ferramentas diretas por entidade",
+                f"sum by (entity_id, tool_name, status) ({metric('agno_chat_tool_calls_total')})",
+                "count",
                 kind="vector",
             ),
         ),

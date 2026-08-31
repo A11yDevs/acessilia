@@ -1,105 +1,61 @@
-const agnoState = {
-  entities: { agents: [], teams: [] },
-  selected: null,
-  sessionId: "",
-  sessions: [],
-  streaming: false,
-  lastContent: "",
-  startedAt: null,
-  activeTab: "view-chat",
-};
+import { createAnalyticsController } from "./agno-analytics.js";
+import { agnoApi } from "./agno-api.js";
+import { readEventStream } from "./agno-stream.js";
+import { escapeHtml, formatCurrency, formatDate, shortId } from "./shared.js";
 
 const runEvents = new Set([
-  "RunStarted",
-  "RunCompleted",
-  "RunError",
-  "RunCancelled",
-  "TeamRunStarted",
-  "TeamRunCompleted",
-  "TeamRunError",
-  "TeamRunCancelled",
+  "RunStarted", "RunCompleted", "RunError", "RunCancelled",
+  "TeamRunStarted", "TeamRunCompleted", "TeamRunError", "TeamRunCancelled",
 ]);
-
 const contentEvents = new Set(["RunContent", "TeamRunContent"]);
-const toolEvents = new Set(["ToolCallStarted", "ToolCallCompleted", "TeamToolCallStarted", "TeamToolCallCompleted"]);
+
+const params = new URLSearchParams(window.location.search);
+const state = {
+  entities: { agents: [], teams: [] },
+  selected: null,
+  sessions: [],
+  sessionId: "",
+  streaming: false,
+  lastContent: "",
+  requestedEntityId: params.get("entity_id") || "",
+  requestedSessionId: params.get("session_id") || "",
+};
 
 const dom = {
+  notice: document.getElementById("agno-notice"),
+  overallStatus: document.getElementById("agno-overall-status"),
   statusCard: document.getElementById("agno-status-card"),
   updatedAt: document.getElementById("agno-updated-at"),
   agentCount: document.getElementById("agno-agent-count"),
+  sourceState: document.getElementById("entity-source-state"),
   agentList: document.getElementById("agno-agent-list"),
   teamList: document.getElementById("agno-team-list"),
   sessionsList: document.getElementById("agno-sessions-list"),
-  newSessionBtn: document.getElementById("agno-new-session"),
   refresh: document.getElementById("agno-refresh"),
+  newSession: document.getElementById("agno-new-session"),
   selectedTitle: document.getElementById("agno-selected-title"),
   selectedDetails: document.getElementById("agno-selected-details"),
+  sessionPill: document.getElementById("agno-session-pill"),
+  clearChat: document.getElementById("agno-clear-chat-btn"),
   chat: document.getElementById("agno-chat-log"),
   form: document.getElementById("agno-chat-form"),
   message: document.getElementById("agno-message"),
-  submit: document.querySelector("#agno-chat-form button"),
-  sessionPill: document.getElementById("agno-session-pill"),
-  clearChatBtn: document.getElementById("agno-clear-chat-btn"),
+  submit: document.querySelector("#agno-chat-form button[type='submit']"),
   runFacts: document.getElementById("agno-run-facts"),
-  eventList: document.getElementById("agno-event-list"),
-
-  // Tabs
-  tabBtns: document.querySelectorAll(".agno-tab-btn"),
+  events: document.getElementById("agno-event-list"),
+  tabs: document.querySelectorAll(".agno-tab-btn"),
   views: document.querySelectorAll(".agno-console-view"),
-
-  // Metrics Tab (2B)
-  metricsAgentTitle: document.getElementById("metrics-agent-title"),
-  metricsDaysSelect: document.getElementById("metrics-days-select"),
-  metricsRefreshBtn: document.getElementById("metrics-refresh-btn"),
-  kpiTotalRuns: document.getElementById("kpi-total-runs"),
-  kpiSuccessRate: document.getElementById("kpi-success-rate"),
-  kpiAvgDuration: document.getElementById("kpi-avg-duration"),
-  kpiP95Duration: document.getElementById("kpi-p95-duration"),
-  kpiAvgTtft: document.getElementById("kpi-avg-ttft"),
-  kpiP95Ttft: document.getElementById("kpi-p95-ttft"),
-  kpiAvgTokens: document.getElementById("kpi-avg-tokens"),
-  kpiTotalTokens: document.getElementById("kpi-total-tokens"),
-  kpiTotalCost: document.getElementById("kpi-total-cost"),
-  agentRunsTbody: document.getElementById("agent-runs-tbody"),
-
-  // Compare Tab (2B)
-  compareGroupSelect: document.getElementById("compare-group-select"),
-  compareRefreshBtn: document.getElementById("compare-refresh-btn"),
-  compareColHeader: document.getElementById("compare-col-header"),
-  compareTbody: document.getElementById("compare-tbody"),
-
-  // Report Tab (2B)
-  reportCopyBtn: document.getElementById("report-copy-btn"),
-  reportRefreshBtn: document.getElementById("report-refresh-btn"),
-  reportMarkdownPreview: document.getElementById("report-markdown-preview"),
 };
 
-// Event Listeners
+const analytics = createAnalyticsController(() => state.selected);
+
 dom.refresh.addEventListener("click", loadEntities);
-dom.newSessionBtn?.addEventListener("click", startNewSession);
-dom.clearChatBtn?.addEventListener("click", clearChatView);
-
-dom.tabBtns.forEach((btn) => {
-  btn.addEventListener("click", () => switchTab(btn.dataset.target));
+dom.newSession.addEventListener("click", startNewSession);
+dom.clearChat.addEventListener("click", () => {
+  dom.chat.innerHTML = '<div class="empty-state">A tela foi limpa.</div>';
 });
-
-dom.metricsRefreshBtn?.addEventListener("click", loadMetricsView);
-dom.metricsDaysSelect?.addEventListener("change", loadMetricsView);
-
-dom.compareRefreshBtn?.addEventListener("click", loadCompareView);
-dom.compareGroupSelect?.addEventListener("change", loadCompareView);
-
-dom.reportRefreshBtn?.addEventListener("click", loadReportView);
-dom.reportCopyBtn?.addEventListener("click", copyReportMarkdown);
-
-dom.form.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const message = dom.message.value.trim();
-  if (!message || !agnoState.selected || agnoState.streaming) return;
-  dom.message.value = "";
-  await sendMessage(message);
-});
-
+dom.tabs.forEach((button) => button.addEventListener("click", () => switchTab(button.dataset.target)));
+dom.form.addEventListener("submit", handleSubmit);
 dom.message.addEventListener("keydown", (event) => {
   if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
     event.preventDefault();
@@ -107,434 +63,328 @@ dom.message.addEventListener("keydown", (event) => {
   }
 });
 
-// Inicialização
 loadEntities();
 
-function switchTab(targetId) {
-  agnoState.activeTab = targetId;
-  dom.tabBtns.forEach((b) => b.classList.toggle("active", b.dataset.target === targetId));
-  dom.views.forEach((v) => v.classList.toggle("active", v.id === targetId));
-
-  if (targetId === "view-metrics") loadMetricsView();
-  if (targetId === "view-compare") loadCompareView();
-  if (targetId === "view-report") loadReportView();
+function switchTab(viewId) {
+  dom.tabs.forEach((button) => {
+    const active = button.dataset.target === viewId;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", String(active));
+  });
+  dom.views.forEach((view) => view.classList.toggle("active", view.id === viewId));
+  analytics.activate(viewId);
 }
 
 async function loadEntities() {
-  setLoading(true);
+  setRefreshState(true);
   try {
-    const response = await fetch("/api/agno/entities", { cache: "no-store" });
-    const payload = await response.json();
-    agnoState.entities = payload.entities || { agents: [], teams: [] };
+    const payload = await agnoApi.entities();
+    state.entities = payload.entities || { agents: [], teams: [] };
     renderStatus(payload.status || {});
-    renderEntities();
+    const selection = findInitialSelection();
+    renderEntityLists();
+    if (selection && (!state.selected || state.selected.id !== selection.entity.id || state.selected.type !== selection.type)) {
+      await selectEntity(selection.entity, selection.type);
+    } else if (!selection) {
+      resetSelection();
+    }
   } catch (error) {
-    renderStatus({ available: false, error: String(error) });
-    renderEmptyList(dom.agentList, "AgentOS indisponível.");
-    renderEmptyList(dom.teamList, "Sem times detectados.");
+    state.entities = { agents: [], teams: [] };
+    renderStatus({ available: false, error: error.message });
+    renderEntityLists();
   } finally {
-    setLoading(false);
-    dom.updatedAt.textContent = `Atualizado em ${new Date().toLocaleTimeString("pt-BR")}`;
+    setRefreshState(false);
+    dom.updatedAt.textContent = `Atualizado ${new Date().toLocaleTimeString("pt-BR")}`;
   }
+}
+
+function resetSelection() {
+  state.selected = null;
+  state.sessionId = "";
+  state.sessions = [];
+  dom.selectedTitle.textContent = "Selecione uma entidade";
+  dom.selectedDetails.textContent = "";
+  dom.sessionPill.textContent = "Sem sessão";
+  dom.message.disabled = true;
+  dom.submit.disabled = true;
+  dom.chat.innerHTML = '<div class="empty-state">Nenhuma entidade disponível.</div>';
+  dom.sessionsList.innerHTML = '<div class="empty-state">Nenhuma sessão.</div>';
+  updateRunFacts({ Status: "indisponível" });
+}
+
+function findInitialSelection() {
+  const agents = state.entities.agents || [];
+  const teams = state.entities.teams || [];
+  if (state.selected) {
+    const current = (state.selected.type === "agent" ? agents : teams).find((item) => item.id === state.selected.id);
+    if (current) return { entity: current, type: state.selected.type };
+  }
+  const requestedAgent = agents.find((item) => item.id === state.requestedEntityId);
+  if (requestedAgent) return { entity: requestedAgent, type: "agent" };
+  const requestedTeam = teams.find((item) => item.id === state.requestedEntityId);
+  if (requestedTeam) return { entity: requestedTeam, type: "team" };
+  if (agents[0]) return { entity: agents[0], type: "agent" };
+  if (teams[0]) return { entity: teams[0], type: "team" };
+  return null;
 }
 
 function renderStatus(status) {
-  dom.statusCard.classList.toggle("online", Boolean(status.available));
-  dom.statusCard.classList.toggle("offline", !status.available);
-  dom.statusCard.querySelector(".status-state").textContent = status.available
-    ? "online"
-    : status.error || `offline${status.status_code ? ` (${status.status_code})` : ""}`;
+  const available = Boolean(status.available);
+  const detail = available ? "online" : status.error || "offline";
+  dom.statusCard.classList.toggle("online", available);
+  dom.statusCard.classList.toggle("offline", !available);
+  dom.statusCard.querySelector(".status-state").textContent = detail;
+  dom.overallStatus.className = `overall-status ${available ? "online" : "offline"}`;
+  dom.overallStatus.textContent = available ? "Runtime conectado" : "Runtime indisponível";
+  dom.sourceState.className = `source-state ${available ? "online" : "degraded"}`;
+  dom.sourceState.textContent = available ? "Conectado" : "Indisponível";
+  dom.notice.hidden = available;
+  dom.notice.textContent = available ? "" : `Não foi possível consultar o runtime Agno: ${detail}`;
 }
 
-function renderEntities() {
-  const agents = agnoState.entities.agents || [];
-  const teams = agnoState.entities.teams || [];
+function renderEntityLists() {
+  const agents = state.entities.agents || [];
+  const teams = state.entities.teams || [];
   dom.agentCount.textContent = `${agents.length} agente(s), ${teams.length} time(s)`;
   renderEntityList(dom.agentList, agents, "agent", "Nenhum agente detectado.");
   renderEntityList(dom.teamList, teams, "team", "Nenhum time detectado.");
-
-  if (!agnoState.selected && agents.length > 0) {
-    selectEntity(agents[0], "agent");
-  }
 }
 
 function renderEntityList(container, items, type, emptyText) {
-  container.innerHTML = "";
   if (!items.length) {
-    renderEmptyList(container, emptyText);
+    container.innerHTML = `<div class="empty-state">${escapeHtml(emptyText)}</div>`;
     return;
   }
-
-  items.forEach((item) => {
+  container.innerHTML = "";
+  for (const item of items) {
+    const model = item.model || {};
     const button = document.createElement("button");
     button.type = "button";
-    button.className = "entity-card";
-    button.dataset.entityId = item.id;
-    button.dataset.entityType = type;
-    if (agnoState.selected?.id === item.id && agnoState.selected?.type === type) {
-      button.classList.add("active");
-    }
-
-    const model = item.model || {};
-    button.innerHTML = `
-      <strong>${escapeHtml(item.name || item.id)}</strong>
-      <small>${escapeHtml(model.model || model.name || "modelo padrão")}</small>
-    `;
+    button.className = "entity-button";
+    button.classList.toggle("active", state.selected?.id === item.id && state.selected?.type === type);
+    button.innerHTML = `<strong>${escapeHtml(item.name || item.id)}</strong><small>${escapeHtml(model.model || model.name || "modelo padrão")}</small>`;
     button.addEventListener("click", () => selectEntity(item, type));
     container.appendChild(button);
-  });
+  }
 }
 
-function renderEmptyList(container, text) {
-  container.innerHTML = `<div class="entity-placeholder">${escapeHtml(text)}</div>`;
-}
-
-function selectEntity(entity, type) {
-  agnoState.selected = { ...entity, type };
-  agnoState.sessionId = "";
-  agnoState.lastContent = "";
+async function selectEntity(entity, type) {
+  state.selected = { ...entity, type };
+  state.sessionId = "";
+  state.lastContent = "";
   dom.selectedTitle.textContent = entity.name || entity.id;
   const model = entity.model || {};
-  dom.selectedDetails.innerHTML = `
-    <code>${escapeHtml(type)}</code>
-    <span>${escapeHtml(entity.id)}</span>
-    <span>${escapeHtml(model.provider || "provedor padrão")}</span>
-    <span>${escapeHtml(model.model || model.name || "modelo padrão")}</span>
-  `;
-  dom.sessionPill.textContent = "Nova sessão";
+  dom.selectedDetails.innerHTML = `<code>${escapeHtml(type)}</code><span>${escapeHtml(entity.id)}</span><span>${escapeHtml(model.provider || "provedor padrão")}</span><span>${escapeHtml(model.model || model.name || "modelo padrão")}</span>`;
   dom.message.disabled = false;
   dom.submit.disabled = false;
-  dom.chat.innerHTML = "";
-  dom.eventList.innerHTML = "";
-  updateRunFacts({
-    "Entidade": `${type}/${entity.id}`,
-    "Sessão": "nova",
-    "Status": "pronto",
-  });
-  renderEntities();
-  loadSessions(type, entity.id);
+  dom.sessionPill.textContent = "Nova sessão";
+  dom.chat.innerHTML = '<div class="empty-state">Nova conversa.</div>';
+  dom.events.innerHTML = '<div class="empty-state">Nenhum evento.</div>';
+  updateRunFacts({ Entidade: `${type}/${entity.id}`, Sessão: "nova", Status: "pronto" });
+  renderEntityLists();
+  updateUrl();
+  await loadSessions();
   dom.message.focus();
 }
 
 function startNewSession() {
-  agnoState.sessionId = "";
-  agnoState.lastContent = "";
+  if (!state.selected) return;
+  state.sessionId = "";
+  state.lastContent = "";
+  state.requestedSessionId = "";
   dom.sessionPill.textContent = "Nova sessão";
-  dom.chat.innerHTML = `
-    <div class="agno-empty">
-      <h3>Nova conversa com ${escapeHtml(agnoState.selected?.name || agnoState.selected?.id || "o agente")}</h3>
-      <p>Envie uma mensagem abaixo para iniciar uma nova sessão persistida no SQLite.</p>
-    </div>
-  `;
-  dom.eventList.innerHTML = "";
-  updateRunFacts({
-    "Entidade": `${agnoState.selected?.type}/${agnoState.selected?.id}`,
-    "Sessão": "nova",
-    "Status": "pronto",
-  });
-  if (agnoState.selected) {
-    loadSessions(agnoState.selected.type, agnoState.selected.id);
-  }
+  dom.chat.innerHTML = '<div class="empty-state">Nova conversa.</div>';
+  dom.events.innerHTML = '<div class="empty-state">Nenhum evento.</div>';
+  updateRunFacts({ Entidade: `${state.selected.type}/${state.selected.id}`, Sessão: "nova", Status: "pronto" });
+  renderSessions();
+  updateUrl();
+  dom.message.focus();
 }
 
-function clearChatView() {
-  dom.chat.innerHTML = `
-    <div class="agno-empty">
-      <h3>Tela limpa</h3>
-      <p>Envie uma mensagem para continuar na sessão atual ou clique em "+ Nova" para trocar de sessão.</p>
-    </div>
-  `;
-}
-
-async function loadSessions(entityType, entityId) {
-  if (!dom.sessionsList) return;
+async function loadSessions() {
+  if (!state.selected) return;
   try {
-    const res = await fetch(`/api/agno/sessions?entity_type=${encodeURIComponent(entityType)}&entity_id=${encodeURIComponent(entityId)}`);
-    const data = await res.json();
-    agnoState.sessions = data.sessions || [];
-    renderSessionsList();
-  } catch (err) {
-    dom.sessionsList.innerHTML = `<div class="entity-placeholder">Erro ao carregar histórico: ${escapeHtml(err.message)}</div>`;
+    const data = await agnoApi.sessions(state.selected.type, state.selected.id);
+    state.sessions = data.sessions || [];
+    renderSessions();
+    if (state.requestedSessionId && state.sessions.some((item) => item.session_id === state.requestedSessionId)) {
+      const requested = state.requestedSessionId;
+      state.requestedSessionId = "";
+      await openSession(requested);
+    }
+  } catch (error) {
+    dom.sessionsList.innerHTML = `<div class="empty-state error-text">${escapeHtml(error.message)}</div>`;
   }
 }
 
-function renderSessionsList() {
-  if (!dom.sessionsList) return;
-  dom.sessionsList.innerHTML = "";
-  if (!agnoState.sessions.length) {
-    dom.sessionsList.innerHTML = `<div class="entity-placeholder">Nenhuma sessão anterior salva.</div>`;
+function renderSessions() {
+  if (!state.sessions.length) {
+    dom.sessionsList.innerHTML = '<div class="empty-state">Nenhuma sessão salva.</div>';
     return;
   }
-
-  agnoState.sessions.forEach((s) => {
-    const item = document.createElement("div");
-    item.className = "session-item";
-    if (agnoState.sessionId === s.session_id) item.classList.add("active");
-
-    const dateStr = s.updated_at ? new Date(s.updated_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "";
-    item.innerHTML = `
-      <div class="session-info">
-        <strong>${escapeHtml(s.name || s.session_id)}</strong>
-        <small>${escapeHtml(dateStr)} • ${s.message_count || 0} msg(s)</small>
-      </div>
-      <button class="session-del-btn" type="button" title="Excluir sessão">×</button>
-    `;
-
-    item.querySelector(".session-info").addEventListener("click", () => openSession(s.session_id));
-    item.querySelector(".session-del-btn").addEventListener("click", (e) => {
-      e.stopPropagation();
-      deleteSession(s.session_id);
-    });
-
-    dom.sessionsList.appendChild(item);
-  });
+  dom.sessionsList.innerHTML = "";
+  for (const session of state.sessions) {
+    const row = document.createElement("div");
+    row.className = "session-item";
+    row.classList.toggle("active", session.session_id === state.sessionId);
+    row.innerHTML = `<button class="session-info" type="button"><strong>${escapeHtml(session.name || shortId(session.session_id))}</strong><small>${escapeHtml(formatDate(session.updated_at, { dateStyle: "short", timeStyle: "short" }))} · ${session.message_count || 0} msg</small></button><button class="session-delete" type="button" title="Excluir sessão" aria-label="Excluir sessão">×</button>`;
+    row.querySelector(".session-info").addEventListener("click", () => openSession(session.session_id));
+    row.querySelector(".session-delete").addEventListener("click", () => deleteSession(session.session_id));
+    dom.sessionsList.appendChild(row);
+  }
 }
 
 async function openSession(sessionId) {
-  agnoState.sessionId = sessionId;
-  dom.sessionPill.textContent = `Sessão ${sessionId.slice(-6)}`;
-  dom.chat.innerHTML = `<div class="entity-placeholder">Carregando mensagens da sessão...</div>`;
-  renderSessionsList();
-
+  state.sessionId = sessionId;
+  dom.sessionPill.textContent = `Sessão ${shortId(sessionId, 8)}`;
+  dom.chat.innerHTML = '<div class="empty-state">Carregando sessão...</div>';
+  renderSessions();
+  updateUrl();
   try {
-    const res = await fetch(`/api/agno/sessions/${encodeURIComponent(sessionId)}`);
-    if (!res.ok) throw new Error("Falha ao buscar sessão");
-    const data = await res.json();
-    renderSessionHistory(data);
-  } catch (err) {
-    dom.chat.innerHTML = `<div class="entity-placeholder error">Erro ao carregar histórico: ${escapeHtml(err.message)}</div>`;
+    renderSessionHistory(await agnoApi.session(sessionId));
+  } catch (error) {
+    dom.chat.innerHTML = `<div class="empty-state error-text">${escapeHtml(error.message)}</div>`;
   }
 }
 
 async function deleteSession(sessionId) {
-  if (!confirm("Excluir esta sessão e todas as métricas associadas?")) return;
+  if (!window.confirm("Excluir esta sessão e as métricas associadas?")) return;
   try {
-    await fetch(`/api/agno/sessions/${encodeURIComponent(sessionId)}`, { method: "DELETE" });
-    if (agnoState.sessionId === sessionId) {
-      startNewSession();
-    } else if (agnoState.selected) {
-      loadSessions(agnoState.selected.type, agnoState.selected.id);
-    }
-  } catch (err) {
-    alert(`Erro ao excluir sessão: ${err.message}`);
+    await agnoApi.deleteSession(sessionId);
+    state.sessions = state.sessions.filter((item) => item.session_id !== sessionId);
+    if (state.sessionId === sessionId) startNewSession();
+    else renderSessions();
+  } catch (error) {
+    dom.notice.hidden = false;
+    dom.notice.textContent = `Falha ao excluir a sessão: ${error.message}`;
   }
 }
 
 function renderSessionHistory(data) {
-  dom.chat.innerHTML = "";
   const messages = data.messages || [];
-  const runsById = data.runs_by_id || {};
-  const toolsByRun = data.tools_by_run || {};
-  const eventsByRun = data.events_by_run || {};
-
+  const runs = data.runs_by_id || {};
+  const tools = data.tools_by_run || {};
+  const events = data.events_by_run || {};
+  dom.chat.innerHTML = "";
   if (!messages.length) {
-    dom.chat.innerHTML = `<div class="agno-empty"><h3>Sessão vazia</h3><p>Envie uma mensagem para começar.</p></div>`;
+    dom.chat.innerHTML = '<div class="empty-state">Sessão vazia.</div>';
     return;
   }
-
-  messages.forEach((msg) => {
-    const role = msg.role === "user" ? "user" : "agent";
-    const run = msg.run_id ? runsById[msg.run_id] : null;
-    const tools = msg.run_id ? (toolsByRun[msg.run_id] || []) : [];
-    const events = msg.run_id ? (eventsByRun[msg.run_id] || []) : [];
-
-    const row = appendMessage(role, msg.content, {
-      createdAt: msg.created_at,
-      run,
-      tools,
-      events,
+  for (const message of messages) {
+    appendMessage(message.role === "user" ? "user" : "agent", message.content, {
+      createdAt: message.created_at,
+      run: message.run_id ? runs[message.run_id] : null,
+      tools: message.run_id ? tools[message.run_id] || [] : [],
+      events: message.run_id ? events[message.run_id] || [] : [],
     });
-  });
+  }
+  const latestRun = (data.runs || []).at(-1);
+  if (latestRun) {
+    updateRunFacts({
+      Entidade: `${latestRun.entity_type}/${latestRun.entity_id}`,
+      Sessão: state.sessionId,
+      Status: latestRun.status || "-",
+      Duração: Number.isFinite(latestRun.duration_seconds)
+        ? `${latestRun.duration_seconds.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}s`
+        : "sem dado",
+      TTFT: Number.isFinite(latestRun.ttft_seconds)
+        ? `${(latestRun.ttft_seconds * 1000).toFixed(0)}ms`
+        : "sem dado",
+      Tokens: `${latestRun.input_tokens || 0} entrada · ${latestRun.output_tokens || 0} saída`,
+      Custo: formatCurrency(latestRun.cost),
+      Trace: shortId(latestRun.trace_id),
+    });
+    dom.events.innerHTML = "";
+    for (const event of events[latestRun.run_id] || []) {
+      const payload = parseStoredValue(event.event_data_json);
+      addEvent(event.event_name || "RunEvent", summarizeEvent(payload || event));
+    }
+    if (!dom.events.children.length) {
+      dom.events.innerHTML = '<div class="empty-state">Nenhum evento.</div>';
+    }
+  }
 }
 
-// --- ENVIO DE MENSAGEM & STREAMING COM MÉTRICAS (2A) ---
+async function handleSubmit(event) {
+  event.preventDefault();
+  const message = dom.message.value.trim();
+  if (!message || !state.selected || state.streaming) return;
+  dom.message.value = "";
+  await sendMessage(message);
+}
 
 async function sendMessage(message) {
-  agnoState.streaming = true;
-  agnoState.lastContent = "";
-  agnoState.startedAt = performance.now();
+  state.streaming = true;
+  state.lastContent = "";
   dom.submit.disabled = true;
   dom.message.disabled = true;
-
-  // Renderiza bolha do usuário
   appendMessage("user", message, { createdAt: new Date().toISOString() });
-
-  // Cria bolha do assistente em estado de carregamento
-  const assistantBubble = appendMessage("agent", "", {
-    createdAt: new Date().toISOString(),
-    inProgress: true,
-  });
-
-  addEvent("RunQueued", "Mensagem enviada ao proxy local.");
-  updateRunFacts({
-    "Entidade": `${agnoState.selected.type}/${agnoState.selected.id}`,
-    "Sessão": agnoState.sessionId || "nova",
-    "Status": "executando",
-  });
-
-  const modelInfo = agnoState.selected.model || {};
-  let currentRunMeta = null;
+  const assistant = appendMessage("agent", "", { createdAt: new Date().toISOString() });
+  dom.events.innerHTML = "";
+  addEvent("RunQueued", "Mensagem enviada");
+  updateRunFacts({ Entidade: `${state.selected.type}/${state.selected.id}`, Sessão: state.sessionId || "nova", Status: "executando" });
+  const startedAt = performance.now();
+  const model = state.selected.model || {};
+  let finalMeta = null;
 
   try {
-    const response = await fetch("/api/agno/runs", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        entity_type: agnoState.selected.type,
-        entity_id: agnoState.selected.id,
-        message,
-        session_id: agnoState.sessionId,
-        model: modelInfo.model || modelInfo.name || "",
-        model_provider: modelInfo.provider || "",
-      }),
+    const body = await agnoApi.run({
+      entity_type: state.selected.type,
+      entity_id: state.selected.id,
+      message,
+      session_id: state.sessionId,
+      model: model.model || model.name || "",
+      model_provider: model.provider || "",
     });
-
-    if (!response.ok || !response.body) {
-      throw new Error(`Falha ao executar: HTTP ${response.status}`);
-    }
-
-    await readStream(response.body, (chunk) => {
-      if (chunk.event === "RunFinished") {
-        currentRunMeta = chunk;
-      } else {
-        handleChunk(chunk, assistantBubble);
-      }
+    await readEventStream(body, (chunk) => {
+      if (chunk.event === "RunFinished") finalMeta = chunk;
+      else handleRunEvent(chunk, assistant);
     });
-
   } catch (error) {
-    assistantBubble.classList.add("error");
-    const contentEl = assistantBubble.querySelector(".message-content");
-    contentEl.textContent = `Erro na execução: ${error.message}`;
-    addEvent("RunError", String(error));
+    assistant.classList.add("error");
+    assistant.querySelector(".message-content").textContent = `Erro na execução: ${error.message}`;
+    addEvent("RunError", error.message);
   } finally {
-    agnoState.streaming = false;
-    dom.submit.disabled = !agnoState.selected;
-    dom.message.disabled = !agnoState.selected;
-
-    const elapsed = (performance.now() - agnoState.startedAt) / 1000;
-
-    // Atualiza badges finais da mensagem com as métricas persistidas
-    finalizeAssistantMessage(assistantBubble, currentRunMeta, elapsed);
-
-    // Atualiza facts do painel lateral
+    state.streaming = false;
+    dom.submit.disabled = !state.selected;
+    dom.message.disabled = !state.selected;
+    const elapsed = (performance.now() - startedAt) / 1000;
+    finalizeMessage(assistant, finalMeta, elapsed);
     updateRunFacts({
-      "Entidade": `${agnoState.selected.type}/${agnoState.selected.id}`,
-      "Sessão": agnoState.sessionId || "salva",
-      "Status": currentRunMeta?.status || "finalizado",
-      "Duração local": `${elapsed.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}s`,
-      "TTFT": currentRunMeta?.ttft_seconds ? `${(currentRunMeta.ttft_seconds * 1000).toFixed(0)}ms` : "N/A",
-      "Tokens": currentRunMeta?.tokens ? `in:${currentRunMeta.tokens.input} out:${currentRunMeta.tokens.output}` : "N/A",
-      "Custo": currentRunMeta?.cost != null ? `US$ ${currentRunMeta.cost.toFixed(6)}` : "Sem dado",
-      "Trace": currentRunMeta?.trace_id ? currentRunMeta.trace_id.slice(0, 12) : "N/A",
+      Entidade: `${state.selected.type}/${state.selected.id}`,
+      Sessão: state.sessionId || "salva",
+      Status: finalMeta?.status || (assistant.classList.contains("error") ? "error" : "finalizado"),
+      Duração: `${elapsed.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}s`,
+      TTFT: Number.isFinite(finalMeta?.ttft_seconds) ? `${(finalMeta.ttft_seconds * 1000).toFixed(0)}ms` : "sem dado",
+      Tokens: finalMeta?.tokens ? `${finalMeta.tokens.input} entrada · ${finalMeta.tokens.output} saída` : "sem dado",
+      Custo: formatCurrency(finalMeta?.cost),
+      Trace: shortId(finalMeta?.trace_id),
     });
-
-    // Recarrega sessões
-    if (agnoState.selected) {
-      loadSessions(agnoState.selected.type, agnoState.selected.id);
-    }
+    if (state.selected) await loadSessions();
+    analytics.refreshMetrics();
     dom.message.focus();
   }
 }
 
-async function readStream(body, onChunk) {
-  const reader = body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    buffer = parseBuffer(buffer, onChunk);
-  }
-  parseBuffer(buffer, onChunk);
-}
-
-function parseBuffer(buffer, onChunk) {
-  let start = buffer.indexOf("{");
-  while (start !== -1) {
-    let depth = 0;
-    let inString = false;
-    let escaped = false;
-    let end = -1;
-
-    for (let index = start; index < buffer.length; index += 1) {
-      const char = buffer[index];
-      if (inString) {
-        if (escaped) escaped = false;
-        else if (char === "\\") escaped = true;
-        else if (char === "\"") inString = false;
-      } else if (char === "\"") {
-        inString = true;
-      } else if (char === "{") {
-        depth += 1;
-      } else if (char === "}") {
-        depth -= 1;
-        if (depth === 0) {
-          end = index;
-          break;
-        }
-      }
-    }
-
-    if (end === -1) return buffer.slice(start);
-
-    const raw = buffer.slice(start, end + 1);
-    try {
-      onChunk(normalizeChunk(JSON.parse(raw)));
-    } catch {
-      return buffer.slice(start + 1);
-    }
-    buffer = buffer.slice(end + 1).trim();
-    start = buffer.indexOf("{");
-  }
-  return buffer;
-}
-
-function normalizeChunk(chunk) {
-  if (chunk && typeof chunk === "object" && "event" in chunk && !("data" in chunk)) {
-    return chunk;
-  }
-  if (chunk && typeof chunk === "object" && "event" in chunk && "data" in chunk) {
-    let data = chunk.data;
-    if (typeof data === "string") {
-      try {
-        data = JSON.parse(data);
-      } catch {
-        data = {};
-      }
-    }
-    return { event: chunk.event, ...(data || {}) };
-  }
-  return chunk;
-}
-
-function handleChunk(chunk, assistant) {
+function handleRunEvent(chunk, assistant) {
   const event = chunk.event || "RunEvent";
   if (chunk.session_id) {
-    agnoState.sessionId = chunk.session_id;
-    dom.sessionPill.textContent = `Sessão ${chunk.session_id.slice(-6)}`;
+    state.sessionId = chunk.session_id;
+    dom.sessionPill.textContent = `Sessão ${shortId(chunk.session_id, 8)}`;
+    updateUrl();
   }
-
-  if (runEvents.has(event) || toolEvents.has(event) || event.includes("Reasoning")) {
-    addEvent(event, summarizeChunk(chunk));
+  if (runEvents.has(event) || event.includes("ToolCall") || event.includes("Reasoning")) {
+    addEvent(event, summarizeEvent(chunk));
   }
-
-  // Acumula tool calls live
-  if (toolEvents.has(event)) {
-    appendToolCall(assistant, chunk);
+  if (event.includes("ToolCall") && (event.endsWith("Completed") || event.endsWith("Error"))) {
+    appendDrawerItem(assistant, "Ferramentas", chunk.tool_name || chunk.name || "ferramenta", chunk.tool_args || chunk.args);
   }
-
-  // Acumula reasoning live
   if (event.includes("Reasoning")) {
-    appendReasoning(assistant, chunk);
+    appendDrawerItem(assistant, "Raciocínio", "Passo", chunk.content || chunk.reasoning_content || "Registrado");
   }
-
-  if (contentEvents.has(event)) {
-    appendAssistantContent(assistant, chunk.content);
-  } else if (event.endsWith("Completed") && chunk.content) {
-    setAssistantContent(assistant, chunk.content);
-  } else if (event.endsWith("Error") || event.endsWith("Cancelled")) {
+  if (contentEvents.has(event)) appendAssistantContent(assistant, chunk.content);
+  else if (event.endsWith("Completed") && chunk.content) setAssistantContent(assistant, chunk.content);
+  else if (event.endsWith("Error") || event.endsWith("Cancelled")) {
     assistant.classList.add("error");
     appendAssistantContent(assistant, chunk.content || "Erro durante a execução.");
   }
@@ -543,352 +393,120 @@ function handleChunk(chunk, assistant) {
 function appendAssistantContent(assistant, content) {
   if (content == null) return;
   const value = typeof content === "string" ? content : JSON.stringify(content, null, 2);
-  const unique = value.startsWith(agnoState.lastContent)
-    ? value.slice(agnoState.lastContent.length)
-    : value;
-  const contentEl = assistant.querySelector(".message-content");
-  contentEl.textContent += unique;
-  agnoState.lastContent = value;
+  const unique = value.startsWith(state.lastContent) ? value.slice(state.lastContent.length) : value;
+  assistant.querySelector(".message-content").textContent += unique;
+  state.lastContent = value;
   dom.chat.scrollTop = dom.chat.scrollHeight;
 }
 
 function setAssistantContent(assistant, content) {
   const value = typeof content === "string" ? content : JSON.stringify(content, null, 2);
-  const contentEl = assistant.querySelector(".message-content");
-  contentEl.textContent = value;
-  agnoState.lastContent = value;
-  dom.chat.scrollTop = dom.chat.scrollHeight;
+  assistant.querySelector(".message-content").textContent = value;
+  state.lastContent = value;
 }
-
-function appendToolCall(assistant, chunk) {
-  let toolsDrawer = assistant.querySelector(".tools-drawer");
-  if (!toolsDrawer) {
-    toolsDrawer = document.createElement("details");
-    toolsDrawer.className = "tools-drawer";
-    toolsDrawer.innerHTML = `<summary>🛠️ Ferramentas acionadas</summary><div class="tools-body"></div>`;
-    assistant.querySelector(".message-body").appendChild(toolsDrawer);
-  }
-  const body = toolsDrawer.querySelector(".tools-body");
-  const toolDiv = document.createElement("div");
-  toolDiv.className = "tool-item";
-  const name = chunk.tool_name || chunk.name || "ferramenta";
-  toolDiv.innerHTML = `<strong>${escapeHtml(name)}</strong>: <small>${escapeHtml(JSON.stringify(chunk.args || chunk.tool_args || ""))}</small>`;
-  body.appendChild(toolDiv);
-}
-
-function appendReasoning(assistant, chunk) {
-  let reasoningDrawer = assistant.querySelector(".reasoning-drawer");
-  if (!reasoningDrawer) {
-    reasoningDrawer = document.createElement("details");
-    reasoningDrawer.className = "reasoning-drawer";
-    reasoningDrawer.innerHTML = `<summary>🧠 Passos de Raciocínio</summary><div class="reasoning-body"></div>`;
-    assistant.querySelector(".message-body").appendChild(reasoningDrawer);
-  }
-  const body = reasoningDrawer.querySelector(".reasoning-body");
-  const stepDiv = document.createElement("div");
-  stepDiv.className = "reasoning-step";
-  stepDiv.textContent = chunk.content || chunk.reasoning_content || "Passo de raciocínio executado.";
-  body.appendChild(stepDiv);
-}
-
-function finalizeAssistantMessage(assistant, runMeta, elapsed) {
-  const metricsBar = assistant.querySelector(".message-metrics");
-  if (!metricsBar) return;
-
-  const dur = runMeta?.duration_seconds ? `${runMeta.duration_seconds}s` : `${elapsed.toFixed(2)}s`;
-  const ttft = runMeta?.ttft_seconds ? `${(runMeta.ttft_seconds * 1000).toFixed(0)}ms` : null;
-  const tokens = runMeta?.tokens;
-  const cost = runMeta?.cost;
-
-  let badges = `
-    <span class="metric-badge" title="Duração total">⏱️ ${dur}</span>
-  `;
-  if (ttft) {
-    badges += `<span class="metric-badge" title="Time To First Token">⚡ TTFT ${ttft}</span>`;
-  }
-  if (tokens && tokens.total) {
-    badges += `<span class="metric-badge" title="Tokens In / Out / Total">🔢 in:${tokens.input} out:${tokens.output} total:${tokens.total}</span>`;
-    if (tokens.reasoning) {
-      badges += `<span class="metric-badge" title="Reasoning Tokens">🧠 ${tokens.reasoning}</span>`;
-    }
-  }
-  if (cost != null) {
-    badges += `<span class="metric-badge highlight" title="Custo informado pelo provedor">💰 US$ ${cost.toFixed(6)}</span>`;
-  } else {
-    badges += `<span class="metric-badge muted-badge" title="Custo não reportado pelo provedor">💰 Custo: Sem dado</span>`;
-  }
-  if (runMeta?.trace_id) {
-    badges += `<span class="metric-badge" title="Trace ID">trace ${escapeHtml(runMeta.trace_id.slice(0, 12))}</span>`;
-  }
-
-  metricsBar.innerHTML = badges;
-}
-
-// --- RENDERIZADOR DE BOLHA DE MENSAGEM COM BLOCOS ESTRUTURADOS ---
 
 function appendMessage(role, content, options = {}) {
   const row = document.createElement("article");
   row.className = `chat-message ${role}`;
-
-  const timeStr = options.createdAt ? new Date(options.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "";
-  const title = role === "user" ? "Você" : (agnoState.selected?.name || "Agente Agno");
-
-  let html = `
-    <div class="message-header">
-      <span class="message-author">${escapeHtml(title)}</span>
-      <span class="message-time">${escapeHtml(timeStr)}</span>
-    </div>
-    <div class="message-body">
-      <div class="message-content"></div>
-      <div class="message-metrics"></div>
-    </div>
-  `;
-
-  row.innerHTML = html;
-  row.querySelector(".message-content").textContent = content;
-
-  // Se já temos dados do run (histórico)
+  const author = role === "user" ? "Você" : state.selected?.name || "Agente";
+  const time = options.createdAt ? formatDate(options.createdAt, { hour: "2-digit", minute: "2-digit" }) : "";
+  row.innerHTML = `<div class="message-header"><span class="message-author">${escapeHtml(author)}</span><time class="message-time">${escapeHtml(time)}</time></div><div class="message-content"></div><div class="message-metrics"></div>`;
+  row.querySelector(".message-content").textContent = content || "";
   if (role === "agent" && options.run) {
-    const run = options.run;
-    const dur = run.duration_seconds ? `${run.duration_seconds.toFixed(2)}s` : "-";
-    const ttft = run.ttft_seconds ? `${(run.ttft_seconds * 1000).toFixed(0)}ms` : null;
-    let badges = `<span class="metric-badge">⏱️ ${dur}</span>`;
-    if (ttft) badges += `<span class="metric-badge">⚡ TTFT ${ttft}</span>`;
-    if (run.total_tokens) {
-      badges += `<span class="metric-badge">🔢 in:${run.input_tokens} out:${run.output_tokens} total:${run.total_tokens}</span>`;
-      if (run.reasoning_tokens) badges += `<span class="metric-badge">🧠 ${run.reasoning_tokens}</span>`;
+    renderStoredMetrics(row, options.run);
+    if (options.tools?.length) {
+      for (const tool of options.tools) appendDrawerItem(row, "Ferramentas", tool.tool_name, parseStoredValue(tool.tool_args_json));
     }
-    if (run.cost != null) {
-      badges += `<span class="metric-badge highlight">💰 US$ ${run.cost.toFixed(6)}</span>`;
-    } else {
-      badges += `<span class="metric-badge muted-badge">💰 Custo: Sem dado</span>`;
-    }
-    if (run.trace_id) {
-      badges += `<span class="metric-badge" title="Trace ID">trace ${escapeHtml(run.trace_id.slice(0, 12))}</span>`;
-    }
-    row.querySelector(".message-metrics").innerHTML = badges;
-
-    // Tool calls do histórico
-    if (options.tools && options.tools.length) {
-      const toolsDrawer = document.createElement("details");
-      toolsDrawer.className = "tools-drawer";
-      toolsDrawer.innerHTML = `<summary>🛠️ ${options.tools.length} ferramenta(s) acionada(s)</summary><div class="tools-body"></div>`;
-      const body = toolsDrawer.querySelector(".tools-body");
-      options.tools.forEach((t) => {
-        const item = document.createElement("div");
-        item.className = "tool-item";
-        item.innerHTML = `<strong>${escapeHtml(t.tool_name)}</strong> <small>(${escapeHtml(t.status)})</small>: <code>${escapeHtml(t.tool_args_json || "")}</code>`;
-        body.appendChild(item);
-      });
-      row.querySelector(".message-body").appendChild(toolsDrawer);
-    }
-
-    const reasoningEvents = (options.events || []).filter((event) => {
-      const name = String(event.event_name || event.event || "");
-      return name.includes("Reasoning");
-    });
-    if (reasoningEvents.length) {
-      const reasoningDrawer = document.createElement("details");
-      reasoningDrawer.className = "reasoning-drawer";
-      reasoningDrawer.innerHTML = `<summary>🧠 ${reasoningEvents.length} passo(s) de raciocínio</summary><div class="reasoning-body"></div>`;
-      const body = reasoningDrawer.querySelector(".reasoning-body");
-      reasoningEvents.forEach((event) => {
-        const item = document.createElement("div");
-        item.className = "reasoning-step";
-        item.textContent = reasoningTextFromEvent(event);
-        body.appendChild(item);
-      });
-      row.querySelector(".message-body").appendChild(reasoningDrawer);
-    }
+    const reasoning = (options.events || []).filter((item) => String(item.event_name || "").includes("Reasoning"));
+    for (const item of reasoning) appendDrawerItem(row, "Raciocínio", "Passo", reasoningText(item));
   }
-
   dom.chat.appendChild(row);
   dom.chat.scrollTop = dom.chat.scrollHeight;
   return row;
 }
 
+function appendDrawerItem(message, title, name, value) {
+  const className = `drawer-${title.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")}`;
+  let drawer = message.querySelector(`.${className}`);
+  if (!drawer) {
+    drawer = document.createElement("details");
+    drawer.className = `message-drawer ${className}`;
+    drawer.innerHTML = `<summary>${escapeHtml(title)}</summary><div class="drawer-body"></div>`;
+    message.appendChild(drawer);
+  }
+  const item = document.createElement("div");
+  item.className = "drawer-item";
+  item.innerHTML = `<strong>${escapeHtml(name || "item")}</strong><br><code>${escapeHtml(displayValue(value))}</code>`;
+  drawer.querySelector(".drawer-body").appendChild(item);
+}
+
+function finalizeMessage(message, meta, elapsed) {
+  if (!message.querySelector(".message-content").textContent.trim()) {
+    message.querySelector(".message-content").textContent = "Execução concluída sem conteúdo.";
+  }
+  const duration = Number.isFinite(meta?.duration_seconds) ? meta.duration_seconds : elapsed;
+  const badges = [`${duration.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}s`];
+  if (Number.isFinite(meta?.ttft_seconds)) badges.push(`TTFT ${(meta.ttft_seconds * 1000).toFixed(0)}ms`);
+  if (meta?.tokens) badges.push(`${meta.tokens.input} in · ${meta.tokens.output} out · ${meta.tokens.total} total`);
+  badges.push(formatCurrency(meta?.cost));
+  if (meta?.trace_id) badges.push(`trace ${shortId(meta.trace_id)}`);
+  message.querySelector(".message-metrics").innerHTML = badges.map((badge) => `<span class="metric-badge">${escapeHtml(badge)}</span>`).join("");
+}
+
+function renderStoredMetrics(message, run) {
+  const badges = [];
+  if (Number.isFinite(run.duration_seconds)) badges.push(`${run.duration_seconds.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}s`);
+  if (Number.isFinite(run.ttft_seconds)) badges.push(`TTFT ${(run.ttft_seconds * 1000).toFixed(0)}ms`);
+  if (run.total_tokens) badges.push(`${run.input_tokens || 0} in · ${run.output_tokens || 0} out · ${run.total_tokens} total`);
+  badges.push(formatCurrency(run.cost));
+  if (run.trace_id) badges.push(`trace ${shortId(run.trace_id)}`);
+  message.querySelector(".message-metrics").innerHTML = badges.map((badge) => `<span class="metric-badge">${escapeHtml(badge)}</span>`).join("");
+}
+
 function addEvent(event, details) {
   const row = document.createElement("div");
   row.className = "event-row";
-  row.innerHTML = `
-    <strong>${escapeHtml(event)}</strong>
-    <small>${escapeHtml(details || "evento recebido")}</small>
-  `;
-  dom.eventList.prepend(row);
+  row.innerHTML = `<strong>${escapeHtml(event)}</strong><small>${escapeHtml(details || "evento recebido")}</small>`;
+  dom.events.prepend(row);
 }
 
 function updateRunFacts(facts) {
-  dom.runFacts.innerHTML = Object.entries(facts)
-    .map(([key, value]) => `<div><dt>${escapeHtml(key)}</dt><dd>${escapeHtml(value)}</dd></div>`)
-    .join("");
+  dom.runFacts.innerHTML = Object.entries(facts).map(([key, value]) => `<div><dt>${escapeHtml(key)}</dt><dd title="${escapeHtml(value)}">${escapeHtml(value)}</dd></div>`).join("");
 }
 
-function summarizeChunk(chunk) {
-  if (chunk.run_id) return `run ${chunk.run_id.slice(-6)}`;
-  if (chunk.tool?.tool_name) return `tool ${chunk.tool.tool_name}`;
-  if (chunk.content && typeof chunk.content === "string") return chunk.content.slice(0, 100);
+function summarizeEvent(chunk) {
+  if (chunk.run_id) return `run ${shortId(chunk.run_id, 8)}`;
+  if (chunk.tool_name) return `tool ${chunk.tool_name}`;
+  if (typeof chunk.content === "string") return chunk.content.slice(0, 100);
   return "evento recebido";
 }
 
-function reasoningTextFromEvent(event) {
-  let payload = event.event_data ?? event;
-  if (event.event_data_json) {
-    try {
-      payload = JSON.parse(event.event_data_json);
-    } catch {
-      payload = event.event_data_json;
-    }
-  }
+function reasoningText(event) {
+  const payload = parseStoredValue(event.event_data_json) || event.event_data || event;
+  const data = payload?.data && typeof payload.data === "object" ? payload.data : payload;
+  return data?.content || data?.reasoning_content || "Passo registrado";
+}
 
-  if (payload && typeof payload === "object" && payload.data && typeof payload.data === "object") {
-    payload = payload.data;
-  }
+function parseStoredValue(value) {
+  if (typeof value !== "string") return value;
+  try { return JSON.parse(value); } catch { return value; }
+}
 
-  const value = payload?.content ?? payload?.reasoning_content ?? payload?.reasoning;
-  if (value == null) return "Passo de raciocínio registrado.";
+function displayValue(value) {
+  if (value == null || value === "") return "sem detalhes";
   return typeof value === "string" ? value : JSON.stringify(value, null, 2);
 }
 
-// --- ETAPA 2B: MÉTRICAS DO AGENTE, COMPARATIVO E RELATÓRIO ---
-
-async function loadMetricsView() {
-  if (!agnoState.selected) {
-    dom.metricsAgentTitle.textContent = "Selecione um agente na lateral";
-    return;
-  }
-
-  dom.metricsAgentTitle.textContent = `Métricas de ${agnoState.selected.name || agnoState.selected.id}`;
-  const days = dom.metricsDaysSelect?.value || 30;
-
-  try {
-    const res = await fetch(`/api/agno/metrics/summary?entity_id=${encodeURIComponent(agnoState.selected.id)}&entity_type=${encodeURIComponent(agnoState.selected.type)}&days=${days}`);
-    const data = await res.json();
-    renderAgentKpis(data);
-  } catch (err) {
-    alert(`Erro ao buscar métricas do agente: ${err.message}`);
-  }
+function updateUrl() {
+  if (!state.selected) return;
+  const next = new URL(window.location.href);
+  next.searchParams.set("entity_id", state.selected.id);
+  if (state.sessionId) next.searchParams.set("session_id", state.sessionId);
+  else next.searchParams.delete("session_id");
+  window.history.replaceState({}, "", next);
 }
 
-function renderAgentKpis(data) {
-  dom.kpiTotalRuns.textContent = data.total_runs || 0;
-  dom.kpiSuccessRate.textContent = `${(100 - (data.error_rate || 0)).toFixed(1)}% taxa de sucesso`;
-
-  dom.kpiAvgDuration.textContent = data.avg_duration ? `${data.avg_duration}s` : "-";
-  dom.kpiP95Duration.textContent = data.p95_duration ? `p95: ${data.p95_duration}s | p50: ${data.p50_duration}s` : "sem dados suficientes";
-
-  dom.kpiAvgTtft.textContent = data.avg_ttft ? `${(data.avg_ttft * 1000).toFixed(0)}ms` : "-";
-  dom.kpiP95Ttft.textContent = data.p95_ttft ? `p95: ${(data.p95_ttft * 1000).toFixed(0)}ms` : "sem dados suficientes";
-
-  dom.kpiAvgTokens.textContent = data.avg_tokens ? `${data.avg_tokens}` : "-";
-  dom.kpiTotalTokens.textContent = `in: ${data.input_tokens_total} | out: ${data.output_tokens_total}`;
-
-  dom.kpiTotalCost.textContent = data.total_cost != null ? `US$ ${data.total_cost.toFixed(6)}` : "Sem dado";
-
-  // Tabela de execuções
-  dom.agentRunsTbody.innerHTML = "";
-  const recent = data.recent_runs || [];
-  if (!recent.length) {
-    dom.agentRunsTbody.innerHTML = `<tr><td colspan="7" class="text-center muted">Nenhuma execução registrada no período.</td></tr>`;
-    return;
-  }
-
-  recent.forEach((r) => {
-    const dateStr = r.created_at ? new Date(r.created_at).toLocaleString("pt-BR") : "";
-    const durStr = r.duration_seconds ? `${r.duration_seconds.toFixed(2)}s` : "-";
-    const ttftStr = r.ttft_seconds ? `${(r.ttft_seconds * 1000).toFixed(0)}ms` : "-";
-    const costStr = r.cost != null ? `US$ ${r.cost.toFixed(6)}` : "Sem dado";
-    const statusClass = r.status === "error" ? "badge-error" : "badge-ok";
-
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${escapeHtml(dateStr)}</td>
-      <td><span class="status-badge ${statusClass}">${escapeHtml(r.status)}</span></td>
-      <td><code>${escapeHtml(r.model || "padrão")}</code></td>
-      <td>${escapeHtml(durStr)}</td>
-      <td>${escapeHtml(ttftStr)}</td>
-      <td>${r.input_tokens || 0} / ${r.output_tokens || 0} / <strong>${r.total_tokens || 0}</strong></td>
-      <td>${escapeHtml(costStr)}</td>
-    `;
-    dom.agentRunsTbody.appendChild(tr);
-  });
-}
-
-async function loadCompareView() {
-  const groupBy = dom.compareGroupSelect?.value || "agent";
-  dom.compareColHeader.textContent = groupBy === "agent" ? "Agente" : "Modelo";
-  dom.compareTbody.innerHTML = `<tr><td colspan="8" class="text-center muted">Atualizando dados comparativos...</td></tr>`;
-
-  try {
-    const res = await fetch(`/api/agno/metrics/compare?group_by=${groupBy}&days=30`);
-    const data = await res.json();
-    renderCompareTable(data.items || []);
-  } catch (err) {
-    dom.compareTbody.innerHTML = `<tr><td colspan="8" class="text-center error">Erro ao carregar comparativo: ${escapeHtml(err.message)}</td></tr>`;
-  }
-}
-
-function renderCompareTable(items) {
-  dom.compareTbody.innerHTML = "";
-  if (!items.length) {
-    dom.compareTbody.innerHTML = `<tr><td colspan="8" class="text-center muted">Sem dados suficientes para comparação.</td></tr>`;
-    return;
-  }
-
-  items.forEach((item) => {
-    const durStr = item.avg_duration ? `${item.avg_duration}s` : "-";
-    const ttftStr = item.avg_ttft ? `${(item.avg_ttft * 1000).toFixed(0)}ms` : "-";
-    const costStr = item.total_cost != null ? `US$ ${item.total_cost.toFixed(6)}` : "Sem dado";
-
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td><strong>${escapeHtml(item.group_key)}</strong></td>
-      <td>${escapeHtml(item.model_provider || "-")}</td>
-      <td>${item.total_calls}</td>
-      <td><strong>${item.success_rate}%</strong></td>
-      <td>${durStr}</td>
-      <td>${ttftStr}</td>
-      <td>${item.avg_tokens}</td>
-      <td>${costStr}</td>
-    `;
-    dom.compareTbody.appendChild(tr);
-  });
-}
-
-async function loadReportView() {
-  dom.reportMarkdownPreview.textContent = "Gerando relatório detalhado de observabilidade...";
-  try {
-    const res = await fetch("/api/agno/metrics/report?days=30");
-    const data = await res.json();
-    dom.reportMarkdownPreview.textContent = data.markdown || "Relatório vazio.";
-  } catch (err) {
-    dom.reportMarkdownPreview.textContent = `Erro ao gerar relatório: ${err.message}`;
-  }
-}
-
-function copyReportMarkdown() {
-  const text = dom.reportMarkdownPreview.textContent;
-  if (!text) return;
-  navigator.clipboard.writeText(text).then(() => {
-    const originalText = dom.reportCopyBtn.textContent;
-    dom.reportCopyBtn.textContent = "✅ Copiado!";
-    setTimeout(() => {
-      dom.reportCopyBtn.textContent = originalText;
-    }, 2000);
-  }).catch((err) => {
-    alert("Falha ao copiar para a área de transferência.");
-  });
-}
-
-function setLoading(loading) {
+function setRefreshState(loading) {
   dom.refresh.disabled = loading;
   dom.refresh.textContent = loading ? "Atualizando..." : "Atualizar";
-}
-
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
 }

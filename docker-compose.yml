@@ -8,6 +8,7 @@ services:
         WITH_DOCLING: "true"
     image: acessilia:latest
     container_name: acessilia-instance
+    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
     ports:
       - "8000:8000"
       - "8001:8001"
@@ -15,6 +16,10 @@ services:
       - ./var:/app/var
     env_file:
       - .env
+    environment:
+      OTEL_SERVICE_NAME: acessilia-api
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OBSERVABILITY_OTLP_TRACES_ENDPOINT:-http://otel-collector:4318/v1/traces}
+      OTEL_EXPORTER_OTLP_HEADERS: ${OBSERVABILITY_OTLP_HEADERS:-}
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "if echo \"$ENABLED_INTERFACES\" | grep -q 'api'; then curl -fsS http://localhost:8000/api/v1/health; else curl -fsS http://localhost:8001/; fi"]
@@ -31,6 +36,10 @@ services:
     container_name: acessilia-prometheus
     ports:
       - "9090:9090"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-remote-write-receiver"
     volumes:
       - ./observability/stack/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
@@ -55,8 +64,13 @@ services:
     container_name: acessilia-loki
     ports:
       - "3100:3100"
-    command: -config.file=/etc/loki/local-config.yaml
+    command:
+      - -config.file=/etc/loki/loki.yml
+      # O limite padrão de 90% interrompe o WAL em máquinas de desenvolvimento
+      # com o disco compartilhado já ocupado, mesmo com o volume do Loki vazio.
+      - -ingester.wal-disk-full-threshold=0.98
     volumes:
+      - ./observability/stack/loki.yml:/etc/loki/loki.yml:ro
       - loki-data:/loki
     restart: unless-stopped
 
@@ -97,12 +111,101 @@ services:
     depends_on:
       - prometheus
       - loki
+      - tempo
+    restart: unless-stopped
+
+  tempo:
+    profiles: ["monitoring"]
+    image: grafana/tempo:2.10.7
+    container_name: acessilia-tempo
+    command: ["-config.file=/etc/tempo.yml"]
+    ports:
+      - "3200:3200"
+    volumes:
+      - ./observability/stack/tempo.yml:/etc/tempo.yml:ro
+      - tempo-data:/var/tempo
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+  otel-collector:
+    profiles: ["monitoring"]
+    image: otel/opentelemetry-collector-contrib:0.159.0
+    container_name: acessilia-otel-collector
+    command: ["--config=/etc/otelcol-contrib/config.yml"]
+    ports:
+      - "127.0.0.1:4317:4317"
+      - "127.0.0.1:4318:4318"
+      - "127.0.0.1:13133:13133"
+    environment:
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-pk-lf-acessilia-local}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-sk-lf-acessilia-local}
+    volumes:
+      - ./observability/stack/otel-collector.yml:/etc/otelcol-contrib/config.yml:ro
+    depends_on:
+      - tempo
+      - langfuse-web
+    restart: unless-stopped
+
+  locust:
+    profiles: ["monitoring"]
+    image: locustio/locust:2.46.3
+    container_name: acessilia-locust
+    command:
+      - -f
+      - /app/observability/testes_de_carga/locustfile.py
+    ports:
+      - "8089:8089"
+    environment:
+      HOST: ${LOCUST_TARGET_URL:-http://acessilia:8000}
+      PROMETHEUS: ${LOCUST_PROMETHEUS_URL:-http://prometheus:9090}
+      ENVIAR_DOCUMENTOS: ${ENVIAR_DOCUMENTOS:-false}
+    volumes:
+      - ./observability:/app/observability:ro
+      - ./tests/fixtures:/app/tests/fixtures:ro
+    depends_on:
+      acessilia:
+        condition: service_healthy
+    restart: unless-stopped
+
+  agent-os:
+    profiles: ["monitoring"]
+    image: acessilia:latest
+    container_name: acessilia-agent-os
+    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
+    build:
+      context: .
+      dockerfile: infra/Dockerfile
+      target: runtime
+      args:
+        WITH_DOCLING: "true"
+    command: python -m frontend.agent_os
+    ports:
+      - "7777:7777"
+    volumes:
+      - ./var:/app/var
+    env_file:
+      - .env
+    environment:
+      AGNO_OS_HOST: 0.0.0.0
+      AGNO_OS_PORT: 7777
+      AGNO_OS_RELOAD: "false"
+      OTEL_SERVICE_NAME: acessilia-agent-os
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OBSERVABILITY_OTLP_TRACES_ENDPOINT:-http://otel-collector:4318/v1/traces}
+      OTEL_EXPORTER_OTLP_HEADERS: ${OBSERVABILITY_OTLP_HEADERS:-}
+      OLLAMA_BASE_URL: ${AGENT_OS_OLLAMA_BASE_URL:-http://host.docker.internal:11434/api/chat}
+      OLLAMA_MODEL: ${AGENT_OS_OLLAMA_MODEL:-${OLLAMA_MODEL:-}}
+      OPENROUTER_BASE_URL: ${AGENT_OS_OPENROUTER_BASE_URL:-${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1/chat/completions}}
+      OPENROUTER_MODEL: ${AGENT_OS_OPENROUTER_MODEL:-${OPENROUTER_MODEL:-}}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
 
   observability-frontend:
     profiles: ["monitoring"]
     image: acessilia:latest
     container_name: acessilia-observability
+    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
     build:
       context: .
       dockerfile: infra/Dockerfile
@@ -125,13 +228,15 @@ services:
       OBSERVABILITY_PROJECT_NAME: ${OBSERVABILITY_PROJECT_NAME:-Acessilia}
       OBSERVABILITY_METRIC_PREFIX: ${OBSERVABILITY_METRIC_PREFIX:-acessilia}
       OBSERVABILITY_PROMETHEUS_API_JOB: ${OBSERVABILITY_PROMETHEUS_API_JOB:-acessilia-api}
-      OBSERVABILITY_LOKI_QUERY: ${OBSERVABILITY_LOKI_QUERY:-'{job="acessilia"}'}
+      OBSERVABILITY_PROMETHEUS_PANEL_JOB: ${OBSERVABILITY_PROMETHEUS_PANEL_JOB:-acessilia-observability}
+      OBSERVABILITY_LOKI_QUERY: '${OBSERVABILITY_LOKI_QUERY:-{job="acessilia"}}'
       ACESSILIA_API_URL: http://acessilia:8000
       PROMETHEUS_URL: http://prometheus:9090
       LOKI_URL: http://loki:3100
       LANGFUSE_URL: http://langfuse-web:3000
-      TEMPO_URL: ${TEMPO_URL:-http://host.docker.internal:3200}
-      LOCUST_URL: ${LOCUST_URL:-http://host.docker.internal:8089}
+      TEMPO_URL: http://tempo:3200
+      LOCUST_URL: http://locust:8089
+      OTEL_COLLECTOR_HEALTH_URL: http://otel-collector:13133
       PUBLIC_ACESSILIA_API_URL: http://localhost:8000
       PUBLIC_GRAFANA_URL: http://localhost:3000
       PUBLIC_PROMETHEUS_URL: http://localhost:9090
@@ -139,11 +244,11 @@ services:
       PUBLIC_LANGFUSE_URL: http://localhost:3001
       PUBLIC_TEMPO_URL: ${PUBLIC_TEMPO_URL:-http://localhost:3200}
       PUBLIC_LOCUST_URL: ${PUBLIC_LOCUST_URL:-http://localhost:8089}
-      OBSERVABILITY_FRONTEND_TRACING: ${OBSERVABILITY_FRONTEND_TRACING:-false}
-      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-acessilia-observability}
-      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
-      OTEL_EXPORTER_OTLP_HEADERS: ${OTEL_EXPORTER_OTLP_HEADERS:-}
-      AGNO_OS_URL: ${AGNO_OS_URL:-http://host.docker.internal:7777}
+      OBSERVABILITY_FRONTEND_TRACING: ${OBSERVABILITY_FRONTEND_TRACING:-true}
+      OTEL_SERVICE_NAME: acessilia-observability
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OBSERVABILITY_OTLP_TRACES_ENDPOINT:-http://otel-collector:4318/v1/traces}
+      OTEL_EXPORTER_OTLP_HEADERS: ${OBSERVABILITY_OTLP_HEADERS:-}
+      AGNO_OS_URL: ${AGNO_OS_URL:-http://agent-os:7777}
       AGNO_OS_SECURITY_KEY: ${AGNO_OS_SECURITY_KEY:-}
       AGNO_CONSOLE_STORE_REASONING: ${AGNO_CONSOLE_STORE_REASONING:-false}
     extra_hosts:
@@ -153,6 +258,10 @@ services:
       - prometheus
       - loki
       - langfuse-web
+      - agent-os
+      - tempo
+      - otel-collector
+      - locust
     restart: unless-stopped
 
   langfuse-worker:
@@ -343,6 +452,7 @@ services:
 
 volumes:
   prometheus-data:
+  tempo-data:
   loki-data:
   alloy-data:
   grafana-data:

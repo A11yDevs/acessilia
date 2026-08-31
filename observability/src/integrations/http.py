@@ -32,21 +32,13 @@ async def service_probe(
         return ServiceProbe(
             name=name,
             endpoint=base_url,
-            available=response.status_code < 500,
+            available=response.is_success,
             status_code=response.status_code,
         )
-    except Exception as exc:
+    except httpx.HTTPError as exc:
         return ServiceProbe(
             name=name,
             endpoint=base_url,
             available=False,
             error=str(exc),
         )
-
-
-async def is_http_available(
-    client: httpx.AsyncClient,
-    base_url: str,
-    path: str = "/",
-) -> bool:
-    return (await service_probe(client, name="http", base_url=base_url, path=path)).available

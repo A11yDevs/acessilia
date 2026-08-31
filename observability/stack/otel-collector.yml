@@ -1,0 +1,44 @@
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+  basicauth/langfuse:
+    client_auth:
+      username: ${env:LANGFUSE_PUBLIC_KEY}
+      password: ${env:LANGFUSE_SECRET_KEY}
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 256
+    spike_limit_mib: 64
+  batch:
+    timeout: 2s
+    send_batch_size: 512
+
+exporters:
+  otlp_grpc/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+  otlp_http/langfuse:
+    endpoint: http://langfuse-web:3000/api/public/otel
+    auth:
+      authenticator: basicauth/langfuse
+    headers:
+      x-langfuse-ingestion-version: "4"
+
+service:
+  extensions: [health_check, basicauth/langfuse]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp_grpc/tempo, otlp_http/langfuse]

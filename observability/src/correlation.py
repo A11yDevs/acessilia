@@ -19,13 +19,23 @@ class CorrelationContext:
         entity_type: str,
         entity_id: str,
         session_id: str,
+        trace_id: str = "",
     ) -> "CorrelationContext":
         return cls(
-            trace_id=uuid.uuid4().hex,
+            trace_id=trace_id or uuid.uuid4().hex,
             run_id=f"run_{uuid.uuid4().hex[:12]}",
             session_id=session_id,
             entity_type=entity_type,
             entity_id=entity_id,
+        )
+
+    def with_trace_id(self, trace_id: str) -> "CorrelationContext":
+        return CorrelationContext(
+            trace_id=trace_id or self.trace_id,
+            run_id=self.run_id,
+            session_id=self.session_id,
+            entity_type=self.entity_type,
+            entity_id=self.entity_id,
         )
 
     def event_fields(self) -> dict[str, str]:

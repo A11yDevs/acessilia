@@ -601,6 +601,109 @@ def get_agno_session_details(
     }
 
 
+def list_agno_runs(
+    *,
+    status: str = "",
+    search: str = "",
+    limit: int = 100,
+    db_path: Path = DEFAULT_DB_PATH,
+) -> list[dict[str, Any]]:
+    init_db(db_path)
+    query = """
+        SELECT
+            r.*,
+            s.name AS session_name,
+            (SELECT COUNT(*) FROM agno_run_events e WHERE e.run_id = r.run_id)
+                AS event_count,
+            (SELECT COUNT(*) FROM agno_tool_calls t WHERE t.run_id = r.run_id)
+                AS tool_count
+        FROM agno_runs r
+        LEFT JOIN agno_sessions s ON s.session_id = r.session_id
+        WHERE 1 = 1
+    """
+    params: list[Any] = []
+    if status:
+        query += " AND r.status = ?"
+        params.append(status)
+    cleaned_search = search.strip()
+    if cleaned_search:
+        query += """
+            AND (
+                r.trace_id LIKE ? OR r.run_id LIKE ? OR r.session_id LIKE ?
+                OR r.entity_id LIKE ? OR r.model LIKE ?
+            )
+        """
+        pattern = f"%{cleaned_search}%"
+        params.extend([pattern] * 5)
+    query += " ORDER BY r.created_at DESC LIMIT ?"
+    params.append(min(max(int(limit), 1), 500))
+
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        return [dict(row) for row in conn.execute(query, params).fetchall()]
+
+
+def get_agno_run_details(
+    run_id: str,
+    db_path: Path = DEFAULT_DB_PATH,
+) -> dict[str, Any] | None:
+    init_db(db_path)
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        run = conn.execute(
+            "SELECT * FROM agno_runs WHERE run_id = ?",
+            (run_id,),
+        ).fetchone()
+        if not run:
+            return None
+        session = conn.execute(
+            "SELECT * FROM agno_sessions WHERE session_id = ?",
+            (run["session_id"],),
+        ).fetchone()
+        messages = conn.execute(
+            "SELECT * FROM agno_messages WHERE run_id = ? ORDER BY id ASC",
+            (run_id,),
+        ).fetchall()
+        events = conn.execute(
+            "SELECT * FROM agno_run_events WHERE run_id = ? ORDER BY id ASC",
+            (run_id,),
+        ).fetchall()
+        tools = conn.execute(
+            "SELECT * FROM agno_tool_calls WHERE run_id = ? ORDER BY id ASC",
+            (run_id,),
+        ).fetchall()
+
+    normalized_events = []
+    for event in events:
+        item = dict(event)
+        item["event_data"] = _json_or_text(item.pop("event_data_json", ""))
+        normalized_events.append(item)
+
+    normalized_tools = []
+    for tool in tools:
+        item = dict(tool)
+        item["tool_args"] = _json_or_text(item.pop("tool_args_json", ""))
+        item["tool_result"] = _json_or_text(item.pop("tool_result_json", ""))
+        normalized_tools.append(item)
+
+    return {
+        "run": dict(run),
+        "session": dict(session) if session else None,
+        "messages": [dict(message) for message in messages],
+        "events": normalized_events,
+        "tools": normalized_tools,
+    }
+
+
+def _json_or_text(value: Any) -> Any:
+    if value in (None, ""):
+        return value
+    try:
+        return json.loads(str(value))
+    except (TypeError, ValueError):
+        return str(value)
+
+
 def _percentile(values: list[float], p: float) -> float | None:
     if not values:
         return None
@@ -630,7 +733,7 @@ def get_agent_metrics_summary(
                 """
                 SELECT * FROM agno_runs
                 WHERE entity_type = ? AND entity_id = ?
-                  AND created_at >= datetime('now', '-' || ? || ' days')
+                  AND datetime(created_at) >= datetime('now', '-' || ? || ' days')
                 ORDER BY created_at DESC
                 """,
                 (entity_type, entity_id, days),
@@ -726,7 +829,7 @@ def get_comparative_metrics(
                 SUM(cost) as total_cost,
                 COUNT(cost) as cost_count
             FROM agno_runs
-            WHERE created_at >= datetime('now', '-' || ? || ' days')
+            WHERE datetime(created_at) >= datetime('now', '-' || ? || ' days')
               AND {group_col} != ''
             GROUP BY {group_col}
             ORDER BY total_calls DESC

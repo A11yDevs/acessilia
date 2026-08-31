@@ -30,14 +30,15 @@ Quando `OBSERVABILITY_ENABLED=true`, essas tres flags herdam `true` se nao estiv
 | Servico | URL | Uso |
 |---------|-----|-----|
 | Painel proprio | http://localhost:8010 | Interface central da observabilidade |
-| Grafana | http://localhost:3000 | Dashboards Prometheus e Loki |
+| Grafana | http://localhost:3000 | Dashboards e exploracao de Prometheus, Loki e Tempo |
 | Prometheus | http://localhost:9090 | Consultas PromQL, targets e series brutas |
 | Loki | http://localhost:3100 | Logs brutos |
 | Langfuse | http://localhost:3001 | Traces de LLM, prompts, respostas, tokens e latencia |
-| Tempo | http://localhost:3200 | Tracing distribuido da infraestrutura quando houver coletor ativo |
+| Tempo | http://localhost:3200 | Tracing distribuido e busca por `trace_id` |
+| OpenTelemetry Collector | http://localhost:13133 | Health do roteador OTLP; ingestao em `4317`/`4318` |
 | Locust | http://localhost:8089 | Testes de carga e comportamento sob estresse |
 | API | http://localhost:8000 | Aplicacao principal e endpoint `/metrics` |
-| Console Agno | http://localhost:8010/agno | Chat direto com agentes detectados pelo AgentOS |
+| Console Agno | http://localhost:8010/agno | Chat direto com agentes expostos pelo runtime Agno configurado |
 
 Essas portas sao para uso local. Nao exponha Grafana, Prometheus, Loki ou Langfuse publicamente sem autenticacao e rede adequada.
 
@@ -51,11 +52,42 @@ Essas portas sao para uso local. Nao exponha Grafana, Prometheus, Loki ou Langfu
 | Alloy | coleta logs locais e envia para o Loki |
 | node-exporter | expoe CPU, memoria, disco, rede e metricas do host |
 | Langfuse | recebe traces de LLM via OTLP |
+| OpenTelemetry Collector | recebe OTLP e envia cada trace ao Tempo e ao Langfuse |
+| Tempo | armazena traces distribuidos e gera metricas de spans para o Prometheus |
+| Locust | executa o cenario de carga local contra a API |
+| agent-os | expõe os agentes do projeto para inspeção e chat direto |
 | observability-frontend | painel proprio em `:8010` |
 
 Promtail nao e mais usado. A coleta de logs passa pelo Grafana Alloy.
 
-Tempo e Locust aparecem no painel quando os endpoints configurados estiverem ativos. Por padrao, o painel tenta ler `TEMPO_URL=http://localhost:3200` e `LOCUST_URL=http://localhost:8089` fora do Docker, ou os valores definidos no `.env`.
+Tempo, Collector e Locust fazem parte do profile `monitoring`. O painel sonda cada servico de forma independente e continua utilizavel quando um deles estiver indisponivel.
+
+## Arquitetura e portabilidade
+
+A observabilidade e opcional: a aplicacao principal continua funcional sem o profile `monitoring` e sem a pasta `observability/`. O codigo ligado ao dominio permanece fora dela. `backend/observability.py` instrumenta a API e `frontend/agent_os.py` registra as entidades Agno do projeto.
+
+```text
+API / AgentOS / painel -> OpenTelemetry Collector -> Tempo
+                                                \-> Langfuse
+
+Loguru JSON -> Alloy -> Loki -> painel / Grafana
+metricas    -> Prometheus -> painel / Grafana
+runs Agno   -> SQLite -> painel
+```
+
+O `trace_id` e propagado do painel para o runtime Agno. Runs do console tambem persistem `run_id`, `session_id`, `entity_id` e eventos. Logs emitidos dentro de um span recebem `trace_id` e `span_id` no JSON, sem labels de alta cardinalidade no Loki.
+
+As integracoes ficam concentradas em contratos substituiveis:
+
+- `ProjectApiClient`: health, estatisticas e historico da aplicacao;
+- `PrometheusMetricsProvider`: consultas PromQL e estados das metricas;
+- `LokiLogsProvider`: consultas LogQL e normalizacao dos logs;
+- `AgnoClient`: contrato HTTP com o runtime Agno;
+- `observability/src/storage/sqlite.py`: persistencia local do painel.
+
+O frontend consome apenas as rotas estaveis do painel. Uma troca de Loki, Prometheus, runtime Agno ou storage deve exigir apenas outro adapter que preserve esses contratos.
+
+Cada dependencia e consultada separadamente e pode ficar `online`, `empty`, `degraded` ou `offline`. Um timeout em uma fonte nao bloqueia as demais, e falhas de telemetria nao interrompem o processamento de documentos.
 
 ## Organizacao dos arquivos
 
@@ -67,13 +99,15 @@ observability/
 ├── instrumentacao/     testes de metricas, tracing e painel
 ├── metricas/           resumo tabular do Prometheus
 ├── src/                nucleo do painel, adapters, storage e contratos
-├── stack/              Prometheus, Grafana, Loki e Alloy
+├── stack/              Prometheus, Grafana, Loki, Alloy, Tempo e Collector
 └── testes_de_carga/    cenario Locust
 ```
 
 O codigo que instrumenta a API fica em `backend/observability.py`, porque roda junto da aplicacao. A pasta `observability/` concentra a stack externa, o painel, consultas, testes e dados proprios da observabilidade.
 
-O painel foi organizado para ser acoplavel. `observability/src` contem o servidor FastAPI, configuracao, contratos, adapters de Prometheus/Loki/AgentOS e storage SQLite. `observability/frontend` contem apenas a camada visual. Os imports antigos em `observability/frontend/app.py`, `store.py` e `agno_client.py` continuam como wrappers para compatibilidade, mas o caminho canonico e `observability.src`.
+O painel foi organizado para ser acoplavel. `observability/src` contem o servidor FastAPI, configuracao, contratos, adapters de Prometheus, Loki, API do projeto e runtime Agno, alem do storage SQLite. `observability/frontend` contem apenas templates, CSS e JavaScript. O caminho canonico do backend e `observability.src`; os modulos antigos duplicados em `observability/frontend` foram removidos.
+
+A rota `/agno` tambem pertence ao painel de observabilidade. A UI, o proxy local, a persistencia das sessoes e as metricas do console ficam em `observability/`. O runtime que registra os agentes reais do Acessilia fica em `frontend/agent_os.py`, porque depende dos agentes e prompts do projeto. Em outro projeto, essa parte pode ser substituida por outro runtime HTTP compativel com as rotas usadas pelo adapter Agno.
 
 Para adaptar em outro projeto, ajuste principalmente:
 
@@ -81,6 +115,7 @@ Para adaptar em outro projeto, ajuste principalmente:
 OBSERVABILITY_PROJECT_NAME=Acessilia
 OBSERVABILITY_METRIC_PREFIX=acessilia
 OBSERVABILITY_PROMETHEUS_API_JOB=acessilia-api
+OBSERVABILITY_PROMETHEUS_PANEL_JOB=acessilia-observability
 OBSERVABILITY_LOKI_QUERY={job="acessilia"}
 OBSERVABILITY_API_HEALTH_PATH=/api/v1/health
 OBSERVABILITY_API_STATS_PATH=/api/v1/stats
@@ -92,35 +127,35 @@ Trocar Prometheus, Loki ou o storage deve ficar concentrado nos adapters em `obs
 
 ## Painel proprio
 
-O painel em http://localhost:8010 centraliza os dados mais importantes para revisao e teste manual.
+O painel em http://localhost:8010 centraliza os dados mais importantes para revisao e teste manual. A tela inicial tambem inclui um acesso direto para o Console Agno em `/agno`, para manter a investigacao de runs, sessoes e metricas no mesmo fluxo operacional.
 
 | Aba | Conteudo |
 |-----|----------|
-| Visao geral | status, health, historico, requisicoes reais, requisicoes internas, erros HTTP e graficos em tempo real |
+| Visao geral | status, health, historico, requisicoes reais, internas, erros HTTP e graficos em tempo real |
+| Execucoes | busca de runs do Agno, detalhes, mensagens, eventos e identificadores de correlacao |
 | Pipeline | fila, jobs ativos, jobs por status, erros por etapa, conversoes por minuto e latencia de conversao |
-| Metricas detalhadas | exportacoes por formato, tamanho dos outputs e series de saida |
-| Logs | ultimas linhas consultadas no Loki |
-| Infra | CPU, RAM, disco, rede, targets, Alloy e GPU quando houver exporter compativel |
-| LLM | chamadas por agente, falhas, duracao, TTFT, tokens, cache, custo, modelos, provedor, Langfuse e Tempo |
+| LLM e agentes | chamadas, falhas, duracao, TTFT, tokens, custo e atalhos para Langfuse e Tempo |
+| Infraestrutura | CPU, RAM, disco, rede, targets, Alloy e GPU quando houver exporter compativel |
+| Logs | busca textual no Loki com nivel, modulo e IDs de correlacao |
 | Anotacoes | notas locais de revisao, incidente, teste ou acompanhamento de PR |
 
 As anotacoes ficam em `observability/data/observability.db`. Esse banco pertence ao painel de observabilidade e nao interfere nos bancos principais da aplicacao. O arquivo `.db` nao deve ser versionado.
 
 ## Console Agno
 
-O Console Agno fica em http://localhost:8010/agno e permite conversar diretamente com agentes detectados pelo AgentOS, sem passar pela pipeline completa.
+O Console Agno fica em http://localhost:8010/agno e permite conversar diretamente com agentes expostos pelo runtime Agno configurado, sem passar pela pipeline completa.
 
 Configuracao local:
 
 ```dotenv
-AGNO_OS_URL=http://host.docker.internal:7777
+AGNO_OS_URL=http://agent-os:7777
 AGNO_OS_SECURITY_KEY=
 AGNO_CONSOLE_STORE_REASONING=false
 ```
 
-Esse valor atende o caso comum de painel no Docker e AgentOS rodando no host. Se o painel estiver rodando fora do Docker, use `AGNO_OS_URL=http://localhost:7777`. Se o AgentOS estiver em outro container ou em outra maquina, ajuste `AGNO_OS_URL` no `.env`.
+Esse valor atende a stack local com o serviço `agent-os` do profile `monitoring`. Se o painel estiver rodando fora do Docker, use `AGNO_OS_URL=http://localhost:7777`. Se o runtime Agno estiver em outro container ou em outra maquina, ajuste `AGNO_OS_URL` no `.env`.
 
-O painel usa `AGNO_OS_URL` para consultar `/health`, `/agents` e `/teams`. Quando `AGNO_OS_SECURITY_KEY` estiver preenchido, o proxy local envia `Authorization: Bearer ...` para o AgentOS.
+O painel usa `AGNO_OS_URL` para consultar `/health`, `/agents` e `/teams`. Quando `AGNO_OS_SECURITY_KEY` estiver preenchido, o proxy local envia `Authorization: Bearer ...` para o runtime Agno.
 
 `AGNO_CONSOLE_STORE_REASONING=false` mantem o modo seguro: eventos de reasoning sao resumidos antes de ir para a interface e para o SQLite. Use `true` apenas em ambiente local controlado, quando for necessario inspecionar o texto bruto.
 
@@ -149,10 +184,10 @@ O painel usa dois ritmos:
 
 | Ritmo | Atualiza | Motivo |
 |-------|----------|--------|
-| 1s | cards e graficos de comportamento recente | acompanhar testes manuais em tempo real |
+| 2s | cards e graficos de comportamento recente | acompanhar testes manuais em tempo real |
 | 10s | snapshot geral, status, logs, historico e anotacoes | evitar consultas pesadas sem necessidade |
 
-O Prometheus coleta a API e o `node-exporter` a cada 5s. A interface pode redesenhar a cada 1s, mas novas amostras reais so aparecem quando o Prometheus recebe outro scrape.
+O Prometheus coleta a API e o painel a cada 5s. A interface redesenha os dados recentes a cada 2s, mas novas amostras reais so aparecem quando o Prometheus recebe outro scrape.
 
 ## Requisicoes reais e internas
 
@@ -225,34 +260,33 @@ Sem exporter de GPU configurado, os cards de GPU ficam como `sem dado`. Isso evi
 
 ## Logs
 
-Com `LOG_JSON=true`, o logger escreve log estruturado alem do log humano. O Alloy coleta:
+Com `LOG_JSON=true`, o logger escreve log estruturado alem do log humano. O Alloy envia ao Loki apenas a versao JSON:
 
 ```text
 var/logs/acessilia_*.json.log
-var/logs/bot_*.log
 ```
 
-O log JSON facilita filtro por nivel, modulo e mensagem no Loki. O log humano continua disponivel para leitura direta.
+O log humano `bot_*.log` continua disponivel para leitura direta, sem ser duplicado no Loki. Quando existe um span OpenTelemetry ativo, o logger inclui `trace_id` e `span_id` no campo `extra`; o painel os extrai sem transforma-los em labels de alta cardinalidade.
 
-## Langfuse
+## Tracing, Tempo e Langfuse
 
 Langfuse sobe junto com `docker compose --profile monitoring up -d`.
 
-Configuracao local padrao dentro do Docker:
+Na stack local, API, AgentOS e painel enviam OTLP ao Collector:
 
 ```dotenv
-OTEL_EXPORTER_OTLP_ENDPOINT=http://langfuse-web:3000/api/public/otel
+OBSERVABILITY_OTLP_TRACES_ENDPOINT=http://otel-collector:4318/v1/traces
 LANGFUSE_PUBLIC_KEY=pk-lf-acessilia-local
 LANGFUSE_SECRET_KEY=sk-lf-acessilia-local
 ```
 
-Se a API estiver fora do Docker e o Langfuse estiver no compose:
+O Collector preserva o mesmo `trace_id` e exporta cada trace para o Tempo e para o Langfuse. Se a aplicacao estiver fora do Docker e a stack estiver no compose:
 
 ```dotenv
-OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:3001/api/public/otel
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318/v1/traces
 ```
 
-`LANGFUSE_PUBLIC_KEY` e `LANGFUSE_SECRET_KEY` viram o header Basic Auth automaticamente. `OTEL_EXPORTER_OTLP_HEADERS` tem prioridade quando for necessario apontar para outro coletor.
+`LANGFUSE_PUBLIC_KEY` e `LANGFUSE_SECRET_KEY` autenticam o exporter do Collector no Langfuse. Para usar outro backend, altere apenas os exporters em `observability/stack/otel-collector.yml`.
 
 O painel tambem pode emitir spans OpenTelemetry proprios quando `OBSERVABILITY_FRONTEND_TRACING=true` e `OTEL_EXPORTER_OTLP_ENDPOINT` estiverem definidos. Sem essa flag, a emissao de spans do painel fica desativada e o restante continua funcionando.
 
@@ -268,7 +302,7 @@ As consultas ficam em `observability/config.py`. Metrica ausente aparece como `-
 
 ## Testes de carga
 
-Com a API no ar:
+O profile `monitoring` ja sobe o Locust. Abra http://localhost:8089 e defina os usuarios pela interface. Para executar fora do Docker:
 
 ```bash
 poetry run locust -f observability/testes_de_carga/locustfile.py
@@ -284,7 +318,7 @@ Antes de abrir PR, rode:
 
 ```bash
 poetry run pytest observability/instrumentacao -q
-poetry run pytest -q
+poetry run pytest -q -m "not docling"
 poetry check --lock
 docker compose --profile monitoring config
 git diff --check

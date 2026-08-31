@@ -23,6 +23,7 @@ class ObservabilitySettings:
     project_name: str
     metric_prefix: str
     prometheus_api_job: str
+    prometheus_observability_job: str
     loki_query: str
     api_url: str
     prometheus_url: str
@@ -30,6 +31,7 @@ class ObservabilitySettings:
     langfuse_url: str
     tempo_url: str
     locust_url: str
+    otel_collector_url: str
     agno_os_url: str
     agno_os_security_key: str
     db_path: Path
@@ -51,6 +53,10 @@ class ObservabilitySettings:
             "OBSERVABILITY_PROMETHEUS_API_JOB",
             f"{metric_prefix}-api",
         ).strip()
+        prometheus_observability_job = os.getenv(
+            "OBSERVABILITY_PROMETHEUS_PANEL_JOB",
+            f"{metric_prefix}-observability",
+        ).strip()
         loki_query = os.getenv(
             "OBSERVABILITY_LOKI_QUERY",
             f'{{job="{metric_prefix}"}}',
@@ -62,6 +68,10 @@ class ObservabilitySettings:
         langfuse_url = env_url("LANGFUSE_URL", "http://localhost:3001")
         tempo_url = env_url("TEMPO_URL", "http://localhost:3200")
         locust_url = env_url("LOCUST_URL", "http://localhost:8089")
+        otel_collector_url = env_url(
+            "OTEL_COLLECTOR_HEALTH_URL",
+            "http://localhost:13133",
+        )
         agno_os_url = env_url("AGNO_OS_URL", "http://localhost:7777")
 
         db_path = Path(
@@ -83,6 +93,9 @@ class ObservabilitySettings:
             project_name=project_name or "Observability",
             metric_prefix=metric_prefix or "app",
             prometheus_api_job=prometheus_api_job or "app-api",
+            prometheus_observability_job=(
+                prometheus_observability_job or "app-observability"
+            ),
             loki_query=loki_query or '{job="app"}',
             api_url=api_url,
             prometheus_url=prometheus_url,
@@ -90,6 +103,7 @@ class ObservabilitySettings:
             langfuse_url=langfuse_url,
             tempo_url=tempo_url,
             locust_url=locust_url,
+            otel_collector_url=otel_collector_url,
             agno_os_url=agno_os_url,
             agno_os_security_key=os.getenv("AGNO_OS_SECURITY_KEY", "").strip(),
             db_path=db_path,

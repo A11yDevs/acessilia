@@ -7,6 +7,7 @@ import httpx
 
 
 MetricKind = Literal["scalar", "vector"]
+QueryState = Literal["ok", "empty", "error", "unavailable"]
 
 
 @dataclass(frozen=True)
@@ -72,5 +73,11 @@ class MetricsProvider(Protocol):
 
 
 class LogsProvider(Protocol):
-    async def entries(self, client: httpx.AsyncClient) -> dict[str, Any]:
+    async def entries(
+        self,
+        client: httpx.AsyncClient,
+        *,
+        search: str = "",
+        limit: int | None = None,
+    ) -> dict[str, Any]:
         ...

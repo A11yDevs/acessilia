@@ -7,7 +7,7 @@ import sys
 from backend.tools.logger import setup_logger, logger
 from backend.config.settings import settings
 
-LOCK_FILE = os.path.join(os.path.dirname(__file__), "bot.lock")
+LOCK_FILE = str(settings.data_dir / "bot.lock")
 
 
 def _is_process_running(pid: int) -> bool:
@@ -26,6 +26,7 @@ def _is_process_running(pid: int) -> bool:
 
 
 def acquire_lock() -> None:
+    settings.data_dir.mkdir(parents=True, exist_ok=True)
     if os.path.exists(LOCK_FILE):
         try:
             with open(LOCK_FILE, "r") as f:

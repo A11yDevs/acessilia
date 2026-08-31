@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Any
@@ -14,7 +15,6 @@ class AgnoEntity:
     type: str
     db_id: str
     model: dict[str, Any]
-    raw: dict[str, Any]
 
 
 class AgnoClient:
@@ -60,10 +60,10 @@ class AgnoClient:
         self,
         client: httpx.AsyncClient,
     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-        agents_response, teams_response = await self._get_json(
-            client,
-            "/agents",
-        ), await self._get_json(client, "/teams")
+        agents_response, teams_response = await asyncio.gather(
+            self._get_json(client, "/agents"),
+            self._get_json(client, "/teams"),
+        )
         agents = [
             self._normalize_entity(item, "agent")
             for item in _as_items(agents_response)
@@ -99,14 +99,18 @@ class AgnoClient:
             or data.get("name")
             or "unknown"
         )
-        model = data.get("model") if isinstance(data.get("model"), dict) else {}
+        raw_model = data.get("model") if isinstance(data.get("model"), dict) else {}
+        model = {
+            key: raw_model[key]
+            for key in ("id", "name", "model", "provider")
+            if isinstance(raw_model.get(key), (str, int, float, bool))
+        }
         entity = AgnoEntity(
             id=str(entity_id),
             name=str(data.get("name") or entity_id),
             type=entity_type,
             db_id=str(data.get("db_id") or ""),
             model=model,
-            raw=data,
         )
         return {
             "id": entity.id,
@@ -114,7 +118,6 @@ class AgnoClient:
             "type": entity.type,
             "db_id": entity.db_id,
             "model": entity.model,
-            "raw": entity.raw,
         }
 
     async def stream_run(
@@ -139,6 +142,12 @@ class AgnoClient:
         }
         headers = self.headers()
         headers.pop("Accept", None)
+        try:
+            from opentelemetry.propagate import inject
+
+            inject(headers)
+        except Exception:
+            pass
 
         timeout = httpx.Timeout(120.0, connect=8.0, read=120.0)
         async with httpx.AsyncClient(timeout=timeout) as client:

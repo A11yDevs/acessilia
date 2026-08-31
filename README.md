@@ -116,13 +116,13 @@ O container expõe `8000` (API) e `8001` (web), persiste tudo em `./var` e roda 
 
 ## Observabilidade
 
-Desligada por padrão. Para usar a stack local, ajuste `OBSERVABILITY_ENABLED=true` no `.env` e suba Prometheus, Grafana, Loki, Alloy, Langfuse e o painel próprio:
+Desligada por padrão. Para usar a stack local, ajuste `OBSERVABILITY_ENABLED=true` no `.env` e suba o painel, Prometheus, Grafana, Loki, Alloy, OpenTelemetry Collector, Tempo, Langfuse, Locust e o runtime Agno:
 
 ```bash
 docker compose --profile monitoring up -d
 ```
 
-O Grafana abre em http://localhost:3000 já com o dashboard pronto. Como ligar na aplicação e onde cada número aparece: [observability/README.md](observability/README.md).
+O painel integrado abre em http://localhost:8010 e o Grafana em http://localhost:3000. A arquitetura, as URLs e o significado das métricas estão em [observability/README.md](observability/README.md).
 
 Para construir somente a variante slim:
 

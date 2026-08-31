@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from typing import Any
 
@@ -16,8 +17,13 @@ class ProjectApiClient:
     history_path: str = "/api/v1/history?limit=20"
 
     async def snapshot(self, client: httpx.AsyncClient) -> dict[str, Any]:
+        health, stats, history = await asyncio.gather(
+            json_or_none(client, self.base_url, self.health_path),
+            json_or_none(client, self.base_url, self.stats_path),
+            json_or_none(client, self.base_url, self.history_path),
+        )
         return {
-            "health": await json_or_none(client, self.base_url, self.health_path),
-            "stats": await json_or_none(client, self.base_url, self.stats_path),
-            "history": await json_or_none(client, self.base_url, self.history_path) or [],
+            "health": health,
+            "stats": stats,
+            "history": history or [],
         }

@@ -16,14 +16,15 @@ from fastapi.responses import HTMLResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
+from starlette.background import BackgroundTask
 
 from observability.src.correlation import CorrelationContext
+from observability.src.dashboard import DashboardService
 from observability.src.events import (
     consume_agno_event_buffer,
     sanitize_agno_event_for_console,
 )
 from observability.src.integrations.agno import AgnoClient
-from observability.src.integrations.http import service_probe
 from observability.src.integrations.loki import LokiLogsProvider
 from observability.src.integrations.project_api import ProjectApiClient
 from observability.src.integrations.prometheus import PrometheusMetricsProvider
@@ -38,9 +39,11 @@ from observability.src.storage.sqlite import (
     delete_annotation,
     delete_agno_session,
     get_agent_metrics_summary,
+    get_agno_run_details,
     get_agno_session_details,
     get_comparative_metrics,
     list_annotations,
+    list_agno_runs,
     list_agno_sessions,
     upsert_agno_session,
 )
@@ -48,7 +51,7 @@ from observability.src.telemetry import (
     configure_opentelemetry,
     get_agno_prom_metrics,
     record_agno_chat_metrics,
-    record_observability_span,
+    start_observability_span,
 )
 
 
@@ -74,11 +77,44 @@ class AgnoRunPayload(BaseModel):
     model_provider: str = Field(default="", max_length=200)
 
 
+def _friendly_agno_error(
+    message: str,
+    *,
+    model_provider: str = "",
+    model: str = "",
+) -> str:
+    lower = message.lower()
+    config_markers = (
+        "porta-aqui-se-diferente-da-padrao",
+        "port could not be cast",
+    )
+    connection_markers = (
+        "all connection attempts failed",
+        "connection refused",
+        "name or service not known",
+        "connecterror",
+    )
+    if any(marker in lower for marker in config_markers):
+        return (
+            "Configuração inválida do modelo Agno. Verifique OLLAMA_BASE_URL ou "
+            "OPENROUTER_BASE_URL no .env e remova placeholders de exemplo."
+        )
+    if any(marker in lower for marker in connection_markers):
+        provider = model_provider or "LLM"
+        model_hint = f" e se o modelo '{model}' existe" if model else ""
+        return (
+            f"{provider} não está acessível a partir do runtime Agno. "
+            f"Verifique se o serviço do modelo está rodando, se a URL está correta{model_hint}."
+        )
+    return message
+
+
 def create_app() -> FastAPI:
     settings = ObservabilitySettings.from_env()
     metrics_catalog = build_metrics_catalog(
         metric_prefix=settings.metric_prefix,
         api_job_name=settings.prometheus_api_job,
+        observability_job_name=settings.prometheus_observability_job,
     )
 
     app = FastAPI(title=f"{settings.project_name} Observability", version="1.0.0")
@@ -114,6 +150,12 @@ def create_app() -> FastAPI:
         base_url=settings.loki_url,
         query=settings.loki_query,
     )
+    app.state.dashboard = DashboardService(
+        settings=settings,
+        project_api=app.state.project_api,
+        metrics_provider=app.state.metrics_provider,
+        logs_provider=app.state.logs_provider,
+    )
 
     app.state.otel_enabled = (
         settings.frontend_tracing_enabled
@@ -132,6 +174,14 @@ def create_app() -> FastAPI:
             return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
         except Exception:
             return Response(content=b"", media_type="text/plain")
+
+    @app.get("/api/health")
+    async def panel_health() -> dict[str, Any]:
+        return {
+            "status": "ok",
+            "service": settings.otel_service_name,
+            "otel_enabled": app.state.otel_enabled,
+        }
 
     @app.get("/", response_class=HTMLResponse)
     async def index(request: Request) -> HTMLResponse:
@@ -190,7 +240,7 @@ def create_app() -> FastAPI:
     async def get_sessions(
         entity_type: str | None = None,
         entity_id: str | None = None,
-        limit: int = 50,
+        limit: int = Query(default=50, ge=1, le=200),
     ) -> dict[str, Any]:
         sessions = list_agno_sessions(
             entity_type=entity_type,
@@ -212,11 +262,35 @@ def create_app() -> FastAPI:
         deleted = delete_agno_session(session_id, db_path=app.state.db_path)
         return {"deleted": deleted}
 
+    @app.get("/api/investigations/runs")
+    async def investigation_runs(
+        status: str = Query(default="", pattern="^(completed|error|cancelled)?$"),
+        search: str = Query(default="", max_length=200),
+        limit: int = Query(default=100, ge=1, le=500),
+    ) -> dict[str, Any]:
+        runs = list_agno_runs(
+            status=status,
+            search=search,
+            limit=limit,
+            db_path=app.state.db_path,
+        )
+        return {
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "items": [{"source": "agno", **run} for run in runs],
+        }
+
+    @app.get("/api/investigations/runs/{run_id}")
+    async def investigation_run_details(run_id: str) -> dict[str, Any]:
+        details = get_agno_run_details(run_id, db_path=app.state.db_path)
+        if not details:
+            raise HTTPException(status_code=404, detail="Execução não encontrada.")
+        return {"source": "agno", **details}
+
     @app.get("/api/agno/metrics/summary")
     async def get_agent_summary(
         entity_id: str,
         entity_type: str = "agent",
-        days: int = 30,
+        days: int = Query(default=30, ge=1, le=365),
     ) -> dict[str, Any]:
         return get_agent_metrics_summary(
             entity_type=entity_type,
@@ -227,8 +301,8 @@ def create_app() -> FastAPI:
 
     @app.get("/api/agno/metrics/compare")
     async def get_comparison(
-        group_by: str = "agent",
-        days: int = 30,
+        group_by: str = Query(default="agent", pattern="^(agent|model)$"),
+        days: int = Query(default=30, ge=1, le=365),
     ) -> dict[str, Any]:
         items = get_comparative_metrics(
             group_by=group_by,
@@ -239,7 +313,7 @@ def create_app() -> FastAPI:
 
     @app.get("/api/agno/metrics/report")
     async def get_metrics_report(
-        days: int = 30,
+        days: int = Query(default=30, ge=1, le=365),
     ) -> dict[str, Any]:
         agents = get_comparative_metrics(group_by="agent", days=days, db_path=app.state.db_path)
         models = get_comparative_metrics(group_by="model", days=days, db_path=app.state.db_path)
@@ -329,6 +403,16 @@ def create_app() -> FastAPI:
             run_id=run_id,
             db_path=db_path,
         )
+        run_span = start_observability_span(
+            "agno.run",
+            attributes={
+                "run_id": correlation.run_id,
+                "session_id": correlation.session_id,
+                "entity_type": correlation.entity_type,
+                "entity_id": correlation.entity_id,
+            },
+        )
+        correlation = correlation.with_trace_id(run_span.trace_id)
 
         async def stream() -> Any:
             t0 = time.perf_counter()
@@ -404,7 +488,15 @@ def create_app() -> FastAPI:
                 if "reasoning" in event_name.lower() or "reasoning" in data_obj:
                     reasoning_steps_count += 1
 
-                if "ToolCall" in event_name:
+                is_terminal_tool_event = (
+                    "ToolCall" in event_name
+                    and (
+                        event_name.endswith("Completed")
+                        or event_name.endswith("Error")
+                        or event_name == "ToolCall"
+                    )
+                )
+                if is_terminal_tool_event:
                     tc_name = data_obj.get("tool_name") or data_obj.get("name") or "tool"
                     tc_args = data_obj.get("tool_args") or data_obj.get("args") or {}
                     tc_res = data_obj.get("tool_result") or data_obj.get("result")
@@ -454,11 +546,18 @@ def create_app() -> FastAPI:
                 if "Error" in event_name:
                     run_status = "error"
                     error_type = event_name
-                    error_message = str(
+                    raw_error_message = str(
                         data_obj.get("content")
                         or data_obj.get("error")
                         or "Erro na execução"
                     )
+                    error_message = _friendly_agno_error(
+                        raw_error_message,
+                        model_provider=detected_provider,
+                        model=detected_model,
+                    )
+                    data_obj["content"] = error_message
+                    data_obj["error"] = error_message
 
                 events_collected.append(
                     {
@@ -468,25 +567,28 @@ def create_app() -> FastAPI:
                 )
 
             try:
-                async for raw_chunk in agno.stream_run(
-                    entity_type=payload.entity_type,
-                    entity_id=payload.entity_id,
-                    message=payload.message,
-                    session_id=session_id,
-                ):
-                    event_buffer += raw_chunk.decode("utf-8", errors="replace")
-                    parsed_events, event_buffer = consume_agno_event_buffer(event_buffer)
-                    for chunk_data in parsed_events:
-                        chunk_data = attach_correlation(
-                            sanitize_agno_event_for_console(
-                                chunk_data,
-                                store_full_reasoning=app.state.store_reasoning,
-                            )
+                with run_span.activate():
+                    async for raw_chunk in agno.stream_run(
+                        entity_type=payload.entity_type,
+                        entity_id=payload.entity_id,
+                        message=payload.message,
+                        session_id=session_id,
+                    ):
+                        event_buffer += raw_chunk.decode("utf-8", errors="replace")
+                        parsed_events, event_buffer = consume_agno_event_buffer(
+                            event_buffer
                         )
-                        collect_event(chunk_data)
-                        yield (
-                            json.dumps(chunk_data, ensure_ascii=False) + "\n"
-                        ).encode("utf-8")
+                        for chunk_data in parsed_events:
+                            chunk_data = attach_correlation(
+                                sanitize_agno_event_for_console(
+                                    chunk_data,
+                                    store_full_reasoning=app.state.store_reasoning,
+                                )
+                            )
+                            collect_event(chunk_data)
+                            yield (
+                                json.dumps(chunk_data, ensure_ascii=False) + "\n"
+                            ).encode("utf-8")
 
                 if event_buffer.strip():
                     parsed_events, event_buffer = consume_agno_event_buffer(
@@ -504,10 +606,19 @@ def create_app() -> FastAPI:
                             json.dumps(chunk_data, ensure_ascii=False) + "\n"
                         ).encode("utf-8")
 
+            except asyncio.CancelledError:
+                run_status = "cancelled"
+                error_type = "CancelledError"
+                error_message = "Stream encerrado antes da conclusão."
+                raise
             except Exception as exc:
                 run_status = "error"
                 error_type = type(exc).__name__
-                error_message = str(exc)
+                error_message = _friendly_agno_error(
+                    str(exc),
+                    model_provider=detected_provider,
+                    model=detected_model,
+                )
                 err_chunk = {
                     "event": "RunError",
                     **correlation.event_fields(),
@@ -599,24 +710,23 @@ def create_app() -> FastAPI:
                     user_chars=len(payload.message),
                     assistant_chars=len(full_assistant_text),
                 )
-                if app.state.otel_enabled:
-                    record_observability_span(
-                        "agno.run",
-                        attributes={
-                            **correlation.attributes(),
-                            "model": detected_model,
-                            "model_provider": detected_provider,
-                            "duration_seconds": duration_seconds,
-                            "ttft_seconds": ttft_seconds,
-                            "input_tokens": input_tokens,
-                            "output_tokens": output_tokens,
-                            "total_tokens": total_tokens,
-                            "reasoning_tokens": reasoning_tokens,
-                            "cost": cost,
-                            "error_type": error_type,
-                        },
-                        status=run_status,
-                    )
+                run_span.finish(
+                    status=run_status,
+                    error=error_message,
+                    attributes={
+                        **correlation.attributes(),
+                        "model": detected_model,
+                        "model_provider": detected_provider,
+                        "duration_seconds": duration_seconds,
+                        "ttft_seconds": ttft_seconds,
+                        "input_tokens": input_tokens,
+                        "output_tokens": output_tokens,
+                        "total_tokens": total_tokens,
+                        "reasoning_tokens": reasoning_tokens,
+                        "cost": cost,
+                        "error_type": error_type,
+                    },
+                )
 
                 # Notifica conclusão com resumo das métricas registradas
                 final_meta = {
@@ -637,56 +747,41 @@ def create_app() -> FastAPI:
                 }
                 yield ("\n" + json.dumps(final_meta)).encode("utf-8")
 
-        return StreamingResponse(stream(), media_type="application/x-ndjson")
+        return StreamingResponse(
+            stream(),
+            media_type="application/x-ndjson",
+            background=BackgroundTask(
+                run_span.finish,
+                status="cancelled",
+                error="Stream encerrado antes da conclusão.",
+            ),
+        )
 
+
+    @app.get("/api/logs")
+    async def logs(
+        search: str = Query(default="", max_length=500),
+        limit: int = Query(default=100, ge=1, le=500),
+    ) -> dict[str, Any]:
+        timeout = httpx.Timeout(8.0, connect=2.0)
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            result = await app.state.logs_provider.entries(
+                client,
+                search=search,
+                limit=limit,
+            )
+        return {
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            **result,
+        }
 
     @app.get("/api/snapshot")
     async def snapshot() -> dict[str, Any]:
         timeout = httpx.Timeout(6.0, connect=2.0)
         async with httpx.AsyncClient(timeout=timeout) as client:
-            api = await app.state.project_api.snapshot(client)
-            metrics = await app.state.metrics_provider.snapshot(client)
-            logs = await app.state.logs_provider.entries(client)
-            langfuse = await service_probe(
-                client,
-                name="langfuse",
-                base_url=app.state.langfuse_url,
-                path="/api/public/health",
-            )
-            tempo = await service_probe(
-                client,
-                name="tempo",
-                base_url=app.state.tempo_url,
-                path="/ready",
-            )
-            locust = await service_probe(
-                client,
-                name="locust",
-                base_url=app.state.locust_url,
-            )
-            services = {
-                "api": api["health"] is not None,
-                "prometheus": metrics["available"],
-                "loki": logs["available"],
-                "langfuse": langfuse.available,
-                "tempo": tempo.available,
-                "locust": locust.available,
-            }
-
-        return {
-            "generated_at": datetime.now(timezone.utc).isoformat(),
-            "services": services,
-            "service_details": {
-                "langfuse": langfuse.as_dict(),
-                "tempo": tempo.as_dict(),
-                "locust": locust.as_dict(),
-            },
-            "api": api,
-            "metrics": metrics["groups"],
-            "logs": logs["entries"],
-            "links": app.state.public_links,
-            "annotations": list_annotations(app.state.db_path, limit=20),
-        }
+            payload = await app.state.dashboard.snapshot(client)
+        payload["annotations"] = list_annotations(app.state.db_path, limit=20)
+        return payload
 
     @app.get("/api/realtime")
     async def realtime() -> dict[str, Any]:
@@ -718,7 +813,9 @@ def create_app() -> FastAPI:
         }
 
     @app.get("/api/annotations")
-    async def annotations(limit: int = 100) -> dict[str, Any]:
+    async def annotations(
+        limit: int = Query(default=100, ge=1, le=500),
+    ) -> dict[str, Any]:
         return {"items": list_annotations(app.state.db_path, limit=limit)}
 
     @app.post("/api/annotations", status_code=201)

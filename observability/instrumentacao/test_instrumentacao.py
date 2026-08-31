@@ -17,6 +17,7 @@ import pytest
 
 from backend.config.settings import _observability_bool_from_env_alias, settings
 from backend import observability
+from backend.tools.logger import _add_trace_context
 
 
 @pytest.fixture(autouse=True)
@@ -55,6 +56,26 @@ def test_tracing_is_idempotent(monkeypatch):
     monkeypatch.setattr(observability, "_tracing_active", True)
     monkeypatch.setattr(settings, "enable_tracing", False)
     assert observability.setup_tracing() is True
+
+
+def test_logger_adds_active_trace_context(monkeypatch):
+    from opentelemetry import trace
+
+    context = SimpleNamespace(
+        is_valid=True,
+        trace_id=int("a" * 32, 16),
+        span_id=int("b" * 16, 16),
+    )
+    span = SimpleNamespace(get_span_context=lambda: context)
+    monkeypatch.setattr(trace, "get_current_span", lambda: span)
+    record = {"extra": {}}
+
+    _add_trace_context(record)
+
+    assert record["extra"] == {
+        "trace_id": "a" * 32,
+        "span_id": "b" * 16,
+    }
 
 
 # ---------------------------------------------------------------------------

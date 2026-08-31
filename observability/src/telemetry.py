@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Iterator
 
 
 @dataclass
@@ -19,6 +20,53 @@ class AgnoPrometheusMetrics:
 
 _agno_prom_metrics: AgnoPrometheusMetrics | None = None
 _otel_configured = False
+
+
+@dataclass
+class ObservabilityRunSpan:
+    span: Any | None = None
+    trace_id: str = ""
+    finished: bool = False
+
+    @contextmanager
+    def activate(self) -> Iterator[None]:
+        if self.span is None:
+            yield
+            return
+        try:
+            from opentelemetry.trace import use_span
+        except Exception:
+            yield
+            return
+        with use_span(self.span, end_on_exit=False):
+            yield
+
+    def finish(
+        self,
+        *,
+        status: str,
+        attributes: dict[str, Any] | None = None,
+        error: str = "",
+    ) -> None:
+        if self.finished:
+            return
+        self.finished = True
+        if self.span is None:
+            return
+        try:
+            from opentelemetry.trace.status import Status, StatusCode
+
+            _set_span_attributes(self.span, attributes or {})
+            self.span.set_attribute("run.status", status)
+            if status == "error":
+                self.span.set_status(Status(StatusCode.ERROR, error or None))
+                if error:
+                    self.span.set_attribute("error.message", error)
+            elif status == "completed":
+                self.span.set_status(Status(StatusCode.OK))
+            self.span.end()
+        except Exception:
+            return
 
 
 def configure_opentelemetry(
@@ -58,17 +106,38 @@ def record_observability_span(
     attributes: dict[str, Any],
     status: str = "completed",
 ) -> None:
+    run_span = start_observability_span(name, attributes=attributes)
+    run_span.finish(status=status, attributes=attributes)
+
+
+def start_observability_span(
+    name: str,
+    *,
+    attributes: dict[str, Any],
+) -> ObservabilityRunSpan:
     try:
         from opentelemetry import trace
 
         tracer = trace.get_tracer("observability")
-        with tracer.start_as_current_span(name) as span:
-            for key, value in attributes.items():
-                if value is not None:
-                    span.set_attribute(key, value)
-            span.set_attribute("run.status", status)
+        span = tracer.start_span(name)
+        if not span.is_recording():
+            return ObservabilityRunSpan()
+        _set_span_attributes(span, attributes)
+        context = span.get_span_context()
+        trace_id = f"{context.trace_id:032x}" if context.is_valid else ""
+        return ObservabilityRunSpan(span=span, trace_id=trace_id)
     except Exception:
-        return
+        return ObservabilityRunSpan()
+
+
+def _set_span_attributes(span: Any, attributes: dict[str, Any]) -> None:
+    for key, value in attributes.items():
+        if value is None:
+            continue
+        if isinstance(value, (str, bool, int, float)):
+            span.set_attribute(key, value)
+        else:
+            span.set_attribute(key, str(value))
 
 
 def get_agno_prom_metrics() -> AgnoPrometheusMetrics | None:
