@@ -181,7 +181,25 @@ docker pull ghcr.io/a11ydevs/acessilia:sha-abc1234
 
 ---
 
-## 6. Variantes de imagem
+## 6. Update automático (staging)
+
+Se você estiver rodando um servidor de homologação, pode configurar **update
+automático** via systemd timer. O script consulta a **GitHub API** a cada
+**5 minutos** e só executa `docker pull` quando há um commit novo na `develop`.
+
+```bash
+# Setup completo (recomendado)
+./scripts/setup-homologacao.sh
+
+# Ou fazer manualmente
+# Consulte docs/homologacao-systemd.md para instruções manuais
+```
+
+**Requer:** `jq` e um token GitHub com escopo `read:packages`.
+
+---
+
+## 7. Variantes de imagem
 
 | Variante | Tamanho aprox. | Docling | OCR | Uso recomendado |
 |----------|----------------|---------|-----|-----------------|
@@ -197,7 +215,7 @@ A variante **slim** faz fallback automático para `pymupdf` com um aviso no log.
 
 ---
 
-## 7. Solução de problemas
+## 8. Solução de problemas
 
 ### Container não sobe — porta ocupada
 
