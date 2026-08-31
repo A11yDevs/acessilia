@@ -118,7 +118,7 @@ class JobExecutor:
             state_manager.atualizar(task_id, status="processing")
 
             base = Path(job.filename).stem
-            out_dir = job.output_dir or (settings.temp_dir / "output" / task_id)
+            out_dir = job.output_dir or (settings.data_dir / "output" / task_id)
             out_dir.mkdir(parents=True, exist_ok=True)
 
             state_manager.atualizar(task_id, etapa="Exportando TXT...", progresso=0.85)
