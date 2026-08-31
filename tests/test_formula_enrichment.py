@@ -2,6 +2,8 @@
 
 from datetime import datetime, timezone
 
+import pytest
+
 from backend.export.renderers.html_renderer import _render_block as render_html_block
 from backend.export.renderers.txt_renderer import _render_block as render_txt_block
 from backend.pipeline.canonical_builder import build_canonical_document
@@ -24,12 +26,14 @@ def test_normalize_latex_strips_delimiters():
     assert normalize_latex("  x  =  1  ") == "x = 1"
 
 
+@pytest.mark.docling  # latex2mathml vem apenas com o extra docling
 def test_latex_to_mathml_converts_valid_latex():
     mathml = latex_to_mathml(r"$x=\frac{-b\pm\sqrt{b^2-4ac}}{2a}$")
     assert mathml.startswith("<math")
     assert "<mfrac>" in mathml
 
 
+@pytest.mark.docling
 def test_latex_to_mathml_handles_spaced_codeformula_output():
     mathml = latex_to_mathml(r"E = m c ^ { 2 }")
     assert mathml.startswith("<math")
@@ -77,6 +81,7 @@ def test_parser_keeps_normal_text_as_paragraph():
 # ── canonical_builder: enriquecimento ──
 
 
+@pytest.mark.docling
 def test_canonical_document_enriches_math_blocks():
     document = build_canonical_document(
         "# Física\n\nConsidere:\n\n$E=mc^2$\n", title="Física"
@@ -203,6 +208,7 @@ def _manifest_with_formula():
     )
 
 
+@pytest.mark.docling
 def test_pddl_mathml_handler_enriches_formula_element():
     from backend.agents.pddl_orchestrator import _handle_mathml_method
 
