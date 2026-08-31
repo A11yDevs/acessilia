@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import functools
 import time
 import zipfile
 from dataclasses import dataclass
@@ -78,9 +79,9 @@ class JobExecutor:
     def __init__(self) -> None:
         self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=3)
 
-    def _run_in_executor(self, fn, *args):
+    def _run_in_executor(self, fn, *args, **kwargs):
         loop = asyncio.get_running_loop()
-        return loop.run_in_executor(self._executor, fn, *args)
+        return loop.run_in_executor(self._executor, functools.partial(fn, *args, **kwargs))
 
     async def run(self, job: ApiJob) -> None:
         task_id = job.task_id
