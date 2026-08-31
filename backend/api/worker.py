@@ -185,7 +185,7 @@ class JobExecutor:
             )
 
             token = await criar_token(out_dir, base)
-            download_url = f"{settings.api_base_url.rstrip('/')}/api/v1/download/{token}"
+            download_url = f"{settings.web_base_url.rstrip('/')}/download/{token}"
             state_manager.registrar_download_url(task_id, download_url)
             state_manager.atualizar(
                 task_id, etapa="Processamento concluido", progresso=1.0,

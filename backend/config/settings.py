@@ -113,6 +113,7 @@ class Settings:
     api_host: str = os.getenv("API_HOST", "0.0.0.0")
     api_port: int = int(os.getenv("API_PORT", "8000"))
     api_base_url: str = os.getenv("API_BASE_URL", "http://localhost:8000")
+    web_base_url: str = os.getenv("WEB_BASE_URL", "http://localhost:8001")
     web_port: int = int(os.getenv("WEB_PORT", "8001"))
 
     # SMTP Settings
