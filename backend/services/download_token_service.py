@@ -136,9 +136,9 @@ async def limpar_tokens_expirados(dias: int = TOKEN_EXPIRY_DAYS):
         for row in rows:
             output_dir = Path(row["output_dir"])
             if output_dir.exists():
-                if str(output_dir).startswith(str(settings.temp_dir)):
+                if str(output_dir).startswith(str(settings.temp_dir)) or str(output_dir).startswith(str(settings.data_dir / "output")):
                     shutil.rmtree(output_dir, ignore_errors=True)
-                    logger.debug("Diretório temporário removido: {}", output_dir)
+                    logger.debug("Diretório de output removido: {}", output_dir)
         cursor = conn.cursor()
         try:
             cursor.execute(

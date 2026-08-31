@@ -15,6 +15,7 @@ async def periodic_cleanup() -> None:
     while True:
         try:
             _clean_temp_directory()
+            _clean_output_directory()
         except Exception:
             logger.exception("Erro na limpeza periódica")
         await asyncio.sleep(CLEANUP_INTERVAL)
@@ -58,3 +59,19 @@ def _clean_temp_directory() -> None:
                     logger.debug("Diretório temporário removido: {}", item.name)
             except Exception as e:
                 logger.warning("Falha ao remover {}: {}", item.name, e)
+
+
+def _clean_output_directory() -> None:
+    """Remove diretorios de output antigos (outputs de jobs expirados)."""
+    output_dir = settings.data_dir / "output"
+    if not output_dir.exists():
+        return
+
+    now = time.time()
+    for item in output_dir.iterdir():
+        if item.is_dir() and _is_stale(item, now, FILE_MAX_AGE * 12):
+            try:
+                shutil.rmtree(item, ignore_errors=True)
+                logger.debug("Diretorio de output removido: {}", item.name)
+            except Exception as e:
+                logger.warning("Falha ao remover output {}: {}", item.name, e)
