@@ -81,9 +81,11 @@ ARG TORCH_VERSION=2.7.1
 ARG TORCHVISION_VERSION=0.22.1
 ARG GIT_COMMIT=
 ARG IMAGE_TAG=
+ARG IMAGE_DIGEST=
 
 ENV GIT_COMMIT=${GIT_COMMIT} \
-    IMAGE_TAG=${IMAGE_TAG}
+    IMAGE_TAG=${IMAGE_TAG} \
+    IMAGE_DIGEST=${IMAGE_DIGEST}
 
 COPY pyproject.toml poetry.lock* ./
 COPY scripts/filter_accelerator_requirements.py /tmp/filter_accelerator_requirements.py

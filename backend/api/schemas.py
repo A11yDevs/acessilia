@@ -72,3 +72,10 @@ class HealthResponse(BaseModel):
     queue_size: int
     git_commit: str = ""
     image_tag: str = ""
+    container_id: str = ""
+    image_digest: str = ""
+    ghcr_latest_sha: str = ""
+    last_check: str = ""
+    last_update: str = ""
+    update_available: bool = False
+    up_to_date: bool = False
