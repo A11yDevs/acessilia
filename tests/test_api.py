@@ -164,7 +164,7 @@ def test_download_url_uses_public_api_prefix(monkeypatch):
 
     assert (
         build_download_url("tok123")
-        == "https://acessilia.example/api/v1/download/tok123"
+        == "https://acessilia.example/download/tok123"
     )
 
 

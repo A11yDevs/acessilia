@@ -25,7 +25,7 @@ queued_jobs: dict[str, dict[str, Any]] = {}
 
 
 def build_download_url(token: str) -> str:
-    return f"{settings.web_base_url.rstrip('/')}/api/v1/download/{token}"
+    return f"{settings.web_base_url.rstrip('/')}/download/{token}"
 
 
 def register_queued_job(

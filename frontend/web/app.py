@@ -33,7 +33,6 @@ BASE_WEB_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_WEB_DIR / "templates"))
 app.mount("/static", StaticFiles(directory=str(BASE_WEB_DIR / "static")), name="static")
 
-API_BASE = settings.api_base_url.rstrip("/")
 client = default_client
 
 WEB_UPLOAD_DIR = settings.temp_dir / "web_uploads"
@@ -214,7 +213,7 @@ async def download_page(request: Request, token: str):
         logger.warning("Falha ao consultar download na API: {} - {}", e.status_code, e.detail)
         raise HTTPException(status_code=502, detail="Serviço de download indisponível")
     for f in info["formats"]:
-        f["url"] = f"{API_BASE}/api/v1{f['url']}"
+        f["url"] = f"/api/v1{f['url']}"
     return templates.TemplateResponse(
         request=request,
         name="download.html",
