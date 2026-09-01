@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import socket
+from pathlib import Path
 
 import httpx
 from fastapi import APIRouter, Request
@@ -19,6 +21,17 @@ def _get_container_id() -> str:
         return socket.gethostname()
     except Exception:
         return ""
+
+
+def _read_staging_status() -> dict:
+    """Le o arquivo de status escrito pelo staging-update.sh (se existir)."""
+    status_file = settings.data_dir / "staging-status.json"
+    try:
+        if status_file.exists():
+            return json.loads(status_file.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    return {}
 
 
 async def _check_model_reachable() -> bool:
@@ -43,6 +56,12 @@ async def health(request: Request):
         if settings.ai_client == "ollama"
         else settings.openrouter_model
     )
+    staging = _read_staging_status()
+    ghcr_latest = staging.get("latest_sha", "")
+    last_update = staging.get("last_update", "")
+    # update_available: ha imagem nova no GHCR em relacao ao que roda agora.
+    # Compara a ultima checagem (ghcr_latest) com o commit da imagem em execucao.
+    update_available = bool(ghcr_latest and settings.git_commit and ghcr_latest != settings.git_commit)
     return HealthResponse(
         status="ok",
         model_client=settings.ai_client,
@@ -53,4 +72,9 @@ async def health(request: Request):
         image_tag=settings.image_tag,
         container_id=_get_container_id(),
         image_digest=settings.image_digest,
+        ghcr_latest_sha=ghcr_latest,
+        last_check=staging.get("last_check", ""),
+        last_update=last_update,
+        update_available=update_available,
+        up_to_date=not update_available and bool(ghcr_latest),
     )

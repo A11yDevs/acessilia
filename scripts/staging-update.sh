@@ -34,6 +34,26 @@ IMAGE_TAG="ghcr.io/a11ydevs/acessilia:develop"
 CACHE_FILE="/opt/acessilia/scripts/.last_sha"
 GITHUB_REPO="A11yDevs/acessilia"
 GITHUB_BRANCH="develop"
+# Arquivo de status consumido pelo health check da API (volume ./var:/app/var)
+STATUS_FILE="${STAGING_STATUS_FILE:-var/data/staging-status.json}"
+
+# ──────────────────────────────────────────────
+# Helpers de status
+# ──────────────────────────────────────────────
+_write_status() {
+  # $1 = latest_sha, $2 = running_sha, $3 = last_update (ISO) ou vazio
+  local latest_sha="$1" running_sha="$2" last_update="$3"
+  local now
+  now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  mkdir -p "$(dirname "$STATUS_FILE")"
+  jq -n \
+    --arg latest "$latest_sha" \
+    --arg running "$running_sha" \
+    --arg check "$now" \
+    --arg update "$last_update" \
+    '{latest_sha: $latest, running_sha: $running, last_check: $check, last_update: $update}' \
+    > "$STATUS_FILE"
+}
 
 # ──────────────────────────────────────────────
 # 1. Checar SHA do último commit via GitHub API
@@ -52,6 +72,7 @@ if [ -z "$LATEST_SHA" ] || [ "$LATEST_SHA" = "null" ]; then
   }
   docker compose -f "$COMPOSE_FILE" up -d --no-deps acessilia
   docker image prune -f
+  _write_status "" "" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo "[staging-update] Container atualizado (fallback)."
   exit 0
 fi
@@ -60,6 +81,7 @@ fi
 if [ -f "$CACHE_FILE" ]; then
   CACHED_SHA=$(cat "$CACHE_FILE")
   if [ "$CACHED_SHA" = "$LATEST_SHA" ]; then
+    _write_status "$LATEST_SHA" "" ""
     echo "[staging-update] ✅ Nenhum commit novo em $GITHUB_REPO/$GITHUB_BRANCH. Pulando."
     exit 0
   fi
@@ -74,6 +96,7 @@ SHA_TAG="ghcr.io/a11ydevs/acessilia:sha-$SHA7"
 if docker manifest inspect "$SHA_TAG" >/dev/null 2>&1; then
   echo "[staging-update] ✅ Imagem sha-$SHA7 já publicada no GHCR."
 else
+  _write_status "$LATEST_SHA" "" ""
   echo "[staging-update] ⏳ Imagem sha-$SHA7 ainda não publicada no GHCR (build em andamento?). Aguardando próxima checagem."
   exit 0
 fi
@@ -94,5 +117,7 @@ echo "[staging-update] 🚀 Reiniciando container..."
 docker compose -f "$COMPOSE_FILE" up -d --no-deps acessilia
 
 docker image prune -f
+
+_write_status "$LATEST_SHA" "$LATEST_SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 echo "[staging-update] ✅ Container $CONTAINER_NAME atualizado com sucesso."
