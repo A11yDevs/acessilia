@@ -123,8 +123,9 @@ def test_download_page_delegates_to_api(web_client):
     resp = web_client.get("/download/tok")
     assert resp.status_code == 200
     assert "doc.pdf" in resp.text
-    assert "http://localhost:8000/api/v1/download/tok/txt" in resp.text
-    assert "http://localhost:8000/api/v1/download/tok/zip" in resp.text
+    assert 'href="/api/v1/download/tok/txt"' in resp.text
+    assert 'href="/api/v1/download/tok/zip"' in resp.text
+    assert "localhost" not in resp.text
 
 
 def test_download_page_not_found(web_client):
@@ -167,4 +168,5 @@ def test_download_page_uses_real_client(monkeypatch):
         with TestClient(web_module.app) as c:
             resp = c.get("/download/tok")
     assert resp.status_code == 200
-    assert "http://localhost:8000/api/v1/download/tok/txt" in resp.text
+    assert 'href="/api/v1/download/tok/txt"' in resp.text
+    assert "localhost" not in resp.text
