@@ -156,30 +156,8 @@ if [ -n "$GHCR_TOKEN" ]; then
   sudo chmod 600 "$STAGING_DIR/.env"
 fi
 
-# Cria um wrapper que carrega o token e exporta STAGING_DIR antes do staging-update.sh
-sudo tee /opt/acessilia/scripts/staging-update-wrapper.sh > /dev/null << 'WRAPPER'
-#!/usr/bin/env bash
-# staging-update-wrapper.sh — Carrega credenciais e executa o staging-update.sh
-set -euo pipefail
-
-# Diretório do staging (onde ficam .env e docker-compose.staging.yml)
-export STAGING_DIR="${STAGING_DIR:-/opt/acessilia/staging}"
-
-# Carrega GHCR_TOKEN se ainda não estiver definido
-if [ -z "${GHCR_TOKEN:-}" ]; then
-  for env_file in "$STAGING_DIR/.env" /opt/acessilia/scripts/.env; do
-    if [ -f "$env_file" ]; then
-      set -a
-      # shellcheck disable=SC1090
-      source "$env_file"
-      set +a
-      break
-    fi
-  done
-fi
-
-exec /opt/acessilia/scripts/staging-update.sh
-WRAPPER
+# Cria o wrapper (versionado em scripts/staging-update-wrapper.sh)
+sudo cp "$SCRIPTS_DIR/staging-update-wrapper.sh" /opt/acessilia/scripts/
 sudo chmod +x /opt/acessilia/scripts/staging-update-wrapper.sh
 
 # Cria o service unit
