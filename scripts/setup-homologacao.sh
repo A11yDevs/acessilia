@@ -16,7 +16,7 @@
 #   1. Configura autenticação no GHCR
 #   2. Cria o .env a partir do .env.example se não existir
 #   3. Sobe os containers com docker compose -f docker-compose.staging.yml
-#   4. Instala o timer systemd para atualização automática via GitHub API
+#   4. Instala o user timer systemd (systemctl --user) para atualização automática via GitHub API
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -121,10 +121,10 @@ docker compose -f docker-compose.staging.yml pull acessilia
 docker compose -f docker-compose.staging.yml up -d
 
 # ──────────────────────────────────────────────
-# 5. Configurar update automático via systemd timer
+# 5. Configurar update automático via systemd user timer
 # ──────────────────────────────────────────────
 echo ""
-echo "[5/5] Configurando update automático via systemd timer..."
+echo "[5/5] Configurando update automático via systemd user timer..."
 
 SCRIPTS_DIR="$(pwd)/scripts"
 
@@ -132,6 +132,8 @@ SCRIPTS_DIR="$(pwd)/scripts"
 sudo mkdir -p /opt/acessilia/scripts
 sudo cp "$SCRIPTS_DIR/staging-update.sh" /opt/acessilia/scripts/
 sudo chmod +x /opt/acessilia/scripts/staging-update.sh
+sudo cp "$SCRIPTS_DIR/staging-update-wrapper.sh" /opt/acessilia/scripts/
+sudo chmod +x /opt/acessilia/scripts/staging-update-wrapper.sh
 
 # Detecta o diretório do staging (onde ficam .env e docker-compose.staging.yml)
 STAGING_DIR="${STAGING_DIR:-}"
@@ -156,26 +158,33 @@ if [ -n "$GHCR_TOKEN" ]; then
   sudo chmod 600 "$STAGING_DIR/.env"
 fi
 
-# Cria o wrapper (versionado em scripts/staging-update-wrapper.sh)
-sudo cp "$SCRIPTS_DIR/staging-update-wrapper.sh" /opt/acessilia/scripts/
-sudo chmod +x /opt/acessilia/scripts/staging-update-wrapper.sh
+# Pré-requisitos do user timer: linger + grupo docker
+if ! loginctl show-user "$USER" 2>/dev/null | grep -q 'Linger=yes'; then
+  echo "  ⚠️  Habilitando linger para $USER (user timer sobrevive ao logout)..."
+  sudo loginctl enable-linger "$USER"
+fi
+if ! id -nG | tr ' ' '\n' | grep -qx docker; then
+  echo "  ⚠️  Adicionando $USER ao grupo docker (user timer acessa o daemon)..."
+  sudo usermod -aG docker "$USER"
+  echo "  ⚠️  Relogue (logout/login) para o grupo docker ter efeito."
+fi
 
-# Cria o service unit
-sudo tee /etc/systemd/system/staging-update.service > /dev/null << 'SERVICE'
+# Cria o diretório de units do usuário
+mkdir -p ~/.config/systemd/user
+
+# Cria o service unit (user)
+cat > ~/.config/systemd/user/staging-update.service << 'SERVICE'
 [Unit]
 Description=Update acessilia staging container
-After=network.target docker.service
-Requires=docker.service
 
 [Service]
 Type=oneshot
 ExecStart=/opt/acessilia/scripts/staging-update-wrapper.sh
-User=root
-Group=root
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 SERVICE
 
-# Cria o timer unit (a cada 5 minutos)
-sudo tee /etc/systemd/system/staging-update.timer > /dev/null << 'TIMER'
+# Cria o timer unit (user, a cada 5 minutos)
+cat > ~/.config/systemd/user/staging-update.timer << 'TIMER'
 [Unit]
 Description=Check acessilia staging updates every 5 minutes
 
@@ -187,10 +196,10 @@ OnUnitActiveSec=300s
 WantedBy=timers.target
 TIMER
 
-sudo systemctl daemon-reload
-sudo systemctl enable --now staging-update.timer
+systemctl --user daemon-reload
+systemctl --user enable --now staging-update.timer
 
-echo "  ✅ Timer systemd instalado e ativo."
+echo "  ✅ User timer systemd instalado e ativo."
 echo "  ⏱   Checa a cada 5 minutos via GitHub API se há novos commits em develop"
 echo "  🔑  Token GHCR salvo em $STAGING_DIR/.env (modo 600)"
 echo ""
