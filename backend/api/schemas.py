@@ -72,3 +72,5 @@ class HealthResponse(BaseModel):
     queue_size: int
     git_commit: str = ""
     image_tag: str = ""
+    container_id: str = ""
+    image_digest: str = ""

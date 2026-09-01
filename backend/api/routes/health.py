@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import socket
+
 import httpx
 from fastapi import APIRouter, Request
 
@@ -9,6 +11,14 @@ from backend.config.settings import settings
 from backend.services.queue_service import unified_queue
 
 router = APIRouter(tags=["health"])
+
+
+def _get_container_id() -> str:
+    """Em Docker, o hostname do container e o container ID."""
+    try:
+        return socket.gethostname()
+    except Exception:
+        return ""
 
 
 async def _check_model_reachable() -> bool:
@@ -41,4 +51,6 @@ async def health(request: Request):
         queue_size=unified_queue.qsize(),
         git_commit=settings.git_commit,
         image_tag=settings.image_tag,
+        container_id=_get_container_id(),
+        image_digest=settings.image_digest,
     )

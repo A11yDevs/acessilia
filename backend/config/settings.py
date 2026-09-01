@@ -119,6 +119,7 @@ class Settings:
     # Build info (injetado via Docker build --build-arg ou variavel de ambiente)
     git_commit: str = os.getenv("GIT_COMMIT", "")
     image_tag: str = os.getenv("IMAGE_TAG", "")
+    image_digest: str = os.getenv("IMAGE_DIGEST", "")
 
     # SMTP Settings
     smtp_server: str = os.getenv("SMTP_SERVER", "smtp.gmail.com")
