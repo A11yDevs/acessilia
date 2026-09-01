@@ -24,6 +24,10 @@ from backend.tools.logger import logger
 queued_jobs: dict[str, dict[str, Any]] = {}
 
 
+def build_download_url(token: str) -> str:
+    return f"{settings.web_base_url.rstrip('/')}/api/v1/download/{token}"
+
+
 def register_queued_job(
     task_id: str, arquivo: str, position: int, source: str
 ) -> None:
@@ -185,7 +189,7 @@ class JobExecutor:
             )
 
             token = await criar_token(out_dir, base)
-            download_url = f"{settings.web_base_url.rstrip('/')}/download/{token}"
+            download_url = build_download_url(token)
             state_manager.registrar_download_url(task_id, download_url)
             state_manager.atualizar(
                 task_id, etapa="Processamento concluido", progresso=1.0,

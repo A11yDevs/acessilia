@@ -157,6 +157,17 @@ def test_download_file_invalid_format(client):
     assert resp.status_code == 404
 
 
+def test_download_url_uses_public_api_prefix(monkeypatch):
+    from backend.api.worker import build_download_url
+
+    monkeypatch.setattr(settings, "web_base_url", "https://acessilia.example/")
+
+    assert (
+        build_download_url("tok123")
+        == "https://acessilia.example/api/v1/download/tok123"
+    )
+
+
 def test_download_full_flow(client, api_paths):
     from backend.services.download_token_service import criar_token
 
