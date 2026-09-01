@@ -94,9 +94,15 @@ async def obter_info_token(token: str) -> dict | None:
         finally:
             cursor.close()
     if row is None:
+        logger.warning("Token de download nao encontrado: {}", token)
         return None
     output_dir = Path(row["output_dir"])
     if not output_dir.exists():
+        logger.warning(
+            "Diretorio do token de download nao existe: {} -> {}",
+            token,
+            output_dir,
+        )
         return None
     formats_list = json.loads(row["formats"]) if row["formats"] else []
     formats = []
