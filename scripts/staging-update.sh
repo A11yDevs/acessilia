@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # staging-update.sh — Atualiza o container de homologação via GitHub API
 #
-# Checa o SHA do último commit na branch develop via GitHub API.
-# Só executa docker pull quando há um commit novo — zero requisições
-# desnecessárias ao GHCR.
+# Checa o SHA do último commit na branch develop via GitHub API e
+# confirma que a imagem correspondente (tag sha-<7>) JÁ FOI PUBLICADA
+# no GHCR antes de atualizar. Evita atualizar para um commit cujo build
+# ainda está rodando ou falhou.
 #
 # Uso:
 #   ./scripts/staging-update.sh                     # Executa uma vez
@@ -65,9 +66,22 @@ if [ -f "$CACHE_FILE" ]; then
 fi
 
 # ──────────────────────────────────────────────
-# 2. SHA mudou → atualizar
+# 2. Confirmar que a imagem do commit já está no GHCR
 # ──────────────────────────────────────────────
-echo "[staging-update] 🔄 Novo commit detectado: ${LATEST_SHA:0:7}. Atualizando..."
+SHA7="${LATEST_SHA:0:7}"
+SHA_TAG="ghcr.io/a11ydevs/acessilia:sha-$SHA7"
+
+if docker manifest inspect "$SHA_TAG" >/dev/null 2>&1; then
+  echo "[staging-update] ✅ Imagem sha-$SHA7 já publicada no GHCR."
+else
+  echo "[staging-update] ⏳ Imagem sha-$SHA7 ainda não publicada no GHCR (build em andamento?). Aguardando próxima checagem."
+  exit 0
+fi
+
+# ──────────────────────────────────────────────
+# 3. SHA mudou e imagem publicada → atualizar
+# ──────────────────────────────────────────────
+echo "[staging-update] 🔄 Novo commit detectado: $SHA7. Atualizando..."
 
 echo "$LATEST_SHA" > "$CACHE_FILE"
 
