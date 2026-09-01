@@ -10,12 +10,12 @@
 #   ./scripts/staging-update.sh                     # Executa uma vez
 #   systemctl start staging-update.service           # Executa via systemd
 #
-# Instalação como timer systemd (a cada 5 min):
+# Instalação como user timer systemd (a cada 5 min):
 #   1. sudo cp scripts/staging-update.sh /opt/acessilia/scripts/
-#   2. Criar /etc/systemd/system/staging-update.service
-#   3. Criar /etc/systemd/system/staging-update.timer
-#   4. sudo systemctl daemon-reload
-#   5. sudo systemctl enable --now staging-update.timer
+#   2. Criar ~/.config/systemd/user/staging-update.service
+#   3. Criar ~/.config/systemd/user/staging-update.timer
+#   4. systemctl --user daemon-reload
+#   5. systemctl --user enable --now staging-update.timer
 #
 # Pré-requisitos:
 #   - Docker + Docker Compose instalados
