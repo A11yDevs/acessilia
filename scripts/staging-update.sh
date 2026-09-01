@@ -56,10 +56,31 @@ _write_status() {
 }
 
 # ──────────────────────────────────────────────
+# 0. Carregar GHCR_TOKEN (se nao definido no ambiente)
+# ──────────────────────────────────────────────
+# Fontes possiveis, em ordem:
+#   1. Variavel de ambiente GHCR_TOKEN
+#   2. Arquivo /opt/acessilia/scripts/.env (GHCR_TOKEN=...)
+#   3. Arquivo ~/.docker/config.json (token salvo pelo docker login)
+if [ -z "${GHCR_TOKEN:-}" ] && [ -f /opt/acessilia/scripts/.env ]; then
+  set -a
+  # shellcheck disable=SC1091
+  source /opt/acessilia/scripts/.env
+  set +a
+fi
+
+# ──────────────────────────────────────────────
 # 1. Checar SHA do último commit via GitHub API
 # ──────────────────────────────────────────────
+# O repositorio e publico: a API funciona sem token (rate limit 60/h).
+# Com token, o limite sobe para 5000/h.
+AUTH_HEADER=()
+if [ -n "${GHCR_TOKEN:-}" ]; then
+  AUTH_HEADER=(-H "Authorization: token $GHCR_TOKEN")
+fi
+
 LATEST_SHA=$(curl -fsS \
-  -H "Authorization: token ${GHCR_TOKEN:?}" \
+  "${AUTH_HEADER[@]}" \
   "https://api.github.com/repos/$GITHUB_REPO/commits/$GITHUB_BRANCH" \
   | jq -r '.sha')
 
