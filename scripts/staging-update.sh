@@ -26,16 +26,30 @@
 
 set -euo pipefail
 
-cd "$(dirname "$0")/.."
+# ──────────────────────────────────────────────
+# Detectar o diretório do staging (onde ficam .env e docker-compose.staging.yml)
+# ──────────────────────────────────────────────
+# Layouts suportados:
+#   A) Servidor de homologacao: /opt/acessilia/staging/  (STAGING_DIR ou deteccao)
+#   B) Repositorio clonado: <repo>/scripts/staging-update.sh -> <repo>/
+# Prioridade: 1. STAGING_DIR (env)  2. /opt/acessilia/staging  3. pai do script
+if [ -n "${STAGING_DIR:-}" ]; then
+  STAGING_DIR="$STAGING_DIR"
+elif [ -d /opt/acessilia/staging ]; then
+  STAGING_DIR="/opt/acessilia/staging"
+else
+  STAGING_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+fi
+cd "$STAGING_DIR"
 
 COMPOSE_FILE="docker-compose.staging.yml"
 CONTAINER_NAME="acessilia-staging"
 IMAGE_TAG="ghcr.io/a11ydevs/acessilia:develop"
-CACHE_FILE="/opt/acessilia/scripts/.last_sha"
 GITHUB_REPO="A11yDevs/acessilia"
 GITHUB_BRANCH="develop"
-# Arquivo de status consumido pelo health check da API (volume ./var:/app/var)
-STATUS_FILE="${STAGING_STATUS_FILE:-var/data/staging-status.json}"
+# Cache e status ficam dentro do volume ./var (visivel ao container via /app/var)
+CACHE_FILE="${STAGING_UPDATE_CACHE:-$STAGING_DIR/var/data/.last_sha}"
+STATUS_FILE="${STAGING_STATUS_FILE:-$STAGING_DIR/var/data/staging-status.json}"
 
 # ──────────────────────────────────────────────
 # Helpers de status
@@ -56,10 +70,36 @@ _write_status() {
 }
 
 # ──────────────────────────────────────────────
+# 0. Carregar GHCR_TOKEN (se nao definido no ambiente)
+# ──────────────────────────────────────────────
+# Fontes possiveis, em ordem:
+#   1. Variavel de ambiente GHCR_TOKEN
+#   2. Arquivo <STAGING_DIR>/.env (GHCR_TOKEN=...)
+#   3. Arquivo /opt/acessilia/scripts/.env (layout antigo)
+if [ -z "${GHCR_TOKEN:-}" ]; then
+  for env_file in "$STAGING_DIR/.env" /opt/acessilia/scripts/.env; do
+    if [ -f "$env_file" ]; then
+      set -a
+      # shellcheck disable=SC1090
+      source "$env_file"
+      set +a
+      break
+    fi
+  done
+fi
+
+# ──────────────────────────────────────────────
 # 1. Checar SHA do último commit via GitHub API
 # ──────────────────────────────────────────────
+# O repositorio e publico: a API funciona sem token (rate limit 60/h).
+# Com token, o limite sobe para 5000/h.
+AUTH_HEADER=()
+if [ -n "${GHCR_TOKEN:-}" ]; then
+  AUTH_HEADER=(-H "Authorization: token $GHCR_TOKEN")
+fi
+
 LATEST_SHA=$(curl -fsS \
-  -H "Authorization: token ${GHCR_TOKEN:?}" \
+  "${AUTH_HEADER[@]}" \
   "https://api.github.com/repos/$GITHUB_REPO/commits/$GITHUB_BRANCH" \
   | jq -r '.sha')
 

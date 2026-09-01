@@ -133,18 +133,31 @@ sudo mkdir -p /opt/acessilia/scripts
 sudo cp "$SCRIPTS_DIR/staging-update.sh" /opt/acessilia/scripts/
 sudo chmod +x /opt/acessilia/scripts/staging-update.sh
 
-# Persiste o token para o script de update (lido via variável de ambiente)
-echo "GHCR_TOKEN=$GHCR_TOKEN" | sudo tee /opt/acessilia/scripts/.env > /dev/null
-sudo chmod 600 /opt/acessilia/scripts/.env
+# Detecta o diretório do staging (onde ficam .env e docker-compose.staging.yml)
+STAGING_DIR="${STAGING_DIR:-}"
+if [ -z "$STAGING_DIR" ] && [ -d /opt/acessilia/staging ]; then
+  STAGING_DIR="/opt/acessilia/staging"
+fi
+if [ -z "$STAGING_DIR" ]; then
+  STAGING_DIR="$(pwd)"
+fi
 
-# Cria um wrapper que carrega o token antes do staging-update.sh
-sudo tee /opt/acessilia/scripts/staging-update-wrapper.sh > /dev/null << 'WRAPPER'
-#!/usr/bin/env bash
-set -a
-source /opt/acessilia/scripts/.env
-set +a
-exec /opt/acessilia/scripts/staging-update.sh
-WRAPPER
+# Persiste o token no .env do staging (usado pelo compose e pelo staging-update.sh)
+if [ -n "$GHCR_TOKEN" ]; then
+  if [ -f "$STAGING_DIR/.env" ]; then
+    if grep -q '^GHCR_TOKEN=' "$STAGING_DIR/.env"; then
+      sudo sed -i "s|^GHCR_TOKEN=.*|GHCR_TOKEN=$GHCR_TOKEN|" "$STAGING_DIR/.env"
+    else
+      echo "GHCR_TOKEN=$GHCR_TOKEN" | sudo tee -a "$STAGING_DIR/.env" > /dev/null
+    fi
+  else
+    echo "GHCR_TOKEN=$GHCR_TOKEN" | sudo tee "$STAGING_DIR/.env" > /dev/null
+  fi
+  sudo chmod 600 "$STAGING_DIR/.env"
+fi
+
+# Cria o wrapper (versionado em scripts/staging-update-wrapper.sh)
+sudo cp "$SCRIPTS_DIR/staging-update-wrapper.sh" /opt/acessilia/scripts/
 sudo chmod +x /opt/acessilia/scripts/staging-update-wrapper.sh
 
 # Cria o service unit
@@ -179,7 +192,7 @@ sudo systemctl enable --now staging-update.timer
 
 echo "  ✅ Timer systemd instalado e ativo."
 echo "  ⏱   Checa a cada 5 minutos via GitHub API se há novos commits em develop"
-echo "  🔑  Token GHCR salvo em /opt/acessilia/scripts/.env (modo 600)"
+echo "  🔑  Token GHCR salvo em $STAGING_DIR/.env (modo 600)"
 echo ""
 
 echo ""
