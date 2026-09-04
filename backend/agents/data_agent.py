@@ -1,5 +1,7 @@
 """DataAgent – Conversão de tabelas e fórmulas matemáticas em texto estruturado."""
 
+import asyncio
+
 from backend.tools.logger import logger
 from backend.tools.prompt_tools import load_region_prompt
 from backend.ai.models.ai_client import get_agno_model
@@ -50,12 +52,19 @@ class DataAgent:
                 telemetry=False,
             )
 
-            response = await agent.arun(
-                input=prompt,
-                images=[Image(content=image_bytes)],
-            )
+            def _run_data():
+                loop = asyncio.new_event_loop()
+                try:
+                    return loop.run_until_complete(
+                        agent.arun(
+                            input=prompt,
+                            images=[Image(content=image_bytes)],
+                        )
+                    ).content
+                finally:
+                    loop.close()
 
-            return response.content.strip()
+            return (await asyncio.to_thread(_run_data)).strip()
 
         except Exception as error:
             import traceback
