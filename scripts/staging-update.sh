@@ -158,8 +158,6 @@ fi
 # ──────────────────────────────────────────────
 echo "[staging-update] 🔄 Novo commit detectado: $SHA7. Atualizando..."
 
-echo "$LATEST_SHA" > "$CACHE_FILE"
-
 docker pull "$IMAGE_TAG" 2>/dev/null || {
   echo "[staging-update] ❌ Falha ao puxar $IMAGE_TAG"
   exit 1
@@ -167,6 +165,9 @@ docker pull "$IMAGE_TAG" 2>/dev/null || {
 
 echo "[staging-update] 🚀 Reiniciando container..."
 docker compose -f "$COMPOSE_FILE" up -d --no-deps acessilia
+
+# so grava o cache apos o restart ter sucesso (set -e aborta antes em caso de falha)
+echo "$LATEST_SHA" > "$CACHE_FILE"
 
 docker image prune -f
 
