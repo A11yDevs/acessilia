@@ -47,7 +47,8 @@ _download() {
   echo "  ✅ ${dest}"
 }
 
-sudo mkdir -p "$SCRIPTS_DIR"
+# so usa sudo se o diretorio ainda nao existir/nao for gravavel pelo usuario atual
+mkdir -p "$SCRIPTS_DIR" 2>/dev/null || sudo mkdir -p "$SCRIPTS_DIR"
 _download "scripts/staging-update.sh" "$SCRIPTS_DIR/staging-update.sh"
 _download "scripts/staging-update-wrapper.sh" "$SCRIPTS_DIR/staging-update-wrapper.sh"
 chmod +x "$SCRIPTS_DIR/staging-update.sh" "$SCRIPTS_DIR/staging-update-wrapper.sh"
