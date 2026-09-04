@@ -1,5 +1,7 @@
 """VisionAgent – Geração de audiodescrições acessíveis de imagens."""
 
+import asyncio
+
 from backend.tools.region_classifier import region_prompt_key
 from backend.tools.logger import logger
 
@@ -55,12 +57,19 @@ class VisionAgent:
                 telemetry=False,
             )
 
-            response = await agent.arun(
-                input=prompt,
-                images=[Image(content=image_bytes)],
-            )
+            def _run_vision():
+                loop = asyncio.new_event_loop()
+                try:
+                    return loop.run_until_complete(
+                        agent.arun(
+                            input=prompt,
+                            images=[Image(content=image_bytes)],
+                        )
+                    ).content
+                finally:
+                    loop.close()
 
-            return response.content.strip()
+            return (await asyncio.to_thread(_run_vision)).strip()
 
         except Exception as error:
             import traceback

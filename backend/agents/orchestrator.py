@@ -23,6 +23,7 @@ class AccessibilityOrchestrator:
         self.vision = VisionAgent(mode=mode)
         self.data = DataAgent()
         self.editor = EditorAgent()
+        self._reader_lock = asyncio.Lock()
 
     async def executar(
         self,
@@ -48,7 +49,10 @@ class AccessibilityOrchestrator:
         if is_pdf:
             if status_callback:
                 await status_callback("📄 Separando PDF em paginas...")
-            page_paths = self.reader.split_file(file_path, tmpdir)
+            async with self._reader_lock:
+                page_paths = await asyncio.to_thread(
+                    self.reader.split_file, file_path, tmpdir
+                )
         else:
             if status_callback:
                 await status_callback("🖼️ Preparando imagem...")
@@ -95,9 +99,11 @@ class AccessibilityOrchestrator:
                 )
                 continue
 
-            tasks = self.reader.analyse_page(
-                page_path, page_num, total_pages, is_pdf,
-            )
+            async with self._reader_lock:
+                tasks = await asyncio.to_thread(
+                    self.reader.analyse_page,
+                    page_path, page_num, total_pages, is_pdf,
+                )
 
             agent_results = await self._dispatch_tasks(
                 tasks,
