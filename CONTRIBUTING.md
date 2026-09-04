@@ -6,10 +6,10 @@ Obrigado por considerar contribuir! Este documento define as diretrizes do proje
 
 ```
 main  ──────────────●──────────────────●──  (versões estáveis)
-   \              / \                /
-    develop ─────●───●──────────────●────  (integração)
-        \        /      \          /
-         feat/* ──       fix/* ────
+   \              /  \                /
+    develop ─────●─── release/x.y.z ─●────  (integração / BHS)
+        \        /  \       |       /
+         feat/* ──   fix/* ─┴──────
 ```
 
 ### Branches eternas
@@ -33,10 +33,11 @@ main  ──────────────●─────────�
 | Prefixo | Finalidade | Nasce de | Mergeia em |
 |---------|------------|----------|------------|
 | `feat/*` | Nova funcionalidade | `develop` | `develop` |
-| `fix/*` | Correção de bug | `develop` | `develop` |
+| `fix/*` | Correção de bug | `develop` | `develop` (ou `release/*` durante o BHS, ver [seção 5.1](#51-bug-huntingsquashing-bhs)) |
 | `docs/*` | Documentação | `develop` | `develop` |
 | `refactor/*` | Refatoração | `develop` | `develop` |
 | `chore/*` | Manutenção (deps, CI, config) | `develop` | `develop` |
+| `release/*` | Estabilização de uma release (ciclo de BHS) | `develop` | `main` e `develop` |
 | `hotfix/*` | Correção crítica em produção | `main` | `main` e `develop` |
 
 > **Importante:** Branches temporárias devem ser deletadas após o merge.
@@ -134,6 +135,55 @@ O setup completo do ambiente de homologação está em:
 
 - `docker-compose.staging.yml` — define o container + Watchtower
 - `scripts/setup-homologacao.sh` — script de configuração inicial
+
+### 5.1 Bug Hunting/Squashing (BHS)
+
+Antes de cada release, há um ciclo de **Bug Hunting/Squashing (BHS)**: um período em
+que o staging testa exatamente o candidato a release, sem misturar features ainda
+em desenvolvimento. Para isso, criamos uma branch efêmera `release/x.y.z` a partir
+da `develop`.
+
+1. **Cut** — no início do BHS, corte a branch de release a partir da `develop`:
+
+   ```bash
+   git checkout develop && git pull
+   git checkout -b release/0.0.1 origin/develop
+   git push origin release/0.0.1
+   ```
+
+2. **Durante o BHS**:
+   - PRs `fix/*` que corrigem bugs encontrados no staging vão para `release/0.0.1`
+     (em vez de `develop`).
+   - PRs `feat/*` continuam mirando `develop` normalmente — a `develop` nunca é
+     bloqueada, pois o escopo da release já foi travado no cut.
+   - A **esteira de CI** (`ci.yml`) roda os mesmos testes slim/docling em PRs e
+     pushes para `release/**`.
+   - A **esteira de CD** (`delivery.yml`) publica a imagem da `release/0.0.1` no
+     GHCR com as tags `release-0.0.1` e `sha-<commit>`.
+
+3. **Staging aponta para a release** — defina `TRACK_BRANCH=release/0.0.1` no
+   `.env` do servidor de homologação para que `scripts/staging-update.sh` passe
+   a rastrear a branch de release (tag de imagem `release-0.0.1`) em vez da
+   `develop`:
+
+   ```bash
+   echo "TRACK_BRANCH=release/0.0.1" >> .env
+   ```
+
+4. **Fechamento do BHS** — quando a release estiver estável:
+
+   ```bash
+   # Merge para main (gera a release oficial, ver seção 6)
+   # Abra um PR de release/0.0.1 → main e mescle após aprovação
+
+   # Propaga as correções para develop
+   # Abra um PR de release/0.0.1 → develop e mescle após aprovação
+
+   git push origin --delete release/0.0.1
+   ```
+
+   Depois, remova (ou reverta) `TRACK_BRANCH` do `.env` de homologação para que
+   o staging volte a rastrear a `develop`.
 
 ### 6. Release (develop → main)
 

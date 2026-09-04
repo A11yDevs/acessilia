@@ -23,6 +23,12 @@
 #   - docker login ghcr.io configurado
 #   - Variável GHCR_TOKEN definida (token com escopo read:packages)
 #   - Executar do diretório raiz do projeto
+#
+# Branch rastreada (Bug Hunting/Squashing):
+#   Por padrao rastreia "develop". Durante o ciclo de BHS, defina TRACK_BRANCH
+#   no .env (ex: TRACK_BRANCH=release/0.0.1) para apontar o staging para a
+#   branch de release efemera; ao encerrar o BHS, remova a variavel (ou volte
+#   para "develop") para retomar o rastreio normal.
 
 set -euo pipefail
 
@@ -44,9 +50,7 @@ cd "$STAGING_DIR"
 
 COMPOSE_FILE="docker-compose.staging.yml"
 CONTAINER_NAME="acessilia-staging"
-IMAGE_TAG="ghcr.io/a11ydevs/acessilia:develop"
 GITHUB_REPO="A11yDevs/acessilia"
-GITHUB_BRANCH="develop"
 # Cache e status ficam dentro do volume ./var (visivel ao container via /app/var)
 CACHE_FILE="${STAGING_UPDATE_CACHE:-$STAGING_DIR/var/data/.last_sha}"
 STATUS_FILE="${STAGING_STATUS_FILE:-$STAGING_DIR/var/data/staging-status.json}"
@@ -87,6 +91,14 @@ if [ -z "${GHCR_TOKEN:-}" ]; then
     fi
   done
 fi
+
+# Branch/tag rastreada: "develop" por padrao, ou TRACK_BRANCH (env ou .env)
+# durante o ciclo de BHS (ex: release/0.0.1)
+GITHUB_BRANCH="${TRACK_BRANCH:-develop}"
+# Docker tags nao aceitam "/" (ex: release/0.0.1 -> release-0.0.1)
+TRACK_TAG="${GITHUB_BRANCH//\//-}"
+IMAGE_TAG="ghcr.io/a11ydevs/acessilia:${TRACK_TAG}"
+export TRACK_TAG
 
 # ──────────────────────────────────────────────
 # 1. Checar SHA do último commit via GitHub API
