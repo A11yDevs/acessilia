@@ -5,7 +5,7 @@ Para reportar um bug novo, copie o [`BUG_TEMPLATE.md`](BUG_TEMPLATE.md) para `NN
 
 Base verificada: [release/0.1.0](https://github.com/A11yDevs/acessilia/tree/release/0.1.0), commit [`7a5e70f`](https://github.com/A11yDevs/acessilia/commit/7a5e70f4809dd4bae29cfb772042d12784fc48b6), em **2026-09-06**. A referência remota foi consultada no GitHub e corresponde ao código local utilizado nas verificações.
 
-**Os 20 bugs permanecem presentes:** 18 reproduções isoladas com assertions e duas verificações estáticas (BUG-0017 e BUG-0020). Serviços externos foram simulados; não houve build Docker ou publicação real. O BUG-0008 foi revalidado no legacy, sem repetir a comparação integrada com PDDL/Docling. Estes resultados são verificações direcionadas dos achados, não uma nova execução da suíte completa.
+**Na base verificada, os 20 bugs estavam presentes:** 18 reproduções isoladas com assertions e duas verificações estáticas (BUG-0017 e BUG-0020). No estado local atual, o BUG-0007 está corrigido e aguarda integração. Serviços externos foram simulados; não houve build Docker ou publicação real. O BUG-0008 foi revalidado no legacy, sem repetir a comparação integrada com PDDL/Docling. Estes resultados são verificações direcionadas dos achados, não uma nova execução da suíte completa.
 
 Os campos Motor, Estruturador e IA descrevem o papel de cada componente no cenário: configuração usada, execução real ou simulada e motivo de não aplicação. Um componente configurado não implica que tenha sido executado, nem que outros motores tenham sido testados.
 
@@ -21,7 +21,7 @@ As fichas preservam os IDs e a origem histórica dos defeitos, mas Ambiente, Res
 | [0004](0004-zip-download-filename-mismatch.md) | Nome do ZIP incompatível com a descoberta dos downloads | 🟠 Alta | Aberto · reproduzido em ambiente isolado |
 | [0005](0005-dotted-filename-downloads.md) | Segundo `stem` quebra arquivos com pontos no nome | 🟠 Alta | Aberto · reproduzido em ambiente isolado |
 | [0006](0006-email-false-delivery-confirmation.md) | Falso aviso de e-mail enviado e ausência de alternativa | 🟠 Alta | Aberto · reproduzido em ambiente isolado |
-| [0007](0007-telegram-health-wrong-provider.md) | Health do Telegram ignora o provedor configurado | 🟡 Média | Aberto · reproduzido em ambiente isolado |
+| [0007](0007-telegram-health-wrong-provider.md) | Health do Telegram ignora o provedor configurado | 🟡 Média | Corrigido localmente · aguardando integração |
 | [0008](0008-legacy-docx-html-as-image.md) | DOCX e HTML não funcionam no caminho legacy anunciado | 🟠 Alta | Aberto no legacy · reproduzido em ambiente isolado |
 | [0009](0009-thinking-mode-no-effect.md) | Thinking mode é uma opção sem efeito no legacy | 🟡 Média | Aberto · reproduzido em ambiente isolado |
 | [0010](0010-empty-table-cells-column-shift.md) | Células vazias eliminadas corrompem alinhamento de tabelas | 🟠 Alta | Aberto · reproduzido em ambiente isolado |

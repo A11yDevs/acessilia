@@ -8,7 +8,7 @@
 | **Data** | 2026-09-05 |
 | **Reportado por** | Wryel Teodoro |
 | **Severidade** | 🟡 Média |
-| **Status** | Aberto · reproduzido em ambiente isolado |
+| **Status** | Corrigido localmente · aguardando integração |
 
 ## Ambiente
 
@@ -59,6 +59,12 @@ Requisição a `/api/tags` do Ollama e mensagem sobre Ollama.
 ## Correção sugerida (se houver)
 
 Consumir `ApiClient.health()` e apresentar os campos retornados pela API.
+
+## Correção aplicada
+
+O comando `/health` agora consome o endpoint canônico da API e apresenta
+`model_client`, `model_name` e `model_reachable`, sem consultar o Ollama
+diretamente. A regressão foi coberta para OpenRouter e para erro da API.
 
 ## Rastreabilidade
 

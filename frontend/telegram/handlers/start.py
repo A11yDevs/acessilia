@@ -1,7 +1,5 @@
-from datetime import datetime
-
-import httpx
 import shutil
+from datetime import datetime
 
 from aiogram import Router
 from aiogram.filters import CommandStart, Command, StateFilter
@@ -184,19 +182,18 @@ async def cmd_health(message: Message) -> None:
     checks = []
 
     try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            tags_url = settings.ollama_base_url.replace("/api/chat", "/api/tags")
-            r = await client.get(tags_url)
-            if r.status_code == 200:
-                data = r.json()
-                models = [m.get("name", "?") for m in data.get("models", [])]
-                checks.append(f"✅ Ollama: online ({len(models)} modelos)")
-            else:
-                checks.append(f"⚠️ Ollama: resposta inesperada ({r.status_code})")
+        health = await client.health()
+        api_icon = "✅" if health.get("status") == "ok" else "⚠️"
+        model_icon = "✅" if health.get("model_reachable") else "❌"
+        checks.append(f"{api_icon} API: {health.get('status', 'desconhecido')}")
+        checks.append(
+            f"{model_icon} Provedor: {health.get('model_client', 'desconhecido')}"
+        )
+        checks.append(f"🤖 Modelo: {health.get('model_name', 'desconhecido')}")
+    except ApiError as e:
+        checks.append(f"❌ API: erro {e.status_code} ({e.detail})")
     except Exception as e:
-        checks.append(f"❌ Ollama: offline ({e})")
-
-    checks.append(f"🤖 Modelo: {settings.ollama_model}")
+        checks.append(f"❌ API: offline ({e})")
 
     temp_dir = settings.temp_dir
     if temp_dir.exists():

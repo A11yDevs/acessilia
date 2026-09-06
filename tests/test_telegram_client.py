@@ -8,6 +8,7 @@ import respx
 from frontend.clients.api_client import ApiClient
 from backend.config.settings import settings
 from frontend.telegram.handlers import document as doc_module
+from frontend.telegram.handlers import start as start_module
 
 BASE = "http://localhost:8000"
 
@@ -192,3 +193,41 @@ def test_photo_flow(doc_module_isolated):
         asyncio.run(doc_module_isolated.handle_photo(msg))
 
     assert any("http://localhost:8000/api/v1/download/tok123" in s for s in bot.sent)
+
+
+def test_health_uses_provider_reported_by_api(monkeypatch, tmp_path):
+    monkeypatch.setattr(settings, "temp_dir", tmp_path)
+    monkeypatch.setattr(start_module, "client", ApiClient(base_url=BASE))
+    message = _FakeMessage(_FakeBot(b""))
+    health = {
+        "status": "ok",
+        "model_client": "openrouter",
+        "model_name": "openai/gpt-4.1-mini",
+        "model_reachable": True,
+        "queue_size": 0,
+    }
+
+    with respx.mock:
+        route = respx.get(f"{BASE}/api/v1/health").mock(
+            return_value=httpx.Response(200, json=health)
+        )
+        asyncio.run(start_module.cmd_health(message))
+
+    assert route.called
+    assert "✅ Provedor: openrouter" in message.answers[0]
+    assert "🤖 Modelo: openai/gpt-4.1-mini" in message.answers[0]
+    assert "Ollama" not in message.answers[0]
+
+
+def test_health_reports_api_error(monkeypatch, tmp_path):
+    monkeypatch.setattr(settings, "temp_dir", tmp_path)
+    monkeypatch.setattr(start_module, "client", ApiClient(base_url=BASE))
+    message = _FakeMessage(_FakeBot(b""))
+
+    with respx.mock:
+        respx.get(f"{BASE}/api/v1/health").mock(
+            return_value=httpx.Response(503, json={"detail": "indisponível"})
+        )
+        asyncio.run(start_module.cmd_health(message))
+
+    assert "❌ API: erro 503 (indisponível)" in message.answers[0]
