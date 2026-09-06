@@ -97,6 +97,14 @@ def region_needs_vision(classification: str) -> bool:
     )
 
 
+def formula_already_extracted(region: Region) -> bool:
+    """Fórmula com LaTeX já extraído pelo enrichment do Docling dispensa visão."""
+    return (
+        bool(region.metadata.get("formula_enriched"))
+        and bool(region.text.strip())
+    )
+
+
 def region_has_markers(classification: str) -> bool:
     return classification in (
         "code_block",

@@ -74,6 +74,8 @@ class DoclingStructurer(BaseStructurer):
             pipeline_options = PdfPipelineOptions()
             pipeline_options.do_ocr = self.enable_ocr
             pipeline_options.ocr_options = RapidOcrOptions(backend="torch")
+            # CodeFormula (local) converte regiões de fórmula em LaTeX sem LLM
+            pipeline_options.do_formula_enrichment = settings.docling_formula_enrichment
             self._converter = DocumentConverter(
                 format_options={
                     InputFormat.PDF: PdfFormatOption(
@@ -187,6 +189,11 @@ class DoclingStructurer(BaseStructurer):
                 "docling_label": str(getattr(item, "label", "")),
                 "docling_label_kind": self._normalized_docling_label(item),
                 "subtype": "callout" if item_type == "callout" else "",
+                "formula_enriched": (
+                    item_type == "formula"
+                    and settings.docling_formula_enrichment
+                    and bool(text)
+                ),
             },
         )
 

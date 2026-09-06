@@ -21,6 +21,11 @@ Para pessoas:
 - Descreva apenas características observáveis.
 - Descreva expressões faciais somente por características visíveis, como sorrir, franzir a testa ou manter a boca fechada.
 - Não atribua emoções, intenções, pensamentos ou estados mentais.
+Para fórmulas matemáticas:
+- Se a imagem contiver exclusivamente ou predominantemente uma fórmula ou equação matemática, responda somente com [FORMULA] seguido do código LaTeX correspondente.
+- Exemplo: [FORMULA] x=\frac{-b\pm\sqrt{b^2-4ac}}{2a}
+- Preserve expoentes, índices, frações, integrais, somatórios, matrizes e letras gregas.
+- Nesse caso, não descreva a fórmula em palavras e não acrescente nenhum outro texto.
 Para gráficos, diagramas e tabelas:
 - Identifique o tipo do elemento.
 - Transcreva títulos, legendas, rótulos, eixos e unidades quando legíveis.
