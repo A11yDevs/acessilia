@@ -39,12 +39,10 @@ class AccessibilityOrchestrator:
         effective_mode = mode or self.mode
         is_pdf = file_path.suffix.lower() == ".pdf"
 
-        if custom_prompt:
-            system_prompt = custom_prompt
-        else:
-            system_prompt = load_system_prompt(effective_mode)
+        dispatch_prompt = custom_prompt
         if thinking_mode:
-            system_prompt = "<|think|>\n" + system_prompt
+            base_prompt = custom_prompt or load_system_prompt(effective_mode)
+            dispatch_prompt = "<|think|>\n" + base_prompt
 
         if is_pdf:
             if status_callback:
@@ -110,7 +108,7 @@ class AccessibilityOrchestrator:
                 page_num,
                 total_pages,
                 effective_mode,
-                custom_prompt,
+                dispatch_prompt,
             )
 
             page_text = self.editor.consolidate_page(tasks, agent_results)

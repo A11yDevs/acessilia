@@ -8,7 +8,7 @@
 | **Data** | 2026-09-05 |
 | **Reportado por** | Wryel Teodoro |
 | **Severidade** | 🟡 Média |
-| **Status** | Aberto · reproduzido em ambiente isolado |
+| **Status** | Corrigido localmente · aguardando integração |
 
 ## Ambiente
 
@@ -60,6 +60,13 @@ A prova compara os argumentos despachados pelo código, sem avaliar inteligênci
 ## Correção sugerida (se houver)
 
 Propagar a opção até a chamada do modelo e esclarecer capacidades por motor na interface.
+
+## Correção aplicada
+
+No motor legacy, o prompt com o marcador `<|think|>` agora é repassado ao
+despacho quando `thinking_mode` está ativo. Com a opção desligada, o fluxo
+anterior de prompts permanece inalterado. Uma regressão compara os argumentos
+despachados nos dois modos.
 
 ## Rastreabilidade
 
