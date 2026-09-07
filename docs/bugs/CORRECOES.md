@@ -38,6 +38,18 @@ O serviço de e-mail falhava sem devolver esse resultado para quem chamou. No Te
 
 A correção fez o serviço de e-mail retornar `True` ou `False`. O worker registra aviso quando o envio do resultado falha. No Telegram, o link de download sempre aparece quando a tarefa termina, mesmo se houver e-mail configurado.
 
+## BUG-0007: health do Telegram ignora o provedor configurado
+
+O comando `/health` do Telegram consultava o Ollama diretamente. Em ambientes usando outro provedor, como OpenRouter, o diagnóstico podia mostrar o serviço errado.
+
+Este bug já veio corrigido no commit do Wryel. O comando `/health` usa `ApiClient.health()` e mostra os campos retornados pela API: provedor, modelo e disponibilidade.
+
+## BUG-0008: DOCX e HTML não funcionam no caminho legacy anunciado
+
+O validador aceitava DOCX e HTML mesmo quando o motor ativo era `legacy`. Esse motor tratava qualquer não-PDF como imagem, então esses arquivos quebravam depois, na leitura.
+
+A correção bloqueia DOCX e HTML já na validação quando `PIPELINE_ENGINE=legacy`. Em motores fora do legacy, os formatos continuam permitidos.
+
 ## Testes criados
 
 - `tests/test_api.py::test_job_executor_marks_history_error_when_export_fails`: simula sucesso no `process()` e falha na exportação TXT. Confirma que o estado público e o histórico terminam como `error`.
@@ -47,3 +59,7 @@ A correção fez o serviço de e-mail retornar `True` ou `False`. O worker regis
 - `tests/test_api.py::test_download_info_keeps_dotted_base_name`: cria artefatos com base `relatorio.v2` e confirma que a consulta encontra os formatos sem cortar o nome.
 - `tests/test_email_service.py::test_result_email_reports_missing_smtp`: confirma que envio de resultado sem SMTP configurado retorna `False`.
 - `tests/test_telegram_client.py::test_document_passes_email_and_notifies`: passou a confirmar que o Telegram mostra o link mesmo quando existe e-mail configurado.
+- `tests/test_telegram_client.py::test_health_uses_provider_reported_by_api`: confirma que `/health` usa o provedor retornado pela API e não menciona Ollama quando a API informa OpenRouter.
+- `tests/test_telegram_client.py::test_health_reports_api_error`: confirma que `/health` mostra erro da API quando a consulta falha.
+- `tests/test_validators.py::test_validate_file_rejects_docx_and_html_in_legacy`: confirma que DOCX e HTML são recusados no motor legacy.
+- `tests/test_validators.py::test_validate_file_allows_docx_and_html_outside_legacy`: confirma que DOCX e HTML continuam aceitos quando o motor não é legacy.

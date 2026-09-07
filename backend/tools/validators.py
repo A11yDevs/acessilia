@@ -18,6 +18,12 @@ def validate_file(filename: str, file_size: int) -> tuple[bool, str]:
             False,
             "Formato de arquivo não suportado. Envie PDF, DOCX, HTML, PNG, JPG, TIFF, BMP ou WEBP.",
         )
+    ext = Path(filename).suffix.lower()
+    if settings.pipeline_engine.strip().lower() == "legacy" and ext in {".docx", ".html"}:
+        return (
+            False,
+            "DOCX e HTML não são suportados no motor legacy. Use PDF ou imagem, ou altere PIPELINE_ENGINE.",
+        )
     if not is_file_size_allowed(file_size):
         return False, f"Arquivo muito grande. Limite: {settings.max_file_size_mb} MB."
     return True, ""
