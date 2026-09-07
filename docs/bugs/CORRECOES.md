@@ -8,6 +8,13 @@ O `process()` marcava a tarefa como `done` antes de o worker gerar os arquivos f
 
 A correção deixou a conclusão da tarefa da API sob responsabilidade do worker. Quando `process()` recebe um `task_id` externo, ele monta o documento canônico e atualiza o cache, mas não grava `done` no estado nem no histórico. O worker só grava `done` depois que os artefatos e o token ficam prontos. Se uma exportação falhar, o worker grava `error` também no histórico.
 
+## BUG-0002: job cancelado na fila é executado
+
+O cancelamento de uma tarefa ainda na fila só mudava o status em `queued_jobs`. O item continuava dentro da fila real e o worker executava o callback mesmo depois do cancelamento.
+
+A correção adicionou cancelamento direto na fila. Quando uma tarefa enfileirada é cancelada, o item pendente é removido da `UnifiedQueue` e o status `cancelled` continua disponível para consulta.
+
 ## Testes criados
 
 - `tests/test_api.py::test_job_executor_marks_history_error_when_export_fails`: simula sucesso no `process()` e falha na exportação TXT. Confirma que o estado público e o histórico terminam como `error`.
+- `tests/test_queue_service.py::test_cancelled_queued_item_is_not_processed`: enfileira uma tarefa, cancela antes do worker executar e confirma que o callback não roda.

@@ -45,6 +45,14 @@ class UnifiedQueue:
             )
             return pos
 
+    def cancel(self, task_id: str) -> bool:
+        for item in list(self._queue):
+            if item.task_id == task_id:
+                self._queue.remove(item)
+                logger.info("Fila Unificada: tarefa {} cancelada antes do processamento", task_id)
+                return True
+        return False
+
     async def _worker(self):
         while True:
             item = None

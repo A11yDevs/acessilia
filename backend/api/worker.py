@@ -61,6 +61,9 @@ def cancel_job_status(task_id: str) -> bool:
         return True
     queued = queued_jobs.get(task_id)
     if queued is not None:
+        from backend.services.queue_service import unified_queue
+
+        unified_queue.cancel(task_id)
         queued["status"] = "cancelled"
         queued["etapa_atual"] = "Cancelado na fila"
         queued["fim"] = time.time()
