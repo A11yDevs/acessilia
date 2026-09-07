@@ -134,6 +134,30 @@ O serviço de histórico salvava `settings.db_path` em uma variável global dura
 
 A correção faz `get_connection()` consultar `settings.db_path` na hora de abrir a conexão. Isso mantém o histórico alinhado com a configuração atual.
 
+## BUG-0023: painel mantinha rota exclusiva de POST após envio
+
+Após o envio de um arquivo, a resposta continuava na rota `/process`, que aceita somente POST. Reabrir essa URL com GET retornava 405.
+
+A correção aplica Post/Redirect/Get: envios aceitos retornam 303 para `/` ou `/advanced`, com a posição na fila. GET em `/process` e `/advanced/process` também redireciona para seus respectivos formulários.
+
+## BUG-0024: falha do PDF/UA ficava invisível no resultado público
+
+Quando a exportação PDF/UA falhava, o worker registrava apenas um warning e finalizava o job sem informar a ausência desse arquivo.
+
+A correção registra a falha do PDF/UA na lista pública de erros da tarefa. Os demais artefatos podem ser entregues, mas a ausência do formato fica visível ao usuário.
+
+## BUG-0025: API confirmava cancelamento de tarefa já encerrada
+
+O endpoint de cancelamento informava sucesso para tarefas já concluídas com `done` ou `error`, embora o estado real não mudasse.
+
+A correção só confirma o cancelamento quando ocorre uma transição válida de estado. Para tarefas terminais, a API preserva e informa o estado efetivo.
+
+## BUG-0026: limpeza temporária apagava upload ainda na fila
+
+A limpeza removia uploads antigos apenas pelo tempo de modificação, inclusive quando ainda estavam associados a tarefas na fila ou em processamento.
+
+A correção protege os caminhos de arquivo das tarefas pendentes e em processamento durante a limpeza. Uploads sem referência continuam elegíveis para remoção.
+
 ## Testes criados
 
 - `tests/test_api.py::test_job_executor_marks_history_error_when_export_fails`: simula sucesso no `process()` e falha na exportação TXT. Confirma que o estado público e o histórico terminam como `error`.
