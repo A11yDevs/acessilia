@@ -242,6 +242,11 @@ class JobExecutor:
 
         except TaskCancelledError:
             logger.info("Job {} cancelado", task_id)
+            await finalizar_conversao(
+                task_id=task_id,
+                status="cancelled",
+                tempo_segundos=time.time() - started_at,
+            )
         except Exception as e:
             logger.exception("Erro no JobExecutor para {}", task_id)
             state_manager.atualizar(

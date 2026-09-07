@@ -355,6 +355,7 @@ async def test_job_executor_marks_history_error_when_export_fails(
 async def test_job_executor_stops_exports_after_cancellation(api_paths, monkeypatch):
     from backend.agents.state_manager import state_manager
     from backend.api.worker import ApiJob, JobExecutor
+    from backend.services import history_service as hs
 
     task_id = "bug0003"
     input_path = api_paths / "cancel.pdf"
@@ -365,6 +366,13 @@ async def test_job_executor_stops_exports_after_cancellation(api_paths, monkeypa
 
     async def fake_process(*args, **kwargs):
         state_manager.criar_tarefa(input_path, task_id=task_id)
+        await hs.registrar_conversao(
+            task_id=task_id,
+            arquivo=input_path.name,
+            extensao=input_path.suffix,
+            tamanho_bytes=input_path.stat().st_size,
+            modo="normal",
+        )
         return {"title": "Documento", "sections": []}
 
     def export_txt_and_cancel(canonical, destination, filename):
@@ -378,7 +386,13 @@ async def test_job_executor_stops_exports_after_cancellation(api_paths, monkeypa
     monkeypatch.setattr("backend.api.worker.export_txt", export_txt_and_cancel)
     monkeypatch.setattr("backend.api.worker.criar_token", fail_if_token_created)
 
-    await JobExecutor().run(
+    executor = JobExecutor()
+
+    async def run_inline(function, *args, **kwargs):
+        return function(*args, **kwargs)
+
+    monkeypatch.setattr(executor, "_run_in_executor", run_inline)
+    await executor.run(
         ApiJob(
             task_id=task_id,
             file_path=input_path,
@@ -391,6 +405,10 @@ async def test_job_executor_stops_exports_after_cancellation(api_paths, monkeypa
     assert task is not None
     assert task["status"] == "cancelled"
     assert not (output_dir / "cancel_acessivel.zip").exists()
+    rows = await hs.listar_historico(10)
+    [row] = [row for row in rows if row["task_id"] == task_id]
+    assert row["status"] == "cancelled"
+    assert row["concluido_em"] is not None
 
 
 @pytest.mark.asyncio
