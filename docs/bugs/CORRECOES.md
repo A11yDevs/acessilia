@@ -116,6 +116,12 @@ O script prometia fazer `docker pull` direto quando não conseguisse consultar o
 
 A correção captura a falha da consulta ao GitHub e deixa `LATEST_SHA` vazio. Com isso, o fluxo já existente de fallback é executado.
 
+## BUG-0020: publicação não aguardava o CI
+
+O workflow de Delivery rodava direto em `push`, independente do resultado da suíte completa do CI para o mesmo commit.
+
+A correção faz o Delivery disparar pela conclusão do workflow CI. A publicação só roda quando o CI terminou com sucesso em um evento de `push`, usando o `head_sha` e a branch testados pelo CI.
+
 ## Testes criados
 
 - `tests/test_api.py::test_job_executor_marks_history_error_when_export_fails`: simula sucesso no `process()` e falha na exportação TXT. Confirma que o estado público e o histórico terminam como `error`.
@@ -146,3 +152,4 @@ A correção captura a falha da consulta ao GitHub e deixa `LATEST_SHA` vazio. C
 - `tests/test_staging_update.py::test_staging_update_reads_track_branch_from_dotenv_with_env_token`: confirma que o staging lê `TRACK_BRANCH` do `.env` mesmo com `GHCR_TOKEN` já exportado.
 - `tests/test_staging_update.py::test_staging_update_env_track_branch_overrides_dotenv`: confirma que `TRACK_BRANCH` exportado no ambiente tem prioridade sobre o valor do `.env`.
 - `tests/test_staging_update.py::test_staging_update_falls_back_when_github_request_fails`: confirma que falha no `curl` aciona o `docker pull` e o `docker compose up` de fallback.
+- `tests/test_compose_config.py::test_delivery_runs_only_after_successful_push_ci`: confirma que o Delivery depende do CI aprovado e usa o SHA/branch testados.
