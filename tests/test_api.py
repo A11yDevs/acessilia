@@ -1,4 +1,5 @@
 import asyncio
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -326,3 +327,55 @@ async def test_job_executor_stops_exports_after_cancellation(api_paths, monkeypa
     assert task is not None
     assert task["status"] == "cancelled"
     assert not (output_dir / "cancel_acessivel.zip").exists()
+
+
+@pytest.mark.asyncio
+async def test_job_executor_reports_mp3_failure(api_paths, monkeypatch):
+    from backend.agents.state_manager import state_manager
+    from backend.api.worker import ApiJob, JobExecutor
+
+    task_id = "bug0011"
+    input_path = api_paths / "audio.pdf"
+    output_dir = api_paths / "output" / task_id
+    input_path.write_bytes(_fake_pdf_bytes())
+    state_manager._tasks.clear()
+    state_manager._cancel_events.clear()
+
+    async def fake_process(*args, **kwargs):
+        state_manager.criar_tarefa(input_path, task_id=task_id)
+        return {"title": "Documento", "sections": []}
+
+    def write_file(_canonical, destination, _filename=None, **_kwargs):
+        destination.write_text("conteudo", encoding="utf-8")
+
+    async def fail_mp3(*args, **kwargs):
+        raise RuntimeError("tts offline")
+
+    async def fake_token(*args, **kwargs):
+        return "tok"
+
+    monkeypatch.setattr("backend.service.process", fake_process)
+    monkeypatch.setattr("backend.api.worker.export_txt", write_file)
+    monkeypatch.setattr("backend.api.worker.export_docx", write_file)
+    monkeypatch.setattr("backend.api.worker.export_pdf", write_file)
+    monkeypatch.setattr("backend.api.worker.export_pdf_ua", write_file)
+    monkeypatch.setattr("backend.api.worker.export_accessible_document", write_file)
+    monkeypatch.setattr("backend.api.worker.export_mp3", fail_mp3)
+    monkeypatch.setattr("backend.api.worker.criar_token", fake_token)
+
+    await JobExecutor().run(
+        ApiJob(
+            task_id=task_id,
+            file_path=input_path,
+            filename=input_path.name,
+            output_dir=output_dir,
+        )
+    )
+
+    task = state_manager.obter(task_id)
+    assert task is not None
+    assert task["status"] == "done"
+    assert any("Falha ao gerar MP3" in erro for erro in task["erros"])
+
+    with zipfile.ZipFile(output_dir / "audio_acessivel.zip") as archive:
+        assert "audio.mp3" not in archive.namelist()

@@ -62,6 +62,12 @@ O pipeline removia células vazias ao montar e ler o `table_ast`. Em tabelas com
 
 A correção preserva células vazias estruturais no `table_ast`, na conversão de volta para linhas e no renderer HTML. Linhas totalmente vazias continuam sendo descartadas.
 
+## BUG-0011: falha de áudio fica invisível no resultado público
+
+Quando a geração de MP3 falhava, o erro ficava só no log. O job terminava como `done`, sem avisar que o áudio não foi gerado, e o ZIP era montado apenas com os arquivos existentes.
+
+A correção registra a falha do MP3 na lista pública de erros da tarefa. O job ainda pode terminar como `done` quando os outros artefatos foram entregues, mas a ausência do áudio fica visível.
+
 ## Testes criados
 
 - `tests/test_api.py::test_job_executor_marks_history_error_when_export_fails`: simula sucesso no `process()` e falha na exportação TXT. Confirma que o estado público e o histórico terminam como `error`.
@@ -78,3 +84,4 @@ A correção preserva células vazias estruturais no `table_ast`, na conversão 
 - `tests/test_orchestrator_thinking_mode.py::test_thinking_mode_changes_dispatched_prompt`: confirma que `thinking_mode` altera o prompt enviado aos agentes no legacy.
 - `tests/test_table_ast.py::test_table_ast_preserves_empty_structural_cells`: confirma que uma célula vazia no meio da tabela é preservada no AST e na volta para linhas.
 - `tests/test_renderers.py::test_render_html_includes_toc_table_and_metadata`: passou a confirmar que o HTML renderiza `<td></td>` para células vazias.
+- `tests/test_api.py::test_job_executor_reports_mp3_failure`: simula falha no TTS e confirma que o job registra erro público e não inclui MP3 no ZIP.

@@ -184,10 +184,14 @@ class JobExecutor:
                     )
                 except Exception as e:
                     logger.error("Falha ao gerar MP3: {}", e)
+                    state_manager.atualizar(task_id, erro=f"Falha ao gerar MP3: {e}")
+                    mp3_path = None
             state_manager.verificar_cancelamento(task_id)
 
             zip_path = out_dir / f"{base}_acessivel.zip"
-            package_paths = [txt_path, docx_path, pdf_path, html_path, mp3_path]
+            package_paths = [txt_path, docx_path, pdf_path, html_path]
+            if isinstance(mp3_path, Path):
+                package_paths.append(mp3_path)
             if isinstance(pdf_ua_path, Path):
                 package_paths.append(pdf_ua_path)
 
