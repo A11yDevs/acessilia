@@ -217,48 +217,14 @@ async def process(
     except Exception as e:
         logger.error("Erro no pipeline: {}: {}", type(e).__name__, e)
         state_manager.errar(task_id, str(e))
-        fallback = _fallback_texto_simples(file_path)
-        state_manager.atualizar(task_id, resultado=fallback)
 
         await finalizar_conversao(
             task_id=task_id,
             status="error",
             erro=str(e),
-            resultado_resumo=fallback[:200],
             tempo_segundos=time.time() - inicio,
         )
 
         if status_callback:
             await status_callback("❌ Nao foi possivel processar o arquivo.")
-        return build_canonical_document(
-            fallback,
-            title=file_path.stem,
-            language="pt-BR",
-            verbosity=verbosity_for_mode(mode),
-            source_name=file_path.name,
-            source_path=str(file_path),
-            audience=["reader"],
-        )
-
-
-def _fallback_texto_simples(file_path: Path) -> str:
-    ext = file_path.suffix.lower()
-    if ext == ".pdf":
-        try:
-            import fitz
-
-            doc = fitz.open(file_path)
-            texts = []
-            for i in range(min(len(doc), 10)):
-                text = doc[i].get_text().strip()
-                if text:
-                    texts.append(f"--- Pagina {i + 1} ---\n{text}")
-            doc.close()
-            if texts:
-                return "\n\n".join(texts)
-        except Exception:
-            pass
-    return (
-        "Nao foi possivel processar o arquivo automaticamente. "
-        "Tente enviar em formato diferente."
-    )
+        raise
