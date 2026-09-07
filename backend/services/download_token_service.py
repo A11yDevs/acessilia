@@ -109,9 +109,12 @@ async def obter_info_token(token: str) -> dict | None:
         )
         return None
     formats_list = json.loads(row["formats"]) if row["formats"] else []
+    allowed_formats = set(formats_list) if isinstance(formats_list, list) else set()
     base = str(row["filename"])
     formats = []
     for ext, label in FORMAT_EXTENSIONS.items():
+        if allowed_formats and ext not in allowed_formats:
+            continue
         suffix = FORMAT_OUTPUT_SUFFIX.get(ext, ext)
         separator = "" if suffix.startswith("_") else "."
         file_path = output_dir / f"{base}{separator}{suffix}"

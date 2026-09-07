@@ -425,8 +425,14 @@ async def test_job_executor_reports_optional_export_failure(
     async def write_mp3(_text, destination, **_kwargs):
         destination.write_bytes(b"audio")
 
-    async def fake_token(*args, **kwargs):
+    registered_formats = []
+
+    async def fake_token(*args, formats=None, **kwargs):
+        registered_formats.extend(formats or [])
         return "tok"
+
+    async def ignore_history(*args, **kwargs):
+        return None
 
     monkeypatch.setattr("backend.service.process", fake_process)
     monkeypatch.setattr("backend.api.worker.export_txt", write_file)
@@ -441,8 +447,15 @@ async def test_job_executor_reports_optional_export_failure(
         fail_mp3 if failed_format == "MP3" else write_mp3,
     )
     monkeypatch.setattr("backend.api.worker.criar_token", fake_token)
+    monkeypatch.setattr("backend.api.worker.finalizar_conversao", ignore_history)
 
-    await JobExecutor().run(
+    executor = JobExecutor()
+
+    async def run_inline(function, *args, **kwargs):
+        return function(*args, **kwargs)
+
+    monkeypatch.setattr(executor, "_run_in_executor", run_inline)
+    await executor.run(
         ApiJob(
             task_id=task_id,
             file_path=input_path,
@@ -463,6 +476,18 @@ async def test_job_executor_reports_optional_export_failure(
         "PDF/UA": ["Falha ao gerar PDF/UA: pandoc indisponivel"],
     }
     assert task["erros"] == expected_errors[failed_format]
+
+    if failed_format == "MP3":
+        assert not (output_dir / "audio.mp3").exists()
+    if failed_format == "PDF/UA":
+        assert not (output_dir / "audio.pdf_ua.pdf").exists()
+
+    expected_formats = {"txt", "docx", "pdf", "html", "zip"}
+    if failed_format != "MP3":
+        expected_formats.add("mp3")
+    if failed_format != "PDF/UA":
+        expected_formats.add("pdf_ua")
+    assert set(registered_formats) == expected_formats
 
     with zipfile.ZipFile(output_dir / "audio_acessivel.zip") as archive:
         expected_files = {"audio.txt", "audio.docx", "audio.pdf", "audio.html"}

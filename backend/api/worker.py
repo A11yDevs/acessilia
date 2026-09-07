@@ -130,20 +130,24 @@ class JobExecutor:
             base = Path(job.filename).stem
             out_dir = job.output_dir or (settings.data_dir / "output" / task_id)
             out_dir.mkdir(parents=True, exist_ok=True)
+            completed_formats: list[str] = []
 
             state_manager.atualizar(task_id, etapa="Exportando TXT...", progresso=0.85)
             txt_path = out_dir / f"{base}.txt"
             await self._run_in_executor(export_txt, canonical, txt_path, job.filename)
+            completed_formats.append("txt")
             state_manager.verificar_cancelamento(task_id)
 
             state_manager.atualizar(task_id, etapa="Exportando DOCX...", progresso=0.88)
             docx_path = out_dir / f"{base}.docx"
             await self._run_in_executor(export_docx, canonical, docx_path, job.filename)
+            completed_formats.append("docx")
             state_manager.verificar_cancelamento(task_id)
 
             state_manager.atualizar(task_id, etapa="Exportando PDF...", progresso=0.91)
             pdf_path = out_dir / f"{base}.pdf"
             await self._run_in_executor(export_pdf, canonical, pdf_path, job.filename)
+            completed_formats.append("pdf")
             state_manager.verificar_cancelamento(task_id)
 
             state_manager.atualizar(task_id, etapa="Exportando PDF/UA...", progresso=0.92)
@@ -155,9 +159,11 @@ class JobExecutor:
                     pdf_ua_path,
                     job.filename,
                 )
+                completed_formats.append("pdf_ua")
             except Exception as exc:
                 logger.warning("Falha ao gerar PDF/UA: {}", exc)
                 state_manager.atualizar(task_id, erro=f"Falha ao gerar PDF/UA: {exc}")
+                _remove_partial_output(pdf_ua_path)
                 pdf_ua_path = None
             state_manager.verificar_cancelamento(task_id)
 
@@ -171,6 +177,7 @@ class JobExecutor:
                 title=base,
                 profile_name="html",
             )
+            completed_formats.append("html")
             state_manager.verificar_cancelamento(task_id)
 
             mp3_path = out_dir / f"{base}.mp3"
@@ -186,9 +193,11 @@ class JobExecutor:
                     await export_mp3(
                         clean_text, mp3_path, progress_callback=audio_progress
                     )
+                    completed_formats.append("mp3")
                 except Exception as e:
                     logger.error("Falha ao gerar MP3: {}", e)
                     state_manager.atualizar(task_id, erro=f"Falha ao gerar MP3: {e}")
+                    _remove_partial_output(mp3_path)
                     mp3_path = None
             state_manager.verificar_cancelamento(task_id)
 
@@ -204,9 +213,10 @@ class JobExecutor:
                 zip_path,
                 package_paths,
             )
+            completed_formats.append("zip")
             state_manager.verificar_cancelamento(task_id)
 
-            token = await criar_token(out_dir, base)
+            token = await criar_token(out_dir, base, formats=completed_formats)
             download_url = build_download_url(token)
             state_manager.registrar_download_url(task_id, download_url)
             state_manager.atualizar(
@@ -258,3 +268,10 @@ def _build_zip_package(zip_path: Path, out_paths: list[Path]) -> None:
         for out_path in out_paths:
             if out_path.exists():
                 archive.write(out_path, arcname=out_path.name)
+
+
+def _remove_partial_output(path: Path) -> None:
+    try:
+        path.unlink(missing_ok=True)
+    except OSError as exc:
+        logger.warning("Falha ao remover artefato parcial {}: {}", path, exc)

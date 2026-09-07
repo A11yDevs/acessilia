@@ -44,3 +44,18 @@ def test_recent_download_token_remains_valid(tmp_path):
 
     assert info is not None
     assert info["stem"] == "doc"
+
+
+def test_download_token_only_lists_registered_formats(tmp_path):
+    output_dir = tmp_path / "output" / "job-partial"
+    output_dir.mkdir(parents=True)
+    (output_dir / "doc.pdf_ua.pdf").write_bytes(b"partial pdf")
+    (output_dir / "doc_acessivel.zip").write_bytes(b"complete zip")
+    token = asyncio.run(
+        token_service.criar_token(output_dir, "doc", formats=["zip"])
+    )
+
+    info = asyncio.run(token_service.obter_info_token(token))
+
+    assert info is not None
+    assert [item["ext"] for item in info["formats"]] == ["zip"]
