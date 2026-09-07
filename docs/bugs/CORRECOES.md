@@ -158,6 +158,48 @@ A limpeza removia uploads antigos apenas pelo tempo de modificação, inclusive 
 
 A correção protege os caminhos de arquivo das tarefas pendentes e em processamento durante a limpeza. Uploads sem referência continuam elegíveis para remoção.
 
+## BUG-0027: falha do pipeline era exportada como sucesso
+
+O serviço capturava exceções do orquestrador, registrava o erro e devolvia um documento canônico de fallback. O worker interpretava esse retorno como resultado válido, gerava os artefatos e sobrescrevia o histórico com `done`.
+
+A correção faz `process()` propagar a exceção depois de registrar a falha. Assim o worker termina o job como `error`, sem produzir arquivos, ZIP, token ou link de download.
+
+## BUG-0028: cache ignorava opções de processamento
+
+A chave do cache do documento não incluía `mode`, `custom_prompt` nem `thinking_mode`. O cache por página também ignorava o prompt personalizado e o modo de raciocínio. Além disso, um cache hit podia reutilizar metadados da submissão anterior.
+
+A correção cria chaves determinísticas e seguras para o sistema de arquivos com todas as opções que afetam o resultado, tanto no documento quanto nas páginas. O cache passou a guardar o payload processado e o documento canônico é reconstruído com o nome, caminho e metadados da submissão atual.
+
+## BUG-0029: artefato opcional parcial permanecia disponível
+
+Quando PDF/UA ou MP3 escrevia um arquivo parcial antes de falhar, o arquivo não entrava no ZIP, mas continuava no diretório. A descoberta de downloads ignorava os formatos registrados no token e oferecia esse arquivo individualmente.
+
+A correção remove a saída parcial quando uma exportação opcional falha. O worker registra no token somente os formatos concluídos, e o serviço de download usa essa lista como permissão antes de publicar um artefato existente.
+
+## BUG-0030: tags literais quebravam a exportação PDF
+
+O renderer enviava texto documental diretamente ao parser XML do ReportLab. Marcações literais como `<b>` podiam ser interpretadas como tags e abortar a geração do PDF.
+
+A correção escapa todo conteúdo textual antes de combiná-lo com a marcação controlada pelo renderer. A proteção cobre título, sumário, seções, cabeçalhos, parágrafos, código, listas, tabelas, notas e demais blocos, preservando as tags literais como texto no PDF.
+
+## BUG-0031: jobs atendidos pelo cache não entravam no histórico
+
+O serviço consultava o cache antes de criar a tarefa e registrar a conversão. Em um cache hit, retornava imediatamente, e a finalização posterior tentava atualizar uma linha inexistente.
+
+A correção registra toda submissão antes da consulta ao cache. Quando o serviço é usado diretamente, um cache hit também finaliza sua própria entrada como `done`; no fluxo da API, o worker continua finalizando somente depois de produzir os artefatos.
+
+## BUG-0032: cancelamento durante exportação deixava histórico em processamento
+
+O worker capturava `TaskCancelledError` durante as exportações e preservava o estado público como `cancelled`, mas não atualizava a linha correspondente no histórico.
+
+A correção persiste `status="cancelled"`, o tempo transcorrido e o horário de conclusão ao capturar o cancelamento. Estado público e histórico passam a observar a mesma transição terminal.
+
+## BUG-0033: falha anterior ao registro desaparecia do histórico
+
+O worker podia falhar antes de entrar em `process()`, e seu tratamento de erro apenas atualizava uma linha que talvez ainda não existisse. Nesse caso, o estado público mostrava `error`, mas o histórico não recebia a conversão.
+
+A correção faz o worker registrar o job assim que o retira da fila, antes do e-mail de confirmação e da chamada a `process()`. A leitura inicial do tamanho do arquivo usa zero se falhar, garantindo que esse preparo também não impeça o registro.
+
 ## Testes criados
 
 - `tests/test_api.py::test_job_executor_marks_history_error_when_export_fails`: simula sucesso no `process()` e falha na exportação TXT. Confirma que o estado público e o histórico terminam como `error`.
@@ -190,3 +232,13 @@ A correção protege os caminhos de arquivo das tarefas pendentes e em processam
 - `tests/test_staging_update.py::test_staging_update_falls_back_when_github_request_fails`: confirma que falha no `curl` aciona o `docker pull` e o `docker compose up` de fallback.
 - `tests/test_compose_config.py::test_delivery_runs_only_after_successful_push_ci`: confirma que o Delivery depende do CI aprovado e usa o SHA/branch testados.
 - `tests/test_compose_config.py::test_delivery_runs_only_after_successful_push_ci`: também confirma que o Delivery não volta a usar `github.ref_name` no evento `workflow_run`.
+- `tests/test_worker_pipeline_failure.py::test_job_executor_does_not_export_pipeline_failure`: faz o orquestrador falhar e confirma que o worker termina em `error`, sem criar diretório de saída ou link de download.
+- `tests/test_processing_options_cache.py::test_document_cache_key_changes_with_each_processing_option`: confirma que `mode`, `custom_prompt` e `thinking_mode` alteram a chave do cache do documento.
+- `tests/test_processing_options_cache.py::test_page_cache_key_changes_with_prompt_and_thinking_mode`: confirma que prompt e modo de raciocínio também diferenciam o cache por página.
+- `tests/test_processing_options_cache.py::test_cached_payload_rebuilds_current_submission_metadata`: reutiliza conteúdo idêntico com nomes diferentes e confirma que o cache hit recebe os metadados da submissão atual.
+- `tests/test_download_token_service.py::test_download_token_only_lists_registered_formats`: cria um PDF/UA parcial ao lado do ZIP e confirma que o token autorizado apenas para ZIP não publica o arquivo parcial.
+- `tests/test_api.py::test_job_executor_reports_optional_export_failure`: passou a confirmar que PDF/UA e MP3 parciais são removidos e que o token recebe somente os formatos concluídos.
+- `tests/test_renderers.py::test_render_pdf_escapes_literal_markup_in_document_text`: gera e relê um PDF com tags literais em diferentes blocos, confirmando que elas permanecem como texto.
+- `tests/test_cache_history.py::test_cached_submission_is_recorded_in_history`: processa duas submissões idênticas com SQLite real e confirma duas entradas `done` para apenas uma execução do agente.
+- `tests/test_api.py::test_job_executor_stops_exports_after_cancellation`: passou a confirmar que o cancelamento durante a exportação também termina o histórico como `cancelled`.
+- `tests/test_api.py::test_job_executor_records_early_process_failure`: passou a confirmar que uma falha anterior ao processamento cria e finaliza a entrada de histórico como `error`.
