@@ -110,9 +110,13 @@ def _done_status(task_id: str = "tg12345") -> dict:
     }
 
 
-def test_document_flow_sends_download_link(doc_module_isolated):
+@pytest.mark.parametrize("pdf_ua_failed", [False, True])
+def test_document_flow_sends_download_link(doc_module_isolated, pdf_ua_failed):
     content = _fake_pdf_bytes()
-    _mock_job_api(_done_status())
+    status = _done_status()
+    if pdf_ua_failed:
+        status["erros"] = ["Falha ao gerar PDF/UA: pandoc indisponivel"]
+    _mock_job_api(status)
     bot = _FakeBot(content)
     msg = _FakeMessage(bot, document=_FakeDocument("doc.pdf", len(content), "file1"))
 
@@ -120,6 +124,7 @@ def test_document_flow_sends_download_link(doc_module_isolated):
         asyncio.run(doc_module_isolated.handle_document(msg))
 
     assert any("http://localhost:8000/api/v1/download/tok123" in s for s in bot.sent)
+    assert any("Não foi possível gerar o PDF/UA" in s for s in bot.sent) == pdf_ua_failed
     assert doc_module_isolated.user_task_ids[(123, None)] == "tg12345"
 
 

@@ -157,6 +157,7 @@ class JobExecutor:
                 )
             except Exception as exc:
                 logger.warning("Falha ao gerar PDF/UA: {}", exc)
+                state_manager.atualizar(task_id, erro=f"Falha ao gerar PDF/UA: {exc}")
                 pdf_ua_path = None
             state_manager.verificar_cancelamento(task_id)
 

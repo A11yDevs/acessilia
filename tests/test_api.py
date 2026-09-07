@@ -330,7 +330,10 @@ async def test_job_executor_stops_exports_after_cancellation(api_paths, monkeypa
 
 
 @pytest.mark.asyncio
-async def test_job_executor_reports_mp3_failure(api_paths, monkeypatch):
+@pytest.mark.parametrize("failed_format", [None, "MP3", "PDF/UA"])
+async def test_job_executor_reports_optional_export_failure(
+    api_paths, monkeypatch, failed_format
+):
     from backend.agents.state_manager import state_manager
     from backend.api.worker import ApiJob, JobExecutor
 
@@ -351,6 +354,13 @@ async def test_job_executor_reports_mp3_failure(api_paths, monkeypatch):
     async def fail_mp3(*args, **kwargs):
         raise RuntimeError("tts offline")
 
+    def fail_pdf_ua(_canonical, destination, _filename):
+        destination.write_bytes(b"partial pdf")
+        raise FileNotFoundError("pandoc indisponivel")
+
+    async def write_mp3(_text, destination, **_kwargs):
+        destination.write_bytes(b"audio")
+
     async def fake_token(*args, **kwargs):
         return "tok"
 
@@ -360,7 +370,12 @@ async def test_job_executor_reports_mp3_failure(api_paths, monkeypatch):
     monkeypatch.setattr("backend.api.worker.export_pdf", write_file)
     monkeypatch.setattr("backend.api.worker.export_pdf_ua", write_file)
     monkeypatch.setattr("backend.api.worker.export_accessible_document", write_file)
-    monkeypatch.setattr("backend.api.worker.export_mp3", fail_mp3)
+    if failed_format == "PDF/UA":
+        monkeypatch.setattr("backend.api.worker.export_pdf_ua", fail_pdf_ua)
+    monkeypatch.setattr(
+        "backend.api.worker.export_mp3",
+        fail_mp3 if failed_format == "MP3" else write_mp3,
+    )
     monkeypatch.setattr("backend.api.worker.criar_token", fake_token)
 
     await JobExecutor().run(
@@ -372,13 +387,26 @@ async def test_job_executor_reports_mp3_failure(api_paths, monkeypatch):
         )
     )
 
-    task = state_manager.obter(task_id)
+    from backend.api.worker import get_job_status
+
+    task = get_job_status(task_id)
     assert task is not None
     assert task["status"] == "done"
-    assert any("Falha ao gerar MP3" in erro for erro in task["erros"])
+    assert task["download_url"]
+    expected_errors = {
+        None: [],
+        "MP3": ["Falha ao gerar MP3: tts offline"],
+        "PDF/UA": ["Falha ao gerar PDF/UA: pandoc indisponivel"],
+    }
+    assert task["erros"] == expected_errors[failed_format]
 
     with zipfile.ZipFile(output_dir / "audio_acessivel.zip") as archive:
-        assert "audio.mp3" not in archive.namelist()
+        expected_files = {"audio.txt", "audio.docx", "audio.pdf", "audio.html"}
+        if failed_format != "MP3":
+            expected_files.add("audio.mp3")
+        if failed_format != "PDF/UA":
+            expected_files.add("audio.pdf_ua.pdf")
+        assert set(archive.namelist()) == expected_files
 
 
 @pytest.mark.asyncio
