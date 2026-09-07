@@ -101,3 +101,46 @@ exit 0
     assert "pull ghcr.io/a11ydevs/acessilia:release-0.0.2" in (
         staging_dir / "docker-args.txt"
     ).read_text()
+
+
+def test_staging_update_falls_back_when_github_request_fails(tmp_path):
+    staging_dir = tmp_path / "staging"
+    bin_dir = tmp_path / "bin"
+    staging_dir.mkdir()
+    bin_dir.mkdir()
+    (staging_dir / "var" / "data").mkdir(parents=True)
+    (staging_dir / "docker-compose.staging.yml").write_text("services: {}\n")
+    (staging_dir / ".env").write_text("TRACK_BRANCH=release/0.0.1\n")
+
+    script_path = staging_dir / "staging-update.sh"
+    shutil.copy(ROOT_DIR / "scripts" / "staging-update.sh", script_path)
+    script_path.chmod(0o755)
+
+    _write_executable(
+        bin_dir / "curl",
+        """#!/usr/bin/env bash
+exit 22
+""",
+    )
+    _write_executable(
+        bin_dir / "docker",
+        """#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$STAGING_DIR/docker-args.txt"
+exit 0
+""",
+    )
+
+    env = os.environ.copy()
+    env.update(
+        {
+            "GHCR_TOKEN": "token-do-ambiente",
+            "PATH": f"{bin_dir}:{env['PATH']}",
+            "STAGING_DIR": str(staging_dir),
+        }
+    )
+
+    subprocess.run([str(script_path)], env=env, check=True, capture_output=True, text=True)
+
+    docker_calls = (staging_dir / "docker-args.txt").read_text()
+    assert "pull ghcr.io/a11ydevs/acessilia:release-0.0.1" in docker_calls
+    assert "compose -f docker-compose.staging.yml up -d --no-deps acessilia" in docker_calls

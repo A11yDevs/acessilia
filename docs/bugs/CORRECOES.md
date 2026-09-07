@@ -110,6 +110,12 @@ O script de staging só carregava o `.env` quando `GHCR_TOKEN` não estava expor
 
 A correção carrega o `.env` independentemente do token. Variáveis já exportadas no ambiente continuam tendo prioridade sobre o arquivo.
 
+## BUG-0019: fallback de staging não rodava em falha HTTP
+
+O script prometia fazer `docker pull` direto quando não conseguisse consultar o SHA no GitHub, mas uma falha do `curl` encerrava o script antes desse fallback.
+
+A correção captura a falha da consulta ao GitHub e deixa `LATEST_SHA` vazio. Com isso, o fluxo já existente de fallback é executado.
+
 ## Testes criados
 
 - `tests/test_api.py::test_job_executor_marks_history_error_when_export_fails`: simula sucesso no `process()` e falha na exportação TXT. Confirma que o estado público e o histórico terminam como `error`.
@@ -139,3 +145,4 @@ A correção carrega o `.env` independentemente do token. Variáveis já exporta
 - `tests/test_compose_config.py::test_local_compose_builds_runtime_stage`: confirma que o Compose local constrói o estágio `base` do Dockerfile.
 - `tests/test_staging_update.py::test_staging_update_reads_track_branch_from_dotenv_with_env_token`: confirma que o staging lê `TRACK_BRANCH` do `.env` mesmo com `GHCR_TOKEN` já exportado.
 - `tests/test_staging_update.py::test_staging_update_env_track_branch_overrides_dotenv`: confirma que `TRACK_BRANCH` exportado no ambiente tem prioridade sobre o valor do `.env`.
+- `tests/test_staging_update.py::test_staging_update_falls_back_when_github_request_fails`: confirma que falha no `curl` aciona o `docker pull` e o `docker compose up` de fallback.

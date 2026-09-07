@@ -119,10 +119,12 @@ if [ -n "${GHCR_TOKEN:-}" ]; then
   AUTH_HEADER=(-H "Authorization: token $GHCR_TOKEN")
 fi
 
-LATEST_SHA=$(curl -fsS \
+if ! LATEST_SHA=$(curl -fsS \
   "${AUTH_HEADER[@]}" \
   "https://api.github.com/repos/$GITHUB_REPO/commits/$GITHUB_BRANCH" \
-  | jq -r '.sha')
+  | jq -r '.sha'); then
+  LATEST_SHA=""
+fi
 
 # Se não conseguiu obter o SHA, faz pull direto (fallback seguro)
 if [ -z "$LATEST_SHA" ] || [ "$LATEST_SHA" = "null" ]; then
