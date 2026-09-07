@@ -1,4 +1,3 @@
-import shutil
 import traceback
 import uuid
 from pathlib import Path
@@ -99,8 +98,20 @@ def _save_upload(upload: UploadFile) -> Path:
     WEB_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     safe_name = f"{uuid.uuid4().hex}{Path(upload.filename or '').suffix.lower()}"
     file_path = WEB_UPLOAD_DIR / safe_name
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(upload.file, buffer)
+    total_size = 0
+    try:
+        with open(file_path, "wb") as buffer:
+            while chunk := upload.file.read(1024 * 1024):
+                total_size += len(chunk)
+                if total_size > settings.max_file_size_bytes:
+                    raise HTTPException(
+                        status_code=413,
+                        detail=f"Arquivo excede o limite de {settings.max_file_size_mb} MB.",
+                    )
+                buffer.write(chunk)
+    except Exception:
+        _remove_file(file_path)
+        raise
     return file_path
 
 
@@ -132,7 +143,15 @@ async def _submit_via_api(
     custom_prompt: str | None = None,
     thinking_mode: bool = False,
 ):
-    file_path = _save_upload(document_file)
+    try:
+        file_path = _save_upload(document_file)
+    except HTTPException as e:
+        return templates.TemplateResponse(
+            request=request,
+            name=template_name,
+            context={"error": e.detail},
+            status_code=e.status_code,
+        )
     try:
         result = await client.submit_job(
             file_path,

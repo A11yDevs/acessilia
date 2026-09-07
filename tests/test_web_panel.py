@@ -69,6 +69,7 @@ def web_client(monkeypatch, tmp_path):
     fake = _FakeApiClient()
     monkeypatch.setattr(web_module, "client", fake)
     monkeypatch.setattr(web_module.settings, "temp_dir", tmp_path)
+    monkeypatch.setattr(web_module, "WEB_UPLOAD_DIR", tmp_path / "web_uploads")
     web_module.limiter.enabled = False
     with TestClient(web_module.app) as c:
         c.fake = fake
@@ -102,6 +103,26 @@ def test_upload_submits_via_api(web_client):
     assert sub["email"] == "test@example.com"
     assert sub["source"] == "web"
     assert not sub["file_path"].exists()
+
+
+def test_upload_rejects_oversized_file_before_api_submission(web_client, monkeypatch):
+    monkeypatch.setattr(web_module.settings, "max_file_size_mb", 1)
+    resp = web_client.post(
+        "/process",
+        files={
+            "document_file": (
+                "grande.pdf",
+                b"x" * (1024 * 1024 + 1),
+                "application/pdf",
+            )
+        },
+        data={"email": "test@example.com"},
+    )
+
+    assert resp.status_code == 413
+    assert "limite de 1 MB" in resp.text
+    assert web_client.fake.submitted == []
+    assert list(web_module.WEB_UPLOAD_DIR.iterdir()) == []
 
 
 def test_advanced_upload_sends_prompt_and_thinking(web_client):
