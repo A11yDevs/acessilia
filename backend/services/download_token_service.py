@@ -106,11 +106,12 @@ async def obter_info_token(token: str) -> dict | None:
         )
         return None
     formats_list = json.loads(row["formats"]) if row["formats"] else []
+    base = str(row["filename"])
     formats = []
     for ext, label in FORMAT_EXTENSIONS.items():
         suffix = FORMAT_OUTPUT_SUFFIX.get(ext, ext)
         separator = "" if suffix.startswith("_") else "."
-        file_path = output_dir / f"{Path(row['filename']).stem}{separator}{suffix}"
+        file_path = output_dir / f"{base}{separator}{suffix}"
         if file_path.exists():
             size_kb = file_path.stat().st_size / 1024
             size_str = f"{size_kb:.0f} KB" if size_kb < 1024 else f"{size_kb / 1024:.1f} MB"
@@ -123,7 +124,7 @@ async def obter_info_token(token: str) -> dict | None:
             })
     return {
         "filename": row["filename"],
-        "stem": Path(row["filename"]).stem,
+        "stem": base,
         "output_dir": str(output_dir),
         "criado_em": row["criado_em"],
         "formats": formats,

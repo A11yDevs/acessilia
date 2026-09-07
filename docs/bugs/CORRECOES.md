@@ -26,9 +26,16 @@ O worker salvava o pacote como `{nome}_acessivel.zip`, mas a consulta do token p
 
 A correção ensinou o serviço de download a procurar o sufixo real do pacote: `_acessivel.zip`. O worker continua produzindo o mesmo nome de arquivo.
 
+## BUG-0005: segundo `stem` quebra arquivos com pontos no nome
+
+O worker já salvava no token a base do arquivo, mas a consulta aplicava `Path(...).stem` de novo. Um nome como `relatorio.v2` virava `relatorio`, e os arquivos reais deixavam de ser encontrados.
+
+A correção usa a base salva no token exatamente como ela está. Assim nomes com pontos continuam apontando para `relatorio.v2.txt`, `relatorio.v2_acessivel.zip` e os outros formatos.
+
 ## Testes criados
 
 - `tests/test_api.py::test_job_executor_marks_history_error_when_export_fails`: simula sucesso no `process()` e falha na exportação TXT. Confirma que o estado público e o histórico terminam como `error`.
 - `tests/test_queue_service.py::test_cancelled_queued_item_is_not_processed`: enfileira uma tarefa, cancela antes do worker executar e confirma que o callback não roda.
 - `tests/test_api.py::test_job_executor_stops_exports_after_cancellation`: cancela a tarefa durante a exportação TXT e confirma que o worker não cria ZIP nem token.
 - `tests/test_api.py::test_download_full_flow`: passou a criar `doc_acessivel.zip` e confirma que o formato `zip` aparece na consulta do token.
+- `tests/test_api.py::test_download_info_keeps_dotted_base_name`: cria artefatos com base `relatorio.v2` e confirma que a consulta encontra os formatos sem cortar o nome.

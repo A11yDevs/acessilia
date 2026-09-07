@@ -196,6 +196,23 @@ def test_download_full_flow(client, api_paths):
     assert resp.status_code == 404
 
 
+def test_download_info_keeps_dotted_base_name(client, api_paths):
+    import backend.services.download_token_service as dts
+
+    out_dir = api_paths / "output" / "task-dotted"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "relatorio.v2.txt").write_text("conteudo", encoding="utf-8")
+    (out_dir / "relatorio.v2_acessivel.zip").write_bytes(b"zip")
+
+    token = asyncio.run(dts.criar_token(out_dir, "relatorio.v2"))
+
+    info = client.get(f"/api/v1/download/{token}")
+    assert info.status_code == 200
+    assert info.json()["stem"] == "relatorio.v2"
+    formats = {item["ext"] for item in info.json()["formats"]}
+    assert formats == {"txt", "zip"}
+
+
 def test_job_executor_records_job(client, monkeypatch):
     fake = _FakeExecutor()
     monkeypatch.setattr("backend.api.routes.jobs.job_executor", fake)
