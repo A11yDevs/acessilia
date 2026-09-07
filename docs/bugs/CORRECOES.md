@@ -122,6 +122,18 @@ O workflow de Delivery rodava direto em `push`, independente do resultado da su�
 
 A correção faz o Delivery disparar pela conclusão do workflow CI. A publicação só roda quando o CI terminou com sucesso em um evento de `push`, usando o `head_sha` e a branch testados pelo CI.
 
+## BUG-0021: Delivery agrupava execuções pela referência errada
+
+Depois que o Delivery passou a rodar por `workflow_run`, a configuração de concorrência ainda usava `github.ref_name`. Nesse evento, esse valor não representa a branch testada pelo CI.
+
+A correção usa `github.event.workflow_run.head_branch` também na concorrência. Assim o cancelamento e o agrupamento do Delivery seguem a branch real que passou no CI.
+
+## BUG-0022: histórico usava caminho de banco congelado
+
+O serviço de histórico salvava `settings.db_path` em uma variável global durante o import. Quando `settings.data_dir` era alterado depois disso, como acontece nos testes e pode acontecer em inicializações controladas, o serviço continuava usando o banco antigo.
+
+A correção faz `get_connection()` consultar `settings.db_path` na hora de abrir a conexão. Isso mantém o histórico alinhado com a configuração atual.
+
 ## Testes criados
 
 - `tests/test_api.py::test_job_executor_marks_history_error_when_export_fails`: simula sucesso no `process()` e falha na exportação TXT. Confirma que o estado público e o histórico terminam como `error`.
@@ -153,3 +165,4 @@ A correção faz o Delivery disparar pela conclusão do workflow CI. A publicaç
 - `tests/test_staging_update.py::test_staging_update_env_track_branch_overrides_dotenv`: confirma que `TRACK_BRANCH` exportado no ambiente tem prioridade sobre o valor do `.env`.
 - `tests/test_staging_update.py::test_staging_update_falls_back_when_github_request_fails`: confirma que falha no `curl` aciona o `docker pull` e o `docker compose up` de fallback.
 - `tests/test_compose_config.py::test_delivery_runs_only_after_successful_push_ci`: confirma que o Delivery depende do CI aprovado e usa o SHA/branch testados.
+- `tests/test_compose_config.py::test_delivery_runs_only_after_successful_push_ci`: também confirma que o Delivery não volta a usar `github.ref_name` no evento `workflow_run`.

@@ -33,3 +33,4 @@ def test_delivery_runs_only_after_successful_push_ci():
     assert "github.event.workflow_run.head_sha" in workflow_text
     assert "github.event.workflow_run.head_branch" in workflow_text
     assert "${{ github.sha }}" not in workflow_text
+    assert "${{ github.ref_name }}" not in workflow_text
