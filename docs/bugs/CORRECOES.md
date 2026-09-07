@@ -74,6 +74,12 @@ Uma falha logo no início do `process()` podia acontecer antes da criação do e
 
 A correção faz o worker remover o item de `queued_jobs` e criar o estado da tarefa antes de chamar `process()`. Se qualquer erro inicial acontecer, existe estado para gravar `error`.
 
+## BUG-0013: página web gera links para a porta errada
+
+A página web montava links como `/api/v1/download/...`, mas o app web não atendia essa rota. Em execução com API e web em portas separadas, o clique ia para a porta da web e retornava 404.
+
+A correção adicionou um proxy de download no app web para `/api/v1/download/{token}/{format}`. A página pode continuar usando links relativos, e o frontend busca o arquivo na API por meio do `ApiClient`. O proxy preserva o nome do arquivo e remove a cópia temporária depois do envio ou de uma falha.
+
 ## Testes criados
 
 - `tests/test_api.py::test_job_executor_marks_history_error_when_export_fails`: simula sucesso no `process()` e falha na exportação TXT. Confirma que o estado público e o histórico terminam como `error`.
@@ -92,3 +98,5 @@ A correção faz o worker remover o item de `queued_jobs` e criar o estado da ta
 - `tests/test_renderers.py::test_render_html_includes_toc_table_and_metadata`: passou a confirmar que o HTML renderiza `<td></td>` para células vazias.
 - `tests/test_api.py::test_job_executor_reports_mp3_failure`: simula falha no TTS e confirma que o job registra erro público e não inclui MP3 no ZIP.
 - `tests/test_api.py::test_job_executor_records_early_process_failure`: simula falha antes de `process()` criar estado e confirma que o job termina como `error`, sem ficar em `queued`.
+- `tests/test_web_panel.py::test_download_proxy_delegates_to_api`: chama o link `/api/v1/download/{token}/{format}` no app web e confirma que ele baixa o arquivo via API.
+- `tests/test_web_panel.py::test_download_proxy_removes_partial_file_after_api_failure`: simula uma falha durante o download e confirma que o arquivo parcial é removido.

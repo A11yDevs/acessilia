@@ -13,7 +13,8 @@ from fastapi import (
 )
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
+from starlette.background import BackgroundTask
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -39,6 +40,19 @@ WEB_UPLOAD_DIR = settings.temp_dir / "web_uploads"
 WEB_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 MAX_CUSTOM_PROMPT_CHARS = 6000
+DOWNLOAD_MEDIA_TYPES = {
+    "txt": "text/plain; charset=utf-8",
+    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "pdf": "application/pdf",
+    "pdf_ua": "application/pdf",
+    "html": "text/html; charset=utf-8",
+    "mp3": "audio/mpeg",
+    "zip": "application/zip",
+}
+DOWNLOAD_SUFFIXES = {
+    "pdf_ua": "pdf_ua.pdf",
+    "zip": "_acessivel.zip",
+}
 
 
 @app.exception_handler(Exception)
@@ -218,4 +232,33 @@ async def download_page(request: Request, token: str):
         request=request,
         name="download.html",
         context={"filename": info["filename"], "formats": info["formats"]},
+    )
+
+
+@app.get("/api/v1/download/{token}/{format}")
+@limiter.limit("20/minute")
+async def proxy_download(request: Request, token: str, format: str):
+    if format not in DOWNLOAD_MEDIA_TYPES:
+        raise HTTPException(status_code=400, detail="Formato inválido")
+    destination = settings.temp_dir / "web_downloads" / f"{uuid.uuid4().hex}.{format}"
+    try:
+        info = await client.get_download_info(token)
+        await client.download_file(token, format, destination)
+    except ApiError as e:
+        _remove_file(destination)
+        if e.status_code == 404:
+            raise HTTPException(status_code=404, detail="Arquivo não encontrado")
+        raise HTTPException(status_code=502, detail="Serviço de download indisponível")
+    except Exception as e:
+        _remove_file(destination)
+        logger.error("Falha no download via web: {}", e)
+        raise HTTPException(status_code=502, detail="Serviço de download indisponível")
+    suffix = DOWNLOAD_SUFFIXES.get(format, format)
+    separator = "" if suffix.startswith("_") else "."
+    filename = f"{info['stem']}{separator}{suffix}"
+    return FileResponse(
+        destination,
+        background=BackgroundTask(_remove_file, destination),
+        media_type=DOWNLOAD_MEDIA_TYPES[format],
+        filename=filename,
     )

@@ -14,6 +14,7 @@ def _fake_pdf_bytes() -> bytes:
 class _FakeApiClient:
     def __init__(self):
         self.submitted = []
+        self.download_destination = None
 
     async def submit_job(
         self,
@@ -51,11 +52,23 @@ class _FakeApiClient:
             ],
         }
 
+    async def download_file(self, token, format, destination):
+        self.download_destination = destination
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        if token == "partial":
+            destination.write_text("partial", encoding="utf-8")
+            raise ApiError(502, "Falha durante download")
+        if token == "bad":
+            raise ApiError(404, "Arquivo não encontrado")
+        destination.write_text(f"{token}:{format}", encoding="utf-8")
+        return destination
+
 
 @pytest.fixture()
-def web_client(monkeypatch):
+def web_client(monkeypatch, tmp_path):
     fake = _FakeApiClient()
     monkeypatch.setattr(web_module, "client", fake)
+    monkeypatch.setattr(web_module.settings, "temp_dir", tmp_path)
     web_module.limiter.enabled = False
     with TestClient(web_module.app) as c:
         c.fake = fake
@@ -128,6 +141,20 @@ def test_download_page_delegates_to_api(web_client):
     assert "localhost" not in resp.text
 
 
+def test_download_proxy_delegates_to_api(web_client):
+    resp = web_client.get("/api/v1/download/tok/txt")
+    assert resp.status_code == 200
+    assert resp.text == "tok:txt"
+    assert 'filename="doc.txt"' in resp.headers["content-disposition"]
+    assert not web_client.fake.download_destination.exists()
+
+
+def test_download_proxy_removes_partial_file_after_api_failure(web_client):
+    resp = web_client.get("/api/v1/download/partial/txt")
+    assert resp.status_code == 502
+    assert not web_client.fake.download_destination.exists()
+
+
 def test_download_page_not_found(web_client):
     resp = web_client.get("/download/bad")
     assert resp.status_code == 404
@@ -164,9 +191,16 @@ def test_download_page_uses_real_client(monkeypatch):
             },
         )
     )
+    respx.get("http://localhost:8000/api/v1/download/tok/txt").mock(
+        return_value=httpx.Response(200, content=b"conteudo acessivel")
+    )
     with respx.mock:
         with TestClient(web_module.app) as c:
             resp = c.get("/download/tok")
+            download_resp = c.get("/api/v1/download/tok/txt")
     assert resp.status_code == 200
     assert 'href="/api/v1/download/tok/txt"' in resp.text
     assert "localhost" not in resp.text
+    assert download_resp.status_code == 200
+    assert download_resp.content == b"conteudo acessivel"
+    assert 'filename="doc.txt"' in download_resp.headers["content-disposition"]
