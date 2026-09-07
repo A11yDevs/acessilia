@@ -27,6 +27,7 @@ FORMAT_EXTENSIONS = {
 
 FORMAT_OUTPUT_SUFFIX = {
     "pdf_ua": "pdf_ua.pdf",
+    "zip": "_acessivel.zip",
 }
 
 
@@ -108,7 +109,8 @@ async def obter_info_token(token: str) -> dict | None:
     formats = []
     for ext, label in FORMAT_EXTENSIONS.items():
         suffix = FORMAT_OUTPUT_SUFFIX.get(ext, ext)
-        file_path = output_dir / f"{Path(row['filename']).stem}.{suffix}"
+        separator = "" if suffix.startswith("_") else "."
+        file_path = output_dir / f"{Path(row['filename']).stem}{separator}{suffix}"
         if file_path.exists():
             size_kb = file_path.stat().st_size / 1024
             size_str = f"{size_kb:.0f} KB" if size_kb < 1024 else f"{size_kb / 1024:.1f} MB"

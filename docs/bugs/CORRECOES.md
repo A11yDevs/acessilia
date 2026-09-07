@@ -20,8 +20,15 @@ O worker verificava cancelamento depois do `process()`, mas não verificava de n
 
 A correção adicionou checagens de cancelamento entre as etapas finais do worker. Se a tarefa for cancelada durante uma exportação, o fluxo para antes de gerar os próximos artefatos, o ZIP, o token e a URL pública.
 
+## BUG-0004: nome do ZIP incompatível com a descoberta dos downloads
+
+O worker salvava o pacote como `{nome}_acessivel.zip`, mas a consulta do token procurava `{nome}.zip`. O ZIP existia em disco, mas não aparecia como formato disponível.
+
+A correção ensinou o serviço de download a procurar o sufixo real do pacote: `_acessivel.zip`. O worker continua produzindo o mesmo nome de arquivo.
+
 ## Testes criados
 
 - `tests/test_api.py::test_job_executor_marks_history_error_when_export_fails`: simula sucesso no `process()` e falha na exportação TXT. Confirma que o estado público e o histórico terminam como `error`.
 - `tests/test_queue_service.py::test_cancelled_queued_item_is_not_processed`: enfileira uma tarefa, cancela antes do worker executar e confirma que o callback não roda.
 - `tests/test_api.py::test_job_executor_stops_exports_after_cancellation`: cancela a tarefa durante a exportação TXT e confirma que o worker não cria ZIP nem token.
+- `tests/test_api.py::test_download_full_flow`: passou a criar `doc_acessivel.zip` e confirma que o formato `zip` aparece na consulta do token.

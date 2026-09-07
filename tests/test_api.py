@@ -174,6 +174,7 @@ def test_download_full_flow(client, api_paths):
     out_dir = api_paths / "output" / "task1"
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "doc.txt").write_text("conteudo de teste", encoding="utf-8")
+    (out_dir / "doc_acessivel.zip").write_bytes(b"zip")
 
     token = asyncio.run(dts.criar_token(out_dir, "doc"))
 
@@ -184,8 +185,8 @@ def test_download_full_flow(client, api_paths):
     info = client.get(f"/api/v1/download/{token}")
     assert info.status_code == 200
     assert info.json()["stem"] == "doc"
-    assert len(info.json()["formats"]) == 1
-    assert info.json()["formats"][0]["ext"] == "txt"
+    formats = {item["ext"] for item in info.json()["formats"]}
+    assert formats == {"txt", "zip"}
 
     resp = client.get(f"/api/v1/download/{token}/txt")
     assert resp.status_code == 200
