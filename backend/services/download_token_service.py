@@ -88,14 +88,17 @@ async def obter_info_token(token: str) -> dict | None:
         cursor = conn.cursor()
         try:
             cursor.execute(
-                "SELECT output_dir, filename, formats, criado_em FROM download_tokens WHERE token = ?",
-                (token,)
+                """SELECT output_dir, filename, formats, criado_em
+                   FROM download_tokens
+                   WHERE token = ?
+                     AND criado_em >= datetime('now', ?)""",
+                (token, f"-{TOKEN_EXPIRY_DAYS} days")
             )
             row = cursor.fetchone()
         finally:
             cursor.close()
     if row is None:
-        logger.warning("Token de download nao encontrado: {}", token)
+        logger.warning("Token de download nao encontrado ou expirado: {}", token)
         return None
     output_dir = Path(row["output_dir"])
     if not output_dir.exists():

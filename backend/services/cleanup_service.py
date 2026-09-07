@@ -5,7 +5,10 @@ from pathlib import Path
 
 from backend.tools.logger import logger
 from backend.config.settings import settings
-from backend.services.download_token_service import TOKEN_EXPIRY_DAYS
+from backend.services.download_token_service import (
+    TOKEN_EXPIRY_DAYS,
+    limpar_tokens_expirados,
+)
 
 
 CLEANUP_INTERVAL = 3600
@@ -18,6 +21,7 @@ async def periodic_cleanup() -> None:
         try:
             _clean_temp_directory()
             _clean_output_directory()
+            await limpar_tokens_expirados()
         except Exception:
             logger.exception("Erro na limpeza periódica")
         await asyncio.sleep(CLEANUP_INTERVAL)

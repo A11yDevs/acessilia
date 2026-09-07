@@ -86,6 +86,12 @@ Os links prometem sete dias de validade, mas a limpeza apagava os arquivos de re
 
 A correção faz a limpeza usar os mesmos sete dias definidos para a validade dos tokens de download.
 
+## BUG-0015: tokens expirados ainda eram aceitos
+
+A consulta verificava apenas se o token existia e se a pasta do resultado continuava no disco. Por isso, um token com mais de sete dias ainda podia ser usado antes da próxima limpeza.
+
+A correção inclui a validade de sete dias na consulta do token e executa a remoção dos registros expirados durante a limpeza periódica.
+
 ## Testes criados
 
 - `tests/test_api.py::test_job_executor_marks_history_error_when_export_fails`: simula sucesso no `process()` e falha na exportação TXT. Confirma que o estado público e o histórico terminam como `error`.
@@ -108,3 +114,6 @@ A correção faz a limpeza usar os mesmos sete dias definidos para a validade do
 - `tests/test_web_panel.py::test_download_proxy_removes_partial_file_after_api_failure`: simula uma falha durante o download e confirma que o arquivo parcial é removido.
 - `tests/test_cleanup_service.py::test_output_cleanup_keeps_results_younger_than_seven_days`: confirma que um resultado com 25 horas não é apagado.
 - `tests/test_cleanup_service.py::test_output_cleanup_removes_results_older_than_seven_days`: confirma que um resultado com mais de sete dias é apagado.
+- `tests/test_download_token_service.py::test_expired_download_token_is_rejected`: confirma que um token com oito dias é rejeitado mesmo quando os arquivos ainda existem.
+- `tests/test_download_token_service.py::test_recent_download_token_remains_valid`: confirma que um token recente continua disponível.
+- `tests/test_cleanup_service.py::test_periodic_cleanup_removes_expired_tokens`: confirma que a limpeza periódica também remove os registros de tokens vencidos.
