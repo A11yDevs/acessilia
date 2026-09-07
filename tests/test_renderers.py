@@ -56,6 +56,12 @@ def _sample_document() -> dict:
                                         {"text": "1"},
                                         {"text": "2"},
                                     ]
+                                },
+                                {
+                                    "cells": [
+                                        {"text": "3"},
+                                        {"text": ""},
+                                    ]
                                 }
                             ],
                         },
@@ -116,7 +122,7 @@ def test_render_html_includes_toc_table_and_metadata():
         assert '<table id="blk-4">' in html
         assert "<caption>Resumo de valores</caption>" in html
         assert '<th scope="col">Coluna A</th>' in html
-        assert "<tbody><tr><td>1</td><td>2</td></tr></tbody>" in html
+        assert "<tbody><tr><td>1</td><td>2</td></tr><tr><td>3</td><td></td></tr></tbody>" in html
         assert '<aside class="meta"' in html
         assert "Observacao" in html
 

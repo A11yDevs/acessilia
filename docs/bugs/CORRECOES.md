@@ -50,6 +50,18 @@ O validador aceitava DOCX e HTML mesmo quando o motor ativo era `legacy`. Esse m
 
 A correção bloqueia DOCX e HTML já na validação quando `PIPELINE_ENGINE=legacy`. Em motores fora do legacy, os formatos continuam permitidos.
 
+## BUG-0009: thinking mode é uma opção sem efeito no legacy
+
+O `thinking_mode` era aceito pela interface, mas o prompt com `<|think|>` não era repassado para as chamadas dos agentes no motor legacy.
+
+Este bug já veio corrigido no commit do Wryel. Quando `thinking_mode` está ativo, o prompt despachado para os agentes recebe o marcador `<|think|>`.
+
+## BUG-0010: células vazias eliminadas corrompem alinhamento de tabelas
+
+O pipeline removia células vazias ao montar e ler o `table_ast`. Em tabelas com célula vazia no meio da linha, os valores seguintes mudavam de coluna.
+
+A correção preserva células vazias estruturais no `table_ast`, na conversão de volta para linhas e no renderer HTML. Linhas totalmente vazias continuam sendo descartadas.
+
 ## Testes criados
 
 - `tests/test_api.py::test_job_executor_marks_history_error_when_export_fails`: simula sucesso no `process()` e falha na exportação TXT. Confirma que o estado público e o histórico terminam como `error`.
@@ -63,3 +75,6 @@ A correção bloqueia DOCX e HTML já na validação quando `PIPELINE_ENGINE=leg
 - `tests/test_telegram_client.py::test_health_reports_api_error`: confirma que `/health` mostra erro da API quando a consulta falha.
 - `tests/test_validators.py::test_validate_file_rejects_docx_and_html_in_legacy`: confirma que DOCX e HTML são recusados no motor legacy.
 - `tests/test_validators.py::test_validate_file_allows_docx_and_html_outside_legacy`: confirma que DOCX e HTML continuam aceitos quando o motor não é legacy.
+- `tests/test_orchestrator_thinking_mode.py::test_thinking_mode_changes_dispatched_prompt`: confirma que `thinking_mode` altera o prompt enviado aos agentes no legacy.
+- `tests/test_table_ast.py::test_table_ast_preserves_empty_structural_cells`: confirma que uma célula vazia no meio da tabela é preservada no AST e na volta para linhas.
+- `tests/test_renderers.py::test_render_html_includes_toc_table_and_metadata`: passou a confirmar que o HTML renderiza `<td></td>` para células vazias.
