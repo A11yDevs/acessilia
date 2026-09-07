@@ -99,6 +99,7 @@ async def process(
     thinking_mode: bool = False,
     task_id: str | None = None,
 ) -> dict[str, Any]:
+    external_task_id = task_id is not None
     cached = await get_cached(file_path, _cache_version())
     if cached is not None:
         logger.info("Cache hit para {}", file_path.name)
@@ -183,20 +184,21 @@ async def process(
             technical_warnings=technical_warnings,
         )
 
-        state_manager.finalizar(
-            task_id,
-            json.dumps(canonical_document, ensure_ascii=False),
-        )
         await set_cache(file_path, canonical_document, _cache_version())
         _salvar_json_canonico(canonical_document, file_path.name)
 
-        await finalizar_conversao(
-            task_id=task_id,
-            status="done",
-            pipeline=f"{settings.ai_client}-{_normalized_engine()}",
-            resultado_resumo=canonical_document["title"][:200],
-            tempo_segundos=time.time() - inicio,
-        )
+        if not external_task_id:
+            state_manager.finalizar(
+                task_id,
+                json.dumps(canonical_document, ensure_ascii=False),
+            )
+            await finalizar_conversao(
+                task_id=task_id,
+                status="done",
+                pipeline=f"{settings.ai_client}-{_normalized_engine()}",
+                resultado_resumo=canonical_document["title"][:200],
+                tempo_segundos=time.time() - inicio,
+            )
 
         if status_callback:
             await status_callback("✅ Processamento finalizado com sucesso!")

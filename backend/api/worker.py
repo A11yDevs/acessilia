@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 import functools
+import json
 import time
 import zipfile
 from dataclasses import dataclass
@@ -19,6 +20,7 @@ from backend.export.exporters.txt_exporter import export_txt
 from backend.export.pandoc_exporter import export_accessible_document
 from backend.services.download_token_service import criar_token
 from backend.services.email_service import send_confirmation_email, send_result_email
+from backend.services.history_service import finalizar_conversao
 from backend.tools.logger import logger
 
 queued_jobs: dict[str, dict[str, Any]] = {}
@@ -89,6 +91,7 @@ class JobExecutor:
 
     async def run(self, job: ApiJob) -> None:
         task_id = job.task_id
+        started_at = time.time()
 
         async def status_callback(msg: str) -> None:
             state_manager.atualizar(task_id, etapa=msg)
@@ -193,7 +196,14 @@ class JobExecutor:
             state_manager.registrar_download_url(task_id, download_url)
             state_manager.atualizar(
                 task_id, etapa="Processamento concluido", progresso=1.0,
+                status="done", resultado=json.dumps(canonical, ensure_ascii=False),
+            )
+            await finalizar_conversao(
+                task_id=task_id,
                 status="done",
+                pipeline=f"{settings.ai_client}-{settings.pipeline_engine}",
+                resultado_resumo=str(canonical.get("title", ""))[:200],
+                tempo_segundos=time.time() - started_at,
             )
 
             if job.email:
@@ -209,6 +219,12 @@ class JobExecutor:
             logger.exception("Erro no JobExecutor para {}", task_id)
             state_manager.atualizar(
                 task_id, status="error", erro=str(e), etapa="Falha no processamento"
+            )
+            await finalizar_conversao(
+                task_id=task_id,
+                status="error",
+                erro=str(e),
+                tempo_segundos=time.time() - started_at,
             )
         finally:
             if job.file_path.exists():

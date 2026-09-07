@@ -214,3 +214,55 @@ def test_job_executor_records_job(client, monkeypatch):
 
     assert len(fake.calls) >= 1
     assert fake.calls[0].filename == "doc.pdf"
+
+
+@pytest.mark.asyncio
+async def test_job_executor_marks_history_error_when_export_fails(
+    api_paths, monkeypatch
+):
+    import backend.services.history_service as hs
+    from backend.agents.state_manager import state_manager
+    from backend.api.worker import ApiJob, JobExecutor
+    from backend.services.history_service import registrar_conversao
+
+    task_id = "bug0001"
+    input_path = api_paths / "input.pdf"
+    input_path.write_bytes(_fake_pdf_bytes())
+    state_manager._tasks.clear()
+    state_manager._cancel_events.clear()
+
+    async def fake_process(*args, **kwargs):
+        state_manager.criar_tarefa(input_path, task_id=task_id)
+        return {"title": "Documento", "sections": []}
+
+    def fail_export_txt(*args, **kwargs):
+        raise OSError("disk full")
+
+    monkeypatch.setattr("backend.service.process", fake_process)
+    monkeypatch.setattr("backend.api.worker.export_txt", fail_export_txt)
+
+    await registrar_conversao(
+        task_id=task_id,
+        arquivo=input_path.name,
+        extensao=input_path.suffix,
+        tamanho_bytes=input_path.stat().st_size,
+        modo="normal",
+    )
+
+    await JobExecutor().run(
+        ApiJob(
+            task_id=task_id,
+            file_path=input_path,
+            filename=input_path.name,
+            output_dir=api_paths / "output" / task_id,
+        )
+    )
+
+    task = state_manager.obter(task_id)
+    assert task is not None
+    assert task["status"] == "error"
+
+    rows = await hs.listar_historico(10)
+    [row] = [row for row in rows if row["task_id"] == task_id]
+    assert row["status"] == "error"
+    assert "disk full" in row["erro"]
