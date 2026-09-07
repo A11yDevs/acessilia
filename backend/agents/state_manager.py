@@ -73,7 +73,7 @@ class StateManager:
     def listar_tarefas_processing(self) -> list[dict]:
         return [t for t in self._tasks.values() if t.get("status") == "processing"]
 
-    def cancelar(self, task_id: str) -> None:
+    def cancelar(self, task_id: str) -> bool:
         task = self._tasks.get(task_id)
         if task and task.get("status") == "processing":
             task["status"] = "cancelled"
@@ -82,6 +82,8 @@ class StateManager:
             event = self._cancel_events.get(task_id)
             if event:
                 event.set()
+            return True
+        return False
 
     def foi_cancelada(self, task_id: str) -> bool:
         event = self._cancel_events.get(task_id)

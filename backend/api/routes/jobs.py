@@ -123,5 +123,11 @@ async def job_status(request: Request, task_id: str):
 @limiter.limit("10/minute")
 async def cancel_job(request: Request, task_id: str):
     if not cancel_job_status(task_id):
-        raise HTTPException(status_code=404, detail="Tarefa não encontrada")
+        job = get_job_status(task_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="Tarefa não encontrada")
+        raise HTTPException(
+            status_code=409,
+            detail=f"Tarefa não pode ser cancelada no estado atual: {job['status']}",
+        )
     return CancelResponse(task_id=task_id, status="cancelled")

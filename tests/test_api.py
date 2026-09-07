@@ -148,6 +148,70 @@ def test_cancel_unknown(client):
     assert resp.status_code == 404
 
 
+@pytest.mark.parametrize("status", ["processing", "done", "error", "cancelled"])
+def test_cancel_respects_task_state(client, monkeypatch, status):
+    from backend.agents.state_manager import StateManager
+    from backend.api import worker
+
+    manager = StateManager()
+    monkeypatch.setattr(worker, "state_manager", manager)
+    task_id = manager.criar_tarefa(Path("doc.pdf"))
+    if status == "cancelled":
+        assert manager.cancelar(task_id) is True
+    else:
+        manager.atualizar(task_id, status=status)
+    before = dict(manager.obter(task_id))
+
+    response = client.post(f"/api/v1/jobs/{task_id}/cancel")
+    actual = client.get(f"/api/v1/jobs/{task_id}").json()
+
+    if status == "processing":
+        assert response.status_code == 200
+        assert response.json()["status"] == actual["status"] == "cancelled"
+        assert manager.foi_cancelada(task_id)
+    else:
+        assert response.status_code == 409
+        assert status in response.json()["detail"]
+        assert actual["status"] == status
+        assert manager.obter(task_id) == before
+        assert manager.foi_cancelada(task_id) == (status == "cancelled")
+
+
+@pytest.mark.parametrize("in_queue", [True, False])
+def test_cancel_queued_job_requires_queue_removal(client, monkeypatch, in_queue):
+    from backend.agents.state_manager import StateManager
+    from backend.api import worker
+    from backend.services import queue_service
+
+    queue = queue_service.UnifiedQueue()
+    monkeypatch.setattr(queue_service, "unified_queue", queue)
+    monkeypatch.setattr(worker, "state_manager", StateManager())
+    monkeypatch.setattr(worker, "queued_jobs", {})
+    task_id = "cancelqueued26"
+    worker.register_queued_job(task_id, "doc.pdf", 1, "pytest")
+    if in_queue:
+        queue._queue.append(queue_service.QueueItem(
+            file_path=Path("doc.pdf"), filename="doc.pdf", source="pytest",
+            callback=None, task_id=task_id,
+        ))
+    before = worker.get_job_status(task_id)
+
+    response = client.post(f"/api/v1/jobs/{task_id}/cancel")
+    actual = client.get(f"/api/v1/jobs/{task_id}").json()
+
+    if in_queue:
+        assert response.status_code == 200
+        assert response.json()["status"] == actual["status"] == "cancelled"
+        assert queue.qsize() == 0
+        cancelled = worker.get_job_status(task_id)
+        assert client.post(f"/api/v1/jobs/{task_id}/cancel").status_code == 409
+        assert worker.get_job_status(task_id) == cancelled
+    else:
+        assert response.status_code == 409
+        assert actual["status"] == "queued"
+        assert worker.get_job_status(task_id) == before
+
+
 def test_download_info_invalid_token(client):
     resp = client.get("/api/v1/download/not-a-token")
     assert resp.status_code == 404

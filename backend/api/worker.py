@@ -57,13 +57,13 @@ def get_job_status(task_id: str) -> dict[str, Any] | None:
 def cancel_job_status(task_id: str) -> bool:
     task = state_manager.obter(task_id)
     if task is not None:
-        state_manager.cancelar(task_id)
-        return True
+        return state_manager.cancelar(task_id)
     queued = queued_jobs.get(task_id)
-    if queued is not None:
+    if queued is not None and queued.get("status") == "queued":
         from backend.services.queue_service import unified_queue
 
-        unified_queue.cancel(task_id)
+        if not unified_queue.cancel(task_id):
+            return False
         queued["status"] = "cancelled"
         queued["etapa_atual"] = "Cancelado na fila"
         queued["fim"] = time.time()
