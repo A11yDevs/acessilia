@@ -104,6 +104,12 @@ O `docker-compose.yml` usava o `infra/Dockerfile` sem definir o alvo do build. C
 
 A correção define `target: base` no build local, que é o estágio de runtime usado pela aplicação e pelos workflows de entrega.
 
+## BUG-0018: staging ignorava branch do `.env`
+
+O script de staging só carregava o `.env` quando `GHCR_TOKEN` não estava exportado. Se o token já viesse do ambiente, `TRACK_BRANCH` definido no arquivo era ignorado e o script voltava para `develop`.
+
+A correção carrega o `.env` independentemente do token. Variáveis já exportadas no ambiente continuam tendo prioridade sobre o arquivo.
+
 ## Testes criados
 
 - `tests/test_api.py::test_job_executor_marks_history_error_when_export_fails`: simula sucesso no `process()` e falha na exportação TXT. Confirma que o estado público e o histórico terminam como `error`.
@@ -131,3 +137,5 @@ A correção define `target: base` no build local, que é o estágio de runtime 
 - `tests/test_web_panel.py::test_upload_rejects_oversized_file_before_api_submission`: confirma que um upload acima do limite é rejeitado, não chega à API e não deixa arquivo parcial.
 - `tests/test_cleanup_service.py::test_periodic_cleanup_removes_expired_tokens`: confirma que a limpeza periódica também remove os registros de tokens vencidos.
 - `tests/test_compose_config.py::test_local_compose_builds_runtime_stage`: confirma que o Compose local constrói o estágio `base` do Dockerfile.
+- `tests/test_staging_update.py::test_staging_update_reads_track_branch_from_dotenv_with_env_token`: confirma que o staging lê `TRACK_BRANCH` do `.env` mesmo com `GHCR_TOKEN` já exportado.
+- `tests/test_staging_update.py::test_staging_update_env_track_branch_overrides_dotenv`: confirma que `TRACK_BRANCH` exportado no ambiente tem prioridade sobre o valor do `.env`.
