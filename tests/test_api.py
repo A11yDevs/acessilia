@@ -521,6 +521,7 @@ async def test_job_executor_records_early_process_failure(api_paths, monkeypatch
     from backend.agents.state_manager import state_manager
     from backend.api import worker as worker_module
     from backend.api.worker import ApiJob, JobExecutor
+    from backend.services import history_service as hs
 
     task_id = "bug0012"
     input_path = api_paths / "early.pdf"
@@ -548,3 +549,8 @@ async def test_job_executor_records_early_process_failure(api_paths, monkeypatch
     assert task["status"] == "error"
     assert task_id not in worker_module.queued_jobs
     assert not input_path.exists()
+    rows = await hs.listar_historico(10)
+    [row] = [row for row in rows if row["task_id"] == task_id]
+    assert row["status"] == "error"
+    assert row["erro"] == "cache inacessivel"
+    assert row["concluido_em"] is not None

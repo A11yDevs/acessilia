@@ -20,10 +20,17 @@ from backend.export.exporters.txt_exporter import export_txt
 from backend.export.pandoc_exporter import export_accessible_document
 from backend.services.download_token_service import criar_token
 from backend.services.email_service import send_confirmation_email, send_result_email
-from backend.services.history_service import finalizar_conversao
+from backend.services.history_service import finalizar_conversao, registrar_conversao
 from backend.tools.logger import logger
 
 queued_jobs: dict[str, dict[str, Any]] = {}
+
+
+def _file_size_or_zero(path: Path) -> int:
+    try:
+        return path.stat().st_size
+    except OSError:
+        return 0
 
 
 def build_download_url(token: str) -> str:
@@ -100,15 +107,23 @@ class JobExecutor:
             state_manager.atualizar(task_id, etapa=msg)
 
         try:
+            queued_jobs.pop(task_id, None)
+            if state_manager.obter(task_id) is None:
+                state_manager.criar_tarefa(job.file_path, task_id=task_id)
+            await registrar_conversao(
+                task_id=task_id,
+                arquivo=job.filename,
+                extensao=job.file_path.suffix,
+                tamanho_bytes=_file_size_or_zero(job.file_path),
+                modo=job.mode,
+            )
+            state_manager.atualizar(task_id, etapa="Enfileirado, aguardando...")
+
             if job.email:
                 await send_confirmation_email(job.email, job.filename)
 
             from backend.service import process
 
-            queued_jobs.pop(task_id, None)
-            if state_manager.obter(task_id) is None:
-                state_manager.criar_tarefa(job.file_path, task_id=task_id)
-            state_manager.atualizar(task_id, etapa="Enfileirado, aguardando...")
             canonical = await process(
                 job.file_path,
                 status_callback=status_callback,
