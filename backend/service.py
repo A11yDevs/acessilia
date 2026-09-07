@@ -142,24 +142,6 @@ async def process(
     task_id: str | None = None,
 ) -> dict[str, Any]:
     external_task_id = task_id is not None
-    cache_variant = _cache_version(mode, custom_prompt, thinking_mode)
-    cached = await get_cached(file_path, cache_variant)
-    if cached is not None:
-        logger.info("Cache hit para {}", file_path.name)
-        cached = _payload_for_source(cached, file_path)
-        canonical_metadata, technical_warnings = _canonical_details(cached)
-        return build_canonical_document(
-            cached,
-            title=file_path.stem,
-            language="pt-BR",
-            verbosity=verbosity_for_mode(mode),
-            source_name=file_path.name,
-            source_path=str(file_path),
-            audience=["reader"],
-            metadata=canonical_metadata,
-            technical_warnings=technical_warnings,
-        )
-
     task_id = state_manager.criar_tarefa(file_path, task_id=task_id)
     inicio = time.time()
     await registrar_conversao(
@@ -171,6 +153,39 @@ async def process(
     )
 
     try:
+        cache_variant = _cache_version(mode, custom_prompt, thinking_mode)
+        cached = await get_cached(file_path, cache_variant)
+        if cached is not None:
+            logger.info("Cache hit para {}", file_path.name)
+            cached = _payload_for_source(cached, file_path)
+            canonical_metadata, technical_warnings = _canonical_details(cached)
+            canonical_document = build_canonical_document(
+                cached,
+                title=file_path.stem,
+                language="pt-BR",
+                verbosity=verbosity_for_mode(mode),
+                source_name=file_path.name,
+                source_path=str(file_path),
+                audience=["reader"],
+                metadata=canonical_metadata,
+                technical_warnings=technical_warnings,
+            )
+            if not external_task_id:
+                state_manager.finalizar(
+                    task_id,
+                    json.dumps(canonical_document, ensure_ascii=False),
+                )
+                await finalizar_conversao(
+                    task_id=task_id,
+                    status="done",
+                    pipeline=f"{settings.ai_client}-{_normalized_engine()}",
+                    resultado_resumo=canonical_document["title"][:200],
+                    tempo_segundos=time.time() - inicio,
+                )
+            if status_callback:
+                await status_callback("✅ Processamento finalizado com sucesso!")
+            return canonical_document
+
         state_manager.atualizar(
             task_id,
             etapa="Preparando arquivo",
