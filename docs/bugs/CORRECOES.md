@@ -98,6 +98,12 @@ O painel web gravava o arquivo inteiro antes que a API verificasse o limite de t
 
 A correção grava o upload em blocos e interrompe a cópia assim que o limite configurado é ultrapassado. O arquivo parcial é removido e o painel retorna o erro 413.
 
+## BUG-0017: Compose local construía o estágio de teste
+
+O `docker-compose.yml` usava o `infra/Dockerfile` sem definir o alvo do build. Como o último estágio do Dockerfile é `test`, o Compose local podia subir uma imagem cujo comando padrão roda `pytest` em vez do servidor.
+
+A correção define `target: base` no build local, que é o estágio de runtime usado pela aplicação e pelos workflows de entrega.
+
 ## Testes criados
 
 - `tests/test_api.py::test_job_executor_marks_history_error_when_export_fails`: simula sucesso no `process()` e falha na exportação TXT. Confirma que o estado público e o histórico terminam como `error`.
@@ -124,3 +130,4 @@ A correção grava o upload em blocos e interrompe a cópia assim que o limite c
 - `tests/test_download_token_service.py::test_recent_download_token_remains_valid`: confirma que um token recente continua disponível.
 - `tests/test_web_panel.py::test_upload_rejects_oversized_file_before_api_submission`: confirma que um upload acima do limite é rejeitado, não chega à API e não deixa arquivo parcial.
 - `tests/test_cleanup_service.py::test_periodic_cleanup_removes_expired_tokens`: confirma que a limpeza periódica também remove os registros de tokens vencidos.
+- `tests/test_compose_config.py::test_local_compose_builds_runtime_stage`: confirma que o Compose local constrói o estágio `base` do Dockerfile.

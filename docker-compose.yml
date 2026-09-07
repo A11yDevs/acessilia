@@ -3,6 +3,7 @@ services:
     build:
       context: .
       dockerfile: infra/Dockerfile
+      target: base
       args:
         WITH_DOCLING: "true"
     image: acessilia:latest
