@@ -67,7 +67,7 @@ class Settings:
         "a11y-devs-describer",
     )
     pymupdf_text_threshold: int = int(os.getenv("PYMUPDF_TEXT_THRESHOLD", "100"))
-    structurer: str = os.getenv("STRUCTURER", "docling")
+    structurer: str = os.getenv("STRUCTURER", "toolbox")
     docling_formula_enrichment: bool = field(
         default_factory=lambda: _bool_from_env_alias(
             ("DOCLING_FORMULA_ENRICHMENT",),
@@ -81,6 +81,19 @@ class Settings:
         )
     )
     pipeline_engine: str = os.getenv("PIPELINE_ENGINE", "legacy")
+
+    # Acessilia Toolbox settings
+    toolbox_base_url: str = os.getenv("TOOLBOX_BASE_URL", "http://localhost:8002")
+    toolbox_provider: str = os.getenv("TOOLBOX_PROVIDER", "docling")
+    toolbox_timeout_seconds: int = int(os.getenv("TOOLBOX_TIMEOUT_SECONDS", "3600"))
+    toolbox_use_artifact_store: bool = field(
+        default_factory=lambda: os.getenv("TOOLBOX_USE_ARTIFACT_STORE", "true").strip().lower()
+        in {"1", "true", "yes", "on", "sim"},
+    )
+    toolbox_use_remote_cache: bool = field(
+        default_factory=lambda: os.getenv("TOOLBOX_USE_REMOTE_CACHE", "true").strip().lower()
+        in {"1", "true", "yes", "on", "sim"},
+    )
     pddl_execute_dry_run: bool = field(
         default_factory=lambda: _bool_from_env_alias(
             ("PDDL_EXECUTE_DRY_RUN", "PMV_EXECUTE_DRY_RUN"),

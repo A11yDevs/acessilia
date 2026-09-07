@@ -50,6 +50,8 @@ def _resolved_structurer() -> str:
     if structurer == "docling" and not DOCLING_AVAILABLE:
         logger.warning(t(LOG_STRUCTURER_FALLBACK_PYMUPDF))
         return "pymupdf"
+    if structurer == "toolbox":
+        logger.info("STRUCTURER=toolbox: usando Acessilia Toolbox remota")
     return structurer
 
 
@@ -84,8 +86,9 @@ def _cache_version(
     thinking_mode: bool = False,
 ) -> str:
     engine = _normalized_engine()
+    structurer = _resolved_structurer()
     return options_cache_key(
-        f"{settings.ai_client}-{engine}-v2",
+        f"{settings.ai_client}-{engine}-{structurer}-v2",
         mode=mode,
         custom_prompt=custom_prompt or "",
         thinking_mode=thinking_mode,

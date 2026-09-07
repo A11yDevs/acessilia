@@ -125,6 +125,66 @@ def test_build_orchestrator_pddl_without_docling_falls_back_to_pymupdf(monkeypat
 
 
 # ---------------------------------------------------------------------------
+# Toolbox backend
+# ---------------------------------------------------------------------------
+
+
+def test_build_orchestrator_pddl_with_toolbox_uses_toolbox_extractor(monkeypatch):
+    """STRUCTURER=toolbox + PIPELINE_ENGINE=pddl seleciona ToolboxManifestExtractor."""
+    from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
+    from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
+
+    monkeypatch.setattr(settings, "structurer", "toolbox")
+    monkeypatch.setattr(settings, "pddl_fast_downward", "")
+    monkeypatch.setattr(settings, "pddl_fast_downward_alias", "")
+    svc = _reimport_service(monkeypatch, "pddl")
+    orchestrator = svc._build_orchestrator()
+    assert isinstance(orchestrator, PddlAccessibilityOrchestrator)
+    extractor = orchestrator.information_structural.extractor
+    assert isinstance(extractor, ToolboxManifestExtractor)
+    assert orchestrator.extractor_backend == "toolbox"
+
+
+def test_resolved_structurer_toolbox_does_not_require_docling(monkeypatch):
+    """STRUCTURER=toolbox não depende de DOCLING_AVAILABLE."""
+    monkeypatch.setattr(settings, "structurer", "toolbox")
+    svc = _reimport_service(monkeypatch, "legacy")
+    assert svc._resolved_structurer() == "toolbox"
+
+
+def test_resolved_structurer_toolbox_without_docling(monkeypatch):
+    """STRUCTURER=toolbox funciona mesmo quando docling não está instalado."""
+    monkeypatch.setattr(settings, "structurer", "toolbox")
+    svc = _reimport_service(monkeypatch, "legacy")
+    monkeypatch.setattr(svc, "DOCLING_AVAILABLE", False)
+    assert svc._resolved_structurer() == "toolbox"
+
+
+def test_toolbox_settings_defaults():
+    """Settings da Toolbox carregam defaults corretos."""
+    import os
+
+    for key in (
+        "TOOLBOX_BASE_URL",
+        "TOOLBOX_PROVIDER",
+        "TOOLBOX_TIMEOUT_SECONDS",
+        "TOOLBOX_USE_ARTIFACT_STORE",
+        "TOOLBOX_USE_REMOTE_CACHE",
+    ):
+        os.environ.pop(key, None)
+
+    import backend.config.settings as cfg_mod
+
+    fresh = cfg_mod.Settings()
+
+    assert fresh.toolbox_base_url == "http://localhost:8002"
+    assert fresh.toolbox_provider == "docling"
+    assert fresh.toolbox_timeout_seconds == 3600
+    assert fresh.toolbox_use_artifact_store is True
+    assert fresh.toolbox_use_remote_cache is True
+
+
+# ---------------------------------------------------------------------------
 # Settings PDDL — defaults e aliases PMV_*
 # ---------------------------------------------------------------------------
 
