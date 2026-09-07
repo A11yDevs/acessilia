@@ -5,6 +5,7 @@ from pathlib import Path
 
 from backend.tools.logger import logger
 from backend.config.settings import settings
+from backend.services.queue_service import unified_queue
 from backend.services.download_token_service import (
     TOKEN_EXPIRY_DAYS,
     limpar_tokens_expirados,
@@ -52,19 +53,29 @@ def _clean_temp_directory() -> None:
         return
 
     now = time.time()
+    protected_paths = unified_queue.protected_file_paths()
+
+    def clean_item(item: Path) -> None:
+        if item.resolve() in protected_paths:
+            return
+        try:
+            stale = _is_stale(item, now, FILE_MAX_AGE)
+            if item.is_dir() and not item.is_symlink():
+                for child in item.iterdir():
+                    clean_item(child)
+                if stale and not any(item.iterdir()):
+                    item.rmdir()
+                    logger.debug("Diretório temporário removido: {}", item.name)
+            elif stale:
+                item.unlink()
+                logger.debug("Arquivo temporário removido: {}", item.name)
+        except OSError as exc:
+            logger.warning("Falha ao remover {}: {}", item.name, exc)
+
     for item in temp_dir.iterdir():
         if item.name in ("output", "cache", "web_output"):
             continue
-        if _is_stale(item, now, FILE_MAX_AGE):
-            try:
-                if item.is_file():
-                    item.unlink()
-                    logger.debug("Arquivo temporário removido: {}", item.name)
-                elif item.is_dir():
-                    shutil.rmtree(item, ignore_errors=True)
-                    logger.debug("Diretório temporário removido: {}", item.name)
-            except Exception as e:
-                logger.warning("Falha ao remover {}: {}", item.name, e)
+        clean_item(item)
 
 
 def _clean_output_directory() -> None:

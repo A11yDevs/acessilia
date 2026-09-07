@@ -58,3 +58,91 @@ def test_periodic_cleanup_removes_expired_tokens(monkeypatch):
         asyncio.run(cleanup_service.periodic_cleanup())
 
     assert calls == [True]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("outcome", ["done", "error", "cancelled"])
+async def test_temp_cleanup_preserves_queued_and_processing_uploads(
+    monkeypatch, tmp_path, outcome
+):
+    from backend.services.queue_service import QueueItem, UnifiedQueue
+
+    monkeypatch.setattr(settings, "temp_dir", tmp_path)
+    queue = UnifiedQueue()
+    monkeypatch.setattr(cleanup_service, "unified_queue", queue)
+    uploads = tmp_path / "uploads"
+    uploads.mkdir()
+    pending = uploads / "pending.pdf"
+    orphan = uploads / "orphan.pdf"
+    recent = uploads / "recent.pdf"
+    for path in (pending, orphan, recent):
+        path.write_bytes(b"%PDF-1.4")
+    old = time.time() - cleanup_service.FILE_MAX_AGE - 60
+    for path in (pending, orphan, uploads):
+        os.utime(path, (old, old))
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    async def process():
+        started.set()
+        await release.wait()
+        assert pending.read_bytes() == b"%PDF-1.4"
+        if outcome == "error":
+            raise RuntimeError("controlled failure")
+
+    await queue.enqueue(QueueItem(
+        file_path=pending, filename=pending.name, source="pytest",
+        task_id="bug27", callback=process,
+    ))
+    cleanup_service._clean_temp_directory()
+    assert pending.exists()
+    assert queue.get_position("bug27") == 1
+    assert not orphan.exists()
+    assert recent.exists()
+
+    queue.start_worker()
+    try:
+        await asyncio.wait_for(started.wait(), timeout=2)
+        assert queue.get_position("bug27") == 0
+        cleanup_service._clean_temp_directory()
+        assert pending.exists()
+        if outcome == "cancelled":
+            queue._worker_task.cancel()
+        else:
+            release.set()
+            await asyncio.sleep(0)
+            assert queue.protected_file_paths() == set()
+    finally:
+        queue._worker_task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await queue._worker_task
+
+    assert queue.protected_file_paths() == set()
+    cleanup_service._clean_temp_directory()
+    assert not pending.exists()
+    assert recent.exists()
+
+
+@pytest.mark.asyncio
+async def test_temp_cleanup_removes_cancelled_queued_upload(monkeypatch, tmp_path):
+    from backend.services.queue_service import QueueItem, UnifiedQueue
+
+    monkeypatch.setattr(settings, "temp_dir", tmp_path)
+    queue = UnifiedQueue()
+    monkeypatch.setattr(cleanup_service, "unified_queue", queue)
+    uploads = _create_aged_output(tmp_path, "uploads", cleanup_service.FILE_MAX_AGE + 60)
+    pending = uploads / "resultado.txt"
+
+    async def process():
+        pytest.fail("Cancelled job must not run")
+
+    await queue.enqueue(QueueItem(
+        file_path=pending, filename=pending.name, source="pytest",
+        task_id="cancel27", callback=process,
+    ))
+    cleanup_service._clean_temp_directory()
+    assert pending.exists()
+    assert queue.cancel("cancel27")
+    cleanup_service._clean_temp_directory()
+    assert not pending.exists()
+    assert not uploads.exists()

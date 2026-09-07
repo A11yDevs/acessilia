@@ -23,6 +23,7 @@ class QueueItem:
 class UnifiedQueue:
     def __init__(self, max_concurrent: int = 1):
         self._queue: deque[QueueItem] = deque()
+        self._active_items: dict[str, QueueItem] = {}
         self._processing_count = 0
         self._max_concurrent = max_concurrent
         self._lock = asyncio.Lock()
@@ -60,6 +61,7 @@ class UnifiedQueue:
                 if self._queue and self._processing_count < self._max_concurrent:
                     item = self._queue.popleft()
                     self._processing_count += 1
+                    self._active_items[item.task_id] = item
 
             if item:
                 try:
@@ -72,6 +74,7 @@ class UnifiedQueue:
                 finally:
                     async with self._lock:
                         self._processing_count -= 1
+                        self._active_items.pop(item.task_id, None)
                     logger.info(
                         "Worker: Tarefa concluída: {}. Aguardando próximo...",
                         item.filename,
@@ -87,6 +90,12 @@ class UnifiedQueue:
 
     def qsize(self) -> int:
         return len(self._queue)
+
+    def protected_file_paths(self) -> set[Path]:
+        return {
+            item.file_path.resolve()
+            for item in [*self._queue, *self._active_items.values()]
+        }
 
 
 unified_queue = UnifiedQueue(max_concurrent=1)
