@@ -1,6 +1,8 @@
 import tempfile
 from pathlib import Path
 
+from pypdf import PdfReader
+
 from backend.export.renderers.docx_renderer import render_docx
 from backend.export.renderers.html_renderer import render_html
 from backend.export.renderers.pdf_renderer import render_pdf
@@ -178,3 +180,47 @@ def test_render_pdf_handles_outline_level_jump():
 
         assert result.exists()
         assert result.stat().st_size > 0
+
+
+def test_render_pdf_escapes_literal_markup_in_document_text(tmp_path):
+    document = {
+        "title": "Manual de <tags> & atributos",
+        "sections": [
+            {
+                "id": 'section-"markup"',
+                "title": "Seção sobre <b> & <i>",
+                "level": 1,
+                "blocks": [
+                    {
+                        "id": 'heading-"markup"',
+                        "type": "heading",
+                        "title": "Cabeçalho <strong>",
+                    },
+                    {
+                        "type": "paragraph",
+                        "text": "O marcador <b> indica negrito & não XML.",
+                    },
+                    {"type": "list", "items": ["Item <x>", "A & B"]},
+                    {
+                        "type": "table",
+                        "rows": [["Tag", "<table>"], ["Operador", "A & B"]],
+                    },
+                    {"type": "note", "text": "Use <note> literalmente."},
+                    {"type": "details", "text": "Detalhe </div> literal."},
+                    {"type": "code", "text": "value = '<tag>'"},
+                ],
+                "children": [],
+            }
+        ],
+    }
+    output = tmp_path / "literal-markup.pdf"
+
+    result = render_pdf(document, output, title="Título <principal> & literal")
+
+    assert result == output
+    assert result.exists()
+    assert result.stat().st_size > 0
+    extracted_text = "\n".join(
+        page.extract_text() or "" for page in PdfReader(result).pages
+    )
+    assert "O marcador <b> indica negrito & não XML." in extracted_text
