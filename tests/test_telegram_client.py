@@ -166,7 +166,9 @@ def test_document_passes_email_and_notifies(doc_module_isolated):
         body = route.calls[0].request.read()
 
     assert b"test@example.com" in body
-    assert any("test@example.com" in a for a in msg.answers)
+    assert any("test@example.com" in s for s in bot.sent)
+    assert any("http://localhost:8000/api/v1/download/tok123" in s for s in bot.sent)
+    assert not any("Link de download enviado" in a for a in msg.answers)
 
 
 def test_document_api_error_sends_message(doc_module_isolated):

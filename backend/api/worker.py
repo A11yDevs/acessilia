@@ -214,9 +214,11 @@ class JobExecutor:
             )
 
             if job.email:
-                await send_result_email(
+                sent = await send_result_email(
                     job.email, job.filename, download_url=download_url
                 )
+                if not sent:
+                    logger.warning("Resultado do job {} nao foi enviado por e-mail", task_id)
 
             logger.info("Job {} concluido (source={})", task_id, job.source)
 

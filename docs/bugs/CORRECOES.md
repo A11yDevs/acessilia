@@ -32,6 +32,12 @@ O worker já salvava no token a base do arquivo, mas a consulta aplicava `Path(.
 
 A correção usa a base salva no token exatamente como ela está. Assim nomes com pontos continuam apontando para `relatorio.v2.txt`, `relatorio.v2_acessivel.zip` e os outros formatos.
 
+## BUG-0006: falso aviso de e-mail enviado e ausência de alternativa
+
+O serviço de e-mail falhava sem devolver esse resultado para quem chamou. No Telegram, quando havia e-mail configurado, a mensagem dizia que o link tinha sido enviado por e-mail e não mostrava o próprio link no chat.
+
+A correção fez o serviço de e-mail retornar `True` ou `False`. O worker registra aviso quando o envio do resultado falha. No Telegram, o link de download sempre aparece quando a tarefa termina, mesmo se houver e-mail configurado.
+
 ## Testes criados
 
 - `tests/test_api.py::test_job_executor_marks_history_error_when_export_fails`: simula sucesso no `process()` e falha na exportação TXT. Confirma que o estado público e o histórico terminam como `error`.
@@ -39,3 +45,5 @@ A correção usa a base salva no token exatamente como ela está. Assim nomes co
 - `tests/test_api.py::test_job_executor_stops_exports_after_cancellation`: cancela a tarefa durante a exportação TXT e confirma que o worker não cria ZIP nem token.
 - `tests/test_api.py::test_download_full_flow`: passou a criar `doc_acessivel.zip` e confirma que o formato `zip` aparece na consulta do token.
 - `tests/test_api.py::test_download_info_keeps_dotted_base_name`: cria artefatos com base `relatorio.v2` e confirma que a consulta encontra os formatos sem cortar o nome.
+- `tests/test_email_service.py::test_result_email_reports_missing_smtp`: confirma que envio de resultado sem SMTP configurado retorna `False`.
+- `tests/test_telegram_client.py::test_document_passes_email_and_notifies`: passou a confirmar que o Telegram mostra o link mesmo quando existe e-mail configurado.

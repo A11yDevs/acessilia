@@ -7,10 +7,10 @@ from backend.config.settings import settings
 
 async def send_email_notification(
     to_email: str, subject: str, body: str, attachment_path: Path | None = None
-):
+) -> bool:
     if not settings.smtp_user or not settings.smtp_password:
         logger.warning("SMTP não configurado. E-mail para {} não enviado.", to_email)
-        return
+        return False
 
     message = EmailMessage()
     message["From"] = f"{settings.smtp_name} <{settings.smtp_from}>"
@@ -39,11 +39,13 @@ async def send_email_notification(
             start_tls=settings.smtp_port == 587,
         )
         logger.info("E-mail enviado para {} com sucesso.", to_email)
+        return True
     except Exception as e:
         logger.error("Erro ao enviar e-mail para {}: {}", to_email, e)
+        return False
 
 
-async def send_confirmation_email(to_email: str, filename: str):
+async def send_confirmation_email(to_email: str, filename: str) -> bool:
     subject = "Recebemos seu arquivo - Acessilia"
     body = (
         f"Olá!\n\nRecebemos o arquivo '{filename}' e já estamos trabalhando para torná-lo acessível.\n"
@@ -51,7 +53,7 @@ async def send_confirmation_email(to_email: str, filename: str):
         "Assim que estiver pronto, você receberá um novo e-mail com o pacote acessível em anexo.\n\n"
         "Atenciosamente,\nEquipe Acessilia"
     )
-    await send_email_notification(to_email, subject, body)
+    return await send_email_notification(to_email, subject, body)
 
 
 async def send_result_email(
@@ -59,7 +61,7 @@ async def send_result_email(
     filename: str,
     zip_path: Path | None = None,
     download_url: str | None = None,
-):
+) -> bool:
     subject = "Seu arquivo acessível está pronto! - Acessilia"
 
     if download_url:
@@ -72,7 +74,7 @@ async def send_result_email(
             f"O link expira em 7 dias.\n\n"
             f"Atenciosamente,\nEquipe Acessilia"
         )
-        await send_email_notification(to_email, subject, body)
+        return await send_email_notification(to_email, subject, body)
     else:
         body = (
             f"Olá!\n\nO processamento do arquivo '{filename}' foi concluído com sucesso.\n"
@@ -84,4 +86,4 @@ async def send_result_email(
             "- Audiodescrição em Áudio (.mp3)\n\n"
             "Atenciosamente,\nEquipe Acessilia"
         )
-        await send_email_notification(to_email, subject, body, attachment_path=zip_path)
+        return await send_email_notification(to_email, subject, body, attachment_path=zip_path)
