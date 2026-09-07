@@ -9,10 +9,11 @@ from fastapi import (
     Request,
     UploadFile,
     HTTPException,
+    Query,
 )
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from starlette.background import BackgroundTask
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from slowapi import Limiter
@@ -124,14 +125,37 @@ def _remove_file(file_path: Path) -> None:
 
 @app.get("/", response_class=HTMLResponse)
 @limiter.limit("30/minute")
-async def index(request: Request):
-    return templates.TemplateResponse(request=request, name="index.html", context={})
+async def index(request: Request, position: int | None = Query(None, ge=1)):
+    return templates.TemplateResponse(
+        request=request, name="index.html", context=_submission_context(position)
+    )
 
 
 @app.get("/advanced", response_class=HTMLResponse)
 @limiter.limit("30/minute")
-async def advanced_page(request: Request):
-    return templates.TemplateResponse(request=request, name="advanced.html", context={})
+async def advanced_page(request: Request, position: int | None = Query(None, ge=1)):
+    return templates.TemplateResponse(
+        request=request, name="advanced.html", context=_submission_context(position)
+    )
+
+
+def _submission_context(position: int | None) -> dict[str, str]:
+    if position is None:
+        return {}
+    return {"message": (
+        f"Sucesso! Seu arquivo entrou na fila (Posição no envio: {position}). "
+        "O resultado será enviado para o e-mail informado."
+    )}
+
+
+@app.get("/process", include_in_schema=False)
+async def upload_page():
+    return RedirectResponse(url="/", status_code=303)
+
+
+@app.get("/advanced/process", include_in_schema=False)
+async def advanced_upload_page():
+    return RedirectResponse(url="/advanced", status_code=303)
 
 
 async def _submit_via_api(
@@ -183,12 +207,9 @@ async def _submit_via_api(
     finally:
         _remove_file(file_path)
 
-    msg = (
-        f"Sucesso! Seu arquivo entrou na fila (Posição: {result['position']}). "
-        f"O resultado será enviado para {email}."
-    )
-    return templates.TemplateResponse(
-        request=request, name=template_name, context={"message": msg}
+    page = "/advanced" if template_name == "advanced.html" else "/"
+    return RedirectResponse(
+        url=f"{page}?position={int(result['position'])}", status_code=303
     )
 
 
