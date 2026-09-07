@@ -7,7 +7,7 @@ from typing import Any, Callable, Coroutine
 from backend.agents.orchestrator import AccessibilityOrchestrator
 from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
 from backend.agents.state_manager import TaskCancelledError, state_manager
-from backend.services.cache import get_cached, set_cache
+from backend.services.cache import get_cached, options_cache_key, set_cache
 from backend.services.history_service import (
     finalizar_conversao,
     limpar_orfas,
@@ -63,9 +63,18 @@ def _build_orchestrator():
 agente = _build_orchestrator()
 
 
-def _cache_version() -> str:
+def _cache_version(
+    mode: str = "normal",
+    custom_prompt: str | None = None,
+    thinking_mode: bool = False,
+) -> str:
     engine = _normalized_engine()
-    return f"{settings.ai_client}-{engine}-v1"
+    return options_cache_key(
+        f"{settings.ai_client}-{engine}-v2",
+        mode=mode,
+        custom_prompt=custom_prompt or "",
+        thinking_mode=thinking_mode,
+    )
 
 
 def _limpar_tarefas_orfas():
@@ -91,6 +100,39 @@ def _salvar_json_canonico(canonical_document: dict, source_name: str) -> None:
         logger.warning("Nao foi possivel salvar JSON canonico: {}", e)
 
 
+def _payload_for_source(payload: Any, file_path: Path) -> Any:
+    if not isinstance(payload, dict):
+        return payload
+
+    current = {**payload, "source_path": str(file_path)}
+    pages = payload.get("pages")
+    if isinstance(pages, list):
+        current_pages = []
+        for index, page in enumerate(pages):
+            if not isinstance(page, dict):
+                current_pages.append(page)
+                continue
+            page_path = (
+                file_path.parent / f"pagina_{index + 1:03d}.pdf"
+                if file_path.suffix.lower() == ".pdf"
+                else file_path
+            )
+            current_pages.append({**page, "file_path": str(page_path)})
+        current["pages"] = current_pages
+    return current
+
+
+def _canonical_details(payload: Any) -> tuple[dict[str, Any] | None, list[str] | None]:
+    if not isinstance(payload, dict):
+        return None, None
+    metadata = payload.get("canonical_metadata")
+    warnings = payload.get("technical_warnings")
+    return (
+        metadata if isinstance(metadata, dict) else None,
+        [str(item) for item in warnings] if isinstance(warnings, list) else None,
+    )
+
+
 async def process(
     file_path: Path,
     status_callback: Callable[[str], Coroutine] | None = None,
@@ -100,19 +142,22 @@ async def process(
     task_id: str | None = None,
 ) -> dict[str, Any]:
     external_task_id = task_id is not None
-    cached = await get_cached(file_path, _cache_version())
+    cache_variant = _cache_version(mode, custom_prompt, thinking_mode)
+    cached = await get_cached(file_path, cache_variant)
     if cached is not None:
         logger.info("Cache hit para {}", file_path.name)
-        if isinstance(cached, dict):
-            return cached
+        cached = _payload_for_source(cached, file_path)
+        canonical_metadata, technical_warnings = _canonical_details(cached)
         return build_canonical_document(
-            str(cached),
+            cached,
             title=file_path.stem,
             language="pt-BR",
             verbosity=verbosity_for_mode(mode),
             source_name=file_path.name,
             source_path=str(file_path),
             audience=["reader"],
+            metadata=canonical_metadata,
+            technical_warnings=technical_warnings,
         )
 
     task_id = state_manager.criar_tarefa(file_path, task_id=task_id)
@@ -168,12 +213,18 @@ async def process(
 
         raw_text = merge_broken_paragraphs(raw_text)
 
+        processed_result: str | dict[str, Any]
+        if isinstance(resultado, dict):
+            processed_result = {**resultado, "text": raw_text}
+        else:
+            processed_result = raw_text
+
         state_manager.verificar_cancelamento(task_id)
         if not raw_text.strip():
             raise RuntimeError("Resposta vazia do agente")
 
         canonical_document = build_canonical_document(
-            resultado,
+            processed_result,
             title=file_path.stem,
             language="pt-BR",
             verbosity=verbosity_for_mode(mode),
@@ -184,7 +235,7 @@ async def process(
             technical_warnings=technical_warnings,
         )
 
-        await set_cache(file_path, canonical_document, _cache_version())
+        await set_cache(file_path, processed_result, cache_variant)
         _salvar_json_canonico(canonical_document, file_path.name)
 
         if not external_task_id:

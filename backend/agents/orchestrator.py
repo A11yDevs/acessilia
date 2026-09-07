@@ -9,7 +9,7 @@ from backend.agents.vision_agent import VisionAgent
 from backend.agents.data_agent import DataAgent
 from backend.agents.editor_agent import EditorAgent
 from backend.agents.types import RegionTask
-from backend.services.cache import get_cached, set_cache
+from backend.services.cache import get_cached, options_cache_key, set_cache
 from backend.tools.logger import logger
 from backend.tools.prompt_tools import load_system_prompt
 from backend.pipeline.structure_parser import parse_text_to_blocks
@@ -77,7 +77,12 @@ class AccessibilityOrchestrator:
                 label = f"📷 Processando pagina {page_num} de {total_pages}..."
                 await status_callback(label)
 
-            page_cache_key = f"page_{page_num}_{effective_mode}"
+            page_cache_key = options_cache_key(
+                f"page_{page_num}_v2",
+                mode=effective_mode,
+                custom_prompt=custom_prompt or "",
+                thinking_mode=thinking_mode,
+            )
             cached_page = await get_cached(
                 page_path,
                 page_cache_key,
