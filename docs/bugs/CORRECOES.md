@@ -80,6 +80,12 @@ A página web montava links como `/api/v1/download/...`, mas o app web não aten
 
 A correção adicionou um proxy de download no app web para `/api/v1/download/{token}/{format}`. A página pode continuar usando links relativos, e o frontend busca o arquivo na API por meio do `ApiClient`. O proxy preserva o nome do arquivo e remove a cópia temporária depois do envio ou de uma falha.
 
+## BUG-0014: resultados eram apagados antes do prazo informado
+
+Os links prometem sete dias de validade, mas a limpeza apagava os arquivos de resultado depois de apenas 24 horas.
+
+A correção faz a limpeza usar os mesmos sete dias definidos para a validade dos tokens de download.
+
 ## Testes criados
 
 - `tests/test_api.py::test_job_executor_marks_history_error_when_export_fails`: simula sucesso no `process()` e falha na exportação TXT. Confirma que o estado público e o histórico terminam como `error`.
@@ -100,3 +106,5 @@ A correção adicionou um proxy de download no app web para `/api/v1/download/{t
 - `tests/test_api.py::test_job_executor_records_early_process_failure`: simula falha antes de `process()` criar estado e confirma que o job termina como `error`, sem ficar em `queued`.
 - `tests/test_web_panel.py::test_download_proxy_delegates_to_api`: chama o link `/api/v1/download/{token}/{format}` no app web e confirma que ele baixa o arquivo via API.
 - `tests/test_web_panel.py::test_download_proxy_removes_partial_file_after_api_failure`: simula uma falha durante o download e confirma que o arquivo parcial é removido.
+- `tests/test_cleanup_service.py::test_output_cleanup_keeps_results_younger_than_seven_days`: confirma que um resultado com 25 horas não é apagado.
+- `tests/test_cleanup_service.py::test_output_cleanup_removes_results_older_than_seven_days`: confirma que um resultado com mais de sete dias é apagado.

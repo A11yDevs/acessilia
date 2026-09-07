@@ -5,10 +5,12 @@ from pathlib import Path
 
 from backend.tools.logger import logger
 from backend.config.settings import settings
+from backend.services.download_token_service import TOKEN_EXPIRY_DAYS
 
 
 CLEANUP_INTERVAL = 3600
 FILE_MAX_AGE = 7200
+OUTPUT_MAX_AGE = TOKEN_EXPIRY_DAYS * 24 * 60 * 60
 
 
 async def periodic_cleanup() -> None:
@@ -69,7 +71,7 @@ def _clean_output_directory() -> None:
 
     now = time.time()
     for item in output_dir.iterdir():
-        if item.is_dir() and _is_stale(item, now, FILE_MAX_AGE * 12):
+        if item.is_dir() and _is_stale(item, now, OUTPUT_MAX_AGE):
             try:
                 shutil.rmtree(item, ignore_errors=True)
                 logger.debug("Diretorio de output removido: {}", item.name)
