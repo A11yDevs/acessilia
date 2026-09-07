@@ -266,3 +266,45 @@ async def test_job_executor_marks_history_error_when_export_fails(
     [row] = [row for row in rows if row["task_id"] == task_id]
     assert row["status"] == "error"
     assert "disk full" in row["erro"]
+
+
+@pytest.mark.asyncio
+async def test_job_executor_stops_exports_after_cancellation(api_paths, monkeypatch):
+    from backend.agents.state_manager import state_manager
+    from backend.api.worker import ApiJob, JobExecutor
+
+    task_id = "bug0003"
+    input_path = api_paths / "cancel.pdf"
+    output_dir = api_paths / "output" / task_id
+    input_path.write_bytes(_fake_pdf_bytes())
+    state_manager._tasks.clear()
+    state_manager._cancel_events.clear()
+
+    async def fake_process(*args, **kwargs):
+        state_manager.criar_tarefa(input_path, task_id=task_id)
+        return {"title": "Documento", "sections": []}
+
+    def export_txt_and_cancel(canonical, destination, filename):
+        destination.write_text("conteudo", encoding="utf-8")
+        state_manager.cancelar(task_id)
+
+    async def fail_if_token_created(*args, **kwargs):
+        raise AssertionError("token should not be created after cancellation")
+
+    monkeypatch.setattr("backend.service.process", fake_process)
+    monkeypatch.setattr("backend.api.worker.export_txt", export_txt_and_cancel)
+    monkeypatch.setattr("backend.api.worker.criar_token", fail_if_token_created)
+
+    await JobExecutor().run(
+        ApiJob(
+            task_id=task_id,
+            file_path=input_path,
+            filename=input_path.name,
+            output_dir=output_dir,
+        )
+    )
+
+    task = state_manager.obter(task_id)
+    assert task is not None
+    assert task["status"] == "cancelled"
+    assert not (output_dir / "cancel_acessivel.zip").exists()

@@ -122,9 +122,6 @@ class JobExecutor:
             if task is None:
                 state_manager.criar_tarefa(job.file_path, task_id=task_id)
 
-            # service.py já marcou como "done", mas as exportações
-            # (ZIP, token, download_url) ainda não foram feitas.
-            # Reverte para "processing" até tudo estar pronto.
             state_manager.atualizar(task_id, status="processing")
 
             base = Path(job.filename).stem
@@ -134,14 +131,17 @@ class JobExecutor:
             state_manager.atualizar(task_id, etapa="Exportando TXT...", progresso=0.85)
             txt_path = out_dir / f"{base}.txt"
             await self._run_in_executor(export_txt, canonical, txt_path, job.filename)
+            state_manager.verificar_cancelamento(task_id)
 
             state_manager.atualizar(task_id, etapa="Exportando DOCX...", progresso=0.88)
             docx_path = out_dir / f"{base}.docx"
             await self._run_in_executor(export_docx, canonical, docx_path, job.filename)
+            state_manager.verificar_cancelamento(task_id)
 
             state_manager.atualizar(task_id, etapa="Exportando PDF...", progresso=0.91)
             pdf_path = out_dir / f"{base}.pdf"
             await self._run_in_executor(export_pdf, canonical, pdf_path, job.filename)
+            state_manager.verificar_cancelamento(task_id)
 
             state_manager.atualizar(task_id, etapa="Exportando PDF/UA...", progresso=0.92)
             pdf_ua_path = out_dir / f"{base}.pdf_ua.pdf"
@@ -155,6 +155,7 @@ class JobExecutor:
             except Exception as exc:
                 logger.warning("Falha ao gerar PDF/UA: {}", exc)
                 pdf_ua_path = None
+            state_manager.verificar_cancelamento(task_id)
 
             state_manager.atualizar(task_id, etapa="Exportando HTML...", progresso=0.93)
             html_path = out_dir / f"{base}.html"
@@ -166,6 +167,7 @@ class JobExecutor:
                 title=base,
                 profile_name="html",
             )
+            state_manager.verificar_cancelamento(task_id)
 
             mp3_path = out_dir / f"{base}.mp3"
             if txt_path.exists():
@@ -182,6 +184,7 @@ class JobExecutor:
                     )
                 except Exception as e:
                     logger.error("Falha ao gerar MP3: {}", e)
+            state_manager.verificar_cancelamento(task_id)
 
             zip_path = out_dir / f"{base}_acessivel.zip"
             package_paths = [txt_path, docx_path, pdf_path, html_path, mp3_path]
@@ -193,6 +196,7 @@ class JobExecutor:
                 zip_path,
                 package_paths,
             )
+            state_manager.verificar_cancelamento(task_id)
 
             token = await criar_token(out_dir, base)
             download_url = build_download_url(token)
