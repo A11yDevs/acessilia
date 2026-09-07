@@ -379,3 +379,37 @@ async def test_job_executor_reports_mp3_failure(api_paths, monkeypatch):
 
     with zipfile.ZipFile(output_dir / "audio_acessivel.zip") as archive:
         assert "audio.mp3" not in archive.namelist()
+
+
+@pytest.mark.asyncio
+async def test_job_executor_records_early_process_failure(api_paths, monkeypatch):
+    from backend.agents.state_manager import state_manager
+    from backend.api import worker as worker_module
+    from backend.api.worker import ApiJob, JobExecutor
+
+    task_id = "bug0012"
+    input_path = api_paths / "early.pdf"
+    input_path.write_bytes(_fake_pdf_bytes())
+    state_manager._tasks.clear()
+    state_manager._cancel_events.clear()
+    worker_module.queued_jobs.clear()
+    worker_module.register_queued_job(task_id, input_path.name, 1, "pytest")
+
+    async def fail_before_state(*args, **kwargs):
+        raise PermissionError("cache inacessivel")
+
+    monkeypatch.setattr("backend.service.process", fail_before_state)
+
+    await JobExecutor().run(
+        ApiJob(
+            task_id=task_id,
+            file_path=input_path,
+            filename=input_path.name,
+        )
+    )
+
+    task = state_manager.obter(task_id)
+    assert task is not None
+    assert task["status"] == "error"
+    assert task_id not in worker_module.queued_jobs
+    assert not input_path.exists()

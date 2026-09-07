@@ -105,6 +105,9 @@ class JobExecutor:
 
             from backend.service import process
 
+            queued_jobs.pop(task_id, None)
+            if state_manager.obter(task_id) is None:
+                state_manager.criar_tarefa(job.file_path, task_id=task_id)
             state_manager.atualizar(task_id, etapa="Enfileirado, aguardando...")
             canonical = await process(
                 job.file_path,

@@ -68,6 +68,12 @@ Quando a geração de MP3 falhava, o erro ficava só no log. O job terminava com
 
 A correção registra a falha do MP3 na lista pública de erros da tarefa. O job ainda pode terminar como `done` quando os outros artefatos foram entregues, mas a ausência do áudio fica visível.
 
+## BUG-0012: falha inicial deixa tarefa eternamente na fila
+
+Uma falha logo no início do `process()` podia acontecer antes da criação do estado da tarefa. O worker tentava marcar erro, mas não havia estado para atualizar, então a consulta continuava mostrando o job como `queued`.
+
+A correção faz o worker remover o item de `queued_jobs` e criar o estado da tarefa antes de chamar `process()`. Se qualquer erro inicial acontecer, existe estado para gravar `error`.
+
 ## Testes criados
 
 - `tests/test_api.py::test_job_executor_marks_history_error_when_export_fails`: simula sucesso no `process()` e falha na exportação TXT. Confirma que o estado público e o histórico terminam como `error`.
@@ -85,3 +91,4 @@ A correção registra a falha do MP3 na lista pública de erros da tarefa. O job
 - `tests/test_table_ast.py::test_table_ast_preserves_empty_structural_cells`: confirma que uma célula vazia no meio da tabela é preservada no AST e na volta para linhas.
 - `tests/test_renderers.py::test_render_html_includes_toc_table_and_metadata`: passou a confirmar que o HTML renderiza `<td></td>` para células vazias.
 - `tests/test_api.py::test_job_executor_reports_mp3_failure`: simula falha no TTS e confirma que o job registra erro público e não inclui MP3 no ZIP.
+- `tests/test_api.py::test_job_executor_records_early_process_failure`: simula falha antes de `process()` criar estado e confirma que o job termina como `error`, sem ficar em `queued`.
