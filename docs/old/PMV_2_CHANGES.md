@@ -1,18 +1,20 @@
 # PMV 2.0
 
-Principais mudanças sobre o pacote recebido:
+You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](PMV_2_CHANGES.pt-br.md)
 
-- `InformationalStructuralAgent` agora constrói um `agno.agent.Agent` com
-  ferramenta determinística de extração;
-- manifesto atualizado para 1.1.0, com custos e tentativas;
-- par versionado `domain_v2.2.pddl` + `domain_description_v2.2.md`;
-- `PlannerAgent` Agno e processador PDDL;
-- fechamento causal e validações obrigatórias;
-- backend interno e adaptador Fast Downward;
-- plano nominal JSON tipado e versionado;
-- `ExecutorAgent` com um Agno Workflow e um Step por ação;
-- confirmação externa de sucesso e protocolo de replanejamento;
+Main changes over the received package:
+
+- `InformationalStructuralAgent` now builds an `agno.agent.Agent` with a
+  deterministic extraction tool;
+- manifest updated to 1.1.0, with costs and attempts;
+- versioned pair `domain_v2.2.pddl` + `domain_description_v2.2.md`;
+- Agno `PlannerAgent` and PDDL processor;
+- causal closure and mandatory validations;
+- internal backend and Fast Downward adapter;
+- typed and versioned nominal JSON plan;
+- `ExecutorAgent` with an Agno Workflow and one Step per action;
+- external confirmation of success and replanning protocol;
 - CLI `a11y-pmv`;
-- schemas de manifesto, plano e relatório;
-- testes de domínio, compilação, custo, fechamento e workflow;
-- preservação de `docling==2.0.0` e `docling-core==2.0.0`.
+- manifest, plan, and report schemas;
+- domain, compilation, cost, closure, and workflow tests;
+- preservation of `docling==2.0.0` and `docling-core==2.0.0`.

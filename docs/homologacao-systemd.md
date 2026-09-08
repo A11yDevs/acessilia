@@ -1,94 +1,94 @@
-# Homologação com systemd timer
+# Staging environment with a systemd timer
 
-O ambiente de homologação usa um **timer systemd** para verificar periodicamente
-se há novos commits na branch `develop` (via GitHub API) e, quando detectados,
-atualizar o container automaticamente com a imagem mais recente.
+You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](homologacao-systemd.pt-br.md)
 
-**Vantagem:** zero requisições desnecessárias ao GHCR. A API do GitHub (com token
-autenticado, 5.000 req/h) é consultada a cada 5 min. O `docker pull` só acontece
-quando há um commit novo.
+The staging (homologation) environment uses a **systemd timer** that periodically checks
+whether there are new commits on the `develop` branch (via the GitHub API) and, when found,
+apdates the container automatically using the most recent image.
 
-## Visão geral
+**Advantage:** zero unnecessary requests to GHCR. The GitHub API (authenticated token,
+5,000 req/h) is queried every 5 minutes, and `docker pull` only runs when a new commit exists.
 
-O timer roda no **escopo do usuário** (`systemctl --user`), com units em
-`~/.config/systemd/user/`. Isso evita depender de `sudo` para o agendamento e
-permite que o usuário gerencie o timer sem privilégios.
+## Overview
+
+The timer runs in the **user scope** (`systemctl --user`) with units under
+`~/.config/systemd/user/`. This avoids depending on `sudo` for scheduling and lets
+the user manage the timer without privileges.
 
 ```
-A cada 5 minutos → staging-update.timer (user)
-                       ↓
-                  staging-update-wrapper.sh
-                       ↓
-                  carrega GHCR_TOKEN de $STAGING_DIR/.env
-                       ↓
-                  staging-update.sh
-                       ↓
-                  GitHub API → SHA do último commit em develop
-                       ↓
-                  SHA mudou? → docker pull + docker compose up -d
-                                    ↓
-                               container reiniciado 🚀
+Every 5 minutes → staging-update.timer (user)
+d                   ↓
+staging-update-wrapper.sh
+                         ↓
+loads GHCR_TOKEN from $STAGING_DIR/.env
+                              ↓
+staging-update.sh
+                    ↓
+GitHub API → SHA of last commit on develop
+                ↓
+SHA changed? → docker pull + docker compose up -d
+                        ↓
+container restarted 🚀
 ```
 
-## Pré-requisitos
+## Prerequisites
 
-- Docker + Docker Compose instalados
-- `jq` instalado (`sudo apt install jq`)
-- Token GitHub com escopo `read:packages`
-  (criar em: https://github.com/settings/tokens/new?scopes=read:packages)
-- `docker login ghcr.io` configurado
-- **Linger habilitado** para o usuário (`sudo loginctl enable-linger $USER`) —
-  sem isso, o user timer morre quando o usuário faz logout
-- **Usuário no grupo `docker`** (`sudo usermod -aG docker $USER`) — o user timer
-  roda sem `sudo` e precisa do grupo para acessar o daemon
+- Docker and Docker Compose installed
+- `jq` installed (`sudo apt install jq`)
+- GitHub token with the `read:packages` scope (create at:
+  https://github.com/settings/tokens/new?scopes=read:packages)
+- `docker login ghcr.io` configured
+- **Linger enabled** for the user (`sudo loginctl enable-linger $USER`) — without it,
+  the user timer dies when the user logs out
+- **User in the `docker` group** (`sudo usermod -aG docker $USER`) — the user timer runs
+  without `sudo` and needs that group to reach the Docker daemon
 
-## Instalação
+## Installation
 
-### Automática (recomendada)
+### Automatic (recommended)
 
 ```bash
-# Modo interativo
+# Interactive mode
 ./scripts/setup-homologacao.sh
 
-# Modo não interativo (via argumentos)
+# Non-interactive mode (arguments mode)
 ./scripts/setup-homologacao.sh --github-user marceloakira --token ghp_exemplo
 
-# Modo não interativo (via variáveis de ambiente)
+# Non-interactive mode (environment variables)
 GITHUB_USER=marceloakira GHCR_TOKEN=ghp_exemplo ./scripts/setup-homologacao.sh
 ```
 
-O script:
-1. Verifica dependências (Docker, Compose, `jq`)
-2. Configura `docker login ghcr.io` com o token
-3. Cria `.env` a partir de `.env.example` (se não existir)
-4. Sobe o container com a imagem mais recente
-5. Instala o **user timer** (`systemctl --user`), habilita linger e o grupo
-   `docker`, e persiste o token em `$STAGING_DIR/.env` (ex.: `/opt/acessilia/staging/.env`)
+The script does the following:
+1. Checks dependencies (Docker, Compose, `jq`); configures `docker login ghcr.io` with the token;
+2. Creates `.env` from `.env.example` (if it doesn't already exist), starts the container
+   with the most recent image; and installs the **user timer** (`systemctl --user`),
+   enabling linger and membership in the `docker` group, persisting the token in
+3. `$STAGING_DIR/.env` (e.g., `/opt/acessilia/staging/.env`).
 
 ### Manual
 
 ```bash
-# 1. Criar diretório para os scripts
+# 1. Create the scripts directory
 sudo mkdir -p /opt/acessilia/scripts
 
-# 2. Copiar o script de update e o wrapper (versionados no repositório)
+# 2. Copy the update script + wrapper (both are versioned in the repo)
 sudo cp scripts/staging-update.sh /opt/acessilia/scripts/
 sudo cp scripts/staging-update-wrapper.sh /opt/acessilia/scripts/
-sudo chmod +x /opt/acessilia/scripts/staging-update.sh /opt/acessilia/scripts/staging-update-wrapper.sh
+sudo chmod +x /opt/acessilia/scripts/staging-update.sh /opt/apacessilia/scripts/staging-update-wrapper.sh
 
-# 3. Persistir o token GHCR no .env do staging
-#    (o wrapper e o staging-update.sh carregam de $STAGING_DIR/.env)
+# 3. Persist the GHCR token in staging's .env
+#    (both wrapper and staging-update.sh load it from $STAGING_DIR/.env)
 sudo tee /opt/acessilia/staging/.env > /dev/null << 'ENV'
-GHCR_TOKEN=seu_token_aqui
+GHCR_TOKEN=your_token_here
 ENV
 sudo chmod 600 /opt/acessilia/staging/.env
 
-# 4. Pré-requisitos do user timer
-sudo loginctl enable-linger "$USER"          # timer sobrevive ao logout
-sudo usermod -aG docker "$USER"              # user timer acessa o docker
-# relogue (logout/login) para o grupo docker valer
+# 4. User-timer prerequisites
+sudo loginctl enable-linger "$USER"          # timer survives logouts
+sudo usermod -aG docker "$USER"              # lets the user timer talk to Docker daemon
+# log out + log in again so the dock group applies
 
-# 5. Criar o service unit (user)
+# 5. Create the service unit (user scope)
 mkdir -p ~/.config/systemd/user
 cat > ~/.config/systemd/user/staging-update.service << 'SERVICE'
 [Unit]
@@ -100,7 +100,7 @@ ExecStart=/opt/acessilia/scripts/staging-update-wrapper.sh
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 SERVICE
 
-# 6. Criar o timer unit (user, a cada 5 minutos)
+# 6. Create the timer unit (user scope, every 5 minutes)
 cat > ~/.config/systemd/user/staging-update.timer << 'TIMER'
 [Unit]
 Description=Check acessilia staging updates every 5 minutes
@@ -113,32 +113,32 @@ OnUnitActiveSec=300s
 WantedBy=timers.target
 TIMER
 
-# 7. Ativar
+# 7. Enable it
 systemctl --user daemon-reload
 systemctl --user enable --now staging-update.timer
 ```
 
-## Gerenciamento
+## Management
 
-> Todos os comandos usam `systemctl --user` (o timer roda no escopo do usuário).
+> A user-scope command uses `systemctl --user` (the timer runs in user scope).
 
 ```bash
-# Verificar status do timer
+# Show timer status
 systemctl --user status staging-update.timer
 
-# Verificar última execução
+# Last run state
 systemctl --user status staging-update.service
 
-# Ver logs da última execução
+# Logs of the last execution
 journalctl --user -u staging-update.service -n 50 --no-pager
 
-# Executar manualmente (forçar update)
+# Run manually (force update)
 systemctl --user start staging-update.service
 
-# Desabilitar temporariamente
+# Temporarily disable it
 systemctl --user stop staging-update.timer
 
-# Remover completamente
+# Remove completely
 systemctl --user disable --now staging-update.timer
 rm ~/.config/systemd/user/staging-update.{service,timer}
 systemctl --user daemon-reload
@@ -146,23 +146,23 @@ systemctl --user daemon-reload
 
 ## Troubleshooting
 
-### O container não reiniciou
+### Container has not restarted
 
-Verifique o log do serviço:
+Check the service's log:
 
 ```bash
 journalctl --user -u staging-update.service -n 50 --no-pager
 ```
 
-Causas comuns:
+Common causes:
 
-| Sintoma | Causa | Solução |
-|---------|-------|---------|
-| `pull access denied` | Token GHCR expirado | Rodar `setup-homologacao.sh` novamente |
-| `jq: command not found` | `jq` não instalado | `sudo apt install jq` |
-| `GHCR_TOKEN: parameter not set` | Token não persistido | Verificar `$STAGING_DIR/.env` (ex.: `/opt/acessilia/staging/.env`) |
-| `permission denied` no docker | Usuário fora do grupo `docker` | `sudo usermod -aG docker $USER` + relogar |
-| Timer não roda após logout | Linger desabilitado | `sudo loginctl enable-linger $USER` |
-| Nada acontece, SHA não muda | Sem commits novos na develop | Aguarde o próximo build |
-| Falha na API (fallback ativado) | GitHub API indisponível | Script faz `docker pull` direto |
-| `Container name already in use` | Container com nome diferente | `docker ps -a` e `docker rm` |
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `pull access denied` | GHCR token expired | rerun `setup-homologacao.sh` |
+| `jq: command not found` | `jq` is not installed | `sudo apt install jq` |
+| `GHCR_TOKEN: parameter not set` | Token was never persisted | check `$STAGING_DIR/.env` (e.g., `/opt/acessilia/staging/.env`) |
+| Docker gives `permission denied` | User is outside the `docker` group | `sudo usermod -aG docker $USER` + re-login |
+| Timer doesn't run after logout | Linger is disabled | `sudo loginctl enable-linger $USER` |
+| Nothing happens, SHA unchanged | No new commits on develop | wait for the next build |
+| API fails (fallback enabled) | GitHub API unavailable | script falls back to a direct `docker pull` |
+| `Container name already in use` | Containers with other names exist | `docker ps -a`, then `docker rm` |

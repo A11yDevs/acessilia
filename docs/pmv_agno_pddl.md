@@ -1,31 +1,33 @@
-# PMV 2.1 — Agno, manifesto, PDDL, comparação e execução nominal
+# PMV 2.1 — Agno, manifest, PDDL, comparison and nominal execution
 
-## Objetivo
+You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](pmv_agno_pddl.pt-br.md)
 
-Esta versão valida o ciclo mínimo:
+## Purpose
+
+This release validates the minimal cycle:
 
 ```text
-documento
-  → Agente Informacional-Estrutural (Agno + Docling)
+document
+  → Informational-Structural Agent (Agno + Docling)
   → processing-manifest.json
-  → Agente Planejador (Agno + ferramentas PDDL)
+  → Planner Agent (Agno + PDDL tools)
   → problem.pddl
   → nominal-plan.json
-  → Agente Executor (Agno Workflow)
-  → execution-report.json + manifesto revisado
+  → Executor Agent (Agno Workflow)
+  → execution-report.json + revised manifest
 ```
 
-O Agno coordena ferramentas e o workflow. Extração, compilação do problema,
-validação de contratos e aplicação de efeitos são funções determinísticas.
-Nenhum LLM escreve PDDL diretamente.
+Agno coordinates the tools and the workflow. Extraction, problem compilation,
+contract validation and effect application are deterministic functions.
+No LLM writes PDDL directly.
 
-## Compatibilidade do macOS
+## macOS compatibility
 
-- Python 3.11 ou 3.12;
+- Python 3.11 or 3.12;
 - `docling==2.0.0`;
 - `docling-core==2.0.0`;
 - `agno==2.8.5`;
-- Fast Downward opcional.
+- Fast Downward optional.
 
 ```bash
 poetry lock
@@ -34,63 +36,61 @@ poetry run python scripts/generate_pmv_schemas.py
 poetry run pytest
 ```
 
-O lock anterior foi produzido antes da inclusão do Agno e não integra o pacote
-novo. Gere-o no próprio macOS; as versões críticas do Docling e do Agno já
-estão fixadas no `pyproject.toml`.
+The previous lock file was produced before Agno was added and does not include the new
+package. Regenerate it on your own macOS machine; the critical Docling and Agno versions
+are already pinned in `pyproject.toml`.
 
-O Fast Downward só é necessário ao usar `--planner fast-downward` ou
-`--planner both`. O backend `internal` é o planner de referência do PMV e
-funciona sem binário externo.
+Fast Downward is only required when using `--planner fast-downward` or
+`--planner both`. The `internal` backend is the PMV's reference planner and works
+without any external binary.
 
-## 1. Agente Informacional-Estrutural
+## 1. Informational-Structural Agent
 
-`InformationalStructuralAgent` constrói um `agno.agent.Agent` com a ferramenta
-`extract_processing_manifest`. O método Python `process()` usa a mesma
-implementação determinística e permite testes sem uma chamada a LLM.
-Um modelo Agno pode ser injetado pelo argumento `model`; o CLI não precisa de
-chave de API porque chama a ferramenta determinística diretamente.
+`InformationalStructuralAgent` builds an `agno.agent.Agent` with the tool
+`extract_processing_manifest`. The Python method `process()` uses the same
+deterministic implementation, which allows testing without an LLM call.
+An Agno model can be injected via the `model` argument; the CLI needs no API key
+because it invokes the deterministic tool directly.
 
 ```bash
-poetry run a11y-pmv manifest documento.pdf \
+poetry run a11y-pmv manifest document.pdf \
   -o output/processing-manifest.json \
   --no-ocr
 ```
 
-O manifesto 1.1 acrescenta a cada obrigação:
+Manifest 1.1 adds to each obligation:
 
-- métodos admissíveis;
-- custos inteiros não negativos por método;
-- tentativas observadas;
-- resultado de cada tentativa.
+- the admissible methods;
+- a non-negative integer cost per method;
+- the observed attempts;
+- the outcome of every attempt.
 
-O arquivo só é persistido depois de passar pelo modelo Pydantic e pelo JSON
+The file is only persisted after it passes the Pydantic model and JSON
 Schema Draft 2020-12.
 
-## 2. Agente Planejador e processador PDDL
+## 2. Planner Agent and PDDL processor
 
-`PlannerAgent` carrega um par inseparável:
+`PlannerAgent` loads an inseparable pair:
 
 - `core/planning/domains/domain_v2.2.pddl`;
 - `core/planning/domains/domain_description_v2.2.md`.
 
-O carregador verifica versão, nome, hashes e cláusulas obrigatórias. O
-compilador:
+The loader checks version, name, hashes and mandatory clauses. The compiler:
 
-1. escolhe as obrigações-raiz;
-2. calcula o fechamento transitivo das predecessoras;
-3. projeta estado, tipos, dependências, métodos, tentativas e custos;
-4. gera `problem.pddl`;
-5. exige `(:metric minimize (total-cost))`;
-6. valida a projeção antes de chamar o planner.
+1. picks the root obligations;
+2. computes the transitive closure of their predecessors;
+3. projects state, types, dependencies, methods, attempts and costs;
+4. generates `problem.pddl`;
+5. requires `(:metric minimize (total-cost))`;
+6. validates the projection before invoking any planner.
 
 ```bash
 poetry run a11y-pmv plan output/processing-manifest.json \
   -o output
 ```
 
-Por padrão, obrigações já marcadas como `selected` são raízes. Se nenhuma
-estiver marcada, todas as obrigações não satisfeitas são selecionadas. Para
-escolher raízes:
+By default, obligations already marked as `selected` are the roots. If none are
+marked, all unsatisfied obligations are selected. To choose specific roots:
 
 ```bash
 poetry run a11y-pmv plan output/processing-manifest.json \
@@ -100,7 +100,7 @@ poetry run a11y-pmv plan output/processing-manifest.json \
 
 ### Backends
 
-Planner interno:
+Internal planner:
 
 ```bash
 poetry run a11y-pmv plan output/processing-manifest.json \
@@ -114,38 +114,36 @@ Fast Downward:
 poetry run a11y-pmv plan output/processing-manifest.json \
   -o output \
   --planner fast-downward \
-  --fast-downward /caminho/fast-downward.py \
+  --fast-downward /path/to/fast-downward.py \
   --fast-downward-search 'astar(blind())'
 ```
 
-`astar(blind())` é o padrão conservador porque preserva custos e suporta
-axiomas/predicados derivados. Um alias pode ser informado explicitamente com
-`--fast-downward-alias`, desde que suas heurísticas suportem os recursos do
-domínio 2.2.
+`astar(blind())` is the conservative default because it preserves costs and supports
+domain axioms/derived predicates. An alias can be given explicitly with
+`--fast-downward-alias`, as long as its heuristics support the features of domain 2.2.
 
-O backend interno não pretende substituir um planner geral. Ele explora a
-estrutura específica do domínio 2.2: ordena o DAG de obrigações e escolhe o
-método admissível não tentado de menor custo. É um oráculo simples e
-reprodutível para validar o PMV.
+The internal backend is not meant to replace a general-purpose planner. It exploits
+the specific structure of domain 2.2: it sorts the obligations DAG and picks the
+cheapest admissible, never-tried method. It is a simple, reproducible oracle for
+validating the PMV.
 
-### Execução dos dois backends
+### Running both backends
 
-Para estudos diferenciais:
+For differential studies:
 
 ```bash
 poetry run a11y-pmv plan output/processing-manifest.json \
   -o output \
   --planner both \
-  --fast-downward /caminho/fast-downward.py \
+  --fast-downward /path/to/fast-downward.py \
   --fast-downward-search 'astar(blind())' \
   --preferred-plan internal
 ```
 
-O domínio é carregado uma vez e o manifesto é compilado uma vez. Portanto,
-ambos os backends recebem os mesmos bytes de `domain_v2.2.pddl` e
-`problem.pddl`, identificados por SHA-256.
+The domain is loaded once and the manifest compiled once, so both backends receive
+the exact same bytes of `domain_v2.2.pddl` and `problem.pddl`, identified by SHA-256.
 
-As saídas são:
+The outputs are:
 
 ```text
 output/
@@ -156,73 +154,68 @@ output/
 └── planning-comparison.json
 ```
 
-`nominal-plan.json` é uma cópia lógica do backend definido por
-`--preferred-plan` e pode ser fornecido diretamente ao Executor. O padrão é
-`internal`; use `--preferred-plan fast-downward` para executar o plano do Fast
-Downward.
+`nominal-plan.json` is a logical copy of the backend defined by `--preferred-plan`
+and can be supplied directly to the Executor. The default is `internal`; use
+`--preferred-plan fast-downward` to run the Fast Downward plan.
 
-Se apenas um backend resolver o problema, seu plano ainda é preservado e o
-relatório recebe o veredito `inconclusive`. O comando só deixa de produzir o
-plano canônico quando justamente o backend preferido falha.
+If only one backend solves the problem, its plan is still preserved and the report
+receives the verdict `inconclusive`. The command stops producing the canonical plan
+only when exactly the preferred backend fails.
 
-## 3. Comparação para estudos
+## 3. Comparison for studies
 
-Antes da comparação, cada plano passa por validação independente de:
+Before comparison, each plan passes independent validation of:
 
-- hashes e identidade do domínio e problema;
-- fechamento de obrigações selecionadas;
-- precondições e ordem causal;
-- método admissível, disponível e ainda não tentado;
-- tipo e custo de cada obrigação;
-- término em `complete-job`.
+- domain and problem identity and hashes;
+- closure of the selected obligations;
+- preconditions and causal order;
+- an admissible, available and not-yet-tried method;
+- the type and cost of every obligation;
+- termination in `complete-job`.
 
-O relatório distingue quatro vereditos:
+The report distinguishes four verdicts:
 
-| Veredito | Significado |
+| Verdict | Meaning |
 |---|---|
-| `identical` | mesmas ações, parâmetros, métodos, custos e ordem |
-| `equivalent` | mesmo conteúdo semântico e custo, com ordem diferente apenas entre ações independentes |
-| `different` | ambos resolvem, mas custo, métodos, ações ou fechamento divergem |
-| `inconclusive` | ao menos um backend não produziu um plano válido |
+| `identical` | same actions, parameters, methods, costs and order |
+| `equivalent` | same semantic content and cost, differing only in the order between independent actions |
+| `different` | both solve, but cost, methods, actions or closure diverge |
+| `inconclusive` | at least one backend did not produce a valid plan |
 
-Além do veredito, `planning-comparison.json` registra:
+Beyond the verdict, `planning-comparison.json` records:
 
-- tempo de parede de cada backend;
-- configuração e estatísticas publicadas pelo Fast Downward;
-- custo total e quantidade de passos;
-- igualdade do fechamento e das obrigações executadas;
-- igualdade da seleção de métodos;
-- igualdade da sequência e do multiconjunto de ações;
-- diferença de custo no sentido Fast Downward menos interno;
-- passos exclusivos de cada resultado;
-- tipo e mensagem de erro, quando houver.
+- wall time per backend;
+- configuration and statistics published by Fast Downward;
+- total cost and number of steps;
+- closure equality and executed obligations; methodology agreement between backends;
+- method selection equality;
+- action sequence and action-multiset equality;
+- the cost delta in the direction Fast Downward minus internal;
+- each result's exclusive steps; error type and message, when applicable.
 
-Coincidência de custo isolada não é tratada como equivalência. Por outro lado,
-uma diferença de ordem entre obrigações causalmente independentes não é
-classificada erroneamente como divergência.
+A costly coincidence match is not treated as equivalence. Conversely, an order
+difference between causally independent obligations is not mistakenly classified as a
+divergence.
 
-## 4. Plano nominal JSON
+## 4. Nominal JSON plan
 
-O plano contém:
+The plan contains:
 
-- identidade e hashes do domínio e da descrição;
-- identidade, revisão e hash do manifesto;
-- hash do `problem.pddl`;
-- backend de planejamento;
-- fechamento selecionado;
-- custo total esperado;
-- ações tipadas e ordenadas.
+- domain and description identity and hashes;
+- manifest identity, revision and hash; problem.pddl hash; planning backend; selected closure;
+- total expected cost;
+- typed, ordered actions.
 
-O efeito de `execute-obligation` significa sucesso no modelo nominal. O
-Executor só confirma esse efeito depois que o handler retorna
-`success=true` e `validated=true`.
+The effect of `execute-obligation` means success in the nominal model. The Executor
+only confirms that effect after the handler returns both `success=true` and
+`validated=true`.
 
-## 5. Agente Executor com Agno Workflow
+## 5. Executor Agent with Agno Workflow
 
-Cada ação do plano torna-se um `agno.workflow.Step`. O `Workflow` executa os
-passos em sequência e interrompe no primeiro erro.
+Each action in the plan becomes an `agno.workflow.Step`. The Workflow executes steps
+in sequence and stops on the first error.
 
-Dry-run, sem confirmar efeitos:
+Dry-run, without confirming effects:
 
 ```bash
 poetry run a11y-pmv execute \
@@ -231,7 +224,7 @@ poetry run a11y-pmv execute \
   -o output/execution
 ```
 
-Execução real requer handlers:
+Real execution requires handlers:
 
 ```bash
 poetry run a11y-pmv execute \
@@ -242,18 +235,18 @@ poetry run a11y-pmv execute \
   --handler-module meu_projeto.handlers
 ```
 
-O módulo deve fornecer:
+The module must provide:
 
 ```python
 from core.execution.models import MethodResult
 
 
 def describe_image(manifest, obligation_id):
-    # chama a ferramenta, valida o resultado e produz artefatos
+    # invokes the tool, validates the result and produces artifacts
     return MethodResult(
         success=True,
         validated=True,
-        message="Descrição validada",
+        message="Validated description",
         artifacts=[],
     )
 
@@ -262,30 +255,28 @@ def register_handlers(registry):
     registry.register("vision-description", describe_image)
 ```
 
-`examples.demo_handlers` permite exercitar o caminho `--live`, mas é
-explicitamente simulado e não deve ser usado em produção.
+`examples.demo_handlers` lets you exercise the `--live` path, but it is explicitly
+simulated and must not be used in production.
 
-Em caso de falha:
+On failure:
 
-- a tentativa é registrada no manifesto;
-- o efeito `satisfied` não é confirmado;
-- o relatório indica falha ou `replan-required`;
-- uma nova compilação emite `(tried obrigação método)`;
-- o planner escolhe outra alternativa, quando houver.
+- the attempt is recorded in the manifest; the effect `satisfied` is not confirmed;
+- the report flags a failure or `replan-required`; a fresh compilation emits `(tried obligation method)`;
+- the planner picks an alternate, when any remains.
 
-## 6. Execução ponta a ponta
+## 6. End-to-end execution
 
 ```bash
-poetry run a11y-pmv pipeline documento.pdf \
+poetry run a11y-pmv pipeline document.pdf \
   -o output/job-001 \
   --no-ocr \
   --planner both \
-  --fast-downward /caminho/fast-downward.py \
+  --fast-downward /path/to/fast-downward.py \
   --preferred-plan internal \
   --execute-dry-run
 ```
 
-Saídas principais:
+Key outputs:
 
 ```text
 output/job-001/
@@ -299,34 +290,28 @@ output/job-001/
 └── execution-report.json
 ```
 
-## 7. Contratos versionados
+## 7. Versioned contracts
 
-| Arquivo | Contrato |
+| File | Contract |
 |---|---|
-| `processing_manifest.schema.json` | estrutura, observações, obrigações, custos e tentativas |
-| `nominal_plan.schema.json` | plano nominal auditável |
-| `planning_comparison.schema.json` | resultados e comparação normalizada dos dois planners |
-| `execution_report.schema.json` | passos observados e decisão de replanejamento |
-| `domain_v2.2.pddl` | semântica geral das ações e custos |
-| `domain_description_v2.2.md` | contrato humano e regras do compilador |
+| `processing_manifest.schema.json` | structure, observations, obligations, costs and attempts |
+| `nominal_plan.schema.json` | auditable nominal plan |
+| `planning_comparison.schema.json` | the outcome of both planners' comparison, normalized |
+| `execution_report.schema.json` | observed steps and replan decision |
+| `domain_v2.2.pddl` | general action and cost semantics |
+| `domain_description_v2.2.md` | human contract and compiler rules |
 
-Os três JSON Schemas são gerados dos modelos Pydantic:
+The three JSON Schemas are generated from the Pydantic models:
 
 ```bash
 poetry run python scripts/generate_pmv_schemas.py
 ```
 
-O CI deve falhar se os arquivos gerados divergirem dos schemas versionados.
+CI must fail if any generated file diverges from the versioned schemas.
 
-## Limites do PMV
+## PMV limitations
 
-- o domínio trata um documento/job por instância;
-- o planner interno só cobre o domínio de obrigações 2.2;
-- a comparação cobre planos e métricas publicadas pelos backends, não mede a
-  qualidade dos artefatos produzidos na execução;
-- os métodos reais de descrição, linearização, verbalização e exportação
-  ainda precisam ser registrados;
-- o workflow interrompe após falha e devolve o estado para uma nova chamada
-  ao Planejador; o laço automático de replanejamento fica para a próxima
-  iteração;
-- credenciais e caminhos de ferramentas permanecem fora do PDDL.
+- one document/job per PDDL instance; the internal planner covers only the 2.2 obligations domain;
+- the comparison covers plans and metrics published by both backends, not artifact quality at runtime;
+- description, linearization, verbalization and export methods still need registration in real form;
+- the workflow halts after a failure and returns state to the Planner; the automatic replan loop is left for the next iteration.

@@ -4,7 +4,7 @@
 Deliver document and image conversion to accessible formats through:
 - **Deterministic extraction and planning** (PDDL-based task ordering and validation)
 - **Multiagent AI processing** (Agno-coordinated specialized agents for vision, data, descriptions)
-- High-quality descriptions in Brazilian Portuguese
+- High-quality descriptions in US English or Brazilian Portuguese (determined by the user's locale)
 - Simple Telegram-based user experience with progressive degradation on AI failures
 
 ## 2. Non-negotiable principles

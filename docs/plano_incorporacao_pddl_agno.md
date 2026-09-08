@@ -1,92 +1,80 @@
-# Plano de Incorporacao PDDL + Agno
+# PDDL + Agno Incorporation Plan
 
-## Objetivo
-Incorporar, de forma incremental e validada, as mudancas arquiteturais documentadas em:
+You can also read this documentation in **Brazilian Portuguese**: [português brasilei](plano_incorporacao_pddl_agno.pt-br.md)
+
+## Goal
+Incorporate, incrementally and with validation, the architectural changes documented in:
 - MVP_CHANGES.md
 - PMV_2_CHANGES.md
 - PMV_2_1_CHANGES.md
 
-Referencia remota: https://github.com/marceloakira/acessilia
+Remote reference: https://github.com/marceloakira/acessilia
 
-## Estado Atual
-- [x] Branch de trabalho criada: feat/arquitetura-pddl-agno
-- [x] Remoto adicionado: marceloakira
-- [x] Changelogs importados e commitados
-- [x] Bloco 1 importado (artefatos estaticos)
-- [x] Bloco 2 importado (manifesto estrutural)
-- [x] Bloco 3 importado (planejamento PDDL)
-- [x] Bloco 4 importado (execucao/Agno)
-- [ ] Consolidacao e hardening
+## Current State
+- [x] working branch created: feat/arquitetura-pddl-agno
+- [x] remote added: marceloakira
+- [x] changelogs imported and committed
+- [x] Block 1 imported (static artifacts)
+- [x] Block 2 imported (structural manifest)
+- [x] Block 3 imported (PDDL planning)
+- [x] Block 4 imported (execution/Agno)
+- [ ] consolidation and hardening
 
-## Registro de Execucao
-- Bloco 1:
-	- arquivos importados: `docs/pmv_agno_pddl.md`, `schemas/*.json`, `core/planning/domains/domain_v2.2.pddl`;
-	- validacao: schemas JSON validos; testes focados sem dependencia externa aprovaram (`16 passed`).
-- Bloco 2:
-	- arquivos importados: `core/manifest/*`, `core/agno_support.py`, `core/agents/informational_structural.py`, scripts de schema e teste dedicado;
-	- validacao: compilacao sintatica Python aprovada para todos os arquivos importados;
-	- limitacao de ambiente: teste dedicado depende de stack Python 3.10+ com pacotes nao instalados no ambiente corrente de execucao.
-- Bloco 3:
-	- arquivos importados: `core/planning/*`, `interfaces/cli/pmv.py`, `tests/test_pddl_planning.py`;
-	- validacao: compilacao sintatica Python aprovada para todos os arquivos importados.
-- Bloco 4:
-	- arquivos importados: `core/execution/*`, `interfaces/cli/manifest.py`, `interfaces/cli/run.py`, `tests/test_agno_executor.py`;
-	- validacao: compilacao sintatica Python aprovada para todos os arquivos importados;
-	- regressao rapida do nucleo existente permanece aprovada (`16 passed`).
+## Execution Log
+- Block 1:
+	- files imported: `docs/pmv_agno_pddl.md`, `schemas/*.json`, `core/planning/domains/domain_v2.2.pddl`;
+	- validation: JSON schemas are valid; focused tests without external dependencies pass (`16 passed`).
+- Block 2:
+	- files imported: `core/manifest/*`, `core/agno_support.py`, `core/agents/informational_structural.py`, the schema script and dedicated tests;
+	- validation: Python syntactic compilation passes for all imported files;
+	- environment limitation: the dedicated test depends on a Python 3.10+ stack that is not installed in the current execution environment.
+- Block 3:
+	- files imported: `core/planning/*`, `interfaces/cli/pmv.py`, `tests/test_pddl_planning.py`;
+	- validation: Python syntactic compilation passes for all imported files.
+- Block 4:
+	- files imported: `core/execution/*`, `interfaces/cli/manifest.py`, `interfaces/cli/run.py`, `tests/test_agno_executor.py`;
+	- validation: Python syntactic compilation passes for all imported files; the quick regression of existing core remains green (`16 passed`).
 
-## Estrategia de Incorporacao
-### Bloco 1 — Artefatos estaticos e documentacao
-Escopo:
+## Incorporation Strategy
+### Block 1 — static artifacts and documentation
+Scope:
 - docs/pmv_agno_pddl.md
 - schemas/*.json
 - core/planning/domains/domain_v2.2.pddl
 
-Validacao:
-- Testes existentes do projeto passam sem regressao
-- Schemas sao JSON validos
+Validation:
+- Existing project tests pass without regressions; JSON schemas are valid.
 
-### Bloco 2 — Manifesto estrutural (PMV 1)
-Escopo:
+### Block 2 — structural manifest (PMV 1)
+Scope:
 - core/manifest/*
-- scripts de geracao de schema relacionados ao manifesto
-- testes focados em processing manifest
+- the schema generation script for manifests
+- focused processing-manifest tests
 
-Validacao:
-- Testes de manifesto passam
-- Compatibilidade com pipeline atual preservada
+Validation:
+- Manifest tests pass and compatibility with the current pipeline is preserved.
 
-### Bloco 3 — Planejamento PDDL (PMV 2)
-Escopo:
-- core/planning/* (processor, planner, schema)
-- adapters/backends de planner (quando aplicavel)
-- testes de planejamento
+### Block 3 — PDDL planning (PMV 2)
+Scope:
+- core/planning/* (processor, planner, schema); planner adapters/Backends (when applicable); planning tests.
 
-Validacao:
-- Geracao e validacao de plano nominal
-- Verificacao de fechamento causal
+Validation:
+- Nominal plan generation/verification and causal closure verification.
 
-### Bloco 4 — Execucao com Agno e comparacao de backends (PMV 2.1)
-Escopo:
-- core/execution/*
-- comparacao de plano (both)
-- execution report e planning comparison schemas
-- testes de workflow/executor
+### Block 4 — execution with Agno + backend comparison (PMV 2.1)
+Scope:
+- core/execution/*; plan comparison (both backends); execution-report and planning-comparison schemas;
+- workflow/executor tests.
 
-Validacao:
-- Fluxo planner internal|fast-downward|both
-- Vereditos de comparacao (identical/equivalent/different/inconclusive)
+Validation:
+- planner internal|fast-downward|both flow works correctly, and comparison verdicts are computed (identical/equivalent/different/inconclusive).
 
-### Bloco 5 — Consolidacao
-Escopo:
-- Integracao com CLI atual e servicos
-- Ajustes de dependencias e configuracoes
-- limpeza tecnica e documentacao final
+### Block 5 — consolidation
+Scope:
+- Integration with the current CLI/service; dependency and configuration tweaks; final technical cleanup + documentation.
 
-Validacao:
-- Suite de testes alvo
-- Checagem de riscos e impactos arquiteturais
+Validation:
+- Final test suite pass rate is acceptable; architectural risks and impact are checked.
 
-## Regras de Seguranca na Migracao
-- Preferir adicao incremental antes de substituicao de modulos atuais.
-- Rodar validacoes ao final de cada bloco.
-- Evitar alteracoes massivas sem checkpoint de commit intermediario.
+## Migration safety rules
+- Prefer incremental addition over replacing currently running modules. Run validations at the end of each block, and avoid mass changes without an intermediate commit checkpoint.
