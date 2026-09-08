@@ -3,94 +3,106 @@
 [![CI](https://github.com/A11yDevs/acessilia/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/A11yDevs/acessilia/actions/workflows/ci.yml)
 [![Delivery](https://github.com/A11yDevs/acessilia/actions/workflows/delivery.yml/badge.svg?branch=main)](https://github.com/A11yDevs/acessilia/actions/workflows/delivery.yml)
 
-**acessilia** é um projeto de código‑aberto que extrai, classifica e torna documentos (PDF, DOCX, imagens, etc.) acessíveis usando LLMs (Ollama, OpenRouter) e um pipeline modular.
+**acessilia** is an open-source project that extracts, classifies, and makes documents (PDF, DOCX, images, etc.) accessible using LLMs (Ollama, OpenRouter) and a modular pipeline.
 
-## Arquitetura
+You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](README.pt-br.md)
 
-O projeto segue a camada *Domínio → Aplicação → Interface*:
+## Architecture
 
-- **backend** – lógica de domínio (agentes, clientes de IA, pipeline, exportadores) e a **API REST** (núcleo).
-- **frontend** – clientes da API: painel web, bot do Telegram e CLI.
-- **tests** – suíte de testes unitários cobrindo a maioria dos módulos.
+The project follows the *Domain → Application → Interface* layering:
 
-### API standalone
+- **backend** – domain logic (agents, AI clients, pipeline, exporters) plus the **REST API** (the core).
+- **frontend** – the API's clients: web panel, Telegram bot, and CLI.
+- **tests** – unit test suite covering most modules.
 
-A **API** (`http://localhost:8000`) é o núcleo: recebe o arquivo, coloca na fila, processa com o LLM, exporta os formatos acessíveis (TXT, DOCX, PDF, PDF/UA, HTML, MP3, ZIP) e disponibiliza o download via token. Os frontends (web, Telegram, CLI) consomem tudo por HTTP usando o cliente compartilhado `frontend.clients.api_client.ApiClient`.
+### Standalone API
 
-Principais endpoints (`/api/v1`):
+The **API** (`http://localhost:8000`) is the core: it receives files, enqueues them, processes them with LLMs, exports the accessible formats (TXT, DOCX, PDF, PDF/UA, HTML, MP3, ZIP), and makes downloads available via a token. All frontends (web, Telegram, CLI) consume it over HTTP using the shared client `frontend.clients.api_client.ApiClient`.
 
-| Método | Rota | Descrição |
+Main endpoints (`/api/v1`):
+
+| Method | Route | Description |
 |---|---|---|
-| `POST` | `/jobs` | Envia arquivo para a fila (retorna `task_id` e posição) |
-| `GET` | `/jobs/{task_id}` | Status/progresso da tarefa |
-| `POST` | `/jobs/{task_id}/cancel` | Cancela a tarefa |
-| `GET` | `/download/{token}` | Lista formatos disponíveis de um token |
-| `GET` | `/download/{token}/{format}` | Baixa o arquivo (txt/docx/pdf/pdf_ua/html/mp3/zip) |
-| `GET` | `/history?limit=20` | Histórico de conversões |
-| `GET` | `/stats` | Estatísticas agregadas |
-| `GET` | `/health` | Status do servidor e do modelo de IA |
+| `POST` | `/jobs` | Submits a file to the queue (returns `task_id` and position) |
+| `GET` | `/jobs/{task_id}` | Task status/progress |
+| `POST` | `/jobs/{task_id}/cancel` | Cancels the task |
+| `GET` | `/download/{token}` | Lists formats available for a token |
+| `GET` | `/download/{token}/{format}` | Downloads the file (txt/docx/pdf/pdf_ua/html/mp3/zip) |
+| `GET` | `/history?limit=20` | Conversion history |
+| `GET` | `/stats` | Aggregated statistics |
+| `GET` | `/health` | Server and AI model status |
 
-> **Nota:** a fila e o estado das tarefas vivem em memória na API; jobs são perdidos se a API reiniciar. Tokens de download e histórico persistem em SQLite.
+> **Note:** the queue and task state live in memory inside the API; jobs are lost if the API restarts. Download tokens and the history persist in SQLite.
 
-## Instalação
+## Installation
 
-### Usando Poetry (recomendado)
+### Using Poetry (recommended)
 
 ```bash
 poetry install
-cp .env.example .env   # configure as chaves (AI, SMTP, Telegram)
+cp .env.example .env   # configure the keys (AI, SMTP, Telegram)
 ```
 
-## Execução
+## Running It
 
-### Tudo em um comando (API + web + Telegram)
+### Everything in one command (API + web + Telegram)
 
 ```bash
 poetry run python -m frontend.run
-# ou: poetry run bot-acess
+# or: poetry run bot-acess
 ```
 
-Inicia as interfaces listadas em `ENABLED_INTERFACES` (default: `api,telegram,web`):
-- API em `http://localhost:8000`
-- Painel web em `http://localhost:8001`
-- Telegram (requer `BOT_TOKEN`)
+Starts the interfaces listed in `ENABLED_INTERFACES` (default: `api,telegram,web`):
+- API on `http://localhost:8000`
+- web panel on `http://localhost:8001`
+- Telegram (requires `BOT_TOKEN`)
 
-### API isolada (para deploy de múltiplos processos)
+### Standalone API (for multi-process deploys)
 
 ```bash
 poetry run python -m backend.api.run
 ```
 
-Depois, o painel web e o Telegram apontam para `API_BASE_URL` (default `http://localhost:8000`).
+Afterward, the web panel and Telegram point at `API_BASE_URL` (default `http://localhost:8000`).
 
-### Somente web ou somente Telegram
+### Web only or Telegram only
 
-Edite `ENABLED_INTERFACES` em `.env`, ex.: `api,web`. A API deve sempre estar habilitada (ou rodando em outro processo) para os clientes funcionarem.
+Edit `ENABLED_INTERFACES` in `.env`, e.g. `api,web`. The API must always be enabled (or running as another process) for the clients to work.
 
-## Testes
+## Internationalization (i18n)
 
-Instale as dependências de desenvolvimento e os extras usados pelo CI:
+The project is internationalized in `en_US` (default) and `pt_BR` using **Babel** (`babel` in `pyproject.toml`). User-facing strings, Telegram bot command responses, e-mails, and server-side log lines are variablized through per-locale strings files (`backend/locales/<locale>/LC_MESSAGES/messages.po`), and the runtime-selected locale decides which strings file is used for variable substitution — adding a new supported locale requires only one new strings file (minimal code changes).
+
+- The active server locale is negotiated from `LOCALE`/`LANGUAGE` in the environment against the supported locales, falling back to `en_US`; the Telegram bot additionally detects each user's language and replies in the user's own locale when it is offered by `I18N_LOCALES_ACTIVE` in `.env` (bottom section: `LOCALE`, `I18N_LOCALES_ACTIVE`).
+- Code looks up strings through `t()` in [backend/i18n.py](backend/i18n.py) using canonical English message ids defined as `MSG_*`/`LOG_*`/`EXE_*` constants; if a translation is missing for the active locale, Babel falls back to the English msgid unchanged.
+- Portuguese slash commands (`/ativar`, `/ajuda`, ...) keep working in every locale, each with a US English alias (`/activate`, `/help`, ...) — command listings and responses render in the user's locale.
+
+Full documentation — where the i18n files live, how to add a new string, how to internationalize an existing file, and how to add and activate a new locale — is in [docs/i18n.md](docs/i18n.md). (Brazilian Portuguese: [documentação em pt-BR](docs/i18n.pt-br.md))
+
+## Tests
+
+Install the development dependencies and the extras used by CI:
 
 ```bash
 poetry install --with dev --extras docling
 ```
 
-Execute a suíte completa da pasta `tests/`:
+Run the full suite from `tests/`:
 
 ```bash
 poetry run pytest
 ```
 
-O GitHub Actions repete essa validação em Python 3.11 nas instalações slim e Docling para todo pull request direcionado à `main`. A variante Docling também converte um PDF real. Falhas, erros e testes pulados são rejeitados. Consulte o [guia de contribuição](CONTRIBUTING.md) para preparar o ambiente e entender o fluxo de revisão.
+GitHub Actions repeats this validation on Python 3.11 in both the slim and Docling installs for every pull request targeting `main`; the Docling variant also converts a real PDF. Failures, errors, and skipped tests are all rejected. See the [contribution guide](CONTRIBUTING.md) to set up the environment and learn the review flow.
 
 ## Docker
 
-### Usando a imagem pronta
+### Using the ready-made images
 
-Depois que o CI da `main` passa, o GitHub Actions publica automaticamente duas imagens Linux amd64 no GitHub Container Registry:
+Once CI on `main` passes, GitHub Actions automatically publishes two Linux amd64 images to the GitHub Container Registry:
 
-- `main`: inclui Docling, RapidOCR e PyTorch CPU para análise estrutural completa;
-- `main-slim`: omite Docling, RapidOCR e PyTorch para uma distribuição menor.
+- `main`: includes Docling, RapidOCR, and PyTorch CPU for full structural analysis;
+- `main-slim`: omits Docling, RapidOCR, and PyTorch for a smaller distribution.
 
 ```bash
 docker pull ghcr.io/a11ydevs/acessilia:main
@@ -102,36 +114,36 @@ docker run --rm \
         ghcr.io/a11ydevs/acessilia:main
 ```
 
-Use `ghcr.io/a11ydevs/acessilia:main-slim` no mesmo comando para a variante slim. Para reproduzir uma versão exata, use `sha-<commit>` ou `sha-<commit>-slim`, mostradas na execução do workflow **Delivery**.
+Use `ghcr.io/a11ydevs/acessilia:main-slim` in the same command for the slim variant. To reproduce an exact version, use `sha-<commit>` or `sha-<commit>-slim`, as shown by the **Delivery** workflow run.
 
-### Construindo localmente
+### Building locally
 
 ```bash
 docker compose up -d --build
 ```
 
-O container expõe `8000` (API) e `8001` (web), persiste tudo em `./var` e roda o healthcheck em `/api/v1/health`.
+The container exposes `8000` (API) and `8001` (web), persists everything under `./var`, and runs its health check at `/api/v1/health`.
 
-Para construir somente a variante slim:
+To build only the slim variant:
 
 ```bash
 docker build -f infra/Dockerfile --build-arg WITH_DOCLING=false -t acessilia:slim .
 ```
 
-### Cache de modelos Docling e RapidOCR
+### Docling and RapidOCR model cache
 
-Nenhum modelo é embutido nas imagens distribuídas. No primeiro processamento com Docling, os modelos são baixados em tempo de execução; por isso essa primeira conversão é mais lenta. O volume `/app/var` deve ser persistido para que execuções seguintes funcionem com os mesmos arquivos, inclusive sem rede.
+All model weights are downloaded at runtime on first Docling use (the distributed images embed no models), which makes that first conversion slower. Persist the `/app/var` volume so later runs reuse the same files, even offline.
 
 - Hugging Face: `/app/var/cache/huggingface` (`HF_HOME`)
 - RapidOCR: `/app/var/cache/rapidocr` (`RAPIDOCR_CACHE_DIR`)
 
-Comportamento:
+Behavior:
 
-- Na primeira execução com Docling, os pesos são baixados para o volume ou copiados para ele.
-- Nas execuções seguintes, os arquivos são restaurados automaticamente antes de inicializar o `RapidOCR`.
-- Remover `./var` remove os caches e força um novo download.
+- The first Docling run downloads (or copies) the weights into the volume.
+- Subsequent runs restore them automatically before `RapidOCR` starts up.
+- Deleting `./var` deletes the caches and forces a fresh download.
 
-Exemplo:
+Example:
 
 ```bash
 docker run --rm -e STRUCTURER=docling -v "$PWD/var:/app/var" \
@@ -141,16 +153,26 @@ docker run --rm -e STRUCTURER=docling -v "$PWD/var:/app/var" \
         --mode normal --export-formats txt,pdf,pdf_ua --pddl-extractor-backend docling
 ```
 
-## Contribuindo
+## Contributing
 
-1. Fork o repositório.
-2. Crie uma branch de feature.
-3. Escreva testes para a nova funcionalidade.
-4. Rode `poetry run pytest` e corrija falhas, erros ou skips.
-5. Envie um pull request.
+1. Fork the repository.
+2. Create a feature branch.
+3. Write tests for new functionality.
+4. Run `poetry run pytest` and fix any failures, errors, or skipped tests.
+5. Open a pull request.
 
-As regras detalhadas estão em [CONTRIBUTING.md](CONTRIBUTING.md).
+Detailed rules live in [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Licença
+## License
 
 MIT © 2026 Jhonata Fernandes Cordeiro
+
+## Changelog
+
+Done:
+- Created [docs/i18n.md](docs/i18n.md) and its Brazilian Portuguese translation [docs/i18n.pt-br.md](docs/i18n.pt-br.md) covering every internationalization feature the runtime supports (server-side locale negotiation, per-user locale detection for Telegram replies, canonical msgid pattern, locale-aware slash commands with Portuguese + English aliases, offered-locale list, localized logs/emails/web panel), where the i18n files and directories live, and step-by-step BASH recipes for adding a new internationalized string, internationalizing an already written code file, and adding/activating a new locale; moved the former Internationalization section of README.md out of both READMEs into these docs (leaving a summary + links), and linked the new pages into the [docs/README.md](docs/README.md) navigation tree.
+- The two Portuguese-language docstrings in `backend/core/agno_support.py` (`build_agent` and the previously undocumented `require_workflow_classes`) plus the hardcoded Portuguese `RuntimeError` raised by `require_workflow_classes` when the optional Agno stack is absent now raise `RuntimeError(t(LOG_AGNO_NOT_INSTALLED))`, a new canonical msgid ("Agno is not installed. Run `poetry install` before using the workflow Executor." / pt_BR "Agno não está instalado. Execute `poetry install` antes de usar o workflow Executor.") added to `backend/log_messages.py` and registered in `scripts/gen_locale_catalogs.py` (import, `MESSAGES`, pt_BR translation) with both locale catalogs regenerated; both functions gained US-English docstrings with typed parameters and defaults per the code-quality rules (tests: `pytest`, 150 passed).
+- Ported the sole remaining Portuguese docstring of `get_agno_model()` in `backend/ai/models/ai_client.py` to US English, adding a typed `Returns` annotation describing the provider selection (OpenRouter when `settings.ai_client == "openrouter"`, Ollama otherwise) per the code quality rules — no runtime output is affected, so no change to locale files or catalogs was needed (tests: `pytest`, 150 passed).
+- Ported the Portuguese display strings and docstrings/comments in `frontend/agent_os.py` (the standalone AgentOS showcase server) to US English via canonical msgids: module docstring, the `_build_data_instructions` docstring plus its inline/fallback strings (now `t(WEB_AGENT_DATA_INSTRUCTIONS_FALLBACK)`), all inline comments, and the three hardcoded `description=` arguments (now `t(WEB_AGENT_OS_DESCRIPTION)`, `t(WEB_AGENT_VISION_DESCRIPTION)`, `t(WEB_AGENT_DATA_DESCRIPTION)`). The four new `WEB_AGENT_*` msgids were added to `frontend/web/messages.py` and registered in `scripts/gen_locale_catalogs.py` (imports, `MESSAGES`, pt_BR translations) with both locale catalogs regenerated; region-prompt keys `regiao_tabela`/`regiao_formula` are internal prompt filenames, not display text, so they were intentionally left as identifiers (tests: `pytest`, 150 passed).
+- Internationalized every hardcoded Portuguese error/status string in the nominal-plan executor (`backend/core/execution/executor.py`): `MethodRegistry.register` empty-name error, all eight `_validate_binding` ValueError messages, the `_execute_step` start-job/execute-obligation/complete-job/unknown-action raises plus dry-run and no-handler/result-rejected messages, and all seven `_check_obligation_preconditions` ValueError messages. A new `backend/core/execution/messages.py` now holds the 23 canonical English `EXE_*` msgids (placeholders like `{method}`, `{unknown}`, `{plan_revision}` substituted by callers after lookup); each `raise` now goes through `t(EXE_*)`, the two PT docstrings (`MethodRegistry`/`ExecutorAgent`) and the `register`/`_validate_binding`/`_check_obligation_preconditions` methods gained US-English docstrings with typed params per the code-quality rules. All 23 msgids registered in `scripts/gen_locale_catalogs.py` (import, `MESSAGES`, pt_BR translations preserving the original Portuguese wording) and both locale catalogs regenerated. No test asserted on the old literals (verified by grep) so behavior is unchanged (tests: `pytest`, 150 passed).
+- Added AGENTS.md and opencode.json.

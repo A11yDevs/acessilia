@@ -1,5 +1,7 @@
 # Design and Integration Patterns
 
+You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](patterns.pt-br.md)
+
 ## Identified Patterns
 
 ### 1. Canonical Document Pipeline
