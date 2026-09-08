@@ -12,19 +12,19 @@ from typing import Any, Mapping
 
 
 class AbstractExporter(ABC):
-    """Interface que todos os exportadores devem implementar.
+    """Interface every exporter must implement.
 
-    Cada exportador deve ser capaz de receber o documento canônico e escrever o
-    arquivo no ``output_path``.
+    Each exporter must be able to receive the canonical document and write the
+    exported file at ``output_path``.
     """
 
     @abstractmethod
     def export(self, canonical_doc: Mapping[str, Any], output_path: Path, source_name: str) -> Path:
-        """Exporta ``canonical_doc`` para ``output_path``.
+        """Exports ``canonical_doc`` to ``output_path``.
 
         Args:
-            canonical_doc: Dicionário contendo a estrutura padronizada.
-            output_path: Caminho onde o arquivo será salvo.
-            source_name: Nome original do arquivo (usado em alguns exportadores).
+            canonical_doc (dict): Mapping holding the standardized document structure.
+            output_path (Path): Destination path where the exported file will be saved.
+            source_name (str): Original filename, used by some exporters for naming/templating purposes.
         """
         raise NotImplementedError

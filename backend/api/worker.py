@@ -13,6 +13,27 @@ from typing import Any
 
 from backend.agents.state_manager import TaskCancelledError, state_manager
 from backend.config.settings import settings
+from backend.i18n import t
+from backend.log_messages import (
+    LOG_JOB_CANCELLED,
+    LOG_JOB_COMPLETED,
+    LOG_JOB_EXECUTOR_ERROR,
+    LOG_MP3_GENERATION_FAILED,
+    LOG_PDF_UA_GENERATION_FAILED,
+)
+from backend.stage_messages import (
+    STAGE_CANCELLED_IN_QUEUE,
+    STAGE_ENQUEUED_WAITING,
+    STAGE_EXPORTING_DOCX,
+    STAGE_EXPORTING_HTML,
+    STAGE_EXPORTING_PDF,
+    STAGE_EXPORTING_PDF_UA,
+    STAGE_EXPORTING_TXT,
+    STAGE_GENERATING_AUDIO,
+    STAGE_PROCESSING_COMPLETED,
+    STAGE_PROCESSING_FAILURE,
+    STAGE_QUEUE_WAITING_POSITION,
+)
 from backend.export.exporters.audio_exporter import export_mp3
 from backend.export.exporters.docx_exporter import export_docx
 from backend.export.exporters.pdf_exporter import export_pdf
@@ -46,7 +67,7 @@ def register_queued_job(
         "arquivo": arquivo,
         "status": "queued",
         "progresso": 0.0,
-        "etapa_atual": f"Aguardando na fila (Posicao: {position})",
+        "etapa_atual": t(STAGE_QUEUE_WAITING_POSITION).format(position=position),
         "erros": [],
         "download_url": None,
         "inicio": time.time(),
@@ -82,7 +103,7 @@ def cancel_job_status(task_id: str) -> bool:
         if not unified_queue.cancel(task_id):
             return False
         queued["status"] = "cancelled"
-        queued["etapa_atual"] = "Cancelado na fila"
+        queued["etapa_atual"] = t(STAGE_CANCELLED_IN_QUEUE)
         queued["fim"] = time.time()
         return True
     return False
@@ -148,8 +169,8 @@ class JobExecutor:
             )
             state_manager.verificar_cancelamento(task_id)
 
-            # Garante que a task existe no state_manager mesmo se
-            # service.py retornou de cache sem criar a tarefa
+            # Ensures the task exists in the state_manager even if
+            # service.py returned from cache without creating it.
             task = state_manager.obter(task_id)
             if task is None:
                 state_manager.criar_tarefa(
@@ -164,25 +185,25 @@ class JobExecutor:
             completed_formats: list[str] = []
             optional_errors: list[str] = []
 
-            state_manager.atualizar(task_id, etapa="Exportando TXT...", progresso=0.85)
+            state_manager.atualizar(task_id, etapa=t(STAGE_EXPORTING_TXT), progresso=0.85)
             txt_path = out_dir / f"{base}.txt"
             await self._run_in_executor(export_txt, canonical, txt_path, job.filename)
             completed_formats.append("txt")
             state_manager.verificar_cancelamento(task_id)
 
-            state_manager.atualizar(task_id, etapa="Exportando DOCX...", progresso=0.88)
+            state_manager.atualizar(task_id, etapa=t(STAGE_EXPORTING_DOCX), progresso=0.88)
             docx_path = out_dir / f"{base}.docx"
             await self._run_in_executor(export_docx, canonical, docx_path, job.filename)
             completed_formats.append("docx")
             state_manager.verificar_cancelamento(task_id)
 
-            state_manager.atualizar(task_id, etapa="Exportando PDF...", progresso=0.91)
+            state_manager.atualizar(task_id, etapa=t(STAGE_EXPORTING_PDF), progresso=0.91)
             pdf_path = out_dir / f"{base}.pdf"
             await self._run_in_executor(export_pdf, canonical, pdf_path, job.filename)
             completed_formats.append("pdf")
             state_manager.verificar_cancelamento(task_id)
 
-            state_manager.atualizar(task_id, etapa="Exportando PDF/UA...", progresso=0.92)
+            state_manager.atualizar(task_id, etapa=t(STAGE_EXPORTING_PDF_UA), progresso=0.92)
             pdf_ua_path = out_dir / f"{base}.pdf_ua.pdf"
             try:
                 await self._run_in_executor(
@@ -193,15 +214,15 @@ class JobExecutor:
                 )
                 completed_formats.append("pdf_ua")
             except Exception as exc:
-                logger.warning("Falha ao gerar PDF/UA: {}", exc)
-                error_msg = f"Falha ao gerar PDF/UA: {exc}"
+                error_msg = t(LOG_PDF_UA_GENERATION_FAILED).format(error=str(exc))
+                logger.warning(error_msg)
                 optional_errors.append(error_msg)
                 state_manager.atualizar(task_id, erro=error_msg)
                 _remove_partial_output(pdf_ua_path)
                 pdf_ua_path = None
             state_manager.verificar_cancelamento(task_id)
 
-            state_manager.atualizar(task_id, etapa="Exportando HTML...", progresso=0.93)
+            state_manager.atualizar(task_id, etapa=t(STAGE_EXPORTING_HTML), progresso=0.93)
             html_path = out_dir / f"{base}.html"
             await self._run_in_executor(
                 export_accessible_document,
@@ -220,7 +241,9 @@ class JobExecutor:
 
                 async def audio_progress(percent: int) -> None:
                     state_manager.atualizar(
-                        task_id, etapa=f"Gerando audio... {percent}%", progresso=0.95
+                        task_id,
+                        etapa=t(STAGE_GENERATING_AUDIO).format(percent=percent),
+                        progresso=0.95,
                     )
 
                 try:
@@ -229,8 +252,8 @@ class JobExecutor:
                     )
                     completed_formats.append("mp3")
                 except Exception as e:
-                    logger.error("Falha ao gerar MP3: {}", e)
-                    error_msg = f"Falha ao gerar MP3: {e}"
+                    error_msg = t(LOG_MP3_GENERATION_FAILED).format(error=str(e))
+                    logger.error(error_msg)
                     optional_errors.append(error_msg)
                     state_manager.atualizar(task_id, erro=error_msg)
                     _remove_partial_output(mp3_path)
@@ -256,7 +279,7 @@ class JobExecutor:
             download_url = build_download_url(token)
             state_manager.registrar_download_url(task_id, download_url)
             state_manager.atualizar(
-                task_id, etapa="Processamento concluido", progresso=1.0,
+                task_id, etapa=t(STAGE_PROCESSING_COMPLETED), progresso=1.0,
                 status="done", resultado=json.dumps(canonical, ensure_ascii=False),
             )
             await finalizar_conversao(
@@ -278,21 +301,23 @@ class JobExecutor:
                 if not sent:
                     logger.warning("Resultado do job {} nao foi enviado por e-mail", task_id)
 
-            logger.info("Job {} concluido (source={})", task_id, job.source)
+            logger.info(
+                t(LOG_JOB_COMPLETED).format(task_id=task_id, source=job.source)
+            )
 
         except TaskCancelledError:
-            logger.info("Job {} cancelado", task_id)
+            logger.info(t(LOG_JOB_CANCELLED).format(task_id=task_id))
             await finalizar_conversao(
                 task_id=task_id,
                 status="cancelled",
                 tempo_segundos=time.time() - started_at,
             )
         except Exception as e:
-            logger.exception("Erro no JobExecutor para {}", task_id)
+            logger.exception(t(LOG_JOB_EXECUTOR_ERROR).format(task_id=task_id))
             if out_dir is not None:
                 _remove_output_dir(out_dir)
             state_manager.atualizar(
-                task_id, status="error", erro=str(e), etapa="Falha no processamento"
+                task_id, status="error", erro=str(e), etapa=t(STAGE_PROCESSING_FAILURE)
             )
             await finalizar_conversao(
                 task_id=task_id,

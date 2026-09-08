@@ -7,9 +7,19 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from backend.i18n import t
 from backend.pipeline.sanitizer import sanitize_text
 from backend.pipeline.table_ast import normalize_table_ast
 from backend.pipeline.table_ast import rows_from_table_ast
+
+from frontend.telegram.messages import (  # noqa: E402
+    MSG_HEADING_GAP,
+    MSG_OBLIGATION_CODE,
+    MSG_OBLIGATION_FORMULA,
+    MSG_OBLIGATION_IMAGE,
+    MSG_OBLIGATION_TABLE,
+    MSG_OBLIGATION_UNKNOWN,
+)
 
 from backend.core.manifest.docling_extractor import DoclingExtraction
 from backend.core.manifest.models import (
@@ -52,27 +62,27 @@ LABEL_TO_TYPE = {
 OBLIGATION_BY_TYPE = {
     "picture": (
         "describe-image",
-        "A imagem deve receber descrição ou ser marcada como decorativa.",
+        t(MSG_OBLIGATION_IMAGE),
         ["vision-description", "human-review"],
     ),
     "table": (
         "linearize-table",
-        "A tabela deve ter cabeçalhos e ordem de leitura verificáveis.",
+        t(MSG_OBLIGATION_TABLE),
         ["docling-table", "pandoc-table", "human-review"],
     ),
     "formula": (
         "verbalize-formula",
-        "A fórmula deve possuir representação matemática acessível e verbalização.",
+        t(MSG_OBLIGATION_FORMULA),
         ["mathml", "latex-verbalizer", "human-review"],
     ),
     "code": (
         "preserve-code-semantics",
-        "O bloco de código deve preservar indentação, linguagem e leitura literal.",
+        t(MSG_OBLIGATION_CODE),
         ["pandoc-code", "human-review"],
     ),
     "unknown": (
         "review-structure",
-        "O elemento não classificado requer inspeção estrutural.",
+        t(MSG_OBLIGATION_UNKNOWN),
         ["docling-retry", "pymupdf-region", "human-review"],
     ),
 }
@@ -554,10 +564,7 @@ def _derive_processing_needs(
     for element_id, level in heading_levels:
         if previous and level > previous + 1:
             suffix = element_id.removeprefix("element-")
-            message = (
-                f"A hierarquia de títulos salta do nível {previous} para o nível "
-                f"{level}."
-            )
+            message = t(MSG_HEADING_GAP).format(previous=previous, level=level)
             observations.append(
                 Observation(
                     id=f"observation-heading-gap-{suffix}",

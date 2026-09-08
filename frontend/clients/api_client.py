@@ -16,9 +16,9 @@ class ApiError(Exception):
 
 
 class ApiClient:
-    """Cliente HTTP para a API Acessilia.
+    """HTTP client for the Acessilia API.
 
-    Usado pelos frontends (web, telegram, cli) e pronto para novos clientes.
+    Used by the frontends (web, telegram, cli) and ready for new clients.
     """
 
     def __init__(

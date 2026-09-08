@@ -1,9 +1,9 @@
-"""Testes de regressão para a seleção de engine e orquestrador em backend/service.py.
+"""Regression tests for engine and orchestrator selection in backend/service.py.
 
-Cobre:
-- _normalized_engine(): mapeamento de valores de PIPELINE_ENGINE
-- _build_orchestrator(): tipo correto de orquestrador por engine
-- Settings PDDL: defaults e aliases PMV_* retroativos
+Covers:
+- _normalized_engine(): mapping of PIPELINE_ENGINE values
+- _build_orchestrator(): the correct orchestrator type per engine
+- PDDL settings: defaults and backward-compatible PMV_* aliases
 """
 from __future__ import annotations
 
@@ -132,7 +132,7 @@ def test_build_orchestrator_pddl_without_docling_falls_back_to_pymupdf(monkeypat
 def test_settings_pddl_defaults():
     import os
 
-    # Garantir que as envvars não estão setadas no ambiente de teste
+    # Ensure the env vars are not set in the test environment.
     for key in (
         "PIPELINE_ENGINE",
         "PDDL_EXECUTE_DRY_RUN",
