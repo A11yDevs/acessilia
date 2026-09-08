@@ -1,15 +1,37 @@
+"""
+What this suite verifies: backend/pipeline/canonical_builder builds a well-formed, sanitized
+canonical document from raw markdown or structured payloads (inferring titles, ids, sections and a
+fallback minimum section for non-textual sources), backend/pipeline/validators flags markdown and
+prompt-leak artifacts in final output text, and backend/export/pandoc_exporter exports those
+documents to txt/html while enforcing the deterministic audit and export-profile checks.
+"""
+
 import tempfile
 from pathlib import Path
 
 import pytest
 
+import backend.i18n as i8n
 from backend.export.pandoc_exporter import export_accessible_document
 from backend.pipeline.canonical_builder import build_canonical_document
 from backend.pipeline.validators import validate_canonical_document
 from backend.pipeline.validators import validate_output_text
 
 
+@pytest.fixture(autouse=True)
+def _pin_en_us(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Force the en_US runtime locale for every test in this module.
+
+    The exporter and validators resolve every user-visible string through backend.i18n.t, so
+    error-message assertions need a deterministic locale; en_US returns the canonical English
+    msgids the assertions below are written against.
+    """
+    monkeypatch.setenv("LOCALE", "en_US")
+    i8n._catalog_for.cache_clear()
+
+
 def test_build_canonical_document_creates_sections_and_ids():
+    """Raw markdown input should become a canonical document with sections, a title and zero validation errors."""
     document = build_canonical_document(
         "# Titulo\n\nParagrafo com **negrito**.\n\n- Item 1\n- Item 2",
         title="Titulo",
@@ -21,6 +43,7 @@ def test_build_canonical_document_creates_sections_and_ids():
 
 
 def test_build_canonical_document_accepts_structured_payload():
+    """A structured per-page payload should be folded into a canonical document preserving page_count and mode in metadata."""
     payload = {
         "text": "# Titulo\n\nParagrafo simples.",
         "page_count": 2,
@@ -232,7 +255,7 @@ def test_export_accessible_document_pdf_ua_requires_latex_engine(monkeypatch):
 
     with tempfile.TemporaryDirectory() as tmpdir:
         out = Path(tmpdir) / "saida.pdf_ua.pdf"
-        with pytest.raises(RuntimeError, match="lualatex ou xelatex"):
+        with pytest.raises(RuntimeError, match="lualatex or xelatex"):
             export_accessible_document(
                 "# Titulo\n\nParagrafo simples.",
                 out,

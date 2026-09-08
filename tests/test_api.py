@@ -80,7 +80,9 @@ def test_history_empty(client):
     assert resp.json() == []
 
 
-def test_upload_invalid_extension(client):
+def test_upload_invalid_extension(client, monkeypatch):
+    """Under pt_BR the API should reject unknown extensions with the localized unsupported-format detail."""
+    monkeypatch.setenv("LOCALE", "pt_BR")
     resp = client.post(
         "/api/v1/jobs",
         files={"document_file": ("script.exe", b"MZ...", "application/octet-stream")},
@@ -101,6 +103,8 @@ def test_upload_oversized_prompt(client):
 
 
 def test_upload_oversized_file(client, monkeypatch):
+    """Under pt_BR an over-limit upload should be rejected with the localized oversized-file detail."""
+    monkeypatch.setenv("LOCALE", "pt_BR")
     monkeypatch.setattr(settings, "max_file_size_mb", 0.000001)
     resp = client.post(
         "/api/v1/jobs",

@@ -20,9 +20,58 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 from backend.config.settings import settings
+from backend.i18n import t, active_locale
+from backend.log_messages import (
+    LOG_WEB_API_UPLOAD_ERROR,
+    LOG_WEB_DOWNLOAD_QUERY_FAILED,
+    LOG_WEB_GLOBAL_ERROR,
+    LOG_WEB_HTTP_EXCEPTION,
+    LOG_WEB_RATE_LIMIT_EXCEEDED,
+    LOG_WEB_UPLOAD_ERROR,
+)
 from backend.tools.logger import logger
 from frontend.clients.api_client import ApiClient, ApiError
 from frontend.clients import default_client
+from frontend.web.messages import (
+    WEB_ADVANCED_BACK_LINK,
+    WEB_ADVANCED_HEADLINE,
+    WEB_ADVANCED_INTRO,
+    WEB_ADVANCED_PROMPT_HELP,
+    WEB_ADVANCED_PROMPT_LABEL,
+    WEB_ADVANCED_PROMPT_PLACEHOLDER,
+    WEB_ADVANCED_SUBHEAD,
+    WEB_ADVANCED_THINKING_LABEL,
+    WEB_ADVANCED_TITLE,
+    WEB_DOWNLOAD_HEADLINE,
+    WEB_DOWNLOAD_NO_FORMATS,
+    WEB_DOWNLOAD_SUBHEAD,
+    WEB_DOWNLOAD_TITLE,
+    WEB_DOWNLOAD_VALID_NOTE,
+    WEB_ERROR_API_UPLOAD,
+    WEB_ERROR_DOWNLOAD_INVALID,
+    WEB_ERROR_DOWNLOAD_UNAVAILABLE,
+    WEB_ERROR_INTERNAL,
+    WEB_ERROR_PROMPT_TOO_LONG,
+    WEB_ERROR_UPLOAD_GENERIC,
+    WEB_FORMAT_DOCX,
+    WEB_FORMAT_HTML,
+    WEB_FORMAT_MP3,
+    WEB_FORMAT_PDF,
+    WEB_FORMAT_TXT,
+    WEB_FORMAT_ZIP,
+    WEB_FOOTER,
+    WEB_INDEX_ADVANCED_LINK,
+    WEB_INDEX_DOC_LABEL,
+    WEB_INDEX_EMAIL_HELP,
+    WEB_INDEX_EMAIL_LABEL,
+    WEB_INDEX_HEADLINE,
+    WEB_INDEX_INTRO,
+    WEB_INDEX_SUBMIT_BUTTON,
+    WEB_INDEX_TITLE,
+    WEB_LOGO_ALT,
+    WEB_RATE_LIMIT_EXCEEDED,
+    WEB_SUCCESS_QUEUED,
+)
 
 app = FastAPI(title="Bot Acess Web Panel")
 
@@ -43,12 +92,23 @@ MAX_CUSTOM_PROMPT_CHARS = 6000
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    logger.error("Erro Global no Painel Web: {} | Path: {}", exc, request.url.path)
+    """Catch-all handler for unexpected errors in the Web Panel.
+
+    Args:
+        request (Request): The in-flight HTTP request that triggered the error.
+        exc (Exception): The unhandled exception raised while processing the request.
+
+    Returns:
+        TemplateResponse: The rendered index page with the localized internal-error message and HTTP status 500.
+    """
+    logger.error(
+        t(LOG_WEB_GLOBAL_ERROR).format(error=str(exc), path=request.url.path)
+    )
     logger.error(traceback.format_exc())
     return templates.TemplateResponse(
         request=request,
         name="index.html",
-        context={"error": f"Erro interno no servidor: {str(exc)}"},
+        context={**_web_strings(), "error": t(WEB_ERROR_INTERNAL).format(error=str(exc))},
         status_code=500,
     )
 
@@ -56,12 +116,12 @@ async def global_exception_handler(request: Request, exc: Exception):
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     logger.warning(
-        "HTTP Exception no Painel Web: {} | Path: {}", exc.detail, request.url.path
+        t(LOG_WEB_HTTP_EXCEPTION).format(error=str(exc.detail), path=request.url.path)
     )
     return templates.TemplateResponse(
         request=request,
         name="index.html",
-        context={"error": exc.detail},
+        context={**_web_strings(), "error": exc.detail},
         status_code=exc.status_code,
     )
 
@@ -69,16 +129,58 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
 @app.exception_handler(RateLimitExceeded)
 async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
     logger.warning(
-        "Rate limit excedido | IP: {} | Path: {}",
-        request.client.host if request.client else "unknown",
-        request.url.path,
+        t(LOG_WEB_RATE_LIMIT_EXCEEDED).format(
+            ip=request.client.host if request.client else "unknown",
+            path=request.url.path,
+        )
     )
     return templates.TemplateResponse(
         request=request,
         name="index.html",
-        context={"error": "Muitas requisições. Aguarde um momento antes de tentar novamente."},
+        context={**_web_strings(), "error": t(WEB_RATE_LIMIT_EXCEEDED)},
         status_code=429,
     )
+
+
+def _web_strings() -> dict:
+    """Assemble localized UI strings for the web panel templates in the active locale.
+
+    Returns:
+        dict: Mapping of template context keys to translated strings; templates merge this with per-request values.
+    """
+    return {
+        "locale": active_locale().replace("_", "-"),
+        "index_title": t(WEB_INDEX_TITLE),
+        "index_headline": t(WEB_INDEX_HEADLINE),
+        "index_intro": t(WEB_INDEX_INTRO),
+        "index_email_label": t(WEB_INDEX_EMAIL_LABEL),
+        "index_email_help": t(WEB_INDEX_EMAIL_HELP),
+        "index_doc_label": t(WEB_INDEX_DOC_LABEL),
+        "index_submit": t(WEB_INDEX_SUBMIT_BUTTON),
+        "index_advanced_link": t(WEB_INDEX_ADVANCED_LINK),
+        "footer": t(WEB_FOOTER),
+        "logo_alt": t(WEB_LOGO_ALT),
+        "advanced_title": t(WEB_ADVANCED_TITLE),
+        "advanced_headline": t(WEB_ADVANCED_HEADLINE),
+        "advanced_subhead": t(WEB_ADVANCED_SUBHEAD),
+        "advanced_intro": t(WEB_ADVANCED_INTRO),
+        "advanced_prompt_label": t(WEB_ADVANCED_PROMPT_LABEL),
+        "advanced_prompt_placeholder": t(WEB_ADVANCED_PROMPT_PLACEHOLDER),
+        "advanced_prompt_help": t(WEB_ADVANCED_PROMPT_HELP),
+        "advanced_thinking_label": t(WEB_ADVANCED_THINKING_LABEL),
+        "advanced_back_link": t(WEB_ADVANCED_BACK_LINK),
+        "download_title": t(WEB_DOWNLOAD_TITLE),
+        "download_headline": t(WEB_DOWNLOAD_HEADLINE),
+        "download_subhead": t(WEB_DOWNLOAD_SUBHEAD),
+        "download_no_formats": t(WEB_DOWNLOAD_NO_FORMATS),
+        "download_valid_note": t(WEB_DOWNLOAD_VALID_NOTE),
+        "format_txt": t(WEB_FORMAT_TXT),
+        "format_docx": t(WEB_FORMAT_DOCX),
+        "format_pdf": t(WEB_FORMAT_PDF),
+        "format_html": t(WEB_FORMAT_HTML),
+        "format_mp3": t(WEB_FORMAT_MP3),
+        "format_zip": t(WEB_FORMAT_ZIP),
+    }
 
 
 def _save_upload(upload: UploadFile) -> Path:
@@ -100,13 +202,13 @@ def _remove_file(file_path: Path) -> None:
 @app.get("/", response_class=HTMLResponse)
 @limiter.limit("30/minute")
 async def index(request: Request):
-    return templates.TemplateResponse(request=request, name="index.html", context={})
+    return templates.TemplateResponse(request=request, name="index.html", context=_web_strings())
 
 
 @app.get("/advanced", response_class=HTMLResponse)
 @limiter.limit("30/minute")
 async def advanced_page(request: Request):
-    return templates.TemplateResponse(request=request, name="advanced.html", context={})
+    return templates.TemplateResponse(request=request, name="advanced.html", context=_web_strings())
 
 
 async def _submit_via_api(
@@ -131,31 +233,30 @@ async def _submit_via_api(
         )
     except ApiError as e:
         logger.warning(
-            "API retornou erro no upload web: {} - {}", e.status_code, e.detail
+            t(LOG_WEB_API_UPLOAD_ERROR).format(
+                status_code=e.status_code, detail=e.detail
+            )
         )
         return templates.TemplateResponse(
             request=request,
             name=template_name,
-            context={"error": f"Erro da API ({e.status_code}): {e.detail}"},
+            context={**_web_strings(), "error": t(WEB_ERROR_API_UPLOAD).format(status_code=e.status_code, detail=e.detail)},
         )
     except Exception as e:
-        logger.error("Erro no upload via web: {}", e)
+        logger.error(t(LOG_WEB_UPLOAD_ERROR).format(error=str(e)))
         return templates.TemplateResponse(
             request=request,
             name=template_name,
-            context={
-                "error": "Ocorreu um erro ao enviar o arquivo para a API. Tente novamente."
-            },
+            context={**_web_strings(), "error": t(WEB_ERROR_UPLOAD_GENERIC)}
         )
     finally:
         _remove_file(file_path)
 
-    msg = (
-        f"Sucesso! Seu arquivo entrou na fila (Posição: {result['position']}). "
-        f"O resultado será enviado para {email}."
+    msg = t(WEB_SUCCESS_QUEUED).format(
+        position=result["position"], email=email
     )
     return templates.TemplateResponse(
-        request=request, name=template_name, context={"message": msg}
+        request=request, name=template_name, context={**_web_strings(), "message": msg}
     )
 
 
@@ -187,9 +288,7 @@ async def handle_advanced_upload(
         return templates.TemplateResponse(
             request=request,
             name="advanced.html",
-            context={
-                "error": "Prompt personalizado excede o limite de 6000 caracteres."
-            },
+            context={**_web_strings(), "error": t(WEB_ERROR_PROMPT_TOO_LONG)}
         )
     return await _submit_via_api(
         request,
@@ -209,13 +308,17 @@ async def download_page(request: Request, token: str):
         info = await client.get_download_info(token)
     except ApiError as e:
         if e.status_code == 404:
-            raise HTTPException(status_code=404, detail="Link inválido ou expirado")
-        logger.warning("Falha ao consultar download na API: {} - {}", e.status_code, e.detail)
-        raise HTTPException(status_code=502, detail="Serviço de download indisponível")
+            raise HTTPException(status_code=404, detail=t(WEB_ERROR_DOWNLOAD_INVALID))
+        logger.warning(
+            t(LOG_WEB_DOWNLOAD_QUERY_FAILED).format(
+                status_code=e.status_code, detail=e.detail
+            )
+        )
+        raise HTTPException(status_code=502, detail=t(WEB_ERROR_DOWNLOAD_UNAVAILABLE))
     for f in info["formats"]:
         f["url"] = f"/api/v1{f['url']}"
     return templates.TemplateResponse(
         request=request,
         name="download.html",
-        context={"filename": info["filename"], "formats": info["formats"]},
+        context={**_web_strings(), "filename": info["filename"], "formats": info["formats"]},
     )

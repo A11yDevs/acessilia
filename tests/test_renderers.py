@@ -1,10 +1,28 @@
+"""
+What this suite verifies: the pure-Python fallback renderers in
+backend/export/renderers (txt, html, docx, pdf) turn a canonical document mapping into
+rendered files while honoring the export profile's block filtering; the txt renderer uses the
+localized table captions/row lines from backend/pipeline/table_ast, and the html renderer emits
+the localized table-of-contents and technical-metadata markup.
+"""
+
 import tempfile
 from pathlib import Path
 
+import pytest
+
+import backend.i18n as i8n
 from backend.export.renderers.docx_renderer import render_docx
 from backend.export.renderers.html_renderer import render_html
 from backend.export.renderers.pdf_renderer import render_pdf
 from backend.export.renderers.txt_renderer import render_txt
+
+
+@pytest.fixture(autouse=True)
+def _pin_en_us(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Force the en_US runtime locale so localized txt/html strings are the canonical English ones."""
+    monkeypatch.setenv("LOCALE", "en_US")
+    i8n._catalog_for.cache_clear()
 
 
 def _sample_document() -> dict:
@@ -100,8 +118,8 @@ def test_render_txt_filters_technical_blocks_and_renders_tables():
         assert "Conteudo tecnico." not in text
         assert "Paragrafo simples." in text
         assert "- Item 1" in text
-        assert "Tabela: Resumo de valores" in text
-        assert "Linha 1: Coluna A: 1; Coluna B: 2" in text
+        assert "Table: Resumo de valores" in text
+        assert "Row 1: Coluna A: 1; Coluna B: 2" in text
         assert "Filho da seção." in text
 
 

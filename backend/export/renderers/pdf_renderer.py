@@ -17,18 +17,34 @@ from reportlab.platypus import (
     Spacer,
 )
 
+from backend.export.pandoc_exporter import MSG_DEFAULT_ACCESSIBLE_TITLE
+from backend.i18n import t
 from backend.pipeline.table_ast import linearize_table_for_text
 from backend.pipeline.verbosity_manager import filter_blocks_for_profile
 from backend.tools.code_tools import normalize_code_text
 
+#: Canonical English msgid for the PDF table-of-contents heading.
+MSG_PDF_TABLE_OF_CONTENTS: str = "Contents"
+#: Canonical English msgid for the PDF note-block prefix label.
+MSG_PDF_NOTE_LABEL: str = "Note"
+#: Canonical English msgid for the PDF warning-block prefix label.
+MSG_PDF_WARNING_LABEL: str = "Warning"
+
 
 class _DocTemplate(SimpleDocTemplate):
+    """SimpleDocTemplate subclass that records heading bookmarks to emit a PDF outline on page end."""
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._outline = []
         self._last_outline_level = -1
 
     def afterFlowable(self, flowable):
+        """After each flowable is drawn, capture heading paragraphs as outline bookmark candidates.
+
+        Args:
+            flowable (Any): The platypus flowable that was just rendered.
+        """
         if isinstance(flowable, Paragraph) and getattr(flowable, "_heading_id", None):
             self.canv.bookmarkPage(flowable._heading_id)
             self._outline.append(
@@ -41,6 +57,7 @@ class _DocTemplate(SimpleDocTemplate):
         super().afterFlowable(flowable)
 
     def handle_pageEnd(self):
+        """Flush the queued outline entries to the canvas at the end of each page."""
         if self._outline:
             for level, text, key in self._outline:
                 safe_level = self._normalize_outline_level(level)
@@ -55,9 +72,17 @@ class _DocTemplate(SimpleDocTemplate):
         super().handle_pageEnd()
 
     def _normalize_outline_level(self, raw_level: int) -> int:
+        """Clamp an outline level so entries never skip more than one level deeper than the previous entry.
+
+        Args:
+            raw_level (int): 0-based outline level requested for the entry.
+
+        Returns:
+            int: The clamped, ReportLab-safe level.
+        """
         target = max(int(raw_level), 0)
         if self._last_outline_level < 0:
-            # ReportLab exige que a primeira entrada comece no nível 0.
+            # ReportLab requires the first outline entry to start at level 0.
             return 0
         if target > self._last_outline_level + 1:
             return self._last_outline_level + 1
@@ -70,6 +95,17 @@ def render_pdf(
     profile_name: str = "pdf",
     title: str | None = None,
 ) -> Path:
+    """Renders the canonical document into a marked A4 PDF with bookmarks for headings.
+
+    Args:
+        document (dict): Canonical document mapping (title, sections) to render.
+        output_path (Path): Destination file path; the parent directory is created when missing.
+        profile_name (str): Export verbosity profile applied to block filtering (default "pdf").
+        title (str | None): Optional title override; falls back to the document title, then the localized default (default None).
+
+    Returns:
+        Path: The output_path where the PDF was written.
+    """
     output_path.parent.mkdir(parents=True, exist_ok=True)
     styles = getSampleStyleSheet()
     styles.add(
@@ -109,18 +145,21 @@ def render_pdf(
         rightMargin=18 * mm,
         topMargin=18 * mm,
         bottomMargin=18 * mm,
-        title=title or document.get("title", "Documento acessível"),
+        title=title or document.get("title") or t(MSG_DEFAULT_ACCESSIBLE_TITLE),
         author="a11y-devs-describer",
     )
     story = [
         Paragraph(
-            title or document.get("title", "Documento acessível"), styles["A11yTitle"]
+            title
+            or document.get("title")
+            or t(MSG_DEFAULT_ACCESSIBLE_TITLE),
+            styles["A11yTitle"],
         ),
         Spacer(1, 6 * mm),
     ]
     toc = _build_toc(document)
     if toc:
-        story.append(Paragraph("Sumario", styles["A11yHeading1"]))
+        story.append(Paragraph(t(MSG_PDF_TABLE_OF_CONTENTS), styles["A11yHeading1"]))
         for level, heading_title, heading_id in toc:
             indent = "&nbsp;" * (level - 1) * 4
             story.append(
@@ -137,6 +176,14 @@ def render_pdf(
 
 
 def _build_toc(document: dict[str, Any]) -> list[tuple[int, str, str]]:
+    """Collects every titled section (including nested children) into table-of-contents entries.
+
+    Args:
+        document (dict): Canonical document mapping with a top-level "sections" list.
+
+    Returns:
+        list[tuple[int, str, str]]: (level, title, id) tuples in document order.
+    """
     toc: list[tuple[int, str, str]] = []
     for section in document.get("sections", []):
         toc.extend(_section_toc(section))
@@ -144,6 +191,14 @@ def _build_toc(document: dict[str, Any]) -> list[tuple[int, str, str]]:
 
 
 def _section_toc(section: dict[str, Any]) -> list[tuple[int, str, str]]:
+    """Gathers the toc entry for one section and recurses into its nested children.
+
+    Args:
+        section (dict): Canonical section mapping with optional "title", "level", "id" and "children".
+
+    Returns:
+        list[tuple[int, str, str]]: Titled (level, title, id) entries for this section and its children.
+    """
     entries = []
     if section.get("title"):
         entries.append(
@@ -155,6 +210,14 @@ def _section_toc(section: dict[str, Any]) -> list[tuple[int, str, str]]:
 
 
 def _render_section(story, section: dict[str, Any], styles, profile_name: str) -> None:
+    """Appends the section title heading and its profile-filtered blocks (and nested children) to the story.
+
+    Args:
+        story (list): The platypus story flowable list being built (mutated in place).
+        section (dict): Canonical section mapping with optional "title", "id", "level", "blocks", "children".
+        styles (dict): The ParagraphStyle mapping for this document.
+        profile_name (str): Export verbosity profile applied to the section's block filtering.
+    """
     if section.get("title"):
         style_name = {1: "A11yHeading1", 2: "Heading2"}.get(
             section.get("level", 1), "A11yHeading2"
@@ -172,6 +235,13 @@ def _render_section(story, section: dict[str, Any], styles, profile_name: str) -
 
 
 def _render_block(story, block: dict[str, Any], styles) -> None:
+    """Appends the PDF flowables for a single canonical block, choosing markup by block type.
+
+    Args:
+        story (list): The platypus story flowable list being built (mutated in place).
+        block (dict): Canonical block mapping with at least "type" and the type-specific payload.
+        styles (dict): The ParagraphStyle mapping for this document.
+    """
     block_type = block.get("type")
     if block_type == "heading":
         paragraph = Paragraph(
@@ -205,7 +275,7 @@ def _render_block(story, block: dict[str, Any], styles) -> None:
             or block.get("text", "")
         )
         if block_type in {"note", "warning"}:
-            label = "Aviso" if block_type == "warning" else "Nota"
+            label = t(MSG_PDF_WARNING_LABEL) if block_type == "warning" else t(MSG_PDF_NOTE_LABEL)
             if text:
                 story.append(Paragraph(f"<b>{label}:</b> {text}", styles["A11yBody"]))
             else:
@@ -227,6 +297,15 @@ def _render_block(story, block: dict[str, Any], styles) -> None:
 
 
 def _looks_like_code_text(text: str) -> bool:
+    """Heuristically decides whether a string of text is likely source code rather than prose.
+
+    Args:
+        text (str): The block text to inspect.
+
+    Returns:
+        bool: True when the text is long enough (or multi-line with 90+ chars) and scores >= 2
+        Java-like tokens together with at least one code punctuation mark; False otherwise.
+    """
     if not isinstance(text, str) or not text.strip():
         return False
     if "\n" not in text and len(text) < 90:

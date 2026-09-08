@@ -109,17 +109,40 @@ class Settings:
     # Interface Settings
     enabled_interfaces: str = os.getenv("ENABLED_INTERFACES", "api,telegram,web")
 
-    # API Settings
-    api_host: str = os.getenv("API_HOST", "0.0.0.0")
-    api_port: int = int(os.getenv("API_PORT", "8000"))
-    api_base_url: str = os.getenv("API_BASE_URL", "http://localhost:8000")
-    web_base_url: str = os.getenv("WEB_BASE_URL", "http://localhost:8001")
-    web_port: int = int(os.getenv("WEB_PORT", "8001"))
+    # API Settings (lazy defaults: environment state at instantiation, not import time)
+    api_host: str = field(
+        default_factory=lambda: os.getenv("API_HOST", "0.0.0.0"),
+    )
+    api_port: int = field(
+        default_factory=lambda: int(os.getenv("API_PORT", "8000")),
+    )
+    api_base_url: str = field(
+        default_factory=lambda: os.getenv("API_BASE_URL", "http://localhost:8000"),
+    )
+    web_base_url: str = field(
+        default_factory=lambda: os.getenv("WEB_BASE_URL", "http://localhost:8001"),
+    )
+    web_port: int = field(
+        default_factory=lambda: int(os.getenv("WEB_PORT", "8001")),
+    )
 
-    # Build info (injetado via Docker build --build-arg ou variavel de ambiente)
+    # Build info (injected via Docker build --build-arg or environment variables)
     git_commit: str = os.getenv("GIT_COMMIT", "")
     image_tag: str = os.getenv("IMAGE_TAG", "")
     image_digest: str = os.getenv("IMAGE_DIGEST", "")
+
+    # I18N Settings
+    # Preferred runtime locale. Blank means "negotiate from the process
+    # environment (LOCALE/LANGUAGE) and, failing that, fall back to the
+    # default en_US locale."
+    locale: str = field(default_factory=lambda: os.getenv("LOCALE", "").strip())
+    # Comma-separated list of locales the software makes available to remote
+    # users. Anything outside this list is not offered as a bot-facing locale.
+    i18n_locales_active: tuple[str, ...] = field(
+        default_factory=lambda: _locales_from_env(
+            os.getenv("I18N_LOCALES_ACTIVE", "en_US,pt_BR")
+        )
+    )
 
     # SMTP Settings
     smtp_server: str = os.getenv("SMTP_SERVER", "smtp.gmail.com")
@@ -135,7 +158,7 @@ class Settings:
         self.logs_dir.mkdir(parents=True, exist_ok=True)
         self.rapidocr_cache_dir.mkdir(parents=True, exist_ok=True)
 
-    # Aliases retroativos para configuração antiga com prefixo PMV.
+    # Backward-compatible aliases for the old PMV-prefixed configuration.
     @property
     def pmv_execute_dry_run(self) -> bool:
         return self.pddl_execute_dry_run
@@ -205,6 +228,23 @@ def _str_from_env_alias(env_vars: tuple[str, ...], default: str) -> str:
         if raw_value is not None:
             return raw_value
     return default
+
+
+def _locales_from_env(raw_value: str) -> tuple[str, ...]:
+    """Parse a comma-separated locale list from an environment string.
+
+    Args:
+        raw_value (str): Comma-separated locale identifiers read from I18N_LOCALES_ACTIVE; blank entries are dropped and the result keeps first-seen order with duplicates removed.
+
+    Returns:
+        tuple: Locally supported locale identifiers in declared order; an empty tuple when the input lists no usable entry.
+    """
+    seen: list[str] = []
+    for entry in raw_value.split(","):
+        locale = entry.strip()
+        if locale and locale not in seen:
+            seen.append(locale)
+    return tuple(seen)
 
 
 def _bool_from_env_alias(env_vars: tuple[str, ...], default: bool) -> bool:

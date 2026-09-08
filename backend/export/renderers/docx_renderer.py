@@ -7,6 +7,8 @@ from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Pt
 
+from backend.i18n import t
+from backend.pipeline.table_ast import MSG_TABLE_TEXT_CAPTION
 from backend.pipeline.table_ast import rows_from_table_ast
 from backend.pipeline.table_ast import table_ast_from_block
 from backend.pipeline.verbosity_manager import filter_blocks_for_profile
@@ -18,6 +20,17 @@ def render_docx(
     profile_name: str = "docx",
     filename: str = "",
 ) -> Path:
+    """Renders the canonical document into a Word .docx file with styled headings, code and tables.
+
+    Args:
+        document (dict): Canonical document mapping (sections, optional title) to render.
+        output_path (Path): Destination file path; the parent directory is created when missing.
+        profile_name (str): Export verbosity profile applied to block filtering (default "docx").
+        filename (str): Optional document heading text rendered as a centered level-1 heading (default "").
+
+    Returns:
+        Path: The output_path where the .docx file was written.
+    """
     output_path.parent.mkdir(parents=True, exist_ok=True)
     doc = Document()
     style = doc.styles["Normal"]
@@ -33,6 +46,13 @@ def render_docx(
 
 
 def _render_section(doc: Document, section: dict[str, Any], profile_name: str) -> None:
+    """Appends a section heading, its profile-filtered blocks, and its nested children to the docx.
+
+    Args:
+        doc (Document): The python-docx Document being built (mutated in place).
+        section (dict): Canonical section mapping with optional "title", "level", "blocks", "children".
+        profile_name (str): Export verbosity profile applied to the section's block filtering.
+    """
     if section.get("title"):
         doc.add_heading(section["title"], level=min(section.get("level", 1), 9))
     for block in filter_blocks_for_profile(section.get("blocks", []), profile_name):
@@ -42,6 +62,12 @@ def _render_section(doc: Document, section: dict[str, Any], profile_name: str) -
 
 
 def _render_block(doc: Document, block: dict[str, Any]) -> None:
+    """Appends the docx content for a single canonical block, choosing markup by block type.
+
+    Args:
+        doc (Document): The python-docx Document being built (mutated in place).
+        block (dict): Canonical block mapping with at least "type" and the type-specific payload.
+    """
     block_type = block.get("type")
     if block_type == "heading":
         doc.add_heading(
@@ -66,7 +92,7 @@ def _render_block(doc: Document, block: dict[str, Any]) -> None:
         if rows:
             caption = table_ast.get("caption") if isinstance(table_ast, dict) else None
             if isinstance(caption, str) and caption.strip():
-                doc.add_paragraph(f"Tabela: {caption.strip()}")
+                doc.add_paragraph(t(MSG_TABLE_TEXT_CAPTION).format(caption=caption.strip()))
             table = doc.add_table(rows=len(rows), cols=max(len(row) for row in rows))
             table.style = "Table Grid"
             for i, row in enumerate(rows):

@@ -5,14 +5,33 @@ from pathlib import Path
 from typing import Any
 
 from backend.export.filters.pandoc_filters import apply_output_profile_filter
+from backend.export.pandoc_exporter import MSG_DEFAULT_ACCESSIBLE_TITLE
+from backend.i18n import t
 from backend.pipeline.table_ast import split_header_and_body
 from backend.pipeline.table_ast import table_ast_from_block
 from backend.pipeline.verbosity_manager import normalize_profile
+
+#: Canonical English msgid for the HTML table-of-contents navigation label.
+MSG_HTML_TABLE_OF_CONTENTS: str = "Contents"
+#: Canonical English msgid for the HTML technical metadata aside heading.
+MSG_HTML_TECHNICAL_METADATA: str = "Technical metadata"
+#: Canonical English msgid for the HTML image long-description disclosure label.
+MSG_HTML_IMAGE_DESCRIPTION: str = "Image description"
 
 
 def render_html(
     document: dict[str, Any], output_path: Path, profile_name: str = "html"
 ) -> Path:
+    """Renders the canonical document into a standalone HTML page with table of contents.
+
+    Args:
+        document (dict): Canonical document mapping (title, language, metadata, sections) to render.
+        output_path (Path): Destination file path; the parent directory is created when missing.
+        profile_name (str): Export verbosity profile applied to block filtering (default "html").
+
+    Returns:
+        Path: The output_path where the .html file was written.
+    """
     output_path.parent.mkdir(parents=True, exist_ok=True)
     profile = normalize_profile(profile_name)
     blocks = apply_output_profile_filter(_all_blocks(document), profile_name)
@@ -30,13 +49,15 @@ def render_html(
             )
         body.append(_render_block(block, profile))
 
+    title = escape(document.get("title") or t(MSG_DEFAULT_ACCESSIBLE_TITLE))
+    toc_label = escape(t(MSG_HTML_TABLE_OF_CONTENTS))
     html = [
         "<!doctype html>",
         f'<html lang="{escape(document.get("language", "pt-BR"))}">',
         "<head>",
         '<meta charset="utf-8">',
         '<meta name="viewport" content="width=device-width, initial-scale=1">',
-        f"<title>{escape(document.get('title', 'Documento acessível'))}</title>",
+        f"<title>{title}</title>",
         "<style>",
         "body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.6;max-width:980px;margin:0 auto;padding:2rem;background:#fafafa;color:#1c1c1c}",
         "nav.toc{background:#fff;border:1px solid #ddd;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem}",
@@ -48,21 +69,21 @@ def render_html(
         "</style>",
         "</head>",
         "<body>",
-        f'<main aria-label="{escape(document.get("title", "Documento acessível"))}">',
+        f'<main aria-label="{title}">',
     ]
     if toc:
         html.append(
-            '<nav class="toc" aria-label="Sumário"><strong>Sumário</strong><ul>'
+            f'<nav class="toc" aria-label="{toc_label}"><strong>{toc_label}</strong><ul>'
         )
-        for level, title, link_id in toc:
+        for level, title_text, link_id in toc:
             html.append(
-                f'<li class="lvl-{level}"><a href="#{escape(link_id)}">{escape(title)}</a></li>'
+                f'<li class="lvl-{level}"><a href="#{escape(link_id)}">{escape(title_text)}</a></li>'
             )
         html.append("</ul></nav>")
     html.extend(body)
     if profile.get("interactive"):
         html.append(
-            '<aside class="meta"><h2>Metadados técnicos</h2><p>'
+            f'<aside class="meta"><h2>{escape(t(MSG_HTML_TECHNICAL_METADATA))}</h2><p>'
             + escape(str(document.get("metadata", {})))
             + "</p></aside>"
         )
@@ -72,6 +93,14 @@ def render_html(
 
 
 def _all_blocks(document: dict[str, Any]) -> list[dict[str, Any]]:
+    """Flattens every section and nested child section of the document into one block list.
+
+    Args:
+        document (dict): Canonical document mapping with a top-level "sections" list.
+
+    Returns:
+        list[dict]: All blocks (including section title headings) in document order.
+    """
     blocks: list[dict[str, Any]] = []
     for section in document.get("sections", []):
         blocks.extend(_collect_section(section))
@@ -79,6 +108,14 @@ def _all_blocks(document: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _collect_section(section: dict[str, Any]) -> list[dict[str, Any]]:
+    """Collects the title heading, the direct blocks, and the recursively nested child blocks of one section.
+
+    Args:
+        section (dict): Canonical section mapping with optional "title", "blocks", and "children".
+
+    Returns:
+        list[dict]: Ordered blocks for the section plus every block of its nested children.
+    """
     blocks = (
         [
             {
@@ -98,6 +135,15 @@ def _collect_section(section: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _render_block(block: dict[str, Any], profile: dict[str, Any]) -> str:
+    """Renders one canonical block into its HTML fragment according to the block type and profile.
+
+    Args:
+        block (dict): Canonical block mapping with at least "type", "id" and the type-specific payload (text, items, table_ast, ...).
+        profile (dict): Normalized export profile mapping; "collapsible" controls whether note-like blocks render as <details> or <section>.
+
+    Returns:
+        str: The HTML fragment for the block (empty string when a table block carries no usable table_ast).
+    """
     block_type = block.get("type")
     block_id = escape(block.get("id", ""))
     if block_type == "heading":
@@ -146,7 +192,7 @@ def _render_block(block: dict[str, Any], profile: dict[str, Any]) -> str:
         alt = escape(block.get("alt_text", block.get("text", "")))
         desc = escape(block.get("long_description", ""))
         details = (
-            f"<details><summary>Descrição da imagem</summary><p>{desc or alt}</p></details>"
+            f"<details><summary>{escape(t(MSG_HTML_IMAGE_DESCRIPTION))}</summary><p>{desc or alt}</p></details>"
             if desc
             else ""
         )
@@ -163,6 +209,15 @@ def _render_block(block: dict[str, Any], profile: dict[str, Any]) -> str:
 
 
 def _render_html_table_row(row: dict[str, Any], *, header: bool) -> str:
+    """Renders one table row (dict of cells) into a <tr> fragment, skipping empty or non-dict cells.
+
+    Args:
+        row (dict): Row mapping with a "cells" list; each cell is a dict with "text" plus optional "scope", "rowspan", "colspan".
+        header (bool): When True the cells render as <th> (scope defaults to "col"), otherwise as <td>.
+
+    Returns:
+        str: The "<tr>...</tr>" fragment, or an empty string when no cell produced visible text.
+    """
     cells = row.get("cells", []) if isinstance(row, dict) else []
     tag = "th" if header else "td"
     rendered_cells: list[str] = []

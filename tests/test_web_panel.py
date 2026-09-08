@@ -3,8 +3,14 @@ from fastapi.testclient import TestClient
 
 pytest.importorskip("fastapi.testclient")
 
+from backend.i18n import t  # noqa: E402
 from frontend.clients.api_client import ApiError  # noqa: E402
 from frontend.web import app as web_module  # noqa: E402
+from frontend.web.messages import (  # noqa: E402
+    WEB_ADVANCED_HEADLINE,
+    WEB_INDEX_HEADLINE,
+    WEB_SUCCESS_QUEUED,
+)
 
 
 def _fake_pdf_bytes() -> bytes:
@@ -63,25 +69,45 @@ def web_client(monkeypatch):
 
 
 def test_index_page(web_client):
+    """The main panel page must render its localized headline text.
+
+    The headline comes from the i18n catalog via WEB_INDEX_HEADLINE, so the test
+    compares against the translated constant rather than a hardcoded language,
+    keeping this assertion stable regardless of the active server locale.
+    """
     resp = web_client.get("/")
     assert resp.status_code == 200
-    assert "Bot Acess" in resp.text
+    assert t(WEB_INDEX_HEADLINE) in resp.text
 
 
 def test_advanced_page(web_client):
+    """The advanced panel page must render its localized headline text.
+
+    Same reason as test_index_page: assert on the localized WEB_ADVANCED_HEADLINE
+    constant so the check survives locale switches.
+    """
     resp = web_client.get("/advanced")
     assert resp.status_code == 200
-    assert "Modo Avançado" in resp.text
+    assert t(WEB_ADVANCED_HEADLINE) in resp.text
 
 
 def test_upload_submits_via_api(web_client):
+    """Uploading a document queues it and the panel shows the success notice.
+
+    The success notice is localized (WEB_SUCCESS_QUEUED), so the exact words vary
+    by active locale; the test builds the expected text from the translated
+    constant with the known position and e-mail, then confirms the API client
+    received a correctly formed submission.
+    """
     resp = web_client.post(
         "/process",
         files={"document_file": ("doc.pdf", _fake_pdf_bytes(), "application/pdf")},
         data={"email": "test@example.com"},
     )
     assert resp.status_code == 200
-    assert "Posição" in resp.text
+    # The fake API reports the job landed at queue position 1.
+    expected_success = t(WEB_SUCCESS_QUEUED).format(position=1, email="test@example.com")
+    assert expected_success in resp.text
     assert len(web_client.fake.submitted) == 1
     sub = web_client.fake.submitted[0]
     assert sub["filename"] == "doc.pdf"

@@ -1,10 +1,19 @@
-"""ReaderAgent – Leitura estrutural e classificação de regiões de páginas."""
+"""ReaderAgent — structural reading and classification of page regions."""
 
 from pathlib import Path
 
 import fitz
 
 from backend.config.settings import settings
+from backend.i18n import t
+from backend.log_messages import (
+    LOG_READER_CLEAN_TEXT_REGIONS,
+    LOG_READER_FULL_PAGE_FALLBACK,
+    LOG_READER_IMAGE_READING,
+    LOG_READER_PDF_REGIONS_EXTRACTED,
+    LOG_READER_REGION_TASK,
+    LOG_READER_TASKS_SUMMARY,
+)
 from backend.tools.region_classifier import (
     classify_region,
     region_has_markers,
@@ -21,13 +30,13 @@ from backend.tools.structurer import get_structurer as get_structurer_instance
 
 
 class ReaderAgent:
-    """Analisa páginas e gera tarefas tipadas para os demais agentes."""
+    """Analyzes document pages and generates typed tasks for the remaining agents."""
 
     def __init__(self):
         self.structurer = get_structurer_instance()
 
     def split_file(self, file_path: Path, tmpdir: Path) -> list[Path]:
-        """Divide PDF em páginas individuais; retorna [file_path] para imagens."""
+        """Splits a PDF into individual pages; returns [file_path] unchanged for image inputs."""
         is_pdf = file_path.suffix.lower() == ".pdf"
         if is_pdf:
             return split_pdf(file_path, tmpdir, settings.max_pages)
@@ -40,7 +49,17 @@ class ReaderAgent:
         total_pages: int,
         is_pdf: bool,
     ) -> list[RegionTask]:
-        """Analisa uma página e retorna uma lista de RegionTasks."""
+        """Analyzes a page and returns a list of RegionTasks.
+
+        Args:
+            page_path: Path to the single-page file (per-page PDF or image).
+            page_num: 1-based page number within the document.
+            total_pages: Total page count of the document.
+            is_pdf: Whether the page file is a PDF (True) or a raster image (False).
+
+        Returns:
+            One RegionTask per detected region on the page.
+        """
 
         if not is_pdf:
             return self._analyse_image_page(page_path, page_num, total_pages)
@@ -66,13 +85,14 @@ class ReaderAgent:
             return []
 
         logger.info(
-            "[pag {}] Extraidas {} regioes na pagina (structurer={})",
-            page_num,
-            len(regions),
-            self.structurer.name,
+            t(LOG_READER_PDF_REGIONS_EXTRACTED).format(
+                page_num=page_num,
+                count=len(regions),
+                structurer=self.structurer.name,
+            )
         )
 
-        # Verifica se todas as regiões são texto limpo (sem necessidade de visão)
+        # Check whether every region is clean text (no vision pass needed)
         all_text_clean = True
         for r in regions:
             classification = classify_region(r)
@@ -90,7 +110,7 @@ class ReaderAgent:
         regions: list[Region],
         page_num: int,
     ) -> list[RegionTask]:
-        """Gera tarefas para regiões puramente textuais (sem visão)."""
+        """Generates tasks for purely textual regions that need no vision pass."""
         tasks: list[RegionTask] = []
         clean_fps: set[int] = set()
 
@@ -122,9 +142,10 @@ class ReaderAgent:
 
         if tasks:
             logger.info(
-                "[pag {}] {} regioes de texto limpo (sem IA de visao)",
-                page_num,
-                len(tasks),
+                t(LOG_READER_CLEAN_TEXT_REGIONS).format(
+                    page_num=page_num,
+                    count=len(tasks),
+                )
             )
 
         return tasks
@@ -136,7 +157,17 @@ class ReaderAgent:
         page_num: int,
         total_pages: int,
     ) -> list[RegionTask]:
-        """Gera tarefas mistas: texto limpo direto + regiões que precisam de visão."""
+        """Generates mixed tasks: clean text sent directly plus regions that need a vision pass.
+
+        Args:
+            page_path: Path to the single-page file (per-page PDF or image).
+            regions: Regions extracted from the page.
+            page_num: 1-based page number within the document.
+            total_pages: Total page count of the document.
+
+        Returns:
+            One RegionTask per region that produced usable output.
+        """
         tasks: list[RegionTask] = []
         clean_bboxes: list[tuple[float, float, float, float]] = []
         content_fingerprints: set[int] = set()
@@ -148,7 +179,7 @@ class ReaderAgent:
             if classification == "ignore":
                 continue
 
-            # Texto limpo → vai direto para o EditorAgent
+            # Clean text goes straight to the EditorAgent
             if classification == "text_clean" and region.text.strip():
                 fp = content_fingerprint(region.text)
                 if fp not in content_fingerprints:
@@ -163,7 +194,7 @@ class ReaderAgent:
                     clean_bboxes.append(region.bbox)
                 continue
 
-            # Regiões com marcadores mas que possuem texto limpo
+            # Regions with markers that also carry clean text
             if region_has_markers(classification) and region.text.strip():
                 fp = content_fingerprint(region.text)
                 if fp not in content_fingerprints:
@@ -178,7 +209,7 @@ class ReaderAgent:
                     clean_bboxes.append(region.bbox)
                 continue
 
-            # Regiões que precisam de visão
+            # Regions that need a vision pass
             if region_needs_vision(classification):
                 if classification in ("unknown", "text_scanned") and overlaps_clean(
                     region.bbox, clean_bboxes
@@ -198,12 +229,12 @@ class ReaderAgent:
 
                 vision_count += 1
 
-                # Recorta a imagem da região para enviar ao agente de visão
+                # Crop the region image to send to the vision agent
                 image_bytes = crop_region_image(
                     self.structurer, page_path, region,
                 )
 
-                # Determina qual agente processar a tarefa
+                # Decide which agent will process the task
                 if classification in ("table",):
                     target = "data"
                 elif classification in ("formula",):
@@ -214,12 +245,13 @@ class ReaderAgent:
                     target = "vision"
 
                 logger.info(
-                    "[pag {}] Regiao {} - tipo={}, bbox={}, target={}",
-                    page_num,
-                    len(tasks) + 1,
-                    classification,
-                    region.bbox,
-                    target,
+                    t(LOG_READER_REGION_TASK).format(
+                        page_num=page_num,
+                        idx=len(tasks) + 1,
+                        type=classification,
+                        bbox=region.bbox,
+                        target=target,
+                    )
                 )
 
                 tasks.append(RegionTask(
@@ -232,11 +264,9 @@ class ReaderAgent:
                 ))
 
         if not tasks:
-            # Fallback: envia a página inteira para o VisionAgent
+            # Fallback: send the whole page to the VisionAgent
             logger.warning(
-                "[pag {}] Nenhum texto extraido por regioes, "
-                "fallback para pagina inteira",
-                page_num,
+                t(LOG_READER_FULL_PAGE_FALLBACK).format(page_num=page_num)
             )
             image_bytes = render_full_page(page_path)
             tasks.append(RegionTask(
@@ -247,16 +277,17 @@ class ReaderAgent:
             ))
 
         logger.info(
-            "[pag {}] {} tarefas ({} texto, {} visao)",
-            page_num,
-            len(tasks),
-            len(tasks) - vision_count,
-            vision_count,
+            t(LOG_READER_TASKS_SUMMARY).format(
+                page_num=page_num,
+                count=len(tasks),
+                text_count=len(tasks) - vision_count,
+                vision_count=vision_count,
+            )
         )
 
         return tasks
 
-    # ── Imagem ──
+    # ── Image ──
 
     def _analyse_image_page(
         self,
@@ -264,8 +295,10 @@ class ReaderAgent:
         page_num: int,
         total_pages: int,
     ) -> list[RegionTask]:
-        """Para arquivos de imagem, gera uma única tarefa de visão."""
-        logger.debug("[pag {}] lendo imagem: {}", page_num, page_path)
+        """For image files, generate a single vision task for the whole page."""
+        logger.debug(
+            t(LOG_READER_IMAGE_READING).format(page_num=page_num, path=page_path)
+        )
         with open(page_path, "rb") as file_handle:
             raw_bytes = file_handle.read()
 

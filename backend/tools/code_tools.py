@@ -8,7 +8,7 @@ def normalize_code_text(text: str) -> str:
         return ""
 
     normalized = text.replace("\r\n", "\n").replace("\r", "\n")
-    # Docling costuma devolver código linearizado com TAB entre tokens.
+    # Docling usually returns linearized code with TABs between tokens.
     normalized = re.sub(r"\t+", " ", normalized)
 
     if _looks_flattened(normalized):
@@ -104,7 +104,7 @@ def _cleanup_lines(text: str) -> str:
             if cleaned_lines and cleaned_lines[-1] != "":
                 cleaned_lines.append("")
             continue
-        # Preserva indentação inicial, mas normaliza espaçamento interno.
+        # Preserves the leading indentation but normalizes the internal spacing.
         leading = re.match(r"^\s*", line).group(0)
         body = line[len(leading):]
         body = re.sub(r"\s+", " ", body).strip()

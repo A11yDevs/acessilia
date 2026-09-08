@@ -294,7 +294,7 @@ async def run_benchmark(
             "error": str(exc),
         }
 
-    # limpar tmpdir após benchmark
+    # Clean up the tmpdir after the benchmark.
     import shutil
     shutil.rmtree(tmpdir, ignore_errors=True)
 

@@ -6,6 +6,13 @@ import threading
 import shutil
 from pathlib import Path
 
+from backend.i18n import t
+from backend.log_messages import (
+    LOG_DOWNLOAD_TOKEN_CREATED,
+    LOG_DOWNLOAD_TOKEN_DIR_MISSING,
+    LOG_DOWNLOAD_TOKEN_NOT_FOUND,
+    LOG_OUTPUT_DIR_REMOVED,
+)
 from backend.tools.logger import logger
 from backend.config.settings import settings
 
@@ -77,7 +84,7 @@ async def criar_token(output_dir: Path, filename: str, formats: list = None) -> 
             conn.commit()
         finally:
             cursor.close()
-    logger.debug("Token de download criado: {} -> {}", token, filename)
+    logger.debug(t(LOG_DOWNLOAD_TOKEN_CREATED).format(token=token, filename=filename))
     return token
 
 
@@ -94,14 +101,12 @@ async def obter_info_token(token: str) -> dict | None:
         finally:
             cursor.close()
     if row is None:
-        logger.warning("Token de download nao encontrado: {}", token)
+        logger.warning(t(LOG_DOWNLOAD_TOKEN_NOT_FOUND).format(token=token))
         return None
     output_dir = Path(row["output_dir"])
     if not output_dir.exists():
         logger.warning(
-            "Diretorio do token de download nao existe: {} -> {}",
-            token,
-            output_dir,
+            t(LOG_DOWNLOAD_TOKEN_DIR_MISSING).format(token=token, output_dir=output_dir)
         )
         return None
     formats_list = json.loads(row["formats"]) if row["formats"] else []
@@ -144,7 +149,7 @@ async def limpar_tokens_expirados(dias: int = TOKEN_EXPIRY_DAYS):
             if output_dir.exists():
                 if str(output_dir).startswith(str(settings.temp_dir)) or str(output_dir).startswith(str(settings.data_dir / "output")):
                     shutil.rmtree(output_dir, ignore_errors=True)
-                    logger.debug("Diretório de output removido: {}", output_dir)
+                    logger.debug(t(LOG_OUTPUT_DIR_REMOVED).format(name=output_dir))
         cursor = conn.cursor()
         try:
             cursor.execute(

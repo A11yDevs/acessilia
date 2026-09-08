@@ -6,6 +6,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Coroutine, Any
 
+from backend.i18n import t
+from backend.log_messages import (
+    LOG_QUEUE_ITEM_ENQUEUED,
+    LOG_WORKER_STARTED,
+    LOG_WORKER_TASK_COMPLETED,
+    LOG_WORKER_TASK_ERROR,
+    LOG_WORKER_TASK_STARTING,
+)
 from backend.tools.logger import logger
 
 
@@ -31,17 +39,16 @@ class UnifiedQueue:
     def start_worker(self):
         if self._worker_task is None or self._worker_task.done():
             self._worker_task = asyncio.create_task(self._worker())
-            logger.info("Worker da Fila Unificada iniciado.")
+            logger.info(t(LOG_WORKER_STARTED))
 
     async def enqueue(self, item: QueueItem) -> int:
         async with self._lock:
             self._queue.append(item)
             pos = len(self._queue)
             logger.info(
-                "Fila Unificada: {} enfileirado de {} (Posição: {})",
-                item.filename,
-                item.source,
-                pos,
+                t(LOG_QUEUE_ITEM_ENQUEUED).format(
+                    filename=item.filename, source=item.source, position=pos
+                )
             )
             return pos
 
@@ -56,17 +63,22 @@ class UnifiedQueue:
             if item:
                 try:
                     logger.info(
-                        "Worker: Iniciando tarefa {} de {}", item.filename, item.source
+                        t(LOG_WORKER_TASK_STARTING).format(
+                            filename=item.filename, source=item.source
+                        )
                     )
                     await item.callback(**item.callback_args)
                 except Exception as e:
-                    logger.error("Erro no Worker ao processar {}: {}", item.filename, e)
+                    logger.error(
+                        t(LOG_WORKER_TASK_ERROR).format(
+                            filename=item.filename, error=e
+                        )
+                    )
                 finally:
                     async with self._lock:
                         self._processing_count -= 1
                     logger.info(
-                        "Worker: Tarefa concluída: {}. Aguardando próximo...",
-                        item.filename,
+                        t(LOG_WORKER_TASK_COMPLETED).format(filename=item.filename)
                     )
 
             await asyncio.sleep(0.5)

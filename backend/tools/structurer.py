@@ -8,6 +8,18 @@ from typing import Any
 import fitz
 
 from backend.config.settings import settings
+from backend.i18n import t
+from backend.log_messages import (
+    LOG_DOCLING_NOT_AVAILABLE,
+    LOG_DOCLING_PAGE_FAILED,
+    LOG_DOCLING_PAGE_NO_PARENT,
+    LOG_DOCLING_PROCESSED,
+    LOG_RAPIDOCR_MODELS_PERSISTED,
+    LOG_RAPIDOCR_MODELS_RESTORED,
+    LOG_STRUCTURER_DOCLING,
+    LOG_STRUCTURER_DOCLING_NOT_INSTALLED,
+    LOG_STRUCTURER_PYMUPDF,
+)
 from backend.tools.code_tools import normalize_code_text
 from backend.tools.region_extractor import Region, crop_region_to_image, extract_regions
 from backend.tools.logger import logger
@@ -62,7 +74,7 @@ class DoclingStructurer(BaseStructurer):
     def _get_converter(self) -> Any:
         if self._converter is None:
             if not DOCLING_AVAILABLE or DocumentConverter is None:
-                raise RuntimeError("Docling não está disponível no ambiente atual.")
+                raise RuntimeError(t(LOG_DOCLING_NOT_AVAILABLE))
             from docling.datamodel.base_models import InputFormat
             from docling.datamodel.pipeline_options import (
                 PdfPipelineOptions,
@@ -99,7 +111,7 @@ class DoclingStructurer(BaseStructurer):
         _persist_rapidocr_models()
         elapsed = time.time() - start
 
-        logger.info("Docling processou {} em {:.1f}s", file_path.name, elapsed)
+        logger.info(t(LOG_DOCLING_PROCESSED).format(filename=file_path.name, elapsed=elapsed))
 
         self._doc_cache[path_str] = {"doc": docling_doc, "time": time.time()}
         return docling_doc
@@ -111,14 +123,12 @@ class DoclingStructurer(BaseStructurer):
 
         try:
             if parent is None or not getattr(parent, "name", None):
-                raise RuntimeError("Página sem documento pai para processamento Docling")
+                raise RuntimeError(t(LOG_DOCLING_PAGE_NO_PARENT))
             docling_doc = self._process_document(Path(parent.name))
             return self._docling_page_to_regions(docling_doc, page_num, page)
         except Exception as e:
             logger.warning(
-                "Docling falhou na pagina {} ({}), fallback PyMuPDF",
-                page_num,
-                e,
+                t(LOG_DOCLING_PAGE_FAILED).format(page=page_num, error=e)
             )
             return extract_regions(page)
 
@@ -296,7 +306,7 @@ def _hydrate_rapidocr_models() -> None:
         shutil.copy2(source, target)
         copied += 1
     if copied:
-        logger.info("RapidOCR: {} modelo(s) restaurado(s) do cache local", copied)
+        logger.info(t(LOG_RAPIDOCR_MODELS_RESTORED).format(count=copied))
 
 
 def _persist_rapidocr_models() -> None:
@@ -316,7 +326,7 @@ def _persist_rapidocr_models() -> None:
         shutil.copy2(source, target)
         copied += 1
     if copied:
-        logger.info("RapidOCR: {} modelo(s) persistido(s) no cache local", copied)
+        logger.info(t(LOG_RAPIDOCR_MODELS_PERSISTED).format(count=copied))
 
 
 def get_structurer() -> BaseStructurer:
@@ -324,13 +334,10 @@ def get_structurer() -> BaseStructurer:
 
     if mode == "docling":
         if not DOCLING_AVAILABLE:
-            logger.warning(
-                "STRUCTURER=docling mas docling nao instalado. "
-                "Execute: pip install docling. Usando PyMuPDF.",
-            )
+            logger.warning(t(LOG_STRUCTURER_DOCLING_NOT_INSTALLED))
             return PyMuPDFStructurer()
-        logger.info("Usando structurer: Docling (com fallback PyMuPDF)")
+        logger.info(t(LOG_STRUCTURER_DOCLING))
         return DoclingStructurer()
 
-    logger.info("Usando structurer: PyMuPDF")
+    logger.info(t(LOG_STRUCTURER_PYMUPDF))
     return PyMuPDFStructurer()

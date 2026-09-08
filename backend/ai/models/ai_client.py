@@ -4,7 +4,16 @@ from backend.config.settings import settings
 
 
 def get_agno_model():
-    """Retorna a instância de modelo do Agno correspondente às configurações."""
+    """Build the Agno model instance that matches the active settings configuration.
+
+    The provider is chosen by ``settings.ai_client``: the value ``"openrouter"`` selects
+    the OpenRouter hosted-API client, and any other value selects the local Ollama client, so the
+    returned model is always the one the rest of the runtime expects for the configured backend.
+
+    Returns:
+        Any: The configured Agno client instance; an ``OpenRouter`` model when
+        ``settings.ai_client == "openrouter"`` or an ``Ollama`` model otherwise, ready to be passed to an Agno agent.
+    """
     if settings.ai_client == "openrouter":
         from agno.models.openrouter import OpenRouter
 

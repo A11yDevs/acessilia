@@ -19,12 +19,39 @@ from backend.core.planning.models import NominalPlan, PlanningComparison
 from backend.core.planning.planner_agent import PlannerAgent
 
 from backend.agents.vision_agent import VisionAgent
+from backend.i18n import t
+from backend.log_messages import (
+    LOG_PDDL_ELEMENT_CROP_FAILED,
+    LOG_PDDL_EXTRACTOR_BACKEND_INVALID,
+    LOG_PDDL_IGNORED_OPTIONS,
+    LOG_PDDL_IMAGES_ENRICHED,
+    LOG_PDDL_PREFERRED_PLAN_MISSING,
+    LOG_PDDL_TABLES_ENRICHED,
+)
+from backend.stage_messages import (
+    STAGE_ANALYZING_STRUCTURAL,
+    STAGE_ENRICHING_IMAGE_DESCRIPTIONS,
+    STAGE_ENRICHING_TABLES_OCR,
+    STAGE_GENERATING_PDDL_PLAN,
+    STAGE_VALIDATING_PLAN_DRY_RUN,
+)
 from backend.tools.code_tools import normalize_code_text
 from backend.tools.logger import logger
 
 
 class PddlAccessibilityOrchestrator:
-    """Orquestra o pipeline PDDL: IE -> Planner -> Executor."""
+    """Drives the PDDL pipeline: informational-extraction -> planner -> executor.
+
+    Args:
+        planner_backend (str): Which planner backend to prefer for nominal-plan generation; defaults to "internal".
+        preferred_plan (str): Which plan source to prefer when multiple are available; defaults to "internal".
+        execute_dry_run (bool): When True the produced plan is only validated in dry-run instead of executed for real; defaults to True.
+        fast_downward (Path | None): Optional filesystem path to a fast-downward binary used when planner_backend is fast-downward; defaults to None.
+        fast_downward_alias (str | None): Optional shell alias to invoke fast_downward through instead of the raw path; defaults to None.
+        fast_downward_search (str): Fast-downward search heuristic string passed when the backend is active; defaults to "astar(blind())".
+        enable_ocr (bool): Whether the docling extraction backend should run its OCR pass; defaults to True.
+        extractor_backend (str): Which manifest-extraction backend to use, "docling" or "pymupdf"; defaults to "docling".
+    """
 
     def __init__(
         self,
@@ -51,9 +78,7 @@ class PddlAccessibilityOrchestrator:
         elif self.extractor_backend == "docling":
             extractor = DoclingManifestExtractor(enable_ocr=enable_ocr)
         else:
-            raise ValueError(
-                "extractor_backend inválido; use 'docling' ou 'pymupdf'"
-            )
+            raise ValueError(t(LOG_PDDL_EXTRACTOR_BACKEND_INVALID))
 
         self.information_structural = InformationalStructuralAgent(
             extractor
@@ -97,13 +122,10 @@ class PddlAccessibilityOrchestrator:
         effective_mode = mode or "medio"
 
         if custom_prompt or thinking_mode:
-            logger.warning(
-                "Pipeline PDDL ignora custom_prompt/thinking_mode; "
-                "apenas fluxo deterministico de manifesto/planejamento/execucao"
-            )
+            logger.warning(t(LOG_PDDL_IGNORED_OPTIONS))
 
         if status_callback:
-            await status_callback("Analisando documento com agente estrutural...")
+            await status_callback(t(STAGE_ANALYZING_STRUCTURAL))
         manifest = await asyncio.to_thread(
             self.information_structural.process,
             file_path.resolve(),
@@ -111,7 +133,7 @@ class PddlAccessibilityOrchestrator:
         )
 
         if status_callback:
-            await status_callback("Enriquecendo descrições de imagens...")
+            await status_callback(t(STAGE_ENRICHING_IMAGE_DESCRIPTIONS))
         await _enrich_picture_descriptions(
             manifest,
             file_path.resolve(),
@@ -119,20 +141,20 @@ class PddlAccessibilityOrchestrator:
         )
 
         if status_callback:
-            await status_callback("Enriquecendo tabelas com OCR (fallback)...")
+            await status_callback(t(STAGE_ENRICHING_TABLES_OCR))
         await _enrich_table_structures(
             manifest,
             file_path.resolve(),
         )
 
         if status_callback:
-            await status_callback("Gerando plano nominal com PDDL...")
+            await status_callback(t(STAGE_GENERATING_PDDL_PLAN))
         plan, comparison = await asyncio.to_thread(self._build_plan, manifest)
 
         execution_report: ExecutionReport | None = None
         if self.execute_dry_run:
             if status_callback:
-                await status_callback("Validando plano em dry-run...")
+                await status_callback(t(STAGE_VALIDATING_PLAN_DRY_RUN))
             _, execution_report = await asyncio.to_thread(
                 self.executor.execute,
                 plan,
@@ -167,8 +189,9 @@ class PddlAccessibilityOrchestrator:
             )
             if self.preferred_plan not in plans:
                 raise RuntimeError(
-                    "Backend preferido nao gerou plano valido no modo both: "
-                    f"{self.preferred_plan}"
+                    t(LOG_PDDL_PREFERRED_PLAN_MISSING).format(
+                        backend=self.preferred_plan
+                    )
                 )
             return plans[self.preferred_plan], comparison
 
@@ -247,10 +270,7 @@ async def _enrich_picture_descriptions(
             enriched += 1
 
     if enriched:
-        logger.info(
-            "Pipeline PDDL: {} imagem(ns) enriquecida(s) com descrição visual",
-            enriched,
-        )
+        logger.info(t(LOG_PDDL_IMAGES_ENRICHED).format(count=enriched))
 
 
 async def _enrich_table_structures(
@@ -313,10 +333,7 @@ async def _enrich_table_structures(
         enriched += 1
 
     if enriched:
-        logger.info(
-            "Pipeline PDDL: {} tabela(s) enriquecida(s) com OCR/reconstrução",
-            enriched,
-        )
+        logger.info(t(LOG_PDDL_TABLES_ENRICHED).format(count=enriched))
 
 
 def _table_element_has_structured_content(element: ManifestElement) -> bool:
@@ -455,8 +472,7 @@ def _extract_picture_bytes(
         return pixmap.tobytes("png"), page_number
     except Exception:
         logger.exception(
-            "Falha ao extrair recorte de imagem para elemento {}",
-            element.id,
+            t(LOG_PDDL_ELEMENT_CROP_FAILED).format(element_id=element.id)
         )
         return None, page_number
     finally:
@@ -577,8 +593,8 @@ def _manifest_pages_to_payload(manifest: ProcessingManifest) -> list[dict[str, A
                 if element_id in elements_by_id
             ]
             if not block_elements:
-                # Alguns extratores podem preencher pages sem element_ids; nesse
-                # caso, fazemos fallback por page_number para não perder conteúdo.
+                # Some extractors can fill in pages without element_ids; in that
+                # case we fall back to page_number so no content is lost.
                 block_elements = [
                     element
                     for element in manifest.elements
@@ -877,6 +893,6 @@ def _rows_from_table_ast(table_ast: dict[str, Any]) -> list[list[str]]:
     return rows
 
 
-# Compatibilidade retroativa com nomenclatura PMV.
+# Backward compatibility with the PMV naming.
 PmvAccessibilityOrchestrator = PddlAccessibilityOrchestrator
 build_pmv_structured_payload = build_pddl_structured_payload

@@ -1,5 +1,8 @@
-"""Ferramentas de gerenciamento de prompts."""
+"""Prompt-loading utilities that assemble the system and region prompts for the vision model."""
 from pathlib import Path
+
+from backend.i18n import t
+from backend.log_messages import LOG_PROMPT_FILE_NOT_FOUND
 from backend.tools.logger import logger
 
 PROMPTS_DIR = Path(__file__).resolve().parent.parent / "ai" / "prompts"
@@ -20,11 +23,21 @@ REGION_PROMPT_MAP = {
 }
 
 def load_system_prompt(mode: str = "medio") -> str:
+    """Load the system prompt for a description mode, falling back to the medio prompt when missing.
+
+    Args:
+        mode (str, "medio"): Description mode key from MODE_MAP; unknown modes fall back to "medio.md".
+
+    Returns:
+        str: The prompt file text, the medio fallback text when the mode file is absent, or a short built-in default when even the medio file is absent.
+    """
     filename = MODE_MAP.get(mode, "medio.md")
     prompt_path = PROMPTS_DIR / filename
     if prompt_path.exists():
         return prompt_path.read_text(encoding="utf-8")
-    logger.warning(f"Prompt file not found at {prompt_path}, falling back to medio")
+    logger.warning(
+        t(LOG_PROMPT_FILE_NOT_FOUND).format(path=str(prompt_path))
+    )
     fallback = PROMPTS_DIR / "medio.md"
     if fallback.exists():
         return fallback.read_text(encoding="utf-8")

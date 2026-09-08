@@ -7,6 +7,13 @@ from typing import Any
 import aiofiles
 import aiofiles.os
 
+from backend.i18n import t
+from backend.log_messages import (
+    LOG_CACHE_CLEARED,
+    LOG_CACHE_DEBUG_HIT,
+    LOG_CACHE_DEBUG_SET,
+    LOG_CACHE_SAVE_FAILED,
+)
 from backend.tools.logger import logger
 
 CACHE_DIR = Path("var/temp/cache")
@@ -49,7 +56,7 @@ async def get_cached(path: Path, extra: str = "", ttl: int = 3600) -> Any:
         if time.time() - data["timestamp"] > ttl:
             await aiofiles.os.remove(str(cp))
             return None
-        logger.debug("Cache hit: {}", key)
+        logger.debug(t(LOG_CACHE_DEBUG_HIT).format(key=key))
         if "payload" in data:
             return data["payload"]
         return data.get("text")
@@ -71,9 +78,9 @@ async def set_cache(path: Path, payload: Any, extra: str = "") -> None:
             data["text"] = payload
         async with aiofiles.open(str(cp), "w", encoding="utf-8") as f:
             await f.write(json.dumps(data, ensure_ascii=False))
-        logger.debug("Cache set: {}", key)
+        logger.debug(t(LOG_CACHE_DEBUG_SET).format(key=key))
     except Exception as e:
-        logger.warning("Falha ao salvar cache: {}", e)
+        logger.warning(t(LOG_CACHE_SAVE_FAILED).format(error=e))
 
 
 async def clear_cache() -> int:
@@ -83,5 +90,5 @@ async def clear_cache() -> int:
         if f.suffix == ".json":
             await aiofiles.os.remove(str(f))
             count += 1
-    logger.info("Cache limpo: {} arquivos removidos", count)
+    logger.info(t(LOG_CACHE_CLEARED).format(count=count))
     return count
