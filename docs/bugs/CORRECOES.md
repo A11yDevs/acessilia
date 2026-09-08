@@ -200,6 +200,36 @@ O worker podia falhar antes de entrar em `process()`, e seu tratamento de erro a
 
 A correção faz o worker registrar o job assim que o retira da fila, antes do e-mail de confirmação e da chamada a `process()`. A leitura inicial do tamanho do arquivo usa zero se falhar, garantindo que esse preparo também não impeça o registro.
 
+## BUG-0034: nome interno do upload substitui o nome original no status
+
+O upload é salvo com um nome interno aleatório, mas esse nome aparecia no status quando o worker criava a tarefa.
+
+A correção permite informar o nome público ao criar a tarefa. O worker passa `job.filename`, então o status continua mostrando o nome enviado pelo usuário.
+
+## BUG-0035: posição exibida na fila fica desatualizada
+
+A posição da fila ficava salva como texto no momento da submissão. Quando uma tarefa anterior saía da fila, as demais ainda mostravam a posição antiga.
+
+A correção recalcula a posição no momento da consulta do status, usando a fila real como fonte.
+
+## BUG-0036: e-mail anuncia formatos opcionais que podem não existir
+
+O e-mail de resultado listava PDF/UA e MP3 mesmo quando uma dessas exportações opcionais falhava.
+
+A correção passa ao serviço de e-mail os formatos realmente concluídos e os avisos das falhas opcionais. O texto do e-mail agora lista somente o que foi gerado.
+
+## BUG-0037: falha em exportação obrigatória deixa artefatos parciais no disco
+
+Quando uma exportação obrigatória falhava depois de escrever parte do arquivo, o diretório de saída podia ficar com arquivos incompletos.
+
+A correção remove o diretório de saída do job quando o worker termina em `error`. Assim não sobra artefato parcial sem token válido.
+
+## BUG-0038: estados concluídos permanecem indefinidamente na memória
+
+Estados `done`, `error` e `cancelled` ficavam guardados no processo sem limite.
+
+A correção adiciona expiração para estados terminais no `StateManager` e para registros terminais da fila. A limpeza periódica chama essa rotina junto da limpeza de arquivos e tokens.
+
 ## Testes criados
 
 - `tests/test_api.py::test_job_executor_marks_history_error_when_export_fails`: simula sucesso no `process()` e falha na exportação TXT. Confirma que o estado público e o histórico terminam como `error`.
@@ -242,3 +272,8 @@ A correção faz o worker registrar o job assim que o retira da fila, antes do e
 - `tests/test_cache_history.py::test_cached_submission_is_recorded_in_history`: processa duas submissões idênticas com SQLite real e confirma duas entradas `done` para apenas uma execução do agente.
 - `tests/test_api.py::test_job_executor_stops_exports_after_cancellation`: passou a confirmar que o cancelamento durante a exportação também termina o histórico como `cancelled`.
 - `tests/test_api.py::test_job_executor_records_early_process_failure`: passou a confirmar que uma falha anterior ao processamento cria e finaliza a entrada de histórico como `error`.
+- `tests/test_api.py::test_job_executor_keeps_original_filename_in_status`: confirma que o status preserva o nome original do arquivo enviado.
+- `tests/test_api.py::test_queued_position_is_recalculated`: confirma que a posição da fila é recalculada quando uma tarefa anterior sai da fila.
+- `tests/test_email_service.py::test_result_email_lists_only_completed_formats`: confirma que o e-mail lista apenas formatos concluídos e inclui avisos opcionais.
+- `tests/test_cleanup_service.py::test_cleanup_expires_terminal_statuses`: confirma que a limpeza periódica remove estados terminais antigos da memória.
+- `tests/test_api.py::test_job_executor_marks_history_error_when_export_fails`: passou a confirmar que o diretório de saída parcial é removido quando uma exportação obrigatória falha.

@@ -35,3 +35,8 @@ As fichas preservam os IDs e a origem histórica dos defeitos, mas Ambiente, Res
 | [0018](0018-staging-ignores-dotenv-branch.md) | Staging ignora branch do .env se token já estiver no ambiente | 🟠 Alta | Corrigido nesta branch |
 | [0019](0019-staging-fallback-unreachable.md) | Fallback de atualização não cobre falha HTTP ou rede | 🟡 Média | Corrigido nesta branch |
 | [0020](0020-delivery-not-gated-by-ci.md) | Publicação não aguarda os testes de CI | 🟠 Alta | Corrigido nesta branch |
+| 0034 | Nome interno do upload substitui o nome original no status | 🟡 Média | Corrigido nesta branch |
+| 0035 | Posição exibida na fila fica desatualizada | 🟡 Média | Corrigido nesta branch |
+| 0036 | E-mail anuncia formatos opcionais que podem não existir | 🟡 Média | Corrigido nesta branch |
+| 0037 | Falha em exportação obrigatória deixa artefatos parciais no disco | 🟡 Média | Corrigido nesta branch |
+| 0038 | Estados concluídos permanecem indefinidamente na memória | 🟡 Média | Corrigido nesta branch |

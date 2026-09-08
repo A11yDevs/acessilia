@@ -5,6 +5,17 @@ from backend.tools.logger import logger
 from backend.config.settings import settings
 
 
+FORMAT_LABELS = {
+    "txt": "Texto (TXT)",
+    "docx": "Documento Word (DOCX)",
+    "pdf": "PDF",
+    "pdf_ua": "PDF/UA",
+    "html": "Página Web (HTML)",
+    "mp3": "Audiodescrição em Áudio (MP3)",
+    "zip": "Pacote ZIP",
+}
+
+
 async def send_email_notification(
     to_email: str, subject: str, body: str, attachment_path: Path | None = None
 ) -> bool:
@@ -61,16 +72,28 @@ async def send_result_email(
     filename: str,
     zip_path: Path | None = None,
     download_url: str | None = None,
+    completed_formats: list[str] | None = None,
+    warnings: list[str] | None = None,
 ) -> bool:
     subject = "Seu arquivo acessível está pronto! - Acessilia"
+    labels = [
+        FORMAT_LABELS[format_name]
+        for format_name in (completed_formats or ["txt", "docx", "pdf", "pdf_ua", "html", "mp3"])
+        if format_name in FORMAT_LABELS
+    ]
+    formats_text = ", ".join(labels)
+    warnings_text = ""
+    if warnings:
+        warnings_text = "\n\nAlguns formatos opcionais não foram gerados:\n"
+        warnings_text += "\n".join(f"- {warning}" for warning in warnings)
 
     if download_url:
         body = (
             f"Olá!\n\nO processamento do arquivo '{filename}' foi concluído com sucesso.\n\n"
             f"Acesse o link abaixo para visualizar e baixar os formatos disponíveis:\n\n"
             f"{download_url}\n\n"
-            f"Formatos disponíveis: Texto (TXT), Documento Word (DOCX), "
-            f"PDF Acessível, Página Web (HTML) e Audiodescrição em Áudio (MP3).\n\n"
+            f"Formatos disponíveis: {formats_text}."
+            f"{warnings_text}\n\n"
             f"O link expira em 7 dias.\n\n"
             f"Atenciosamente,\nEquipe Acessilia"
         )
@@ -79,11 +102,8 @@ async def send_result_email(
         body = (
             f"Olá!\n\nO processamento do arquivo '{filename}' foi concluído com sucesso.\n"
             "Em anexo, você encontrará um pacote ZIP contendo os seguintes formatos:\n"
-            "- Texto Puro (.txt)\n"
-            "- Documento Word (.docx)\n"
-            "- PDF Acessível (.pdf)\n"
-            "- Página Web (.html)\n"
-            "- Audiodescrição em Áudio (.mp3)\n\n"
+            + "\n".join(f"- {label}" for label in labels)
+            + f"{warnings_text}\n\n"
             "Atenciosamente,\nEquipe Acessilia"
         )
         return await send_email_notification(to_email, subject, body, attachment_path=zip_path)

@@ -138,6 +138,44 @@ def test_upload_ok_and_status_queued(client, monkeypatch):
     assert status.json()["arquivo"] == "doc.pdf"
 
 
+def test_queued_position_is_recalculated(client, monkeypatch):
+    from backend.api import worker
+    from backend.services import queue_service
+
+    queue = queue_service.UnifiedQueue()
+    monkeypatch.setattr(queue_service, "unified_queue", queue)
+    monkeypatch.setattr(worker, "queued_jobs", {})
+
+    async def process():
+        return None
+
+    first = queue_service.QueueItem(
+        file_path=Path("first.pdf"),
+        filename="first.pdf",
+        source="pytest",
+        task_id="queuedfirst",
+        callback=process,
+    )
+    second = queue_service.QueueItem(
+        file_path=Path("second.pdf"),
+        filename="second.pdf",
+        source="pytest",
+        task_id="queuedsecond",
+        callback=process,
+    )
+
+    asyncio.run(queue.enqueue(first))
+    asyncio.run(queue.enqueue(second))
+    worker.register_queued_job("queuedfirst", "first.pdf", 1, "pytest")
+    worker.register_queued_job("queuedsecond", "second.pdf", 2, "pytest")
+
+    assert queue.cancel("queuedfirst")
+
+    status = client.get("/api/v1/jobs/queuedsecond")
+    assert status.status_code == 200
+    assert status.json()["etapa_atual"] == "Aguardando na fila (Posicao: 1)"
+
+
 def test_status_unknown(client):
     resp = client.get("/api/v1/jobs/unknown1")
     assert resp.status_code == 404
@@ -319,6 +357,8 @@ async def test_job_executor_marks_history_error_when_export_fails(
         return {"title": "Documento", "sections": []}
 
     def fail_export_txt(*args, **kwargs):
+        output_path = args[1]
+        output_path.write_text("parcial", encoding="utf-8")
         raise OSError("disk full")
 
     monkeypatch.setattr("backend.service.process", fake_process)
@@ -344,6 +384,7 @@ async def test_job_executor_marks_history_error_when_export_fails(
     task = state_manager.obter(task_id)
     assert task is not None
     assert task["status"] == "error"
+    assert not (api_paths / "output" / task_id).exists()
 
     rows = await hs.listar_historico(10)
     [row] = [row for row in rows if row["task_id"] == task_id]
@@ -412,6 +453,64 @@ async def test_job_executor_stops_exports_after_cancellation(api_paths, monkeypa
 
 
 @pytest.mark.asyncio
+async def test_job_executor_keeps_original_filename_in_status(api_paths, monkeypatch):
+    from backend.agents.state_manager import state_manager
+    from backend.api.worker import ApiJob, JobExecutor
+
+    task_id = "bug0034"
+    input_path = api_paths / "8ab9f21d.pdf"
+    output_dir = api_paths / "output" / task_id
+    input_path.write_bytes(_fake_pdf_bytes())
+    state_manager._tasks.clear()
+    state_manager._cancel_events.clear()
+
+    async def fake_process(*args, **kwargs):
+        state_manager.criar_tarefa(input_path, task_id=task_id)
+        return {"title": "Documento", "sections": []}
+
+    def write_file(_canonical, destination, _filename=None, **_kwargs):
+        destination.write_text("conteudo", encoding="utf-8")
+
+    async def write_mp3(_text, destination, **_kwargs):
+        destination.write_bytes(b"audio")
+
+    async def fake_token(*args, **kwargs):
+        return "tok"
+
+    async def ignore_history(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr("backend.service.process", fake_process)
+    monkeypatch.setattr("backend.api.worker.export_txt", write_file)
+    monkeypatch.setattr("backend.api.worker.export_docx", write_file)
+    monkeypatch.setattr("backend.api.worker.export_pdf", write_file)
+    monkeypatch.setattr("backend.api.worker.export_pdf_ua", write_file)
+    monkeypatch.setattr("backend.api.worker.export_accessible_document", write_file)
+    monkeypatch.setattr("backend.api.worker.export_mp3", write_mp3)
+    monkeypatch.setattr("backend.api.worker.criar_token", fake_token)
+    monkeypatch.setattr("backend.api.worker.finalizar_conversao", ignore_history)
+
+    executor = JobExecutor()
+
+    async def run_inline(function, *args, **kwargs):
+        return function(*args, **kwargs)
+
+    monkeypatch.setattr(executor, "_run_in_executor", run_inline)
+    await executor.run(
+        ApiJob(
+            task_id=task_id,
+            file_path=input_path,
+            filename="relatorio-final.pdf",
+            output_dir=output_dir,
+        )
+    )
+
+    task = state_manager.obter(task_id)
+    assert task is not None
+    assert task["arquivo"] == "relatorio-final.pdf"
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("failed_format", [None, "MP3", "PDF/UA"])
 async def test_job_executor_reports_optional_export_failure(
     api_paths, monkeypatch, failed_format
@@ -449,6 +548,12 @@ async def test_job_executor_reports_optional_export_failure(
         registered_formats.extend(formats or [])
         return "tok"
 
+    sent_emails = []
+
+    async def fake_result_email(*args, **kwargs):
+        sent_emails.append(kwargs)
+        return True
+
     async def ignore_history(*args, **kwargs):
         return None
 
@@ -465,6 +570,8 @@ async def test_job_executor_reports_optional_export_failure(
         fail_mp3 if failed_format == "MP3" else write_mp3,
     )
     monkeypatch.setattr("backend.api.worker.criar_token", fake_token)
+    monkeypatch.setattr("backend.api.worker.send_confirmation_email", ignore_history)
+    monkeypatch.setattr("backend.api.worker.send_result_email", fake_result_email)
     monkeypatch.setattr("backend.api.worker.finalizar_conversao", ignore_history)
 
     executor = JobExecutor()
@@ -478,6 +585,7 @@ async def test_job_executor_reports_optional_export_failure(
             task_id=task_id,
             file_path=input_path,
             filename=input_path.name,
+            email="test@example.invalid",
             output_dir=output_dir,
         )
     )
@@ -514,6 +622,11 @@ async def test_job_executor_reports_optional_export_failure(
         if failed_format != "PDF/UA":
             expected_files.add("audio.pdf_ua.pdf")
         assert set(archive.namelist()) == expected_files
+
+    assert len(sent_emails) == 1
+    assert sent_emails[0]["download_url"].endswith("/download/tok")
+    assert sent_emails[0]["completed_formats"] == registered_formats
+    assert sent_emails[0]["warnings"] == expected_errors[failed_format]
 
 
 @pytest.mark.asyncio

@@ -4,6 +4,7 @@ import asyncio
 import concurrent.futures
 import functools
 import json
+import shutil
 import time
 import zipfile
 from dataclasses import dataclass
@@ -58,7 +59,16 @@ def get_job_status(task_id: str) -> dict[str, Any] | None:
     if task is not None:
         return dict(task)
     queued = queued_jobs.get(task_id)
-    return dict(queued) if queued else None
+    if not queued:
+        return None
+    status = dict(queued)
+    if status.get("status") == "queued":
+        from backend.services.queue_service import unified_queue
+
+        position = unified_queue.get_position(task_id)
+        if position > 0:
+            status["etapa_atual"] = f"Aguardando na fila (Posicao: {position})"
+    return status
 
 
 def cancel_job_status(task_id: str) -> bool:
@@ -102,6 +112,7 @@ class JobExecutor:
     async def run(self, job: ApiJob) -> None:
         task_id = job.task_id
         started_at = time.time()
+        out_dir: Path | None = None
 
         async def status_callback(msg: str) -> None:
             state_manager.atualizar(task_id, etapa=msg)
@@ -109,7 +120,9 @@ class JobExecutor:
         try:
             queued_jobs.pop(task_id, None)
             if state_manager.obter(task_id) is None:
-                state_manager.criar_tarefa(job.file_path, task_id=task_id)
+                state_manager.criar_tarefa(
+                    job.file_path, task_id=task_id, arquivo=job.filename
+                )
             await registrar_conversao(
                 task_id=task_id,
                 arquivo=job.filename,
@@ -138,7 +151,9 @@ class JobExecutor:
             # service.py retornou de cache sem criar a tarefa
             task = state_manager.obter(task_id)
             if task is None:
-                state_manager.criar_tarefa(job.file_path, task_id=task_id)
+                state_manager.criar_tarefa(
+                    job.file_path, task_id=task_id, arquivo=job.filename
+                )
 
             state_manager.atualizar(task_id, status="processing")
 
@@ -146,6 +161,7 @@ class JobExecutor:
             out_dir = job.output_dir or (settings.data_dir / "output" / task_id)
             out_dir.mkdir(parents=True, exist_ok=True)
             completed_formats: list[str] = []
+            optional_errors: list[str] = []
 
             state_manager.atualizar(task_id, etapa="Exportando TXT...", progresso=0.85)
             txt_path = out_dir / f"{base}.txt"
@@ -177,7 +193,9 @@ class JobExecutor:
                 completed_formats.append("pdf_ua")
             except Exception as exc:
                 logger.warning("Falha ao gerar PDF/UA: {}", exc)
-                state_manager.atualizar(task_id, erro=f"Falha ao gerar PDF/UA: {exc}")
+                error_msg = f"Falha ao gerar PDF/UA: {exc}"
+                optional_errors.append(error_msg)
+                state_manager.atualizar(task_id, erro=error_msg)
                 _remove_partial_output(pdf_ua_path)
                 pdf_ua_path = None
             state_manager.verificar_cancelamento(task_id)
@@ -211,7 +229,9 @@ class JobExecutor:
                     completed_formats.append("mp3")
                 except Exception as e:
                     logger.error("Falha ao gerar MP3: {}", e)
-                    state_manager.atualizar(task_id, erro=f"Falha ao gerar MP3: {e}")
+                    error_msg = f"Falha ao gerar MP3: {e}"
+                    optional_errors.append(error_msg)
+                    state_manager.atualizar(task_id, erro=error_msg)
                     _remove_partial_output(mp3_path)
                     mp3_path = None
             state_manager.verificar_cancelamento(task_id)
@@ -248,7 +268,11 @@ class JobExecutor:
 
             if job.email:
                 sent = await send_result_email(
-                    job.email, job.filename, download_url=download_url
+                    job.email,
+                    job.filename,
+                    download_url=download_url,
+                    completed_formats=completed_formats,
+                    warnings=optional_errors,
                 )
                 if not sent:
                     logger.warning("Resultado do job {} nao foi enviado por e-mail", task_id)
@@ -264,6 +288,8 @@ class JobExecutor:
             )
         except Exception as e:
             logger.exception("Erro no JobExecutor para {}", task_id)
+            if out_dir is not None:
+                _remove_output_dir(out_dir)
             state_manager.atualizar(
                 task_id, status="error", erro=str(e), etapa="Falha no processamento"
             )
@@ -295,3 +321,24 @@ def _remove_partial_output(path: Path) -> None:
         path.unlink(missing_ok=True)
     except OSError as exc:
         logger.warning("Falha ao remover artefato parcial {}: {}", path, exc)
+
+
+def _remove_output_dir(path: Path) -> None:
+    try:
+        shutil.rmtree(path, ignore_errors=True)
+    except OSError as exc:
+        logger.warning("Falha ao remover output parcial {}: {}", path, exc)
+
+
+def expirar_status_fila(max_age_seconds: int, now: float | None = None) -> int:
+    now = now or time.time()
+    expired = [
+        task_id
+        for task_id, job in queued_jobs.items()
+        if job.get("status") in ("done", "error", "cancelled")
+        and job.get("fim") is not None
+        and (now - job["fim"]) > max_age_seconds
+    ]
+    for task_id in expired:
+        queued_jobs.pop(task_id, None)
+    return len(expired)

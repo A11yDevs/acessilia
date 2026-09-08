@@ -60,6 +60,29 @@ def test_periodic_cleanup_removes_expired_tokens(monkeypatch):
     assert calls == [True]
 
 
+def test_cleanup_expires_terminal_statuses(monkeypatch, tmp_path):
+    from backend.agents.state_manager import StateManager
+    from backend.api import worker
+
+    manager = StateManager()
+    monkeypatch.setattr(cleanup_service, "state_manager", manager)
+    monkeypatch.setattr(worker, "queued_jobs", {})
+
+    finished = time.time() - cleanup_service.IN_MEMORY_STATUS_MAX_AGE - 60
+    task_id = manager.criar_tarefa(tmp_path / "done.pdf")
+    manager.atualizar(task_id, status="done")
+    manager.obter(task_id)["fim"] = finished
+
+    worker.register_queued_job("cancelledqueued", "queued.pdf", 1, "pytest")
+    worker.queued_jobs["cancelledqueued"]["status"] = "cancelled"
+    worker.queued_jobs["cancelledqueued"]["fim"] = finished
+
+    cleanup_service._clean_in_memory_statuses()
+
+    assert manager.obter(task_id) is None
+    assert "cancelledqueued" not in worker.queued_jobs
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("outcome", ["done", "error", "cancelled"])
 async def test_temp_cleanup_preserves_queued_and_processing_uploads(
