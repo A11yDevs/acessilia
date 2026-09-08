@@ -1,5 +1,7 @@
 # Use Cases
 
+You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](use_cases.pt-br.md)
+
 ## Actors
 1. End user, via the REST API directly or through the Telegram bot or Web panel (both clients of the API). The Telegram-specific commands below (status, cancel, pause, feedback) apply to the bot interface.
 2. Operator/Architect (environment setup and diagnostics).

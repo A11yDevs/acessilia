@@ -1,7 +1,9 @@
-# Acessília Project Documentation
+# Acessilia Project Documentation
+
+You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](README.pt-br.md)
 
 ## Purpose
-This documentation details the architecture of **Acessília**, a document accessibility system that combines **deterministic planning** (PDDL-based task ordering and validation) with **Agno-coordinated multi-agent AI** for vision, data, and description tasks. Deterministic functions are the source of truth; LLMs provide interpretation and description.
+This documentation details the architecture of **Acessilia**, a document accessibility system that combines **deterministic planning** (PDDL-based task ordering and validation) with **Agno-coordinated multi-agent AI** for vision, data, and description tasks. Deterministic functions are the source of truth; LLMs provide interpretation and description.
 
 The system runs in one of two pipeline engines, selected by the `PIPELINE_ENGINE` setting: `legacy` (the direct orchestrated pipeline, default) or `pddl` (the manifest → plan → execution flow). See [architecture.md](architecture.md).
 
@@ -17,6 +19,7 @@ The system runs in one of two pipeline engines, selected by the `PIPELINE_ENGINE
 6. [Automated Test Suite](../tests/README.md) — test strategy and coverage.
 7. [Docker Compose](docker-compose.md) — local execution, GHCR images, staging and production update paths.
 8. [Production systemd timer](producao-systemd.md) — production setup, promotion and rollback procedure.
+9. [Internationalization (i18n)](i18n.md) — what is localized, where the locale strings files live, and step-by-step guides for adding strings, internationalizing a file, and adding a new locale.
 
 ---
 
@@ -24,8 +27,8 @@ The system runs in one of two pipeline engines, selected by the `PIPELINE_ENGINE
 
 The planning-based pipeline and its incorporation are documented separately:
 
-1. [PMV — Agno, manifest, PDDL and nominal execution](pmv_agno_pddl.md) — the minimal cycle `document → manifest → PDDL plan → execution report → canonical document`, and how Agno coordinates the deterministic tools.
-2. [PDDL + Agno incorporation plan](plano_incorporacao_pddl_agno.md) — the block-by-block plan used to bring the planning layer into the codebase.
+1. [PMV — Agno, manifest, PDDL and nominal execution](pmv_agno_pddl.md) — the minimal cycle `document → manifest → PDDL plan → execution report → canonical document`, and how Agno coordinates the deterministic tools. (Brazilian Portuguese: [versão em pt-BR](pmv_agno_pddl.pt-br.md))
+2. [PDDL + Agno incorporation plan](plano_incorporacao_pddl_agno.md) — the block-by-block plan used to bring the planning layer into the codebase. (Brazilian Portuguese: [plano em pt-BR](plano_incorporacao_pddl_agno.pt-br.md))
 
 ---
 
