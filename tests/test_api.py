@@ -453,6 +453,73 @@ async def test_job_executor_stops_exports_after_cancellation(api_paths, monkeypa
 
 
 @pytest.mark.asyncio
+async def test_job_executor_preserves_cancellation_before_process(
+    api_paths, monkeypatch
+):
+    from backend.agents.state_manager import state_manager
+    from backend.api.worker import ApiJob, JobExecutor
+
+    task_id = "cancel-before-process"
+    input_path = api_paths / "cancel-before-process.pdf"
+    input_path.write_bytes(_fake_pdf_bytes())
+    state_manager._tasks.clear()
+    state_manager._cancel_events.clear()
+
+    async def cancel_during_confirmation(*args, **kwargs):
+        assert state_manager.cancelar(task_id)
+        return True
+
+    async def fail_if_processed(*args, **kwargs):
+        raise AssertionError("process should not run after cancellation")
+
+    async def ignore_history(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr(
+        "backend.api.worker.send_confirmation_email", cancel_during_confirmation
+    )
+    monkeypatch.setattr("backend.service.process", fail_if_processed)
+    monkeypatch.setattr("backend.api.worker.registrar_conversao", ignore_history)
+    monkeypatch.setattr("backend.api.worker.finalizar_conversao", ignore_history)
+
+    await JobExecutor().run(
+        ApiJob(
+            task_id=task_id,
+            file_path=input_path,
+            filename=input_path.name,
+            email="user@example.com",
+        )
+    )
+
+    task = state_manager.obter(task_id)
+    assert task is not None
+    assert task["status"] == "cancelled"
+    assert state_manager.foi_cancelada(task_id)
+
+
+@pytest.mark.asyncio
+async def test_process_preserves_existing_cancelled_state(api_paths):
+    from backend import service
+    from backend.agents.state_manager import TaskCancelledError, state_manager
+
+    task_id = "cancelled-process"
+    input_path = api_paths / "cancelled-process.pdf"
+    input_path.write_bytes(_fake_pdf_bytes())
+    state_manager._tasks.clear()
+    state_manager._cancel_events.clear()
+    state_manager.criar_tarefa(input_path, task_id=task_id)
+    assert state_manager.cancelar(task_id)
+
+    with pytest.raises(TaskCancelledError):
+        await service.process(input_path, task_id=task_id)
+
+    task = state_manager.obter(task_id)
+    assert task is not None
+    assert task["status"] == "cancelled"
+    assert state_manager.foi_cancelada(task_id)
+
+
+@pytest.mark.asyncio
 async def test_job_executor_keeps_original_filename_in_status(api_paths, monkeypatch):
     from backend.agents.state_manager import state_manager
     from backend.api.worker import ApiJob, JobExecutor

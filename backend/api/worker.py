@@ -134,6 +134,7 @@ class JobExecutor:
 
             if job.email:
                 await send_confirmation_email(job.email, job.filename)
+                state_manager.verificar_cancelamento(task_id)
 
             from backend.service import process
 

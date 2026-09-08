@@ -142,7 +142,11 @@ async def process(
     task_id: str | None = None,
 ) -> dict[str, Any]:
     external_task_id = task_id is not None
-    task_id = state_manager.criar_tarefa(file_path, task_id=task_id)
+    if task_id is None:
+        task_id = state_manager.criar_tarefa(file_path)
+    elif state_manager.obter(task_id) is None:
+        state_manager.criar_tarefa(file_path, task_id=task_id)
+    state_manager.verificar_cancelamento(task_id)
     inicio = time.time()
     await registrar_conversao(
         task_id=task_id,
