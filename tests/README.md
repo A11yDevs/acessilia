@@ -1,27 +1,30 @@
-# Automated Test Suite
+# Automated Test Suite (tests)
 
-A suíte unitária do projeto: pipeline canônico, motor PDDL, API e exporters. Tudo rápido e isolado — arquivos vão para diretórios temporários, rede e chamadas de LLM são mockadas, e fluxos async rodam com `pytest-asyncio`.
+You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](README.pt-br.md)
 
-Pela constitution, o portão é o container: os testes precisam passar no Docker (equivalente à produção) antes do merge. A execução nativa é verificação secundária.
+The project's unit test suite covers the canonical pipeline, PDDL engine, API and exporters. Everything is fast and isolated: files go to temporary directories; network and LLM calls are mocked, and async flows run with `pytest-asyncio`.
 
-## Rodar
+By constitution, the gate is the container: tests must pass inside Docker (production equivalent) before a merge. The native run is secondary verification.
+
+## Running
 
 ```bash
-# Nativo
+# Native
 poetry run pytest
 
-# Um arquivo só
+# A single file only
 poetry run pytest tests/test_pddl_planning.py
 
-# Container (o portão — estágio `test` do infra/Dockerfile)
+# Container (the gate — the `test` stage of infra/Dockerfile)
 docker build -f infra/Dockerfile --target test -t acessilia:test-docling .
 docker run --rm -v "$PWD:/app" -w /app acessilia:test-docling pytest tests/
 ```
 
 ## Fixtures
 
-`fixtures/` tem PDFs e imagens de exemplo, usados tanto pelos testes quanto pelo cenário de carga e pelos benchmarks em `scripts/`.
+`fixtures/` holds sample PDFs and images, used both by the tests and by the load scenarios and benchmarks in `scripts/`.
 
-## Documentação relacionada
+## Related documentation
 - [Architecture](../docs/architecture.md)
 - [PDDL + Agno pipeline](../docs/pmv_agno_pddl.md)
+- [Internationalization (i18n)](../docs/i18n.md) — see the internationalization test suite in [test_i18n.py](test_i18n.py)
