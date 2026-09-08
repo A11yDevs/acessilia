@@ -7,12 +7,21 @@ Para reportar um bug novo, copie o [`BUG_TEMPLATE.md`](BUG_TEMPLATE.md) para `NN
 
 | ID | Título | Severidade | Status |
 |---|---|---|---|
-| [0001](0001-html-export-crash.md) | Conversão web/API quebra na exportação HTML (`_run_in_executor` não aceita kwargs) | 🔴 Crítica | Corrigido localmente · a reportar |
-| [0002](0002-test-isolation-history-db.md) | Testes de `stats`/`history` não isolados do banco real | 🟡 Média | Aberto |
-| [0003](0003-vision-no-description-dark-image.md) | Modelo de visão recusa imagens válidas de forma inconsistente, sem validação no pipeline | 🟠 Alta | Confirmado (questão de modelo) |
-| [0004](0004-api-blocks-during-inference.md) | API sem responder durante a inferência (bloqueio do event loop) | 🟡 Média | Aberto |
+| [0001](0001-html-export-crash.md) | Conversão web/API quebra na exportação HTML (`_run_in_executor` não aceita kwargs) | 🔴 Crítica | ✅ **Corrigido** na `release/0.1.0` |
+| [0002](0002-test-isolation-history-db.md) | Testes de `stats`/`history` não isolados do banco real | 🟡 Média | Causa raiz confirmada · corrigido em 2 branches · **aberto** na `release/0.1.0` |
+| [0003](0003-vision-no-description-dark-image.md) | Modelo de visão recusa imagens válidas de forma inconsistente, sem validação no pipeline | 🟢 Baixa | ✅ **Não reproduz** com o modelo de produção (`qwen3-vl-8b`) |
+| [0004](0004-api-blocks-during-inference.md) | API sem responder durante a inferência (bloqueio do event loop) | 🟡 Média | ✅ **Corrigido e mergeado** (PR #67, com teste de regressão) |
 
 > **Tema comum (0001 e 0002):** o CI passa verde, mas os defeitos existem — o 0001 tem o trecho *mockado* e o 0002 só falha com banco populado. Reforça a necessidade de testes E2E além do CI.
+
+## Atualização — 2026-09-08 (revisão da equipe + re-teste)
+
+- **0001 e 0004 — corrigidos** na `release/0.1.0`. No 0001, a correção aplicada é a mesma sugerida no relatório; o 0004 virou o **PR #67** e ainda ganhou um **teste de regressão** na revisão.
+- **0002 — causa raiz confirmada** pela equipe. ⚠️ **Correção ao relatório:** a suspeita sobre o `download_token_service.py` estava **incorreta** — ele já lê `settings.db_path` dinamicamente; **somente o `history_service.py` é afetado**. Já corrigido em `feat/observability-stack` (lado-teste) e `feat/suporte-mysql-mariadb` (refactor da camada de DB); **segue aberto** na `release/0.1.0`.
+- **0003 — não reproduz em produção.** Re-testado com o modelo real da equipe, **`qwen3-vl-8b`** (VM2): **0 recusas em 6 execuções** (3 por imagem), descrições ricas e precisas. Era limitação do `llava:7b`, usado só como modelo local de teste. Severidade rebaixada para 🟢 Baixa; fica apenas a recomendação de **validar a saída de visão** como defesa em profundidade.
+
+### Desempenho observado no modelo de produção
+`qwen3-vl-8b` (llama.cpp, VM2): **~65 s por imagem**. Consistente com a estimativa de ~1 min/página discutida pela equipe.
 
 ## Sessão de testes E2E — 2026-09-01
 

@@ -6,8 +6,8 @@
 | **ID** | BUG-0003 |
 | **Data** | 2026-09-01 |
 | **Reportado por** | Pedro Alano |
-| **Severidade** | 🟠 Alta (falha silenciosa de acessibilidade em entrada válida) |
-| **Status** | Aberto · **confirmado como questão de modelo** (ver comparativo) |
+| **Severidade** | 🟢 Baixa — **rebaixada** após re-teste (não afeta produção; era o modelo local de teste) |
+| **Status** | ✅ **Não reproduz com o modelo de produção** (`qwen3-vl-8b`) — ver re-teste abaixo. Recomendação de validação segue aberta, em baixa prioridade |
 | **Link da issue** | <preencher ao abrir no GitHub> |
 
 ## Ambiente
@@ -39,6 +39,18 @@ Sempre uma descrição textual da imagem.
 - **pinguins:** no pipeline → descreveu; em teste direto → 1x meia-recusa, 1x descreveu.
 
 A frase de recusa **não existe no código-fonte** (busca em `backend/`) — é a **saída literal do modelo**, não um fallback do sistema.
+
+## ✅ Re-teste com o modelo de produção (2026-09-08)
+A pedido da equipe, o teste foi refeito com o modelo que roda em produção — **`qwen3-vl-8b`** (endpoint OpenAI-compatible da VM2, `http://200.137.215.134/v1`, servidor llama.cpp) — nas **mesmas imagens**, com **3 execuções cada** (para captar o não-determinismo):
+
+| Imagem | Recusas | Erros | Tempo médio | Tamanho da descrição |
+|---|---|---|---|---|
+| yoga (silhueta escura) | **0/3** | 0/3 | 68,8 s | 1.847–2.695 chars |
+| pinguins (controle) | **0/3** | 0/3 | 63,1 s | 1.973–2.324 chars |
+
+**6 execuções, zero recusas.** O modelo de produção descreveu as duas imagens com riqueza e precisão — identificou corretamente "pinguins-rei" (o `llava:7b` dizia "pingos").
+
+➡️ **Conclusão: o bug NÃO afeta produção.** Era limitação do `llava:7b`, usado apenas como modelo local de teste. A **parte 2** (ausência de validação da saída de visão) permanece como **recomendação de robustez**, agora em **baixa prioridade** — vale como defesa em profundidade, já que qualquer modelo pode falhar eventualmente.
 
 ## Causa raiz
 1. **Modelo `llava:7b` não-confiável:** produz **recusas espúrias/aleatórias** em imagens válidas. **Confirmado** pelo [comparativo de modelos](comparativo-modelos-visao.md): modelos melhores (`dots-3-note-preview`, `minimax-m3`) descreveram as **mesmas** imagens — inclusive a yoga — de forma **consistente e detalhada**.
