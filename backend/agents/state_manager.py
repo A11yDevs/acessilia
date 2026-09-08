@@ -3,6 +3,10 @@ import time
 import uuid
 from pathlib import Path
 
+from backend.i18n import t
+from backend.log_messages import LOG_TASK_CANCELLED_BY_USER
+from backend.stage_messages import STAGE_CANCELLED_BY_USER
+
 
 class StateManager:
     def __init__(self):
@@ -80,7 +84,7 @@ class StateManager:
         task = self._tasks.get(task_id)
         if task and task.get("status") == "processing":
             task["status"] = "cancelled"
-            task["etapa_atual"] = "Cancelado pelo usuario"
+            task["etapa_atual"] = t(STAGE_CANCELLED_BY_USER)
             task["fim"] = time.time()
             event = self._cancel_events.get(task_id)
             if event:
@@ -93,8 +97,15 @@ class StateManager:
         return event is not None and event.is_set()
 
     def verificar_cancelamento(self, task_id: str) -> None:
+        """Check whether the given task was cancelled, raising a localized cancellation error when it was.
+
+        Args:
+            task_id (str): Task identifier whose cancellation event is inspected; no default (required).
+        """
         if self.foi_cancelada(task_id):
-            raise TaskCancelledError(f"Tarefa {task_id} cancelada pelo usuario")
+            raise TaskCancelledError(
+                t(LOG_TASK_CANCELLED_BY_USER).format(task_id=task_id)
+            )
 
     def registrar_download_url(self, task_id: str, url: str) -> None:
         task = self._tasks.get(task_id)

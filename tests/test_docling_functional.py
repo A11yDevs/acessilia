@@ -1,13 +1,26 @@
 from importlib.metadata import distributions
+from importlib.util import find_spec
 from pathlib import Path
 
 import pytest
+
+# The optional Docling stack is needed by the two extraction tests below; when absent from
+# this environment (e.g. plain `poetry install` without the docling extra), those tests are
+# skipped instead of failing, while containerized CI images where the stack exists continue to run them.
+DOCSTACK_AVAILABLE = (
+    find_spec("docling") is not None and find_spec("torch") is not None
+)
+skip_if_no_docstack = pytest.mark.skipif(
+    not DOCSTACK_AVAILABLE,
+    reason="Optional Docling stack (docling + CPU torch) unavailable in this environment",
+)
 
 
 FIXTURE = Path(__file__).parent / "fixtures" / "tutorials" / "java-oo-3pgs.pdf"
 
 
 @pytest.mark.docling
+@skip_if_no_docstack
 def test_docling_converts_real_pdf_with_cpu_only_torch() -> None:
     import torch
 
@@ -35,19 +48,20 @@ def test_docling_converts_real_pdf_with_cpu_only_torch() -> None:
 
 
 @pytest.mark.docling
+@skip_if_no_docstack
 def test_docling_respects_enable_ocr_flag() -> None:
-    """Verifica que enable_ocr é propagado para o structurer e pipeline_options."""
+    """Checks that enable_ocr propagates to the structurer and pipeline options."""
     from backend.core.manifest.docling_extractor import DoclingManifestExtractor
     from backend.tools.structurer import DoclingStructurer
 
-    # Cria structurer manualmente para inspecionar o flag
+    # Builds structurers manually to inspect the flag
     structurer = DoclingStructurer(enable_ocr=False)
     assert structurer.enable_ocr is False
 
     structurer_with_ocr = DoclingStructurer(enable_ocr=True)
     assert structurer_with_ocr.enable_ocr is True
 
-    # Verifica que o flag é propagado via _build_structurer
+    # Checks the flag is propagated via _build_structurer
     extractor = DoclingManifestExtractor(enable_ocr=False)
     built = extractor._build_structurer()
     assert built.enable_ocr is False
@@ -59,7 +73,7 @@ def test_docling_respects_enable_ocr_flag() -> None:
 
 @pytest.mark.docling
 def test_docling_removed_create_converter() -> None:
-    """Verifica que _create_converter foi removido (código morto)."""
+    """Checks that the dead-code `_create_converter` method is gone."""
     from backend.core.manifest.docling_extractor import DoclingManifestExtractor
 
     extractor = DoclingManifestExtractor(enable_ocr=True)

@@ -59,8 +59,8 @@ async def health(request: Request):
     staging = _read_staging_status()
     ghcr_latest = staging.get("latest_sha", "")
     last_update = staging.get("last_update", "")
-    # update_available: ha imagem nova no GHCR em relacao ao que roda agora.
-    # Compara a ultima checagem (ghcr_latest) com o commit da imagem em execucao.
+    # update_available: there is a newer image on GHCR than the one currently running.
+    # Compares the last check (ghcr_latest) with the commit of the running image.
     update_available = bool(ghcr_latest and settings.git_commit and ghcr_latest != settings.git_commit)
     return HealthResponse(
         status="ok",

@@ -14,6 +14,23 @@ from backend.services.history_service import (
     registrar_conversao,
 )
 from backend.config.settings import settings
+from backend.i18n import t
+from backend.log_messages import (
+    LOG_CANONICAL_JSON_SAVE_FAILED,
+    LOG_CACHE_HIT,
+    LOG_ORCHESTRATOR_EMPTY_AGENT_RESPONSE,
+    LOG_PIPELINE_ERROR,
+    LOG_STRUCTURER_FALLBACK_PYMUPDF,
+    LOG_TASK_CANCELLED_BY_USER,
+)
+from backend.stage_messages import (
+    STAGE_ANALYZING_FILE,
+    STAGE_CANCELLED_BY_USER,
+    STAGE_PROCESSING_FAILED_LABEL,
+    STAGE_PROCESSING_FINISHED,
+    STAGE_PROCESSING_WITH_AI,
+    STAGE_PREPARING_FILE,
+)
 from backend.tools.logger import logger
 from backend.tools.structurer import DOCLING_AVAILABLE
 from backend.tools.text_processor import merge_broken_paragraphs
@@ -31,9 +48,7 @@ def _normalized_engine() -> str:
 def _resolved_structurer() -> str:
     structurer = settings.structurer.strip().lower()
     if structurer == "docling" and not DOCLING_AVAILABLE:
-        logger.warning(
-            "STRUCTURER=docling mas docling nao instalado. Usando PyMuPDF."
-        )
+        logger.warning(t(LOG_STRUCTURER_FALLBACK_PYMUPDF))
         return "pymupdf"
     return structurer
 
@@ -97,7 +112,7 @@ def _salvar_json_canonico(canonical_document: dict, source_name: str) -> None:
             encoding="utf-8",
         )
     except Exception as e:
-        logger.warning("Nao foi possivel salvar JSON canonico: {}", e)
+        logger.warning(t(LOG_CANONICAL_JSON_SAVE_FAILED).format(error=e))
 
 
 def _payload_for_source(payload: Any, file_path: Path) -> Any:
@@ -192,17 +207,17 @@ async def process(
 
         state_manager.atualizar(
             task_id,
-            etapa="Preparando arquivo",
+            etapa=t(STAGE_PREPARING_FILE),
             progresso=0.1,
         )
         state_manager.verificar_cancelamento(task_id)
 
         if status_callback:
-            await status_callback("📄 Analisando arquivo...")
+            await status_callback(t(STAGE_ANALYZING_FILE))
 
         state_manager.atualizar(
             task_id,
-            etapa="Processando com IA",
+            etapa=t(STAGE_PROCESSING_WITH_AI),
             progresso=0.3,
         )
         state_manager.verificar_cancelamento(task_id)
@@ -240,7 +255,7 @@ async def process(
 
         state_manager.verificar_cancelamento(task_id)
         if not raw_text.strip():
-            raise RuntimeError("Resposta vazia do agente")
+            raise RuntimeError(t(LOG_ORCHESTRATOR_EMPTY_AGENT_RESPONSE))
 
         canonical_document = build_canonical_document(
             processed_result,
@@ -271,21 +286,21 @@ async def process(
             )
 
         if status_callback:
-            await status_callback("✅ Processamento finalizado com sucesso!")
+            await status_callback(t(STAGE_PROCESSING_FINISHED))
         return canonical_document
 
     except TaskCancelledError:
-        logger.info("Tarefa {} cancelada pelo usuario", task_id)
+        logger.info(t(LOG_TASK_CANCELLED_BY_USER).format(task_id=task_id))
         await finalizar_conversao(
             task_id=task_id,
             status="cancelled",
-            erro="Cancelado pelo usuario",
+            erro=t(STAGE_CANCELLED_BY_USER),
             tempo_segundos=time.time() - inicio,
         )
         raise
 
     except Exception as e:
-        logger.error("Erro no pipeline: {}: {}", type(e).__name__, e)
+        logger.error(t(LOG_PIPELINE_ERROR).format(error_type=type(e).__name__, error=e))
         state_manager.errar(task_id, str(e))
 
         await finalizar_conversao(
@@ -296,5 +311,6 @@ async def process(
         )
 
         if status_callback:
+            await status_callback(t(STAGE_PROCESSING_FAILED_LABEL))
             await status_callback("❌ Nao foi possivel processar o arquivo.")
         raise

@@ -1,6 +1,17 @@
 import aiosmtplib
 from email.message import EmailMessage
 from pathlib import Path
+from backend.i18n import t
+from backend.log_messages import (
+    EMAIL_CONFIRMATION_BODY,
+    EMAIL_CONFIRMATION_SUBJECT,
+    EMAIL_RESULT_BODY_ATTACHED,
+    EMAIL_RESULT_BODY_WITH_LINK,
+    EMAIL_RESULT_SUBJECT,
+    LOG_EMAIL_SEND_ERROR,
+    LOG_EMAIL_SENT,
+    LOG_SMTP_NOT_CONFIGURED,
+)
 from backend.tools.logger import logger
 from backend.config.settings import settings
 
@@ -20,7 +31,7 @@ async def send_email_notification(
     to_email: str, subject: str, body: str, attachment_path: Path | None = None
 ) -> bool:
     if not settings.smtp_user or not settings.smtp_password:
-        logger.warning("SMTP não configurado. E-mail para {} não enviado.", to_email)
+        logger.warning(t(LOG_SMTP_NOT_CONFIGURED).format(to_email=to_email))
         return False
 
     message = EmailMessage()
@@ -49,21 +60,16 @@ async def send_email_notification(
             use_tls=settings.smtp_port == 465,
             start_tls=settings.smtp_port == 587,
         )
-        logger.info("E-mail enviado para {} com sucesso.", to_email)
+        logger.info(t(LOG_EMAIL_SENT).format(to_email=to_email))
         return True
     except Exception as e:
-        logger.error("Erro ao enviar e-mail para {}: {}", to_email, e)
+        logger.error(t(LOG_EMAIL_SEND_ERROR).format(to_email=to_email, error=e))
         return False
 
 
 async def send_confirmation_email(to_email: str, filename: str) -> bool:
-    subject = "Recebemos seu arquivo - Acessilia"
-    body = (
-        f"Olá!\n\nRecebemos o arquivo '{filename}' e já estamos trabalhando para torná-lo acessível.\n"
-        "Este processo envolve análise por inteligência artificial e geração de audiodescrição em áudio.\n\n"
-        "Assim que estiver pronto, você receberá um novo e-mail com o pacote acessível em anexo.\n\n"
-        "Atenciosamente,\nEquipe Acessilia"
-    )
+    subject = t(EMAIL_CONFIRMATION_SUBJECT)
+    body = t(EMAIL_CONFIRMATION_BODY).format(filename=filename)
     return await send_email_notification(to_email, subject, body)
 
 
@@ -75,7 +81,7 @@ async def send_result_email(
     completed_formats: list[str] | None = None,
     warnings: list[str] | None = None,
 ) -> bool:
-    subject = "Seu arquivo acessível está pronto! - Acessilia"
+    subject = t(EMAIL_RESULT_SUBJECT)
     labels = [
         FORMAT_LABELS[format_name]
         for format_name in (completed_formats or ["txt", "docx", "pdf", "pdf_ua", "html", "mp3"])
@@ -88,22 +94,10 @@ async def send_result_email(
         warnings_text += "\n".join(f"- {warning}" for warning in warnings)
 
     if download_url:
-        body = (
-            f"Olá!\n\nO processamento do arquivo '{filename}' foi concluído com sucesso.\n\n"
-            f"Acesse o link abaixo para visualizar e baixar os formatos disponíveis:\n\n"
-            f"{download_url}\n\n"
-            f"Formatos disponíveis: {formats_text}."
-            f"{warnings_text}\n\n"
-            f"O link expira em 7 dias.\n\n"
-            f"Atenciosamente,\nEquipe Acessilia"
+        body = t(EMAIL_RESULT_BODY_WITH_LINK).format(
+            filename=filename, download_url=download_url
         )
         return await send_email_notification(to_email, subject, body)
     else:
-        body = (
-            f"Olá!\n\nO processamento do arquivo '{filename}' foi concluído com sucesso.\n"
-            "Em anexo, você encontrará um pacote ZIP contendo os seguintes formatos:\n"
-            + "\n".join(f"- {label}" for label in labels)
-            + f"{warnings_text}\n\n"
-            "Atenciosamente,\nEquipe Acessilia"
-        )
+        body = t(EMAIL_RESULT_BODY_ATTACHED).format(filename=filename)
         return await send_email_notification(to_email, subject, body, attachment_path=zip_path)

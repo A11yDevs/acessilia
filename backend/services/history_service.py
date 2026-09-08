@@ -1,5 +1,11 @@
 import asyncio
 import sqlite3
+from backend.i18n import t
+from backend.log_messages import (
+    LOG_ORPHAN_TASKS_CLEANED,
+    LOG_ORPHAN_TASKS_CLEANUP_FAILED,
+    LOG_STALE_PROCESS_INTERRUPTED,
+)
 from backend.tools.logger import logger
 from backend.config.settings import settings
 
@@ -82,17 +88,23 @@ def init_db():
     get_connection()
 
 
-def limpar_orfas():
+def limpar_orfas() -> None:
+    """Mark stale processing records (stuck over one hour) as errors so the UI does not show them as running.
+
+    Args:
+        None: no parameters.
+    """
     conn = get_connection()
     try:
         conn.execute(
-            "UPDATE conversoes SET status='error', erro='Stale: process interrupted' "
-            "WHERE status='processing' AND criado_em < datetime('now', '-1 hours')"
+            "UPDATE conversoes SET status='error', erro=? "
+            "WHERE status='processing' AND criado_em < datetime('now', '-1 hours')",
+            (t(LOG_STALE_PROCESS_INTERRUPTED),),
         )
         conn.commit()
-        logger.info("Tarefas orfas limpas")
+        logger.info(t(LOG_ORPHAN_TASKS_CLEANED))
     except Exception as e:
-        logger.warning("Falha ao limpar tarefas orfas: {}", e)
+        logger.warning(t(LOG_ORPHAN_TASKS_CLEANUP_FAILED).format(error=e))
 
 
 async def registrar_conversao(

@@ -1,7 +1,12 @@
-"""VisionAgent – Geração de audiodescrições acessíveis de imagens."""
+"""VisionAgent — generation of accessible audio descriptions for images."""
 
 import asyncio
 
+from backend.i18n import t
+from backend.log_messages import (
+    LOG_VISION_AGENT_REGION_ERROR,
+    LOG_VISION_AGENT_SENDING_REGION,
+)
 from backend.tools.region_classifier import region_prompt_key
 from backend.tools.logger import logger
 
@@ -12,9 +17,14 @@ from agno.media import Image
 
 
 class VisionAgent:
-    """Processa regiões visuais e produz audiodescrições acessíveis."""
+    """Processes visual regions and produces accessible audio descriptions."""
 
-    def __init__(self, mode: str = "medio"):
+    def __init__(self, mode: str = "medio") -> None:
+        """Create a vision agent with a default prompting mode.
+
+        Args:
+            mode (str): Prompting mode name whose system prompt is loaded at construction (default "medio").
+        """
         self.mode = mode
         self.system_prompt = load_system_prompt(mode)
 
@@ -27,7 +37,19 @@ class VisionAgent:
         mode: str | None = None,
         custom_prompt: str | None = None,
     ) -> str:
-        """Descreve uma região visual usando IA de visão."""
+        """Describe a single visual region of a page with the vision model.
+
+        Args:
+            image_bytes (bytes): PNG/encoded image payload of the region to describe.
+            classification (str): Region classification key (e.g. "full_page_fallback", "full_page_image", or a region type) driving prompt selection.
+            page_num (int): 1-based page number the region belongs to, used in log lines and page prompts (default 0).
+            total_pages (int): Total page count of the source document for page prompts (default 0).
+            mode (str | None): Prompting mode override for this call; falls back to the instance default when None (default None).
+            custom_prompt (str | None): Fully custom prompt that, when given, replaces all selection logic (default None).
+
+        Returns:
+            str: The model's region description text, or an empty string when the vision call raised (the exception is logged as critical).
+        """
         effective_mode = mode or self.mode
 
         if custom_prompt:
@@ -45,10 +67,11 @@ class VisionAgent:
 
         try:
             logger.debug(
-                "[pag {}] Enviando regiao para visao ({} bytes, tipo={})",
-                page_num,
-                len(image_bytes),
-                classification,
+                t(LOG_VISION_AGENT_SENDING_REGION).format(
+                    page_num=page_num,
+                    size=len(image_bytes),
+                    type=classification,
+                )
             )
 
             agent = Agent(
@@ -75,10 +98,11 @@ class VisionAgent:
             import traceback
             tb = traceback.format_exc()
             logger.critical(
-                "[pag {}] Erro na regiao {}: {} | Traceback:\n{}",
-                page_num,
-                classification,
-                error,
-                tb,
+                t(LOG_VISION_AGENT_REGION_ERROR).format(
+                    page_num=page_num,
+                    type=classification,
+                    error=error,
+                    tb=tb,
+                )
             )
             return ""
