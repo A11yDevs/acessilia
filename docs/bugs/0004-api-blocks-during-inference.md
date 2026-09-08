@@ -7,7 +7,7 @@
 | **Data** | 2026-09-01 |
 | **Reportado por** | Pedro Alano |
 | **Severidade** | 🟡 Média (afeta responsividade/concorrência; relevante para a VPS) |
-| **Status** | Aberto · a reportar como issue |
+| **Status** | ✅ **Corrigido e mergeado** — PR #67 (`fix(api): libera o event loop durante inferencia`), com teste de regressão adicionado na revisão |
 | **Link da issue** | <preencher ao abrir no GitHub> |
 
 ## Ambiente

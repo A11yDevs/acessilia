@@ -7,7 +7,7 @@
 | **Data** | 2026-08-26 |
 | **Reportado por** | Pedro Alano |
 | **Severidade** | 🔴 Crítica |
-| **Status** | Corrigido localmente (patch não commitado) · a reportar como issue |
+| **Status** | ✅ **Corrigido na `release/0.1.0`** — a correção aplicada é a mesma sugerida neste relatório |
 | **Link da issue** | <preencher ao abrir no GitHub> |
 
 ## Ambiente

@@ -7,7 +7,7 @@
 | **Data** | 2026-08-26 |
 | **Reportado por** | Pedro Alano |
 | **Severidade** | 🟡 Média |
-| **Status** | Aberto · a reportar como issue (não corrigido no repo) |
+| **Status** | Causa raiz **confirmada** na revisão da equipe · corrigido em `feat/observability-stack` e `feat/suporte-mysql-mariadb` · **aberto** em `main`/`develop`/`release/0.1.0` |
 | **Link da issue** | <preencher ao abrir no GitHub> |
 
 ## Ambiente
@@ -53,7 +53,7 @@ FAILED tests/test_api.py::test_history_empty
 - **Linha 6:** `DB_PATH = settings.db_path` — o caminho é fixado **no import** (constante de módulo).
 - `get_connection()` (linha ~71) usa essa global `DB_PATH`, **não** `settings.db_path` dinâmico.
 - O fixture `_isolate_paths` em `tests/test_api.py` faz `monkeypatch.setattr(settings, "data_dir", <temp>)` e `hs._connection = None`, mas como `DB_PATH` **já foi capturado no import**, o monkeypatch **não redireciona** o histórico → os testes leem o banco real.
-- `backend/services/download_token_service.py` provavelmente tem o **mesmo padrão latente** (mesmo `_connection` resetado pelo fixture).
+- ~~`download_token_service.py` teria o mesmo padrão latente~~ → **Correção (revisão da equipe, 2026-09-08):** essa suspeita está **incorreta**. O `download_token_service.py` **já lê `settings.db_path` dinamicamente** dentro de `_get_connection()` em todas as branches. **Somente o `history_service.py` é afetado.**
 
 ## Correção sugerida
 1. **Produção (preferível):** `get_connection()` resolver o caminho **dinamicamente** a cada abertura, lendo `settings.db_path` em vez da global `DB_PATH` fixada no import. (Idem `download_token_service`.)
