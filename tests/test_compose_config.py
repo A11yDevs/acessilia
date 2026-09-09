@@ -15,22 +15,21 @@ def test_local_compose_builds_runtime_stage():
     assert build_config["target"] == "base"
 
 
-def test_delivery_runs_only_after_successful_push_ci():
+def test_delivery_is_reusable_with_explicit_commit_reference():
     workflow = yaml.safe_load(
         (ROOT_DIR / ".github" / "workflows" / "delivery.yml").read_text()
     )
 
-    trigger = workflow[True]["workflow_run"]
-    publish_job = workflow["jobs"]["publish"]
+    workflow_call = workflow[True]["workflow_call"]
     workflow_text = (ROOT_DIR / ".github" / "workflows" / "delivery.yml").read_text()
 
-    assert trigger["workflows"] == ["CI"]
-    assert trigger["types"] == ["completed"]
-    assert publish_job["if"] == (
-        "github.event.workflow_run.conclusion == 'success' && "
-        "github.event.workflow_run.event == 'push'"
+    assert set(workflow_call["inputs"]) == {"ref", "branch", "sha"}
+    assert all(
+        workflow_call["inputs"][name]["required"]
+        for name in ("ref", "branch", "sha")
     )
-    assert "github.event.workflow_run.head_sha" in workflow_text
-    assert "github.event.workflow_run.head_branch" in workflow_text
-    assert "${{ github.sha }}" not in workflow_text
-    assert "${{ github.ref_name }}" not in workflow_text
+    assert workflow[True]["workflow_dispatch"]["inputs"] == workflow_call["inputs"]
+    assert "github.event.workflow_run" not in workflow_text
+    assert "${{ inputs.ref }}" in workflow_text
+    assert "${{ inputs.branch }}" in workflow_text
+    assert "${{ inputs.sha }}" in workflow_text
