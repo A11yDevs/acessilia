@@ -62,14 +62,26 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Generate image tags
+        id: tags
+        run: |
+          BRANCH="${{ github.event.workflow_run.head_branch }}"
+          SHA="${{ github.event.workflow_run.head_sha }}"
+          SUFFIX="${{ matrix.tag_suffix }}"
+          SAFE_BRANCH="${BRANCH//\//-}"
+          TAGS="${REGISTRY}/${IMAGE_NAME}:${SAFE_BRANCH}${SUFFIX}"
+          TAGS="${TAGS},${REGISTRY}/${IMAGE_NAME}:sha-${SHA:0:7}${SUFFIX}"
+          if [ "$BRANCH" = "main" ]; then
+            TAGS="${TAGS},${REGISTRY}/${IMAGE_NAME}:latest${SUFFIX}"
+          fi
+          echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
+
       - name: Generate image metadata
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=raw,value=main${{ matrix.tag_suffix }}
-            type=sha,prefix=sha-,suffix=${{ matrix.tag_suffix }},format=long
+          tags: ${{ steps.tags.outputs.tags }}
           labels: |
             org.opencontainers.image.title=acessilia
             org.opencontainers.image.description=Pipeline para extracao e acessibilidade de documentos
