@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   variant-tests:
-    name: tests (${{ matrix.variant }}, Python 3.11)
+    name: tests (${{ matrix.variant }}, Python 3.12)
     runs-on: ubuntu-latest
     timeout-minutes: ${{ matrix.variant == 'docling' && 60 || 30 }}
     strategy:
@@ -45,10 +45,10 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Python 3.11
+      - name: Set up Python 3.12
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
-          python-version: "3.11"
+          python-version: "3.12"
 
       - name: Restore dependency cache
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
@@ -57,16 +57,16 @@ jobs:
             ~/.cache/pip
             ~/.cache/pypoetry
             .venv
-          key: poetry-${{ matrix.variant }}-${{ runner.os }}-py3.11-${{ hashFiles('poetry.lock') }}
+          key: poetry-${{ matrix.variant }}-${{ runner.os }}-py3.12-${{ hashFiles('poetry.lock') }}
           restore-keys: |
-            poetry-${{ matrix.variant }}-${{ runner.os }}-py3.11-
+            poetry-${{ matrix.variant }}-${{ runner.os }}-py3.12-
 
       - name: Restore Docling model cache
         if: matrix.variant == 'docling'
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: var/cache
-          key: docling-models-${{ runner.os }}-py3.11-${{ hashFiles('poetry.lock') }}
+          key: docling-models-${{ runner.os }}-py3.12-${{ hashFiles('poetry.lock') }}
 
       - name: Install system dependencies
         run: |
@@ -191,7 +191,7 @@ jobs:
           PY
 
   tests:
-    name: tests (Python 3.11)
+    name: tests (Python 3.12)
     if: always()
     needs:
       - variant-tests
