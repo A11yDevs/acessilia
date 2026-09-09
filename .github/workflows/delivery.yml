@@ -1,23 +1,42 @@
 name: Delivery
 
 on:
-  workflow_run:
-    workflows:
-      - CI
-    types:
-      - completed
-    branches:
-      - main
-      - develop
-      - 'release/**'
+  workflow_call:
+    inputs:
+      ref:
+        description: Commit a publicar
+        required: true
+        type: string
+      branch:
+        description: Branch associada ao commit
+        required: true
+        type: string
+      sha:
+        description: SHA completo do commit
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Commit a publicar
+        required: true
+        type: string
+      branch:
+        description: Branch associada ao commit
+        required: true
+        type: string
+      sha:
+        description: SHA completo do commit
+        required: true
+        type: string
 
 permissions:
   contents: read
   packages: write
 
 concurrency:
-  group: delivery-${{ github.event.workflow_run.head_branch }}
-  cancel-in-progress: ${{ github.event.workflow_run.head_branch != 'main' }}
+  group: delivery-${{ inputs.branch }}
+  cancel-in-progress: ${{ inputs.branch != 'main' }}
 
 env:
   REGISTRY: ghcr.io
@@ -26,7 +45,6 @@ env:
 jobs:
   publish:
     name: publish ${{ matrix.variant }} image to GHCR
-    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     strategy:
@@ -47,7 +65,7 @@ jobs:
       - name: Check out tested commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ inputs.ref }}
           persist-credentials: false
 
       - name: Set up Docker Buildx
@@ -63,8 +81,8 @@ jobs:
       - name: Generate image tags
         id: tags
         run: |
-          BRANCH="${{ github.event.workflow_run.head_branch }}"
-          SHA="${{ github.event.workflow_run.head_sha }}"
+          BRANCH="${{ inputs.branch }}"
+          SHA="${{ inputs.sha }}"
           SUFFIX="${{ matrix.tag_suffix }}"
           # Docker tags nao aceitam "/" (ex: release/0.0.1 -> release-0.0.1)
           SAFE_BRANCH="${BRANCH//\//-}"
@@ -91,7 +109,7 @@ jobs:
           tags: ${{ env.LOCAL_IMAGE }}
           build-args: |
             WITH_DOCLING=${{ matrix.with_docling }}
-            GIT_COMMIT=${{ github.event.workflow_run.head_sha }}
+            GIT_COMMIT=${{ inputs.sha }}
             IMAGE_TAG=${{ steps.tags.outputs.branch }}${{ matrix.tag_suffix }}
           cache-from: type=gha,scope=production-${{ matrix.variant }}
           cache-to: type=gha,mode=max,scope=production-${{ matrix.variant }}
@@ -179,10 +197,10 @@ jobs:
             org.opencontainers.image.title=acessilia
             org.opencontainers.image.description=Pipeline para extracao e acessibilidade de documentos
             org.opencontainers.image.licenses=MIT
-            org.opencontainers.image.revision=${{ github.event.workflow_run.head_sha }}
+            org.opencontainers.image.revision=${{ inputs.sha }}
           build-args: |
             WITH_DOCLING=${{ matrix.with_docling }}
-            GIT_COMMIT=${{ github.event.workflow_run.head_sha }}
+            GIT_COMMIT=${{ inputs.sha }}
             IMAGE_TAG=${{ steps.tags.outputs.branch }}${{ matrix.tag_suffix }}
           cache-from: type=gha,scope=production-${{ matrix.variant }}
 
