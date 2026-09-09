@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - develop
+      - 'release/**'
 
 permissions:
   contents: read
@@ -12,7 +13,7 @@ permissions:
 
 concurrency:
   group: delivery-${{ github.ref_name }}
-  cancel-in-progress: ${{ github.ref_name == 'develop' }}
+  cancel-in-progress: ${{ github.ref_name != 'main' }}
 
 env:
   REGISTRY: ghcr.io
@@ -60,8 +61,10 @@ jobs:
           BRANCH="${{ github.ref_name }}"
           SHA="${{ github.sha }}"
           SUFFIX="${{ matrix.tag_suffix }}"
+          # Docker tags nao aceitam "/" (ex: release/0.0.1 -> release-0.0.1)
+          SAFE_BRANCH="${BRANCH//\//-}"
 
-          TAGS="${REGISTRY}/${IMAGE_NAME}:${BRANCH}${SUFFIX}"
+          TAGS="${REGISTRY}/${IMAGE_NAME}:${SAFE_BRANCH}${SUFFIX}"
           TAGS="${TAGS},${REGISTRY}/${IMAGE_NAME}:sha-${SHA:0:7}${SUFFIX}"
 
           if [ "$BRANCH" = "main" ]; then
@@ -69,7 +72,7 @@ jobs:
           fi
 
           echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
-          echo "branch=${BRANCH}" >> "$GITHUB_OUTPUT"
+          echo "branch=${SAFE_BRANCH}" >> "$GITHUB_OUTPUT"
 
       - name: Build production image for verification
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6

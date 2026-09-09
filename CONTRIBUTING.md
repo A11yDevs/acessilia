@@ -7,9 +7,60 @@ You can also read these guidelines in **Brazilian Portuguese**: [português bras
 ## Branching model
 
 ```
-main  ──────────────●──────────────────●──  (stable releases)
-   \              / \                /
-    develop ─────●───●──────────────●────  (integration)
+main  ──────────────●──────────────────●──  (stable versions)
+   \              /  \                /
+    develop ─────●─── release/x.y.z ─●────  (integration / BHS)
+        \        /  \       |       /
+         feat/* ──   fix/* ─┴──────
+```
+    
+### Internationalization Changes
+
+Internationalized the code and the documnentation.
+See docs/i18n.md (English) and docs/i18n.pt-br.md (Portuguese) for implementation details.
+
+Currently supported locales:
+- en_US: This is the new default for the code
+- pt_BR: This is fully supported and selectable (see LOCALE in `.env.example`)
+
+Strings that are included in the i18n work and are now localized:
+- Python code comment text
+- Python code output strings
+- Telegram bot slash commands and their responses
+- HTML pages shown to one or more users that contain natural language text
+- Email subjects and email body text
+- Text document structure pagination label words
+- Documents such as README.md and CONTRIBUTING.md now contain US English text, and the Portuguese text is contained in separate files such as README.pt-br.md and CONTRIBUTING.pt-br.md. Links from one document to the next hyperlink the user to the equivalent in their chosen language.
+
+What this pull request did not internationalize, what remained unchanged:
+- All Telegram bot slash commands that had command words in Portuguese are still working in the form of the Portuguese command words, because that is a user-facing interface. English word slash command equivalents were added so that people who know some English words but who do not know Portuguese have an alternative, and so that native English speakers can easily operate the bot.
+- SQL schema symbols that were initially chosen as Portuguese words are unchanged. Those words will probably not be meaningful to non-Portuguese speakers, and may also be confusing or frustrating for English speaker software engineers.
+- AI prompt text, because it is not user visible, and may be sensitive to translations. We know the prompts that are currently there work well, or at least we know how well they work. Those should be more closely reviewed to determine which are safe to translate into English, because international developers who expect English will otherwise find Portuguese AI prompt text.
+- There are some regular expressions that match on Portuguese words, but changing these to English would likely change the behavior of the code. A deeper review of each of these should be done.
+- Generation of audio is still in Brazilian Portuguese. Supporting speech output in more languages is a new separate feature to add.### Internationalization Changes
+
+Internationalized the code and the documnentation.
+See docs/i18n.md (English) and docs/i18n.pt-br.md (Portuguese) for implementation details.
+
+Currently supported locales:
+- en_US: This is the new default for the code
+- pt_BR: This is fully supported and selectable (see LOCALE in `.env.example`)
+
+Strings that are included in the i18n work and are now localized:
+- Python code comment text
+- Python code output strings
+- Telegram bot slash commands and their responses
+- HTML pages shown to one or more users that contain natural language text
+- Email subjects and email body text
+- Text document structure pagination label words
+- Documents such as README.md and CONTRIBUTING.md now contain US English text, and the Portuguese text is contained in separate files such as README.pt-br.md and CONTRIBUTING.pt-br.md. Links from one document to the next hyperlink the user to the equivalent in their chosen language.
+
+What this pull request did not internationalize, what remained unchanged:
+- All Telegram bot slash commands that had command words in Portuguese are still working in the form of the Portuguese command words, because that is a user-facing interface. English word slash command equivalents were added so that people who know some English words but who do not know Portuguese have an alternative, and so that native English speakers can easily operate the bot.
+- SQL schema symbols that were initially chosen as Portuguese words are unchanged. Those words will probably not be meaningful to non-Portuguese speakers, and may also be confusing or frustrating for English speaker software engineers.
+- AI prompt text, because it is not user visible, and may be sensitive to translations. We know the prompts that are currently there work well, or at least we know how well they work. Those should be more closely reviewed to determine which are safe to translate into English, because international developers who expect English will otherwise find Portuguese AI prompt text.
+- There are some regular expressions that match on Portuguese words, but changing these to English would likely change the behavior of the code. A deeper review of each of these should be done.
+- Generation of audio is still in Brazilian Portuguese. Supporting speech output in more languages is a new separate feature to add.──●───●──────────────●────  (integration)
         \        /      \          /
          feat/* ──       fix/* ────
 ```
@@ -35,11 +86,12 @@ main  ──────────────●─────────�
 | Prefix | Purpose | Born from | Merges into |
 |--------|---------|-----------|-------------|
 | `feat/*` | New feature | `develop` | `develop` |
-| `fix/*` | Bug fix | `develop` | `develop` |
+| `fix/*` | Correção de bug | `develop` | `develop` (or `release/*` during BHS, ver [section 5.1](#51-bug-huntingsquashing-bhs)) |
 | `docs/*` | Documentation | `develop` | `develop` |
-| `refactor/*` | Refactoring | `develop` | `develop` |
+| `refactor/*` | Refactor | `develop` | `develop` |
 | `chore/*` | Maintenance (deps, CI, config) | `develop` | `develop` |
-| `hotfix/*` | Critical production fix | `main` | both `main` and `develop` |
+| `release/*` | Release stabilisation (BHS cycle) | `develop` | `main` e `develop` |
+| `hotfix/*` | Critical fix in production | `main` | `main` e `develop` |
 
 > **Important:** temporary branches must be deleted after their merge.
 
@@ -130,7 +182,56 @@ The complete staging environment setup lives in:
 - `docker-compose.staging.yml` — defines the container + Watchtower
 - `scripts/setup-homologacao.sh` — initial configuration script
 
-### 6. Releases (develop → main)
+### 5.1 Bug Hunting/Squashing (BHS)
+
+Before each release, there is a cycle of **Bug Hunting/Squashing (BHS)**: a period
+where staging t tests the release candidate exactly as is, without mixing in features
+that are still under development. To do this, we create an ephemeral branch. `release/x.y.z`
+based off of `develop`.
+
+1. **Cut** — At the start of the BHS, cut the release branch based on `develop`:
+
+   ```bash
+   git checkout develop && git pull
+   git checkout -b release/0.0.1 origin/develop
+   git push origin release/0.0.1
+   ```
+
+2. **During BHS**:
+   - PRs `fix/*` that fix bugs found in staging go to `release/0.0.1`
+     (instead of `develop`).
+   - PRs `feat/*` continue targeting `develop` normally — `develop` is never
+     blocked, as the release scope was already locked at the outset.
+   - **CI** (`ci.yml`) run the same slim/docling tests on PRs and
+     pushes to `release/**`.
+   - **CD** (`delivery.yml`) publishes an image of `release/0.0.1` in
+     GHCR with the tags `release-0.0.1` and `sha-<commit>`.
+
+3. **Staging points to the release** — it sets `TRACK_BRANCH=release/0.0.1` in
+   `.env` of the staging server so that `scripts/staging-update.sh` switches to
+   tracking the release branch (tag of the image `release-0.0.1`) instead of
+   `develop`:
+
+   ```bash
+   echo "TRACK_BRANCH=release/0.0.1" >> .env
+   ```
+
+4. **Completion of BHS** — once the release is stable:
+
+   ```bash
+   # Merge into main (generates the official release, see section 6)
+   # Open a PR de release/0.0.1 → main and merge after approval
+
+   # Propagate the fixes to develop
+   # Open a PR of release/0.0.1 → develop and merge after approval
+
+   git push origin --delete release/0.0.1
+   ```
+
+   After, remove (or revert) `TRACK_BRANCH` of `.env` of staging so that
+   staging returns to tracking `develop`.
+
+### 6. Release (develop → main)
 
 Only maintainers ([@marceloakira](https://github.com/marceloakira),
 [@jhonata192](https://github.com/jhonata192) and

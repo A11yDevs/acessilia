@@ -1,6 +1,7 @@
 services:
   acessilia:
-    image: ghcr.io/a11ydevs/acessilia:develop
+    # TRACK_TAG (definido no .env): "develop" fora do BHS, "release-x.y.z" durante o ciclo
+    image: ghcr.io/a11ydevs/acessilia:${TRACK_TAG:-develop}
     container_name: acessilia-staging
     ports:
       - "8000:8000"
