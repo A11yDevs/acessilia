@@ -8,14 +8,16 @@ on:
       - completed
     branches:
       - main
+      - develop
+      - 'release/**'
 
 permissions:
   contents: read
   packages: write
 
 concurrency:
-  group: delivery-main
-  cancel-in-progress: false
+  group: delivery-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: ${{ github.event.workflow_run.head_branch != 'main' }}
 
 env:
   REGISTRY: ghcr.io
@@ -24,7 +26,9 @@ env:
 jobs:
   publish:
     name: publish ${{ matrix.variant }} image to GHCR
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     strategy:
