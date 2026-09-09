@@ -3,6 +3,8 @@
 Registro de bugs e resultados de teste levantados durante a homologação, por **Pedro Alano**.
 Para reportar um bug novo, copie o [`BUG_TEMPLATE.md`](BUG_TEMPLATE.md) para `NNNN-slug.md`.
 
+> 📋 **[Relatório de Homologação da `release/0.1.0`](RELATORIO-HOMOLOGACAO.md)** — parecer, resultados de teste e pendências.
+
 ## Findings
 
 | ID | Título | Severidade | Status |
@@ -11,6 +13,7 @@ Para reportar um bug novo, copie o [`BUG_TEMPLATE.md`](BUG_TEMPLATE.md) para `NN
 | [0002](0002-test-isolation-history-db.md) | Testes de `stats`/`history` não isolados do banco real | 🟡 Média | Causa raiz confirmada · corrigido em 2 branches · **aberto** na `release/0.1.0` |
 | [0003](0003-vision-no-description-dark-image.md) | Modelo de visão recusa imagens válidas de forma inconsistente, sem validação no pipeline | 🟢 Baixa | ✅ **Não reproduz** com o modelo de produção (`qwen3-vl-8b`) |
 | [0004](0004-api-blocks-during-inference.md) | API sem responder durante a inferência (bloqueio do event loop) | 🟡 Média | ✅ **Corrigido e mergeado** (PR #67, com teste de regressão) |
+| [0005](0005-docling-table-cells-descartadas.md) | Conteúdo das tabelas do Docling é descartado (tabela chega vazia) | 🔴 Alta | ✅ **Corrigido e verificado** em `fix/docling-table-ast` — aguardando PR |
 
 > **Tema comum (0001 e 0002):** o CI passa verde, mas os defeitos existem — o 0001 tem o trecho *mockado* e o 0002 só falha com banco populado. Reforça a necessidade de testes E2E além do CI.
 
