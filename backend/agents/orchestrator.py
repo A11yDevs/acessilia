@@ -9,7 +9,7 @@ from backend.agents.vision_agent import VisionAgent
 from backend.agents.data_agent import DataAgent
 from backend.agents.editor_agent import EditorAgent
 from backend.agents.types import RegionTask
-from backend.services.cache import get_cached, set_cache
+from backend.services.cache import get_cached, options_cache_key, set_cache
 from backend.tools.logger import logger
 from backend.tools.prompt_tools import load_system_prompt
 from backend.pipeline.structure_parser import parse_text_to_blocks
@@ -39,12 +39,10 @@ class AccessibilityOrchestrator:
         effective_mode = mode or self.mode
         is_pdf = file_path.suffix.lower() == ".pdf"
 
-        if custom_prompt:
-            system_prompt = custom_prompt
-        else:
-            system_prompt = load_system_prompt(effective_mode)
+        dispatch_prompt = custom_prompt
         if thinking_mode:
-            system_prompt = "<|think|>\n" + system_prompt
+            base_prompt = custom_prompt or load_system_prompt(effective_mode)
+            dispatch_prompt = "<|think|>\n" + base_prompt
 
         if is_pdf:
             if status_callback:
@@ -79,7 +77,12 @@ class AccessibilityOrchestrator:
                 label = f"📷 Processando pagina {page_num} de {total_pages}..."
                 await status_callback(label)
 
-            page_cache_key = f"page_{page_num}_{effective_mode}"
+            page_cache_key = options_cache_key(
+                f"page_{page_num}_v2",
+                mode=effective_mode,
+                custom_prompt=custom_prompt or "",
+                thinking_mode=thinking_mode,
+            )
             cached_page = await get_cached(
                 page_path,
                 page_cache_key,
@@ -110,7 +113,7 @@ class AccessibilityOrchestrator:
                 page_num,
                 total_pages,
                 effective_mode,
-                custom_prompt,
+                dispatch_prompt,
             )
 
             page_text = self.editor.consolidate_page(tasks, agent_results)

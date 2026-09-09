@@ -27,6 +27,7 @@ FORMAT_EXTENSIONS = {
 
 FORMAT_OUTPUT_SUFFIX = {
     "pdf_ua": "pdf_ua.pdf",
+    "zip": "_acessivel.zip",
 }
 
 
@@ -87,14 +88,17 @@ async def obter_info_token(token: str) -> dict | None:
         cursor = conn.cursor()
         try:
             cursor.execute(
-                "SELECT output_dir, filename, formats, criado_em FROM download_tokens WHERE token = ?",
-                (token,)
+                """SELECT output_dir, filename, formats, criado_em
+                   FROM download_tokens
+                   WHERE token = ?
+                     AND criado_em >= datetime('now', ?)""",
+                (token, f"-{TOKEN_EXPIRY_DAYS} days")
             )
             row = cursor.fetchone()
         finally:
             cursor.close()
     if row is None:
-        logger.warning("Token de download nao encontrado: {}", token)
+        logger.warning("Token de download nao encontrado ou expirado: {}", token)
         return None
     output_dir = Path(row["output_dir"])
     if not output_dir.exists():
@@ -105,10 +109,15 @@ async def obter_info_token(token: str) -> dict | None:
         )
         return None
     formats_list = json.loads(row["formats"]) if row["formats"] else []
+    allowed_formats = set(formats_list) if isinstance(formats_list, list) else set()
+    base = str(row["filename"])
     formats = []
     for ext, label in FORMAT_EXTENSIONS.items():
+        if allowed_formats and ext not in allowed_formats:
+            continue
         suffix = FORMAT_OUTPUT_SUFFIX.get(ext, ext)
-        file_path = output_dir / f"{Path(row['filename']).stem}.{suffix}"
+        separator = "" if suffix.startswith("_") else "."
+        file_path = output_dir / f"{base}{separator}{suffix}"
         if file_path.exists():
             size_kb = file_path.stat().st_size / 1024
             size_str = f"{size_kb:.0f} KB" if size_kb < 1024 else f"{size_kb / 1024:.1f} MB"
@@ -121,7 +130,7 @@ async def obter_info_token(token: str) -> dict | None:
             })
     return {
         "filename": row["filename"],
-        "stem": Path(row["filename"]).stem,
+        "stem": base,
         "output_dir": str(output_dir),
         "criado_em": row["criado_em"],
         "formats": formats,

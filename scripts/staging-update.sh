@@ -74,22 +74,31 @@ _write_status() {
 }
 
 # ──────────────────────────────────────────────
-# 0. Carregar GHCR_TOKEN (se nao definido no ambiente)
+# 0. Carregar configuracoes do .env
 # ──────────────────────────────────────────────
 # Fontes possiveis, em ordem:
-#   1. Variavel de ambiente GHCR_TOKEN
-#   2. Arquivo <STAGING_DIR>/.env (GHCR_TOKEN=...)
+#   1. Variaveis de ambiente ja exportadas
+#   2. Arquivo <STAGING_DIR>/.env
 #   3. Arquivo /opt/acessilia/scripts/.env (layout antigo)
-if [ -z "${GHCR_TOKEN:-}" ]; then
-  for env_file in "$STAGING_DIR/.env" /opt/acessilia/scripts/.env; do
-    if [ -f "$env_file" ]; then
-      set -a
-      # shellcheck disable=SC1090
-      source "$env_file"
-      set +a
-      break
-    fi
-  done
+ENV_GHCR_TOKEN="${GHCR_TOKEN:-}"
+ENV_TRACK_BRANCH="${TRACK_BRANCH:-}"
+
+for env_file in "$STAGING_DIR/.env" /opt/acessilia/scripts/.env; do
+  if [ -f "$env_file" ]; then
+    set -a
+    # shellcheck disable=SC1090
+    source "$env_file"
+    set +a
+    break
+  fi
+done
+
+if [ -n "$ENV_GHCR_TOKEN" ]; then
+  GHCR_TOKEN="$ENV_GHCR_TOKEN"
+fi
+
+if [ -n "$ENV_TRACK_BRANCH" ]; then
+  TRACK_BRANCH="$ENV_TRACK_BRANCH"
 fi
 
 # Branch/tag rastreada: "develop" por padrao, ou TRACK_BRANCH (env ou .env)
@@ -110,10 +119,12 @@ if [ -n "${GHCR_TOKEN:-}" ]; then
   AUTH_HEADER=(-H "Authorization: token $GHCR_TOKEN")
 fi
 
-LATEST_SHA=$(curl -fsS \
+if ! LATEST_SHA=$(curl -fsS \
   "${AUTH_HEADER[@]}" \
   "https://api.github.com/repos/$GITHUB_REPO/commits/$GITHUB_BRANCH" \
-  | jq -r '.sha')
+  | jq -r '.sha'); then
+  LATEST_SHA=""
+fi
 
 # Se não conseguiu obter o SHA, faz pull direto (fallback seguro)
 if [ -z "$LATEST_SHA" ] || [ "$LATEST_SHA" = "null" ]; then
