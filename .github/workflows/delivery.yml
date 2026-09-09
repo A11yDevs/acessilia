@@ -1,19 +1,42 @@
 name: Delivery
 
 on:
-  workflow_run:
-    workflows:
-      - CI
-    types:
-      - completed
+  workflow_call:
+    inputs:
+      ref:
+        description: Commit a publicar
+        required: true
+        type: string
+      branch:
+        description: Branch associada ao commit
+        required: true
+        type: string
+      sha:
+        description: SHA completo do commit
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Commit a publicar
+        required: true
+        type: string
+      branch:
+        description: Branch associada ao commit
+        required: true
+        type: string
+      sha:
+        description: SHA completo do commit
+        required: true
+        type: string
 
 permissions:
   contents: read
   packages: write
 
 concurrency:
-  group: delivery-${{ github.event.workflow_run.head_branch }}
-  cancel-in-progress: ${{ github.event.workflow_run.head_branch != 'main' }}
+  group: delivery-${{ inputs.branch }}
+  cancel-in-progress: ${{ inputs.branch != 'main' }}
 
 env:
   REGISTRY: ghcr.io
@@ -22,14 +45,6 @@ env:
 jobs:
   publish:
     name: publish ${{ matrix.variant }} image to GHCR
-    if: >
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'push' &&
-      (
-        github.event.workflow_run.head_branch == 'main' ||
-        github.event.workflow_run.head_branch == 'develop' ||
-        startsWith(github.event.workflow_run.head_branch, 'release/')
-      )
     runs-on: ubuntu-latest
     timeout-minutes: 120
     strategy:
@@ -50,7 +65,7 @@ jobs:
       - name: Check out tested commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ inputs.ref }}
           persist-credentials: false
 
       - name: Set up Docker Buildx
@@ -66,8 +81,8 @@ jobs:
       - name: Generate image tags
         id: tags
         run: |
-          BRANCH="${{ github.event.workflow_run.head_branch }}"
-          SHA="${{ github.event.workflow_run.head_sha }}"
+          BRANCH="${{ inputs.branch }}"
+          SHA="${{ inputs.sha }}"
           SUFFIX="${{ matrix.tag_suffix }}"
           SAFE_BRANCH="${BRANCH//\//-}"
           TAGS="${REGISTRY}/${IMAGE_NAME}:${SAFE_BRANCH}${SUFFIX}"
