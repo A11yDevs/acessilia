@@ -68,9 +68,9 @@ Cinco frentes de verificação:
 ### 4.1 Funcional
 | ID | Achado | Severidade | Situação |
 |---|---|---|---|
-| [0005](0005-docling-table-cells-descartadas.md) | Conteúdo das tabelas do Docling é descartado | 🔴 Alta | ✅ **Corrigido e verificado** em `fix/docling-table-ast` (`8ce4e39`) — aguardando PR |
+| [0005](0005-docling-table-cells-descartadas.md) | Conteúdo das tabelas do Docling é descartado | 🔴 Alta | 🔎 **Causa raiz confirmada** · correção **sugerida** ao time |
 
-**Destaque:** o Docling extrai as tabelas corretamente; o adaptador da Acessilia é que descartava o conteúdo. Corrigido com +75 linhas aditivas. Após a correção, o HTML passou a conter `<table>`, `<thead>` e `<th scope>`, e o texto linearizado associa cada célula ao seu cabeçalho.
+**Destaque:** o Docling extrai as tabelas corretamente; o adaptador da Acessilia é que descartava o conteúdo. A correção sugerida (aditiva, ~75 linhas) foi validada em protótipo local **não versionado**: o HTML passou a conter `<table>`, `<thead>` e `<th scope>`, e o texto linearizado associa cada célula ao seu cabeçalho.
 
 ### 4.2 Revisão de segurança
 | # | Achado | Severidade |
@@ -104,15 +104,15 @@ Cinco frentes de verificação:
 
 | Prioridade | Pendência |
 |---|---|
-| 🔴 Alta | Mesclar a correção do **0005** — hoje há **perda de conteúdo tabular**, e tabela é meta declarada do 1.0.0 |
+| 🔴 Alta | Avaliar e aplicar a correção sugerida no **0005** — hoje há **perda de conteúdo tabular**, e tabela é meta declarada do 1.0.0 |
 | 🔴 Alta | Tratar **S2** (upload sem limite no painel web) — risco de indisponibilidade |
-| 🟡 Média | Mesclar a correção do **0002** (já existe em duas branches) |
+| 🟡 Média | Aplicar a correção do **0002** (já existe em duas branches) |
 | 🟡 Média | **S5** (vazamento de mensagem de erro) — correção trivial |
 
 **Não recomendado para produção com usuários reais** enquanto **S1**, **S2** e o **0005** não estiverem resolvidos.
 
 ### Justificativa
-A versão está **funcionalmente sólida**: suíte verde sem skips, pipeline completo entregando todos os formatos, cache correto, e o modelo de produção com desempenho consistente. Os dois bugs críticos anteriores (0001 e 0004) foram corrigidos no ciclo. A ressalva principal é o **0005**, que compromete diretamente o objetivo do produto (conteúdo de tabela não chega ao usuário) — mas **já existe correção pronta e verificada**, sem regressão.
+A versão está **funcionalmente sólida**: suíte verde sem skips, pipeline completo entregando todos os formatos, cache correto, e o modelo de produção com desempenho consistente. Os dois bugs críticos anteriores (0001 e 0004) foram corrigidos no ciclo. A ressalva principal é o **0005**, que compromete diretamente o objetivo do produto (conteúdo de tabela não chega ao usuário) — a causa raiz está identificada e há **correção sugerida validada em protótipo**, sem regressão na suíte.
 
 ---
 
