@@ -1,4 +1,3 @@
-import shutil
 import traceback
 import uuid
 from pathlib import Path
@@ -10,10 +9,12 @@ from fastapi import (
     Request,
     UploadFile,
     HTTPException,
+    Query,
 )
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from starlette.background import BackgroundTask
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -39,6 +40,19 @@ WEB_UPLOAD_DIR = settings.temp_dir / "web_uploads"
 WEB_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 MAX_CUSTOM_PROMPT_CHARS = 6000
+DOWNLOAD_MEDIA_TYPES = {
+    "txt": "text/plain; charset=utf-8",
+    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "pdf": "application/pdf",
+    "pdf_ua": "application/pdf",
+    "html": "text/html; charset=utf-8",
+    "mp3": "audio/mpeg",
+    "zip": "application/zip",
+}
+DOWNLOAD_SUFFIXES = {
+    "pdf_ua": "pdf_ua.pdf",
+    "zip": "_acessivel.zip",
+}
 
 
 @app.exception_handler(Exception)
@@ -85,8 +99,20 @@ def _save_upload(upload: UploadFile) -> Path:
     WEB_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     safe_name = f"{uuid.uuid4().hex}{Path(upload.filename or '').suffix.lower()}"
     file_path = WEB_UPLOAD_DIR / safe_name
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(upload.file, buffer)
+    total_size = 0
+    try:
+        with open(file_path, "wb") as buffer:
+            while chunk := upload.file.read(1024 * 1024):
+                total_size += len(chunk)
+                if total_size > settings.max_file_size_bytes:
+                    raise HTTPException(
+                        status_code=413,
+                        detail=f"Arquivo excede o limite de {settings.max_file_size_mb} MB.",
+                    )
+                buffer.write(chunk)
+    except Exception:
+        _remove_file(file_path)
+        raise
     return file_path
 
 
@@ -99,14 +125,37 @@ def _remove_file(file_path: Path) -> None:
 
 @app.get("/", response_class=HTMLResponse)
 @limiter.limit("30/minute")
-async def index(request: Request):
-    return templates.TemplateResponse(request=request, name="index.html", context={})
+async def index(request: Request, position: int | None = Query(None, ge=1)):
+    return templates.TemplateResponse(
+        request=request, name="index.html", context=_submission_context(position)
+    )
 
 
 @app.get("/advanced", response_class=HTMLResponse)
 @limiter.limit("30/minute")
-async def advanced_page(request: Request):
-    return templates.TemplateResponse(request=request, name="advanced.html", context={})
+async def advanced_page(request: Request, position: int | None = Query(None, ge=1)):
+    return templates.TemplateResponse(
+        request=request, name="advanced.html", context=_submission_context(position)
+    )
+
+
+def _submission_context(position: int | None) -> dict[str, str]:
+    if position is None:
+        return {}
+    return {"message": (
+        f"Sucesso! Seu arquivo entrou na fila (Posição no envio: {position}). "
+        "O resultado será enviado para o e-mail informado."
+    )}
+
+
+@app.get("/process", include_in_schema=False)
+async def upload_page():
+    return RedirectResponse(url="/", status_code=303)
+
+
+@app.get("/advanced/process", include_in_schema=False)
+async def advanced_upload_page():
+    return RedirectResponse(url="/advanced", status_code=303)
 
 
 async def _submit_via_api(
@@ -118,7 +167,15 @@ async def _submit_via_api(
     custom_prompt: str | None = None,
     thinking_mode: bool = False,
 ):
-    file_path = _save_upload(document_file)
+    try:
+        file_path = _save_upload(document_file)
+    except HTTPException as e:
+        return templates.TemplateResponse(
+            request=request,
+            name=template_name,
+            context={"error": e.detail},
+            status_code=e.status_code,
+        )
     try:
         result = await client.submit_job(
             file_path,
@@ -150,12 +207,9 @@ async def _submit_via_api(
     finally:
         _remove_file(file_path)
 
-    msg = (
-        f"Sucesso! Seu arquivo entrou na fila (Posição: {result['position']}). "
-        f"O resultado será enviado para {email}."
-    )
-    return templates.TemplateResponse(
-        request=request, name=template_name, context={"message": msg}
+    page = "/advanced" if template_name == "advanced.html" else "/"
+    return RedirectResponse(
+        url=f"{page}?position={int(result['position'])}", status_code=303
     )
 
 
@@ -218,4 +272,33 @@ async def download_page(request: Request, token: str):
         request=request,
         name="download.html",
         context={"filename": info["filename"], "formats": info["formats"]},
+    )
+
+
+@app.get("/api/v1/download/{token}/{format}")
+@limiter.limit("20/minute")
+async def proxy_download(request: Request, token: str, format: str):
+    if format not in DOWNLOAD_MEDIA_TYPES:
+        raise HTTPException(status_code=400, detail="Formato inválido")
+    destination = settings.temp_dir / "web_downloads" / f"{uuid.uuid4().hex}.{format}"
+    try:
+        info = await client.get_download_info(token)
+        await client.download_file(token, format, destination)
+    except ApiError as e:
+        _remove_file(destination)
+        if e.status_code == 404:
+            raise HTTPException(status_code=404, detail="Arquivo não encontrado")
+        raise HTTPException(status_code=502, detail="Serviço de download indisponível")
+    except Exception as e:
+        _remove_file(destination)
+        logger.error("Falha no download via web: {}", e)
+        raise HTTPException(status_code=502, detail="Serviço de download indisponível")
+    suffix = DOWNLOAD_SUFFIXES.get(format, format)
+    separator = "" if suffix.startswith("_") else "."
+    filename = f"{info['stem']}{separator}{suffix}"
+    return FileResponse(
+        destination,
+        background=BackgroundTask(_remove_file, destination),
+        media_type=DOWNLOAD_MEDIA_TYPES[format],
+        filename=filename,
     )

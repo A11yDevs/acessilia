@@ -104,6 +104,14 @@ docker run --rm \
 
 Use `ghcr.io/a11ydevs/acessilia:main-slim` no mesmo comando para a variante slim. Para reproduzir uma versão exata, use `sha-<commit>` ou `sha-<commit>-slim`, mostradas na execução do workflow **Delivery**.
 
+Para um servidor de producao com atualizacao automatica da `main`, use:
+
+```bash
+./scripts/setup-producao.sh
+```
+
+O procedimento completo de promocao, validacao e rollback esta em [docs/producao-systemd.md](docs/producao-systemd.md).
+
 ### Construindo localmente
 
 ```bash

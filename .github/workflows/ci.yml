@@ -15,6 +15,7 @@ on:
 
 permissions:
   contents: read
+  packages: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -208,3 +209,22 @@ jobs:
             exit 1
           fi
           echo "As variantes slim e docling passaram."
+
+  delivery:
+    name: publish verified images
+    if: >
+      needs.tests.result == 'success' &&
+      github.event_name == 'push' &&
+      (
+        github.ref_name == 'main' ||
+        github.ref_name == 'develop' ||
+        startsWith(github.ref_name, 'release/')
+      )
+    needs:
+      - tests
+    uses: ./.github/workflows/delivery.yml
+    with:
+      ref: ${{ github.sha }}
+      branch: ${{ github.ref_name }}
+      sha: ${{ github.sha }}
+    secrets: inherit

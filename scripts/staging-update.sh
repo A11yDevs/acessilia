@@ -29,6 +29,13 @@
 #   no .env (ex: TRACK_BRANCH=release/0.0.1) para apontar o staging para a
 #   branch de release efemera; ao encerrar o BHS, remova a variavel (ou volte
 #   para "develop") para retomar o rastreio normal.
+#
+# Parametrizacao para outros ambientes:
+#   DEPLOY_DIR=/opt/acessilia/production
+#   COMPOSE_FILE=docker-compose.production.yml
+#   CONTAINER_NAME=acessilia-production
+#   DEPLOY_ENV=production
+#   DEFAULT_TRACK_BRANCH=main
 
 set -euo pipefail
 
@@ -39,7 +46,9 @@ set -euo pipefail
 #   A) Servidor de homologacao: /opt/acessilia/staging/  (STAGING_DIR ou deteccao)
 #   B) Repositorio clonado: <repo>/scripts/staging-update.sh -> <repo>/
 # Prioridade: 1. STAGING_DIR (env)  2. /opt/acessilia/staging  3. pai do script
-if [ -n "${STAGING_DIR:-}" ]; then
+if [ -n "${DEPLOY_DIR:-}" ]; then
+  STAGING_DIR="$DEPLOY_DIR"
+elif [ -n "${STAGING_DIR:-}" ]; then
   STAGING_DIR="$STAGING_DIR"
 elif [ -d /opt/acessilia/staging ]; then
   STAGING_DIR="/opt/acessilia/staging"
@@ -48,12 +57,13 @@ else
 fi
 cd "$STAGING_DIR"
 
-COMPOSE_FILE="docker-compose.staging.yml"
-CONTAINER_NAME="acessilia-staging"
+DEPLOY_ENV="${DEPLOY_ENV:-staging}"
+COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.staging.yml}"
+CONTAINER_NAME="${CONTAINER_NAME:-acessilia-staging}"
 GITHUB_REPO="A11yDevs/acessilia"
 # Cache e status ficam dentro do volume ./var (visivel ao container via /app/var)
 CACHE_FILE="${STAGING_UPDATE_CACHE:-$STAGING_DIR/var/data/.last_sha}"
-STATUS_FILE="${STAGING_STATUS_FILE:-$STAGING_DIR/var/data/staging-status.json}"
+STATUS_FILE="${STAGING_STATUS_FILE:-$STAGING_DIR/var/data/$DEPLOY_ENV-status.json}"
 
 # ──────────────────────────────────────────────
 # Helpers de status
@@ -74,27 +84,37 @@ _write_status() {
 }
 
 # ──────────────────────────────────────────────
-# 0. Carregar GHCR_TOKEN (se nao definido no ambiente)
+# 0. Carregar configuracoes do .env
 # ──────────────────────────────────────────────
 # Fontes possiveis, em ordem:
-#   1. Variavel de ambiente GHCR_TOKEN
-#   2. Arquivo <STAGING_DIR>/.env (GHCR_TOKEN=...)
+#   1. Variaveis de ambiente ja exportadas
+#   2. Arquivo <STAGING_DIR>/.env
 #   3. Arquivo /opt/acessilia/scripts/.env (layout antigo)
-if [ -z "${GHCR_TOKEN:-}" ]; then
-  for env_file in "$STAGING_DIR/.env" /opt/acessilia/scripts/.env; do
-    if [ -f "$env_file" ]; then
-      set -a
-      # shellcheck disable=SC1090
-      source "$env_file"
-      set +a
-      break
-    fi
-  done
+ENV_GHCR_TOKEN="${GHCR_TOKEN:-}"
+ENV_TRACK_BRANCH="${TRACK_BRANCH:-}"
+
+for env_file in "$STAGING_DIR/.env" /opt/acessilia/scripts/.env; do
+  if [ -f "$env_file" ]; then
+    set -a
+    # shellcheck disable=SC1090
+    source "$env_file"
+    set +a
+    break
+  fi
+done
+
+if [ -n "$ENV_GHCR_TOKEN" ]; then
+  GHCR_TOKEN="$ENV_GHCR_TOKEN"
 fi
 
-# Branch/tag rastreada: "develop" por padrao, ou TRACK_BRANCH (env ou .env)
-# durante o ciclo de BHS (ex: release/0.0.1)
-GITHUB_BRANCH="${TRACK_BRANCH:-develop}"
+if [ -n "$ENV_TRACK_BRANCH" ]; then
+  TRACK_BRANCH="$ENV_TRACK_BRANCH"
+fi
+
+# Branch/tag rastreada: DEFAULT_TRACK_BRANCH por padrao, ou TRACK_BRANCH
+# (env ou .env) durante o ciclo de BHS (ex: release/0.0.1)
+DEFAULT_TRACK_BRANCH="${DEFAULT_TRACK_BRANCH:-develop}"
+GITHUB_BRANCH="${TRACK_BRANCH:-$DEFAULT_TRACK_BRANCH}"
 # Docker tags nao aceitam "/" (ex: release/0.0.1 -> release-0.0.1)
 TRACK_TAG="${GITHUB_BRANCH//\//-}"
 IMAGE_TAG="ghcr.io/a11ydevs/acessilia:${TRACK_TAG}"
@@ -110,10 +130,12 @@ if [ -n "${GHCR_TOKEN:-}" ]; then
   AUTH_HEADER=(-H "Authorization: token $GHCR_TOKEN")
 fi
 
-LATEST_SHA=$(curl -fsS \
+if ! LATEST_SHA=$(curl -fsS \
   "${AUTH_HEADER[@]}" \
   "https://api.github.com/repos/$GITHUB_REPO/commits/$GITHUB_BRANCH" \
-  | jq -r '.sha')
+  | jq -r '.sha'); then
+  LATEST_SHA=""
+fi
 
 # Se não conseguiu obter o SHA, faz pull direto (fallback seguro)
 if [ -z "$LATEST_SHA" ] || [ "$LATEST_SHA" = "null" ]; then

@@ -80,7 +80,6 @@ def table_ast_from_rows(rows: Any, *, caption: str | None = None) -> dict[str, A
                     "text": str(cell).strip(),
                 }
                 for cell in row
-                if str(cell).strip()
             ]
         }
         for row in normalized_rows
@@ -108,9 +107,9 @@ def rows_from_table_ast(table_ast: Any) -> list[list[str]]:
             row_values = [
                 str(cell.get("text", "")).strip()
                 for cell in cells
-                if isinstance(cell, dict) and str(cell.get("text", "")).strip()
+                if isinstance(cell, dict)
             ]
-            if row_values:
+            if any(value for value in row_values):
                 rows.append(row_values)
     return rows
 
@@ -198,23 +197,23 @@ def _row_texts(row: dict[str, Any]) -> list[str]:
     values = [
         str(cell.get("text", "")).strip()
         for cell in cells
-        if isinstance(cell, dict) and str(cell.get("text", "")).strip()
+        if isinstance(cell, dict)
     ]
     return values
 
 
 def _normalize_row(raw_row: Any) -> dict[str, Any] | None:
     if isinstance(raw_row, list):
-        cells = [{"text": str(cell).strip()} for cell in raw_row if str(cell).strip()]
-        return {"cells": cells} if cells else None
+        cells = [{"text": str(cell).strip()} for cell in raw_row]
+        return {"cells": cells} if any(cell["text"] for cell in cells) else None
 
     row_obj = _coerce_object(raw_row)
     if row_obj is None:
         return None
 
     if isinstance(row_obj, list):
-        cells = [{"text": str(cell).strip()} for cell in row_obj if str(cell).strip()]
-        return {"cells": cells} if cells else None
+        cells = [{"text": str(cell).strip()} for cell in row_obj]
+        return {"cells": cells} if any(cell["text"] for cell in cells) else None
 
     if not isinstance(row_obj, dict):
         return None
@@ -226,7 +225,7 @@ def _normalize_row(raw_row: Any) -> dict[str, Any] | None:
             cell = _normalize_cell(raw_cell)
             if cell is not None:
                 cells.append(cell)
-        return {"cells": cells} if cells else None
+        return {"cells": cells} if any(cell["text"] for cell in cells) else None
 
     rows_field = row_obj.get("rows")
     if isinstance(rows_field, list):
@@ -243,22 +242,20 @@ def _normalize_row(raw_row: Any) -> dict[str, Any] | None:
 
 def _normalize_cell(raw_cell: Any) -> dict[str, Any] | None:
     if isinstance(raw_cell, str):
-        text = raw_cell.strip()
-        return {"text": text} if text else None
+        return {"text": raw_cell.strip()}
 
     cell_obj = _coerce_object(raw_cell)
     if cell_obj is None:
         return None
 
     if isinstance(cell_obj, str):
-        text = cell_obj.strip()
-        return {"text": text} if text else None
+        return {"text": cell_obj.strip()}
 
     if not isinstance(cell_obj, dict):
         return None
 
     text = cell_obj.get("text")
-    if not isinstance(text, str) or not text.strip():
+    if not isinstance(text, str):
         return None
 
     cell: dict[str, Any] = {"text": text.strip()}
@@ -287,15 +284,15 @@ def _rows_from_mixed(raw_rows: Any) -> list[list[str]]:
     rows: list[list[str]] = []
     for raw_row in raw_rows:
         if isinstance(raw_row, list):
-            values = [str(cell).strip() for cell in raw_row if str(cell).strip()]
-            if values:
+            values = [str(cell).strip() for cell in raw_row]
+            if any(values):
                 rows.append(values)
             continue
 
         row_dict = _normalize_row(raw_row)
         if row_dict is not None:
             values = _row_texts(row_dict)
-            if values:
+            if any(values):
                 rows.append(values)
     return rows
 

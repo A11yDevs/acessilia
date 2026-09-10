@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import re
 from typing import Any
+from xml.sax.saxutils import escape, quoteattr
 
 from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4
@@ -20,6 +21,10 @@ from reportlab.platypus import (
 from backend.pipeline.table_ast import linearize_table_for_text
 from backend.pipeline.verbosity_manager import filter_blocks_for_profile
 from backend.tools.code_tools import normalize_code_text
+
+
+def _escape_text(value: Any) -> str:
+    return escape(str(value))
 
 
 class _DocTemplate(SimpleDocTemplate):
@@ -114,7 +119,8 @@ def render_pdf(
     )
     story = [
         Paragraph(
-            title or document.get("title", "Documento acessível"), styles["A11yTitle"]
+            _escape_text(title or document.get("title", "Documento acessível")),
+            styles["A11yTitle"],
         ),
         Spacer(1, 6 * mm),
     ]
@@ -125,7 +131,8 @@ def render_pdf(
             indent = "&nbsp;" * (level - 1) * 4
             story.append(
                 Paragraph(
-                    f'{indent}<link href="#{heading_id}">{heading_title}</link>',
+                    f"{indent}<link href={quoteattr(f'#{heading_id}')}>"
+                    f"{_escape_text(heading_title)}</link>",
                     styles["A11yBody"],
                 )
             )
@@ -160,7 +167,9 @@ def _render_section(story, section: dict[str, Any], styles, profile_name: str) -
             section.get("level", 1), "A11yHeading2"
         )
         paragraph = Paragraph(
-            f'<a name="{section.get("id", "")}"/>{section["title"]}', styles[style_name]
+            f'<a name={quoteattr(str(section.get("id", "")))}/>'
+            f'{_escape_text(section["title"])}',
+            styles[style_name],
         )
         paragraph._heading_id = section.get("id", "")
         paragraph._heading_level = section.get("level", 1)
@@ -175,29 +184,31 @@ def _render_block(story, block: dict[str, Any], styles) -> None:
     block_type = block.get("type")
     if block_type == "heading":
         paragraph = Paragraph(
-            f'<a name="{block.get("id", "")}"/>{block.get("title", block.get("text", ""))}',
+            f'<a name={quoteattr(str(block.get("id", "")))}/>'
+            f'{_escape_text(block.get("title", block.get("text", "")))}',
             styles["A11yHeading2"],
         )
         paragraph._heading_id = block.get("id", "")
         paragraph._heading_level = block.get("level", 1)
         story.append(paragraph)
     elif block_type == "paragraph":
-        story.append(Paragraph(block.get("text", ""), styles["A11yBody"]))
+        story.append(Paragraph(_escape_text(block.get("text", "")), styles["A11yBody"]))
     elif block_type == "code":
         code_text = normalize_code_text(block.get("text", ""))
         story.append(
-            Preformatted(code_text, styles["A11yCode"], dedent=False)
+            Preformatted(_escape_text(code_text), styles["A11yCode"], dedent=False)
         )
     elif block_type == "list":
         items = [
-            Paragraph(str(item), styles["A11yBody"]) for item in block.get("items", [])
+            Paragraph(_escape_text(item), styles["A11yBody"])
+            for item in block.get("items", [])
         ]
         story.append(
             ListFlowable(items, bulletType="1" if block.get("ordered") else "bullet")
         )
     elif block_type == "table":
         for line in linearize_table_for_text(block):
-            story.append(Paragraph(line, styles["A11yBody"]))
+            story.append(Paragraph(_escape_text(line), styles["A11yBody"]))
     elif block_type in {"details", "note", "warning", "quote", "image", "math"}:
         text = (
             block.get("long_description")
@@ -207,23 +218,28 @@ def _render_block(story, block: dict[str, Any], styles) -> None:
         if block_type in {"note", "warning"}:
             label = "Aviso" if block_type == "warning" else "Nota"
             if text:
-                story.append(Paragraph(f"<b>{label}:</b> {text}", styles["A11yBody"]))
+                story.append(
+                    Paragraph(
+                        f"<b>{label}:</b> {_escape_text(text)}",
+                        styles["A11yBody"],
+                    )
+                )
             else:
                 story.append(Paragraph(f"<b>{label}</b>", styles["A11yBody"]))
         else:
-            story.append(Paragraph(text, styles["A11yBody"]))
+            story.append(Paragraph(_escape_text(text), styles["A11yBody"]))
     else:
         text = block.get("text", "")
         if _looks_like_code_text(text):
             story.append(
                 Preformatted(
-                    normalize_code_text(text),
+                    _escape_text(normalize_code_text(text)),
                     styles["A11yCode"],
                     dedent=False,
                 )
             )
         else:
-            story.append(Paragraph(text, styles["A11yBody"]))
+            story.append(Paragraph(_escape_text(text), styles["A11yBody"]))
 
 
 def _looks_like_code_text(text: str) -> bool:

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "bot-acess"
-version = "0.2.0"
+version = "0.1.0"
 description = "Bot para extração e acessibilidade de documentos."
 authors = ["Jhonata"]
 license = "MIT"

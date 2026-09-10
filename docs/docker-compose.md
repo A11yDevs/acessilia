@@ -106,8 +106,10 @@ O CI/CD publica automaticamente as seguintes imagens:
 | `:latest-slim`                   | slim     | Aponta para `main` (leve)          |
 | `:sha-<7-char-commit>`           | docling  | Build de um commit específico      |
 | `:sha-<7-char-commit>-slim`      | slim     | Build de um commit específico (leve)|
-| `:vX.Y.Z`                        | docling  | Release versionada                 |
-| `:vX.Y.Z-slim`                   | slim     | Release versionada (leve)          |
+| `:X.Y.Z`                         | docling  | Release versionada                 |
+| `:X.Y.Z-slim`                    | slim     | Release versionada (leve)          |
+| `:X.Y` / `:X`                    | docling  | Alias semântico da release         |
+| `:X.Y-slim` / `:X-slim`          | slim     | Alias semântico da release (leve)  |
 
 Exemplo para puxar uma imagem manualmente:
 
@@ -181,7 +183,7 @@ docker pull ghcr.io/a11ydevs/acessilia:sha-abc1234
 
 ---
 
-## 6. Update automático (staging)
+## 6. Update automático (staging e produção)
 
 Se você estiver rodando um servidor de homologação, pode configurar **update
 automático** via systemd timer. O script consulta a **GitHub API** a cada
@@ -194,6 +196,10 @@ automático** via systemd timer. O script consulta a **GitHub API** a cada
 # Ou fazer manualmente
 # Consulte docs/homologacao-systemd.md para instruções manuais
 ```
+
+Para producao, use [docs/producao-systemd.md](docs/producao-systemd.md) ou rode
+`./scripts/setup-producao.sh`. O ambiente rastreia `main` por padrao com
+`docker-compose.production.yml` e `scripts/production-update.sh`.
 
 **Requer:** `jq` e um token GitHub com escopo `read:packages`.
 
