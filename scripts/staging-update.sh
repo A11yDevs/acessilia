@@ -70,7 +70,9 @@ STATUS_FILE="${STAGING_STATUS_FILE:-$STAGING_DIR/var/data/$DEPLOY_ENV-status.jso
 # ──────────────────────────────────────────────
 _write_status() {
   # $1 = latest_sha, $2 = running_sha, $3 = last_update (ISO) ou vazio
+  # $4 = latest_digest, $5 = running_digest
   local latest_sha="$1" running_sha="$2" last_update="$3"
+  local latest_digest="${4:-}" running_digest="${5:-}"
   local now
   now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   mkdir -p "$(dirname "$STATUS_FILE")"
@@ -79,7 +81,9 @@ _write_status() {
     --arg running "$running_sha" \
     --arg check "$now" \
     --arg update "$last_update" \
-    '{latest_sha: $latest, running_sha: $running, last_check: $check, last_update: $update}' \
+    --arg latest_digest "$latest_digest" \
+    --arg running_digest "$running_digest" \
+    '{latest_sha: $latest, running_sha: $running, last_check: $check, last_update: $update, latest_digest: $latest_digest, running_digest: $running_digest}' \
     > "$STATUS_FILE"
 }
 
@@ -136,6 +140,7 @@ if ! LATEST_SHA=$(curl -fsS \
   | jq -r '.sha'); then
   LATEST_SHA=""
 fi
+LATEST_DIGEST=""
 
 # Se não conseguiu obter o SHA, faz pull direto (fallback seguro)
 if [ -z "$LATEST_SHA" ] || [ "$LATEST_SHA" = "null" ]; then
@@ -146,7 +151,7 @@ if [ -z "$LATEST_SHA" ] || [ "$LATEST_SHA" = "null" ]; then
   }
   docker compose -f "$COMPOSE_FILE" up -d --no-deps acessilia
   docker image prune -f
-  _write_status "" "" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  _write_status "" "" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "" ""
   echo "[staging-update] Container atualizado (fallback)."
   exit 0
 fi
@@ -155,7 +160,7 @@ fi
 if [ -f "$CACHE_FILE" ]; then
   CACHED_SHA=$(cat "$CACHE_FILE")
   if [ "$CACHED_SHA" = "$LATEST_SHA" ]; then
-    _write_status "$LATEST_SHA" "" ""
+    _write_status "$LATEST_SHA" "" "" "$LATEST_DIGEST" ""
     echo "[staging-update] ✅ Nenhum commit novo em $GITHUB_REPO/$GITHUB_BRANCH. Pulando."
     exit 0
   fi
@@ -163,14 +168,17 @@ fi
 
 # ──────────────────────────────────────────────
 # 2. Confirmar que a imagem do commit já está no GHCR
+#    e extrair o digest da imagem publicada
 # ──────────────────────────────────────────────
 SHA7="${LATEST_SHA:0:7}"
 SHA_TAG="ghcr.io/a11ydevs/acessilia:sha-$SHA7"
 
 if docker manifest inspect "$SHA_TAG" >/dev/null 2>&1; then
   echo "[staging-update] ✅ Imagem sha-$SHA7 já publicada no GHCR."
+  # Extrai o digest da primeira plataforma (linux/amd64)
+  LATEST_DIGEST=$(docker manifest inspect "$SHA_TAG" | jq -r '.manifests[0].digest // ""')
 else
-  _write_status "$LATEST_SHA" "" ""
+  _write_status "$LATEST_SHA" "" "" "" ""
   echo "[staging-update] ⏳ Imagem sha-$SHA7 ainda não publicada no GHCR (build em andamento?). Aguardando próxima checagem."
   exit 0
 fi
@@ -185,6 +193,10 @@ docker pull "$IMAGE_TAG" 2>/dev/null || {
   exit 1
 }
 
+# Extrai o digest da imagem que acabou de ser puxada
+RUNNING_DIGEST=$(docker image inspect "$IMAGE_TAG" --format '{{.RepoDigests}}' \
+  | grep -oE 'sha256:[a-f0-9]{64}' | head -1 || echo "")
+
 echo "[staging-update] 🚀 Reiniciando container..."
 docker compose -f "$COMPOSE_FILE" up -d --no-deps acessilia
 
@@ -193,6 +205,6 @@ echo "$LATEST_SHA" > "$CACHE_FILE"
 
 docker image prune -f
 
-_write_status "$LATEST_SHA" "$LATEST_SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+_write_status "$LATEST_SHA" "$LATEST_SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$LATEST_DIGEST" "$RUNNING_DIGEST"
 
 echo "[staging-update] ✅ Container $CONTAINER_NAME atualizado com sucesso."
