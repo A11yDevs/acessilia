@@ -7,6 +7,8 @@ CodeFormula (Docling) extrai o LaTeX do recorte. LLM fica como último recurso.
 from __future__ import annotations
 
 import io
+import os
+import threading
 from typing import Any
 
 from backend.tools.image_enhancer import is_math_likely
@@ -16,6 +18,9 @@ _ocr_engine: Any = None
 _ocr_failed = False
 _codeformula_model: Any = None
 _codeformula_failed = False
+
+# Timeout em segundos para inferência CodeFormula em CPU (~2 min/fórmula típico)
+CODEFORMULA_TIMEOUT_SECONDS = int(os.getenv("FORMULA_CODEFORMULA_TIMEOUT", "120"))
 
 
 def _get_ocr() -> Any:
@@ -87,8 +92,35 @@ def is_formula_image(image_bytes: bytes) -> bool:
     return _looks_math(ocr_image_text(image_bytes))
 
 
-_STRONG_MATH_CHARS = "√∫∑∏±×÷≤≥≠≈²³πθλμσωΔ∂∞"
+import unicodedata
+
+# Strong: Unicode category Sm (Math Symbol), plus Greek letters, double-struck
+# letters (ℝ, ℕ), and superscripts/subscripts that are not Sm but clearly math.
 _WEAK_MATH_CHARS = "=+^_/"
+
+
+def _is_strong_math_char(ch: str) -> bool:
+    """True if ch is a mathematical symbol or clearly mathematical letter/number."""
+    category = unicodedata.category(ch)
+    if category == "Sm":
+        # Exclude ambiguous operators that appear in prose
+        return ch not in "+-=<>|~"
+    if category in ("Ll", "Lu"):
+        cp = ord(ch)
+        # Greek alphabet
+        if 0x0391 <= cp <= 0x03A9 or 0x03B1 <= cp <= 0x03C9:
+            return True
+        # Double-struck letters (math blackboard bold: ℝ, ℕ, ℤ, ℚ, ℂ)
+        if 0x1D400 <= cp <= 0x1D7FF:  # Mathematical Alphanumeric Symbols
+            return True
+        if 0x2100 <= cp <= 0x214F:  # Letterlike Symbols (ℝ, ℕ, ℂ, ℙ, ℚ, ℤ)
+            return True
+    if category == "No":
+        cp = ord(ch)
+        # Superscripts and subscripts
+        if 0x2070 <= cp <= 0x2089:
+            return True
+    return False
 
 
 def _looks_math(text: str) -> bool:
@@ -97,7 +129,7 @@ def _looks_math(text: str) -> bool:
     if not text:
         return False
 
-    strong = sum(text.count(ch) for ch in _STRONG_MATH_CHARS)
+    strong = sum(1 for ch in text if _is_strong_math_char(ch))
     if strong >= 1:
         return True
 
@@ -143,9 +175,32 @@ def extract_latex_from_image(image_bytes: bytes) -> str:
             max_new_tokens=512,
             extra_generation_config={"skip_special_tokens": False},
         )
-        outputs = model.engine.predict_batch([engine_input])
-        latex = model._post_process([outputs[0].text])[0].strip()
-        return latex if looks_like_latex(latex) else ""
+        # Executa em thread separada para respeitar timeout em CPU
+        result: list[str] = []
+        error: list[Exception] = []
+
+        def _run():
+            try:
+                outputs = model.engine.predict_batch([engine_input])
+                latex = model._post_process([outputs[0].text])[0].strip()
+                if looks_like_latex(latex):
+                    result.append(latex)
+            except Exception as e:
+                error.append(e)
+
+        thread = threading.Thread(target=_run, daemon=True)
+        thread.start()
+        thread.join(timeout=CODEFORMULA_TIMEOUT_SECONDS)
+        if thread.is_alive():
+            logger.warning(
+                "CodeFormula excedeu timeout de {}s; retornando vazio",
+                CODEFORMULA_TIMEOUT_SECONDS,
+            )
+            return ""
+        if error:
+            logger.warning("CodeFormula falhou no recorte: {}", error[0])
+            return ""
+        return result[0] if result else ""
     except Exception as error:
         logger.warning("CodeFormula falhou no recorte: {}", error)
         return ""

@@ -189,6 +189,45 @@ def test_looks_math_heuristic():
     )
 
 
+def test_looks_math_unicode_math_symbol():
+    """Sm cobre centenas de símbolos: ∀ ∃ ∈ ℝ ⊕ ⊗ etc."""
+    from backend.tools.formula_tools import _looks_math
+
+    # Símbolos matemáticos Unicode (Sm) fora da lista hardcoded original
+    assert _looks_math("∀x ∈ ℝ")
+    assert _looks_math("∃y ⊕ z")
+    assert _looks_math("A ⊗ B")
+    assert _looks_math("f: ℕ → ℕ")
+
+    # Letras gregas e sobrescritos (não são Sm, mas são matemáticos)
+    assert _looks_math("π r²")
+    assert _looks_math("θ λ μ")
+
+    # Não deve detectar prosa comum
+    assert not _looks_math("O custo é R$ 5 + 2 = 7")
+    assert not _looks_math("A+B=C")  # fracos insuficientes sem contexto
+
+
+def test_codeformula_timeout_returns_empty(monkeypatch):
+    """Timeout configurável evita travamento em fórmula complexa."""
+    import time
+
+    from backend.tools import formula_tools
+
+    class SlowEngine:
+        def predict_batch(self, inputs):
+            time.sleep(5)  # Muito mais que o timeout
+            return [type("O", (), {"text": r"\frac{a}{b}"})()]
+
+    model = type("M", (), {"engine": SlowEngine(), "_post_process": lambda s, x: x})()
+
+    monkeypatch.setattr(formula_tools, "_codeformula_model", model)
+    monkeypatch.setattr(formula_tools, "_codeformula_failed", False)
+    monkeypatch.setattr(formula_tools, "CODEFORMULA_TIMEOUT_SECONDS", 0.1)
+
+    assert formula_tools.extract_latex_from_image(b"fake") == ""
+
+
 def test_cascade_routes_math_image_to_editor(reader, monkeypatch):
     monkeypatch.setattr(
         "backend.agents.reader_agent.try_extract_formula_locally",

@@ -44,6 +44,33 @@ def test_latex_to_mathml_empty_input():
     assert latex_to_mathml("$$") == ""
 
 
+def test_latex_to_mathml_warns_when_library_missing(monkeypatch, caplog):
+    """Quando latex2mathml não está instalado, emite warning e retorna vazio."""
+    import builtins
+    import sys
+
+    from backend.tools import formula_tools
+
+    # Simula ausência da biblioteca
+    real_import = builtins.__import__
+
+    def fake_import(name, *args, **kwargs):
+        if name == "latex2mathml.converter":
+            raise ImportError("No module named 'latex2mathml'")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    # Limpa cache para garantir que o import é re-tentado
+    monkeypatch.delitem(sys.modules, "latex2mathml.converter", raising=False)
+
+    with caplog.at_level("WARNING"):
+        result = formula_tools.latex_to_mathml(r"$x=1$")
+
+    assert result == ""
+    assert "latex2mathml não instalado" in caplog.text
+    assert "latex2mathml_unavailable" in caplog.text or "enriquecimento" in caplog.text
+
+
 def test_verbalize_latex_fallback_portuguese():
     spoken = verbalize_latex_fallback(r"$x=\frac{a}{b}$")
     assert spoken.startswith("Fórmula:")

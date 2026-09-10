@@ -142,6 +142,25 @@ docker build -f infra/Dockerfile --build-arg WITH_DOCLING=false -t acessilia:sli
 
 All model weights are downloaded at runtime on first Docling use (the distributed images embed no models), which makes that first conversion slower. Persist the `/app/var` volume so later runs reuse the same files, even offline.
 
+### Configuração de fórmulas matemáticas
+
+O pipeline de acessibilização de fórmulas (PR #49) usa CodeFormula (~200M parâmetros, MIT) para extrair LaTeX de imagens. Em CPU, cada fórmula leva **~2 minutos** para processar.
+
+| Variável | Default | Descrição |
+|---|---|---|
+| `DOCLING_FORMULA_ENRICHMENT` | `true` | Habilita extração de fórmulas via Docling |
+| `FORMULA_IMAGE_CASCADE` | `true` | Habilita cascata OCR → CodeFormula para imagens |
+| `FORMULA_CODEFORMULA_TIMEOUT` | `120` | Timeout em segundos para inferência CodeFormula em CPU |
+
+Para desabilitar fórmulas ou ajustar o timeout, edite o `.env` sem mudar código:
+
+```bash
+DOCLING_FORMULA_ENRICHMENT=false  # desliga extração de fórmulas
+FORMULA_CODEFORMULA_TIMEOUT=300   # 5 minutos para fórmulas complexas
+```
+
+O timeout evita que uma fórmula complexa trave o pipeline; excedido o tempo, a fórmula é registrada como "não extraída" e o processamento continua.
+
 - Hugging Face: `/app/var/cache/huggingface` (`HF_HOME`)
 - RapidOCR: `/app/var/cache/rapidocr` (`RAPIDOCR_CACHE_DIR`)
 
