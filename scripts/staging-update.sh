@@ -127,17 +127,19 @@ export TRACK_TAG
 # ──────────────────────────────────────────────
 # Auto-update: verifica se o proprio script esta desatualizado
 # ──────────────────────────────────────────────
-# Compara o hash do script local com a versao no branch rastreado.
-# Se diferente, baixa a versao mais recente e reexecuta.
+# A branch usada para buscar a versao mais recente do script.
+# Durante PRs, defina SCRIPT_UPDATE_BRANCH no .env (ex: fix/health-ghcr-digest).
+# Apos o merge, remova a variavel para voltar ao padrao (GITHUB_BRANCH).
+SCRIPT_UPDATE_BRANCH="${SCRIPT_UPDATE_BRANCH:-$GITHUB_BRANCH}"
 SCRIPT_PATH="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
-SCRIPT_RAW_URL="https://raw.githubusercontent.com/$GITHUB_REPO/$GITHUB_BRANCH/scripts/staging-update.sh"
+SCRIPT_RAW_URL="https://raw.githubusercontent.com/$GITHUB_REPO/$SCRIPT_UPDATE_BRANCH/scripts/staging-update.sh"
 
 if [ -f "$SCRIPT_PATH" ] && command -v sha256sum &>/dev/null; then
   REMOTE_HASH=$(curl -fsS "${AUTH_HEADER[@]}" "$SCRIPT_RAW_URL" 2>/dev/null | sha256sum | cut -d' ' -f1 || echo "")
   LOCAL_HASH=$(sha256sum "$SCRIPT_PATH" | cut -d' ' -f1)
 
   if [ -n "$REMOTE_HASH" ] && [ "$REMOTE_HASH" != "$LOCAL_HASH" ]; then
-    echo "[staging-update] 🔄 Script desatualizado. Atualizando de $GITHUB_BRANCH..."
+    echo "[staging-update] 🔄 Script desatualizado. Atualizando de $SCRIPT_UPDATE_BRANCH..."
     if curl -fsSL -o "$SCRIPT_PATH.tmp" "$SCRIPT_RAW_URL"; then
       chmod +x "$SCRIPT_PATH.tmp"
       mv "$SCRIPT_PATH.tmp" "$SCRIPT_PATH"
