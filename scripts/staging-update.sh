@@ -181,6 +181,19 @@ if [ -z "$LATEST_SHA" ] || [ "$LATEST_SHA" = "null" ]; then
   exit 0
 fi
 
+# ──────────────────────────────────────────────
+# 2. Extrair digest da imagem publicada no GHCR
+#    (executa SEMPRE, mesmo sem commit novo)
+# ──────────────────────────────────────────────
+SHA7="${LATEST_SHA:0:7}"
+SHA_TAG="ghcr.io/a11ydevs/acessilia:sha-$SHA7"
+
+if docker manifest inspect "$SHA_TAG" >/dev/null 2>&1; then
+  LATEST_DIGEST=$(docker manifest inspect "$SHA_TAG" | jq -r '.manifests[0].digest // ""')
+else
+  echo "[staging-update] ⏳ Imagem sha-$SHA7 ainda não publicada no GHCR (build em andamento?)."
+fi
+
 # Compara com o SHA da última execução
 if [ -f "$CACHE_FILE" ]; then
   CACHED_SHA=$(cat "$CACHE_FILE")
@@ -192,24 +205,16 @@ if [ -f "$CACHE_FILE" ]; then
 fi
 
 # ──────────────────────────────────────────────
-# 2. Confirmar que a imagem do commit já está no GHCR
-#    e extrair o digest da imagem publicada
+# 3. Se imagem ainda nao publicada, aguardar
 # ──────────────────────────────────────────────
-SHA7="${LATEST_SHA:0:7}"
-SHA_TAG="ghcr.io/a11ydevs/acessilia:sha-$SHA7"
-
-if docker manifest inspect "$SHA_TAG" >/dev/null 2>&1; then
-  echo "[staging-update] ✅ Imagem sha-$SHA7 já publicada no GHCR."
-  # Extrai o digest da primeira plataforma (linux/amd64)
-  LATEST_DIGEST=$(docker manifest inspect "$SHA_TAG" | jq -r '.manifests[0].digest // ""')
-else
+if [ -z "$LATEST_DIGEST" ]; then
   _write_status "$LATEST_SHA" "" "" "" ""
-  echo "[staging-update] ⏳ Imagem sha-$SHA7 ainda não publicada no GHCR (build em andamento?). Aguardando próxima checagem."
+  echo "[staging-update] ⏳ Imagem sha-$SHA7 ainda não publicada no GHCR. Aguardando próxima checagem."
   exit 0
 fi
 
 # ──────────────────────────────────────────────
-# 3. SHA mudou e imagem publicada → atualizar
+# 4. SHA mudou e imagem publicada → atualizar
 # ──────────────────────────────────────────────
 echo "[staging-update] 🔄 Novo commit detectado: $SHA7. Atualizando..."
 
