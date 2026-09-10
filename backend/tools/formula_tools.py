@@ -117,8 +117,8 @@ def _is_strong_math_char(ch: str) -> bool:
             return True
     if category == "No":
         cp = ord(ch)
-        # Superscripts and subscripts
-        if 0x2070 <= cp <= 0x2089:
+        # Superscripts/subscripts (0x2070-0x2089) and Latin-1 ²³ (0xB2-0xB3)
+        if 0x2070 <= cp <= 0x2089 or cp in (0xB2, 0xB3):
             return True
     return False
 
@@ -133,9 +133,13 @@ def _looks_math(text: str) -> bool:
     if strong >= 1:
         return True
 
+    # Weak chars need to be "pure math" - no long words that suggest prose
     weak = sum(text.count(ch) for ch in _WEAK_MATH_CHARS)
     if weak >= 2 and len(text) <= 120:
-        return True
+        # If there are words longer than 3 chars, it's likely prose with math symbols
+        words = [w for w in text.split() if w.isalpha() and len(w) > 3]
+        if not words:
+            return True
 
     # Matrizes/expressões simbólicas: muitos tokens de um só caractere
     tokens = text.split()

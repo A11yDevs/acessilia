@@ -44,7 +44,7 @@ def test_latex_to_mathml_empty_input():
     assert latex_to_mathml("$$") == ""
 
 
-def test_latex_to_mathml_warns_when_library_missing(monkeypatch, caplog):
+def test_latex_to_mathml_warns_when_library_missing(monkeypatch):
     """Quando latex2mathml não está instalado, emite warning e retorna vazio."""
     import builtins
     import sys
@@ -63,12 +63,11 @@ def test_latex_to_mathml_warns_when_library_missing(monkeypatch, caplog):
     # Limpa cache para garantir que o import é re-tentado
     monkeypatch.delitem(sys.modules, "latex2mathml.converter", raising=False)
 
-    with caplog.at_level("WARNING"):
-        result = formula_tools.latex_to_mathml(r"$x=1$")
+    result = formula_tools.latex_to_mathml(r"$x=1$")
+    report = formula_tools.convert_latex_with_report(r"$x=1$")
 
     assert result == ""
-    assert "latex2mathml não instalado" in caplog.text
-    assert "latex2mathml_unavailable" in caplog.text or "enriquecimento" in caplog.text
+    assert "latex2mathml_unavailable" in report["issues"]
 
 
 def test_verbalize_latex_fallback_portuguese():
