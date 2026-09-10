@@ -23,7 +23,7 @@ main  ──────────────●─────────�
 
 | Papel | Quem | Permissões |
 |-------|------|------------|
-| **Mantenedores** | [@marceloakira](https://github.com/marceloakira), [@jhonata192](https://github.com/jhonata192) e [@fragaeduardo](https://github.com/fragaeduardo) | Únicos autorizados a mesclar `develop → main` e criar releases. |
+| **Mantenedores** | [@marceloakira](https://github.com/marceloakira), [@jhonata192](https://github.com/jhonata192) e [@fragaeduardo](https://github.com/fragaeduardo) | Únicos autorizados a mesclar branches de release na `main` e criar releases. |
 | **Colaboradores** | Todos os demais | Podem abrir PRs para `develop` e revisar. |
 
 > **Importante:** branches temporárias devem ser deletadas após o merge.
@@ -185,34 +185,32 @@ da `develop`.
    Depois, remova (ou reverta) `TRACK_BRANCH` do `.env` de homologação para que
    o staging volte a rastrear a `develop`.
 
-### 6. Release (develop → main)
+### 6. Release (`release/*` → `main`)
 
 Apenas mantenedores ([@marceloakira](https://github.com/marceloakira),
 [@jhonata192](https://github.com/jhonata192) e
-[@fragaeduardo](https://github.com/fragaeduardo)) podem mesclar `develop → main`.
+[@fragaeduardo](https://github.com/fragaeduardo)) podem mesclar uma release na `main`.
 
 1. **QA homologou?** → siga em frente.
-2. Abra um Pull Request de `develop` para `main` no GitHub.
+2. Abra um Pull Request de `release/x.y.z` para `main` no GitHub.
 3. Solicite revisão de outro mantenedor.
 4. Após aprovação, faça o merge (preferencialmente "Create a merge commit").
 5. A **esteira de CD** na `main` publica as tags `main`, `latest` e `sha-<commit>`.
+6. Promova o ambiente produtivo conforme [docs/producao-systemd.md](docs/producao-systemd.md).
 
 Para criar uma **Release oficial** com versão semântica:
 
 ```bash
-# 1. Atualize a versão no pyproject.toml
-#    (ex: bump de "0.2.0" para "0.3.0")
+# 1. Garanta que a versão no pyproject.toml foi atualizada na branch de release
+#    (ex: 0.1.0 para a branch release/0.1.0)
 git checkout main && git pull
-# edite pyproject.toml
-git add pyproject.toml
-git commit -m "chore(release): bump to 0.3.0"
 
 # 2. Crie a tag semântica
-git tag v0.3.0
-git push origin main --tags
+git tag v0.1.0
+git push origin v0.1.0
 
-# 3. O workflow Release (release.yml) builda, publica v0.3.0 no GHCR
-#    e cria a GitHub Release com changelog automático
+# 3. O workflow Release (release.yml) builda, publica 0.1.0, 0.1, 0
+#    e variantes -slim no GHCR, e cria a GitHub Release com changelog automático
 ```
 
 Depois do release, mergeie `main` de volta para `develop`:
@@ -357,7 +355,7 @@ A esteira de CI/CD está definida em três workflows:
 | **CI** | Push na `main` ou `develop` | Testa as variantes slim e docling |
 | **Delivery** | CI concluído na `main` | Build, smoke test + push: `main`, `latest`, `sha-xxx`, `main-slim`, `sha-xxx-slim` |
 | **Delivery** | CI concluído na `develop` | Build, smoke test + push: `develop`, `sha-xxx`, `develop-slim`, `sha-xxx-slim` |
-| **Release** | Tag `v*` criada no git | Build, smoke test + push: `vX.Y.Z`, `vX.Y.Z-slim` + GitHub Release |
+| **Release** | Tag `v*` criada no git | Build, smoke test + push: `X.Y.Z`, `X.Y`, `X` e variantes `-slim` + GitHub Release |
 
 São publicadas as seguintes referências no `ghcr.io/a11ydevs/acessilia`:
 
@@ -367,7 +365,8 @@ São publicadas as seguintes referências no `ghcr.io/a11ydevs/acessilia`:
 | `main` / `main-slim` | `main` | Produção (CD) |
 | `latest` / `latest-slim` | `main` | Produção (aponta pro último) |
 | `sha-<commit>` / `sha-<commit>-slim` | `main` ou `develop` | Referência imutável |
-| `vX.Y.Z` / `vX.Y.Z-slim` | Tag git `v*` | Release oficial |
+| `X.Y.Z` / `X.Y.Z-slim` | Tag git `v*` | Release oficial versionada |
+| `X.Y` / `X.Y-slim`, `X` / `X-slim` | Tag git `v*` | Alias semântico da release mais recente nessa linha |
 
 ## Dúvidas?
 

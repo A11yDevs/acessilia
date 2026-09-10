@@ -15,6 +15,8 @@ The system runs in one of two pipeline engines, selected by the `PIPELINE_ENGINE
 4. [Use Cases](use_cases.md) — actors and user-facing operations.
 5. [Endpoints & APIs](endpoints.md) — the REST API, the Web panel, and the AgentOS runtime.
 6. [Automated Test Suite](../tests/README.md) — test strategy and coverage.
+7. [Docker Compose](docker-compose.md) — local execution, GHCR images, staging and production update paths.
+8. [Production systemd timer](producao-systemd.md) — production setup, promotion and rollback procedure.
 
 ---
 
