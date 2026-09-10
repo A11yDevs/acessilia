@@ -608,7 +608,7 @@ async def test_job_executor_reports_optional_export_failure(
 
     def fail_pdf_ua(_canonical, destination, _filename):
         destination.write_bytes(b"partial pdf")
-        raise FileNotFoundError("pandoc indisponivel")
+        raise FileNotFoundError("pandoc unavailable")
 
     async def write_mp3(_text, destination, **_kwargs):
         destination.write_bytes(b"audio")
@@ -669,8 +669,8 @@ async def test_job_executor_reports_optional_export_failure(
     assert task["download_url"]
     expected_errors = {
         None: [],
-        "MP3": ["Falha ao gerar MP3: tts offline"],
-        "PDF/UA": ["Falha ao gerar PDF/UA: pandoc indisponivel"],
+        "MP3": ["Failed to generate MP3: tts offline"],
+        "PDF/UA": ["Failed to generate PDF/UA: pandoc unavailable"],
     }
     assert task["erros"] == expected_errors[failed_format]
 
