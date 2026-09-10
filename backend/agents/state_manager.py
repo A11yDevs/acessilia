@@ -9,11 +9,14 @@ class StateManager:
         self._tasks: dict[str, dict] = {}
         self._cancel_events: dict[str, asyncio.Event] = {}
 
-    def criar_tarefa(self, file_path: Path, task_id: str | None = None) -> str:
+    def criar_tarefa(
+        self, file_path: Path, task_id: str | None = None, arquivo: str | None = None
+    ) -> str:
         task_id = task_id or str(uuid.uuid4())[:8]
+        current = self._tasks.get(task_id)
         self._tasks[task_id] = {
             "task_id": task_id,
-            "arquivo": file_path.name,
+            "arquivo": arquivo or (current or {}).get("arquivo") or file_path.name,
             "status": "processing",
             "progresso": 0.0,
             "etapa_atual": "",
@@ -73,7 +76,7 @@ class StateManager:
     def listar_tarefas_processing(self) -> list[dict]:
         return [t for t in self._tasks.values() if t.get("status") == "processing"]
 
-    def cancelar(self, task_id: str) -> None:
+    def cancelar(self, task_id: str) -> bool:
         task = self._tasks.get(task_id)
         if task and task.get("status") == "processing":
             task["status"] = "cancelled"
@@ -82,6 +85,8 @@ class StateManager:
             event = self._cancel_events.get(task_id)
             if event:
                 event.set()
+            return True
+        return False
 
     def foi_cancelada(self, task_id: str) -> bool:
         event = self._cancel_events.get(task_id)
@@ -95,6 +100,22 @@ class StateManager:
         task = self._tasks.get(task_id)
         if task:
             task["download_url"] = url
+
+    def expirar_tarefas_terminais(
+        self, max_age_seconds: int, now: float | None = None
+    ) -> int:
+        now = now or time.time()
+        expired = [
+            task_id
+            for task_id, task in self._tasks.items()
+            if task.get("status") in ("done", "error", "cancelled")
+            and task.get("fim") is not None
+            and (now - task["fim"]) > max_age_seconds
+        ]
+        for task_id in expired:
+            self._tasks.pop(task_id, None)
+            self._cancel_events.pop(task_id, None)
+        return len(expired)
 
 
 class TaskCancelledError(Exception):

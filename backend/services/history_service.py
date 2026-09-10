@@ -3,8 +3,6 @@ import sqlite3
 from backend.tools.logger import logger
 from backend.config.settings import settings
 
-DB_PATH = settings.db_path
-
 _connection: sqlite3.Connection | None = None
 _connection_lock = asyncio.Lock()
 
@@ -71,8 +69,9 @@ def _criar_tabelas(conn: sqlite3.Connection) -> None:
 def get_connection() -> sqlite3.Connection:
     global _connection
     if _connection is None:
-        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
+        db_path = settings.db_path
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(str(db_path), check_same_thread=False)
         conn.row_factory = sqlite3.Row
         _criar_tabelas(conn)
         _connection = conn

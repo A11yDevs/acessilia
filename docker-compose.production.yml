@@ -1,13 +1,8 @@
 services:
   acessilia:
-    build:
-      context: .
-      dockerfile: infra/Dockerfile
-      target: base
-      args:
-        WITH_DOCLING: "true"
-    image: acessilia:latest
-    container_name: acessilia-instance
+    # TRACK_TAG e definido pelo production-update.sh. Use main por padrao.
+    image: ghcr.io/a11ydevs/acessilia:${TRACK_TAG:-main}
+    container_name: acessilia-production
     ports:
       - "8000:8000"
       - "8001:8001"

@@ -7,7 +7,7 @@ from typing import Any, Callable, Coroutine
 from backend.agents.orchestrator import AccessibilityOrchestrator
 from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
 from backend.agents.state_manager import TaskCancelledError, state_manager
-from backend.services.cache import get_cached, set_cache
+from backend.services.cache import get_cached, options_cache_key, set_cache
 from backend.services.history_service import (
     finalizar_conversao,
     limpar_orfas,
@@ -63,9 +63,18 @@ def _build_orchestrator():
 agente = _build_orchestrator()
 
 
-def _cache_version() -> str:
+def _cache_version(
+    mode: str = "normal",
+    custom_prompt: str | None = None,
+    thinking_mode: bool = False,
+) -> str:
     engine = _normalized_engine()
-    return f"{settings.ai_client}-{engine}-v1"
+    return options_cache_key(
+        f"{settings.ai_client}-{engine}-v2",
+        mode=mode,
+        custom_prompt=custom_prompt or "",
+        thinking_mode=thinking_mode,
+    )
 
 
 def _limpar_tarefas_orfas():
@@ -91,6 +100,39 @@ def _salvar_json_canonico(canonical_document: dict, source_name: str) -> None:
         logger.warning("Nao foi possivel salvar JSON canonico: {}", e)
 
 
+def _payload_for_source(payload: Any, file_path: Path) -> Any:
+    if not isinstance(payload, dict):
+        return payload
+
+    current = {**payload, "source_path": str(file_path)}
+    pages = payload.get("pages")
+    if isinstance(pages, list):
+        current_pages = []
+        for index, page in enumerate(pages):
+            if not isinstance(page, dict):
+                current_pages.append(page)
+                continue
+            page_path = (
+                file_path.parent / f"pagina_{index + 1:03d}.pdf"
+                if file_path.suffix.lower() == ".pdf"
+                else file_path
+            )
+            current_pages.append({**page, "file_path": str(page_path)})
+        current["pages"] = current_pages
+    return current
+
+
+def _canonical_details(payload: Any) -> tuple[dict[str, Any] | None, list[str] | None]:
+    if not isinstance(payload, dict):
+        return None, None
+    metadata = payload.get("canonical_metadata")
+    warnings = payload.get("technical_warnings")
+    return (
+        metadata if isinstance(metadata, dict) else None,
+        [str(item) for item in warnings] if isinstance(warnings, list) else None,
+    )
+
+
 async def process(
     file_path: Path,
     status_callback: Callable[[str], Coroutine] | None = None,
@@ -99,22 +141,12 @@ async def process(
     thinking_mode: bool = False,
     task_id: str | None = None,
 ) -> dict[str, Any]:
-    cached = await get_cached(file_path, _cache_version())
-    if cached is not None:
-        logger.info("Cache hit para {}", file_path.name)
-        if isinstance(cached, dict):
-            return cached
-        return build_canonical_document(
-            str(cached),
-            title=file_path.stem,
-            language="pt-BR",
-            verbosity=verbosity_for_mode(mode),
-            source_name=file_path.name,
-            source_path=str(file_path),
-            audience=["reader"],
-        )
-
-    task_id = state_manager.criar_tarefa(file_path, task_id=task_id)
+    external_task_id = task_id is not None
+    if task_id is None:
+        task_id = state_manager.criar_tarefa(file_path)
+    elif state_manager.obter(task_id) is None:
+        state_manager.criar_tarefa(file_path, task_id=task_id)
+    state_manager.verificar_cancelamento(task_id)
     inicio = time.time()
     await registrar_conversao(
         task_id=task_id,
@@ -125,6 +157,39 @@ async def process(
     )
 
     try:
+        cache_variant = _cache_version(mode, custom_prompt, thinking_mode)
+        cached = await get_cached(file_path, cache_variant)
+        if cached is not None:
+            logger.info("Cache hit para {}", file_path.name)
+            cached = _payload_for_source(cached, file_path)
+            canonical_metadata, technical_warnings = _canonical_details(cached)
+            canonical_document = build_canonical_document(
+                cached,
+                title=file_path.stem,
+                language="pt-BR",
+                verbosity=verbosity_for_mode(mode),
+                source_name=file_path.name,
+                source_path=str(file_path),
+                audience=["reader"],
+                metadata=canonical_metadata,
+                technical_warnings=technical_warnings,
+            )
+            if not external_task_id:
+                state_manager.finalizar(
+                    task_id,
+                    json.dumps(canonical_document, ensure_ascii=False),
+                )
+                await finalizar_conversao(
+                    task_id=task_id,
+                    status="done",
+                    pipeline=f"{settings.ai_client}-{_normalized_engine()}",
+                    resultado_resumo=canonical_document["title"][:200],
+                    tempo_segundos=time.time() - inicio,
+                )
+            if status_callback:
+                await status_callback("✅ Processamento finalizado com sucesso!")
+            return canonical_document
+
         state_manager.atualizar(
             task_id,
             etapa="Preparando arquivo",
@@ -167,12 +232,18 @@ async def process(
 
         raw_text = merge_broken_paragraphs(raw_text)
 
+        processed_result: str | dict[str, Any]
+        if isinstance(resultado, dict):
+            processed_result = {**resultado, "text": raw_text}
+        else:
+            processed_result = raw_text
+
         state_manager.verificar_cancelamento(task_id)
         if not raw_text.strip():
             raise RuntimeError("Resposta vazia do agente")
 
         canonical_document = build_canonical_document(
-            resultado,
+            processed_result,
             title=file_path.stem,
             language="pt-BR",
             verbosity=verbosity_for_mode(mode),
@@ -183,20 +254,21 @@ async def process(
             technical_warnings=technical_warnings,
         )
 
-        state_manager.finalizar(
-            task_id,
-            json.dumps(canonical_document, ensure_ascii=False),
-        )
-        await set_cache(file_path, canonical_document, _cache_version())
+        await set_cache(file_path, processed_result, cache_variant)
         _salvar_json_canonico(canonical_document, file_path.name)
 
-        await finalizar_conversao(
-            task_id=task_id,
-            status="done",
-            pipeline=f"{settings.ai_client}-{_normalized_engine()}",
-            resultado_resumo=canonical_document["title"][:200],
-            tempo_segundos=time.time() - inicio,
-        )
+        if not external_task_id:
+            state_manager.finalizar(
+                task_id,
+                json.dumps(canonical_document, ensure_ascii=False),
+            )
+            await finalizar_conversao(
+                task_id=task_id,
+                status="done",
+                pipeline=f"{settings.ai_client}-{_normalized_engine()}",
+                resultado_resumo=canonical_document["title"][:200],
+                tempo_segundos=time.time() - inicio,
+            )
 
         if status_callback:
             await status_callback("✅ Processamento finalizado com sucesso!")
@@ -215,48 +287,14 @@ async def process(
     except Exception as e:
         logger.error("Erro no pipeline: {}: {}", type(e).__name__, e)
         state_manager.errar(task_id, str(e))
-        fallback = _fallback_texto_simples(file_path)
-        state_manager.atualizar(task_id, resultado=fallback)
 
         await finalizar_conversao(
             task_id=task_id,
             status="error",
             erro=str(e),
-            resultado_resumo=fallback[:200],
             tempo_segundos=time.time() - inicio,
         )
 
         if status_callback:
             await status_callback("❌ Nao foi possivel processar o arquivo.")
-        return build_canonical_document(
-            fallback,
-            title=file_path.stem,
-            language="pt-BR",
-            verbosity=verbosity_for_mode(mode),
-            source_name=file_path.name,
-            source_path=str(file_path),
-            audience=["reader"],
-        )
-
-
-def _fallback_texto_simples(file_path: Path) -> str:
-    ext = file_path.suffix.lower()
-    if ext == ".pdf":
-        try:
-            import fitz
-
-            doc = fitz.open(file_path)
-            texts = []
-            for i in range(min(len(doc), 10)):
-                text = doc[i].get_text().strip()
-                if text:
-                    texts.append(f"--- Pagina {i + 1} ---\n{text}")
-            doc.close()
-            if texts:
-                return "\n\n".join(texts)
-        except Exception:
-            pass
-    return (
-        "Nao foi possivel processar o arquivo automaticamente. "
-        "Tente enviar em formato diferente."
-    )
+        raise

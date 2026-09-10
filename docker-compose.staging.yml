@@ -1,13 +1,8 @@
 services:
   acessilia:
-    build:
-      context: .
-      dockerfile: infra/Dockerfile
-      target: base
-      args:
-        WITH_DOCLING: "true"
-    image: acessilia:latest
-    container_name: acessilia-instance
+    # TRACK_TAG (definido no .env): "develop" fora do BHS, "release-x.y.z" durante o ciclo
+    image: ghcr.io/a11ydevs/acessilia:${TRACK_TAG:-develop}
+    container_name: acessilia-staging
     ports:
       - "8000:8000"
       - "8001:8001"

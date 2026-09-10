@@ -170,8 +170,6 @@ def _render_html_table_row(row: dict[str, Any], *, header: bool) -> str:
         if not isinstance(cell, dict):
             continue
         text = escape(str(cell.get("text", "")).strip())
-        if not text:
-            continue
 
         attrs: list[str] = []
         if tag == "th":

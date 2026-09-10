@@ -40,7 +40,7 @@ concurrency:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  IMAGE_NAME: a11ydevs/acessilia
 
 jobs:
   publish:
@@ -84,24 +84,18 @@ jobs:
           BRANCH="${{ inputs.branch }}"
           SHA="${{ inputs.sha }}"
           SUFFIX="${{ matrix.tag_suffix }}"
+          # Docker tags nao aceitam "/" (ex: release/0.0.1 -> release-0.0.1)
           SAFE_BRANCH="${BRANCH//\//-}"
+
           TAGS="${REGISTRY}/${IMAGE_NAME}:${SAFE_BRANCH}${SUFFIX}"
           TAGS="${TAGS},${REGISTRY}/${IMAGE_NAME}:sha-${SHA:0:7}${SUFFIX}"
+
           if [ "$BRANCH" = "main" ]; then
             TAGS="${TAGS},${REGISTRY}/${IMAGE_NAME}:latest${SUFFIX}"
           fi
-          echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
 
-      - name: Generate image metadata
-        id: meta
-        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: ${{ steps.tags.outputs.tags }}
-          labels: |
-            org.opencontainers.image.title=acessilia
-            org.opencontainers.image.description=Pipeline para extracao e acessibilidade de documentos
-            org.opencontainers.image.licenses=MIT
+          echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
+          echo "branch=${SAFE_BRANCH}" >> "$GITHUB_OUTPUT"
 
       - name: Build production image for verification
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
@@ -115,6 +109,8 @@ jobs:
           tags: ${{ env.LOCAL_IMAGE }}
           build-args: |
             WITH_DOCLING=${{ matrix.with_docling }}
+            GIT_COMMIT=${{ inputs.sha }}
+            IMAGE_TAG=${{ steps.tags.outputs.branch }}${{ matrix.tag_suffix }}
           cache-from: type=gha,scope=production-${{ matrix.variant }}
           cache-to: type=gha,mode=max,scope=production-${{ matrix.variant }}
 
@@ -196,10 +192,16 @@ jobs:
           target: base
           platforms: linux/amd64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.tags.outputs.tags }}
+          labels: |
+            org.opencontainers.image.title=acessilia
+            org.opencontainers.image.description=Pipeline para extracao e acessibilidade de documentos
+            org.opencontainers.image.licenses=MIT
+            org.opencontainers.image.revision=${{ inputs.sha }}
           build-args: |
             WITH_DOCLING=${{ matrix.with_docling }}
+            GIT_COMMIT=${{ inputs.sha }}
+            IMAGE_TAG=${{ steps.tags.outputs.branch }}${{ matrix.tag_suffix }}
           cache-from: type=gha,scope=production-${{ matrix.variant }}
 
       - name: Enforce published image size guardrail

@@ -173,17 +173,17 @@ async def _poll_job(
             await tracker.finish(success=True)
             url = status.get("download_url")
             if url:
+                msg = f"✅ Pacote acessível gerado!\n\n📥 Link para download (válido por 7 dias):\n{url}"
+                if any("Falha ao gerar PDF/UA:" in erro for erro in status.get("erros", [])):
+                    msg += "\n\n⚠️ Não foi possível gerar o PDF/UA. Esse formato não está incluído no pacote."
                 if email:
-                    await message.answer(
-                        f"✅ Link de download enviado para {email}!"
-                    )
-                else:
-                    await _send_with_retry(
-                        message.bot,
-                        message.chat.id,
-                        f"✅ Pacote acessível gerado!\n\n📥 Link para download (válido por 7 dias):\n{url}",
-                        message_thread_id=message_thread_id,
-                    )
+                    msg += f"\n\nE-mail configurado: {email}"
+                await _send_with_retry(
+                    message.bot,
+                    message.chat.id,
+                    msg,
+                    message_thread_id=message_thread_id,
+                )
             return
 
         if st == "error":

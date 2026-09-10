@@ -33,6 +33,18 @@ def _cache_path(key: str) -> Path:
     return CACHE_DIR / f"{key}.json"
 
 
+def options_cache_key(prefix: str, **options: Any) -> str:
+    """Build a filesystem-safe cache variant from output-affecting options."""
+    serialized = json.dumps(
+        options,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    digest = hashlib.sha256(serialized.encode("utf-8")).hexdigest()[:16]
+    return f"{prefix}_{digest}"
+
+
 async def get_cached(path: Path, extra: str = "", ttl: int = 3600) -> Any:
     _ensure_cache_dir()
     key = _cache_key(path, extra)

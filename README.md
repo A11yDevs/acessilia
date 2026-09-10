@@ -95,14 +95,22 @@ Depois que o CI da `main` passa, o GitHub Actions publica automaticamente duas i
 ```bash
 docker pull ghcr.io/a11ydevs/acessilia:main
 docker run --rm \
-	--env-file .env \
-	-p 8000:8000 \
-	-p 8001:8001 \
-	-v "$PWD/var:/app/var" \
-	ghcr.io/a11ydevs/acessilia:main
+        --env-file .env \
+        -p 8000:8000 \
+        -p 8001:8001 \
+        -v "$PWD/var:/app/var" \
+        ghcr.io/a11ydevs/acessilia:main
 ```
 
 Use `ghcr.io/a11ydevs/acessilia:main-slim` no mesmo comando para a variante slim. Para reproduzir uma versão exata, use `sha-<commit>` ou `sha-<commit>-slim`, mostradas na execução do workflow **Delivery**.
+
+Para um servidor de producao com atualizacao automatica da `main`, use:
+
+```bash
+./scripts/setup-producao.sh
+```
+
+O procedimento completo de promocao, validacao e rollback esta em [docs/producao-systemd.md](docs/producao-systemd.md).
 
 ### Construindo localmente
 
@@ -135,10 +143,10 @@ Exemplo:
 
 ```bash
 docker run --rm -e STRUCTURER=docling -v "$PWD/var:/app/var" \
-	ghcr.io/a11ydevs/acessilia:main \
-	python scripts/benchmark_pipelines.py tests/fixtures/tutorials/java-oo-3pgs.pdf \
-	-o temp/output/regression-bench/java-oo-3pgs-offline/docling \
-	--mode normal --export-formats txt,pdf,pdf_ua --pddl-extractor-backend docling
+        ghcr.io/a11ydevs/acessilia:main \
+        python scripts/benchmark_pipelines.py tests/fixtures/tutorials/java-oo-3pgs.pdf \
+        -o temp/output/regression-bench/java-oo-3pgs-offline/docling \
+        --mode normal --export-formats txt,pdf,pdf_ua --pddl-extractor-backend docling
 ```
 
 ## Contribuindo

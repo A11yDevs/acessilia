@@ -8,6 +8,7 @@ import respx
 from frontend.clients.api_client import ApiClient
 from backend.config.settings import settings
 from frontend.telegram.handlers import document as doc_module
+from frontend.telegram.handlers import start as start_module
 
 BASE = "http://localhost:8000"
 
@@ -109,9 +110,13 @@ def _done_status(task_id: str = "tg12345") -> dict:
     }
 
 
-def test_document_flow_sends_download_link(doc_module_isolated):
+@pytest.mark.parametrize("pdf_ua_failed", [False, True])
+def test_document_flow_sends_download_link(doc_module_isolated, pdf_ua_failed):
     content = _fake_pdf_bytes()
-    _mock_job_api(_done_status())
+    status = _done_status()
+    if pdf_ua_failed:
+        status["erros"] = ["Falha ao gerar PDF/UA: pandoc indisponivel"]
+    _mock_job_api(status)
     bot = _FakeBot(content)
     msg = _FakeMessage(bot, document=_FakeDocument("doc.pdf", len(content), "file1"))
 
@@ -119,6 +124,7 @@ def test_document_flow_sends_download_link(doc_module_isolated):
         asyncio.run(doc_module_isolated.handle_document(msg))
 
     assert any("http://localhost:8000/api/v1/download/tok123" in s for s in bot.sent)
+    assert any("Não foi possível gerar o PDF/UA" in s for s in bot.sent) == pdf_ua_failed
     assert doc_module_isolated.user_task_ids[(123, None)] == "tg12345"
 
 
@@ -165,7 +171,9 @@ def test_document_passes_email_and_notifies(doc_module_isolated):
         body = route.calls[0].request.read()
 
     assert b"test@example.com" in body
-    assert any("test@example.com" in a for a in msg.answers)
+    assert any("test@example.com" in s for s in bot.sent)
+    assert any("http://localhost:8000/api/v1/download/tok123" in s for s in bot.sent)
+    assert not any("Link de download enviado" in a for a in msg.answers)
 
 
 def test_document_api_error_sends_message(doc_module_isolated):
@@ -192,3 +200,41 @@ def test_photo_flow(doc_module_isolated):
         asyncio.run(doc_module_isolated.handle_photo(msg))
 
     assert any("http://localhost:8000/api/v1/download/tok123" in s for s in bot.sent)
+
+
+def test_health_uses_provider_reported_by_api(monkeypatch, tmp_path):
+    monkeypatch.setattr(settings, "temp_dir", tmp_path)
+    monkeypatch.setattr(start_module, "client", ApiClient(base_url=BASE))
+    message = _FakeMessage(_FakeBot(b""))
+    health = {
+        "status": "ok",
+        "model_client": "openrouter",
+        "model_name": "openai/gpt-4.1-mini",
+        "model_reachable": True,
+        "queue_size": 0,
+    }
+
+    with respx.mock:
+        route = respx.get(f"{BASE}/api/v1/health").mock(
+            return_value=httpx.Response(200, json=health)
+        )
+        asyncio.run(start_module.cmd_health(message))
+
+    assert route.called
+    assert "✅ Provedor: openrouter" in message.answers[0]
+    assert "🤖 Modelo: openai/gpt-4.1-mini" in message.answers[0]
+    assert "Ollama" not in message.answers[0]
+
+
+def test_health_reports_api_error(monkeypatch, tmp_path):
+    monkeypatch.setattr(settings, "temp_dir", tmp_path)
+    monkeypatch.setattr(start_module, "client", ApiClient(base_url=BASE))
+    message = _FakeMessage(_FakeBot(b""))
+
+    with respx.mock:
+        respx.get(f"{BASE}/api/v1/health").mock(
+            return_value=httpx.Response(503, json={"detail": "indisponível"})
+        )
+        asyncio.run(start_module.cmd_health(message))
+
+    assert "❌ API: erro 503 (indisponível)" in message.answers[0]
