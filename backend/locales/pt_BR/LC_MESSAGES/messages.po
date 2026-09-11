@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-09-11 01:29-0400\n"
+"POT-Creation-Date: 2026-09-11 02:55-0400\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: pt_BR\n"
@@ -422,6 +422,10 @@ msgstr "✅ Feedback recebido! Obrigado pela contribuição."
 
 msgid "Task not found"
 msgstr "Tarefa não encontrada"
+
+#, python-brace-format
+msgid "Task cannot be cancelled in its current state: {status}"
+msgstr "A tarefa não pode ser cancelada no estado atual: {status}"
 
 #, python-brace-format
 msgid "File queued (Position: {position})."
