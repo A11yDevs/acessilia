@@ -20,7 +20,6 @@ from backend.log_messages import (
     LOG_ORCHESTRATOR_WAITING_TASKS,
     LOG_ORCHESTRATOR_TASK_FAILED,
 )
-from backend.services.cache import get_cached, set_cache
 from backend.stage_messages import (
     STAGE_PREPARING_IMAGE,
     STAGE_PROCESSING_PAGE,
