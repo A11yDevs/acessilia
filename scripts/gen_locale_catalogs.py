@@ -1779,6 +1779,93 @@ def build_locales(locales_dir: Path = DEFAULT_LOCALES_DIR) -> dict[str, tuple[Pa
     return result
 
 
+def ensure_locales(locales_dir: Path = DEFAULT_LOCALES_DIR, *, verbose: bool = False) -> bool:
+    """Regenerate the compiled ``messages.mo`` binaries when any are missing or stale, if Babel is importable.
+
+    The ``.mo`` binaries are never checked into git; the checked-in ``.po`` sources are the only
+    translation input, so any working tree may arrive without compiled catalogs. This helper
+    rebuilds only what is needed, letting ``poetry install`` and ``poetry run pytest`` run on the
+    spot (see :func:`_mo_needs_rebuild`) while a full ``.po``/``.mo`` refresh stays an explicit
+    ``gen-locale-catalogs`` invocation. Import and build failures are reported as warnings so a
+    Babel-less or broken-translation environment degrades to the English-identity ``t()`` path
+    instead of breaking an install or a test run.
+
+    Args:
+        locales_dir (Path): Output root receiving one directory per locale; defaults to :data:`DEFAULT_LOCALES_DIR`.
+        verbose (bool): When True, print one line per (re)generated or skipped locale; defaults to False.
+
+    Returns:
+        bool: True when every locale's ``messages.mo`` exists and is newer than its ``messages.po`` source after this call; False otherwise.
+    """
+    try:
+        from babel.messages.mofile import write_mo  # noqa: F401
+        from babel.messages.pofile import read_po
+    except Exception:
+        if verbose:
+            print("skip: babel is not importable in this environment", file=sys.stderr)
+        return False
+    try:
+        rebuilt = 0
+        for locale in SUPPORTED_LOCALES:
+            lmessages = locales_dir / locale / "LC_MESSAGES"
+            po_path = lmessages / "messages.po"
+            mo_path = lmessages / "messages.mo"
+            if not po_path.is_file():
+                if verbose:
+                    print(f"miss: {po_path}", file=sys.stderr)
+                continue
+            if not _mo_needs_rebuild(mo_path, po_path):
+                if verbose:
+                    print(f"skip: {mo_path} is up to date", file=sys.stderr)
+                continue
+            try:
+                with open(po_path, "rb") as source_stream:
+                    catalog = read_po(source_stream, locale=locale)
+            except Exception as exc:
+                if verbose:
+                    print(f"miss: {po_path} ({exc})", file=sys.stderr)
+                continue
+            # read_po already returns a Catalog bound to the locale it was asked
+            # about, so pass it straight to the mo writer.
+            lmessages.mkdir(parents=True, exist_ok=True)
+            with open(mo_path, "wb") as mo_stream:
+                write_mo(mo_stream, catalog)
+            rebuilt += 1
+            if verbose:
+                print(f"built: {mo_path}")
+        if verbose:
+            print(f"locale catalogs: {rebuilt} rebuilt")
+    except Exception as exc:  # noqa: BLE001 - any build failure must not break install or tests
+        if verbose:
+            print(f"warn: locale .mo regeneration failed: {exc}", file=sys.stderr)
+        return False
+    return all(
+        (locales_dir / locale / "LC_MESSAGES" / "messages.mo").is_file() for locale in SUPPORTED_LOCALES
+    )
+
+
+def _mo_needs_rebuild(mo_path: Path, po_path: Path) -> bool:
+    """Whether a compiled ``.mo`` must be rebuilt from its ``.po`` source.
+
+    Args:
+        mo_path (Path): Path of the compiled binary catalog.
+        po_path (Path): Path of the source catalog the binary is compiled from.
+
+    Returns:
+        bool: True when the binary is absent, its source file is newer, or its size is 0 (a truncated artifact).
+    """
+    if not mo_path.is_file():
+        return True
+    try:
+        if mo_path.stat().st_size == 0:
+            return True
+        if po_path.stat().st_mtime > mo_path.stat().st_mtime:
+            return True
+    except OSError:
+        return True
+    return False
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Construct the CLI argument parser for this generator script.
 

@@ -221,6 +221,56 @@ def locale_for_user(raw_locale: str | None) -> str:
     return _active_locale()
 
 
+def _ensure_compiled_catalogs() -> None:
+    """Compile any missing or stale Babel ``.mo`` binaries in place from their ``.po`` sources.
+
+    The compiled ``messages.mo`` binaries are build artifacts and are not
+    checked into git, so a fresh checkout (or a CI environment) runs without
+    them and lookups would silently fall back to English msgids. Rebuilding
+    here, once at import time, lets every runtime path (bot/API/web startup,
+    tests, docker) resolve real catalogs without a separate compilation step.
+    A locale whose sources cannot be read or compiled is skipped so the
+    runtime degrades to the English-identity path instead of crashing.
+
+    Args:
+        (none)
+
+    Returns:
+        None: Always returns; individual catalog failures are absorbed intentionally.
+    """
+    try:
+        from babel.messages.mofile import write_mo
+        from babel.messages.pofile import read_po
+    except Exception:
+        return
+    for locale in SUPPORTED_LOCALES:
+        lmessages = LOCALE_CATALOGS_DIR / locale / "LC_MESSAGES"
+        po_path = lmessages / "messages.po"
+        mo_path = lmessages / "messages.mo"
+        if not po_path.is_file():
+            continue
+        try:
+            # Skip when the binary is present, non-empty, and not older than its source.
+            if (
+                mo_path.is_file()
+                and mo_path.stat().st_size > 0
+                and po_path.stat().st_mtime <= mo_path.stat().st_mtime
+            ):
+                continue
+            with open(po_path, "rb") as source_stream:
+                catalog = read_po(source_stream, locale=locale)
+            with open(mo_path, "wb") as mo_stream:
+                write_mo(mo_stream, catalog)
+        except Exception:
+            continue
+
+
+# Self-heal once at import time so every consumer of this module (test runs,
+# bot/API/web startup, docker containers) starts with compiled catalogs even
+# on a checkout that only carries the tracked .po sources.
+_ensure_compiled_catalogs()
+
+
 @lru_cache(maxsize=None)
 def _catalog_for(locale: str) -> Translations | None:
     """Load a Babel message catalog directory (or ``None`` when none could be found).
