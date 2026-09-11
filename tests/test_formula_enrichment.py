@@ -47,27 +47,78 @@ def test_latex_to_mathml_empty_input():
 def test_latex_to_mathml_warns_when_library_missing(monkeypatch):
     """Quando latex2mathml não está instalado, emite warning e retorna vazio."""
     import builtins
-    import sys
 
     from backend.tools import formula_tools
 
-    # Simula ausência da biblioteca
     real_import = builtins.__import__
 
     def fake_import(name, *args, **kwargs):
         if name == "latex2mathml.converter":
-            raise ImportError("No module named 'latex2mathml'")
+            raise ModuleNotFoundError("private dependency detail", name="latex2mathml")
         return real_import(name, *args, **kwargs)
 
     monkeypatch.setattr(builtins, "__import__", fake_import)
-    # Limpa cache para garantir que o import é re-tentado
-    monkeypatch.delitem(sys.modules, "latex2mathml.converter", raising=False)
+    records = []
+    sink = formula_tools.logger.add(lambda message: records.append(message.record))
+    try:
+        assert formula_tools.latex_to_mathml(r"$private_source=1$") == ""
+    finally:
+        formula_tools.logger.remove(sink)
 
-    result = formula_tools.latex_to_mathml(r"$x=1$")
-    report = formula_tools.convert_latex_with_report(r"$x=1$")
+    assert len(records) == 1
+    assert records[0]["level"].name == "WARNING"
+    assert "latex2mathml indisponível" in records[0]["message"]
+    assert "private" not in records[0]["message"]
+    assert records[0]["exception"] is None
 
-    assert result == ""
-    assert "latex2mathml_unavailable" in report["issues"]
+
+def test_latex_to_mathml_conversion_error_falls_back_without_source_leak(monkeypatch):
+    import sys
+    from types import ModuleType
+
+    from backend.tools import formula_tools
+
+    package = ModuleType("latex2mathml")
+    converter = ModuleType("latex2mathml.converter")
+
+    def fail(latex):
+        raise ValueError(f"private conversion detail: {latex}")
+
+    converter.convert = fail
+    package.converter = converter
+    monkeypatch.setitem(sys.modules, "latex2mathml", package)
+    monkeypatch.setitem(sys.modules, "latex2mathml.converter", converter)
+    records = []
+    sink = formula_tools.logger.add(lambda message: records.append(message.record))
+    try:
+        assert formula_tools.latex_to_mathml("private_source=1") == ""
+    finally:
+        formula_tools.logger.remove(sink)
+
+    assert len(records) == 1
+    assert "Conversão LaTeX→MathML falhou" in records[0]["message"]
+    assert "indisponível" not in records[0]["message"]
+    assert "private" not in records[0]["message"]
+    assert records[0]["exception"] is None
+
+
+def test_latex_to_mathml_unexpected_import_error_still_falls_back(monkeypatch):
+    import builtins
+
+    real_import = builtins.__import__
+
+    def fail_import(name, *args, **kwargs):
+        if name == "latex2mathml.converter":
+            raise RuntimeError("broken optional installation")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", fail_import)
+    assert latex_to_mathml("x=1") == ""
+
+
+@pytest.mark.docling
+def test_latex_to_mathml_malformed_conversion_returns_empty():
+    assert latex_to_mathml(r"\frac{") == ""
 
 
 def test_verbalize_latex_fallback_portuguese():
@@ -105,6 +156,53 @@ def test_parser_keeps_normal_text_as_paragraph():
 
 
 # ── canonical_builder: enriquecimento ──
+
+
+def test_enrichment_skips_non_math_without_changing_document(monkeypatch):
+    from copy import deepcopy
+
+    from backend.pipeline import canonical_builder
+
+    def unexpected(*args):
+        pytest.fail("Non-math blocks must not invoke formula helpers")
+
+    for name in ("normalize_latex", "latex_to_mathml", "verbalize_latex_fallback"):
+        monkeypatch.setattr(canonical_builder, name, unexpected)
+    sections = [{"blocks": [{"type": "paragraph", "text": "Texto"}],
+                 "children": [{"blocks": [{"type": "code", "text": "x=1"}]}]}]
+    before = deepcopy(sections)
+    canonical_builder._enrich_math_blocks(sections)
+    canonical_builder._enrich_math_blocks([])
+    assert sections == before
+
+
+def test_enrichment_reaches_nested_math_and_preserves_alt_text(monkeypatch):
+    from backend.pipeline import canonical_builder
+
+    calls = []
+
+    def convert(latex):
+        calls.append(latex)
+        return ""
+
+    monkeypatch.setattr(canonical_builder, "latex_to_mathml", convert)
+    block = {"type": "math", "text": "$x=1$", "alt_text": "Descrição existente"}
+    sections = [{"blocks": [], "children": [{"blocks": [block]}]}]
+    canonical_builder._enrich_math_blocks(sections)
+    assert calls == ["x=1"]
+    assert block == {"type": "math", "text": "x=1", "alt_text": "Descrição existente"}
+
+
+def test_canonical_document_keeps_formula_when_conversion_unavailable(monkeypatch):
+    from backend.pipeline import canonical_builder
+
+    monkeypatch.setattr(canonical_builder, "latex_to_mathml", lambda latex: "")
+    document = canonical_builder.build_canonical_document("$x=1$")
+    block = document["sections"][0]["blocks"][0]
+    assert block["type"] == "math"
+    assert block["text"] == "x=1"
+    assert block["alt_text"].startswith("Fórmula:")
+    assert "mathml" not in block.get("metadata", {})
 
 
 @pytest.mark.docling

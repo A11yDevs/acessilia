@@ -205,27 +205,40 @@ def test_looks_math_unicode_math_symbol():
 
     # Não deve detectar prosa comum
     assert not _looks_math("O custo é R$ 5 + 2 = 7")
-    assert not _looks_math("A+B=C")  # fracos insuficientes sem contexto
+    assert _looks_math("A+B=C")
 
 
-def test_codeformula_timeout_returns_empty(monkeypatch):
-    """Timeout configurável evita travamento em fórmula complexa."""
-    import time
+@pytest.mark.parametrize("text", [
+    "∀x∈ℝ", "ℕ", "ℂ", "ℓ", "α β γ", "x¹", "x²", "x³", "x⁴", "x₉",
+    "𝑥 + 𝑦", "[1 2; 3 4]", "a b c d", "x = 1", "sin(x)", "sin x",
+    "sin(x) + cos(x) - tan(x)", "log(value) = exponent",
+    "velocity = distance / time", "total_cost = unit_price * quantity",
+])
+def test_looks_math_accepts_symbols_and_named_expressions(text):
+    from backend.tools.formula_tools import _looks_math
 
-    from backend.tools import formula_tools
+    assert _looks_math(text)
 
-    class SlowEngine:
-        def predict_batch(self, inputs):
-            time.sleep(5)  # Muito mais que o timeout
-            return [type("O", (), {"text": r"\frac{a}{b}"})()]
 
-    model = type("M", (), {"engine": SlowEngine(), "_post_process": lambda s, x: x})()
+@pytest.mark.parametrize("text", [
+    "O custo é R$ 5 + 2 = 7", "O total é $5 + $2 = $7", "Preço: €5 / unidade",
+    "Marca™", "Marca®", "Temperatura 25℃", "25℉", "℀", "℁", "℅", "℆",
+    "https://example.org/a+b?x=1&y=2", "www.example.org/a/b",
+    "Veja a + b = c no manual", "O sinal + e o sinal = são usados aqui",
+    "O a e o b estão no texto", "singular costume tangente logotipo",
+    "Consulte sin e cos no manual", "Entrada Processo Saida",
+])
+def test_looks_math_rejects_prose_currency_trademarks_and_urls(text):
+    from backend.tools.formula_tools import _looks_math
 
-    monkeypatch.setattr(formula_tools, "_codeformula_model", model)
-    monkeypatch.setattr(formula_tools, "_codeformula_failed", False)
-    monkeypatch.setattr(formula_tools, "CODEFORMULA_TIMEOUT_SECONDS", 0.1)
+    assert not _looks_math(text)
 
-    assert formula_tools.extract_latex_from_image(b"fake") == ""
+
+@pytest.mark.parametrize("symbol", ["™", "®", "℃", "℉", "℀", "℁", "℅", "℆", "+", "=", "/"])
+def test_non_math_and_weak_symbols_are_not_strong(symbol):
+    from backend.tools.formula_tools import _is_strong_math_char
+
+    assert not _is_strong_math_char(symbol)
 
 
 def test_cascade_routes_math_image_to_editor(reader, monkeypatch):

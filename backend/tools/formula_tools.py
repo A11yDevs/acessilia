@@ -7,20 +7,37 @@ CodeFormula (Docling) extrai o LaTeX do recorte. LLM fica como último recurso.
 from __future__ import annotations
 
 import io
+import json
+import math
 import os
-import threading
+import re
+import signal
+import subprocess
+import sys
+import tempfile
+import time
+import unicodedata
 from typing import Any
 
-from backend.tools.image_enhancer import is_math_likely
 from backend.tools.logger import logger
 
 _ocr_engine: Any = None
 _ocr_failed = False
-_codeformula_model: Any = None
-_codeformula_failed = False
 
-# Timeout em segundos para inferência CodeFormula em CPU (~2 min/fórmula típico)
-CODEFORMULA_TIMEOUT_SECONDS = int(os.getenv("FORMULA_CODEFORMULA_TIMEOUT", "120"))
+CODEFORMULA_TIMEOUT_SECONDS = 120.0
+_MAX_WORKER_RESULT_BYTES = 8192
+
+
+def _codeformula_timeout() -> float:
+    """Lê segundos positivos finitos por chamada; configuração inválida usa 120s."""
+    try:
+        timeout = float(os.environ.get("FORMULA_CODEFORMULA_TIMEOUT", "120"))
+        if math.isfinite(timeout) and timeout > 0:
+            return timeout
+    except ValueError:
+        pass
+    logger.warning("FORMULA_CODEFORMULA_TIMEOUT inválido; usando 120s")
+    return CODEFORMULA_TIMEOUT_SECONDS
 
 
 def _get_ocr() -> Any:
@@ -41,32 +58,6 @@ def _get_ocr() -> Any:
             _ocr_failed = True
             logger.warning("RapidOCR indisponível para cascata de fórmulas: {}", error)
     return _ocr_engine
-
-
-def _get_codeformula() -> Any:
-    global _codeformula_model, _codeformula_failed
-    if _codeformula_model is None and not _codeformula_failed:
-        try:
-            from docling.datamodel.accelerator_options import AcceleratorOptions
-            from docling.datamodel.pipeline_options import PdfPipelineOptions
-            from docling.models.stages.code_formula.code_formula_vlm_model import (
-                CodeFormulaVlmModel,
-            )
-
-            options = PdfPipelineOptions().code_formula_options.model_copy(
-                update={"extract_code": False, "extract_formulas": True}
-            )
-            _codeformula_model = CodeFormulaVlmModel(
-                enabled=True,
-                enable_remote_services=False,
-                artifacts_path=None,
-                options=options,
-                accelerator_options=AcceleratorOptions(),
-            )
-        except Exception as error:
-            _codeformula_failed = True
-            logger.warning("CodeFormula indisponível para cascata: {}", error)
-    return _codeformula_model
 
 
 def ocr_image_text(image_bytes: bytes) -> str:
@@ -92,63 +83,62 @@ def is_formula_image(image_bytes: bytes) -> bool:
     return _looks_math(ocr_image_text(image_bytes))
 
 
-import unicodedata
-
-# Strong: Unicode category Sm (Math Symbol), plus Greek letters, double-struck
-# letters (ℝ, ℕ), and superscripts/subscripts that are not Sm but clearly math.
-_WEAK_MATH_CHARS = "=+^_/"
+_LETTERLIKE_MATH_CHARS = frozenset("ℂℍℕℙℚℝℤℓℏℎℑℜ℘")
+_ASCII_MATH_FUNCTIONS = frozenset(("sin", "cos", "tan", "log", "ln", "exp", "sqrt"))
+_MATH_TOKEN = re.compile(r"[^\W\d]\w*|\d+(?:\.\d+)?|[=+*/^<>|~()\[\]{},;\-]", re.UNICODE)
 
 
 def _is_strong_math_char(ch: str) -> bool:
     """True if ch is a mathematical symbol or clearly mathematical letter/number."""
     category = unicodedata.category(ch)
     if category == "Sm":
-        # Exclude ambiguous operators that appear in prose
         return ch not in "+-=<>|~"
+    if ch in _LETTERLIKE_MATH_CHARS:
+        return True
     if category in ("Ll", "Lu"):
         cp = ord(ch)
-        # Greek alphabet
         if 0x0391 <= cp <= 0x03A9 or 0x03B1 <= cp <= 0x03C9:
             return True
-        # Double-struck letters (math blackboard bold: ℝ, ℕ, ℤ, ℚ, ℂ)
-        if 0x1D400 <= cp <= 0x1D7FF:  # Mathematical Alphanumeric Symbols
-            return True
-        if 0x2100 <= cp <= 0x214F:  # Letterlike Symbols (ℝ, ℕ, ℂ, ℙ, ℚ, ℤ)
+        if 0x1D400 <= cp <= 0x1D7FF:
             return True
     if category == "No":
         cp = ord(ch)
-        # Superscripts/subscripts (0x2070-0x2089) and Latin-1 ²³ (0xB2-0xB3)
-        if 0x2070 <= cp <= 0x2089 or cp in (0xB2, 0xB3):
+        if 0x2070 <= cp <= 0x2089 or cp in (0xB9, 0xB2, 0xB3):
             return True
     return False
 
 
 def _looks_math(text: str) -> bool:
-    """Classifica texto de OCR como matemático; mais sensível que is_math_likely."""
+    """Heurística de símbolos fortes ou estrutura de expressão, não validação."""
     text = text.strip()
     if not text:
         return False
+    if any(unicodedata.category(ch) == "Sc" for ch in text):
+        return False
+    if re.search(r"(?:\w+://|www\.)", text, re.IGNORECASE):
+        return False
 
-    strong = sum(1 for ch in text if _is_strong_math_char(ch))
-    if strong >= 1:
+    if any(_is_strong_math_char(ch) for ch in text):
         return True
 
-    # Weak chars need to be "pure math" - no long words that suggest prose
-    weak = sum(text.count(ch) for ch in _WEAK_MATH_CHARS)
-    if weak >= 2 and len(text) <= 120:
-        # If there are words longer than 3 chars, it's likely prose with math symbols
-        words = [w for w in text.split() if w.isalpha() and len(w) > 3]
-        if not words:
-            return True
-
-    # Matrizes/expressões simbólicas: muitos tokens de um só caractere
-    tokens = text.split()
-    if len(tokens) >= 4:
-        single = sum(1 for tok in tokens if len(tok) == 1)
-        if single / len(tokens) >= 0.6:
-            return True
-
-    return is_math_likely(text)
+    if len(text) > 120:
+        return False
+    tokens = _MATH_TOKEN.findall(text)
+    if "".join(tokens) != re.sub(r"\s+", "", text):
+        return False
+    words = text.split()
+    if len(words) >= 4 and all(len(word) == 1 and word.isalnum() for word in words):
+        return True
+    atoms = [token for token in tokens if token[0].isalnum() or token[0] == "_"]
+    if not atoms:
+        return False
+    for previous, current in zip(tokens, tokens[1:]):
+        if previous in atoms and current in atoms and previous not in _ASCII_MATH_FUNCTIONS:
+            if not ("[" in tokens and "]" in tokens and previous.isdecimal() and current.isdecimal()):
+                return False
+    return any(token in _ASCII_MATH_FUNCTIONS for token in tokens) or any(
+        token in "=+*/^<>|-" or token == "[" for token in tokens
+    )
 
 
 def looks_like_latex(text: str) -> bool:
@@ -160,54 +150,65 @@ def looks_like_latex(text: str) -> bool:
     return any(hint in text for hint in math_hints)
 
 
+def _codeformula_command(result_fd: int) -> list[str]:
+    return [sys.executable, "-m", "backend.tools.formula_worker", str(result_fd)]
+
+
 def extract_latex_from_image(image_bytes: bytes) -> str:
-    """Roda o CodeFormula diretamente no recorte; '' quando falha/inválido."""
-    model = _get_codeformula()
-    if model is None or model.engine is None:
+    """Extrai em processo descartável; orçamento inclui startup, carga e inferência."""
+    if not image_bytes:
         return ""
+    if not hasattr(os, "killpg"):
+        logger.warning("CodeFormula isolado requer POSIX; usando fallback")
+        return ""
+    timeout = _codeformula_timeout()
+    deadline = time.monotonic() + timeout
     try:
-        from PIL import Image
-
-        from docling.models.inference_engines.vlm import VlmEngineInput
-
-        img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-        engine_input = VlmEngineInput(
-            image=img,
-            prompt="<formula>",
-            temperature=0.0,
-            # 512 é folgado p/ fórmulas e evita geração degenerada de minutos em CPU
-            max_new_tokens=512,
-            extra_generation_config={"skip_special_tokens": False},
-        )
-        # Executa em thread separada para respeitar timeout em CPU
-        result: list[str] = []
-        error: list[Exception] = []
-
-        def _run():
-            try:
-                outputs = model.engine.predict_batch([engine_input])
-                latex = model._post_process([outputs[0].text])[0].strip()
-                if looks_like_latex(latex):
-                    result.append(latex)
-            except Exception as e:
-                error.append(e)
-
-        thread = threading.Thread(target=_run, daemon=True)
-        thread.start()
-        thread.join(timeout=CODEFORMULA_TIMEOUT_SECONDS)
-        if thread.is_alive():
-            logger.warning(
-                "CodeFormula excedeu timeout de {}s; retornando vazio",
-                CODEFORMULA_TIMEOUT_SECONDS,
+        with tempfile.TemporaryFile() as image, tempfile.TemporaryFile() as result:
+            image.write(image_bytes)
+            image.seek(0)
+            process = subprocess.Popen(
+                _codeformula_command(result.fileno()),
+                stdin=image,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                pass_fds=(result.fileno(),),
+                close_fds=True,
+                shell=False,
+                start_new_session=True,
             )
-            return ""
-        if error:
-            logger.warning("CodeFormula falhou no recorte: {}", error[0])
-            return ""
-        return result[0] if result else ""
-    except Exception as error:
-        logger.warning("CodeFormula falhou no recorte: {}", error)
-        return ""
+            try:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise subprocess.TimeoutExpired(process.args, timeout)
+                returncode = process.wait(timeout=remaining)
+            finally:
+                # Não aguarda EOF de pipes herdados; encerra também descendentes do grupo.
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                finally:
+                    process.wait()
+            if returncode != 0:
+                logger.warning("CodeFormula falhou no recorte (status {})", returncode)
+                return ""
+            result.seek(0)
+            payload = result.read(_MAX_WORKER_RESULT_BYTES + 1)
+            if len(payload) > _MAX_WORKER_RESULT_BYTES:
+                raise ValueError("oversized worker result")
+            decoded = json.loads(payload)
+            if not isinstance(decoded, dict) or set(decoded) != {"latex"}:
+                raise ValueError("invalid worker result")
+            latex = decoded["latex"]
+            if not isinstance(latex, str):
+                raise ValueError("invalid latex type")
+            return latex.strip() if looks_like_latex(latex) else ""
+    except subprocess.TimeoutExpired:
+        logger.warning("CodeFormula excedeu orçamento de {}s; retornando vazio", timeout)
+    except Exception:
+        logger.warning("CodeFormula falhou no recorte ou retornou resultado inválido")
+    return ""
 
 
 def try_extract_formula_locally(image_bytes: bytes) -> str:
@@ -253,10 +254,16 @@ def latex_to_mathml(latex: str) -> str:
         return ""
     try:
         import latex2mathml.converter
-
+    except ImportError:
+        logger.warning("latex2mathml indisponível; conversão LaTeX→MathML omitida")
+        return ""
+    except Exception:
+        logger.warning("Conversão LaTeX→MathML falhou; usando fallback")
+        return ""
+    try:
         return latex2mathml.converter.convert(latex)
-    except Exception as error:
-        logger.warning("Conversão LaTeX→MathML falhou ({}): {}", latex[:60], error)
+    except Exception:
+        logger.warning("Conversão LaTeX→MathML falhou; usando fallback")
         return ""
 
 
