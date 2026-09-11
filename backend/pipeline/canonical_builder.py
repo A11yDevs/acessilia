@@ -80,6 +80,8 @@ def build_canonical_document(
 
 def _enrich_math_blocks(sections: list[dict[str, Any]]) -> None:
     """Normaliza LaTeX e adiciona MathML + verbalização acessível aos blocos math."""
+    if not sections:
+        return
     for section in sections:
         for block in section.get("blocks", []):
             if block.get("type") != "math":

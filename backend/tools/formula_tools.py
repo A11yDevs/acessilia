@@ -267,58 +267,140 @@ def latex_to_mathml(latex: str) -> str:
         return ""
 
 
-# Traduções pt-BR para verbalização determinística (fallback sem LLM)
-_VERBAL_REPLACEMENTS: tuple[tuple[str, str], ...] = (
-    ("\\begin{pmatrix}", " matriz: "),
-    ("\\begin{bmatrix}", " matriz: "),
-    ("\\end{pmatrix}", " fim da matriz "),
-    ("\\end{bmatrix}", " fim da matriz "),
-    ("\\frac", " fração "),
-    ("\\sqrt", " raiz quadrada de "),
-    ("\\sum", " somatório "),
-    ("\\prod", " produtório "),
-    ("\\int", " integral "),
-    ("\\lim", " limite "),
-    ("\\infty", " infinito "),
-    ("\\pm", " mais ou menos "),
-    ("\\times", " vezes "),
-    ("\\cdot", " vezes "),
-    ("\\div", " dividido por "),
-    ("\\leq", " menor ou igual a "),
-    ("\\geq", " maior ou igual a "),
-    ("\\neq", " diferente de "),
-    ("\\approx", " aproximadamente "),
-    ("\\alpha", " alfa "),
-    ("\\beta", " beta "),
-    ("\\pi", " pi "),
-    ("\\theta", " teta "),
-    ("\\lambda", " lambda "),
-    ("\\mu", " mi "),
-    ("\\sigma", " sigma "),
-    ("\\omega", " ômega "),
-    ("\\Delta", " delta "),
-    ("\\partial", " derivada parcial "),
-    ("\\nabla", " nabla "),
-    ("\\,", " "),
-    ("\\\\", "; "),
-    ("&", ", "),
-    ("=", " igual a "),
-    ("+", " mais "),
-    ("^", " elevado a "),
-    ("_", " índice "),
-)
+# Tabela pt-BR de símbolos e comandos terminais (fallback determinístico, sem LLM).
+# Comandos estruturais (\frac, \sqrt, ^, _, \begin/\end) são tratados pelo parser.
+_VERBAL_REPLACEMENTS: dict[str, str] = {
+    "\\begin{pmatrix}": "matriz:",
+    "\\begin{bmatrix}": "matriz:",
+    "\\end{pmatrix}": "fim da matriz",
+    "\\end{bmatrix}": "fim da matriz",
+    "\\sum": "somatório",
+    "\\prod": "produtório",
+    "\\int": "integral",
+    "\\lim": "limite",
+    "\\infty": "infinito",
+    "\\pm": "mais ou menos",
+    "\\times": "vezes",
+    "\\cdot": "vezes",
+    "\\div": "dividido por",
+    "\\leq": "menor ou igual a",
+    "\\geq": "maior ou igual a",
+    "\\neq": "diferente de",
+    "\\approx": "aproximadamente",
+    "\\alpha": "alfa",
+    "\\beta": "beta",
+    "\\pi": "pi",
+    "\\theta": "teta",
+    "\\lambda": "lambda",
+    "\\mu": "mi",
+    "\\sigma": "sigma",
+    "\\omega": "ômega",
+    "\\Delta": "delta",
+    "\\partial": "derivada parcial",
+    "\\nabla": "nabla",
+    "\\,": "",
+    "\\\\": ";",
+    "&": ",",
+    "=": "igual a",
+    "+": "mais",
+    "-": "menos",
+    "^": "elevado a",
+    "_": "índice",
+}
+
+_LATEX_TOKEN = re.compile(r"\\[a-zA-Z]+|\\.|\d+(?:\.\d+)?|\s+|.", re.DOTALL)
+
+
+class _LatexVerbalizer:
+    """Descida recursiva sobre tokens LaTeX que produz palavras faladas (melhor esforço)."""
+
+    def __init__(self, latex: str) -> None:
+        self.tokens = [t for t in _LATEX_TOKEN.findall(latex) if not t.isspace() and t != "\\"]
+        self.pos = 0
+
+    def run(self) -> list[str]:
+        return self._sequence(stop=None)
+
+    def _sequence(self, stop: str | None) -> list[str]:
+        words: list[str] = []
+        while self.pos < len(self.tokens):
+            token = self.tokens[self.pos]
+            if token == stop:
+                self.pos += 1
+                return words
+            if token == "}":
+                self.pos += 1  # fechamento sem abertura correspondente
+                continue
+            words.extend(self._atom())
+        return words
+
+    def _atom(self) -> list[str]:
+        token = self.tokens[self.pos]
+        self.pos += 1
+        if token == "{":
+            return self._sequence(stop="}")
+        if token == "\\frac":
+            return self._fraction(self._argument(), self._argument())
+        if token == "\\sqrt":
+            return self._root()
+        if token in ("\\begin", "\\end"):
+            environment = "".join(self._argument())
+            return _VERBAL_REPLACEMENTS.get(f"{token}{{{environment}}}", "").split()
+        if token in ("^", "_"):
+            return _VERBAL_REPLACEMENTS[token].split() + self._argument()
+        if token in _VERBAL_REPLACEMENTS:
+            return _VERBAL_REPLACEMENTS[token].split()
+        if token.startswith("\\"):
+            return []  # comando desconhecido: descartado, argumentos seguem falados
+        return [token]
+
+    def _argument(self) -> list[str]:
+        if self.pos >= len(self.tokens) or self.tokens[self.pos] == "}":
+            return []
+        return self._atom()
+
+    @staticmethod
+    def _fraction(numerator: list[str], denominator: list[str]) -> list[str]:
+        if not numerator or not denominator:
+            return numerator + denominator
+        if len(numerator) == 1 and len(denominator) == 1:
+            return [*numerator, "sobre", *denominator]
+        return [*numerator[:-1], numerator[-1] + ",", "dividido", "por", *denominator]
+
+    def _root(self) -> list[str]:
+        index: list[str] = []
+        if self.pos < len(self.tokens) and self.tokens[self.pos] == "[":
+            self.pos += 1
+            index = self._sequence(stop="]")
+        radicand = self._argument()
+        if not index:
+            prefix = ["raiz", "quadrada", "de"]
+        elif index == ["3"]:
+            prefix = ["raiz", "cúbica", "de"]
+        else:
+            prefix = ["raiz", "de", "índice", *index, "de"]
+        return prefix + radicand
+
+
+def _join_spoken_words(words: list[str]) -> str:
+    joined: list[str] = []
+    for word in words:
+        if word in (",", ";") and joined:
+            joined[-1] += word
+        else:
+            joined.append(word)
+    return " ".join(joined)
 
 
 def verbalize_latex_fallback(latex: str) -> str:
-    """Verbalização pt-BR determinística de LaTeX (sem LLM); melhor esforço."""
-    import re
-
+    """Verbalização pt-BR estrutural e determinística de LaTeX (melhor esforço, não validada)."""
     text = normalize_latex(latex)
     if not text:
         return ""
-    for token, spoken in _VERBAL_REPLACEMENTS:
-        text = text.replace(token, spoken)
-    text = re.sub(r"\\[a-zA-Z]+", " ", text)  # comandos não mapeados
-    text = text.replace("{", " ").replace("}", " ")
-    text = " ".join(text.split())
-    return f"Fórmula: {text}" if text else ""
+    try:
+        words = _LatexVerbalizer(text).run()
+    except Exception:
+        logger.debug("Verbalização estrutural falhou; usando achatamento literal")
+        words = re.sub(r"\\[a-zA-Z]+|[\\{}]", " ", text).split()
+    spoken = _join_spoken_words(words)
+    return f"Fórmula: {spoken}" if spoken else ""

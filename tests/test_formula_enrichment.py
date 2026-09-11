@@ -125,9 +125,70 @@ def test_verbalize_latex_fallback_portuguese():
     spoken = verbalize_latex_fallback(r"$x=\frac{a}{b}$")
     assert spoken.startswith("Fórmula:")
     assert "igual a" in spoken
-    assert "fração" in spoken
+    assert "a sobre b" in spoken
     assert "\\" not in spoken
     assert "{" not in spoken
+
+
+def test_verbalize_fraction_simple_uses_sobre():
+    assert verbalize_latex_fallback(r"\frac{a}{b}") == "Fórmula: a sobre b"
+
+
+def test_verbalize_nested_fraction_uses_dividido_por():
+    spoken = verbalize_latex_fallback(r"\frac{\frac{a}{b}}{c}")
+    assert spoken == "Fórmula: a sobre b, dividido por c"
+
+
+def test_verbalize_compound_exponent_spoken_as_group():
+    assert verbalize_latex_fallback(r"x^{n+1}") == "Fórmula: x elevado a n mais 1"
+
+
+def test_verbalize_roots_by_index():
+    assert verbalize_latex_fallback(r"\sqrt{x}") == "Fórmula: raiz quadrada de x"
+    assert verbalize_latex_fallback(r"\sqrt[3]{x}") == "Fórmula: raiz cúbica de x"
+    assert verbalize_latex_fallback(r"\sqrt[n]{x}") == "Fórmula: raiz de índice n de x"
+
+
+def test_verbalize_keeps_renderer_fixture_string():
+    assert verbalize_latex_fallback("E=mc^2") == "Fórmula: E igual a m c elevado a 2"
+
+
+def test_verbalize_subscripts():
+    assert verbalize_latex_fallback(r"x_{i}") == "Fórmula: x índice i"
+    assert verbalize_latex_fallback(r"a_{ij}") == "Fórmula: a índice i j"
+
+
+def test_verbalize_preserves_symbol_table():
+    spoken = verbalize_latex_fallback(
+        r"\sum \prod \int \lim \infty \pm \times \cdot \div \leq \geq \neq \approx "
+        r"\alpha \beta \pi \theta \lambda \mu \sigma \omega \Delta \partial \nabla"
+    )
+    for word in (
+        "somatório", "produtório", "integral", "limite", "infinito", "mais ou menos",
+        "vezes", "dividido por", "menor ou igual a", "maior ou igual a", "diferente de",
+        "aproximadamente", "alfa", "beta", "pi", "teta", "lambda", "mi", "sigma", "ômega",
+        "delta", "derivada parcial", "nabla",
+    ):
+        assert word in spoken
+    matrix = verbalize_latex_fallback(r"\begin{pmatrix} a & b \\ c & d \end{pmatrix}")
+    assert matrix == "Fórmula: matriz: a, b; c, d fim da matriz"
+    assert verbalize_latex_fallback(r"a\,b") == "Fórmula: a b"
+
+
+def test_verbalize_drops_unknown_commands_but_speaks_content():
+    spoken = verbalize_latex_fallback(r"\mathbf{v}=\left(a+b\right)")
+    assert spoken.startswith("Fórmula:")
+    assert "v igual a" in spoken
+    assert "a mais b" in spoken
+    assert "\\" not in spoken
+
+
+def test_verbalize_unbalanced_input_degrades_gracefully():
+    spoken = verbalize_latex_fallback(r"\frac{a")
+    assert spoken.startswith("Fórmula:")
+    assert "a" in spoken
+    assert "{" not in spoken
+    assert "\\" not in spoken
 
 
 def test_verbalize_latex_fallback_empty():
