@@ -1,6 +1,7 @@
 import traceback
 import uuid
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import (
     FastAPI,
@@ -227,27 +228,67 @@ def _remove_file(file_path: Path) -> None:
 
 @app.get("/", response_class=HTMLResponse)
 @limiter.limit("30/minute")
-async def index(request: Request, position: int | None = Query(None, ge=1)):
+async def index(
+    request: Request,
+    position: int | None = Query(None, ge=1),
+    email: str | None = Query(None),
+):
+    """Render the main upload panel, optionally with the post-queue success notice.
+
+    Args:
+        request (Request): The in-flight HTTP request, used to resolve templates and the active locale.
+        position (int | None): Queue position carried by a success redirect; defaults to None.
+        email (str | None): Deliver-to e-mail carried by a success redirect; defaults to None.
+
+    Returns:
+        TemplateResponse: The rendered index page with localized strings and the success notice when present.
+    """
     return templates.TemplateResponse(
-        request=request, name="index.html", context=_submission_context(position)
+        request=request,
+        name="index.html",
+        context={**_web_strings(), **_submission_context(position, email)},
     )
 
 
 @app.get("/advanced", response_class=HTMLResponse)
 @limiter.limit("30/minute")
-async def advanced_page(request: Request, position: int | None = Query(None, ge=1)):
+async def advanced_page(
+    request: Request,
+    position: int | None = Query(None, ge=1),
+    email: str | None = Query(None),
+):
+    """Render the advanced upload panel, optionally with the post-queue success notice.
+
+    Args:
+        request (Request): The in-flight HTTP request, used to resolve templates and the active locale.
+        position (int | None): Queue position carried by a success redirect; defaults to None.
+        email (str | None): Deliver-to e-mail carried by a success redirect; defaults to None.
+
+    Returns:
+        TemplateResponse: The rendered advanced page with localized strings and the success notice when present.
+    """
     return templates.TemplateResponse(
-        request=request, name="advanced.html", context=_submission_context(position)
+        request=request,
+        name="advanced.html",
+        context={**_web_strings(), **_submission_context(position, email)},
     )
 
 
-def _submission_context(position: int | None) -> dict[str, str]:
+def _submission_context(position: int | None, email: str | None) -> dict[str, str]:
+    """Build the localized success notice shown after a file is added to the queue.
+
+    Args:
+        position (int | None): The queue position reported by the API; None disables the notice.
+        email (str | None): The deliver-to e-mail address shown in the notice; None renders an empty address.
+
+    Returns:
+        dict[str, str]: Empty when no position is present; otherwise a mapping with a "message" key holding the localized notice.
+    """
     if position is None:
         return {}
-    return {"message": (
-        f"Sucesso! Seu arquivo entrou na fila (Posição no envio: {position}). "
-        "O resultado será enviado para o e-mail informado."
-    )}
+    return {
+        "message": t(WEB_SUCCESS_QUEUED).format(position=position, email=email or "")
+    }
 
 
 @app.get("/process", include_in_schema=False)
@@ -311,7 +352,8 @@ async def _submit_via_api(
 
     page = "/advanced" if template_name == "advanced.html" else "/"
     return RedirectResponse(
-        url=f"{page}?position={int(result['position'])}", status_code=303
+        url=f"{page}?position={int(result['position'])}&email={quote(email, safe='')}",
+        status_code=303,
     )
 
 
