@@ -49,9 +49,17 @@ from backend.log_messages import (
     API_RATE_LIMIT_DETAIL,
     EMAIL_CONFIRMATION_BODY,
     EMAIL_CONFIRMATION_SUBJECT,
+    EMAIL_FORMAT_DOCX,
+    EMAIL_FORMAT_HTML,
+    EMAIL_FORMAT_MP3,
+    EMAIL_FORMAT_PDF,
+    EMAIL_FORMAT_PDF_UA,
+    EMAIL_FORMAT_TXT,
+    EMAIL_FORMAT_ZIP,
     EMAIL_RESULT_BODY_ATTACHED,
     EMAIL_RESULT_BODY_WITH_LINK,
     EMAIL_RESULT_SUBJECT,
+    EMAIL_RESULT_WARNINGS_HEADER,
     LOG_AGNO_NOT_INSTALLED,
     LOG_API_ERROR,
     LOG_API_INTERFACE_ENABLED,
@@ -746,6 +754,14 @@ MESSAGES: tuple[str, ...] = (
     EMAIL_RESULT_SUBJECT,
     EMAIL_RESULT_BODY_WITH_LINK,
     EMAIL_RESULT_BODY_ATTACHED,
+    EMAIL_FORMAT_TXT,
+    EMAIL_FORMAT_DOCX,
+    EMAIL_FORMAT_PDF,
+    EMAIL_FORMAT_PDF_UA,
+    EMAIL_FORMAT_HTML,
+    EMAIL_FORMAT_MP3,
+    EMAIL_FORMAT_ZIP,
+    EMAIL_RESULT_WARNINGS_HEADER,
     LOG_CANONICAL_JSON_SAVE_FAILED,
     LOG_TASK_CANCELLED_BY_USER,
     LOG_PIPELINE_ERROR,
@@ -1490,21 +1506,30 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "O processamento do arquivo '{filename}' foi concluído com sucesso.\n\n"
             "Acesse o link abaixo para visualizar e baixar os formatos disponíveis:\n\n"
             "{download_url}\n\n"
-            "Formatos disponíveis: Texto Puro (TXT), Documento Word (DOCX), "
-            "PDF Acessível, Página Web (HTML) e Audiodescrição (MP3).\n\n"
+            "Formatos disponíveis: {formats}."
+            "{warnings}\n\n"
             "O link expira em 7 dias.\n\n"
             "Atenciosamente,\nA equipe Acessilia"
         ),
+        # Attached-body mirrors the msgid's bullet-list + warnings placeholders;
+        # {formats} receives one "- <label>" line per completed format.
         EMAIL_RESULT_BODY_ATTACHED: (
             "Olá!\n\n"
             "O processamento do arquivo '{filename}' foi concluído com sucesso.\n"
             "Em anexo, você encontrará um pacote ZIP contendo os seguintes formatos:\n"
-            "- Texto Puro (.txt)\n"
-            "- Documento Word (.docx)\n"
-            "- PDF Acessível (.pdf)\n"
-            "- Página Web (.html)\n"
-            "- Audiodescrição (.mp3)\n\n"
+            "{formats}"
+            "{warnings}\n\n"
             "Atenciosamente,\nA equipe Acessilia"
+        ),
+        EMAIL_FORMAT_TXT: "Texto Puro (TXT)",
+        EMAIL_FORMAT_DOCX: "Documento Word (DOCX)",
+        EMAIL_FORMAT_PDF: "PDF Acessível",
+        EMAIL_FORMAT_PDF_UA: "PDF/UA",
+        EMAIL_FORMAT_HTML: "Página Web (HTML)",
+        EMAIL_FORMAT_MP3: "Audiodescrição (MP3)",
+        EMAIL_FORMAT_ZIP: "Pacote ZIP",
+        EMAIL_RESULT_WARNINGS_HEADER: (
+            "Alguns formatos opcionais não foram gerados:"
         ),
         LOG_CANONICAL_JSON_SAVE_FAILED: (
             "Não foi possível salvar o JSON canônico: {error}"

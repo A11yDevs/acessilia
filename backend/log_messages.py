@@ -98,29 +98,42 @@ EMAIL_CONFIRMATION_BODY: str = (
 )
 #: Subject line of the result email sent when the accessible package is ready.
 EMAIL_RESULT_SUBJECT: str = "Your accessible file is ready! - Acessilia"
-#: Body of the result email when a download link is available; {filename} the source file name, {download_url} the URL.
+#: Body of the result email when a download link is available; {filename} the source file name, {download_url} the URL, {formats} the localized comma-separated list of completed formats, {warnings} the optional localized warning block (or empty text when there are no warnings).
 EMAIL_RESULT_BODY_WITH_LINK: str = (
     "Hello!\n\n"
     "The processing of the file '{filename}' has completed successfully.\n\n"
     "Access the link below to view and download the available formats:\n\n"
     "{download_url}\n\n"
-    "Available formats: Plain Text (TXT), Word Document (DOCX), "
-    "Accessible PDF, Web Page (HTML) and Audio Description (MP3).\n\n"
+    "Available formats: {formats}."
+    "{warnings}\n\n"
     "The link expires in 7 days.\n\n"
     "Best regards,\nThe Acessilia Team"
 )
-#: Body of the result email when the accessible package is attached as a ZIP; {filename} the source file name.
+#: Body of the result email when the accessible package is attached as a ZIP; {filename} the source file name, {formats} the localized newline-separated bullet list of completed formats, {warnings} the optional localized warning block (or empty text when there are no warnings).
 EMAIL_RESULT_BODY_ATTACHED: str = (
     "Hello!\n\n"
     "The processing of the file '{filename}' has completed successfully.\n"
     "Attached, you will find a ZIP package containing the following formats:\n"
-    "- Plain Text (.txt)\n"
-    "- Word Document (.docx)\n"
-    "- Accessible PDF (.pdf)\n"
-    "- Web Page (.html)\n"
-    "- Audio Description (.mp3)\n\n"
+    "{formats}"
+    "{warnings}\n\n"
     "Best regards,\nThe Acessilia Team"
 )
+#: Localized display name of the plain-text (TXT) output artifact, listed in the result email's completed-formats block.
+EMAIL_FORMAT_TXT: str = "Plain Text (TXT)"
+#: Localized display name of the Word (DOCX) output artifact, listed in the result email's completed-formats block.
+EMAIL_FORMAT_DOCX: str = "Word Document (DOCX)"
+#: Localized display name of the non-tagged PDF output artifact, listed in the result email's completed-formats block.
+EMAIL_FORMAT_PDF: str = "PDF"
+#: Localized display name of the tagged PDF/UA output artifact, listed in the result email's completed-formats block.
+EMAIL_FORMAT_PDF_UA: str = "PDF/UA"
+#: Localized display name of the web-page (HTML) output artifact, listed in the result email's completed-formats block.
+EMAIL_FORMAT_HTML: str = "Web Page (HTML)"
+#: Localized display name of the spoken-audio (MP3) output artifact, listed in the result email's completed-formats block.
+EMAIL_FORMAT_MP3: str = "Audio Description (MP3)"
+#: Localized display name of the bundled ZIP package output artifact, listed in the result email's completed-formats block.
+EMAIL_FORMAT_ZIP: str = "ZIP Package"
+#: Intro line of the optional warning block appended to the result email body when one or more optional export formats failed; has no placeholders.
+EMAIL_RESULT_WARNINGS_HEADER: str = "Some optional formats were not generated:"
 #: Info logged when a canonical-JSON persistence attempt raised; the exception text follows.
 LOG_CANONICAL_JSON_SAVE_FAILED: str = "Could not save the canonical JSON: {error}"
 #: Info logged when a processing job is cancelled by the user; {task_id} identifies the job.
