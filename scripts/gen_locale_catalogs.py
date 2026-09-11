@@ -45,8 +45,15 @@ from backend.core.manifest.docling_extractor import (
     MSG_SOURCE_NOT_FOUND,
 )
 from backend.log_messages import (
+    API_CANCEL_STATE_INVALID,
+    API_FILE_NOT_FOUND,
+    API_FORMAT_INVALID,
     API_INTERNAL_ERROR_DETAIL,
+    API_JOB_QUEUED,
+    API_LINK_INVALID,
+    API_PROMPT_TOO_LONG,
     API_RATE_LIMIT_DETAIL,
+    API_TASK_NOT_FOUND,
     EMAIL_CONFIRMATION_BODY,
     EMAIL_CONFIRMATION_SUBJECT,
     EMAIL_FORMAT_DOCX,
@@ -197,6 +204,14 @@ from backend.log_messages import (
     LOG_WORKER_TASK_COMPLETED,
     LOG_WORKER_TASK_ERROR,
     LOG_WORKER_TASK_STARTING,
+    MSG_PLANNER_NOT_STARTED,
+    MSG_SOURCE_FILE_MISSING,
+    MSG_OBLIGATION_CODE,
+    MSG_OBLIGATION_FORMULA,
+    MSG_OBLIGATION_IMAGE,
+    MSG_OBLIGATION_TABLE,
+    MSG_OBLIGATION_UNKNOWN,
+    MSG_HEADING_GAP,
 )
 from backend.pipeline.validators import (
     MSG_BLOCK_NOT_ALLOWED_IN_PROFILE,
@@ -334,12 +349,6 @@ from frontend.web.messages import (
 )
 from frontend.telegram.messages import (
     MSG_ACCESSIBLE_PACKAGE_READY,
-    MSG_API_FILE_NOT_FOUND,
-    MSG_API_FORMAT_INVALID,
-    MSG_API_JOB_QUEUED,
-    MSG_API_LINK_INVALID,
-    MSG_API_PROMPT_TOO_LONG,
-    MSG_API_TASK_NOT_FOUND,
     MSG_ACTION_REJECTS_EXECUTION_PARAMETERS,
     MSG_BOT_PAUSED,
     MSG_BOT_RESUMED,
@@ -364,7 +373,6 @@ from frontend.telegram.messages import (
     MSG_HEALTH_TEMP_MISSING,
     MSG_HEALTH_TEMP_OK,
     MSG_HELP_TEXT,
-    MSG_HEADING_GAP,
     MSG_METHOD_RESULT_DUPLICATE_ARTIFACT_IDS,
     MSG_METHOD_RESULT_SUCCESS_REQUIRES_VALIDATION,
     MSG_MODE_BAIXO_ON,
@@ -375,18 +383,12 @@ from frontend.telegram.messages import (
     MSG_NOMINAL_PLAN_MUST_END_COMPLETE_JOB,
     MSG_NOMINAL_PLAN_SCHEMA_DESCRIPTION,
     MSG_NO_TASK_REGISTERED,
-    MSG_OBLIGATION_CODE,
-    MSG_OBLIGATION_FORMULA,
-    MSG_OBLIGATION_IMAGE,
-    MSG_OBLIGATION_TABLE,
-    MSG_OBLIGATION_UNKNOWN,
     MSG_OLLAMA_OFFLINE,
     MSG_OLLAMA_ONLINE,
     MSG_OLLAMA_UNEXPECTED,
     MSG_PHOTO_RECEIVED,
     MSG_PLAN_CONTAINS_UNSELECTED_OBLIGATION,
     MSG_PLAN_INDICES_CONSECUTIVE_FROM_ZERO,
-    MSG_PLANNER_NOT_STARTED,
     MSG_PLANNER_OUTCOME_FAILED_MUST_NOT_PASS_VALIDATION,
     MSG_PLANNER_OUTCOME_FAILED_REQUIRES_ERROR,
     MSG_PLANNER_OUTCOME_MUST_PASS_VALIDATION,
@@ -397,7 +399,6 @@ from frontend.telegram.messages import (
     MSG_PROCESSING_ERROR_GENERIC,
     MSG_PROCESSING_TIMEOUT,
     MSG_QUEUE_POSITION,
-    MSG_SOURCE_FILE_MISSING,
     MSG_START_TEXT,
     MSG_STATUS_CONVERSION_DONE,
     MSG_STATUS_NO_TASK,
@@ -500,12 +501,13 @@ MESSAGES: tuple[str, ...] = (
     MSG_FEEDBACK_PROMPT,
     MSG_FEEDBACK_THANKS,
     # Backend API HTTP detail/receipt bodies surfaced verbatim to chat and web clients.
-    MSG_API_TASK_NOT_FOUND,
-    MSG_API_JOB_QUEUED,
-    MSG_API_PROMPT_TOO_LONG,
-    MSG_API_LINK_INVALID,
-    MSG_API_FORMAT_INVALID,
-    MSG_API_FILE_NOT_FOUND,
+    API_TASK_NOT_FOUND,
+    API_CANCEL_STATE_INVALID,
+    API_JOB_QUEUED,
+    API_PROMPT_TOO_LONG,
+    API_LINK_INVALID,
+    API_FORMAT_INVALID,
+    API_FILE_NOT_FOUND,
     # Manifest/planner internal diagnostic strings surfaced in logs or model validation errors.
     MSG_OBLIGATION_IMAGE,
     MSG_OBLIGATION_TABLE,
@@ -1051,19 +1053,21 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         # Thanks receipt once the user's feedback message has been recorded.
         MSG_FEEDBACK_THANKS: "✅ Feedback recebido! Obrigado pela contribuição.",
         # Localized variant of the 404 API detail body for jobs task endpoints (surfaces via ApiError.detail).
-        MSG_API_TASK_NOT_FOUND: "Tarefa não encontrada",
+        API_TASK_NOT_FOUND: "Tarefa não encontrada",
+        # 409 API detail body returned by the job cancel endpoint when the task state does not accept cancellation; {status} is substituted at call time.
+        API_CANCEL_STATE_INVALID: "A tarefa não pode ser cancelada no estado atual: {status}",
         # 202 API upload receipt returned when a job has been enqueued; {position} is substituted at call time.
-        MSG_API_JOB_QUEUED: "Arquivo na fila (Posição: {position}).",
+        API_JOB_QUEUED: "Arquivo na fila (Posição: {position}).",
         # 400 API detail body for over-limit custom prompts; {limit} is the maximum accepted character count.
-        MSG_API_PROMPT_TOO_LONG: (
+        API_PROMPT_TOO_LONG: (
             "Prompt personalizado excede o limite de {limit} caracteres."
         ),
         # 404 API detail body when a download token lookup misses.
-        MSG_API_LINK_INVALID: "Link inválido ou expirado",
+        API_LINK_INVALID: "Link inválido ou expirado",
         # 400 API detail body when a download request names an unsupported format.
-        MSG_API_FORMAT_INVALID: "Formato inválido",
+        API_FORMAT_INVALID: "Formato inválido",
         # 404 API detail body when a known token's artifact file is missing on disk.
-        MSG_API_FILE_NOT_FOUND: "Arquivo não encontrado",
+        API_FILE_NOT_FOUND: "Arquivo não encontrado",
         # Manifest processing-needs rationale texts used in LLM prompt obligations per element type.
         MSG_OBLIGATION_IMAGE: ("A imagem deve receber descrição ou ser marcada como decorativa."),
         MSG_OBLIGATION_TABLE: (

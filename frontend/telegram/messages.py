@@ -170,37 +170,7 @@ MSG_FEEDBACK_PROMPT: str = (
 )
 #: Confirmation emitted once the user's feedback message has been recorded and logged; thanks them for contributing.
 MSG_FEEDBACK_THANKS: str = ("✅ Feedback received! Thanks for your contribution.")
-#: API HTTP 404 detail body when a task lookup misses in the jobs endpoints; surfaced verbatim to clients as ApiError.detail.
-MSG_API_TASK_NOT_FOUND: str = "Task not found"
-#: API 202 upload receipt body returned when a job has been accepted and placed in the processing queue; {position} is the queue slot.
-MSG_API_JOB_QUEUED: str = "File queued (Position: {position})."
-#: API HTTP 400 detail body when a custom prompt on the advanced panel exceeds the accepted length; {limit} carries the character count.
-MSG_API_PROMPT_TOO_LONG: str = "The custom prompt exceeds the limit of {limit} characters."
-#: API HTTP 404 detail body when a download token lookup misses on the download endpoints.
-MSG_API_LINK_INVALID: str = "The download link is invalid or has expired"
-#: API HTTP 400 detail body when a download request names a format the service cannot produce.
-MSG_API_FORMAT_INVALID: str = "Invalid format"
-#: API HTTP 404 detail body when a known token's artifact file is missing on disk.
-MSG_API_FILE_NOT_FOUND: str = "File not found"
 
-#: Manifest processing-needs rationale texts used by LLM prompt obligations per element type.
-MSG_OBLIGATION_IMAGE: str = "The image must receive a description or be marked decorative."
-MSG_OBLIGATION_TABLE: str = ("The table must have verifiable headers and reading order.")
-MSG_OBLIGATION_FORMULA: str = (
-    "The formula must carry an accessible mathematical representation plus verbalization."
-)
-MSG_OBLIGATION_CODE: str = (
-    "The code block must preserve indentation, language and literal reading."
-)
-MSG_OBLIGATION_UNKNOWN: str = ("Unrecognized elements require structural inspection.")
-#: Observation message for heading-level skips found while validating the manifest.
-MSG_HEADING_GAP: str = (
-    "Title hierarchy jumps from level {previous} to level {level}."
-)
-#: PyMuPDF extraction fallback when the source file is missing on disk at lookup time; {source_path} injected at call time.
-MSG_SOURCE_FILE_MISSING: str = ("Document not found: {source_path}")
-#: Model validation failure text for a planner outcome recorded before execution actually began.
-MSG_PLANNER_NOT_STARTED: str = ("The trial ended before starting")
 # Batch A planning/validation failure templates, registered alongside the part-5 entries above so catalog
 # completeness checks keep requiring non-empty pt_BR translations plus matching en_US identity pairs until the i18n effort for this branch is complete.
 #: PlanStep.validate_parameters failing on an execute-obligation action missing any of obligation_id / obligation_kind / method.

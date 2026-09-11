@@ -6,7 +6,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from backend.i18n import t
-from frontend.telegram.messages import MSG_PLANNER_NOT_STARTED  # noqa: E402
+from backend.log_messages import MSG_PLANNER_NOT_STARTED
 
 
 SCHEMA_VERSION = "1.1.0"

@@ -8,11 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from backend.i18n import t
-from backend.pipeline.sanitizer import sanitize_text
-from backend.pipeline.table_ast import normalize_table_ast
-from backend.pipeline.table_ast import rows_from_table_ast
-
-from frontend.telegram.messages import (  # noqa: E402
+from backend.log_messages import (
     MSG_HEADING_GAP,
     MSG_OBLIGATION_CODE,
     MSG_OBLIGATION_FORMULA,
@@ -20,6 +16,9 @@ from frontend.telegram.messages import (  # noqa: E402
     MSG_OBLIGATION_TABLE,
     MSG_OBLIGATION_UNKNOWN,
 )
+from backend.pipeline.sanitizer import sanitize_text
+from backend.pipeline.table_ast import normalize_table_ast
+from backend.pipeline.table_ast import rows_from_table_ast
 
 from backend.core.manifest.docling_extractor import DoclingExtraction
 from backend.core.manifest.models import (

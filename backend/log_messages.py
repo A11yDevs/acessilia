@@ -246,6 +246,38 @@ API_RATE_LIMIT_DETAIL: str = (
 )
 #: HTTP 500 detail body returned by the API global exception handler.
 API_INTERNAL_ERROR_DETAIL: str = "Internal server error"
+#: HTTP 404 detail body returned by the API jobs endpoints when a task lookup misses; surfaced verbatim to clients as ApiError.detail.
+API_TASK_NOT_FOUND: str = "Task not found"
+#: HTTP 202 upload receipt body returned by the API when a job has been accepted and placed in the processing queue; {position} is the queue slot.
+API_JOB_QUEUED: str = "File queued (Position: {position})."
+#: HTTP 400 detail body returned by the API when a custom prompt exceeds the accepted length; {limit} carries the character count.
+API_PROMPT_TOO_LONG: str = "The custom prompt exceeds the limit of {limit} characters."
+#: HTTP 404 detail body returned by the API download endpoints when a download token lookup misses.
+API_LINK_INVALID: str = "The download link is invalid or has expired"
+#: HTTP 400 detail body returned by the API download endpoints when a request names a format the service cannot produce.
+API_FORMAT_INVALID: str = "Invalid format"
+#: HTTP 404 detail body returned by the API download endpoints when a known token's artifact file is missing on disk.
+API_FILE_NOT_FOUND: str = "File not found"
+#: HTTP 409 detail body returned by the API job cancel endpoint when the task is in a state that does not accept cancellation; {status} is the task's current status.
+API_CANCEL_STATE_INVALID: str = "Task cannot be cancelled in its current state: {status}"
+#: FileNotFoundError text raised by the PyMuPDF manifest extractor when the source file is missing on disk at extraction time; {source_path} is the resolved missing path.
+MSG_SOURCE_FILE_MISSING: str = "Document not found: {source_path}"
+#: ValueError text raised by the manifest planner model when a planner outcome is recorded before execution actually began; no placeholders.
+MSG_PLANNER_NOT_STARTED: str = "The trial ended before starting"
+#: Manifest processing-needs rationale for picture elements, used as the LLM prompt obligation text per element type.
+MSG_OBLIGATION_IMAGE: str = "The image must receive a description or be marked decorative."
+#: Manifest processing-needs rationale for table elements, used as the LLM prompt obligation text per element type.
+MSG_OBLIGATION_TABLE: str = "The table must have verifiable headers and reading order."
+#: Manifest processing-needs rationale for formula elements, used as the LLM prompt obligation text per element type.
+MSG_OBLIGATION_FORMULA: str = (
+    "The formula must carry an accessible mathematical representation plus verbalization."
+)
+#: Manifest processing-needs rationale for code elements, used as the LLM prompt obligation text per element type.
+MSG_OBLIGATION_CODE: str = "The code block must preserve indentation, language and literal reading."
+#: Manifest processing-needs rationale for unknown/unrecognized elements, used as the LLM prompt obligation text per element type.
+MSG_OBLIGATION_UNKNOWN: str = "Unrecognized elements require structural inspection."
+#: Observation message for heading-level skips found while validating the manifest; {previous} is the previous heading level and {level} the current one.
+MSG_HEADING_GAP: str = "Title hierarchy jumps from level {previous} to level {level}."
 #: Debug logged by the orchestrator when a page is served straight from the cache, skipping the AI pass; {page_num} is the page index.
 LOG_ORCHESTRATOR_PAGE_CACHE_SKIP: str = "[page {page_num}] Cache hit (skipping AI)"
 #: Warning logged when a mode prompt file is missing on disk and the loader falls back to the medio prompt; {path} is the missing prompt file path.

@@ -8,10 +8,10 @@ from typing import Any
 
 import fitz
 
-from backend.i18n import t
-from backend.pipeline.semantic_rules import classify_text_block
-from frontend.telegram.messages import MSG_SOURCE_FILE_MISSING  # noqa: E402
 from backend.core.manifest.docling_extractor import DoclingExtraction
+from backend.i18n import t
+from backend.log_messages import MSG_SOURCE_FILE_MISSING
+from backend.pipeline.semantic_rules import classify_text_block
 
 
 class _PseudoDocument:
