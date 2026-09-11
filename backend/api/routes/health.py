@@ -57,11 +57,12 @@ async def health(request: Request):
         else settings.openrouter_model
     )
     staging = _read_staging_status()
-    ghcr_latest = staging.get("latest_sha", "")
+    ghcr_latest = staging.get("latest_digest", "")
+    running_digest = staging.get("running_digest", "") or settings.image_digest
     last_update = staging.get("last_update", "")
     # update_available: there is a newer image on GHCR than the one currently running.
     # Compares the last check (ghcr_latest) with the commit of the running image.
-    update_available = bool(ghcr_latest and settings.git_commit and ghcr_latest != settings.git_commit)
+    update_available = bool(ghcr_latest and running_digest and ghcr_latest != running_digest)
     return HealthResponse(
         status="ok",
         model_client=settings.ai_client,
@@ -71,7 +72,7 @@ async def health(request: Request):
         git_commit=settings.git_commit,
         image_tag=settings.image_tag,
         container_id=_get_container_id(),
-        image_digest=settings.image_digest,
+        image_digest=running_digest,
         ghcr_latest_sha=ghcr_latest,
         last_check=staging.get("last_check", ""),
         last_update=last_update,
