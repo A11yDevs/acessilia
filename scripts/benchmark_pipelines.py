@@ -9,7 +9,7 @@ from importlib import import_module
 from pathlib import Path
 from typing import Any
 
-from backend.agents.orchestrator import AccessibilityOrchestrator
+from backend.agents.workflow import AccessibilityWorkflow
 from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
 from backend.pipeline.canonical_builder import build_canonical_document
 from backend.pipeline.verbosity_manager import verbosity_for_mode
@@ -82,7 +82,7 @@ def _summarize_document(document: dict[str, Any]) -> dict[str, Any]:
 
 
 async def _run_legacy(file_path: Path, mode: str, tmpdir: Path) -> dict[str, Any]:
-    orchestrator = AccessibilityOrchestrator(mode=mode)
+    orchestrator = AccessibilityWorkflow(mode=mode)
     structured = await orchestrator.executar(
         file_path=file_path,
         tmpdir=tmpdir,
