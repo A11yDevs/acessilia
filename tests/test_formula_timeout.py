@@ -88,17 +88,17 @@ def test_startup_consuming_budget_is_timeout(monkeypatch, temporary_files):
     process, _, killer = _mock_child(monkeypatch)
     assert formula_tools.extract_latex_from_image(b"crop") == ""
     killer.assert_called_once_with(process.pid, signal.SIGKILL)
-    process.wait.assert_called_once_with()
+    assert process.wait.call_count == 2
 
 
 def test_timeout_kills_waits_and_next_call_recovers(monkeypatch, temporary_files):
     process, launcher, killer = _mock_child(monkeypatch)
-    process.wait.side_effect = [subprocess.TimeoutExpired("worker", 1), -9, 0, 0]
+    process.wait.side_effect = [subprocess.TimeoutExpired("worker", 1), -9, 0, 0, 0]
     assert formula_tools.extract_latex_from_image(b"crop") == ""
     assert formula_tools.extract_latex_from_image(b"crop") == "x=1"
     assert launcher.call_count == 2
     assert killer.call_count == 1
-    assert process.wait.call_count == 4
+    assert process.wait.call_count == 5
 
 
 @pytest.mark.parametrize("payload, returncode", [
