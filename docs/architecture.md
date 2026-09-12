@@ -7,7 +7,7 @@ The system converts documents into accessible formats through a multi-agent extr
 
 The system combines **deterministic planning with AI-driven execution**: deterministic functions (extraction, PDDL problem generation, contract validation) are the source of truth, and LLMs provide interpretation and description. Two pipeline engines coexist, selected by the `PIPELINE_ENGINE` setting:
 
-- **`legacy`** (default): the direct orchestrated pipeline — `AccessibilityOrchestrator` runs Reader → Vision/Data → Editor.
+- **`legacy`** (Agno workflow engine): the direct orchestrated pipeline — `AccessibilityWorkflow` runs Reader → Vision/Data → Editor.
 - **`pddl`**: the planning-based pipeline — a processing manifest is extracted, a PDDL plan is generated and validated, and an Agno Workflow executor applies it. See [pmv_agno_pddl.md](pmv_agno_pddl.md).
 
 Both engines converge on the same canonical document and the same renderers.
@@ -19,7 +19,7 @@ Both engines converge on the same canonical document and the same renderers.
 ### 0. Backend (`backend/`) — Interface-agnostic business logic and AI pipeline
 
 #### 0.1. Multi-Agent Pipeline & Orchestration (`backend/agents/`)
-- [backend/agents/orchestrator.py](../backend/agents/orchestrator.py): `AccessibilityOrchestrator` coordinates the multi-agent execution pipeline, cache lookup, task state, history, and status callbacks.
+- [backend/agents/workflow.py](../backend/agents/workflow.py): `AccessibilityWorkflow` coordinates the multi-agent Agno Workflow execution pipeline, cache lookup, task state, history, and status callbacks.
 - [backend/agents/reader_agent.py](../backend/agents/reader_agent.py): `ReaderAgent` performs local-first PDF/image structural parsing (via PyMuPDF or Docling), splits pages, and classifies content regions (image, table, formula, text).
 - [backend/agents/vision_agent.py](../backend/agents/vision_agent.py): `VisionAgent` utilizes Agno (`agno.agent.Agent`) and LLM multimodal capabilities (`agno.media.Image`) to produce detailed alt-text and audio descriptions for visual elements and scanned pages.
 - [backend/agents/data_agent.py](../backend/agents/data_agent.py): `DataAgent` utilizes Agno (`agno.agent.Agent`) and LLM capabilities to convert complex tables and mathematical formulas into structured Markdown and LaTeX representations.
@@ -108,7 +108,7 @@ The codebase follows a pragmatic layered architecture with a top-down flow: Inte
 1. User submits a document via the REST API directly, or through the Telegram bot, Web panel, or CLI (which call the API).
 2. The interface handler validates the file extension and size.
 3. The file is saved and enqueued in `ProcessingQueue`.
-4. The worker dequeues the task and runs the pipeline for the active engine (`PIPELINE_ENGINE`): the `legacy` orchestrator (`AccessibilityOrchestrator.process()`, described below) or the `pddl` orchestrator (manifest → plan → execution). Both produce the same canonical document. The legacy flow:
+4. The worker dequeues the task and runs the pipeline for the active engine (`PIPELINE_ENGINE`): the `legacy` workflow (`AccessibilityWorkflow.executar()`, described below) or the `pddl` orchestrator (manifest → plan → execution). Both produce the same canonical document. The legacy flow:
    - Registers task in `StateManager` and checks local text cache.
    - **`ReaderAgent`** splits pages, extracts local text (PyMuPDF/Docling), and classifies regions (images, tables, formulas, text).
    - **`VisionAgent`** and **`DataAgent`** run in parallel to describe visual elements and structure data using Agno `Agent` instances.

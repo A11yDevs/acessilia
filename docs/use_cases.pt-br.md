@@ -17,7 +17,7 @@ Também disponível em **inglês (EUA)**: [English version](use_cases.md)
 - Saída: TXT, DOCX, PDF, PDF/UA, HTML e MP3, entregues no chat, como link de download ou por e-mail.
 - Implementação:
   - entrada/validação: [frontend/telegram/handlers/document.py](../frontend/telegram/handlers/document.py), [backend/tools/validators.py](../backend/tools/validators.py)
-  - processamento: [backend/service.py](../backend/service.py) seleciona o motor (`PIPELINE_ENGINE`): o orquestrador legado [backend/agents/orchestrator.py](../backend/agents/orchestrator.py) ou o orquestrador PDDL [backend/agents/pddl_orchestrator.py](../backend/agents/pddl_orchestrator.py); ambos alimentam o [backend/pipeline/canonical_builder.py](../backend/pipeline/canonical_builder.py)
+  - processamento: [backend/service.py](../backend/service.py) seleciona o motor (`PIPELINE_ENGINE`): o workflow Agno [backend/agents/workflow.py](../backend/agents/workflow.py) ou o orquestrador PDDL [backend/agents/pddl_orchestrator.py](../backend/agents/pddl_orchestrator.py); ambos alimentam o [backend/pipeline/canonical_builder.py](../backend/pipeline/canonical_builder.py)
   - exportação: [backend/export/pandoc_exporter.py](../backend/export/pandoc_exporter.py), [backend/export/exporters](../backend/export/exporters), [backend/export/renderers](../backend/export/renderers)
 
 ## UC-02 Selecionar nível de descrição
@@ -68,7 +68,7 @@ Também disponível em **inglês (EUA)**: [English version](use_cases.md)
 - Objetivo: evitar o processamento repetido de arquivos/páginas.
 - Implementação:
   - serviço de cache: [backend/services/cache.py](../backend/services/cache.py)
-  - uso no fluxo: [backend/service.py](../backend/service.py) e [backend/agents/orchestrator.py](../backend/agents/orchestrator.py)
+  - uso no fluxo: [backend/service.py](../backend/service.py) e [backend/agents/workflow.py](../backend/agents/workflow.py)
 
 ## UC-09 Operação segura de instância única
 - Ator principal: Operador.
