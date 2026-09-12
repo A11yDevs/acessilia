@@ -60,11 +60,11 @@ def test_normalized_engine_unknown_defaults_to_legacy(monkeypatch):
 
 
 def test_build_orchestrator_returns_legacy_by_default(monkeypatch):
-    from backend.agents.orchestrator import AccessibilityOrchestrator
+    from backend.agents.workflow import AccessibilityWorkflow
 
     svc = _reimport_service(monkeypatch, "legacy")
     orchestrator = svc._build_orchestrator()
-    assert isinstance(orchestrator, AccessibilityOrchestrator)
+    assert isinstance(orchestrator, AccessibilityWorkflow)
 
 
 def test_build_orchestrator_returns_pddl_when_configured(monkeypatch):

@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from backend.agents.orchestrator import AccessibilityOrchestrator
+from backend.agents.workflow import AccessibilityWorkflow
 from backend.agents.types import RegionTask
 
 
@@ -37,7 +37,7 @@ class _FakeEditor:
 
 
 def test_thinking_mode_changes_dispatched_prompt(monkeypatch, tmp_path):
-    from backend.agents import orchestrator as orchestrator_module
+    from backend.agents import workflow as workflow_module
 
     async def no_cache(*args, **kwargs):
         return None
@@ -48,11 +48,11 @@ def test_thinking_mode_changes_dispatched_prompt(monkeypatch, tmp_path):
     async def run_inline(function, *args):
         return function(*args)
 
-    monkeypatch.setattr(orchestrator_module, "get_cached", no_cache)
-    monkeypatch.setattr(orchestrator_module, "set_cache", ignore_cache_write)
-    monkeypatch.setattr(orchestrator_module.asyncio, "to_thread", run_inline)
+    monkeypatch.setattr(workflow_module, "get_cached", no_cache)
+    monkeypatch.setattr(workflow_module, "set_cache", ignore_cache_write)
+    monkeypatch.setattr(workflow_module.asyncio, "to_thread", run_inline)
 
-    orchestrator = AccessibilityOrchestrator.__new__(AccessibilityOrchestrator)
+    orchestrator = AccessibilityWorkflow.__new__(AccessibilityWorkflow)
     orchestrator.mode = "medio"
     orchestrator.reader = _FakeReader()
     orchestrator.editor = _FakeEditor()
