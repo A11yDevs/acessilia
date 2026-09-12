@@ -1,5 +1,7 @@
 """EditorAgent – Text consolidation, deduplication, and accessibility marking."""
 
+from agno.workflow.step import Step, StepInput, StepOutput
+
 from backend.i18n import t
 from backend.log_messages import LOG_EDITOR_PAGE_CONSOLIDATED, LOG_EDITOR_PAGE_EMPTY
 from backend.tools.region_classifier import region_has_markers
@@ -12,6 +14,9 @@ from backend.tools.text_tools import FORMULA_SENTINEL, apply_marker, content_fin
 
 class EditorAgent:
     """Consolidates the other agents' results into accessible text."""
+
+    def __init__(self):
+        self.__name__ = self.__class__.__name__
 
     def consolidate_page(
         self,
@@ -31,36 +36,18 @@ class EditorAgent:
         content_fingerprints: set[int] = set()
 
         for idx, task in enumerate(tasks):
-            # Clean-text tasks arrive ready from the ReaderAgent
-            if task.agent_target == "editor":
-                text = task.text
-            else:
-                # Results processed by VisionAgent or DataAgent
-                text = results.get(idx, "")
-
+            text = task.text if task.agent_target == "editor" else results.get(idx, "")
             if not text or not text.strip():
                 continue
 
-            # Deduplication
             fp = content_fingerprint(text)
             if fp in content_fingerprints:
                 continue
             content_fingerprints.add(fp)
 
-            # Image identified by vision as formula → keep only the LaTeX
-            if task.agent_target != "editor" and text.startswith(FORMULA_SENTINEL):
-                text = ensure_math_delimiters(text[len(FORMULA_SENTINEL):].strip())
-                if not text:
-                    continue
-            # Formula result from DataAgent → delimit to become a math block
-            elif task.agent_target == "data" and task.classification == "formula":
-                text = ensure_math_delimiters(text)
-            # Apply accessibility markers when needed (vision/data results)
-            elif task.agent_target != "editor" and region_has_markers(task.classification):
-                if task.region is not None:
-                    text = apply_marker(text, task.classification, task.region)
-
-            text_parts.append(text)
+            formatted = self._format_task_text(task, text)
+            if formatted:
+                text_parts.append(formatted)
 
         if not text_parts:
             logger.warning(
@@ -76,5 +63,57 @@ class EditorAgent:
                 count=len(text_parts),
             )
         )
-
         return "\n\n".join(text_parts)
+
+    @staticmethod
+    def _format_task_text(task: RegionTask, text: str) -> str:
+        if task.agent_target != "editor" and text.startswith(FORMULA_SENTINEL):
+            return ensure_math_delimiters(text[len(FORMULA_SENTINEL):].strip())
+        if task.agent_target == "data" and task.classification == "formula":
+            return ensure_math_delimiters(text)
+        if task.agent_target != "editor" and region_has_markers(task.classification) and task.region is not None:
+            return apply_marker(text, task.classification, task.region)
+        return text
+
+    def execute_step(self, step_input: StepInput) -> StepOutput:
+        """Executes editor step for an Agno workflow."""
+        tasks: list[RegionTask] | None = None
+        results: dict[int, str] = {}
+
+        candidates = [step_input.input, step_input.previous_step_content, step_input.get_step_content("ReaderAgent")]
+        for src in candidates:
+            if isinstance(src, dict) and "tasks" in src:
+                tasks = src["tasks"]
+                results = src.get("results", {}) or results
+                break
+            if isinstance(src, list):
+                tasks = src
+                break
+
+        if tasks is None:
+            return StepOutput(content="", success=False, error="EditorAgent step received no tasks to consolidate")
+
+        try:
+            return StepOutput(content=self.consolidate_page(tasks=tasks, results=results), success=True)
+        except Exception as exc:
+            logger.error(f"EditorAgent step execution failed: {exc}")
+            return StepOutput(content="", success=False, error=str(exc))
+
+    def __call__(self, step_input: StepInput) -> StepOutput:
+        """Allows EditorAgent instance to be passed directly as an Agno workflow step."""
+        return self.execute_step(step_input)
+
+    def as_step(
+        self,
+        name: str = "EditorAgent",
+        description: str = "Consolidates and sanitizes text into accessible output",
+    ) -> Step:
+        """Wraps EditorAgent as an explicit Agno Step instance."""
+        return Step(name=name, description=description, executor=self.execute_step)
+
+
+def editor_step(step_input: StepInput) -> StepOutput:
+    """Module-level step function for EditorAgent in Agno workflows."""
+    return EditorAgent().execute_step(step_input)
+
+
