@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="{{ locale }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Download - Acessilia</title>
+    <title>{{ download_title }}</title>
     <link rel="icon" type="image/png" href="/static/logo.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
@@ -92,15 +92,15 @@
     <main class="container" role="main">
         <div class="card">
             <header class="card-header">
-                <h1 class="h4 mb-1">Download</h1>
-                <p class="mb-0 small opacity-75">Escolha o formato desejado</p>
+                <h1 class="h4 mb-1">{{ download_headline }}</h1>
+                <p class="mb-0 small opacity-75">{{ download_subhead }}</p>
             </header>
             <div class="card-body p-4">
                 <p class="mb-3 fw-semibold">{{ filename }}</p>
 
                 {% if not formats %}
                 <div class="alert alert-warning" role="alert">
-                    Nenhum formato disponível para este documento. O link pode ter expirado.
+                    {{ download_no_formats }}
                 </div>
                 {% else %}
                 <ul class="format-list">
@@ -119,12 +119,12 @@
                             </span>
                             <span class="info">
                                 <span class="name">
-                                    {% if f.ext == "txt" %}Texto (TXT)
-                                    {% elif f.ext == "docx" %}Documento Word (DOCX)
-                                    {% elif f.ext == "pdf" %}PDF Acessível
-                                    {% elif f.ext == "html" %}Página Web (HTML)
-                                    {% elif f.ext == "mp3" %}Audiodescrição (MP3)
-                                    {% elif f.ext == "zip" %}Pacote completo (ZIP)
+                                    {% if f.ext == "txt" %}{{ format_txt }}
+                                    {% elif f.ext == "docx" %}{{ format_docx }}
+                                    {% elif f.ext == "pdf" %}{{ format_pdf }}
+                                    {% elif f.ext == "html" %}{{ format_html }}
+                                    {% elif f.ext == "mp3" %}{{ format_mp3 }}
+                                    {% elif f.ext == "zip" %}{{ format_zip }}
                                     {% else %}{{ f.ext | upper }}
                                     {% endif %}
                                 </span>
@@ -138,12 +138,12 @@
                 {% endif %}
 
                 <p class="text-muted small mt-3 mb-0">
-                    Link válido por 7 dias.
+                    {{ download_valid_note }}
                 </p>
             </div>
         </div>
         <footer class="footer">
-            <p>&copy; 2026 Acessilia - Tecnologia para Inclusão</p>
+            <p>&copy; 2026 Acessilia - {{ footer }}</p>
         </footer>
     </main>
 

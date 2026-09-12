@@ -15,7 +15,15 @@ from backend.api.worker import (
 from backend.config.settings import settings
 from backend.services.queue_service import QueueItem, unified_queue
 from backend.tools.logger import logger
-from backend.tools.validators import validate_file
+from backend.i18n import t
+from backend.log_messages import (
+    API_CANCEL_STATE_INVALID,
+    API_JOB_QUEUED,
+    API_PROMPT_TOO_LONG,
+    API_TASK_NOT_FOUND,
+    LOG_API_JOB_ENQUEUED,
+)
+from backend.tools.validators import MSG_FILE_TOO_LARGE, validate_file
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -38,7 +46,7 @@ def _save_upload(upload: UploadFile) -> Path:
                 if total > settings.max_file_size_bytes:
                     raise HTTPException(
                         status_code=413,
-                        detail=f"Arquivo muito grande. Limite: {settings.max_file_size_mb} MB.",
+                        detail=t(MSG_FILE_TOO_LARGE).format(limit=settings.max_file_size_mb),
                     )
                 buffer.write(chunk)
     except Exception:
@@ -67,7 +75,7 @@ async def submit_job(
     if len(prompt) > MAX_CUSTOM_PROMPT_CHARS:
         raise HTTPException(
             status_code=400,
-            detail=f"Prompt personalizado excede o limite de {MAX_CUSTOM_PROMPT_CHARS} caracteres.",
+            detail=t(API_PROMPT_TOO_LONG).format(limit=MAX_CUSTOM_PROMPT_CHARS),
         )
 
     file_path = _save_upload(document_file)
@@ -92,11 +100,13 @@ async def submit_job(
     )
     position = await unified_queue.enqueue(item)
     register_queued_job(task_id, filename, position, source)
-    logger.info("API: job {} enfileirado (source={})", task_id, source)
+    logger.info(
+        t(LOG_API_JOB_ENQUEUED).format(task_id=task_id, source=source)
+    )
     return UploadResponse(
         task_id=task_id,
         position=position,
-        message=f"Arquivo na fila (Posição: {position}).",
+        message=t(API_JOB_QUEUED).format(position=position),
     )
 
 
@@ -105,7 +115,7 @@ async def submit_job(
 async def job_status(request: Request, task_id: str):
     job = get_job_status(task_id)
     if job is None:
-        raise HTTPException(status_code=404, detail="Tarefa não encontrada")
+        raise HTTPException(status_code=404, detail=t(API_TASK_NOT_FOUND))
     return JobStatus(
         task_id=job["task_id"],
         arquivo=job.get("arquivo", ""),
@@ -125,9 +135,9 @@ async def cancel_job(request: Request, task_id: str):
     if not cancel_job_status(task_id):
         job = get_job_status(task_id)
         if job is None:
-            raise HTTPException(status_code=404, detail="Tarefa não encontrada")
+            raise HTTPException(status_code=404, detail=t(API_TASK_NOT_FOUND))
         raise HTTPException(
             status_code=409,
-            detail=f"Tarefa não pode ser cancelada no estado atual: {job['status']}",
+            detail=t(API_CANCEL_STATE_INVALID).format(status=job["status"]),
         )
     return CancelResponse(task_id=task_id, status="cancelled")

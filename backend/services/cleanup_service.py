@@ -3,6 +3,15 @@ import asyncio
 import time
 from pathlib import Path
 
+from backend.i18n import t
+from backend.log_messages import (
+    LOG_CLEANUP_ITEM_FAILED,
+    LOG_CLEANUP_OUTPUT_FAILED,
+    LOG_CLEANUP_PERIODIC_ERROR,
+    LOG_OUTPUT_DIR_REMOVED,
+    LOG_TEMP_DIR_REMOVED,
+    LOG_TEMP_FILE_REMOVED,
+)
 from backend.tools.logger import logger
 from backend.agents.state_manager import state_manager
 from backend.config.settings import settings
@@ -27,12 +36,21 @@ async def periodic_cleanup() -> None:
             _clean_in_memory_statuses()
             await limpar_tokens_expirados()
         except Exception:
-            logger.exception("Erro na limpeza periódica")
+            logger.exception(t(LOG_CLEANUP_PERIODIC_ERROR))
         await asyncio.sleep(CLEANUP_INTERVAL)
 
 
 def _is_stale(path: Path, now: float, max_age: int) -> bool:
-    """Verifica se o arquivo/diretório está inativo há mais que max_age."""
+    """Check whether the file/directory has been inactive for longer than max_age.
+
+    Args:
+        path (Path): File or directory path whose freshness is tested.
+        now (float): Current epoch timestamp the age is computed against.
+        max_age (int): Maximum acceptable idle age in seconds before the path counts as stale.
+
+    Returns:
+        bool: True when the path has been idle for longer than max_age with no recent children inside it (for directories), False otherwise.
+    """
     try:
         if path.is_file():
             return (now - path.stat().st_mtime) > max_age
@@ -40,7 +58,7 @@ def _is_stale(path: Path, now: float, max_age: int) -> bool:
             dir_age = now - path.stat().st_mtime
             if dir_age <= max_age:
                 return False
-            # Verifica se há arquivos recentes dentro do diretório
+            # Check for any recently-modified files nested in the directory.
             for child in path.rglob("*"):
                 if child.is_file() and (now - child.stat().st_mtime) <= max_age:
                     return False
@@ -82,7 +100,7 @@ def _clean_temp_directory() -> None:
 
 
 def _clean_output_directory() -> None:
-    """Remove diretorios de output antigos (outputs de jobs expirados)."""
+    """Remove stale output directories (outputs from expired jobs)."""
     output_dir = settings.data_dir / "output"
     if not output_dir.exists():
         return
@@ -92,9 +110,11 @@ def _clean_output_directory() -> None:
         if item.is_dir() and _is_stale(item, now, OUTPUT_MAX_AGE):
             try:
                 shutil.rmtree(item, ignore_errors=True)
-                logger.debug("Diretorio de output removido: {}", item.name)
+                logger.debug(t(LOG_OUTPUT_DIR_REMOVED).format(name=item.name))
             except Exception as e:
-                logger.warning("Falha ao remover output {}: {}", item.name, e)
+                logger.warning(
+                    t(LOG_CLEANUP_OUTPUT_FAILED).format(name=item.name, error=e)
+                )
 
 
 def _clean_in_memory_statuses() -> None:

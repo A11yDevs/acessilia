@@ -5,6 +5,9 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from backend.i18n import t
+from backend.log_messages import MSG_PLANNER_NOT_STARTED
+
 
 SCHEMA_VERSION = "1.1.0"
 SCHEMA_ID = "urn:a11y-devs:schema:processing-manifest:1.1.0"
@@ -113,7 +116,7 @@ class ObligationAttempt(StrictModel):
     @model_validator(mode="after")
     def validate_interval(self) -> "ObligationAttempt":
         if self.completed_at < self.started_at:
-            raise ValueError("A tentativa terminou antes de começar")
+            raise ValueError(t(MSG_PLANNER_NOT_STARTED))
         return self
 
 

@@ -1,0 +1,1726 @@
+# Portuguese (Brazil) translations for PROJECT.
+# Copyright (C) 2026 ORGANIZATION
+# This file is distributed under the same license as the PROJECT project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-09-11 02:55-0400\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: pt_BR\n"
+"Language-Team: pt_BR <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+msgid "Processing your document…"
+msgstr "Processando seu documento…"
+
+msgid "Job complete: your file is ready for download"
+msgstr "Tarefa concluída: o arquivo está pronto para download"
+
+msgid ""
+"Unsupported file format. Send PDF, DOCX, HTML, PNG, JPG, TIFF, BMP or "
+"WEBP."
+msgstr ""
+"Formato de arquivo não suportado. Envie PDF, DOCX, HTML, PNG, JPG, TIFF, "
+"BMP ou WEBP."
+
+#, python-brace-format
+msgid "File too large. Limit: {limit} MB."
+msgstr "Arquivo muito grande. Limite: {limit} MB."
+
+#, python-brace-format
+msgid "Waiting in the queue (Position: {position})"
+msgstr "Aguardando na fila (Posição: {position})"
+
+msgid "Cancelled before it reached the processing queue"
+msgstr "Cancelado antes de entrar na fila de processamento"
+
+msgid "Queued and waiting..."
+msgstr "Enfileirado, aguardando..."
+
+msgid "Preparing your file..."
+msgstr "Preparando o seu arquivo..."
+
+msgid "📄 Analyzing your document..."
+msgstr "📄 Analisando o seu documento..."
+
+msgid "Processing your file with the AI..."
+msgstr "Processando o seu arquivo com a IA..."
+
+msgid "✅ Processing finished successfully!"
+msgstr "✅ Processamento concluído com sucesso!"
+
+msgid "❌ Could not process the file."
+msgstr "❌ Não foi possível processar o arquivo."
+
+msgid "Exporting the plain text version (TXT)..."
+msgstr "Exportando a versão em texto puro (TXT)..."
+
+msgid "Exporting the accessible Word document (DOCX)..."
+msgstr "Exportando o documento Word acessível (DOCX)..."
+
+msgid "Exporting the PDF..."
+msgstr "Exportando o PDF..."
+
+msgid "Exporting the tagged accessible PDF/UA..."
+msgstr "Exportando o PDF/UA acessível com marcações..."
+
+msgid "Exporting the semantic HTML version..."
+msgstr "Exportando a versão em HTML semântico..."
+
+#, python-brace-format
+msgid "Generating the spoken audio version... {percent}%"
+msgstr "Gerando a versão em áudio falado... {percent}%"
+
+msgid "Processing completed"
+msgstr "Processamento concluído"
+
+msgid "Processing failed"
+msgstr "Falha no processamento"
+
+msgid "Cancelled by the user"
+msgstr "Cancelado pelo usuário"
+
+msgid "📄 Splitting the PDF into pages..."
+msgstr "📄 Separando o PDF em páginas..."
+
+msgid "🖼️ Preparing the image..."
+msgstr "🖼️ Preparando a imagem..."
+
+#, python-brace-format
+msgid "📷 Processing page {page_num} of {total_pages}..."
+msgstr "📷 Processando a página {page_num} de {total_pages}..."
+
+msgid "Analyzing the document with the structural agent..."
+msgstr "Analisando o documento com o agente estrutural..."
+
+msgid "Enriching the image descriptions..."
+msgstr "Enriquecendo as descrições de imagens..."
+
+msgid "Enriching the tables with OCR (fallback)..."
+msgstr "Enriquecendo as tabelas com OCR (fallback)..."
+
+msgid "Generating the nominal PDDL plan..."
+msgstr "Gerando o plano nominal com PDDL..."
+
+msgid "Validating the plan in dry-run mode..."
+msgstr "Validando o plano em modo dry-run..."
+
+msgid "Please provide an e-mail address: /email you@example.com"
+msgstr "Por favor, informe o e-mail: /email seu@email.com"
+
+#, python-brace-format
+msgid ""
+"E-mail {email} configured! Now send your document and it will be "
+"delivered to this e-mail address."
+msgstr ""
+"E-mail {email} configurado! Agora envie o documento para ser enviado para"
+" este e-mail."
+
+msgid ""
+"Hello! Send a PDF, image or scanned document.\n"
+"\n"
+"You'll get back an accessible version for screen readers.\n"
+"\n"
+"Accepted formats: PDF, PNG, JPG, TIFF, BMP, WEBP"
+msgstr ""
+"Olá! Envie um PDF, imagem ou documento escaneado.\n"
+"\n"
+"Enviarei de volta uma versão acessível para leitores de tela.\n"
+"\n"
+"Formatos aceitos: PDF, PNG, JPG, TIFF, BMP, WEBP"
+
+msgid ""
+"Available commands:\n"
+"\n"
+"🔧 General:\n"
+"/start - Start the bot\n"
+"/help - Show this message\n"
+"/formats - List supported input and output formats\n"
+"\n"
+"🎨 Description modes:\n"
+"/detailed - Maximum detail: typography, colors, layout, element positions"
+"\n"
+"/medium - Full text + clear image descriptions (default)\n"
+"/low - Content focused: full text extraction + concise image description "
+"(faster)\n"
+"/normal - Equivalent to /medium\n"
+"/ocr - Text extraction only, no visual description\n"
+"\n"
+"⚙️ Control:\n"
+"/status - Inspect processing queue and in-progress task progress\n"
+"/cancel - Cancel a running task\n"
+"/deactivate - Disable the bot for this chat\n"
+"/activate - Re-enable the bot for this chat\n"
+"/health - Check system health (server, model, disk)\n"
+"/feedback - Send your opinion about processing quality\n"
+"\n"
+"Just send a file and I'll process it automatically."
+msgstr ""
+"Comandos disponíveis:\n"
+"\n"
+"🔧 Gerais:\n"
+"/start - Iniciar o bot\n"
+"/ajuda ou /help - Mostrar esta mensagem\n"
+"/formatos - Listar formatos de entrada e saída suportados\n"
+"\n"
+"🎨 Modos de Descrição:\n"
+"/detalhado - Máximo detalhe: tipografia, cores, layout, posição de "
+"elementos\n"
+"/medio - Texto completo + descrição clara de imagens (padrão)\n"
+"/baixo - Foco no conteúdo: texto + descrição concisa (mais rápido)\n"
+"/normal - Equivalente ao /medio\n"
+"/ocr - Apenas extração de texto, sem descrição visual\n"
+"\n"
+"⚙️ Controle:\n"
+"/status - Mostra o andamento da tarefa em processamento\n"
+"/cancelar - Cancelar tarefa em andamento\n"
+"/desativar - Desativar o bot neste chat\n"
+"/ativar - Reativar o bot neste chat\n"
+"/health - Verificar status do sistema (servidor, modelo, disco)\n"
+"/feedback - Enviar opinião sobre a qualidade do processamento\n"
+"\n"
+"Basta enviar um arquivo que eu processo automaticamente."
+
+msgid ""
+"Accepted input formats:\n"
+"• PDF (scanned or digital)\n"
+"• PNG, JPG, JPEG\n"
+"• TIFF, TIF\n"
+"• BMP\n"
+"• WEBP\n"
+"\n"
+"Output formats available:\n"
+"• Structured TXT\n"
+"• Accessible DOCX\n"
+"• Semantic HTML\n"
+"• Markdown\n"
+"• Searchable PDF"
+msgstr ""
+"Formatos de entrada aceitos:\n"
+"• PDF (escaneado ou digital)\n"
+"• PNG, JPG, JPEG\n"
+"• TIFF, TIF\n"
+"• BMP\n"
+"• WEBP\n"
+"\n"
+"Formatos de saída disponíveis:\n"
+"• TXT estruturado\n"
+"• DOCX acessível\n"
+"• HTML semântico\n"
+"• Markdown\n"
+"• PDF pesquisável"
+
+msgid "📄 File received!"
+msgstr "📄 Arquivo recebido!"
+
+msgid "📷 Photo received!"
+msgstr "📷 Foto recebida!"
+
+msgid "Downloading file..."
+msgstr "Baixando arquivo..."
+
+#, python-brace-format
+msgid "❌ Error submitting the file for processing ({status_code}): {detail}"
+msgstr "❌ Erro ao enviar o arquivo para processamento ({status_code}): {detail}"
+
+msgid "❌ Could not contact the processing server. Try again."
+msgstr "❌ Não foi possível contatar o servidor de processamento. Tente novamente."
+
+#, python-brace-format
+msgid "Task {task_id} queued..."
+msgstr "Tarefa {task_id} enfileirada..."
+
+#, python-brace-format
+msgid "⏳ You are in the queue (Position: {position})."
+msgstr "⏳ Você está na fila única (Posição: {position})."
+
+#, python-brace-format
+msgid "Waiting in queue... {step}"
+msgstr "Aguardando na fila... {step}"
+
+#, python-brace-format
+msgid "✅ Download link sent to {email}!"
+msgstr "✅ Link de download enviado para {email}!"
+
+#, python-brace-format
+msgid ""
+"✅ Accessible package generated!\n"
+"\n"
+"📥 Download link (valid for 7 days):\n"
+"{url}"
+msgstr ""
+"✅ Pacote acessível gerado!\n"
+"\n"
+"📥 Link para download (válido por 7 dias):\n"
+"{url}"
+
+msgid "❌ Error processing the file. Try again."
+msgstr "❌ Erro ao processar o arquivo. Tente novamente."
+
+msgid "❌ Processing error."
+msgstr "❌ Erro no processamento."
+
+msgid "🚫 Task cancelled."
+msgstr "🚫 Tarefa cancelada."
+
+msgid "⏰ Processing took longer than expected. Use /status to follow progress."
+msgstr ""
+"⏰ O processamento demorou mais que o esperado. Use /status para "
+"acompanhar."
+
+msgid ""
+"📄 OCR Mode On!\n"
+"\n"
+"Send a PDF or image and I shall extract ONLY the written text, without "
+"visual description."
+msgstr ""
+"📄 Modo OCR ativado!\n"
+"\n"
+"Envie um PDF ou imagem e extrairei APENAS o texto, sem descrição visual. "
+"Ideal para documentos de texto puro."
+
+msgid ""
+"🔍 Detailed Mode On!\n"
+"\n"
+"Description at the highest detail level: typography, spacing, colors, "
+"layout, element positions and a professional image description."
+msgstr ""
+"🔍 Modo Detalhado ativado!\n"
+"\n"
+"Descrição no maior nível de detalhe: tipografia, espaçamento, cores, "
+"layout, posição dos elementos e uma descrição profissional das imagens."
+
+msgid ""
+"📋 Medium Mode on!\n"
+"\n"
+"Full text plus clear image descriptions. Ideal for most documents."
+msgstr ""
+"📋 Modo Médio ativado!\n"
+"\n"
+"Texto completo com descrições claras de imagens. Ideal para a maioria dos"
+" documentos."
+
+msgid ""
+"⚡ Low Mode on!\n"
+"\n"
+"Focused on content: the full text extracted and a concise description of "
+"images. Faster."
+msgstr ""
+"⚡ Modo Baixo ativado!\n"
+"\n"
+"Focado no conteúdo: texto integral extraído e descrição concisa das "
+"imagens. Mais rápido."
+
+msgid ""
+"📋 Normal Mode on (equivalent to Medium).\n"
+"\n"
+"Full text plus clear image descriptions."
+msgstr ""
+"📋 Modo Normal ativado (equivalente ao Médio).\n"
+"\n"
+"Texto completo com descrições claras de imagens."
+
+msgid "No task registered in this chat yet."
+msgstr "Nenhuma tarefa registrada neste chat ainda."
+
+msgid "No task in this chat."
+msgstr "Nenhuma tarefa neste chat."
+
+#, python-brace-format
+msgid ""
+"{icon} Task `{task_id}` - {filename}\n"
+"{pct}% - {stage}"
+msgstr ""
+"{icon} Tarefa `{task_id}` - {filename}\n"
+"{pct}% - {stage}"
+
+#, python-brace-format
+msgid "❌ Task not found in API ({status_code})."
+msgstr "❌ Tarefa não encontrada na API ({status_code})."
+
+#, python-brace-format
+msgid "✅ Ollama: online ({model_count} model(s))"
+msgstr "✅ Ollama: online ({model_count} modelo(s))"
+
+#, python-brace-format
+msgid "⚠️ Ollama: unexpected answer ({code})"
+msgstr "⚠️ Ollama: resposta inesperada ({code})"
+
+#, python-brace-format
+msgid "❌ Ollama: offline ({error})"
+msgstr "❌ Ollama: offline ({error})"
+
+#, python-brace-format
+msgid "🤖 Model: {model}"
+msgstr "🤖 Modelo: {model}"
+
+msgid "✅ Temp dir: ok"
+msgstr "✅ Pasta temporária: ok"
+
+msgid "⚠️ Temp dir: missing"
+msgstr "⚠️ Pasta temporária: ausente"
+
+#, python-brace-format
+msgid "🧹 Cache cleared! {count} file(s) removed."
+msgstr "🧹 Cache limpo! {count} arquivo(s) removido(s)."
+
+#, python-brace-format
+msgid "💾 Free disk: {free_gb:.1f} GB"
+msgstr "💾 Disco livre: {free_gb:.1f} GB"
+
+msgid "No active task in this chat to cancel."
+msgstr "Nenhuma tarefa ativa neste chat para cancelar."
+
+#, python-brace-format
+msgid "✅ Task {task_id} cancelled."
+msgstr "✅ Tarefa {task_id} cancelada."
+
+#, python-brace-format
+msgid "❌ Could not cancel the task ({status_code}): {detail}"
+msgstr "❌ Não foi possível cancelar a tarefa ({status_code}): {detail}"
+
+msgid "Bot disabled in this chat. Use /activate to re-enable it."
+msgstr "Bot desativado neste chat. Use /ativar para reativá-lo."
+
+msgid "Bot re-enabled! Send me a document to get started."
+msgstr "Bot reativado! Envie um documento para começar."
+
+msgid ""
+"📝 **Send Feedback**\n"
+"\n"
+"Type your opinion on processing quality, improvement suggestions or "
+"issues you encountered.\n"
+"\n"
+"Example:\n"
+"\"The image description came out great but the extracted text had a few "
+"errors.\"\n"
+"\n"
+"Your feedback is very important to us!"
+msgstr ""
+"📝 **Enviar Feedback**\n"
+"\n"
+"Digite sua opinião sobre a qualidade do processamento, sugestões de "
+"melhoria ou problemas encontrados.\n"
+"\n"
+"Exemplo:\n"
+"“A descrição da imagem ficou ótima mas o texto extraído teve alguns "
+"erros.”\n"
+"\n"
+"Seu feedback é muito importante para nós!"
+
+msgid "✅ Feedback received! Thanks for your contribution."
+msgstr "✅ Feedback recebido! Obrigado pela contribuição."
+
+msgid "Task not found"
+msgstr "Tarefa não encontrada"
+
+#, python-brace-format
+msgid "Task cannot be cancelled in its current state: {status}"
+msgstr "A tarefa não pode ser cancelada no estado atual: {status}"
+
+#, python-brace-format
+msgid "File queued (Position: {position})."
+msgstr "Arquivo na fila (Posição: {position})."
+
+#, python-brace-format
+msgid "The custom prompt exceeds the limit of {limit} characters."
+msgstr "Prompt personalizado excede o limite de {limit} caracteres."
+
+msgid "The download link is invalid or has expired"
+msgstr "Link inválido ou expirado"
+
+msgid "Invalid format"
+msgstr "Formato inválido"
+
+msgid "File not found"
+msgstr "Arquivo não encontrado"
+
+msgid "The image must receive a description or be marked decorative."
+msgstr "A imagem deve receber descrição ou ser marcada como decorativa."
+
+msgid "The table must have verifiable headers and reading order."
+msgstr "A tabela deve ter cabeçalhos e ordem de leitura verificáveis."
+
+msgid ""
+"The formula must carry an accessible mathematical representation plus "
+"verbalization."
+msgstr "A fórmula deve possuir representação matemática acessível e verbalização."
+
+msgid "The code block must preserve indentation, language and literal reading."
+msgstr "O bloco de código deve preservar indentação, linguagem e leitura literal."
+
+msgid "Unrecognized elements require structural inspection."
+msgstr "O elemento não classificado requer inspeção estrutural."
+
+#, python-brace-format
+msgid "Title hierarchy jumps from level {previous} to level {level}."
+msgstr "A hierarquia de títulos salta do nível {previous} para o nível {level}."
+
+#, python-brace-format
+msgid "Document not found: {source_path}"
+msgstr "Documento não encontrado: {source_path}"
+
+#, python-brace-format
+msgid "Source file not found: {source_path}"
+msgstr "Arquivo de origem não encontrado: {source_path}"
+
+msgid "Docling is not installed. Run `poetry install` or `pip install docling`."
+msgstr ""
+"Docling não está instalado. Execute `poetry install` ou `pip install "
+"docling`."
+
+msgid ""
+"Incompatible structurer: expected convert_document() or "
+"_process_document()."
+msgstr ""
+"Structurer incompatível: esperado convert_document() ou "
+"_process_document()."
+
+msgid "Method name cannot be empty"
+msgstr "O nome do método não pode ser vazio"
+
+msgid "The plan uses a different PDDL domain"
+msgstr "O plano usa outro domínio PDDL"
+
+msgid "The plan's domain version is incompatible"
+msgstr "A versão do domínio do plano é incompatível"
+
+msgid "domain.pddl was changed after planning"
+msgstr "O domain.pddl foi alterado depois do planejamento"
+
+msgid "The domain description was changed after planning"
+msgstr "A descrição do domínio foi alterada depois do planejamento"
+
+msgid "The plan belongs to another manifest"
+msgstr "O plano pertence a outro manifesto"
+
+#, python-brace-format
+msgid ""
+"Divergent revision between plan and manifest: {plan_revision} != "
+"{manifest_revision}"
+msgstr ""
+"Revisão divergente entre plano e manifesto: {plan_revision} != "
+"{manifest_revision}"
+
+msgid "The manifest was changed after plan generation"
+msgstr "O manifesto foi alterado depois da geração do plano"
+
+#, python-brace-format
+msgid "The plan selects non-existent obligations: {unknown}"
+msgstr "O plano seleciona obrigações inexistentes: {unknown}"
+
+#, python-brace-format
+msgid "start-job invalid in state {status}"
+msgstr "start-job inválido no estado {status}"
+
+#, python-brace-format
+msgid "Non-existent obligation: {obligation_id}"
+msgstr "Obrigação inexistente: {obligation_id}"
+
+msgid "Simulated execution; no effect was persisted"
+msgstr "Execução simulada; nenhum efeito foi persistido"
+
+#, python-brace-format
+msgid "No handler registered for {method}"
+msgstr "Nenhum handler registrado para {method}"
+
+msgid "Result rejected by the validator"
+msgstr "Resultado rejeitado pelo validador"
+
+#, python-brace-format
+msgid "Selected obligations not satisfied: {unsatisfied}"
+msgstr "Obrigações selecionadas não satisfeitas: {unsatisfied}"
+
+#, python-brace-format
+msgid "Unknown action: {action}"
+msgstr "Ação desconhecida: {action}"
+
+msgid "The job is not in processing"
+msgstr "O job não está em processamento"
+
+#, python-brace-format
+msgid "Obligation not selected: {obligation_id}"
+msgstr "Obrigação não selecionada: {obligation_id}"
+
+#, python-brace-format
+msgid "Obligation already satisfied: {obligation_id}"
+msgstr "Obrigação já satisfeita: {obligation_id}"
+
+msgid "Obligation type diverges from the plan"
+msgstr "Tipo da obrigação diverge do plano"
+
+#, python-brace-format
+msgid "Method not admissible: {method}"
+msgstr "Método não admissível: {method}"
+
+#, python-brace-format
+msgid "Method already tried: {method}"
+msgstr "Método já tentado: {method}"
+
+#, python-brace-format
+msgid "Unsatisfied predecessors for {obligation_id}: {unsatisfied}"
+msgstr "Predecessoras não satisfeitas para {obligation_id}: {unsatisfied}"
+
+msgid "The trial ended before starting"
+msgstr "A tentativa terminou antes de começar"
+
+msgid ""
+"The execute-obligation action requires obligation_id, obligation_kind and"
+" method"
+msgstr "execute-obligation exige obligation_id, obligation_kind e method"
+
+#, python-brace-format
+msgid "{action} does not accept obligation or method parameters"
+msgstr "{action} não aceita parâmetros de obrigação ou método"
+
+msgid "Plan step indices must be contiguous whole numbers starting at zero"
+msgstr "Índices do plano devem ser contíguos e iniciar em zero"
+
+msgid "A nominal plan must end with the complete-job action"
+msgstr "O plano nominal deve terminar com complete-job"
+
+#, python-brace-format
+msgid ""
+"Declared expected_total_cost={declared}; plan steps sum to expected cost "
+"{calculated}"
+msgstr ""
+"expected_total_cost={declared}; o custo somado das etapas do plano é "
+"{calculated}"
+
+msgid "A nominal plan contains an obligation that was not selected"
+msgstr "O plano contém obrigação não selecionada"
+
+msgid ""
+"A solver outcome marked as ended before execution began cannot carry plan"
+" details"
+msgstr ""
+"Um resultado marcado como resolvido exige plano completo com identidade "
+"de documento"
+
+msgid ""
+"Marking a planner outcome as solved requires its computed solution to "
+"have passed validation"
+msgstr "Um resultado definido como resolvido deve ter a validação aprovada"
+
+msgid "Solving a planner outcome cannot also hold recorded error information"
+msgstr ""
+"Um resultado definido como resolvido não pode conter valores de erro "
+"preenchidos"
+
+msgid "A planner outcome marked as failed requires an error type and message"
+msgstr ""
+"Um resultado marcado como falha exige um tipo de erro junto com sua "
+"mensagem descritiva"
+
+msgid ""
+"A planner outcome marked as failed cannot simultaneously record "
+"successful validation"
+msgstr "Um resultado marcado como falha não pode passar na validação à mesma tempo"
+
+msgid ""
+"Planning comparisons must contain results from both the internal planner "
+"and Fast Downward"
+msgstr ""
+"A comparação deve conter os resultados de ambos os planejadores, interno "
+"e Fast Downward"
+
+#, python-brace-format
+msgid "Outcome key {key} does not match recorded planner backend {backend}"
+msgstr ""
+"A chave {key} diverge do backend registrado como {backend} nesse par de "
+"resultados"
+
+msgid ""
+"Normalized comparison between the internal planner and Fast Downward "
+"executions of one planning problem"
+msgstr ""
+"Comparação normalizada entre as execuções do planejador interno e o Fast "
+"Downward de um único problema"
+
+msgid ""
+"Nominal plan derived from the processing manifest and PDDL domain of "
+"Acessilia; effects are confirmed only after executed by an executor"
+msgstr ""
+"Plano nominal derivado do manifesto de processamento e o domínio PDDL do "
+"Acessilia"
+
+msgid ""
+"A method result claimed as successful must also have passed its "
+"validation gate"
+msgstr ""
+"Um resultado de método reivindicado como bem-sucedido também deve ter "
+"passado na sua validação"
+
+msgid "The method result contains duplicate artifact identifiers"
+msgstr "O resultado do método contém identificadores de artefatos duplicados"
+
+msgid ""
+"Report of the execution of a nominal plan over one manifest, with per-"
+"step method results and collected artifacts"
+msgstr ""
+"Relatório da execução de um plano nominal sobre um manifesto, com "
+"resultados por passo e artefatos coletados"
+
+msgid "✅ Conversion complete!"
+msgstr "✅ Conversão concluída!"
+
+msgid "❌ Error during processing."
+msgstr "❌ Erro durante o processamento."
+
+msgid "Canonical document must be a JSON object."
+msgstr "Documento canônico deve ser um objeto JSON."
+
+#, python-brace-format
+msgid "Required field missing: {field}"
+msgstr "Campo obrigatório ausente: {field}"
+
+msgid "The sections field must be a list."
+msgstr "Campo sections deve ser uma lista."
+
+#, python-brace-format
+msgid "Duplicate internal id: {block_id}"
+msgstr "ID interno duplicado: {block_id}"
+
+#, python-brace-format
+msgid "Possible prompt leak in {block_id}"
+msgstr "Possível vazamento de prompt em {block_id}"
+
+#, python-brace-format
+msgid "Improper markdown in {block_id}"
+msgstr "Markdown indevido em {block_id}"
+
+#, python-brace-format
+msgid "Inconsistent code indentation in {block_id}"
+msgstr "Indentação de código inconsistente em {block_id}"
+
+msgid "The document must have only one main H1 heading."
+msgstr "O documento deve ter apenas um H1 principal."
+
+msgid "The document must start with a main H1 heading."
+msgstr "O documento deve começar com um H1 principal."
+
+msgid "Heading hierarchy skips levels improperly."
+msgstr "Hierarquia de headings salta níveis indevidamente."
+
+#, python-brace-format
+msgid "Internal link points to a nonexistent id: {link}"
+msgstr "Link interno aponta para ID inexistente: {link}"
+
+#, python-brace-format
+msgid "Unknown export profile: {profile_name}"
+msgstr "Perfil de exportação desconhecido: {profile_name}"
+
+#, python-brace-format
+msgid "Block {block_id} not allowed in profile {profile_name}"
+msgstr "Bloco {block_id} não permitido no perfil {profile_name}"
+
+msgid "Possible prompt leak in the final output."
+msgstr "Possível vazamento de prompt na saída final."
+
+msgid "Improper markdown in the final output."
+msgstr "Markdown indevido na saída final."
+
+msgid "Technical metadata must not appear in TXT."
+msgstr "Metadados técnicos não devem aparecer no TXT."
+
+#, python-brace-format
+msgid "Image {block_id} has no alt-text."
+msgstr "Imagem {block_id} sem alt-text."
+
+#, python-brace-format
+msgid "Table {table_id} has no explicit header; review header inference."
+msgstr "Tabela {table_id} sem header explícito; revisar inferência de cabeçalhos."
+
+#, python-brace-format
+msgid "Table {table_id} has no table_ast; using legacy row fallback."
+msgstr "Tabela {table_id} sem table_ast; usando fallback legado por linhas."
+
+msgid "Document has no sections."
+msgstr "Documento sem seções."
+
+msgid "(no-id)"
+msgstr "(sem-id)"
+
+#, python-brace-format
+msgid "Empty table in {block_id}"
+msgstr "Tabela vazia em {block_id}"
+
+#, python-brace-format
+msgid "Table with invalid rows in {block_id}"
+msgstr "Tabela com rows inválidas em {block_id}"
+
+#, python-brace-format
+msgid "Table with invalid row in {block_id} (row {row_index})"
+msgstr "Tabela com linha inválida em {block_id} (row {row_index})"
+
+#, python-brace-format
+msgid "Table with inconsistent columns in {block_id} (row {row_index})"
+msgstr "Tabela com colunas inconsistentes em {block_id} (row {row_index})"
+
+#, python-brace-format
+msgid ""
+"Table with non-textual cell in {block_id} (row {row_index}, col "
+"{col_index})"
+msgstr ""
+"Tabela com célula não textual em {block_id} (row {row_index}, col "
+"{col_index})"
+
+#, python-brace-format
+msgid "Table with empty cell in {block_id} (row {row_index}, col {col_index})"
+msgstr "Tabela com célula vazia em {block_id} (row {row_index}, col {col_index})"
+
+#, python-brace-format
+msgid "Invalid table_ast in {block_id}"
+msgstr "table_ast inválido em {block_id}"
+
+#, python-brace-format
+msgid "table_ast without body in {block_id}"
+msgstr "table_ast sem body em {block_id}"
+
+#, python-brace-format
+msgid "table_ast.{section_name} invalid in {block_id}"
+msgstr "table_ast.{section_name} inválido em {block_id}"
+
+#, python-brace-format
+msgid "table_ast.{section_name}[{row_index}] invalid in {block_id}"
+msgstr "table_ast.{section_name}[{row_index}] inválido em {block_id}"
+
+#, python-brace-format
+msgid "table_ast.{section_name}[{row_index}] without cells in {block_id}"
+msgstr "table_ast.{section_name}[{row_index}] sem cells em {block_id}"
+
+#, python-brace-format
+msgid ""
+"table_ast invalid cell in {block_id} ({section_name} "
+"{row_index}:{col_index})"
+msgstr ""
+"table_ast célula inválida em {block_id} ({section_name} "
+"{row_index}:{col_index})"
+
+#, python-brace-format
+msgid ""
+"table_ast cell without text in {block_id} ({section_name} "
+"{row_index}:{col_index})"
+msgstr ""
+"table_ast célula sem texto em {block_id} ({section_name} "
+"{row_index}:{col_index})"
+
+#, python-brace-format
+msgid ""
+"table_ast.{section_name} with inconsistent width in {block_id} (row "
+"{row_index})"
+msgstr ""
+"table_ast.{section_name} com largura inconsistente em {block_id} (row "
+"{row_index})"
+
+msgid "Accessible document"
+msgstr "Documento acessível"
+
+msgid "pandoc not found on PATH"
+msgstr "pandoc não encontrado no PATH"
+
+#, python-brace-format
+msgid "pandoc failed ({to_format}): {stderr}"
+msgstr "pandoc falhou ({to_format}): {stderr}"
+
+msgid ""
+"pandoc not found on PATH. The pdf_ua format requires pandoc plus a LaTeX "
+"engine."
+msgstr ""
+"pandoc não encontrado no PATH. O formato pdf_ua exige pandoc + engine "
+"LaTeX."
+
+msgid ""
+"No LaTeX engine found on PATH. The pdf_ua format requires lualatex or "
+"xelatex."
+msgstr ""
+"Nenhuma engine LaTeX encontrada no PATH. O formato pdf_ua exige lualatex "
+"ou xelatex."
+
+#, python-brace-format
+msgid "PDF/UA template not found: {template_path}"
+msgstr "Template PDF/UA não encontrado: {template_path}"
+
+#, python-brace-format
+msgid "Audit failed: {findings}"
+msgstr "Auditoria falhou: {findings}"
+
+#, python-brace-format
+msgid "Unsupported export format: {format_name}"
+msgstr "Formato de exportação não suportado: {format_name}"
+
+msgid "Contents"
+msgstr "Sumário"
+
+msgid "Technical metadata"
+msgstr "Metadados técnicos"
+
+msgid "Image description"
+msgstr "Descrição da imagem"
+
+msgid "Note"
+msgstr "Nota"
+
+msgid "Warning"
+msgstr "Aviso"
+
+#, python-brace-format
+msgid "Table: {caption}"
+msgstr "Tabela: {caption}"
+
+#, python-brace-format
+msgid "Row {row_index}: {joined}"
+msgstr "Linha {row_index}: {joined}"
+
+#, python-brace-format
+msgid "Footer: {footer_text}"
+msgstr "Rodapé: {footer_text}"
+
+msgid "Accessibility Panel - Acessilia"
+msgstr "Painel de Acessibilidade - Acessilia"
+
+msgid "Acessia Bot - Accessibility Generator"
+msgstr "Bot Acess - Gerador de Acessibilidade"
+
+msgid "Convert your documents into accessible formats and receive them by e-mail."
+msgstr "Converta seus documentos em formatos acessíveis e receba-os por e-mail."
+
+msgid "Your E-mail"
+msgstr "Seu E-mail"
+
+msgid "We will send the final files to this address."
+msgstr "Enviaremos o arquivo final para este endereço."
+
+msgid "Attach a Document (PDF or Image)"
+msgstr "Anexar Documento (PDF ou Imagem)"
+
+msgid "Make Accessible"
+msgstr "Tornar Acessível"
+
+msgid "Advanced Mode"
+msgstr "Modo Avançado"
+
+msgid "Advanced Mode - Acessilia"
+msgstr "Modo Avançado - Acessilia"
+
+msgid "Custom Prompt"
+msgstr "Prompt Personalizado"
+
+msgid "Customize the prompt sent to the AI model."
+msgstr "Personalize o prompt enviado ao modelo de IA."
+
+msgid ""
+"Type your custom prompt here. It will completely replace the system's "
+"default prompt."
+msgstr ""
+"Digite seu prompt personalizado aqui. Ele substituirá completamente o "
+"prompt padrão do sistema."
+
+msgid ""
+"Up to 6000 characters. Plain text only (no formatting). This prompt "
+"replaces the system's default prompt on every page."
+msgstr ""
+"Máximo de 6000 caracteres. Texto puro apenas (sem formatação). Este "
+"prompt substitui o prompt padrão do sistema para todas as páginas."
+
+msgid "Enable Thinking Mode (the model's internal reasoning)"
+msgstr "Ativar Modo Pensamento (raciocínio interno do modelo)"
+
+msgid "Back to normal mode"
+msgstr "Voltar ao modo normal"
+
+msgid "Download - Acessilia"
+msgstr "Download - Acessilia"
+
+msgid "Download"
+msgstr "Download"
+
+msgid "Choose the format you want"
+msgstr "Escolha o formato desejado"
+
+msgid "No formats available for this document. The link may have expired."
+msgstr "Nenhum formato disponível para este documento. O link pode ter expirado."
+
+msgid "Link valid for 7 days."
+msgstr "Link válido por 7 dias."
+
+msgid "Text (TXT)"
+msgstr "Texto (TXT)"
+
+msgid "Word Document (DOCX)"
+msgstr "Documento Word (DOCX)"
+
+msgid "Accessible PDF"
+msgstr "PDF Acessível"
+
+msgid "Web Page (HTML)"
+msgstr "Página Web (HTML)"
+
+msgid "Audio Description (MP3)"
+msgstr "Audiodescrição (MP3)"
+
+msgid "Complete Package (ZIP)"
+msgstr "Pacote completo (ZIP)"
+
+msgid ""
+"Logo featuring the name \"acessilia\" prominently at the top. Above the "
+"wordmark a blue circle blends two images: on the left a rounded document "
+"carrying a photo icon at its top and a spreadsheet-style grid at its "
+"bottom; on the right a human head profile facing right, also blue. Three "
+"curved lines leave the mouth area, suggesting speech or sound. To the "
+"left of the document, rows of small circular dots in shades of blue give "
+"a sense of motion or a digital texture. Below the symbol is the word "
+"\"acessilia\": \"acess\" in dark blue and \"ilia\" in teal. Under the "
+"name, a thin blue line with a dot at each end. Further down, the tagline "
+"reads \"TRANSFORMING DOCUMENTS. GENERATING ACCESSIBILITY.\" At the very "
+"bottom four dark-blue icons are separated by small dashes: a square with "
+"six raised dots (a braille-like symbol), a loudspeaker, a stylized eye, "
+"and a rectangle representing a document or page."
+msgstr ""
+"Logotipo com o nome \"acessilia\" em destaque na parte superior. Acima do"
+" nome, um círculo em tons de azul mistura duas imagens: à esquerda, um "
+"documento com bordas arredondadas contendo um ícone de foto no topo e uma"
+" grade tipo planilha na parte inferior; à direita, o perfil de uma cabeça"
+" humana voltado para a direita, também em azul. Três linhas curvas saem "
+"da região da boca, sugerindo fala ou som. À esquerda do documento, "
+"fileiras de pequenos pontos circulares em degradê de azul dão sensação de"
+" movimento ou textura digital. Abaixo do símbolo está a palavra "
+"\"acessilia\": \"acess\" em azul escuro e \"ilia\" em verde-água. Sob o "
+"nome, uma linha fina azul com um ponto em cada ponta. Mais abaixo, o "
+"texto \"TRANSFORMANDO DOCUMENTOS. GERANDO ACESSIBILIDADE.\" No rodapé "
+"aparecem quatro ícones em azul escuro, separados por pequenos traços: um "
+"quadrado com seis pontos em relevo (símbolo que lembra braille), um alto-"
+"falante, um olho estilizado e um retângulo que representa um documento ou"
+" página."
+
+msgid "Technology for Inclusion"
+msgstr "Tecnologia para Inclusão"
+
+msgid "Acessilia accessibility agent showcase."
+msgstr "Vitrine dos agentes de acessibilidade do Acessília."
+
+msgid "Generates accessible audio descriptions of images and scanned pages."
+msgstr "Gera audiodescrições acessíveis de imagens e páginas escaneadas."
+
+msgid "Converts tables and mathematical formulas into structured text."
+msgstr "Converte tabelas e fórmulas matemáticas em texto estruturado."
+
+msgid ""
+"Convert tables and mathematical formulas from images into accessible "
+"structured text (Markdown for tables, LaTeX for formulas)."
+msgstr ""
+"Converta tabelas e fórmulas matemáticas de imagens em texto estruturado "
+"acessível (Markdown para tabelas, LaTeX para fórmulas)."
+
+#, python-brace-format
+msgid "Internal server error: {error}"
+msgstr "Erro interno no servidor: {error}"
+
+#, python-brace-format
+msgid "API error ({status_code}): {detail}"
+msgstr "Erro da API ({status_code}): {detail}"
+
+msgid "An error occurred sending the file to the API. Please try again."
+msgstr "Ocorreu um erro ao enviar o arquivo para a API. Tente novamente."
+
+msgid "The custom prompt exceeds the limit of 6000 characters."
+msgstr "Prompt personalizado excede o limite de 6000 caracteres."
+
+msgid "The download service is temporarily unavailable"
+msgstr "Serviço de download indisponível"
+
+msgid "Too many requests. Please wait a moment before trying again."
+msgstr "Muitas requisições. Aguarde um momento antes de tentar novamente."
+
+#, python-brace-format
+msgid ""
+"Success! Your file has been added to the queue (Position: {position}). "
+"The result will be sent to {email}."
+msgstr ""
+"Sucesso! Seu arquivo entrou na fila (Posição: {position}). O resultado "
+"será enviado para {email}."
+
+#, python-brace-format
+msgid "Logger configured - level: {level}"
+msgstr "Logger configurado - nível: {level}"
+
+#, python-brace-format
+msgid "Another instance of the bot is already running (PID={pid})"
+msgstr "Outra instância do bot já está em execução (PID={pid})"
+
+#, python-brace-format
+msgid "Lock file stale (PID {pid} does not exist), removing..."
+msgstr "Arquivo de lock obsoleto (PID {pid} não existe), removendo..."
+
+#, python-brace-format
+msgid "Lock acquired (PID={pid})"
+msgstr "Lock adquirido (PID={pid})"
+
+msgid "Lock released"
+msgstr "Lock liberado"
+
+#, python-brace-format
+msgid "API interface enabled (http://localhost:{port})"
+msgstr "Interface API habilitada (http://localhost:{port})"
+
+msgid "Telegram interface enabled"
+msgstr "Interface Telegram habilitada"
+
+msgid "Telegram interface enabled but BOT_TOKEN not configured"
+msgstr "Interface Telegram habilitada, mas BOT_TOKEN não configurado"
+
+#, python-brace-format
+msgid "Web interface enabled (http://localhost:{port})"
+msgstr "Interface Web habilitada (http://localhost:{port})"
+
+msgid "No interface enabled. Configure ENABLED_INTERFACES in the .env file"
+msgstr "Nenhuma interface habilitada. Configure ENABLED_INTERFACES no arquivo .env"
+
+#, python-brace-format
+msgid "Starting with interfaces: {interfaces}"
+msgstr "Iniciando com as interfaces: {interfaces}"
+
+msgid "Bot interrupted by the user"
+msgstr "Bot interrompido pelo usuário"
+
+msgid "Bot shutting down"
+msgstr "Bot encerrando"
+
+msgid "Bot started (Acessilia API client)"
+msgstr "Bot iniciado (cliente da API Acessilia)"
+
+msgid "Starting polling"
+msgstr "Iniciando polling"
+
+msgid "BOT_TOKEN not configured"
+msgstr "BOT_TOKEN não configurado"
+
+msgid "Fatal error in the bot"
+msgstr "Erro fatal no bot"
+
+msgid "Unified Queue worker started."
+msgstr "Worker da Fila Unificada iniciado."
+
+#, python-brace-format
+msgid "Unified Queue: {filename} enqueued from {source} (Position: {position})"
+msgstr "Fila Unificada: {filename} enfileirado de {source} (Posição: {position})"
+
+#, python-brace-format
+msgid "Worker: starting task {filename} from {source}"
+msgstr "Worker: iniciando tarefa {filename} de {source}"
+
+#, python-brace-format
+msgid "Worker error while processing {filename}: {error}"
+msgstr "Erro no worker ao processar {filename}: {error}"
+
+#, python-brace-format
+msgid "Worker: task completed: {filename}. Waiting for the next..."
+msgstr "Worker: tarefa concluída: {filename}. Aguardando pela próxima..."
+
+msgid "Acessilia API started (queue worker + cleanup active)"
+msgstr "Acessilia API iniciada (worker da fila + limpeza ativos)"
+
+#, python-brace-format
+msgid "Error in the API: {error} | Path: {path}"
+msgstr "Erro na API: {error} | Caminho: {path}"
+
+#, python-brace-format
+msgid "API: job {task_id} enqueued (source={source})"
+msgstr "API: job {task_id} enfileirado (source={source})"
+
+#, python-brace-format
+msgid "Failed to remove {name}: {error}"
+msgstr "Falha ao remover {name}: {error}"
+
+msgid "Error in the periodic cleanup"
+msgstr "Erro na limpeza periódica"
+
+#, python-brace-format
+msgid "Temporary file removed: {name}"
+msgstr "Arquivo temporário removido: {name}"
+
+#, python-brace-format
+msgid "Temporary directory removed: {name}"
+msgstr "Diretório temporário removido: {name}"
+
+#, python-brace-format
+msgid "Downloading file: {file_path} -> {filename}"
+msgstr "Baixando arquivo: {file_path} -> {filename}"
+
+#, python-brace-format
+msgid "File downloaded: {filename} ({size} bytes)"
+msgstr "Arquivo baixado: {filename} ({size} bytes)"
+
+#, python-brace-format
+msgid "API rejected the Telegram job: {status_code} - {detail}"
+msgstr "API rejeitou a tarefa do Telegram: {status_code} - {detail}"
+
+msgid "Failure contacting API via Telegram"
+msgstr "Falha ao contatar a API via Telegram"
+
+msgid "Error processing file via Telegram"
+msgstr "Erro ao processar arquivo via Telegram"
+
+#, python-brace-format
+msgid "Error querying job {task_id} status: {error}"
+msgstr "Erro ao consultar o status da tarefa {task_id}: {error}"
+
+#, python-brace-format
+msgid "Telegram rate limit, waiting {wait}s: {preview}"
+msgstr "Limite de requisições do Telegram, aguardando {wait}s: {preview}"
+
+#, python-brace-format
+msgid "Failed after {attempts} attempts to send message"
+msgstr "Falha ao enviar mensagem após {attempts} tentativas"
+
+#, python-brace-format
+msgid "Unhandled error: {error}"
+msgstr "Erro não tratado: {error}"
+
+#, python-brace-format
+msgid "FEEDBACK from {user_info}: {feedback}"
+msgstr "FEEDBACK de {user_info}: {feedback}"
+
+#, python-brace-format
+msgid "Output directory removed: {name}"
+msgstr "Diretório de saída removido: {name}"
+
+#, python-brace-format
+msgid "Failed to remove output {name}: {error}"
+msgstr "Falha ao remover saída {name}: {error}"
+
+#, python-brace-format
+msgid "SMTP not configured. E-mail to {to_email} not sent."
+msgstr "SMTP não configurado. E-mail para {to_email} não enviado."
+
+#, python-brace-format
+msgid "E-mail sent successfully to {to_email}."
+msgstr "E-mail enviado com sucesso para {to_email}."
+
+#, python-brace-format
+msgid "Error sending e-mail to {to_email}: {error}"
+msgstr "Erro ao enviar e-mail para {to_email}: {error}"
+
+#, python-brace-format
+msgid "Exporting TXT to {path}"
+msgstr "Exportando TXT para {path}"
+
+#, python-brace-format
+msgid "Exporting DOCX to {path}"
+msgstr "Exportando DOCX para {path}"
+
+#, python-brace-format
+msgid "Exporting PDF to {path}"
+msgstr "Exportando PDF para {path}"
+
+#, python-brace-format
+msgid "Exporting PDF/UA to {path}"
+msgstr "Exportando PDF/UA para {path}"
+
+#, python-brace-format
+msgid "Exporting MP3 to {path}"
+msgstr "Exportando MP3 para {path}"
+
+#, python-brace-format
+msgid "Page converted to PNG: {size} bytes"
+msgstr "Página convertida para PNG: {size} bytes"
+
+msgid ""
+"PDDL pipeline ignores custom_prompt/thinking_mode; only the deterministic"
+" manifest/planning/execution flow runs"
+msgstr ""
+"Pipeline PDDL ignora custom_prompt/thinking_mode; apenas fluxo "
+"deterministico de manifesto/planejamento/execucao"
+
+#, python-brace-format
+msgid "Pipeline PDDL: {count} image(s) enriched with visual description"
+msgstr "Pipeline PDDL: {count} imagem(ns) enriquecida(s) com descrição visual"
+
+#, python-brace-format
+msgid "Pipeline PDDL: {count} table(s) enriched with OCR/reconstruction"
+msgstr "Pipeline PDDL: {count} tabela(s) enriquecida(s) com OCR/reconstrução"
+
+#, python-brace-format
+msgid "PDF has {total} pages, processing {limit}"
+msgstr "PDF tem {total} páginas, processando {limit}"
+
+#, python-brace-format
+msgid "Page {page} saved: {name}"
+msgstr "Página {page} salva: {name}"
+
+#, python-brace-format
+msgid "{count} pages extracted to {tmpdir}"
+msgstr "{count} páginas extraídas para {tmpdir}"
+
+#, python-brace-format
+msgid "Failed to extract the image clip for element {element_id}"
+msgstr "Falha ao extrair recorte de imagem para elemento {element_id}"
+
+msgid "Invalid extractor_backend; use 'docling' or 'pymupdf'"
+msgstr "extractor_backend inválido; use 'docling' ou 'pymupdf'"
+
+#, python-brace-format
+msgid ""
+"Preferred planner backend {backend} did not produce a valid plan in both "
+"mode"
+msgstr "Backend preferido {backend} não gerou plano válido no modo both"
+
+msgid "The problem.pddl hash diverges from the plan"
+msgstr "Hash do problem.pddl diverge do plano"
+
+msgid "The domain.pddl hash diverges from the plan"
+msgstr "Hash do domain.pddl diverge do plano"
+
+msgid "The domain description hash diverges from the plan"
+msgstr "Hash da descrição do domínio diverge do plano"
+
+msgid "The selected closure diverges from the compiled problem"
+msgstr "Fechamento selecionado diverge do problema compilado"
+
+#, python-brace-format
+msgid ""
+"[page {page_num}] Extracted {count} region(s) on the page "
+"(structurer={structurer})"
+msgstr ""
+"[página {page_num}] Extraídas {count} região(ns) na página "
+"(structurer={structurer})"
+
+#, python-brace-format
+msgid "[page {page_num}] {count} clean-text region(s) (no vision AI)"
+msgstr "[página {page_num}] {count} região(ns) de texto limpo (sem IA de visão)"
+
+#, python-brace-format
+msgid "[page {page_num}] Region {idx} - type={type}, bbox={bbox}, target={target}"
+msgstr ""
+"[página {page_num}] Região {idx} - tipo={type}, bbox={bbox}, "
+"target={target}"
+
+#, python-brace-format
+msgid "[page {page_num}] No text extracted by regions, fallback to the full page"
+msgstr ""
+"[página {page_num}] Nenhum texto extraído por regiões, fallback para a "
+"página completa"
+
+#, python-brace-format
+msgid ""
+"[page {page_num}] {count} task(s) ({text_count} text, {vision_count} "
+"vision)"
+msgstr ""
+"[página {page_num}] {count} tarefas ({text_count} texto, {vision_count} "
+"visão)"
+
+#, python-brace-format
+msgid "[page {page_num}] reading image: {path}"
+msgstr "[página {page_num}] lendo imagem: {path}"
+
+#, python-brace-format
+msgid "PDF exported with bookmarks and page numbering: {output_path}"
+msgstr "PDF exportado com marcadores e numeração de páginas: {output_path}"
+
+#, python-brace-format
+msgid "PDF/UA exported: {output_path}"
+msgstr "PDF/UA exportado: {output_path}"
+
+#, python-brace-format
+msgid "TXT exported: {output_path}"
+msgstr "TXT exportado: {output_path}"
+
+#, python-brace-format
+msgid "DOCX exported: {output_path}"
+msgstr "DOCX exportado: {output_path}"
+
+msgid "We received your file - Acessilia"
+msgstr "Recebemos o seu arquivo - Acessilia"
+
+#, python-brace-format
+msgid ""
+"Hello!\n"
+"\n"
+"We received the file '{filename}' and we are already working to make it "
+"accessible.\n"
+"This process involves analysis by artificial intelligence and generation "
+"of an audio description.\n"
+"\n"
+"As soon as it is ready, you will receive a new e-mail with the accessible"
+" package attached.\n"
+"\n"
+"Best regards,\n"
+"The Acessilia Team"
+msgstr ""
+"Olá!\n"
+"\n"
+"Recebemos o arquivo '{filename}' e já estamos trabalhando para torná-lo "
+"acessível.\n"
+"Esse processo envolve análise por inteligência artificial e geração de "
+"uma descrição em áudio.\n"
+"\n"
+"Assim que estiver pronto, você receberá um novo e-mail com o pacote "
+"acessível em anexo.\n"
+"\n"
+"Atenciosamente,\n"
+"A equipe Acessilia"
+
+msgid "Your accessible file is ready! - Acessilia"
+msgstr "Seu arquivo acessível está pronto! - Acessilia"
+
+#, python-brace-format
+msgid ""
+"Hello!\n"
+"\n"
+"The processing of the file '{filename}' has completed successfully.\n"
+"\n"
+"Access the link below to view and download the available formats:\n"
+"\n"
+"{download_url}\n"
+"\n"
+"Available formats: {formats}.{warnings}\n"
+"\n"
+"The link expires in 7 days.\n"
+"\n"
+"Best regards,\n"
+"The Acessilia Team"
+msgstr ""
+"Olá!\n"
+"\n"
+"O processamento do arquivo '{filename}' foi concluído com sucesso.\n"
+"\n"
+"Acesse o link abaixo para visualizar e baixar os formatos disponíveis:\n"
+"\n"
+"{download_url}\n"
+"\n"
+"Formatos disponíveis: {formats}.{warnings}\n"
+"\n"
+"O link expira em 7 dias.\n"
+"\n"
+"Atenciosamente,\n"
+"A equipe Acessilia"
+
+#, python-brace-format
+msgid ""
+"Hello!\n"
+"\n"
+"The processing of the file '{filename}' has completed successfully.\n"
+"Attached, you will find a ZIP package containing the following formats:\n"
+"{formats}{warnings}\n"
+"\n"
+"Best regards,\n"
+"The Acessilia Team"
+msgstr ""
+"Olá!\n"
+"\n"
+"O processamento do arquivo '{filename}' foi concluído com sucesso.\n"
+"Em anexo, você encontrará um pacote ZIP contendo os seguintes formatos:\n"
+"{formats}{warnings}\n"
+"\n"
+"Atenciosamente,\n"
+"A equipe Acessilia"
+
+msgid "Plain Text (TXT)"
+msgstr "Texto Puro (TXT)"
+
+msgid "PDF"
+msgstr "PDF Acessível"
+
+msgid "PDF/UA"
+msgstr "PDF/UA"
+
+msgid "ZIP Package"
+msgstr "Pacote ZIP"
+
+msgid "Some optional formats were not generated:"
+msgstr "Alguns formatos opcionais não foram gerados:"
+
+#, python-brace-format
+msgid "Could not save the canonical JSON: {error}"
+msgstr "Não foi possível salvar o JSON canônico: {error}"
+
+#, python-brace-format
+msgid "Task {task_id} cancelled by the user"
+msgstr "Tarefa {task_id} cancelada pelo usuário"
+
+#, python-brace-format
+msgid "Pipeline error: {error_type}: {error}"
+msgstr "Erro no pipeline: {error_type}: {error}"
+
+#, python-brace-format
+msgid "Prompt file not found at {path}, falling back to medio"
+msgstr "Arquivo de prompt não encontrado em {path}, usando o fallback para medio"
+
+#, python-brace-format
+msgid "[page {page_num}] Prompt not found for type={type}, using fallback"
+msgstr ""
+"[página {page_num}] Prompt não encontrado para tipo={type}, usando "
+"fallback"
+
+#, python-brace-format
+msgid "[page {page_num}] DataAgent processing region ({size} bytes, type={type})"
+msgstr ""
+"[página {page_num}] DataAgent processando região ({size} bytes, "
+"tipo={type})"
+
+#, python-brace-format
+msgid ""
+"[page {page_num}] DataAgent error in region {type}: {error} | Traceback:\n"
+"{tb}"
+msgstr ""
+"[página {page_num}] DataAgent erro na região {type}: {error} | Traceback:"
+"\n"
+"{tb}"
+
+#, python-brace-format
+msgid ""
+"[page {page_num}] VisionAgent error in region {type}: {error} | "
+"Traceback:\n"
+"{tb}"
+msgstr ""
+"[página {page_num}] Erro na região {type}: {error} | Traceback:\n"
+"{tb}"
+
+#, python-brace-format
+msgid "[page {page_num}] Sending region to vision ({size} bytes, type={type})"
+msgstr "[página {page_num}] Enviando região para visão ({size} bytes, tipo={type})"
+
+#, python-brace-format
+msgid "[page {page_num}] EditorAgent: no consolidated text"
+msgstr "[página {page_num}] EditorAgent: nenhum texto consolidado"
+
+#, python-brace-format
+msgid "[page {page_num}] EditorAgent: {count} text parts consolidated"
+msgstr "[página {page_num}] EditorAgent: {count} partes de texto consolidadas"
+
+#, python-brace-format
+msgid "Failed to crop the region: {error}"
+msgstr "Falha ao recortar a região: {error}"
+
+#, python-brace-format
+msgid "Cache hit for {name}"
+msgstr "Cache: item existente para {name}"
+
+#, python-brace-format
+msgid "Cache hit: {key}"
+msgstr "Cache: item existente: {key}"
+
+#, python-brace-format
+msgid "Cache set: {key}"
+msgstr "Cache: item gravado: {key}"
+
+#, python-brace-format
+msgid "Failed to save cache: {error}"
+msgstr "Falha ao salvar no cache: {error}"
+
+#, python-brace-format
+msgid "Cache cleared: {count} files removed"
+msgstr "Cache limpo: {count} arquivo(s) removido(s)"
+
+msgid "Orphan tasks cleaned"
+msgstr "Tarefas órfãs limpas"
+
+#, python-brace-format
+msgid "Failed to clean orphan tasks: {error}"
+msgstr "Falha ao limpar tarefas órfãs: {error}"
+
+msgid "Docling is not available in the current environment."
+msgstr "Docling não está disponível no ambiente atual."
+
+#, python-brace-format
+msgid "Docling failed on page {page} ({error}), fallback PyMuPDF"
+msgstr "Docling falhou na página {page} ({error}), fallback PyMuPDF"
+
+msgid "Page has no parent document for Docling processing"
+msgstr "Página sem documento pai para processamento Docling"
+
+#, python-brace-format
+msgid "Docling processed {filename} in {elapsed:.1f}s"
+msgstr "Docling processou {filename} em {elapsed:.1f}s"
+
+#, python-brace-format
+msgid "Download token created: {token} -> {filename}"
+msgstr "Token de download criado: {token} -> {filename}"
+
+#, python-brace-format
+msgid "Download token not found: {token}"
+msgstr "Token de download não encontrado: {token}"
+
+#, python-brace-format
+msgid "Download token output directory missing: {token} -> {output_dir}"
+msgstr "Diretório de saída do token de download ausente: {token} -> {output_dir}"
+
+#, python-brace-format
+msgid "Failed to generate PDF/UA: {error}"
+msgstr "Falha ao gerar o PDF/UA: {error}"
+
+#, python-brace-format
+msgid "Failed to generate MP3: {error}"
+msgstr "Falha ao gerar o MP3: {error}"
+
+#, python-brace-format
+msgid "Job {task_id} completed (source={source})"
+msgstr "Job {task_id} concluído (source={source})"
+
+#, python-brace-format
+msgid "Job {task_id} cancelled"
+msgstr "Job {task_id} cancelado"
+
+#, python-brace-format
+msgid "Error in JobExecutor for {task_id}"
+msgstr "Erro no JobExecutor para {task_id}"
+
+#, python-brace-format
+msgid "Image pre-processing error: {error}"
+msgstr "Erro no pré-processamento de imagem: {error}"
+
+#, python-brace-format
+msgid "Image resized: {old_width}x{old_height} -> {new_width}x{new_height}"
+msgstr ""
+"Imagem redimensionada: {old_width}x{old_height} -> "
+"{new_width}x{new_height}"
+
+#, python-brace-format
+msgid "Image rotated by {angle:.2f} degrees"
+msgstr "Imagem rotacionada em {angle:.2f} graus"
+
+#, python-brace-format
+msgid "Global error in the Web Panel: {error} | Path: {path}"
+msgstr "Erro global no Painel Web: {error} | Caminho: {path}"
+
+#, python-brace-format
+msgid "Error in the web upload: {error}"
+msgstr "Erro no upload da web: {error}"
+
+#, python-brace-format
+msgid "Failed to query the API for the download: {status_code} - {detail}"
+msgstr "Falha ao consultar a API para o download: {status_code} - {detail}"
+
+#, python-brace-format
+msgid "HTTP exception in the Web Panel: {error} | Path: {path}"
+msgstr "Exceção HTTP no Painel Web: {error} | Caminho: {path}"
+
+#, python-brace-format
+msgid "Rate limit exceeded in the Web Panel: ip={ip} | Path: {path}"
+msgstr "Limite de requisições excedido no Painel Web: ip={ip} | Caminho: {path}"
+
+#, python-brace-format
+msgid "API upload error in the Web Panel: {status_code} - {detail}"
+msgstr "Erro de upload na API no Painel Web: {status_code} - {detail}"
+
+#, python-brace-format
+msgid "Failed to send the status message: {error}"
+msgstr "Falha ao enviar a mensagem de status: {error}"
+
+#, python-brace-format
+msgid "Failed to edit the status message: {error}"
+msgstr "Falha ao editar a mensagem de status: {error}"
+
+#, python-brace-format
+msgid "Unexpected error while editing the status: {error}"
+msgstr "Erro inesperado ao editar o status: {error}"
+
+#, python-brace-format
+msgid "Spoken audio (MP3) granularly exported successfully: {path}"
+msgstr "Áudio falado (MP3) exportado em detalhes com sucesso: {path}"
+
+#, python-brace-format
+msgid "Error exporting granular MP3: {error}"
+msgstr "Erro ao exportar o MP3 em detalhes: {error}"
+
+#, python-brace-format
+msgid "Generating audio (TTS): {completed}/{total} chunks done ({percent}%)"
+msgstr "Gerando áudio (TTS): {completed}/{total} blocos concluídos ({percent}%)"
+
+#, python-brace-format
+msgid "Starting granular audio (TTS) generation: {voice} -> {path}"
+msgstr "Iniciando geração de áudio granular (TTS): {voice} -> {path}"
+
+msgid "Too many requests. Please wait a moment and try again."
+msgstr "Muitas requisições. Aguarde um momento e tente novamente."
+
+msgid "Internal server error"
+msgstr "Erro interno no servidor"
+
+msgid "Empty response from the agent"
+msgstr "Resposta vazia do agente"
+
+#, python-brace-format
+msgid "Empty response for page {page_num}"
+msgstr "Resposta vazia para página {page_num}"
+
+#, python-brace-format
+msgid "[page {page_num}] Cache hit (skipping AI)"
+msgstr "[página {page_num}] Cache: item existente (pulando IA)"
+
+#, python-brace-format
+msgid "Response for page {page_num} saved to {file_name}"
+msgstr "Resposta da página {page_num} salva em {file_name}"
+
+#, python-brace-format
+msgid "[page {page_num}] Waiting for {count} AI task(s) in parallel..."
+msgstr "[página {page_num}] Aguardando {count} tarefa(s) de IA em paralelo..."
+
+#, python-brace-format
+msgid "[page {page_num}] Task {idx} failed: {error}"
+msgstr "[página {page_num}] Tarefa {idx} falhou: {error}"
+
+#, python-brace-format
+msgid ""
+"AccessibilityWorkflow: processing {page_count} page(s) for {file_name} "
+"(reader={reader}, mode={mode})"
+msgstr ""
+"AccessibilityWorkflow: processando {page_count} página(s) para "
+"{file_name} (reader={reader}, mode={mode})"
+
+#, python-brace-format
+msgid ""
+"AccessibilityWorkflow: {total_pages} pages processed, {total_chars} chars"
+" in total"
+msgstr ""
+"AccessibilityWorkflow: {total_pages} páginas processadas, {total_chars} "
+"chars no total"
+
+#, python-brace-format
+msgid "RapidOCR: {count} model(s) restored from local cache"
+msgstr "RapidOCR: {count} modelo(s) restaurado(s) do cache local"
+
+#, python-brace-format
+msgid "RapidOCR: {count} model(s) persisted to local cache"
+msgstr "RapidOCR: {count} modelo(s) persistido(s) no cache local"
+
+msgid "Using structurer: Docling (with PyMuPDF fallback)"
+msgstr "Usando structurer: Docling (com fallback PyMuPDF)"
+
+msgid ""
+"STRUCTURER=docling is set but docling is not installed. Run: pip install "
+"docling. Falling back to PyMuPDF."
+msgstr ""
+"STRUCTURER=docling está definido mas docling não está instalado. Execute:"
+" pip install docling. Usando PyMuPDF."
+
+msgid "STRUCTURER=docling is set but docling is not installed. Using PyMuPDF."
+msgstr "STRUCTURER=docling mas docling nao instalado. Usando PyMuPDF."
+
+msgid "Using structurer: PyMuPDF"
+msgstr "Usando structurer: PyMuPDF"
+
+msgid "Stale: process interrupted"
+msgstr "Obsoleta: processo interrompido"
+
+msgid ""
+"Agno is not installed. Run `poetry install` before using the workflow "
+"Executor."
+msgstr ""
+"Agno não está instalado. Execute `poetry install` antes de usar o "
+"workflow Executor."
+
+msgid "document"
+msgid_plural "documents"
+msgstr[0] "documento"
+msgstr[1] "documentos"
+

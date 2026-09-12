@@ -81,7 +81,9 @@ def test_history_empty(client):
     assert resp.json() == []
 
 
-def test_upload_invalid_extension(client):
+def test_upload_invalid_extension(client, monkeypatch):
+    """Under pt_BR the API should reject unknown extensions with the localized unsupported-format detail."""
+    monkeypatch.setenv("LOCALE", "pt_BR")
     resp = client.post(
         "/api/v1/jobs",
         files={"document_file": ("script.exe", b"MZ...", "application/octet-stream")},
@@ -102,6 +104,8 @@ def test_upload_oversized_prompt(client):
 
 
 def test_upload_oversized_file(client, monkeypatch):
+    """Under pt_BR an over-limit upload should be rejected with the localized oversized-file detail."""
+    monkeypatch.setenv("LOCALE", "pt_BR")
     monkeypatch.setattr(settings, "max_file_size_mb", 0.000001)
     resp = client.post(
         "/api/v1/jobs",
@@ -604,7 +608,7 @@ async def test_job_executor_reports_optional_export_failure(
 
     def fail_pdf_ua(_canonical, destination, _filename):
         destination.write_bytes(b"partial pdf")
-        raise FileNotFoundError("pandoc indisponivel")
+        raise FileNotFoundError("pandoc unavailable")
 
     async def write_mp3(_text, destination, **_kwargs):
         destination.write_bytes(b"audio")
@@ -665,8 +669,8 @@ async def test_job_executor_reports_optional_export_failure(
     assert task["download_url"]
     expected_errors = {
         None: [],
-        "MP3": ["Falha ao gerar MP3: tts offline"],
-        "PDF/UA": ["Falha ao gerar PDF/UA: pandoc indisponivel"],
+        "MP3": ["Failed to generate MP3: tts offline"],
+        "PDF/UA": ["Failed to generate PDF/UA: pandoc unavailable"],
     }
     assert task["erros"] == expected_errors[failed_format]
 

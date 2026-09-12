@@ -7,6 +7,12 @@ from fastapi.responses import FileResponse
 
 from backend.api.limiter import limiter
 from backend.api.schemas import DownloadFormat, DownloadInfo
+from backend.i18n import t
+from backend.log_messages import (
+    API_FILE_NOT_FOUND,
+    API_FORMAT_INVALID,
+    API_LINK_INVALID,
+)
 from backend.services.download_token_service import obter_info_token
 
 router = APIRouter(prefix="/download", tags=["download"])
@@ -27,7 +33,7 @@ MEDIA_TYPES = {
 async def download_info(request: Request, token: str):
     info = await obter_info_token(token)
     if info is None:
-        raise HTTPException(status_code=404, detail="Link inválido ou expirado")
+        raise HTTPException(status_code=404, detail=t(API_LINK_INVALID))
     return DownloadInfo(
         filename=info["filename"],
         stem=info["stem"],
@@ -40,17 +46,17 @@ async def download_info(request: Request, token: str):
 @limiter.limit("20/minute")
 async def download_file(request: Request, token: str, format: str):
     if format not in MEDIA_TYPES:
-        raise HTTPException(status_code=400, detail="Formato inválido")
+        raise HTTPException(status_code=400, detail=t(API_FORMAT_INVALID))
     info = await obter_info_token(token)
     if info is None:
-        raise HTTPException(status_code=404, detail="Link inválido ou expirado")
+        raise HTTPException(status_code=404, detail=t(API_LINK_INVALID))
     file_path = None
     for f in info["formats"]:
         if f["ext"] == format:
             file_path = Path(f["file_path"])
             break
     if file_path is None or not file_path.exists():
-        raise HTTPException(status_code=404, detail="Arquivo não encontrado")
+        raise HTTPException(status_code=404, detail=t(API_FILE_NOT_FOUND))
     return FileResponse(
         path=file_path,
         filename=file_path.name,

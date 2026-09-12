@@ -8,8 +8,10 @@ from typing import Any
 
 import fitz
 
-from backend.pipeline.semantic_rules import classify_text_block
 from backend.core.manifest.docling_extractor import DoclingExtraction
+from backend.i18n import t
+from backend.log_messages import MSG_SOURCE_FILE_MISSING
+from backend.pipeline.semantic_rules import classify_text_block
 
 
 class _PseudoDocument:
@@ -25,7 +27,7 @@ class _PseudoDocument:
 
 
 class PyMuPDFManifestExtractor:
-    """Extrator estrutural simplificado para pipeline PDDL sem Docling."""
+    """Simplified structural extractor for PDDL pipeline use when Docling is unavailable."""
 
     def __init__(self, *, include_images: bool = True) -> None:
         self.include_images = include_images
@@ -33,7 +35,7 @@ class PyMuPDFManifestExtractor:
     def extract(self, source_path: Path) -> DoclingExtraction:
         source_path = source_path.resolve()
         if not source_path.is_file():
-            raise FileNotFoundError(f"Documento não encontrado: {source_path}")
+            raise FileNotFoundError(t(MSG_SOURCE_FILE_MISSING).format(source_path=source_path))
 
         started_at = datetime.now(timezone.utc)
         started_clock = perf_counter()
@@ -57,7 +59,7 @@ class PyMuPDFManifestExtractor:
         items: list[tuple[Any, int]] = []
         pages: dict[int, Any] = {}
 
-        # Item raiz para preservar parentesco no manifesto.
+        # Root item used to preserve parentage in the manifest.
         root = SimpleNamespace(
             label=None,
             name="body",

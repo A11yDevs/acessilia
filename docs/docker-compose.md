@@ -1,46 +1,48 @@
-# Docker Compose — Subindo a Acessília
+# Docker Compose — Running Acessilia
 
-Este documento descreve como executar a Acessília localmente usando Docker, tanto
-com **build a partir do código-fonte** quanto com **imagens pré-publicadas no GHCR**
-(sem precisar baixar o repositório nem compilar nada).
+You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](docker-compose.pt-br.md)
 
----
-
-## Pré-requisitos
-
-- [Docker](https://docs.docker.com/get-docker/) (com Compose V2 integrado)
-- Acesso à internet para baixar imagens ou dependências
+This document describes how to run Acessilia locally using Docker, both with a
+**build from source** and with **pre-published images on GHCR**
+(without needing to download the repository or compile anything).
 
 ---
 
-## 1. Subindo com build local (a partir do código-fonte)
+## Prerequisites
 
-Usa o `docker-compose.yml` padrão, que faz o build da imagem localmente.
+- [Docker](https://docs.docker.com/get-docker/) (with integrated Compose V2)
+- Internet access to download images or dependencies
+
+---
+
+## 1. Running with a local build (from source)
+
+Uses the default `docker-compose.yml`, which builds the image locally.
 
 ```bash
-# 1. Clone o repositório (se ainda não tiver)
+# 1. Clone the repository (if you don't already have it)
 git clone git@github.com:A11yDevs/acessilia.git
 cd acessilia
 
-# 2. Configure o ambiente
+# 2. Configure the environment
 cp .env.example .env
-# Edite .env com suas credenciais (pelo menos BOT_TOKEN se for usar Telegram)
+# Edit .env with your credentials (at least BOT_TOKEN if you'll use Telegram)
 
-# 3. Suba o container (build automático)
+# 3. Start the container (automatic build)
 docker compose up -d
 ```
 
-Isso constrói a imagem a partir do `infra/Dockerfile` com a variante **docling**
-(completa, ~4-6 GB). O container expõe:
+This builds the image from `infra/Dockerfile` with the **docling** variant
+(full, ~4-6 GB). The container exposes:
 
-| Porta | Serviço        |
-|-------|----------------|
-| 8000  | API REST       |
-| 8001  | Painel web     |
+| Port | Service  |
+|------|----------|
+| 8000 | REST API |
+| 8001 | Web panel |
 
-### Variante slim (sem Docling)
+### Slim variant (without Docling)
 
-Para uma imagem mais leve (~2 GB), sem OCR do Docling:
+For a smaller image (~2 GB) without Docling OCR:
 
 ```bash
 docker compose build --build-arg WITH_DOCLING=false
@@ -49,69 +51,71 @@ docker compose up -d
 
 ---
 
-## 2. Subindo com imagem do GHCR (sem build)
+## 2. Running with a GHCR image (no build)
 
-Usa o `docker-compose.staging.yml`, que já referencia as imagens publicadas
-no GitHub Container Registry. **Não requer o código-fonte.**
+Uses the `docker-compose.staging.yml`, which already references the images
+published on the GitHub Container Registry. **It does not require the source code.**
 
 ```bash
-# 1. Crie um diretório para o ambiente
+# 1. Create a directory for the environment
 mkdir acessilia-staging && cd acessilia-staging
 
-# 2. Baixe apenas o compose file e o .env.example
+# 2. Download only the compose file and .env.example
 curl -O https://raw.githubusercontent.com/A11yDevs/acessilia/develop/docker-compose.staging.yml
 curl -O https://raw.githubusercontent.com/A11yDevs/acessilia/develop/.env.example
 
-# 3. Configure o ambiente
+# 3. Configure the environment
 cp .env.example .env
-# Edite .env com suas credenciais
+# Edit .env with your credentials
 
-# 4. Crie os diretórios de dados
+# 4. Create the data directories
 mkdir -p var/temp var/data var/logs
 
-# 5. Suba o container (baixa a imagem automaticamente)
+# 5. Start the container (downloads the image automatically)
 docker compose -f docker-compose.staging.yml up -d
 ```
 
-Isso baixa e executa `ghcr.io/a11ydevs/acessilia:develop` (variante docling).
+This downloads and runs `ghcr.io/a11ydevs/acessilia:develop` (docling variant).
 
-### Usando a variante slim
+### Using the slim variant
 
-Edite o `docker-compose.staging.yml` e altere a tag da imagem:
+Edit the `docker-compose.staging.yml` and change the image tag:
 
 ```yaml
 image: ghcr.io/a11ydevs/acessilia:develop-slim
 ```
 
-Ou via sed:
+Or via sed (macOS):
 
 ```bash
 sed -i '' 's/:develop$/:develop-slim/' docker-compose.staging.yml
 docker compose -f docker-compose.staging.yml up -d
 ```
 
+On Linux use `sed -i 's/:develop$/:develop-slim/'` (no `''`).
+
 ---
 
-## 3. Tags disponíveis no GHCR
+## 3. Tags available on GHCR
 
-O CI/CD publica automaticamente as seguintes imagens:
+CI/CD automatically publishes the following images:
 
-| Tag                              | Variante | Descrição                          |
-|----------------------------------|----------|------------------------------------|
-| `:develop`                       | docling  | Último build da branch `develop`   |
-| `:develop-slim`                  | slim     | Último build da `develop` (leve)   |
-| `:main`                          | docling  | Último build da branch `main`      |
-| `:main-slim`                     | slim     | Último build da `main` (leve)      |
-| `:latest`                        | docling  | Aponta para `main`                 |
-| `:latest-slim`                   | slim     | Aponta para `main` (leve)          |
-| `:sha-<7-char-commit>`           | docling  | Build de um commit específico      |
-| `:sha-<7-char-commit>-slim`      | slim     | Build de um commit específico (leve)|
-| `:X.Y.Z`                         | docling  | Release versionada                 |
-| `:X.Y.Z-slim`                    | slim     | Release versionada (leve)          |
-| `:X.Y` / `:X`                    | docling  | Alias semântico da release         |
-| `:X.Y-slim` / `:X-slim`          | slim     | Alias semântico da release (leve)  |
+| Tag                              | Variant | Description                           |
+|----------------------------------|---------|---------------------------------------|
+| `:develop`                       | docling | Latest build of the `develop` branch  |
+| `:develop-slim`                  | slim    | Latest build of `develop` (light)     |
+| `:main`                          | docling | Latest build of the `main` branch     |
+| `:main-slim`                     | slim    | Latest build of `main` (light)        |
+| `:latest`                        | docling | Points to `main`                      |
+| `:latest-slim`                   | slim    | Points to `main` (light)              |
+| `:sha-<7-char-commit>`           | docling | Build of a specific commit            |
+| `:sha-<7-char-commit>-slim`      | slim    | Build of a specific commit (light)    |
+| `:X.Y.Z`                         | docling | Versioned release                     |
+| `:X.Y.Z-slim`                    | slim    | Versioned release (light)             |
+| `:X.Y` / `:X`                    | docling | Semantic alias of the release         |
+| `:X.Y-slim` / `:X-slim`          | slim    | Semantic alias of the release (light) |
 
-Exemplo para puxar uma imagem manualmente:
+Example to pull an image manually:
 
 ```bash
 docker pull ghcr.io/a11ydevs/acessilia:develop
@@ -120,12 +124,12 @@ docker pull ghcr.io/a11ydevs/acessilia:sha-abc1234
 
 ---
 
-## 4. Configuração do `.env`
+## 4. Configuring `.env`
 
-O mínimo necessário para testar:
+The minimum needed to test:
 
 ```env
-# Interfaces ativas
+# Active interfaces
 ENABLED_INTERFACES=api,web
 
 # API
@@ -134,123 +138,123 @@ API_PORT=8000
 API_BASE_URL=http://localhost:8000
 WEB_PORT=8001
 
-# Diretórios
+# Directories
 TEMP_DIR=var/temp
 DATA_DIR=var/data
 LOGS_DIR=var/logs
 
-# Log
+# Logging
 LOG_LEVEL=INFO
 
-# AI Client (escolha um)
+# AI Client (pick one)
 AI_CLIENT=ollama
 OLLAMA_BASE_URL=http://host.docker.internal:11434/v1/chat/completions
 OLLAMA_MODEL=llama3.2-vision
 
-# Estruturação de documentos
-STRUCTURER=docling   # ou pymupdf (mais leve, sem dependências extras)
+# Document structuring
+STRUCTURER=docling   # or pymupdf (lighter, no extra dependencies)
 
 # Pipeline
 PIPELINE_ENGINE=legacy
 ```
 
-> **Dica para Ollama local:** Use `host.docker.internal` no lugar de `localhost`
-> para que o container alcance o servidor Ollama rodando no host.
+> **Ollama local tip:** Use `host.docker.internal` instead of `localhost`
+> so the container can reach the Ollama server running on the host.
 
 ---
 
-## 5. Comandos úteis
+## 5. Useful commands
 
 ```bash
-# Ver logs em tempo real
+# Watch logs in real time
 docker compose logs -f
 
-# Parar e remover o container
+# Stop and remove the container
 docker compose down
 
-# Executar comando interativo no container
+# Run a command interactively inside the container
 docker compose exec acessilia python -c "from backend.core.version import __version__; print(__version__)"
 
-# Verificar health check da API
+# Check the API health endpoint
 curl http://localhost:8000/api/v1/health
 
-# Inspecionar qual imagem está rodando
+# Inspect which image is running
 docker inspect acessilia-instance --format '{{.Config.Image}}'
 
-# Puxar manualmente uma imagem específica
+# Manually pull a specific image
 docker pull ghcr.io/a11ydevs/acessilia:sha-abc1234
 ```
 
 ---
 
-## 6. Update automático (staging e produção)
+## 6. Automatic updates (staging and production)
 
-Se você estiver rodando um servidor de homologação, pode configurar **update
-automático** via systemd timer. O script consulta a **GitHub API** a cada
-**5 minutos** e só executa `docker pull` quando há um commit novo na `develop`.
+If you are running a staging server, you can configure **automatic updates**
+via a systemd timer. The script consults the **GitHub API** every
+**5 minutes** and only runs `docker pull` when there is a new commit on `develop`.
 
 ```bash
-# Setup completo (recomendado)
+# Full setup (recommended)
 ./scripts/setup-homologacao.sh
 
-# Ou fazer manualmente
-# Consulte docs/homologacao-systemd.md para instruções manuais
+# Or do it manually
+# See docs/homologacao-systemd.md for manual instructions
 ```
 
-Para producao, use [docs/producao-systemd.md](docs/producao-systemd.md) ou rode
-`./scripts/setup-producao.sh`. O ambiente rastreia `main` por padrao com
-`docker-compose.production.yml` e `scripts/production-update.sh`.
+For production, use [docs/producao-systemd.md](docs/producao-systemd.md) or run
+`./scripts/setup-producao.sh`. The environment tracks `main` by default using
+`docker-compose.production.yml` and `scripts/production-update.sh`.
 
-**Requer:** `jq` e um token GitHub com escopo `read:packages`.
-
----
-
-## 7. Variantes de imagem
-
-| Variante | Tamanho aprox. | Docling | OCR | Uso recomendado |
-|----------|----------------|---------|-----|-----------------|
-| **docling** | ~4-6 GB | ✅ Sim | ✅ Nativo (CPU) | Precisão máxima em documentos |
-| **slim**   | ~2 GB   | ❌ Não | ❌ Fallback pymupdf | Testes rápidos, recursos limitados |
-
-A variante **docling** é a padrão e oferece:
-- Detecção de tabelas, figuras e fórmulas
-- OCR nativo CPU-only (sem GPU)
-- Extração estrutural mais precisa
-
-A variante **slim** faz fallback automático para `pymupdf` com um aviso no log.
+**Requires:** `jq` and a GitHub token with the `read:packages` scope.
 
 ---
 
-## 8. Solução de problemas
+## 7. Image variants
 
-### Container não sobe — porta ocupada
+| Variant   | Approx. size | Docling | OCR | Recommended use                |
+|-----------|--------------|---------|-----|--------------------------------|
+| **docling** | ~4-6 GB    | ✅ Yes | ✅ Native (CPU) | Maximum document precision |
+| **slim**   | ~2 GB      | ❌ No  | ❌ Fallback pymupdf | Fast tests, limited resources |
+
+The **docling** variant is the default and offers:
+- Table, figure, and formula detection
+- Native CPU-only OCR (no GPU)
+- More precise structural extraction
+
+The **slim** variant automatically falls back to `pymupdf` with a warning in the log.
+
+---
+
+## 8. Troubleshooting
+
+### Container won't start — port in use
 
 ```bash
-# Verifique se a porta já está em uso
+# Check whether the port is already in use
 lsof -i :8000
-# Altere as portas no docker-compose.yml ou pare o serviço conflitante
+# Change the ports in docker-compose.yml or stop the conflicting service
 ```
 
-### Health check falhando
+### Health check failing
 
 ```bash
-# Verifique os logs
+# Check the logs
 docker compose logs acessilia
-# Confirme que o .env tem ENABLED_INTERFACES=api (mínimo para health check)
+# Confirm that .env has ENABLED_INTERFACES=api (minimum for the health check)
 ```
 
-### Ollama não acessível do container
+### Ollama not reachable from the container
 
-Certifique-se de que:
-1. O Ollama está rodando no host
-2. A variável `OLLAMA_BASE_URL` usa `http://host.docker.internal:11434/...`
-3. No Linux, use `--network host` ou o IP do gateway: `http://172.17.0.1:11434/...`
+Make sure that:
+1. Ollama is running on the host
+2. The `OLLAMA_BASE_URL` variable uses `http://host.docker.internal:11434/...`
+3. On Linux, use `--network host` or the gateway IP: `http://172.17.0.1:11434/...`
 
-### Imagem não encontrada no GHCR
+### Image not found on GHCR
 
 ```bash
-# Verifique se a tag existe
+# Check whether the tag exists
 docker pull ghcr.io/a11ydevs/acessilia:develop
-# Se falhar, faça login no GHCR
-echo $GITHUB_TOKEN | docker login ghcr.io -u <seu-user> --password-stdin
+# If it fails, log in to GHCR
+echo $GITHUB_TOKEN | docker login ghcr.io -u <your-user> --password-stdin
 ```

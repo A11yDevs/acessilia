@@ -1,4 +1,4 @@
-"""Orquestração de agentes de acessibilidade documental em pipeline assíncrono."""
+"""Orchestration of documentary-accessibility agents running in an async pipeline."""
 
 import asyncio
 from pathlib import Path
@@ -10,12 +10,27 @@ from backend.agents.data_agent import DataAgent
 from backend.agents.editor_agent import EditorAgent
 from backend.agents.types import RegionTask
 from backend.services.cache import get_cached, options_cache_key, set_cache
+from backend.i18n import t
+from backend.log_messages import (
+    LOG_ORCHESTRATOR_EMPTY_PAGE_RESPONSE,
+    LOG_ORCHESTRATOR_PAGE_CACHE_SKIP,
+    LOG_ORCHESTRATOR_PAGE_RESPONSE_SAVED,
+    LOG_ORCHESTRATOR_WORKFLOW_START,
+    LOG_ORCHESTRATOR_WORKFLOW_SUMMARY,
+    LOG_ORCHESTRATOR_WAITING_TASKS,
+    LOG_ORCHESTRATOR_TASK_FAILED,
+)
+from backend.stage_messages import (
+    STAGE_PREPARING_IMAGE,
+    STAGE_PROCESSING_PAGE,
+    STAGE_SPLITTING_PDF_PAGES,
+)
 from backend.tools.logger import logger
 from backend.tools.prompt_tools import load_system_prompt
 from backend.pipeline.structure_parser import parse_text_to_blocks
 
 class AccessibilityOrchestrator:
-    """Orquestra o pipeline de processamento de documentos acessíveis."""
+    """Drives the pipeline that performs accessible document processing."""
 
     def __init__(self, mode: str = "medio"):
         self.mode = mode
@@ -35,7 +50,7 @@ class AccessibilityOrchestrator:
         custom_prompt: str | None = None,
         thinking_mode: bool = False,
     ) -> str | dict[str, Any]:
-        """Processa o documento e gera a versão acessível correspondente."""
+        """Processes the document and produces its corresponding accessible (plain text) version."""
         effective_mode = mode or self.mode
         is_pdf = file_path.suffix.lower() == ".pdf"
 
@@ -46,26 +61,27 @@ class AccessibilityOrchestrator:
 
         if is_pdf:
             if status_callback:
-                await status_callback("📄 Separando PDF em paginas...")
+                await status_callback(t(STAGE_SPLITTING_PDF_PAGES))
             async with self._reader_lock:
                 page_paths = await asyncio.to_thread(
                     self.reader.split_file, file_path, tmpdir
                 )
         else:
             if status_callback:
-                await status_callback("🖼️ Preparando imagem...")
+                await status_callback(t(STAGE_PREPARING_IMAGE))
             page_paths = [file_path]
 
         total_pages = len(page_paths)
         if total_pages == 0:
-            raise RuntimeError("Nenhuma pagina gerada a partir do arquivo")
+            raise RuntimeError("No pages could be generated from the source file")
 
         logger.info(
-            "AccessibilityWorkflow: processando {} pagina(s) para {} (reader={}, mode={})",
-            total_pages,
-            file_path.name,
-            self.reader.structurer.name,
-            effective_mode,
+            t(LOG_ORCHESTRATOR_WORKFLOW_START).format(
+                page_count=total_pages,
+                file_name=file_path.name,
+                reader=self.reader.structurer.name,
+                mode=effective_mode,
+            )
         )
 
         results: list[str] = []
@@ -74,7 +90,9 @@ class AccessibilityOrchestrator:
         for index, page_path in enumerate(page_paths):
             page_num = index + 1
             if status_callback:
-                label = f"📷 Processando pagina {page_num} de {total_pages}..."
+                label = t(STAGE_PROCESSING_PAGE).format(
+                    page_num=page_num, total_pages=total_pages
+                )
                 await status_callback(label)
 
             page_cache_key = options_cache_key(
@@ -89,7 +107,9 @@ class AccessibilityOrchestrator:
                 ttl=86400,
             )
             if cached_page:
-                logger.info("[pag {}] Cache hit (pulando IA)", page_num)
+                logger.info(
+                    t(LOG_ORCHESTRATOR_PAGE_CACHE_SKIP).format(page_num=page_num)
+                )
                 results.append(cached_page)
                 page_payloads.append(
                     {
@@ -119,7 +139,9 @@ class AccessibilityOrchestrator:
             page_text = self.editor.consolidate_page(tasks, agent_results)
 
             if not page_text.strip():
-                logger.warning("Resposta vazia para pagina {}", page_num)
+                logger.warning(
+                    t(LOG_ORCHESTRATOR_EMPTY_PAGE_RESPONSE).format(page_num=page_num)
+                )
                 page_text = f"[Pagina {page_num}: resposta vazia do modelo]"
 
             await set_cache(page_path, page_text, page_cache_key)
@@ -127,9 +149,9 @@ class AccessibilityOrchestrator:
             output_file = tmpdir / f"imagen{page_num:03d}.txt"
             output_file.write_text(page_text, encoding="utf-8")
             logger.info(
-                "Resposta da pagina {} salva em {}",
-                page_num,
-                output_file.name,
+                t(LOG_ORCHESTRATOR_PAGE_RESPONSE_SAVED).format(
+                    page_num=page_num, file_name=output_file.name
+                )
             )
 
             results.append(page_text)
@@ -148,9 +170,9 @@ class AccessibilityOrchestrator:
         )
 
         logger.info(
-            "AccessibilityWorkflow: {} paginas processadas, {} chars no total",
-            total_pages,
-            len(texto_final),
+            t(LOG_ORCHESTRATOR_WORKFLOW_SUMMARY).format(
+                total_pages=total_pages, total_chars=len(texto_final)
+            )
         )
 
         if structured_output:
@@ -209,9 +231,10 @@ class AccessibilityOrchestrator:
 
         if pending:
             logger.info(
-                "[pag {}] Aguardando {} tarefas de IA em paralelo...",
-                page_num,
-                len(pending),
+                t(LOG_ORCHESTRATOR_WAITING_TASKS).format(
+                    page_num=page_num,
+                    count=len(pending),
+                )
             )
             done = await asyncio.gather(
                 *(t for _, t in pending),
@@ -220,10 +243,11 @@ class AccessibilityOrchestrator:
             for (idx, _), result in zip(pending, done):
                 if isinstance(result, Exception):
                     logger.error(
-                        "[pag {}] Tarefa {} falhou: {}",
-                        page_num,
-                        idx,
-                        result,
+                        t(LOG_ORCHESTRATOR_TASK_FAILED).format(
+                            page_num=page_num,
+                            idx=idx,
+                            error=result,
+                        )
                     )
                     results[idx] = tasks[idx].text if tasks[idx].text.strip() else ""
                 else:

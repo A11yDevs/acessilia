@@ -73,7 +73,7 @@ def classify_text_block(
         level, _ = plain_heading
         return "heading", level
 
-    # Indício forte de heading tipográfico.
+    # Strong hint of a typographic heading.
     if (
         cleaned
         and len(cleaned) <= 120

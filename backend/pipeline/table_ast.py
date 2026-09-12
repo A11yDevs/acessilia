@@ -3,7 +3,16 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
+from backend.i18n import t
+
 ALLOWED_SCOPES = {"none", "row", "col", "rowgroup", "colgroup"}
+
+#: Canonical English msgid template for the TXT table caption line; {caption} is the table caption.
+MSG_TABLE_TEXT_CAPTION: str = "Table: {caption}"
+#: Canonical English msgid template for a TXT table row line; {row_index} is the 1-based body row number and {joined} the rendered cells.
+MSG_TABLE_TEXT_ROW: str = "Row {row_index}: {joined}"
+#: Canonical English msgid template for the TXT table footer line; {footer_text} is the rendered footer cells.
+MSG_TABLE_TEXT_FOOTER: str = "Footer: {footer_text}"
 
 
 def normalize_table_ast(raw: Any) -> dict[str, Any] | None:
@@ -136,6 +145,14 @@ def split_header_and_body(
 
 
 def linearize_table_for_text(block: dict[str, Any]) -> list[str]:
+    """Linearizes the block's table_ast into locale-specific TXT lines.
+
+    Args:
+        block (dict): Canonical table block mapping, expected to carry a "table_ast" (or legacy "rows"/"caption").
+
+    Returns:
+        list[str]: One localized line per caption, body row, and footer row; empty when the block has no usable table_ast.
+    """
     table_ast = table_ast_from_block(block)
     if table_ast is None:
         return []
@@ -143,7 +160,7 @@ def linearize_table_for_text(block: dict[str, Any]) -> list[str]:
     lines: list[str] = []
     caption = table_ast.get("caption")
     if isinstance(caption, str) and caption.strip():
-        lines.append(f"Tabela: {caption.strip()}")
+        lines.append(t(MSG_TABLE_TEXT_CAPTION).format(caption=caption.strip()))
 
     header_rows, body_rows, footer_rows = split_header_and_body(table_ast)
     headers = _effective_headers(header_rows)
@@ -157,17 +174,21 @@ def linearize_table_for_text(block: dict[str, Any]) -> list[str]:
             joined = "; ".join(
                 f"{headers[cell_index]}: {value}" for cell_index, value in enumerate(cells)
             )
-            lines.append(f"Linha {index}: {joined}")
+            lines.append(t(MSG_TABLE_TEXT_ROW).format(row_index=index, joined=joined))
         else:
-            lines.append(f"Linha {index}: {' | '.join(cells)}")
+            lines.append(
+                t(MSG_TABLE_TEXT_ROW).format(
+                    row_index=index, joined=" | ".join(cells)
+                )
+            )
 
     for row in footer_rows:
         footer_text = " | ".join(_row_texts(row))
         if footer_text:
-            lines.append(f"Rodape: {footer_text}")
+            lines.append(t(MSG_TABLE_TEXT_FOOTER).format(footer_text=footer_text))
 
     if not lines:
-        # Fallback defensivo para tabelas degeneradas.
+        # Defensive fallback for degenerate tables.
         for row in rows_from_table_ast(table_ast):
             lines.append(" | ".join(row))
 

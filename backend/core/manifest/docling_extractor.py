@@ -7,6 +7,17 @@ from pathlib import Path
 from time import perf_counter
 from typing import Any
 
+from backend.i18n import t
+
+MSG_SOURCE_NOT_FOUND = "Source file not found: {source_path}"
+#: Canonical English id for the hint raised when the optional Docling stack is absent from the environment.
+MSG_DOCLING_MISSING = (
+    "Docling is not installed. Run `poetry install` or `pip install docling`."
+)
+MSG_INCOMPATIBLE_STRUCTURER = (
+    "Incompatible structurer: expected convert_document() or _process_document()."
+)
+
 
 @dataclass(frozen=True)
 class DoclingExtraction:
@@ -19,7 +30,7 @@ class DoclingExtraction:
 
 
 class DoclingManifestExtractor:
-    """Adaptador fino que converte exatamente uma vez por documento."""
+    """Thin adapter converting the caller-provided source exactly once per call."""
 
     def __init__(
         self,
@@ -33,7 +44,7 @@ class DoclingManifestExtractor:
     def extract(self, source_path: Path) -> DoclingExtraction:
         source_path = source_path.resolve()
         if not source_path.is_file():
-            raise FileNotFoundError(f"Documento não encontrado: {source_path}")
+            raise FileNotFoundError(t(MSG_SOURCE_NOT_FOUND).format(source_path=source_path))
 
         if self._structurer is None:
             structurer = self._build_structurer()
@@ -62,10 +73,7 @@ class DoclingManifestExtractor:
         from backend.tools.structurer import DOCLING_AVAILABLE, DoclingStructurer
 
         if not DOCLING_AVAILABLE:
-            raise RuntimeError(
-                "Docling não está instalado. Execute `poetry install` ou "
-                "`pip install docling`."
-            )
+            raise RuntimeError(t(MSG_DOCLING_MISSING))
 
         return DoclingStructurer(enable_ocr=self.enable_ocr)
 
@@ -75,9 +83,7 @@ class DoclingManifestExtractor:
             return structurer.convert_document(source_path)
         if hasattr(structurer, "_process_document"):
             return structurer._process_document(source_path)
-        raise RuntimeError(
-            "Structurer incompatível: esperado convert_document() ou _process_document()."
-        )
+        raise RuntimeError(t(MSG_INCOMPATIBLE_STRUCTURER))
 
 
 def _package_version(package: str) -> str:
