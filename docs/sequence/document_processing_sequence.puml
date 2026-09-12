@@ -10,11 +10,11 @@ end note
 
 actor User
 participant "Frontend\n(Web/Telegram/CLI, via REST API)" as Front
-participant "AccessibilityOrchestrator\nbackend/agents/orchestrator.py" as Orchestrator
-participant "ReaderAgent\n(Função Determinística)" as Reader
+participant "AccessibilityWorkflow\nbackend/agents/workflow.py" as Orchestrator
+participant "ReaderAgent\n(Agno Step Function)" as Reader
 participant "VisionAgent\n(Agno LLM)" as Vision
 participant "DataAgent\n(Agno LLM)" as Data
-participant "EditorAgent\n(Função Determinística)" as Editor
+participant "EditorAgent\n(Agno Step Function)" as Editor
 participant "Canonical Builder\nbackend/pipeline" as Builder
 participant "Renderers\nbackend/export" as Export
 
