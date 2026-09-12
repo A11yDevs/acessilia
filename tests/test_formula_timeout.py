@@ -76,7 +76,7 @@ def test_timeout_budget_includes_process_startup(monkeypatch, temporary_files):
     process, _, killer = _mock_child(monkeypatch)
     assert formula_tools.extract_latex_from_image(b"crop") == "x=1"
     assert process.wait.call_args_list[0].kwargs["timeout"] == 6.5
-    killer.assert_called_once_with(process.pid, signal.SIGKILL)
+    killer.assert_not_called()
     assert process.wait.call_args_list[-1].args == ()
     assert process.wait.call_args_list[-1].kwargs == {}
 
@@ -97,7 +97,7 @@ def test_timeout_kills_waits_and_next_call_recovers(monkeypatch, temporary_files
     assert formula_tools.extract_latex_from_image(b"crop") == ""
     assert formula_tools.extract_latex_from_image(b"crop") == "x=1"
     assert launcher.call_count == 2
-    assert killer.call_count == 2
+    assert killer.call_count == 1
     assert process.wait.call_count == 4
 
 
@@ -110,7 +110,7 @@ def test_timeout_kills_waits_and_next_call_recovers(monkeypatch, temporary_files
 def test_child_error_or_malformed_result_returns_empty(monkeypatch, temporary_files, payload, returncode):
     process, _, killer = _mock_child(monkeypatch, payload, returncode)
     assert formula_tools.extract_latex_from_image(b"crop") == ""
-    killer.assert_called_once_with(process.pid, signal.SIGKILL)
+    killer.assert_not_called()
     assert process.wait.call_count == 2
 
 
@@ -123,7 +123,7 @@ def test_wait_error_still_kills_and_reaps(monkeypatch, temporary_files):
     process, _, killer = _mock_child(monkeypatch)
     process.wait.side_effect = [OSError("wait failed"), -9]
     assert formula_tools.extract_latex_from_image(b"crop") == ""
-    killer.assert_called_once_with(process.pid, signal.SIGKILL)
+    killer.assert_not_called()
     assert process.wait.call_count == 2
 
 
@@ -131,6 +131,7 @@ def test_already_exited_group_still_reaps_worker(monkeypatch, temporary_files):
     process, _, killer = _mock_child(monkeypatch)
     killer.side_effect = ProcessLookupError
     assert formula_tools.extract_latex_from_image(b"crop") == "x=1"
+    killer.assert_not_called()
     assert process.wait.call_count == 2
 
 
@@ -314,3 +315,61 @@ def test_worker_recognizer_preserves_model_and_generation_options(monkeypatch, o
         model._post_process.assert_called_once_with([output])
         source.__exit__.assert_called_once()
         image.__exit__.assert_called_once()
+
+
+# ── Testes de regressão ──
+
+
+def test_killpg_nao_chamado_em_sucesso(monkeypatch, temporary_files):
+    """Regressão M2: os.killpg NÃO deve ser chamado quando o processo termina normalmente."""
+    process, _, killer = _mock_child(monkeypatch)
+    assert formula_tools.extract_latex_from_image(b"crop") == "x=1"
+    killer.assert_not_called()
+
+
+def test_killpg_chamado_em_timeout(monkeypatch, temporary_files):
+    """Regressão M2: os.killpg DEVE ser chamado quando o processo excede o orçamento."""
+    monkeypatch.setenv("FORMULA_CODEFORMULA_TIMEOUT", "0.01")
+    process, _, killer = _mock_child(monkeypatch)
+    process.wait.side_effect = subprocess.TimeoutExpired("worker", 0.01)
+    assert formula_tools.extract_latex_from_image(b"crop") == ""
+    killer.assert_called_once_with(process.pid, signal.SIGKILL)
+
+
+def test_get_ocr_lock_prevents_duplicate_instantiation(monkeypatch):
+    """Regressão M1: _get_ocr com lock não cria duas instâncias."""
+    from backend.tools import formula_tools
+
+    calls = []
+    original_rapidocr = None
+    try:
+        from rapidocr import RapidOCR
+        original_rapidocr = RapidOCR
+    except ImportError:
+        pass
+
+    class FakeRapidOCR:
+        def __init__(self, **kwargs):
+            calls.append(1)
+
+    monkeypatch.setattr(formula_tools, "_ocr_engine", None)
+    monkeypatch.setattr(formula_tools, "_ocr_failed", False)
+    if original_rapidocr:
+        monkeypatch.setattr("rapidocr.RapidOCR", FakeRapidOCR)
+        monkeypatch.setattr("rapidocr.EngineType", type("ET", (), {"TORCH": "torch"}))
+
+    import threading
+    barrier = threading.Barrier(5)
+    results = []
+
+    def call_ocr():
+        barrier.wait()
+        results.append(formula_tools._get_ocr())
+
+    threads = [threading.Thread(target=call_ocr) for _ in range(5)]
+    for t in threads: t.start()
+    for t in threads: t.join()
+
+    if original_rapidocr:
+        assert len(calls) == 1, f"RapidOCR instanciado {len(calls)} vezes (esperado 1)"
+    assert all(r is results[0] for r in results)
