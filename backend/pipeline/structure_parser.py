@@ -82,6 +82,10 @@ def parse_text_to_blocks(text: str) -> list[dict[str, Any]]:
             blocks.append({"type": "code", "text": stripped})
             i += 1
             continue
+        if _looks_like_math_line(stripped):
+            blocks.append({"type": "math", "text": stripped})
+            i += 1
+            continue
         if _looks_like_table_row(stripped):
             rows, end_index = _parse_table_rows(lines, i)
             if rows:
@@ -106,6 +110,26 @@ def _attach_ids(blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 def _looks_like_table_row(line: str) -> bool:
     return line.startswith("|") and line.endswith("|")
+
+
+_LATEX_COMMANDS = (
+    "\\frac", "\\sqrt", "\\sum", "\\int", "\\prod", "\\lim",
+    "\\begin{", "\\pm", "\\infty", "\\partial", "\\nabla",
+    "\\alpha", "\\beta", "\\pi", "\\theta", "\\lambda", "\\sigma",
+)
+
+
+def _looks_like_math_line(line: str) -> bool:
+    if len(line) > 2000:
+        return False
+    if line.startswith("$") and line.endswith("$") and len(line) > 2:
+        return True
+    if line.startswith("\\[") and line.endswith("\\]"):
+        return True
+    if any(cmd in line for cmd in _LATEX_COMMANDS):
+        return True
+    # Saída do CodeFormula sem comandos: expoentes/índices com chaves
+    return "^ {" in line or "_ {" in line or "^{" in line or "_{" in line
 
 
 def _extract_plain_heading(
