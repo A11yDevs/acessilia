@@ -4,6 +4,8 @@ from pathlib import Path
 
 import fitz
 
+from agno.workflow.step import Step, StepInput, StepOutput
+
 from backend.config.settings import settings
 from backend.i18n import t
 from backend.log_messages import (
@@ -38,6 +40,7 @@ class ReaderAgent:
     """Analyzes document pages and generates typed tasks for the remaining agents."""
 
     def __init__(self):
+        self.__name__ = self.__class__.__name__
         self.structurer = get_structurer_instance()
 
     def split_file(self, file_path: Path, tmpdir: Path) -> list[Path]:
@@ -98,12 +101,9 @@ class ReaderAgent:
         )
 
         # Check whether every region is clean text (no vision pass needed)
-        all_text_clean = True
-        for r in regions:
-            classification = classify_region(r)
-            if classification != "text_clean" and classification != "ignore":
-                all_text_clean = False
-                break
+        all_text_clean = all(
+            classify_region(r) in ("text_clean", "ignore") for r in regions
+        )
 
         if all_text_clean:
             return self._extract_clean_text_tasks(regions, page_num)
@@ -121,29 +121,13 @@ class ReaderAgent:
 
         for region in regions:
             classification = classify_region(region)
-
-            if classification == "text_clean" and region.text.strip():
-                fp = content_fingerprint(region.text)
-                if fp not in clean_fps:
-                    clean_fps.add(fp)
-                    tasks.append(RegionTask(
-                        agent_target="editor",
-                        classification=classification,
-                        text=region.text,
-                        region=region,
-                        page_num=page_num,
-                    ))
-            elif region_has_markers(classification) and region.text.strip():
-                fp = content_fingerprint(region.text)
-                if fp not in clean_fps:
-                    clean_fps.add(fp)
-                    tasks.append(RegionTask(
-                        agent_target="editor",
-                        classification=classification,
-                        text=apply_marker(region.text, classification, region),
-                        region=region,
-                        page_num=page_num,
-                    ))
+            if (classification == "text_clean" or region_has_markers(classification)) and region.text.strip():
+                task = _build_text_task(region, classification, page_num)
+                if task:
+                    fp = content_fingerprint(region.text)
+                    if fp not in clean_fps:
+                        clean_fps.add(fp)
+                        tasks.append(task)
 
         if tasks:
             logger.info(
@@ -162,17 +146,7 @@ class ReaderAgent:
         page_num: int,
         total_pages: int,
     ) -> list[RegionTask]:
-        """Generates mixed tasks: clean text sent directly plus regions that need a vision pass.
-
-        Args:
-            page_path: Path to the single-page file (per-page PDF or image).
-            regions: Regions extracted from the page.
-            page_num: 1-based page number within the document.
-            total_pages: Total page count of the document.
-
-        Returns:
-            One RegionTask per region that produced usable output.
-        """
+        """Generates mixed tasks: clean text sent directly plus regions that need a vision pass."""
         tasks: list[RegionTask] = []
         clean_bboxes: list[tuple[float, float, float, float]] = []
         content_fingerprints: set[int] = set()
@@ -184,34 +158,15 @@ class ReaderAgent:
             if classification == "ignore":
                 continue
 
-            # Clean text goes straight to the EditorAgent
-            if classification == "text_clean" and region.text.strip():
-                fp = content_fingerprint(region.text)
-                if fp not in content_fingerprints:
-                    content_fingerprints.add(fp)
-                    tasks.append(RegionTask(
-                        agent_target="editor",
-                        classification=classification,
-                        text=region.text,
-                        region=region,
-                        page_num=page_num,
-                    ))
-                    clean_bboxes.append(region.bbox)
-                continue
-
-            # Regions with markers that also carry clean text
-            if region_has_markers(classification) and region.text.strip():
-                fp = content_fingerprint(region.text)
-                if fp not in content_fingerprints:
-                    content_fingerprints.add(fp)
-                    tasks.append(RegionTask(
-                        agent_target="editor",
-                        classification=classification,
-                        text=apply_marker(region.text, classification, region),
-                        region=region,
-                        page_num=page_num,
-                    ))
-                    clean_bboxes.append(region.bbox)
+            # Clean text or regions with markers that also carry clean text
+            if (classification == "text_clean" or region_has_markers(classification)) and region.text.strip():
+                task = _build_text_task(region, classification, page_num)
+                if task:
+                    fp = content_fingerprint(region.text)
+                    if fp not in content_fingerprints:
+                        content_fingerprints.add(fp)
+                        tasks.append(task)
+                        clean_bboxes.append(region.bbox)
                 continue
 
             # Formula with LaTeX already extracted by Docling (CodeFormula) → editor directly
@@ -239,22 +194,15 @@ class ReaderAgent:
                 if classification in ("unknown", "text_scanned") and overlaps_clean(
                     region.bbox, clean_bboxes
                 ):
-                    if region.text.strip():
+                    task = _build_text_task(region, classification, page_num)
+                    if task:
                         fp = content_fingerprint(region.text)
                         if fp not in content_fingerprints:
                             content_fingerprints.add(fp)
-                            tasks.append(RegionTask(
-                                agent_target="editor",
-                                classification=classification,
-                                text=region.text,
-                                region=region,
-                                page_num=page_num,
-                            ))
+                            tasks.append(task)
                     continue
 
                 vision_count += 1
-
-                # Crop the region image to send to the vision agent
                 image_bytes = crop_region_image(
                     self.structurer, page_path, region,
                 )
@@ -286,15 +234,7 @@ class ReaderAgent:
                         ))
                         continue
 
-                # Decide which agent will process the task
-                if classification in ("table",):
-                    target = "data"
-                elif classification in ("formula",):
-                    target = "data"
-                elif classification in ("embedded_image",):
-                    target = "vision"
-                else:
-                    target = "vision"
+                target = "data" if classification in ("table", "formula") else "vision"
 
                 logger.info(
                     t(LOG_READER_REGION_TASK).format(
@@ -362,3 +302,95 @@ class ReaderAgent:
             image_bytes=jpg_bytes,
             page_num=page_num,
         )]
+
+    def execute_step(self, step_input: StepInput) -> StepOutput:
+        """Executes reader step for an Agno workflow."""
+        raw = step_input.input if step_input.input is not None else step_input.previous_step_content
+        page_path, page_num, total_pages, is_pdf = self._parse_step_input(raw)
+
+        if not page_path:
+            return StepOutput(
+                content=None,
+                success=False,
+                error="ReaderAgent requires 'page_path' or 'file_path' in input",
+            )
+
+        try:
+            tasks = self.analyse_page(
+                page_path=page_path,
+                page_num=page_num,
+                total_pages=total_pages,
+                is_pdf=is_pdf if is_pdf is not None else (page_path.suffix.lower() == ".pdf"),
+            )
+            return StepOutput(
+                content={
+                    "tasks": tasks,
+                    "page_path": str(page_path),
+                    "page_num": page_num,
+                    "total_pages": total_pages,
+                    "is_pdf": is_pdf if is_pdf is not None else (page_path.suffix.lower() == ".pdf"),
+                    "total_tasks": len(tasks),
+                },
+                success=True,
+            )
+        except Exception as exc:
+            logger.error(f"ReaderAgent step execution failed for {page_path}: {exc}")
+            return StepOutput(content=None, success=False, error=str(exc))
+
+    @staticmethod
+    def _parse_step_input(raw: object) -> tuple[Path | None, int, int, bool | None]:
+        if isinstance(raw, dict):
+            path_val = raw.get("page_path") or raw.get("file_path")
+            return (
+                Path(path_val) if path_val else None,
+                raw.get("page_num") or 1,
+                raw.get("total_pages") or 1,
+                raw.get("is_pdf"),
+            )
+        if isinstance(raw, (str, Path)):
+            return Path(raw), 1, 1, None
+        if hasattr(raw, "page_path"):
+            path_val = raw.page_path
+            return (
+                Path(path_val) if path_val else None,
+                getattr(raw, "page_num", 1) or 1,
+                getattr(raw, "total_pages", 1) or 1,
+                getattr(raw, "is_pdf", None),
+            )
+        return None, 1, 1, None
+
+    def __call__(self, step_input: StepInput) -> StepOutput:
+        """Allows ReaderAgent instance to be passed directly as an Agno workflow step."""
+        return self.execute_step(step_input)
+
+    def as_step(
+        self,
+        name: str = "ReaderAgent",
+        description: str = "Structural page reading and region classification",
+    ) -> Step:
+        """Wraps ReaderAgent as an explicit Agno Step instance."""
+        return Step(name=name, description=description, executor=self.execute_step)
+
+
+def _build_text_task(region: Region, classification: str, page_num: int) -> RegionTask | None:
+    if not region.text.strip():
+        return None
+    text = (
+        apply_marker(region.text, classification, region)
+        if region_has_markers(classification)
+        else region.text
+    )
+    return RegionTask(
+        agent_target="editor",
+        classification=classification,
+        text=text,
+        region=region,
+        page_num=page_num,
+    )
+
+
+def reader_step(step_input: StepInput) -> StepOutput:
+    """Module-level step function for ReaderAgent in Agno workflows."""
+    return ReaderAgent().execute_step(step_input)
+
+
