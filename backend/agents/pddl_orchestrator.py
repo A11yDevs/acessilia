@@ -13,6 +13,7 @@ from backend.core.execution.executor import ExecutorAgent, MethodRegistry
 from backend.core.execution.models import ExecutionReport, MethodResult
 from backend.core.manifest.docling_extractor import DoclingManifestExtractor
 from backend.core.manifest.pymupdf_extractor import PyMuPDFManifestExtractor
+from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
 from backend.core.manifest.models import ManifestElement, ProcessingManifest
 from backend.core.planning.domain_bundle import DomainBundle
 from backend.core.planning.models import NominalPlan, PlanningComparison
@@ -157,6 +158,8 @@ class PddlAccessibilityOrchestrator:
             extractor = PyMuPDFManifestExtractor(include_images=True)
         elif self.extractor_backend == "docling":
             extractor = DoclingManifestExtractor(enable_ocr=enable_ocr)
+        elif self.extractor_backend == "toolbox":
+            extractor = ToolboxManifestExtractor(enable_ocr=enable_ocr)
         else:
             raise ValueError(t(LOG_PDDL_EXTRACTOR_BACKEND_INVALID))
 

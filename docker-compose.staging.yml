@@ -10,6 +10,8 @@ services:
       - ./var:/app/var
     env_file:
       - .env
+    environment:
+      TOOLBOX_API_KEY: ${TOOLBOX_API_KEY:-}
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "if echo \"$ENABLED_INTERFACES\" | grep -q 'api'; then curl -fsS http://localhost:8000/api/v1/health; else curl -fsS http://localhost:8001/; fi"]
