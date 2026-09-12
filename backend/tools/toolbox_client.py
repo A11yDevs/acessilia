@@ -159,7 +159,7 @@ class ToolboxClient:
                     }
                     if not use_cache:
                         data["no_cache"] = True
-                    response = await client.post(url, json=data)
+                    response = await client.post(url, data=data)
                 else:
                     with open(file_path, "rb") as f:
                         files = {"file": (file_path.name, f, _media_type(file_path))}
