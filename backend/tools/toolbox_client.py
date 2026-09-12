@@ -39,6 +39,10 @@ class ToolboxCapabilityError(ToolboxError):
     """Capacidade inválida ou não disponível na Toolbox."""
 
 
+class ToolboxAuthenticationError(ToolboxError):
+    """Autenticação falhou — chave inválida ou ausente."""
+
+
 class ToolboxClient:
     """Cliente HTTP para a Acessilia Toolbox (REST API na porta 8002).
 
@@ -51,13 +55,19 @@ class ToolboxClient:
         base_url: str | None = None,
         provider: str | None = None,
         timeout_seconds: int | None = None,
+        api_key: str | None = None,
     ) -> None:
         self.base_url = (base_url or settings.toolbox_base_url).rstrip("/")
         self.provider = provider or settings.toolbox_provider
         self.timeout_seconds = timeout_seconds or settings.toolbox_timeout_seconds
+        self.api_key = api_key if api_key is not None else settings.toolbox_api_key
+        headers: dict[str, str] = {}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
         self._client = httpx.AsyncClient(
             base_url=self.base_url,
             timeout=httpx.Timeout(self.timeout_seconds),
+            headers=headers,
         )
 
     async def health(self) -> dict[str, Any]:
@@ -80,6 +90,7 @@ class ToolboxClient:
                     response = await client.post(
                         url,
                         files={"file": (file_path.name, f, _media_type(file_path))},
+                        headers=self._auth_headers,
                     )
                 _raise_for_error(response, "artifact.store")
                 data = response.json()
@@ -108,7 +119,7 @@ class ToolboxClient:
         url = f"{self.base_url}/v1/artifacts/{artifact_id}"
         try:
             async with httpx.AsyncClient(timeout=httpx.Timeout(self.timeout_seconds)) as client:
-                response = await client.get(url)
+                response = await client.get(url, headers=self._auth_headers)
             _raise_for_error(response, "artifact.retrieve")
             output_path.write_bytes(response.content)
             logger.info(
@@ -159,7 +170,7 @@ class ToolboxClient:
                     }
                     if not use_cache:
                         data["no_cache"] = True
-                    response = await client.post(url, data=data)
+                    response = await client.post(url, data=data, headers=self._auth_headers)
                 else:
                     with open(file_path, "rb") as f:
                         files = {"file": (file_path.name, f, _media_type(file_path))}
@@ -169,7 +180,7 @@ class ToolboxClient:
                         }
                         if not use_cache:
                             params["no_cache"] = True
-                        response = await client.post(url, files=files, data=params)
+                        response = await client.post(url, files=files, data=params, headers=self._auth_headers)
 
             _raise_for_error(response, "document.structure.extract")
             result = response.json()
@@ -197,6 +208,12 @@ class ToolboxClient:
 
     async def close(self) -> None:
         await self._client.aclose()
+
+    @property
+    def _auth_headers(self) -> dict[str, str]:
+        if self.api_key:
+            return {"Authorization": f"Bearer {self.api_key}"}
+        return {}
 
     async def _get(self, path: str) -> Any:
         try:
@@ -265,6 +282,10 @@ def _raise_for_error(response: httpx.Response, context: str) -> None:
     if status == 400:
         raise ToolboxCapabilityError(
             f"Capacidade inválida ({context}): {detail}"
+        )
+    if status == 401:
+        raise ToolboxAuthenticationError(
+            f"Autenticação falhou ({context}): {detail}"
         )
 
     raise ToolboxError(

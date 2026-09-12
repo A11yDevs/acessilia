@@ -13,6 +13,7 @@ import respx
 
 from backend.tools.toolbox_client import (
     ToolboxArtifactNotFound,
+    ToolboxAuthenticationError,
     ToolboxCapabilityError,
     ToolboxClient,
     ToolboxContractViolation,
@@ -283,3 +284,119 @@ async def test_timeout_on_get_raises_timeout(respx_mock, client):
 
     with pytest.raises(ToolboxTimeout):
         await client.health()
+
+
+# ---------------------------------------------------------------------------
+# Authentication
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_client_with_api_key_sends_auth_header(respx_mock):
+    """Quando api_key é fornecida, o header Authorization deve ser enviado."""
+    auth_client = ToolboxClient(
+        base_url="http://localhost:8002",
+        provider="docling",
+        timeout_seconds=30,
+        api_key="test-key-123",
+    )
+
+    route = respx_mock.get("http://localhost:8002/v1/capabilities")
+    route.return_value = httpx.Response(200, json=[])
+
+    await auth_client.capabilities()
+
+    request = route.calls[0].request
+    assert request.headers.get("Authorization") == "Bearer test-key-123"
+
+
+@pytest.mark.asyncio
+async def test_client_without_api_key_skips_auth_header(respx_mock, client):
+    """Quando api_key não é fornecida, o header Authorization não deve ser enviado."""
+    route = respx_mock.get("http://localhost:8002/v1/capabilities")
+    route.return_value = httpx.Response(200, json=[])
+
+    await client.capabilities()
+
+    request = route.calls[0].request
+    assert "Authorization" not in request.headers
+
+
+@pytest.mark.asyncio
+async def test_health_works_with_api_key(respx_mock):
+    """Health check (público) funciona mesmo com api_key configurada."""
+    auth_client = ToolboxClient(
+        base_url="http://localhost:8002",
+        provider="docling",
+        timeout_seconds=30,
+        api_key="test-key-123",
+    )
+
+    route = respx_mock.get("http://localhost:8002/v1/health")
+    route.return_value = httpx.Response(200, json={"status": "ok"})
+
+    result = await auth_client.health()
+    assert result["status"] == "ok"
+
+
+@pytest.mark.asyncio
+async def test_401_raises_authentication_error(respx_mock, client):
+    """HTTP 401 deve levantar ToolboxAuthenticationError."""
+    route = respx_mock.get("http://localhost:8002/v1/capabilities")
+    route.return_value = httpx.Response(
+        401, json={"detail": "Missing or invalid token"}
+    )
+
+    with pytest.raises(ToolboxAuthenticationError, match="Autenticação falhou"):
+        await client.capabilities()
+
+
+@pytest.mark.asyncio
+async def test_upload_artifact_sends_auth_header(respx_mock):
+    """upload_artifact com api_key envia header Authorization."""
+    auth_client = ToolboxClient(
+        base_url="http://localhost:8002",
+        provider="docling",
+        timeout_seconds=30,
+        api_key="test-key-123",
+    )
+
+    route = respx_mock.post("http://localhost:8002/v1/artifacts")
+    route.return_value = httpx.Response(
+        200, json={"artifact_id": "sha256:abc123"}
+    )
+
+    await auth_client.upload_artifact(FIXTURE_PDF)
+
+    request = route.calls[0].request
+    assert request.headers.get("Authorization") == "Bearer test-key-123"
+
+
+@pytest.mark.asyncio
+async def test_extract_structure_sends_auth_header(respx_mock):
+    """extract_structure com api_key envia header Authorization."""
+    auth_client = ToolboxClient(
+        base_url="http://localhost:8002",
+        provider="docling",
+        timeout_seconds=30,
+        api_key="test-key-123",
+    )
+
+    route = respx_mock.post(
+        "http://localhost:8002/v1/capabilities/document.structure.extract:execute"
+    )
+    route.return_value = httpx.Response(
+        200,
+        json={
+            "status": "succeeded",
+            "capability": "document.structure.extract",
+            "provider": "docling",
+            "document": {"elements": [], "pages": []},
+            "provenance": {"duration_ms": 100, "provider_version": "1.0"},
+        },
+    )
+
+    await auth_client.extract_structure(file_path=FIXTURE_PDF)
+
+    request = route.calls[0].request
+    assert request.headers.get("Authorization") == "Bearer test-key-123"

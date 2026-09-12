@@ -85,6 +85,7 @@ class Settings:
     # Acessilia Toolbox settings
     toolbox_base_url: str = os.getenv("TOOLBOX_BASE_URL", "http://localhost:8002")
     toolbox_provider: str = os.getenv("TOOLBOX_PROVIDER", "docling")
+    toolbox_api_key: str = os.getenv("TOOLBOX_API_KEY", "")
     toolbox_timeout_seconds: int = int(os.getenv("TOOLBOX_TIMEOUT_SECONDS", "3600"))
     toolbox_use_artifact_store: bool = field(
         default_factory=lambda: os.getenv("TOOLBOX_USE_ARTIFACT_STORE", "true").strip().lower()
