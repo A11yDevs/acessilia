@@ -15,6 +15,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unicodedata
 from typing import Any
@@ -23,6 +24,7 @@ from backend.tools.logger import logger
 
 _ocr_engine: Any = None
 _ocr_failed = False
+_ocr_lock = threading.Lock()
 
 CODEFORMULA_TIMEOUT_SECONDS = 120.0
 _MAX_WORKER_RESULT_BYTES = 8192
@@ -43,20 +45,22 @@ def _codeformula_timeout() -> float:
 def _get_ocr() -> Any:
     global _ocr_engine, _ocr_failed
     if _ocr_engine is None and not _ocr_failed:
-        try:
-            from rapidocr import EngineType, RapidOCR
+        with _ocr_lock:
+            if _ocr_engine is None and not _ocr_failed:
+                try:
+                    from rapidocr import EngineType, RapidOCR
 
-            # backend torch: mesmo usado pelo Docling no repo (onnxruntime ausente)
-            _ocr_engine = RapidOCR(
-                params={
-                    "Det.engine_type": EngineType.TORCH,
-                    "Cls.engine_type": EngineType.TORCH,
-                    "Rec.engine_type": EngineType.TORCH,
-                }
-            )
-        except Exception as error:
-            _ocr_failed = True
-            logger.warning("RapidOCR indisponível para cascata de fórmulas: {}", error)
+                    # backend torch: mesmo usado pelo Docling no repo (onnxruntime ausente)
+                    _ocr_engine = RapidOCR(
+                        params={
+                            "Det.engine_type": EngineType.TORCH,
+                            "Cls.engine_type": EngineType.TORCH,
+                            "Rec.engine_type": EngineType.TORCH,
+                        }
+                    )
+                except Exception as error:
+                    _ocr_failed = True
+                    logger.warning("RapidOCR indisponível para cascata de fórmulas: {}", error)
     return _ocr_engine
 
 
@@ -182,14 +186,15 @@ def extract_latex_from_image(image_bytes: bytes) -> str:
                 if remaining <= 0:
                     raise subprocess.TimeoutExpired(process.args, timeout)
                 returncode = process.wait(timeout=remaining)
-            finally:
-                # Não aguarda EOF de pipes herdados; encerra também descendentes do grupo.
+            except subprocess.TimeoutExpired:
                 try:
                     os.killpg(process.pid, signal.SIGKILL)
                 except ProcessLookupError:
                     pass
-                finally:
-                    process.wait()
+                process.wait()
+                return ""
+            finally:
+                process.wait()
             if returncode != 0:
                 logger.warning("CodeFormula falhou no recorte (status {})", returncode)
                 return ""

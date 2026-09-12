@@ -201,7 +201,7 @@ def _render_block(block: dict[str, Any], profile: dict[str, Any]) -> str:
         alt = escape(block.get("alt_text", ""))
         mathml = (block.get("metadata") or {}).get("mathml", "")
         if mathml:
-            return f'<div id="{block_id}" role="math" aria-label="{alt}">{mathml}</div>'
+            return f'<div id="{block_id}" role="math" aria-label="{alt}">{escape(mathml)}</div>'
         return (
             f'<p id="{block_id}" role="math" aria-label="{alt}">'
             f'{escape(block.get("text", ""))}</p>'

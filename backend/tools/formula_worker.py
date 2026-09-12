@@ -30,16 +30,16 @@ def _recognize(image_bytes: bytes) -> str:
         return ""
     with Image.open(io.BytesIO(image_bytes)) as source:
         image = source.convert("RGB")
-    with image:
-        engine_input = VlmEngineInput(
-            image=image,
-            prompt="<formula>",
-            temperature=0.0,
-            max_new_tokens=512,
-            extra_generation_config={"skip_special_tokens": False},
-        )
-        outputs = model.engine.predict_batch([engine_input])
-        return model._post_process([outputs[0].text])[0].strip()
+        with image:
+            engine_input = VlmEngineInput(
+                image=image,
+                prompt="<formula>",
+                temperature=0.0,
+                max_new_tokens=512,
+                extra_generation_config={"skip_special_tokens": False},
+            )
+            outputs = model.engine.predict_batch([engine_input])
+            return model._post_process([outputs[0].text])[0].strip()
 
 
 def main() -> int:
