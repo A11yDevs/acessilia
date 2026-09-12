@@ -120,7 +120,6 @@ class ExecutorAgent:
                     name=f"{plan_step.index:04d}-{plan_step.action}",
                     executor=execute_step,
                     max_retries=0,
-                    on_error="fail",
                 )
             )
         return Workflow(

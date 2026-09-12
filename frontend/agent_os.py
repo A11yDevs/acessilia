@@ -34,7 +34,15 @@ from frontend.web.messages import (
 )
 
 # Session/memory database of the AgentOS (kept in the project data directory).
-_db = SqliteDb(db_file=str(settings.data_dir / "agentos.db"))
+_db_file = settings.data_dir / "agentos.db"
+_db = SqliteDb(db_file=str(_db_file))
+if _db_file.exists():
+    try:
+        from agno.db.migrations.manager import MigrationManager
+
+        MigrationManager(_db).up()
+    except Exception:
+        pass
 
 
 def _build_data_instructions() -> str:

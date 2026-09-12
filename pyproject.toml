@@ -15,7 +15,7 @@ requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.dependencies]
-python = "~3.11"
+python = "^3.11, <3.14"
 
 loguru = "^0.7.3"
 aiosmtplib = "^5.1.2"
@@ -37,7 +37,7 @@ rapidocr = { version = "^3.9.1", optional = true }
 slowapi = "^0.1.10"
 python-multipart = "^0.0.32"
 jinja2 = "^3.1.6"
-agno = "^2.7.2"
+agno = "^3.0.0"
 jsonschema = "^4.20"
 openai = "^2.45.0"
 ollama = "^0.6.2"
