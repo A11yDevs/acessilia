@@ -400,3 +400,24 @@ async def test_extract_structure_sends_auth_header(respx_mock):
 
     request = route.calls[0].request
     assert request.headers.get("Authorization") == "Bearer test-key-123"
+
+
+@pytest.mark.asyncio
+async def test_retrieve_artifact_sends_auth_header(respx_mock, tmp_path):
+    """retrieve_artifact com api_key envia header Authorization."""
+    auth_client = ToolboxClient(
+        base_url="http://localhost:8002",
+        provider="docling",
+        timeout_seconds=30,
+        api_key="test-key-123",
+    )
+
+    route = respx_mock.get("http://localhost:8002/v1/artifacts/sha256:abc")
+    route.return_value = httpx.Response(200, content=b"pdf-content")
+
+    out = tmp_path / "downloaded.pdf"
+    await auth_client.retrieve_artifact("sha256:abc", out)
+
+    request = route.calls[0].request
+    assert request.headers.get("Authorization") == "Bearer test-key-123"
+    assert out.read_bytes() == b"pdf-content"
