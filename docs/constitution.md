@@ -15,6 +15,7 @@ Deliver document and image conversion to accessible formats through:
 5. Local-first extraction: text-based PDFs should prefer deterministic local extraction before invoking AI.
 6. Hybrid determinism and intelligence: the system combines deterministic planning (PDDL processing, manifesto generation) with AI-driven execution to ensure reliability and flexibility. Deterministic functions are the source of truth; LLMs provide interpretation and description.
 7. Container-first validation: test suite must pass in Docker container (production-equivalent environment) before merge. Native environment testing is secondary and environment-specific.
+8. **English-first documentation: all source code (identifiers, comments, docstrings), Markdown documentation, issues, pull requests, and commit messages must be written in English. Brazilian Portuguese is allowed only in user-facing content (Telegram messages, rendered output, prompts for the AI models) and in domain-specific educational materials where the target audience is Portuguese-speaking.**
 
 ## 3. Architectural quality rules
 1. Layer separation (updated for PDDL + Agno multiagent architecture):
