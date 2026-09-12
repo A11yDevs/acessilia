@@ -4,7 +4,7 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Coroutine
 
-from backend.agents.orchestrator import AccessibilityOrchestrator
+from backend.agents.workflow import AccessibilityWorkflow
 from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
 from backend.agents.state_manager import TaskCancelledError, state_manager
 from backend.services.cache import get_cached, options_cache_key, set_cache
@@ -72,7 +72,7 @@ def _build_orchestrator():
             enable_ocr=structurer == "docling",
             extractor_backend=structurer,
         )
-    return AccessibilityOrchestrator()
+    return AccessibilityWorkflow()
 
 
 agente = _build_orchestrator()
