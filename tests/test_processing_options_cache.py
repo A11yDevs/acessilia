@@ -19,8 +19,8 @@ def test_document_cache_key_changes_with_each_processing_option(monkeypatch):
 
 
 def test_page_cache_key_changes_with_prompt_and_thinking_mode(monkeypatch, tmp_path):
-    from backend.agents import orchestrator as orchestrator_module
-    from backend.agents.orchestrator import AccessibilityOrchestrator
+    from backend.agents import workflow as workflow_module
+    from backend.agents.workflow import AccessibilityWorkflow
 
     observed_keys: list[str] = []
 
@@ -44,11 +44,11 @@ def test_page_cache_key_changes_with_prompt_and_thinking_mode(monkeypatch, tmp_p
         def consolidate_page(self, _tasks, _results):
             return "page result"
 
-    monkeypatch.setattr(orchestrator_module, "get_cached", cache_miss)
-    monkeypatch.setattr(orchestrator_module, "set_cache", ignore_cache_write)
-    monkeypatch.setattr(orchestrator_module.asyncio, "to_thread", run_inline)
+    monkeypatch.setattr(workflow_module, "get_cached", cache_miss)
+    monkeypatch.setattr(workflow_module, "set_cache", ignore_cache_write)
+    monkeypatch.setattr(workflow_module.asyncio, "to_thread", run_inline)
 
-    orchestrator = AccessibilityOrchestrator.__new__(AccessibilityOrchestrator)
+    orchestrator = AccessibilityWorkflow.__new__(AccessibilityWorkflow)
     orchestrator.mode = "medio"
     orchestrator.reader = Reader()
     orchestrator.editor = Editor()
