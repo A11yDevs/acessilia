@@ -23,7 +23,6 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 # ── Exempt paths (entire directories) ──────────────────────────────
 EXEMPT_PATHS = {
     # Real document content — not source code.
-    PROJECT_ROOT / "dataset",
     PROJECT_ROOT / "fixtures" / "images",
     PROJECT_ROOT / "fixtures" / "presentations",
     PROJECT_ROOT / "fixtures" / "tutorials",
