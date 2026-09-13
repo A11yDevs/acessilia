@@ -1,11 +1,17 @@
-"""Compare legacy pipeline vs PDDL+Toolbox pipeline outputs end-to-end.
+"""Compare PDDL local vs PDDL+Toolbox pipeline outputs end-to-end.
 
 Runs both pipelines on the same input document(s) and generates a detailed
 diff report comparing canonical documents at structural and text levels.
 
+Both paths use the same PDDL orchestrator -- only the extraction backend
+differs (local Docling/PyMuPDF vs remote Acessilia Toolbox).
+
 Usage:
-    # Single file
+    # Single file with local Docling extractor
     poetry run python scripts/compare_pipelines.py tests/fixtures/tutorials/java-oo-3pgs.pdf
+
+    # With PyMuPDF extractor
+    poetry run python scripts/compare_pipelines.py input.pdf --extractor pymupdf
 
     # Batch mode (all PDFs in fixtures directory)
     poetry run python scripts/compare_pipelines.py tests/fixtures/ --batch
@@ -24,7 +30,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from backend.agents.orchestrator import AccessibilityOrchestrator
 from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
 from backend.pipeline.canonical_builder import build_canonical_document
 from backend.pipeline.verbosity_manager import verbosity_for_mode
@@ -155,40 +160,41 @@ def _summarize_document(document: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-async def _run_legacy(
+async def _run_pddl_local(
     file_path: Path,
     mode: str,
     tmpdir: Path,
     *,
-    structurer: str = "pymupdf",
+    extractor: str = "docling",
+    enable_ocr: bool = False,
+    planner_backend: str = "internal",
+    execute_plan: bool = False,
 ) -> dict[str, Any]:
-    """Run the legacy pipeline (AccessibilityOrchestrator + structurer).
+    """Run the PDDL pipeline with a local extractor (docling or pymupdf).
 
     Args:
         file_path: Input file to process.
-        mode: Verbosity mode.
+        mode: Verbosity mode (unused by local, kept for interface parity).
         tmpdir: Temporary directory for intermediate files.
-        structurer: "pymupdf" (default) or "docling".
+        extractor: "docling" (default) or "pymupdf".
+        enable_ocr: Whether to enable OCR in the Docling extractor.
+        planner_backend: PDDL planner backend ("internal" or "fast-downward").
+        execute_plan: Whether to actually execute the plan (vs dry-run).
     """
-    from backend.tools import structurer as structurer_module
-
-    original = structurer_module.get_structurer
-    try:
-        if structurer == "pymupdf":
-            structurer_module.get_structurer = lambda: structurer_module.PyMuPDFStructurer()
-        elif structurer == "docling":
-            structurer_module.get_structurer = lambda: structurer_module.DoclingStructurer(enable_ocr=True)
-        else:
-            raise ValueError(f"Unknown structurer: {structurer}")
-        orchestrator = AccessibilityOrchestrator(mode=mode)
-        structured = await orchestrator.executar(
-            file_path=file_path,
-            tmpdir=tmpdir,
-            structured_output=True,
-            mode=mode,
-        )
-    finally:
-        structurer_module.get_structurer = original
+    orchestrator = PddlAccessibilityOrchestrator(
+        planner_backend=planner_backend,
+        preferred_plan=planner_backend,
+        execute_dry_run=not execute_plan,
+        enable_ocr=enable_ocr,
+        extractor_backend=extractor,
+    )
+    structured = await orchestrator.executar(
+        file_path=file_path,
+        tmpdir=tmpdir,
+        structured_output=True,
+    )
+    canonical_metadata = structured.get("canonical_metadata")
+    technical_warnings = structured.get("technical_warnings")
 
     canonical = build_canonical_document(
         structured,
@@ -198,8 +204,12 @@ async def _run_legacy(
         source_name=file_path.name,
         source_path=str(file_path),
         audience=["reader"],
-        metadata=None,
-        technical_warnings=None,
+        metadata=canonical_metadata if isinstance(canonical_metadata, dict) else None,
+        technical_warnings=(
+            [str(item) for item in technical_warnings]
+            if isinstance(technical_warnings, list)
+            else None
+        ),
     )
     return {"structured": structured, "canonical": canonical}
 
@@ -253,122 +263,122 @@ async def _run_pddl_toolbox(
 
 
 def _compare_documents(
-    legacy: dict[str, Any],
-    pddl: dict[str, Any],
+    pddl_local: dict[str, Any],
+    pddl_toolbox: dict[str, Any],
 ) -> dict[str, Any]:
     """Compare two canonical documents and return a structured diff report."""
-    legacy_blocks = _flatten_blocks(legacy)
-    pddl_blocks = _flatten_blocks(pddl)
-    legacy_text = _extract_text(legacy)
-    pddl_text = _extract_text(pddl)
+    local_blocks = _flatten_blocks(pddl_local)
+    tb_blocks = _flatten_blocks(pddl_toolbox)
+    local_text = _extract_text(pddl_local)
+    tb_text = _extract_text(pddl_toolbox)
 
-    legacy_by_type = _count_by_type(legacy_blocks)
-    pddl_by_type = _count_by_type(pddl_blocks)
+    local_by_type = _count_by_type(local_blocks)
+    tb_by_type = _count_by_type(tb_blocks)
 
     # Type diff
-    all_types = sorted(set(legacy_by_type) | set(pddl_by_type))
+    all_types = sorted(set(local_by_type) | set(tb_by_type))
     type_deltas: dict[str, dict[str, int]] = {}
     for t in all_types:
-        l = legacy_by_type.get(t, 0)
-        p = pddl_by_type.get(t, 0)
+        l = local_by_type.get(t, 0)
+        p = tb_by_type.get(t, 0)
         if l != p:
-            type_deltas[t] = {"legacy": l, "pddl_toolbox": p}
+            type_deltas[t] = {"local": l, "toolbox": p}
 
     # Text similarity
-    similarity = _jaccard_similarity(legacy_text, pddl_text)
+    similarity = _jaccard_similarity(local_text, tb_text)
 
     # Formula comparison
-    legacy_formulas = _extract_formulas(legacy)
-    pddl_formulas = _extract_formulas(pddl)
+    local_formulas = _extract_formulas(pddl_local)
+    tb_formulas = _extract_formulas(pddl_toolbox)
 
     # Table comparison
-    legacy_tables = _extract_tables(legacy)
-    pddl_tables = _extract_tables(pddl)
+    local_tables = _extract_tables(pddl_local)
+    tb_tables = _extract_tables(pddl_toolbox)
 
     return {
         "structural": {
             "section_count": {
-                "legacy": len(legacy.get("sections", [])),
-                "pddl_toolbox": len(pddl.get("sections", [])),
+                "local": len(pddl_local.get("sections", [])),
+                "toolbox": len(pddl_toolbox.get("sections", [])),
             },
             "block_count": {
-                "legacy": len(legacy_blocks),
-                "pddl_toolbox": len(pddl_blocks),
-                "delta": len(pddl_blocks) - len(legacy_blocks),
+                "local": len(local_blocks),
+                "toolbox": len(tb_blocks),
+                "delta": len(tb_blocks) - len(local_blocks),
             },
             "blocks_by_type_delta": type_deltas,
         },
         "text": {
-            "legacy_length": len(legacy_text),
-            "pddl_toolbox_length": len(pddl_text),
+            "local_length": len(local_text),
+            "toolbox_length": len(tb_text),
             "jaccard_similarity": round(similarity, 4),
         },
         "formulas": {
-            "legacy_count": len(legacy_formulas),
-            "pddl_toolbox_count": len(pddl_formulas),
+            "local_count": len(local_formulas),
+            "toolbox_count": len(tb_formulas),
             "common_formulas": len(
-                set(legacy_formulas) & set(pddl_formulas)
+                set(local_formulas) & set(tb_formulas)
             ),
         },
         "tables": {
-            "legacy_count": len(legacy_tables),
-            "pddl_toolbox_count": len(pddl_tables),
+            "local_count": len(local_tables),
+            "toolbox_count": len(tb_tables),
         },
     }
 
 
 def _format_comparison_summary(
     comparison: dict[str, Any],
-    legacy_elapsed: float,
-    pddl_elapsed: float,
+    local_elapsed: float,
+    toolbox_elapsed: float,
 ) -> str:
     """Format a human-readable summary of the comparison."""
     lines: list[str] = [
         "=" * 72,
-        "  PIPELINE COMPARISON REPORT (legacy vs PDDL+Toolbox)",
+        "  PIPELINE COMPARISON REPORT (PDDL local vs PDDL+Toolbox)",
         "=" * 72,
     ]
 
     s = comparison.get("structural", {})
     lines.append("\n[Structural]")
-    lines.append(f"  Block count:    legacy={s.get('block_count', {}).get('legacy', '?')}, "
-                  f"pddl+toolbox={s.get('block_count', {}).get('pddl_toolbox', '?')} "
+    lines.append(f"  Block count:    local={s.get('block_count', {}).get('local', '?')}, "
+                  f"toolbox={s.get('block_count', {}).get('toolbox', '?')} "
                   f"(delta={s.get('block_count', {}).get('delta', 0):+d})")
     type_deltas = s.get("blocks_by_type_delta", {})
     if type_deltas:
-        lines.append("  Block type deltas (legacy → pddl+toolbox):")
+        lines.append("  Block type deltas (local \u2192 toolbox):")
         for bt, vals in type_deltas.items():
-            l = vals.get("legacy", 0)
-            p = vals.get("pddl_toolbox", 0)
+            l = vals.get("local", 0)
+            p = vals.get("toolbox", 0)
             delta = p - l
             sign = "+" if delta > 0 else ""
-            lines.append(f"    {bt}: {l} → {p} ({sign}{delta})")
+            lines.append(f"    {bt}: {l} \u2192 {p} ({sign}{delta})")
 
     t = comparison.get("text", {})
     lines.append(f"\n[Text]")
-    lines.append(f"  Length:       legacy={t.get('legacy_length', '?')}, "
-                  f"pddl+toolbox={t.get('pddl_toolbox_length', '?')}")
+    lines.append(f"  Length:       local={t.get('local_length', '?')}, "
+                  f"toolbox={t.get('toolbox_length', '?')}")
     sim = t.get("jaccard_similarity", 0)
     bar_len = 30
     filled = int(sim * bar_len)
-    bar = "█" * filled + "░" * (bar_len - filled)
+    bar = "\u2588" * filled + "\u2591" * (bar_len - filled)
     lines.append(f"  Jaccard sim:  {sim:.1%}  [{bar}]")
 
     f = comparison.get("formulas", {})
     lines.append(f"\n[Formulas]")
-    lines.append(f"  Count: legacy={f.get('legacy_count', '?')}, "
-                  f"pddl+toolbox={f.get('pddl_toolbox_count', '?')}")
+    lines.append(f"  Count: local={f.get('local_count', '?')}, "
+                  f"toolbox={f.get('toolbox_count', '?')}")
     lines.append(f"  Common: {f.get('common_formulas', '?')}")
 
     tbl = comparison.get("tables", {})
     lines.append(f"\n[Tables]")
-    lines.append(f"  Count: legacy={tbl.get('legacy_count', '?')}, "
-                  f"pddl+toolbox={tbl.get('pddl_toolbox_count', '?')}")
+    lines.append(f"  Count: local={tbl.get('local_count', '?')}, "
+                  f"toolbox={tbl.get('toolbox_count', '?')}")
 
     lines.append(f"\n[Performance]")
-    lines.append(f"  Legacy:       {legacy_elapsed:.1f}s")
-    lines.append(f"  PDDL+Toolbox: {pddl_elapsed:.1f}s")
-    delta_time = pddl_elapsed - legacy_elapsed
+    lines.append(f"  Local:       {local_elapsed:.1f}s")
+    lines.append(f"  Toolbox:     {toolbox_elapsed:.1f}s")
+    delta_time = toolbox_elapsed - local_elapsed
     sign = "+" if delta_time > 0 else ""
     lines.append(f"  Delta:        {sign}{delta_time:.1f}s")
 
@@ -391,9 +401,9 @@ def _compute_verdict(comparison: dict[str, Any]) -> str:
     if block_delta > 20:
         issues.append(f"grande diferença no número de blocos ({block_delta:+d})")
     if type_deltas:
-        significant = [f"{k}: {v.get('legacy',0)}→{v.get('pddl_toolbox',0)}"
+        significant = [f"{k}: {v.get('local',0)}\u2192{v.get('toolbox',0)}"
                        for k, v in type_deltas.items()
-                       if abs(v.get('pddl_toolbox',0) - v.get('legacy',0)) > 3]
+                       if abs(v.get('toolbox',0) - v.get('local',0)) > 3]
         if significant:
             issues.append(f"diferenças significativas por tipo: {', '.join(significant)}")
 
@@ -413,7 +423,7 @@ async def run_comparison(
     output_dir: Path,
     mode: str,
     *,
-    structurer: str = "pymupdf",
+    extractor: str = "pymupdf",
     planner_backend: str = "internal",
     execute_plan: bool = False,
     enable_ocr: bool = False,
@@ -431,67 +441,73 @@ async def run_comparison(
         "comparison": {},
     }
 
-    # --- Legacy pipeline ---
-    legacy_start = time.perf_counter()
+    # --- PDDL local pipeline ---
+    local_start = time.perf_counter()
     try:
-        legacy = await _run_legacy(file_path, mode, tmpdir, structurer=structurer)
-        legacy_elapsed = time.perf_counter() - legacy_start
-        _write_artifacts(legacy, output_dir, "legacy")
-        report["engines"]["legacy"] = {
+        local = await _run_pddl_local(
+            file_path, mode, tmpdir,
+            extractor=extractor,
+            enable_ocr=enable_ocr,
+            planner_backend=planner_backend,
+            execute_plan=execute_plan,
+        )
+        local_elapsed = time.perf_counter() - local_start
+        _write_artifacts(local, output_dir, "pddl_local")
+        report["engines"]["pddl_local"] = {
             "status": "ok",
-            "elapsed_s": round(legacy_elapsed, 2),
-            "summary": _summarize_document(legacy["canonical"]),
+            "elapsed_s": round(local_elapsed, 2),
+            "summary": _summarize_document(local["canonical"]),
         }
     except Exception as exc:
-        legacy_elapsed = time.perf_counter() - legacy_start
-        report["engines"]["legacy"] = {
+        local_elapsed = time.perf_counter() - local_start
+        report["engines"]["pddl_local"] = {
             "status": "error",
-            "elapsed_s": round(legacy_elapsed, 2),
+            "elapsed_s": round(local_elapsed, 2),
             "error_type": type(exc).__name__,
             "error": str(exc),
         }
 
     # --- PDDL + Toolbox pipeline ---
-    pddl_start = time.perf_counter()
+    toolbox_start = time.perf_counter()
     try:
-        pddl = await _run_pddl_toolbox(
+        toolbox = await _run_pddl_toolbox(
             file_path, tmpdir, mode=mode,
             planner_backend=planner_backend,
             execute_plan=execute_plan,
             enable_ocr=enable_ocr,
         )
-        pddl_elapsed = time.perf_counter() - pddl_start
-        _write_artifacts(pddl, output_dir, "pddl_toolbox")
+        toolbox_elapsed = time.perf_counter() - toolbox_start
+        _write_artifacts(toolbox, output_dir, "pddl_toolbox")
         report["engines"]["pddl_toolbox"] = {
             "status": "ok",
-            "elapsed_s": round(pddl_elapsed, 2),
-            "summary": _summarize_document(pddl["canonical"]),
+            "elapsed_s": round(toolbox_elapsed, 2),
+            "summary": _summarize_document(toolbox["canonical"]),
         }
     except Exception as exc:
-        pddl_elapsed = time.perf_counter() - pddl_start
+        toolbox_elapsed = time.perf_counter() - toolbox_start
         report["engines"]["pddl_toolbox"] = {
             "status": "error",
-            "elapsed_s": round(pddl_elapsed, 2),
+            "elapsed_s": round(toolbox_elapsed, 2),
             "error_type": type(exc).__name__,
             "error": str(exc),
         }
 
     # --- Comparison ---
-    legacy_ok = report["engines"].get("legacy", {}).get("status") == "ok"
-    pddl_ok = report["engines"].get("pddl_toolbox", {}).get("status") == "ok"
-    if legacy_ok and pddl_ok:
-        comparison = _compare_documents(legacy["canonical"], pddl["canonical"])
+    local_ok = report["engines"].get("pddl_local", {}).get("status") == "ok"
+    toolbox_ok = report["engines"].get("pddl_toolbox", {}).get("status") == "ok"
+    if local_ok and toolbox_ok:
+        comparison = _compare_documents(local["canonical"], toolbox["canonical"])
         report["comparison"] = comparison
         verdict = _compute_verdict(comparison)
         report["verdict"] = verdict
-    elif legacy_ok and not pddl_ok:
-        pddl_error = report["engines"]["pddl_toolbox"].get("error", "unknown error")
-        report["verdict"] = f"⚠️  PDDL+Toolbox falhou: {pddl_error}"
-    elif pddl_ok and not legacy_ok:
-        legacy_error = report["engines"]["legacy"].get("error", "unknown error")
-        report["verdict"] = f"⚠️  Legacy falhou: {legacy_error}"
+    elif local_ok and not toolbox_ok:
+        tb_error = report["engines"]["pddl_toolbox"].get("error", "unknown error")
+        report["verdict"] = f"\u26a0\ufe0f  Toolbox falhou: {tb_error}"
+    elif toolbox_ok and not local_ok:
+        local_error = report["engines"]["pddl_local"].get("error", "unknown error")
+        report["verdict"] = f"\u26a0\ufe0f  Local falhou: {local_error}"
     else:
-        report["verdict"] = "❌ Ambos os pipelines falharam"
+        report["verdict"] = "\u274c Ambos os pipelines falharam"
 
     # --- Cleanup and save ---
     import shutil
@@ -506,7 +522,7 @@ async def run_comparison(
     # Console summary
     print(_format_comparison_summary(
         report.get("comparison", {}),
-        report["engines"].get("legacy", {}).get("elapsed_s", 0),
+        report["engines"].get("pddl_local", {}).get("elapsed_s", 0),
         report["engines"].get("pddl_toolbox", {}).get("elapsed_s", 0),
     ))
 
@@ -550,7 +566,7 @@ def _collect_inputs(file_or_dir: Path, recursive: bool) -> list[Path]:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="compare-pipelines",
-        description="Compare legacy pipeline vs PDDL+Toolbox pipeline outputs end-to-end.",
+        description="Compare PDDL local extractor vs PDDL+Toolbox extraction backend.",
     )
     parser.add_argument(
         "input",
@@ -568,7 +584,7 @@ def parse_args() -> argparse.Namespace:
         "--mode",
         default="normal",
         choices=["normal", "medio", "detalhado"],
-        help="Verbosity mode for the legacy pipeline.",
+        help="Verbosity mode for canonical document generation.",
     )
     parser.add_argument(
         "--batch",
@@ -587,10 +603,10 @@ def parse_args() -> argparse.Namespace:
         help="Maximum number of files to process in batch mode (0 = unlimited).",
     )
     parser.add_argument(
-        "--structurer",
+        "--extractor",
         default="pymupdf",
-        choices=["pymupdf", "docling"],
-        help="Structurer backend for the legacy pipeline (default: pymupdf).",
+        choices=["docling", "pymupdf"],
+        help="Local extractor backend for the PDDL pipeline (default: pymupdf).",
     )
     parser.add_argument(
         "--planner",
@@ -637,7 +653,7 @@ def main() -> int:
                     file_path=file_path,
                     output_dir=out_dir,
                     mode=args.mode,
-                    structurer=args.structurer,
+                    extractor=args.extractor,
                     planner_backend=args.planner,
                     execute_plan=args.execute_plan,
                     enable_ocr=args.enable_ocr,
@@ -678,7 +694,7 @@ def main() -> int:
                 file_path=args.input.resolve(),
                 output_dir=output_dir,
                 mode=args.mode,
-                structurer=args.structurer,
+                extractor=args.extractor,
                 planner_backend=args.planner,
                 execute_plan=args.execute_plan,
                 enable_ocr=args.enable_ocr,

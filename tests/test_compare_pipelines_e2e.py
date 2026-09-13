@@ -1,7 +1,7 @@
 """End-to-end tests for pipeline comparison (requires Toolbox and infrastructure).
 
 These tests exercise the full comparison workflow against a real PDF file
-using both the legacy and PDDL+Toolbox pipelines. They require:
+using both the PDDL local extractor and PDDL+Toolbox pipelines. They require:
 
 - All backend dependencies installed
 - Toolbox service running and accessible via settings.toolbox_base_url
@@ -106,15 +106,15 @@ async def test_run_comparison_defaults(small_pdf: Path, output_tmpdir: Path) -> 
     assert "verdict" in report
 
     # Both engines should have run
-    assert "legacy" in report["engines"]
+    assert "pddl_local" in report["engines"]
     assert "pddl_toolbox" in report["engines"]
 
     # Check engine status
-    assert report["engines"]["legacy"]["status"] == "ok"
+    assert report["engines"]["pddl_local"]["status"] == "ok"
     assert report["engines"]["pddl_toolbox"]["status"] == "ok"
 
     # Engine summaries must be present
-    for engine in ("legacy", "pddl_toolbox"):
+    for engine in ("pddl_local", "pddl_toolbox"):
         summary = report["engines"][engine].get("summary", {})
         assert "block_count" in summary
         assert "section_count" in summary
@@ -126,8 +126,8 @@ async def test_run_comparison_defaults(small_pdf: Path, output_tmpdir: Path) -> 
     assert "structural" in comparison
     assert "text" in comparison
     assert "structural" in comparison
-    assert comparison["structural"]["section_count"]["legacy"] >= 0
-    assert comparison["structural"]["section_count"]["pddl_toolbox"] >= 0
+    assert comparison["structural"]["section_count"]["local"] >= 0
+    assert comparison["structural"]["section_count"]["toolbox"] >= 0
 
 
 @pytest.mark.e2e
@@ -142,24 +142,24 @@ async def test_run_comparison_verdict_present(small_pdf: Path, output_tmpdir: Pa
     report = json.loads(report_path.read_text(encoding="utf-8"))
     # A verdict must be present (either EQUIVALENTE or DIVERGENTE)
     assert "verdict" in report
-    assert report["engines"]["legacy"]["status"] == "ok"
+    assert report["engines"]["pddl_local"]["status"] == "ok"
     assert report["engines"]["pddl_toolbox"]["status"] == "ok"
 
 
 @pytest.mark.e2e
 @pytest.mark.asyncio
-async def test_run_comparison_with_structurer_docling(
+async def test_run_comparison_with_extractor_pymupdf(
     small_pdf: Path, output_tmpdir: Path
 ) -> None:
-    """Run comparison with 'docling' structurer on the legacy pipeline."""
+    """Run comparison with 'pymupdf' local extractor."""
     report_path = await run_comparison(
         file_path=small_pdf,
         output_dir=output_tmpdir,
         mode="normal",
-        structurer="docling",
+        extractor="pymupdf",
     )
     report = json.loads(report_path.read_text(encoding="utf-8"))
-    assert report["engines"]["legacy"]["status"] == "ok"
+    assert report["engines"]["pddl_local"]["status"] == "ok"
 
 
 @pytest.mark.e2e
@@ -173,7 +173,7 @@ async def test_run_comparison_ocr_enabled(small_pdf: Path, output_tmpdir: Path) 
         enable_ocr=True,
     )
     report = json.loads(report_path.read_text(encoding="utf-8"))
-    assert report["engines"]["legacy"]["status"] == "ok"
+    assert report["engines"]["pddl_local"]["status"] == "ok"
     assert report["engines"]["pddl_toolbox"]["status"] == "ok"
 
 
@@ -189,6 +189,7 @@ async def test_run_comparison_execute_plan(small_pdf: Path, output_tmpdir: Path)
     )
     report = json.loads(report_path.read_text(encoding="utf-8"))
     # plan execution may affect results but shouldn't crash
+    assert report["engines"]["pddl_local"]["status"] == "ok"
     assert report["engines"]["pddl_toolbox"]["status"] == "ok"
 
 
@@ -201,7 +202,7 @@ async def test_run_comparison_artifact_files(small_pdf: Path, output_tmpdir: Pat
         output_dir=output_tmpdir,
         mode="normal",
     )
-    for name in ("legacy", "pddl_toolbox"):
+    for name in ("pddl_local", "pddl_toolbox"):
         structured = output_tmpdir / f"{name}.structured.json"
         canonical = output_tmpdir / f"{name}.canonical.json"
         assert structured.exists(), f"Missing {structured}"
@@ -229,36 +230,36 @@ async def test_helper_consistency(small_pdf: Path, output_tmpdir: Path) -> None:
     )
     report = json.loads(report_path.read_text(encoding="utf-8"))
 
-    legacy_canonical_path = output_tmpdir / "legacy.canonical.json"
-    pddl_canonical_path = output_tmpdir / "pddl_toolbox.canonical.json"
+    local_canonical_path = output_tmpdir / "pddl_local.canonical.json"
+    toolbox_canonical_path = output_tmpdir / "pddl_toolbox.canonical.json"
 
-    legacy = json.loads(legacy_canonical_path.read_text(encoding="utf-8"))
-    pddl = json.loads(pddl_canonical_path.read_text(encoding="utf-8"))
+    local = json.loads(local_canonical_path.read_text(encoding="utf-8"))
+    toolbox = json.loads(toolbox_canonical_path.read_text(encoding="utf-8"))
 
     # _flatten_blocks must work
-    legacy_blocks = _flatten_blocks(legacy)
-    pddl_blocks = _flatten_blocks(pddl)
-    assert isinstance(legacy_blocks, list)
-    assert isinstance(pddl_blocks, list)
+    local_blocks = _flatten_blocks(local)
+    toolbox_blocks = _flatten_blocks(toolbox)
+    assert isinstance(local_blocks, list)
+    assert isinstance(toolbox_blocks, list)
 
     # _extract_text must work (receives the full document dict)
-    legacy_text = _extract_text(legacy)
-    pddl_text = _extract_text(pddl)
-    assert isinstance(legacy_text, str)
-    assert isinstance(pddl_text, str)
+    local_text = _extract_text(local)
+    toolbox_text = _extract_text(toolbox)
+    assert isinstance(local_text, str)
+    assert isinstance(toolbox_text, str)
 
     # _jaccard_similarity must produce a value in [0, 1]
-    sim = _jaccard_similarity(legacy_text, pddl_text)
+    sim = _jaccard_similarity(local_text, toolbox_text)
     assert 0.0 <= sim <= 1.0
 
     # _summarize_document must match report summary
-    reported_summary = report["engines"]["legacy"]["summary"]
-    direct_summary = _summarize_document(legacy)
+    reported_summary = report["engines"]["pddl_local"]["summary"]
+    direct_summary = _summarize_document(local)
     assert reported_summary["block_count"] == direct_summary["block_count"]
 
     # _extract_formulas and _extract_tables must return lists
-    formulas = _extract_formulas(legacy)
-    tables = _extract_tables(pddl)
+    formulas = _extract_formulas(local)
+    tables = _extract_tables(toolbox)
     assert isinstance(formulas, list)
     assert isinstance(tables, list)
 
@@ -282,5 +283,5 @@ async def test_run_comparison_nonexistent_file(output_tmpdir: Path) -> None:
     # At least one engine should have an error
     assert any(
         report["engines"].get(e, {}).get("status") == "error"
-        for e in ("legacy", "pddl_toolbox")
+        for e in ("pddl_local", "pddl_toolbox")
     )
