@@ -24,9 +24,6 @@ from backend.tools.toolbox_pdf_client import ToolboxPdfClient
 TOOLBOX_BASE_URL = os.getenv("TOOLBOX_BASE_URL", "").strip()
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
-if not TOOLBOX_BASE_URL:
-    pytest.skip("TOOLBOX_BASE_URL not set — skipping E2E tests", allow_module_level=True)
-
 
 def _get_pdf() -> Path:
     pdfs = sorted(FIXTURES_DIR.rglob("*.pdf"))

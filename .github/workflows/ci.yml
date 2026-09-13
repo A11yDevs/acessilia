@@ -158,9 +158,9 @@ jobs:
           VARIANT: ${{ matrix.variant }}
         run: |
           if [ "$VARIANT" = "slim" ]; then
-            python -m pytest --collect-only -q -m "not docling"
+            python -m pytest --collect-only -q -m "not docling and not e2e"
           else
-            python -m pytest --collect-only -q
+            python -m pytest --collect-only -q -m "not e2e"
           fi
 
       - name: Run complete test suite
@@ -168,9 +168,9 @@ jobs:
           VARIANT: ${{ matrix.variant }}
         run: |
           if [ "$VARIANT" = "slim" ]; then
-            python -m pytest -m "not docling" --junitxml=test-results.xml
+            python -m pytest -m "not docling and not e2e" --junitxml=test-results.xml
           else
-            python -m pytest --junitxml=test-results.xml
+            python -m pytest -m "not e2e" --junitxml=test-results.xml
           fi
 
       - name: Reject unexpected skipped tests
