@@ -30,17 +30,19 @@ def toolbox_recognize_formula(image_bytes: bytes) -> list[dict[str, Any]]:
         List of {latex, confidence, page, bbox} dicts, or empty list on failure.
     """
     import tempfile
-    from pathlib import Path as _Path
 
-    tmp = _Path(tempfile.mkdtemp()) / "formula.png"
+    tmp = Path(tempfile.mkdtemp()) / "formula.png"
+    tmp.parent.mkdir(parents=True, exist_ok=True)
     tmp.write_bytes(image_bytes)
     try:
         return _run_async(_recognize_formula_async(tmp))
     except Exception as e:
-        logger.warning("Toolbox Math recognize falhou ({}), retornando vazio", e)
+        logger.warning("Toolbox Math recognize failed ({}), returning empty", e)
         return []
     finally:
         tmp.unlink(missing_ok=True)
+        import shutil
+        shutil.rmtree(tmp.parent, ignore_errors=True)
 
 
 async def _recognize_formula_async(file_path: Path) -> list[dict[str, Any]]:
@@ -65,7 +67,7 @@ def toolbox_convert_latex(latex: str, direction: str = "latex-to-mathml") -> str
     try:
         return _run_async(_convert_latex_async(latex, direction))
     except Exception as e:
-        logger.warning("Toolbox Math convert falhou ({}), retornando vazio", e)
+        logger.warning("Toolbox Math convert failed ({}), returning empty", e)
         return ""
 
 
@@ -92,7 +94,7 @@ def toolbox_verbalize_latex(latex: str, language: str = "pt-BR") -> str:
     try:
         return _run_async(_verbalize_latex_async(latex, language))
     except Exception as e:
-        logger.warning("Toolbox Math verbalize falhou ({}), retornando vazio", e)
+        logger.warning("Toolbox Math verbalize failed ({}), returning empty", e)
         return ""
 
 
