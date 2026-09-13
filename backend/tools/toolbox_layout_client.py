@@ -14,15 +14,9 @@ import httpx
 from backend.config.settings import settings
 from backend.tools.logger import logger
 from backend.tools.toolbox_client import (
-    ToolboxArtifactNotFound,
-    ToolboxAuthenticationError,
-    ToolboxCapabilityError,
-    ToolboxClient,
     ToolboxContractViolation,
-    ToolboxError,
     ToolboxProviderUnavailable,
     ToolboxTimeout,
-    ToolboxUnsupportedMediaType,
     _media_type,
     _raise_for_error,
 )
@@ -47,9 +41,17 @@ class ToolboxLayoutClient:
         api_key: str | None = None,
     ) -> None:
         self.base_url = (base_url or settings.toolbox_base_url).rstrip("/")
-        self.provider = provider or "docling-layout"
+        self.provider = provider or settings.toolbox_provider
         self.timeout_seconds = timeout_seconds or settings.toolbox_timeout_seconds
         self.api_key = api_key if api_key is not None else settings.toolbox_api_key
+        headers: dict[str, str] = {}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        self._client = httpx.AsyncClient(
+            base_url=self.base_url,
+            timeout=httpx.Timeout(self.timeout_seconds),
+            headers=headers,
+        )
 
     async def analyze(
         self,
@@ -57,6 +59,7 @@ class ToolboxLayoutClient:
         artifact_id: str | None = None,
         *,
         language: str = "pt-BR",
+        use_remote_cache: bool | None = None,
     ) -> dict[str, Any]:
         """POST /v1/capabilities/document.layout.analyze:execute.
 
@@ -67,13 +70,14 @@ class ToolboxLayoutClient:
             file_path: Caminho para o documento PDF/imagem.
             artifact_id: ID do artifact previamente armazenado na Toolbox.
             language: Idioma para análise (default: pt-BR).
+            use_remote_cache: Se False, força re-processamento remoto.
 
         Returns:
             Dict com a resposta da Toolbox contendo:
             - status: "succeeded"
             - capability: "document.layout.analyze"
             - provider: "docling-layout"
-            - document: {page_count, region_count, pages: [{page_number, dimensions, regions}]}
+            - document: {page_count, region_count, pages: [{page_number, width, height, regions}]}
             - provenance: metadados de execução
         """
         if file_path is None and artifact_id is None:
@@ -82,36 +86,33 @@ class ToolboxLayoutClient:
         url = f"{self.base_url}{EXECUTE_PATH}"
 
         try:
-            async with httpx.AsyncClient(
-                timeout=httpx.Timeout(self.timeout_seconds)
-            ) as client:
-                headers = self._auth_headers
-
-                if artifact_id:
-                    data: dict[str, Any] = {
-                        "artifact_id": artifact_id,
+            if artifact_id:
+                data: dict[str, Any] = {
+                    "artifact_id": artifact_id,
+                    "language": language,
+                    "provider": self.provider,
+                }
+                if use_remote_cache is False:
+                    data["no_cache"] = True
+                response = await self._client.post(url, data=data)
+            else:
+                with open(file_path, "rb") as f:
+                    files = {
+                        "file": (
+                            file_path.name,
+                            f,
+                            _media_type(file_path),
+                        )
+                    }
+                    params: dict[str, Any] = {
                         "language": language,
                         "provider": self.provider,
                     }
-                    response = await client.post(
-                        url, data=data, headers=headers
+                    if use_remote_cache is False:
+                        params["no_cache"] = True
+                    response = await self._client.post(
+                        url, files=files, data=params
                     )
-                else:
-                    with open(file_path, "rb") as f:
-                        files = {
-                            "file": (
-                                file_path.name,
-                                f,
-                                _media_type(file_path),
-                            )
-                        }
-                        params: dict[str, Any] = {
-                            "language": language,
-                            "provider": self.provider,
-                        }
-                        response = await client.post(
-                            url, files=files, data=params, headers=headers
-                        )
 
             _raise_for_error(response, CAPABILITY)
             result = response.json()
@@ -187,19 +188,26 @@ class ToolboxLayoutClient:
         return None
 
     async def health(self) -> dict[str, Any]:
-        """Verifica se a Toolbox está operacional (usa cliente genérico)."""
-        client = ToolboxClient(
-            base_url=self.base_url,
-            timeout_seconds=self.timeout_seconds,
-            api_key=self.api_key,
-        )
-        return await client.health()
+        """Verifica se a Toolbox está operacional."""
+        try:
+            response = await self._client.get("/v1/health")
+            _raise_for_error(response, "health")
+            return response.json()
+        except httpx.TimeoutException as e:
+            raise ToolboxTimeout(
+                f"Timeout ao verificar health da Toolbox: {e}"
+            ) from e
+        except httpx.RequestError as e:
+            raise ToolboxProviderUnavailable(
+                f"Toolbox indisponível em {self.base_url}: {e}"
+            ) from e
+
+    async def close(self) -> None:
+        """Libera a conexão HTTP."""
+        await self._client.aclose()
 
     @property
     def _auth_headers(self) -> dict[str, str]:
         if self.api_key:
             return {"Authorization": f"Bearer {self.api_key}"}
         return {}
-
-
-__all__ = ["ToolboxLayoutClient"]
