@@ -61,4 +61,5 @@ testpaths = ["tests"]
 addopts = "--strict-config --strict-markers -ra"
 markers = [
     "docling: requires the optional Docling stack and its model downloads",
+    "e2e: requires a running Acessilia Toolbox instance at TOOLBOX_BASE_URL",
 ]
