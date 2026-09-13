@@ -34,18 +34,44 @@ from scripts.compare_pipelines import (
 # Fixtures
 # ---------------------------------------------------------------------------
 
-SAMPLE_PDF = (
-    Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "tutorials" / "java-oo-3pgs.pdf"
-)
+FIXTURES_DIR = Path(__file__).resolve().parents[1] / "tests" / "fixtures"
+
+SMALL_FIXTURES: list[tuple[str, str, Path]] = [
+    (
+        "java-oo-3pgs",
+        "3-page Java OO tutorial (basic text)",
+        FIXTURES_DIR / "tutorials" / "java-oo-3pgs.pdf",
+    ),
+    (
+        "java-oo-tables-pg26",
+        "Single page with table structures",
+        FIXTURES_DIR / "tutorials" / "java-oo-tables-pg26.pdf",
+    ),
+    (
+        "grandezas-pg3",
+        "Single page from grandezas-e-medidas presentation",
+        FIXTURES_DIR / "presentations" / "grandezas-e-medidas-pg3-42.pdf",
+    ),
+    (
+        "grandezas-pg7",
+        "Single page from grandezas-e-medidas presentation",
+        FIXTURES_DIR / "presentations" / "grandezas-e-medidas-pg7-42.pdf",
+    ),
+]
 
 
-@pytest.fixture
-def sample_pdf() -> Path:
-    """Return path to a sample PDF that exists in the repository."""
-    pdf = SAMPLE_PDF
-    if not pdf.exists():
-        pytest.skip(f"Sample PDF not found: {pdf}")
-    return pdf
+def _resolve_fixture(label: str, path: Path) -> Path:
+    """Return fixture path or skip if missing."""
+    if not path.exists():
+        pytest.skip(f"Fixture '{label}' not found: {path}")
+    return path
+
+
+@pytest.fixture(params=SMALL_FIXTURES, ids=[f[0] for f in SMALL_FIXTURES])
+def small_pdf(request: pytest.FixtureRequest) -> Path:
+    """Parametrized fixture over all small PDFs (< 10 pages)."""
+    _label, _desc, path = request.param
+    return _resolve_fixture(_label, path)
 
 
 @pytest.fixture
@@ -61,10 +87,10 @@ def output_tmpdir(tmp_path: Path) -> Path:
 
 @pytest.mark.e2e
 @pytest.mark.asyncio
-async def test_run_comparison_defaults(sample_pdf: Path, output_tmpdir: Path) -> None:
+async def test_run_comparison_defaults(small_pdf: Path, output_tmpdir: Path) -> None:
     """Run comparison with default parameters and verify report structure."""
     report_path = await run_comparison(
-        file_path=sample_pdf,
+        file_path=small_pdf,
         output_dir=output_tmpdir,
         mode="normal",
     )
@@ -106,10 +132,10 @@ async def test_run_comparison_defaults(sample_pdf: Path, output_tmpdir: Path) ->
 
 @pytest.mark.e2e
 @pytest.mark.asyncio
-async def test_run_comparison_verdict_equivalent(sample_pdf: Path, output_tmpdir: Path) -> None:
+async def test_run_comparison_verdict_present(small_pdf: Path, output_tmpdir: Path) -> None:
     """Both pipelines should produce a valid comparison report."""
     report_path = await run_comparison(
-        file_path=sample_pdf,
+        file_path=small_pdf,
         output_dir=output_tmpdir,
         mode="normal",
     )
@@ -123,11 +149,11 @@ async def test_run_comparison_verdict_equivalent(sample_pdf: Path, output_tmpdir
 @pytest.mark.e2e
 @pytest.mark.asyncio
 async def test_run_comparison_with_structurer_docling(
-    sample_pdf: Path, output_tmpdir: Path
+    small_pdf: Path, output_tmpdir: Path
 ) -> None:
     """Run comparison with 'docling' structurer on the legacy pipeline."""
     report_path = await run_comparison(
-        file_path=sample_pdf,
+        file_path=small_pdf,
         output_dir=output_tmpdir,
         mode="normal",
         structurer="docling",
@@ -138,10 +164,10 @@ async def test_run_comparison_with_structurer_docling(
 
 @pytest.mark.e2e
 @pytest.mark.asyncio
-async def test_run_comparison_ocr_enabled(sample_pdf: Path, output_tmpdir: Path) -> None:
+async def test_run_comparison_ocr_enabled(small_pdf: Path, output_tmpdir: Path) -> None:
     """Run comparison with OCR enabled."""
     report_path = await run_comparison(
-        file_path=sample_pdf,
+        file_path=small_pdf,
         output_dir=output_tmpdir,
         mode="normal",
         enable_ocr=True,
@@ -153,10 +179,10 @@ async def test_run_comparison_ocr_enabled(sample_pdf: Path, output_tmpdir: Path)
 
 @pytest.mark.e2e
 @pytest.mark.asyncio
-async def test_run_comparison_execute_plan(sample_pdf: Path, output_tmpdir: Path) -> None:
+async def test_run_comparison_execute_plan(small_pdf: Path, output_tmpdir: Path) -> None:
     """Run comparison with plan execution enabled."""
     report_path = await run_comparison(
-        file_path=sample_pdf,
+        file_path=small_pdf,
         output_dir=output_tmpdir,
         mode="normal",
         execute_plan=True,
@@ -168,10 +194,10 @@ async def test_run_comparison_execute_plan(sample_pdf: Path, output_tmpdir: Path
 
 @pytest.mark.e2e
 @pytest.mark.asyncio
-async def test_run_comparison_artifact_files(sample_pdf: Path, output_tmpdir: Path) -> None:
+async def test_run_comparison_artifact_files(small_pdf: Path, output_tmpdir: Path) -> None:
     """Verify that structured and canonical JSON artifacts are written."""
     await run_comparison(
-        file_path=sample_pdf,
+        file_path=small_pdf,
         output_dir=output_tmpdir,
         mode="normal",
     )
@@ -194,10 +220,10 @@ async def test_run_comparison_artifact_files(sample_pdf: Path, output_tmpdir: Pa
 
 @pytest.mark.e2e
 @pytest.mark.asyncio
-async def test_helper_consistency(sample_pdf: Path, output_tmpdir: Path) -> None:
+async def test_helper_consistency(small_pdf: Path, output_tmpdir: Path) -> None:
     """Run comparison and verify helper functions produce consistent results."""
     report_path = await run_comparison(
-        file_path=sample_pdf,
+        file_path=small_pdf,
         output_dir=output_tmpdir,
         mode="normal",
     )
