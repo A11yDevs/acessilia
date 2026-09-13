@@ -155,13 +155,31 @@ def _summarize_document(document: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-async def _run_legacy(file_path: Path, mode: str, tmpdir: Path) -> dict[str, Any]:
-    """Run the legacy pipeline (AccessibilityOrchestrator + PyMuPDF structurer)."""
+async def _run_legacy(
+    file_path: Path,
+    mode: str,
+    tmpdir: Path,
+    *,
+    structurer: str = "pymupdf",
+) -> dict[str, Any]:
+    """Run the legacy pipeline (AccessibilityOrchestrator + structurer).
+
+    Args:
+        file_path: Input file to process.
+        mode: Verbosity mode.
+        tmpdir: Temporary directory for intermediate files.
+        structurer: "pymupdf" (default) or "docling".
+    """
     from backend.tools import structurer as structurer_module
 
     original = structurer_module.get_structurer
     try:
-        structurer_module.get_structurer = lambda: structurer_module.PyMuPDFStructurer()
+        if structurer == "pymupdf":
+            structurer_module.get_structurer = lambda: structurer_module.PyMuPDFStructurer()
+        elif structurer == "docling":
+            structurer_module.get_structurer = lambda: structurer_module.DoclingStructurer(enable_ocr=True)
+        else:
+            raise ValueError(f"Unknown structurer: {structurer}")
         orchestrator = AccessibilityOrchestrator(mode=mode)
         structured = await orchestrator.executar(
             file_path=file_path,
@@ -180,17 +198,27 @@ async def _run_legacy(file_path: Path, mode: str, tmpdir: Path) -> dict[str, Any
         source_name=file_path.name,
         source_path=str(file_path),
         audience=["reader"],
+        metadata=None,
+        technical_warnings=None,
     )
     return {"structured": structured, "canonical": canonical}
 
 
-async def _run_pddl_toolbox(file_path: Path, tmpdir: Path) -> dict[str, Any]:
+async def _run_pddl_toolbox(
+    file_path: Path,
+    tmpdir: Path,
+    mode: str = "normal",
+    *,
+    planner_backend: str = "internal",
+    execute_plan: bool = False,
+    enable_ocr: bool = False,
+) -> dict[str, Any]:
     """Run the PDDL pipeline with ToolboxManifestExtractor."""
     orchestrator = PddlAccessibilityOrchestrator(
-        planner_backend="internal",
-        preferred_plan="internal",
-        execute_dry_run=True,
-        enable_ocr=False,
+        planner_backend=planner_backend,
+        preferred_plan=planner_backend,
+        execute_dry_run=not execute_plan,
+        enable_ocr=enable_ocr,
         extractor_backend="toolbox",
     )
     structured = await orchestrator.executar(
@@ -205,7 +233,7 @@ async def _run_pddl_toolbox(file_path: Path, tmpdir: Path) -> dict[str, Any]:
         structured,
         title=file_path.stem,
         language="pt-BR",
-        verbosity=verbosity_for_mode("normal"),
+        verbosity=verbosity_for_mode(mode),
         source_name=file_path.name,
         source_path=str(file_path),
         audience=["reader"],
@@ -260,8 +288,8 @@ def _compare_documents(
     return {
         "structural": {
             "section_count": {
-                "legacy": legacy.get("metadata", {}).get("page_count"),
-                "pddl_toolbox": pddl.get("metadata", {}).get("page_count"),
+                "legacy": len(legacy.get("sections", [])),
+                "pddl_toolbox": len(pddl.get("sections", [])),
             },
             "block_count": {
                 "legacy": len(legacy_blocks),
@@ -384,6 +412,11 @@ async def run_comparison(
     file_path: Path,
     output_dir: Path,
     mode: str,
+    *,
+    structurer: str = "pymupdf",
+    planner_backend: str = "internal",
+    execute_plan: bool = False,
+    enable_ocr: bool = False,
 ) -> Path:
     """Run both pipelines on a single file and produce a comparison report."""
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -401,7 +434,7 @@ async def run_comparison(
     # --- Legacy pipeline ---
     legacy_start = time.perf_counter()
     try:
-        legacy = await _run_legacy(file_path, mode, tmpdir)
+        legacy = await _run_legacy(file_path, mode, tmpdir, structurer=structurer)
         legacy_elapsed = time.perf_counter() - legacy_start
         _write_artifacts(legacy, output_dir, "legacy")
         report["engines"]["legacy"] = {
@@ -421,7 +454,12 @@ async def run_comparison(
     # --- PDDL + Toolbox pipeline ---
     pddl_start = time.perf_counter()
     try:
-        pddl = await _run_pddl_toolbox(file_path, tmpdir)
+        pddl = await _run_pddl_toolbox(
+            file_path, tmpdir, mode=mode,
+            planner_backend=planner_backend,
+            execute_plan=execute_plan,
+            enable_ocr=enable_ocr,
+        )
         pddl_elapsed = time.perf_counter() - pddl_start
         _write_artifacts(pddl, output_dir, "pddl_toolbox")
         report["engines"]["pddl_toolbox"] = {
@@ -548,6 +586,28 @@ def parse_args() -> argparse.Namespace:
         default=0,
         help="Maximum number of files to process in batch mode (0 = unlimited).",
     )
+    parser.add_argument(
+        "--structurer",
+        default="pymupdf",
+        choices=["pymupdf", "docling"],
+        help="Structurer backend for the legacy pipeline (default: pymupdf).",
+    )
+    parser.add_argument(
+        "--planner",
+        default="internal",
+        choices=["internal", "fast-downward"],
+        help="PDDL planner backend (default: internal).",
+    )
+    parser.add_argument(
+        "--execute-plan",
+        action="store_true",
+        help="Actually execute the PDDL plan (default: dry-run / simulate only).",
+    )
+    parser.add_argument(
+        "--enable-ocr",
+        action="store_true",
+        help="Enable OCR in the structurer / pipeline.",
+    )
     return parser.parse_args()
 
 
@@ -577,6 +637,10 @@ def main() -> int:
                     file_path=file_path,
                     output_dir=out_dir,
                     mode=args.mode,
+                    structurer=args.structurer,
+                    planner_backend=args.planner,
+                    execute_plan=args.execute_plan,
+                    enable_ocr=args.enable_ocr,
                 )
             )
             report = json.loads(report_path.read_text(encoding="utf-8"))
@@ -614,6 +678,10 @@ def main() -> int:
                 file_path=args.input.resolve(),
                 output_dir=output_dir,
                 mode=args.mode,
+                structurer=args.structurer,
+                planner_backend=args.planner,
+                execute_plan=args.execute_plan,
+                enable_ocr=args.enable_ocr,
             )
         )
         return 0
