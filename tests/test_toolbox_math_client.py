@@ -148,6 +148,24 @@ async def test_convert_latex_to_mathml(respx_mock, client):
 
 
 @pytest.mark.asyncio
+async def test_convert_sends_params_in_query_string(respx_mock, client):
+    """Verifica que provider e direction vão na query string (body é text/plain)."""
+    route = respx_mock.post(
+        "http://localhost:8002/v1/capabilities/math.convert:execute"
+    )
+    route.return_value = httpx.Response(200, json=SAMPLE_CONVERT_RESPONSE)
+
+    await client.convert("E = mc^2", direction="latex-to-mathml")
+
+    request = route.calls.last.request
+    # Provider deve vir do client, não hardcoded
+    assert "provider=docling-math" in request.url.query.decode()
+    assert "direction=latex-to-mathml" in request.url.query.decode()
+    # Body deve ser o texto LaTeX puro
+    assert request.content == b"E = mc^2"
+
+
+@pytest.mark.asyncio
 async def test_convert_sends_content_type_header(respx_mock):
     client = ToolboxMathClient(
         base_url="http://localhost:8002",
@@ -181,6 +199,24 @@ async def test_verbalize_latex(respx_mock, client):
     assert result["status"] == "succeeded"
     assert result["document"]["verbalized"] == "E igual a m c elevado a 2"
     assert result["document"]["language"] == "pt-BR"
+
+
+@pytest.mark.asyncio
+async def test_verbalize_sends_params_in_query_string(respx_mock, client):
+    """Verifica que provider e language vão na query string (body é text/plain)."""
+    route = respx_mock.post(
+        "http://localhost:8002/v1/capabilities/math.verbalize:execute"
+    )
+    route.return_value = httpx.Response(200, json=SAMPLE_VERBALIZE_RESPONSE)
+
+    await client.verbalize("E = mc^2", language="pt-BR")
+
+    request = route.calls.last.request
+    # Provider deve vir do client, não hardcoded
+    assert "provider=docling-math" in request.url.query.decode()
+    assert "language=pt-BR" in request.url.query.decode()
+    # Body deve ser o texto LaTeX puro
+    assert request.content == b"E = mc^2"
 
 
 @pytest.mark.asyncio

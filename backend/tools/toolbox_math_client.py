@@ -144,14 +144,17 @@ class ToolboxMathClient:
         latex: str,
         *,
         direction: str = "latex-to-mathml",
+        use_remote_cache: bool | None = None,
     ) -> dict[str, Any]:
         """POST /v1/capabilities/math.convert:execute.
 
         Converte LaTeX para MathML ou vice-versa.
+        O corpo da requisição é o texto LaTeX em plain text.
 
         Args:
             latex: Expressão LaTeX (ou MathML, se direction=mathml-to-latex).
             direction: "latex-to-mathml" (default) ou "mathml-to-latex".
+            use_remote_cache: Se False, força re-processamento remoto.
 
         Returns:
             Dict com latex, mathml, direction.
@@ -160,9 +163,11 @@ class ToolboxMathClient:
 
         try:
             data: dict[str, Any] = {
-                "provider": "pure-math",
+                "provider": self.provider,
                 "direction": direction,
             }
+            if use_remote_cache is False:
+                data["no_cache"] = True
             response = await self._client.post(
                 url,
                 content=latex.encode("utf-8"),
@@ -199,14 +204,18 @@ class ToolboxMathClient:
         latex: str,
         *,
         language: str = "pt-BR",
+        use_remote_cache: bool | None = None,
     ) -> dict[str, Any]:
         """POST /v1/capabilities/math.verbalize:execute.
 
         Converte LaTeX para texto natural em português.
+        O corpo da requisição é o texto LaTeX em plain text;
+        os metadados (provider, language) vão na query string.
 
         Args:
             latex: Expressão LaTeX para verbalizar.
             language: Idioma da verbalização (default: pt-BR).
+            use_remote_cache: Se False, força re-processamento remoto.
 
         Returns:
             Dict com latex, verbalized, language.
@@ -215,9 +224,11 @@ class ToolboxMathClient:
 
         try:
             data: dict[str, Any] = {
-                "provider": "pure-math",
+                "provider": self.provider,
                 "language": language,
             }
+            if use_remote_cache is False:
+                data["no_cache"] = True
             response = await self._client.post(
                 url,
                 content=latex.encode("utf-8"),
