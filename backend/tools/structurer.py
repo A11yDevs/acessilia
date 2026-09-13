@@ -352,5 +352,11 @@ def get_structurer() -> BaseStructurer:
         logger.info("Usando structurer: Toolbox (remoto via Acessilia Toolbox)")
         return ToolboxStructurer()
 
+    if mode in ("toolbox-layout", "toolbox_layout"):
+        from backend.tools.toolbox_layout_structurer import ToolboxLayoutStructurer
+
+        logger.info("Usando structurer: ToolboxLayout (layout remoto via Acessilia Toolbox)")
+        return ToolboxLayoutStructurer()
+
     logger.info(t(LOG_STRUCTURER_PYMUPDF))
     return PyMuPDFStructurer()
