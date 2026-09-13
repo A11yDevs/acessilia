@@ -50,8 +50,8 @@ def _resolved_structurer() -> str:
     if structurer == "docling" and not DOCLING_AVAILABLE:
         logger.warning(t(LOG_STRUCTURER_FALLBACK_PYMUPDF))
         return "pymupdf"
-    if structurer == "toolbox":
-        logger.info("STRUCTURER=toolbox: usando Acessilia Toolbox remota")
+    if structurer in ("toolbox", "toolbox-layout", "toolbox_layout"):
+        logger.info(f"STRUCTURER={structurer}: usando Acessilia Toolbox remota")
     return structurer
 
 
