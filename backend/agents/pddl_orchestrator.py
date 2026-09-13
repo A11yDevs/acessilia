@@ -131,7 +131,13 @@ class PddlAccessibilityOrchestrator:
         fast_downward_alias (str | None): Optional shell alias to invoke fast_downward through instead of the raw path; defaults to None.
         fast_downward_search (str): Fast-downward search heuristic string passed when the backend is active; defaults to "astar(blind())".
         enable_ocr (bool): Whether the docling extraction backend should run its OCR pass; defaults to True.
-        extractor_backend (str): Which manifest-extraction backend to use, "docling" or "pymupdf"; defaults to "docling".
+        extractor_backend (str): Which manifest-extraction backend to use.
+            Supported values:
+            - "docling" — DoclingManifestExtractor (requires docling installed)
+            - "pymupdf" — PyMuPDFManifestExtractor (lightweight, no OCR)
+            - "toolbox" — ToolboxManifestExtractor (remote via Acessilia Toolbox)
+            - "toolbox-layout" / "toolbox_layout" — mapped to "toolbox" (same REST API)
+            Defaults to "docling".
     """
 
     def __init__(
@@ -158,7 +164,11 @@ class PddlAccessibilityOrchestrator:
             extractor = PyMuPDFManifestExtractor(include_images=True)
         elif self.extractor_backend == "docling":
             extractor = DoclingManifestExtractor(enable_ocr=enable_ocr)
-        elif self.extractor_backend == "toolbox":
+        elif self.extractor_backend in ("toolbox", "toolbox-layout", "toolbox_layout"):
+            logger.info(
+                "PDDL extractor_backend={}: usando ToolboxManifestExtractor",
+                self.extractor_backend,
+            )
             extractor = ToolboxManifestExtractor(enable_ocr=enable_ocr)
         else:
             raise ValueError(t(LOG_PDDL_EXTRACTOR_BACKEND_INVALID))

@@ -6,6 +6,7 @@ PyMuPDF funciona em falha.
 """
 from __future__ import annotations
 
+import copy
 from pathlib import Path
 from unittest.mock import AsyncMock
 
@@ -258,7 +259,7 @@ def test_cache_works_for_same_file_different_page(mock_client):
 
 def test_region_without_bbox_is_skipped(mock_client):
     """Região sem bbox é ignorada (None retornado por _raw_region_to_region)."""
-    response = dict(SAMPLE_LAYOUT_RESPONSE)
+    response = copy.deepcopy(SAMPLE_LAYOUT_RESPONSE)
     response["document"]["pages"][0]["regions"] = [
         {"type": "text_clean", "text": "no bbox", "confidence": 0.9},
     ]
