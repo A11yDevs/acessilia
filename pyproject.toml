@@ -37,7 +37,7 @@ rapidocr = { version = "^3.9.1", optional = true }
 slowapi = "^0.1.10"
 python-multipart = "^0.0.32"
 jinja2 = "^3.1.6"
-agno = "^3.0.0"
+agno = "3.0.5"
 jsonschema = "^4.20"
 openai = "^2.45.0"
 ollama = "^0.6.2"

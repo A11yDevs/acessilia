@@ -5307,4 +5307,4 @@ docling = ["docling", "rapidocr"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11, <3.14"
-content-hash = "85ca6fcc823ae5b62b796611d8a8caced83479ac8b045fea039c0a45ce4661b9"
+content-hash = "71003bb0fc4c49a4c6468990862fd56df665728d4f6a297edae6111bdbaccb4f"
