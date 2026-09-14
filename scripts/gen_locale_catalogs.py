@@ -98,10 +98,6 @@ from backend.log_messages import (
     LOG_CLEANUP_ITEM_FAILED,
     LOG_CLEANUP_OUTPUT_FAILED,
     LOG_CLEANUP_PERIODIC_ERROR,
-    LOG_DOCLING_NOT_AVAILABLE,
-    LOG_DOCLING_PAGE_FAILED,
-    LOG_DOCLING_PAGE_NO_PARENT,
-    LOG_DOCLING_PROCESSED,
     LOG_DOWNLOAD_TOKEN_CREATED,
     LOG_DOWNLOAD_TOKEN_DIR_MISSING,
     LOG_DOWNLOAD_TOKEN_NOT_FOUND,
@@ -783,10 +779,6 @@ MESSAGES: tuple[str, ...] = (
     LOG_CACHE_CLEARED,
     LOG_ORPHAN_TASKS_CLEANED,
     LOG_ORPHAN_TASKS_CLEANUP_FAILED,
-    LOG_DOCLING_NOT_AVAILABLE,
-    LOG_DOCLING_PAGE_FAILED,
-    LOG_DOCLING_PAGE_NO_PARENT,
-    LOG_DOCLING_PROCESSED,
     LOG_DOWNLOAD_TOKEN_CREATED,
     LOG_DOWNLOAD_TOKEN_NOT_FOUND,
     LOG_DOWNLOAD_TOKEN_DIR_MISSING,
@@ -1572,14 +1564,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         LOG_ORPHAN_TASKS_CLEANUP_FAILED: (
             "Falha ao limpar tarefas órfãs: {error}"
         ),
-        LOG_DOCLING_NOT_AVAILABLE: "Docling não está disponível no ambiente atual.",
-        LOG_DOCLING_PAGE_NO_PARENT: (
-            "Página sem documento pai para processamento Docling"
-        ),
-        LOG_DOCLING_PAGE_FAILED: (
-            "Docling falhou na página {page} ({error}), fallback PyMuPDF"
-        ),
-        LOG_DOCLING_PROCESSED: "Docling processou {filename} em {elapsed:.1f}s",
         LOG_DOWNLOAD_TOKEN_CREATED: "Token de download criado: {token} -> {filename}",
         LOG_DOWNLOAD_TOKEN_NOT_FOUND: "Token de download não encontrado: {token}",
         LOG_DOWNLOAD_TOKEN_DIR_MISSING: (
