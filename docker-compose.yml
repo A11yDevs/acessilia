@@ -21,6 +21,7 @@ services:
       # TOOLBOX_BASE_URL=http://host.docker.internal:8002
       TOOLBOX_BASE_URL=${TOOLBOX_BASE_URL:-http://host.docker.internal:8002}
       TOOLBOX_API_KEY=${TOOLBOX_API_KEY:-}
+      PIPELINE_ENGINE=pddl
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "if echo \"$ENABLED_INTERFACES\" | grep -q 'api'; then curl -fsS http://localhost:8000/api/v1/health; else curl -fsS http://localhost:8001/; fi"]
