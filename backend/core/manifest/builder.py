@@ -20,7 +20,6 @@ from backend.pipeline.sanitizer import sanitize_text
 from backend.pipeline.table_ast import normalize_table_ast
 from backend.pipeline.table_ast import rows_from_table_ast
 
-from backend.core.manifest.docling_extractor import DoclingExtraction
 from backend.core.manifest.models import (
     BoundingBox,
     ExtractorRun,
@@ -67,7 +66,7 @@ OBLIGATION_BY_TYPE = {
     "table": (
         "linearize-table",
         t(MSG_OBLIGATION_TABLE),
-        ["docling-table", "pandoc-table", "human-review"],
+        ["pandoc-table", "human-review"],
     ),
     "formula": (
         "verbalize-formula",
@@ -82,18 +81,16 @@ OBLIGATION_BY_TYPE = {
     "unknown": (
         "review-structure",
         t(MSG_OBLIGATION_UNKNOWN),
-        ["docling-retry", "pymupdf-region", "human-review"],
+        ["pymupdf-region", "human-review"],
     ),
 }
 
 DEFAULT_METHOD_COSTS = {
     "vision-description": 20,
-    "docling-table": 10,
     "pandoc-table": 15,
     "mathml": 10,
     "latex-verbalizer": 20,
     "pandoc-code": 10,
-    "docling-retry": 25,
     "pymupdf-region": 30,
     "deterministic-heading-repair": 5,
     "human-review": 100,
@@ -112,7 +109,7 @@ KNOWN_CALLOUT_TITLES = {
 
 def build_processing_manifest(
     source_path: Path,
-    extraction: DoclingExtraction,
+    extraction: Any,
     *,
     language: str = "pt-BR",
 ) -> ProcessingManifest:
@@ -171,7 +168,7 @@ def build_processing_manifest(
 
 def _build_from_toolbox_json(
     source_path: Path,
-    extraction: DoclingExtraction,
+    extraction: Any,
     *,
     digest: str,
     language: str,

@@ -89,8 +89,8 @@
       "additionalProperties": false,
       "properties": {
         "name": {
-          "const": "docling",
           "default": "docling",
+          "enum": ["docling", "toolbox"],
           "title": "Name",
           "type": "string"
         },

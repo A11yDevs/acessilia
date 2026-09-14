@@ -65,7 +65,7 @@ class SourceDocument(StrictModel):
 
 
 class ExtractorRun(StrictModel):
-    name: Literal["docling"] = "docling"
+    name: Literal["docling", "toolbox"] = "docling"
     version: str = Field(min_length=1)
     started_at: datetime
     completed_at: datetime

@@ -29,16 +29,9 @@ class Settings:
     logs_dir: Path = field(
         default_factory=lambda: _path_from_env("LOGS_DIR", BASE_DIR / "var" / "logs")
     )
-    rapidocr_cache_dir: Path = field(
-        default_factory=lambda: _path_from_env(
-            "RAPIDOCR_CACHE_DIR",
-            BASE_DIR / "var" / "cache" / "rapidocr",
-        )
-    )
     request_timeout: int = int(os.getenv("REQUEST_TIMEOUT", "3600"))
     log_level: str = os.getenv("LOG_LEVEL", "INFO")
     allowed_extensions: set[str] = field(default_factory=lambda: _default_extensions())
-    tesseract_cmd: str = os.getenv("TESSERACT_CMD", "tesseract")
     max_page_width: int = int(os.getenv("MAX_PAGE_WIDTH", "1600"))
     jpg_quality: int = int(os.getenv("JPG_QUALITY", "85"))
     pdf_split_dpi: int = int(os.getenv("PDF_SPLIT_DPI", "150"))
@@ -68,18 +61,6 @@ class Settings:
     )
     pymupdf_text_threshold: int = int(os.getenv("PYMUPDF_TEXT_THRESHOLD", "100"))
     structurer: str = os.getenv("STRUCTURER", "toolbox")
-    docling_formula_enrichment: bool = field(
-        default_factory=lambda: _bool_from_env_alias(
-            ("DOCLING_FORMULA_ENRICHMENT",),
-            True,
-        )
-    )
-    formula_image_cascade: bool = field(
-        default_factory=lambda: _bool_from_env_alias(
-            ("FORMULA_IMAGE_CASCADE",),
-            True,
-        )
-    )
     pipeline_engine: str = os.getenv("PIPELINE_ENGINE", "pddl")
 
     # Acessilia Toolbox settings
@@ -182,7 +163,6 @@ class Settings:
         self.temp_dir.mkdir(parents=True, exist_ok=True)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.logs_dir.mkdir(parents=True, exist_ok=True)
-        self.rapidocr_cache_dir.mkdir(parents=True, exist_ok=True)
 
     # Backward-compatible aliases for the old PMV-prefixed configuration.
     @property

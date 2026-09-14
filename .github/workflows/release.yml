@@ -19,22 +19,9 @@ env:
 
 jobs:
   publish:
-    name: publish ${{ matrix.variant }} release image
+    name: publish release image
     runs-on: ubuntu-latest
-    timeout-minutes: 120
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - variant: docling
-            with_docling: "true"
-            tag_suffix: ""
-          - variant: slim
-            with_docling: "false"
-            tag_suffix: -slim
-
-    env:
-      LOCAL_IMAGE: acessilia:release-${{ matrix.variant }}
+    timeout-minutes: 60
 
     steps:
       - name: Check out repository
@@ -59,9 +46,9 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=semver,pattern={{version}},suffix=${{ matrix.tag_suffix }}
-            type=semver,pattern={{major}}.{{minor}},suffix=${{ matrix.tag_suffix }}
-            type=semver,pattern={{major}},suffix=${{ matrix.tag_suffix }}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
           labels: |
             org.opencontainers.image.title=acessilia
             org.opencontainers.image.description=Pipeline para extracao e acessibilidade de documentos
@@ -73,54 +60,19 @@ jobs:
         with:
           context: .
           file: infra/Dockerfile
-          target: base
           platforms: linux/amd64
           load: true
           push: false
-          tags: ${{ env.LOCAL_IMAGE }}
-          build-args: |
-            WITH_DOCLING=${{ matrix.with_docling }}
-          cache-from: type=gha,scope=production-${{ matrix.variant }}
-          cache-to: type=gha,mode=max,scope=production-${{ matrix.variant }}
-
-      - name: Verify installed variant and empty model caches
-        env:
-          VARIANT: ${{ matrix.variant }}
-        run: |
-          docker run --rm --interactive \
-            --env VARIANT \
-            "$LOCAL_IMAGE" \
-            python - <<'PY'
-          import os
-          from importlib.metadata import distributions
-
-          installed = {
-              distribution.metadata["Name"].lower().replace("_", "-")
-              for distribution in distributions()
-              if distribution.metadata["Name"]
-          }
-          if os.environ["VARIANT"] == "slim":
-              unexpected = {"docling", "rapidocr", "torch", "torchvision"} & installed
-              if unexpected:
-                  raise SystemExit(f"Pacotes inesperados na imagem slim: {unexpected}")
-          else:
-              import torch
-              if torch.version.cuda is not None:
-                  raise SystemExit(f"Torch CUDA detectado: {torch.version.cuda}")
-              accelerators = {"triton"} & installed
-              accelerators |= {name for name in installed if name.startswith("nvidia-")}
-              if accelerators:
-                  raise SystemExit(f"Aceleradores inesperados: {accelerators}")
-          PY
-          docker run --rm "$LOCAL_IMAGE" sh -c \
-            'test -z "$(find /app/var/cache -type f 2>/dev/null)"'
+          tags: acessilia:release
+          cache-from: type=gha,scope=production
+          cache-to: type=gha,mode=max,scope=production
 
       - name: Smoke test API health
         run: |
           container_id=$(docker run --detach --rm \
             --env ENABLED_INTERFACES=api \
             --publish 127.0.0.1::8000 \
-            "$LOCAL_IMAGE" \
+            acessilia:release \
             python -m uvicorn backend.api.app:app --host 0.0.0.0 --port 8000)
           trap 'docker rm --force "$container_id" >/dev/null 2>&1 || true' EXIT
           port=$(docker port "$container_id" 8000/tcp | awk -F: '{print $NF}')
@@ -129,7 +81,7 @@ jobs:
             "http://127.0.0.1:${port}/api/v1/health"
 
       - name: Enforce local image size guardrail
-        run: python scripts/check_image_size.py local "$LOCAL_IMAGE" --limit-gb 9
+        run: python scripts/check_image_size.py local acessilia:release --limit-gb 9
 
       - name: Publish verified release image
         id: publish
@@ -137,14 +89,10 @@ jobs:
         with:
           context: .
           file: infra/Dockerfile
-          target: base
           platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          build-args: |
-            WITH_DOCLING=${{ matrix.with_docling }}
-          cache-from: type=gha,scope=production-${{ matrix.variant }}
 
   release:
     name: create GitHub Release

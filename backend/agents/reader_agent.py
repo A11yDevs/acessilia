@@ -260,10 +260,7 @@ class ReaderAgent:
                 )
 
                 # Local cascade: image that is actually a formula → OCR + CodeFormula
-                if (
-                    classification == "embedded_image"
-                    and settings.formula_image_cascade
-                ):
+                if classification == "embedded_image":
                     latex = try_extract_formula_locally(image_bytes)
                     if latex:
                         latex = ensure_math_delimiters(latex)

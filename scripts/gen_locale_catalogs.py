@@ -98,10 +98,6 @@ from backend.log_messages import (
     LOG_CLEANUP_ITEM_FAILED,
     LOG_CLEANUP_OUTPUT_FAILED,
     LOG_CLEANUP_PERIODIC_ERROR,
-    LOG_DOCLING_NOT_AVAILABLE,
-    LOG_DOCLING_PAGE_FAILED,
-    LOG_DOCLING_PAGE_NO_PARENT,
-    LOG_DOCLING_PROCESSED,
     LOG_DOWNLOAD_TOKEN_CREATED,
     LOG_DOWNLOAD_TOKEN_DIR_MISSING,
     LOG_DOWNLOAD_TOKEN_NOT_FOUND,
@@ -142,7 +138,6 @@ from backend.log_messages import (
     LOG_PDDL_IMAGES_ENRICHED,
     LOG_PDDL_TABLES_ENRICHED,
     LOG_PDDL_ELEMENT_CROP_FAILED,
-    LOG_PDDL_EXTRACTOR_BACKEND_INVALID,
     LOG_PDDL_PREFERRED_PLAN_MISSING,
     LOG_PDDL_PROBLEM_HASH_MISMATCH,
     LOG_PDDL_DOMAIN_HASH_MISMATCH,
@@ -166,12 +161,6 @@ from backend.log_messages import (
     LOG_READER_TASKS_SUMMARY,
     LOG_READER_IMAGE_READING,
     LOG_QUEUE_ITEM_ENQUEUED,
-    LOG_RAPIDOCR_MODELS_PERSISTED,
-    LOG_RAPIDOCR_MODELS_RESTORED,
-    LOG_STRUCTURER_DOCLING,
-    LOG_STRUCTURER_DOCLING_NOT_INSTALLED,
-    LOG_STRUCTURER_FALLBACK_PYMUPDF,
-    LOG_STRUCTURER_PYMUPDF,
     LOG_SMTP_NOT_CONFIGURED,
     LOG_STARTING_INTERFACES,
     LOG_STALE_PROCESS_INTERRUPTED,
@@ -735,7 +724,6 @@ MESSAGES: tuple[str, ...] = (
     LOG_PDF_PAGE_SAVED,
     LOG_PDF_PAGES_EXTRACTED,
     LOG_PDDL_ELEMENT_CROP_FAILED,
-    LOG_PDDL_EXTRACTOR_BACKEND_INVALID,
     LOG_PDDL_PREFERRED_PLAN_MISSING,
     LOG_PDDL_PROBLEM_HASH_MISMATCH,
     LOG_PDDL_DOMAIN_HASH_MISMATCH,
@@ -783,10 +771,6 @@ MESSAGES: tuple[str, ...] = (
     LOG_CACHE_CLEARED,
     LOG_ORPHAN_TASKS_CLEANED,
     LOG_ORPHAN_TASKS_CLEANUP_FAILED,
-    LOG_DOCLING_NOT_AVAILABLE,
-    LOG_DOCLING_PAGE_FAILED,
-    LOG_DOCLING_PAGE_NO_PARENT,
-    LOG_DOCLING_PROCESSED,
     LOG_DOWNLOAD_TOKEN_CREATED,
     LOG_DOWNLOAD_TOKEN_NOT_FOUND,
     LOG_DOWNLOAD_TOKEN_DIR_MISSING,
@@ -821,12 +805,6 @@ MESSAGES: tuple[str, ...] = (
     LOG_ORCHESTRATOR_TASK_FAILED,
     LOG_ORCHESTRATOR_WORKFLOW_START,
     LOG_ORCHESTRATOR_WORKFLOW_SUMMARY,
-    LOG_RAPIDOCR_MODELS_RESTORED,
-    LOG_RAPIDOCR_MODELS_PERSISTED,
-    LOG_STRUCTURER_DOCLING,
-    LOG_STRUCTURER_DOCLING_NOT_INSTALLED,
-    LOG_STRUCTURER_FALLBACK_PYMUPDF,
-    LOG_STRUCTURER_PYMUPDF,
     LOG_STALE_PROCESS_INTERRUPTED,
     LOG_AGNO_NOT_INSTALLED,
 )
@@ -1440,10 +1418,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         LOG_PDDL_ELEMENT_CROP_FAILED: (
             "Falha ao extrair recorte de imagem para elemento {element_id}"
         ),
-        # raised when the PDDL pipeline is configured with an invalid extractor backend value.
-        LOG_PDDL_EXTRACTOR_BACKEND_INVALID: (
-            "extractor_backend inválido; use 'docling' ou 'pymupdf'"
-        ),
         # raised when the preferred planner backend produced no valid plan in both mode; {backend} is the preferred backend's name.
         LOG_PDDL_PREFERRED_PLAN_MISSING: (
             "Backend preferido {backend} não gerou plano válido no modo both"
@@ -1572,14 +1546,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         LOG_ORPHAN_TASKS_CLEANUP_FAILED: (
             "Falha ao limpar tarefas órfãs: {error}"
         ),
-        LOG_DOCLING_NOT_AVAILABLE: "Docling não está disponível no ambiente atual.",
-        LOG_DOCLING_PAGE_NO_PARENT: (
-            "Página sem documento pai para processamento Docling"
-        ),
-        LOG_DOCLING_PAGE_FAILED: (
-            "Docling falhou na página {page} ({error}), fallback PyMuPDF"
-        ),
-        LOG_DOCLING_PROCESSED: "Docling processou {filename} em {elapsed:.1f}s",
         LOG_DOWNLOAD_TOKEN_CREATED: "Token de download criado: {token} -> {filename}",
         LOG_DOWNLOAD_TOKEN_NOT_FOUND: "Token de download não encontrado: {token}",
         LOG_DOWNLOAD_TOKEN_DIR_MISSING: (
@@ -1668,26 +1634,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         LOG_ORCHESTRATOR_PAGE_CACHE_SKIP: (
             "[página {page_num}] Cache: item existente (pulando IA)"
         ),
-        # RapidOCR local model cache restore line (pt-BR mirror); {count} is the number of model files restored.
-        LOG_RAPIDOCR_MODELS_RESTORED: (
-            "RapidOCR: {count} modelo(s) restaurado(s) do cache local"
-        ),
-        # RapidOCR local model cache persist line (pt-BR mirror); {count} is the number of model files persisted.
-        LOG_RAPIDOCR_MODELS_PERSISTED: (
-            "RapidOCR: {count} modelo(s) persistido(s) no cache local"
-        ),
-        # Document structurer selection lines (pt-BR mirrors of the LOG_STRUCTURER_* ids above).
-        LOG_STRUCTURER_DOCLING: (
-            "Usando structurer: Docling (com fallback PyMuPDF)"
-        ),
-        LOG_STRUCTURER_DOCLING_NOT_INSTALLED: (
-            "STRUCTURER=docling está definido mas docling não está instalado. "
-            "Execute: pip install docling. Usando PyMuPDF."
-        ),
-        LOG_STRUCTURER_FALLBACK_PYMUPDF: (
-            "STRUCTURER=docling mas docling nao instalado. Usando PyMuPDF."
-        ),
-        LOG_STRUCTURER_PYMUPDF: "Usando structurer: PyMuPDF",
         LOG_STALE_PROCESS_INTERRUPTED: "Obsoleta: processo interrompido",
         LOG_AGNO_NOT_INSTALLED: (
             "Agno não está instalado. Execute `poetry install` antes de usar "

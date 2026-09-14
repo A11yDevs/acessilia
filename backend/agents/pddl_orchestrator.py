@@ -11,9 +11,6 @@ from backend.agents.data_agent import DataAgent
 from backend.core.agents.informational_structural import InformationalStructuralAgent
 from backend.core.execution.executor import ExecutorAgent, MethodRegistry
 from backend.core.execution.models import ExecutionReport, MethodResult
-from backend.core.manifest.docling_extractor import DoclingManifestExtractor
-from backend.core.manifest.docling_serve_extractor import DoclingServeManifestExtractor
-from backend.core.manifest.pymupdf_extractor import PyMuPDFManifestExtractor
 from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
 from backend.core.manifest.models import ManifestElement, ProcessingManifest
 from backend.core.planning.domain_bundle import DomainBundle
@@ -24,7 +21,6 @@ from backend.agents.vision_agent import VisionAgent
 from backend.i18n import t
 from backend.log_messages import (
     LOG_PDDL_ELEMENT_CROP_FAILED,
-    LOG_PDDL_EXTRACTOR_BACKEND_INVALID,
     LOG_PDDL_IGNORED_OPTIONS,
     LOG_PDDL_IMAGES_ENRICHED,
     LOG_PDDL_PREFERRED_PLAN_MISSING,
@@ -134,12 +130,9 @@ class PddlAccessibilityOrchestrator:
         enable_ocr (bool): Whether the docling extraction backend should run its OCR pass; defaults to True.
         extractor_backend (str): Which manifest-extraction backend to use.
             Supported values:
-            - "docling" — DoclingManifestExtractor (requires docling installed)
-            - "docling-serve" — DoclingServeManifestExtractor (via docling-serve Docker)
-            - "pymupdf" — PyMuPDFManifestExtractor (lightweight, no OCR)
             - "toolbox" — ToolboxManifestExtractor (remote via Acessilia Toolbox)
             - "toolbox-layout" / "toolbox_layout" — mapped to "toolbox" (same REST API)
-            Defaults to "docling".
+            Defaults to "toolbox".
     """
 
     def __init__(
@@ -152,7 +145,7 @@ class PddlAccessibilityOrchestrator:
         fast_downward_alias: str | None = None,
         fast_downward_search: str = "astar(blind())",
         enable_ocr: bool = True,
-        extractor_backend: str = "docling",
+        extractor_backend: str = "toolbox",
     ) -> None:
         self.planner_backend = planner_backend
         self.preferred_plan = preferred_plan
