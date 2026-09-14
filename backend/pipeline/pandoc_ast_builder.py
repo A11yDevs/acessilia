@@ -127,7 +127,7 @@ def _table_to_pandoc_ast(table_ast: dict[str, Any]) -> dict[str, Any]:
     all_rows = header_rows + body_rows + footer_rows
     column_count = max((len(row.get("cells", [])) for row in all_rows), default=1)
     colspecs = [
-        [{"t": "AlignDefault"}, {"t": "ColWidthDefault"}]
+        [{"t": "AlignDefault"}, {"t": "ColWidth", "c": 1.0 / max(column_count, 1)}]
         for _ in range(column_count)
     ]
 
