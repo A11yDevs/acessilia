@@ -378,10 +378,6 @@ LOG_PDDL_TABLES_ENRICHED: str = (
 LOG_PDDL_ELEMENT_CROP_FAILED: str = (
     "Failed to extract the image clip for element {element_id}"
 )
-#: Error raised when the PDDL pipeline is configured with an invalid extractor backend value; no placeholders.
-LOG_PDDL_EXTRACTOR_BACKEND_INVALID: str = (
-    "Invalid extractor_backend; use 'docling' or 'pymupdf'"
-)
 #: Error raised when the preferred planner backend produced no valid plan in both mode; {backend} is the preferred backend's name.
 LOG_PDDL_PREFERRED_PLAN_MISSING: str = (
     "Preferred planner backend {backend} did not produce a valid plan in both mode"
