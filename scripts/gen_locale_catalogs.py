@@ -1634,19 +1634,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         LOG_ORCHESTRATOR_PAGE_CACHE_SKIP: (
             "[página {page_num}] Cache: item existente (pulando IA)"
         ),
-        # RapidOCR local model cache restore line (pt-BR mirror); {count} is the number of model files restored.
-            "RapidOCR: {count} modelo(s) restaurado(s) do cache local"
-        ),
-        # RapidOCR local model cache persist line (pt-BR mirror); {count} is the number of model files persisted.
-            "RapidOCR: {count} modelo(s) persistido(s) no cache local"
-        ),
-            "Usando structurer: Docling (com fallback PyMuPDF)"
-        ),
-            "STRUCTURER=docling está definido mas docling não está instalado. "
-            "Execute: pip install docling. Usando PyMuPDF."
-        ),
-            "STRUCTURER=docling mas docling nao instalado. Usando PyMuPDF."
-        ),
         LOG_STALE_PROCESS_INTERRUPTED: "Obsoleta: processo interrompido",
         LOG_AGNO_NOT_INSTALLED: (
             "Agno não está instalado. Execute `poetry install` antes de usar "
