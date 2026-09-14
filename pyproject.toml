@@ -48,8 +48,8 @@ dev = [
 [project.scripts]
 bot-acess = "frontend.cli.run:main"
 
-[tool.setuptools.packages]
-include = ["backend", "backend.*", "frontend", "frontend.*"]
+[tool.setuptools.packages.find]
+include = ["backend*", "frontend*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
