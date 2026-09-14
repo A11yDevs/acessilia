@@ -162,23 +162,17 @@ class PddlAccessibilityOrchestrator:
         self.fast_downward_search = fast_downward_search
         self.extractor_backend = extractor_backend.strip().lower()
 
-        if self.extractor_backend == "pymupdf":
-            extractor = PyMuPDFManifestExtractor(include_images=True)
-        elif self.extractor_backend == "docling":
-            extractor = DoclingManifestExtractor(enable_ocr=enable_ocr)
-        elif self.extractor_backend == "docling-serve":
-            logger.info(
-                "PDDL extractor_backend=docling-serve: usando DoclingServeManifestExtractor (Docker)",
-            )
-            extractor = DoclingServeManifestExtractor(enable_ocr=enable_ocr)
-        elif self.extractor_backend in ("toolbox", "toolbox-layout", "toolbox_layout"):
+        if self.extractor_backend in ("toolbox", "toolbox-layout", "toolbox_layout"):
             logger.info(
                 "PDDL extractor_backend={}: usando ToolboxManifestExtractor",
                 self.extractor_backend,
             )
             extractor = ToolboxManifestExtractor(enable_ocr=enable_ocr)
         else:
-            raise ValueError(t(LOG_PDDL_EXTRACTOR_BACKEND_INVALID))
+            raise ValueError(
+                f"Extractor local '{self.extractor_backend}' desativado. "
+                f"Use extractor_backend='toolbox' para o pipeline PDDL+Toolbox."
+            )
 
         self.information_structural = InformationalStructuralAgent(
             extractor

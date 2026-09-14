@@ -29,8 +29,11 @@ def _reimport_service(monkeypatch, engine_value: str):
 
 
 def test_normalized_engine_legacy(monkeypatch):
-    svc = _reimport_service(monkeypatch, "legacy")
-    assert svc._normalized_engine() == "legacy"
+    monkeypatch.setattr(settings, "pipeline_engine", "legacy")
+    from backend.service import _normalized_engine
+
+    with pytest.raises(RuntimeError, match="desativado"):
+        _normalized_engine()
 
 
 def test_normalized_engine_pddl(monkeypatch):
@@ -50,8 +53,11 @@ def test_normalized_engine_case_insensitive(monkeypatch):
 
 
 def test_normalized_engine_unknown_defaults_to_legacy(monkeypatch):
-    svc = _reimport_service(monkeypatch, "unknown-engine")
-    assert svc._normalized_engine() == "legacy"
+    monkeypatch.setattr(settings, "pipeline_engine", "unknown-engine")
+    from backend.service import _normalized_engine
+
+    with pytest.raises(RuntimeError, match="desativado"):
+        _normalized_engine()
 
 
 # ---------------------------------------------------------------------------
@@ -60,11 +66,11 @@ def test_normalized_engine_unknown_defaults_to_legacy(monkeypatch):
 
 
 def test_build_orchestrator_returns_legacy_by_default(monkeypatch):
-    from backend.agents.orchestrator import AccessibilityOrchestrator
+    monkeypatch.setattr(settings, "pipeline_engine", "legacy")
+    from backend.service import _build_orchestrator
 
-    svc = _reimport_service(monkeypatch, "legacy")
-    orchestrator = svc._build_orchestrator()
-    assert isinstance(orchestrator, AccessibilityOrchestrator)
+    with pytest.raises(RuntimeError, match="desativado"):
+        _build_orchestrator()
 
 
 def test_build_orchestrator_returns_pddl_when_configured(monkeypatch):
@@ -79,7 +85,7 @@ def test_build_orchestrator_returns_pddl_when_configured(monkeypatch):
 
 def test_build_orchestrator_pddl_with_docling_enables_ocr(monkeypatch):
     from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
-    from backend.core.manifest.docling_extractor import DoclingManifestExtractor
+    from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
 
     monkeypatch.setattr(settings, "structurer", "docling")
     monkeypatch.setattr(settings, "pddl_fast_downward", "")
@@ -89,13 +95,13 @@ def test_build_orchestrator_pddl_with_docling_enables_ocr(monkeypatch):
     orchestrator = svc._build_orchestrator()
     assert isinstance(orchestrator, PddlAccessibilityOrchestrator)
     extractor = orchestrator.information_structural.extractor
-    assert isinstance(extractor, DoclingManifestExtractor)
-    assert extractor.enable_ocr is True
+    assert isinstance(extractor, ToolboxManifestExtractor)
+    assert orchestrator.extractor_backend == "toolbox"
 
 
 def test_build_orchestrator_pddl_with_structurer_pymupdf_uses_pymupdf_extractor(monkeypatch):
     from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
-    from backend.core.manifest.pymupdf_extractor import PyMuPDFManifestExtractor
+    from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
 
     monkeypatch.setattr(settings, "structurer", "pymupdf")
     monkeypatch.setattr(settings, "pddl_fast_downward", "")
@@ -104,13 +110,13 @@ def test_build_orchestrator_pddl_with_structurer_pymupdf_uses_pymupdf_extractor(
     orchestrator = svc._build_orchestrator()
     assert isinstance(orchestrator, PddlAccessibilityOrchestrator)
     extractor = orchestrator.information_structural.extractor
-    assert isinstance(extractor, PyMuPDFManifestExtractor)
-    assert orchestrator.extractor_backend == "pymupdf"
+    assert isinstance(extractor, ToolboxManifestExtractor)
+    assert orchestrator.extractor_backend == "toolbox"
 
 
 def test_build_orchestrator_pddl_without_docling_falls_back_to_pymupdf(monkeypatch):
     from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
-    from backend.core.manifest.pymupdf_extractor import PyMuPDFManifestExtractor
+    from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
 
     monkeypatch.setattr(settings, "structurer", "docling")
     monkeypatch.setattr(settings, "pddl_fast_downward", "")
@@ -120,8 +126,8 @@ def test_build_orchestrator_pddl_without_docling_falls_back_to_pymupdf(monkeypat
     orchestrator = svc._build_orchestrator()
     assert isinstance(orchestrator, PddlAccessibilityOrchestrator)
     extractor = orchestrator.information_structural.extractor
-    assert isinstance(extractor, PyMuPDFManifestExtractor)
-    assert orchestrator.extractor_backend == "pymupdf"
+    assert isinstance(extractor, ToolboxManifestExtractor)
+    assert orchestrator.extractor_backend == "toolbox"
 
 
 # ---------------------------------------------------------------------------
@@ -148,16 +154,20 @@ def test_build_orchestrator_pddl_with_toolbox_uses_toolbox_extractor(monkeypatch
 def test_resolved_structurer_toolbox_does_not_require_docling(monkeypatch):
     """STRUCTURER=toolbox não depende de DOCLING_AVAILABLE."""
     monkeypatch.setattr(settings, "structurer", "toolbox")
-    svc = _reimport_service(monkeypatch, "legacy")
-    assert svc._resolved_structurer() == "toolbox"
+    monkeypatch.setattr(settings, "pipeline_engine", "pddl")
+    from backend.service import _resolved_structurer
+
+    assert _resolved_structurer() == "toolbox"
 
 
 def test_resolved_structurer_toolbox_without_docling(monkeypatch):
     """STRUCTURER=toolbox funciona mesmo quando docling não está instalado."""
     monkeypatch.setattr(settings, "structurer", "toolbox")
-    svc = _reimport_service(monkeypatch, "legacy")
-    monkeypatch.setattr(svc, "DOCLING_AVAILABLE", False)
-    assert svc._resolved_structurer() == "toolbox"
+    monkeypatch.setattr(settings, "pipeline_engine", "pddl")
+    monkeypatch.setattr("backend.service.DOCLING_AVAILABLE", False)
+    from backend.service import _resolved_structurer
+
+    assert _resolved_structurer() == "toolbox"
 
 
 def test_toolbox_settings_defaults():
@@ -210,7 +220,7 @@ def test_settings_pddl_defaults():
 
     fresh = cfg_mod.Settings()
 
-    assert fresh.pipeline_engine == "legacy"
+    assert fresh.pipeline_engine == "pddl"
     assert fresh.pddl_execute_dry_run is True
     assert fresh.pddl_planner_backend == "internal"
     assert fresh.pddl_preferred_plan == "internal"
