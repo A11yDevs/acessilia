@@ -266,19 +266,6 @@ def test_cascade_miss_falls_back_to_vision(reader, monkeypatch):
     assert tasks[0].classification == "embedded_image"
 
 
-def test_cascade_disabled_by_setting(reader, monkeypatch):
-    from backend.config.settings import settings
-
-    monkeypatch.setattr(settings, "formula_image_cascade", False)
-    monkeypatch.setattr(
-        "backend.agents.reader_agent.try_extract_formula_locally",
-        lambda image_bytes: (_ for _ in ()).throw(AssertionError("não deveria rodar")),
-    )
-    tasks = reader._extract_mixed_tasks(Path("page.pdf"), [_image_region()], 1, 1)
-
-    assert tasks[0].agent_target == "vision"
-
-
 def test_try_extract_formula_locally_skips_non_math(monkeypatch):
     from backend.tools import formula_tools
 

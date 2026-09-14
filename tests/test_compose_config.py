@@ -12,7 +12,7 @@ def test_local_compose_builds_runtime_stage():
     build_config = compose["services"]["acessilia"]["build"]
 
     assert build_config["dockerfile"] == "infra/Dockerfile"
-    assert build_config["target"] == "base"
+    assert "target" not in build_config
 
 
 def test_production_compose_uses_main_image_and_production_container():
@@ -45,10 +45,9 @@ def test_delivery_is_reusable_with_explicit_commit_reference():
     assert "${{ inputs.sha }}" in workflow_text
 
 
-def test_release_workflow_publishes_slim_semver_tags_with_suffix():
+def test_release_workflow_publishes_semver_tags():
     workflow_text = (ROOT_DIR / ".github" / "workflows" / "release.yml").read_text()
 
-    assert "tag_suffix: -slim" in workflow_text
-    assert "type=semver,pattern={{version}},suffix=${{ matrix.tag_suffix }}" in workflow_text
-    assert "type=semver,pattern={{major}}.{{minor}},suffix=${{ matrix.tag_suffix }}" in workflow_text
-    assert "type=semver,pattern={{major}},suffix=${{ matrix.tag_suffix }}" in workflow_text
+    assert "type=semver,pattern={{version}}" in workflow_text
+    assert "type=semver,pattern={{major}}.{{minor}}" in workflow_text
+    assert "type=semver,pattern={{major}}" in workflow_text

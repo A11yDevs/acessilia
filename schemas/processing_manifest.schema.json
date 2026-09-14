@@ -89,7 +89,10 @@
       "additionalProperties": false,
       "properties": {
         "name": {
-          "const": "docling",
+          "anyOf": [
+            {"const": "docling"},
+            {"const": "toolbox"}
+          ],
           "default": "docling",
           "title": "Name",
           "type": "string"
