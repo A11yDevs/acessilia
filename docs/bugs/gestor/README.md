@@ -3,7 +3,6 @@
 Resultados dos testes do **Acessilia Gestor** (`A11yDevs/acessilia-ufg`), a pedido do professor e do @master_jf, por **Pedro Alano** (testes/homologação).
 
 - 📋 **[RELATORIO-QA-GESTOR.md](RELATORIO-QA-GESTOR.md)** — relatório completo: achados, evidências, status de confirmação e sugestões.
-- 💬 **[MENSAGEM-GRUPO.md](MENSAGEM-GRUPO.md)** — resumo em linguagem simples para o grupo.
 
 ## Placar rápido (2026-09-14)
 
