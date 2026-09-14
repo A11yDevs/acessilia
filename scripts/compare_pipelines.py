@@ -1,23 +1,20 @@
-"""Compare PDDL local vs PDDL+Toolbox pipeline outputs end-to-end.
+"""Compare reference canonical document vs PDDL+Toolbox pipeline output.
 
-Runs both pipelines on the same input document(s) and generates a detailed
-diff report comparing canonical documents at structural and text levels.
-
-Both paths use the same PDDL orchestrator -- only the extraction backend
-differs (local Docling/PyMuPDF vs remote Acessilia Toolbox).
+Loads a pre-computed reference canonical document (from tests/dataset/)
+and compares it against the PDDL+Toolbox pipeline output on the same input.
 
 Usage:
-    # Single file with local Docling extractor
-    poetry run python scripts/compare_pipelines.py tests/fixtures/tutorials/java-oo-3pgs.pdf
+    # Single file with reference
+    poetry run python scripts/compare_pipelines.py tests/dataset/input/001.pdf \
+        --reference tests/dataset/intermediate/canonical-document/001.json
 
-    # With PyMuPDF extractor
-    poetry run python scripts/compare_pipelines.py input.pdf --extractor pymupdf
-
-    # Batch mode (all PDFs in fixtures directory)
-    poetry run python scripts/compare_pipelines.py tests/fixtures/ --batch
+    # Batch mode (all dataset inputs)
+    poetry run python scripts/compare_pipelines.py tests/dataset/input/ --batch \
+        --reference-dir tests/dataset/intermediate/canonical-document/
 
     # With custom output directory
-    poetry run python scripts/compare_pipelines.py input.pdf -o temp/output/comparison
+    poetry run python scripts/compare_pipelines.py input.pdf -o temp/output/comparison \
+        --reference ref.json
 """
 
 from __future__ import annotations
@@ -160,33 +157,22 @@ def _summarize_document(document: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-async def _run_pddl_local(
+async def _run_toolbox(
     file_path: Path,
-    mode: str,
     tmpdir: Path,
+    mode: str = "normal",
     *,
-    extractor: str = "docling-serve",
-    enable_ocr: bool = False,
     planner_backend: str = "internal",
     execute_plan: bool = False,
+    enable_ocr: bool = False,
 ) -> dict[str, Any]:
-    """Run the PDDL pipeline with a local extractor (docling-serve, docling or pymupdf).
-
-    Args:
-        file_path: Input file to process.
-        mode: Verbosity mode (unused by local, kept for interface parity).
-        tmpdir: Temporary directory for intermediate files.
-        extractor: "docling-serve" (default, via Docker), "docling" or "pymupdf".
-        enable_ocr: Whether to enable OCR in the extractor.
-        planner_backend: PDDL planner backend ("internal" or "fast-downward").
-        execute_plan: Whether to actually execute the plan (vs dry-run).
-    """
+    """Run the PDDL pipeline with ToolboxManifestExtractor."""
     orchestrator = PddlAccessibilityOrchestrator(
         planner_backend=planner_backend,
         preferred_plan=planner_backend,
         execute_dry_run=not execute_plan,
         enable_ocr=enable_ocr,
-        extractor_backend=extractor,
+        extractor_backend="toolbox",
     )
     structured = await orchestrator.executar(
         file_path=file_path,
@@ -214,7 +200,7 @@ async def _run_pddl_local(
     return {"structured": structured, "canonical": canonical}
 
 
-async def _run_pddl_toolbox(
+async def _run_toolbox(
     file_path: Path,
     tmpdir: Path,
     mode: str = "normal",
@@ -263,65 +249,65 @@ async def _run_pddl_toolbox(
 
 
 def _compare_documents(
-    pddl_local: dict[str, Any],
-    pddl_toolbox: dict[str, Any],
+    reference: dict[str, Any],
+    toolbox: dict[str, Any],
 ) -> dict[str, Any]:
     """Compare two canonical documents and return a structured diff report."""
-    local_blocks = _flatten_blocks(pddl_local)
-    tb_blocks = _flatten_blocks(pddl_toolbox)
-    local_text = _extract_text(pddl_local)
-    tb_text = _extract_text(pddl_toolbox)
+    ref_blocks = _flatten_blocks(reference)
+    tb_blocks = _flatten_blocks(toolbox)
+    ref_text = _extract_text(reference)
+    tb_text = _extract_text(toolbox)
 
-    local_by_type = _count_by_type(local_blocks)
+    ref_by_type = _count_by_type(ref_blocks)
     tb_by_type = _count_by_type(tb_blocks)
 
     # Type diff
-    all_types = sorted(set(local_by_type) | set(tb_by_type))
+    all_types = sorted(set(ref_by_type) | set(tb_by_type))
     type_deltas: dict[str, dict[str, int]] = {}
     for t in all_types:
-        l = local_by_type.get(t, 0)
+        l = ref_by_type.get(t, 0)
         p = tb_by_type.get(t, 0)
         if l != p:
-            type_deltas[t] = {"local": l, "toolbox": p}
+            type_deltas[t] = {"reference": l, "toolbox": p}
 
     # Text similarity
-    similarity = _jaccard_similarity(local_text, tb_text)
+    similarity = _jaccard_similarity(ref_text, tb_text)
 
     # Formula comparison
-    local_formulas = _extract_formulas(pddl_local)
-    tb_formulas = _extract_formulas(pddl_toolbox)
+    ref_formulas = _extract_formulas(reference)
+    tb_formulas = _extract_formulas(toolbox)
 
     # Table comparison
-    local_tables = _extract_tables(pddl_local)
-    tb_tables = _extract_tables(pddl_toolbox)
+    ref_tables = _extract_tables(reference)
+    tb_tables = _extract_tables(toolbox)
 
     return {
         "structural": {
             "section_count": {
-                "local": len(pddl_local.get("sections", [])),
-                "toolbox": len(pddl_toolbox.get("sections", [])),
+                "reference": len(reference.get("sections", [])),
+                "toolbox": len(toolbox.get("sections", [])),
             },
             "block_count": {
-                "local": len(local_blocks),
+                "reference": len(ref_blocks),
                 "toolbox": len(tb_blocks),
-                "delta": len(tb_blocks) - len(local_blocks),
+                "delta": len(tb_blocks) - len(ref_blocks),
             },
             "blocks_by_type_delta": type_deltas,
         },
         "text": {
-            "local_length": len(local_text),
+            "reference_length": len(ref_text),
             "toolbox_length": len(tb_text),
             "jaccard_similarity": round(similarity, 4),
         },
         "formulas": {
-            "local_count": len(local_formulas),
+            "reference_count": len(ref_formulas),
             "toolbox_count": len(tb_formulas),
             "common_formulas": len(
-                set(local_formulas) & set(tb_formulas)
+                set(ref_formulas) & set(tb_formulas)
             ),
         },
         "tables": {
-            "local_count": len(local_tables),
+            "reference_count": len(ref_tables),
             "toolbox_count": len(tb_tables),
         },
     }
@@ -329,26 +315,25 @@ def _compare_documents(
 
 def _format_comparison_summary(
     comparison: dict[str, Any],
-    local_elapsed: float,
     toolbox_elapsed: float,
 ) -> str:
     """Format a human-readable summary of the comparison."""
     lines: list[str] = [
         "=" * 72,
-        "  PIPELINE COMPARISON REPORT (PDDL local vs PDDL+Toolbox)",
+        "  COMPARISON REPORT (reference canonical vs PDDL+Toolbox)",
         "=" * 72,
     ]
 
     s = comparison.get("structural", {})
     lines.append("\n[Structural]")
-    lines.append(f"  Block count:    local={s.get('block_count', {}).get('local', '?')}, "
+    lines.append(f"  Block count:    reference={s.get('block_count', {}).get('reference', '?')}, "
                   f"toolbox={s.get('block_count', {}).get('toolbox', '?')} "
                   f"(delta={s.get('block_count', {}).get('delta', 0):+d})")
     type_deltas = s.get("blocks_by_type_delta", {})
     if type_deltas:
-        lines.append("  Block type deltas (local \u2192 toolbox):")
+        lines.append("  Block type deltas (reference \u2192 toolbox):")
         for bt, vals in type_deltas.items():
-            l = vals.get("local", 0)
+            l = vals.get("reference", 0)
             p = vals.get("toolbox", 0)
             delta = p - l
             sign = "+" if delta > 0 else ""
@@ -356,7 +341,7 @@ def _format_comparison_summary(
 
     t = comparison.get("text", {})
     lines.append(f"\n[Text]")
-    lines.append(f"  Length:       local={t.get('local_length', '?')}, "
+    lines.append(f"  Length:       reference={t.get('reference_length', '?')}, "
                   f"toolbox={t.get('toolbox_length', '?')}")
     sim = t.get("jaccard_similarity", 0)
     bar_len = 30
@@ -366,21 +351,17 @@ def _format_comparison_summary(
 
     f = comparison.get("formulas", {})
     lines.append(f"\n[Formulas]")
-    lines.append(f"  Count: local={f.get('local_count', '?')}, "
+    lines.append(f"  Count: reference={f.get('reference_count', '?')}, "
                   f"toolbox={f.get('toolbox_count', '?')}")
     lines.append(f"  Common: {f.get('common_formulas', '?')}")
 
     tbl = comparison.get("tables", {})
     lines.append(f"\n[Tables]")
-    lines.append(f"  Count: local={tbl.get('local_count', '?')}, "
+    lines.append(f"  Count: reference={tbl.get('reference_count', '?')}, "
                   f"toolbox={tbl.get('toolbox_count', '?')}")
 
     lines.append(f"\n[Performance]")
-    lines.append(f"  Local:       {local_elapsed:.1f}s")
     lines.append(f"  Toolbox:     {toolbox_elapsed:.1f}s")
-    delta_time = toolbox_elapsed - local_elapsed
-    sign = "+" if delta_time > 0 else ""
-    lines.append(f"  Delta:        {sign}{delta_time:.1f}s")
 
     verdict = _compute_verdict(comparison)
     lines.append(f"\n[Verdict]")
@@ -401,9 +382,9 @@ def _compute_verdict(comparison: dict[str, Any]) -> str:
     if block_delta > 20:
         issues.append(f"grande diferença no número de blocos ({block_delta:+d})")
     if type_deltas:
-        significant = [f"{k}: {v.get('local',0)}\u2192{v.get('toolbox',0)}"
+        significant = [f"{k}: {v.get('reference',0)}\u2192{v.get('toolbox',0)}"
                        for k, v in type_deltas.items()
-                       if abs(v.get('toolbox',0) - v.get('local',0)) > 3]
+                       if abs(v.get('toolbox',0) - v.get('reference',0)) > 3]
         if significant:
             issues.append(f"diferenças significativas por tipo: {', '.join(significant)}")
 
@@ -420,72 +401,60 @@ def _compute_verdict(comparison: dict[str, Any]) -> str:
 
 async def run_comparison(
     file_path: Path,
+    reference_path: Path,
     output_dir: Path,
-    mode: str,
+    mode: str = "normal",
     *,
-    extractor: str = "docling-serve",
     planner_backend: str = "internal",
     execute_plan: bool = False,
     enable_ocr: bool = False,
 ) -> Path:
-    """Run both pipelines on a single file and produce a comparison report."""
+    """Run PDDL+Toolbox and compare against a reference canonical document.
+
+    Args:
+        file_path: Input file to process with Toolbox.
+        reference_path: Path to the reference canonical JSON.
+        output_dir: Output directory for artifacts and report.
+        mode: Verbosity mode.
+        planner_backend: PDDL planner backend.
+        execute_plan: Whether to execute the plan.
+        enable_ocr: Whether to enable OCR.
+    """
     output_dir.mkdir(parents=True, exist_ok=True)
     tmpdir = output_dir / "tmp"
     tmpdir.mkdir(parents=True, exist_ok=True)
 
+    # Load reference
+    reference = json.loads(reference_path.read_text(encoding="utf-8"))
+
     report: dict[str, Any] = {
         "source_file": str(file_path.resolve()),
+        "reference_file": str(reference_path.resolve()),
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "mode": mode,
         "engines": {},
         "comparison": {},
     }
 
-    # --- PDDL local pipeline ---
-    local_start = time.perf_counter()
-    try:
-        local = await _run_pddl_local(
-            file_path, mode, tmpdir,
-            extractor=extractor,
-            enable_ocr=enable_ocr,
-            planner_backend=planner_backend,
-            execute_plan=execute_plan,
-        )
-        local_elapsed = time.perf_counter() - local_start
-        _write_artifacts(local, output_dir, "pddl_local")
-        report["engines"]["pddl_local"] = {
-            "status": "ok",
-            "elapsed_s": round(local_elapsed, 2),
-            "summary": _summarize_document(local["canonical"]),
-        }
-    except Exception as exc:
-        local_elapsed = time.perf_counter() - local_start
-        report["engines"]["pddl_local"] = {
-            "status": "error",
-            "elapsed_s": round(local_elapsed, 2),
-            "error_type": type(exc).__name__,
-            "error": str(exc),
-        }
-
     # --- PDDL + Toolbox pipeline ---
     toolbox_start = time.perf_counter()
     try:
-        toolbox = await _run_pddl_toolbox(
+        toolbox = await _run_toolbox(
             file_path, tmpdir, mode=mode,
             planner_backend=planner_backend,
             execute_plan=execute_plan,
             enable_ocr=enable_ocr,
         )
         toolbox_elapsed = time.perf_counter() - toolbox_start
-        _write_artifacts(toolbox, output_dir, "pddl_toolbox")
-        report["engines"]["pddl_toolbox"] = {
+        _write_artifacts(toolbox, output_dir, "toolbox")
+        report["engines"]["toolbox"] = {
             "status": "ok",
             "elapsed_s": round(toolbox_elapsed, 2),
             "summary": _summarize_document(toolbox["canonical"]),
         }
     except Exception as exc:
         toolbox_elapsed = time.perf_counter() - toolbox_start
-        report["engines"]["pddl_toolbox"] = {
+        report["engines"]["toolbox"] = {
             "status": "error",
             "elapsed_s": round(toolbox_elapsed, 2),
             "error_type": type(exc).__name__,
@@ -493,21 +462,16 @@ async def run_comparison(
         }
 
     # --- Comparison ---
-    local_ok = report["engines"].get("pddl_local", {}).get("status") == "ok"
-    toolbox_ok = report["engines"].get("pddl_toolbox", {}).get("status") == "ok"
-    if local_ok and toolbox_ok:
-        comparison = _compare_documents(local["canonical"], toolbox["canonical"])
+    toolbox_ok = report["engines"].get("toolbox", {}).get("status") == "ok"
+    if toolbox_ok:
+        comparison = _compare_documents(reference, toolbox["canonical"])
         report["comparison"] = comparison
+        report["reference_summary"] = _summarize_document(reference)
         verdict = _compute_verdict(comparison)
         report["verdict"] = verdict
-    elif local_ok and not toolbox_ok:
-        tb_error = report["engines"]["pddl_toolbox"].get("error", "unknown error")
-        report["verdict"] = f"\u26a0\ufe0f  Toolbox falhou: {tb_error}"
-    elif toolbox_ok and not local_ok:
-        local_error = report["engines"]["pddl_local"].get("error", "unknown error")
-        report["verdict"] = f"\u26a0\ufe0f  Local falhou: {local_error}"
     else:
-        report["verdict"] = "\u274c Ambos os pipelines falharam"
+        tb_error = report["engines"]["toolbox"].get("error", "unknown error")
+        report["verdict"] = f"\u26a0\ufe0f  Toolbox falhou: {tb_error}"
 
     # --- Cleanup and save ---
     import shutil
@@ -522,8 +486,7 @@ async def run_comparison(
     # Console summary
     print(_format_comparison_summary(
         report.get("comparison", {}),
-        report["engines"].get("pddl_local", {}).get("elapsed_s", 0),
-        report["engines"].get("pddl_toolbox", {}).get("elapsed_s", 0),
+        report["engines"].get("toolbox", {}).get("elapsed_s", 0),
     ))
 
     return report_path
@@ -662,7 +625,7 @@ def _collect_inputs(file_or_dir: Path, recursive: bool) -> list[Path]:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="compare-pipelines",
-        description="Compare PDDL local extractor vs PDDL+Toolbox extraction backend.",
+        description="Compare reference canonical document vs PDDL+Toolbox extraction.",
     )
     parser.add_argument(
         "input",
@@ -683,9 +646,21 @@ def parse_args() -> argparse.Namespace:
         help="Verbosity mode for canonical document generation.",
     )
     parser.add_argument(
+        "--reference",
+        type=Path,
+        default=None,
+        help="Path to reference canonical JSON file (required for single-file mode).",
+    )
+    parser.add_argument(
+        "--reference-dir",
+        type=Path,
+        default=None,
+        help="Directory with reference canonical JSONs (used in batch mode).",
+    )
+    parser.add_argument(
         "--batch",
         action="store_true",
-        help="Batch mode: process all PDFs/images in the input directory.",
+        help="Batch mode: process all files in the input directory.",
     )
     parser.add_argument(
         "--recursive",
@@ -697,12 +672,6 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=0,
         help="Maximum number of files to process in batch mode (0 = unlimited).",
-    )
-    parser.add_argument(
-        "--extractor",
-        default="docling-serve",
-        choices=["docling-serve", "docling", "pymupdf"],
-        help="Local extractor backend for the PDDL pipeline (default: docling-serve via Docker).",
     )
     parser.add_argument(
         "--planner",
@@ -718,7 +687,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--enable-ocr",
         action="store_true",
-        help="Enable OCR in the structurer / pipeline.",
+        help="Enable OCR in the pipeline.",
     )
     return parser.parse_args()
 
@@ -736,20 +705,32 @@ def main() -> int:
         output_base.mkdir(parents=True, exist_ok=True)
         results: list[dict[str, Any]] = []
         max_files = args.max_files or len(files)
+        ref_dir = args.reference_dir
 
         for i, file_path in enumerate(files[:max_files]):
             rel = file_path.relative_to(args.input.resolve() if args.input.is_dir()
                                          else args.input.parent)
             stem = "_".join(rel.with_suffix("").parts)
             out_dir = output_base / stem
+
+            # Resolve reference path
+            if ref_dir:
+                ref_path = ref_dir / f"{stem}.json"
+            elif args.reference:
+                ref_path = args.reference
+            else:
+                print(f"  [{i + 1}/{min(max_files, len(files))}] {rel} -- ERRO: --reference ou --reference-dir necessario")
+                results.append({"file": str(file_path), "status": "ERRO: sem referencia", "report_path": ""})
+                continue
+
             print(f"\n[{i + 1}/{min(max_files, len(files))}] {rel}")
 
             report_path = asyncio.run(
                 run_comparison(
                     file_path=file_path,
+                    reference_path=ref_path,
                     output_dir=out_dir,
                     mode=args.mode,
-                    extractor=args.extractor,
                     planner_backend=args.planner,
                     execute_plan=args.execute_plan,
                     enable_ocr=args.enable_ocr,
@@ -771,26 +752,29 @@ def main() -> int:
         # Print batch summary
         passed = sum(1 for r in results if "EQUIVALENTE" in r.get("status", ""))
         failed = sum(1 for r in results if "DIVERGENTE" in r.get("status", ""))
-        errors = sum(1 for r in results if "falhou" in r.get("status", ""))
+        errors = sum(1 for r in results if "falhou" in r.get("status", "") or "ERRO" in r.get("status", ""))
         print("\n" + "=" * 72)
         print(f"  BATCH SUMMARY: {len(results)} files")
-        print(f"  ✅ Equivalentes:  {passed}")
-        print(f"  ⚠️  Divergentes:  {failed}")
-        print(f"  ❌ Erros:         {errors}")
-        print(f"  Relatório: {summary_path}")
+        print(f"  \u2705 Equivalentes:  {passed}")
+        print(f"  \u26a0\ufe0f  Divergentes:  {failed}")
+        print(f"  \u274c Erros:         {errors}")
+        print(f"  Relatorio: {summary_path}")
         print("=" * 72)
 
         return 1 if errors > 0 else 0
 
     else:
         # Single file mode
+        if not args.reference:
+            print("Erro: --reference e obrigatorio no modo single-file")
+            return 1
         output_dir = args.output_dir.resolve() / args.input.stem
         asyncio.run(
             run_comparison(
                 file_path=args.input.resolve(),
+                reference_path=args.reference,
                 output_dir=output_dir,
                 mode=args.mode,
-                extractor=args.extractor,
                 planner_backend=args.planner,
                 execute_plan=args.execute_plan,
                 enable_ocr=args.enable_ocr,

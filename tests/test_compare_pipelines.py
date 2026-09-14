@@ -202,7 +202,7 @@ class TestComputeVerdict:
         return {
             "text": {"jaccard_similarity": similarity},
             "structural": {
-                "block_count": {"local": 10, "toolbox": 10 + block_delta, "delta": block_delta},
+                "block_count": {"reference": 10, "toolbox": 10 + block_delta, "delta": block_delta},
                 "blocks_by_type_delta": type_deltas or {},
             },
         }
@@ -225,7 +225,7 @@ class TestComputeVerdict:
     def test_significant_type_delta(self):
         comp = self._make_comparison(
             similarity=0.95,
-            type_deltas={"table": {"local": 10, "toolbox": 2}},
+            type_deltas={"table": {"reference": 10, "toolbox": 2}},
         )
         verdict = _compute_verdict(comp)
         assert "DIVERGENTE" in verdict
