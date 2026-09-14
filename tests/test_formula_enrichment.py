@@ -26,14 +26,12 @@ def test_normalize_latex_strips_delimiters():
     assert normalize_latex("  x  =  1  ") == "x = 1"
 
 
-@pytest.mark.docling  # latex2mathml vem apenas com o extra docling
 def test_latex_to_mathml_converts_valid_latex():
     mathml = latex_to_mathml(r"$x=\frac{-b\pm\sqrt{b^2-4ac}}{2a}$")
     assert mathml.startswith("<math")
     assert "<mfrac>" in mathml
 
 
-@pytest.mark.docling
 def test_latex_to_mathml_handles_spaced_codeformula_output():
     mathml = latex_to_mathml(r"E = m c ^ { 2 }")
     assert mathml.startswith("<math")
@@ -116,7 +114,6 @@ def test_latex_to_mathml_unexpected_import_error_still_falls_back(monkeypatch):
     assert latex_to_mathml("x=1") == ""
 
 
-@pytest.mark.docling
 def test_latex_to_mathml_malformed_conversion_returns_empty():
     assert latex_to_mathml(r"\frac{") == ""
 
@@ -266,7 +263,6 @@ def test_canonical_document_keeps_formula_when_conversion_unavailable(monkeypatc
     assert "mathml" not in block.get("metadata", {})
 
 
-@pytest.mark.docling
 def test_canonical_document_enriches_math_blocks():
     document = build_canonical_document(
         "# Física\n\nConsidere:\n\n$E=mc^2$\n", title="Física"
@@ -393,7 +389,6 @@ def _manifest_with_formula():
     )
 
 
-@pytest.mark.docling
 def test_pddl_mathml_handler_enriches_formula_element():
     from backend.agents.pddl_orchestrator import _handle_mathml_method
 

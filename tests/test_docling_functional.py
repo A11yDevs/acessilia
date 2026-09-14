@@ -19,7 +19,6 @@ skip_if_no_docstack = pytest.mark.skipif(
 FIXTURE = Path(__file__).parent / "fixtures" / "tutorials" / "java-oo-3pgs.pdf"
 
 
-@pytest.mark.docling
 @skip_if_no_docstack
 def test_docling_converts_real_pdf_with_cpu_only_torch() -> None:
     import torch
@@ -47,7 +46,6 @@ def test_docling_converts_real_pdf_with_cpu_only_torch() -> None:
     assert extraction.document.export_to_markdown().strip()
 
 
-@pytest.mark.docling
 @skip_if_no_docstack
 def test_docling_respects_enable_ocr_flag() -> None:
     """Checks that enable_ocr propagates to the structurer and pipeline options."""
@@ -71,7 +69,6 @@ def test_docling_respects_enable_ocr_flag() -> None:
     assert built_with_ocr.enable_ocr is True
 
 
-@pytest.mark.docling
 def test_docling_removed_create_converter() -> None:
     """Checks that the dead-code `_create_converter` method is gone."""
     from backend.core.manifest.docling_extractor import DoclingManifestExtractor
