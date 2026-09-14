@@ -4,8 +4,6 @@ FROM python:3.11-slim@sha256:94c50be2dc994b873b55bc123e95e6dbade08095b3dfd790f51
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    POETRY_VERSION=1.8.3 \
-    POETRY_VIRTUALENVS_CREATE=false \
     PYTHONPATH=/app
 
 WORKDIR /app
@@ -81,13 +79,10 @@ ENV GIT_COMMIT=${GIT_COMMIT} \
     IMAGE_TAG=${IMAGE_TAG} \
     IMAGE_DIGEST=${IMAGE_DIGEST}
 
-COPY pyproject.toml poetry.lock* ./
+COPY pyproject.toml ./
 
 RUN pip install --upgrade pip \
-    && pip install "poetry==$POETRY_VERSION" \
-    && poetry export --only main --without-hashes --format requirements.txt --output /tmp/requirements.txt \
-    && pip install --requirement /tmp/requirements.txt \
-    && rm /tmp/requirements.txt
+    && pip install . --no-cache-dir
 
 COPY . .
 
