@@ -44,22 +44,9 @@ env:
 
 jobs:
   publish:
-    name: publish ${{ matrix.variant }} image to GHCR
+    name: publish image to GHCR
     runs-on: ubuntu-latest
-    timeout-minutes: 120
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - variant: docling
-            with_docling: "true"
-            tag_suffix: ""
-          - variant: slim
-            with_docling: "false"
-            tag_suffix: -slim
-
-    env:
-      LOCAL_IMAGE: acessilia:delivery-${{ matrix.variant }}
+    timeout-minutes: 60
 
     steps:
       - name: Check out tested commit
@@ -83,15 +70,14 @@ jobs:
         run: |
           BRANCH="${{ inputs.branch }}"
           SHA="${{ inputs.sha }}"
-          SUFFIX="${{ matrix.tag_suffix }}"
           # Docker tags nao aceitam "/" (ex: release/0.0.1 -> release-0.0.1)
           SAFE_BRANCH="${BRANCH//\//-}"
 
-          TAGS="${REGISTRY}/${IMAGE_NAME}:${SAFE_BRANCH}${SUFFIX}"
-          TAGS="${TAGS},${REGISTRY}/${IMAGE_NAME}:sha-${SHA:0:7}${SUFFIX}"
+          TAGS="${REGISTRY}/${IMAGE_NAME}:${SAFE_BRANCH}"
+          TAGS="${TAGS},${REGISTRY}/${IMAGE_NAME}:sha-${SHA:0:7}"
 
           if [ "$BRANCH" = "main" ]; then
-            TAGS="${TAGS},${REGISTRY}/${IMAGE_NAME}:latest${SUFFIX}"
+            TAGS="${TAGS},${REGISTRY}/${IMAGE_NAME}:latest"
           fi
 
           echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
@@ -102,57 +88,22 @@ jobs:
         with:
           context: .
           file: infra/Dockerfile
-          target: base
           platforms: linux/amd64
           load: true
           push: false
-          tags: ${{ env.LOCAL_IMAGE }}
+          tags: acessilia:delivery
           build-args: |
-            WITH_DOCLING=${{ matrix.with_docling }}
             GIT_COMMIT=${{ inputs.sha }}
-            IMAGE_TAG=${{ steps.tags.outputs.branch }}${{ matrix.tag_suffix }}
-          cache-from: type=gha,scope=production-${{ matrix.variant }}
-          cache-to: type=gha,mode=max,scope=production-${{ matrix.variant }}
-
-      - name: Verify installed variant and empty model caches
-        env:
-          VARIANT: ${{ matrix.variant }}
-        run: |
-          docker run --rm --interactive \
-            --env VARIANT \
-            "$LOCAL_IMAGE" \
-            python - <<'PY'
-          import os
-          from importlib.metadata import distributions
-
-          installed = {
-              distribution.metadata["Name"].lower().replace("_", "-")
-              for distribution in distributions()
-              if distribution.metadata["Name"]
-          }
-          if os.environ["VARIANT"] == "slim":
-              unexpected = {"docling", "rapidocr", "torch", "torchvision"} & installed
-              if unexpected:
-                  raise SystemExit(f"Pacotes inesperados na imagem slim: {unexpected}")
-          else:
-              import torch
-
-              if torch.version.cuda is not None:
-                  raise SystemExit(f"Torch CUDA detectado: {torch.version.cuda}")
-              accelerators = {"triton"} & installed
-              accelerators |= {name for name in installed if name.startswith("nvidia-")}
-              if accelerators:
-                  raise SystemExit(f"Aceleradores inesperados: {accelerators}")
-          PY
-          docker run --rm "$LOCAL_IMAGE" sh -c \
-            'test -z "$(find /app/var/cache -type f 2>/dev/null)"'
+            IMAGE_TAG=${{ steps.tags.outputs.branch }}
+          cache-from: type=gha,scope=production
+          cache-to: type=gha,mode=max,scope=production
 
       - name: Smoke test API health
         run: |
           container_id=$(docker run --detach --rm \
             --env ENABLED_INTERFACES=api \
             --publish 127.0.0.1::8000 \
-            "$LOCAL_IMAGE" \
+            acessilia:delivery \
             python -m uvicorn backend.api.app:app --host 0.0.0.0 --port 8000)
           trap 'docker rm --force "$container_id" >/dev/null 2>&1 || true' EXIT
           port=$(docker port "$container_id" 8000/tcp | awk -F: '{print $NF}')
@@ -160,28 +111,8 @@ jobs:
             --retry 20 --retry-all-errors --retry-connrefused --retry-delay 2 \
             "http://127.0.0.1:${port}/api/v1/health"
 
-      - name: Verify Docling first-use and offline model cache
-        if: matrix.variant == 'docling'
-        run: |
-          cache_volume="acessilia-models-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          docker volume create "$cache_volume" >/dev/null
-          trap 'docker volume rm --force "$cache_volume" >/dev/null 2>&1 || true' EXIT
-          conversion='from pathlib import Path; from backend.core.manifest.docling_extractor import DoclingManifestExtractor; result = DoclingManifestExtractor(enable_ocr=False).extract(Path("tests/fixtures/tutorials/java-oo-3pgs.pdf")); assert result.document.export_to_markdown().strip()'
-          docker run --rm \
-            --volume "$cache_volume:/app/var" \
-            "$LOCAL_IMAGE" python -c "$conversion"
-          docker run --rm \
-            --volume "$cache_volume:/app/var" \
-            "$LOCAL_IMAGE" sh -c \
-            'test -n "$(find /app/var/cache/huggingface -type f 2>/dev/null)"'
-          docker run --rm --network none \
-            --env HF_HUB_OFFLINE=1 \
-            --env TRANSFORMERS_OFFLINE=1 \
-            --volume "$cache_volume:/app/var" \
-            "$LOCAL_IMAGE" python -c "$conversion"
-
       - name: Enforce local image size guardrail
-        run: python scripts/check_image_size.py local "$LOCAL_IMAGE" --limit-gb 9
+        run: python scripts/check_image_size.py local acessilia:delivery --limit-gb 9
 
       - name: Publish verified production image
         id: publish
@@ -189,7 +120,6 @@ jobs:
         with:
           context: .
           file: infra/Dockerfile
-          target: base
           platforms: linux/amd64
           push: true
           tags: ${{ steps.tags.outputs.tags }}
@@ -198,11 +128,6 @@ jobs:
             org.opencontainers.image.description=Pipeline para extracao e acessibilidade de documentos
             org.opencontainers.image.licenses=MIT
             org.opencontainers.image.revision=${{ inputs.sha }}
-          build-args: |
-            WITH_DOCLING=${{ matrix.with_docling }}
-            GIT_COMMIT=${{ inputs.sha }}
-            IMAGE_TAG=${{ steps.tags.outputs.branch }}${{ matrix.tag_suffix }}
-          cache-from: type=gha,scope=production-${{ matrix.variant }}
 
       - name: Enforce published image size guardrail
         env:
@@ -211,7 +136,6 @@ jobs:
           python scripts/check_image_size.py remote \
             "${REGISTRY}/${IMAGE_NAME}@${DIGEST}" --limit-gb 9 | tee image-size.txt
           {
-            echo "### ${{ matrix.variant }} image"
             echo '```text'
             cat image-size.txt
             echo '```'
