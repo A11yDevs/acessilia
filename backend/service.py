@@ -42,7 +42,10 @@ def _normalized_engine() -> str:
     engine = settings.pipeline_engine.strip().lower()
     if engine in {"pddl", "pmv"}:
         return "pddl"
-    return "legacy"
+    raise RuntimeError(
+        f"Pipeline legado ({engine}) foi desativado. "
+        f"Use PIPELINE_ENGINE=pddl para o pipeline PDDL+Toolbox."
+    )
 
 
 def _resolved_structurer() -> str:
@@ -71,10 +74,10 @@ def _build_orchestrator():
             fast_downward=fast_downward,
             fast_downward_alias=alias,
             fast_downward_search=settings.pddl_fast_downward_search,
-            enable_ocr=structurer == "docling",
-            extractor_backend=structurer,
+            enable_ocr=False,
+            extractor_backend="toolbox",
         )
-    return AccessibilityOrchestrator()
+    raise RuntimeError("Pipeline legado desativado — use PIPELINE_ENGINE=pddl")
 
 
 agente = _build_orchestrator()

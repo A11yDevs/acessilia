@@ -80,7 +80,7 @@ class Settings:
             True,
         )
     )
-    pipeline_engine: str = os.getenv("PIPELINE_ENGINE", "legacy")
+    pipeline_engine: str = os.getenv("PIPELINE_ENGINE", "pddl")
 
     # Acessilia Toolbox settings
     toolbox_base_url: str = os.getenv("TOOLBOX_BASE_URL", "http://localhost:8002")
