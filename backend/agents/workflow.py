@@ -52,11 +52,12 @@ class AccessibilityWorkflow:
         if getattr(self, "_workflow", None) is None:
             self._workflow = Workflow(
                 name="accessibility_document_workflow",
-                description="Transforms documents into accessible text using Reader, Dispatch, and Editor steps",
+                description="Transforms documents into accessible text using DocumentReader, PageProcessor, and DocumentEditor steps",
+                telemetry=False,
                 steps=[
-                    Step(name="ReaderAgent", executor=self._step_reader),
-                    Step(name="DispatchAgent", executor=self._step_dispatch),
-                    Step(name="EditorAgent", executor=self._step_editor),
+                    Step(name="DocumentReader", executor=self._step_reader),
+                    Step(name="PageProcessor", executor=self._step_process_pages),
+                    Step(name="DocumentEditor", executor=self._step_editor),
                 ],
             )
         return self._workflow
@@ -103,14 +104,12 @@ class AccessibilityWorkflow:
     # ── Workflow Steps ──
 
     async def _step_reader(self, step_input: StepInput) -> StepOutput:
-        """Step 1: Splits document into pages and extracts structural region tasks."""
+        """Step 1: Splits document into pages and prepares page paths."""
         ctx = step_input.input if isinstance(step_input.input, dict) else {}
         file_path = Path(ctx["file_path"])
         tmpdir = Path(ctx["tmpdir"])
         status_callback = ctx.get("status_callback")
         effective_mode = ctx.get("mode") or self.mode
-        custom_prompt = ctx.get("custom_prompt")
-        thinking_mode = ctx.get("thinking_mode", False)
 
         is_pdf = file_path.suffix.lower() == ".pdf"
         if is_pdf:
@@ -144,7 +143,42 @@ class AccessibilityWorkflow:
             )
         )
 
-        pages: list[dict[str, Any]] = []
+        return StepOutput(
+            content={
+                **ctx,
+                "page_paths": page_paths,
+                "total_pages": total_pages,
+                "is_pdf": is_pdf,
+            },
+            success=True,
+        )
+
+    async def _step_process_pages(self, step_input: StepInput) -> StepOutput:
+        """Step 2: Iterates page-by-page, running layout analysis, task dispatch, and consolidation.
+
+        Releases task and cropped image memory at the end of each page to prevent multi-page memory accumulation.
+        """
+        data = step_input.previous_step_content
+        if not isinstance(data, dict):
+            data = step_input.input if isinstance(step_input.input, dict) else {}
+
+        page_paths = data.get("page_paths", [])
+        total_pages = data.get("total_pages", len(page_paths))
+        is_pdf = data.get("is_pdf", False)
+        status_callback = data.get("status_callback")
+        effective_mode = data.get("mode") or self.mode
+        custom_prompt = data.get("custom_prompt")
+        thinking_mode = data.get("thinking_mode", False)
+        tmpdir = Path(data.get("tmpdir", "."))
+
+        dispatch_prompt = custom_prompt
+        if thinking_mode:
+            base_prompt = custom_prompt or load_system_prompt(effective_mode)
+            dispatch_prompt = "<|think|>\n" + base_prompt
+
+        results: list[str] = []
+        page_payloads: list[dict[str, Any]] = []
+
         for index, page_path in enumerate(page_paths):
             page_num = index + 1
             if status_callback:
@@ -162,13 +196,13 @@ class AccessibilityWorkflow:
             cached_page = await get_cached(page_path, page_cache_key, ttl=86400)
             if cached_page:
                 logger.info(t(LOG_ORCHESTRATOR_PAGE_CACHE_SKIP).format(page_num=page_num))
-                pages.append({
-                    "page_num": page_num,
-                    "page_path": page_path,
+                results.append(cached_page)
+                page_payloads.append({
+                    "page_number": page_num,
+                    "file_path": str(page_path),
+                    "text": cached_page,
+                    "blocks": parse_text_to_blocks(cached_page),
                     "cached": True,
-                    "cached_text": cached_page,
-                    "cache_key": page_cache_key,
-                    "tasks": [],
                 })
                 continue
 
@@ -181,47 +215,6 @@ class AccessibilityWorkflow:
                     is_pdf,
                 )
 
-            pages.append({
-                "page_num": page_num,
-                "page_path": page_path,
-                "cached": False,
-                "cache_key": page_cache_key,
-                "tasks": tasks,
-            })
-
-        return StepOutput(
-            content={
-                **ctx,
-                "pages": pages,
-                "total_pages": total_pages,
-                "is_pdf": is_pdf,
-            },
-            success=True,
-        )
-
-    async def _step_dispatch(self, step_input: StepInput) -> StepOutput:
-        """Step 2: Dispatches multimodal tasks in parallel via VisionAgent and DataAgent."""
-        data = step_input.previous_step_content
-        if not isinstance(data, dict):
-            data = step_input.input if isinstance(step_input.input, dict) else {}
-
-        pages = data.get("pages", [])
-        total_pages = data.get("total_pages", len(pages))
-        effective_mode = data.get("mode") or self.mode
-        custom_prompt = data.get("custom_prompt")
-        thinking_mode = data.get("thinking_mode", False)
-
-        dispatch_prompt = custom_prompt
-        if thinking_mode:
-            base_prompt = custom_prompt or load_system_prompt(effective_mode)
-            dispatch_prompt = "<|think|>\n" + base_prompt
-
-        results_by_page: dict[int, dict[int, str]] = {}
-        for page_info in pages:
-            if page_info.get("cached"):
-                continue
-            page_num = page_info["page_num"]
-            tasks = page_info.get("tasks", [])
             agent_results = await self._dispatch_tasks(
                 tasks,
                 page_num,
@@ -229,57 +222,14 @@ class AccessibilityWorkflow:
                 effective_mode,
                 dispatch_prompt,
             )
-            results_by_page[page_num] = agent_results
 
-        return StepOutput(
-            content={
-                **data,
-                "agent_results": results_by_page,
-            },
-            success=True,
-        )
-
-    async def _step_editor(self, step_input: StepInput) -> StepOutput:
-        """Step 3: Consolidates page tasks into accessible markdown and formats document."""
-        data = step_input.previous_step_content
-        if not isinstance(data, dict):
-            data = step_input.input if isinstance(step_input.input, dict) else {}
-
-        pages = data.get("pages", [])
-        total_pages = data.get("total_pages", len(pages))
-        agent_results = data.get("agent_results", {})
-        tmpdir = Path(data.get("tmpdir", "."))
-        file_path = Path(data.get("file_path", "document"))
-        effective_mode = data.get("mode") or self.mode
-
-        results: list[str] = []
-        page_payloads: list[dict[str, Any]] = []
-
-        for page_info in pages:
-            page_num = page_info["page_num"]
-            page_path = page_info["page_path"]
-
-            if page_info.get("cached"):
-                cached_page = page_info["cached_text"]
-                results.append(cached_page)
-                page_payloads.append({
-                    "page_number": page_num,
-                    "file_path": str(page_path),
-                    "text": cached_page,
-                    "blocks": parse_text_to_blocks(cached_page),
-                    "cached": True,
-                })
-                continue
-
-            tasks = page_info.get("tasks", [])
-            page_results = agent_results.get(page_num, {})
-            page_text = self.editor.consolidate_page(tasks, page_results)
+            page_text = self.editor.consolidate_page(tasks, agent_results)
 
             if not page_text.strip():
                 logger.warning(t(LOG_ORCHESTRATOR_EMPTY_PAGE_RESPONSE).format(page_num=page_num))
                 page_text = f"[Pagina {page_num}: resposta vazia do modelo]"
 
-            await set_cache(page_path, page_text, page_info["cache_key"])
+            await set_cache(page_path, page_text, page_cache_key)
 
             output_file = tmpdir / f"imagen{page_num:03d}.txt"
             output_file.write_text(page_text, encoding="utf-8")
@@ -297,6 +247,31 @@ class AccessibilityWorkflow:
                 "blocks": parse_text_to_blocks(page_text),
                 "cached": False,
             })
+
+            # Explicitly release task structures and image payloads
+            del tasks
+            del agent_results
+
+        return StepOutput(
+            content={
+                **data,
+                "results": results,
+                "page_payloads": page_payloads,
+            },
+            success=True,
+        )
+
+    async def _step_editor(self, step_input: StepInput) -> StepOutput:
+        """Step 3: Consolidates page results into the final document and summary."""
+        data = step_input.previous_step_content
+        if not isinstance(data, dict):
+            data = step_input.input if isinstance(step_input.input, dict) else {}
+
+        results = data.get("results", [])
+        page_payloads = data.get("page_payloads", [])
+        total_pages = data.get("total_pages", len(page_payloads))
+        file_path = Path(data.get("file_path", "document"))
+        effective_mode = data.get("mode") or self.mode
 
         texto_final = "\n\n".join(
             f"=== Pagina {i + 1} ===\n{response}" for i, response in enumerate(results)
