@@ -118,6 +118,12 @@ def build_processing_manifest(
 ) -> ProcessingManifest:
     source_path = source_path.resolve()
     digest = _sha256(source_path)
+
+    # ── Toolbox extraction: manifest JSON já veio pronto ──────────────────
+    if isinstance(extraction.document, dict):
+        return _build_from_toolbox_json(source_path, extraction, digest=digest, language=language)
+
+    # ── Docling extraction: construir a partir do objeto docling.Document ──
     extractor_name = str(extraction.configuration.get("extractor", "")).strip().lower()
     enable_callouts = extractor_name != "pymupdf"
     elements = _build_elements(extraction.document, enable_callouts=enable_callouts)
@@ -161,6 +167,48 @@ def build_processing_manifest(
             element_types=element_types,
         ),
     )
+
+
+def _build_from_toolbox_json(
+    source_path: Path,
+    extraction: DoclingExtraction,
+    *,
+    digest: str,
+    language: str,
+) -> ProcessingManifest:
+    """Build a ProcessingManifest from a pre-built Toolbox JSON response.
+
+    The Toolbox already returns a complete ProcessingManifest-compatible JSON
+    payload inside ``extraction.document["document"]``, so we parse it directly.
+    """
+    data: dict[str, Any] = extraction.document["document"]
+
+    data["manifest_id"] = data.get("manifest_id") or f"manifest-{digest[:16]}-r1"
+
+    # Override source with local file info
+    data["source"] = {
+        "document_id": f"doc-{digest[:16]}",
+        "filename": source_path.name,
+        "path": str(source_path.resolve()),
+        "media_type": mimetypes.guess_type(source_path.name)[0]
+        or "application/octet-stream",
+        "byte_size": source_path.stat().st_size,
+        "sha256": digest,
+    }
+
+    # Override extractor metadata with this run
+    data["extractor"] = {
+        "version": extraction.version,
+        "started_at": extraction.started_at.isoformat(),
+        "completed_at": extraction.completed_at.isoformat(),
+        "duration_ms": extraction.duration_ms,
+        "configuration": extraction.configuration,
+    }
+
+    data.setdefault("language", language)
+    data.setdefault("created_at", extraction.completed_at.isoformat())
+
+    return ProcessingManifest.model_validate(data)
 
 
 def _build_elements(document: Any, *, enable_callouts: bool = True) -> list[ManifestElement]:
