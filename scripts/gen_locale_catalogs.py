@@ -161,12 +161,6 @@ from backend.log_messages import (
     LOG_READER_TASKS_SUMMARY,
     LOG_READER_IMAGE_READING,
     LOG_QUEUE_ITEM_ENQUEUED,
-    LOG_RAPIDOCR_MODELS_PERSISTED,
-    LOG_RAPIDOCR_MODELS_RESTORED,
-    LOG_STRUCTURER_DOCLING,
-    LOG_STRUCTURER_DOCLING_NOT_INSTALLED,
-    LOG_STRUCTURER_FALLBACK_PYMUPDF,
-    LOG_STRUCTURER_PYMUPDF,
     LOG_SMTP_NOT_CONFIGURED,
     LOG_STARTING_INTERFACES,
     LOG_STALE_PROCESS_INTERRUPTED,
@@ -811,12 +805,6 @@ MESSAGES: tuple[str, ...] = (
     LOG_ORCHESTRATOR_TASK_FAILED,
     LOG_ORCHESTRATOR_WORKFLOW_START,
     LOG_ORCHESTRATOR_WORKFLOW_SUMMARY,
-    LOG_RAPIDOCR_MODELS_RESTORED,
-    LOG_RAPIDOCR_MODELS_PERSISTED,
-    LOG_STRUCTURER_DOCLING,
-    LOG_STRUCTURER_DOCLING_NOT_INSTALLED,
-    LOG_STRUCTURER_FALLBACK_PYMUPDF,
-    LOG_STRUCTURER_PYMUPDF,
     LOG_STALE_PROCESS_INTERRUPTED,
     LOG_AGNO_NOT_INSTALLED,
 )
@@ -1647,25 +1635,18 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "[página {page_num}] Cache: item existente (pulando IA)"
         ),
         # RapidOCR local model cache restore line (pt-BR mirror); {count} is the number of model files restored.
-        LOG_RAPIDOCR_MODELS_RESTORED: (
             "RapidOCR: {count} modelo(s) restaurado(s) do cache local"
         ),
         # RapidOCR local model cache persist line (pt-BR mirror); {count} is the number of model files persisted.
-        LOG_RAPIDOCR_MODELS_PERSISTED: (
             "RapidOCR: {count} modelo(s) persistido(s) no cache local"
         ),
-        # Document structurer selection lines (pt-BR mirrors of the LOG_STRUCTURER_* ids above).
-        LOG_STRUCTURER_DOCLING: (
             "Usando structurer: Docling (com fallback PyMuPDF)"
         ),
-        LOG_STRUCTURER_DOCLING_NOT_INSTALLED: (
             "STRUCTURER=docling está definido mas docling não está instalado. "
             "Execute: pip install docling. Usando PyMuPDF."
         ),
-        LOG_STRUCTURER_FALLBACK_PYMUPDF: (
             "STRUCTURER=docling mas docling nao instalado. Usando PyMuPDF."
         ),
-        LOG_STRUCTURER_PYMUPDF: "Usando structurer: PyMuPDF",
         LOG_STALE_PROCESS_INTERRUPTED: "Obsoleta: processo interrompido",
         LOG_AGNO_NOT_INSTALLED: (
             "Agno não está instalado. Execute `poetry install` antes de usar "
