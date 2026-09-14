@@ -27,6 +27,7 @@ from scripts.compare_pipelines import (
     _jaccard_similarity,
     _summarize_document,
     run_comparison,
+    run_comparison_with_reference,
 )
 
 
@@ -262,6 +263,120 @@ async def test_helper_consistency(small_pdf: Path, output_tmpdir: Path) -> None:
     tables = _extract_tables(toolbox)
     assert isinstance(formulas, list)
     assert isinstance(tables, list)
+
+
+# ---------------------------------------------------------------------------
+# E2E: reference-based comparison (fastest — uses pre-computed canonical)
+# ---------------------------------------------------------------------------
+
+DATASET_DIR = Path(__file__).resolve().parents[1] / "tests" / "dataset"
+
+REFERENCE_FIXTURES: list[tuple[str, str, Path, Path]] = [
+    (
+        "001-java-oo-3pgs",
+        "3-page Java OO tutorial",
+        DATASET_DIR / "input" / "001.pdf",
+        DATASET_DIR / "intermediate" / "canonical-document" / "001.json",
+    ),
+    (
+        "004-java-oo-tables",
+        "Single page with tables",
+        DATASET_DIR / "input" / "004.pdf",
+        DATASET_DIR / "intermediate" / "canonical-document" / "004.json",
+    ),
+    (
+        "005-sunset-skyline",
+        "Sunset photograph (JPEG)",
+        DATASET_DIR / "input" / "005.jpeg",
+        DATASET_DIR / "intermediate" / "canonical-document" / "005.json",
+    ),
+    (
+        "007-grandezas-formulas",
+        "Single page with formulas",
+        DATASET_DIR / "input" / "007.pdf",
+        DATASET_DIR / "intermediate" / "canonical-document" / "007.json",
+    ),
+    (
+        "008-grandezas-chart",
+        "Single page with bar chart",
+        DATASET_DIR / "input" / "008.pdf",
+        DATASET_DIR / "intermediate" / "canonical-document" / "008.json",
+    ),
+]
+
+
+def _resolve_pair(label: str, input_path: Path, ref_path: Path) -> tuple[Path, Path]:
+    """Return (input, reference) or skip if either is missing."""
+    if not input_path.exists():
+        pytest.skip(f"Input '{label}' not found: {input_path}")
+    if not ref_path.exists():
+        pytest.skip(f"Reference '{label}' not found: {ref_path}")
+    return (input_path, ref_path)
+
+
+@pytest.fixture(params=REFERENCE_FIXTURES, ids=[f[0] for f in REFERENCE_FIXTURES])
+def reference_pair(request: pytest.FixtureRequest) -> tuple[Path, Path]:
+    """Parametrized fixture: (input_file, reference_canonical)."""
+    _label, _desc, input_path, ref_path = request.param
+    return _resolve_pair(_label, input_path, ref_path)
+
+
+@pytest.mark.e2e
+@pytest.mark.asyncio
+async def test_reference_comparison_defaults(
+    reference_pair: tuple[Path, Path], output_tmpdir: Path
+) -> None:
+    """Compare Toolbox output against pre-computed reference canonical."""
+    input_path, ref_path = reference_pair
+    report_path = await run_comparison_with_reference(
+        file_path=input_path,
+        reference_path=ref_path,
+        output_dir=output_tmpdir,
+        mode="normal",
+    )
+    assert report_path.exists()
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+
+    # Top-level keys
+    assert "source_file" in report
+    assert "reference_file" in report
+    assert "engines" in report
+    assert "comparison" in report
+    assert "verdict" in report
+
+    # Toolbox must have run
+    assert report["engines"]["pddl_toolbox"]["status"] == "ok"
+
+    # Comparison must have structural and text sections
+    comparison = report["comparison"]
+    assert "structural" in comparison
+    assert "text" in comparison
+    assert comparison["structural"]["section_count"]["local"] >= 0
+    assert comparison["structural"]["section_count"]["toolbox"] >= 0
+
+
+@pytest.mark.e2e
+@pytest.mark.asyncio
+async def test_reference_comparison_artifact_files(
+    reference_pair: tuple[Path, Path], output_tmpdir: Path
+) -> None:
+    """Verify that toolbox artifacts are written during reference comparison."""
+    input_path, ref_path = reference_pair
+    await run_comparison_with_reference(
+        file_path=input_path,
+        reference_path=ref_path,
+        output_dir=output_tmpdir,
+        mode="normal",
+    )
+    # Only toolbox artifacts are written (no local pipeline)
+    structured = output_tmpdir / "pddl_toolbox.structured.json"
+    canonical = output_tmpdir / "pddl_toolbox.canonical.json"
+    assert structured.exists(), f"Missing {structured}"
+    assert canonical.exists(), f"Missing {canonical}"
+    structured_data = json.loads(structured.read_text(encoding="utf-8"))
+    canonical_data = json.loads(canonical.read_text(encoding="utf-8"))
+    assert isinstance(structured_data, dict)
+    assert isinstance(canonical_data, dict)
 
 
 # ---------------------------------------------------------------------------

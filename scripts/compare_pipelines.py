@@ -547,7 +547,103 @@ def _write_artifacts(
     )
 
 
-# ---------------------------------------------------------------------------
+async def run_comparison_with_reference(
+    file_path: Path,
+    reference_path: Path,
+    output_dir: Path,
+    mode: str = "normal",
+    *,
+    planner_backend: str = "internal",
+    execute_plan: bool = False,
+    enable_ocr: bool = False,
+) -> Path:
+    """Run PDDL+Toolbox and compare against a reference canonical document.
+
+    This is the fastest E2E validation: it loads a pre-computed reference
+    canonical document (from tests/dataset/intermediate/canonical-document/)
+    and compares it against the toolbox output, without running any local
+    pipeline.
+
+    Args:
+        file_path: Input file to process with Toolbox.
+        reference_path: Path to the reference canonical JSON.
+        output_dir: Output directory for artifacts and report.
+        mode: Verbosity mode.
+        planner_backend: PDDL planner backend.
+        execute_plan: Whether to execute the plan.
+        enable_ocr: Whether to enable OCR.
+    """
+    output_dir.mkdir(parents=True, exist_ok=True)
+    tmpdir = output_dir / "tmp"
+    tmpdir.mkdir(parents=True, exist_ok=True)
+
+    # Load reference
+    reference = json.loads(reference_path.read_text(encoding="utf-8"))
+
+    report: dict[str, Any] = {
+        "source_file": str(file_path.resolve()),
+        "reference_file": str(reference_path.resolve()),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "mode": mode,
+        "engines": {},
+        "comparison": {},
+    }
+
+    # --- PDDL + Toolbox pipeline ---
+    toolbox_start = time.perf_counter()
+    try:
+        toolbox = await _run_pddl_toolbox(
+            file_path, tmpdir, mode=mode,
+            planner_backend=planner_backend,
+            execute_plan=execute_plan,
+            enable_ocr=enable_ocr,
+        )
+        toolbox_elapsed = time.perf_counter() - toolbox_start
+        _write_artifacts(toolbox, output_dir, "pddl_toolbox")
+        report["engines"]["pddl_toolbox"] = {
+            "status": "ok",
+            "elapsed_s": round(toolbox_elapsed, 2),
+            "summary": _summarize_document(toolbox["canonical"]),
+        }
+    except Exception as exc:
+        toolbox_elapsed = time.perf_counter() - toolbox_start
+        report["engines"]["pddl_toolbox"] = {
+            "status": "error",
+            "elapsed_s": round(toolbox_elapsed, 2),
+            "error_type": type(exc).__name__,
+            "error": str(exc),
+        }
+
+    # --- Comparison ---
+    toolbox_ok = report["engines"].get("pddl_toolbox", {}).get("status") == "ok"
+    if toolbox_ok:
+        comparison = _compare_documents(reference, toolbox["canonical"])
+        report["comparison"] = comparison
+        report["reference_summary"] = _summarize_document(reference)
+        verdict = _compute_verdict(comparison)
+        report["verdict"] = verdict
+    else:
+        tb_error = report["engines"]["pddl_toolbox"].get("error", "unknown error")
+        report["verdict"] = f"\u26a0\ufe0f  Toolbox falhou: {tb_error}"
+
+    # --- Cleanup and save ---
+    import shutil
+    shutil.rmtree(tmpdir, ignore_errors=True)
+
+    report_path = output_dir / "comparison_report.json"
+    report_path.write_text(
+        json.dumps(report, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+    # Console summary
+    print(_format_comparison_summary(
+        report.get("comparison", {}),
+        0,
+        report["engines"].get("pddl_toolbox", {}).get("elapsed_s", 0),
+    ))
+
+    return report_path
 # CLI
 # ---------------------------------------------------------------------------
 
