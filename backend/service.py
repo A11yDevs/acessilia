@@ -40,13 +40,11 @@ from backend.pipeline.verbosity_manager import verbosity_for_mode
 
 def _normalized_engine() -> str:
     engine = settings.pipeline_engine.strip().lower()
-    if engine in {"agno", "workflow"}:
-        return "agno"
-    if engine == "legacy":
-        return "legacy"
     if engine in {"pddl", "pmv"}:
         return "pddl"
-    return "pddl"
+    if engine in {"agno", "workflow"}:
+        return "agno"
+    return "legacy"
 
 
 def _resolved_structurer() -> str:
@@ -58,26 +56,25 @@ def _resolved_structurer() -> str:
 
 
 def _build_orchestrator():
-    engine = _normalized_engine()
-    if engine in {"agno", "workflow", "legacy"}:
-        return AccessibilityWorkflow()
-    structurer = _resolved_structurer()
-    fast_downward = (
-        Path(settings.pddl_fast_downward).expanduser()
-        if settings.pddl_fast_downward.strip()
-        else None
-    )
-    alias = settings.pddl_fast_downward_alias.strip() or None
-    return PddlAccessibilityOrchestrator(
-        planner_backend=settings.pddl_planner_backend,
-        preferred_plan=settings.pddl_preferred_plan,
-        execute_dry_run=settings.pddl_execute_dry_run,
-        fast_downward=fast_downward,
-        fast_downward_alias=alias,
-        fast_downward_search=settings.pddl_fast_downward_search,
-        enable_ocr=structurer == "docling",
-        extractor_backend=structurer,
-    )
+    if _normalized_engine() == "pddl":
+        structurer = _resolved_structurer()
+        fast_downward = (
+            Path(settings.pddl_fast_downward).expanduser()
+            if settings.pddl_fast_downward.strip()
+            else None
+        )
+        alias = settings.pddl_fast_downward_alias.strip() or None
+        return PddlAccessibilityOrchestrator(
+            planner_backend=settings.pddl_planner_backend,
+            preferred_plan=settings.pddl_preferred_plan,
+            execute_dry_run=settings.pddl_execute_dry_run,
+            fast_downward=fast_downward,
+            fast_downward_alias=alias,
+            fast_downward_search=settings.pddl_fast_downward_search,
+            enable_ocr=structurer == "docling",
+            extractor_backend=structurer,
+        )
+    return AccessibilityWorkflow()
 
 
 agente = _build_orchestrator()

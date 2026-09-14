@@ -10,7 +10,7 @@ Também disponível em **inglês (EUA)**: [English version](patterns.md)
 - Benefício: saída determinística e uma única fonte da verdade para todos os exportadores de saída.
 
 ### 2. Orquestração de Pipeline Multiagente (Workflow Agno / motor legacy)
-- Implementação: [backend/agents/workflow.py](../backend/agents/workflow.py) (`AccessibilityWorkflow`), usada quando `PIPELINE_ENGINE=agno` (ou `legacy`). O motor padrão `pddl` usa a orquestração baseada em planejamento do padrão 10 em vez disso.
+- Implementação: [backend/agents/workflow.py](../backend/agents/workflow.py) (`AccessibilityWorkflow`), usada quando `PIPELINE_ENGINE=legacy` (o padrão). O motor `pddl` usa a orquestração baseada em planejamento do padrão 10 em vez disso.
 - Papel: coordena o ciclo de vida multiagente: leitura estrutural local, processamento visual/de dados em paralelo, edição/deduplicação de texto, cache, registro de histórico e fallback.
 - Benefício: centraliza as regras de negócio e isola as responsabilidades de cada etapa.
 

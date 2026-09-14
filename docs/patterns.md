@@ -10,7 +10,7 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 - Benefit: deterministic output and a single source of truth for all output exporters.
 
 ### 2. Multi-Agent Pipeline Orchestration (Agno Workflow / legacy engine)
-- Implementation: [backend/agents/workflow.py](../backend/agents/workflow.py) (`AccessibilityWorkflow`), used when `PIPELINE_ENGINE=agno` (or `legacy`). The default `pddl` engine uses the planning-based orchestration in pattern 10 instead.
+- Implementation: [backend/agents/workflow.py](../backend/agents/workflow.py) (`AccessibilityWorkflow`), used when `PIPELINE_ENGINE=legacy` (the default). The `pddl` engine uses the planning-based orchestration in pattern 10 instead.
 - Role: coordinates multi-agent lifecycle: local structural reading, parallel visual/data processing, text editing/deduplication, cache, history logging, and fallback.
 - Benefit: centralizes business rules and isolates step responsibilities.
 
