@@ -8,7 +8,7 @@ def test_document_cache_key_changes_with_each_processing_option(monkeypatch):
     from backend import service
 
     monkeypatch.setattr(service.settings, "ai_client", "fake")
-    monkeypatch.setattr(service.settings, "pipeline_engine", "legacy")
+    monkeypatch.setattr(service.settings, "pipeline_engine", "pddl")
 
     base = service._cache_version("normal", None, False)
 
