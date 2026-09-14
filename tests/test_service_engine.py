@@ -33,6 +33,13 @@ def test_normalized_engine_legacy(monkeypatch):
     assert svc._normalized_engine() == "legacy"
 
 
+def test_normalized_engine_agno(monkeypatch):
+    svc = _reimport_service(monkeypatch, "agno")
+    assert svc._normalized_engine() == "agno"
+    svc = _reimport_service(monkeypatch, "workflow")
+    assert svc._normalized_engine() == "agno"
+
+
 def test_normalized_engine_pddl(monkeypatch):
     svc = _reimport_service(monkeypatch, "pddl")
     assert svc._normalized_engine() == "pddl"
@@ -49,9 +56,9 @@ def test_normalized_engine_case_insensitive(monkeypatch):
     assert svc._normalized_engine() == "pddl"
 
 
-def test_normalized_engine_unknown_defaults_to_legacy(monkeypatch):
+def test_normalized_engine_unknown_defaults_to_pddl(monkeypatch):
     svc = _reimport_service(monkeypatch, "unknown-engine")
-    assert svc._normalized_engine() == "legacy"
+    assert svc._normalized_engine() == "pddl"
 
 
 # ---------------------------------------------------------------------------
@@ -59,15 +66,7 @@ def test_normalized_engine_unknown_defaults_to_legacy(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_build_orchestrator_returns_legacy_by_default(monkeypatch):
-    from backend.agents.workflow import AccessibilityWorkflow
-
-    svc = _reimport_service(monkeypatch, "legacy")
-    orchestrator = svc._build_orchestrator()
-    assert isinstance(orchestrator, AccessibilityWorkflow)
-
-
-def test_build_orchestrator_returns_pddl_when_configured(monkeypatch):
+def test_build_orchestrator_returns_pddl_by_default(monkeypatch):
     from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
 
     monkeypatch.setattr(settings, "pddl_fast_downward", "")
@@ -75,6 +74,15 @@ def test_build_orchestrator_returns_pddl_when_configured(monkeypatch):
     svc = _reimport_service(monkeypatch, "pddl")
     orchestrator = svc._build_orchestrator()
     assert isinstance(orchestrator, PddlAccessibilityOrchestrator)
+
+
+def test_build_orchestrator_returns_workflow_when_configured(monkeypatch):
+    from backend.agents.workflow import AccessibilityWorkflow
+
+    for eng in ("agno", "workflow", "legacy"):
+        svc = _reimport_service(monkeypatch, eng)
+        orchestrator = svc._build_orchestrator()
+        assert isinstance(orchestrator, AccessibilityWorkflow)
 
 
 def test_build_orchestrator_pddl_with_docling_enables_ocr(monkeypatch):
@@ -150,7 +158,7 @@ def test_settings_pddl_defaults():
 
     fresh = cfg_mod.Settings()
 
-    assert fresh.pipeline_engine == "legacy"
+    assert fresh.pipeline_engine == "pddl"
     assert fresh.pddl_execute_dry_run is True
     assert fresh.pddl_planner_backend == "internal"
     assert fresh.pddl_preferred_plan == "internal"

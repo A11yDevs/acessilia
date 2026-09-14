@@ -63,6 +63,17 @@ def test_validate_file_rejects_docx_and_html_in_legacy(monkeypatch):
         assert "legacy" in msg.lower()
 
 
+def test_validate_file_rejects_docx_and_html_in_agno(monkeypatch):
+    from backend.config.settings import settings
+
+    monkeypatch.setattr(settings, "pipeline_engine", "agno")
+
+    for filename in ("documento.docx", "pagina.html"):
+        valid, msg = validate_file(filename, 1024 * 1024)
+        assert valid is False
+        assert "agno" in msg.lower()
+
+
 def test_validate_file_allows_docx_and_html_outside_legacy(monkeypatch):
     from backend.config.settings import settings
 

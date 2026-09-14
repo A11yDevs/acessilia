@@ -51,10 +51,10 @@ def validate_file(filename: str, file_size: int) -> tuple[bool, str]:
     if not is_extension_allowed(filename):
         return False, t(MSG_UNSUPPORTED_FORMAT)
     ext = Path(filename).suffix.lower()
-    if settings.pipeline_engine.strip().lower() == "legacy" and ext in {".docx", ".html"}:
+    if settings.pipeline_engine.strip().lower() in {"legacy", "agno", "workflow"} and ext in {".docx", ".html"}:
         return (
             False,
-            "DOCX e HTML não são suportados no motor legacy. Use PDF ou imagem, ou altere PIPELINE_ENGINE.",
+            "DOCX e HTML não são suportados no motor legacy/agno. Use PDF ou imagem, ou altere PIPELINE_ENGINE.",
         )
     if not is_file_size_allowed(file_size):
         return False, t(MSG_FILE_TOO_LARGE).format(limit=settings.max_file_size_mb)

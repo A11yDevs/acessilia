@@ -80,7 +80,7 @@ class Settings:
             True,
         )
     )
-    pipeline_engine: str = os.getenv("PIPELINE_ENGINE", "legacy")
+    pipeline_engine: str = os.getenv("PIPELINE_ENGINE", "pddl")
     pddl_execute_dry_run: bool = field(
         default_factory=lambda: _bool_from_env_alias(
             ("PDDL_EXECUTE_DRY_RUN", "PMV_EXECUTE_DRY_RUN"),
