@@ -138,7 +138,6 @@ from backend.log_messages import (
     LOG_PDDL_IMAGES_ENRICHED,
     LOG_PDDL_TABLES_ENRICHED,
     LOG_PDDL_ELEMENT_CROP_FAILED,
-    LOG_PDDL_EXTRACTOR_BACKEND_INVALID,
     LOG_PDDL_PREFERRED_PLAN_MISSING,
     LOG_PDDL_PROBLEM_HASH_MISMATCH,
     LOG_PDDL_DOMAIN_HASH_MISMATCH,
@@ -731,7 +730,6 @@ MESSAGES: tuple[str, ...] = (
     LOG_PDF_PAGE_SAVED,
     LOG_PDF_PAGES_EXTRACTED,
     LOG_PDDL_ELEMENT_CROP_FAILED,
-    LOG_PDDL_EXTRACTOR_BACKEND_INVALID,
     LOG_PDDL_PREFERRED_PLAN_MISSING,
     LOG_PDDL_PROBLEM_HASH_MISMATCH,
     LOG_PDDL_DOMAIN_HASH_MISMATCH,
@@ -1431,10 +1429,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         ),
         LOG_PDDL_ELEMENT_CROP_FAILED: (
             "Falha ao extrair recorte de imagem para elemento {element_id}"
-        ),
-        # raised when the PDDL pipeline is configured with an invalid extractor backend value.
-        LOG_PDDL_EXTRACTOR_BACKEND_INVALID: (
-            "extractor_backend inválido; use 'docling' ou 'pymupdf'"
         ),
         # raised when the preferred planner backend produced no valid plan in both mode; {backend} is the preferred backend's name.
         LOG_PDDL_PREFERRED_PLAN_MISSING: (
