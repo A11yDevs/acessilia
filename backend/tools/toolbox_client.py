@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import time
 from pathlib import Path
@@ -174,13 +175,13 @@ class ToolboxClient:
                 else:
                     with open(file_path, "rb") as f:
                         files = {"file": (file_path.name, f, _media_type(file_path))}
-                        params: dict[str, Any] = {
+                        form_data: dict[str, Any] = {
                             "language": language,
                             "provider": self.provider,
                         }
                         if not use_cache:
-                            params["no_cache"] = True
-                        response = await client.post(url, files=files, data=params, headers=self._auth_headers)
+                            form_data["no_cache"] = "true"
+                        response = await client.post(url, files=files, data=form_data, headers=self._auth_headers)
 
             _raise_for_error(response, "document.structure.extract")
             result = response.json()
