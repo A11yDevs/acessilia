@@ -20,7 +20,6 @@ from backend.log_messages import (
     LOG_CACHE_HIT,
     LOG_ORCHESTRATOR_EMPTY_AGENT_RESPONSE,
     LOG_PIPELINE_ERROR,
-    LOG_STRUCTURER_FALLBACK_PYMUPDF,
     LOG_TASK_CANCELLED_BY_USER,
 )
 from backend.stage_messages import (
@@ -32,7 +31,6 @@ from backend.stage_messages import (
     STAGE_PREPARING_FILE,
 )
 from backend.tools.logger import logger
-from backend.tools.structurer import DOCLING_AVAILABLE
 from backend.tools.text_processor import merge_broken_paragraphs
 from backend.pipeline.canonical_builder import build_canonical_document
 from backend.pipeline.verbosity_manager import verbosity_for_mode
@@ -50,9 +48,6 @@ def _normalized_engine() -> str:
 
 def _resolved_structurer() -> str:
     structurer = settings.structurer.strip().lower()
-    if structurer == "docling" and not DOCLING_AVAILABLE:
-        logger.warning(t(LOG_STRUCTURER_FALLBACK_PYMUPDF))
-        return "pymupdf"
     if structurer in ("toolbox", "toolbox-layout", "toolbox_layout"):
         logger.info("STRUCTURER={}: usando Acessilia Toolbox remota", structurer)
     return structurer

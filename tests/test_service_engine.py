@@ -83,7 +83,8 @@ def test_build_orchestrator_returns_pddl_when_configured(monkeypatch):
     assert isinstance(orchestrator, PddlAccessibilityOrchestrator)
 
 
-def test_build_orchestrator_pddl_with_docling_enables_ocr(monkeypatch):
+def test_build_orchestrator_pddl_with_structurer_docling_uses_toolbox(monkeypatch):
+    """STRUCTURER=docling ainda usa Toolbox (extrator local desativado)."""
     from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
     from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
 
@@ -91,7 +92,6 @@ def test_build_orchestrator_pddl_with_docling_enables_ocr(monkeypatch):
     monkeypatch.setattr(settings, "pddl_fast_downward", "")
     monkeypatch.setattr(settings, "pddl_fast_downward_alias", "")
     svc = _reimport_service(monkeypatch, "pddl")
-    monkeypatch.setattr(svc, "DOCLING_AVAILABLE", True)
     orchestrator = svc._build_orchestrator()
     assert isinstance(orchestrator, PddlAccessibilityOrchestrator)
     extractor = orchestrator.information_structural.extractor
@@ -99,7 +99,8 @@ def test_build_orchestrator_pddl_with_docling_enables_ocr(monkeypatch):
     assert orchestrator.extractor_backend == "toolbox"
 
 
-def test_build_orchestrator_pddl_with_structurer_pymupdf_uses_pymupdf_extractor(monkeypatch):
+def test_build_orchestrator_pddl_with_structurer_pymupdf_uses_toolbox(monkeypatch):
+    """STRUCTURER=pymupdf ainda usa Toolbox (extrator local desativado)."""
     from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
     from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
 
@@ -107,22 +108,6 @@ def test_build_orchestrator_pddl_with_structurer_pymupdf_uses_pymupdf_extractor(
     monkeypatch.setattr(settings, "pddl_fast_downward", "")
     monkeypatch.setattr(settings, "pddl_fast_downward_alias", "")
     svc = _reimport_service(monkeypatch, "pddl")
-    orchestrator = svc._build_orchestrator()
-    assert isinstance(orchestrator, PddlAccessibilityOrchestrator)
-    extractor = orchestrator.information_structural.extractor
-    assert isinstance(extractor, ToolboxManifestExtractor)
-    assert orchestrator.extractor_backend == "toolbox"
-
-
-def test_build_orchestrator_pddl_without_docling_falls_back_to_pymupdf(monkeypatch):
-    from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
-    from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
-
-    monkeypatch.setattr(settings, "structurer", "docling")
-    monkeypatch.setattr(settings, "pddl_fast_downward", "")
-    monkeypatch.setattr(settings, "pddl_fast_downward_alias", "")
-    svc = _reimport_service(monkeypatch, "pddl")
-    monkeypatch.setattr(svc, "DOCLING_AVAILABLE", False)
     orchestrator = svc._build_orchestrator()
     assert isinstance(orchestrator, PddlAccessibilityOrchestrator)
     extractor = orchestrator.information_structural.extractor
@@ -152,7 +137,7 @@ def test_build_orchestrator_pddl_with_toolbox_uses_toolbox_extractor(monkeypatch
 
 
 def test_resolved_structurer_toolbox_does_not_require_docling(monkeypatch):
-    """STRUCTURER=toolbox não depende de DOCLING_AVAILABLE."""
+    """STRUCTURER=toolbox funciona independentemente de docling."""
     monkeypatch.setattr(settings, "structurer", "toolbox")
     monkeypatch.setattr(settings, "pipeline_engine", "pddl")
     from backend.service import _resolved_structurer
@@ -164,7 +149,6 @@ def test_resolved_structurer_toolbox_without_docling(monkeypatch):
     """STRUCTURER=toolbox funciona mesmo quando docling não está instalado."""
     monkeypatch.setattr(settings, "structurer", "toolbox")
     monkeypatch.setattr(settings, "pipeline_engine", "pddl")
-    monkeypatch.setattr("backend.service.DOCLING_AVAILABLE", False)
     from backend.service import _resolved_structurer
 
     assert _resolved_structurer() == "toolbox"

@@ -424,29 +424,10 @@ LOG_READER_TASKS_SUMMARY: str = (
 )
 #: Debug logged by the reader agent for each image page before reading its bytes; {page_num} is the page number, {path} the per-page image file path.
 LOG_READER_IMAGE_READING: str = "[page {page_num}] reading image: {path}"
-#: Info logged after Docling finishes converting a document; {filename} is the source file name, {elapsed:.1f} the conversion duration in seconds.
-LOG_DOCLING_PROCESSED: str = "Docling processed {filename} in {elapsed:.1f}s"
-#: Warning logged when Docling fails to extract one page's regions, so the PyMuPDF fallback runs; {page} is the 1-based page number, {error} the reason.
-LOG_DOCLING_PAGE_FAILED: str = "Docling failed on page {page} ({error}), fallback PyMuPDF"
-#: Info logged when RapidOCR model files are copied back from the local model cache before use; {count} is the number of model files restored.
-LOG_RAPIDOCR_MODELS_RESTORED: str = "RapidOCR: {count} model(s) restored from local cache"
-#: Info logged when RapidOCR model files are copied into the local model cache after a page run; {count} is the number of model files persisted.
-LOG_RAPIDOCR_MODELS_PERSISTED: str = "RapidOCR: {count} model(s) persisted to local cache"
-#: Error raised when a Docling converter is requested but the Docling stack is not importable in the current environment.
-LOG_DOCLING_NOT_AVAILABLE: str = "Docling is not available in the current environment."
-#: Error raised when a PyMuPDF page being routed to Docling has no parent document to extract.
-LOG_DOCLING_PAGE_NO_PARENT: str = "Page has no parent document for Docling processing"
-#: Warning logged when STRUCTURER=docling is configured but the Docling package is absent, so the PyMuPDF structurer is used instead.
-LOG_STRUCTURER_DOCLING_NOT_INSTALLED: str = (
-    "STRUCTURER=docling is set but docling is not installed. "
-    "Run: pip install docling. Falling back to PyMuPDF."
-)
 #: Warning logged at service level when the configured docling structurer is unavailable and the PyMuPDF structurer is resolved instead.
 LOG_STRUCTURER_FALLBACK_PYMUPDF: str = (
     "STRUCTURER=docling is set but docling is not installed. Using PyMuPDF."
 )
-#: Info logged when the Docling document structurer is selected, with PyMuPDF as the fallback engine.
-LOG_STRUCTURER_DOCLING: str = "Using structurer: Docling (with PyMuPDF fallback)"
 #: Info logged when the PyMuPDF document structurer is selected directly.
 LOG_STRUCTURER_PYMUPDF: str = "Using structurer: PyMuPDF"
 #: Error raised when the optional Agno agent stack is absent and a workflow class import is required; no placeholders.
