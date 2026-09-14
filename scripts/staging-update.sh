@@ -168,15 +168,12 @@ fi
 
 # ──────────────────────────────────────────────
 # 2. Confirmar que a imagem do commit já está no GHCR
-#    e extrair o digest da imagem publicada
 # ──────────────────────────────────────────────
 SHA7="${LATEST_SHA:0:7}"
 SHA_TAG="ghcr.io/a11ydevs/acessilia:sha-$SHA7"
 
 if docker manifest inspect "$SHA_TAG" >/dev/null 2>&1; then
   echo "[staging-update] ✅ Imagem sha-$SHA7 já publicada no GHCR."
-  # Extrai o digest da primeira plataforma (linux/amd64)
-  LATEST_DIGEST=$(docker manifest inspect "$SHA_TAG" | jq -r '.manifests[0].digest // ""')
 else
   _write_status "$LATEST_SHA" "" "" "" ""
   echo "[staging-update] ⏳ Imagem sha-$SHA7 ainda não publicada no GHCR (build em andamento?). Aguardando próxima checagem."
@@ -193,7 +190,16 @@ docker pull "$IMAGE_TAG" 2>/dev/null || {
   exit 1
 }
 
-# Extrai o digest da imagem que acabou de ser puxada
+# Puxa a tag sha- para extrair o digest (mesmo metodo do RUNNING_DIGEST)
+docker pull "$SHA_TAG" 2>/dev/null || {
+  echo "[staging-update] ❌ Falha ao puxar $SHA_TAG"
+  exit 1
+}
+
+# Extrai ambos os digests por docker image inspect (config digest)
+LATEST_DIGEST=$(docker image inspect "$SHA_TAG" --format '{{.RepoDigests}}' \
+  | grep -oE 'sha256:[a-f0-9]{64}' | head -1 || echo "")
+
 RUNNING_DIGEST=$(docker image inspect "$IMAGE_TAG" --format '{{.RepoDigests}}' \
   | grep -oE 'sha256:[a-f0-9]{64}' | head -1 || echo "")
 
