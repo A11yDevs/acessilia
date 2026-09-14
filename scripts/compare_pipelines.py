@@ -165,19 +165,19 @@ async def _run_pddl_local(
     mode: str,
     tmpdir: Path,
     *,
-    extractor: str = "docling",
+    extractor: str = "docling-serve",
     enable_ocr: bool = False,
     planner_backend: str = "internal",
     execute_plan: bool = False,
 ) -> dict[str, Any]:
-    """Run the PDDL pipeline with a local extractor (docling or pymupdf).
+    """Run the PDDL pipeline with a local extractor (docling-serve, docling or pymupdf).
 
     Args:
         file_path: Input file to process.
         mode: Verbosity mode (unused by local, kept for interface parity).
         tmpdir: Temporary directory for intermediate files.
-        extractor: "docling" (default) or "pymupdf".
-        enable_ocr: Whether to enable OCR in the Docling extractor.
+        extractor: "docling-serve" (default, via Docker), "docling" or "pymupdf".
+        enable_ocr: Whether to enable OCR in the extractor.
         planner_backend: PDDL planner backend ("internal" or "fast-downward").
         execute_plan: Whether to actually execute the plan (vs dry-run).
     """
@@ -423,7 +423,7 @@ async def run_comparison(
     output_dir: Path,
     mode: str,
     *,
-    extractor: str = "pymupdf",
+    extractor: str = "docling-serve",
     planner_backend: str = "internal",
     execute_plan: bool = False,
     enable_ocr: bool = False,
@@ -604,9 +604,9 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--extractor",
-        default="pymupdf",
-        choices=["docling", "pymupdf"],
-        help="Local extractor backend for the PDDL pipeline (default: pymupdf).",
+        default="docling-serve",
+        choices=["docling-serve", "docling", "pymupdf"],
+        help="Local extractor backend for the PDDL pipeline (default: docling-serve via Docker).",
     )
     parser.add_argument(
         "--planner",

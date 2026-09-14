@@ -12,6 +12,7 @@ from backend.core.agents.informational_structural import InformationalStructural
 from backend.core.execution.executor import ExecutorAgent, MethodRegistry
 from backend.core.execution.models import ExecutionReport, MethodResult
 from backend.core.manifest.docling_extractor import DoclingManifestExtractor
+from backend.core.manifest.docling_serve_extractor import DoclingServeManifestExtractor
 from backend.core.manifest.pymupdf_extractor import PyMuPDFManifestExtractor
 from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
 from backend.core.manifest.models import ManifestElement, ProcessingManifest
@@ -134,6 +135,7 @@ class PddlAccessibilityOrchestrator:
         extractor_backend (str): Which manifest-extraction backend to use.
             Supported values:
             - "docling" — DoclingManifestExtractor (requires docling installed)
+            - "docling-serve" — DoclingServeManifestExtractor (via docling-serve Docker)
             - "pymupdf" — PyMuPDFManifestExtractor (lightweight, no OCR)
             - "toolbox" — ToolboxManifestExtractor (remote via Acessilia Toolbox)
             - "toolbox-layout" / "toolbox_layout" — mapped to "toolbox" (same REST API)
@@ -164,6 +166,11 @@ class PddlAccessibilityOrchestrator:
             extractor = PyMuPDFManifestExtractor(include_images=True)
         elif self.extractor_backend == "docling":
             extractor = DoclingManifestExtractor(enable_ocr=enable_ocr)
+        elif self.extractor_backend == "docling-serve":
+            logger.info(
+                "PDDL extractor_backend=docling-serve: usando DoclingServeManifestExtractor (Docker)",
+            )
+            extractor = DoclingServeManifestExtractor(enable_ocr=enable_ocr)
         elif self.extractor_backend in ("toolbox", "toolbox-layout", "toolbox_layout"):
             logger.info(
                 "PDDL extractor_backend={}: usando ToolboxManifestExtractor",
