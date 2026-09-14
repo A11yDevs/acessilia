@@ -163,7 +163,7 @@ def test_reader_and_editor_in_agno_workflow(tmp_path: Path):
     ]
 
     with patch.object(reader, "analyse_page", return_value=mock_tasks):
-        wf = Workflow(name="accessible_page_pipeline", steps=[reader, editor])
+        wf = Workflow(name="accessible_page_pipeline", steps=[reader, editor], telemetry=False)
         result = wf.run(input={"page_path": str(sample_file), "page_num": 1})
 
         assert result is not None

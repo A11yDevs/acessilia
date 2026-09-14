@@ -50,7 +50,7 @@ Ambos os motores convergem para o mesmo documento canônico e os mesmos renderiz
 
 #### 0.5. Camada de Planejamento (`backend/core/`) — motor PDDL
 
-Usado quando `PIPELINE_ENGINE=pddl`. Ele transforma a estrutura do documento em um plano explícito antes de qualquer IA rodar, de modo que a ordem e as dependências das tarefas sejam determinísticas e auditáveis.
+Usado por padrão (ou quando `PIPELINE_ENGINE=pddl`). Converte a estrutura do documento em um plano explícito antes de qualquer execução de IA, tornando a ordenação de tarefas e dependências determinística e auditável.
 
 - `backend/core/manifest/`: o agente Informacional-Estrutural extrai um `processing-manifest.json` do documento (regiões, tipos e obrigações de processamento) via extratores Docling ou PyMuPDF.
 - `backend/core/planning/`: o `PlannerAgent` compila o manifesto mais um domínio PDDL em um problema, gera um `nominal-plan.json` (planejador interno ou backend Fast Downward) e o valida. A geração do problema PDDL é determinística — nenhum LLM escreve PDDL.

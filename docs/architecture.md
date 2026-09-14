@@ -50,7 +50,7 @@ Both engines converge on the same canonical document and the same renderers.
 
 #### 0.5. Planning Layer (`backend/core/`) — PDDL engine
 
-Used when `PIPELINE_ENGINE=pddl`. It turns document structure into an explicit plan before any AI runs, so task ordering and dependencies are deterministic and auditable.
+Used by default (or when `PIPELINE_ENGINE=pddl`). It turns document structure into an explicit plan before any AI runs, so task ordering and dependencies are deterministic and auditable.
 
 - `backend/core/manifest/`: the Informational-Structural agent extracts a `processing-manifest.json` from the document (regions, types, and processing obligations) via Docling or PyMuPDF extractors.
 - `backend/core/planning/`: the `PlannerAgent` compiles the manifest plus a PDDL domain into a problem, generates a `nominal-plan.json` (internal planner or Fast Downward backend), and validates it. PDDL problem generation is deterministic — no LLM writes PDDL.

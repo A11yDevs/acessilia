@@ -17,7 +17,7 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 - Output: TXT, DOCX, PDF, PDF/UA, HTML and MP3, delivered in chat, as a download link, or by email.
 - Implementation:
   - input/validation: [frontend/telegram/handlers/document.py](../frontend/telegram/handlers/document.py), [backend/tools/validators.py](../backend/tools/validators.py)
-  - processing: [backend/service.py](../backend/service.py) selects the engine (`PIPELINE_ENGINE`): the Agno workflow [backend/agents/workflow.py](../backend/agents/workflow.py) or the PDDL orchestrator [backend/agents/pddl_orchestrator.py](../backend/agents/pddl_orchestrator.py); both feed [backend/pipeline/canonical_builder.py](../backend/pipeline/canonical_builder.py)
+  - processing: [backend/service.py](../backend/service.py) selects the engine (`PIPELINE_ENGINE`): the default PDDL orchestrator [backend/agents/pddl_orchestrator.py](../backend/agents/pddl_orchestrator.py) or the Agno workflow [backend/agents/workflow.py](../backend/agents/workflow.py); both feed [backend/pipeline/canonical_builder.py](../backend/pipeline/canonical_builder.py)
   - export: [backend/export/pandoc_exporter.py](../backend/export/pandoc_exporter.py), [backend/export/exporters](../backend/export/exporters), [backend/export/renderers](../backend/export/renderers)
 
 ## UC-02 Select description level
