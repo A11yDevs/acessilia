@@ -210,15 +210,114 @@ class ToolboxClient:
     async def close(self) -> None:
         await self._client.aclose()
 
+    # ── Dataset capabilities ────────────────────────────────────────────
+
+    async def list_datasets(self) -> list[dict[str, Any]]:
+        """GET /v1/datasets — list all datasets available through the toolbox."""
+        return await self._get("/v1/datasets")
+
+    async def describe_dataset(
+        self, dataset_id: str, revision: str | None = None
+    ) -> dict[str, Any]:
+        """GET /v1/datasets/{dataset_id} — get detailed metadata about a dataset."""
+        params = {}
+        if revision:
+            params["revision"] = revision
+        return await self._get(f"/v1/datasets/{dataset_id}", params=params)
+
+    async def list_splits(
+        self, dataset_id: str, revision: str | None = None
+    ) -> list[dict[str, Any]]:
+        """GET /v1/datasets/{dataset_id}/splits — list available splits."""
+        params = {}
+        if revision:
+            params["revision"] = revision
+        return await self._get(f"/v1/datasets/{dataset_id}/splits", params=params)
+
+    async def list_items(
+        self,
+        dataset_id: str,
+        split: str,
+        revision: str | None = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        """GET /v1/datasets/{dataset_id}/splits/{split}/items — list items with pagination."""
+        params: dict[str, Any] = {"limit": limit, "offset": offset}
+        if revision:
+            params["revision"] = revision
+        return await self._get(
+            f"/v1/datasets/{dataset_id}/splits/{split}/items",
+            params=params,
+        )
+
+    async def get_item(
+        self,
+        dataset_id: str,
+        split: str,
+        item_id: str,
+        revision: str | None = None,
+    ) -> dict[str, Any]:
+        """GET /v1/datasets/{dataset_id}/splits/{split}/items/{item_id} — get a full item."""
+        params = {}
+        if revision:
+            params["revision"] = revision
+        return await self._get(
+            f"/v1/datasets/{dataset_id}/splits/{split}/items/{item_id}",
+            params=params,
+        )
+
+    async def get_dataset_artifact(
+        self,
+        dataset_id: str,
+        split: str,
+        item_id: str,
+        artifact_path: str,
+        revision: str | None = None,
+    ) -> bytes:
+        """GET /v1/datasets/{dataset_id}/splits/{split}/items/{item_id}/artifacts/{path}
+        — retrieve the raw bytes of a dataset artifact."""
+        params = {}
+        if revision:
+            params["revision"] = revision
+        url = f"{self.base_url}/v1/datasets/{dataset_id}/splits/{split}/items/{item_id}/artifacts/{artifact_path}"
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(self.timeout_seconds)) as client:
+                response = await client.get(url, headers=self._auth_headers, params=params)
+            _raise_for_error(response, "dataset.get_artifact")
+            return response.content
+        except httpx.TimeoutException as e:
+            raise ToolboxTimeout(f"Timeout ao baixar artifact de dataset: {e}") from e
+        except httpx.RequestError as e:
+            raise ToolboxProviderUnavailable(
+                f"Toolbox indisponível em {self.base_url}: {e}"
+            ) from e
+
+    async def sample_dataset(
+        self,
+        dataset_id: str,
+        split: str,
+        revision: str | None = None,
+        n: int = 5,
+    ) -> list[dict[str, Any]]:
+        """GET /v1/datasets/{dataset_id}/splits/{split}/sample — get a random sample of items."""
+        params: dict[str, Any] = {"n": n}
+        if revision:
+            params["revision"] = revision
+        return await self._get(
+            f"/v1/datasets/{dataset_id}/splits/{split}/sample",
+            params=params,
+        )
+
     @property
     def _auth_headers(self) -> dict[str, str]:
         if self.api_key:
             return {"Authorization": f"Bearer {self.api_key}"}
         return {}
 
-    async def _get(self, path: str) -> Any:
+    async def _get(self, path: str, params: dict[str, Any] | None = None) -> Any:
         try:
-            response = await self._client.get(path)
+            response = await self._client.get(path, params=params)
             _raise_for_error(response, path)
             return response.json()
         except httpx.TimeoutException as e:
