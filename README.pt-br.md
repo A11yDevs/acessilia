@@ -95,6 +95,21 @@ poetry run pytest
 
 O GitHub Actions repete essa validação em Python 3.11 nas instalações slim e Docling para todo pull request direcionado à `main`. A variante Docling também converte um PDF real. Falhas, erros e testes pulados são rejeitados. Consulte o [guia de contribuição](CONTRIBUTING.md) para preparar o ambiente e entender o fluxo de revisão.
 
+## Notebooks Interativos
+
+O diretório [`docs/notebooks/`](docs/notebooks/) contém notebooks Jupyter que demonstram e diagnosticam o pipeline de forma interativa:
+
+- **[Diagnóstico do Pipeline PDDL](docs/notebooks/diagnose_pipeline_pddl.ipynb)** — percorre cada etapa do pipeline PDDL (obtenção de dataset via Toolbox, extração de estrutura, construção do manifesto, detecção visual, enriquecimento de imagens, renderização de texto e inspeção de cache). O notebook busca imagens de exemplo do `acessilia-dataset` através da API de datasets da Toolbox — sem caminhos locais fixos.
+
+Para executar os notebooks:
+
+```bash
+poetry install --with dev
+poetry run jupyter notebook docs/notebooks/
+```
+
+Ou abra-os diretamente no VS Code e execute as células com o suporte nativo a notebooks.
+
 ## Docker
 
 ### Usando a imagem pronta
