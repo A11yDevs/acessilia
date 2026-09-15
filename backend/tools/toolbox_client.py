@@ -216,6 +216,51 @@ class ToolboxClient:
         """GET /v1/datasets — list all datasets available through the toolbox."""
         return await self._get("/v1/datasets")
 
+    async def sync_dataset(
+        self,
+        dataset_id: str,
+        revision: str | None = None,
+        split: str | None = None,
+        timeout_seconds: int | None = None,
+    ) -> Any:
+        """POST /v1/datasets/{dataset_id}/sync — re-mirror dataset artifacts.
+
+        Re-mirrors all artifacts of the dataset (or a single split) to the
+        local artifact store. Requires mirroring enabled in the provider
+        config (``dataset-huggingface`` has ``mirror: true``).
+
+        Args:
+            dataset_id: The dataset identifier (e.g. ``dr-docbench``).
+            revision: Optional Git/HF revision to pin.
+            split: Optional split name to sync only that split.
+            timeout_seconds: Optional longer timeout (sync can be slow).
+
+        Returns:
+            The sync report (list of mirrored artifacts).
+        """
+        url = f"{self.base_url}/v1/datasets/{dataset_id}/sync"
+        params: dict[str, Any] = {}
+        if revision:
+            params["revision"] = revision
+        if split:
+            params["split"] = split
+        timeout = timeout_seconds or max(self.timeout_seconds, 1800)
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(timeout)) as client:
+                response = await client.post(url, params=params, headers=self._auth_headers)
+            _raise_for_error(response, "dataset.sync")
+            result = response.json()
+            logger.info("Toolbox: dataset {} sincronizado", dataset_id)
+            return result
+        except httpx.TimeoutException as e:
+            raise ToolboxTimeout(
+                f"Timeout ao sincronizar dataset {dataset_id}: {e}"
+            ) from e
+        except httpx.RequestError as e:
+            raise ToolboxProviderUnavailable(
+                f"Toolbox indisponível em {self.base_url}: {e}"
+            ) from e
+
     async def describe_dataset(
         self, dataset_id: str, revision: str | None = None
     ) -> dict[str, Any]:
