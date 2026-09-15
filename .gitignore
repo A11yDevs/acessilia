@@ -46,3 +46,6 @@ tests/fixtures/tutorials/pagina_*.pdf
 
 # Agentes Copilot locais (nao devem ir para PR)
 .github/agents/
+
+*.egg-info
+.venv-1

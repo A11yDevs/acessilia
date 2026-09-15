@@ -19,6 +19,7 @@ router = APIRouter(prefix="/download", tags=["download"])
 
 MEDIA_TYPES = {
     "txt": "text/plain; charset=utf-8",
+    "drbench_md": "text/markdown; charset=utf-8",
     "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "pdf": "application/pdf",
     "pdf_ua": "application/pdf",

@@ -21,6 +21,7 @@ O sistema opera em um de dois motores de pipeline, selecionado pela opção `PIP
 8. [Ambiente de homologação (systemd timer)](homologacao-systemd.pt-br.md) — como as atualizações de homologação incorporam novas imagens do Docker automaticamente. (Inglês: [English guide](homologacao-systemd.md))
 9. [Relatório de revisão técnica — PR #14](pr-14-review.pt-br.md) — achados classificados por severidade e uma lista de verificação de aceite para a mudança de pipeline PDDL/Agno. (Inglês: [English report](pr-14-review.md))
 10. [Internacionalização (i18n)](i18n.pt-br.md) — o que é localizado, onde os arquivos de strings por locale ficam e guias passo a passo para adicionar strings, internacionalizar um arquivo e adicionar um novo locale. (English: [English guide](i18n.md))
+11. [Benchmark Dr.DocBench](drbench.pt-br.md) — benchmark de provedores de extração de estrutura (Docling vs MinerU), métricas e resultados. (English: [English guide](drbench.md))
 
 ---
 

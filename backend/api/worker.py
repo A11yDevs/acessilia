@@ -25,6 +25,7 @@ from backend.stage_messages import (
     STAGE_CANCELLED_IN_QUEUE,
     STAGE_ENQUEUED_WAITING,
     STAGE_EXPORTING_DOCX,
+    STAGE_EXPORTING_DRBENCH_MD,
     STAGE_EXPORTING_HTML,
     STAGE_EXPORTING_PDF,
     STAGE_EXPORTING_PDF_UA,
@@ -39,6 +40,7 @@ from backend.export.exporters.docx_exporter import export_docx
 from backend.export.exporters.pdf_exporter import export_pdf
 from backend.export.exporters.pdf_exporter import export_pdf_ua
 from backend.export.exporters.txt_exporter import export_txt
+from backend.export.exporters.drbench_md_exporter import export_drbench_md
 from backend.export.pandoc_exporter import export_accessible_document
 from backend.services.download_token_service import criar_token
 from backend.services.email_service import send_confirmation_email, send_result_email
@@ -189,6 +191,19 @@ class JobExecutor:
             txt_path = out_dir / f"{base}.txt"
             await self._run_in_executor(export_txt, canonical, txt_path, job.filename)
             completed_formats.append("txt")
+            state_manager.verificar_cancelamento(task_id)
+
+            state_manager.atualizar(task_id, etapa=t(STAGE_EXPORTING_DRBENCH_MD), progresso=0.86)
+            drbench_md_path = out_dir / f"{base}.drbench.md"
+            try:
+                await self._run_in_executor(
+                    export_drbench_md, canonical, drbench_md_path, job.filename
+                )
+                completed_formats.append("drbench_md")
+            except Exception as exc:
+                logger.warning("drbench_md export failed: {}", exc)
+                _remove_partial_output(drbench_md_path)
+                drbench_md_path = None
             state_manager.verificar_cancelamento(task_id)
 
             state_manager.atualizar(task_id, etapa=t(STAGE_EXPORTING_DOCX), progresso=0.88)
