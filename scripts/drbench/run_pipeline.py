@@ -63,8 +63,11 @@ def _run_coro_sync(coro):
 def provider_payload_to_canonical(result: dict) -> dict:
     """Normalize a toolbox capability response into a canonical document.
 
-    Reuses the same bridge the main pipeline uses for toolbox structure
-    results; falls back to treating the payload as pre-structured blocks.
+    Manifest payloads (``document.elements``) are mapped element-by-element to
+    canonical blocks, so block types come from the provider's layout model
+    rather than from the heuristic line parser (which mis-typed prose that
+    contains inline math as ``math`` blocks). Other shapes fall back to the
+    flattened-text path.
     """
     from backend.pipeline.canonical_builder import (
         build_canonical_document,
@@ -75,22 +78,132 @@ def provider_payload_to_canonical(result: dict) -> dict:
         # Already canonical — just sanitize.
         return sanitize_canonical_document(result)
 
-    text = _extract_text_from_provider(result)
+    doc = result.get("document", result)
+    blocks = elements_to_canonical_blocks(doc.get("elements") or [])
+    if blocks:
+        payload: dict = {"text": "", "pages": [{"blocks": blocks}]}
+    else:
+        payload = {"text": _extract_text_from_provider(result), "pages": result.get("pages", [])}
     document = build_canonical_document(
-        {"text": text, "pages": result.get("pages", [])},
-        title=result.get("title") or "Dr.DocBench page",
+        payload,
+        title=_PLACEHOLDER_TITLE,
         language=result.get("language") or "en",
         verbosity="detailed",
     )
+    if document.get("title") == _PLACEHOLDER_TITLE:
+        # No heading on the page: do not emit a synthetic "# ..." line.
+        document["title"] = ""
     return sanitize_canonical_document(document)
 
 
+_PLACEHOLDER_TITLE = "Dr.DocBench page"
+
+
+def _strip_display_delims(latex: str) -> str:
+    s = latex.strip()
+    if s.startswith("$$") and s.endswith("$$") and len(s) > 4:
+        s = s[2:-2]
+    elif s.startswith("\\[") and s.endswith("\\]"):
+        s = s[2:-2]
+    return s.strip()
+
+
+def elements_to_canonical_blocks(elements: list[dict]) -> list[dict]:
+    """Map manifest elements (reading order) to canonical blocks.
+
+    heading/title -> heading; formula -> math; table -> table (raw ``html``
+    kept for the renderer); code -> code; picture -> dropped; everything else
+    with text (paragraph, caption, footnote, page_header/footer, list_item…)
+    -> paragraph.
+    """
+    blocks: list[dict] = []
+    for e in sorted(elements, key=lambda e: e.get("reading_order") or 0):
+        etype = str(e.get("type", "")).lower()
+        text = (e.get("text") or "").strip()
+        if etype == "table":
+            html = _element_markdown(e)
+            if html and _looks_like_html_table(html):
+                blocks.append({"type": "table", "html": html})
+            elif text:
+                blocks.append({"type": "paragraph", "text": text})
+            continue
+        if not text or etype == "picture":
+            continue
+        if etype == "formula":
+            latex = _strip_display_delims(text)
+            if latex:
+                blocks.append({"type": "math", "text": latex})
+        elif etype in ("heading", "title", "section_header"):
+            level = int(e.get("hierarchy_level") or 1)
+            blocks.append({"type": "heading", "level": max(1, min(level, 6)), "text": text})
+        elif etype == "code":
+            blocks.append({"type": "code", "text": text})
+        else:
+            blocks.append({"type": "paragraph", "text": text})
+    return blocks
+
+
+def _looks_like_html_table(text: str) -> bool:
+    return "<table" in text.lower() and "</table>" in text.lower()
+
+
+def table_ast_to_html(table_ast: dict) -> str | None:
+    """Render a toolbox ``table_ast`` (header/body/footer rows of cells) as HTML."""
+    import html as _html
+
+    def row_html(row: dict, header: bool) -> str:
+        cells = []
+        for c in row.get("cells") or []:
+            if not isinstance(c, dict):
+                continue
+            tag = "th" if header or c.get("header") else "td"
+            attrs = "".join(
+                f' {k}="{int(c[k])}"' for k in ("rowspan", "colspan")
+                if isinstance(c.get(k), int) and c[k] > 1
+            )
+            cells.append(f"<{tag}{attrs}>{_html.escape(str(c.get('text', '')))}</{tag}>")
+        return f"<tr>{''.join(cells)}</tr>" if cells else ""
+
+    rows = [row_html(r, True) for r in table_ast.get("header") or []]
+    rows += [row_html(r, False) for r in table_ast.get("body") or []]
+    rows += [row_html(r, False) for r in table_ast.get("footer") or []]
+    rows = [r for r in rows if r]
+    return f"<table>{''.join(rows)}</table>" if rows else None
+
+
+def _element_markdown(e: dict) -> str | None:
+    """Render one manifest element as Dr.DocBench markdown (None = skip)."""
+    text = (e.get("text") or "").strip()
+    etype = str(e.get("type", "")).lower()
+    if etype == "table":
+        if text and _looks_like_html_table(text):
+            return text
+        ast = (e.get("metadata") or {}).get("table_ast")
+        if isinstance(ast, dict):
+            html = table_ast_to_html(ast)
+            if html:
+                return html
+        return text or None
+    if not text:
+        return None
+    if etype == "formula":
+        if text.startswith("$"):
+            return text
+        return f"$${text}$$"
+    if etype in ("heading", "title", "section_header"):
+        level = int(e.get("hierarchy_level") or 1)
+        return f"{'#' * max(1, min(level, 6))} {text}"
+    return text
+
+
 def _extract_text_from_provider(result: dict) -> str:
-    """Best-effort plain text extraction from a toolbox structure payload.
+    """Best-effort markdown extraction from a toolbox structure payload.
 
     Supports two payload shapes:
     - Processing manifest (document.elements): flat element list with type /
-      text / reading_order, sorted by reading order.
+      text / metadata / reading_order, sorted by reading order. Tables become
+      HTML (from ``metadata.table_ast`` when the provider gives no HTML text)
+      and formulas are wrapped in ``$$``.
     - DoclingDocument (document.texts): legacy label/text shape.
     """
     doc = result.get("document", result)
@@ -103,15 +216,9 @@ def _extract_text_from_provider(result: dict) -> str:
             elements, key=lambda e: e.get("reading_order") or 0
         )
         for e in ordered:
-            text = (e.get("text") or "").strip()
-            if not text:
-                continue
-            etype = str(e.get("type", "")).lower()
-            level = int(e.get("hierarchy_level") or 1)
-            if etype in ("heading", "title") or etype == "section_header":
-                parts.append(f"{'#' * max(1, min(level, 6))} {text}")
-            else:
-                parts.append(text)
+            md = _element_markdown(e)
+            if md:
+                parts.append(md)
         for table in doc.get("tables") or []:
             from scripts.drbench._legacy_tables import docling_table_to_markdown
             parts.append(docling_table_to_markdown(table))
@@ -136,14 +243,59 @@ def _extract_text_from_provider(result: dict) -> str:
     return "\n\n".join(parts)
 
 
+def provider_blocks(result: dict) -> list[dict]:
+    """Flatten a toolbox structure payload into reading-ordered blocks with bbox.
+
+    This is the persisted "canonical tree" consumed by block-level adjudication
+    (Tree Differ). Coordinates are in the provider's page space; ``page_size``
+    is stored on each block so consumers can normalise.
+    """
+    doc = result.get("document", result)
+    sizes: dict[int, tuple[float | None, float | None]] = {}
+    pages = doc.get("pages") or result.get("pages") or []
+    if isinstance(pages, dict):
+        pages = list(pages.values())
+    for p in pages:
+        if not isinstance(p, dict):
+            continue
+        no = p.get("page_number", p.get("page_no"))
+        size = p.get("size") or p
+        if no is not None:
+            sizes[int(no)] = (size.get("width"), size.get("height"))
+
+    blocks: list[dict] = []
+    for e in sorted(doc.get("elements") or [], key=lambda e: e.get("reading_order") or 0):
+        prov = (e.get("provenance") or [{}])[0]
+        bbox = prov.get("bbox") or {}
+        page_no = prov.get("page_number") or e.get("page_number")
+        w, h = sizes.get(int(page_no), (None, None)) if page_no is not None else (None, None)
+        blocks.append({
+            "id": e.get("id"),
+            "type": str(e.get("type", "unknown")).lower(),
+            "raw_label": e.get("raw_label"),
+            "reading_order": e.get("reading_order"),
+            "level": e.get("hierarchy_level"),
+            "text": e.get("text"),
+            "markdown": _element_markdown(e),
+            "bbox": [bbox.get("left"), bbox.get("top"), bbox.get("right"), bbox.get("bottom")]
+            if bbox else None,
+            "coord_origin": bbox.get("coord_origin") if bbox else None,
+            "page": page_no,
+            "page_size": [w, h],
+        })
+    return blocks
+
+
 def run_page(
     page: DrBenchPage,
     *,
     provider: str | None = None,
     out_dir: Path,
+    save_raw: bool = False,
 ) -> Path | None:
     """Run the transformation pipeline for a single page."""
     import asyncio
+    import json
 
     from backend.tools.toolbox_client import ToolboxClient, ToolboxError
 
@@ -169,6 +321,14 @@ def run_page(
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / page.markdown_filename
     out_path.write_text(markdown, encoding="utf-8")
+    stem = out_path.name[: -len(".drbench.md")] if out_path.name.endswith(".drbench.md") else out_path.stem
+    (out_dir / f"{stem}.blocks.json").write_text(
+        json.dumps(provider_blocks(result), ensure_ascii=False), encoding="utf-8"
+    )
+    if save_raw:
+        (out_dir / f"{stem}.provider.json").write_text(
+            json.dumps(result, ensure_ascii=False), encoding="utf-8"
+        )
     print(f"[OK] {page.item_id} ({elapsed:.1f}s) -> {out_path.name}")
     return out_path
 
@@ -211,6 +371,9 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         default=REPO_ROOT / "var" / "drbench" / "predictions",
     )
+    parser.add_argument(
+        "--save-raw", action="store_true",
+        help="also write the raw toolbox payload as <item>.provider.json")
     args = parser.parse_args(argv)
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
@@ -257,7 +420,8 @@ def main(argv: list[str] | None = None) -> int:
     for page in pages:
         if page.image_path is None:
             continue
-        if run_page(page, provider=args.provider, out_dir=args.out_dir):
+        if run_page(page, provider=args.provider, out_dir=args.out_dir,
+                    save_raw=args.save_raw):
             ok += 1
 
     print(f"\nDone: {ok}/{len(pages)} pages processed -> {args.out_dir}")

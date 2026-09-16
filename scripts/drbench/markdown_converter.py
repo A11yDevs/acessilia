@@ -103,6 +103,10 @@ def _render_block(block: dict[str, Any]) -> str:
 
 def _render_table(block: dict[str, Any]) -> str:
     """Render a canonical table block as structured HTML via table_ast."""
+    raw_html = block.get("html")
+    if isinstance(raw_html, str) and "<table" in raw_html.lower():
+        # Provider-native HTML (e.g. MinerU) is already the target format.
+        return raw_html.strip()
     ast = block.get("table_ast") or table_ast_from_block(block)
     if not ast:
         # Fallback: flat rows.
