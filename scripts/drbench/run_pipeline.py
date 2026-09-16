@@ -215,6 +215,10 @@ def _element_markdown(e: dict) -> str | None:
     if etype in ("heading", "title", "section_header"):
         level = int(e.get("hierarchy_level") or 1)
         return f"{'#' * max(1, min(level, 6))} {text}"
+    if etype in ("paragraph", "text"):
+        inline = _whole_inline_math(text)
+        if inline:
+            return f"$${inline}$$"
     return text
 
 
