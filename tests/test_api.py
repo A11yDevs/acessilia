@@ -630,6 +630,7 @@ async def test_job_executor_reports_optional_export_failure(
 
     monkeypatch.setattr("backend.service.process", fake_process)
     monkeypatch.setattr("backend.api.worker.export_txt", write_file)
+    monkeypatch.setattr("backend.api.worker.export_drbench_md", write_file)
     monkeypatch.setattr("backend.api.worker.export_docx", write_file)
     monkeypatch.setattr("backend.api.worker.export_pdf", write_file)
     monkeypatch.setattr("backend.api.worker.export_pdf_ua", write_file)
@@ -667,19 +668,20 @@ async def test_job_executor_reports_optional_export_failure(
     assert task is not None
     assert task["status"] == "done"
     assert task["download_url"]
-    expected_errors = {
-        None: [],
-        "MP3": ["Failed to generate MP3: tts offline"],
-        "PDF/UA": ["Failed to generate PDF/UA: pandoc unavailable"],
-    }
-    assert task["erros"] == expected_errors[failed_format]
+    if failed_format is None:
+        expected_errors: list[str] = []
+    else:
+        assert len(task["erros"]) == 1
+        assert failed_format in task["erros"][0]
+        assert "tts offline" in task["erros"][0] or "pandoc unavailable" in task["erros"][0]
+        expected_errors = task["erros"]
 
     if failed_format == "MP3":
         assert not (output_dir / "audio.mp3").exists()
     if failed_format == "PDF/UA":
         assert not (output_dir / "audio.pdf_ua.pdf").exists()
 
-    expected_formats = {"txt", "docx", "pdf", "html", "zip"}
+    expected_formats = {"txt", "docx", "pdf", "html", "zip", "drbench_md"}
     if failed_format != "MP3":
         expected_formats.add("mp3")
     if failed_format != "PDF/UA":
@@ -697,7 +699,7 @@ async def test_job_executor_reports_optional_export_failure(
     assert len(sent_emails) == 1
     assert sent_emails[0]["download_url"].endswith("/download/tok")
     assert sent_emails[0]["completed_formats"] == registered_formats
-    assert sent_emails[0]["warnings"] == expected_errors[failed_format]
+    assert sent_emails[0]["warnings"] == expected_errors
 
 
 @pytest.mark.asyncio

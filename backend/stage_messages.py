@@ -27,6 +27,8 @@ STAGE_PROCESSING_FAILED_LABEL: str = "❌ Could not process the file."
 STAGE_EXPORTING_TXT: str = "Exporting the plain text version (TXT)..."
 #: Live stage while the exported result files are being rendered as an accessible Word document (DOCX).
 STAGE_EXPORTING_DOCX: str = "Exporting the accessible Word document (DOCX)..."
+#: Live stage while the benchmark markdown (*.drbench.md) is being written.
+STAGE_EXPORTING_DRBENCH_MD: str = "Exporting the benchmark markdown (Dr.DocBench)..."
 #: Live stage while the exported result files are being rendered as a standard PDF.
 STAGE_EXPORTING_PDF: str = "Exporting the PDF..."
 #: Live stage while the exported result files are being rendered as a tagged accessible PDF/UA.
