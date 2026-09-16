@@ -108,6 +108,24 @@ def _strip_display_delims(latex: str) -> str:
     return s.strip()
 
 
+def _whole_inline_math(text: str) -> str | None:
+    """Return the LaTeX body if ``text`` is a single ``$...$`` span and nothing else.
+
+    MinerU emits a text block whose only span is an ``inline_equation`` when a
+    display formula is laid out inside a paragraph box; the benchmark GT marks
+    those as isolated equations, so we promote them to math blocks.
+    """
+    s = text.strip()
+    if len(s) < 3 or not (s.startswith("$") and s.endswith("$")):
+        return None
+    if s.startswith("$$"):
+        return None
+    body = s[1:-1]
+    if "$" in body or not body.strip():
+        return None
+    return body.strip()
+
+
 def elements_to_canonical_blocks(elements: list[dict]) -> list[dict]:
     """Map manifest elements (reading order) to canonical blocks.
 
@@ -139,7 +157,11 @@ def elements_to_canonical_blocks(elements: list[dict]) -> list[dict]:
         elif etype == "code":
             blocks.append({"type": "code", "text": text})
         else:
-            blocks.append({"type": "paragraph", "text": text})
+            inline = _whole_inline_math(text) if etype in ("paragraph", "text") else None
+            if inline:
+                blocks.append({"type": "math", "text": inline})
+            else:
+                blocks.append({"type": "paragraph", "text": text})
     return blocks
 
 
