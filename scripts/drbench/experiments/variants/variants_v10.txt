@@ -1,0 +1,8 @@
+# Ciclo 2 / S6.1e — melhor v9 (supQ-fg-dw = 74.6) sobre entradas com páginas rotacionadas re-inferidas
+# (DOCLING_DIR=runs/dev-full/docling+rot/predictions, MINERU_DIR=runs/dev-full/mineru+rot/predictions; 46 páginas sobrescritas)
+# V4 = --drop-docling group+unknown --decor-tail --junk-filter --text-pick auto --merge-paragraphs
+# Q  = V4 --suppress-regions --pic-rule quality --pic-min-blocks 4
+v10-rot-v4merge|--drop-docling group+unknown --decor-tail --junk-filter --text-pick auto --merge-paragraphs
+v10-rot-best|--drop-docling group+unknown --decor-tail --junk-filter --text-pick auto --merge-paragraphs --suppress-regions --pic-rule quality --pic-min-blocks 4 --fuse-lines --pick-guard 1.5 --decor-wins
+v10-rot-best-nofuse|--drop-docling group+unknown --decor-tail --junk-filter --text-pick auto --merge-paragraphs --suppress-regions --pic-rule quality --pic-min-blocks 4 --pick-guard 1.5 --decor-wins
+v10-rot-best-lam03|--lam 0.3 --drop-docling group+unknown --decor-tail --junk-filter --text-pick auto --merge-paragraphs --suppress-regions --pic-rule quality --pic-min-blocks 4 --fuse-lines --pick-guard 1.5 --decor-wins

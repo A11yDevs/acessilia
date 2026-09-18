@@ -1,0 +1,3 @@
+# isolate header/footer effect
+v3d-footer|--drop-docling group+unknown+page_footer
+v3e-junk|--drop-docling group+unknown

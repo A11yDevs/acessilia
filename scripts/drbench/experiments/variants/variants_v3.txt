@@ -1,0 +1,4 @@
+# name|extra args for tree_differ_v2 (base: --lam 0.5 --tau 0.6 --min-len 0); use '+' as list separator
+v3a-clean|--drop-docling group+unknown+page_header+page_footer
+v3b-nocap|--drop-docling group+unknown+page_header+page_footer+caption --drop-mineru caption+footnote
+v3c-fallback|--drop-docling group+unknown+page_header+page_footer --garbage-fallback 0.25

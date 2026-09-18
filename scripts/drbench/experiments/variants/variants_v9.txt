@@ -1,0 +1,11 @@
+# Ciclo 2 / S6.1d — consolidado sobre v4-merge (V4): suppress (tables / quality-rule), fuse-lines, pick-guard, decor-wins, running-heads
+# V4 = --drop-docling group+unknown --decor-tail --junk-filter --text-pick auto --merge-paragraphs
+# Q  = V4 --suppress-regions --pic-rule quality --pic-min-blocks 4
+v9-supT|--drop-docling group+unknown --decor-tail --junk-filter --text-pick auto --merge-paragraphs --suppress-regions --suppress-mode tables
+v9-supQ|--drop-docling group+unknown --decor-tail --junk-filter --text-pick auto --merge-paragraphs --suppress-regions --pic-rule quality --pic-min-blocks 4
+v9-supQ-fuse|--drop-docling group+unknown --decor-tail --junk-filter --text-pick auto --merge-paragraphs --suppress-regions --pic-rule quality --pic-min-blocks 4 --fuse-lines
+v9-supQ-fg|--drop-docling group+unknown --decor-tail --junk-filter --text-pick auto --merge-paragraphs --suppress-regions --pic-rule quality --pic-min-blocks 4 --fuse-lines --pick-guard 1.5
+v9-supQ-fg-dw|--drop-docling group+unknown --decor-tail --junk-filter --text-pick auto --merge-paragraphs --suppress-regions --pic-rule quality --pic-min-blocks 4 --fuse-lines --pick-guard 1.5 --decor-wins
+v9-supQ-fg-rh|--drop-docling group+unknown --decor-tail --junk-filter --text-pick auto --merge-paragraphs --suppress-regions --pic-rule quality --pic-min-blocks 4 --fuse-lines --pick-guard 1.5 --running-heads 3
+v9-all|--drop-docling group+unknown --decor-tail --junk-filter --text-pick auto --merge-paragraphs --suppress-regions --pic-rule quality --pic-min-blocks 4 --fuse-lines --pick-guard 1.5 --decor-wins --running-heads 3
+v9-all-cap300|--drop-docling group+unknown --decor-tail --junk-filter --text-pick auto --merge-paragraphs --suppress-regions --pic-rule quality --pic-min-blocks 4 --fuse-lines --fuse-max-len 300 --pick-guard 1.5 --decor-wins --running-heads 3
