@@ -1,0 +1,5 @@
+# Ciclo 2 / S6.1e — swallow guard (--pick-guard) e --merge-side, sobre v7-fuse
+v8-guard|--drop-docling group+unknown --decor-tail --junk-filter --text-pick auto --merge-paragraphs --suppress-regions --merge-min-sim 0.3 --fuse-lines --pick-guard 1.5
+v8-guard-mside|--drop-docling group+unknown --decor-tail --junk-filter --text-pick auto --merge-paragraphs --merge-side docling --suppress-regions --merge-min-sim 0.3 --fuse-lines --pick-guard 1.5
+v8-guard-lam03|--drop-docling group+unknown --decor-tail --junk-filter --text-pick auto --merge-paragraphs --suppress-regions --merge-min-sim 0.3 --fuse-lines --pick-guard 1.5 --lam 0.3
+v8-guard2|--drop-docling group+unknown --decor-tail --junk-filter --text-pick auto --merge-paragraphs --suppress-regions --merge-min-sim 0.3 --fuse-lines --pick-guard 2.0

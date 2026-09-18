@@ -1,0 +1,209 @@
+providers:
+  - id: docling
+    version: "1.32"
+    transport: http
+    endpoint: ${DOCLING_SERVE_URL}
+    health_path: /health
+    timeout_seconds: 600
+    config:
+      force_ocr: true
+    capabilities:
+      - document.structure.extract
+    media_types:
+      - application/pdf
+      - application/vnd.openxmlformats-officedocument.wordprocessingml.document
+      - image/png
+      - image/jpeg
+      - image/tiff
+
+  - id: docling-layout
+    version: "1.32"
+    transport: http
+    endpoint: ${DOCLING_SERVE_URL}
+    health_path: /health
+    timeout_seconds: 600
+    capabilities:
+      - document.layout.analyze
+    media_types:
+      - application/pdf
+      - application/vnd.openxmlformats-officedocument.wordprocessingml.document
+      - image/png
+      - image/jpeg
+      - image/tiff
+
+  - id: pymupdf-pdf
+    version: "1.24"
+    transport: in_process
+    capabilities:
+      - pdf.split
+      - pdf.render
+    media_types:
+      - application/pdf
+
+  - id: docling-math
+    version: "1.32"
+    transport: http
+    endpoint: ${DOCLING_SERVE_URL}
+    health_path: /health
+    timeout_seconds: 300
+    capabilities:
+      - math.recognize
+    media_types:
+      - image/png
+      - image/jpeg
+      - image/tiff
+
+  - id: docling-ocr
+    version: "1.32"
+    transport: http
+    endpoint: ${DOCLING_SERVE_URL}
+    health_path: /health
+    timeout_seconds: 600
+    capabilities:
+      - document.ocr
+    media_types:
+      - image/png
+      - image/jpeg
+      - image/tiff
+      - application/pdf
+
+  - id: mineru
+    version: "2.1"
+    transport: http
+    config:
+      backend: ${MINERU_BACKEND}
+    endpoint: ${MINERU_SERVE_URL}
+    health_path: /openapi.json
+    timeout_seconds: 600
+    capabilities:
+      - document.structure.extract
+    media_types:
+      - application/pdf
+      - image/png
+      - image/jpeg
+      - image/tiff
+
+  - id: mineru-layout
+    version: "2.1"
+    transport: http
+    endpoint: ${MINERU_SERVE_URL}
+    health_path: /openapi.json
+    timeout_seconds: 600
+    capabilities:
+      - document.layout.analyze
+    media_types:
+      - application/pdf
+      - image/png
+      - image/jpeg
+      - image/tiff
+
+  - id: mineru-ocr
+    version: "2.1"
+    transport: http
+    endpoint: ${MINERU_SERVE_URL}
+    health_path: /openapi.json
+    timeout_seconds: 600
+    capabilities:
+      - document.ocr
+    media_types:
+      - image/png
+      - image/jpeg
+      - image/tiff
+      - application/pdf
+
+  - id: pure-code
+    version: "1.0"
+    transport: in_process
+    capabilities:
+      - code.normalize
+    media_types:
+      - text/plain
+
+  - id: pure-text
+    version: "1.0"
+    transport: in_process
+    capabilities:
+      - text.postprocess
+    media_types:
+      - application/json
+
+  - id: pure-accessibility
+    version: "1.0"
+    transport: in_process
+    capabilities:
+      - accessibility.mark
+    media_types:
+      - application/json
+
+  - id: pure-math
+    version: "1.0"
+    transport: in_process
+    capabilities:
+      - math.convert
+      - math.verbalize
+    media_types:
+      - application/json
+      - text/plain
+
+  - id: minio
+    version: "2025.04"
+    transport: s3
+    endpoint: ${MINIO_URL}
+    capabilities:
+      - artifact.store
+      - artifact.retrieve
+    config:
+      bucket: acessilia
+      access_key: ${MINIO_ACCESS_KEY}
+      secret_key: ${MINIO_SECRET_KEY}
+
+  - id: valkey
+    version: "8"
+    transport: redis
+    endpoint: ${VALKEY_URL}
+    capabilities:
+      - cache.get
+      - cache.put
+
+  - id: dataset-github
+    version: "1.0"
+    transport: in_process
+    capabilities:
+      - dataset.list
+      - dataset.describe
+      - dataset.list_splits
+      - dataset.list_items
+      - dataset.get_item
+      - dataset.get_artifact
+      - dataset.sample
+      - dataset.sync
+    config:
+      mirror: false
+
+  - id: dataset-huggingface
+    version: "1.0"
+    transport: in_process
+    capabilities:
+      - dataset.list
+      - dataset.describe
+      - dataset.list_splits
+      - dataset.list_items
+      - dataset.get_item
+      - dataset.get_artifact
+      - dataset.sample
+      - dataset.sync
+    config:
+      mirror: true
+      db: 0
+      ttl_seconds: 604800
+
+  - id: artifact-store
+    version: "1.0"
+    transport: s3
+    endpoint: ${MINIO_URL}
+    capabilities:
+      - artifact.store
+    config:
+      bucket: acessilia
+      access_key: ${MINIO_ACCESS_KEY}
+      secret_key: ${MINIO_SECRET_KEY}

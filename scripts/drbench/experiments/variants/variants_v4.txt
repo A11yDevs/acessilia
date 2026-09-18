@@ -1,0 +1,6 @@
+# Ciclo 2 / S6.1 — ablação incremental (base: --lam 0.5 --tau 0.6 --min-len 0); v3a-clean = 66.8
+v4-decor|--drop-docling group+unknown --decor-tail
+v4-decor-junk|--drop-docling group+unknown --decor-tail --junk-filter
+v4-pick|--drop-docling group+unknown --decor-tail --junk-filter --text-pick auto
+v4-merge|--drop-docling group+unknown --decor-tail --junk-filter --text-pick auto --merge-paragraphs
+v4-merge-dpick|--drop-docling group+unknown --decor-tail --junk-filter --merge-paragraphs

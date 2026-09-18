@@ -1,0 +1,1184 @@
+{
+ "n_pages_common": 120,
+ "runs": [
+  "docling",
+  "docling-forceocr",
+  "mineru",
+  "adjudicator-v0",
+  "adjudicator-v0b"
+ ],
+ "strata_counts": {
+  "table": 41,
+  "special": 67,
+  "multicol": 57,
+  "plain": 15,
+  "equation": 11
+ },
+ "table2": {
+  "overall": {
+   "n": 120,
+   "docling": 47.84705672289262,
+   "docling-forceocr": 48.25204570967032,
+   "mineru": 62.81161288460409,
+   "adjudicator-v0": 60.770078270545305,
+   "adjudicator-v0b": 58.99401338732637
+  },
+  "text": {
+   "n": 120,
+   "docling": 50.85010319162929,
+   "docling-forceocr": 51.257908851829,
+   "mineru": 62.49418488341755,
+   "adjudicator-v0": 60.28297889057685,
+   "adjudicator-v0b": 59.8216834050785
+  },
+  "reading_order": {
+   "n": 120,
+   "docling": 51.51008620390497,
+   "docling-forceocr": 51.92167186157267,
+   "mineru": 63.34621935516247,
+   "adjudicator-v0": 61.02153977672104,
+   "adjudicator-v0b": 60.564953581624174
+  },
+  "teds": {
+   "n": 38,
+   "docling": 0.0,
+   "docling-forceocr": 0.0,
+   "mineru": 49.350474862076986,
+   "adjudicator-v0": 49.350474862076986,
+   "adjudicator-v0b": 39.719670357242606
+  },
+  "cdm": {
+   "n": 11,
+   "docling": 0.0,
+   "docling-forceocr": 0.0,
+   "mineru": 45.500787167827916,
+   "adjudicator-v0": 45.500787167827916,
+   "adjudicator-v0b": 30.658333976584064
+  }
+ },
+ "table3": {
+  "plain": {
+   "n": 15,
+   "docling": 72.63029626523993,
+   "docling-forceocr": 72.08968526311604,
+   "mineru": 80.21135194045627,
+   "adjudicator-v0": 72.08968526311604,
+   "adjudicator-v0b": 72.08968526311604
+  },
+  "multicol": {
+   "n": 57,
+   "docling": 58.351430929456704,
+   "docling-forceocr": 59.30410832214364,
+   "mineru": 71.56316358250601,
+   "adjudicator-v0": 66.03823503765048,
+   "adjudicator-v0b": 65.29642571375672
+  },
+  "special": {
+   "n": 67,
+   "docling": 36.82322088440421,
+   "docling-forceocr": 36.998780460948005,
+   "mineru": 54.798680651850916,
+   "adjudicator-v0": 55.67036602904826,
+   "adjudicator-v0b": 53.62826424934711
+  },
+  "table": {
+   "n": 41,
+   "docling": 15.375734429540845,
+   "docling-forceocr": 15.463471224838223,
+   "mineru": 47.55757930295935,
+   "adjudicator-v0": 47.48774712720941,
+   "adjudicator-v0b": 43.600064200498394
+  },
+  "equation": {
+   "n": 11,
+   "docling": 28.724947191751657,
+   "docling-forceocr": 28.54619824000753,
+   "mineru": 50.40259565942221,
+   "adjudicator-v0": 50.40259565942221,
+   "adjudicator-v0b": 45.5177969329567
+  },
+  "layout=single_column": {
+   "n": 52,
+   "docling": 41.890861884225515,
+   "docling-forceocr": 42.05605012108645,
+   "mineru": 60.02611058725032,
+   "adjudicator-v0": 59.99857759544256,
+   "adjudicator-v0b": 56.71310346997473
+  },
+  "layout=double_column": {
+   "n": 26,
+   "docling": 66.58360456017827,
+   "docling-forceocr": 69.01582163409638,
+   "mineru": 78.92416658755032,
+   "adjudicator-v0": 73.76236946491262,
+   "adjudicator-v0b": 73.04373462947882
+  },
+  "layout=1andmore_column": {
+   "n": 22,
+   "docling": 56.96608977518849,
+   "docling-forceocr": 56.49291352883395,
+   "mineru": 66.17155299564065,
+   "adjudicator-v0": 61.96857594691482,
+   "adjudicator-v0b": 60.89591114052093
+  },
+  "layout=other_layout": {
+   "n": 11,
+   "docling": 21.571856889850405,
+   "docling-forceocr": 20.27242768197767,
+   "mineru": 30.630497401148276,
+   "adjudicator-v0": 37.11854185057687,
+   "adjudicator-v0b": 37.11854185057687
+  },
+  "layout=three_column": {
+   "n": 9,
+   "docling": 37.95598548447225,
+   "docling-forceocr": 38.11985713792609,
+   "mineru": 63.47753633582676,
+   "adjudicator-v0": 53.67212446958031,
+   "adjudicator-v0b": 53.67212446958031
+  },
+  "special_issue=none": {
+   "n": 53,
+   "docling": 61.78284919796286,
+   "docling-forceocr": 62.4778715901306,
+   "mineru": 72.94116872600904,
+   "adjudicator-v0": 67.21688431168306,
+   "adjudicator-v0b": 65.77713022213034
+  },
+  "special_issue=colorful_backgroud": {
+   "n": 19,
+   "docling": 61.60767258097828,
+   "docling-forceocr": 62.678158495464515,
+   "mineru": 62.61543902031957,
+   "adjudicator-v0": 66.40884337692712,
+   "adjudicator-v0b": 66.40884337692712
+  },
+  "special_issue=table_fewer_line": {
+   "n": 18,
+   "docling": 18.207486823586855,
+   "docling-forceocr": 17.88768693395709,
+   "mineru": 55.70066495222085,
+   "adjudicator-v0": 54.905834721856365,
+   "adjudicator-v0b": 51.277991940242096
+  },
+  "special_issue=fuzzy_scan": {
+   "n": 14,
+   "docling": 59.16041211410167,
+   "docling-forceocr": 58.62176162857025,
+   "mineru": 55.349131760004475,
+   "adjudicator-v0": 62.12801760482389,
+   "adjudicator-v0b": 62.12801760482389
+  },
+  "special_issue=table_full_line": {
+   "n": 14,
+   "docling": 18.46127562694203,
+   "docling-forceocr": 18.842821936871353,
+   "mineru": 44.03500369313038,
+   "adjudicator-v0": 44.03500369313038,
+   "adjudicator-v0b": 38.92645732377893
+  },
+  "special_issue=table_wireless_line": {
+   "n": 8,
+   "docling": 10.61871629778237,
+   "docling-forceocr": 10.673838137350426,
+   "mineru": 36.64467123108929,
+   "adjudicator-v0": 37.72972920155968,
+   "adjudicator-v0b": 37.72972920155968
+  },
+  "special_issue=table_horizontal": {
+   "n": 7,
+   "docling": 7.028985393874052,
+   "docling-forceocr": 6.585314856107458,
+   "mineru": 49.599448127679636,
+   "adjudicator-v0": 49.599448127679636,
+   "adjudicator-v0b": 49.599448127679636
+  }
+ },
+ "table4": {
+  "primary": "docling-forceocr",
+  "secondary": "mineru",
+  "n": 120,
+  "mean_primary": 48.25204570967032,
+  "mean_secondary": 62.81161288460409,
+  "oracle": 65.8034010977868,
+  "gain_vs_best_single": 2.9917882131827156,
+  "wins_primary": 21,
+  "wins_secondary": 88,
+  "ties_abs_lt_0.5": 11,
+  "delta_stats": {
+   "min": -55.94088352780406,
+   "q1": -31.61289604671062,
+   "median": -11.084106198100425,
+   "q3": -0.3921423966048465,
+   "max": 56.72577990441069,
+   "mean": -14.559567174933774,
+   "std": 22.685149679197593
+  },
+  "per_component": {
+   "text": {
+    "n": 120,
+    "docling-forceocr": 51.257908851829,
+    "mineru": 62.49418488341755,
+    "oracle": 65.50352313709824
+   },
+   "reading_order": {
+    "n": 120,
+    "docling-forceocr": 51.92167186157267,
+    "mineru": 63.34621935516247,
+    "oracle": 66.39625055059251
+   },
+   "teds": {
+    "n": 38,
+    "docling-forceocr": 0.0,
+    "mineru": 49.350474862076986,
+    "oracle": 49.350474862076986
+   },
+   "cdm": {
+    "n": 11,
+    "docling-forceocr": 0.0,
+    "mineru": 45.500787167827916,
+    "oracle": 45.500787167827916
+   }
+  }
+ },
+ "analyses": {
+  "near_empty": {
+   "docling": {
+    "n": 12,
+    "with_gt_table": 7,
+    "ids": [
+     "11fb213b-fe17-4bde-9f32-85010907118d_p73",
+     "11fb213b-fe17-4bde-9f32-85010907118d_p78",
+     "11fb213b-fe17-4bde-9f32-85010907118d_p79",
+     "4d5947df-6197-462e-a183-4e8fca579008_p112",
+     "547e2947-5211-4ccf-83ae-f9dbf47a491f_p17",
+     "547e2947-5211-4ccf-83ae-f9dbf47a491f_p21",
+     "a5cc5b38-7122-404b-93e7-1472fb3e8e74_p145",
+     "d824013e-80a3-4149-877e-a60274be2fc7_p36",
+     "f8438f43-c0d7-4dae-8497-16f1d222e9b2_p222",
+     "f8438f43-c0d7-4dae-8497-16f1d222e9b2_p224",
+     "f8438f43-c0d7-4dae-8497-16f1d222e9b2_p225",
+     "f8438f43-c0d7-4dae-8497-16f1d222e9b2_p226"
+    ]
+   },
+   "docling-forceocr": {
+    "n": 12,
+    "with_gt_table": 6,
+    "ids": [
+     "11fb213b-fe17-4bde-9f32-85010907118d_p73",
+     "11fb213b-fe17-4bde-9f32-85010907118d_p78",
+     "11fb213b-fe17-4bde-9f32-85010907118d_p79",
+     "4d5947df-6197-462e-a183-4e8fca579008_p112",
+     "4d5947df-6197-462e-a183-4e8fca579008_p120",
+     "547e2947-5211-4ccf-83ae-f9dbf47a491f_p17",
+     "547e2947-5211-4ccf-83ae-f9dbf47a491f_p21",
+     "a5cc5b38-7122-404b-93e7-1472fb3e8e74_p145",
+     "d824013e-80a3-4149-877e-a60274be2fc7_p36",
+     "f8438f43-c0d7-4dae-8497-16f1d222e9b2_p222",
+     "f8438f43-c0d7-4dae-8497-16f1d222e9b2_p224",
+     "f8438f43-c0d7-4dae-8497-16f1d222e9b2_p226"
+    ]
+   },
+   "mineru": {
+    "n": 8,
+    "with_gt_table": 0,
+    "ids": [
+     "18b6da40-f4c6-49c5-9725-dec8cbde2c4a_p355",
+     "23bdb6d7-c5ef-4c2a-971b-fbf1f6d0f9ca_p120",
+     "4d5947df-6197-462e-a183-4e8fca579008_p112",
+     "4d5947df-6197-462e-a183-4e8fca579008_p120",
+     "547e2947-5211-4ccf-83ae-f9dbf47a491f_p17",
+     "547e2947-5211-4ccf-83ae-f9dbf47a491f_p21",
+     "a5cc5b38-7122-404b-93e7-1472fb3e8e74_p145",
+     "d824013e-80a3-4149-877e-a60274be2fc7_p36"
+    ]
+   },
+   "adjudicator-v0": {
+    "n": 6,
+    "with_gt_table": 0,
+    "ids": [
+     "4d5947df-6197-462e-a183-4e8fca579008_p112",
+     "4d5947df-6197-462e-a183-4e8fca579008_p120",
+     "547e2947-5211-4ccf-83ae-f9dbf47a491f_p17",
+     "547e2947-5211-4ccf-83ae-f9dbf47a491f_p21",
+     "a5cc5b38-7122-404b-93e7-1472fb3e8e74_p145",
+     "d824013e-80a3-4149-877e-a60274be2fc7_p36"
+    ]
+   },
+   "adjudicator-v0b": {
+    "n": 6,
+    "with_gt_table": 0,
+    "ids": [
+     "4d5947df-6197-462e-a183-4e8fca579008_p112",
+     "4d5947df-6197-462e-a183-4e8fca579008_p120",
+     "547e2947-5211-4ccf-83ae-f9dbf47a491f_p17",
+     "547e2947-5211-4ccf-83ae-f9dbf47a491f_p21",
+     "a5cc5b38-7122-404b-93e7-1472fb3e8e74_p145",
+     "d824013e-80a3-4149-877e-a60274be2fc7_p36"
+    ]
+   }
+  },
+  "a_duplication": {
+   "docling_default_dup_frac": 0.13333333333333333,
+   "docling_forceocr_dup_frac": 0.06666666666666667,
+   "mineru_dup_frac": 0.05,
+   "gt_dup_frac": 0.1,
+   "mean_gain_text": 0.4078056601997155,
+   "mean_gain_overall": 0.4049889867777011,
+   "pages_forceocr_better_overall": 50,
+   "pages_default_better_overall": 48
+  },
+  "b_reading_order": {
+   "docling": {
+    "multicol": 60.66958336434438,
+    "n_multicol": 57,
+    "non_multicol": 43.22292210636454,
+    "n_non_multicol": 63
+   },
+   "docling-forceocr": {
+    "multicol": 61.631219003977805,
+    "n_multicol": 57,
+    "non_multicol": 43.136843494634675,
+    "n_non_multicol": 63
+   },
+   "mineru": {
+    "multicol": 73.50498478750131,
+    "n_multicol": 57,
+    "non_multicol": 54.15495539257017,
+    "n_non_multicol": 63
+   },
+   "adjudicator-v0": {
+    "multicol": 67.38704127895483,
+    "n_multicol": 57,
+    "non_multicol": 55.26227651279524,
+    "n_non_multicol": 63
+   },
+   "adjudicator-v0b": {
+    "multicol": 67.34804773769208,
+    "n_multicol": 57,
+    "non_multicol": 54.42786839280081,
+    "n_non_multicol": 63
+   }
+  },
+  "c_agreement": {
+   "mean_agreement": 0.6745697047471881,
+   "median": 0.7947775883521089,
+   "spearman_agree_vs_absdelta": -0.7138841480046665,
+   "spearman_agree_vs_mean_error": -0.8721870827624139,
+   "spearman_agree_vs_oracle": 0.7533765424286346,
+   "n": 120,
+   "bins": [
+    [
+     "[0.00,0.50)",
+     33,
+     "33.4",
+     "75.8",
+     "40.9"
+    ],
+    [
+     "[0.50,0.70)",
+     14,
+     "28.4",
+     "64.5",
+     "49.7"
+    ],
+    [
+     "[0.70,0.85)",
+     21,
+     "25.7",
+     "42.8",
+     "70.1"
+    ],
+    [
+     "[0.85,1.00)",
+     52,
+     "8.2",
+     "19.9",
+     "84.3"
+    ]
+   ]
+  },
+  "d_formulas": {
+   "n_pages_gt_formula": 11,
+   "n_gt_formulas": 43,
+   "docling": {
+    "pages_with_pred_formula_on_gt_formula_pages": 0,
+    "pages_with_pred_formula_any": 0,
+    "pages_using_$$": 0,
+    "pages_using_\\[": 0
+   },
+   "docling-forceocr": {
+    "pages_with_pred_formula_on_gt_formula_pages": 0,
+    "pages_with_pred_formula_any": 0,
+    "pages_using_$$": 0,
+    "pages_using_\\[": 0
+   },
+   "mineru": {
+    "pages_with_pred_formula_on_gt_formula_pages": 11,
+    "pages_with_pred_formula_any": 13,
+    "pages_using_$$": 13,
+    "pages_using_\\[": 0
+   },
+   "adjudicator-v0": {
+    "pages_with_pred_formula_on_gt_formula_pages": 11,
+    "pages_with_pred_formula_any": 13,
+    "pages_using_$$": 13,
+    "pages_using_\\[": 0
+   },
+   "adjudicator-v0b": {
+    "pages_with_pred_formula_on_gt_formula_pages": 8,
+    "pages_with_pred_formula_any": 9,
+    "pages_using_$$": 9,
+    "pages_using_\\[": 0
+   }
+  },
+  "e_worst": {
+   "docling": [
+    {
+     "id": "f8438f43-c0d7-4dae-8497-16f1d222e9b2_p226",
+     "overall": 0.11982437880582546,
+     "len_ratio": 0.001874136910633261,
+     "hypothesis": [
+      "prediction much shorter than GT (missed regions / OCR failure)",
+      "table(s) in GT not emitted as <table>",
+      "multi-column layout (reading order)",
+      "manual: boxing-record list rendered as tables in GT; Docling output empty (tables flattened away)"
+     ],
+     "strata": [
+      "table",
+      "multicol",
+      "special"
+     ],
+     "special_issue": [
+      "table_wireless_line"
+     ]
+    },
+    {
+     "id": "11fb213b-fe17-4bde-9f32-85010907118d_p78",
+     "overall": 0.132783255562711,
+     "len_ratio": 0.0028425241614553724,
+     "hypothesis": [
+      "prediction much shorter than GT (missed regions / OCR failure)",
+      "table(s) in GT not emitted as <table>",
+      "manual: whole page is one wireless horizontal table; Docling pipeline drops table content, only page number/footer survive"
+     ],
+     "strata": [
+      "table",
+      "special"
+     ],
+     "special_issue": [
+      "table_horizontal",
+      "table_wireless_line"
+     ]
+    },
+    {
+     "id": "f8438f43-c0d7-4dae-8497-16f1d222e9b2_p224",
+     "overall": 0.16015385960311082,
+     "len_ratio": 0.002544529262086514,
+     "hypothesis": [
+      "prediction much shorter than GT (missed regions / OCR failure)",
+      "table(s) in GT not emitted as <table>",
+      "multi-column layout (reading order)",
+      "manual: same document/pattern as p226: tabular record pages -> empty Docling output"
+     ],
+     "strata": [
+      "table",
+      "multicol",
+      "special"
+     ],
+     "special_issue": [
+      "table_wireless_line"
+     ]
+    },
+    {
+     "id": "f8438f43-c0d7-4dae-8497-16f1d222e9b2_p222",
+     "overall": 0.2198291921403491,
+     "len_ratio": 0.0034904013961605585,
+     "hypothesis": [
+      "prediction much shorter than GT (missed regions / OCR failure)",
+      "table(s) in GT not emitted as <table>",
+      "multi-column layout (reading order)",
+      "manual: same document/pattern as p226"
+     ],
+     "strata": [
+      "table",
+      "multicol"
+     ],
+     "special_issue": []
+    },
+    {
+     "id": "f8438f43-c0d7-4dae-8497-16f1d222e9b2_p225",
+     "overall": 0.6817361738949312,
+     "len_ratio": 0.01065757220505169,
+     "hypothesis": [
+      "prediction much shorter than GT (missed regions / OCR failure)",
+      "table(s) in GT not emitted as <table>",
+      "multi-column layout (reading order)",
+      "manual: same document/pattern as p226"
+     ],
+     "strata": [
+      "table",
+      "multicol",
+      "special"
+     ],
+     "special_issue": [
+      "table_wireless_line"
+     ]
+    }
+   ],
+   "docling-forceocr": [
+    {
+     "id": "a5cc5b38-7122-404b-93e7-1472fb3e8e74_p145",
+     "overall": 0.0,
+     "len_ratio": 0.15384615384615385,
+     "hypothesis": [
+      "prediction much shorter than GT (missed regions / OCR failure)",
+      "manual: figure-only page (GT = image ref); Docling OCRs the word 'STYLIST' inside the figure"
+     ],
+     "strata": [
+      "plain"
+     ],
+     "special_issue": []
+    },
+    {
+     "id": "f8438f43-c0d7-4dae-8497-16f1d222e9b2_p226",
+     "overall": 0.11982437880582546,
+     "len_ratio": 0.001874136910633261,
+     "hypothesis": [
+      "prediction much shorter than GT (missed regions / OCR failure)",
+      "table(s) in GT not emitted as <table>",
+      "multi-column layout (reading order)",
+      "manual: boxing-record list rendered as tables in GT; Docling output empty (tables flattened away)"
+     ],
+     "strata": [
+      "table",
+      "multicol",
+      "special"
+     ],
+     "special_issue": [
+      "table_wireless_line"
+     ]
+    },
+    {
+     "id": "11fb213b-fe17-4bde-9f32-85010907118d_p78",
+     "overall": 0.132783255562711,
+     "len_ratio": 0.0028425241614553724,
+     "hypothesis": [
+      "prediction much shorter than GT (missed regions / OCR failure)",
+      "table(s) in GT not emitted as <table>",
+      "manual: whole page is one wireless horizontal table; Docling pipeline drops table content, only page number/footer survive"
+     ],
+     "strata": [
+      "table",
+      "special"
+     ],
+     "special_issue": [
+      "table_horizontal",
+      "table_wireless_line"
+     ]
+    },
+    {
+     "id": "f8438f43-c0d7-4dae-8497-16f1d222e9b2_p224",
+     "overall": 0.16015385960311082,
+     "len_ratio": 0.002544529262086514,
+     "hypothesis": [
+      "prediction much shorter than GT (missed regions / OCR failure)",
+      "table(s) in GT not emitted as <table>",
+      "multi-column layout (reading order)",
+      "manual: same document/pattern as p226: tabular record pages -> empty Docling output"
+     ],
+     "strata": [
+      "table",
+      "multicol",
+      "special"
+     ],
+     "special_issue": [
+      "table_wireless_line"
+     ]
+    },
+    {
+     "id": "f8438f43-c0d7-4dae-8497-16f1d222e9b2_p222",
+     "overall": 0.2198291921403491,
+     "len_ratio": 0.0034904013961605585,
+     "hypothesis": [
+      "prediction much shorter than GT (missed regions / OCR failure)",
+      "table(s) in GT not emitted as <table>",
+      "multi-column layout (reading order)",
+      "manual: same document/pattern as p226"
+     ],
+     "strata": [
+      "table",
+      "multicol"
+     ],
+     "special_issue": []
+    }
+   ],
+   "mineru": [
+    {
+     "id": "18b6da40-f4c6-49c5-9725-dec8cbde2c4a_p355",
+     "overall": 3.352294292734576,
+     "len_ratio": 0.04148471615720524,
+     "hypothesis": [
+      "prediction much shorter than GT (missed regions / OCR failure)",
+      "fuzzy scan",
+      "manual: fuzzy-scan advertisement page; MinerU layout detects only figures -> empty output"
+     ],
+     "strata": [
+      "special"
+     ],
+     "special_issue": [
+      "fuzzy_scan"
+     ]
+    },
+    {
+     "id": "11fb213b-fe17-4bde-9f32-85010907118d_p79",
+     "overall": 5.048406566343281,
+     "len_ratio": 0.09269089424254798,
+     "hypothesis": [
+      "prediction much shorter than GT (missed regions / OCR failure)",
+      "manual: wireless 2-column table collapsed by MinerU into a single 1x2 cell (structure lost, TEDS 0)"
+     ],
+     "strata": [
+      "table",
+      "special"
+     ],
+     "special_issue": [
+      "table_wireless_line"
+     ]
+    },
+    {
+     "id": "23bdb6d7-c5ef-4c2a-971b-fbf1f6d0f9ca_p120",
+     "overall": 5.65714285714286,
+     "len_ratio": 0.057775046097111246,
+     "hypothesis": [
+      "prediction much shorter than GT (missed regions / OCR failure)",
+      "multi-column layout (reading order)",
+      "fuzzy scan",
+      "manual: fuzzy scan, multi-column; MinerU returns almost nothing"
+     ],
+     "strata": [
+      "multicol",
+      "special"
+     ],
+     "special_issue": [
+      "fuzzy_scan"
+     ]
+    },
+    {
+     "id": "d824013e-80a3-4149-877e-a60274be2fc7_p36",
+     "overall": 5.957554686368244,
+     "len_ratio": 0.1532258064516129,
+     "hypothesis": [
+      "prediction much shorter than GT (missed regions / OCR failure)",
+      "colorful background",
+      "manual: comic-style page, text inside colored artwork; MinerU treats page as a figure"
+     ],
+     "strata": [
+      "special"
+     ],
+     "special_issue": [
+      "colorful_backgroud"
+     ]
+    },
+    {
+     "id": "547e2947-5211-4ccf-83ae-f9dbf47a491f_p21",
+     "overall": 6.091092006584964,
+     "len_ratio": 0.11875,
+     "hypothesis": [
+      "prediction much shorter than GT (missed regions / OCR failure)",
+      "colorful background",
+      "manual: colorful background; MinerU misses most text regions"
+     ],
+     "strata": [
+      "special"
+     ],
+     "special_issue": [
+      "colorful_backgroud"
+     ]
+    }
+   ],
+   "adjudicator-v0": [
+    {
+     "id": "a5cc5b38-7122-404b-93e7-1472fb3e8e74_p145",
+     "overall": 0.0,
+     "len_ratio": 0.15384615384615385,
+     "hypothesis": [
+      "prediction much shorter than GT (missed regions / OCR failure)",
+      "manual: figure-only page (GT = image ref); Docling OCRs the word 'STYLIST' inside the figure"
+     ],
+     "strata": [
+      "plain"
+     ],
+     "special_issue": []
+    },
+    {
+     "id": "f8438f43-c0d7-4dae-8497-16f1d222e9b2_p225",
+     "overall": 0.6996463354625782,
+     "len_ratio": 0.01097729937120324,
+     "hypothesis": [
+      "prediction much shorter than GT (missed regions / OCR failure)",
+      "table(s) in GT not emitted as <table>",
+      "multi-column layout (reading order)",
+      "manual: same document/pattern as p226"
+     ],
+     "strata": [
+      "table",
+      "multicol",
+      "special"
+     ],
+     "special_issue": [
+      "table_wireless_line"
+     ]
+    },
+    {
+     "id": "4d5947df-6197-462e-a183-4e8fca579008_p120",
+     "overall": 2.307828865613354,
+     "len_ratio": 0.6496350364963503,
+     "hypothesis": [
+      "check manually"
+     ],
+     "strata": [
+      "plain"
+     ],
+     "special_issue": []
+    },
+    {
+     "id": "11fb213b-fe17-4bde-9f32-85010907118d_p79",
+     "overall": 5.048406566343281,
+     "len_ratio": 0.09269089424254798,
+     "hypothesis": [
+      "prediction much shorter than GT (missed regions / OCR failure)",
+      "manual: wireless 2-column table collapsed by MinerU into a single 1x2 cell (structure lost, TEDS 0)"
+     ],
+     "strata": [
+      "table",
+      "special"
+     ],
+     "special_issue": [
+      "table_wireless_line"
+     ]
+    },
+    {
+     "id": "547e2947-5211-4ccf-83ae-f9dbf47a491f_p17",
+     "overall": 8.633540372670812,
+     "len_ratio": 0.11842105263157894,
+     "hypothesis": [
+      "prediction much shorter than GT (missed regions / OCR failure)",
+      "colorful background"
+     ],
+     "strata": [
+      "special"
+     ],
+     "special_issue": [
+      "colorful_backgroud"
+     ]
+    }
+   ],
+   "adjudicator-v0b": [
+    {
+     "id": "a5cc5b38-7122-404b-93e7-1472fb3e8e74_p145",
+     "overall": 0.0,
+     "len_ratio": 0.15384615384615385,
+     "hypothesis": [
+      "prediction much shorter than GT (missed regions / OCR failure)",
+      "manual: figure-only page (GT = image ref); Docling OCRs the word 'STYLIST' inside the figure"
+     ],
+     "strata": [
+      "plain"
+     ],
+     "special_issue": []
+    },
+    {
+     "id": "f8438f43-c0d7-4dae-8497-16f1d222e9b2_p225",
+     "overall": 0.6996463354625782,
+     "len_ratio": 0.01097729937120324,
+     "hypothesis": [
+      "prediction much shorter than GT (missed regions / OCR failure)",
+      "table(s) in GT not emitted as <table>",
+      "multi-column layout (reading order)",
+      "manual: same document/pattern as p226"
+     ],
+     "strata": [
+      "table",
+      "multicol",
+      "special"
+     ],
+     "special_issue": [
+      "table_wireless_line"
+     ]
+    },
+    {
+     "id": "4d5947df-6197-462e-a183-4e8fca579008_p120",
+     "overall": 2.307828865613354,
+     "len_ratio": 0.6496350364963503,
+     "hypothesis": [
+      "check manually"
+     ],
+     "strata": [
+      "plain"
+     ],
+     "special_issue": []
+    },
+    {
+     "id": "11fb213b-fe17-4bde-9f32-85010907118d_p79",
+     "overall": 5.048406566343281,
+     "len_ratio": 0.09269089424254798,
+     "hypothesis": [
+      "prediction much shorter than GT (missed regions / OCR failure)",
+      "manual: wireless 2-column table collapsed by MinerU into a single 1x2 cell (structure lost, TEDS 0)"
+     ],
+     "strata": [
+      "table",
+      "special"
+     ],
+     "special_issue": [
+      "table_wireless_line"
+     ]
+    },
+    {
+     "id": "547e2947-5211-4ccf-83ae-f9dbf47a491f_p17",
+     "overall": 8.633540372670812,
+     "len_ratio": 0.11842105263157894,
+     "hypothesis": [
+      "prediction much shorter than GT (missed regions / OCR failure)",
+      "colorful background"
+     ],
+     "strata": [
+      "special"
+     ],
+     "special_issue": [
+      "colorful_backgroud"
+     ]
+    }
+   ]
+  }
+ },
+ "official": {
+  "table2": [
+   [
+    "Overall (no CDM)",
+    119,
+    "64.9",
+    "72.1",
+    "74.0",
+    "72.8",
+    "78.0"
+   ],
+   [
+    "Overall (with local CDM)",
+    119,
+    "–",
+    "–",
+    "–",
+    "–",
+    "78.0"
+   ],
+   [
+    "Text (1−Edit)×100",
+    108,
+    "78.7",
+    "73.1",
+    "77.7",
+    "76.5",
+    "81.2"
+   ],
+   [
+    "Reading order (1−Edit)×100",
+    108,
+    "76.5",
+    "76.8",
+    "76.2",
+    "74.6",
+    "82.3"
+   ],
+   [
+    "TEDS×100",
+    39,
+    "0.0",
+    "58.2",
+    "58.2",
+    "58.2",
+    "58.2"
+   ],
+   [
+    "Formula (1−Edit)×100, not in overall",
+    11,
+    "0.0",
+    "69.3",
+    "69.3",
+    "69.7",
+    "67.1"
+   ],
+   [
+    "CDM×100 (local TeX)",
+    11,
+    "–",
+    "–",
+    "–",
+    "–",
+    "78.0"
+   ]
+  ],
+  "table3": [
+   [
+    "plain",
+    14,
+    "88.5",
+    "94.2",
+    "88.5",
+    "86.4",
+    "92.5"
+   ],
+   [
+    "multicol",
+    57,
+    "67.4",
+    "71.8",
+    "71.5",
+    "70.5",
+    "76.8"
+   ],
+   [
+    "special",
+    67,
+    "55.3",
+    "66.6",
+    "71.0",
+    "70.3",
+    "74.4"
+   ],
+   [
+    "table",
+    41,
+    "36.1",
+    "62.4",
+    "63.0",
+    "62.0",
+    "65.2"
+   ],
+   [
+    "equation",
+    11,
+    "64.8",
+    "67.4",
+    "67.4",
+    "67.1",
+    "73.8"
+   ]
+  ],
+  "table4": [
+   [
+    "Docling (force OCR)",
+    119,
+    "64.9"
+   ],
+   [
+    "MinerU",
+    119,
+    "72.1"
+   ],
+   [
+    "Per-page oracle (max)",
+    119,
+    "78.1"
+   ],
+   [
+    "Gain vs. best single",
+    119,
+    "+6.1"
+   ],
+   [
+    "Pages won by Docling / MinerU / tie (|Δ|<0.5)",
+    119,
+    "41 / 67 / 11"
+   ]
+  ],
+  "n_pairs": 119,
+  "delta_stats": {
+   "min": -97.26078900225781,
+   "q1": -21.09533556909811,
+   "median": -2.403637938501518,
+   "q3": 3.652607545293243,
+   "max": 66.98878038421944,
+   "mean": -7.2026055739057
+  }
+ },
+ "adjudicator": {
+  "runs": [
+   "docling",
+   "docling-forceocr",
+   "mineru",
+   "adjudicator-v0",
+   "adjudicator-v0b"
+  ],
+  "table5_local": [
+   [
+    "Overall (local)",
+    120,
+    "47.8",
+    "48.3",
+    "62.8",
+    "60.8",
+    "59.0"
+   ],
+   [
+    "Text (local)",
+    120,
+    "50.9",
+    "51.3",
+    "62.5",
+    "60.3",
+    "59.8"
+   ],
+   [
+    "Reading order (local)",
+    120,
+    "51.5",
+    "51.9",
+    "63.3",
+    "61.0",
+    "60.6"
+   ],
+   [
+    "TEDS (local)",
+    38,
+    "0.0",
+    "0.0",
+    "49.4",
+    "49.4",
+    "39.7"
+   ],
+   [
+    "CDM token-F1 (local)",
+    11,
+    "0.0",
+    "0.0",
+    "45.5",
+    "45.5",
+    "30.7"
+   ]
+  ],
+  "table5_official": [
+   [
+    "Overall, no CDM (official)",
+    119,
+    "64.4",
+    "64.9",
+    "72.1",
+    "74.0",
+    "73.1"
+   ],
+   [
+    "Text (official)",
+    108,
+    "78.1",
+    "78.7",
+    "73.1",
+    "77.7",
+    "77.8"
+   ],
+   [
+    "Reading order (official)",
+    108,
+    "75.9",
+    "76.5",
+    "76.8",
+    "76.2",
+    "76.8"
+   ],
+   [
+    "TEDS (official)",
+    39,
+    "0.0",
+    "0.0",
+    "58.2",
+    "58.2",
+    "47.2"
+   ],
+   [
+    "Formula 1−Edit (official, not in overall)",
+    11,
+    "0.0",
+    "0.0",
+    "69.3",
+    "69.3",
+    "69.4"
+   ]
+  ],
+  "table6": [
+   [
+    "Best single system (MinerU)",
+    "62.8",
+    "72.1"
+   ],
+   [
+    "Adjudicator v0",
+    "60.8",
+    "74.0"
+   ],
+   [
+    "  Δ vs. MinerU",
+    "-2.0",
+    "+1.9"
+   ],
+   [
+    "  gap to oracle",
+    "-5.0",
+    "-4.1"
+   ],
+   [
+    "Adjudicator v0b (agreement)",
+    "59.0",
+    "73.1"
+   ],
+   [
+    "  Δ vs. MinerU",
+    "-3.8",
+    "+1.0"
+   ],
+   [
+    "  gap to oracle",
+    "-6.8",
+    "-5.0"
+   ],
+   [
+    "Per-page oracle (max)",
+    "65.8",
+    "78.1"
+   ]
+  ],
+  "decisions": {
+   "adjudicator-v0": {
+    "n": 120,
+    "choice": {
+     "mineru": 48,
+     "docling": 72
+    },
+    "reason": {
+     "mineru_has_table": 36,
+     "default_docling_text": 70,
+     "mineru_near_empty": 2,
+     "mineru_has_formula": 10,
+     "docling_near_empty": 2
+    }
+   },
+   "adjudicator-v0b": {
+    "n": 120,
+    "choice": {
+     "mineru": 40,
+     "docling": 80
+    },
+    "reason": {
+     "mineru_has_table": 31,
+     "default_docling_text": 26,
+     "agreement>=0.85": 52,
+     "mineru_near_empty": 2,
+     "mineru_has_formula": 7,
+     "docling_near_empty": 2
+    }
+   }
+  },
+  "oracle_local": 65.8034010977868,
+  "oracle_official": 78.1
+ }
+}
