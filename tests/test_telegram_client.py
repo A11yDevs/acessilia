@@ -40,7 +40,7 @@ class _FakeBot:
     async def download_file(self, file_path, destination):
         Path(destination).write_bytes(self.content)
 
-    async def send_message(self, chat_id, text, message_thread_id=None, parse_mode=None):
+    async def send_message(self, chat_id, text, message_thread_id=None, parse_mode=None, **kwargs):
         self.sent.append(text)
         return _FakeSentMsg(len(self.sent))
 
@@ -59,6 +59,7 @@ class _FakeMessage:
         self.photo = photo
         self.chat = _FakeChat()
         self.message_thread_id = None
+        self.message_id = 999
         self.answers = []
 
     async def answer(self, text, **kwargs):

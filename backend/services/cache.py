@@ -28,12 +28,13 @@ def _file_hash(path: Path) -> str:
     with open(path, "rb") as f:
         for chunk in iter(lambda: f.read(65536), b""):
             hasher.update(chunk)
-    return hasher.hexdigest()[:16]
+    return hasher.hexdigest()
 
 
 def _cache_key(path: Path, extra: str = "") -> str:
     digest = _file_hash(path)
-    return f"{digest}_{extra}"
+    file_size = path.stat().st_size if path.exists() else 0
+    return f"{digest}_{file_size}_{extra}"
 
 
 def _cache_path(key: str) -> Path:
