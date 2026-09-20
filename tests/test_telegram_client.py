@@ -63,6 +63,39 @@ class _FakeJobClient:
         return {"task_id": task_id, "status": "cancelled"}
 
 
+class _ConcurrentJobClient:
+    def __init__(self):
+        self.submissions = {}
+        self.all_submitted = asyncio.Event()
+
+    async def submit_job(
+        self,
+        file_path,
+        filename,
+        mode="normal",
+        custom_prompt=None,
+        thinking_mode=False,
+        email=None,
+        source="api",
+    ):
+        task_id = f"{Path(filename).stem}-task"
+        self.submissions[filename] = {
+            "task_id": task_id,
+            "mode": mode,
+            "email": email,
+            "source": source,
+        }
+        if len(self.submissions) == 2:
+            self.all_submitted.set()
+        await self.all_submitted.wait()
+        return {"task_id": task_id, "position": 1, "message": "ok"}
+
+    async def get_job_status(self, task_id):
+        status = _done_status(task_id)
+        status["download_url"] = f"{BASE}/api/v1/download/{task_id}"
+        return status
+
+
 class _FakeChat:
     def __init__(self, chat_id=123):
         self.id = chat_id
@@ -268,6 +301,95 @@ def test_document_does_not_consume_another_senders_preferences(doc_module_isolat
     assert user_context.user_modes[(group_id, None, 101)] == "detalhado"
     assert user_context.user_emails[(group_id, None, 101)] == "first@example.com"
     assert user_context.user_task_ids[(group_id, None, 202)] == "second-task"
+
+
+def test_concurrent_group_users_keep_preferences_and_tasks_isolated(
+    doc_module_isolated,
+    monkeypatch,
+):
+    async def run_concurrent_flows():
+        group_id = -100123
+        first_key = (group_id, None, 101)
+        second_key = (group_id, None, 202)
+        bot = _FakeBot(_fake_pdf_bytes())
+        concurrent_client = _ConcurrentJobClient()
+        monkeypatch.setattr(doc_module, "client", concurrent_client)
+
+        first_preferences = _FakeMessage(
+            bot,
+            chat_id=group_id,
+            user_id=101,
+            text="/email first@example.com",
+        )
+        second_preferences = _FakeMessage(
+            bot,
+            chat_id=group_id,
+            user_id=202,
+            text="/email second@example.com",
+        )
+        await asyncio.gather(
+            start_module.cmd_email(first_preferences),
+            start_module.cmd_email(second_preferences),
+            start_module.cmd_detailed(first_preferences),
+            start_module.cmd_low(second_preferences),
+        )
+
+        first_upload = _FakeMessage(
+            bot,
+            document=_FakeDocument("first.pdf", len(bot.content), "file1"),
+            chat_id=group_id,
+            user_id=101,
+        )
+        second_upload = _FakeMessage(
+            bot,
+            document=_FakeDocument("second.pdf", len(bot.content), "file2"),
+            chat_id=group_id,
+            user_id=202,
+        )
+        await asyncio.wait_for(
+            asyncio.gather(
+                doc_module.handle_document(first_upload),
+                doc_module.handle_document(second_upload),
+            ),
+            timeout=2,
+        )
+
+        assert concurrent_client.submissions == {
+            "first.pdf": {
+                "task_id": "first-task",
+                "mode": "detalhado",
+                "email": "first@example.com",
+                "source": "telegram",
+            },
+            "second.pdf": {
+                "task_id": "second-task",
+                "mode": "baixo",
+                "email": "second@example.com",
+                "source": "telegram",
+            },
+        }
+        assert user_context.user_task_ids[first_key] == "first-task"
+        assert user_context.user_task_ids[second_key] == "second-task"
+        assert first_key not in user_context.user_emails
+        assert second_key not in user_context.user_emails
+        assert first_key not in user_context.user_modes
+        assert second_key not in user_context.user_modes
+
+        command_client = _FakeJobClient()
+        monkeypatch.setattr(start_module, "client", command_client)
+        first_status = _FakeMessage(bot, chat_id=group_id, user_id=101)
+        second_cancel = _FakeMessage(bot, chat_id=group_id, user_id=202)
+        await asyncio.gather(
+            start_module.cmd_status(first_status),
+            start_module.cmd_cancel(second_cancel),
+        )
+
+        assert command_client.status_requests == ["first-task"]
+        assert command_client.cancel_requests == ["second-task"]
+        assert user_context.user_task_ids[first_key] == "first-task"
+        assert second_key not in user_context.user_task_ids
+
+    asyncio.run(run_concurrent_flows())
 
 
 def test_status_reads_only_the_senders_task(doc_module_isolated, monkeypatch):
