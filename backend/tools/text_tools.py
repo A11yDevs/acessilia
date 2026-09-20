@@ -2,6 +2,10 @@
 from backend.tools.code_tools import normalize_code_text
 from backend.tools.region_extractor import Region
 
+# Geometria/fingerprint migrados para a lib docstruct (Fase 2 do plano).
+# Reexportados aqui para compatibilidade com imports existentes.
+from docstruct.geometry import content_fingerprint, overlaps_clean  # noqa: F401
+
 # Sentinela devolvido pelo VisionAgent quando a imagem é uma fórmula matemática
 FORMULA_SENTINEL = "[FORMULA]"
 
@@ -32,14 +36,5 @@ def apply_marker(text: str, classification: str, region: Region) -> str:
         end = f"Fim de {custom}"
     return f"{start}\n{text}\n{end}"
 
-def content_fingerprint(text: str) -> int:
-    return hash(" ".join(text.lower().split()))
-
-def overlaps_clean(bbox, clean_bboxes, threshold=0.3) -> bool:
-    x0, y0, x1, y1 = bbox
-    area = max((x1 - x0) * (y1 - y0), 1)
-    for cb in clean_bboxes:
-        ox0, oy0, ox1, oy1 = max(x0, cb[0]), max(y0, cb[1]), min(x1, cb[2]), min(y1, cb[3])
-        if ox0 < ox1 and oy0 < oy1:
-            if ((ox1 - ox0) * (oy1 - oy0)) / area >= threshold: return True
-    return False
+# content_fingerprint e overlaps_clean agora vivem em docstruct.geometry
+# (reexportados no topo do arquivo).

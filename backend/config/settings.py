@@ -63,6 +63,12 @@ class Settings:
     structurer: str = os.getenv("STRUCTURER", "toolbox")
     pipeline_engine: str = os.getenv("PIPELINE_ENGINE", "pddl")
 
+    # Fusão multi-provider (Fase 4 do plano docstruct)
+    # "single": comportamento atual (um provider, fallback PyMuPDF).
+    # "dual": extrai com dois providers e funde via docstruct.fusion.
+    fusion_mode: str = os.getenv("FUSION_MODE", "single")
+    fusion_secondary_provider: str = os.getenv("FUSION_SECONDARY_PROVIDER", "mineru")
+
     # Acessilia Toolbox settings
     toolbox_base_url: str = os.getenv("TOOLBOX_BASE_URL", "http://localhost:8002")
     toolbox_provider: str = os.getenv("TOOLBOX_PROVIDER", "docling")
