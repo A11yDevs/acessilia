@@ -49,6 +49,20 @@ class _FakeBot:
         self.edited.append(text)
 
 
+class _FakeJobClient:
+    def __init__(self):
+        self.status_requests = []
+        self.cancel_requests = []
+
+    async def get_job_status(self, task_id):
+        self.status_requests.append(task_id)
+        return _done_status(task_id)
+
+    async def cancel_job(self, task_id):
+        self.cancel_requests.append(task_id)
+        return {"task_id": task_id, "status": "cancelled"}
+
+
 class _FakeChat:
     def __init__(self, chat_id=123):
         self.id = chat_id
@@ -100,6 +114,7 @@ class _FakePhoto:
 def doc_module_isolated(monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "temp_dir", tmp_path)
     monkeypatch.setattr(doc_module, "client", ApiClient(base_url=BASE))
+    monkeypatch.setattr(start_module, "client", ApiClient(base_url=BASE))
     monkeypatch.setattr(doc_module, "POLL_INTERVAL_SECONDS", 0.01)
     user_context.user_modes.clear()
     user_context.user_emails.clear()
@@ -221,6 +236,67 @@ def test_user_preferences_are_stored_per_sender(doc_module_isolated):
     assert user_context.user_emails[(123, None, 202)] == "second@example.com"
     assert user_context.user_modes[(123, None, 101)] == "detalhado"
     assert user_context.user_modes[(123, None, 202)] == "baixo"
+
+
+def test_document_does_not_consume_another_senders_preferences(doc_module_isolated):
+    content = _fake_pdf_bytes()
+    group_id = -100123
+    user_context.user_modes[(group_id, None, 101)] = "detalhado"
+    user_context.user_emails[(group_id, None, 101)] = "first@example.com"
+    route = respx.post(f"{BASE}/api/v1/jobs").mock(
+        return_value=httpx.Response(
+            202, json={"task_id": "second-task", "position": 1, "message": "ok"}
+        )
+    )
+    respx.get(f"{BASE}/api/v1/jobs/second-task").mock(
+        return_value=httpx.Response(200, json=_done_status("second-task"))
+    )
+    bot = _FakeBot(content)
+    second_user = _FakeMessage(
+        bot,
+        document=_FakeDocument("doc.pdf", len(content), "file1"),
+        chat_id=group_id,
+        user_id=202,
+    )
+
+    with respx.mock:
+        asyncio.run(doc_module_isolated.handle_document(second_user))
+        body = route.calls[0].request.read()
+
+    assert b'name="mode"' in body and b"normal" in body
+    assert b"first@example.com" not in body
+    assert user_context.user_modes[(group_id, None, 101)] == "detalhado"
+    assert user_context.user_emails[(group_id, None, 101)] == "first@example.com"
+    assert user_context.user_task_ids[(group_id, None, 202)] == "second-task"
+
+
+def test_status_reads_only_the_senders_task(doc_module_isolated, monkeypatch):
+    group_id = -100123
+    user_context.user_task_ids[(group_id, None, 101)] = "first-task"
+    user_context.user_task_ids[(group_id, None, 202)] = "second-task"
+    client = _FakeJobClient()
+    monkeypatch.setattr(start_module, "client", client)
+    message = _FakeMessage(_FakeBot(b""), chat_id=group_id, user_id=101)
+
+    asyncio.run(start_module.cmd_status(message))
+
+    assert client.status_requests == ["first-task"]
+    assert any("first-task" in answer for answer in message.answers)
+
+
+def test_cancel_removes_only_the_senders_task(doc_module_isolated, monkeypatch):
+    group_id = -100123
+    user_context.user_task_ids[(group_id, None, 101)] = "first-task"
+    user_context.user_task_ids[(group_id, None, 202)] = "second-task"
+    client = _FakeJobClient()
+    monkeypatch.setattr(start_module, "client", client)
+    message = _FakeMessage(_FakeBot(b""), chat_id=group_id, user_id=101)
+
+    asyncio.run(start_module.cmd_cancel(message))
+
+    assert client.cancel_requests == ["first-task"]
+    assert (group_id, None, 101) not in user_context.user_task_ids
+    assert user_context.user_task_ids[(group_id, None, 202)] == "second-task"
 
 
 def test_document_api_error_sends_message(doc_module_isolated):
