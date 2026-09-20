@@ -57,6 +57,7 @@ async def _send_with_retry(
     chat_id: int,
     msg: str,
     message_thread_id: int | None = None,
+    reply_to_message_id: int | None = None,
     max_retries: int = 3,
 ) -> None:
     """Send a Telegram message, retrying on rate-limit backoffs until successful or retries are exhausted.
@@ -66,11 +67,17 @@ async def _send_with_retry(
         chat_id (int): Numeric id of the target chat; no default (required).
         msg (str): Full message text already localized by the caller via backend.i18n.t(); no default (required).
         message_thread_id (int|None): Forum-topic thread identifier or None for top-level chats (default: None).
+        reply_to_message_id (int|None): Optional message identifier to reply directly to (default: None).
         max_retries (int): Number of send attempts before giving up (default: 3).
     """
     for attempt in range(max_retries):
         try:
-            await bot.send_message(chat_id, msg, message_thread_id=message_thread_id)
+            kwargs = {}
+            if message_thread_id is not None:
+                kwargs["message_thread_id"] = message_thread_id
+            if reply_to_message_id is not None:
+                kwargs["reply_to_message_id"] = reply_to_message_id
+            await bot.send_message(chat_id, msg, **kwargs)
             return
         except TelegramRetryAfter as e:
             wait = e.retry_after + attempt * 5
@@ -249,6 +256,7 @@ async def _poll_job(
                     message.chat.id,
                     msg,
                     message_thread_id=message_thread_id,
+                    reply_to_message_id=message.message_id,
                 )
             return
 
@@ -263,6 +271,7 @@ async def _poll_job(
                 message.chat.id,
                 msg,
                 message_thread_id=message_thread_id,
+                reply_to_message_id=message.message_id,
             )
             return
 
@@ -273,6 +282,7 @@ async def _poll_job(
                 message.chat.id,
                 t(MSG_TASK_CANCELLED),
                 message_thread_id=message_thread_id,
+                reply_to_message_id=message.message_id,
             )
             return
 
@@ -284,4 +294,5 @@ async def _poll_job(
         message.chat.id,
         t(MSG_PROCESSING_TIMEOUT),
         message_thread_id=message_thread_id,
+        reply_to_message_id=message.message_id,
     )
