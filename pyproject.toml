@@ -9,7 +9,7 @@ description = "Bot para extração e acessibilidade de documentos."
 authors = [{name = "Jhonata"}]
 license = {text = "MIT"}
 readme = "README.md"
-requires-python = ">=3.11,<3.12"
+requires-python = ">=3.11,<3.14"
 dependencies = [
     "loguru>=0.7.3,<0.8",
     "aiosmtplib>=5.1.2,<6",
@@ -30,7 +30,7 @@ dependencies = [
     "latex2mathml>=3.77.0,<4",
     "python-multipart>=0.0.32,<0.1",
     "jinja2>=3.1.6,<4",
-    "agno>=2.7.2,<3",
+    "agno==3.0.5",
     "jsonschema>=4.20,<5",
     "openai>=2.45.0,<3",
     "ollama>=0.6.2,<0.7",
