@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "acessilia-docstruct"
+version = "0.1.0"
+description = "Núcleo puro de processamento estrutural de documentos: tipos canônicos, geometria, fusão multi-provider e filtros de ruído."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/docstruct"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
