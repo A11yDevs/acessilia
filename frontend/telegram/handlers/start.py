@@ -14,7 +14,7 @@ from backend.services.cache import clear_cache
 from backend.tools.logger import logger
 from frontend.clients.api_client import ApiError
 from frontend.clients import default_client
-from frontend.telegram.handlers.document import user_modes, user_emails, user_task_ids
+from frontend.telegram import user_context
 from frontend.telegram.middlewares.pause_middleware import get_paused_chats
 from frontend.telegram.messages import (
     MSG_BOT_PAUSED,
@@ -58,7 +58,7 @@ class FeedbackStates(StatesGroup):
 
 @router.message(Command("email"))
 async def cmd_email(message: Message) -> None:
-    """Record the user's e-mail address from /email so processed files can be delivered there.
+    """Record the sender's e-mail for their next job in the current chat and topic.
 
     Args:
         message (Message): Incoming aiogram ``/email`` command carrying the address argument to store, or none when only the bare command was sent; no default (required).
@@ -69,7 +69,7 @@ async def cmd_email(message: Message) -> None:
         return
 
     email = args[1].strip()
-    user_emails[(message.chat.id, message.message_thread_id)] = email
+    user_context.user_emails[user_context.get_user_state_key(message)] = email
     await message.answer(t(MSG_EMAIL_CONFIGURED).format(email=email))
 
 
@@ -108,12 +108,12 @@ async def cmd_formats(message: Message) -> None:
 @router.message(Command("ocr"))
 async def cmd_ocr(message: Message) -> None:
     """
-    Activate text-only OCR extraction mode for this chat via /ocr so subsequent files skip visual description.
+    Activate text-only OCR mode for the sender's next file in this chat and topic.
 
     Args:
         message (Message): Incoming aiogram /ocr command; no default (required).
     """
-    user_modes[(message.chat.id, message.message_thread_id)] = "ocr"
+    user_context.user_modes[user_context.get_user_state_key(message)] = "ocr"
     await message.answer(t(MSG_MODE_OCR_ON))
 
 
@@ -121,12 +121,12 @@ async def cmd_ocr(message: Message) -> None:
 @router.message(Command("detailed"))
 async def cmd_detailed(message: Message) -> None:
     """
-    Activate maximum-detail image+text description mode for this chat via /detalhado or its English alias /detailed.
+    Activate maximum-detail mode for the sender's next file in this chat and topic.
 
     Args:
         message (Message): Incoming aiogram /detalhado (or /detailed) command; no default (required).
     """
-    user_modes[(message.chat.id, message.message_thread_id)] = "detalhado"
+    user_context.user_modes[user_context.get_user_state_key(message)] = "detalhado"
     await message.answer(t(MSG_MODE_DETAILED_ON))
 
 
@@ -134,12 +134,12 @@ async def cmd_detailed(message: Message) -> None:
 @router.message(Command("medium"))
 async def cmd_medium(message: Message) -> None:
     """
-    Activate the default full-text + clear image description mode for this chat via /medio or its English alias /medium.
+    Activate medium-detail mode for the sender's next file in this chat and topic.
 
     Args:
         message (Message): Incoming aiogram /medio (or /medium) command; no default (required).
     """
-    user_modes[(message.chat.id, message.message_thread_id)] = "medio"
+    user_context.user_modes[user_context.get_user_state_key(message)] = "medio"
     await message.answer(t(MSG_MODE_MEDIO_ON))
 
 
@@ -147,30 +147,30 @@ async def cmd_medium(message: Message) -> None:
 @router.message(Command("low"))
 async def cmd_low(message: Message) -> None:
     """
-    Activate content-focused fast mode for this chat via /baixo or its English alias /low (full text + concise image description only).
+    Activate low-detail mode for the sender's next file in this chat and topic.
 
     Args:
         message (Message): Incoming aiogram /baixo (or /low) command; no default (required).
     """
-    user_modes[(message.chat.id, message.message_thread_id)] = "baixo"
+    user_context.user_modes[user_context.get_user_state_key(message)] = "baixo"
     await message.answer(t(MSG_MODE_BAIXO_ON))
 
 
 @router.message(Command("normal"))
 async def cmd_normal(message: Message) -> None:
-    user_modes[(message.chat.id, message.message_thread_id)] = "medio"
+    user_context.user_modes[user_context.get_user_state_key(message)] = "medio"
     await message.answer(t(MSG_MODE_NORMAL_ON))
 
 
 @router.message(Command("status"))
 async def cmd_status(message: Message) -> None:
     """
-    Show the current state of any processing task recorded for this chat, or a no-task notice when none exists.
+    Show the processing task recorded for the sender in this chat and topic.
 
     Args:
         message (Message): Incoming aiogram /status command; no default (required).
     """
-    task_id = user_task_ids.get((message.chat.id, message.message_thread_id))
+    task_id = user_context.user_task_ids.get(user_context.get_user_state_key(message))
     if not task_id:
         await message.answer(t(MSG_NO_TASK_REGISTERED))
         return
@@ -249,12 +249,13 @@ async def cmd_limpar(message: Message) -> None:
 @router.message(Command("cancel"))
 async def cmd_cancel(message: Message) -> None:
     """
-    Cancel the currently tracked (if any) processing job for this chat and confirm or report failure.
+    Cancel the job tracked for the sender in this chat and topic.
 
     Args:
         message (Message): Incoming aiogram /cancelar (or its English alias /cancel) command; no default (required).
     """
-    task_id = user_task_ids.get((message.chat.id, message.message_thread_id))
+    state_key = user_context.get_user_state_key(message)
+    task_id = user_context.user_task_ids.get(state_key)
     if not task_id:
         await message.answer(t(MSG_CANCEL_NO_TASK))
         return
@@ -265,7 +266,7 @@ async def cmd_cancel(message: Message) -> None:
             t(MSG_TASK_CANCEL_FAILED).format(status_code=e.status_code, detail=e.detail)
         )
         return
-    user_task_ids.pop((message.chat.id, message.message_thread_id), None)
+    user_context.user_task_ids.pop(state_key, None)
     cancelled_id = result.get('task_id', task_id)
     await message.answer(t(MSG_TASK_CANCEL_DONE).format(task_id=cancelled_id))
 
