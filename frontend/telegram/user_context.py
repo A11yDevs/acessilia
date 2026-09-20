@@ -8,6 +8,10 @@ if TYPE_CHECKING:
 
 UserStateKey = tuple[int, int | None, int]
 
+user_modes: dict[UserStateKey, str] = {}
+user_emails: dict[UserStateKey, str] = {}
+user_task_ids: dict[UserStateKey, str] = {}
+
 
 def get_user_state_key(message: Message) -> UserStateKey:
     """Return the chat, topic and user identity used to isolate bot state."""

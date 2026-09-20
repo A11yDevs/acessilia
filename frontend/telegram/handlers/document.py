@@ -10,6 +10,7 @@ from aiogram.exceptions import TelegramRetryAfter
 from frontend.telegram.adapters.file_service import download_file
 from frontend.clients.api_client import ApiError
 from frontend.clients import default_client
+from frontend.telegram import user_context
 
 from backend.tools.logger import logger
 from backend.i18n import t
@@ -44,10 +45,6 @@ from frontend.telegram.messages import (
 router = Router()
 
 client = default_client
-
-user_modes: dict[tuple[int, int | None], str] = {}
-user_emails: dict[tuple[int, int | None], str] = {}
-user_task_ids: dict[tuple[int, int | None], str] = {}
 
 POLL_INTERVAL_SECONDS = 3.0
 
@@ -111,7 +108,8 @@ async def handle_document(message: Message) -> None:
         await message.answer(error_msg)
         return
 
-    mode = user_modes.pop((message.chat.id, message.message_thread_id), "normal")
+    state_key = user_context.get_user_state_key(message)
+    mode = user_context.user_modes.pop(state_key, "normal")
     await message.answer(t(MSG_FILE_RECEIVED))
     await process_file(message, document.file_id, filename, mode=mode)
 
@@ -127,7 +125,8 @@ async def handle_photo(message: Message) -> None:
     if photo is None:
         return
 
-    mode = user_modes.pop((message.chat.id, message.message_thread_id), "normal")
+    state_key = user_context.get_user_state_key(message)
+    mode = user_context.user_modes.pop(state_key, "normal")
     await message.answer(t(MSG_PHOTO_RECEIVED))
     await process_file(message, photo.file_id, "image.png", mode=mode)
 
@@ -141,7 +140,7 @@ async def process_file(
     """Download a remote file locally, submit it to the processing API and wait for completion.
 
     Args:
-        message (Message): Aiogram Message triggering the job; used only for threading/chat id context; no default (required).
+        message (Message): Aiogram Message triggering the job; provides the sender-scoped state and chat context; no default (required).
         file_id (str): Telegram unique file identifier of the received attachment; no default (required).
         filename (str): Original filename to store and report inside the job; no default (required).
         mode (str): Description-detail preset requested by the user's last /detalhado|/medio|/baixo command (default: "normal").
@@ -150,7 +149,8 @@ async def process_file(
     tracker = StatusTracker(
         message.bot, message.chat.id, filename, message_thread_id=message_thread_id
     )
-    email = user_emails.get((message.chat.id, message.message_thread_id))
+    state_key = user_context.get_user_state_key(message)
+    email = user_context.user_emails.get(state_key)
 
     try:
         with tempfile.TemporaryDirectory(dir=settings.temp_dir) as tmpdir:
@@ -183,10 +183,10 @@ async def process_file(
                 await message.answer(t(MSG_CONTACT_SERVER_FAILED))
                 return
 
-        user_emails.pop((message.chat.id, message.message_thread_id), None)
+        user_context.user_emails.pop(state_key, None)
         task_id = result["task_id"]
         position = result.get("position", 1)
-        user_task_ids[(message.chat.id, message.message_thread_id)] = task_id
+        user_context.user_task_ids[state_key] = task_id
 
         await tracker(t(MSG_TASK_ENQUEUED).format(task_id=task_id))
         if position > 1:
