@@ -68,6 +68,9 @@ class Settings:
     # "dual": extrai com dois providers e funde via docstruct.fusion.
     fusion_mode: str = os.getenv("FUSION_MODE", "single")
     fusion_secondary_provider: str = os.getenv("FUSION_SECONDARY_PROVIDER", "mineru")
+    # Domain-specific callout titles injected into the region grouping
+    # heuristics (semicolon-separated). No document-specific constants in code.
+    callout_known_titles: str = os.getenv("CALLOUT_KNOWN_TITLES", "")
 
     # Acessilia Toolbox settings
     toolbox_base_url: str = os.getenv("TOOLBOX_BASE_URL", "http://localhost:8002")
