@@ -65,6 +65,11 @@ Também disponível em **inglês (EUA)**: [English version](patterns.md)
 - Implementação: [backend/api/](../backend/api/); clientes em [frontend/clients/api_client.py](../frontend/clients/api_client.py), consumidos pelo bot Telegram e pelo painel Web.
 - Benefício: um único lugar possui a fila e o pipeline; toda interface (chamadores da API, Telegram, Web, CLI) é um cliente fino, de modo que o comportamento permanece consistente entre as superfícies.
 
+### 12. Agente de Fusão Determinístico (ferramentas docstruct)
+- Implementação: [backend/core/agents/fusion_agent.py](../backend/core/agents/fusion_agent.py) (`FusionAgent`), envolvendo a biblioteca pura `docstruct` (`libs/docstruct`).
+- Papel: expõe quatro ferramentas determinísticas ao Agno — `fuse_providers` (funde dois providers de toolbox via `docstruct.fusion`), `audit_document` (auditoria do documento canônico), `classify_block` (classificação de regiões) e `needs_reinfer` (decide se uma região precisa de re-inferência de visão/orientação). Cada capacidade tem um método `process_*` puro (testável sem Agno) mais um envelope JSON fino.
+- Benefício: segue o padrão `InformationalStructuralAgent` — núcleo determinístico, envelope Agno opcional — de modo que a lógica de fusão/auditoria permanece testável e o LLM só seleciona qual ferramenta chamar. O método PDDL `dual-provider-fusion` (padrão 10) reutiliza `backend.pipeline.fusion.extract_fused` e só é admissível quando `FUSION_MODE=dual`. Veja [docstruct_algorithms.pt-br.md](docstruct_algorithms.pt-br.md) para os detalhes dos algoritmos.
+
 ---
 
 ## Roadmap de Evolução Arquitetural
