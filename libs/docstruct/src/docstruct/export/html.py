@@ -1,0 +1,259 @@
+"""Standalone HTML rendering of canonical documents (pure transformation).
+
+Ported from backend/export/renderers/html_renderer.py. The file write and
+the i18n label resolution stay in the backend; this module takes the
+resolved labels as input.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from html import escape
+from typing import Any
+
+from docstruct.export.filters import apply_output_profile_filter
+from docstruct.profiles import normalize_profile
+from docstruct.tables.ast import split_header_and_body, table_ast_from_block
+
+
+@dataclass
+class HtmlLabels:
+    """User-facing labels for the standalone HTML page (resolved by the consumer)."""
+
+    default_title: str = "Accessible document"
+    table_of_contents: str = "Contents"
+    technical_metadata: str = "Technical metadata"
+    image_description: str = "Image description"
+    extra: dict[str, str] = field(default_factory=dict)
+
+
+def _collect_section(section: dict[str, Any]) -> list[dict[str, Any]]:
+    """Collects the title heading, the direct blocks, and the recursively nested child blocks of one section.
+
+    Args:
+        section (dict): Canonical section mapping with optional "title", "blocks", and "children".
+
+    Returns:
+        list[dict]: Ordered blocks for the section plus every block of its nested children.
+    """
+    blocks = (
+        [
+            {
+                "type": "heading",
+                "level": section.get("level", 1),
+                "title": section.get("title", ""),
+                "id": section.get("id", ""),
+            }
+        ]
+        if section.get("title")
+        else []
+    )
+    blocks.extend(section.get("blocks", []))
+    for child in section.get("children", []):
+        blocks.extend(_collect_section(child))
+    return blocks
+
+
+
+def _all_blocks(document: dict[str, Any]) -> list[dict[str, Any]]:
+    """Flattens every section and nested child section of the document into one block list.
+
+    Args:
+        document (dict): Canonical document mapping with a top-level "sections" list.
+
+    Returns:
+        list[dict]: All blocks (including section title headings) in document order.
+    """
+    blocks: list[dict[str, Any]] = []
+    for section in document.get("sections", []):
+        blocks.extend(_collect_section(section))
+    return blocks
+
+
+
+def _render_block(block: dict[str, Any], profile: dict[str, Any]) -> str:
+    """Renders one canonical block into its HTML fragment according to the block type and profile.
+
+    Args:
+        block (dict): Canonical block mapping with at least "type", "id" and the type-specific payload (text, items, table_ast, ...).
+        profile (dict): Normalized export profile mapping; "collapsible" controls whether note-like blocks render as <details> or <section>.
+
+    Returns:
+        str: The HTML fragment for the block (empty string when a table block carries no usable table_ast).
+    """
+    block_type = block.get("type")
+    block_id = escape(block.get("id", ""))
+    if block_type == "heading":
+        level = min(max(int(block.get("level", 1)), 1), 6)
+        return f'<h{level} id="{block_id}">{escape(block.get("title", block.get("text", "")))}</h{level}>'
+    if block_type == "paragraph":
+        return f'<p id="{block_id}">{escape(block.get("text", ""))}</p>'
+    if block_type == "code":
+        return (
+            f'<pre id="{block_id}"><code>{escape(block.get("text", ""))}</code></pre>'
+        )
+    if block_type == "list":
+        tag = "ol" if block.get("ordered") else "ul"
+        items = "".join(
+            f"<li>{escape(str(item))}</li>" for item in block.get("items", [])
+        )
+        return f'<{tag} id="{block_id}">{items}</{tag}>'
+    if block_type == "table":
+        table_ast = table_ast_from_block(block)
+        if table_ast is None:
+            return ""
+        header_rows, body_rows, footer_rows = split_header_and_body(table_ast)
+
+        caption = table_ast.get("caption")
+        caption_html = (
+            f"<caption>{escape(str(caption))}</caption>"
+            if isinstance(caption, str) and caption.strip()
+            else ""
+        )
+
+        thead = ""
+        if header_rows:
+            thead_rows = "".join(_render_html_table_row(row, header=True) for row in header_rows)
+            thead = f"<thead>{thead_rows}</thead>"
+
+        tbody_rows = "".join(_render_html_table_row(row, header=False) for row in body_rows)
+        tbody = f"<tbody>{tbody_rows}</tbody>" if tbody_rows else ""
+
+        tfoot = ""
+        if footer_rows:
+            tfoot_rows = "".join(_render_html_table_row(row, header=False) for row in footer_rows)
+            tfoot = f"<tfoot>{tfoot_rows}</tfoot>"
+
+        return f'<table id="{block_id}">{caption_html}{thead}{tbody}{tfoot}</table>'
+    if block_type == "image":
+        alt = escape(block.get("alt_text", block.get("text", "")))
+        desc = escape(block.get("long_description", ""))
+        details = (
+            f"<details><summary>{escape(t(MSG_HTML_IMAGE_DESCRIPTION))}</summary><p>{desc or alt}</p></details>"
+            if desc
+            else ""
+        )
+        return f'<figure id="{block_id}"><img alt="{alt}" src="{escape(block.get("metadata", {}).get("src", ""))}">{details}</figure>'
+    if block_type == "math":
+        alt = escape(block.get("alt_text", ""))
+        mathml = (block.get("metadata") or {}).get("mathml", "")
+        if mathml:
+            return f'<div id="{block_id}" role="math" aria-label="{alt}">{escape(mathml)}</div>'
+        return (
+            f'<p id="{block_id}" role="math" aria-label="{alt}">'
+            f'{escape(block.get("text", ""))}</p>'
+        )
+    if block_type in {"details", "note", "warning", "quote"}:
+        summary = escape(block.get("title", block_type.title()))
+        content = escape(block.get("text", ""))
+        if profile.get("collapsible"):
+            return f'<details id="{block_id}"><summary>{summary}</summary><p>{content}</p></details>'
+        return f'<section id="{block_id}"><h2>{summary}</h2><p>{content}</p></section>'
+    return f'<p id="{block_id}">{escape(block.get("text", ""))}</p>'
+
+
+
+def _render_html_table_row(row: dict[str, Any], *, header: bool) -> str:
+    """Renders one table row (dict of cells) into a <tr> fragment, skipping empty or non-dict cells.
+
+    Args:
+        row (dict): Row mapping with a "cells" list; each cell is a dict with "text" plus optional "scope", "rowspan", "colspan".
+        header (bool): When True the cells render as <th> (scope defaults to "col"), otherwise as <td>.
+
+    Returns:
+        str: The "<tr>...</tr>" fragment, or an empty string when no cell produced visible text.
+    """
+    cells = row.get("cells", []) if isinstance(row, dict) else []
+    tag = "th" if header else "td"
+    rendered_cells: list[str] = []
+    for cell in cells:
+        if not isinstance(cell, dict):
+            continue
+        text = escape(str(cell.get("text", "")).strip())
+
+        attrs: list[str] = []
+        if tag == "th":
+            scope = cell.get("scope")
+            if isinstance(scope, str) and scope in {"row", "col", "rowgroup", "colgroup"}:
+                attrs.append(f'scope="{scope}"')
+            else:
+                attrs.append('scope="col"')
+
+        rowspan = cell.get("rowspan")
+        if isinstance(rowspan, int) and rowspan > 1:
+            attrs.append(f'rowspan="{rowspan}"')
+        colspan = cell.get("colspan")
+        if isinstance(colspan, int) and colspan > 1:
+            attrs.append(f'colspan="{colspan}"')
+
+        attrs_text = f" {' '.join(attrs)}" if attrs else ""
+        rendered_cells.append(f"<{tag}{attrs_text}>{text}</{tag}>")
+
+    if not rendered_cells:
+        return ""
+    return "<tr>" + "".join(rendered_cells) + "</tr>"
+
+
+def document_to_html(
+    document: dict[str, Any],
+    *,
+    profile: str = "html",
+    labels: HtmlLabels | None = None,
+) -> str:
+    """Render the canonical document into a standalone HTML page (no file I/O)."""
+    labels = labels or HtmlLabels()
+    profile_dict = normalize_profile(profile)
+    blocks = apply_output_profile_filter(_all_blocks(document), profile)
+
+    toc = []
+    body = []
+    for block in blocks:
+        if block.get("type") == "heading":
+            toc.append(
+                (
+                    block.get("level", 1),
+                    block.get("title", block.get("text", "")),
+                    block.get("id", ""),
+                )
+            )
+        body.append(_render_block(block, profile_dict))
+
+    title = escape(document.get("title") or labels.default_title)
+    toc_label = escape(labels.table_of_contents)
+    html = [
+        "<!doctype html>",
+        f'<html lang="{escape(document.get("language", "pt-BR"))}">',
+        "<head>",
+        '<meta charset="utf-8">',
+        '<meta name="viewport" content="width=device-width, initial-scale=1">',
+        f"<title>{title}</title>",
+        "<style>",
+        "body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.6;max-width:980px;margin:0 auto;padding:2rem;background:#fafafa;color:#1c1c1c}",
+        "nav.toc{background:#fff;border:1px solid #ddd;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem}",
+        "nav.toc ul{margin:0;padding-left:1.2rem}",
+        "pre{overflow:auto;background:#111;color:#f4f4f4;padding:1rem;border-radius:10px}",
+        "code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}",
+        "details{background:#fff;border:1px solid #ddd;border-radius:10px;padding:.75rem 1rem;margin:1rem 0}",
+        "aside.meta{background:#f3f4f6;border-left:4px solid #7c3aed;padding:.75rem 1rem;margin:1.5rem 0}",
+        "</style>",
+        "</head>",
+        "<body>",
+        f'<main aria-label="{title}">',
+    ]
+    if toc:
+        html.append(
+            f'<nav class="toc" aria-label="{toc_label}"><strong>{toc_label}</strong><ul>'
+        )
+        for level, title_text, link_id in toc:
+            html.append(
+                f'<li class="lvl-{level}"><a href="#{escape(link_id)}">{escape(title_text)}</a></li>'
+            )
+        html.append("</ul></nav>")
+    html.extend(body)
+    if profile_dict.get("interactive"):
+        html.append(
+            f'<aside class="meta"><h2>{escape(labels.technical_metadata)}</h2><p>'
+            + escape(str(document.get("metadata", {})))
+            + "</p></aside>"
+        )
+    html.append("</main></body></html>")
+    return "\n".join(html) + "\n"
