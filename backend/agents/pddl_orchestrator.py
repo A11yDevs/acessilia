@@ -117,6 +117,40 @@ def _handle_latex_verbalizer_method(
     )
 
 
+def _run_extract_fused(source_path: Path) -> dict:
+    """Executa ``extract_fused`` respeitando o contexto de event loop.
+
+    Detecta a presença de um event loop **antes** de criar a coroutine,
+    evitando criar um objeto coroutine que ficaria sem ``await`` (e
+    produziria ``RuntimeWarning: coroutine ... was never awaited``).
+
+    Nota de arquitetura: quando chamado a partir de um thread com event
+    loop ativo (Agno Workflow, API), ``.result()`` ainda bloqueia o loop
+    chamador até a fusão terminar. O contrato dos handlers permanece
+    síncrono; quem invoca o executor a partir de código async deve rodar
+    o executor inteiro via ``await asyncio.to_thread(...)`` para não
+    bloquear o event loop principal.
+    """
+    import asyncio
+    import concurrent.futures
+
+    from backend.pipeline.fusion import extract_fused
+
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        # Contexto síncrono (executor determinístico, CLI, testes):
+        # não existe event loop ativo neste thread.
+        return asyncio.run(extract_fused(source_path))
+
+    # Já existe um event loop neste thread; como o handler é síncrono,
+    # a coroutine é executada em um thread dedicado com seu próprio loop.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(
+            lambda: asyncio.run(extract_fused(source_path))
+        ).result()
+
+
 def _handle_dual_provider_fusion_method(
     manifest: ProcessingManifest, obligation_id: str
 ) -> MethodResult:
@@ -131,11 +165,9 @@ def _handle_dual_provider_fusion_method(
     Em modo single (FUSION_MODE=single) o método não é admissível e não
     deve ser selecionado pelo compilador.
     """
-    import asyncio
     import json
 
     from backend.config.settings import settings
-    from backend.pipeline.fusion import extract_fused
 
     obligation = next(
         (o for o in manifest.obligations if o.id == obligation_id), None
@@ -148,7 +180,7 @@ def _handle_dual_provider_fusion_method(
         )
     source_path = Path(manifest.source.path)
     try:
-        payload = asyncio.run(extract_fused(source_path))
+        payload = _run_extract_fused(source_path)
     except Exception as exc:  # noqa: BLE001
         return MethodResult(
             success=False,
