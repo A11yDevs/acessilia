@@ -148,7 +148,20 @@ def _handle_dual_provider_fusion_method(
         )
     source_path = Path(manifest.source.path)
     try:
-        payload = asyncio.run(extract_fused(source_path))
+        try:
+            # Contexto síncrono (executor determinístico, CLI, testes).
+            payload = asyncio.run(extract_fused(source_path))
+        except RuntimeError as exc:
+            if "cannot be called from a running event loop" not in str(exc):
+                raise
+            # Contexto async (Agno Workflow, API): executa a corrotina no
+            # loop em execução.
+            import concurrent.futures
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                payload = pool.submit(
+                    asyncio.run, extract_fused(source_path)
+                ).result()
     except Exception as exc:  # noqa: BLE001
         return MethodResult(
             success=False,
