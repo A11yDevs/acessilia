@@ -38,6 +38,12 @@ class TestPresets:
         assert p.fuse_lines is True
         assert p.pic_need_text is False
         assert p.formula_text is False
+        # Paridade com o script de referência (tree_differ_v2 v12-rh3-pc4):
+        assert p.pic_min_blocks == 4
+        assert p.pic_rule == "quality"
+        assert p.pick_guard == 1.5
+        assert p.fuse_h_ratio == 0.6
+        assert p.fuse_max_len == 300
 
     def test_v13_ativa_formulas(self):
         p = FusionPolicy.drbench_v13()

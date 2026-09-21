@@ -92,7 +92,7 @@ def merge_blocks(
     policy: FusionPolicy,
     *,
     min_len: int = 20,
-    garbage_frac: float = 0.0,
+    garbage_frac: float | None = None,
     m_pics: list | None = None,
     running: frozenset[str] = frozenset(),
     decor_wins: bool = False,
@@ -105,13 +105,16 @@ def merge_blocks(
         M: blocos do provider B (MinerU) — esqueleto de ordem de leitura.
         policy: FusionPolicy com as alavancas.
         min_len: tamanho mínimo para manter bloco Docling unilateral.
-        garbage_frac: fallback para ordem Docling quando quase nada casa.
+        garbage_frac: fallback para ordem Docling quando quase nada casa
+            (None = usa ``policy.garbage_frac``).
         m_pics: bboxes de figuras do provider B (para suppress).
         running: textos de running heads do documento (pré-computados).
         decor_wins: body repetindo header/footer é descartado.
         stats: Counter opcional para acumular decisões.
     """
     stats = stats if stats is not None else Counter()
+    if garbage_frac is None:
+        garbage_frac = policy.garbage_frac
     tail: list[str] = []
 
     if policy.formula_text:
@@ -126,10 +129,17 @@ def merge_blocks(
             mode = "tables"
         D = suppress_in_regions(
             D, M, m_pics or [], stats, mode=mode,
+            pic_min_blocks=policy.pic_min_blocks,
+            pic_max_quality=policy.pic_max_quality,
+            pic_full_page=policy.pic_full_page,
+            pic_rule=policy.pic_rule,
+            table_full_page=policy.table_full_page,
+            table_probe=policy.table_probe,
         )
     if policy.decor_tail:
-        D, dec_d = split_decor(D, stats, "docling", running, 0)
-        M, dec_m = split_decor(M, stats, "mineru", running, 0)
+        pagenum_cap = 4 if policy.pagenum_cap else 0
+        D, dec_d = split_decor(D, stats, "docling", running, pagenum_cap)
+        M, dec_m = split_decor(M, stats, "mineru", running, pagenum_cap)
         body_txt = {b.text for b in D + M if b.text}
         kept = []
         for b in dec_d + dec_m:
@@ -160,11 +170,25 @@ def merge_blocks(
         if len(M) == 0:
             stats["junk-mineru"] += 1
     if policy.fuse_lines:
-        D = fuse_line_runs(D, stats, "docling", h_ratio=policy.fuse_h_ratio)
-        M = fuse_line_runs(M, stats, "mineru", h_ratio=policy.fuse_h_ratio)
+        D = fuse_line_runs(
+            D, stats, "docling", h_ratio=policy.fuse_h_ratio,
+            short=policy.fuse_short, min_run=policy.fuse_min_run,
+            max_len=policy.fuse_max_len,
+        )
+        M = fuse_line_runs(
+            M, stats, "mineru", h_ratio=policy.fuse_h_ratio,
+            short=policy.fuse_short, min_run=policy.fuse_min_run,
+            max_len=policy.fuse_max_len,
+        )
     if policy.merge_paragraphs:
-        D = group_split_blocks(D, M, stats, "docling")
-        M = group_split_blocks(M, D, stats, "mineru")
+        D = group_split_blocks(
+            D, M, stats, "docling", frac=policy.merge_frac,
+            min_sim=policy.merge_min_sim,
+        )
+        M = group_split_blocks(
+            M, D, stats, "mineru", frac=policy.merge_frac,
+            min_sim=policy.merge_min_sim,
+        )
 
     if not M:
         stats["mineru_empty->docling"] += 1

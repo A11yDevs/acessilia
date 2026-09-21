@@ -25,7 +25,7 @@ class FusionPolicy:
 
     # --- Escolha de texto por bloco ---
     text_pick: Literal["auto", "docling", "mineru"] = "auto"
-    pick_guard: bool = True  # proteção contra Docling engolir colunas
+    pick_guard: float = 0.0  # >0: proteção contra Docling engolir colunas (ratio)
 
     # --- Reconstrução de parágrafos/colunas ---
     merge_paragraphs: bool = True
@@ -39,6 +39,21 @@ class FusionPolicy:
     junk_filter: bool = True
     suppress_regions: bool = True  # texto Docling dentro de tabela/figura MinerU
     pic_need_text: bool = True  # exceto quando o provider não leu texto na página
+    # Calibração do suppress-in-region (porta fiel do tree_differ_v2):
+    pic_min_blocks: int = 2  # nº mínimo de blocos Docling dentro da figura
+    pic_max_quality: float = 0.7  # qualidade média abaixo da qual suprime
+    pic_full_page: float = 0.9  # figura cobrindo a página toda (comics)
+    pic_rule: Literal["count-or-quality", "quality"] = "count-or-quality"
+    table_full_page: float = 0.0  # tabela gigante = flyer mal detectado
+    table_probe: bool = False  # só suprime se a tabela capturou o texto
+
+    # --- Reconstrução: parâmetros finos ---
+    merge_frac: float = 0.6  # contenção para re-fusão de parágrafos
+    merge_min_sim: float = 0.0
+    fuse_max_len: int = 0  # cap de blocos fundidos (0 = ilimitado)
+    fuse_short: int = 80
+    fuse_min_run: int = 3
+    garbage_frac: float = 0.0  # fallback para ordem Docling quando nada casa
 
     # --- Fórmulas ---
     formula_text: bool = True  # fórmulas sem operador matemático → texto
@@ -74,10 +89,11 @@ class FusionPolicy:
             align_lambda=0.5,
             align_tau=0.6,
             text_pick="auto",
-            pick_guard=True,
+            pick_guard=1.5,
             merge_paragraphs=True,
             fuse_lines=True,
-            fuse_h_ratio=0.8,
+            fuse_h_ratio=0.6,
+            fuse_max_len=300,
             decor_tail=True,
             running_heads=True,
             pagenum_cap=True,
@@ -86,6 +102,9 @@ class FusionPolicy:
             pic_need_text=False,
             formula_text=False,
             inline_math_promote=True,
+            pic_min_blocks=4,
+            pic_rule="quality",
+            garbage_frac=0.0,
         )
 
     @classmethod
