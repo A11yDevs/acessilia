@@ -273,6 +273,38 @@ Em caso de falha:
 - uma nova compilação emite `(tried obrigação método)`;
 - o planner escolhe outra alternativa, quando houver.
 
+### 5.1 Método `dual-provider-fusion`
+
+O método `dual-provider-fusion` (Fase 5) representa a extração fundida de dois
+providers de toolbox (por padrão `docling` + `mineru`) via `docstruct.fusion`.
+O handler registrado em `PddlAccessibilityOrchestrator._build_executor`
+reutiliza `backend.pipeline.fusion.extract_fused`, persiste o payload fundido
+em `data_dir/artifacts/fusion/<obligation_id>.json` e o retorna em
+`MethodResult.artifacts`. O `ExecutorAgent` incorpora o artefato ao manifesto
+e associa seu `artifact_id` à tentativa executada (proveniência).
+
+O handler é **estrito**: se só um provider participou (o fallback
+single-provider dentro de `extract_fused`), a ação `dual-provider-fusion`
+planejada é tratada como **falha**, registrando `(tried ...)` e permitindo
+replanejamento para um método single-provider. Isso mantém a semântica
+planejada alinhada com o que realmente foi executado.
+
+Regras de compilação:
+
+- só é emitido como admissível quando `FUSION_MODE=dual`;
+- custo maior que o equivalente single-provider, de modo que o planner o
+  prefira só quando a qualidade do texto é crítica ou o método single não
+  está disponível;
+- o domínio PDDL em si não muda — `dual-provider-fusion` é apenas outro
+  símbolo `method` com seus próprios `supports`/`admissible`/`execution-cost`.
+
+O `FusionAgent` (`backend/core/agents/fusion_agent.py`) expone as ferramentas
+determinísticas `fuse_providers`, `audit_document`, `classify_block` e
+`needs_reinfer` sobre a biblioteca pura `docstruct`, seguindo o mesmo padrão de
+núcleo determinístico + envelope Agno opcional que o agente
+Informacional-Estrutural. Veja [docstruct_algorithms.pt-br.md](docstruct_algorithms.pt-br.md)
+para saber como funcionan os algoritmos subjacentes.
+
 ## 6. Execução ponta a ponta
 
 ```bash
