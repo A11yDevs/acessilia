@@ -68,7 +68,7 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 ### 12. Deterministic Fusion Agent (docstruct tools)
 - Implementation: [backend/core/agents/fusion_agent.py](../backend/core/agents/fusion_agent.py) (`FusionAgent`), wrapping the pure `docstruct` library (`libs/docstruct`).
 - Role: exposes four deterministic tools to Agno — `fuse_providers` (merge two toolbox providers via `docstruct.fusion`), `audit_document` (canonical-document audit), `classify_block` (region classification), and `needs_reinfer` (decide whether a region needs vision/orientation re-inference). Each capability has a pure `process_*` method (unit-testable without Agno) plus a thin JSON tool envelope.
-- Benefit: follows the `InformationalStructuralAgent` pattern — deterministic core, optional Agno envelope — so the fusion/audit logic stays testable and the LLM only selects which tool to call. The `dual-provider-fusion` PDDL method (pattern 10) reuses `backend.pipeline.fusion.extract_fused` and is only admissible when `FUSION_MODE=dual`.
+- Benefit: follows the `InformationalStructuralAgent` pattern — deterministic core, optional Agno envelope — so the fusion/audit logic stays testable and the LLM only selects which tool to call. The `dual-provider-fusion` PDDL method (pattern 10) reuses `backend.pipeline.fusion.extract_fused` and is only admissible when `FUSION_MODE=dual`. See [docstruct_algorithms.md](docstruct_algorithms.md) for the algorithm details.
 
 ---
 

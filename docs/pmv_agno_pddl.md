@@ -293,7 +293,8 @@ The `FusionAgent` (`backend/core/agents/fusion_agent.py`) exposes the
 deterministic tools `fuse_providers`, `audit_document`, `classify_block` and
 `needs_reinfer` over the pure `docstruct` library, following the same
 deterministic-core + optional-Agno-envelope pattern as the
-Informational-Structural agent.
+Informational-Structural agent. See [docstruct_algorithms.md](docstruct_algorithms.md)
+for how the underlying algorithms work.
 
 ## 6. End-to-end execution
 
