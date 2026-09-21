@@ -1,0 +1,6 @@
+# Ciclo 2 / S6.1c — lever K (suppress Docling text inside MinerU tables/pictures) + merge-min-sim, sobre v4-merge (73.7)
+v6-sup|--drop-docling group+unknown --decor-tail --junk-filter --text-pick auto --merge-paragraphs --suppress-regions
+v6-sup-msim|--drop-docling group+unknown --decor-tail --junk-filter --text-pick auto --merge-paragraphs --suppress-regions --merge-min-sim 0.3
+v6-msim|--drop-docling group+unknown --decor-tail --junk-filter --text-pick auto --merge-paragraphs --merge-min-sim 0.3
+v6-sup-pic1|--drop-docling group+unknown --decor-tail --junk-filter --text-pick auto --merge-paragraphs --suppress-regions --pic-min-blocks 1
+v6-sup-full08|--drop-docling group+unknown --decor-tail --junk-filter --text-pick auto --merge-paragraphs --suppress-regions --pic-full-page 0.8

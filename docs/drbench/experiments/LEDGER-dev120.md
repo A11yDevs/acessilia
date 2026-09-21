@@ -1,0 +1,20 @@
+# Dev-120 ledger (official evaluator; see PLAN.md §8.2)
+
+| date (UTC) | run | N | overall | no-CDM | text | RO | TEDS | formula | CDM | baseline | Δ no-CDM | decision | note |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2026-09-16 14:01 | adjudicator-v0 | 120 | – | 74.0 | 77.7 | 76.2 | 58.2 | 69.3 | – | adjudicator-v0 | +0.00 | ACCEPT | baseline (rerun of summary) acessilia@3b272e9 toolbox@0f3292e |
+| 2026-09-16 14:01 | differ-v1 | 120 | – | 72.8 | 76.5 | 74.6 | 58.2 | 69.7 | – | adjudicator-v0 | -1.16 | REJECT: text↓, reading_order↓ | text-only differ acessilia@3b272e9 toolbox@0f3292e |
+| 2026-09-16 14:15 | adjudicator-v0-notitle-20260916 | 120 | – | 74.0 | 77.7 | 76.4 | 58.2 | 69.3 | – | adjudicator-v0 | +0.06 | ACCEPT | strip placeholder title job=32631 acessilia@3b272e9 toolbox@bef0e6f |
+| 2026-09-16 14:37 | mineru-v2-20260916 | 120 | – | 70.7 | 73.9 | 72.9 | 58.2 | 66.6 | – | adjudicator-v0 | -3.30 | REJECT: text↓, reading_order↓ | mineru structured-canonical replay job=32633 acessilia@3b272e9 toolbox@bef0e6f |
+| 2026-09-16 15:06 | mineru-v3-20260916 | 120 | – | 70.7 | 73.9 | 72.9 | 58.2 | 67.0 | – | mineru | -1.39 | REJECT: reading_order↓ | mineru replay + inline-math promotion job=32634 acessilia@d9c57d4 toolbox@bef0e6f |
+| 2026-09-16 15:07 | docling-v2-20260916 | 120 | – | 63.9 | 78.7 | 73.8 | 0.0 | 21.8 | – | docling-focr | – | n/a | docling force_ocr structured mapping (tables HTML job=32635 acessilia@d9c57d4 toolbox@bef0e6f |
+| 2026-09-16 15:44 | mineru-v3-20260916 | 120 | – | 70.7 | 73.9 | 72.9 | 58.2 | 67.0 | – | mineru | -1.39 | REJECT: reading_order↓ | re-eval com CDM local (skimage 0.22) job=32646 acessilia@d6d1348 toolbox@6be3685 |
+| 2026-09-16 15:44 | docling-v3-20260916 | 120 | – | 68.6 | 78.7 | 73.8 | 31.3 | 21.8 | – | docling-v2-20260916 | +4.70 | ACCEPT | docling force_ocr + toolbox table_ast(grid) reinference job=32647 acessilia@d6d1348 toolbox@6be3685 |
+| 2026-09-16 15:46 | adjudicator-v1-20260916 | 120 | – | 74.3 | 78.7 | 76.0 | 58.2 | 67.0 | – | adjudicator-v0 | +0.31 | ACCEPT | adjudicator v1  over docling-v3-20260916 + mineru-v3-20260916 job=32648 acessilia@d6d1348 toolbox@6be3685 |
+| 2026-09-16 15:46 | adjudicator-v1d-20260916 | 120 | – | 72.0 | 79.4 | 74.9 | 43.9 | 26.1 | – | adjudicator-v1-20260916 | -2.24 | REJECT: reading_order↓, teds↓ | adjudicator v1 --table-pref docling --formula-pref docling over docling-v3-20260916 + mineru-v3-20260916 job=32649 acessilia@d6d1348 toolbox@6be3685 |
+| 2026-09-16 15:52 | differ-v2-20260916 | 120 | – | 77.4 | 80.8 | 81.4 | 58.2 | 67.1 | – | adjudicator-v1-20260916 | +3.11 | ACCEPT | tree_differ_v2 --lam 0.5 --tau 0.6 over docling-v3-20260916 + mineru-v3-20260916 job=32650 acessilia@d6d1348 toolbox@6be3685 |
+| 2026-09-16 16:52 | differ-v2-l03-t06-20260916 | 120 | 77.4 | 77.3 | 80.7 | 81.3 | 58.2 | 67.1 | 78.0 | differ-v2-20260916 | -0.09 | ACCEPT | tree_differ_v2 grid lam=0.3 tau=0.6 over docling-v3-20260916 + mineru-v3-20260916 job=32655 acessilia@d6d1348 toolbox@6be3685 |
+| 2026-09-16 16:53 | differ-v2-l07-t06-20260916 | 120 | 77.5 | 77.4 | 80.8 | 81.4 | 58.2 | 67.1 | 78.0 | differ-v2-20260916 | -0.02 | ACCEPT | tree_differ_v2 grid lam=0.7 tau=0.6 over docling-v3-20260916 + mineru-v3-20260916 job=32655 acessilia@d6d1348 toolbox@6be3685 |
+| 2026-09-16 16:54 | differ-v2-l05-t05-20260916 | 120 | 77.5 | 77.4 | 80.9 | 81.3 | 58.2 | 67.1 | 78.0 | differ-v2-20260916 | +0.02 | ACCEPT | tree_differ_v2 grid lam=0.5 tau=0.5 over docling-v3-20260916 + mineru-v3-20260916 job=32655 acessilia@d6d1348 toolbox@6be3685 |
+| 2026-09-16 16:55 | differ-v2-l05-t07-20260916 | 120 | 77.4 | 77.3 | 80.7 | 81.2 | 58.2 | 67.1 | 78.0 | differ-v2-20260916 | -0.08 | ACCEPT | tree_differ_v2 grid lam=0.5 tau=0.7 over docling-v3-20260916 + mineru-v3-20260916 job=32655 acessilia@d6d1348 toolbox@6be3685 |
+| 2026-09-16 18:30 | differ-v2-minlen0-20260916 | 120 | 78.0 | 78.0 | 81.2 | 82.3 | 58.2 | 67.1 | 78.0 | differ-v2-20260916 | +0.58 | ACCEPT | tree_differ_v2 --lam 0.5 --tau 0.6 --min-len 0 over docling-v3-20260916 + mineru-v3-20260916 job=32666 acessilia@d6d1348 toolbox@6be3685 |

@@ -1,0 +1,7 @@
+# Ciclo 2 / S6.1b — afinação sobre v4-merge (73.7): tau, lambda, merge frac, fallback
+v5-tau07|--drop-docling group+unknown --decor-tail --junk-filter --text-pick auto --merge-paragraphs --tau 0.7
+v5-tau05|--drop-docling group+unknown --decor-tail --junk-filter --text-pick auto --merge-paragraphs --tau 0.5
+v5-lam03|--drop-docling group+unknown --decor-tail --junk-filter --text-pick auto --merge-paragraphs --lam 0.3
+v5-lam07|--drop-docling group+unknown --decor-tail --junk-filter --text-pick auto --merge-paragraphs --lam 0.7
+v5-fallback|--drop-docling group+unknown --decor-tail --junk-filter --text-pick auto --merge-paragraphs --garbage-fallback 0.25
+v5-mfrac05|--drop-docling group+unknown --decor-tail --junk-filter --text-pick auto --merge-paragraphs --merge-frac 0.5

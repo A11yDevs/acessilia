@@ -1,0 +1,5 @@
+# Ciclo 2 / S6.1d — lever L (fuse short aligned line runs: index/reference columns) sobre v6-sup-msim
+v7-fuse|--drop-docling group+unknown --decor-tail --junk-filter --text-pick auto --merge-paragraphs --suppress-regions --merge-min-sim 0.3 --fuse-lines
+v7-fuse-cap300|--drop-docling group+unknown --decor-tail --junk-filter --text-pick auto --merge-paragraphs --suppress-regions --merge-min-sim 0.3 --fuse-lines --fuse-max-len 300
+v7-fuse-run4|--drop-docling group+unknown --decor-tail --junk-filter --text-pick auto --merge-paragraphs --suppress-regions --merge-min-sim 0.3 --fuse-lines --fuse-min-run 4
+v7-fuse-short60|--drop-docling group+unknown --decor-tail --junk-filter --text-pick auto --merge-paragraphs --suppress-regions --merge-min-sim 0.3 --fuse-lines --fuse-short 60
