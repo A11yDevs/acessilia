@@ -36,6 +36,8 @@ dependencies = [
     "ollama>=0.6.2,<0.7",
     "sqlalchemy>=2.0.51,<3",
     "babel>=2.18.0,<3",
+    # Núcleo puro de processamento estrutural (libs/docstruct, instalado editável)
+    "acessilia-docstruct",
 ]
 
 [project.optional-dependencies]
