@@ -80,8 +80,10 @@ ENV GIT_COMMIT=${GIT_COMMIT} \
     IMAGE_DIGEST=${IMAGE_DIGEST}
 
 COPY pyproject.toml ./
+COPY libs/docstruct ./libs/docstruct
 
 RUN pip install --upgrade pip \
+    && pip install ./libs/docstruct --no-cache-dir \
     && pip install . --no-cache-dir
 
 COPY . .
