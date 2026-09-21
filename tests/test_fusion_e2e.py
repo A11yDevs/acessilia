@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import os
+import warnings
 from datetime import datetime, timezone
 from importlib.util import find_spec
 from pathlib import Path
@@ -157,6 +158,29 @@ def test_handler_fails_when_single_provider(tmp_path, monkeypatch):
     assert result.artifacts == []
 
 
+@pytest.mark.asyncio
+async def test_handler_inside_running_event_loop_without_warning(
+    tmp_path, monkeypatch
+):
+    """Handler síncrono chamado dentro de um event loop ativo não deve
+    criar coroutines sem await (nenhuma RuntimeWarning)."""
+    manifest = _make_manifest(tmp_path)
+
+    async def _fake_extract_fused(*args, **kwargs):
+        return _dual_payload()
+
+    monkeypatch.setattr(
+        "backend.pipeline.fusion.extract_fused", _fake_extract_fused
+    )
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        result = _handle_dual_provider_fusion_method(manifest, "o-fuse")
+
+    assert result.success is True
+    assert result.validated is True
+
+
 @pytest.mark.skipif(find_spec("agno") is None, reason="Agno não instalado")
 def test_executor_wires_fusion_artifact_into_attempt(tmp_path, monkeypatch):
     """Proveniência: o ExecutorAgent associa o artefato à tentativa."""
@@ -197,6 +221,11 @@ def test_executor_wires_fusion_artifact_into_attempt(tmp_path, monkeypatch):
 TOOLBOX_BASE_URL = os.getenv("TOOLBOX_BASE_URL", "").strip()
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
+requires_toolbox = pytest.mark.skipif(
+    not TOOLBOX_BASE_URL,
+    reason="TOOLBOX_BASE_URL is required for real e2e tests",
+)
+
 
 def _get_small_pdf() -> Path:
     pdfs = sorted(FIXTURES_DIR.rglob("*.pdf"))
@@ -205,10 +234,13 @@ def _get_small_pdf() -> Path:
     for pdf in pdfs:
         if pdf.stat().st_size < 500_000:
             return pdf
-    return min(pdfs, key=lambda p: p.stat().st_size)
+    pytest.skip(
+        "No PDF fixture under 500KB found under tests/fixtures/"
+    )
 
 
 @pytest.mark.e2e
+@requires_toolbox
 @pytest.mark.asyncio
 async def test_extract_fused_against_real_toolbox():
     """Real dual-provider extraction via the Toolbox (docling + mineru)."""
@@ -227,6 +259,7 @@ async def test_extract_fused_against_real_toolbox():
 
 
 @pytest.mark.e2e
+@requires_toolbox
 @pytest.mark.asyncio
 async def test_fusion_handler_with_real_toolbox(tmp_path):
     """Full handler flow against the real Toolbox: payload → artifact."""
@@ -247,6 +280,7 @@ async def test_fusion_handler_with_real_toolbox(tmp_path):
 
 
 @pytest.mark.e2e
+@requires_toolbox
 @pytest.mark.skipif(find_spec("agno") is None, reason="Agno não instalado")
 def test_fusion_executor_e2e_with_real_toolbox(tmp_path):
     """Full PDDL → plan → execute flow against the real Toolbox."""
