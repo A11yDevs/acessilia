@@ -264,6 +264,28 @@ On failure:
 - the report flags a failure or `replan-required`; a fresh compilation emits `(tried obligation method)`;
 - the planner picks an alternate, when any remains.
 
+### 5.1 `dual-provider-fusion` method
+
+The `dual-provider-fusion` method (Phase 5) represents extraction fused from
+two toolbox providers (default `docling` + `mineru`) via `docstruct.fusion`.
+The handler registered in `PddlAccessibilityOrchestrator._build_executor`
+reuses `backend.pipeline.fusion.extract_fused` and records the fused payload
+as a `fusion-payload` artifact in the manifest.
+
+Compilation rules:
+
+- only emitted as admissible when `FUSION_MODE=dual`;
+- cost higher than the single-provider equivalent, so the planner prefers it
+  only when text quality is critical or the single method is unavailable;
+- the PDDL domain itself is unchanged — `dual-provider-fusion` is just another
+  `method` symbol with its own `supports`/`admissible`/`execution-cost`.
+
+The `FusionAgent` (`backend/core/agents/fusion_agent.py`) exposes the
+deterministic tools `fuse_providers`, `audit_document`, `classify_block` and
+`needs_reinfer` over the pure `docstruct` library, following the same
+deterministic-core + optional-Agno-envelope pattern as the
+Informational-Structural agent.
+
 ## 6. End-to-end execution
 
 ```bash

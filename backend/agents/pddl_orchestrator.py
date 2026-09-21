@@ -12,7 +12,7 @@ from backend.core.agents.informational_structural import InformationalStructural
 from backend.core.execution.executor import ExecutorAgent, MethodRegistry
 from backend.core.execution.models import ExecutionReport, MethodResult
 from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
-from backend.core.manifest.models import ManifestElement, ProcessingManifest
+from backend.core.manifest.models import Artifact, ManifestElement, ProcessingManifest
 from backend.core.planning.domain_bundle import DomainBundle
 from backend.core.planning.models import NominalPlan, PlanningComparison
 from backend.core.planning.planner_agent import PlannerAgent
@@ -117,6 +117,60 @@ def _handle_latex_verbalizer_method(
     )
 
 
+def _handle_dual_provider_fusion_method(
+    manifest: ProcessingManifest, obligation_id: str
+) -> MethodResult:
+    """Funde dois providers (docling+mineru) para a obrigação alvo.
+
+    Reutiliza ``backend.pipeline.fusion.extract_fused`` (Fase 4) para
+    produzir o payload fundido e o registra como artefato no manifesto.
+    Em modo single (FUSION_MODE=single) o método não é admissível e não
+    deve ser selecionado pelo compilador.
+    """
+    from backend.pipeline.fusion import extract_fused
+
+    obligation = next(
+        (o for o in manifest.obligations if o.id == obligation_id), None
+    )
+    if obligation is None:
+        return MethodResult(
+            success=False,
+            validated=False,
+            message=f"Obrigação não encontrada: {obligation_id}",
+        )
+    source_path = Path(manifest.source.path)
+    try:
+        import asyncio
+
+        payload = asyncio.run(extract_fused(source_path))
+    except Exception as exc:  # noqa: BLE001
+        return MethodResult(
+            success=False,
+            validated=False,
+            message=f"Fusão dual-provider falhou: {type(exc).__name__}: {exc}",
+        )
+    if payload.get("status") != "succeeded":
+        return MethodResult(
+            success=False,
+            validated=False,
+            message="Fusão dual-provider não concluiu com sucesso",
+        )
+    stats = payload.get("fusion_stats", {})
+    manifest.artifacts.append(
+        Artifact(
+            id=f"artifact-fusion-{obligation_id}",
+            kind="fusion-payload",
+            path=str(source_path),
+            media_type="application/json",
+        )
+    )
+    return MethodResult(
+        success=True,
+        validated=True,
+        message=f"Fusão dual-provider concluída ({len(stats)} decisões)",
+    )
+
+
 class PddlAccessibilityOrchestrator:
     """Drives the PDDL pipeline: informational-extraction -> planner -> executor.
 
@@ -196,6 +250,9 @@ class PddlAccessibilityOrchestrator:
 
         registry.register("mathml", _handle_mathml_method)
         registry.register("latex-verbalizer", _handle_latex_verbalizer_method)
+        registry.register(
+            "dual-provider-fusion", _handle_dual_provider_fusion_method
+        )
 
         return ExecutorAgent(registry, domain=DomainBundle.load())
 

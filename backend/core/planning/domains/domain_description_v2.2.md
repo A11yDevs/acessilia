@@ -447,6 +447,32 @@ Além disso:
 
 Um problema que falhe nessas verificações deve ser rejeitado antes de chamar o planner, com diagnóstico voltado ao compilador ou ao runtime.
 
+### 14.4 Método `dual-provider-fusion`
+
+O método `dual-provider-fusion` representa a extração fundida de dois
+providers (por padrão `docling` + `mineru`) via `docstruct.fusion`
+(Fase 4/5 do plano docstruct). Ele é um método **remoto e de custo mais
+alto** que a extração de um único provider, porque consome dois serviços
+e executa o Tree Differ.
+
+Regras de compilação:
+
+- o método só deve ser emitido como admissível quando `FUSION_MODE=dual`;
+- em `FUSION_MODE=single` o compilador não deve incluir o par
+  `(admissible dual-provider-fusion <obrigação>)`;
+- o custo deve ser maior que o do método single-provider equivalente
+  (ex.: `dual-provider-fusion` > `docling`), para que o planner só o
+  escolha quando a qualidade do texto for crítica ou quando o método
+  single não estiver disponível/admissível;
+- o handler registrado no executor chama
+  `backend.pipeline.fusion.extract_fused` e registra o payload fundido
+  como artefato no manifesto.
+
+O domínio PDDL em si não muda: `dual-provider-fusion` é apenas mais um
+símbolo de `method` emitido pelo compilador, com `supports`, `admissible`
+e `execution-cost` próprios. A semântica nominal de `execute-obligation`
+permanece idêntica.
+
 ## 15. Compatibilidade com predicados derivados
 
 Os predicados derivados foram mantidos. Fast Downward suporta axiomas e predicados derivados, embora nem todas as heurísticas sejam compatíveis.
