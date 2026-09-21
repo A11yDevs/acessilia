@@ -8,6 +8,7 @@ from typing import Any, Callable, Coroutine
 import fitz
 
 from backend.agents.data_agent import DataAgent
+from backend.agents.output_schemas import DataOutput, VisionOutput
 from backend.core.agents.informational_structural import InformationalStructuralAgent
 from backend.core.execution.executor import ExecutorAgent, MethodRegistry
 from backend.core.execution.models import ExecutionReport, MethodResult
@@ -343,19 +344,32 @@ async def _enrich_picture_descriptions(
         if not image_bytes:
             continue
 
-        description = await vision.describe_region(
+        vision_output = await vision.describe_region(
             image_bytes=image_bytes,
             classification="embedded_image",
             page_num=page_number,
             total_pages=total_pages,
             mode=mode,
         )
-        if description and description.strip():
-            element.text = description.strip()
-            if element.type != "picture":
-                element.metadata["original_type"] = element.type
-                element.type = "picture"
-                element.raw_label = "picture"
+        if isinstance(vision_output, VisionOutput):
+            element.metadata["vision_language"] = vision_output.language
+            element.metadata["vision_confidence"] = vision_output.confidence
+            element.metadata["vision_elements"] = list(vision_output.mentioned_elements)
+            if vision_output.warnings:
+                element.metadata["vision_warnings"] = list(vision_output.warnings)
+
+            if vision_output.kind == "formula":
+                element.text = vision_output.formula_latex or ""
+                if element.type != "formula":
+                    element.metadata["original_type"] = element.type
+                    element.type = "formula"
+                    element.raw_label = "formula"
+            else:
+                element.text = vision_output.description
+                if element.type != "picture":
+                    element.metadata["original_type"] = element.type
+                    element.type = "picture"
+                    element.raw_label = "picture"
             if element.page_number is None and page_number >= 1:
                 element.page_number = page_number
             enriched += 1
@@ -396,28 +410,29 @@ async def _enrich_table_structures(
         if not image_bytes:
             continue
 
-        ocr_text = await data_agent.process_region(
+        table_output = await data_agent.process_region(
             image_bytes=image_bytes,
             classification="table",
             page_num=page_number,
             fallback_text=element.text or "",
         )
-        if not isinstance(ocr_text, str) or not ocr_text.strip():
+        if not isinstance(table_output, DataOutput) or table_output.kind != "table":
             continue
 
-        rows = _rows_from_visual_table_text(ocr_text)
-        if not rows:
-            continue
-
-        table_ast = _table_ast_from_rows(rows)
-        if table_ast is None:
-            continue
+        rows = table_output.table_rows()
+        table_ast = table_output.table_ast()
 
         element.metadata["table_ast"] = table_ast
-        element.metadata["table_linearization_hint"] = "ocr-visual-fallback"
+        element.metadata["table_linearization_hint"] = "data-agent-structured"
         element.metadata["table_row_count"] = len(rows)
         element.metadata["table_column_count"] = max((len(row) for row in rows), default=0)
-        element.metadata["table_has_header"] = bool(rows and len(rows[0]) >= 2)
+        element.metadata["table_has_header"] = any(
+            cell.header for row in table_output.rows for cell in row.cells
+        )
+        element.metadata["data_language"] = table_output.language
+        element.metadata["data_confidence"] = table_output.confidence
+        if table_output.warnings:
+            element.metadata["data_warnings"] = list(table_output.warnings)
         element.text = ""
         if element.page_number is None and page_number >= 1:
             element.page_number = page_number
@@ -1009,8 +1024,7 @@ def _rows_from_table_ast(table_ast: dict[str, Any]) -> list[list[str]]:
                 for cell in cells
                 if isinstance(cell, dict)
             ]
-            row_values = [value for value in row_values if value]
-            if row_values:
+            if any(row_values):
                 rows.append(row_values)
     return rows
 

@@ -9,6 +9,7 @@ from backend.agents.vision_agent import VisionAgent
 from backend.agents.data_agent import DataAgent
 from backend.agents.editor_agent import EditorAgent
 from backend.agents.types import RegionTask
+from backend.agents.output_schemas import StructuredOutput
 from backend.services.cache import get_cached, options_cache_key, set_cache
 from backend.i18n import t
 from backend.log_messages import (
@@ -107,16 +108,24 @@ class AccessibilityOrchestrator:
                 ttl=86400,
             )
             if cached_page:
+                if isinstance(cached_page, dict):
+                    cached_text = str(cached_page.get("text", ""))
+                    cached_blocks = cached_page.get("blocks")
+                    if not isinstance(cached_blocks, list):
+                        cached_blocks = parse_text_to_blocks(cached_text)
+                else:
+                    cached_text = str(cached_page)
+                    cached_blocks = parse_text_to_blocks(cached_text)
                 logger.info(
                     t(LOG_ORCHESTRATOR_PAGE_CACHE_SKIP).format(page_num=page_num)
                 )
-                results.append(cached_page)
+                results.append(cached_text)
                 page_payloads.append(
                     {
                         "page_number": page_num,
                         "file_path": str(page_path),
-                        "text": cached_page,
-                        "blocks": parse_text_to_blocks(cached_page),
+                        "text": cached_text,
+                        "blocks": cached_blocks,
                         "cached": True,
                     }
                 )
@@ -137,14 +146,20 @@ class AccessibilityOrchestrator:
             )
 
             page_text = self.editor.consolidate_page(tasks, agent_results)
+            page_blocks = self.editor.build_page_blocks(tasks, agent_results)
 
             if not page_text.strip():
                 logger.warning(
                     t(LOG_ORCHESTRATOR_EMPTY_PAGE_RESPONSE).format(page_num=page_num)
                 )
                 page_text = f"[Pagina {page_num}: resposta vazia do modelo]"
+                page_blocks = parse_text_to_blocks(page_text)
 
-            await set_cache(page_path, page_text, page_cache_key)
+            await set_cache(
+                page_path,
+                {"text": page_text, "blocks": page_blocks},
+                page_cache_key,
+            )
 
             output_file = tmpdir / f"imagen{page_num:03d}.txt"
             output_file.write_text(page_text, encoding="utf-8")
@@ -160,7 +175,7 @@ class AccessibilityOrchestrator:
                     "page_number": page_num,
                     "file_path": str(page_path),
                     "text": page_text,
-                    "blocks": parse_text_to_blocks(page_text),
+                    "blocks": page_blocks,
                     "cached": False,
                 }
             )
@@ -193,9 +208,9 @@ class AccessibilityOrchestrator:
         total_pages: int,
         mode: str,
         custom_prompt: str | None,
-    ) -> dict[int, str]:
+    ) -> dict[int, str | StructuredOutput | None]:
         """Despacha tarefas de processamento de imagem em paralelo."""
-        results: dict[int, str] = {}
+        results: dict[int, str | StructuredOutput | None] = {}
         pending: list[tuple[int, asyncio.Task]] = []
 
         for idx, task in enumerate(tasks):
@@ -251,6 +266,9 @@ class AccessibilityOrchestrator:
                     )
                     results[idx] = tasks[idx].text if tasks[idx].text.strip() else ""
                 else:
-                    results[idx] = result
+                    if result is None and tasks[idx].text.strip():
+                        results[idx] = tasks[idx].text
+                    else:
+                        results[idx] = result
 
         return results

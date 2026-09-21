@@ -23,6 +23,12 @@ from agno.media import Image  # noqa: F401  (available for multimodal tests in t
 from agno.os import AgentOS
 
 from backend.ai.models.ai_client import get_agno_model
+from backend.agents.output_schemas import (
+    DATA_SCHEMA_INSTRUCTION,
+    VISION_SCHEMA_INSTRUCTION,
+    DataOutput,
+    VisionOutput,
+)
 from backend.config.settings import settings
 from backend.i18n import t
 from backend.tools.prompt_tools import load_region_prompt, load_system_prompt
@@ -65,7 +71,8 @@ def _build_data_instructions() -> str:
 vision_agent = Agent(
     name="VisionAgent",
     model=get_agno_model(),
-    instructions=load_system_prompt("medio"),
+    instructions=f"{load_system_prompt('medio')}\n\n{VISION_SCHEMA_INSTRUCTION}",
+    output_schema=VisionOutput,
     db=_db,
     markdown=True,
     telemetry=False,
@@ -75,7 +82,8 @@ vision_agent = Agent(
 data_agent = Agent(
     name="DataAgent",
     model=get_agno_model(),
-    instructions=_build_data_instructions(),
+    instructions=f"{_build_data_instructions()}\n\n{DATA_SCHEMA_INSTRUCTION}",
+    output_schema=DataOutput,
     db=_db,
     markdown=True,
     telemetry=False,
