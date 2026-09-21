@@ -269,8 +269,17 @@ On failure:
 The `dual-provider-fusion` method (Phase 5) represents extraction fused from
 two toolbox providers (default `docling` + `mineru`) via `docstruct.fusion`.
 The handler registered in `PddlAccessibilityOrchestrator._build_executor`
-reuses `backend.pipeline.fusion.extract_fused` and records the fused payload
-as a `fusion-payload` artifact in the manifest.
+reuses `backend.pipeline.fusion.extract_fused`, persists the fused payload to
+`data_dir/artifacts/fusion/<obligation_id>.json`, and returns it in
+`MethodResult.artifacts`. The `ExecutorAgent` then incorporates the artifact
+into the manifest and associates its `artifact_id` with the executed attempt
+(provenance).
+
+The handler is **strict**: if only one provider participated (the
+single-provider fallback inside `extract_fused`), the planned
+`dual-provider-fusion` action is treated as a **failure**, recording
+`(tried ...)` and allowing replanning to a single-provider method. This keeps
+the planned semantics aligned with what actually executed.
 
 Compilation rules:
 

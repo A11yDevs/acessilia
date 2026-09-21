@@ -123,10 +123,18 @@ def _handle_dual_provider_fusion_method(
     """Funde dois providers (docling+mineru) para a obrigação alvo.
 
     Reutiliza ``backend.pipeline.fusion.extract_fused`` (Fase 4) para
-    produzir o payload fundido e o registra como artefato no manifesto.
+    produzir o payload fundido, persiste o JSON em ``data_dir/artifacts/
+    fusion/`` e o retorna em ``MethodResult.artifacts`` — deixando o
+    ``ExecutorAgent`` responsável por incorporá-lo ao manifesto e registrar
+    a proveniência na tentativa.
+
     Em modo single (FUSION_MODE=single) o método não é admissível e não
     deve ser selecionado pelo compilador.
     """
+    import asyncio
+    import json
+
+    from backend.config.settings import settings
     from backend.pipeline.fusion import extract_fused
 
     obligation = next(
@@ -140,8 +148,6 @@ def _handle_dual_provider_fusion_method(
         )
     source_path = Path(manifest.source.path)
     try:
-        import asyncio
-
         payload = asyncio.run(extract_fused(source_path))
     except Exception as exc:  # noqa: BLE001
         return MethodResult(
@@ -155,19 +161,41 @@ def _handle_dual_provider_fusion_method(
             validated=False,
             message="Fusão dual-provider não concluiu com sucesso",
         )
-    stats = payload.get("fusion_stats", {})
-    manifest.artifacts.append(
-        Artifact(
-            id=f"artifact-fusion-{obligation_id}",
-            kind="fusion-payload",
-            path=str(source_path),
-            media_type="application/json",
+
+    # A ação planejada é dual-provider: se apenas um provider participou,
+    # a semântica planejada não foi executada → falha para permitir replanning
+    # para um método single-provider.
+    provider = str(payload.get("provider") or "")
+    if "+" not in provider:
+        return MethodResult(
+            success=False,
+            validated=False,
+            message=(
+                "Fusão dual-provider executou com um único provider "
+                f"({provider or 'desconhecido'}); replanning necessário"
+            ),
         )
+
+    output_path = (
+        settings.data_dir / "artifacts" / "fusion" / f"{obligation_id}.json"
+    )
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    artifact = Artifact(
+        id=f"artifact-fusion-{obligation_id}",
+        kind="fusion-payload",
+        path=str(output_path),
+        media_type="application/json",
     )
     return MethodResult(
         success=True,
         validated=True,
-        message=f"Fusão dual-provider concluída ({len(stats)} decisões)",
+        message="Fusão dual-provider concluída com sucesso",
+        artifacts=[artifact],
     )
 
 

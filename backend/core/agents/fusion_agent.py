@@ -15,6 +15,13 @@ Tools exposed:
 The deterministic methods live here so they can be unit-tested without Agno
 installed; the tool envelopes are only wired into the Agno agent when the
 optional stack is available (see ``backend.core.agno_support.build_agent``).
+
+Design note (tool envelope vs core): the Agno tool envelopes intentionally do
+NOT serialize ``image_bytes`` — they reconstruct a ``Region`` with
+``image_bytes=None``. This is a conscious decision: binary payloads should not
+cross tool-call boundaries. For future multimodal decisions, pass a persistent
+reference (``artifact_id`` / ``image_ref`` / ``crop_path`` / object-storage URI)
+instead of raw bytes.
 """
 from __future__ import annotations
 

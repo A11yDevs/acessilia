@@ -465,8 +465,15 @@ Regras de compilação:
   escolha quando a qualidade do texto for crítica ou quando o método
   single não estiver disponível/admissível;
 - o handler registrado no executor chama
-  `backend.pipeline.fusion.extract_fused` e registra o payload fundido
-  como artefato no manifesto.
+  `backend.pipeline.fusion.extract_fused`, persiste o payload fundido em
+  `data_dir/artifacts/fusion/<obligation_id>.json` e o retorna em
+  `MethodResult.artifacts` — o `ExecutorAgent` é quem o incorpora ao
+  manifesto e associa o `artifact_id` à tentativa (proveniência);
+- o handler é **estrito**: se apenas um provider participou da extração
+  (fallback single-provider de `extract_fused`), a ação planejada
+  `dual-provider-fusion` é considerada **falha**, registrando `(tried ...)`
+  e permitindo replanning para um método single-provider. Isso preserva a
+  semântica planejada vs. executada.
 
 O domínio PDDL em si não muda: `dual-provider-fusion` é apenas mais um
 símbolo de `method` emitido pelo compilador, com `supports`, `admissible`
