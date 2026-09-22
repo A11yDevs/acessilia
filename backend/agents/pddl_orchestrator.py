@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Callable, Coroutine
 
 import fitz
+from docstruct.tables.ast import effective_section_width
 
 from backend.agents.data_agent import DataAgent
 from backend.agents.output_schemas import DataOutput, VisionOutput
@@ -557,10 +558,8 @@ async def _enrich_table_structures(
         element.metadata["table_ast"] = table_ast
         element.metadata["table_linearization_hint"] = "data-agent-structured"
         element.metadata["table_row_count"] = len(rows)
-        element.metadata["table_column_count"] = max((len(row) for row in rows), default=0)
-        element.metadata["table_has_header"] = any(
-            cell.header for row in table_output.rows for cell in row.cells
-        )
+        element.metadata["table_column_count"] = _table_ast_column_count(table_ast)
+        element.metadata["table_has_header"] = _table_ast_has_headers(table_ast)
         element.metadata["data_language"] = table_output.language
         element.metadata["data_confidence"] = table_output.confidence
         if table_output.warnings:
@@ -589,6 +588,44 @@ def _table_element_has_structured_content(element: ManifestElement) -> bool:
         return True
 
     return not _rows_look_like_placeholder(rows)
+
+
+def _table_ast_column_count(table_ast: dict[str, Any]) -> int:
+    """Return the widest logical section, including cell spans."""
+    widths: list[int] = []
+    for section_name in ("header", "body", "footer"):
+        section = table_ast.get(section_name)
+        if isinstance(section, list):
+            widths.append(effective_section_width(section))
+    return max(widths, default=0)
+
+
+def _table_ast_has_headers(table_ast: dict[str, Any]) -> bool:
+    """Return whether any canonical table cell carries header semantics."""
+    for section_name in ("header", "body", "footer"):
+        section = table_ast.get(section_name)
+        if not isinstance(section, list):
+            continue
+        if section_name == "header" and section:
+            return True
+        for row in section:
+            if not isinstance(row, dict):
+                continue
+            cells = row.get("cells")
+            if not isinstance(cells, list):
+                continue
+            for cell in cells:
+                if not isinstance(cell, dict):
+                    continue
+                scope = str(cell.get("scope", "")).strip().lower()
+                if bool(cell.get("header")) or scope in {
+                    "row",
+                    "col",
+                    "rowgroup",
+                    "colgroup",
+                }:
+                    return True
+    return False
 
 
 def _backfill_table_from_existing_text(element: ManifestElement) -> bool:

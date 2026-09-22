@@ -6,7 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from backend.agents.output_schemas import VisionOutput
+from backend.agents.output_schemas import DataOutput, VisionOutput
+from backend.agents.pddl_orchestrator import _enrich_table_structures
 from backend.agents.pddl_orchestrator import _enrich_picture_descriptions
 from backend.agents.pddl_orchestrator import build_pddl_structured_payload
 from backend.agents.pddl_orchestrator import _rows_from_visual_table_text
@@ -574,6 +575,61 @@ def test_table_ast_from_metadata_preserves_empty_structural_cells() -> None:
         "",
         "C",
     ]
+
+
+def test_table_enrichment_metadata_uses_ast_spans_and_scope_headers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from backend.agents import pddl_orchestrator as pddl_module
+
+    manifest = _sample_manifest()
+    element = manifest.elements[1]
+    element.type = "table"
+    element.raw_label = "table"
+    element.text = None
+    element.metadata = {}
+
+    class FakeDataAgent:
+        async def process_region(self, **_kwargs):
+            return DataOutput(
+                kind="table",
+                rows=[
+                    {
+                        "cells": [
+                            {
+                                "text": "Resumo",
+                                "scope": "col",
+                                "colspan": 2,
+                            }
+                        ]
+                    },
+                    {"cells": [{"text": "Total", "colspan": 2}]},
+                ],
+                language="pt-BR",
+                confidence=0.95,
+            )
+
+    monkeypatch.setattr(pddl_module, "DataAgent", FakeDataAgent)
+    monkeypatch.setattr(
+        pddl_module,
+        "_extract_picture_bytes",
+        lambda *_args: (b"image", 1),
+    )
+
+    async def run_inline(function, *args):
+        return function(*args)
+
+    monkeypatch.setattr(pddl_module.asyncio, "to_thread", run_inline)
+
+    asyncio.run(
+        _enrich_table_structures(
+            manifest,
+            Path("/tmp/amostra.pdf"),
+        )
+    )
+
+    assert element.metadata["table_column_count"] == 2
+    assert element.metadata["table_has_header"] is True
 
 
 def test_picture_reclassified_as_formula_reconciles_processing_needs(
