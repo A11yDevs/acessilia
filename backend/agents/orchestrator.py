@@ -97,7 +97,7 @@ class AccessibilityOrchestrator:
                 await status_callback(label)
 
             page_cache_key = options_cache_key(
-                f"page_{page_num}_v2",
+                f"page_{page_num}_v3",
                 mode=effective_mode,
                 custom_prompt=custom_prompt or "",
                 thinking_mode=thinking_mode,

@@ -70,6 +70,7 @@ def test_page_cache_key_changes_with_prompt_and_thinking_mode(monkeypatch, tmp_p
     asyncio.run(exercise_options())
 
     assert len(set(observed_keys)) == 3
+    assert all(key.startswith("page_1_v3_") for key in observed_keys)
 
 
 def test_cached_payload_rebuilds_current_submission_metadata(monkeypatch, tmp_path):
