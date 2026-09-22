@@ -167,3 +167,38 @@ class TestMergeBlocks:
         out, stats = merge_blocks(D, M, policy)
         assert isinstance(stats, Counter)
         assert stats["unilateral-mineru"] == 0
+
+    def test_suppress_in_picture_respeita_pic_min_blocks(self):
+        """Regressão: pic_min_blocks/pic_rule da policy devem ser respeitados
+        (paridade com o tree_differ_v2). Com pic_rule='quality' e poucos blocos
+        legíveis, o texto dentro da figura sobrevive."""
+        # 2 blocos legíveis dentro de uma figura (não é OCR de figura)
+        D = [
+            mk("New York", box=(0.2, 0.2, 0.4, 0.3)),
+            mk("The world", box=(0.2, 0.35, 0.4, 0.45)),
+        ]
+        M = [mk("corpo", box=(0.0, 0.0, 1.0, 0.1))]
+        m_pics = [(0.1, 0.1, 0.9, 0.9)]  # figura grande
+        # pic_rule='quality' + pic_min_blocks=4: 2 < 4 → não suprime
+        policy = FusionPolicy(suppress_regions=True, pic_rule="quality", pic_min_blocks=4, pic_need_text=False)
+        out, stats = merge_blocks(D, M, policy, min_len=0, m_pics=m_pics)
+        assert stats.get("suppress-in-picture", 0) == 0
+        assert stats.get("keep-in-picture", 0) == 2
+        assert len(out) == 3  # corpo + 2 rótulos
+
+    def test_suppress_in_picture_quality_rule(self):
+        """pic_rule='quality' suprime quando há muitos blocos de baixa qualidade."""
+        D = [
+            mk("a", box=(0.2, 0.2, 0.4, 0.3)),
+            mk("b", box=(0.2, 0.35, 0.4, 0.45)),
+            mk("c", box=(0.2, 0.5, 0.4, 0.6)),
+            mk("d", box=(0.2, 0.65, 0.4, 0.75)),
+            mk("e", box=(0.2, 0.8, 0.4, 0.9)),
+        ]
+        M = [mk("corpo", box=(0.0, 0.0, 1.0, 0.1))]
+        m_pics = [(0.1, 0.1, 0.9, 0.9)]
+        policy = FusionPolicy(suppress_regions=True, pic_rule="quality", pic_min_blocks=4, pic_need_text=False)
+        out, stats = merge_blocks(D, M, policy, min_len=0, m_pics=m_pics)
+        # 5 >= 4 e qualidade baixa (letras soltas) → suprime
+        assert stats.get("suppress-in-picture", 0) == 5
+        assert out == ["corpo"]
