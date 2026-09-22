@@ -221,7 +221,23 @@ def audit_canonical_document(document: dict[str, Any]) -> dict[str, list[str]]:
                 if isinstance(table_ast, dict):
                     header = table_ast.get("header")
                     body = table_ast.get("body")
-                    if (not isinstance(header, list) or not header) and isinstance(body, list) and len(body) > 1:
+                    body_has_header_cells = (
+                        isinstance(body, list)
+                        and any(
+                            isinstance(cell, dict) and bool(cell.get("header"))
+                            for row in body
+                            if isinstance(row, dict)
+                            for cells in [row.get("cells")]
+                            if isinstance(cells, list)
+                            for cell in cells
+                        )
+                    )
+                    if (
+                        (not isinstance(header, list) or not header)
+                        and not body_has_header_cells
+                        and isinstance(body, list)
+                        and len(body) > 1
+                    ):
                         report["WARNING"].append(
                             Finding(MSG_TABLE_MISSING_HEADER, table_id=table_id)
                         )

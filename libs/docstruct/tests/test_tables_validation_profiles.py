@@ -43,6 +43,29 @@ class TestTableAst:
         _, body, _ = split_header_and_body({"body": [{"cells": [{"text": "H"}]}, {"cells": [{"text": "v"}]}]})
         assert len(body) == 1
 
+    def test_explicit_row_headers_disable_legacy_first_row_inference(self):
+        header, body, _ = split_header_and_body(
+            {
+                "body": [
+                    {
+                        "cells": [
+                            {"text": "Janeiro", "header": True, "scope": "row"},
+                            {"text": "10"},
+                        ]
+                    },
+                    {
+                        "cells": [
+                            {"text": "Fevereiro", "header": True, "scope": "row"},
+                            {"text": "12"},
+                        ]
+                    },
+                ]
+            }
+        )
+
+        assert header == []
+        assert len(body) == 2
+
     def test_linearize_canonical_english(self):
         out = linearize_table_for_text({"rows": [["A", "B"], ["1", "2"]], "caption": "T"})
         assert out[0] == "Table: T"

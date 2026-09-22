@@ -130,3 +130,33 @@ def test_audit_nested_sections_accessibility():
     report = audit_canonical_document(doc)
 
     assert any("Image img-sub has no alt-text" in err for err in report["WARNING"])
+
+
+def test_audit_accepts_explicit_row_header_cells() -> None:
+    doc = _sample_valid_document()
+    doc["sections"][0]["blocks"].append(
+        {
+            "id": "table-row-headers",
+            "type": "table",
+            "table_ast": {
+                "body": [
+                    {
+                        "cells": [
+                            {"text": "Janeiro", "header": True, "scope": "row"},
+                            {"text": "10"},
+                        ]
+                    },
+                    {
+                        "cells": [
+                            {"text": "Fevereiro", "header": True, "scope": "row"},
+                            {"text": "12"},
+                        ]
+                    },
+                ]
+            },
+        }
+    )
+
+    report = audit_canonical_document(doc)
+
+    assert report["WARNING"] == []

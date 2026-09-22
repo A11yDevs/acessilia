@@ -144,7 +144,20 @@ def split_header_and_body(
     body = list(table_ast.get("body") or [])
     footer = list(table_ast.get("footer") or [])
 
-    if not header and infer_legacy_header and len(body) >= 2:
+    has_explicit_cell_headers = any(
+        isinstance(cell, dict) and bool(cell.get("header"))
+        for row in body
+        if isinstance(row, dict)
+        for cells in [row.get("cells")]
+        if isinstance(cells, list)
+        for cell in cells
+    )
+    if (
+        not header
+        and not has_explicit_cell_headers
+        and infer_legacy_header
+        and len(body) >= 2
+    ):
         header = [body[0]]
         body = body[1:]
 

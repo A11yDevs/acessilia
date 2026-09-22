@@ -70,9 +70,9 @@ def test_data_table_preserves_cells_spans_and_warnings_in_canonical_ast() -> Non
 
     ast = output.table_ast()
 
-    assert ast["body"][0]["cells"][0]["header"] is True
-    assert ast["body"][1]["cells"][0]["rowspan"] == 2
-    assert ast["body"][1]["cells"][1]["text"] == ""
+    assert ast["header"][0]["cells"][0]["header"] is True
+    assert ast["body"][0]["cells"][0]["rowspan"] == 2
+    assert ast["body"][0]["cells"][1]["text"] == ""
     assert ast["metadata"]["warnings"] == ["Uma célula está ilegível."]
 
     document = build_canonical_document(
@@ -103,7 +103,12 @@ def test_editor_integrates_typed_table_without_reparsing_text() -> None:
     output = DataOutput(
         kind="table",
         rows=[
-            {"cells": [{"text": "Nome", "header": True}, {"text": "Nota"}]},
+            {
+                "cells": [
+                    {"text": "Nome", "header": True},
+                    {"text": "Nota", "header": True},
+                ]
+            },
             {"cells": [{"text": "Ana"}, {"text": "9,5"}]},
         ],
         language="pt-BR",
@@ -123,8 +128,39 @@ def test_editor_integrates_typed_table_without_reparsing_text() -> None:
 
     assert table["type"] == "table"
     assert table["rows"] == [["Nome", "Nota"], ["Ana", "9,5"]]
-    assert table["table_ast"]["body"][0]["cells"][0]["header"] is True
+    assert table["table_ast"]["header"][0]["cells"][0]["header"] is True
     assert table["metadata"]["source"] == "data-agent"
+
+
+def test_data_table_keeps_row_headers_in_body() -> None:
+    output = DataOutput(
+        kind="table",
+        rows=[
+            {
+                "cells": [
+                    {"text": "Janeiro", "header": True, "scope": "row"},
+                    {"text": "10"},
+                ]
+            },
+            {
+                "cells": [
+                    {"text": "Fevereiro", "header": True, "scope": "row"},
+                    {"text": "12"},
+                ]
+            },
+        ],
+        language="pt-BR",
+        confidence=0.9,
+    )
+
+    ast = output.table_ast()
+
+    assert "header" not in ast
+    assert ast["body"][0]["cells"][0] == {
+        "text": "Janeiro",
+        "header": True,
+        "scope": "row",
+    }
 
 
 def test_editor_integrates_typed_vision_formula_as_math() -> None:

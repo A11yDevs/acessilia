@@ -160,15 +160,16 @@ def _render_html_table_row(row: dict[str, Any], *, header: bool) -> str:
         header (bool): When True the cells render as <th> (scope defaults to "col"), otherwise as <td>.
 
     Returns:
-        str: The "<tr>...</tr>" fragment, or an empty string when no cell produced visible text.
+        str: The "<tr>...</tr>" fragment, or an empty string when the row has no valid cells.
     """
     cells = row.get("cells", []) if isinstance(row, dict) else []
-    tag = "th" if header else "td"
     rendered_cells: list[str] = []
     for cell in cells:
         if not isinstance(cell, dict):
             continue
         text = escape(str(cell.get("text", "")).strip())
+        cell_is_header = header or bool(cell.get("header"))
+        tag = "th" if cell_is_header else "td"
 
         attrs: list[str] = []
         if tag == "th":
@@ -176,7 +177,8 @@ def _render_html_table_row(row: dict[str, Any], *, header: bool) -> str:
             if isinstance(scope, str) and scope in {"row", "col", "rowgroup", "colgroup"}:
                 attrs.append(f'scope="{scope}"')
             else:
-                attrs.append('scope="col"')
+                default_scope = "col" if header else "row"
+                attrs.append(f'scope="{default_scope}"')
 
         rowspan = cell.get("rowspan")
         if isinstance(rowspan, int) and rowspan > 1:

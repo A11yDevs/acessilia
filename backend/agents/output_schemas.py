@@ -138,12 +138,12 @@ class DataOutput(AgentOutput):
         if self.kind != "table":
             raise ValueError("table_ast is only available for table output")
 
-        body: list[dict[str, Any]] = []
+        ast_rows: list[dict[str, Any]] = []
         for row in self.rows:
             cells: list[dict[str, Any]] = []
             for cell in row.cells:
                 canonical_cell: dict[str, Any] = {"text": cell.text}
-                if cell.header:
+                if cell.header or cell.scope != "none":
                     canonical_cell["header"] = True
                 if cell.scope != "none":
                     canonical_cell["scope"] = cell.scope
@@ -152,9 +152,26 @@ class DataOutput(AgentOutput):
                 if cell.colspan > 1:
                     canonical_cell["colspan"] = cell.colspan
                 cells.append(canonical_cell)
-            body.append({"cells": cells})
+            ast_rows.append({"cells": cells})
 
-        table_ast: dict[str, Any] = {"body": body}
+        # Promote only leading, fully marked header rows. Mixed rows stay in
+        # the body so row headers (for example the first cell of every row)
+        # retain their cell-level semantics instead of turning the whole row
+        # into a column-header row. Keep at least one body row because the
+        # canonical table contract requires a non-empty body.
+        header_count = 0
+        for row in self.rows[:-1]:
+            if not all(
+                (cell.header or cell.scope in {"col", "colgroup"})
+                and cell.scope not in {"row", "rowgroup"}
+                for cell in row.cells
+            ):
+                break
+            header_count += 1
+
+        table_ast: dict[str, Any] = {"body": ast_rows[header_count:]}
+        if header_count:
+            table_ast["header"] = ast_rows[:header_count]
         if self.caption:
             table_ast["caption"] = self.caption
         if self.warnings:
