@@ -192,6 +192,21 @@ def demote_formulas(blocks: list[dict], stats: Counter, tag: str) -> list[dict]:
 SPEAKER_RE = re.compile(r"^(?:[A-Z][A-Z'’.\-]*(?: [A-Z][A-Z'’.\-]*){0,3})[.:]?$")
 SENT_END_RE = re.compile(r"[.!?…][”\"’')\]]*$")
 STANDALONE_INT_RE = re.compile(r"(?<![\w.,/:\-])(\d{1,4})(?![\w.,/:%\-])")
+RECORD_END_RE = re.compile(r"\d\W*$")
+LEADER_RE = re.compile(r"\.{3,}|…|\\dotfill")
+
+
+def record_like(lines: list[str], min_frac: float = 0.6) -> bool:
+    """TOC / index / fight-record / results lists: most lines end with a number or carry dot leaders. GT keeps
+    one block per entry (<= 300 chars, so the evaluator re-groups our chunks); real verse/dialogue lines end
+    with words and GT keeps the whole stanza (often > 300 chars) -> those must stay whole. dev-986 (v15):
+    chunking verse lost up to 59 text pts/page, chunking records gained up to 38."""
+    ls = [l.strip() for l in lines if l.strip()]
+    if not ls:
+        return False
+    endnum = sum(bool(RECORD_END_RE.search(l)) for l in ls) / len(ls)
+    leaders = sum(bool(LEADER_RE.search(l)) for l in ls) / len(ls)
+    return endnum >= min_frac or leaders >= 0.5
 
 
 def verse_lines(md: str, min_lines: int = 3, max_median: int = 70, max_line: int = 120) -> list[str] | None:
@@ -251,12 +266,16 @@ def split_box_rows(box, parts: list[int]):
     return out
 
 
-def verse_blocks(blocks: list[dict], stats: Counter, tag: str, max_chars: int) -> list[dict]:
+def verse_blocks(blocks: list[dict], stats: Counter, tag: str, max_chars: int, kind: str = "records") -> list[dict]:
     out: list[dict] = []
     for b in blocks:
         lines = verse_lines(b["md"]) if b["kind"] == "text" else None
         if lines is None:
             out.append(b)
+            continue
+        if kind == "records" and not record_like(lines):
+            out.append(b)
+            stats[f"verse-{tag}-whole"] += 1
             continue
         chunks = chunk_verse(lines, max_chars)
         if len(chunks) <= 1:
@@ -739,7 +758,7 @@ def merge_v2(D: list[dict], M: list[dict], *, lam: float, tau: float, min_len: i
              vlm_decisions: dict[str, str] | None = None,
              item_id: str = "",
              verse_chunk: int = 0, line_numbers: bool = False,
-             table_eq: bool = False) -> tuple[list[str], Counter]:
+             table_eq: bool = False, verse_kind: str = "records") -> tuple[list[str], Counter]:
     stats: Counter = Counter()
     tail: list[str] = []
     if table_eq:
@@ -756,8 +775,8 @@ def merge_v2(D: list[dict], M: list[dict], *, lam: float, tau: float, min_len: i
         D = extract_line_numbers(D, stats, "docling")
         M = extract_line_numbers(M, stats, "mineru")
     if verse_chunk > 0:
-        D = verse_blocks(D, stats, "docling", verse_chunk)
-        M = verse_blocks(M, stats, "mineru", verse_chunk)
+        D = verse_blocks(D, stats, "docling", verse_chunk, verse_kind)
+        M = verse_blocks(M, stats, "mineru", verse_chunk, verse_kind)
     if suppress:
         mode = suppress_mode
         # MinerU saw only a picture: its picture box is the whole illustration and Docling's labels are the
@@ -1035,8 +1054,11 @@ def main() -> int:
     ap.add_argument("--no-rescue-omitted", dest="rescue_omitted", action="store_false", default=True,
                     help="disable rescuing omitted legitimate text blocks inside picture bboxes or small boxes")
     ap.add_argument("--verse-chunk", type=int, default=0, metavar="N",
-                    help="split verse/drama text blocks (several short lines) into stanza-like chunks of <= N chars, "
-                         "kept out of --fuse-lines/--merge-paragraphs (0=off; evaluator merges preds only up to 300 chars)")
+                    help="split multi-line short-line text blocks into chunks of <= N chars at line boundaries (N=1 -> one "
+                         "block per line), kept out of --fuse-lines/--merge-paragraphs (0=off)")
+    ap.add_argument("--verse-kind", choices=["records", "all"], default="records",
+                    help="records: chunk only list-like blocks (>=60%% lines end with a number / dot leaders), real verse "
+                         "stays whole (GT stanzas > 300 chars are never re-merged by the evaluator); all: chunk every one")
     ap.add_argument("--line-numbers", action="store_true",
                     help="marginal verse line numbers OCR'd into a text block (arithmetic run of >= 3 integers) become "
                          "separate blocks after it, as in GT")
@@ -1124,7 +1146,8 @@ def main() -> int:
                                      item_id=stem,
                                      verse_chunk=a.verse_chunk,
                                      line_numbers=a.line_numbers,
-                                     table_eq=a.table_eq)
+                                     table_eq=a.table_eq,
+                                     verse_kind=a.verse_kind)
         if not blocks:
             blocks = split_blocks(doc_md if len(norm(doc_md)) >= len(norm(min_md)) else min_md)
             stats["fallback-longer"] += 1
