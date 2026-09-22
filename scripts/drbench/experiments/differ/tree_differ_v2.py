@@ -738,9 +738,17 @@ def merge_v2(D: list[dict], M: list[dict], *, lam: float, tau: float, min_len: i
              queue_pred_shorter: bool = True, vlm_queue: list[dict] | None = None,
              vlm_decisions: dict[str, str] | None = None,
              item_id: str = "",
-             verse_chunk: int = 0, line_numbers: bool = False) -> tuple[list[str], Counter]:
+             verse_chunk: int = 0, line_numbers: bool = False,
+             table_eq: bool = False) -> tuple[list[str], Counter]:
     stats: Counter = Counter()
     tail: list[str] = []
+    if table_eq:
+        # MinerU wraps inline math in table cells as <eq>..</eq>; the TEDS normaliser does not strip it
+        # (GT has plain text) -> every such cell is a token mismatch
+        for b in D + M:
+            if b["kind"] == "table" and "<eq" in b["md"]:
+                b["md"] = re.sub(r"</?eq[^>]*>", "", b["md"])
+                stats["table-eq-unwrapped"] += 1
     if formula_text:
         D = demote_formulas(D, stats, "docling")
         M = demote_formulas(M, stats, "mineru")
@@ -1032,6 +1040,7 @@ def main() -> int:
     ap.add_argument("--line-numbers", action="store_true",
                     help="marginal verse line numbers OCR'd into a text block (arithmetic run of >= 3 integers) become "
                          "separate blocks after it, as in GT")
+    ap.add_argument("--table-eq", action="store_true", help="strip <eq> tags inside table HTML (TEDS token mismatch)")
     a = ap.parse_args()
     # '+' also accepted because Slurm --export splits values on commas
     drop_d = frozenset(t.strip().lower() for t in re.split(r"[,+]", a.drop_docling) if t.strip())
@@ -1114,7 +1123,8 @@ def main() -> int:
                                      vlm_decisions=vlm_decisions,
                                      item_id=stem,
                                      verse_chunk=a.verse_chunk,
-                                     line_numbers=a.line_numbers)
+                                     line_numbers=a.line_numbers,
+                                     table_eq=a.table_eq)
         if not blocks:
             blocks = split_blocks(doc_md if len(norm(doc_md)) >= len(norm(min_md)) else min_md)
             stats["fallback-longer"] += 1
