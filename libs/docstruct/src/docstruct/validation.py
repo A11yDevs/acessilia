@@ -11,7 +11,7 @@ import re
 from typing import Any
 
 from docstruct.profiles import OUTPUT_PROFILES
-from docstruct.tables.ast import effective_row_width, row_header_column_count
+from docstruct.tables.ast import effective_section_row_widths, row_header_column_count
 from docstruct.text.sanitize import contains_markdown_artifacts, contains_prompt_leak
 
 
@@ -405,6 +405,7 @@ def _validate_table_block(block: dict[str, Any]) -> list[str]:
                     )
                 )
                 continue
+            row_widths = effective_section_row_widths(section)
             expected_width: int | None = None
             for row_index, row in enumerate(section):
                 if not isinstance(row, dict):
@@ -428,7 +429,7 @@ def _validate_table_block(block: dict[str, Any]) -> list[str]:
                         )
                     )
                     continue
-                row_effective_width = effective_row_width(row)
+                row_effective_width = row_widths[row_index]
                 for col_index, cell in enumerate(cells):
                     if not isinstance(cell, dict):
                         errors.append(

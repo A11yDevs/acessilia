@@ -178,6 +178,37 @@ def test_render_html_uses_cell_level_row_headers():
     assert "<thead>" not in html
 
 
+def test_render_html_treats_explicit_scope_as_header_semantics():
+    document = _sample_document()
+    table = document["sections"][0]["blocks"][3]
+    table["table_ast"] = {
+        "body": [
+            {
+                "cells": [
+                    {"text": "Janeiro", "scope": "row"},
+                    {"text": "10"},
+                ]
+            },
+            {
+                "cells": [
+                    {"text": "Fevereiro", "scope": "row"},
+                    {"text": "12"},
+                ]
+            },
+        ]
+    }
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        output = Path(tmpdir) / "scope-row-headers.html"
+        html = render_html(document, output, profile_name="html").read_text(
+            encoding="utf-8"
+        )
+
+    assert '<th scope="row">Janeiro</th><td>10</td>' in html
+    assert '<th scope="row">Fevereiro</th><td>12</td>' in html
+    assert "<thead>" not in html
+
+
 def test_render_docx_and_pdf_create_files():
     with tempfile.TemporaryDirectory() as tmpdir:
         docx_output = Path(tmpdir) / "saida.docx"

@@ -224,6 +224,32 @@ def test_validate_canonical_document_accepts_spanning_table_footer_projection():
     assert not any("blk-table-footer" in error for error in errors)
 
 
+def test_validate_canonical_document_accounts_for_active_rowspans():
+    document = _sample_document()
+    document["sections"][0]["blocks"].append(
+        {
+            "id": "blk-table-rowspan",
+            "type": "table",
+            "rows": [["Grupo", "10"], ["12"]],
+            "table_ast": {
+                "body": [
+                    {
+                        "cells": [
+                            {"text": "Grupo", "rowspan": 2},
+                            {"text": "10"},
+                        ]
+                    },
+                    {"cells": [{"text": "12"}]},
+                ]
+            },
+        }
+    )
+
+    errors = validate_canonical_document(document)
+
+    assert not any("blk-table-rowspan" in error for error in errors)
+
+
 def test_validate_export_profile_detects_profile_mismatch():
     """A technical block inside a txt-profile document is not allowed by the txt verbosity set."""
     document = _sample_document()

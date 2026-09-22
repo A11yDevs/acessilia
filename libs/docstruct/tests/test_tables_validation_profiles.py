@@ -85,6 +85,24 @@ class TestTableAst:
         assert body == rows[1:]
         assert row_header_column_count(rows) == 0
 
+    def test_row_header_count_carries_rowspan_into_following_rows(self):
+        rows = [
+            {
+                "cells": [
+                    {
+                        "text": "Grupo A",
+                        "header": True,
+                        "scope": "rowgroup",
+                        "rowspan": 2,
+                    },
+                    {"text": "10"},
+                ]
+            },
+            {"cells": [{"text": "12"}]},
+        ]
+
+        assert row_header_column_count(rows) == 1
+
     def test_linearize_canonical_english(self):
         out = linearize_table_for_text({"rows": [["A", "B"], ["1", "2"]], "caption": "T"})
         assert out[0] == "Table: T"

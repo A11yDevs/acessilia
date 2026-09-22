@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from docstruct.tables.ast import effective_row_width, row_header_column_count
+from docstruct.tables.ast import effective_section_width, row_header_column_count
 from docstruct.tables.ast import split_header_and_body
 from docstruct.tables.ast import table_ast_from_block
 
@@ -131,8 +131,12 @@ def _table_to_pandoc_ast(table_ast: dict[str, Any]) -> dict[str, Any]:
     header_rows, body_rows, footer_rows = split_header_and_body(table_ast)
     row_head_columns = row_header_column_count(body_rows)
 
-    all_rows = header_rows + body_rows + footer_rows
-    column_count = max((effective_row_width(row) for row in all_rows), default=1)
+    column_count = max(
+        effective_section_width(header_rows),
+        effective_section_width(body_rows),
+        effective_section_width(footer_rows),
+        1,
+    )
     colspecs = [
         [{"t": "AlignDefault"}, {"t": "ColWidth", "c": 1.0 / max(column_count, 1)}]
         for _ in range(column_count)

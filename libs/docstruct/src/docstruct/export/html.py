@@ -168,13 +168,18 @@ def _render_html_table_row(row: dict[str, Any], *, header: bool) -> str:
         if not isinstance(cell, dict):
             continue
         text = escape(str(cell.get("text", "")).strip())
-        cell_is_header = header or bool(cell.get("header"))
+        scope = str(cell.get("scope", "")).strip().lower()
+        cell_is_header = header or bool(cell.get("header")) or scope in {
+            "row",
+            "col",
+            "rowgroup",
+            "colgroup",
+        }
         tag = "th" if cell_is_header else "td"
 
         attrs: list[str] = []
         if tag == "th":
-            scope = cell.get("scope")
-            if isinstance(scope, str) and scope in {"row", "col", "rowgroup", "colgroup"}:
+            if scope in {"row", "col", "rowgroup", "colgroup"}:
                 attrs.append(f'scope="{scope}"')
             else:
                 default_scope = "col" if header else "row"
