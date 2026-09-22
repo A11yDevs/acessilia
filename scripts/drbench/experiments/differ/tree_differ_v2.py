@@ -127,6 +127,147 @@ def demote_formulas(blocks: list[dict], stats: Counter, tag: str) -> list[dict]:
     return blocks
 
 
+# ---- verse / drama ------------------------------------------------------------------------------
+# GT (mds/) keeps one block per stanza / speech and marginal line numbers as separate blocks. The evaluator
+# can only merge consecutive predictions into a GT block (or absorb extra GT blocks into a prediction)
+# when the strings are <= 300 chars (_FUZZY_MAX_LEN), so a whole-page verse block loses every stanza but
+# one. VLM sources (MinerU hybrid) keep the verse line breaks: chunk them at <= --verse-chunk chars,
+# preferring stanza ends (blank line, sentence-final punctuation, next speaker label).
+SPEAKER_RE = re.compile(r"^(?:[A-Z][A-Z'’.\-]*(?: [A-Z][A-Z'’.\-]*){0,3})[.:]?$")
+SENT_END_RE = re.compile(r"[.!?…][”\"’')\]]*$")
+STANDALONE_INT_RE = re.compile(r"(?<![\w.,/:\-])(\d{1,4})(?![\w.,/:%\-])")
+
+
+def verse_lines(md: str, min_lines: int = 3, max_median: int = 70, max_line: int = 120) -> list[str] | None:
+    """Lines of a verse-like text block (several short lines separated by single newlines), else None."""
+    s = md.strip()
+    if "\n" not in s or s.startswith(("#", "<", "|", "$$", "![")):
+        return None
+    lines = [l.rstrip() for l in s.split("\n")]
+    nonempty = [l for l in lines if l.strip()]
+    if len(nonempty) < min_lines:
+        return None
+    lens = sorted(len(l) for l in nonempty)
+    if lens[len(lens) // 2] > max_median or lens[-1] > max_line:
+        return None
+    return lines
+
+
+def chunk_verse(lines: list[str], max_chars: int, soft: float = 0.6) -> list[str]:
+    chunks: list[str] = []
+    cur: list[str] = []
+    cur_len = 0
+
+    def flush():
+        nonlocal cur, cur_len
+        if cur:
+            chunks.append("\n".join(cur))
+        cur, cur_len = [], 0
+
+    for l in lines:
+        s = l.strip()
+        if not s:  # blank line = stanza break
+            flush()
+            continue
+        if cur and SPEAKER_RE.match(s) and len(s) <= 32:
+            flush()
+        n = len(norm(s))
+        if cur and cur_len + n > max_chars:
+            flush()
+        cur.append(s)
+        cur_len += n
+        if cur_len >= soft * max_chars and SENT_END_RE.search(s):
+            flush()
+    flush()
+    return chunks
+
+
+def split_box_rows(box, parts: list[int]):
+    """Split a box vertically in proportion to the number of lines of each part."""
+    if box is None:
+        return [None] * len(parts)
+    tot = sum(parts) or 1
+    y0, h = box[1], box[3] - box[1]
+    out, acc = [], 0
+    for p in parts:
+        out.append((box[0], y0 + h * acc / tot, box[2], y0 + h * (acc + p) / tot))
+        acc += p
+    return out
+
+
+def verse_blocks(blocks: list[dict], stats: Counter, tag: str, max_chars: int) -> list[dict]:
+    out: list[dict] = []
+    for b in blocks:
+        lines = verse_lines(b["md"]) if b["kind"] == "text" else None
+        if lines is None:
+            out.append(b)
+            continue
+        chunks = chunk_verse(lines, max_chars)
+        if len(chunks) <= 1:
+            out.append(b)
+            stats[f"verse-{tag}-kept"] += 1
+            continue
+        boxes = split_box_rows(b["box"], [c.count("\n") + 1 for c in chunks])
+        for c, bx in zip(chunks, boxes):
+            out.append({**b, "md": c, "text": norm(c), "box": bx, "verse": True})
+        stats[f"verse-{tag}-split"] += 1
+        stats[f"verse-{tag}-chunks"] += len(chunks)
+    return out
+
+
+def line_number_chain(values: list[int], steps=(5, 4, 10, 2, 3), min_len: int = 3) -> tuple[int, set[int]]:
+    """Indices of the longest run of values forming an arithmetic progression with a typical verse
+    line-number step (5, 4, 10, 2, 3); values need not be adjacent in the list (years/figures may interleave)."""
+    best: tuple[int, set[int]] = (0, set())
+    for step in steps:
+        for i in range(len(values)):
+            chain = [i]
+            for j in range(i + 1, len(values)):
+                if values[j] == values[chain[-1]] + step:
+                    chain.append(j)
+            if len(chain) >= min_len and len(chain) > len(best[1]):
+                best = (step, set(chain))
+    return best
+
+
+def extract_line_numbers(blocks: list[dict], stats: Counter, tag: str) -> list[dict]:
+    """Marginal verse line numbers OCR'd inline ("be seen 3964 or recognized") or as their own lines ->
+    removed from the text and emitted as separate blocks right after it (GT keeps them as blocks)."""
+    out: list[dict] = []
+    for b in blocks:
+        if b["kind"] != "text" or b.get("verse_nums") or len(b["text"]) < 120:
+            out.append(b)
+            continue
+        hits = list(STANDALONE_INT_RE.finditer(b["md"]))
+        if len(hits) < 3:
+            out.append(b)
+            continue
+        step, idx = line_number_chain([int(h.group(1)) for h in hits])
+        if not idx:
+            out.append(b)
+            continue
+        md = b["md"]
+        nums = []
+        for k in sorted(idx, reverse=True):
+            h = hits[k]
+            nums.append(h.group(1))
+            md = md[:h.start()] + md[h.end():]
+        md = re.sub(r"[ \t]{2,}", " ", md)
+        md = "\n".join(l.rstrip() for l in md.split("\n") if l.strip())
+        nums.reverse()
+        if not norm(md):
+            out.append(b)
+            continue
+        out.append({**b, "md": md, "text": norm(md), "verse_nums": True})
+        bx = b["box"]
+        for n in nums:
+            nbox = (max(0.0, bx[2] - 0.06), bx[1], bx[2], bx[3]) if bx else None
+            out.append({"md": n, "kind": "text", "box": nbox, "text": norm(n), "type": "line_number"})
+        stats[f"line-numbers-{tag}"] += 1
+        stats[f"line-numbers-{tag}-count"] += len(nums)
+    return out
+
+
 def flood_guard(D: list[dict], M: list[dict], stats: Counter, ratio: float, min_blocks: int = 30,
                 short: int = 15) -> list[dict]:
     """Chart/diagram pages: Docling emits every axis tick / label as a block (90 blocks) while MinerU sees
@@ -149,7 +290,7 @@ def flood_guard(D: list[dict], M: list[dict], stats: Counter, ratio: float, min_
 
 
 def decor_role(b: dict, running: frozenset[str] = frozenset()) -> str | None:
-    if b["kind"] in ("table", "formula"):
+    if b["kind"] in ("table", "formula") or b["type"] == "line_number":
         return None
     if PAGENUM_RE.match(b["md"]) and len(b["md"]) <= 16:
         return "page_number"
@@ -254,7 +395,7 @@ def group_split_blocks(A: list[dict], B: list[dict], stats: Counter, tag: str, f
     (A over-segmented the paragraph that B kept whole). Returns a new A list, order preserved."""
     owner: dict[int, int] = {}
     for i, a in enumerate(A):
-        if a["kind"] != "text" or a["box"] is None:
+        if a["kind"] != "text" or a["box"] is None or a.get("verse") or a.get("type") == "line_number":
             continue
         best, bf = None, 0.0
         for j, b in enumerate(B):
@@ -366,7 +507,8 @@ def fuse_line_runs(blocks: list[dict], stats: Counter, tag: str, short: int = 80
     adjacent. max_len>0 caps the fused block length (evaluator forgives pred merges only up to 300 chars)."""
     def short_text(b):
         return (b["kind"] == "text" and b["box"] is not None and len(b["text"]) <= short
-                and "\n" not in b["md"] and not b["md"].lstrip().startswith("#"))
+                and "\n" not in b["md"] and not b["md"].lstrip().startswith("#") and not b.get("verse")
+                and b.get("type") != "line_number")
 
     def adjacent(p, n):
         pb, nb = p["box"], n["box"]
@@ -520,12 +662,18 @@ def merge_v2(D: list[dict], M: list[dict], *, lam: float, tau: float, min_len: i
              suppress_mode: str = "both", pic_rule: str = "count-or-quality",
              table_full_page: float = 0.0, fuse_h_ratio: float = 0.0, table_probe: bool = False,
              pagenum_cap: int = 0, flood: float = 0.0, pic_need_text: bool = False,
-             formula_text: bool = False) -> tuple[list[str], Counter]:
+             formula_text: bool = False, verse_chunk: int = 0, line_numbers: bool = False) -> tuple[list[str], Counter]:
     stats: Counter = Counter()
     tail: list[str] = []
     if formula_text:
         D = demote_formulas(D, stats, "docling")
         M = demote_formulas(M, stats, "mineru")
+    if line_numbers:
+        D = extract_line_numbers(D, stats, "docling")
+        M = extract_line_numbers(M, stats, "mineru")
+    if verse_chunk > 0:
+        D = verse_blocks(D, stats, "docling", verse_chunk)
+        M = verse_blocks(M, stats, "mineru", verse_chunk)
     if suppress:
         mode = suppress_mode
         # MinerU saw only a picture: its picture box is the whole illustration and Docling's labels are the
@@ -749,6 +897,12 @@ def main() -> int:
                     help="with --suppress-regions: skip picture suppression when MinerU has no text block on the page")
     ap.add_argument("--formula-text", action="store_true",
                     help="turn $$..$$ blocks without real math (workout tables, chemistry) into plain text")
+    ap.add_argument("--verse-chunk", type=int, default=0, metavar="N",
+                    help="split verse/drama text blocks (several short lines) into stanza-like chunks of <= N chars, "
+                         "kept out of --fuse-lines/--merge-paragraphs (0=off; evaluator merges preds only up to 300 chars)")
+    ap.add_argument("--line-numbers", action="store_true",
+                    help="marginal verse line numbers OCR'd into a text block (arithmetic run of >= 3 integers) become "
+                         "separate blocks after it, as in GT")
     a = ap.parse_args()
     # '+' also accepted because Slurm --export splits values on commas
     drop_d = frozenset(t.strip().lower() for t in re.split(r"[,+]", a.drop_docling) if t.strip())
@@ -787,7 +941,8 @@ def main() -> int:
                                      table_full_page=a.table_full_page, fuse_h_ratio=a.fuse_h_ratio,
                                      table_probe=a.table_probe, pagenum_cap=a.pagenum_cap,
                                      flood=a.flood_guard, pic_need_text=a.pic_need_text,
-                                     formula_text=a.formula_text)
+                                     formula_text=a.formula_text, verse_chunk=a.verse_chunk,
+                                     line_numbers=a.line_numbers)
         if not blocks:
             blocks = split_blocks(doc_md if len(norm(doc_md)) >= len(norm(min_md)) else min_md)
             stats["fallback-longer"] += 1
