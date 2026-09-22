@@ -28,10 +28,11 @@ TEXTO ILEGÍVEL:
 [ilegivel]
 - Não complete informações ausentes.
 NOTAS E RODAPÉS:
-- Após a tabela, transcreva integralmente qualquer nota associada.
+- Transcreva integralmente qualquer nota associada no campo notes.
 - Preserve a ordem original.
 FORMATO DE SAÍDA:
 - Use rows para preservar a ordem das linhas e cells para preservar a ordem das colunas.
+- Use caption para a legenda da tabela e notes para notas ou rodapés associados, quando existirem.
 - Marque células de cabeçalho com header=true e o scope apropriado.
 - Informe idioma, confiança e qualquer incerteza em warnings.
 - Não devolva tabela em texto livre ou Markdown.

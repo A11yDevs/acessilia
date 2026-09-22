@@ -990,12 +990,10 @@ def _element_to_block(element: ManifestElement) -> dict[str, Any]:
     elif element.type == "code":
         block.update({"type": "code", "text": normalize_code_text(text)})
     elif element.type == "formula":
-        block.update(
-            {
-                "type": "paragraph",
-                "text": text or "Formula detectada.",
-            }
-        )
+        if text:
+            block.update({"type": "math", "text": text})
+        else:
+            block.update({"type": "paragraph", "text": "Formula detectada."})
     else:
         block.update({"type": "paragraph", "text": text or element.raw_label})
 

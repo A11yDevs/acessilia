@@ -11,7 +11,9 @@ import re
 from typing import Any
 
 from docstruct.profiles import OUTPUT_PROFILES
+from docstruct.tables.ast import effective_row_width, row_header_column_count
 from docstruct.text.sanitize import contains_markdown_artifacts, contains_prompt_leak
+
 
 def Finding(msgid: str, **kwargs: Any) -> tuple[str, dict[str, Any]]:
     """A structured validation finding: canonical msgid + format kwargs."""
@@ -221,20 +223,13 @@ def audit_canonical_document(document: dict[str, Any]) -> dict[str, list[str]]:
                 if isinstance(table_ast, dict):
                     header = table_ast.get("header")
                     body = table_ast.get("body")
-                    body_has_header_cells = (
+                    body_has_complete_row_headers = (
                         isinstance(body, list)
-                        and any(
-                            isinstance(cell, dict) and bool(cell.get("header"))
-                            for row in body
-                            if isinstance(row, dict)
-                            for cells in [row.get("cells")]
-                            if isinstance(cells, list)
-                            for cell in cells
-                        )
+                        and row_header_column_count(body) > 0
                     )
                     if (
                         (not isinstance(header, list) or not header)
-                        and not body_has_header_cells
+                        and not body_has_complete_row_headers
                         and isinstance(body, list)
                         and len(body) > 1
                     ):
@@ -350,6 +345,7 @@ def _validate_table_block(block: dict[str, Any]) -> list[str]:
 
     rows = block.get("rows")
     table_ast = block.get("table_ast")
+    rows_are_legacy_source = not isinstance(table_ast, dict)
 
     if not rows and not table_ast:
         return [Finding(MSG_TABLE_EMPTY, block_id=block_id)]
@@ -362,38 +358,33 @@ def _validate_table_block(block: dict[str, Any]) -> list[str]:
             for row_index, row in enumerate(rows):
                 if not isinstance(row, list) or not row:
                     errors.append(
-                        Finding(MSG_TABLE_ROW_INVALID, 
+                        Finding(
+                            MSG_TABLE_ROW_INVALID,
                             block_id=block_id, row_index=row_index
                         )
                     )
                     continue
-                if expected_columns is None:
-                    expected_columns = len(row)
-                elif len(row) != expected_columns:
-                    errors.append(
-                        Finding(MSG_TABLE_COLUMNS_INCONSISTENT, 
-                            block_id=block_id, row_index=row_index
+                if rows_are_legacy_source:
+                    if expected_columns is None:
+                        expected_columns = len(row)
+                    elif len(row) != expected_columns:
+                        errors.append(
+                            Finding(
+                                MSG_TABLE_COLUMNS_INCONSISTENT,
+                                block_id=block_id, row_index=row_index
+                            )
                         )
-                    )
                 for col_index, cell in enumerate(row):
                     if not isinstance(cell, str):
                         errors.append(
-                            Finding(MSG_TABLE_CELL_NOT_TEXT, 
+                            Finding(
+                                MSG_TABLE_CELL_NOT_TEXT,
                                 block_id=block_id,
                                 row_index=row_index,
                                 col_index=col_index,
                             )
                         )
                         continue
-                    if not cell.strip():
-                        errors.append(
-                            Finding(MSG_TABLE_CELL_EMPTY, 
-                                block_id=block_id,
-                                row_index=row_index,
-                                col_index=col_index,
-                            )
-                        )
-
     if table_ast is not None:
         if not isinstance(table_ast, dict):
             errors.append(Finding(MSG_TABLE_AST_INVALID, block_id=block_id))
@@ -408,7 +399,8 @@ def _validate_table_block(block: dict[str, Any]) -> list[str]:
                 continue
             if not isinstance(section, list):
                 errors.append(
-                    Finding(MSG_TABLE_AST_SECTION_INVALID, 
+                    Finding(
+                        MSG_TABLE_AST_SECTION_INVALID,
                         section_name=section_name, block_id=block_id
                     )
                 )
@@ -417,7 +409,8 @@ def _validate_table_block(block: dict[str, Any]) -> list[str]:
             for row_index, row in enumerate(section):
                 if not isinstance(row, dict):
                     errors.append(
-                        Finding(MSG_TABLE_AST_ROW_INVALID, 
+                        Finding(
+                            MSG_TABLE_AST_ROW_INVALID,
                             section_name=section_name,
                             row_index=row_index,
                             block_id=block_id,
@@ -427,18 +420,20 @@ def _validate_table_block(block: dict[str, Any]) -> list[str]:
                 cells = row.get("cells")
                 if not isinstance(cells, list) or not cells:
                     errors.append(
-                        Finding(MSG_TABLE_AST_ROW_NO_CELLS, 
+                        Finding(
+                            MSG_TABLE_AST_ROW_NO_CELLS,
                             section_name=section_name,
                             row_index=row_index,
                             block_id=block_id,
                         )
                     )
                     continue
-                row_effective_width = 0
+                row_effective_width = effective_row_width(row)
                 for col_index, cell in enumerate(cells):
                     if not isinstance(cell, dict):
                         errors.append(
-                            Finding(MSG_TABLE_AST_CELL_INVALID, 
+                            Finding(
+                                MSG_TABLE_AST_CELL_INVALID,
                                 block_id=block_id,
                                 section_name=section_name,
                                 row_index=row_index,
@@ -447,26 +442,22 @@ def _validate_table_block(block: dict[str, Any]) -> list[str]:
                         )
                         continue
                     text = cell.get("text")
-                    if not isinstance(text, str) or not text.strip():
+                    if not isinstance(text, str):
                         errors.append(
-                            Finding(MSG_TABLE_AST_CELL_NO_TEXT, 
+                            Finding(
+                                MSG_TABLE_AST_CELL_NO_TEXT,
                                 block_id=block_id,
                                 section_name=section_name,
                                 row_index=row_index,
                                 col_index=col_index,
                             )
                         )
-                    colspan = cell.get("colspan")
-                    if isinstance(colspan, int) and colspan >= 1:
-                        row_effective_width += colspan
-                    else:
-                        row_effective_width += 1
-
                 if expected_width is None:
                     expected_width = row_effective_width
                 elif row_effective_width != expected_width:
                     errors.append(
-                        Finding(MSG_TABLE_AST_WIDTH_INCONSISTENT, 
+                        Finding(
+                            MSG_TABLE_AST_WIDTH_INCONSISTENT,
                             section_name=section_name,
                             block_id=block_id,
                             row_index=row_index,

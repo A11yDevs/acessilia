@@ -15,8 +15,8 @@ VISION_SCHEMA_INSTRUCTION = (
 
 DATA_SCHEMA_INSTRUCTION = (
     "Retorne somente o objeto estruturado solicitado: use kind='table' com rows/cells "
-    "para tabelas, ou kind='formula' com latex para fórmulas. Sempre informe language, "
-    "confidence e warnings."
+    "para tabelas, incluindo caption e notes quando visíveis, ou kind='formula' com "
+    "latex para fórmulas. Sempre informe language, confidence e warnings."
 )
 
 
@@ -102,6 +102,10 @@ class DataOutput(AgentOutput):
         description="Extracted LaTeX; required for formula output and absent for tables.",
     )
     caption: str | None = Field(default=None, description="Visible table caption, if present.")
+    notes: list[str] = Field(
+        default_factory=list,
+        description="Visible notes or footnotes associated with the table, in reading order.",
+    )
     language: str = Field(
         min_length=2,
         max_length=35,
@@ -127,6 +131,8 @@ class DataOutput(AgentOutput):
                 raise ValueError("rows are only allowed when kind is 'table'")
             if self.caption is not None:
                 raise ValueError("caption is only allowed when kind is 'table'")
+            if self.notes:
+                raise ValueError("notes are only allowed when kind is 'table'")
         return self
 
     def table_rows(self) -> list[list[str]]:
@@ -174,6 +180,22 @@ class DataOutput(AgentOutput):
             table_ast["header"] = ast_rows[:header_count]
         if self.caption:
             table_ast["caption"] = self.caption
+        notes = [note for note in self.notes if note]
+        if notes:
+            column_count = max(
+                (
+                    sum(cell.colspan for cell in row.cells)
+                    for row in self.rows
+                ),
+                default=1,
+            )
+            footer_rows: list[dict[str, Any]] = []
+            for note in notes:
+                note_cell: dict[str, Any] = {"text": note}
+                if column_count > 1:
+                    note_cell["colspan"] = column_count
+                footer_rows.append({"cells": [note_cell]})
+            table_ast["footer"] = footer_rows
         if self.warnings:
             table_ast["metadata"] = {"warnings": list(self.warnings)}
         return table_ast

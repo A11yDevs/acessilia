@@ -160,3 +160,35 @@ def test_audit_accepts_explicit_row_header_cells() -> None:
     report = audit_canonical_document(doc)
 
     assert report["WARNING"] == []
+
+
+def test_audit_warns_when_only_one_body_row_has_a_partial_header() -> None:
+    doc = _sample_valid_document()
+    doc["sections"][0]["blocks"].append(
+        {
+            "id": "table-partial-row-header",
+            "type": "table",
+            "table_ast": {
+                "body": [
+                    {"cells": [{"text": "Mês"}, {"text": "Valor"}]},
+                    {
+                        "cells": [
+                            {
+                                "text": "Janeiro",
+                                "header": True,
+                                "scope": "row",
+                            },
+                            {"text": "10"},
+                        ]
+                    },
+                    {"cells": [{"text": "Fevereiro"}, {"text": "12"}]},
+                ]
+            },
+        }
+    )
+
+    report = audit_canonical_document(doc)
+
+    assert any(
+        "table-partial-row-header" in warning for warning in report["WARNING"]
+    )

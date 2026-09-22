@@ -122,10 +122,14 @@ class EditorAgent:
                 if raw_output.kind == "formula":
                     text = raw_output.latex or ""
                 else:
-                    text = "\n".join(
+                    table_lines = [
                         "| " + " | ".join(row) + " |"
                         for row in raw_output.table_rows()
-                    )
+                    ]
+                    if raw_output.caption:
+                        table_lines.insert(0, raw_output.caption)
+                    table_lines.extend(note for note in raw_output.notes if note)
+                    text = "\n".join(table_lines)
             else:
                 text = raw_output if isinstance(raw_output, str) else ""
 

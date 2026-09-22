@@ -653,3 +653,20 @@ def test_picture_reclassified_as_formula_reconciles_processing_needs(
     assert [observation.kind for observation in manifest.observations] == [
         "formula-requires-processing"
     ]
+
+    payload = build_pddl_structured_payload(
+        file_path=Path("/tmp/amostra.pdf"),
+        manifest=manifest,
+        plan=_sample_plan(),
+        planner_backend="internal",
+        execution_report=None,
+        comparison=None,
+    )
+    formula_block = payload["pages"][0]["blocks"][1]
+    assert formula_block["type"] == "math"
+
+    document = build_canonical_document(payload)
+    canonical_formula = document["sections"][0]["blocks"][0]
+    assert canonical_formula["type"] == "math"
+    assert canonical_formula["text"] == r"E=mc^2"
+    assert canonical_formula["metadata"]["mathml"]

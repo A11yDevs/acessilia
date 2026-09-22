@@ -12,6 +12,7 @@ from docstruct.tables.ast import (
     MSG_TABLE_TEXT_ROW,
     linearize_table_for_text,
     normalize_table_ast,
+    row_header_column_count,
     rows_from_table_ast,
     split_header_and_body,
     table_ast_from_block,
@@ -65,6 +66,24 @@ class TestTableAst:
 
         assert header == []
         assert len(body) == 2
+
+    def test_partial_row_header_does_not_disable_legacy_inference(self):
+        rows = [
+            {"cells": [{"text": "Mês"}, {"text": "Valor"}]},
+            {
+                "cells": [
+                    {"text": "Janeiro", "header": True, "scope": "row"},
+                    {"text": "10"},
+                ]
+            },
+            {"cells": [{"text": "Fevereiro"}, {"text": "12"}]},
+        ]
+
+        header, body, _ = split_header_and_body({"body": rows})
+
+        assert header == [rows[0]]
+        assert body == rows[1:]
+        assert row_header_column_count(rows) == 0
 
     def test_linearize_canonical_english(self):
         out = linearize_table_for_text({"rows": [["A", "B"], ["1", "2"]], "caption": "T"})

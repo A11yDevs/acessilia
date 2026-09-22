@@ -137,6 +137,43 @@ def table_ast_from_block(block: dict[str, Any]) -> dict[str, Any] | None:
     return table_ast_from_rows(block.get("rows"), caption=block.get("caption"))
 
 
+def effective_row_width(row: dict[str, Any]) -> int:
+    """Return the number of logical columns occupied by a table row."""
+    cells = row.get("cells", []) if isinstance(row, dict) else []
+    width = 0
+    for cell in cells:
+        if not isinstance(cell, dict):
+            continue
+        colspan = cell.get("colspan")
+        width += colspan if isinstance(colspan, int) and colspan >= 1 else 1
+    return width
+
+
+def row_header_column_count(body_rows: list[dict[str, Any]]) -> int:
+    """Return the common leading width carrying row-header semantics."""
+    if not body_rows:
+        return 0
+
+    leading_widths: list[int] = []
+    for row in body_rows:
+        cells = row.get("cells", []) if isinstance(row, dict) else []
+        width = 0
+        for cell in cells:
+            if not isinstance(cell, dict):
+                break
+            scope = str(cell.get("scope", "")).strip().lower()
+            is_row_header = scope in {"row", "rowgroup"} or (
+                bool(cell.get("header")) and scope not in {"col", "colgroup"}
+            )
+            if not is_row_header:
+                break
+            colspan = cell.get("colspan")
+            width += colspan if isinstance(colspan, int) and colspan >= 1 else 1
+        leading_widths.append(width)
+
+    return min(leading_widths, default=0)
+
+
 def split_header_and_body(
     table_ast: dict[str, Any], *, infer_legacy_header: bool = True
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
@@ -144,17 +181,10 @@ def split_header_and_body(
     body = list(table_ast.get("body") or [])
     footer = list(table_ast.get("footer") or [])
 
-    has_explicit_cell_headers = any(
-        isinstance(cell, dict) and bool(cell.get("header"))
-        for row in body
-        if isinstance(row, dict)
-        for cells in [row.get("cells")]
-        if isinstance(cells, list)
-        for cell in cells
-    )
+    has_complete_row_headers = row_header_column_count(body) > 0
     if (
         not header
-        and not has_explicit_cell_headers
+        and not has_complete_row_headers
         and infer_legacy_header
         and len(body) >= 2
     ):

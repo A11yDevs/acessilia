@@ -63,6 +63,7 @@ def test_data_table_preserves_cells_spans_and_warnings_in_canonical_ast() -> Non
             },
         ],
         caption="Preços",
+        notes=["Fonte: levantamento interno."],
         language="pt-BR",
         confidence=0.91,
         warnings=["Uma célula está ilegível."],
@@ -73,6 +74,16 @@ def test_data_table_preserves_cells_spans_and_warnings_in_canonical_ast() -> Non
     assert ast["header"][0]["cells"][0]["header"] is True
     assert ast["body"][0]["cells"][0]["rowspan"] == 2
     assert ast["body"][0]["cells"][1]["text"] == ""
+    assert ast["footer"] == [
+        {
+            "cells": [
+                {
+                    "text": "Fonte: levantamento interno.",
+                    "colspan": 2,
+                }
+            ]
+        }
+    ]
     assert ast["metadata"]["warnings"] == ["Uma célula está ilegível."]
 
     document = build_canonical_document(
@@ -80,6 +91,9 @@ def test_data_table_preserves_cells_spans_and_warnings_in_canonical_ast() -> Non
     )
     table = document["sections"][0]["blocks"][0]
     assert table["rows"][1] == ["Arroz", ""]
+    assert table["table_ast"]["footer"][0]["cells"][0]["text"] == (
+        "Fonte: levantamento interno."
+    )
 
 
 def test_data_formula_rejects_table_rows() -> None:
@@ -88,6 +102,17 @@ def test_data_formula_rejects_table_rows() -> None:
             kind="formula",
             rows=[{"cells": [{"text": "x"}]}],
             latex="x",
+            language="und",
+            confidence=1.0,
+        )
+
+
+def test_data_formula_rejects_table_notes() -> None:
+    with pytest.raises(ValidationError):
+        DataOutput(
+            kind="formula",
+            latex="x",
+            notes=["Nota exclusiva de tabela"],
             language="und",
             confidence=1.0,
         )
@@ -130,6 +155,30 @@ def test_editor_integrates_typed_table_without_reparsing_text() -> None:
     assert table["rows"] == [["Nome", "Nota"], ["Ana", "9,5"]]
     assert table["table_ast"]["header"][0]["cells"][0]["header"] is True
     assert table["metadata"]["source"] == "data-agent"
+
+
+def test_editor_preserves_table_caption_and_notes_in_text_and_blocks() -> None:
+    task = RegionTask(
+        agent_target="data",
+        classification="table",
+        image_bytes=b"image",
+        page_num=1,
+    )
+    output = DataOutput(
+        kind="table",
+        rows=[{"cells": [{"text": "A"}, {"text": "B"}]}],
+        caption="Resumo",
+        notes=["Fonte: exemplo."],
+        language="pt-BR",
+        confidence=0.9,
+    )
+    editor = EditorAgent()
+
+    text = editor.consolidate_page([task], {0: output})
+    blocks = editor.build_page_blocks([task], {0: output})
+
+    assert text == "Resumo\n| A | B |\nFonte: exemplo."
+    assert blocks[0]["table_ast"]["footer"][0]["cells"][0]["text"] == "Fonte: exemplo."
 
 
 def test_data_table_keeps_row_headers_in_body() -> None:
