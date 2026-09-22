@@ -12,6 +12,9 @@ from backend.agents.output_schemas import DataOutput, VisionOutput
 from backend.core.agents.informational_structural import InformationalStructuralAgent
 from backend.core.execution.executor import ExecutorAgent, MethodRegistry
 from backend.core.execution.models import ExecutionReport, MethodResult
+from backend.core.manifest.builder import (
+    reconcile_reclassified_element_processing_needs,
+)
 from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
 from backend.core.manifest.models import Artifact, ManifestElement, ProcessingManifest
 from backend.core.planning.domain_bundle import DomainBundle
@@ -446,15 +449,27 @@ async def _enrich_picture_descriptions(
             if vision_output.kind == "formula":
                 element.text = vision_output.formula_latex or ""
                 if element.type != "formula":
+                    previous_type = element.type
                     element.metadata["original_type"] = element.type
                     element.type = "formula"
                     element.raw_label = "formula"
+                    reconcile_reclassified_element_processing_needs(
+                        manifest,
+                        element,
+                        previous_type=previous_type,
+                    )
             else:
                 element.text = vision_output.description
                 if element.type != "picture":
+                    previous_type = element.type
                     element.metadata["original_type"] = element.type
                     element.type = "picture"
                     element.raw_label = "picture"
+                    reconcile_reclassified_element_processing_needs(
+                        manifest,
+                        element,
+                        previous_type=previous_type,
+                    )
             if element.page_number is None and page_number >= 1:
                 element.page_number = page_number
             enriched += 1
@@ -1043,11 +1058,9 @@ def _table_ast_from_metadata(metadata: dict[str, Any]) -> dict[str, Any] | None:
                 continue
             normalized_cells: list[dict[str, Any]] = []
             for cell in cells:
-                if not isinstance(cell, dict):
+                if not isinstance(cell, dict) or "text" not in cell:
                     continue
                 text = str(cell.get("text", "")).strip()
-                if not text:
-                    continue
                 normalized_cell: dict[str, Any] = {"text": text}
                 if isinstance(cell.get("header"), bool):
                     normalized_cell["header"] = cell["header"]
@@ -1085,8 +1098,7 @@ def _table_ast_from_rows(rows: list[list[str]]) -> dict[str, Any]:
         cells = []
         for cell in row:
             text = str(cell).strip()
-            if text:
-                cells.append({"text": text})
+            cells.append({"text": text})
         if cells:
             body.append({"cells": cells})
     return {"body": body}

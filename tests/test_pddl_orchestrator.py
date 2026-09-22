@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 from pathlib import Path
 
+import pytest
+
+from backend.agents.output_schemas import VisionOutput
+from backend.agents.pddl_orchestrator import _enrich_picture_descriptions
 from backend.agents.pddl_orchestrator import build_pddl_structured_payload
 from backend.agents.pddl_orchestrator import _rows_from_visual_table_text
+from backend.agents.pddl_orchestrator import _table_ast_from_metadata
 from backend.agents.pddl_orchestrator import _table_element_has_structured_content
 from backend.pipeline.canonical_builder import build_canonical_document
 from backend.core.manifest.models import (
@@ -12,6 +18,7 @@ from backend.core.manifest.models import (
     ManifestElement,
     ManifestSummary,
     Obligation,
+    Observation,
     PageDescriptor,
     ProcessingManifest,
     SourceDocument,
@@ -542,3 +549,107 @@ def test_table_element_has_structured_content_rejects_placeholder_table_ast() ->
     )
 
     assert _table_element_has_structured_content(element) is False
+
+
+def test_table_ast_from_metadata_preserves_empty_structural_cells() -> None:
+    table_ast = _table_ast_from_metadata(
+        {
+            "table_ast": {
+                "body": [
+                    {
+                        "cells": [
+                            {"text": "A"},
+                            {"text": ""},
+                            {"text": "C"},
+                        ]
+                    }
+                ]
+            }
+        }
+    )
+
+    assert table_ast is not None
+    assert [cell["text"] for cell in table_ast["body"][0]["cells"]] == [
+        "A",
+        "",
+        "C",
+    ]
+
+
+def test_picture_reclassified_as_formula_reconciles_processing_needs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from backend.agents import pddl_orchestrator as pddl_module
+
+    manifest = _sample_manifest()
+    element = manifest.elements[1]
+    element.type = "picture"
+    element.raw_label = "picture"
+    element.text = None
+    manifest.observations = [
+        Observation(
+            id="observation-describe-image-2",
+            kind="picture-requires-processing",
+            severity="warning",
+            message="Descrever imagem",
+            target_ids=[element.id],
+        )
+    ]
+    manifest.obligations[0] = Obligation(
+        id="obligation-describe-image-2",
+        kind="describe-image",
+        target_ids=[element.id],
+        admissible_methods=["vision-description", "human-review"],
+        method_costs={"vision-description": 20, "human-review": 100},
+        rationale="Descrever imagem",
+    )
+    manifest.summary.observation_count = 1
+    manifest.summary.element_types = {"heading": 1, "picture": 1}
+
+    class FakeVisionAgent:
+        def __init__(self, **_kwargs):
+            pass
+
+        async def describe_region(self, **_kwargs):
+            return VisionOutput(
+                kind="formula",
+                formula_latex=r"E=mc^2",
+                language="und",
+                confidence=0.98,
+                mentioned_elements=["equação"],
+            )
+
+    monkeypatch.setattr(pddl_module, "VisionAgent", FakeVisionAgent)
+    monkeypatch.setattr(
+        pddl_module,
+        "_extract_picture_bytes",
+        lambda *_args: (b"image", 1),
+    )
+
+    async def run_inline(function, *args):
+        return function(*args)
+
+    monkeypatch.setattr(pddl_module.asyncio, "to_thread", run_inline)
+
+    asyncio.run(
+        _enrich_picture_descriptions(
+            manifest,
+            Path("/tmp/amostra.pdf"),
+            mode="medio",
+        )
+    )
+
+    assert element.type == "formula"
+    assert element.text == r"E=mc^2"
+    assert manifest.summary.element_types == {"formula": 1, "heading": 1}
+    assert [obligation.kind for obligation in manifest.obligations] == [
+        "verbalize-formula"
+    ]
+    assert manifest.obligations[0].admissible_methods == [
+        "mathml",
+        "latex-verbalizer",
+        "human-review",
+    ]
+    assert [observation.kind for observation in manifest.observations] == [
+        "formula-requires-processing"
+    ]
