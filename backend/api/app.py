@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 
 from contextlib import asynccontextmanager
 
@@ -24,6 +25,16 @@ from backend.services.queue_service import unified_queue
 from backend.tools.logger import logger, setup_logger
 
 
+def _filter_health_access(record: logging.LogRecord) -> bool:
+    args = record.args
+    return not (
+        isinstance(args, tuple)
+        and len(args) == 5
+        and args[2].split("?", 1)[0] == "/api/v1/health"
+        and args[4] == 200
+    )
+
+
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
     setup_logger()
@@ -31,12 +42,17 @@ async def _lifespan(app: FastAPI):
     await limpar_tokens_expirados()
     cleanup_task = asyncio.create_task(periodic_cleanup())
     logger.info(t(LOG_API_STARTED))
-    yield
-    cleanup_task.cancel()
+    access_logger = logging.getLogger("uvicorn.access")
+    access_logger.addFilter(_filter_health_access)
     try:
-        await cleanup_task
-    except asyncio.CancelledError:
-        pass
+        yield
+    finally:
+        access_logger.removeFilter(_filter_health_access)
+        cleanup_task.cancel()
+        try:
+            await cleanup_task
+        except asyncio.CancelledError:
+            pass
 
 
 def create_app() -> FastAPI:

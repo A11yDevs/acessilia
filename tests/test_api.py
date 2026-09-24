@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import zipfile
 from pathlib import Path
 
@@ -10,7 +11,7 @@ from backend.config.settings import settings
 
 pytest.importorskip("fastapi.testclient")
 
-from backend.api.app import app  # noqa: E402
+from backend.api.app import _filter_health_access, app  # noqa: E402
 
 
 @pytest.fixture(scope="session")
@@ -62,6 +63,18 @@ def test_health(client):
     assert body["status"] == "ok"
     assert body["model_client"] == settings.ai_client
     assert "queue_size" in body
+
+
+def test_health_access_filter_keeps_failures_and_other_requests():
+    def record(path, status):
+        return logging.LogRecord(
+            "uvicorn.access", logging.INFO, __file__, 0, "%s %s %s %s %d",
+            ("127.0.0.1", "GET", path, "1.1", status), None,
+        )
+
+    assert not _filter_health_access(record("/api/v1/health", 200))
+    assert _filter_health_access(record("/api/v1/health", 503))
+    assert _filter_health_access(record("/api/v1/jobs", 200))
 
 
 def test_stats_empty(client):
