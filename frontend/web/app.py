@@ -120,6 +120,10 @@ DOWNLOAD_SUFFIXES = {
 }
 
 
+def _route_path(request: Request) -> str:
+    return getattr(request.scope.get("route"), "path", "<unmatched>")
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """Catch-all handler for unexpected errors in the Web Panel.
@@ -132,7 +136,7 @@ async def global_exception_handler(request: Request, exc: Exception):
         TemplateResponse: The rendered index page with the localized internal-error message and HTTP status 500.
     """
     logger.error(
-        t(LOG_WEB_GLOBAL_ERROR).format(error=str(exc), path=request.url.path)
+        t(LOG_WEB_GLOBAL_ERROR).format(error=str(exc), path=_route_path(request))
     )
     logger.error(traceback.format_exc())
     return templates.TemplateResponse(
@@ -146,7 +150,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     logger.warning(
-        t(LOG_WEB_HTTP_EXCEPTION).format(error=str(exc.detail), path=request.url.path)
+        t(LOG_WEB_HTTP_EXCEPTION).format(error=str(exc.detail), path=_route_path(request))
     )
     return templates.TemplateResponse(
         request=request,
@@ -161,7 +165,7 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
     logger.warning(
         t(LOG_WEB_RATE_LIMIT_EXCEEDED).format(
             ip=request.client.host if request.client else "unknown",
-            path=request.url.path,
+            path=_route_path(request),
         )
     )
     return templates.TemplateResponse(

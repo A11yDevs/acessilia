@@ -203,8 +203,16 @@ def test_download_proxy_removes_partial_file_after_api_failure(web_client):
 
 
 def test_download_page_not_found(web_client):
-    resp = web_client.get("/download/bad")
+    messages = []
+    sink = web_module.logger.add(messages.append, format="{message}")
+    try:
+        resp = web_client.get("/download/bad")
+    finally:
+        web_module.logger.remove(sink)
     assert resp.status_code == 404
+    logged = "".join(str(message) for message in messages)
+    assert "/download/{token}" in logged
+    assert "/download/bad" not in logged
 
 
 def test_download_page_uses_real_client(monkeypatch):
