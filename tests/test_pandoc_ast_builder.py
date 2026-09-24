@@ -103,3 +103,39 @@ def test_build_pandoc_ast_preserves_empty_cells():
     cells = body_rows[0][1]
     assert len(cells) == 3  # All 3 cells preserved, including the empty cell!
 
+
+def test_build_pandoc_ast_cell_with_none_text():
+    document = {
+        "title": "Doc com None",
+        "sections": [
+            {
+                "id": "sec-1",
+                "blocks": [
+                    {
+                        "id": "tbl-none",
+                        "type": "table",
+                        "table_ast": {
+                            "body": [
+                                {
+                                    "cells": [
+                                        {"text": "A"},
+                                        {"text": None},
+                                    ]
+                                }
+                            ]
+                        },
+                    }
+                ],
+            }
+        ],
+    }
+
+    ast = build_pandoc_ast(document)
+    table_node = [b for b in ast["blocks"] if b.get("t") == "Table"][0]
+    cell = table_node["c"][4][0][3][0][1][0]
+    # cell[4] is the block content: [{"t": "Para", "c": [...]}]
+    content_inlines = cell[4][0]["c"]
+    # Should not contain any Str with literal "None"
+    assert not any(inline.get("c") == "None" for inline in content_inlines)
+
+
