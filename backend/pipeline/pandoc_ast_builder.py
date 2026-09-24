@@ -166,7 +166,7 @@ def _pandoc_row(row: dict[str, Any], *, header: bool) -> list[Any]:
         [
             _pandoc_cell(cell, header=header)
             for cell in cells
-            if isinstance(cell, dict) and str(cell.get("text", "")).strip()
+            if isinstance(cell, dict)
         ],
     ]
 

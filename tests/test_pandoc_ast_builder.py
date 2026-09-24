@@ -50,3 +50,56 @@ def test_build_pandoc_ast_emits_table_node_from_table_ast():
     caption = table_node["c"][1]
     assert isinstance(caption, list)
     assert caption[0]
+
+
+def test_build_pandoc_ast_preserves_empty_cells():
+    document = {
+        "title": "Documento com células vazias",
+        "language": "pt-BR",
+        "verbosity": "detailed",
+        "sections": [
+            {
+                "id": "sec-1",
+                "title": "Seção",
+                "level": 1,
+                "blocks": [
+                    {
+                        "id": "tbl-gantt",
+                        "type": "table",
+                        "table_ast": {
+                            "caption": "Cronograma",
+                            "header": [
+                                {
+                                    "cells": [
+                                        {"text": "Tarefa"},
+                                        {"text": "Semana 1"},
+                                        {"text": "Semana 2"},
+                                    ]
+                                }
+                            ],
+                            "body": [
+                                {
+                                    "cells": [
+                                        {"text": "Etapa 1"},
+                                        {"text": "Ativo"},
+                                        {"text": ""},  # Célula vazia
+                                    ]
+                                }
+                            ],
+                        },
+                    }
+                ],
+                "children": [],
+            }
+        ],
+    }
+
+    ast = build_pandoc_ast(document)
+    table_node = [b for b in ast["blocks"] if b.get("t") == "Table"][0]
+    # table_node["c"][4] is bodies: list of [attr, rowhead_columns, intermediate_head, rows]
+    body_rows = table_node["c"][4][0][3]
+    assert len(body_rows) == 1
+    # row is [attr, cells]
+    cells = body_rows[0][1]
+    assert len(cells) == 3  # All 3 cells preserved, including the empty cell!
+

@@ -232,10 +232,6 @@ def _validate_table_block(block: dict[str, Any]) -> list[str]:
                             f"Tabela com celula nao textual em {block_id} (row {row_index}, col {col_index})"
                         )
                         continue
-                    if not cell.strip():
-                        errors.append(
-                            f"Tabela com celula vazia em {block_id} (row {row_index}, col {col_index})"
-                        )
 
     if table_ast is not None:
         if not isinstance(table_ast, dict):
@@ -273,9 +269,9 @@ def _validate_table_block(block: dict[str, Any]) -> list[str]:
                         )
                         continue
                     text = cell.get("text")
-                    if not isinstance(text, str) or not text.strip():
+                    if text is not None and not isinstance(text, str):
                         errors.append(
-                            f"table_ast celula sem texto em {block_id} ({section_name} {row_index}:{col_index})"
+                            f"table_ast celula com texto invalido em {block_id} ({section_name} {row_index}:{col_index})"
                         )
                     colspan = cell.get("colspan")
                     if isinstance(colspan, int) and colspan >= 1:

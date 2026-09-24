@@ -97,3 +97,44 @@ def test_audit_nested_sections_accessibility():
     report = audit_canonical_document(doc)
 
     assert any("Imagem img-sub sem alt-text" in err for err in report["WARNING"])
+
+
+def test_audit_table_with_empty_cells_allowed():
+    doc = _sample_valid_document()
+    doc["sections"][0]["blocks"].append(
+        {
+            "id": "blk-tbl-1",
+            "type": "table",
+            "table_ast": {
+                "header": [
+                    {
+                        "cells": [
+                            {"text": "Tarefa", "header": True},
+                            {"text": "Semana 1", "header": True},
+                            {"text": "Semana 2", "header": True},
+                        ]
+                    }
+                ],
+                "body": [
+                    {
+                        "cells": [
+                            {"text": "Planejamento"},
+                            {"text": "X"},
+                            {"text": ""},  # Célula vazia (ex: Gantt / cronograma)
+                        ]
+                    },
+                    {
+                        "cells": [
+                            {"text": "Execução"},
+                            {"text": ""},  # Célula vazia
+                            {"text": "X"},
+                        ]
+                    },
+                ],
+            },
+        }
+    )
+
+    report = audit_canonical_document(doc)
+    assert report["BLOCKER"] == []
+
