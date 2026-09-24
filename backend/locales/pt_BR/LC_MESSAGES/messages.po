@@ -1021,9 +1021,8 @@ msgstr ""
 "Converta tabelas e fórmulas matemáticas de imagens em texto estruturado "
 "acessível (Markdown para tabelas, LaTeX para fórmulas)."
 
-#, python-brace-format
-msgid "Internal server error: {error}"
-msgstr "Erro interno no servidor: {error}"
+msgid "Internal server error. Please try again."
+msgstr "Erro interno no servidor. Tente novamente."
 
 #, python-brace-format
 msgid "API error ({status_code}): {detail}"

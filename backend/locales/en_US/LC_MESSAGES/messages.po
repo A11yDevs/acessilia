@@ -1017,9 +1017,8 @@ msgstr ""
 "Convert tables and mathematical formulas from images into accessible "
 "structured text (Markdown for tables, LaTeX for formulas)."
 
-#, python-brace-format
-msgid "Internal server error: {error}"
-msgstr "Internal server error: {error}"
+msgid "Internal server error. Please try again."
+msgstr "Internal server error. Please try again."
 
 #, python-brace-format
 msgid "API error ({status_code}): {detail}"

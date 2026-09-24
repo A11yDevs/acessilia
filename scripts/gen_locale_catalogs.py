@@ -1303,7 +1303,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "estilizado e um retângulo que representa um documento ou página."
         ),
         WEB_FOOTER: "Tecnologia para Inclusão",
-        WEB_ERROR_INTERNAL: "Erro interno no servidor: {error}",
+        WEB_ERROR_INTERNAL: "Erro interno no servidor. Tente novamente.",
         WEB_ERROR_API_UPLOAD: "Erro da API ({status_code}): {detail}",
         WEB_ERROR_UPLOAD_GENERIC: (
             "Ocorreu um erro ao enviar o arquivo para a API. Tente novamente."

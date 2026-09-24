@@ -142,7 +142,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     return templates.TemplateResponse(
         request=request,
         name="index.html",
-        context={**_web_strings(), "error": t(WEB_ERROR_INTERNAL).format(error=str(exc))},
+        context={**_web_strings(), "error": t(WEB_ERROR_INTERNAL)},
         status_code=500,
     )
 
