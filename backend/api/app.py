@@ -11,7 +11,7 @@ from slowapi.errors import RateLimitExceeded
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from backend.api.limiter import limiter
-from backend.api.routes import download, health, history, jobs
+from backend.api.routes import download, health, history, jobs, logs
 from backend.i18n import t
 from backend.log_messages import (
     API_INTERNAL_ERROR_DETAIL,
@@ -82,6 +82,7 @@ def create_app() -> FastAPI:
     app.include_router(download.router, prefix="/api/v1")
     app.include_router(history.router, prefix="/api/v1")
     app.include_router(health.router, prefix="/api/v1")
+    app.include_router(logs.router, prefix="/api/v1")
     return app
 
 

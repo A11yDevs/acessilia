@@ -77,6 +77,46 @@ def test_health_access_filter_keeps_failures_and_other_requests():
     assert _filter_health_access(record("/api/v1/jobs", 200))
 
 
+def test_logs_require_configured_token(client, monkeypatch):
+    monkeypatch.setattr(settings, "logs_api_token", "")
+    assert client.get("/api/v1/logs").status_code == 503
+
+
+def test_logs_list_and_download_files_with_token(client, monkeypatch):
+    monkeypatch.setattr(settings, "logs_api_token", "secret")
+    monkeypatch.setattr(settings, "logs_dir", settings.logs_dir / "manual")
+    settings.logs_dir.mkdir(parents=True, exist_ok=True)
+    (settings.logs_dir / "bot_2020-01-01.log").write_text("first\nsecond\nthird\n", encoding="utf-8")
+    (settings.logs_dir / "bot_2019-12-31.log.zip").write_bytes(b"archive")
+    (settings.logs_dir / "other.log").write_text("hidden", encoding="utf-8")
+    secret = settings.logs_dir.parent / "secret.log"
+    secret.write_text("private", encoding="utf-8")
+    (settings.logs_dir / "bot_secret.log").symlink_to(secret)
+
+    assert client.get("/api/v1/logs").status_code == 401
+    assert client.get("/api/v1/logs", headers={"Authorization": "Bearer wrong"}).status_code == 401
+    assert client.get("/api/v1/logs/bot_2020-01-01.log").status_code == 401
+    headers = {"Authorization": "Bearer secret"}
+    response = client.get("/api/v1/logs", headers=headers)
+    assert response.status_code == 200
+    assert response.json() == {"files": [
+        {"name": "bot_2020-01-01.log", "size_bytes": 19},
+        {"name": "bot_2019-12-31.log.zip", "size_bytes": 7},
+    ]}
+    assert client.get("/api/v1/logs/bot_2020-01-01.log", headers=headers).text == "first\nsecond\nthird\n"
+    assert client.get("/api/v1/logs/bot_2019-12-31.log.zip", headers=headers).content == b"archive"
+    assert client.get("/api/v1/logs/other.log", headers=headers).status_code == 404
+    assert client.get("/api/v1/logs/bot_secret.log", headers=headers).status_code == 404
+
+
+def test_logs_return_empty_list_when_no_files_exist(client, monkeypatch):
+    monkeypatch.setattr(settings, "logs_api_token", "secret")
+    monkeypatch.setattr(settings, "logs_dir", settings.logs_dir / "missing")
+    response = client.get("/api/v1/logs", headers={"Authorization": "Bearer secret"})
+    assert response.status_code == 200
+    assert response.json() == {"files": []}
+
+
 def test_stats_empty(client):
     resp = client.get("/api/v1/stats")
     assert resp.status_code == 200
