@@ -7,6 +7,7 @@ import respx
 
 from frontend.clients.api_client import ApiClient
 from backend.config.settings import settings
+from frontend.telegram import user_context
 from frontend.telegram.handlers import document as doc_module
 from frontend.telegram.handlers import start as start_module
 
@@ -40,7 +41,7 @@ class _FakeBot:
     async def download_file(self, file_path, destination):
         Path(destination).write_bytes(self.content)
 
-    async def send_message(self, chat_id, text, message_thread_id=None, parse_mode=None):
+    async def send_message(self, chat_id, text, message_thread_id=None, parse_mode=None, **kwargs):
         self.sent.append(text)
         return _FakeSentMsg(len(self.sent))
 
@@ -48,17 +49,83 @@ class _FakeBot:
         self.edited.append(text)
 
 
+class _FakeJobClient:
+    def __init__(self):
+        self.status_requests = []
+        self.cancel_requests = []
+
+    async def get_job_status(self, task_id):
+        self.status_requests.append(task_id)
+        return _done_status(task_id)
+
+    async def cancel_job(self, task_id):
+        self.cancel_requests.append(task_id)
+        return {"task_id": task_id, "status": "cancelled"}
+
+
+class _ConcurrentJobClient:
+    def __init__(self):
+        self.submissions = {}
+        self.all_submitted = asyncio.Event()
+
+    async def submit_job(
+        self,
+        file_path,
+        filename,
+        mode="normal",
+        custom_prompt=None,
+        thinking_mode=False,
+        email=None,
+        source="api",
+    ):
+        task_id = f"{Path(filename).stem}-task"
+        self.submissions[filename] = {
+            "task_id": task_id,
+            "mode": mode,
+            "email": email,
+            "source": source,
+        }
+        if len(self.submissions) == 2:
+            self.all_submitted.set()
+        await self.all_submitted.wait()
+        return {"task_id": task_id, "position": 1, "message": "ok"}
+
+    async def get_job_status(self, task_id):
+        status = _done_status(task_id)
+        status["download_url"] = f"{BASE}/api/v1/download/{task_id}"
+        return status
+
+
 class _FakeChat:
-    id = 123
+    def __init__(self, chat_id=123):
+        self.id = chat_id
+
+
+class _FakeUser:
+    def __init__(self, user_id=456):
+        self.id = user_id
 
 
 class _FakeMessage:
-    def __init__(self, bot, document=None, photo=None):
+    def __init__(
+        self,
+        bot,
+        document=None,
+        photo=None,
+        *,
+        chat_id=123,
+        thread_id=None,
+        user_id=456,
+        text=None,
+    ):
         self.bot = bot
         self.document = document
         self.photo = photo
-        self.chat = _FakeChat()
-        self.message_thread_id = None
+        self.chat = _FakeChat(chat_id)
+        self.message_thread_id = thread_id
+        self.from_user = _FakeUser(user_id)
+        self.message_id = 999
+        self.text = text
         self.answers = []
 
     async def answer(self, text, **kwargs):
@@ -80,11 +147,15 @@ class _FakePhoto:
 def doc_module_isolated(monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "temp_dir", tmp_path)
     monkeypatch.setattr(doc_module, "client", ApiClient(base_url=BASE))
+    monkeypatch.setattr(start_module, "client", ApiClient(base_url=BASE))
     monkeypatch.setattr(doc_module, "POLL_INTERVAL_SECONDS", 0.01)
-    monkeypatch.setattr(doc_module, "user_modes", {})
-    monkeypatch.setattr(doc_module, "user_emails", {})
-    monkeypatch.setattr(doc_module, "user_task_ids", {})
-    return doc_module
+    user_context.user_modes.clear()
+    user_context.user_emails.clear()
+    user_context.user_task_ids.clear()
+    yield doc_module
+    user_context.user_modes.clear()
+    user_context.user_emails.clear()
+    user_context.user_task_ids.clear()
 
 
 def _mock_job_api(status_body: dict, task_id: str = "tg12345"):
@@ -125,7 +196,7 @@ def test_document_flow_sends_download_link(doc_module_isolated, pdf_ua_failed):
 
     assert any("http://localhost:8000/api/v1/download/tok123" in s for s in bot.sent)
     assert any("Não foi possível gerar o PDF/UA" in s for s in bot.sent) == pdf_ua_failed
-    assert doc_module_isolated.user_task_ids[(123, None)] == "tg12345"
+    assert user_context.user_task_ids[(123, None, 456)] == "tg12345"
 
 
 def test_document_submits_with_mode_and_source(doc_module_isolated):
@@ -139,7 +210,7 @@ def test_document_submits_with_mode_and_source(doc_module_isolated):
         return_value=httpx.Response(200, json=_done_status())
     )
 
-    doc_module_isolated.user_modes[(123, None)] = "detalhado"
+    user_context.user_modes[(123, None, 456)] = "detalhado"
     bot = _FakeBot(content)
     msg = _FakeMessage(bot, document=_FakeDocument("doc.pdf", len(content), "file1"))
 
@@ -162,7 +233,7 @@ def test_document_passes_email_and_notifies(doc_module_isolated):
         return_value=httpx.Response(200, json=_done_status())
     )
 
-    doc_module_isolated.user_emails[(123, None)] = "test@example.com"
+    user_context.user_emails[(123, None, 456)] = "test@example.com"
     bot = _FakeBot(content)
     msg = _FakeMessage(bot, document=_FakeDocument("doc.pdf", len(content), "file1"))
 
@@ -174,6 +245,180 @@ def test_document_passes_email_and_notifies(doc_module_isolated):
     assert any("test@example.com" in s for s in bot.sent)
     assert any("http://localhost:8000/api/v1/download/tok123" in s for s in bot.sent)
     assert not any("Link de download enviado" in a for a in msg.answers)
+
+
+def test_user_preferences_are_stored_per_sender(doc_module_isolated):
+    bot = _FakeBot(b"")
+    first_user = _FakeMessage(
+        bot,
+        user_id=101,
+        text="/email first@example.com",
+    )
+    second_user = _FakeMessage(
+        bot,
+        user_id=202,
+        text="/email second@example.com",
+    )
+
+    asyncio.run(start_module.cmd_email(first_user))
+    asyncio.run(start_module.cmd_email(second_user))
+    asyncio.run(start_module.cmd_detailed(first_user))
+    asyncio.run(start_module.cmd_low(second_user))
+
+    assert user_context.user_emails[(123, None, 101)] == "first@example.com"
+    assert user_context.user_emails[(123, None, 202)] == "second@example.com"
+    assert user_context.user_modes[(123, None, 101)] == "detalhado"
+    assert user_context.user_modes[(123, None, 202)] == "baixo"
+
+
+def test_document_does_not_consume_another_senders_preferences(doc_module_isolated):
+    content = _fake_pdf_bytes()
+    group_id = -100123
+    user_context.user_modes[(group_id, None, 101)] = "detalhado"
+    user_context.user_emails[(group_id, None, 101)] = "first@example.com"
+    route = respx.post(f"{BASE}/api/v1/jobs").mock(
+        return_value=httpx.Response(
+            202, json={"task_id": "second-task", "position": 1, "message": "ok"}
+        )
+    )
+    respx.get(f"{BASE}/api/v1/jobs/second-task").mock(
+        return_value=httpx.Response(200, json=_done_status("second-task"))
+    )
+    bot = _FakeBot(content)
+    second_user = _FakeMessage(
+        bot,
+        document=_FakeDocument("doc.pdf", len(content), "file1"),
+        chat_id=group_id,
+        user_id=202,
+    )
+
+    with respx.mock:
+        asyncio.run(doc_module_isolated.handle_document(second_user))
+        body = route.calls[0].request.read()
+
+    assert b'name="mode"' in body and b"normal" in body
+    assert b"first@example.com" not in body
+    assert user_context.user_modes[(group_id, None, 101)] == "detalhado"
+    assert user_context.user_emails[(group_id, None, 101)] == "first@example.com"
+    assert user_context.user_task_ids[(group_id, None, 202)] == "second-task"
+
+
+def test_concurrent_group_users_keep_preferences_and_tasks_isolated(
+    doc_module_isolated,
+    monkeypatch,
+):
+    async def run_concurrent_flows():
+        group_id = -100123
+        first_key = (group_id, None, 101)
+        second_key = (group_id, None, 202)
+        bot = _FakeBot(_fake_pdf_bytes())
+        concurrent_client = _ConcurrentJobClient()
+        monkeypatch.setattr(doc_module, "client", concurrent_client)
+
+        first_preferences = _FakeMessage(
+            bot,
+            chat_id=group_id,
+            user_id=101,
+            text="/email first@example.com",
+        )
+        second_preferences = _FakeMessage(
+            bot,
+            chat_id=group_id,
+            user_id=202,
+            text="/email second@example.com",
+        )
+        await asyncio.gather(
+            start_module.cmd_email(first_preferences),
+            start_module.cmd_email(second_preferences),
+            start_module.cmd_detailed(first_preferences),
+            start_module.cmd_low(second_preferences),
+        )
+
+        first_upload = _FakeMessage(
+            bot,
+            document=_FakeDocument("first.pdf", len(bot.content), "file1"),
+            chat_id=group_id,
+            user_id=101,
+        )
+        second_upload = _FakeMessage(
+            bot,
+            document=_FakeDocument("second.pdf", len(bot.content), "file2"),
+            chat_id=group_id,
+            user_id=202,
+        )
+        await asyncio.wait_for(
+            asyncio.gather(
+                doc_module.handle_document(first_upload),
+                doc_module.handle_document(second_upload),
+            ),
+            timeout=2,
+        )
+
+        assert concurrent_client.submissions == {
+            "first.pdf": {
+                "task_id": "first-task",
+                "mode": "detalhado",
+                "email": "first@example.com",
+                "source": "telegram",
+            },
+            "second.pdf": {
+                "task_id": "second-task",
+                "mode": "baixo",
+                "email": "second@example.com",
+                "source": "telegram",
+            },
+        }
+        assert user_context.user_task_ids[first_key] == "first-task"
+        assert user_context.user_task_ids[second_key] == "second-task"
+        assert first_key not in user_context.user_emails
+        assert second_key not in user_context.user_emails
+        assert first_key not in user_context.user_modes
+        assert second_key not in user_context.user_modes
+
+        command_client = _FakeJobClient()
+        monkeypatch.setattr(start_module, "client", command_client)
+        first_status = _FakeMessage(bot, chat_id=group_id, user_id=101)
+        second_cancel = _FakeMessage(bot, chat_id=group_id, user_id=202)
+        await asyncio.gather(
+            start_module.cmd_status(first_status),
+            start_module.cmd_cancel(second_cancel),
+        )
+
+        assert command_client.status_requests == ["first-task"]
+        assert command_client.cancel_requests == ["second-task"]
+        assert user_context.user_task_ids[first_key] == "first-task"
+        assert second_key not in user_context.user_task_ids
+
+    asyncio.run(run_concurrent_flows())
+
+
+def test_status_reads_only_the_senders_task(doc_module_isolated, monkeypatch):
+    group_id = -100123
+    user_context.user_task_ids[(group_id, None, 101)] = "first-task"
+    user_context.user_task_ids[(group_id, None, 202)] = "second-task"
+    client = _FakeJobClient()
+    monkeypatch.setattr(start_module, "client", client)
+    message = _FakeMessage(_FakeBot(b""), chat_id=group_id, user_id=101)
+
+    asyncio.run(start_module.cmd_status(message))
+
+    assert client.status_requests == ["first-task"]
+    assert any("first-task" in answer for answer in message.answers)
+
+
+def test_cancel_removes_only_the_senders_task(doc_module_isolated, monkeypatch):
+    group_id = -100123
+    user_context.user_task_ids[(group_id, None, 101)] = "first-task"
+    user_context.user_task_ids[(group_id, None, 202)] = "second-task"
+    client = _FakeJobClient()
+    monkeypatch.setattr(start_module, "client", client)
+    message = _FakeMessage(_FakeBot(b""), chat_id=group_id, user_id=101)
+
+    asyncio.run(start_module.cmd_cancel(message))
+
+    assert client.cancel_requests == ["first-task"]
+    assert (group_id, None, 101) not in user_context.user_task_ids
+    assert user_context.user_task_ids[(group_id, None, 202)] == "second-task"
 
 
 def test_document_api_error_sends_message(doc_module_isolated):

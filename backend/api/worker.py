@@ -252,7 +252,13 @@ class JobExecutor:
             completed_formats.append("zip")
             state_manager.verificar_cancelamento(task_id)
 
-            token = await criar_token(out_dir, base, formats=completed_formats)
+            token = await criar_token(
+                out_dir,
+                base,
+                formats=completed_formats,
+                task_id=task_id,
+                owner=job.email or "",
+            )
             download_url = build_download_url(token)
             state_manager.registrar_download_url(task_id, download_url)
             state_manager.atualizar(

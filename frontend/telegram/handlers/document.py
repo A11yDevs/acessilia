@@ -10,6 +10,7 @@ from aiogram.exceptions import TelegramRetryAfter
 from frontend.telegram.adapters.file_service import download_file
 from frontend.clients.api_client import ApiError
 from frontend.clients import default_client
+from frontend.telegram import user_context
 
 from backend.tools.logger import logger
 from backend.tools.validators import validate_file
@@ -20,10 +21,6 @@ router = Router()
 
 client = default_client
 
-user_modes: dict[tuple[int, int | None], str] = {}
-user_emails: dict[tuple[int, int | None], str] = {}
-user_task_ids: dict[tuple[int, int | None], str] = {}
-
 POLL_INTERVAL_SECONDS = 3.0
 
 
@@ -32,11 +29,17 @@ async def _send_with_retry(
     chat_id: int,
     msg: str,
     message_thread_id: int | None = None,
+    reply_to_message_id: int | None = None,
     max_retries: int = 3,
 ) -> None:
     for attempt in range(max_retries):
         try:
-            await bot.send_message(chat_id, msg, message_thread_id=message_thread_id)
+            kwargs = {}
+            if message_thread_id is not None:
+                kwargs["message_thread_id"] = message_thread_id
+            if reply_to_message_id is not None:
+                kwargs["reply_to_message_id"] = reply_to_message_id
+            await bot.send_message(chat_id, msg, **kwargs)
             return
         except TelegramRetryAfter as e:
             wait = e.retry_after + attempt * 5
@@ -63,7 +66,8 @@ async def handle_document(message: Message) -> None:
         await message.answer(error_msg)
         return
 
-    mode = user_modes.pop((message.chat.id, message.message_thread_id), "normal")
+    state_key = user_context.get_user_state_key(message)
+    mode = user_context.user_modes.pop(state_key, "normal")
     await message.answer("📄 Arquivo recebido!")
     await process_file(message, document.file_id, filename, mode=mode)
 
@@ -74,7 +78,8 @@ async def handle_photo(message: Message) -> None:
     if photo is None:
         return
 
-    mode = user_modes.pop((message.chat.id, message.message_thread_id), "normal")
+    state_key = user_context.get_user_state_key(message)
+    mode = user_context.user_modes.pop(state_key, "normal")
     await message.answer("📷 Foto recebida!")
     await process_file(message, photo.file_id, "imagem.png", mode=mode)
 
@@ -89,7 +94,8 @@ async def process_file(
     tracker = StatusTracker(
         message.bot, message.chat.id, filename, message_thread_id=message_thread_id
     )
-    email = user_emails.get((message.chat.id, message.message_thread_id))
+    state_key = user_context.get_user_state_key(message)
+    email = user_context.user_emails.get(state_key)
 
     try:
         with tempfile.TemporaryDirectory(dir=settings.temp_dir) as tmpdir:
@@ -122,10 +128,10 @@ async def process_file(
                 )
                 return
 
-        user_emails.pop((message.chat.id, message.message_thread_id), None)
+        user_context.user_emails.pop(state_key, None)
         task_id = result["task_id"]
         position = result.get("position", 1)
-        user_task_ids[(message.chat.id, message.message_thread_id)] = task_id
+        user_context.user_task_ids[state_key] = task_id
 
         await tracker(f"Tarefa {task_id} enfileirada...")
         if position > 1:
@@ -183,6 +189,7 @@ async def _poll_job(
                     message.chat.id,
                     msg,
                     message_thread_id=message_thread_id,
+                    reply_to_message_id=message.message_id,
                 )
             return
 
@@ -197,6 +204,7 @@ async def _poll_job(
                 message.chat.id,
                 msg,
                 message_thread_id=message_thread_id,
+                reply_to_message_id=message.message_id,
             )
             return
 
@@ -207,6 +215,7 @@ async def _poll_job(
                 message.chat.id,
                 "🚫 Tarefa cancelada.",
                 message_thread_id=message_thread_id,
+                reply_to_message_id=message.message_id,
             )
             return
 
@@ -218,4 +227,5 @@ async def _poll_job(
         message.chat.id,
         "⏰ O processamento demorou mais que o esperado. Use /status para acompanhar.",
         message_thread_id=message_thread_id,
+        reply_to_message_id=message.message_id,
     )

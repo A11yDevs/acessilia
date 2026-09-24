@@ -12,7 +12,7 @@ from backend.services.cache import clear_cache
 from backend.tools.logger import logger
 from frontend.clients.api_client import ApiError
 from frontend.clients import default_client
-from frontend.telegram.handlers.document import user_modes, user_emails, user_task_ids
+from frontend.telegram import user_context
 from frontend.telegram.middlewares.pause_middleware import get_paused_chats
 
 router = Router()
@@ -32,7 +32,7 @@ async def cmd_email(message: Message) -> None:
         return
 
     email = args[1].strip()
-    user_emails[(message.chat.id, message.message_thread_id)] = email
+    user_context.user_emails[user_context.get_user_state_key(message)] = email
     await message.answer(
         f"E-mail {email} configurado! Agora envie o documento para ser enviado para este e-mail."
     )
@@ -99,7 +99,7 @@ async def cmd_formats(message: Message) -> None:
 
 @router.message(Command("ocr"))
 async def cmd_ocr(message: Message) -> None:
-    user_modes[(message.chat.id, message.message_thread_id)] = "ocr"
+    user_context.user_modes[user_context.get_user_state_key(message)] = "ocr"
     text = (
         "📄 Modo OCR ativado!\n\n"
         "Envie um PDF ou imagem e extrairei APENAS o texto, "
@@ -110,7 +110,7 @@ async def cmd_ocr(message: Message) -> None:
 
 @router.message(Command("detalhado"))
 async def cmd_detailed(message: Message) -> None:
-    user_modes[(message.chat.id, message.message_thread_id)] = "detalhado"
+    user_context.user_modes[user_context.get_user_state_key(message)] = "detalhado"
     text = (
         "🔍 Modo Detalhado ativado!\n\n"
         "Descricao com maximo nivel de detalhe: tipografia, "
@@ -122,7 +122,7 @@ async def cmd_detailed(message: Message) -> None:
 
 @router.message(Command("medio"))
 async def cmd_medium(message: Message) -> None:
-    user_modes[(message.chat.id, message.message_thread_id)] = "medio"
+    user_context.user_modes[user_context.get_user_state_key(message)] = "medio"
     text = (
         "📋 Modo Medio ativado!\n\n"
         "Texto completo e descricao clara de imagens. "
@@ -133,7 +133,7 @@ async def cmd_medium(message: Message) -> None:
 
 @router.message(Command("baixo"))
 async def cmd_low(message: Message) -> None:
-    user_modes[(message.chat.id, message.message_thread_id)] = "baixo"
+    user_context.user_modes[user_context.get_user_state_key(message)] = "baixo"
     text = (
         "⚡ Modo Baixo ativado!\n\n"
         "Foco no conteudo: extracao completa de texto e "
@@ -144,7 +144,7 @@ async def cmd_low(message: Message) -> None:
 
 @router.message(Command("normal"))
 async def cmd_normal(message: Message) -> None:
-    user_modes[(message.chat.id, message.message_thread_id)] = "medio"
+    user_context.user_modes[user_context.get_user_state_key(message)] = "medio"
     text = (
         "📋 Modo Normal ativado (equivalente ao Medio).\n\n"
         "Texto completo e descricao clara de imagens."
@@ -154,7 +154,7 @@ async def cmd_normal(message: Message) -> None:
 
 @router.message(Command("status"))
 async def cmd_status(message: Message) -> None:
-    task_id = user_task_ids.get((message.chat.id, message.message_thread_id))
+    task_id = user_context.user_task_ids.get(user_context.get_user_state_key(message))
     if not task_id:
         await message.answer("Nenhuma tarefa registrada neste chat ainda.")
         return
@@ -219,7 +219,8 @@ async def cmd_limpar(message: Message) -> None:
 
 @router.message(Command("cancelar"))
 async def cmd_cancel(message: Message) -> None:
-    task_id = user_task_ids.get((message.chat.id, message.message_thread_id))
+    state_key = user_context.get_user_state_key(message)
+    task_id = user_context.user_task_ids.get(state_key)
     if not task_id:
         await message.answer("Nenhuma tarefa registrada neste chat para cancelar.")
         return
@@ -228,7 +229,7 @@ async def cmd_cancel(message: Message) -> None:
     except ApiError as e:
         await message.answer(f"❌ Não foi possível cancelar ({e.status_code}): {e.detail}")
         return
-    user_task_ids.pop((message.chat.id, message.message_thread_id), None)
+    user_context.user_task_ids.pop(state_key, None)
     await message.answer(f"✅ Tarefa {result.get('task_id', task_id)} cancelada.")
 
 

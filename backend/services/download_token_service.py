@@ -46,13 +46,19 @@ def _get_connection():
                     output_dir TEXT NOT NULL DEFAULT '',
                     filename TEXT NOT NULL DEFAULT '',
                     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    formats TEXT NULL DEFAULT '[]'
+                    formats TEXT NULL DEFAULT '[]',
+                    task_id TEXT NULL DEFAULT '',
+                    owner TEXT NULL DEFAULT ''
                 )
             """)
             cursor.execute("PRAGMA table_info(download_tokens)")
             columns = [row[1] for row in cursor.fetchall()]
             if 'formats' not in columns:
                 cursor.execute("ALTER TABLE download_tokens ADD COLUMN formats TEXT NULL DEFAULT '[]'")
+            if 'task_id' not in columns:
+                cursor.execute("ALTER TABLE download_tokens ADD COLUMN task_id TEXT NULL DEFAULT ''")
+            if 'owner' not in columns:
+                cursor.execute("ALTER TABLE download_tokens ADD COLUMN owner TEXT NULL DEFAULT ''")
             try:
                 cursor.execute("CREATE INDEX idx_download_tokens_token ON download_tokens(token)")
             except sqlite3.OperationalError as e:
@@ -64,7 +70,13 @@ def _get_connection():
     return _connection
 
 
-async def criar_token(output_dir: Path, filename: str, formats: list = None) -> str:
+async def criar_token(
+    output_dir: Path,
+    filename: str,
+    formats: list = None,
+    task_id: str = "",
+    owner: str = "",
+) -> str:
     token = str(uuid.uuid4())
     formats_json = json.dumps(formats) if formats else '[]'
     with _connection_lock:
@@ -72,8 +84,8 @@ async def criar_token(output_dir: Path, filename: str, formats: list = None) -> 
         cursor = conn.cursor()
         try:
             cursor.execute(
-                "INSERT INTO download_tokens (token, output_dir, filename, formats) VALUES (?, ?, ?, ?)",
-                (token, str(output_dir), filename, formats_json)
+                "INSERT INTO download_tokens (token, output_dir, filename, formats, task_id, owner) VALUES (?, ?, ?, ?, ?, ?)",
+                (token, str(output_dir), filename, formats_json, task_id, owner)
             )
             conn.commit()
         finally:
@@ -88,7 +100,7 @@ async def obter_info_token(token: str) -> dict | None:
         cursor = conn.cursor()
         try:
             cursor.execute(
-                """SELECT output_dir, filename, formats, criado_em
+                """SELECT output_dir, filename, formats, criado_em, task_id, owner
                    FROM download_tokens
                    WHERE token = ?
                      AND criado_em >= datetime('now', ?)""",
@@ -133,6 +145,8 @@ async def obter_info_token(token: str) -> dict | None:
         "stem": base,
         "output_dir": str(output_dir),
         "criado_em": row["criado_em"],
+        "task_id": row["task_id"] if "task_id" in row.keys() else "",
+        "owner": row["owner"] if "owner" in row.keys() else "",
         "formats": formats,
     }
 
