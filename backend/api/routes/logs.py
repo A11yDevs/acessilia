@@ -1,23 +1,14 @@
 from pathlib import Path
-from secrets import compare_digest
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse
 
 from backend.api.limiter import limiter
+from backend.api.observability_auth import require_observability_token
 from backend.config.settings import settings
 
 
-def _require_token(authorization: str | None = Header(default=None)) -> None:
-    if not settings.logs_api_token:
-        raise HTTPException(status_code=503, detail="Consulta de logs não configurada")
-
-    scheme, _, token = (authorization or "").partition(" ")
-    if scheme.lower() != "bearer" or not compare_digest(token, settings.logs_api_token):
-        raise HTTPException(status_code=401, detail="Token inválido")
-
-
-router = APIRouter(tags=["logs"], dependencies=[Depends(_require_token)])
+router = APIRouter(tags=["logs"], dependencies=[Depends(require_observability_token)])
 
 
 def _log_files() -> list[Path]:

@@ -38,10 +38,10 @@ Defined in [backend/api/app.py](../backend/api/app.py), with routes in [backend/
 | GET | `/api/v1/history?limit=20` | Lists the most recent conversions (limit 1–100). | JSON `HistoryItem[]`: `task_id`, `arquivo`, `extensao`, `status`, `modo`, `pipeline`, `erro`, `resultado_resumo`, `tempo_segundos`, dates. | 30/min |
 | GET | `/api/v1/stats` | Aggregated stats. | JSON `{total, sucesso, erros, tempo_medio_segundos}`. | 30/min |
 | GET | `/api/v1/health` | Health and model-connectivity check. | JSON `{status, model_client, model_name, model_reachable, queue_size}`. | 30/min |
-| GET | `/api/v1/logs` | Lists the application log files still retained. Requires `Authorization: Bearer <LOGS_API_TOKEN>`. | JSON `{files: [{name, size_bytes}]}`. | 30/min |
+| GET | `/api/v1/logs` | Lists the application log files still retained. Requires `Authorization: Bearer <OBSERVABILITY_API_TOKEN>`. | JSON `{files: [{name, size_bytes}]}`. | 30/min |
 | GET | `/api/v1/logs/{filename}` | Downloads a complete log file, including older `.zip` archives. Requires the same token. | File download; `404` if absent. | 30/min |
 
-`LOGS_API_TOKEN` is a password set in `.env`; leaving it empty disables these routes. Send it in the header, for example: `curl -H "Authorization: Bearer YOUR_TOKEN" http://localhost:8000/api/v1/logs`. Use HTTPS or a private network to protect the token and log contents. The routes serve only `bot_*` files in `LOGS_DIR`, within the logger's configured retention period (30 days). Analysis tools can download the files without depending on a particular observability stack. Uvicorn access logs remain available through `docker compose logs`.
+`OBSERVABILITY_API_TOKEN` is a read-only password set in `.env` for these routes and future protected observability routes; leaving it empty disables them. Send it in the header, for example: `curl -H "Authorization: Bearer YOUR_TOKEN" http://localhost:8000/api/v1/logs`. Use HTTPS or a private network to protect the token and log contents. The routes serve only `bot_*` files in `LOGS_DIR`, within the logger's configured retention period (30 days). Analysis tools can download the files without depending on a particular observability stack. Uvicorn access logs remain available through `docker compose logs`.
 
 Observations:
 

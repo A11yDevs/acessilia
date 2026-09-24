@@ -38,10 +38,10 @@ Definida em [backend/api/app.py](../backend/api/app.py), com as rotas em [backen
 | GET | `/api/v1/history?limit=20` | Lista as últimas conversões (limit 1–100). | JSON `HistoryItem[]`: `task_id`, `arquivo`, `extensao`, `status`, `modo`, `pipeline`, `erro`, `resultado_resumo`, `tempo_segundos`, datas. | 30/min |
 | GET | `/api/v1/stats` | Estatísticas agregadas. | JSON `{total, sucesso, erros, tempo_medio_segundos}`. | 30/min |
 | GET | `/api/v1/health` | Checagem de saúde e conectividade do modelo. | JSON `{status, model_client, model_name, model_reachable, queue_size}`. | 30/min |
-| GET | `/api/v1/logs` | Lista os arquivos de log retidos pela aplicação. Requer `Authorization: Bearer <LOGS_API_TOKEN>`. | JSON `{files: [{name, size_bytes}]}`. | 30/min |
+| GET | `/api/v1/logs` | Lista os arquivos de log retidos pela aplicação. Requer `Authorization: Bearer <OBSERVABILITY_API_TOKEN>`. | JSON `{files: [{name, size_bytes}]}`. | 30/min |
 | GET | `/api/v1/logs/{filename}` | Baixa um arquivo de log completo, inclusive arquivos `.zip` de dias anteriores. Requer o mesmo token. | Arquivo para download; `404` se não existir. | 30/min |
 
-`LOGS_API_TOKEN` é uma senha definida no `.env`; vazio, essas rotas ficam desabilitadas. Envie-a no cabeçalho, por exemplo: `curl -H "Authorization: Bearer SEU_TOKEN" http://localhost:8000/api/v1/logs`. Use HTTPS ou uma rede privada para não expor a senha e o conteúdo. As rotas servem apenas arquivos `bot_*` em `LOGS_DIR`, dentro da retenção configurada pelo logger (30 dias). Ferramentas de análise podem baixar os arquivos e processá-los sem depender de uma stack específica. Os logs de acesso do Uvicorn continuam disponíveis em `docker compose logs`.
+`OBSERVABILITY_API_TOKEN` é uma senha de leitura definida no `.env` para estas rotas e futuras rotas de observabilidade protegidas; vazio, elas ficam desabilitadas. Envie-a no cabeçalho, por exemplo: `curl -H "Authorization: Bearer SEU_TOKEN" http://localhost:8000/api/v1/logs`. Use HTTPS ou uma rede privada para não expor a senha e o conteúdo. As rotas servem apenas arquivos `bot_*` em `LOGS_DIR`, dentro da retenção configurada pelo logger (30 dias). Ferramentas de análise podem baixar os arquivos e processá-los sem depender de uma stack específica. Os logs de acesso do Uvicorn continuam disponíveis em `docker compose logs`.
 
 Observações:
 

@@ -31,7 +31,7 @@ class Settings:
     )
     request_timeout: int = int(os.getenv("REQUEST_TIMEOUT", "3600"))
     log_level: str = os.getenv("LOG_LEVEL", "INFO")
-    logs_api_token: str = os.getenv("LOGS_API_TOKEN", "")
+    observability_api_token: str = os.getenv("OBSERVABILITY_API_TOKEN", "")
     allowed_extensions: set[str] = field(default_factory=lambda: _default_extensions())
     max_page_width: int = int(os.getenv("MAX_PAGE_WIDTH", "1600"))
     jpg_quality: int = int(os.getenv("JPG_QUALITY", "85"))

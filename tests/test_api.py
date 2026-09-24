@@ -4,9 +4,12 @@ import zipfile
 from pathlib import Path
 
 import pytest
+from fastapi import HTTPException, Request
+from fastapi.security import HTTPAuthorizationCredentials
 from fastapi.testclient import TestClient
 
 from backend.api.limiter import limiter
+from backend.api.observability_auth import require_observability_token
 from backend.config.settings import settings
 
 pytest.importorskip("fastapi.testclient")
@@ -78,12 +81,28 @@ def test_health_access_filter_keeps_failures_and_other_requests():
 
 
 def test_logs_require_configured_token(client, monkeypatch):
-    monkeypatch.setattr(settings, "logs_api_token", "")
+    monkeypatch.setattr(settings, "observability_api_token", "")
     assert client.get("/api/v1/logs").status_code == 503
 
 
+def test_logs_declare_bearer_auth_in_openapi(client):
+    schema = client.get("/openapi.json").json()
+    assert schema["paths"]["/api/v1/logs"]["get"]["security"] == [
+        {"ObservabilityToken": []}
+    ]
+
+
+def test_observability_token_cannot_authorize_writes(monkeypatch):
+    monkeypatch.setattr(settings, "observability_api_token", "secret")
+    request = Request({"type": "http", "method": "POST"})
+    credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="secret")
+    with pytest.raises(HTTPException) as exc:
+        require_observability_token(request, credentials)
+    assert exc.value.status_code == 403
+
+
 def test_logs_list_and_download_files_with_token(client, monkeypatch):
-    monkeypatch.setattr(settings, "logs_api_token", "secret")
+    monkeypatch.setattr(settings, "observability_api_token", "secret")
     monkeypatch.setattr(settings, "logs_dir", settings.logs_dir / "manual")
     settings.logs_dir.mkdir(parents=True, exist_ok=True)
     (settings.logs_dir / "bot_2020-01-01.log").write_text("first\nsecond\nthird\n", encoding="utf-8")
@@ -95,6 +114,7 @@ def test_logs_list_and_download_files_with_token(client, monkeypatch):
 
     assert client.get("/api/v1/logs").status_code == 401
     assert client.get("/api/v1/logs", headers={"Authorization": "Bearer wrong"}).status_code == 401
+    assert client.get("/api/v1/logs", headers={"Authorization": "Basic secret"}).status_code == 401
     assert client.get("/api/v1/logs/bot_2020-01-01.log").status_code == 401
     headers = {"Authorization": "Bearer secret"}
     response = client.get("/api/v1/logs", headers=headers)
@@ -110,7 +130,7 @@ def test_logs_list_and_download_files_with_token(client, monkeypatch):
 
 
 def test_logs_return_empty_list_when_no_files_exist(client, monkeypatch):
-    monkeypatch.setattr(settings, "logs_api_token", "secret")
+    monkeypatch.setattr(settings, "observability_api_token", "secret")
     monkeypatch.setattr(settings, "logs_dir", settings.logs_dir / "missing")
     response = client.get("/api/v1/logs", headers={"Authorization": "Bearer secret"})
     assert response.status_code == 200
