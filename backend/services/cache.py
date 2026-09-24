@@ -21,7 +21,7 @@ def _file_hash(path: Path) -> str:
     with open(path, "rb") as f:
         for chunk in iter(lambda: f.read(65536), b""):
             hasher.update(chunk)
-    return hasher.hexdigest()[:16]
+    return hasher.hexdigest()
 
 
 def _cache_key(path: Path, extra: str = "") -> str:

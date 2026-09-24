@@ -59,3 +59,24 @@ def test_download_token_only_lists_registered_formats(tmp_path):
 
     assert info is not None
     assert [item["ext"] for item in info["formats"]] == ["zip"]
+
+
+def test_download_token_stores_task_id_and_owner(tmp_path):
+    output_dir = tmp_path / "output" / "job-owner"
+    output_dir.mkdir(parents=True)
+    (output_dir / "doc.txt").write_text("resultado", encoding="utf-8")
+    token = asyncio.run(
+        token_service.criar_token(
+            output_dir,
+            "doc",
+            formats=["txt"],
+            task_id="task-12345",
+            owner="user@example.com",
+        )
+    )
+
+    info = asyncio.run(token_service.obter_info_token(token))
+
+    assert info is not None
+    assert info["task_id"] == "task-12345"
+    assert info["owner"] == "user@example.com"

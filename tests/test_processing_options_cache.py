@@ -135,5 +135,26 @@ def test_cached_payload_rebuilds_current_submission_metadata(monkeypatch, tmp_pa
     assert first_result["id"] != second_result["id"]
 
 
+def test_cache_key_sha256_full_hash_and_file_size(tmp_path):
+    from backend.services.cache import _cache_key
+
+    file_a = tmp_path / "a.txt"
+    file_b = tmp_path / "b.txt"
+    file_c = tmp_path / "c.txt"
+
+    file_a.write_bytes(b"content one")
+    file_b.write_bytes(b"content two")
+    file_c.write_bytes(b"content one plus more data")
+
+    key_a = _cache_key(file_a, "opt")
+    key_b = _cache_key(file_b, "opt")
+    key_c = _cache_key(file_c, "opt")
+
+    assert key_a != key_b
+    assert key_a != key_c
+    assert len(key_a.split("_")[0]) == 64
+    assert len(key_b.split("_")[0]) == 64
+
+
 async def _async_noop(*_args, **_kwargs):
     return None
