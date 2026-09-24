@@ -1546,10 +1546,10 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         LOG_ORPHAN_TASKS_CLEANUP_FAILED: (
             "Falha ao limpar tarefas órfãs: {error}"
         ),
-        LOG_DOWNLOAD_TOKEN_CREATED: "Token de download criado: {token} -> {filename}",
-        LOG_DOWNLOAD_TOKEN_NOT_FOUND: "Token de download não encontrado: {token}",
+        LOG_DOWNLOAD_TOKEN_CREATED: "Token de download criado para {filename}",
+        LOG_DOWNLOAD_TOKEN_NOT_FOUND: "Token de download não encontrado",
         LOG_DOWNLOAD_TOKEN_DIR_MISSING: (
-            "Diretório de saída do token de download ausente: {token} -> {output_dir}"
+            "Diretório de saída do token de download ausente: {output_dir}"
         ),
         LOG_PDF_UA_GENERATION_FAILED: (
             "Falha ao gerar o PDF/UA: {error}"

@@ -1,5 +1,7 @@
+import logging
 import traceback
 import uuid
+from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import quote
 
@@ -31,6 +33,7 @@ from backend.log_messages import (
     LOG_WEB_RATE_LIMIT_EXCEEDED,
     LOG_WEB_UPLOAD_ERROR,
 )
+from backend.tools.access_log_filter import AccessLogFilter
 from backend.tools.logger import logger
 from frontend.clients.api_client import ApiClient, ApiError
 from frontend.clients import default_client
@@ -75,7 +78,19 @@ from frontend.web.messages import (
     WEB_SUCCESS_QUEUED,
 )
 
-app = FastAPI(title="Bot Acess Web Panel")
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    access_logger = logging.getLogger("uvicorn.access")
+    access_filter = AccessLogFilter()
+    access_logger.addFilter(access_filter)
+    try:
+        yield
+    finally:
+        access_logger.removeFilter(access_filter)
+
+
+app = FastAPI(title="Bot Acess Web Panel", lifespan=_lifespan)
 
 limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
 app.state.limiter = limiter

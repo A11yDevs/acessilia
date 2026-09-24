@@ -156,13 +156,13 @@ LOG_ORPHAN_TASKS_CLEANED: str = "Orphan tasks cleaned"
 LOG_ORPHAN_TASKS_CLEANUP_FAILED: str = "Failed to clean orphan tasks: {error}"
 #: User-facing error value stored in the conversion-history record of a stale task that cleanup marked as failed; no placeholders.
 LOG_STALE_PROCESS_INTERRUPTED: str = "Stale: process interrupted"
-#: Debug logged when a download token is created; {token} is the new token, {filename} its source file name.
-LOG_DOWNLOAD_TOKEN_CREATED: str = "Download token created: {token} -> {filename}"
-#: Warning logged when a download token lookup misses; {token} is the unknown token.
-LOG_DOWNLOAD_TOKEN_NOT_FOUND: str = "Download token not found: {token}"
-#: Warning logged when a known token's stored output directory no longer exists on disk; {token} is the token, {output_dir} its path.
+#: Debug logged when a download token is created; {filename} is its source file name.
+LOG_DOWNLOAD_TOKEN_CREATED: str = "Download token created for {filename}"
+#: Warning logged when a download token lookup misses; no token value is logged.
+LOG_DOWNLOAD_TOKEN_NOT_FOUND: str = "Download token not found"
+#: Warning logged when a known token's stored output directory no longer exists on disk; {output_dir} is its path.
 LOG_DOWNLOAD_TOKEN_DIR_MISSING: str = (
-    "Download token output directory missing: {token} -> {output_dir}"
+    "Download token output directory missing: {output_dir}"
 )
 #: Debug logged by the Telegram file service while downloading an uploaded file; {file_path} is the Telegram file path, {filename} the destination file name.
 LOG_TELEGRAM_FILE_DOWNLOADING: str = "Downloading file: {file_path} -> {filename}"
