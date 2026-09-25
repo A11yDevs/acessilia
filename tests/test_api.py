@@ -1,12 +1,19 @@
 import asyncio
+import logging
 import zipfile
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
+from fastapi import HTTPException, Request
+from fastapi.security import HTTPAuthorizationCredentials
 from fastapi.testclient import TestClient
 
 from backend.api.limiter import limiter
+from backend.api.observability_auth import require_observability_token
 from backend.config.settings import settings
+from backend.tools.access_log_filter import AccessLogFilter
+from backend.tools.logger import logger
 
 pytest.importorskip("fastapi.testclient")
 
@@ -62,6 +69,112 @@ def test_health(client):
     assert body["status"] == "ok"
     assert body["model_client"] == settings.ai_client
     assert "queue_size" in body
+
+
+def test_health_access_filter_keeps_failures_and_other_requests():
+    def record(path, status):
+        return logging.LogRecord(
+            "uvicorn.access", logging.INFO, __file__, 0, "%s %s %s %s %d",
+            ("127.0.0.1", "GET", path, "1.1", status), None,
+        )
+
+    access_filter = AccessLogFilter()
+    assert not access_filter.filter(record("/api/v1/health", 200))
+    assert access_filter.filter(record("/api/v1/health", 503))
+    assert access_filter.filter(record("/api/v1/jobs", 200))
+
+
+def test_access_log_filter_redacts_download_tokens():
+    access_filter = AccessLogFilter()
+    for path in (
+        "/api/v1/download/private-token/pdf?preview=true",
+        "/download/private-token?preview=true",
+    ):
+        record = logging.LogRecord(
+            "uvicorn.access", logging.INFO, __file__, 0, '%s - "%s %s HTTP/%s" %d',
+            ("127.0.0.1", "GET", path, "1.1", 200), None,
+        )
+        assert access_filter.filter(record)
+        assert "private-token" not in record.getMessage()
+        assert "[redacted]" in record.getMessage()
+
+
+def test_logs_require_configured_token(client, monkeypatch):
+    monkeypatch.setattr(settings, "observability_api_token", "")
+    assert client.get("/api/v1/logs").status_code == 503
+
+
+def test_logs_declare_bearer_auth_in_openapi(client):
+    schema = client.get("/openapi.json").json()
+    assert schema["paths"]["/api/v1/logs"]["get"]["security"] == [
+        {"ObservabilityToken": []}
+    ]
+
+
+def test_observability_token_cannot_authorize_writes(monkeypatch):
+    monkeypatch.setattr(settings, "observability_api_token", "secret")
+    request = Request({"type": "http", "method": "POST"})
+    credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="secret")
+    with pytest.raises(HTTPException) as exc:
+        require_observability_token(request, credentials)
+    assert exc.value.status_code == 403
+
+
+def test_api_error_log_uses_route_template_instead_of_download_token():
+    messages = []
+    sink = logger.add(messages.append, format="{message}")
+    try:
+        request = Request({
+            "type": "http",
+            "method": "GET",
+            "path": "/api/v1/download/private-token",
+            "headers": [],
+            "route": SimpleNamespace(path="/api/v1/download/{token}"),
+        })
+        response = asyncio.run(app.exception_handlers[Exception](request, RuntimeError("failed")))
+    finally:
+        logger.remove(sink)
+
+    assert response.status_code == 500
+    logged = "".join(str(message) for message in messages)
+    assert "/api/v1/download/{token}" in logged
+    assert "private-token" not in logged
+
+
+def test_logs_list_and_download_files_with_token(client, monkeypatch):
+    monkeypatch.setattr(settings, "observability_api_token", "secret")
+    monkeypatch.setattr(settings, "logs_dir", settings.logs_dir / "manual")
+    settings.logs_dir.mkdir(parents=True, exist_ok=True)
+    (settings.logs_dir / "bot_2020-01-01.log").write_text("first\nsecond\nthird\n", encoding="utf-8")
+    (settings.logs_dir / "bot_2019-12-31.log.zip").write_bytes(b"archive")
+    (settings.logs_dir / "other.log").write_text("hidden", encoding="utf-8")
+    secret = settings.logs_dir.parent / "secret.log"
+    secret.write_text("private", encoding="utf-8")
+    (settings.logs_dir / "bot_secret.log").symlink_to(secret)
+
+    assert client.get("/api/v1/logs").status_code == 401
+    assert client.get("/api/v1/logs", headers={"Authorization": "Bearer wrong"}).status_code == 401
+    assert client.get("/api/v1/logs", headers={"Authorization": "Basic secret"}).status_code == 401
+    assert client.get("/api/v1/logs/bot_2020-01-01.log").status_code == 401
+    headers = {"Authorization": "Bearer secret"}
+    response = client.get("/api/v1/logs", headers=headers)
+    assert response.status_code == 200
+    assert response.json() == {"files": [
+        {"name": "bot_2020-01-01.log", "size_bytes": 19},
+        {"name": "bot_2019-12-31.log.zip", "size_bytes": 7},
+    ]}
+    assert client.get("/api/v1/logs/bot_2020-01-01.log", headers=headers).text == "first\nsecond\nthird\n"
+    assert client.get("/api/v1/logs/bot_2019-12-31.log.zip", headers=headers).content == b"archive"
+    assert client.get("/api/v1/logs/other.log", headers=headers).status_code == 404
+    assert client.get("/api/v1/logs/bot_secret.log", headers=headers).status_code == 404
+
+
+def test_logs_return_empty_list_when_no_files_exist(client, monkeypatch):
+    monkeypatch.setattr(settings, "observability_api_token", "secret")
+    monkeypatch.setattr(settings, "logs_dir", settings.logs_dir / "missing")
+    response = client.get("/api/v1/logs", headers={"Authorization": "Bearer secret"})
+    assert response.status_code == 200
+    assert response.json() == {"files": []}
 
 
 def test_stats_empty(client):
