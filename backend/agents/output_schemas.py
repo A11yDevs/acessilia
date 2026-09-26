@@ -141,6 +141,14 @@ class DataOutput(AgentOutput):
         description="Uncertainties such as illegible cells or ambiguous mathematical symbols.",
     )
 
+    @field_validator("latex", "caption", mode="before")
+    @classmethod
+    def normalize_empty_optional_strings(cls, value: Any) -> Any:
+        """Treat blank optional fields as absent, as some providers emit empty strings."""
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
     @model_validator(mode="after")
     def validate_content(self) -> "DataOutput":
         if self.kind == "table":

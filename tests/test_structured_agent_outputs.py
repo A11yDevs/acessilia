@@ -164,6 +164,30 @@ def test_data_formula_rejects_table_notes() -> None:
         )
 
 
+def test_data_output_normalizes_blank_optional_latex_and_caption() -> None:
+    output = DataOutput(
+        kind="table",
+        rows=[{"cells": [{"text": "Item"}]}],
+        latex="  ",
+        caption="\n ",
+        language="en",
+        confidence=0.9,
+    )
+
+    assert output.latex is None
+    assert output.caption is None
+
+
+def test_data_formula_rejects_blank_latex_after_normalization() -> None:
+    with pytest.raises(ValidationError, match="latex is required"):
+        DataOutput(
+            kind="formula",
+            latex="  ",
+            language="und",
+            confidence=1.0,
+        )
+
+
 def test_editor_integrates_typed_table_without_reparsing_text() -> None:
     task = RegionTask(
         agent_target="data",
