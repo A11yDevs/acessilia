@@ -101,7 +101,15 @@ def test_access_log_filter_redacts_download_tokens():
 
 def test_logs_require_configured_token(client, monkeypatch):
     monkeypatch.setattr(settings, "observability_api_token", "")
-    assert client.get("/api/v1/logs").status_code == 503
+    monkeypatch.setenv("LOCALE", "en_US")
+    resp_en = client.get("/api/v1/logs")
+    assert resp_en.status_code == 503
+    assert resp_en.json()["detail"] == "Observability access not configured"
+
+    monkeypatch.setenv("LOCALE", "pt_BR")
+    resp_pt = client.get("/api/v1/logs")
+    assert resp_pt.status_code == 503
+    assert resp_pt.json()["detail"] == "Acesso de observabilidade não configurado"
 
 
 def test_logs_declare_bearer_auth_in_openapi(client):
@@ -115,9 +123,18 @@ def test_observability_token_cannot_authorize_writes(monkeypatch):
     monkeypatch.setattr(settings, "observability_api_token", "secret")
     request = Request({"type": "http", "method": "POST"})
     credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="secret")
-    with pytest.raises(HTTPException) as exc:
+
+    monkeypatch.setenv("LOCALE", "en_US")
+    with pytest.raises(HTTPException) as exc_en:
         require_observability_token(request, credentials)
-    assert exc.value.status_code == 403
+    assert exc_en.value.status_code == 403
+    assert exc_en.value.detail == "Token allows read-only access"
+
+    monkeypatch.setenv("LOCALE", "pt_BR")
+    with pytest.raises(HTTPException) as exc_pt:
+        require_observability_token(request, credentials)
+    assert exc_pt.value.status_code == 403
+    assert exc_pt.value.detail == "Token permite somente leitura"
 
 
 def test_api_error_log_uses_route_template_instead_of_download_token():
@@ -152,7 +169,18 @@ def test_logs_list_and_download_files_with_token(client, monkeypatch):
     secret.write_text("private", encoding="utf-8")
     (settings.logs_dir / "bot_secret.log").symlink_to(secret)
 
-    assert client.get("/api/v1/logs").status_code == 401
+    monkeypatch.setenv("LOCALE", "en_US")
+    resp_401_en = client.get("/api/v1/logs")
+    assert resp_401_en.status_code == 401
+    assert resp_401_en.json()["detail"] == "Invalid token"
+    assert resp_401_en.headers["WWW-Authenticate"] == "Bearer"
+
+    monkeypatch.setenv("LOCALE", "pt_BR")
+    resp_401_pt = client.get("/api/v1/logs")
+    assert resp_401_pt.status_code == 401
+    assert resp_401_pt.json()["detail"] == "Token inválido"
+    assert resp_401_pt.headers["WWW-Authenticate"] == "Bearer"
+
     assert client.get("/api/v1/logs", headers={"Authorization": "Bearer wrong"}).status_code == 401
     assert client.get("/api/v1/logs", headers={"Authorization": "Basic secret"}).status_code == 401
     assert client.get("/api/v1/logs/bot_2020-01-01.log").status_code == 401
@@ -165,7 +193,16 @@ def test_logs_list_and_download_files_with_token(client, monkeypatch):
     ]}
     assert client.get("/api/v1/logs/bot_2020-01-01.log", headers=headers).text == "first\nsecond\nthird\n"
     assert client.get("/api/v1/logs/bot_2019-12-31.log.zip", headers=headers).content == b"archive"
-    assert client.get("/api/v1/logs/other.log", headers=headers).status_code == 404
+
+    monkeypatch.setenv("LOCALE", "en_US")
+    resp_404_en = client.get("/api/v1/logs/other.log", headers=headers)
+    assert resp_404_en.status_code == 404
+    assert resp_404_en.json()["detail"] == "Log file not found"
+
+    monkeypatch.setenv("LOCALE", "pt_BR")
+    resp_404_pt = client.get("/api/v1/logs/other.log", headers=headers)
+    assert resp_404_pt.status_code == 404
+    assert resp_404_pt.json()["detail"] == "Log não encontrado"
     assert client.get("/api/v1/logs/bot_secret.log", headers=headers).status_code == 404
 
 

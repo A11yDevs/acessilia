@@ -260,6 +260,14 @@ API_FORMAT_INVALID: str = "Invalid format"
 API_FILE_NOT_FOUND: str = "File not found"
 #: HTTP 409 detail body returned by the API job cancel endpoint when the task is in a state that does not accept cancellation; {status} is the task's current status.
 API_CANCEL_STATE_INVALID: str = "Task cannot be cancelled in its current state: {status}"
+#: HTTP 404 detail body returned by the API logs endpoints when a log file lookup misses.
+API_LOG_FILE_NOT_FOUND: str = "Log file not found"
+#: HTTP 503 detail body returned when observability access is not configured.
+API_OBSERVABILITY_NOT_CONFIGURED: str = "Observability access not configured"
+#: HTTP 401 detail body returned by observability endpoints when the bearer token is missing or invalid.
+API_TOKEN_INVALID: str = "Invalid token"
+#: HTTP 403 detail body returned by observability endpoints when write access is attempted with a read-only token.
+API_TOKEN_READ_ONLY: str = "Token allows read-only access"
 #: FileNotFoundError text raised by the PyMuPDF manifest extractor when the source file is missing on disk at extraction time; {source_path} is the resolved missing path.
 MSG_SOURCE_FILE_MISSING: str = "Document not found: {source_path}"
 #: ValueError text raised by the manifest planner model when a planner outcome is recorded before execution actually began; no placeholders.
