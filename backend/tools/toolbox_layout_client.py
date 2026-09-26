@@ -41,7 +41,7 @@ class ToolboxLayoutClient:
         api_key: str | None = None,
     ) -> None:
         self.base_url = (base_url or settings.toolbox_base_url).rstrip("/")
-        self.provider = provider or settings.toolbox_provider
+        self.provider = provider or settings.toolbox_layout_provider
         self.timeout_seconds = timeout_seconds or settings.toolbox_timeout_seconds
         self.api_key = api_key if api_key is not None else settings.toolbox_api_key
         headers: dict[str, str] = {}

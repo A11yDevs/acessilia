@@ -14,7 +14,9 @@ import io
 import os
 from pathlib import Path
 
+import httpx
 import pytest
+import pytest_asyncio
 
 from backend.tools.toolbox_layout_client import ToolboxLayoutClient
 from backend.tools.toolbox_math_client import ToolboxMathClient
@@ -23,6 +25,24 @@ from backend.tools.toolbox_pdf_client import ToolboxPdfClient
 
 TOOLBOX_BASE_URL = os.getenv("TOOLBOX_BASE_URL", "").strip()
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
+
+
+@pytest.fixture(scope="module", autouse=True)
+def require_toolbox() -> None:
+    """Skip E2E tests unless a Toolbox health endpoint is reachable."""
+    if not TOOLBOX_BASE_URL:
+        pytest.skip("TOOLBOX_BASE_URL not configured")
+
+    try:
+        response = httpx.get(
+            f"{TOOLBOX_BASE_URL.rstrip('/')}/v1/health", timeout=10
+        )
+        healthy = response.status_code == 200
+    except httpx.HTTPError:
+        healthy = False
+
+    if not healthy:
+        pytest.skip(f"Toolbox is not reachable at {TOOLBOX_BASE_URL}")
 
 
 def _get_pdf() -> Path:
@@ -55,28 +75,28 @@ def _make_formula_image() -> bytes:
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def layout_client() -> ToolboxLayoutClient:
     client = ToolboxLayoutClient(base_url=TOOLBOX_BASE_URL, timeout_seconds=120)
     yield client
     await client.close()
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def pdf_client() -> ToolboxPdfClient:
     client = ToolboxPdfClient(base_url=TOOLBOX_BASE_URL, timeout_seconds=120)
     yield client
     await client.close()
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def math_client() -> ToolboxMathClient:
     client = ToolboxMathClient(base_url=TOOLBOX_BASE_URL, timeout_seconds=300)
     yield client
     await client.close()
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def ocr_client() -> ToolboxOcrClient:
     client = ToolboxOcrClient(base_url=TOOLBOX_BASE_URL, timeout_seconds=300)
     yield client
@@ -103,7 +123,7 @@ class TestLayoutClientE2E:
         pdf = _get_pdf()
         result = await layout_client.analyze(file_path=pdf)
         assert result["status"] == "succeeded"
-        assert result["capability"] == "document.layout.analyze"
+        assert result["capability"] == "document.layout.analyze@1"
         doc = result.get("document", {})
         assert doc.get("page_count", 0) >= 1
         assert doc.get("page_count") == len(doc.get("pages", []))
@@ -146,7 +166,7 @@ class TestPdfClientE2E:
         pdf = _get_pdf()
         result = await pdf_client.split(file_path=pdf)
         assert result["status"] == "succeeded"
-        assert result["capability"] == "pdf.split"
+        assert result["capability"] == "pdf.split@1"
         doc = result.get("document", {})
         assert doc.get("page_count", 0) >= 1
         assert len(doc.get("pages", [])) == doc["page_count"]
