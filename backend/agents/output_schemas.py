@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Literal, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 VISION_SCHEMA_INSTRUCTION = (
     "Retorne somente o objeto estruturado solicitado: use kind='description' e "
@@ -39,12 +39,18 @@ class VisionOutput(AgentOutput):
     language: str = Field(
         min_length=2,
         max_length=35,
-        description="BCP 47 language tag for the description, or 'und' when unknown.",
+        description=(
+            "Model-reported BCP 47 language tag for the description, or 'und' when unknown; "
+            "metadata only, not an independently verified quality signal."
+        ),
     )
     confidence: float = Field(
         ge=0.0,
         le=1.0,
-        description="Confidence in the extracted visual information, from 0 to 1.",
+        description=(
+            "Model-reported confidence in the extracted visual information, from 0 to 1; "
+            "metadata only, not an independently calibrated quality signal."
+        ),
     )
     mentioned_elements: list[str] = Field(
         default_factory=list,
@@ -58,6 +64,14 @@ class VisionOutput(AgentOutput):
         default_factory=list,
         description="Uncertainties such as illegible or partially occluded content.",
     )
+
+    @field_validator("formula_latex", mode="before")
+    @classmethod
+    def normalize_empty_formula_latex(cls, value: Any) -> Any:
+        """Treat a provider's empty optional string as an absent formula."""
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
     @model_validator(mode="after")
     def validate_content(self) -> "VisionOutput":
@@ -109,9 +123,19 @@ class DataOutput(AgentOutput):
     language: str = Field(
         min_length=2,
         max_length=35,
-        description="BCP 47 language tag for textual content, or 'und' when unknown.",
+        description=(
+            "Model-reported BCP 47 language tag for textual content, or 'und' when unknown; "
+            "metadata only, not an independently verified quality signal."
+        ),
     )
-    confidence: float = Field(ge=0.0, le=1.0)
+    confidence: float = Field(
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Model-reported confidence in the extraction, from 0 to 1; metadata only, "
+            "not an independently calibrated quality signal."
+        ),
+    )
     warnings: list[str] = Field(
         default_factory=list,
         description="Uncertainties such as illegible cells or ambiguous mathematical symbols.",
@@ -140,7 +164,12 @@ class DataOutput(AgentOutput):
         return [[cell.text for cell in row.cells] for row in self.rows]
 
     def table_ast(self) -> dict[str, Any]:
-        """Build the canonical table AST without reparsing model-generated text."""
+        """Build the canonical table AST without reparsing model-generated text.
+
+        The canonical contract requires a non-empty body. Consequently, when
+        every row is marked as a column header, the final row remains in the
+        body while retaining its cell-level header semantics.
+        """
         if self.kind != "table":
             raise ValueError("table_ast is only available for table output")
 
@@ -206,9 +235,27 @@ OutputModel = TypeVar("OutputModel", bound=AgentOutput)
 
 
 def validate_structured_content(content: Any, schema: type[OutputModel]) -> OutputModel:
-    """Validate Agno content even when a provider returns JSON instead of a model."""
+    """Validate Agno content returned as a model, mapping, or JSON string.
+
+    Some providers wrap otherwise valid structured JSON in a Markdown fence.
+    Accept an optional whole-content ``json`` (or unlabelled) fence without
+    weakening validation of the enclosed payload.
+    """
     if isinstance(content, schema):
         return content
     if isinstance(content, str):
-        return schema.model_validate_json(content)
+        return schema.model_validate_json(_strip_json_fence(content))
     return schema.model_validate(content)
+
+
+def _strip_json_fence(content: str) -> str:
+    """Remove a Markdown fence only when it encloses the entire JSON payload."""
+    stripped = content.strip()
+    lines = stripped.splitlines()
+    if len(lines) < 3 or lines[-1].strip() != "```":
+        return content
+
+    opening = lines[0].strip().casefold()
+    if opening not in {"```", "```json"}:
+        return content
+    return "\n".join(lines[1:-1]).strip()

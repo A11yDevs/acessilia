@@ -27,6 +27,19 @@ def test_vision_output_requires_description_for_description_kind() -> None:
         )
 
 
+def test_vision_description_normalizes_empty_optional_formula() -> None:
+    output = VisionOutput(
+        kind="description",
+        description="A sunset over a city.",
+        language="en",
+        confidence=0.98,
+        mentioned_elements=["sunset", "city"],
+        formula_latex="  ",
+    )
+
+    assert output.formula_latex is None
+
+
 def test_json_content_is_validated_into_the_requested_schema() -> None:
     result = validate_structured_content(
         """{
@@ -43,6 +56,39 @@ def test_json_content_is_validated_into_the_requested_schema() -> None:
 
     assert isinstance(result, VisionOutput)
     assert result.formula_latex == "E=mc^2"
+
+
+@pytest.mark.parametrize("opening_fence", ["```json", "```JSON", "```"])
+def test_fenced_json_content_is_validated_into_the_requested_schema(
+    opening_fence: str,
+) -> None:
+    result = validate_structured_content(
+        f"""{opening_fence}
+        {{
+            "kind": "formula",
+            "description": "",
+            "language": "und",
+            "confidence": 0.75,
+            "mentioned_elements": ["equation"],
+            "formula_latex": "E=mc^2",
+            "warnings": []
+        }}
+        ```""",
+        VisionOutput,
+    )
+
+    assert isinstance(result, VisionOutput)
+    assert result.formula_latex == "E=mc^2"
+
+
+def test_non_json_fence_is_not_silently_accepted() -> None:
+    with pytest.raises(ValidationError):
+        validate_structured_content(
+            """```yaml
+            kind: formula
+            ```""",
+            VisionOutput,
+        )
 
 
 def test_data_table_preserves_cells_spans_and_warnings_in_canonical_ast() -> None:
@@ -210,6 +256,27 @@ def test_data_table_keeps_row_headers_in_body() -> None:
         "header": True,
         "scope": "row",
     }
+
+
+def test_all_header_table_keeps_final_row_in_body() -> None:
+    output = DataOutput(
+        kind="table",
+        rows=[
+            {"cells": [{"text": "Group", "header": True, "scope": "colgroup"}]},
+            {"cells": [{"text": "Value", "header": True, "scope": "col"}]},
+        ],
+        language="en",
+        confidence=0.9,
+    )
+
+    ast = output.table_ast()
+
+    assert ast["header"] == [
+        {"cells": [{"text": "Group", "header": True, "scope": "colgroup"}]}
+    ]
+    assert ast["body"] == [
+        {"cells": [{"text": "Value", "header": True, "scope": "col"}]}
+    ]
 
 
 def test_editor_integrates_typed_vision_formula_as_math() -> None:
