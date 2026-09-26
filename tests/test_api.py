@@ -165,9 +165,6 @@ def test_logs_list_and_download_files_with_token(client, monkeypatch):
     (settings.logs_dir / "bot_2020-01-01.log").write_text("first\nsecond\nthird\n", encoding="utf-8")
     (settings.logs_dir / "bot_2019-12-31.log.zip").write_bytes(b"archive")
     (settings.logs_dir / "other.log").write_text("hidden", encoding="utf-8")
-    secret = settings.logs_dir.parent / "secret.log"
-    secret.write_text("private", encoding="utf-8")
-    (settings.logs_dir / "bot_secret.log").symlink_to(secret)
 
     monkeypatch.setenv("LOCALE", "en_US")
     resp_401_en = client.get("/api/v1/logs")
@@ -203,6 +200,26 @@ def test_logs_list_and_download_files_with_token(client, monkeypatch):
     resp_404_pt = client.get("/api/v1/logs/other.log", headers=headers)
     assert resp_404_pt.status_code == 404
     assert resp_404_pt.json()["detail"] == "Log não encontrado"
+
+
+def test_logs_ignore_symlinks(client, monkeypatch):
+    monkeypatch.setattr(settings, "observability_api_token", "secret")
+    monkeypatch.setattr(settings, "logs_dir", settings.logs_dir / "symlink_test")
+    settings.logs_dir.mkdir(parents=True, exist_ok=True)
+    secret = settings.logs_dir.parent / "secret.log"
+    secret.write_text("private", encoding="utf-8")
+    try:
+        (settings.logs_dir / "bot_secret.log").symlink_to(secret)
+    except OSError as exc:
+        if getattr(exc, "winerror", None) == 1314:
+            pytest.skip("Symlink creation requires administrative privileges on Windows")
+        raise
+
+    headers = {"Authorization": "Bearer secret"}
+    response = client.get("/api/v1/logs", headers=headers)
+    assert response.status_code == 200
+    files = [f["name"] for f in response.json()["files"]]
+    assert "bot_secret.log" not in files
     assert client.get("/api/v1/logs/bot_secret.log", headers=headers).status_code == 404
 
 
