@@ -148,8 +148,8 @@ async def test_convert_latex_to_mathml(respx_mock, client):
 
 
 @pytest.mark.asyncio
-async def test_convert_sends_params_in_query_string(respx_mock, client):
-    """Verifica que provider e direction vão na query string (body é text/plain)."""
+async def test_convert_sends_multipart_form(respx_mock, client):
+    """Provider, parameters and LaTeX use the REST multipart contract."""
     route = respx_mock.post(
         "http://localhost:8002/v1/capabilities/math.convert:execute"
     )
@@ -158,11 +158,11 @@ async def test_convert_sends_params_in_query_string(respx_mock, client):
     await client.convert("E = mc^2", direction="latex-to-mathml")
 
     request = route.calls.last.request
-    # Provider deve vir do client, não hardcoded
-    assert "provider=docling-math" in request.url.query.decode()
-    assert "direction=latex-to-mathml" in request.url.query.decode()
-    # Body deve ser o texto LaTeX puro
-    assert request.content == b"E = mc^2"
+    assert request.url.query == b""
+    assert b"pure-math" in request.content
+    assert b"latex-to-mathml" in request.content
+    assert b"formula.tex" in request.content
+    assert b"E = mc^2" in request.content
 
 
 @pytest.mark.asyncio
@@ -179,7 +179,10 @@ async def test_convert_sends_content_type_header(respx_mock):
 
     await client.convert("E = mc^2")
 
-    assert route.calls.last.request.headers["Content-Type"] == "text/plain"
+    assert route.calls.last.request.headers["Content-Type"].startswith(
+        "multipart/form-data;"
+    )
+    assert b"Content-Type: text/plain" in route.calls.last.request.content
 
 
 # ---------------------------------------------------------------------------
@@ -202,8 +205,8 @@ async def test_verbalize_latex(respx_mock, client):
 
 
 @pytest.mark.asyncio
-async def test_verbalize_sends_params_in_query_string(respx_mock, client):
-    """Verifica que provider e language vão na query string (body é text/plain)."""
+async def test_verbalize_sends_multipart_form(respx_mock, client):
+    """Provider, language and LaTeX use the REST multipart contract."""
     route = respx_mock.post(
         "http://localhost:8002/v1/capabilities/math.verbalize:execute"
     )
@@ -212,11 +215,11 @@ async def test_verbalize_sends_params_in_query_string(respx_mock, client):
     await client.verbalize("E = mc^2", language="pt-BR")
 
     request = route.calls.last.request
-    # Provider deve vir do client, não hardcoded
-    assert "provider=docling-math" in request.url.query.decode()
-    assert "language=pt-BR" in request.url.query.decode()
-    # Body deve ser o texto LaTeX puro
-    assert request.content == b"E = mc^2"
+    assert request.url.query == b""
+    assert b"pure-math" in request.content
+    assert b"pt-BR" in request.content
+    assert b"formula.tex" in request.content
+    assert b"E = mc^2" in request.content
 
 
 @pytest.mark.asyncio
@@ -233,7 +236,10 @@ async def test_verbalize_sends_content_type_header(respx_mock):
 
     await client.verbalize("E = mc^2")
 
-    assert route.calls.last.request.headers["Content-Type"] == "text/plain"
+    assert route.calls.last.request.headers["Content-Type"].startswith(
+        "multipart/form-data;"
+    )
+    assert b"Content-Type: text/plain" in route.calls.last.request.content
 
 
 # ---------------------------------------------------------------------------

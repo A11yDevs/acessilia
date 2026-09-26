@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from docstruct.tables.ast import effective_section_width, row_header_column_count
 from docstruct.tables.ast import split_header_and_body
 from docstruct.tables.ast import table_ast_from_block
 
@@ -128,9 +129,14 @@ def _meta_inlines(text: str) -> list[dict[str, Any]]:
 
 def _table_to_pandoc_ast(table_ast: dict[str, Any]) -> dict[str, Any]:
     header_rows, body_rows, footer_rows = split_header_and_body(table_ast)
+    row_head_columns = row_header_column_count(body_rows)
 
-    all_rows = header_rows + body_rows + footer_rows
-    column_count = max((len(row.get("cells", [])) for row in all_rows), default=1)
+    column_count = max(
+        effective_section_width(header_rows),
+        effective_section_width(body_rows),
+        effective_section_width(footer_rows),
+        1,
+    )
     colspecs = [
         [{"t": "AlignDefault"}, {"t": "ColWidth", "c": 1.0 / max(column_count, 1)}]
         for _ in range(column_count)
@@ -144,7 +150,7 @@ def _table_to_pandoc_ast(table_ast: dict[str, Any]) -> dict[str, Any]:
     bodies = [
         [
             ["", [], []],
-            0,
+            row_head_columns,
             [],
             [_pandoc_row(row, header=False) for row in body_rows],
         ]
@@ -169,11 +175,21 @@ def _pandoc_row(row: dict[str, Any], *, header: bool) -> list[Any]:
     return [
         ["", [], []],
         [
-            _pandoc_cell(cell, header=header)
+            _pandoc_cell(cell, header=header or _cell_is_header(cell))
             for cell in cells
-            if isinstance(cell, dict) and str(cell.get("text", "")).strip()
+            if isinstance(cell, dict)
         ],
     ]
+
+
+def _cell_is_header(cell: dict[str, Any]) -> bool:
+    scope = str(cell.get("scope", "")).strip().lower()
+    return bool(cell.get("header")) or scope in {
+        "row",
+        "rowgroup",
+        "col",
+        "colgroup",
+    }
 
 
 def _pandoc_cell(cell: dict[str, Any], *, header: bool) -> list[Any]:

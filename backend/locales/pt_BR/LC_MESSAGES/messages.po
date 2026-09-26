@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-09-11 02:55-0400\n"
+"POT-Creation-Date: 2026-09-26 12:29-0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: pt_BR\n"
@@ -1264,9 +1264,6 @@ msgstr "{count} páginas extraídas para {tmpdir}"
 msgid "Failed to extract the image clip for element {element_id}"
 msgstr "Falha ao extrair recorte de imagem para elemento {element_id}"
 
-msgid "Invalid extractor_backend; use 'docling' or 'pymupdf'"
-msgstr "extractor_backend inválido; use 'docling' ou 'pymupdf'"
-
 #, python-brace-format
 msgid ""
 "Preferred planner backend {backend} did not produce a valid plan in both "
@@ -1527,20 +1524,6 @@ msgstr "Tarefas órfãs limpas"
 msgid "Failed to clean orphan tasks: {error}"
 msgstr "Falha ao limpar tarefas órfãs: {error}"
 
-msgid "Docling is not available in the current environment."
-msgstr "Docling não está disponível no ambiente atual."
-
-#, python-brace-format
-msgid "Docling failed on page {page} ({error}), fallback PyMuPDF"
-msgstr "Docling falhou na página {page} ({error}), fallback PyMuPDF"
-
-msgid "Page has no parent document for Docling processing"
-msgstr "Página sem documento pai para processamento Docling"
-
-#, python-brace-format
-msgid "Docling processed {filename} in {elapsed:.1f}s"
-msgstr "Docling processou {filename} em {elapsed:.1f}s"
-
 #, python-brace-format
 msgid "Download token created for {filename}"
 msgstr "Token de download criado para {filename}"
@@ -1682,30 +1665,6 @@ msgid ""
 msgstr ""
 "AccessibilityWorkflow: {total_pages} páginas processadas, {total_chars} "
 "chars no total"
-
-#, python-brace-format
-msgid "RapidOCR: {count} model(s) restored from local cache"
-msgstr "RapidOCR: {count} modelo(s) restaurado(s) do cache local"
-
-#, python-brace-format
-msgid "RapidOCR: {count} model(s) persisted to local cache"
-msgstr "RapidOCR: {count} modelo(s) persistido(s) no cache local"
-
-msgid "Using structurer: Docling (with PyMuPDF fallback)"
-msgstr "Usando structurer: Docling (com fallback PyMuPDF)"
-
-msgid ""
-"STRUCTURER=docling is set but docling is not installed. Run: pip install "
-"docling. Falling back to PyMuPDF."
-msgstr ""
-"STRUCTURER=docling está definido mas docling não está instalado. Execute:"
-" pip install docling. Usando PyMuPDF."
-
-msgid "STRUCTURER=docling is set but docling is not installed. Using PyMuPDF."
-msgstr "STRUCTURER=docling mas docling nao instalado. Usando PyMuPDF."
-
-msgid "Using structurer: PyMuPDF"
-msgstr "Usando structurer: PyMuPDF"
 
 msgid "Stale: process interrupted"
 msgstr "Obsoleta: processo interrompido"

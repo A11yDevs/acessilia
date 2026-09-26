@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import Awaitable, Callable
+from typing import Any, Awaitable, Callable
 
 import pytest
 
 from backend.agents.data_agent import DataAgent
+from backend.agents.output_schemas import DataOutput, VisionOutput
 from backend.agents.vision_agent import VisionAgent
 
 
@@ -17,16 +18,32 @@ MAX_TICK_SECONDS = 0.1
 
 
 class _BlockingAgent:
-    def __init__(self, **_kwargs: object) -> None:
-        pass
+    def __init__(self, **kwargs: object) -> None:
+        self.output_schema = kwargs["output_schema"]
 
-    async def arun(self, **_kwargs: object):
+    def run(self, **_kwargs: object):
         time.sleep(BLOCK_SECONDS)
-        return type("Response", (), {"content": "resultado"})()
+        if self.output_schema is VisionOutput:
+            content: Any = VisionOutput(
+                kind="description",
+                description="resultado",
+                language="pt-BR",
+                confidence=0.9,
+                mentioned_elements=[],
+            )
+        else:
+            content = DataOutput(
+                kind="table",
+                rows=[{"cells": [{"text": "resultado"}]}],
+                language="pt-BR",
+                confidence=0.9,
+            )
+        return type("Response", (), {"content": content})()
 
 
 async def _assert_event_loop_is_responsive(
-    inference: Callable[[], Awaitable[str]],
+    inference: Callable[[], Awaitable[Any]],
+    expected_type: type,
 ) -> None:
     """Confirma que outra coroutine roda enquanto a inferência está em curso."""
     tick = asyncio.create_task(asyncio.sleep(0.01))
@@ -38,7 +55,7 @@ async def _assert_event_loop_is_responsive(
     assert elapsed < MAX_TICK_SECONDS, (
         f"A inferencia bloqueou o event loop por {elapsed:.3f}s"
     )
-    assert await inference_task == "resultado"
+    assert isinstance(await inference_task, expected_type)
 
 
 @pytest.mark.asyncio
@@ -51,6 +68,7 @@ async def test_vision_inference_does_not_block_event_loop(monkeypatch):
 
     await _assert_event_loop_is_responsive(
         lambda: agent.describe_region(b"image", "embedded_image"),
+        VisionOutput,
     )
 
 
@@ -65,4 +83,5 @@ async def test_data_inference_does_not_block_event_loop(monkeypatch):
 
     await _assert_event_loop_is_responsive(
         lambda: agent.process_region(b"image", "table"),
+        DataOutput,
     )

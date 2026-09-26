@@ -6,6 +6,7 @@ para dividir PDFs em páginas individuais e renderizar páginas como PNG.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -42,7 +43,7 @@ class ToolboxPdfClient:
         api_key: str | None = None,
     ) -> None:
         self.base_url = (base_url or settings.toolbox_base_url).rstrip("/")
-        self.provider = provider or settings.toolbox_provider
+        self.provider = provider or settings.toolbox_pdf_provider
         self.timeout_seconds = timeout_seconds or settings.toolbox_timeout_seconds
         self.api_key = api_key if api_key is not None else settings.toolbox_api_key
         headers: dict[str, str] = {}
@@ -164,8 +165,9 @@ class ToolboxPdfClient:
                 data: dict[str, Any] = {
                     "artifact_id": artifact_id,
                     "provider": self.provider,
-                    "page_number": page_number,
-                    "dpi": dpi,
+                    "parameters": json.dumps(
+                        {"page_number": page_number, "dpi": dpi}
+                    ),
                 }
                 if use_remote_cache is False:
                     data["no_cache"] = True
@@ -181,8 +183,9 @@ class ToolboxPdfClient:
                     }
                     params: dict[str, Any] = {
                         "provider": self.provider,
-                        "page_number": page_number,
-                        "dpi": dpi,
+                        "parameters": json.dumps(
+                            {"page_number": page_number, "dpi": dpi}
+                        ),
                     }
                     if use_remote_cache is False:
                         params["no_cache"] = True

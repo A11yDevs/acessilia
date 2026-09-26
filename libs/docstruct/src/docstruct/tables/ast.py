@@ -137,6 +137,130 @@ def table_ast_from_block(block: dict[str, Any]) -> dict[str, Any] | None:
     return table_ast_from_rows(block.get("rows"), caption=block.get("caption"))
 
 
+def effective_row_width(row: dict[str, Any]) -> int:
+    """Return the number of logical columns occupied by a table row."""
+    cells = row.get("cells", []) if isinstance(row, dict) else []
+    width = 0
+    for cell in cells:
+        if not isinstance(cell, dict):
+            continue
+        colspan = cell.get("colspan")
+        width += colspan if isinstance(colspan, int) and colspan >= 1 else 1
+    return width
+
+
+def effective_section_row_widths(rows: list[dict[str, Any]]) -> list[int]:
+    """Return each row's logical width while carrying active row spans.
+
+    Cells in HTML/Pandoc tables are placed in the first contiguous free column
+    range. A cell spanning subsequent rows therefore occupies those columns
+    even though it is absent from the later rows' ``cells`` lists.
+    """
+    return [width for width, _leading_headers in _project_section_rows(rows)]
+
+
+def effective_section_width(rows: list[dict[str, Any]]) -> int:
+    """Return the maximum logical width of a table section."""
+    return max(effective_section_row_widths(rows), default=0)
+
+
+def row_header_column_count(body_rows: list[dict[str, Any]]) -> int:
+    """Return the common leading width carrying row-header semantics."""
+    if not body_rows:
+        return 0
+
+    projections = _project_section_rows(body_rows)
+    leading_widths = [leading_headers for _width, leading_headers in projections]
+
+    # A legacy body-only AST may mark the whole first row as headers while the
+    # following rows mark only their first column. Let split_header_and_body()
+    # promote that first row instead of treating it as another row-header row.
+    first_width, first_leading_headers = projections[0]
+    if (
+        len(projections) >= 2
+        and first_width > 0
+        and first_leading_headers == first_width
+        and any(
+            leading_headers < first_leading_headers
+            for _width, leading_headers in projections[1:]
+        )
+    ):
+        return 0
+
+    return min(leading_widths, default=0)
+
+
+def _project_section_rows(
+    rows: list[dict[str, Any]],
+) -> list[tuple[int, int]]:
+    """Project rows into a logical grid as ``(width, leading_headers)``."""
+    # column -> (number of future rows still occupied, row-header semantics)
+    active_spans: dict[int, tuple[int, bool]] = {}
+    projections: list[tuple[int, int]] = []
+
+    for row in rows:
+        occupied = {
+            column: is_row_header
+            for column, (_remaining, is_row_header) in active_spans.items()
+        }
+        next_spans = {
+            column: (remaining - 1, is_row_header)
+            for column, (remaining, is_row_header) in active_spans.items()
+            if remaining > 1
+        }
+
+        cells = row.get("cells", []) if isinstance(row, dict) else []
+        cursor = 0
+        for cell in cells:
+            if not isinstance(cell, dict):
+                continue
+
+            colspan_value = cell.get("colspan")
+            colspan = (
+                colspan_value
+                if isinstance(colspan_value, int) and colspan_value >= 1
+                else 1
+            )
+            rowspan_value = cell.get("rowspan")
+            rowspan = (
+                rowspan_value
+                if isinstance(rowspan_value, int) and rowspan_value >= 1
+                else 1
+            )
+
+            while True:
+                conflicting_column = next(
+                    (
+                        column
+                        for column in range(cursor, cursor + colspan)
+                        if column in occupied
+                    ),
+                    None,
+                )
+                if conflicting_column is None:
+                    break
+                cursor = conflicting_column + 1
+
+            scope = str(cell.get("scope", "")).strip().lower()
+            is_row_header = scope in {"row", "rowgroup"} or (
+                bool(cell.get("header")) and scope not in {"col", "colgroup"}
+            )
+            for column in range(cursor, cursor + colspan):
+                occupied[column] = is_row_header
+                if rowspan > 1:
+                    next_spans[column] = (rowspan - 1, is_row_header)
+            cursor += colspan
+
+        width = max(occupied, default=-1) + 1
+        leading_headers = 0
+        while occupied.get(leading_headers) is True:
+            leading_headers += 1
+        projections.append((width, leading_headers))
+        active_spans = next_spans
+
+    return projections
+
+
 def split_header_and_body(
     table_ast: dict[str, Any], *, infer_legacy_header: bool = True
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
@@ -144,7 +268,13 @@ def split_header_and_body(
     body = list(table_ast.get("body") or [])
     footer = list(table_ast.get("footer") or [])
 
-    if not header and infer_legacy_header and len(body) >= 2:
+    has_complete_row_headers = row_header_column_count(body) > 0
+    if (
+        not header
+        and not has_complete_row_headers
+        and infer_legacy_header
+        and len(body) >= 2
+    ):
         header = [body[0]]
         body = body[1:]
 

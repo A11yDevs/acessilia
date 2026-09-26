@@ -6,11 +6,16 @@ from pathlib import Path
 from typing import Any, Callable, Coroutine
 
 import fitz
+from docstruct.tables.ast import effective_section_width
 
 from backend.agents.data_agent import DataAgent
+from backend.agents.output_schemas import DataOutput, VisionOutput
 from backend.core.agents.informational_structural import InformationalStructuralAgent
 from backend.core.execution.executor import ExecutorAgent, MethodRegistry
 from backend.core.execution.models import ExecutionReport, MethodResult
+from backend.core.manifest.builder import (
+    reconcile_reclassified_element_processing_needs,
+)
 from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
 from backend.core.manifest.models import Artifact, ManifestElement, ProcessingManifest
 from backend.core.planning.domain_bundle import DomainBundle
@@ -460,19 +465,44 @@ async def _enrich_picture_descriptions(
         if not image_bytes:
             continue
 
-        description = await vision.describe_region(
+        vision_output = await vision.describe_region(
             image_bytes=image_bytes,
             classification="embedded_image",
             page_num=page_number,
             total_pages=total_pages,
             mode=mode,
         )
-        if description and description.strip():
-            element.text = description.strip()
-            if element.type != "picture":
-                element.metadata["original_type"] = element.type
-                element.type = "picture"
-                element.raw_label = "picture"
+        if isinstance(vision_output, VisionOutput):
+            element.metadata["vision_language"] = vision_output.language
+            element.metadata["vision_confidence"] = vision_output.confidence
+            element.metadata["vision_elements"] = list(vision_output.mentioned_elements)
+            if vision_output.warnings:
+                element.metadata["vision_warnings"] = list(vision_output.warnings)
+
+            if vision_output.kind == "formula":
+                element.text = vision_output.formula_latex or ""
+                if element.type != "formula":
+                    previous_type = element.type
+                    element.metadata["original_type"] = element.type
+                    element.type = "formula"
+                    element.raw_label = "formula"
+                    reconcile_reclassified_element_processing_needs(
+                        manifest,
+                        element,
+                        previous_type=previous_type,
+                    )
+            else:
+                element.text = vision_output.description
+                if element.type != "picture":
+                    previous_type = element.type
+                    element.metadata["original_type"] = element.type
+                    element.type = "picture"
+                    element.raw_label = "picture"
+                    reconcile_reclassified_element_processing_needs(
+                        manifest,
+                        element,
+                        previous_type=previous_type,
+                    )
             if element.page_number is None and page_number >= 1:
                 element.page_number = page_number
             enriched += 1
@@ -513,28 +543,27 @@ async def _enrich_table_structures(
         if not image_bytes:
             continue
 
-        ocr_text = await data_agent.process_region(
+        table_output = await data_agent.process_region(
             image_bytes=image_bytes,
             classification="table",
             page_num=page_number,
             fallback_text=element.text or "",
         )
-        if not isinstance(ocr_text, str) or not ocr_text.strip():
+        if not isinstance(table_output, DataOutput) or table_output.kind != "table":
             continue
 
-        rows = _rows_from_visual_table_text(ocr_text)
-        if not rows:
-            continue
-
-        table_ast = _table_ast_from_rows(rows)
-        if table_ast is None:
-            continue
+        rows = table_output.table_rows()
+        table_ast = table_output.table_ast()
 
         element.metadata["table_ast"] = table_ast
-        element.metadata["table_linearization_hint"] = "ocr-visual-fallback"
+        element.metadata["table_linearization_hint"] = "data-agent-structured"
         element.metadata["table_row_count"] = len(rows)
-        element.metadata["table_column_count"] = max((len(row) for row in rows), default=0)
-        element.metadata["table_has_header"] = bool(rows and len(rows[0]) >= 2)
+        element.metadata["table_column_count"] = _table_ast_column_count(table_ast)
+        element.metadata["table_has_header"] = _table_ast_has_headers(table_ast)
+        element.metadata["data_language"] = table_output.language
+        element.metadata["data_confidence"] = table_output.confidence
+        if table_output.warnings:
+            element.metadata["data_warnings"] = list(table_output.warnings)
         element.text = ""
         if element.page_number is None and page_number >= 1:
             element.page_number = page_number
@@ -559,6 +588,44 @@ def _table_element_has_structured_content(element: ManifestElement) -> bool:
         return True
 
     return not _rows_look_like_placeholder(rows)
+
+
+def _table_ast_column_count(table_ast: dict[str, Any]) -> int:
+    """Return the widest logical section, including cell spans."""
+    widths: list[int] = []
+    for section_name in ("header", "body", "footer"):
+        section = table_ast.get(section_name)
+        if isinstance(section, list):
+            widths.append(effective_section_width(section))
+    return max(widths, default=0)
+
+
+def _table_ast_has_headers(table_ast: dict[str, Any]) -> bool:
+    """Return whether any canonical table cell carries header semantics."""
+    for section_name in ("header", "body", "footer"):
+        section = table_ast.get(section_name)
+        if not isinstance(section, list):
+            continue
+        if section_name == "header" and section:
+            return True
+        for row in section:
+            if not isinstance(row, dict):
+                continue
+            cells = row.get("cells")
+            if not isinstance(cells, list):
+                continue
+            for cell in cells:
+                if not isinstance(cell, dict):
+                    continue
+                scope = str(cell.get("scope", "")).strip().lower()
+                if bool(cell.get("header")) or scope in {
+                    "row",
+                    "col",
+                    "rowgroup",
+                    "colgroup",
+                }:
+                    return True
+    return False
 
 
 def _backfill_table_from_existing_text(element: ManifestElement) -> bool:
@@ -960,12 +1027,10 @@ def _element_to_block(element: ManifestElement) -> dict[str, Any]:
     elif element.type == "code":
         block.update({"type": "code", "text": normalize_code_text(text)})
     elif element.type == "formula":
-        block.update(
-            {
-                "type": "paragraph",
-                "text": text or "Formula detectada.",
-            }
-        )
+        if text:
+            block.update({"type": "math", "text": text})
+        else:
+            block.update({"type": "paragraph", "text": "Formula detectada."})
     else:
         block.update({"type": "paragraph", "text": text or element.raw_label})
 
@@ -1060,11 +1125,9 @@ def _table_ast_from_metadata(metadata: dict[str, Any]) -> dict[str, Any] | None:
                 continue
             normalized_cells: list[dict[str, Any]] = []
             for cell in cells:
-                if not isinstance(cell, dict):
+                if not isinstance(cell, dict) or "text" not in cell:
                     continue
                 text = str(cell.get("text", "")).strip()
-                if not text:
-                    continue
                 normalized_cell: dict[str, Any] = {"text": text}
                 if isinstance(cell.get("header"), bool):
                     normalized_cell["header"] = cell["header"]
@@ -1102,8 +1165,7 @@ def _table_ast_from_rows(rows: list[list[str]]) -> dict[str, Any]:
         cells = []
         for cell in row:
             text = str(cell).strip()
-            if text:
-                cells.append({"text": text})
+            cells.append({"text": text})
         if cells:
             body.append({"cells": cells})
     return {"body": body}
@@ -1126,8 +1188,7 @@ def _rows_from_table_ast(table_ast: dict[str, Any]) -> list[list[str]]:
                 for cell in cells
                 if isinstance(cell, dict)
             ]
-            row_values = [value for value in row_values if value]
-            if row_values:
+            if any(row_values):
                 rows.append(row_values)
     return rows
 

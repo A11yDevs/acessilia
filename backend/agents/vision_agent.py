@@ -12,6 +12,11 @@ from backend.tools.logger import logger
 
 from backend.tools.prompt_tools import build_page_prompt, load_region_prompt, load_system_prompt
 from backend.ai.models.ai_client import get_agno_model
+from backend.agents.output_schemas import (
+    VISION_SCHEMA_INSTRUCTION,
+    VisionOutput,
+    validate_structured_content,
+)
 from agno.agent import Agent
 from agno.media import Image
 
@@ -36,7 +41,7 @@ class VisionAgent:
         total_pages: int = 0,
         mode: str | None = None,
         custom_prompt: str | None = None,
-    ) -> str:
+    ) -> VisionOutput | None:
         """Describe a single visual region of a page with the vision model.
 
         Args:
@@ -48,7 +53,7 @@ class VisionAgent:
             custom_prompt (str | None): Fully custom prompt that, when given, replaces all selection logic (default None).
 
         Returns:
-            str: The model's region description text, or an empty string when the vision call raised (the exception is logged as critical).
+            A validated visual result, or None when inference or validation fails.
         """
         effective_mode = mode or self.mode
 
@@ -65,6 +70,8 @@ class VisionAgent:
             region_prompt = load_region_prompt(prompt_key)
             prompt = region_prompt if region_prompt else self.system_prompt
 
+        prompt = f"{prompt}\n\n{VISION_SCHEMA_INSTRUCTION}"
+
         try:
             logger.debug(
                 t(LOG_VISION_AGENT_SENDING_REGION).format(
@@ -77,22 +84,18 @@ class VisionAgent:
             agent = Agent(
                 name="VisionAgent",
                 model=get_agno_model(),
+                output_schema=VisionOutput,
                 telemetry=False,
             )
 
             def _run_vision():
-                loop = asyncio.new_event_loop()
-                try:
-                    return loop.run_until_complete(
-                        agent.arun(
-                            input=prompt,
-                            images=[Image(content=image_bytes)],
-                        )
-                    ).content
-                finally:
-                    loop.close()
+                return agent.run(
+                    input=prompt,
+                    images=[Image(content=image_bytes)],
+                ).content
 
-            return (await asyncio.to_thread(_run_vision)).strip()
+            content = await asyncio.to_thread(_run_vision)
+            return validate_structured_content(content, VisionOutput)
 
         except Exception as error:
             import traceback
@@ -105,4 +108,4 @@ class VisionAgent:
                     tb=tb,
                 )
             )
-            return ""
+            return None

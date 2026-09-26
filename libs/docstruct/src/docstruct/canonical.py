@@ -325,11 +325,9 @@ def _sanitize_table_ast(raw: dict[str, Any]) -> dict[str, Any]:
                 continue
             normalized_cells: list[dict[str, Any]] = []
             for cell in cells:
-                if not isinstance(cell, dict):
+                if not isinstance(cell, dict) or "text" not in cell:
                     continue
                 text = sanitize_block_text(str(cell.get("text", "")))
-                if not text:
-                    continue
                 normalized_cell: dict[str, Any] = {"text": text}
                 if isinstance(cell.get("header"), bool):
                     normalized_cell["header"] = cell["header"]
@@ -362,7 +360,7 @@ def _sanitize_table_ast(raw: dict[str, Any]) -> dict[str, Any]:
 def _table_ast_from_rows(rows: list[list[str]]) -> dict[str, Any]:
     body = []
     for row in rows:
-        cells = [{"text": sanitize_block_text(str(cell))} for cell in row if str(cell).strip()]
+        cells = [{"text": sanitize_block_text(str(cell))} for cell in row]
         if cells:
             body.append({"cells": cells})
     return {"body": body}
@@ -381,8 +379,7 @@ def _rows_from_table_ast(table_ast: dict[str, Any]) -> list[list[str]]:
             if not isinstance(cells, list):
                 continue
             row_values = [str(cell.get("text", "")).strip() for cell in cells if isinstance(cell, dict)]
-            row_values = [value for value in row_values if value]
-            if row_values:
+            if any(row_values):
                 rows.append(row_values)
     return rows
 

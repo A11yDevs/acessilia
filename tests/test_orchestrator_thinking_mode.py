@@ -35,6 +35,9 @@ class _FakeEditor:
     def consolidate_page(self, _tasks, results) -> str:
         return results[0]
 
+    def build_page_blocks(self, _tasks, results) -> list[dict]:
+        return [{"type": "paragraph", "text": results[0]}]
+
 
 def test_thinking_mode_changes_dispatched_prompt(monkeypatch, tmp_path):
     from backend.agents import orchestrator as orchestrator_module
