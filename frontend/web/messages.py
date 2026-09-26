@@ -7,8 +7,8 @@ canonical English string; callers resolve it at render time through
 like the Telegram and API surfaces.
 """
 
-#: Shown when the global exception handler renders a 500 response; {error} carries the exception text.
-WEB_ERROR_INTERNAL: str = "Internal server error: {error}"
+#: Shown when the global exception handler renders a 500 response.
+WEB_ERROR_INTERNAL: str = "Internal server error. Please try again."
 #: Shown when the API rejects a web upload with a non-success code; {status_code} and {detail} replaced at render time.
 WEB_ERROR_API_UPLOAD: str = "API error ({status_code}): {detail}"
 #: Shown when an unexpected exception interrupts the web upload flow before the API is even contacted.

@@ -46,6 +46,24 @@ def test_recent_download_token_remains_valid(tmp_path):
     assert info["stem"] == "doc"
 
 
+def test_download_tokens_are_not_written_to_application_logs(tmp_path):
+    messages = []
+    sink = token_service.logger.add(messages.append, level="DEBUG", format="{message}")
+    try:
+        output_dir = tmp_path / "output" / "job"
+        output_dir.mkdir(parents=True)
+        token = asyncio.run(token_service.criar_token(output_dir, "doc"))
+        asyncio.run(token_service.obter_info_token("unknown-download-token"))
+        output_dir.rmdir()
+        asyncio.run(token_service.obter_info_token(token))
+    finally:
+        token_service.logger.remove(sink)
+
+    logged = "".join(str(message) for message in messages)
+    assert token not in logged
+    assert "unknown-download-token" not in logged
+
+
 def test_download_token_only_lists_registered_formats(tmp_path):
     output_dir = tmp_path / "output" / "job-partial"
     output_dir.mkdir(parents=True)
@@ -80,4 +98,3 @@ def test_download_token_stores_task_id_and_owner(tmp_path):
     assert info is not None
     assert info["task_id"] == "task-12345"
     assert info["owner"] == "user@example.com"
-

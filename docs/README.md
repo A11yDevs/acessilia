@@ -21,6 +21,7 @@ The system runs in one of two pipeline engines, selected by the `PIPELINE_ENGINE
 8. [Production systemd timer](producao-systemd.md) — production setup, promotion and rollback procedure.
 9. [Internationalization (i18n)](i18n.md) — what is localized, where the locale strings files live, and step-by-step guides for adding strings, internationalizing a file, and adding a new locale.
 10. [Dr.DocBench benchmark](drbench.md) — structure-extraction provider benchmark (Docling vs MinerU), metrics and results.
+11. [Toolbox tool integration](toolbox_integration.md) — how to integrate a new Toolbox tool into the core: HTTP contract, local vs. remote tools, and the two integration scenarios. (Brazilian Portuguese: [versão em pt-BR](toolbox_integration.pt-br.md))
 
 ---
 

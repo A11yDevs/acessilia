@@ -97,7 +97,7 @@ async def criar_token(
             conn.commit()
         finally:
             cursor.close()
-    logger.debug(t(LOG_DOWNLOAD_TOKEN_CREATED).format(token=token, filename=filename))
+    logger.debug(t(LOG_DOWNLOAD_TOKEN_CREATED).format(filename=filename))
     return token
 
 
@@ -117,12 +117,12 @@ async def obter_info_token(token: str) -> dict | None:
         finally:
             cursor.close()
     if row is None:
-        logger.warning(t(LOG_DOWNLOAD_TOKEN_NOT_FOUND).format(token=token))
+        logger.warning(t(LOG_DOWNLOAD_TOKEN_NOT_FOUND))
         return None
     output_dir = Path(row["output_dir"])
     if not output_dir.exists():
         logger.warning(
-            t(LOG_DOWNLOAD_TOKEN_DIR_MISSING).format(token=token, output_dir=output_dir)
+            t(LOG_DOWNLOAD_TOKEN_DIR_MISSING).format(output_dir=output_dir)
         )
         return None
     formats_list = json.loads(row["formats"]) if row["formats"] else []

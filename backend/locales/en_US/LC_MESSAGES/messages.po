@@ -1017,9 +1017,8 @@ msgstr ""
 "Convert tables and mathematical formulas from images into accessible "
 "structured text (Markdown for tables, LaTeX for formulas)."
 
-#, python-brace-format
-msgid "Internal server error: {error}"
-msgstr "Internal server error: {error}"
+msgid "Internal server error. Please try again."
+msgstr "Internal server error. Please try again."
 
 #, python-brace-format
 msgid "API error ({status_code}): {detail}"
@@ -1533,16 +1532,15 @@ msgid "Docling processed {filename} in {elapsed:.1f}s"
 msgstr "Docling processed {filename} in {elapsed:.1f}s"
 
 #, python-brace-format
-msgid "Download token created: {token} -> {filename}"
-msgstr "Download token created: {token} -> {filename}"
+msgid "Download token created for {filename}"
+msgstr "Download token created for {filename}"
+
+msgid "Download token not found"
+msgstr "Download token not found"
 
 #, python-brace-format
-msgid "Download token not found: {token}"
-msgstr "Download token not found: {token}"
-
-#, python-brace-format
-msgid "Download token output directory missing: {token} -> {output_dir}"
-msgstr "Download token output directory missing: {token} -> {output_dir}"
+msgid "Download token output directory missing: {output_dir}"
+msgstr "Download token output directory missing: {output_dir}"
 
 #, python-brace-format
 msgid "Failed to generate PDF/UA: {error}"
@@ -1711,4 +1709,3 @@ msgid "document"
 msgid_plural "documents"
 msgstr[0] "document"
 msgstr[1] "documents"
-

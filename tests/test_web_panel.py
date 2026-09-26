@@ -8,6 +8,7 @@ from frontend.clients.api_client import ApiError  # noqa: E402
 from frontend.web import app as web_module  # noqa: E402
 from frontend.web.messages import (  # noqa: E402
     WEB_ADVANCED_HEADLINE,
+    WEB_ERROR_INTERNAL,
     WEB_INDEX_HEADLINE,
     WEB_SUCCESS_QUEUED,
 )
@@ -203,8 +204,30 @@ def test_download_proxy_removes_partial_file_after_api_failure(web_client):
 
 
 def test_download_page_not_found(web_client):
-    resp = web_client.get("/download/bad")
+    messages = []
+    sink = web_module.logger.add(messages.append, format="{message}")
+    try:
+        resp = web_client.get("/download/bad")
+    finally:
+        web_module.logger.remove(sink)
     assert resp.status_code == 404
+    logged = "".join(str(message) for message in messages)
+    assert "/download/{token}" in logged
+    assert "/download/bad" not in logged
+
+
+def test_internal_error_does_not_expose_exception_details(monkeypatch):
+    async def fail_download_info(token):
+        raise RuntimeError("internal-detail-should-stay-private")
+
+    monkeypatch.setattr(web_module.client, "get_download_info", fail_download_info)
+    monkeypatch.setattr(web_module.limiter, "enabled", False)
+    with TestClient(web_module.app, raise_server_exceptions=False) as client:
+        response = client.get("/download/example")
+
+    assert response.status_code == 500
+    assert t(WEB_ERROR_INTERNAL) in response.text
+    assert "internal-detail-should-stay-private" not in response.text
 
 
 def test_download_page_uses_real_client(monkeypatch):
