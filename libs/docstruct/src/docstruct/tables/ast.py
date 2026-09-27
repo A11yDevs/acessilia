@@ -125,7 +125,7 @@ def rows_from_table_ast(table_ast: Any) -> list[list[str]]:
                 for cell in cells
                 if isinstance(cell, dict)
             ]
-            if any(value for value in row_values):
+            if row_values:
                 rows.append(row_values)
     return rows
 
@@ -180,6 +180,7 @@ def row_header_column_count(body_rows: list[dict[str, Any]]) -> int:
         len(projections) >= 2
         and first_width > 0
         and first_leading_headers == first_width
+        and not _row_has_explicit_row_scope(body_rows[0])
         and any(
             leading_headers < first_leading_headers
             for _width, leading_headers in projections[1:]
@@ -188,6 +189,22 @@ def row_header_column_count(body_rows: list[dict[str, Any]]) -> int:
         return 0
 
     return min(leading_widths, default=0)
+
+
+def _cell_is_row_header(cell: dict[str, Any]) -> bool:
+    scope = str(cell.get("scope", "")).strip().lower()
+    return scope in {"row", "rowgroup"} or (
+        bool(cell.get("header")) and scope not in {"col", "colgroup"}
+    )
+
+
+def _row_has_explicit_row_scope(row: dict[str, Any]) -> bool:
+    cells = row.get("cells", []) if isinstance(row, dict) else []
+    return any(
+        isinstance(cell, dict)
+        and str(cell.get("scope", "")).strip().lower() in {"row", "rowgroup"}
+        for cell in cells
+    )
 
 
 def _project_section_rows(
@@ -241,10 +258,7 @@ def _project_section_rows(
                     break
                 cursor = conflicting_column + 1
 
-            scope = str(cell.get("scope", "")).strip().lower()
-            is_row_header = scope in {"row", "rowgroup"} or (
-                bool(cell.get("header")) and scope not in {"col", "colgroup"}
-            )
+            is_row_header = _cell_is_row_header(cell)
             for column in range(cursor, cursor + colspan):
                 occupied[column] = is_row_header
                 if rowspan > 1:
@@ -274,6 +288,7 @@ def split_header_and_body(
         and not has_complete_row_headers
         and infer_legacy_header
         and len(body) >= 2
+        and not _row_has_explicit_row_scope(body[0])
     ):
         header = [body[0]]
         body = body[1:]
@@ -365,7 +380,7 @@ def _row_texts(row: dict[str, Any]) -> list[str]:
 def _normalize_row(raw_row: Any) -> dict[str, Any] | None:
     if isinstance(raw_row, list):
         cells = [{"text": str(cell).strip()} for cell in raw_row]
-        return {"cells": cells} if any(cell["text"] for cell in cells) else None
+        return {"cells": cells} if cells else None
 
     row_obj = _coerce_object(raw_row)
     if row_obj is None:
@@ -373,7 +388,7 @@ def _normalize_row(raw_row: Any) -> dict[str, Any] | None:
 
     if isinstance(row_obj, list):
         cells = [{"text": str(cell).strip()} for cell in row_obj]
-        return {"cells": cells} if any(cell["text"] for cell in cells) else None
+        return {"cells": cells} if cells else None
 
     if not isinstance(row_obj, dict):
         return None
@@ -385,7 +400,7 @@ def _normalize_row(raw_row: Any) -> dict[str, Any] | None:
             cell = _normalize_cell(raw_cell)
             if cell is not None:
                 cells.append(cell)
-        return {"cells": cells} if any(cell["text"] for cell in cells) else None
+        return {"cells": cells} if cells else None
 
     rows_field = row_obj.get("rows")
     if isinstance(rows_field, list):

@@ -379,7 +379,7 @@ def _rows_from_table_ast(table_ast: dict[str, Any]) -> list[list[str]]:
             if not isinstance(cells, list):
                 continue
             row_values = [str(cell.get("text", "")).strip() for cell in cells if isinstance(cell, dict)]
-            if any(row_values):
+            if row_values:
                 rows.append(row_values)
     return rows
 
