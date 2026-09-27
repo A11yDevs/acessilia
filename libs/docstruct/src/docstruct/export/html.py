@@ -157,7 +157,9 @@ def _render_html_table_row(row: dict[str, Any], *, header: bool) -> str:
 
     Args:
         row (dict): Row mapping with a "cells" list; each cell is a dict with "text" plus optional "scope", "rowspan", "colspan".
-        header (bool): When True the cells render as <th> (scope defaults to "col"), otherwise as <td>.
+        header (bool): Whether the row belongs to <thead>; each cell still
+            follows its own header/scope metadata (scope defaults to "col"
+            for marked cells in a header row and to "row" otherwise).
 
     Returns:
         str: The "<tr>...</tr>" fragment, or an empty string when the row has no valid cells.
@@ -169,7 +171,7 @@ def _render_html_table_row(row: dict[str, Any], *, header: bool) -> str:
             continue
         text = escape(str(cell.get("text", "")).strip())
         scope = str(cell.get("scope", "")).strip().lower()
-        cell_is_header = header or bool(cell.get("header")) or scope in {
+        cell_is_header = bool(cell.get("header")) or scope in {
             "row",
             "col",
             "rowgroup",

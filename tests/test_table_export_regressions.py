@@ -1,5 +1,6 @@
 """Regression cases for structured table export."""
 
+from backend.agents.output_schemas import DataOutput
 from docstruct.export.html import document_to_html
 from docstruct.export.pandoc_ast import build_pandoc_ast
 from docstruct.export.txt import document_to_txt_lines
@@ -74,6 +75,29 @@ def test_offset_row_headers_keep_data_cells_out_of_table_header() -> None:
         f"Entrada (table_ast): {table_ast!r}\n"
         f"Esperado: {expected!r}\n"
         f"Obtido: {actual!r}"
+    )
+
+
+def test_mixed_inferred_header_row_preserves_unmarked_data_cell() -> None:
+    output = DataOutput(
+        kind="table",
+        rows=[
+            {"cells": [{"text": ""}, {"text": "Valor", "header": True, "scope": "col"}]},
+            {"cells": [{"text": "Janeiro", "header": True, "scope": "row"}, {"text": "10"}]},
+            {"cells": [{"text": "Fevereiro", "header": True, "scope": "row"}, {"text": "12"}]},
+        ],
+        language="pt-BR",
+        confidence=0.9,
+    )
+    document = _document_with_table(output.table_ast())
+
+    assert _render_table(document) == (
+        '<table id="table-1">'
+        '<thead><tr><td></td><th scope="col">Valor</th></tr></thead>'
+        '<tbody>'
+        '<tr><th scope="row">Janeiro</th><td>10</td></tr>'
+        '<tr><th scope="row">Fevereiro</th><td>12</td></tr>'
+        '</tbody></table>'
     )
 
 
