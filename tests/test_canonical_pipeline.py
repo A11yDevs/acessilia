@@ -262,3 +262,35 @@ def test_export_accessible_document_pdf_ua_requires_latex_engine(monkeypatch):
                 format_name="pdf_ua",
                 title="Titulo",
             )
+
+def test_export_accessible_document_html_preserves_mixed_header_cells():
+    document = {
+        "schema_version": "1",
+        "id": "doc-table",
+        "title": "Tabela",
+        "language": "pt-BR",
+        "sections": [{
+            "id": "sec-1",
+            "title": "Dados",
+            "level": 1,
+            "children": [],
+            "blocks": [{
+                "id": "table-1",
+                "type": "table",
+                "table_ast": {
+                    "body": [
+                        {"cells": [{"text": ""}, {"text": "Valor", "header": True, "scope": "col"}]},
+                        {"cells": [{"text": "Janeiro", "header": True, "scope": "row"}, {"text": "10"}]},
+                    ]
+                },
+            }],
+        }],
+    }
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        output = export_accessible_document(
+            document, Path(tmpdir) / "saida.html", format_name="html"
+        )
+        html = output.read_text(encoding="utf-8")
+
+    assert '<thead><tr><td></td><th scope="col">Valor</th></tr></thead>' in html

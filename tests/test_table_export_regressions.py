@@ -147,3 +147,21 @@ def test_empty_row_remains_between_rows_with_rowspan() -> None:
         f"Esperado: {expected!r}\n"
         f"Obtido: {actual!r}"
     )
+
+def test_drbench_renderers_preserve_mixed_header_cells() -> None:
+    from scripts.drbench.markdown_converter import _render_table
+    from scripts.drbench.run_pipeline import table_ast_to_html
+
+    table_ast = {
+        "header": [{"cells": [{"text": ""}, {"text": "Valor", "header": True, "scope": "col"}]}],
+        "body": [{"cells": [{"text": "Janeiro", "header": True, "scope": "row"}, {"text": "10"}]}],
+    }
+
+    assert table_ast_to_html(table_ast) == (
+        '<table><tr><td></td><th scope="col">Valor</th></tr>'
+        '<tr><th scope="row">Janeiro</th><td>10</td></tr></table>'
+    )
+    assert _render_table({"table_ast": table_ast}) == (
+        '<table><thead><tr><td></td><th scope="col">Valor</th></tr></thead>'
+        '<tbody><tr><th scope="row">Janeiro</th><td>10</td></tr></tbody></table>'
+    )

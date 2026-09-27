@@ -221,16 +221,12 @@ def export_accessible_document(
     profile_errors = validate_export_profile(profile, filtered)
     if profile_errors:
         raise ValueError("; ".join(profile_errors))
-    ast = build_pandoc_ast(filtered)
-    pandoc = _pandoc_bin()
     if format_name == "html":
-        if pandoc:
-            return _render_with_pandoc(
-                ast, output_path, "html5", extra_args=["--toc", "--standalone"]
-            )
         from backend.export.renderers.html_renderer import render_html
 
         return render_html(filtered, output_path, profile_name=profile)
+    ast = build_pandoc_ast(filtered)
+    pandoc = _pandoc_bin()
     if format_name == "docx":
         if pandoc:
             return _render_with_pandoc(ast, output_path, "docx")

@@ -127,8 +127,18 @@ def _render_table(block: dict[str, Any]) -> str:
         for row in rows:
             cells = []
             for cell in row.get("cells", []):
-                tag_c = "th" if cell.get("header") or part == "header" else "td"
+                scope = str(cell.get("scope", "")).strip().lower()
+                cell_is_header = bool(cell.get("header")) or scope in {
+                    "row",
+                    "col",
+                    "rowgroup",
+                    "colgroup",
+                }
+                tag_c = "th" if cell_is_header else "td"
                 attrs = _cell_attrs(cell)
+                if tag_c == "th":
+                    cell_scope = scope if scope in {"row", "col", "rowgroup", "colgroup"} else ("col" if part == "header" else "row")
+                    attrs += f' scope="{cell_scope}"'
                 cells.append(
                     f"<{tag_c}{attrs}>{_escape(cell.get('text', ''))}</{tag_c}>"
                 )
