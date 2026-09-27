@@ -1721,3 +1721,15 @@ msgid "document"
 msgid_plural "documents"
 msgstr[0] "documento"
 msgstr[1] "documentos"
+
+msgid "Log file not found"
+msgstr "Log não encontrado"
+
+msgid "Observability access not configured"
+msgstr "Acesso de observabilidade não configurado"
+
+msgid "Invalid token"
+msgstr "Token inválido"
+
+msgid "Token allows read-only access"
+msgstr "Token permite somente leitura"

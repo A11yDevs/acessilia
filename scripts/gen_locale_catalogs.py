@@ -51,9 +51,13 @@ from backend.log_messages import (
     API_INTERNAL_ERROR_DETAIL,
     API_JOB_QUEUED,
     API_LINK_INVALID,
+    API_LOG_FILE_NOT_FOUND,
+    API_OBSERVABILITY_NOT_CONFIGURED,
     API_PROMPT_TOO_LONG,
     API_RATE_LIMIT_DETAIL,
     API_TASK_NOT_FOUND,
+    API_TOKEN_INVALID,
+    API_TOKEN_READ_ONLY,
     EMAIL_CONFIRMATION_BODY,
     EMAIL_CONFIRMATION_SUBJECT,
     EMAIL_FORMAT_DOCX,
@@ -497,6 +501,10 @@ MESSAGES: tuple[str, ...] = (
     API_LINK_INVALID,
     API_FORMAT_INVALID,
     API_FILE_NOT_FOUND,
+    API_LOG_FILE_NOT_FOUND,
+    API_OBSERVABILITY_NOT_CONFIGURED,
+    API_TOKEN_INVALID,
+    API_TOKEN_READ_ONLY,
     # Manifest/planner internal diagnostic strings surfaced in logs or model validation errors.
     MSG_OBLIGATION_IMAGE,
     MSG_OBLIGATION_TABLE,
@@ -1046,6 +1054,14 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         API_FORMAT_INVALID: "Formato inválido",
         # 404 API detail body when a known token's artifact file is missing on disk.
         API_FILE_NOT_FOUND: "Arquivo não encontrado",
+        # 404 API detail body when a log file lookup misses.
+        API_LOG_FILE_NOT_FOUND: "Log não encontrado",
+        # 503 API detail body when observability access is not configured.
+        API_OBSERVABILITY_NOT_CONFIGURED: "Acesso de observabilidade não configurado",
+        # 401 API detail body when an invalid observability token is supplied.
+        API_TOKEN_INVALID: "Token inválido",
+        # 403 API detail body when write access is attempted with an observability token.
+        API_TOKEN_READ_ONLY: "Token permite somente leitura",
         # Manifest processing-needs rationale texts used in LLM prompt obligations per element type.
         MSG_OBLIGATION_IMAGE: ("A imagem deve receber descrição ou ser marcada como decorativa."),
         MSG_OBLIGATION_TABLE: (
