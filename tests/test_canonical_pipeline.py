@@ -327,3 +327,37 @@ def test_export_accessible_document_html_keeps_legacy_column_headers():
         '<tbody><tr><td>Janeiro</td><td>10</td></tr></tbody>'
         '</table>'
     ) in html
+
+
+def test_export_accessible_document_html_renders_long_image_description():
+    document = {
+        "schema_version": "1",
+        "id": "doc-image",
+        "title": "Imagem",
+        "language": "pt-BR",
+        "sections": [{
+            "id": "sec-1",
+            "title": "Dados",
+            "level": 1,
+            "children": [],
+            "blocks": [{
+                "id": "image-1",
+                "type": "image",
+                "alt_text": "Gráfico",
+                "long_description": "Barras de janeiro e fevereiro.",
+                "metadata": {"src": "grafico.png"},
+            }],
+        }],
+    }
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        output = export_accessible_document(
+            document, Path(tmpdir) / "saida.html", format_name="html"
+        )
+        html = output.read_text(encoding="utf-8")
+
+    assert (
+        '<figure id="image-1"><img alt="Gráfico" src="grafico.png">'
+        '<details><summary>Image description</summary>'
+        '<p>Barras de janeiro e fevereiro.</p></details></figure>'
+    ) in html

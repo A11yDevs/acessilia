@@ -70,12 +70,17 @@ def _all_blocks(document: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 
-def _render_block(block: dict[str, Any], profile: dict[str, Any]) -> str:
+def _render_block(
+    block: dict[str, Any],
+    profile: dict[str, Any],
+    image_description: str = "Image description",
+) -> str:
     """Renders one canonical block into its HTML fragment according to the block type and profile.
 
     Args:
         block (dict): Canonical block mapping with at least "type", "id" and the type-specific payload (text, items, table_ast, ...).
         profile (dict): Normalized export profile mapping; "collapsible" controls whether note-like blocks render as <details> or <section>.
+        image_description (str): Resolved label for image descriptions.
 
     Returns:
         str: The HTML fragment for the block (empty string when a table block carries no usable table_ast).
@@ -128,7 +133,7 @@ def _render_block(block: dict[str, Any], profile: dict[str, Any]) -> str:
         alt = escape(block.get("alt_text", block.get("text", "")))
         desc = escape(block.get("long_description", ""))
         details = (
-            f"<details><summary>{escape(t(MSG_HTML_IMAGE_DESCRIPTION))}</summary><p>{desc or alt}</p></details>"
+            f"<details><summary>{escape(image_description)}</summary><p>{desc or alt}</p></details>"
             if desc
             else ""
         )
@@ -228,7 +233,7 @@ def document_to_html(
                     block.get("id", ""),
                 )
             )
-        body.append(_render_block(block, profile_dict))
+        body.append(_render_block(block, profile_dict, labels.image_description))
 
     title = escape(document.get("title") or labels.default_title)
     toc_label = escape(labels.table_of_contents)
