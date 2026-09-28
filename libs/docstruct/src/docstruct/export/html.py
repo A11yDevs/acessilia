@@ -157,21 +157,25 @@ def _render_html_table_row(row: dict[str, Any], *, header: bool) -> str:
 
     Args:
         row (dict): Row mapping with a "cells" list; each cell is a dict with "text" plus optional "scope", "rowspan", "colspan".
-        header (bool): Whether the row belongs to <thead>; each cell still
-            follows its own header/scope metadata (scope defaults to "col"
-            for marked cells in a header row and to "row" otherwise).
+        header (bool): Whether the row belongs to <thead>. A row without
+            cell-level header metadata uses column headers; marked rows follow
+            each cell's own metadata.
 
     Returns:
         str: The "<tr>...</tr>" fragment, or an empty string when the row has no valid cells.
     """
     cells = row.get("cells", []) if isinstance(row, dict) else []
+    unmarked_header_row = header and not any(
+        isinstance(cell, dict) and ("header" in cell or "scope" in cell)
+        for cell in cells
+    )
     rendered_cells: list[str] = []
     for cell in cells:
         if not isinstance(cell, dict):
             continue
         text = escape(str(cell.get("text", "")).strip())
         scope = str(cell.get("scope", "")).strip().lower()
-        cell_is_header = bool(cell.get("header")) or scope in {
+        cell_is_header = unmarked_header_row or bool(cell.get("header")) or scope in {
             "row",
             "col",
             "rowgroup",

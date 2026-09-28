@@ -174,12 +174,17 @@ def table_ast_to_html(table_ast: dict) -> str | None:
     import html as _html
 
     def row_html(row: dict, header: bool) -> str:
+        row_cells = row.get("cells") or []
+        unmarked_header_row = header and not any(
+            isinstance(c, dict) and ("header" in c or "scope" in c)
+            for c in row_cells
+        )
         cells = []
-        for c in row.get("cells") or []:
+        for c in row_cells:
             if not isinstance(c, dict):
                 continue
             scope = str(c.get("scope", "")).strip().lower()
-            cell_is_header = bool(c.get("header")) or scope in {
+            cell_is_header = unmarked_header_row or bool(c.get("header")) or scope in {
                 "row",
                 "col",
                 "rowgroup",

@@ -101,6 +101,56 @@ def test_mixed_inferred_header_row_preserves_unmarked_data_cell() -> None:
     )
 
 
+def test_legacy_rows_still_infer_column_header_cells() -> None:
+    document = _document_with_table({})
+    document["sections"][0]["blocks"][0] = {
+        "id": "table-1",
+        "type": "table",
+        "rows": [["Mês", "Valor"], ["Janeiro", "10"]],
+    }
+
+    assert _render_table(document) == (
+        '<table id="table-1">'
+        '<thead><tr><th scope="col">Mês</th><th scope="col">Valor</th></tr></thead>'
+        '<tbody><tr><td>Janeiro</td><td>10</td></tr></tbody>'
+        '</table>'
+    )
+    pandoc_table = _pandoc_table(document)
+    assert len(pandoc_table["c"][3][1]) == 1
+    assert len(pandoc_table["c"][4][0][3]) == 1
+
+
+def test_explicit_unmarked_header_row_still_uses_column_header_cells() -> None:
+    document = _document_with_table({
+        "header": [{"cells": [{"text": "Mês"}, {"text": "Valor"}]}],
+        "body": [{"cells": [{"text": "Janeiro"}, {"text": "10"}]}],
+    })
+
+    assert _render_table(document) == (
+        '<table id="table-1">'
+        '<thead><tr><th scope="col">Mês</th><th scope="col">Valor</th></tr></thead>'
+        '<tbody><tr><td>Janeiro</td><td>10</td></tr></tbody>'
+        '</table>'
+    )
+
+
+def test_explicit_data_cell_in_header_row_remains_data() -> None:
+    document = _document_with_table({
+        "header": [{"cells": [
+            {"text": "", "header": False},
+            {"text": "Valor", "header": True, "scope": "col"},
+        ]}],
+        "body": [{"cells": [{"text": "Janeiro", "scope": "row"}, {"text": "10"}]}],
+    })
+
+    assert _render_table(document) == (
+        '<table id="table-1">'
+        '<thead><tr><td></td><th scope="col">Valor</th></tr></thead>'
+        '<tbody><tr><th scope="row">Janeiro</th><td>10</td></tr></tbody>'
+        '</table>'
+    )
+
+
 def test_empty_row_remains_between_rows_with_rowspan() -> None:
     table_ast = {
         "header": [
@@ -164,4 +214,23 @@ def test_drbench_renderers_preserve_mixed_header_cells() -> None:
     assert _render_table({"table_ast": table_ast}) == (
         '<table><thead><tr><td></td><th scope="col">Valor</th></tr></thead>'
         '<tbody><tr><th scope="row">Janeiro</th><td>10</td></tr></tbody></table>'
+    )
+
+
+def test_drbench_renderers_keep_unmarked_header_cells() -> None:
+    from scripts.drbench.markdown_converter import _render_table
+    from scripts.drbench.run_pipeline import table_ast_to_html
+
+    table_ast = {
+        "header": [{"cells": [{"text": "Mês"}, {"text": "Valor"}]}],
+        "body": [{"cells": [{"text": "Janeiro"}, {"text": "10"}]}],
+    }
+
+    assert table_ast_to_html(table_ast) == (
+        '<table><tr><th scope="col">Mês</th><th scope="col">Valor</th></tr>'
+        '<tr><td>Janeiro</td><td>10</td></tr></table>'
+    )
+    assert _render_table({"table_ast": table_ast}) == (
+        '<table><thead><tr><th scope="col">Mês</th><th scope="col">Valor</th></tr></thead>'
+        '<tbody><tr><td>Janeiro</td><td>10</td></tr></tbody></table>'
     )

@@ -294,3 +294,36 @@ def test_export_accessible_document_html_preserves_mixed_header_cells():
         html = output.read_text(encoding="utf-8")
 
     assert '<thead><tr><td></td><th scope="col">Valor</th></tr></thead>' in html
+
+
+def test_export_accessible_document_html_keeps_legacy_column_headers():
+    document = {
+        "schema_version": "1",
+        "id": "doc-table-legacy",
+        "title": "Tabela",
+        "language": "pt-BR",
+        "sections": [{
+            "id": "sec-1",
+            "title": "Dados",
+            "level": 1,
+            "children": [],
+            "blocks": [{
+                "id": "table-1",
+                "type": "table",
+                "rows": [["Mês", "Valor"], ["Janeiro", "10"]],
+            }],
+        }],
+    }
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        output = export_accessible_document(
+            document, Path(tmpdir) / "saida.html", format_name="html"
+        )
+        html = output.read_text(encoding="utf-8")
+
+    assert (
+        '<table id="table-1">'
+        '<thead><tr><th scope="col">Mês</th><th scope="col">Valor</th></tr></thead>'
+        '<tbody><tr><td>Janeiro</td><td>10</td></tr></tbody>'
+        '</table>'
+    ) in html
