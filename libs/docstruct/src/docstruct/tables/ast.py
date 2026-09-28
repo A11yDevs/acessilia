@@ -137,18 +137,6 @@ def table_ast_from_block(block: dict[str, Any]) -> dict[str, Any] | None:
     return table_ast_from_rows(block.get("rows"), caption=block.get("caption"))
 
 
-def effective_row_width(row: dict[str, Any]) -> int:
-    """Return the number of logical columns occupied by a table row."""
-    cells = row.get("cells", []) if isinstance(row, dict) else []
-    width = 0
-    for cell in cells:
-        if not isinstance(cell, dict):
-            continue
-        colspan = cell.get("colspan")
-        width += colspan if isinstance(colspan, int) and colspan >= 1 else 1
-    return width
-
-
 def effective_section_row_widths(rows: list[dict[str, Any]]) -> list[int]:
     """Return each row's logical width while carrying active row spans.
 
