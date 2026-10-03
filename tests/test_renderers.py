@@ -9,7 +9,7 @@ the localized table-of-contents and technical-metadata markup.
 import tempfile
 from pathlib import Path
 
-from pypdf import PdfReader
+import pymupdf
 
 import pytest
 
@@ -300,7 +300,6 @@ def test_render_pdf_escapes_literal_markup_in_document_text(tmp_path):
     assert result == output
     assert result.exists()
     assert result.stat().st_size > 0
-    extracted_text = "\n".join(
-        page.extract_text() or "" for page in PdfReader(result).pages
-    )
+    with pymupdf.open(result) as pdf:
+        extracted_text = "\n".join(page.get_text() for page in pdf)
     assert "O marcador <b> indica negrito & não XML." in extracted_text

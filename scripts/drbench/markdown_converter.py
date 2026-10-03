@@ -19,6 +19,7 @@ canonical form (via toolbox structurer + build_canonical_document).
 
 from __future__ import annotations
 
+from html import escape
 from typing import Any
 
 from backend.pipeline.table_ast import table_ast_from_block
@@ -163,12 +164,7 @@ def _cell_attrs(cell: dict[str, Any]) -> str:
 
 
 def _escape(text: str) -> str:
-    return (
-        str(text)
-        .replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-    )
+    return escape(str(text), quote=False)
 
 
 __all__ = ["canonical_to_drbench_md"]

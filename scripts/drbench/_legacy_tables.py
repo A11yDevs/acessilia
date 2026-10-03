@@ -7,6 +7,7 @@ path (markdown_converter._render_table) takes over.
 
 from __future__ import annotations
 
+from html import escape
 from typing import Any
 
 
@@ -37,12 +38,7 @@ def docling_table_to_markdown(table_node: dict[str, Any]) -> str:
 
 
 def _escape(text: str) -> str:
-    return (
-        str(text)
-        .replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-    )
+    return escape(str(text), quote=False)
 
 
 __all__ = ["docling_table_to_markdown"]
