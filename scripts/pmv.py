@@ -10,7 +10,7 @@ from typing import Any
 
 from backend.core.agents.informational_structural import InformationalStructuralAgent
 from backend.core.execution.executor import ExecutorAgent, MethodRegistry
-from backend.core.manifest.docling_extractor import DoclingManifestExtractor
+from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
 from backend.core.manifest.models import ProcessingManifest
 from backend.core.manifest.schema import validate_manifest
 from backend.core.planning.domain_bundle import (
@@ -31,7 +31,7 @@ DEFAULT_MANIFEST_SCHEMA = (
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="a11y-pmv",
-        description="PMV Agno + Docling + PDDL para processamento acessível.",
+        description="PMV Agno + Toolbox + PDDL para processamento acessível.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -42,7 +42,10 @@ def build_parser() -> argparse.ArgumentParser:
     manifest.add_argument("document", type=Path)
     manifest.add_argument("-o", "--output", type=Path, required=True)
     manifest.add_argument("--language", default="pt-BR")
-    manifest.add_argument("--no-ocr", action="store_true")
+    manifest.add_argument(
+        "--no-ocr", action="store_true",
+        help="Opção de compatibilidade; a Toolbox atual não permite desabilitar OCR.",
+    )
 
     plan = subparsers.add_parser(
         "plan",
@@ -78,7 +81,10 @@ def build_parser() -> argparse.ArgumentParser:
     pipeline.add_argument("document", type=Path)
     pipeline.add_argument("-o", "--output-directory", type=Path, required=True)
     pipeline.add_argument("--language", default="pt-BR")
-    pipeline.add_argument("--no-ocr", action="store_true")
+    pipeline.add_argument(
+        "--no-ocr", action="store_true",
+        help="Opção de compatibilidade; a Toolbox atual não permite desabilitar OCR.",
+    )
     pipeline.add_argument(
         "--execute-dry-run",
         action="store_true",
@@ -170,9 +176,9 @@ def _run_manifest(
     language: str,
     no_ocr: bool,
 ) -> ProcessingManifest:
-    agent = InformationalStructuralAgent(
-        DoclingManifestExtractor(enable_ocr=not no_ocr)
-    )
+    if no_ocr:
+        raise ValueError("--no-ocr is unsupported by the current Toolbox provider.")
+    agent = InformationalStructuralAgent(ToolboxManifestExtractor(language=language))
     manifest = agent.process(document.resolve(), language=language)
     payload = manifest.model_dump(mode="json", by_alias=True)
     errors = validate_manifest(payload, DEFAULT_MANIFEST_SCHEMA)

@@ -5,7 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from backend.core.agents.informational_structural import InformationalStructuralAgent
-from backend.core.manifest.docling_extractor import DoclingExtraction
+from backend.core.manifest.extraction import ExtractionResult
 from backend.core.manifest.schema import processing_manifest_schema, validate_manifest
 
 
@@ -72,9 +72,9 @@ class FakeDocument:
 
 
 class FakeExtractor:
-    def extract(self, _: Path) -> DoclingExtraction:
+    def extract(self, _: Path) -> ExtractionResult:
         timestamp = datetime(2026, 7, 27, tzinfo=timezone.utc)
-        return DoclingExtraction(
+        return ExtractionResult(
             document=FakeDocument(),
             started_at=timestamp,
             completed_at=timestamp,
@@ -244,9 +244,9 @@ def test_manifest_demotes_heading_inside_indented_callout_group(tmp_path: Path):
             return 1
 
     class CalloutExtractor:
-        def extract(self, _: Path) -> DoclingExtraction:
+        def extract(self, _: Path) -> ExtractionResult:
             timestamp = datetime(2026, 7, 27, tzinfo=timezone.utc)
-            return DoclingExtraction(
+            return ExtractionResult(
                 document=CalloutDocument(),
                 started_at=timestamp,
                 completed_at=timestamp,
@@ -331,9 +331,9 @@ def test_manifest_preserves_code_text_without_sanitizer_side_effects(tmp_path: P
             return 1
 
     class CodeExtractor:
-        def extract(self, _: Path) -> DoclingExtraction:
+        def extract(self, _: Path) -> ExtractionResult:
             timestamp = datetime(2026, 7, 27, tzinfo=timezone.utc)
-            return DoclingExtraction(
+            return ExtractionResult(
                 document=CodeDocument(),
                 started_at=timestamp,
                 completed_at=timestamp,
@@ -426,9 +426,9 @@ def test_manifest_extracts_table_ast_metadata_for_table_elements(tmp_path: Path)
             return 1
 
     class TableExtractor:
-        def extract(self, _: Path) -> DoclingExtraction:
+        def extract(self, _: Path) -> ExtractionResult:
             timestamp = datetime(2026, 7, 27, tzinfo=timezone.utc)
-            return DoclingExtraction(
+            return ExtractionResult(
                 document=TableDocument(),
                 started_at=timestamp,
                 completed_at=timestamp,

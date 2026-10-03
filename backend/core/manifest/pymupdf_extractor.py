@@ -8,7 +8,7 @@ from typing import Any
 
 import fitz
 
-from backend.core.manifest.docling_extractor import DoclingExtraction
+from backend.core.manifest.extraction import ExtractionResult
 from backend.i18n import t
 from backend.log_messages import MSG_SOURCE_FILE_MISSING
 from backend.pipeline.semantic_rules import classify_text_block
@@ -32,7 +32,7 @@ class PyMuPDFManifestExtractor:
     def __init__(self, *, include_images: bool = True) -> None:
         self.include_images = include_images
 
-    def extract(self, source_path: Path) -> DoclingExtraction:
+    def extract(self, source_path: Path) -> ExtractionResult:
         source_path = source_path.resolve()
         if not source_path.is_file():
             raise FileNotFoundError(t(MSG_SOURCE_FILE_MISSING).format(source_path=source_path))
@@ -43,7 +43,7 @@ class PyMuPDFManifestExtractor:
         duration_ms = round((perf_counter() - started_clock) * 1000)
         completed_at = datetime.now(timezone.utc)
 
-        return DoclingExtraction(
+        return ExtractionResult(
             document=document,
             started_at=started_at,
             completed_at=completed_at,

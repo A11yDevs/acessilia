@@ -309,7 +309,7 @@ service.py: _build_orchestrator()
             ├─ [artifact store] upload_artifact() → /v1/artifacts
             └─ extract_structure(artifact_id=..., use_remote_cache=...)
                  → POST /v1/capabilities/document.structure.extract:execute
-                 → ToolboxExtraction (configuration: toolbox_base_url, provider, artifact_id, cache_key)
+                 → ExtractionResult (configuration: toolbox_base_url, provider, artifact_id, cache_key)
        └─ InformationalStructuralAgent.process() → manifest
        └─ PlannerAgent → ExecutorAgent (MethodRegistry)
 ```

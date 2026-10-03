@@ -11,9 +11,9 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from backend.core.manifest.toolbox_extractor import (
-    ToolboxExtraction,
     ToolboxManifestExtractor,
 )
+from backend.core.manifest.extraction import ExtractionResult
 from backend.tools.toolbox_client import ToolboxClient
 
 
@@ -85,7 +85,7 @@ def mock_client():
 
 
 def test_extract_returns_toolbox_extraction(mock_client):
-    """Verifica que extract() retorna um ToolboxExtraction com dados corretos."""
+    """Verifica que extract() retorna um ExtractionResult com dados corretos."""
     mock_client.extract_structure = AsyncMock(return_value=SAMPLE_TOOLBOX_RESPONSE)
     mock_client.upload_artifact = AsyncMock(return_value="sha256:abc123")
 
@@ -96,7 +96,7 @@ def test_extract_returns_toolbox_extraction(mock_client):
     )
     result = extractor.extract(FIXTURE_PDF)
 
-    assert isinstance(result, ToolboxExtraction)
+    assert isinstance(result, ExtractionResult)
     assert result.document["status"] == "succeeded"
     assert result.version == "1.32.0"
     assert result.artifact_id == "sha256:abc123"
@@ -129,7 +129,7 @@ def test_extract_raises_file_not_found(mock_client):
 
 
 def test_extract_preserves_configuration(mock_client):
-    """Configuração do extractor é propagada para ToolboxExtraction."""
+    """Configuração do extractor é propagada para ExtractionResult."""
     mock_client.extract_structure = AsyncMock(return_value=SAMPLE_TOOLBOX_RESPONSE)
 
     extractor = ToolboxManifestExtractor(
