@@ -157,6 +157,99 @@ def test_validate_canonical_document_detects_table_row_inconsistency():
     assert any("inconsistent columns" in error for error in errors)
 
 
+def test_validate_canonical_document_accepts_structural_empty_cells():
+    document = _sample_document()
+    document["sections"][0]["blocks"].append(
+        {
+            "id": "blk-table-empty-cell",
+            "type": "table",
+            "rows": [["A", ""], ["B", "C"]],
+            "table_ast": {
+                "body": [
+                    {"cells": [{"text": "A"}, {"text": ""}]},
+                    {"cells": [{"text": "B"}, {"text": "C"}]},
+                ]
+            },
+        }
+    )
+
+    errors = validate_canonical_document(document)
+
+    assert not any("blk-table-empty-cell" in error for error in errors)
+
+
+def test_validate_canonical_document_uses_ast_width_for_colspan_projection():
+    document = _sample_document()
+    document["sections"][0]["blocks"].append(
+        {
+            "id": "blk-table-colspan",
+            "type": "table",
+            "rows": [["Cabeçalho"], ["A", "B"]],
+            "table_ast": {
+                "header": [
+                    {"cells": [{"text": "Cabeçalho", "colspan": 2}]}
+                ],
+                "body": [{"cells": [{"text": "A"}, {"text": "B"}]}],
+            },
+        }
+    )
+
+    errors = validate_canonical_document(document)
+
+    assert not any("blk-table-colspan" in error for error in errors)
+
+
+def test_validate_canonical_document_accepts_spanning_table_footer_projection():
+    document = _sample_document()
+    document["sections"][0]["blocks"].append(
+        {
+            "id": "blk-table-footer",
+            "type": "table",
+            "rows": [["A", "B"], ["Fonte: exemplo."]],
+            "table_ast": {
+                "body": [{"cells": [{"text": "A"}, {"text": "B"}]}],
+                "footer": [
+                    {
+                        "cells": [
+                            {"text": "Fonte: exemplo.", "colspan": 2}
+                        ]
+                    }
+                ],
+            },
+        }
+    )
+
+    errors = validate_canonical_document(document)
+
+    assert not any("blk-table-footer" in error for error in errors)
+
+
+def test_validate_canonical_document_accounts_for_active_rowspans():
+    document = _sample_document()
+    document["sections"][0]["blocks"].append(
+        {
+            "id": "blk-table-rowspan",
+            "type": "table",
+            "rows": [["Grupo", "10"], ["12"]],
+            "table_ast": {
+                "body": [
+                    {
+                        "cells": [
+                            {"text": "Grupo", "rowspan": 2},
+                            {"text": "10"},
+                        ]
+                    },
+                    {"cells": [{"text": "12"}]},
+                ]
+            },
+        }
+    )
+
+    errors = validate_canonical_document(document)
+
+    assert not any("blk-table-rowspan" in error for error in errors)
+
+
 def test_validate_export_profile_detects_profile_mismatch():
     """A technical block inside a txt-profile document is not allowed by the txt verbosity set."""
     document = _sample_document()

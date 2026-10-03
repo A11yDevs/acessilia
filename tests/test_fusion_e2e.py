@@ -25,6 +25,7 @@ from datetime import datetime, timezone
 from importlib.util import find_spec
 from pathlib import Path
 
+import httpx
 import pytest
 
 from backend.agents.pddl_orchestrator import (
@@ -227,6 +228,24 @@ requires_toolbox = pytest.mark.skipif(
 )
 
 
+def _require_fusion_providers() -> None:
+    """Skip real fusion E2Es unless both configured providers are healthy."""
+    base_url = TOOLBOX_BASE_URL.rstrip("/")
+    for provider in ("docling", "mineru"):
+        try:
+            response = httpx.get(
+                f"{base_url}/v1/providers/{provider}/health", timeout=10
+            )
+            healthy = (
+                response.status_code == 200
+                and response.json().get("healthy") is True
+            )
+        except (httpx.HTTPError, ValueError):
+            healthy = False
+        if not healthy:
+            pytest.skip(f"Toolbox provider {provider} is not healthy")
+
+
 def _get_small_pdf() -> Path:
     pdfs = sorted(FIXTURES_DIR.rglob("*.pdf"))
     if not pdfs:
@@ -244,6 +263,7 @@ def _get_small_pdf() -> Path:
 @pytest.mark.asyncio
 async def test_extract_fused_against_real_toolbox():
     """Real dual-provider extraction via the Toolbox (docling + mineru)."""
+    _require_fusion_providers()
     from backend.pipeline.fusion import extract_fused
 
     pdf = _get_small_pdf()
@@ -263,6 +283,7 @@ async def test_extract_fused_against_real_toolbox():
 @pytest.mark.asyncio
 async def test_fusion_handler_with_real_toolbox(tmp_path):
     """Full handler flow against the real Toolbox: payload → artifact."""
+    _require_fusion_providers()
     pdf = _get_small_pdf()
     manifest = _make_manifest(tmp_path, source_path=pdf)
 
@@ -284,6 +305,7 @@ async def test_fusion_handler_with_real_toolbox(tmp_path):
 @pytest.mark.skipif(find_spec("agno") is None, reason="Agno não instalado")
 def test_fusion_executor_e2e_with_real_toolbox(tmp_path):
     """Full PDDL → plan → execute flow against the real Toolbox."""
+    _require_fusion_providers()
     pdf = _get_small_pdf()
     manifest = _make_manifest(tmp_path, source_path=pdf)
     _, plan = PlannerAgent().plan(manifest, selected_roots=["o-fuse"])

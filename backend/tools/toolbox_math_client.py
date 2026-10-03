@@ -7,6 +7,7 @@ math.verbalize (LaTeX → texto pt-BR via pure-python).
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -43,11 +44,17 @@ class ToolboxMathClient:
         self,
         base_url: str | None = None,
         provider: str | None = None,
+        transform_provider: str | None = None,
         timeout_seconds: int | None = None,
         api_key: str | None = None,
     ) -> None:
         self.base_url = (base_url or settings.toolbox_base_url).rstrip("/")
-        self.provider = provider or settings.toolbox_provider
+        # provider remains the recognition-provider override for backward
+        # compatibility. Text transformations use the pure-math provider.
+        self.provider = provider or settings.toolbox_math_recognize_provider
+        self.transform_provider = (
+            transform_provider or settings.toolbox_math_provider
+        )
         self.timeout_seconds = timeout_seconds or settings.toolbox_timeout_seconds
         self.api_key = api_key if api_key is not None else settings.toolbox_api_key
         headers: dict[str, str] = {}
@@ -149,7 +156,7 @@ class ToolboxMathClient:
         """POST /v1/capabilities/math.convert:execute.
 
         Converte LaTeX para MathML ou vice-versa.
-        O corpo da requisição é o texto LaTeX em plain text.
+        O LaTeX é enviado como arquivo text/plain em um formulário multipart.
 
         Args:
             latex: Expressão LaTeX (ou MathML, se direction=mathml-to-latex).
@@ -163,16 +170,15 @@ class ToolboxMathClient:
 
         try:
             data: dict[str, Any] = {
-                "provider": self.provider,
-                "direction": direction,
+                "provider": self.transform_provider,
+                "parameters": json.dumps({"direction": direction}),
             }
             if use_remote_cache is False:
                 data["no_cache"] = True
             response = await self._client.post(
                 url,
-                content=latex.encode("utf-8"),
-                headers={"Content-Type": "text/plain", **self._auth_headers},
-                params=data,
+                files={"file": ("formula.tex", latex.encode("utf-8"), "text/plain")},
+                data=data,
             )
 
             _raise_for_error(response, CONVERT_CAPABILITY)
@@ -209,8 +215,8 @@ class ToolboxMathClient:
         """POST /v1/capabilities/math.verbalize:execute.
 
         Converte LaTeX para texto natural em português.
-        O corpo da requisição é o texto LaTeX em plain text;
-        os metadados (provider, language) vão na query string.
+        O LaTeX é enviado como arquivo text/plain em um formulário multipart;
+        provider e language são campos do mesmo formulário.
 
         Args:
             latex: Expressão LaTeX para verbalizar.
@@ -224,16 +230,15 @@ class ToolboxMathClient:
 
         try:
             data: dict[str, Any] = {
-                "provider": self.provider,
+                "provider": self.transform_provider,
                 "language": language,
             }
             if use_remote_cache is False:
                 data["no_cache"] = True
             response = await self._client.post(
                 url,
-                content=latex.encode("utf-8"),
-                headers={"Content-Type": "text/plain", **self._auth_headers},
-                params=data,
+                files={"file": ("formula.tex", latex.encode("utf-8"), "text/plain")},
+                data=data,
             )
 
             _raise_for_error(response, VERBALIZE_CAPABILITY)
@@ -278,12 +283,6 @@ class ToolboxMathClient:
     async def close(self) -> None:
         """Libera a conexão HTTP."""
         await self._client.aclose()
-
-    @property
-    def _auth_headers(self) -> dict[str, str]:
-        if self.api_key:
-            return {"Authorization": f"Bearer {self.api_key}"}
-        return {}
 
 
 __all__ = ["ToolboxMathClient"]

@@ -6,6 +6,7 @@ itens com confiança, página e bounding boxes.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -40,7 +41,7 @@ class ToolboxOcrClient:
         api_key: str | None = None,
     ) -> None:
         self.base_url = (base_url or settings.toolbox_base_url).rstrip("/")
-        self.provider = provider or settings.toolbox_provider
+        self.provider = provider or settings.toolbox_ocr_provider
         self.timeout_seconds = timeout_seconds or settings.toolbox_timeout_seconds
         self.api_key = api_key if api_key is not None else settings.toolbox_api_key
         headers: dict[str, str] = {}
@@ -86,8 +87,10 @@ class ToolboxOcrClient:
                 data: dict[str, Any] = {
                     "artifact_id": artifact_id,
                     "language": language,
-                    "force_ocr": force_ocr,
                     "provider": self.provider,
+                    "parameters": json.dumps(
+                        {"ocr_lang": language, "force_ocr": force_ocr}
+                    ),
                 }
                 if use_remote_cache is False:
                     data["no_cache"] = True
@@ -103,8 +106,10 @@ class ToolboxOcrClient:
                     }
                     params: dict[str, Any] = {
                         "language": language,
-                        "force_ocr": force_ocr,
                         "provider": self.provider,
+                        "parameters": json.dumps(
+                            {"ocr_lang": language, "force_ocr": force_ocr}
+                        ),
                     }
                     if use_remote_cache is False:
                         params["no_cache"] = True

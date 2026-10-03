@@ -28,6 +28,7 @@ def get_agno_model():
             id=settings.openrouter_model,
             api_key=settings.openrouter_api_key,
             base_url=base_url,
+            max_tokens=settings.openrouter_max_tokens,
             extra_headers=extra_headers if extra_headers else None,
             timeout=float(settings.request_timeout),
         )

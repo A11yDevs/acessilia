@@ -47,6 +47,8 @@ def test_default_locale_used_when_env_missing(monkeypatch) -> None:
     _build_and_repoint(monkeypatch)
     monkeypatch.delenv("LOCALE", raising=False)
     monkeypatch.delenv("LANGUAGE", raising=False)
+    monkeypatch.delenv("LC_ALL", raising=False)
+    monkeypatch.delenv("LANG", raising=False)
     i8n._catalog_for.cache_clear()
     assert i8n.t("Processing your document…") == "Processing your document…"
 

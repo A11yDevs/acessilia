@@ -125,10 +125,15 @@ def run_docling(case: Case, structurer: DoclingStructurer) -> None:
 
 async def run_llm(case: Case) -> None:
     from backend.agents.data_agent import DataAgent
+    from backend.agents.output_schemas import DataOutput
 
     image_bytes = case.image_path.read_bytes()
     result = await DataAgent().process_region(image_bytes, "formula", page_num=1)
-    case.llm_latex = result.strip()
+    case.llm_latex = (
+        result.latex.strip()
+        if isinstance(result, DataOutput) and result.latex
+        else ""
+    )
 
 
 def main() -> None:

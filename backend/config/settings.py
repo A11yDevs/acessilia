@@ -51,6 +51,7 @@ class Settings:
         "OPENROUTER_MODEL",
         "nvidia/nemotron-nano-12b-v2-vl:free",
     )
+    openrouter_max_tokens: int = int(os.getenv("OPENROUTER_MAX_TOKENS", "4096"))
     openrouter_base_url: str = os.getenv(
         "OPENROUTER_BASE_URL",
         "https://openrouter.ai/api/v1/chat/completions",
@@ -75,7 +76,25 @@ class Settings:
 
     # Acessilia Toolbox settings
     toolbox_base_url: str = os.getenv("TOOLBOX_BASE_URL", "http://localhost:8002")
+    # Structural extraction keeps the historical TOOLBOX_PROVIDER variable for
+    # backward compatibility. Specialized capabilities use providers bound to
+    # their own contracts in the Toolbox registry.
     toolbox_provider: str = os.getenv("TOOLBOX_PROVIDER", "docling")
+    toolbox_layout_provider: str = os.getenv(
+        "TOOLBOX_LAYOUT_PROVIDER", "docling-layout"
+    )
+    toolbox_pdf_provider: str = os.getenv(
+        "TOOLBOX_PDF_PROVIDER", "pymupdf-pdf"
+    )
+    toolbox_math_recognize_provider: str = os.getenv(
+        "TOOLBOX_MATH_RECOGNIZE_PROVIDER", "docling-math"
+    )
+    toolbox_math_provider: str = os.getenv(
+        "TOOLBOX_MATH_PROVIDER", "pure-math"
+    )
+    toolbox_ocr_provider: str = os.getenv(
+        "TOOLBOX_OCR_PROVIDER", "docling-ocr"
+    )
     toolbox_api_key: str = os.getenv("TOOLBOX_API_KEY", "")
     toolbox_timeout_seconds: int = int(os.getenv("TOOLBOX_TIMEOUT_SECONDS", "3600"))
     toolbox_use_artifact_store: bool = field(

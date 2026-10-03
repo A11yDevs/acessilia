@@ -638,6 +638,121 @@ def _derive_processing_needs(
     return observations, obligations
 
 
+def reconcile_reclassified_element_processing_needs(
+    manifest: ProcessingManifest,
+    element: ManifestElement,
+    *,
+    previous_type: str,
+) -> None:
+    """Reconcile derived observations/obligations after an element changes type.
+
+    Toolbox manifests may carry obligations beyond the ones derived locally, so
+    rebuilding the complete list would discard provider-specific planning data.
+    This function replaces only the standard processing need associated with the
+    reclassified element and leaves unrelated/custom obligations untouched.
+    """
+    if previous_type == element.type:
+        return
+
+    previous_spec = OBLIGATION_BY_TYPE.get(previous_type)
+    current_spec = OBLIGATION_BY_TYPE.get(element.type)
+    if current_spec is None:
+        return
+
+    current_kind, rationale, methods = current_spec
+    previous_kind = previous_spec[0] if previous_spec is not None else None
+    previous_observation_kind = (
+        f"{previous_type}-requires-processing" if previous_spec is not None else None
+    )
+    current_observation_kind = f"{element.type}-requires-processing"
+    suffix = element.id.removeprefix("element-")
+    current_obligation_id = f"obligation-{current_kind}-{suffix}"
+    current_observation_id = f"observation-{current_kind}-{suffix}"
+
+    removed_obligation_ids: set[str] = set()
+    retained_obligations: list[Obligation] = []
+    has_current_obligation = False
+    for obligation in manifest.obligations:
+        targets_only_element = obligation.target_ids == [element.id]
+        if targets_only_element and obligation.kind == current_kind:
+            has_current_obligation = True
+        if (
+            targets_only_element
+            and previous_kind is not None
+            and obligation.kind == previous_kind
+        ):
+            removed_obligation_ids.add(obligation.id)
+            continue
+        retained_obligations.append(obligation)
+
+    if not has_current_obligation:
+        retained_obligations.append(
+            Obligation(
+                id=current_obligation_id,
+                kind=current_kind,
+                target_ids=[element.id],
+                admissible_methods=list(methods),
+                method_costs={
+                    method: DEFAULT_METHOD_COSTS.get(method, 50)
+                    for method in methods
+                },
+                rationale=rationale,
+            )
+        )
+
+    replacement_id = next(
+        (
+            obligation.id
+            for obligation in retained_obligations
+            if obligation.target_ids == [element.id]
+            and obligation.kind == current_kind
+        ),
+        current_obligation_id,
+    )
+    for obligation in retained_obligations:
+        obligation.dependencies = [
+            replacement_id if dependency in removed_obligation_ids else dependency
+            for dependency in obligation.dependencies
+        ]
+    manifest.obligations = retained_obligations
+
+    retained_observations: list[Observation] = []
+    has_current_observation = False
+    for observation in manifest.observations:
+        targets_only_element = observation.target_ids == [element.id]
+        if targets_only_element and observation.kind == current_observation_kind:
+            has_current_observation = True
+        if (
+            targets_only_element
+            and previous_observation_kind is not None
+            and observation.kind == previous_observation_kind
+        ):
+            continue
+        retained_observations.append(observation)
+
+    if not has_current_observation:
+        retained_observations.append(
+            Observation(
+                id=current_observation_id,
+                kind=current_observation_kind,
+                severity="warning" if element.type != "code" else "info",
+                message=rationale,
+                target_ids=[element.id],
+                evidence={
+                    "raw_label": element.raw_label,
+                    "page_number": element.page_number,
+                },
+            )
+        )
+    manifest.observations = retained_observations
+
+    manifest.summary.observation_count = len(manifest.observations)
+    manifest.summary.obligation_count = len(manifest.obligations)
+    manifest.summary.element_types = dict(
+        sorted(Counter(item.type for item in manifest.elements).items())
+    )
+
+
 def _item_label(item: Any) -> str:
     label = getattr(item, "label", None)
     if label is None:

@@ -262,3 +262,102 @@ def test_export_accessible_document_pdf_ua_requires_latex_engine(monkeypatch):
                 format_name="pdf_ua",
                 title="Titulo",
             )
+
+def test_export_accessible_document_html_preserves_mixed_header_cells():
+    document = {
+        "schema_version": "1",
+        "id": "doc-table",
+        "title": "Tabela",
+        "language": "pt-BR",
+        "sections": [{
+            "id": "sec-1",
+            "title": "Dados",
+            "level": 1,
+            "children": [],
+            "blocks": [{
+                "id": "table-1",
+                "type": "table",
+                "table_ast": {
+                    "body": [
+                        {"cells": [{"text": ""}, {"text": "Valor", "header": True, "scope": "col"}]},
+                        {"cells": [{"text": "Janeiro", "header": True, "scope": "row"}, {"text": "10"}]},
+                    ]
+                },
+            }],
+        }],
+    }
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        output = export_accessible_document(
+            document, Path(tmpdir) / "saida.html", format_name="html"
+        )
+        html = output.read_text(encoding="utf-8")
+
+    assert '<thead><tr><td></td><th scope="col">Valor</th></tr></thead>' in html
+
+
+def test_export_accessible_document_html_keeps_legacy_column_headers():
+    document = {
+        "schema_version": "1",
+        "id": "doc-table-legacy",
+        "title": "Tabela",
+        "language": "pt-BR",
+        "sections": [{
+            "id": "sec-1",
+            "title": "Dados",
+            "level": 1,
+            "children": [],
+            "blocks": [{
+                "id": "table-1",
+                "type": "table",
+                "rows": [["Mês", "Valor"], ["Janeiro", "10"]],
+            }],
+        }],
+    }
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        output = export_accessible_document(
+            document, Path(tmpdir) / "saida.html", format_name="html"
+        )
+        html = output.read_text(encoding="utf-8")
+
+    assert (
+        '<table id="table-1">'
+        '<thead><tr><th scope="col">Mês</th><th scope="col">Valor</th></tr></thead>'
+        '<tbody><tr><td>Janeiro</td><td>10</td></tr></tbody>'
+        '</table>'
+    ) in html
+
+
+def test_export_accessible_document_html_renders_long_image_description():
+    document = {
+        "schema_version": "1",
+        "id": "doc-image",
+        "title": "Imagem",
+        "language": "pt-BR",
+        "sections": [{
+            "id": "sec-1",
+            "title": "Dados",
+            "level": 1,
+            "children": [],
+            "blocks": [{
+                "id": "image-1",
+                "type": "image",
+                "alt_text": "Gráfico",
+                "long_description": "Barras de janeiro e fevereiro.",
+                "metadata": {"src": "grafico.png"},
+            }],
+        }],
+    }
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        output = export_accessible_document(
+            document, Path(tmpdir) / "saida.html", format_name="html"
+        )
+        html = output.read_text(encoding="utf-8")
+
+    assert (
+        '<figure id="image-1"><img alt="Gráfico" src="grafico.png">'
+        '<details><summary>Image description</summary>'
+        '<p>Barras de janeiro e fevereiro.</p></details></figure>'
+    ) in html

@@ -86,7 +86,7 @@ def _cache_version(
     engine = _normalized_engine()
     structurer = _resolved_structurer()
     return options_cache_key(
-        f"{settings.ai_client}-{engine}-{structurer}-v2",
+        f"{settings.ai_client}-{engine}-{structurer}-v3",
         mode=mode,
         custom_prompt=custom_prompt or "",
         thinking_mode=thinking_mode,

@@ -70,12 +70,17 @@ def _all_blocks(document: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 
-def _render_block(block: dict[str, Any], profile: dict[str, Any]) -> str:
+def _render_block(
+    block: dict[str, Any],
+    profile: dict[str, Any],
+    image_description: str = "Image description",
+) -> str:
     """Renders one canonical block into its HTML fragment according to the block type and profile.
 
     Args:
         block (dict): Canonical block mapping with at least "type", "id" and the type-specific payload (text, items, table_ast, ...).
         profile (dict): Normalized export profile mapping; "collapsible" controls whether note-like blocks render as <details> or <section>.
+        image_description (str): Resolved label for image descriptions.
 
     Returns:
         str: The HTML fragment for the block (empty string when a table block carries no usable table_ast).
@@ -128,7 +133,7 @@ def _render_block(block: dict[str, Any], profile: dict[str, Any]) -> str:
         alt = escape(block.get("alt_text", block.get("text", "")))
         desc = escape(block.get("long_description", ""))
         details = (
-            f"<details><summary>{escape(t(MSG_HTML_IMAGE_DESCRIPTION))}</summary><p>{desc or alt}</p></details>"
+            f"<details><summary>{escape(image_description)}</summary><p>{desc or alt}</p></details>"
             if desc
             else ""
         )
@@ -157,26 +162,39 @@ def _render_html_table_row(row: dict[str, Any], *, header: bool) -> str:
 
     Args:
         row (dict): Row mapping with a "cells" list; each cell is a dict with "text" plus optional "scope", "rowspan", "colspan".
-        header (bool): When True the cells render as <th> (scope defaults to "col"), otherwise as <td>.
+        header (bool): Whether the row belongs to <thead>. A row without
+            cell-level header metadata uses column headers; marked rows follow
+            each cell's own metadata.
 
     Returns:
-        str: The "<tr>...</tr>" fragment, or an empty string when no cell produced visible text.
+        str: The "<tr>...</tr>" fragment, or an empty string when the row has no valid cells.
     """
     cells = row.get("cells", []) if isinstance(row, dict) else []
-    tag = "th" if header else "td"
+    unmarked_header_row = header and not any(
+        isinstance(cell, dict) and ("header" in cell or "scope" in cell)
+        for cell in cells
+    )
     rendered_cells: list[str] = []
     for cell in cells:
         if not isinstance(cell, dict):
             continue
         text = escape(str(cell.get("text", "")).strip())
+        scope = str(cell.get("scope", "")).strip().lower()
+        cell_is_header = unmarked_header_row or bool(cell.get("header")) or scope in {
+            "row",
+            "col",
+            "rowgroup",
+            "colgroup",
+        }
+        tag = "th" if cell_is_header else "td"
 
         attrs: list[str] = []
         if tag == "th":
-            scope = cell.get("scope")
-            if isinstance(scope, str) and scope in {"row", "col", "rowgroup", "colgroup"}:
+            if scope in {"row", "col", "rowgroup", "colgroup"}:
                 attrs.append(f'scope="{scope}"')
             else:
-                attrs.append('scope="col"')
+                default_scope = "col" if header else "row"
+                attrs.append(f'scope="{default_scope}"')
 
         rowspan = cell.get("rowspan")
         if isinstance(rowspan, int) and rowspan > 1:
@@ -215,7 +233,7 @@ def document_to_html(
                     block.get("id", ""),
                 )
             )
-        body.append(_render_block(block, profile_dict))
+        body.append(_render_block(block, profile_dict, labels.image_description))
 
     title = escape(document.get("title") or labels.default_title)
     toc_label = escape(labels.table_of_contents)

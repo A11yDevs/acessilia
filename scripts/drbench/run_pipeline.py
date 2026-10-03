@@ -174,15 +174,30 @@ def table_ast_to_html(table_ast: dict) -> str | None:
     import html as _html
 
     def row_html(row: dict, header: bool) -> str:
+        row_cells = row.get("cells") or []
+        unmarked_header_row = header and not any(
+            isinstance(c, dict) and ("header" in c or "scope" in c)
+            for c in row_cells
+        )
         cells = []
-        for c in row.get("cells") or []:
+        for c in row_cells:
             if not isinstance(c, dict):
                 continue
-            tag = "th" if header or c.get("header") else "td"
+            scope = str(c.get("scope", "")).strip().lower()
+            cell_is_header = unmarked_header_row or bool(c.get("header")) or scope in {
+                "row",
+                "col",
+                "rowgroup",
+                "colgroup",
+            }
+            tag = "th" if cell_is_header else "td"
             attrs = "".join(
                 f' {k}="{int(c[k])}"' for k in ("rowspan", "colspan")
                 if isinstance(c.get(k), int) and c[k] > 1
             )
+            if tag == "th":
+                cell_scope = scope if scope in {"row", "col", "rowgroup", "colgroup"} else ("col" if header else "row")
+                attrs = f' scope="{cell_scope}"' + attrs
             cells.append(f"<{tag}{attrs}>{_html.escape(str(c.get('text', '')))}</{tag}>")
         return f"<tr>{''.join(cells)}</tr>" if cells else ""
 
