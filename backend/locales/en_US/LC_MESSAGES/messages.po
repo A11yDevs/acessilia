@@ -469,20 +469,6 @@ msgstr "Title hierarchy jumps from level {previous} to level {level}."
 msgid "Document not found: {source_path}"
 msgstr "Document not found: {source_path}"
 
-#, python-brace-format
-msgid "Source file not found: {source_path}"
-msgstr "Source file not found: {source_path}"
-
-msgid "Docling is not installed. Run `poetry install` or `pip install docling`."
-msgstr "Docling is not installed. Run `poetry install` or `pip install docling`."
-
-msgid ""
-"Incompatible structurer: expected convert_document() or "
-"_process_document()."
-msgstr ""
-"Incompatible structurer: expected convert_document() or "
-"_process_document()."
-
 msgid "Method name cannot be empty"
 msgstr "Method name cannot be empty"
 
@@ -1132,20 +1118,8 @@ msgstr "Error in the API: {error} | Path: {path}"
 msgid "API: job {task_id} enqueued (source={source})"
 msgstr "API: job {task_id} enqueued (source={source})"
 
-#, python-brace-format
-msgid "Failed to remove {name}: {error}"
-msgstr "Failed to remove {name}: {error}"
-
 msgid "Error in the periodic cleanup"
 msgstr "Error in the periodic cleanup"
-
-#, python-brace-format
-msgid "Temporary file removed: {name}"
-msgstr "Temporary file removed: {name}"
-
-#, python-brace-format
-msgid "Temporary directory removed: {name}"
-msgstr "Temporary directory removed: {name}"
 
 #, python-brace-format
 msgid "Downloading file: {file_path} -> {filename}"
@@ -1205,30 +1179,6 @@ msgstr "E-mail sent successfully to {to_email}."
 msgid "Error sending e-mail to {to_email}: {error}"
 msgstr "Error sending e-mail to {to_email}: {error}"
 
-#, python-brace-format
-msgid "Exporting TXT to {path}"
-msgstr "Exporting TXT to {path}"
-
-#, python-brace-format
-msgid "Exporting DOCX to {path}"
-msgstr "Exporting DOCX to {path}"
-
-#, python-brace-format
-msgid "Exporting PDF to {path}"
-msgstr "Exporting PDF to {path}"
-
-#, python-brace-format
-msgid "Exporting PDF/UA to {path}"
-msgstr "Exporting PDF/UA to {path}"
-
-#, python-brace-format
-msgid "Exporting MP3 to {path}"
-msgstr "Exporting MP3 to {path}"
-
-#, python-brace-format
-msgid "Page converted to PNG: {size} bytes"
-msgstr "Page converted to PNG: {size} bytes"
-
 msgid ""
 "PDDL pipeline ignores custom_prompt/thinking_mode; only the deterministic"
 " manifest/planning/execution flow runs"
@@ -1279,38 +1229,6 @@ msgstr "The domain description hash diverges from the plan"
 
 msgid "The selected closure diverges from the compiled problem"
 msgstr "The selected closure diverges from the compiled problem"
-
-#, python-brace-format
-msgid ""
-"[page {page_num}] Extracted {count} region(s) on the page "
-"(structurer={structurer})"
-msgstr ""
-"[page {page_num}] Extracted {count} region(s) on the page "
-"(structurer={structurer})"
-
-#, python-brace-format
-msgid "[page {page_num}] {count} clean-text region(s) (no vision AI)"
-msgstr "[page {page_num}] {count} clean-text region(s) (no vision AI)"
-
-#, python-brace-format
-msgid "[page {page_num}] Region {idx} - type={type}, bbox={bbox}, target={target}"
-msgstr "[page {page_num}] Region {idx} - type={type}, bbox={bbox}, target={target}"
-
-#, python-brace-format
-msgid "[page {page_num}] No text extracted by regions, fallback to the full page"
-msgstr "[page {page_num}] No text extracted by regions, fallback to the full page"
-
-#, python-brace-format
-msgid ""
-"[page {page_num}] {count} task(s) ({text_count} text, {vision_count} "
-"vision)"
-msgstr ""
-"[page {page_num}] {count} task(s) ({text_count} text, {vision_count} "
-"vision)"
-
-#, python-brace-format
-msgid "[page {page_num}] reading image: {path}"
-msgstr "[page {page_num}] reading image: {path}"
 
 #, python-brace-format
 msgid "PDF exported with bookmarks and page numbering: {output_path}"
@@ -1476,22 +1394,6 @@ msgid "[page {page_num}] Sending region to vision ({size} bytes, type={type})"
 msgstr "[page {page_num}] Sending region to vision ({size} bytes, type={type})"
 
 #, python-brace-format
-msgid "[page {page_num}] EditorAgent: no consolidated text"
-msgstr "[page {page_num}] EditorAgent: no consolidated text"
-
-#, python-brace-format
-msgid "[page {page_num}] EditorAgent: {count} text parts consolidated"
-msgstr "[page {page_num}] EditorAgent: {count} text parts consolidated"
-
-#, python-brace-format
-msgid "Failed to crop the region: {error}"
-msgstr "Failed to crop the region: {error}"
-
-#, python-brace-format
-msgid "Cache hit for {name}"
-msgstr "Cache hit for {name}"
-
-#, python-brace-format
 msgid "Cache hit: {key}"
 msgstr "Cache hit: {key}"
 
@@ -1544,18 +1446,6 @@ msgstr "Job {task_id} cancelled"
 #, python-brace-format
 msgid "Error in JobExecutor for {task_id}"
 msgstr "Error in JobExecutor for {task_id}"
-
-#, python-brace-format
-msgid "Image pre-processing error: {error}"
-msgstr "Image pre-processing error: {error}"
-
-#, python-brace-format
-msgid "Image resized: {old_width}x{old_height} -> {new_width}x{new_height}"
-msgstr "Image resized: {old_width}x{old_height} -> {new_width}x{new_height}"
-
-#, python-brace-format
-msgid "Image rotated by {angle:.2f} degrees"
-msgstr "Image rotated by {angle:.2f} degrees"
 
 #, python-brace-format
 msgid "Global error in the Web Panel: {error} | Path: {path}"
@@ -1617,42 +1507,6 @@ msgstr "Internal server error"
 
 msgid "Empty response from the agent"
 msgstr "Empty response from the agent"
-
-#, python-brace-format
-msgid "Empty response for page {page_num}"
-msgstr "Empty response for page {page_num}"
-
-#, python-brace-format
-msgid "[page {page_num}] Cache hit (skipping AI)"
-msgstr "[page {page_num}] Cache hit (skipping AI)"
-
-#, python-brace-format
-msgid "Response for page {page_num} saved to {file_name}"
-msgstr "Response for page {page_num} saved to {file_name}"
-
-#, python-brace-format
-msgid "[page {page_num}] Waiting for {count} AI task(s) in parallel..."
-msgstr "[page {page_num}] Waiting for {count} AI task(s) in parallel..."
-
-#, python-brace-format
-msgid "[page {page_num}] Task {idx} failed: {error}"
-msgstr "[page {page_num}] Task {idx} failed: {error}"
-
-#, python-brace-format
-msgid ""
-"AccessibilityWorkflow: processing {page_count} page(s) for {file_name} "
-"(reader={reader}, mode={mode})"
-msgstr ""
-"AccessibilityWorkflow: processing {page_count} page(s) for {file_name} "
-"(reader={reader}, mode={mode})"
-
-#, python-brace-format
-msgid ""
-"AccessibilityWorkflow: {total_pages} pages processed, {total_chars} chars"
-" in total"
-msgstr ""
-"AccessibilityWorkflow: {total_pages} pages processed, {total_chars} chars"
-" in total"
 
 msgid "Stale: process interrupted"
 msgstr "Stale: process interrupted"

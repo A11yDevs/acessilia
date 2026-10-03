@@ -39,11 +39,6 @@ from backend.core.execution.messages import (
     EXE_START_JOB_INVALID_STATE,
     EXE_UNKNOWN_ACTION,
 )
-from backend.core.manifest.docling_extractor import (
-    MSG_DOCLING_MISSING,
-    MSG_INCOMPATIBLE_STRUCTURER,
-    MSG_SOURCE_NOT_FOUND,
-)
 from backend.log_messages import (
     API_CANCEL_STATE_INVALID,
     API_FILE_NOT_FOUND,
@@ -90,16 +85,12 @@ from backend.log_messages import (
     LOG_CACHE_CLEARED,
     LOG_CACHE_DEBUG_HIT,
     LOG_CACHE_DEBUG_SET,
-    LOG_CACHE_HIT,
     LOG_CACHE_SAVE_FAILED,
     LOG_DATA_AGENT_PROMPT_NOT_FOUND,
     LOG_DATA_AGENT_PROCESSING_REGION,
     LOG_DATA_AGENT_REGION_ERROR,
     LOG_VISION_AGENT_REGION_ERROR,
     LOG_VISION_AGENT_SENDING_REGION,
-    LOG_EDITOR_PAGE_EMPTY,
-    LOG_EDITOR_PAGE_CONSOLIDATED,
-    LOG_CLEANUP_ITEM_FAILED,
     LOG_CLEANUP_OUTPUT_FAILED,
     LOG_CLEANUP_PERIODIC_ERROR,
     LOG_DOWNLOAD_TOKEN_CREATED,
@@ -107,16 +98,7 @@ from backend.log_messages import (
     LOG_DOWNLOAD_TOKEN_NOT_FOUND,
     LOG_EMAIL_SEND_ERROR,
     LOG_EMAIL_SENT,
-    LOG_EXPORT_DOCX_START,
-    LOG_EXPORT_MP3_START,
-    LOG_EXPORT_PDF_START,
-    LOG_EXPORT_PDF_UA_START,
-    LOG_EXPORT_TXT_START,
-    LOG_PAGE_CONVERTED_TO_PNG,
     LOG_FATAL_ERROR_IN_BOT,
-    LOG_IMAGE_PREPROCESS_FAILED,
-    LOG_IMAGE_RESIZED,
-    LOG_IMAGE_ROTATED,
     LOG_JOB_CANCELLED,
     LOG_JOB_COMPLETED,
     LOG_JOB_EXECUTOR_ERROR,
@@ -127,17 +109,9 @@ from backend.log_messages import (
     LOG_MP3_GENERATION_FAILED,
     LOG_NO_INTERFACE_ENABLED,
     LOG_ORCHESTRATOR_EMPTY_AGENT_RESPONSE,
-    LOG_ORCHESTRATOR_EMPTY_PAGE_RESPONSE,
-    LOG_ORCHESTRATOR_PAGE_CACHE_SKIP,
-    LOG_ORCHESTRATOR_PAGE_RESPONSE_SAVED,
-    LOG_ORCHESTRATOR_WAITING_TASKS,
-    LOG_ORCHESTRATOR_TASK_FAILED,
-    LOG_ORCHESTRATOR_WORKFLOW_START,
-    LOG_ORCHESTRATOR_WORKFLOW_SUMMARY,
     LOG_ORPHAN_TASKS_CLEANED,
     LOG_ORPHAN_TASKS_CLEANUP_FAILED,
     LOG_OUTPUT_DIR_REMOVED,
-    LOG_PAGE_CONVERTED_TO_PNG,
     LOG_PDDL_IGNORED_OPTIONS,
     LOG_PDDL_IMAGES_ENRICHED,
     LOG_PDDL_TABLES_ENRICHED,
@@ -156,14 +130,7 @@ from backend.log_messages import (
     LOG_TXT_EXPORTED,
     LOG_DOCX_EXPORTED,
     LOG_PIPELINE_ERROR,
-    LOG_REGION_CROP_FAILED,
     LOG_PROMPT_FILE_NOT_FOUND,
-    LOG_READER_PDF_REGIONS_EXTRACTED,
-    LOG_READER_CLEAN_TEXT_REGIONS,
-    LOG_READER_REGION_TASK,
-    LOG_READER_FULL_PAGE_FALLBACK,
-    LOG_READER_TASKS_SUMMARY,
-    LOG_READER_IMAGE_READING,
     LOG_QUEUE_ITEM_ENQUEUED,
     LOG_SMTP_NOT_CONFIGURED,
     LOG_STARTING_INTERFACES,
@@ -172,8 +139,6 @@ from backend.log_messages import (
     LOG_STATUS_MESSAGE_EDIT_FAILED,
     LOG_STATUS_MESSAGE_SEND_FAILED,
     LOG_TASK_CANCELLED_BY_USER,
-    LOG_TEMP_DIR_REMOVED,
-    LOG_TEMP_FILE_REMOVED,
     LOG_TELEGRAM_FILE_DOWNLOADING,
     LOG_TELEGRAM_FILE_DOWNLOADED,
     LOG_TELEGRAM_API_JOB_REJECTED,
@@ -513,12 +478,9 @@ MESSAGES: tuple[str, ...] = (
     MSG_OBLIGATION_UNKNOWN,
     MSG_HEADING_GAP,
     MSG_SOURCE_FILE_MISSING,
-    # Docling-structural-attachment extraction diagnostics (backend/core/manifest/docling_extractor.py),
+    # Structural extraction diagnostics,
     # surfaced as RuntimeError/ValueError text when the optional Docling stack is absent or its document
     # structurer is incompatible; {source_path} substituted at call time via .format().
-    MSG_SOURCE_NOT_FOUND,
-    MSG_DOCLING_MISSING,
-    MSG_INCOMPATIBLE_STRUCTURER,
     # Nominal-plan executor error and status messages (backend/core/execution/messages.py),
     # raised or recorded by ExecutorAgent/MethodRegistry; placeholders substituted at call time.
     EXE_METHOD_NAME_REQUIRED,
@@ -700,10 +662,7 @@ MESSAGES: tuple[str, ...] = (
     LOG_API_STARTED,
     LOG_API_ERROR,
     LOG_API_JOB_ENQUEUED,
-    LOG_CLEANUP_ITEM_FAILED,
     LOG_CLEANUP_PERIODIC_ERROR,
-    LOG_TEMP_FILE_REMOVED,
-    LOG_TEMP_DIR_REMOVED,
     LOG_TELEGRAM_FILE_DOWNLOADING,
     LOG_TELEGRAM_FILE_DOWNLOADED,
     LOG_TELEGRAM_API_JOB_REJECTED,
@@ -719,12 +678,6 @@ MESSAGES: tuple[str, ...] = (
     LOG_SMTP_NOT_CONFIGURED,
     LOG_EMAIL_SENT,
     LOG_EMAIL_SEND_ERROR,
-    LOG_EXPORT_TXT_START,
-    LOG_EXPORT_DOCX_START,
-    LOG_EXPORT_PDF_START,
-    LOG_EXPORT_PDF_UA_START,
-    LOG_EXPORT_MP3_START,
-    LOG_PAGE_CONVERTED_TO_PNG,
     LOG_PDDL_IGNORED_OPTIONS,
     LOG_PDDL_IMAGES_ENRICHED,
     LOG_PDDL_TABLES_ENRICHED,
@@ -737,12 +690,6 @@ MESSAGES: tuple[str, ...] = (
     LOG_PDDL_DOMAIN_HASH_MISMATCH,
     LOG_PDDL_DOMAIN_DESCRIPTION_HASH_MISMATCH,
     LOG_PDDL_SELECTED_CLOSURE_MISMATCH,
-    LOG_READER_PDF_REGIONS_EXTRACTED,
-    LOG_READER_CLEAN_TEXT_REGIONS,
-    LOG_READER_REGION_TASK,
-    LOG_READER_FULL_PAGE_FALLBACK,
-    LOG_READER_TASKS_SUMMARY,
-    LOG_READER_IMAGE_READING,
     LOG_PDF_EXPORTED,
     LOG_PDF_UA_EXPORTED,
     LOG_TXT_EXPORTED,
@@ -769,10 +716,6 @@ MESSAGES: tuple[str, ...] = (
     LOG_DATA_AGENT_REGION_ERROR,
     LOG_VISION_AGENT_REGION_ERROR,
     LOG_VISION_AGENT_SENDING_REGION,
-    LOG_EDITOR_PAGE_EMPTY,
-    LOG_EDITOR_PAGE_CONSOLIDATED,
-    LOG_REGION_CROP_FAILED,
-    LOG_CACHE_HIT,
     LOG_CACHE_DEBUG_HIT,
     LOG_CACHE_DEBUG_SET,
     LOG_CACHE_SAVE_FAILED,
@@ -787,9 +730,6 @@ MESSAGES: tuple[str, ...] = (
     LOG_JOB_COMPLETED,
     LOG_JOB_CANCELLED,
     LOG_JOB_EXECUTOR_ERROR,
-    LOG_IMAGE_PREPROCESS_FAILED,
-    LOG_IMAGE_RESIZED,
-    LOG_IMAGE_ROTATED,
     LOG_WEB_GLOBAL_ERROR,
     LOG_WEB_UPLOAD_ERROR,
     LOG_WEB_DOWNLOAD_QUERY_FAILED,
@@ -806,13 +746,6 @@ MESSAGES: tuple[str, ...] = (
     API_RATE_LIMIT_DETAIL,
     API_INTERNAL_ERROR_DETAIL,
     LOG_ORCHESTRATOR_EMPTY_AGENT_RESPONSE,
-    LOG_ORCHESTRATOR_EMPTY_PAGE_RESPONSE,
-    LOG_ORCHESTRATOR_PAGE_CACHE_SKIP,
-    LOG_ORCHESTRATOR_PAGE_RESPONSE_SAVED,
-    LOG_ORCHESTRATOR_WAITING_TASKS,
-    LOG_ORCHESTRATOR_TASK_FAILED,
-    LOG_ORCHESTRATOR_WORKFLOW_START,
-    LOG_ORCHESTRATOR_WORKFLOW_SUMMARY,
     LOG_STALE_PROCESS_INTERRUPTED,
     LOG_AGNO_NOT_INSTALLED,
 )
@@ -900,15 +833,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "\n• HTML semântico"
             "\n• Markdown"
             "\n• PDF pesquisável"
-        ),
-        # Docling extractor diagnostics (backend/core/manifest/docling_extractor.py).
-        MSG_SOURCE_NOT_FOUND: "Arquivo de origem não encontrado: {source_path}",
-        MSG_DOCLING_MISSING: (
-            "Docling não está instalado. Execute `poetry install` ou " +
-            "`pip install docling`."
-        ),
-        MSG_INCOMPATIBLE_STRUCTURER: (
-            "Structurer incompatível: esperado convert_document() ou _process_document()."
         ),
         # Nominal-plan executor diagnostics (backend/core/execution/messages.py): pt-BR mirror preserving the original wording.
         EXE_METHOD_NAME_REQUIRED: "O nome do método não pode ser vazio",
@@ -1386,10 +1310,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         LOG_API_STARTED: "Acessilia API iniciada (worker da fila + limpeza ativos)",
         LOG_API_ERROR: "Erro na API: {error} | Caminho: {path}",
         LOG_API_JOB_ENQUEUED: "API: job {task_id} enfileirado (source={source})",
-        LOG_CLEANUP_ITEM_FAILED: "Falha ao remover {name}: {error}",
         LOG_CLEANUP_PERIODIC_ERROR: "Erro na limpeza periódica",
-        LOG_TEMP_FILE_REMOVED: "Arquivo temporário removido: {name}",
-        LOG_TEMP_DIR_REMOVED: "Diretório temporário removido: {name}",
         LOG_TELEGRAM_FILE_DOWNLOADING: "Baixando arquivo: {file_path} -> {filename}",
         LOG_TELEGRAM_FILE_DOWNLOADED: "Arquivo baixado: {filename} ({size} bytes)",
         LOG_TELEGRAM_API_JOB_REJECTED: (
@@ -1415,12 +1336,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         ),
         LOG_EMAIL_SENT: "E-mail enviado com sucesso para {to_email}.",
         LOG_EMAIL_SEND_ERROR: "Erro ao enviar e-mail para {to_email}: {error}",
-        LOG_EXPORT_TXT_START: "Exportando TXT para {path}",
-        LOG_EXPORT_DOCX_START: "Exportando DOCX para {path}",
-        LOG_EXPORT_PDF_START: "Exportando PDF para {path}",
-        LOG_EXPORT_PDF_UA_START: "Exportando PDF/UA para {path}",
-        LOG_EXPORT_MP3_START: "Exportando MP3 para {path}",
-        LOG_PAGE_CONVERTED_TO_PNG: "Página convertida para PNG: {size} bytes",
         LOG_PDDL_IGNORED_OPTIONS: (
             "Pipeline PDDL ignora custom_prompt/thinking_mode; "
             "apenas fluxo deterministico de manifesto/planejamento/execucao"
@@ -1450,25 +1365,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         LOG_PDDL_SELECTED_CLOSURE_MISMATCH: (
             "Fechamento selecionado diverge do problema compilado"
         ),
-        LOG_READER_PDF_REGIONS_EXTRACTED: (
-            "[página {page_num}] Extraídas {count} região(ns) na página (structurer={structurer})"
-        ),
-        LOG_READER_CLEAN_TEXT_REGIONS: (
-            "[página {page_num}] {count} região(ns) de texto limpo (sem IA de visão)"
-        ),
-        LOG_READER_REGION_TASK: (
-            "[página {page_num}] Região {idx} - tipo={type}, bbox={bbox}, target={target}"
-        ),
-        # reader full-page fallback warning; {page_num} the page number.
-        LOG_READER_FULL_PAGE_FALLBACK: (
-            "[página {page_num}] Nenhum texto extraído por regiões, fallback para a página completa"
-        ),
-        # reader per-page task summary line; {page_num} the page number, {count} total tasks, {text_count} editor-bound, {vision_count} vision-bound.
-        LOG_READER_TASKS_SUMMARY: (
-            "[página {page_num}] {count} tarefas ({text_count} texto, {vision_count} visão)"
-        ),
-        # reader image-page debug line; {page_num} the page number, {path} the per-page image file path.
-        LOG_READER_IMAGE_READING: "[página {page_num}] lendo imagem: {path}",
 
         LOG_PDF_PAGE_COUNT_LOGGED: (
             "PDF tem {total} páginas, processando {limit}"
@@ -1548,12 +1444,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         LOG_VISION_AGENT_REGION_ERROR: (
             "[página {page_num}] Erro na região {type}: {error} | Traceback:\n{tb}"
         ),
-        LOG_EDITOR_PAGE_EMPTY: "[página {page_num}] EditorAgent: nenhum texto consolidado",
-        LOG_EDITOR_PAGE_CONSOLIDATED: (
-            "[página {page_num}] EditorAgent: {count} partes de texto consolidadas"
-        ),
-        LOG_REGION_CROP_FAILED: "Falha ao recortar a região: {error}",
-        LOG_CACHE_HIT: "Cache: item existente para {name}",
         LOG_CACHE_DEBUG_HIT: "Cache: item existente: {key}",
         LOG_CACHE_DEBUG_SET: "Cache: item gravado: {key}",
         LOG_CACHE_SAVE_FAILED: "Falha ao salvar no cache: {error}",
@@ -1574,11 +1464,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         LOG_JOB_COMPLETED: "Job {task_id} concluído (source={source})",
         LOG_JOB_CANCELLED: "Job {task_id} cancelado",
         LOG_JOB_EXECUTOR_ERROR: "Erro no JobExecutor para {task_id}",
-        LOG_IMAGE_PREPROCESS_FAILED: "Erro no pré-processamento de imagem: {error}",
-        LOG_IMAGE_RESIZED: (
-            "Imagem redimensionada: {old_width}x{old_height} -> {new_width}x{new_height}"
-        ),
-        LOG_IMAGE_ROTATED: "Imagem rotacionada em {angle:.2f} graus",
         LOG_WEB_GLOBAL_ERROR: (
             "Erro global no Painel Web: {error} | Caminho: {path}"
         ),
@@ -1621,35 +1506,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         API_INTERNAL_ERROR_DETAIL: "Erro interno no servidor",
         # raised when the language-agent returns an empty result for a document.
         LOG_ORCHESTRATOR_EMPTY_AGENT_RESPONSE: "Resposta vazia do agente",
-        # orchestrator empty model-response warning; {page_num} is the page number.
-        LOG_ORCHESTRATOR_EMPTY_PAGE_RESPONSE: (
-            "Resposta vazia para página {page_num}"
-        ),
-        # orchestrator page-response saved info line; {page_num} is the page number, {file_name} the output file name.
-        LOG_ORCHESTRATOR_PAGE_RESPONSE_SAVED: (
-            "Resposta da página {page_num} salva em {file_name}"
-        ),
-        # orchestrator parallel-task wait line; {page_num} is the page number, {count} the number of pending AI tasks.
-        LOG_ORCHESTRATOR_WAITING_TASKS: (
-            "[página {page_num}] Aguardando {count} tarefa(s) de IA em paralelo..."
-        ),
-        # orchestrator failed-task error line; {page_num} is the page number, {idx} the failed task's index, {error} the exception.
-        LOG_ORCHESTRATOR_TASK_FAILED: (
-            "[página {page_num}] Tarefa {idx} falhou: {error}"
-        ),
-        # orchestrator workflow start line; {page_count} the page count, {file_name} the source file name, {reader} the structurer, {mode} the effective mode.
-        LOG_ORCHESTRATOR_WORKFLOW_START: (
-            "AccessibilityWorkflow: processando {page_count} página(s) para {file_name} "
-            "(reader={reader}, mode={mode})"
-        ),
-        # orchestrator workflow summary line; {total_pages} and {total_chars} are the run totals.
-        LOG_ORCHESTRATOR_WORKFLOW_SUMMARY: (
-            "AccessibilityWorkflow: {total_pages} páginas processadas, {total_chars} chars no total"
-        ),
-        # orchestrator page-cache debug line; {page_num} is the page index.
-        LOG_ORCHESTRATOR_PAGE_CACHE_SKIP: (
-            "[página {page_num}] Cache: item existente (pulando IA)"
-        ),
         LOG_STALE_PROCESS_INTERRUPTED: "Obsoleta: processo interrompido",
         LOG_AGNO_NOT_INSTALLED: (
             "Agno não está instalado. Execute `poetry install` antes de usar "
