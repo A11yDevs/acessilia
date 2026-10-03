@@ -40,10 +40,11 @@ def _is_process_running(pid: int) -> bool:
         return False
 
 
-def acquire_lock() -> None:
-    if os.path.exists(LOCK_FILE):
+def acquire_lock(lock_file: str | None = None) -> None:
+    lock_file = LOCK_FILE if lock_file is None else lock_file
+    if os.path.exists(lock_file):
         try:
-            with open(LOCK_FILE, "r") as f:
+            with open(lock_file, "r") as f:
                 pid = int(f.read().strip())
             if _is_process_running(pid):
                 logger.critical(
@@ -54,18 +55,19 @@ def acquire_lock() -> None:
                 logger.warning(
                     t(LOG_LOCK_FILE_STALE).format(pid=pid)
                 )
-                os.remove(LOCK_FILE)
+                os.remove(lock_file)
         except ValueError:
-            os.remove(LOCK_FILE)
-    with open(LOCK_FILE, "w") as f:
+            os.remove(lock_file)
+    with open(lock_file, "w") as f:
         f.write(str(os.getpid()))
     logger.info(t(LOG_LOCK_ACQUIRED).format(pid=os.getpid()))
 
 
-def release_lock() -> None:
+def release_lock(lock_file: str | None = None) -> None:
+    lock_file = LOCK_FILE if lock_file is None else lock_file
     try:
-        if os.path.exists(LOCK_FILE):
-            os.remove(LOCK_FILE)
+        if os.path.exists(lock_file):
+            os.remove(lock_file)
             logger.info(t(LOG_LOCK_RELEASED))
     except OSError:
         pass
@@ -122,8 +124,8 @@ async def startup():
     await asyncio.gather(*tasks)
 
 
-if __name__ == "__main__":
-    acquire_lock()
+def main(*, lock_file: str | None = None):
+    acquire_lock(lock_file)
     try:
         asyncio.run(startup())
     except KeyboardInterrupt:
@@ -132,4 +134,8 @@ if __name__ == "__main__":
         logger.exception(t(LOG_FATAL_ERROR_IN_BOT))
         sys.exit(1)
     finally:
-        release_lock()
+        release_lock(lock_file)
+
+
+if __name__ == "__main__":
+    main()
