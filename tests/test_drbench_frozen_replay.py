@@ -9,7 +9,7 @@ from scripts.drbench.experiments.eval.frozen_inputs import (
     export_revision, freeze, sha256, validate_pages,
 )
 from scripts.drbench.experiments.eval.frozen_replay import (
-    check_sources, evaluate, resolve_fusion_args, verify_inputs, verify_sources,
+    check_sources, evaluate, verify_inputs, verify_sources,
 )
 from scripts.drbench.experiments.eval.replay_report import (
     METRICS, check_inventory, metric_score, summarize,
@@ -168,23 +168,44 @@ def test_nonempty_samples_require_an_official_metric(tmp_path):
     assert metric_score(tmp_path, "batch-01", "reading_order", page()) == (75, "evaluated")
 
 
-def test_frozen_cli_defaults_and_explicit_override_are_recorded(tmp_path):
-    source = tmp_path / "cli.py"
-    source.write_text('ap.add_argument("--garbage-frac", type=float, default=0.0)')
-    assert resolve_fusion_args(source, [])["garbage_frac"] == 0.0
-    source.write_text('ap.add_argument("--garbage-frac", type=float, default=None)')
-    assert resolve_fusion_args(source, [])["garbage_frac"] is None
-    assert resolve_fusion_args(source, ["--garbage-frac", "0.3"])["garbage_frac"] == 0.3
+@pytest.mark.parametrize("default,flags,expected", [(0.0, [], 0.0), (None, [], 0.3),
+                                                    (None, ["--garbage-frac", "0.7"], 0.7)])
+def test_actual_cli_defaults_and_override_are_recorded(tmp_path, monkeypatch, default, flags, expected):
+    import argparse
+    from types import SimpleNamespace
+    from scripts.drbench.experiments import differ
+    from scripts.drbench.experiments.eval.replay_worker import run_fusion
+
+    def main():
+        parser = argparse.ArgumentParser()
+        for option in ("docling", "mineru", "out"):
+            parser.add_argument(f"--{option}", type=Path, required=True)
+        parser.add_argument("--policy")
+        parser.add_argument("--garbage-frac", type=float, default=default)
+        parser.parse_args()
+
+    cli = SimpleNamespace(main=main, policy_by_name=lambda _: SimpleNamespace(to_dict=lambda: {"garbage_frac": 0.3}))
+    monkeypatch.setattr(differ, "lib_fuse", cli, raising=False)
+    (tmp_path / "baseline").mkdir()
+    (tmp_path / "manifest.json").write_text(json.dumps({"variants": {"baseline": {"policy": "v12", "fusion_args": flags}}}))
+    run_fusion(tmp_path, "baseline")
+    config = json.loads((tmp_path / "baseline/fusion-config.json").read_text())
+    assert config["resolved_fusion_args"]["garbage_frac"] == (float(flags[1]) if flags else default)
+    assert config["resolved_policy"]["garbage_frac"] == expected
 
 
 def test_generated_translation_catalogue_is_recorded_but_new_code_is_rejected(tmp_path):
-    source = tmp_path / "sources/baseline/acessilia/backend/locales/en_US/LC_MESSAGES"
+    source = tmp_path / "sources/baseline/acessilia/translations/en_US"
     source.mkdir(parents=True)
     (source / "messages.po").write_text("versioned translation")
     before = verify_sources(tmp_path)
     (source / "messages.mo").write_bytes(b"compiled catalogue")
     generated = check_sources(tmp_path, before)
-    assert list(generated) == ["sources/baseline/acessilia/backend/locales/en_US/LC_MESSAGES/messages.mo"]
+    assert list(generated) == ["sources/baseline/acessilia/translations/en_US/messages.mo"]
+    (source / "orphan.mo").write_bytes(b"no versioned source catalogue")
+    with pytest.raises(ValueError, match="Unexpected file"):
+        check_sources(tmp_path, before)
+    (source / "orphan.mo").unlink()
     (source / "unexpected.py").write_text("new code")
     with pytest.raises(ValueError, match="Unexpected file"):
         check_sources(tmp_path, before)

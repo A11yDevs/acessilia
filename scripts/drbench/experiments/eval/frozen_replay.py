@@ -2,12 +2,10 @@
 from __future__ import annotations
 
 import argparse
-import ast
 import importlib.metadata
 import json
 import os
 import platform
-import re
 import shutil
 import subprocess
 import sys
@@ -16,29 +14,6 @@ from pathlib import Path
 
 from scripts.drbench.experiments.eval.frozen_inputs import freeze, sha256, write_json
 from scripts.drbench.experiments.eval.replay_report import check_inventory, make_report
-
-
-def resolve_fusion_args(source: Path, argv: list[str]) -> dict:
-    """Read the frozen CLI's literal declarations instead of assuming today's defaults.
-
-    Fail on dynamic declarations rather than record an invented configuration.
-    The existing lib_fuse CLI uses only literals and Path/int/float types.
-    """
-    parser = argparse.ArgumentParser()
-    for node in ast.walk(ast.parse(source.read_text())):
-        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
-            continue
-        if node.func.attr != "add_argument":
-            continue
-        options = {}
-        for keyword in node.keywords:
-            if keyword.arg == "type":
-                options["type"] = {"Path": Path, "int": int, "float": float}[keyword.value.id]
-            elif keyword.arg != "help":
-                options[keyword.arg] = ast.literal_eval(keyword.value)
-        parser.add_argument(*(ast.literal_eval(arg) for arg in node.args), **options)
-    values = vars(parser.parse_args(argv))
-    return {key: str(value) if isinstance(value, Path) else value for key, value in values.items()}
 
 
 def verify_inputs(root: Path, manifest: dict) -> None:
@@ -60,8 +35,8 @@ def check_sources(root: Path, original: dict) -> dict:
         raise ValueError("Frozen source changed during evaluation")
     generated = {name: digest for name, digest in current.items() if name not in original}
     # Importing the backend compiles its versioned .po catalogues into ignored .mo files.
-    allowed = r"sources/(?:baseline|candidate)/acessilia/backend/locales/[^/]+/LC_MESSAGES/messages\.mo"
-    if any(re.fullmatch(allowed, name) is None for name in generated):
+    if any(Path(name).suffix != ".mo" or str(Path(name).with_suffix(".po")) not in original
+           for name in generated):
         raise ValueError("Unexpected file created inside frozen source")
     return generated
 
@@ -123,17 +98,10 @@ def evaluate(root: Path) -> dict:
             forbidden = ("--out", "--docling", "--mineru", "--policy")
             if any(flag.split("=", 1)[0] in forbidden for flag in flags):
                 raise ValueError("fusion_args cannot override paths or policy")
-            command = [sys.executable, "-m", "scripts.drbench.experiments.differ.lib_fuse",
-                       "--docling", str(out / "docling"), "--mineru", str(out / "mineru"),
-                       "--out", str(out / "fusion"), "--policy", settings["policy"], *flags]
-            settings["resolved_fusion_args"] = resolve_fusion_args(
-                acc / "scripts/drbench/experiments/differ/lib_fuse.py", command[3:]
-            )
-            execute(command, acc, env, logs / f"{variant}-fusion.log", manifest, root)
-            settings["resolved_policy"] = json.loads((out / "policy.json").read_text())
-            garbage = settings["resolved_fusion_args"].get("garbage_frac")
-            if garbage is not None:
-                settings["resolved_policy"]["garbage_frac"] = garbage
+            execute([sys.executable, str(runner_dir / "replay_worker.py"), "--run", str(root),
+                     "--variant", variant, "--fuse"], acc, env,
+                    logs / f"{variant}-fusion.log", manifest, root)
+            settings.update(json.loads((out / "fusion-config.json").read_text()))
             check_inventory(out / "fusion", pages)
             (out / "result").mkdir()
             for batch in sorted({p["batch"] for p in pages}):

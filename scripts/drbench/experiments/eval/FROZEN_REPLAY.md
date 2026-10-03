@@ -10,8 +10,8 @@ Create a local JSON specification with paths relative to the specification file
 
 ```json
 {
-  "data_root": "../../../reading-order-evaluation",
-  "pages": "../../../reading-order-evaluation/data/pages.json",
+  "data_root": "../reading-order-evaluation",
+  "pages": "../reading-order-evaluation/data/pages.json",
   "dataset": {"revision": "DATASET_COMMIT", "split": "dev"},
   "seed": 20261003,
   "inference": {"identity_source": "describe how model versions were obtained"},
@@ -74,7 +74,7 @@ directory, so a pilot cannot consume old predictions. A completed or failed run
 is never reused; create another run to retry. Failed runs retain their logs and
 failure status. No source checkout or old result directory is cleaned.
 
-The manifest records commands, resolved CLI defaults from each frozen version,
+The manifest records commands, resolved CLI arguments captured during execution of each frozen version,
 resolved policy (including the CLI garbage fallback override), package versions,
 timings, runner hashes and source hashes. The backend's generated translation
 catalogues are recorded separately; mutation of committed source is rejected.
