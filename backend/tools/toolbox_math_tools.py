@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any
 
 from backend.tools.logger import logger
@@ -29,20 +30,14 @@ def toolbox_recognize_formula(image_bytes: bytes) -> list[dict[str, Any]]:
     Returns:
         List of {latex, confidence, page, bbox} dicts, or empty list on failure.
     """
-    import tempfile
-
-    tmp = Path(tempfile.mkdtemp()) / "formula.png"
-    tmp.parent.mkdir(parents=True, exist_ok=True)
-    tmp.write_bytes(image_bytes)
-    try:
-        return _run_async(_recognize_formula_async(tmp))
-    except Exception as e:
-        logger.warning("Toolbox Math recognize failed ({}), returning empty", e)
-        return []
-    finally:
-        tmp.unlink(missing_ok=True)
-        import shutil
-        shutil.rmtree(tmp.parent, ignore_errors=True)
+    with TemporaryDirectory() as directory:
+        tmp = Path(directory) / "formula.png"
+        tmp.write_bytes(image_bytes)
+        try:
+            return _run_async(_recognize_formula_async(tmp))
+        except Exception as e:
+            logger.warning("Toolbox Math recognize failed ({}), returning empty", e)
+            return []
 
 
 async def _recognize_formula_async(file_path: Path) -> list[dict[str, Any]]:

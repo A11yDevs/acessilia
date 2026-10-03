@@ -12,6 +12,7 @@ from typing import Any, Callable
 
 import re
 from copy import deepcopy
+from .tables.ast import rows_from_table_sections as _rows_from_table_ast
 from typing import Any
 
 
@@ -366,22 +367,6 @@ def _table_ast_from_rows(rows: list[list[str]]) -> dict[str, Any]:
     return {"body": body}
 
 
-def _rows_from_table_ast(table_ast: dict[str, Any]) -> list[list[str]]:
-    rows: list[list[str]] = []
-    for section_name in ("header", "body", "footer"):
-        section = table_ast.get(section_name)
-        if not isinstance(section, list):
-            continue
-        for row in section:
-            if not isinstance(row, dict):
-                continue
-            cells = row.get("cells")
-            if not isinstance(cells, list):
-                continue
-            row_values = [str(cell.get("text", "")).strip() for cell in cells if isinstance(cell, dict)]
-            if row_values:
-                rows.append(row_values)
-    return rows
 
 
 def _make_id(prefix: str, text: str, counter: int) -> str:

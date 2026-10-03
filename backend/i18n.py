@@ -56,23 +56,6 @@ def _normalize_locale(raw_value: str) -> str:
     return f"{language}_{region}" if region else language
 
 
-def _locales_from_raw(raw_value: str) -> tuple[str, ...]:
-    """Split a comma-separated locale list into a de-duplicated, order-preserving tuple.
-
-    Args:
-        raw_value (str): Raw comma-separated locale identifiers; blank entries are dropped.
-
-    Returns:
-        tuple: Locale identifiers in first-seen order with duplicates removed.
-    """
-    seen: list[str] = []
-    for entry in raw_value.split(","):
-        candidate = entry.strip()
-        if candidate and candidate not in seen:
-            seen.append(candidate)
-    return tuple(seen)
-
-
 def active_locales() -> tuple[str, ...]:
     """Locales the software advertises to remote users, per I18N_LOCALES_ACTIVE in .env.
 

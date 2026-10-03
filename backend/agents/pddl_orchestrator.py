@@ -5,6 +5,8 @@ import re
 from pathlib import Path
 from typing import Any, Callable, Coroutine
 
+from docstruct.tables.ast import rows_from_table_sections as _rows_from_table_ast
+
 import fitz
 from docstruct.tables.ast import effective_section_width
 
@@ -1147,26 +1149,6 @@ def _table_ast_from_rows(rows: list[list[str]]) -> dict[str, Any]:
     return {"body": body}
 
 
-def _rows_from_table_ast(table_ast: dict[str, Any]) -> list[list[str]]:
-    rows: list[list[str]] = []
-    for section_name in ("header", "body", "footer"):
-        section = table_ast.get(section_name)
-        if not isinstance(section, list):
-            continue
-        for row in section:
-            if not isinstance(row, dict):
-                continue
-            cells = row.get("cells")
-            if not isinstance(cells, list):
-                continue
-            row_values = [
-                str(cell.get("text", "")).strip()
-                for cell in cells
-                if isinstance(cell, dict)
-            ]
-            if row_values:
-                rows.append(row_values)
-    return rows
 
 
 # Backward compatibility with the PMV naming.

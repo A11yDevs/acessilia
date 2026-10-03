@@ -200,49 +200,6 @@ async def _run_toolbox(
     return {"structured": structured, "canonical": canonical}
 
 
-async def _run_toolbox(
-    file_path: Path,
-    tmpdir: Path,
-    mode: str = "normal",
-    *,
-    planner_backend: str = "internal",
-    execute_plan: bool = False,
-    enable_ocr: bool = False,
-) -> dict[str, Any]:
-    """Run the PDDL pipeline with ToolboxManifestExtractor."""
-    orchestrator = PddlAccessibilityOrchestrator(
-        planner_backend=planner_backend,
-        preferred_plan=planner_backend,
-        execute_dry_run=not execute_plan,
-        enable_ocr=enable_ocr,
-        extractor_backend="toolbox",
-    )
-    structured = await orchestrator.executar(
-        file_path=file_path,
-        tmpdir=tmpdir,
-        structured_output=True,
-    )
-    canonical_metadata = structured.get("canonical_metadata")
-    technical_warnings = structured.get("technical_warnings")
-
-    canonical = build_canonical_document(
-        structured,
-        title=file_path.stem,
-        language="pt-BR",
-        verbosity=verbosity_for_mode(mode),
-        source_name=file_path.name,
-        source_path=str(file_path),
-        audience=["reader"],
-        metadata=canonical_metadata if isinstance(canonical_metadata, dict) else None,
-        technical_warnings=(
-            [str(item) for item in technical_warnings]
-            if isinstance(technical_warnings, list)
-            else None
-        ),
-    )
-    return {"structured": structured, "canonical": canonical}
-
-
 # ---------------------------------------------------------------------------
 # Comparison logic
 # ---------------------------------------------------------------------------

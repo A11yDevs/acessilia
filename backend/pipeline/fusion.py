@@ -43,38 +43,6 @@ def _element_to_canonical_block(el: dict, page_index: int) -> dict:
     return block
 
 
-def _payload_to_blocks(payload: dict) -> list[dict]:
-    """Extract the canonical block list (dict) from an extraction payload.
-
-    Supports the processing manifest shape (document.elements ordered by
-    reading_order). Payloads without usable elements return an empty list.
-    """
-    doc = payload.get("document", payload)
-    elements = doc.get("elements") or []
-    blocks: list[dict] = []
-    page = 0
-    for el in sorted(elements, key=lambda e: e.get("reading_order") or 0):
-        text = (el.get("text") or "").strip()
-        if not text:
-            continue
-        blocks.append(_element_to_canonical_block(el, el.get("page") or page))
-    return blocks
-
-
-def _blocks_to_text(blocks: list[dict]) -> str:
-    """Serialize merged blocks into simple markdown (heading + body)."""
-    parts: list[str] = []
-    for b in blocks:
-        etype = b["type"]
-        text = b["text"]
-        if etype in ("heading", "title", "section_header"):
-            level = int(b["metadata"].get("hierarchy_level") or 1)
-            parts.append(f"{'#' * max(1, min(level, 6))} {text}")
-        else:
-            parts.append(text)
-    return "\n\n".join(parts)
-
-
 async def extract_fused(
     file_path,
     *,

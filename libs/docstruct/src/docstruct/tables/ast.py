@@ -113,18 +113,23 @@ def rows_from_table_ast(table_ast: Any) -> list[list[str]]:
     normalized = normalize_table_ast(table_ast)
     if normalized is None:
         return []
+    return rows_from_table_sections(normalized)
+
+
+def rows_from_table_sections(table_ast: dict[str, Any]) -> list[list[str]]:
+    """Read header/body/footer cells without normalizing or mutating the AST."""
     rows: list[list[str]] = []
     for section_name in ("header", "body", "footer"):
-        section = normalized.get(section_name)
+        section = table_ast.get(section_name)
         if not isinstance(section, list):
             continue
         for row in section:
-            cells = row.get("cells", []) if isinstance(row, dict) else []
-            row_values = [
-                str(cell.get("text", "")).strip()
-                for cell in cells
-                if isinstance(cell, dict)
-            ]
+            if not isinstance(row, dict):
+                continue
+            cells = row.get("cells")
+            if not isinstance(cells, list):
+                continue
+            row_values = [str(cell.get("text", "")).strip() for cell in cells if isinstance(cell, dict)]
             if row_values:
                 rows.append(row_values)
     return rows
