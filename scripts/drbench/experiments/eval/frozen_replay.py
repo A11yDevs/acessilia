@@ -96,11 +96,13 @@ def evaluate(root: Path) -> dict:
         Path(__file__), runner_dir / "replay_worker.py", runner_dir / "replay_report.py",
         runner_dir / "frozen_inputs.py",
     )}
-    source_hashes = verify_sources(root)
-    write_json(root / "source-hashes.json", source_hashes)
-    manifest["source_hashes_sha256"] = sha256(root / "source-hashes.json")
     try:
         verify_inputs(root, manifest)
+        if sha256(root / "source-hashes.json") != manifest["source_hashes_sha256"]:
+            raise ValueError("Frozen source hash inventory changed")
+        source_hashes = json.loads((root / "source-hashes.json").read_text())
+        if verify_sources(root) != source_hashes:
+            raise ValueError("Frozen source changed before evaluation")
         for variant in ("baseline", "candidate"):
             source = root / "sources" / variant
             acc, toolbox = source / "acessilia", source / "toolbox"
@@ -157,6 +159,8 @@ def evaluate(root: Path) -> dict:
                 print(f"Evaluated {variant} batch {batch}", flush=True)
         verify_inputs(root, manifest)
         manifest["generated_catalogue_hashes"] = check_sources(root, source_hashes)
+        if any(sha256(runner_dir / name) != digest for name, digest in manifest["runner_hashes"].items()):
+            raise ValueError("Runner changed during evaluation")
         summary = make_report(root)
         manifest.update(status="completed", quality_gate=summary["quality_gate"])
         return summary

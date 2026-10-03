@@ -9,7 +9,7 @@ from scripts.drbench.experiments.eval.frozen_inputs import (
     export_revision, freeze, sha256, validate_pages,
 )
 from scripts.drbench.experiments.eval.frozen_replay import (
-    check_sources, resolve_fusion_args, verify_inputs, verify_sources,
+    check_sources, evaluate, resolve_fusion_args, verify_inputs, verify_sources,
 )
 from scripts.drbench.experiments.eval.replay_report import (
     METRICS, check_inventory, metric_score, summarize,
@@ -198,3 +198,14 @@ def test_modified_versioned_source_is_rejected(tmp_path):
     source.write_text("modified")
     with pytest.raises(ValueError, match="source changed"):
         check_sources(tmp_path, before)
+
+
+def test_source_mutation_between_freeze_and_run_fails_before_any_command(spec, tmp_path):
+    root = tmp_path / "run"
+    freeze(spec, root)
+    (root / "sources/baseline/acessilia/version.txt").write_text("changed after freeze")
+    with pytest.raises(ValueError, match="before evaluation"):
+        evaluate(root)
+    manifest = json.loads((root / "manifest.json").read_text())
+    assert manifest["status"] == "failed"
+    assert manifest["commands"] == []

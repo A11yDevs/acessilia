@@ -130,6 +130,10 @@ def freeze(spec_path: Path, output: Path, limit: int = 0) -> dict:
             resolve_path(base, evaluator["repo"]), evaluator["ref"],
             output / "sources/evaluator",
         )
+        sources = {str(p.relative_to(output)): sha256(p)
+                   for p in sorted((output / "sources").rglob("*")) if p.is_file()}
+        write_json(output / "source-hashes.json", sources)
+        manifest["source_hashes_sha256"] = sha256(output / "source-hashes.json")
         # Preserve extraction options/locks as evidence, not verified model identity.
         evidence = output / "evidence"
         evidence.mkdir()
