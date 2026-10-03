@@ -120,8 +120,8 @@ native traversal is experimental and disabled by default.
 Evaluate provider Markdown separately from fusion Markdown when assessing an
 adapter change. Neutral fusion scores can conceal a provider conversion loss.
 
-Native MinerU indices are currently transported without changing iteration or
-fusion order. The adapter stores provider, source, page index and native block
+Native MinerU indices are transported without changing iteration or fusion
+order by default. The adapter stores provider, source, page index and native block
 index in `metadata.reading_order_context`. `provider_blocks`, the persisted
 block loader and both library/CLI conversions retain that context. `DiffBlock`
 stores the contributing contexts in `order_sources`; block joins concatenate
@@ -129,3 +129,13 @@ them instead of claiming one native index for the joined block. Figures and
 empty Markdown still follow the existing loader filters. Legacy blocks without
 context have no order sources. This transport step requires identical provider
 and fusion Markdown before experimenting with consuming those indices.
+
+For that separate experiment, set `"mineru_native_order": true` on the candidate
+variant, using a Toolbox revision supporting `native_order=True`. Leave Docling
+mode and all fusion settings fixed. MinerU sorts each page only with complete,
+valid, distinct indices; missing/invalid values or ties retain the received
+sequence and record the reason. The flag is frozen and actual constructor
+options are recorded in extraction configuration. Default and false settings
+pass no constructor override, preserving the selected historical source's
+defaults. A storage shuffle is a metamorphic test; restoring the original
+Markdown does not count as a gain on naturally occurring benchmark pages.
