@@ -3,6 +3,7 @@
 Render clean and degraded formula images, embed them in single-page PDFs,
 and inspect the regions returned by the existing Toolbox adapter.
 Use --llm to also compare the DataAgent's LaTeX output.
+Toolbox errors abort the benchmark instead of measuring a local fallback.
 
 Usage: python scripts/benchmark_formula_extraction.py [--llm] [--keep]
 """
@@ -161,7 +162,9 @@ def main() -> None:
         cases.append(Case(name, "degradada", latex, degraded))
 
     print(f"{len(cases)} casos preparados. Gerando PDFs e rodando Docling...")
-    structurer = ToolboxStructurer(client=ToolboxClient(provider="docling"))
+    structurer = ToolboxStructurer(
+        client=ToolboxClient(provider="docling"), allow_fallback=False,
+    )
     for case in cases:
         case.pdf_path = workdir / f"{case.name}_{case.variant}.pdf"
         build_pdf(case.image_path, case.pdf_path)

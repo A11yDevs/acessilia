@@ -5,7 +5,11 @@ from unittest.mock import AsyncMock
 import fitz
 import pytest
 
-from backend.tools.toolbox_client import ToolboxClient
+from backend.tools.toolbox_client import (
+    ToolboxClient,
+    ToolboxContractViolation,
+    ToolboxProviderUnavailable,
+)
 from backend.tools.toolbox_structurer import ToolboxStructurer
 
 
@@ -76,3 +80,52 @@ def test_arxiv_diagnostic_selects_the_math_page(formula_pdf, monkeypatch, tmp_pa
     with fitz.open(page_pdf) as pdf:
         assert len(pdf) == 1
         assert "E=mc^2" in pdf[0].get_text()
+
+
+@pytest.mark.parametrize("diagnostic_name", [
+    "benchmark_formula_extraction",
+    "benchmark_formula_grandezas_medidas",
+    "test_formula_arxiv",
+])
+@pytest.mark.parametrize("error_type", [
+    ToolboxProviderUnavailable,
+    ToolboxContractViolation,
+])
+def test_formula_diagnostics_reject_toolbox_failure(
+    diagnostic_name, error_type, formula_pdf, monkeypatch, tmp_path, capsys
+):
+    """An unavailable or failed provider must not produce Docling metrics."""
+    import importlib
+    import sys
+
+    from PIL import Image
+
+    diagnostic = importlib.import_module(f"scripts.{diagnostic_name}")
+    source, extraction = formula_pdf
+    extraction.side_effect = error_type("Docling extraction failed")
+
+    if diagnostic_name == "benchmark_formula_extraction":
+        monkeypatch.setattr(sys, "argv", [diagnostic_name])
+        monkeypatch.setattr(diagnostic, "FORMULAS", [("equation", "E=mc^2")])
+        monkeypatch.setattr(
+            diagnostic, "download_formula",
+            lambda _latex, dest: Image.new("RGB", (32, 32), "white").save(dest),
+        )
+    elif diagnostic_name == "benchmark_formula_grandezas_medidas":
+        monkeypatch.setattr(diagnostic, "PDF", source)
+    else:
+        monkeypatch.setattr(diagnostic, "WORKDIR", tmp_path / "arxiv")
+        monkeypatch.setattr(diagnostic, "PAPERS", [("paper", "test-id", "Test paper")])
+        monkeypatch.setattr(
+            diagnostic, "_download",
+            lambda _id, dest: dest.write_bytes(source.read_bytes()),
+        )
+
+    with pytest.raises(error_type, match="Docling extraction failed"):
+        diagnostic.main()
+
+    extraction.assert_awaited_once()
+    output = capsys.readouterr().out
+    assert "## Resultados" not in output
+    assert "### Resumo" not in output
+    assert "provider=docling" not in output

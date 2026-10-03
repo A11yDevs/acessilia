@@ -9,7 +9,11 @@ import pytest
 
 from backend.tools.region_extractor import Region
 from backend.tools.toolbox_structurer import ToolboxStructurer
-from backend.tools.toolbox_client import ToolboxClient, ToolboxProviderUnavailable
+from backend.tools.toolbox_client import (
+    ToolboxClient,
+    ToolboxContractViolation,
+    ToolboxProviderUnavailable,
+)
 
 
 FIXTURE_PDF = Path(__file__).parent / "fixtures" / "tutorials" / "java-oo-3pgs.pdf"
@@ -60,11 +64,12 @@ def mock_client():
     return client
 
 
-def test_extract_page_regions_returns_regions(mock_client):
+@pytest.mark.parametrize("allow_fallback", [True, False])
+def test_extract_page_regions_returns_regions(mock_client, allow_fallback):
     """ToolboxStructurer.extract_page_regions retorna Regions ordenadas."""
     mock_client.extract_structure = AsyncMock(return_value=SAMPLE_TOOLBOX_RESPONSE)
 
-    structurer = ToolboxStructurer(client=mock_client)
+    structurer = ToolboxStructurer(client=mock_client, allow_fallback=allow_fallback)
 
     doc = fitz.open(FIXTURE_PDF)
     page = doc[0]
@@ -104,10 +109,14 @@ def test_extract_page_regions_empty_page_fallback(mock_client):
     assert regions[0].metadata.get("toolbox_empty") is True
 
 
-def test_fallback_on_provider_unavailable(mock_client):
-    """Se Toolbox está indisponível, cai em PyMuPDF (extract_regions)."""
+@pytest.mark.parametrize("error_type", [
+    ToolboxProviderUnavailable,
+    ToolboxContractViolation,
+])
+def test_fallback_on_toolbox_error(mock_client, error_type):
+    """Application callers retain local fallback on provider errors."""
     mock_client.extract_structure = AsyncMock(
-        side_effect=ToolboxProviderUnavailable("offline")
+        side_effect=error_type("extraction failed")
     )
 
     structurer = ToolboxStructurer(client=mock_client)

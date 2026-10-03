@@ -2,6 +2,7 @@
 
 Inspect every page of tests/fixtures/presentations/grandezas-e-medidas-42pgs.pdf
 and report region types, page counts and returned formula text.
+Toolbox errors abort the diagnostic instead of measuring a local fallback.
 
 Usage: python scripts/benchmark_formula_grandezas_medidas.py
 """
@@ -23,28 +24,28 @@ from backend.tools.toolbox_structurer import ToolboxStructurer
 PDF = Path("tests/fixtures/presentations/grandezas-e-medidas-42pgs.pdf")
 
 def main() -> None:
-    structurer = ToolboxStructurer(client=ToolboxClient(provider="docling"))
-    doc = fitz.open(str(PDF))
+    structurer = ToolboxStructurer(
+        client=ToolboxClient(provider="docling"), allow_fallback=False,
+    )
 
     type_counts: Counter[str] = Counter()
     formula_pages: list[tuple[int, str]] = []
     total_start = time.time()
-    page_count = len(doc)
-
-    for i in range(page_count):
-        page = doc[i]
-        start = time.time()
-        regions = structurer.extract_page_regions(page)
-        elapsed = time.time() - start
-        for region in regions:
-            type_counts[region.type] += 1
-            if region.type == "formula":
-                formula_pages.append((i + 1, region.text.strip() or "(sem texto)"))
-        print(f"pagina {i + 1}/{page_count}: {len(regions)} regioes em {elapsed:.1f}s "
-              f"({Counter(r.type for r in regions)})")
+    with fitz.open(str(PDF)) as doc:
+        page_count = len(doc)
+        for i in range(page_count):
+            page = doc[i]
+            start = time.time()
+            regions = structurer.extract_page_regions(page)
+            elapsed = time.time() - start
+            for region in regions:
+                type_counts[region.type] += 1
+                if region.type == "formula":
+                    formula_pages.append((i + 1, region.text.strip() or "(sem texto)"))
+            print(f"pagina {i + 1}/{page_count}: {len(regions)} regioes em {elapsed:.1f}s "
+                  f"({Counter(r.type for r in regions)})")
 
     total_elapsed = time.time() - total_start
-    doc.close()
 
     print(f"\n### Resumo: {page_count} paginas em {total_elapsed:.1f}s\n")
     print("Distribuicao de tipos de regiao:")

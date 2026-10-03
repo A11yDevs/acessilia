@@ -2,6 +2,7 @@
 
 Download papers with different mathematical notation, select the page with
 most mathematical symbols, and inspect it using the existing Toolbox adapter.
+Toolbox errors abort the diagnostic instead of measuring a local fallback.
 
 Usage: python scripts/test_formula_arxiv.py
 """
@@ -53,7 +54,9 @@ def _best_math_page(doc: fitz.Document) -> int:
 
 def main() -> None:
     WORKDIR.mkdir(parents=True, exist_ok=True)
-    structurer = ToolboxStructurer(client=ToolboxClient(provider="docling"))
+    structurer = ToolboxStructurer(
+        client=ToolboxClient(provider="docling"), allow_fallback=False,
+    )
     total_formulas = 0
     total_regions = 0
 
@@ -71,11 +74,10 @@ def main() -> None:
         single.close()
         src.close()
 
-        doc = fitz.open(str(page_pdf))
-        start = time.time()
-        regions = structurer.extract_page_regions(doc[0])
-        elapsed = time.time() - start
-        doc.close()
+        with fitz.open(str(page_pdf)) as doc:
+            start = time.time()
+            regions = structurer.extract_page_regions(doc[0])
+            elapsed = time.time() - start
 
         formulas = [r for r in regions if r.type == "formula"]
         total_regions += len(regions)

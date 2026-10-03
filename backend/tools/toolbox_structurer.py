@@ -25,10 +25,12 @@ class ToolboxStructurer(BaseStructurer):
         *,
         client: ToolboxClient | None = None,
         enable_ocr: bool = True,
+        allow_fallback: bool = True,
     ) -> None:
         self._client = client or ToolboxClient()
         self._doc_cache: dict[str, dict[str, Any]] = {}
         self.enable_ocr = enable_ocr
+        self.allow_fallback = allow_fallback
 
     @property
     def name(self) -> str:
@@ -53,9 +55,9 @@ class ToolboxStructurer(BaseStructurer):
         return result
 
     def extract_page_regions(self, page: fitz.Page) -> list[Region]:
-        """Extrai regiões de uma página usando a Toolbox.
+        """Extract page regions using Toolbox.
 
-        Fallback para PyMuPDF se a Toolbox estiver indisponível.
+        Fall back to PyMuPDF on errors unless allow_fallback is disabled.
         """
         page_index = getattr(page, "number", 0)
         page_num = int(page_index or 0) + 1
@@ -73,6 +75,8 @@ class ToolboxStructurer(BaseStructurer):
             )
             return self._toolbox_result_to_regions(result, page_num, page)
         except Exception as e:
+            if not self.allow_fallback:
+                raise
             logger.warning(
                 "Toolbox falhou na pagina {} ({}), fallback PyMuPDF",
                 page_num,
