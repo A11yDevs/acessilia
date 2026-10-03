@@ -53,7 +53,6 @@ def main() -> None:
 
     root = args.run.resolve()
     manifest = json.loads((root / "manifest.json").read_text())
-    variant = manifest["variants"][args.variant]
     out = root / args.variant
     out.mkdir(exist_ok=True)
     versions = manifest["inference"].get("versions", {})

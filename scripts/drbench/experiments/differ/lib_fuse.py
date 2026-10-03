@@ -54,6 +54,7 @@ def main() -> int:
     ap.add_argument("--no-decor-wins", dest="decor_wins", action="store_false")
     ap.add_argument("--drop-docling", default="group+unknown")
     ap.add_argument("--drop-mineru", default="")
+    ap.add_argument("--no-unilateral-dedup", dest="unilateral_dedup", action="store_false", default=True)
     a = ap.parse_args()
 
     policy = policy_by_name(a.policy)
@@ -105,6 +106,7 @@ def main() -> int:
             m_pics=m_pics,
             running=running.get(doc_id_of(stem), frozenset()),
             decor_wins=a.decor_wins,
+            unilateral_dedup=a.unilateral_dedup,
         )
         if not out:
             # Fallback do script de referência: quando a fusão não produz

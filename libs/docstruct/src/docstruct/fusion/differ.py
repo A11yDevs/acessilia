@@ -102,6 +102,7 @@ def merge_blocks(
     m_pics: list | None = None,
     running: frozenset[str] = frozenset(),
     decor_wins: bool = False,
+    unilateral_dedup: bool = True,
     stats: Counter | None = None,
 ) -> tuple[list[str], Counter]:
     """Funde os blocos dos dois providers. Retorna (markdowns ordenados, stats).
@@ -116,6 +117,7 @@ def merge_blocks(
         m_pics: bboxes de figuras do provider B (para suppress).
         running: textos de running heads do documento (pré-computados).
         decor_wins: body repetindo header/footer é descartado.
+        unilateral_dedup: permite desligar somente a deduplicação Docling unilateral.
         stats: Counter opcional para acumular decisões.
     """
     stats = stats if stats is not None else Counter()
@@ -279,7 +281,7 @@ def merge_blocks(
         ):
             stats["dropped-docling-swallowing"] += 1
             continue
-        if policy.pick_guard and d.kind == "text" and is_duplicate(d.text, m_body_texts):
+        if unilateral_dedup and policy.pick_guard and d.kind == "text" and is_duplicate(d.text, m_body_texts):
             stats["dropped-docling-duplicate"] += 1
             continue
         cx, cy = center(d.box)

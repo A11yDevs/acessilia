@@ -231,3 +231,17 @@ class TestMergeBlocks:
         assert stats.get("merge-split-docling", 0) == 0
         assert len(out) == 2
         assert "# Carrots" in out
+
+
+def test_disabling_unilateral_dedup_preserves_a_second_text_occurrence():
+    text = "Repeated safety notice for this section"
+    matched = mk(text, box=(0.0, 0.1, 0.4, 0.2))
+    elsewhere = mk(text, box=(0.6, 0.7, 1.0, 0.8))
+    policy = FusionPolicy(pick_guard=1.5, merge_paragraphs=False, decor_tail=False,
+                          junk_filter=False, suppress_regions=False)
+    original, original_stats = merge_blocks([matched, elsewhere], [matched], policy)
+    ablation, ablation_stats = merge_blocks([matched, elsewhere], [matched], policy, unilateral_dedup=False)
+    assert original == [text]
+    assert original_stats["dropped-docling-duplicate"] == 1
+    assert ablation == [text, text]
+    assert ablation_stats["dropped-docling-duplicate"] == 0
