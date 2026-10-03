@@ -147,6 +147,9 @@ def _row_to_diff(b: dict) -> DiffBlock:
         box=b["box"],
         text=b["text"],
         type=b.get("type", "text"),
+        order_sources=(dict(b["reading_order_context"]),) if isinstance(
+            b.get("reading_order_context"), dict
+        ) else (),
     )
 
 

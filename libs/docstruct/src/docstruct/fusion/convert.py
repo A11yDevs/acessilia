@@ -69,4 +69,8 @@ def block_to_diff(b: CanonicalBlock) -> DiffBlock:
     text = b.text or md
     if kind == "table" or kind == "formula" or PAGENUM_RE.match(md):
         pass  # kind já decidido
-    return DiffBlock(md=md, kind=kind, box=box, text=text, type=(b.type or "unknown").lower())
+    context = b.metadata.get("reading_order_context")
+    return DiffBlock(
+        md=md, kind=kind, box=box, text=text, type=(b.type or "unknown").lower(),
+        order_sources=(dict(context),) if isinstance(context, dict) else (),
+    )

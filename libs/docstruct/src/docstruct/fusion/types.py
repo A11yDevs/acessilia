@@ -20,6 +20,9 @@ class DiffBlock:
     role: Optional[str] = None  # decor: "header" | "footer" | "page_number"
     merged: int = 0
     fused: int = 0
+    # Provider evidence only: the current fusion does not sort by these indices.
+    # Multiple sources survive block joins; absent evidence stays empty.
+    order_sources: tuple[dict[str, Any], ...] = ()
 
     def as_dict(self) -> dict[str, Any]:
         return {f.name: getattr(self, f.name) for f in fields(self)}

@@ -323,6 +323,9 @@ def provider_blocks(result: dict) -> list[dict]:
             "coord_origin": bbox.get("coord_origin") if bbox else None,
             "page": page_no,
             "page_size": [w, h],
+            **({"reading_order_context": dict(e["metadata"]["reading_order_context"])}
+               if isinstance((e.get("metadata") or {}).get("reading_order_context"), dict)
+               else {}),
         })
     return blocks
 

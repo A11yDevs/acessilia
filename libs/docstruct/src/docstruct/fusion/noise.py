@@ -323,6 +323,7 @@ def group_split_blocks(
             text=merged_text,
             type=parts[0].type,
             merged=len(parts),
+            order_sources=tuple(source for p in parts for source in p.order_sources),
         )
         absorbed.update(idxs[1:])
         stats[f"merge-split-{tag}"] += 1
@@ -417,6 +418,7 @@ def fuse_line_runs(
                     text="".join(p.text for p in parts),
                     type=parts[0].type,
                     fused=len(parts),
+                    order_sources=tuple(source for p in parts for source in p.order_sources),
                 )
             )
             absorbed.update(ch)
