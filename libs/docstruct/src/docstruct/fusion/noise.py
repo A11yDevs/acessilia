@@ -273,15 +273,17 @@ def group_split_blocks(
     frac: float = 0.6,
     min_sim: float = 0.0,
 ) -> list[DiffBlock]:
-    """Funde blocos de texto de A geometricamente contidos (>= frac) num único
-    bloco de texto de B (A sobre-segmentou o parágrafo que B manteve inteiro)."""
+    """Funde blocos de texto/título de A geometricamente contidos (>= frac) num único
+    bloco de B (A sobre-segmentou o parágrafo ou título que B manteve inteiro)."""
     owner: dict[int, int] = {}
     for i, a in enumerate(A):
-        if a.kind != "text" or a.box is None:
+        if a.kind not in ("text", "heading") or a.box is None:
             continue
         best, bf = None, 0.0
         for j, b in enumerate(B):
-            if b.kind != "text" or b.box is None:
+            if b.kind not in ("text", "heading") or b.box is None:
+                continue
+            if a.kind != b.kind:
                 continue
             f = contain_frac(a.box, b.box)
             if f > bf:
@@ -302,9 +304,21 @@ def group_split_blocks(
         if sim(merged_text[:2000], B[j].text[:2000]) < min_sim:
             stats[f"merge-split-{tag}-rejected"] += 1
             continue
+        if parts[0].kind == "heading":
+            raw_t0 = re.sub(r"^#+\s*", "", parts[0].md).strip()
+            raw_t1 = re.sub(r"^#+\s*", "", parts[1].md).strip() if len(parts) > 1 else ""
+            continuation = (
+                raw_t0.lower().endswith((" and", " or", " of", " for", " to", " in", " the", " with", " &", "-", "–", "—", ":"))
+                or (len(raw_t1) >= 1 and raw_t1[0].islower())
+            )
+            if not continuation:
+                continue
+            merged_md = parts[0].md + " " + " ".join(re.sub(r"^#+\s*", "", p.md).strip() for p in parts[1:])
+        else:
+            merged_md = " ".join(p.md for p in parts)
         merged_first[idxs[0]] = DiffBlock(
-            md=" ".join(p.md for p in parts),
-            kind="text",
+            md=merged_md,
+            kind=parts[0].kind,
             box=union_box(p.box for p in parts),
             text=merged_text,
             type=parts[0].type,

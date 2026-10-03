@@ -285,7 +285,7 @@ def merge_blocks(
         cx, cy = center(d.box)
         j = min(
             range(len(centers)),
-            key=lambda k: (2.0 * (cx - centers[k][0])) ** 2 + (cy - centers[k][1]) ** 2,
+            key=lambda k: (1.5 * (cx - centers[k][0])) ** 2 + (cy - centers[k][1]) ** 2,
         )
         above = cy < centers[j][1]
         seq.append((float(j) - 0.5 if above else float(j) + 0.5, cy, d.md))

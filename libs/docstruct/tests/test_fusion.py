@@ -202,3 +202,32 @@ class TestMergeBlocks:
         # 5 >= 4 e qualidade baixa (letras soltas) → suprime
         assert stats.get("suppress-in-picture", 0) == 5
         assert out == ["corpo"]
+
+    def test_heading_continuation_merge(self):
+        """Headings sobre-segmentados com continuação sintática (conectivo ou minúscula) são unidos."""
+        policy = FusionPolicy(merge_paragraphs=True)
+        D = [
+            mk("Signs and Symbols – Direction and", box=(0.1, 0.1, 0.9, 0.15), kind="heading", md="# Signs and Symbols – Direction and"),
+            mk("Prediction", box=(0.1, 0.15, 0.9, 0.2), kind="heading", md="# Prediction"),
+        ]
+        M = [
+            mk("Signs and Symbols – Direction and Prediction", box=(0.1, 0.1, 0.9, 0.2), kind="heading", md="# Signs and Symbols – Direction and Prediction"),
+        ]
+        out, stats = merge_blocks(D, M, policy)
+        assert out == ["# Signs and Symbols – Direction and Prediction"]
+        assert stats.get("merge-split-docling", 0) == 1
+
+    def test_heading_no_continuation_preserves_separate(self):
+        """Headings independentes em maiúscula dentro de um bloco único do parceiro não são fundidos."""
+        policy = FusionPolicy(merge_paragraphs=True)
+        D = [
+            mk("ROOTS AND BULBS", box=(0.1, 0.1, 0.9, 0.14), kind="heading", md="# ROOTS AND BULBS"),
+            mk("Carrots", box=(0.1, 0.15, 0.9, 0.2), kind="heading", md="# Carrots"),
+        ]
+        M = [
+            mk("ROOTS AND BULBS Carrots", box=(0.1, 0.1, 0.9, 0.2), kind="heading", md="# ROOTS AND BULBS Carrots"),
+        ]
+        out, stats = merge_blocks(D, M, policy)
+        assert stats.get("merge-split-docling", 0) == 0
+        assert len(out) == 2
+        assert "# Carrots" in out
