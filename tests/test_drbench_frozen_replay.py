@@ -8,6 +8,12 @@ import pytest
 from scripts.drbench.experiments.eval.frozen_inputs import (
     export_revision, freeze, sha256, validate_pages,
 )
+from scripts.drbench.experiments.eval.frozen_replay import (
+    check_sources, resolve_fusion_args, verify_inputs, verify_sources,
+)
+from scripts.drbench.experiments.eval.replay_report import (
+    METRICS, check_inventory, metric_score, summarize,
+)
 
 
 def page(number=1):
@@ -92,3 +98,103 @@ def test_output_inside_repository_is_rejected(spec, tmp_path):
 def test_selection_cannot_be_empty_duplicate_or_escape_data_root(pages):
     with pytest.raises(ValueError):
         validate_pages(pages)
+
+
+def test_changed_frozen_input_is_detected(spec, tmp_path):
+    root = tmp_path / "run"
+    manifest = freeze(spec, root)
+    (root / "raw/docling/doc_p1.json").write_text("tampered")
+    with pytest.raises(ValueError, match="input changed"):
+        verify_inputs(root, manifest)
+
+
+def test_missing_and_stale_predictions_are_failures(tmp_path):
+    with pytest.raises(ValueError, match="coverage mismatch"):
+        check_inventory(tmp_path, [page()])
+    (tmp_path / "doc_p1.drbench.md").write_text("ok")
+    check_inventory(tmp_path, [page()])
+    (tmp_path / "doc_p2.drbench.md").write_text("stale")
+    with pytest.raises(ValueError, match="coverage mismatch"):
+        check_inventory(tmp_path, [page()])
+
+
+def result_row(a=80.0, b=80.0):
+    row = {"id": "doc_p1"}
+    for metric in METRICS:
+        row.update({f"baseline_{metric}": a, f"candidate_{metric}": b,
+                    f"delta_{metric}": b-a if a is not None and b is not None else None})
+    return row
+
+
+def test_identical_scores_pass_and_keep_paired_denominator():
+    summary = summarize([result_row()])
+    assert summary["quality_gate"] == "passed"
+    assert summary["metrics"]["reading_order"]["delta"] == 0
+    assert summary["metrics"]["reading_order"]["equal"] == 1
+
+
+def test_text_loss_rejects_even_with_reading_order_gain():
+    row = result_row(80, 85)
+    row.update(baseline_text_block=80, candidate_text_block=79, delta_text_block=-1)
+    summary = summarize([row])
+    assert summary["quality_gate"] == "rejected"
+    assert summary["metrics"]["text_block"]["regressions"] == [{"id": "doc_p1", "delta": -1}]
+
+
+def test_asymmetric_coverage_is_rejected():
+    row = result_row()
+    row.update(candidate_text_block=None, delta_text_block=None)
+    summary = summarize([result_row(), row])
+    assert summary["quality_gate"] == "rejected"
+    assert summary["metrics"]["text_block"]["coverage_mismatch"] == ["doc_p1"]
+
+
+def test_zero_evaluated_pairs_is_inconclusive():
+    assert summarize([result_row(None, None)])["quality_gate"] == "inconclusive"
+
+
+def test_no_samples_is_distinct_from_missing_evaluator_output(tmp_path):
+    with pytest.raises(FileNotFoundError):
+        metric_score(tmp_path, "batch-01", "reading_order", page())
+    (tmp_path / "batch-01_reading_order_result.json").write_text("[]")
+    assert metric_score(tmp_path, "batch-01", "reading_order", page()) == (None, "no_official_samples")
+
+
+def test_nonempty_samples_require_an_official_metric(tmp_path):
+    (tmp_path / "batch-01_reading_order_result.json").write_text(json.dumps([{"img_id": "doc_page_1-1.jpg"}]))
+    with pytest.raises(FileNotFoundError):
+        metric_score(tmp_path, "batch-01", "reading_order", page())
+    (tmp_path / "batch-01_reading_order_per_page_edit.json").write_text('{"doc_page_1-1.jpg": 0.25}')
+    assert metric_score(tmp_path, "batch-01", "reading_order", page()) == (75, "evaluated")
+
+
+def test_frozen_cli_defaults_and_explicit_override_are_recorded(tmp_path):
+    source = tmp_path / "cli.py"
+    source.write_text('ap.add_argument("--garbage-frac", type=float, default=0.0)')
+    assert resolve_fusion_args(source, [])["garbage_frac"] == 0.0
+    source.write_text('ap.add_argument("--garbage-frac", type=float, default=None)')
+    assert resolve_fusion_args(source, [])["garbage_frac"] is None
+    assert resolve_fusion_args(source, ["--garbage-frac", "0.3"])["garbage_frac"] == 0.3
+
+
+def test_generated_translation_catalogue_is_recorded_but_new_code_is_rejected(tmp_path):
+    source = tmp_path / "sources/baseline/acessilia/backend/locales/en_US/LC_MESSAGES"
+    source.mkdir(parents=True)
+    (source / "messages.po").write_text("versioned translation")
+    before = verify_sources(tmp_path)
+    (source / "messages.mo").write_bytes(b"compiled catalogue")
+    generated = check_sources(tmp_path, before)
+    assert list(generated) == ["sources/baseline/acessilia/backend/locales/en_US/LC_MESSAGES/messages.mo"]
+    (source / "unexpected.py").write_text("new code")
+    with pytest.raises(ValueError, match="Unexpected file"):
+        check_sources(tmp_path, before)
+
+
+def test_modified_versioned_source_is_rejected(tmp_path):
+    source = tmp_path / "sources/source.py"
+    source.parent.mkdir()
+    source.write_text("original")
+    before = verify_sources(tmp_path)
+    source.write_text("modified")
+    with pytest.raises(ValueError, match="source changed"):
+        check_sources(tmp_path, before)
