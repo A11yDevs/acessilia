@@ -58,15 +58,22 @@ def sim(a: str, b: str) -> float:
     return difflib.SequenceMatcher(None, a, b, autojunk=False).ratio()
 
 
+def _swallow_comparison_text(text: str) -> str:
+    # A word broken at a line end is OCR formatting; punctuation inside a
+    # number/expression is content. Keep decimal points, signs and operators.
+    text = re.sub(r"(?<=[^\W\d_])-[ \t]*\r?\n[ \t]*(?=[^\W\d_])", "", text)
+    return re.sub(r"\s+", "", text.casefold().replace("\u00ad", ""))
+
+
 def swallows(d_text: str, other_texts: list[str], n: int = 25) -> bool:
     """True se ``d_text`` também contém material de >= 1 outro bloco.
-    Normaliza caracteres alfanuméricos para ser robusto a variações de OCR
-    (espaçamento, hifenização e quebras de linha)."""
-    nd = re.sub(r"[\W_]+", "", d_text.casefold())
+    Normaliza espaços e hifenização de fim de linha sem apagar pontuação
+    que distingue números e expressões. O texto emitido não é modificado."""
+    nd = _swallow_comparison_text(d_text)
     if len(nd) < n:
         return False
     for t in other_texts:
-        nt = re.sub(r"[\W_]+", "", t.casefold())
+        nt = _swallow_comparison_text(t)
         if len(nt) < n:
             continue
         if nt in nd:
