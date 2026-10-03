@@ -150,6 +150,7 @@ def _row_to_diff(b: dict) -> DiffBlock:
         order_sources=(dict(b["reading_order_context"]),) if isinstance(
             b.get("reading_order_context"), dict
         ) else (),
+        provenance=tuple(b.get("provenance") or []),
     )
 
 

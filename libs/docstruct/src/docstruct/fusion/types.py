@@ -23,6 +23,8 @@ class DiffBlock:
     # Provider evidence only: the current fusion does not sort by these indices.
     # Multiple sources survive block joins; absent evidence stays empty.
     order_sources: tuple[dict[str, Any], ...] = ()
+    # Source coordinates/units stay separate from the active normalized box.
+    provenance: tuple[dict[str, Any], ...] = ()
 
     def as_dict(self) -> dict[str, Any]:
         return {f.name: getattr(self, f.name) for f in fields(self)}

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+from copy import deepcopy
 from typing import Optional
 
 from docstruct.fusion.similarity import PAGENUM_RE
@@ -70,7 +71,9 @@ def block_to_diff(b: CanonicalBlock) -> DiffBlock:
     if kind == "table" or kind == "formula" or PAGENUM_RE.match(md):
         pass  # kind já decidido
     context = b.metadata.get("reading_order_context")
+    provenance = b.metadata.get("provenance")
     return DiffBlock(
         md=md, kind=kind, box=box, text=text, type=(b.type or "unknown").lower(),
         order_sources=(dict(context),) if isinstance(context, dict) else (),
+        provenance=tuple(deepcopy(provenance)) if isinstance(provenance, (list, tuple)) else (),
     )
