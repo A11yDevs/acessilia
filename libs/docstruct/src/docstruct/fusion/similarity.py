@@ -58,19 +58,21 @@ def sim(a: str, b: str) -> float:
     return difflib.SequenceMatcher(None, a, b, autojunk=False).ratio()
 
 
-def swallows(d_text: str, other_texts: list[str], n: int = 30) -> bool:
-    """True se ``d_text`` também contém material de >= 1 outro bloco (probes
-    de n chars): o provider leu através de colunas / mesclou parágrafos
-    vizinhos. Porta fiel de ``swallows()``."""
-    hits = 0
+def swallows(d_text: str, other_texts: list[str], n: int = 25) -> bool:
+    """True se ``d_text`` também contém material de >= 1 outro bloco.
+    Normaliza caracteres alfanuméricos para ser robusto a variações de OCR
+    (espaçamento, hifenização e quebras de linha)."""
+    nd = re.sub(r"[\W_]+", "", d_text.casefold())
+    if len(nd) < n:
+        return False
     for t in other_texts:
-        if len(t) < n:
+        nt = re.sub(r"[\W_]+", "", t.casefold())
+        if len(nt) < n:
             continue
-        probes = {t[k:k + n] for k in range(0, len(t) - n, max(n, (len(t) - n) // 4 or 1))}
-        if sum(p in d_text for p in probes) >= 2:
-            hits += 1
-            if hits >= 1:
-                return True
+        step = max(n, (len(nt) - n) // 4 or 1)
+        probes = {nt[k:k + n] for k in range(0, len(nt) - n + 1, step)}
+        if sum(p in nd for p in probes) >= 2:
+            return True
     return False
 
 
