@@ -100,3 +100,11 @@ For a first validation, use identical commits/settings for both variants. Then
 reproduce the historical comparison. For an ablation, change one source revision
 or one configuration while holding everything else fixed. `fusion_args` accepts
 the frozen CLI's options but cannot override paths or the recorded preset.
+
+For a unilateral-deduplication ablation, set the candidate's `fusion_args` to
+`["--no-unilateral-dedup"]` and leave baseline arguments empty, using the same
+committed version for both. This disables only that deletion rule; matching,
+swallowing guards, content selection and fallback stay enabled. The current rule
+requires the full normalized content in a selected emitted text block and at
+least 0.6 containment of the candidate box in that emitted block's box. Missing
+coordinates do not justify deletion; numeric punctuation is preserved.

@@ -1,4 +1,4 @@
-"""Counterexamples for OCR normalization used by the swallowing guard."""
+"""Counterexamples for OCR comparison in swallowing and deduplication guards."""
 import pytest
 
 from docstruct.fusion.similarity import is_duplicate, swallows
