@@ -1,63 +1,16 @@
-<!DOCTYPE html>
-<html lang="{{ locale }}">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ index_title }}</title>
-    <link rel="icon" type="image/png" href="/static/logo.png">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body {
-            background-color: #f8f9fa;
-            color: #212529;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        .container {
-            max-width: 600px;
-            margin-top: 50px;
-        }
-        .card {
-            border: none;
-            border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        }
-        .card-header {
-            background-color: #0d6efd;
-            color: white;
-            border-radius: 15px 15px 0 0 !important;
-            padding: 20px;
-            text-align: center;
-        }
+{% extends "base.html" %}
+{% set page_title = index_title %}
+{% set page_headline = index_headline %}
+
+{% block styles %}
         .btn-primary {
             padding: 12px;
             font-weight: bold;
             border-radius: 8px;
         }
-        .footer {
-            margin-top: 30px;
-            text-align: center;
-            font-size: 0.9em;
-            color: #6c757d;
-        }
-        /* Accessibility: contrast and focus visibility */
-        :focus {
-            outline: 3px solid #ffc107 !important;
-            outline-offset: 2px;
-        }
-    </style>
-</head>
-<body>
-    <main class="container" role="main">
-        <div class="card">
-            <header class="card-header">
-                <div class="text-start mb-2">
-                    <img src="/static/logo.png"
-                         alt="{{ logo_alt }}"
-                         style="max-width: 180px; height: auto;">
-                </div>
-                <h1 class="h3 mb-0">{{ index_headline }}</h1>
-            </header>
-            <div class="card-body p-4">
+{% endblock %}
+
+{% block content %}
                 <p class="mb-4">{{ index_intro }}</p>
                 
                 {% if message %}
@@ -93,13 +46,4 @@
                 <div class="text-center mt-3">
                     <a href="/advanced" class="btn btn-outline-secondary">{{ index_advanced_link }}</a>
                 </div>
-            </div>
-        </div>
-        <footer class="footer">
-            <p>&copy; 2026 Acessilia - {{ footer }}</p>
-        </footer>
-    </main>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+{% endblock %}

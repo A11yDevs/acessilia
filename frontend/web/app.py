@@ -35,7 +35,7 @@ from backend.log_messages import (
 )
 from backend.tools.access_log_filter import AccessLogFilter
 from backend.tools.logger import logger
-from frontend.clients.api_client import ApiClient, ApiError
+from frontend.clients.api_client import ApiError
 from frontend.clients import default_client
 from frontend.web.messages import (
     WEB_ADVANCED_BACK_LINK,
