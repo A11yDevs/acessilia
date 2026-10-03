@@ -5,10 +5,8 @@ import re
 from pathlib import Path
 from typing import Any, Callable, Coroutine
 
-from docstruct.tables.ast import rows_from_table_sections as _rows_from_table_ast
-
-import fitz
 from docstruct.tables.ast import effective_section_width
+from docstruct.tables.ast import rows_from_table_sections as _rows_from_table_ast
 
 from backend.agents.data_agent import DataAgent
 from backend.agents.output_schemas import DataOutput, VisionOutput
@@ -27,7 +25,6 @@ from backend.core.planning.planner_agent import PlannerAgent
 from backend.agents.vision_agent import VisionAgent
 from backend.i18n import t
 from backend.log_messages import (
-    LOG_PDDL_ELEMENT_CROP_FAILED,
     LOG_PDDL_IGNORED_OPTIONS,
     LOG_PDDL_IMAGES_ENRICHED,
     LOG_PDDL_PREFERRED_PLAN_MISSING,
@@ -47,6 +44,7 @@ from backend.tools.formula_tools import (
     verbalize_latex_fallback,
 )
 from backend.tools.logger import logger
+from backend.tools.region_extractor import PdfRegionReader, _extract_picture_bytes
 
 
 def _formula_elements_for_obligation(
@@ -244,7 +242,7 @@ class PddlAccessibilityOrchestrator:
     Args:
         planner_backend (str): Which planner backend to prefer for nominal-plan generation; defaults to "internal".
         preferred_plan (str): Which plan source to prefer when multiple are available; defaults to "internal".
-        execute_dry_run (bool): When True the produced plan is only validated in dry-run instead of executed for real; defaults to True.
+        execute_dry_run (bool): When True the plan is validated in dry-run; False skips executor validation. Defaults to True.
         fast_downward (Path | None): Optional filesystem path to a fast-downward binary used when planner_backend is fast-downward; defaults to None.
         fast_downward_alias (str | None): Optional shell alias to invoke fast_downward through instead of the raw path; defaults to None.
         fast_downward_search (str): Fast-downward search heuristic string passed when the backend is active; defaults to "astar(blind())".
@@ -346,20 +344,23 @@ class PddlAccessibilityOrchestrator:
             language="pt-BR",
         )
 
-        if status_callback:
-            await status_callback(t(STAGE_ENRICHING_IMAGE_DESCRIPTIONS))
-        await _enrich_picture_descriptions(
-            manifest,
-            file_path.resolve(),
-            mode=effective_mode,
-        )
+        async with PdfRegionReader(file_path.resolve()) as reader:
+            if status_callback:
+                await status_callback(t(STAGE_ENRICHING_IMAGE_DESCRIPTIONS))
+            await _enrich_picture_descriptions(
+                manifest,
+                file_path.resolve(),
+                mode=effective_mode,
+                reader=reader,
+            )
 
-        if status_callback:
-            await status_callback(t(STAGE_ENRICHING_TABLES_OCR))
-        await _enrich_table_structures(
-            manifest,
-            file_path.resolve(),
-        )
+            if status_callback:
+                await status_callback(t(STAGE_ENRICHING_TABLES_OCR))
+            await _enrich_table_structures(
+                manifest,
+                file_path.resolve(),
+                reader=reader,
+            )
 
         if status_callback:
             await status_callback(t(STAGE_GENERATING_PDDL_PLAN))
@@ -424,7 +425,13 @@ async def _enrich_picture_descriptions(
     source_file: Path,
     *,
     mode: str,
+    reader: PdfRegionReader | None = None,
 ) -> None:
+    if reader is None:
+        async with PdfRegionReader(source_file) as reader:
+            await _enrich_picture_descriptions(manifest, source_file, mode=mode, reader=reader)
+        return
+
     pictures = [
         element
         for element in manifest.elements
@@ -458,12 +465,7 @@ async def _enrich_picture_descriptions(
         if fallback_page_number is None and len(manifest.pages) == 1:
             fallback_page_number = manifest.pages[0].page_number
 
-        image_bytes, page_number = await asyncio.to_thread(
-            _extract_picture_bytes,
-            source_file,
-            element,
-            fallback_page_number,
-        )
+        image_bytes, page_number = await reader.crop(element, fallback_page_number)
         if not image_bytes:
             continue
 
@@ -516,7 +518,14 @@ async def _enrich_picture_descriptions(
 async def _enrich_table_structures(
     manifest: ProcessingManifest,
     source_file: Path,
+    *,
+    reader: PdfRegionReader | None = None,
 ) -> None:
+    if reader is None:
+        async with PdfRegionReader(source_file) as reader:
+            await _enrich_table_structures(manifest, source_file, reader=reader)
+        return
+
     table_elements = [
         element
         for element in manifest.elements
@@ -536,12 +545,7 @@ async def _enrich_table_structures(
         if fallback_page_number is None and len(manifest.pages) == 1:
             fallback_page_number = manifest.pages[0].page_number
 
-        image_bytes, page_number = await asyncio.to_thread(
-            _extract_picture_bytes,
-            source_file,
-            element,
-            fallback_page_number,
-        )
+        image_bytes, page_number = await reader.crop(element, fallback_page_number)
         if not image_bytes:
             continue
 
@@ -705,60 +709,6 @@ def _rows_look_like_placeholder(rows: list[list[str]]) -> bool:
     if len(rows) != 1 or len(rows[0]) != 1:
         return False
     return rows[0][0].strip().lower() == "tabela detectada"
-
-
-def _extract_picture_bytes(
-    source_file: Path,
-    element: ManifestElement,
-    fallback_page_number: int | None,
-) -> tuple[bytes | None, int]:
-    provenance = element.provenance[0] if element.provenance else None
-    page_number = provenance.page_number if provenance is not None else (fallback_page_number or 0)
-    if page_number < 1:
-        return None, 0
-
-    doc = fitz.open(source_file)
-    try:
-        page = doc.load_page(page_number - 1)
-        rect = _clip_rect_from_provenance(page, provenance)
-        pixmap = page.get_pixmap(clip=rect, dpi=160, alpha=False)
-        return pixmap.tobytes("png"), page_number
-    except Exception:
-        logger.exception(
-            t(LOG_PDDL_ELEMENT_CROP_FAILED).format(element_id=element.id)
-        )
-        return None, page_number
-    finally:
-        doc.close()
-
-
-def _clip_rect_from_provenance(page: fitz.Page, provenance: Any) -> fitz.Rect:
-    bbox = getattr(provenance, "bbox", None)
-    if bbox is None:
-        return page.rect
-
-    left = float(bbox.left)
-    right = float(bbox.right)
-    top = float(bbox.top)
-    bottom = float(bbox.bottom)
-
-    if getattr(bbox, "coord_origin", "UNKNOWN") == "BOTTOMLEFT":
-        page_height = float(page.rect.height)
-        top_from_top = page_height - top
-        bottom_from_top = page_height - bottom
-        y0 = min(top_from_top, bottom_from_top)
-        y1 = max(top_from_top, bottom_from_top)
-    else:
-        y0 = min(top, bottom)
-        y1 = max(top, bottom)
-
-    x0 = min(left, right)
-    x1 = max(left, right)
-
-    rect = fitz.Rect(x0, y0, x1, y1) & page.rect
-    if rect.width < 4 or rect.height < 4:
-        return page.rect
-    return rect
 
 
 def _is_mostly_visual_manifest(manifest: ProcessingManifest) -> bool:

@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import asyncio
+from concurrent.futures import ProcessPoolExecutor
+from multiprocessing import get_context
+from multiprocessing.util import Finalize
+from pathlib import Path
 from typing import Any
 
-import fitz
+import pymupdf as fitz
 
 from docstruct.regions.grouping import (  # noqa: F401
     CALLOUT_MAX_VERTICAL_GAP,
@@ -25,6 +30,10 @@ from docstruct.regions.grouping import (  # noqa: F401
 from docstruct.types import Region
 
 from backend.config.settings import settings
+from backend.core.manifest.models import ManifestElement
+from backend.i18n import t
+from backend.log_messages import LOG_PDDL_ELEMENT_CROP_FAILED
+from backend.tools.logger import logger
 
 
 def _known_callout_titles() -> frozenset[str]:
@@ -295,3 +304,120 @@ def crop_region_to_image(
     clip = fitz.Rect(bbox)
     pix = page.get_pixmap(dpi=dpi, clip=clip)
     return pix.tobytes("png")
+
+
+def _extract_picture_bytes(
+    source_file: Path,
+    element: ManifestElement,
+    fallback_page_number: int | None,
+) -> tuple[bytes | None, int]:
+    provenance = element.provenance[0] if element.provenance else None
+    page_number = provenance.page_number if provenance is not None else (fallback_page_number or 0)
+    if page_number < 1:
+        return None, 0
+
+    with fitz.open(source_file) as document:
+        return _crop_from_document(document, element, provenance, page_number)
+
+
+def _crop_from_document(
+    doc: fitz.Document, element: ManifestElement, provenance: Any, page_number: int,
+) -> tuple[bytes | None, int]:
+    try:
+        page = doc.load_page(page_number - 1)
+        rect = _clip_rect_from_provenance(page, provenance)
+        pixmap = page.get_pixmap(clip=rect, dpi=160, alpha=False)
+        return pixmap.tobytes("png"), page_number
+    except Exception:
+        logger.exception(
+            t(LOG_PDDL_ELEMENT_CROP_FAILED).format(element_id=element.id)
+        )
+        return None, page_number
+
+
+def _clip_rect_from_provenance(page: fitz.Page, provenance: Any) -> fitz.Rect:
+    bbox = getattr(provenance, "bbox", None)
+    if bbox is None:
+        return page.rect
+
+    left = float(bbox.left)
+    right = float(bbox.right)
+    top = float(bbox.top)
+    bottom = float(bbox.bottom)
+
+    if getattr(bbox, "coord_origin", "UNKNOWN") == "BOTTOMLEFT":
+        page_height = float(page.rect.height)
+        top_from_top = page_height - top
+        bottom_from_top = page_height - bottom
+        y0 = min(top_from_top, bottom_from_top)
+        y1 = max(top_from_top, bottom_from_top)
+    else:
+        y0 = min(top, bottom)
+        y1 = max(top, bottom)
+
+    x0 = min(left, right)
+    x1 = max(left, right)
+
+    rect = fitz.Rect(x0, y0, x1, y1) & page.rect
+    if rect.width < 4 or rect.height < 4:
+        return page.rect
+    return rect
+
+
+# Each spawned worker serves one source and owns its native document handle.
+_crop_document: fitz.Document | None = None
+_crop_source: str = ""
+
+
+def _initialize_crop_worker(source: str) -> None:
+    global _crop_source
+    _crop_source = source
+
+
+def _crop_in_worker(
+    element: ManifestElement, fallback_page_number: int | None,
+) -> tuple[bytes | None, int]:
+    global _crop_document
+    provenance = element.provenance[0] if element.provenance else None
+    page_number = provenance.page_number if provenance is not None else (fallback_page_number or 0)
+    if page_number < 1:
+        return None, 0
+    if _crop_document is None:
+        _crop_document = fitz.open(_crop_source)
+        Finalize(None, _crop_document.close, exitpriority=10)
+    return _crop_from_document(_crop_document, element, provenance, page_number)
+
+
+class PdfRegionReader:
+    """Lazy document crop session; native PyMuPDF access stays in one process.
+
+    Share the session across image/table enrichment and close it with async with.
+    Only one requested PNG is returned at a time, preserving provider ordering.
+    """
+
+    def __init__(self, source: Path) -> None:
+        self._source = str(source)
+        self._pool: ProcessPoolExecutor | None = None
+
+    async def __aenter__(self) -> PdfRegionReader:
+        return self
+
+    async def __aexit__(self, *_exc: Any) -> None:
+        if self._pool is not None:
+            await asyncio.to_thread(self._pool.shutdown, wait=True, cancel_futures=True)
+            self._pool = None
+
+    async def crop(
+        self, element: ManifestElement, fallback_page_number: int | None,
+    ) -> tuple[bytes | None, int]:
+        page_number = element.provenance[0].page_number if element.provenance else (fallback_page_number or 0)
+        if page_number < 1:
+            return None, 0
+        if self._pool is None:
+            self._pool = ProcessPoolExecutor(
+                max_workers=1, mp_context=get_context("spawn"),
+                initializer=_initialize_crop_worker, initargs=(self._source,),
+            )
+        return await asyncio.get_running_loop().run_in_executor(
+            self._pool, _crop_in_worker, element, fallback_page_number,
+        )

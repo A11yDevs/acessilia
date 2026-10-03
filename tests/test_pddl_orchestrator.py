@@ -610,11 +610,10 @@ def test_table_enrichment_metadata_uses_ast_spans_and_scope_headers(
             )
 
     monkeypatch.setattr(pddl_module, "DataAgent", FakeDataAgent)
-    monkeypatch.setattr(
-        pddl_module,
-        "_extract_picture_bytes",
-        lambda *_args: (b"image", 1),
-    )
+    async def fake_crop(*_args):
+        return b"image", 1
+
+    monkeypatch.setattr(pddl_module.PdfRegionReader, "crop", fake_crop)
 
     async def run_inline(function, *args):
         return function(*args)
@@ -676,11 +675,10 @@ def test_picture_reclassified_as_formula_reconciles_processing_needs(
             )
 
     monkeypatch.setattr(pddl_module, "VisionAgent", FakeVisionAgent)
-    monkeypatch.setattr(
-        pddl_module,
-        "_extract_picture_bytes",
-        lambda *_args: (b"image", 1),
-    )
+    async def fake_crop(*_args):
+        return b"image", 1
+
+    monkeypatch.setattr(pddl_module.PdfRegionReader, "crop", fake_crop)
 
     async def run_inline(function, *args):
         return function(*args)
