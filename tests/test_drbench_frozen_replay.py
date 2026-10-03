@@ -232,18 +232,20 @@ def test_source_mutation_between_freeze_and_run_fails_before_any_command(spec, t
     assert manifest["commands"] == []
 
 
-def test_normalization_mode_is_frozen_and_does_not_default_to_native(spec, tmp_path):
+@pytest.mark.parametrize("option", ["docling_native_order", "mineru_native_order"])
+def test_normalization_mode_is_frozen_and_does_not_default_to_native(spec, tmp_path, option):
     data = json.loads(spec.read_text())
-    data["variants"]["candidate"] = {**data["variants"]["candidate"], "docling_native_order": True}
+    data["variants"]["candidate"] = {**data["variants"]["candidate"], option: True}
     spec.write_text(json.dumps(data))
     frozen = freeze(spec, tmp_path / "native-run")
-    assert frozen["variants"]["baseline"]["docling_native_order"] is False
-    assert frozen["variants"]["candidate"]["docling_native_order"] is True
+    assert frozen["variants"]["baseline"][option] is False
+    assert frozen["variants"]["candidate"][option] is True
 
 
-def test_non_boolean_normalization_mode_fails_before_creating_run(spec, tmp_path):
+@pytest.mark.parametrize("option", ["docling_native_order", "mineru_native_order"])
+def test_non_boolean_normalization_mode_fails_before_creating_run(spec, tmp_path, option):
     data = json.loads(spec.read_text())
-    data["variants"]["candidate"]["docling_native_order"] = "false"
+    data["variants"]["candidate"][option] = "false"
     spec.write_text(json.dumps(data))
     with pytest.raises(ValueError, match="must be a boolean"):
         freeze(spec, tmp_path / "invalid-mode")

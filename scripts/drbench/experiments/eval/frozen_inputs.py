@@ -79,8 +79,9 @@ def freeze(spec_path: Path, output: Path, limit: int = 0) -> dict:
     validate_pages(pages)
     if set(spec["variants"]) != {"baseline", "candidate"}:
         raise ValueError("Exactly baseline and candidate are required")
-    if any(not isinstance(v.get("docling_native_order", False), bool) for v in spec["variants"].values()):
-        raise ValueError("docling_native_order must be a boolean")
+    for option in ("docling_native_order", "mineru_native_order"):
+        if any(not isinstance(v.get(option, False), bool) for v in spec["variants"].values()):
+            raise ValueError(f"{option} must be a boolean")
     # A unique root prevents stale outputs from being interpreted as this run.
     output = output.resolve()
     for repo_spec in [spec["evaluator"]] + [
@@ -120,7 +121,8 @@ def freeze(spec_path: Path, output: Path, limit: int = 0) -> dict:
         for variant_name, variant in spec["variants"].items():
             frozen = {"policy": variant.get("policy", "v12"),
                       "fusion_args": variant.get("fusion_args", []),
-                      "docling_native_order": variant.get("docling_native_order", False)}
+                      "docling_native_order": variant.get("docling_native_order", False),
+                      "mineru_native_order": variant.get("mineru_native_order", False)}
             for component in ("acessilia", "toolbox"):
                 source = variant[component]
                 frozen[component] = export_revision(
