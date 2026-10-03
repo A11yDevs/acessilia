@@ -1,10 +1,9 @@
-"""Teste rápido: extração de fórmulas em PDFs reais do arXiv (nativo, não sintético).
+"""Inspect formula regions from real arXiv PDFs through Docling via Toolbox.
 
-Baixa alguns papers de áreas diferentes (transformers, VAEs, GANs) para variar o
-estilo de notação matemática, seleciona automaticamente a página com maior
-densidade de símbolos matemáticos em cada um e roda o DoclingStructurer nela.
+Download papers with different mathematical notation, select the page with
+most mathematical symbols, and inspect it using the existing Toolbox adapter.
 
-Uso: python scripts/test_formula_arxiv.py
+Usage: python scripts/test_formula_arxiv.py
 """
 
 import sys
@@ -16,10 +15,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import fitz
 
-from backend.tools.structurer import DoclingStructurer
+from backend.tools.toolbox_client import ToolboxClient
+from backend.tools.toolbox_structurer import ToolboxStructurer
 
 WORKDIR = Path("var/temp/benchmark_formulas")
-WORKDIR.mkdir(parents=True, exist_ok=True)
 
 # (nome, arxiv id, descricao)
 PAPERS = [
@@ -52,38 +51,44 @@ def _best_math_page(doc: fitz.Document) -> int:
     return best_index
 
 
-structurer = DoclingStructurer()
-total_formulas = 0
-total_regions = 0
+def main() -> None:
+    WORKDIR.mkdir(parents=True, exist_ok=True)
+    structurer = ToolboxStructurer(client=ToolboxClient(provider="docling"))
+    total_formulas = 0
+    total_regions = 0
 
-for name, arxiv_id, description in PAPERS:
-    pdf_path = WORKDIR / f"{name}.pdf"
-    print(f"\n=== {name} ({arxiv_id}): {description} ===")
-    _download(arxiv_id, pdf_path)
+    for name, arxiv_id, description in PAPERS:
+        pdf_path = WORKDIR / f"{name}.pdf"
+        print(f"\n=== {name} ({arxiv_id}): {description} ===")
+        _download(arxiv_id, pdf_path)
 
-    src = fitz.open(str(pdf_path))
-    page_index = _best_math_page(src)
-    page_pdf = WORKDIR / f"{name}_p{page_index + 1}.pdf"
-    single = fitz.open()
-    single.insert_pdf(src, from_page=page_index, to_page=page_index)
-    single.save(str(page_pdf))
-    single.close()
-    src.close()
+        src = fitz.open(str(pdf_path))
+        page_index = _best_math_page(src)
+        page_pdf = WORKDIR / f"{name}_p{page_index + 1}.pdf"
+        single = fitz.open()
+        single.insert_pdf(src, from_page=page_index, to_page=page_index)
+        single.save(str(page_pdf))
+        single.close()
+        src.close()
 
-    doc = fitz.open(str(page_pdf))
-    start = time.time()
-    regions = structurer.extract_page_regions(doc[0])
-    elapsed = time.time() - start
-    doc.close()
+        doc = fitz.open(str(page_pdf))
+        start = time.time()
+        regions = structurer.extract_page_regions(doc[0])
+        elapsed = time.time() - start
+        doc.close()
 
-    formulas = [r for r in regions if r.type == "formula"]
-    total_regions += len(regions)
-    total_formulas += len(formulas)
-    print(f"pagina {page_index + 1}: {len(regions)} regioes em {elapsed:.1f}s, "
-          f"{len(formulas)} formula(s) detectada(s)")
-    for i, r in enumerate(formulas, 1):
-        print(f"  --- formula {i} (enriched={r.metadata.get('formula_enriched')}) ---")
-        print(f"  {r.text or '(sem texto)'}")
+        formulas = [r for r in regions if r.type == "formula"]
+        total_regions += len(regions)
+        total_formulas += len(formulas)
+        print(f"pagina {page_index + 1}: {len(regions)} regioes em {elapsed:.1f}s, "
+              f"{len(formulas)} formula(s) detectada(s)")
+        for i, r in enumerate(formulas, 1):
+            print(f"  --- formula {i} (provider=docling) ---")
+            print(f"  {r.text or '(sem texto)'}")
 
-print(f"\n### Resumo: {total_formulas} formula(s) em {total_regions} regioes, "
-      f"{len(PAPERS)} papers reais testados")
+    print(f"\n### Resumo: {total_formulas} formula(s) em {total_regions} regioes, "
+          f"{len(PAPERS)} papers reais testados")
+
+
+if __name__ == "__main__":
+    main()

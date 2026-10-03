@@ -1,8 +1,4 @@
-"""Testes para o ToolboxStructurer (pipeline legacy).
-
-Valida que a extração remota via Toolbox produz Regions compatíveis
-com o pipeline legacy e que o fallback PyMuPDF funciona em falha.
-"""
+"""Toolbox structurer tests, including the standalone PyMuPDF fallback."""
 from __future__ import annotations
 
 from pathlib import Path

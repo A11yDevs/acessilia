@@ -1,11 +1,10 @@
-"""Benchmark de extração de fórmulas: Docling/CodeFormula vs LLM de visão.
+"""Compare formula regions from Docling via Toolbox with optional LLM recognition.
 
-Baixa imagens de fórmulas renderizadas (CodeCogs), gera variantes degradadas
-(simulando scans ruins), embute cada uma em um PDF de página única e roda o
-DoclingStructurer com formula enrichment. Com --llm, compara com o DataAgent.
+Render clean and degraded formula images, embed them in single-page PDFs,
+and inspect the regions returned by the existing Toolbox adapter.
+Use --llm to also compare the DataAgent's LaTeX output.
 
-Uso:
-    python scripts/benchmark_formula_extraction.py [--llm] [--keep]
+Usage: python scripts/benchmark_formula_extraction.py [--llm] [--keep]
 """
 
 from __future__ import annotations
@@ -26,7 +25,8 @@ import cv2
 import fitz
 import numpy as np
 
-from backend.tools.structurer import DoclingStructurer
+from backend.tools.toolbox_client import ToolboxClient
+from backend.tools.toolbox_structurer import ToolboxStructurer
 
 CODECOGS_URL = "https://latex.codecogs.com/png.image"
 
@@ -105,7 +105,7 @@ def build_pdf(image_path: Path, dest: Path) -> None:
     doc.close()
 
 
-def run_docling(case: Case, structurer: DoclingStructurer) -> None:
+def run_docling(case: Case, structurer: ToolboxStructurer) -> None:
     doc = fitz.open(str(case.pdf_path))
     try:
         start = time.time()
@@ -161,7 +161,7 @@ def main() -> None:
         cases.append(Case(name, "degradada", latex, degraded))
 
     print(f"{len(cases)} casos preparados. Gerando PDFs e rodando Docling...")
-    structurer = DoclingStructurer()
+    structurer = ToolboxStructurer(client=ToolboxClient(provider="docling"))
     for case in cases:
         case.pdf_path = workdir / f"{case.name}_{case.variant}.pdf"
         build_pdf(case.image_path, case.pdf_path)

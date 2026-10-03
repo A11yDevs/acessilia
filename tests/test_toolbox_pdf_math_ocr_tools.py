@@ -170,6 +170,24 @@ class TestMathTools:
         result = toolbox_verbalize_latex("E = mc^2")
         assert result == ""
 
+    @pytest.mark.parametrize("fail", [False, True])
+    def test_recognize_removes_temporary_image(self, fail, monkeypatch):
+        from backend.tools import toolbox_math_tools
+
+        paths = []
+
+        async def recognize(path):
+            paths.append(path)
+            assert path.read_bytes() == b"test image"
+            if fail:
+                raise RuntimeError("recognition failed")
+            return [{"latex": "x"}]
+
+        monkeypatch.setattr(toolbox_math_tools, "_recognize_formula_async", recognize)
+        result = toolbox_recognize_formula(b"test image")
+        assert result == ([] if fail else [{"latex": "x"}])
+        assert not paths[0].parent.exists()
+
     def test_recognize_fallback(self):
         """Invalid image → empty list (Toolbox offline)."""
         result = toolbox_recognize_formula(b"not-a-real-image")

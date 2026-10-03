@@ -6,7 +6,6 @@ from typing import Any
 
 import fitz
 
-from backend.config.settings import settings
 from backend.tools.region_extractor import Region, extract_regions
 from backend.tools.structurer import BaseStructurer
 from backend.tools.toolbox_client import ToolboxClient
@@ -18,7 +17,7 @@ class ToolboxStructurer(BaseStructurer):
 
     Implementa BaseStructurer.extract_page_regions(page) usando a resposta
     de document.structure.extract da Toolbox. Mantém cache em memória por
-    documento (análogo a DoclingStructurer._doc_cache).
+    documento.
     """
 
     def __init__(
