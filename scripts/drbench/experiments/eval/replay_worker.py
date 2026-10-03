@@ -53,18 +53,21 @@ def main() -> None:
 
     root = args.run.resolve()
     manifest = json.loads((root / "manifest.json").read_text())
+    native_order = manifest["variants"][args.variant].get("docling_native_order", False)
     out = root / args.variant
     out.mkdir(exist_ok=True)
     versions = manifest["inference"].get("versions", {})
     for page in json.loads((root / "pages.json").read_text()):
         for name, cls in (("docling", DoclingServeDocument), ("mineru", MineruDocument)):
             raw = root / "raw" / name / f"{page['id']}.json"
-            document = cls(json.loads(raw.read_text()))
+            options = {"native_order": True} if name == "docling" and native_order else {}
+            document = cls(json.loads(raw.read_text()), **options)
             now = datetime.now(timezone.utc)
             extraction = ExtractionResult(
                 document=document, backend=name, started_at=now, completed_at=now,
                 duration_ms=0, version=versions.get(name, "unknown"),
-                configuration={"extractor": "docling-serve" if name == "docling" else "mineru-api"},
+                configuration={"extractor": "docling-serve" if name == "docling" else "mineru-api",
+                               **({"native_reading_order": native_order} if name == "docling" else {})},
             )
             result = {"document": build_processing_manifest(
                 root / "data/hf" / page["image"], extraction, language=page.get("language", "en")

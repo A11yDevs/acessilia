@@ -230,3 +230,21 @@ def test_source_mutation_between_freeze_and_run_fails_before_any_command(spec, t
     manifest = json.loads((root / "manifest.json").read_text())
     assert manifest["status"] == "failed"
     assert manifest["commands"] == []
+
+
+def test_normalization_mode_is_frozen_and_does_not_default_to_native(spec, tmp_path):
+    data = json.loads(spec.read_text())
+    data["variants"]["candidate"] = {**data["variants"]["candidate"], "docling_native_order": True}
+    spec.write_text(json.dumps(data))
+    frozen = freeze(spec, tmp_path / "native-run")
+    assert frozen["variants"]["baseline"]["docling_native_order"] is False
+    assert frozen["variants"]["candidate"]["docling_native_order"] is True
+
+
+def test_non_boolean_normalization_mode_fails_before_creating_run(spec, tmp_path):
+    data = json.loads(spec.read_text())
+    data["variants"]["candidate"]["docling_native_order"] = "false"
+    spec.write_text(json.dumps(data))
+    with pytest.raises(ValueError, match="must be a boolean"):
+        freeze(spec, tmp_path / "invalid-mode")
+    assert not (tmp_path / "invalid-mode").exists()
