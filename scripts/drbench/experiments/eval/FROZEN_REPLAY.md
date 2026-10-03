@@ -117,6 +117,15 @@ adapters. The manifest records the boolean and extraction configuration records
 the actual adapter options. The current adapter defaults to collection order;
 native traversal is experimental and disabled by default.
 
+**Historical B1–B5 notes:** These product experiments were withdrawn on
+2026-10-03 at the user's request after neutral fusion scores. The following
+ordering, provenance and charspan descriptions record removed product features.
+Replay flags remain solely to reproduce historical revisions that support the
+corresponding constructor options. Current Toolbox defaults and fusion inputs
+have returned to their pre-B contracts; leave native flags absent or false
+when replaying the current product. Existing raw provider provenance remains
+part of the original manifest contract. No experiment report was deleted.
+
 Evaluate provider Markdown separately from fusion Markdown when assessing an
 adapter change. Neutral fusion scores can conceal a provider conversion loss.
 

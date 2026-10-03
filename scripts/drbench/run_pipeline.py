@@ -16,7 +16,6 @@ from __future__ import annotations
 import argparse
 import sys
 import time
-from copy import deepcopy
 from pathlib import Path
 
 from scripts.drbench.markdown_converter import canonical_to_drbench_md
@@ -324,12 +323,6 @@ def provider_blocks(result: dict) -> list[dict]:
             "coord_origin": bbox.get("coord_origin") if bbox else None,
             "page": page_no,
             "page_size": [w, h],
-            "provenance": deepcopy(e.get("provenance") or []),
-            **({"text_source": deepcopy(e["metadata"]["text_source"])}
-               if isinstance((e.get("metadata") or {}).get("text_source"), dict) else {}),
-            **({"reading_order_context": dict(e["metadata"]["reading_order_context"])}
-               if isinstance((e.get("metadata") or {}).get("reading_order_context"), dict)
-               else {}),
         })
     return blocks
 

@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import asyncio
 from collections import Counter
-from copy import deepcopy
 from typing import Any
 
 from backend.tools.logger import logger
@@ -36,9 +35,6 @@ def _element_to_canonical_block(el: dict, page_index: int) -> dict:
             "reading_order": el.get("reading_order") or 0,
             "page_size": el.get("page_size"),
             "coord_origin": el.get("coord_origin") or "",
-            "provenance": deepcopy(el.get("provenance") or []),
-            **({"text_source": deepcopy(el["metadata"]["text_source"])}
-               if isinstance((el.get("metadata") or {}).get("text_source"), dict) else {}),
         },
     }
     if bbox and all(isinstance(v, (int, float)) for v in bbox):

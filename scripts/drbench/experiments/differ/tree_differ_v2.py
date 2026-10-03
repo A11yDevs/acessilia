@@ -225,12 +225,6 @@ def load_blocks(path: Path, drop: frozenset[str] = frozenset(), pictures: list |
                "formula" if t == "formula" or FORMULA_RE.search(md) else \
                "heading" if t in ("heading", "title", "section_header") else "text"
         out.append({"md": md, "kind": kind, "box": nb, "text": norm(b.get("text") or md), "type": t})
-        context = b.get("reading_order_context")
-        if isinstance(context, dict):
-            out[-1]["reading_order_context"] = dict(context)
-        out[-1]["provenance"] = b.get("provenance") or []
-        if isinstance(b.get("text_source"), dict):
-            out[-1]["text_source"] = b["text_source"]
     return out
 
 
