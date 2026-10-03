@@ -243,15 +243,18 @@ def merge_blocks(
 
     # esqueleto: ordem do provider B (MinerU), pares resolvidos
     seq: list[tuple[float, float, str]] = []
+    emitted_body: list[DiffBlock] = []
     for j, m in enumerate(M):
         md = _pick(D[m2d[j]], m, M, policy, stats) if j in m2d else m.md
         if j not in m2d:
             stats["unilateral-mineru"] += 1
         seq.append((float(j), 0.0, md))
+        chosen = D[m2d[j]] if j in m2d and md == D[m2d[j]].md else m
+        if chosen.kind == "text":
+            emitted_body.append(chosen)
 
     # insere blocos Docling unilaterais junto ao bloco MinerU mais próximo
     centers = [center(m.box) for m in M]
-    m_body_texts = [m.text for m in M if m.kind == "text" and m.text]
     for i, d in enumerate(D):
         if i in match_d2m:
             continue
@@ -281,7 +284,12 @@ def merge_blocks(
         ):
             stats["dropped-docling-swallowing"] += 1
             continue
-        if unilateral_dedup and policy.pick_guard and d.kind == "text" and is_duplicate(d.text, m_body_texts):
+        # Drop only content represented by an emitted block in the same area.
+        # Missing coordinates or a discarded provider alternative are not evidence.
+        if unilateral_dedup and policy.pick_guard and d.kind == "text" and any(
+            contain_frac(d.box, other.box) >= 0.6 and is_duplicate(d.md, [other.md])
+            for other in emitted_body
+        ):
             stats["dropped-docling-duplicate"] += 1
             continue
         cx, cy = center(d.box)

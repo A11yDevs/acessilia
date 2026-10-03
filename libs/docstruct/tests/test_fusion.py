@@ -233,15 +233,52 @@ class TestMergeBlocks:
         assert "# Carrots" in out
 
 
-def test_disabling_unilateral_dedup_preserves_a_second_text_occurrence():
-    text = "Repeated safety notice for this section"
-    matched = mk(text, box=(0.0, 0.1, 0.4, 0.2))
-    elsewhere = mk(text, box=(0.6, 0.7, 1.0, 0.8))
+
+def test_disabling_unilateral_dedup_preserves_a_represented_fragment():
+    fragment = "saved my life and brought me back to camp"
+    text = "This earlier event " + fragment + " before the next day."
+    matched = mk(text, box=(0.0, 0.1, 0.9, 0.3))
+    contained = mk(fragment, box=(0.1, 0.15, 0.8, 0.2))
     policy = FusionPolicy(pick_guard=1.5, merge_paragraphs=False, decor_tail=False,
                           junk_filter=False, suppress_regions=False)
-    original, original_stats = merge_blocks([matched, elsewhere], [matched], policy)
-    ablation, ablation_stats = merge_blocks([matched, elsewhere], [matched], policy, unilateral_dedup=False)
+    original, original_stats = merge_blocks([matched, contained], [matched], policy)
+    ablation, ablation_stats = merge_blocks([matched, contained], [matched], policy, unilateral_dedup=False)
     assert original == [text]
     assert original_stats["dropped-docling-duplicate"] == 1
-    assert ablation == [text, text]
+    assert fragment in ablation
     assert ablation_stats["dropped-docling-duplicate"] == 0
+
+
+def test_repeated_text_in_distinct_regions_is_preserved():
+    text = "Repeated safety notice for this section"
+    first = mk(text, box=(0.0, 0.1, 0.4, 0.2))
+    second = mk(text, box=(0.6, 0.7, 1.0, 0.8))
+    policy = FusionPolicy(pick_guard=1.5, merge_paragraphs=False, decor_tail=False,
+                          junk_filter=False, suppress_regions=False)
+    out, stats = merge_blocks([first, second], [first], policy)
+    assert out == [text, text]
+    assert stats["dropped-docling-duplicate"] == 0
+
+
+def test_missing_coordinates_cannot_prove_a_repeated_occurrence_is_redundant():
+    text = "Repeated form instruction for this section"
+    block = mk(text)
+    policy = FusionPolicy(pick_guard=1.5, merge_paragraphs=False, decor_tail=False,
+                          junk_filter=False, suppress_regions=False)
+    out, stats = merge_blocks([block, block.copy()], [block], policy)
+    assert out == [text, text]
+    assert stats["dropped-docling-duplicate"] == 0
+
+
+def test_content_in_discarded_mineru_alternative_is_not_deduplicated():
+    parent = "The selected parent paragraph contains its own complete description of this section."
+    child = "Additional independent detail that must survive."
+    box = (0.0, 0.1, 0.9, 0.3)
+    docling = [mk(parent, box=box), mk(child, box=(0.1, 0.15, 0.8, 0.2))]
+    mineru = [mk(parent + " " + child, box=box)]
+    policy = FusionPolicy(pick_guard=1.5, text_pick="docling", merge_paragraphs=False,
+                          decor_tail=False, junk_filter=False, suppress_regions=False)
+    out, stats = merge_blocks(docling, mineru, policy)
+    assert parent in out
+    assert child in out
+    assert stats["dropped-docling-duplicate"] == 0
