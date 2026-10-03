@@ -30,6 +30,7 @@ from docstruct.fusion.noise import (
 )
 from docstruct.fusion.similarity import center, contain_frac, iou, sim, swallows
 from docstruct.fusion.types import DiffBlock
+from docstruct.fusion.xycut import reorder as xycut_reorder
 from docstruct.policy import FusionPolicy
 
 
@@ -227,12 +228,13 @@ def merge_blocks(
     m2d = {j: i for i, j in match_d2m.items()}
 
     # esqueleto: ordem do provider B (MinerU), pares resolvidos
-    seq: list[tuple[float, float, str]] = []
+    seq: list[tuple[float, float, str, object]] = []  # (order key, sub key, md, box)
     for j, m in enumerate(M):
         md = _pick(D[m2d[j]], m, M, policy, stats) if j in m2d else m.md
         if j not in m2d:
             stats["unilateral-mineru"] += 1
-        seq.append((float(j), 0.0, md))
+        box = m.box if m.box is not None else (D[m2d[j]].box if j in m2d else None)
+        seq.append((float(j), 0.0, md, box))
 
     # insere blocos Docling unilaterais junto ao bloco MinerU mais próximo
     centers = [center(m.box) for m in M]
@@ -261,7 +263,16 @@ def merge_blocks(
             key=lambda k: (cx - centers[k][0]) ** 2 + (cy - centers[k][1]) ** 2,
         )
         above = cy < centers[j][1]
-        seq.append((float(j) - 0.5 if above else float(j) + 0.5, cy, d.md))
+        seq.append((float(j) - 0.5 if above else float(j) + 0.5, cy, d.md, d.box))
         stats["unilateral-docling"] += 1
     seq.sort(key=lambda t: (t[0], t[1]))
-    return [md for _, _, md in seq] + tail, stats
+    if policy.order_xycut != "off":
+        body = xycut_reorder(
+            [(box, md) for _, _, md, box in seq],
+            mode=policy.order_xycut,
+            min_columns=policy.xycut_min_columns,
+            min_balance=policy.xycut_min_balance,
+            stats=stats,
+        )
+        return body + tail, stats
+    return [md for _, _, md, _ in seq] + tail, stats

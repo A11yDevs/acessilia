@@ -118,6 +118,29 @@ Para um par pareado, o texto é escolhido conforme `policy.text_pick`:
   texto ou tenha pior qualidade de OCR; Docling vence quando é
   significativamente mais longo ou quando MinerU engoliu colunas.
 
+#### Etapa F — Reordenação XY-cut opcional (`policy.order_xycut`)
+
+Por padrão o esqueleto de MinerU é mantido. Com `order_xycut="multicol"` a
+página fundida é reordenada por um **XY-cut** recursivo
+(`docstruct.fusion.xycut`): a página é dividida nas calhas verticais (colunas
+lidas da esquerda para a direita), blocos de largura total (títulos, tabelas
+largas) funcionam como quebras de seção e cada região é lida de cima para baixo.
+O portão só age em páginas cujas caixas formam pelo menos `xycut_min_columns`
+(padrão 2) colunas no nível superior; Com `xycut_min_balance > 0` (ex.: 0,7) exige também que a coluna mais estreita tenha pelo menos essa fração da mais larga, de modo que uma coluna principal ao lado de uma barra lateral estreita não é tocada. páginas de coluna única mantêm a ordem do
+esqueleto, porque nelas a ordem do GT frequentemente foge de uma leitura
+puramente de cima para baixo (figuras, legendas, boxes laterais).
+`order_xycut="always"` reordena todas as páginas e existe só para comparação.
+
+A etapa muda apenas a sequência dos blocos que sobreviveram às etapas
+anteriores: nada é acrescentado, removido ou reescrito. Blocos sem caixa
+utilizável acompanham o bloco com caixa que os precede. Cabeçalho, rodapé e
+número de página continuam na cauda de decorativos. Contadores:
+`xycut-applied`, `xycut-moved`, `xycut-columns:<n>`, `xycut-skipped:<motivo>`.
+Padrão: `off` (inclusive nos presets `drbench_v12`/`drbench_v13`).
+
+Veja [Ordem de leitura por XY-cut em páginas multicoluna](reading_order_xycut.pt-br.md) para a
+motivação, o experimento e as limitações.
+
 ### 1.4 `FusionPolicy`
 
 `FusionPolicy` é um dataclass congelado com **defaults conservadores e
