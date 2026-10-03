@@ -139,3 +139,24 @@ options are recorded in extraction configuration. Default and false settings
 pass no constructor override, preserving the selected historical source's
 defaults. A storage shuffle is a metamorphic test; restoring the original
 Markdown does not count as a gain on naturally occurring benchmark pages.
+
+All source `provenance` records now survive provider elements, persisted blocks,
+CLI/library conversion and backend canonical conversion. `DiffBlock.provenance`
+contains the contributing records; paragraph and line joins concatenate them,
+including repeated records. Copies preserve source payloads. Existing picture
+and empty-Markdown filters still apply. Legacy inputs without provenance have
+an empty collection; no coordinates or character spans are inferred.
+
+These records retain source page numbers, coordinate units/origins and original
+character offsets. They do not describe spans in transformed Markdown. Keeping
+them is a transport change: the replay still uses its previous first-provenance
+active box and page assignment, without unions or additional blocks. Validate
+unchanged Markdown, active geometry and all retained records before consuming
+this evidence in matching or segmentation.
+
+The backend has a separate geometry limitation: its canonical conversion reads
+flat `bbox`/`page_size`/`coord_origin` fields, while current provider manifests
+store geometry in provenance and document pages. Its grouping also reads the
+legacy `page` field. Carrying provenance does not fix this mapping. A separate
+backend contract and behavioral experiment must cover active boxes and page
+assignment before relying on geometry for production matching.
