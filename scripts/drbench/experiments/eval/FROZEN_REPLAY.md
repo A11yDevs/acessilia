@@ -160,3 +160,24 @@ store geometry in provenance and document pages. Its grouping also reads the
 legacy `page` field. Carrying provenance does not fix this mapping. A separate
 backend contract and behavioral experiment must cover active boxes and page
 assignment before relying on geometry for production matching.
+
+Charspan transport requires the provider's uncleaned text: Toolbox stores it
+with the selected field and raw spans in element `metadata.text_source` when
+spans exist. Docling adapter/cache identity includes this contract. Raw invalid
+values remain in metadata; values incompatible with the normalized nonnegative
+integer provenance fields become unknown there, without coercion or clamping.
+
+Blocks and backend canonical metadata retain `text_source`. Conversion maps
+strict, in-bounds Unicode code-point offsets (exclusive end) into the current
+source-block Markdown only when known CR/CRLF/control cleanup and whitespace
+trimming yield an exact, unique contained string. Heading/formula wrappers may
+shift offsets. Missing, malformed, out-of-range, empty, removed, ambiguous or
+unsupported mappings carry a status and no Markdown span. Fields other than
+provider `text` have unknown offset scope; no claim is made about `orig` spans.
+
+`DiffBlock.text_sources` stores mappings together with their Markdown snapshot
+and explicit `source_block` scope. Joins concatenate snapshots; decor splits
+and formula demotion retain source evidence. Their offsets are not positions in
+the later joined, split or demoted Markdown. Any consumer of current-output
+offsets must verify the snapshot against the current text or explicitly rebase
+and validate it. This stage changes no output, matching, split or merge rules.
