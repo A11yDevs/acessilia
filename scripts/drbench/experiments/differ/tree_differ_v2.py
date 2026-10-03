@@ -229,6 +229,8 @@ def load_blocks(path: Path, drop: frozenset[str] = frozenset(), pictures: list |
         if isinstance(context, dict):
             out[-1]["reading_order_context"] = dict(context)
         out[-1]["provenance"] = b.get("provenance") or []
+        if isinstance(b.get("text_source"), dict):
+            out[-1]["text_source"] = b["text_source"]
     return out
 
 

@@ -25,6 +25,8 @@ class DiffBlock:
     order_sources: tuple[dict[str, Any], ...] = ()
     # Source coordinates/units stay separate from the active normalized box.
     provenance: tuple[dict[str, Any], ...] = ()
+    # Offsets refer to the stored source-block Markdown, not a later merged md.
+    text_sources: tuple[dict[str, Any], ...] = ()
 
     def as_dict(self) -> dict[str, Any]:
         return {f.name: getattr(self, f.name) for f in fields(self)}

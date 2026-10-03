@@ -6,6 +6,7 @@ from copy import deepcopy
 from typing import Optional
 
 from docstruct.fusion.similarity import PAGENUM_RE
+from docstruct.fusion.spans import map_charspans
 from docstruct.fusion.types import DiffBlock
 from docstruct.types import BBox, CanonicalBlock
 
@@ -72,8 +73,10 @@ def block_to_diff(b: CanonicalBlock) -> DiffBlock:
         pass  # kind já decidido
     context = b.metadata.get("reading_order_context")
     provenance = b.metadata.get("provenance")
+    source = b.metadata.get("text_source")
     return DiffBlock(
         md=md, kind=kind, box=box, text=text, type=(b.type or "unknown").lower(),
         order_sources=(dict(context),) if isinstance(context, dict) else (),
         provenance=tuple(deepcopy(provenance)) if isinstance(provenance, (list, tuple)) else (),
+        text_sources=(map_charspans(source, md),) if isinstance(source, dict) else (),
     )

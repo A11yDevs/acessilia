@@ -325,6 +325,8 @@ def provider_blocks(result: dict) -> list[dict]:
             "page": page_no,
             "page_size": [w, h],
             "provenance": deepcopy(e.get("provenance") or []),
+            **({"text_source": deepcopy(e["metadata"]["text_source"])}
+               if isinstance((e.get("metadata") or {}).get("text_source"), dict) else {}),
             **({"reading_order_context": dict(e["metadata"]["reading_order_context"])}
                if isinstance((e.get("metadata") or {}).get("reading_order_context"), dict)
                else {}),

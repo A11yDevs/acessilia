@@ -25,6 +25,7 @@ from collections import Counter
 from pathlib import Path
 
 from docstruct.fusion import merge_blocks
+from docstruct.fusion.spans import map_charspans
 from docstruct.fusion.types import DiffBlock
 from docstruct.policy import FusionPolicy
 
@@ -151,6 +152,8 @@ def _row_to_diff(b: dict) -> DiffBlock:
             b.get("reading_order_context"), dict
         ) else (),
         provenance=tuple(b.get("provenance") or []),
+        text_sources=(map_charspans(b["text_source"], b["md"]),)
+        if isinstance(b.get("text_source"), dict) else (),
     )
 
 
