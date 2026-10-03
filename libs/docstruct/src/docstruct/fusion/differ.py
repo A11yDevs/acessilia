@@ -28,7 +28,7 @@ from docstruct.fusion.noise import (
     split_decor,
     suppress_in_regions,
 )
-from docstruct.fusion.similarity import center, contain_frac, iou, sim, swallows
+from docstruct.fusion.similarity import center, contain_frac, iou, is_duplicate, sim, swallows
 from docstruct.fusion.types import DiffBlock
 from docstruct.policy import FusionPolicy
 
@@ -236,6 +236,7 @@ def merge_blocks(
 
     # insere blocos Docling unilaterais junto ao bloco MinerU mais próximo
     centers = [center(m.box) for m in M]
+    m_body_texts = [m.text for m in M if m.kind == "text" and m.text]
     for i, d in enumerate(D):
         if i in match_d2m:
             continue
@@ -254,6 +255,9 @@ def merge_blocks(
             ))
         ):
             stats["dropped-docling-swallowing"] += 1
+            continue
+        if policy.pick_guard and d.kind == "text" and is_duplicate(d.text, m_body_texts):
+            stats["dropped-docling-duplicate"] += 1
             continue
         cx, cy = center(d.box)
         j = min(

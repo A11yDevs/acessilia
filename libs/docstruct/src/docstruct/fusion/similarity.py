@@ -76,6 +76,26 @@ def swallows(d_text: str, other_texts: list[str], n: int = 25) -> bool:
     return False
 
 
+def is_duplicate(text: str, other_texts: list[str], min_len: int = 20) -> bool:
+    """True se o texto (normalizado) já está contido ou é quase-duplicata de algum outro bloco."""
+    nt = re.sub(r"[\W_]+", "", text.casefold())
+    if len(nt) < min_len:
+        return False
+    for other in other_texts:
+        no = re.sub(r"[\W_]+", "", other.casefold())
+        if len(no) < min_len:
+            continue
+        if nt in no:
+            return True
+        if len(nt) >= 30:
+            step = 25
+            probes = [nt[k:k + step] for k in range(0, len(nt) - step + 1, step)]
+            if probes and sum(p in no for p in probes) / len(probes) >= 0.8:
+                return True
+    return False
+
+
+
 # Página/número: token curto numérico/romano, com colchetes/traves/dots opcionais.
 PAGENUM_RE = re.compile(
     r"^[\W_]*(?:page\s*)?(\d{1,4}|[ivxlcdm]{1,7})[\W_]*$", re.IGNORECASE
