@@ -182,3 +182,31 @@ pages and 61.8 on `other_layout`, which is why the gates exist.
 - `libs/docstruct/src/docstruct/policy.py` — `order_xycut`, `xycut_min_columns`, `xycut_min_balance`
 - `libs/docstruct/src/docstruct/fusion/differ.py` — hook at the end of `merge_blocks`
 - `libs/docstruct/tests/test_xycut.py` — 29 tests
+
+## Additional held-out books (2026-10-03)
+
+The same corrected implementation and frozen `multicol` / balance `0.7`
+configuration were evaluated on 60 additional DrDocBench pages from 16 books
+absent from dev-120. Selection seed: `3102026`; dataset
+`2077AIDataFoundation/DrDocBench` at revision `7a2bc3882dff68e883fb55d10d4df22865ce2b07`.
+The accompanying [per-page CSV](drbench/experiments/xycut-new60-local_per_page.csv)
+identifies every selected page, including one page without evaluable content.
+
+Official md2md evaluation, window 1, no CDM: 59 paired pages. Unlike the
+earlier local run, the baseline here preserves recovered HTML tables; this
+particular held-out sample has no table/formula GT. Do not pool absolute scores
+with dev-120 or treat this as full dev-986 confirmation.
+
+| Metric | Baseline | XY-cut | Paired delta |
+|---|---:|---:|---:|
+| Overall, without CDM | 73.1276 | 73.3544 | +0.2269 |
+| Reading order | 72.9665 | 73.4202 | +0.4537 |
+
+Text scores are unchanged. Overall: 4 improvements,
+1 regression, 54 ties (tolerance 0.05 points).
+The paired Overall 95% interval from resampling whole books is
+[0.0000, 0.6249].
+The smaller gain and observed regression support keeping the option disabled
+by default. A further 120-page DrDocBench holdout and a separate 120-page
+OmniDocBench diagnostic are in progress; no result from those unfinished runs
+is claimed here.

@@ -183,3 +183,25 @@ gabarito com RO 87,1 nas páginas multicoluna, 84,6 em coluna única e 61,8 em
 - `libs/docstruct/src/docstruct/policy.py` — `order_xycut`, `xycut_min_columns`, `xycut_min_balance`
 - `libs/docstruct/src/docstruct/fusion/differ.py` — gancho no fim do `merge_blocks`
 - `libs/docstruct/tests/test_xycut.py` — 29 testes
+
+## Livros adicionais de validação (03/10/2026)
+
+A implementação corrigida, com `multicol` e balance `0.7` congelados, foi
+avaliada em outras 60 páginas do DrDocBench, de 16 livros ausentes do dev-120.
+Semente `3102026`; revisão do dataset `7a2bc3882dff68e883fb55d10d4df22865ce2b07`.
+O [CSV por página](drbench/experiments/xycut-new60-local_per_page.csv) identifica
+toda a amostra, incluindo uma página sem conteúdo avaliável.
+
+São 59 comparações pareadas, avaliador oficial md2md, janela 1, sem CDM.
+Este baseline preserva HTML recuperado de tabelas; o lote, porém, não tem GT de
+tabelas/fórmulas. Os resultados absolutos não devem ser agrupados com o dev-120.
+
+Overall: 73.1276 → 73.3544 (+0.2269);
+RO: 72.9665 → 73.4202 (+0.4537). Texto inalterado.
+Há 4 melhorias, 1 piora e 54 empates
+(tolerância 0,05 ponto). IC 95% de Overall por reamostragem de livros:
+[0.0000, 0.6249].
+
+O ganho menor e a regressão observada justificam manter a opção desligada por
+padrão. Outros 120 exemplos do DrDocBench e 120 do OmniDocBench estão em
+processamento; seus resultados não são apresentados como concluídos.
