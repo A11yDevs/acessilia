@@ -55,6 +55,11 @@ class TestXYCutOrder:
         assert count_columns([L1, L2]) == 1
         assert count_columns([]) == 1
 
+    def test_full_width_title_does_not_hide_the_columns(self):
+        # a title spanning both columns bridges the gutter; the gate must still see two columns
+        assert count_columns([TITLE, L1, L2, R1, R2]) == 2
+        assert count_columns([TITLE, L1, L2, R1, R2, FOOTNOTE]) == 2
+
 
 class TestReorder:
     def test_multicol_reorders_interleaved_columns(self):
@@ -83,6 +88,16 @@ class TestReorder:
         out = reorder(items, mode="always")
         assert sorted(out) == sorted(p for _, p in items)
 
+    def test_multicol_acts_on_columns_under_a_full_width_title(self):
+        stats = Counter()
+        items = [(TITLE, "t"), (L1, "a"), (R1, "c"), (L2, "b"), (R2, "d")]
+        assert reorder(items, min_balance=0.7, stats=stats) == ["t", "a", "b", "c", "d"]
+        assert stats["xycut-applied"] == 1
+
+    def test_inverted_boxes_are_still_ordered(self):
+        inv = lambda b: (b[2], b[3], b[0], b[1])
+        assert reorder([(inv(L1), "a"), (inv(R1), "c"), (inv(L2), "b"), (inv(R2), "d")]) == ["a", "b", "c", "d"]
+
     def test_few_boxes_is_a_no_op(self):
         stats = Counter()
         assert reorder([(None, "a"), (L1, "b")], stats=stats) == ["a", "b"]
@@ -94,15 +109,27 @@ class TestReorder:
 
 
 class TestColumnBalance:
-    # main text column (x 0.05-0.70) next to a narrow sidebar (x 0.76-0.95)
-    MAIN1, MAIN2 = (0.05, 0.10, 0.70, 0.40), (0.05, 0.42, 0.70, 0.80)
-    SIDE1, SIDE2 = (0.76, 0.10, 0.95, 0.30), (0.76, 0.32, 0.95, 0.50)
+    # main text column (x 0.05-0.45) next to a sidebar half as wide (x 0.55-0.75)
+    MAIN1, MAIN2 = (0.05, 0.10, 0.45, 0.40), (0.05, 0.42, 0.45, 0.80)
+    SIDE1, SIDE2 = (0.55, 0.10, 0.75, 0.30), (0.55, 0.32, 0.75, 0.50)
+    # dominant main column (>= 60% of the text span) next to a narrow margin column
+    WIDE1, WIDE2 = (0.05, 0.10, 0.70, 0.40), (0.05, 0.42, 0.70, 0.80)
+    NOTE1, NOTE2 = (0.76, 0.10, 0.95, 0.30), (0.76, 0.32, 0.95, 0.50)
 
     def test_equal_columns_are_balanced(self):
         assert column_balance([L1, L2, R1, R2]) == pytest.approx(1.0)
 
     def test_sidebar_is_unbalanced(self):
-        assert column_balance([self.MAIN1, self.MAIN2, self.SIDE1, self.SIDE2]) < 0.35
+        assert column_balance([self.MAIN1, self.MAIN2, self.SIDE1, self.SIDE2]) == pytest.approx(0.5)
+
+    def test_dominant_main_column_counts_as_single_column(self):
+        # the main column is a full-width block for the gates: the page is not treated as multi-column
+        boxes = [self.WIDE1, self.WIDE2, self.NOTE1, self.NOTE2]
+        assert count_columns(boxes) == 1
+        stats = Counter()
+        items = [(self.NOTE1, "n1"), (self.WIDE1, "w1"), (self.NOTE2, "n2"), (self.WIDE2, "w2")]
+        assert reorder(items, stats=stats) == ["n1", "w1", "n2", "w2"]
+        assert stats["xycut-skipped:single-column"] == 1
 
     def test_single_column_has_zero_balance(self):
         assert column_balance([L1, L2]) == 0.0

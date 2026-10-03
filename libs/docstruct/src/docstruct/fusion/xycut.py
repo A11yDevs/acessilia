@@ -115,24 +115,35 @@ def xycut_order(boxes: Sequence[Sequence[float]], gutter: float = GUTTER) -> lis
     return _order(list(range(len(norm))), norm, gutter)
 
 
+def _gate_groups(boxes: Sequence[Sequence[float]], gutter: float) -> tuple[list[Box], list[list[int]]]:
+    """Columns as seen by the gates: full-width blocks (titles, wide tables) are set aside first.
+
+    ``_order`` already treats those blocks as section breaks, but a single one bridges the
+    gutter and makes the whole page look like one column to a naive projection.
+    """
+    norm = [_normalise(b) for b in boxes]
+    span = max(b[2] for b in norm) - min(b[0] for b in norm)
+    narrow = [i for i, b in enumerate(norm) if (b[2] - b[0]) < WIDE_FRAC * span] if span > 0 else []
+    idx = narrow if len(narrow) >= 2 else list(range(len(norm)))
+    return norm, _columns(idx, norm, gutter)
+
+
 def count_columns(boxes: Sequence[Sequence[float]], gutter: float = GUTTER) -> int:
-    """Number of top-level columns (vertical gutters that cut the whole page)."""
+    """Number of top-level columns, ignoring full-width blocks."""
     if len(boxes) < 2:
         return 1
-    norm = [_normalise(b) for b in boxes]
-    return len(_columns(list(range(len(norm))), norm, gutter))
+    return len(_gate_groups(boxes, gutter)[1])
 
 
 def column_balance(boxes: Sequence[Sequence[float]], gutter: float = GUTTER) -> float:
     """Narrowest / widest top-level column width (1.0 = equal columns, 0 = no columns).
 
     A main text column next to a narrow sidebar has a low balance; true multi-column
-    body text is close to 1.
+    body text is close to 1. Full-width blocks are ignored, as in ``count_columns``.
     """
     if len(boxes) < 2:
         return 0.0
-    norm = [_normalise(b) for b in boxes]
-    groups = _columns(list(range(len(norm))), norm, gutter)
+    norm, groups = _gate_groups(boxes, gutter)
     if len(groups) < 2:
         return 0.0
     widths = [max(norm[i][2] for i in g) - min(norm[i][0] for i in g) for g in groups]
@@ -146,7 +157,7 @@ def _valid(box: Sequence[float] | None) -> bool:
         x0, y0, x1, y1 = (float(v) for v in box)
     except (TypeError, ValueError):
         return False
-    return x1 > x0 and y1 > y0
+    return x1 != x0 and y1 != y0  # inverted axes are fine (normalised later); zero area is not
 
 
 def reorder(

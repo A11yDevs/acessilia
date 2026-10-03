@@ -53,6 +53,12 @@ sidebars). So the step is guarded by two gates:
 The second gate separates real text columns from a **main column next to a
 narrow sidebar** — the case where XY-cut loses.
 
+Both gates set full-width blocks aside before looking for columns: a title or
+a wide table that spans two columns bridges the gutter and would otherwise make
+the page look like a single column. For the same reason a dominant text column
+(60% or more of the text span) next to a narrow margin column is treated as a
+single-column page.
+
 The step only changes the *sequence* of the blocks that survived the previous
 fusion stages: nothing is added, dropped or rewritten. Blocks without a usable
 box travel with the block before them. Headers, footers and page numbers stay
@@ -98,35 +104,53 @@ subset (`docs/drbench/experiments/dev120-subset.json`), official DrDocBench
 evaluator (`multipage_md2md_dataset`, 1-page windows, no CDM; ground truth
 scored against itself gives 100), Docling through the Toolbox, MinerU 2.7.6
 `pipeline` backend on CPU converted by the Toolbox adapter, fusion with
-`lib_fuse.py --policy v13`. 119 pages are scorable. Comparison is **paired per
-page** against the same fusion without XY-cut.
+`lib_fuse.py --policy v13`. 119 pages are scorable (113 have a reading-order
+score). Comparison is **paired per page** against the same fusion without
+XY-cut.
 
 | Variant (on top of fusion v13) | RO delta | 95% CI | pages up / down | sign test p | Overall delta |
 |---|---|---|---|---|---|
 | XY-cut on every page (`always`) | -0.29 | [-3.0, +2.5] | 12 / 13 | 1.00 | -0.14 |
-| `multicol` | +0.84 | [-1.1, +3.0] | 8 / 5 | 0.58 | +0.40 |
-| `multicol` + balance 0.5 | +1.17 | [-0.4, +3.0] | 7 / 2 | 0.18 | +0.56 |
-| **`multicol` + balance 0.7** | **+1.65** | **[+0.45, +3.30]** | **7 / 0** | **0.016** | **+0.79** |
+| `multicol` | +1.12 | [-1.2, +3.6] | 12 / 8 | 0.50 | +0.53 |
+| `multicol` + balance 0.5 | +1.91 | [+0.15, +3.98] | 10 / 2 | 0.039 | +0.91 |
+| **`multicol` + balance 0.7** | **+2.14** | **[+0.75, +3.97]** | **9 / 0** | **0.004** | **+1.02** |
 
 Text edit distance is unchanged in every variant (the evaluator matches blocks
-regardless of order). Policy v12 shows the same pattern.
+regardless of order). Policy v12 gives the same +2.14.
 
-By page layout, `multicol` → `multicol` + balance 0.7:
+By page layout:
 
-| Layout (pages) | RO delta without balance | RO delta with balance 0.7 |
+| Layout (pages) | RO delta, `multicol` | RO delta, `multicol` + balance 0.7 |
 |---|---|---|
-| double_column (26) | +6.0 | +4.5 (4 up, 0 down) |
-| three_column (9) | +1.0 | +1.0 |
-| 1andmore_column (22) | -0.7 | +2.8 (2 up, 0 down) |
-| other_layout (8) | -7.0 | 0.0 (not touched) |
-| single_column (48) | 0.0 | 0.0 (not touched) |
+| double_column (26) | +7.1 (6 up, 0 down) | +6.0 (5 up, 0 down) |
+| three_column (9) | +5.6 (2 up, 0 down) | +1.0 (1 up, 0 down) |
+| 1andmore_column (22) | -2.1 (3 up, 5 down) | +3.4 (3 up, 0 down) |
+| other_layout (8) | -7.0 (0 up, 2 down) | 0.0 (not touched) |
+| single_column (48) | -0.1 | 0.0 (not touched) |
 
 Per-page numbers: [`drbench/experiments/xycut-dev120-local_per_page.csv`](drbench/experiments/xycut-dev120-local_per_page.csv).
 
+### How robust is the +2.14?
+
+The result was put through an adversarial review; these are the stricter
+checks, all for `multicol` + balance 0.7:
+
+| Check | Result |
+|---|---|
+| Even half of the pages (ids sorted, even positions) | +3.06 (6 up, 0 down) |
+| Odd half | +1.13 (3 up, 0 down) |
+| 95% CI resampling whole **documents** (48 books) instead of pages | [+0.39, +4.38] |
+| Documents that improve / get worse | 5 / 0 |
+| Without the strongest document | +1.51 |
+| Without the two strongest documents | +0.90 |
+
+So the direction holds in both halves and no page or document gets worse, but
+the size depends on a handful of books: the gain comes from **5 of the 48
+documents** (cooking, gardening, social science, transportation, house & home).
+
 Ceiling check: XY-cut applied to the *ground-truth* boxes reproduces the
-ground-truth order with RO 87.1 on the pages the multi-column gate selects
-(84.6 on single-column pages and 61.8 on `other_layout`, which is why the gate
-exists).
+ground-truth order with RO 87.1 on multi-column pages, 84.6 on single-column
+pages and 61.8 on `other_layout`, which is why the gates exist.
 
 ## Limitations — read before using the numbers
 
@@ -135,13 +159,18 @@ exists).
   blocks (TEDS n=0). Absolute scores are therefore lower than the cluster runs
   (fusion RO 69.8 here vs 79.3 on dev-986) and are **not comparable**; only the
   paired difference between variants is meaningful.
-- **The 0.7 threshold was chosen on dev-120** (only 0.5 and 0.7 were tried).
-  It must be confirmed on **dev-986 with the cluster evaluator** before any
-  EvalAI submission (acceptance rule: at least +0.3 `evalai_style`, no
-  component dropping more than 0.3).
-- The gain is **small and local** (about +1.6 RO on average, concentrated in
-  ~25 multi-column pages). It does not close the reading-order gap to the
-  leaderboard leaders by itself.
+- **The 0.7 threshold was chosen on dev-120** (0.5 and 0.7 were tried). Going
+  from no balance gate to 0.7 accounts for about half of the gain, by leaving
+  out the pages that lost. It must be confirmed on **dev-986 with the cluster
+  evaluator** before any EvalAI submission (acceptance rule: at least +0.3
+  `evalai_style`, no component dropping more than 0.3).
+- The gain is **small and concentrated** (about +2 RO on average, from 9 pages
+  in 5 books). It does not close the reading-order gap to the leaderboard
+  leaders by itself.
+- The column gates are geometric. A legitimate asymmetric layout (for example
+  a 65% text column with a 35% column of continuous notes) is left untouched
+  by design; the gutter constant (4 pt on an A4 page) comes from the gazette
+  study and was not re-tuned for books.
 - It is independent from the `order_relations` option (conservative placement
   of Docling-only blocks): that one fixes insertions, this one fixes the
   skeleton order on multi-column pages. Applying `order_relations` first and
@@ -152,4 +181,4 @@ exists).
 - `libs/docstruct/src/docstruct/fusion/xycut.py` — `xycut_order`, `count_columns`, `column_balance`, `reorder`
 - `libs/docstruct/src/docstruct/policy.py` — `order_xycut`, `xycut_min_columns`, `xycut_min_balance`
 - `libs/docstruct/src/docstruct/fusion/differ.py` — hook at the end of `merge_blocks`
-- `libs/docstruct/tests/test_xycut.py` — 25 tests
+- `libs/docstruct/tests/test_xycut.py` — 29 tests

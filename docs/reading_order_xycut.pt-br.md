@@ -53,6 +53,12 @@ baixo (figuras, legendas, boxes laterais). Por isso a etapa tem dois portões:
 O segundo portão separa colunas de texto de verdade de uma **coluna principal ao
 lado de uma barra lateral estreita** — o caso em que o XY-cut erra.
 
+Os dois portões deixam de lado os blocos de largura total antes de procurar
+colunas: um título ou uma tabela larga que atravessa duas colunas "tampa" a
+calha e faria a página parecer de coluna única. Pelo mesmo motivo, uma coluna de
+texto dominante (60% ou mais da mancha) ao lado de uma coluna de margem estreita
+é tratada como página de coluna única.
+
 A etapa só muda a *sequência* dos blocos que sobreviveram às etapas anteriores
 da fusão: nada é acrescentado, removido ou reescrito. Blocos sem caixa
 utilizável acompanham o bloco anterior. Cabeçalho, rodapé e número de página
@@ -98,34 +104,53 @@ mantido só para comparação). As decisões são contadas no `decisions.csv`:
 DrDocBench (`multipage_md2md_dataset`, janela de 1 página, sem CDM; o gabarito
 avaliado contra ele mesmo dá 100), Docling pela Toolbox, MinerU 2.7.6 backend
 `pipeline` em CPU convertido pelo adaptador da Toolbox, fusão com
-`lib_fuse.py --policy v13`. São 119 páginas avaliáveis. A comparação é
-**pareada por página** contra a mesma fusão sem XY-cut.
+`lib_fuse.py --policy v13`. São 119 páginas avaliáveis (113 com nota de ordem
+de leitura). A comparação é **pareada por página** contra a mesma fusão sem
+XY-cut.
 
 | Variante (sobre a fusão v13) | Δ RO | IC 95% | páginas ↑ / ↓ | sign test p | Δ Overall |
 |---|---|---|---|---|---|
 | XY-cut em todas as páginas (`always`) | −0,29 | [−3,0, +2,5] | 12 / 13 | 1,00 | −0,14 |
-| `multicol` | +0,84 | [−1,1, +3,0] | 8 / 5 | 0,58 | +0,40 |
-| `multicol` + balance 0,5 | +1,17 | [−0,4, +3,0] | 7 / 2 | 0,18 | +0,56 |
-| **`multicol` + balance 0,7** | **+1,65** | **[+0,45, +3,30]** | **7 / 0** | **0,016** | **+0,79** |
+| `multicol` | +1,12 | [−1,2, +3,6] | 12 / 8 | 0,50 | +0,53 |
+| `multicol` + balance 0,5 | +1,91 | [+0,15, +3,98] | 10 / 2 | 0,039 | +0,91 |
+| **`multicol` + balance 0,7** | **+2,14** | **[+0,75, +3,97]** | **9 / 0** | **0,004** | **+1,02** |
 
 A distância de edição do texto não muda em nenhuma variante (o avaliador casa os
-blocos independentemente da ordem). A política v12 mostra o mesmo padrão.
+blocos independentemente da ordem). A política v12 dá o mesmo +2,14.
 
-Por layout da página, `multicol` → `multicol` + balance 0,7:
+Por layout da página:
 
-| Layout (páginas) | Δ RO sem balance | Δ RO com balance 0,7 |
+| Layout (páginas) | Δ RO, `multicol` | Δ RO, `multicol` + balance 0,7 |
 |---|---|---|
-| double_column (26) | +6,0 | +4,5 (4 sobem, 0 caem) |
-| three_column (9) | +1,0 | +1,0 |
-| 1andmore_column (22) | −0,7 | +2,8 (2 sobem, 0 caem) |
-| other_layout (8) | −7,0 | 0,0 (não é tocado) |
-| single_column (48) | 0,0 | 0,0 (não é tocado) |
+| double_column (26) | +7,1 (6 sobem, 0 caem) | +6,0 (5 sobem, 0 caem) |
+| three_column (9) | +5,6 (2 sobem, 0 caem) | +1,0 (1 sobe, 0 caem) |
+| 1andmore_column (22) | −2,1 (3 sobem, 5 caem) | +3,4 (3 sobem, 0 caem) |
+| other_layout (8) | −7,0 (0 sobem, 2 caem) | 0,0 (não é tocado) |
+| single_column (48) | −0,1 | 0,0 (não é tocado) |
 
 Números por página: [`drbench/experiments/xycut-dev120-local_per_page.csv`](drbench/experiments/xycut-dev120-local_per_page.csv).
 
+### O quanto o +2,14 é robusto?
+
+O resultado passou por uma revisão adversarial; estas são as verificações mais
+duras, todas para `multicol` + balance 0,7:
+
+| Verificação | Resultado |
+|---|---|
+| Metade par das páginas (ids ordenados, posições pares) | +3,06 (6 sobem, 0 caem) |
+| Metade ímpar | +1,13 (3 sobem, 0 caem) |
+| IC 95% reamostrando **documentos** inteiros (48 livros) em vez de páginas | [+0,39, +4,38] |
+| Documentos que melhoram / pioram | 5 / 0 |
+| Sem o documento mais forte | +1,51 |
+| Sem os dois documentos mais fortes | +0,90 |
+
+Ou seja: a direção se mantém nas duas metades e nenhuma página ou documento
+piora, mas o tamanho depende de poucos livros — o ganho vem de **5 dos 48
+documentos** (culinária, jardinagem, ciências sociais, transporte, casa).
+
 Teto do método: o XY-cut aplicado às caixas do *gabarito* reproduz a ordem do
-gabarito com RO 87,1 nas páginas que o portão multicoluna seleciona (84,6 em
-coluna única e 61,8 em `other_layout` — por isso o portão existe).
+gabarito com RO 87,1 nas páginas multicoluna, 84,6 em coluna única e 61,8 em
+`other_layout` — por isso os portões existem.
 
 ## Limitações — leia antes de usar os números
 
@@ -134,13 +159,19 @@ coluna única e 61,8 em `other_layout` — por isso o portão existe).
   blocos locais (TEDS n=0). Por isso os valores absolutos são menores que os do
   cluster (RO da fusão 69,8 aqui contra 79,3 no dev-986) e **não são
   comparáveis**; só a diferença pareada entre variantes tem significado.
-- **O limiar 0,7 foi escolhido no dev-120** (só 0,5 e 0,7 foram testados).
-  Precisa ser confirmado no **dev-986 com o avaliador do cluster** antes de
-  qualquer envio ao EvalAI (regra de aceite: pelo menos +0,3 em `evalai_style`,
-  nenhum componente caindo mais de 0,3).
-- O ganho é **pequeno e localizado** (cerca de +1,6 de RO na média, concentrado
-  em ~25 páginas multicoluna). Sozinho, não fecha a diferença de ordem de leitura
-  para os líderes do leaderboard.
+- **O limiar 0,7 foi escolhido no dev-120** (foram testados 0,5 e 0,7). Passar
+  de "sem portão de equilíbrio" para 0,7 responde por cerca de metade do ganho,
+  ao deixar de fora as páginas que perdiam. Precisa ser confirmado no
+  **dev-986 com o avaliador do cluster** antes de qualquer envio ao EvalAI
+  (regra de aceite: pelo menos +0,3 em `evalai_style`, nenhum componente caindo
+  mais de 0,3).
+- O ganho é **pequeno e concentrado** (cerca de +2 de RO na média, vindo de 9
+  páginas em 5 livros). Sozinho, não fecha a diferença de ordem de leitura para
+  os líderes do leaderboard.
+- Os portões de coluna são geométricos. Um layout assimétrico legítimo (por
+  exemplo, coluna de texto com 65% e coluna de notas contínuas com 35%) fica
+  intocado, por construção; a constante da calha (4 pt numa página A4) vem do
+  estudo com diários oficiais e não foi recalibrada para livros.
 - É independente da opção `order_relations` (posicionamento conservador dos
   blocos que só o Docling viu): aquela corrige inserções, esta corrige a ordem
   do esqueleto em páginas multicoluna. Aplicar `order_relations` primeiro e o
@@ -151,4 +182,4 @@ coluna única e 61,8 em `other_layout` — por isso o portão existe).
 - `libs/docstruct/src/docstruct/fusion/xycut.py` — `xycut_order`, `count_columns`, `column_balance`, `reorder`
 - `libs/docstruct/src/docstruct/policy.py` — `order_xycut`, `xycut_min_columns`, `xycut_min_balance`
 - `libs/docstruct/src/docstruct/fusion/differ.py` — gancho no fim do `merge_blocks`
-- `libs/docstruct/tests/test_xycut.py` — 25 testes
+- `libs/docstruct/tests/test_xycut.py` — 29 testes
