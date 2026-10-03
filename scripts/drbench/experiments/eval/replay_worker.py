@@ -67,7 +67,7 @@ def main() -> None:
                 document=document, backend=name, started_at=now, completed_at=now,
                 duration_ms=0, version=versions.get(name, "unknown"),
                 configuration={"extractor": "docling-serve" if name == "docling" else "mineru-api",
-                               **({"native_reading_order": native_order} if name == "docling" else {})},
+                               **({"adapter_options": options} if name == "docling" else {})},
             )
             result = {"document": build_processing_manifest(
                 root / "data/hf" / page["image"], extraction, language=page.get("language", "en")
