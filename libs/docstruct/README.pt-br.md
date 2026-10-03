@@ -19,6 +19,7 @@ Núcleo puro de processamento estrutural de documentos do Acessilia.
 | `docstruct.geometry` | `content_fingerprint`, `overlaps_clean`, `merge_bboxes`, `union` |
 | `docstruct.policy` | `FusionPolicy` (+ presets) |
 | `docstruct.fusion` | `merge_blocks`, `block_to_diff`, `DiffBlock`, `ProviderBlocks`, `quality`, `is_junk` |
+| `docstruct.fusion.xycut` | `xycut_order`, `count_columns`, `column_balance`, `reorder` — ordem de leitura XY-cut opcional (`FusionPolicy.order_xycut`) |
 
 Módulos planejados (fases 2–3): `text/`, `blocks/`, `regions/`, `tables/`, `math/`, `render/`, `validation.py`.
 
