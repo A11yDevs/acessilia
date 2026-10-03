@@ -33,8 +33,6 @@ class Settings:
     log_level: str = os.getenv("LOG_LEVEL", "INFO")
     observability_api_token: str = os.getenv("OBSERVABILITY_API_TOKEN", "")
     allowed_extensions: set[str] = field(default_factory=lambda: _default_extensions())
-    max_page_width: int = int(os.getenv("MAX_PAGE_WIDTH", "1600"))
-    jpg_quality: int = int(os.getenv("JPG_QUALITY", "85"))
     pdf_split_dpi: int = int(os.getenv("PDF_SPLIT_DPI", "150"))
     ai_client: str = os.getenv("AI_CLIENT", "ollama")
     ollama_api_key: str = os.getenv("OLLAMA_API_KEY", "")
@@ -61,7 +59,6 @@ class Settings:
         "OPENROUTER_APP_NAME",
         "a11y-devs-describer",
     )
-    pymupdf_text_threshold: int = int(os.getenv("PYMUPDF_TEXT_THRESHOLD", "100"))
     structurer: str = os.getenv("STRUCTURER", "toolbox")
     pipeline_engine: str = os.getenv("PIPELINE_ENGINE", "pddl")
 

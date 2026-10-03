@@ -1,7 +1,6 @@
 from pathlib import Path
 
 from aiogram import Bot
-from aiogram.types import FSInputFile
 
 from backend.i18n import t
 from backend.log_messages import (
@@ -35,14 +34,3 @@ async def download_file(bot: Bot, file_id: str, destination: Path) -> Path:
         )
     )
     return destination
-
-
-async def send_output_file(
-    bot: Bot, chat_id: int, file_path: Path, caption: str,
-    message_thread_id: int | None = None,
-) -> None:
-    input_file = FSInputFile(file_path)
-    await bot.send_document(
-        chat_id=chat_id, document=input_file, caption=caption,
-        message_thread_id=message_thread_id,
-    )

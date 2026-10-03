@@ -5,15 +5,12 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from backend.agents.editor_agent import EditorAgent
 from backend.agents.output_schemas import (
     DataOutput,
     VisionOutput,
     validate_structured_content,
 )
-from backend.agents.types import RegionTask
 from backend.pipeline.canonical_builder import build_canonical_document
-from docstruct.types import Region
 
 
 def test_vision_output_requires_description_for_description_kind() -> None:
@@ -188,69 +185,6 @@ def test_data_formula_rejects_blank_latex_after_normalization() -> None:
         )
 
 
-def test_editor_integrates_typed_table_without_reparsing_text() -> None:
-    task = RegionTask(
-        agent_target="data",
-        classification="table",
-        image_bytes=b"image",
-        page_num=1,
-    )
-    output = DataOutput(
-        kind="table",
-        rows=[
-            {
-                "cells": [
-                    {"text": "Nome", "header": True},
-                    {"text": "Nota", "header": True},
-                ]
-            },
-            {"cells": [{"text": "Ana"}, {"text": "9,5"}]},
-        ],
-        language="pt-BR",
-        confidence=0.95,
-        warnings=[],
-    )
-
-    editor = EditorAgent()
-    blocks = editor.build_page_blocks([task], {0: output})
-    document = build_canonical_document(
-        {
-            "text": editor.consolidate_page([task], {0: output}),
-            "pages": [{"blocks": blocks}],
-        }
-    )
-    table = document["sections"][0]["blocks"][0]
-
-    assert table["type"] == "table"
-    assert table["rows"] == [["Nome", "Nota"], ["Ana", "9,5"]]
-    assert table["table_ast"]["header"][0]["cells"][0]["header"] is True
-    assert table["metadata"]["source"] == "data-agent"
-
-
-def test_editor_preserves_table_caption_and_notes_in_text_and_blocks() -> None:
-    task = RegionTask(
-        agent_target="data",
-        classification="table",
-        image_bytes=b"image",
-        page_num=1,
-    )
-    output = DataOutput(
-        kind="table",
-        rows=[{"cells": [{"text": "A"}, {"text": "B"}]}],
-        caption="Resumo",
-        notes=["Fonte: exemplo."],
-        language="pt-BR",
-        confidence=0.9,
-    )
-    editor = EditorAgent()
-
-    text = editor.consolidate_page([task], {0: output})
-    blocks = editor.build_page_blocks([task], {0: output})
-
-    assert text == "Resumo\n| A | B |\nFonte: exemplo."
-    assert blocks[0]["table_ast"]["footer"][0]["cells"][0]["text"] == "Fonte: exemplo."
-
-
 def test_data_table_keeps_row_headers_in_body() -> None:
     output = DataOutput(
         kind="table",
@@ -301,38 +235,6 @@ def test_all_header_table_keeps_final_row_in_body() -> None:
     assert ast["body"] == [
         {"cells": [{"text": "Value", "header": True, "scope": "col"}]}
     ]
-
-
-def test_editor_integrates_typed_vision_formula_as_math() -> None:
-    region = Region(
-        bbox=(0.0, 0.0, 10.0, 10.0),
-        type="image",
-        text="",
-        image_bytes=b"image",
-        confidence=0.9,
-        page_num=1,
-    )
-    task = RegionTask(
-        agent_target="vision",
-        classification="embedded_image",
-        image_bytes=b"image",
-        region=region,
-        page_num=1,
-    )
-    output = VisionOutput(
-        kind="formula",
-        description="",
-        language="und",
-        confidence=0.88,
-        mentioned_elements=["equação"],
-        formula_latex=r"E=mc^2",
-    )
-
-    blocks = EditorAgent().build_page_blocks([task], {0: output})
-
-    assert blocks[0]["type"] == "math"
-    assert blocks[0]["text"] == r"$E=mc^2$"
-    assert blocks[0]["metadata"]["confidence"] == 0.88
 
 
 @pytest.mark.asyncio

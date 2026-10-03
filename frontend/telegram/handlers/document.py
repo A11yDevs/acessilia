@@ -26,10 +26,8 @@ from backend.tools.validators import validate_file
 from frontend.telegram.adapters.status_tracker import StatusTracker
 from backend.config.settings import settings
 from frontend.telegram.messages import (
-    MSG_ACCESSIBLE_PACKAGE_READY,
     MSG_CONTACT_SERVER_FAILED,
     MSG_DOWNLOADING_FILE,
-    MSG_DOWNLOAD_LINK_EMAILED,
     MSG_FILE_RECEIVED,
     MSG_PHOTO_RECEIVED,
     MSG_PROCESS_FAILED_BASE,

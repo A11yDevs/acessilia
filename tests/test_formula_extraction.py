@@ -1,10 +1,7 @@
-"""Testes do caminho de extração de fórmulas (Docling enrichment vs LLM)."""
-
-from pathlib import Path
+"""Shared formula classification and local extraction utilities."""
 
 import pytest
 
-from backend.agents.reader_agent import ReaderAgent
 from backend.tools.region_classifier import (
     classify_region,
     formula_already_extracted,
@@ -42,121 +39,10 @@ def test_formula_already_extracted_requires_enrichment_and_text():
     assert not formula_already_extracted(_formula_region("   ", enriched=True))
 
 
-@pytest.fixture
-def reader(monkeypatch):
-    monkeypatch.setattr(
-        "backend.agents.reader_agent.get_structurer_instance", lambda: object()
-    )
-    monkeypatch.setattr(
-        "backend.agents.reader_agent.crop_region_image",
-        lambda structurer, page_path, region: b"fake-image-bytes",
-    )
-    return ReaderAgent()
-
-
-def test_enriched_formula_goes_straight_to_editor(reader):
-    region = _formula_region(r"E=mc^2", enriched=True)
-    tasks = reader._extract_mixed_tasks(Path("page.pdf"), [region], 1, 1)
-
-    assert len(tasks) == 1
-    assert tasks[0].agent_target == "editor"
-    assert tasks[0].classification == "formula"
-    assert tasks[0].text == r"$E=mc^2$"  # delimitado p/ virar bloco math
-    assert tasks[0].image_bytes is None
-
-
-def test_non_enriched_formula_falls_back_to_data_agent(reader):
-    region = _formula_region("", enriched=False)
-    tasks = reader._extract_mixed_tasks(Path("page.pdf"), [region], 1, 1)
-
-    assert len(tasks) == 1
-    assert tasks[0].agent_target == "data"
-    assert tasks[0].classification == "formula"
-    assert tasks[0].image_bytes == b"fake-image-bytes"
-
-
-def test_duplicate_enriched_formulas_are_deduplicated(reader):
-    regions = [
-        _formula_region(r"\frac{a}{b}", enriched=True),
-        _formula_region(r"\frac{a}{b}", enriched=True),
-    ]
-    tasks = reader._extract_mixed_tasks(Path("page.pdf"), regions, 1, 1)
-
-    formula_tasks = [t for t in tasks if t.classification == "formula"]
-    assert len(formula_tasks) == 1
-
-
 # ── Sentinela [FORMULA] do VisionAgent (imagem que na verdade é fórmula) ──
 
 
-def _image_task() -> "RegionTask":
-    from backend.agents.types import RegionTask
-
-    region = Region(
-        bbox=(10.0, 10.0, 200.0, 60.0),
-        type="image",
-        text="",
-        image_bytes=b"fake",
-        confidence=0.9,
-        page_num=1,
-        metadata={"source": "docling"},
-    )
-    return RegionTask(
-        agent_target="vision",
-        classification="embedded_image",
-        text="",
-        image_bytes=b"fake",
-        region=region,
-        page_num=1,
-    )
-
-
-def test_editor_unwraps_formula_sentinel_from_vision():
-    from backend.agents.editor_agent import EditorAgent
-
-    task = _image_task()
-    result = EditorAgent().consolidate_page(
-        [task], {0: r"[FORMULA] E=mc^2"}
-    )
-
-    assert result == r"$E=mc^2$"
-    assert "Início de imagem" not in result
-
-
-def test_editor_keeps_image_marker_for_normal_descriptions():
-    from backend.agents.editor_agent import EditorAgent
-
-    task = _image_task()
-    result = EditorAgent().consolidate_page(
-        [task], {0: "Fotografia de um gato sobre uma mesa."}
-    )
-
-    assert "Início de imagem" in result
-    assert "Fotografia de um gato" in result
-
-
-def test_editor_skips_empty_formula_sentinel():
-    from backend.agents.editor_agent import EditorAgent
-
-    task = _image_task()
-    result = EditorAgent().consolidate_page([task], {0: "[FORMULA]"})
-
-    assert result == ""
-
-
 # ── Cascata local (OCR + CodeFormula) para imagens com fórmulas ──
-
-
-def _image_region() -> Region:
-    return Region(
-        bbox=(10.0, 10.0, 300.0, 120.0),
-        type="image",
-        text="",
-        image_bytes=b"fake",
-        confidence=0.9,
-        page_num=1,
-        metadata={"source": "docling"},
-    )
 
 
 def test_looks_like_latex():
@@ -239,31 +125,6 @@ def test_non_math_and_weak_symbols_are_not_strong(symbol):
     from backend.tools.formula_tools import _is_strong_math_char
 
     assert not _is_strong_math_char(symbol)
-
-
-def test_cascade_routes_math_image_to_editor(reader, monkeypatch):
-    monkeypatch.setattr(
-        "backend.agents.reader_agent.try_extract_formula_locally",
-        lambda image_bytes: r"E=mc^2",
-    )
-    tasks = reader._extract_mixed_tasks(Path("page.pdf"), [_image_region()], 1, 1)
-
-    assert len(tasks) == 1
-    assert tasks[0].agent_target == "editor"
-    assert tasks[0].classification == "formula"
-    assert tasks[0].text == r"$E=mc^2$"
-
-
-def test_cascade_miss_falls_back_to_vision(reader, monkeypatch):
-    monkeypatch.setattr(
-        "backend.agents.reader_agent.try_extract_formula_locally",
-        lambda image_bytes: "",
-    )
-    tasks = reader._extract_mixed_tasks(Path("page.pdf"), [_image_region()], 1, 1)
-
-    assert len(tasks) == 1
-    assert tasks[0].agent_target == "vision"
-    assert tasks[0].classification == "embedded_image"
 
 
 def test_try_extract_formula_locally_skips_non_math(monkeypatch):

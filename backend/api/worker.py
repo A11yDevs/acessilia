@@ -23,7 +23,6 @@ from backend.log_messages import (
 )
 from backend.stage_messages import (
     STAGE_CANCELLED_IN_QUEUE,
-    STAGE_ENQUEUED_WAITING,
     STAGE_EXPORTING_DOCX,
     STAGE_EXPORTING_DRBENCH_MD,
     STAGE_EXPORTING_HTML,

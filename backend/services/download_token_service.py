@@ -1,4 +1,3 @@
-import asyncio
 import json
 import sqlite3
 import uuid

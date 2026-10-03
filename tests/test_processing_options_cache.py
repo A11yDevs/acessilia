@@ -19,61 +19,6 @@ def test_document_cache_key_changes_with_each_processing_option(monkeypatch):
     assert service._cache_version("normal", None, False) == base
 
 
-def test_page_cache_key_changes_with_prompt_and_thinking_mode(monkeypatch, tmp_path):
-    from backend.agents import orchestrator as orchestrator_module
-    from backend.agents.orchestrator import AccessibilityOrchestrator
-
-    observed_keys: list[str] = []
-
-    async def cache_miss(_path, extra, **_kwargs):
-        observed_keys.append(extra)
-        return None
-
-    async def ignore_cache_write(*_args, **_kwargs):
-        return None
-
-    async def run_inline(function, *args):
-        return function(*args)
-
-    class Reader:
-        structurer = type("Structurer", (), {"name": "fake"})()
-
-        def analyse_page(self, *_args):
-            return []
-
-    class Editor:
-        def consolidate_page(self, _tasks, _results):
-            return "page result"
-
-        def build_page_blocks(self, _tasks, _results):
-            return [{"type": "paragraph", "text": "page result"}]
-
-    monkeypatch.setattr(orchestrator_module, "get_cached", cache_miss)
-    monkeypatch.setattr(orchestrator_module, "set_cache", ignore_cache_write)
-    monkeypatch.setattr(orchestrator_module.asyncio, "to_thread", run_inline)
-
-    orchestrator = AccessibilityOrchestrator.__new__(AccessibilityOrchestrator)
-    orchestrator.mode = "medio"
-    orchestrator.reader = Reader()
-    orchestrator.editor = Editor()
-    orchestrator._reader_lock = asyncio.Lock()
-
-    image = tmp_path / "page.png"
-    image.write_bytes(b"same image")
-
-    async def exercise_options():
-        await orchestrator.executar(image, tmp_path, custom_prompt="first")
-        await orchestrator.executar(image, tmp_path, custom_prompt="second")
-        await orchestrator.executar(
-            image, tmp_path, custom_prompt="first", thinking_mode=True
-        )
-
-    asyncio.run(exercise_options())
-
-    assert len(set(observed_keys)) == 3
-    assert all(key.startswith("page_1_v3_") for key in observed_keys)
-
-
 def test_cached_payload_rebuilds_current_submission_metadata(monkeypatch, tmp_path):
     from backend import service
 

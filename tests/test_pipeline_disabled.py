@@ -1,11 +1,7 @@
-"""Tests to verify legacy and local pipelines are disabled.
-
-Ensures that only the PDDL+Toolbox pipeline can be used.
-"""
+"""Legacy is unavailable; PDDL uses Toolbox extraction."""
 from __future__ import annotations
 
 import os
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -15,21 +11,20 @@ from backend.service import _normalized_engine, _build_orchestrator
 
 
 # ---------------------------------------------------------------------------
-# Legacy pipeline must be disabled
+# PDDL is the only engine; legacy and unknown names are rejected
 # ---------------------------------------------------------------------------
 
 
-class TestLegacyPipelineDisabled:
-    def test_normalized_engine_raises_on_legacy(self):
-        """_normalized_engine() must raise RuntimeError for legacy engine."""
+class TestPipelineSelection:
+    def test_normalized_engine_rejects_legacy(self):
         with patch("backend.service.settings.pipeline_engine", "legacy"):
-            with pytest.raises(RuntimeError, match="desativado"):
+            with pytest.raises(RuntimeError, match="Unsupported PIPELINE_ENGINE"):
                 _normalized_engine()
 
     def test_normalized_engine_raises_on_unknown(self):
         """_normalized_engine() must raise RuntimeError for unknown engine."""
         with patch("backend.service.settings.pipeline_engine", "unknown"):
-            with pytest.raises(RuntimeError, match="desativado"):
+            with pytest.raises(RuntimeError, match="Unsupported PIPELINE_ENGINE"):
                 _normalized_engine()
 
     def test_normalized_engine_accepts_pddl(self):
@@ -42,10 +37,9 @@ class TestLegacyPipelineDisabled:
         with patch("backend.service.settings.pipeline_engine", "pmv"):
             assert _normalized_engine() == "pddl"
 
-    def test_build_orchestrator_raises_on_legacy(self):
-        """_build_orchestrator() must raise RuntimeError for legacy engine."""
+    def test_build_orchestrator_rejects_legacy(self):
         with patch("backend.service.settings.pipeline_engine", "legacy"):
-            with pytest.raises(RuntimeError, match="desativado"):
+            with pytest.raises(RuntimeError, match="Unsupported PIPELINE_ENGINE"):
                 _build_orchestrator()
 
     def test_build_orchestrator_returns_pddl_toolbox(self):

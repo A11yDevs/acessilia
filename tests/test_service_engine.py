@@ -32,7 +32,7 @@ def test_normalized_engine_legacy(monkeypatch):
     monkeypatch.setattr(settings, "pipeline_engine", "legacy")
     from backend.service import _normalized_engine
 
-    with pytest.raises(RuntimeError, match="desativado"):
+    with pytest.raises(RuntimeError, match="Unsupported PIPELINE_ENGINE"):
         _normalized_engine()
 
 
@@ -52,11 +52,11 @@ def test_normalized_engine_case_insensitive(monkeypatch):
     assert svc._normalized_engine() == "pddl"
 
 
-def test_normalized_engine_unknown_defaults_to_legacy(monkeypatch):
+def test_normalized_engine_rejects_unknown(monkeypatch):
     monkeypatch.setattr(settings, "pipeline_engine", "unknown-engine")
     from backend.service import _normalized_engine
 
-    with pytest.raises(RuntimeError, match="desativado"):
+    with pytest.raises(RuntimeError, match="Unsupported PIPELINE_ENGINE"):
         _normalized_engine()
 
 
@@ -65,11 +65,11 @@ def test_normalized_engine_unknown_defaults_to_legacy(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_build_orchestrator_returns_legacy_by_default(monkeypatch):
+def test_build_orchestrator_rejects_legacy(monkeypatch):
     monkeypatch.setattr(settings, "pipeline_engine", "legacy")
     from backend.service import _build_orchestrator
 
-    with pytest.raises(RuntimeError, match="desativado"):
+    with pytest.raises(RuntimeError, match="Unsupported PIPELINE_ENGINE"):
         _build_orchestrator()
 
 
