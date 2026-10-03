@@ -232,50 +232,46 @@ def _validate_table_block(block: dict[str, Any]) -> list[str]:
                             f"Tabela com celula nao textual em {block_id} (row {row_index}, col {col_index})"
                         )
                         continue
-                    if not cell.strip():
-                        errors.append(
-                            f"Tabela com celula vazia em {block_id} (row {row_index}, col {col_index})"
-                        )
 
     if table_ast is not None:
         if not isinstance(table_ast, dict):
-            errors.append(f"table_ast invalido em {block_id}")
+            errors.append(f"invalid table_ast in {block_id}")
             return errors
 
         if not isinstance(table_ast.get("body"), list) or not table_ast.get("body"):
-            errors.append(f"table_ast sem body em {block_id}")
+            errors.append(f"table_ast missing body in {block_id}")
 
         for section_name in ("header", "body", "footer"):
             section = table_ast.get(section_name)
             if section is None:
                 continue
             if not isinstance(section, list):
-                errors.append(f"table_ast.{section_name} invalido em {block_id}")
+                errors.append(f"invalid table_ast.{section_name} in {block_id}")
                 continue
             expected_width: int | None = None
             for row_index, row in enumerate(section):
                 if not isinstance(row, dict):
                     errors.append(
-                        f"table_ast.{section_name}[{row_index}] invalido em {block_id}"
+                        f"invalid table_ast.{section_name}[{row_index}] in {block_id}"
                     )
                     continue
                 cells = row.get("cells")
                 if not isinstance(cells, list) or not cells:
                     errors.append(
-                        f"table_ast.{section_name}[{row_index}] sem cells em {block_id}"
+                        f"table_ast.{section_name}[{row_index}] missing cells in {block_id}"
                     )
                     continue
                 row_effective_width = 0
                 for col_index, cell in enumerate(cells):
                     if not isinstance(cell, dict):
                         errors.append(
-                            f"table_ast celula invalida em {block_id} ({section_name} {row_index}:{col_index})"
+                            f"invalid table_ast cell in {block_id} ({section_name} {row_index}:{col_index})"
                         )
                         continue
                     text = cell.get("text")
-                    if not isinstance(text, str) or not text.strip():
+                    if text is not None and not isinstance(text, str):
                         errors.append(
-                            f"table_ast celula sem texto em {block_id} ({section_name} {row_index}:{col_index})"
+                            f"table_ast cell with invalid text in {block_id} ({section_name} {row_index}:{col_index})"
                         )
                     colspan = cell.get("colspan")
                     if isinstance(colspan, int) and colspan >= 1:
@@ -287,7 +283,7 @@ def _validate_table_block(block: dict[str, Any]) -> list[str]:
                     expected_width = row_effective_width
                 elif row_effective_width != expected_width:
                     errors.append(
-                        f"table_ast.{section_name} com largura inconsistente em {block_id} (row {row_index})"
+                        f"table_ast.{section_name} inconsistent width in {block_id} (row {row_index})"
                     )
 
     return errors

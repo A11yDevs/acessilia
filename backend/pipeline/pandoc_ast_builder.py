@@ -166,13 +166,14 @@ def _pandoc_row(row: dict[str, Any], *, header: bool) -> list[Any]:
         [
             _pandoc_cell(cell, header=header)
             for cell in cells
-            if isinstance(cell, dict) and str(cell.get("text", "")).strip()
+            if isinstance(cell, dict)
         ],
     ]
 
 
 def _pandoc_cell(cell: dict[str, Any], *, header: bool) -> list[Any]:
-    text = str(cell.get("text", "")).strip()
+    raw_text = cell.get("text")
+    text = str(raw_text).strip() if raw_text is not None else ""
     rowspan = cell.get("rowspan") if isinstance(cell.get("rowspan"), int) else 1
     colspan = cell.get("colspan") if isinstance(cell.get("colspan"), int) else 1
 
