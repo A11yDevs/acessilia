@@ -238,8 +238,9 @@ The paragraph-content multiset is byte-equivalent after stripping outer
 whitespace for **all 120 outputs**. Tables and formula edit scores are unchanged.
 Text edit score improves on one page (+0.0177 in the mean)
 despite identical extracted content: reordering affects evaluator matching,
-so this must not be attributed to better OCR. Both variants were independently
-re-evaluated with identical per-page metrics.
+so this must not be attributed to better OCR. Fresh evaluator processes in the
+same work session reproduced both variants' per-page metrics exactly. This checks
+local repeatability; it is not external review or cluster replication.
 
 This supports the optional ordering pass on additional pages; the smaller
 unseen-book result above still limits claims of generalization. Full cluster

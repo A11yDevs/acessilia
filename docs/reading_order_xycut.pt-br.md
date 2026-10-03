@@ -229,8 +229,10 @@ diferente dos componentes. Nenhuma é nota de uma submissão ao EvalAI.
 O multiconjunto de conteúdo dos parágrafos foi preservado nas 120 saídas,
 após desconsiderar espaços nas bordas. TEDS e fórmulas não mudam. O avaliador
 altera a nota de texto em uma página (+0.0177 na média) com
-conteúdo idêntico; não é melhora de OCR. A reavaliação independente repetiu
-exatamente as métricas por página de ambas as variantes.
+conteúdo idêntico; não é melhora de OCR. Reexecuções do avaliador em processos
+novos, nesta mesma sessão de trabalho, repetiram exatamente as métricas por
+página de ambas as variantes. Isso verifica a repetibilidade local; não substitui
+revisão externa nem reprodução no cluster.
 
 A evidência favorece a opção de ordem em páginas adicionais, mas o resultado
 menor nos livros novos acima ainda limita a generalização. Resta confirmar no
