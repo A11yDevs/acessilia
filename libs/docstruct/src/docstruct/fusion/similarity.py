@@ -69,9 +69,12 @@ def swallows(d_text: str, other_texts: list[str], n: int = 25) -> bool:
         nt = re.sub(r"[\W_]+", "", t.casefold())
         if len(nt) < n:
             continue
+        if nt in nd:
+            return True
         step = max(n, (len(nt) - n) // 4 or 1)
         probes = {nt[k:k + n] for k in range(0, len(nt) - n + 1, step)}
-        if sum(p in nd for p in probes) >= 2:
+        threshold = 2 if len(probes) >= 2 else 1
+        if sum(p in nd for p in probes) >= threshold:
             return True
     return False
 

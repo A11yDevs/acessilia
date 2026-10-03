@@ -13,6 +13,7 @@ Porta fiel do tree_differ_v2.py da PR #98, com:
 """
 from __future__ import annotations
 
+import re
 from collections import Counter
 from typing import Optional
 
@@ -28,7 +29,7 @@ from docstruct.fusion.noise import (
     split_decor,
     suppress_in_regions,
 )
-from docstruct.fusion.similarity import center, contain_frac, iou, is_duplicate, sim, swallows
+from docstruct.fusion.similarity import PAGENUM_RE, center, contain_frac, iou, is_duplicate, sim, swallows
 from docstruct.fusion.types import DiffBlock
 from docstruct.policy import FusionPolicy
 
@@ -81,6 +82,11 @@ def _pick(
         stats["pair-formula->docling"] += 1
         return d.md
     if d.kind == "heading" or m.kind == "heading":
+        if d.kind == "heading" and policy.pick_guard and swallows(
+            d.text, [o.text for o in M if o is not m and o.kind == "text"]
+        ):
+            stats["pair-heading-auto->mineru(docling-swallowed)"] += 1
+            return m.md
         stats["pair-heading->docling"] += 1
         return d.md if d.kind == "heading" else m.md
     return _pick_text(d, m, M, policy, stats)
@@ -249,6 +255,16 @@ def merge_blocks(
             continue
         if len(d.text) < min_len and d.kind == "text":
             stats["dropped-docling-short"] += 1
+            continue
+        core = re.sub(r"\s+", "", d.text)
+        if (
+            len(core) <= 2
+            and not core.isdigit()
+            and not (len(core) == 1 and core.lower() in ("a", "i"))
+            and not re.match(r"^[a-zA-Z0-9][\.\)\-]$", core)
+            and not PAGENUM_RE.match(d.text)
+        ):
+            stats["dropped-docling-short-noise"] += 1
             continue
         if policy.pick_guard and d.kind == "text" and d.box is not None and (
             sum(
