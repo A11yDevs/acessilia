@@ -1,54 +1,40 @@
 @startuml document_processing_sequence
 skinparam shadowing false
-
-title Sequência de Processamento — motor legacy (PIPELINE_ENGINE=legacy, padrão)
-
-note over User
-  Este diagrama mostra o motor legacy (padrão).
-  O motor pddl (manifesto -> plano -> execução) está em docs/pmv_agno_pddl.md.
-end note
+title Document processing — PDDL workflow
 
 actor User
-participant "Frontend\n(Web/Telegram/CLI, via REST API)" as Front
-participant "AccessibilityOrchestrator\nbackend/agents/orchestrator.py" as Orchestrator
-participant "ReaderAgent\n(Função Determinística)" as Reader
-participant "VisionAgent\n(Agno LLM)" as Vision
-participant "DataAgent\n(Agno LLM)" as Data
-participant "EditorAgent\n(Função Determinística)" as Editor
-participant "Canonical Builder\nbackend/pipeline" as Builder
-participant "Renderers\nbackend/export" as Export
+participant "Frontend\n(Web/Telegram/CLI)" as Front
+participant "REST API / Worker\nbackend/api" as API
+participant "Processing Service\nbackend/service.py" as Service
+participant "PddlAccessibilityOrchestrator" as Orchestrator
+participant "Acessilia Toolbox" as Toolbox
+participant "PlannerAgent" as Planner
+participant "Executor (Agno Workflow)" as Executor
+participant "Vision / Data Agents" as Agents
+participant "Canonical Builder / Validators" as Builder
+participant "Renderers / Exporters" as Export
 
-User -> Front: Envia documento (PDF/imagem)
-Front -> Orchestrator: process(input_path, mode)
-
-Orchestrator -> Reader: extract_regions(document)
-Reader -> Reader: PyMuPDF / Docling (divisão & classificação)
-Reader --> Orchestrator: Regiões estruturadas (Texto, Imagens, Tabelas, Fórmulas)
-
-note over Orchestrator, Data
-  <b>Processamento Paralelo (asyncio.gather ×N):</b>
-  Orquestração atual executa visão e dados em paralelo.
-  <i>Evolução Futura:</i> Orquestrador Dinâmico selecionará dinamicamente
-  os modelos e grau de paralelismo por região.
-end note
-
-par Processar Regiões Visuais
-  Orchestrator -> Vision: process_image_region(region)
-  Vision --> Orchestrator: Alt-text & Audiodescrição
-and Processar Tabelas / Fórmulas
-  Orchestrator -> Data: process_data_region(region)
-  Data --> Orchestrator: Estrutura Markdown / LaTeX
+User -> Front: Submit document
+Front -> API: Upload and enqueue
+API -> Service: process(input_path, mode)
+Service -> Service: Register task and check cache
+Service -> Orchestrator: executar(input_path, temp_dir)
+Orchestrator -> Toolbox: Extract structure
+Toolbox --> Orchestrator: Processing manifest
+Orchestrator -> Agents: Enrich eligible images and tables
+Agents --> Orchestrator: Structured results
+Orchestrator -> Planner: Generate and validate PDDL plan
+Planner --> Orchestrator: Validated plan
+opt execute_dry_run enabled
+  Orchestrator -> Executor: Validate plan in dry-run mode
+  Executor --> Orchestrator: Execution report
 end
-
-Orchestrator -> Editor: consolidate_and_tag(regions)
-Editor -> Editor: Sanitização, Deduplicação MD5 & Tags de Acessibilidade
-Editor --> Orchestrator: Payload consolidado
-
-Orchestrator -> Builder: build_canonical_document()
-Builder --> Orchestrator: Documento Canônico Validado
-
-Orchestrator -> Export: render_all(canonical_doc)
-Export --> Front: Arquivos acessíveis (TXT, DOCX, PDF, PDF/UA, HTML, MP3)
-Front --> User: Entrega do documento acessível
-
+Orchestrator --> Service: Processed payload
+Service -> Builder: Build and validate canonical document
+Builder --> Service: Canonical document
+Service --> API: Processing result
+API -> Export: Render accessible formats
+Export --> API: Output artifacts
+API --> Front: Status and download links
+Front --> User: Accessible documents
 @enduml

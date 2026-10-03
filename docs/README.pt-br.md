@@ -5,7 +5,7 @@ Você também pode ler esta documentação em **inglês**: [English](README.md)
 ## Propósito
 Esta documentação detalha a arquitetura do **Acessilia**, um sistema de acessibilidade de documentos que combina **planejamento determinístico** (ordenação e validação de tarefas baseada em PDDL) com **IA multiagente coordenada por Agno** para tarefas de visão, dados e descrição. As funções determinísticas são a fonte de verdade; os LLMs fornecem interpretação e descrição.
 
-O sistema opera em um de dois motores de pipeline, selecionado pela opção `PIPELINE_ENGINE`: `legacy` (o pipeline orquestrado direto, padrão) ou `pddl` (o fluxo manifest → plan → execution). Veja [architecture.pt-br.md](architecture.pt-br.md).
+O sistema usa o motor `pddl` (manifesto → plano → execução), com o alias `pmv` aceito por compatibilidade. Veja [architecture.pt-br.md](architecture.pt-br.md).
 
 ---
 
@@ -49,8 +49,8 @@ Cada diagrama é um auxílio visual; a descrição vinculada resume seu conteúd
 ## Escopo Abrangido
 
 - **`backend/`** — Lógica de negócio agnóstica da interface.
-  - `core/` — a camada de planejamento: `manifest/` (extração Estrutural-Informational via Docling/PyMuPDF → `processing-manifest.json`), `planning/` (PlannerAgent → problema PDDL e `nominal-plan.json`), `execution/` (Executor via Agno Workflow → `execution-report.json`).
-  - `agents/` — os agentes do pipeline (`ReaderAgent`, `VisionAgent`, `DataAgent`, `EditorAgent`) e os orquestradores legacy e PDDL.
+  - `core/` — a camada de planejamento: `manifest/` (extração Informacional-Estrutural via Toolbox → `processing-manifest.json`), `planning/` (PlannerAgent → problema PDDL e `nominal-plan.json`), `execution/` (Executor via Agno Workflow → `execution-report.json`).
+  - `agents/` — os agentes Vision/Data, o estado das tarefas e o orquestrador PDDL.
   - `api/` — a API REST standalone (jobs, download, history, health).
   - `pipeline/` + `export/` — construção, validação e renderizadores de formato do documento canônico.
   - `ai/`, `services/`, `tools/` — registro de modelos Agno e prompts, serviços de infraestrutura (cache, queue, history, cleanup, email, tokens) e utilidades compartilhadas.

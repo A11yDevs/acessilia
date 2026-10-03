@@ -46,7 +46,7 @@ Defined in [backend/api/app.py](../backend/api/app.py), with routes in [backend/
 Observations:
 
 - **Errors are always JSON** (`{"detail": "..."}`): `400` validation, `404` not found, `429` rate limit, `500` internal error. There is a global per-IP limit in addition to the per-route ones.
-- The `pipeline` field in history records which engine ran the job — `legacy` or `pddl` (see `PIPELINE_ENGINE` in [architecture.md](architecture.md)).
+- The `pipeline` field in history records which engine ran the job — `pddl` for new jobs; historical records may contain `legacy` (see [architecture.md](architecture.md)).
 - Standard interactive FastAPI docs at `GET /docs` and `GET /openapi.json`.
 
 ---

@@ -9,10 +9,10 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 - Role: normalize structured region payloads into a canonical document schema, validate structure and heading hierarchy, build intermediate AST, and dispatch to renderers.
 - Benefit: deterministic output and a single source of truth for all output exporters.
 
-### 2. Multi-Agent Pipeline Orchestration (legacy engine)
-- Implementation: [backend/agents/orchestrator.py](../backend/agents/orchestrator.py) (`AccessibilityOrchestrator`), used when `PIPELINE_ENGINE=legacy` (the default). The `pddl` engine uses the planning-based orchestration in pattern 10 instead.
-- Role: coordinates multi-agent lifecycle: local structural reading, parallel visual/data processing, text editing/deduplication, cache, history logging, and fallback.
-- Benefit: centralizes business rules and isolates step responsibilities.
+### 2. Processing Service
+- Implementation: [backend/service.py](../backend/service.py).
+- Role: coordinate task state, cancellation, cache, history and canonical document construction around the PDDL workflow.
+- Benefit: one processing lifecycle for every interface.
 
 ### 3. Strategy & Model Abstraction for AI (Agno)
 - Implementation: [backend/ai/models/ai_client.py](../backend/ai/models/ai_client.py) (`get_agno_model()`)
@@ -21,21 +21,16 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
   - OpenRouter (cloud API models like Claude/GPT-4o)
 - Benefit: AI model provider can be switched seamlessly via environment configuration without changing agent logic.
 
-### 4. Local-First Extraction Strategy
-- Implementation: [backend/agents/reader_agent.py](../backend/agents/reader_agent.py) using PyMuPDF and Docling.
-- Role:
-  - perform local deterministic PDF text and region extraction first,
-  - call Agno vision/data agents only for scanned pages, images, complex tables, and formulas,
-  - maintain page-level and region-level caching.
-- Benefit: lower latency, lower operational cost, and privacy preservation for text-native PDFs.
+### 4. Structural Extraction through Toolbox
+- Implementation: [backend/core/manifest/toolbox_extractor.py](../backend/core/manifest/toolbox_extractor.py).
+- Role: convert the Toolbox structural response into a deterministic manifest with regions and processing obligations.
+- Benefit: AI only processes regions that require enrichment.
 
 ### 5. Multi-Agent Specialization
 - Implementation:
-  - [backend/agents/reader_agent.py](../backend/agents/reader_agent.py) (`ReaderAgent` - deterministic region splitting)
   - [backend/agents/vision_agent.py](../backend/agents/vision_agent.py) (`VisionAgent` - Agno LLM visual alt-text & audio descriptions)
   - [backend/agents/data_agent.py](../backend/agents/data_agent.py) (`DataAgent` - Agno LLM tables & math formulas)
-  - [backend/agents/editor_agent.py](../backend/agents/editor_agent.py) (`EditorAgent` - deterministic sanitization, fingerprint deduplication, and accessibility tagging)
-- Benefit: clean separation of concerns and parallel execution (`asyncio.gather`).
+- Benefit: separate typed contracts for visual descriptions and table/formula reconstruction.
 
 ### 6. Export Adapters & Renderers
 - Implementation: [backend/export/pandoc_exporter.py](../backend/export/pandoc_exporter.py) with renderers in `backend/export/renderers/` (TXT, DOCX, PDF, HTML) and export adapters in `backend/export/exporters/` (MP3 via edge-tts, and the PDF/UA variant).
@@ -49,17 +44,16 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 ### 8. Cache-Aside Pattern
 - Implementation:
   - global file cache in `backend/services/cache.py`
-  - region cache in `backend/agents/orchestrator.py`
 - Benefit: eliminates duplicate LLM calls for unchanged documents or images.
 
 ### 9. Single-Instance Execution & Process Lock
 - Implementation: [frontend/run.py](../frontend/run.py)
 - Benefit: prevents process collisions on the host machine.
 
-### 10. Deterministic Planning with PDDL (optional engine)
+### 10. Deterministic Planning with PDDL
 - Implementation: [backend/core/manifest/](../backend/core/manifest/), [backend/core/planning/](../backend/core/planning/), [backend/core/execution/](../backend/core/execution/), coordinated by [backend/agents/pddl_orchestrator.py](../backend/agents/pddl_orchestrator.py). Active when `PIPELINE_ENGINE=pddl`.
-- Role: separate *what to do* from *doing it*. A deterministic manifest describes the document's regions and obligations; a PDDL planner compiles it into a validated, ordered plan; an Agno Workflow executor applies the plan, calling the Vision/Data agents only where the plan requires. See [pmv_agno_pddl.md](pmv_agno_pddl.md).
-- Benefit: task ordering and dependencies become explicit and auditable, and planning stays deterministic (no LLM writes PDDL) while AI is confined to description. Falls back to deterministic extraction if planning fails.
+- Role: separate *what to do* from *doing it*. A deterministic manifest describes the document's regions and obligations; a PDDL planner compiles it into a validated, ordered plan; Vision/Data enrich eligible regions before planning, and an Agno Workflow executor optionally validates the plan in dry-run mode. See [pmv_agno_pddl.md](pmv_agno_pddl.md).
+- Benefit: task ordering and dependencies become explicit and auditable, and planning stays deterministic (no LLM writes PDDL) while AI is confined to description. Planning errors propagate to the processing service.
 
 ### 11. REST API with Interface Clients
 - Implementation: [backend/api/](../backend/api/); clients in [frontend/clients/api_client.py](../frontend/clients/api_client.py), consumed by the Telegram bot and Web panel.

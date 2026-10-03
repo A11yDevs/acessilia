@@ -2,76 +2,51 @@
 skinparam componentStyle rectangle
 skinparam shadowing false
 skinparam packageStyle rectangle
+title Acessilia — PDDL processing architecture
 
-title Arquitetura de Processamento — Workflow Acessília
-
-actor "Usuário (Web / Telegram / CLI)" as User
-
-package "Infraestrutura (Docker Container)" {
-  
-  package "Frontend (Clientes)" {
-    component "Web Panel (HTML)\nfrontend/web" as WebUI
-    component "Telegram Bot (aiogram)\nfrontend/telegram" as TelegramBot
-    component "CLI Runner\nfrontend/cli" as CLI
-  }
-
-  component "REST API (FastAPI)\nbackend/api" as API
-
-  package "Workflow Acessília" {
-    component "AccessibilityOrchestrator\nbackend/agents/orchestrator.py" as Orchestrator
-    
-    component "Reader\n[Função-step Determinístico]\nbackend/agents/reader_agent.py" as Reader
-    
-    package "Processar Regiões (asyncio.gather ×N paralelo)" {
-      component "Vision\n[Agent LLM — Agno]\nbackend/agents/vision_agent.py" as Vision
-      component "Data\n[Agent LLM — Agno]\nbackend/agents/data_agent.py" as Data
-    }
-    
-    component "Editor\n[Função-step Determinístico]\nbackend/agents/editor_agent.py" as Editor
-  }
-
-  package "Pipeline Canônico & Exporters" {
-    component "Canonical Builder & Sanitizer\nbackend/pipeline" as Pipeline
-    component "Renderers & Exporters\n(TXT/DOCX/PDF/PDF-UA/HTML/MP3)\nbackend/export" as Exporters
-  }
-
-  database "SQLite (WAL)\nvar/data/history.db" as DB
-  folder "Cache\nvar/temp/cache" as Cache
+actor "User (Web / Telegram / CLI)" as User
+package "Frontend Clients" {
+  component "Web Panel" as WebUI
+  component "Telegram Bot" as TelegramBot
+  component "CLI Runner" as CLI
 }
-
-cloud "Ollama (Local) / OpenRouter (Cloud)\nvia Agno Framework (get_agno_model)" as AI
-
-note bottom of Orchestrator
-  <b>Motores de pipeline (PIPELINE_ENGINE):</b>
-  - <i>legacy</i> (padrão): fluxo mostrado aqui — Reader, Vision/Data em paralelo, Editor.
-  - <i>pddl</i>: extrai um manifesto, gera e valida um plano PDDL e executa via Agno Workflow
-    (backend/core + backend/agents/pddl_orchestrator.py). Converge no mesmo documento canônico.
-  - <i>Futuro:</i> um Orquestrador Dinâmico que roteia tarefas por complexidade, custo e SLA.
-end note
+component "REST API / Worker\nbackend/api" as API
+component "Processing Service\nbackend/service.py" as Service
+package "PDDL Workflow" {
+  component "PddlAccessibilityOrchestrator\nbackend/agents/pddl_orchestrator.py" as Orchestrator
+  component "Manifest Extraction\nbackend/core/manifest" as Manifest
+  component "PlannerAgent\nbackend/core/planning" as Planner
+  component "Executor (Agno Workflow)\nbackend/core/execution" as Executor
+  component "Vision / Data Agents\nbackend/agents" as Agents
+}
+package "Canonical Pipeline & Exports" {
+  component "Canonical Builder / Validators\nbackend/pipeline" as Pipeline
+  component "Renderers / Exporters\nbackend/export" as Exporters
+}
+database "SQLite History" as DB
+folder "Document Cache" as Cache
+cloud "Acessilia Toolbox" as Toolbox
+cloud "Ollama / OpenRouter\nAgno Model" as AI
 
 User --> WebUI
 User --> TelegramBot
 User --> CLI
-User --> API : REST direto
-
+User --> API : Direct REST
 WebUI --> API
 TelegramBot --> API
 CLI --> API
-API --> Orchestrator
-
-Orchestrator --> DB
-Orchestrator --> Cache
-
-Orchestrator --> Reader : 1. Extração local de estrutura
-Reader --> Vision : 2a. Regiões visuais (imagens)
-Reader --> Data : 2b. Regiões de dados (tabelas/fórmulas)
-Vision --> AI
-Data --> AI
-
-Vision --> Editor : 3a. Audiodescrições geradas
-Data --> Editor : 3b. Markdown/LaTeX estruturado
-Editor --> Pipeline : 4. Sanitização & Fingerprints
-Pipeline --> Exporters : 5. Documento Canônico
-Exporters --> User : 6. Entrega do Documento Acessível
-
+API --> Service
+Service --> DB
+Service --> Cache
+Service --> Orchestrator
+Orchestrator --> Manifest
+Manifest --> Toolbox
+Orchestrator --> Planner
+Orchestrator --> Executor
+Orchestrator --> Agents : Pre-plan enrichment
+Orchestrator --> Executor : Optional dry-run validation
+Agents --> AI
+Orchestrator --> Pipeline
+Pipeline --> Exporters
+Exporters --> API : Accessible artifacts
 @enduml

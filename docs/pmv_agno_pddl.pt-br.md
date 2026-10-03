@@ -6,7 +6,7 @@ Esta versão valida o ciclo mínimo:
 
 ```text
 documento
-  → Agente Informacional-Estrutural (Agno + Docling)
+  → Agente Informacional-Estrutural (Agno + Toolbox)
   → processing-manifest.json
   → Agente Planejador (Agno + ferramentas PDDL)
   → problem.pddl
@@ -22,9 +22,8 @@ Nenhum LLM escreve PDDL diretamente.
 ## Compatibilidade do macOS
 
 - Python 3.11 ou 3.12;
-- `docling==2.0.0`;
-- `docling-core==2.0.0`;
-- `agno==2.8.5`;
+- `agno==3.0.5`, conforme declarado no `pyproject.toml`;
+- uma instância Toolbox acessível para extração estrutural;
 - Fast Downward opcional.
 
 ```bash
@@ -34,9 +33,8 @@ poetry run python scripts/generate_pmv_schemas.py
 poetry run pytest
 ```
 
-O lock anterior foi produzido antes da inclusão do Agno e não integra o pacote
-novo. Gere-o no próprio macOS; as versões críticas do Docling e do Agno já
-estão fixadas no `pyproject.toml`.
+As dependências são declaradas no `pyproject.toml`; nenhum lock de dependências é
+versionado. Docling e seus modelos pertencem ao ambiente do provedor remoto da Toolbox.
 
 O Fast Downward só é necessário ao usar `--planner fast-downward` ou
 `--planner both`. O backend `internal` é o planner de referência do PMV e
@@ -50,10 +48,11 @@ implementação determinística e permite testes sem uma chamada a LLM.
 Um modelo Agno pode ser injetado pelo argumento `model`; o CLI não precisa de
 chave de API porque chama a ferramenta determinística diretamente.
 
+A extração usa a Toolbox configurada por `TOOLBOX_BASE_URL`/`TOOLBOX_PROVIDER`. O provider atual não permite desabilitar OCR por chamada; `--no-ocr` retorna um erro explícito em vez de ser ignorado.
+
 ```bash
-poetry run a11y-pmv manifest documento.pdf \
-  -o output/processing-manifest.json \
-  --no-ocr
+python -m scripts.pmv manifest documento.pdf \
+  -o output/processing-manifest.json
 ```
 
 O manifesto 1.1 acrescenta a cada obrigação:
@@ -84,7 +83,7 @@ compilador:
 6. valida a projeção antes de chamar o planner.
 
 ```bash
-poetry run a11y-pmv plan output/processing-manifest.json \
+python -m scripts.pmv plan output/processing-manifest.json \
   -o output
 ```
 
@@ -93,7 +92,7 @@ estiver marcada, todas as obrigações não satisfeitas são selecionadas. Para
 escolher raízes:
 
 ```bash
-poetry run a11y-pmv plan output/processing-manifest.json \
+python -m scripts.pmv plan output/processing-manifest.json \
   -o output \
   --select obligation-describe-image-000012
 ```
@@ -103,7 +102,7 @@ poetry run a11y-pmv plan output/processing-manifest.json \
 Planner interno:
 
 ```bash
-poetry run a11y-pmv plan output/processing-manifest.json \
+python -m scripts.pmv plan output/processing-manifest.json \
   -o output \
   --planner internal
 ```
@@ -111,7 +110,7 @@ poetry run a11y-pmv plan output/processing-manifest.json \
 Fast Downward:
 
 ```bash
-poetry run a11y-pmv plan output/processing-manifest.json \
+python -m scripts.pmv plan output/processing-manifest.json \
   -o output \
   --planner fast-downward \
   --fast-downward /caminho/fast-downward.py \
@@ -133,7 +132,7 @@ reprodutível para validar o PMV.
 Para estudos diferenciais:
 
 ```bash
-poetry run a11y-pmv plan output/processing-manifest.json \
+python -m scripts.pmv plan output/processing-manifest.json \
   -o output \
   --planner both \
   --fast-downward /caminho/fast-downward.py \
@@ -225,7 +224,7 @@ passos em sequência e interrompe no primeiro erro.
 Dry-run, sem confirmar efeitos:
 
 ```bash
-poetry run a11y-pmv execute \
+python -m scripts.pmv execute \
   output/processing-manifest.json \
   output/nominal-plan.json \
   -o output/execution
@@ -234,7 +233,7 @@ poetry run a11y-pmv execute \
 Execução real requer handlers:
 
 ```bash
-poetry run a11y-pmv execute \
+python -m scripts.pmv execute \
   output/processing-manifest.json \
   output/nominal-plan.json \
   -o output/execution \
@@ -308,9 +307,8 @@ para saber como funcionan os algoritmos subjacentes.
 ## 6. Execução ponta a ponta
 
 ```bash
-poetry run a11y-pmv pipeline documento.pdf \
+python -m scripts.pmv pipeline documento.pdf \
   -o output/job-001 \
-  --no-ocr \
   --planner both \
   --fast-downward /caminho/fast-downward.py \
   --preferred-plan internal \

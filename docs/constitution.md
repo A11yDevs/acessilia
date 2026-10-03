@@ -31,10 +31,8 @@ Deliver document and image conversion to accessible formats through:
       - `core/manifest/` – InformationalStructuralAgent; extracts processing manifesto
    
    c. **Agent Layer (Agno Multiagent):**
-      - ReaderAgent (Python) – structural extraction via Docling/PyMuPDF
       - VisionAgent (Agno) – image descriptions
       - DataAgent (Agno) – tabular/formula text representation
-      - EditorAgent (Python) – deduplication and accessibility tagging
    
    d. **Canonical Pipeline:**
       - `pipeline/` – canonical document construction and validation
@@ -58,7 +56,7 @@ Deliver document and image conversion to accessible formats through:
 
 ## 4. Domain contracts
 1. Document processing lifecycle (extended for planning phase):
-   - **Extraction Phase:** Document → ReaderAgent → processing-manifest.json
+   - **Extraction Phase:** Document → InformationalStructuralAgent (Toolbox) → processing-manifest.json
    - **Planning Phase:** manifesto + domain constraints → PlannerAgent → nominal-plan.json
    - **Execution Phase:** plan + manifesto → Executor (Agno Workflow) → execution-report.json
    - **Canonical Generation:** execution results → canonical document (accessible)

@@ -8,7 +8,7 @@ This release validates the minimal cycle:
 
 ```text
 document
-  → Informational-Structural Agent (Agno + Docling)
+  → Informational-Structural Agent (Agno + Toolbox)
   → processing-manifest.json
   → Planner Agent (Agno + PDDL tools)
   → problem.pddl
@@ -24,9 +24,8 @@ No LLM writes PDDL directly.
 ## macOS compatibility
 
 - Python 3.11 or 3.12;
-- `docling==2.0.0`;
-- `docling-core==2.0.0`;
-- `agno==2.8.5`;
+- `agno==3.0.5`, as declared in `pyproject.toml`;
+- a reachable Toolbox instance for structural extraction;
 - Fast Downward optional.
 
 ```bash
@@ -36,9 +35,8 @@ poetry run python scripts/generate_pmv_schemas.py
 poetry run pytest
 ```
 
-The previous lock file was produced before Agno was added and does not include the new
-package. Regenerate it on your own macOS machine; the critical Docling and Agno versions
-are already pinned in `pyproject.toml`.
+Dependencies are declared in `pyproject.toml`; no dependency lock is tracked. Docling
+and its model dependencies belong to the remote Toolbox provider environment.
 
 Fast Downward is only required when using `--planner fast-downward` or
 `--planner both`. The `internal` backend is the PMV's reference planner and works
@@ -52,10 +50,11 @@ deterministic implementation, which allows testing without an LLM call.
 An Agno model can be injected via the `model` argument; the CLI needs no API key
 because it invokes the deterministic tool directly.
 
+Extraction uses the Toolbox configured by `TOOLBOX_BASE_URL`/`TOOLBOX_PROVIDER`. The current provider cannot disable OCR per request; `--no-ocr` returns an explicit error rather than being ignored.
+
 ```bash
-poetry run a11y-pmv manifest document.pdf \
-  -o output/processing-manifest.json \
-  --no-ocr
+python -m scripts.pmv manifest document.pdf \
+  -o output/processing-manifest.json
 ```
 
 Manifest 1.1 adds to each obligation:
@@ -85,7 +84,7 @@ The loader checks version, name, hashes and mandatory clauses. The compiler:
 6. validates the projection before invoking any planner.
 
 ```bash
-poetry run a11y-pmv plan output/processing-manifest.json \
+python -m scripts.pmv plan output/processing-manifest.json \
   -o output
 ```
 
@@ -93,7 +92,7 @@ By default, obligations already marked as `selected` are the roots. If none are
 marked, all unsatisfied obligations are selected. To choose specific roots:
 
 ```bash
-poetry run a11y-pmv plan output/processing-manifest.json \
+python -m scripts.pmv plan output/processing-manifest.json \
   -o output \
   --select obligation-describe-image-000012
 ```
@@ -103,7 +102,7 @@ poetry run a11y-pmv plan output/processing-manifest.json \
 Internal planner:
 
 ```bash
-poetry run a11y-pmv plan output/processing-manifest.json \
+python -m scripts.pmv plan output/processing-manifest.json \
   -o output \
   --planner internal
 ```
@@ -111,7 +110,7 @@ poetry run a11y-pmv plan output/processing-manifest.json \
 Fast Downward:
 
 ```bash
-poetry run a11y-pmv plan output/processing-manifest.json \
+python -m scripts.pmv plan output/processing-manifest.json \
   -o output \
   --planner fast-downward \
   --fast-downward /path/to/fast-downward.py \
@@ -132,7 +131,7 @@ validating the PMV.
 For differential studies:
 
 ```bash
-poetry run a11y-pmv plan output/processing-manifest.json \
+python -m scripts.pmv plan output/processing-manifest.json \
   -o output \
   --planner both \
   --fast-downward /path/to/fast-downward.py \
@@ -218,7 +217,7 @@ in sequence and stops on the first error.
 Dry-run, without confirming effects:
 
 ```bash
-poetry run a11y-pmv execute \
+python -m scripts.pmv execute \
   output/processing-manifest.json \
   output/nominal-plan.json \
   -o output/execution
@@ -227,7 +226,7 @@ poetry run a11y-pmv execute \
 Real execution requires handlers:
 
 ```bash
-poetry run a11y-pmv execute \
+python -m scripts.pmv execute \
   output/processing-manifest.json \
   output/nominal-plan.json \
   -o output/execution \
@@ -299,9 +298,8 @@ for how the underlying algorithms work.
 ## 6. End-to-end execution
 
 ```bash
-poetry run a11y-pmv pipeline document.pdf \
+python -m scripts.pmv pipeline document.pdf \
   -o output/job-001 \
-  --no-ocr \
   --planner both \
   --fast-downward /path/to/fast-downward.py \
   --preferred-plan internal \

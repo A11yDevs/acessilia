@@ -32,22 +32,12 @@ cp .env.example .env
 docker compose up -d
 ```
 
-Isso constrói a imagem a partir do `infra/Dockerfile` com a variante **docling**
-(completa, ~4-6 GB). O container expõe:
+Isso constrói a imagem de `infra/Dockerfile`. A extração estrutural usa a Toolbox remota. O container expõe:
 
 | Porta | Serviço        |
 |-------|----------------|
 | 8000  | API REST       |
 | 8001  | Painel web     |
-
-### Variante slim (sem Docling)
-
-Para uma imagem mais leve (~2 GB), sem OCR do Docling:
-
-```bash
-docker compose build --build-arg WITH_DOCLING=false
-docker compose up -d
-```
 
 ---
 
@@ -75,22 +65,7 @@ mkdir -p var/temp var/data var/logs
 docker compose -f docker-compose.staging.yml up -d
 ```
 
-Isso baixa e executa `ghcr.io/a11ydevs/acessilia:develop` (variante docling).
-
-### Usando a variante slim
-
-Edite o `docker-compose.staging.yml` e altere a tag da imagem:
-
-```yaml
-image: ghcr.io/a11ydevs/acessilia:develop-slim
-```
-
-Ou via sed:
-
-```bash
-sed -i '' 's/:develop$/:develop-slim/' docker-compose.staging.yml
-docker compose -f docker-compose.staging.yml up -d
-```
+Isso baixa e executa `ghcr.io/a11ydevs/acessilia:develop`; a extração usa a Toolbox.
 
 ---
 
@@ -98,20 +73,13 @@ docker compose -f docker-compose.staging.yml up -d
 
 O CI/CD publica automaticamente as seguintes imagens:
 
-| Tag                              | Variante | Descrição                          |
-|----------------------------------|----------|------------------------------------|
-| `:develop`                       | docling  | Último build da branch `develop`   |
-| `:develop-slim`                  | slim     | Último build da `develop` (leve)   |
-| `:main`                          | docling  | Último build da branch `main`      |
-| `:main-slim`                     | slim     | Último build da `main` (leve)      |
-| `:latest`                        | docling  | Aponta para `main`                 |
-| `:latest-slim`                   | slim     | Aponta para `main` (leve)          |
-| `:sha-<7-char-commit>`           | docling  | Build de um commit específico      |
-| `:sha-<7-char-commit>-slim`      | slim     | Build de um commit específico (leve)|
-| `:X.Y.Z`                         | docling  | Release versionada                 |
-| `:X.Y.Z-slim`                    | slim     | Release versionada (leve)          |
-| `:X.Y` / `:X`                    | docling  | Alias semântico da release         |
-| `:X.Y-slim` / `:X-slim`          | slim     | Alias semântico da release (leve)  |
+| Tag | Descrição |
+|-----|-----------|
+| `:develop` | Build aprovado da branch develop |
+| `:main` | Build aprovado da branch main |
+| `:latest` | Alias de main |
+| `:sha-<7-char-commit>` | Commit específico |
+| `:release-<nome>` | Branch release, com `/` convertido em `-` |
 
 Exemplo para puxar uma imagem manualmente:
 
@@ -150,10 +118,12 @@ OLLAMA_BASE_URL=http://host.docker.internal:11434/v1/chat/completions
 OLLAMA_MODEL=llama3.2-vision
 
 # Estruturação de documentos
-STRUCTURER=docling   # ou pymupdf (mais leve, sem dependências extras)
+STRUCTURER=toolbox
+TOOLBOX_BASE_URL=http://host.docker.internal:8002
+TOOLBOX_PROVIDER=docling
 
 # Pipeline
-PIPELINE_ENGINE=legacy
+PIPELINE_ENGINE=pddl
 ```
 
 > **Dica para Ollama local:** Use `host.docker.internal` no lugar de `localhost`
@@ -207,19 +177,16 @@ Para producao, use [docs/producao-systemd.md](docs/producao-systemd.md) ou rode
 
 ---
 
-## 7. Variantes de imagem
+## 7. Extração e modelos
 
-| Variante | Tamanho aprox. | Docling | OCR | Uso recomendado |
-|----------|----------------|---------|-----|-----------------|
-| **docling** | ~4-6 GB | ✅ Sim | ✅ Nativo (CPU) | Precisão máxima em documentos |
-| **slim**   | ~2 GB   | ❌ Não | ❌ Fallback pymupdf | Testes rápidos, recursos limitados |
+A aplicação publica uma imagem e depende da API Toolbox para extração estrutural. Configure o provedor e seu cache no serviço Toolbox. O Dockerfile da aplicação não aceita `WITH_DOCLING` e o workflow atual não publica variantes `-slim`.
 
-A variante **docling** é a padrão e oferece:
-- Detecção de tabelas, figuras e fórmulas
-- OCR nativo CPU-only (sem GPU)
-- Extração estrutural mais precisa
+Para diagnosticar a conexão e validar uma extração:
 
-A variante **slim** faz fallback automático para `pymupdf` com um aviso no log.
+```bash
+docker compose exec acessilia python -m scripts.check_toolbox
+docker compose exec acessilia python -m scripts.manifest /app/path/to/document.pdf
+```
 
 ---
 

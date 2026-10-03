@@ -81,19 +81,19 @@ A documentação completa — onde ficam os arquivos de i18n, como adicionar uma
 
 ## Testes
 
-Instale as dependências de desenvolvimento e os extras usados pelo CI:
+Instale as dependências de desenvolvimento usadas pelo CI:
 
 ```bash
-poetry install --with dev --extras docling
+poetry install --with dev
 ```
 
 Execute a suíte completa da pasta `tests/`:
 
 ```bash
-poetry run pytest
+poetry run pytest -m "not e2e"
 ```
 
-O GitHub Actions repete essa validação em Python 3.11 nas instalações slim e Docling para todo pull request direcionado à `main`. A variante Docling também converte um PDF real. Falhas, erros e testes pulados são rejeitados. Consulte o [guia de contribuição](CONTRIBUTING.md) para preparar o ambiente e entender o fluxo de revisão.
+O GitHub Actions executa a suíte em Python 3.11 para PRs direcionados a `main`, `develop` e `release/**`. Falhas, erros e skips inesperados são rejeitados. Os testes `e2e` exigem uma Toolbox real e são executados separadamente. Consulte o [guia de contribuição](CONTRIBUTING.md).
 
 ## Notebooks Interativos
 
@@ -114,10 +114,7 @@ Ou abra-os diretamente no VS Code e execute as células com o suporte nativo a n
 
 ### Usando a imagem pronta
 
-Depois que o CI da `main` passa, o GitHub Actions publica automaticamente duas imagens Linux amd64 no GitHub Container Registry:
-
-- `main`: inclui Docling, RapidOCR e PyTorch CPU para análise estrutural completa;
-- `main-slim`: omite Docling, RapidOCR e PyTorch para uma distribuição menor.
+Depois que o CI passa em `main`, `develop` ou `release/**`, o workflow Delivery valida e publica uma imagem Linux amd64. Docling/RapidOCR são serviços remotos da Toolbox, não dependências da imagem da aplicação.
 
 ```bash
 docker pull ghcr.io/a11ydevs/acessilia:main
@@ -129,7 +126,7 @@ docker run --rm \
         ghcr.io/a11ydevs/acessilia:main
 ```
 
-Use `ghcr.io/a11ydevs/acessilia:main-slim` no mesmo comando para a variante slim. Para reproduzir uma versão exata, use `sha-<commit>` ou `sha-<commit>-slim`, mostradas na execução do workflow **Delivery**.
+Para reproduzir uma versão exata, use a tag `sha-<7 caracteres do commit>` ou o digest mostrado pelo workflow **Delivery**.
 
 Para um servidor de producao com atualizacao automatica da `main`, use:
 
@@ -147,34 +144,22 @@ docker compose up -d --build
 
 O container expõe `8000` (API) e `8001` (web), persiste tudo em `./var` e roda o healthcheck em `/api/v1/health`.
 
-Para construir somente a variante slim:
+### Extração estrutural remota
+
+Use `STRUCTURER=toolbox`, `PIPELINE_ENGINE=pddl` e `TOOLBOX_PROVIDER=docling`. Configure `TOOLBOX_BASE_URL` para uma instância acessível; dentro do Docker, `http://host.docker.internal:8002` permite alcançar a Toolbox no host. Modelos e cache do provedor pertencem ao serviço Toolbox. O volume `/app/var` guarda os dados, temporários e logs da aplicação.
 
 ```bash
-docker build -f infra/Dockerfile --build-arg WITH_DOCLING=false -t acessilia:slim .
+poetry run python -m scripts.check_toolbox
+poetry run python -m scripts.manifest tests/fixtures/tutorials/java-oo-3pgs.pdf
 ```
 
-### Cache de modelos Docling e RapidOCR
+O primeiro comando consulta saúde/capacidades; o segundo extrai e valida um manifesto pela API. A geração do PDDL é determinística. Vision/Data podem enriquecer imagens e tabelas antes do planejamento. A validação do plano é um dry-run opcional.
 
-Nenhum modelo é embutido nas imagens distribuídas. No primeiro processamento com Docling, os modelos são baixados em tempo de execução; por isso essa primeira conversão é mais lenta. O volume `/app/var` deve ser persistido para que execuções seguintes funcionem com os mesmos arquivos, inclusive sem rede.
+### Utilitários locais de fórmulas
 
-- Hugging Face: `/app/var/cache/huggingface` (`HF_HOME`)
-- RapidOCR: `/app/var/cache/rapidocr` (`RAPIDOCR_CACHE_DIR`)
+O helper local preservado aceita `FORMULA_CODEFORMULA_TIMEOUT` (padrão: 120 segundos positivos e finitos, inclusive frações). Valores inválidos geram aviso e usam 120. O orçamento inclui preparação do recorte, inicialização do interpretador/modelo e inferência, inclusive downloads. Operações do SO e limpeza/leitura podem acrescentar overhead. O helper exige grupos de processos POSIX e o stack de modelos instalado separadamente; caso contrário retorna o fallback vazio.
 
-Comportamento:
-
-- Na primeira execução com Docling, os pesos são baixados para o volume ou copiados para ele.
-- Nas execuções seguintes, os arquivos são restaurados automaticamente antes de inicializar o `RapidOCR`.
-- Remover `./var` remove os caches e força um novo download.
-
-Exemplo:
-
-```bash
-docker run --rm -e STRUCTURER=docling -v "$PWD/var:/app/var" \
-        ghcr.io/a11ydevs/acessilia:main \
-        python scripts/benchmark_pipelines.py tests/fixtures/tutorials/java-oo-3pgs.pdf \
-        -o temp/output/regression-bench/java-oo-3pgs-offline/docling \
-        --mode normal --export-formats txt,pdf,pdf_ua --pddl-extractor-backend docling
-```
+A inferência usa um filho novo; em timeout, encerra e recolhe seu grupo de processos. O JSON é limitado a 8192 bytes e o LaTeX a 2000 caracteres; resultado inválido ou excessivo também retorna fallback. O orçamento não cobre o OCR anterior. Esses utilitários são separados do fluxo PDDL atual; seus testes com filhos locais não medem inferência real. Os antigos switches `DOCLING_FORMULA_ENRICHMENT` e `FORMULA_IMAGE_CASCADE` não têm consumidores na aplicação.
 
 ## Contribuindo
 

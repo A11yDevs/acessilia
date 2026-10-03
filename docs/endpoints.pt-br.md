@@ -46,7 +46,7 @@ Definida em [backend/api/app.py](../backend/api/app.py), com as rotas em [backen
 Observações:
 
 - **Erros sempre em JSON** (`{"detail": "..."}`): `400` validação, `404` não encontrado, `429` rate limit, `500` erro interno. Há um limite global por IP além dos por rota.
-- O campo `pipeline` no histórico registra qual motor rodou o job — `legacy` ou `pddl` (veja `PIPELINE_ENGINE` em [architecture.md](architecture.md)).
+- O campo `pipeline` no histórico registra qual motor rodou o job — `pddl` nos novos jobs; registros históricos podem conter `legacy` (veja [architecture.pt-br.md](architecture.pt-br.md)).
 - Documentação interativa padrão do FastAPI em `GET /docs` e `GET /openapi.json`.
 
 ---

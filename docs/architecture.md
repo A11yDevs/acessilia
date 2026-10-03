@@ -3,14 +3,9 @@
 You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](architecture.pt-br.md)
 
 ## Overview
-The system converts documents into accessible formats through a multi-agent extraction pipeline (local-first structural extraction with PyMuPDF/Docling plus Agno-powered multimodal AI vision and data agents), a canonical document pipeline, deterministic validation, and format-specific renderers. The architecture is modular: **backend/** holds the domain logic plus the REST API that exposes it, **frontend/** holds the interface clients (Telegram, Web, CLI) that talk to that API, and **infra/** holds the Dockerfile (the Compose file sits at the repository root).
+The system converts documents into accessible formats through a multi-agent extraction pipeline (structural extraction through Acessilia Toolbox plus Agno-powered multimodal AI vision and data agents), a canonical document pipeline, deterministic validation, and format-specific renderers. The architecture is modular: **backend/** holds the domain logic plus the REST API that exposes it, **frontend/** holds the interface clients (Telegram, Web, CLI) that talk to that API, and **infra/** holds the Dockerfile (the Compose file sits at the repository root).
 
-The system combines **deterministic planning with AI-driven execution**: deterministic functions (extraction, PDDL problem generation, contract validation) are the source of truth, and LLMs provide interpretation and description. Two pipeline engines coexist, selected by the `PIPELINE_ENGINE` setting:
-
-- **`legacy`** (default): the direct orchestrated pipeline — `AccessibilityOrchestrator` runs Reader → Vision/Data → Editor.
-- **`pddl`**: the planning-based pipeline — a processing manifest is extracted, a PDDL plan is generated and validated, and an Agno Workflow executor applies it. See [pmv_agno_pddl.md](pmv_agno_pddl.md).
-
-Both engines converge on the same canonical document and the same renderers.
+The system combines **deterministic planning with AI-driven execution**. The only engine is `pddl`: it extracts a manifest through Acessilia Toolbox, enriches it with Vision/Data and generates a PDDL plan, optionally validated by an Agno Workflow dry run. `PIPELINE_ENGINE` accepts `pddl` and its `pmv` alias; `legacy` and unknown names are rejected. See [pmv_agno_pddl.md](pmv_agno_pddl.md).
 
 ---
 
@@ -19,13 +14,10 @@ Both engines converge on the same canonical document and the same renderers.
 ### 0. Backend (`backend/`) — Interface-agnostic business logic and AI pipeline
 
 #### 0.1. Multi-Agent Pipeline & Orchestration (`backend/agents/`)
-- [backend/agents/orchestrator.py](../backend/agents/orchestrator.py): `AccessibilityOrchestrator` coordinates the multi-agent execution pipeline, cache lookup, task state, history, and status callbacks.
-- [backend/agents/reader_agent.py](../backend/agents/reader_agent.py): `ReaderAgent` performs local-first PDF/image structural parsing (via PyMuPDF or Docling), splits pages, and classifies content regions (image, table, formula, text).
+- [backend/agents/pddl_orchestrator.py](../backend/agents/pddl_orchestrator.py): coordinates Toolbox extraction, PDDL planning and validated execution.
 - [backend/agents/vision_agent.py](../backend/agents/vision_agent.py): `VisionAgent` utilizes Agno (`agno.agent.Agent`) and LLM multimodal capabilities (`agno.media.Image`) to produce detailed alt-text and audio descriptions for visual elements and scanned pages.
 - [backend/agents/data_agent.py](../backend/agents/data_agent.py): `DataAgent` utilizes Agno (`agno.agent.Agent`) and LLM capabilities to convert complex tables and mathematical formulas into structured Markdown and LaTeX representations.
-- [backend/agents/editor_agent.py](../backend/agents/editor_agent.py): `EditorAgent` sanitizes content and deduplicates repeated passages via content fingerprints (`content_fingerprint` in [backend/tools/text_tools.py](../backend/tools/text_tools.py), which normalizes the text before hashing). The current implementation uses Python's built-in `hash()` and should be swapped for a stable hash later; `ReaderAgent` uses the same fingerprints to drop regions repeated across pages.
 - [backend/agents/state_manager.py](../backend/agents/state_manager.py): in-memory task state machine with cooperative cancellation support.
-- [backend/agents/types.py](../backend/agents/types.py): shared data contracts and task types (`RegionTask`).
 
 #### 0.2. AI Client Integration (`backend/ai/`)
 - [backend/ai/models/ai_client.py](../backend/ai/models/ai_client.py): central `get_agno_model()` initializer that instantiates Agno Model wrappers for Ollama or OpenRouter based on environment settings.
@@ -42,21 +34,19 @@ Both engines converge on the same canonical document and the same renderers.
 - [backend/tools/logger.py](../backend/tools/logger.py): centralized loguru logger setup.
 - [backend/tools/validators.py](../backend/tools/validators.py): file extension and size validation.
 - [backend/tools/pdf_splitter.py](../backend/tools/pdf_splitter.py): single-page PDF splitter.
-- [backend/tools/image_converter.py](../backend/tools/image_converter.py): PDF page to PNG conversion.
-- [backend/tools/image_enhancer.py](../backend/tools/image_enhancer.py): OpenCV deskew, CLAHE contrast, and denoise for scanned pages.
+- [backend/tools/toolbox_pdf_tools.py](../backend/tools/toolbox_pdf_tools.py): remote PDF splitting/rendering with local PyMuPDF fallback.
 - [backend/tools/text_processor.py](../backend/tools/text_processor.py): text normalization and Markdown parsing.
-- [backend/tools/image_tools.py](../backend/tools/image_tools.py): image cropping and region extraction.
 - [backend/tools/prompt_tools.py](../backend/tools/prompt_tools.py): prompt loader and template resolver.
 
 #### 0.5. Planning Layer (`backend/core/`) — PDDL engine
 
-Used when `PIPELINE_ENGINE=pddl`. It turns document structure into an explicit plan before any AI runs, so task ordering and dependencies are deterministic and auditable.
+The PDDL engine extracts the manifest through Toolbox and enriches images/tables with Vision/Data before planning. PDDL problem compilation and method contracts are deterministic; the executor validates the plan in dry-run mode when enabled. `pmv` is an alias of `pddl`.
 
-- `backend/core/manifest/`: the Informational-Structural agent extracts a `processing-manifest.json` from the document (regions, types, and processing obligations) via Docling or PyMuPDF extractors.
+- `backend/core/manifest/`: the Informational-Structural agent extracts a `processing-manifest.json` from the document (regions, types, and processing obligations) through Acessilia Toolbox.
 - `backend/core/planning/`: the `PlannerAgent` compiles the manifest plus a PDDL domain into a problem, generates a `nominal-plan.json` (internal planner or Fast Downward backend), and validates it. PDDL problem generation is deterministic — no LLM writes PDDL.
-- `backend/core/execution/`: the Executor applies the validated plan as an Agno Workflow, invoking the Vision/Data agents where the plan requires them, and produces an `execution-report.json`.
+- `backend/core/execution/`: the Executor traverses the validated plan as an Agno Workflow and, in the application’s optional dry run, produces an `execution-report.json` without running real methods.
 - `backend/core/agents/fusion_agent.py`: the `FusionAgent` exposes deterministic Agno tools over the pure `docstruct` library — `fuse_providers`, `audit_document`, `classify_block`, and `needs_reinfer`. The `dual-provider-fusion` PDDL method reuses `backend.pipeline.fusion.extract_fused` and is only admissible when `FUSION_MODE=dual`. See [docstruct_algorithms.md](docstruct_algorithms.md) for how these algorithms work.
-- `backend/agents/pddl_orchestrator.py`: coordinates the manifest → plan → execution phases, with fallback to deterministic extraction if planning fails.
+- `backend/agents/pddl_orchestrator.py`: coordinates extraction → enrichment → planning → optional dry run → output. Planning errors propagate.
 
 The PDDL domain lives under `backend/core/planning/domains/`. The JSON schemas (manifest, plan, comparison, execution report) live in `schemas/` at the repository root and are generated by `scripts/generate_pmv_schemas.py`.
 
@@ -74,6 +64,7 @@ The PDDL domain lives under `backend/core/planning/domains/`. The JSON schemas (
 
 #### Web Panel (`frontend/web/`)
 - [frontend/web/app.py](../frontend/web/app.py): server-rendered HTML panel. It is a thin client of the REST API — upload, status, and download are delegated to `backend/api` via `frontend/clients/api_client.py`.
+- [frontend/web/templates/base.html](../frontend/web/templates/base.html): shared HTML shell, styles and footer; the basic, advanced and download pages keep their own content.
 
 #### Command Line Interface (`frontend/cli/`)
 - [frontend/cli/run.py](../frontend/cli/run.py): CLI entrypoint for batch processing and standalone execution.
@@ -100,7 +91,7 @@ The PDDL domain lives under `backend/core/planning/domains/`. The JSON schemas (
 
 ## Layering & Dependency Direction
 
-The codebase follows a pragmatic layered architecture with a top-down flow: Interface → Orchestration → Extraction → Canonical Document → Output. Infrastructure services and shared tools support multiple layers but do not own business decisions. A few controlled exceptions exist: `backend/adapters/exporters` is a thin compatibility wrapper over `backend/export`, and the orchestrator coordinates both processing and infrastructure concerns (cache, history).
+The codebase follows a pragmatic layered architecture with a top-down flow: Interface → Orchestration → Extraction → Canonical Document → Output. Infrastructure services and shared tools support multiple layers but do not own business decisions. The processing service coordinates the workflow, cache and history; the worker calls the exporters in `backend/export` directly.
 
 ---
 
@@ -109,11 +100,7 @@ The codebase follows a pragmatic layered architecture with a top-down flow: Inte
 1. User submits a document via the REST API directly, or through the Telegram bot, Web panel, or CLI (which call the API).
 2. The interface handler validates the file extension and size.
 3. The file is saved and enqueued in `ProcessingQueue`.
-4. The worker dequeues the task and runs the pipeline for the active engine (`PIPELINE_ENGINE`): the `legacy` orchestrator (`AccessibilityOrchestrator.process()`, described below) or the `pddl` orchestrator (manifest → plan → execution). Both produce the same canonical document. The legacy flow:
-   - Registers task in `StateManager` and checks local text cache.
-   - **`ReaderAgent`** splits pages, extracts local text (PyMuPDF/Docling), and classifies regions (images, tables, formulas, text).
-   - **`VisionAgent`** and **`DataAgent`** run in parallel to describe visual elements and structure data using Agno `Agent` instances.
-   - **`EditorAgent`** sanitizes results, applies deduplicação via fingerprints, and inserts accessibility tags into the final canonical structure.
+4. The worker calls `backend.service.process()`, which registers the task and checks the cache. The PDDL orchestrator extracts the manifest through Toolbox, generates and validates the plan, and executes the selected steps. Vision/Data enrich the planned regions; results feed the canonical document.
 5. Canonical validators verify schema adherence, heading hierarchy, and output safety.
 6. Renderers and export adapters build the output artifacts (TXT, DOCX, PDF, PDF/UA, HTML, MP3).
 7. Output files are packaged and delivered to the user (via Telegram message, Web download link, or email).
@@ -135,7 +122,9 @@ The AgentOS runtime is not part of `ENABLED_INTERFACES`; it is started separatel
 
 - **Agno Framework:** multi-agent orchestration and unified multimodal LLM interface.
 - **AI Providers:** Ollama API (local models like LLaVA/Qwen-VL) or OpenRouter API (cloud models like Claude/GPT-4o).
-- **Processing Libraries:** PyMuPDF, Docling, Pillow, OpenCV, reportlab, python-docx, pypdf, edge-tts, aiogram, FastAPI.
+- **Processing Libraries:** PyMuPDF, Docling, Pillow, OpenCV, reportlab, python-docx, edge-tts, aiogram, FastAPI.
+
+Local PDF splitting and rendering use PyMuPDF. Splitting preserves page order, geometry, links, annotations and form fields, with a default limit of 50 pages. Links to other extracted pages point to the sibling page PDFs; links beyond the limit point to the original source. The minimum supported PyMuPDF version is 1.28.2, validated for copying form fields and navigation on rotated, cropped pages. Named destinations and document-level outlines are not exported by this per-page operation.
 
 ---
 
