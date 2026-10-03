@@ -49,7 +49,7 @@ def main() -> int:
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--policy", default="v12", help="v12|v13|default")
     ap.add_argument("--min-len", type=int, default=0)
-    ap.add_argument("--garbage-frac", type=float, default=0.0)
+    ap.add_argument("--garbage-frac", type=float, default=None)
     ap.add_argument("--decor-wins", action="store_true", default=True)
     ap.add_argument("--no-decor-wins", dest="decor_wins", action="store_false")
     ap.add_argument("--drop-docling", default="group+unknown")

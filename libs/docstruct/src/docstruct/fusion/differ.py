@@ -210,6 +210,13 @@ def merge_blocks(
         int(i): int(j)
         for i, j in ri_ci
         if cost[i][j] <= policy.align_tau
+        and not (
+            D[int(i)].kind == "text"
+            and M[int(j)].kind == "text"
+            and len(D[int(i)].text) >= 20
+            and len(M[int(j)].text) >= 20
+            and sim(D[int(i)].text, M[int(j)].text) < 0.15
+        )
     }
 
     # esqueleto não confiável quando quase nada casa (scans rotacionados/lixo)
