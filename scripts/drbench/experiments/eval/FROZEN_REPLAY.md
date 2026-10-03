@@ -119,3 +119,13 @@ native traversal is experimental and disabled by default.
 
 Evaluate provider Markdown separately from fusion Markdown when assessing an
 adapter change. Neutral fusion scores can conceal a provider conversion loss.
+
+Native MinerU indices are currently transported without changing iteration or
+fusion order. The adapter stores provider, source, page index and native block
+index in `metadata.reading_order_context`. `provider_blocks`, the persisted
+block loader and both library/CLI conversions retain that context. `DiffBlock`
+stores the contributing contexts in `order_sources`; block joins concatenate
+them instead of claiming one native index for the joined block. Figures and
+empty Markdown still follow the existing loader filters. Legacy blocks without
+context have no order sources. This transport step requires identical provider
+and fusion Markdown before experimenting with consuming those indices.
