@@ -210,3 +210,37 @@ The smaller gain and observed regression support keeping the option disabled
 by default. A further 120-page DrDocBench holdout and a separate 120-page
 OmniDocBench diagnostic are in progress; no result from those unfinished runs
 is claimed here.
+
+## Further page holdout (2026-10-03)
+
+A further 120 previously unused DrDocBench pages were selected before scoring
+(seed `3102027`, the same pinned dataset revision), round robin across 66 books.
+These books overlap earlier experiments: this is a page holdout, **not another
+unseen-book test**. None of the 180 previously explored page IDs were reused.
+
+Official md2md/window 1, no CDM, same frozen balance 0.7 and table-preserving
+baseline. All 120 predictions are present; 115 pages receive an Overall score
+from the evaluator, 111 reading-order scores, 5 table scores and 4 formula edit
+scores. [Per-page CSV and sample IDs](drbench/experiments/xycut-new120-local_per_page.csv).
+
+| Metric | Baseline | XY-cut | Paired delta | 95% interval by book |
+|---|---:|---:|---:|---|
+| Mean per-page Overall, no CDM (n=115) | 76.7906 | 77.9596 | +1.1691 | [0.3136, 2.2990] |
+| Reading order (n=111) | 73.1632 | 75.5673 | +2.4041 | [0.6349, 4.6594] |
+
+There are 9 improvements, 0 regressions and 106 ties
+in Overall. The component-average no-CDM proxy is
+67.7168 → 68.5241; it differs
+from mean per-page Overall because component coverage differs. Neither is an
+actual EvalAI submission score.
+
+The paragraph-content multiset is byte-equivalent after stripping outer
+whitespace for **all 120 outputs**. Tables and formula edit scores are unchanged.
+Text edit score improves on one page (+0.0177 in the mean)
+despite identical extracted content: reordering affects evaluator matching,
+so this must not be attributed to better OCR. Both variants were independently
+re-evaluated with identical per-page metrics.
+
+This supports the optional ordering pass on additional pages; the smaller
+unseen-book result above still limits claims of generalization. Full cluster
+dev-986 validation remains required. OmniDocBench and TeleOCR runs are unfinished.

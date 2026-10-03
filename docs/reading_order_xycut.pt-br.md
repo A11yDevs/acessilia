@@ -205,3 +205,33 @@ Há 4 melhorias, 1 piora e 54 empates
 O ganho menor e a regressão observada justificam manter a opção desligada por
 padrão. Outros 120 exemplos do DrDocBench e 120 do OmniDocBench estão em
 processamento; seus resultados não são apresentados como concluídos.
+
+## Mais 120 páginas de validação (03/10/2026)
+
+Selecionadas antes de avaliar, semente `3102027`, sem repetir as 180 páginas
+anteriores; 66 livros, mas com sobreposição de livros com os experimentos
+anteriores. Portanto é validação em páginas novas, **não em livros novos**.
+[CSV e IDs da amostra](drbench/experiments/xycut-new120-local_per_page.csv).
+
+Avaliador oficial md2md, janela 1, sem CDM; balance 0,7 congelado e baseline
+com recuperação de HTML. Todas as 120 predições presentes. Cobertura: 115
+páginas com Overall, 111 com RO, 5 com TEDS e 4 com distância de edição de fórmulas.
+
+Média por página de Overall: 76.7906 → 77.9596
+(+1.1691); IC 95% por livros
+[0.3136, 2.2990].
+RO: 73.1632 → 75.5673 (+2.4041).
+Overall: 9 melhorias, 0 pioras, 106 empates.
+A média dos componentes sem CDM foi 67.7168 →
+68.5241; difere da média por página por causa da cobertura
+diferente dos componentes. Nenhuma é nota de uma submissão ao EvalAI.
+
+O multiconjunto de conteúdo dos parágrafos foi preservado nas 120 saídas,
+após desconsiderar espaços nas bordas. TEDS e fórmulas não mudam. O avaliador
+altera a nota de texto em uma página (+0.0177 na média) com
+conteúdo idêntico; não é melhora de OCR. A reavaliação independente repetiu
+exatamente as métricas por página de ambas as variantes.
+
+A evidência favorece a opção de ordem em páginas adicionais, mas o resultado
+menor nos livros novos acima ainda limita a generalização. Resta confirmar no
+dev-986 do cluster; OmniDocBench e TeleOCR ainda estão em processamento.
