@@ -1,7 +1,7 @@
 """Toolbox-backed PDF split and render operations.
 
-Replaces pdf_splitter.py and image_converter.py with remote calls
-to the Acessilia Toolbox. Falls back to local PyMuPDF/pypdf on failure.
+Provides PDF splitting and page rendering through remote calls
+to the Acessilia Toolbox. Falls back to local PyMuPDF on failure.
 """
 
 from __future__ import annotations
