@@ -108,3 +108,14 @@ swallowing guards, content selection and fallback stay enabled. The current rule
 requires the full normalized content in a selected emitted text block and at
 least 0.6 containment of the candidate box in that emitted block's box. Missing
 coordinates do not justify deletion; numeric punctuation is preserved.
+
+For a Docling native-order ablation, add `"docling_native_order": true` to the
+candidate variant and leave the baseline setting absent or false. This passes
+`native_order=True` to the frozen Toolbox adapter; use a revision supporting that
+keyword. False leaves constructor defaults unchanged, preserving replay of older
+adapters. The manifest records the boolean and extraction configuration records
+the actual adapter options. The current adapter defaults to collection order;
+native traversal is experimental and disabled by default.
+
+Evaluate provider Markdown separately from fusion Markdown when assessing an
+adapter change. Neutral fusion scores can conceal a provider conversion loss.
