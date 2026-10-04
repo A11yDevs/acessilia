@@ -104,7 +104,10 @@ def decor_role(b: DiffBlock, running: frozenset[str] = frozenset()) -> Optional[
     if b.kind in ("table", "formula"):
         return None
     if PAGENUM_RE.match(b.md) and len(b.md) <= 16:
-        return "page_number"
+        bx = b.box
+        cy = center(bx)[1] if bx else 0.5
+        if b.type in DECOR_TYPES or not (0.12 <= cy <= 0.88):
+            return "page_number"
     role = DECOR_TYPES.get(b.type)
     if role is None and running and b.text in running and b.box is not None:
         cy = center(b.box)[1]

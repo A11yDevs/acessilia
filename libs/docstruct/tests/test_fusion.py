@@ -297,3 +297,24 @@ def test_high_iou_preserves_match_under_ocr_degradation():
     assert out == [clean_text]
     assert stats.get("unilateral-docling", 0) == 0
     assert stats.get("pair-text-auto->docling(quality)", 0) == 1
+
+
+def test_interior_paragraph_numbers_not_treated_as_page_numbers():
+    """Números isolados no miolo da página (0.12 <= cy <= 0.88) permanecem no corpo como texto e não vão para decor."""
+    from docstruct.fusion.noise import decor_role
+    # Número no miolo da página (cy = 0.50): não é page_number
+    b_interior = mk("239", box=(0.1, 0.48, 0.2, 0.52), type="paragraph")
+    assert decor_role(b_interior) is None
+
+    # Número na margem superior (cy = 0.05): é page_number
+    b_margin_top = mk("239", box=(0.1, 0.04, 0.2, 0.06), type="paragraph")
+    assert decor_role(b_margin_top) == "page_number"
+
+    # Número na margem inferior (cy = 0.95): é page_number
+    b_margin_bottom = mk("239", box=(0.1, 0.94, 0.2, 0.96), type="paragraph")
+    assert decor_role(b_margin_bottom) == "page_number"
+
+    # Bloco explicitamente tipado como decor: é page_number mesmo no miolo
+    b_explicit = mk("239", box=(0.1, 0.48, 0.2, 0.52), type="page_header")
+    assert decor_role(b_explicit) == "page_number"
+
