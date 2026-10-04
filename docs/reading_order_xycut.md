@@ -223,6 +223,14 @@ baseline. All 120 predictions are present; 115 pages receive an Overall score
 from the evaluator, 111 reading-order scores, 5 table scores and 4 formula edit
 scores. [Per-page CSV and sample IDs](drbench/experiments/xycut-new120-local_per_page.csv).
 
+**Table coverage:** the official parser finds 16 GT tables on 6 pages. The md2md
+evaluator matches tables only when a prediction contains a table in the same
+format. Both variants score 15 tables on 5 pages; the remaining page has no
+predicted table and no TEDS component, rather than a zero penalty. Every component
+mask is identical between baseline and XY-cut, supporting the paired comparison,
+but mean per-page Overall does not fully penalize omitted tables. Rankings across
+providers with different component coverage require this caveat.
+
 | Metric | Baseline | XY-cut | Paired delta | 95% interval by book |
 |---|---:|---:|---:|---|
 | Mean per-page Overall, no CDM (n=115) | 76.7906 | 77.9596 | +1.1691 | [0.3136, 2.2990] |

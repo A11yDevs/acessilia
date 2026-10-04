@@ -217,6 +217,15 @@ Avaliador oficial md2md, janela 1, sem CDM; balance 0,7 congelado e baseline
 com recuperação de HTML. Todas as 120 predições presentes. Cobertura: 115
 páginas com Overall, 111 com RO, 5 com TEDS e 4 com distância de edição de fórmulas.
 
+**Cobertura de tabelas:** o parser oficial encontra 16 tabelas no gabarito em
+6 páginas. O avaliador md2md só casa tabelas quando a predição também contém
+tabela do mesmo formato; as duas variantes receberam TEDS em 15 tabelas de
+5 páginas. A página restante não tem tabela na saída e fica sem componente TEDS,
+em vez de receber zero. A cobertura de todos os componentes é idêntica entre
+baseline e XY-cut, permitindo a comparação pareada, mas a média por página
+não penaliza integralmente tabelas omitidas. Comparações entre extratores com
+coberturas diferentes exigem essa ressalva.
+
 Média por página de Overall: 76.7906 → 77.9596
 (+1.1691); IC 95% por livros
 [0.3136, 2.2990].
