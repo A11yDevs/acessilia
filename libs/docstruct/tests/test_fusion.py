@@ -371,3 +371,29 @@ def test_decor_wins_preserves_body_headings():
     assert len(out) == 2
 
 
+def test_form_metadata_labels_in_margins_become_decor():
+    """Rótulos de metadados/formulário (NAME, CLASS, DATE) nas margens tornam-se decor."""
+    from docstruct.fusion.noise import decor_role
+    b_name_margin = mk("NAME", box=(0.03, 0.01, 0.10, 0.03), type="paragraph")
+    assert decor_role(b_name_margin) == "header"
+
+    b_date_margin = mk("DATE", box=(0.70, 0.01, 0.75, 0.03), type="paragraph")
+    assert decor_role(b_date_margin) == "header"
+
+    # No miolo da página, não deve ser tratado como decor
+    b_name_body = mk("NAME", box=(0.03, 0.40, 0.10, 0.43), type="paragraph")
+    assert decor_role(b_name_body) is None
+
+
+def test_decor_tail_same_line_sorts_ltr():
+    """Itens de decor na mesma linha horizontal são ordenados da esquerda para a direita (LTR)."""
+    from docstruct.fusion.noise import decor_tail
+    b_name = mk("NAME", box=(0.04, 0.025, 0.10, 0.035), role="header")
+    b_class = mk("CLASS", box=(0.43, 0.024, 0.49, 0.034), role="header")
+    b_date = mk("DATE", box=(0.70, 0.023, 0.75, 0.033), role="header")
+    # Mesmo com cy ligeiramente menor em DATE (0.028 vs 0.030), a quantização ordena por cx
+    res = decor_tail([b_name, b_class, b_date], [])
+    assert res == ["NAME", "CLASS", "DATE"]
+
+
+

@@ -31,6 +31,10 @@ CHAPTER_RE = re.compile(
     r"^(?:chapter|section|part|volume|vol\.|unit|lesson|book)\s+\d+$",
     re.I,
 )
+FORM_LABEL_RE = re.compile(
+    r"^(?:name|class|date|period|score|grade|teacher|student(?:\s+name)?|subject|assignment|course|semester)\s*[:_—\-]*$",
+    re.I,
+)
 MATH_RE = re.compile(
     r"\\(frac|sum|int|sqrt|lim|partial|infty|prod|left|right|leq|geq|neq|approx"
     r"|cdot|pm|alpha|beta|theta|pi|sigma|Delta)\b|[=<>]|\^\{?[a-zA-Z]"
@@ -112,6 +116,11 @@ def decor_role(b: DiffBlock, running: frozenset[str] = frozenset()) -> Optional[
         cy = center(bx)[1] if bx else 0.5
         if b.type in DECOR_TYPES or not (0.12 <= cy <= 0.88):
             return "page_number"
+    if FORM_LABEL_RE.match(b.md):
+        bx = b.box
+        cy = center(bx)[1] if bx else 0.5
+        if not (0.08 <= cy <= 0.92):
+            return "header" if cy < 0.5 else "footer"
     role = DECOR_TYPES.get(b.type)
     if role is None and running and b.text in running and b.box is not None:
         cy = center(b.box)[1]
@@ -180,7 +189,13 @@ def decor_tail(dec_d: list[DiffBlock], dec_m: list[DiffBlock]) -> list[str]:
     Docling vence duplicatas."""
     seen = {d.text for d in dec_d}
     items = list(dec_d) + [m for m in dec_m if m.text not in seen]
-    items.sort(key=lambda b: (DECOR_ORDER[b.role or "footer"], center(b.box)[1], center(b.box)[0]))
+    items.sort(
+        key=lambda b: (
+            DECOR_ORDER[b.role or "footer"],
+            round(center(b.box)[1], 2) if b.box else 0.5,
+            center(b.box)[0] if b.box else 0.5,
+        )
+    )
     return [b.md for b in items]
 
 
