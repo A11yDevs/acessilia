@@ -288,6 +288,10 @@ def group_split_blocks(
                 continue
             if a.kind != b.kind:
                 continue
+            # Evita que um mega-bloco sub-segmentado de B engula e funda múltiplos
+            # parágrafos válidos de A em um bloco gigante.
+            if area(b.box) > 0.35 or (b.box[3] - b.box[1]) > 0.40:
+                continue
             f = contain_frac(a.box, b.box)
             if f > bf:
                 best, bf = j, f
@@ -299,7 +303,7 @@ def group_split_blocks(
     merged_first: dict[int, DiffBlock] = {}
     absorbed: set[int] = set()
     for j, idxs in groups.items():
-        if len(idxs) < 2:
+        if len(idxs) < 2 or len(idxs) > 4:
             continue
         idxs.sort()
         parts = [A[i] for i in idxs]

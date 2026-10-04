@@ -318,3 +318,22 @@ def test_interior_paragraph_numbers_not_treated_as_page_numbers():
     b_explicit = mk("239", box=(0.1, 0.48, 0.2, 0.52), type="page_header")
     assert decor_role(b_explicit) == "page_number"
 
+
+def test_mega_block_does_not_merge_separate_paragraphs():
+    """Mega-bloco sub-segmentado do parceiro (área > 0.35 ou altura > 0.40) não deve fundir parágrafos separados."""
+    policy = FusionPolicy(merge_paragraphs=True)
+    # 5 parágrafos separados ocupando a página
+    D = [
+        mk(f"Paragraph {i} with distinct information and words.", box=(0.1, 0.1 * i, 0.9, 0.1 * i + 0.08))
+        for i in range(1, 6)
+    ]
+    # Mega-bloco cobrindo quase a página toda (área > 0.5, altura > 0.6)
+    M = [
+        mk("Mega block text containing everything", box=(0.05, 0.05, 0.95, 0.75))
+    ]
+    out, stats = merge_blocks(D, M, policy)
+    assert stats.get("merge-split-docling", 0) == 0
+    # Todos os 5 parágrafos de D foram preservados sem serem esmagados em um único bloco
+    for i in range(1, 6):
+        assert any(f"Paragraph {i}" in x for x in out)
+
