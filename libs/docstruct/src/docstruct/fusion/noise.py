@@ -27,6 +27,10 @@ DECOR_ORDER = {"header": 0, "footer": 1, "page_number": 2}
 TRAIL_NUM_RE = re.compile(
     r"^(?:(.*?[A-Za-z].*?)\s+(\d{1,4})|(\d{1,4})\s+(.*?[A-Za-z].*?))$"
 )
+CHAPTER_RE = re.compile(
+    r"^(?:chapter|section|part|volume|vol\.|unit|lesson|book)\s+\d+$",
+    re.I,
+)
 MATH_RE = re.compile(
     r"\\(frac|sum|int|sqrt|lim|partial|infty|prod|left|right|leq|geq|neq|approx"
     r"|cdot|pm|alpha|beta|theta|pi|sigma|Delta)\b|[=<>]|\^\{?[a-zA-Z]"
@@ -101,7 +105,7 @@ def demote_formulas(blocks: list[DiffBlock], stats: Counter, tag: str) -> list[D
 
 
 def decor_role(b: DiffBlock, running: frozenset[str] = frozenset()) -> Optional[str]:
-    if b.kind in ("table", "formula"):
+    if b.kind in ("table", "formula", "heading"):
         return None
     if PAGENUM_RE.match(b.md) and len(b.md) <= 16:
         bx = b.box
@@ -146,7 +150,11 @@ def split_decor(
             continue
         if b.type not in DECOR_TYPES and role != "page_number":
             stats[f"decor-{tag}-running"] += 1
-        m = TRAIL_NUM_RE.match(b.md) if role != "page_number" else None
+        m = (
+            TRAIL_NUM_RE.match(b.md)
+            if (role != "page_number" and not CHAPTER_RE.match(b.md))
+            else None
+        )
         if m:
             txt, num = (m.group(1), m.group(2)) if m.group(1) else (m.group(4), m.group(3))
             decor.append(

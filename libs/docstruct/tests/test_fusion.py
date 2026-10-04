@@ -337,3 +337,37 @@ def test_mega_block_does_not_merge_separate_paragraphs():
     for i in range(1, 6):
         assert any(f"Paragraph {i}" in x for x in out)
 
+
+def test_structural_heading_not_treated_as_decor():
+    """Títulos estruturais (kind='heading') nunca são classificados como decor/page_number."""
+    from docstruct.fusion.noise import decor_role
+    # Título '1' na margem superior: permanece heading do corpo
+    b_title = mk("1", box=(0.1, 0.02, 0.2, 0.06), type="title", kind="heading", md="# 1")
+    assert decor_role(b_title) is None
+
+
+def test_chapter_title_not_split_into_page_number():
+    """Cabeçalhos de capítulo/seção como 'Chapter 5' não são decompostos em page_number avulso."""
+    from docstruct.fusion.noise import split_decor
+    b_chap = mk("Chapter 5", box=(0.1, 0.92, 0.4, 0.96), type="page_footer", md="Chapter 5")
+    stats = Counter()
+    body, decor = split_decor([b_chap], stats, "docling")
+    assert any(b.text == "Chapter 5" for b in decor)
+    assert not any(b.text == "5" and b.role == "page_number" for b in decor)
+    assert stats.get("decor-docling-split-number", 0) == 0
+
+
+def test_decor_wins_preserves_body_headings():
+    """decor_wins não deve deletar headings do corpo do documento."""
+    policy = FusionPolicy(decor_tail=True)
+    heading = mk("INTRODUCTION", box=(0.1, 0.05, 0.9, 0.1), kind="heading", md="# INTRODUCTION")
+    p1 = mk("Body paragraph 1", box=(0.1, 0.15, 0.9, 0.3))
+    # Docling extraiu erroneamente como page_header no mesmo local
+    header = mk("INTRODUCTION", box=(0.1, 0.05, 0.9, 0.1), type="page_header", md="INTRODUCTION")
+    out, stats = merge_blocks([header, p1], [heading, p1], policy, decor_wins=True)
+    assert out[0] == "# INTRODUCTION"
+    assert out[1] == "Body paragraph 1"
+    # O heading não foi jogado para o final da página
+    assert len(out) == 2
+
+

@@ -156,15 +156,31 @@ def merge_blocks(
             else:
                 kept.append(b)
         if decor_wins:
+            def is_same_block_as_heading(dec_b: DiffBlock) -> bool:
+                for h in D + M:
+                    if h.kind == "heading" and h.text and dec_b.text == h.text:
+                        if dec_b.box and h.box:
+                            if (
+                                iou(dec_b.box, h.box) >= 0.30
+                                or contain_frac(dec_b.box, h.box) >= 0.50
+                                or contain_frac(h.box, dec_b.box) >= 0.50
+                                or abs(center(dec_b.box)[1] - center(h.box)[1]) < 0.05
+                            ):
+                                return True
+                        elif dec_b.text == h.text:
+                            return True
+                return False
+
+            kept = [b for b in kept if not is_same_block_as_heading(b)]
             dec_txt = {b.text for b in kept if b.role != "page_number" and b.text}
             nD, nM = len(D), len(M)
             D = [
                 b for b in D
-                if not (b.kind in ("text", "heading") and b.text in dec_txt)
+                if not (b.kind == "text" and b.text in dec_txt)
             ]
             M = [
                 b for b in M
-                if not (b.kind in ("text", "heading") and b.text in dec_txt)
+                if not (b.kind == "text" and b.text in dec_txt)
             ]
             stats["body-dup-of-decor"] += (nD - len(D)) + (nM - len(M))
         dec_d = [b for b in kept if b in dec_d]
