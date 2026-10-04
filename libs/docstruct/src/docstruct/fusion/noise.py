@@ -16,6 +16,7 @@ from docstruct.fusion.similarity import (
     area,
     center,
     contain_frac,
+    iou,
     sim,
     swallows,
     union_box,
@@ -34,6 +35,9 @@ CHAPTER_RE = re.compile(
 FORM_LABEL_RE = re.compile(
     r"^(?:name|class|date|period|score|grade|teacher|student(?:\s+name)?|subject|assignment|course|semester)\s*[:_—\-]*$",
     re.I,
+)
+_HEADING_CONTINUATION_SUFFIXES = (
+    " and", " or", " of", " for", " to", " in", " the", " with", " &", "-", "–", "—", ":",
 )
 MATH_RE = re.compile(
     r"\\(frac|sum|int|sqrt|lim|partial|infty|prod|left|right|leq|geq|neq|approx"
@@ -108,22 +112,37 @@ def demote_formulas(blocks: list[DiffBlock], stats: Counter, tag: str) -> list[D
     return blocks
 
 
+def is_co_located(b1: DiffBlock, b2: DiffBlock) -> bool:
+    """True se dois blocos ocupam aproximadamente o mesmo espaço físico na página."""
+    if not (b1.box and b2.box):
+        return True
+    return (
+        iou(b1.box, b2.box) >= 0.30
+        or contain_frac(b1.box, b2.box) >= 0.50
+        or contain_frac(b2.box, b1.box) >= 0.50
+        or abs(center(b1.box)[1] - center(b2.box)[1]) < 0.05
+    )
+
+
+def is_decor_duplicate_of_heading(dec_b: DiffBlock, headings: list[DiffBlock]) -> bool:
+    """True se um bloco de decor é na verdade um título estrutural co-localizado."""
+    return any(
+        h.text and dec_b.text == h.text and is_co_located(dec_b, h)
+        for h in headings
+    )
+
+
 def decor_role(b: DiffBlock, running: frozenset[str] = frozenset()) -> Optional[str]:
     if b.kind in ("table", "formula", "heading"):
         return None
+    cy = center(b.box)[1] if b.box else 0.5
     if PAGENUM_RE.match(b.md) and len(b.md) <= 16:
-        bx = b.box
-        cy = center(bx)[1] if bx else 0.5
         if b.type in DECOR_TYPES or not (0.12 <= cy <= 0.88):
             return "page_number"
-    if FORM_LABEL_RE.match(b.md):
-        bx = b.box
-        cy = center(bx)[1] if bx else 0.5
-        if not (0.08 <= cy <= 0.92):
-            return "header" if cy < 0.5 else "footer"
+    if FORM_LABEL_RE.match(b.md) and not (0.08 <= cy <= 0.92):
+        return "header" if cy < 0.5 else "footer"
     role = DECOR_TYPES.get(b.type)
     if role is None and running and b.text in running and b.box is not None:
-        cy = center(b.box)[1]
         role = "header" if cy < 0.5 else "footer"
     return role
 
@@ -338,7 +357,7 @@ def group_split_blocks(
             raw_t0 = re.sub(r"^#+\s*", "", parts[0].md).strip()
             raw_t1 = re.sub(r"^#+\s*", "", parts[1].md).strip() if len(parts) > 1 else ""
             continuation = (
-                raw_t0.lower().endswith((" and", " or", " of", " for", " to", " in", " the", " with", " &", "-", "–", "—", ":"))
+                raw_t0.lower().endswith(_HEADING_CONTINUATION_SUFFIXES)
                 or (len(raw_t1) >= 1 and raw_t1[0].islower())
             )
             if not continuation:

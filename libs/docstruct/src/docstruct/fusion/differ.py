@@ -24,6 +24,7 @@ from docstruct.fusion.noise import (
     demote_formulas,
     fuse_line_runs,
     group_split_blocks,
+    is_decor_duplicate_of_heading,
     is_junk,
     quality,
     split_decor,
@@ -32,6 +33,29 @@ from docstruct.fusion.noise import (
 from docstruct.fusion.similarity import PAGENUM_RE, center, contain_frac, iou, is_duplicate, sim, swallows
 from docstruct.fusion.types import DiffBlock
 from docstruct.policy import FusionPolicy
+
+
+def _is_spurious_text_pair(d: DiffBlock, m: DiffBlock) -> bool:
+    """Descarta matches textuais com baixa similaridade, a menos que haja ancoragem geométrica forte."""
+    if d.kind != "text" or m.kind != "text" or len(d.text) < 20 or len(m.text) < 20:
+        return False
+    if sim(d.text, m.text) >= 0.15:
+        return False
+    if d.box and m.box and iou(d.box, m.box) >= 0.70:
+        return False
+    return True
+
+
+def _is_short_noise(text: str) -> bool:
+    """Descarta ruídos isolados de OCR com <= 2 chars que não sejam dígitos nem marcadores."""
+    core = re.sub(r"\s+", "", text)
+    return (
+        len(core) <= 2
+        and not core.isdigit()
+        and not (len(core) == 1 and core.lower() in ("a", "i"))
+        and not re.match(r"^[a-zA-Z0-9][\.\)\-]$", core)
+        and not PAGENUM_RE.match(text)
+    )
 
 
 def _pick_text(
@@ -156,22 +180,8 @@ def merge_blocks(
             else:
                 kept.append(b)
         if decor_wins:
-            def is_same_block_as_heading(dec_b: DiffBlock) -> bool:
-                for h in D + M:
-                    if h.kind == "heading" and h.text and dec_b.text == h.text:
-                        if dec_b.box and h.box:
-                            if (
-                                iou(dec_b.box, h.box) >= 0.30
-                                or contain_frac(dec_b.box, h.box) >= 0.50
-                                or contain_frac(h.box, dec_b.box) >= 0.50
-                                or abs(center(dec_b.box)[1] - center(h.box)[1]) < 0.05
-                            ):
-                                return True
-                        elif dec_b.text == h.text:
-                            return True
-                return False
-
-            kept = [b for b in kept if not is_same_block_as_heading(b)]
+            headings = [b for b in D + M if b.kind == "heading"]
+            kept = [b for b in kept if not is_decor_duplicate_of_heading(b, headings)]
             dec_txt = {b.text for b in kept if b.role != "page_number" and b.text}
             nD, nM = len(D), len(M)
             D = [
@@ -233,15 +243,7 @@ def merge_blocks(
     match_d2m = {
         int(i): int(j)
         for i, j in ri_ci
-        if cost[i][j] <= policy.align_tau
-        and not (
-            D[int(i)].kind == "text"
-            and M[int(j)].kind == "text"
-            and len(D[int(i)].text) >= 20
-            and len(M[int(j)].text) >= 20
-            and sim(D[int(i)].text, M[int(j)].text) < 0.15
-            and (iou(D[int(i)].box, M[int(j)].box) < 0.70 if (D[int(i)].box and M[int(j)].box) else True)
-        )
+        if cost[i][j] <= policy.align_tau and not _is_spurious_text_pair(D[int(i)], M[int(j)])
     }
 
     # esqueleto não confiável quando quase nada casa (scans rotacionados/lixo)
@@ -278,14 +280,7 @@ def merge_blocks(
         if len(d.text) < min_len and d.kind == "text":
             stats["dropped-docling-short"] += 1
             continue
-        core = re.sub(r"\s+", "", d.text)
-        if (
-            len(core) <= 2
-            and not core.isdigit()
-            and not (len(core) == 1 and core.lower() in ("a", "i"))
-            and not re.match(r"^[a-zA-Z0-9][\.\)\-]$", core)
-            and not PAGENUM_RE.match(d.text)
-        ):
+        if _is_short_noise(d.text):
             stats["dropped-docling-short-noise"] += 1
             continue
         if policy.pick_guard and d.kind == "text" and d.box is not None and (
@@ -303,12 +298,11 @@ def merge_blocks(
             continue
         # Drop only content represented by an emitted block in the same area.
         # Missing coordinates or a discarded provider alternative are not evidence.
-        if unilateral_dedup and policy.pick_guard and d.kind == "text" and any(
-            contain_frac(d.box, other.box) >= 0.6 and is_duplicate(d.md, [other.md])
-            for other in emitted_body
-        ):
-            stats["dropped-docling-duplicate"] += 1
-            continue
+        if unilateral_dedup and policy.pick_guard and d.kind == "text":
+            matched = [o.md for o in emitted_body if contain_frac(d.box, o.box) >= 0.6]
+            if matched and is_duplicate(d.md, matched):
+                stats["dropped-docling-duplicate"] += 1
+                continue
         cx, cy = center(d.box)
         j = min(
             range(len(centers)),
