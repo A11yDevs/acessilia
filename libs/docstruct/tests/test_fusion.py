@@ -282,3 +282,18 @@ def test_content_in_discarded_mineru_alternative_is_not_deduplicated():
     assert parent in out
     assert child in out
     assert stats["dropped-docling-duplicate"] == 0
+
+
+def test_high_iou_preserves_match_under_ocr_degradation():
+    """BBoxes com alto IoU (>= 0.70) permanecem pareados mesmo se OCR de um dos lados estiver degradado (sim < 0.15)."""
+    clean_text = "This is a clean psychological evaluation text block with plenty of words."
+    degraded_text = "d e s n e n x x y y z z w w q q 1 2 3 4 5 6 7 8 9 0"
+    box = (0.1, 0.1, 0.9, 0.3)
+    d = mk(clean_text, box=box)
+    m = mk(degraded_text, box=box)
+    policy = FusionPolicy(pick_guard=1.5, merge_paragraphs=False, decor_tail=False,
+                          junk_filter=False, suppress_regions=False)
+    out, stats = merge_blocks([d], [m], policy)
+    assert out == [clean_text]
+    assert stats.get("unilateral-docling", 0) == 0
+    assert stats.get("pair-text-auto->docling(quality)", 0) == 1

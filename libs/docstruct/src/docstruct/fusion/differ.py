@@ -224,6 +224,7 @@ def merge_blocks(
             and len(D[int(i)].text) >= 20
             and len(M[int(j)].text) >= 20
             and sim(D[int(i)].text, M[int(j)].text) < 0.15
+            and (iou(D[int(i)].box, M[int(j)].box) < 0.70 if (D[int(i)].box and M[int(j)].box) else True)
         )
     }
 
