@@ -244,5 +244,36 @@ página de ambas as variantes. Isso verifica a repetibilidade local; não substi
 revisão externa nem reprodução no cluster.
 
 A evidência favorece a opção de ordem em páginas adicionais, mas o resultado
-menor nos livros novos acima ainda limita a generalização. Resta confirmar no
-dev-986 do cluster; OmniDocBench e TeleOCR ainda estão em processamento.
+menor nos livros novos acima ainda limita a generalização. Resta confirmar no dev-986 do cluster. O resultado XY-cut no Omni segue abaixo; a avaliação separada do TeleOCR continua.
+
+## Diagnóstico externo no OmniDocBench (04/10/2026)
+
+Testei também a configuração congelada `multicol` / balance `0.7` em 120 páginas
+públicas em inglês: 40 com tabelas, 40 com fórmulas sem tabelas e 40 outras.
+Seleção antes das notas, semente `3102027`, revisão
+`aa1ee96d106dbe53d0ae59474d75c6e6d9b53fec` de `opendatalab/OmniDocBench`.
+É um lote diagnóstico balanceado, **não o benchmark completo nem o ranking**.
+[CSV numérico por página](drbench/experiments/xycut-omni120-local_per_page.csv).
+
+O avaliador oficial end-to-end pontua 119 páginas; uma página só com cabeçalho
+fica fora das categorias avaliadas. Cobertura idêntica no par: 108 páginas de
+texto, 119 de ordem, 40 de tabelas e 42 de fórmulas.
+
+RO: 69.7267 → 70.0248 (+0.2981); intervalo 95% por
+grupo de origem [0.0359, 0.6606].
+Overall derivado por página: 78.4555 → 78.6150 (+0.1595),
+intervalo [0.0253, 0.3395];
+6 melhorias, 0 pioras e 113 empates, tolerância 0,05 ponto.
+Esse Overall usa texto/RO/TEDS disponíveis, sem fórmulas/CDM, e **não é a nota
+oficial principal do Omni**. Os 3.000 sorteios usam grupos inferidos dos nomes
+dos arquivos; não provam livros independentes ou inéditos.
+
+Conteúdo preservado nas 120 saídas. A pequena alteração de texto em duas páginas
+(+0.0364 na média) vem do pareamento do avaliador, não do OCR. Tabelas e
+fórmulas ficam iguais. TEDS nativo ponderado pelas 100 tabelas:
+53.2112; média pareada por 40 páginas:
+77.2125. São denominadores diferentes.
+
+O ganho externo é pequeno e favorece manter a opção desligada por padrão. A
+piora anterior em um livro novo e a validação dev-986 ainda pendente limitam a
+conclusão. Este PR continua restrito à ordenação XY-cut.

@@ -252,4 +252,39 @@ local repeatability; it is not external review or cluster replication.
 
 This supports the optional ordering pass on additional pages; the smaller
 unseen-book result above still limits claims of generalization. Full cluster
-dev-986 validation remains required. OmniDocBench and TeleOCR runs are unfinished.
+dev-986 validation remains required. Completed XY-cut Omni results follow below; the separate TeleOCR comparisons are still being evaluated.
+
+## External OmniDocBench diagnostic (2026-10-04)
+
+The frozen `multicol` / balance `0.7` setting was also tested on 120 public
+English pages: 40 with tables, 40 with formulas and no tables, and 40 others.
+Selection preceded scoring (seed `3102027`), using `opendatalab/OmniDocBench`
+revision `aa1ee96d106dbe53d0ae59474d75c6e6d9b53fec`. This is a balanced diagnostic
+sample from that revision, **not a full-benchmark or leaderboard result**.
+[Numeric per-page results](drbench/experiments/xycut-omni120-local_per_page.csv).
+
+The pinned native end-to-end evaluator gives 119 scorable pages: one header-only
+page is outside its scored categories. Coverage is identical for the pair:
+108 text, 119 reading-order, 40 table and 42 formula pages.
+
+| Metric | Baseline | XY-cut | Paired delta | 95% interval by source group |
+|---|---:|---:|---:|---|
+| Reading order (n=119) | 69.7267 | 70.0248 | +0.2981 | [0.0359, 0.6606] |
+| Derived mean per-page Overall (n=119) | 78.4555 | 78.6150 | +0.1595 | [0.0253, 0.3395] |
+
+The derived Overall averages available text/RO/TEDS on each page and excludes
+formula edit distance because CDM was not run; **it is not the official Omni
+headline metric**. Its wins/losses/ties are 6/0/113
+(0.05-point tolerance). Intervals use 3,000 resamples of filename-inferred
+source groups; these do not establish independent or previously unseen books.
+
+All 120 paragraph-content multisets are preserved. Text changes on two scored
+pages (+0.0364 mean) are evaluator matching effects, not improved OCR.
+Table and formula scores are unchanged. Native table-weighted TEDS is
+53.2112 on 100 table records; the
+page-weighted paired TEDS is 77.2125 on 40 pages.
+The two averages have different denominators and must not be interchanged.
+
+This small external gain supports keeping XY-cut optional. The earlier
+unseen-book regression and pending full Dr dev-986 run still limit the claim.
+No OCR, table, formula, selector or TeleOCR implementation change is in this PR.
