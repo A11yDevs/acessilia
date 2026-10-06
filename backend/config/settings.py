@@ -70,6 +70,7 @@ class Settings:
     # "dual": extrai com dois providers e funde via docstruct.fusion.
     fusion_mode: str = os.getenv("FUSION_MODE", "single")
     fusion_secondary_provider: str = os.getenv("FUSION_SECONDARY_PROVIDER", "mineru")
+    fusion_structure_provider: str = os.getenv("FUSION_STRUCTURE_PROVIDER", "")
     # Domain-specific callout titles injected into the region grouping
     # heuristics (semicolon-separated). No document-specific constants in code.
     callout_known_titles: str = os.getenv("CALLOUT_KNOWN_TITLES", "")

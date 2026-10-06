@@ -136,6 +136,46 @@ class TestExtractFused:
         texts = [e["text"] for e in result["document"]["elements"]]
         assert texts.index("A") < texts.index("B")
 
+    @pytest.mark.asyncio
+    async def test_specialist_adds_only_tables_and_formulas(self, monkeypatch):
+        base_text = "Texto de Docling e MinerU preservado"
+
+        async def fake_extract(provider):
+            if provider in {"docling", "mineru"}:
+                return _payload([_el(base_text, 0)])
+            return _payload([
+                _el("prosa do especialista não deve entrar", 0),
+                _el(r"x^2 + y^2", 1, type_="formula"),
+                _el("$\\sin x$", 2),
+                _el("<table><tr><td>valor</td></tr></table>", 3, type_="table",
+                    metadata={"table_ast": {"body": [{"cells": [{"text": "valor"}]}]}}),
+            ])
+
+        monkeypatch.setattr(
+            "backend.pipeline.fusion.ToolboxClient",
+            _FakeClientFactory(extract_fn=fake_extract),
+        )
+        result = await extract_fused("arquivo.pdf", structure_provider="teleocr")
+        elements = result["document"]["elements"]
+        assert elements[0]["text"] == base_text
+        assert [(element["type"], element["text"]) for element in elements[1:]] == [
+            ("formula", r"x^2 + y^2"),
+            ("formula", r"\sin x"),
+            ("table", "<table><tr><td>valor</td></tr></table>"),
+        ]
+        assert all(element["metadata"]["supplemental"] for element in elements[1:])
+        assert result["provider"] == "docling+mineru+teleocr"
+        assert result["fusion_stats"]["supplemental_structures"] == 3
+
+        from scripts.drbench.markdown_converter import canonical_to_drbench_md
+        from scripts.drbench.run_pipeline import provider_payload_to_canonical
+
+        markdown = canonical_to_drbench_md(provider_payload_to_canonical(result))
+        assert base_text in markdown
+        assert "$$\nx^2 + y^2\n$$" in markdown
+        assert "$$\n\\sin x\n$$" in markdown
+        assert "<table>" in markdown and "valor" in markdown
+
 
 class _FakeClientFactory:
     """Builds fake clients with an async extract_structure."""

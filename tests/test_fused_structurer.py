@@ -41,6 +41,17 @@ class TestFusedTextsForPage:
         texts = s._fused_texts_for_page(result, 0)
         assert texts == ["primeiro", "segundo"]
 
+    def test_supplemental_structures_do_not_shift_text_regions(self):
+        s = FusedStructurer()
+        result = _fused_payload(["texto principal"])
+        result["document"]["elements"].append({
+            "type": "formula",
+            "text": "x^2",
+            "reading_order": 1,
+            "metadata": {"supplemental": True},
+        })
+        assert s._fused_texts_for_page(result, 0) == ["texto principal"]
+
     def test_multi_page_markers(self):
         s = FusedStructurer()
         payload = {

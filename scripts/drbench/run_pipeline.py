@@ -331,6 +331,8 @@ def run_page(
     page: DrBenchPage,
     *,
     provider: str | None = None,
+    current_fusion: bool = False,
+    supplement_provider: str | None = None,
     out_dir: Path,
     save_raw: bool = False,
 ) -> Path | None:
@@ -341,6 +343,19 @@ def run_page(
     from backend.tools.toolbox_client import ToolboxClient, ToolboxError
 
     async def _execute() -> tuple[dict | None, float]:
+        if current_fusion:
+            from backend.pipeline.fusion import extract_fused
+
+            start = time.perf_counter()
+            try:
+                result = await extract_fused(
+                    page.image_path, structure_provider=supplement_provider
+                )
+                return result, time.perf_counter() - start
+            except ToolboxError as e:
+                print(f"[FAIL] {page.item_id}: {e}", file=sys.stderr)
+                return None, time.perf_counter() - start
+
         client = ToolboxClient(provider=provider)
         start = time.perf_counter()
         try:
@@ -403,6 +418,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--item", help="run a single item id (e.g. <uuid>_p3)")
     parser.add_argument("--provider", help="optional toolbox provider override")
     parser.add_argument(
+        "--current-fusion", action="store_true",
+        help="use the configured Docling+MinerU fusion instead of one provider",
+    )
+    parser.add_argument(
+        "--supplement-provider",
+        help="append only this provider's formulas/tables to --current-fusion output",
+    )
+    parser.add_argument(
         "--images-root", type=Path, default=None,
         help="local image tree to process instead of the Toolbox dataset "
              "(layout: <root>/<subject>/<doc_id>/images/page_<N>.jpg); "
@@ -416,6 +439,10 @@ def main(argv: list[str] | None = None) -> int:
         "--save-raw", action="store_true",
         help="also write the raw toolbox payload as <item>.provider.json")
     args = parser.parse_args(argv)
+    if args.current_fusion and args.provider:
+        parser.error("--provider cannot be combined with --current-fusion")
+    if args.supplement_provider and not args.current_fusion:
+        parser.error("--supplement-provider requires --current-fusion")
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -461,8 +488,14 @@ def main(argv: list[str] | None = None) -> int:
     for page in pages:
         if page.image_path is None:
             continue
-        if run_page(page, provider=args.provider, out_dir=args.out_dir,
-                    save_raw=args.save_raw):
+        if run_page(
+            page,
+            provider=args.provider,
+            current_fusion=args.current_fusion,
+            supplement_provider=args.supplement_provider,
+            out_dir=args.out_dir,
+            save_raw=args.save_raw,
+        ):
             ok += 1
 
     print(f"\nDone: {ok}/{len(pages)} pages processed -> {args.out_dir}")

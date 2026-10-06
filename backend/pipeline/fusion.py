@@ -82,6 +82,7 @@ async def extract_fused(
     policy: FusionPolicy | None = None,
     primary_provider: str | None = None,
     secondary_provider: str | None = None,
+    structure_provider: str | None = None,
 ) -> dict[str, Any]:
     """Extract with the primary + secondary providers and merge the results.
 
@@ -97,6 +98,7 @@ async def extract_fused(
     policy = policy or FusionPolicy()
     primary = primary_provider or settings.toolbox_provider
     secondary = secondary_provider or settings.fusion_secondary_provider
+    specialist = structure_provider or settings.fusion_structure_provider or None
 
     async def _extract(provider: str) -> dict | None:
         client = ToolboxClient(provider=provider)
@@ -139,7 +141,7 @@ async def extract_fused(
         len(merged_blocks),
         dict(stats),
     )
-    return {
+    result = {
         "status": "succeeded",
         "provider": f"{primary}+{secondary}",
         "document": {
@@ -150,6 +152,71 @@ async def extract_fused(
         },
         "fusion_stats": dict(stats),
     }
+
+    if specialist:
+        structures = _supplemental_structures(await _extract(specialist), specialist)
+        elements = result["document"]["elements"]
+        seen = {" ".join(str(element.get("text") or "").split()) for element in elements}
+        added = []
+        for element in structures:
+            key = " ".join(element["text"].split()) or repr(
+                element.get("metadata", {}).get("table_ast")
+            )
+            if key and key != "None" and key not in seen:
+                # ponytail: append by page order; align by bbox if TeleOCR returns boxes.
+                element["reading_order"] = len(elements)
+                elements.append(element)
+                seen.add(key)
+                added.append(element)
+        if added:
+            result["provider"] += f"+{specialist}"
+            result["fusion_stats"].update({
+                "supplemental_structures": len(added),
+                "supplemental_tables": sum(item["type"] == "table" for item in added),
+                "supplemental_formulas": sum(
+                    item["type"] == "formula" for item in added
+                ),
+            })
+    return result
+
+
+def _supplemental_structures(payload: dict | None, provider: str | None) -> list[dict]:
+    """Keep only specialist tables/formulas; the text/order fusion stays primary."""
+    if not payload:
+        return []
+    document = payload.get("document", payload)
+    structures = []
+    for element in document.get("elements") or []:
+        element_type = str(element.get("type", "")).lower()
+        text = str(element.get("text") or "").strip()
+        metadata = dict(element.get("metadata") or {})
+        if element_type in {"paragraph", "text"}:
+            formula = _whole_formula(text)
+            if formula:
+                element_type, text = "formula", formula
+        if element_type not in {"formula", "math", "table"} or not (
+            text or (element_type == "table" and metadata.get("table_ast"))
+        ):
+            continue
+        metadata.update({"supplemental": True, "supplemental_source": provider})
+        structures.append({
+            "type": "formula" if element_type == "math" else element_type,
+            "text": text,
+            "reading_order": element.get("reading_order") or 0,
+            "metadata": metadata,
+        })
+    return structures
+
+
+def _whole_formula(text: str) -> str | None:
+    """Promote a specialist paragraph only when it contains one whole formula."""
+    if text.startswith("$$") and text.endswith("$$") and text.count("$$") == 2:
+        return text[2:-2].strip() or None
+    if text.startswith("$$") and text.endswith("$") and text.count("$") == 3:
+        return text[2:-1].strip() or None
+    if text.startswith("$") and text.endswith("$") and text.count("$") == 2:
+        return text[1:-1].strip() or None
+    return None
 
 
 def _canonical_to_diff(block: dict):

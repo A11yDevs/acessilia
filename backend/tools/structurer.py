@@ -91,7 +91,12 @@ class FusedStructurer(BaseStructurer):
         else:
             ordered = elements
         ordered.sort(key=lambda el: el.get("reading_order") or 0)
-        return [str(el.get("text") or "") for el in ordered if (el.get("text") or "").strip()]
+        return [
+            str(el.get("text") or "")
+            for el in ordered
+            if (el.get("text") or "").strip()
+            and not (el.get("metadata") or {}).get("supplemental")
+        ]
 
     def extract_page_regions(self, page: fitz.Page) -> list[Region]:
         page_index = getattr(page, "number", 0) or 0
