@@ -55,6 +55,30 @@ class TestGroupByPage:
         assert block["bbox"] == [1.0, 2.0, 3.0, 4.0]
         assert block["page_index"] == 0
 
+    def test_toolbox_manifest_provenance_is_normalized(self):
+        payload = {
+            "document": {
+                "pages": [{"page_number": 2, "width": 400, "height": 600}],
+                "elements": [{
+                    "type": "formula",
+                    "text": "x^2",
+                    "reading_order": 7,
+                    "page_number": 2,
+                    "provenance": [{
+                        "page_number": 2,
+                        "bbox": {
+                            "left": 10, "top": 20, "right": 90, "bottom": 40,
+                            "coord_origin": "TOPLEFT",
+                        },
+                    }],
+                }],
+            },
+        }
+        block = _group_by_page(payload)[1][0]
+        assert block["bbox"] == [10.0, 20.0, 90.0, 40.0]
+        assert block["page_index"] == 1
+        assert block["metadata"]["page_size"] == [400, 600]
+
 
 class TestExtractFused:
     @pytest.mark.asyncio
@@ -155,7 +179,7 @@ class TestExtractFused:
             "backend.pipeline.fusion.ToolboxClient",
             _FakeClientFactory(extract_fn=fake_extract),
         )
-        result = await extract_fused("arquivo.pdf", structure_provider="teleocr")
+        result = await extract_fused("arquivo.png", structure_provider="teleocr")
         elements = result["document"]["elements"]
         assert elements[0]["text"] == base_text
         assert [(element["type"], element["text"]) for element in elements[1:]] == [
@@ -176,6 +200,79 @@ class TestExtractFused:
         assert "$$\n\\sin x\n$$" in markdown
         assert "<table>" in markdown and "valor" in markdown
 
+    @pytest.mark.asyncio
+    async def test_teleocr_pdf_is_rendered_once_per_page_with_provenance(
+        self, monkeypatch, tmp_path
+    ):
+        import fitz
+
+        source = tmp_path / "two-pages.pdf"
+        pdf = fitz.open()
+        pdf.new_page(width=400, height=600)
+        pdf.new_page(width=400, height=600)
+        pdf.save(source)
+        pdf.close()
+        calls = []
+
+        class Client:
+            def __init__(self, provider):
+                self.provider = provider
+
+            async def extract_structure(self, file_path, **kwargs):
+                if self.provider != "teleocr":
+                    return _payload([
+                        _el("texto página 1", 0, page=0),
+                        _el("texto página 2", 1, page=1),
+                    ])
+                calls.append(file_path)
+                assert file_path.suffix == ".png"
+                page_number = int(file_path.stem.rsplit("-", 1)[1])
+                return {
+                    "status": "succeeded",
+                    "provenance": {
+                        "provider_version": "1.2b",
+                        "model_versions": {
+                            "model_revision": "teleocr-test-revision",
+                            "inference_configuration": "{\"batch_size\": 8}",
+                        },
+                    },
+                    "document": {
+                        "pages": [{"page_number": 1, "width": 1111, "height": 1667}],
+                        "elements": [{
+                            "type": "formula",
+                            "text": f"x_{page_number}^2",
+                            "reading_order": 1,
+                            "page_number": 1,
+                            "provenance": [{
+                                "page_number": 1,
+                                "bbox": {
+                                    "left": 10, "top": 20, "right": 90, "bottom": 40,
+                                    "coord_origin": "TOPLEFT",
+                                },
+                            }],
+                        }],
+                    },
+                }
+
+            async def close(self):
+                pass
+
+        monkeypatch.setattr(
+            "backend.pipeline.fusion.ToolboxClient", lambda provider: Client(provider)
+        )
+        result = await extract_fused(source, structure_provider="teleocr")
+
+        assert len(calls) == 2
+        supplements = [e for e in result["document"]["elements"] if e["type"] == "formula"]
+        assert [(e["page"], e["text"]) for e in supplements] == [
+            (0, "x_1^2"), (1, "x_2^2")
+        ]
+        assert all(e["bbox"] == [10.0, 20.0, 90.0, 40.0] for e in supplements)
+        assert all(e["metadata"]["page_size"] == [1111, 1667] for e in supplements)
+        assert result["fusion_stats"]["specialist_provider_version"] == "1.2b"
+        assert result["fusion_stats"]["specialist_model_versions"]["model_revision"] == (
+            "teleocr-test-revision"
+        )
 
 class _FakeClientFactory:
     """Builds fake clients with an async extract_structure."""
