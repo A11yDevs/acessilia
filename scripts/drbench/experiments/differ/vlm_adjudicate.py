@@ -15,6 +15,7 @@ Usage (inside a GPU job):
 import argparse
 import difflib
 import json
+import os
 import re
 import sys
 from collections import Counter
@@ -102,8 +103,11 @@ def main() -> int:
           f"({Counter(r['cls'] for r in recs)})", flush=True)
 
     from vllm import LLM, SamplingParams
+    # vLLM recusa file:// fora de allowed_local_media_path (job 33358)
+    media_root = os.path.commonpath([os.path.dirname(os.path.abspath(r["crop"])) for r in recs])
     llm = LLM(model=a.model, max_model_len=a.max_model_len, gpu_memory_utilization=0.85,
-              limit_mm_per_prompt={"image": 1}, enforce_eager=False)
+              limit_mm_per_prompt={"image": 1}, enforce_eager=False,
+              allowed_local_media_path=media_root)
     sampling = SamplingParams(temperature=0.0, max_tokens=1024)
 
     convs = []
