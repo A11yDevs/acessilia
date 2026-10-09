@@ -50,6 +50,24 @@ def validate_pages(pages: list[dict]) -> None:
             raise ValueError("Images must be relative to data/hf")
 
 
+def _extract_archive(tar: tarfile.TarFile, destination: Path) -> None:
+    """Extract a git archive without path traversal on any supported Python.
+
+    ``filter="data"`` (the CVE-2007-4559 backport) only exists on Python
+    >= 3.11.4; earlier 3.11 patch releases raise TypeError, so fall back to a
+    manual member check that preserves the same guarantee.
+    """
+    try:
+        tar.extractall(destination, filter="data")
+    except TypeError:
+        root = destination.resolve()
+        for member in tar.getmembers():
+            target = (destination / member.name).resolve()
+            if not target.is_relative_to(root):
+                raise ValueError(f"Archive member escapes destination: {member.name}")
+        tar.extractall(destination)
+
+
 def export_revision(repo: Path, ref: str, destination: Path) -> dict:
     commit = subprocess.check_output(
         ["git", "-C", str(repo), "rev-parse", "--verify", f"{ref}^{{commit}}"], text=True
@@ -57,7 +75,7 @@ def export_revision(repo: Path, ref: str, destination: Path) -> dict:
     archive = subprocess.check_output(["git", "-C", str(repo), "archive", commit])
     destination.mkdir(parents=True)
     with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
-        tar.extractall(destination, filter="data")
+        _extract_archive(tar, destination)
     return {
         "repository": str(repo), "requested_ref": ref, "commit": commit,
         "archive_sha256": hashlib.sha256(archive).hexdigest(),
