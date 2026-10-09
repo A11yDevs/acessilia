@@ -238,18 +238,80 @@ def ensure_math_delimiters(latex: str) -> str:
     return f"${text}$"
 
 
+try:
+    from acessilia_toolbox.core.normalization.latex import (
+        normalize_latex as _toolbox_normalize_latex,
+        wrap_latex as _toolbox_wrap_latex,
+    )
+except ImportError:
+    _toolbox_normalize_latex = None
+    _toolbox_wrap_latex = None
+
+
 def normalize_latex(latex: str) -> str:
-    """Remove delimitadores ($, $$, \\[ \\]) e espaços redundantes."""
-    text = latex.strip()
+    """Normalize LaTeX formula string, stripping delimiters and syntactic whitespace.
+
+    Delegates to acessilia_toolbox when installed; otherwise uses a robust local fallback.
+    """
+    if _toolbox_normalize_latex is not None:
+        try:
+            return _toolbox_normalize_latex(latex)
+        except Exception:
+            pass
+
+    text = (latex or "").strip()
+    if not text:
+        return ""
+
+    # Strip outer delimiters: $$, $, \[, \], \(, \)
     if text.startswith("$$") and text.endswith("$$") and len(text) > 4:
         text = text[2:-2]
     elif text.startswith("$") and text.endswith("$") and len(text) > 2:
         text = text[1:-1]
-    elif text.startswith("\\[") and text.endswith("\\]"):
+    elif text.startswith("\\[") and text.endswith("\\]") and len(text) >= 4:
         text = text[2:-2]
-    if not text.strip("$ "):
+    elif text.startswith("\\(") and text.endswith("\\)") and len(text) >= 4:
+        text = text[2:-2]
+
+    # Normalize unicode math symbols to ASCII equivalents
+    text = text.replace("\u2212", "-")  # unicode minus
+    text = text.replace("\u00a0", " ")  # non-breaking space
+    text = text.replace("\u2009", " ")  # thin space
+    text = text.replace("\u202f", " ")  # narrow no-break space
+    text = text.replace("\u200b", "")   # zero-width space
+    text = text.replace("\u00d7", "\\times ")
+    text = text.replace("\u00f7", "\\div ")
+
+    # Normalize LaTeX spacing commands
+    text = re.sub(r"\\(?:quad|qquad|enspace|thinspace)\b", " ", text)
+    text = re.sub(r"\\[,;! ]", " ", text)
+
+    # Standardize curly brace spacing
+    text = re.sub(r"\{\s+", "{", text)
+    text = re.sub(r"\s+\}", "}", text)
+
+    # Standardize operators spacing
+    text = re.sub(r"\s*([=+<>-])\s*", r" \1 ", text)
+    # Restore negative exponents or signs like ^- or (-
+    text = re.sub(r"\^\s*-\s*", "^-", text)
+    text = re.sub(r"\(\s*-\s*", "(-", text)
+
+    # Collapse multiple whitespace
+    normalized = " ".join(text.split())
+    return normalized.strip("$ ")
+
+
+def wrap_latex(latex: str, display: bool = False) -> str:
+    """Wrap normalized LaTeX in display ($$) or inline ($) delimiters."""
+    if _toolbox_wrap_latex is not None:
+        try:
+            return _toolbox_wrap_latex(latex, display=display)
+        except Exception:
+            pass
+    norm = normalize_latex(latex)
+    if not norm:
         return ""
-    return " ".join(text.split())
+    return f"$${norm}$$" if display else f"${norm}$"
 
 
 def latex_to_mathml(latex: str) -> str:

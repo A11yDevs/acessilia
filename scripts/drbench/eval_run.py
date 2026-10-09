@@ -28,6 +28,8 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 
+from backend.tools.formula_tools import normalize_latex  # noqa: E402
+
 TABLE_RE = re.compile(r"<table.*?</table>", re.DOTALL | re.IGNORECASE)
 DISPLAY_FORMULA_RE = re.compile(r"\$\$(.+?)\$\$", re.DOTALL)
 
@@ -139,7 +141,7 @@ def _extract_tables(md: str) -> list[str]:
 
 
 def _extract_formulas(md: str) -> list[str]:
-    return [m.group(1).strip() for m in DISPLAY_FORMULA_RE.finditer(md)]
+    return [normalize_latex(m.group(1).strip()) for m in DISPLAY_FORMULA_RE.finditer(md)]
 
 
 def _pairwise_mean(preds: list[str], gts: list[str], metric) -> float | None:

@@ -24,6 +24,8 @@ from scripts.drbench.page_record import DrBenchPage, parse_items_metadata
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 
+from backend.tools.formula_tools import normalize_latex, wrap_latex  # noqa: E402
+
 
 def _run_coro_sync(coro):
     """Run a coroutine from sync context, inside or outside an event loop.
@@ -100,12 +102,7 @@ _PLACEHOLDER_TITLE = "Dr.DocBench page"
 
 
 def _strip_display_delims(latex: str) -> str:
-    s = latex.strip()
-    if s.startswith("$$") and s.endswith("$$") and len(s) > 4:
-        s = s[2:-2]
-    elif s.startswith("\\[") and s.endswith("\\]"):
-        s = s[2:-2]
-    return s.strip()
+    return normalize_latex(latex)
 
 
 def _whole_inline_math(text: str) -> str | None:
@@ -224,9 +221,8 @@ def _element_markdown(e: dict) -> str | None:
     if not text:
         return None
     if etype == "formula":
-        if text.startswith("$"):
-            return text
-        return f"$${text}$$"
+        norm = normalize_latex(text)
+        return f"$${norm}$$" if norm else None
     if etype in ("heading", "title", "section_header"):
         level = int(e.get("hierarchy_level") or 1)
         return f"{'#' * max(1, min(level, 6))} {text}"
@@ -323,6 +319,7 @@ def provider_blocks(result: dict) -> list[dict]:
             "coord_origin": bbox.get("coord_origin") if bbox else None,
             "page": page_no,
             "page_size": [w, h],
+            "metadata": e.get("metadata") or {},
         })
     return blocks
 

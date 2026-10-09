@@ -33,10 +33,37 @@ from collections import Counter
 from pathlib import Path
 
 import numpy as np
-from scipy.optimize import linear_sum_assignment
+try:
+    from scipy.optimize import linear_sum_assignment
+except ImportError:
+    def linear_sum_assignment(cost_matrix):
+        """Greedy fallback matching when scipy is not installed."""
+        cost = np.asarray(cost_matrix)
+        rows, cols = cost.shape
+        matched_r, matched_c = [], []
+        used_cols: set[int] = set()
+        for r in range(rows):
+            best_c, best_val = -1, float("inf")
+            for c in range(cols):
+                if c not in used_cols and cost[r, c] < best_val:
+                    best_val = cost[r, c]
+                    best_c = c
+            if best_c != -1:
+                matched_r.append(r)
+                matched_c.append(best_c)
+                used_cols.add(best_c)
+        return np.array(matched_r), np.array(matched_c)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from tree_differ_v1 import merge as merge_v1, norm, split_blocks  # noqa: E402
+
+REPO_ROOT = Path(__file__).resolve().parents[4]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+try:
+    from backend.tools.formula_tools import normalize_latex
+except ImportError:
+    normalize_latex = lambda s: s.strip()  # noqa: E731
 
 TABLE_RE = re.compile(r"<table", re.IGNORECASE)
 FORMULA_RE = re.compile(r"\$\$")
@@ -102,6 +129,35 @@ def is_junk(text: str) -> bool:
     if CJK_RE.search(core):  # corpus is English; CJK is figure-OCR noise
         return True
     return quality(text) < 0.34 and len(text.split()) >= 3
+
+
+def is_legitimate_text(b: dict) -> bool:
+    """True if block has legitimate textual content with consistent alphanumeric density.
+
+    Used by cross-rescue to retain Docling blocks that MinerU discarded or omitted.
+    """
+    if b.get("kind") != "text":
+        return False
+    md = b.get("md", "")
+    text = b.get("text", "") or md
+    stripped = text.strip()
+    if not stripped:
+        return False
+    if is_junk(md):
+        return False
+    if PAGENUM_RE.match(stripped):
+        return False
+    alphas = [c for c in stripped if c.isalpha()]
+    if len(alphas) < 3:
+        return False
+    core = re.sub(r"\s+", "", text)
+    if not core:
+        return False
+    alnum = sum(c.isalnum() for c in core)
+    density = alnum / len(core)
+    if density < 0.4:
+        return False
+    return max(quality(md), lex_quality(md)) >= 0.35
 
 
 # display math worth keeping as a formula (CDM is scored only on real isolated equations; workout
@@ -224,7 +280,14 @@ def load_blocks(path: Path, drop: frozenset[str] = frozenset(), pictures: list |
         kind = "table" if t == "table" or TABLE_RE.search(md) else \
                "formula" if t == "formula" or FORMULA_RE.search(md) else \
                "heading" if t in ("heading", "title", "section_header") else "text"
-        out.append({"md": md, "kind": kind, "box": nb, "text": norm(b.get("text") or md), "type": t})
+        out.append({
+            "md": md,
+            "kind": kind,
+            "box": nb,
+            "text": norm(b.get("text") or md),
+            "type": t,
+            "metadata": b.get("metadata") or {},
+        })
     return out
 
 
@@ -299,7 +362,8 @@ def group_split_blocks(A: list[dict], B: list[dict], stats: Counter, tag: str, f
 def suppress_in_regions(D: list[dict], M: list[dict], m_pics: list, stats: Counter, frac: float = 0.75,
                         pic_min_blocks: int = 2, pic_max_quality: float = 0.7, pic_full_page: float = 0.9,
                         mode: str = "both", pic_rule: str = "count-or-quality",
-                        table_full_page: float = 0.0, table_probe: bool = False) -> list[dict]:
+                        table_full_page: float = 0.0, table_probe: bool = False,
+                        rescue_omitted: bool = True) -> list[dict]:
     """Drop Docling text/heading blocks lying inside (>= frac) a MinerU table (its cells already carry the
     text) or inside a MinerU picture when the region looks like figure OCR (many low-quality fragments).
     Comics speech bubbles (few, word-like blocks) survive. table_full_page>0: a MinerU table covering that
@@ -341,6 +405,13 @@ def suppress_in_regions(D: list[dict], M: list[dict], m_pics: list, stats: Count
                   and d["box"] is not None and contain_frac(d["box"], pb) >= frac]
         if not inside:
             continue
+        if rescue_omitted:
+            rescued = [i for i in inside if is_legitimate_text(D[i])]
+            if rescued:
+                stats["rescued-in-picture"] += len(rescued)
+                inside = [i for i in inside if i not in rescued]
+            if not inside:
+                continue
         toks = sum(len(D[i]["md"].split()) for i in inside) or 1
         q = sum(min(quality(D[i]["md"]), lex_quality(D[i]["md"])) * len(D[i]["md"].split()) for i in inside) / toks
         full_page = area(pb) >= pic_full_page  # comics: the whole page is one picture and its text is GT
@@ -520,7 +591,11 @@ def merge_v2(D: list[dict], M: list[dict], *, lam: float, tau: float, min_len: i
              suppress_mode: str = "both", pic_rule: str = "count-or-quality",
              table_full_page: float = 0.0, fuse_h_ratio: float = 0.0, table_probe: bool = False,
              pagenum_cap: int = 0, flood: float = 0.0, pic_need_text: bool = False,
-             formula_text: bool = False) -> tuple[list[str], Counter]:
+             formula_text: bool = False, rescue_omitted: bool = True,
+             table_smart_fusion: bool = True, queue_sim: float = 0.94,
+             queue_pred_shorter: bool = True, vlm_queue: list[dict] | None = None,
+             vlm_decisions: dict[str, str] | None = None,
+             item_id: str = "") -> tuple[list[str], Counter]:
     stats: Counter = Counter()
     tail: list[str] = []
     if formula_text:
@@ -537,7 +612,7 @@ def merge_v2(D: list[dict], M: list[dict], *, lam: float, tau: float, min_len: i
         D = suppress_in_regions(D, M, m_pics or [], stats, pic_min_blocks=pic_min_blocks,
                                 pic_max_quality=pic_max_quality, pic_full_page=pic_full_page,
                                 mode=mode, pic_rule=pic_rule, table_full_page=table_full_page,
-                                table_probe=table_probe)
+                                table_probe=table_probe, rescue_omitted=rescue_omitted)
     if flood > 0:
         D = flood_guard(D, M, stats, flood)
     if decor:
@@ -610,7 +685,34 @@ def merge_v2(D: list[dict], M: list[dict], *, lam: float, tau: float, min_len: i
         stats["garbage-mineru->docling"] += 1
         return [d["md"] for d in D] + tail, stats
 
-    def pick_text(d: dict, m: dict) -> str:
+    def pick_text(d: dict, m: dict, item_id: str = "", block_idx: int = 0) -> str:
+        s = sim(d["text"], m["text"])
+        ld, lm = len(d["text"]), len(m["text"])
+        is_pred_shorter = (lm < 0.65 * ld or ld < 0.65 * lm)
+        is_disputed = (s < queue_sim) or (queue_pred_shorter and is_pred_shorter)
+
+        if is_disputed:
+            stats["vlm-disputed"] += 1
+            if is_pred_shorter:
+                stats["vlm-disputed(pred_shorter)"] += 1
+            if vlm_queue is not None:
+                vlm_queue.append({
+                    "item": item_id,
+                    "block_idx": block_idx,
+                    "sim": round(s, 4),
+                    "is_pred_shorter": is_pred_shorter,
+                    "docling_len": ld,
+                    "mineru_len": lm,
+                    "docling_md": d["md"],
+                    "mineru_md": m["md"],
+                })
+            if vlm_decisions:
+                key = f"{item_id}:{block_idx}"
+                v_choice = vlm_decisions.get(key) or vlm_decisions.get(item_id)
+                if v_choice in ("docling", "mineru"):
+                    stats[f"pair-text->vlm({v_choice})"] += 1
+                    return d["md"] if v_choice == "docling" else m["md"]
+
         if text_pick == "docling":
             stats["pair-text->docling"] += 1
             return d["md"]
@@ -618,10 +720,7 @@ def merge_v2(D: list[dict], M: list[dict], *, lam: float, tau: float, min_len: i
             stats["pair-text->mineru"] += 1
             return m["md"]
         # auto: MinerU wins on body text unless it truncated the block or its OCR is worse
-        ld, lm = len(d["text"]), len(m["text"])
         if lm < 0.6 * ld:
-            # guard: a Docling block much longer than its MinerU partner that also contains text of other
-            # MinerU blocks swallowed neighbours (cross-column OCR lines); MinerU segmentation is GT-like
             if pick_guard and ld > pick_guard * lm and swallows(d, [o for o in M if o is not m and o["kind"] == "text"]):
                 stats["pair-text-auto->mineru(docling-swallowed)"] += 1
                 return m["md"]
@@ -637,11 +736,23 @@ def merge_v2(D: list[dict], M: list[dict], *, lam: float, tau: float, min_len: i
         stats["pair-text-auto->mineru"] += 1
         return m["md"]
 
-    def pick(d: dict, m: dict) -> str:
+    def pick(d: dict, m: dict, item_id: str = "", block_idx: int = 0) -> str:
         if d["kind"] == "table" or m["kind"] == "table":
             if d["kind"] != m["kind"]:
                 stats["pair-only-one-table"] += 1
                 return d["md"] if d["kind"] == "table" else m["md"]
+            if table_smart_fusion:
+                d_meta = d.get("metadata") or {}
+                d_has_spans = bool(
+                    d_meta.get("table_has_spans")
+                    or d_meta.get("table_is_complex")
+                    or (d_meta.get("table_max_rowspan", 0) > 1)
+                    or (d_meta.get("table_max_colspan", 0) > 1)
+                    or re.search(r'(?:rowspan|colspan)=["\']?[2-9]\d*', d.get("md", ""), re.IGNORECASE)
+                )
+                if d_has_spans:
+                    stats["pair-table->docling(spans)"] += 1
+                    return d["md"]
             stats[f"pair-table->{table_pref}"] += 1
             return d["md"] if table_pref == "docling" else m["md"]
         if d["kind"] == "formula" or m["kind"] == "formula":
@@ -653,13 +764,13 @@ def merge_v2(D: list[dict], M: list[dict], *, lam: float, tau: float, min_len: i
         if d["kind"] == "heading" or m["kind"] == "heading":
             stats["pair-heading->docling"] += 1
             return d["md"] if d["kind"] == "heading" else m["md"]
-        return pick_text(d, m)
+        return pick_text(d, m, item_id=item_id, block_idx=block_idx)
 
     # skeleton: MinerU order, matched pairs resolved
     seq: list[tuple[float, float, str]] = []  # (order key, sub key, md)
     m2d = {j: i for i, j in match_d2m.items()}
     for j, m in enumerate(M):
-        md = pick(D[m2d[j]], m) if j in m2d else m["md"]
+        md = pick(D[m2d[j]], m, item_id=item_id, block_idx=j) if j in m2d else m["md"]
         if j not in m2d:
             stats["unilateral-mineru"] += 1
         seq.append((float(j), 0.0, md))
@@ -669,9 +780,12 @@ def merge_v2(D: list[dict], M: list[dict], *, lam: float, tau: float, min_len: i
     for i, d in enumerate(D):
         if i in match_d2m:
             continue
-        if len(d["text"]) < min_len and d["kind"] == "text":
+        min_threshold = 5 if (rescue_omitted and is_legitimate_text(d)) else min_len
+        if len(d["text"]) < min_threshold and d["kind"] == "text":
             stats["dropped-docling-short"] += 1
             continue
+        if rescue_omitted and is_legitimate_text(d) and len(d["text"]) < min_len:
+            stats["rescued-docling-short"] += 1
         if pick_guard and d["kind"] == "text" and (
                 (d["box"] is not None and sum(m["kind"] == "text" and m["box"] is not None and
                                               contain_frac(m["box"], d["box"]) >= 0.6 for m in M) >= 2)
@@ -683,6 +797,8 @@ def merge_v2(D: list[dict], M: list[dict], *, lam: float, tau: float, min_len: i
         above = cy < centers[j][1]
         seq.append((float(j) - 0.5 if above else float(j) + 0.5, cy, d["md"]))
         stats["unilateral-docling"] += 1
+        if rescue_omitted and is_legitimate_text(d):
+            stats["rescued-docling-body"] += 1
     seq.sort(key=lambda t: (t[0], t[1]))
     return [md for _, _, md in seq] + tail, stats
 
@@ -749,10 +865,57 @@ def main() -> int:
                     help="with --suppress-regions: skip picture suppression when MinerU has no text block on the page")
     ap.add_argument("--formula-text", action="store_true",
                     help="turn $$..$$ blocks without real math (workout tables, chemistry) into plain text")
+    ap.add_argument("--queue-sim", type=float, default=0.94,
+                    help="text similarity threshold below which pairs are flagged for VLM adjudication (default: 0.94)")
+    ap.add_argument("--queue-vlm", type=Path, default=None,
+                    help="path to dump VLM adjudication queue JSONL")
+    ap.add_argument("--no-queue-pred-shorter", dest="queue_pred_shorter", action="store_false", default=True,
+                    help="disable flagging pred_shorter structural divergences for VLM adjudication")
+    ap.add_argument("--vlm-decisions", type=Path, default=None,
+                    help="path to VLM adjudication decisions JSON or JSONL")
+    ap.add_argument("--no-table-smart-fusion", dest="table_smart_fusion", action="store_false", default=True,
+                    help="disable smart hybrid table fusion based on table span / complexity metadata")
+    ap.add_argument("--no-rescue-omitted", dest="rescue_omitted", action="store_false", default=True,
+                    help="disable rescuing omitted legitimate text blocks inside picture bboxes or small boxes")
     a = ap.parse_args()
     # '+' also accepted because Slurm --export splits values on commas
     drop_d = frozenset(t.strip().lower() for t in re.split(r"[,+]", a.drop_docling) if t.strip())
     drop_m = frozenset(t.strip().lower() for t in re.split(r"[,+]", a.drop_mineru) if t.strip())
+
+    vlm_decisions: dict[str, str] = {}
+    if a.vlm_decisions and a.vlm_decisions.exists():
+        if a.vlm_decisions.suffix == ".jsonl":
+            with a.vlm_decisions.open(encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    row = json.loads(line)
+                    dec = row.get("decision") or row.get("pick") or row.get("winner") or row.get("choice")
+                    if dec:
+                        if "item" in row and "block_idx" in row:
+                            vlm_decisions[f"{row['item']}:{row['block_idx']}"] = dec
+                        if "item" in row:
+                            vlm_decisions[row["item"]] = dec
+                        if "key" in row:
+                            vlm_decisions[row["key"]] = dec
+        else:
+            with a.vlm_decisions.open(encoding="utf-8") as f:
+                raw = json.load(f)
+                if isinstance(raw, dict):
+                    vlm_decisions = raw
+                elif isinstance(raw, list):
+                    for row in raw:
+                        dec = row.get("decision") or row.get("pick") or row.get("winner") or row.get("choice")
+                        if dec:
+                            if "item" in row and "block_idx" in row:
+                                vlm_decisions[f"{row['item']}:{row['block_idx']}"] = dec
+                            if "item" in row:
+                                vlm_decisions[row["item"]] = dec
+                            if "key" in row:
+                                vlm_decisions[row["key"]] = dec
+
+    vlm_queue: list[dict] | None = [] if a.queue_vlm else None
 
     ids = sorted({p.name for p in a.docling.glob("*.drbench.md")} & {p.name for p in a.mineru.glob("*.drbench.md")})
     running: dict[str, frozenset[str]] = {}
@@ -787,7 +950,14 @@ def main() -> int:
                                      table_full_page=a.table_full_page, fuse_h_ratio=a.fuse_h_ratio,
                                      table_probe=a.table_probe, pagenum_cap=a.pagenum_cap,
                                      flood=a.flood_guard, pic_need_text=a.pic_need_text,
-                                     formula_text=a.formula_text)
+                                     formula_text=a.formula_text,
+                                     rescue_omitted=a.rescue_omitted,
+                                     table_smart_fusion=a.table_smart_fusion,
+                                     queue_sim=a.queue_sim,
+                                     queue_pred_shorter=a.queue_pred_shorter,
+                                     vlm_queue=vlm_queue,
+                                     vlm_decisions=vlm_decisions,
+                                     item_id=stem)
         if not blocks:
             blocks = split_blocks(doc_md if len(norm(doc_md)) >= len(norm(min_md)) else min_md)
             stats["fallback-longer"] += 1
@@ -795,6 +965,12 @@ def main() -> int:
         tot.update(stats)
         rows.append({"item": stem, "n_docling": len(D or []), "n_mineru": len(M or []), "n_out": len(blocks),
                      **dict(stats)})
+    if a.queue_vlm and vlm_queue:
+        a.queue_vlm.parent.mkdir(parents=True, exist_ok=True)
+        with a.queue_vlm.open("w", encoding="utf-8") as f:
+            for q_item in vlm_queue:
+                f.write(json.dumps(q_item, ensure_ascii=False) + "\n")
+        print(f"vlm queue written to {a.queue_vlm}: {len(vlm_queue)} items")
     keys = ["item", "n_docling", "n_mineru", "n_out"] + sorted(tot)
     with (a.out / "decisions.csv").open("w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=keys, restval=0); w.writeheader(); w.writerows(rows)
