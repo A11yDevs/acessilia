@@ -180,6 +180,36 @@ class TestMergeBlocksOption:
         assert out[-1] == "42"
         assert [o.split()[0] for o in out[:-1]] == ["Left", "Left", "Right", "Right"]
 
+    def test_mineru_empty_still_applies_xycut(self):
+        D = [mk("Left first", L1), mk("Right first", R1), mk("Left second", L2), mk("Right second", R2)]
+        out, stats = merge_blocks(D, [], FusionPolicy(decor_tail=False, order_xycut="always"))
+        assert stats["mineru_empty->docling"] == 1
+        assert stats["xycut-applied"] == 1
+        assert [o.split()[0] for o in out] == ["Left", "Left", "Right", "Right"]
+
+    def test_docling_empty_still_applies_xycut(self):
+        M = [mk("Left first", L1), mk("Right first", R1), mk("Left second", L2), mk("Right second", R2)]
+        out, stats = merge_blocks([], M, FusionPolicy(decor_tail=False, order_xycut="always"))
+        assert stats["docling_empty->mineru"] == 1
+        assert stats["xycut-applied"] == 1
+        assert [o.split()[0] for o in out] == ["Left", "Left", "Right", "Right"]
+
+    def test_garbage_fallback_still_applies_xycut(self):
+        # D forms two interleaved columns; M has disjoint boxes and distinct text
+        # so nothing matches (cost 1.0 > tau) and the garbage fallback fires.
+        D = [mk("apple", L1), mk("banana", R1), mk("cherry", L2)]
+        M = [
+            mk("xylophone", (0.05, 0.80, 0.30, 0.95)),
+            mk("yacht", (0.35, 0.80, 0.60, 0.95)),
+            mk("zebra", (0.65, 0.80, 0.90, 0.95)),
+        ]
+        out, stats = merge_blocks(
+            D, M, FusionPolicy(decor_tail=False, order_xycut="always", garbage_frac=1.0)
+        )
+        assert stats["garbage-mineru->docling"] == 1
+        assert stats["xycut-applied"] == 1
+        assert out == ["apple", "cherry", "banana"]
+
 
 class TestPolicy:
     def test_default_is_off(self):

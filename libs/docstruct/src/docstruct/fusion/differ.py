@@ -87,6 +87,27 @@ def _pick(
     return _pick_text(d, m, M, policy, stats)
 
 
+def _finalize(
+    items: list[tuple[object, str]],
+    policy: FusionPolicy,
+    stats: Counter,
+) -> list[str]:
+    """Finaliza a ordem dos blocos ``(box, md)`` aplicando XY-cut quando ativo.
+
+    Centraliza a aplicação do XY-cut para que todos os caminhos de saída de
+    ``merge_blocks`` (normal e fallbacks) tenham comportamento consistente.
+    """
+    if policy.order_xycut != "off":
+        return xycut_reorder(
+            items,
+            mode=policy.order_xycut,
+            min_columns=policy.xycut_min_columns,
+            min_balance=policy.xycut_min_balance,
+            stats=stats,
+        )
+    return [md for _, md in items]
+
+
 def merge_blocks(
     D: list[DiffBlock],
     M: list[DiffBlock],
@@ -193,10 +214,10 @@ def merge_blocks(
 
     if not M:
         stats["mineru_empty->docling"] += 1
-        return [d.md for d in D] + tail, stats
+        return _finalize([(d.box, d.md) for d in D], policy, stats) + tail, stats
     if not D:
         stats["docling_empty->mineru"] += 1
-        return [m.md for m in M] + tail, stats
+        return _finalize([(m.box, m.md) for m in M], policy, stats) + tail, stats
 
     # --- alinhamento Húngaro ---
     cost = [[1.0] * len(M) for _ in D]
@@ -223,7 +244,7 @@ def merge_blocks(
         and len(match_d2m) < garbage_frac * min(len(D), len(M))
     ):
         stats["garbage-mineru->docling"] += 1
-        return [d.md for d in D] + tail, stats
+        return _finalize([(d.box, d.md) for d in D], policy, stats) + tail, stats
 
     m2d = {j: i for i, j in match_d2m.items()}
 
@@ -266,13 +287,4 @@ def merge_blocks(
         seq.append((float(j) - 0.5 if above else float(j) + 0.5, cy, d.md, d.box))
         stats["unilateral-docling"] += 1
     seq.sort(key=lambda t: (t[0], t[1]))
-    if policy.order_xycut != "off":
-        body = xycut_reorder(
-            [(box, md) for _, _, md, box in seq],
-            mode=policy.order_xycut,
-            min_columns=policy.xycut_min_columns,
-            min_balance=policy.xycut_min_balance,
-            stats=stats,
-        )
-        return body + tail, stats
-    return [md for _, _, md, _ in seq] + tail, stats
+    return _finalize([(box, md) for _, _, md, box in seq], policy, stats) + tail, stats
