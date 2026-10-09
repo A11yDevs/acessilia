@@ -17,11 +17,17 @@
 #   sbatch --export=ALL,SPLIT=dev,POLICY=v12 runs/slurm/lib_fuse.sbatch
 #   sbatch --export=ALL,SPLIT=dev,POLICY=v13 runs/slurm/lib_fuse.sbatch
 #   POLICY=script  -> roda o tree_differ_v2.py de referência (baseline de comparação)
+#   XYCUT=multicol -> reorders multi-column pages by XY-cut (lib only; default off)
+#   XYCUT_MIN_COLUMNS=3 -> require at least 3 columns for the multicol gate (default 2)
+#   sbatch --export=ALL,SPLIT=dev,POLICY=v13,XYCUT=multicol,XYCUT_MIN_BALANCE=0.7,RUN_NAME=lib-fuse-v13-xycut-bal07 runs/slurm/lib_fuse.sbatch
 set -uo pipefail
 source /raid/user_marcospaulo/drdocbench/runs/slurm/env.sh
 cd "$WS/repos/acessilia"
 SPLIT=${SPLIT:-dev}
 POLICY=${POLICY:-v12}
+XYCUT=${XYCUT:-off}
+XYCUT_MIN_COLUMNS=${XYCUT_MIN_COLUMNS:-2}
+XYCUT_MIN_BALANCE=${XYCUT_MIN_BALANCE:-0}
 [[ $SPLIT == dev ]] && OUTBASE=$WS/runs/dev-full || OUTBASE=$WS/runs/evalai
 DOCLING_DIR=${DOCLING_DIR:-$OUTBASE/docling-lib/predictions}
 MINERU_DIR=${MINERU_DIR:-$OUTBASE/mineru-lib/predictions}
@@ -29,7 +35,7 @@ RUN_NAME=${RUN_NAME:-lib-fuse-$POLICY-$(date +%Y%m%d)}
 PRED=$OUTBASE/$RUN_NAME/predictions
 PY=$WS/repos/acessilia/.venv/bin/python
 
-echo "job=$SLURM_JOB_ID split=$SPLIT policy=$POLICY run=$RUN_NAME"
+echo "job=$SLURM_JOB_ID split=$SPLIT policy=$POLICY xycut=$XYCUT min_columns=$XYCUT_MIN_COLUMNS run=$RUN_NAME"
 echo "docling=$DOCLING_DIR mineru=$MINERU_DIR"
 echo "n_docling=$(ls "$DOCLING_DIR"/*.drbench.md 2>/dev/null | wc -l) n_mineru=$(ls "$MINERU_DIR"/*.drbench.md 2>/dev/null | wc -l)"
 
@@ -47,7 +53,7 @@ if [[ $POLICY == script ]]; then
 else
   # Porta da lib: docstruct.fusion com FusionPolicy preset.
   $PY -m scripts.drbench.experiments.differ.lib_fuse \
-      --docling "$DOCLING_DIR" --mineru "$MINERU_DIR" --out "$PRED" --policy "$POLICY"
+      --docling "$DOCLING_DIR" --mineru "$MINERU_DIR" --out "$PRED" --policy "$POLICY" --xycut "$XYCUT" --xycut-min-columns "$XYCUT_MIN_COLUMNS" --xycut-min-balance "$XYCUT_MIN_BALANCE"
 fi
 
 N=$(ls "$PRED"/*.drbench.md 2>/dev/null | wc -l)
@@ -55,7 +61,7 @@ echo "n_pred=$N"
 cat > "$OUTBASE/$RUN_NAME/RUN.md" <<EOF
 # $RUN_NAME
 - job: $SLURM_JOB_ID  date: $(date -u +%FT%TZ)  split: $SPLIT
-- policy: $POLICY (lib docstruct) | docling=$DOCLING_DIR mineru=$MINERU_DIR
+- policy: $POLICY (lib docstruct) xycut=$XYCUT min_columns=$XYCUT_MIN_COLUMNS min_balance=$XYCUT_MIN_BALANCE | docling=$DOCLING_DIR mineru=$MINERU_DIR
 - commits: acessilia=$(git rev-parse --short HEAD) toolbox=$(git -C "$WS/repos/acessilia-toolbox" rev-parse --short HEAD)
 EOF
 [[ $N -gt 0 ]] || { echo "no predictions produced"; exit 2; }

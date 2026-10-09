@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import dataclasses
 import json
 import sys
 from collections import Counter
@@ -49,14 +50,23 @@ def main() -> int:
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--policy", default="v12", help="v12|v13|default")
     ap.add_argument("--min-len", type=int, default=0)
-    ap.add_argument("--garbage-frac", type=float, default=0.0)
+    ap.add_argument("--garbage-frac", type=float, default=None)
     ap.add_argument("--decor-wins", action="store_true", default=True)
     ap.add_argument("--no-decor-wins", dest="decor_wins", action="store_false")
     ap.add_argument("--drop-docling", default="group+unknown")
     ap.add_argument("--drop-mineru", default="")
+    ap.add_argument("--no-unilateral-dedup", dest="unilateral_dedup", action="store_false", default=True)
+    ap.add_argument("--xycut", choices=["off", "multicol", "always"], default="off",
+                    help="reorder the fused page by XY-cut (multicol: only pages with >= 2 columns)")
+    ap.add_argument("--xycut-min-columns", type=int, default=2)
+    ap.add_argument("--xycut-min-balance", type=float, default=0.0,
+                    help="multicol gate: min narrowest/widest column width ratio (0=off)")
     a = ap.parse_args()
 
     policy = policy_by_name(a.policy)
+    if a.xycut != "off":
+        policy = dataclasses.replace(policy, order_xycut=a.xycut, xycut_min_columns=a.xycut_min_columns,
+                                     xycut_min_balance=a.xycut_min_balance)
     drop_d = frozenset(
         t.strip().lower() for t in a.drop_docling.replace(",", "+").split("+") if t.strip()
     )
@@ -105,6 +115,7 @@ def main() -> int:
             m_pics=m_pics,
             running=running.get(doc_id_of(stem), frozenset()),
             decor_wins=a.decor_wins,
+            unilateral_dedup=a.unilateral_dedup,
         )
         if not out:
             # Fallback do script de referência: quando a fusão não produz
@@ -127,7 +138,7 @@ def main() -> int:
         w = csv.DictWriter(f, fieldnames=keys, restval=0)
         w.writeheader()
         w.writerows(rows)
-    print(f"pages={len(ids)} policy={a.policy} min_len={a.min_len}")
+    print(f"pages={len(ids)} policy={a.policy} min_len={a.min_len} xycut={a.xycut}")
     for k, v in sorted(tot.items()):
         print(f"  {k}: {v}")
     return 0

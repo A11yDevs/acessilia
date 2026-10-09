@@ -32,6 +32,7 @@ The planning-based pipeline and its incorporation are documented separately:
 1. [PMV — Agno, manifest, PDDL and nominal execution](pmv_agno_pddl.md) — the minimal cycle `document → manifest → PDDL plan → execution report → canonical document`, and how Agno coordinates the deterministic tools. (Brazilian Portuguese: [versão em pt-BR](pmv_agno_pddl.pt-br.md))
 2. [PDDL + Agno incorporation plan](plano_incorporacao_pddl_agno.md) — the block-by-block plan used to bring the planning layer into the codebase. (Brazilian Portuguese: [plano em pt-BR](plano_incorporacao_pddl_agno.pt-br.md))
 3. [docstruct Algorithms](docstruct_algorithms.md) — how the deterministic algorithms work (multi-provider fusion / Tree Differ, canonical audit, region classification, re-inference) and how the agents invoke them. (Brazilian Portuguese: [algoritmos em pt-BR](docstruct_algorithms.pt-br.md))
+4. [XY-cut reading order for multi-column pages](reading_order_xycut.md) — optional fusion step that fixes the reading order on multi-column pages: the problem, the gates, how to enable it, the small-batch Dr.DocBench experiment and its limitations. (Brazilian Portuguese: [XY-cut em pt-BR](reading_order_xycut.pt-br.md))
 
 ---
 

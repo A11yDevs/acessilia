@@ -16,6 +16,7 @@ from docstruct.fusion.similarity import (
     area,
     center,
     contain_frac,
+    iou,
     sim,
     swallows,
     union_box,
@@ -26,6 +27,17 @@ DECOR_TYPES = {"page_header": "header", "page_footer": "footer"}
 DECOR_ORDER = {"header": 0, "footer": 1, "page_number": 2}
 TRAIL_NUM_RE = re.compile(
     r"^(?:(.*?[A-Za-z].*?)\s+(\d{1,4})|(\d{1,4})\s+(.*?[A-Za-z].*?))$"
+)
+CHAPTER_RE = re.compile(
+    r"^(?:chapter|section|part|volume|vol\.|unit|lesson|book)\s+\d+$",
+    re.I,
+)
+FORM_LABEL_RE = re.compile(
+    r"^(?:name|class|date|period|score|grade|teacher|student(?:\s+name)?|subject|assignment|course|semester)\s*[:_—\-]*$",
+    re.I,
+)
+_HEADING_CONTINUATION_SUFFIXES = (
+    " and", " or", " of", " for", " to", " in", " the", " with", " &", "-", "–", "—", ":",
 )
 MATH_RE = re.compile(
     r"\\(frac|sum|int|sqrt|lim|partial|infty|prod|left|right|leq|geq|neq|approx"
@@ -100,14 +112,37 @@ def demote_formulas(blocks: list[DiffBlock], stats: Counter, tag: str) -> list[D
     return blocks
 
 
+def is_co_located(b1: DiffBlock, b2: DiffBlock) -> bool:
+    """True se dois blocos ocupam aproximadamente o mesmo espaço físico na página."""
+    if not (b1.box and b2.box):
+        return True
+    return (
+        iou(b1.box, b2.box) >= 0.30
+        or contain_frac(b1.box, b2.box) >= 0.50
+        or contain_frac(b2.box, b1.box) >= 0.50
+        or abs(center(b1.box)[1] - center(b2.box)[1]) < 0.05
+    )
+
+
+def is_decor_duplicate_of_heading(dec_b: DiffBlock, headings: list[DiffBlock]) -> bool:
+    """True se um bloco de decor é na verdade um título estrutural co-localizado."""
+    return any(
+        h.text and dec_b.text == h.text and is_co_located(dec_b, h)
+        for h in headings
+    )
+
+
 def decor_role(b: DiffBlock, running: frozenset[str] = frozenset()) -> Optional[str]:
-    if b.kind in ("table", "formula"):
+    if b.kind in ("table", "formula", "heading"):
         return None
+    cy = center(b.box)[1] if b.box else 0.5
     if PAGENUM_RE.match(b.md) and len(b.md) <= 16:
-        return "page_number"
+        if b.type in DECOR_TYPES or not (0.12 <= cy <= 0.88):
+            return "page_number"
+    if FORM_LABEL_RE.match(b.md) and not (0.08 <= cy <= 0.92):
+        return "header" if cy < 0.5 else "footer"
     role = DECOR_TYPES.get(b.type)
     if role is None and running and b.text in running and b.box is not None:
-        cy = center(b.box)[1]
         role = "header" if cy < 0.5 else "footer"
     return role
 
@@ -143,7 +178,11 @@ def split_decor(
             continue
         if b.type not in DECOR_TYPES and role != "page_number":
             stats[f"decor-{tag}-running"] += 1
-        m = TRAIL_NUM_RE.match(b.md) if role != "page_number" else None
+        m = (
+            TRAIL_NUM_RE.match(b.md)
+            if (role != "page_number" and not CHAPTER_RE.match(b.md))
+            else None
+        )
         if m:
             txt, num = (m.group(1), m.group(2)) if m.group(1) else (m.group(4), m.group(3))
             decor.append(
@@ -169,7 +208,13 @@ def decor_tail(dec_d: list[DiffBlock], dec_m: list[DiffBlock]) -> list[str]:
     Docling vence duplicatas."""
     seen = {d.text for d in dec_d}
     items = list(dec_d) + [m for m in dec_m if m.text not in seen]
-    items.sort(key=lambda b: (DECOR_ORDER[b.role or "footer"], center(b.box)[1], center(b.box)[0]))
+    items.sort(
+        key=lambda b: (
+            DECOR_ORDER[b.role or "footer"],
+            round(center(b.box)[1], 2) if b.box else 0.5,
+            center(b.box)[0] if b.box else 0.5,
+        )
+    )
     return [b.md for b in items]
 
 
@@ -273,15 +318,21 @@ def group_split_blocks(
     frac: float = 0.6,
     min_sim: float = 0.0,
 ) -> list[DiffBlock]:
-    """Funde blocos de texto de A geometricamente contidos (>= frac) num único
-    bloco de texto de B (A sobre-segmentou o parágrafo que B manteve inteiro)."""
+    """Funde blocos de texto/título de A geometricamente contidos (>= frac) num único
+    bloco de B (A sobre-segmentou o parágrafo ou título que B manteve inteiro)."""
     owner: dict[int, int] = {}
     for i, a in enumerate(A):
-        if a.kind != "text" or a.box is None:
+        if a.kind not in ("text", "heading") or a.box is None:
             continue
         best, bf = None, 0.0
         for j, b in enumerate(B):
-            if b.kind != "text" or b.box is None:
+            if b.kind not in ("text", "heading") or b.box is None:
+                continue
+            if a.kind != b.kind:
+                continue
+            # Evita que um mega-bloco sub-segmentado de B engula e funda múltiplos
+            # parágrafos válidos de A em um bloco gigante.
+            if area(b.box) > 0.35 or (b.box[3] - b.box[1]) > 0.40:
                 continue
             f = contain_frac(a.box, b.box)
             if f > bf:
@@ -294,7 +345,7 @@ def group_split_blocks(
     merged_first: dict[int, DiffBlock] = {}
     absorbed: set[int] = set()
     for j, idxs in groups.items():
-        if len(idxs) < 2:
+        if len(idxs) < 2 or len(idxs) > 4:
             continue
         idxs.sort()
         parts = [A[i] for i in idxs]
@@ -302,9 +353,21 @@ def group_split_blocks(
         if sim(merged_text[:2000], B[j].text[:2000]) < min_sim:
             stats[f"merge-split-{tag}-rejected"] += 1
             continue
+        if parts[0].kind == "heading":
+            raw_t0 = re.sub(r"^#+\s*", "", parts[0].md).strip()
+            raw_t1 = re.sub(r"^#+\s*", "", parts[1].md).strip() if len(parts) > 1 else ""
+            continuation = (
+                raw_t0.lower().endswith(_HEADING_CONTINUATION_SUFFIXES)
+                or (len(raw_t1) >= 1 and raw_t1[0].islower())
+            )
+            if not continuation:
+                continue
+            merged_md = parts[0].md + " " + " ".join(re.sub(r"^#+\s*", "", p.md).strip() for p in parts[1:])
+        else:
+            merged_md = " ".join(p.md for p in parts)
         merged_first[idxs[0]] = DiffBlock(
-            md=" ".join(p.md for p in parts),
-            kind="text",
+            md=merged_md,
+            kind=parts[0].kind,
             box=union_box(p.box for p in parts),
             text=merged_text,
             type=parts[0].type,
