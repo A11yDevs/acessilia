@@ -117,7 +117,7 @@ class FusionPolicy:
             inline_math_promote=True,
             pic_min_blocks=4,
             pic_rule="quality",
-            garbage_frac=0.0,
+            garbage_frac=0.3,
         )
 
     @classmethod

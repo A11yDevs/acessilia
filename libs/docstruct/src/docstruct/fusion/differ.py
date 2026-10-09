@@ -13,6 +13,7 @@ Porta fiel do tree_differ_v2.py da PR #98, com:
 """
 from __future__ import annotations
 
+import re
 from collections import Counter
 from typing import Optional
 
@@ -23,15 +24,39 @@ from docstruct.fusion.noise import (
     demote_formulas,
     fuse_line_runs,
     group_split_blocks,
+    is_decor_duplicate_of_heading,
     is_junk,
     quality,
     split_decor,
     suppress_in_regions,
 )
-from docstruct.fusion.similarity import center, contain_frac, iou, sim, swallows
+from docstruct.fusion.similarity import PAGENUM_RE, center, contain_frac, iou, is_duplicate, sim, swallows
 from docstruct.fusion.types import DiffBlock
 from docstruct.fusion.xycut import reorder as xycut_reorder
 from docstruct.policy import FusionPolicy
+
+
+def _is_spurious_text_pair(d: DiffBlock, m: DiffBlock) -> bool:
+    """Descarta matches textuais com baixa similaridade, a menos que haja ancoragem geométrica forte."""
+    if d.kind != "text" or m.kind != "text" or len(d.text) < 20 or len(m.text) < 20:
+        return False
+    if sim(d.text, m.text) >= 0.15:
+        return False
+    if d.box and m.box and iou(d.box, m.box) >= 0.70:
+        return False
+    return True
+
+
+def _is_short_noise(text: str) -> bool:
+    """Descarta ruídos isolados de OCR com <= 2 chars que não sejam dígitos nem marcadores."""
+    core = re.sub(r"\s+", "", text)
+    return (
+        len(core) <= 2
+        and not core.isdigit()
+        and not (len(core) == 1 and core.lower() in ("a", "i"))
+        and not re.match(r"^[a-zA-Z0-9][\.\)\-]$", core)
+        and not PAGENUM_RE.match(text)
+    )
 
 
 def _pick_text(
@@ -82,6 +107,11 @@ def _pick(
         stats["pair-formula->docling"] += 1
         return d.md
     if d.kind == "heading" or m.kind == "heading":
+        if d.kind == "heading" and policy.pick_guard and swallows(
+            d.text, [o.text for o in M if o is not m and o.kind == "text"]
+        ):
+            stats["pair-heading-auto->mineru(docling-swallowed)"] += 1
+            return m.md
         stats["pair-heading->docling"] += 1
         return d.md if d.kind == "heading" else m.md
     return _pick_text(d, m, M, policy, stats)
@@ -118,6 +148,7 @@ def merge_blocks(
     m_pics: list | None = None,
     running: frozenset[str] = frozenset(),
     decor_wins: bool = False,
+    unilateral_dedup: bool = True,
     stats: Counter | None = None,
 ) -> tuple[list[str], Counter]:
     """Funde os blocos dos dois providers. Retorna (markdowns ordenados, stats).
@@ -132,6 +163,7 @@ def merge_blocks(
         m_pics: bboxes de figuras do provider B (para suppress).
         running: textos de running heads do documento (pré-computados).
         decor_wins: body repetindo header/footer é descartado.
+        unilateral_dedup: permite desligar somente a deduplicação Docling unilateral.
         stats: Counter opcional para acumular decisões.
     """
     stats = stats if stats is not None else Counter()
@@ -170,15 +202,17 @@ def merge_blocks(
             else:
                 kept.append(b)
         if decor_wins:
+            headings = [b for b in D + M if b.kind == "heading"]
+            kept = [b for b in kept if not is_decor_duplicate_of_heading(b, headings)]
             dec_txt = {b.text for b in kept if b.role != "page_number" and b.text}
             nD, nM = len(D), len(M)
             D = [
                 b for b in D
-                if not (b.kind in ("text", "heading") and b.text in dec_txt)
+                if not (b.kind == "text" and b.text in dec_txt)
             ]
             M = [
                 b for b in M
-                if not (b.kind in ("text", "heading") and b.text in dec_txt)
+                if not (b.kind == "text" and b.text in dec_txt)
             ]
             stats["body-dup-of-decor"] += (nD - len(D)) + (nM - len(M))
         dec_d = [b for b in kept if b in dec_d]
@@ -231,7 +265,7 @@ def merge_blocks(
     match_d2m = {
         int(i): int(j)
         for i, j in ri_ci
-        if cost[i][j] <= policy.align_tau
+        if cost[i][j] <= policy.align_tau and not _is_spurious_text_pair(D[int(i)], M[int(j)])
     }
 
     # esqueleto não confiável quando quase nada casa (scans rotacionados/lixo)
@@ -250,12 +284,16 @@ def merge_blocks(
 
     # esqueleto: ordem do provider B (MinerU), pares resolvidos
     seq: list[tuple[float, float, str, object]] = []  # (order key, sub key, md, box)
+    emitted_body: list[DiffBlock] = []
     for j, m in enumerate(M):
         md = _pick(D[m2d[j]], m, M, policy, stats) if j in m2d else m.md
         if j not in m2d:
             stats["unilateral-mineru"] += 1
         box = m.box if m.box is not None else (D[m2d[j]].box if j in m2d else None)
         seq.append((float(j), 0.0, md, box))
+        chosen = D[m2d[j]] if j in m2d and md == D[m2d[j]].md else m
+        if chosen.kind == "text":
+            emitted_body.append(chosen)
 
     # insere blocos Docling unilaterais junto ao bloco MinerU mais próximo
     centers = [center(m.box) for m in M]
@@ -264,6 +302,9 @@ def merge_blocks(
             continue
         if len(d.text) < min_len and d.kind == "text":
             stats["dropped-docling-short"] += 1
+            continue
+        if _is_short_noise(d.text):
+            stats["dropped-docling-short-noise"] += 1
             continue
         if policy.pick_guard and d.kind == "text" and d.box is not None and (
             sum(
@@ -278,10 +319,17 @@ def merge_blocks(
         ):
             stats["dropped-docling-swallowing"] += 1
             continue
+        # Drop only content represented by an emitted block in the same area.
+        # Missing coordinates or a discarded provider alternative are not evidence.
+        if unilateral_dedup and policy.pick_guard and d.kind == "text":
+            matched = [o.md for o in emitted_body if contain_frac(d.box, o.box) >= 0.6]
+            if matched and is_duplicate(d.md, matched):
+                stats["dropped-docling-duplicate"] += 1
+                continue
         cx, cy = center(d.box)
         j = min(
             range(len(centers)),
-            key=lambda k: (cx - centers[k][0]) ** 2 + (cy - centers[k][1]) ** 2,
+            key=lambda k: (1.5 * (cx - centers[k][0])) ** 2 + (cy - centers[k][1]) ** 2,
         )
         above = cy < centers[j][1]
         seq.append((float(j) - 0.5 if above else float(j) + 0.5, cy, d.md, d.box))
