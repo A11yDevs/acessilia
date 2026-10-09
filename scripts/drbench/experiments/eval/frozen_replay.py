@@ -26,7 +26,7 @@ def verify_inputs(root: Path, manifest: dict) -> None:
 
 def verify_sources(root: Path) -> dict:
     # Git exports have no .git metadata. Hash every exported file used by this run.
-    return {str(p.relative_to(root)): sha256(p) for p in sorted((root / "sources").rglob("*")) if p.is_file()}
+    return {p.relative_to(root).as_posix(): sha256(p) for p in sorted((root / "sources").rglob("*")) if p.is_file()}
 
 
 def check_sources(root: Path, original: dict) -> dict:
@@ -35,7 +35,7 @@ def check_sources(root: Path, original: dict) -> dict:
         raise ValueError("Frozen source changed during evaluation")
     generated = {name: digest for name, digest in current.items() if name not in original}
     # Importing the backend compiles its versioned .po catalogues into ignored .mo files.
-    if any(Path(name).suffix != ".mo" or str(Path(name).with_suffix(".po")) not in original
+    if any(Path(name).suffix != ".mo" or Path(name).with_suffix(".po").as_posix() not in original
            for name in generated):
         raise ValueError("Unexpected file created inside frozen source")
     return generated

@@ -135,7 +135,7 @@ def freeze(spec_path: Path, output: Path, limit: int = 0) -> dict:
                 target = output / relative
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes((data_root / relative).read_bytes())
-                manifest["input_hashes"][str(relative)] = sha256(target)
+                manifest["input_hashes"][relative.as_posix()] = sha256(target)
         for variant_name, variant in spec["variants"].items():
             frozen = {"policy": variant.get("policy", "v12"),
                       "fusion_args": variant.get("fusion_args", []),
@@ -153,7 +153,7 @@ def freeze(spec_path: Path, output: Path, limit: int = 0) -> dict:
             resolve_path(base, evaluator["repo"]), evaluator["ref"],
             output / "sources/evaluator",
         )
-        sources = {str(p.relative_to(output)): sha256(p)
+        sources = {p.relative_to(output).as_posix(): sha256(p)
                    for p in sorted((output / "sources").rglob("*")) if p.is_file()}
         write_json(output / "source-hashes.json", sources)
         manifest["source_hashes_sha256"] = sha256(output / "source-hashes.json")
@@ -164,7 +164,7 @@ def freeze(spec_path: Path, output: Path, limit: int = 0) -> dict:
             source = resolve_path(base, name)
             target = evidence / f"{index:02d}-{source.name}"
             target.write_bytes(source.read_bytes())
-            manifest["input_hashes"][str(target.relative_to(output))] = sha256(target)
+            manifest["input_hashes"][target.relative_to(output).as_posix()] = sha256(target)
         manifest["status"] = "frozen"
     except Exception as exc:
         manifest["status"] = "freeze_failed"
