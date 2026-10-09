@@ -63,11 +63,24 @@ class FusionPolicy:
     orientation_min_confidence: float = 0.85
     orientation_reinfer: bool = True
 
+    # --- Reading order ---
+    # XY-cut over the fused page: "multicol" reorders only pages whose boxes form
+    # at least ``xycut_min_columns`` columns; "always" reorders every page.
+    order_xycut: Literal["off", "multicol", "always"] = "off"
+    xycut_min_columns: int = 2
+    xycut_min_balance: float = 0.0  # >0: skip pages whose columns differ too much in width
+
     def __post_init__(self) -> None:
         if not 0.0 <= self.align_lambda <= 1.0:
             raise ValueError(f"align_lambda deve estar em [0,1], got {self.align_lambda}")
         if not 0.0 < self.align_tau <= 1.0:
             raise ValueError(f"align_tau deve estar em (0,1], got {self.align_tau}")
+        if self.order_xycut not in ("off", "multicol", "always"):
+            raise ValueError(f"order_xycut must be off|multicol|always, got {self.order_xycut!r}")
+        if not 0.0 <= self.xycut_min_balance <= 1.0:
+            raise ValueError(f"xycut_min_balance must be in [0,1], got {self.xycut_min_balance}")
+        if self.xycut_min_columns < 2:
+            raise ValueError(f"xycut_min_columns must be >= 2, got {self.xycut_min_columns}")
         if self.fuse_lines and not self.merge_paragraphs:
             raise ValueError("fuse_lines sem merge_paragraphs é no-op: combinação inválida")
 

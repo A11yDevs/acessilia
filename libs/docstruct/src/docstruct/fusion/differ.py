@@ -32,6 +32,7 @@ from docstruct.fusion.noise import (
 )
 from docstruct.fusion.similarity import PAGENUM_RE, center, contain_frac, iou, is_duplicate, sim, swallows
 from docstruct.fusion.types import DiffBlock
+from docstruct.fusion.xycut import reorder as xycut_reorder
 from docstruct.policy import FusionPolicy
 
 
@@ -114,6 +115,27 @@ def _pick(
         stats["pair-heading->docling"] += 1
         return d.md if d.kind == "heading" else m.md
     return _pick_text(d, m, M, policy, stats)
+
+
+def _finalize(
+    items: list[tuple[object, str]],
+    policy: FusionPolicy,
+    stats: Counter,
+) -> list[str]:
+    """Finaliza a ordem dos blocos ``(box, md)`` aplicando XY-cut quando ativo.
+
+    Centraliza a aplicação do XY-cut para que todos os caminhos de saída de
+    ``merge_blocks`` (normal e fallbacks) tenham comportamento consistente.
+    """
+    if policy.order_xycut != "off":
+        return xycut_reorder(
+            items,
+            mode=policy.order_xycut,
+            min_columns=policy.xycut_min_columns,
+            min_balance=policy.xycut_min_balance,
+            stats=stats,
+        )
+    return [md for _, md in items]
 
 
 def merge_blocks(
@@ -226,10 +248,10 @@ def merge_blocks(
 
     if not M:
         stats["mineru_empty->docling"] += 1
-        return [d.md for d in D] + tail, stats
+        return _finalize([(d.box, d.md) for d in D], policy, stats) + tail, stats
     if not D:
         stats["docling_empty->mineru"] += 1
-        return [m.md for m in M] + tail, stats
+        return _finalize([(m.box, m.md) for m in M], policy, stats) + tail, stats
 
     # --- alinhamento Húngaro ---
     cost = [[1.0] * len(M) for _ in D]
@@ -256,18 +278,19 @@ def merge_blocks(
         and len(match_d2m) < garbage_frac * min(len(D), len(M))
     ):
         stats["garbage-mineru->docling"] += 1
-        return [d.md for d in D] + tail, stats
+        return _finalize([(d.box, d.md) for d in D], policy, stats) + tail, stats
 
     m2d = {j: i for i, j in match_d2m.items()}
 
     # esqueleto: ordem do provider B (MinerU), pares resolvidos
-    seq: list[tuple[float, float, str]] = []
+    seq: list[tuple[float, float, str, object]] = []  # (order key, sub key, md, box)
     emitted_body: list[DiffBlock] = []
     for j, m in enumerate(M):
         md = _pick(D[m2d[j]], m, M, policy, stats) if j in m2d else m.md
         if j not in m2d:
             stats["unilateral-mineru"] += 1
-        seq.append((float(j), 0.0, md))
+        box = m.box if m.box is not None else (D[m2d[j]].box if j in m2d else None)
+        seq.append((float(j), 0.0, md, box))
         chosen = D[m2d[j]] if j in m2d and md == D[m2d[j]].md else m
         if chosen.kind == "text":
             emitted_body.append(chosen)
@@ -309,7 +332,7 @@ def merge_blocks(
             key=lambda k: (1.5 * (cx - centers[k][0])) ** 2 + (cy - centers[k][1]) ** 2,
         )
         above = cy < centers[j][1]
-        seq.append((float(j) - 0.5 if above else float(j) + 0.5, cy, d.md))
+        seq.append((float(j) - 0.5 if above else float(j) + 0.5, cy, d.md, d.box))
         stats["unilateral-docling"] += 1
     seq.sort(key=lambda t: (t[0], t[1]))
-    return [md for _, _, md in seq] + tail, stats
+    return _finalize([(box, md) for _, _, md, box in seq], policy, stats) + tail, stats
