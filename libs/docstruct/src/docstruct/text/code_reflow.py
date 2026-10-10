@@ -109,7 +109,8 @@ def _cleanup_lines(text: str) -> str:
                 cleaned_lines.append("")
             continue
         # Preserves the leading indentation but normalizes the internal spacing.
-        leading = re.match(r"^\s*", line).group(0)
+        match = re.match(r"^\s*", line)
+        leading = match.group(0) if match else ""
         body = line[len(leading):]
         body = re.sub(r"\s+", " ", body).strip()
         cleaned_lines.append(f"{leading}{body}".rstrip())
