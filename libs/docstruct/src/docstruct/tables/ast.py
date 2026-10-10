@@ -42,6 +42,11 @@ def normalize_table_ast(raw: Any) -> dict[str, Any] | None:
         if nested_table is not None:
             return nested_table
 
+    if "table_cells" in candidate or "grid" in candidate:
+        grid_table = table_ast_from_docling_grid(candidate)
+        if grid_table is not None:
+            return grid_table
+
     result: dict[str, Any] = {}
 
     caption = candidate.get("caption") or candidate.get("title")
@@ -107,6 +112,214 @@ def table_ast_from_rows(rows: Any, *, caption: str | None = None) -> dict[str, A
     if isinstance(caption, str) and caption.strip():
         result["caption"] = caption.strip()
     return result
+
+
+def table_ast_from_docling_grid(
+    grid_or_cells: Any,
+    *,
+    caption: str | None = None,
+) -> dict[str, Any] | None:
+    """Extract a canonical table_ast from Docling table grid or cell items.
+
+    Handles Docling table representations such as:
+    - Lists of table cell dicts or objects with:
+      start_row_offset_idx, start_col_offset_idx, row_span, col_span, text, column_header, row_header
+    - Objects with .table_cells, .data.table_cells, or .data.grid
+    - Dictionaries containing "table_cells" or "grid"
+    """
+    if grid_or_cells is None:
+        return None
+    candidate = _coerce_object(grid_or_cells)
+    if candidate is None:
+        candidate = grid_or_cells
+
+    raw_cells: list[tuple[Any, int | None, int | None]] = []
+    if isinstance(candidate, list):
+        if candidate and isinstance(candidate[0], list):
+            # 2D grid of cells
+            for r_idx, row in enumerate(candidate):
+                if isinstance(row, list):
+                    for c_idx, cell in enumerate(row):
+                        raw_cells.append((cell, r_idx, c_idx))
+        else:
+            raw_cells = [(c, None, None) for c in candidate]
+    elif isinstance(candidate, dict):
+        if "table_cells" in candidate and isinstance(candidate["table_cells"], list):
+            raw_cells = [(c, None, None) for c in candidate["table_cells"]]
+        elif "grid" in candidate and isinstance(candidate["grid"], list):
+            grid = candidate["grid"]
+            if grid and isinstance(grid[0], list):
+                for r_idx, row in enumerate(grid):
+                    if isinstance(row, list):
+                        for c_idx, cell in enumerate(row):
+                            raw_cells.append((cell, r_idx, c_idx))
+            else:
+                raw_cells = [(c, None, None) for c in grid]
+        elif "data" in candidate and isinstance(candidate["data"], dict):
+            return table_ast_from_docling_grid(candidate["data"], caption=caption)
+    else:
+        # Check object attributes
+        data_attr = getattr(candidate, "data", None)
+        if data_attr is not None:
+            return table_ast_from_docling_grid(data_attr, caption=caption)
+        cells_attr = getattr(candidate, "table_cells", None)
+        if isinstance(cells_attr, list):
+            raw_cells = [(c, None, None) for c in cells_attr]
+        grid_attr = getattr(candidate, "grid", None)
+        if isinstance(grid_attr, list):
+            return table_ast_from_docling_grid(grid_attr, caption=caption)
+
+    if not raw_cells:
+        return None
+
+    rows_by_idx: dict[int, list[tuple[int, dict[str, Any]]]] = {}
+    is_header_row: dict[int, bool] = {}
+
+    for item, fallback_r, fallback_c in raw_cells:
+        cell_dict = _coerce_object(item)
+        if cell_dict is None:
+            cell_dict = item
+
+        raw_r: Any = None
+        raw_c: Any = None
+        raw_row_span: Any = None
+        raw_col_span: Any = None
+        if isinstance(cell_dict, dict):
+            text = str(cell_dict.get("text", "")).strip()
+            raw_r = cell_dict.get("start_row_offset_idx")
+            if raw_r is None:
+                raw_r = cell_dict.get("row_idx", fallback_r)
+            raw_c = cell_dict.get("start_col_offset_idx")
+            if raw_c is None:
+                raw_c = cell_dict.get("col_idx", fallback_c)
+            raw_row_span = cell_dict.get("row_span") or cell_dict.get("rowspan")
+            if raw_row_span is None and "end_row_offset_idx" in cell_dict and raw_r is not None:
+                raw_row_span = cell_dict["end_row_offset_idx"] - raw_r
+            raw_col_span = cell_dict.get("col_span") or cell_dict.get("colspan")
+            if raw_col_span is None and "end_col_offset_idx" in cell_dict and raw_c is not None:
+                raw_col_span = cell_dict["end_col_offset_idx"] - raw_c
+            is_col_header = bool(cell_dict.get("column_header", False))
+            is_row_header = bool(cell_dict.get("row_header", False))
+        else:
+            text = str(getattr(cell_dict, "text", "")).strip()
+            raw_r = getattr(cell_dict, "start_row_offset_idx", fallback_r)
+            raw_c = getattr(cell_dict, "start_col_offset_idx", fallback_c)
+            raw_row_span = getattr(cell_dict, "row_span", 1)
+            raw_col_span = getattr(cell_dict, "col_span", 1)
+            is_col_header = bool(getattr(cell_dict, "column_header", False))
+            is_row_header = bool(getattr(cell_dict, "row_header", False))
+
+        r_idx = 0 if raw_r is None else int(raw_r)
+        c_idx = 0 if raw_c is None else int(raw_c)
+        row_span = 1 if raw_row_span is None else max(1, int(raw_row_span))
+        col_span = 1 if raw_col_span is None else max(1, int(raw_col_span))
+
+        norm_cell: dict[str, Any] = {"text": text}
+        if row_span > 1:
+            norm_cell["rowspan"] = row_span
+        if col_span > 1:
+            norm_cell["colspan"] = col_span
+        if is_col_header or is_row_header:
+            norm_cell["header"] = True
+            if is_col_header:
+                norm_cell["scope"] = "col"
+            elif is_row_header:
+                norm_cell["scope"] = "row"
+
+        rows_by_idx.setdefault(r_idx, []).append((c_idx, norm_cell))
+        if is_col_header:
+            is_header_row[r_idx] = True
+
+    if not rows_by_idx:
+        return None
+
+    header_section: list[dict[str, Any]] = []
+    body_section: list[dict[str, Any]] = []
+
+    for r_idx in sorted(rows_by_idx.keys()):
+        cells_in_row = [cell for _, cell in sorted(rows_by_idx[r_idx], key=lambda t: t[0])]
+        row_obj = {"cells": cells_in_row}
+        if is_header_row.get(r_idx, False):
+            header_section.append(row_obj)
+        else:
+            body_section.append(row_obj)
+
+    if not body_section and header_section:
+        if len(header_section) == 1:
+            body_section = header_section
+            header_section = []
+        else:
+            body_section = header_section[1:]
+            header_section = [header_section[0]]
+
+    table_ast: dict[str, Any] = {}
+    if header_section:
+        table_ast["header"] = header_section
+    if body_section:
+        table_ast["body"] = body_section
+    if caption:
+        table_ast["caption"] = caption.strip()
+
+    return normalize_table_ast(table_ast)
+
+
+def analyze_table_complexity(table_ast: Any) -> dict[str, Any]:
+    """Analyze table AST structure to compute span and complexity metrics.
+
+    Returns:
+        Dictionary with:
+        - has_spans: bool
+        - max_rowspan: int
+        - max_colspan: int
+        - spanned_cell_count: int
+        - is_complex: bool
+    """
+    normalized = normalize_table_ast(table_ast)
+    if normalized is None:
+        return {
+            "has_spans": False,
+            "max_rowspan": 1,
+            "max_colspan": 1,
+            "spanned_cell_count": 0,
+            "is_complex": False,
+        }
+
+    all_cells: list[dict[str, Any]] = []
+    for section_name in ("header", "body", "footer"):
+        section = normalized.get(section_name)
+        if isinstance(section, list):
+            for row in section:
+                if isinstance(row, dict):
+                    cells = row.get("cells")
+                    if isinstance(cells, list):
+                        for cell in cells:
+                            if isinstance(cell, dict):
+                                all_cells.append(cell)
+
+    max_rowspan = 1
+    max_colspan = 1
+    spanned_count = 0
+
+    for cell in all_cells:
+        rs = cell.get("rowspan") or 1
+        cs = cell.get("colspan") or 1
+        if isinstance(rs, int) and rs > max_rowspan:
+            max_rowspan = rs
+        if isinstance(cs, int) and cs > max_colspan:
+            max_colspan = cs
+        if (isinstance(rs, int) and rs > 1) or (isinstance(cs, int) and cs > 1):
+            spanned_count += 1
+
+    has_spans = max_rowspan > 1 or max_colspan > 1
+    is_complex = has_spans
+
+    return {
+        "has_spans": has_spans,
+        "max_rowspan": max_rowspan,
+        "max_colspan": max_colspan,
+        "spanned_cell_count": spanned_count,
+        "is_complex": is_complex,
+    }
 
 
 def rows_from_table_ast(table_ast: Any) -> list[list[str]]:
@@ -331,8 +544,8 @@ def linearize_table_for_text(block: dict[str, Any]) -> list[str]:
 
     if not lines:
         # Defensive fallback for degenerate tables.
-        for row in rows_from_table_ast(table_ast):
-            lines.append(" | ".join(row))
+        for fallback_row in rows_from_table_ast(table_ast):
+            lines.append(" | ".join(fallback_row))
 
     return lines
 
@@ -469,15 +682,16 @@ def _coerce_object(value: Any) -> Any:
     for method_name in ("model_dump", "to_dict", "export_to_dict"):
         method = getattr(value, method_name, None)
         if callable(method):
+            dumped = None
             try:
                 dumped = method()
             except TypeError:
                 try:
                     dumped = method(mode="json")
-                except Exception:
-                    continue
-            except Exception:
-                continue
+                except (TypeError, ValueError, AttributeError):
+                    dumped = None
+            except (ValueError, AttributeError):
+                dumped = None
             if isinstance(dumped, (dict, list)):
                 return dumped
     return None
