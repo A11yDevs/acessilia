@@ -80,7 +80,20 @@ class TestMultiColumnReadingOrder:
         refined = refine_reading_order(interleaved)
         ids = [b.id for b in refined]
 
-        assert ids == ["c1_top", "c1_bot", "c2_top", "c2_bot", "title"] or ids == ["title", "c1_top", "c1_bot", "c2_top", "c2_bot"]
+        assert ids == ["title", "c1_top", "c1_bot", "c2_top", "c2_bot"]
+
+    def test_mid_page_banner_splits_column_sections(self):
+        s1_c1 = CanonicalBlock(id="s1_c1", type="paragraph", text="Sec 1 Col 1", bbox=(50.0, 100.0, 250.0, 200.0), page_index=1)
+        s1_c2 = CanonicalBlock(id="s1_c2", type="paragraph", text="Sec 1 Col 2", bbox=(300.0, 100.0, 500.0, 200.0), page_index=1)
+        mid_banner = CanonicalBlock(id="mid_banner", type="heading", text="Mid Banner", bbox=(50.0, 220.0, 500.0, 250.0), page_index=1)
+        s2_c1 = CanonicalBlock(id="s2_c1", type="paragraph", text="Sec 2 Col 1", bbox=(50.0, 270.0, 250.0, 370.0), page_index=1)
+        s2_c2 = CanonicalBlock(id="s2_c2", type="paragraph", text="Sec 2 Col 2", bbox=(300.0, 270.0, 500.0, 370.0), page_index=1)
+
+        interleaved = [s2_c2, s1_c2, mid_banner, s2_c1, s1_c1]
+        refined = refine_reading_order(interleaved)
+        ids = [b.id for b in refined]
+
+        assert ids == ["s1_c1", "s1_c2", "mid_banner", "s2_c1", "s2_c2"]
 
     def test_single_column_page_stays_top_down(self):
         b1 = CanonicalBlock(id="b1", type="paragraph", text="P1", bbox=(50.0, 100.0, 450.0, 150.0), page_index=1)
@@ -89,3 +102,19 @@ class TestMultiColumnReadingOrder:
 
         refined = refine_reading_order([b3, b1, b2])
         assert [b.id for b in refined] == ["b1", "b2", "b3"]
+
+    def test_provenance_guards_without_bbox(self):
+        # Empty list, non-subscriptable object, None provenance
+        class DummyBlock:
+            def __init__(self, prov):
+                self.provenance = prov
+                self.type = "paragraph"
+                self.page_index = 1
+
+        b_empty = DummyBlock([])
+        b_none = DummyBlock(None)
+        b_str = DummyBlock("invalid_non_sequence")
+
+        # Must not raise IndexError or TypeError
+        refined = refine_reading_order([b_empty, b_none, b_str])
+        assert len(refined) == 3

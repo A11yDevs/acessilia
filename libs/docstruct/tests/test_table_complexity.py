@@ -2,8 +2,15 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import get_origin
 
-from docstruct.tables.ast import analyze_table_complexity, table_ast_from_docling_grid
+from docstruct.tables.ast import (
+    TableAST,
+    TableASTError,
+    TableComplexityMetrics,
+    analyze_table_complexity,
+    table_ast_from_docling_grid,
+)
 
 
 class TestTableAstFromDoclingGrid:
@@ -111,15 +118,23 @@ class TestAnalyzeTableComplexity:
             "body": [{"cells": [{"text": "1"}, {"text": "2"}, {"text": "3"}, {"text": "4"}]}],
         }
         res = analyze_table_complexity(colspan_ast)
+        assert isinstance(res, TableComplexityMetrics)
+        assert res.has_spans is True
         assert res["has_spans"] is True
-        assert res["max_rowspan"] == 1
-        assert res["max_colspan"] == 4
-        assert res["spanned_cell_count"] == 1
-        assert res["is_complex"] is True
+        assert res.max_rowspan == 1
+        assert res.max_colspan == 4
+        assert res.spanned_cell_count == 1
+        assert res.is_complex is True
+        assert res.to_dict()["max_colspan"] == 4
 
     def test_invalid_table_fallback(self):
         res = analyze_table_complexity(None)
-        assert res["has_spans"] is False
-        assert res["is_complex"] is False
-        assert res["max_rowspan"] == 1
-        assert res["max_colspan"] == 1
+        assert isinstance(res, TableComplexityMetrics)
+        assert res.has_spans is False
+        assert res.is_complex is False
+        assert res.max_rowspan == 1
+        assert res.max_colspan == 1
+
+    def test_table_ast_types(self):
+        assert issubclass(TableASTError, Exception)
+        assert get_origin(TableAST) is dict

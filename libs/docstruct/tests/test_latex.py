@@ -74,6 +74,13 @@ class TestNormalizeLatex:
     def test_spacing_macros(self):
         assert normalize_latex(r"a \, b \; c \quad d") == "a b c d"
 
+    def test_angle_bracket_delimiters(self):
+        assert normalize_latex(r"\left< x \right>") == r"\left< x \right>"
+        assert normalize_latex(r"\left < x \right >") == r"\left< x \right>"
+        assert normalize_latex(r"\langle x \rangle") == r"\langle x \rangle"
+        assert normalize_latex(r"\left\langle x \right\rangle") == r"\left\langle x \right\rangle"
+        assert normalize_latex("a < b and c > d") == "a < b and c > d"
+
 
 class TestWrapLatex:
     def test_wrap_display(self):

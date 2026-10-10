@@ -1,4 +1,4 @@
-﻿# acessilia-docstruct
+# acessilia-docstruct
 
 Núcleo puro de processamento estrutural de documentos do Acessilia.
 
@@ -25,7 +25,7 @@ Núcleo puro de processamento estrutural de documentos do Acessilia.
 | `docstruct.adapters.mineru` | `clean_mineru_text`, `format_mineru_block_text`, `extract_mineru_blocks` — parsing de `middle_json` do MinerU, espaçamento, de-hifenização e formatação de fórmulas/tabelas |
 | `docstruct.tables.ast` | `table_ast_from_docling_grid`, `analyze_table_complexity`, `TableAST`, `TableComplexityMetrics`, `TableASTError` |
 | `docstruct.text` | `sanitize_text`, `merge_broken_paragraphs`, `normalize_code_text`, `classify_text_block` |
-| `docstruct.profiles` | `OUTPUT_PROFILES`, `filter_blocks_for_profile`, `normalize_profile_name` |
+| `docstruct.profiles` | `OUTPUT_PROFILES`, `filter_blocks_for_profile`, `normalize_profile` |
 | `docstruct.validation` | `validate_canonical_document`, `validate_output_text`, `Finding` |
 
 ## Módulos

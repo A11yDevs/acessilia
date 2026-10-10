@@ -147,7 +147,11 @@ def extract_mineru_blocks(
     for page in pages:
         if not isinstance(page, dict):
             continue
-        page_idx = int(page.get("page_idx", 0))
+        raw_idx = page.get("page_idx")
+        try:
+            page_idx = int(raw_idx) if raw_idx is not None else 0
+        except (ValueError, TypeError):
+            page_idx = 0
         page_size = page.get("page_size")
 
         sources: list[tuple[dict[str, Any], bool]] = [

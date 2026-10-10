@@ -25,13 +25,15 @@ def _extract_bbox(item: Any) -> BBox | None:
 
     if raw is None:
         prov = getattr(item, "provenance", None)
-        if prov and hasattr(prov[0], "bbox"):
-            b = prov[0].bbox
-            if b is not None:
-                if hasattr(b, "l") and hasattr(b, "t") and hasattr(b, "r") and hasattr(b, "b"):
-                    return (float(b.l), float(b.t), float(b.r), float(b.b))
-                if hasattr(b, "left") and hasattr(b, "top") and hasattr(b, "right") and hasattr(b, "bottom"):
-                    return (float(b.left), float(b.top), float(b.right), float(b.bottom))
+        if isinstance(prov, (list, tuple)) and len(prov) > 0:
+            first_prov = prov[0]
+            if hasattr(first_prov, "bbox"):
+                b = getattr(first_prov, "bbox", None)
+                if b is not None:
+                    if hasattr(b, "l") and hasattr(b, "t") and hasattr(b, "r") and hasattr(b, "b"):
+                        return (float(b.l), float(b.t), float(b.r), float(b.b))
+                    if hasattr(b, "left") and hasattr(b, "top") and hasattr(b, "right") and hasattr(b, "bottom"):
+                        return (float(b.left), float(b.top), float(b.right), float(b.bottom))
 
     if isinstance(raw, (list, tuple)) and len(raw) == 4:
         return (float(raw[0]), float(raw[1]), float(raw[2]), float(raw[3]))

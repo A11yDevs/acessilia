@@ -132,3 +132,21 @@ class TestExtractMineruBlocks:
         blocks_all = extract_mineru_blocks(middle_json, include_discarded=True)
         assert len(blocks_all) == 3
         assert blocks_all[2]["metadata"]["discarded"] is True
+
+    def test_non_numeric_or_none_page_idx(self):
+        middle_json = {
+            "pdf_info": [
+                {
+                    "page_idx": None,
+                    "preproc_blocks": [{"type": "text", "lines": [{"spans": [{"type": "text", "content": "A"}]}]}],
+                },
+                {
+                    "page_idx": "invalid_number",
+                    "preproc_blocks": [{"type": "text", "lines": [{"spans": [{"type": "text", "content": "B"}]}]}],
+                },
+            ]
+        }
+        blocks = extract_mineru_blocks(middle_json)
+        assert len(blocks) == 2
+        assert blocks[0]["page_index"] == 0
+        assert blocks[1]["page_index"] == 0

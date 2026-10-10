@@ -10,9 +10,51 @@ output, which keeps the lib output directly usable without a catalog.
 from __future__ import annotations
 
 from copy import deepcopy
+from dataclasses import dataclass
 from typing import Any
 
 ALLOWED_SCOPES = {"none", "row", "col", "rowgroup", "colgroup"}
+
+
+class TableASTError(Exception):
+    """Raised when TableAST conversion or validation encounters an error."""
+
+
+#: Type alias representing a normalized table AST dictionary.
+TableAST = dict[str, Any]
+
+
+@dataclass
+class TableComplexityMetrics:
+    """Structural complexity metrics for a table AST.
+
+    Supports attribute access (metrics.has_spans) and dictionary-style access
+    (metrics["has_spans"]) for full compatibility.
+    """
+
+    has_spans: bool
+    max_rowspan: int
+    max_colspan: int
+    spanned_cell_count: int
+    is_complex: bool
+
+    def __getitem__(self, key: str) -> Any:
+        try:
+            return getattr(self, key)
+        except AttributeError as err:
+            raise KeyError(key) from err
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return getattr(self, key, default)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "has_spans": self.has_spans,
+            "max_rowspan": self.max_rowspan,
+            "max_colspan": self.max_colspan,
+            "spanned_cell_count": self.spanned_cell_count,
+            "is_complex": self.is_complex,
+        }
 
 #: Canonical English msgid template for the TXT table caption line; {caption} is the table caption.
 MSG_TABLE_TEXT_CAPTION: str = "Table: {caption}"
@@ -263,11 +305,11 @@ def table_ast_from_docling_grid(
     return normalize_table_ast(table_ast)
 
 
-def analyze_table_complexity(table_ast: Any) -> dict[str, Any]:
+def analyze_table_complexity(table_ast: Any) -> TableComplexityMetrics:
     """Analyze table AST structure to compute span and complexity metrics.
 
     Returns:
-        Dictionary with:
+        TableComplexityMetrics dataclass with:
         - has_spans: bool
         - max_rowspan: int
         - max_colspan: int
@@ -276,13 +318,13 @@ def analyze_table_complexity(table_ast: Any) -> dict[str, Any]:
     """
     normalized = normalize_table_ast(table_ast)
     if normalized is None:
-        return {
-            "has_spans": False,
-            "max_rowspan": 1,
-            "max_colspan": 1,
-            "spanned_cell_count": 0,
-            "is_complex": False,
-        }
+        return TableComplexityMetrics(
+            has_spans=False,
+            max_rowspan=1,
+            max_colspan=1,
+            spanned_cell_count=0,
+            is_complex=False,
+        )
 
     all_cells: list[dict[str, Any]] = []
     for section_name in ("header", "body", "footer"):
@@ -313,13 +355,13 @@ def analyze_table_complexity(table_ast: Any) -> dict[str, Any]:
     has_spans = max_rowspan > 1 or max_colspan > 1
     is_complex = has_spans
 
-    return {
-        "has_spans": has_spans,
-        "max_rowspan": max_rowspan,
-        "max_colspan": max_colspan,
-        "spanned_cell_count": spanned_count,
-        "is_complex": is_complex,
-    }
+    return TableComplexityMetrics(
+        has_spans=has_spans,
+        max_rowspan=max_rowspan,
+        max_colspan=max_colspan,
+        spanned_cell_count=spanned_count,
+        is_complex=is_complex,
+    )
 
 
 def rows_from_table_ast(table_ast: Any) -> list[list[str]]:
@@ -688,9 +730,9 @@ def _coerce_object(value: Any) -> Any:
             except TypeError:
                 try:
                     dumped = method(mode="json")
-                except (TypeError, ValueError, AttributeError):
+                except Exception:  # noqa: BLE001
                     dumped = None
-            except (ValueError, AttributeError):
+            except Exception:  # noqa: BLE001
                 dumped = None
             if isinstance(dumped, (dict, list)):
                 return dumped

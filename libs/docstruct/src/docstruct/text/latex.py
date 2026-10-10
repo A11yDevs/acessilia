@@ -150,9 +150,28 @@ def normalize_latex(expr: str | None) -> str:
     out = re.sub(r"\\(?:quad|qquad)", " ", out)
 
     # 6. Standardize spacing around relational operators
-    # =, <, >, \le, \ge, \ne, \approx, \sim
-    relational_pattern = r"(?:\\(?:le|ge|ne|approx|sim|equiv|subset|subseteq|supset|supseteq)\b|=|<|>)"
-    out = re.sub(rf"\s*({relational_pattern})\s*", r" \1 ", out)
+    # =, \le, \ge, \ne, \approx, \sim
+    relational_macros = r"(?:\\(?:le|ge|ne|approx|sim|equiv|subset|subseteq|supset|supseteq)\b|=)"
+    out = re.sub(rf"\s*({relational_macros})\s*", r" \1 ", out)
+
+    # Standardize spacing around relational < and >, protecting angle delimiters
+    # such as \left<, \right>, \<, \>
+    def _relational_angle_replace(m: re.Match[str]) -> str:
+        delim_or_macro = m.group(1)
+        if delim_or_macro:
+            if "left" in delim_or_macro:
+                return r"\left<"
+            if "right" in delim_or_macro:
+                return r"\right>"
+            return delim_or_macro
+        op = m.group(2).strip()
+        return f" {op} "
+
+    out = re.sub(
+        r"(\\left\s*<|\\right\s*>|\\<|\\>)|(\s*(?:<|>)\s*)",
+        _relational_angle_replace,
+        out,
+    )
 
     # 7. Standardize binary operators (+, - when used as binary)
     # Binary plus
