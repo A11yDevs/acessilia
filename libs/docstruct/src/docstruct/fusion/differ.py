@@ -58,6 +58,11 @@ def _is_short_noise(text: str) -> bool:
     )
 
 
+def _is_short_text_noise(block: DiffBlock) -> bool:
+    """Whether a plain text block is short OCR noise; structured content is kept."""
+    return block.kind == "text" and _is_short_noise(block.text)
+
+
 def _pick_text(
     d: DiffBlock, m: DiffBlock, M_texts: list[DiffBlock],
     policy: FusionPolicy, stats: Counter,
@@ -308,7 +313,7 @@ def merge_blocks(
         if len(d.text) < min_len and d.kind == "text":
             stats["dropped-docling-short"] += 1
             continue
-        if _is_short_noise(d.text):
+        if _is_short_text_noise(d):
             stats["dropped-docling-short-noise"] += 1
             continue
         if policy.pick_guard and d.kind == "text" and d.box is not None and (
