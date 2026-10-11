@@ -1,6 +1,8 @@
 """Testes do núcleo de fusão: Húngaro puro, conversão e merge_blocks."""
 from collections import Counter
 
+import pytest
+
 from docstruct.fusion._hungarian import linear_sum_assignment
 from docstruct.fusion.convert import block_to_diff, normalize_bbox
 from docstruct.fusion.differ import merge_blocks
@@ -12,6 +14,24 @@ from docstruct.policy import FusionPolicy
 
 def mk(text, box=None, kind="text", md=None, **kw):
     return DiffBlock(md=md or text, kind=kind, box=box, text=text, type=kw.pop("type", kind), **kw)
+
+
+@pytest.mark.parametrize("kind,text,md,keep", [
+    ("heading", "B", "# B", True),
+    ("formula", "y", "$$y$$", True),
+    ("table", "Q", "<table><tr><td>Q</td></tr></table>", True),
+    ("text", "~", "~", False),
+])
+def test_short_noise_filter_preserves_structured_content(kind, text, md, keep):
+    docling = mk(text, kind=kind, md=md, box=(0.1, 0.6, 0.2, 0.7))
+    mineru = mk("A body paragraph from MinerU", box=(0.1, 0.1, 0.8, 0.3))
+
+    output, stats = merge_blocks(
+        [docling], [mineru], FusionPolicy(formula_text=False), min_len=0,
+    )
+
+    assert (md in output) is keep
+    assert stats["dropped-docling-short-noise"] == (0 if keep else 1)
 
 
 class TestHungarian:
@@ -394,6 +414,3 @@ def test_decor_tail_same_line_sorts_ltr():
     # Mesmo com cy ligeiramente menor em DATE (0.028 vs 0.030), a quantização ordena por cx
     res = decor_tail([b_name, b_class, b_date], [])
     assert res == ["NAME", "CLASS", "DATE"]
-
-
-

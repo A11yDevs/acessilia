@@ -303,7 +303,7 @@ def merge_blocks(
         if len(d.text) < min_len and d.kind == "text":
             stats["dropped-docling-short"] += 1
             continue
-        if _is_short_noise(d.text):
+        if d.kind == "text" and _is_short_noise(d.text):
             stats["dropped-docling-short-noise"] += 1
             continue
         if policy.pick_guard and d.kind == "text" and d.box is not None and (
