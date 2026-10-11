@@ -55,13 +55,16 @@ def _extract_archive(tar: tarfile.TarFile, destination: Path) -> None:
 
     ``filter="data"`` (the CVE-2007-4559 backport) only exists on Python
     >= 3.11.4; earlier 3.11 patch releases raise TypeError, so fall back to a
-    manual member check that preserves the same guarantee.
+    manual check restricted to regular files and directories.
     """
     try:
         tar.extractall(destination, filter="data")
     except TypeError:
         root = destination.resolve()
         for member in tar.getmembers():
+            # shortcut: legacy Python exports files/directories only; upgrade to 3.11.4+ for links.
+            if not (member.isfile() or member.isdir()):
+                raise ValueError(f"Unsupported archive member on legacy Python: {member.name}")
             target = (destination / member.name).resolve()
             if not target.is_relative_to(root):
                 raise ValueError(f"Archive member escapes destination: {member.name}")

@@ -1,12 +1,14 @@
 """Protect experiment identity, coverage and isolation using temporary Git repos."""
+import io
 import json
 import subprocess
+import tarfile
 from pathlib import Path
 
 import pytest
 
 from scripts.drbench.experiments.eval.frozen_inputs import (
-    export_revision, freeze, sha256, validate_pages,
+    _extract_archive, export_revision, freeze, sha256, validate_pages,
 )
 from scripts.drbench.experiments.eval.frozen_replay import (
     check_sources, evaluate, verify_inputs, verify_sources,
@@ -29,6 +31,36 @@ def repository(path):
     subprocess.run(["git", "-C", str(path), "-c", "user.name=Test",
                     "-c", "user.email=test@example.invalid", "commit", "-qm", "fixture"], check=True)
     return path
+
+
+@pytest.mark.parametrize("symlink", [False, True])
+def test_legacy_archive_extraction_rejects_symlink_escape(tmp_path, monkeypatch, symlink):
+    """Old Python must not follow an archive link outside the export directory."""
+    data = io.BytesIO()
+    payload = b"exported source"
+    with tarfile.open(fileobj=data, mode="w") as archive:
+        if symlink:
+            link = tarfile.TarInfo("link")
+            link.type = tarfile.SYMTYPE
+            link.linkname = ".."
+            archive.addfile(link)
+        member = tarfile.TarInfo("link/escaped.txt" if symlink else "source.txt")
+        member.size = len(payload)
+        archive.addfile(member, io.BytesIO(payload))
+    data.seek(0)
+    destination = tmp_path / "export"
+    destination.mkdir()
+    with tarfile.open(fileobj=data) as archive:
+        extract = archive.extractall
+        # Simulate the pre-3.11.4 API, which has no filter keyword.
+        monkeypatch.setattr(archive, "extractall", lambda path: extract(path, filter="fully_trusted"))
+        if symlink:
+            with pytest.raises(ValueError, match="Unsupported archive member"):
+                _extract_archive(archive, destination)
+            assert not (tmp_path / "escaped.txt").exists()
+        else:
+            _extract_archive(archive, destination)
+            assert (destination / "source.txt").read_bytes() == payload
 
 
 @pytest.fixture
