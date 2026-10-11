@@ -202,3 +202,198 @@ class TestMergeBlocks:
         # 5 >= 4 e qualidade baixa (letras soltas) → suprime
         assert stats.get("suppress-in-picture", 0) == 5
         assert out == ["corpo"]
+
+    def test_heading_continuation_merge(self):
+        """Headings sobre-segmentados com continuação sintática (conectivo ou minúscula) são unidos."""
+        policy = FusionPolicy(merge_paragraphs=True)
+        D = [
+            mk("Signs and Symbols – Direction and", box=(0.1, 0.1, 0.9, 0.15), kind="heading", md="# Signs and Symbols – Direction and"),
+            mk("Prediction", box=(0.1, 0.15, 0.9, 0.2), kind="heading", md="# Prediction"),
+        ]
+        M = [
+            mk("Signs and Symbols – Direction and Prediction", box=(0.1, 0.1, 0.9, 0.2), kind="heading", md="# Signs and Symbols – Direction and Prediction"),
+        ]
+        out, stats = merge_blocks(D, M, policy)
+        assert out == ["# Signs and Symbols – Direction and Prediction"]
+        assert stats.get("merge-split-docling", 0) == 1
+
+    def test_heading_no_continuation_preserves_separate(self):
+        """Headings independentes em maiúscula dentro de um bloco único do parceiro não são fundidos."""
+        policy = FusionPolicy(merge_paragraphs=True)
+        D = [
+            mk("ROOTS AND BULBS", box=(0.1, 0.1, 0.9, 0.14), kind="heading", md="# ROOTS AND BULBS"),
+            mk("Carrots", box=(0.1, 0.15, 0.9, 0.2), kind="heading", md="# Carrots"),
+        ]
+        M = [
+            mk("ROOTS AND BULBS Carrots", box=(0.1, 0.1, 0.9, 0.2), kind="heading", md="# ROOTS AND BULBS Carrots"),
+        ]
+        out, stats = merge_blocks(D, M, policy)
+        assert stats.get("merge-split-docling", 0) == 0
+        assert len(out) == 2
+        assert "# Carrots" in out
+
+
+
+def test_disabling_unilateral_dedup_preserves_a_represented_fragment():
+    fragment = "saved my life and brought me back to camp"
+    text = "This earlier event " + fragment + " before the next day."
+    matched = mk(text, box=(0.0, 0.1, 0.9, 0.3))
+    contained = mk(fragment, box=(0.1, 0.15, 0.8, 0.2))
+    policy = FusionPolicy(pick_guard=1.5, merge_paragraphs=False, decor_tail=False,
+                          junk_filter=False, suppress_regions=False)
+    original, original_stats = merge_blocks([matched, contained], [matched], policy)
+    ablation, ablation_stats = merge_blocks([matched, contained], [matched], policy, unilateral_dedup=False)
+    assert original == [text]
+    assert original_stats["dropped-docling-duplicate"] == 1
+    assert fragment in ablation
+    assert ablation_stats["dropped-docling-duplicate"] == 0
+
+
+def test_repeated_text_in_distinct_regions_is_preserved():
+    text = "Repeated safety notice for this section"
+    first = mk(text, box=(0.0, 0.1, 0.4, 0.2))
+    second = mk(text, box=(0.6, 0.7, 1.0, 0.8))
+    policy = FusionPolicy(pick_guard=1.5, merge_paragraphs=False, decor_tail=False,
+                          junk_filter=False, suppress_regions=False)
+    out, stats = merge_blocks([first, second], [first], policy)
+    assert out == [text, text]
+    assert stats["dropped-docling-duplicate"] == 0
+
+
+def test_missing_coordinates_cannot_prove_a_repeated_occurrence_is_redundant():
+    text = "Repeated form instruction for this section"
+    block = mk(text)
+    policy = FusionPolicy(pick_guard=1.5, merge_paragraphs=False, decor_tail=False,
+                          junk_filter=False, suppress_regions=False)
+    out, stats = merge_blocks([block, block.copy()], [block], policy)
+    assert out == [text, text]
+    assert stats["dropped-docling-duplicate"] == 0
+
+
+def test_content_in_discarded_mineru_alternative_is_not_deduplicated():
+    parent = "The selected parent paragraph contains its own complete description of this section."
+    child = "Additional independent detail that must survive."
+    box = (0.0, 0.1, 0.9, 0.3)
+    docling = [mk(parent, box=box), mk(child, box=(0.1, 0.15, 0.8, 0.2))]
+    mineru = [mk(parent + " " + child, box=box)]
+    policy = FusionPolicy(pick_guard=1.5, text_pick="docling", merge_paragraphs=False,
+                          decor_tail=False, junk_filter=False, suppress_regions=False)
+    out, stats = merge_blocks(docling, mineru, policy)
+    assert parent in out
+    assert child in out
+    assert stats["dropped-docling-duplicate"] == 0
+
+
+def test_high_iou_preserves_match_under_ocr_degradation():
+    """BBoxes com alto IoU (>= 0.70) permanecem pareados mesmo se OCR de um dos lados estiver degradado (sim < 0.15)."""
+    clean_text = "This is a clean psychological evaluation text block with plenty of words."
+    degraded_text = "d e s n e n x x y y z z w w q q 1 2 3 4 5 6 7 8 9 0"
+    box = (0.1, 0.1, 0.9, 0.3)
+    d = mk(clean_text, box=box)
+    m = mk(degraded_text, box=box)
+    policy = FusionPolicy(pick_guard=1.5, merge_paragraphs=False, decor_tail=False,
+                          junk_filter=False, suppress_regions=False)
+    out, stats = merge_blocks([d], [m], policy)
+    assert out == [clean_text]
+    assert stats.get("unilateral-docling", 0) == 0
+    assert stats.get("pair-text-auto->docling(quality)", 0) == 1
+
+
+def test_interior_paragraph_numbers_not_treated_as_page_numbers():
+    """Números isolados no miolo da página (0.12 <= cy <= 0.88) permanecem no corpo como texto e não vão para decor."""
+    from docstruct.fusion.noise import decor_role
+    # Número no miolo da página (cy = 0.50): não é page_number
+    b_interior = mk("239", box=(0.1, 0.48, 0.2, 0.52), type="paragraph")
+    assert decor_role(b_interior) is None
+
+    # Número na margem superior (cy = 0.05): é page_number
+    b_margin_top = mk("239", box=(0.1, 0.04, 0.2, 0.06), type="paragraph")
+    assert decor_role(b_margin_top) == "page_number"
+
+    # Número na margem inferior (cy = 0.95): é page_number
+    b_margin_bottom = mk("239", box=(0.1, 0.94, 0.2, 0.96), type="paragraph")
+    assert decor_role(b_margin_bottom) == "page_number"
+
+    # Bloco explicitamente tipado como decor: é page_number mesmo no miolo
+    b_explicit = mk("239", box=(0.1, 0.48, 0.2, 0.52), type="page_header")
+    assert decor_role(b_explicit) == "page_number"
+
+
+def test_mega_block_does_not_merge_separate_paragraphs():
+    """Mega-bloco sub-segmentado do parceiro (área > 0.35 ou altura > 0.40) não deve fundir parágrafos separados."""
+    policy = FusionPolicy(merge_paragraphs=True)
+    # 5 parágrafos separados ocupando a página
+    D = [
+        mk(f"Paragraph {i} with distinct information and words.", box=(0.1, 0.1 * i, 0.9, 0.1 * i + 0.08))
+        for i in range(1, 6)
+    ]
+    # Mega-bloco cobrindo quase a página toda (área > 0.5, altura > 0.6)
+    M = [
+        mk("Mega block text containing everything", box=(0.05, 0.05, 0.95, 0.75))
+    ]
+    out, stats = merge_blocks(D, M, policy)
+    assert stats.get("merge-split-docling", 0) == 0
+    # Todos os 5 parágrafos de D foram preservados sem serem esmagados em um único bloco
+    for i in range(1, 6):
+        assert any(f"Paragraph {i}" in x for x in out)
+
+
+def test_structural_heading_not_treated_as_decor():
+    """Títulos estruturais (kind='heading') nunca são classificados como decor/page_number."""
+    from docstruct.fusion.noise import decor_role
+    # Título '1' na margem superior: permanece heading do corpo
+    b_title = mk("1", box=(0.1, 0.02, 0.2, 0.06), type="title", kind="heading", md="# 1")
+    assert decor_role(b_title) is None
+
+
+def test_chapter_title_not_split_into_page_number():
+    """Cabeçalhos de capítulo/seção como 'Chapter 5' não são decompostos em page_number avulso."""
+    from docstruct.fusion.noise import split_decor
+    b_chap = mk("Chapter 5", box=(0.1, 0.92, 0.4, 0.96), type="page_footer", md="Chapter 5")
+    stats = Counter()
+    body, decor = split_decor([b_chap], stats, "docling")
+    assert any(b.text == "Chapter 5" for b in decor)
+    assert not any(b.text == "5" and b.role == "page_number" for b in decor)
+    assert stats.get("decor-docling-split-number", 0) == 0
+
+
+def test_decor_wins_preserves_body_headings():
+    """decor_wins não deve deletar headings do corpo do documento."""
+    policy = FusionPolicy(decor_tail=True)
+    heading = mk("INTRODUCTION", box=(0.1, 0.05, 0.9, 0.1), kind="heading", md="# INTRODUCTION")
+    p1 = mk("Body paragraph 1", box=(0.1, 0.15, 0.9, 0.3))
+    # Docling extraiu erroneamente como page_header no mesmo local
+    header = mk("INTRODUCTION", box=(0.1, 0.05, 0.9, 0.1), type="page_header", md="INTRODUCTION")
+    out, stats = merge_blocks([header, p1], [heading, p1], policy, decor_wins=True)
+    assert out[0] == "# INTRODUCTION"
+    assert out[1] == "Body paragraph 1"
+    # O heading não foi jogado para o final da página
+    assert len(out) == 2
+
+
+def test_form_metadata_labels_in_margins_become_decor():
+    """Rótulos de metadados/formulário (NAME, CLASS, DATE) nas margens tornam-se decor."""
+    from docstruct.fusion.noise import decor_role
+    b_name_margin = mk("NAME", box=(0.03, 0.01, 0.10, 0.03), type="paragraph")
+    assert decor_role(b_name_margin) == "header"
+
+    b_date_margin = mk("DATE", box=(0.70, 0.01, 0.75, 0.03), type="paragraph")
+    assert decor_role(b_date_margin) == "header"
+
+    # No miolo da página, não deve ser tratado como decor
+    b_name_body = mk("NAME", box=(0.03, 0.40, 0.10, 0.43), type="paragraph")
+    assert decor_role(b_name_body) is None
+
+
+def test_decor_tail_same_line_sorts_ltr():
+    """Itens de decor na mesma linha horizontal são ordenados da esquerda para a direita (LTR)."""
+    from docstruct.fusion.noise import decor_tail
+    b_name = mk("NAME", box=(0.04, 0.025, 0.10, 0.035), role="header")
+    b_class = mk("CLASS", box=(0.43, 0.024, 0.49, 0.034), role="header")
+    b_date = mk("DATE", box=(0.70, 0.023, 0.75, 0.033), role="header")
+    # Mesmo com cy ligeiramente menor em DATE (0.028 vs 0.030), a quantização ordena por cx
+    res = decor_tail([b_name, b_class, b_date], [])
+    assert res == ["NAME", "CLASS", "DATE"]
+
+
+

@@ -111,6 +111,28 @@ For a matched pair, the text is chosen by `policy.text_pick`:
   has worse OCR quality; Docling wins when it is significantly longer or when
   MinerU swallowed columns.
 
+#### Stage F — Optional XY-cut reordering (`policy.order_xycut`)
+
+The MinerU skeleton is kept by default. With `order_xycut="multicol"` the fused
+page is reordered by a recursive **XY-cut** (`docstruct.fusion.xycut`): the page
+is split at vertical gutters (columns read left to right), full-width blocks
+(titles, wide tables) act as section breaks, and each region is read top to
+bottom. The gate only acts on pages whose boxes form at least
+`xycut_min_columns` (default 2) top-level columns; With `xycut_min_balance > 0` (e.g. 0.7) it also requires the narrowest column to be at least that fraction of the widest one, so a main column next to a narrow sidebar is left alone. single-column pages keep the
+skeleton order, because there the GT order often departs from a pure top-down
+reading (figures, captions, sidebars). `order_xycut="always"` reorders every
+page and exists for comparison only.
+
+The step only changes the sequence of the blocks that survived the previous
+stages; nothing is added, dropped or rewritten. Blocks without a usable box
+travel with the boxed block before them. Header/footer/page-number blocks stay
+in the decor tail. Counters: `xycut-applied`, `xycut-moved`,
+`xycut-columns:<n>`, `xycut-skipped:<reason>`. Default: `off` (also in the
+`drbench_v12`/`drbench_v13` presets).
+
+See [XY-cut reading order for multi-column pages](reading_order_xycut.md) for the motivation, the
+experiment and the limitations.
+
 ### 1.4 `FusionPolicy`
 
 `FusionPolicy` is a frozen dataclass with **conservative, neutral defaults**.

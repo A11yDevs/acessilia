@@ -33,6 +33,7 @@ O pipeline baseado em planejamento e sua incorporação são documentados separa
 1. [PMV — Agno, manifest, PDDL e execução nominal](pmv_agno_pddl.pt-br.md) — o ciclo mínimo `documento → manifest → plano PDDL → relatório de execução → documento canônico` e como o Agno coordena as ferramentas determinísticas. (English: [English version](pmv_agno_pddl.md))
 2. [Plano de incorporação PDDL + Agno](plano_incorporacao_pddl_agno.pt-br.md) — o plano bloco a bloco usado para trazer a camada de planejamento ao código-base. (English: [English plan](plano_incorporacao_pddl_agno.md))
 3. [Algoritmos de docstruct](docstruct_algorithms.pt-br.md) — como funcionam os algoritmos determinísticos (fusão multi-provider / Tree Differ, auditoria canônica, classificação de regiões, re-inferência) e como os agentes os invocam. (English: [English version](docstruct_algorithms.md))
+4. [Ordem de leitura por XY-cut em páginas multicoluna](reading_order_xycut.pt-br.md) — etapa opcional da fusão que corrige a ordem de leitura em páginas multicoluna: o problema, os portões, como ligar, o experimento em lote pequeno no Dr.DocBench e as limitações. (English: [English version](reading_order_xycut.md))
 ---
 
 ## Diagramas UML (PlantUML)

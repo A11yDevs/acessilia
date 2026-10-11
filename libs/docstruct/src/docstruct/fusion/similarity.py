@@ -58,20 +58,44 @@ def sim(a: str, b: str) -> float:
     return difflib.SequenceMatcher(None, a, b, autojunk=False).ratio()
 
 
-def swallows(d_text: str, other_texts: list[str], n: int = 30) -> bool:
-    """True se ``d_text`` também contém material de >= 1 outro bloco (probes
-    de n chars): o provider leu através de colunas / mesclou parágrafos
-    vizinhos. Porta fiel de ``swallows()``."""
-    hits = 0
+def _comparison_text(text: str) -> str:
+    # A word broken at a line end is OCR formatting; punctuation inside a
+    # number/expression is content. Keep decimal points, signs and operators.
+    text = re.sub(r"(?<=[^\W\d_])-[ \t]*\r?\n[ \t]*(?=[^\W\d_])", "", text)
+    return re.sub(r"\s+", "", text.casefold().replace("\u00ad", ""))
+
+
+def swallows(d_text: str, other_texts: list[str], n: int = 25) -> bool:
+    """True se ``d_text`` também contém material de >= 1 outro bloco.
+    Normaliza espaços e hifenização de fim de linha sem apagar pontuação
+    que distingue números e expressões. O texto emitido não é modificado."""
+    nd = _comparison_text(d_text)
+    if len(nd) < n:
+        return False
     for t in other_texts:
-        if len(t) < n:
+        nt = _comparison_text(t)
+        if len(nt) < n:
             continue
-        probes = {t[k:k + n] for k in range(0, len(t) - n, max(n, (len(t) - n) // 4 or 1))}
-        if sum(p in d_text for p in probes) >= 2:
-            hits += 1
-            if hits >= 1:
-                return True
+        if nt in nd:
+            return True
+        step = max(n, (len(nt) - n) // 4 or 1)
+        probes = {nt[k:k + n] for k in range(0, len(nt) - n + 1, step)}
+        threshold = 2 if len(probes) >= 2 else 1
+        if sum(p in nd for p in probes) >= threshold:
+            return True
     return False
+
+
+def is_duplicate(text: str, other_texts: list[str], min_len: int = 20) -> bool:
+    """True when the full normalized text is contained in another emitted block.
+
+    Preserve numeric punctuation; partial matching probes cannot establish
+    that all content, including a changed value, is already represented.
+    """
+    normalized = _comparison_text(text)
+    return len(normalized) >= min_len and any(
+        normalized in _comparison_text(other) for other in other_texts
+    )
 
 
 # Página/número: token curto numérico/romano, com colchetes/traves/dots opcionais.
