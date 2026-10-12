@@ -49,3 +49,4 @@ tests/fixtures/tutorials/pagina_*.pdf
 
 *.egg-info
 .venv-1
+scripts/drbench/builds
