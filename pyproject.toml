@@ -46,6 +46,8 @@ dev = [
     "pytest>=9.1.1,<10",
     "respx>=0.23.1,<0.24",
     "pytest-asyncio>=1.4.0,<2",
+    # Used by the Dr.DocBench page-level experiment scripts (scripts/drbench/experiments/pages).
+    "rapidfuzz>=3.9,<4",
 ]
 
 [project.scripts]
