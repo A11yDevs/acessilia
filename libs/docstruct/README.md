@@ -36,8 +36,32 @@ Port of the Tree Differ v2 from PR #98 (Dr.DocBench) as a pure library:
 - `noise.py` — decor-tail, running heads, junk filter, region suppression,
   paragraph re-fusion, line-run fusing.
 - `FusionPolicy` — frozen dataclass with conservative defaults; benchmark
-  presets (`drbench_v12`, `drbench_v13`) are named classmethods, never
-  defaults (they were overfitted to the dev split).
+  presets (`drbench_v12`, `drbench_v13`, `drbench_v14`, `drbench_v15`,
+  `drbench_best_method`) are named classmethods, never defaults (they were
+  overfitted to the dev split).
+- `fusion/verse.py`, `fusion/line_numbers.py`, `fusion/flood.py`,
+  `fusion/tailjoin.py`, `fusion/repetition.py`, `fusion/page_select.py`,
+  `fusion/judge.py`, `fusion/adjudication.py`, `fusion/oracle.py`,
+  `fusion/hf_end.py`, `fusion/table_specialist.py` — the deterministic
+  Dr.DocBench PR #125 policies, ported as pure functions.
+- `text/normalize.py`, `text/norm_fix.py`, `text/latex.py` — text
+  normalization primitives.
+- `imaging/policy.py` — pure upscale/orientation decisions (no PIL/cv2).
+
+### Dr.DocBench presets
+
+| Preset | Composition | Status |
+|---|---|---|
+| `drbench_v12` | differ-v12 (calibrated on dev) | named, never default |
+| `drbench_v13` | v12 + pic-need-text + formula-text | named, never default |
+| `drbench_v14` | v13 + line-numbers + table-eq + verse-chunk 300 | named, never default |
+| `drbench_v15` | v14 + page judge + tailjoin `end/50/3/hdr` + rep-guard + hf-end + upscale + orientation | **confirmed leaderboard best** (EvalAI 70.37) |
+| `drbench_best_method` | v15 + judge2 thresholds + page swap + blank pages + norm-text | dev best (87.33), **never confirmed** — dev→test gap ≈ 8 pts |
+
+`drbench_best_method` exists to make the loop's best method reproducible for
+future performance work. It must never become a default: the TEDS gain did not
+transfer (dev +5.9 → test +0.2), and the real test gain came from reading order
+with the MinerU hybrid-VLM source.
 
 ## Development
 

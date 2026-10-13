@@ -201,3 +201,34 @@ class FusionPolicy:
                 "orientation": True,
             }
         )
+
+    @classmethod
+    def drbench_best_method(cls) -> "FusionPolicy":
+        """Preset do melhor método do loop (dev 87.33, ``hyb-v29-judge2-televm-adf-tj3``).
+
+        Composição: v13-pnt sobre ``docling-v3+rot`` x ``mineru-hyb+rot``, com
+        seleção de página VLM, ``rep_guard``, adição de número de página, juiz
+        pareado ``judge2`` (nova > 0.5, senão antiga > 0.2), TeleOCR com upscale
+        2x/1.5x e ``tailjoin3``.
+
+        **NUNCA usar como default.** Este resultado nunca foi confirmado no
+        leaderboard: o gap dev->test observado é de ~8 pontos, e o TEDS não
+        transferiu (dev +5.9 -> test +0.2). O melhor *confirmado* é
+        ``drbench_v15`` (EvalAI 70.37). Use este preset apenas para retomar os
+        testes de performance, sempre com confirmação no leaderboard antes de
+        qualquer promoção.
+        """
+        return cls(
+            **{
+                **cls.drbench_v15().to_dict(),
+                "page_judge_new_thr": 0.5,
+                "page_judge_old_thr": 0.2,
+                "page_select_dm": 0.6,
+                "page_swap_agree_thr": 0.45,
+                "page_swap_min_alt_frac": 0.3,
+                "rep_reps": 5,
+                "rep_max_n": 12,
+                "blank_pages": True,
+                "norm_text": True,
+            }
+        )

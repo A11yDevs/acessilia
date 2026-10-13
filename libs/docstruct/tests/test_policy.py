@@ -129,3 +129,48 @@ class TestDrbenchV14V15:
     def test_validacao_de_verse_chunk_negativo(self):
         with pytest.raises(ValueError):
             FusionPolicy(verse_chunk=-1)
+
+
+class TestDrbenchBestMethod:
+    def test_reproduz_a_composicao_do_melhor_metodo(self):
+        p = FusionPolicy.drbench_best_method()
+        # v13-pnt: alinhamento, escolha de texto e guarda
+        assert p.align_lambda == 0.5
+        assert p.align_tau == 0.6
+        assert p.text_pick == "auto"
+        assert p.pick_guard == 1.5
+        assert p.fuse_max_len == 300
+        # determinísticos da PR #125
+        assert p.line_numbers is True
+        assert p.table_eq is True
+        assert p.verse_chunk == 300
+        assert p.norm_text is True
+        assert p.hf_end is True
+        assert p.rep_guard is True
+        assert p.blank_pages is True
+        # híbrido de página + tj3
+        assert p.page_judge is True
+        assert p.page_judge_new_thr == 0.5
+        assert p.page_judge_old_thr == 0.2
+        assert p.tailjoin == "end"
+        assert p.tailjoin_max_len == 50
+        assert p.tailjoin_k == 3
+        assert p.tailjoin_bot == "hdr"
+        # imagem
+        assert p.upscale is True
+        assert p.orientation is True
+
+    def test_herda_v15(self):
+        v15, best = FusionPolicy.drbench_v15(), FusionPolicy.drbench_best_method()
+        assert best.verse_chunk == v15.verse_chunk
+        assert best.page_judge == v15.page_judge
+        assert best.tailjoin == v15.tailjoin
+
+    def test_nao_e_o_default(self):
+        assert FusionPolicy() != FusionPolicy.drbench_best_method()
+        assert FusionPolicy().page_judge is False
+        assert FusionPolicy().tailjoin == "off"
+
+    def test_roundtrip_to_from_dict(self):
+        p = FusionPolicy.drbench_best_method()
+        assert FusionPolicy.from_dict(p.to_dict()) == p
