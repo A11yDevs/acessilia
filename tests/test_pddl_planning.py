@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+
 import json
 from pathlib import Path
 
@@ -322,3 +323,63 @@ class TestV23Costs:
         from backend.core.manifest.builder import DEFAULT_METHOD_COSTS as C
 
         assert all(isinstance(v, int) and v >= 0 for v in C.values())
+
+
+class TestV23CompilerValidation:
+    def _manifest_with(self, kind: str, methods: list[str], costs: dict[str, int]):
+        from backend.core.manifest.models import Obligation
+
+        base = make_manifest()
+        obligation = Obligation(
+            id="o-v23",
+            kind=kind,
+            target_ids=["element-1"],
+            admissible_methods=methods,
+            method_costs=costs,
+            rationale="teste",
+        )
+        return base.model_copy(
+            update={"obligations": [*base.obligations, obligation]}
+        )
+
+    def test_metodos_fora_do_catalogo_sao_recusados(self):
+        manifest = self._manifest_with(
+            "chunk-verse", ["verse-chunker", "invented-method"],
+            {"verse-chunker": 5, "invented-method": 5},
+        )
+        with pytest.raises(ValueError, match="fora do catálogo"):
+            PlannerAgent().plan(manifest, selected_roots=["o-v23"])
+
+    def test_subconjunto_do_catalogo_e_aceito(self):
+        # O manifesto pode restringir os métodos (ex.: FUSION_MODE=single).
+        manifest = self._manifest_with(
+            "chunk-verse", ["verse-chunker"], {"verse-chunker": 5}
+        )
+        compiled, plan = PlannerAgent().plan(manifest, selected_roots=["o-v23"])
+        assert "chunk-verse" in compiled.text
+        assert any(step.obligation_kind == "chunk-verse" for step in plan.steps)
+
+    def test_metodos_do_catalogo_sao_aceitos(self):
+        manifest = self._manifest_with(
+            "chunk-verse",
+            ["verse-chunker", "human-review"],
+            {"verse-chunker": 5, "human-review": 100},
+        )
+        compiled, plan = PlannerAgent().plan(manifest, selected_roots=["o-v23"])
+        assert "chunk-verse" in compiled.text
+        assert any(step.obligation_kind == "chunk-verse" for step in plan.steps)
+
+    def test_custo_ausente_e_recusado(self):
+        manifest = self._manifest_with(
+            "chunk-verse", ["verse-chunker", "human-review"], {"verse-chunker": 5}
+        )
+        with pytest.raises(ValueError, match="Custo ausente"):
+            PlannerAgent().plan(manifest, selected_roots=["o-v23"])
+
+    def test_kind_fora_do_catalogo_e_aceito(self):
+        # O compilador é genérico: kinds fora do catálogo v2.3 continuam válidos.
+        manifest = self._manifest_with(
+            "extract-image", ["vision"], {"vision": 20}
+        )
+        compiled, _ = PlannerAgent().plan(manifest, selected_roots=["o-v23"])
+        assert "extract-image" in compiled.text
