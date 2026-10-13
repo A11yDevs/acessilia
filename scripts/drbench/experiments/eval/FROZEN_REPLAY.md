@@ -5,6 +5,28 @@ the official Dr.DocBench evaluator. This uses existing raw inference JSON; it
 does not run OCR again. Keep specifications, datasets, source exports and results
 outside the Acessília and Toolbox repositories.
 
+## Versioned specs
+
+`eval/specs/` holds the specs for the three splits the performance work used:
+
+| Spec | Split | Pages | Notes |
+|---|---|---|---|
+| `dev120.spec.json` | dev | 120 | stratified subset (seed 13); `dev120-pages.json` is versioned |
+| `dev986.spec.json` | dev | 986 | full dev split; `pages.json` is generated in the workspace |
+| `test509.spec.json` | evalai | 509 | EvalAI test split; `pages.json` is generated in the workspace |
+
+The dataset does not live in this repository, so the two full-split specs declare
+a `pages_generator` command instead of a versioned selection:
+
+```bash
+python scripts/drbench/experiments/eval/make_replay_pages.py \
+    --images-root <WS>/data/hf/dev --out dev986-pages.json
+```
+
+`make_replay_pages.py` emits the replay selection format (`id`, `subject`,
+`document_id`, `page`, `batch`, `image`) and validates it with the same
+`validate_pages` the freeze uses.
+
 Create a local JSON specification with paths relative to the specification file
 (absolute paths are also accepted):
 
