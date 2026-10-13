@@ -5,7 +5,6 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-
 load_dotenv()
 
 
@@ -94,6 +93,15 @@ class Settings:
     )
     toolbox_ocr_provider: str = os.getenv(
         "TOOLBOX_OCR_PROVIDER", "docling-ocr"
+    )
+    toolbox_media_inspect_provider: str = os.getenv(
+        "TOOLBOX_MEDIA_INSPECT_PROVIDER", "pure-media-inspect"
+    )
+    toolbox_media_inspect_enabled: bool = field(
+        default_factory=lambda: os.getenv(
+            "TOOLBOX_MEDIA_INSPECT_ENABLED", "true"
+        ).strip().lower()
+        in {"1", "true", "yes", "on", "sim"},
     )
     toolbox_api_key: str = os.getenv("TOOLBOX_API_KEY", "")
     toolbox_timeout_seconds: int = int(os.getenv("TOOLBOX_TIMEOUT_SECONDS", "3600"))

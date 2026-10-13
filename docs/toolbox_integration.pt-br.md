@@ -268,12 +268,33 @@ primeiro e degrada para a implementação local em caso de falha.
 - **Fusão dual** (`backend/pipeline/fusion.py`): se a capacidade produz blocos
   canônicos, pode participar como provider em `extract_fused()`.
 
-### 4.4 Testes
+### 4.4 Tests
 
 - **Unit** (mock respx): no estilo de `tests/test_toolbox_client.py` — verifica o
   mapeamento de erros HTTP para exceções tipadas e o envio do provider.
 - **E2E** (marcador `e2e`): no estilo de `tests/test_toolbox_e2e.py` — contra
   `TOOLBOX_BASE_URL` real; é ignorado se a variável não estiver definida.
+
+### 4.5 Exemplo concreto: `media.inspect`
+
+A capacidade `media.inspect` (provider `pure-media-inspect`, PR
+`A11yDevs/acessilia-toolbox#33`) é consumida no core com o padrão do Cenário B:
+
+- **Cliente:** `backend/tools/toolbox_media_inspect_client.py`
+  (`ToolboxMediaInspectClient` → `POST /v1/capabilities/media.inspect:execute`).
+- **Fallback local:** `backend/tools/media_inspect.py`
+  (`inspect_source_media`, `inspect_media_payload`) — port determinístico em
+  Pillow/PyMuPDF que replica o schema `artifact/media-inspection@1` quando a
+  Toolbox está indisponível.
+- **Integração:** `backend/agents/pddl_orchestrator.py` chama
+  `inspect_source_media()` após a extração e usa o sinal
+  `requires_visual_inspection` para injetar um elemento `picture` de página
+  inteira quando a entrada é imagem isolada sem blocos visuais — garantindo a
+  audiodescrição pelo VisionAgent.
+
+Os predicados PDDL `media_inspected`/`media_profile_classified` pertencem ao
+domínio da Toolbox; no core o sinal é consumido apenas como heurística de
+enriquecimento e não entra no problema de planejamento.
 
 ---
 
@@ -289,6 +310,8 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 | `TOOLBOX_TIMEOUT_SECONDS` | `3600` | Timeout das requisições |
 | `TOOLBOX_USE_ARTIFACT_STORE` | `true` | Envia o arquivo para `/v1/artifacts` antes de extrair |
 | `TOOLBOX_USE_REMOTE_CACHE` | `true` | Usa o cache remoto (`no_cache=false`) |
+| `TOOLBOX_MEDIA_INSPECT_PROVIDER` | `pure-media-inspect` | Provider da capacidade `media.inspect` |
+| `TOOLBOX_MEDIA_INSPECT_ENABLED` | `true` | Executa `media.inspect` (Toolbox-first com fallback local) |
 | `FUSION_MODE` | `single` | `single` (um provider) ou `dual` (dois providers + fusão) |
 | `FUSION_SECONDARY_PROVIDER` | `mineru` | Provider secundário para `FUSION_MODE=dual` |
 | `STRUCTURER` | `toolbox` | Motor de regiões por página (`toolbox`, `toolbox-layout`, `pymupdf`) |

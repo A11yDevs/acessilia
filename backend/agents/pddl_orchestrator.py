@@ -2,27 +2,33 @@ from __future__ import annotations
 
 import asyncio
 import re
+from collections import Counter
+from collections.abc import Callable, Coroutine
 from pathlib import Path
-from typing import Any, Callable, Coroutine
+from typing import Any
 
 import fitz
 from docstruct.tables.ast import effective_section_width
 
 from backend.agents.data_agent import DataAgent
 from backend.agents.output_schemas import DataOutput, VisionOutput
+from backend.agents.vision_agent import VisionAgent
 from backend.core.agents.informational_structural import InformationalStructuralAgent
 from backend.core.execution.executor import ExecutorAgent, MethodRegistry
 from backend.core.execution.models import ExecutionReport, MethodResult
 from backend.core.manifest.builder import (
+    _derive_processing_needs,
     reconcile_reclassified_element_processing_needs,
 )
+from backend.core.manifest.models import (
+    Artifact,
+    ManifestElement,
+    ProcessingManifest,
+)
 from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
-from backend.core.manifest.models import Artifact, ManifestElement, ProcessingManifest
 from backend.core.planning.domain_bundle import DomainBundle
 from backend.core.planning.models import NominalPlan, PlanningComparison
 from backend.core.planning.planner_agent import PlannerAgent
-
-from backend.agents.vision_agent import VisionAgent
 from backend.i18n import t
 from backend.log_messages import (
     LOG_PDDL_ELEMENT_CROP_FAILED,
@@ -45,6 +51,7 @@ from backend.tools.formula_tools import (
     verbalize_latex_fallback,
 )
 from backend.tools.logger import logger
+from backend.tools.media_inspect import inspect_source_media
 
 
 def _formula_elements_for_obligation(
@@ -344,12 +351,22 @@ class PddlAccessibilityOrchestrator:
             language="pt-BR",
         )
 
+        source_path = file_path.resolve()
+        media_inspection = await inspect_source_media(source_path)
+        if media_inspection is None:
+            logger.warning(
+                "Inspeção de mídia indisponível para %s; seguindo sem o "
+                "sinal de imagem isolada",
+                source_path.name,
+            )
+
         if status_callback:
             await status_callback(t(STAGE_ENRICHING_IMAGE_DESCRIPTIONS))
         await _enrich_picture_descriptions(
             manifest,
-            file_path.resolve(),
+            source_path,
             mode=effective_mode,
+            media_inspection=media_inspection,
         )
 
         if status_callback:
@@ -422,7 +439,10 @@ async def _enrich_picture_descriptions(
     source_file: Path,
     *,
     mode: str,
+    media_inspection: dict[str, Any] | None = None,
 ) -> None:
+    _inject_full_page_picture(manifest, media_inspection)
+
     pictures = [
         element
         for element in manifest.elements
@@ -509,6 +529,72 @@ async def _enrich_picture_descriptions(
 
     if enriched:
         logger.info(t(LOG_PDDL_IMAGES_ENRICHED).format(count=enriched))
+
+
+def _inject_full_page_picture(
+    manifest: ProcessingManifest,
+    media_inspection: dict[str, Any] | None,
+) -> None:
+    """Injeta um elemento `picture` sintético de página inteira.
+
+    Quando a entrada é uma imagem raster isolada (``media_inspect`` classifica
+    como imagem e sinaliza ``requires_visual_inspection=true``) e o extrator
+    estrutural não produziu nenhum bloco visual (picture/formula), o orquestrador
+    não teria alvo para audiodescrição. Este fallback cria um elemento `picture`
+    que cobre a página inteira para que o VisionAgent descreva a imagem.
+
+    O sinal é consumido apenas como heurística de enriquecimento: não altera o
+    problema PDDL (predicados ``media_inspected``/``media_profile_classified``
+    pertencem ao domínio da Toolbox).
+    """
+    if not isinstance(media_inspection, dict):
+        return
+    if not media_inspection.get("is_image"):
+        return
+    if not media_inspection.get("requires_visual_inspection"):
+        return
+
+    has_visual_element = any(
+        element.type in {"picture", "formula"} for element in manifest.elements
+    )
+    if has_visual_element:
+        return
+
+    max_reading_order = max(
+        (element.reading_order for element in manifest.elements), default=0
+    )
+    page_number = (
+        manifest.pages[0].page_number if manifest.pages else 1
+    )
+
+    element = ManifestElement(
+        id=f"element-injected-picture-{len(manifest.elements) + 1:06d}",
+        type="picture",
+        raw_label="picture",
+        reading_order=max_reading_order + 1,
+        hierarchy_level=1,
+        text=None,
+        page_number=page_number,
+        metadata={
+            "injected_picture": True,
+            "media_inspection": media_inspection,
+        },
+    )
+    manifest.elements.append(element)
+
+    if manifest.pages:
+        manifest.pages[0].element_ids.append(element.id)
+
+    observations, obligations = _derive_processing_needs([element])
+    manifest.observations.extend(observations)
+    manifest.obligations.extend(obligations)
+
+    manifest.summary.element_count = len(manifest.elements)
+    manifest.summary.observation_count = len(manifest.observations)
+    manifest.summary.obligation_count = len(manifest.obligations)
+    manifest.summary.element_types = dict(
+        sorted(Counter(item.type for item in manifest.elements).items())
+    )
 
 
 async def _enrich_table_structures(
