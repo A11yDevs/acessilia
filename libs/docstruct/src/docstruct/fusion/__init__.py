@@ -9,6 +9,13 @@ from docstruct.fusion.noise import is_junk, quality
 from docstruct.fusion.types import DiffBlock, ProviderBlocks
 from docstruct.fusion.convert import block_to_diff
 from docstruct.fusion.line_numbers import extract_line_numbers, line_number_chain
+from docstruct.fusion.repetition import (
+    collapse,
+    guard_page,
+    is_blank_page,
+    max_run,
+    strip_comment,
+)
 from docstruct.fusion.tailjoin import (
     is_page_number,
     join_tail,
@@ -29,17 +36,22 @@ __all__ = [
     "ProviderBlocks",
     "block_to_diff",
     "chunk_verse",
+    "collapse",
     "extract_line_numbers",
     "flood_guard",
+    "guard_page",
+    "is_blank_page",
     "is_junk",
     "is_page_number",
     "join_tail",
     "line_number_chain",
+    "max_run",
     "merge_blocks",
     "page_number_position",
     "quality",
     "record_like",
     "split_box_rows",
+    "strip_comment",
     "tail_start",
     "tailjoin3",
     "verse_blocks",
