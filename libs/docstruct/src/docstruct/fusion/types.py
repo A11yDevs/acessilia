@@ -20,6 +20,7 @@ class DiffBlock:
     role: Optional[str] = None  # decor: "header" | "footer" | "page_number"
     merged: int = 0
     fused: int = 0
+    verse: bool = False  # pedaço produzido pelo chunking de verso/registro
 
     def as_dict(self) -> dict[str, Any]:
         return {f.name: getattr(self, f.name) for f in fields(self)}
