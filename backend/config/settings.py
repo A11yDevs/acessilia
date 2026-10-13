@@ -95,6 +95,15 @@ class Settings:
     toolbox_ocr_provider: str = os.getenv(
         "TOOLBOX_OCR_PROVIDER", "docling-ocr"
     )
+    toolbox_page_ocr_provider: str = os.getenv(
+        "TOOLBOX_PAGE_OCR_PROVIDER", "qwen3-vl-page"
+    )
+    toolbox_adjudicate_provider: str = os.getenv(
+        "TOOLBOX_ADJUDICATE_PROVIDER", "qwen3-vl-judge"
+    )
+    toolbox_orientation_provider: str = os.getenv(
+        "TOOLBOX_ORIENTATION_PROVIDER", "rapidocr-orientation"
+    )
     toolbox_api_key: str = os.getenv("TOOLBOX_API_KEY", "")
     toolbox_timeout_seconds: int = int(os.getenv("TOOLBOX_TIMEOUT_SECONDS", "3600"))
     toolbox_use_artifact_store: bool = field(
