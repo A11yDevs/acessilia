@@ -71,22 +71,27 @@ class FusionPolicy:
     xycut_min_balance: float = 0.0  # >0: skip pages whose columns differ too much in width
 
     # --- Pós-processamento determinístico (PR #125) ---
-    verse_chunk: int = 0  # >0: divide blocos de verso/registro em pedaços <= N chars
+    # Os defaults abaixo são os de PRODUÇÃO: as capacidades determinísticas com
+    # evidência de ganho (ou correção de defeito) ficam ligadas. As que consomem
+    # modelo ficam desligadas e são ligadas quando a Toolbox expõe a capacidade.
+    verse_chunk: int = 300  # >0: divide blocos de verso/registro em pedaços <= N chars
     verse_kind: Literal["records", "all"] = "records"  # "records" preserva verso real inteiro
-    line_numbers: bool = False  # extrai números de linha marginais para blocos próprios
-    table_eq: bool = False  # desembrulha <eq>..</eq> em células de tabela do MinerU
-    norm_text: bool = False  # limpezas determinísticas (ligaduras, hífen suave, NBSP)
-    hf_end: bool = False  # cabeçalho/rodapé/número de página ao fim da página
-    tailjoin: Literal["off", "num", "end", "any"] = "off"  # junta a cauda de blocos curtos
+    line_numbers: bool = True  # extrai números de linha marginais para blocos próprios
+    table_eq: bool = True  # desembrulha <eq>..</eq> em células de tabela do MinerU
+    norm_text: bool = True  # limpezas determinísticas (ligaduras, hífen suave, NBSP)
+    hf_end: bool = True  # cabeçalho/rodapé/número de página ao fim da página
+    tailjoin: Literal["off", "num", "end", "any"] = "end"  # junta a cauda de blocos curtos
     tailjoin_max_len: int = 50
     tailjoin_k: int = 3
-    tailjoin_bot: Literal["keep", "hdr"] = "keep"  # comportamento com o número no rodapé
-    rep_guard: bool = False  # corta repetição degenerada (loops de geração)
+    tailjoin_bot: Literal["keep", "hdr"] = "hdr"  # comportamento com o número no rodapé
+    rep_guard: bool = True  # corta repetição degenerada (loops de geração)
     rep_reps: int = 5
     rep_max_n: int = 12
-    blank_pages: bool = False  # esvazia páginas em branco detectadas
+    blank_pages: bool = True  # esvazia páginas em branco detectadas
 
     # --- Híbrido de página (PR #125) ---
+    # Consome modelo: desligado por default, ligado quando a Toolbox expõe a
+    # capacidade (document.adjudicate.page / document.ocr.page).
     page_judge: bool = False  # juiz pareado por VLM decide a página
     page_judge_new_thr: float = 0.5
     page_judge_old_thr: float = 0.2
@@ -95,8 +100,9 @@ class FusionPolicy:
     page_swap_min_alt_frac: float = 0.3
 
     # --- Imagem (decisão pura; aplicação no backend) ---
-    upscale: bool = False  # amplia páginas pequenas antes do OCR
-    orientation: bool = False  # detecta e corrige rotação 0/90/270
+    # Determinístico e com o maior ganho isolado da linha Tele: ligado.
+    upscale: bool = True  # amplia páginas pequenas antes do OCR
+    orientation: bool = True  # detecta e corrige rotação 0/90/270
 
     def __post_init__(self) -> None:
         if not 0.0 <= self.align_lambda <= 1.0:

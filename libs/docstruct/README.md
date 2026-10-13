@@ -35,8 +35,10 @@ Port of the Tree Differ v2 from PR #98 (Dr.DocBench) as a pure library:
   zero dependencies).
 - `noise.py` — decor-tail, running heads, junk filter, region suppression,
   paragraph re-fusion, line-run fusing.
-- `FusionPolicy` — frozen dataclass with conservative defaults; benchmark
-  presets (`drbench_v12`, `drbench_v13`, `drbench_v14`, `drbench_v15`,
+- `FusionPolicy` — frozen dataclass. The defaults are the **production**
+  policy: the deterministic capabilities with evidence of gain (or that fix a
+  defect) are on, and anything that consumes a model is off. Benchmark presets
+  (`drbench_v12`, `drbench_v13`, `drbench_v14`, `drbench_v15`,
   `drbench_best_method`) are named classmethods, never defaults (they were
   overfitted to the dev split).
 - `fusion/verse.py`, `fusion/line_numbers.py`, `fusion/flood.py`,
@@ -47,6 +49,22 @@ Port of the Tree Differ v2 from PR #98 (Dr.DocBench) as a pure library:
 - `text/normalize.py`, `text/norm_fix.py`, `text/latex.py` — text
   normalization primitives.
 - `imaging/policy.py` — pure upscale/orientation decisions (no PIL/cv2).
+
+### Production defaults
+
+| Capability | Default | Why |
+|---|---|---|
+| `verse_chunk` 300, `verse_kind` records | on | deterministic; keeps real verse whole |
+| `line_numbers`, `table_eq`, `norm_text`, `hf_end` | on | deterministic, low risk |
+| `tailjoin` end / 50 / 3 / `hdr` | on | the `tj3` rule: Δtune +1.47, Δhold +0.79 |
+| `rep_guard`, `blank_pages` | on | fixes degenerate generation loops |
+| `upscale`, `orientation` | on | largest isolated gain of the Tele line (Δtune +1.59, Δhold +2.91) |
+| `page_judge` | **off** | consumes a model; enable when the Toolbox exposes `document.adjudicate.page` |
+
+Rejected experiments (word_vote, dedup_blocks, medoid, block judge, header
+move, dots tables, DeepSeek arbiter, logistic selector, prompt ensemble,
+threshold retuning) are **not** in the defaults: they showed Δtune ≤ 0 and
+Δhold ≤ 0.
 
 ### Dr.DocBench presets
 

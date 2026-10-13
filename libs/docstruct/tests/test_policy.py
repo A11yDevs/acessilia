@@ -97,18 +97,28 @@ class TestDrbenchV14V15:
         assert v15.line_numbers == v14.line_numbers
         assert v15.verse_chunk == v14.verse_chunk
 
-    def test_defaults_nao_ativam_nada_novo(self):
+    def test_defaults_ligam_o_deterministico(self):
+        # Produção: as capacidades determinísticas com evidência de ganho (ou
+        # correção de defeito) ficam ligadas por default.
         p = FusionPolicy()
-        assert p.verse_chunk == 0
-        assert p.line_numbers is False
-        assert p.table_eq is False
-        assert p.norm_text is False
-        assert p.hf_end is False
-        assert p.tailjoin == "off"
-        assert p.rep_guard is False
+        assert p.verse_chunk == 300
+        assert p.verse_kind == "records"
+        assert p.line_numbers is True
+        assert p.table_eq is True
+        assert p.norm_text is True
+        assert p.hf_end is True
+        assert p.tailjoin == "end"
+        assert p.tailjoin_bot == "hdr"
+        assert p.rep_guard is True
+        assert p.blank_pages is True
+        assert p.upscale is True
+        assert p.orientation is True
+
+    def test_defaults_nao_ligam_o_que_consome_modelo(self):
+        # O juiz VLM e as fontes extras só entram quando a Toolbox expõe a
+        # capacidade; nunca por default.
+        p = FusionPolicy()
         assert p.page_judge is False
-        assert p.upscale is False
-        assert p.orientation is False
 
     def test_roundtrip_to_from_dict(self):
         p = FusionPolicy.drbench_v15()
@@ -167,10 +177,40 @@ class TestDrbenchBestMethod:
         assert best.tailjoin == v15.tailjoin
 
     def test_nao_e_o_default(self):
+        # O default de produção liga o determinístico, mas nunca o juiz VLM.
         assert FusionPolicy() != FusionPolicy.drbench_best_method()
         assert FusionPolicy().page_judge is False
-        assert FusionPolicy().tailjoin == "off"
+        assert FusionPolicy().page_swap_agree_thr == 0.45
 
     def test_roundtrip_to_from_dict(self):
         p = FusionPolicy.drbench_best_method()
         assert FusionPolicy.from_dict(p.to_dict()) == p
+
+
+class TestProductionDefaults:
+    """Os defaults são a política de produção: determinístico ligado, modelo desligado."""
+
+    def test_deterministic_capabilities_are_on(self):
+        p = FusionPolicy()
+        for field in ("line_numbers", "table_eq", "norm_text", "hf_end",
+                      "rep_guard", "blank_pages", "upscale", "orientation"):
+            assert getattr(p, field) is True, f"{field} deveria estar ligado"
+        assert p.verse_chunk == 300
+        assert p.tailjoin == "end"
+
+    def test_model_consuming_capabilities_are_off(self):
+        assert FusionPolicy().page_judge is False
+
+    def test_rejected_experiments_are_not_in_the_defaults(self):
+        # §2.4 do plano: rejeitados não entram.
+        p = FusionPolicy()
+        assert p.page_swap_agree_thr == 0.45  # só usado com page_judge
+        assert p.page_judge is False
+
+    def test_defaults_are_not_a_benchmark_preset(self):
+        default = FusionPolicy()
+        for preset in ("drbench_v12", "drbench_v13", "drbench_v14",
+                       "drbench_v15", "drbench_best_method"):
+            assert default != getattr(FusionPolicy, preset)(), (
+                f"o default não pode ser igual a {preset}"
+            )
