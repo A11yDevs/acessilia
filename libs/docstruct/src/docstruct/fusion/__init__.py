@@ -16,6 +16,13 @@ from docstruct.fusion.adjudication import (
 )
 from docstruct.fusion.differ import merge_blocks
 from docstruct.fusion.flood import flood_guard
+from docstruct.fusion.hf_end import (
+    hf_categories_texts,
+    hf_norm,
+    hf_texts,
+    move_body_hf_to_tail,
+    move_hf_to_end,
+)
 from docstruct.fusion.noise import is_junk, quality
 from docstruct.fusion.oracle import (
     best_score,
@@ -86,6 +93,9 @@ __all__ = [
     "fuse",
     "guard_page",
     "gt_text_blocks",
+    "hf_categories_texts",
+    "hf_norm",
+    "hf_texts",
     "is_blank_page",
     "is_junk",
     "is_page_number",
@@ -95,6 +105,8 @@ __all__ = [
     "line_number_chain",
     "max_run",
     "merge_blocks",
+    "move_body_hf_to_tail",
+    "move_hf_to_end",
     "norm_text",
     "nrm",
     "oracle_page",
