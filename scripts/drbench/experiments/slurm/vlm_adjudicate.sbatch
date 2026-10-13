@@ -6,14 +6,14 @@
 #SBATCH --mem=128G
 #SBATCH --time=08:00:00
 #SBATCH --signal=B:SIGUSR1@600
-#SBATCH --output=/raid/user_marcospaulo/drdocbench/runs/slurm/logs/%x_%j.log
+#SBATCH --output=runs/slurm/logs/%x_%j.log
 # Job A (GPU): VLM exact-transcription adjudicator (paper's Adjudicator Agent).
 #   1) venv .venv-vlm (vllm + nvcc pip — node has no /usr/local/cuda)
 #   2) wide queue regen (--queue-sim 0.97, unilaterals both sides) + crops
 #   3) vlm_adjudicate.py transcription mode -> adjudications.jsonl
 # Differ variants + eval happen in matrix_v18.sbatch (CPU, afterany this + mineru-vlm).
 set -uo pipefail
-source /raid/user_marcospaulo/drdocbench/runs/slurm/env.sh
+source "$WS/runs/slurm/env.sh"
 cd "$WS"
 FULL=$WS/runs/dev-full
 # test split: QDIR=runs/evalai/adjudication-queue DOCLING_DIR=runs/evalai/docling-v3+rot/predictions MINERU_DIR=runs/evalai/mineru-hyb+rot/predictions IMAGES_ROOT=data/evalai/drdocbench-evaluation-v4/images
@@ -37,7 +37,7 @@ fi
 RT=$($VENV/bin/python -c "import importlib.metadata as m;print(m.version('nvidia-cuda-runtime').rsplit('.',1)[0])")
 uv pip install -q --python "$VENV/bin/python" "nvidia-cuda-nvcc==$RT.*" "nvidia-cuda-crt==$RT.*" || { echo "nvcc pin FAILED"; exit 3; }
 export VLLM_USE_FLASHINFER_SAMPLER=0          # evita JIT do sampler (único op que precisou compilar)
-export FLASHINFER_WORKSPACE_BASE=/raid/user_marcospaulo/cache/flashinfer   # JIT cache fora da home
+export FLASHINFER_WORKSPACE_BASE=$CACHE_ROOT/flashinfer   # JIT cache fora da home
 # nvcc 13.4 já vem nas deps do torch cu13 (nvidia/cu13/bin) — só localizar
 NVCC=$(find "$VENV/lib/python3.11/site-packages/nvidia" -name nvcc -type f | sort | head -1)
 [[ -x $NVCC ]] || { echo "nvcc missing under site-packages/nvidia"; exit 3; }

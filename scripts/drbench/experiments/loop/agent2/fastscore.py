@@ -4,13 +4,14 @@ usage: fastscore.py PRED_DIR [--out per_page.json] [--dump DIR]   (PRED_DIR has 
 Prints tune/hold/all means of text and RO (x100)."""
 import sys, os, re, json, glob, hashlib, argparse
 from multiprocessing import Pool
-REPO = "/raid/user_marcospaulo/drdocbench/repos/DrDocBench"
+WS = os.environ.get("DRBENCH_WS", "/raid/user_marcospaulo/drdocbench")
+REPO = os.environ.get("DRBENCH_EVALUATOR", f"{WS}/repos/DrDocBench")
 sys.path.insert(0, REPO); os.chdir(REPO)
 import Levenshtein
 from utils.extract import md_tex_filter
 from utils.match_quick import match_gt2pred_quick
 from dataset.multipage_md2md_dataset import MultipageMd2MdDataset
-GT = "/raid/user_marcospaulo/drdocbench/data/hf/dev"
+GT = os.environ.get("DRBENCH_GT", f"{WS}/data/hf/dev")
 
 def pages():
     out = []
@@ -53,9 +54,9 @@ def part(win):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(); ap.add_argument("pred"); ap.add_argument("--out"); ap.add_argument("--pairs")
     a = ap.parse_args()
-    R = "/raid/user_marcospaulo/drdocbench/"
+    R = WS.rstrip("/") + "/"
     a.out = a.out and os.path.join(R, a.out); a.pairs = a.pairs and os.path.join(R, a.pairs)
-    pd = os.path.abspath(os.path.join("/raid/user_marcospaulo/drdocbench", a.pred))
+    pd = os.path.abspath(os.path.join(WS, a.pred))
     with Pool(24) as pool:
         res = pool.map(score_page, [(pd, *x) for x in pages()], chunksize=4)
     rows = {w: {"text": t, "reading_order": r} for w, t, r, _ in res}

@@ -1,6 +1,6 @@
 # Slurm jobs — Dr.DocBench (partição h100n2, nó dgx-H100-02)
 
-Todos os jobs fazem `source runs/slurm/env.sh` (caches em `/raid/user_marcospaulo/cache`). Logs em `runs/slurm/logs/<name>_<jobid>.log` (+ `_docling.log` / `_mineru.log` / `_toolbox.log` para os serviços). Scripts: `setup.sbatch`, `pipeline.sbatch` (genérico, reentrante), `full_gpu.sbatch`.
+Todos os jobs fazem `source runs/slurm/env.sh` (caches em `$CACHE_ROOT`). Logs em `runs/slurm/logs/<name>_<jobid>.log` (+ `_docling.log` / `_mineru.log` / `_toolbox.log` para os serviços). Scripts: `setup.sbatch`, `pipeline.sbatch` (genérico, reentrante), `full_gpu.sbatch`.
 
 | Job | Nome | Recursos | Propósito | Status (2026-09-15 ~16:40 UTC) |
 |---|---|---|---|---|
@@ -17,7 +17,7 @@ Todos os jobs fazem `source runs/slurm/env.sh` (caches em `/raid/user_marcospaul
 
 ## Como submeter
 ```bash
-cd /raid/user_marcospaulo/drdocbench
+cd "$WS"
 sbatch -c 32 --mem 128G --time 06:00:00 --job-name drb-dev-docling \
   --export=ALL,PROVIDER=docling,IMAGES_ROOT=$PWD/runs/dev/subset-images,OUT_DIR=$PWD/runs/dev/docling/predictions,SAMPLE=0 \
   runs/slurm/pipeline.sbatch
@@ -26,8 +26,8 @@ sbatch -c 32 --mem 128G --time 06:00:00 --job-name drb-dev-docling \
 
 ## Bugs / workarounds
 - **acessilia-toolbox** `src/acessilia_toolbox/core/normalization/builder.py:188` chama `document.iterate_items(...)` e `:460` `document.pages.items()`, mas `src/acessilia_toolbox/providers/mineru_document.py::MineruDocument` não implementa `iterate_items` e `pages` retorna `list` → HTTP 500 em `document.structure.extract` com provider mineru. Workaround sem tocar no repo: `scripts/toolbox_shim/sitecustomize.py` carregado via `PYTHONPATH` só no processo uvicorn da toolbox (ver `pipeline.sbatch`). Mapeia blocos MinerU → labels Docling (`text/section_header/table/formula/...`), page_no 1-based, tabela como HTML, fórmula como `$$…$$`.
-- **Docling models** foram baixados para `~/.cache/docling/models` pelo `docling-tools models download`; movidos para `/raid/user_marcospaulo/cache/docling/models` (symlink na home) e `DOCLING_ARTIFACTS_PATH` em `env.sh`.
-- **mineru.json** gerado em `~/mineru.json` com `models-dir.pipeline` apontando para o HF cache em `/raid`; cópia em `/raid/user_marcospaulo/cache/mineru/mineru.json` (`MINERU_TOOLS_CONFIG_JSON`). Pipeline usa `MINERU_MODEL_SOURCE=local`.
+- **Docling models** foram baixados para `~/.cache/docling/models` pelo `docling-tools models download`; movidos para `$CACHE_ROOT/docling/models` (symlink na home) e `DOCLING_ARTIFACTS_PATH` em `env.sh`.
+- **mineru.json** gerado em `~/mineru.json` com `models-dir.pipeline` apontando para o HF cache em `/raid`; cópia em `$CACHE_ROOT/mineru/mineru.json` (`MINERU_TOOLS_CONFIG_JSON`). Pipeline usa `MINERU_MODEL_SOURCE=local`.
 - **acessilia** `scripts/drbench/run_pipeline.py` não é reentrante e roda 1 página por invocação com `--item`; o sbatch faz o loop e o skip.
 - Observado no smoke docling (`runs/smoke/docling/predictions/*_p17.drbench.md`): título e parágrafos duplicados na saída (ex. "# DAVID LEWIS DAVID LEWIS", parágrafo "son is committed…" repetido). Suspeito: `scripts/drbench/run_pipeline.py:_extract_text_from_provider` / `backend/pipeline/canonical_builder.py` — investigar (afeta Edit Distance).
 | 32571 | drb-dev-docling-focr | h100n2, CPU 32c/128G, 4h, afterany:32566 | Docling com `force_ocr=true` (patch local em toolbox providers/docling.py) no subset dev → runs/dev/docling-forceocr | COMPLETED 120/120 |
@@ -41,7 +41,7 @@ sbatch -c 32 --mem 128G --time 06:00:00 --job-name drb-dev-docling \
 | 32585 | drb-adjudicator-v0 | CPU 4c/16G/30m, `--dependency=afterany:32584` | `runs/slurm/adjudicator_v0.sbatch`: `scripts/adjudicate_v0.py` (v0 e v0b) sobre runs/dev/{docling-forceocr,mineru} → `runs/dev/adjudicator-v0{,b}/predictions` (+`decisions.csv`); `eval_local.py` + avaliador oficial (`end2end_nocdm.yaml`) → `runs/dev/adjudicator-v0{,b}/reports/{local,official}.json`; `eval_summary.py`/`official_summary.py`/`adjudicator_summary.py` (5 runs) → `runs/dev/summary.md` (seção "Adjudicator v0"); por fim `scripts/build_all_submissions.sh` (zips EvalAI para docling-forceocr/mineru/adjudicator-v0, só se ambos com 509 págs) | PENDING (QOS 2 jobs) — conferir `tail -f runs/slurm/logs/drb-adjudicator-v0_32585.log` |
 | 32586/32587 | drb-build-sub (srun) | h100n2 -c4 16G 20min | build+validate 3 submission.zip (1ª tentativa falhou: builder da toolbox rejeita p0/subject vazio → scripts/build_submission_manifest.py) | concluído 19:21 UTC |
 | 32594 | drb-differ-v1 | h100n2 -c4 16G 30min | Tree Differ v1 (text-only block merge) dev subset + eval local/oficial | 21:24 UTC |
-| 32626 | drb-setup-cdm | h100n2 -c8 32G 3h | `runs/slurm/setup_cdm.sbatch`: node portátil + TeX Live 2025 scheme-small (xelatex, xeCJK) + magick shim + Source Han Sans em /raid/user_marcospaulo/opt → `runs/slurm/cdm_env.sh`; habilita CDM local (`end2end_full.yaml`) | 2026-09-16 |
+| 32626 | drb-setup-cdm | h100n2 -c8 32G 3h | `runs/slurm/setup_cdm.sbatch`: node portátil + TeX Live 2025 scheme-small (xelatex, xeCJK) + magick shim + Source Han Sans em $CACHE_ROOT/opt → `runs/slurm/cdm_env.sh`; habilita CDM local (`end2end_full.yaml`) | 2026-09-16 |
 | 32631 | drb-eval adjudicator-v0-notitle-20260916 | h100n2 -c8 32G 2h | validação do `runs/slurm/eval_run.sbatch` (S0.1): reproduz 74.0 (+0.06 c/ strip de título placeholder) → LEDGER.md | concluído 14:15 UTC |
 | 32632 | drb-dev-docling-fix | h100n2 -c32 128G 3h | Docling force-OCR dev-120 com `--save-raw` → `runs/dev/docling-fix-20260916/predictions/*.{drbench.md,blocks.json,provider.json}`. ATENÇÃO: código de run_pipeline mudou durante o job (páginas 1–60 caminho texto, resto caminho estruturado) → predições NÃO avaliar; usar só os `.provider.json` e re-renderizar (`scripts/rerender_from_payloads.py`) como `docling-v2-20260916` | 2026-09-16 14:26 UTC |
 | 32633 | drb-replay-mineru mineru-v2-20260916 | h100n2 -c8 32G 2h | `runs/slurm/replay_mineru.sbatch`: manifests a partir dos middle.json do MinerU já em disco (`scripts/replay_mineru_manifests.py`, mapeia por sha256 da imagem) → re-render com mapeamento canônico estruturado (`scripts/rerender_from_payloads.py`) → eval_run (oficial+local+ledger). Testa correção do bug prosa→$$ | PENDING (QOS) |

@@ -4,9 +4,9 @@
 #   --export=ALL,PROVIDER=docling,IMAGES_ROOT=...,OUT_DIR=...,SAMPLE=2[,ITEMS_FILE=...] pipeline.sbatch
 #SBATCH --partition=h100n2
 #SBATCH --signal=B:SIGUSR1@300
-#SBATCH --output=/raid/user_marcospaulo/drdocbench/runs/slurm/logs/%x_%j.log
+#SBATCH --output=runs/slurm/logs/%x_%j.log
 set -uo pipefail
-source /raid/user_marcospaulo/drdocbench/runs/slurm/env.sh
+source "$WS/runs/slurm/env.sh"
 
 : "${PROVIDER:?docling|mineru}"; : "${IMAGES_ROOT:?}"; : "${OUT_DIR:?}"
 SAMPLE=${SAMPLE:-0}; ITEMS_FILE=${ITEMS_FILE:-}; EXTRA_ARGS=${EXTRA_ARGS:-}

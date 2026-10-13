@@ -4,10 +4,10 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=48G
 #SBATCH --time=04:00:00
-#SBATCH --output=/raid/user_marcospaulo/drdocbench/runs/slurm/logs/%x_%j.log
+#SBATCH --output=runs/slurm/logs/%x_%j.log
 # v19 matrix on dev-986: bands order, adjacent dedup, tighter fuse, chunk 800 — then eval vs 78.3.
 set -uo pipefail
-source /raid/user_marcospaulo/drdocbench/runs/slurm/env.sh
+source "$WS/runs/slurm/env.sh"
 cd "$WS"
 DRB=$WS/repos/DrDocBench/.venv/bin/python
 FULL=$WS/runs/dev-full

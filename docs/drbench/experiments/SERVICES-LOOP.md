@@ -10,4 +10,4 @@
 
 Portas derivadas do `SLURM_JOB_ID` para que jobs docling e mineru coexistam no mesmo nó; `DOCLING_SERVE_URL`, `MINERU_SERVE_URL`, `TOOLBOX_BASE_URL` são exportados pelo sbatch de acordo. Health: `GET /health` (docling), `GET /openapi.json` (mineru), `GET /v1/health` (toolbox). Logs dos serviços: `runs/slurm/logs/<job>_<id>_{docling,mineru,toolbox}.log`.
 
-Venvs (Python 3.11, uv): `repos/acessilia-toolbox/{.venv,.venv-docling,.venv-mineru}`, `repos/acessilia/.venv`. Modelos: `/raid/user_marcospaulo/cache/docling/models`, `/raid/user_marcospaulo/cache/huggingface/hub/models--opendatalab--PDF-Extract-Kit-1.0`. Ambiente: `runs/slurm/env.sh`.
+Venvs (Python 3.11, uv): `repos/acessilia-toolbox/{.venv,.venv-docling,.venv-mineru}`, `repos/acessilia/.venv`. Modelos: `$CACHE_ROOT/docling/models`, `$CACHE_ROOT/huggingface/hub/models--opendatalab--PDF-Extract-Kit-1.0`. Ambiente: `runs/slurm/env.sh` (parametrizado — ver `scripts/drbench/experiments/README.md`).

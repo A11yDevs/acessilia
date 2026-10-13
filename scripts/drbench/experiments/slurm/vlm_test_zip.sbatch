@@ -6,12 +6,12 @@
 #SBATCH --mem=128G
 #SBATCH --time=06:00:00
 #SBATCH --signal=B:SIGUSR1@600
-#SBATCH --output=/raid/user_marcospaulo/drdocbench/runs/slurm/logs/%x_%j.log
+#SBATCH --output=runs/slurm/logs/%x_%j.log
 # Fast path: reuse existing test crops → VLM adjudicate → filter → differ + submission.zip
 #   sbatch --export=ALL,MODEL=Qwen/Qwen3-VL-8B-Instruct,RUN_ID=differ-v21-qwen3vl8b-20260927 \
 #          runs/slurm/vlm_test_zip.sbatch
 set -uo pipefail
-source /raid/user_marcospaulo/drdocbench/runs/slurm/env.sh
+source "$WS/runs/slurm/env.sh"
 cd "$WS"
 
 MODEL=${MODEL:-Qwen/Qwen3-VL-8B-Instruct}
@@ -47,7 +47,7 @@ fi
 RT=$($VENV/bin/python -c "import importlib.metadata as m;print(m.version('nvidia-cuda-runtime').rsplit('.',1)[0])")
 uv pip install -q --python "$VENV/bin/python" "nvidia-cuda-nvcc==$RT.*" "nvidia-cuda-crt==$RT.*" || { echo "nvcc pin FAILED"; exit 3; }
 export VLLM_USE_FLASHINFER_SAMPLER=0
-export FLASHINFER_WORKSPACE_BASE=/raid/user_marcospaulo/cache/flashinfer
+export FLASHINFER_WORKSPACE_BASE=$CACHE_ROOT/flashinfer
 NVCC=$(find "$VENV/lib/python3.11/site-packages/nvidia" -name nvcc -type f | sort | head -1)
 [[ -x $NVCC ]] || { echo "nvcc missing"; exit 3; }
 export CUDA_HOME=$(dirname "$(dirname "$NVCC")")

@@ -4,10 +4,10 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
 #SBATCH --time=00:30:00
-#SBATCH --output=/raid/user_marcospaulo/drdocbench/runs/slurm/logs/%x_%j.log
+#SBATCH --output=runs/slurm/logs/%x_%j.log
 # build & validate submission.zip from raw provider predictions: sbatch --export=ALL,RUN_ID=<dir under runs/evalai> probe_zip.sbatch
 set -uo pipefail
-source /raid/user_marcospaulo/drdocbench/runs/slurm/env.sh
+source "$WS/runs/slurm/env.sh"
 cd "$WS"; R=${RUN_ID:?}
 PY=$WS/repos/acessilia/.venv/bin/python; EVALAI=$WS/runs/evalai; MANIFEST=$WS/data/evalai/drdocbench-evaluation-v4/evaluation_pages.json
 PRED=$EVALAI/$R/predictions; OUT=$EVALAI/$R/submission

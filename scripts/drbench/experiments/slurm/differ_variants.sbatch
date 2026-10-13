@@ -4,7 +4,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=48G
 #SBATCH --time=02:00:00
-#SBATCH --output=/raid/user_marcospaulo/drdocbench/runs/slurm/logs/%x_%j.log
+#SBATCH --output=runs/slurm/logs/%x_%j.log
 # Run several tree_differ_v2 variants on dev-986 sequentially, then evaluate them all with the
 # official md2md single-page protocol (eval_full.sbatch inline).
 #   VARIANTS_FILE: file with one "name|extra args[|mineru_run]" per line (base args always: --lam 0.5 --tau 0.6 --min-len 0).
@@ -13,7 +13,7 @@
 #   Use '+' instead of ',' inside --drop-* lists (Slurm --export splits on commas).
 #   sbatch --export=ALL,VARIANTS_FILE=runs/dev-full/variants_v3.txt runs/slurm/differ_variants.sbatch
 set -uo pipefail
-source /raid/user_marcospaulo/drdocbench/runs/slurm/env.sh
+source "$WS/runs/slurm/env.sh"
 cd "$WS"
 VARIANTS=$(grep -v '^\s*#' "${VARIANTS_FILE:?}"); BASE=${BASE:-"--lam 0.5 --tau 0.6 --min-len 0"}
 DRB=$WS/repos/DrDocBench/.venv/bin/python

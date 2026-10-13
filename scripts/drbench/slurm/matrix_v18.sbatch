@@ -4,14 +4,14 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=48G
 #SBATCH --time=05:00:00
-#SBATCH --output=/raid/user_marcospaulo/drdocbench/runs/slurm/logs/%x_%j.log
+#SBATCH --output=runs/slurm/logs/%x_%j.log
 # Job C (CPU): v18 ablation matrix on dev-986 vs baseline v16-hyb-rec300 (78.3 md2md evalai_style).
 #   v18-norm   = v16 + --norm-text            v18-xy    = v16 + --order xy
 #   v18-vlmreg = v16 + VLM adjudications      v18-pswap = v16 + page swap -> mineru-vlm
 #   v18-all    = everything that can be combined
 # Submit with:  sbatch --dependency=afterany:<jobA>:<jobB> runs/slurm/matrix_v18.sbatch
 set -uo pipefail
-source /raid/user_marcospaulo/drdocbench/runs/slurm/env.sh
+source "$WS/runs/slurm/env.sh"
 cd "$WS"
 FULL=$WS/runs/dev-full
 QDIR=$FULL/adjudication-queue-v2

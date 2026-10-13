@@ -6,14 +6,14 @@
 #SBATCH --mem=128G
 #SBATCH --time=08:00:00
 #SBATCH --signal=B:SIGUSR1@600
-#SBATCH --output=/raid/user_marcospaulo/drdocbench/runs/slurm/logs/%x_%j.log
+#SBATCH --output=runs/slurm/logs/%x_%j.log
 # Job A (GPU): VLM exact-transcription adjudicator (paper's Adjudicator Agent).
 #   1) venv .venv-vlm (vllm + nvcc pip — node has no /usr/local/cuda)
 #   2) wide queue regen (--queue-sim 0.97, unilaterals both sides) + crops
 #   3) vlm_adjudicate.py transcription mode -> adjudications.jsonl
 # Differ variants + eval happen in matrix_v18.sbatch (CPU, afterany this + mineru-vlm).
 set -uo pipefail
-source /raid/user_marcospaulo/drdocbench/runs/slurm/env.sh
+source "$WS/runs/slurm/env.sh"
 cd "$WS"
 FULL=$WS/runs/dev-full
 QDIR=$FULL/adjudication-queue-v2

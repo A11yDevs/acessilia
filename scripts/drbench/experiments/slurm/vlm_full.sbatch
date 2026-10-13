@@ -6,13 +6,13 @@
 #SBATCH --mem=128G
 #SBATCH --time=12:00:00
 #SBATCH --signal=B:SIGUSR1@600
-#SBATCH --output=/raid/user_marcospaulo/drdocbench/runs/slurm/logs/%x_%j.log
+#SBATCH --output=runs/slurm/logs/%x_%j.log
 # v23: Adjudicador VLM forte (Qwen3-VL-32B-FP8) com cobertura total (--queue-sim QSIM>1 => todo par casado
 # entra na fila, inclusive os "agreed": ataca erros compartilhados pelos dois parsers). dev-986 e test-509.
 # Fix jobs 33371/33372 (ptxas no JIT do DeepGEMM): VLLM_USE_DEEP_GEMM=0 + --enforce-eager.
 # Saída: <QDIR>/adjudications{,-notab,-tight,-sel}.jsonl; differ+eval do dev em differ_variants (afterok).
 set -uo pipefail
-source /raid/user_marcospaulo/drdocbench/runs/slurm/env.sh
+source "$WS/runs/slurm/env.sh"
 cd "$WS"
 MODEL=${MODEL:-Qwen/Qwen3-VL-32B-Instruct-FP8}
 TAG=${TAG:-q32full}
@@ -26,7 +26,7 @@ nvidia-smi --query-gpu=index,name,memory.used,memory.total --format=csv || true
 RT=$($VENV/bin/python -c "import importlib.metadata as m;print(m.version('nvidia-cuda-runtime').rsplit('.',1)[0])")
 uv pip install -q --python "$VENV/bin/python" "nvidia-cuda-nvcc==$RT.*" "nvidia-cuda-crt==$RT.*" || { echo "nvcc pin FAILED"; exit 3; }
 export VLLM_USE_FLASHINFER_SAMPLER=0 VLLM_USE_DEEP_GEMM=0
-export FLASHINFER_WORKSPACE_BASE=/raid/user_marcospaulo/cache/flashinfer
+export FLASHINFER_WORKSPACE_BASE=$CACHE_ROOT/flashinfer
 NVCC=$(find "$VENV/lib/python3.11/site-packages/nvidia" -name nvcc -type f | sort | head -1)
 export CUDA_HOME=$(dirname "$(dirname "$NVCC")")
 export PATH=$VENV/bin:$CUDA_HOME/bin:$PATH

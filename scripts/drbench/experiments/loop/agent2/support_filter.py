@@ -10,7 +10,7 @@ ap.add_argument('src'); ap.add_argument('out')
 ap.add_argument('--ref', default='mineru-hyb+rot'); ap.add_argument('--thr', type=float, default=0.5)
 ap.add_argument('--minlen', type=int, default=20); ap.add_argument('--mode', default='all')
 a = ap.parse_args()
-FULL = '/raid/user_marcospaulo/drdocbench/runs/dev-full'
+FULL = os.environ.get('DRBENCH_FULL', '/raid/user_marcospaulo/drdocbench/runs/dev-full')
 os.makedirs(a.out, exist_ok=True)
 norm = lambda s: re.sub(r'[\W_]', '', re.sub(r'!\[.*?\]\(.*?\)', '', s)).lower()
 def blocks(s): return [b for b in re.split(r'\n\s*\n', s.strip()) if b.strip()]

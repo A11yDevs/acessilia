@@ -4,13 +4,13 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=48G
 #SBATCH --time=02:30:00
-#SBATCH --output=/raid/user_marcospaulo/drdocbench/runs/slurm/logs/%x_%j.log
+#SBATCH --output=runs/slurm/logs/%x_%j.log
 # Job 2 (CPU): 1) rerun differ v16-rec300 config on dev-986 with --dump-queue (adjudication queue),
 # 2) block-level text oracle vs current differ (scripts/block_oracle.py),
 # 3) materialise crops for the VLM adjudicator (scripts/make_crops.py).
 #   sbatch runs/slurm/block_oracle.sbatch
 set -uo pipefail
-source /raid/user_marcospaulo/drdocbench/runs/slurm/env.sh
+source "$WS/runs/slurm/env.sh"
 cd "$WS"
 DRB=$WS/repos/DrDocBench/.venv/bin/python
 FULL=$WS/runs/dev-full

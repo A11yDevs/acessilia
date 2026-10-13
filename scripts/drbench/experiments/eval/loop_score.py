@@ -2,8 +2,8 @@
 """Score dev-986 runs on a fixed document split (tune = 2/3, holdout = 1/3 by md5 of doc id).
 evalai_style_no_cdm = mean(text, teds, reading_order) over the windows of each subset.
   python3 scripts/loop_score.py BASE RUN [RUN ...]   (deltas are vs BASE)"""
-import hashlib, json, statistics as st, sys
-FULL = "/raid/user_marcospaulo/drdocbench/runs/dev-full"
+import hashlib, json, os, statistics as st, sys
+FULL = os.environ.get("DRBENCH_FULL", "/raid/user_marcospaulo/drdocbench/runs/dev-full")
 MET = ("text", "reading_order", "teds")
 
 def load(r):

@@ -5,8 +5,7 @@
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=128G
 #SBATCH --time=10:00:00
-#SBATCH --chdir=/home/user_marcospaulo/v24stage
-#SBATCH --output=/home/user_marcospaulo/v24stage/runs/slurm/logs/%x_%j.log
+#SBATCH --output=runs/slurm/logs/%x_%j.log
 # v24 VLM stages, runnable on ANY GPU node. Each node has its own /raid (drdocbench only exists on dgx-H100-02's
 # /raid: 34161 died on h100n3 "no /raid/user_marcospaulo", 34169 on b200n1 "env.sh: No such file"), so
 # everything is staged on /home (NFS, the only shared fs): venv, crops (paths rewritten), images, model cache.
@@ -15,7 +14,8 @@
 # GPU safety: Slurm here has no device cgroup (proctrack/pgid, task/affinity) and only exports
 # CUDA_VISIBLE_DEVICES; scripts/gpu_audit.py SIGTERMs any process of this job seen on a GPU outside it.
 set -uo pipefail
-S=/home/user_marcospaulo/v24stage
+# Staging root on the shared NFS filesystem; override with S=<path> sbatch ... to relocate.
+S=${S:-/home/user_marcospaulo/v24stage}
 echo "=== $(date -u +%FT%TZ) job ${SLURM_JOB_ID:-manual} on $(hostname) CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-} SLURM_JOB_GPUS=${SLURM_JOB_GPUS:-}"
 # --- preflight: fail fast with a readable reason instead of a 0 s FAILED
 [[ -n ${CUDA_VISIBLE_DEVICES:-} && ${CUDA_VISIBLE_DEVICES} != NoDevFiles ]] || { echo "FATAL: no GPU allocation"; exit 4; }

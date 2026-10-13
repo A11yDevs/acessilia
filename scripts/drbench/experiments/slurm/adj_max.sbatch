@@ -5,7 +5,7 @@
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=128G
 #SBATCH --time=10:00:00
-#SBATCH --output=/raid/user_marcospaulo/drdocbench/runs/slurm/logs/%x_%j.log
+#SBATCH --output=runs/slurm/logs/%x_%j.log
 # v24 "adjudicador máximo" (paper: VLM especialista generate-compare-adjudicate + adjudicador select/edit).
 # Por split (dev-986, test-509), Qwen3-VL-32B-FP8 (fallback BF16), estágios retomáveis:
 #   B tabelas: vlm_tables.py (1 greedy + 3 amostras, medoide TEDS vs Docling/MinerU) -> tab-{medoid,greedy}.jsonl
@@ -13,7 +13,7 @@
 #   C ordem:   vlm_order.py (caixas numeradas na página) -> order-{sel,vlm}.jsonl
 # Depois (CPU, no mesmo job p/ não esperar fila): zips de teste de todas as combinações + eval dev md2md.
 set -uo pipefail
-source /raid/user_marcospaulo/drdocbench/runs/slurm/env.sh
+source "$WS/runs/slurm/env.sh"
 cd "$WS"
 MODEL=${MODEL:-Qwen/Qwen3-VL-32B-Instruct-FP8}
 FALLBACK=${FALLBACK:-Qwen/Qwen3-VL-32B-Instruct}
@@ -32,7 +32,7 @@ nvidia-smi --query-gpu=index,name,memory.used,memory.total --format=csv || true
 RT=$($VPY -c "import importlib.metadata as m;print(m.version('nvidia-cuda-runtime').rsplit('.',1)[0])")
 uv pip install -q --python "$VPY" "nvidia-cuda-nvcc==$RT.*" "nvidia-cuda-crt==$RT.*" || { echo "nvcc pin FAILED"; exit 3; }
 export VLLM_USE_FLASHINFER_SAMPLER=0 VLLM_USE_DEEP_GEMM=0
-export FLASHINFER_WORKSPACE_BASE=/raid/user_marcospaulo/cache/flashinfer
+export FLASHINFER_WORKSPACE_BASE=$CACHE_ROOT/flashinfer
 NVCC=$(find "$VENV/lib/python3.11/site-packages/nvidia" -name nvcc -type f | sort | head -1)
 export CUDA_HOME=$(dirname "$(dirname "$NVCC")")
 export PATH=$VENV/bin:$CUDA_HOME/bin:$PATH

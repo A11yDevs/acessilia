@@ -16,9 +16,29 @@ layout:
   runs/evalai/<run>/submission/submission.zip                    # EvalAI zips
 ```
 
-Scripts and sbatch files therefore reference `$WS/scripts/<name>.py` and `runs/...` relative to `<WS>`,
-and some contain the absolute `/raid/user_marcospaulo/...` prefix. They are kept verbatim here for
-reproducibility of the reported numbers; adapt `WS`/`env.sh` before running elsewhere.
+Scripts and sbatch files therefore reference `$WS/scripts/<name>.py` and `runs/...` relative to `<WS>`.
+
+## Relocating the workspace
+
+`slurm/env.sh` is parameterised: every path is `${VAR:-default}`, so the historical DGX
+locations remain the defaults (keeping the recorded jobs reproducible as they were run) while
+another cluster can override them:
+
+```bash
+WS=/my/workspace CACHE_ROOT=/my/cache source runs/slurm/env.sh
+```
+
+The Python helpers read the same roots from the environment:
+
+| Variable | Used by | Default |
+|---|---|---|
+| `DRBENCH_WS` | `loop/agent2/fastscore.py` | `/raid/user_marcospaulo/drdocbench` |
+| `DRBENCH_FULL` | `eval/loop_score.py`, `loop/agent2/support_filter.py` | `$DRBENCH_WS/runs/dev-full` |
+| `DRBENCH_EVALUATOR` | `loop/agent2/fastscore.py` | `$DRBENCH_WS/repos/DrDocBench` |
+| `DRBENCH_GT` | `loop/agent2/fastscore.py` | `$DRBENCH_WS/data/hf/dev` |
+
+`#SBATCH --output` uses a path relative to the submission directory (`runs/slurm/logs/`),
+because Slurm does not expand shell variables in `#SBATCH` directives. Submit from `$WS`.
 
 ## Contents
 
