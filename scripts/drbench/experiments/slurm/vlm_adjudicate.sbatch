@@ -16,7 +16,11 @@ set -uo pipefail
 source /raid/user_marcospaulo/drdocbench/runs/slurm/env.sh
 cd "$WS"
 FULL=$WS/runs/dev-full
-QDIR=$FULL/adjudication-queue-v2
+# test split: QDIR=runs/evalai/adjudication-queue DOCLING_DIR=runs/evalai/docling-v3+rot/predictions MINERU_DIR=runs/evalai/mineru-hyb+rot/predictions IMAGES_ROOT=data/evalai/drdocbench-evaluation-v4/images
+QDIR=${QDIR:-$FULL/adjudication-queue-v2}
+DOCLING_DIR=${DOCLING_DIR:-$FULL/docling+rot/predictions}
+MINERU_DIR=${MINERU_DIR:-$FULL/mineru-hyb+rot/predictions}
+CROPS_EXTRA=(); [[ -n ${IMAGES_ROOT:-} ]] && CROPS_EXTRA=(--images-root "$IMAGES_ROOT")
 DRB=$WS/repos/DrDocBench/.venv/bin/python
 VENV=$WS/repos/acessilia-toolbox/.venv-vlm
 MODEL=${MODEL:-Qwen/Qwen2.5-VL-7B-Instruct}
@@ -46,10 +50,10 @@ $VENV/bin/python -c "import vllm; print('vllm', vllm.__version__)"
 
 echo "[$(date +%T)] step 2: wide queue + crops"
 if [[ ! -s $QDIR/queue_crops.jsonl ]]; then
-  $DRB scripts/tree_differ_v2.py --docling "$FULL/docling+rot/predictions" --mineru "$FULL/mineru-hyb+rot/predictions" \
-      --out "$FULL/v16-requeue/predictions" --dump-queue "$QDIR/queue.jsonl" --queue-sim 0.97 $ARGS \
+  $DRB scripts/tree_differ_v2.py --docling "$DOCLING_DIR" --mineru "$MINERU_DIR" \
+      --out "$QDIR/requeue-predictions" --dump-queue "$QDIR/queue.jsonl" --queue-sim 0.97 $ARGS \
       || { echo "queue regen FAILED"; exit 4; }
-  $DRB scripts/make_crops.py --queue "$QDIR/queue.jsonl" --out "$QDIR/queue_crops.jsonl" --crops "$QDIR/crops" \
+  $DRB scripts/make_crops.py --queue "$QDIR/queue.jsonl" --out "$QDIR/queue_crops.jsonl" --crops "$QDIR/crops" "${CROPS_EXTRA[@]}" \
       || { echo "crops FAILED"; exit 4; }
 fi
 echo "queue: $(wc -l < $QDIR/queue_crops.jsonl) records with crops"
@@ -62,4 +66,6 @@ else
   echo "adjudications.jsonl exists, reusing ($(wc -l < $QDIR/adjudications.jsonl) decisions)"
 fi
 echo "decisions: $(wc -l < $QDIR/adjudications.jsonl)"
+# v20 (dev): raw decisions 77.5 (<table> replaced by text); filtered sel/tight 78.5, notab 78.4
+$DRB scripts/filter_adjudications.py --queue "$QDIR/queue_crops.jsonl" --decisions "$QDIR/adjudications.jsonl" --out-prefix "$QDIR/adjudications"
 echo "[$(date +%T)] done"
