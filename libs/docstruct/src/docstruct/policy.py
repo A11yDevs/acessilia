@@ -70,6 +70,34 @@ class FusionPolicy:
     xycut_min_columns: int = 2
     xycut_min_balance: float = 0.0  # >0: skip pages whose columns differ too much in width
 
+    # --- Pós-processamento determinístico (PR #125) ---
+    verse_chunk: int = 0  # >0: divide blocos de verso/registro em pedaços <= N chars
+    verse_kind: Literal["records", "all"] = "records"  # "records" preserva verso real inteiro
+    line_numbers: bool = False  # extrai números de linha marginais para blocos próprios
+    table_eq: bool = False  # desembrulha <eq>..</eq> em células de tabela do MinerU
+    norm_text: bool = False  # limpezas determinísticas (ligaduras, hífen suave, NBSP)
+    hf_end: bool = False  # cabeçalho/rodapé/número de página ao fim da página
+    tailjoin: Literal["off", "num", "end", "any"] = "off"  # junta a cauda de blocos curtos
+    tailjoin_max_len: int = 50
+    tailjoin_k: int = 3
+    tailjoin_bot: Literal["keep", "hdr"] = "keep"  # comportamento com o número no rodapé
+    rep_guard: bool = False  # corta repetição degenerada (loops de geração)
+    rep_reps: int = 5
+    rep_max_n: int = 12
+    blank_pages: bool = False  # esvazia páginas em branco detectadas
+
+    # --- Híbrido de página (PR #125) ---
+    page_judge: bool = False  # juiz pareado por VLM decide a página
+    page_judge_new_thr: float = 0.5
+    page_judge_old_thr: float = 0.2
+    page_select_dm: float = 0.6  # concordância Docling/MinerU abaixo da qual vale a VLM
+    page_swap_agree_thr: float = 0.45  # concordância abaixo da qual a fonte alternativa substitui
+    page_swap_min_alt_frac: float = 0.3
+
+    # --- Imagem (decisão pura; aplicação no backend) ---
+    upscale: bool = False  # amplia páginas pequenas antes do OCR
+    orientation: bool = False  # detecta e corrige rotação 0/90/270
+
     def __post_init__(self) -> None:
         if not 0.0 <= self.align_lambda <= 1.0:
             raise ValueError(f"align_lambda deve estar em [0,1], got {self.align_lambda}")
@@ -77,6 +105,14 @@ class FusionPolicy:
             raise ValueError(f"align_tau deve estar em (0,1], got {self.align_tau}")
         if self.order_xycut not in ("off", "multicol", "always"):
             raise ValueError(f"order_xycut must be off|multicol|always, got {self.order_xycut!r}")
+        if self.verse_kind not in ("records", "all"):
+            raise ValueError(f"verse_kind must be records|all, got {self.verse_kind!r}")
+        if self.tailjoin not in ("off", "num", "end", "any"):
+            raise ValueError(f"tailjoin must be off|num|end|any, got {self.tailjoin!r}")
+        if self.tailjoin_bot not in ("keep", "hdr"):
+            raise ValueError(f"tailjoin_bot must be keep|hdr, got {self.tailjoin_bot!r}")
+        if self.verse_chunk < 0:
+            raise ValueError(f"verse_chunk must be >= 0, got {self.verse_chunk}")
         if not 0.0 <= self.xycut_min_balance <= 1.0:
             raise ValueError(f"xycut_min_balance must be in [0,1], got {self.xycut_min_balance}")
         if self.xycut_min_columns < 2:
@@ -125,4 +161,43 @@ class FusionPolicy:
         """Preset do differ-v13 (pic-need-text + formula-text ativados)."""
         return cls(
             **{**cls.drbench_v12().to_dict(), "pic_need_text": True, "formula_text": True}
+        )
+
+    @classmethod
+    def drbench_v14(cls) -> "FusionPolicy":
+        """Preset do differ-v14: v13 + os pós-processamentos determinísticos da
+        PR #125 (números de linha, ``<eq>`` em tabelas, chunking de verso).
+
+        Calibrado no dev do Dr.DocBench — NÃO usar como default de produção.
+        """
+        return cls(
+            **{
+                **cls.drbench_v13().to_dict(),
+                "line_numbers": True,
+                "table_eq": True,
+                "verse_chunk": 300,
+                "verse_kind": "records",
+            }
+        )
+
+    @classmethod
+    def drbench_v15(cls) -> "FusionPolicy":
+        """Preset do differ-v15: v14 + o híbrido de página e a regra ``tj3``.
+
+        É o melhor confirmado no leaderboard (EvalAI 70.37, ``differ-v15-hyb``).
+        Calibrado no dev do Dr.DocBench — NÃO usar como default de produção.
+        """
+        return cls(
+            **{
+                **cls.drbench_v14().to_dict(),
+                "page_judge": True,
+                "tailjoin": "end",
+                "tailjoin_max_len": 50,
+                "tailjoin_k": 3,
+                "tailjoin_bot": "hdr",
+                "rep_guard": True,
+                "hf_end": True,
+                "upscale": True,
+                "orientation": True,
+            }
         )
