@@ -70,38 +70,36 @@ sbatch -c 32 --mem 128G --time 06:00:00 --job-name drb-dev-docling \
 | 32681 | drb-differ-variants v3d/v3e | CPU 8c/48G | ablação: v3d-footer (drop group+unknown+page_footer), v3e-junk (drop group+unknown) em dev-986 md2md | 2026-09-16 20:00 UTC | DONE: v3d-footer 64.5 (RO 53.3!) · v3e-junk 66.4 → só header+footer juntos ajudam RO |
 | 32682 | drb-adjudicate differ-v3a-clean (test) | CPU 8c/32G | tree_differ_v2 min_len0 + drop docling group+unknown+page_header+page_footer sobre test-509 docling-v3 + mineru-v3 → runs/evalai/differ-v3a-clean-20260916 | 2026-09-16 19:56 UTC |
 | srun drb-zip | zip differ-v3a-clean | CPU 2c/8G | build_submission_manifest + validate (valid, 509) → runs/evalai/differ-v3a-clean-20260916/submission/submission.zip sha 5c430b93… | 2026-09-16 20:10 UTC |
-| 32745 | drb-differ-v4 | CPU 8c/48G 2h | S6.1: tree_differ_v2 variantes v4-decor (decor tail), v4-decor-junk, v4-pick (text-pick auto), v4-merge (+merge-paragraphs), v4-merge-dpick (merge, pick docling) em dev-986 md2md (`runs/dev-full/variants_v4.txt`, CDM=0) → runs/dev-full/v4-* + LEDGER | 2026-09-18 |
-| 32746, 32747 | srun drb-orient-test / drb-orient-venv | CPU 4c/16G | teste de `scripts/orient_pages.py` (RapidOCR) em 4 págs; venv `repos/.venv-orient` (rapidocr+onnxruntime+opencv) — 2/2 páginas rotate270 detectadas (score270/score90 ≈ 14×) | 2026-09-18 13:18 UTC |
-| 32748 | drb-orient | CPU 16c/48G 3h | `runs/slurm/orient.sbatch`: orientação de dev-986 + test-509 → runs/orientation_{dev,test}.json + cópias giradas em data/rotated/{dev,test} (items.txt) | 2026-09-18 13:22 UTC |
-| 32749→32750 (32749 cancelado: backend inválido) | drb-mineru-vlm | GPU 1×H100 16c/128G 10h (PENDENTE, fila cheia) | Alavanca E: MinerU 3.4.5 backend `hybrid-engine` (VLM MinerU2.5 + pipeline), TAG mineru-hybrid (MinerU2.5 1.2B, HF) via `runs/slurm/mineru_vlm.sbatch` + `providers-config-vlm.yaml`; estágios dev-120 → dev-986 → test-509 → runs/{dev,dev-full,evalai}/mineru-vlm/predictions (--save-raw) | 2026-09-18 13:35 UTC |
-| 32745 DONE | drb-differ-v4 | | **v4-decor 72.8 · v4-decor-junk 72.8 · v4-pick 73.3 · v4-merge 73.7 (text 81.3 RO 77.3) · v4-merge-dpick 73.2** vs v3a-clean 66.8 (evalai_style md2md w1) | 13:40 UTC |
-| 32751 | drb-test-zip differ-v4-merge-20260918 | CPU 8c/32G 1h | `runs/slurm/differ_test_zip.sbatch`: tree_differ_v2 v4-merge sobre test-509 docling-v3 + mineru-v3 → runs/evalai/differ-v4-merge-20260918/{predictions,submission/submission.zip} + validate | 2026-09-18 13:42 UTC |
-| 32752 | drb-differ-v5 | CPU 8c/48G 2h | afinação sobre v4-merge: tau 0.7/0.5, lam 0.3/0.7, garbage-fallback 0.25, merge-frac 0.5 (`runs/dev-full/variants_v5.txt`) | 2026-09-18 13:42 UTC |
-
-## 2026-09-18 (tarde)
-- 32751 drb-test-zip DONE: runs/evalai/differ-v4-merge-20260918/submission/submission.zip valid 509 pages sha256 79e69874a4ab533cafa64f5e4b8ef55bfd02651be80b5856a35cee94b0a38d88
-- 32748 drb-orient DONE: dev 46/986 rotadas (data/rotated/dev), test 16/509 (data/rotated/test); runs/orientation_{dev,test}.json
-- 32753 drb-differ-v6 (CPU 8c/48G 2h): variants_v6.txt — lever K --suppress-regions (+ --merge-min-sim) sobre v4-merge
-- 32754 drb-rot-infer SPLIT=dev (CPU 16c/96G 6h): docling+mineru nas 46 páginas rotacionadas -> runs/dev-full/{docling,mineru}-rot
-- 32755 drb-rot-infer SPLIT=test (afterany:32754): 16 páginas -> runs/evalai/{docling,mineru}-rot
-- 32756 drb-differ-v7 (CPU 8c/48G 2h): variants_v7.txt — lever L --fuse-lines (index/reference columns) sobre v6-sup-msim
-- 32757 drb-differ-v8 (CPU 8c/48G 2h): variants_v8.txt — --pick-guard (Docling swallowed columns) + --merge-side sobre v7-fuse
-- 32756/32757 CANCELADOS (consolidados em v9)
-- 32758 drb-differ-v9 (CPU 8c/48G 2h): variants_v9.txt — fuse-lines, pick-guard, decor-wins, running-heads (6 variantes)
-- 32758 CANCELADO (v9 redefinido) → 32759 drb-differ-v9 (8 variantes: supT/supQ/fuse/guard/decor-wins/running-heads)
-- 32759 DONE (11 min): v9 → melhor v9-supQ-fg-dw evalai_style=74.6 (text 84.5, RO 76.9); running-heads regride RO (75.9)
-- 32760 drb-differ-v10 (CPU 8c/48G 2h): variants_v10.txt sobre overlays docling+rot / mineru+rot (46 páginas rotacionadas re-inferidas)
-- 32754/32755 DONE: rot-infer dev 46/46 e test 16/16 (docling+mineru); overlays em runs/dev-full/{docling,mineru}+rot e runs/evalai/{docling,mineru}-v3+rot
-- 32760 DONE (12 min): v10 rot → v10-rot-best 75.5 (text 85.0 RO 78.1 TEDS 63.3); rotação +0.9
-- 32761 drb-differ-v11 (CPU 8c/48G 2h): variants_v11.txt sobre +rot — fuse-h-ratio 0.6, fuse-max-len 300, table-probe
-- 32762 drb-zip-v10rot (CPU): zip de teste differ-v10-rot-best-20260918 (docling-v3+rot, mineru-v3+rot; args v10-rot-best)
-- 32762 DONE: zip differ-v10-rot-best-20260918 valid 509, sha e5974a6b…
-- 32761 DONE (~17 min): v11 → v11-hr-cap300 75.7 (text 85.1 RO 78.7 TEDS 63.3); hr +0.1, cap300 +0.1, table-probe neutro/−0.1 text, lam03 = lam05
-- 32763 drb-differ-v12 (CPU 8c/48G 2h): variants_v12.txt sobre +rot — base v11-hr-cap300 + running-heads 3 / pagenum-cap 2|4 / table-full-page 0.85
-- 32763 DONE (~15 min): v12 → rh3 75.7 (neutro) · pc2 75.9 (RO 79.2) · rh3-pc2 75.9 · rh3-pc2-tfp 75.9 · **rh3-pc4 75.9 (text 85.1 RO 79.3 TEDS 63.3)**; pagenum-cap +0.2
-- 32764 drb-zip-v12 (CPU): zip de teste differ-v12-rh3-pc4-20260918 (docling-v3+rot, mineru-v3+rot; args v12-rh3-pc4)
-- 32764 DONE: zip differ-v12-rh3-pc4-20260918 valid 509, sha 3caf5bdd…
-- 32765 drb-differ-v13 (CPU 8c/48G 2h): variants_v13.txt sobre +rot — base v12-rh3-pc4 + flood-guard 5|3 / pic-need-text / formula-text (ciclo 3 M1-M3)
-- 32765 DONE: v13-fg 75.8 (text 85.2 RO 79.0) | v13-pnt 75.9 (85.0/79.4) | v13-ft 75.9 | v13-all 75.9 (85.1/79.2) | v13-all-fg3 75.9 — todos neutros em dev; 48 flood-pages, 178 pic-suppress-skipped, 11 formula->text
-- 32766 drb-zip-v13 (CPU): zip teste differ-v13-pnt-ft-20260918 = v12-rh3-pc4 + --pic-need-text --formula-text (flood-guard descartado: RO −0.3 em dev)
-- 32766 DONE: zip differ-v13-pnt-ft-20260918 valid 509, sha da91e889…
+| 33037–33038 | srun smoke/GT-stats | CPU 2c/8G/10m | smoke `tree_differ_v2 --verse-chunk/--line-numbers/--table-eq` em 3 págs POETRY; distribuição de tamanho dos blocos de verso no GT (709 blocos, 80% ≤300 chars, mediana 158) | 2026-09-22 | DONE |
+| 33039 | drb-differ-v15 | CPU 8c/48G/2h30 | `differ_variants.sbatch` com `runs/dev-full/variants_v15.txt` (7 variantes: fonte mineru-hyb+rot, verse-chunk 150/200/300, line-numbers, table-eq, nofuse; docling+rot) + eval md2md de `mineru-hyb+rot` standalone → `runs/dev-full/v15-*/reports`, LEDGER.md | 2026-09-22 | PENDING (Priority) |
+| 33039 (upd) | drb-differ-v15 | — | DONE 17:44: v15-hyb **78.1** (text 85.3 RO 80.0 TEDS 69.2; +2.2 vs v13-pnt 75.9); verse-chunk (all) 77.7–78.0 (POETRY text −18: GT estrofes >300 chars não são re-fundidas); pipe lnum+eq 76.0 (POETRY 68.4→77.1); mineru-hyb+rot cru 68.5 | 2026-09-22 | DONE |
+| 33046 | drb-differ-v16 | CPU 8c/48G/2h | variants_v16.txt: hyb + line-numbers + table-eq (+ --verse-chunk 1/150/300 só em blocos record-like, --verse-kind records) e pipe rec1 | 2026-09-22 | DONE: hyb-lnum-eq 78.1, rec1 78.2, rec150 78.2, **rec300 78.3** (text 85.6), pipe-rec1 76.0 |
+| 33047 | drb-differ-test-zip differ-v15-hyb-20260922 | CPU | test-509: v13-pnt args sobre docling-v3+rot + mineru-hyb+rot → runs/evalai/differ-v15-hyb-20260922/submission/submission.zip | 2026-09-22 | DONE 21:07 valid 509, sha db577d6d… |
+| 33239–33291 (outro PC, 25–26/09) | mineru-vlm (COMPLETED 37 min), matrix-v18 (norm 78.3, xy 77.9, pswap 77.1, all 76.6), puzzle, matrix-v19 (puzzle/dedup 78.3, bands 74.5, fuse04 78.2), test-zip differ-v19-puzzle-dedup-20260926 (valid 509, sha c8a494b1…) | — | vlm-adjud 33240/33259/33285 **FAILED** (vLLM/FlashInfer JIT: `ninja` não no PATH); 33286 matrix-v18 (vlmreg) nunca rodou (afterok) → cancelado | 2026-09-27 | — |
+| 33356 | drb-vlm-adjud (relançado) | GPU 1 + 16c/128G/8h | vlm_adjudicate.sbatch com `PATH=$VENV/bin` (ninja) — Qwen2.5-VL-7B transcrição da fila (1673 crops já prontos) | 2026-09-27 | PENDING |
+| 33357 | drb-matrix-v18 (relançado) | CPU 8c/48G/5h | afterok:33356 — v18-vlmreg/all com adjudicações VLM | 2026-09-27 | PENDING |
+| 33356/33357 | — | — | 33356 FAILED em 1 min: ninja ok agora, mas FlashInfer JIT do sampler falhou "CUDA compiler and CUDA toolkit headers are incompatible" (nvcc pip 13.4.92 vs cuda_runtime 13.0.96); 33357 cancelado | 2026-09-27 | FAILED/CANCELLED |
+| 33358 | drb-vlm-adjud (3ª tentativa) | GPU 1 + 16c/128G/8h | pin nvidia-cuda-nvcc/crt==13.0.*, VLLM_USE_FLASHINFER_SAMPLER=0, FLASHINFER_WORKSPACE_BASE em /raid | 2026-09-27 | PENDING |
+| 33359 | drb-matrix-v18 | CPU 8c/48G/5h | afterok:33358 — v18-vlmreg/all | 2026-09-27 | PENDING |
+| 33358/33359 | — | — | 33358 FAILED: engine subiu OK (nvcc pin funcionou), mas vLLM recusou `file://` crops: "Cannot load local files without --allowed-local-media-path"; fix em scripts/vlm_adjudicate.py (allowed_local_media_path=commonpath dos crops); 33359 cancelado | 2026-09-27 | FAILED/CANCELLED |
+| 33360 | drb-vlm-adjud (4ª) | GPU 1 + 16c/128G/8h | idem 33358 + allowed_local_media_path | 2026-09-27 | PENDING |
+| 33361 | drb-matrix-v18 | CPU 8c/48G/5h | afterok:33360 | 2026-09-27 | PENDING |
+| 33360 | drb-vlm-adjud | GPU 1 | **COMPLETED** ~2 min: 1673 crops → 1252 decisões (pair-select 779, pair-replace 191, uni-replace 231, drops 51) em runs/dev-full/adjudication-queue-v2/adjudications.jsonl | 2026-09-27 | COMPLETED |
+| 33361 | drb-matrix-v18 | CPU | rodou mas differ falhou "unrecognized arguments --norm-text/--order/--adjudications": scripts/tree_differ_v2.py e cópia do repo tinham sido sobrescritos às 11:00 (27/09) com versão pré-v18 (be86468). Só pswap/all/all-nc (sem VLM) avaliados = repetição. Restaurado do HEAD 8216ac9 | 2026-09-27 | COMPLETED (inútil) |
+| 33362 | drb-matrix-v18 VLM_ONLY=1 | CPU 8c/48G/5h | v18-vlmreg + v18-all + v18-all-nc (com adjudicações VLM); norm/xy/pswap pulados | 2026-09-27 | PENDING |
+| 33365 | drb-differ-v20 | CPU (differ_variants) | adjudicações VLM filtradas: notab / tight / sel vs 78.3 | 2026-09-27 | PENDING |
+| 33365 | drb-differ-v20 | CPU | **notab 78.4, tight 78.5, sel 78.5** (text 85.6→86.1, TEDS 69.1 mantido) vs 78.3 — novo melhor dev | 2026-09-27 | COMPLETED |
+| 33366 | drb-vlm-adjud-test | GPU 1 | fila+crops+VLM no split de teste (docling-v3+rot × mineru-hyb+rot, 509 págs) → runs/evalai/adjudication-queue/adjudications{,-sel,-tight,-notab}.jsonl | 2026-09-27 | PENDING |
+| 33367 | drb-zip-v20-sel | CPU | afterok:33366 — zip differ-v20-vlmsel-20260927 (v16-rec300 args + --adjudications sel) | 2026-09-27 | PENDING |
+| 33370 | drb-vlm3-zip Qwen3-VL-8B | GPU 1 + 16c/128G/6h | test-509 VLM adjudicate (reuse crops) → filter sel → zip differ-v21-qwen3vl8b-20260927 | 2026-09-27 | PENDING |
+| 33371 | drb-vlm32-zip Qwen3-VL-32B-FP8 | GPU 1 afterany:33370 | best single-H100 VLM → zip differ-v21-qwen3vl32b-fp8-20260927 | 2026-09-27 | PENDING |
+| 33372 | drb-vlm32bf16-zip Qwen3-VL-32B BF16 | GPU 2 (TP=2) afterany:33371 | best non-quantized on H100 → zip differ-v21-qwen3vl32b-bf16-20260927 | 2026-09-27 | PENDING |
+| 34135 | srun drb-qfull | CPU 4c/16G | fila completa (--queue-sim 1.01: inclui pares "agreed") + crops: dev 5389, test 3659 → runs/{dev-full,evalai}/adjq-q32full | 2026-10-08 | DONE |
+| 34137 | drb-vlm32-full (vlm_full.sbatch) | GPU 1 | v23: Qwen3-VL-32B-FP8 (VLLM_USE_DEEP_GEMM=0 + --enforce-eager, fix 33371) sobre a fila completa dev+test → adjudications{,-notab,-tight,-sel} | 2026-10-08 | PENDING |
+| 34138 | drb-differ-variants v23 | CPU afterok:34137 | variants_v23.txt (v23-q32-{raw,notab,tight,sel}) dev-986 md2md | 2026-10-08 | PENDING |
+| 34137/34138 | — | — | cancelados: substituídos pelo v24 (34161), que cobre a mesma fila de texto + tabelas + ordem | 2026-10-08 | CANCELLED |
+| 34161 | drb-adjmax-v24 (adj_max.sbatch) | GPU 1 (h100n3,b200n1,h100n2) 16c/128G/10h | v24 adjudicador máximo, Qwen3-VL-32B-FP8 (fallback BF16): B tabelas (vlm_tables medoide TEDS), A texto (--skip-kinds table), C ordem (vlm_order caixas numeradas), dev+test → runs/{dev-full,evalai}/adjq-v24; depois zips test differ-v24-{T,Tg,Asel,Atight,AT,ATg,Osel,Ovlm,ATOs,ATOv}-20261008 + eval dev variants_v24.txt | 2026-10-08 | PENDING |
+| 34161 | — | — | FAILED 0 s em dgx-H100-03 (sem log, sinal 53; 34045 falhou igual nesse nó) → ressubmetido como 34169 em b200n1,h100n2 | 2026-10-08 | FAILED |
+| 34251 | drb-adjmax-h3 (adj_max_h3.sbatch, staging em /home/user_marcospaulo/v24stage) | GPU 1 h100n3 | v24 só estágios VLM | 2026-10-09 | CANCELLED (pedido do usuário, nunca iniciou) |
+| 34169/34078/34132 | — | — | cancelados a pedido do usuário: nenhum job nas H100 por enquanto | 2026-10-09 | CANCELLED |
+| 34364 | drb-adjmax-home (adj_max_h3.sbatch, roda de /home/user_marcospaulo/v24stage) | GPU 1 h100n2/h100n3/b200n1 | v24 estágios VLM test→dev (B gen, A raw, C ordem) com preflight + gpu_audit --kill; pós (TEDS/filter/zips/dev eval) no dgx-H100-02 | 2026-10-09 | COMPLETED 51 min, GPU 4 apenas, gpu_audit 0 violações; saídas copiadas p/ /raid, /home/v24stage apagado |
