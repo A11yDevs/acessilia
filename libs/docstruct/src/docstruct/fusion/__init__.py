@@ -3,6 +3,17 @@
 Porta do Tree Differ v2 (PR #98, Dr.DocBench) como biblioteca pura.
 API principal: ``merge_blocks`` + ``blocks_from_provider``.
 """
+from docstruct.fusion.adjudication import (
+    clean_transcription,
+    decide,
+    decide_v0,
+    decide_v1,
+    filter_decision,
+    is_struct,
+    norm_text,
+    nrm,
+    useful_text,
+)
 from docstruct.fusion.differ import merge_blocks
 from docstruct.fusion.flood import flood_guard
 from docstruct.fusion.noise import is_junk, quality
@@ -53,20 +64,28 @@ __all__ = [
     "block_to_diff",
     "blocks",
     "chunk_verse",
+    "clean_transcription",
     "collapse",
     "debias",
+    "decide",
     "decide_pair",
+    "decide_v0",
+    "decide_v1",
     "extract_line_numbers",
+    "filter_decision",
     "flood_guard",
     "fuse",
     "guard_page",
     "is_blank_page",
     "is_junk",
     "is_page_number",
+    "is_struct",
     "join_tail",
     "line_number_chain",
     "max_run",
     "merge_blocks",
+    "norm_text",
+    "nrm",
     "page_agreement",
     "page_norm",
     "page_number_position",
@@ -82,6 +101,7 @@ __all__ = [
     "swap_norm",
     "tail_start",
     "tailjoin3",
+    "useful_text",
     "verse_blocks",
     "verse_lines",
 ]
