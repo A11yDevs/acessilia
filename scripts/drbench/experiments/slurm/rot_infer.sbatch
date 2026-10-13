@@ -5,13 +5,13 @@
 #SBATCH --mem=96G
 #SBATCH --time=06:00:00
 #SBATCH --signal=B:SIGUSR1@600
-#SBATCH --output=/raid/user_marcospaulo/drdocbench/runs/slurm/logs/%x_%j.log
+#SBATCH --output=runs/slurm/logs/%x_%j.log
 # Re-infer the rotated pages (data/rotated/<SPLIT>/items.txt) with docling then mineru on upright copies.
 # CPU-only unless the job got a GPU (pipeline.sbatch decides). Reentrant.
 #   sbatch --export=ALL,SPLIT=dev runs/slurm/rot_infer.sbatch     # -> runs/dev-full/{docling,mineru}-rot/predictions
 #   sbatch --export=ALL,SPLIT=test runs/slurm/rot_infer.sbatch    # -> runs/evalai/{docling,mineru}-rot/predictions
 set -uo pipefail
-source /raid/user_marcospaulo/drdocbench/runs/slurm/env.sh
+source "${WS:-/raid/user_marcospaulo/drdocbench}/runs/slurm/env.sh"
 SPLIT=${SPLIT:-dev}
 ROOT=$WS/data/rotated/$SPLIT
 [[ $SPLIT == dev ]] && OUTBASE=$WS/runs/dev-full || OUTBASE=$WS/runs/evalai

@@ -4,12 +4,12 @@
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=48G
 #SBATCH --time=03:00:00
-#SBATCH --output=/raid/user_marcospaulo/drdocbench/runs/slurm/logs/%x_%j.log
+#SBATCH --output=runs/slurm/logs/%x_%j.log
 # Page-orientation classification (RapidOCR CPU) for dev-986 and test-509; writes
 # runs/orientation_{dev,test}.json and rotated copies under data/rotated/{dev,test}/ (+ items.txt).
 # Reentrant: orient_pages.py skips ids already in the JSON.
 set -uo pipefail
-source /raid/user_marcospaulo/drdocbench/runs/slurm/env.sh
+source "${WS:-/raid/user_marcospaulo/drdocbench}/runs/slurm/env.sh"
 cd "$WS"
 PY=$WS/repos/.venv-orient/bin/python
 export OMP_NUM_THREADS=2

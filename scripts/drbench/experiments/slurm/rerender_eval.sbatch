@@ -4,13 +4,13 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
 #SBATCH --time=01:30:00
-#SBATCH --output=/raid/user_marcospaulo/drdocbench/runs/slurm/logs/%x_%j.log
+#SBATCH --output=runs/slurm/logs/%x_%j.log
 # Re-render dev predictions from saved <id>.provider.json payloads (no inference) and eval.
 #   sbatch --export=ALL,RUN_ID=docling-v2-20260916,SRC=runs/dev/docling-fix-20260916/predictions,BASELINE=docling-focr,NOTE="..." \
 #          runs/slurm/rerender_eval.sbatch
 # SRC may be a list separated by ':' (all payloads are rendered into the same run).
 set -uo pipefail
-source /raid/user_marcospaulo/drdocbench/runs/slurm/env.sh
+source "${WS:-/raid/user_marcospaulo/drdocbench}/runs/slurm/env.sh"
 cd "$WS"
 R=${RUN_ID:?}; SRC=${SRC:?}; SPLIT=${SPLIT:-dev}
 ACPY=$WS/repos/acessilia/.venv/bin/python

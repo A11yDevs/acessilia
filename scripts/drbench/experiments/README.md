@@ -40,6 +40,10 @@ The Python helpers read the same roots from the environment:
 `#SBATCH --output` uses a path relative to the submission directory (`runs/slurm/logs/`),
 because Slurm does not expand shell variables in `#SBATCH` directives. Submit from `$WS`.
 
+Every sbatch sources `env.sh` through `${WS:-<historical default>}`, so a job can be
+submitted from any workspace by exporting `WS` first. `cdm_env.sh` (the official CDM
+metric environment) is parameterised the same way via `OPT` and `CDM_PYTHON`.
+
 ## Contents
 
 | dir | what |

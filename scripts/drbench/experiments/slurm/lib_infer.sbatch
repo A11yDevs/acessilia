@@ -5,7 +5,7 @@
 #SBATCH --mem=96G
 #SBATCH --time=08:00:00
 #SBATCH --signal=B:SIGUSR1@600
-#SBATCH --output=/raid/user_marcospaulo/drdocbench/runs/slurm/logs/%x_%j.log
+#SBATCH --output=runs/slurm/logs/%x_%j.log
 # Inferência docling + mineru EM PARALELO com --save-raw (payloads blocks.json
 # necessários para a fusão via lib docstruct). Reentrante: pula ids já produzidos.
 #   sbatch --export=ALL,SPLIT=dev runs/slurm/lib_infer.sbatch
@@ -15,7 +15,7 @@
 # Reusa predictions existentes de runs anteriores quando os blocks.json já
 # existem (DOCLING_REUSE/MINERU_REUSE), evitando re-inferência desnecessária.
 set -uo pipefail
-source /raid/user_marcospaulo/drdocbench/runs/slurm/env.sh
+source "${WS:-/raid/user_marcospaulo/drdocbench}/runs/slurm/env.sh"
 SPLIT=${SPLIT:-dev}
 [[ $SPLIT == dev ]] && OUTBASE=$WS/runs/dev-full || OUTBASE=$WS/runs/evalai
 DOCLING_REUSE=${DOCLING_REUSE:-}; MINERU_REUSE=${MINERU_REUSE:-}
