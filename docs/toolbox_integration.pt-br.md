@@ -292,6 +292,10 @@ A capacidade `media.inspect` (provider `pure-media-inspect`, PR
   inteira quando a entrada é imagem isolada sem blocos visuais — garantindo a
   audiodescrição pelo VisionAgent.
 
+  O fallback local não infere que uma imagem é uma página escaneada apenas por
+  suas dimensões ou proporção; imagens de um único frame são encaminhadas para
+  inspeção visual para não descartar infográficos ou ilustrações retrato.
+
 Os predicados PDDL `media_inspected`/`media_profile_classified` pertencem ao
 domínio da Toolbox; no core o sinal é consumido apenas como heurística de
 enriquecimento e não entra no problema de planejamento.

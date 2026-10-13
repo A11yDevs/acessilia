@@ -291,6 +291,10 @@ The `media.inspect` capability (provider `pure-media-inspect`, PR
   signal to inject a full-page `picture` element when the input is a standalone image
   with no visual blocks — ensuring the VisionAgent audiodescribes it.
 
+  The local fallback does not infer that an image is a scanned page from dimensions
+  or aspect ratio alone; single-frame images are sent for visual inspection so
+  portrait infographics or illustrations are not skipped.
+
 The PDDL predicates `media_inspected`/`media_profile_classified` belong to the Toolbox
 domain; the core consumes the signal only as an enrichment heuristic and it does not
 enter the planning problem.

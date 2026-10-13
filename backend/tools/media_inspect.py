@@ -19,13 +19,6 @@ from typing import Any
 from backend.tools.logger import logger
 from backend.tools.toolbox_client import ToolboxError
 
-# Limiar mínimo de aresta (px) para uma imagem ser considerada página de
-# documento. Miniaturas e ícones não devem ser classificados como página.
-MIN_SCANNED_PAGE_PX = 200
-
-# Páginas A4 e US Letter retrato caem nesta faixa de proporção largura/altura.
-SCANNED_PAGE_ASPECT = (0.65, 0.78)
-
 # Formato de contêiner -> MIME type (o map de Pillow omite formatos não
 # embutidos no binário em execução, então o map é explícito).
 MEDIA_TYPE_BY_FORMAT = {
@@ -172,16 +165,11 @@ def inspect_media_payload(
     except UnidentifiedImageError:
         return _unsupported_media(payload, filename, media_type)
 
-    aspect_ratio = round(width / height, 4)
-    is_page_sized = min(width, height) >= MIN_SCANNED_PAGE_PX
     if frame_count > 1:
         nature = "paginated_document"
-    elif (
-        is_page_sized
-        and SCANNED_PAGE_ASPECT[0] <= aspect_ratio <= SCANNED_PAGE_ASPECT[1]
-    ):
-        nature = "scanned_page"
     else:
+        # Geometry alone cannot distinguish a scanned page from a portrait
+        # infographic, so inspect every single-frame image.
         nature = "standalone_image"
 
     return {

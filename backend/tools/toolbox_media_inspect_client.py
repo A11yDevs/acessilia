@@ -81,6 +81,11 @@ class ToolboxMediaInspectClient:
         if file_path is None and artifact_id is None:
             raise ValueError("Forneça file_path ou artifact_id")
 
+        use_cache = (
+            use_remote_cache
+            if use_remote_cache is not None
+            else settings.toolbox_use_remote_cache
+        )
         url = f"{self.base_url}{EXECUTE_PATH}"
 
         try:
@@ -89,7 +94,7 @@ class ToolboxMediaInspectClient:
                     "artifact_id": artifact_id,
                     "provider": self.provider,
                 }
-                if use_remote_cache is False:
+                if not use_cache:
                     data["no_cache"] = True
                 response = await self._client.post(url, data=data)
             else:
@@ -104,14 +109,24 @@ class ToolboxMediaInspectClient:
                     params: dict[str, Any] = {
                         "provider": self.provider,
                     }
-                    if use_remote_cache is False:
+                    if not use_cache:
                         params["no_cache"] = True
                     response = await self._client.post(
                         url, files=files, data=params
                     )
 
             _raise_for_error(response, CAPABILITY)
-            result = response.json()
+            try:
+                result = response.json()
+            except ValueError as e:
+                raise ToolboxContractViolation(
+                    "Resposta de media.inspect não contém JSON válido"
+                ) from e
+
+            if not isinstance(result, dict):
+                raise ToolboxContractViolation(
+                    "Resposta de media.inspect deve ser um objeto JSON"
+                )
 
             if result.get("status") != "succeeded":
                 raise ToolboxContractViolation(
@@ -125,11 +140,17 @@ class ToolboxMediaInspectClient:
                     "Resposta de media.inspect sem campo 'document'"
                 )
 
+            provenance = result.get("provenance")
+            duration_ms = (
+                provenance.get("duration_ms", "?")
+                if isinstance(provenance, dict)
+                else "?"
+            )
             logger.info(
                 "Toolbox: media.inspect concluído (nature={}, visual={}, {} ms)",
                 document.get("artifact_nature", "?"),
                 document.get("requires_visual_inspection", "?"),
-                result.get("provenance", {}).get("duration_ms", "?"),
+                duration_ms,
             )
             return document
 

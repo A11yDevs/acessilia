@@ -97,6 +97,51 @@ async def test_inspect_sends_provider_form_field(respx_mock, client):
 
 
 @pytest.mark.asyncio
+async def test_inspect_sends_bearer_api_key(respx_mock):
+    client = ToolboxMediaInspectClient(
+        base_url="http://localhost:8002",
+        provider="pure-media-inspect",
+        timeout_seconds=30,
+        api_key="test-api-key",
+    )
+    route = respx_mock.post(
+        "http://localhost:8002/v1/capabilities/media.inspect:execute"
+    ).mock(
+        return_value=respx.MockResponse(
+            status_code=200,
+            json={"status": "succeeded", "document": SAMPLE_DOCUMENT},
+        )
+    )
+
+    await client.inspect(file_path=FIXTURE_IMAGE)
+
+    assert route.calls.last.request.headers["Authorization"] == "Bearer test-api-key"
+    await client.close()
+
+
+@pytest.mark.asyncio
+async def test_inspect_uses_global_remote_cache_setting_when_unspecified(
+    respx_mock, client, monkeypatch
+):
+    from backend.config.settings import settings
+
+    monkeypatch.setattr(settings, "toolbox_use_remote_cache", False)
+    route = respx_mock.post(
+        "http://localhost:8002/v1/capabilities/media.inspect:execute"
+    ).mock(
+        return_value=respx.MockResponse(
+            status_code=200,
+            json={"status": "succeeded", "document": SAMPLE_DOCUMENT},
+        )
+    )
+
+    await client.inspect(file_path=FIXTURE_IMAGE)
+
+    assert b'name="no_cache"' in route.calls.last.request.content
+    assert b"\r\n\r\ntrue\r\n" in route.calls.last.request.content
+
+
+@pytest.mark.asyncio
 async def test_inspect_raises_on_not_succeeded(respx_mock, client):
     respx_mock.post(
         "http://localhost:8002/v1/capabilities/media.inspect:execute"
@@ -121,6 +166,27 @@ async def test_inspect_raises_on_missing_document(respx_mock, client):
             json={"status": "succeeded"},
         )
     )
+
+    with pytest.raises(ToolboxContractViolation):
+        await client.inspect(file_path=FIXTURE_IMAGE)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "response",
+    [
+        respx.MockResponse(
+            status_code=200,
+            content=b"not-json",
+            headers={"Content-Type": "application/json"},
+        ),
+        respx.MockResponse(status_code=200, json=[]),
+    ],
+)
+async def test_inspect_raises_on_invalid_json_contract(respx_mock, client, response):
+    respx_mock.post(
+        "http://localhost:8002/v1/capabilities/media.inspect:execute"
+    ).mock(return_value=response)
 
     with pytest.raises(ToolboxContractViolation):
         await client.inspect(file_path=FIXTURE_IMAGE)

@@ -38,20 +38,20 @@ def test_standalone_image_requires_visual_inspection() -> None:
     assert result["dimensions"]["aspect_ratio"] == pytest.approx(1.7778)
 
 
-def test_scanned_page_does_not_require_visual_inspection() -> None:
-    # 595x842 é A4 retrato (na faixa de aspect ratio de página escaneada).
+def test_portrait_image_requires_visual_inspection_without_content_evidence() -> None:
+    # A geometria de uma página A4 não distingue um scan de um infográfico.
     result = inspect_media_payload(
         png_bytes(595, 842),
         "pagina.png",
         "image/png",
     )
 
-    assert result["artifact_nature"] == "scanned_page"
-    assert result["requires_visual_inspection"] is False
+    assert result["artifact_nature"] == "standalone_image"
+    assert result["requires_visual_inspection"] is True
 
 
 def test_tiny_thumbnail_is_standalone_image() -> None:
-    # Abaixo do limiar mínimo de página, mesmo com aspect ratio de página.
+    # Imagens de um único frame são inspecionadas independentemente do tamanho.
     result = inspect_media_payload(
         png_bytes(60, 85),
         "thumb.png",
@@ -106,6 +106,32 @@ async def test_inspect_source_media_falls_back_to_local(monkeypatch) -> None:
 
     result = await inspect_source_media(
         Path(__file__).parent / "fixtures" / "images" / "sunset-skyline.jpeg"
+    )
+
+    assert result is not None
+    assert result["is_image"] is True
+    assert result["requires_visual_inspection"] is True
+
+
+@pytest.mark.asyncio
+async def test_inspect_source_media_falls_back_after_toolbox_contract_error(
+    monkeypatch,
+) -> None:
+    from backend.config import settings as settings_module
+    from backend.tools.toolbox_client import ToolboxContractViolation
+
+    monkeypatch.setattr(settings_module.settings, "toolbox_media_inspect_enabled", True)
+
+    class InvalidResponseClient:
+        async def inspect(self, **_kwargs):
+            raise ToolboxContractViolation("invalid response")
+
+        async def close(self):
+            pass
+
+    result = await inspect_source_media(
+        Path(__file__).parent / "fixtures" / "images" / "sunset-skyline.jpeg",
+        client=InvalidResponseClient(),
     )
 
     assert result is not None
