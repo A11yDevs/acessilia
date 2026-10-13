@@ -128,8 +128,16 @@ catalogues are recorded separately; mutation of committed source is rejected.
 
 Outputs include provider payloads, `.blocks.json`, fusion Markdown, `decisions.csv`,
 official matched samples, `per-page.csv`, `summary.json` and `REPORT.md`. Tables
-(TEDS and edit distance) and formula edit distance accompany RO and text; CDM and
-Overall are outside this runner. TEDS is summarized per page from official samples.
+(TEDS and edit distance) and formula edit distance accompany RO and text. TEDS is
+summarized per page from official samples.
+
+`overall` is the competition ranking metric: the per-page mean of the available
+components, computed from the components already scored (missing components do
+not enter the mean, matching the official evaluator). It appears in
+`per-page.csv`, `summary.json` and `REPORT.md`, and participates in the quality
+gate. CDM is not read by this runner: the official evaluator does not emit it as
+a per-page component here, so it would have to be approximated locally, which
+would not be the leaderboard number.
 
 The quality gate rejects per-page losses and asymmetric metric coverage, even
 when the mean improves. Missing required evaluator outputs fail the run. An

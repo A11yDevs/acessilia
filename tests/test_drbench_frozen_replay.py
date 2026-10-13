@@ -498,3 +498,90 @@ def test_freeze_requires_raw_for_every_declared_provider(tmp_path):
 
     with pytest.raises(FileNotFoundError):
         freeze(path, tmp_path / "run")
+
+
+# ---------------------------------------------------------------------------
+# Overall: the competition ranking metric must be in the report
+# ---------------------------------------------------------------------------
+
+
+def test_overall_is_the_mean_of_available_components():
+    from scripts.drbench.experiments.eval.replay_report import overall_score
+
+    row = {
+        "baseline_reading_order": 80.0,
+        "baseline_text_block": 90.0,
+        "baseline_table": None,
+        "baseline_display_formula": None,
+        "baseline_table_teds": None,
+    }
+    assert overall_score(row, "baseline") == 85.0
+
+
+def test_overall_ignores_missing_components():
+    from scripts.drbench.experiments.eval.replay_report import overall_score
+
+    row = {
+        "baseline_reading_order": 80.0,
+        "baseline_text_block": 90.0,
+        "baseline_table": 100.0,
+        "baseline_display_formula": None,
+        "baseline_table_teds": None,
+    }
+    assert overall_score(row, "baseline") == 90.0
+
+
+def test_overall_is_none_without_components():
+    from scripts.drbench.experiments.eval.replay_report import overall_score
+
+    assert overall_score({}, "baseline") is None
+
+
+def test_summary_includes_overall():
+    summary = summarize([result_row()])
+    assert "overall" in summary["metrics"]
+    assert summary["metrics"]["overall"]["delta"] == 0
+    assert summary["metrics"]["overall"]["paired"] == 1
+
+
+def test_overall_regression_rejects_the_gate():
+    row = result_row(a=80.0, b=80.0)
+    # só o Overall piora: um componente cai, outro sobe na mesma medida
+    row["candidate_reading_order"] = 70.0
+    row["delta_reading_order"] = -10.0
+    row["candidate_text_block"] = 90.0
+    row["delta_text_block"] = 10.0
+    summary = summarize([row])
+    assert summary["metrics"]["overall"]["delta"] == 0
+    assert summary["quality_gate"] == "rejected"  # reading_order piorou
+
+
+def test_report_mentions_overall(tmp_path):
+    from scripts.drbench.experiments.eval.replay_report import make_report
+
+    pages = [{"id": "doc_p1", "subject": "SCIENCE", "document_id": "doc",
+              "page": 1, "batch": 1}]
+    (tmp_path / "pages.json").write_text(json.dumps(pages))
+    for variant in ("baseline", "candidate"):
+        fusion = tmp_path / variant / "fusion"
+        fusion.mkdir(parents=True)
+        (fusion / "doc_p1.drbench.md").write_text("body")
+        result = tmp_path / variant / "result"
+        result.mkdir(parents=True)
+        key = "doc_page_1-1.jpg"
+        for component in ("reading_order", "text_block", "table", "display_formula"):
+            (result / f"batch-01_{component}_result.json").write_text(
+                json.dumps([{"img_id": key, "metric": {}}])
+            )
+            (result / f"batch-01_{component}_per_page_edit.json").write_text(
+                json.dumps({key: 0.1})
+            )
+        (result / "batch-01_table_result.json").write_text(
+            json.dumps([{"img_id": key, "metric": {"TEDS": 0.9}}])
+        )
+
+    summary = make_report(tmp_path)
+    assert "overall" in summary["metrics"]
+    report = (tmp_path / "REPORT.md").read_text()
+    assert "overall" in report
+    assert "competition ranking metric" in report
