@@ -143,10 +143,64 @@ motivação, o experimento e as limitações.
 
 ### 1.4 `FusionPolicy`
 
-`FusionPolicy` é um dataclass congelado com **defaults conservadores e
-neutros**. Os presets ajustados ao benchmark (`drbench_v12`, `drbench_v13`)
-são classmethods nomeados, nunca defaults, porque foram sobreajustados ao
-split dev (gap dev→test ≈ −6).
+`FusionPolicy` é um dataclass congelado. Seus defaults são a política de
+**produção**: as capacidades determinísticas com evidência de ganho (ou que
+corrigem um defeito) ficam ligadas, e o que consome modelo fica desligado.
+
+| Capacidade | Default | Evidência |
+|---|---|---|
+| `verse_chunk` 300 / `verse_kind` records | ligado | determinístico; preserva verso real inteiro |
+| `line_numbers`, `table_eq`, `norm_text`, `hf_end` | ligado | determinístico, baixo risco |
+| `tailjoin` end / 50 / 3 / `hdr` | ligado | a regra `tj3`: Δtune +1.47, Δhold +0.79 |
+| `rep_guard`, `blank_pages` | ligado | corrige loops de geração degenerada |
+| `upscale`, `orientation` | ligado | maior ganho isolado da linha Tele (Δtune +1.59, Δhold +2.91) |
+| `page_judge` | **desligado** | consome modelo; ligue quando a Toolbox expuser `document.adjudicate.page` |
+
+Os presets ajustados ao benchmark (`drbench_v12`, `drbench_v13`, `drbench_v14`,
+`drbench_v15`, `drbench_best_method`) são classmethods nomeados, nunca defaults,
+porque foram sobreajustados ao split dev (gap dev→test ≈ 8 pontos).
+
+Os experimentos rejeitados (word_vote, dedup_blocks, medoide, juiz por bloco,
+mover cabeçalho, tabelas do dots, árbitro DeepSeek, seletor logístico, ensemble
+de prompts, reajuste de limiares) **não** entram nos defaults: mostraram
+Δtune ≤ 0 e Δhold ≤ 0.
+
+### 1.5 Pós-processamento determinístico (Dr.DocBench PR #125)
+
+Além do Tree Differ, a biblioteca expõe as políticas determinísticas que o
+trabalho de benchmark produziu, todas como funções puras:
+
+| Módulo | O que faz |
+|---|---|
+| `fusion.verse` | divide blocos de verso/registro para o avaliador reagrupar |
+| `fusion.line_numbers` | move números de linha marginais para blocos próprios |
+| `fusion.flood` | descarta blocos curtos quando um provider inunda a página |
+| `fusion.tailjoin` | junta blocos curtos finais (a regra `tj3`) |
+| `fusion.repetition` | corta loops de geração degenerada, detecta páginas brancas |
+| `fusion.page_select` | fusão de página inteira e a troca GT-free por baixa concordância |
+| `fusion.judge` | a regra do juiz pareado por VLM |
+| `fusion.adjudication` | o protocolo do adjudicador e seus filtros de segurança |
+| `fusion.oracle` | oráculo por bloco e folga (dimensionar antes de gastar GPU) |
+| `fusion.hf_end` | a convenção do GT de cabeçalho/rodapé no fim |
+| `fusion.table_specialist` | o medoide de tabela (gerar-comparar-adjudicar) |
+| `text.normalize`, `text.norm_fix`, `text.latex` | primitivas de normalização de texto |
+| `imaging.policy` | decisões puras de upscale/orientação (sem PIL/cv2) |
+| `docstruct.fusion.verse` | chunk verse/record blocks so the evaluator can re-group them |
+| `docstruct.fusion.line_numbers` | pull marginal verse line numbers into their own blocks |
+| `docstruct.fusion.flood` | drop short blocks when a provider floods the page |
+| `docstruct.fusion.tailjoin` | join trailing short blocks (the `tj3` rule) |
+| `docstruct.fusion.repetition` | cut degenerate generation loops, detect blank pages |
+| `docstruct.fusion.page_select` | whole-page fusion and the GT-free low-agreement swap |
+| `docstruct.fusion.judge` | the pairwise VLM judge rule |
+| `docstruct.fusion.adjudication` | the adjudicator protocol and its safety filters |
+| `docstruct.fusion.oracle` | per-block oracle and headroom (sizing before spending GPU) |
+| `docstruct.fusion.hf_end` | the ground-truth header/footer-at-end convention |
+| `docstruct.fusion.table_specialist` | the generate-compare-adjudicate table medoid |
+| `docstruct.text.normalize` | the shared comparison normalizer |
+| `docstruct.text.norm_fix` | deterministic text cleanups (ligatures, hyphen, NBSP) |
+| `docstruct.text.latex` | LaTeX normalization |
+| `docstruct.imaging.policy` | pure upscale/orientation decisions (no PIL/cv2) |
+| `docstruct.evaluation.holdout` | the tune/holdout split and the acceptance criteria |
 
 ---
 

@@ -135,10 +135,63 @@ experiment and the limitations.
 
 ### 1.4 `FusionPolicy`
 
-`FusionPolicy` is a frozen dataclass with **conservative, neutral defaults**.
-The benchmark-tuned presets (`drbench_v12`, `drbench_v13`) are named
-classmethods, never defaults, because they were overfitted to the dev split
-(gap dev→test ≈ −6).
+`FusionPolicy` is a frozen dataclass. Its defaults are the **production**
+policy: the deterministic capabilities with evidence of gain (or that fix a
+defect) are on, and anything that consumes a model is off.
+
+| Capability | Default | Evidence |
+|---|---|---|
+| `verse_chunk` 300 / `verse_kind` records | on | deterministic; keeps real verse whole |
+| `line_numbers`, `table_eq`, `norm_text`, `hf_end` | on | deterministic, low risk |
+| `tailjoin` end / 50 / 3 / `hdr` | on | the `tj3` rule: Δtune +1.47, Δhold +0.79 |
+| `rep_guard`, `blank_pages` | on | fixes degenerate generation loops |
+| `upscale`, `orientation` | on | largest isolated gain of the Tele line (Δtune +1.59, Δhold +2.91) |
+| `page_judge` | **off** | consumes a model; enable when the Toolbox exposes `document.adjudicate.page` |
+
+The benchmark-tuned presets (`drbench_v12`, `drbench_v13`, `drbench_v14`,
+`drbench_v15`, `drbench_best_method`) are named classmethods, never defaults,
+because they were overfitted to the dev split (gap dev→test ≈ 8 points).
+
+Rejected experiments (word_vote, dedup_blocks, medoid, block judge, header move,
+dots tables, DeepSeek arbiter, logistic selector, prompt ensemble, threshold
+retuning) are **not** in the defaults: they showed Δtune ≤ 0 and Δhold ≤ 0.
+
+### 1.5 Deterministic post-processing (Dr.DocBench PR #125)
+
+Beyond the Tree Differ, the library exposes the deterministic policies that the
+benchmark work produced, all as pure functions:
+
+| Module | What it does |
+|---|---|
+| `fusion.verse` | chunk verse/record blocks so the evaluator can re-group them |
+| `fusion.line_numbers` | pull marginal verse line numbers into their own blocks |
+| `fusion.flood` | drop short blocks when a provider floods the page |
+| `fusion.tailjoin` | join trailing short blocks (the `tj3` rule) |
+| `fusion.repetition` | cut degenerate generation loops, detect blank pages |
+| `fusion.page_select` | whole-page fusion and the GT-free low-agreement swap |
+| `fusion.judge` | the pairwise VLM judge rule |
+| `fusion.adjudication` | the adjudicator protocol and its safety filters |
+| `fusion.oracle` | per-block oracle and headroom (sizing before spending GPU) |
+| `fusion.hf_end` | the ground-truth header/footer-at-end convention |
+| `fusion.table_specialist` | the generate-compare-adjudicate table medoid |
+| `text.normalize`, `text.norm_fix`, `text.latex` | text normalization primitives |
+| `imaging.policy` | pure upscale/orientation decisions (no PIL/cv2) |
+| `docstruct.fusion.verse` | chunk verse/record blocks so the evaluator can re-group them |
+| `docstruct.fusion.line_numbers` | pull marginal verse line numbers into their own blocks |
+| `docstruct.fusion.flood` | drop short blocks when a provider floods the page |
+| `docstruct.fusion.tailjoin` | join trailing short blocks (the `tj3` rule) |
+| `docstruct.fusion.repetition` | cut degenerate generation loops, detect blank pages |
+| `docstruct.fusion.page_select` | whole-page fusion and the GT-free low-agreement swap |
+| `docstruct.fusion.judge` | the pairwise VLM judge rule |
+| `docstruct.fusion.adjudication` | the adjudicator protocol and its safety filters |
+| `docstruct.fusion.oracle` | per-block oracle and headroom (sizing before spending GPU) |
+| `docstruct.fusion.hf_end` | the ground-truth header/footer-at-end convention |
+| `docstruct.fusion.table_specialist` | the generate-compare-adjudicate table medoid |
+| `docstruct.text.normalize` | the shared comparison normalizer |
+| `docstruct.text.norm_fix` | deterministic text cleanups (ligatures, hyphen, NBSP) |
+| `docstruct.text.latex` | LaTeX normalization |
+| `docstruct.imaging.policy` | pure upscale/orientation decisions (no PIL/cv2) |
+| `docstruct.evaluation.holdout` | the tune/holdout split and the acceptance criteria |
 
 ---
 
