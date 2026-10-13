@@ -332,6 +332,9 @@ def test_wrap_latex():
     assert wrap_latex("x^2", display=False) == "$x^2$"
     assert wrap_latex("x^2", display=True) == "$$x^2$$"
     assert wrap_latex("$x^2$", display=False) == "$x^2$"
+    # backend.tools.formula_tools defaults to inline, unlike the docstruct
+    # library helper which defaults to display.
+    assert wrap_latex("x^2") == "$x^2$"
 
 
 # =========================================================================
