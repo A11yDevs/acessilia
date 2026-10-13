@@ -295,6 +295,7 @@ Defined in `backend/config/settings.py` and documented in `.env.example`:
 | `TOOLBOX_PAGE_OCR_PROVIDER` | `qwen3-vl-page` | Whole-page VLM transcription (`document.ocr.page`) |
 | `TOOLBOX_ADJUDICATE_PROVIDER` | `qwen3-vl-judge` | Pairwise judge / region transcription (`document.adjudicate.*`) |
 | `TOOLBOX_ORIENTATION_PROVIDER` | `rapidocr-orientation` | Rotation detection (`document.orientation.detect`) |
+| `FUSION_HYBRID_PROVIDER` | `mineru-hyb` | MinerU hybrid-VLM provider id (the B source of the confirmed leaderboard best) |
 
 > `TOOLBOX_USE_ARTIFACT_STORE` and `TOOLBOX_USE_REMOTE_CACHE` directly affect the
 > extraction flow: with the artifact store on, the core uploads the file once and
@@ -344,3 +345,10 @@ service.py: _build_orchestrator()
 
 The provider registrations live in the Toolbox repository; the Dr.DocBench job
 config that mirrors them is `scripts/drbench/experiments/slurm/providers-config-vlm.yaml`.
+
+`mineru-hyb` (MinerU 3.x, `backend=hybrid-engine`) is registered as a
+`document.structure.extract` / `document.layout.analyze` / `document.ocr`
+provider. It is the B source of the confirmed leaderboard best
+(`differ-v15-hyb`, EvalAI 70.37): the real test gain came from reading order
+(+16.4) with this source, not from TEDS. Adopt it explicitly with
+`FUSION_SECONDARY_PROVIDER=mineru-hyb`; the dual-fusion default stays `mineru`.

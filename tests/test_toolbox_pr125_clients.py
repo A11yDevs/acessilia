@@ -341,3 +341,28 @@ def test_client_capability_constants_match_the_config():
         ORIENTATION_CAPABILITY,
     ):
         assert capability in by_cap, f"{capability} não está no providers-config"
+
+
+# ---------------------------------------------------------------------------
+# mineru-hyb provider (the B source of the confirmed leaderboard best)
+# ---------------------------------------------------------------------------
+
+
+def test_mineru_hyb_provider_is_registered():
+    import yaml
+
+    data = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
+    providers = {p["id"]: p for p in data["providers"]}
+    assert "mineru-hyb" in providers
+    hyb = providers["mineru-hyb"]
+    assert hyb["config"]["backend"] == "hybrid-engine"
+    assert "document.structure.extract" in hyb["capabilities"]
+
+
+def test_mineru_hyb_is_usable_as_the_fusion_secondary_provider():
+    from backend.config.settings import settings
+
+    assert settings.fusion_hybrid_provider == "mineru-hyb"
+    # O default da fusão dual continua sendo o mineru clássico; adotar o híbrido
+    # é uma escolha explícita via FUSION_SECONDARY_PROVIDER.
+    assert settings.fusion_secondary_provider == "mineru"

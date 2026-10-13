@@ -295,6 +295,7 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 | `TOOLBOX_PAGE_OCR_PROVIDER` | `qwen3-vl-page` | Transcrição VLM de página inteira (`document.ocr.page`) |
 | `TOOLBOX_ADJUDICATE_PROVIDER` | `qwen3-vl-judge` | Juiz pareado / transcrição de região (`document.adjudicate.*`) |
 | `TOOLBOX_ORIENTATION_PROVIDER` | `rapidocr-orientation` | Detecção de rotação (`document.orientation.detect`) |
+| `FUSION_HYBRID_PROVIDER` | `mineru-hyb` | Id do provider MinerU hybrid-VLM (a fonte B do melhor confirmado no leaderboard) |
 
 > `TOOLBOX_USE_ARTIFACT_STORE` e `TOOLBOX_USE_REMOTE_CACHE` afetam diretamente o
 > fluxo de extração: com o artifact store ativo, o core envia o arquivo uma vez e
@@ -345,3 +346,10 @@ service.py: _build_orchestrator()
 Os registros de provider vivem no repositório da Toolbox; a configuração de job
 do Dr.DocBench que os espelha é
 `scripts/drbench/experiments/slurm/providers-config-vlm.yaml`.
+
+O `mineru-hyb` (MinerU 3.x, `backend=hybrid-engine`) está registrado como
+provider de `document.structure.extract` / `document.layout.analyze` /
+`document.ocr`. É a fonte B do melhor confirmado no leaderboard
+(`differ-v15-hyb`, EvalAI 70.37): o ganho real no test veio da ordem de leitura
+(+16.4) com essa fonte, não do TEDS. Adote-o explicitamente com
+`FUSION_SECONDARY_PROVIDER=mineru-hyb`; o default da fusão dual continua `mineru`.

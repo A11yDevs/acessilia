@@ -191,6 +191,28 @@ providers:
       - image/tiff
       - application/pdf
 
+  # MinerU hybrid-VLM (MinerU 3.x, backend=hybrid-engine): pipeline + VLM
+  # (MinerU2.5 1.2B). É a fonte B do melhor resultado confirmado no leaderboard
+  # do Dr.DocBench (differ-v15-hyb, EvalAI 70.37): o ganho real no test veio de
+  # RO +16.4 com esta fonte, não do TEDS.
+  - id: mineru-hyb
+    version: "3.4"
+    transport: http
+    endpoint: ${MINERU_SERVE_URL}
+    health_path: /openapi.json
+    timeout_seconds: 900
+    config:
+      backend: hybrid-engine
+    capabilities:
+      - document.structure.extract
+      - document.layout.analyze
+      - document.ocr
+    media_types:
+      - application/pdf
+      - image/png
+      - image/jpeg
+      - image/tiff
+
   - id: pure-code
     version: "1.0"
     transport: in_process
