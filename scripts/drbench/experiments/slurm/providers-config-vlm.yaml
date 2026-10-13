@@ -67,6 +67,86 @@ providers:
       - image/tiff
       - application/pdf
 
+  # --- Capacidades da PR #125 (Dr.DocBench) ---
+  # Transcrição de página inteira por VLM. É a fonte B do híbrido de página:
+  # quando Docling e MinerU discordam muito, a página VLM substitui a saída do
+  # differ. O sufixo +rot (orientação) está em ambas as fontes do melhor
+  # resultado confirmado no leaderboard (differ-v15-hyb, EvalAI 70.37).
+  - id: qwen3-vl-page
+    version: "32B"
+    transport: http
+    endpoint: ${QWEN3_VL_SERVE_URL}
+    health_path: /health
+    timeout_seconds: 900
+    capabilities:
+      - document.ocr.page
+    media_types:
+      - image/png
+      - image/jpeg
+
+  - id: dots-ocr-page
+    version: "1.0"
+    transport: http
+    endpoint: ${DOTS_OCR_SERVE_URL}
+    health_path: /health
+    timeout_seconds: 900
+    capabilities:
+      - document.ocr.page
+    media_types:
+      - image/png
+      - image/jpeg
+
+  - id: deepseek-ocr-page
+    version: "2"
+    transport: http
+    endpoint: ${DEEPSEEK_OCR_SERVE_URL}
+    health_path: /health
+    timeout_seconds: 900
+    capabilities:
+      - document.ocr.page
+    media_types:
+      - image/png
+      - image/jpeg
+
+  - id: teleocr-page
+    version: "1.0"
+    transport: http
+    endpoint: ${TELEOCR_SERVE_URL}
+    health_path: /health
+    timeout_seconds: 900
+    capabilities:
+      - document.ocr.page
+    media_types:
+      - image/png
+      - image/jpeg
+
+  # Juiz pareado por VLM: vê a imagem da página e duas transcrições candidatas
+  # e diz qual é mais fiel (as duas ordens são perguntadas, para debiasing).
+  - id: qwen3-vl-judge
+    version: "32B"
+    transport: http
+    endpoint: ${QWEN3_VL_SERVE_URL}
+    health_path: /health
+    timeout_seconds: 900
+    capabilities:
+      - document.adjudicate.page
+      - document.adjudicate.region
+    media_types:
+      - image/png
+      - image/jpeg
+
+  # Detecção de rotação 0/90/180/270 (RapidOCR: caixas altas -> candidato;
+  # OCR a 90/270, vence o maior sum(len x score)).
+  - id: rapidocr-orientation
+    version: "1.0"
+    transport: in_process
+    capabilities:
+      - document.orientation.detect
+    media_types:
+      - image/png
+      - image/jpeg
+      - image/tiff
+
   - id: mineru
     version: "2.1"
     transport: http

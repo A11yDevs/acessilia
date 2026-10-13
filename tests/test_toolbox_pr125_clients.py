@@ -275,3 +275,69 @@ async def test_orientation_raises_on_timeout(respx_mock, orientation):
 
     with pytest.raises(ToolboxTimeout):
         await orientation.detect(file_path=FIXTURE_IMAGE)
+
+
+# ---------------------------------------------------------------------------
+# Provider registration (providers-config-vlm.yaml)
+# ---------------------------------------------------------------------------
+
+CONFIG_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "scripts" / "drbench" / "experiments" / "slurm" / "providers-config-vlm.yaml"
+)
+
+PR125_CAPABILITIES = {
+    "document.ocr.page": {"qwen3-vl-page", "dots-ocr-page", "deepseek-ocr-page", "teleocr-page"},
+    "document.adjudicate.page": {"qwen3-vl-judge"},
+    "document.adjudicate.region": {"qwen3-vl-judge"},
+    "document.orientation.detect": {"rapidocr-orientation"},
+}
+
+
+def _providers_by_capability() -> dict[str, set[str]]:
+    import yaml
+
+    data = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
+    out: dict[str, set[str]] = {}
+    for provider in data["providers"]:
+        for capability in provider["capabilities"]:
+            out.setdefault(capability, set()).add(provider["id"])
+    return out
+
+
+def test_pr125_capabilities_are_registered():
+    by_cap = _providers_by_capability()
+    for capability, providers in PR125_CAPABILITIES.items():
+        assert capability in by_cap, f"capacidade {capability} não registrada"
+        assert providers <= by_cap[capability], (
+            f"{capability}: faltam {providers - by_cap[capability]}"
+        )
+
+
+def test_pr125_providers_declare_their_capabilities():
+    import yaml
+
+    data = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
+    ids = {p["id"] for p in data["providers"]}
+    expected = set().union(*PR125_CAPABILITIES.values())
+    assert expected <= ids, f"providers ausentes: {expected - ids}"
+
+
+def test_client_capability_constants_match_the_config():
+    from backend.tools.toolbox_adjudicate_client import (
+        PAGE_CAPABILITY,
+        REGION_CAPABILITY,
+    )
+    from backend.tools.toolbox_orientation_client import (
+        CAPABILITY as ORIENTATION_CAPABILITY,
+    )
+    from backend.tools.toolbox_page_ocr_client import CAPABILITY as PAGE_OCR_CAPABILITY
+
+    by_cap = _providers_by_capability()
+    for capability in (
+        PAGE_OCR_CAPABILITY,
+        PAGE_CAPABILITY,
+        REGION_CAPABILITY,
+        ORIENTATION_CAPABILITY,
+    ):
+        assert capability in by_cap, f"{capability} não está no providers-config"
