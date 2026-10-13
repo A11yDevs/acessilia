@@ -132,6 +132,7 @@ def main() -> int:
     ap.add_argument("--from-raw", type=Path)
     ap.add_argument("--keys", type=Path, help="only these <doc>_p<N> pages")
     ap.add_argument("--model", default="XingChen-AGI/TeleOCR")
+    ap.add_argument("--revision", default=None, help="HF revision (commit/tag) to pin the model weights")
     ap.add_argument("--max-tokens", type=int, default=4096)
     ap.add_argument("--max-model-len", type=int, default=16384)
     ap.add_argument("--gpu-memory-utilization", type=float, default=0.85)
@@ -174,7 +175,7 @@ def main() -> int:
     q25.init_vllm_registered_model = lambda **kw: _init(**{**kw, "architectures": ["Qwen3ForCausalLM"]},
                                                        hf_config=kw["vllm_config"].model_config.hf_config.get_text_config())
     from vllm.model_executor.models.deepseek_ocr import NGramPerReqLogitsProcessor
-    llm = LLM(model=a.model, max_model_len=a.max_model_len, gpu_memory_utilization=a.gpu_memory_utilization,
+    llm = LLM(model=a.model, revision=a.revision, max_model_len=a.max_model_len, gpu_memory_utilization=a.gpu_memory_utilization,
               limit_mm_per_prompt={"image": 1, "video": 0}, enforce_eager=True,
               **({"logits_processors": [NGramPerReqLogitsProcessor]} if a.ngram else {}))
     ng = dict(extra_args=dict(ngram_size=a.ngram, window_size=a.max_model_len)) if a.ngram else {}

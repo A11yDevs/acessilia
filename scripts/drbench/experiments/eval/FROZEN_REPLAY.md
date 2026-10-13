@@ -29,7 +29,10 @@ Create a local JSON specification with paths relative to the specification file
     }
   },
   "evidence_files": [],
-  "lockfile": "uv.lock"
+  "lockfile": "uv.lock",
+  "models": [
+    {"model": "Qwen/Qwen3-VL-32B-Instruct-FP8", "revision": "HF_COMMIT", "role": "page-ocr"}
+  ]
 }
 ```
 
@@ -60,6 +63,12 @@ compares the installed package versions against the lock and writes the result
 to `manifest["environment"]`; a mismatch is reported, not silently ignored.
 Recording `importlib.metadata.distributions()` at run time is *registration*, not
 pinning — without the lockfile the environment cannot be reconstructed.
+
+`models` lists every model the run loads, each with a `revision` (HF commit or
+tag). It is frozen into `evidence/models.json` and its SHA-256 is recorded. The
+replay writes `manifest["model_pinning"]`, listing any model declared without a
+revision. A bare model name is not reproducible: the weights behind a tag can
+change. The page-OCR scripts accept `--revision` for exactly this reason.
 
 ## Replay, fusion and official evaluation
 

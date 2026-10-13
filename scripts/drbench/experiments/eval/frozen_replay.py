@@ -55,6 +55,33 @@ def verify_environment(root: Path, manifest: dict) -> dict:
     }
 
 
+def verify_models(root: Path, manifest: dict) -> dict:
+    """Verifica a pinagem dos pesos dos modelos.
+
+    A identidade do modelo em ``inference`` é evidência fornecida, não uma
+    asserção automática de que aqueles pesos foram carregados. O que se pode
+    verificar é que cada modelo declarado tem uma revisão (commit/tag) e que o
+    manifesto de modelos congelado não mudou.
+    """
+    models = manifest.get("models")
+    if not models:
+        return {"checked": False, "unpinned": [], "models": []}
+    path = root / "evidence" / "models.json"
+    if not path.is_file():
+        raise ValueError("Manifesto de modelos congelado ausente")
+    if sha256(path) != models["sha256"]:
+        raise ValueError("Manifesto de modelos congelado mudou")
+    declared = json.loads(path.read_text())
+    unpinned = sorted(
+        entry["model"] for entry in declared if not entry.get("revision")
+    )
+    return {
+        "checked": True,
+        "models": declared,
+        "unpinned": unpinned,
+    }
+
+
 def _lock_versions(path: Path) -> dict[str, str]:
     """Extrai ``{nome: versão}`` de um ``uv.lock`` (formato TOML)."""
     import tomllib
@@ -117,6 +144,7 @@ def evaluate(root: Path) -> dict:
     try:
         verify_inputs(root, manifest)
         manifest["environment"] = verify_environment(root, manifest)
+        manifest["model_pinning"] = verify_models(root, manifest)
         write_json(root / "manifest.json", manifest)
         if sha256(root / "source-hashes.json") != manifest["source_hashes_sha256"]:
             raise ValueError("Frozen source hash inventory changed")

@@ -353,3 +353,88 @@ def test_missing_frozen_lockfile_is_detected(spec_with_lock, tmp_path):
 
     with pytest.raises(ValueError, match="Lockfile congelado ausente"):
         verify_environment(out, manifest)
+
+
+# ---------------------------------------------------------------------------
+# Model pinning: a bare model name is not reproducible
+# ---------------------------------------------------------------------------
+
+MODELS = [
+    {"model": "Qwen/Qwen3-VL-32B-Instruct-FP8", "revision": "abc123", "role": "page-ocr"},
+    {"model": "dots-studio/dots.ocr", "revision": "def456", "role": "page-ocr"},
+]
+
+
+@pytest.fixture
+def spec_with_models(tmp_path):
+    path = spec.__wrapped__(tmp_path)
+    data = json.loads(path.read_text())
+    data["models"] = MODELS
+    path.write_text(json.dumps(data))
+    return path
+
+
+def test_models_are_frozen_as_evidence(spec_with_models, tmp_path):
+    out = tmp_path / "run"
+    manifest = freeze(spec_with_models, out)
+
+    assert manifest["models"]["count"] == 2
+    frozen = out / "evidence" / "models.json"
+    assert frozen.is_file()
+    assert json.loads(frozen.read_text()) == MODELS
+    assert manifest["input_hashes"]["evidence/models.json"] == manifest["models"]["sha256"]
+
+
+def test_model_pinning_reports_pinned_models(spec_with_models, tmp_path):
+    from scripts.drbench.experiments.eval.frozen_replay import verify_models
+
+    out = tmp_path / "run"
+    manifest = freeze(spec_with_models, out)
+    report = verify_models(out, manifest)
+
+    assert report["checked"] is True
+    assert report["unpinned"] == []
+    assert len(report["models"]) == 2
+
+
+def test_model_pinning_flags_unpinned_models(tmp_path):
+    from scripts.drbench.experiments.eval.frozen_replay import verify_models
+
+    path = spec.__wrapped__(tmp_path)
+    data = json.loads(path.read_text())
+    data["models"] = [{"model": "some/model", "role": "page-ocr"}]
+    path.write_text(json.dumps(data))
+
+    out = tmp_path / "run"
+    manifest = freeze(path, out)
+    report = verify_models(out, manifest)
+
+    assert report["unpinned"] == ["some/model"]
+
+
+def test_model_pinning_without_models_is_a_no_op(tmp_path):
+    from scripts.drbench.experiments.eval.frozen_replay import verify_models
+
+    assert verify_models(tmp_path, {}) == {"checked": False, "unpinned": [], "models": []}
+
+
+def test_changed_frozen_models_manifest_is_detected(spec_with_models, tmp_path):
+    from scripts.drbench.experiments.eval.frozen_replay import verify_models
+
+    out = tmp_path / "run"
+    manifest = freeze(spec_with_models, out)
+    (out / "evidence" / "models.json").write_text("[]")
+
+    with pytest.raises(ValueError, match="Manifesto de modelos congelado mudou"):
+        verify_models(out, manifest)
+
+
+def test_missing_frozen_models_manifest_is_detected(spec_with_models, tmp_path):
+    from scripts.drbench.experiments.eval.frozen_replay import verify_models
+
+    out = tmp_path / "run"
+    manifest = freeze(spec_with_models, out)
+    (out / "evidence" / "models.json").unlink()
+
+    with pytest.raises(ValueError, match="Manifesto de modelos congelado ausente"):
+        verify_models(out, manifest)

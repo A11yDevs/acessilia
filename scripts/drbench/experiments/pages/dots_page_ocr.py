@@ -83,6 +83,7 @@ def main() -> int:
     ap.add_argument("--drop", default="", help="comma-separated categories to leave out")
     ap.add_argument("--hf-end", action="store_true", help="move Page-header/Page-footer to the end of the page")
     ap.add_argument("--model", default="dots-studio/dots.ocr")
+    ap.add_argument("--revision", default=None, help="HF revision (commit/tag) to pin the model weights")
     ap.add_argument("--max-tokens", type=int, default=16000)
     ap.add_argument("--max-model-len", type=int, default=24000)
     ap.add_argument("--gpu-memory-utilization", type=float, default=0.90)
@@ -116,7 +117,7 @@ def main() -> int:
         return 0
     from vllm import LLM, SamplingParams
     from vllm.model_executor.models.deepseek_ocr import NGramPerReqLogitsProcessor
-    llm = LLM(model=a.model, max_model_len=a.max_model_len, gpu_memory_utilization=a.gpu_memory_utilization,
+    llm = LLM(model=a.model, revision=a.revision, max_model_len=a.max_model_len, gpu_memory_utilization=a.gpu_memory_utilization,
               limit_mm_per_prompt={"image": 1, "video": 0}, trust_remote_code=True, enforce_eager=a.enforce_eager,
               allowed_local_media_path=str(a.images_root.resolve()),
               **({"logits_processors": [NGramPerReqLogitsProcessor]} if a.ngram else {}))

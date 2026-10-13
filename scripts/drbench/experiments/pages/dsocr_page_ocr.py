@@ -48,6 +48,7 @@ def main() -> int:
     ap.add_argument("--from-raw", type=Path)
     ap.add_argument("--hf-end", action="store_true")
     ap.add_argument("--model", default="deepseek-ai/DeepSeek-OCR-2")
+    ap.add_argument("--revision", default=None, help="HF revision (commit/tag) to pin the model weights")
     ap.add_argument("--max-tokens", type=int, default=7000)
     ap.add_argument("--max-model-len", type=int, default=8192)
     ap.add_argument("--gpu-memory-utilization", type=float, default=0.90)
@@ -80,7 +81,7 @@ def main() -> int:
     from PIL import Image
     from vllm import LLM, SamplingParams
     from vllm.model_executor.models.deepseek_ocr import NGramPerReqLogitsProcessor
-    llm = LLM(model=a.model, max_model_len=a.max_model_len, gpu_memory_utilization=a.gpu_memory_utilization,
+    llm = LLM(model=a.model, revision=a.revision, max_model_len=a.max_model_len, gpu_memory_utilization=a.gpu_memory_utilization,
               enable_prefix_caching=False, mm_processor_cache_gb=0, logits_processors=[NGramPerReqLogitsProcessor],
               trust_remote_code=True, enforce_eager=a.enforce_eager)
     sp = SamplingParams(temperature=0.0, max_tokens=a.max_tokens, skip_special_tokens=False,

@@ -55,6 +55,7 @@ def main() -> int:
     ap.add_argument("--max-ratio", type=float, default=0.97)
     ap.add_argument("--max-chars", type=int, default=14000)
     ap.add_argument("--model", default="Qwen/Qwen3-VL-32B-Instruct-FP8")
+    ap.add_argument("--revision", default=None, help="HF revision (commit/tag) to pin the model weights")
     ap.add_argument("--max-model-len", type=int, default=32768)
     ap.add_argument("--gpu-memory-utilization", type=float, default=0.90)
     ap.add_argument("--enforce-eager", action="store_true")
@@ -84,7 +85,7 @@ def main() -> int:
     if not todo:
         return 0
     from vllm import LLM, SamplingParams
-    llm = LLM(model=a.model, max_model_len=a.max_model_len, gpu_memory_utilization=a.gpu_memory_utilization,
+    llm = LLM(model=a.model, revision=a.revision, max_model_len=a.max_model_len, gpu_memory_utilization=a.gpu_memory_utilization,
               limit_mm_per_prompt={"image": 1, "video": 0}, enforce_eager=a.enforce_eager,
               allowed_local_media_path=str(a.images_root.resolve()), trust_remote_code=True)
     sp = SamplingParams(temperature=0.0, max_tokens=1, logprobs=20)

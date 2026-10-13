@@ -53,6 +53,7 @@ def main() -> int:
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--only-gt", type=Path, help="dev: keep only pages with <root>/<SUBJ>/<doc>/mds/<doc>_<N>.md")
     ap.add_argument("--model", default="Qwen/Qwen3-VL-32B-Instruct-FP8")
+    ap.add_argument("--revision", default=None, help="HF revision (commit/tag) to pin the model weights")
     ap.add_argument("--max-tokens", type=int, default=6000)
     ap.add_argument("--max-model-len", type=int, default=16384)
     ap.add_argument("--max-pixels", type=int, default=2_400_000)
@@ -80,7 +81,7 @@ def main() -> int:
         return 0
     a.out.mkdir(parents=True, exist_ok=True)
     from vllm import LLM, SamplingParams
-    llm = LLM(model=a.model, max_model_len=a.max_model_len, gpu_memory_utilization=a.gpu_memory_utilization,
+    llm = LLM(model=a.model, revision=a.revision, max_model_len=a.max_model_len, gpu_memory_utilization=a.gpu_memory_utilization,
               limit_mm_per_prompt={"image": 1, "video": 0}, enforce_eager=a.enforce_eager,
               allowed_local_media_path=str(a.images_root.resolve()), trust_remote_code=True,
               mm_processor_kwargs={"max_pixels": a.max_pixels})

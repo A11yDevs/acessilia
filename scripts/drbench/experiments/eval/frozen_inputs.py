@@ -180,6 +180,14 @@ def freeze(spec_path: Path, output: Path, limit: int = 0) -> dict:
                 "name": source.name,
                 "sha256": sha256(target),
             }
+        # Model weights must be pinned by revision: a bare model name is not
+        # reproducible. The manifest is frozen so a replay can detect drift.
+        models = spec.get("models")
+        if models:
+            target = evidence / "models.json"
+            write_json(target, models)
+            manifest["input_hashes"][target.relative_to(output).as_posix()] = sha256(target)
+            manifest["models"] = {"sha256": sha256(target), "count": len(models)}
         manifest["status"] = "frozen"
     except Exception as exc:
         manifest["status"] = "freeze_failed"
