@@ -8,6 +8,12 @@ from docstruct.fusion.flood import flood_guard
 from docstruct.fusion.noise import is_junk, quality
 from docstruct.fusion.types import DiffBlock, ProviderBlocks
 from docstruct.fusion.convert import block_to_diff
+from docstruct.fusion.judge import (
+    debias,
+    decide_pair,
+    p2_from_logprobs,
+    should_judge,
+)
 from docstruct.fusion.line_numbers import extract_line_numbers, line_number_chain
 from docstruct.fusion.page_select import (
     blocks,
@@ -48,6 +54,8 @@ __all__ = [
     "blocks",
     "chunk_verse",
     "collapse",
+    "debias",
+    "decide_pair",
     "extract_line_numbers",
     "flood_guard",
     "fuse",
@@ -62,10 +70,12 @@ __all__ = [
     "page_agreement",
     "page_norm",
     "page_number_position",
+    "p2_from_logprobs",
     "quality",
     "ratio",
     "record_like",
     "select_by_agreement",
+    "should_judge",
     "split_box_rows",
     "strip_comment",
     "swap_low_agreement_pages",
