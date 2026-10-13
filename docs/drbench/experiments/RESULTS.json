@@ -1,0 +1,101 @@
+{
+  "_comment": "Frozen result artifacts for the Dr.DocBench submissions. The run outputs live outside the repository (on the cluster scratch); this file preserves the numbers, the submission zip hashes and the composition of each run so the performance work can be resumed. No ground truth or predictions are stored here.",
+  "task": "DocInsights 2026 Dr.DocBench shared task",
+  "metric": "EvalAI Overall (per-page mean of the available components)",
+  "submissions": [
+    {
+      "run": "mineru",
+      "date": "2026-09-15",
+      "composition": "MinerU 2.1 single provider",
+      "zip_sha256": null,
+      "pages": 509,
+      "evalai": {
+        "text_ed": 0.3235,
+        "table_teds": 47.36,
+        "formula_cdm": 0.0,
+        "reading_order": 53.44,
+        "overall": 58.09
+      }
+    },
+    {
+      "run": "differ-v2-20260916",
+      "date": "2026-09-16",
+      "composition": "tree_differ_v2 lambda=0.5 tau=0.6 over docling-v3 + mineru-v3 (acessilia d6d1348, toolbox 6be3685)",
+      "zip_sha256": "34018a8a19efcd73521c2897de204ff39abb4911c234c2101f87b2bc6aefe46b",
+      "pages": 509,
+      "dev120": {"overall_no_cdm": 77.4, "overall_with_cdm": 77.5, "text": 80.8, "reading_order": 81.4, "teds": 58.2, "cdm": 78.0},
+      "evalai": {
+        "text_ed": 0.2786,
+        "text": 72.1,
+        "table_teds": 57.51,
+        "formula_cdm": 0.0,
+        "reading_order": 55.91,
+        "overall": 61.73
+      }
+    },
+    {
+      "run": "differ-v2-minlen0-20260916",
+      "date": "2026-09-16",
+      "composition": "differ-v2 + --min-len 0 (job 32672)",
+      "zip_sha256": "8b455c804cc17f1c9f0645464e47e6cb4160c910e3c9422b6750105ef89e5aa6",
+      "pages": 509,
+      "dev120": {"overall": 78.0, "text": 81.2, "reading_order": 82.3, "teds": 58.2, "cdm": 78.0},
+      "evalai": {
+        "text_ed": 0.2833,
+        "text": 71.7,
+        "table_teds": 57.51,
+        "formula_cdm": 0.0,
+        "reading_order": 60.81,
+        "overall": 63.15
+      }
+    },
+    {
+      "run": "differ-v15-hyb-20260922",
+      "date": "2026-09-22",
+      "composition": "tree_differ_v2 args v13-pnt over docling-v3+rot x mineru-hyb+rot (MinerU hybrid-VLM, 491 pages + 16 rot + 2 fallback)",
+      "zip_sha256": "db577d6dfab595ec5c68bdb1251b195f022b7f4d46e4b652a124636334936033",
+      "pages": 509,
+      "dev986_md2md": {"overall": 78.1, "text": 85.3, "reading_order": 80.0, "teds": 69.2},
+      "evalai": {
+        "text": 74.67,
+        "reading_order": 72.3,
+        "table_teds": 58.31,
+        "formula_cdm": 0.22,
+        "overall": 70.37
+      },
+      "confirmed_best": true,
+      "note": "TEDS did NOT transfer: dev +5.9 -> test +0.2. The real test gain came from reading order (+16.4, 55.91 -> 72.3) with the MinerU hybrid-VLM + rotation source."
+    },
+    {
+      "run": "differ-v20-vlmsel-20260927",
+      "date": "2026-09-27",
+      "composition": "v16-rec300 args + VLM adjudications-sel (job 33367)",
+      "zip_sha256": "71962a145a046e4535d13e68248638f97a33d4442a79cc07abf3f8c983029735",
+      "pages": 509,
+      "dev986_md2md": {"sel": 78.5, "tight": 78.5, "notab": 78.4},
+      "evalai": {
+        "text_ed": 0.2765,
+        "text": 72.35,
+        "table_teds": 58.18,
+        "formula_cdm": 0.08,
+        "reading_order": 74.96,
+        "overall": 70.35
+      },
+      "note": "-0.02 vs v15-hyb; better reading order (+2.66), slightly worse text/TEDS."
+    }
+  ],
+  "dev_best_unconfirmed": {
+    "run": "hyb-v29-judge2-televm-adf-tj3",
+    "dev_overall": 87.33,
+    "tune": 90.60,
+    "hold": 83.11,
+    "confirmed": false,
+    "note": "Never submitted or confirmed on the leaderboard. The observed dev->test gap is ~8 points. Reproducible via FusionPolicy.drbench_best_method(), which is named and never a default."
+  },
+  "gap_dev_to_test": {
+    "confirmed_best_dev986_md2md": 78.1,
+    "confirmed_best_evalai": 70.37,
+    "delta": 7.73,
+    "note": "The dev split evaluates isolated pages; the test split uses 34 documents x 15 contiguous pages. Part of the gap is the window, not the method."
+  }
+}

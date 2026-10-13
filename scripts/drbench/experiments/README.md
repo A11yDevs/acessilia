@@ -62,6 +62,11 @@ LOOP.md, SERVICES-LOOP.md, SUBMISSIONS-LEADERBOARD.md, LEDGER-dev120.md, LEDGER-
 dev-120 subset ids/json, per-page csvs). English is authoritative; the `*.pt-br.md` files are
 Brazilian Portuguese mirrors kept in sync in the same change.
 
+`docs/drbench/experiments/RESULTS.json` freezes the result artifacts: the numbers, the submission
+zip hashes and the composition of each run. The run outputs live outside the repository (on the
+cluster scratch), so this file is what makes the performance work resumable. It holds no ground
+truth and no predictions.
+
 ## Final differ arguments (submission differ-v13-pnt-ft-20260918)
 
 ```
