@@ -7,8 +7,29 @@ from pathlib import Path
 
 
 DEFAULT_DOMAIN_DIR = Path(__file__).resolve().parent / "domains"
-DEFAULT_DOMAIN_PATH = DEFAULT_DOMAIN_DIR / "domain_v2.2.pddl"
-DEFAULT_DESCRIPTION_PATH = DEFAULT_DOMAIN_DIR / "domain_description_v2.2.md"
+DEFAULT_DOMAIN_PATH = DEFAULT_DOMAIN_DIR / "domain_v2.3.pddl"
+DEFAULT_DESCRIPTION_PATH = DEFAULT_DOMAIN_DIR / "domain_description_v2.3.md"
+
+# Obrigações introduzidas na versão 2.3 (Dr.DocBench PR #125). O domínio PDDL
+# não muda de estrutura: são símbolos de `obligationkind` emitidos pelo
+# compilador. A descrição precisa documentá-los.
+V23_OBLIGATION_KINDS = (
+    "adjudicate-page",
+    "fuse-providers",
+    "refine-reading-order",
+    "normalize-formula",
+    "rescue-omitted-block",
+    "guard-repetition",
+    "join-tail-blocks",
+    "select-table-source",
+    "chunk-verse",
+    "extract-line-numbers",
+    "normalize-text",
+)
+
+
+def _version_tuple(version: str) -> tuple[int, ...]:
+    return tuple(int(part) for part in version.split("."))
 
 
 @dataclass(frozen=True)
@@ -96,6 +117,20 @@ class DomainBundle:
                 "A descrição não documenta o contrato exigido: "
                 + ", ".join(missing_description)
             )
+
+        # Contrato 2.3: as obrigações novas precisam estar documentadas na
+        # descrição (o domínio PDDL em si não muda de estrutura).
+        if _version_tuple(domain_version.group(1)) >= (2, 3):
+            missing_v23 = [
+                kind
+                for kind in V23_OBLIGATION_KINDS
+                if kind not in description_text
+            ]
+            if missing_v23:
+                raise ValueError(
+                    "A descrição 2.3 não documenta as obrigações novas: "
+                    + ", ".join(missing_v23)
+                )
 
         return cls(
             domain_path=domain_path,

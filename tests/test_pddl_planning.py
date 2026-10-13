@@ -84,7 +84,7 @@ def test_domain_bundle_validates_matching_version():
     domain = DomainBundle.load()
 
     assert domain.name == "acessilia-obligations"
-    assert domain.version == "2.2"
+    assert domain.version == "2.3"
     assert len(domain.domain_sha256) == 64
 
 
@@ -241,3 +241,36 @@ def test_cli_both_writes_backend_plans_and_comparison(tmp_path):
         (output / "planning-comparison.json").read_text(encoding="utf-8")
     )
     assert payload["comparison"]["verdict"] == "identical"
+
+
+def test_domain_v23_documents_the_new_obligations():
+    from backend.core.planning.domain_bundle import V23_OBLIGATION_KINDS
+
+    domain = DomainBundle.load()
+    description = domain.description_path.read_text(encoding="utf-8")
+
+    assert domain.version == "2.3"
+    for kind in V23_OBLIGATION_KINDS:
+        assert kind in description, f"obrigação {kind} não documentada"
+
+
+def test_domain_v23_keeps_the_v22_structure():
+    domain = DomainBundle.load()
+    text = domain.domain_path.read_text(encoding="utf-8")
+
+    # A v2.3 não muda a estrutura do domínio: só a descrição ganha as obrigações.
+    assert "(:action execute-obligation" in text
+    assert "(:derived (ready ?o - obligation)" in text
+    assert "(increase (total-cost) (execution-cost ?m ?o))" in text
+
+
+def test_domain_v23_rejects_a_description_missing_a_new_obligation(tmp_path):
+    domain = DomainBundle.load()
+    broken = tmp_path / "domain_description_v2.3.md"
+    broken.write_text(
+        domain.description_path.read_text(encoding="utf-8").replace("chunk-verse", "x"),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="chunk-verse"):
+        DomainBundle.load(domain_path=domain.domain_path, description_path=broken)
