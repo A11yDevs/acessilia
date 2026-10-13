@@ -54,7 +54,9 @@ because Slurm does not expand shell variables in `#SBATCH` directives. Submit fr
 | `pages/` | page-level hybrid (v24 → v31): `vlm_page_ocr.py` (whole-page transcription by a VLM), `vlm_page_select.py` / `page_select.py` / `page_fuse.py` (GT-free choice between candidate pages), `vlm_page_judge.py` (Qwen3-VL judge, both orders, first-token probability), `dots_page_ocr.py` / `dsocr_page_ocr.py` / `teleocr_page_ocr.py` (extra whole-page sources: dots.ocr, DeepSeek-OCR, TeleOCR), `dots_page_select.py`, `pagenum_add.py`, `rep_guard.py`, `dedup_blocks.py`, `vlm_reseg.py`, `word_vote.py`, `loop_post.py`, and the tail-join post-process `tailjoin3.py` (+ `pnpos.py`, `tailjoin.py`) |
 
 Experiment logs and decisions are in `docs/drbench/experiments/` (PLAN.md, SUBMISSIONS.md, JOBS.md,
-LEDGER-dev120.md, LEDGER-dev986.md, dev-120 subset ids/json, per-page csvs).
+LOOP.md, SERVICES-LOOP.md, SUBMISSIONS-LEADERBOARD.md, LEDGER-dev120.md, LEDGER-dev986.md,
+dev-120 subset ids/json, per-page csvs). English is authoritative; the `*.pt-br.md` files are
+Brazilian Portuguese mirrors kept in sync in the same change.
 
 ## Final differ arguments (submission differ-v13-pnt-ft-20260918)
 
