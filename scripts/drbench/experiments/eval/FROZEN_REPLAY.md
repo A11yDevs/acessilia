@@ -54,7 +54,8 @@ Create a local JSON specification with paths relative to the specification file
   "lockfile": "uv.lock",
   "models": [
     {"model": "Qwen/Qwen3-VL-32B-Instruct-FP8", "revision": "HF_COMMIT", "role": "page-ocr"}
-  ]
+  ],
+  "providers": ["docling", "mineru"]
 }
 ```
 
@@ -91,6 +92,13 @@ tag). It is frozen into `evidence/models.json` and its SHA-256 is recorded. The
 replay writes `manifest["model_pinning"]`, listing any model declared without a
 revision. A bare model name is not reproducible: the weights behind a tag can
 change. The page-OCR scripts accept `--revision` for exactly this reason.
+
+`providers` lists the extraction sources to freeze, in order. Omitting it keeps
+the historical `["docling", "mineru"]` pair, so older specs stay valid. The best
+method uses more than two sources (`mineru-hyb`, `dots-ocr-page`, ...), and the
+replay freezes one `raw/<provider>/` directory per declared name. A provider
+without an adapter in `replay_worker.py` is a hard error rather than a silent
+skip.
 
 ## Replay, fusion and official evaluation
 

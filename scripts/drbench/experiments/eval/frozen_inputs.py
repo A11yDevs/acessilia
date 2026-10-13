@@ -83,6 +83,26 @@ def export_revision(repo: Path, ref: str, destination: Path) -> dict:
     }
 
 
+def _providers(spec: dict) -> list[str]:
+    """Providers a congelar, na ordem declarada.
+
+    O spec pode declarar ``providers`` (lista de nomes). Sem a chave, mantém-se
+    o par histórico ``docling``/``mineru``, para que os specs antigos continuem
+    válidos.
+    """
+    providers = spec.get("providers")
+    if providers is None:
+        return ["docling", "mineru"]
+    if not isinstance(providers, list) or not providers:
+        raise ValueError("providers deve ser uma lista não vazia")
+    for name in providers:
+        if not isinstance(name, str) or not name or "/" in name or "\\" in name:
+            raise ValueError(f"nome de provider inválido: {name!r}")
+    if len(set(providers)) != len(providers):
+        raise ValueError("providers contém duplicatas")
+    return list(providers)
+
+
 def freeze(spec_path: Path, output: Path, limit: int = 0) -> dict:
     spec_path = spec_path.resolve()
     spec = json.loads(spec_path.read_text())
@@ -121,11 +141,14 @@ def freeze(spec_path: Path, output: Path, limit: int = 0) -> dict:
         "inference": spec.get("inference", {}), "variants": {}, "input_hashes": {},
     }
     write_json(output / "manifest.json", manifest)
+    providers = _providers(spec)
+    manifest["providers"] = providers
+    write_json(output / "manifest.json", manifest)
     try:
         for page in pages:
             relative_paths = [
                 Path("raw") / provider / f"{page['id']}.json"
-                for provider in ("docling", "mineru")
+                for provider in providers
             ] + [
                 Path("data/hf") / page["image"],
                 Path("data/hf/dev") / page["subject"] / page["document_id"]

@@ -438,3 +438,63 @@ def test_missing_frozen_models_manifest_is_detected(spec_with_models, tmp_path):
 
     with pytest.raises(ValueError, match="Manifesto de modelos congelado ausente"):
         verify_models(out, manifest)
+
+
+# ---------------------------------------------------------------------------
+# Multi-provider: the best method uses more than docling/mineru
+# ---------------------------------------------------------------------------
+
+
+def test_default_providers_are_the_historical_pair(tmp_path):
+    from scripts.drbench.experiments.eval.frozen_inputs import _providers
+
+    assert _providers({}) == ["docling", "mineru"]
+
+
+def test_declared_providers_are_used_in_order(tmp_path):
+    from scripts.drbench.experiments.eval.frozen_inputs import _providers
+
+    spec = {"providers": ["docling", "mineru-hyb", "dots-ocr-page"]}
+    assert _providers(spec) == ["docling", "mineru-hyb", "dots-ocr-page"]
+
+
+def test_empty_providers_list_is_rejected():
+    from scripts.drbench.experiments.eval.frozen_inputs import _providers
+
+    with pytest.raises(ValueError, match="lista não vazia"):
+        _providers({"providers": []})
+
+
+def test_duplicate_providers_are_rejected():
+    from scripts.drbench.experiments.eval.frozen_inputs import _providers
+
+    with pytest.raises(ValueError, match="duplicatas"):
+        _providers({"providers": ["docling", "docling"]})
+
+
+def test_provider_names_cannot_escape_the_raw_directory():
+    from scripts.drbench.experiments.eval.frozen_inputs import _providers
+
+    with pytest.raises(ValueError, match="inválido"):
+        _providers({"providers": ["../etc"]})
+
+
+def test_freeze_records_the_declared_providers(tmp_path):
+    path = spec.__wrapped__(tmp_path)
+    data = json.loads(path.read_text())
+    data["providers"] = ["docling", "mineru"]
+    path.write_text(json.dumps(data))
+
+    out = tmp_path / "run"
+    manifest = freeze(path, out)
+    assert manifest["providers"] == ["docling", "mineru"]
+
+
+def test_freeze_requires_raw_for_every_declared_provider(tmp_path):
+    path = spec.__wrapped__(tmp_path)
+    data = json.loads(path.read_text())
+    data["providers"] = ["docling", "mineru", "mineru-hyb"]
+    path.write_text(json.dumps(data))
+
+    with pytest.raises(FileNotFoundError):
+        freeze(path, tmp_path / "run")
