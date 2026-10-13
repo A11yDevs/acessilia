@@ -274,3 +274,51 @@ def test_domain_v23_rejects_a_description_missing_a_new_obligation(tmp_path):
 
     with pytest.raises(ValueError, match="chunk-verse"):
         DomainBundle.load(domain_path=domain.domain_path, description_path=broken)
+
+
+class TestV23Costs:
+    def test_toda_obrigacao_v23_tem_metodos_com_custo(self):
+        from backend.core.manifest.builder import (
+            DEFAULT_METHOD_COSTS,
+            V23_OBLIGATION_BY_KIND,
+        )
+        from backend.core.planning.domain_bundle import V23_OBLIGATION_KINDS
+
+        assert set(V23_OBLIGATION_KINDS) == set(V23_OBLIGATION_BY_KIND)
+        for kind, (_, methods) in V23_OBLIGATION_BY_KIND.items():
+            assert methods, f"{kind} sem métodos"
+            for method in methods:
+                assert method in DEFAULT_METHOD_COSTS, f"{kind}: {method} sem custo"
+
+    def test_metodos_deterministicos_custam_menos_que_os_de_modelo(self):
+        from backend.core.manifest.builder import DEFAULT_METHOD_COSTS as C
+
+        deterministic = (
+            "agreement-rule", "xycut-order", "skeleton-order", "latex-normalizer",
+            "rep-guard", "tailjoin", "tailjoin-positioned", "verse-chunker",
+            "line-number-extractor", "norm-fix",
+        )
+        model_based = ("vlm-pairwise-judge", "table-specialist", "dual-provider-fusion")
+        assert max(C[m] for m in deterministic) < min(C[m] for m in model_based)
+
+    def test_human_review_e_o_mais_caro(self):
+        from backend.core.manifest.builder import DEFAULT_METHOD_COSTS as C
+
+        assert C["human-review"] == max(C.values())
+
+    def test_join_tail_prefere_a_variante_posicionada(self):
+        from backend.core.manifest.builder import V23_OBLIGATION_BY_KIND
+
+        methods = V23_OBLIGATION_BY_KIND["join-tail-blocks"][1]
+        assert methods.index("tailjoin-positioned") < methods.index("tailjoin")
+
+    def test_fuse_providers_prefere_a_fusao_dual(self):
+        from backend.core.manifest.builder import V23_OBLIGATION_BY_KIND
+
+        methods = V23_OBLIGATION_BY_KIND["fuse-providers"][1]
+        assert methods[0] == "dual-provider-fusion"
+
+    def test_custos_sao_inteiros_nao_negativos(self):
+        from backend.core.manifest.builder import DEFAULT_METHOD_COSTS as C
+
+        assert all(isinstance(v, int) and v >= 0 for v in C.values())
