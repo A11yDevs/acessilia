@@ -4,9 +4,9 @@
 #   --export=ALL,PROVIDER=docling,IMAGES_ROOT=...,OUT_DIR=...,SAMPLE=2[,ITEMS_FILE=...] pipeline.sbatch
 #SBATCH --partition=h100n2
 #SBATCH --signal=B:SIGUSR1@300
-#SBATCH --output=/raid/user_marcospaulo/drdocbench/runs/slurm/logs/%x_%j.log
+#SBATCH --output=runs/slurm/logs/%x_%j.log
 set -uo pipefail
-source /raid/user_marcospaulo/drdocbench/runs/slurm/env.sh
+source "$WS/runs/slurm/env.sh"
 
 : "${PROVIDER:?docling|mineru}"; : "${IMAGES_ROOT:?}"; : "${OUT_DIR:?}"
 SAMPLE=${SAMPLE:-0}; ITEMS_FILE=${ITEMS_FILE:-}; EXTRA_ARGS=${EXTRA_ARGS:-}
@@ -31,7 +31,7 @@ else
   echo "DEVICE=gpu CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
 fi
 export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK:-8} DOCLING_NUM_THREADS=${SLURM_CPUS_PER_TASK:-8}
-export DOCLING_SERVE_ENABLE_UI=0 DOCLING_SERVE_ENG_LOC_NUM_WORKERS=1 MINERU_MODEL_SOURCE=${MINERU_MODEL_SOURCE_OVERRIDE:-local}
+export DOCLING_SERVE_ENABLE_UI=0 DOCLING_SERVE_ENG_LOC_NUM_WORKERS=1 MINERU_MODEL_SOURCE=local
 echo "JOB=$SLURM_JOB_ID PROVIDER=$PROVIDER ports docling=$DOCLING_PORT mineru=$MINERU_PORT toolbox=$TOOLBOX_PORT"
 echo "IMAGES_ROOT=$IMAGES_ROOT OUT_DIR=$OUT_DIR SAMPLE=$SAMPLE ITEMS_FILE=$ITEMS_FILE EXTRA_ARGS=$EXTRA_ARGS"
 echo "acessilia=$(git -C "$ACC" rev-parse --short HEAD) toolbox=$(git -C "$TB" rev-parse --short HEAD)"

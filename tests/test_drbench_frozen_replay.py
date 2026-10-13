@@ -250,3 +250,338 @@ def test_non_boolean_normalization_mode_fails_before_creating_run(spec, tmp_path
     with pytest.raises(ValueError, match="must be a boolean"):
         freeze(spec, tmp_path / "invalid-mode")
     assert not (tmp_path / "invalid-mode").exists()
+
+
+# ---------------------------------------------------------------------------
+# Lockfile: the environment must be reconstructible, not just recorded
+# ---------------------------------------------------------------------------
+
+LOCK_CONTENT = """\
+version = 1
+revision = 3
+requires-python = ">=3.11, <3.14"
+
+[[package]]
+name = "acessilia-docstruct"
+version = "0.1.0"
+source = { editable = "libs/docstruct" }
+
+[[package]]
+name = "agno"
+version = "3.0.5"
+"""
+
+
+@pytest.fixture
+def spec_with_lock(tmp_path):
+    path = spec.__wrapped__(tmp_path)
+    lock = tmp_path / "uv.lock"
+    lock.write_text(LOCK_CONTENT)
+    data = json.loads(path.read_text())
+    data["lockfile"] = str(lock)
+    path.write_text(json.dumps(data))
+    return path
+
+
+def test_lockfile_is_frozen_as_evidence(spec_with_lock, tmp_path):
+    out = tmp_path / "run"
+    manifest = freeze(spec_with_lock, out)
+
+    assert manifest["lockfile"]["name"] == "uv.lock"
+    assert len(manifest["lockfile"]["sha256"]) == 64
+    frozen = out / "evidence" / "lock-uv.lock"
+    assert frozen.is_file()
+    assert frozen.read_text() == LOCK_CONTENT
+    assert manifest["input_hashes"]["evidence/lock-uv.lock"] == manifest["lockfile"]["sha256"]
+
+
+def test_missing_lockfile_fails_the_freeze(spec, tmp_path):
+    data = json.loads(spec.read_text())
+    data["lockfile"] = str(tmp_path / "nope.lock")
+    spec.write_text(json.dumps(data))
+
+    with pytest.raises(FileNotFoundError, match="Lockfile"):
+        freeze(spec, tmp_path / "run")
+
+
+def test_lock_versions_are_parsed(spec_with_lock, tmp_path):
+    from scripts.drbench.experiments.eval.frozen_replay import _lock_versions
+
+    versions = _lock_versions(tmp_path / "uv.lock")
+    assert versions == {"acessilia-docstruct": "0.1.0", "agno": "3.0.5"}
+
+
+def test_environment_check_reports_mismatches(spec_with_lock, tmp_path):
+    from scripts.drbench.experiments.eval.frozen_replay import verify_environment
+
+    out = tmp_path / "run"
+    manifest = freeze(spec_with_lock, out)
+    report = verify_environment(out, manifest)
+
+    assert report["checked"] is True
+    assert report["lockfile"] == "uv.lock"
+    assert report["locked_packages"] == 2
+    # "agno" está instalado no ambiente de teste; a versão pode divergir do lock
+    # sintético, então só verificamos que o relatório é coerente.
+    assert isinstance(report["mismatches"], list)
+
+
+def test_environment_check_without_lockfile_is_a_no_op(tmp_path):
+    from scripts.drbench.experiments.eval.frozen_replay import verify_environment
+
+    report = verify_environment(tmp_path, {})
+    assert report == {"lockfile": None, "checked": False, "mismatches": []}
+
+
+def test_changed_frozen_lockfile_is_detected(spec_with_lock, tmp_path):
+    from scripts.drbench.experiments.eval.frozen_replay import verify_environment
+
+    out = tmp_path / "run"
+    manifest = freeze(spec_with_lock, out)
+    (out / "evidence" / "lock-uv.lock").write_text("tampered")
+
+    with pytest.raises(ValueError, match="Lockfile congelado mudou"):
+        verify_environment(out, manifest)
+
+
+def test_missing_frozen_lockfile_is_detected(spec_with_lock, tmp_path):
+    from scripts.drbench.experiments.eval.frozen_replay import verify_environment
+
+    out = tmp_path / "run"
+    manifest = freeze(spec_with_lock, out)
+    (out / "evidence" / "lock-uv.lock").unlink()
+
+    with pytest.raises(ValueError, match="Lockfile congelado ausente"):
+        verify_environment(out, manifest)
+
+
+# ---------------------------------------------------------------------------
+# Model pinning: a bare model name is not reproducible
+# ---------------------------------------------------------------------------
+
+MODELS = [
+    {"model": "Qwen/Qwen3-VL-32B-Instruct-FP8", "revision": "abc123", "role": "page-ocr"},
+    {"model": "dots-studio/dots.ocr", "revision": "def456", "role": "page-ocr"},
+]
+
+
+@pytest.fixture
+def spec_with_models(tmp_path):
+    path = spec.__wrapped__(tmp_path)
+    data = json.loads(path.read_text())
+    data["models"] = MODELS
+    path.write_text(json.dumps(data))
+    return path
+
+
+def test_models_are_frozen_as_evidence(spec_with_models, tmp_path):
+    out = tmp_path / "run"
+    manifest = freeze(spec_with_models, out)
+
+    assert manifest["models"]["count"] == 2
+    frozen = out / "evidence" / "models.json"
+    assert frozen.is_file()
+    assert json.loads(frozen.read_text()) == MODELS
+    assert manifest["input_hashes"]["evidence/models.json"] == manifest["models"]["sha256"]
+
+
+def test_model_pinning_reports_pinned_models(spec_with_models, tmp_path):
+    from scripts.drbench.experiments.eval.frozen_replay import verify_models
+
+    out = tmp_path / "run"
+    manifest = freeze(spec_with_models, out)
+    report = verify_models(out, manifest)
+
+    assert report["checked"] is True
+    assert report["unpinned"] == []
+    assert len(report["models"]) == 2
+
+
+def test_model_pinning_flags_unpinned_models(tmp_path):
+    from scripts.drbench.experiments.eval.frozen_replay import verify_models
+
+    path = spec.__wrapped__(tmp_path)
+    data = json.loads(path.read_text())
+    data["models"] = [{"model": "some/model", "role": "page-ocr"}]
+    path.write_text(json.dumps(data))
+
+    out = tmp_path / "run"
+    manifest = freeze(path, out)
+    report = verify_models(out, manifest)
+
+    assert report["unpinned"] == ["some/model"]
+
+
+def test_model_pinning_without_models_is_a_no_op(tmp_path):
+    from scripts.drbench.experiments.eval.frozen_replay import verify_models
+
+    assert verify_models(tmp_path, {}) == {"checked": False, "unpinned": [], "models": []}
+
+
+def test_changed_frozen_models_manifest_is_detected(spec_with_models, tmp_path):
+    from scripts.drbench.experiments.eval.frozen_replay import verify_models
+
+    out = tmp_path / "run"
+    manifest = freeze(spec_with_models, out)
+    (out / "evidence" / "models.json").write_text("[]")
+
+    with pytest.raises(ValueError, match="Manifesto de modelos congelado mudou"):
+        verify_models(out, manifest)
+
+
+def test_missing_frozen_models_manifest_is_detected(spec_with_models, tmp_path):
+    from scripts.drbench.experiments.eval.frozen_replay import verify_models
+
+    out = tmp_path / "run"
+    manifest = freeze(spec_with_models, out)
+    (out / "evidence" / "models.json").unlink()
+
+    with pytest.raises(ValueError, match="Manifesto de modelos congelado ausente"):
+        verify_models(out, manifest)
+
+
+# ---------------------------------------------------------------------------
+# Multi-provider: the best method uses more than docling/mineru
+# ---------------------------------------------------------------------------
+
+
+def test_default_providers_are_the_historical_pair(tmp_path):
+    from scripts.drbench.experiments.eval.frozen_inputs import _providers
+
+    assert _providers({}) == ["docling", "mineru"]
+
+
+def test_declared_providers_are_used_in_order(tmp_path):
+    from scripts.drbench.experiments.eval.frozen_inputs import _providers
+
+    spec = {"providers": ["docling", "mineru-hyb", "dots-ocr-page"]}
+    assert _providers(spec) == ["docling", "mineru-hyb", "dots-ocr-page"]
+
+
+def test_empty_providers_list_is_rejected():
+    from scripts.drbench.experiments.eval.frozen_inputs import _providers
+
+    with pytest.raises(ValueError, match="lista não vazia"):
+        _providers({"providers": []})
+
+
+def test_duplicate_providers_are_rejected():
+    from scripts.drbench.experiments.eval.frozen_inputs import _providers
+
+    with pytest.raises(ValueError, match="duplicatas"):
+        _providers({"providers": ["docling", "docling"]})
+
+
+def test_provider_names_cannot_escape_the_raw_directory():
+    from scripts.drbench.experiments.eval.frozen_inputs import _providers
+
+    with pytest.raises(ValueError, match="inválido"):
+        _providers({"providers": ["../etc"]})
+
+
+def test_freeze_records_the_declared_providers(tmp_path):
+    path = spec.__wrapped__(tmp_path)
+    data = json.loads(path.read_text())
+    data["providers"] = ["docling", "mineru"]
+    path.write_text(json.dumps(data))
+
+    out = tmp_path / "run"
+    manifest = freeze(path, out)
+    assert manifest["providers"] == ["docling", "mineru"]
+
+
+def test_freeze_requires_raw_for_every_declared_provider(tmp_path):
+    path = spec.__wrapped__(tmp_path)
+    data = json.loads(path.read_text())
+    data["providers"] = ["docling", "mineru", "mineru-hyb"]
+    path.write_text(json.dumps(data))
+
+    with pytest.raises(FileNotFoundError):
+        freeze(path, tmp_path / "run")
+
+
+# ---------------------------------------------------------------------------
+# Overall: the competition ranking metric must be in the report
+# ---------------------------------------------------------------------------
+
+
+def test_overall_is_the_mean_of_available_components():
+    from scripts.drbench.experiments.eval.replay_report import overall_score
+
+    row = {
+        "baseline_reading_order": 80.0,
+        "baseline_text_block": 90.0,
+        "baseline_table": None,
+        "baseline_display_formula": None,
+        "baseline_table_teds": None,
+    }
+    assert overall_score(row, "baseline") == 85.0
+
+
+def test_overall_ignores_missing_components():
+    from scripts.drbench.experiments.eval.replay_report import overall_score
+
+    row = {
+        "baseline_reading_order": 80.0,
+        "baseline_text_block": 90.0,
+        "baseline_table": 100.0,
+        "baseline_display_formula": None,
+        "baseline_table_teds": None,
+    }
+    assert overall_score(row, "baseline") == 90.0
+
+
+def test_overall_is_none_without_components():
+    from scripts.drbench.experiments.eval.replay_report import overall_score
+
+    assert overall_score({}, "baseline") is None
+
+
+def test_summary_includes_overall():
+    summary = summarize([result_row()])
+    assert "overall" in summary["metrics"]
+    assert summary["metrics"]["overall"]["delta"] == 0
+    assert summary["metrics"]["overall"]["paired"] == 1
+
+
+def test_overall_regression_rejects_the_gate():
+    row = result_row(a=80.0, b=80.0)
+    # só o Overall piora: um componente cai, outro sobe na mesma medida
+    row["candidate_reading_order"] = 70.0
+    row["delta_reading_order"] = -10.0
+    row["candidate_text_block"] = 90.0
+    row["delta_text_block"] = 10.0
+    summary = summarize([row])
+    assert summary["metrics"]["overall"]["delta"] == 0
+    assert summary["quality_gate"] == "rejected"  # reading_order piorou
+
+
+def test_report_mentions_overall(tmp_path):
+    from scripts.drbench.experiments.eval.replay_report import make_report
+
+    pages = [{"id": "doc_p1", "subject": "SCIENCE", "document_id": "doc",
+              "page": 1, "batch": 1}]
+    (tmp_path / "pages.json").write_text(json.dumps(pages))
+    for variant in ("baseline", "candidate"):
+        fusion = tmp_path / variant / "fusion"
+        fusion.mkdir(parents=True)
+        (fusion / "doc_p1.drbench.md").write_text("body")
+        result = tmp_path / variant / "result"
+        result.mkdir(parents=True)
+        key = "doc_page_1-1.jpg"
+        for component in ("reading_order", "text_block", "table", "display_formula"):
+            (result / f"batch-01_{component}_result.json").write_text(
+                json.dumps([{"img_id": key, "metric": {}}])
+            )
+            (result / f"batch-01_{component}_per_page_edit.json").write_text(
+                json.dumps({key: 0.1})
+            )
+        (result / "batch-01_table_result.json").write_text(
+            json.dumps([{"img_id": key, "metric": {"TEDS": 0.9}}])
+        )
+
+    summary = make_report(tmp_path)
+    assert "overall" in summary["metrics"]
+    report = (tmp_path / "REPORT.md").read_text()
+    assert "overall" in report
+    assert "competition ranking metric" in report

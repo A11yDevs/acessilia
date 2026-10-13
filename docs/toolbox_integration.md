@@ -318,6 +318,10 @@ Defined in `backend/config/settings.py` and documented in `.env.example`:
 | `FUSION_MODE` | `single` | `single` (one provider) or `dual` (two providers + fusion) |
 | `FUSION_SECONDARY_PROVIDER` | `mineru` | Secondary provider for `FUSION_MODE=dual` |
 | `STRUCTURER` | `toolbox` | Per-page region engine (`toolbox`, `toolbox-layout`, `pymupdf`) |
+| `TOOLBOX_PAGE_OCR_PROVIDER` | `qwen3-vl-page` | Whole-page VLM transcription (`document.ocr.page`) |
+| `TOOLBOX_ADJUDICATE_PROVIDER` | `qwen3-vl-judge` | Pairwise judge / region transcription (`document.adjudicate.*`) |
+| `TOOLBOX_ORIENTATION_PROVIDER` | `rapidocr-orientation` | Rotation detection (`document.orientation.detect`) |
+| `FUSION_HYBRID_PROVIDER` | `mineru-hyb` | MinerU hybrid-VLM provider id (the B source of the confirmed leaderboard best) |
 
 > `TOOLBOX_USE_ARTIFACT_STORE` and `TOOLBOX_USE_REMOTE_CACHE` directly affect the
 > extraction flow: with the artifact store on, the core uploads the file once and
@@ -347,8 +351,30 @@ service.py: _build_orchestrator()
 - `backend/tools/toolbox_client.py` — base client and exception hierarchy
 - `backend/tools/toolbox_layout_client.py` — Scenario B template
 - `backend/tools/toolbox_ocr_tools.py`, `toolbox_math_tools.py`, `toolbox_pdf_tools.py` — wrappers with local fallback
+- `backend/tools/toolbox_page_ocr_client.py` — `document.ocr.page` (whole-page VLM)
+- `backend/tools/toolbox_adjudicate_client.py` — `document.adjudicate.page` / `.region`
+- `backend/tools/toolbox_orientation_client.py` — `document.orientation.detect`
 - `backend/tools/structurer.py` — `get_structurer()` and structurer selection
 - `backend/core/manifest/toolbox_extractor.py` — `ToolboxManifestExtractor`
 - `backend/pipeline/fusion.py` — `extract_fused()` (dual fusion)
 - `backend/config/settings.py` — Toolbox configuration
 - `docs/drbench.md` — provider benchmark (Docling vs MinerU)
+
+### 7.1 Capabilities added for Dr.DocBench (PR #125)
+
+| Capability | Client | Providers | Purpose |
+|---|---|---|---|
+| `document.ocr.page` | `ToolboxPageOcrClient` | `qwen3-vl-page`, `dots-ocr-page`, `deepseek-ocr-page`, `teleocr-page` | Whole-page VLM transcription — the B source of the page hybrid |
+| `document.adjudicate.page` | `ToolboxAdjudicateClient` | `qwen3-vl-judge` | Pairwise judge between two candidate transcriptions (both orders, position debiasing) |
+| `document.adjudicate.region` | `ToolboxAdjudicateClient` | `qwen3-vl-judge` | Exact transcription of a region crop, turned into a differ decision |
+| `document.orientation.detect` | `ToolboxOrientationClient` | `rapidocr-orientation` | Rotation 0/90/180/270 detection |
+
+The provider registrations live in the Toolbox repository; the Dr.DocBench job
+config that mirrors them is `scripts/drbench/experiments/slurm/providers-config-vlm.yaml`.
+
+`mineru-hyb` (MinerU 3.x, `backend=hybrid-engine`) is registered as a
+`document.structure.extract` / `document.layout.analyze` / `document.ocr`
+provider. It is the B source of the confirmed leaderboard best
+(`differ-v15-hyb`, EvalAI 70.37): the real test gain came from reading order
+(+16.4) with this source, not from TEDS. Adopt it explicitly with
+`FUSION_SECONDARY_PROVIDER=mineru-hyb`; the dual-fusion default stays `mineru`.

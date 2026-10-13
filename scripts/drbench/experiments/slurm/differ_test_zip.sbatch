@@ -4,12 +4,12 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
 #SBATCH --time=01:00:00
-#SBATCH --output=/raid/user_marcospaulo/drdocbench/runs/slurm/logs/%x_%j.log
+#SBATCH --output=runs/slurm/logs/%x_%j.log
 # tree_differ_v2 over the test-509 docling/mineru predictions + build & validate submission.zip.
 #   sbatch --export=ALL,RUN_ID=differ-v4-merge-20260918,ARGS="--lam 0.5 ... --merge-paragraphs" \
 #          [DOCLING=docling-v3-20260916,MINERU=mineru-v3-20260916] runs/slurm/differ_test_zip.sbatch
 set -uo pipefail
-source /raid/user_marcospaulo/drdocbench/runs/slurm/env.sh
+source "${WS:-/raid/user_marcospaulo/drdocbench}/runs/slurm/env.sh"
 cd "$WS"
 R=${RUN_ID:?}; D=${DOCLING:-docling-v3-20260916}; M=${MINERU:-mineru-v3-20260916}; ARGS=${ARGS:?}
 DRB=$WS/repos/DrDocBench/.venv/bin/python; PY=$WS/repos/acessilia/.venv/bin/python

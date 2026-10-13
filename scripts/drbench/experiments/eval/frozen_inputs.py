@@ -83,6 +83,26 @@ def export_revision(repo: Path, ref: str, destination: Path) -> dict:
     }
 
 
+def _providers(spec: dict) -> list[str]:
+    """Providers a congelar, na ordem declarada.
+
+    O spec pode declarar ``providers`` (lista de nomes). Sem a chave, mantém-se
+    o par histórico ``docling``/``mineru``, para que os specs antigos continuem
+    válidos.
+    """
+    providers = spec.get("providers")
+    if providers is None:
+        return ["docling", "mineru"]
+    if not isinstance(providers, list) or not providers:
+        raise ValueError("providers deve ser uma lista não vazia")
+    for name in providers:
+        if not isinstance(name, str) or not name or "/" in name or "\\" in name:
+            raise ValueError(f"nome de provider inválido: {name!r}")
+    if len(set(providers)) != len(providers):
+        raise ValueError("providers contém duplicatas")
+    return list(providers)
+
+
 def freeze(spec_path: Path, output: Path, limit: int = 0) -> dict:
     spec_path = spec_path.resolve()
     spec = json.loads(spec_path.read_text())
@@ -121,11 +141,14 @@ def freeze(spec_path: Path, output: Path, limit: int = 0) -> dict:
         "inference": spec.get("inference", {}), "variants": {}, "input_hashes": {},
     }
     write_json(output / "manifest.json", manifest)
+    providers = _providers(spec)
+    manifest["providers"] = providers
+    write_json(output / "manifest.json", manifest)
     try:
         for page in pages:
             relative_paths = [
                 Path("raw") / provider / f"{page['id']}.json"
-                for provider in ("docling", "mineru")
+                for provider in providers
             ] + [
                 Path("data/hf") / page["image"],
                 Path("data/hf/dev") / page["subject"] / page["document_id"]
@@ -135,7 +158,7 @@ def freeze(spec_path: Path, output: Path, limit: int = 0) -> dict:
                 target = output / relative
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes((data_root / relative).read_bytes())
-                manifest["input_hashes"][str(relative)] = sha256(target)
+                manifest["input_hashes"][relative.as_posix()] = sha256(target)
         for variant_name, variant in spec["variants"].items():
             frozen = {"policy": variant.get("policy", "v12"),
                       "fusion_args": variant.get("fusion_args", []),
@@ -153,7 +176,7 @@ def freeze(spec_path: Path, output: Path, limit: int = 0) -> dict:
             resolve_path(base, evaluator["repo"]), evaluator["ref"],
             output / "sources/evaluator",
         )
-        sources = {str(p.relative_to(output)): sha256(p)
+        sources = {p.relative_to(output).as_posix(): sha256(p)
                    for p in sorted((output / "sources").rglob("*")) if p.is_file()}
         write_json(output / "source-hashes.json", sources)
         manifest["source_hashes_sha256"] = sha256(output / "source-hashes.json")
@@ -164,7 +187,30 @@ def freeze(spec_path: Path, output: Path, limit: int = 0) -> dict:
             source = resolve_path(base, name)
             target = evidence / f"{index:02d}-{source.name}"
             target.write_bytes(source.read_bytes())
-            manifest["input_hashes"][str(target.relative_to(output))] = sha256(target)
+            manifest["input_hashes"][target.relative_to(output).as_posix()] = sha256(target)
+        # The lockfile pins the environment; without it the recorded package
+        # versions cannot be reconstructed. It is frozen as evidence and its
+        # hash is recorded so a replay can detect a changed environment.
+        lockfile = spec.get("lockfile")
+        if lockfile:
+            source = resolve_path(base, lockfile)
+            if not source.is_file():
+                raise FileNotFoundError(f"Lockfile não encontrado: {source}")
+            target = evidence / f"lock-{source.name}"
+            target.write_bytes(source.read_bytes())
+            manifest["input_hashes"][target.relative_to(output).as_posix()] = sha256(target)
+            manifest["lockfile"] = {
+                "name": source.name,
+                "sha256": sha256(target),
+            }
+        # Model weights must be pinned by revision: a bare model name is not
+        # reproducible. The manifest is frozen so a replay can detect drift.
+        models = spec.get("models")
+        if models:
+            target = evidence / "models.json"
+            write_json(target, models)
+            manifest["input_hashes"][target.relative_to(output).as_posix()] = sha256(target)
+            manifest["models"] = {"sha256": sha256(target), "count": len(models)}
         manifest["status"] = "frozen"
     except Exception as exc:
         manifest["status"] = "freeze_failed"

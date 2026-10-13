@@ -344,6 +344,10 @@ LOG_IMAGE_RESIZED: str = "Image resized: {old_width}x{old_height} -> {new_width}
 LOG_IMAGE_ROTATED: str = "Image rotated by {angle:.2f} degrees"
 #: Error logged when OCR image pre-processing fails; {error} is the exception text.
 LOG_IMAGE_PREPROCESS_FAILED: str = "Image pre-processing error: {error}"
+#: Debug logged when a small page is upscaled before OCR; {factor} is the scale factor, {old_width}/{old_height} the original dimensions.
+LOG_IMAGE_UPSCALED: str = "Image upscaled {factor}x: {old_width}x{old_height}"
+#: Debug logged when a page is rotated to correct its orientation; {angle} is the applied rotation in degrees.
+LOG_IMAGE_ORIENTED: str = "Image orientation corrected by {angle} degrees"
 #: Error raised when the language-agent returns an empty result for a document; no placeholders.
 LOG_ORCHESTRATOR_EMPTY_AGENT_RESPONSE: str = "Empty response from the agent"
 #: Warning logged when a page is processed but the model returns no usable text for it.

@@ -4,7 +4,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
 #SBATCH --time=02:00:00
-#SBATCH --output=/raid/user_marcospaulo/drdocbench/runs/slurm/logs/%x_%j.log
+#SBATCH --output=runs/slurm/logs/%x_%j.log
 # Fusão via LIB docstruct (não o script tree_differ_v2) sobre os payloads
 # blocks.json de docling-lib + mineru-lib. Produz predictions no mesmo formato
 # <id>.drbench.md para o avaliador oficial md2md.
@@ -21,7 +21,7 @@
 #   XYCUT_MIN_COLUMNS=3 -> require at least 3 columns for the multicol gate (default 2)
 #   sbatch --export=ALL,SPLIT=dev,POLICY=v13,XYCUT=multicol,XYCUT_MIN_BALANCE=0.7,RUN_NAME=lib-fuse-v13-xycut-bal07 runs/slurm/lib_fuse.sbatch
 set -uo pipefail
-source /raid/user_marcospaulo/drdocbench/runs/slurm/env.sh
+source "${WS:-/raid/user_marcospaulo/drdocbench}/runs/slurm/env.sh"
 cd "$WS/repos/acessilia"
 SPLIT=${SPLIT:-dev}
 POLICY=${POLICY:-v12}

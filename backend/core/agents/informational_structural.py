@@ -51,4 +51,5 @@ class InformationalStructuralAgent:
             source_path,
             extraction,
             language=language,
+            refine_reading_order=True,
         )

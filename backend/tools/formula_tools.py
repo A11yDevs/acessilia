@@ -239,7 +239,7 @@ def ensure_math_delimiters(latex: str) -> str:
 
 
 def normalize_latex(latex: str) -> str:
-    """Remove delimitadores ($, $$, \\[ \\]) e espaços redundantes."""
+    """Strip outer math delimiters and collapse whitespace without rewriting math."""
     text = latex.strip()
     if text.startswith("$$") and text.endswith("$$") and len(text) > 4:
         text = text[2:-2]
@@ -247,9 +247,19 @@ def normalize_latex(latex: str) -> str:
         text = text[1:-1]
     elif text.startswith("\\[") and text.endswith("\\]"):
         text = text[2:-2]
+    elif text.startswith("\\(") and text.endswith("\\)"):
+        text = text[2:-2]
     if not text.strip("$ "):
         return ""
     return " ".join(text.split())
+
+
+def wrap_latex(latex: str, display: bool = False) -> str:
+    """Wrap normalized LaTeX in display ($$) or inline ($) delimiters."""
+    norm = normalize_latex(latex)
+    if not norm:
+        return ""
+    return f"$${norm}$$" if display else f"${norm}$"
 
 
 def latex_to_mathml(latex: str) -> str:
