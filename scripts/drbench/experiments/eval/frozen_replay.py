@@ -24,6 +24,76 @@ def verify_inputs(root: Path, manifest: dict) -> None:
         raise ValueError("Frozen selection changed")
 
 
+def verify_environment(root: Path, manifest: dict) -> dict:
+    """Compara o ambiente atual com o lockfile congelado.
+
+    O lockfile é a única forma de reconstruir o ambiente: o replay *registra*
+    ``importlib.metadata.distributions()`` em tempo de execução, mas isso é
+    registro, não pinagem. Devolve um resumo com as divergências encontradas
+    (vazio quando o ambiente bate com o lockfile).
+    """
+    lock = manifest.get("lockfile")
+    if not lock:
+        return {"lockfile": None, "checked": False, "mismatches": []}
+    path = root / "evidence" / f"lock-{lock['name']}"
+    if not path.is_file():
+        raise ValueError(f"Lockfile congelado ausente: {path.name}")
+    if sha256(path) != lock["sha256"]:
+        raise ValueError("Lockfile congelado mudou")
+    expected = _lock_versions(path)
+    installed = {d.metadata["Name"]: d.version for d in importlib.metadata.distributions()}
+    mismatches = sorted(
+        f"{name}: lock={version} instalado={installed.get(name, '<ausente>')}"
+        for name, version in expected.items()
+        if installed.get(name) != version
+    )
+    return {
+        "lockfile": lock["name"],
+        "checked": True,
+        "locked_packages": len(expected),
+        "mismatches": mismatches,
+    }
+
+
+def verify_models(root: Path, manifest: dict) -> dict:
+    """Verifica a pinagem dos pesos dos modelos.
+
+    A identidade do modelo em ``inference`` é evidência fornecida, não uma
+    asserção automática de que aqueles pesos foram carregados. O que se pode
+    verificar é que cada modelo declarado tem uma revisão (commit/tag) e que o
+    manifesto de modelos congelado não mudou.
+    """
+    models = manifest.get("models")
+    if not models:
+        return {"checked": False, "unpinned": [], "models": []}
+    path = root / "evidence" / "models.json"
+    if not path.is_file():
+        raise ValueError("Manifesto de modelos congelado ausente")
+    if sha256(path) != models["sha256"]:
+        raise ValueError("Manifesto de modelos congelado mudou")
+    declared = json.loads(path.read_text())
+    unpinned = sorted(
+        entry["model"] for entry in declared if not entry.get("revision")
+    )
+    return {
+        "checked": True,
+        "models": declared,
+        "unpinned": unpinned,
+    }
+
+
+def _lock_versions(path: Path) -> dict[str, str]:
+    """Extrai ``{nome: versão}`` de um ``uv.lock`` (formato TOML)."""
+    import tomllib
+
+    data = tomllib.loads(path.read_text(encoding="utf-8"))
+    return {
+        package["name"]: package["version"]
+        for package in data.get("package", [])
+        if "version" in package
+    }
+
+
 def verify_sources(root: Path) -> dict:
     # Git exports have no .git metadata. Hash every exported file used by this run.
     return {p.relative_to(root).as_posix(): sha256(p) for p in sorted((root / "sources").rglob("*")) if p.is_file()}
@@ -73,6 +143,9 @@ def evaluate(root: Path) -> dict:
     )}
     try:
         verify_inputs(root, manifest)
+        manifest["environment"] = verify_environment(root, manifest)
+        manifest["model_pinning"] = verify_models(root, manifest)
+        write_json(root / "manifest.json", manifest)
         if sha256(root / "source-hashes.json") != manifest["source_hashes_sha256"]:
             raise ValueError("Frozen source hash inventory changed")
         source_hashes = json.loads((root / "source-hashes.json").read_text())

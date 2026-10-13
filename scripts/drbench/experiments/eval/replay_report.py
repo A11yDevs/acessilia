@@ -12,6 +12,14 @@ from scripts.drbench.experiments.eval.frozen_inputs import write_json
 METRICS = ("reading_order", "text_block", "table", "display_formula", "table_teds")
 TOLERANCE = 1e-9  # Floating-point equality, not an allowed quality loss.
 
+# Overall é a métrica de ranking da competição: a média por página dos
+# componentes disponíveis. É derivada, não lida do avaliador, então é calculada
+# aqui a partir dos componentes já pontuados.
+OVERALL = "overall"
+
+# Componentes que entram no Overall, na ordem do avaliador oficial.
+OVERALL_COMPONENTS = ("reading_order", "text_block", "table", "display_formula", "table_teds")
+
 
 def check_inventory(directory: Path, pages: list[dict]) -> None:
     expected = {p["id"] for p in pages}
@@ -40,6 +48,20 @@ def metric_score(result: Path, prefix: str, metric: str, page: dict) -> tuple[fl
     return score, "evaluated"
 
 
+def overall_score(row: dict, variant: str) -> float | None:
+    """Média por página dos componentes disponíveis (semântica do Overall).
+
+    Componentes ausentes (``None``) não entram na média, como no avaliador
+    oficial. Devolve ``None`` quando nenhum componente está disponível.
+    """
+    values = [
+        row[f"{variant}_{metric}"]
+        for metric in OVERALL_COMPONENTS
+        if row.get(f"{variant}_{metric}") is not None
+    ]
+    return sum(values) / len(values) if values else None
+
+
 def summarize(rows: list[dict]) -> dict:
     summary = {}
     for metric in METRICS:
@@ -61,6 +83,10 @@ def summarize(rows: list[dict]) -> dict:
             "missing_candidate": [r["id"] for r in rows if r[f"candidate_{metric}"] is None],
             "coverage_mismatch": mismatch,
         }
+    # Overall entra no resumo como métrica derivada, para que o número de
+    # ranking da competição apareça no relatório e no gate.
+    overall = _summarize_metric(rows, OVERALL, overall_score)
+    summary[OVERALL] = overall
     if any(summary[m]["paired"] == 0 for m in ("reading_order", "text_block")):
         gate = "inconclusive"
     elif any(v["worse"] or v["coverage_mismatch"] for v in summary.values()):
@@ -68,6 +94,30 @@ def summarize(rows: list[dict]) -> dict:
     else:
         gate = "passed"
     return {"quality_gate": gate, "metrics": summary}
+
+
+def _summarize_metric(rows: list[dict], metric: str, score_fn) -> dict:
+    """Resume uma métrica derivada (não lida diretamente do avaliador)."""
+    paired = [r for r in rows if score_fn(r, "baseline") is not None and score_fn(r, "candidate") is not None]
+    deltas = [score_fn(r, "candidate") - score_fn(r, "baseline") for r in paired]
+    losses = [r for r, d in zip(paired, deltas) if d < -TOLERANCE]
+    mismatch = [
+        r["id"] for r in rows
+        if (score_fn(r, "baseline") is None) != (score_fn(r, "candidate") is None)
+    ]
+    return {
+        "paired": len(paired), "selected": len(rows),
+        "baseline": statistics.mean(score_fn(r, "baseline") for r in paired) if paired else None,
+        "candidate": statistics.mean(score_fn(r, "candidate") for r in paired) if paired else None,
+        "delta": statistics.mean(deltas) if deltas else None,
+        "better": sum(d > TOLERANCE for d in deltas), "worse": len(losses),
+        "equal": sum(abs(d) <= TOLERANCE for d in deltas),
+        "regressions": [{"id": r["id"], "delta": d} for r, d in zip(paired, deltas) if d < -TOLERANCE],
+        "worst_delta": min(deltas) if deltas else None,
+        "missing_baseline": [r["id"] for r in rows if score_fn(r, "baseline") is None],
+        "missing_candidate": [r["id"] for r in rows if score_fn(r, "candidate") is None],
+        "coverage_mismatch": mismatch,
+    }
 
 
 def make_report(root: Path) -> dict:
@@ -84,6 +134,10 @@ def make_report(root: Path) -> dict:
                 row[f"{variant}_{metric}_status"] = status
             a, b = row[f"baseline_{metric}"], row[f"candidate_{metric}"]
             row[f"delta_{metric}"] = b - a if a is not None and b is not None else None
+        for variant in ("baseline", "candidate"):
+            row[f"{variant}_{OVERALL}"] = overall_score(row, variant)
+        a, b = row[f"baseline_{OVERALL}"], row[f"candidate_{OVERALL}"]
+        row[f"delta_{OVERALL}"] = b - a if a is not None and b is not None else None
         row["markdown_changed"] = (
             (root / "baseline/fusion" / f"{page['id']}.drbench.md").read_bytes()
             != (root / "candidate/fusion" / f"{page['id']}.drbench.md").read_bytes()
@@ -97,7 +151,8 @@ def make_report(root: Path) -> dict:
     summary["markdown_changed"] = sum(row["markdown_changed"] for row in rows)
     write_json(root / "summary.json", summary)
     lines = ["# Paired frozen replay", "", f"Quality gate: **{summary['quality_gate']}**.", "",
-             "Scores are 0–100, higher is better; Δ = candidate − baseline. No Overall is calculated.", "",
+             "Scores are 0–100, higher is better; Δ = candidate − baseline. `overall` is the "
+             "per-page mean of the available components (the competition ranking metric).", "",
              "| Metric | Paired/selected | Baseline | Candidate | Δ p.p. | Better/worse/equal |",
              "| --- | --- | --- | --- | --- | --- |"]
     for metric, value in summary["metrics"].items():

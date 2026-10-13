@@ -94,6 +94,74 @@ DEFAULT_METHOD_COSTS = {
     "pymupdf-region": 30,
     "deterministic-heading-repair": 5,
     "human-review": 100,
+    # --- Capacidades da PR #125 (domínio v2.3) ---
+    # Determinísticas: custo baixo, o planner deve preferi-las.
+    "agreement-rule": 5,
+    "xycut-order": 10,
+    "skeleton-order": 5,
+    "latex-normalizer": 10,
+    "rep-guard": 5,
+    "tailjoin": 5,
+    "tailjoin-positioned": 5,
+    "verse-chunker": 5,
+    "line-number-extractor": 5,
+    "norm-fix": 5,
+    "rescue-omitted": 15,
+    "table-smart-fusion": 20,
+    "single-provider": 20,
+    # Consomem modelo: custo alto, só admissíveis com a política ativa.
+    "vlm-pairwise-judge": 40,
+    "table-specialist": 45,
+    "dual-provider-fusion": 60,
+}
+
+# Obrigações introduzidas na versão 2.3 do domínio PDDL (PR #125).
+# kind -> (rationale, métodos admissíveis)
+V23_OBLIGATION_BY_KIND = {
+    "adjudicate-page": (
+        "Página com divergência entre providers exige adjudicação.",
+        ["vlm-pairwise-judge", "agreement-rule", "human-review"],
+    ),
+    "fuse-providers": (
+        "Extração fundida de dois providers melhora a fidelidade do texto.",
+        ["dual-provider-fusion", "single-provider", "human-review"],
+    ),
+    "refine-reading-order": (
+        "Ordem de leitura precisa seguir as colunas da página.",
+        ["xycut-order", "skeleton-order", "human-review"],
+    ),
+    "normalize-formula": (
+        "Fórmula exige normalização de delimitadores e símbolos.",
+        ["latex-normalizer", "mathml", "human-review"],
+    ),
+    "rescue-omitted-block": (
+        "Bloco presente em um provider foi omitido na fusão.",
+        ["rescue-omitted", "human-review"],
+    ),
+    "guard-repetition": (
+        "Saída degenerada por repetição precisa ser cortada.",
+        ["rep-guard", "human-review"],
+    ),
+    "join-tail-blocks": (
+        "Blocos curtos finais (cabeçalho/rodapé/número) devem ser unidos.",
+        ["tailjoin-positioned", "tailjoin", "human-review"],
+    ),
+    "select-table-source": (
+        "Tabela exige escolha da melhor fonte entre os providers.",
+        ["table-smart-fusion", "table-specialist", "human-review"],
+    ),
+    "chunk-verse": (
+        "Bloco de verso/registro excede o limite de reagrupamento do avaliador.",
+        ["verse-chunker", "human-review"],
+    ),
+    "extract-line-numbers": (
+        "Números de linha marginais devem virar blocos próprios.",
+        ["line-number-extractor", "human-review"],
+    ),
+    "normalize-text": (
+        "Texto exige limpezas determinísticas (ligaduras, hífen, NBSP).",
+        ["norm-fix", "human-review"],
+    ),
 }
 
 CALL_OUT_MIN_GROUP_SIZE = 3

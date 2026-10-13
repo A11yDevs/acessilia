@@ -183,6 +183,166 @@ def demote_formulas(blocks: list[dict], stats: Counter, tag: str) -> list[dict]:
     return blocks
 
 
+# ---- verse / drama ------------------------------------------------------------------------------
+# GT (mds/) keeps one block per stanza / speech and marginal line numbers as separate blocks. The evaluator
+# can only merge consecutive predictions into a GT block (or absorb extra GT blocks into a prediction)
+# when the strings are <= 300 chars (_FUZZY_MAX_LEN), so a whole-page verse block loses every stanza but
+# one. VLM sources (MinerU hybrid) keep the verse line breaks: chunk them at <= --verse-chunk chars,
+# preferring stanza ends (blank line, sentence-final punctuation, next speaker label).
+SPEAKER_RE = re.compile(r"^(?:[A-Z][A-Z'’.\-]*(?: [A-Z][A-Z'’.\-]*){0,3})[.:]?$")
+SENT_END_RE = re.compile(r"[.!?…][”\"’')\]]*$")
+STANDALONE_INT_RE = re.compile(r"(?<![\w.,/:\-])(\d{1,4})(?![\w.,/:%\-])")
+RECORD_END_RE = re.compile(r"\d\W*$")
+LEADER_RE = re.compile(r"\.{3,}|…|\\dotfill")
+
+
+def record_like(lines: list[str], min_frac: float = 0.6) -> bool:
+    """TOC / index / fight-record / results lists: most lines end with a number or carry dot leaders. GT keeps
+    one block per entry (<= 300 chars, so the evaluator re-groups our chunks); real verse/dialogue lines end
+    with words and GT keeps the whole stanza (often > 300 chars) -> those must stay whole. dev-986 (v15):
+    chunking verse lost up to 59 text pts/page, chunking records gained up to 38."""
+    ls = [l.strip() for l in lines if l.strip()]
+    if not ls:
+        return False
+    endnum = sum(bool(RECORD_END_RE.search(l)) for l in ls) / len(ls)
+    leaders = sum(bool(LEADER_RE.search(l)) for l in ls) / len(ls)
+    return endnum >= min_frac or leaders >= 0.5
+
+
+def verse_lines(md: str, min_lines: int = 3, max_median: int = 70, max_line: int = 120) -> list[str] | None:
+    """Lines of a verse-like text block (several short lines separated by single newlines), else None."""
+    s = md.strip()
+    if "\n" not in s or s.startswith(("#", "<", "|", "$$", "![")):
+        return None
+    lines = [l.rstrip() for l in s.split("\n")]
+    nonempty = [l for l in lines if l.strip()]
+    if len(nonempty) < min_lines:
+        return None
+    lens = sorted(len(l) for l in nonempty)
+    if lens[len(lens) // 2] > max_median or lens[-1] > max_line:
+        return None
+    return lines
+
+
+def chunk_verse(lines: list[str], max_chars: int, soft: float = 0.6) -> list[str]:
+    chunks: list[str] = []
+    cur: list[str] = []
+    cur_len = 0
+
+    def flush():
+        nonlocal cur, cur_len
+        if cur:
+            chunks.append("\n".join(cur))
+        cur, cur_len = [], 0
+
+    for l in lines:
+        s = l.strip()
+        if not s:  # blank line = stanza break
+            flush()
+            continue
+        if cur and SPEAKER_RE.match(s) and len(s) <= 32:
+            flush()
+        n = len(norm(s))
+        if cur and cur_len + n > max_chars:
+            flush()
+        cur.append(s)
+        cur_len += n
+        if cur_len >= soft * max_chars and SENT_END_RE.search(s):
+            flush()
+    flush()
+    return chunks
+
+
+def split_box_rows(box, parts: list[int]):
+    """Split a box vertically in proportion to the number of lines of each part."""
+    if box is None:
+        return [None] * len(parts)
+    tot = sum(parts) or 1
+    y0, h = box[1], box[3] - box[1]
+    out, acc = [], 0
+    for p in parts:
+        out.append((box[0], y0 + h * acc / tot, box[2], y0 + h * (acc + p) / tot))
+        acc += p
+    return out
+
+
+def verse_blocks(blocks: list[dict], stats: Counter, tag: str, max_chars: int, kind: str = "records") -> list[dict]:
+    out: list[dict] = []
+    for b in blocks:
+        lines = verse_lines(b["md"]) if b["kind"] == "text" else None
+        if lines is None:
+            out.append(b)
+            continue
+        if kind == "records" and not record_like(lines):
+            out.append(b)
+            stats[f"verse-{tag}-whole"] += 1
+            continue
+        chunks = chunk_verse(lines, max_chars)
+        if len(chunks) <= 1:
+            out.append(b)
+            stats[f"verse-{tag}-kept"] += 1
+            continue
+        boxes = split_box_rows(b["box"], [c.count("\n") + 1 for c in chunks])
+        for c, bx in zip(chunks, boxes):
+            out.append({**b, "md": c, "text": norm(c), "box": bx, "verse": True})
+        stats[f"verse-{tag}-split"] += 1
+        stats[f"verse-{tag}-chunks"] += len(chunks)
+    return out
+
+
+def line_number_chain(values: list[int], steps=(5, 4, 10, 2, 3), min_len: int = 3) -> tuple[int, set[int]]:
+    """Indices of the longest run of values forming an arithmetic progression with a typical verse
+    line-number step (5, 4, 10, 2, 3); values need not be adjacent in the list (years/figures may interleave)."""
+    best: tuple[int, set[int]] = (0, set())
+    for step in steps:
+        for i in range(len(values)):
+            chain = [i]
+            for j in range(i + 1, len(values)):
+                if values[j] == values[chain[-1]] + step:
+                    chain.append(j)
+            if len(chain) >= min_len and len(chain) > len(best[1]):
+                best = (step, set(chain))
+    return best
+
+
+def extract_line_numbers(blocks: list[dict], stats: Counter, tag: str) -> list[dict]:
+    """Marginal verse line numbers OCR'd inline ("be seen 3964 or recognized") or as their own lines ->
+    removed from the text and emitted as separate blocks right after it (GT keeps them as blocks)."""
+    out: list[dict] = []
+    for b in blocks:
+        if b["kind"] != "text" or b.get("verse_nums") or len(b["text"]) < 120:
+            out.append(b)
+            continue
+        hits = list(STANDALONE_INT_RE.finditer(b["md"]))
+        if len(hits) < 3:
+            out.append(b)
+            continue
+        step, idx = line_number_chain([int(h.group(1)) for h in hits])
+        if not idx:
+            out.append(b)
+            continue
+        md = b["md"]
+        nums = []
+        for k in sorted(idx, reverse=True):
+            h = hits[k]
+            nums.append(h.group(1))
+            md = md[:h.start()] + md[h.end():]
+        md = re.sub(r"[ \t]{2,}", " ", md)
+        md = "\n".join(l.rstrip() for l in md.split("\n") if l.strip())
+        nums.reverse()
+        if not norm(md):
+            out.append(b)
+            continue
+        out.append({**b, "md": md, "text": norm(md), "verse_nums": True})
+        bx = b["box"]
+        for n in nums:
+            nbox = (max(0.0, bx[2] - 0.06), bx[1], bx[2], bx[3]) if bx else None
+            out.append({"md": n, "kind": "text", "box": nbox, "text": norm(n), "type": "line_number"})
+        stats[f"line-numbers-{tag}"] += 1
+        stats[f"line-numbers-{tag}-count"] += len(nums)
+    return out
+
+
 def flood_guard(D: list[dict], M: list[dict], stats: Counter, ratio: float, min_blocks: int = 30,
                 short: int = 15) -> list[dict]:
     """Chart/diagram pages: Docling emits every axis tick / label as a block (90 blocks) while MinerU sees
@@ -205,7 +365,7 @@ def flood_guard(D: list[dict], M: list[dict], stats: Counter, ratio: float, min_
 
 
 def decor_role(b: dict, running: frozenset[str] = frozenset()) -> str | None:
-    if b["kind"] in ("table", "formula"):
+    if b["kind"] in ("table", "formula") or b["type"] == "line_number":
         return None
     if PAGENUM_RE.match(b["md"]) and len(b["md"]) <= 16:
         return "page_number"
@@ -317,7 +477,7 @@ def group_split_blocks(A: list[dict], B: list[dict], stats: Counter, tag: str, f
     (A over-segmented the paragraph that B kept whole). Returns a new A list, order preserved."""
     owner: dict[int, int] = {}
     for i, a in enumerate(A):
-        if a["kind"] != "text" or a["box"] is None:
+        if a["kind"] != "text" or a["box"] is None or a.get("verse") or a.get("type") == "line_number":
             continue
         best, bf = None, 0.0
         for j, b in enumerate(B):
@@ -437,7 +597,8 @@ def fuse_line_runs(blocks: list[dict], stats: Counter, tag: str, short: int = 80
     adjacent. max_len>0 caps the fused block length (evaluator forgives pred merges only up to 300 chars)."""
     def short_text(b):
         return (b["kind"] == "text" and b["box"] is not None and len(b["text"]) <= short
-                and "\n" not in b["md"] and not b["md"].lstrip().startswith("#"))
+                and "\n" not in b["md"] and not b["md"].lstrip().startswith("#") and not b.get("verse")
+                and b.get("type") != "line_number")
 
     def adjacent(p, n):
         pb, nb = p["box"], n["box"]
@@ -579,6 +740,53 @@ def decor_tail(dec_d: list[dict], dec_m: list[dict]) -> list[str]:
     return [b["md"] for b in items]
 
 
+LIGATURES = {"ﬁ": "fi", "ﬂ": "fl", "ﬀ": "ff", "ﬃ": "ffi", "ﬄ": "ffl", "ﬅ": "ft", "ﬆ": "st"}
+
+
+def norm_fix(md: str) -> str:
+    """Deterministic text cleanups that cost Levenshtein: ligatures, soft hyphens, NBSP,
+    line-end hyphenation, duplicate spaces. Tables/formulas are left untouched."""
+    if md.lstrip().startswith(("<table", "$$", "\\[", "|")):
+        return md
+    for k, v in LIGATURES.items():
+        md = md.replace(k, v)
+    md = md.replace("\u00ad", "").replace("\u00a0", " ")
+    md = re.sub(r"([A-Za-zÀ-ÿ])-\n([a-zà-ÿ])", r"\1\2", md)
+    md = re.sub(r"[ \t]{2,}", " ", md)
+    return md
+
+
+def xy_order(boxes: list) -> list[int]:
+    """Recursive XY-cut reading order over normalised TOPLEFT boxes: split on y-gaps (top->bottom),
+    then x-gaps (left->right). Returns the permutation of indices."""
+    out: list[int] = []
+
+    def merged_intervals(idxs: list[int], a0: int, a1: int) -> list[list[float]]:
+        iv = sorted((boxes[i][a0], boxes[i][a1]) for i in idxs)
+        merged = [list(iv[0])]
+        for s, e in iv[1:]:
+            if s > merged[-1][1] + 1e-6:
+                merged.append([s, e])
+            else:
+                merged[-1][1] = max(merged[-1][1], e)
+        return merged
+
+    def rec(idxs: list[int], depth: int) -> None:
+        if len(idxs) <= 1 or depth > 12:
+            out.extend(sorted(idxs, key=lambda i: (boxes[i][1], boxes[i][0])))
+            return
+        for a0, a1 in ((1, 3), (0, 2)):  # y-cut first, then x-cut
+            m = merged_intervals(idxs, a0, a1)
+            if len(m) > 1:
+                for s, e in m:
+                    rec([i for i in idxs if boxes[i][a0] >= s - 1e-6 and boxes[i][a1] <= e + 1e-6], depth + 1)
+                return
+        out.extend(sorted(idxs, key=lambda i: (boxes[i][1], boxes[i][0])))
+
+    rec(list(range(len(boxes))), 0)
+    return out
+
+
 def merge_v2(D: list[dict], M: list[dict], *, lam: float, tau: float, min_len: int,
              table_pref: str, formula_pref: str, garbage_frac: float = 0.0,
              text_pick: str = "docling", decor: bool = False, junk: bool = False,
@@ -595,12 +803,30 @@ def merge_v2(D: list[dict], M: list[dict], *, lam: float, tau: float, min_len: i
              table_smart_fusion: bool = True, queue_sim: float = 0.94,
              queue_pred_shorter: bool = True, vlm_queue: list[dict] | None = None,
              vlm_decisions: dict[str, str] | None = None,
-             item_id: str = "") -> tuple[list[str], Counter]:
+             item_id: str = "",
+             verse_chunk: int = 0, line_numbers: bool = False,
+             table_eq: bool = False, verse_kind: str = "records",
+             forced: dict | None = None, queue: list | None = None, page: str = "",
+             order: str = "mineru", queue_tables: bool = False,
+             order_forced: list | None = None, order_dump: list | None = None) -> tuple[list[str], Counter]:
     stats: Counter = Counter()
     tail: list[str] = []
+    if table_eq:
+        # MinerU wraps inline math in table cells as <eq>..</eq>; the TEDS normaliser does not strip it
+        # (GT has plain text) -> every such cell is a token mismatch
+        for b in D + M:
+            if b["kind"] == "table" and "<eq" in b["md"]:
+                b["md"] = re.sub(r"</?eq[^>]*>", "", b["md"])
+                stats["table-eq-unwrapped"] += 1
     if formula_text:
         D = demote_formulas(D, stats, "docling")
         M = demote_formulas(M, stats, "mineru")
+    if line_numbers:
+        D = extract_line_numbers(D, stats, "docling")
+        M = extract_line_numbers(M, stats, "mineru")
+    if verse_chunk > 0:
+        D = verse_blocks(D, stats, "docling", verse_chunk, verse_kind)
+        M = verse_blocks(M, stats, "mineru", verse_chunk, verse_kind)
     if suppress:
         mode = suppress_mode
         # MinerU saw only a picture: its picture box is the whole illustration and Docling's labels are the
@@ -677,6 +903,36 @@ def merge_v2(D: list[dict], M: list[dict], *, lam: float, tau: float, min_len: i
     match_d2m = {int(i): int(j) for i, j in zip(ri, ci) if cost[i, j] <= tau}
     matched_m = set(match_d2m.values())
 
+    if queue is not None:
+        # adjudication queue: matched pairs that are NOT clean agreements, plus long unilateral Docling
+        # blocks. i/j index the post-transform D/M lists -> stable across reruns with the same args.
+        TEXTISH = ("text", "heading")
+        for i, j in sorted(match_d2m.items()):
+            d, m = D[i], M[j]
+            same_grp = d["kind"] == m["kind"] or {d["kind"], m["kind"]} <= set(TEXTISH)
+            s = sim(d["text"], m["text"])
+            cls = "agreed" if (same_grp and s >= queue_sim) else "disputed-content" if same_grp else "disputed-type"
+            is_tab = queue_tables and "table" in (d["kind"], m["kind"])  # v24: table specialist sees every table
+            if not is_tab and (cls == "agreed" or (cls == "disputed-content" and min(len(d["md"]), len(m["md"])) < 40)):
+                continue
+            queue.append({"page": page, "i": i, "j": j, "cls": cls, "kind_d": d["kind"], "kind_m": m["kind"],
+                          "cost": round(float(cost[i, j]), 4), "sim": round(s, 4),
+                          "box_d": d["box"], "box_m": m["box"], "md_d": d["md"], "md_m": m["md"]})
+        for i, d in enumerate(D):
+            if i in match_d2m or not ((d["kind"] == "text" and len(d["md"]) >= 60) or
+                                      (queue_tables and d["kind"] == "table")):
+                continue
+            queue.append({"page": page, "i": i, "j": -1, "cls": "unilateral-docling", "kind_d": d["kind"],
+                          "kind_m": None, "cost": None, "sim": None, "box_d": d["box"], "box_m": None,
+                          "md_d": d["md"], "md_m": None})
+        for j, m in enumerate(M):
+            if j in matched_m or not ((m["kind"] == "text" and len(m["md"]) >= 60) or
+                                      (queue_tables and m["kind"] == "table")):
+                continue
+            queue.append({"page": page, "i": -1, "j": j, "cls": "unilateral-mineru", "kind_d": None,
+                          "kind_m": m["kind"], "cost": None, "sim": None, "box_d": None, "box_m": m["box"],
+                          "md_d": None, "md_m": m["md"]})
+
     # MinerU skeleton is unreliable when almost nothing matches (rotated/fuzzy scans -> garbage OCR)
     nd_txt = sum(d["kind"] == "text" for d in D)
     nm_txt = sum(m["kind"] == "text" for m in M)
@@ -736,7 +992,19 @@ def merge_v2(D: list[dict], M: list[dict], *, lam: float, tau: float, min_len: i
         stats["pair-text-auto->mineru"] += 1
         return m["md"]
 
-    def pick(d: dict, m: dict, item_id: str = "", block_idx: int = 0) -> str:
+    def pick(d: dict, m: dict, item_id: str = "", block_idx: int = 0,
+             i: int = -1, j: int = -1) -> str:
+        if forced:
+            act = forced.get((i, j))
+            if act == "select_a":
+                stats["pair-forced->docling"] += 1
+                return d["md"]
+            if act == "select_b":
+                stats["pair-forced->mineru"] += 1
+                return m["md"]
+            if isinstance(act, tuple) and act[0] == "replace" and act[1].strip():
+                stats["pair-forced->vlm-text"] += 1
+                return act[1].strip()
         if d["kind"] == "table" or m["kind"] == "table":
             if d["kind"] != m["kind"]:
                 stats["pair-only-one-table"] += 1
@@ -767,19 +1035,36 @@ def merge_v2(D: list[dict], M: list[dict], *, lam: float, tau: float, min_len: i
         return pick_text(d, m, item_id=item_id, block_idx=block_idx)
 
     # skeleton: MinerU order, matched pairs resolved
-    seq: list[tuple[float, float, str]] = []  # (order key, sub key, md)
+    seq: list[tuple[float, float, str, object, tuple]] = []  # (order key, sub key, md, box, block id)
     m2d = {j: i for i, j in match_d2m.items()}
     for j, m in enumerate(M):
-        md = pick(D[m2d[j]], m, item_id=item_id, block_idx=j) if j in m2d else m["md"]
-        if j not in m2d:
+        if j in m2d:
+            md = pick(D[m2d[j]], m, item_id=item_id, block_idx=j, i=m2d[j], j=j)
+        else:
+            act = forced.get((-1, j)) if forced else None
+            if act == "drop":
+                stats["unilateral-mineru-dropped-vlm"] += 1
+                continue
+            if isinstance(act, tuple) and act[0] == "replace" and act[1].strip():
+                stats["unilateral-mineru->vlm-text"] += 1
+                md = act[1].strip()
+            else:
+                md = m["md"]
             stats["unilateral-mineru"] += 1
-        seq.append((float(j), 0.0, md))
+        seq.append((float(j), 0.0, md, m["box"], ("m", j)))
 
     # insert unmatched Docling blocks next to the nearest MinerU block
     centers = [center(m["box"]) for m in M]
     for i, d in enumerate(D):
         if i in match_d2m:
             continue
+        act_u = forced.get((i, -1)) if forced else None
+        if act_u == "drop":
+            stats["unilateral-docling-dropped-vlm"] += 1
+            continue
+        if isinstance(act_u, tuple) and act_u[0] == "replace" and act_u[1].strip():
+            stats["unilateral-docling->vlm-text"] += 1
+            d = dict(d, md=act_u[1].strip())
         min_threshold = 5 if (rescue_omitted and is_legitimate_text(d)) else min_len
         if len(d["text"]) < min_threshold and d["kind"] == "text":
             stats["dropped-docling-short"] += 1
@@ -795,12 +1080,30 @@ def merge_v2(D: list[dict], M: list[dict], *, lam: float, tau: float, min_len: i
         cx, cy = center(d["box"])
         j = int(np.argmin([(cx - x) ** 2 + (cy - y) ** 2 for x, y in centers]))
         above = cy < centers[j][1]
-        seq.append((float(j) - 0.5 if above else float(j) + 0.5, cy, d["md"]))
+        seq.append((float(j) - 0.5 if above else float(j) + 0.5, cy, d["md"], d["box"], ("d", i)))
         stats["unilateral-docling"] += 1
         if rescue_omitted and is_legitimate_text(d):
             stats["rescued-docling-body"] += 1
     seq.sort(key=lambda t: (t[0], t[1]))
-    return [md for _, _, md in seq] + tail, stats
+    if order == "xy" and seq and all(t[3] for t in seq):
+        stats["order-xy"] += 1
+        perm = xy_order([t[3] for t in seq])
+        seq = [seq[i] for i in perm]
+    elif order == "xy":
+        stats["order-xy-skipped-nobox"] += 1
+    if order_dump is not None and len(seq) >= 3 and all(t[3] for t in seq):
+        # v24 reading-order adjudication: blocks in skeleton order + XY-cut alternative, keyed by block id
+        order_dump.append({"page": page, "keys": [list(t[4]) for t in seq], "boxes": [t[3] for t in seq],
+                           "text": [t[2][:80] for t in seq], "xy": xy_order([t[3] for t in seq])})
+    if order_forced:
+        rank = {tuple(k): r for r, k in enumerate(order_forced)}
+        keyed, last = [], -1.0
+        for n, t in enumerate(seq):  # blocks unknown to the decision stay right after their predecessor
+            last = rank.get(t[4], last + 1e-3)
+            keyed.append((last, n, t))
+        seq = [t for *_, t in sorted(keyed)]
+        stats["order-forced"] += 1
+    return [t[2] for t in seq] + tail, stats
 
 
 def main() -> int:
@@ -877,6 +1180,33 @@ def main() -> int:
                     help="disable smart hybrid table fusion based on table span / complexity metadata")
     ap.add_argument("--no-rescue-omitted", dest="rescue_omitted", action="store_false", default=True,
                     help="disable rescuing omitted legitimate text blocks inside picture bboxes or small boxes")
+    ap.add_argument("--verse-chunk", type=int, default=0, metavar="N",
+                    help="split multi-line short-line text blocks into chunks of <= N chars at line boundaries (N=1 -> one "
+                         "block per line), kept out of --fuse-lines/--merge-paragraphs (0=off)")
+    ap.add_argument("--verse-kind", choices=["records", "all"], default="records",
+                    help="records: chunk only list-like blocks (>=60%% lines end with a number / dot leaders), real verse "
+                         "stays whole (GT stanzas > 300 chars are never re-merged by the evaluator); all: chunk every one")
+    ap.add_argument("--line-numbers", action="store_true",
+                    help="marginal verse line numbers OCR'd into a text block (arithmetic run of >= 3 integers) become "
+                         "separate blocks after it, as in GT")
+    ap.add_argument("--table-eq", action="store_true", help="strip <eq> tags inside table HTML (TEDS token mismatch)")
+    ap.add_argument("--dump-queue", type=Path, default=None,
+                    help="write adjudication queue JSONL (disputed/unilateral blocks with bboxes and candidates)")
+    ap.add_argument("--queue-sim", type=float, default=0.85,
+                    help="pairs with same kind-group and sim >= this are 'agreed' and left out of the queue")
+    ap.add_argument("--norm-text", action="store_true",
+                    help="deterministic cleanups on final non-table/formula blocks (ligatures, soft hyphens, "
+                         "NBSP, line-end hyphenation, duplicate spaces)")
+    ap.add_argument("--order", choices=["mineru", "xy"], default="mineru",
+                    help="final block order: MinerU skeleton (default) or recursive XY-cut on bboxes")
+    ap.add_argument("--queue-tables", action="store_true",
+                    help="v24: dump every table block (matched or unilateral) into the queue for the table specialist")
+    ap.add_argument("--dump-order", type=Path, default=None,
+                    help="v24: write per-page final block ids/boxes (+XY-cut alternative) for order adjudication")
+    ap.add_argument("--order-adjudications", type=Path, default=None,
+                    help="v24: JSONL {page, order: [[side, idx], ...]} forcing the final block order")
+    ap.add_argument("--adjudications", type=Path, default=None,
+                    help="JSONL of VLM decisions {page,i,j,action: select_a|select_b|drop|replace[,text]} forcing picks")
     a = ap.parse_args()
     # '+' also accepted because Slurm --export splits values on commas
     drop_d = frozenset(t.strip().lower() for t in re.split(r"[,+]", a.drop_docling) if t.strip())
@@ -923,6 +1253,23 @@ def main() -> int:
         running = running_texts(ids, a.docling, a.mineru, drop_d, drop_m, min_pages=a.running_heads)
         print(f"running heads: {sum(len(v) for v in running.values())} texts in {sum(1 for v in running.values() if v)} docs")
     a.out.mkdir(parents=True, exist_ok=True)
+    adj: dict[str, dict] = {}
+    if a.adjudications:
+        for line in a.adjudications.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                r = json.loads(line)
+                act = ("replace", r.get("text") or "") if r["action"] == "replace" else r["action"]
+                adj.setdefault(r["page"], {})[(r["i"], r["j"])] = act
+        print(f"adjudications: {sum(len(v) for v in adj.values())} decisions over {len(adj)} pages")
+    order_adj: dict[str, list] = {}
+    if a.order_adjudications:
+        for line in a.order_adjudications.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                r = json.loads(line)
+                order_adj[r["page"]] = [tuple(k) for k in r["order"]]
+        print(f"order adjudications: {len(order_adj)} pages")
+    order_dump: list = []
+    queue: list = []
     rows, tot = [], Counter()
     for name in ids:
         stem = name.removesuffix(".drbench.md")
@@ -957,10 +1304,20 @@ def main() -> int:
                                      queue_pred_shorter=a.queue_pred_shorter,
                                      vlm_queue=vlm_queue,
                                      vlm_decisions=vlm_decisions,
-                                     item_id=stem)
+                                     item_id=stem,
+                                     verse_chunk=a.verse_chunk,
+                                     line_numbers=a.line_numbers,
+                                     table_eq=a.table_eq,
+                                     verse_kind=a.verse_kind,
+                                     forced=adj.get(stem), queue=queue if a.dump_queue else None,
+                                     page=stem, order=a.order,
+                                     queue_tables=a.queue_tables, order_forced=order_adj.get(stem),
+                                     order_dump=order_dump if a.dump_order else None)
         if not blocks:
             blocks = split_blocks(doc_md if len(norm(doc_md)) >= len(norm(min_md)) else min_md)
             stats["fallback-longer"] += 1
+        if a.norm_text:
+            blocks = [norm_fix(b) for b in blocks]
         (a.out / name).write_text("\n\n".join(blocks) + "\n", encoding="utf-8")
         tot.update(stats)
         rows.append({"item": stem, "n_docling": len(D or []), "n_mineru": len(M or []), "n_out": len(blocks),
@@ -974,6 +1331,16 @@ def main() -> int:
     keys = ["item", "n_docling", "n_mineru", "n_out"] + sorted(tot)
     with (a.out / "decisions.csv").open("w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=keys, restval=0); w.writeheader(); w.writerows(rows)
+    if a.dump_queue:
+        a.dump_queue.parent.mkdir(parents=True, exist_ok=True)
+        with a.dump_queue.open("w", encoding="utf-8") as f:
+            for r in queue:
+                f.write(json.dumps(r, ensure_ascii=False) + "\n")
+        print(f"queue: {len(queue)} records -> {a.dump_queue}")
+    if a.dump_order:
+        a.dump_order.parent.mkdir(parents=True, exist_ok=True)
+        a.dump_order.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in order_dump), encoding="utf-8")
+        print(f"order dump: {len(order_dump)} pages -> {a.dump_order}")
     print(f"pages={len(ids)} lam={a.lam} tau={a.tau} min_len={a.min_len} "
           f"table_pref={a.table_pref} formula_pref={a.formula_pref} "
           f"drop_docling={sorted(drop_d)} drop_mineru={sorted(drop_m)} garbage_fallback={a.garbage_fallback} "

@@ -56,8 +56,18 @@ def main() -> None:
     out = root / args.variant
     out.mkdir(exist_ok=True)
     versions = manifest["inference"].get("versions", {})
+    # O manifesto declara os providers congelados; sem a chave, mantém-se o par
+    # histórico docling/mineru para que os runs antigos continuem válidos.
+    providers = manifest.get("providers") or ["docling", "mineru"]
+    adapters = {"docling": DoclingServeDocument, "mineru": MineruDocument}
     for page in json.loads((root / "pages.json").read_text()):
-        for name, cls in (("docling", DoclingServeDocument), ("mineru", MineruDocument)):
+        for name in providers:
+            cls = adapters.get(name)
+            if cls is None:
+                raise ValueError(
+                    f"provider {name!r} não tem adaptador no replay_worker "
+                    f"(conhecidos: {sorted(adapters)})"
+                )
             raw = root / "raw" / name / f"{page['id']}.json"
             native_order = manifest["variants"][args.variant].get(f"{name}_native_order", False)
             options = {"native_order": True} if native_order else {}

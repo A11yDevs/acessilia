@@ -72,18 +72,24 @@ jobs:
       - name: Run complete test suite
         run: python -m pytest -m "not e2e" --junitxml=test-results.xml
 
+      - name: Run docstruct library test suite
+        working-directory: libs/docstruct
+        run: python -m pytest --junitxml=docstruct-test-results.xml
+
       - name: Reject unexpected skipped tests
         run: |
           python - <<'PY'
           from pathlib import Path
           from xml.etree import ElementTree
 
-          report = Path("test-results.xml")
-          root = ElementTree.parse(report).getroot()
-          skipped = sum(
-              int(suite.attrib.get("skipped", "0"))
-              for suite in root.iter("testsuite")
-          )
+          reports = [Path("test-results.xml"), Path("libs/docstruct/docstruct-test-results.xml")]
+          skipped = 0
+          for report in reports:
+              root = ElementTree.parse(report).getroot()
+              skipped += sum(
+                  int(suite.attrib.get("skipped", "0"))
+                  for suite in root.iter("testsuite")
+              )
           if skipped:
               raise SystemExit(
                   f"CI incompleto: {skipped} teste(s) foram pulado(s). "
