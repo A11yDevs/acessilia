@@ -4,6 +4,7 @@ Porta do Tree Differ v2 (PR #98, Dr.DocBench) como biblioteca pura.
 API principal: ``merge_blocks`` + ``blocks_from_provider``.
 """
 from docstruct.fusion.differ import merge_blocks
+from docstruct.fusion.flood import flood_guard
 from docstruct.fusion.noise import is_junk, quality
 from docstruct.fusion.types import DiffBlock, ProviderBlocks
 from docstruct.fusion.convert import block_to_diff
@@ -22,6 +23,7 @@ __all__ = [
     "block_to_diff",
     "chunk_verse",
     "extract_line_numbers",
+    "flood_guard",
     "is_junk",
     "line_number_chain",
     "merge_blocks",
