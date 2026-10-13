@@ -20,8 +20,22 @@ Pure document-structure processing core for Acessilia.
 | `docstruct.policy` | `FusionPolicy` (+ presets) |
 | `docstruct.fusion` | `merge_blocks`, `block_to_diff`, `DiffBlock`, `ProviderBlocks`, `quality`, `is_junk` |
 | `docstruct.fusion.xycut` | `xycut_order`, `count_columns`, `column_balance`, `reorder` — optional XY-cut reading order (`FusionPolicy.order_xycut`) |
+| `docstruct.fusion.verse` | `record_like`, `verse_lines`, `chunk_verse`, `split_box_rows`, `verse_blocks` |
+| `docstruct.fusion.line_numbers` | `line_number_chain`, `extract_line_numbers` |
+| `docstruct.fusion.flood` | `flood_guard` |
+| `docstruct.fusion.tailjoin` | `is_page_number`, `join_tail`, `page_number_position`, `tailjoin3` |
+| `docstruct.fusion.repetition` | `collapse`, `guard_page`, `is_blank_page`, `strip_comment` |
+| `docstruct.fusion.page_select` | `fuse`, `select_by_agreement`, `swap_low_agreement_pages`, `ratio` |
+| `docstruct.fusion.judge` | `debias`, `decide_pair`, `p2_from_logprobs`, `should_judge` |
+| `docstruct.fusion.adjudication` | `decide_v0`, `decide_v1`, `decide`, `filter_decision` |
+| `docstruct.fusion.oracle` | `oracle_page`, `best_score`, `summarize` |
+| `docstruct.fusion.hf_end` | `move_hf_to_end`, `move_body_hf_to_tail` |
+| `docstruct.fusion.table_specialist` | `extract_table`, `norm_table`, `select_table`, `select_greedy` |
+| `docstruct.text` | `normalize.norm`, `norm_fix.norm_fix`, `latex.normalize_latex` |
+| `docstruct.imaging.policy` | `upscale_factor`, `decide_orientation` (no PIL/cv2) |
+| `docstruct.evaluation.holdout` | `partition`, `score`, `evaluate_candidate` |
 
-Planned modules (phases 2–3): `text/`, `blocks/`, `regions/`, `tables/`, `math/`, `render/`, `validation.py`.
+Planned modules (phases 2–3): `blocks/`, `regions/`, `tables/`, `math/`, `render/`, `validation.py`.
 
 ## Fusion (`docstruct.fusion`)
 
