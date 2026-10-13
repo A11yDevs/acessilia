@@ -6,6 +6,17 @@ Base: v24-AOs (dev evalai_style_no_cdm 78.68; tune 79.13 / hold 76.91). Best on 
 Score: `python3 scripts/loop_score.py BASE RUN...` (split by document md5%3: hold=0). Accepted: Δtune ≥ +0.10, Δhold ≥ 0, no metric −0.3.
 Freeze: 2026-10-10 06:00 local. GPU only h100n2 + gpu_audit.
 
+The split and the acceptance criteria are implemented in
+`docstruct.evaluation.holdout` (`partition`, `score`, `evaluate_candidate`), so
+the discipline is testable and shared instead of reimplemented per script. The
+split is **by document**, not by page: pages of the same document are correlated,
+so splitting them would leak information.
+
+**A dev gain is not a result.** The observed dev→test gap is ~8 points, and TEDS
+did not transfer (dev +5.9 → test +0.2). Before promoting anything, confirm it on
+the leaderboard and run the frozen replay as the regression gate
+(`docs/drbench/experiments/RUNBOOK.md`).
+
 | # | hypothesis | variant | Δtune | Δhold | decision |
 |---|---|---|---|---|---|
 | 1 | merged paragraphs break the matcher → split the block into lines | split150 (loop_post --split-lines 150) | +0.10 | +0.07 | ACCEPTED (all 78.77; text +0.15 RO +0.11) — split1 −0.58/−1.17, split60 +0.09/+0.09 rejected |
