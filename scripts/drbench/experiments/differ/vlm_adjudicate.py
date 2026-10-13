@@ -10,7 +10,7 @@ Output feeds `tree_differ_v2 --adjudications`.
 
 Usage (inside a GPU job):
   python scripts/vlm_adjudicate.py --queue queue_crops.jsonl --out adjudications.jsonl \
-      --model Qwen/Qwen2.5-VL-7B-Instruct [--max-records 20000]
+      --model Qwen/Qwen3-VL-8B-Instruct [--max-records 20000]
 """
 import argparse
 import difflib
@@ -86,13 +86,22 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--queue", type=Path, required=True)
     ap.add_argument("--out", type=Path, required=True)
-    ap.add_argument("--model", default="Qwen/Qwen2.5-VL-7B-Instruct")
+    ap.add_argument("--model", default="Qwen/Qwen3-VL-8B-Instruct")
     ap.add_argument("--max-records", type=int, default=20000)
     ap.add_argument("--max-model-len", type=int, default=8192)
+    ap.add_argument("--gpu-memory-utilization", type=float, default=0.90)
+    ap.add_argument("--tensor-parallel-size", type=int, default=1)
+    # jobs 33371/33372: JIT do DeepGEMM/FlashInfer quebra no ptxas -> modo eager evita CUDA graphs/compilação
+    ap.add_argument("--enforce-eager", action="store_true")
+    # v24: tables go to the table specialist (a plain-text transcription would destroy the HTML table)
+    ap.add_argument("--skip-kinds", default="", help="+-list of block kinds to leave out (e.g. table)")
     a = ap.parse_args()
 
     recs = [json.loads(l) for l in a.queue.read_text(encoding="utf-8").splitlines() if l.strip()]
     recs = [r for r in recs if r.get("crop")]
+    if a.skip_kinds:
+        skip = set(a.skip_kinds.split("+"))
+        recs = [r for r in recs if not ({r.get("kind_d"), r.get("kind_m")} & skip)]
     if len(recs) > a.max_records:
         # prioritise content disputes by lowest similarity, then unilaterals by longest text
         pairs = sorted((r for r in recs if r["i"] >= 0 and r["j"] >= 0), key=lambda r: r.get("sim") or 0.0)
@@ -101,13 +110,28 @@ def main() -> int:
         recs = (pairs + unis)[: a.max_records]
     print(f"queue: {len(recs)} records "
           f"({Counter(r['cls'] for r in recs)})", flush=True)
+    print(f"model={a.model} max_model_len={a.max_model_len} "
+          f"gpu_mem={a.gpu_memory_utilization} tp={a.tensor_parallel_size}", flush=True)
 
     from vllm import LLM, SamplingParams
     # vLLM recusa file:// fora de allowed_local_media_path (job 33358)
     media_root = os.path.commonpath([os.path.dirname(os.path.abspath(r["crop"])) for r in recs])
-    llm = LLM(model=a.model, max_model_len=a.max_model_len, gpu_memory_utilization=0.85,
-              limit_mm_per_prompt={"image": 1}, enforce_eager=False,
-              allowed_local_media_path=media_root)
+    # Qwen3-VL: disable video to save VRAM; trust_remote_code for newer configs
+    llm_kwargs = dict(
+        model=a.model,
+        max_model_len=a.max_model_len,
+        gpu_memory_utilization=a.gpu_memory_utilization,
+        tensor_parallel_size=a.tensor_parallel_size,
+        limit_mm_per_prompt={"image": 1, "video": 0},
+        enforce_eager=a.enforce_eager,
+        allowed_local_media_path=media_root,
+        trust_remote_code=True,
+    )
+    try:
+        llm = LLM(**llm_kwargs)
+    except TypeError:
+        llm_kwargs.pop("trust_remote_code", None)
+        llm = LLM(**llm_kwargs)
     sampling = SamplingParams(temperature=0.0, max_tokens=1024)
 
     convs = []

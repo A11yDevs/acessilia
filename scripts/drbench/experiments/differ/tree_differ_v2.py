@@ -731,7 +731,8 @@ def merge_v2(D: list[dict], M: list[dict], *, lam: float, tau: float, min_len: i
              formula_text: bool = False, verse_chunk: int = 0, line_numbers: bool = False,
              table_eq: bool = False, verse_kind: str = "records",
              forced: dict | None = None, queue: list | None = None, page: str = "",
-             queue_sim: float = 0.85, order: str = "mineru") -> tuple[list[str], Counter]:
+             queue_sim: float = 0.85, order: str = "mineru", queue_tables: bool = False,
+             order_forced: list | None = None, order_dump: list | None = None) -> tuple[list[str], Counter]:
     stats: Counter = Counter()
     tail: list[str] = []
     if table_eq:
@@ -835,19 +836,22 @@ def merge_v2(D: list[dict], M: list[dict], *, lam: float, tau: float, min_len: i
             same_grp = d["kind"] == m["kind"] or {d["kind"], m["kind"]} <= set(TEXTISH)
             s = sim(d["text"], m["text"])
             cls = "agreed" if (same_grp and s >= queue_sim) else "disputed-content" if same_grp else "disputed-type"
-            if cls == "agreed" or (cls == "disputed-content" and min(len(d["md"]), len(m["md"])) < 40):
+            is_tab = queue_tables and "table" in (d["kind"], m["kind"])  # v24: table specialist sees every table
+            if not is_tab and (cls == "agreed" or (cls == "disputed-content" and min(len(d["md"]), len(m["md"])) < 40)):
                 continue
             queue.append({"page": page, "i": i, "j": j, "cls": cls, "kind_d": d["kind"], "kind_m": m["kind"],
                           "cost": round(float(cost[i, j]), 4), "sim": round(s, 4),
                           "box_d": d["box"], "box_m": m["box"], "md_d": d["md"], "md_m": m["md"]})
         for i, d in enumerate(D):
-            if i in match_d2m or d["kind"] != "text" or len(d["md"]) < 60:
+            if i in match_d2m or not ((d["kind"] == "text" and len(d["md"]) >= 60) or
+                                      (queue_tables and d["kind"] == "table")):
                 continue
             queue.append({"page": page, "i": i, "j": -1, "cls": "unilateral-docling", "kind_d": d["kind"],
                           "kind_m": None, "cost": None, "sim": None, "box_d": d["box"], "box_m": None,
                           "md_d": d["md"], "md_m": None})
         for j, m in enumerate(M):
-            if j in matched_m or m["kind"] != "text" or len(m["md"]) < 60:
+            if j in matched_m or not ((m["kind"] == "text" and len(m["md"]) >= 60) or
+                                      (queue_tables and m["kind"] == "table")):
                 continue
             queue.append({"page": page, "i": -1, "j": j, "cls": "unilateral-mineru", "kind_d": None,
                           "kind_m": m["kind"], "cost": None, "sim": None, "box_d": None, "box_m": m["box"],
@@ -918,7 +922,7 @@ def merge_v2(D: list[dict], M: list[dict], *, lam: float, tau: float, min_len: i
         return pick_text(d, m)
 
     # skeleton: MinerU order, matched pairs resolved
-    seq: list[tuple[float, float, str, object]] = []  # (order key, sub key, md, box)
+    seq: list[tuple[float, float, str, object, tuple]] = []  # (order key, sub key, md, box, block id)
     m2d = {j: i for i, j in match_d2m.items()}
     for j, m in enumerate(M):
         if j in m2d:
@@ -934,7 +938,7 @@ def merge_v2(D: list[dict], M: list[dict], *, lam: float, tau: float, min_len: i
             else:
                 md = m["md"]
             stats["unilateral-mineru"] += 1
-        seq.append((float(j), 0.0, md, m["box"]))
+        seq.append((float(j), 0.0, md, m["box"], ("m", j)))
 
     # insert unmatched Docling blocks next to the nearest MinerU block
     centers = [center(m["box"]) for m in M]
@@ -960,7 +964,7 @@ def merge_v2(D: list[dict], M: list[dict], *, lam: float, tau: float, min_len: i
         cx, cy = center(d["box"])
         j = int(np.argmin([(cx - x) ** 2 + (cy - y) ** 2 for x, y in centers]))
         above = cy < centers[j][1]
-        seq.append((float(j) - 0.5 if above else float(j) + 0.5, cy, d["md"], d["box"]))
+        seq.append((float(j) - 0.5 if above else float(j) + 0.5, cy, d["md"], d["box"], ("d", i)))
         stats["unilateral-docling"] += 1
     seq.sort(key=lambda t: (t[0], t[1]))
     if order == "xy" and seq and all(t[3] for t in seq):
@@ -969,7 +973,19 @@ def merge_v2(D: list[dict], M: list[dict], *, lam: float, tau: float, min_len: i
         seq = [seq[i] for i in perm]
     elif order == "xy":
         stats["order-xy-skipped-nobox"] += 1
-    return [md for _, _, md, _ in seq] + tail, stats
+    if order_dump is not None and len(seq) >= 3 and all(t[3] for t in seq):
+        # v24 reading-order adjudication: blocks in skeleton order + XY-cut alternative, keyed by block id
+        order_dump.append({"page": page, "keys": [list(t[4]) for t in seq], "boxes": [t[3] for t in seq],
+                           "text": [t[2][:80] for t in seq], "xy": xy_order([t[3] for t in seq])})
+    if order_forced:
+        rank = {tuple(k): r for r, k in enumerate(order_forced)}
+        keyed, last = [], -1.0
+        for n, t in enumerate(seq):  # blocks unknown to the decision stay right after their predecessor
+            last = rank.get(t[4], last + 1e-3)
+            keyed.append((last, n, t))
+        seq = [t for *_, t in sorted(keyed)]
+        stats["order-forced"] += 1
+    return [t[2] for t in seq] + tail, stats
 
 
 def main() -> int:
@@ -1053,6 +1069,12 @@ def main() -> int:
                          "NBSP, line-end hyphenation, duplicate spaces)")
     ap.add_argument("--order", choices=["mineru", "xy"], default="mineru",
                     help="final block order: MinerU skeleton (default) or recursive XY-cut on bboxes")
+    ap.add_argument("--queue-tables", action="store_true",
+                    help="v24: dump every table block (matched or unilateral) into the queue for the table specialist")
+    ap.add_argument("--dump-order", type=Path, default=None,
+                    help="v24: write per-page final block ids/boxes (+XY-cut alternative) for order adjudication")
+    ap.add_argument("--order-adjudications", type=Path, default=None,
+                    help="v24: JSONL {page, order: [[side, idx], ...]} forcing the final block order")
     ap.add_argument("--adjudications", type=Path, default=None,
                     help="JSONL of VLM decisions {page,i,j,action: select_a|select_b|drop|replace[,text]} forcing picks")
     a = ap.parse_args()
@@ -1074,6 +1096,14 @@ def main() -> int:
                 act = ("replace", r.get("text") or "") if r["action"] == "replace" else r["action"]
                 adj.setdefault(r["page"], {})[(r["i"], r["j"])] = act
         print(f"adjudications: {sum(len(v) for v in adj.values())} decisions over {len(adj)} pages")
+    order_adj: dict[str, list] = {}
+    if a.order_adjudications:
+        for line in a.order_adjudications.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                r = json.loads(line)
+                order_adj[r["page"]] = [tuple(k) for k in r["order"]]
+        print(f"order adjudications: {len(order_adj)} pages")
+    order_dump: list = []
     queue: list = []
     rows, tot = [], Counter()
     for name in ids:
@@ -1106,7 +1136,9 @@ def main() -> int:
                                      line_numbers=a.line_numbers, table_eq=a.table_eq,
                                      verse_kind=a.verse_kind,
                                      forced=adj.get(stem), queue=queue if a.dump_queue else None,
-                                     page=stem, queue_sim=a.queue_sim, order=a.order)
+                                     page=stem, queue_sim=a.queue_sim, order=a.order,
+                                     queue_tables=a.queue_tables, order_forced=order_adj.get(stem),
+                                     order_dump=order_dump if a.dump_order else None)
         if not blocks:
             blocks = split_blocks(doc_md if len(norm(doc_md)) >= len(norm(min_md)) else min_md)
             stats["fallback-longer"] += 1
@@ -1125,6 +1157,10 @@ def main() -> int:
             for r in queue:
                 f.write(json.dumps(r, ensure_ascii=False) + "\n")
         print(f"queue: {len(queue)} records -> {a.dump_queue}")
+    if a.dump_order:
+        a.dump_order.parent.mkdir(parents=True, exist_ok=True)
+        a.dump_order.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in order_dump), encoding="utf-8")
+        print(f"order dump: {len(order_dump)} pages -> {a.dump_order}")
     print(f"pages={len(ids)} lam={a.lam} tau={a.tau} min_len={a.min_len} "
           f"table_pref={a.table_pref} formula_pref={a.formula_pref} "
           f"drop_docling={sorted(drop_d)} drop_mineru={sorted(drop_m)} garbage_fallback={a.garbage_fallback} "
