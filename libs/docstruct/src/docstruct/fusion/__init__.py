@@ -17,6 +17,14 @@ from docstruct.fusion.adjudication import (
 from docstruct.fusion.differ import merge_blocks
 from docstruct.fusion.flood import flood_guard
 from docstruct.fusion.noise import is_junk, quality
+from docstruct.fusion.oracle import (
+    best_score,
+    gt_text_blocks,
+    kind_of,
+    oracle_page,
+    page_scores,
+    summarize,
+)
 from docstruct.fusion.types import DiffBlock, ProviderBlocks
 from docstruct.fusion.convert import block_to_diff
 from docstruct.fusion.judge import (
@@ -63,6 +71,7 @@ __all__ = [
     "ProviderBlocks",
     "block_to_diff",
     "blocks",
+    "best_score",
     "chunk_verse",
     "clean_transcription",
     "collapse",
@@ -76,19 +85,23 @@ __all__ = [
     "flood_guard",
     "fuse",
     "guard_page",
+    "gt_text_blocks",
     "is_blank_page",
     "is_junk",
     "is_page_number",
     "is_struct",
     "join_tail",
+    "kind_of",
     "line_number_chain",
     "max_run",
     "merge_blocks",
     "norm_text",
     "nrm",
+    "oracle_page",
     "page_agreement",
     "page_norm",
     "page_number_position",
+    "page_scores",
     "p2_from_logprobs",
     "quality",
     "ratio",
@@ -97,6 +110,7 @@ __all__ = [
     "should_judge",
     "split_box_rows",
     "strip_comment",
+    "summarize",
     "swap_low_agreement_pages",
     "swap_norm",
     "tail_start",
