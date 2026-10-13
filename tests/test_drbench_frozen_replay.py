@@ -250,3 +250,106 @@ def test_non_boolean_normalization_mode_fails_before_creating_run(spec, tmp_path
     with pytest.raises(ValueError, match="must be a boolean"):
         freeze(spec, tmp_path / "invalid-mode")
     assert not (tmp_path / "invalid-mode").exists()
+
+
+# ---------------------------------------------------------------------------
+# Lockfile: the environment must be reconstructible, not just recorded
+# ---------------------------------------------------------------------------
+
+LOCK_CONTENT = """\
+version = 1
+revision = 3
+requires-python = ">=3.11, <3.14"
+
+[[package]]
+name = "acessilia-docstruct"
+version = "0.1.0"
+source = { editable = "libs/docstruct" }
+
+[[package]]
+name = "agno"
+version = "3.0.5"
+"""
+
+
+@pytest.fixture
+def spec_with_lock(tmp_path):
+    path = spec.__wrapped__(tmp_path)
+    lock = tmp_path / "uv.lock"
+    lock.write_text(LOCK_CONTENT)
+    data = json.loads(path.read_text())
+    data["lockfile"] = str(lock)
+    path.write_text(json.dumps(data))
+    return path
+
+
+def test_lockfile_is_frozen_as_evidence(spec_with_lock, tmp_path):
+    out = tmp_path / "run"
+    manifest = freeze(spec_with_lock, out)
+
+    assert manifest["lockfile"]["name"] == "uv.lock"
+    assert len(manifest["lockfile"]["sha256"]) == 64
+    frozen = out / "evidence" / "lock-uv.lock"
+    assert frozen.is_file()
+    assert frozen.read_text() == LOCK_CONTENT
+    assert manifest["input_hashes"]["evidence/lock-uv.lock"] == manifest["lockfile"]["sha256"]
+
+
+def test_missing_lockfile_fails_the_freeze(spec, tmp_path):
+    data = json.loads(spec.read_text())
+    data["lockfile"] = str(tmp_path / "nope.lock")
+    spec.write_text(json.dumps(data))
+
+    with pytest.raises(FileNotFoundError, match="Lockfile"):
+        freeze(spec, tmp_path / "run")
+
+
+def test_lock_versions_are_parsed(spec_with_lock, tmp_path):
+    from scripts.drbench.experiments.eval.frozen_replay import _lock_versions
+
+    versions = _lock_versions(tmp_path / "uv.lock")
+    assert versions == {"acessilia-docstruct": "0.1.0", "agno": "3.0.5"}
+
+
+def test_environment_check_reports_mismatches(spec_with_lock, tmp_path):
+    from scripts.drbench.experiments.eval.frozen_replay import verify_environment
+
+    out = tmp_path / "run"
+    manifest = freeze(spec_with_lock, out)
+    report = verify_environment(out, manifest)
+
+    assert report["checked"] is True
+    assert report["lockfile"] == "uv.lock"
+    assert report["locked_packages"] == 2
+    # "agno" está instalado no ambiente de teste; a versão pode divergir do lock
+    # sintético, então só verificamos que o relatório é coerente.
+    assert isinstance(report["mismatches"], list)
+
+
+def test_environment_check_without_lockfile_is_a_no_op(tmp_path):
+    from scripts.drbench.experiments.eval.frozen_replay import verify_environment
+
+    report = verify_environment(tmp_path, {})
+    assert report == {"lockfile": None, "checked": False, "mismatches": []}
+
+
+def test_changed_frozen_lockfile_is_detected(spec_with_lock, tmp_path):
+    from scripts.drbench.experiments.eval.frozen_replay import verify_environment
+
+    out = tmp_path / "run"
+    manifest = freeze(spec_with_lock, out)
+    (out / "evidence" / "lock-uv.lock").write_text("tampered")
+
+    with pytest.raises(ValueError, match="Lockfile congelado mudou"):
+        verify_environment(out, manifest)
+
+
+def test_missing_frozen_lockfile_is_detected(spec_with_lock, tmp_path):
+    from scripts.drbench.experiments.eval.frozen_replay import verify_environment
+
+    out = tmp_path / "run"
+    manifest = freeze(spec_with_lock, out)
+    (out / "evidence" / "lock-uv.lock").unlink()
+
+    with pytest.raises(ValueError, match="Lockfile congelado ausente"):
+        verify_environment(out, manifest)

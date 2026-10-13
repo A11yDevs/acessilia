@@ -28,7 +28,8 @@ Create a local JSON specification with paths relative to the specification file
       "policy": "v12", "fusion_args": []
     }
   },
-  "evidence_files": []
+  "evidence_files": [],
+  "lockfile": "uv.lock"
 }
 ```
 
@@ -52,6 +53,13 @@ a candidate before freezing it; otherwise its edits are not evaluated.
 Model identity in `inference` is supplied evidence, not an automatic assertion
 that those model weights were loaded. Preserve extraction logs, options and locks
 through `evidence_files`; new inference should additionally record actual weights.
+
+`lockfile` points at the environment lock (`uv.lock`). It is frozen into
+`evidence/lock-<name>` and its SHA-256 is recorded in the manifest. The replay
+compares the installed package versions against the lock and writes the result
+to `manifest["environment"]`; a mismatch is reported, not silently ignored.
+Recording `importlib.metadata.distributions()` at run time is *registration*, not
+pinning — without the lockfile the environment cannot be reconstructed.
 
 ## Replay, fusion and official evaluation
 

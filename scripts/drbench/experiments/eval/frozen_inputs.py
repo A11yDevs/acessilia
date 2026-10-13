@@ -165,6 +165,21 @@ def freeze(spec_path: Path, output: Path, limit: int = 0) -> dict:
             target = evidence / f"{index:02d}-{source.name}"
             target.write_bytes(source.read_bytes())
             manifest["input_hashes"][target.relative_to(output).as_posix()] = sha256(target)
+        # The lockfile pins the environment; without it the recorded package
+        # versions cannot be reconstructed. It is frozen as evidence and its
+        # hash is recorded so a replay can detect a changed environment.
+        lockfile = spec.get("lockfile")
+        if lockfile:
+            source = resolve_path(base, lockfile)
+            if not source.is_file():
+                raise FileNotFoundError(f"Lockfile não encontrado: {source}")
+            target = evidence / f"lock-{source.name}"
+            target.write_bytes(source.read_bytes())
+            manifest["input_hashes"][target.relative_to(output).as_posix()] = sha256(target)
+            manifest["lockfile"] = {
+                "name": source.name,
+                "sha256": sha256(target),
+            }
         manifest["status"] = "frozen"
     except Exception as exc:
         manifest["status"] = "freeze_failed"
