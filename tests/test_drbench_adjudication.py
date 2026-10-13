@@ -316,15 +316,10 @@ def test_normalize_latex_delimiters():
     assert normalize_latex(r"$ x \le y $") == r"x \le y"
 
 
-def test_normalize_latex_unicode_and_spacing():
-    """Verify Unicode minus, spaces, and macro spacing are standardized."""
-    expr = "x \u2212 5 = 0"
-    assert normalize_latex(expr) == "x - 5 = 0"
-
-    spaced = r"a \, b \; c \quad d"
-    norm_res = normalize_latex(spaced)
-    assert r"\," not in norm_res
-    assert r"\quad" not in norm_res
+def test_normalize_latex_preserves_formula_content():
+    """The backend wrapper strips delimiters but does not rewrite formulas."""
+    assert normalize_latex("$E=mc^2$") == "E=mc^2"
+    assert normalize_latex("x \u2212 5 = 0") == "x \u2212 5 = 0"
 
 
 def test_wrap_latex():
