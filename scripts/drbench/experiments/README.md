@@ -67,6 +67,9 @@ zip hashes and the composition of each run. The run outputs live outside the rep
 cluster scratch), so this file is what makes the performance work resumable. It holds no ground
 truth and no predictions.
 
+`docs/drbench/experiments/RUNBOOK.md` is the single entry point for resuming the performance work:
+rebuild the environment, freeze a run, replay it, compare, and the GPU cost of each step.
+
 ## Final differ arguments (submission differ-v13-pnt-ft-20260918)
 
 ```
