@@ -164,23 +164,38 @@ def limpar_tokens_expirados(dias: int = TOKEN_EXPIRY_DAYS):
         conn = _get_connection()
         cursor = conn.cursor()
         try:
+            conn.execute("BEGIN IMMEDIATE")
+            cutoff = f"-{dias} days"
             cursor.execute(
-                "SELECT output_dir FROM download_tokens WHERE criado_em < datetime('now', '-{} days')".format(dias)
+                "SELECT DISTINCT output_dir FROM download_tokens WHERE criado_em < datetime('now', ?)",
+                (cutoff,),
             )
-            rows = cursor.fetchall()
-        finally:
-            cursor.close()
-        for row in rows:
-            output_dir = Path(row["output_dir"])
-            if output_dir.exists():
-                if str(output_dir).startswith(str(settings.temp_dir)) or str(output_dir).startswith(str(settings.data_dir / "output")):
+            expired_dirs = [Path(row["output_dir"]) for row in cursor.fetchall()]
+            cursor.execute(
+                "SELECT DISTINCT output_dir FROM download_tokens WHERE criado_em >= datetime('now', ?)",
+                (cutoff,),
+            )
+            active_dirs = {Path(row["output_dir"]).resolve() for row in cursor.fetchall()}
+            roots = (settings.temp_dir.resolve(), (settings.data_dir / "output").resolve())
+            for output_dir in expired_dirs:
+                resolved = output_dir.resolve()
+                if output_dir.is_symlink() or not any(root in resolved.parents for root in roots):
+                    continue
+                if any(
+                    resolved == active or resolved in active.parents or active in resolved.parents
+                    for active in active_dirs
+                ):
+                    continue
+                if output_dir.exists():
                     shutil.rmtree(output_dir, ignore_errors=True)
                     logger.debug(t(LOG_OUTPUT_DIR_REMOVED).format(name=output_dir))
-        cursor = conn.cursor()
-        try:
             cursor.execute(
-                "DELETE FROM download_tokens WHERE criado_em < datetime('now', '-{} days')".format(dias)
+                "DELETE FROM download_tokens WHERE criado_em < datetime('now', ?)",
+                (cutoff,),
             )
             conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
         finally:
             cursor.close()
