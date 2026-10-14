@@ -20,6 +20,7 @@ PAIRS = (
     ("drbench.md", "drbench.pt-br.md"),
     ("pmv_agno_pddl.md", "pmv_agno_pddl.pt-br.md"),
     ("toolbox_integration.md", "toolbox_integration.pt-br.md"),
+    ("staging_consistency.md", "staging_consistency.pt-br.md"),
 )
 
 # Módulos que a documentação afirma existir.

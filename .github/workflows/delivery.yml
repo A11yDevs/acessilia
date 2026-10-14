@@ -123,6 +123,12 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: ${{ steps.tags.outputs.tags }}
+          # The published image must carry the same build identity it was
+          # verified with; otherwise /api/v1/health reports an empty
+          # git_commit/image_tag and the running commit cannot be proven.
+          build-args: |
+            GIT_COMMIT=${{ inputs.sha }}
+            IMAGE_TAG=${{ steps.tags.outputs.branch }}
           labels: |
             org.opencontainers.image.title=acessilia
             org.opencontainers.image.description=Pipeline para extracao e acessibilidade de documentos
