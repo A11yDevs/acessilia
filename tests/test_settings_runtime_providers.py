@@ -11,7 +11,7 @@ from backend.config.settings import Settings
         ("fusion_hybrid_provider", "FUSION_HYBRID_PROVIDER", "mineru-hyb"),
         ("toolbox_page_ocr_provider", "TOOLBOX_PAGE_OCR_PROVIDER", "qwen3-vl-page"),
         ("toolbox_adjudicate_provider", "TOOLBOX_ADJUDICATE_PROVIDER", "qwen3-vl-judge"),
-        ("toolbox_orientation_provider", "TOOLBOX_ORIENTATION_PROVIDER", "rapidocr-orientation"),
+        ("toolbox_orientation_provider", "TOOLBOX_ORIENTATION_PROVIDER", "rapidocr-orient"),
     ],
 )
 def test_provider_environment_is_read_at_instantiation(
