@@ -176,19 +176,8 @@ def limpar_tokens_expirados(dias: int = TOKEN_EXPIRY_DAYS):
                 (cutoff,),
             )
             active_dirs = {Path(row["output_dir"]).resolve() for row in cursor.fetchall()}
-            roots = (settings.temp_dir.resolve(), (settings.data_dir / "output").resolve())
             for output_dir in expired_dirs:
-                resolved = output_dir.resolve()
-                if output_dir.is_symlink() or not any(root in resolved.parents for root in roots):
-                    continue
-                if any(
-                    resolved == active or resolved in active.parents or active in resolved.parents
-                    for active in active_dirs
-                ):
-                    continue
-                if output_dir.exists():
-                    shutil.rmtree(output_dir, ignore_errors=True)
-                    logger.debug(t(LOG_OUTPUT_DIR_REMOVED).format(name=output_dir))
+                _remove_unreferenced_output_directory(output_dir, active_dirs)
             cursor.execute(
                 "DELETE FROM download_tokens WHERE criado_em < datetime('now', ?)",
                 (cutoff,),
@@ -199,3 +188,39 @@ def limpar_tokens_expirados(dias: int = TOKEN_EXPIRY_DAYS):
             raise
         finally:
             cursor.close()
+
+
+def _remove_unreferenced_output_directory(output_dir: Path, active_dirs: set[Path]) -> bool:
+    resolved = output_dir.resolve()
+    roots = (settings.temp_dir.resolve(), (settings.data_dir / "output").resolve())
+    if output_dir.is_symlink() or not any(root in resolved.parents for root in roots):
+        return False
+    if any(
+        resolved == active or resolved in active.parents or active in resolved.parents
+        for active in active_dirs
+    ):
+        return False
+    if not output_dir.is_dir():
+        return False
+    shutil.rmtree(output_dir)
+    logger.debug(t(LOG_OUTPUT_DIR_REMOVED).format(name=output_dir))
+    return True
+
+
+def remove_unreferenced_output_directory(output_dir: Path) -> bool:
+    """Serialize retention checks and deletion with token creation, including other processes."""
+    with _connection_lock:
+        conn = _get_connection()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            rows = conn.execute(
+                "SELECT DISTINCT output_dir FROM download_tokens WHERE criado_em >= datetime('now', ?)",
+                (f"-{TOKEN_EXPIRY_DAYS} days",),
+            ).fetchall()
+            active_dirs = {Path(row["output_dir"]).resolve() for row in rows}
+            removed = _remove_unreferenced_output_directory(output_dir, active_dirs)
+            conn.commit()
+            return removed
+        except Exception:
+            conn.rollback()
+            raise

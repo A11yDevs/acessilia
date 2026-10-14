@@ -7,6 +7,16 @@ import pytest
 from backend.config.settings import settings
 from backend.services import cleanup_service
 from backend.services.cleanup_service import _clean_output_directory
+from backend.services import download_token_service as tokens
+
+
+@pytest.fixture(autouse=True)
+def isolate_token_connection(monkeypatch):
+    monkeypatch.setattr(tokens, "_connection", None)
+    yield
+    if tokens._connection is not None:
+        tokens._connection.close()
+        tokens._connection = None
 
 
 def _create_aged_output(output_dir, name, age_seconds):
@@ -40,6 +50,81 @@ def test_output_cleanup_removes_results_older_than_seven_days(monkeypatch, tmp_p
     assert not job_dir.exists()
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("reference", ["same", "alias", "child", "parent"])
+async def test_age_cleanup_preserves_valid_download_references(monkeypatch, tmp_path, reference):
+    monkeypatch.setattr(settings, "data_dir", tmp_path)
+    job_dir = _create_aged_output(tmp_path / "output", "old-result", 8 * 86400)
+    active = job_dir
+    if reference == "child":
+        active = job_dir / "child"
+        active.mkdir()
+        (active / "resultado.txt").write_text("result", encoding="utf-8")
+        old = time.time() - 8 * 86400
+        for path in (active / "resultado.txt", active, job_dir):
+            os.utime(path, (old, old))
+    elif reference == "parent":
+        active = job_dir.parent
+        (active / "resultado.txt").write_text("result", encoding="utf-8")
+    elif reference == "alias":
+        active = job_dir / ".." / "old-result"
+    token = await tokens.criar_token(active, "resultado", formats=["txt"])
+
+    _clean_output_directory()
+
+    assert job_dir.exists()
+    assert await tokens.obter_info_token(token) is not None
+
+
+@pytest.mark.asyncio
+async def test_age_cleanup_removes_expired_unreferenced_directory(monkeypatch, tmp_path):
+    monkeypatch.setattr(settings, "data_dir", tmp_path)
+    job_dir = _create_aged_output(tmp_path / "output", "expired-result", 8 * 86400)
+    token = await tokens.criar_token(job_dir, "resultado", formats=["txt"])
+    connection = tokens._get_connection()
+    connection.execute(
+        "UPDATE download_tokens SET criado_em = datetime('now', '-8 days') WHERE token = ?",
+        (token,),
+    )
+    connection.commit()
+
+    _clean_output_directory()
+
+    assert not job_dir.exists()
+
+
+@pytest.mark.asyncio
+async def test_cleanup_walk_does_not_block_event_loop(monkeypatch):
+    import threading
+
+    entered, release = threading.Event(), threading.Event()
+
+    def slow_walk(*args):
+        entered.set()
+        assert release.wait(2)
+
+    async def noop():
+        return None
+
+    monkeypatch.setattr(cleanup_service, "_clean_temp_directory", slow_walk)
+    monkeypatch.setattr(cleanup_service, "_clean_output_directory", lambda: None)
+    monkeypatch.setattr(cleanup_service, "_clean_in_memory_statuses", lambda: None)
+    monkeypatch.setattr(cleanup_service, "limpar_tokens_expirados", noop)
+    task = asyncio.create_task(cleanup_service.periodic_cleanup())
+    try:
+        for _ in range(100):
+            await asyncio.sleep(0.005)
+            if entered.is_set():
+                break
+        assert entered.is_set()
+        assert not task.done()
+    finally:
+        release.set()
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+
 def test_periodic_cleanup_removes_expired_tokens(monkeypatch):
     calls = []
 
@@ -49,7 +134,7 @@ def test_periodic_cleanup_removes_expired_tokens(monkeypatch):
     async def stop_after_first_cycle(_interval):
         raise asyncio.CancelledError
 
-    monkeypatch.setattr(cleanup_service, "_clean_temp_directory", lambda: None)
+    monkeypatch.setattr(cleanup_service, "_clean_temp_directory", lambda *args: None)
     monkeypatch.setattr(cleanup_service, "_clean_output_directory", lambda: None)
     monkeypatch.setattr(cleanup_service, "limpar_tokens_expirados", remove_expired_tokens)
     monkeypatch.setattr(cleanup_service.asyncio, "sleep", stop_after_first_cycle)
