@@ -6,7 +6,10 @@ document.adjudicate.region e image.page.orient.
 """
 from __future__ import annotations
 
+import json
+import re
 from pathlib import Path
+from urllib.parse import unquote_plus
 
 import httpx
 import pytest
@@ -22,6 +25,18 @@ from backend.tools.toolbox_orientation_client import ToolboxOrientationClient
 from backend.tools.toolbox_page_ocr_client import ToolboxPageOcrClient
 
 FIXTURE_IMAGE = Path(__file__).parent / "fixtures" / "tutorials" / "java-oo-3pgs.pdf"
+
+
+def _parameters_of(request: httpx.Request) -> str:
+    """The `parameters` JSON a request carried, whether multipart or urlencoded."""
+    raw = request.content.decode(errors="ignore").replace("\r", "").replace("\n", "")
+    pattern = r'parameters["\s:=]{0,4}(\{[^}]*\})'
+    for body in (raw, unquote_plus(raw)):
+        match = re.search(pattern, body)
+        if match:
+            return match.group(1)
+    raise AssertionError(f"no parameters field in request body: {raw[:200]!r}")
+
 
 PAGE_OCR_RESPONSE = {
     "status": "succeeded",
@@ -236,6 +251,11 @@ async def test_orientation_direct_upload(respx_mock, orientation):
     assert result["status"] == "succeeded"
     assert result["document"]["angle"] == 90
 
+    # The capability contract is `return_image`; `tall_thr` belongs to the
+    # local Dr.DocBench RapidOCR script and is not a provider parameter.
+    parameters = _parameters_of(route.calls.last.request)
+    assert json.loads(parameters) == {"return_image": False}
+
 
 @pytest.mark.asyncio
 async def test_orientation_by_artifact_id(respx_mock, orientation):
@@ -247,6 +267,22 @@ async def test_orientation_by_artifact_id(respx_mock, orientation):
     result = await orientation.detect(artifact_id="sha256:abc123")
 
     assert result["status"] == "succeeded"
+
+    parameters = _parameters_of(route.calls.last.request)
+    assert json.loads(parameters) == {"return_image": False}
+
+
+@pytest.mark.asyncio
+async def test_orientation_return_image_is_forwarded(respx_mock, orientation):
+    route = respx_mock.post(
+        "http://localhost:8002/v1/capabilities/image.page.orient:execute"
+    )
+    route.return_value = httpx.Response(200, json=ORIENTATION_RESPONSE)
+
+    await orientation.detect(artifact_id="sha256:abc123", return_image=True)
+
+    parameters = _parameters_of(route.calls.last.request)
+    assert json.loads(parameters) == {"return_image": True}
 
 
 @pytest.mark.asyncio

@@ -76,15 +76,18 @@ provar seu commit depois de S1; a Toolbox não consegue.
 Contra a Toolbox em execução (26 capacidades, 25 providers):
 
 ```
-7 contract violation(s):
+5 contract violation(s):
   - core consumes capability 'document.adjudicate.page'  but the Toolbox does not expose it
   - core consumes capability 'document.adjudicate.region' but the Toolbox does not expose it
   - core consumes capability 'document.ocr.page'          but the Toolbox does not expose it
-  - core consumes capability 'document.orientation.detect' but the Toolbox does not expose it
   - core default TOOLBOX_ADJUDICATE_PROVIDER   -> provider 'qwen3-vl-judge'      not registered
   - core default TOOLBOX_PAGE_OCR_PROVIDER     -> provider 'qwen3-vl-page'       not registered
-  - core default TOOLBOX_ORIENTATION_PROVIDER  -> provider 'rapidocr-orientation' not registered
 ```
+
+No momento da captura este bloco listava sete violações. As duas entradas de
+orientação foram resolvidas apontando o cliente para `image.page.orient` /
+`rapidocr-orient`, a capacidade e o provider que a Toolbox de fato expõe; os
+números acima são os pós-correção, e o comando abaixo os reproduz.
 
 Reproduza com:
 
@@ -92,10 +95,9 @@ Reproduza com:
 python scripts/check_capability_contract.py --snapshot tests/fixtures/toolbox-contract.json
 ```
 
-As quatro capacidades ausentes são os clientes da PR #125
-(`toolbox_page_ocr_client.py`, `toolbox_adjudicate_client.py`,
-`toolbox_orientation_client.py`), que não têm chamador de produção. O perfil de
-providers VLM que os serviria existe apenas como
+As três capacidades ausentes são os clientes da PR #125
+(`toolbox_page_ocr_client.py`, `toolbox_adjudicate_client.py`), que não têm
+chamador de produção. O perfil de providers VLM que os serviria existe apenas como
 `scripts/drbench/experiments/slurm/providers-config-vlm.yaml` dentro do repositório do
 *core*, nunca no catálogo da Toolbox de onde a imagem é construída.
 
@@ -135,7 +137,7 @@ Duas observações:
   (`document.structure.extract`, `document.layout.analyze`, `document.ocr`,
   `math.recognize`, `math.convert`, `math.verbalize`, `pdf.split`, `pdf.render`,
   `media.inspect`, `artifact.store`, `artifact.retrieve`, `dataset.*`) existem todas.
-- As sete capacidades da Toolbox sem cliente no core são uma decisão de produto, não uma
+- As seis capacidades da Toolbox sem cliente no core são uma decisão de produto, não uma
   falha de implantação; estão rastreadas em `docs/toolbox_capability_matrix.md`.
 
 ## Próximos passos
