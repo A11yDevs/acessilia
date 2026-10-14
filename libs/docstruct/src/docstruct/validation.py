@@ -11,6 +11,7 @@ import re
 from typing import Any
 
 from docstruct.profiles import OUTPUT_PROFILES
+from docstruct.sections import explicit_section_title
 from docstruct.tables.ast import effective_section_row_widths, row_header_column_count
 from docstruct.text.sanitize import contains_markdown_artifacts, contains_prompt_leak
 
@@ -114,17 +115,12 @@ def validate_canonical_document(document: dict[str, Any]) -> list[str]:
             blocks = section.get("blocks", [])
             if section.get("title"):
                 section_id = section.get("id")
-                if section_id:
+                explicit_title = explicit_section_title(section)
+                if section_id and (explicit_title is None or explicit_title.get("id") != section_id):
                     if section_id in ids:
                         errors.append(Finding(MSG_DUPLICATE_ID, block_id=section_id))
                     ids.add(section_id)
-                first = blocks[0] if blocks else {}
-                explicit_title = (
-                    first.get("type") == "heading"
-                    and first.get("text") == section["title"]
-                    and first.get("level", 1) == section.get("level", 1)
-                )
-                if not explicit_title:
+                if explicit_title is None:
                     headings.append(int(section.get("level", 1)))
             walk_blocks(blocks)
             walk_sections(section.get("children", []))

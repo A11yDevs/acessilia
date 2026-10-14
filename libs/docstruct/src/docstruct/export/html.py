@@ -13,6 +13,7 @@ from xml.etree import ElementTree
 
 from docstruct.export.filters import apply_output_profile_filter
 from docstruct.profiles import normalize_profile
+from docstruct.sections import section_body_blocks, section_title_alias
 from docstruct.tables.ast import split_header_and_body, table_ast_from_block
 
 
@@ -43,12 +44,13 @@ def _collect_section(section: dict[str, Any]) -> list[dict[str, Any]]:
                 "level": section.get("level", 1),
                 "title": section.get("title", ""),
                 "id": section.get("id", ""),
+                "title_alias": section_title_alias(section),
             }
         ]
         if section.get("title")
         else []
     )
-    blocks.extend(section.get("blocks", []))
+    blocks.extend(section_body_blocks(section))
     for child in section.get("children", []):
         blocks.extend(_collect_section(child))
     return blocks
@@ -134,7 +136,9 @@ def _render_block(
     block_id = escape(block.get("id", ""))
     if block_type == "heading":
         level = min(max(int(block.get("level", 1)), 1), 6)
-        return f'<h{level} id="{block_id}">{escape(block.get("title", block.get("text", "")))}</h{level}>'
+        alias = block.get("title_alias", "")
+        anchor = f'<span id="{escape(alias)}"></span>' if alias else ""
+        return f'{anchor}<h{level} id="{block_id}">{escape(block.get("title", block.get("text", "")))}</h{level}>'
     if block_type == "paragraph":
         return f'<p id="{block_id}">{escape(block.get("text", ""))}</p>'
     if block_type == "code":

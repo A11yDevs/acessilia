@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import Any
 
 from docstruct.profiles import filter_blocks_for_profile
+from docstruct.sections import section_body_blocks
 from docstruct.tables.ast import linearize_table_for_text
 
 DEFAULT_FORMULA_LABEL = "Fórmula: {text}"
@@ -39,7 +40,7 @@ def _render_section(section: dict[str, Any], profile_name: str, formula_label: s
     lines: list[str] = []
     if section.get("title"):
         lines.append(section["title"])
-    for block in filter_blocks_for_profile(section.get("blocks", []), profile_name):
+    for block in filter_blocks_for_profile(section_body_blocks(section), profile_name):
         lines.extend(_render_block(block, formula_label))
     for child in section.get("children", []):
         lines.extend(_render_section(child, profile_name))

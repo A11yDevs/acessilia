@@ -6,6 +6,7 @@ document dict -> Pandoc JSON AST (in-memory dict), no I/O.
 from __future__ import annotations
 
 from typing import Any
+from docstruct.sections import section_body_blocks, section_title_alias
 
 from docstruct.tables.ast import effective_section_width, row_header_column_count
 from docstruct.tables.ast import split_header_and_body
@@ -45,7 +46,10 @@ def _section_to_blocks(section: dict[str, Any]) -> list[dict[str, Any]]:
             ],
         }
     ]
-    for block in section.get("blocks", []):
+    alias = section_title_alias(section)
+    if alias:
+        blocks.insert(0, {"t": "Div", "c": [[alias, [], []], []]})
+    for block in section_body_blocks(section):
         blocks.extend(_block_to_ast(block))
     for child in section.get("children", []):
         blocks.extend(_section_to_blocks(child))

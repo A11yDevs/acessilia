@@ -6,6 +6,7 @@ from typing import Any
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Pt
+from docstruct.sections import section_body_blocks
 
 from backend.i18n import t
 from backend.pipeline.table_ast import MSG_TABLE_TEXT_CAPTION
@@ -55,7 +56,7 @@ def _render_section(doc: Document, section: dict[str, Any], profile_name: str) -
     """
     if section.get("title"):
         doc.add_heading(section["title"], level=min(section.get("level", 1), 9))
-    for block in filter_blocks_for_profile(section.get("blocks", []), profile_name):
+    for block in filter_blocks_for_profile(section_body_blocks(section), profile_name):
         _render_block(doc, block)
     for child in section.get("children", []):
         _render_section(doc, child, profile_name)
