@@ -11,7 +11,7 @@ import fitz
 from docstruct.fusion.line_numbers import extract_line_numbers
 from docstruct.fusion.tailjoin import join_tail
 from docstruct.fusion.verse import chunk_verse
-from docstruct.tables.ast import effective_section_width
+from docstruct.tables.ast import effective_section_width, linearize_table_for_text
 from docstruct.text.norm_fix import norm_fix
 
 from backend.services.blocking import run_blocking
@@ -21,6 +21,7 @@ from backend.agents.vision_agent import VisionAgent
 from backend.core.agents.informational_structural import InformationalStructuralAgent
 from backend.core.execution.executor import ExecutorAgent, MethodRegistry
 from backend.core.execution.models import ExecutionReport, MethodResult
+from backend.core.execution.messages import EXE_COMPLETED_OBLIGATIONS_UNSATISFIED
 from backend.core.manifest.builder import (
     _derive_processing_needs,
     reconcile_reclassified_element_processing_needs,
@@ -216,12 +217,14 @@ def _handle_vision_description_method(
             message="Nenhuma imagem encontrada para a obrigação",
         )
 
-    # The canonical signal is the element text: `_enrich_picture_descriptions`
-    # writes the model description there, and the extractor may already deliver a
-    # valid caption. `_has_meaningful_text` is the same predicate the enrichment
-    # step uses to decide what still needs a description, so honouring anything
-    # else here would disagree with the work that actually ran.
-    undescribed = [el for el in elements if not _has_meaningful_text(el)]
+    undescribed = [
+        el for el in elements
+        if not (
+            bool((el.text or "").strip())
+            if el.metadata.get("vision_description_complete")
+            else _has_meaningful_text(el)
+        )
+    ]
     if undescribed:
         return MethodResult(
             success=False,
@@ -252,7 +255,20 @@ def _handle_pandoc_table_method(
             message="Nenhuma tabela encontrada para a obrigação",
         )
 
-    missing = [el for el in elements if not (el.metadata or {}).get("table_ast")]
+    missing = []
+    for element in elements:
+        try:
+            usable = _table_element_has_structured_content(element)
+            table_ast = element.metadata.get("table_ast")
+            if usable:
+                usable = any(
+                    value.strip() for row in _rows_from_table_ast(table_ast) for value in row
+                )
+                linearize_table_for_text({"table_ast": table_ast})
+        except (TypeError, ValueError, AttributeError):
+            usable = False
+        if not usable:
+            missing.append(element)
     if missing:
         return MethodResult(
             success=False,
@@ -845,6 +861,9 @@ class PddlAccessibilityOrchestrator:
                 dry_run=False,
             )
 
+        if execution_report.status not in {"completed", "dry-run-completed"}:
+            raise RuntimeError(_unsatisfied_execution_message(manifest))
+
         payload = build_pddl_structured_payload(
             file_path=file_path,
             manifest=manifest,
@@ -1388,6 +1407,15 @@ def _has_meaningful_text(element: ManifestElement) -> bool:
     return True
 
 
+def _unsatisfied_execution_message(manifest: ProcessingManifest) -> str:
+    return t(EXE_COMPLETED_OBLIGATIONS_UNSATISFIED).format(
+        unsatisfied=", ".join(
+            obligation.id for obligation in manifest.obligations
+            if obligation.selected and obligation.status != "satisfied"
+        )
+    )
+
+
 def build_pddl_structured_payload(
     *,
     file_path: Path,
@@ -1405,6 +1433,8 @@ def build_pddl_structured_payload(
         technical_warnings.append(
             "Executor nao foi executado; somente manifesto e plano foram gerados."
         )
+    elif execution_report.status in {"failed", "replan-required"}:
+        technical_warnings.append(_unsatisfied_execution_message(manifest))
 
     if comparison is not None:
         technical_warnings.append(

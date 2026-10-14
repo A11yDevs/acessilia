@@ -14,7 +14,7 @@ def test_document_cache_key_changes_with_each_processing_option(monkeypatch):
 
     base = service._cache_version("normal", None, False)
 
-    assert "-v4_" in base
+    assert "-v5_" in base
     assert service._cache_version("detailed", None, False) != base
     assert service._cache_version("normal", "Describe charts", False) != base
     assert service._cache_version("normal", None, True) != base
