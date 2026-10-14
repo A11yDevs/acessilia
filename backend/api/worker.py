@@ -173,6 +173,7 @@ class JobExecutor:
         task_id = job.task_id
         started_at = time.time()
         out_dir: Path | None = None
+        result_published = False
 
         async def status_callback(msg: str) -> None:
             state_manager.atualizar(task_id, etapa=msg)
@@ -341,6 +342,7 @@ class JobExecutor:
                 status="done", resultado=json.dumps(canonical, ensure_ascii=False),
                 email_delivery="pending" if job.email else None,
             )
+            result_published = True
             await run_blocking(save_status, task_id, get_job_status(task_id))
             await finalizar_conversao(
                 task_id=task_id,
@@ -371,6 +373,9 @@ class JobExecutor:
             )
 
         except (TaskCancelledError, asyncio.CancelledError):
+            if result_published:
+                state_manager.atualizar(task_id, email_delivery="unknown" if job.email else None)
+                return
             state_manager.atualizar(task_id, status="cancelled", etapa=t(STAGE_CANCELLED_BY_USER))
             if out_dir is not None:
                 _remove_output_dir(out_dir)
@@ -382,6 +387,9 @@ class JobExecutor:
             )
         except Exception as e:
             logger.exception(t(LOG_JOB_EXECUTOR_ERROR).format(task_id=task_id))
+            if result_published:
+                state_manager.atualizar(task_id, email_delivery="unknown" if job.email else None)
+                return
             if out_dir is not None:
                 _remove_output_dir(out_dir)
             state_manager.atualizar(
@@ -394,14 +402,17 @@ class JobExecutor:
                 tempo_segundos=time.time() - started_at,
             )
         finally:
-            status = get_job_status(task_id)
-            if status is not None:
-                await run_blocking(save_status, task_id, status)
-            if job.file_path.exists():
-                try:
-                    job.file_path.unlink()
-                except OSError:
-                    pass
+            try:
+                status = get_job_status(task_id)
+                if status is not None:
+                    await run_blocking(save_status, task_id, status)
+            finally:
+                if job.file_path.exists():
+                    try:
+                        job.file_path.unlink()
+                    except OSError:
+                        pass
+
 
 
 def _build_zip_package(zip_path: Path, out_paths: list[Path]) -> None:
