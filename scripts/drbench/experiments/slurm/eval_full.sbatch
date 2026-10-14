@@ -4,14 +4,14 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=48G
 #SBATCH --time=04:00:00
-#SBATCH --output=/raid/user_marcospaulo/drdocbench/runs/slurm/logs/%x_%j.log
+#SBATCH --output=runs/slurm/logs/%x_%j.log
 # Official evaluation of a full-split run (runs/dev-full/<RUN>/predictions, 986 pages) with
 # 1-page windows and/or document windows (contiguous 15-page runs, like the EvalAI test docs).
 # PROTO=end2end (JSON layout GT) | md2md (curated mds/*.md GT = EvalAI contract
 # drdocbench-document-parsing-v3-single-page-md2md; use WINDOWS=1).
 #   sbatch --export=ALL,RUNS="mineru docling differ-v2",WINDOWS="1 doc"[,PROTO=md2md,CDM=0] runs/slurm/eval_full.sbatch
 set -uo pipefail
-source /raid/user_marcospaulo/drdocbench/runs/slurm/env.sh
+source "${WS:-/raid/user_marcospaulo/drdocbench}/runs/slurm/env.sh"
 cd "$WS"
 RUNS=${RUNS:?}; WINDOWS=${WINDOWS:-"1 doc"}; CDM=${CDM:-auto}; PROTO=${PROTO:-end2end}
 DRB=$WS/repos/DrDocBench/.venv/bin/python

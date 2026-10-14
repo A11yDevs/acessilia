@@ -1,5 +1,7 @@
 # PMV 2.1 — Agno, manifesto, PDDL, comparação e execução nominal
 
+> English version: [English](pmv_agno_pddl.md)
+
 ## Objetivo
 
 Esta versão valida o ciclo mínimo:
@@ -70,8 +72,8 @@ Schema Draft 2020-12.
 
 `PlannerAgent` carrega um par inseparável:
 
-- `core/planning/domains/domain_v2.2.pddl`;
-- `core/planning/domains/domain_description_v2.2.md`.
+- `core/planning/domains/domain_v2.3.pddl`;
+- `core/planning/domains/domain_description_v2.3.md`.
 
 O carregador verifica versão, nome, hashes e cláusulas obrigatórias. O
 compilador:
@@ -142,7 +144,7 @@ poetry run a11y-pmv plan output/processing-manifest.json \
 ```
 
 O domínio é carregado uma vez e o manifesto é compilado uma vez. Portanto,
-ambos os backends recebem os mesmos bytes de `domain_v2.2.pddl` e
+ambos os backends recebem os mesmos bytes de `domain_v2.3.pddl` e
 `problem.pddl`, identificados por SHA-256.
 
 As saídas são:
@@ -298,12 +300,38 @@ Regras de compilação:
 - o domínio PDDL em si não muda — `dual-provider-fusion` é apenas outro
   símbolo `method` com seus próprios `supports`/`admissible`/`execution-cost`.
 
-O `FusionAgent` (`backend/core/agents/fusion_agent.py`) expone as ferramentas
+O `FusionAgent` (`backend/core/agents/fusion_agent.py`) expõe as ferramentas
 determinísticas `fuse_providers`, `audit_document`, `classify_block` e
 `needs_reinfer` sobre a biblioteca pura `docstruct`, seguindo o mesmo padrão de
 núcleo determinístico + envelope Agno opcional que o agente
 Informacional-Estrutural. Veja [docstruct_algorithms.pt-br.md](docstruct_algorithms.pt-br.md)
-para saber como funcionan os algoritmos subjacentes.
+para saber como funcionam os algoritmos subjacentes.
+
+### 5.3 Agentes adicionados para o Dr.DocBench (PR #125)
+
+Mais quatro agentes seguem o mesmo padrão (método `process_*` puro + envelope
+JSON), cada um envolvendo uma política determinística do `docstruct`:
+
+| Agente | Ferramentas | Biblioteca |
+|---|---|---|
+| `AdjudicationAgent` | `route_page`, `decide_from_transcription`, `filter_decisions`, `judge_pair`, `should_judge`, `select_page`, `swap_low_agreement`, `oracle_headroom` | `fusion.adjudication`, `fusion.judge`, `fusion.page_select`, `fusion.oracle` |
+| `PageLevelAgent` | `fuse_page`, `select_page`, `swap_low_agreement`, `page_agreement`, `join_tail`, `move_header_footer_to_end`, `upscale_factor`, `decide_orientation` | `fusion.page_select`, `fusion.tailjoin`, `fusion.hf_end`, `imaging.policy` |
+| `OrderAdjudicationAgent` | `parse_order`, `kendall_tau`, `complete_order`, `adjudicate_order`, `refine_reading_order` | `fusion.xycut` |
+| `TableSpecialistAgent` | `extract_table`, `normalize_table`, `is_valid_table`, `build_candidates`, `select_table`, `select_greedy` | `fusion.table_specialist` |
+
+O `FusionAgent` também ganhou as ferramentas de pós-processamento determinístico
+(`chunk_verse`, `extract_line_numbers`, `join_tail`, `guard_repetition`,
+`normalize_text`, `normalize_formula`, `refine_reading_order`,
+`move_header_footer_to_end`).
+
+O domínio v2.3 adiciona as obrigações correspondentes (`adjudicate-page`,
+`fuse-providers`, `refine-reading-order`, `normalize-formula`,
+`rescue-omitted-block`, `guard-repetition`, `join-tail-blocks`,
+`select-table-source`, `chunk-verse`, `extract-line-numbers`,
+`normalize-text`). A estrutura PDDL não muda: cada uma é um símbolo comum de
+`obligationkind` com `supports`/`admissible`/`execution-cost` próprios. Métodos
+determinísticos custam 5–15; os que consomem modelo custam 40–60, então o
+planner só recorre a eles quando o caminho determinístico não está disponível.
 
 ## 6. Execução ponta a ponta
 
@@ -339,8 +367,8 @@ output/job-001/
 | `nominal_plan.schema.json` | plano nominal auditável |
 | `planning_comparison.schema.json` | resultados e comparação normalizada dos dois planners |
 | `execution_report.schema.json` | passos observados e decisão de replanejamento |
-| `domain_v2.2.pddl` | semântica geral das ações e custos |
-| `domain_description_v2.2.md` | contrato humano e regras do compilador |
+| `domain_v2.3.pddl` | semântica geral das ações e custos |
+| `domain_description_v2.3.md` | contrato humano e regras do compilador |
 
 Os três JSON Schemas são gerados dos modelos Pydantic:
 

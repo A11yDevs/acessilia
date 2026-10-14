@@ -133,8 +133,43 @@ a Toolbox o consome via HTTP — sem runtime de ML na Toolbox:
   + `mineru_document.py` (facade `middle_json` → contrato do normalizer:
   `iterate_items()`, `prov` com page_no 1-based, `pages` como dict).
 
+## What became standard in Acessilia
+
+The benchmark work produced capabilities that are now standard in the product.
+The rule is: **deterministic with evidence of gain becomes a default; anything
+that consumes a model only enters when the Toolbox exposes the capability.**
+
+| Capability | Where it lives | Default |
+|---|---|---|
+| Verse/record chunking | `docstruct.fusion.verse` | on (`verse_chunk` 300) |
+| Marginal line numbers | `docstruct.fusion.line_numbers` | on |
+| Provider flood guard | `docstruct.fusion.flood` | on |
+| Tail-join (`tj3`) | `docstruct.fusion.tailjoin` | on (`end/50/3/hdr`) |
+| Repetition guard | `docstruct.fusion.repetition` | on |
+| Header/footer at the end | `docstruct.fusion.hf_end` | on |
+| Text normalization | `docstruct.text.norm_fix` | on |
+| Upscale before OCR | `docstruct.imaging.policy` + `backend/tools/image_enhancer.py` | on |
+| Orientation correction | `docstruct.imaging.policy` + `backend/tools/image_enhancer.py` | on |
+| Pairwise VLM judge | `docstruct.fusion.judge` | off (consumes a model) |
+| Page selection/fusion | `docstruct.fusion.page_select` | off (consumes a model) |
+| Table specialist | `docstruct.fusion.table_specialist` | off (consumes a model) |
+| Tune/holdout discipline | `docstruct.evaluation.holdout` | always applied |
+
+The capabilities are also first-class obligations in the PDDL v2.3 domain
+(`adjudicate-page`, `fuse-providers`, `chunk-verse`, `join-tail-blocks`, ...) and
+Agno agent tools (`FusionAgent`, `AdjudicationAgent`, `PageLevelAgent`,
+`OrderAdjudicationAgent`, `TableSpecialistAgent`).
+
+**Method caveat:** the observed dev->test gap is ~8 points and TEDS did not
+transfer (dev +5.9 -> test +0.2). The *confirmed* leaderboard best is
+`differ-v15-hyb` (EvalAI 70.37); the dev best (87.33) was never confirmed. No
+benchmark preset is a default. See
+[`docs/drbench/experiments/RUNBOOK.md`](drbench/experiments/RUNBOOK.md).
+
 ## Relacionados
 
 - [Notebook de onboarding Dr.DocBench](notebooks/drdocbench/initial.ipynb)
 - [Architecture](architecture.md) — pipeline canônico
 - [PMV Agno + PDDL](pmv_agno_pddl.md) — orquestração
+- [Runbook de reprodução](drbench/experiments/RUNBOOK.md) — retomar os testes de performance
+- [Algoritmos do docstruct](docstruct_algorithms.md) — as políticas determinísticas

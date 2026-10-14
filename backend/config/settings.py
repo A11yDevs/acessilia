@@ -101,6 +101,13 @@ class Settings:
     fusion_secondary_provider: str = field(
         default_factory=lambda: os.getenv("FUSION_SECONDARY_PROVIDER", "mineru")
     )
+    # Provider MinerU hybrid-VLM (MinerU 3.x, backend=hybrid-engine). É a fonte B
+    # do melhor resultado confirmado no leaderboard do Dr.DocBench
+    # (differ-v15-hyb, EvalAI 70.37). Use FUSION_SECONDARY_PROVIDER=mineru-hyb
+    # para adotá-lo na fusão dual.
+    fusion_hybrid_provider: str = field(
+        default_factory=lambda: os.getenv("FUSION_HYBRID_PROVIDER", "mineru-hyb")
+    )
     # Domain-specific callout titles injected into the region grouping
     # heuristics (semicolon-separated). No document-specific constants in code.
     callout_known_titles: str = field(
@@ -133,6 +140,15 @@ class Settings:
     )
     toolbox_ocr_provider: str = field(
         default_factory=lambda: os.getenv("TOOLBOX_OCR_PROVIDER", "docling-ocr")
+    )
+    toolbox_page_ocr_provider: str = field(
+        default_factory=lambda: os.getenv("TOOLBOX_PAGE_OCR_PROVIDER", "qwen3-vl-page")
+    )
+    toolbox_adjudicate_provider: str = field(
+        default_factory=lambda: os.getenv("TOOLBOX_ADJUDICATE_PROVIDER", "qwen3-vl-judge")
+    )
+    toolbox_orientation_provider: str = field(
+        default_factory=lambda: os.getenv("TOOLBOX_ORIENTATION_PROVIDER", "rapidocr-orientation")
     )
     toolbox_media_inspect_provider: str = field(
         default_factory=lambda: os.getenv(

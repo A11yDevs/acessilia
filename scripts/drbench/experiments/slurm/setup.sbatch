@@ -4,9 +4,9 @@
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=64G
 #SBATCH --time=02:00:00
-#SBATCH --output=/raid/user_marcospaulo/drdocbench/runs/slurm/logs/%x_%j.log
+#SBATCH --output=runs/slurm/logs/%x_%j.log
 set -uo pipefail
-source /raid/user_marcospaulo/drdocbench/runs/slurm/env.sh
+source "${WS:-/raid/user_marcospaulo/drdocbench}/runs/slurm/env.sh"
 cd "$WS"
 step() { echo; echo "===== [$(date -u +%H:%M:%S)] $*"; }
 
@@ -14,9 +14,10 @@ step() { echo; echo "===== [$(date -u +%H:%M:%S)] $*"; }
 step "dev split download (background)"
 mkdir -p "$WS/data/hf"
 uv run --python 3.11 --with huggingface_hub python - <<'EOF' > "$WS/runs/slurm/logs/devsplit_$SLURM_JOB_ID.log" 2>&1 &
+import os
 from huggingface_hub import snapshot_download
 p = snapshot_download(repo_id="2077AIDataFoundation/DrDocBench", repo_type="dataset",
-    allow_patterns=["dev/**"], local_dir="/raid/user_marcospaulo/drdocbench/data/hf", max_workers=16)
+    allow_patterns=["dev/**"], local_dir=os.environ.get("WS", "/raid/user_marcospaulo/drdocbench") + "/data/hf", max_workers=16)
 print("done", p)
 EOF
 DL_PID=$!

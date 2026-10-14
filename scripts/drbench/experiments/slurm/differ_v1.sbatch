@@ -4,11 +4,11 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
 #SBATCH --time=00:30:00
-#SBATCH --output=/raid/user_marcospaulo/drdocbench/runs/slurm/logs/%x_%j.log
+#SBATCH --output=runs/slurm/logs/%x_%j.log
 # Tree Differ v1 (text-only block-level merge) on the dev subset: merge existing
 # docling-forceocr + mineru predictions, then evaluate with local + official scorers.
 set -uo pipefail
-source /raid/user_marcospaulo/drdocbench/runs/slurm/env.sh
+source "${WS:-/raid/user_marcospaulo/drdocbench}/runs/slurm/env.sh"
 cd "$WS"
 ACE=$WS/repos/acessilia/.venv/bin/python
 DRB=$WS/repos/DrDocBench/.venv/bin/python

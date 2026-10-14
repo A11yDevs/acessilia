@@ -133,8 +133,43 @@ a Toolbox o consome via HTTP — sem runtime de ML na Toolbox:
   + `mineru_document.py` (facade `middle_json` → contrato do normalizer:
   `iterate_items()`, `prov` com page_no 1-based, `pages` como dict).
 
+## O que virou padrão no Acessilia
+
+O trabalho de benchmark produziu capacidades que hoje são padrão no produto. A
+regra é: **determinístico com evidência de ganho vira default; o que consome
+modelo só entra quando a Toolbox expõe a capacidade.**
+
+| Capacidade | Onde vive | Default |
+|---|---|---|
+| Chunking de verso/registro | `docstruct.fusion.verse` | ligado (`verse_chunk` 300) |
+| Números de linha marginais | `docstruct.fusion.line_numbers` | ligado |
+| Guarda de inundação de provider | `docstruct.fusion.flood` | ligado |
+| Junção de cauda (`tj3`) | `docstruct.fusion.tailjoin` | ligado (`end/50/3/hdr`) |
+| Guarda de repetição | `docstruct.fusion.repetition` | ligado |
+| Cabeçalho/rodapé no fim | `docstruct.fusion.hf_end` | ligado |
+| Normalização de texto | `docstruct.text.norm_fix` | ligado |
+| Upscale antes do OCR | `docstruct.imaging.policy` + `backend/tools/image_enhancer.py` | ligado |
+| Correção de orientação | `docstruct.imaging.policy` + `backend/tools/image_enhancer.py` | ligado |
+| Juiz pareado por VLM | `docstruct.fusion.judge` | desligado (consome modelo) |
+| Seleção/fusão de página | `docstruct.fusion.page_select` | desligado (consome modelo) |
+| Especialista de tabela | `docstruct.fusion.table_specialist` | desligado (consome modelo) |
+| Disciplina tune/holdout | `docstruct.evaluation.holdout` | sempre aplicada |
+
+As capacidades também são obrigações de primeira classe no domínio PDDL v2.3
+(`adjudicate-page`, `fuse-providers`, `chunk-verse`, `join-tail-blocks`, ...) e
+tools dos agentes Agno (`FusionAgent`, `AdjudicationAgent`, `PageLevelAgent`,
+`OrderAdjudicationAgent`, `TableSpecialistAgent`).
+
+**Ressalva de método:** o gap dev→test observado é de ~8 pontos e o TEDS não
+transferiu (dev +5.9 → test +0.2). O melhor *confirmado* no leaderboard é
+`differ-v15-hyb` (EvalAI 70.37); o melhor de dev (87.33) nunca foi confirmado.
+Nenhum preset de benchmark é default. Ver
+[`docs/drbench/experiments/RUNBOOK.pt-br.md`](drbench/experiments/RUNBOOK.pt-br.md).
+
 ## Relacionados
 
 - [Notebook de onboarding Dr.DocBench](notebooks/drdocbench/initial.ipynb)
 - [Architecture](architecture.md) — pipeline canônico
 - [PMV Agno + PDDL](pmv_agno_pddl.md) — orquestração
+- [Runbook de reprodução](drbench/experiments/RUNBOOK.pt-br.md) — retomar os testes de performance
+- [Algoritmos do docstruct](docstruct_algorithms.pt-br.md) — as políticas determinísticas

@@ -123,9 +123,12 @@ def normalize_latex(expr: str | None) -> str:
     if not out:
         return ""
 
-    # 1. Normalize Unicode minus and Unicode whitespace
+    # 1. Normalize Unicode minus and Unicode whitespace.
+    # Zero-width space is invisible, so it is removed rather than widened to a
+    # space; the other Unicode spaces are equivalent to a plain space.
     out = out.replace("\u2212", "-")
-    out = re.sub(r"[\u00a0\u2000-\u200b\u202f]", " ", out)
+    out = out.replace("\u200b", "")
+    out = re.sub(r"[\u00a0\u2000-\u200a\u202f]", " ", out)
 
     # 2. Convert Unicode math symbols and Greek characters
     for char, macro in _UNICODE_MATH_MAP.items():

@@ -4,13 +4,13 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
 #SBATCH --time=02:00:00
-#SBATCH --output=/raid/user_marcospaulo/drdocbench/runs/slurm/logs/%x_%j.log
+#SBATCH --output=runs/slurm/logs/%x_%j.log
 # Offline re-render of MinerU predictions from middle.json already on disk, then dev eval.
 #   sbatch --export=ALL,RUN_ID=mineru-v2-20260916[,SPLIT=dev|test] runs/slurm/replay_mineru.sbatch
 # dev : runs/dev/<RUN_ID>/{predictions,blocks} + eval_run pipeline (official + local + ledger)
 # test: runs/evalai/<RUN_ID>/predictions (509) — build the zip separately.
 set -uo pipefail
-source /raid/user_marcospaulo/drdocbench/runs/slurm/env.sh
+source "${WS:-/raid/user_marcospaulo/drdocbench}/runs/slurm/env.sh"
 cd "$WS"
 R=${RUN_ID:?}; SPLIT=${SPLIT:-dev}
 TBPY=$WS/repos/acessilia-toolbox/.venv/bin/python

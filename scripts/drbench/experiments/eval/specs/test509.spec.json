@@ -1,0 +1,67 @@
+{
+  "dataset": {
+    "revision": "2077AIDataFoundation/DrDocBench",
+    "split": "evalai"
+  },
+  "seed": 20261009,
+  "data_root": "../../../../../../..",
+  "pages": "test509-pages.json",
+  "lockfile": "../../../../../uv.lock",
+  "inference": {
+    "identity_source": "HF revisions pinned in `models`; the page-OCR scripts accept --revision"
+  },
+  "models": [
+    {
+      "model": "docling",
+      "revision": "1.32",
+      "role": "structure-extract"
+    },
+    {
+      "model": "mineru-hyb",
+      "revision": "3.4",
+      "role": "structure-extract"
+    },
+    {
+      "model": "Qwen/Qwen3-VL-32B-Instruct-FP8",
+      "revision": "HF_COMMIT",
+      "role": "page-ocr"
+    },
+    {
+      "model": "XingChen-AGI/TeleOCR",
+      "revision": "HF_COMMIT",
+      "role": "page-ocr"
+    }
+  ],
+  "evaluator": {
+    "repo": "../../../../../../DrDocBench",
+    "ref": "EVALUATOR_COMMIT"
+  },
+  "variants": {
+    "baseline": {
+      "acessilia": {
+        "repo": "../../../../..",
+        "ref": "BASELINE_COMMIT"
+      },
+      "toolbox": {
+        "repo": "../../../../../../acessilia-toolbox",
+        "ref": "BASELINE_TOOLBOX_COMMIT"
+      },
+      "policy": "v12",
+      "fusion_args": []
+    },
+    "candidate": {
+      "acessilia": {
+        "repo": "../../../../..",
+        "ref": "CANDIDATE_COMMIT"
+      },
+      "toolbox": {
+        "repo": "../../../../../../acessilia-toolbox",
+        "ref": "CANDIDATE_TOOLBOX_COMMIT"
+      },
+      "policy": "v12",
+      "fusion_args": []
+    }
+  },
+  "evidence_files": [],
+  "pages_generator": "python scripts/drbench/experiments/eval/make_replay_pages.py --images-root <WS>/data/evalai/drdocbench-evaluation-v4/images --out test509-pages.json --split evalai"
+}

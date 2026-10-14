@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
 
+from backend.core.manifest.builder import V23_OBLIGATION_BY_KIND
 from backend.core.manifest.models import Obligation, ProcessingManifest
 from backend.core.planning.domain_bundle import DomainBundle
 from backend.core.planning.models import DomainIdentity, NominalPlan, PlanStep
@@ -108,6 +109,7 @@ class PddlProblemCompiler:
         )
         initially_pending = frozenset(selected) - initially_satisfied
         self._validate_causal_state(selected_obligations, initially_satisfied)
+        self._validate_kinds(selected_obligations)
         self._validate_methods(
             selected_obligations,
             initially_pending,
@@ -200,6 +202,35 @@ class PddlProblemCompiler:
                     f"Estado causalmente inconsistente: {obligation_id} está "
                     f"satisfeita, mas depende de {sorted(unsatisfied)}"
                 )
+
+    @staticmethod
+    def _validate_kinds(obligations: dict[str, Obligation]) -> None:
+        """Valida a consistência das obrigações v2.3 com o catálogo.
+
+        O compilador é genérico e aceita qualquer `kind` (o domínio PDDL trata
+        todos como símbolos de `obligationkind`). O que se verifica aqui é que,
+        quando o `kind` pertence ao catálogo v2.3, os métodos admissíveis do
+        manifesto são um subconjunto dos do catálogo (o manifesto pode
+        legitimamente restringir, ex.: `FUSION_MODE=single` remove
+        `dual-provider-fusion`) e que todo método declarado tem custo.
+        """
+        for item in obligations.values():
+            spec = V23_OBLIGATION_BY_KIND.get(item.kind)
+            if spec is None:
+                continue
+            _, catalog_methods = spec
+            declared = set(item.admissible_methods)
+            extra = declared - set(catalog_methods)
+            if extra:
+                raise ValueError(
+                    f"Métodos fora do catálogo v2.3 para {item.kind}: "
+                    f"{sorted(extra)}"
+                )
+            for method in declared:
+                if method not in item.method_costs:
+                    raise ValueError(
+                        f"Custo ausente para {item.kind}/{method}"
+                    )
 
     @staticmethod
     def _validate_methods(

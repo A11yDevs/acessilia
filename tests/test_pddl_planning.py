@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+
 import json
 from pathlib import Path
 
@@ -84,7 +85,7 @@ def test_domain_bundle_validates_matching_version():
     domain = DomainBundle.load()
 
     assert domain.name == "acessilia-obligations"
-    assert domain.version == "2.2"
+    assert domain.version == "2.3"
     assert len(domain.domain_sha256) == 64
 
 
@@ -241,3 +242,144 @@ def test_cli_both_writes_backend_plans_and_comparison(tmp_path):
         (output / "planning-comparison.json").read_text(encoding="utf-8")
     )
     assert payload["comparison"]["verdict"] == "identical"
+
+
+def test_domain_v23_documents_the_new_obligations():
+    from backend.core.planning.domain_bundle import V23_OBLIGATION_KINDS
+
+    domain = DomainBundle.load()
+    description = domain.description_path.read_text(encoding="utf-8")
+
+    assert domain.version == "2.3"
+    for kind in V23_OBLIGATION_KINDS:
+        assert kind in description, f"obrigação {kind} não documentada"
+
+
+def test_domain_v23_keeps_the_v22_structure():
+    domain = DomainBundle.load()
+    text = domain.domain_path.read_text(encoding="utf-8")
+
+    # A v2.3 não muda a estrutura do domínio: só a descrição ganha as obrigações.
+    assert "(:action execute-obligation" in text
+    assert "(:derived (ready ?o - obligation)" in text
+    assert "(increase (total-cost) (execution-cost ?m ?o))" in text
+
+
+def test_domain_v23_rejects_a_description_missing_a_new_obligation(tmp_path):
+    domain = DomainBundle.load()
+    broken = tmp_path / "domain_description_v2.3.md"
+    broken.write_text(
+        domain.description_path.read_text(encoding="utf-8").replace("chunk-verse", "x"),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="chunk-verse"):
+        DomainBundle.load(domain_path=domain.domain_path, description_path=broken)
+
+
+class TestV23Costs:
+    def test_toda_obrigacao_v23_tem_metodos_com_custo(self):
+        from backend.core.manifest.builder import (
+            DEFAULT_METHOD_COSTS,
+            V23_OBLIGATION_BY_KIND,
+        )
+        from backend.core.planning.domain_bundle import V23_OBLIGATION_KINDS
+
+        assert set(V23_OBLIGATION_KINDS) == set(V23_OBLIGATION_BY_KIND)
+        for kind, (_, methods) in V23_OBLIGATION_BY_KIND.items():
+            assert methods, f"{kind} sem métodos"
+            for method in methods:
+                assert method in DEFAULT_METHOD_COSTS, f"{kind}: {method} sem custo"
+
+    def test_metodos_deterministicos_custam_menos_que_os_de_modelo(self):
+        from backend.core.manifest.builder import DEFAULT_METHOD_COSTS as C
+
+        deterministic = (
+            "agreement-rule", "xycut-order", "skeleton-order", "latex-normalizer",
+            "rep-guard", "tailjoin", "tailjoin-positioned", "verse-chunker",
+            "line-number-extractor", "norm-fix",
+        )
+        model_based = ("vlm-pairwise-judge", "table-specialist", "dual-provider-fusion")
+        assert max(C[m] for m in deterministic) < min(C[m] for m in model_based)
+
+    def test_human_review_e_o_mais_caro(self):
+        from backend.core.manifest.builder import DEFAULT_METHOD_COSTS as C
+
+        assert C["human-review"] == max(C.values())
+
+    def test_join_tail_prefere_a_variante_posicionada(self):
+        from backend.core.manifest.builder import V23_OBLIGATION_BY_KIND
+
+        methods = V23_OBLIGATION_BY_KIND["join-tail-blocks"][1]
+        assert methods.index("tailjoin-positioned") < methods.index("tailjoin")
+
+    def test_fuse_providers_prefere_a_fusao_dual(self):
+        from backend.core.manifest.builder import V23_OBLIGATION_BY_KIND
+
+        methods = V23_OBLIGATION_BY_KIND["fuse-providers"][1]
+        assert methods[0] == "dual-provider-fusion"
+
+    def test_custos_sao_inteiros_nao_negativos(self):
+        from backend.core.manifest.builder import DEFAULT_METHOD_COSTS as C
+
+        assert all(isinstance(v, int) and v >= 0 for v in C.values())
+
+
+class TestV23CompilerValidation:
+    def _manifest_with(self, kind: str, methods: list[str], costs: dict[str, int]):
+        from backend.core.manifest.models import Obligation
+
+        base = make_manifest()
+        obligation = Obligation(
+            id="o-v23",
+            kind=kind,
+            target_ids=["element-1"],
+            admissible_methods=methods,
+            method_costs=costs,
+            rationale="teste",
+        )
+        return base.model_copy(
+            update={"obligations": [*base.obligations, obligation]}
+        )
+
+    def test_metodos_fora_do_catalogo_sao_recusados(self):
+        manifest = self._manifest_with(
+            "chunk-verse", ["verse-chunker", "invented-method"],
+            {"verse-chunker": 5, "invented-method": 5},
+        )
+        with pytest.raises(ValueError, match="fora do catálogo"):
+            PlannerAgent().plan(manifest, selected_roots=["o-v23"])
+
+    def test_subconjunto_do_catalogo_e_aceito(self):
+        # O manifesto pode restringir os métodos (ex.: FUSION_MODE=single).
+        manifest = self._manifest_with(
+            "chunk-verse", ["verse-chunker"], {"verse-chunker": 5}
+        )
+        compiled, plan = PlannerAgent().plan(manifest, selected_roots=["o-v23"])
+        assert "chunk-verse" in compiled.text
+        assert any(step.obligation_kind == "chunk-verse" for step in plan.steps)
+
+    def test_metodos_do_catalogo_sao_aceitos(self):
+        manifest = self._manifest_with(
+            "chunk-verse",
+            ["verse-chunker", "human-review"],
+            {"verse-chunker": 5, "human-review": 100},
+        )
+        compiled, plan = PlannerAgent().plan(manifest, selected_roots=["o-v23"])
+        assert "chunk-verse" in compiled.text
+        assert any(step.obligation_kind == "chunk-verse" for step in plan.steps)
+
+    def test_custo_ausente_e_recusado(self):
+        manifest = self._manifest_with(
+            "chunk-verse", ["verse-chunker", "human-review"], {"verse-chunker": 5}
+        )
+        with pytest.raises(ValueError, match="Custo ausente"):
+            PlannerAgent().plan(manifest, selected_roots=["o-v23"])
+
+    def test_kind_fora_do_catalogo_e_aceito(self):
+        # O compilador é genérico: kinds fora do catálogo v2.3 continuam válidos.
+        manifest = self._manifest_with(
+            "extract-image", ["vision"], {"vision": 20}
+        )
+        compiled, _ = PlannerAgent().plan(manifest, selected_roots=["o-v23"])
+        assert "extract-image" in compiled.text

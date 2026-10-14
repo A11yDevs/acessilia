@@ -5,6 +5,28 @@ the official Dr.DocBench evaluator. This uses existing raw inference JSON; it
 does not run OCR again. Keep specifications, datasets, source exports and results
 outside the Acessília and Toolbox repositories.
 
+## Versioned specs
+
+`eval/specs/` holds the specs for the three splits the performance work used:
+
+| Spec | Split | Pages | Notes |
+|---|---|---|---|
+| `dev120.spec.json` | dev | 120 | stratified subset (seed 13); `dev120-pages.json` is versioned |
+| `dev986.spec.json` | dev | 986 | full dev split; `pages.json` is generated in the workspace |
+| `test509.spec.json` | evalai | 509 | EvalAI test split; `pages.json` is generated in the workspace |
+
+The dataset does not live in this repository, so the two full-split specs declare
+a `pages_generator` command instead of a versioned selection:
+
+```bash
+python scripts/drbench/experiments/eval/make_replay_pages.py \
+    --images-root <WS>/data/hf/dev --out dev986-pages.json
+```
+
+`make_replay_pages.py` emits the replay selection format (`id`, `subject`,
+`document_id`, `page`, `batch`, `image`) and validates it with the same
+`validate_pages` the freeze uses.
+
 Create a local JSON specification with paths relative to the specification file
 (absolute paths are also accepted):
 
@@ -28,7 +50,12 @@ Create a local JSON specification with paths relative to the specification file
       "policy": "v12", "fusion_args": []
     }
   },
-  "evidence_files": []
+  "evidence_files": [],
+  "lockfile": "uv.lock",
+  "models": [
+    {"model": "Qwen/Qwen3-VL-32B-Instruct-FP8", "revision": "HF_COMMIT", "role": "page-ocr"}
+  ],
+  "providers": ["docling", "mineru"]
 }
 ```
 
@@ -52,6 +79,26 @@ a candidate before freezing it; otherwise its edits are not evaluated.
 Model identity in `inference` is supplied evidence, not an automatic assertion
 that those model weights were loaded. Preserve extraction logs, options and locks
 through `evidence_files`; new inference should additionally record actual weights.
+
+`lockfile` points at the environment lock (`uv.lock`). It is frozen into
+`evidence/lock-<name>` and its SHA-256 is recorded in the manifest. The replay
+compares the installed package versions against the lock and writes the result
+to `manifest["environment"]`; a mismatch is reported, not silently ignored.
+Recording `importlib.metadata.distributions()` at run time is *registration*, not
+pinning — without the lockfile the environment cannot be reconstructed.
+
+`models` lists every model the run loads, each with a `revision` (HF commit or
+tag). It is frozen into `evidence/models.json` and its SHA-256 is recorded. The
+replay writes `manifest["model_pinning"]`, listing any model declared without a
+revision. A bare model name is not reproducible: the weights behind a tag can
+change. The page-OCR scripts accept `--revision` for exactly this reason.
+
+`providers` lists the extraction sources to freeze, in order. Omitting it keeps
+the historical `["docling", "mineru"]` pair, so older specs stay valid. The best
+method uses more than two sources (`mineru-hyb`, `dots-ocr-page`, ...), and the
+replay freezes one `raw/<provider>/` directory per declared name. A provider
+without an adapter in `replay_worker.py` is a hard error rather than a silent
+skip.
 
 ## Replay, fusion and official evaluation
 
@@ -81,8 +128,16 @@ catalogues are recorded separately; mutation of committed source is rejected.
 
 Outputs include provider payloads, `.blocks.json`, fusion Markdown, `decisions.csv`,
 official matched samples, `per-page.csv`, `summary.json` and `REPORT.md`. Tables
-(TEDS and edit distance) and formula edit distance accompany RO and text; CDM and
-Overall are outside this runner. TEDS is summarized per page from official samples.
+(TEDS and edit distance) and formula edit distance accompany RO and text. TEDS is
+summarized per page from official samples.
+
+`overall` is the competition ranking metric: the per-page mean of the available
+components, computed from the components already scored (missing components do
+not enter the mean, matching the official evaluator). It appears in
+`per-page.csv`, `summary.json` and `REPORT.md`, and participates in the quality
+gate. CDM is not read by this runner: the official evaluator does not emit it as
+a per-page component here, so it would have to be approximated locally, which
+would not be the leaderboard number.
 
 The quality gate rejects per-page losses and asymmetric metric coverage, even
 when the mean improves. Missing required evaluator outputs fail the run. An

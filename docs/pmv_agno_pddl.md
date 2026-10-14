@@ -72,8 +72,8 @@ Schema Draft 2020-12.
 
 `PlannerAgent` loads an inseparable pair:
 
-- `core/planning/domains/domain_v2.2.pddl`;
-- `core/planning/domains/domain_description_v2.2.md`.
+- `core/planning/domains/domain_v2.3.pddl`;
+- `core/planning/domains/domain_description_v2.3.md`.
 
 The loader checks version, name, hashes and mandatory clauses. The compiler:
 
@@ -141,7 +141,7 @@ poetry run a11y-pmv plan output/processing-manifest.json \
 ```
 
 The domain is loaded once and the manifest compiled once, so both backends receive
-the exact same bytes of `domain_v2.2.pddl` and `problem.pddl`, identified by SHA-256.
+the exact same bytes of `domain_v2.3.pddl` and `problem.pddl`, identified by SHA-256.
 
 The outputs are:
 
@@ -296,6 +296,32 @@ deterministic-core + optional-Agno-envelope pattern as the
 Informational-Structural agent. See [docstruct_algorithms.md](docstruct_algorithms.md)
 for how the underlying algorithms work.
 
+### 5.3 Agents added for Dr.DocBench (PR #125)
+
+Four more agents follow the same pattern (pure `process_*` method + JSON tool
+envelope), each wrapping a deterministic policy from `docstruct`:
+
+| Agent | Tools | Library |
+|---|---|---|
+| `AdjudicationAgent` | `route_page`, `decide_from_transcription`, `filter_decisions`, `judge_pair`, `should_judge`, `select_page`, `swap_low_agreement`, `oracle_headroom` | `fusion.adjudication`, `fusion.judge`, `fusion.page_select`, `fusion.oracle` |
+| `PageLevelAgent` | `fuse_page`, `select_page`, `swap_low_agreement`, `page_agreement`, `join_tail`, `move_header_footer_to_end`, `upscale_factor`, `decide_orientation` | `fusion.page_select`, `fusion.tailjoin`, `fusion.hf_end`, `imaging.policy` |
+| `OrderAdjudicationAgent` | `parse_order`, `kendall_tau`, `complete_order`, `adjudicate_order`, `refine_reading_order` | `fusion.xycut` |
+| `TableSpecialistAgent` | `extract_table`, `normalize_table`, `is_valid_table`, `build_candidates`, `select_table`, `select_greedy` | `fusion.table_specialist` |
+
+`FusionAgent` also gained the deterministic post-processing tools
+(`chunk_verse`, `extract_line_numbers`, `join_tail`, `guard_repetition`,
+`normalize_text`, `normalize_formula`, `refine_reading_order`,
+`move_header_footer_to_end`).
+
+The domain v2.3 adds the matching obligation kinds (`adjudicate-page`,
+`fuse-providers`, `refine-reading-order`, `normalize-formula`,
+`rescue-omitted-block`, `guard-repetition`, `join-tail-blocks`,
+`select-table-source`, `chunk-verse`, `extract-line-numbers`,
+`normalize-text`). The PDDL structure is unchanged: each is an ordinary
+`obligationkind` symbol with its own `supports`/`admissible`/`execution-cost`.
+Deterministic methods cost 5–15; model-consuming methods cost 40–60, so the
+planner only reaches for them when the deterministic path is unavailable.
+
 ## 6. End-to-end execution
 
 ```bash
@@ -330,8 +356,8 @@ output/job-001/
 | `nominal_plan.schema.json` | auditable nominal plan |
 | `planning_comparison.schema.json` | the outcome of both planners' comparison, normalized |
 | `execution_report.schema.json` | observed steps and replan decision |
-| `domain_v2.2.pddl` | general action and cost semantics |
-| `domain_description_v2.2.md` | human contract and compiler rules |
+| `domain_v2.3.pddl` | general action and cost semantics |
+| `domain_description_v2.3.md` | human contract and compiler rules |
 
 The three JSON Schemas are generated from the Pydantic models:
 
