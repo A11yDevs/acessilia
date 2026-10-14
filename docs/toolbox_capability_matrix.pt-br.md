@@ -102,14 +102,24 @@ REAL execution status: failed   failed_step: 1   replan_required: False
 
 `PddlAccessibilityOrchestrator._build_executor` registra 3 handlers reais
 (`mathml`, `latex-verbalizer`, `dual-provider-fusion`) mais um fallback no-op para
-8 nomes; `DEFAULT_METHOD_COSTS` lista 24 metodos admisseis. Todo passo de plano cujo
-metodo e um dos outros 21 levanta excecao na execucao, e `replan_required` e `False`,
-entao nada e retentado nem degradado.
+8 nomes, ou seja, 11 dos 24 métodos de `DEFAULT_METHOD_COSTS` estão registrados e 20
+não estão. O conjunto admissível é um pouco menor que a tabela de custos: as tabelas
+de obrigação (`OBLIGATION_BY_TYPE` mais `V23_OBLIGATION_BY_KIND`) admitem 23 métodos,
+dos quais 19 não têm handler. Todo passo de plano cujo método seja um desses levanta
+exceção na execução e nada é retentado nem degradado.
 
-Em outras palavras: o padrao `PDDL_EXECUTE_DRY_RUN=true` da homologacao e o que
-mantem o pipeline parecendo saudavel. Desligá-lo quebraria todo job. Por isso
-"tornar todo metodo admissivel acionavel" e pre-requisito de qualquer trabalho de
-execucao real, nao um detalhe.
+O `replan_required` permanece `False` por um motivo diferente de "as alternativas se
+esgotaram": o `Executor` levanta `EXE_NO_HANDLER_REGISTERED` quando `handler is None`,
+e esse `raise` fica *fora* do `try/except` que calcula `alternatives` e define a
+flag. A flag, portanto, nunca é avaliada para um método não registrado. Isso também
+esconde um bug latente — `describe-image` admite `vision-description` e
+`human-review`, e `human-review` *está* registrado, então um replanejamento seria
+possível se a falha tivesse passado pelo caminho do handler.
+
+Em outras palavras: o padrão `PDDL_EXECUTE_DRY_RUN=true` da homologação é o que
+mantém o pipeline parecendo saudável. Desligá-lo quebraria todo job. Por isso
+"tornar todo método admissível acionável" é pré-requisito de qualquer trabalho de
+execução real, não um detalhe.
 
 ## Vereditos
 

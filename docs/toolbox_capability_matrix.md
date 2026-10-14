@@ -104,9 +104,19 @@ REAL execution status: failed   failed_step: 1   replan_required: False
 
 `PddlAccessibilityOrchestrator._build_executor` registers 3 real handlers
 (`mathml`, `latex-verbalizer`, `dual-provider-fusion`) plus a no-op fallback for
-8 names; `DEFAULT_METHOD_COSTS` lists 24 admissible methods. Every plan step whose
-method is one of the other 21 raises at execution time, `replan_required` is
-`False`, so nothing is retried or downgraded.
+8 names, so 11 of the 24 methods in `DEFAULT_METHOD_COSTS` are registered and 20
+are not. The admissible set is slightly smaller than the cost table: the
+obligation tables (`OBLIGATION_BY_TYPE` plus `V23_OBLIGATION_BY_KIND`) admit 23
+methods, of which 19 have no handler. Every plan step whose method is one of
+those raises at execution time and nothing is retried or downgraded.
+
+`replan_required` stays `False` for a different reason than "alternatives were
+exhausted": `Executor` raises `EXE_NO_HANDLER_REGISTERED` when `handler is None`,
+and that raise sits *outside* the `try/except` that computes `alternatives` and
+sets the flag. The flag is therefore never evaluated for an unregistered method.
+That also hides a latent bug — `describe-image` admits `vision-description` and
+`human-review`, and `human-review` *is* registered, so a replan would have been
+possible had the failure gone through the handler path.
 
 In other words: the homologation default `PDDL_EXECUTE_DRY_RUN=true` is what keeps
 the pipeline looking healthy. Turning it off would fail every job. This is why

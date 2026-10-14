@@ -145,11 +145,17 @@ entry, while `http://localhost:8002/v1/health` answers `200`. With
 `PIPELINE_ENGINE=pddl` and `STRUCTURER=toolbox`, every job opens with a Toolbox
 call, so the pipeline aborts at 30% before producing anything.
 
-`docker-compose.production.yml` already declared
-`host.docker.internal:host-gateway`; the staging compose did not. Fixed by giving
-staging the same mapping and defaulting `TOOLBOX_BASE_URL` to
-`http://host.docker.internal:8002`, overridable from `.env` for a Toolbox that
-lives elsewhere. `tests/test_compose_config.py` now pins both.
+`docker-compose.staging.yml` now declares the same
+`host.docker.internal:host-gateway` mapping and defaults `TOOLBOX_BASE_URL` to
+`http://host.docker.internal:8002`. The default is a literal, not an
+interpolation of `TOOLBOX_BASE_URL`: the staging `.env` is also the `env_file`,
+so interpolating that name read the stale public URL and the default never
+applied. The override knob is `STAGING_TOOLBOX_BASE_URL`, for a Toolbox that
+lives elsewhere. `tests/test_compose_config.py` pins both.
+
+Note that `docker-compose.production.yml` does **not** declare the mapping on
+`develop` or `main`; it exists only on the unmerged `fix/v2-readiness` branch
+(PR #128). Staging is therefore ahead of production here, not catching up.
 
 ## What is consistent
 
@@ -168,5 +174,6 @@ lives elsewhere. `tests/test_compose_config.py` now pins both.
 S1, S2 and S3 are reproduced and fixed by the homologation consistency work
 (`fix/health-build-info`, `fix/staging-digest-status`,
 `fix/toolbox-health-build-info`). S4 is the integration review's subject and is
-pinned by `tests/test_toolbox_contract_drift.py`. S5 is documented here and needs a
-product decision on the Toolbox URL.
+pinned by `tests/test_toolbox_contract_drift.py`. S5 is documented here; S6
+resolves the Toolbox URL for the same-host case, and the remaining product
+decision is only whether a Toolbox on another host should be reachable.

@@ -70,3 +70,22 @@ def test_staging_reaches_the_toolbox_without_public_dns():
     base_url = service["environment"]["TOOLBOX_BASE_URL"]
     assert "host.docker.internal" in base_url
     assert "acessilia3.inf.ufg.br" not in base_url
+
+
+def test_staging_toolbox_url_survives_a_stale_env_file():
+    """The staging .env is also the env_file, so it must not win over the default.
+
+    Interpolating ``${TOOLBOX_BASE_URL:-...}`` reads the host shell env / project
+    .env, so a stale ``TOOLBOX_BASE_URL`` in the staging .env shadowed the
+    default and the container kept receiving the public URL. The override knob
+    is therefore a distinct name, and the literal default has to be what the
+    container actually gets.
+    """
+    compose = yaml.safe_load((ROOT_DIR / "docker-compose.staging.yml").read_text())
+    environment = compose["services"]["acessilia"]["environment"]
+
+    assert environment["TOOLBOX_BASE_URL"] == (
+        "${STAGING_TOOLBOX_BASE_URL:-http://host.docker.internal:8002}"
+    )
+    # Interpolating the same name the .env defines is what made the fix inert.
+    assert "${TOOLBOX_BASE_URL" not in environment["TOOLBOX_BASE_URL"]
