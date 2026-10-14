@@ -583,6 +583,9 @@ def _project_text_rows(rows: list[dict[str, Any]], width: int = 0) -> list[dict[
     active: dict[int, tuple[int, tuple[int, str]]] = {}
     projected: list[dict[int, tuple[int, str]]] = []
     identity = 0
+    if len(rows) > 10000:
+        raise ValueError("Table row count exceeds supported limits")
+    projected_cells = 0
     for row in rows:
         if width and sum(cell.get("colspan", 1) for cell in row.get("cells", [])) >= width:
             active = {}
@@ -592,12 +595,20 @@ def _project_text_rows(rows: list[dict[str, Any]], width: int = 0) -> list[dict[
         for cell in row.get("cells", []):
             colspan = cell.get("colspan", 1)
             rowspan = cell.get("rowspan", 1)
+            if type(colspan) is not int or not 1 <= colspan <= 1000:
+                raise ValueError("Table column span exceeds supported limits")
+            if type(rowspan) is not int or not 1 <= rowspan <= 10000:
+                raise ValueError("Table row span exceeds supported limits")
             explicit_column = cell.get("metadata", {}).get("column_index")
-            if type(explicit_column) is int and explicit_column >= 0:
+            if explicit_column is not None:
+                if type(explicit_column) is not int or not 0 <= explicit_column < 1000:
+                    raise ValueError("Table column index exceeds supported limits")
                 cursor = explicit_column
             else:
                 while any(column in columns for column in range(cursor, cursor + colspan)):
                     cursor += 1
+            if cursor + colspan > 1000:
+                raise ValueError("Table width exceeds supported limits")
             entry = (identity, str(cell.get("text", "")).strip())
             identity += 1
             for column in range(cursor, cursor + colspan):
@@ -606,6 +617,9 @@ def _project_text_rows(rows: list[dict[str, Any]], width: int = 0) -> list[dict[
                 if rowspan > 1:
                     following[column] = (rowspan - 1, entry)
             cursor += colspan
+        projected_cells += max(columns, default=-1) + 1
+        if projected_cells > 100000:
+            raise ValueError("Table grid exceeds supported limits")
         projected.append(columns)
         active = following
     return projected
