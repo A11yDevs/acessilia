@@ -64,6 +64,9 @@ jobs:
           load: true
           push: false
           tags: acessilia:release
+          build-args: |
+            GIT_COMMIT=${{ github.sha }}
+            IMAGE_TAG=${{ github.ref_name }}
           cache-from: type=gha,scope=production
           cache-to: type=gha,mode=max,scope=production
 
@@ -92,6 +95,11 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
+          # Release images must also carry the build identity; the verification
+          # build above already passes it, so the published image must match.
+          build-args: |
+            GIT_COMMIT=${{ github.sha }}
+            IMAGE_TAG=${{ github.ref_name }}
           labels: ${{ steps.meta.outputs.labels }}
 
   release:

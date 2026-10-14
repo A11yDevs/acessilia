@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 import subprocess
@@ -101,6 +102,67 @@ exit 0
     assert "pull ghcr.io/a11ydevs/acessilia:release-0.0.2" in (
         staging_dir / "docker-args.txt"
     ).read_text()
+
+
+def test_staging_update_writes_digests_when_no_new_commit(tmp_path):
+    """The health check needs both digests even when there is nothing to update.
+
+    /api/v1/health derives `up_to_date` from `latest_digest` and
+    `running_digest`; writing them only on the update path left the status file
+    with empty digests, so "up to date" could never be reported.
+    """
+    staging_dir = tmp_path / "staging"
+    bin_dir = tmp_path / "bin"
+    staging_dir.mkdir()
+    bin_dir.mkdir()
+    (staging_dir / "var" / "data").mkdir(parents=True)
+    (staging_dir / "docker-compose.staging.yml").write_text("services: {}\n")
+    (staging_dir / ".env").write_text("TRACK_BRANCH=develop\n")
+
+    digest = "sha256:" + "a" * 64
+    (staging_dir / "var" / "data" / ".last_sha").write_text("1234567890abcdef")
+
+    script_path = staging_dir / "staging-update.sh"
+    shutil.copy(ROOT_DIR / "scripts" / "staging-update.sh", script_path)
+    script_path.chmod(0o755)
+
+    _write_executable(
+        bin_dir / "curl",
+        """#!/usr/bin/env bash
+printf '{"sha":"1234567890abcdef"}'
+""",
+    )
+    _write_executable(
+        bin_dir / "docker",
+        f"""#!/usr/bin/env bash
+case "$*" in
+  *"manifest inspect --verbose"*) printf '{{"Descriptor":{{"digest":"{digest}"}}}}\\n' ;;
+  *"image inspect"*) printf 'ghcr.io/a11ydevs/acessilia@{digest} {digest}\\n' ;;
+esac
+exit 0
+""",
+    )
+
+    env = os.environ.copy()
+    env.update(
+        {
+            "GHCR_TOKEN": "token-do-ambiente",
+            "PATH": f"{bin_dir}:{env['PATH']}",
+            "STAGING_DIR": str(staging_dir),
+        }
+    )
+
+    subprocess.run(
+        [str(script_path)], env=env, check=True, capture_output=True, text=True
+    )
+
+    status = json.loads(
+        (staging_dir / "var" / "data" / "staging-status.json").read_text()
+    )
+    assert status["latest_sha"] == "1234567890abcdef"
+    assert status["running_sha"] == "1234567890abcdef"
+    assert status["latest_digest"] == digest
+    assert status["running_digest"] == digest
 
 
 def test_staging_update_falls_back_when_github_request_fails(tmp_path):
