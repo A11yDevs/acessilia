@@ -106,7 +106,7 @@ class Settings:
         "TOOLBOX_ADJUDICATE_PROVIDER", "qwen3-vl-judge"
     )
     toolbox_orientation_provider: str = os.getenv(
-        "TOOLBOX_ORIENTATION_PROVIDER", "rapidocr-orientation"
+        "TOOLBOX_ORIENTATION_PROVIDER", "rapidocr-orient"
     )
     toolbox_media_inspect_provider: str = os.getenv(
         "TOOLBOX_MEDIA_INSPECT_PROVIDER", "pure-media-inspect"

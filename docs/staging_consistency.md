@@ -76,15 +76,19 @@ core can prove its commit once S1 is fixed; the Toolbox cannot.
 Against the running Toolbox (26 capabilities, 25 providers):
 
 ```
-7 contract violation(s):
+5 contract violation(s):
   - core consumes capability 'document.adjudicate.page'  but the Toolbox does not expose it
   - core consumes capability 'document.adjudicate.region' but the Toolbox does not expose it
   - core consumes capability 'document.ocr.page'          but the Toolbox does not expose it
-  - core consumes capability 'document.orientation.detect' but the Toolbox does not expose it
   - core default TOOLBOX_ADJUDICATE_PROVIDER   -> provider 'qwen3-vl-judge'      not registered
   - core default TOOLBOX_PAGE_OCR_PROVIDER     -> provider 'qwen3-vl-page'       not registered
-  - core default TOOLBOX_ORIENTATION_PROVIDER  -> provider 'rapidocr-orientation' not registered
 ```
+
+At the moment of capture this block listed seven violations. The two orientation
+entries were resolved by pointing the client at `image.page.orient` /
+`rapidocr-orient`, the capability and provider the Toolbox actually exposes, so
+the numbers above are the post-fix ones; the reproduction command below returns
+them.
 
 Reproduce with:
 
@@ -92,8 +96,8 @@ Reproduce with:
 python scripts/check_capability_contract.py --snapshot tests/fixtures/toolbox-contract.json
 ```
 
-The four missing capabilities are the PR #125 clients (`toolbox_page_ocr_client.py`,
-`toolbox_adjudicate_client.py`, `toolbox_orientation_client.py`), which have no
+The three missing capabilities are the PR #125 clients
+(`toolbox_page_ocr_client.py`, `toolbox_adjudicate_client.py`), which have no
 production caller. The VLM provider profile that would serve them exists only as
 `scripts/drbench/experiments/slurm/providers-config-vlm.yaml` inside the *core*
 repository, never in the Toolbox catalogue the image is built from.
@@ -134,7 +138,7 @@ Two notes:
   (`document.structure.extract`, `document.layout.analyze`, `document.ocr`,
   `math.recognize`, `math.convert`, `math.verbalize`, `pdf.split`, `pdf.render`,
   `media.inspect`, `artifact.store`, `artifact.retrieve`, `dataset.*`) all exist.
-- The seven Toolbox capabilities with no core client are a product decision, not a
+- The six Toolbox capabilities with no core client are a product decision, not a
   deployment fault; they are tracked in
   `docs/toolbox_capability_matrix.md`.
 

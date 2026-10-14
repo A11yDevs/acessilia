@@ -28,16 +28,19 @@ SNAPSHOT_PATH = REPO_ROOT / "tests" / "fixtures" / "toolbox-contract.json"
 # Drift that already existed when the contract check was introduced. Each entry
 # is a capability the core consumes without the Toolbox exposing it, or a
 # provider default in ``settings.py`` that the Toolbox does not register.
-# Tracked by the integration review; see docs/toolbox_capability_matrix.md.
+#
+# The orientation entries were resolved by pointing the client at
+# image.page.orient / rapidocr-orient, which the Toolbox does expose; the
+# remaining three VLM capabilities have no production caller yet and depend on
+# the Dr.DocBench provider profile shipping in the Toolbox. Tracked by the
+# integration review; see docs/toolbox_capability_matrix.md.
 KNOWN_DRIFT = frozenset(
     {
         "core consumes capability 'document.adjudicate.page' (toolbox_adjudicate_client.py) but the Toolbox does not expose it",
         "core consumes capability 'document.adjudicate.region' (toolbox_adjudicate_client.py) but the Toolbox does not expose it",
         "core consumes capability 'document.ocr.page' (toolbox_page_ocr_client.py) but the Toolbox does not expose it",
-        "core consumes capability 'document.orientation.detect' (toolbox_orientation_client.py) but the Toolbox does not expose it",
         "core default for TOOLBOX_ADJUDICATE_PROVIDER points at provider 'qwen3-vl-judge' which the Toolbox does not register",
         "core default for TOOLBOX_PAGE_OCR_PROVIDER points at provider 'qwen3-vl-page' which the Toolbox does not register",
-        "core default for TOOLBOX_ORIENTATION_PROVIDER points at provider 'rapidocr-orientation' which the Toolbox does not register",
     }
 )
 
@@ -49,7 +52,6 @@ EXPECTED_UNCONSUMED = frozenset(
         "chem.convert",
         "chem.recognize",
         "code.normalize",
-        "image.page.orient",
         "music.omr",
         "text.postprocess",
     }
