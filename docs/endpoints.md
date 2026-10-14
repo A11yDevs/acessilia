@@ -21,7 +21,7 @@ Defined in [backend/api/app.py](../backend/api/app.py), with routes in [backend/
 | Method | Route | What it does | Response | Limit |
 |--------|-------|--------------|----------|-------|
 | POST | `/api/v1/jobs` | Submits a document for processing. Form fields: `document_file`, `mode` (`detalhado`, `medio`, `normal`, `baixo` or `ocr`; default `normal`), `custom_prompt` (must be empty), `thinking_mode` (must be false), `email`, `source`. Validates extension/size and enqueues. | `202` with `task_id`, `job_token`, `position` and message. `400` for invalid input; `422` for unsupported processing options. | 5/min |
-| GET | `/api/v1/jobs/{task_id}` | Checks the state of a job. Requires `X-Job-Token`. | JSON `JobStatus`: `task_id`, `arquivo`, `status`, `progresso` (0–1), `etapa_atual`, `erros[]`, `download_url` (when ready), `criado_em`, `fim`. | 60/min |
+| GET | `/api/v1/jobs/{task_id}` | Checks the state of a job. Requires `X-Job-Token`. | JSON `JobStatus`: `task_id`, `arquivo`, `status`, `progresso` (0–1), `etapa_atual`, `erros[]`, `download_url` (when ready), `email_delivery`, `criado_em`, `fim`. | 60/min |
 | POST | `/api/v1/jobs/{task_id}/cancel` | Requests job cancellation. Requires `X-Job-Token`. | JSON `{task_id, status}`. | 10/min |
 
 ### Download (finished result)
@@ -54,6 +54,9 @@ Observations:
 - `POST /api/v1/jobs` accepts submissions without login and returns `job_token` alongside `task_id`/`position`. Keep this token: `GET /api/v1/jobs/{task_id}` and `POST /api/v1/jobs/{task_id}/cancel` require `X-Job-Token: <job_token>`. Missing/incorrect credentials return 404 without disclosing job existence. Jobs without a saved authorization credential cannot be accessed; resubmit the document if its job token is unavailable.
 - Global history and statistics require `Authorization: Bearer <OBSERVABILITY_API_TOKEN>`, like logs. An unconfigured service returns 503; invalid/missing credentials return 401. This read-only credential cannot replace a job token.
 - `ApiClient` automatically retains tokens returned by submissions through that instance. A new client can pass `job_token` explicitly to `get_job_status`/`cancel_job`. For history/statistics, construct it with `observability_token`. Retain the returned job token if reconnecting after a client restart.
+- Active cancellation reports `cancelling` while cleanup finishes, then `cancelled`. Async operations are interrupted. Already running threads are joined before their files are removed; cancellation does not kill a thread or stop a remote provider. Synchronous provider work remains bounded by its configured timeouts.
+- SQLite persistence runs outside the async event loop. Failed enqueue removes both the durable request and upload; delayed writes cannot overwrite terminal states. Restart recovery finishes `cancelling` jobs as `cancelled`.
+- Web submissions redirect to `/jobs/{task_id}`, retaining the token in an HttpOnly, SameSite=Lax cookie scoped to that page, with Secure on HTTPS. The page puts no token in URLs or HTML, disables caching, and lets users follow/download results even if email fails. The cookie lasts seven days; a bookmarked link requires the same browser and cookie. `email_delivery` reports `pending`, `sent`, `failed` or `unknown` (delivery unconfirmed after restart).
 - Nonempty `custom_prompt` and `thinking_mode=true` return 422 in the active pipeline. Corresponding advanced-panel controls are disabled. Empty/false values remain accepted for compatibility.
 - Pending requests persist before the 202 response in `DATA_DIR/history.db`. Restart recovery requeues queued jobs whose upload still exists, marks previously processing work interrupted for resubmission, and preserves completed status/download links. Downloads retain their normal expiry. Missing uploads produce an explicit error.
 - Run one API worker per `DATA_DIR` on persistent local storage. The `api-worker.lock` lease prevents concurrent startup against the same directory; independent replicas and distributed queues are unsupported. Compose uses the existing persistent `var/` volume.
@@ -69,8 +72,9 @@ Defined in [frontend/web/app.py](../frontend/web/app.py). It is a **server-rende
 |--------|-------|--------------|----------|
 | GET | `/` | Home page with the submission form. | HTML. |
 | GET | `/advanced` | Advanced page; unsupported prompt/thinking controls are disabled. | HTML. |
-| POST | `/process` | Takes the form and forwards the upload to `POST /api/v1/jobs`. | HTML with the confirmation/error. |
+| POST | `/process` | Takes the form and forwards the upload to `POST /api/v1/jobs`. | `303` to `/jobs/{task_id}` with a private cookie; HTML on error. |
 | POST | `/advanced/process` | Same submission; nonempty `custom_prompt` or true `thinking_mode` returns 422. | HTML. |
+| GET | `/jobs/{task_id}` | Follows the job and recovers its files. Requires the private submission cookie. | HTML that refreshes while pending; `404` without authorization, `503` if the API is unavailable. |
 | GET | `/download/{token}` | Download page; queries the API and builds links to `/api/v1/download/...`. | HTML listing the formats. `404` if the token expired. |
 | — | `/static/*` | Static files (CSS, JS, images). | The file itself. |
 

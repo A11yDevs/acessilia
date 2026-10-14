@@ -21,7 +21,7 @@ Definida em [backend/api/app.py](../backend/api/app.py), com as rotas em [backen
 | Método | Rota | O que faz | Retorno | Limite |
 |--------|------|-----------|---------|--------|
 | POST | `/api/v1/jobs` | Envia um documento para processar. Campos do form: `document_file`, `mode` (`detalhado`, `medio`, `normal`, `baixo` ou `ocr`; padrão `normal`), `custom_prompt` (deve ser vazio), `thinking_mode` (deve ser falso), `email`, `source`. Valida extensão/tamanho e enfileira. | `202` com `task_id`, `job_token`, `position` e mensagem. `400` para entrada inválida; `422` para opções não suportadas. | 5/min |
-| GET | `/api/v1/jobs/{task_id}` | Consulta o estado de um job. Requer `X-Job-Token`. | JSON `JobStatus`: `task_id`, `arquivo`, `status`, `progresso` (0–1), `etapa_atual`, `erros[]`, `download_url` (quando pronto), `criado_em`, `fim`. | 60/min |
+| GET | `/api/v1/jobs/{task_id}` | Consulta o estado de um job. Requer `X-Job-Token`. | JSON `JobStatus`: `task_id`, `arquivo`, `status`, `progresso` (0–1), `etapa_atual`, `erros[]`, `download_url` (quando pronto), `email_delivery`, `criado_em`, `fim`. | 60/min |
 | POST | `/api/v1/jobs/{task_id}/cancel` | Solicita o cancelamento de um job. Requer `X-Job-Token`. | JSON `{task_id, status}`. | 10/min |
 
 ### Download (resultado pronto)
@@ -54,6 +54,9 @@ Observações:
 - `POST /api/v1/jobs` aceita submissões sem login e devolve `job_token` além de `task_id`/`position`. Guarde o token: `GET /api/v1/jobs/{task_id}` e `POST /api/v1/jobs/{task_id}/cancel` exigem `X-Job-Token: <job_token>`. Token ausente/incorreto retorna 404 sem revelar se o job existe. Jobs sem credencial de autorização persistida não podem ser acessados; reenvie o documento se o token do job estiver indisponível.
 - Histórico e estatísticas globais exigem `Authorization: Bearer <OBSERVABILITY_API_TOKEN>`, assim como logs. Sem configuração retornam 503; sem credencial válida, 401. Esse token é somente leitura e não substitui o token de job.
 - O cliente `ApiClient` guarda automaticamente tokens das submissões feitas por sua instância. Um novo cliente pode passar `job_token` explicitamente a `get_job_status`/`cancel_job`. Para histórico/estatísticas, instancie com `observability_token`. Guarde o token devolvido se precisar reconectar após reinício do cliente.
+- Cancelamento ativo sinaliza `cancelling` enquanto termina a limpeza; `cancelled` indica o encerramento. Operações assíncronas são interrompidas. Threads já iniciadas são aguardadas antes de remover seus arquivos; cancelar não mata uma thread nem encerra remotamente o provider. Trabalho síncrono continua limitado pelos timeouts configurados dos providers.
+- A persistência SQLite executa fora do loop assíncrono. Falha ao enfileirar remove a solicitação persistida e o upload; gravações atrasadas não substituem estados terminais. No reinício, `cancelling` é finalizado como `cancelled`.
+- O painel redireciona o envio para `/jobs/{task_id}` e mantém o token em cookie HttpOnly, SameSite=Lax, limitado àquela página, com Secure em HTTPS. A página não coloca o token em URLs ou HTML, não usa cache e permite acompanhar/baixar o resultado mesmo se o e-mail falhar. O cookie dura sete dias; o link salvo exige o mesmo navegador e cookie. `email_delivery` informa `pending`, `sent`, `failed` ou `unknown` (entrega não confirmada após reinício).
 - `custom_prompt` não vazio e `thinking_mode=true` retornam 422 no pipeline ativo. Os controles correspondentes ficam desabilitados no painel avançado. Os campos ainda são aceitos com valores vazios/falsos por compatibilidade.
 - Pedidos pendentes são persistidos antes do 202 em `DATA_DIR/history.db`. No reinício, jobs enfileirados com upload disponível voltam à fila; jobs que estavam processando são marcados como interrompidos, exigindo reenvio. Jobs concluídos mantêm seu status/link persistido; os downloads continuam sujeitos à expiração normal. Upload ausente produz erro explícito.
 - Use um único worker de API por `DATA_DIR`, em armazenamento local persistente. A trava `api-worker.lock` impede inicialização concorrente no mesmo diretório; não há suporte a réplicas com filas independentes nem a uma fila distribuída. O Compose usa o volume persistente existente em `var/`.
@@ -69,8 +72,9 @@ Definido em [frontend/web/app.py](../frontend/web/app.py). É um app **renderiza
 |--------|------|-----------|---------|
 | GET | `/` | Página inicial com o formulário de envio. | HTML. |
 | GET | `/advanced` | Página avançada; controles de prompt/thinking não suportados ficam desabilitados. | HTML. |
-| POST | `/process` | Recebe o formulário e repassa o upload para `POST /api/v1/jobs`. | HTML com a confirmação/erro. |
+| POST | `/process` | Recebe o formulário e repassa o upload para `POST /api/v1/jobs`. | `303` para `/jobs/{task_id}` com cookie privado; HTML em caso de erro. |
 | POST | `/advanced/process` | Mesmo envio; `custom_prompt` não vazio ou `thinking_mode` verdadeiro retorna 422. | HTML. |
+| GET | `/jobs/{task_id}` | Acompanha o job e permite recuperar seus arquivos. Exige o cookie privado da submissão. | HTML com atualização automática enquanto pendente; `404` sem autorização, `503` se a API estiver indisponível. |
 | GET | `/download/{token}` | Página de download; consulta a API e monta os links para `/api/v1/download/...`. | HTML listando os formatos. `404` se o token expirou. |
 | — | `/static/*` | Arquivos estáticos (CSS, JS, imagens). | O arquivo. |
 
