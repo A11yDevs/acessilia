@@ -15,7 +15,6 @@ from backend.services.cache import (
 )
 from backend.services.history_service import (
     finalizar_conversao,
-    limpar_orfas,
     registrar_conversao,
 )
 from backend.config.settings import settings
@@ -97,12 +96,6 @@ def _cache_version(
         thinking_mode=thinking_mode,
         configuration=processing_cache_configuration(),
     )
-
-
-def _limpar_tarefas_orfas():
-    limpar_orfas()
-
-
 
 
 def _salvar_json_canonico(canonical_document: dict, source_name: str) -> None:

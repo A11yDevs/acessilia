@@ -53,7 +53,7 @@ def processing_cache_configuration() -> dict[str, Any]:
         "toolbox_pdf_provider", "toolbox_math_recognize_provider", "toolbox_math_provider",
         "toolbox_ocr_provider", "toolbox_page_ocr_provider", "toolbox_adjudicate_provider",
         "toolbox_orientation_provider", "toolbox_media_inspect_provider",
-        "toolbox_media_inspect_enabled", "pdf_split_dpi", "jpg_quality", "callout_known_titles",
+        "toolbox_media_inspect_enabled", "pdf_split_dpi", "jpg_quality", "max_page_width", "pymupdf_text_threshold", "callout_known_titles",
     )
     return {name: getattr(settings, name) for name in fields}
 
