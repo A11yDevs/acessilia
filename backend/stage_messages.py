@@ -69,3 +69,5 @@ STAGE_RESTART_INTERRUPTED = 'Processing interrupted by restart'
 STAGE_RESTART_RESUBMIT = 'Processing interrupted by restart; submit again'
 
 STAGE_PENDING_UPLOAD_MISSING = 'Pending upload no longer exists'
+#: PDDL-pipeline stage while the generated plan is executed for real (PDDL_EXECUTE_DRY_RUN=false).
+STAGE_EXECUTING_PLAN: str = "Executing the plan..."

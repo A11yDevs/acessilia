@@ -203,6 +203,9 @@ class Settings:
             "",
         )
     )
+    pddl_max_replans: int = int(
+        os.getenv("PDDL_MAX_REPLANS", os.getenv("PMV_MAX_REPLANS", "2"))
+    )
     pddl_fast_downward_alias: str = field(
         default_factory=lambda: _str_from_env_alias(
             ("PDDL_FAST_DOWNWARD_ALIAS", "PMV_FAST_DOWNWARD_ALIAS"),

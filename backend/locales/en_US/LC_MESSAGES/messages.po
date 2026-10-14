@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-14 12:14-0300\n"
+"POT-Creation-Date: 2026-09-26 12:29-0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: en_US\n"
@@ -164,6 +164,9 @@ msgstr "Generating the nominal PDDL plan..."
 
 msgid "Validating the plan in dry-run mode..."
 msgstr "Validating the plan in dry-run mode..."
+
+msgid "Executing the plan..."
+msgstr "Executing the plan..."
 
 msgid "Please provide an e-mail address: /email you@example.com"
 msgstr "Please provide an e-mail address: /email you@example.com"
@@ -1731,3 +1734,4 @@ msgid "document"
 msgid_plural "documents"
 msgstr[0] "document"
 msgstr[1] "documents"
+

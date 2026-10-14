@@ -8,7 +8,11 @@ from pathlib import Path
 from typing import Any
 
 import fitz
+from docstruct.fusion.line_numbers import extract_line_numbers
+from docstruct.fusion.tailjoin import join_tail
+from docstruct.fusion.verse import chunk_verse
 from docstruct.tables.ast import effective_section_width
+from docstruct.text.norm_fix import norm_fix
 
 from backend.services.blocking import run_blocking
 from backend.agents.data_agent import DataAgent
@@ -33,6 +37,8 @@ from backend.core.planning.planner_agent import PlannerAgent
 from backend.i18n import t
 from backend.log_messages import (
     LOG_PDDL_ELEMENT_CROP_FAILED,
+    LOG_PDDL_EMPTY_VISION_DESCRIPTION,
+    LOG_PDDL_IGNORED_OPTIONS,
     LOG_PDDL_IMAGES_ENRICHED,
     LOG_PDDL_PREFERRED_PLAN_MISSING,
     LOG_PDDL_TABLES_ENRICHED,
@@ -43,6 +49,7 @@ from backend.stage_messages import (
     STAGE_ENRICHING_TABLES_OCR,
     STAGE_GENERATING_PDDL_PLAN,
     STAGE_VALIDATING_PLAN_DRY_RUN,
+    STAGE_EXECUTING_PLAN,
 )
 from backend.tools.code_tools import normalize_code_text
 from backend.tools.formula_tools import (
@@ -162,6 +169,429 @@ def _run_extract_fused(source_path: Path) -> dict:
         ).result()
 
 
+def _target_elements(
+    manifest: ProcessingManifest, obligation_id: str
+) -> list[ManifestElement]:
+    """Elements an obligation points at, in reading order."""
+    obligation = next(
+        (o for o in manifest.obligations if o.id == obligation_id), None
+    )
+    if obligation is None:
+        return []
+    targets = set(obligation.target_ids)
+    return sorted(
+        (el for el in manifest.elements if el.id in targets),
+        key=lambda el: el.reading_order,
+    )
+
+
+def _missing_obligation(obligation_id: str) -> MethodResult:
+    return MethodResult(
+        success=False,
+        validated=False,
+        message=f"Obrigação não encontrada: {obligation_id}",
+    )
+
+
+def _handle_vision_description_method(
+    manifest: ProcessingManifest, obligation_id: str
+) -> MethodResult:
+    """Require every picture target to already carry a description.
+
+    The description itself is produced before planning (`_enrich_picture_descriptions`
+    tries the vision model and falls back to a deterministic description), so this
+    method validates that the work the planner is asking for actually happened
+    instead of pretending to perform it. A picture that is still undescribed is a
+    real failure and keeps the next admissible method available.
+    """
+    elements = [
+        el
+        for el in _target_elements(manifest, obligation_id)
+        if el.type == "picture"
+    ]
+    if not elements:
+        return MethodResult(
+            success=False,
+            validated=False,
+            message="Nenhuma imagem encontrada para a obrigação",
+        )
+
+    # The canonical signal is the element text: `_enrich_picture_descriptions`
+    # writes the model description there, and the extractor may already deliver a
+    # valid caption. `_has_meaningful_text` is the same predicate the enrichment
+    # step uses to decide what still needs a description, so honouring anything
+    # else here would disagree with the work that actually ran.
+    undescribed = [el for el in elements if not _has_meaningful_text(el)]
+    if undescribed:
+        return MethodResult(
+            success=False,
+            validated=False,
+            message=(
+                "Imagem sem descrição textual: "
+                + ", ".join(el.id for el in undescribed)
+            ),
+        )
+    return MethodResult(
+        success=True,
+        validated=True,
+        message=f"Descrição validada para {len(elements)} imagem(ns)",
+    )
+
+
+def _handle_pandoc_table_method(
+    manifest: ProcessingManifest, obligation_id: str
+) -> MethodResult:
+    """Require the table targets to carry a structured AST."""
+    elements = [
+        el for el in _target_elements(manifest, obligation_id) if el.type == "table"
+    ]
+    if not elements:
+        return MethodResult(
+            success=False,
+            validated=False,
+            message="Nenhuma tabela encontrada para a obrigação",
+        )
+
+    missing = [el for el in elements if not (el.metadata or {}).get("table_ast")]
+    if missing:
+        return MethodResult(
+            success=False,
+            validated=False,
+            message=(
+                "Tabela sem estrutura tabular: "
+                + ", ".join(el.id for el in missing)
+            ),
+        )
+    return MethodResult(
+        success=True,
+        validated=True,
+        message=f"Estrutura tabular validada para {len(elements)} tabela(s)",
+    )
+
+
+def _handle_pandoc_code_method(
+    manifest: ProcessingManifest, obligation_id: str
+) -> MethodResult:
+    """Normalize code targets in place and record the normalized language."""
+    elements = [
+        el for el in _target_elements(manifest, obligation_id) if el.type == "code"
+    ]
+    if not elements:
+        return MethodResult(
+            success=False,
+            validated=False,
+            message="Nenhum bloco de código encontrado para a obrigação",
+        )
+
+    normalized = 0
+    for element in elements:
+        text = normalize_code_text(element.text or "")
+        if not text:
+            continue
+        element.text = text
+        element.metadata["code_normalized"] = True
+        normalized += 1
+
+    if normalized != len(elements):
+        return MethodResult(
+            success=False,
+            validated=False,
+            message=(
+                f"Código normalizado em {normalized}/{len(elements)} bloco(s)"
+            ),
+        )
+    return MethodResult(
+        success=True,
+        validated=True,
+        message=f"Código normalizado em {normalized} bloco(s)",
+    )
+
+
+def _handle_pymupdf_region_method(
+    manifest: ProcessingManifest, obligation_id: str
+) -> MethodResult:
+    """Require a region crop for every target so the region was actually inspected."""
+    elements = _target_elements(manifest, obligation_id)
+    if not elements:
+        return _missing_obligation(obligation_id)
+
+    missing = [el for el in elements if not (el.metadata or {}).get("region_crop")]
+    if missing:
+        return MethodResult(
+            success=False,
+            validated=False,
+            message=(
+                "Região não inspecionada (sem recorte): "
+                + ", ".join(el.id for el in missing)
+            ),
+        )
+    return MethodResult(
+        success=True,
+        validated=True,
+        message=f"Região inspecionada para {len(elements)} elemento(s)",
+    )
+
+
+def _handle_latex_normalizer_method(
+    manifest: ProcessingManifest, obligation_id: str
+) -> MethodResult:
+    """Normalize the LaTeX of every formula target in place."""
+    elements = [
+        el
+        for el in _target_elements(manifest, obligation_id)
+        if el.type == "formula"
+    ]
+    if not elements:
+        return MethodResult(
+            success=False,
+            validated=False,
+            message="Nenhuma fórmula encontrada para a obrigação",
+        )
+
+    normalized = 0
+    for element in elements:
+        cleaned = normalize_latex(element.text or "")
+        if not cleaned:
+            continue
+        element.metadata["latex_normalized"] = cleaned
+        normalized += 1
+
+    if normalized != len(elements):
+        return MethodResult(
+            success=False,
+            validated=False,
+            message=(
+                f"LaTeX normalizado em {normalized}/{len(elements)} fórmula(s)"
+            ),
+        )
+    return MethodResult(
+        success=True,
+        validated=True,
+        message=f"LaTeX normalizado em {normalized} fórmula(s)",
+    )
+
+
+def _handle_norm_fix_method(
+    manifest: ProcessingManifest, obligation_id: str
+) -> MethodResult:
+    """Apply the deterministic text cleanups (ligatures, hyphenation, NBSP)."""
+    elements = _target_elements(manifest, obligation_id)
+    if not elements:
+        return _missing_obligation(obligation_id)
+
+    fixed = 0
+    for element in elements:
+        current = element.text or ""
+        if not current:
+            continue
+        cleaned = norm_fix(current)
+        if cleaned != current:
+            element.text = cleaned
+            element.metadata["norm_fixed"] = True
+        fixed += 1
+
+    if not fixed:
+        return MethodResult(
+            success=False,
+            validated=False,
+            message="Nenhum texto elegível para normalização",
+        )
+    return MethodResult(
+        success=True,
+        validated=True,
+        message=f"Normalização determinística aplicada em {fixed} elemento(s)",
+    )
+
+
+def _handle_extract_line_numbers_method(
+    manifest: ProcessingManifest, obligation_id: str
+) -> MethodResult:
+    """Record the marginal line numbers the extractor found on the target text."""
+    elements = _target_elements(manifest, obligation_id)
+    if not elements:
+        return _missing_obligation(obligation_id)
+
+    total = 0
+    for element in elements:
+        numbers = extract_line_numbers(element.text or "")
+        element.metadata["line_numbers"] = numbers
+        total += len(numbers)
+
+    if not total:
+        return MethodResult(
+            success=False,
+            validated=False,
+            message="Nenhum número de linha marginal encontrado",
+        )
+    return MethodResult(
+        success=True,
+        validated=True,
+        message=f"{total} número(s) de linha extraído(s)",
+    )
+
+
+def _handle_chunk_verse_method(
+    manifest: ProcessingManifest, obligation_id: str
+) -> MethodResult:
+    """Split the target text into verse-sized chunks recorded in metadata."""
+    elements = _target_elements(manifest, obligation_id)
+    if not elements:
+        return _missing_obligation(obligation_id)
+
+    chunked = 0
+    for element in elements:
+        chunks = chunk_verse(element.text or "")
+        if not chunks:
+            continue
+        element.metadata["verse_chunks"] = chunks
+        chunked += 1
+
+    if not chunked:
+        return MethodResult(
+            success=False,
+            validated=False,
+            message="Nenhum bloco de verso elegível para fragmentação",
+        )
+    return MethodResult(
+        success=True,
+        validated=True,
+        message=f"Verso fragmentado em {chunked} elemento(s)",
+    )
+
+
+def _handle_tailjoin_method(
+    manifest: ProcessingManifest, obligation_id: str
+) -> MethodResult:
+    """Join the trailing short blocks of the target text into the recorded result."""
+    elements = _target_elements(manifest, obligation_id)
+    if not elements:
+        return _missing_obligation(obligation_id)
+
+    joined = 0
+    for element in elements:
+        merged = join_tail(element.text or "")
+        if not merged:
+            continue
+        element.metadata["tailjoined"] = merged
+        joined += 1
+
+    if not joined:
+        return MethodResult(
+            success=False,
+            validated=False,
+            message="Nenhum bloco de cauda elegível para união",
+        )
+    return MethodResult(
+        success=True,
+        validated=True,
+        message=f"Blocos de cauda unidos em {joined} elemento(s)",
+    )
+
+
+def _handle_human_review_method(
+    manifest: ProcessingManifest, obligation_id: str
+) -> MethodResult:
+    """Record the obligation as escalated to a human reviewer.
+
+    `human-review` is the terminal method every obligation lists as its last
+    admissible option. It is not an automated method that can succeed on its own,
+    so resolving it must be an explicit decision: an obligation reaching this
+    handler is escalated and stays visible in the execution report, instead of
+    being marked satisfied by a handler that did nothing.
+    """
+    obligation = next(
+        (o for o in manifest.obligations if o.id == obligation_id), None
+    )
+    if obligation is None:
+        return _missing_obligation(obligation_id)
+
+    return MethodResult(
+        success=False,
+        validated=False,
+        message=(
+            "Escalonado para revisão humana: nenhum método automático satisfez "
+            f"{obligation.kind} ({obligation_id})"
+        ),
+    )
+
+
+def _handle_deterministic_heading_repair_method(
+    manifest: ProcessingManifest, obligation_id: str
+) -> MethodResult:
+    """Clamp a heading whose level skips ahead of its predecessor.
+
+    The compiled obligation carries the previous level as evidence; the repair is
+    deterministic, so a missing level is a real failure rather than something to
+    guess at.
+    """
+    obligation = next(
+        (o for o in manifest.obligations if o.id == obligation_id), None
+    )
+    if obligation is None:
+        return _missing_obligation(obligation_id)
+
+    elements = {
+        el.id: el for el in _target_elements(manifest, obligation_id)
+    }
+    repaired = 0
+    for element in elements.values():
+        if element.type != "heading":
+            continue
+        previous = _previous_heading_level(manifest, element)
+        if previous and element.hierarchy_level > previous + 1:
+            element.hierarchy_level = previous + 1
+            element.metadata["heading_repaired"] = True
+        repaired += 1
+
+    if not repaired:
+        return MethodResult(
+            success=False,
+            validated=False,
+            message="Nenhum título encontrado para a obrigação",
+        )
+    return MethodResult(
+        success=True,
+        validated=True,
+        message=f"Hierarquia de títulos verificada em {repaired} título(s)",
+    )
+
+
+def _previous_heading_level(
+    manifest: ProcessingManifest, element: ManifestElement
+) -> int:
+    """Level of the closest heading that precedes the element in reading order."""
+    previous = 0
+    for candidate in sorted(
+        (el for el in manifest.elements if el.type == "heading"),
+        key=lambda el: el.reading_order,
+    ):
+        if candidate.id == element.id:
+            return previous
+        previous = candidate.hierarchy_level
+    return previous
+
+
+DETERMINISTIC_METHOD_HANDLERS: dict[
+    str, Callable[[ProcessingManifest, str], MethodResult]
+] = {
+    #: Method name -> handler for every method whose work is already done before
+    #: planning (or can be done without a model call). A method the manifest can
+    #: require but that is absent from here is reported to the planner as
+    #: unavailable, so the plan never contains a step that can only fail.
+    "vision-description": _handle_vision_description_method,
+    "pandoc-table": _handle_pandoc_table_method,
+    "pandoc-code": _handle_pandoc_code_method,
+    "pymupdf-region": _handle_pymupdf_region_method,
+    "latex-normalizer": _handle_latex_normalizer_method,
+    "norm-fix": _handle_norm_fix_method,
+    "line-number-extractor": _handle_extract_line_numbers_method,
+    "verse-chunker": _handle_chunk_verse_method,
+    "tailjoin": _handle_tailjoin_method,
+    "tailjoin-positioned": _handle_tailjoin_method,
+    "deterministic-heading-repair": _handle_deterministic_heading_repair_method,
+}
+
+
 def _handle_dual_provider_fusion_method(
     manifest: ProcessingManifest, obligation_id: str
 ) -> MethodResult:
@@ -271,10 +701,12 @@ class PddlAccessibilityOrchestrator:
         fast_downward_search: str = "astar(blind())",
         enable_ocr: bool = True,
         extractor_backend: str = "toolbox",
+        max_replans: int = 2,
     ) -> None:
         self.planner_backend = planner_backend
         self.preferred_plan = preferred_plan
         self.execute_dry_run = execute_dry_run
+        self.max_replans = max(0, max_replans)
         self.fast_downward = fast_downward
         self.fast_downward_alias = fast_downward_alias
         self.fast_downward_search = fast_downward_search
@@ -302,28 +734,18 @@ class PddlAccessibilityOrchestrator:
     def _build_executor() -> ExecutorAgent:
         registry = MethodRegistry()
 
-        def _noop_handler(
-            _manifest: ProcessingManifest, _obligation_id: str
-        ) -> MethodResult:
-            return MethodResult(success=False, validated=False, message="This method requires a real implementation or human review")
-
-        for method in (
-            "docling",
-            "hierarchy-llm",
-            "canonical-builder",
-            "accessibility-checker",
-            "html-exporter",
-            "local-summarizer",
-            "vision",
-            "human-review",
-        ):
-            registry.register(method, _noop_handler)
-
+        # Model-backed or cross-cutting methods already wired by the pipeline.
         registry.register("mathml", _handle_mathml_method)
         registry.register("latex-verbalizer", _handle_latex_verbalizer_method)
         registry.register(
             "dual-provider-fusion", _handle_dual_provider_fusion_method
         )
+        for method, handler in DETERMINISTIC_METHOD_HANDLERS.items():
+            registry.register(method, handler)
+
+        # `human-review` has its own semantics: it is the terminal escalation the
+        # pipeline performs when no automated method can satisfy an obligation.
+        registry.register("human-review", _handle_human_review_method)
 
         return ExecutorAgent(registry, domain=DomainBundle.load())
 
@@ -380,14 +802,47 @@ class PddlAccessibilityOrchestrator:
         plan, comparison = await run_blocking(self._build_plan, manifest)
 
         execution_report: ExecutionReport | None = None
-        if self.execute_dry_run:
-            if status_callback:
-                await status_callback(t(STAGE_VALIDATING_PLAN_DRY_RUN))
-            _, execution_report = await run_blocking(
+        if status_callback:
+            await status_callback(
+                t(STAGE_VALIDATING_PLAN_DRY_RUN)
+                if self.execute_dry_run
+                else t(STAGE_EXECUTING_PLAN)
+            )
+        # `execute_dry_run` selects the *mode* of execution; it used to also gate
+        # whether the executor ran at all, so setting it to false produced a plan
+        # that was never executed and a report of None. Real execution is now the
+        # other branch instead of silence.
+        manifest, execution_report = await run_blocking(
+            self.executor.execute,
+            plan,
+            manifest,
+            dry_run=self.execute_dry_run,
+        )
+
+        # A `replan-required` report means the executor recorded `(tried ?o ?m)`
+        # for a method that failed and left the obligation pending. Without this
+        # loop the status was terminal in production: the pipeline returned a plan
+        # it already knew was wrong, and `complete-job` never ran, so no document
+        # was produced.
+        replans = 0
+        while (
+            execution_report.replan_required
+            and replans < self.max_replans
+            and not self.execute_dry_run
+        ):
+            replans += 1
+            logger.info(
+                "PDDL: replanejando ({}/{}) após {}",
+                replans,
+                self.max_replans,
+                execution_report.status,
+            )
+            plan, comparison = await run_blocking(self._build_plan, manifest)
+            manifest, execution_report = await run_blocking(
                 self.executor.execute,
                 plan,
                 manifest,
-                dry_run=True,
+                dry_run=False,
             )
 
         payload = build_pddl_structured_payload(
@@ -407,9 +862,15 @@ class PddlAccessibilityOrchestrator:
         self,
         manifest: ProcessingManifest,
     ) -> tuple[NominalPlan, PlanningComparison | None]:
+        # Tell the compiler which methods the executor can actually run. Without
+        # this the planner happily emits steps for methods that have no handler,
+        # and the failure only surfaces at execution time -- after the model-backed
+        # work has already been paid for.
+        unavailable = self._unavailable_methods(manifest)
         if self.planner_backend == "both":
             _, plans, comparison = self.planner.compare(
                 manifest,
+                unavailable_methods=unavailable,
                 fast_downward=self.fast_downward,
                 fast_downward_alias=self.fast_downward_alias,
                 fast_downward_search=self.fast_downward_search,
@@ -425,12 +886,28 @@ class PddlAccessibilityOrchestrator:
 
         _, plan = self.planner.plan(
             manifest,
+            unavailable_methods=unavailable,
             backend=self.planner_backend,
             fast_downward=self.fast_downward,
             fast_downward_alias=self.fast_downward_alias,
             fast_downward_search=self.fast_downward_search,
         )
         return plan, None
+
+    def _unavailable_methods(self, manifest: ProcessingManifest) -> list[str]:
+        """Methods this manifest can ask for that no registered handler implements.
+
+        The set is restricted to the methods the manifest actually declares: the
+        compiler rejects unknown names on purpose, so passing every method that
+        exists anywhere would be reported as a typo instead of a capability gap.
+        """
+        registered = set(self.executor.registry.names())
+        requested = {
+            method
+            for obligation in manifest.obligations
+            for method in obligation.admissible_methods
+        }
+        return sorted(requested - registered)
 
 
 async def _enrich_picture_descriptions(
@@ -527,7 +1004,18 @@ async def _enrich_picture_descriptions(
                     )
             if element.page_number is None and page_number >= 1:
                 element.page_number = page_number
-            enriched += 1
+            # A model that answers with an empty description used to be counted as
+            # an enrichment, producing an element that still had no text and an
+            # obligation that could not be satisfied. Report it so the operator
+            # sees the model refused instead of a silent gap.
+            if _has_meaningful_text(element):
+                enriched += 1
+            else:
+                logger.warning(
+                    t(LOG_PDDL_EMPTY_VISION_DESCRIPTION).format(
+                        element_id=element.id
+                    )
+                )
 
     if enriched:
         logger.info(t(LOG_PDDL_IMAGES_ENRICHED).format(count=enriched))

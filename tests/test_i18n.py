@@ -136,6 +136,44 @@ def test_default_checked_in_catalog_tree_is_generated_by_repo_layout(tmp_path: P
         assert (DEFAULT_REPOS_CATALOGS_DIR / locale / "LC_MESSAGES" / "messages.po").is_file()
         for extension in ("po", "mo"):
             assert (generated_root / locale / "LC_MESSAGES" / f"messages.{extension}").is_file()
+def test_checked_in_catalogs_match_what_the_generator_produces(tmp_path) -> None:
+    """The checked-in ``.po`` sources must be exactly what ``build_locales`` writes.
+
+    This used to regenerate straight into ``backend/locales`` and only assert the
+    four files existed, so every test run rewrote the checked-in sources and left
+    the worktree dirty even when nothing had changed. Comparing content instead
+    makes the test a real check and keeps the repository read-only:
+
+    - drift between the message table and the checked-in catalogs now fails, and
+      the fix is to rerun ``python -m scripts.gen_locale_catalogs``;
+    - the generator has to stay deterministic, which is why
+      :data:`gen_locales.CATALOG_CREATION_DATE` is fixed rather than derived from
+      the clock.
+    """
+    generated = gen_locales.build_locales(tmp_path)
+
+    for locale, (po_path, _) in generated.items():
+        checked_in = DEFAULT_REPOS_CATALOGS_DIR / locale / "LC_MESSAGES" / "messages.po"
+        assert checked_in.is_file(), f"{checked_in} ausente"
+        assert po_path.read_bytes() == checked_in.read_bytes(), (
+            f"{locale}: backend/locales está defasado em relação à tabela de "
+            "mensagens; rode `python -m scripts.gen_locale_catalogs`"
+        )
+
+
+def test_catalog_generation_is_deterministic(tmp_path) -> None:
+    """Regenerating twice must produce byte-identical catalogs.
+
+    A clock-derived ``POT-Creation-Date`` made the previously checked-in files
+    differ on every run, which is what turned every test run into a source-tree
+    modification.
+    """
+    first = gen_locales.build_locales(tmp_path / "a")
+    second = gen_locales.build_locales(tmp_path / "b")
+
+    for locale in first:
+        assert first[locale][0].read_bytes() == second[locale][0].read_bytes()
+        assert first[locale][1].read_bytes() == second[locale][1].read_bytes()
 
 
 def test_server_locale_negotiated_from_shell_env(monkeypatch: pytest.MonkeyPatch) -> None:
