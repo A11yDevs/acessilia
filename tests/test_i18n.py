@@ -191,3 +191,14 @@ def test_set_request_locale_overrides_server_locale(monkeypatch: pytest.MonkeyPa
     i8n.reset_request_locale(token)
     i8n._catalog_for.cache_clear()
     assert i8n.t("Downloading file...") == "Downloading file..."
+
+
+def test_generated_catalogs_preserve_versioned_messages(tmp_path):
+    from babel.messages.pofile import read_po
+    generated = gen_locales.build_locales(tmp_path)
+    for locale, (po_path, _) in generated.items():
+        with po_path.open("rb") as stream:
+            actual = {msg.id: msg.string for msg in read_po(stream) if msg.id}
+        with (DEFAULT_REPOS_CATALOGS_DIR / locale / "LC_MESSAGES/messages.po").open("rb") as stream:
+            expected = {msg.id: msg.string for msg in read_po(stream) if msg.id}
+        assert actual == expected

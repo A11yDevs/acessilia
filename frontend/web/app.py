@@ -40,6 +40,7 @@ from backend.tools.logger import logger
 from frontend.clients.api_client import ApiError
 from frontend.clients import default_client
 from frontend.web.messages import (
+    WEB_ERROR_INVALID_RECEIPT,
     WEB_ADVANCED_BACK_LINK,
     WEB_ADVANCED_HEADLINE,
     WEB_ADVANCED_INTRO,
@@ -384,7 +385,7 @@ async def _submit_via_api(
 
     task_id = str(result["task_id"])
     if not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", task_id) or not result.get("job_token"):
-        raise HTTPException(status_code=502, detail="Invalid job receipt from API")
+        raise HTTPException(status_code=502, detail=t(WEB_ERROR_INVALID_RECEIPT))
     receipt_path = f"/jobs/{task_id}"
     response = RedirectResponse(url=receipt_path, status_code=303)
     response.set_cookie(
@@ -461,7 +462,10 @@ async def handle_advanced_upload(
             context={**_web_strings(), "error": t(WEB_ERROR_PROMPT_TOO_LONG)}
         )
     if prompt or thinking_mode:
-        raise HTTPException(status_code=422, detail=t("Custom instructions and thinking mode are unavailable for this pipeline"))
+        return templates.TemplateResponse(
+            request=request, name="advanced.html", status_code=422,
+            context={**_web_strings(), "error": t("Custom instructions and thinking mode are unavailable for this pipeline")},
+        )
     return await _submit_via_api(
         request,
         template_name="advanced.html",

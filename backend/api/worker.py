@@ -24,6 +24,10 @@ from backend.log_messages import (
     LOG_PDF_UA_GENERATION_FAILED,
 )
 from backend.stage_messages import (
+    STAGE_RESTART_CANCELLED,
+    STAGE_RESTART_INTERRUPTED,
+    STAGE_RESTART_RESUBMIT,
+    STAGE_PENDING_UPLOAD_MISSING,
     STAGE_CANCELLED_IN_QUEUE,
     STAGE_CANCELLED_BY_USER,
     STAGE_EXPORTING_DOCX,
@@ -444,16 +448,16 @@ async def recover_pending_jobs() -> None:
         task_id = record["task_id"]
         status = record["status"]
         if status["status"] == "cancelling":
-            status.update(status="cancelled", fim=time.time(), etapa_atual="Cancelled during restart")
+            status.update(status="cancelled", fim=time.time(), etapa_atual=t(STAGE_RESTART_CANCELLED))
             await run_blocking(save_status, task_id, status)
             Path(record["request"]["file_path"]).unlink(missing_ok=True)
             await finalizar_conversao(task_id, status="cancelled")
             continue
         if status["status"] == "processing":
-            status.update(status="error", fim=time.time(), etapa_atual="Processing interrupted by restart")
-            status.setdefault("erros", []).append("Processing interrupted by restart; submit again")
+            status.update(status="error", fim=time.time(), etapa_atual=t(STAGE_RESTART_INTERRUPTED))
+            status.setdefault("erros", []).append(t(STAGE_RESTART_RESUBMIT))
             await run_blocking(save_status, task_id, status)
-            await finalizar_conversao(task_id, status="error", erro="Processing interrupted by restart")
+            await finalizar_conversao(task_id, status="error", erro=t(STAGE_RESTART_INTERRUPTED))
             continue
         if unified_queue.get_position(task_id):
             continue
@@ -462,7 +466,7 @@ async def recover_pending_jobs() -> None:
         payload["output_dir"] = Path(payload["output_dir"]) if payload.get("output_dir") else None
         job = ApiJob(**payload)
         if not job.file_path.is_file():
-            status.update(status="error", fim=time.time(), erros=["Pending upload no longer exists"])
+            status.update(status="error", fim=time.time(), erros=[t(STAGE_PENDING_UPLOAD_MISSING)])
             await run_blocking(save_status, task_id, status)
             continue
         queued_jobs[task_id] = status

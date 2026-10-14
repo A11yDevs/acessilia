@@ -162,6 +162,7 @@ def test_advanced_upload_rejects_unsupported_options(web_client):
         },
     )
     assert resp.status_code == 422
+    assert 'action="/advanced/process"' in resp.text
     assert web_client.fake.submitted == []
 
 

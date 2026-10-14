@@ -149,3 +149,5 @@ WEB_JOB_ERRORS = "Processing notices"
 WEB_JOB_HOME = "Send another document"
 
 WEB_JOB_EMAIL_UNKNOWN = "Email delivery could not be confirmed. You can download your files here."
+
+WEB_ERROR_INVALID_RECEIPT = "Invalid job receipt from API"

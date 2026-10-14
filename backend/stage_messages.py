@@ -61,3 +61,11 @@ STAGE_GENERATING_PDDL_PLAN: str = "Generating the nominal PDDL plan..."
 STAGE_VALIDATING_PLAN_DRY_RUN: str = "Validating the plan in dry-run mode..."
 
 STAGE_CANCELLATION_REQUESTED: str = "Cancellation requested; finishing the current operation safely"
+
+STAGE_RESTART_CANCELLED = 'Cancelled during restart'
+
+STAGE_RESTART_INTERRUPTED = 'Processing interrupted by restart'
+
+STAGE_RESTART_RESUBMIT = 'Processing interrupted by restart; submit again'
+
+STAGE_PENDING_UPLOAD_MISSING = 'Pending upload no longer exists'
