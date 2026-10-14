@@ -1,6 +1,7 @@
 import asyncio
 import tempfile
 import time
+import uuid
 from pathlib import Path
 
 from aiogram import Router, F
@@ -100,7 +101,7 @@ async def handle_document(message: Message) -> None:
     if document is None:
         return
 
-    filename = document.file_name or "document"
+    filename = Path((document.file_name or "document").replace("\\", "/")).name
     file_size = document.file_size or 0
 
     valid, error_msg = validate_file(filename, file_size)
@@ -145,6 +146,7 @@ async def process_file(
         filename (str): Original filename to store and report inside the job; no default (required).
         mode (str): Description-detail preset requested by the user's last /detalhado|/medio|/baixo command (default: "normal").
     """
+    filename = Path(filename.replace("\\", "/")).name or "document"
     message_thread_id = message.message_thread_id
     tracker = StatusTracker(
         message.bot, message.chat.id, filename, message_thread_id=message_thread_id
@@ -153,8 +155,9 @@ async def process_file(
     email = user_context.user_emails.get(state_key)
 
     try:
+        settings.temp_dir.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(dir=settings.temp_dir) as tmpdir:
-            input_path = Path(tmpdir) / filename
+            input_path = Path(tmpdir) / f"{uuid.uuid4().hex}{Path(filename).suffix.lower()}"
             await tracker(t(MSG_DOWNLOADING_FILE))
             await download_file(message.bot, file_id, input_path)
 
