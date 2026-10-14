@@ -234,3 +234,15 @@ def test_drbench_renderers_keep_unmarked_header_cells() -> None:
         '<table><thead><tr><th scope="col">Mês</th><th scope="col">Valor</th></tr></thead>'
         '<tbody><tr><td>Janeiro</td><td>10</td></tr></tbody></table>'
     )
+
+
+def test_explicit_full_row_replaces_conflicting_rowspan():
+    from docstruct.tables.ast import linearize_table_for_text
+    table = {"header": [{"cells": [{"text": "H1"}, {"text": "H2"}]}], "body": [
+        {"cells": [{"text": "A", "rowspan": 2}, {"text": "B"}]},
+        {"cells": [{"text": "C"}, {"text": "D"}]},
+        {"cells": [{"text": "E"}, {"text": "F"}]},
+    ]}
+    assert linearize_table_for_text({"table_ast": table}) == [
+        "Row 1: H1: A; H2: B", "Row 2: H1: C; H2: D", "Row 3: H1: E; H2: F",
+    ]

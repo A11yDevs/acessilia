@@ -578,24 +578,31 @@ def linearize_table_for_text(block: dict[str, Any]) -> list[str]:
     return lines
 
 
-def _project_text_rows(rows: list[dict[str, Any]]) -> list[dict[int, tuple[int, str]]]:
+def _project_text_rows(rows: list[dict[str, Any]], width: int = 0) -> list[dict[int, tuple[int, str]]]:
     """Place cells on logical columns, carrying row spans into following rows."""
     active: dict[int, tuple[int, tuple[int, str]]] = {}
     projected: list[dict[int, tuple[int, str]]] = []
     identity = 0
     for row in rows:
+        if width and sum(cell.get("colspan", 1) for cell in row.get("cells", [])) >= width:
+            active = {}
         columns = {column: entry for column, (_, entry) in active.items()}
         following = {column: (left - 1, entry) for column, (left, entry) in active.items() if left > 1}
         cursor = 0
         for cell in row.get("cells", []):
             colspan = cell.get("colspan", 1)
             rowspan = cell.get("rowspan", 1)
-            while any(column in columns for column in range(cursor, cursor + colspan)):
-                cursor += 1
+            explicit_column = cell.get("metadata", {}).get("column_index")
+            if type(explicit_column) is int and explicit_column >= 0:
+                cursor = explicit_column
+            else:
+                while any(column in columns for column in range(cursor, cursor + colspan)):
+                    cursor += 1
             entry = (identity, str(cell.get("text", "")).strip())
             identity += 1
             for column in range(cursor, cursor + colspan):
                 columns[column] = entry
+                following.pop(column, None)
                 if rowspan > 1:
                     following[column] = (rowspan - 1, entry)
             cursor += colspan
@@ -623,7 +630,7 @@ def _effective_headers(header_rows: list[dict[str, Any]]) -> list[str]:
 
 def _linearized_body_rows(body_rows: list[dict[str, Any]], headers: list[str]) -> list[str]:
     result: list[str] = []
-    for row in _project_text_rows(body_rows):
+    for row in _project_text_rows(body_rows, len(headers)):
         groups: dict[int, tuple[str, list[str]]] = {}
         for column, (identity, text) in sorted(row.items()):
             if identity not in groups:
