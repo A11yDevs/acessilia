@@ -3,7 +3,9 @@ import traceback
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import urlsplit
+import re
+from starlette.concurrency import run_in_threadpool
 
 from fastapi import (
     FastAPI,
@@ -35,7 +37,7 @@ from backend.log_messages import (
 )
 from backend.tools.access_log_filter import AccessLogFilter
 from backend.tools.logger import logger
-from frontend.clients.api_client import ApiClient, ApiError
+from frontend.clients.api_client import ApiError
 from frontend.clients import default_client
 from frontend.web.messages import (
     WEB_ADVANCED_BACK_LINK,
@@ -76,6 +78,16 @@ from frontend.web.messages import (
     WEB_LOGO_ALT,
     WEB_RATE_LIMIT_EXCEEDED,
     WEB_SUCCESS_QUEUED,
+    WEB_JOB_TITLE,
+    WEB_JOB_PENDING,
+    WEB_JOB_DOWNLOAD,
+    WEB_JOB_EMAIL_FAILED,
+    WEB_JOB_EMAIL_SENT,
+    WEB_JOB_EMAIL_UNKNOWN,
+    WEB_JOB_UNAVAILABLE,
+    WEB_JOB_STATUS,
+    WEB_JOB_ERRORS,
+    WEB_JOB_HOME,
 )
 
 
@@ -331,7 +343,7 @@ async def _submit_via_api(
     thinking_mode: bool = False,
 ):
     try:
-        file_path = _save_upload(document_file)
+        file_path = await run_in_threadpool(_save_upload, document_file)
     except HTTPException as e:
         return templates.TemplateResponse(
             request=request,
@@ -370,10 +382,51 @@ async def _submit_via_api(
     finally:
         _remove_file(file_path)
 
-    page = "/advanced" if template_name == "advanced.html" else "/"
-    return RedirectResponse(
-        url=f"{page}?position={int(result['position'])}&email={quote(email, safe='')}",
-        status_code=303,
+    task_id = str(result["task_id"])
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", task_id) or not result.get("job_token"):
+        raise HTTPException(status_code=502, detail="Invalid job receipt from API")
+    receipt_path = f"/jobs/{task_id}"
+    response = RedirectResponse(url=receipt_path, status_code=303)
+    response.set_cookie(
+        "acessilia_job", result["job_token"], path=receipt_path,
+        max_age=7 * 24 * 60 * 60, httponly=True, samesite="lax",
+        secure=request.url.scheme == "https",
+    )
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    return response
+
+
+@app.get("/jobs/{task_id}", response_class=HTMLResponse)
+@limiter.limit("60/minute")
+async def job_receipt(request: Request, task_id: str):
+    token = request.cookies.get("acessilia_job")
+    if not token:
+        raise HTTPException(status_code=404, detail="Job not found")
+    unavailable = False
+    try:
+        job = await client.get_job_status(task_id, job_token=token)
+    except ApiError as exc:
+        if exc.status_code in {401, 403, 404}:
+            raise HTTPException(status_code=404, detail="Job not found") from None
+        job, unavailable = {}, True
+    except Exception:
+        job, unavailable = {}, True
+    download_path = urlsplit(job.get("download_url") or "").path
+    if not re.fullmatch(r"/download/[A-Za-z0-9_-]+", download_path):
+        download_path = None
+    refresh = unavailable or job.get("status") in {"queued", "processing", "cancelling"}
+    refresh = refresh or job.get("email_delivery") == "pending"
+    return templates.TemplateResponse(
+        request=request, name="job.html", status_code=503 if unavailable else 200,
+        headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"},
+        context={**_web_strings(), "job": job, "download_path": download_path,
+            "refresh": refresh, "unavailable": unavailable,
+            "job_title": t(WEB_JOB_TITLE), "job_pending": t(WEB_JOB_PENDING),
+            "job_download": t(WEB_JOB_DOWNLOAD), "job_email_failed": t(WEB_JOB_EMAIL_FAILED),
+            "job_email_sent": t(WEB_JOB_EMAIL_SENT), "job_email_unknown": t(WEB_JOB_EMAIL_UNKNOWN), "job_unavailable": t(WEB_JOB_UNAVAILABLE),
+            "job_status": t(WEB_JOB_STATUS), "job_errors": t(WEB_JOB_ERRORS),
+            "job_home": t(WEB_JOB_HOME)},
     )
 
 

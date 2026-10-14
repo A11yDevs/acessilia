@@ -10,7 +10,7 @@ from frontend.web.messages import (  # noqa: E402
     WEB_ADVANCED_HEADLINE,
     WEB_ERROR_INTERNAL,
     WEB_INDEX_HEADLINE,
-    WEB_SUCCESS_QUEUED,
+    WEB_JOB_PENDING,
 )
 
 
@@ -44,7 +44,12 @@ class _FakeApiClient:
                 "source": source,
             }
         )
-        return {"task_id": "web12345", "position": 1, "message": "ok"}
+        return {"task_id": "web12345", "job_token": "private-web-token", "position": 1, "message": "ok"}
+
+    async def get_job_status(self, task_id, job_token=None):
+        if task_id != "web12345" or job_token != "private-web-token":
+            raise ApiError(404, "Job not found")
+        return {"task_id": task_id, "arquivo": "doc.pdf", "status": "queued", "etapa_atual": "Queued", "erros": []}
 
     async def get_download_info(self, token):
         if token == "bad":
@@ -107,22 +112,16 @@ def test_advanced_page(web_client):
 
 
 def test_upload_submits_via_api(web_client):
-    """Uploading a document queues it and the panel shows the success notice.
-
-    The success notice is localized (WEB_SUCCESS_QUEUED), so the exact words vary
-    by active locale; the test builds the expected text from the translated
-    constant with the known position and e-mail, then confirms the API client
-    received a correctly formed submission.
-    """
+    """Uploading redirects to a private, refreshable job receipt."""
     resp = web_client.post(
         "/process",
         files={"document_file": ("doc.pdf", _fake_pdf_bytes(), "application/pdf")},
         data={"email": "test@example.com"},
     )
     assert resp.status_code == 200
-    # The fake API reports the job landed at queue position 1.
-    expected_success = t(WEB_SUCCESS_QUEUED).format(position=1, email="test@example.com")
-    assert expected_success in resp.text
+    assert resp.url.path == "/jobs/web12345"
+    assert t(WEB_JOB_PENDING) in resp.text
+    assert "private-web-token" not in resp.text
     assert len(web_client.fake.submitted) == 1
     sub = web_client.fake.submitted[0]
     assert sub["filename"] == "doc.pdf"
@@ -192,6 +191,12 @@ def test_download_proxy_delegates_to_api(web_client):
     assert resp.text == "tok:txt"
     assert 'filename="doc.txt"' in resp.headers["content-disposition"]
     assert not web_client.fake.download_destination.exists()
+
+
+def test_download_proxy_rejects_internal_drbench_markdown(web_client):
+    resp = web_client.get("/api/v1/download/tok/drbench_md")
+    assert resp.status_code == 400
+    assert web_client.fake.download_destination is None
 
 
 def test_download_proxy_removes_partial_file_after_api_failure(web_client):
@@ -271,3 +276,62 @@ def test_download_page_uses_real_client(monkeypatch):
     assert download_resp.status_code == 200
     assert download_resp.content == b"conteudo acessivel"
     assert 'filename="doc.txt"' in download_resp.headers["content-disposition"]
+
+
+def test_receipt_cookie_is_private_and_scoped_to_job(web_client):
+    response = web_client.post("/process", files={"document_file": ("doc.pdf", _fake_pdf_bytes(), "application/pdf")},
+        data={"email": "test@example.com"}, follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers["location"] == "/jobs/web12345"
+    cookie = response.headers["set-cookie"]
+    assert "HttpOnly" in cookie
+    assert "SameSite=lax" in cookie
+    assert "Path=/jobs/web12345" in cookie
+    assert "private-web-token" not in response.text
+    assert web_client.get("/jobs/someone-else").status_code == 404
+    assert web_client.get("/jobs/web12345", headers={"Cookie": ""}).status_code == 404
+
+
+@pytest.mark.parametrize("delivery", ["sent", "failed"])
+def test_receipt_recovers_result_after_refresh(web_client, monkeypatch, delivery):
+    from frontend.web.messages import WEB_JOB_EMAIL_FAILED, WEB_JOB_EMAIL_SENT
+    web_client.post("/process", files={"document_file": ("doc.pdf", _fake_pdf_bytes(), "application/pdf")},
+        data={"email": "test@example.com"})
+
+    async def status(task_id, job_token=None):
+        assert job_token == "private-web-token"
+        return {"arquivo": "doc.pdf", "status": "done", "email_delivery": delivery,
+            "download_url": "http://web.invalid/download/tok", "erros": []}
+
+    monkeypatch.setattr(web_client.fake, "get_job_status", status)
+    for _ in range(2):
+        page = web_client.get("/jobs/web12345")
+        assert page.status_code == 200
+        assert 'href="/download/tok"' in page.text
+        assert t(WEB_JOB_EMAIL_FAILED if delivery == "failed" else WEB_JOB_EMAIL_SENT) in page.text
+        assert page.headers["cache-control"] == "no-store"
+        assert page.headers["referrer-policy"] == "no-referrer"
+        assert "private-web-token" not in page.text
+        assert 'http-equiv="refresh"' not in page.text
+
+
+def test_receipt_survives_temporary_api_failure(web_client, monkeypatch):
+    from frontend.web.messages import WEB_JOB_UNAVAILABLE
+    web_client.post("/process", files={"document_file": ("doc.pdf", _fake_pdf_bytes(), "application/pdf")},
+        data={"email": "test@example.com"})
+
+    async def unavailable(*args, **kwargs):
+        raise ApiError(503, "upstream unavailable")
+
+    monkeypatch.setattr(web_client.fake, "get_job_status", unavailable)
+    page = web_client.get("/jobs/web12345")
+    assert page.status_code == 503
+    assert t(WEB_JOB_UNAVAILABLE) in page.text
+    assert 'http-equiv="refresh"' in page.text
+
+
+def test_receipt_cookie_requires_https_when_served_over_https(web_client):
+    response = web_client.post("https://testserver/process", files={"document_file": ("doc.pdf", _fake_pdf_bytes(), "application/pdf")},
+        data={"email": "test@example.com"}, follow_redirects=False)
+    assert response.status_code == 303
+    assert "; Secure" in response.headers["set-cookie"]

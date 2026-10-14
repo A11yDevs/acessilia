@@ -1697,3 +1697,36 @@ msgid "document"
 msgid_plural "documents"
 msgstr[0] "documento"
 msgstr[1] "documentos"
+
+msgid "Your document"
+msgstr "Seu documento"
+
+msgid "Keep this page open or bookmark it to follow your document."
+msgstr "Mantenha esta página aberta ou salve-a nos favoritos para acompanhar seu documento."
+
+msgid "Download your files"
+msgstr "Baixar seus arquivos"
+
+msgid "The email could not be sent. You can download your files here."
+msgstr "Não foi possível enviar o e-mail. Você pode baixar seus arquivos aqui."
+
+msgid "The result email was sent. You can also download your files here."
+msgstr "O e-mail com o resultado foi enviado. Você também pode baixar seus arquivos aqui."
+
+msgid "Job status is temporarily unavailable. Refresh this page to try again."
+msgstr "O status está temporariamente indisponível. Atualize esta página para tentar novamente."
+
+msgid "Status"
+msgstr "Status"
+
+msgid "Processing notices"
+msgstr "Avisos do processamento"
+
+msgid "Send another document"
+msgstr "Enviar outro documento"
+
+msgid "Email delivery could not be confirmed. You can download your files here."
+msgstr "Não foi possível confirmar a entrega do e-mail. Você pode baixar seus arquivos aqui."
+
+msgid "Cancellation requested; finishing the current operation safely"
+msgstr "Cancelamento solicitado; concluindo a operação atual com segurança"

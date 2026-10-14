@@ -136,3 +136,16 @@ WEB_AGENT_DATA_INSTRUCTIONS_FALLBACK: str = (
     "Convert tables and mathematical formulas from images into accessible "
     "structured text (Markdown for tables, LaTeX for formulas)."
 )
+
+# Private job receipt and result recovery.
+WEB_JOB_TITLE = "Your document"
+WEB_JOB_PENDING = "Keep this page open or bookmark it to follow your document."
+WEB_JOB_DOWNLOAD = "Download your files"
+WEB_JOB_EMAIL_FAILED = "The email could not be sent. You can download your files here."
+WEB_JOB_EMAIL_SENT = "The result email was sent. You can also download your files here."
+WEB_JOB_UNAVAILABLE = "Job status is temporarily unavailable. Refresh this page to try again."
+WEB_JOB_STATUS = "Status"
+WEB_JOB_ERRORS = "Processing notices"
+WEB_JOB_HOME = "Send another document"
+
+WEB_JOB_EMAIL_UNKNOWN = "Email delivery could not be confirmed. You can download your files here."

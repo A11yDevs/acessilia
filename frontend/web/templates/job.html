@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="{{ locale }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer">
+    {% if refresh %}<meta http-equiv="refresh" content="5">{% endif %}
+    <title>{{ job_title }}</title>
+</head>
+<body>
+    <main class="container mt-5" style="max-width: 48rem; margin: 2rem auto; padding: 1rem;">
+        <h1>{{ job_title }}</h1>
+        {% if unavailable %}
+        <p role="alert">{{ job_unavailable }}</p>
+        {% else %}
+        <h2>{{ job.arquivo }}</h2>
+        <p>{{ job_status }}: {{ job.etapa_atual or job.status }}</p>
+        {% if refresh %}<p>{{ job_pending }}</p>{% endif %}
+        {% if job.email_delivery == 'failed' %}<p role="alert">{{ job_email_failed }}</p>{% endif %}
+        {% if job.email_delivery == 'unknown' %}<p role="alert">{{ job_email_unknown }}</p>{% endif %}
+        {% if job.email_delivery == 'sent' %}<p>{{ job_email_sent }}</p>{% endif %}
+        {% if download_path %}<p><a href="{{ download_path }}">{{ job_download }}</a></p>{% endif %}
+        {% if job.erros %}
+        <h2>{{ job_errors }}</h2>
+        <ul>{% for error in job.erros %}<li>{{ error }}</li>{% endfor %}</ul>
+        {% endif %}
+        {% endif %}
+        <p><a href="/">{{ job_home }}</a></p>
+    </main>
+</body>
+</html>
