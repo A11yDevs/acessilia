@@ -104,7 +104,8 @@ async def test_api_rejects_inactive_pipeline_options_before_enqueue(isolated):
 
 
 @pytest.mark.asyncio
-async def test_ocr_text_is_not_a_visual_description(monkeypatch):
+@pytest.mark.parametrize("description", ["A map with two connected regions", "Map", "Logo", "A"])
+async def test_ocr_text_is_not_a_visual_description(monkeypatch, description):
     from backend.agents.output_schemas import VisionOutput
     from backend.agents.pddl_orchestrator import _enrich_picture_descriptions
     from tests.test_pddl_orchestrator import _sample_manifest
@@ -124,7 +125,7 @@ async def test_ocr_text_is_not_a_visual_description(monkeypatch):
             self.__class__.calls += 1
             return VisionOutput(
                 kind="description",
-                description="A map with two connected regions",
+                description=description,
                 language="en",
                 confidence=0.8,
             )

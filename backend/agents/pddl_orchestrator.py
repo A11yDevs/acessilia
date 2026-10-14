@@ -446,7 +446,7 @@ async def _enrich_picture_descriptions(
         element
         for element in manifest.elements
         if element.type == "picture"
-        and not (element.metadata.get("vision_description_complete") and _has_meaningful_text(element))
+        and not element.metadata.get("vision_description_complete")
     ]
     if not pictures and _is_mostly_visual_manifest(manifest):
         pictures = [
