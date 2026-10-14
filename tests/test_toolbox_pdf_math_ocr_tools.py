@@ -109,8 +109,10 @@ class TestPdfTools:
             assert p.exists()
             assert p.suffix == ".pdf"
 
+    @respx.mock
     def test_split_fallback(self, tmp_path):
         """Toolbox offline → local-only split."""
+        respx.route().mock(side_effect=httpx.ConnectError("synthetic offline provider"))
         pdf = _make_test_pdf(tmp_path, pages=2)
         result = toolbox_split_pdf(pdf, tmp_path, max_pages=5)
         assert len(result) == 2
@@ -125,15 +127,19 @@ class TestPdfTools:
         assert isinstance(result, bytes)
         assert result[:4] == b"\x89PNG"
 
+    @respx.mock
     def test_render_fallback_page_number(self, tmp_path):
         """Fallback renders the exact requested page (not just page 1)."""
+        respx.route().mock(side_effect=httpx.ConnectError("synthetic offline provider"))
         pdf = _make_test_pdf(tmp_path, pages=2)
         result = toolbox_render_page(pdf, page_number=2)
         assert isinstance(result, bytes)
         assert result[:4] == b"\x89PNG"
 
+    @respx.mock
     def test_render_fallback(self, tmp_path):
         """Toolbox offline → local PyMuPDF render."""
+        respx.route().mock(side_effect=httpx.ConnectError("synthetic offline provider"))
         pdf = _make_test_pdf(tmp_path)
         result = toolbox_render_page(pdf, page_number=1)
         assert isinstance(result, bytes)
@@ -151,8 +157,10 @@ class TestMathTools:
         result = toolbox_convert_latex("E = mc^2", direction="latex-to-mathml")
         assert "<math>" in result
 
+    @respx.mock
     def test_convert_fallback(self):
         """Toolbox unavailable → empty string."""
+        respx.route().mock(side_effect=httpx.ConnectError("synthetic offline provider"))
         result = toolbox_convert_latex("E = mc^2")
         assert result == ""
 
@@ -166,19 +174,25 @@ class TestMathTools:
         result = toolbox_verbalize_latex("E = mc^2", language="pt-BR")
         assert "elevado" in result
 
+    @respx.mock
     def test_verbalize_fallback(self):
+        respx.route().mock(side_effect=httpx.ConnectError("synthetic offline provider"))
         result = toolbox_verbalize_latex("E = mc^2")
         assert result == ""
 
+    @respx.mock
     def test_recognize_fallback(self):
         """Invalid image → empty list (Toolbox offline)."""
+        respx.route().mock(side_effect=httpx.ConnectError("synthetic offline provider"))
         result = toolbox_recognize_formula(b"not-a-real-image")
         assert result == []
 
 
 class TestOcrTools:
+    @respx.mock
     def test_ocr_fallback(self):
         """Toolbox offline → empty string. No real PDF fixture required."""
+        respx.route().mock(side_effect=httpx.ConnectError("synthetic offline provider"))
         result = toolbox_ocr_text(Path("/nonexistent/file.pdf"))
         assert result == ""
 
