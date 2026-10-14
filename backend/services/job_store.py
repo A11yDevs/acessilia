@@ -58,6 +58,10 @@ def load_record(task_id: str) -> dict[str, Any] | None:
 
 
 def save_status(task_id: str, status: dict) -> None:
+    status = {key: value for key, value in status.items() if key != "resultado"}
+    destination = status.get("status")
+    if destination not in {"queued", "processing", "cancelling", "cancelled", "done", "error"}:
+        raise ValueError("A valid job status is required")
     with connection() as conn:
         conn.execute(
             """UPDATE api_jobs SET status=? WHERE task_id=?
@@ -71,7 +75,7 @@ def save_status(task_id: str, status: dict) -> None:
                    COALESCE(json_extract(status, '$.status'), '') = 'cancelled'
                    AND ? != 'cancelled'
                )""",
-            (json.dumps(status), task_id, status.get("status"), status.get("status"), status.get("status")),
+            (json.dumps(status), task_id, destination, destination, destination),
         )
 
 

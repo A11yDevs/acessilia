@@ -7,6 +7,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from starlette.concurrency import run_in_threadpool
 
+from backend.api import worker
 from backend.api.job_auth import require_job_access
 from backend.api.limiter import limiter
 from backend.api.schemas import CancelResponse, JobStatus, UploadResponse
@@ -20,6 +21,7 @@ from backend.api.worker import (
 )
 from backend.config.settings import settings
 from backend.i18n import t
+from backend.stage_messages import STAGE_QUEUE_WAITING_POSITION
 from backend.log_messages import (
     API_CANCEL_STATE_INVALID,
     API_JOB_QUEUED,
@@ -123,14 +125,16 @@ async def submit_job(
         await run_blocking(save_request, task_id, job_token, payload, get_job_status(task_id))
         position = await unified_queue.enqueue(item)
     except (Exception, asyncio.CancelledError):
-        from backend.api.worker import queued_jobs
-
-        queued_jobs.pop(task_id, None)
+        worker.queued_jobs.pop(task_id, None)
         try:
             await run_blocking(delete_request, task_id)
         finally:
             file_path.unlink(missing_ok=True)
         raise
+    status = worker.queued_jobs.get(task_id)
+    if status is not None and status.get("status") == "queued":
+        status["etapa_atual"] = t(STAGE_QUEUE_WAITING_POSITION).format(position=position)
+        await run_blocking(save_status, task_id, status)
     logger.info(t(LOG_API_JOB_ENQUEUED).format(task_id=task_id, source=source))
     return UploadResponse(
         task_id=task_id,

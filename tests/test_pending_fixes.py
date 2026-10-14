@@ -339,3 +339,37 @@ async def test_submission_cancellation_does_not_leave_durable_request(isolated_r
             assert not list((settings.temp_dir / "uploads").iterdir())
         finally:
             release.set()
+
+
+@pytest.mark.parametrize("existing", ["queued", "processing", "cancelling", "done", "error", "cancelled"])
+@pytest.mark.parametrize("missing", [{}, {"status": None}])
+def test_status_without_destination_is_rejected(isolated_runtime, existing, missing):
+    job_store.save_request("job", "token", {}, {"status": existing})
+    with pytest.raises(ValueError):
+        job_store.save_status("job", missing)
+    assert job_store.load_record("job")["status"]["status"] == existing
+
+
+def test_status_persistence_excludes_canonical_result(isolated_runtime):
+    job_store.save_request("job", "token", {}, {"status": "queued"})
+    status = {"status": "done", "resultado": {"text": "large document"}, "email_delivery": "sent"}
+    job_store.save_status("job", status)
+    assert job_store.load_record("job")["status"] == {"status": "done", "email_delivery": "sent"}
+    assert "resultado" in status
+
+
+@pytest.mark.asyncio
+async def test_queue_status_uses_actual_enqueue_position(isolated_runtime, monkeypatch):
+    from backend.api.app import create_app
+    from backend.i18n import t
+    from backend.stage_messages import STAGE_QUEUE_WAITING_POSITION
+    queue, _ = isolated_runtime
+    monkeypatch.setattr(queue, "qsize", lambda: 99)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(create_app()), base_url="http://test") as client:
+        response = await client.post("/api/v1/jobs", files={"document_file": ("doc.pdf", b"%PDF", "application/pdf")})
+    assert response.status_code == 202
+    result = response.json()
+    assert result["position"] == 1
+    expected = t(STAGE_QUEUE_WAITING_POSITION).format(position=1)
+    assert worker.get_job_status(result["task_id"])["etapa_atual"] == expected
+    assert job_store.load_record(result["task_id"])["status"]["etapa_atual"] == expected

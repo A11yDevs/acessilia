@@ -95,7 +95,7 @@ def get_job_status(task_id: str, *, durable: bool = True) -> dict[str, Any] | No
 
         position = unified_queue.get_position(task_id)
         if position > 0:
-            status["etapa_atual"] = f"Aguardando na fila (Posicao: {position})"
+            status["etapa_atual"] = t(STAGE_QUEUE_WAITING_POSITION).format(position=position)
     return status
 
 

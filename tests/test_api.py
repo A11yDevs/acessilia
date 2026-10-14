@@ -351,7 +351,10 @@ def test_queued_position_is_recalculated(client, monkeypatch):
 
     status = client.get("/api/v1/jobs/queuedsecond")
     assert status.status_code == 200
-    assert status.json()["etapa_atual"] == "Aguardando na fila (Posicao: 1)"
+    from backend.i18n import t
+    from backend.stage_messages import STAGE_QUEUE_WAITING_POSITION
+
+    assert status.json()["etapa_atual"] == t(STAGE_QUEUE_WAITING_POSITION).format(position=1)
 
 
 def test_status_unknown(client):
