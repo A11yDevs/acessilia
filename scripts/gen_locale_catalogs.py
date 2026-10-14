@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import sys
 from collections.abc import Sequence
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from backend.core.execution.messages import (
@@ -411,6 +412,22 @@ DEFAULT_LOCALES_DIR: Path = PROJECT_ROOT / "backend" / "locales"
 SUPPORTED_LOCALES: tuple[str, ...] = ("en_US", "pt_BR")
 #: Locale whose strings act as canonical English identity lookups.
 DEFAULT_LOCALE: str = "en_US"
+
+#: Value stamped into ``POT-Creation-Date``.
+#:
+#: Babel defaults the header to ``datetime.now()``, so regenerating the catalogs
+#: rewrote that one header line and left ``backend/locales`` dirty even when not a
+#: single message had changed. `tests/test_i18n.py` regenerates the checked-in tree
+#: on purpose, which made every test run a source-tree modification and, when the
+#: worktree was not restored, made unrelated tests time-sensitive.
+#:
+#: The value is fixed rather than absent because Babel's ``format_datetime``
+#: requires a timezone-aware datetime for the header. Translation content is what
+#: the catalogs are for; the timestamp only made the generated files
+#: non-reproducible.
+CATALOG_CREATION_DATE: datetime = datetime(
+    2026, 9, 26, 12, 29, tzinfo=timezone(timedelta(hours=-3))
+)
 
 #: Canonical English msgids surfaced to end users at runtime; every id must carry a non-blank pt_BR translation in
 #: TRANSLATIONS before catalogs are allowed to be written out, per the module's completeness-validation contract.
@@ -1729,7 +1746,7 @@ def build_locales(locales_dir: Path = DEFAULT_LOCALES_DIR) -> dict[str, tuple[Pa
 
     result: dict[str, tuple[Path, Path]] = {}
     for locale in SUPPORTED_LOCALES:
-        catalog = Catalog(locale=locale)
+        catalog = Catalog(locale=locale, creation_date=CATALOG_CREATION_DATE)
         if locale == DEFAULT_LOCALE:
             for msgid in MESSAGES:
                 catalog.add(msgid, msgid)

@@ -442,6 +442,18 @@ msgstr "Invalid format"
 msgid "File not found"
 msgstr "File not found"
 
+msgid "Log file not found"
+msgstr "Log file not found"
+
+msgid "Observability access not configured"
+msgstr "Observability access not configured"
+
+msgid "Invalid token"
+msgstr "Invalid token"
+
+msgid "Token allows read-only access"
+msgstr "Token allows read-only access"
+
 msgid "The image must receive a description or be marked decorative."
 msgstr "The image must receive a description or be marked decorative."
 
@@ -1669,14 +1681,3 @@ msgid_plural "documents"
 msgstr[0] "document"
 msgstr[1] "documents"
 
-msgid "Log file not found"
-msgstr "Log file not found"
-
-msgid "Observability access not configured"
-msgstr "Observability access not configured"
-
-msgid "Invalid token"
-msgstr "Invalid token"
-
-msgid "Token allows read-only access"
-msgstr "Token allows read-only access"
