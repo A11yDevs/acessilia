@@ -123,11 +123,40 @@ Duas observações:
 - `STRUCTURER` aparece duas vezes. O valor efetivo é `toolbox`, correto para o pipeline
   PDDL, mas a duplicata é uma armadilha latente para quem editar o arquivo depois.
 - `TOOLBOX_BASE_URL` aponta para a URL pública do proxy reverso
-  `https://www.acessilia3.inf.ufg.br/toolbox`. Com `PIPELINE_ENGINE=pddl` e
-  `STRUCTURER=toolbox`, **todo** documento processado em homologação delega sua extração
-  estrutural de volta pela proxy pública em vez de usar o contêiner da Toolbox no mesmo
-  host. Vale confirmar se é intencional; uma URL de loopback removeria uma dependência
-  externa desnecessária do caminho crítico.
+  `https://www.acessilia3.inf.ufg.br/toolbox`. Não é apenas um salto externo
+  desnecessário — quebra a implantação neste ambiente; ver S6.
+
+### S6 — A homologação não processa nenhum documento (crítico, resolvido)
+
+Enviar um documento real para o core implantado falha imediatamente:
+
+```json
+{"task_id":"c55ed243","status":"error","progresso":0.3,
+ "etapa_atual":"Falha no processamento",
+ "erros":["Toolbox indisponivel em https://www.acessilia3.inf.ufg.br/toolbox:
+           [Errno -3] Temporary failure in name resolution"]}
+```
+
+O `TOOLBOX_BASE_URL` do `.env` de homologação aponta para a URL pública da proxy
+reversa enquanto a Toolbox roda no mesmo host. O host não resolve o próprio nome
+público: `getent hosts www.acessilia3.inf.ufg.br` falha e não há entrada em
+`/etc/hosts`, enquanto `http://localhost:8002/v1/health` responde `200`. Com
+`PIPELINE_ENGINE=pddl` e `STRUCTURER=toolbox`, todo job começa com uma chamada à
+Toolbox, então o pipeline aborta em 30% antes de produzir qualquer coisa.
+
+O `docker-compose.staging.yml` agora declara o mesmo mapeamento
+`host.docker.internal:host-gateway` e usa
+`http://host.docker.internal:8002` como padrão de `TOOLBOX_BASE_URL`. O padrão é
+um literal, não uma interpolação de `TOOLBOX_BASE_URL`: o `.env` de homologação
+também é o `env_file`, então interpolar esse nome lia a URL pública obsoleta e o
+padrão nunca se aplicava. A chave de sobrescrita é `STAGING_TOOLBOX_BASE_URL`,
+para uma Toolbox que viva em outro lugar. O `tests/test_compose_config.py` fixa
+os dois.
+
+Vale notar que o `docker-compose.production.yml` **não** declara o mapeamento em
+`develop` nem em `main`; ele existe apenas no branch não mergeado
+`fix/v2-readiness` (PR #128). Nesse ponto, portanto, a homologação está à frente
+da produção, e não correndo atrás dela.
 
 ## O que está consistente
 
@@ -145,5 +174,6 @@ Duas observações:
 S1, S2 e S3 são reproduzidos e corrigidos pelo trabalho de consistência de homologação
 (`fix/health-build-info`, `fix/staging-digest-status`,
 `fix/toolbox-health-build-info`). S4 é o objeto da revisão de integração e está fixado
-por `tests/test_toolbox_contract_drift.py`. S5 é documentado aqui e precisa de decisão de
-produto sobre a URL da Toolbox.
+por `tests/test_toolbox_contract_drift.py`. S5 é documentado aqui; S6 resolve a URL da
+Toolbox para o caso de mesmo host, e a decisão de produto restante é apenas se uma
+Toolbox em outro host deve ser alcançável.
