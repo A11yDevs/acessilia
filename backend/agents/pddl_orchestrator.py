@@ -10,6 +10,7 @@ from typing import Any
 import fitz
 from docstruct.tables.ast import effective_section_width
 
+from backend.services.blocking import run_blocking
 from backend.agents.data_agent import DataAgent
 from backend.agents.output_schemas import DataOutput, VisionOutput
 from backend.agents.vision_agent import VisionAgent
@@ -139,10 +140,9 @@ def _run_extract_fused(source_path: Path) -> dict:
     loop ativo (Agno Workflow, API), ``.result()`` ainda bloqueia o loop
     chamador até a fusão terminar. O contrato dos handlers permanece
     síncrono; quem invoca o executor a partir de código async deve rodar
-    o executor inteiro via ``await asyncio.to_thread(...)`` para não
+    o executor inteiro via ``await run_blocking(...)`` para não
     bloquear o event loop principal.
     """
-    import asyncio
     import concurrent.futures
 
     from backend.pipeline.fusion import extract_fused
@@ -344,7 +344,7 @@ class PddlAccessibilityOrchestrator:
 
         if status_callback:
             await status_callback(t(STAGE_ANALYZING_STRUCTURAL))
-        manifest = await asyncio.to_thread(
+        manifest = await run_blocking(
             self.information_structural.process,
             file_path.resolve(),
             language="pt-BR",
@@ -377,13 +377,13 @@ class PddlAccessibilityOrchestrator:
 
         if status_callback:
             await status_callback(t(STAGE_GENERATING_PDDL_PLAN))
-        plan, comparison = await asyncio.to_thread(self._build_plan, manifest)
+        plan, comparison = await run_blocking(self._build_plan, manifest)
 
         execution_report: ExecutionReport | None = None
         if self.execute_dry_run:
             if status_callback:
                 await status_callback(t(STAGE_VALIDATING_PLAN_DRY_RUN))
-            _, execution_report = await asyncio.to_thread(
+            _, execution_report = await run_blocking(
                 self.executor.execute,
                 plan,
                 manifest,
@@ -477,7 +477,7 @@ async def _enrich_picture_descriptions(
         if fallback_page_number is None and len(manifest.pages) == 1:
             fallback_page_number = manifest.pages[0].page_number
 
-        image_bytes, page_number = await asyncio.to_thread(
+        image_bytes, page_number = await run_blocking(
             _extract_picture_bytes,
             source_file,
             element,
@@ -622,7 +622,7 @@ async def _enrich_table_structures(
         if fallback_page_number is None and len(manifest.pages) == 1:
             fallback_page_number = manifest.pages[0].page_number
 
-        image_bytes, page_number = await asyncio.to_thread(
+        image_bytes, page_number = await run_blocking(
             _extract_picture_bytes,
             source_file,
             element,

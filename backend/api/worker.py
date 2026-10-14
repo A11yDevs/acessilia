@@ -14,6 +14,7 @@ from typing import Any
 from backend.agents.state_manager import TaskCancelledError, state_manager
 from backend.config.settings import settings
 from backend.services.job_store import load_record, save_status, pending_records
+from backend.services.blocking import run_blocking
 from backend.i18n import t
 from backend.log_messages import (
     LOG_JOB_CANCELLED,
@@ -24,7 +25,7 @@ from backend.log_messages import (
 )
 from backend.stage_messages import (
     STAGE_CANCELLED_IN_QUEUE,
-    STAGE_ENQUEUED_WAITING,
+    STAGE_CANCELLED_BY_USER,
     STAGE_EXPORTING_DOCX,
     STAGE_EXPORTING_DRBENCH_MD,
     STAGE_EXPORTING_HTML,
@@ -78,12 +79,14 @@ def register_queued_job(
     }
 
 
-def get_job_status(task_id: str) -> dict[str, Any] | None:
+def get_job_status(task_id: str, *, durable: bool = True) -> dict[str, Any] | None:
     task = state_manager.obter(task_id)
     if task is not None:
         return dict(task)
     queued = queued_jobs.get(task_id)
     if not queued:
+        if not durable:
+            return None
         record = load_record(task_id)
         return record["status"] if record else None
     status = dict(queued)
@@ -96,10 +99,27 @@ def get_job_status(task_id: str) -> dict[str, Any] | None:
     return status
 
 
+async def get_job_status_async(task_id: str) -> dict[str, Any] | None:
+    current = get_job_status(task_id, durable=False)
+    if current is not None:
+        return current
+    record = await run_blocking(load_record, task_id)
+    if record is None:
+        return None
+    status = record["status"]
+    return status
+
+
 def cancel_job_status(task_id: str) -> bool:
     task = state_manager.obter(task_id)
     if task is not None:
-        return state_manager.cancelar(task_id)
+        from backend.services.queue_service import unified_queue
+
+        active = task_id in unified_queue._active_tasks
+        accepted = state_manager.cancelar(task_id, pending=active)
+        if accepted and active:
+            unified_queue.cancel(task_id)
+        return accepted
     queued = queued_jobs.get(task_id)
     if queued is not None and queued.get("status") == "queued":
         from backend.services.queue_service import unified_queue
@@ -130,9 +150,17 @@ class JobExecutor:
     def __init__(self) -> None:
         self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=3)
 
-    def _run_in_executor(self, fn, *args, **kwargs):
+    async def _run_in_executor(self, fn, *args, **kwargs):
         loop = asyncio.get_running_loop()
-        return loop.run_in_executor(self._executor, functools.partial(fn, *args, **kwargs))
+        operation = loop.run_in_executor(self._executor, functools.partial(fn, *args, **kwargs))
+        try:
+            return await asyncio.shield(operation)
+        except asyncio.CancelledError:
+            try:
+                await operation
+            except Exception:
+                pass
+            raise
 
     async def run(self, job: ApiJob) -> None:
         task_id = job.task_id
@@ -148,7 +176,7 @@ class JobExecutor:
                 state_manager.criar_tarefa(
                     job.file_path, task_id=task_id, arquivo=job.filename
                 )
-            save_status(task_id, get_job_status(task_id))
+            await run_blocking(save_status, task_id, get_job_status(task_id))
             await registrar_conversao(
                 task_id=task_id,
                 arquivo=job.filename,
@@ -306,6 +334,7 @@ class JobExecutor:
                 task_id, etapa=t(STAGE_PROCESSING_COMPLETED), progresso=1.0,
                 status="done", resultado=json.dumps(canonical, ensure_ascii=False),
             )
+            await run_blocking(save_status, task_id, get_job_status(task_id))
             await finalizar_conversao(
                 task_id=task_id,
                 status="done",
@@ -329,7 +358,10 @@ class JobExecutor:
                 t(LOG_JOB_COMPLETED).format(task_id=task_id, source=job.source)
             )
 
-        except TaskCancelledError:
+        except (TaskCancelledError, asyncio.CancelledError):
+            state_manager.atualizar(task_id, status="cancelled", etapa=t(STAGE_CANCELLED_BY_USER))
+            if out_dir is not None:
+                _remove_output_dir(out_dir)
             logger.info(t(LOG_JOB_CANCELLED).format(task_id=task_id))
             await finalizar_conversao(
                 task_id=task_id,
@@ -352,7 +384,7 @@ class JobExecutor:
         finally:
             status = get_job_status(task_id)
             if status is not None:
-                save_status(task_id, status)
+                await run_blocking(save_status, task_id, status)
             if job.file_path.exists():
                 try:
                     job.file_path.unlink()
@@ -400,13 +432,19 @@ def expirar_status_fila(max_age_seconds: int, now: float | None = None) -> int:
 async def recover_pending_jobs() -> None:
     from backend.services.queue_service import unified_queue, QueueItem
     from backend.api.routes.jobs import job_executor
-    for record in pending_records():
+    for record in await run_blocking(pending_records):
         task_id = record["task_id"]
         status = record["status"]
+        if status["status"] == "cancelling":
+            status.update(status="cancelled", fim=time.time(), etapa_atual="Cancelled during restart")
+            await run_blocking(save_status, task_id, status)
+            Path(record["request"]["file_path"]).unlink(missing_ok=True)
+            await finalizar_conversao(task_id, status="cancelled")
+            continue
         if status["status"] == "processing":
             status.update(status="error", fim=time.time(), etapa_atual="Processing interrupted by restart")
             status.setdefault("erros", []).append("Processing interrupted by restart; submit again")
-            save_status(task_id, status)
+            await run_blocking(save_status, task_id, status)
             await finalizar_conversao(task_id, status="error", erro="Processing interrupted by restart")
             continue
         if unified_queue.get_position(task_id):
@@ -417,7 +455,7 @@ async def recover_pending_jobs() -> None:
         job = ApiJob(**payload)
         if not job.file_path.is_file():
             status.update(status="error", fim=time.time(), erros=["Pending upload no longer exists"])
-            save_status(task_id, status)
+            await run_blocking(save_status, task_id, status)
             continue
         queued_jobs[task_id] = status
         await unified_queue.enqueue(QueueItem(file_path=job.file_path, filename=job.filename, source=job.source, task_id=task_id, callback=job_executor.run, callback_args={"job": job}))

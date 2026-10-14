@@ -59,3 +59,5 @@ STAGE_ENRICHING_TABLES_OCR: str = "Enriching the tables with OCR (fallback)..."
 STAGE_GENERATING_PDDL_PLAN: str = "Generating the nominal PDDL plan..."
 #: PDDL-pipeline stage while the generated plan is validated in dry-run mode before execution.
 STAGE_VALIDATING_PLAN_DRY_RUN: str = "Validating the plan in dry-run mode..."
+
+STAGE_CANCELLATION_REQUESTED: str = "Cancellation requested; finishing the current operation safely"

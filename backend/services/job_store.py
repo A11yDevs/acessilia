@@ -60,17 +60,32 @@ def load_record(task_id: str) -> dict[str, Any] | None:
 def save_status(task_id: str, status: dict) -> None:
     with connection() as conn:
         conn.execute(
-            "UPDATE api_jobs SET status=? WHERE task_id=?",
-            (json.dumps(status), task_id),
+            """UPDATE api_jobs SET status=? WHERE task_id=?
+               AND NOT (
+                   COALESCE(json_extract(status, '$.status'), '') IN ('done', 'error', 'cancelled')
+                   AND ? IN ('queued', 'processing', 'cancelling')
+               ) AND NOT (
+                   COALESCE(json_extract(status, '$.status'), '') = 'cancelling'
+                   AND ? IN ('queued', 'processing')
+               ) AND NOT (
+                   COALESCE(json_extract(status, '$.status'), '') = 'cancelled'
+                   AND ? != 'cancelled'
+               )""",
+            (json.dumps(status), task_id, status.get("status"), status.get("status"), status.get("status")),
         )
 
 
 def pending_records() -> list[dict[str, Any]]:
     with connection() as conn:
-        ids = [row[0] for row in conn.execute("SELECT task_id FROM api_jobs")]
+        ids = [row[0] for row in conn.execute("SELECT task_id FROM api_jobs ORDER BY rowid")]
     return [
         record
         for task_id in ids
         if (record := load_record(task_id))
-        and record["status"].get("status") in {"queued", "processing"}
+        and record["status"].get("status") in {"queued", "processing", "cancelling"}
     ]
+
+
+def delete_request(task_id: str) -> None:
+    with connection() as conn:
+        conn.execute("DELETE FROM api_jobs WHERE task_id=?", (task_id,))

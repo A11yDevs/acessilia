@@ -30,6 +30,9 @@ async def _lifespan(app: FastAPI):
     from backend.services.runtime_lease import runtime_lease
     with runtime_lease():
         setup_logger()
+        from backend.services.blocking import run_blocking
+        from backend.services.history_service import limpar_orfas
+        await run_blocking(limpar_orfas)
         from backend.api.worker import recover_pending_jobs
         await recover_pending_jobs()
         unified_queue.start_worker()

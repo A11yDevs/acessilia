@@ -103,7 +103,6 @@ def _limpar_tarefas_orfas():
     limpar_orfas()
 
 
-_limpar_tarefas_orfas()
 
 
 def _salvar_json_canonico(canonical_document: dict, source_name: str) -> None:

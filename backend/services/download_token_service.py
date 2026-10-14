@@ -1,4 +1,4 @@
-import asyncio
+from backend.services.blocking import offload
 import json
 import sqlite3
 import uuid
@@ -77,7 +77,8 @@ def _get_connection():
     return _connection
 
 
-async def criar_token(
+@offload
+def criar_token(
     output_dir: Path,
     filename: str,
     formats: list = None,
@@ -101,7 +102,8 @@ async def criar_token(
     return token
 
 
-async def obter_info_token(token: str) -> dict | None:
+@offload
+def obter_info_token(token: str) -> dict | None:
     with _connection_lock:
         conn = _get_connection()
         cursor = conn.cursor()
@@ -156,7 +158,8 @@ async def obter_info_token(token: str) -> dict | None:
     }
 
 
-async def limpar_tokens_expirados(dias: int = TOKEN_EXPIRY_DAYS):
+@offload
+def limpar_tokens_expirados(dias: int = TOKEN_EXPIRY_DAYS):
     with _connection_lock:
         conn = _get_connection()
         cursor = conn.cursor()

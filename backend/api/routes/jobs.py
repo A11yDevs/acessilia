@@ -1,3 +1,4 @@
+import asyncio
 import secrets
 import uuid
 from dataclasses import asdict
@@ -14,6 +15,7 @@ from backend.api.worker import (
     JobExecutor,
     cancel_job_status,
     get_job_status,
+    get_job_status_async,
     register_queued_job,
 )
 from backend.config.settings import settings
@@ -25,7 +27,8 @@ from backend.log_messages import (
     API_TASK_NOT_FOUND,
     LOG_API_JOB_ENQUEUED,
 )
-from backend.services.job_store import save_request, save_status
+from backend.services.job_store import delete_request, save_request, save_status
+from backend.services.blocking import run_blocking
 from backend.services.queue_service import QueueItem, unified_queue
 from backend.tools.logger import logger
 from backend.tools.validators import MSG_FILE_TOO_LARGE, validate_file
@@ -117,13 +120,16 @@ async def submit_job(
     payload["file_path"] = str(file_path)
     payload["output_dir"] = str(job.output_dir) if job.output_dir else None
     try:
-        save_request(task_id, job_token, payload, get_job_status(task_id))
+        await run_blocking(save_request, task_id, job_token, payload, get_job_status(task_id))
         position = await unified_queue.enqueue(item)
-    except Exception:
+    except (Exception, asyncio.CancelledError):
         from backend.api.worker import queued_jobs
 
         queued_jobs.pop(task_id, None)
-        file_path.unlink(missing_ok=True)
+        try:
+            await run_blocking(delete_request, task_id)
+        finally:
+            file_path.unlink(missing_ok=True)
         raise
     logger.info(t(LOG_API_JOB_ENQUEUED).format(task_id=task_id, source=source))
     return UploadResponse(
@@ -139,7 +145,7 @@ async def submit_job(
 )
 @limiter.limit("60/minute")
 async def job_status(request: Request, task_id: str):
-    job = get_job_status(task_id)
+    job = await get_job_status_async(task_id)
     if job is None:
         raise HTTPException(status_code=404, detail=t(API_TASK_NOT_FOUND))
     return JobStatus(
@@ -163,12 +169,13 @@ async def job_status(request: Request, task_id: str):
 @limiter.limit("10/minute")
 async def cancel_job(request: Request, task_id: str):
     if not cancel_job_status(task_id):
-        job = get_job_status(task_id)
+        job = await get_job_status_async(task_id)
         if job is None:
             raise HTTPException(status_code=404, detail=t(API_TASK_NOT_FOUND))
         raise HTTPException(
             status_code=409,
             detail=t(API_CANCEL_STATE_INVALID).format(status=job["status"]),
         )
-    save_status(task_id, get_job_status(task_id))
-    return CancelResponse(task_id=task_id, status="cancelled")
+    status = await get_job_status_async(task_id)
+    await run_blocking(save_status, task_id, status)
+    return CancelResponse(task_id=task_id, status=status["status"])

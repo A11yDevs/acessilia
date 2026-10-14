@@ -5,7 +5,7 @@ from pathlib import Path
 
 from backend.i18n import t
 from backend.log_messages import LOG_TASK_CANCELLED_BY_USER
-from backend.stage_messages import STAGE_CANCELLED_BY_USER
+from backend.stage_messages import STAGE_CANCELLED_BY_USER, STAGE_CANCELLATION_REQUESTED
 
 
 class StateManager:
@@ -46,6 +46,8 @@ class StateManager:
             return
         if task.get("status") == "cancelled":
             return
+        if task.get("status") == "cancelling" and status != "cancelled":
+            return
         if progresso is not None:
             task["progresso"] = progresso
         if etapa is not None:
@@ -56,10 +58,8 @@ class StateManager:
             task["erros"].append(erro)
         if resultado is not None:
             task["resultado"] = resultado
-        if status in ("done", "error"):
+        if status in ("done", "error", "cancelled"):
             task["fim"] = time.time()
-            from backend.services.job_store import save_status
-            save_status(task_id, dict(task))
 
     def obter(self, task_id: str) -> dict | None:
         return self._tasks.get(task_id)
@@ -82,12 +82,12 @@ class StateManager:
     def listar_tarefas_processing(self) -> list[dict]:
         return [t for t in self._tasks.values() if t.get("status") == "processing"]
 
-    def cancelar(self, task_id: str) -> bool:
+    def cancelar(self, task_id: str, *, pending: bool = False) -> bool:
         task = self._tasks.get(task_id)
         if task and task.get("status") == "processing":
-            task["status"] = "cancelled"
-            task["etapa_atual"] = t(STAGE_CANCELLED_BY_USER)
-            task["fim"] = time.time()
+            task["status"] = "cancelling" if pending else "cancelled"
+            task["etapa_atual"] = t(STAGE_CANCELLATION_REQUESTED if pending else STAGE_CANCELLED_BY_USER)
+            task["fim"] = None if pending else time.time()
             event = self._cancel_events.get(task_id)
             if event:
                 event.set()
