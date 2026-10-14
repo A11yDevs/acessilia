@@ -91,7 +91,7 @@ def _cache_version(
     engine = _normalized_engine()
     structurer = _resolved_structurer()
     return options_cache_key(
-        f"{settings.ai_client}-{engine}-{structurer}-v5",
+        f"{settings.ai_client}-{engine}-{structurer}-v6",
         mode=mode,
         custom_prompt=custom_prompt or "",
         thinking_mode=thinking_mode,
@@ -174,6 +174,13 @@ async def process(
     try:
         cache_variant = _cache_version(mode, custom_prompt, thinking_mode)
         cached = await get_cached(file_path, cache_variant)
+        if isinstance(cached, dict):
+            metadata = cached.get("canonical_metadata")
+            execution_status = metadata.get("pddl_execution_status") if isinstance(metadata, dict) else None
+            if execution_status in {"failed", "replan-required"} or (
+                not settings.pddl_execute_dry_run and execution_status == "dry-run-completed"
+            ):
+                cached = None
         if cached is not None:
             logger.info("Cache hit para {}", file_path.name)
             cached = _payload_for_source(cached, file_path)
