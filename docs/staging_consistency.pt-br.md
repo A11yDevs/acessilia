@@ -123,11 +123,33 @@ Duas observações:
 - `STRUCTURER` aparece duas vezes. O valor efetivo é `toolbox`, correto para o pipeline
   PDDL, mas a duplicata é uma armadilha latente para quem editar o arquivo depois.
 - `TOOLBOX_BASE_URL` aponta para a URL pública do proxy reverso
-  `https://www.acessilia3.inf.ufg.br/toolbox`. Com `PIPELINE_ENGINE=pddl` e
-  `STRUCTURER=toolbox`, **todo** documento processado em homologação delega sua extração
-  estrutural de volta pela proxy pública em vez de usar o contêiner da Toolbox no mesmo
-  host. Vale confirmar se é intencional; uma URL de loopback removeria uma dependência
-  externa desnecessária do caminho crítico.
+  `https://www.acessilia3.inf.ufg.br/toolbox`. Não é apenas um salto externo
+  desnecessário — quebra a implantação neste ambiente; ver S6.
+
+### S6 — A homologacao nao processa nenhum documento (critico, resolvido)
+
+Enviar um documento real para o core implantado falha imediatamente:
+
+```json
+{"task_id":"c55ed243","status":"error","progresso":0.3,
+ "etapa_atual":"Falha no processamento",
+ "erros":["Toolbox indisponivel em https://www.acessilia3.inf.ufg.br/toolbox:
+           [Errno -3] Temporary failure in name resolution"]}
+```
+
+O `TOOLBOX_BASE_URL` do `.env` de homologacao aponta para a URL publica da proxy
+reversa enquanto a Toolbox roda no mesmo host. O host nao resolve o proprio nome
+publico: `getent hosts www.acessilia3.inf.ufg.br` falha e nao ha entrada em
+`/etc/hosts`, enquanto `http://localhost:8002/v1/health` responde `200`. Com
+`PIPELINE_ENGINE=pddl` e `STRUCTURER=toolbox`, todo job comeca com uma chamada a
+Toolbox, entao o pipeline aborta em 30% antes de produzir qualquer coisa.
+
+O `docker-compose.production.yml` ja declarava
+`host.docker.internal:host-gateway`; o compose de homologacao nao. Corrigido
+dando a homologacao o mesmo mapeamento e usando
+`http://host.docker.internal:8002` como padrao de `TOOLBOX_BASE_URL`,
+sobrescrivivel pelo `.env` para uma Toolbox que viva em outro lugar. O
+`tests/test_compose_config.py` agora fixa os dois.
 
 ## O que está consistente
 

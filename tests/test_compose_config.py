@@ -51,3 +51,22 @@ def test_release_workflow_publishes_semver_tags():
     assert "type=semver,pattern={{version}}" in workflow_text
     assert "type=semver,pattern={{major}}.{{minor}}" in workflow_text
     assert "type=semver,pattern={{major}}" in workflow_text
+
+
+def test_staging_reaches_the_toolbox_without_public_dns():
+    """Staging must not depend on the host resolving its own public name.
+
+    The Toolbox runs on the same host and publishes 8002. When
+    TOOLBOX_BASE_URL pointed at the public reverse-proxy URL, every job failed
+    with "Temporary failure in name resolution" because split-horizon DNS does
+    not resolve the public name from inside the host, and no document was
+    processed at all.
+    """
+    compose = yaml.safe_load((ROOT_DIR / "docker-compose.staging.yml").read_text())
+    service = compose["services"]["acessilia"]
+
+    assert "host.docker.internal:host-gateway" in service["extra_hosts"]
+
+    base_url = service["environment"]["TOOLBOX_BASE_URL"]
+    assert "host.docker.internal" in base_url
+    assert "acessilia3.inf.ufg.br" not in base_url

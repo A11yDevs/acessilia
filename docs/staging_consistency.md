@@ -124,11 +124,32 @@ Two notes:
 - `STRUCTURER` appears twice. The effective value is `toolbox`, which is right for the
   PDDL pipeline, but the duplicate is a latent trap for whoever edits the file next.
 - `TOOLBOX_BASE_URL` points at the public reverse-proxy URL
-  `https://www.acessilia3.inf.ufg.br/toolbox`. With `PIPELINE_ENGINE=pddl` and
-  `STRUCTURER=toolbox`, **every** document processed in homologation delegates its
-  structural extraction back out through the public proxy instead of using the
-  Toolbox container on the same host. This is worth confirming as intentional; a
-  loopback URL would remove an unnecessary external dependency from the critical path.
+  `https://www.acessilia3.inf.ufg.br/toolbox`. This is not merely an unnecessary
+  external hop -- it breaks the deployment outright in this environment; see S6.
+
+### S6 — Homologation processes no document at all (critical, resolved)
+
+Submitting a real document to the deployed core fails immediately:
+
+```json
+{"task_id":"c55ed243","status":"error","progresso":0.3,
+ "etapa_atual":"Falha no processamento",
+ "erros":["Toolbox indisponivel em https://www.acessilia3.inf.ufg.br/toolbox:
+           [Errno -3] Temporary failure in name resolution"]}
+```
+
+`TOOLBOX_BASE_URL` in the staging `.env` points at the public reverse-proxy URL
+while the Toolbox runs on the same host. The host does not resolve its own public
+name: `getent hosts www.acessilia3.inf.ufg.br` fails and there is no `/etc/hosts`
+entry, while `http://localhost:8002/v1/health` answers `200`. With
+`PIPELINE_ENGINE=pddl` and `STRUCTURER=toolbox`, every job opens with a Toolbox
+call, so the pipeline aborts at 30% before producing anything.
+
+`docker-compose.production.yml` already declared
+`host.docker.internal:host-gateway`; the staging compose did not. Fixed by giving
+staging the same mapping and defaulting `TOOLBOX_BASE_URL` to
+`http://host.docker.internal:8002`, overridable from `.env` for a Toolbox that
+lives elsewhere. `tests/test_compose_config.py` now pins both.
 
 ## What is consistent
 

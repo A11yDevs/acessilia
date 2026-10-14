@@ -87,6 +87,30 @@ continua sem chamador de produção, então o veredito dele é
 A deriva conhecida está fixada em `tests/test_toolbox_contract_drift.py`; qualquer
 deriva *nova* quebra a suíte, e corrigir um achado exige removê-lo da lista fixada.
 
+## Acionabilidade do PDDL (medida contra a Toolbox real)
+
+Rodar o pipeline PDDL localmente contra a Toolbox de homologacao com
+`PDDL_EXECUTE_DRY_RUN=false` falha na primeira obrigacao:
+
+```
+obligations: 7  kinds: {preserve-code-semantics: 6, describe-image: 1}
+plan steps: 9
+  1 execute-obligation describe-image vision-description cost=20
+REAL execution status: failed   failed_step: 1   replan_required: False
+  step 1 vision-description status=failed msg='RuntimeError: No handler registered for vision-description'
+```
+
+`PddlAccessibilityOrchestrator._build_executor` registra 3 handlers reais
+(`mathml`, `latex-verbalizer`, `dual-provider-fusion`) mais um fallback no-op para
+8 nomes; `DEFAULT_METHOD_COSTS` lista 24 metodos admisseis. Todo passo de plano cujo
+metodo e um dos outros 21 levanta excecao na execucao, e `replan_required` e `False`,
+entao nada e retentado nem degradado.
+
+Em outras palavras: o padrao `PDDL_EXECUTE_DRY_RUN=true` da homologacao e o que
+mantem o pipeline parecendo saudavel. Desligá-lo quebraria todo job. Por isso
+"tornar todo metodo admissivel acionavel" e pre-requisito de qualquer trabalho de
+execucao real, nao um detalhe.
+
 ## Vereditos
 
 Os vereditos por capacidade (integrar / manter opt-in / aposentar) e sua
