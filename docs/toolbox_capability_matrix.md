@@ -54,11 +54,10 @@ Legend for **Call path**: how the core reaches the capability.
 | `media.inspect` | `toolbox_media_inspect_client.py` | `TOOLBOX_MEDIA_INSPECT_PROVIDER=pure-media-inspect` | `pure-media-inspect` | `backend/tools/media_inspect.py`, gated by `TOOLBOX_MEDIA_INSPECT_ENABLED` |
 | `artifact.store` / `artifact.retrieve` | `toolbox_client.py` REST `/v1/artifacts` | — | `minio`, `filesystem` | upload before extraction |
 | `dataset.*` (8 capabilities) | `toolbox_client.py` REST `/v1/datasets` | — | `dataset-github`, `dataset-huggingface` | `toolbox_dataset_tools.py` (Dr.DocBench scripts) |
-| `document.orientation.detect` | `toolbox_orientation_client.py` | `TOOLBOX_ORIENTATION_PROVIDER=rapidocr-orientation` | **absent** | **no caller** |
 | `document.ocr.page` | `toolbox_page_ocr_client.py` | `TOOLBOX_PAGE_OCR_PROVIDER=qwen3-vl-page` | **absent** | **no caller** |
 | `document.adjudicate.page` | `toolbox_adjudicate_client.py` | `TOOLBOX_ADJUDICATE_PROVIDER=qwen3-vl-judge` | **absent** | **no caller** |
 | `document.adjudicate.region` | `toolbox_adjudicate_client.py` | `TOOLBOX_ADJUDICATE_PROVIDER=qwen3-vl-judge` | **absent** | **no caller** |
-| `image.page.orient` | **absent** | — | `rapidocr-orient` | Toolbox-internal `auto_rotate` only (no core caller) |
+| `image.page.orient` | `toolbox_orientation_client.py` | `TOOLBOX_ORIENTATION_PROVIDER=rapidocr-orient` | `rapidocr-orient` | contract-valid, **no production caller yet** |
 | `accessibility.mark` | **absent** | — | `pure-accessibility` | — |
 | `chem.convert` | **absent** | — | `pure-chem` | — |
 | `chem.recognize` | **absent** | — | `docling-chem` | — |
@@ -72,14 +71,19 @@ Legend for **Call path**: how the core reaches the capability.
 Measured against the running staging Toolbox with
 `python scripts/check_capability_contract.py --snapshot tests/fixtures/toolbox-contract.json`:
 
-1. Four capabilities are consumed by the core but do not exist in the Toolbox
-   catalogue: `document.orientation.detect`, `document.ocr.page`,
-   `document.adjudicate.page`, `document.adjudicate.region`.
-2. Three provider defaults in `settings.py` point at providers the Toolbox does
-   not register: `rapidocr-orientation`, `qwen3-vl-page`, `qwen3-vl-judge`.
-3. The Toolbox does expose the orientation capability the core needs, under a
-   different id: `image.page.orient` implemented by `rapidocr-orient`.
-4. Seven capabilities have no core client at all (see the matrix).
+1. Three capabilities are consumed by the core but do not exist in the Toolbox
+   catalogue: `document.ocr.page`, `document.adjudicate.page`,
+   `document.adjudicate.region`.
+2. Two provider defaults in `settings.py` point at providers the Toolbox does
+   not register: `qwen3-vl-page`, `qwen3-vl-judge`.
+3. Six capabilities have no core client at all (see the matrix).
+
+The orientation drift was resolved: the client posted to
+`document.orientation.detect` with provider `rapidocr-orientation`, neither of
+which the Toolbox knows, while the Toolbox exposes `image.page.orient`
+implemented by `rapidocr-orient`. The client and the default now match the
+catalogue. The client still has no production caller, so its verdict is
+"integrate or retire" rather than "done".
 
 The known drift is pinned in `tests/test_toolbox_contract_drift.py`; any *new*
 drift fails the suite, and fixing a finding requires removing it from the pinned
