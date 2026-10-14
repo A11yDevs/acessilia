@@ -10,7 +10,12 @@ from backend.agents.data_agent import DataAgent
 from backend.agents.editor_agent import EditorAgent
 from backend.agents.types import RegionTask
 from backend.agents.output_schemas import StructuredOutput
-from backend.services.cache import get_cached, options_cache_key, set_cache
+from backend.services.cache import (
+    get_cached,
+    options_cache_key,
+    processing_cache_configuration,
+    set_cache,
+)
 from backend.i18n import t
 from backend.log_messages import (
     LOG_ORCHESTRATOR_EMPTY_PAGE_RESPONSE,
@@ -101,6 +106,7 @@ class AccessibilityOrchestrator:
                 mode=effective_mode,
                 custom_prompt=custom_prompt or "",
                 thinking_mode=thinking_mode,
+                configuration=processing_cache_configuration(),
             )
             cached_page = await get_cached(
                 page_path,

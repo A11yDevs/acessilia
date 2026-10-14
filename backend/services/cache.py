@@ -41,6 +41,23 @@ def _cache_path(key: str) -> Path:
     return CACHE_DIR / f"{key}.json"
 
 
+def processing_cache_configuration() -> dict[str, Any]:
+    """Configuration shared by whole-document and page-level result caches."""
+    from backend.config.settings import settings
+
+    fields = (
+        "ai_client", "ollama_model", "ollama_base_url", "openrouter_model",
+        "openrouter_base_url", "openrouter_max_tokens", "pipeline_engine", "structurer",
+        "fusion_mode", "fusion_secondary_provider", "fusion_hybrid_provider",
+        "toolbox_base_url", "toolbox_provider", "toolbox_layout_provider",
+        "toolbox_pdf_provider", "toolbox_math_recognize_provider", "toolbox_math_provider",
+        "toolbox_ocr_provider", "toolbox_page_ocr_provider", "toolbox_adjudicate_provider",
+        "toolbox_orientation_provider", "toolbox_media_inspect_provider",
+        "toolbox_media_inspect_enabled", "pdf_split_dpi", "jpg_quality", "callout_known_titles",
+    )
+    return {name: getattr(settings, name) for name in fields}
+
+
 def options_cache_key(prefix: str, **options: Any) -> str:
     """Build a filesystem-safe cache variant from output-affecting options."""
     serialized = json.dumps(

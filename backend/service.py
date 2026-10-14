@@ -7,7 +7,12 @@ from typing import Any, Callable, Coroutine
 from backend.agents.orchestrator import AccessibilityOrchestrator
 from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
 from backend.agents.state_manager import TaskCancelledError, state_manager
-from backend.services.cache import get_cached, options_cache_key, set_cache
+from backend.services.cache import (
+    get_cached,
+    options_cache_key,
+    processing_cache_configuration,
+    set_cache,
+)
 from backend.services.history_service import (
     finalizar_conversao,
     limpar_orfas,
@@ -90,6 +95,7 @@ def _cache_version(
         mode=mode,
         custom_prompt=custom_prompt or "",
         thinking_mode=thinking_mode,
+        configuration=processing_cache_configuration(),
     )
 
 
