@@ -321,7 +321,7 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 | `STRUCTURER` | `toolbox` | Motor de regiões por página (`toolbox`, `toolbox-layout`, `pymupdf`) |
 | `TOOLBOX_PAGE_OCR_PROVIDER` | `qwen3-vl-page` | Transcrição VLM de página inteira (`document.ocr.page`) |
 | `TOOLBOX_ADJUDICATE_PROVIDER` | `qwen3-vl-judge` | Juiz pareado / transcrição de região (`document.adjudicate.*`) |
-| `TOOLBOX_ORIENTATION_PROVIDER` | `rapidocr-orientation` | Detecção de rotação (`document.orientation.detect`) |
+| `TOOLBOX_ORIENTATION_PROVIDER` | `rapidocr-orient` | Detecção de rotação (`image.page.orient`) |
 | `FUSION_HYBRID_PROVIDER` | `mineru-hyb` | Id do provider MinerU hybrid-VLM (a fonte B do melhor confirmado no leaderboard) |
 
 > `TOOLBOX_USE_ARTIFACT_STORE` e `TOOLBOX_USE_REMOTE_CACHE` afetam diretamente o
@@ -354,7 +354,7 @@ service.py: _build_orchestrator()
 - `backend/tools/toolbox_ocr_tools.py`, `toolbox_math_tools.py`, `toolbox_pdf_tools.py` — wrappers com fallback local
 - `backend/tools/toolbox_page_ocr_client.py` — `document.ocr.page` (VLM de página inteira)
 - `backend/tools/toolbox_adjudicate_client.py` — `document.adjudicate.page` / `.region`
-- `backend/tools/toolbox_orientation_client.py` — `document.orientation.detect`
+- `backend/tools/toolbox_orientation_client.py` — `image.page.orient`
 - `backend/tools/structurer.py` — `get_structurer()` e seleção de structurer
 - `backend/core/manifest/toolbox_extractor.py` — `ToolboxManifestExtractor`
 - `backend/pipeline/fusion.py` — `extract_fused()` (fusão dual)
@@ -368,7 +368,7 @@ service.py: _build_orchestrator()
 | `document.ocr.page` | `ToolboxPageOcrClient` | `qwen3-vl-page`, `dots-ocr-page`, `deepseek-ocr-page`, `teleocr-page` | Transcrição VLM de página inteira — a fonte B do híbrido de página |
 | `document.adjudicate.page` | `ToolboxAdjudicateClient` | `qwen3-vl-judge` | Juiz pareado entre duas transcrições candidatas (as duas ordens, debiasing de posição) |
 | `document.adjudicate.region` | `ToolboxAdjudicateClient` | `qwen3-vl-judge` | Transcrição exata de um recorte de região, convertida em decisão do differ |
-| `document.orientation.detect` | `ToolboxOrientationClient` | `rapidocr-orientation` | Detecção de rotação 0/90/180/270 |
+| `image.page.orient` | `ToolboxOrientationClient` | `rapidocr-orient` | Detecção de rotação 0/90/180/270 |
 
 Os registros de provider vivem no repositório da Toolbox; a configuração de job
 do Dr.DocBench que os espelha é

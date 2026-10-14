@@ -2,7 +2,7 @@
 
 Usa respostas HTTPX mockadas para validar URLs, parâmetros, timeout e parsing
 de erro. Cobre document.ocr.page, document.adjudicate.page,
-document.adjudicate.region e document.orientation.detect.
+document.adjudicate.region e image.page.orient.
 """
 from __future__ import annotations
 
@@ -50,9 +50,9 @@ ADJUDICATE_REGION_RESPONSE = {
 
 ORIENTATION_RESPONSE = {
     "status": "succeeded",
-    "capability": "document.orientation.detect",
-    "provider": "rapidocr-orientation",
-    "document": {"angle": 90, "tall_frac": 0.8, "n_boxes": 12},
+    "capability": "image.page.orient",
+    "provider": "rapidocr-orient",
+    "document": {"angle": 90, "confidence": 0.98, "stage": "text-line"},
 }
 
 
@@ -74,7 +74,7 @@ def adjudicate() -> ToolboxAdjudicateClient:
 def orientation() -> ToolboxOrientationClient:
     return ToolboxOrientationClient(
         base_url="http://localhost:8002",
-        provider="rapidocr-orientation",
+        provider="rapidocr-orient",
         timeout_seconds=30,
     )
 
@@ -220,14 +220,14 @@ async def test_adjudicate_region_raises_on_no_input(adjudicate):
 
 
 # ---------------------------------------------------------------------------
-# document.orientation.detect
+# image.page.orient
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
 async def test_orientation_direct_upload(respx_mock, orientation):
     route = respx_mock.post(
-        "http://localhost:8002/v1/capabilities/document.orientation.detect:execute"
+        "http://localhost:8002/v1/capabilities/image.page.orient:execute"
     )
     route.return_value = httpx.Response(200, json=ORIENTATION_RESPONSE)
 
@@ -240,7 +240,7 @@ async def test_orientation_direct_upload(respx_mock, orientation):
 @pytest.mark.asyncio
 async def test_orientation_by_artifact_id(respx_mock, orientation):
     route = respx_mock.post(
-        "http://localhost:8002/v1/capabilities/document.orientation.detect:execute"
+        "http://localhost:8002/v1/capabilities/image.page.orient:execute"
     )
     route.return_value = httpx.Response(200, json=ORIENTATION_RESPONSE)
 
@@ -258,7 +258,7 @@ async def test_orientation_raises_on_no_input(orientation):
 @pytest.mark.asyncio
 async def test_orientation_raises_on_failed_status(respx_mock, orientation):
     route = respx_mock.post(
-        "http://localhost:8002/v1/capabilities/document.orientation.detect:execute"
+        "http://localhost:8002/v1/capabilities/image.page.orient:execute"
     )
     route.return_value = httpx.Response(200, json={"status": "failed"})
 
@@ -269,7 +269,7 @@ async def test_orientation_raises_on_failed_status(respx_mock, orientation):
 @pytest.mark.asyncio
 async def test_orientation_raises_on_timeout(respx_mock, orientation):
     route = respx_mock.post(
-        "http://localhost:8002/v1/capabilities/document.orientation.detect:execute"
+        "http://localhost:8002/v1/capabilities/image.page.orient:execute"
     )
     route.side_effect = httpx.TimeoutException("timeout")
 
@@ -290,7 +290,7 @@ PR125_CAPABILITIES = {
     "document.ocr.page": {"qwen3-vl-page", "dots-ocr-page", "deepseek-ocr-page", "teleocr-page"},
     "document.adjudicate.page": {"qwen3-vl-judge"},
     "document.adjudicate.region": {"qwen3-vl-judge"},
-    "document.orientation.detect": {"rapidocr-orientation"},
+    "image.page.orient": {"rapidocr-orient"},
 }
 
 

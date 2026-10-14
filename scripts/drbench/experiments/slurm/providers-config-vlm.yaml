@@ -137,15 +137,22 @@ providers:
 
   # Detecção de rotação 0/90/180/270 (RapidOCR: caixas altas -> candidato;
   # OCR a 90/270, vence o maior sum(len x score)).
-  - id: rapidocr-orientation
+  # O id, a capacidade e o transporte espelham o catálogo da Toolbox
+  # (capabilities/image.page.orient.yaml + providers-config.yaml): a Toolbox é
+  # quem executa, então o perfil não pode divergir dela.
+  - id: rapidocr-orient
     version: "1.0"
-    transport: in_process
+    transport: http
+    endpoint: ${RAPIDOCR_ORIENT_URL:-http://rapidocr-orient:5006}
+    health_path: /health
+    timeout_seconds: 30
     capabilities:
-      - document.orientation.detect
+      - image.page.orient
     media_types:
       - image/png
       - image/jpeg
       - image/tiff
+      - image/webp
 
   - id: mineru
     version: "2.1"
