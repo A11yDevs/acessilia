@@ -109,9 +109,27 @@ def validate_canonical_document(document: dict[str, Any]) -> list[str]:
                 errors.extend(_validate_table_block(block))
             internal_links.extend(_extract_internal_links(block))
 
-    for section in document.get("sections", []):
-        walk_blocks(section.get("blocks", []))
-        _walk_sections(section.get("children", []), walk_blocks)
+    def walk_sections(sections: list[dict[str, Any]]) -> None:
+        for section in sections:
+            blocks = section.get("blocks", [])
+            if section.get("title"):
+                section_id = section.get("id")
+                if section_id:
+                    if section_id in ids:
+                        errors.append(Finding(MSG_DUPLICATE_ID, block_id=section_id))
+                    ids.add(section_id)
+                first = blocks[0] if blocks else {}
+                explicit_title = (
+                    first.get("type") == "heading"
+                    and first.get("text") == section["title"]
+                    and first.get("level", 1) == section.get("level", 1)
+                )
+                if not explicit_title:
+                    headings.append(int(section.get("level", 1)))
+            walk_blocks(blocks)
+            walk_sections(section.get("children", []))
+
+    walk_sections(document.get("sections", []))
 
     if headings.count(1) > 1:
         errors.append(Finding(MSG_MULTIPLE_H1))

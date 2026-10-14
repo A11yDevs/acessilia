@@ -878,9 +878,9 @@ def _derive_processing_needs(
         )
 
     heading_levels = [
-        (element.id, element.hierarchy_level)
-        for element in elements
-        if element.type == "heading"
+        (element.id, 1 if element.type == "title" else element.hierarchy_level)
+        for element in sorted(elements, key=lambda item: item.reading_order)
+        if element.type in {"title", "heading"}
     ]
     previous = 0
     for element_id, level in heading_levels:

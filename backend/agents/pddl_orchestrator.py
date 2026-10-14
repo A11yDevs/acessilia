@@ -426,57 +426,37 @@ def _handle_human_review_method(
 def _handle_deterministic_heading_repair_method(
     manifest: ProcessingManifest, obligation_id: str
 ) -> MethodResult:
-    """Clamp a heading whose level skips ahead of its predecessor.
-
-    The compiled obligation carries the previous level as evidence; the repair is
-    deterministic, so a missing level is a real failure rather than something to
-    guess at.
-    """
+    """Repair the full sequence, since fixing one heading can expose a later gap."""
     obligation = next(
         (o for o in manifest.obligations if o.id == obligation_id), None
     )
     if obligation is None:
         return _missing_obligation(obligation_id)
 
-    elements = {
-        el.id: el for el in _target_elements(manifest, obligation_id)
-    }
-    repaired = 0
-    for element in elements.values():
-        if element.type != "heading":
-            continue
-        previous = _previous_heading_level(manifest, element)
-        if previous and element.hierarchy_level > previous + 1:
-            element.hierarchy_level = previous + 1
-            element.metadata["heading_repaired"] = True
-        repaired += 1
-
-    if not repaired:
+    targets = _target_elements(manifest, obligation_id)
+    if not targets or any(element.type != "heading" for element in targets):
         return MethodResult(
             success=False,
             validated=False,
             message="Nenhum título encontrado para a obrigação",
         )
+    previous = 0
+    repaired = 0
+    for element in sorted(manifest.elements, key=lambda item: item.reading_order):
+        if element.type not in {"title", "heading"}:
+            continue
+        level = 1 if element.type == "title" or not previous else max(1, min(element.hierarchy_level, previous + 1, 6))
+        if level != element.hierarchy_level:
+            element.metadata["original_heading_level"] = element.hierarchy_level
+            element.hierarchy_level = level
+            element.metadata["heading_repaired"] = True
+            repaired += 1
+        previous = level
     return MethodResult(
         success=True,
         validated=True,
-        message=f"Hierarquia de títulos verificada em {repaired} título(s)",
+        message=f"Hierarquia de títulos verificada; {repaired} título(s) reparado(s)",
     )
-
-
-def _previous_heading_level(
-    manifest: ProcessingManifest, element: ManifestElement
-) -> int:
-    """Level of the closest heading that precedes the element in reading order."""
-    previous = 0
-    for candidate in sorted(
-        (el for el in manifest.elements if el.type == "heading"),
-        key=lambda el: el.reading_order,
-    ):
-        if candidate.id == element.id:
-            return previous
-        previous = candidate.hierarchy_level
-    return previous
 
 
 DETERMINISTIC_METHOD_HANDLERS: dict[
