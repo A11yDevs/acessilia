@@ -127,13 +127,15 @@ def test_catalog_validator_flags_missing_translations() -> None:
     assert sorted(problems_partial) == sorted(expected_missing)
 
 
-def test_default_checked_in_catalog_tree_is_generated_by_repo_layout() -> None:
-    """Running build_locales against the default backend/locales root should produce complete .po/.mo pairs for both locales."""
-    gen_locales.build_locales(DEFAULT_REPOS_CATALOGS_DIR)
-    assert (DEFAULT_REPOS_CATALOGS_DIR / "en_US" / "LC_MESSAGES" / "messages.po").is_file()
-    assert (DEFAULT_REPOS_CATALOGS_DIR / "en_US" / "LC_MESSAGES" / "messages.mo").is_file()
-    assert (DEFAULT_REPOS_CATALOGS_DIR / "pt_BR" / "LC_MESSAGES" / "messages.po").is_file()
-    assert (DEFAULT_REPOS_CATALOGS_DIR / "pt_BR" / "LC_MESSAGES" / "messages.mo").is_file()
+def test_default_checked_in_catalog_tree_is_generated_by_repo_layout(tmp_path: Path) -> None:
+    """Check the production location and generate its layout without rewriting tracked catalogs."""
+    assert gen_locales.DEFAULT_LOCALES_DIR.resolve() == DEFAULT_REPOS_CATALOGS_DIR.resolve()
+    generated_root = tmp_path / "backend" / "locales"
+    gen_locales.build_locales(generated_root)
+    for locale in gen_locales.SUPPORTED_LOCALES:
+        assert (DEFAULT_REPOS_CATALOGS_DIR / locale / "LC_MESSAGES" / "messages.po").is_file()
+        for extension in ("po", "mo"):
+            assert (generated_root / locale / "LC_MESSAGES" / f"messages.{extension}").is_file()
 
 
 def test_server_locale_negotiated_from_shell_env(monkeypatch: pytest.MonkeyPatch) -> None:
