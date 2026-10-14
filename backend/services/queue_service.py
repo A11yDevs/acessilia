@@ -57,6 +57,10 @@ class UnifiedQueue:
         for item in list(self._queue):
             if item.task_id == task_id:
                 self._queue.remove(item)
+                try:
+                    item.file_path.unlink(missing_ok=True)
+                except OSError as exc:
+                    logger.warning("Could not remove cancelled upload {}: {}", item.file_path, exc)
                 logger.info("Fila Unificada: tarefa {} cancelada antes do processamento", task_id)
                 return True
         return False

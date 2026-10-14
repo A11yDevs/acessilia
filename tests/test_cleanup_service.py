@@ -168,4 +168,5 @@ async def test_temp_cleanup_removes_cancelled_queued_upload(monkeypatch, tmp_pat
     assert queue.cancel("cancel27")
     cleanup_service._clean_temp_directory()
     assert not pending.exists()
-    assert not uploads.exists()
+    # Cancellation removes the file immediately, refreshing the directory mtime.
+    assert not uploads.exists() or not any(uploads.iterdir())
