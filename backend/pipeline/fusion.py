@@ -144,7 +144,7 @@ async def extract_fused(
         return primary_res
 
     stats: Counter = Counter()
-    merged_blocks: list[str] = []
+    merged_elements: list[dict[str, Any]] = []
     # Group by page when the payload carries pages; otherwise treat as 1 page.
     pages_d = _group_by_page(primary_res)
     pages_m = _group_by_page(secondary_res)
@@ -160,21 +160,23 @@ async def extract_fused(
             d_blocks, m_blocks, policy, min_len=0, m_pics=m_pics, stats=stats
         )
         stats.update(page_stats)
-        merged_blocks.extend(out)
+        offset = len(merged_elements)
+        merged_elements.extend(
+            {"type": "paragraph", "text": md, "reading_order": offset + i + 1,
+             "page_number": page_key + 1}
+            for i, md in enumerate(out)
+        )
 
     logger.info(
         "Fusion done: {} final blocks, decisions: {}",
-        len(merged_blocks),
+        len(merged_elements),
         dict(stats),
     )
     return {
         "status": "succeeded",
         "provider": f"{primary}+{secondary}",
         "document": {
-            "elements": [
-                {"type": "paragraph", "text": md, "reading_order": i}
-                for i, md in enumerate(merged_blocks)
-            ]
+            "elements": merged_elements
         },
         "fusion_stats": dict(stats),
     }
@@ -206,6 +208,6 @@ def _group_by_page(payload: dict) -> dict[int, list[dict]]:
     for el in doc.get("elements") or []:
         if not (el.get("text") or "").strip():
             continue
-        page = int(el.get("page") or 0)
+        page = int(el["page_number"]) - 1 if el.get("page_number") is not None else int(el.get("page") or 0)
         groups.setdefault(page, []).append(_element_to_canonical_block(el, page))
     return groups

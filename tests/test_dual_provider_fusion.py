@@ -80,7 +80,7 @@ def _dual_payload() -> dict:
     return {
         "status": "succeeded",
         "provider": "docling+mineru",
-        "document": {"elements": []},
+        "document": {"elements": [{"type": "paragraph", "text": "Recovered content"}]},
         "fusion_stats": {"pairs": 3, "matched": 25},
     }
 

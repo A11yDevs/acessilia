@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
+import os
 import re
+import tempfile
 from collections import Counter
 from collections.abc import Callable, Coroutine
 from pathlib import Path
@@ -26,6 +30,7 @@ from backend.core.manifest.builder import (
 from backend.core.manifest.models import (
     Artifact,
     ManifestElement,
+    PageDescriptor,
     ProcessingManifest,
 )
 from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
@@ -532,8 +537,6 @@ def _handle_dual_provider_fusion_method(
     Em modo single (FUSION_MODE=single) o método não é admissível e não
     deve ser selecionado pelo compilador.
     """
-    import json
-
     from backend.config.settings import settings
 
     obligation = next(
@@ -575,20 +578,51 @@ def _handle_dual_provider_fusion_method(
             ),
         )
 
-    output_path = (
-        settings.data_dir / "artifacts" / "fusion" / f"{obligation_id}.json"
-    )
+    try:
+        elements = _fused_text_elements(manifest, obligation.target_ids, payload)
+    except (TypeError, ValueError) as exc:
+        return MethodResult(success=False, validated=False, message=str(exc))
+
+    content = json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    digest = hashlib.sha256(content).hexdigest()
+    scope = hashlib.sha256(json.dumps([
+        manifest.manifest_id, manifest.source.document_id, manifest.source.sha256,
+        manifest.revision, obligation_id,
+    ]).encode()).hexdigest()
+    output_path = settings.data_dir / "artifacts" / "fusion" / scope / f"{digest}.json"
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=output_path.parent, delete=False) as stream:
+            temporary = Path(stream.name)
+            stream.write(content)
+        os.replace(temporary, output_path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+    manifest.elements = elements
+    page_ids = {element.page_number or 1 for element in elements}
+    existing_pages = {page.page_number: page for page in manifest.pages}
+    manifest.pages = [
+        PageDescriptor(
+            page_number=number,
+            width=existing_pages[number].width if number in existing_pages else None,
+            height=existing_pages[number].height if number in existing_pages else None,
+            element_ids=[element.id for element in elements if (element.page_number or 1) == number],
+        )
+        for number in sorted(page_ids)
+    ]
+    manifest.summary.page_count = len(manifest.pages)
+    manifest.summary.element_count = len(elements)
+    manifest.summary.element_types = dict(Counter(element.type for element in elements))
 
     artifact = Artifact(
-        id=f"artifact-fusion-{obligation_id}",
+        id=f"artifact-fusion-{scope[:16]}-{digest[:16]}",
         kind="fusion-payload",
         path=str(output_path),
         media_type="application/json",
+        sha256=digest,
     )
     return MethodResult(
         success=True,
@@ -596,6 +630,64 @@ def _handle_dual_provider_fusion_method(
         message="Fusão dual-provider concluída com sucesso",
         artifacts=[artifact],
     )
+
+
+def _fused_text_elements(
+    manifest: ProcessingManifest, target_ids: list[str], payload: dict[str, Any]
+) -> list[ManifestElement]:
+    # The fusion adapter currently emits text-only blocks. It cannot safely
+    # replace a structured document or a subset with a whole-document result.
+    if any(element.type != "paragraph" for element in manifest.elements) or set(target_ids) != {
+        element.id for element in manifest.elements
+    }:
+        raise ValueError("Text fusion requires all paragraphs of a text-only manifest")
+    raw_elements = payload.get("document", {}).get("elements")
+    if not isinstance(raw_elements, list) or not raw_elements:
+        raise ValueError("Fusion returned no usable document elements")
+    originals = sorted(manifest.elements, key=lambda element: element.reading_order)
+    by_page: dict[int, list[dict[str, Any]]] = {}
+    for raw in raw_elements:
+        if not isinstance(raw, dict) or raw.get("type") != "paragraph":
+            raise ValueError("Fusion returned unsupported structured content")
+        text = raw.get("text")
+        if not isinstance(text, str) or not text.strip():
+            raise ValueError("Fusion returned an empty text block")
+        page = raw.get("page_number", raw.get("page"))
+        if page is None:
+            if len(manifest.pages) > 1:
+                raise ValueError("Fusion omitted page identity for a multipage document")
+            page = manifest.pages[0].page_number if manifest.pages else 1
+        if type(page) is not int or page < 1:
+            raise ValueError("Fusion returned an invalid page number")
+        by_page.setdefault(page, []).append(raw)
+    original_pages = {element.page_number or 1 for element in originals}
+    if not original_pages.issubset(by_page):
+        raise ValueError("Fusion omitted a source page")
+
+    result = []
+    for number, rows in sorted(by_page.items()):
+        old = [element for element in originals if (element.page_number or 1) == number]
+        # Keep every existing ID and reference; ambiguous mappings fail closed.
+        if len(rows) < len(old):
+            raise ValueError("Fusion cannot safely map fewer blocks to existing element references")
+        for index, raw in enumerate(rows):
+            if index < len(old):
+                element = old[index].model_copy(deep=True)
+                element.text = raw["text"]
+                element.page_number = number
+            else:
+                identifier = hashlib.sha256(json.dumps([
+                    manifest.manifest_id, number, index, raw["text"],
+                ]).encode()).hexdigest()[:24]
+                element = ManifestElement(
+                    id=f"element-fusion-{identifier}", type="paragraph", raw_label="paragraph",
+                    reading_order=len(result) + 1, hierarchy_level=0,
+                    page_number=number, text=raw["text"],
+                )
+            element.metadata["fusion_provider"] = payload["provider"]
+            element.reading_order = len(result) + 1
+            result.append(element)
+    return result
 
 
 class PddlAccessibilityOrchestrator:

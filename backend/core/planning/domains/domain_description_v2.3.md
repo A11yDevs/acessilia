@@ -505,7 +505,8 @@ Regras de compilação:
   single não estiver disponível/admissível;
 - o handler registrado no executor chama
   `backend.pipeline.fusion.extract_fused`, persiste o payload fundido em
-  `data_dir/artifacts/fusion/<obligation_id>.json` e o retorna em
+  `data_dir/artifacts/fusion/<escopo-sha256>/<conteudo-sha256>.json`
+  com escrita atômica e SHA-256 registrado no artefato, e o retorna em
   `MethodResult.artifacts` — o `ExecutorAgent` é quem o incorpora ao
   manifesto e associa o `artifact_id` à tentativa (proveniência);
 - o handler é **estrito**: se apenas um provider participou da extração
@@ -568,3 +569,19 @@ A arquitetura da versão 2.2 é:
 > **Manifesto canônico multicamada + seleção externa de raízes + fechamento causal determinístico + PDDL operacional mínimo + execução monitorada com confirmação e replanejamento.**
 
 O PDDL não decide o conteúdo do documento nem inventa resultados perceptuais. Ele recebe um conjunto operacional coerente e decide a ordem e o método de tratamento, sob dependências, admissibilidade, tentativas anteriores e custo.
+
+
+### Limites dos adaptadores de execução
+
+`line-number-extractor`, `verse-chunker`, `tailjoin` e `tailjoin-positioned`
+continuam disponíveis na biblioteca docstruct, mas não possuem adaptação
+executável para ProcessingManifest. O orquestrador os declara indisponíveis
+ao planner; a falha da revisão humana é terminal quando não existem outras
+alternativas registradas.
+
+A aplicação de `dual-provider-fusion` ao manifesto aceita somente uma obrigação
+que cubra todos os parágrafos de um documento exclusivamente textual. O resultado
+precisa manter a identidade de página e permitir preservar todos os IDs de
+elementos existentes. Novos blocos recuperados recebem IDs próprios. Documentos
+estruturados, subconjuntos e mapeamentos ambíguos falham explicitamente; não são
+substituídos por texto achatado nem certificados como processados.
