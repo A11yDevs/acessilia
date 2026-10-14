@@ -58,6 +58,8 @@ class StateManager:
             task["resultado"] = resultado
         if status in ("done", "error"):
             task["fim"] = time.time()
+            from backend.services.job_store import save_status
+            save_status(task_id, dict(task))
 
     def obter(self, task_id: str) -> dict | None:
         return self._tasks.get(task_id)

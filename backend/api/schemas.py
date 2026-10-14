@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 class UploadResponse(BaseModel):
     task_id: str
+    job_token: str
     position: int
     message: str
 

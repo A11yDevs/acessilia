@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
+from backend.api.observability_auth import require_observability_token
 
 from backend.api.limiter import limiter
 from backend.api.schemas import HistoryItem, StatsResponse
 from backend.services.history_service import estatisticas, listar_historico
 
-router = APIRouter(tags=["history"])
+router = APIRouter(tags=["history"], dependencies=[Depends(require_observability_token)])
 
 FIELD_NAMES = {
     "task_id",

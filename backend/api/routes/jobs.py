@@ -1,8 +1,12 @@
+import secrets
 import uuid
+from dataclasses import asdict
 from pathlib import Path
 
-from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from starlette.concurrency import run_in_threadpool
 
+from backend.api.job_auth import require_job_access
 from backend.api.limiter import limiter
 from backend.api.schemas import CancelResponse, JobStatus, UploadResponse
 from backend.api.worker import (
@@ -13,8 +17,6 @@ from backend.api.worker import (
     register_queued_job,
 )
 from backend.config.settings import settings
-from backend.services.queue_service import QueueItem, unified_queue
-from backend.tools.logger import logger
 from backend.i18n import t
 from backend.log_messages import (
     API_CANCEL_STATE_INVALID,
@@ -23,6 +25,9 @@ from backend.log_messages import (
     API_TASK_NOT_FOUND,
     LOG_API_JOB_ENQUEUED,
 )
+from backend.services.job_store import save_request, save_status
+from backend.services.queue_service import QueueItem, unified_queue
+from backend.tools.logger import logger
 from backend.tools.validators import MSG_FILE_TOO_LARGE, validate_file
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
@@ -46,7 +51,9 @@ def _save_upload(upload: UploadFile) -> Path:
                 if total > settings.max_file_size_bytes:
                     raise HTTPException(
                         status_code=413,
-                        detail=t(MSG_FILE_TOO_LARGE).format(limit=settings.max_file_size_mb),
+                        detail=t(MSG_FILE_TOO_LARGE).format(
+                            limit=settings.max_file_size_mb
+                        ),
                     )
                 buffer.write(chunk)
     except Exception:
@@ -78,8 +85,15 @@ async def submit_job(
             detail=t(API_PROMPT_TOO_LONG).format(limit=MAX_CUSTOM_PROMPT_CHARS),
         )
 
-    file_path = _save_upload(document_file)
-    task_id = uuid.uuid4().hex[:8]
+    if prompt or thinking_mode:
+        raise HTTPException(
+            status_code=422,
+            detail="Custom instructions and thinking mode are unavailable for this pipeline",
+        )
+
+    file_path = await run_in_threadpool(_save_upload, document_file)
+    task_id = uuid.uuid4().hex
+    job_token = secrets.token_urlsafe(32)
     job = ApiJob(
         task_id=task_id,
         file_path=file_path,
@@ -98,19 +112,31 @@ async def submit_job(
         callback=job_executor.run,
         callback_args={"job": job},
     )
-    position = await unified_queue.enqueue(item)
-    register_queued_job(task_id, filename, position, source)
-    logger.info(
-        t(LOG_API_JOB_ENQUEUED).format(task_id=task_id, source=source)
-    )
+    register_queued_job(task_id, filename, unified_queue.qsize() + 1, source)
+    payload = asdict(job)
+    payload["file_path"] = str(file_path)
+    payload["output_dir"] = str(job.output_dir) if job.output_dir else None
+    try:
+        save_request(task_id, job_token, payload, get_job_status(task_id))
+        position = await unified_queue.enqueue(item)
+    except Exception:
+        from backend.api.worker import queued_jobs
+
+        queued_jobs.pop(task_id, None)
+        file_path.unlink(missing_ok=True)
+        raise
+    logger.info(t(LOG_API_JOB_ENQUEUED).format(task_id=task_id, source=source))
     return UploadResponse(
         task_id=task_id,
+        job_token=job_token,
         position=position,
         message=t(API_JOB_QUEUED).format(position=position),
     )
 
 
-@router.get("/{task_id}", response_model=JobStatus)
+@router.get(
+    "/{task_id}", response_model=JobStatus, dependencies=[Depends(require_job_access)]
+)
 @limiter.limit("60/minute")
 async def job_status(request: Request, task_id: str):
     job = get_job_status(task_id)
@@ -129,7 +155,11 @@ async def job_status(request: Request, task_id: str):
     )
 
 
-@router.post("/{task_id}/cancel", response_model=CancelResponse)
+@router.post(
+    "/{task_id}/cancel",
+    response_model=CancelResponse,
+    dependencies=[Depends(require_job_access)],
+)
 @limiter.limit("10/minute")
 async def cancel_job(request: Request, task_id: str):
     if not cancel_job_status(task_id):
@@ -140,4 +170,5 @@ async def cancel_job(request: Request, task_id: str):
             status_code=409,
             detail=t(API_CANCEL_STATE_INVALID).format(status=job["status"]),
         )
+    save_status(task_id, get_job_status(task_id))
     return CancelResponse(task_id=task_id, status="cancelled")

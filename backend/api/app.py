@@ -27,23 +27,33 @@ from backend.tools.logger import logger, setup_logger
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
-    setup_logger()
-    unified_queue.start_worker()
-    await limpar_tokens_expirados()
-    cleanup_task = asyncio.create_task(periodic_cleanup())
-    logger.info(t(LOG_API_STARTED))
-    access_logger = logging.getLogger("uvicorn.access")
-    access_filter = AccessLogFilter()
-    access_logger.addFilter(access_filter)
-    try:
-        yield
-    finally:
-        access_logger.removeFilter(access_filter)
-        cleanup_task.cancel()
+    from backend.services.runtime_lease import runtime_lease
+    with runtime_lease():
+        setup_logger()
+        from backend.api.worker import recover_pending_jobs
+        await recover_pending_jobs()
+        unified_queue.start_worker()
+        await limpar_tokens_expirados()
+        cleanup_task = asyncio.create_task(periodic_cleanup())
+        logger.info(t(LOG_API_STARTED))
+        access_logger = logging.getLogger("uvicorn.access")
+        access_filter = AccessLogFilter()
+        access_logger.addFilter(access_filter)
         try:
-            await cleanup_task
-        except asyncio.CancelledError:
-            pass
+            yield
+        finally:
+            access_logger.removeFilter(access_filter)
+            if unified_queue._worker_task is not None:
+                unified_queue._worker_task.cancel()
+                try:
+                    await unified_queue._worker_task
+                except asyncio.CancelledError:
+                    pass
+            cleanup_task.cancel()
+            try:
+                await cleanup_task
+            except asyncio.CancelledError:
+                pass
 
 
 def create_app() -> FastAPI:

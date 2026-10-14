@@ -13,6 +13,7 @@ from typing import Any
 
 from backend.agents.state_manager import TaskCancelledError, state_manager
 from backend.config.settings import settings
+from backend.services.job_store import load_record, save_status, pending_records
 from backend.i18n import t
 from backend.log_messages import (
     LOG_JOB_CANCELLED,
@@ -83,7 +84,8 @@ def get_job_status(task_id: str) -> dict[str, Any] | None:
         return dict(task)
     queued = queued_jobs.get(task_id)
     if not queued:
-        return None
+        record = load_record(task_id)
+        return record["status"] if record else None
     status = dict(queued)
     if status.get("status") == "queued":
         from backend.services.queue_service import unified_queue
@@ -146,6 +148,7 @@ class JobExecutor:
                 state_manager.criar_tarefa(
                     job.file_path, task_id=task_id, arquivo=job.filename
                 )
+            save_status(task_id, get_job_status(task_id))
             await registrar_conversao(
                 task_id=task_id,
                 arquivo=job.filename,
@@ -347,6 +350,9 @@ class JobExecutor:
                 tempo_segundos=time.time() - started_at,
             )
         finally:
+            status = get_job_status(task_id)
+            if status is not None:
+                save_status(task_id, status)
             if job.file_path.exists():
                 try:
                     job.file_path.unlink()
@@ -389,3 +395,29 @@ def expirar_status_fila(max_age_seconds: int, now: float | None = None) -> int:
     for task_id in expired:
         queued_jobs.pop(task_id, None)
     return len(expired)
+
+
+async def recover_pending_jobs() -> None:
+    from backend.services.queue_service import unified_queue, QueueItem
+    from backend.api.routes.jobs import job_executor
+    for record in pending_records():
+        task_id = record["task_id"]
+        status = record["status"]
+        if status["status"] == "processing":
+            status.update(status="error", fim=time.time(), etapa_atual="Processing interrupted by restart")
+            status.setdefault("erros", []).append("Processing interrupted by restart; submit again")
+            save_status(task_id, status)
+            await finalizar_conversao(task_id, status="error", erro="Processing interrupted by restart")
+            continue
+        if unified_queue.get_position(task_id):
+            continue
+        payload = record["request"]
+        payload["file_path"] = Path(payload["file_path"])
+        payload["output_dir"] = Path(payload["output_dir"]) if payload.get("output_dir") else None
+        job = ApiJob(**payload)
+        if not job.file_path.is_file():
+            status.update(status="error", fim=time.time(), erros=["Pending upload no longer exists"])
+            save_status(task_id, status)
+            continue
+        queued_jobs[task_id] = status
+        await unified_queue.enqueue(QueueItem(file_path=job.file_path, filename=job.filename, source=job.source, task_id=task_id, callback=job_executor.run, callback_args={"job": job}))

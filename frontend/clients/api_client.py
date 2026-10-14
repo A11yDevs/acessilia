@@ -26,9 +26,12 @@ class ApiClient:
         base_url: str,
         timeout: float = 60.0,
         api_key: str | None = None,
+        observability_token: str | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
+        self._observability_token = observability_token
+        self._job_tokens: dict[str, str] = {}
         self._headers: dict[str, str] = {}
         if api_key:
             self._headers["X-API-Key"] = api_key
@@ -64,13 +67,7 @@ class ApiClient:
             data["custom_prompt"] = custom_prompt
         if email:
             data["email"] = email
-        files = {
-            "document_file": (
-                filename,
-                file_path.open("rb"),
-                "application/octet-stream",
-            )
-        }
+        files = {}
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             with file_path.open("rb") as file_handle:
                 files["document_file"] = (filename, file_handle, "application/octet-stream")
@@ -81,23 +78,33 @@ class ApiClient:
                     headers=self._headers,
                 )
         self._raise_for_status(response)
-        return response.json()
+        result = response.json()
+        if result.get("job_token"):
+            self._job_tokens[result["task_id"]] = result["job_token"]
+        return result
 
-    async def get_job_status(self, task_id: str) -> dict[str, Any]:
+    async def get_job_status(self, task_id: str, job_token: str | None = None) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.get(
-                self._url(f"/jobs/{task_id}"), headers=self._headers
+                self._url(f"/jobs/{task_id}"), headers=self._job_headers(task_id, job_token)
             )
         self._raise_for_status(response)
         return response.json()
 
-    async def cancel_job(self, task_id: str) -> dict[str, Any]:
+    async def cancel_job(self, task_id: str, job_token: str | None = None) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.post(
-                self._url(f"/jobs/{task_id}/cancel"), headers=self._headers
+                self._url(f"/jobs/{task_id}/cancel"), headers=self._job_headers(task_id, job_token)
             )
         self._raise_for_status(response)
         return response.json()
+
+    def _job_headers(self, task_id: str, token: str | None = None) -> dict[str, str]:
+        headers = dict(self._headers)
+        access_token = token or self._job_tokens.get(task_id)
+        if access_token:
+            headers["X-Job-Token"] = access_token
+        return headers
 
     async def get_download_info(self, token: str) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=self.timeout) as client:
@@ -137,16 +144,22 @@ class ApiClient:
     async def history(self, limit: int = 20) -> list[dict[str, Any]]:
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.get(
-                self._url(f"/history?limit={limit}"), headers=self._headers
+                self._url(f"/history?limit={limit}"), headers=self._admin_headers()
             )
         self._raise_for_status(response)
         return response.json()
 
     async def stats(self) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.get(self._url("/stats"), headers=self._headers)
+            response = await client.get(self._url("/stats"), headers=self._admin_headers())
         self._raise_for_status(response)
         return response.json()
+
+    def _admin_headers(self) -> dict[str, str]:
+        headers = dict(self._headers)
+        if self._observability_token:
+            headers["Authorization"] = f"Bearer {self._observability_token}"
+        return headers
 
 
 def get_default_client() -> ApiClient:
