@@ -200,6 +200,7 @@ def _web_strings() -> dict:
         "advanced_intro": t(WEB_ADVANCED_INTRO),
         "advanced_prompt_label": t(WEB_ADVANCED_PROMPT_LABEL),
         "advanced_prompt_placeholder": t(WEB_ADVANCED_PROMPT_PLACEHOLDER),
+        "advanced_options_unavailable": t("Custom instructions and thinking mode are unavailable for this pipeline"),
         "advanced_prompt_help": t(WEB_ADVANCED_PROMPT_HELP),
         "advanced_thinking_label": t(WEB_ADVANCED_THINKING_LABEL),
         "advanced_back_link": t(WEB_ADVANCED_BACK_LINK),
@@ -406,6 +407,8 @@ async def handle_advanced_upload(
             name="advanced.html",
             context={**_web_strings(), "error": t(WEB_ERROR_PROMPT_TOO_LONG)}
         )
+    if prompt or thinking_mode:
+        raise HTTPException(status_code=422, detail=t("Custom instructions and thinking mode are unavailable for this pipeline"))
     return await _submit_via_api(
         request,
         template_name="advanced.html",

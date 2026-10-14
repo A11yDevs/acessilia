@@ -152,7 +152,7 @@ def test_upload_rejects_oversized_file_before_api_submission(web_client, monkeyp
     assert list(web_module.WEB_UPLOAD_DIR.iterdir()) == []
 
 
-def test_advanced_upload_sends_prompt_and_thinking(web_client):
+def test_advanced_upload_rejects_unsupported_options(web_client):
     resp = web_client.post(
         "/advanced/process",
         files={"document_file": ("doc.pdf", _fake_pdf_bytes(), "application/pdf")},
@@ -162,11 +162,8 @@ def test_advanced_upload_sends_prompt_and_thinking(web_client):
             "thinking_mode": "true",
         },
     )
-    assert resp.status_code == 200
-    assert len(web_client.fake.submitted) == 1
-    sub = web_client.fake.submitted[0]
-    assert sub["custom_prompt"] == "Explique em detalhes"
-    assert sub["thinking_mode"] is True
+    assert resp.status_code == 422
+    assert web_client.fake.submitted == []
 
 
 def test_advanced_upload_oversized_prompt(web_client):

@@ -415,6 +415,7 @@ DEFAULT_LOCALE: str = "en_US"
 #: Canonical English msgids surfaced to end users at runtime; every id must carry a non-blank pt_BR translation in
 #: TRANSLATIONS before catalogs are allowed to be written out, per the module's completeness-validation contract.
 MESSAGES: tuple[str, ...] = (
+    "Custom instructions and thinking mode are unavailable for this pipeline",
     "Processing your document…",
     "Job complete: your file is ready for download",
     MSG_UNSUPPORTED_FORMAT,
@@ -820,6 +821,7 @@ MESSAGES: tuple[str, ...] = (
 #: msgid -> localized text mappings per non-default locale; every id in MESSAGES must appear for each such locale.
 TRANSLATIONS: dict[str, dict[str, str]] = {
     "pt_BR": {
+        "Custom instructions and thinking mode are unavailable for this pipeline": "Instruções personalizadas e modo de raciocínio estão indisponíveis neste pipeline",
         "Processing your document…": "Processando seu documento…",
         "Job complete: your file is ready for download": "Tarefa concluída: o arquivo está pronto para download",
         MSG_UNSUPPORTED_FORMAT: ("Formato de arquivo não suportado. Envie PDF, DOCX, HTML, PNG, JPG, " +

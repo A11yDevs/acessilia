@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-09-26 12:29-0300\n"
+"POT-Creation-Date: 2026-10-13 17:35-0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: en_US\n"
@@ -18,6 +18,9 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.18.0\n"
+
+msgid "Custom instructions and thinking mode are unavailable for this pipeline"
+msgstr "Custom instructions and thinking mode are unavailable for this pipeline"
 
 msgid "Processing your document…"
 msgstr "Processing your document…"
@@ -441,6 +444,18 @@ msgstr "Invalid format"
 
 msgid "File not found"
 msgstr "File not found"
+
+msgid "Log file not found"
+msgstr "Log file not found"
+
+msgid "Observability access not configured"
+msgstr "Observability access not configured"
+
+msgid "Invalid token"
+msgstr "Invalid token"
+
+msgid "Token allows read-only access"
+msgstr "Token allows read-only access"
 
 msgid "The image must receive a description or be marked decorative."
 msgstr "The image must receive a description or be marked decorative."
@@ -1668,15 +1683,3 @@ msgid "document"
 msgid_plural "documents"
 msgstr[0] "document"
 msgstr[1] "documents"
-
-msgid "Log file not found"
-msgstr "Log file not found"
-
-msgid "Observability access not configured"
-msgstr "Observability access not configured"
-
-msgid "Invalid token"
-msgstr "Invalid token"
-
-msgid "Token allows read-only access"
-msgstr "Token allows read-only access"

@@ -32,7 +32,6 @@ from backend.core.planning.planner_agent import PlannerAgent
 from backend.i18n import t
 from backend.log_messages import (
     LOG_PDDL_ELEMENT_CROP_FAILED,
-    LOG_PDDL_IGNORED_OPTIONS,
     LOG_PDDL_IMAGES_ENRICHED,
     LOG_PDDL_PREFERRED_PLAN_MISSING,
     LOG_PDDL_TABLES_ENRICHED,
@@ -341,7 +340,7 @@ class PddlAccessibilityOrchestrator:
         effective_mode = mode or "medio"
 
         if custom_prompt or thinking_mode:
-            logger.warning(t(LOG_PDDL_IGNORED_OPTIONS))
+            raise ValueError("Custom instructions and thinking mode are unavailable for this pipeline")
 
         if status_callback:
             await status_callback(t(STAGE_ANALYZING_STRUCTURAL))
