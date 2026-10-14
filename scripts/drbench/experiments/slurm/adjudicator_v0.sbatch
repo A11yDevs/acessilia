@@ -4,13 +4,13 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
 #SBATCH --time=00:30:00
-#SBATCH --output=/raid/user_marcospaulo/drdocbench/runs/slurm/logs/%x_%j.log
+#SBATCH --output=runs/slurm/logs/%x_%j.log
 # Adjudicator v0/v0b on the dev subset: route pages between existing
 # docling-forceocr and mineru predictions, evaluate (local + official), append
 # tables to runs/dev/summary.md; then, if the 509-page EvalAI runs are complete,
 # build+validate the three submission zips.
 set -uo pipefail
-source /raid/user_marcospaulo/drdocbench/runs/slurm/env.sh
+source "${WS:-/raid/user_marcospaulo/drdocbench}/runs/slurm/env.sh"
 cd "$WS"
 ACE=$WS/repos/acessilia/.venv/bin/python
 DRB=$WS/repos/DrDocBench/.venv/bin/python

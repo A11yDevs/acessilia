@@ -32,6 +32,7 @@ import importlib  # noqa: E402
 _ted = importlib.import_module("scripts.metrics.text_ed")
 from scripts.metrics.cdm import cdm_score  # noqa: E402
 from scripts.metrics.teds import teds_score  # noqa: E402
+from backend.tools.formula_tools import normalize_latex  # noqa: E402
 
 TABLE_RE = re.compile(r"<table.*?</table>", re.DOTALL | re.IGNORECASE)
 GT_FORMULA_RE = re.compile(r"\$\$(.+?)\$\$", re.DOTALL)
@@ -113,8 +114,8 @@ def score_item(args):
     pred_tables = TABLE_RE.findall(pred_md)
     teds = _pair_mean(pred_tables, gt_tables, teds_score)
 
-    gt_f = [m.group(1).strip() for m in GT_FORMULA_RE.finditer(gt_md)]
-    pred_f = [(m.group(1) or m.group(2) or "").strip()
+    gt_f = [normalize_latex(m.group(1).strip()) for m in GT_FORMULA_RE.finditer(gt_md)]
+    pred_f = [normalize_latex((m.group(1) or m.group(2) or "").strip())
               for m in PRED_FORMULA_RE.finditer(pred_md)]
     cdm = _pair_mean(pred_f, gt_f, cdm_score)
 

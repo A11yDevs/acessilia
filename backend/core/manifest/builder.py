@@ -94,6 +94,74 @@ DEFAULT_METHOD_COSTS = {
     "pymupdf-region": 30,
     "deterministic-heading-repair": 5,
     "human-review": 100,
+    # --- Capacidades da PR #125 (domínio v2.3) ---
+    # Determinísticas: custo baixo, o planner deve preferi-las.
+    "agreement-rule": 5,
+    "xycut-order": 10,
+    "skeleton-order": 5,
+    "latex-normalizer": 10,
+    "rep-guard": 5,
+    "tailjoin": 5,
+    "tailjoin-positioned": 5,
+    "verse-chunker": 5,
+    "line-number-extractor": 5,
+    "norm-fix": 5,
+    "rescue-omitted": 15,
+    "table-smart-fusion": 20,
+    "single-provider": 20,
+    # Consomem modelo: custo alto, só admissíveis com a política ativa.
+    "vlm-pairwise-judge": 40,
+    "table-specialist": 45,
+    "dual-provider-fusion": 60,
+}
+
+# Obrigações introduzidas na versão 2.3 do domínio PDDL (PR #125).
+# kind -> (rationale, métodos admissíveis)
+V23_OBLIGATION_BY_KIND = {
+    "adjudicate-page": (
+        "Página com divergência entre providers exige adjudicação.",
+        ["vlm-pairwise-judge", "agreement-rule", "human-review"],
+    ),
+    "fuse-providers": (
+        "Extração fundida de dois providers melhora a fidelidade do texto.",
+        ["dual-provider-fusion", "single-provider", "human-review"],
+    ),
+    "refine-reading-order": (
+        "Ordem de leitura precisa seguir as colunas da página.",
+        ["xycut-order", "skeleton-order", "human-review"],
+    ),
+    "normalize-formula": (
+        "Fórmula exige normalização de delimitadores e símbolos.",
+        ["latex-normalizer", "mathml", "human-review"],
+    ),
+    "rescue-omitted-block": (
+        "Bloco presente em um provider foi omitido na fusão.",
+        ["rescue-omitted", "human-review"],
+    ),
+    "guard-repetition": (
+        "Saída degenerada por repetição precisa ser cortada.",
+        ["rep-guard", "human-review"],
+    ),
+    "join-tail-blocks": (
+        "Blocos curtos finais (cabeçalho/rodapé/número) devem ser unidos.",
+        ["tailjoin-positioned", "tailjoin", "human-review"],
+    ),
+    "select-table-source": (
+        "Tabela exige escolha da melhor fonte entre os providers.",
+        ["table-smart-fusion", "table-specialist", "human-review"],
+    ),
+    "chunk-verse": (
+        "Bloco de verso/registro excede o limite de reagrupamento do avaliador.",
+        ["verse-chunker", "human-review"],
+    ),
+    "extract-line-numbers": (
+        "Números de linha marginais devem virar blocos próprios.",
+        ["line-number-extractor", "human-review"],
+    ),
+    "normalize-text": (
+        "Texto exige limpezas determinísticas (ligaduras, hífen, NBSP).",
+        ["norm-fix", "human-review"],
+    ),
 }
 
 CALL_OUT_MIN_GROUP_SIZE = 3
@@ -112,18 +180,27 @@ def build_processing_manifest(
     extraction: Any,
     *,
     language: str = "pt-BR",
+    refine_reading_order: bool = False,
 ) -> ProcessingManifest:
     source_path = source_path.resolve()
     digest = _sha256(source_path)
 
     # ── Toolbox extraction: manifest JSON já veio pronto ──────────────────
     if isinstance(extraction.document, dict):
-        return _build_from_toolbox_json(source_path, extraction, digest=digest, language=language)
+        return _build_from_toolbox_json(
+            source_path,
+            extraction,
+            digest=digest,
+            language=language,
+            refine_reading_order=refine_reading_order,
+        )
 
     # ── Docling extraction: construir a partir do objeto docling.Document ──
     extractor_name = str(extraction.configuration.get("extractor", "")).strip().lower()
     enable_callouts = extractor_name != "pymupdf"
     elements = _build_elements(extraction.document, enable_callouts=enable_callouts)
+    if refine_reading_order:
+        elements = _refine_reading_order(elements)
     pages = _build_pages(extraction.document, elements)
     title = _infer_title(source_path, elements)
     observations, obligations = _derive_processing_needs(elements)
@@ -172,6 +249,7 @@ def _build_from_toolbox_json(
     *,
     digest: str,
     language: str,
+    refine_reading_order: bool = False,
 ) -> ProcessingManifest:
     """Build a ProcessingManifest from a pre-built Toolbox JSON response.
 
@@ -205,7 +283,16 @@ def _build_from_toolbox_json(
     data.setdefault("language", language)
     data.setdefault("created_at", extraction.completed_at.isoformat())
 
-    return ProcessingManifest.model_validate(data)
+    manifest = ProcessingManifest.model_validate(data)
+    if refine_reading_order:
+        manifest.elements = _refine_reading_order(manifest.elements)
+        by_page: dict[int, list[str]] = {}
+        for elem in manifest.elements:
+            if elem.page_number is not None:
+                by_page.setdefault(elem.page_number, []).append(elem.id)
+        for page in manifest.pages:
+            page.element_ids = by_page.get(page.page_number, [])
+    return manifest
 
 
 def _build_elements(document: Any, *, enable_callouts: bool = True) -> list[ManifestElement]:
@@ -526,6 +613,197 @@ def _is_known_callout_body_candidate(
     if right_indent < 4.0:
         return False
     return (left_indent >= indent_threshold) or (right_indent >= indent_threshold)
+
+
+def _refine_reading_order(elements: list[ManifestElement]) -> list[ManifestElement]:
+    """Refine reading order with column-aware gutter partitioning and marginals isolation.
+
+    Ensures headers stay at the top, footers/page numbers stay at the base (never
+    interleaved inside paragraphs), and body blocks follow a clean multi-column
+    reading order (reading column 1 before column 2/3).
+    """
+    if not elements:
+        return elements
+
+    by_page: dict[int | None, list[ManifestElement]] = {}
+    for elem in elements:
+        by_page.setdefault(elem.page_number, []).append(elem)
+
+    refined: list[ManifestElement] = []
+    for page_no, page_elements in sorted(
+        by_page.items(),
+        key=lambda pair: (0 if pair[0] is None else 1, pair[0] or 0),
+    ):
+        if page_no is None or len(page_elements) <= 1:
+            refined.extend(page_elements)
+            continue
+
+        groups: list[ManifestElement] = []
+        headers: list[ManifestElement] = []
+        footers: list[ManifestElement] = []
+        body: list[ManifestElement] = []
+
+        for e in page_elements:
+            etype = str(e.type).lower()
+            raw = str(e.raw_label).lower()
+            is_header = etype in ("header", "page_header") or raw in ("header", "page_header")
+            is_footer = (
+                etype in ("footer", "page_footer", "page_number")
+                or raw in ("footer", "page_footer", "page_number")
+            )
+            if etype == "group":
+                groups.append(e)
+            elif is_header:
+                headers.append(e)
+            elif is_footer:
+                footers.append(e)
+            else:
+                body.append(e)
+
+        # Sort headers top-to-bottom, left-to-right
+        headers.sort(
+            key=lambda item: (
+                _element_bbox(item)[1] if _element_bbox(item) else 0.0,
+                _element_bbox(item)[0] if _element_bbox(item) else 0.0,
+                item.reading_order,
+            )
+        )
+
+        # Sort footers top-to-bottom, left-to-right
+        footers.sort(
+            key=lambda item: (
+                _element_bbox(item)[1] if _element_bbox(item) else 0.0,
+                _element_bbox(item)[0] if _element_bbox(item) else 0.0,
+                item.reading_order,
+            )
+        )
+
+        sorted_body = _order_body_elements_by_column(body)
+        refined.extend(groups + headers + sorted_body + footers)
+
+    for index, elem in enumerate(refined, start=1):
+        elem.reading_order = index
+
+    return refined
+
+
+def _order_body_elements_by_column(body: list[ManifestElement]) -> list[ManifestElement]:
+    """Order body elements respecting multi-column gutters and full-width banners."""
+    elements_with_bbox = [e for e in body if _element_bbox(e) is not None]
+    if len(elements_with_bbox) < 2:
+        return sorted(
+            body,
+            key=lambda e: (
+                _element_bbox(e)[1] if _element_bbox(e) else 0.0,
+                e.reading_order,
+            ),
+        )
+
+    min_left = min(_element_bbox(e)[0] for e in elements_with_bbox)
+    max_right = max(_element_bbox(e)[2] for e in elements_with_bbox)
+    page_width = max(1.0, max_right - min_left)
+
+    # Detect multi-column candidates (width < 75% of content width)
+    narrow_elements = [
+        e
+        for e in elements_with_bbox
+        if (_element_bbox(e)[2] - _element_bbox(e)[0]) < (0.75 * page_width)
+    ]
+
+    mid_x = min_left + 0.5 * page_width
+    col1 = [
+        e
+        for e in narrow_elements
+        if _element_bbox(e)[2] <= (mid_x + 0.05 * page_width)
+    ]
+    col2 = [
+        e
+        for e in narrow_elements
+        if _element_bbox(e)[0] >= (mid_x - 0.05 * page_width)
+    ]
+
+    is_multi_column = len(col1) >= 2 and len(col2) >= 2
+
+    if not is_multi_column:
+        return sorted(
+            body,
+            key=lambda e: (
+                _element_bbox(e)[1] if _element_bbox(e) else 0.0,
+                _element_bbox(e)[0] if _element_bbox(e) else 0.0,
+                e.reading_order,
+            ),
+        )
+
+    full_width = [
+        e
+        for e in elements_with_bbox
+        if (_element_bbox(e)[2] - _element_bbox(e)[0]) >= (0.75 * page_width)
+    ]
+    full_width.sort(key=lambda e: _element_bbox(e)[1])
+
+    ordered: list[ManifestElement] = []
+    seen_ids: set[str] = set()
+    prev_top = -1.0
+
+    for fw in full_width:
+        fw_top = _element_bbox(fw)[1]
+        segment = [
+            e
+            for e in narrow_elements
+            if prev_top < _element_bbox(e)[1] < fw_top and e.id not in seen_ids
+        ]
+        seg_c1 = [
+            e
+            for e in segment
+            if (_element_bbox(e)[0] + _element_bbox(e)[2]) / 2.0 < mid_x
+        ]
+        seg_c2 = [
+            e
+            for e in segment
+            if (_element_bbox(e)[0] + _element_bbox(e)[2]) / 2.0 >= mid_x
+        ]
+        seg_c1.sort(key=lambda e: (_element_bbox(e)[1], _element_bbox(e)[0]))
+        seg_c2.sort(key=lambda e: (_element_bbox(e)[1], _element_bbox(e)[0]))
+        for el in seg_c1:
+            ordered.append(el)
+            seen_ids.add(el.id)
+        for el in seg_c2:
+            ordered.append(el)
+            seen_ids.add(el.id)
+        ordered.append(fw)
+        seen_ids.add(fw.id)
+        prev_top = _element_bbox(fw)[3]
+
+    remainder = [
+        e
+        for e in narrow_elements
+        if _element_bbox(e)[1] > prev_top and e.id not in seen_ids
+    ]
+    rem_c1 = [
+        e
+        for e in remainder
+        if (_element_bbox(e)[0] + _element_bbox(e)[2]) / 2.0 < mid_x
+    ]
+    rem_c2 = [
+        e
+        for e in remainder
+        if (_element_bbox(e)[0] + _element_bbox(e)[2]) / 2.0 >= mid_x
+    ]
+    rem_c1.sort(key=lambda e: (_element_bbox(e)[1], _element_bbox(e)[0]))
+    rem_c2.sort(key=lambda e: (_element_bbox(e)[1], _element_bbox(e)[0]))
+    for el in rem_c1:
+        ordered.append(el)
+        seen_ids.add(el.id)
+    for el in rem_c2:
+        ordered.append(el)
+        seen_ids.add(el.id)
+
+    for e in body:
+        if e.id not in seen_ids:
+            ordered.append(e)
+            seen_ids.add(e.id)
+
+    return ordered
 
 
 def _build_pages(document: Any, elements: list[ManifestElement]) -> list[PageDescriptor]:

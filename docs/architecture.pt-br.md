@@ -5,7 +5,7 @@ Também disponível em **inglês (EUA)**: [English version](architecture.md)
 ## Visão geral
 O sistema converte documentos em formatos acessíveis por meio de um pipeline de extração multiagente (extração estrutural via Acessilia Toolbox, mais agentes de visão e de dados de IA multimodal conduzidos por Agno), um pipeline de documento canônico, validação determinística e renderizadores específicos de formato. A arquitetura é modular: **backend/** guarda a lógica de domínio e a API REST que a expõe, **frontend/** guarda os clientes de interface (Telegram, Web, CLI) que conversam com essa API, e **infra/** guarda o Dockerfile (o arquivo Compose fica na raiz do repositório).
 
-O sistema combina **planejamento determinístico com execução por IA**. O único motor é `pddl`: extrai um manifesto via Acessilia Toolbox, enriquece-o com Vision/Data e gera um plano PDDL, com validação opcional em dry-run por Agno Workflow. `PIPELINE_ENGINE` aceita `pddl` e o alias `pmv`; `legacy` e nomes desconhecidos são rejeitados. Veja [pmv_agno_pddl.pt-br.md](pmv_agno_pddl.pt-br.md).
+O sistema combina **planejamento determinístico com execução por IA**. O único motor é `pddl`: extrai um manifesto via Acessilia Toolbox, enriquece-o com Vision/Data e gera um plano PDDL e percorre um Agno Workflow em dry-run ou execução real. `PIPELINE_ENGINE` aceita `pddl` e o alias `pmv`; `legacy` e nomes desconhecidos são rejeitados. Veja [pmv_agno_pddl.pt-br.md](pmv_agno_pddl.pt-br.md).
 
 ---
 
@@ -40,13 +40,13 @@ O sistema combina **planejamento determinístico com execução por IA**. O úni
 
 #### 0.5. Camada de Planejamento (`backend/core/`) — motor PDDL
 
-O motor PDDL extrai o manifesto via Toolbox e enriquece imagens/tabelas com Vision/Data antes de gerar o plano. A compilação do problema PDDL e os contratos dos métodos são determinísticos; o executor valida o plano em dry-run quando habilitado. `pmv` é um alias de `pddl`.
+O motor PDDL extrai o manifesto via Toolbox e enriquece imagens/tabelas com Vision/Data antes de gerar o plano. A compilação do problema PDDL e os contratos dos métodos são determinísticos; o executor valida o plano em dry-run ou executa os métodos registrados e replaneja após uma tentativa malsucedida. `pmv` é um alias de `pddl`.
 
 - `backend/core/manifest/`: o agente Informacional-Estrutural extrai um `processing-manifest.json` do documento (regiões, tipos e obrigações de processamento) via Acessilia Toolbox.
 - `backend/core/planning/`: o `PlannerAgent` compila o manifesto mais um domínio PDDL em um problema, gera um `nominal-plan.json` (planejador interno ou backend Fast Downward) e o valida. A geração do problema PDDL é determinística — nenhum LLM escreve PDDL.
-- `backend/core/execution/`: o Executor percorre o plano validado em um Agno Workflow e, no dry-run opcional da aplicação, produz um `execution-report.json` sem executar os métodos reais.
+- `backend/core/execution/`: o Executor percorre o plano validado em um Agno Workflow e, produz um `execution-report.json` em dry-run ou modo real. O dry-run simula os passos; o modo real executa os handlers registrados.
 - `backend/core/agents/fusion_agent.py`: o `FusionAgent` expõe ferramentas Agno determinísticas sobre a biblioteca pura `docstruct` — `fuse_providers`, `audit_document`, `classify_block` e `needs_reinfer`. O método PDDL `dual-provider-fusion` reutiliza `backend.pipeline.fusion.extract_fused` e só é admissível quando `FUSION_MODE=dual`. Veja [docstruct_algorithms.pt-br.md](docstruct_algorithms.pt-br.md) para saber como funcionam esses algoritmos.
-- `backend/agents/pddl_orchestrator.py`: coordena extração → enriquecimento → plano → dry-run opcional → saída. Erros de planejamento são propagados.
+- `backend/agents/pddl_orchestrator.py`: coordena extração → enriquecimento → plano → dry-run ou execução real → saída. Erros de planejamento são propagados.
 
 O domínio PDDL vive em `backend/core/planning/domains/`. Os esquemas JSON (manifesto, plano, comparação, relatório de execução) ficam em `schemas/` na raiz do repositório e são gerados por `scripts/generate_pmv_schemas.py`.
 

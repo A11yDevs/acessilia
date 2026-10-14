@@ -8,9 +8,9 @@
 #SBATCH --mem=128G
 #SBATCH --time=12:00:00
 #SBATCH --signal=B:SIGUSR1@600
-#SBATCH --output=/raid/user_marcospaulo/drdocbench/runs/slurm/logs/%x_%j.log
+#SBATCH --output=runs/slurm/logs/%x_%j.log
 set -uo pipefail
-source /raid/user_marcospaulo/drdocbench/runs/slurm/env.sh
+source "${WS:-/raid/user_marcospaulo/drdocbench}/runs/slurm/env.sh"
 EVALAI=$WS/data/evalai/drdocbench-evaluation-v4/images
 DEV=$WS/data/hf/dev
 STOP=0; CHILD=

@@ -114,6 +114,9 @@ msgstr "Gerando o plano nominal com PDDL..."
 msgid "Validating the plan in dry-run mode..."
 msgstr "Validando o plano em modo dry-run..."
 
+msgid "Executing the plan..."
+msgstr "Executando o plano..."
+
 msgid "Please provide an e-mail address: /email you@example.com"
 msgstr "Por favor, informe o e-mail: /email seu@email.com"
 
@@ -443,6 +446,18 @@ msgstr "Formato inválido"
 
 msgid "File not found"
 msgstr "Arquivo não encontrado"
+
+msgid "Log file not found"
+msgstr "Log não encontrado"
+
+msgid "Observability access not configured"
+msgstr "Acesso de observabilidade não configurado"
+
+msgid "Invalid token"
+msgstr "Token inválido"
+
+msgid "Token allows read-only access"
+msgstr "Token permite somente leitura"
 
 msgid "The image must receive a description or be marked decorative."
 msgstr "A imagem deve receber descrição ou ser marcada como decorativa."
@@ -1526,15 +1541,3 @@ msgid "document"
 msgid_plural "documents"
 msgstr[0] "documento"
 msgstr[1] "documentos"
-
-msgid "Log file not found"
-msgstr "Log não encontrado"
-
-msgid "Observability access not configured"
-msgstr "Acesso de observabilidade não configurado"
-
-msgid "Invalid token"
-msgstr "Token inválido"
-
-msgid "Token allows read-only access"
-msgstr "Token permite somente leitura"

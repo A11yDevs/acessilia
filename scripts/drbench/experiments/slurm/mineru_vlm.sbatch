@@ -6,14 +6,14 @@
 #SBATCH --mem=128G
 #SBATCH --time=10:00:00
 #SBATCH --signal=B:SIGUSR1@600
-#SBATCH --output=/raid/user_marcospaulo/drdocbench/runs/slurm/logs/%x_%j.log
+#SBATCH --output=runs/slurm/logs/%x_%j.log
 # Lever E: MinerU 3.x VLM backend (MinerU2.5 1.2B) as third voter. Same pipeline.sbatch, but the
 # toolbox `mineru` provider gets config.backend=${MINERU_BACKEND} (runs/slurm/providers-config-vlm.yaml).
 # Stages (reentrant, each skips pages already done): dev-120 subset -> dev-986 -> test-509.
 #   sbatch runs/slurm/mineru_vlm.sbatch            # hybrid-engine (VLM + pipeline; auto engine: vllm/lmdeploy/transformers)
 #   sbatch --export=ALL,MINERU_BACKEND=vlm-engine,TAG=mineru-vlm runs/slurm/mineru_vlm.sbatch
 set -uo pipefail
-source /raid/user_marcospaulo/drdocbench/runs/slurm/env.sh
+source "${WS:-/raid/user_marcospaulo/drdocbench}/runs/slurm/env.sh"
 export MINERU_BACKEND=${MINERU_BACKEND:-hybrid-engine}   # MinerU 3.4.5 choices: pipeline | vlm-engine | hybrid-engine
 export TOOLBOX_PROVIDERS_CONFIG=$WS/runs/slurm/providers-config-vlm.yaml
 export MINERU_MODEL_SOURCE_OVERRIDE=huggingface   # VLM weights are fetched from HF into $HF_HOME on first use

@@ -45,10 +45,16 @@ dev = [
     "pytest>=9.1.1,<10",
     "respx>=0.23.1,<0.24",
     "pytest-asyncio>=1.4.0,<2",
+    # Used by the Dr.DocBench page-level experiment scripts (scripts/drbench/experiments/pages).
+    "rapidfuzz>=3.9,<4",
 ]
 
 [project.scripts]
 bot-acess = "frontend.cli.run:main"
+
+[tool.uv.sources]
+# O núcleo puro vive em libs/docstruct e é instalado editável a partir do repo.
+acessilia-docstruct = { path = "libs/docstruct", editable = true }
 
 [tool.setuptools.packages.find]
 include = ["backend*", "frontend*"]

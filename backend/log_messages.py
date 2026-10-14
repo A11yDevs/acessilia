@@ -309,6 +309,12 @@ LOG_PDF_PAGE_COUNT_LOGGED: str = "PDF has {total} pages, processing {limit}"
 LOG_PDF_PAGE_SAVED: str = "Page {page} saved: {name}"
 #: Info logged once a PDF has been split into standalone per-page files; {count} is the number of pages extracted, {tmpdir} the destination directory name.
 LOG_PDF_PAGES_EXTRACTED: str = "{count} pages extracted to {tmpdir}"
+#: Error logged when OCR image pre-processing fails; {error} is the exception text.
+LOG_IMAGE_PREPROCESS_FAILED: str = "Image pre-processing error: {error}"
+#: Debug logged when a small page is upscaled before OCR; {factor} is the scale factor, {old_width}/{old_height} the original dimensions.
+LOG_IMAGE_UPSCALED: str = "Image upscaled {factor}x: {old_width}x{old_height}"
+#: Debug logged when a page is rotated to correct its orientation; {angle} is the applied rotation in degrees.
+LOG_IMAGE_ORIENTED: str = "Image orientation corrected by {angle} degrees"
 #: Error raised when the language-agent returns an empty result for a document; no placeholders.
 LOG_ORCHESTRATOR_EMPTY_AGENT_RESPONSE: str = "Empty response from the agent"
 #: Warning logged by the PDDL pipeline when a caller passes custom_prompt or thinking_mode, which the deterministic manifest/planning/execution flow does not use.
@@ -327,6 +333,10 @@ LOG_PDDL_TABLES_ENRICHED: str = (
 #: Exception logged when extracting an element's image clip from the source PDF for the PDDL pipeline fails; {element_id} is the failing element's id.
 LOG_PDDL_ELEMENT_CROP_FAILED: str = (
     "Failed to extract the image clip for element {element_id}"
+)
+#: Warning logged when the vision model answered with an empty description for a picture element, leaving the `describe-image` obligation unsatisfiable. {element_id} is the element without a usable description.
+LOG_PDDL_EMPTY_VISION_DESCRIPTION: str = (
+    "Vision model returned an empty description for element {element_id}"
 )
 #: Error raised when the preferred planner backend produced no valid plan in both mode; {backend} is the preferred backend's name.
 LOG_PDDL_PREFERRED_PLAN_MISSING: str = (

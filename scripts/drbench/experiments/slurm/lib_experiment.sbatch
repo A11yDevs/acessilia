@@ -5,7 +5,7 @@
 #SBATCH --mem=96G
 #SBATCH --time=12:00:00
 #SBATCH --signal=B:SIGUSR1@600
-#SBATCH --output=/raid/user_marcospaulo/drdocbench/runs/slurm/logs/%x_%j.log
+#SBATCH --output=runs/slurm/logs/%x_%j.log
 # Experimento de integração da lib docstruct — ponta a ponta:
 #   1. inferência docling+mineru com --save-raw (reusa runs anteriores)
 #   2. fusão via lib (preset v12) + baseline via script de referência
@@ -19,7 +19,7 @@
 #   MINERU_REUSE=runs/dev-full/mineru-v3-20260916/predictions
 #   ROT_REUSE=1  -> usa docling+rot/mineru+rot como base (v10/v12 usam +rot)
 set -uo pipefail
-source /raid/user_marcospaulo/drdocbench/runs/slurm/env.sh
+source "${WS:-/raid/user_marcospaulo/drdocbench}/runs/slurm/env.sh"
 cd "$WS"
 SPLIT=${SPLIT:-dev}
 [[ $SPLIT == dev ]] && OUTBASE=$WS/runs/dev-full || OUTBASE=$WS/runs/evalai

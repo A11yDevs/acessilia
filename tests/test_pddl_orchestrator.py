@@ -724,3 +724,103 @@ def test_picture_reclassified_as_formula_reconciles_processing_needs(
     assert canonical_formula["type"] == "math"
     assert canonical_formula["text"] == r"E=mc^2"
     assert canonical_formula["metadata"]["mathml"]
+
+
+def test_standalone_image_injects_full_page_picture_for_vision(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+) -> None:
+    """Regressão do bug do mapa-múndi político.
+
+    O extrator estrutural (Docling) classificou uma imagem isolada como dois
+    parágrafos de OCR, sem nenhum bloco `picture`. Com o sinal de
+    media.inspect (is_image + requires_visual_inspection), o orquestrador deve
+    injetar um elemento `picture` de página inteira e acionar o VisionAgent.
+    """
+    from backend.agents import pddl_orchestrator as pddl_module
+
+    manifest = _sample_manifest()
+    # Simula o Docling: só texto curto de OCR, sem elementos visuais.
+    manifest.elements = [
+        ManifestElement(
+            id="el-1",
+            type="paragraph",
+            raw_label="paragraph",
+            reading_order=1,
+            hierarchy_level=1,
+            text="BM",
+            page_number=1,
+        ),
+        ManifestElement(
+            id="el-2",
+            type="paragraph",
+            raw_label="paragraph",
+            reading_order=2,
+            hierarchy_level=1,
+            text="Planiatorio Pottico",
+            page_number=1,
+        ),
+    ]
+    manifest.pages = [PageDescriptor(page_number=1, element_ids=["el-1", "el-2"])]
+    manifest.obligations = []
+    manifest.summary.element_count = 2
+    manifest.summary.obligation_count = 0
+    manifest.summary.observation_count = 0
+    manifest.summary.element_types = {"paragraph": 2}
+
+    media_inspection = {
+        "media_type": "image/jpeg",
+        "is_image": True,
+        "is_pdf": False,
+        "page_count": 1,
+        "artifact_nature": "standalone_image",
+        "requires_visual_inspection": True,
+        "dimensions": {"width": 400, "height": 250, "aspect_ratio": 1.6},
+    }
+
+    class FakeVisionAgent:
+        def __init__(self, **_kwargs):
+            pass
+
+        async def describe_region(self, **_kwargs):
+            return VisionOutput(
+                kind="description",
+                description=(
+                    "Mapa-múndi político com divisão geopolítica por cores, "
+                    "oceanos identificados e um mapa detalhado da Europa."
+                ),
+                language="pt-BR",
+                confidence=0.95,
+                mentioned_elements=["mapa", "oceanos", "Europa"],
+            )
+
+    monkeypatch.setattr(pddl_module, "VisionAgent", FakeVisionAgent)
+    from PIL import Image
+
+    source = tmp_path / "world-map.jpg"
+    Image.new("RGB", (400, 250), "blue").save(source)
+
+    asyncio.run(
+        _enrich_picture_descriptions(
+            manifest,
+            source,
+            mode="medio",
+            media_inspection=media_inspection,
+        )
+    )
+
+    # Um elemento picture foi injetado e descrito.
+    picture = next(e for e in manifest.elements if e.type == "picture")
+    assert picture.metadata["injected_picture"] is True
+    assert "Mapa-múndi político" in picture.text
+    assert picture.id in manifest.pages[0].element_ids
+
+    # A obrigação describe-image foi derivada para o elemento injetado.
+    assert any(
+        obligation.kind == "describe-image"
+        and obligation.target_ids == [picture.id]
+        for obligation in manifest.obligations
+    )
+
+    # O resumo foi atualizado para refletir o elemento injetado.
+    assert manifest.summary.element_types["picture"] == 1
+    assert manifest.summary.element_count == 3

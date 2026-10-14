@@ -122,12 +122,13 @@ async def test_orchestrator_reuses_reader_across_phases_and_preserves_dry_run(so
         return plan, None
 
     def execute(*args, **kwargs):
-        assert kwargs == {"dry_run": True}
-        calls.append("dry-run")
+        assert kwargs == {"dry_run": dry_run}
+        calls.append("dry-run" if dry_run else "real")
         return document, ExecutionReport(plan_id=plan.plan_id, manifest_id=document.manifest_id,
                                          started_at=document.created_at, completed_at=document.created_at,
                                          execution_id="crop-execution", manifest_revision_before=1,
-                                         manifest_revision_after=1, mode="dry-run", status="dry-run-completed",
+                                         manifest_revision_after=1, mode="dry-run" if dry_run else "live",
+                                         status="dry-run-completed" if dry_run else "completed",
                                          replan_required=False, steps=[])
 
     # Keep the real coordinator and rendering; replace only extraction, AI and planner/executor boundaries.
@@ -147,8 +148,8 @@ async def test_orchestrator_reuses_reader_across_phases_and_preserves_dry_run(so
 
     output = await orchestrator.executar(source, source.parent, status_callback=status, structured_output=True)
     assert "A green rectangle" in output["text"]
-    assert calls == ["vision", "data", "plan"] + (["dry-run"] if dry_run else [])
-    assert len(statuses) == (5 if dry_run else 4)
+    assert calls == ["vision", "data", "plan", "dry-run" if dry_run else "real"]
+    assert len(statuses) == 5
     assert states[0][0] is states[1][0]
     assert states[0][1] == states[1][1]
     assert states[0][1][1] == 1

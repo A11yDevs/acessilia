@@ -23,6 +23,7 @@ from html import escape
 from typing import Any
 
 from backend.pipeline.table_ast import table_ast_from_block
+from backend.tools.formula_tools import normalize_latex
 
 
 def canonical_to_drbench_md(document: dict[str, Any]) -> str:
@@ -79,6 +80,7 @@ def _render_block(block: dict[str, Any]) -> str:
 
     if btype == "math":
         latex = (block.get("text") or "").strip()
+        latex = normalize_latex(latex)
         return f"$$\n{latex}\n$$" if latex else ""
 
     if btype == "code":

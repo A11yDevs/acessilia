@@ -52,7 +52,7 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 
 ### 10. Deterministic Planning with PDDL
 - Implementation: [backend/core/manifest/](../backend/core/manifest/), [backend/core/planning/](../backend/core/planning/), [backend/core/execution/](../backend/core/execution/), coordinated by [backend/agents/pddl_orchestrator.py](../backend/agents/pddl_orchestrator.py). Active when `PIPELINE_ENGINE=pddl`.
-- Role: separate *what to do* from *doing it*. A deterministic manifest describes the document's regions and obligations; a PDDL planner compiles it into a validated, ordered plan; Vision/Data enrich eligible regions before planning, and an Agno Workflow executor optionally validates the plan in dry-run mode. See [pmv_agno_pddl.md](pmv_agno_pddl.md).
+- Role: separate *what to do* from *doing it*. A deterministic manifest describes the document's regions and obligations; a PDDL planner compiles it into a validated, ordered plan; Vision/Data enrich eligible regions before planning, and an Agno Workflow executor validates the plan in dry-run mode or executes registered handlers in real mode. See [pmv_agno_pddl.md](pmv_agno_pddl.md).
 - Benefit: task ordering and dependencies become explicit and auditable, and planning stays deterministic (no LLM writes PDDL) while AI is confined to description. Planning errors propagate to the processing service.
 
 ### 11. REST API with Interface Clients

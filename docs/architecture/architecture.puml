@@ -44,7 +44,7 @@ Manifest --> Toolbox
 Orchestrator --> Planner
 Orchestrator --> Executor
 Orchestrator --> Agents : Pre-plan enrichment
-Orchestrator --> Executor : Optional dry-run validation
+Orchestrator --> Executor : Dry-run or real execution
 Agents --> AI
 Orchestrator --> Pipeline
 Pipeline --> Exporters

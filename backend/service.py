@@ -68,6 +68,7 @@ def _build_orchestrator():
         fast_downward_search=settings.pddl_fast_downward_search,
         enable_ocr=False,
         extractor_backend="toolbox",
+        max_replans=settings.pddl_max_replans,
     )
 
 

@@ -87,6 +87,39 @@ _write_status() {
     > "$STATUS_FILE"
 }
 
+_image_digest() {
+  # Manifest digest of a locally cached image reference (empty when absent).
+  docker image inspect "$1" --format '{{.RepoDigests}}' 2>/dev/null \
+    | grep -oE 'sha256:[a-f0-9]{64}' | head -1 || true
+}
+
+_registry_digest() {
+  # Manifest digest published for a tag, resolved without pulling so the
+  # comparison also works when there is nothing to update.
+  docker manifest inspect --verbose "$1" 2>/dev/null \
+    | jq -r 'if type == "array" then .[0].Descriptor.digest else .Descriptor.digest end' 2>/dev/null \
+    || true
+}
+
+# Digests for the status file. /api/v1/health compares the published digest
+# against the running one to decide `update_available`/`up_to_date`, so both
+# have to be written on every check, not only when an update happens.
+_collect_digests() {
+  # $1 = tag published for the tracked branch, $2 = sha-tagged reference
+  local track_ref="$1" sha_ref="$2"
+  LATEST_DIGEST=$(_registry_digest "$sha_ref")
+  if [ -z "$LATEST_DIGEST" ]; then
+    LATEST_DIGEST=$(_image_digest "$sha_ref")
+  fi
+  RUNNING_DIGEST=$(_image_digest "$track_ref")
+  if [ -n "$LATEST_DIGEST" ] && [ -z "$RUNNING_DIGEST" ]; then
+    # A local copy of the tracked tag is authoritative when GHCR cannot be
+    # reached; without it the health check would compare a digest against
+    # nothing and never report "up to date".
+    RUNNING_DIGEST=$(_image_digest "$sha_ref")
+  fi
+}
+
 # ──────────────────────────────────────────────
 # 0. Carregar configuracoes do .env
 # ──────────────────────────────────────────────
@@ -160,7 +193,11 @@ fi
 if [ -f "$CACHE_FILE" ]; then
   CACHED_SHA=$(cat "$CACHE_FILE")
   if [ "$CACHED_SHA" = "$LATEST_SHA" ]; then
-    _write_status "$LATEST_SHA" "" "" "$LATEST_DIGEST" ""
+    # Record the running and published digests even when there is nothing to
+    # update: /api/v1/health derives `up_to_date` from them, and leaving them
+    # empty made the check structurally unable to report "up to date".
+    _collect_digests "$IMAGE_TAG" "ghcr.io/a11ydevs/acessilia:sha-${LATEST_SHA:0:7}"
+    _write_status "$LATEST_SHA" "$LATEST_SHA" "" "$LATEST_DIGEST" "$RUNNING_DIGEST"
     echo "[staging-update] ✅ Nenhum commit novo em $GITHUB_REPO/$GITHUB_BRANCH. Pulando."
     exit 0
   fi

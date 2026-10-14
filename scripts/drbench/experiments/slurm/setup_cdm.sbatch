@@ -4,13 +4,13 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
 #SBATCH --time=03:00:00
-#SBATCH --output=/raid/user_marcospaulo/drdocbench/runs/slurm/logs/%x_%j.log
+#SBATCH --output=runs/slurm/logs/%x_%j.log
 # Userspace install of everything the DrDocBench CDM metric shells out to:
 # xelatex (TeX Live scheme-small + xeCJK), node (KaTeX tokenizer), `magick` shim over IM6 `convert`,
 # Source Han Sans SC font. Everything under /raid/user_marcospaulo/opt. Reentrant.
 set -uo pipefail
-source /raid/user_marcospaulo/drdocbench/runs/slurm/env.sh
-OPT=/raid/user_marcospaulo/opt
+source "${WS:-/raid/user_marcospaulo/drdocbench}/runs/slurm/env.sh"
+OPT=${OPT:-/raid/user_marcospaulo/opt}
 SRC=$OPT/src
 mkdir -p "$OPT/bin" "$SRC" "$OPT/fonts" "$OPT/fontconfig/cache"
 cd "$SRC"
@@ -107,7 +107,7 @@ EOF
 # 7. smoke test: xelatex template -> pdf -> png -> CDM score on a trivial pair
 step "smoke"
 source "$WS/runs/slurm/cdm_env.sh"
-T=$(mktemp -d -p /raid/user_marcospaulo/cache)
+T=$(mktemp -d -p "${CACHE_ROOT:-/raid/user_marcospaulo/cache}")
 cat > "$T/t.tex" <<'EOF'
 \documentclass[12pt]{article}
 \usepackage[landscape]{geometry}\geometry{a5paper,scale=0.98}\pagestyle{empty}
@@ -120,7 +120,7 @@ cd "$WS/repos/DrDocBench" && "$DRB" - <<'EOF'
 import sys, os, tempfile
 sys.path.insert(0, ".")
 from metrics.cdm_metric import CDM
-out = tempfile.mkdtemp(prefix="cdm_", dir="/raid/user_marcospaulo/cache")
+out = tempfile.mkdtemp(prefix="cdm_", dir=os.environ.get("CACHE_ROOT", "/raid/user_marcospaulo/cache"))
 c = CDM(output_root=out)
 r1 = c.evaluate(r"\frac{a}{b} + c^2", r"\frac{a}{b} + c^2", "smoke1")
 r2 = c.evaluate(r"\frac{a}{b} + c^2", r"\frac{a}{b} + d^3", "smoke2")

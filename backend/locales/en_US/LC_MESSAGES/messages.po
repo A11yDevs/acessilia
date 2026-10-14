@@ -114,6 +114,9 @@ msgstr "Generating the nominal PDDL plan..."
 msgid "Validating the plan in dry-run mode..."
 msgstr "Validating the plan in dry-run mode..."
 
+msgid "Executing the plan..."
+msgstr "Executing the plan..."
+
 msgid "Please provide an e-mail address: /email you@example.com"
 msgstr "Please provide an e-mail address: /email you@example.com"
 
@@ -441,6 +444,18 @@ msgstr "Invalid format"
 
 msgid "File not found"
 msgstr "File not found"
+
+msgid "Log file not found"
+msgstr "Log file not found"
+
+msgid "Observability access not configured"
+msgstr "Observability access not configured"
+
+msgid "Invalid token"
+msgstr "Invalid token"
+
+msgid "Token allows read-only access"
+msgstr "Token allows read-only access"
 
 msgid "The image must receive a description or be marked decorative."
 msgstr "The image must receive a description or be marked decorative."
@@ -1522,15 +1537,3 @@ msgid "document"
 msgid_plural "documents"
 msgstr[0] "document"
 msgstr[1] "documents"
-
-msgid "Log file not found"
-msgstr "Log file not found"
-
-msgid "Observability access not configured"
-msgstr "Observability access not configured"
-
-msgid "Invalid token"
-msgstr "Invalid token"
-
-msgid "Token allows read-only access"
-msgstr "Token allows read-only access"

@@ -268,12 +268,37 @@ primeiro e degrada para a implementação local em caso de falha.
 - **Fusão dual** (`backend/pipeline/fusion.py`): se a capacidade produz blocos
   canônicos, pode participar como provider em `extract_fused()`.
 
-### 4.4 Testes
+### 4.4 Tests
 
 - **Unit** (mock respx): no estilo de `tests/test_toolbox_client.py` — verifica o
   mapeamento de erros HTTP para exceções tipadas e o envio do provider.
 - **E2E** (marcador `e2e`): no estilo de `tests/test_toolbox_e2e.py` — contra
   `TOOLBOX_BASE_URL` real; é ignorado se a variável não estiver definida.
+
+### 4.5 Exemplo concreto: `media.inspect`
+
+A capacidade `media.inspect` (provider `pure-media-inspect`, PR
+`A11yDevs/acessilia-toolbox#33`) é consumida no core com o padrão do Cenário B:
+
+- **Cliente:** `backend/tools/toolbox_media_inspect_client.py`
+  (`ToolboxMediaInspectClient` → `POST /v1/capabilities/media.inspect:execute`).
+- **Fallback local:** `backend/tools/media_inspect.py`
+  (`inspect_source_media`, `inspect_media_payload`) — port determinístico em
+  Pillow/PyMuPDF que replica o schema `artifact/media-inspection@1` quando a
+  Toolbox está indisponível.
+- **Integração:** `backend/agents/pddl_orchestrator.py` chama
+  `inspect_source_media()` após a extração e usa o sinal
+  `requires_visual_inspection` para injetar um elemento `picture` de página
+  inteira quando a entrada é imagem isolada sem blocos visuais — garantindo a
+  audiodescrição pelo VisionAgent.
+
+  O fallback local não infere que uma imagem é uma página escaneada apenas por
+  suas dimensões ou proporção; imagens de um único frame são encaminhadas para
+  inspeção visual para não descartar infográficos ou ilustrações retrato.
+
+Os predicados PDDL `media_inspected`/`media_profile_classified` pertencem ao
+domínio da Toolbox; no core o sinal é consumido apenas como heurística de
+enriquecimento e não entra no problema de planejamento.
 
 ---
 
@@ -289,9 +314,15 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 | `TOOLBOX_TIMEOUT_SECONDS` | `3600` | Timeout das requisições |
 | `TOOLBOX_USE_ARTIFACT_STORE` | `true` | Envia o arquivo para `/v1/artifacts` antes de extrair |
 | `TOOLBOX_USE_REMOTE_CACHE` | `true` | Usa o cache remoto (`no_cache=false`) |
+| `TOOLBOX_MEDIA_INSPECT_PROVIDER` | `pure-media-inspect` | Provider da capacidade `media.inspect` |
+| `TOOLBOX_MEDIA_INSPECT_ENABLED` | `true` | Executa `media.inspect` (Toolbox-first com fallback local) |
 | `FUSION_MODE` | `single` | `single` (um provider) ou `dual` (dois providers + fusão) |
 | `FUSION_SECONDARY_PROVIDER` | `mineru` | Provider secundário para `FUSION_MODE=dual` |
 | `STRUCTURER` | `toolbox` | Motor de regiões por página (`toolbox`, `toolbox-layout`, `pymupdf`) |
+| `TOOLBOX_PAGE_OCR_PROVIDER` | `qwen3-vl-page` | Transcrição VLM de página inteira (`document.ocr.page`) |
+| `TOOLBOX_ADJUDICATE_PROVIDER` | `qwen3-vl-judge` | Juiz pareado / transcrição de região (`document.adjudicate.*`) |
+| `TOOLBOX_ORIENTATION_PROVIDER` | `rapidocr-orient` | Detecção de rotação (`image.page.orient`) |
+| `FUSION_HYBRID_PROVIDER` | `mineru-hyb` | Id do provider MinerU hybrid-VLM (a fonte B do melhor confirmado no leaderboard) |
 
 > `TOOLBOX_USE_ARTIFACT_STORE` e `TOOLBOX_USE_REMOTE_CACHE` afetam diretamente o
 > fluxo de extração: com o artifact store ativo, o core envia o arquivo uma vez e
@@ -321,8 +352,31 @@ service.py: _build_orchestrator()
 - `backend/tools/toolbox_client.py` — cliente base e hierarquia de exceções
 - `backend/tools/toolbox_layout_client.py` — modelo do Cenário B
 - `backend/tools/toolbox_ocr_tools.py`, `toolbox_math_tools.py`, `toolbox_pdf_tools.py` — wrappers com fallback local
+- `backend/tools/toolbox_page_ocr_client.py` — `document.ocr.page` (VLM de página inteira)
+- `backend/tools/toolbox_adjudicate_client.py` — `document.adjudicate.page` / `.region`
+- `backend/tools/toolbox_orientation_client.py` — `image.page.orient`
 - `backend/tools/structurer.py` — `get_structurer()` e seleção de structurer
 - `backend/core/manifest/toolbox_extractor.py` — `ToolboxManifestExtractor`
 - `backend/pipeline/fusion.py` — `extract_fused()` (fusão dual)
 - `backend/config/settings.py` — configuração da Toolbox
 - `docs/drbench.pt-br.md` — benchmark de providers (Docling vs MinerU)
+
+### 7.1 Capacidades adicionadas para o Dr.DocBench (PR #125)
+
+| Capacidade | Cliente | Providers | Finalidade |
+|---|---|---|---|
+| `document.ocr.page` | `ToolboxPageOcrClient` | `qwen3-vl-page`, `dots-ocr-page`, `deepseek-ocr-page`, `teleocr-page` | Transcrição VLM de página inteira — a fonte B do híbrido de página |
+| `document.adjudicate.page` | `ToolboxAdjudicateClient` | `qwen3-vl-judge` | Juiz pareado entre duas transcrições candidatas (as duas ordens, debiasing de posição) |
+| `document.adjudicate.region` | `ToolboxAdjudicateClient` | `qwen3-vl-judge` | Transcrição exata de um recorte de região, convertida em decisão do differ |
+| `image.page.orient` | `ToolboxOrientationClient` | `rapidocr-orient` | Detecção de rotação 0/90/180/270 |
+
+Os registros de provider vivem no repositório da Toolbox; a configuração de job
+do Dr.DocBench que os espelha é
+`scripts/drbench/experiments/slurm/providers-config-vlm.yaml`.
+
+O `mineru-hyb` (MinerU 3.x, `backend=hybrid-engine`) está registrado como
+provider de `document.structure.extract` / `document.layout.analyze` /
+`document.ocr`. É a fonte B do melhor confirmado no leaderboard
+(`differ-v15-hyb`, EvalAI 70.37): o ganho real no test veio da ordem de leitura
+(+16.4) com essa fonte, não do TEDS. Adote-o explicitamente com
+`FUSION_SECONDARY_PROVIDER=mineru-hyb`; o default da fusão dual continua `mineru`.

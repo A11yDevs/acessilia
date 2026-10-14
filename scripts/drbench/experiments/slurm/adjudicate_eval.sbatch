@@ -4,12 +4,12 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
 #SBATCH --time=01:30:00
-#SBATCH --output=/raid/user_marcospaulo/drdocbench/runs/slurm/logs/%x_%j.log
+#SBATCH --output=runs/slurm/logs/%x_%j.log
 # Page-level adjudication of two dev runs + eval.
 #   sbatch --export=ALL,RUN_ID=adjudicator-v1-20260916,DOCLING=docling-v3-20260916,MINERU=mineru-v3-20260916[,ARGS="--table-pref mineru",BASELINE=adjudicator-v0,SPLIT=dev] \
 #          runs/slurm/adjudicate_eval.sbatch
 set -uo pipefail
-source /raid/user_marcospaulo/drdocbench/runs/slurm/env.sh
+source "${WS:-/raid/user_marcospaulo/drdocbench}/runs/slurm/env.sh"
 cd "$WS"
 R=${RUN_ID:?}; D=${DOCLING:?}; M=${MINERU:?}; SPLIT=${SPLIT:-dev}; ARGS=${ARGS:-}
 SCRIPT=${SCRIPT:-scripts/adjudicate_v1.py}

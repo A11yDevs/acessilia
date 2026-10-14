@@ -25,10 +25,12 @@ Orchestrator -> Agents: Enrich eligible images and tables
 Agents --> Orchestrator: Structured results
 Orchestrator -> Planner: Generate and validate PDDL plan
 Planner --> Orchestrator: Validated plan
-opt execute_dry_run enabled
+alt execute_dry_run enabled
   Orchestrator -> Executor: Validate plan in dry-run mode
-  Executor --> Orchestrator: Execution report
+else Real execution
+  Orchestrator -> Executor: Execute registered handlers
 end
+Executor --> Orchestrator: Execution report
 Orchestrator --> Service: Processed payload
 Service -> Builder: Build and validate canonical document
 Builder --> Service: Canonical document

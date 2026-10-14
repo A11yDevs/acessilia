@@ -4,7 +4,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=48G
 #SBATCH --time=04:00:00
-#SBATCH --output=/raid/user_marcospaulo/drdocbench/runs/slurm/logs/%x_%j.log
+#SBATCH --output=runs/slurm/logs/%x_%j.log
 # Avaliação md2md oficial (janela 1) das runs de fusão via lib + comparação
 # com o baseline do script de referência.
 #
@@ -15,7 +15,7 @@
 #   - reports/official_w1-md2md.json por run (protocolo oficial)
 #   - runs/dev-full/lib-integration-report.md (resumo da comparação)
 set -uo pipefail
-source /raid/user_marcospaulo/drdocbench/runs/slurm/env.sh
+source "${WS:-/raid/user_marcospaulo/drdocbench}/runs/slurm/env.sh"
 cd "$WS"
 SPLIT=${SPLIT:-dev}
 RUNS=${RUNS:?}; SCRIPT_RUN=${SCRIPT_RUN:-differ-v12-rh3-pc4-20260918}

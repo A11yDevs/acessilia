@@ -67,6 +67,93 @@ providers:
       - image/tiff
       - application/pdf
 
+  # --- Capacidades da PR #125 (Dr.DocBench) ---
+  # Transcrição de página inteira por VLM. É a fonte B do híbrido de página:
+  # quando Docling e MinerU discordam muito, a página VLM substitui a saída do
+  # differ. O sufixo +rot (orientação) está em ambas as fontes do melhor
+  # resultado confirmado no leaderboard (differ-v15-hyb, EvalAI 70.37).
+  - id: qwen3-vl-page
+    version: "32B"
+    transport: http
+    endpoint: ${QWEN3_VL_SERVE_URL}
+    health_path: /health
+    timeout_seconds: 900
+    capabilities:
+      - document.ocr.page
+    media_types:
+      - image/png
+      - image/jpeg
+
+  - id: dots-ocr-page
+    version: "1.0"
+    transport: http
+    endpoint: ${DOTS_OCR_SERVE_URL}
+    health_path: /health
+    timeout_seconds: 900
+    capabilities:
+      - document.ocr.page
+    media_types:
+      - image/png
+      - image/jpeg
+
+  - id: deepseek-ocr-page
+    version: "2"
+    transport: http
+    endpoint: ${DEEPSEEK_OCR_SERVE_URL}
+    health_path: /health
+    timeout_seconds: 900
+    capabilities:
+      - document.ocr.page
+    media_types:
+      - image/png
+      - image/jpeg
+
+  - id: teleocr-page
+    version: "1.0"
+    transport: http
+    endpoint: ${TELEOCR_SERVE_URL}
+    health_path: /health
+    timeout_seconds: 900
+    capabilities:
+      - document.ocr.page
+    media_types:
+      - image/png
+      - image/jpeg
+
+  # Juiz pareado por VLM: vê a imagem da página e duas transcrições candidatas
+  # e diz qual é mais fiel (as duas ordens são perguntadas, para debiasing).
+  - id: qwen3-vl-judge
+    version: "32B"
+    transport: http
+    endpoint: ${QWEN3_VL_SERVE_URL}
+    health_path: /health
+    timeout_seconds: 900
+    capabilities:
+      - document.adjudicate.page
+      - document.adjudicate.region
+    media_types:
+      - image/png
+      - image/jpeg
+
+  # Detecção de rotação 0/90/180/270 (RapidOCR: caixas altas -> candidato;
+  # OCR a 90/270, vence o maior sum(len x score)).
+  # O id, a capacidade e o transporte espelham o catálogo da Toolbox
+  # (capabilities/image.page.orient.yaml + providers-config.yaml): a Toolbox é
+  # quem executa, então o perfil não pode divergir dela.
+  - id: rapidocr-orient
+    version: "1.0"
+    transport: http
+    endpoint: ${RAPIDOCR_ORIENT_URL:-http://rapidocr-orient:5006}
+    health_path: /health
+    timeout_seconds: 30
+    capabilities:
+      - image.page.orient
+    media_types:
+      - image/png
+      - image/jpeg
+      - image/tiff
+      - image/webp
+
   - id: mineru
     version: "2.1"
     transport: http
@@ -110,6 +197,28 @@ providers:
       - image/jpeg
       - image/tiff
       - application/pdf
+
+  # MinerU hybrid-VLM (MinerU 3.x, backend=hybrid-engine): pipeline + VLM
+  # (MinerU2.5 1.2B). É a fonte B do melhor resultado confirmado no leaderboard
+  # do Dr.DocBench (differ-v15-hyb, EvalAI 70.37): o ganho real no test veio de
+  # RO +16.4 com esta fonte, não do TEDS.
+  - id: mineru-hyb
+    version: "3.4"
+    transport: http
+    endpoint: ${MINERU_SERVE_URL}
+    health_path: /openapi.json
+    timeout_seconds: 900
+    config:
+      backend: hybrid-engine
+    capabilities:
+      - document.structure.extract
+      - document.layout.analyze
+      - document.ocr
+    media_types:
+      - application/pdf
+      - image/png
+      - image/jpeg
+      - image/tiff
 
   - id: pure-code
     version: "1.0"
