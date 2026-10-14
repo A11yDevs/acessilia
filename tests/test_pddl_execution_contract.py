@@ -55,12 +55,14 @@ def test_crop_metadata_cannot_certify_region_inspection(crop):
     )
     manifest.obligations[0].method_costs = {"pymupdf-region": 1, "human-review": 100}
     orchestrator = _orchestrator()
-    assert orchestrator._unavailable_methods(manifest) == ["pymupdf-region"]
+    assert orchestrator._unavailable_methods(manifest) == []
     plan, _ = orchestrator._build_plan(manifest)
-    assert "pymupdf-region" not in {step.method for step in plan.steps}
+    assert "pymupdf-region" in {step.method for step in plan.steps}
     updated, report = orchestrator.executor.execute(plan, manifest, dry_run=False)
-    assert report.status == "failed"
-    assert updated.obligations[0].status == "failed"
+    assert report.status == "replan-required"
+    assert updated.obligations[0].status == "pending"
+    assert updated.obligations[0].attempts[0].status == "failed"
+    assert not updated.artifacts
 
 
 def test_existing_crop_file_is_not_inspection_evidence(tmp_path):
@@ -70,4 +72,6 @@ def test_existing_crop_file_is_not_inspection_evidence(tmp_path):
         [_element("unknown", "unknown", metadata={"region_crop": str(crop)})],
         [_obligation("review-structure", ["unknown"], ["pymupdf-region", "human-review"])],
     )
-    assert _orchestrator()._unavailable_methods(manifest) == ["pymupdf-region"]
+    orchestrator = _orchestrator()
+    assert orchestrator._unavailable_methods(manifest) == []
+    assert not orchestrator.executor.registry.get("pymupdf-region")(manifest, "o-1").success

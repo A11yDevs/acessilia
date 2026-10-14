@@ -587,7 +587,10 @@ estruturados, subconjuntos e mapeamentos ambíguos falham explicitamente; não s
 substituídos por texto achatado nem certificados como processados.
 
 
-`pymupdf-region` também é declarado indisponível: a presença de um recorte,
-mesmo existente, não comprova inspeção da região. A obrigação de revisão de
-estrutura segue para revisão humana até existir um adaptador de inspeção
-verificável; metadados `region_crop` não certificam sucesso.
+`pymupdf-region` está disponível para inspeção real: valida a identidade SHA-256
+da fonte, página e coordenadas, renderiza a região com PyMuPDF e solicita análise
+estruturada ao VisionAgent. Atualiza o elemento como imagem descrita ou fórmula
+e registra PNG/JSON de evidência com hashes em `data_dir/artifacts/regions/`.
+Metadados `region_crop` recebidos do extrator não substituem essa execução.
+Fonte ausente/alterada, página/recorte inválido ou análise inválida retornam falha
+e permitem a alternativa de revisão humana. Dry-run continua sendo simulação.

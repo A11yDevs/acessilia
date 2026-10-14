@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import math
 import os
 import re
 import tempfile
@@ -396,6 +397,152 @@ def _handle_norm_fix_method(
     )
 
 
+def _render_inspection_region(source: Path, element: ManifestElement) -> tuple[bytes, int, list[float]]:
+    """Render only the requested, validated source region; never trust crop metadata."""
+    provenance = element.provenance[0] if element.provenance else None
+    number = provenance.page_number if provenance else element.page_number
+    if provenance and element.page_number is not None and number != element.page_number:
+        raise ValueError("Region page identity is inconsistent")
+    with fitz.open(source) as document:
+        if number is None and document.page_count == 1:
+            number = 1
+        if type(number) is not int or not 1 <= number <= document.page_count:
+            raise ValueError("Region page is missing or out of range")
+        page = document.load_page(number - 1)
+        rectangle = page.rect
+        bbox = provenance.bbox if provenance else None
+        if bbox is not None:
+            values = (bbox.left, bbox.top, bbox.right, bbox.bottom)
+            if not all(math.isfinite(value) for value in values):
+                raise ValueError("Region coordinates must be finite")
+            if bbox.coord_origin not in {"TOPLEFT", "BOTTOMLEFT"}:
+                raise ValueError("Region coordinate origin is unknown")
+            top, bottom = bbox.top, bbox.bottom
+            if bbox.coord_origin == "BOTTOMLEFT":
+                top, bottom = page.rect.height - top, page.rect.height - bottom
+            rectangle = fitz.Rect(
+                min(bbox.left, bbox.right), min(top, bottom),
+                max(bbox.left, bbox.right), max(top, bottom),
+            ) & page.rect
+            if rectangle.is_empty or rectangle.width < 1 or rectangle.height < 1:
+                raise ValueError("Region does not intersect the source page")
+        if rectangle.width * rectangle.height * (160 / 72) ** 2 > 20_000_000:
+            raise ValueError("Region exceeds the render pixel limit")
+        return page.get_pixmap(clip=rectangle, dpi=160).tobytes("png"), number, list(rectangle)
+
+
+def _inspect_region(image: bytes, number: int, total_pages: int, mode: str) -> VisionOutput | None:
+    async def inspect():
+        return await VisionAgent(mode=mode).describe_region(
+            image_bytes=image, classification="embedded_image", page_num=number,
+            total_pages=total_pages, mode=mode,
+        )
+
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(inspect())
+    import concurrent.futures
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(lambda: asyncio.run(inspect())).result()
+
+
+def _save_region_artifact(content: bytes, scope: str, kind: str, suffix: str, media_type: str) -> Artifact:
+    from backend.config.settings import settings
+
+    digest = hashlib.sha256(content).hexdigest()
+    path = settings.data_dir / "artifacts" / "regions" / scope / f"{digest}.{suffix}"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=path.parent, delete=False) as stream:
+            temporary = Path(stream.name)
+            stream.write(content)
+        os.replace(temporary, path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+    return Artifact(
+        id=f"artifact-{kind}-{scope[:16]}-{digest[:16]}", kind=kind,
+        path=str(path), media_type=media_type, sha256=digest,
+    )
+
+
+def _handle_pymupdf_region_method(manifest: ProcessingManifest, obligation_id: str) -> MethodResult:
+    """Inspect real source pixels and update targets only after every result validates."""
+    elements = _target_elements(manifest, obligation_id)
+    if not elements:
+        return _missing_obligation(obligation_id)
+    try:
+        source = Path(manifest.source.path)
+        with source.open("rb") as stream:
+            if hashlib.file_digest(stream, "sha256").hexdigest() != manifest.source.sha256:
+                raise ValueError("Region source differs from the manifest")
+        inspected = []
+        for element in elements:
+            if element.type != "unknown":
+                raise ValueError("Region inspection requires an unknown target element")
+            image, number, rectangle = _render_inspection_region(source, element)
+            declared_pages = {
+                page.page_number for page in manifest.pages if element.id in page.element_ids
+            }
+            if declared_pages and declared_pages != {number}:
+                raise ValueError("Region page differs from the manifest page index")
+            output = _inspect_region(
+                image, number, max(len(manifest.pages), number),
+                str(manifest.extractor.configuration.get("region_inspection_mode", "medio")),
+            )
+            if not isinstance(output, VisionOutput):
+                raise ValueError(f"Region inspection failed for {element.id}")
+            output = VisionOutput.model_validate(output.model_dump())
+            text = output.description if output.kind == "description" else normalize_latex(output.formula_latex or "")
+            if not text.strip():
+                raise ValueError(f"Region inspection returned empty content for {element.id}")
+            inspected.append((element, image, number, rectangle, output, text))
+
+        artifacts = []
+        replacements = {}
+        for element, image, number, rectangle, output, text in inspected:
+            scope = hashlib.sha256(json.dumps([
+                manifest.manifest_id, manifest.source.sha256, manifest.revision, obligation_id, element.id,
+            ]).encode()).hexdigest()
+            crop = _save_region_artifact(image, scope, "region-crop", "png", "image/png")
+            evidence = {
+                "source_sha256": manifest.source.sha256, "element_id": element.id,
+                "page_number": number, "bbox": rectangle, "crop_sha256": crop.sha256,
+                "result": output.model_dump(),
+            }
+            record = _save_region_artifact(
+                json.dumps(evidence, ensure_ascii=False, sort_keys=True).encode(),
+                scope, "region-inspection", "json", "application/json",
+            )
+            replacement = element.model_copy(deep=True)
+            replacement.metadata.update(
+                original_type=element.type, vision_description_complete=True,
+                vision_language=output.language, vision_confidence=output.confidence,
+                vision_warnings=output.warnings, region_crop=crop.path,
+                region_inspection=record.id,
+            )
+            replacement.text = text
+            replacement.type = "formula" if output.kind == "formula" else "picture"
+            replacement.raw_label = replacement.type
+            replacement.page_number = number
+            replacements[element.id] = replacement
+            artifacts.extend([crop, record])
+        manifest.elements = [replacements.get(element.id, element) for element in manifest.elements]
+        manifest.summary.element_types = dict(Counter(element.type for element in manifest.elements))
+        return MethodResult(
+            success=True, validated=True,
+            message=f"Inspected {len(elements)} source region(s)", artifacts=artifacts,
+        )
+    except Exception as exc:
+        return MethodResult(
+            success=False, validated=False,
+            message=f"Region inspection failed: {type(exc).__name__}: {exc}",
+        )
+
+
 def _handle_human_review_method(
     manifest: ProcessingManifest, obligation_id: str
 ) -> MethodResult:
@@ -469,6 +616,7 @@ DETERMINISTIC_METHOD_HANDLERS: dict[
     "vision-description": _handle_vision_description_method,
     "pandoc-table": _handle_pandoc_table_method,
     "pandoc-code": _handle_pandoc_code_method,
+    "pymupdf-region": _handle_pymupdf_region_method,
     "latex-normalizer": _handle_latex_normalizer_method,
     "norm-fix": _handle_norm_fix_method,
     # These helpers operate on docstruct blocks, not ManifestElement text.
@@ -743,6 +891,7 @@ class PddlAccessibilityOrchestrator:
             file_path.resolve(),
             language="pt-BR",
         )
+        manifest.extractor.configuration["region_inspection_mode"] = effective_mode
 
         source_path = file_path.resolve()
         media_inspection = await inspect_source_media(source_path)

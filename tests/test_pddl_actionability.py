@@ -138,7 +138,6 @@ class TestRegistryCoverage:
             "verse-chunker",
             "tailjoin",
             "tailjoin-positioned",
-            "pymupdf-region",
         }
     )
 
