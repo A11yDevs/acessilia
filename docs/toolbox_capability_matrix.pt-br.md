@@ -89,8 +89,10 @@ deriva *nova* quebra a suíte, e corrigir um achado exige removê-lo da lista fi
 
 ## Acionabilidade do PDDL (medida contra a Toolbox real)
 
-Rodar o pipeline PDDL localmente contra a Toolbox de homologacao com
-`PDDL_EXECUTE_DRY_RUN=false` falha na primeira obrigacao:
+### Estado antes da correção
+
+Rodar o pipeline PDDL localmente contra a Toolbox de homologação com
+`PDDL_EXECUTE_DRY_RUN=false` falhava na primeira obrigação:
 
 ```
 obligations: 7  kinds: {preserve-code-semantics: 6, describe-image: 1}
@@ -100,26 +102,89 @@ REAL execution status: failed   failed_step: 1   replan_required: False
   step 1 vision-description status=failed msg='RuntimeError: No handler registered for vision-description'
 ```
 
-`PddlAccessibilityOrchestrator._build_executor` registra 3 handlers reais
+`PddlAccessibilityOrchestrator._build_executor` registrava 3 handlers reais
 (`mathml`, `latex-verbalizer`, `dual-provider-fusion`) mais um fallback no-op para
-8 nomes, ou seja, 11 dos 24 métodos de `DEFAULT_METHOD_COSTS` estão registrados e 20
-não estão. O conjunto admissível é um pouco menor que a tabela de custos: as tabelas
-de obrigação (`OBLIGATION_BY_TYPE` mais `V23_OBLIGATION_BY_KIND`) admitem 23 métodos,
-dos quais 19 não têm handler. Todo passo de plano cujo método seja um desses levanta
-exceção na execução e nada é retentado nem degradado.
+8 nomes, ou seja, 11 dos 24 métodos de `DEFAULT_METHOD_COSTS` estavam registrados e
+20 não estavam. O conjunto admissível é um pouco menor que a tabela de custos: as
+tabelas de obrigação (`OBLIGATION_BY_TYPE` e `V23_OBLIGATION_BY_KIND`) admitem 23
+métodos, dos quais 19 não tinham handler. Todo passo de plano cujo método fosse um
+desses levantava exceção em tempo de execução, sem retentativa nem degradação.
 
-O `replan_required` permanece `False` por um motivo diferente de "as alternativas se
-esgotaram": o `Executor` levanta `EXE_NO_HANDLER_REGISTERED` quando `handler is None`,
-e esse `raise` fica *fora* do `try/except` que calcula `alternatives` e define a
-flag. A flag, portanto, nunca é avaliada para um método não registrado. Isso também
-esconde um bug latente — `describe-image` admite `vision-description` e
-`human-review`, e `human-review` *está* registrado, então um replanejamento seria
-possível se a falha tivesse passado pelo caminho do handler.
+Pior: o fallback no-op retornava `success=True, validated=True` com a mensagem
+*"Handler padrão (sem operação real)"*. Oito nomes de método, portanto, marcavam
+obrigações como **satisfeitas** sem fazer absolutamente nada — uma mentira silenciosa
+que fazia a suíte passar na `develop`.
 
-Em outras palavras: o padrão `PDDL_EXECUTE_DRY_RUN=true` da homologação é o que
-mantém o pipeline parecendo saudável. Desligá-lo quebraria todo job. Por isso
-"tornar todo método admissível acionável" é pré-requisito de qualquer trabalho de
-execução real, não um detalhe.
+`replan_required` permanecia `False` por um motivo diferente de "alternativas
+esgotadas": o `Executor` levanta `EXE_NO_HANDLER_REGISTERED` quando `handler is None`,
+e esse raise fica *fora* do `try/except` que calcula `alternatives` e liga a flag. A
+flag nunca era avaliada para um método não registrado.
+
+Além disso, `executar()` só invocava o executor dentro de `if self.execute_dry_run:`,
+então `PDDL_EXECUTE_DRY_RUN=false` produzia **execução nenhuma** e
+`execution_report=None`. O default de dry-run era o que mantinha o pipeline parecendo
+saudável; desligá-lo pulava a execução em vez de expor a lacuna.
+
+### Estado depois da correção
+
+- **Todo método admissível está contabilizado.** Cada um resolve para um handler
+  registrado ou é reportado ao planejador como indisponível;
+  `tests/test_pddl_actionability.py` falha para qualquer método que não seja nenhum
+  dos dois.
+- **15 handlers registrados** (antes: 3 reais + 8 no-op): os 3 com modelo mais 12
+  handlers determinísticos cobrindo `vision-description`, `pandoc-table`,
+  `pandoc-code`, `pymupdf-region`, `latex-normalizer`, `norm-fix`,
+  `line-number-extractor`, `verse-chunker`, `tailjoin`, `tailjoin-positioned`,
+  `deterministic-heading-repair`. Eles *validam* o trabalho que o pipeline já
+  realizou, em vez de fingir realizá-lo.
+- **O no-op silencioso foi eliminado.** Um handler que declara sucesso precisa
+  marcar `validated=True` sobre trabalho real.
+- **`human-review` tem semântica própria.** É o escalonamento terminal que toda
+  obrigação lista por último. Ele reporta `success=False` com mensagem explícita de
+  escalonamento, em vez de marcar como satisfeita uma obrigação que nenhum método
+  automático cumpriu.
+- **O planejador sabe o que está indisponível.** `_unavailable_methods(manifest)`
+  restringe o conjunto aos métodos que o manifesto realmente declara (o compilador
+  rejeita nomes desconhecidos), então `_validate_methods` falha cedo, em tempo de
+  plano, em vez de deixar um passo inexequível chegar ao executor.
+- **`PDDL_EXECUTE_DRY_RUN` agora escolhe o modo, não se a execução acontece.**
+- **`replan-required` deixou de ser terminal.** `executar()` replaneja até
+  `PDDL_MAX_REPLANS` vezes (padrão 2), reutilizando o estado `(tried ?o ?m)` que o
+  executor registrou, de modo que um método que falhou passa para o próximo
+  admissível.
+
+Nove métodos permanecem **declarados indisponíveis** em vez de implementados:
+`skeleton-order`, `xycut-order`, `agreement-rule`, `rep-guard`, `rescue-omitted`,
+`single-provider`, `table-smart-fusion`, `table-specialist`, `vlm-pairwise-judge`.
+Todos são métodos v2.3 que dependem de divergência entre providers ou de um juiz
+VLM; o planejador nunca emite um passo para eles hoje. Estão listados como catraca
+em `KnownUnavailable` dentro do arquivo de teste, então implementar um deles quebra
+o teste até que seja removido da lista.
+
+### Evidência ao vivo
+
+Contra a Toolbox de homologação, `001.pdf`, `PDDL_EXECUTE_DRY_RUN=false`:
+
+```
+plan steps: 9
+status: completed
+  [0] start-job                          -> succeeded
+  [1] execute-obligation vision-description -> succeeded
+      "Descrição validada para 1 imagem(ns)"
+```
+
+Antes da correção a mesma entrada produzia `failed` com
+`RuntimeError: No handler registered for vision-description`.
+
+### Pendente
+
+`_validate_methods` só levanta quando uma obrigação tem **zero** candidatos
+disponíveis. Quando um método declarado indisponível pelo compilador simplesmente
+desaparece do problema compilado enquanto a lista admissível do manifesto ainda o
+contém, o planejador ainda recebe um método que não pode rodar: o predicado
+`available` só é emitido para `available_methods`, e o `InternalReferencePlanner`
+filtra por ele, mas o `FastDownwardPlanner` depende da precondição do domínio.
+Ainda não corrigido.
 
 ## Vereditos
 

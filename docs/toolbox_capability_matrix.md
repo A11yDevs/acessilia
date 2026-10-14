@@ -91,8 +91,10 @@ list.
 
 ## PDDL actionability (measured against the live Toolbox)
 
+### State before the fix
+
 Running the PDDL pipeline locally against the homologation Toolbox with
-`PDDL_EXECUTE_DRY_RUN=false` fails on the first obligation:
+`PDDL_EXECUTE_DRY_RUN=false` failed on the first obligation:
 
 ```
 obligations: 7  kinds: {preserve-code-semantics: 6, describe-image: 1}
@@ -102,26 +104,88 @@ REAL execution status: failed   failed_step: 1   replan_required: False
   step 1 vision-description status=failed msg='RuntimeError: No handler registered for vision-description'
 ```
 
-`PddlAccessibilityOrchestrator._build_executor` registers 3 real handlers
+`PddlAccessibilityOrchestrator._build_executor` registered 3 real handlers
 (`mathml`, `latex-verbalizer`, `dual-provider-fusion`) plus a no-op fallback for
-8 names, so 11 of the 24 methods in `DEFAULT_METHOD_COSTS` are registered and 20
-are not. The admissible set is slightly smaller than the cost table: the
+8 names, so 11 of the 24 methods in `DEFAULT_METHOD_COSTS` were registered and 20
+were not. The admissible set is slightly smaller than the cost table: the
 obligation tables (`OBLIGATION_BY_TYPE` plus `V23_OBLIGATION_BY_KIND`) admit 23
-methods, of which 19 have no handler. Every plan step whose method is one of
-those raises at execution time and nothing is retried or downgraded.
+methods, of which 19 had no handler. Every plan step whose method was one of those
+raised at execution time and nothing was retried or downgraded.
 
-`replan_required` stays `False` for a different reason than "alternatives were
+Worse, the no-op fallback returned `success=True, validated=True` with the message
+*"Handler padrão (sem operação real)"*. Eight method names therefore marked
+obligations **satisfied** while doing nothing at all — a silent lie that made the
+test suite pass on `develop`.
+
+`replan_required` stayed `False` for a different reason than "alternatives were
 exhausted": `Executor` raises `EXE_NO_HANDLER_REGISTERED` when `handler is None`,
 and that raise sits *outside* the `try/except` that computes `alternatives` and
-sets the flag. The flag is therefore never evaluated for an unregistered method.
-That also hides a latent bug — `describe-image` admits `vision-description` and
-`human-review`, and `human-review` *is* registered, so a replan would have been
-possible had the failure gone through the handler path.
+sets the flag. The flag was therefore never evaluated for an unregistered method.
 
-In other words: the homologation default `PDDL_EXECUTE_DRY_RUN=true` is what keeps
-the pipeline looking healthy. Turning it off would fail every job. This is why
-"make every admissible method actionable" is a prerequisite for any real-execution
-work, not a nicety.
+On top of that, `executar()` invoked the executor only inside
+`if self.execute_dry_run:`, so `PDDL_EXECUTE_DRY_RUN=false` produced **no execution
+at all** and `execution_report=None`. The dry-run default is what kept the pipeline
+looking healthy; turning it off skipped execution entirely rather than exposing the
+gap.
+
+### State after the fix
+
+- **Every admissible method is accounted for.** Each one now resolves to a
+  registered handler or is reported to the planner as unavailable;
+  `tests/test_pddl_actionability.py` fails on any method that is neither.
+- **15 handlers registered** (was 3 real + 8 no-op): the 3 model-backed ones plus
+  12 deterministic handlers covering `vision-description`, `pandoc-table`,
+  `pandoc-code`, `pymupdf-region`, `latex-normalizer`, `norm-fix`,
+  `line-number-extractor`, `verse-chunker`, `tailjoin`, `tailjoin-positioned`,
+  `deterministic-heading-repair`. They *validate* the work the pipeline already
+  performed instead of pretending to perform it.
+- **The silent no-op is gone.** A handler that claims success must set
+  `validated=True` on real work.
+- **`human-review` has its own semantics.** It is the terminal escalation every
+  obligation lists last. It reports `success=False` with an explicit escalation
+  message rather than marking an obligation satisfied that no automated method
+  performed.
+- **The planner is told what is unavailable.** `_unavailable_methods(manifest)`
+  restricts the set to methods the manifest actually declares (the compiler rejects
+  unknown names), so `_validate_methods` fails early, at plan time, instead of
+  letting an unexecutable step reach the executor.
+- **`PDDL_EXECUTE_DRY_RUN` now selects the mode, not whether execution happens.**
+- **`replan-required` is no longer terminal.** `executar()` replans up to
+  `PDDL_MAX_REPLANS` (default 2) times, reusing the `(tried ?o ?m)` state the
+  executor recorded, so a failed method moves to the next admissible one.
+
+Nine methods remain **declared unavailable** rather than implemented:
+`skeleton-order`, `xycut-order`, `agreement-rule`, `rep-guard`, `rescue-omitted`,
+`single-provider`, `table-smart-fusion`, `table-specialist`, `vlm-pairwise-judge`.
+They are all v2.3 methods that depend on provider disagreement or a VLM judge; the
+planner never emits a step for them today. They are listed as a ratchet in
+`KnownUnavailable` inside the test file, so implementing one fails the test until
+it is removed from the list.
+
+### Live evidence
+
+Against the homologation Toolbox, `001.pdf`, `PDDL_EXECUTE_DRY_RUN=false`:
+
+```
+plan steps: 9
+status: completed
+  [0] start-job                          -> succeeded
+  [1] execute-obligation vision-description -> succeeded
+      "Descrição validada para 1 imagem(ns)"
+```
+
+Before the fix the same input produced `failed` with
+`RuntimeError: No handler registered for vision-description`.
+
+### Deferred
+
+`_validate_methods` only raises when an obligation has **zero** available
+candidates. When a compiler-declared unavailable method simply disappears from the
+compiled problem while the manifest's admissible list still contains it, the
+planner is still offered a method that cannot run: the `available` predicate is
+emitted only for `available_methods`, and `InternalReferencePlanner` filters on it,
+but `FastDownwardPlanner` relies on the domain's precondition instead. Not yet
+fixed.
 
 ## Verdicts
 
