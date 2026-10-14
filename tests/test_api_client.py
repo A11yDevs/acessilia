@@ -88,3 +88,21 @@ async def test_history():
     respx.get(f"{BASE}/api/v1/history?limit=5").mock(return_value=httpx.Response(200, json=[]))
     client = ApiClient(base_url=BASE)
     assert await client.history(limit=5) == []
+
+
+@respx.mock
+async def test_job_token_retention_is_bounded_and_terminal_jobs_remain_accessible(tmp_path):
+    client = ApiClient(base_url=BASE)
+    client._job_tokens.update((f"old-{i}", "token") for i in range(256))
+    respx.post(f"{BASE}/api/v1/jobs").mock(return_value=httpx.Response(
+        202, json={"task_id": "new", "job_token": "new-token"}))
+    path = tmp_path / "doc.pdf"
+    path.write_bytes(b"%PDF")
+    await client.submit_job(path, "doc.pdf")
+    assert len(client._job_tokens) == 256
+    assert "old-0" not in client._job_tokens
+    route = respx.get(f"{BASE}/api/v1/jobs/new").mock(return_value=httpx.Response(
+        200, json={"task_id": "new", "status": "done"}))
+    await client.get_job_status("new")
+    await client.get_job_status("new")
+    assert all(call.request.headers["X-Job-Token"] == "new-token" for call in route.calls)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import OrderedDict
 from pathlib import Path
 from typing import Any
 
@@ -31,7 +32,7 @@ class ApiClient:
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self._observability_token = observability_token
-        self._job_tokens: dict[str, str] = {}
+        self._job_tokens: OrderedDict[str, str] = OrderedDict()
         self._headers: dict[str, str] = {}
         if api_key:
             self._headers["X-API-Key"] = api_key
@@ -81,6 +82,9 @@ class ApiClient:
         result = response.json()
         if result.get("job_token"):
             self._job_tokens[result["task_id"]] = result["job_token"]
+            self._job_tokens.move_to_end(result["task_id"])
+            while len(self._job_tokens) > 256:
+                self._job_tokens.popitem(last=False)
         return result
 
     async def get_job_status(self, task_id: str, job_token: str | None = None) -> dict[str, Any]:
