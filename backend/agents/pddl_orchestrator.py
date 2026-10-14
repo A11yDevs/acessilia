@@ -305,7 +305,7 @@ class PddlAccessibilityOrchestrator:
         def _noop_handler(
             _manifest: ProcessingManifest, _obligation_id: str
         ) -> MethodResult:
-            return MethodResult(success=True, validated=True, message="Handler padrão (sem operação real)")
+            return MethodResult(success=False, validated=False, message="This method requires a real implementation or human review")
 
         for method in (
             "docling",
@@ -446,13 +446,14 @@ async def _enrich_picture_descriptions(
         element
         for element in manifest.elements
         if element.type == "picture"
-        and not _has_meaningful_text(element)
+        and not (element.metadata.get("vision_description_complete") and _has_meaningful_text(element))
     ]
     if not pictures and _is_mostly_visual_manifest(manifest):
         pictures = [
             element
             for element in manifest.elements
             if _is_placeholder_visual_element(element)
+            and not element.metadata.get("vision_description_complete")
         ]
 
     if (
@@ -461,7 +462,8 @@ async def _enrich_picture_descriptions(
         and len(manifest.pages) == 1
         and manifest.elements
     ):
-        pictures = [manifest.elements[0]]
+        pictures = [element for element in manifest.elements
+                    if not element.metadata.get("vision_description_complete")][:1]
 
     if not pictures:
         return
@@ -492,6 +494,7 @@ async def _enrich_picture_descriptions(
             mode=mode,
         )
         if isinstance(vision_output, VisionOutput):
+            element.metadata["vision_description_complete"] = True
             element.metadata["vision_language"] = vision_output.language
             element.metadata["vision_confidence"] = vision_output.confidence
             element.metadata["vision_elements"] = list(vision_output.mentioned_elements)
@@ -928,6 +931,8 @@ def build_pddl_structured_payload(
         "source_path": str(file_path),
         "canonical_metadata": {
             "pipeline_engine": "pddl",
+            "pddl_validation_only": True,
+            "accessibility_verified": False,
             "pddl_manifest_id": manifest.manifest_id,
             "pddl_manifest_revision": manifest.revision,
             "pddl_plan_id": plan.plan_id,
