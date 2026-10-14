@@ -1,5 +1,6 @@
 import asyncio
 import secrets
+import sqlite3
 import uuid
 from dataclasses import asdict
 from pathlib import Path
@@ -134,7 +135,12 @@ async def submit_job(
     status = worker.queued_jobs.get(task_id)
     if status is not None and status.get("status") == "queued":
         status["etapa_atual"] = t(STAGE_QUEUE_WAITING_POSITION).format(position=position)
-        await run_blocking(save_status, task_id, status)
+        try:
+            await run_blocking(save_status, task_id, status)
+        except sqlite3.Error as exc:
+            # Acceptance is already durable and the job is in the queue. An
+            # auxiliary position update must not prevent returning its token.
+            logger.warning("Could not persist queue position for job {}: {}", task_id, exc)
     logger.info(t(LOG_API_JOB_ENQUEUED).format(task_id=task_id, source=source))
     return UploadResponse(
         task_id=task_id,
