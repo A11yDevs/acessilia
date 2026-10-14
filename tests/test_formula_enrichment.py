@@ -299,7 +299,8 @@ def test_html_renderer_embeds_mathml_with_aria_label():
     html = render_html_block(_math_block(), {})
     assert 'role="math"' in html
     assert 'aria-label="Fórmula: E igual a m c elevado a 2"' in html
-    assert "&lt;math" in html
+    assert '<math xmlns="http://www.w3.org/1998/Math/MathML">' in html
+    assert "&lt;math" not in html
 
 
 def test_html_renderer_falls_back_to_text_without_mathml():
@@ -419,7 +420,7 @@ def test_pddl_handlers_fail_for_unknown_obligation():
 
 
 def test_html_renderer_mathml_sanitizado():
-    """Regressão M7: MathML com caracteres especiais HTML deve ser escapado."""
+    """Reject active markup in MathML and preserve the readable formula fallback."""
     block = {
         "id": "blk-1",
         "type": "math",
@@ -430,5 +431,6 @@ def test_html_renderer_mathml_sanitizado():
         },
     }
     html = render_html_block(block, {})
-    assert "&lt;script&gt;" in html
+    assert "&lt;script&gt;" not in html
+    assert ">x=1</p>" in html
     assert "<script>" not in html

@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from html import escape
 from typing import Any
+from xml.etree import ElementTree
 
 from docstruct.export.filters import apply_output_profile_filter
 from docstruct.profiles import normalize_profile
@@ -68,6 +69,50 @@ def _all_blocks(document: dict[str, Any]) -> list[dict[str, Any]]:
         blocks.extend(_collect_section(section))
     return blocks
 
+
+
+_MATHML_TAGS = frozenset(
+    "math mi mn mo mtext mspace ms mrow mfrac msqrt mroot mstyle merror mpadded "
+    "mphantom mfenced menclose msub msup msubsup munder mover munderover mmultiscripts "
+    "mprescripts none mtable mtr mtd mlabeledtr semantics annotation".split()
+)
+_MATHML_ATTRIBUTES = frozenset(
+    "display mathvariant mathsize mathcolor mathbackground dir stretchy symmetric "
+    "fence separator form accent accentunder largeop movablelimits lspace rspace "
+    "linethickness bevelled notation rowalign columnalign rowspacing columnspacing "
+    "rowlines columnlines frame framespacing equalrows equalcolumns columnspan rowspan "
+    "scriptlevel displaystyle encoding".split()
+)
+
+
+def _safe_mathml(value: Any) -> str | None:
+    """Accept a bounded MathML tree without active markup, URLs or entities."""
+    if not isinstance(value, str) or len(value) > 100000 or "<!" in value:
+        return None
+    try:
+        root = ElementTree.fromstring(value)
+    except (ElementTree.ParseError, ValueError):
+        return None
+    namespace = "{http://www.w3.org/1998/Math/MathML}"
+    if root.tag not in {"math", namespace + "math"}:
+        return None
+    pending = [(root, 0)]
+    nodes = []
+    while pending:
+        node, depth = pending.pop()
+        if depth > 100 or len(nodes) >= 2000:
+            return None
+        nodes.append(node)
+        pending.extend((child, depth + 1) for child in node)
+    for node in nodes:
+        tag = node.tag.removeprefix(namespace)
+        if tag not in _MATHML_TAGS:
+            return None
+        if any(key not in _MATHML_ATTRIBUTES for key in node.attrib):
+            return None
+        node.tag = tag
+    root.set("xmlns", namespace[1:-1])
+    return ElementTree.tostring(root, encoding="unicode")
 
 
 def _render_block(
@@ -140,9 +185,9 @@ def _render_block(
         return f'<figure id="{block_id}"><img alt="{alt}" src="{escape(block.get("metadata", {}).get("src", ""))}">{details}</figure>'
     if block_type == "math":
         alt = escape(block.get("alt_text", ""))
-        mathml = (block.get("metadata") or {}).get("mathml", "")
+        mathml = _safe_mathml((block.get("metadata") or {}).get("mathml", ""))
         if mathml:
-            return f'<div id="{block_id}" role="math" aria-label="{alt}">{escape(mathml)}</div>'
+            return f'<div id="{block_id}" role="math" aria-label="{alt}">{mathml}</div>'
         return (
             f'<p id="{block_id}" role="math" aria-label="{alt}">'
             f'{escape(block.get("text", ""))}</p>'
