@@ -158,6 +158,7 @@ async def job_status(request: Request, task_id: str):
         download_url=job.get("download_url"),
         criado_em=job.get("inicio"),
         fim=job.get("fim"),
+        email_delivery=job.get("email_delivery"),
     )
 
 

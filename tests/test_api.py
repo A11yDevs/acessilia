@@ -855,13 +855,14 @@ async def test_job_executor_reports_optional_export_failure(
     if failed_format == "PDF/UA":
         assert not (output_dir / "audio.pdf_ua.pdf").exists()
 
-    expected_formats = {"txt", "docx", "pdf", "html", "zip", "drbench_md"}
+    expected_formats = {"txt", "docx", "pdf", "html", "zip"}
     if failed_format != "MP3":
         expected_formats.add("mp3")
     if failed_format != "PDF/UA":
         expected_formats.add("pdf_ua")
     assert set(registered_formats) == expected_formats
 
+    assert (output_dir / "audio.drbench.md").is_file()
     with zipfile.ZipFile(output_dir / "audio_acessivel.zip") as archive:
         expected_files = {"audio.txt", "audio.docx", "audio.pdf", "audio.html"}
         if failed_format != "MP3":

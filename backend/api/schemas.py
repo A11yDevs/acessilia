@@ -25,6 +25,7 @@ class JobStatus(BaseModel):
     etapa_atual: str
     erros: list[str] = Field(default_factory=list)
     download_url: str | None = None
+    email_delivery: str | None = None
     criado_em: float | None = None
     fim: float | None = None
 

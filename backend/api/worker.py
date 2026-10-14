@@ -107,6 +107,9 @@ async def get_job_status_async(task_id: str) -> dict[str, Any] | None:
     if record is None:
         return None
     status = record["status"]
+    if status.get("email_delivery") == "pending":
+        # No in-memory task owns delivery after a restart.
+        status["email_delivery"] = "unknown"
     return status
 
 
@@ -230,7 +233,6 @@ class JobExecutor:
                 await self._run_in_executor(
                     export_drbench_md, canonical, drbench_md_path, job.filename
                 )
-                completed_formats.append("drbench_md")
             except Exception as exc:
                 logger.warning("drbench_md export failed: {}", exc)
                 _remove_partial_output(drbench_md_path)
@@ -333,6 +335,7 @@ class JobExecutor:
             state_manager.atualizar(
                 task_id, etapa=t(STAGE_PROCESSING_COMPLETED), progresso=1.0,
                 status="done", resultado=json.dumps(canonical, ensure_ascii=False),
+                email_delivery="pending" if job.email else None,
             )
             await run_blocking(save_status, task_id, get_job_status(task_id))
             await finalizar_conversao(
@@ -344,13 +347,18 @@ class JobExecutor:
             )
 
             if job.email:
-                sent = await send_result_email(
-                    job.email,
-                    job.filename,
-                    download_url=download_url,
-                    completed_formats=completed_formats,
-                    warnings=optional_errors,
-                )
+                try:
+                    sent = await send_result_email(
+                        job.email,
+                        job.filename,
+                        download_url=download_url,
+                        completed_formats=completed_formats,
+                        warnings=optional_errors,
+                    )
+                except Exception:
+                    logger.warning("Result email delivery failed for job {}", task_id)
+                    sent = False
+                state_manager.atualizar(task_id, email_delivery="sent" if sent else "failed")
                 if not sent:
                     logger.warning("Resultado do job {} nao foi enviado por e-mail", task_id)
 

@@ -40,6 +40,7 @@ class StateManager:
         status: str | None = None,
         erro: str | None = None,
         resultado: str | None = None,
+        email_delivery: str | None = None,
     ) -> None:
         task = self._tasks.get(task_id)
         if not task:
@@ -58,6 +59,8 @@ class StateManager:
             task["erros"].append(erro)
         if resultado is not None:
             task["resultado"] = resultado
+        if email_delivery is not None:
+            task["email_delivery"] = email_delivery
         if status in ("done", "error", "cancelled"):
             task["fim"] = time.time()
 
