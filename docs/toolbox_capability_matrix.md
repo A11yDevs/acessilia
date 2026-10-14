@@ -89,6 +89,40 @@ The known drift is pinned in `tests/test_toolbox_contract_drift.py`; any *new*
 drift fails the suite, and fixing a finding requires removing it from the pinned
 list.
 
+## PDDL actionability (measured against the live Toolbox)
+
+Running the PDDL pipeline locally against the homologation Toolbox with
+`PDDL_EXECUTE_DRY_RUN=false` fails on the first obligation:
+
+```
+obligations: 7  kinds: {preserve-code-semantics: 6, describe-image: 1}
+plan steps: 9
+  1 execute-obligation describe-image vision-description cost=20
+REAL execution status: failed   failed_step: 1   replan_required: False
+  step 1 vision-description status=failed msg='RuntimeError: No handler registered for vision-description'
+```
+
+`PddlAccessibilityOrchestrator._build_executor` registers 3 real handlers
+(`mathml`, `latex-verbalizer`, `dual-provider-fusion`) plus a no-op fallback for
+8 names, so 11 of the 24 methods in `DEFAULT_METHOD_COSTS` are registered and 20
+are not. The admissible set is slightly smaller than the cost table: the
+obligation tables (`OBLIGATION_BY_TYPE` plus `V23_OBLIGATION_BY_KIND`) admit 23
+methods, of which 19 have no handler. Every plan step whose method is one of
+those raises at execution time and nothing is retried or downgraded.
+
+`replan_required` stays `False` for a different reason than "alternatives were
+exhausted": `Executor` raises `EXE_NO_HANDLER_REGISTERED` when `handler is None`,
+and that raise sits *outside* the `try/except` that computes `alternatives` and
+sets the flag. The flag is therefore never evaluated for an unregistered method.
+That also hides a latent bug — `describe-image` admits `vision-description` and
+`human-review`, and `human-review` *is* registered, so a replan would have been
+possible had the failure gone through the handler path.
+
+In other words: the homologation default `PDDL_EXECUTE_DRY_RUN=true` is what keeps
+the pipeline looking healthy. Turning it off would fail every job. This is why
+"make every admissible method actionable" is a prerequisite for any real-execution
+work, not a nicety.
+
 ## Verdicts
 
 Per-capability verdicts (integrate / keep as opt-in / retire) and their

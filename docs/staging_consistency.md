@@ -124,11 +124,38 @@ Two notes:
 - `STRUCTURER` appears twice. The effective value is `toolbox`, which is right for the
   PDDL pipeline, but the duplicate is a latent trap for whoever edits the file next.
 - `TOOLBOX_BASE_URL` points at the public reverse-proxy URL
-  `https://www.acessilia3.inf.ufg.br/toolbox`. With `PIPELINE_ENGINE=pddl` and
-  `STRUCTURER=toolbox`, **every** document processed in homologation delegates its
-  structural extraction back out through the public proxy instead of using the
-  Toolbox container on the same host. This is worth confirming as intentional; a
-  loopback URL would remove an unnecessary external dependency from the critical path.
+  `https://www.acessilia3.inf.ufg.br/toolbox`. This is not merely an unnecessary
+  external hop -- it breaks the deployment outright in this environment; see S6.
+
+### S6 — Homologation processes no document at all (critical, resolved)
+
+Submitting a real document to the deployed core fails immediately:
+
+```json
+{"task_id":"c55ed243","status":"error","progresso":0.3,
+ "etapa_atual":"Falha no processamento",
+ "erros":["Toolbox indisponivel em https://www.acessilia3.inf.ufg.br/toolbox:
+           [Errno -3] Temporary failure in name resolution"]}
+```
+
+`TOOLBOX_BASE_URL` in the staging `.env` points at the public reverse-proxy URL
+while the Toolbox runs on the same host. The host does not resolve its own public
+name: `getent hosts www.acessilia3.inf.ufg.br` fails and there is no `/etc/hosts`
+entry, while `http://localhost:8002/v1/health` answers `200`. With
+`PIPELINE_ENGINE=pddl` and `STRUCTURER=toolbox`, every job opens with a Toolbox
+call, so the pipeline aborts at 30% before producing anything.
+
+`docker-compose.staging.yml` now declares the same
+`host.docker.internal:host-gateway` mapping and defaults `TOOLBOX_BASE_URL` to
+`http://host.docker.internal:8002`. The default is a literal, not an
+interpolation of `TOOLBOX_BASE_URL`: the staging `.env` is also the `env_file`,
+so interpolating that name read the stale public URL and the default never
+applied. The override knob is `STAGING_TOOLBOX_BASE_URL`, for a Toolbox that
+lives elsewhere. `tests/test_compose_config.py` pins both.
+
+Note that `docker-compose.production.yml` does **not** declare the mapping on
+`develop` or `main`; it exists only on the unmerged `fix/v2-readiness` branch
+(PR #128). Staging is therefore ahead of production here, not catching up.
 
 ## What is consistent
 
@@ -147,5 +174,6 @@ Two notes:
 S1, S2 and S3 are reproduced and fixed by the homologation consistency work
 (`fix/health-build-info`, `fix/staging-digest-status`,
 `fix/toolbox-health-build-info`). S4 is the integration review's subject and is
-pinned by `tests/test_toolbox_contract_drift.py`. S5 is documented here and needs a
-product decision on the Toolbox URL.
+pinned by `tests/test_toolbox_contract_drift.py`. S5 is documented here; S6
+resolves the Toolbox URL for the same-host case, and the remaining product
+decision is only whether a Toolbox on another host should be reachable.
