@@ -16,6 +16,7 @@ import httpx
 from backend.config.settings import settings
 from backend.tools.logger import logger
 from backend.tools.toolbox_client import (
+    ToolboxClient,
     ToolboxContractViolation,
     ToolboxProviderUnavailable,
     ToolboxTimeout,
@@ -27,7 +28,7 @@ CAPABILITY = "image.page.orient"
 EXECUTE_PATH = f"/v1/capabilities/{CAPABILITY}:execute"
 
 
-class ToolboxOrientationClient:
+class ToolboxOrientationClient(ToolboxClient):
     """Cliente para detecção de orientação via Acessilia Toolbox.
 
     Encapsula a capacidade image.page.orient, que devolve o ângulo
@@ -51,17 +52,11 @@ class ToolboxOrientationClient:
         timeout_seconds: int | None = None,
         api_key: str | None = None,
     ) -> None:
-        self.base_url = (base_url or settings.toolbox_base_url).rstrip("/")
-        self.provider = provider or settings.toolbox_orientation_provider
-        self.timeout_seconds = timeout_seconds or settings.toolbox_timeout_seconds
-        self.api_key = api_key if api_key is not None else settings.toolbox_api_key
-        headers: dict[str, str] = {}
-        if self.api_key:
-            headers["Authorization"] = f"******"
-        self._client = httpx.AsyncClient(
-            base_url=self.base_url,
-            timeout=httpx.Timeout(self.timeout_seconds),
-            headers=headers,
+        super().__init__(
+            base_url=base_url,
+            provider=provider or settings.toolbox_orientation_provider,
+            timeout_seconds=timeout_seconds,
+            api_key=api_key,
         )
 
     async def detect(
@@ -159,10 +154,5 @@ class ToolboxOrientationClient:
             raise ToolboxProviderUnavailable(
                 f"Toolbox indisponível em {self.base_url}: {e}"
             ) from e
-
-    async def close(self) -> None:
-        """Libera a conexão HTTP."""
-        await self._client.aclose()
-
 
 __all__ = ["ToolboxOrientationClient"]

@@ -14,6 +14,7 @@ import httpx
 from backend.config.settings import settings
 from backend.tools.logger import logger
 from backend.tools.toolbox_client import (
+    ToolboxClient,
     ToolboxContractViolation,
     ToolboxProviderUnavailable,
     ToolboxTimeout,
@@ -25,7 +26,7 @@ CAPABILITY = "document.layout.analyze"
 EXECUTE_PATH = f"/v1/capabilities/{CAPABILITY}:execute"
 
 
-class ToolboxLayoutClient:
+class ToolboxLayoutClient(ToolboxClient):
     """Cliente para extração de layout via Acessilia Toolbox.
 
     Encapsula a capacidade document.layout.analyze, que classifica regiões
@@ -40,17 +41,11 @@ class ToolboxLayoutClient:
         timeout_seconds: int | None = None,
         api_key: str | None = None,
     ) -> None:
-        self.base_url = (base_url or settings.toolbox_base_url).rstrip("/")
-        self.provider = provider or settings.toolbox_layout_provider
-        self.timeout_seconds = timeout_seconds or settings.toolbox_timeout_seconds
-        self.api_key = api_key if api_key is not None else settings.toolbox_api_key
-        headers: dict[str, str] = {}
-        if self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
-        self._client = httpx.AsyncClient(
-            base_url=self.base_url,
-            timeout=httpx.Timeout(self.timeout_seconds),
-            headers=headers,
+        super().__init__(
+            base_url=base_url,
+            provider=provider or settings.toolbox_layout_provider,
+            timeout_seconds=timeout_seconds,
+            api_key=api_key,
         )
 
     async def analyze(
@@ -201,13 +196,3 @@ class ToolboxLayoutClient:
             raise ToolboxProviderUnavailable(
                 f"Toolbox indisponível em {self.base_url}: {e}"
             ) from e
-
-    async def close(self) -> None:
-        """Libera a conexão HTTP."""
-        await self._client.aclose()
-
-    @property
-    def _auth_headers(self) -> dict[str, str]:
-        if self.api_key:
-            return {"Authorization": f"Bearer {self.api_key}"}
-        return {}

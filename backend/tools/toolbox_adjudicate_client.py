@@ -21,6 +21,7 @@ import httpx
 from backend.config.settings import settings
 from backend.tools.logger import logger
 from backend.tools.toolbox_client import (
+    ToolboxClient,
     ToolboxContractViolation,
     ToolboxProviderUnavailable,
     ToolboxTimeout,
@@ -34,7 +35,7 @@ PAGE_PATH = f"/v1/capabilities/{PAGE_CAPABILITY}:execute"
 REGION_PATH = f"/v1/capabilities/{REGION_CAPABILITY}:execute"
 
 
-class ToolboxAdjudicateClient:
+class ToolboxAdjudicateClient(ToolboxClient):
     """Cliente para adjudicação por VLM via Acessilia Toolbox.
 
     Encapsula as capacidades:
@@ -49,17 +50,11 @@ class ToolboxAdjudicateClient:
         timeout_seconds: int | None = None,
         api_key: str | None = None,
     ) -> None:
-        self.base_url = (base_url or settings.toolbox_base_url).rstrip("/")
-        self.provider = provider or settings.toolbox_adjudicate_provider
-        self.timeout_seconds = timeout_seconds or settings.toolbox_timeout_seconds
-        self.api_key = api_key if api_key is not None else settings.toolbox_api_key
-        headers: dict[str, str] = {}
-        if self.api_key:
-            headers["Authorization"] = f"******"
-        self._client = httpx.AsyncClient(
-            base_url=self.base_url,
-            timeout=httpx.Timeout(self.timeout_seconds),
-            headers=headers,
+        super().__init__(
+            base_url=base_url,
+            provider=provider or settings.toolbox_adjudicate_provider,
+            timeout_seconds=timeout_seconds,
+            api_key=api_key,
         )
 
     async def _execute(
@@ -209,10 +204,5 @@ class ToolboxAdjudicateClient:
             raise ToolboxProviderUnavailable(
                 f"Toolbox indisponível em {self.base_url}: {e}"
             ) from e
-
-    async def close(self) -> None:
-        """Libera a conexão HTTP."""
-        await self._client.aclose()
-
 
 __all__ = ["ToolboxAdjudicateClient"]
