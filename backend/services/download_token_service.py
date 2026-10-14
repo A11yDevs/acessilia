@@ -1,4 +1,5 @@
 from backend.services.blocking import offload
+from contextlib import contextmanager
 import json
 import sqlite3
 import uuid
@@ -207,8 +208,9 @@ def _remove_unreferenced_output_directory(output_dir: Path, active_dirs: set[Pat
     return True
 
 
-def remove_unreferenced_output_directory(output_dir: Path) -> bool:
-    """Serialize retention checks and deletion with token creation, including other processes."""
+@contextmanager
+def active_download_directories():
+    """Hold token creation and expiry while a caller checks and removes files."""
     with _connection_lock:
         conn = _get_connection()
         try:
@@ -218,9 +220,14 @@ def remove_unreferenced_output_directory(output_dir: Path) -> bool:
                 (f"-{TOKEN_EXPIRY_DAYS} days",),
             ).fetchall()
             active_dirs = {Path(row["output_dir"]).resolve() for row in rows}
-            removed = _remove_unreferenced_output_directory(output_dir, active_dirs)
+            yield active_dirs
             conn.commit()
-            return removed
         except Exception:
             conn.rollback()
             raise
+
+
+def remove_unreferenced_output_directory(output_dir: Path) -> bool:
+    """Serialize retention checks and deletion with token creation, including other processes."""
+    with active_download_directories() as active_dirs:
+        return _remove_unreferenced_output_directory(output_dir, active_dirs)

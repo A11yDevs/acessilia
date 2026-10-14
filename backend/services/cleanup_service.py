@@ -19,6 +19,7 @@ from backend.services.download_token_service import (
     TOKEN_EXPIRY_DAYS,
     limpar_tokens_expirados,
     remove_unreferenced_output_directory,
+    active_download_directories,
 )
 
 
@@ -78,14 +79,17 @@ def _clean_temp_directory(protected_paths: set[Path] | None = None) -> None:
     if protected_paths is None:
         protected_paths = unified_queue.protected_file_paths()
 
-    def clean_item(item: Path) -> None:
-        if item.resolve() in protected_paths:
+    def clean_item(item: Path, active_dirs: set[Path]) -> None:
+        resolved = item.resolve()
+        if resolved in protected_paths or any(
+            resolved == active or active in resolved.parents for active in active_dirs
+        ):
             return
         try:
             stale = _is_stale(item, now, FILE_MAX_AGE)
             if item.is_dir() and not item.is_symlink():
                 for child in item.iterdir():
-                    clean_item(child)
+                    clean_item(child, active_dirs)
                 if stale and not any(item.iterdir()):
                     item.rmdir()
                     logger.debug("Diretório temporário removido: {}", item.name)
@@ -95,10 +99,11 @@ def _clean_temp_directory(protected_paths: set[Path] | None = None) -> None:
         except OSError as exc:
             logger.warning("Falha ao remover {}: {}", item.name, exc)
 
-    for item in temp_dir.iterdir():
-        if item.name in ("output", "cache", "web_output"):
-            continue
-        clean_item(item)
+    with active_download_directories() as active_dirs:
+        for item in temp_dir.iterdir():
+            if item.name in ("output", "cache", "web_output"):
+                continue
+            clean_item(item, active_dirs)
 
 
 def _clean_output_directory() -> None:
