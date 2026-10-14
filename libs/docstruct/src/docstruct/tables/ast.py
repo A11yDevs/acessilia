@@ -562,22 +562,8 @@ def linearize_table_for_text(block: dict[str, Any]) -> list[str]:
     header_rows, body_rows, footer_rows = split_header_and_body(table_ast)
     headers = _effective_headers(header_rows)
 
-    if not body_rows:
-        body_rows = []
-
-    for index, row in enumerate(body_rows, start=1):
-        cells = _row_texts(row)
-        if headers and len(headers) == len(cells):
-            joined = "; ".join(
-                f"{headers[cell_index]}: {value}" for cell_index, value in enumerate(cells)
-            )
-            lines.append(MSG_TABLE_TEXT_ROW.format(row_index=index, joined=joined))
-        else:
-            lines.append(
-                MSG_TABLE_TEXT_ROW.format(
-                    row_index=index, joined=" | ".join(cells)
-                )
-            )
+    for index, joined in enumerate(_linearized_body_rows(body_rows, headers), start=1):
+        lines.append(MSG_TABLE_TEXT_ROW.format(row_index=index, joined=joined))
 
     for row in footer_rows:
         footer_text = " | ".join(_row_texts(row))
@@ -592,22 +578,65 @@ def linearize_table_for_text(block: dict[str, Any]) -> list[str]:
     return lines
 
 
-def _effective_headers(header_rows: list[dict[str, Any]]) -> list[str]:
-    if not header_rows:
-        return []
-    if len(header_rows) == 1:
-        return _row_texts(header_rows[0])
+def _project_text_rows(rows: list[dict[str, Any]]) -> list[dict[int, tuple[int, str]]]:
+    """Place cells on logical columns, carrying row spans into following rows."""
+    active: dict[int, tuple[int, tuple[int, str]]] = {}
+    projected: list[dict[int, tuple[int, str]]] = []
+    identity = 0
+    for row in rows:
+        columns = {column: entry for column, (_, entry) in active.items()}
+        following = {column: (left - 1, entry) for column, (left, entry) in active.items() if left > 1}
+        cursor = 0
+        for cell in row.get("cells", []):
+            colspan = cell.get("colspan", 1)
+            rowspan = cell.get("rowspan", 1)
+            while any(column in columns for column in range(cursor, cursor + colspan)):
+                cursor += 1
+            entry = (identity, str(cell.get("text", "")).strip())
+            identity += 1
+            for column in range(cursor, cursor + colspan):
+                columns[column] = entry
+                if rowspan > 1:
+                    following[column] = (rowspan - 1, entry)
+            cursor += colspan
+        projected.append(columns)
+        active = following
+    return projected
 
-    merged: list[str] = []
-    width = max((len(_row_texts(row)) for row in header_rows), default=0)
-    for col_index in range(width):
-        parts = []
-        for row in header_rows:
-            row_values = _row_texts(row)
-            if col_index < len(row_values) and row_values[col_index]:
-                parts.append(row_values[col_index])
-        merged.append(" - ".join(parts))
-    return merged
+
+def _effective_headers(header_rows: list[dict[str, Any]]) -> list[str]:
+    projected = _project_text_rows(header_rows)
+    width = max((max(row, default=-1) + 1 for row in projected), default=0)
+    headers: list[str] = []
+    for column in range(width):
+        seen: set[int] = set()
+        parts: list[str] = []
+        for row in projected:
+            if column in row:
+                identity, text = row[column]
+                if identity not in seen and text:
+                    parts.append(text)
+                    seen.add(identity)
+        headers.append(" - ".join(parts))
+    return headers
+
+
+def _linearized_body_rows(body_rows: list[dict[str, Any]], headers: list[str]) -> list[str]:
+    result: list[str] = []
+    for row in _project_text_rows(body_rows):
+        groups: dict[int, tuple[str, list[str]]] = {}
+        for column, (identity, text) in sorted(row.items()):
+            if identity not in groups:
+                groups[identity] = (text, [])
+            labels = groups[identity][1]
+            if column < len(headers) and headers[column] and headers[column] not in labels:
+                labels.append(headers[column])
+        use_headers = bool(headers) and max(row, default=-1) + 1 == len(headers)
+        result.append(("; " if use_headers else " | ").join(
+            f"{' / '.join(labels)}: {text}" if use_headers and labels else text
+            for text, labels in groups.values()
+        ))
+    return result
 
 
 def _row_texts(row: dict[str, Any]) -> list[str]:

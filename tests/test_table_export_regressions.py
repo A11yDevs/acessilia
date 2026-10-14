@@ -187,7 +187,7 @@ def test_empty_row_remains_between_rows_with_rowspan() -> None:
         "pandoc_columns": 2,
         "txt": [
             "Row 1: H1: A; H2: B",
-            "Row 2: ",
+            "Row 2: H1: A; H2: ",
             "Row 3: H1: C; H2: D",
         ],
     }
