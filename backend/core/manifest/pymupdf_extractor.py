@@ -106,7 +106,10 @@ class PyMuPDFManifestExtractor:
         return _PseudoDocument(items=items, pages=pages)
 
     def _extract_semantic_blocks(self, page: fitz.Page) -> tuple[list[dict[str, Any]], float]:
-        page_dict = page.get_text("dict", flags=fitz.TEXT_PRESERVE_WHITESPACE)
+        flags = fitz.TEXT_PRESERVE_WHITESPACE
+        if self.include_images:
+            flags |= fitz.TEXT_PRESERVE_IMAGES
+        page_dict = page.get_text("dict", flags=flags)
         blocks = page_dict.get("blocks", [])
 
         font_sizes: list[float] = []
