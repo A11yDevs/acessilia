@@ -1,0 +1,349 @@
+{
+  "_comment": "Toolbox capability/provider contract captured from a running toolbox. Regenerate with scripts/capture_toolbox_contract.py. Only the fields the core's contract checker reads are kept, so the fixture stays stable.",
+  "capabilities": [
+    {
+      "id": "accessibility.mark",
+      "providers": [
+        "pure-python"
+      ]
+    },
+    {
+      "id": "artifact.retrieve",
+      "providers": [
+        "filesystem",
+        "minio"
+      ]
+    },
+    {
+      "id": "artifact.store",
+      "providers": [
+        "filesystem",
+        "minio"
+      ]
+    },
+    {
+      "id": "chem.convert",
+      "providers": [
+        "pure-chem"
+      ]
+    },
+    {
+      "id": "chem.recognize",
+      "providers": [
+        "docling-chem"
+      ]
+    },
+    {
+      "id": "code.normalize",
+      "providers": [
+        "pure-python"
+      ]
+    },
+    {
+      "id": "dataset.describe",
+      "providers": [
+        "dataset-github",
+        "dataset-huggingface"
+      ]
+    },
+    {
+      "id": "dataset.get_artifact",
+      "providers": [
+        "dataset-github",
+        "dataset-huggingface"
+      ]
+    },
+    {
+      "id": "dataset.get_item",
+      "providers": [
+        "dataset-github",
+        "dataset-huggingface"
+      ]
+    },
+    {
+      "id": "dataset.list",
+      "providers": [
+        "dataset-github",
+        "dataset-huggingface"
+      ]
+    },
+    {
+      "id": "dataset.list_items",
+      "providers": [
+        "dataset-github",
+        "dataset-huggingface"
+      ]
+    },
+    {
+      "id": "dataset.list_splits",
+      "providers": [
+        "dataset-github",
+        "dataset-huggingface"
+      ]
+    },
+    {
+      "id": "dataset.sample",
+      "providers": [
+        "dataset-github",
+        "dataset-huggingface"
+      ]
+    },
+    {
+      "id": "dataset.sync",
+      "providers": [
+        "dataset-github",
+        "dataset-huggingface"
+      ]
+    },
+    {
+      "id": "document.layout.analyze",
+      "providers": [
+        "docling-layout",
+        "mineru-layout"
+      ]
+    },
+    {
+      "id": "document.ocr",
+      "providers": [
+        "docling-ocr",
+        "mineru-ocr"
+      ]
+    },
+    {
+      "id": "document.structure.extract",
+      "providers": [
+        "docling",
+        "mineru",
+        "nougat",
+        "teleocr"
+      ]
+    },
+    {
+      "id": "image.page.orient",
+      "providers": [
+        "rapidocr-orient"
+      ]
+    },
+    {
+      "id": "math.convert",
+      "providers": [
+        "pure-math"
+      ]
+    },
+    {
+      "id": "math.recognize",
+      "providers": [
+        "docling-math",
+        "rapid-latex-ocr"
+      ]
+    },
+    {
+      "id": "math.verbalize",
+      "providers": [
+        "pure-math"
+      ]
+    },
+    {
+      "id": "media.inspect",
+      "providers": [
+        "pure-media-inspect"
+      ]
+    },
+    {
+      "id": "music.omr",
+      "providers": [
+        "audiveris",
+        "homr"
+      ]
+    },
+    {
+      "id": "pdf.render",
+      "providers": [
+        "pymupdf-pdf"
+      ]
+    },
+    {
+      "id": "pdf.split",
+      "providers": [
+        "pymupdf-pdf"
+      ]
+    },
+    {
+      "id": "text.postprocess",
+      "providers": [
+        "pure-python"
+      ]
+    }
+  ],
+  "providers": [
+    {
+      "id": "audiveris",
+      "capabilities": [
+        "music.omr"
+      ]
+    },
+    {
+      "id": "dataset-github",
+      "capabilities": [
+        "dataset.describe",
+        "dataset.get_artifact",
+        "dataset.get_item",
+        "dataset.list",
+        "dataset.list_items",
+        "dataset.list_splits",
+        "dataset.sample",
+        "dataset.sync"
+      ]
+    },
+    {
+      "id": "dataset-huggingface",
+      "capabilities": [
+        "dataset.describe",
+        "dataset.get_artifact",
+        "dataset.get_item",
+        "dataset.list",
+        "dataset.list_items",
+        "dataset.list_splits",
+        "dataset.sample",
+        "dataset.sync"
+      ]
+    },
+    {
+      "id": "docling",
+      "capabilities": [
+        "document.structure.extract"
+      ]
+    },
+    {
+      "id": "docling-chem",
+      "capabilities": [
+        "chem.recognize"
+      ]
+    },
+    {
+      "id": "docling-layout",
+      "capabilities": [
+        "document.layout.analyze"
+      ]
+    },
+    {
+      "id": "docling-math",
+      "capabilities": [
+        "math.recognize"
+      ]
+    },
+    {
+      "id": "docling-ocr",
+      "capabilities": [
+        "document.ocr"
+      ]
+    },
+    {
+      "id": "filesystem",
+      "capabilities": [
+        "artifact.retrieve",
+        "artifact.store"
+      ]
+    },
+    {
+      "id": "homr",
+      "capabilities": [
+        "music.omr"
+      ]
+    },
+    {
+      "id": "mineru",
+      "capabilities": [
+        "document.structure.extract"
+      ]
+    },
+    {
+      "id": "mineru-layout",
+      "capabilities": [
+        "document.layout.analyze"
+      ]
+    },
+    {
+      "id": "mineru-ocr",
+      "capabilities": [
+        "document.ocr"
+      ]
+    },
+    {
+      "id": "minio",
+      "capabilities": [
+        "artifact.retrieve",
+        "artifact.store"
+      ]
+    },
+    {
+      "id": "nougat",
+      "capabilities": [
+        "document.structure.extract"
+      ]
+    },
+    {
+      "id": "pure-accessibility",
+      "capabilities": [
+        "accessibility.mark"
+      ]
+    },
+    {
+      "id": "pure-chem",
+      "capabilities": [
+        "chem.convert"
+      ]
+    },
+    {
+      "id": "pure-code",
+      "capabilities": [
+        "code.normalize"
+      ]
+    },
+    {
+      "id": "pure-math",
+      "capabilities": [
+        "math.convert",
+        "math.verbalize"
+      ]
+    },
+    {
+      "id": "pure-media-inspect",
+      "capabilities": [
+        "media.inspect"
+      ]
+    },
+    {
+      "id": "pure-text",
+      "capabilities": [
+        "text.postprocess"
+      ]
+    },
+    {
+      "id": "pymupdf-pdf",
+      "capabilities": [
+        "pdf.render",
+        "pdf.split"
+      ]
+    },
+    {
+      "id": "rapid-latex-ocr",
+      "capabilities": [
+        "math.recognize"
+      ]
+    },
+    {
+      "id": "rapidocr-orient",
+      "capabilities": [
+        "image.page.orient"
+      ]
+    },
+    {
+      "id": "valkey",
+      "capabilities": [
+        "cache.get",
+        "cache.put"
+      ]
+    }
+  ]
+}
