@@ -1,0 +1,506 @@
+"""Actionability guarantees for the PDDL executor.
+
+The executor used to register 3 real handlers for 24 admissible methods and fall
+back to a no-op that reported success for 8 more, while the other 20 methods had
+no handler at all. A plan step for one of those raised
+``RuntimeError: No handler registered for <method>`` at execution time, and
+nothing told the planner to avoid it.
+
+These tests pin the three properties that make the gap impossible to reintroduce
+silently:
+
+1. every admissible method resolves to exactly one of: a registered handler, or
+   the "unavailable" set handed to the planner;
+2. the orchestrator tells the planner which methods are unavailable, restricted to
+   the methods the manifest can actually ask for;
+3. the real handlers validate the work instead of asserting success.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime, timezone
+
+import pytest
+
+from backend.agents.pddl_orchestrator import (
+    DETERMINISTIC_METHOD_HANDLERS,
+    PddlAccessibilityOrchestrator,
+    _handle_human_review_method,
+    _handle_pandoc_code_method,
+    _handle_pandoc_table_method,
+    _handle_vision_description_method,
+)
+from backend.core.execution.models import MethodResult
+from backend.core.manifest.builder import DEFAULT_METHOD_COSTS
+from backend.core.planning.planner_agent import PlannerAgent
+from backend.core.manifest.models import (
+    ExtractorRun,
+    ManifestElement,
+    ManifestSummary,
+    Obligation,
+    PageDescriptor,
+    ProcessingManifest,
+    SourceDocument,
+)
+
+NOW = datetime(2026, 10, 14, tzinfo=timezone.utc)
+
+
+def _manifest(
+    elements: list[ManifestElement],
+    obligations: list[Obligation],
+) -> ProcessingManifest:
+    return ProcessingManifest(
+        manifest_id="manifest-actionability",
+        created_at=NOW,
+        source=SourceDocument(
+            document_id="doc-actionability",
+            filename="amostra.pdf",
+            path="/tmp/amostra.pdf",
+            media_type="application/pdf",
+            byte_size=1,
+            sha256="a" * 64,
+        ),
+        extractor=ExtractorRun(
+            version="2.0.0",
+            started_at=NOW,
+            completed_at=NOW,
+            duration_ms=1,
+            configuration={},
+        ),
+        title="Actionability",
+        language="pt-BR",
+        pages=[PageDescriptor(page_number=1, element_ids=[e.id for e in elements])],
+        elements=elements,
+        obligations=obligations,
+        summary=ManifestSummary(
+            page_count=1,
+            element_count=len(elements),
+            observation_count=0,
+            obligation_count=len(obligations),
+            element_types={},
+        ),
+    )
+
+
+def _element(
+    element_id: str,
+    element_type: str,
+    *,
+    text: str | None = None,
+    metadata: dict | None = None,
+    reading_order: int = 1,
+) -> ManifestElement:
+    return ManifestElement(
+        id=element_id,
+        type=element_type,
+        raw_label=element_type,
+        reading_order=reading_order,
+        hierarchy_level=1,
+        text=text,
+        page_number=1,
+        metadata=metadata or {},
+    )
+
+
+def _obligation(
+    kind: str, targets: list[str], methods: list[str]
+) -> Obligation:
+    return Obligation(
+        id="o-1",
+        kind=kind,
+        target_ids=targets,
+        admissible_methods=methods,
+        method_costs={method: 5 for method in methods},
+        rationale="test",
+    )
+
+
+class TestRegistryCoverage:
+    #: Methods that are admissible in the catalogue but still have no handler.
+    #:
+    #: They are *not* silently missing: the orchestrator reports them through
+    #: `_unavailable_methods`, so the planner never emits a step for them. This
+    #: set is a ratchet -- implementing one of these requires removing it here, and
+    #: the test below fails if a *new* method appears without a handler.
+    KNOWN_UNAVAILABLE = frozenset(
+        {
+            "agreement-rule",
+            "rep-guard",
+            "rescue-omitted",
+            "single-provider",
+            "skeleton-order",
+            "table-smart-fusion",
+            "table-specialist",
+            "vlm-pairwise-judge",
+            "xycut-order",
+        }
+    )
+
+    def test_every_admissible_method_is_registered_or_declared_unavailable(self) -> None:
+        """No admissible method may be silently unexecutable.
+
+        Each one is either backed by a registered handler or reported to the
+        planner as unavailable; the planner can then choose another method instead
+        of producing a step that raises at execution time.
+        """
+        registered = set(PddlAccessibilityOrchestrator._build_executor().registry.names())
+        unaccounted = sorted(set(DEFAULT_METHOD_COSTS) - registered - self.KNOWN_UNAVAILABLE)
+
+        assert not unaccounted, (
+            "métodos admissíveis sem handler e sem declaração de indisponibilidade: "
+            f"{unaccounted}"
+        )
+
+    def test_unavailable_set_shrinks_only_deliberately(self) -> None:
+        registered = set(PddlAccessibilityOrchestrator._build_executor().registry.names())
+        still_unavailable = set(DEFAULT_METHOD_COSTS) - registered
+
+        now_covered = sorted(self.KNOWN_UNAVAILABLE - still_unavailable)
+        assert not now_covered, (
+            "estes métodos ganharam handler; remova-os de KNOWN_UNAVAILABLE: "
+            f"{now_covered}"
+        )
+
+    def test_registry_reports_its_own_names(self) -> None:
+        executor = PddlAccessibilityOrchestrator._build_executor()
+        names = set(executor.registry.names())
+
+        assert "vision-description" in names
+        assert "pandoc-code" in names
+        assert "human-review" in names
+
+    def test_deterministic_handlers_are_all_registered(self) -> None:
+        registered = set(PddlAccessibilityOrchestrator._build_executor().registry.names())
+        assert set(DETERMINISTIC_METHOD_HANDLERS) <= registered
+
+    def test_no_handler_is_a_silent_success(self) -> None:
+        """A handler must not report success without doing anything.
+
+        The previous fallback returned `success=True, validated=True` with no work,
+        marking obligations satisfied while nothing had been processed.
+        """
+        executor = PddlAccessibilityOrchestrator._build_executor()
+        manifest = _manifest([_element("el-1", "picture")], [])
+
+        results = [
+            handler(manifest, "o-inexistente")
+            for handler in (
+                executor.registry.get(name) for name in executor.registry.names()
+            )
+        ]
+
+        for result in results:
+            assert isinstance(result, MethodResult)
+            if result.success:
+                assert result.validated, "sucesso sem validação"
+
+
+class TestUnavailableMethods:
+    def test_only_methods_the_manifest_requests_are_reported(self) -> None:
+        """The compiler rejects unknown method names, so the set must be scoped.
+
+        Reporting every method in the catalogue would be read as a typo instead of
+        a capability gap.
+        """
+        orchestrator = PddlAccessibilityOrchestrator.__new__(
+            PddlAccessibilityOrchestrator
+        )
+        orchestrator.executor = PddlAccessibilityOrchestrator._build_executor()
+        manifest = _manifest(
+            [_element("el-1", "table")],
+            [_obligation("linearize-table", ["el-1"], ["pandoc-table", "missing-method"])],
+        )
+
+        unavailable = orchestrator._unavailable_methods(manifest)
+
+        assert unavailable == ["missing-method"]
+
+    def test_empty_when_every_requested_method_is_registered(self) -> None:
+        orchestrator = PddlAccessibilityOrchestrator.__new__(
+            PddlAccessibilityOrchestrator
+        )
+        orchestrator.executor = PddlAccessibilityOrchestrator._build_executor()
+        manifest = _manifest(
+            [_element("el-1", "table")],
+            [_obligation("linearize-table", ["el-1"], ["pandoc-table"])],
+        )
+
+        assert orchestrator._unavailable_methods(manifest) == []
+
+
+class TestVisionDescriptionValidates:
+    def test_fails_when_the_picture_has_no_description(self) -> None:
+        manifest = _manifest(
+            [_element("el-1", "picture")],
+            [_obligation("describe-image", ["el-1"], ["vision-description"])],
+        )
+
+        result = _handle_vision_description_method(manifest, "o-1")
+
+        assert result.success is False
+        assert "el-1" in (result.message or "")
+
+    def test_succeeds_when_the_picture_carries_a_description(self) -> None:
+        manifest = _manifest(
+            [_element("el-1", "picture", text="Um gráfico de barras.")],
+            [_obligation("describe-image", ["el-1"], ["vision-description"])],
+        )
+
+        result = _handle_vision_description_method(manifest, "o-1")
+
+        assert result.success is True
+        assert result.validated is True
+
+    def test_whitespace_only_text_is_not_a_description(self) -> None:
+        manifest = _manifest(
+            [_element("el-1", "picture", text="   ")],
+            [_obligation("describe-image", ["el-1"], ["vision-description"])],
+        )
+
+        assert _handle_vision_description_method(manifest, "o-1").success is False
+
+    def test_fails_when_the_obligation_has_no_picture_target(self) -> None:
+        manifest = _manifest(
+            [_element("el-1", "paragraph", text="texto")],
+            [_obligation("describe-image", ["el-1"], ["vision-description"])],
+        )
+
+        assert _handle_vision_description_method(manifest, "o-1").success is False
+
+
+class TestPandocTableValidates:
+    def test_fails_without_a_table_ast(self) -> None:
+        manifest = _manifest(
+            [_element("el-1", "table")],
+            [_obligation("linearize-table", ["el-1"], ["pandoc-table"])],
+        )
+
+        result = _handle_pandoc_table_method(manifest, "o-1")
+
+        assert result.success is False
+        assert "el-1" in (result.message or "")
+
+    def test_succeeds_with_a_table_ast(self) -> None:
+        manifest = _manifest(
+            [_element("el-1", "table", metadata={"table_ast": {"rows": []}})],
+            [_obligation("linearize-table", ["el-1"], ["pandoc-table"])],
+        )
+
+        assert _handle_pandoc_table_method(manifest, "o-1").success is True
+
+
+class TestPandocCodeNormalizes:
+    def test_normalizes_the_target_in_place(self) -> None:
+        element = _element("el-1", "code", text="def  f( ):\n  return 1")
+        manifest = _manifest(
+            [element],
+            [_obligation("preserve-code-semantics", ["el-1"], ["pandoc-code"])],
+        )
+
+        result = _handle_pandoc_code_method(manifest, "o-1")
+
+        assert result.success is True
+        assert element.metadata.get("code_normalized") is True
+        assert element.text != "def  f( ):\n  return 1"
+
+    def test_fails_when_the_target_is_not_code(self) -> None:
+        manifest = _manifest(
+            [_element("el-1", "paragraph", text="texto")],
+            [_obligation("preserve-code-semantics", ["el-1"], ["pandoc-code"])],
+        )
+
+        assert _handle_pandoc_code_method(manifest, "o-1").success is False
+
+
+class TestHumanReviewIsTerminalEscalation:
+    def test_reports_escalation_instead_of_success(self) -> None:
+        """`human-review` must not claim an automated method satisfied the obligation."""
+        manifest = _manifest(
+            [_element("el-1", "picture")],
+            [_obligation("describe-image", ["el-1"], ["human-review"])],
+        )
+
+        result = _handle_human_review_method(manifest, "o-1")
+
+        assert result.success is False
+        assert result.validated is False
+        assert "revisão humana" in (result.message or "").lower()
+
+    def test_reports_a_missing_obligation(self) -> None:
+        manifest = _manifest([_element("el-1", "picture")], [])
+
+        result = _handle_human_review_method(manifest, "o-inexistente")
+
+        assert result.success is False
+        assert "não encontrada" in (result.message or "")
+
+
+def _orchestrator(*, max_replans: int = 0) -> PddlAccessibilityOrchestrator:
+    """Orchestrator with the real registry, without running its constructor.
+
+    The constructor builds a Toolbox-backed extractor; these tests only exercise
+    planning and execution, so the extractor is irrelevant.
+    """
+    orchestrator = PddlAccessibilityOrchestrator.__new__(PddlAccessibilityOrchestrator)
+    orchestrator.executor = PddlAccessibilityOrchestrator._build_executor()
+    orchestrator.planner_backend = "internal"
+    orchestrator.preferred_plan = "internal"
+    orchestrator.fast_downward = None
+    orchestrator.fast_downward_alias = None
+    orchestrator.fast_downward_search = "astar(blind())"
+    orchestrator.execute_dry_run = False
+    orchestrator.max_replans = max_replans
+    orchestrator.planner = PlannerAgent()
+    return orchestrator
+
+
+class TestRealExecutionReachesAMethod:
+    @pytest.mark.parametrize(
+        ("kind", "element_type", "method", "metadata"),
+        [
+            ("linearize-table", "table", "pandoc-table", {"table_ast": {"rows": []}}),
+            ("describe-image", "picture", "vision-description", {"text": "Uma foto."}),
+            ("preserve-code-semantics", "code", "pandoc-code", {}),
+        ],
+    )
+    def test_plan_step_executes_without_a_missing_handler(
+        self, kind, element_type, method, metadata
+    ) -> None:
+        """The executor must run the step, not raise for a missing handler."""
+        element = _element(
+            "el-1",
+            element_type,
+            text=(
+                "codigo"
+                if element_type == "code"
+                else metadata.pop("text", None)
+            ),
+            metadata=metadata,
+        )
+        manifest = _manifest([element], [_obligation(kind, ["el-1"], [method, "human-review"])])
+        orchestrator = _orchestrator()
+
+        plan, _ = orchestrator._build_plan(manifest)
+        _, report = orchestrator.executor.execute(plan, manifest, dry_run=False)
+
+        messages = " ".join((s.message or "") for s in report.steps)
+        assert "No handler registered" not in messages, messages
+        assert report.status != "failed", [
+            (s.method, s.status, s.message) for s in report.steps
+        ]
+
+
+class TestReplanning:
+    """`replan-required` used to be terminal: the pipeline returned a plan it
+    already knew had a failed step and never reached `complete-job`.
+
+    A report reaches `replan-required` only when the failed obligation still has an
+    admissible, untried method left; with a single method it degrades to `failed`.
+    """
+
+    @staticmethod
+    def _handler(*, succeed: bool):
+        from backend.core.execution.models import MethodResult
+
+        def handler(manifest, obligation_id):
+            if not succeed:
+                return MethodResult(
+                    success=False, validated=False, message="falha permanente"
+                )
+            element = next(el for el in manifest.elements if el.id == "el-1")
+            element.text = "resolvido na segunda tentativa"
+            return MethodResult(success=True, validated=True, message="ok")
+
+        return handler
+
+    def _orchestrator_with(self, outcomes: dict[str, bool], max_replans: int):
+        orchestrator = _orchestrator(max_replans=max_replans)
+        for method, succeed in outcomes.items():
+            orchestrator.executor.registry.register(
+                method, self._handler(succeed=succeed)
+            )
+        return orchestrator
+
+    @staticmethod
+    def _manifest_with(methods: list[str]):
+        """Manifest whose obligation offers `methods` at escalating costs.
+
+        The planner picks the cheapest admissible method, so the order here is the
+        order the replan loop will try; explicit costs keep the test independent of
+        `DEFAULT_METHOD_COSTS`.
+        """
+        obligation = _obligation("linearize-table", ["el-1"], methods)
+        obligation.method_costs = {
+            method: 10 * (index + 1) for index, method in enumerate(methods)
+        }
+        return _manifest([_element("el-1", "table")], [obligation])
+
+    def test_moves_to_the_next_method_and_completes(self) -> None:
+        orchestrator = self._orchestrator_with(
+            {"pandoc-table": False, "pymupdf-region": True}, max_replans=1
+        )
+        manifest = self._manifest_with(["pandoc-table", "pymupdf-region"])
+
+        final, report, reports = self._run_with_replan(orchestrator, manifest)
+
+        assert report.status == "completed"
+        assert report.replan_required is False
+        assert final.status == "completed"
+        assert len(reports) == 2
+        assert "pymupdf-region" in [step.method for step in reports[-1].steps]
+
+    def test_stops_at_the_configured_limit(self) -> None:
+        outcomes = {
+            "pandoc-table": False,
+            "pymupdf-region": False,
+            "norm-fix": False,
+        }
+        orchestrator = self._orchestrator_with(outcomes, max_replans=1)
+        manifest = self._manifest_with(list(outcomes))
+
+        _, report, reports = self._run_with_replan(orchestrator, manifest)
+
+        assert report.replan_required is True
+        assert report.status == "replan-required"
+        # One replan only: the third method was never attempted.
+        assert len(reports) == 2
+        assert reports[1].steps[0].method == "pymupdf-region"
+
+    def test_no_replan_when_disabled(self) -> None:
+        orchestrator = self._orchestrator_with(
+            {"pandoc-table": False, "pymupdf-region": True}, max_replans=0
+        )
+        manifest = self._manifest_with(["pandoc-table", "pymupdf-region"])
+
+        _, report, reports = self._run_with_replan(orchestrator, manifest)
+
+        assert report.status == "replan-required"
+        assert len(reports) == 1
+        executed = [step.method for step in report.steps if step.method is not None]
+        assert "pymupdf-region" not in executed, executed
+
+    @staticmethod
+    def _run_with_replan(orchestrator, manifest):
+        """Drive the same plan/execute/replan loop `executar()` performs.
+
+        Returns the final manifest, the final report, and every report produced
+        (each `ExecutionReport` describes only its own execution).
+        """
+        plan, _ = orchestrator._build_plan(manifest)
+        current, report = orchestrator.executor.execute(plan, manifest, dry_run=False)
+        reports = [report]
+
+        replans = 0
+        while (
+            report.replan_required
+            and replans < orchestrator.max_replans
+            and not orchestrator.execute_dry_run
+        ):
+            replans += 1
+            plan, _ = orchestrator._build_plan(current)
+            current, report = orchestrator.executor.execute(
+                plan, current, dry_run=False
+            )
+            reports.append(report)
+        return current, report, reports

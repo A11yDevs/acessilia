@@ -390,6 +390,10 @@ LOG_PDDL_TABLES_ENRICHED: str = (
 LOG_PDDL_ELEMENT_CROP_FAILED: str = (
     "Failed to extract the image clip for element {element_id}"
 )
+#: Warning logged when the vision model answered with an empty description for a picture element, leaving the `describe-image` obligation unsatisfiable. {element_id} is the element without a usable description.
+LOG_PDDL_EMPTY_VISION_DESCRIPTION: str = (
+    "Vision model returned an empty description for element {element_id}"
+)
 #: Error raised when the preferred planner backend produced no valid plan in both mode; {backend} is the preferred backend's name.
 LOG_PDDL_PREFERRED_PLAN_MISSING: str = (
     "Preferred planner backend {backend} did not produce a valid plan in both mode"

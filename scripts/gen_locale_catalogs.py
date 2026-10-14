@@ -295,6 +295,7 @@ from backend.stage_messages import (
     STAGE_QUEUE_WAITING_POSITION,
     STAGE_SPLITTING_PDF_PAGES,
     STAGE_VALIDATING_PLAN_DRY_RUN,
+    STAGE_EXECUTING_PLAN,
 )
 from backend.tools.validators import MSG_FILE_TOO_LARGE, MSG_UNSUPPORTED_FORMAT
 from frontend.web.messages import (
@@ -463,6 +464,7 @@ MESSAGES: tuple[str, ...] = (
     STAGE_ENRICHING_TABLES_OCR,
     STAGE_GENERATING_PDDL_PLAN,
     STAGE_VALIDATING_PLAN_DRY_RUN,
+    STAGE_EXECUTING_PLAN,
     # Telegram bot command responses (frontend/telegram/handlers/start.py).
     MSG_EMAIL_HINT,
     MSG_EMAIL_CONFIGURED,
@@ -875,6 +877,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         STAGE_VALIDATING_PLAN_DRY_RUN: (
             "Validando o plano em modo dry-run..."
         ),
+        STAGE_EXECUTING_PLAN: "Executando o plano...",
         MSG_EMAIL_HINT: "Por favor, informe o e-mail: /email seu@email.com",
         MSG_EMAIL_CONFIGURED:
             "E-mail {email} configurado! Agora envie o documento para ser enviado para este e-mail.",

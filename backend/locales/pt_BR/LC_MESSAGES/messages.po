@@ -114,6 +114,9 @@ msgstr "Gerando o plano nominal com PDDL..."
 msgid "Validating the plan in dry-run mode..."
 msgstr "Validando o plano em modo dry-run..."
 
+msgid "Executing the plan..."
+msgstr "Executando o plano..."
+
 msgid "Please provide an e-mail address: /email you@example.com"
 msgstr "Por favor, informe o e-mail: /email seu@email.com"
 
