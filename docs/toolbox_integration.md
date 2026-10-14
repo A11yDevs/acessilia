@@ -320,7 +320,7 @@ Defined in `backend/config/settings.py` and documented in `.env.example`:
 | `STRUCTURER` | `toolbox` | Per-page region engine (`toolbox`, `toolbox-layout`, `pymupdf`) |
 | `TOOLBOX_PAGE_OCR_PROVIDER` | `qwen3-vl-page` | Whole-page VLM transcription (`document.ocr.page`) |
 | `TOOLBOX_ADJUDICATE_PROVIDER` | `qwen3-vl-judge` | Pairwise judge / region transcription (`document.adjudicate.*`) |
-| `TOOLBOX_ORIENTATION_PROVIDER` | `rapidocr-orientation` | Rotation detection (`document.orientation.detect`) |
+| `TOOLBOX_ORIENTATION_PROVIDER` | `rapidocr-orient` | Rotation detection (`image.page.orient`) |
 | `FUSION_HYBRID_PROVIDER` | `mineru-hyb` | MinerU hybrid-VLM provider id (the B source of the confirmed leaderboard best) |
 
 > `TOOLBOX_USE_ARTIFACT_STORE` and `TOOLBOX_USE_REMOTE_CACHE` directly affect the
@@ -353,7 +353,7 @@ service.py: _build_orchestrator()
 - `backend/tools/toolbox_ocr_tools.py`, `toolbox_math_tools.py`, `toolbox_pdf_tools.py` — wrappers with local fallback
 - `backend/tools/toolbox_page_ocr_client.py` — `document.ocr.page` (whole-page VLM)
 - `backend/tools/toolbox_adjudicate_client.py` — `document.adjudicate.page` / `.region`
-- `backend/tools/toolbox_orientation_client.py` — `document.orientation.detect`
+- `backend/tools/toolbox_orientation_client.py` — `image.page.orient`
 - `backend/tools/structurer.py` — `get_structurer()` and structurer selection
 - `backend/core/manifest/toolbox_extractor.py` — `ToolboxManifestExtractor`
 - `backend/pipeline/fusion.py` — `extract_fused()` (dual fusion)
@@ -367,7 +367,7 @@ service.py: _build_orchestrator()
 | `document.ocr.page` | `ToolboxPageOcrClient` | `qwen3-vl-page`, `dots-ocr-page`, `deepseek-ocr-page`, `teleocr-page` | Whole-page VLM transcription — the B source of the page hybrid |
 | `document.adjudicate.page` | `ToolboxAdjudicateClient` | `qwen3-vl-judge` | Pairwise judge between two candidate transcriptions (both orders, position debiasing) |
 | `document.adjudicate.region` | `ToolboxAdjudicateClient` | `qwen3-vl-judge` | Exact transcription of a region crop, turned into a differ decision |
-| `document.orientation.detect` | `ToolboxOrientationClient` | `rapidocr-orientation` | Rotation 0/90/180/270 detection |
+| `image.page.orient` | `ToolboxOrientationClient` | `rapidocr-orient` | Rotation 0/90/180/270 detection |
 
 The provider registrations live in the Toolbox repository; the Dr.DocBench job
 config that mirrors them is `scripts/drbench/experiments/slurm/providers-config-vlm.yaml`.

@@ -148,7 +148,7 @@ class Settings:
         default_factory=lambda: os.getenv("TOOLBOX_ADJUDICATE_PROVIDER", "qwen3-vl-judge")
     )
     toolbox_orientation_provider: str = field(
-        default_factory=lambda: os.getenv("TOOLBOX_ORIENTATION_PROVIDER", "rapidocr-orientation")
+        default_factory=lambda: os.getenv("TOOLBOX_ORIENTATION_PROVIDER", "rapidocr-orient")
     )
     toolbox_media_inspect_provider: str = field(
         default_factory=lambda: os.getenv(
