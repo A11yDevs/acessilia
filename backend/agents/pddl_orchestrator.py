@@ -325,31 +325,6 @@ def _handle_pandoc_code_method(
     )
 
 
-def _handle_pymupdf_region_method(
-    manifest: ProcessingManifest, obligation_id: str
-) -> MethodResult:
-    """Require a region crop for every target so the region was actually inspected."""
-    elements = _target_elements(manifest, obligation_id)
-    if not elements:
-        return _missing_obligation(obligation_id)
-
-    missing = [el for el in elements if not (el.metadata or {}).get("region_crop")]
-    if missing:
-        return MethodResult(
-            success=False,
-            validated=False,
-            message=(
-                "Região não inspecionada (sem recorte): "
-                + ", ".join(el.id for el in missing)
-            ),
-        )
-    return MethodResult(
-        success=True,
-        validated=True,
-        message=f"Região inspecionada para {len(elements)} elemento(s)",
-    )
-
-
 def _handle_latex_normalizer_method(
     manifest: ProcessingManifest, obligation_id: str
 ) -> MethodResult:
@@ -514,7 +489,6 @@ DETERMINISTIC_METHOD_HANDLERS: dict[
     "vision-description": _handle_vision_description_method,
     "pandoc-table": _handle_pandoc_table_method,
     "pandoc-code": _handle_pandoc_code_method,
-    "pymupdf-region": _handle_pymupdf_region_method,
     "latex-normalizer": _handle_latex_normalizer_method,
     "norm-fix": _handle_norm_fix_method,
     # These helpers operate on docstruct blocks, not ManifestElement text.

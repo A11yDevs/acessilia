@@ -585,3 +585,9 @@ precisa manter a identidade de página e permitir preservar todos os IDs de
 elementos existentes. Novos blocos recuperados recebem IDs próprios. Documentos
 estruturados, subconjuntos e mapeamentos ambíguos falham explicitamente; não são
 substituídos por texto achatado nem certificados como processados.
+
+
+`pymupdf-region` também é declarado indisponível: a presença de um recorte,
+mesmo existente, não comprova inspeção da região. A obrigação de revisão de
+estrutura segue para revisão humana até existir um adaptador de inspeção
+verificável; metadados `region_crop` não certificam sucesso.
