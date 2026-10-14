@@ -134,6 +134,10 @@ class TestRegistryCoverage:
             "table-specialist",
             "vlm-pairwise-judge",
             "xycut-order",
+            "line-number-extractor",
+            "verse-chunker",
+            "tailjoin",
+            "tailjoin-positioned",
         }
     )
 

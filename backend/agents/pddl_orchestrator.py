@@ -8,9 +8,6 @@ from pathlib import Path
 from typing import Any
 
 import fitz
-from docstruct.fusion.line_numbers import extract_line_numbers
-from docstruct.fusion.tailjoin import join_tail
-from docstruct.fusion.verse import chunk_verse
 from docstruct.tables.ast import effective_section_width, linearize_table_for_text
 from docstruct.text.norm_fix import norm_fix
 
@@ -419,91 +416,6 @@ def _handle_norm_fix_method(
     )
 
 
-def _handle_extract_line_numbers_method(
-    manifest: ProcessingManifest, obligation_id: str
-) -> MethodResult:
-    """Record the marginal line numbers the extractor found on the target text."""
-    elements = _target_elements(manifest, obligation_id)
-    if not elements:
-        return _missing_obligation(obligation_id)
-
-    total = 0
-    for element in elements:
-        numbers = extract_line_numbers(element.text or "")
-        element.metadata["line_numbers"] = numbers
-        total += len(numbers)
-
-    if not total:
-        return MethodResult(
-            success=False,
-            validated=False,
-            message="Nenhum número de linha marginal encontrado",
-        )
-    return MethodResult(
-        success=True,
-        validated=True,
-        message=f"{total} número(s) de linha extraído(s)",
-    )
-
-
-def _handle_chunk_verse_method(
-    manifest: ProcessingManifest, obligation_id: str
-) -> MethodResult:
-    """Split the target text into verse-sized chunks recorded in metadata."""
-    elements = _target_elements(manifest, obligation_id)
-    if not elements:
-        return _missing_obligation(obligation_id)
-
-    chunked = 0
-    for element in elements:
-        chunks = chunk_verse(element.text or "")
-        if not chunks:
-            continue
-        element.metadata["verse_chunks"] = chunks
-        chunked += 1
-
-    if not chunked:
-        return MethodResult(
-            success=False,
-            validated=False,
-            message="Nenhum bloco de verso elegível para fragmentação",
-        )
-    return MethodResult(
-        success=True,
-        validated=True,
-        message=f"Verso fragmentado em {chunked} elemento(s)",
-    )
-
-
-def _handle_tailjoin_method(
-    manifest: ProcessingManifest, obligation_id: str
-) -> MethodResult:
-    """Join the trailing short blocks of the target text into the recorded result."""
-    elements = _target_elements(manifest, obligation_id)
-    if not elements:
-        return _missing_obligation(obligation_id)
-
-    joined = 0
-    for element in elements:
-        merged = join_tail(element.text or "")
-        if not merged:
-            continue
-        element.metadata["tailjoined"] = merged
-        joined += 1
-
-    if not joined:
-        return MethodResult(
-            success=False,
-            validated=False,
-            message="Nenhum bloco de cauda elegível para união",
-        )
-    return MethodResult(
-        success=True,
-        validated=True,
-        message=f"Blocos de cauda unidos em {joined} elemento(s)",
-    )
-
-
 def _handle_human_review_method(
     manifest: ProcessingManifest, obligation_id: str
 ) -> MethodResult:
@@ -600,10 +512,8 @@ DETERMINISTIC_METHOD_HANDLERS: dict[
     "pymupdf-region": _handle_pymupdf_region_method,
     "latex-normalizer": _handle_latex_normalizer_method,
     "norm-fix": _handle_norm_fix_method,
-    "line-number-extractor": _handle_extract_line_numbers_method,
-    "verse-chunker": _handle_chunk_verse_method,
-    "tailjoin": _handle_tailjoin_method,
-    "tailjoin-positioned": _handle_tailjoin_method,
+    # These helpers operate on docstruct blocks, not ManifestElement text.
+    # Keep them unavailable until their results can be applied to the manifest.
     "deterministic-heading-repair": _handle_deterministic_heading_repair_method,
 }
 

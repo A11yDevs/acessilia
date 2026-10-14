@@ -158,7 +158,7 @@ class ExecutorAgent:
 
         if dry_run:
             returned_manifest = deepcopy(manifest)
-            status = "dry-run-completed"
+            status = "failed" if state.failed_step_index is not None else "dry-run-completed"
             revision_after = manifest.revision
         else:
             returned_manifest = state.manifest
@@ -331,7 +331,7 @@ class ExecutorAgent:
                             message=f"{type(exc).__name__}: {exc}",
                             artifact_ids=[],
                         )
-                        alternatives = set(obligation.admissible_methods) - {
+                        alternatives = set(obligation.admissible_methods) & set(self.registry.names()) - {
                             attempt.method
                             for attempt in obligation.attempts
                             if attempt.status in {"failed", "rejected"}
@@ -362,7 +362,7 @@ class ExecutorAgent:
                         if artifact.id not in existing_artifacts
                     )
                     if not result.success or not result.validated:
-                        alternatives = set(obligation.admissible_methods) - {
+                        alternatives = set(obligation.admissible_methods) & set(self.registry.names()) - {
                             attempt.method
                             for attempt in obligation.attempts
                             if attempt.status in {"failed", "rejected"}
