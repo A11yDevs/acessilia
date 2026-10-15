@@ -30,6 +30,8 @@ from backend.agents.pddl_orchestrator import (
     _handle_pandoc_table_method,
     _handle_repetition_guard_method,
     _handle_vision_description_method,
+    _tailjoin_position,
+    _unsatisfied_obligations,
 )
 from backend.core.execution.models import MethodResult
 from backend.core.manifest.builder import DEFAULT_METHOD_COSTS
@@ -40,6 +42,7 @@ from backend.core.manifest.models import (
     ManifestElement,
     ManifestSummary,
     Obligation,
+    ObligationAttempt,
     PageDescriptor,
     ProcessingManifest,
     Provenance,
@@ -759,3 +762,91 @@ class TestEveryHandlerIsCallable:
         covered = set(self.CASES)
 
         assert registered <= covered, sorted(registered - covered)
+
+
+class TestTailjoinPosition:
+    """The builder marks page furniture in `type`, not in `metadata["role"]`."""
+
+    def _footer_manifest(self, metadata: dict | None = None) -> ProcessingManifest:
+        footer = ManifestElement(
+            id="el-1",
+            type="page_footer",
+            raw_label="page_footer",
+            reading_order=1,
+            hierarchy_level=1,
+            text="42",
+            page_number=1,
+            metadata=metadata or {},
+            provenance=[
+                Provenance(
+                    page_number=1,
+                    bbox=BoundingBox(
+                        left=280, top=780, right=320, bottom=800,
+                        coord_origin="TOPLEFT",
+                    ),
+                )
+            ],
+        )
+        manifest = _manifest([footer], [])
+        manifest.pages[0].width = 600
+        manifest.pages[0].height = 840
+        return manifest
+
+    def test_position_is_derived_from_page_footer_type(self) -> None:
+        assert _tailjoin_position(self._footer_manifest()) == "bot"
+
+    def test_explicit_role_metadata_still_wins(self) -> None:
+        manifest = self._footer_manifest(metadata={"role": "body"})
+        assert _tailjoin_position(manifest) is None
+
+
+class TestUnsatisfiedObligations:
+    def _attempt(self, method: str, status: str, message: str) -> ObligationAttempt:
+        return ObligationAttempt(
+            method=method,
+            status=status,
+            started_at=NOW,
+            completed_at=NOW,
+            message=message,
+        )
+
+    def test_reports_escalated_and_exhausted_obligations(self) -> None:
+        escalated = _obligation("review-structure", ["el-1"], ["human-review"])
+        escalated.selected = True
+        escalated.status = "failed"
+        escalated.attempts.append(
+            self._attempt("human-review", "failed", "Escalonado para revisão humana")
+        )
+        exhausted = Obligation(
+            id="o-2",
+            kind="guard-repetition",
+            selected=True,
+            status="pending",
+            target_ids=["el-1"],
+            admissible_methods=["rep-guard"],
+            rationale="test",
+            attempts=[self._attempt("rep-guard", "failed", "Nada a cortar")],
+        )
+        satisfied = Obligation(
+            id="o-3",
+            kind="guard-repetition",
+            selected=True,
+            status="satisfied",
+            target_ids=["el-1"],
+            rationale="test",
+        )
+        unselected = Obligation(
+            id="o-4", kind="guard-repetition", target_ids=["el-1"], rationale="test"
+        )
+        manifest = _manifest(
+            [_element("el-1", "paragraph", text="texto")],
+            [escalated, exhausted, satisfied, unselected],
+        )
+
+        report = _unsatisfied_obligations(manifest)
+
+        assert [item["id"] for item in report] == ["o-1", "o-2"]
+        assert report[0]["escalated"] is True
+        assert report[0]["last_method"] == "human-review"
+        assert report[1]["escalated"] is False
+        assert report[1]["last_message"] == "Nada a cortar"

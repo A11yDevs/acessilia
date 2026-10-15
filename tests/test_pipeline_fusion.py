@@ -183,6 +183,40 @@ class TestExtractFused:
         )
 
     @pytest.mark.asyncio
+    async def test_repetition_guard_does_not_cut_across_blocks(self, monkeypatch):
+        """`guard_page` collapses repetitions within a block, never across blocks.
+
+        Calling it per fused block therefore reports the same `tokens_cut` as
+        calling it once on the whole page: a phrase repeated as separate blocks is
+        left alone either way.
+        """
+        from docstruct.fusion.repetition import guard_page
+
+        blocks = ["observacao observacao observacao"] * 2
+
+        async def fake_extract(provider):
+            return _payload([_el("observacao", 0)])
+
+        def fake_merge_blocks(*args, **kwargs):
+            return list(blocks), {}
+
+        monkeypatch.setattr(
+            "backend.pipeline.fusion.ToolboxClient",
+            _FakeClientFactory(extract_fn=fake_extract),
+        )
+        monkeypatch.setattr("backend.pipeline.fusion.merge_blocks", fake_merge_blocks)
+
+        result = await extract_fused("arquivo.pdf")
+
+        _, page_cut, _ = guard_page("\n\n".join(blocks), "observacao", "observacao")
+        assert page_cut == 0
+        assert [e["text"].strip() for e in result["document"]["elements"]] == blocks
+        assert (
+            "repetition_tokens_cut"
+            not in result["fusion_evidence"]["pages"][0]["stats"]
+        )
+
+    @pytest.mark.asyncio
     async def test_fusion_stats_are_page_local_and_not_double_counted(
         self, monkeypatch
     ):

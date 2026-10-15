@@ -5,11 +5,14 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from time import perf_counter
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from backend.config.settings import settings
 from backend.tools.logger import logger
 from backend.tools.toolbox_client import ToolboxClient, ToolboxError
+
+if TYPE_CHECKING:
+    from docstruct.policy import FusionPolicy
 
 
 @dataclass(frozen=True)
@@ -44,9 +47,12 @@ class ToolboxManifestExtractor:
         enable_ocr: bool = True,
         use_artifact_store: bool | None = None,
         use_remote_cache: bool | None = None,
+        fusion_policy: FusionPolicy | None = None,
     ) -> None:
         self._client = client or ToolboxClient()
         self.enable_ocr = enable_ocr
+        # Policy for FUSION_MODE=dual; None keeps the fusion stack's default.
+        self.fusion_policy = fusion_policy
         self.use_artifact_store = (
             use_artifact_store
             if use_artifact_store is not None
@@ -126,6 +132,7 @@ class ToolboxManifestExtractor:
                         secondary_result,
                         primary_provider=self._client.provider,
                         secondary_provider=secondary_provider,
+                        policy=self.fusion_policy,
                     )
                     result = {
                         **result,

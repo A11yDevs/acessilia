@@ -215,6 +215,43 @@ def test_dual_mode_attaches_page_evidence_without_replacing_manifest(
     assert "dual-provider-fusion" in compiled.text
 
 
+def test_dual_mode_passes_configured_fusion_policy(mock_client, monkeypatch):
+    from docstruct.policy import FusionPolicy
+
+    from backend.config.settings import settings
+
+    monkeypatch.setattr(settings, "fusion_mode", "dual")
+    monkeypatch.setattr(settings, "fusion_secondary_provider", "mineru")
+    mock_client.extract_structure = AsyncMock(return_value=SAMPLE_TOOLBOX_RESPONSE)
+    secondary_client = AsyncMock(spec=ToolboxClient)
+    secondary_client.provider = "mineru"
+    secondary_client.extract_structure.return_value = deepcopy(
+        SAMPLE_TOOLBOX_RESPONSE
+    )
+    monkeypatch.setattr(
+        "backend.core.manifest.toolbox_extractor.ToolboxClient",
+        lambda **kwargs: secondary_client,
+    )
+    seen: dict = {}
+
+    def fake_fuse(*args, **kwargs):
+        seen["policy"] = kwargs.get("policy")
+        return {"fusion_stats": {}, "fusion_evidence": {"pages": []}}
+
+    monkeypatch.setattr(
+        "backend.pipeline.fusion.fuse_extraction_payloads", fake_fuse
+    )
+    policy = FusionPolicy(text_pick="mineru")
+
+    ToolboxManifestExtractor(
+        client=mock_client,
+        use_artifact_store=False,
+        fusion_policy=policy,
+    ).extract(FIXTURE_PDF)
+
+    assert seen["policy"] is policy
+
+
 def test_matching_dual_providers_do_not_create_fusion_obligations(
     mock_client, monkeypatch
 ):

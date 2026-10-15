@@ -522,11 +522,24 @@ def _element_blocks(
                 "text": element.text or "",
                 "kind": _block_kind(element),
                 "type": element.type,
-                "role": (element.metadata or {}).get("role"),
+                "role": _element_role(element),
                 "box": list(bbox) if bbox else None,
             }
         )
     return blocks
+
+
+def _element_role(element: ManifestElement) -> str | None:
+    """Fusion block role for an element.
+
+    The manifest builder records page furniture in `element.type`
+    (`page_header`/`page_footer`) and does not populate `metadata["role"]`, so the
+    role is derived from the type when the metadata does not carry one.
+    """
+    role = (element.metadata or {}).get("role")
+    if role:
+        return role
+    return {"page_header": "header", "page_footer": "footer"}.get(element.type)
 
 
 def _block_kind(element: ManifestElement) -> str:
@@ -613,7 +626,7 @@ def _tailjoin_position(manifest: ProcessingManifest) -> str | None:
     `tailjoin-positioned`.
     """
     for element in manifest.elements:
-        role = (element.metadata or {}).get("role")
+        role = _element_role(element)
         if role in {"header", "footer", "page_number"} and _is_page_number(
             element.text or ""
         ):
@@ -842,6 +855,11 @@ def _handle_dual_provider_fusion_method(
 
     Em modo single (FUSION_MODE=single) o método não é admissível e não
     deve ser selecionado pelo compilador.
+
+    Custo: a fusão reextrai o documento inteiro nos dois providers, sem
+    reutilizar a evidência que o ``ToolboxManifestExtractor`` já coletou em
+    ``FUSION_MODE=dual``. Cada passo ``fuse-providers`` paga, portanto, uma
+    extração dual completa (cache remoto da Toolbox à parte).
     """
     obligation = next(
         (o for o in manifest.obligations if o.id == obligation_id), None
@@ -1735,9 +1753,36 @@ def build_pddl_structured_payload(
             "pddl_comparison_verdict": comparison.comparison.verdict
             if comparison
             else None,
+            "pddl_unsatisfied_obligations": _unsatisfied_obligations(manifest),
         },
         "technical_warnings": technical_warnings,
     }
+
+
+def _unsatisfied_obligations(manifest: ProcessingManifest) -> list[dict[str, Any]]:
+    """Selected obligations the execution left unsatisfied.
+
+    `pddl_execution_status` alone does not say which obligations were exhausted
+    or escalated, so each one is reported with its last attempt. An obligation
+    whose last attempt is `human-review` is a pending escalation.
+    """
+    unsatisfied: list[dict[str, Any]] = []
+    for obligation in manifest.obligations:
+        if not obligation.selected or obligation.status == "satisfied":
+            continue
+        last = obligation.attempts[-1] if obligation.attempts else None
+        unsatisfied.append(
+            {
+                "id": obligation.id,
+                "kind": obligation.kind,
+                "status": obligation.status,
+                "target_ids": list(obligation.target_ids),
+                "last_method": last.method if last else None,
+                "last_message": last.message if last else None,
+                "escalated": bool(last and last.method == "human-review"),
+            }
+        )
+    return unsatisfied
 
 
 def _manifest_pages_to_payload(manifest: ProcessingManifest) -> list[dict[str, Any]]:
