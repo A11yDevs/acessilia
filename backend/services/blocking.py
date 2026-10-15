@@ -11,10 +11,15 @@ async def run_blocking(function, *args, **kwargs):
     try:
         return await asyncio.shield(operation)
     except asyncio.CancelledError:
-        try:
-            await operation
-        except Exception:
-            pass
+        while not operation.done():
+            try:
+                await asyncio.shield(operation)
+            except asyncio.CancelledError:
+                continue
+            except Exception:
+                break
+        if not operation.cancelled():
+            operation.exception()
         raise
 
 
