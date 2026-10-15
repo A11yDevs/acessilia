@@ -889,13 +889,13 @@ test = ["pytest"]
 
 [[package]]
 name = "edge-tts"
-version = "7.2.8"
+version = "7.3.1"
 description = "Microsoft Edge's TTS"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "edge_tts-7.2.8-py3-none-any.whl", hash = "sha256:361fe48ce7ef613adbe30f664e3765dd71029c6cb57427279eff8ad6df2eb211"},
-    {file = "edge_tts-7.2.8.tar.gz", hash = "sha256:fcf185a0d527a0d2d003f9d5841facc1d5e0e7b3b88d5df9c32990402c6b8cd0"},
+    {file = "edge_tts-7.3.1-py3-none-any.whl", hash = "sha256:2a3c79d6235a7a736d681233823ce5492e829b43eb47beae49aa181237a8f9a4"},
+    {file = "edge_tts-7.3.1.tar.gz", hash = "sha256:ee1fabf911b9ea83b38ae93aee5619ee41eaf0b109fef6e65d797dc4ebf1f20f"},
 ]
 
 [package.dependencies]
@@ -5243,4 +5243,4 @@ docling = ["docling", "rapidocr"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "67d7f428730dd79009192f5fb2e04649779b88b34e42ba8a2dc182473427db9c"
+content-hash = "809b998038d9d60f85c7feba623c070f0610f147138e7f96ab793210327857d0"
