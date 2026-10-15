@@ -8,11 +8,8 @@ from pathlib import Path
 
 import httpx
 import pytest
-import respx
 
 from backend.tools.toolbox_client import (
-    ToolboxContractViolation,
-    ToolboxProviderUnavailable,
     ToolboxTimeout,
 )
 from backend.tools.toolbox_math_client import ToolboxMathClient

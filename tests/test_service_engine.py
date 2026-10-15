@@ -199,7 +199,6 @@ def test_settings_pddl_defaults():
     ):
         os.environ.pop(key, None)
 
-    from dataclasses import fields
     import backend.config.settings as cfg_mod
 
     fresh = cfg_mod.Settings()

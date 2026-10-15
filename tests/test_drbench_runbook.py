@@ -7,7 +7,6 @@ Portuguese mirror have to stay in sync (constitution rule 8).
 """
 from __future__ import annotations
 
-import json
 import re
 from pathlib import Path
 

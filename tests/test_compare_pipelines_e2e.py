@@ -21,13 +21,10 @@ from pathlib import Path
 import pytest
 
 from scripts.compare_pipelines import (
-    _compare_documents,
-    _compute_verdict,
     _extract_formulas,
     _extract_tables,
     _extract_text,
     _flatten_blocks,
-    _jaccard_similarity,
     _summarize_document,
     run_comparison,
 )

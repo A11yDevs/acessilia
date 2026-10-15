@@ -8,7 +8,6 @@ from pathlib import Path
 
 import httpx
 import pytest
-import respx
 
 from backend.tools.toolbox_client import (
     ToolboxContractViolation,

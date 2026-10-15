@@ -11,11 +11,9 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
-import pytest
 
 from backend.core.agents.informational_structural import InformationalStructuralAgent
 from backend.core.manifest.builder import (
-    build_processing_manifest,
     _refine_reading_order,
     _order_body_elements_by_column,
 )
@@ -29,8 +27,6 @@ from scripts.drbench.experiments.differ.tree_differ_v2 import (
 )
 from scripts.drbench.experiments.analysis.block_oracle import (
     evaluate_oracle_headroom,
-    classify_block,
-    compute_edit_dist,
 )
 
 

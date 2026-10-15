@@ -5,11 +5,9 @@ Usa resp HTTPX mockadas para validar URLs, multipart, timeout e parsing de erro.
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import AsyncMock, Mock
 
 import httpx
 import pytest
-import respx
 
 from backend.tools.toolbox_client import (
     ToolboxArtifactNotFound,
