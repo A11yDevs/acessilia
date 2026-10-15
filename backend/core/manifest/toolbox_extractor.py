@@ -8,7 +8,8 @@ from time import perf_counter
 from typing import Any
 
 from backend.config.settings import settings
-from backend.tools.toolbox_client import ToolboxClient
+from backend.tools.logger import logger
+from backend.tools.toolbox_client import ToolboxClient, ToolboxError
 
 
 @dataclass(frozen=True)
@@ -88,6 +89,51 @@ class ToolboxManifestExtractor:
             language="pt-BR",
             use_remote_cache=self.use_remote_cache,
         )
+        if settings.fusion_mode == "dual":
+            secondary_provider = settings.fusion_secondary_provider
+            if secondary_provider == self._client.provider:
+                logger.warning(
+                    "Fusão dual ignorada: provider primário e secundário são ambos {}",
+                    secondary_provider,
+                )
+            else:
+                from backend.pipeline.fusion import fuse_extraction_payloads
+
+                secondary_client = ToolboxClient(
+                    base_url=self._client.base_url,
+                    provider=secondary_provider,
+                    timeout_seconds=getattr(
+                        self._client, "timeout_seconds", None
+                    ),
+                    api_key=getattr(self._client, "api_key", None),
+                )
+                try:
+                    secondary_result = await secondary_client.extract_structure(
+                        file_path=None if artifact_id else source_path,
+                        artifact_id=artifact_id,
+                        language="pt-BR",
+                        use_remote_cache=self.use_remote_cache,
+                    )
+                except ToolboxError as exc:
+                    logger.warning(
+                        "Fusão dual sem evidência: provider {} falhou ({})",
+                        secondary_provider,
+                        type(exc).__name__,
+                    )
+                else:
+                    fusion = fuse_extraction_payloads(
+                        result,
+                        secondary_result,
+                        primary_provider=self._client.provider,
+                        secondary_provider=secondary_provider,
+                    )
+                    result = {
+                        **result,
+                        "fusion_stats": fusion["fusion_stats"],
+                        "fusion_evidence": fusion["fusion_evidence"],
+                    }
+                finally:
+                    await secondary_client.close()
 
         duration_ms = round((perf_counter() - started_clock) * 1000)
         completed_at = datetime.now(timezone.utc)
