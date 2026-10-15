@@ -65,7 +65,7 @@ def _merge_callout_groups(
         and region.text.strip()
         and region.metadata.get("subtype") not in {"code"}
     ]
-    if len(text_regions) < CALLOUT_MIN_GROUP_SIZE:
+    if len(text_regions) < 2:
         return regions
 
     main_left, main_right = _estimate_main_text_band(text_regions)
@@ -96,7 +96,7 @@ def _merge_callout_groups(
             continue
         candidates.append(region)
 
-    if len(candidates) < CALLOUT_MIN_GROUP_SIZE:
+    if len(candidates) < 2:
         return regions
 
     groups: list[list[Region]] = []
@@ -110,21 +110,20 @@ def _merge_callout_groups(
             current = [region]
     groups.append(current)
 
+    groups = [group for group in groups if len(group) >= (
+        2 if _is_known_callout_title(_extract_callout_title(group[0], known_titles), known_titles)
+        else CALLOUT_MIN_GROUP_SIZE
+    )]
     grouped_ids = {
         id(region)
         for group in groups
-        if len(group) >= CALLOUT_MIN_GROUP_SIZE
         for region in group
     }
     result: list[Region] = [region for region in regions if id(region) not in grouped_ids]
 
     for index, group in enumerate(groups, start=1):
         sorted_group = sorted(group, key=lambda item: (item.bbox[1], item.bbox[0]))
-        callout_title = _extract_callout_title(sorted_group[0])
-        min_size = 2 if _is_known_callout_title(callout_title, known_titles) else CALLOUT_MIN_GROUP_SIZE
-        if len(group) < min_size:
-            continue
-
+        callout_title = _extract_callout_title(sorted_group[0], known_titles)
         x0 = min(region.bbox[0] for region in sorted_group)
         y0 = min(region.bbox[1] for region in sorted_group)
         x1 = max(region.bbox[2] for region in sorted_group)
@@ -185,7 +184,7 @@ def _is_same_callout_cluster(previous: Region, current: Region) -> bool:
 
 
 
-def _extract_callout_title(region: Region) -> str:
+def _extract_callout_title(region: Region, known_titles: frozenset[str] = frozenset()) -> str:
     text = region.text.strip()
     if not text:
         return ""
@@ -212,7 +211,7 @@ def _is_known_callout_title(text: str, known_titles: frozenset[str] = frozenset(
 
 
 def _fill_gaps_with_unknown(
-    page: fitz.Page,
+    page: Any,
     regions: list[Region],
     page_num: int,
 ) -> None:
@@ -233,7 +232,8 @@ def _fill_gaps_with_unknown(
         )
         return
 
-    covered = _merge_bboxes([r.bbox for r in regions])
+    # Preserve the union of actual rectangles, including gaps between columns.
+    covered = [r.bbox for r in regions]
 
     _add_unknown_gaps(covered, page_w, page_h, regions, page_num)
 
@@ -263,7 +263,7 @@ def _add_unknown_gaps(
     regions: list[Region],
     page_num: int,
 ) -> None:
-    y_stops = sorted({0} | {c[3] for c in covered} | {page_h})
+    y_stops = sorted({0, page_h} | {max(0, min(page_h, y)) for c in covered for y in (c[1], c[3])})
     for i in range(len(y_stops) - 1):
         y0 = y_stops[i]
         y1 = y_stops[i + 1]
@@ -272,11 +272,14 @@ def _add_unknown_gaps(
             continue
 
         gap_x_stops = sorted(
-            {0} | {c[2] for c in covered if c[1] < y1 and c[3] > y0} | {page_w}
+            {0, page_w} | {max(0, min(page_w, x)) for c in covered
+                           if c[1] < y1 and c[3] > y0 for x in (c[0], c[2])}
         )
         for j in range(len(gap_x_stops) - 1):
             x0 = gap_x_stops[j]
             x1 = gap_x_stops[j + 1]
+            if any(c[0] < x1 and c[2] > x0 and c[1] < y1 and c[3] > y0 for c in covered):
+                continue
             gap_width = x1 - x0
             if gap_width < 30:
                 continue

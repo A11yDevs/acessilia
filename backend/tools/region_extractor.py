@@ -13,17 +13,10 @@ from docstruct.regions.grouping import (  # noqa: F401
     CALLOUT_MIN_INDENT_RATIO,
     LIST_LINE_PATTERNS,
     MONOSPACE_FONTS,
-    _add_unknown_gaps,
-    _estimate_main_text_band,
+    _add_unknown_gaps as _shared_add_unknown_gaps,
     ENABLE_PYMUPDF_CALLOUT_MERGE,
-    _extract_callout_title,
-    _fill_gaps_with_unknown,
     _is_known_callout_title,
-    _is_same_callout_cluster,
-    _merge_bboxes,
-    _merge_callout_groups,
-    _normalize_text_key,
-    _starts_with_list_marker,
+    _merge_callout_groups as _shared_merge_callout_groups,
 )
 from docstruct.types import Region
 
@@ -44,12 +37,14 @@ def extract_regions(page: fitz.Page) -> list[Region]:
 
     image_map = _build_image_map(page)
 
-    blocks = page.get_text("dict", flags=fitz.TEXT_PRESERVE_WHITESPACE).get(
+    blocks = page.get_text(
+        "dict", flags=fitz.TEXT_PRESERVE_WHITESPACE | fitz.TEXT_PRESERVE_IMAGES
+    ).get(
         "blocks", []
     )
 
     for block in blocks:
-        bbox = tuple(block.get("bbox", (0, 0, 0, 0)))
+        bbox = tuple(fitz.Rect(block.get("bbox", (0, 0, 0, 0))) * page.rotation_matrix)
         block_type = block.get("type")
 
         if block_type == 0:
@@ -168,101 +163,7 @@ def _text_block_to_region(
 
 
 def _merge_callout_groups(regions: list[Region], page_width: float) -> list[Region]:
-    text_regions = [
-        region
-        for region in regions
-        if region.type == "text"
-        and region.text.strip()
-        and region.metadata.get("subtype") not in {"code"}
-    ]
-    if len(text_regions) < CALLOUT_MIN_GROUP_SIZE:
-        return regions
-
-    main_left, main_right = _estimate_main_text_band(text_regions)
-    band_width = main_right - main_left
-    if band_width <= 0:
-        return regions
-
-    indent_threshold = max(
-        CALLOUT_MIN_INDENT_PX,
-        max(page_width, band_width) * CALLOUT_MIN_INDENT_RATIO,
-    )
-
-    candidates: list[Region] = []
-    for region in sorted(text_regions, key=lambda item: (item.bbox[1], item.bbox[0])):
-        left, top, right, bottom = region.bbox
-        width = max(1.0, right - left)
-        left_indent = left - main_left
-        right_indent = main_right - right
-        combined_indent = max(0.0, left_indent) + max(0.0, right_indent)
-        if (
-            max(left_indent, right_indent) < indent_threshold
-            and combined_indent < (indent_threshold * 1.35)
-        ):
-            continue
-        if width > band_width * CALLOUT_MAX_WIDTH_RATIO:
-            continue
-        if top >= bottom:
-            continue
-        candidates.append(region)
-
-    if len(candidates) < CALLOUT_MIN_GROUP_SIZE:
-        return regions
-
-    groups: list[list[Region]] = []
-    current: list[Region] = [candidates[0]]
-    for region in candidates[1:]:
-        previous = current[-1]
-        if _is_same_callout_cluster(previous, region):
-            current.append(region)
-        else:
-            groups.append(current)
-            current = [region]
-    groups.append(current)
-
-    grouped_ids = {
-        id(region)
-        for group in groups
-        if len(group) >= CALLOUT_MIN_GROUP_SIZE
-        for region in group
-    }
-    result: list[Region] = [region for region in regions if id(region) not in grouped_ids]
-
-    for index, group in enumerate(groups, start=1):
-        sorted_group = sorted(group, key=lambda item: (item.bbox[1], item.bbox[0]))
-        callout_title = _extract_callout_title(sorted_group[0])
-        min_size = 2 if _is_known_callout_title(callout_title, _known_callout_titles()) else CALLOUT_MIN_GROUP_SIZE
-        if len(group) < min_size:
-            continue
-
-        x0 = min(region.bbox[0] for region in sorted_group)
-        y0 = min(region.bbox[1] for region in sorted_group)
-        x1 = max(region.bbox[2] for region in sorted_group)
-        y1 = max(region.bbox[3] for region in sorted_group)
-        merged_text = "\n".join(region.text.strip() for region in sorted_group if region.text.strip())
-
-        merged = Region(
-            bbox=(x0, y0, x1, y1),
-            type="text",
-            text=merged_text,
-            image_bytes=None,
-            confidence=max(region.confidence for region in sorted_group),
-            page_num=sorted_group[0].page_num,
-            metadata={
-                "total_chars": sum(int(region.metadata.get("total_chars", 0)) for region in sorted_group),
-                "text_density": max(float(region.metadata.get("text_density", 0.0)) for region in sorted_group),
-                "avg_font_size": max(float(region.metadata.get("avg_font_size", 0.0)) for region in sorted_group),
-                "line_count": sum(int(region.metadata.get("line_count", 1)) for region in sorted_group),
-                "subtype": "callout",
-                "callout_id": f"callout-p{sorted_group[0].page_num}-{index}",
-                "callout_type": "note",
-                "callout_title": callout_title,
-                "callout_source": "pymupdf-geometry",
-            },
-        )
-        result.append(merged)
-
-    return result
+    return _shared_merge_callout_groups(regions, page_width, _known_callout_titles())
 
 
 def _estimate_main_text_band(regions: list[Region]) -> tuple[float, float]:
@@ -322,16 +223,9 @@ def _image_block_to_region(
     if width_area < 200:
         return None
 
-    image_bytes: bytes | None = None
-    for xref, img_data in image_map.items():
-        img_w = img_data.get("width", 0)
-        img_h = img_data.get("height", 0)
-        page_area = width_area
-        img_area = img_w * img_h
-
-        if img_area > 0 and abs(page_area - img_area) / img_area < 0.5:
-            image_bytes = img_data.get("image")
-            break
+    image_bytes: bytes | None = block.get("image")
+    if image_bytes is None:
+        image_bytes = image_map.get(block.get("xref"), {}).get("image")
 
     return Region(
         bbox=bbox,
@@ -366,7 +260,8 @@ def _fill_gaps_with_unknown(
         )
         return
 
-    covered = _merge_bboxes([r.bbox for r in regions])
+    # Bounding envelopes can cover real whitespace between separate columns.
+    covered = [r.bbox for r in regions]
 
     _add_unknown_gaps(covered, page_w, page_h, regions, page_num)
 
@@ -394,38 +289,7 @@ def _add_unknown_gaps(
     regions: list[Region],
     page_num: int,
 ) -> None:
-    y_stops = sorted({0} | {c[3] for c in covered} | {page_h})
-    for i in range(len(y_stops) - 1):
-        y0 = y_stops[i]
-        y1 = y_stops[i + 1]
-        gap_height = y1 - y0
-        if gap_height < 20:
-            continue
-
-        gap_x_stops = sorted(
-            {0} | {c[2] for c in covered if c[1] < y1 and c[3] > y0} | {page_w}
-        )
-        for j in range(len(gap_x_stops) - 1):
-            x0 = gap_x_stops[j]
-            x1 = gap_x_stops[j + 1]
-            gap_width = x1 - x0
-            if gap_width < 30:
-                continue
-
-            gap_area = gap_width * gap_height
-            if gap_area < 500:
-                continue
-
-            regions.append(
-                Region(
-                    bbox=(x0, y0, x1, y1),
-                    type="unknown",
-                    text="",
-                    image_bytes=None,
-                    confidence=0.0,
-                    page_num=page_num,
-                )
-            )
+    _shared_add_unknown_gaps(covered, page_w, page_h, regions, page_num)
 
 
 def crop_region_to_image(
