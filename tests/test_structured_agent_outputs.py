@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
+from agno.run.base import RunStatus
 import pytest
 from pydantic import ValidationError
 
@@ -10,10 +13,22 @@ from backend.agents.output_schemas import (
     DataOutput,
     VisionOutput,
     validate_structured_content,
+    validate_structured_run,
 )
 from backend.agents.types import RegionTask
 from backend.pipeline.canonical_builder import build_canonical_document
 from docstruct.types import Region
+
+
+@pytest.mark.parametrize("status", [RunStatus.error, RunStatus.cancelled, RunStatus.paused])
+def test_unsuccessful_agent_run_cannot_publish_valid_looking_content(status):
+    content = VisionOutput(
+        kind="description", description="A blue circle.", language="en",
+        confidence=0.9, mentioned_elements=["circle"],
+    )
+    response = SimpleNamespace(status=status, content=content)
+    with pytest.raises(RuntimeError, match="Agent run did not complete"):
+        validate_structured_run(response, VisionOutput)
 
 
 def test_vision_output_requires_description_for_description_kind() -> None:

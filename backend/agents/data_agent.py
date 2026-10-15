@@ -14,7 +14,7 @@ from backend.ai.models.ai_client import get_agno_model
 from backend.agents.output_schemas import (
     DATA_SCHEMA_INSTRUCTION,
     DataOutput,
-    validate_structured_content,
+    validate_structured_run,
 )
 from agno.agent import Agent
 from agno.media import Image
@@ -77,10 +77,10 @@ class DataAgent:
                 return agent.run(
                     input=prompt,
                     images=[Image(content=image_bytes)],
-                ).content
+                )
 
-            content = await asyncio.to_thread(_run_data)
-            result = validate_structured_content(content, DataOutput)
+            response = await asyncio.to_thread(_run_data)
+            result = validate_structured_run(response, DataOutput)
             if result.kind != classification:
                 raise ValueError(
                     f"DataAgent returned kind={result.kind!r} for classification={classification!r}"
