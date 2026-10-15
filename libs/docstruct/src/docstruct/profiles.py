@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from copy import deepcopy
 
-from copy import deepcopy
 
 OUTPUT_PROFILES = {
     "html": {

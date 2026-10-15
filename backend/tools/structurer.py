@@ -9,7 +9,6 @@ import fitz
 from backend.config.settings import settings
 from backend.i18n import t
 from backend.log_messages import (
-    LOG_STRUCTURER_FALLBACK_PYMUPDF,
     LOG_STRUCTURER_PYMUPDF,
 )
 from backend.tools.region_extractor import Region, crop_region_to_image, extract_regions

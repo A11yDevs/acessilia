@@ -43,7 +43,6 @@ class DoclingDocumentProxy:
         raw_pages = self._data.get("pages", {})
         for page_no_str, page_info in raw_pages.items():
             page_no = int(page_no_str)
-            size = page_info.get("size", {})
             self._pages[page_no] = page_info
 
     @property

@@ -27,10 +27,8 @@ from backend.tools.validators import validate_file
 from frontend.telegram.adapters.status_tracker import StatusTracker
 from backend.config.settings import settings
 from frontend.telegram.messages import (
-    MSG_ACCESSIBLE_PACKAGE_READY,
     MSG_CONTACT_SERVER_FAILED,
     MSG_DOWNLOADING_FILE,
-    MSG_DOWNLOAD_LINK_EMAILED,
     MSG_FILE_RECEIVED,
     MSG_PHOTO_RECEIVED,
     MSG_PROCESS_FAILED_BASE,
@@ -180,7 +178,7 @@ async def process_file(
                     t(MSG_SUBMIT_FAILED).format(status_code=e.status_code, detail=e.detail)
                 )
                 return
-            except Exception as e:
+            except Exception:
                 logger.exception(t(LOG_TELEGRAM_API_CONTACT_FAILED))
                 await tracker.finish(success=False)
                 await message.answer(t(MSG_CONTACT_SERVER_FAILED))
@@ -198,7 +196,7 @@ async def process_file(
             )
 
         await _poll_job(message, tracker, task_id, email)
-    except Exception as e:
+    except Exception:
         logger.exception(t(LOG_TELEGRAM_FILE_PROCESSING_ERROR))
         await tracker.finish(success=False)
         await message.answer(t(MSG_PROCESSING_ERROR_GENERIC))

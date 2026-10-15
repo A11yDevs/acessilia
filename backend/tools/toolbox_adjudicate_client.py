@@ -55,7 +55,7 @@ class ToolboxAdjudicateClient:
         self.api_key = api_key if api_key is not None else settings.toolbox_api_key
         headers: dict[str, str] = {}
         if self.api_key:
-            headers["Authorization"] = f"******"
+            headers["Authorization"] = "******"
         self._client = httpx.AsyncClient(
             base_url=self.base_url,
             timeout=httpx.Timeout(self.timeout_seconds),

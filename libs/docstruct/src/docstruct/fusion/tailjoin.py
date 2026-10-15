@@ -20,7 +20,6 @@ import re
 from typing import Optional
 
 from docstruct.fusion.types import DiffBlock
-from docstruct.types import BBox
 
 # Número de página: arábico ou romano, até 5 caracteres.
 PAGE_NUMBER_RE = re.compile(r"[\divxlcIVXLC]{1,5}")

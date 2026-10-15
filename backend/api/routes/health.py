@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import socket
-from pathlib import Path
 
 import httpx
 from fastapi import APIRouter, Request

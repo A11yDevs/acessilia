@@ -11,7 +11,6 @@ from typing import Any, Callable
 
 
 import re
-from typing import Any
 
 from docstruct.blocks.classify import extract_plain_heading
 from docstruct.text.sanitize import sanitize_block_text
