@@ -156,9 +156,29 @@ no core**. Basta:
 Quando a Toolbox expõe uma **capacidade nova** (ex.: `document.layout.analyze`), o core
 precisa de um cliente especializado. Siga o padrão de `toolbox_layout_client.py`:
 
-### 4.1 Cliente especializado
+### 4.1 Registrar a capacidade e escrever um cliente fino
 
-Crie `backend/tools/toolbox_<x>_client.py`:
+Toda chamada à Toolbox passa por `execute_capability`
+(`backend/tools/toolbox_client.py`), que recusa qualquer capacidade fora do
+registro. Adicionar uma capacidade tem dois passos.
+
+**1. Declarar** em `backend/config/toolbox_capabilities.py`:
+
+```python
+ToolboxCapability(
+    "<capability>", 1, "<Rótulo>",               # id, versão do manifesto, rótulo de erro
+    provider_setting="toolbox_<x>_provider",     # atributo do Settings / TOOLBOX_<X>_PROVIDER
+    output_schema="<schema>@1",                  # output.schema do manifesto
+),
+```
+
+Se a configuração de provider for nova, acrescente o default em
+`PROVIDER_DEFAULTS` e o atributo correspondente em `Settings`
+(`os.getenv("TOOLBOX_<X>_PROVIDER", provider_default("toolbox_<x>_provider"))`).
+
+**2. Escrever o cliente** como subclasse de `ToolboxCapabilityClient`, que já
+cuida da conexão, do header Bearer, de `health()`, `close()`, do mapeamento de
+erros de timeout/rede e da validação do envelope de resposta:
 
 ```python
 """Cliente especializado para a capacidade <capability> da Toolbox."""
@@ -168,91 +188,35 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-import httpx
-
-from backend.config.settings import settings
-from backend.tools.toolbox_client import (
-    ToolboxContractViolation,
-    ToolboxProviderUnavailable,
-    ToolboxTimeout,
-    _media_type,
-    _raise_for_error,
-)
+from backend.tools.toolbox_client import ToolboxCapabilityClient
 
 CAPABILITY = "<capability>"
-EXECUTE_PATH = f"/v1/capabilities/{CAPABILITY}:execute"
 
 
-class Toolbox<X>Client:
-    """Cliente para <capability> via Acessilia Toolbox."""
+class Toolbox<X>Client(ToolboxCapabilityClient):
+    provider_setting = "toolbox_<x>_provider"
 
-    def __init__(
-        self,
-        base_url: str | None = None,
-        provider: str | None = None,
-        timeout_seconds: int | None = None,
-        api_key: str | None = None,
-    ) -> None:
-        self.base_url = (base_url or settings.toolbox_base_url).rstrip("/")
-        self.provider = provider or settings.toolbox_provider
-        self.timeout_seconds = timeout_seconds or settings.toolbox_timeout_seconds
-        self.api_key = api_key if api_key is not None else settings.toolbox_api_key
-        headers: dict[str, str] = {}
-        if self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
-        self._client = httpx.AsyncClient(
-            base_url=self.base_url,
-            timeout=httpx.Timeout(self.timeout_seconds),
-            headers=headers,
-        )
-
-    async def execute(
+    async def run(
         self,
         file_path: Path | None = None,
         artifact_id: str | None = None,
         *,
-        language: str = "pt-BR",
         use_remote_cache: bool | None = None,
     ) -> dict[str, Any]:
-        if file_path is None and artifact_id is None:
-            raise ValueError("Forneça file_path ou artifact_id")
-
-        url = f"{self.base_url}{EXECUTE_PATH}"
-        try:
-            if artifact_id:
-                data: dict[str, Any] = {
-                    "artifact_id": artifact_id,
-                    "language": language,
-                    "provider": self.provider,
-                }
-                if use_remote_cache is False:
-                    data["no_cache"] = True
-                response = await self._client.post(url, data=data)
-            else:
-                with open(file_path, "rb") as f:
-                    files = {"file": (file_path.name, f, _media_type(file_path))}
-                    params: dict[str, Any] = {
-                        "language": language,
-                        "provider": self.provider,
-                    }
-                    if use_remote_cache is False:
-                        params["no_cache"] = True
-                    response = await self._client.post(url, files=files, data=params)
-
-            _raise_for_error(response, CAPABILITY)
-            result = response.json()
-            if result.get("status") != "succeeded":
-                raise ToolboxContractViolation(
-                    f"{CAPABILITY}: status inesperado {result.get('status')!r}"
-                )
-            return result
-        except httpx.TimeoutException as exc:
-            raise ToolboxTimeout(f"{CAPABILITY}: timeout") from exc
-        except httpx.HTTPStatusError as exc:
-            raise ToolboxProviderUnavailable(
-                f"{CAPABILITY}: HTTP {exc.response.status_code}"
-            ) from exc
+        return await self._execute(
+            CAPABILITY,
+            file_path=file_path,
+            artifact_id=artifact_id,
+            parameters={...},                      # opcional, enviado como JSON
+            no_cache=use_remote_cache is False,
+        )
 ```
+
+Entradas de texto usam `upload=(nome, bytes, media_type)` no lugar de
+`file_path` (veja `toolbox_math_client.py`). `scripts/check_capability_contract.py`
+lê o registro, então o novo ID é conferido contra o catálogo da Toolbox sem
+outras mudanças; `tests/test_toolbox_capability_registry.py` falha se um cliente
+fixar uma rota `:execute` no código ou usar um ID não registrado.
 
 ### 4.2 Wrapper de tool Agno (opcional, com fallback local)
 
