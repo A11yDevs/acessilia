@@ -225,9 +225,9 @@ def audit_canonical_document(document: dict[str, Any]) -> dict[str, list[str]]:
     # Check whether images carry alt text (when the schema supports it).
     def check_accessibility(blocks: list[dict[str, Any]]) -> None:
         for block in blocks:
-            if block.get("type") == "image" and not block.get("metadata", {}).get(
-                "alt"
-            ):
+            if block.get("type") == "image" and not str(
+                block.get("alt_text", block.get("text", "")) or ""
+            ).strip():
                 report["WARNING"].append(
                     Finding(MSG_IMAGE_MISSING_ALT, block_id=block.get("id"))
                 )

@@ -4,7 +4,7 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Coroutine
 
-from backend.agents.orchestrator import AccessibilityOrchestrator
+from backend.agents.orchestrator import AccessibilityOrchestrator as AccessibilityOrchestrator
 from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
 from backend.agents.state_manager import TaskCancelledError, state_manager
 from backend.services.cache import (
@@ -21,7 +21,6 @@ from backend.config.settings import settings
 from backend.i18n import t
 from backend.log_messages import (
     LOG_CANONICAL_JSON_SAVE_FAILED,
-    LOG_CACHE_HIT,
     LOG_ORCHESTRATOR_EMPTY_AGENT_RESPONSE,
     LOG_PIPELINE_ERROR,
     LOG_TASK_CANCELLED_BY_USER,
@@ -59,7 +58,7 @@ def _resolved_structurer() -> str:
 
 def _build_orchestrator():
     if _normalized_engine() == "pddl":
-        structurer = _resolved_structurer()
+        _resolved_structurer()
         fast_downward = (
             Path(settings.pddl_fast_downward).expanduser()
             if settings.pddl_fast_downward.strip()
@@ -91,7 +90,7 @@ def _cache_version(
     engine = _normalized_engine()
     structurer = _resolved_structurer()
     return options_cache_key(
-        f"{settings.ai_client}-{engine}-{structurer}-v7",
+        f"{settings.ai_client}-{engine}-{structurer}-v9",
         mode=mode,
         custom_prompt=custom_prompt or "",
         thinking_mode=thinking_mode,

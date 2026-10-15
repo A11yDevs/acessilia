@@ -884,7 +884,9 @@ def _derive_processing_needs(
     ]
     previous = 0
     for element_id, level in heading_levels:
-        if previous and level > previous + 1:
+        invalid_first = not previous and level != 1
+        invalid_successor = previous and (level < 2 or level > min(previous + 1, 6))
+        if invalid_first or invalid_successor:
             suffix = element_id.removeprefix("element-")
             message = t(MSG_HEADING_GAP).format(previous=previous, level=level)
             observations.append(

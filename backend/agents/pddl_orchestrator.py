@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import hashlib
 import json
 import math
@@ -42,7 +43,6 @@ from backend.i18n import t
 from backend.log_messages import (
     LOG_PDDL_ELEMENT_CROP_FAILED,
     LOG_PDDL_EMPTY_VISION_DESCRIPTION,
-    LOG_PDDL_IGNORED_OPTIONS,
     LOG_PDDL_IMAGES_ENRICHED,
     LOG_PDDL_PREFERRED_PLAN_MISSING,
     LOG_PDDL_TABLES_ENRICHED,
@@ -526,6 +526,10 @@ def _handle_pymupdf_region_method(manifest: ProcessingManifest, obligation_id: s
             )
             replacement.text = text
             replacement.type = "formula" if output.kind == "formula" else "picture"
+            if replacement.type == "picture":
+                replacement.metadata["src"] = (
+                    "data:image/png;base64," + base64.b64encode(image).decode("ascii")
+                )
             replacement.raw_label = replacement.type
             replacement.page_number = number
             replacements[element.id] = replacement
@@ -581,7 +585,7 @@ def _handle_deterministic_heading_repair_method(
         return _missing_obligation(obligation_id)
 
     targets = _target_elements(manifest, obligation_id)
-    if not targets or any(element.type != "heading" for element in targets):
+    if not targets or any(element.type not in {"title", "heading"} for element in targets):
         return MethodResult(
             success=False,
             validated=False,
@@ -592,13 +596,17 @@ def _handle_deterministic_heading_repair_method(
     for element in sorted(manifest.elements, key=lambda item: item.reading_order):
         if element.type not in {"title", "heading"}:
             continue
-        level = 1 if element.type == "title" or not previous else max(1, min(element.hierarchy_level, previous + 1, 6))
+        level = 1 if not previous else max(2, min(element.hierarchy_level, previous + 1, 6))
+        if previous and element.type == "title":
+            element.metadata["original_type"] = "title"
+            element.type = "heading"
         if level != element.hierarchy_level:
             element.metadata["original_heading_level"] = element.hierarchy_level
             element.hierarchy_level = level
             element.metadata["heading_repaired"] = True
             repaired += 1
         previous = level
+    manifest.summary.element_types = dict(Counter(element.type for element in manifest.elements))
     return MethodResult(
         success=True,
         validated=True,
