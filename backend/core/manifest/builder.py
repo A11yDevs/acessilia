@@ -204,6 +204,16 @@ def build_processing_manifest(
     pages = _build_pages(extraction.document, elements)
     title = _infer_title(source_path, elements)
     observations, obligations = _derive_processing_needs(elements)
+    v23_observations, v23_obligations = _derive_v23_processing_needs(
+        elements,
+        page_sizes={
+            page.page_number: (page.width, page.height) for page in pages
+        },
+        fusion_evidence=getattr(extraction, "fusion_evidence", None),
+        fusion_stats=getattr(extraction, "fusion_stats", None),
+    )
+    observations.extend(v23_observations)
+    obligations.extend(v23_obligations)
     element_types = dict(sorted(Counter(e.type for e in elements).items()))
 
     source = SourceDocument(
@@ -292,6 +302,15 @@ def _build_from_toolbox_json(
                 by_page.setdefault(elem.page_number, []).append(elem.id)
         for page in manifest.pages:
             page.element_ids = by_page.get(page.page_number, [])
+    observations, obligations = _derive_v23_processing_needs(
+        manifest.elements,
+        page_sizes={
+            page.page_number: (page.width, page.height) for page in manifest.pages
+        },
+        fusion_evidence=extraction.document.get("fusion_evidence"),
+        fusion_stats=extraction.document.get("fusion_stats"),
+    )
+    _append_processing_needs(manifest, observations, obligations)
     return manifest
 
 
@@ -914,6 +933,261 @@ def _derive_processing_needs(
             )
         previous = level
     return observations, obligations
+
+
+def _derive_v23_processing_needs(
+    elements: list[ManifestElement],
+    *,
+    page_sizes: dict[int, tuple[float | None, float | None]] | None = None,
+    fusion_evidence: Any = None,
+    fusion_stats: Any = None,
+) -> tuple[list[Observation], list[Obligation]]:
+    """Emit v2.3 needs only when deterministic checks or fusion evidence support them."""
+    from docstruct.fusion.line_numbers import extract_line_numbers
+    from docstruct.fusion.tailjoin import join_tail, page_number_position, tailjoin3
+    from docstruct.fusion.types import DiffBlock
+    from docstruct.fusion.verse import verse_blocks
+    from docstruct.fusion.xycut import xycut_order
+    from docstruct.text.latex import normalize_latex
+    from docstruct.text.norm_fix import norm_fix
+
+    candidates: list[tuple[str, list[ManifestElement], dict[str, Any]]] = []
+    by_page: dict[int | None, list[ManifestElement]] = {}
+    for element in elements:
+        by_page.setdefault(element.page_number, []).append(element)
+
+    def add(
+        kind: str,
+        targets: list[ManifestElement],
+        evidence: dict[str, Any],
+    ) -> None:
+        valid_targets = [item for item in targets if item.id]
+        if valid_targets:
+            candidates.append((kind, valid_targets, evidence))
+
+    for element in elements:
+        text = element.text or ""
+        if element.type == "formula" and text:
+            normalized = normalize_latex(text)
+            if normalized != text:
+                add("normalize-formula", [element], {"before": text, "after": normalized})
+        elif element.type in {"paragraph", "heading", "title", "list_item", "caption"} and text:
+            normalized = norm_fix(text)
+            if normalized != text:
+                add("normalize-text", [element], {"before": text, "after": normalized})
+
+    for page_number, page_elements in by_page.items():
+        positioned = [
+            item for item in page_elements
+            if _normalized_element_bbox(item, page_sizes) is not None
+        ]
+        if len(positioned) > 1:
+            current = sorted(positioned, key=lambda item: item.reading_order)
+            boxes = [_normalized_element_bbox(item, page_sizes) for item in current]
+            order = xycut_order([box for box in boxes if box is not None])
+            if order != list(range(len(current))):
+                reordered_ids = [current[index].id for index in order]
+                add(
+                    "refine-reading-order",
+                    current,
+                    {
+                        "page_number": page_number,
+                        "order_before": [item.id for item in current],
+                        "order_after": reordered_ids,
+                    },
+                )
+
+        text_elements = [
+            item for item in page_elements
+            if item.text and item.type not in {"formula", "table", "picture"}
+        ]
+        if not text_elements:
+            continue
+        blocks = [
+            DiffBlock(
+                md=item.text or "",
+                kind="text",
+                box=_normalized_element_bbox(item, page_sizes),
+                text=item.text or "",
+                type=item.type,
+                role=(
+                    "header" if item.type == "page_header"
+                    else "footer" if item.type == "page_footer"
+                    else "page_number" if item.type == "page_number"
+                    else None
+                ),
+            )
+            for item in text_elements
+        ]
+
+        verse_stats: Counter = Counter()
+        verse_blocks(blocks, verse_stats, "manifest", 300, "records")
+        if verse_stats.get("verse-manifest-split", 0):
+            add(
+                "chunk-verse",
+                text_elements,
+                {"chunks": verse_stats["verse-manifest-chunks"]},
+            )
+
+        line_stats: Counter = Counter()
+        extract_line_numbers(blocks, line_stats, "manifest")
+        if line_stats.get("line-numbers-manifest-count", 0):
+            add(
+                "extract-line-numbers",
+                text_elements,
+                {"count": line_stats["line-numbers-manifest-count"]},
+            )
+
+        page_text = [item.text or "" for item in text_elements]
+        position = page_number_position(blocks)
+        if position is not None:
+            joined = tailjoin3(page_text, position, 50, 3, "keep")
+        else:
+            joined = join_tail(page_text, "end", 50, 3)
+        if joined != page_text:
+            tail_targets = text_elements[len(text_elements) - (len(page_text) - len(joined) + 1):]
+            add(
+                "join-tail-blocks",
+                tail_targets,
+                {"position": position, "before_count": len(page_text), "after_count": len(joined)},
+            )
+
+    stats = fusion_stats
+    if not isinstance(stats, dict) and isinstance(fusion_evidence, dict):
+        stats = fusion_evidence.get("stats")
+    if isinstance(fusion_evidence, dict):
+        pages = fusion_evidence.get("pages")
+        if isinstance(pages, list):
+            for page_data in pages:
+                if not isinstance(page_data, dict):
+                    continue
+                page_stats = page_data.get("stats")
+                page_number = page_data.get("page_number")
+                page_targets = by_page.get(page_number, [])
+                if not isinstance(page_stats, dict) or not page_targets:
+                    continue
+                _add_fusion_observations(add, page_targets, page_stats, page_number)
+    elif isinstance(stats, dict):
+        targets = [element for element in elements if element.text]
+        if targets:
+            _add_fusion_observations(add, targets, stats, None)
+
+    observations: list[Observation] = []
+    obligations: list[Obligation] = []
+    seen: set[tuple[str, tuple[str, ...]]] = set()
+    for kind, targets, evidence in candidates:
+        target_ids = list(dict.fromkeys(item.id for item in targets))
+        key = (kind, tuple(target_ids))
+        if key in seen:
+            continue
+        seen.add(key)
+        rationale, methods = V23_OBLIGATION_BY_KIND[kind]
+        suffix = "-".join(item.removeprefix("element-") for item in target_ids)
+        observations.append(
+            Observation(
+                id=f"observation-{kind}-{suffix}",
+                kind=f"{kind}-detected",
+                severity="warning",
+                message=rationale,
+                target_ids=target_ids,
+                evidence=evidence,
+            )
+        )
+        obligations.append(
+            Obligation(
+                id=f"obligation-{kind}-{suffix}",
+                kind=kind,
+                target_ids=target_ids,
+                admissible_methods=methods,
+                method_costs={
+                    method: DEFAULT_METHOD_COSTS.get(method, 50)
+                    for method in methods
+                },
+                rationale=rationale,
+            )
+        )
+    return observations, obligations
+
+
+def _add_fusion_observations(
+    add: Any,
+    targets: list[ManifestElement],
+    stats: dict[str, Any],
+    page_number: int | None,
+) -> None:
+    if not stats:
+        return
+    if stats.get("text_divergence"):
+        add("adjudicate-page", targets, {"page_number": page_number, "fusion_stats": stats})
+    if stats.get("provider_divergence"):
+        add("fuse-providers", targets, {"page_number": page_number, "fusion_stats": stats})
+    if any(key.startswith("dropped-") and value for key, value in stats.items()):
+        add("rescue-omitted-block", targets, {"page_number": page_number, "fusion_stats": stats})
+    if stats.get("table_divergence"):
+        table_targets = [item for item in targets if item.type == "table"]
+        if table_targets:
+            add(
+                "select-table-source",
+                table_targets,
+                {"page_number": page_number, "fusion_stats": stats},
+            )
+    cut_count = stats.get("repetition_tokens_cut", 0)
+    if cut_count:
+        add(
+            "guard-repetition",
+            targets,
+            {"page_number": page_number, "tokens_cut": cut_count},
+        )
+
+
+def _normalized_element_bbox(
+        element: ManifestElement,
+        page_sizes: dict[int, tuple[float | None, float | None]] | None,
+) -> tuple[float, float, float, float] | None:
+        bbox = _element_bbox(element)
+        if bbox is None or element.page_number is None or page_sizes is None:
+            return None
+        size = page_sizes.get(element.page_number)
+        if size is None:
+            return None
+        width, height = size
+        if not width or not height:
+            return None
+        left, top, right, bottom = bbox
+        provenance_bbox = next(
+            (item.bbox for item in element.provenance if item.bbox is not None),
+            None,
+        )
+        if provenance_bbox and provenance_bbox.coord_origin == "BOTTOMLEFT":
+            top, bottom = height - bottom, height - top
+        return (
+            left / width,
+            top / height,
+            right / width,
+            bottom / height,
+        )
+
+
+def _append_processing_needs(
+    manifest: ProcessingManifest,
+    observations: list[Observation],
+    obligations: list[Obligation],
+) -> None:
+    existing_observations = {item.id for item in manifest.observations}
+    existing_obligations = {item.id for item in manifest.obligations}
+    existing_pairs = {
+        (item.kind, tuple(item.target_ids)) for item in manifest.obligations
+    }
+    manifest.observations.extend(
+        item for item in observations if item.id not in existing_observations
+    )
+    for item in obligations:
+        pair = (item.kind, tuple(item.target_ids))
+        if item.id not in existing_obligations and pair not in existing_pairs:
+            manifest.obligations.append(item)
+            existing_pairs.add(pair)
+    manifest.summary.observation_count = len(manifest.observations)
+    manifest.summary.obligation_count = len(manifest.obligations)
 
 
 def reconcile_reclassified_element_processing_needs(

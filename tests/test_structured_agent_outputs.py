@@ -393,10 +393,49 @@ async def test_data_agent_rejects_output_for_the_wrong_region_kind(monkeypatch) 
         return function(*args)
 
     monkeypatch.setattr(data_module, "Agent", FakeAgent)
-    monkeypatch.setattr(data_module, "get_agno_model", lambda: object())
+    monkeypatch.setattr(data_module, "get_agno_model", lambda **_kwargs: object())
     monkeypatch.setattr(data_module, "load_region_prompt", lambda _key: "prompt")
     monkeypatch.setattr(data_module.asyncio, "to_thread", run_inline)
 
     result = await data_module.DataAgent().process_region(b"image", "table")
 
     assert result is None
+
+
+@pytest.mark.asyncio
+async def test_data_agent_uses_larger_token_budget_for_tables(monkeypatch) -> None:
+    from backend.agents import data_agent as data_module
+
+    captured: dict[str, object] = {}
+
+    class FakeAgent:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+        def run(self, **_kwargs):
+            content = DataOutput(
+                kind="table",
+                rows=[{"cells": [{"text": "Item"}, {"text": "Valor"}]}],
+                language="pt-BR",
+                confidence=0.9,
+            )
+            return type("Response", (), {"content": content})()
+
+    async def run_inline(function, *args):
+        return function(*args)
+
+    monkeypatch.setattr(data_module, "Agent", FakeAgent)
+    monkeypatch.setattr(
+        data_module,
+        "get_agno_model",
+        lambda **kwargs: (captured.update(model_kwargs=kwargs) or object()),
+    )
+    monkeypatch.setattr(data_module, "load_region_prompt", lambda _key: "prompt")
+    monkeypatch.setattr(data_module.asyncio, "to_thread", run_inline)
+    monkeypatch.setattr(data_module.settings, "data_agent_max_tokens", 8192)
+
+    result = await data_module.DataAgent().process_region(b"image", "table")
+
+    assert result is not None and result.kind == "table"
+    assert captured["model_kwargs"] == {"max_tokens": 8192}
+    assert captured["output_schema"] is DataOutput

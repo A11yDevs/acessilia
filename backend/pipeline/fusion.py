@@ -17,9 +17,11 @@ from typing import Any
 from backend.tools.logger import logger
 from backend.tools.toolbox_client import (
     ToolboxClient,
+    ToolboxError,
     ToolboxProviderUnavailable,
 )
 from docstruct.fusion import block_to_diff, merge_blocks
+from docstruct.fusion.types import DiffBlock
 from docstruct.policy import FusionPolicy
 
 
@@ -89,8 +91,8 @@ async def extract_fused(
     with elements), so it plugs into the existing canonical bridge without
     changes to consumers.
 
-    Fallback: if the secondary provider fails (unavailable, contract
-    error), silently uses only the primary (info log).
+    Fallback: if one provider reports a Toolbox error, uses the other result
+    and logs which provider failed. Unexpected errors are propagated.
     """
     from backend.config.settings import settings
 
@@ -102,7 +104,7 @@ async def extract_fused(
         client = ToolboxClient(provider=provider)
         try:
             return await client.extract_structure(file_path, language=language)
-        except (ToolboxProviderUnavailable, Exception) as exc:  # noqa: BLE001
+        except ToolboxError as exc:
             logger.info("Fusion: provider {} failed ({})", provider, type(exc).__name__)
             return None
 
@@ -116,39 +118,104 @@ async def extract_fused(
     if secondary_res is None:
         return primary_res
 
+    return fuse_extraction_payloads(
+        primary_res,
+        secondary_res,
+        primary_provider=primary,
+        secondary_provider=secondary,
+        policy=policy,
+    )
+
+
+def fuse_extraction_payloads(
+    primary_res: dict[str, Any],
+    secondary_res: dict[str, Any],
+    *,
+    primary_provider: str,
+    secondary_provider: str,
+    policy: FusionPolicy | None = None,
+) -> dict[str, Any]:
+    """Fuse two already-extracted payloads and return output plus evidence."""
+    policy = policy or FusionPolicy()
     stats: Counter = Counter()
-    merged_blocks: list[str] = []
+    merged_page_blocks: list[tuple[int, str]] = []
+    page_evidence: list[dict[str, Any]] = []
     # Group by page when the payload carries pages; otherwise treat as 1 page.
     pages_d = _group_by_page(primary_res)
     pages_m = _group_by_page(secondary_res)
+    from docstruct.fusion.repetition import guard_page
+
     for page_key in sorted(set(pages_d) | set(pages_m)):
         d_blocks = [_canonical_to_diff(b) for b in pages_d.get(page_key, [])]
         m_blocks = [_canonical_to_diff(b) for b in pages_m.get(page_key, [])]
+        page_stats: Counter = Counter()
         m_pics = [
             b["bbox"] for b in pages_m.get(page_key, [])
             if b["type"] == "picture" and "bbox" in b
         ]
         out, page_stats = merge_blocks(
-            d_blocks, m_blocks, policy, min_len=0, m_pics=m_pics, stats=stats
+            d_blocks, m_blocks, policy, min_len=0, m_pics=m_pics, stats=page_stats
         )
         stats.update(page_stats)
-        merged_blocks.extend(out)
+        docling_text = "\n\n".join(block.md for block in d_blocks)
+        mineru_text = "\n\n".join(block.md for block in m_blocks)
+
+        guarded_blocks: list[str] = []
+        repetition_tokens_cut = 0
+        for block_text in out:
+            guarded, cut, _ = guard_page(
+                block_text, docling_text, mineru_text
+            )
+            guarded_blocks.append(guarded)
+            repetition_tokens_cut += cut
+        out = guarded_blocks
+        evidence_stats = dict(page_stats)
+        evidence_stats["provider_count"] = 2
+        evidence_stats["provider_divergence"] = (
+            _page_content_signature(d_blocks)
+            != _page_content_signature(m_blocks)
+        )
+        evidence_stats["text_divergence"] = (
+            _page_content_signature(
+                d_blocks, kinds={"text", "heading", "title"}
+            )
+            != _page_content_signature(
+                m_blocks, kinds={"text", "heading", "title"}
+            )
+        )
+        evidence_stats["table_divergence"] = (
+            _page_content_signature(d_blocks, kinds={"table"})
+            != _page_content_signature(m_blocks, kinds={"table"})
+        )
+        if repetition_tokens_cut:
+            evidence_stats["repetition_tokens_cut"] = repetition_tokens_cut
+            stats["repetition_tokens_cut"] += repetition_tokens_cut
+        page_evidence.append(
+            {"page_number": page_key + 1, "stats": evidence_stats}
+        )
+        merged_page_blocks.extend((page_key, block) for block in out)
 
     logger.info(
         "Fusion done: {} final blocks, decisions: {}",
-        len(merged_blocks),
+        len(merged_page_blocks),
         dict(stats),
     )
     return {
         "status": "succeeded",
-        "provider": f"{primary}+{secondary}",
+        "provider": f"{primary_provider}+{secondary_provider}",
         "document": {
             "elements": [
-                {"type": "paragraph", "text": md, "reading_order": i}
-                for i, md in enumerate(merged_blocks)
+                {
+                    "type": "paragraph",
+                    "text": md,
+                    "reading_order": i,
+                    "page": page_key,
+                }
+                for i, (page_key, md) in enumerate(merged_page_blocks)
             ]
         },
         "fusion_stats": dict(stats),
+        "fusion_evidence": {"pages": page_evidence},
     }
 
 
@@ -157,6 +224,21 @@ def _canonical_to_diff(block: dict):
     from docstruct.types import CanonicalBlock
 
     return block_to_diff(CanonicalBlock(**_canon_kwargs(block)))
+
+
+def _page_content_signature(
+    blocks: list[DiffBlock],
+    *,
+    kinds: set[str] | None = None,
+) -> list[tuple[str, str]]:
+    from docstruct.fusion.repetition import token_norm
+
+    return sorted(
+        (block.kind, token)
+        for block in blocks
+        if kinds is None or block.kind in kinds
+        for token in token_norm(block.text).split()
+    )
 
 
 def _canon_kwargs(block: dict) -> dict:
@@ -178,6 +260,9 @@ def _group_by_page(payload: dict) -> dict[int, list[dict]]:
     for el in doc.get("elements") or []:
         if not (el.get("text") or "").strip():
             continue
-        page = int(el.get("page") or 0)
+        if el.get("page_number") is not None:
+            page = max(0, int(el["page_number"]) - 1)
+        else:
+            page = int(el.get("page") or 0)
         groups.setdefault(page, []).append(_element_to_canonical_block(el, page))
     return groups

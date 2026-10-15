@@ -28,18 +28,24 @@ from backend.agents.pddl_orchestrator import (
     _handle_human_review_method,
     _handle_pandoc_code_method,
     _handle_pandoc_table_method,
+    _handle_repetition_guard_method,
     _handle_vision_description_method,
+    _tailjoin_position,
+    _unsatisfied_obligations,
 )
 from backend.core.execution.models import MethodResult
 from backend.core.manifest.builder import DEFAULT_METHOD_COSTS
 from backend.core.planning.planner_agent import PlannerAgent
 from backend.core.manifest.models import (
+    BoundingBox,
     ExtractorRun,
     ManifestElement,
     ManifestSummary,
     Obligation,
+    ObligationAttempt,
     PageDescriptor,
     ProcessingManifest,
+    Provenance,
     SourceDocument,
 )
 
@@ -126,14 +132,11 @@ class TestRegistryCoverage:
     KNOWN_UNAVAILABLE = frozenset(
         {
             "agreement-rule",
-            "rep-guard",
             "rescue-omitted",
-            "single-provider",
             "skeleton-order",
             "table-smart-fusion",
             "table-specialist",
             "vlm-pairwise-judge",
-            "xycut-order",
         }
     )
 
@@ -192,8 +195,87 @@ class TestRegistryCoverage:
 
         for result in results:
             assert isinstance(result, MethodResult)
+
+
+class TestXycutOrder:
+    def test_applies_multicolumn_reading_order(self) -> None:
+            elements = [
+                _element("left-top", "paragraph", text="Left top", reading_order=1),
+                _element("right-top", "paragraph", text="Right top", reading_order=2),
+                _element("left-bottom", "paragraph", text="Left bottom", reading_order=3),
+                _element("right-bottom", "paragraph", text="Right bottom", reading_order=4),
+            ]
+            boxes = [
+                (10, 10, 40, 20),
+                (60, 10, 90, 20),
+                (10, 30, 40, 40),
+                (60, 30, 90, 40),
+            ]
+            for element, (left, top, right, bottom) in zip(elements, boxes):
+                element.provenance = [
+                    Provenance(
+                        page_number=1,
+                        bbox=BoundingBox(
+                            left=left,
+                            top=top,
+                            right=right,
+                            bottom=bottom,
+                        ),
+                    )
+                ]
+            manifest = _manifest(
+                elements,
+                [
+                    _obligation(
+                        "refine-reading-order",
+                        [element.id for element in elements],
+                        ["xycut-order"],
+                    )
+                ],
+            )
+            manifest.pages[0].width = 100
+            manifest.pages[0].height = 100
+
+            result = DETERMINISTIC_METHOD_HANDLERS["xycut-order"](manifest, "o-1")
+
+            assert result.success is True
+            assert [element.id for element in manifest.elements] == [
+                "left-top",
+                "left-bottom",
+                "right-top",
+                "right-bottom",
+            ]
             if result.success:
                 assert result.validated, "sucesso sem validação"
+
+
+class TestRepetitionGuard:
+    def test_cuts_degenerate_repetition_and_records_effect(self) -> None:
+        element = _element("el-1", "paragraph", text="5 5 5 5 5 5")
+        manifest = _manifest(
+            [element],
+            [_obligation("guard-repetition", ["el-1"], ["rep-guard"])],
+        )
+
+        result = _handle_repetition_guard_method(manifest, "o-1")
+
+        assert result.success is True
+        assert result.validated is True
+        assert element.text.strip() == "5"
+        assert element.metadata["repetition_guard"] == {"tokens_cut": 5}
+
+    def test_fails_when_no_repetition_is_found(self) -> None:
+        element = _element("el-1", "paragraph", text="Texto sem repetição.")
+        manifest = _manifest(
+            [element],
+            [_obligation("guard-repetition", ["el-1"], ["rep-guard"])],
+        )
+
+        result = _handle_repetition_guard_method(manifest, "o-1")
+
+        assert result.success is False
+        assert result.validated is False
+        assert element.text == "Texto sem repetição."
 
 
 class TestUnavailableMethods:
@@ -334,6 +416,35 @@ class TestHumanReviewIsTerminalEscalation:
 
         assert result.success is False
         assert "não encontrada" in (result.message or "")
+
+#: Long text with a regular integer progression, which is what
+#: `extract_line_numbers` looks for in marginal verse numbering.
+_LONG_VERSE_TEXT = (
+    "Primeira linha do poema com bastante texto para passar do limite minimo "
+    "de deteccao 3964 e continuar.\n"
+    "Segunda linha do poema, tambem longa o suficiente para o detector de "
+    "numeros de linha marginais considerar o bloco 3969 como candidato.\n"
+    "Terceira linha do poema, mantendo o comprimento necessario para que a "
+    "progressao aritmetica seja reconhecida 3974 pelo detector.\n"
+)
+
+#: Record-shaped block (two short groups of dot-leader entries) so
+#: `verse_blocks` with its default `kind="records"` actually splits it. Real
+#: verse is deliberately left whole by that policy.
+_VERSE_TEXT = (
+    "Capitulo 1 .......... 10\n"
+    "Capitulo 2 .......... 25\n"
+    "\n"
+    "Capitulo 3 .......... 40\n"
+    "Capitulo 4 .......... 55\n"
+    "Capitulo 5 .......... 70\n"
+)
+
+
+#: Body block long enough to stay out of the short-tail window.
+_TAIL_BODY = (
+    "Um paragrafo de corpo bem mais longo que o limite de bloco curto usado aqui."
+)
 
 
 def _orchestrator(*, max_replans: int = 0) -> PddlAccessibilityOrchestrator:
@@ -504,3 +615,238 @@ class TestReplanning:
             )
             reports.append(report)
         return current, report, reports
+
+
+class TestEveryHandlerIsCallable:
+    """Each handler must survive a positive input.
+
+    The earlier suite only exercised a few handlers, so four of them kept a `TypeError`
+    for a mis-called `docstruct` primitive and still passed: `tailjoin`,
+    `tailjoin-positioned`, `verse-chunker` and `line-number-extractor` were never
+    invoked with the arguments their signature requires.
+    """
+
+    #: Minimum input each handler needs, keyed by method name.
+    CASES = {
+        "vision-description": (
+            "describe-image",
+            [_element("el-1", "picture", text="Uma foto de um gato.")],
+        ),
+        "pandoc-table": (
+            "linearize-table",
+            [_element("el-1", "table", metadata={"table_ast": {"rows": []}})],
+        ),
+        "pandoc-code": (
+            "preserve-code-semantics",
+            [_element("el-1", "code", text="def  f( ):\n  return  1")],
+        ),
+        "pymupdf-region": (
+            "describe-image",
+            [_element("el-1", "picture", metadata={"region_crop": "x"})],
+        ),
+        "latex-normalizer": (
+            "normalize-formula",
+            [_element("el-1", "formula", text="$  x  +  y  $")],
+        ),
+        "mathml": (
+            "verbalize-formula",
+            [_element("el-1", "formula", text="$x + y$")],
+        ),
+        "latex-verbalizer": (
+            "verbalize-formula",
+            [_element("el-1", "formula", text="$x + y$")],
+        ),
+        "norm-fix": (
+            "normalize-text",
+            [_element("el-1", "paragraph", text="useful\u00a0text with fi ligature")],
+        ),
+        "rep-guard": (
+            "guard-repetition",
+            [_element("el-1", "paragraph", text="5 5 5 5 5 5")],
+        ),
+        "deterministic-heading-repair": (
+            "repair-heading-order",
+            [
+                _element("el-1", "heading", text="A", reading_order=1),
+                _element("el-2", "heading", text="B", reading_order=2),
+            ],
+        ),
+        "line-number-extractor": (
+            "extract-line-numbers",
+            [
+                _element(
+                    "el-1",
+                    "paragraph",
+                    text=_LONG_VERSE_TEXT,
+                )
+            ],
+        ),
+        "verse-chunker": (
+            "chunk-verse",
+            [_element("el-1", "paragraph", text=_VERSE_TEXT)],
+        ),
+        # `join_tail` only merges a tail of *two or more* short blocks, so the
+        # fixture needs a body plus two short trailing blocks.
+        "tailjoin": (
+            "join-tail-blocks",
+            [
+                _element("el-1", "paragraph", text=_TAIL_BODY),
+                _element("el-2", "paragraph", text="Capitulo 1"),
+                _element("el-3", "paragraph", text="42"),
+            ],
+        ),
+        "xycut-order": (
+            "refine-reading-order",
+            [
+                _element("el-1", "paragraph", text="Left upper", reading_order=1),
+                _element("el-2", "paragraph", text="Right upper", reading_order=2),
+            ],
+        ),
+        "tailjoin-positioned": (
+            "join-tail-blocks",
+            [
+                _element("el-1", "paragraph", text=_TAIL_BODY),
+                _element("el-2", "paragraph", text="Capitulo 1"),
+                _element("el-3", "paragraph", text="42"),
+            ],
+        ),
+        "human-review": (
+            "review-structure",
+            [_element("el-1", "paragraph", text="texto")],
+        ),
+        # Integration-level: reads the source file and calls the Toolbox twice, so
+        # this only asserts the handler is reachable and returns the failure shape
+        # instead of raising. The end-to-end path is covered by
+        # `tests/test_fusion_e2e.py`.
+        "dual-provider-fusion": (
+            "fuse-providers",
+            [_element("el-1", "paragraph", text="texto")],
+        ),
+        "single-provider": (
+            "fuse-providers",
+            [_element("el-1", "paragraph", text="texto")],
+        ),
+    }
+
+    @pytest.mark.parametrize("method", sorted(CASES))
+    def test_handler_runs_without_raising(self, method, monkeypatch, tmp_path) -> None:
+        # The fixture points at a path that does not exist; that must surface as a
+        # failed `MethodResult`, never as an unhandled exception.
+        kind, elements = self.CASES[method]
+        # The heading fixture needs the repaired heading to skip a level, which
+        # `_previous_heading_level` can only detect with a real predecessor.
+        if method == "deterministic-heading-repair":
+            elements[1].hierarchy_level = 3
+        manifest = _manifest(
+            elements, [_obligation(kind, [elements[0].id], [method])]
+        )
+        if method == "single-provider":
+            source_path = tmp_path / "source.pdf"
+            source_path.write_bytes(b"%PDF-test")
+            manifest.source.path = str(source_path)
+            monkeypatch.setattr(
+                "backend.agents.pddl_orchestrator._run_extract_single_provider",
+                lambda _: {"status": "succeeded", "provider": "docling"},
+            )
+        handler = DETERMINISTIC_METHOD_HANDLERS.get(
+            method, PddlAccessibilityOrchestrator._build_executor().registry.get(method)
+        )
+
+        result = handler(manifest, "o-1")
+
+        assert isinstance(result, MethodResult)
+
+    def test_every_registered_handler_has_a_positive_case(self) -> None:
+        """A handler nobody calls with real input is a handler nobody tested."""
+        registered = set(PddlAccessibilityOrchestrator._build_executor().registry.names())
+        covered = set(self.CASES)
+
+        assert registered <= covered, sorted(registered - covered)
+
+
+class TestTailjoinPosition:
+    """The builder marks page furniture in `type`, not in `metadata["role"]`."""
+
+    def _footer_manifest(self, metadata: dict | None = None) -> ProcessingManifest:
+        footer = ManifestElement(
+            id="el-1",
+            type="page_footer",
+            raw_label="page_footer",
+            reading_order=1,
+            hierarchy_level=1,
+            text="42",
+            page_number=1,
+            metadata=metadata or {},
+            provenance=[
+                Provenance(
+                    page_number=1,
+                    bbox=BoundingBox(
+                        left=280, top=780, right=320, bottom=800,
+                        coord_origin="TOPLEFT",
+                    ),
+                )
+            ],
+        )
+        manifest = _manifest([footer], [])
+        manifest.pages[0].width = 600
+        manifest.pages[0].height = 840
+        return manifest
+
+    def test_position_is_derived_from_page_footer_type(self) -> None:
+        assert _tailjoin_position(self._footer_manifest()) == "bot"
+
+    def test_explicit_role_metadata_still_wins(self) -> None:
+        manifest = self._footer_manifest(metadata={"role": "body"})
+        assert _tailjoin_position(manifest) is None
+
+
+class TestUnsatisfiedObligations:
+    def _attempt(self, method: str, status: str, message: str) -> ObligationAttempt:
+        return ObligationAttempt(
+            method=method,
+            status=status,
+            started_at=NOW,
+            completed_at=NOW,
+            message=message,
+        )
+
+    def test_reports_escalated_and_exhausted_obligations(self) -> None:
+        escalated = _obligation("review-structure", ["el-1"], ["human-review"])
+        escalated.selected = True
+        escalated.status = "failed"
+        escalated.attempts.append(
+            self._attempt("human-review", "failed", "Escalonado para revisão humana")
+        )
+        exhausted = Obligation(
+            id="o-2",
+            kind="guard-repetition",
+            selected=True,
+            status="pending",
+            target_ids=["el-1"],
+            admissible_methods=["rep-guard"],
+            rationale="test",
+            attempts=[self._attempt("rep-guard", "failed", "Nada a cortar")],
+        )
+        satisfied = Obligation(
+            id="o-3",
+            kind="guard-repetition",
+            selected=True,
+            status="satisfied",
+            target_ids=["el-1"],
+            rationale="test",
+        )
+        unselected = Obligation(
+            id="o-4", kind="guard-repetition", target_ids=["el-1"], rationale="test"
+        )
+        manifest = _manifest(
+            [_element("el-1", "paragraph", text="texto")],
+            [escalated, exhausted, satisfied, unselected],
+        )
+
+        report = _unsatisfied_obligations(manifest)
+
+        assert [item["id"] for item in report] == ["o-1", "o-2"]
+        assert report[0]["escalated"] is True
+        assert report[0]["last_method"] == "human-review"
+        assert report[1]["escalated"] is False
+        assert report[1]["last_message"] == "Nada a cortar"

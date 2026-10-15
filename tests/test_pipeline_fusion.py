@@ -55,6 +55,15 @@ class TestGroupByPage:
         assert block["bbox"] == [1.0, 2.0, 3.0, 4.0]
         assert block["page_index"] == 0
 
+    def test_manifest_page_number_is_normalized_to_zero_based_index(self):
+        payload = _payload([
+            {"type": "paragraph", "text": "página 1", "page_number": 1}
+        ])
+
+        groups = _group_by_page(payload)
+
+        assert set(groups) == {0}
+
 
 class TestExtractFused:
     @pytest.mark.asyncio
@@ -87,6 +96,19 @@ class TestExtractFused:
             await extract_fused("arquivo.pdf")
 
     @pytest.mark.asyncio
+    async def test_unexpected_provider_error_is_not_hidden(self, monkeypatch):
+        async def fake_extract(provider):
+            raise FileNotFoundError("arquivo ausente")
+
+        monkeypatch.setattr(
+            "backend.pipeline.fusion.ToolboxClient",
+            _FakeClientFactory(extract_fn=fake_extract),
+        )
+
+        with pytest.raises(FileNotFoundError, match="arquivo ausente"):
+            await extract_fused("arquivo.pdf")
+
+    @pytest.mark.asyncio
     async def test_basic_fusion(self, monkeypatch):
         async def fake_extract(provider):
             if provider == "docling":
@@ -113,6 +135,8 @@ class TestExtractFused:
         # docling-only aparece (min_len=0)
         assert "Só no docling texto suficiente" in texts
         assert result["fusion_stats"]
+        assert result["fusion_evidence"]["pages"][0]["page_number"] == 1
+        assert result["fusion_evidence"]["pages"][0]["stats"]["provider_count"] == 2
 
     @pytest.mark.asyncio
     async def test_mineru_skeleton_order(self, monkeypatch):
@@ -135,6 +159,97 @@ class TestExtractFused:
         result = await extract_fused("arquivo.pdf")
         texts = [e["text"] for e in result["document"]["elements"]]
         assert texts.index("A") < texts.index("B")
+
+    @pytest.mark.asyncio
+    async def test_repetition_guard_changes_fused_output(self, monkeypatch):
+        async def fake_extract(provider):
+            return _payload([_el("observacao", 0)])
+
+        def fake_merge_blocks(*args, **kwargs):
+            return [" ".join(["observacao"] * 6)], {}
+
+        monkeypatch.setattr(
+            "backend.pipeline.fusion.ToolboxClient",
+            _FakeClientFactory(extract_fn=fake_extract),
+        )
+        monkeypatch.setattr("backend.pipeline.fusion.merge_blocks", fake_merge_blocks)
+
+        result = await extract_fused("arquivo.pdf")
+
+        assert result["document"]["elements"][0]["text"].strip() == "observacao"
+        assert (
+            result["fusion_evidence"]["pages"][0]["stats"]["repetition_tokens_cut"]
+            == 5
+        )
+
+    @pytest.mark.asyncio
+    async def test_repetition_guard_does_not_cut_across_blocks(self, monkeypatch):
+        """`guard_page` collapses repetitions within a block, never across blocks.
+
+        Calling it per fused block therefore reports the same `tokens_cut` as
+        calling it once on the whole page: a phrase repeated as separate blocks is
+        left alone either way.
+        """
+        from docstruct.fusion.repetition import guard_page
+
+        blocks = ["observacao observacao observacao"] * 2
+
+        async def fake_extract(provider):
+            return _payload([_el("observacao", 0)])
+
+        def fake_merge_blocks(*args, **kwargs):
+            return list(blocks), {}
+
+        monkeypatch.setattr(
+            "backend.pipeline.fusion.ToolboxClient",
+            _FakeClientFactory(extract_fn=fake_extract),
+        )
+        monkeypatch.setattr("backend.pipeline.fusion.merge_blocks", fake_merge_blocks)
+
+        result = await extract_fused("arquivo.pdf")
+
+        _, page_cut, _ = guard_page("\n\n".join(blocks), "observacao", "observacao")
+        assert page_cut == 0
+        assert [e["text"].strip() for e in result["document"]["elements"]] == blocks
+        assert (
+            "repetition_tokens_cut"
+            not in result["fusion_evidence"]["pages"][0]["stats"]
+        )
+
+    @pytest.mark.asyncio
+    async def test_fusion_stats_are_page_local_and_not_double_counted(
+        self, monkeypatch
+    ):
+        async def fake_extract(provider):
+            if provider == "docling":
+                return _payload([
+                    _el("Mesmo texto", 0, page=0),
+                    _el("Texto Docling", 1, page=1),
+                ])
+            return _payload([
+                _el("Mesmo texto", 0, page=0),
+                _el("Texto MinerU", 1, page=1),
+            ])
+
+        def fake_merge_blocks(docling, mineru, policy, *, stats, **kwargs):
+            stats["pair-text-auto->mineru"] += 1
+            return [docling[0].md], stats
+
+        monkeypatch.setattr(
+            "backend.pipeline.fusion.ToolboxClient",
+            _FakeClientFactory(extract_fn=fake_extract),
+        )
+        monkeypatch.setattr("backend.pipeline.fusion.merge_blocks", fake_merge_blocks)
+
+        result = await extract_fused("arquivo.pdf")
+        pages = result["fusion_evidence"]["pages"]
+
+        assert [page["page_number"] for page in pages] == [1, 2]
+        assert pages[0]["stats"]["pair-text-auto->mineru"] == 1
+        assert pages[1]["stats"]["pair-text-auto->mineru"] == 1
+        assert pages[0]["stats"]["text_divergence"] is False
+        assert pages[1]["stats"]["text_divergence"] is True
+        assert result["fusion_stats"]["pair-text-auto->mineru"] == 2
 
 
 class _FakeClientFactory:

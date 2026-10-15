@@ -77,7 +77,7 @@ async def test_data_inference_does_not_block_event_loop(monkeypatch):
     import backend.agents.data_agent as data_module
 
     monkeypatch.setattr(data_module, "Agent", _BlockingAgent)
-    monkeypatch.setattr(data_module, "get_agno_model", lambda: object())
+    monkeypatch.setattr(data_module, "get_agno_model", lambda **_kwargs: object())
     monkeypatch.setattr(data_module, "load_region_prompt", lambda _key: "prompt")
     agent = DataAgent()
 
