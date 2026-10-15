@@ -3,7 +3,8 @@
 Regenerates ``tests/fixtures/toolbox-contract.json`` from a running Toolbox so
 the offline contract check in CI keeps tracking the catalogue the core is
 expected to talk to. Only the identifiers the checker reads are kept; the
-Toolbox already masks provider credentials in ``/v1/providers``.
+Toolbox already masks provider credentials in ``/v1/providers``. When
+``TOOLBOX_API_KEY`` is set it is sent as a Bearer token.
 
 Usage:
     python scripts/capture_toolbox_contract.py --url http://localhost:8002
@@ -14,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import urllib.error
 import urllib.request
@@ -30,8 +32,12 @@ COMMENT = (
 
 
 def _fetch(url: str) -> object:
+    request = urllib.request.Request(url)
+    api_key = os.getenv("TOOLBOX_API_KEY", "")
+    if api_key:
+        request.add_header("Authorization", f"Bearer {api_key}")
     try:
-        with urllib.request.urlopen(url, timeout=30) as response:
+        with urllib.request.urlopen(request, timeout=30) as response:
             return json.load(response)
     except (urllib.error.URLError, TimeoutError) as exc:
         raise SystemExit(f"cannot reach the Toolbox at {url}: {exc}")

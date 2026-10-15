@@ -1,15 +1,22 @@
 from __future__ import annotations
 
-import hashlib
+import asyncio
+import concurrent.futures
 import json
-import time
+from collections.abc import Coroutine
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, ClassVar, TypeVar
 
 import httpx
 
 from backend.config.settings import settings
+from backend.config.toolbox_capabilities import (
+    TOOLBOX_CAPABILITIES,
+    ToolboxCapability,
+)
 from backend.tools.logger import logger
+
+T = TypeVar("T")
 
 
 class ToolboxError(Exception):
@@ -44,6 +51,182 @@ class ToolboxAuthenticationError(ToolboxError):
     """Autenticação falhou — chave inválida ou ausente."""
 
 
+def auth_headers(api_key: str | None) -> dict[str, str]:
+    """Bearer header for the Toolbox, or nothing when no key is configured."""
+    if api_key:
+        return {"Authorization": f"Bearer {api_key}"}
+    return {}
+
+
+def require_capability(capability_id: str) -> ToolboxCapability:
+    """Return the registry entry for an executable capability.
+
+    The registry in ``backend/config/toolbox_capabilities.py`` is the allowlist
+    of contracts the core may call; anything else is refused before it reaches
+    the wire.
+    """
+    spec = TOOLBOX_CAPABILITIES.get(capability_id)
+    if spec is None:
+        raise ToolboxCapabilityError(
+            f"Capacidade não registrada no core: {capability_id}"
+        )
+    if spec.transport != "execute":
+        raise ToolboxCapabilityError(
+            f"Capacidade {capability_id} não é executada via :execute"
+        )
+    return spec
+
+
+async def execute_capability(
+    http: httpx.AsyncClient,
+    capability_id: str,
+    *,
+    provider: str,
+    file_path: Path | None = None,
+    artifact_id: str | None = None,
+    upload: tuple[str, bytes, str] | None = None,
+    language: str | None = None,
+    parameters: dict[str, Any] | None = None,
+    no_cache: bool = False,
+) -> dict[str, Any]:
+    """POST /v1/capabilities/{capability_id}:execute and validate the envelope.
+
+    The input is exactly one of ``artifact_id`` (already stored in the Toolbox),
+    ``file_path`` or ``upload`` (``(filename, content, media_type)``); when an
+    ``artifact_id`` is given it wins. ``http`` must carry the Toolbox base URL
+    and auth headers. Returns the full response envelope.
+    """
+    spec = require_capability(capability_id)
+    if file_path is None and artifact_id is None and upload is None:
+        raise ValueError("Forneça file_path ou artifact_id")
+
+    form: dict[str, Any] = {}
+    if artifact_id:
+        form["artifact_id"] = artifact_id
+    if language is not None:
+        form["language"] = language
+    form["provider"] = provider
+    if parameters is not None:
+        form["parameters"] = json.dumps(parameters)
+    if no_cache:
+        form["no_cache"] = True
+
+    path = f"/v1/capabilities/{capability_id}:execute"
+    try:
+        if artifact_id:
+            response = await http.post(path, data=form)
+        elif upload is not None:
+            response = await http.post(path, files={"file": upload}, data=form)
+        else:
+            with open(file_path, "rb") as f:
+                files = {"file": (file_path.name, f, _media_type(file_path))}
+                response = await http.post(path, files=files, data=form)
+    except httpx.TimeoutException as e:
+        raise ToolboxTimeout(
+            f"Timeout ao executar {capability_id} via Toolbox: {e}"
+        ) from e
+    except httpx.RequestError as e:
+        raise ToolboxProviderUnavailable(
+            f"Toolbox indisponível em {http.base_url}: {e}"
+        ) from e
+
+    _raise_for_error(response, capability_id)
+    try:
+        result = response.json()
+    except ValueError as e:
+        raise ToolboxContractViolation(
+            f"Resposta de {capability_id} não contém JSON válido"
+        ) from e
+    if not isinstance(result, dict):
+        raise ToolboxContractViolation(
+            f"Resposta de {capability_id} deve ser um objeto JSON"
+        )
+    if result.get("status") != "succeeded":
+        raise ToolboxContractViolation(
+            f"{spec.label} falhou na Toolbox: status={result.get('status')}"
+        )
+    return result
+
+
+class ToolboxCapabilityClient:
+    """Base for the per-capability clients.
+
+    Holds the connection, the auth header and the provider chosen for the
+    capability family; subclasses only shape parameters and results.
+    """
+
+    #: ``Settings`` attribute with the default provider of this client.
+    provider_setting: ClassVar[str]
+
+    def __init__(
+        self,
+        base_url: str | None = None,
+        provider: str | None = None,
+        timeout_seconds: int | None = None,
+        api_key: str | None = None,
+    ) -> None:
+        self.base_url = (base_url or settings.toolbox_base_url).rstrip("/")
+        self.provider = provider or getattr(settings, self.provider_setting)
+        self.timeout_seconds = timeout_seconds or settings.toolbox_timeout_seconds
+        self.api_key = api_key if api_key is not None else settings.toolbox_api_key
+        self._client = httpx.AsyncClient(
+            base_url=self.base_url,
+            timeout=httpx.Timeout(self.timeout_seconds),
+            headers=auth_headers(self.api_key),
+        )
+
+    async def _execute(
+        self,
+        capability_id: str,
+        *,
+        provider: str | None = None,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        return await execute_capability(
+            self._client,
+            capability_id,
+            provider=provider or self.provider,
+            **kwargs,
+        )
+
+    async def health(self) -> dict[str, Any]:
+        """Verifica se a Toolbox está operacional."""
+        try:
+            response = await self._client.get("/v1/health")
+        except httpx.TimeoutException as e:
+            raise ToolboxTimeout(
+                f"Timeout ao verificar health da Toolbox: {e}"
+            ) from e
+        except httpx.RequestError as e:
+            raise ToolboxProviderUnavailable(
+                f"Toolbox indisponível em {self.base_url}: {e}"
+            ) from e
+        _raise_for_error(response, "health")
+        return response.json()
+
+    async def close(self) -> None:
+        """Libera a conexão HTTP."""
+        await self._client.aclose()
+
+    @property
+    def _auth_headers(self) -> dict[str, str]:
+        return auth_headers(self.api_key)
+
+
+def run_sync(coro: Coroutine[Any, Any, T]) -> T:
+    """Run a coroutine from synchronous code, inside or outside an event loop.
+
+    ``asyncio.run`` raises when a loop is already running in this thread; the
+    coroutine then runs on a fresh loop in a worker thread instead.
+    """
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(asyncio.run, coro).result()
+
+
 class ToolboxClient:
     """Cliente HTTP para a Acessilia Toolbox (REST API na porta 8002).
 
@@ -62,14 +245,36 @@ class ToolboxClient:
         self.provider = provider or settings.toolbox_provider
         self.timeout_seconds = timeout_seconds or settings.toolbox_timeout_seconds
         self.api_key = api_key if api_key is not None else settings.toolbox_api_key
-        headers: dict[str, str] = {}
-        if self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
         self._client = httpx.AsyncClient(
             base_url=self.base_url,
             timeout=httpx.Timeout(self.timeout_seconds),
-            headers=headers,
+            headers=auth_headers(self.api_key),
         )
+
+    async def execute(
+        self,
+        capability_id: str,
+        *,
+        provider: str | None = None,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        """Execute any capability registered in ``TOOLBOX_CAPABILITIES``.
+
+        Accepts the keyword arguments of :func:`execute_capability`. A fresh
+        connection is opened per call so the client can be shared by code that
+        runs each extraction on its own event loop.
+        """
+        async with httpx.AsyncClient(
+            base_url=self.base_url,
+            timeout=httpx.Timeout(self.timeout_seconds),
+            headers=auth_headers(self.api_key),
+        ) as http:
+            return await execute_capability(
+                http,
+                capability_id,
+                provider=provider or self.provider,
+                **kwargs,
+            )
 
     async def health(self) -> dict[str, Any]:
         """GET /v1/health — verifica se a Toolbox está operacional."""
@@ -150,62 +355,24 @@ class ToolboxClient:
         Aceita upload direto (file_path) ou referência a artifact já armazenado
         (artifact_id). Retorna o JSON completo da resposta.
         """
-        if file_path is None and artifact_id is None:
-            raise ValueError("Forneça file_path ou artifact_id")
-
         use_cache = (
             use_remote_cache
             if use_remote_cache is not None
             else settings.toolbox_use_remote_cache
         )
-
-        url = f"{self.base_url}/v1/capabilities/document.structure.extract:execute"
-
-        try:
-            async with httpx.AsyncClient(timeout=httpx.Timeout(self.timeout_seconds)) as client:
-                if artifact_id:
-                    data = {
-                        "artifact_id": artifact_id,
-                        "language": language,
-                        "provider": self.provider,
-                    }
-                    if not use_cache:
-                        data["no_cache"] = True
-                    response = await client.post(url, data=data, headers=self._auth_headers)
-                else:
-                    with open(file_path, "rb") as f:
-                        files = {"file": (file_path.name, f, _media_type(file_path))}
-                        form_data: dict[str, Any] = {
-                            "language": language,
-                            "provider": self.provider,
-                        }
-                        if not use_cache:
-                            form_data["no_cache"] = "true"
-                        response = await client.post(url, files=files, data=form_data, headers=self._auth_headers)
-
-            _raise_for_error(response, "document.structure.extract")
-            result = response.json()
-
-            if result.get("status") != "succeeded":
-                raise ToolboxContractViolation(
-                    f"Extração falhou na Toolbox: status={result.get('status')}"
-                )
-
-            logger.info(
-                "Toolbox: extração concluída ({} ms, provider={})",
-                result.get("provenance", {}).get("duration_ms", "?"),
-                result.get("provider", "?"),
-            )
-            return result
-
-        except httpx.TimeoutException as e:
-            raise ToolboxTimeout(
-                f"Timeout ao extrair documento via Toolbox: {e}"
-            ) from e
-        except httpx.RequestError as e:
-            raise ToolboxProviderUnavailable(
-                f"Toolbox indisponível em {self.base_url}: {e}"
-            ) from e
+        result = await self.execute(
+            "document.structure.extract",
+            file_path=file_path,
+            artifact_id=artifact_id,
+            language=language,
+            no_cache=not use_cache,
+        )
+        logger.info(
+            "Toolbox: extração concluída ({} ms, provider={})",
+            result.get("provenance", {}).get("duration_ms", "?"),
+            result.get("provider", "?"),
+        )
+        return result
 
     async def close(self) -> None:
         await self._client.aclose()
@@ -356,9 +523,7 @@ class ToolboxClient:
 
     @property
     def _auth_headers(self) -> dict[str, str]:
-        if self.api_key:
-            return {"Authorization": f"Bearer {self.api_key}"}
-        return {}
+        return auth_headers(self.api_key)
 
     async def _get(self, path: str, params: dict[str, Any] | None = None) -> Any:
         try:

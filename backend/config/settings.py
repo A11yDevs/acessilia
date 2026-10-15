@@ -5,6 +5,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from backend.config.toolbox_capabilities import provider_default
+
 load_dotenv()
 
 
@@ -83,34 +85,37 @@ class Settings:
     toolbox_base_url: str = os.getenv("TOOLBOX_BASE_URL", "http://localhost:8002")
     # Structural extraction keeps the historical TOOLBOX_PROVIDER variable for
     # backward compatibility. Specialized capabilities use providers bound to
-    # their own contracts in the Toolbox registry.
-    toolbox_provider: str = os.getenv("TOOLBOX_PROVIDER", "docling")
+    # their own contracts in the Toolbox registry. Every default comes from
+    # backend/config/toolbox_capabilities.py.
+    toolbox_provider: str = os.getenv(
+        "TOOLBOX_PROVIDER", provider_default("toolbox_provider")
+    )
     toolbox_layout_provider: str = os.getenv(
-        "TOOLBOX_LAYOUT_PROVIDER", "docling-layout"
+        "TOOLBOX_LAYOUT_PROVIDER", provider_default("toolbox_layout_provider")
     )
     toolbox_pdf_provider: str = os.getenv(
-        "TOOLBOX_PDF_PROVIDER", "pymupdf-pdf"
+        "TOOLBOX_PDF_PROVIDER", provider_default("toolbox_pdf_provider")
     )
     toolbox_math_recognize_provider: str = os.getenv(
-        "TOOLBOX_MATH_RECOGNIZE_PROVIDER", "docling-math"
+        "TOOLBOX_MATH_RECOGNIZE_PROVIDER", provider_default("toolbox_math_recognize_provider")
     )
     toolbox_math_provider: str = os.getenv(
-        "TOOLBOX_MATH_PROVIDER", "pure-math"
+        "TOOLBOX_MATH_PROVIDER", provider_default("toolbox_math_provider")
     )
     toolbox_ocr_provider: str = os.getenv(
-        "TOOLBOX_OCR_PROVIDER", "docling-ocr"
+        "TOOLBOX_OCR_PROVIDER", provider_default("toolbox_ocr_provider")
     )
     toolbox_page_ocr_provider: str = os.getenv(
-        "TOOLBOX_PAGE_OCR_PROVIDER", "qwen3-vl-page"
+        "TOOLBOX_PAGE_OCR_PROVIDER", provider_default("toolbox_page_ocr_provider")
     )
     toolbox_adjudicate_provider: str = os.getenv(
-        "TOOLBOX_ADJUDICATE_PROVIDER", "qwen3-vl-judge"
+        "TOOLBOX_ADJUDICATE_PROVIDER", provider_default("toolbox_adjudicate_provider")
     )
     toolbox_orientation_provider: str = os.getenv(
-        "TOOLBOX_ORIENTATION_PROVIDER", "rapidocr-orient"
+        "TOOLBOX_ORIENTATION_PROVIDER", provider_default("toolbox_orientation_provider")
     )
     toolbox_media_inspect_provider: str = os.getenv(
-        "TOOLBOX_MEDIA_INSPECT_PROVIDER", "pure-media-inspect"
+        "TOOLBOX_MEDIA_INSPECT_PROVIDER", provider_default("toolbox_media_inspect_provider")
     )
     toolbox_media_inspect_enabled: bool = field(
         default_factory=lambda: os.getenv(
