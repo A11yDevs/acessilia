@@ -11,6 +11,7 @@ from backend.log_messages import (
 from backend.tools.logger import logger
 from backend.tools.prompt_tools import load_region_prompt
 from backend.ai.models.ai_client import get_agno_model
+from backend.config.settings import settings
 from backend.agents.output_schemas import (
     DATA_SCHEMA_INSTRUCTION,
     DataOutput,
@@ -68,7 +69,13 @@ class DataAgent:
 
             agent = Agent(
                 name="DataAgent",
-                model=get_agno_model(),
+                model=get_agno_model(
+                    max_tokens=(
+                        settings.data_agent_max_tokens
+                        if classification == "table"
+                        else None
+                    )
+                ),
                 output_schema=DataOutput,
                 telemetry=False,
             )

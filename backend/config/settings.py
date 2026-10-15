@@ -51,6 +51,7 @@ class Settings:
         "nvidia/nemotron-nano-12b-v2-vl:free",
     )
     openrouter_max_tokens: int = int(os.getenv("OPENROUTER_MAX_TOKENS", "4096"))
+    data_agent_max_tokens: int = int(os.getenv("DATA_AGENT_MAX_TOKENS", "8192"))
     openrouter_base_url: str = os.getenv(
         "OPENROUTER_BASE_URL",
         "https://openrouter.ai/api/v1/chat/completions",
