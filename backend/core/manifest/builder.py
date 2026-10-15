@@ -216,6 +216,7 @@ def build_processing_manifest(
         sha256=digest,
     )
     extractor = ExtractorRun(
+        name=extractor_name or "docling",
         version=extraction.version,
         started_at=extraction.started_at,
         completed_at=extraction.completed_at,
@@ -256,7 +257,7 @@ def _build_from_toolbox_json(
     The Toolbox already returns a complete ProcessingManifest-compatible JSON
     payload inside ``extraction.document["document"]``, so we parse it directly.
     """
-    data: dict[str, Any] = extraction.document["document"]
+    data: dict[str, Any] = dict(extraction.document["document"])
 
     data["manifest_id"] = data.get("manifest_id") or f"manifest-{digest[:16]}-r1"
 
@@ -273,6 +274,9 @@ def _build_from_toolbox_json(
 
     # Override extractor metadata with this run
     data["extractor"] = {
+        "name": data.get("extractor", {}).get(
+            "name", extraction.configuration.get("toolbox_provider") or "toolbox"
+        ),
         "version": extraction.version,
         "started_at": extraction.started_at.isoformat(),
         "completed_at": extraction.completed_at.isoformat(),

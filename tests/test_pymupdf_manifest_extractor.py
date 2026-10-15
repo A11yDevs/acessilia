@@ -6,6 +6,7 @@ import fitz
 import pytest
 
 from backend.core.manifest.pymupdf_extractor import PyMuPDFManifestExtractor
+from backend.core.manifest.builder import build_processing_manifest
 from backend.core.manifest.models import BoundingBox, Provenance
 from backend.agents.pddl_orchestrator import _extract_picture_bytes, _render_inspection_region
 from tests.test_pddl_actionability import _element
@@ -28,6 +29,7 @@ def test_pymupdf_manifest_extractor_builds_pseudo_document(tmp_path: Path):
     extraction = extractor.extract(source)
 
     assert extraction.configuration["extractor"] == "pymupdf"
+    assert build_processing_manifest(source, extraction).extractor.name == "pymupdf"
     assert extraction.duration_ms >= 0
     assert extraction.version.startswith("pymupdf-")
 

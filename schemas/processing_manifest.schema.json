@@ -90,7 +90,7 @@
       "properties": {
         "name": {
           "default": "docling",
-          "enum": ["docling", "toolbox"],
+          "minLength": 1,
           "title": "Name",
           "type": "string"
         },

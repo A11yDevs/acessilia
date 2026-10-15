@@ -5,14 +5,17 @@ from live inference. It preserves the cross-project normalization contract.
 """
 
 import json
+from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 from docx import Document
 
 from backend.agents.pddl_orchestrator import _manifest_pages_to_payload
 from backend.core.manifest.builder import build_processing_manifest
+from backend.core.manifest.schema import validate_manifest
 from backend.export.exporters.docx_exporter import export_docx
 from backend.export.exporters.txt_exporter import export_txt
 from backend.pipeline.canonical_builder import build_canonical_document
@@ -68,3 +71,28 @@ def test_toolbox_contract_retains_order_tables_and_math_through_exports(tmp_path
         "",
         "Recife",
     ]
+
+
+@pytest.mark.parametrize("provider", ["docling", "mineru", "pymupdf", "custom-provider"])
+def test_toolbox_manifest_preserves_provider_and_input(tmp_path, provider):
+    response = json.loads(
+        (Path(__file__).parent / "fixtures/toolbox-v2-contract.json").read_text()
+    )
+    response["document"]["extractor"]["name"] = provider
+    original = deepcopy(response)
+    assert validate_manifest(response["document"]) == []
+    source = tmp_path / "local.pdf"
+    source.write_bytes(b"%PDF-local")
+    now = datetime.now(timezone.utc)
+    extraction = SimpleNamespace(
+        document=response,
+        version="provider-version",
+        started_at=now,
+        completed_at=now,
+        duration_ms=5,
+        configuration={"toolbox_provider": provider},
+    )
+    manifest = build_processing_manifest(source, extraction)
+    assert manifest.extractor.name == provider
+    assert manifest.source.filename == "local.pdf"
+    assert response == original
