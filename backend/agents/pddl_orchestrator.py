@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import re
 from collections import Counter
 from collections.abc import Callable, Coroutine
@@ -8,15 +9,14 @@ from pathlib import Path
 from typing import Any
 
 import fitz
-from docstruct.fusion.line_numbers import extract_line_numbers
-from docstruct.fusion.tailjoin import join_tail
-from docstruct.fusion.verse import chunk_verse
+from docstruct.fusion.tailjoin import is_page_number as _is_page_number
 from docstruct.tables.ast import effective_section_width
 from docstruct.text.norm_fix import norm_fix
 
 from backend.agents.data_agent import DataAgent
 from backend.agents.output_schemas import DataOutput, VisionOutput
 from backend.agents.vision_agent import VisionAgent
+from backend.core.agents.fusion_agent import FusionAgent
 from backend.core.agents.informational_structural import InformationalStructuralAgent
 from backend.core.execution.executor import ExecutorAgent, MethodRegistry
 from backend.core.execution.models import ExecutionReport, MethodResult
@@ -167,6 +167,74 @@ def _run_extract_fused(source_path: Path) -> dict:
         return pool.submit(
             lambda: asyncio.run(extract_fused(source_path))
         ).result()
+
+
+def _run_extract_single_provider(source_path: Path) -> dict[str, Any]:
+    """Extract through the configured Toolbox provider for the PDDL fallback."""
+    import concurrent.futures
+
+    from backend.tools.toolbox_client import ToolboxClient
+
+    async def extract() -> dict[str, Any]:
+        client = ToolboxClient()
+        try:
+            return await client.extract_structure(
+                file_path=source_path,
+                language="pt-BR",
+                use_remote_cache=False,
+            )
+        finally:
+            await client.close()
+
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(extract())
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(lambda: asyncio.run(extract())).result()
+
+
+def _fusion_agent() -> FusionAgent:
+    """Fusion agent used to reach the deterministic fusion primitives.
+
+    The `docstruct` functions take classified blocks, counters and tuning
+    parameters; `FusionAgent.process_*` is the in-repo entry point that supplies
+    them, so handlers call that instead of a primitive whose signature they would
+    otherwise have to guess.
+    """
+    return FusionAgent()
+
+
+def _element_bbox(
+    element: ManifestElement,
+    manifest: ProcessingManifest,
+) -> tuple[float, float, float, float] | None:
+    """Element bounding box normalized to the unit page expected by docstruct."""
+    for item in element.provenance:
+        box = getattr(item, "bbox", None)
+        if box is None:
+            continue
+        page = next(
+            (
+                page
+                for page in manifest.pages
+                if page.page_number == item.page_number
+            ),
+            None,
+        )
+        if page is None or not page.width or not page.height:
+            return None
+        top, bottom = box.top, box.bottom
+        if box.coord_origin == "BOTTOMLEFT":
+            top, bottom = page.height - bottom, page.height - top
+        return (
+            box.left / page.width,
+            top / page.height,
+            box.right / page.width,
+            bottom / page.height,
+        )
+    return None
 
 
 def _target_elements(
@@ -403,88 +471,255 @@ def _handle_norm_fix_method(
     )
 
 
-def _handle_extract_line_numbers_method(
+def _handle_repetition_guard_method(
     manifest: ProcessingManifest, obligation_id: str
 ) -> MethodResult:
-    """Record the marginal line numbers the extractor found on the target text."""
+    """Remove repeated token loops from the obligation's current page text."""
     elements = _target_elements(manifest, obligation_id)
     if not elements:
         return _missing_obligation(obligation_id)
 
-    total = 0
+    fusion_agent = _fusion_agent()
+    cut_total = 0
     for element in elements:
-        numbers = extract_line_numbers(element.text or "")
-        element.metadata["line_numbers"] = numbers
-        total += len(numbers)
+        result = fusion_agent.process_guard_repetition(element.text or "")
+        cut = int(result["tokens_cut"])
+        if not cut:
+            continue
+        element.text = result["text"]
+        element.metadata["repetition_guard"] = {"tokens_cut": cut}
+        cut_total += cut
 
-    if not total:
+    if not cut_total:
+        return MethodResult(
+            success=False,
+            validated=False,
+            message="Nenhuma repetição degenerada encontrada nos alvos",
+        )
+    return MethodResult(
+        success=True,
+        validated=True,
+        message=f"Guarda de repetição removeu {cut_total} token(s)",
+    )
+
+
+def _element_blocks(
+    elements: list[ManifestElement],
+    manifest: ProcessingManifest,
+) -> list[dict[str, Any]]:
+    """Manifest elements as the fusion stack's block dicts.
+
+    The deterministic primitives in `docstruct` operate on classified blocks, not
+    on bare strings, so the elements are adapted once here instead of each handler
+    guessing at a signature.
+    """
+    blocks: list[dict[str, Any]] = []
+    for element in elements:
+        bbox = _element_bbox(element, manifest)
+        blocks.append(
+            {
+                "md": element.text or "",
+                "text": element.text or "",
+                "kind": _block_kind(element),
+                "type": element.type,
+                "role": (element.metadata or {}).get("role"),
+                "box": list(bbox) if bbox else None,
+            }
+        )
+    return blocks
+
+
+def _block_kind(element: ManifestElement) -> str:
+    """Fusion block kind for an element type (`DiffBlock.kind` vocabulary)."""
+    if element.type == "heading":
+        return "heading"
+    if element.type == "table":
+        return "table"
+    if element.type == "formula":
+        return "formula"
+    return "text"
+
+
+def _handle_extract_line_numbers_method(
+    manifest: ProcessingManifest, obligation_id: str
+) -> MethodResult:
+    """Pull marginal verse line numbers out of the target blocks.
+
+    Uses `FusionAgent.process_extract_line_numbers`, which is the supported entry
+    point: `docstruct.fusion.line_numbers.extract_line_numbers` needs a block list
+    plus a stats counter and a provenance tag, so calling it with a plain string
+    raised `TypeError` on every step.
+    """
+    elements = _target_elements(manifest, obligation_id)
+    if not elements:
+        return _missing_obligation(obligation_id)
+
+    result = _fusion_agent().process_extract_line_numbers(
+        _element_blocks(elements, manifest)
+    )
+    extracted = int(result.get("stats", {}).get("line-numbers-agent-count", 0))
+    if not extracted:
         return MethodResult(
             success=False,
             validated=False,
             message="Nenhum número de linha marginal encontrado",
         )
+    for element in elements:
+        element.metadata["line_numbers_extracted"] = extracted
     return MethodResult(
         success=True,
         validated=True,
-        message=f"{total} número(s) de linha extraído(s)",
+        message=f"{extracted} número(s) de linha extraído(s)",
     )
 
 
 def _handle_chunk_verse_method(
     manifest: ProcessingManifest, obligation_id: str
 ) -> MethodResult:
-    """Split the target text into verse-sized chunks recorded in metadata."""
+    """Split verse/record blocks into chunks the evaluator can re-group.
+
+    `docstruct.fusion.verse.chunk_verse` takes already-split lines plus a character
+    budget, so the handler goes through `FusionAgent.process_chunk_verse`, which
+    detects the verse lines itself.
+    """
     elements = _target_elements(manifest, obligation_id)
     if not elements:
         return _missing_obligation(obligation_id)
 
-    chunked = 0
-    for element in elements:
-        chunks = chunk_verse(element.text or "")
-        if not chunks:
-            continue
-        element.metadata["verse_chunks"] = chunks
-        chunked += 1
-
-    if not chunked:
+    result = _fusion_agent().process_chunk_verse(_element_blocks(elements, manifest))
+    # `verse_blocks` reports `verse-{tag}-{whole,kept,split,chunks}`; only the
+    # blocks it actually split are evidence that the method did anything.
+    chunks = result.get("stats", {}).get("verse-agent-split", 0)
+    if not chunks:
         return MethodResult(
             success=False,
             validated=False,
             message="Nenhum bloco de verso elegível para fragmentação",
         )
+    for element in elements:
+        element.metadata["verse_chunks"] = chunks
     return MethodResult(
         success=True,
         validated=True,
-        message=f"Verso fragmentado em {chunked} elemento(s)",
+        message=f"Verso fragmentado em {chunks} pedaço(s)",
     )
+
+
+def _tailjoin_position(manifest: ProcessingManifest) -> str | None:
+    """Vertical position ("top"/"bot") of the page number in the manifest.
+
+    `join_tail` only applies the position-conditioned `tj3` rule when it knows
+    where the page number sits, which is the distinction between `tailjoin` and
+    `tailjoin-positioned`.
+    """
+    for element in manifest.elements:
+        role = (element.metadata or {}).get("role")
+        if role in {"header", "footer", "page_number"} and _is_page_number(
+            element.text or ""
+        ):
+            bbox = _element_bbox(element, manifest)
+            if bbox is None:
+                continue
+            return "top" if (bbox[1] + bbox[3]) / 2 < 0.5 else "bot"
+    return None
 
 
 def _handle_tailjoin_method(
     manifest: ProcessingManifest, obligation_id: str
 ) -> MethodResult:
-    """Join the trailing short blocks of the target text into the recorded result."""
+    """Join the trailing short blocks (header/footer/page number).
+
+    `docstruct.fusion.tailjoin.join_tail` requires the tail mode, a maximum short
+    block length and the number of blocks to consider, so it cannot be called with
+    the text alone. `FusionAgent.process_join_tail` supplies those defaults.
+    """
     elements = _target_elements(manifest, obligation_id)
     if not elements:
         return _missing_obligation(obligation_id)
 
-    joined = 0
-    for element in elements:
-        merged = join_tail(element.text or "")
-        if not merged:
-            continue
-        element.metadata["tailjoined"] = merged
-        joined += 1
-
-    if not joined:
+    texts = [(element.text or "") for element in elements]
+    merged = _fusion_agent().process_join_tail(
+        texts, position=_tailjoin_position(manifest)
+    )
+    if len(merged) >= len(texts):
         return MethodResult(
             success=False,
             validated=False,
             message="Nenhum bloco de cauda elegível para união",
         )
+    for element in elements:
+        element.metadata["tailjoined"] = True
     return MethodResult(
         success=True,
         validated=True,
-        message=f"Blocos de cauda unidos em {joined} elemento(s)",
+        message=(
+            f"Blocos de cauda unidos: {len(texts)} -> {len(merged)} bloco(s)"
+        ),
+    )
+
+
+def _handle_xycut_order_method(
+    manifest: ProcessingManifest, obligation_id: str
+) -> MethodResult:
+    """Apply XY-cut reading order to the evidenced page elements."""
+    elements = _target_elements(manifest, obligation_id)
+    if not elements:
+        return _missing_obligation(obligation_id)
+
+    fusion_agent = _fusion_agent()
+    reordered_pages: set[int] = set()
+    by_page: dict[int, list[ManifestElement]] = {}
+    for element in elements:
+        if element.page_number is not None:
+            by_page.setdefault(element.page_number, []).append(element)
+
+    for page_number, page_elements in by_page.items():
+        positioned = [
+            element for element in page_elements
+            if _element_bbox(element, manifest) is not None
+        ]
+        if len(positioned) < 2:
+            continue
+        current = sorted(positioned, key=lambda element: element.reading_order)
+        boxes = [_element_bbox(element, manifest) for element in current]
+        order = fusion_agent.process_refine_reading_order(
+            [list(box) for box in boxes if box is not None]
+        )
+        if order == list(range(len(current))):
+            continue
+        slots = sorted(element.reading_order for element in current)
+        for slot, index in zip(slots, order):
+            current[index].reading_order = slot
+        reordered_pages.add(page_number)
+
+    if not reordered_pages:
+        return MethodResult(
+            success=False,
+            validated=False,
+            message="XY-cut não identificou uma mudança de ordem de leitura",
+        )
+
+    manifest.elements.sort(key=lambda element: element.reading_order)
+    for page in manifest.pages:
+        if page.page_number in reordered_pages:
+            page.element_ids = [
+                element.id
+                for element in sorted(
+                    (
+                        element
+                        for element in manifest.elements
+                        if element.page_number == page.page_number
+                    ),
+                    key=lambda element: element.reading_order,
+                )
+            ]
+    return MethodResult(
+        success=True,
+        validated=True,
+        message=(
+            "Ordem de leitura XY-cut aplicada nas páginas "
+            + ", ".join(map(str, sorted(reordered_pages)))
+        ),
     )
 
 
@@ -584,10 +819,12 @@ DETERMINISTIC_METHOD_HANDLERS: dict[
     "pymupdf-region": _handle_pymupdf_region_method,
     "latex-normalizer": _handle_latex_normalizer_method,
     "norm-fix": _handle_norm_fix_method,
+    "rep-guard": _handle_repetition_guard_method,
     "line-number-extractor": _handle_extract_line_numbers_method,
     "verse-chunker": _handle_chunk_verse_method,
     "tailjoin": _handle_tailjoin_method,
     "tailjoin-positioned": _handle_tailjoin_method,
+    "xycut-order": _handle_xycut_order_method,
     "deterministic-heading-repair": _handle_deterministic_heading_repair_method,
 }
 
@@ -606,10 +843,6 @@ def _handle_dual_provider_fusion_method(
     Em modo single (FUSION_MODE=single) o método não é admissível e não
     deve ser selecionado pelo compilador.
     """
-    import json
-
-    from backend.config.settings import settings
-
     obligation = next(
         (o for o in manifest.obligations if o.id == obligation_id), None
     )
@@ -649,26 +882,97 @@ def _handle_dual_provider_fusion_method(
             ),
         )
 
-    output_path = (
-        settings.data_dir / "artifacts" / "fusion" / f"{obligation_id}.json"
-    )
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
-
-    artifact = Artifact(
-        id=f"artifact-fusion-{obligation_id}",
+    artifact = _persist_fusion_payload(
+        payload,
+        obligation_id,
         kind="fusion-payload",
-        path=str(output_path),
-        media_type="application/json",
     )
     return MethodResult(
         success=True,
         validated=True,
         message="Fusão dual-provider concluída com sucesso",
         artifacts=[artifact],
+    )
+
+
+def _handle_single_provider_method(
+    manifest: ProcessingManifest, obligation_id: str
+) -> MethodResult:
+    """Run the configured provider as a real fallback after dual fusion fails."""
+    obligation = next(
+        (item for item in manifest.obligations if item.id == obligation_id), None
+    )
+    if obligation is None:
+        return _missing_obligation(obligation_id)
+    if obligation.kind != "fuse-providers":
+        return MethodResult(
+            success=False,
+            validated=False,
+            message="single-provider só é válido para fuse-providers",
+        )
+
+    source_path = Path(manifest.source.path)
+    if not source_path.is_file():
+        return MethodResult(
+            success=False,
+            validated=False,
+            message=f"Documento-fonte indisponível: {source_path}",
+        )
+    try:
+        payload = _run_extract_single_provider(source_path)
+    except Exception as exc:  # noqa: BLE001
+        return MethodResult(
+            success=False,
+            validated=False,
+            message=(
+                "Extração single-provider falhou: "
+                f"{type(exc).__name__}: {exc}"
+            ),
+        )
+
+    provider = str(payload.get("provider") or "")
+    if payload.get("status") != "succeeded" or not provider or "+" in provider:
+        return MethodResult(
+            success=False,
+            validated=False,
+            message="A Toolbox não confirmou uma extração de provider único",
+        )
+
+    artifact = _persist_fusion_payload(
+        payload,
+        obligation_id,
+        kind="single-provider-payload",
+    )
+    return MethodResult(
+        success=True,
+        validated=True,
+        message=f"Fallback single-provider concluído ({provider})",
+        artifacts=[artifact],
+    )
+
+
+def _persist_fusion_payload(
+    payload: dict[str, Any],
+    obligation_id: str,
+    *,
+    kind: str,
+) -> Artifact:
+    import json
+
+    from backend.config.settings import settings
+
+    safe_id = hashlib.sha256(obligation_id.encode("utf-8")).hexdigest()[:16]
+    output_path = settings.data_dir / "artifacts" / "fusion" / f"{safe_id}.json"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    return Artifact(
+        id=f"artifact-{kind}-{safe_id}",
+        kind=kind,
+        path=str(output_path),
+        media_type="application/json",
     )
 
 
@@ -740,6 +1044,7 @@ class PddlAccessibilityOrchestrator:
         registry.register(
             "dual-provider-fusion", _handle_dual_provider_fusion_method
         )
+        registry.register("single-provider", _handle_single_provider_method)
         for method, handler in DETERMINISTIC_METHOD_HANDLERS.items():
             registry.register(method, handler)
 

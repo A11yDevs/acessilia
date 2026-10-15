@@ -120,6 +120,45 @@ def test_compiler_rejects_selected_obligation_without_method():
         )
 
 
+def test_fast_downward_respects_unavailable_methods(tmp_path):
+    planner = PlannerAgent()
+    manifest = make_manifest()
+    compiled = planner.compile_problem(
+        manifest,
+        selected_roots=["o-describe"],
+        unavailable_methods=["vision"],
+    )
+
+    assert "(available vision)" not in compiled.text
+    assert "(available human-review)" in compiled.text
+
+    fallback_plan = _expected_fast_downward_plan()
+    fallback_plan[2] = (
+        "(execute-obligation o-describe describe-image human-review)"
+    )
+    executable = _fake_fast_downward(tmp_path, fallback_plan)
+    _, plan = planner.plan(
+        manifest,
+        selected_roots=["o-describe"],
+        unavailable_methods=["vision"],
+        backend="fast-downward",
+        fast_downward=executable,
+    )
+    assert plan.steps[2].method == "human-review"
+
+    executable = _fake_fast_downward(
+        tmp_path, _expected_fast_downward_plan()
+    )
+    with pytest.raises(ValueError, match="Método indisponível: vision"):
+        planner.plan(
+            manifest,
+            selected_roots=["o-describe"],
+            unavailable_methods=["vision"],
+            backend="fast-downward",
+            fast_downward=executable,
+        )
+
+
 def _fake_fast_downward(
     directory: Path,
     plan_lines: list[str],
