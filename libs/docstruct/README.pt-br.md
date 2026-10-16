@@ -136,4 +136,55 @@ pip install -e "libs/docstruct[dev]"
 pytest libs/docstruct/tests
 ```
 
-O CI roda `pytest libs/docstruct/tests` sem o backend instalado — se precisar importar `backend/`, a mudança está violando o desacoplamento.
+`tests/test_purity.py` importa todos os módulos num interpretador que recusa `backend`, `acessilia_toolbox` e `acessilia_sdk`, então uma mudança que os importe falha mesmo quando eles estão instalados (como no CI do core).
+
+## Releases
+
+A Toolbox e os demais repositórios consomem um artefato publicado, não este
+diretório. O `.github/workflows/docstruct-release.yml` publica uma wheel e um
+sdist num GitHub Release quando é enviada uma tag igual à versão:
+
+1. Atualizar `version` em `libs/docstruct/pyproject.toml` (versionamento
+   semântico: mudar o comportamento ou a assinatura de uma função pública é
+   major enquanto a versão for menor que 1.0, e minor depois).
+2. Fazer o merge e criar a tag no commit mergeado:
+   `git tag docstruct-v0.2.0 && git push origin docstruct-v0.2.0`.
+
+O workflow recusa uma tag diferente da versão do pacote, roda esta suíte só com
+a docstruct instalada, gera os arquivos de forma reprodutível a partir do commit
+(`SOURCE_DATE_EPOCH`), importa todos os módulos a partir da wheel instalada e
+anexa os arquivos com o SHA-256. As notas do release trazem a linha para copiar:
+
+```
+acessilia-docstruct @ https://github.com/A11yDevs/acessilia/releases/download/docstruct-v<versão>/acessilia_docstruct-<versão>-py3-none-any.whl#sha256=<hash>
+```
+
+O pip confere o fragmento `#sha256=` no download, inclusive quando o
+consumidor instala sem arquivo de lock.
+
+### Depois do release
+
+Confira a execução e os arquivos publicados antes que alguém dependa deles:
+
+```bash
+gh run list --workflow docstruct-release.yml --limit 1   # depois: gh run watch <id>
+gh release view docstruct-v<versão>                      # as notas trazem a linha de dependência
+gh release download docstruct-v<versão> -D /tmp/docstruct-rel
+(cd /tmp/docstruct-rel && sha256sum -c SHA256SUMS)       # macOS: shasum -a 256 -c
+```
+
+O release é criado no último passo, então uma execução que falha não publica
+nada. Para tentar de novo, apague a tag (`git push --delete origin
+docstruct-v<versão>` e `git tag -d docstruct-v<versão>`), corrija num PR e crie a
+tag no novo commit de merge. Uma versão publicada nunca é substituída: uma
+correção sai como versão nova.
+
+### Atualizar os consumidores
+
+Publicar não muda nenhum consumidor. Cada um passa para a versão nova num PR
+próprio, trocando a URL e o `#sha256=` pelos que aparecem nas notas do release.
+Para a Toolbox, veja
+[Updating docstruct](https://github.com/A11yDevs/acessilia-toolbox/blob/develop/docs/dev-workflow.md#6-updating-docstruct) no fluxo de desenvolvimento dela.
+O core instala este diretório a partir do próprio checkout (modo editável no
+desenvolvimento, `pip install ./libs/docstruct` no CI e na imagem), então sempre
+roda o código do mesmo commit e não precisa de atualização.

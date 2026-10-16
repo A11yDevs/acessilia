@@ -5,6 +5,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from acessilia_sdk.toolbox.capabilities import provider_default
+
 load_dotenv()
 
 
@@ -71,6 +73,9 @@ class Settings:
     openrouter_max_tokens: int = field(
         default_factory=lambda: int(os.getenv("OPENROUTER_MAX_TOKENS", "4096"))
     )
+    data_agent_max_tokens: int = field(
+        default_factory=lambda: int(os.getenv("DATA_AGENT_MAX_TOKENS", "8192"))
+    )
     openrouter_base_url: str = field(
         default_factory=lambda: os.getenv(
             "OPENROUTER_BASE_URL",
@@ -120,39 +125,63 @@ class Settings:
     )
     # Structural extraction keeps the historical TOOLBOX_PROVIDER variable for
     # backward compatibility. Specialized capabilities use providers bound to
-    # their own contracts in the Toolbox registry.
+    # their own contracts in the Toolbox registry. Every default comes from
+    # libs/sdk/src/acessilia_sdk/toolbox/capabilities.py.
     toolbox_provider: str = field(
-        default_factory=lambda: os.getenv("TOOLBOX_PROVIDER", "docling")
+        default_factory=lambda: os.getenv(
+            "TOOLBOX_PROVIDER", provider_default("toolbox_provider")
+        )
     )
     toolbox_layout_provider: str = field(
-        default_factory=lambda: os.getenv("TOOLBOX_LAYOUT_PROVIDER", "docling-layout")
+        default_factory=lambda: os.getenv(
+            "TOOLBOX_LAYOUT_PROVIDER", provider_default("toolbox_layout_provider")
+        )
     )
     toolbox_pdf_provider: str = field(
-        default_factory=lambda: os.getenv("TOOLBOX_PDF_PROVIDER", "pymupdf-pdf")
+        default_factory=lambda: os.getenv(
+            "TOOLBOX_PDF_PROVIDER", provider_default("toolbox_pdf_provider")
+        )
     )
     toolbox_math_recognize_provider: str = field(
         default_factory=lambda: os.getenv(
-            "TOOLBOX_MATH_RECOGNIZE_PROVIDER", "docling-math"
+            "TOOLBOX_MATH_RECOGNIZE_PROVIDER",
+            provider_default("toolbox_math_recognize_provider"),
         )
     )
     toolbox_math_provider: str = field(
-        default_factory=lambda: os.getenv("TOOLBOX_MATH_PROVIDER", "pure-math")
+        default_factory=lambda: os.getenv(
+            "TOOLBOX_MATH_PROVIDER", provider_default("toolbox_math_provider")
+        )
     )
     toolbox_ocr_provider: str = field(
-        default_factory=lambda: os.getenv("TOOLBOX_OCR_PROVIDER", "docling-ocr")
+        default_factory=lambda: os.getenv(
+            "TOOLBOX_OCR_PROVIDER", provider_default("toolbox_ocr_provider")
+        )
     )
     toolbox_page_ocr_provider: str = field(
-        default_factory=lambda: os.getenv("TOOLBOX_PAGE_OCR_PROVIDER", "qwen3-vl-page")
+        default_factory=lambda: os.getenv(
+            "TOOLBOX_PAGE_OCR_PROVIDER", provider_default("toolbox_page_ocr_provider")
+        )
     )
     toolbox_adjudicate_provider: str = field(
-        default_factory=lambda: os.getenv("TOOLBOX_ADJUDICATE_PROVIDER", "qwen3-vl-judge")
+        default_factory=lambda: os.getenv(
+            "TOOLBOX_ADJUDICATE_PROVIDER", provider_default("toolbox_adjudicate_provider")
+        )
+    )
+    toolbox_table_provider: str = field(
+        default_factory=lambda: os.getenv(
+            "TOOLBOX_TABLE_PROVIDER", provider_default("toolbox_table_provider")
+        )
     )
     toolbox_orientation_provider: str = field(
-        default_factory=lambda: os.getenv("TOOLBOX_ORIENTATION_PROVIDER", "rapidocr-orient")
+        default_factory=lambda: os.getenv(
+            "TOOLBOX_ORIENTATION_PROVIDER", provider_default("toolbox_orientation_provider")
+        )
     )
     toolbox_media_inspect_provider: str = field(
         default_factory=lambda: os.getenv(
-            "TOOLBOX_MEDIA_INSPECT_PROVIDER", "pure-media-inspect"
+            "TOOLBOX_MEDIA_INSPECT_PROVIDER",
+            provider_default("toolbox_media_inspect_provider"),
         )
     )
     toolbox_media_inspect_enabled: bool = field(
@@ -166,6 +195,21 @@ class Settings:
     )
     toolbox_timeout_seconds: int = field(
         default_factory=lambda: int(os.getenv("TOOLBOX_TIMEOUT_SECONDS", "3600"))
+    )
+    # Availability gate for planning methods that call the Toolbox: "observe"
+    # only reports what the live catalogue would rule out, "enforce" removes
+    # those methods from the plan (failing closed without a catalogue), "off"
+    # skips the check.
+    toolbox_availability_gate: str = field(
+        default_factory=lambda: os.getenv(
+            "TOOLBOX_AVAILABILITY_GATE", "observe"
+        ).strip().lower()
+    )
+    toolbox_catalog_refresh_seconds: int = field(
+        default_factory=lambda: int(os.getenv("TOOLBOX_CATALOG_REFRESH_SECONDS", "60"))
+    )
+    toolbox_catalog_stale_seconds: int = field(
+        default_factory=lambda: int(os.getenv("TOOLBOX_CATALOG_STALE_SECONDS", "900"))
     )
     toolbox_use_artifact_store: bool = field(
         default_factory=lambda: (

@@ -7,31 +7,23 @@ math.verbalize (LaTeX → texto pt-BR via pure-python).
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 
-import httpx
-
 from backend.config.settings import settings
 from backend.tools.logger import logger
-from backend.tools.toolbox_client import (
-    ToolboxContractViolation,
-    ToolboxProviderUnavailable,
-    ToolboxTimeout,
-    _media_type,
-    _raise_for_error,
-)
+from backend.tools.toolbox_client import ToolboxCapabilityClient
 
 RECOGNIZE_CAPABILITY = "math.recognize"
 CONVERT_CAPABILITY = "math.convert"
 VERBALIZE_CAPABILITY = "math.verbalize"
-RECOGNIZE_PATH = f"/v1/capabilities/{RECOGNIZE_CAPABILITY}:execute"
-CONVERT_PATH = f"/v1/capabilities/{CONVERT_CAPABILITY}:execute"
-VERBALIZE_PATH = f"/v1/capabilities/{VERBALIZE_CAPABILITY}:execute"
 
 
-class ToolboxMathClient:
+def _latex_upload(latex: str) -> tuple[str, bytes, str]:
+    return ("formula.tex", latex.encode("utf-8"), "text/plain")
+
+
+class ToolboxMathClient(ToolboxCapabilityClient):
     """Cliente para operações matemáticas via Acessilia Toolbox.
 
     Encapsula as capacidades:
@@ -39,6 +31,10 @@ class ToolboxMathClient:
     - math.convert: converter LaTeX ↔ MathML
     - math.verbalize: converter LaTeX → texto natural pt-BR
     """
+
+    # provider remains the recognition-provider override for backward
+    # compatibility. Text transformations use the pure-math provider.
+    provider_key = "toolbox_math_recognize_provider"
 
     def __init__(
         self,
@@ -48,22 +44,14 @@ class ToolboxMathClient:
         timeout_seconds: int | None = None,
         api_key: str | None = None,
     ) -> None:
-        self.base_url = (base_url or settings.toolbox_base_url).rstrip("/")
-        # provider remains the recognition-provider override for backward
-        # compatibility. Text transformations use the pure-math provider.
-        self.provider = provider or settings.toolbox_math_recognize_provider
+        super().__init__(
+            base_url=base_url,
+            provider=provider,
+            timeout_seconds=timeout_seconds,
+            api_key=api_key,
+        )
         self.transform_provider = (
             transform_provider or settings.toolbox_math_provider
-        )
-        self.timeout_seconds = timeout_seconds or settings.toolbox_timeout_seconds
-        self.api_key = api_key if api_key is not None else settings.toolbox_api_key
-        headers: dict[str, str] = {}
-        if self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
-        self._client = httpx.AsyncClient(
-            base_url=self.base_url,
-            timeout=httpx.Timeout(self.timeout_seconds),
-            headers=headers,
         )
 
     async def recognize(
@@ -76,8 +64,6 @@ class ToolboxMathClient:
     ) -> dict[str, Any]:
         """POST /v1/capabilities/math.recognize:execute.
 
-        Reconhece expressões matemáticas em imagens e retorna LaTeX.
-
         Args:
             file_path: Caminho para a imagem.
             artifact_id: ID do artifact previamente armazenado.
@@ -88,63 +74,18 @@ class ToolboxMathClient:
             Dict com formulas (lista de {latex, confidence, page, bbox}),
             formula_count, raw_text.
         """
-        if file_path is None and artifact_id is None:
-            raise ValueError("Forneça file_path ou artifact_id")
-
-        url = f"{self.base_url}{RECOGNIZE_PATH}"
-
-        try:
-            if artifact_id:
-                data: dict[str, Any] = {
-                    "artifact_id": artifact_id,
-                    "language": language,
-                    "provider": self.provider,
-                }
-                if use_remote_cache is False:
-                    data["no_cache"] = True
-                response = await self._client.post(url, data=data)
-            else:
-                with open(file_path, "rb") as f:
-                    files = {
-                        "file": (
-                            file_path.name,
-                            f,
-                            _media_type(file_path),
-                        )
-                    }
-                    params: dict[str, Any] = {
-                        "language": language,
-                        "provider": self.provider,
-                    }
-                    if use_remote_cache is False:
-                        params["no_cache"] = True
-                    response = await self._client.post(
-                        url, files=files, data=params
-                    )
-
-            _raise_for_error(response, RECOGNIZE_CAPABILITY)
-            result = response.json()
-
-            if result.get("status") != "succeeded":
-                raise ToolboxContractViolation(
-                    f"Reconhecimento de fórmula falhou na Toolbox: "
-                    f"status={result.get('status')}"
-                )
-
-            logger.info(
-                "Toolbox: {} fórmula(s) reconhecida(s)",
-                result.get("document", {}).get("formula_count", "?"),
-            )
-            return result
-
-        except httpx.TimeoutException as e:
-            raise ToolboxTimeout(
-                f"Timeout ao reconhecer fórmula via Toolbox: {e}"
-            ) from e
-        except httpx.RequestError as e:
-            raise ToolboxProviderUnavailable(
-                f"Toolbox indisponível em {self.base_url}: {e}"
-            ) from e
+        result = await self._execute(
+            RECOGNIZE_CAPABILITY,
+            file_path=file_path,
+            artifact_id=artifact_id,
+            language=language,
+            no_cache=use_remote_cache is False,
+        )
+        logger.info(
+            "Toolbox: {} fórmula(s) reconhecida(s)",
+            result.get("document", {}).get("formula_count", "?"),
+        )
+        return result
 
     async def convert(
         self,
@@ -155,7 +96,6 @@ class ToolboxMathClient:
     ) -> dict[str, Any]:
         """POST /v1/capabilities/math.convert:execute.
 
-        Converte LaTeX para MathML ou vice-versa.
         O LaTeX é enviado como arquivo text/plain em um formulário multipart.
 
         Args:
@@ -166,44 +106,15 @@ class ToolboxMathClient:
         Returns:
             Dict com latex, mathml, direction.
         """
-        url = f"{self.base_url}{CONVERT_PATH}"
-
-        try:
-            data: dict[str, Any] = {
-                "provider": self.transform_provider,
-                "parameters": json.dumps({"direction": direction}),
-            }
-            if use_remote_cache is False:
-                data["no_cache"] = True
-            response = await self._client.post(
-                url,
-                files={"file": ("formula.tex", latex.encode("utf-8"), "text/plain")},
-                data=data,
-            )
-
-            _raise_for_error(response, CONVERT_CAPABILITY)
-            result = response.json()
-
-            if result.get("status") != "succeeded":
-                raise ToolboxContractViolation(
-                    f"Conversão de fórmula falhou na Toolbox: "
-                    f"status={result.get('status')}"
-                )
-
-            logger.info(
-                "Toolbox: fórmula convertida ({})",
-                direction,
-            )
-            return result
-
-        except httpx.TimeoutException as e:
-            raise ToolboxTimeout(
-                f"Timeout ao converter fórmula via Toolbox: {e}"
-            ) from e
-        except httpx.RequestError as e:
-            raise ToolboxProviderUnavailable(
-                f"Toolbox indisponível em {self.base_url}: {e}"
-            ) from e
+        result = await self._execute(
+            CONVERT_CAPABILITY,
+            provider=self.transform_provider,
+            upload=_latex_upload(latex),
+            parameters={"direction": direction},
+            no_cache=use_remote_cache is False,
+        )
+        logger.info("Toolbox: fórmula convertida ({})", direction)
+        return result
 
     async def verbalize(
         self,
@@ -214,7 +125,6 @@ class ToolboxMathClient:
     ) -> dict[str, Any]:
         """POST /v1/capabilities/math.verbalize:execute.
 
-        Converte LaTeX para texto natural em português.
         O LaTeX é enviado como arquivo text/plain em um formulário multipart;
         provider e language são campos do mesmo formulário.
 
@@ -226,63 +136,18 @@ class ToolboxMathClient:
         Returns:
             Dict com latex, verbalized, language.
         """
-        url = f"{self.base_url}{VERBALIZE_PATH}"
-
-        try:
-            data: dict[str, Any] = {
-                "provider": self.transform_provider,
-                "language": language,
-            }
-            if use_remote_cache is False:
-                data["no_cache"] = True
-            response = await self._client.post(
-                url,
-                files={"file": ("formula.tex", latex.encode("utf-8"), "text/plain")},
-                data=data,
-            )
-
-            _raise_for_error(response, VERBALIZE_CAPABILITY)
-            result = response.json()
-
-            if result.get("status") != "succeeded":
-                raise ToolboxContractViolation(
-                    f"Verbalização de fórmula falhou na Toolbox: "
-                    f"status={result.get('status')}"
-                )
-
-            logger.info(
-                "Toolbox: fórmula verbalizada ({} caracteres)",
-                len(result.get("document", {}).get("verbalized", "")),
-            )
-            return result
-
-        except httpx.TimeoutException as e:
-            raise ToolboxTimeout(
-                f"Timeout ao verbalizar fórmula via Toolbox: {e}"
-            ) from e
-        except httpx.RequestError as e:
-            raise ToolboxProviderUnavailable(
-                f"Toolbox indisponível em {self.base_url}: {e}"
-            ) from e
-
-    async def health(self) -> dict[str, Any]:
-        """Verifica se a Toolbox está operacional."""
-        try:
-            response = await self._client.get("/v1/health")
-            _raise_for_error(response, "health")
-            return response.json()
-        except httpx.TimeoutException as e:
-            raise ToolboxTimeout(
-                f"Timeout ao verificar health da Toolbox: {e}"
-            ) from e
-        except httpx.RequestError as e:
-            raise ToolboxProviderUnavailable(
-                f"Toolbox indisponível em {self.base_url}: {e}"
-            ) from e
-
-    async def close(self) -> None:
-        """Libera a conexão HTTP."""
-        await self._client.aclose()
+        result = await self._execute(
+            VERBALIZE_CAPABILITY,
+            provider=self.transform_provider,
+            upload=_latex_upload(latex),
+            language=language,
+            no_cache=use_remote_cache is False,
+        )
+        logger.info(
+            "Toolbox: fórmula verbalizada ({} caracteres)",
+            len(result.get("document", {}).get("verbalized", "")),
+        )
+        return result
 
 
 __all__ = ["ToolboxMathClient"]

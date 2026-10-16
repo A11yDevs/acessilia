@@ -25,7 +25,7 @@ def payload(text="Recovered content", page=1):
 
 def test_fusion_output_contains_recovered_text_and_valid_references(monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "data_dir", tmp_path)
-    monkeypatch.setattr(pddl, "_run_extract_fused", lambda path: payload())
+    monkeypatch.setattr(pddl, "_run_extract_fused", lambda path, **_: payload())
     source = manifest()
     orchestrator = _orchestrator()
     plan, _ = orchestrator._build_plan(source)
@@ -49,14 +49,14 @@ def test_artifacts_are_isolated_across_documents_and_payloads(monkeypatch, tmp_p
     first, second = manifest(), manifest()
     second.manifest_id = "manifest-second"
     second.source.document_id = "document-second"
-    monkeypatch.setattr(pddl, "_run_extract_fused", lambda path: payload(str(path)))
+    monkeypatch.setattr(pddl, "_run_extract_fused", lambda path, **_: payload(str(path)))
     one = pddl._handle_dual_provider_fusion_method(first, "o-1").artifacts[0]
     original = Path(one.path).read_bytes()
     two = pddl._handle_dual_provider_fusion_method(second, "o-1").artifacts[0]
     assert one.path != two.path
     assert one.id != two.id
     assert Path(one.path).read_bytes() == original
-    monkeypatch.setattr(pddl, "_run_extract_fused", lambda path: payload("Different revision"))
+    monkeypatch.setattr(pddl, "_run_extract_fused", lambda path, **_: payload("Different revision"))
     three = pddl._handle_dual_provider_fusion_method(first, "o-1").artifacts[0]
     assert three.path != one.path
     assert Path(one.path).read_bytes() == original
@@ -71,7 +71,7 @@ def test_invalid_fusion_does_not_mutate_or_certify_manifest(monkeypatch, tmp_pat
     monkeypatch.setattr(settings, "data_dir", tmp_path)
     source = manifest()
     original = source.model_dump()
-    monkeypatch.setattr(pddl, "_run_extract_fused", lambda path: {
+    monkeypatch.setattr(pddl, "_run_extract_fused", lambda path, **_: {
         "status": "succeeded", "provider": "docling+mineru", "document": invalid,
     })
     result = pddl._handle_dual_provider_fusion_method(source, "o-1")
@@ -85,7 +85,7 @@ def test_text_fusion_does_not_flatten_structured_manifest(monkeypatch, tmp_path)
     source = manifest()
     source.elements[0].type = "table"
     original = source.model_dump()
-    monkeypatch.setattr(pddl, "_run_extract_fused", lambda path: payload())
+    monkeypatch.setattr(pddl, "_run_extract_fused", lambda path, **_: payload())
     result = pddl._handle_dual_provider_fusion_method(source, "o-1")
     assert not result.success
     assert source.model_dump() == original
@@ -105,7 +105,7 @@ def test_recovered_pages_and_extra_blocks_reach_output(monkeypatch, tmp_path):
         {"type": "paragraph", "text": "Additional recovered block", "page_number": 1},
         {"type": "paragraph", "text": "Recovered page two", "page_number": 2},
     ])
-    monkeypatch.setattr(pddl, "_run_extract_fused", lambda path: fused)
+    monkeypatch.setattr(pddl, "_run_extract_fused", lambda path, **_: fused)
     assert pddl._handle_dual_provider_fusion_method(source, "o-1").success
     ProcessingManifest.model_validate(source.model_dump())
     assert len(source.elements) == 3
@@ -123,6 +123,9 @@ async def test_fusion_preserves_processing_manifest_page_numbers(monkeypatch):
     class Client:
         def __init__(self, provider):
             self.provider = provider
+
+        async def close(self):
+            pass
 
         async def extract_structure(self, *args, **kwargs):
             return {"status": "succeeded", "provider": self.provider, "document": {

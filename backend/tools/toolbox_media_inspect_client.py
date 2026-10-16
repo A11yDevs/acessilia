@@ -12,23 +12,17 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-import httpx
-
 from backend.config.settings import settings
 from backend.tools.logger import logger
 from backend.tools.toolbox_client import (
+    ToolboxCapabilityClient,
     ToolboxContractViolation,
-    ToolboxProviderUnavailable,
-    ToolboxTimeout,
-    _media_type,
-    _raise_for_error,
 )
 
 CAPABILITY = "media.inspect"
-EXECUTE_PATH = f"/v1/capabilities/{CAPABILITY}:execute"
 
 
-class ToolboxMediaInspectClient:
+class ToolboxMediaInspectClient(ToolboxCapabilityClient):
     """Cliente para inspeção determinística de mídia via Acessilia Toolbox.
 
     Encapsula a capacidade media.inspect, que classifica a natureza do artefato
@@ -36,25 +30,7 @@ class ToolboxMediaInspectClient:
     sinal requires_visual_inspection.
     """
 
-    def __init__(
-        self,
-        base_url: str | None = None,
-        provider: str | None = None,
-        timeout_seconds: int | None = None,
-        api_key: str | None = None,
-    ) -> None:
-        self.base_url = (base_url or settings.toolbox_base_url).rstrip("/")
-        self.provider = provider or settings.toolbox_media_inspect_provider
-        self.timeout_seconds = timeout_seconds or settings.toolbox_timeout_seconds
-        self.api_key = api_key if api_key is not None else settings.toolbox_api_key
-        headers: dict[str, str] = {}
-        if self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
-        self._client = httpx.AsyncClient(
-            base_url=self.base_url,
-            timeout=httpx.Timeout(self.timeout_seconds),
-            headers=headers,
-        )
+    provider_key = "toolbox_media_inspect_provider"
 
     async def inspect(
         self,
@@ -78,97 +54,37 @@ class ToolboxMediaInspectClient:
             Dict com os campos de inspeção (media_type, is_image, is_pdf,
             page_count, dimensions, artifact_nature, requires_visual_inspection, ...).
         """
-        if file_path is None and artifact_id is None:
-            raise ValueError("Forneça file_path ou artifact_id")
-
         use_cache = (
             use_remote_cache
             if use_remote_cache is not None
             else settings.toolbox_use_remote_cache
         )
-        url = f"{self.base_url}{EXECUTE_PATH}"
+        result = await self._execute(
+            CAPABILITY,
+            file_path=file_path,
+            artifact_id=artifact_id,
+            no_cache=not use_cache,
+        )
 
-        try:
-            if artifact_id:
-                data: dict[str, Any] = {
-                    "artifact_id": artifact_id,
-                    "provider": self.provider,
-                }
-                if not use_cache:
-                    data["no_cache"] = True
-                response = await self._client.post(url, data=data)
-            else:
-                with open(file_path, "rb") as f:
-                    files = {
-                        "file": (
-                            file_path.name,
-                            f,
-                            _media_type(file_path),
-                        )
-                    }
-                    params: dict[str, Any] = {
-                        "provider": self.provider,
-                    }
-                    if not use_cache:
-                        params["no_cache"] = True
-                    response = await self._client.post(
-                        url, files=files, data=params
-                    )
-
-            _raise_for_error(response, CAPABILITY)
-            try:
-                result = response.json()
-            except ValueError as e:
-                raise ToolboxContractViolation(
-                    "Resposta de media.inspect não contém JSON válido"
-                ) from e
-
-            if not isinstance(result, dict):
-                raise ToolboxContractViolation(
-                    "Resposta de media.inspect deve ser um objeto JSON"
-                )
-
-            if result.get("status") != "succeeded":
-                raise ToolboxContractViolation(
-                    f"Inspeção de mídia falhou na Toolbox: "
-                    f"status={result.get('status')}"
-                )
-
-            document = result.get("document")
-            if not isinstance(document, dict):
-                raise ToolboxContractViolation(
-                    "Resposta de media.inspect sem campo 'document'"
-                )
-
-            provenance = result.get("provenance")
-            duration_ms = (
-                provenance.get("duration_ms", "?")
-                if isinstance(provenance, dict)
-                else "?"
+        document = result.get("document")
+        if not isinstance(document, dict):
+            raise ToolboxContractViolation(
+                "Resposta de media.inspect sem campo 'document'"
             )
-            logger.info(
-                "Toolbox: media.inspect concluído (nature={}, visual={}, {} ms)",
-                document.get("artifact_nature", "?"),
-                document.get("requires_visual_inspection", "?"),
-                duration_ms,
-            )
-            return document
 
-        except httpx.TimeoutException as e:
-            raise ToolboxTimeout(
-                f"Timeout ao inspecionar mídia via Toolbox: {e}"
-            ) from e
-        except httpx.RequestError as e:
-            raise ToolboxProviderUnavailable(
-                f"Toolbox indisponível em {self.base_url}: {e}"
-            ) from e
+        provenance = result.get("provenance")
+        duration_ms = (
+            provenance.get("duration_ms", "?")
+            if isinstance(provenance, dict)
+            else "?"
+        )
+        logger.info(
+            "Toolbox: media.inspect concluído (nature={}, visual={}, {} ms)",
+            document.get("artifact_nature", "?"),
+            document.get("requires_visual_inspection", "?"),
+            duration_ms,
+        )
+        return document
 
-    async def close(self) -> None:
-        """Libera a conexão HTTP."""
-        await self._client.aclose()
 
-    @property
-    def _auth_headers(self) -> dict[str, str]:
-        if self.api_key:
-            return {"Authorization": f"Bearer {self.api_key}"}
-        return {}
+__all__ = ["ToolboxMediaInspectClient"]

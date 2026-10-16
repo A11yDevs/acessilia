@@ -5,9 +5,11 @@ that are declared in two different repositories. Nothing in either repository
 currently verifies that they still match, so a rename on one side silently
 produces a client that can only fail at runtime.
 
-This script builds the cross-repository contract from the core side and checks
-it against the Toolbox, either live (``--url``) or from a captured snapshot
-(``--snapshot``), so it can run inside CI without a running Toolbox.
+This script reads the core side from ``libs/sdk/src/acessilia_sdk/toolbox/capabilities.py``
+(the allowlist every Toolbox client goes through) and checks it against the
+Toolbox, either live (``--url``) or from a captured snapshot (``--snapshot``),
+so it can run inside CI without a running Toolbox. Live reads send
+``TOOLBOX_API_KEY`` as a Bearer token when it is set.
 
 Usage:
     python scripts/check_capability_contract.py --snapshot tests/fixtures/toolbox-contract.json
@@ -19,9 +21,9 @@ Exit status is 0 when the contract holds, 1 when any drift is reported.
 from __future__ import annotations
 
 import argparse
-import ast
+import importlib.util
 import json
-import re
+import os
 import sys
 import urllib.error
 import urllib.request
@@ -29,43 +31,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-TOOLS_DIR = REPO_ROOT / "backend" / "tools"
-SETTINGS_PATH = REPO_ROOT / "backend" / "config" / "settings.py"
+REGISTRY_PATH = (
+    REPO_ROOT / "libs" / "sdk" / "src" / "acessilia_sdk" / "toolbox" / "capabilities.py"
+)
+REGISTRY_MODULE = "acessilia_sdk.toolbox.capabilities"
 
 # Capabilities that the Toolbox implements internally and that the core must
 # never call directly: they belong to the Toolbox's own orchestration.
 INTERNAL_CAPABILITIES = frozenset({"cache.get", "cache.put"})
-
-# Rest surfaces that back a whole capability family instead of a single
-# ":execute" call. The core reaches these through dedicated REST routes.
-REST_ROUTE_CAPABILITIES: dict[str, frozenset[str]] = {
-    "/v1/datasets": frozenset(
-        {
-            "dataset.list",
-            "dataset.describe",
-            "dataset.list_splits",
-            "dataset.list_items",
-            "dataset.get_item",
-            "dataset.get_artifact",
-            "dataset.sample",
-            "dataset.sync",
-        }
-    ),
-    "/v1/artifacts": frozenset({"artifact.store", "artifact.retrieve"}),
-}
-
-_CAPABILITY_RE = re.compile(r'^[A-Z_]*CAPABILITY(?:_[A-Z]+)?\s*=\s*"([^"]+)"')
-_PROVIDER_ENV_RE = re.compile(
-    r'os\.getenv\(\s*"(TOOLBOX_[A-Z_]*PROVIDER)"\s*,\s*"([^"]*)"'
-)
-# Some clients inline the capability in the execute URL instead of declaring a
-# constant, e.g. f"{base}/v1/capabilities/document.structure.extract:execute".
-_INLINE_EXECUTE_RE = re.compile(
-    r"/v1/capabilities/([a-z][a-z0-9]*(?:\.[a-z0-9]+)+):execute"
-)
-_URL_LITERAL_RE = re.compile(
-    r'["\']([^"\']*?/v1/capabilities/([a-z][a-z0-9]*(?:\.[a-z0-9]+)+)[^"\']*)["\']'
-)
 
 
 @dataclass
@@ -84,53 +57,32 @@ class ToolboxContract:
     providers: dict[str, set[str]]
 
 
+def _load_registry():
+    # Loaded by path: the registry is pure data and must not pull in settings,
+    # HTTP clients or a .env file just to be compared.
+    spec = importlib.util.spec_from_file_location(
+        "toolbox_capabilities", REGISTRY_PATH
+    )
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 def read_core_contract() -> CoreContract:
+    registry = _load_registry()
     contract = CoreContract()
 
-    for path in sorted(TOOLS_DIR.glob("toolbox_*.py")):
-        text = path.read_text(encoding="utf-8")
-        tree = ast.parse(text, filename=str(path))
+    for capability in registry.TOOLBOX_CAPABILITIES.values():
+        contract.capabilities.setdefault(capability.id, set()).add(
+            REGISTRY_MODULE
+        )
 
-        declared: set[str] = set()
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Assign):
-                continue
-            for target in node.targets:
-                if not isinstance(target, ast.Name):
-                    continue
-                match = _CAPABILITY_RE.match(f'{target.id} = "{_literal(node.value)}"')
-                if match:
-                    declared.add(match.group(1))
-
-        # Capabilities that only appear inside an execute URL, built either as
-        # a literal or as an f-string with a declared capability constant.
-        for match in _INLINE_EXECUTE_RE.finditer(text):
-            declared.add(match.group(1))
-        for _, capability in _URL_LITERAL_RE.findall(text):
-            declared.add(capability)
-
-        for capability in declared:
-            contract.capabilities.setdefault(capability, set()).add(path.name)
-
-        for route, capabilities in REST_ROUTE_CAPABILITIES.items():
-            if route in text:
-                for capability in capabilities:
-                    contract.capabilities.setdefault(capability, set()).add(
-                        path.name
-                    )
-
-    settings_text = SETTINGS_PATH.read_text(encoding="utf-8")
-    for env_name, default in _PROVIDER_ENV_RE.findall(settings_text):
-        if default:
-            contract.providers.setdefault(default, set()).add(env_name)
+    for setting, default in registry.PROVIDER_DEFAULTS.items():
+        contract.providers.setdefault(default, set()).add(setting.upper())
 
     return contract
-
-
-def _literal(node: ast.AST) -> str:
-    if isinstance(node, ast.Constant) and isinstance(node.value, str):
-        return node.value
-    return ""
 
 
 def read_toolbox_live(url: str) -> ToolboxContract:
@@ -145,8 +97,12 @@ def read_toolbox_snapshot(path: Path) -> ToolboxContract:
 
 
 def _fetch(url: str) -> object:
+    request = urllib.request.Request(url)
+    api_key = os.getenv("TOOLBOX_API_KEY", "")
+    if api_key:
+        request.add_header("Authorization", f"Bearer {api_key}")
     try:
-        with urllib.request.urlopen(url, timeout=30) as response:
+        with urllib.request.urlopen(request, timeout=30) as response:
             return json.load(response)
     except (urllib.error.URLError, TimeoutError) as exc:
         raise SystemExit(f"cannot reach the Toolbox at {url}: {exc}")

@@ -9,23 +9,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-import httpx
-
-from backend.config.settings import settings
 from backend.tools.logger import logger
-from backend.tools.toolbox_client import (
-    ToolboxContractViolation,
-    ToolboxProviderUnavailable,
-    ToolboxTimeout,
-    _media_type,
-    _raise_for_error,
-)
+from backend.tools.toolbox_client import ToolboxCapabilityClient
 
 CAPABILITY = "document.layout.analyze"
-EXECUTE_PATH = f"/v1/capabilities/{CAPABILITY}:execute"
 
 
-class ToolboxLayoutClient:
+class ToolboxLayoutClient(ToolboxCapabilityClient):
     """Cliente para extração de layout via Acessilia Toolbox.
 
     Encapsula a capacidade document.layout.analyze, que classifica regiões
@@ -33,25 +23,7 @@ class ToolboxLayoutClient:
     embedded_image, code_block, list_block, callout_box, etc.).
     """
 
-    def __init__(
-        self,
-        base_url: str | None = None,
-        provider: str | None = None,
-        timeout_seconds: int | None = None,
-        api_key: str | None = None,
-    ) -> None:
-        self.base_url = (base_url or settings.toolbox_base_url).rstrip("/")
-        self.provider = provider or settings.toolbox_layout_provider
-        self.timeout_seconds = timeout_seconds or settings.toolbox_timeout_seconds
-        self.api_key = api_key if api_key is not None else settings.toolbox_api_key
-        headers: dict[str, str] = {}
-        if self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
-        self._client = httpx.AsyncClient(
-            base_url=self.base_url,
-            timeout=httpx.Timeout(self.timeout_seconds),
-            headers=headers,
-        )
+    provider_key = "toolbox_layout_provider"
 
     async def analyze(
         self,
@@ -80,65 +52,20 @@ class ToolboxLayoutClient:
             - document: {page_count, region_count, pages: [{page_number, width, height, regions}]}
             - provenance: metadados de execução
         """
-        if file_path is None and artifact_id is None:
-            raise ValueError("Forneça file_path ou artifact_id")
-
-        url = f"{self.base_url}{EXECUTE_PATH}"
-
-        try:
-            if artifact_id:
-                data: dict[str, Any] = {
-                    "artifact_id": artifact_id,
-                    "language": language,
-                    "provider": self.provider,
-                }
-                if use_remote_cache is False:
-                    data["no_cache"] = True
-                response = await self._client.post(url, data=data)
-            else:
-                with open(file_path, "rb") as f:
-                    files = {
-                        "file": (
-                            file_path.name,
-                            f,
-                            _media_type(file_path),
-                        )
-                    }
-                    params: dict[str, Any] = {
-                        "language": language,
-                        "provider": self.provider,
-                    }
-                    if use_remote_cache is False:
-                        params["no_cache"] = True
-                    response = await self._client.post(
-                        url, files=files, data=params
-                    )
-
-            _raise_for_error(response, CAPABILITY)
-            result = response.json()
-
-            if result.get("status") != "succeeded":
-                raise ToolboxContractViolation(
-                    f"Análise de layout falhou na Toolbox: "
-                    f"status={result.get('status')}"
-                )
-
-            logger.info(
-                "Toolbox: layout analisado ({} páginas, {} regiões, {} ms)",
-                result.get("document", {}).get("page_count", "?"),
-                result.get("document", {}).get("region_count", "?"),
-                result.get("provenance", {}).get("duration_ms", "?"),
-            )
-            return result
-
-        except httpx.TimeoutException as e:
-            raise ToolboxTimeout(
-                f"Timeout ao analisar layout via Toolbox: {e}"
-            ) from e
-        except httpx.RequestError as e:
-            raise ToolboxProviderUnavailable(
-                f"Toolbox indisponível em {self.base_url}: {e}"
-            ) from e
+        result = await self._execute(
+            CAPABILITY,
+            file_path=file_path,
+            artifact_id=artifact_id,
+            language=language,
+            no_cache=use_remote_cache is False,
+        )
+        logger.info(
+            "Toolbox: layout analisado ({} páginas, {} regiões, {} ms)",
+            result.get("document", {}).get("page_count", "?"),
+            result.get("document", {}).get("region_count", "?"),
+            result.get("provenance", {}).get("duration_ms", "?"),
+        )
+        return result
 
     async def analyze_pages(
         self,
@@ -186,28 +113,3 @@ class ToolboxLayoutClient:
             if page.get("page_number") == page_number:
                 return page
         return None
-
-    async def health(self) -> dict[str, Any]:
-        """Verifica se a Toolbox está operacional."""
-        try:
-            response = await self._client.get("/v1/health")
-            _raise_for_error(response, "health")
-            return response.json()
-        except httpx.TimeoutException as e:
-            raise ToolboxTimeout(
-                f"Timeout ao verificar health da Toolbox: {e}"
-            ) from e
-        except httpx.RequestError as e:
-            raise ToolboxProviderUnavailable(
-                f"Toolbox indisponível em {self.base_url}: {e}"
-            ) from e
-
-    async def close(self) -> None:
-        """Libera a conexão HTTP."""
-        await self._client.aclose()
-
-    @property
-    def _auth_headers(self) -> dict[str, str]:
-        if self.api_key:
-            return {"Authorization": f"Bearer {self.api_key}"}
-        return {}

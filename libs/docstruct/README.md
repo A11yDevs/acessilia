@@ -136,4 +136,54 @@ pip install -e "libs/docstruct[dev]"
 pytest libs/docstruct/tests
 ```
 
-CI runs `pytest libs/docstruct/tests` without the backend installed — if a change needs to import `backend/`, it is violating the decoupling.
+`tests/test_purity.py` imports every module in an interpreter that refuses `backend`, `acessilia_toolbox` and `acessilia_sdk`, so a change that imports them fails even when they are installed (as they are in the core's CI).
+
+## Releases
+
+The Toolbox and other repositories consume a published artifact, not this
+directory. `.github/workflows/docstruct-release.yml` publishes a wheel and an
+sdist on a GitHub Release when a tag matching the version is pushed:
+
+1. Bump `version` in `libs/docstruct/pyproject.toml` (semantic versioning: a
+   change in a public function's behaviour or signature is a major bump while
+   the version is below 1.0, a minor one after).
+2. Merge, then tag the merged commit:
+   `git tag docstruct-v0.2.0 && git push origin docstruct-v0.2.0`.
+
+The workflow refuses a tag that differs from the package version, runs this
+suite with only docstruct installed, builds reproducibly from the commit
+(`SOURCE_DATE_EPOCH`), imports every module from the installed wheel and
+attaches the files with their SHA-256. The release notes carry the pin to copy:
+
+```
+acessilia-docstruct @ https://github.com/A11yDevs/acessilia/releases/download/docstruct-v<version>/acessilia_docstruct-<version>-py3-none-any.whl#sha256=<hash>
+```
+
+pip verifies the `#sha256=` fragment on download, also when the consumer
+installs without a lock file.
+
+### After the release
+
+Check the run and the published files before anyone depends on them:
+
+```bash
+gh run list --workflow docstruct-release.yml --limit 1   # then: gh run watch <id>
+gh release view docstruct-v<version>                     # the notes carry the pin
+gh release download docstruct-v<version> -D /tmp/docstruct-rel
+(cd /tmp/docstruct-rel && sha256sum -c SHA256SUMS)       # macOS: shasum -a 256 -c
+```
+
+The release is created by the last step, so a failed run publishes nothing. To
+retry, delete the tag (`git push --delete origin docstruct-v<version>` and
+`git tag -d docstruct-v<version>`), fix it in a PR and tag the new merge commit.
+A published version is never replaced: a fix ships as a new version.
+
+### Updating consumers
+
+Publishing does not change any consumer. Each one moves to the new version in
+its own PR, replacing the URL and the `#sha256=` with the ones in the release
+notes. For the Toolbox, see
+[Updating docstruct](https://github.com/A11yDevs/acessilia-toolbox/blob/develop/docs/dev-workflow.md#6-updating-docstruct) in its development workflow.
+The core installs this directory from its own checkout (editable in
+development, `pip install ./libs/docstruct` in CI and in its image), so it always
+runs the code of the same commit and needs no update.

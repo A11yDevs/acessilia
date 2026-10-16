@@ -81,9 +81,11 @@ ENV GIT_COMMIT=${GIT_COMMIT} \
 
 COPY pyproject.toml ./
 COPY libs/docstruct ./libs/docstruct
+COPY libs/sdk ./libs/sdk
 
 RUN pip install --upgrade pip \
     && pip install ./libs/docstruct --no-cache-dir \
+    && pip install ./libs/sdk --no-cache-dir \
     && pip install . --no-cache-dir
 
 COPY . .

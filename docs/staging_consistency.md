@@ -71,7 +71,14 @@ side being fetched, the check is structurally unable to report "up to date".
 `ENV` by that repository's `Dockerfile` (lines 13-15), but nothing reads them. The
 core can prove its commit once S1 is fixed; the Toolbox cannot.
 
-### S4 — The capability contract is broken between the deployed pair (high)
+### S4 — The capability contract is broken between the deployed pair (high, resolved in code)
+
+> **Superseded in code.** Toolbox A11yDevs/acessilia-toolbox#50 publishes the
+> `qwen3-vl-8b` provider for the three capabilities, and A11yDevs/acessilia#144
+> points the core defaults at it; the reproduction command below now reports
+> `capability contract holds`. Staging still runs a Toolbox image older than #50,
+> so the deployed pair stays broken until that image is updated. The text below
+> is the record at the date of capture.
 
 Against the running Toolbox (26 capabilities, 25 providers):
 

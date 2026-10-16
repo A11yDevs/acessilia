@@ -6,17 +6,17 @@ Toolbox document.ocr capability. Falls back to empty string on failure.
 
 from __future__ import annotations
 
-import asyncio
 from pathlib import Path
 from typing import Any
 
 from backend.tools.logger import logger
+from backend.tools.toolbox_client import run_sync
 from backend.tools.toolbox_ocr_client import ToolboxOcrClient
 
 
 def _run_async(coro) -> Any:
-    """Run an async coroutine from a sync context."""
-    return asyncio.run(coro)
+    """Run an async coroutine from a sync context, even inside a running loop."""
+    return run_sync(coro)
 
 
 def toolbox_ocr_text(

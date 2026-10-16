@@ -1,3 +1,10 @@
+"""Core-side access to the Acessilia Toolbox.
+
+The transport, the capability registry and the client base class live in the
+SDK (``libs/sdk``, package ``acessilia_sdk``); this module binds them to the
+core's ``settings`` and keeps the names other modules import from here.
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -5,40 +12,48 @@ from typing import Any
 
 import httpx
 
+from acessilia_sdk.runtime import run_sync
+from acessilia_sdk.toolbox import (
+    ToolboxArtifactNotFound,
+    ToolboxAuthenticationError,
+    ToolboxCapabilityError,
+    ToolboxContractViolation,
+    ToolboxError,
+    ToolboxProviderUnavailable,
+    ToolboxTimeout,
+    ToolboxUnsupportedMediaType,
+    auth_headers,
+    execute_capability,
+    require_capability,
+)
+from acessilia_sdk.toolbox import ToolboxCapabilityClient as _SdkCapabilityClient
+from acessilia_sdk.toolbox.transport import media_type_for as _media_type
+from acessilia_sdk.toolbox.transport import raise_for_error as _raise_for_error
 from backend.config.settings import settings
 from backend.tools.logger import logger
 
 
-class ToolboxError(Exception):
-    """Erro base para falhas de comunicação com a Acessilia Toolbox."""
+class ToolboxCapabilityClient(_SdkCapabilityClient):
+    """SDK client base with defaults taken from the core's ``settings``.
 
+    The provider default is read from the ``settings`` attribute named by
+    ``provider_key`` at construction time, so ``TOOLBOX_*_PROVIDER`` overrides
+    keep working.
+    """
 
-class ToolboxProviderUnavailable(ToolboxError):
-    """Provedor da Toolbox está offline ou não respondeu."""
-
-
-class ToolboxTimeout(ToolboxError):
-    """A requisição excedeu o timeout configurado."""
-
-
-class ToolboxUnsupportedMediaType(ToolboxError):
-    """Tipo de mídia não suportado pela capacidade solicitada."""
-
-
-class ToolboxArtifactNotFound(ToolboxError):
-    """Artefato requisitado não foi encontrado na Toolbox."""
-
-
-class ToolboxContractViolation(ToolboxError):
-    """Resposta da Toolbox violou o contrato esperado."""
-
-
-class ToolboxCapabilityError(ToolboxError):
-    """Capacidade inválida ou não disponível na Toolbox."""
-
-
-class ToolboxAuthenticationError(ToolboxError):
-    """Autenticação falhou — chave inválida ou ausente."""
+    def __init__(
+        self,
+        base_url: str | None = None,
+        provider: str | None = None,
+        timeout_seconds: int | None = None,
+        api_key: str | None = None,
+    ) -> None:
+        super().__init__(
+            base_url=base_url or settings.toolbox_base_url,
+            provider=provider or getattr(settings, self.provider_key),
+            timeout_seconds=timeout_seconds or settings.toolbox_timeout_seconds,
+            api_key=api_key if api_key is not None else settings.toolbox_api_key,
+        )
 
 
 class ToolboxClient:
@@ -59,14 +74,36 @@ class ToolboxClient:
         self.provider = provider or settings.toolbox_provider
         self.timeout_seconds = timeout_seconds or settings.toolbox_timeout_seconds
         self.api_key = api_key if api_key is not None else settings.toolbox_api_key
-        headers: dict[str, str] = {}
-        if self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
         self._client = httpx.AsyncClient(
             base_url=self.base_url,
             timeout=httpx.Timeout(self.timeout_seconds),
-            headers=headers,
+            headers=auth_headers(self.api_key),
         )
+
+    async def execute(
+        self,
+        capability_id: str,
+        *,
+        provider: str | None = None,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        """Execute any capability registered in ``TOOLBOX_CAPABILITIES``.
+
+        Accepts the keyword arguments of :func:`execute_capability`. A fresh
+        connection is opened per call so the client can be shared by code that
+        runs each extraction on its own event loop.
+        """
+        async with httpx.AsyncClient(
+            base_url=self.base_url,
+            timeout=httpx.Timeout(self.timeout_seconds),
+            headers=auth_headers(self.api_key),
+        ) as http:
+            return await execute_capability(
+                http,
+                capability_id,
+                provider=provider or self.provider,
+                **kwargs,
+            )
 
     async def health(self) -> dict[str, Any]:
         """GET /v1/health — verifica se a Toolbox está operacional."""
@@ -147,62 +184,24 @@ class ToolboxClient:
         Aceita upload direto (file_path) ou referência a artifact já armazenado
         (artifact_id). Retorna o JSON completo da resposta.
         """
-        if file_path is None and artifact_id is None:
-            raise ValueError("Forneça file_path ou artifact_id")
-
         use_cache = (
             use_remote_cache
             if use_remote_cache is not None
             else settings.toolbox_use_remote_cache
         )
-
-        url = f"{self.base_url}/v1/capabilities/document.structure.extract:execute"
-
-        try:
-            async with httpx.AsyncClient(timeout=httpx.Timeout(self.timeout_seconds)) as client:
-                if artifact_id:
-                    data = {
-                        "artifact_id": artifact_id,
-                        "language": language,
-                        "provider": self.provider,
-                    }
-                    if not use_cache:
-                        data["no_cache"] = True
-                    response = await client.post(url, data=data, headers=self._auth_headers)
-                else:
-                    with open(file_path, "rb") as f:
-                        files = {"file": (file_path.name, f, _media_type(file_path))}
-                        form_data: dict[str, Any] = {
-                            "language": language,
-                            "provider": self.provider,
-                        }
-                        if not use_cache:
-                            form_data["no_cache"] = "true"
-                        response = await client.post(url, files=files, data=form_data, headers=self._auth_headers)
-
-            _raise_for_error(response, "document.structure.extract")
-            result = response.json()
-
-            if result.get("status") != "succeeded":
-                raise ToolboxContractViolation(
-                    f"Extração falhou na Toolbox: status={result.get('status')}"
-                )
-
-            logger.info(
-                "Toolbox: extração concluída ({} ms, provider={})",
-                result.get("provenance", {}).get("duration_ms", "?"),
-                result.get("provider", "?"),
-            )
-            return result
-
-        except httpx.TimeoutException as e:
-            raise ToolboxTimeout(
-                f"Timeout ao extrair documento via Toolbox: {e}"
-            ) from e
-        except httpx.RequestError as e:
-            raise ToolboxProviderUnavailable(
-                f"Toolbox indisponível em {self.base_url}: {e}"
-            ) from e
+        result = await self.execute(
+            "document.structure.extract",
+            file_path=file_path,
+            artifact_id=artifact_id,
+            language=language,
+            no_cache=not use_cache,
+        )
+        logger.info(
+            "Toolbox: extração concluída ({} ms, provider={})",
+            result.get("provenance", {}).get("duration_ms", "?"),
+            result.get("provider", "?"),
+        )
+        return result
 
     async def close(self) -> None:
         await self._client.aclose()
@@ -353,9 +352,7 @@ class ToolboxClient:
 
     @property
     def _auth_headers(self) -> dict[str, str]:
-        if self.api_key:
-            return {"Authorization": f"Bearer {self.api_key}"}
-        return {}
+        return auth_headers(self.api_key)
 
     async def _get(self, path: str, params: dict[str, Any] | None = None) -> Any:
         try:
@@ -370,66 +367,19 @@ class ToolboxClient:
             ) from e
 
 
-def _media_type(path: Path) -> str:
-    suffix = path.suffix.lower()
-    mapping = {
-        ".pdf": "application/pdf",
-        ".png": "image/png",
-        ".jpg": "image/jpeg",
-        ".jpeg": "image/jpeg",
-        ".tiff": "image/tiff",
-        ".tif": "image/tiff",
-        ".bmp": "image/bmp",
-        ".gif": "image/gif",
-        ".webp": "image/webp",
-        ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        ".html": "text/html",
-        ".txt": "text/plain",
-    }
-    return mapping.get(suffix, "application/octet-stream")
-
-
-def _raise_for_error(response: httpx.Response, context: str) -> None:
-    """Converte códigos HTTP em exceções Toolbox específicas."""
-    if response.is_success:
-        return
-
-    status = response.status_code
-    try:
-        body = response.json()
-        detail = body.get("detail", body.get("message", ""))
-    except Exception:
-        detail = response.text[:500]
-
-    if status == 503:
-        raise ToolboxProviderUnavailable(
-            f"Provedor indisponível ({context}): {detail}"
-        )
-    if status == 504:
-        raise ToolboxTimeout(
-            f"Timeout do provedor ({context}): {detail}"
-        )
-    if status == 415:
-        raise ToolboxUnsupportedMediaType(
-            f"Tipo de mídia não suportado ({context}): {detail}"
-        )
-    if status == 404:
-        raise ToolboxArtifactNotFound(
-            f"Artefato não encontrado ({context}): {detail}"
-        )
-    if status == 422:
-        raise ToolboxContractViolation(
-            f"Requisição inválida ({context}): {detail}"
-        )
-    if status == 400:
-        raise ToolboxCapabilityError(
-            f"Capacidade inválida ({context}): {detail}"
-        )
-    if status == 401:
-        raise ToolboxAuthenticationError(
-            f"Autenticação falhou ({context}): {detail}"
-        )
-
-    raise ToolboxError(
-        f"Erro HTTP {status} na Toolbox ({context}): {detail}"
-    )
+__all__ = [
+    "ToolboxArtifactNotFound",
+    "ToolboxAuthenticationError",
+    "ToolboxCapabilityClient",
+    "ToolboxCapabilityError",
+    "ToolboxClient",
+    "ToolboxContractViolation",
+    "ToolboxError",
+    "ToolboxProviderUnavailable",
+    "ToolboxTimeout",
+    "ToolboxUnsupportedMediaType",
+    "auth_headers",
+    "execute_capability",
+    "require_capability",
+    "run_sync",
+]

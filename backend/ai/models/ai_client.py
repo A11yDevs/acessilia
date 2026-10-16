@@ -3,7 +3,7 @@ from backend.config.settings import settings
 
 
 
-def get_agno_model():
+def get_agno_model(*, max_tokens: int | None = None):
     """Build the Agno model instance that matches the active settings configuration.
 
     The provider is chosen by ``settings.ai_client``: the value ``"openrouter"`` selects
@@ -28,7 +28,11 @@ def get_agno_model():
             id=settings.openrouter_model,
             api_key=settings.openrouter_api_key,
             base_url=base_url,
-            max_tokens=settings.openrouter_max_tokens,
+            max_tokens=(
+                max_tokens
+                if max_tokens is not None
+                else settings.openrouter_max_tokens
+            ),
             extra_headers=extra_headers if extra_headers else None,
             timeout=float(settings.request_timeout),
         )
@@ -42,6 +46,8 @@ def get_agno_model():
             "top_k": 64,
             "seed": 42,
         }
+        if max_tokens is not None:
+            options["num_predict"] = max_tokens
 
         return Ollama(
             id=settings.ollama_model,

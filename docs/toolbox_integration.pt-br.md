@@ -48,14 +48,16 @@ Uma resposta de extração bem-sucedida tem a forma:
 }
 ```
 
-**Ponto-chave:** o core **não tem registro de providers**. O `provider` é apenas uma
-string enviada no form; o roteamento real acontece no `providers-config.yaml` da
-Toolbox. A validação de que um provider existe é feita do lado da Toolbox — quando
+**Ponto-chave:** o core **não registra quais providers existem**. A única tabela de
+providers do core é `PROVIDER_DEFAULTS`, em `libs/sdk/src/acessilia_sdk/toolbox/capabilities.py`, que
+guarda o provider padrão de cada capacidade. Ela não lista os providers existentes nem
+faz roteamento. O `provider` é apenas uma string enviada no form; o roteamento real
+acontece no `providers-config.yaml` da Toolbox. A validação de que um provider existe é feita do lado da Toolbox — quando
 falha, o core recebe `ToolboxCapabilityError` ou `ToolboxContractViolation`.
 
 ### Hierarquia de exceções
 
-Todas herdam de `ToolboxError` (definida em `backend/tools/toolbox_client.py`):
+Todas herdam de `ToolboxError` (definida no SDK, `acessilia_sdk.toolbox.errors`, e re-exportada por `backend/tools/toolbox_client.py`):
 
 - `ToolboxProviderUnavailable` — serviço/provedor indisponível (ex.: HTTP 503)
 - `ToolboxTimeout` — excedeu `toolbox_timeout_seconds`
@@ -156,9 +158,29 @@ no core**. Basta:
 Quando a Toolbox expõe uma **capacidade nova** (ex.: `document.layout.analyze`), o core
 precisa de um cliente especializado. Siga o padrão de `toolbox_layout_client.py`:
 
-### 4.1 Cliente especializado
+### 4.1 Registrar a capacidade e escrever um cliente fino
 
-Crie `backend/tools/toolbox_<x>_client.py`:
+Toda chamada à Toolbox passa por `execute_capability`
+(SDK, `libs/sdk`: `acessilia_sdk.toolbox.transport`), que recusa qualquer capacidade fora do
+registro. Adicionar uma capacidade tem dois passos.
+
+**1. Declarar** em `libs/sdk/src/acessilia_sdk/toolbox/capabilities.py`:
+
+```python
+ToolboxCapability(
+    "<capability>", 1, "<Rótulo>",               # id, versão do manifesto, rótulo de erro
+    provider_key="toolbox_<x>_provider",     # atributo do Settings / TOOLBOX_<X>_PROVIDER
+    output_schema="<schema>@1",                  # output.schema do manifesto
+),
+```
+
+Se a configuração de provider for nova, acrescente o default em
+`PROVIDER_DEFAULTS` e o atributo correspondente em `Settings`
+(`os.getenv("TOOLBOX_<X>_PROVIDER", provider_default("toolbox_<x>_provider"))`).
+
+**2. Escrever o cliente** como subclasse de `ToolboxCapabilityClient`, que já
+cuida da conexão, do header Bearer, de `health()`, `close()`, do mapeamento de
+erros de timeout/rede e da validação do envelope de resposta:
 
 ```python
 """Cliente especializado para a capacidade <capability> da Toolbox."""
@@ -168,91 +190,35 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-import httpx
-
-from backend.config.settings import settings
-from backend.tools.toolbox_client import (
-    ToolboxContractViolation,
-    ToolboxProviderUnavailable,
-    ToolboxTimeout,
-    _media_type,
-    _raise_for_error,
-)
+from backend.tools.toolbox_client import ToolboxCapabilityClient
 
 CAPABILITY = "<capability>"
-EXECUTE_PATH = f"/v1/capabilities/{CAPABILITY}:execute"
 
 
-class Toolbox<X>Client:
-    """Cliente para <capability> via Acessilia Toolbox."""
+class Toolbox<X>Client(ToolboxCapabilityClient):
+    provider_key = "toolbox_<x>_provider"
 
-    def __init__(
-        self,
-        base_url: str | None = None,
-        provider: str | None = None,
-        timeout_seconds: int | None = None,
-        api_key: str | None = None,
-    ) -> None:
-        self.base_url = (base_url or settings.toolbox_base_url).rstrip("/")
-        self.provider = provider or settings.toolbox_provider
-        self.timeout_seconds = timeout_seconds or settings.toolbox_timeout_seconds
-        self.api_key = api_key if api_key is not None else settings.toolbox_api_key
-        headers: dict[str, str] = {}
-        if self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
-        self._client = httpx.AsyncClient(
-            base_url=self.base_url,
-            timeout=httpx.Timeout(self.timeout_seconds),
-            headers=headers,
-        )
-
-    async def execute(
+    async def run(
         self,
         file_path: Path | None = None,
         artifact_id: str | None = None,
         *,
-        language: str = "pt-BR",
         use_remote_cache: bool | None = None,
     ) -> dict[str, Any]:
-        if file_path is None and artifact_id is None:
-            raise ValueError("Forneça file_path ou artifact_id")
-
-        url = f"{self.base_url}{EXECUTE_PATH}"
-        try:
-            if artifact_id:
-                data: dict[str, Any] = {
-                    "artifact_id": artifact_id,
-                    "language": language,
-                    "provider": self.provider,
-                }
-                if use_remote_cache is False:
-                    data["no_cache"] = True
-                response = await self._client.post(url, data=data)
-            else:
-                with open(file_path, "rb") as f:
-                    files = {"file": (file_path.name, f, _media_type(file_path))}
-                    params: dict[str, Any] = {
-                        "language": language,
-                        "provider": self.provider,
-                    }
-                    if use_remote_cache is False:
-                        params["no_cache"] = True
-                    response = await self._client.post(url, files=files, data=params)
-
-            _raise_for_error(response, CAPABILITY)
-            result = response.json()
-            if result.get("status") != "succeeded":
-                raise ToolboxContractViolation(
-                    f"{CAPABILITY}: status inesperado {result.get('status')!r}"
-                )
-            return result
-        except httpx.TimeoutException as exc:
-            raise ToolboxTimeout(f"{CAPABILITY}: timeout") from exc
-        except httpx.HTTPStatusError as exc:
-            raise ToolboxProviderUnavailable(
-                f"{CAPABILITY}: HTTP {exc.response.status_code}"
-            ) from exc
+        return await self._execute(
+            CAPABILITY,
+            file_path=file_path,
+            artifact_id=artifact_id,
+            parameters={...},                      # opcional, enviado como JSON
+            no_cache=use_remote_cache is False,
+        )
 ```
+
+Entradas de texto usam `upload=(nome, bytes, media_type)` no lugar de
+`file_path` (veja `toolbox_math_client.py`). `scripts/check_capability_contract.py`
+lê o registro, então o novo ID é conferido contra o catálogo da Toolbox sem
+outras mudanças; `tests/test_toolbox_capability_registry.py` falha se um cliente
+fixar uma rota `:execute` no código ou usar um ID não registrado.
 
 ### 4.2 Wrapper de tool Agno (opcional, com fallback local)
 
@@ -267,6 +233,27 @@ primeiro e degrada para a implementação local em caso de falha.
   `ToolboxLayoutStructurer`).
 - **Fusão dual** (`backend/pipeline/fusion.py`): se a capacidade produz blocos
   canônicos, pode participar como provider em `extract_fused()`.
+- **Método PDDL** (`backend/core/planning/toolbox_gate.py`): se o handler de um
+  método de planejamento chama a capacidade, declare-a em
+  `METHOD_TOOLBOX_REQUIREMENTS` (capacidade e provider). O gate de disponibilidade
+  passa a conferi-la contra o catálogo vivo antes de cada documento ser planejado
+  (veja abaixo).
+
+#### Gate de disponibilidade
+
+Antes de planejar um documento, o orquestrador tira um snapshot do catálogo
+(`GET /v1/capabilities` + `/v1/providers`, em cache por
+`TOOLBOX_CATALOG_REFRESH_SECONDS`) e confere cada método pedido que esteja em
+`METHOD_TOOLBOX_REQUIREMENTS`: a capacidade precisa estar na allowlist do SDK, ser
+publicada com a versão exata do contrato, e o provider configurado precisa estar
+registrado e implementá-la. O catálogo só restringe; nunca torna um método
+disponível.
+
+| `TOOLBOX_AVAILABILITY_GATE` | Efeito |
+|---|---|
+| `observe` (padrão) | Registra no log o que seria removido e grava em `canonical_metadata.pddl_toolbox_availability`; o plano não muda |
+| `enforce` | Remove esses métodos do plano e de todos os replanejamentos do documento. Quando o catálogo não pode ser lido e o último snapshot válido tem mais de `TOOLBOX_CATALOG_STALE_SECONDS`, todo método com requisitos da Toolbox é removido (fail closed) |
+| `off` | Sem verificação |
 
 ### 4.4 Tests
 
@@ -311,6 +298,9 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 | `TOOLBOX_BASE_URL` | `http://localhost:8002` | URL base do serviço |
 | `TOOLBOX_PROVIDER` | `docling` | Provider principal de extração |
 | `TOOLBOX_API_KEY` | *(vazio)* | Chave para `Authorization: Bearer` |
+| `TOOLBOX_AVAILABILITY_GATE` | `observe` | Gate de disponibilidade: `observe`, `enforce` ou `off` (seção 4.3) |
+| `TOOLBOX_CATALOG_REFRESH_SECONDS` | `60` | Por quanto tempo um snapshot do catálogo é reutilizado |
+| `TOOLBOX_CATALOG_STALE_SECONDS` | `900` | Por quanto tempo o último snapshot válido é servido quando o catálogo não pode ser lido |
 | `TOOLBOX_TIMEOUT_SECONDS` | `3600` | Timeout das requisições |
 | `TOOLBOX_USE_ARTIFACT_STORE` | `true` | Envia o arquivo para `/v1/artifacts` antes de extrair |
 | `TOOLBOX_USE_REMOTE_CACHE` | `true` | Usa o cache remoto (`no_cache=false`) |
@@ -319,8 +309,9 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 | `FUSION_MODE` | `single` | `single` (um provider) ou `dual` (dois providers + fusão) |
 | `FUSION_SECONDARY_PROVIDER` | `mineru` | Provider secundário para `FUSION_MODE=dual` |
 | `STRUCTURER` | `toolbox` | Motor de regiões por página (`toolbox`, `toolbox-layout`, `pymupdf`) |
-| `TOOLBOX_PAGE_OCR_PROVIDER` | `qwen3-vl-page` | Transcrição VLM de página inteira (`document.ocr.page`) |
-| `TOOLBOX_ADJUDICATE_PROVIDER` | `qwen3-vl-judge` | Juiz pareado / transcrição de região (`document.adjudicate.*`) |
+| `TOOLBOX_PAGE_OCR_PROVIDER` | `qwen3-vl-8b` | Transcrição VLM de página inteira (`document.ocr.page`) |
+| `TOOLBOX_ADJUDICATE_PROVIDER` | `qwen3-vl-8b` | Juiz pareado / transcrição de região (`document.adjudicate.*`) |
+| `TOOLBOX_TABLE_PROVIDER` | `qwen3-vl-8b` | Regeração de tabelas para o especialista de tabelas (`table.recognize`) |
 | `TOOLBOX_ORIENTATION_PROVIDER` | `rapidocr-orient` | Detecção de rotação (`image.page.orient`) |
 | `FUSION_HYBRID_PROVIDER` | `mineru-hyb` | Id do provider MinerU hybrid-VLM (a fonte B do melhor confirmado no leaderboard) |
 
@@ -349,7 +340,8 @@ service.py: _build_orchestrator()
 
 ## 7. Referências de código
 
-- `backend/tools/toolbox_client.py` — cliente base e hierarquia de exceções
+- `libs/sdk/src/acessilia_sdk/toolbox/` — registro de capacidades, transporte, classe base dos clientes e hierarquia de exceções (SDK)
+- `backend/tools/toolbox_client.py` — liga a classe base do SDK ao settings do core; `ToolboxClient` genérico (extração, artefatos, datasets)
 - `backend/tools/toolbox_layout_client.py` — modelo do Cenário B
 - `backend/tools/toolbox_ocr_tools.py`, `toolbox_math_tools.py`, `toolbox_pdf_tools.py` — wrappers com fallback local
 - `backend/tools/toolbox_page_ocr_client.py` — `document.ocr.page` (VLM de página inteira)
@@ -365,9 +357,10 @@ service.py: _build_orchestrator()
 
 | Capacidade | Cliente | Providers | Finalidade |
 |---|---|---|---|
-| `document.ocr.page` | `ToolboxPageOcrClient` | `qwen3-vl-page`, `dots-ocr-page`, `deepseek-ocr-page`, `teleocr-page` | Transcrição VLM de página inteira — a fonte B do híbrido de página |
-| `document.adjudicate.page` | `ToolboxAdjudicateClient` | `qwen3-vl-judge` | Juiz pareado entre duas transcrições candidatas (as duas ordens, debiasing de posição) |
-| `document.adjudicate.region` | `ToolboxAdjudicateClient` | `qwen3-vl-judge` | Transcrição exata de um recorte de região, convertida em decisão do differ |
+| `document.ocr.page` | `ToolboxPageOcrClient` | `qwen3-vl-8b` | Transcrição VLM de página inteira — a fonte B do híbrido de página |
+| `document.adjudicate.page` | `ToolboxAdjudicateClient` | `qwen3-vl-8b` | Juiz pareado entre duas transcrições candidatas (as duas ordens, debiasing de posição); usado pelo método `vlm-pairwise-judge` |
+| `document.adjudicate.region` | `ToolboxAdjudicateClient` | `qwen3-vl-8b` | Transcrição exata de um recorte de região, convertida em decisão do differ |
+| `table.recognize` | `ToolboxTableClient` | `qwen3-vl-8b` | Gerações HTML (greedy e com semente) de um recorte de tabela, para o especialista de tabelas |
 | `image.page.orient` | `ToolboxOrientationClient` | `rapidocr-orient` | Detecção de rotação 0/90/180/270 |
 
 Os registros de provider vivem no repositório da Toolbox; a configuração de job

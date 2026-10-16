@@ -12,20 +12,18 @@ from tests.test_pddl_actionability import _element, _manifest, _obligation, _orc
     ("join-tail-blocks", "tailjoin"),
     ("join-tail-blocks", "tailjoin-positioned"),
 ])
-def test_unimplemented_text_adapter_is_excluded_from_plan(kind, method):
+def test_text_adapter_runs_without_signature_errors(kind, method):
     manifest = _manifest(
         [_element("text", "paragraph", text="First line 5\nSecond line 10\nThird line 15")],
         [_obligation(kind, ["text"], [method, "human-review"])],
     )
     manifest.obligations[0].method_costs = {method: 1, "human-review": 100}
     orchestrator = _orchestrator()
-    assert orchestrator._unavailable_methods(manifest) == [method]
+    assert method not in orchestrator._unavailable_methods(manifest)
     plan, _ = orchestrator._build_plan(manifest)
-    assert method not in {step.method for step in plan.steps}
-    updated, report = orchestrator.executor.execute(plan, manifest, dry_run=False)
-    assert report.status == "failed"
+    assert method in {step.method for step in plan.steps}
+    _, report = orchestrator.executor.execute(plan, manifest, dry_run=False)
     assert all("TypeError" not in (step.message or "") for step in report.steps)
-    assert updated.obligations[0].attempts[0].method == "human-review"
 
 
 def test_failed_dry_run_reports_failure_and_preserves_manifest():

@@ -102,6 +102,22 @@ O domínio PDDL vive em `backend/core/planning/domains/`. Os esquemas JSON (mani
 
 A base de código segue uma arquitetura em camadas pragmática com fluxo de cima para baixo: Interface → Orquestração → Extração → Documento Canônico → Saída. Os serviços de infraestrutura e as ferramentas compartilhadas sustentam várias camadas, mas não possuem decisões de negócio. Existem algumas exceções controladas: `backend/adapters/exporters` é um envelope fino de compatibilidade sobre `backend/export`, e o orquestrador coordena tanto preocupações de processamento quanto de infraestrutura (cache, histórico).
 
+### Bibliotecas e a Toolbox (`libs/`)
+
+Os modelos pesados rodam num serviço separado, a [Acessilia Toolbox](https://github.com/A11yDevs/acessilia-toolbox). Entre ela e este core ficam duas bibliotecas, mantidas em `libs/`. As dependências só apontam para baixo:
+
+| Camada | Pacote | Papel | Pode depender de |
+|---|---|---|---|
+| 0 | `libs/docstruct` (`acessilia-docstruct`) | Algoritmos puros de estrutura de documentos (fusão, tabelas, ordem de leitura), sem dependências próprias | nada |
+| 1 | Toolbox (repositório separado) | Providers pesados, armazenamento de artefatos, execução de capacidades por REST/MCP | docstruct |
+| 2 | `libs/sdk` (`acessilia-sdk`) | Allowlist de capacidades, transporte HTTP, verificações do catálogo; a configuração é injetada | o **contrato publicado** da Toolbox (IDs de capacidade, versões, schemas), nunca o pacote dela |
+| 3 | Core (`backend/`) | Agentes, planejamento PDDL, obrigações, políticas | SDK, docstruct |
+
+- **O core decide o que fazer e quando; o SDK define como acessar uma operação; a Toolbox fornece onde e com quais recursos ela roda.** Obrigações, métodos admissíveis e custos são política de planejamento do core: a Toolbox relata o que encontrou, e o core deriva as obrigações ([#138](https://github.com/A11yDevs/acessilia/pull/138)).
+- **O catálogo da Toolbox só restringe.** Os métodos que chamam a Toolbox são conferidos contra o catálogo vivo antes de cada documento ser planejado (`TOOLBOX_AVAILABILITY_GATE`); uma capacidade fora da allowlist do SDK nunca fica disponível. Veja [toolbox_integration.pt-br.md](toolbox_integration.pt-br.md).
+- **A docstruct é distribuída como wheel de release.** O core a instala a partir deste checkout. A Toolbox fixa a wheel de um GitHub Release `docstruct-vX.Y.Z` pela URL e pelo `#sha256=` ([Releases](../libs/docstruct/README.pt-br.md#releases)). O SDK tem um único consumidor, o core, e ainda não é publicado.
+- **Garantido por testes:** `libs/docstruct/tests/test_purity.py` e `libs/sdk/tests/test_purity.py` importam todos os módulos com as camadas de cima bloqueadas; `tests/test_architecture_layers.py` falha se o `backend` importar o pacote da Toolbox.
+
 ---
 
 ## Fluxo Principal de Processamento

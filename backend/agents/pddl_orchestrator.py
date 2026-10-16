@@ -9,11 +9,13 @@ import os
 import re
 import tempfile
 from collections import Counter
-from collections.abc import Callable, Coroutine
+from collections.abc import Callable, Coroutine, Iterable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import fitz
+from docstruct.fusion.tailjoin import is_page_number as _is_page_number
 from docstruct.tables.ast import effective_section_width, linearize_table_for_text
 from docstruct.text.norm_fix import norm_fix
 
@@ -21,11 +23,13 @@ from backend.services.blocking import run_blocking
 from backend.agents.data_agent import DataAgent
 from backend.agents.output_schemas import DataOutput, VisionOutput
 from backend.agents.vision_agent import VisionAgent
+from backend.core.agents.fusion_agent import FusionAgent
 from backend.core.agents.informational_structural import InformationalStructuralAgent
 from backend.core.execution.executor import ExecutorAgent, MethodRegistry
 from backend.core.execution.models import ExecutionReport, MethodResult
 from backend.core.execution.messages import EXE_COMPLETED_OBLIGATIONS_UNSATISFIED
 from backend.core.manifest.builder import (
+    SECONDARY_EXTRACTION_KIND,
     _derive_processing_needs,
     reconcile_reclassified_element_processing_needs,
 )
@@ -38,6 +42,7 @@ from backend.core.manifest.models import (
 from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
 from backend.core.planning.domain_bundle import DomainBundle
 from backend.core.planning.models import NominalPlan, PlanningComparison
+from backend.core.planning import toolbox_gate
 from backend.core.planning.planner_agent import PlannerAgent
 from backend.i18n import t
 from backend.log_messages import (
@@ -140,7 +145,9 @@ def _handle_latex_verbalizer_method(
     )
 
 
-def _run_extract_fused(source_path: Path) -> dict:
+def _run_extract_fused(
+    source_path: Path, *, artifact_id: str | None = None
+) -> dict:
     """Executa ``extract_fused`` respeitando o contexto de event loop.
 
     Detecta a presença de um event loop **antes** de criar a coroutine,
@@ -163,14 +170,84 @@ def _run_extract_fused(source_path: Path) -> dict:
     except RuntimeError:
         # Contexto síncrono (executor determinístico, CLI, testes):
         # não existe event loop ativo neste thread.
-        return asyncio.run(extract_fused(source_path))
+        return asyncio.run(extract_fused(source_path, artifact_id=artifact_id))
 
     # Já existe um event loop neste thread; como o handler é síncrono,
     # a coroutine é executada em um thread dedicado com seu próprio loop.
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
         return pool.submit(
-            lambda: asyncio.run(extract_fused(source_path))
+            lambda: asyncio.run(
+                extract_fused(source_path, artifact_id=artifact_id)
+            )
         ).result()
+
+
+def _run_extract_single_provider(source_path: Path) -> dict[str, Any]:
+    """Extract through the configured Toolbox provider for the PDDL fallback."""
+    import concurrent.futures
+
+    from backend.tools.toolbox_client import ToolboxClient
+
+    async def extract() -> dict[str, Any]:
+        client = ToolboxClient()
+        try:
+            return await client.extract_structure(
+                file_path=source_path,
+                language="pt-BR",
+                use_remote_cache=False,
+            )
+        finally:
+            await client.close()
+
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(extract())
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(lambda: asyncio.run(extract())).result()
+
+
+def _fusion_agent() -> FusionAgent:
+    """Fusion agent used to reach the deterministic fusion primitives.
+
+    The `docstruct` functions take classified blocks, counters and tuning
+    parameters; `FusionAgent.process_*` is the in-repo entry point that supplies
+    them, so handlers call that instead of a primitive whose signature they would
+    otherwise have to guess.
+    """
+    return FusionAgent()
+
+
+def _element_bbox(
+    element: ManifestElement,
+    manifest: ProcessingManifest,
+) -> tuple[float, float, float, float] | None:
+    """Element bounding box normalized to the unit page expected by docstruct."""
+    for item in element.provenance:
+        box = getattr(item, "bbox", None)
+        if box is None:
+            continue
+        page = next(
+            (
+                page
+                for page in manifest.pages
+                if page.page_number == item.page_number
+            ),
+            None,
+        )
+        if page is None or not page.width or not page.height:
+            return None
+        top, bottom = box.top, box.bottom
+        if box.coord_origin == "BOTTOMLEFT":
+            top, bottom = page.height - top, page.height - bottom
+        return (
+            box.left / page.width,
+            top / page.height,
+            box.right / page.width,
+            bottom / page.height,
+        )
+    return None
 
 
 def _target_elements(
@@ -547,6 +624,912 @@ def _handle_pymupdf_region_method(manifest: ProcessingManifest, obligation_id: s
         )
 
 
+def _handle_repetition_guard_method(
+    manifest: ProcessingManifest, obligation_id: str
+) -> MethodResult:
+    """Remove repeated token loops from the obligation's current page text."""
+    elements = _target_elements(manifest, obligation_id)
+    if not elements:
+        return _missing_obligation(obligation_id)
+
+    fusion_agent = _fusion_agent()
+    cut_total = 0
+    for element in elements:
+        result = fusion_agent.process_guard_repetition(element.text or "")
+        cut = int(result["tokens_cut"])
+        if not cut:
+            continue
+        element.text = result["text"]
+        element.metadata["repetition_guard"] = {"tokens_cut": cut}
+        cut_total += cut
+
+    if not cut_total:
+        return MethodResult(
+            success=False,
+            validated=False,
+            message="Nenhuma repetição degenerada encontrada nos alvos",
+        )
+    return MethodResult(
+        success=True,
+        validated=True,
+        message=f"Guarda de repetição removeu {cut_total} token(s)",
+    )
+
+
+def _element_blocks(
+    elements: list[ManifestElement],
+    manifest: ProcessingManifest,
+) -> list[dict[str, Any]]:
+    """Manifest elements as the fusion stack's block dicts.
+
+    The deterministic primitives in `docstruct` operate on classified blocks, not
+    on bare strings, so the elements are adapted once here instead of each handler
+    guessing at a signature.
+    """
+    blocks: list[dict[str, Any]] = []
+    for element in elements:
+        bbox = _element_bbox(element, manifest)
+        blocks.append(
+            {
+                "md": element.text or "",
+                "text": element.text or "",
+                "kind": _block_kind(element),
+                "type": element.type,
+                "role": _element_role(element),
+                "box": list(bbox) if bbox else None,
+            }
+        )
+    return blocks
+
+
+def _element_role(element: ManifestElement) -> str | None:
+    """Fusion block role for an element.
+
+    The manifest builder records page furniture in `element.type`
+    (`page_header`/`page_footer`) and does not populate `metadata["role"]`, so the
+    role is derived from the type when the metadata does not carry one.
+    """
+    role = (element.metadata or {}).get("role")
+    if role:
+        return role
+    return {"page_header": "header", "page_footer": "footer"}.get(element.type)
+
+
+def _block_kind(element: ManifestElement) -> str:
+    """Fusion block kind for an element type (`DiffBlock.kind` vocabulary)."""
+    if element.type == "heading":
+        return "heading"
+    if element.type == "table":
+        return "table"
+    if element.type == "formula":
+        return "formula"
+    return "text"
+
+
+def _handle_extract_line_numbers_method(
+    manifest: ProcessingManifest, obligation_id: str
+) -> MethodResult:
+    """Pull marginal verse line numbers out of the target blocks.
+
+    Uses `FusionAgent.process_extract_line_numbers`, which is the supported entry
+    point: `docstruct.fusion.line_numbers.extract_line_numbers` needs a block list
+    plus a stats counter and a provenance tag, so calling it with a plain string
+    raised `TypeError` on every step.
+    """
+    elements = _target_elements(manifest, obligation_id)
+    if not elements:
+        return _missing_obligation(obligation_id)
+
+    result = _fusion_agent().process_extract_line_numbers(
+        _element_blocks(elements, manifest)
+    )
+    extracted = int(result.get("stats", {}).get("line-numbers-agent-count", 0))
+    if not extracted:
+        return MethodResult(
+            success=False,
+            validated=False,
+            message="Nenhum número de linha marginal encontrado",
+        )
+    for element in elements:
+        element.metadata["line_numbers_extracted"] = extracted
+    return MethodResult(
+        success=True,
+        validated=True,
+        message=f"{extracted} número(s) de linha extraído(s)",
+    )
+
+
+def _handle_chunk_verse_method(
+    manifest: ProcessingManifest, obligation_id: str
+) -> MethodResult:
+    """Split verse/record blocks into chunks the evaluator can re-group.
+
+    `docstruct.fusion.verse.chunk_verse` takes already-split lines plus a character
+    budget, so the handler goes through `FusionAgent.process_chunk_verse`, which
+    detects the verse lines itself.
+    """
+    elements = _target_elements(manifest, obligation_id)
+    if not elements:
+        return _missing_obligation(obligation_id)
+
+    result = _fusion_agent().process_chunk_verse(_element_blocks(elements, manifest))
+    # `verse_blocks` reports `verse-{tag}-{whole,kept,split,chunks}`; only the
+    # blocks it actually split are evidence that the method did anything.
+    chunks = result.get("stats", {}).get("verse-agent-split", 0)
+    if not chunks:
+        return MethodResult(
+            success=False,
+            validated=False,
+            message="Nenhum bloco de verso elegível para fragmentação",
+        )
+    for element in elements:
+        element.metadata["verse_chunks"] = chunks
+    return MethodResult(
+        success=True,
+        validated=True,
+        message=f"Verso fragmentado em {chunks} pedaço(s)",
+    )
+
+
+def _tailjoin_position(manifest: ProcessingManifest) -> str | None:
+    """Vertical position ("top"/"bot") of the page number in the manifest.
+
+    `join_tail` only applies the position-conditioned `tj3` rule when it knows
+    where the page number sits, which is the distinction between `tailjoin` and
+    `tailjoin-positioned`.
+    """
+    for element in manifest.elements:
+        role = _element_role(element)
+        if role in {"header", "footer", "page_number"} and _is_page_number(
+            element.text or ""
+        ):
+            bbox = _element_bbox(element, manifest)
+            if bbox is None:
+                continue
+            return "top" if (bbox[1] + bbox[3]) / 2 < 0.5 else "bot"
+    return None
+
+
+def _handle_tailjoin_method(
+    manifest: ProcessingManifest, obligation_id: str
+) -> MethodResult:
+    """Join the trailing short blocks (header/footer/page number).
+
+    `docstruct.fusion.tailjoin.join_tail` requires the tail mode, a maximum short
+    block length and the number of blocks to consider, so it cannot be called with
+    the text alone. `FusionAgent.process_join_tail` supplies those defaults.
+    """
+    elements = _target_elements(manifest, obligation_id)
+    if not elements:
+        return _missing_obligation(obligation_id)
+
+    texts = [(element.text or "") for element in elements]
+    merged = _fusion_agent().process_join_tail(
+        texts, position=_tailjoin_position(manifest)
+    )
+    if len(merged) >= len(texts):
+        return MethodResult(
+            success=False,
+            validated=False,
+            message="Nenhum bloco de cauda elegível para união",
+        )
+    for element in elements:
+        element.metadata["tailjoined"] = True
+    return MethodResult(
+        success=True,
+        validated=True,
+        message=(
+            f"Blocos de cauda unidos: {len(texts)} -> {len(merged)} bloco(s)"
+        ),
+    )
+
+
+# --- Methods that choose between the two providers of FUSION_MODE=dual -------
+#
+# table-smart-fusion, skeleton-order and agreement-rule port Dr.DocBench rules
+# (scripts/drbench/experiments/differ/tree_differ_v2.py and
+# docstruct.fusion.adjudication.decide_v1). They read the secondary provider's
+# extraction that the structure extractor keeps as a manifest artifact. The
+# rules were calibrated on the docling + mineru pair, so any other pair fails
+# explicitly instead of applying a preference nobody measured.
+
+_CALIBRATED_PAIR = ("docling", "mineru")
+#: Accepted Dr.DocBench table preference (TEDS): MinerU's table, unless Docling's
+#: has spans or is the only one.
+_TABLE_PREFERENCE = "mineru"
+#: Minimum intersection over union to pair two blocks by position.
+_MIN_BLOCK_IOU = 0.3
+#: Minimum text similarity to pair two blocks that could not be paired by position.
+_MIN_BLOCK_TEXT_RATIO = 0.8
+#: Share of a page's elements that must be paired to follow the skeleton order.
+_MIN_SKELETON_MATCH = 0.5
+
+_Box = tuple[float, float, float, float]
+
+
+@dataclass(frozen=True)
+class _SecondaryExtraction:
+    provider: str
+    #: page number -> raw elements of the secondary provider, in reading order.
+    pages: dict[int, list[dict[str, Any]]]
+    sizes: dict[int, tuple[float, float]]
+
+    def bbox(self, element: dict[str, Any]) -> _Box | None:
+        """Normalized box of a raw Toolbox element (same frame as _element_bbox)."""
+        for item in element.get("provenance") or []:
+            if not isinstance(item, dict) or not item.get("bbox"):
+                continue
+            box = item["bbox"]
+            page = _page_number(item.get("page_number", element.get("page_number")))
+            width, height = self.sizes.get(page, (0.0, 0.0)) if page else (0.0, 0.0)
+            if not width or not height:
+                return None
+            try:
+                left, right = float(box["left"]), float(box["right"])
+                top, bottom = float(box["top"]), float(box["bottom"])
+            except (KeyError, TypeError, ValueError):
+                return None
+            if box.get("coord_origin") == "BOTTOMLEFT":
+                top, bottom = height - top, height - bottom
+            return _ordered_box(
+                left / width, top / height, right / width, bottom / height
+            )
+        return None
+
+
+def _page_number(value: Any) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _load_secondary_extraction(
+    manifest: ProcessingManifest,
+) -> tuple[_SecondaryExtraction | None, str]:
+    """The secondary provider's extraction, if recorded and unchanged.
+
+    When it cannot be used, the second item says why (missing, replaced or
+    unreadable), so the method result can tell those cases apart.
+    """
+    import json
+
+    artifact = next(
+        (a for a in manifest.artifacts if a.kind == SECONDARY_EXTRACTION_KIND), None
+    )
+    if artifact is None:
+        return None, "Extração do provider secundário ausente do manifesto"
+    try:
+        raw = Path(artifact.path).read_bytes()
+    except OSError:
+        return None, f"Extração do provider secundário indisponível: {artifact.path}"
+    if artifact.sha256 and hashlib.sha256(raw).hexdigest() != artifact.sha256:
+        logger.warning(
+            "Extração secundária {} não confere com o sha256 registrado",
+            artifact.path,
+        )
+        return None, (
+            "Extração do provider secundário alterada: sha256 diverge do "
+            f"registrado no manifesto ({artifact.path})"
+        )
+    unreadable = f"Extração do provider secundário ilegível: {artifact.path}"
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        return None, unreadable
+    payload = data.get("document") if isinstance(data, dict) else None
+    if not isinstance(payload, dict):
+        return None, unreadable
+    document = payload.get("document", payload)
+    sizes: dict[int, tuple[float, float]] = {}
+    for page in document.get("pages") or []:
+        try:
+            sizes[int(page["page_number"])] = (
+                float(page.get("width") or 0),
+                float(page.get("height") or 0),
+            )
+        except (KeyError, TypeError, ValueError):
+            continue
+    pages: dict[int, list[dict[str, Any]]] = {}
+    for element in sorted(
+        (e for e in document.get("elements") or [] if isinstance(e, dict)),
+        key=lambda e: e.get("reading_order") or 0,
+    ):
+        page = _page_number(element.get("page_number"))
+        if page is not None:
+            pages.setdefault(page, []).append(element)
+    return _SecondaryExtraction(str(data.get("provider") or ""), pages, sizes), ""
+
+
+def _provider_pair_problem(
+    manifest: ProcessingManifest, secondary: _SecondaryExtraction
+) -> str | None:
+    primary = str((manifest.extractor.configuration or {}).get("toolbox_provider") or "")
+    if (primary, secondary.provider) == _CALIBRATED_PAIR:
+        return None
+    return (
+        f"Regra calibrada para {'+'.join(_CALIBRATED_PAIR)}; "
+        f"par atual: {primary or '?'}+{secondary.provider or '?'}"
+    )
+
+
+def _secondary_or_failure(
+    manifest: ProcessingManifest,
+) -> tuple[_SecondaryExtraction | None, MethodResult | None]:
+    secondary, problem = _load_secondary_extraction(manifest)
+    if secondary is None:
+        return None, MethodResult(success=False, validated=False, message=problem)
+    problem = _provider_pair_problem(manifest, secondary)
+    if problem:
+        return None, MethodResult(success=False, validated=False, message=problem)
+    return secondary, None
+
+
+def _ordered_box(left: float, top: float, right: float, bottom: float) -> _Box:
+    return (min(left, right), min(top, bottom), max(left, right), max(top, bottom))
+
+
+def _iou(a: _Box, b: _Box) -> float:
+    width = min(a[2], b[2]) - max(a[0], b[0])
+    height = min(a[3], b[3]) - max(a[1], b[1])
+    if width <= 0 or height <= 0:
+        return 0.0
+    inter = width * height
+    union = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter
+    return inter / union if union > 0 else 0.0
+
+
+def _pair_block(
+    element: ManifestElement,
+    manifest: ProcessingManifest,
+    candidates: list[dict[str, Any]],
+    secondary: _SecondaryExtraction,
+    used: set[int],
+) -> int | None:
+    """Index in ``candidates`` of the block that matches ``element``.
+
+    Greedy: each element takes its best free candidate in the current reading
+    order, while Dr.DocBench uses a global (Hungarian) assignment. The two can
+    differ only when blocks compete for the same candidate, which is rare above
+    the IoU / text thresholds and does not move the skeleton's 0.5 page gate.
+    """
+    import difflib
+
+    box = _element_bbox(element, manifest)
+    if box is not None:
+        box = _ordered_box(*box)
+        scored = [
+            (_iou(box, other), index)
+            for index, candidate in enumerate(candidates)
+            if index not in used and (other := secondary.bbox(candidate)) is not None
+        ]
+        best = max(scored, default=(0.0, None))
+        if best[0] >= _MIN_BLOCK_IOU:
+            return best[1]
+    text = " ".join((element.text or "").split())
+    if not text:
+        return None
+    scored_text = [
+        (
+            difflib.SequenceMatcher(
+                None,
+                text,
+                " ".join(str(candidate["text"]).split()),
+                autojunk=False,
+            ).ratio(),
+            index,
+        )
+        for index, candidate in enumerate(candidates)
+        if index not in used and candidate.get("text")
+    ]
+    best_text = max(scored_text, default=(0.0, None))
+    return best_text[1] if best_text[0] >= _MIN_BLOCK_TEXT_RATIO else None
+
+
+def _handle_table_smart_fusion_method(
+    manifest: ProcessingManifest, obligation_id: str
+) -> MethodResult:
+    """Pick each table's source between the two providers (Dr.DocBench rule).
+
+    Docling's table is kept when it has spans (MinerU flattens them) or when it
+    is the only one; otherwise MinerU's table is adopted. Tables are paired by
+    position or text; a page with a single table on each side pairs them only
+    when there is no position to compare. The choice and its reason are recorded
+    in ``table_source`` / ``table_source_reason``.
+    """
+    from docstruct.tables.ast import analyze_table_complexity
+
+    tables = [
+        element
+        for element in _target_elements(manifest, obligation_id)
+        if element.type == "table"
+    ]
+    if not tables:
+        return _missing_obligation(obligation_id)
+    secondary, failure = _secondary_or_failure(manifest)
+    if failure is not None:
+        return failure
+
+    primary_name, secondary_name = _CALIBRATED_PAIR
+    primary_tables_by_page = Counter(
+        element.page_number
+        for element in manifest.elements
+        if element.type == "table"
+    )
+    reasons: Counter = Counter()
+    for element in tables:
+        primary_ast = (element.metadata or {}).get("table_ast")
+        candidates = [
+            block
+            for block in secondary.pages.get(element.page_number or 0, [])
+            if block.get("type") == "table"
+        ]
+        match = _pair_block(element, manifest, candidates, secondary, set())
+        if (
+            match is None
+            and len(candidates) == 1
+            and primary_tables_by_page[element.page_number] == 1
+            and (
+                _element_bbox(element, manifest) is None
+                or secondary.bbox(candidates[0]) is None
+            )
+        ):
+            # One table on each side and no position to compare them by: the
+            # same table. With both positions known and no overlap, they are not.
+            match = 0
+        chosen = candidates[match] if match is not None else None
+        chosen_meta = (chosen or {}).get("metadata") or {}
+
+        if primary_ast and analyze_table_complexity(primary_ast).has_spans:
+            source, reason = primary_name, "primary-has-spans"
+        elif not candidates:
+            source, reason = primary_name, "no-secondary-table"
+        elif chosen is None:
+            source, reason = primary_name, "no-secondary-match"
+        elif not (chosen.get("text") or chosen_meta.get("table_ast")):
+            source, reason = primary_name, "secondary-table-empty"
+        else:
+            source, reason = _TABLE_PREFERENCE, f"preference-{_TABLE_PREFERENCE}"
+
+        if source == secondary_name and chosen is not None:
+            # Docling's table_* keys (AST, row/column counts, header) describe
+            # the table being replaced; the output prefers table_ast over the
+            # text, so a stale AST would hide the adopted MinerU text.
+            for key in [k for k in element.metadata if k.startswith("table_")]:
+                del element.metadata[key]
+            if chosen.get("text"):
+                element.text = chosen["text"]
+            for key, value in chosen_meta.items():
+                if key.startswith("table_"):
+                    element.metadata[key] = value
+        element.metadata["table_source"] = source
+        element.metadata["table_source_reason"] = reason
+        reasons[reason] += 1
+
+    return MethodResult(
+        success=True,
+        validated=True,
+        message="Fonte de tabela escolhida: "
+        + ", ".join(f"{reason}={count}" for reason, count in sorted(reasons.items())),
+    )
+
+
+def _handle_skeleton_order_method(
+    manifest: ProcessingManifest, obligation_id: str
+) -> MethodResult:
+    """Follow the secondary provider's reading order (MinerU skeleton).
+
+    Page elements are paired with the secondary blocks by position (falling
+    back to text); paired elements take the skeleton order and unpaired ones
+    stay right after the element that preceded them. A page with fewer than
+    half its elements paired is left alone.
+    """
+    elements = _target_elements(manifest, obligation_id)
+    if not elements:
+        return _missing_obligation(obligation_id)
+    secondary, failure = _secondary_or_failure(manifest)
+    if failure is not None:
+        return failure
+
+    by_page: dict[int, list[ManifestElement]] = {}
+    for element in elements:
+        if element.page_number is not None:
+            by_page.setdefault(element.page_number, []).append(element)
+
+    reordered: set[int] = set()
+    confirmed: set[int] = set()
+    for page_number, page_elements in by_page.items():
+        current = sorted(page_elements, key=lambda element: element.reading_order)
+        skeleton = secondary.pages.get(page_number, [])
+        used: set[int] = set()
+        keys: dict[int, int] = {}
+        for index, element in enumerate(current):
+            match = _pair_block(element, manifest, skeleton, secondary, used)
+            if match is not None:
+                used.add(match)
+                keys[index] = match
+        if len(current) < 2 or len(keys) < _MIN_SKELETON_MATCH * len(current):
+            continue
+        ranked: list[tuple[float, int, int]] = []
+        last = -1.0
+        for index in range(len(current)):
+            if index in keys:
+                last = float(keys[index])
+                ranked.append((last, 0, index))
+            else:
+                ranked.append((last, 1, index))
+        order = [index for _, _, index in sorted(ranked)]
+        if _apply_page_order(current, order):
+            reordered.add(page_number)
+        else:
+            confirmed.add(page_number)
+
+    if not reordered and not confirmed:
+        return MethodResult(
+            success=False,
+            validated=False,
+            message="Esqueleto do provider secundário não casou com a página",
+        )
+    _refresh_page_element_ids(manifest, reordered)
+    parts = []
+    if reordered:
+        parts.append("aplicada nas páginas " + ", ".join(map(str, sorted(reordered))))
+    if confirmed:
+        parts.append("confirmada nas páginas " + ", ".join(map(str, sorted(confirmed))))
+    return MethodResult(
+        success=True,
+        validated=True,
+        message="Ordem do esqueleto " + "; ".join(parts),
+    )
+
+
+def _page_markdown(items: Iterable[tuple[str, str | None]]) -> str:
+    """Page text with the markers the page router looks for."""
+    parts = []
+    for kind, text in items:
+        text = (text or "").strip()
+        if kind == "table":
+            parts.append(f"<table>{text}</table>")
+        elif kind == "formula":
+            parts.append(f"$${text}$$")
+        elif text:
+            parts.append(text)
+    return "\n\n".join(parts)
+
+
+def _handle_agreement_rule_method(
+    manifest: ProcessingManifest, obligation_id: str
+) -> MethodResult:
+    """Deterministic page router between the providers (``decide_v1``).
+
+    When the router keeps the primary (Docling) page the obligation is
+    satisfied without changing the text. When it picks the secondary page the
+    decision is recorded but not applied: replacing a whole page would reopen
+    the manifest mid-plan, and Dr.DocBench measured this router below the
+    block-level fusion the core already runs. The method then fails, so the
+    obligation goes to ``human-review`` with the route in ``page_route``.
+    """
+    from docstruct.fusion.adjudication import decide_v1
+
+    elements = _target_elements(manifest, obligation_id)
+    if not elements:
+        return _missing_obligation(obligation_id)
+    secondary, failure = _secondary_or_failure(manifest)
+    if failure is not None:
+        return failure
+
+    primary_name = _CALIBRATED_PAIR[0]
+    routes: dict[int, tuple[str, str]] = {}
+    for page_number in sorted({e.page_number for e in elements if e.page_number}):
+        primary_md = _page_markdown(
+            (element.type, element.text)
+            for element in sorted(manifest.elements, key=lambda e: e.reading_order)
+            if element.page_number == page_number
+        )
+        secondary_md = _page_markdown(
+            (str(block.get("type") or ""), block.get("text"))
+            for block in secondary.pages.get(page_number, [])
+        )
+        routes[page_number] = decide_v1(primary_md, secondary_md)
+
+    for element in elements:
+        if element.page_number in routes:
+            choice, reason = routes[element.page_number]
+            element.metadata["page_route"] = {"choice": choice, "reason": reason}
+
+    rerouted = {page: route for page, route in routes.items() if route[0] != primary_name}
+    if not routes:
+        return MethodResult(
+            success=False,
+            validated=False,
+            message="Obrigação sem página identificada para o roteador",
+        )
+    if rerouted:
+        return MethodResult(
+            success=False,
+            validated=False,
+            message=(
+                "Roteador por página escolhe o provider secundário ("
+                + ", ".join(f"p{page}: {reason}" for page, (_, reason) in sorted(rerouted.items()))
+                + "); a troca de página não é aplicada automaticamente"
+            ),
+        )
+    return MethodResult(
+        success=True,
+        validated=True,
+        message="Roteador por página mantém o provider primário nas páginas "
+        + ", ".join(map(str, sorted(routes))),
+    )
+
+
+#: Longest side of the page image sent to the judge. Two candidates plus the
+#: image must fit one 8192-token slot of the production VLM server.
+_JUDGE_PAGE_MAX_SIDE = 1600
+
+
+def _render_page_png(source_path: Path, page_number: int) -> bytes:
+    """Page ``page_number`` (1-based) of a PDF or image as PNG, bounded in size."""
+    doc = fitz.open(source_path)
+    try:
+        page = doc.load_page(page_number - 1)
+        longest = max(page.rect.width, page.rect.height) or 1.0
+        zoom = min(2.0, _JUDGE_PAGE_MAX_SIDE / longest)
+        return page.get_pixmap(matrix=fitz.Matrix(zoom, zoom), alpha=False).tobytes("png")
+    finally:
+        doc.close()
+
+
+def _judge_page(image: bytes, candidate_a: str, candidate_b: str) -> dict[str, Any]:
+    """Call document.adjudicate.page through the Toolbox (sync wrapper)."""
+    import tempfile
+
+    from backend.tools.toolbox_adjudicate_client import ToolboxAdjudicateClient
+    from backend.tools.toolbox_client import run_sync
+
+    async def call(path: Path) -> dict[str, Any]:
+        client = ToolboxAdjudicateClient()
+        try:
+            return await client.judge_page(candidate_a, candidate_b, file_path=path)
+        finally:
+            await client.close()
+
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "page.png"
+        path.write_bytes(image)
+        return run_sync(call(path))
+
+
+#: Characters per candidate the Toolbox's judge reads (``judge_max_chars`` of
+#: ``qwen3-vl-8b`` in its ``providers-config.yaml``); beyond it the candidate is
+#: cut on the Toolbox side, so the verdict does not cover the whole page.
+_JUDGE_MAX_CHARS = 6000
+
+
+def _judge_probability(document: dict[str, Any]) -> float | None:
+    """``pB`` of a judge answer, or ``None`` when absent or outside [0, 1]."""
+    try:
+        p_b = float(document["pB"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    return p_b if 0.0 <= p_b <= 1.0 else None
+
+
+def _handle_vlm_pairwise_judge_method(
+    manifest: ProcessingManifest, obligation_id: str
+) -> MethodResult:
+    """Pairwise VLM judge between the two providers' pages.
+
+    The Toolbox (``document.adjudicate.page``) returns the position-debiased
+    probability that the secondary page is the more faithful transcription.
+    Only pages where the two transcriptions diverge are judged
+    (``should_judge``); the others keep the primary page without a call. Of
+    docstruct's two-threshold rule (``decide_pair``) only the ``p_new >
+    DEFAULT_NEW_THR`` branch applies: there is no previous judge to consult
+    here. As with ``agreement-rule``, a kept primary page satisfies the
+    obligation, and a preferred secondary page is recorded in
+    ``page_judgement`` but not swapped in: the method fails and the obligation
+    goes to ``human-review``. An answer without a valid ``pB`` fails the method
+    instead of counting as a kept primary.
+    """
+    from docstruct.fusion.judge import DEFAULT_NEW_THR, should_judge
+
+    from backend.tools.toolbox_client import (
+        ToolboxAuthenticationError,
+        ToolboxContractViolation,
+        ToolboxError,
+    )
+
+    elements = _target_elements(manifest, obligation_id)
+    if not elements:
+        return _missing_obligation(obligation_id)
+    secondary, failure = _secondary_or_failure(manifest)
+    if failure is not None:
+        return failure
+
+    primary_name = _CALIBRATED_PAIR[0]
+    source_path = Path(manifest.source.path)
+    judgements: dict[int, dict[str, Any]] = {}
+    for page_number in sorted({e.page_number for e in elements if e.page_number}):
+        primary_md = _page_markdown(
+            (element.type, element.text)
+            for element in sorted(manifest.elements, key=lambda e: e.reading_order)
+            if element.page_number == page_number
+        )
+        secondary_md = _page_markdown(
+            (str(block.get("type") or ""), block.get("text"))
+            for block in secondary.pages.get(page_number, [])
+        )
+        if not primary_md.strip() or not secondary_md.strip():
+            logger.info(
+                "vlm-pairwise-judge: página {} sem as duas transcrições; ignorada", page_number
+            )
+            continue
+        if not should_judge(primary_md, secondary_md):
+            judgements[page_number] = {"choice": primary_name, "pB": None, "reason": "agree"}
+            continue
+
+        try:
+            image = _render_page_png(source_path, page_number)
+        except Exception as exc:  # noqa: BLE001 - rendering a broken source
+            return MethodResult(
+                success=False,
+                validated=False,
+                message=f"Página {page_number} não pôde ser renderizada: {exc}",
+            )
+        truncated = max(len(primary_md), len(secondary_md)) > _JUDGE_MAX_CHARS
+        if truncated:
+            logger.warning(
+                "vlm-pairwise-judge: página {} passa de {} caracteres; "
+                "o juiz lê a transcrição truncada",
+                page_number,
+                _JUDGE_MAX_CHARS,
+            )
+        logger.info("vlm-pairwise-judge: julgando a página {}", page_number)
+        try:
+            result = _judge_page(image, primary_md, secondary_md)
+        except (ToolboxAuthenticationError, ToolboxContractViolation) as exc:
+            return MethodResult(
+                success=False,
+                validated=False,
+                message=f"Juiz VLM recusou a chamada: {type(exc).__name__}: {exc}",
+            )
+        except ToolboxError as exc:
+            return MethodResult(
+                success=False,
+                validated=False,
+                message=f"Juiz VLM indisponível: {type(exc).__name__}: {exc}",
+            )
+        document = result.get("document") or {}
+        p_b = _judge_probability(document)
+        if p_b is None:
+            return MethodResult(
+                success=False,
+                validated=False,
+                message=(
+                    f"Juiz VLM não devolveu pB válido para a página {page_number}: "
+                    f"{document.get('pB')!r}"
+                ),
+            )
+        judgements[page_number] = {
+            "choice": secondary.provider if p_b > DEFAULT_NEW_THR else primary_name,
+            "pB": p_b,
+            "pB_ab": document.get("pB_ab"),
+            "pA_ba": document.get("pA_ba"),
+            "model": document.get("model"),
+            "truncated": truncated,
+        }
+
+    if not judgements:
+        return MethodResult(
+            success=False,
+            validated=False,
+            message="Sem páginas com as duas transcrições para o juiz VLM",
+        )
+    for element in elements:
+        if element.page_number in judgements:
+            element.metadata["page_judgement"] = judgements[element.page_number]
+
+    preferred = {
+        page: judgement
+        for page, judgement in judgements.items()
+        if judgement["choice"] != primary_name
+    }
+    if preferred:
+        return MethodResult(
+            success=False,
+            validated=False,
+            message=(
+                "Juiz VLM prefere o provider secundário ("
+                + ", ".join(f"p{page}: pB={j['pB']:.2f}" for page, j in sorted(preferred.items()))
+                + "); a troca de página não é aplicada automaticamente"
+            ),
+        )
+    return MethodResult(
+        success=True,
+        validated=True,
+        message="Juiz VLM mantém o provider primário nas páginas "
+        + ", ".join(
+            f"{page} (pB={j['pB']:.2f})" if j["pB"] is not None else f"{page} (concordam)"
+            for page, j in sorted(judgements.items())
+        ),
+    )
+
+
+def _apply_page_order(current: list[ManifestElement], order: list[int]) -> bool:
+    """Reassign the reading-order slots of ``current`` following ``order``.
+
+    ``order[i]`` is the index in ``current`` of the element that goes to the
+    i-th slot. Returns whether anything moved.
+    """
+    if order == list(range(len(current))):
+        return False
+    slots = sorted(element.reading_order for element in current)
+    for slot, index in zip(slots, order):
+        current[index].reading_order = slot
+    return True
+
+
+def _refresh_page_element_ids(
+    manifest: ProcessingManifest, page_numbers: set[int]
+) -> None:
+    manifest.elements.sort(key=lambda element: element.reading_order)
+    for page in manifest.pages:
+        if page.page_number in page_numbers:
+            page.element_ids = [
+                element.id
+                for element in manifest.elements
+                if element.page_number == page.page_number
+            ]
+
+
+def _handle_xycut_order_method(
+    manifest: ProcessingManifest, obligation_id: str
+) -> MethodResult:
+    """Apply XY-cut reading order to the evidenced page elements."""
+    elements = _target_elements(manifest, obligation_id)
+    if not elements:
+        return _missing_obligation(obligation_id)
+
+    fusion_agent = _fusion_agent()
+    reordered_pages: set[int] = set()
+    by_page: dict[int, list[ManifestElement]] = {}
+    for element in elements:
+        if element.page_number is not None:
+            by_page.setdefault(element.page_number, []).append(element)
+
+    for page_number, page_elements in by_page.items():
+        positioned = [
+            element for element in page_elements
+            if _element_bbox(element, manifest) is not None
+        ]
+        if len(positioned) < 2:
+            continue
+        current = sorted(positioned, key=lambda element: element.reading_order)
+        boxes = [_element_bbox(element, manifest) for element in current]
+        order = fusion_agent.process_refine_reading_order(
+            [list(box) for box in boxes if box is not None]
+        )
+        if _apply_page_order(current, order):
+            reordered_pages.add(page_number)
+
+    if not reordered_pages:
+        return MethodResult(
+            success=False,
+            validated=False,
+            message="XY-cut não identificou uma mudança de ordem de leitura",
+        )
+
+    _refresh_page_element_ids(manifest, reordered_pages)
+    return MethodResult(
+        success=True,
+        validated=True,
+        message=(
+            "Ordem de leitura XY-cut aplicada nas páginas "
+            + ", ".join(map(str, sorted(reordered_pages)))
+        ),
+    )
+
+
 def _handle_human_review_method(
     manifest: ProcessingManifest, obligation_id: str
 ) -> MethodResult:
@@ -627,8 +1610,15 @@ DETERMINISTIC_METHOD_HANDLERS: dict[
     "pymupdf-region": _handle_pymupdf_region_method,
     "latex-normalizer": _handle_latex_normalizer_method,
     "norm-fix": _handle_norm_fix_method,
-    # These helpers operate on docstruct blocks, not ManifestElement text.
-    # Keep them unavailable until their results can be applied to the manifest.
+    "rep-guard": _handle_repetition_guard_method,
+    "line-number-extractor": _handle_extract_line_numbers_method,
+    "verse-chunker": _handle_chunk_verse_method,
+    "tailjoin": _handle_tailjoin_method,
+    "tailjoin-positioned": _handle_tailjoin_method,
+    "xycut-order": _handle_xycut_order_method,
+    "skeleton-order": _handle_skeleton_order_method,
+    "table-smart-fusion": _handle_table_smart_fusion_method,
+    "agreement-rule": _handle_agreement_rule_method,
     "deterministic-heading-repair": _handle_deterministic_heading_repair_method,
 }
 
@@ -646,9 +1636,16 @@ def _handle_dual_provider_fusion_method(
 
     Em modo single (FUSION_MODE=single) o método não é admissível e não
     deve ser selecionado pelo compilador.
-    """
-    from backend.config.settings import settings
 
+    Custo: a fusão reextrai o documento inteiro nos dois providers, sem
+    reutilizar a evidência que o ``ToolboxManifestExtractor`` já coletou em
+    ``FUSION_MODE=dual``. Cada passo ``fuse-providers`` paga, portanto, uma
+    extração dual completa (cache remoto da Toolbox à parte). Em regra o
+    documento não é reenviado: os dois providers leem o ``artifact_id`` que o
+    extrator registrou em ``manifest.extractor.configuration``. Se a Toolbox
+    não tiver mais esse artefato (expirado/removido), ``extract_fused`` faz o
+    upload do arquivo como fallback.
+    """
     obligation = next(
         (o for o in manifest.obligations if o.id == obligation_id), None
     )
@@ -659,8 +1656,10 @@ def _handle_dual_provider_fusion_method(
             message=f"Obrigação não encontrada: {obligation_id}",
         )
     source_path = Path(manifest.source.path)
+    # Reuse the document the structure extractor already stored in the Toolbox.
+    artifact_id = (manifest.extractor.configuration or {}).get("artifact_id")
     try:
-        payload = _run_extract_fused(source_path)
+        payload = _run_extract_fused(source_path, artifact_id=artifact_id)
     except Exception as exc:  # noqa: BLE001
         return MethodResult(
             success=False,
@@ -693,23 +1692,12 @@ def _handle_dual_provider_fusion_method(
     except (TypeError, ValueError) as exc:
         return MethodResult(success=False, validated=False, message=str(exc))
 
-    content = json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
-    digest = hashlib.sha256(content).hexdigest()
-    scope = hashlib.sha256(json.dumps([
-        manifest.manifest_id, manifest.source.document_id, manifest.source.sha256,
-        manifest.revision, obligation_id,
-    ]).encode()).hexdigest()
-    output_path = settings.data_dir / "artifacts" / "fusion" / scope / f"{digest}.json"
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = None
-    try:
-        with tempfile.NamedTemporaryFile(dir=output_path.parent, delete=False) as stream:
-            temporary = Path(stream.name)
-            stream.write(content)
-        os.replace(temporary, output_path)
-    finally:
-        if temporary is not None:
-            temporary.unlink(missing_ok=True)
+    artifact = _persist_fusion_payload(
+        manifest,
+        payload,
+        obligation_id,
+        kind="fusion-payload",
+    )
 
     manifest.elements = elements
     page_ids = {element.page_number or 1 for element in elements}
@@ -726,14 +1714,6 @@ def _handle_dual_provider_fusion_method(
     manifest.summary.page_count = len(manifest.pages)
     manifest.summary.element_count = len(elements)
     manifest.summary.element_types = dict(Counter(element.type for element in elements))
-
-    artifact = Artifact(
-        id=f"artifact-fusion-{scope[:16]}-{digest[:16]}",
-        kind="fusion-payload",
-        path=str(output_path),
-        media_type="application/json",
-        sha256=digest,
-    )
     return MethodResult(
         success=True,
         validated=True,
@@ -798,6 +1778,99 @@ def _fused_text_elements(
             element.reading_order = len(result) + 1
             result.append(element)
     return result
+
+
+def _handle_single_provider_method(
+    manifest: ProcessingManifest, obligation_id: str
+) -> MethodResult:
+    """Run the configured provider as a real fallback after dual fusion fails."""
+    obligation = next(
+        (item for item in manifest.obligations if item.id == obligation_id), None
+    )
+    if obligation is None:
+        return _missing_obligation(obligation_id)
+    if obligation.kind != "fuse-providers":
+        return MethodResult(
+            success=False,
+            validated=False,
+            message="single-provider só é válido para fuse-providers",
+        )
+
+    source_path = Path(manifest.source.path)
+    if not source_path.is_file():
+        return MethodResult(
+            success=False,
+            validated=False,
+            message=f"Documento-fonte indisponível: {source_path}",
+        )
+    try:
+        payload = _run_extract_single_provider(source_path)
+    except Exception as exc:  # noqa: BLE001
+        return MethodResult(
+            success=False,
+            validated=False,
+            message=(
+                "Extração single-provider falhou: "
+                f"{type(exc).__name__}: {exc}"
+            ),
+        )
+
+    provider = str(payload.get("provider") or "")
+    if payload.get("status") != "succeeded" or not provider or "+" in provider:
+        return MethodResult(
+            success=False,
+            validated=False,
+            message="A Toolbox não confirmou uma extração de provider único",
+        )
+
+    artifact = _persist_fusion_payload(
+        manifest,
+        payload,
+        obligation_id,
+        kind="single-provider-payload",
+    )
+    return MethodResult(
+        success=True,
+        validated=True,
+        message=f"Fallback single-provider concluído ({provider})",
+        artifacts=[artifact],
+    )
+
+
+def _persist_fusion_payload(
+    manifest: ProcessingManifest,
+    payload: dict[str, Any],
+    obligation_id: str,
+    *,
+    kind: str,
+) -> Artifact:
+    """Write the payload atomically, addressed by its manifest scope and content."""
+    from backend.config.settings import settings
+
+    content = json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    digest = hashlib.sha256(content).hexdigest()
+    scope = hashlib.sha256(json.dumps([
+        manifest.manifest_id, manifest.source.document_id, manifest.source.sha256,
+        manifest.revision, obligation_id,
+    ]).encode()).hexdigest()
+    output_path = settings.data_dir / "artifacts" / "fusion" / scope / f"{digest}.json"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=output_path.parent, delete=False) as stream:
+            temporary = Path(stream.name)
+            stream.write(content)
+        os.replace(temporary, output_path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+    return Artifact(
+        id=f"artifact-{kind.removesuffix('-payload')}-{scope[:16]}-{digest[:16]}",
+        kind=kind,
+        path=str(output_path),
+        media_type="application/json",
+        sha256=digest,
+    )
 
 
 class PddlAccessibilityOrchestrator:
@@ -868,6 +1941,8 @@ class PddlAccessibilityOrchestrator:
         registry.register(
             "dual-provider-fusion", _handle_dual_provider_fusion_method
         )
+        registry.register("single-provider", _handle_single_provider_method)
+        registry.register("vlm-pairwise-judge", _handle_vlm_pairwise_judge_method)
         for method, handler in DETERMINISTIC_METHOD_HANDLERS.items():
             registry.register(method, handler)
 
@@ -928,7 +2003,14 @@ class PddlAccessibilityOrchestrator:
 
         if status_callback:
             await status_callback(t(STAGE_GENERATING_PDDL_PLAN))
-        plan, comparison = await run_blocking(self._build_plan, manifest)
+        # One catalogue snapshot per document, so the first plan and every replan
+        # see the same Toolbox.
+        availability = await toolbox_gate.decide(manifest)
+        _log_availability(availability)
+        gated = availability.unavailable_methods
+        plan, comparison = await run_blocking(
+            self._build_plan, manifest, extra_unavailable=gated
+        )
 
         execution_report: ExecutionReport | None = None
         if status_callback:
@@ -966,7 +2048,9 @@ class PddlAccessibilityOrchestrator:
                 self.max_replans,
                 execution_report.status,
             )
-            plan, comparison = await run_blocking(self._build_plan, manifest)
+            plan, comparison = await run_blocking(
+                self._build_plan, manifest, extra_unavailable=gated
+            )
             manifest, execution_report = await run_blocking(
                 self.executor.execute,
                 plan,
@@ -984,6 +2068,7 @@ class PddlAccessibilityOrchestrator:
             planner_backend=self.planner_backend,
             execution_report=execution_report,
             comparison=comparison,
+            toolbox_availability=availability.to_metadata(),
         )
 
         if structured_output:
@@ -993,12 +2078,17 @@ class PddlAccessibilityOrchestrator:
     def _build_plan(
         self,
         manifest: ProcessingManifest,
+        *,
+        extra_unavailable: Iterable[str] = (),
     ) -> tuple[NominalPlan, PlanningComparison | None]:
         # Tell the compiler which methods the executor can actually run. Without
         # this the planner happily emits steps for methods that have no handler,
         # and the failure only surfaces at execution time -- after the model-backed
-        # work has already been paid for.
-        unavailable = self._unavailable_methods(manifest)
+        # work has already been paid for. ``extra_unavailable`` adds the methods
+        # the Toolbox availability gate rules out for this document.
+        unavailable = sorted(
+            set(self._unavailable_methods(manifest)) | set(extra_unavailable)
+        )
         if self.planner_backend == "both":
             _, plans, comparison = self.planner.compare(
                 manifest,
@@ -1529,6 +2619,27 @@ def _unsatisfied_execution_message(manifest: ProcessingManifest) -> str:
     )
 
 
+def _log_availability(availability: toolbox_gate.AvailabilityDecision) -> None:
+    if not availability.blocked:
+        return
+    blocked = "; ".join(
+        f"{method}: {', '.join(reasons)}"
+        for method, reasons in availability.blocked.items()
+    )
+    if availability.enforced:
+        logger.warning(
+            "Gate da Toolbox (catálogo {}): métodos fora do plano — {}",
+            availability.catalog_revision or "indisponível",
+            blocked,
+        )
+    else:
+        logger.warning(
+            "Gate da Toolbox em observação (catálogo {}): removeria — {}",
+            availability.catalog_revision or "indisponível",
+            blocked,
+        )
+
+
 def build_pddl_structured_payload(
     *,
     file_path: Path,
@@ -1537,6 +2648,7 @@ def build_pddl_structured_payload(
     planner_backend: str,
     execution_report: ExecutionReport | None,
     comparison: PlanningComparison | None,
+    toolbox_availability: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     pages_payload = _manifest_pages_to_payload(manifest)
     text_output = _render_text_from_pages(pages_payload)
@@ -1578,9 +2690,37 @@ def build_pddl_structured_payload(
             "pddl_comparison_verdict": comparison.comparison.verdict
             if comparison
             else None,
+            "pddl_unsatisfied_obligations": _unsatisfied_obligations(manifest),
+            "pddl_toolbox_availability": toolbox_availability,
         },
         "technical_warnings": technical_warnings,
     }
+
+
+def _unsatisfied_obligations(manifest: ProcessingManifest) -> list[dict[str, Any]]:
+    """Selected obligations the execution left unsatisfied.
+
+    `pddl_execution_status` alone does not say which obligations were exhausted
+    or escalated, so each one is reported with its last attempt. An obligation
+    whose last attempt is `human-review` is a pending escalation.
+    """
+    unsatisfied: list[dict[str, Any]] = []
+    for obligation in manifest.obligations:
+        if not obligation.selected or obligation.status == "satisfied":
+            continue
+        last = obligation.attempts[-1] if obligation.attempts else None
+        unsatisfied.append(
+            {
+                "id": obligation.id,
+                "kind": obligation.kind,
+                "status": obligation.status,
+                "target_ids": list(obligation.target_ids),
+                "last_method": last.method if last else None,
+                "last_message": last.message if last else None,
+                "escalated": bool(last and last.method == "human-review"),
+            }
+        )
+    return unsatisfied
 
 
 def _manifest_pages_to_payload(manifest: ProcessingManifest) -> list[dict[str, Any]]:

@@ -21,6 +21,9 @@ def install_clients(monkeypatch, fail):
         def __init__(self, provider):
             self.provider = provider
 
+        async def close(self):
+            pass
+
         async def extract_structure(self, *args, **kwargs):
             calls[self.provider] += 1
             error = fail(self.provider, calls[self.provider])
@@ -67,7 +70,7 @@ async def test_transient_failure_recovers_without_repeating_success(
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "error",
-    [ToolboxAuthenticationError, ToolboxContractViolation, ToolboxError, RuntimeError],
+    [ToolboxAuthenticationError, ToolboxContractViolation, ToolboxError],
 )
 async def test_permanent_failure_is_not_retried(monkeypatch, error):
     calls = install_clients(monkeypatch, lambda p, n: error if p == "docling" else None)
@@ -76,6 +79,18 @@ async def test_permanent_failure_is_not_retried(monkeypatch, error):
     )
     assert result["provider"] == "mineru"
     assert calls == {"docling": 1, "mineru": 1}
+
+
+@pytest.mark.asyncio
+async def test_unexpected_error_is_propagated_without_retry(monkeypatch):
+    calls = install_clients(
+        monkeypatch, lambda p, n: RuntimeError if p == "docling" else None
+    )
+    with pytest.raises(RuntimeError):
+        await extract_fused(
+            "synthetic.pdf", primary_provider="docling", secondary_provider="mineru"
+        )
+    assert calls["docling"] == 1
 
 
 @pytest.mark.asyncio

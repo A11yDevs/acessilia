@@ -7,19 +7,18 @@ ground-truth (markdown/OmniDocJSON) access for the ``dr-docbench`` dataset.
 
 from __future__ import annotations
 
-import asyncio
 from pathlib import Path
 from typing import Any
 
 from backend.tools.logger import logger
-from backend.tools.toolbox_client import ToolboxClient, ToolboxError
+from backend.tools.toolbox_client import ToolboxClient, ToolboxError, run_sync
 
 DATASET_ID = "dr-docbench"
 
 
 def _run_async(coro) -> Any:
-    """Run an async coroutine from a sync context."""
-    return asyncio.run(coro)
+    """Run an async coroutine from a sync context, even inside a running loop."""
+    return run_sync(coro)
 
 
 def toolbox_list_drbench_items(

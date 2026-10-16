@@ -25,24 +25,14 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 CHECKER_PATH = REPO_ROOT / "scripts" / "check_capability_contract.py"
 SNAPSHOT_PATH = REPO_ROOT / "tests" / "fixtures" / "toolbox-contract.json"
 
-# Drift that already existed when the contract check was introduced. Each entry
-# is a capability the core consumes without the Toolbox exposing it, or a
-# provider default in ``settings.py`` that the Toolbox does not register.
+# Accepted drift between the core and the Toolbox catalogue. Each entry would be
+# a capability the core consumes without the Toolbox exposing it, or a provider
+# default in the SDK registry that the Toolbox does not register.
 #
-# The orientation entries were resolved by pointing the client at
-# image.page.orient / rapidocr-orient, which the Toolbox does expose; the
-# remaining three VLM capabilities have no production caller yet and depend on
-# the Dr.DocBench provider profile shipping in the Toolbox. Tracked by the
-# integration review; see docs/toolbox_capability_matrix.md.
-KNOWN_DRIFT = frozenset(
-    {
-        "core consumes capability 'document.adjudicate.page' (toolbox_adjudicate_client.py) but the Toolbox does not expose it",
-        "core consumes capability 'document.adjudicate.region' (toolbox_adjudicate_client.py) but the Toolbox does not expose it",
-        "core consumes capability 'document.ocr.page' (toolbox_page_ocr_client.py) but the Toolbox does not expose it",
-        "core default for TOOLBOX_ADJUDICATE_PROVIDER points at provider 'qwen3-vl-judge' which the Toolbox does not register",
-        "core default for TOOLBOX_PAGE_OCR_PROVIDER points at provider 'qwen3-vl-page' which the Toolbox does not register",
-    }
-)
+# Empty since the Toolbox publishes the Dr.DocBench VLM capabilities
+# (acessilia-toolbox#50, provider qwen3-vl-8b) and the SDK defaults point at
+# that provider. The snapshot was regenerated from Toolbox develop c777886.
+KNOWN_DRIFT: frozenset[str] = frozenset()
 
 # Capabilities the Toolbox exposes that the core has no client for at all. These
 # are candidates for "integrate / keep as opt-in / retire" in the review.
