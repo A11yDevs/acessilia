@@ -4,7 +4,7 @@ import asyncio
 import hashlib
 import re
 from collections import Counter
-from collections.abc import Callable, Coroutine
+from collections.abc import Callable, Coroutine, Iterable
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +32,7 @@ from backend.core.manifest.models import (
 from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
 from backend.core.planning.domain_bundle import DomainBundle
 from backend.core.planning.models import NominalPlan, PlanningComparison
+from backend.core.planning import toolbox_gate
 from backend.core.planning.planner_agent import PlannerAgent
 from backend.i18n import t
 from backend.log_messages import (
@@ -1132,7 +1133,14 @@ class PddlAccessibilityOrchestrator:
 
         if status_callback:
             await status_callback(t(STAGE_GENERATING_PDDL_PLAN))
-        plan, comparison = await asyncio.to_thread(self._build_plan, manifest)
+        # One catalogue snapshot per document, so the first plan and every replan
+        # see the same Toolbox.
+        availability = await toolbox_gate.decide(manifest)
+        _log_availability(availability)
+        gated = availability.unavailable_methods
+        plan, comparison = await asyncio.to_thread(
+            self._build_plan, manifest, extra_unavailable=gated
+        )
 
         execution_report: ExecutionReport | None = None
         if status_callback:
@@ -1170,7 +1178,9 @@ class PddlAccessibilityOrchestrator:
                 self.max_replans,
                 execution_report.status,
             )
-            plan, comparison = await asyncio.to_thread(self._build_plan, manifest)
+            plan, comparison = await asyncio.to_thread(
+                self._build_plan, manifest, extra_unavailable=gated
+            )
             manifest, execution_report = await asyncio.to_thread(
                 self.executor.execute,
                 plan,
@@ -1185,6 +1195,7 @@ class PddlAccessibilityOrchestrator:
             planner_backend=self.planner_backend,
             execution_report=execution_report,
             comparison=comparison,
+            toolbox_availability=availability.to_metadata(),
         )
 
         if structured_output:
@@ -1194,12 +1205,17 @@ class PddlAccessibilityOrchestrator:
     def _build_plan(
         self,
         manifest: ProcessingManifest,
+        *,
+        extra_unavailable: Iterable[str] = (),
     ) -> tuple[NominalPlan, PlanningComparison | None]:
         # Tell the compiler which methods the executor can actually run. Without
         # this the planner happily emits steps for methods that have no handler,
         # and the failure only surfaces at execution time -- after the model-backed
-        # work has already been paid for.
-        unavailable = self._unavailable_methods(manifest)
+        # work has already been paid for. ``extra_unavailable`` adds the methods
+        # the Toolbox availability gate rules out for this document.
+        unavailable = sorted(
+            set(self._unavailable_methods(manifest)) | set(extra_unavailable)
+        )
         if self.planner_backend == "both":
             _, plans, comparison = self.planner.compare(
                 manifest,
@@ -1718,6 +1734,27 @@ def _has_meaningful_text(element: ManifestElement) -> bool:
     return True
 
 
+def _log_availability(availability: toolbox_gate.AvailabilityDecision) -> None:
+    if not availability.blocked:
+        return
+    blocked = "; ".join(
+        f"{method}: {', '.join(reasons)}"
+        for method, reasons in availability.blocked.items()
+    )
+    if availability.enforced:
+        logger.warning(
+            "Gate da Toolbox (catálogo {}): métodos fora do plano — {}",
+            availability.catalog_revision or "indisponível",
+            blocked,
+        )
+    else:
+        logger.warning(
+            "Gate da Toolbox em observação (catálogo {}): removeria — {}",
+            availability.catalog_revision or "indisponível",
+            blocked,
+        )
+
+
 def build_pddl_structured_payload(
     *,
     file_path: Path,
@@ -1726,6 +1763,7 @@ def build_pddl_structured_payload(
     planner_backend: str,
     execution_report: ExecutionReport | None,
     comparison: PlanningComparison | None,
+    toolbox_availability: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     pages_payload = _manifest_pages_to_payload(manifest)
     text_output = _render_text_from_pages(pages_payload)
@@ -1764,6 +1802,7 @@ def build_pddl_structured_payload(
             if comparison
             else None,
             "pddl_unsatisfied_obligations": _unsatisfied_obligations(manifest),
+            "pddl_toolbox_availability": toolbox_availability,
         },
         "technical_warnings": technical_warnings,
     }

@@ -233,6 +233,27 @@ primeiro e degrada para a implementação local em caso de falha.
   `ToolboxLayoutStructurer`).
 - **Fusão dual** (`backend/pipeline/fusion.py`): se a capacidade produz blocos
   canônicos, pode participar como provider em `extract_fused()`.
+- **Método PDDL** (`backend/core/planning/toolbox_gate.py`): se o handler de um
+  método de planejamento chama a capacidade, declare-a em
+  `METHOD_TOOLBOX_REQUIREMENTS` (capacidade e provider). O gate de disponibilidade
+  passa a conferi-la contra o catálogo vivo antes de cada documento ser planejado
+  (veja abaixo).
+
+#### Gate de disponibilidade
+
+Antes de planejar um documento, o orquestrador tira um snapshot do catálogo
+(`GET /v1/capabilities` + `/v1/providers`, em cache por
+`TOOLBOX_CATALOG_REFRESH_SECONDS`) e confere cada método pedido que esteja em
+`METHOD_TOOLBOX_REQUIREMENTS`: a capacidade precisa estar na allowlist do SDK, ser
+publicada com a versão exata do contrato, e o provider configurado precisa estar
+registrado e implementá-la. O catálogo só restringe; nunca torna um método
+disponível.
+
+| `TOOLBOX_AVAILABILITY_GATE` | Efeito |
+|---|---|
+| `observe` (padrão) | Registra no log o que seria removido e grava em `canonical_metadata.pddl_toolbox_availability`; o plano não muda |
+| `enforce` | Remove esses métodos do plano e de todos os replanejamentos do documento. Quando o catálogo não pode ser lido e o último snapshot válido tem mais de `TOOLBOX_CATALOG_STALE_SECONDS`, todo método com requisitos da Toolbox é removido (fail closed) |
+| `off` | Sem verificação |
 
 ### 4.4 Tests
 
@@ -277,6 +298,9 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 | `TOOLBOX_BASE_URL` | `http://localhost:8002` | URL base do serviço |
 | `TOOLBOX_PROVIDER` | `docling` | Provider principal de extração |
 | `TOOLBOX_API_KEY` | *(vazio)* | Chave para `Authorization: Bearer` |
+| `TOOLBOX_AVAILABILITY_GATE` | `observe` | Gate de disponibilidade: `observe`, `enforce` ou `off` (seção 4.3) |
+| `TOOLBOX_CATALOG_REFRESH_SECONDS` | `60` | Por quanto tempo um snapshot do catálogo é reutilizado |
+| `TOOLBOX_CATALOG_STALE_SECONDS` | `900` | Por quanto tempo o último snapshot válido é servido quando o catálogo não pode ser lido |
 | `TOOLBOX_TIMEOUT_SECONDS` | `3600` | Timeout das requisições |
 | `TOOLBOX_USE_ARTIFACT_STORE` | `true` | Envia o arquivo para `/v1/artifacts` antes de extrair |
 | `TOOLBOX_USE_REMOTE_CACHE` | `true` | Usa o cache remoto (`no_cache=false`) |
