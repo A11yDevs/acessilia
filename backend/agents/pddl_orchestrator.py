@@ -863,9 +863,11 @@ def _handle_dual_provider_fusion_method(
     Custo: a fusão reextrai o documento inteiro nos dois providers, sem
     reutilizar a evidência que o ``ToolboxManifestExtractor`` já coletou em
     ``FUSION_MODE=dual``. Cada passo ``fuse-providers`` paga, portanto, uma
-    extração dual completa (cache remoto da Toolbox à parte). O documento não
-    é reenviado: os dois providers leem o ``artifact_id`` que o extrator
-    registrou em ``manifest.extractor.configuration``.
+    extração dual completa (cache remoto da Toolbox à parte). Em regra o
+    documento não é reenviado: os dois providers leem o ``artifact_id`` que o
+    extrator registrou em ``manifest.extractor.configuration``. Se a Toolbox
+    não tiver mais esse artefato (expirado/removido), ``extract_fused`` faz o
+    upload do arquivo como fallback.
     """
     obligation = next(
         (o for o in manifest.obligations if o.id == obligation_id), None

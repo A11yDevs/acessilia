@@ -274,13 +274,22 @@ class _FakeClient:
         pass
 
 
+class _RecordingToolbox:
+    """Fake ``ToolboxClient`` factory that records, in order, how each
+    provider received the document. State lives on the instance, so every
+    test gets its own recorder."""
+
+    def __init__(self, *, missing_artifact: bool = False):
+        self.missing_artifact = missing_artifact
+        self.calls: list[tuple[str, str | None, object]] = []
+
+    def __call__(self, provider: str = "docling", **kw):
+        return _RecordingClient(self, provider)
+
+
 class _RecordingClient:
-    """Fake client that records how each provider received the document."""
-
-    calls: list[tuple[str, str | None, object]] = []
-    missing_artifact = False
-
-    def __init__(self, provider: str = "docling", **kw):
+    def __init__(self, recorder: _RecordingToolbox, provider: str):
+        self._recorder = recorder
         self.provider = provider
 
     async def extract_structure(
@@ -288,8 +297,8 @@ class _RecordingClient:
     ):
         from backend.tools.toolbox_client import ToolboxArtifactNotFound
 
-        type(self).calls.append((self.provider, artifact_id, file_path))
-        if artifact_id and type(self).missing_artifact:
+        self._recorder.calls.append((self.provider, artifact_id, file_path))
+        if artifact_id and self._recorder.missing_artifact:
             raise ToolboxArtifactNotFound("artifact expired")
         return _payload([_el(f"texto {self.provider}", 0)])
 
@@ -299,9 +308,8 @@ class _RecordingClient:
 
 @pytest.mark.asyncio
 async def test_extract_fused_reuses_the_stored_artifact(monkeypatch):
-    _RecordingClient.calls = []
-    _RecordingClient.missing_artifact = False
-    monkeypatch.setattr("backend.pipeline.fusion.ToolboxClient", _RecordingClient)
+    toolbox = _RecordingToolbox()
+    monkeypatch.setattr("backend.pipeline.fusion.ToolboxClient", toolbox)
 
     await extract_fused(
         "doc.pdf",
@@ -310,7 +318,7 @@ async def test_extract_fused_reuses_the_stored_artifact(monkeypatch):
         artifact_id="art-1",
     )
 
-    assert sorted(_RecordingClient.calls) == [
+    assert sorted(toolbox.calls) == [
         ("docling", "art-1", None),
         ("mineru", "art-1", None),
     ]
@@ -318,9 +326,8 @@ async def test_extract_fused_reuses_the_stored_artifact(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_extract_fused_uploads_when_the_artifact_is_gone(monkeypatch):
-    _RecordingClient.calls = []
-    _RecordingClient.missing_artifact = True
-    monkeypatch.setattr("backend.pipeline.fusion.ToolboxClient", _RecordingClient)
+    toolbox = _RecordingToolbox(missing_artifact=True)
+    monkeypatch.setattr("backend.pipeline.fusion.ToolboxClient", toolbox)
 
     result = await extract_fused(
         "doc.pdf",
@@ -330,5 +337,10 @@ async def test_extract_fused_uploads_when_the_artifact_is_gone(monkeypatch):
     )
 
     assert result["status"] == "succeeded"
-    uploads = sorted(c for c in _RecordingClient.calls if c[1] is None)
-    assert uploads == [("docling", None, "doc.pdf"), ("mineru", None, "doc.pdf")]
+    # Each provider first asks for the stored artifact and only uploads the
+    # file after the Toolbox reports it missing.
+    for provider in ("docling", "mineru"):
+        assert [c for c in toolbox.calls if c[0] == provider] == [
+            (provider, "art-1", None),
+            (provider, None, "doc.pdf"),
+        ]

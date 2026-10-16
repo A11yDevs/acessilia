@@ -1215,10 +1215,10 @@ def reconcile_reclassified_element_processing_needs(
 ) -> None:
     """Reconcile derived observations/obligations after an element changes type.
 
-    Toolbox manifests may carry obligations beyond the ones derived locally, so
-    rebuilding the complete list would discard provider-specific planning data.
-    This function replaces only the standard processing need associated with the
-    reclassified element and leaves unrelated/custom obligations untouched.
+    Only the standard processing need associated with the reclassified element
+    is replaced; every other observation/obligation (e.g. the v2.3 needs
+    derived from dual-provider fusion evidence) is kept untouched instead of
+    rebuilding the complete list.
     """
     if previous_type == element.type:
         return
