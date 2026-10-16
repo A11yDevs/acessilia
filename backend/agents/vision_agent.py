@@ -15,9 +15,9 @@ from backend.ai.models.ai_client import get_agno_model
 from backend.agents.output_schemas import (
     VISION_SCHEMA_INSTRUCTION,
     VisionOutput,
-    run_content,
     validate_structured_content,
 )
+from backend.agents.run_helpers import run_content
 from agno.agent import Agent
 from agno.media import Image
 

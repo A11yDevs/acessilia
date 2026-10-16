@@ -15,9 +15,9 @@ from backend.config.settings import settings
 from backend.agents.output_schemas import (
     DATA_SCHEMA_INSTRUCTION,
     DataOutput,
-    run_content,
     validate_structured_content,
 )
+from backend.agents.run_helpers import run_content
 from agno.agent import Agent
 from agno.media import Image
 

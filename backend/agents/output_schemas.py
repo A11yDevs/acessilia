@@ -242,24 +242,6 @@ StructuredOutput = VisionOutput | DataOutput
 OutputModel = TypeVar("OutputModel", bound=AgentOutput)
 
 
-class AgentRunError(RuntimeError):
-    """An Agno run that ended in error (provider unreachable, rejected key, ...)."""
-
-
-def run_content(output: Any) -> Any:
-    """Content of an Agno run, raising when the run itself failed.
-
-    Agno does not raise on provider errors: the run ends with
-    ``status=RunStatus.error`` and the error message as ``content``. Read as
-    content, "Invalid API Key" would only surface later as a JSON validation
-    error, hiding the cause.
-    """
-    status = getattr(output, "status", None)
-    if str(getattr(status, "value", status) or "").upper() == "ERROR":
-        raise AgentRunError(f"model run failed: {getattr(output, 'content', '')}")
-    return getattr(output, "content", output)
-
-
 def validate_structured_content(content: Any, schema: type[OutputModel]) -> OutputModel:
     """Validate Agno content returned as a model, mapping, or JSON string.
 
