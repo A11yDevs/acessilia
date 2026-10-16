@@ -136,4 +136,28 @@ pip install -e "libs/docstruct[dev]"
 pytest libs/docstruct/tests
 ```
 
-O CI roda `pytest libs/docstruct/tests` sem o backend instalado — se precisar importar `backend/`, a mudança está violando o desacoplamento.
+`tests/test_purity.py` importa todos os módulos num interpretador que recusa `backend`, `acessilia_toolbox` e `acessilia_sdk`, então uma mudança que os importe falha mesmo quando eles estão instalados (como no CI do core).
+
+## Releases
+
+A Toolbox e os demais repositórios consomem um artefato publicado, não este
+diretório. O `.github/workflows/docstruct-release.yml` publica uma wheel e um
+sdist num GitHub Release quando é enviada uma tag igual à versão:
+
+1. Atualizar `version` em `libs/docstruct/pyproject.toml` (versionamento
+   semântico: mudar o comportamento ou a assinatura de uma função pública é
+   major enquanto a versão for menor que 1.0, e minor depois).
+2. Fazer o merge e criar a tag no commit mergeado:
+   `git tag docstruct-v0.2.0 && git push origin docstruct-v0.2.0`.
+
+O workflow recusa uma tag diferente da versão do pacote, roda esta suíte só com
+a docstruct instalada, gera os arquivos de forma reprodutível a partir do commit
+(`SOURCE_DATE_EPOCH`), importa todos os módulos a partir da wheel instalada e
+anexa os arquivos com o SHA-256. As notas do release trazem a linha para copiar:
+
+```
+acessilia-docstruct @ https://github.com/A11yDevs/acessilia/releases/download/docstruct-v<versão>/acessilia_docstruct-<versão>-py3-none-any.whl#sha256=<hash>
+```
+
+O pip confere o fragmento `#sha256=` no download, inclusive quando o
+consumidor instala sem arquivo de lock.
