@@ -167,6 +167,14 @@ def test_extract_duration_and_timestamps(mock_client):
     assert result.completed_at >= result.started_at
 
 
+@pytest.fixture(autouse=True)
+def _isolated_data_dir(tmp_path, monkeypatch):
+    """Dual mode persists the secondary extraction under settings.data_dir."""
+    from backend.config.settings import settings
+
+    monkeypatch.setattr(settings, "data_dir", tmp_path)
+
+
 def test_dual_mode_attaches_page_evidence_without_replacing_manifest(
     mock_client, monkeypatch
 ):
@@ -213,6 +221,16 @@ def test_dual_mode_attaches_page_evidence_without_replacing_manifest(
     compiled = PddlProblemCompiler(DomainBundle.load()).compile(manifest)
     assert "fuse-providers" in compiled.text
     assert "dual-provider-fusion" in compiled.text
+
+    # The secondary extraction is kept for the methods that choose between
+    # providers, under a content-addressed name whose hash is recorded.
+    import hashlib
+    import json
+
+    [artifact] = [a for a in manifest.artifacts if a.kind == "provider-extraction"]
+    stored = Path(artifact.path).read_bytes()
+    assert hashlib.sha256(stored).hexdigest() == artifact.sha256
+    assert json.loads(stored) == {"provider": "mineru", "document": secondary_response}
 
 
 def test_dual_mode_passes_configured_fusion_policy(mock_client, monkeypatch):

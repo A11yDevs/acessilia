@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -138,6 +140,9 @@ class ToolboxManifestExtractor:
                         **result,
                         "fusion_stats": fusion["fusion_stats"],
                         "fusion_evidence": fusion["fusion_evidence"],
+                        "secondary_extraction": _persist_secondary_extraction(
+                            secondary_result, secondary_provider
+                        ),
                     }
                 finally:
                     await secondary_client.close()
@@ -168,3 +173,26 @@ class ToolboxManifestExtractor:
             artifact_id=artifact_id,
             cache_key=cache_key,
         )
+
+
+def _persist_secondary_extraction(
+    payload: dict[str, Any], provider: str
+) -> dict[str, str]:
+    """Keep the secondary provider's extraction for the planning methods.
+
+    The fusion evidence only carries per-page statistics, but the methods that
+    resolve the obligations it raises (table source, skeleton order, page
+    routing) decide between the two providers' blocks. The file is named by its
+    content hash and the hash is recorded, so a reader can tell it was not
+    replaced afterwards.
+    """
+    content = json.dumps(
+        {"provider": provider, "document": payload},
+        ensure_ascii=False,
+        sort_keys=True,
+    ).encode("utf-8")
+    digest = hashlib.sha256(content).hexdigest()
+    path = settings.data_dir / "artifacts" / "fusion" / f"secondary-{digest[:16]}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(content)
+    return {"provider": provider, "path": str(path), "sha256": digest}

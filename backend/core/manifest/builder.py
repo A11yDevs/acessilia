@@ -21,6 +21,7 @@ from backend.pipeline.table_ast import normalize_table_ast
 from backend.pipeline.table_ast import rows_from_table_ast
 
 from backend.core.manifest.models import (
+    Artifact,
     BoundingBox,
     ExtractorRun,
     ManifestElement,
@@ -163,6 +164,11 @@ V23_OBLIGATION_BY_KIND = {
         ["norm-fix", "human-review"],
     ),
 }
+
+#: Artifact holding the secondary provider's extraction when FUSION_MODE=dual;
+#: the v2.3 methods that choose between providers read it.
+SECONDARY_EXTRACTION_KIND = "provider-extraction"
+SECONDARY_EXTRACTION_ARTIFACT_ID = "artifact-secondary-extraction"
 
 CALL_OUT_MIN_GROUP_SIZE = 3
 CALL_OUT_MIN_INDENT_PX = 8.0
@@ -328,6 +334,17 @@ def _build_from_toolbox_json(
     observations.extend(v23_observations)
     obligations.extend(v23_obligations)
     _append_processing_needs(manifest, observations, obligations)
+    secondary = extraction.document.get("secondary_extraction")
+    if isinstance(secondary, dict) and secondary.get("path"):
+        manifest.artifacts.append(
+            Artifact(
+                id=SECONDARY_EXTRACTION_ARTIFACT_ID,
+                kind=SECONDARY_EXTRACTION_KIND,
+                path=str(secondary["path"]),
+                media_type="application/json",
+                sha256=secondary.get("sha256"),
+            )
+        )
     return manifest
 
 
