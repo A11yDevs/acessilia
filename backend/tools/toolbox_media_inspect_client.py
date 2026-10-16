@@ -30,7 +30,7 @@ class ToolboxMediaInspectClient(ToolboxCapabilityClient):
     sinal requires_visual_inspection.
     """
 
-    provider_setting = "toolbox_media_inspect_provider"
+    provider_key = "toolbox_media_inspect_provider"
 
     async def inspect(
         self,

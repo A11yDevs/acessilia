@@ -49,7 +49,7 @@ Uma resposta de extração bem-sucedida tem a forma:
 ```
 
 **Ponto-chave:** o core **não registra quais providers existem**. A única tabela de
-providers do core é `PROVIDER_DEFAULTS`, em `backend/config/toolbox_capabilities.py`, que
+providers do core é `PROVIDER_DEFAULTS`, em `libs/sdk/src/acessilia_sdk/toolbox/capabilities.py`, que
 guarda o provider padrão de cada capacidade. Ela não lista os providers existentes nem
 faz roteamento. O `provider` é apenas uma string enviada no form; o roteamento real
 acontece no `providers-config.yaml` da Toolbox. A validação de que um provider existe é feita do lado da Toolbox — quando
@@ -57,7 +57,7 @@ falha, o core recebe `ToolboxCapabilityError` ou `ToolboxContractViolation`.
 
 ### Hierarquia de exceções
 
-Todas herdam de `ToolboxError` (definida em `backend/tools/toolbox_client.py`):
+Todas herdam de `ToolboxError` (definida no SDK, `acessilia_sdk.toolbox.errors`, e re-exportada por `backend/tools/toolbox_client.py`):
 
 - `ToolboxProviderUnavailable` — serviço/provedor indisponível (ex.: HTTP 503)
 - `ToolboxTimeout` — excedeu `toolbox_timeout_seconds`
@@ -161,15 +161,15 @@ precisa de um cliente especializado. Siga o padrão de `toolbox_layout_client.py
 ### 4.1 Registrar a capacidade e escrever um cliente fino
 
 Toda chamada à Toolbox passa por `execute_capability`
-(`backend/tools/toolbox_client.py`), que recusa qualquer capacidade fora do
+(SDK, `libs/sdk`: `acessilia_sdk.toolbox.transport`), que recusa qualquer capacidade fora do
 registro. Adicionar uma capacidade tem dois passos.
 
-**1. Declarar** em `backend/config/toolbox_capabilities.py`:
+**1. Declarar** em `libs/sdk/src/acessilia_sdk/toolbox/capabilities.py`:
 
 ```python
 ToolboxCapability(
     "<capability>", 1, "<Rótulo>",               # id, versão do manifesto, rótulo de erro
-    provider_setting="toolbox_<x>_provider",     # atributo do Settings / TOOLBOX_<X>_PROVIDER
+    provider_key="toolbox_<x>_provider",     # atributo do Settings / TOOLBOX_<X>_PROVIDER
     output_schema="<schema>@1",                  # output.schema do manifesto
 ),
 ```
@@ -196,7 +196,7 @@ CAPABILITY = "<capability>"
 
 
 class Toolbox<X>Client(ToolboxCapabilityClient):
-    provider_setting = "toolbox_<x>_provider"
+    provider_key = "toolbox_<x>_provider"
 
     async def run(
         self,
@@ -315,7 +315,8 @@ service.py: _build_orchestrator()
 
 ## 7. Referências de código
 
-- `backend/tools/toolbox_client.py` — cliente base e hierarquia de exceções
+- `libs/sdk/src/acessilia_sdk/toolbox/` — registro de capacidades, transporte, classe base dos clientes e hierarquia de exceções (SDK)
+- `backend/tools/toolbox_client.py` — liga a classe base do SDK ao settings do core; `ToolboxClient` genérico (extração, artefatos, datasets)
 - `backend/tools/toolbox_layout_client.py` — modelo do Cenário B
 - `backend/tools/toolbox_ocr_tools.py`, `toolbox_math_tools.py`, `toolbox_pdf_tools.py` — wrappers com fallback local
 - `backend/tools/toolbox_page_ocr_client.py` — `document.ocr.page` (VLM de página inteira)

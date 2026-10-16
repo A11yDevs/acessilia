@@ -5,7 +5,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from backend.config.toolbox_capabilities import provider_default
+from acessilia_sdk.toolbox.capabilities import provider_default
 
 load_dotenv()
 
@@ -86,7 +86,7 @@ class Settings:
     # Structural extraction keeps the historical TOOLBOX_PROVIDER variable for
     # backward compatibility. Specialized capabilities use providers bound to
     # their own contracts in the Toolbox registry. Every default comes from
-    # backend/config/toolbox_capabilities.py.
+    # libs/sdk/src/acessilia_sdk/toolbox/capabilities.py.
     toolbox_provider: str = os.getenv(
         "TOOLBOX_PROVIDER", provider_default("toolbox_provider")
     )

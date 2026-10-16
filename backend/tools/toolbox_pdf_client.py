@@ -23,7 +23,7 @@ class ToolboxPdfClient(ToolboxCapabilityClient):
     pdf.render (renderizar página como PNG).
     """
 
-    provider_setting = "toolbox_pdf_provider"
+    provider_key = "toolbox_pdf_provider"
 
     async def split(
         self,

@@ -23,7 +23,7 @@ class ToolboxLayoutClient(ToolboxCapabilityClient):
     embedded_image, code_block, list_block, callout_box, etc.).
     """
 
-    provider_setting = "toolbox_layout_provider"
+    provider_key = "toolbox_layout_provider"
 
     async def analyze(
         self,

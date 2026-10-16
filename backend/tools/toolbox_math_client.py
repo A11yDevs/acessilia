@@ -34,7 +34,7 @@ class ToolboxMathClient(ToolboxCapabilityClient):
 
     # provider remains the recognition-provider override for backward
     # compatibility. Text transformations use the pure-math provider.
-    provider_setting = "toolbox_math_recognize_provider"
+    provider_key = "toolbox_math_recognize_provider"
 
     def __init__(
         self,

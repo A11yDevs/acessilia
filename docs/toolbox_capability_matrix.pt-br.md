@@ -29,9 +29,9 @@ sem descartar a capacidade por falta de acionamento atual.
 
 | Elo | Artefato | Local |
 |---|---|---|
-| Entrada no registro | `ToolboxCapability` (id, versão, configuração de provider, schema de saída) | `backend/config/toolbox_capabilities.py` |
+| Entrada no registro | `ToolboxCapability` (id, versão, configuração de provider, schema de saída) | `libs/sdk/src/acessilia_sdk/toolbox/capabilities.py` |
 | Cliente | subclasse de `ToolboxCapabilityClient` chamando o id registrado | `backend/tools/toolbox_*_client.py` |
-| Default de provider | `PROVIDER_DEFAULTS`, lido por `TOOLBOX_*_PROVIDER` no `Settings` | `backend/config/toolbox_capabilities.py` |
+| Default de provider | `PROVIDER_DEFAULTS`, lido por `TOOLBOX_*_PROVIDER` no `Settings` | `libs/sdk/src/acessilia_sdk/toolbox/capabilities.py` |
 | Manifest | `capabilities/*.yaml` | `acessilia-toolbox` |
 | Registro do provider | entrada em `providers-config.yaml` com adapter | `acessilia-toolbox` |
 
