@@ -57,12 +57,18 @@ obrigações artificiais em cada documento.
 
 ### 3. Tornar os métodos Dr.DocBench executáveis
 
-- Implementar os seis métodos ainda explicitamente indisponíveis
-  (`agreement-rule`, `rescue-omitted`, `skeleton-order`, `table-smart-fusion`,
-  `table-specialist`, `vlm-pairwise-judge`) usando as funções/agents Dr.DocBench
-  já existentes ou os clientes Toolbox correspondentes. `single-provider` e
-  `rep-guard` já têm handlers registrados; a guarda também altera o texto e
-  registra quantos tokens removeu.
+- Implementar os três métodos ainda explicitamente indisponíveis
+  (`rescue-omitted`, `table-specialist`, `vlm-pairwise-judge`) usando as
+  funções/agents Dr.DocBench já existentes ou os clientes Toolbox
+  correspondentes. `single-provider` e `rep-guard` já têm handlers registrados;
+  a guarda também altera o texto e registra quantos tokens removeu.
+- `table-smart-fusion`, `skeleton-order` e `agreement-rule` têm handlers que
+  decidem entre os dois providers lendo a extração secundária que o extrator
+  guarda como artefato (`provider-extraction`, com sha256) em `FUSION_MODE=dual`.
+  As regras são as do Dr.DocBench, calibradas para docling + mineru; outro par
+  falha explicitamente. Quando o roteador por página (`agreement-rule`) escolhe o
+  provider secundário, a decisão fica em `page_route` e a obrigação segue para
+  `human-review`: a troca de página inteira não é aplicada automaticamente.
 - Fazer o client da página OCR usar um contrato realmente publicado pela
   Toolbox ou completar o manifesto/provider correspondente; não manter um ID
   que falha apenas em runtime.
@@ -150,7 +156,7 @@ obrigações artificiais em cada documento.
 | Truncamento tabular | corrigido com `DATA_AGENT_MAX_TOKENS=8192`; caso `004.pdf` e suíte E2E completa passaram anteriormente |
 | PDDL/P1 | removido fallback silencioso; execução real e replanejamento limitado cobertos |
 | PDDL/P2 | obrigações v2.3 cobertas; evidência dual por página agora percorre o extrator de produção até `problem.pddl` quando `FUSION_MODE=dual` |
-| Métodos v2.3 | `rep-guard` e `single-provider` têm handler; seis ainda indisponíveis |
+| Métodos v2.3 | `rep-guard`, `single-provider`, `table-smart-fusion`, `skeleton-order` e `agreement-rule` têm handler; três ainda indisponíveis (`rescue-omitted`, `table-specialist`, `vlm-pairwise-judge`) |
 | Availability gate | indisponibilidade excluída do PDDL e plano externo inválido rejeitado por teste |
 | Contrato ao vivo atual | OpenAPI 3.1 genérica disponível; 26 capacidades; 3 IDs OCR/adjudicação consultados pelo core retornam 404 |
 | Estado de publicação | alterações deste progresso permanecem locais no core; sem push/deploy nesta etapa |
