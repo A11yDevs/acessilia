@@ -131,10 +131,7 @@ class TestRegistryCoverage:
     #: the test below fails if a *new* method appears without a handler.
     KNOWN_UNAVAILABLE = frozenset(
         {
-            "agreement-rule",
             "rescue-omitted",
-            "skeleton-order",
-            "table-smart-fusion",
             "table-specialist",
             "vlm-pairwise-judge",
         }
@@ -724,6 +721,21 @@ class TestEveryHandlerIsCallable:
         ),
         "single-provider": (
             "fuse-providers",
+            [_element("el-1", "paragraph", text="texto")],
+        ),
+        # These choose between the two providers and read the secondary
+        # extraction artifact; without one they must fail, not raise. The
+        # positive cases live in tests/test_provider_choice_methods.py.
+        "table-smart-fusion": (
+            "select-table-source",
+            [_element("el-1", "table", metadata={"table_ast": {"rows": []}})],
+        ),
+        "skeleton-order": (
+            "refine-reading-order",
+            [_element("el-1", "paragraph", text="texto")],
+        ),
+        "agreement-rule": (
+            "adjudicate-page",
             [_element("el-1", "paragraph", text="texto")],
         ),
     }
