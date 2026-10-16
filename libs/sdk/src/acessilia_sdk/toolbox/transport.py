@@ -108,7 +108,7 @@ def require_capability(capability_id: str) -> ToolboxCapability:
     spec = TOOLBOX_CAPABILITIES.get(capability_id)
     if spec is None:
         raise ToolboxCapabilityError(
-            f"Capacidade não registrada no core: {capability_id}"
+            f"Capacidade não registrada no SDK: {capability_id}"
         )
     if spec.transport != "execute":
         raise ToolboxCapabilityError(

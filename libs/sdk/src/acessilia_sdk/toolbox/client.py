@@ -14,6 +14,9 @@ from acessilia_sdk.toolbox.transport import (
     raise_for_error,
 )
 
+#: SDK-side fallback used only when the caller passes no ``timeout_seconds``.
+#: The core always injects ``settings.toolbox_timeout_seconds``, so this value
+#: does not need to track the core default.
 DEFAULT_TIMEOUT_SECONDS = 3600
 
 
