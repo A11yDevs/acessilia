@@ -53,6 +53,9 @@ METHOD_TOOLBOX_REQUIREMENTS: dict[str, Callable[[], list[Requirement]]] = {
         Requirement(_EXTRACT, settings.fusion_secondary_provider),
     ],
     "single-provider": lambda: [Requirement(_EXTRACT, settings.toolbox_provider)],
+    "vlm-pairwise-judge": lambda: [
+        Requirement("document.adjudicate.page", settings.toolbox_adjudicate_provider)
+    ],
 }
 
 

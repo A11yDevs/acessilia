@@ -133,7 +133,6 @@ class TestRegistryCoverage:
         {
             "rescue-omitted",
             "table-specialist",
-            "vlm-pairwise-judge",
         }
     )
 
@@ -735,6 +734,12 @@ class TestEveryHandlerIsCallable:
             [_element("el-1", "paragraph", text="texto")],
         ),
         "agreement-rule": (
+            "adjudicate-page",
+            [_element("el-1", "paragraph", text="texto")],
+        ),
+        # Calls the Toolbox; the positive cases with a fake judge live in
+        # tests/test_provider_choice_methods.py.
+        "vlm-pairwise-judge": (
             "adjudicate-page",
             [_element("el-1", "paragraph", text="texto")],
         ),

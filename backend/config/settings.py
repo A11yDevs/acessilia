@@ -111,6 +111,9 @@ class Settings:
     toolbox_adjudicate_provider: str = os.getenv(
         "TOOLBOX_ADJUDICATE_PROVIDER", provider_default("toolbox_adjudicate_provider")
     )
+    toolbox_table_provider: str = os.getenv(
+        "TOOLBOX_TABLE_PROVIDER", provider_default("toolbox_table_provider")
+    )
     toolbox_orientation_provider: str = os.getenv(
         "TOOLBOX_ORIENTATION_PROVIDER", provider_default("toolbox_orientation_provider")
     )

@@ -58,9 +58,10 @@ Legenda de **Caminho de chamada**: como o core alcança a capacidade.
 | `media.inspect` | `toolbox_media_inspect_client.py` | `TOOLBOX_MEDIA_INSPECT_PROVIDER=pure-media-inspect` | `pure-media-inspect` | `backend/tools/media_inspect.py`, controlado por `TOOLBOX_MEDIA_INSPECT_ENABLED` |
 | `artifact.store` / `artifact.retrieve` | `toolbox_client.py` REST `/v1/artifacts` | — | `minio`, `filesystem` | upload antes da extração |
 | `dataset.*` (8 capacidades) | `toolbox_client.py` REST `/v1/datasets` | — | `dataset-github`, `dataset-huggingface` | `toolbox_dataset_tools.py` (scripts do Dr.DocBench) |
-| `document.ocr.page` | `toolbox_page_ocr_client.py` | `TOOLBOX_PAGE_OCR_PROVIDER=qwen3-vl-page` | **ID ausente (404)** | A REST/OpenAPI genérica está publicada; ainda falta este manifesto de capacidade/provider e a obrigação/método PDDL por evidência |
-| `document.adjudicate.page` | `toolbox_adjudicate_client.py` | `TOOLBOX_ADJUDICATE_PROVIDER=qwen3-vl-judge` | **ID ausente (404)** | A REST/OpenAPI genérica está publicada; ainda falta este manifesto de capacidade/provider e a obrigação/método PDDL por divergência |
-| `document.adjudicate.region` | `toolbox_adjudicate_client.py` | `TOOLBOX_ADJUDICATE_PROVIDER=qwen3-vl-judge` | **ID ausente (404)** | A REST/OpenAPI genérica está publicada; ainda falta este manifesto de capacidade/provider e a obrigação/método PDDL por evidência regional |
+| `document.ocr.page` | `toolbox_page_ocr_client.py` | `TOOLBOX_PAGE_OCR_PROVIDER=qwen3-vl-8b` | `qwen3-vl-8b` (acessilia-toolbox#50) | publicada; nenhum método PDDL a chama ainda |
+| `document.adjudicate.page` | `toolbox_adjudicate_client.py` | `TOOLBOX_ADJUDICATE_PROVIDER=qwen3-vl-8b` | `qwen3-vl-8b` (acessilia-toolbox#50) | `vlm-pairwise-judge` em `adjudicate-page`; limiares a revalidar no modelo 8B |
+| `document.adjudicate.region` | `toolbox_adjudicate_client.py` | `TOOLBOX_ADJUDICATE_PROVIDER=qwen3-vl-8b` | `qwen3-vl-8b` (acessilia-toolbox#50) | publicada; handler do `rescue-omitted` pendente |
+| `table.recognize` | `toolbox_table_client.py` | `TOOLBOX_TABLE_PROVIDER=qwen3-vl-8b` | `qwen3-vl-8b` (acessilia-toolbox#50) | publicada; handler do `table-specialist` pendente (regra de seleção a decidir) |
 | `image.page.orient` | `toolbox_orientation_client.py` | `TOOLBOX_ORIENTATION_PROVIDER=rapidocr-orient` | `rapidocr-orient` | contrato válido; falta gatilho PDDL e validação do efeito em produção |
 | `accessibility.mark` | **ausente** | — | `pure-accessibility` | pendente: cliente e obrigação/método/handler acionados por evidência |
 | `chem.convert` | **ausente** | — | `pure-chem` | pendente: cliente e obrigação/método/handler acionados por evidência |
@@ -80,11 +81,12 @@ Medida contra a Toolbox de homologação em execução com
    disponíveis em `GET /v1/capabilities/{capability_id}`. OpenAPI ao vivo:
    `https://www.acessilia3.inf.ufg.br/toolbox/v1/openapi.json` (UI:
    `/toolbox/v1/docs`). Ela não define rotas específicas por capacidade.
-2. Três capacidades consumidas pelo core não existem no catálogo da Toolbox:
-   `document.ocr.page`, `document.adjudicate.page` e
-   `document.adjudicate.region`; a consulta de cada detalhe retorna HTTP 404.
-3. Dois defaults de provider em `settings.py` apontam para providers que a Toolbox
-   não registra: `qwen3-vl-page`, `qwen3-vl-judge`.
+2. Resolvido pelo acessilia-toolbox#50: `document.ocr.page`,
+   `document.adjudicate.page` e `document.adjudicate.region` são publicadas pelo
+   provider `qwen3-vl-8b`, e os defaults do SDK apontam para ele (antes citavam
+   `qwen3-vl-page` e `qwen3-vl-judge`, do perfil de 32B dos experimentos).
+3. O `KNOWN_DRIFT` está vazio contra o catálogo do develop da Toolbox; a
+   homologação ainda roda uma imagem anterior ao #50 até ser reimplantada.
 4. Seis capacidades não têm nenhum cliente no core (ver a matriz).
 
 A deriva de contrato de orientação foi resolvida: o cliente postava em
