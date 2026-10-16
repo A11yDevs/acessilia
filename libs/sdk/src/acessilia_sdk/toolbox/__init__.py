@@ -6,6 +6,14 @@ from acessilia_sdk.toolbox.capabilities import (
     ToolboxCapability,
     provider_default,
 )
+from acessilia_sdk.toolbox.catalog import (
+    CatalogCache,
+    CatalogSnapshot,
+    Requirement,
+    fetch_catalog,
+    missing_requirements,
+    snapshot_from_payloads,
+)
 from acessilia_sdk.toolbox.client import ToolboxCapabilityClient
 from acessilia_sdk.toolbox.errors import (
     ToolboxArtifactNotFound,
@@ -26,7 +34,10 @@ from acessilia_sdk.toolbox.transport import (
 )
 
 __all__ = [
+    "CatalogCache",
+    "CatalogSnapshot",
     "PROVIDER_DEFAULTS",
+    "Requirement",
     "TOOLBOX_CAPABILITIES",
     "ToolboxArtifactNotFound",
     "ToolboxAuthenticationError",
@@ -40,8 +51,11 @@ __all__ = [
     "ToolboxUnsupportedMediaType",
     "auth_headers",
     "execute_capability",
+    "fetch_catalog",
+    "missing_requirements",
     "media_type_for",
     "provider_default",
     "raise_for_error",
     "require_capability",
+    "snapshot_from_payloads",
 ]

@@ -124,6 +124,19 @@ class Settings:
         in {"1", "true", "yes", "on", "sim"},
     )
     toolbox_api_key: str = os.getenv("TOOLBOX_API_KEY", "")
+    # Availability gate for planning methods that call the Toolbox: "observe"
+    # only reports what the live catalogue would rule out, "enforce" removes
+    # those methods from the plan (failing closed without a catalogue), "off"
+    # skips the check.
+    toolbox_availability_gate: str = os.getenv(
+        "TOOLBOX_AVAILABILITY_GATE", "observe"
+    ).strip().lower()
+    toolbox_catalog_refresh_seconds: int = int(
+        os.getenv("TOOLBOX_CATALOG_REFRESH_SECONDS", "60")
+    )
+    toolbox_catalog_stale_seconds: int = int(
+        os.getenv("TOOLBOX_CATALOG_STALE_SECONDS", "900")
+    )
     toolbox_timeout_seconds: int = int(os.getenv("TOOLBOX_TIMEOUT_SECONDS", "3600"))
     toolbox_use_artifact_store: bool = field(
         default_factory=lambda: os.getenv("TOOLBOX_USE_ARTIFACT_STORE", "true").strip().lower()

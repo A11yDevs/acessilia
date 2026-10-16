@@ -234,6 +234,26 @@ first, and degrade to the local implementation on failure.
   `ToolboxLayoutStructurer`).
 - **Dual fusion** (`backend/pipeline/fusion.py`): if the capability produces canonical
   blocks, it can participate as a provider in `extract_fused()`.
+- **PDDL method** (`backend/core/planning/toolbox_gate.py`): if a planning method's
+  handler calls the capability, declare it in `METHOD_TOOLBOX_REQUIREMENTS`
+  (capability and provider). The availability gate then checks it against the live
+  catalogue before each document is planned (see below).
+
+#### Availability gate
+
+Before planning a document the orchestrator takes one catalogue snapshot
+(`GET /v1/capabilities` + `/v1/providers`, cached for
+`TOOLBOX_CATALOG_REFRESH_SECONDS`) and checks every requested method listed in
+`METHOD_TOOLBOX_REQUIREMENTS`: the capability must be in the SDK allowlist, be
+published with the exact contract version, and the configured provider must be
+registered and implement it. The catalogue only restricts; it never makes a method
+available.
+
+| `TOOLBOX_AVAILABILITY_GATE` | Effect |
+|---|---|
+| `observe` (default) | Logs what would be removed and records it in `canonical_metadata.pddl_toolbox_availability`; the plan is unchanged |
+| `enforce` | Removes those methods from the plan and from every replan of the document. When the catalogue cannot be read and the last good snapshot is older than `TOOLBOX_CATALOG_STALE_SECONDS`, every method with Toolbox requirements is removed (fail closed) |
+| `off` | No check |
 
 ### 4.4 Tests
 
@@ -277,6 +297,9 @@ Defined in `backend/config/settings.py` and documented in `.env.example`:
 | `TOOLBOX_BASE_URL` | `http://localhost:8002` | Service base URL |
 | `TOOLBOX_PROVIDER` | `docling` | Primary extraction provider |
 | `TOOLBOX_API_KEY` | *(empty)* | Key for `Authorization: Bearer` |
+| `TOOLBOX_AVAILABILITY_GATE` | `observe` | Availability gate: `observe`, `enforce` or `off` (section 4.3) |
+| `TOOLBOX_CATALOG_REFRESH_SECONDS` | `60` | How long a catalogue snapshot is reused |
+| `TOOLBOX_CATALOG_STALE_SECONDS` | `900` | How long the last good snapshot is served when the catalogue cannot be read |
 | `TOOLBOX_TIMEOUT_SECONDS` | `3600` | Request timeout |
 | `TOOLBOX_USE_ARTIFACT_STORE` | `true` | Upload the file to `/v1/artifacts` before extracting |
 | `TOOLBOX_USE_REMOTE_CACHE` | `true` | Use the remote cache (`no_cache=false`) |
