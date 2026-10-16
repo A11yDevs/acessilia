@@ -48,6 +48,12 @@ def _default_providers(monkeypatch):
 
 
 def test_default_providers_pass_against_the_staging_catalogue() -> None:
+    """Expects ``docling`` and ``mineru`` registered in the fixture.
+
+    The fixture is shared with ``test_toolbox_contract_drift.py``: when
+    regenerating it from a staging where either provider is not registered,
+    this test fails for that reason, not because the gate regressed.
+    """
     decision = toolbox_gate.evaluate(
         FUSE_METHODS, _staging_snapshot(), mode="enforce"
     )
@@ -150,7 +156,7 @@ async def test_decide_is_a_no_op_when_off(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_decide_uses_one_snapshot_for_the_document(monkeypatch) -> None:
+async def test_decide_reads_the_cache_once(monkeypatch) -> None:
     cache = _CountingCache(_staging_snapshot())
     monkeypatch.setattr(toolbox_gate, "catalog_cache", lambda: cache)
     monkeypatch.setattr(settings, "toolbox_availability_gate", "enforce")

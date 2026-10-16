@@ -13,6 +13,7 @@ take every remote operation away at once; past its staleness limit it returns
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import time
@@ -70,7 +71,7 @@ def snapshot_from_payloads(
         if not isinstance(entry, dict) or not entry.get("id"):
             raise ToolboxContractViolation("Capacidade sem id no catálogo da Toolbox")
         capability_id = str(entry["id"])
-        version = int(entry.get("version") or 1)
+        version = _manifest_version(capability_id, entry.get("version"))
         versions[capability_id] = max(version, versions.get(capability_id, 0))
     bindings: dict[str, frozenset[str]] = {}
     for entry in providers:
@@ -100,15 +101,17 @@ async def fetch_catalog(
     """Read the catalogue a Toolbox publishes.
 
     The two routes are separate requests, so a redeploy (or another replica)
-    between them could produce a pair from two catalogues. The pair is read
-    until two consecutive reads agree on the revision, at most three times.
+    between them could produce a pair from two catalogues. Capabilities change
+    with a Toolbox release, provider registrations far more often, so
+    ``/v1/capabilities`` is read once and ``/v1/providers`` is re-read until two
+    consecutive reads agree on the revision, at most three times. A release
+    landing between the two routes is picked up by the next refresh.
     """
+    capabilities = await _get_json(http, "/v1/capabilities")
 
     async def read() -> CatalogSnapshot:
         return snapshot_from_payloads(
-            await _get_json(http, "/v1/capabilities"),
-            await _get_json(http, "/v1/providers"),
-            fetched_at=clock(),
+            capabilities, await _get_json(http, "/v1/providers"), fetched_at=clock()
         )
 
     previous = await read()
@@ -164,7 +167,9 @@ class CatalogCache:
     """Last good catalogue, refreshed at most every ``refresh_seconds``.
 
     When a refresh fails the previous snapshot keeps being served until it is
-    ``stale_seconds`` old; after that :meth:`get` returns ``None``.
+    ``stale_seconds`` old; after that :meth:`get` returns ``None``. Refreshes
+    are single-flight: callers that find one in progress wait for its outcome
+    instead of reading the catalogue themselves.
     """
 
     def __init__(
@@ -180,22 +185,42 @@ class CatalogCache:
         self.stale_seconds = max(stale_seconds, refresh_seconds)
         self._clock = clock
         self._snapshot: CatalogSnapshot | None = None
+        self._attempts = 0  # completed refreshes, successful or not
+        self._lock = asyncio.Lock()
         self.last_error: str | None = None
 
     async def get(self) -> CatalogSnapshot | None:
-        now = self._clock()
-        cached = self._snapshot
-        if cached is not None and now - cached.fetched_at < self.refresh_seconds:
-            return cached
-        try:
-            self._snapshot = await self._fetch()
-            self.last_error = None
+        if self._age() < self.refresh_seconds:
             return self._snapshot
-        except ToolboxError as exc:
-            self.last_error = f"{type(exc).__name__}: {exc}"
-        if cached is not None and now - cached.fetched_at < self.stale_seconds:
-            return cached
-        return None
+        attempts_seen = self._attempts
+        async with self._lock:
+            # A caller that waited on another's refresh takes its outcome,
+            # failure included, rather than reading the catalogue again.
+            if self._attempts == attempts_seen:
+                try:
+                    self._snapshot = await self._fetch()
+                    self.last_error = None
+                except ToolboxError as exc:
+                    self.last_error = f"{type(exc).__name__}: {exc}"
+                finally:
+                    self._attempts += 1
+        return self._snapshot if self._age() < self.stale_seconds else None
+
+    def _age(self) -> float:
+        if self._snapshot is None:
+            return float("inf")
+        return self._clock() - self._snapshot.fetched_at
+
+
+def _manifest_version(capability_id: str, raw: Any) -> int:
+    """A capability's manifest version; an absent version means v1."""
+    if raw is None:
+        return 1
+    if isinstance(raw, bool) or not isinstance(raw, int) or raw < 1:
+        raise ToolboxContractViolation(
+            f"Versão inválida para {capability_id} no catálogo da Toolbox: {raw!r}"
+        )
+    return raw
 
 
 async def _get_json(http: httpx.AsyncClient, path: str) -> Any:

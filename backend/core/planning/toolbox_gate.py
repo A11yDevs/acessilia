@@ -39,6 +39,8 @@ from backend.core.manifest.models import ProcessingManifest
 GATE_MODES = ("observe", "enforce", "off")
 
 #: Reading the catalogue must not hold a document for the extraction timeout.
+#: Per request: a refresh makes at most four (one capabilities read, up to three
+#: providers reads), so ~40s in the worst case.
 CATALOG_TIMEOUT_SECONDS = 10.0
 
 _EXTRACT = "document.structure.extract"

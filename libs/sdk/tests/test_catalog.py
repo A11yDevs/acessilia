@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 import httpx
 import pytest
 import respx
@@ -86,6 +88,18 @@ def test_allowlist_is_checked_even_without_a_snapshot() -> None:
     assert "fora da allowlist" in message
 
 
+def test_absent_version_means_v1() -> None:
+    unversioned = [{"id": EXTRACT}]
+    assert _snapshot(capabilities=unversioned).capabilities == {EXTRACT: 1}
+
+
+@pytest.mark.parametrize("version", ["abc", "2", 0, -1, True, 1.5])
+def test_invalid_version_is_a_contract_violation(version) -> None:
+    """Not a ``ValueError``: the cache only absorbs ``ToolboxError``."""
+    with pytest.raises(ToolboxContractViolation, match="Versão inválida"):
+        _snapshot(capabilities=[{"id": EXTRACT, "version": version}])
+
+
 @pytest.mark.asyncio
 async def test_fetch_returns_a_consistent_snapshot() -> None:
     with respx.mock() as router:
@@ -105,7 +119,7 @@ async def test_fetch_returns_a_consistent_snapshot() -> None:
 async def test_fetch_rereads_when_the_catalogue_changes_mid_read() -> None:
     fewer = [entry for entry in PROVIDERS if entry["id"] != "mineru"]
     with respx.mock() as router:
-        router.get(f"{BASE_URL}/v1/capabilities").mock(
+        capabilities = router.get(f"{BASE_URL}/v1/capabilities").mock(
             return_value=httpx.Response(200, json=CAPABILITIES)
         )
         router.get(f"{BASE_URL}/v1/providers").mock(
@@ -118,6 +132,7 @@ async def test_fetch_rereads_when_the_catalogue_changes_mid_read() -> None:
         async with httpx.AsyncClient(base_url=BASE_URL) as http:
             snapshot = await fetch_catalog(http)
     assert "mineru" not in snapshot.bindings
+    assert capabilities.call_count == 1  # only providers are re-read
 
 
 @pytest.mark.asyncio
@@ -188,3 +203,42 @@ async def test_cache_without_any_snapshot_returns_none() -> None:
         raise ToolboxProviderUnavailable("down")
 
     assert await CatalogCache(fetch).get() is None
+
+
+@pytest.mark.asyncio
+async def test_concurrent_refreshes_share_one_fetch() -> None:
+    calls = {"n": 0}
+    release = asyncio.Event()
+
+    async def fetch():
+        calls["n"] += 1
+        await release.wait()
+        return _snapshot()
+
+    cache = CatalogCache(fetch, clock=lambda: 0.0)
+    pending = [asyncio.create_task(cache.get()) for _ in range(5)]
+    await asyncio.sleep(0)
+    release.set()
+    results = await asyncio.gather(*pending)
+
+    assert calls["n"] == 1
+    assert all(result is results[0] is not None for result in results)
+
+
+@pytest.mark.asyncio
+async def test_concurrent_callers_share_a_failed_refresh() -> None:
+    calls = {"n": 0}
+    release = asyncio.Event()
+
+    async def fetch():
+        calls["n"] += 1
+        await release.wait()
+        raise ToolboxProviderUnavailable("down")
+
+    cache = CatalogCache(fetch)
+    pending = [asyncio.create_task(cache.get()) for _ in range(5)]
+    await asyncio.sleep(0)
+    release.set()
+
+    assert await asyncio.gather(*pending) == [None] * 5
+    assert calls["n"] == 1
