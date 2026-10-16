@@ -39,6 +39,8 @@ dependencies = [
     "babel>=2.18.0,<3",
     # Núcleo puro de processamento estrutural (libs/docstruct, instalado editável)
     "acessilia-docstruct",
+    # Acesso às capacidades da Toolbox pelo contrato HTTP (libs/sdk, instalado editável)
+    "acessilia-sdk",
 ]
 
 [project.optional-dependencies]
@@ -56,6 +58,8 @@ bot-acess = "frontend.cli.run:main"
 [tool.uv.sources]
 # O núcleo puro vive em libs/docstruct e é instalado editável a partir do repo.
 acessilia-docstruct = { path = "libs/docstruct", editable = true }
+# O SDK vive em libs/sdk enquanto não tiver repositório próprio.
+acessilia-sdk = { path = "libs/sdk", editable = true }
 
 [tool.setuptools.packages.find]
 include = ["backend*", "frontend*"]

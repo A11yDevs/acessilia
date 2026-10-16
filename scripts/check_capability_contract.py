@@ -5,7 +5,7 @@ that are declared in two different repositories. Nothing in either repository
 currently verifies that they still match, so a rename on one side silently
 produces a client that can only fail at runtime.
 
-This script reads the core side from ``backend/config/toolbox_capabilities.py``
+This script reads the core side from ``libs/sdk/src/acessilia_sdk/toolbox/capabilities.py``
 (the allowlist every Toolbox client goes through) and checks it against the
 Toolbox, either live (``--url``) or from a captured snapshot (``--snapshot``),
 so it can run inside CI without a running Toolbox. Live reads send
@@ -31,7 +31,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-REGISTRY_PATH = REPO_ROOT / "backend" / "config" / "toolbox_capabilities.py"
+REGISTRY_PATH = (
+    REPO_ROOT / "libs" / "sdk" / "src" / "acessilia_sdk" / "toolbox" / "capabilities.py"
+)
+REGISTRY_MODULE = "acessilia_sdk.toolbox.capabilities"
 
 # Capabilities that the Toolbox implements internally and that the core must
 # never call directly: they belong to the Toolbox's own orchestration.
@@ -73,7 +76,7 @@ def read_core_contract() -> CoreContract:
 
     for capability in registry.TOOLBOX_CAPABILITIES.values():
         contract.capabilities.setdefault(capability.id, set()).add(
-            REGISTRY_PATH.name
+            REGISTRY_MODULE
         )
 
     for setting, default in registry.PROVIDER_DEFAULTS.items():

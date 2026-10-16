@@ -30,7 +30,7 @@ class ToolboxAdjudicateClient(ToolboxCapabilityClient):
     - document.adjudicate.region: transcrição exata de um recorte de região
     """
 
-    provider_setting = "toolbox_adjudicate_provider"
+    provider_key = "toolbox_adjudicate_provider"
 
     async def judge_page(
         self,

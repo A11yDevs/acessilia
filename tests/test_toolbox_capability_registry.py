@@ -1,15 +1,14 @@
-"""Keeps every Toolbox call behind the core's capability registry.
+"""Keeps every core Toolbox call behind the SDK's capability registry.
 
-``backend/config/toolbox_capabilities.py`` is the allowlist of Toolbox
-contracts the core may call. These tests make sure the clients cannot bypass
-it, that settings take their provider defaults from it, and that the shared
-transport in ``execute_capability`` behaves the same for every client.
+``acessilia_sdk.toolbox.capabilities`` is the allowlist of Toolbox contracts.
+These tests make sure the core's clients cannot bypass it and that the core's
+settings take their provider defaults from it; the transport itself is covered
+by ``libs/sdk/tests``.
 """
 
 from __future__ import annotations
 
 import ast
-import asyncio
 import os
 import re
 from pathlib import Path
@@ -18,18 +17,12 @@ import httpx
 import pytest
 import respx
 
-from backend.config import settings as settings_module
-from backend.config.toolbox_capabilities import (
+from acessilia_sdk.toolbox.capabilities import (
     PROVIDER_DEFAULTS,
     TOOLBOX_CAPABILITIES,
 )
+from backend.config import settings as settings_module
 from backend.tools.toolbox_adjudicate_client import ToolboxAdjudicateClient
-from backend.tools.toolbox_client import (
-    ToolboxCapabilityError,
-    ToolboxContractViolation,
-    execute_capability,
-    run_sync,
-)
 from backend.tools.toolbox_orientation_client import ToolboxOrientationClient
 from backend.tools.toolbox_page_ocr_client import ToolboxPageOcrClient
 
@@ -121,67 +114,11 @@ def test_provider_settings_default_to_the_registry() -> None:
 
 def test_every_provider_setting_is_used_by_a_capability() -> None:
     used = {
-        capability.provider_setting
+        capability.provider_key
         for capability in TOOLBOX_CAPABILITIES.values()
-        if capability.provider_setting
+        if capability.provider_key
     }
     assert set(PROVIDER_DEFAULTS) == used
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("capability_id", "message"),
-    [
-        ("music.omr", "não registrada"),
-        ("dataset.sync", "não é executada via :execute"),
-    ],
-)
-async def test_execute_refuses_capabilities_outside_the_allowlist(
-    capability_id: str, message: str
-) -> None:
-    with respx.mock(assert_all_called=False) as router:
-        route = router.post(url__regex=r".*")
-        async with httpx.AsyncClient(base_url=BASE_URL) as http:
-            with pytest.raises(ToolboxCapabilityError, match=message):
-                await execute_capability(
-                    http,
-                    capability_id,
-                    provider="any",
-                    upload=("x.txt", b"x", "text/plain"),
-                )
-        assert not route.called
-
-
-@pytest.mark.asyncio
-async def test_execute_rejects_a_non_json_response() -> None:
-    with respx.mock() as router:
-        router.post(f"{BASE_URL}/v1/capabilities/document.ocr:execute").mock(
-            return_value=httpx.Response(200, text="<html>proxy error</html>")
-        )
-        async with httpx.AsyncClient(base_url=BASE_URL) as http:
-            with pytest.raises(ToolboxContractViolation, match="JSON válido"):
-                await execute_capability(
-                    http,
-                    "document.ocr",
-                    provider="docling-ocr",
-                    artifact_id="a1",
-                )
-
-
-@pytest.mark.asyncio
-async def test_execute_rejects_a_non_object_response() -> None:
-    with respx.mock() as router:
-        router.post(f"{BASE_URL}/v1/capabilities/document.ocr:execute").mock(
-            return_value=httpx.Response(200, json=["not", "an", "envelope"])
-        )
-        async with httpx.AsyncClient(base_url=BASE_URL) as http:
-            with pytest.raises(ToolboxContractViolation, match="objeto JSON"):
-                await execute_capability(
-                    http,
-                    "document.ocr",
-                    provider="docling-ocr",
-                    artifact_id="a1",
-                )
 
 
 @pytest.mark.asyncio
@@ -225,21 +162,3 @@ async def test_clients_send_the_configured_api_key(
         )
     finally:
         await client.close()
-
-
-def test_run_sync_outside_an_event_loop() -> None:
-    async def value() -> int:
-        return 42
-
-    assert run_sync(value()) == 42
-
-
-@pytest.mark.asyncio
-async def test_run_sync_inside_a_running_event_loop() -> None:
-    """``asyncio.run`` would raise here; ``run_sync`` moves to a worker thread."""
-
-    async def value() -> str:
-        await asyncio.sleep(0)
-        return "ok"
-
-    assert run_sync(value()) == "ok"

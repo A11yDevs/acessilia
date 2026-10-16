@@ -24,7 +24,7 @@ class ToolboxPageOcrClient(ToolboxCapabilityClient):
     completa com um modelo VLM (Qwen3-VL, dots.ocr, DeepSeek-OCR-2, TeleOCR).
     """
 
-    provider_setting = "toolbox_page_ocr_provider"
+    provider_key = "toolbox_page_ocr_provider"
 
     async def transcribe(
         self,

@@ -23,7 +23,7 @@ class ToolboxOrientationClient(ToolboxCapabilityClient):
     de correção (0/90/180/270) de uma página.
     """
 
-    provider_setting = "toolbox_orientation_provider"
+    provider_key = "toolbox_orientation_provider"
 
     async def detect(
         self,

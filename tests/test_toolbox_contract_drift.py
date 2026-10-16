@@ -36,9 +36,9 @@ SNAPSHOT_PATH = REPO_ROOT / "tests" / "fixtures" / "toolbox-contract.json"
 # integration review; see docs/toolbox_capability_matrix.md.
 KNOWN_DRIFT = frozenset(
     {
-        "core consumes capability 'document.adjudicate.page' (toolbox_capabilities.py) but the Toolbox does not expose it",
-        "core consumes capability 'document.adjudicate.region' (toolbox_capabilities.py) but the Toolbox does not expose it",
-        "core consumes capability 'document.ocr.page' (toolbox_capabilities.py) but the Toolbox does not expose it",
+        "core consumes capability 'document.adjudicate.page' (acessilia_sdk.toolbox.capabilities) but the Toolbox does not expose it",
+        "core consumes capability 'document.adjudicate.region' (acessilia_sdk.toolbox.capabilities) but the Toolbox does not expose it",
+        "core consumes capability 'document.ocr.page' (acessilia_sdk.toolbox.capabilities) but the Toolbox does not expose it",
         "core default for TOOLBOX_ADJUDICATE_PROVIDER points at provider 'qwen3-vl-judge' which the Toolbox does not register",
         "core default for TOOLBOX_PAGE_OCR_PROVIDER points at provider 'qwen3-vl-page' which the Toolbox does not register",
     }

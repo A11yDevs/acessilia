@@ -22,7 +22,7 @@ class ToolboxOcrClient(ToolboxCapabilityClient):
     de imagens e documentos digitalizados.
     """
 
-    provider_setting = "toolbox_ocr_provider"
+    provider_key = "toolbox_ocr_provider"
 
     async def ocr(
         self,

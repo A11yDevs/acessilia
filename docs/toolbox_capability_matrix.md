@@ -30,9 +30,9 @@ a capability because it is not currently activated.
 
 | Link | Artifact | Location |
 |---|---|---|
-| Registry entry | `ToolboxCapability` (id, version, provider setting, output schema) | `backend/config/toolbox_capabilities.py` |
+| Registry entry | `ToolboxCapability` (id, version, provider setting, output schema) | `libs/sdk/src/acessilia_sdk/toolbox/capabilities.py` |
 | Client | `ToolboxCapabilityClient` subclass calling the registered id | `backend/tools/toolbox_*_client.py` |
-| Provider default | `PROVIDER_DEFAULTS`, read by `TOOLBOX_*_PROVIDER` in `Settings` | `backend/config/toolbox_capabilities.py` |
+| Provider default | `PROVIDER_DEFAULTS`, read by `TOOLBOX_*_PROVIDER` in `Settings` | `libs/sdk/src/acessilia_sdk/toolbox/capabilities.py` |
 | Manifest | `capabilities/*.yaml` | `acessilia-toolbox` |
 | Provider registration | `providers-config.yaml` entry with an adapter | `acessilia-toolbox` |
 
