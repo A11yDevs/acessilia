@@ -232,7 +232,7 @@ def _element_bbox(
             return None
         top, bottom = box.top, box.bottom
         if box.coord_origin == "BOTTOMLEFT":
-            top, bottom = page.height - bottom, page.height - top
+            top, bottom = page.height - top, page.height - bottom
         return (
             box.left / page.width,
             top / page.height,

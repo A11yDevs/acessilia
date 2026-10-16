@@ -1176,7 +1176,7 @@ def _normalized_element_bbox(
             None,
         )
         if provenance_bbox and provenance_bbox.coord_origin == "BOTTOMLEFT":
-            top, bottom = height - bottom, height - top
+            top, bottom = height - top, height - bottom
         return (
             left / width,
             top / height,
