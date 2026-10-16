@@ -4,7 +4,7 @@
     {
       "id": "accessibility.mark",
       "providers": [
-        "pure-python"
+        "pure-accessibility"
       ]
     },
     {
@@ -36,7 +36,7 @@
     {
       "id": "code.normalize",
       "providers": [
-        "pure-python"
+        "pure-code"
       ]
     },
     {
@@ -171,7 +171,7 @@
     {
       "id": "text.postprocess",
       "providers": [
-        "pure-python"
+        "pure-text"
       ]
     }
   ],

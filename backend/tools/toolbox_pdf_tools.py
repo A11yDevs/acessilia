@@ -6,19 +6,19 @@ to the Acessilia Toolbox. Falls back to local PyMuPDF/pypdf on failure.
 
 from __future__ import annotations
 
-import asyncio
 import base64
 from pathlib import Path
 from typing import Any
 
 from backend.tools.logger import logger
 from backend.tools.pdf_splitter import split_pdf as _local_split_pdf
+from backend.tools.toolbox_client import run_sync
 from backend.tools.toolbox_pdf_client import ToolboxPdfClient
 
 
 def _run_async(coro) -> Any:
-    """Run an async coroutine from a sync context."""
-    return asyncio.run(coro)
+    """Run an async coroutine from a sync context, even inside a running loop."""
+    return run_sync(coro)
 
 
 def toolbox_split_pdf(file_path: Path, tmpdir: Path, max_pages: int = 50) -> list[Path]:

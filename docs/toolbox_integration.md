@@ -48,8 +48,11 @@ A successful extraction response has the following shape:
 }
 ```
 
-**Key point:** the core **has no provider registry**. The `provider` is just a string
-sent in the form; the actual routing happens in the Toolbox `providers-config.yaml`.
+**Key point:** the core **does not register which providers exist**. Its only provider
+table is `PROVIDER_DEFAULTS` in `backend/config/toolbox_capabilities.py`, which holds the
+default provider per capability. It does not list existing providers or route anything.
+The `provider` is just a string sent in the form; the actual routing happens in the
+Toolbox `providers-config.yaml`.
 Validation that a provider exists happens on the Toolbox side — when it fails, the core
 receives `ToolboxCapabilityError` or `ToolboxContractViolation`.
 
@@ -156,9 +159,29 @@ Just:
 When the Toolbox exposes a **new capability** (e.g. `document.layout.analyze`), the core
 needs a specialized client. Follow the `toolbox_layout_client.py` pattern:
 
-### 4.1 Specialized client
+### 4.1 Register the capability and write a thin client
 
-Create `backend/tools/toolbox_<x>_client.py`:
+Every Toolbox call goes through `execute_capability`
+(`backend/tools/toolbox_client.py`), which refuses any capability that is not in
+the registry. Adding a capability takes two steps.
+
+**1. Declare it** in `backend/config/toolbox_capabilities.py`:
+
+```python
+ToolboxCapability(
+    "<capability>", 1, "<Label>",                # id, manifest version, error label
+    provider_setting="toolbox_<x>_provider",     # Settings attribute / TOOLBOX_<X>_PROVIDER
+    output_schema="<schema>@1",                  # manifest output.schema
+),
+```
+
+If the provider setting is new, add its default to `PROVIDER_DEFAULTS` and the
+matching attribute to `Settings` (`os.getenv("TOOLBOX_<X>_PROVIDER",
+provider_default("toolbox_<x>_provider"))`).
+
+**2. Write the client** as a subclass of `ToolboxCapabilityClient`, which
+already owns the connection, the Bearer header, `health()`, `close()`, the
+timeout/network error mapping and the response envelope check:
 
 ```python
 """Specialized client for the <capability> Toolbox capability."""
@@ -168,91 +191,35 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-import httpx
-
-from backend.config.settings import settings
-from backend.tools.toolbox_client import (
-    ToolboxContractViolation,
-    ToolboxProviderUnavailable,
-    ToolboxTimeout,
-    _media_type,
-    _raise_for_error,
-)
+from backend.tools.toolbox_client import ToolboxCapabilityClient
 
 CAPABILITY = "<capability>"
-EXECUTE_PATH = f"/v1/capabilities/{CAPABILITY}:execute"
 
 
-class Toolbox<X>Client:
-    """Client for <capability> via the Acessilia Toolbox."""
+class Toolbox<X>Client(ToolboxCapabilityClient):
+    provider_setting = "toolbox_<x>_provider"
 
-    def __init__(
-        self,
-        base_url: str | None = None,
-        provider: str | None = None,
-        timeout_seconds: int | None = None,
-        api_key: str | None = None,
-    ) -> None:
-        self.base_url = (base_url or settings.toolbox_base_url).rstrip("/")
-        self.provider = provider or settings.toolbox_provider
-        self.timeout_seconds = timeout_seconds or settings.toolbox_timeout_seconds
-        self.api_key = api_key if api_key is not None else settings.toolbox_api_key
-        headers: dict[str, str] = {}
-        if self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
-        self._client = httpx.AsyncClient(
-            base_url=self.base_url,
-            timeout=httpx.Timeout(self.timeout_seconds),
-            headers=headers,
-        )
-
-    async def execute(
+    async def run(
         self,
         file_path: Path | None = None,
         artifact_id: str | None = None,
         *,
-        language: str = "pt-BR",
         use_remote_cache: bool | None = None,
     ) -> dict[str, Any]:
-        if file_path is None and artifact_id is None:
-            raise ValueError("Provide file_path or artifact_id")
-
-        url = f"{self.base_url}{EXECUTE_PATH}"
-        try:
-            if artifact_id:
-                data: dict[str, Any] = {
-                    "artifact_id": artifact_id,
-                    "language": language,
-                    "provider": self.provider,
-                }
-                if use_remote_cache is False:
-                    data["no_cache"] = True
-                response = await self._client.post(url, data=data)
-            else:
-                with open(file_path, "rb") as f:
-                    files = {"file": (file_path.name, f, _media_type(file_path))}
-                    params: dict[str, Any] = {
-                        "language": language,
-                        "provider": self.provider,
-                    }
-                    if use_remote_cache is False:
-                        params["no_cache"] = True
-                    response = await self._client.post(url, files=files, data=params)
-
-            _raise_for_error(response, CAPABILITY)
-            result = response.json()
-            if result.get("status") != "succeeded":
-                raise ToolboxContractViolation(
-                    f"{CAPABILITY}: unexpected status {result.get('status')!r}"
-                )
-            return result
-        except httpx.TimeoutException as exc:
-            raise ToolboxTimeout(f"{CAPABILITY}: timeout") from exc
-        except httpx.HTTPStatusError as exc:
-            raise ToolboxProviderUnavailable(
-                f"{CAPABILITY}: HTTP {exc.response.status_code}"
-            ) from exc
+        return await self._execute(
+            CAPABILITY,
+            file_path=file_path,
+            artifact_id=artifact_id,
+            parameters={...},                      # optional, sent as JSON
+            no_cache=use_remote_cache is False,
+        )
 ```
+
+Text inputs use `upload=(filename, content_bytes, media_type)` instead of
+`file_path` (see `toolbox_math_client.py`). `scripts/check_capability_contract.py`
+reads the registry, so the new id is checked against the Toolbox catalogue
+without further changes; `tests/test_toolbox_capability_registry.py` fails if a
+client hard-codes an `:execute` route or uses an unregistered id.
 
 ### 4.2 Agno tool wrapper (optional, with local fallback)
 

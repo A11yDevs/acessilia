@@ -29,8 +29,9 @@ sem descartar a capacidade por falta de acionamento atual.
 
 | Elo | Artefato | Local |
 |---|---|---|
-| Cliente | `Toolbox*Client` com o id da capacidade | `backend/tools/toolbox_*_client.py` |
-| Default de provider | `TOOLBOX_*_PROVIDER` (ou `TOOLBOX_PROVIDER`) | `backend/config/settings.py` |
+| Entrada no registro | `ToolboxCapability` (id, versão, configuração de provider, schema de saída) | `backend/config/toolbox_capabilities.py` |
+| Cliente | subclasse de `ToolboxCapabilityClient` chamando o id registrado | `backend/tools/toolbox_*_client.py` |
+| Default de provider | `PROVIDER_DEFAULTS`, lido por `TOOLBOX_*_PROVIDER` no `Settings` | `backend/config/toolbox_capabilities.py` |
 | Manifest | `capabilities/*.yaml` | `acessilia-toolbox` |
 | Registro do provider | entrada em `providers-config.yaml` com adapter | `acessilia-toolbox` |
 
@@ -46,7 +47,7 @@ Legenda de **Caminho de chamada**: como o core alcança a capacidade.
 
 | Capacidade | Cliente no core | Default de provider no core | Provider na Toolbox | Caminho de chamada |
 |---|---|---|---|---|
-| `document.structure.extract` | `toolbox_client.py` (URL inline) | `TOOLBOX_PROVIDER=docling` | `docling`, `mineru`, `nougat`, `teleocr` | `ToolboxManifestExtractor` → extração do PDDL; com `FUSION_MODE=dual`, também compara o provider secundário e repassa evidências por página ao builder do manifesto |
+| `document.structure.extract` | `toolbox_client.py` (`ToolboxClient.extract_structure`) | `TOOLBOX_PROVIDER=docling` | `docling`, `mineru`, `nougat`, `teleocr` | `ToolboxManifestExtractor` → extração do PDDL; com `FUSION_MODE=dual`, também compara o provider secundário e repassa evidências por página ao builder do manifesto |
 | `document.layout.analyze` | `toolbox_layout_client.py` | `TOOLBOX_LAYOUT_PROVIDER=docling-layout` | `docling-layout`, `mineru-layout` | `ToolboxLayoutStructurer` via `STRUCTURER=toolbox-layout` |
 | `document.ocr` | `toolbox_ocr_client.py` | `TOOLBOX_OCR_PROVIDER=docling-ocr` | `docling-ocr`, `mineru-ocr` | `toolbox_ocr_tools.py` (wrapper Agno) |
 | `math.recognize` | `toolbox_math_client.py` | `TOOLBOX_MATH_RECOGNIZE_PROVIDER=docling-math` | `docling-math`, `rapid-latex-ocr` | `toolbox_math_tools.py` |

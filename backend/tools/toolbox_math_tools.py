@@ -7,17 +7,17 @@ returning empty results on failure.
 
 from __future__ import annotations
 
-import asyncio
 from pathlib import Path
 from typing import Any
 
 from backend.tools.logger import logger
+from backend.tools.toolbox_client import run_sync
 from backend.tools.toolbox_math_client import ToolboxMathClient
 
 
 def _run_async(coro) -> Any:
-    """Run an async coroutine from a sync context."""
-    return asyncio.run(coro)
+    """Run an async coroutine from a sync context, even inside a running loop."""
+    return run_sync(coro)
 
 
 def toolbox_recognize_formula(image_bytes: bytes) -> list[dict[str, Any]]:
