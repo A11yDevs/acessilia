@@ -293,6 +293,20 @@ def _build_from_toolbox_json(
     data.setdefault("language", language)
     data.setdefault("created_at", extraction.completed_at.isoformat())
 
+    # The Toolbox is a capability layer: deciding what a document needs and which
+    # methods may satisfy it is this core's planning policy. Whatever processing
+    # needs the payload carries (older Toolbox images derive their own, with
+    # methods the core does not implement) are discarded and derived below with
+    # the same rules as the Docling path.
+    data["observations"] = []
+    data["obligations"] = []
+    if isinstance(data.get("summary"), dict):
+        data["summary"] = {
+            **data["summary"],
+            "observation_count": 0,
+            "obligation_count": 0,
+        }
+
     manifest = ProcessingManifest.model_validate(data)
     if refine_reading_order:
         manifest.elements = _refine_reading_order(manifest.elements)
@@ -302,7 +316,8 @@ def _build_from_toolbox_json(
                 by_page.setdefault(elem.page_number, []).append(elem.id)
         for page in manifest.pages:
             page.element_ids = by_page.get(page.page_number, [])
-    observations, obligations = _derive_v23_processing_needs(
+    observations, obligations = _derive_processing_needs(manifest.elements)
+    v23_observations, v23_obligations = _derive_v23_processing_needs(
         manifest.elements,
         page_sizes={
             page.page_number: (page.width, page.height) for page in manifest.pages
@@ -310,6 +325,8 @@ def _build_from_toolbox_json(
         fusion_evidence=extraction.document.get("fusion_evidence"),
         fusion_stats=extraction.document.get("fusion_stats"),
     )
+    observations.extend(v23_observations)
+    obligations.extend(v23_obligations)
     _append_processing_needs(manifest, observations, obligations)
     return manifest
 
