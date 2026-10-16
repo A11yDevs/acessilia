@@ -32,7 +32,11 @@ sys.path.insert(0, {str(SRC)!r})
 
 import docstruct
 failures = []
-for module in pkgutil.walk_packages(docstruct.__path__, "docstruct."):
+# Without onerror, walk_packages swallows a subpackage's ImportError and never
+# lists the modules inside it.
+for module in pkgutil.walk_packages(
+    docstruct.__path__, "docstruct.", onerror=lambda name: failures.append(f"{{name}}: import failed")
+):
     try:
         importlib.import_module(module.name)
     except ImportError as exc:

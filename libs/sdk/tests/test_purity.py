@@ -31,7 +31,11 @@ sys.path.insert(0, {str(SRC)!r})
 
 import acessilia_sdk
 failures = []
-for module in pkgutil.walk_packages(acessilia_sdk.__path__, "acessilia_sdk."):
+# Without onerror, walk_packages swallows a subpackage's ImportError and never
+# lists the modules inside it.
+for module in pkgutil.walk_packages(
+    acessilia_sdk.__path__, "acessilia_sdk.", onerror=lambda name: failures.append(f"{{name}}: import failed")
+):
     try:
         importlib.import_module(module.name)
     except ImportError as exc:

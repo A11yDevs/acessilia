@@ -79,7 +79,16 @@ jobs:
           cd /tmp && /tmp/docstruct-wheel/bin/python -I - <<'PY'
           import importlib, pkgutil
           import docstruct
-          names = [m.name for m in pkgutil.walk_packages(docstruct.__path__, "docstruct.")]
+
+          def broken(name):
+              # walk_packages swallows a subpackage's ImportError unless told
+              # otherwise, and then never lists the modules inside it.
+              raise SystemExit(f"cannot import {name} from the installed wheel")
+
+          names = [
+              m.name
+              for m in pkgutil.walk_packages(docstruct.__path__, "docstruct.", onerror=broken)
+          ]
           for name in names:
               importlib.import_module(name)
           print(f"imported {len(names)} modules")
