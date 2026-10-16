@@ -15,6 +15,7 @@ from backend.config.settings import settings
 from backend.agents.output_schemas import (
     DATA_SCHEMA_INSTRUCTION,
     DataOutput,
+    run_content,
     validate_structured_content,
 )
 from agno.agent import Agent
@@ -81,10 +82,12 @@ class DataAgent:
             )
 
             def _run_data():
-                return agent.run(
-                    input=prompt,
-                    images=[Image(content=image_bytes)],
-                ).content
+                return run_content(
+                    agent.run(
+                        input=prompt,
+                        images=[Image(content=image_bytes)],
+                    )
+                )
 
             content = await asyncio.to_thread(_run_data)
             result = validate_structured_content(content, DataOutput)

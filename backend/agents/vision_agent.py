@@ -15,6 +15,7 @@ from backend.ai.models.ai_client import get_agno_model
 from backend.agents.output_schemas import (
     VISION_SCHEMA_INSTRUCTION,
     VisionOutput,
+    run_content,
     validate_structured_content,
 )
 from agno.agent import Agent
@@ -89,10 +90,12 @@ class VisionAgent:
             )
 
             def _run_vision():
-                return agent.run(
-                    input=prompt,
-                    images=[Image(content=image_bytes)],
-                ).content
+                return run_content(
+                    agent.run(
+                        input=prompt,
+                        images=[Image(content=image_bytes)],
+                    )
+                )
 
             content = await asyncio.to_thread(_run_vision)
             return validate_structured_content(content, VisionOutput)
