@@ -48,8 +48,11 @@ A successful extraction response has the following shape:
 }
 ```
 
-**Key point:** the core **has no provider registry**. The `provider` is just a string
-sent in the form; the actual routing happens in the Toolbox `providers-config.yaml`.
+**Key point:** the core **does not register which providers exist**. Its only provider
+table is `PROVIDER_DEFAULTS` in `backend/config/toolbox_capabilities.py`, which holds the
+default provider per capability. It does not list existing providers or route anything.
+The `provider` is just a string sent in the form; the actual routing happens in the
+Toolbox `providers-config.yaml`.
 Validation that a provider exists happens on the Toolbox side — when it fails, the core
 receives `ToolboxCapabilityError` or `ToolboxContractViolation`.
 

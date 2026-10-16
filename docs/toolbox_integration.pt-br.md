@@ -48,9 +48,11 @@ Uma resposta de extração bem-sucedida tem a forma:
 }
 ```
 
-**Ponto-chave:** o core **não tem registro de providers**. O `provider` é apenas uma
-string enviada no form; o roteamento real acontece no `providers-config.yaml` da
-Toolbox. A validação de que um provider existe é feita do lado da Toolbox — quando
+**Ponto-chave:** o core **não registra quais providers existem**. A única tabela de
+providers do core é `PROVIDER_DEFAULTS`, em `backend/config/toolbox_capabilities.py`, que
+guarda o provider padrão de cada capacidade. Ela não lista os providers existentes nem
+faz roteamento. O `provider` é apenas uma string enviada no form; o roteamento real
+acontece no `providers-config.yaml` da Toolbox. A validação de que um provider existe é feita do lado da Toolbox — quando
 falha, o core recebe `ToolboxCapabilityError` ou `ToolboxContractViolation`.
 
 ### Hierarquia de exceções

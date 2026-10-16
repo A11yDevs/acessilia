@@ -48,7 +48,7 @@ Legend for **Call path**: how the core reaches the capability.
 
 | Capability | Core client | Core provider default | Toolbox provider | Call path |
 |---|---|---|---|---|
-| `document.structure.extract` | `toolbox_client.py` (inline URL) | `TOOLBOX_PROVIDER=docling` | `docling`, `mineru`, `nougat`, `teleocr` | `ToolboxManifestExtractor` → PDDL extraction; with `FUSION_MODE=dual`, also compares the secondary provider and passes page evidence to the manifest builder |
+| `document.structure.extract` | `toolbox_client.py` (`ToolboxClient.extract_structure`) | `TOOLBOX_PROVIDER=docling` | `docling`, `mineru`, `nougat`, `teleocr` | `ToolboxManifestExtractor` → PDDL extraction; with `FUSION_MODE=dual`, also compares the secondary provider and passes page evidence to the manifest builder |
 | `document.layout.analyze` | `toolbox_layout_client.py` | `TOOLBOX_LAYOUT_PROVIDER=docling-layout` | `docling-layout`, `mineru-layout` | `ToolboxLayoutStructurer` via `STRUCTURER=toolbox-layout` |
 | `document.ocr` | `toolbox_ocr_client.py` | `TOOLBOX_OCR_PROVIDER=docling-ocr` | `docling-ocr`, `mineru-ocr` | `toolbox_ocr_tools.py` (Agno wrapper) |
 | `math.recognize` | `toolbox_math_client.py` | `TOOLBOX_MATH_RECOGNIZE_PROVIDER=docling-math` | `docling-math`, `rapid-latex-ocr` | `toolbox_math_tools.py` |

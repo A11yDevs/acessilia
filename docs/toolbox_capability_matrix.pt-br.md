@@ -47,7 +47,7 @@ Legenda de **Caminho de chamada**: como o core alcança a capacidade.
 
 | Capacidade | Cliente no core | Default de provider no core | Provider na Toolbox | Caminho de chamada |
 |---|---|---|---|---|
-| `document.structure.extract` | `toolbox_client.py` (URL inline) | `TOOLBOX_PROVIDER=docling` | `docling`, `mineru`, `nougat`, `teleocr` | `ToolboxManifestExtractor` → extração do PDDL; com `FUSION_MODE=dual`, também compara o provider secundário e repassa evidências por página ao builder do manifesto |
+| `document.structure.extract` | `toolbox_client.py` (`ToolboxClient.extract_structure`) | `TOOLBOX_PROVIDER=docling` | `docling`, `mineru`, `nougat`, `teleocr` | `ToolboxManifestExtractor` → extração do PDDL; com `FUSION_MODE=dual`, também compara o provider secundário e repassa evidências por página ao builder do manifesto |
 | `document.layout.analyze` | `toolbox_layout_client.py` | `TOOLBOX_LAYOUT_PROVIDER=docling-layout` | `docling-layout`, `mineru-layout` | `ToolboxLayoutStructurer` via `STRUCTURER=toolbox-layout` |
 | `document.ocr` | `toolbox_ocr_client.py` | `TOOLBOX_OCR_PROVIDER=docling-ocr` | `docling-ocr`, `mineru-ocr` | `toolbox_ocr_tools.py` (wrapper Agno) |
 | `math.recognize` | `toolbox_math_client.py` | `TOOLBOX_MATH_RECOGNIZE_PROVIDER=docling-math` | `docling-math`, `rapid-latex-ocr` | `toolbox_math_tools.py` |
