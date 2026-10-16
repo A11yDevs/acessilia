@@ -220,7 +220,71 @@ class TestTableSmartFusion:
         )
 
         assert result.success
-        assert table.metadata["table_source_reason"] == "only-primary-table"
+        assert table.metadata["table_source_reason"] == "no-secondary-table"
+
+    def test_adoption_without_secondary_ast_drops_the_primary_ast(self, tmp_path) -> None:
+        """Docling's AST would otherwise win over the adopted MinerU text."""
+        table = _el(
+            "t-1",
+            "table",
+            "a | b",
+            LEFT,
+            1,
+            {"table_ast": SIMPLE_AST, "table_row_count": 1, "table_has_header": False},
+        )
+        manifest = _manifest(
+            tmp_path,
+            [table],
+            "select-table-source",
+            ["table-smart-fusion", "human-review"],
+            [_raw("table", "A | B", LEFT, 1)],
+        )
+
+        result = _handle_table_smart_fusion_method(manifest, "o-1")
+
+        assert result.success
+        assert table.text == "A | B"
+        assert not {"table_ast", "table_row_count", "table_has_header"} & set(
+            table.metadata
+        )
+        assert table.metadata["table_source"] == "mineru"
+
+    def test_a_single_mineru_table_elsewhere_is_not_paired(self, tmp_path) -> None:
+        _, table, result = self._run(
+            tmp_path,
+            SIMPLE_AST,
+            [_raw("table", "outra tabela", BOTTOM, 1, {"table_ast": MINERU_AST})],
+        )
+
+        assert result.success
+        assert table.text == "a | b"
+        assert table.metadata["table_ast"] == SIMPLE_AST
+        assert table.metadata["table_source_reason"] == "no-secondary-match"
+
+    def test_a_single_table_on_each_side_pairs_without_position(self, tmp_path) -> None:
+        table = _el("t-1", "table", "a | b", LEFT, 1, {"table_ast": SIMPLE_AST})
+        table.provenance = []
+        manifest = _manifest(
+            tmp_path,
+            [table],
+            "select-table-source",
+            ["table-smart-fusion", "human-review"],
+            [_raw("table", "outra tabela", BOTTOM, 1, {"table_ast": MINERU_AST})],
+        )
+
+        _handle_table_smart_fusion_method(manifest, "o-1")
+
+        assert table.metadata["table_ast"] == MINERU_AST
+        assert table.metadata["table_source_reason"] == "preference-mineru"
+
+    def test_ignores_secondary_blocks_with_a_malformed_page(self, tmp_path) -> None:
+        broken = _raw("table", "A | B", LEFT, 1, {"table_ast": MINERU_AST})
+        broken["page_number"] = "um"
+        broken["provenance"][0]["page_number"] = None
+        _, table, result = self._run(tmp_path, SIMPLE_AST, [broken])
+
+        assert result.success
+        assert table.metadata["table_source_reason"] == "no-secondary-table"
 
     def test_pairs_by_position_not_order(self, tmp_path) -> None:
         """With two MinerU tables, the one at the same place is chosen."""
@@ -260,7 +324,7 @@ class TestTableSmartFusion:
         result = _handle_table_smart_fusion_method(manifest, "o-1")
 
         assert not result.success
-        assert "indisponível" in result.message
+        assert "sha256 diverge" in result.message
         assert table.text == "a | b"
 
 
@@ -420,4 +484,4 @@ def test_without_the_secondary_artifact_the_method_fails(handler, tmp_path) -> N
     result = handler(manifest, "o-1")
 
     assert not result.success
-    assert "secundário indisponível" in result.message
+    assert "secundário ausente" in result.message

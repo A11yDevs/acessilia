@@ -330,3 +330,16 @@ def test_dual_mode_does_not_emit_evidence_when_secondary_provider_fails(
     assert "fusion_evidence" not in result.document
     assert "fusion_stats" not in result.document
     secondary_client.close.assert_awaited_once()
+
+def test_secondary_extraction_write_failure_does_not_fail_extraction(
+    tmp_path, monkeypatch
+):
+    """The artifact only feeds the provider-choice methods, which fail without it."""
+    from backend.config.settings import settings
+    from backend.core.manifest.toolbox_extractor import _persist_secondary_extraction
+
+    blocker = tmp_path / "artifacts"
+    blocker.write_text("not a directory")
+    monkeypatch.setattr(settings, "data_dir", tmp_path)
+
+    assert _persist_secondary_extraction({"elements": []}, "mineru") == {}

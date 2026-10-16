@@ -185,6 +185,9 @@ def _persist_secondary_extraction(
     routing) decide between the two providers' blocks. The file is named by its
     content hash and the hash is recorded, so a reader can tell it was not
     replaced afterwards.
+
+    A write failure does not fail the extraction: the manifest goes without the
+    artifact and those methods report it as unavailable.
     """
     content = json.dumps(
         {"provider": provider, "document": payload},
@@ -193,6 +196,15 @@ def _persist_secondary_extraction(
     ).encode("utf-8")
     digest = hashlib.sha256(content).hexdigest()
     path = settings.data_dir / "artifacts" / "fusion" / f"secondary-{digest[:16]}.json"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(content)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+    except OSError as exc:
+        logger.warning(
+            "Extração secundária de {} não foi gravada ({}): {}",
+            provider,
+            type(exc).__name__,
+            exc,
+        )
+        return {}
     return {"provider": provider, "path": str(path), "sha256": digest}

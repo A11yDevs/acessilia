@@ -714,50 +714,66 @@ class _SecondaryExtraction:
             if not isinstance(item, dict) or not item.get("bbox"):
                 continue
             box = item["bbox"]
-            page = item.get("page_number", element.get("page_number"))
-            width, height = self.sizes.get(int(page), (0.0, 0.0)) if page else (0.0, 0.0)
+            page = _page_number(item.get("page_number", element.get("page_number")))
+            width, height = self.sizes.get(page, (0.0, 0.0)) if page else (0.0, 0.0)
             if not width or not height:
                 return None
-            top, bottom = float(box["top"]), float(box["bottom"])
+            try:
+                left, right = float(box["left"]), float(box["right"])
+                top, bottom = float(box["top"]), float(box["bottom"])
+            except (KeyError, TypeError, ValueError):
+                return None
             if box.get("coord_origin") == "BOTTOMLEFT":
                 top, bottom = height - top, height - bottom
             return _ordered_box(
-                float(box["left"]) / width,
-                top / height,
-                float(box["right"]) / width,
-                bottom / height,
+                left / width, top / height, right / width, bottom / height
             )
+        return None
+
+
+def _page_number(value: Any) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
         return None
 
 
 def _load_secondary_extraction(
     manifest: ProcessingManifest,
-) -> _SecondaryExtraction | None:
-    """The secondary provider's extraction, if recorded and unchanged."""
+) -> tuple[_SecondaryExtraction | None, str]:
+    """The secondary provider's extraction, if recorded and unchanged.
+
+    When it cannot be used, the second item says why (missing, replaced or
+    unreadable), so the method result can tell those cases apart.
+    """
     import json
 
     artifact = next(
         (a for a in manifest.artifacts if a.kind == SECONDARY_EXTRACTION_KIND), None
     )
     if artifact is None:
-        return None
+        return None, "Extração do provider secundário ausente do manifesto"
     try:
         raw = Path(artifact.path).read_bytes()
     except OSError:
-        return None
+        return None, f"Extração do provider secundário indisponível: {artifact.path}"
     if artifact.sha256 and hashlib.sha256(raw).hexdigest() != artifact.sha256:
         logger.warning(
             "Extração secundária {} não confere com o sha256 registrado",
             artifact.path,
         )
-        return None
+        return None, (
+            "Extração do provider secundário alterada: sha256 diverge do "
+            f"registrado no manifesto ({artifact.path})"
+        )
+    unreadable = f"Extração do provider secundário ilegível: {artifact.path}"
     try:
         data = json.loads(raw)
     except ValueError:
-        return None
+        return None, unreadable
     payload = data.get("document") if isinstance(data, dict) else None
     if not isinstance(payload, dict):
-        return None
+        return None, unreadable
     document = payload.get("document", payload)
     sizes: dict[int, tuple[float, float]] = {}
     for page in document.get("pages") or []:
@@ -773,9 +789,10 @@ def _load_secondary_extraction(
         (e for e in document.get("elements") or [] if isinstance(e, dict)),
         key=lambda e: e.get("reading_order") or 0,
     ):
-        if element.get("page_number") is not None:
-            pages.setdefault(int(element["page_number"]), []).append(element)
-    return _SecondaryExtraction(str(data.get("provider") or ""), pages, sizes)
+        page = _page_number(element.get("page_number"))
+        if page is not None:
+            pages.setdefault(page, []).append(element)
+    return _SecondaryExtraction(str(data.get("provider") or ""), pages, sizes), ""
 
 
 def _provider_pair_problem(
@@ -793,13 +810,9 @@ def _provider_pair_problem(
 def _secondary_or_failure(
     manifest: ProcessingManifest,
 ) -> tuple[_SecondaryExtraction | None, MethodResult | None]:
-    secondary = _load_secondary_extraction(manifest)
+    secondary, problem = _load_secondary_extraction(manifest)
     if secondary is None:
-        return None, MethodResult(
-            success=False,
-            validated=False,
-            message="Extração do provider secundário indisponível no manifesto",
-        )
+        return None, MethodResult(success=False, validated=False, message=problem)
     problem = _provider_pair_problem(manifest, secondary)
     if problem:
         return None, MethodResult(success=False, validated=False, message=problem)
@@ -827,7 +840,13 @@ def _pair_block(
     secondary: _SecondaryExtraction,
     used: set[int],
 ) -> int | None:
-    """Index in ``candidates`` of the block that matches ``element``."""
+    """Index in ``candidates`` of the block that matches ``element``.
+
+    Greedy: each element takes its best free candidate in the current reading
+    order, while Dr.DocBench uses a global (Hungarian) assignment. The two can
+    differ only when blocks compete for the same candidate, which is rare above
+    the IoU / text thresholds and does not move the skeleton's 0.5 page gate.
+    """
     import difflib
 
     box = _element_bbox(element, manifest)
@@ -847,7 +866,10 @@ def _pair_block(
     scored_text = [
         (
             difflib.SequenceMatcher(
-                None, text, " ".join(str(candidate["text"]).split())
+                None,
+                text,
+                " ".join(str(candidate["text"]).split()),
+                autojunk=False,
             ).ratio(),
             index,
         )
@@ -864,8 +886,10 @@ def _handle_table_smart_fusion_method(
     """Pick each table's source between the two providers (Dr.DocBench rule).
 
     Docling's table is kept when it has spans (MinerU flattens them) or when it
-    is the only one; otherwise MinerU's table is adopted. The choice and its
-    reason are recorded in ``table_source`` / ``table_source_reason``.
+    is the only one; otherwise MinerU's table is adopted. Tables are paired by
+    position or text; a page with a single table on each side pairs them only
+    when there is no position to compare. The choice and its reason are recorded
+    in ``table_source`` / ``table_source_reason``.
     """
     from docstruct.tables.ast import analyze_table_complexity
 
@@ -881,6 +905,11 @@ def _handle_table_smart_fusion_method(
         return failure
 
     primary_name, secondary_name = _CALIBRATED_PAIR
+    primary_tables_by_page = Counter(
+        element.page_number
+        for element in manifest.elements
+        if element.type == "table"
+    )
     reasons: Counter = Counter()
     for element in tables:
         primary_ast = (element.metadata or {}).get("table_ast")
@@ -890,21 +919,38 @@ def _handle_table_smart_fusion_method(
             if block.get("type") == "table"
         ]
         match = _pair_block(element, manifest, candidates, secondary, set())
-        if match is None and len(candidates) == 1:
+        if (
+            match is None
+            and len(candidates) == 1
+            and primary_tables_by_page[element.page_number] == 1
+            and (
+                _element_bbox(element, manifest) is None
+                or secondary.bbox(candidates[0]) is None
+            )
+        ):
+            # One table on each side and no position to compare them by: the
+            # same table. With both positions known and no overlap, they are not.
             match = 0
         chosen = candidates[match] if match is not None else None
         chosen_meta = (chosen or {}).get("metadata") or {}
 
         if primary_ast and analyze_table_complexity(primary_ast).has_spans:
             source, reason = primary_name, "primary-has-spans"
+        elif not candidates:
+            source, reason = primary_name, "no-secondary-table"
         elif chosen is None:
-            source, reason = primary_name, "only-primary-table"
+            source, reason = primary_name, "no-secondary-match"
         elif not (chosen.get("text") or chosen_meta.get("table_ast")):
             source, reason = primary_name, "secondary-table-empty"
         else:
             source, reason = _TABLE_PREFERENCE, f"preference-{_TABLE_PREFERENCE}"
 
         if source == secondary_name and chosen is not None:
+            # Docling's table_* keys (AST, row/column counts, header) describe
+            # the table being replaced; the output prefers table_ast over the
+            # text, so a stale AST would hide the adopted MinerU text.
+            for key in [k for k in element.metadata if k.startswith("table_")]:
+                del element.metadata[key]
             if chosen.get("text"):
                 element.text = chosen["text"]
             for key, value in chosen_meta.items():
