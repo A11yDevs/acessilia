@@ -309,8 +309,9 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 | `FUSION_MODE` | `single` | `single` (um provider) ou `dual` (dois providers + fusão) |
 | `FUSION_SECONDARY_PROVIDER` | `mineru` | Provider secundário para `FUSION_MODE=dual` |
 | `STRUCTURER` | `toolbox` | Motor de regiões por página (`toolbox`, `toolbox-layout`, `pymupdf`) |
-| `TOOLBOX_PAGE_OCR_PROVIDER` | `qwen3-vl-page` | Transcrição VLM de página inteira (`document.ocr.page`) |
-| `TOOLBOX_ADJUDICATE_PROVIDER` | `qwen3-vl-judge` | Juiz pareado / transcrição de região (`document.adjudicate.*`) |
+| `TOOLBOX_PAGE_OCR_PROVIDER` | `qwen3-vl-8b` | Transcrição VLM de página inteira (`document.ocr.page`) |
+| `TOOLBOX_ADJUDICATE_PROVIDER` | `qwen3-vl-8b` | Juiz pareado / transcrição de região (`document.adjudicate.*`) |
+| `TOOLBOX_TABLE_PROVIDER` | `qwen3-vl-8b` | Regeração de tabelas para o especialista de tabelas (`table.recognize`) |
 | `TOOLBOX_ORIENTATION_PROVIDER` | `rapidocr-orient` | Detecção de rotação (`image.page.orient`) |
 | `FUSION_HYBRID_PROVIDER` | `mineru-hyb` | Id do provider MinerU hybrid-VLM (a fonte B do melhor confirmado no leaderboard) |
 
@@ -356,9 +357,10 @@ service.py: _build_orchestrator()
 
 | Capacidade | Cliente | Providers | Finalidade |
 |---|---|---|---|
-| `document.ocr.page` | `ToolboxPageOcrClient` | `qwen3-vl-page`, `dots-ocr-page`, `deepseek-ocr-page`, `teleocr-page` | Transcrição VLM de página inteira — a fonte B do híbrido de página |
-| `document.adjudicate.page` | `ToolboxAdjudicateClient` | `qwen3-vl-judge` | Juiz pareado entre duas transcrições candidatas (as duas ordens, debiasing de posição) |
-| `document.adjudicate.region` | `ToolboxAdjudicateClient` | `qwen3-vl-judge` | Transcrição exata de um recorte de região, convertida em decisão do differ |
+| `document.ocr.page` | `ToolboxPageOcrClient` | `qwen3-vl-8b` | Transcrição VLM de página inteira — a fonte B do híbrido de página |
+| `document.adjudicate.page` | `ToolboxAdjudicateClient` | `qwen3-vl-8b` | Juiz pareado entre duas transcrições candidatas (as duas ordens, debiasing de posição); usado pelo método `vlm-pairwise-judge` |
+| `document.adjudicate.region` | `ToolboxAdjudicateClient` | `qwen3-vl-8b` | Transcrição exata de um recorte de região, convertida em decisão do differ |
+| `table.recognize` | `ToolboxTableClient` | `qwen3-vl-8b` | Gerações HTML (greedy e com semente) de um recorte de tabela, para o especialista de tabelas |
 | `image.page.orient` | `ToolboxOrientationClient` | `rapidocr-orient` | Detecção de rotação 0/90/180/270 |
 
 Os registros de provider vivem no repositório da Toolbox; a configuração de job

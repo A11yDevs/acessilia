@@ -485,3 +485,87 @@ def test_without_the_secondary_artifact_the_method_fails(handler, tmp_path) -> N
 
     assert not result.success
     assert "secundário ausente" in result.message
+
+
+class TestVlmPairwiseJudge:
+    """The judge itself is the Toolbox's; these fake its answer."""
+
+    TEXT = "Texto da página com conteúdo suficiente para o juiz comparar."
+
+    def _manifest(self, tmp_path):
+        import fitz
+
+        doc = fitz.open()
+        page = doc.new_page(width=W, height=H)
+        page.insert_text((40, 120), self.TEXT)
+        doc.save(tmp_path / "doc.pdf")
+        doc.close()
+        return _manifest(
+            tmp_path,
+            [_el("p-1", "paragraph", self.TEXT, LEFT, 1)],
+            "adjudicate-page",
+            ["vlm-pairwise-judge", "human-review"],
+            [_raw("paragraph", self.TEXT + " (variante)", LEFT, 1)],
+        )
+
+    def _fake_judge(self, monkeypatch, p_b):
+        seen = {}
+
+        def judge(image, candidate_a, candidate_b):
+            seen.update(image=image, a=candidate_a, b=candidate_b)
+            return {"document": {"pB": p_b, "pB_ab": p_b, "pA_ba": 1 - p_b, "model": "qwen3-vl-8b"}}
+
+        monkeypatch.setattr("backend.agents.pddl_orchestrator._judge_page", judge)
+        return seen
+
+    def test_keeps_the_primary_page(self, tmp_path, monkeypatch) -> None:
+        from backend.agents.pddl_orchestrator import _handle_vlm_pairwise_judge_method
+
+        manifest = self._manifest(tmp_path)
+        seen = self._fake_judge(monkeypatch, 0.1)
+
+        result = _handle_vlm_pairwise_judge_method(manifest, "o-1")
+
+        assert result.success and result.validated
+        assert seen["image"].startswith(b"\x89PNG")
+        assert seen["a"] == self.TEXT and seen["b"] == self.TEXT + " (variante)"
+        judgement = manifest.elements[0].metadata["page_judgement"]
+        assert judgement["choice"] == "docling" and judgement["pB"] == 0.1
+
+    def test_preferred_secondary_is_recorded_and_escalated(self, tmp_path, monkeypatch) -> None:
+        from backend.agents.pddl_orchestrator import _handle_vlm_pairwise_judge_method
+
+        manifest = self._manifest(tmp_path)
+        self._fake_judge(monkeypatch, 0.9)
+
+        result = _handle_vlm_pairwise_judge_method(manifest, "o-1")
+
+        assert not result.success
+        assert "pB=0.90" in result.message
+        assert manifest.elements[0].metadata["page_judgement"]["choice"] == "mineru"
+        assert manifest.elements[0].text == self.TEXT
+
+    def test_toolbox_failure_lets_the_planner_move_on(self, tmp_path, monkeypatch) -> None:
+        from backend.agents.pddl_orchestrator import _handle_vlm_pairwise_judge_method
+        from backend.tools.toolbox_client import ToolboxProviderUnavailable
+
+        manifest = self._manifest(tmp_path)
+
+        def down(*_args):
+            raise ToolboxProviderUnavailable("VLM offline")
+
+        monkeypatch.setattr("backend.agents.pddl_orchestrator._judge_page", down)
+
+        result = _handle_vlm_pairwise_judge_method(manifest, "o-1")
+
+        assert not result.success
+        assert "indisponível" in result.message
+
+    def test_rendered_page_fits_the_server_slot(self, tmp_path) -> None:
+        import fitz
+
+        from backend.agents.pddl_orchestrator import _JUDGE_PAGE_MAX_SIDE, _render_page_png
+
+        self._manifest(tmp_path)
+        pixmap = fitz.Pixmap(_render_page_png(tmp_path / "doc.pdf", 1))
+        assert max(pixmap.width, pixmap.height) <= _JUDGE_PAGE_MAX_SIDE

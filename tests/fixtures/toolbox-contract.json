@@ -96,6 +96,18 @@
       ]
     },
     {
+      "id": "document.adjudicate.page",
+      "providers": [
+        "qwen3-vl-8b"
+      ]
+    },
+    {
+      "id": "document.adjudicate.region",
+      "providers": [
+        "qwen3-vl-8b"
+      ]
+    },
+    {
       "id": "document.layout.analyze",
       "providers": [
         "docling-layout",
@@ -107,6 +119,12 @@
       "providers": [
         "docling-ocr",
         "mineru-ocr"
+      ]
+    },
+    {
+      "id": "document.ocr.page",
+      "providers": [
+        "qwen3-vl-8b"
       ]
     },
     {
@@ -166,6 +184,12 @@
       "id": "pdf.split",
       "providers": [
         "pymupdf-pdf"
+      ]
+    },
+    {
+      "id": "table.recognize",
+      "providers": [
+        "qwen3-vl-8b"
       ]
     },
     {
@@ -324,6 +348,15 @@
       "capabilities": [
         "pdf.render",
         "pdf.split"
+      ]
+    },
+    {
+      "id": "qwen3-vl-8b",
+      "capabilities": [
+        "document.adjudicate.page",
+        "document.adjudicate.region",
+        "document.ocr.page",
+        "table.recognize"
       ]
     },
     {

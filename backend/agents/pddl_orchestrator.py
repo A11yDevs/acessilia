@@ -1116,6 +1116,138 @@ def _handle_agreement_rule_method(
     )
 
 
+#: Longest side of the page image sent to the judge. Two candidates plus the
+#: image must fit one 8192-token slot of the production VLM server.
+_JUDGE_PAGE_MAX_SIDE = 1600
+
+
+def _render_page_png(source_path: Path, page_number: int) -> bytes:
+    """Page ``page_number`` (1-based) of a PDF or image as PNG, bounded in size."""
+    doc = fitz.open(source_path)
+    try:
+        page = doc.load_page(page_number - 1)
+        longest = max(page.rect.width, page.rect.height) or 1.0
+        zoom = min(2.0, _JUDGE_PAGE_MAX_SIDE / longest)
+        return page.get_pixmap(matrix=fitz.Matrix(zoom, zoom), alpha=False).tobytes("png")
+    finally:
+        doc.close()
+
+
+def _judge_page(image: bytes, candidate_a: str, candidate_b: str) -> dict[str, Any]:
+    """Call document.adjudicate.page through the Toolbox (sync wrapper)."""
+    import tempfile
+
+    from backend.tools.toolbox_adjudicate_client import ToolboxAdjudicateClient
+    from backend.tools.toolbox_client import run_sync
+
+    async def call(path: Path) -> dict[str, Any]:
+        client = ToolboxAdjudicateClient()
+        try:
+            return await client.judge_page(candidate_a, candidate_b, file_path=path)
+        finally:
+            await client.close()
+
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "page.png"
+        path.write_bytes(image)
+        return run_sync(call(path))
+
+
+def _handle_vlm_pairwise_judge_method(
+    manifest: ProcessingManifest, obligation_id: str
+) -> MethodResult:
+    """Pairwise VLM judge between the two providers' pages.
+
+    The Toolbox (``document.adjudicate.page``) returns the position-debiased
+    probability that the secondary page is the more faithful transcription;
+    the decision uses docstruct's threshold. As with ``agreement-rule``, a kept
+    primary page satisfies the obligation, and a preferred secondary page is
+    recorded in ``page_judgement`` but not swapped in: the method fails and the
+    obligation goes to ``human-review``.
+    """
+    from docstruct.fusion.judge import DEFAULT_NEW_THR
+
+    from backend.tools.toolbox_client import ToolboxError
+
+    elements = _target_elements(manifest, obligation_id)
+    if not elements:
+        return _missing_obligation(obligation_id)
+    secondary, failure = _secondary_or_failure(manifest)
+    if failure is not None:
+        return failure
+
+    source_path = Path(manifest.source.path)
+    judgements: dict[int, dict[str, Any]] = {}
+    for page_number in sorted({e.page_number for e in elements if e.page_number}):
+        primary_md = _page_markdown(
+            (element.type, element.text)
+            for element in sorted(manifest.elements, key=lambda e: e.reading_order)
+            if element.page_number == page_number
+        )
+        secondary_md = _page_markdown(
+            (str(block.get("type") or ""), block.get("text"))
+            for block in secondary.pages.get(page_number, [])
+        )
+        if not primary_md.strip() or not secondary_md.strip():
+            continue
+        try:
+            image = _render_page_png(source_path, page_number)
+            result = _judge_page(image, primary_md, secondary_md)
+        except ToolboxError as exc:
+            return MethodResult(
+                success=False,
+                validated=False,
+                message=f"Juiz VLM indisponível: {type(exc).__name__}: {exc}",
+            )
+        except Exception as exc:  # noqa: BLE001 - rendering a broken source
+            return MethodResult(
+                success=False,
+                validated=False,
+                message=f"Página {page_number} não pôde ser renderizada: {exc}",
+            )
+        document = result.get("document") or {}
+        p_b = float(document.get("pB", 0.5))
+        judgements[page_number] = {
+            "choice": secondary.provider if p_b > DEFAULT_NEW_THR else _CALIBRATED_PAIR[0],
+            "pB": p_b,
+            "pB_ab": document.get("pB_ab"),
+            "pA_ba": document.get("pA_ba"),
+            "model": document.get("model"),
+        }
+
+    if not judgements:
+        return MethodResult(
+            success=False,
+            validated=False,
+            message="Sem páginas com as duas transcrições para o juiz VLM",
+        )
+    for element in elements:
+        if element.page_number in judgements:
+            element.metadata["page_judgement"] = judgements[element.page_number]
+
+    preferred = {
+        page: judgement
+        for page, judgement in judgements.items()
+        if judgement["choice"] != _CALIBRATED_PAIR[0]
+    }
+    if preferred:
+        return MethodResult(
+            success=False,
+            validated=False,
+            message=(
+                "Juiz VLM prefere o provider secundário ("
+                + ", ".join(f"p{page}: pB={j['pB']:.2f}" for page, j in sorted(preferred.items()))
+                + "); a troca de página não é aplicada automaticamente"
+            ),
+        )
+    return MethodResult(
+        success=True,
+        validated=True,
+        message="Juiz VLM mantém o provider primário nas páginas "
+        + ", ".join(f"{page} (pB={j['pB']:.2f})" for page, j in sorted(judgements.items())),
+    )
+
+
 def _apply_page_order(current: list[ManifestElement], order: list[int]) -> bool:
     """Reassign the reading-order slots of ``current`` following ``order``.
 
@@ -1527,6 +1659,7 @@ class PddlAccessibilityOrchestrator:
             "dual-provider-fusion", _handle_dual_provider_fusion_method
         )
         registry.register("single-provider", _handle_single_provider_method)
+        registry.register("vlm-pairwise-judge", _handle_vlm_pairwise_judge_method)
         for method, handler in DETERMINISTIC_METHOD_HANDLERS.items():
             registry.register(method, handler)
 

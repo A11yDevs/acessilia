@@ -51,8 +51,9 @@ PROVIDER_DEFAULTS: dict[str, str] = {
     "toolbox_math_recognize_provider": "docling-math",
     "toolbox_math_provider": "pure-math",
     "toolbox_ocr_provider": "docling-ocr",
-    "toolbox_page_ocr_provider": "qwen3-vl-page",
-    "toolbox_adjudicate_provider": "qwen3-vl-judge",
+    "toolbox_page_ocr_provider": "qwen3-vl-8b",
+    "toolbox_adjudicate_provider": "qwen3-vl-8b",
+    "toolbox_table_provider": "qwen3-vl-8b",
     "toolbox_orientation_provider": "rapidocr-orient",
     "toolbox_media_inspect_provider": "pure-media-inspect",
 }
@@ -109,19 +110,27 @@ _CAPABILITIES: tuple[ToolboxCapability, ...] = (
         provider_key="toolbox_media_inspect_provider",
         output_schema="media-inspection@1",
     ),
-    # Dr.DocBench (PR #125) contracts the Toolbox does not publish yet; tracked
-    # as KNOWN_DRIFT in the core (tests/test_toolbox_contract_drift.py).
+    # Vision-language capabilities (Dr.DocBench, PR #125), served by the
+    # Toolbox's OpenAI-compatible VLM provider.
     ToolboxCapability(
         "document.ocr.page", 1, "OCR de página",
         provider_key="toolbox_page_ocr_provider",
+        output_schema="page-transcription@1",
     ),
     ToolboxCapability(
         "document.adjudicate.page", 1, "Adjudicação",
         provider_key="toolbox_adjudicate_provider",
+        output_schema="page-judgement@1",
     ),
     ToolboxCapability(
         "document.adjudicate.region", 1, "Adjudicação",
         provider_key="toolbox_adjudicate_provider",
+        output_schema="region-transcription@1",
+    ),
+    ToolboxCapability(
+        "table.recognize", 1, "Reconhecimento de tabela",
+        provider_key="toolbox_table_provider",
+        output_schema="table-candidates@1",
     ),
     # Reached through dedicated REST routes, not ":execute".
     *(

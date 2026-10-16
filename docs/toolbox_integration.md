@@ -308,8 +308,9 @@ Defined in `backend/config/settings.py` and documented in `.env.example`:
 | `FUSION_MODE` | `single` | `single` (one provider) or `dual` (two providers + fusion) |
 | `FUSION_SECONDARY_PROVIDER` | `mineru` | Secondary provider for `FUSION_MODE=dual` |
 | `STRUCTURER` | `toolbox` | Per-page region engine (`toolbox`, `toolbox-layout`, `pymupdf`) |
-| `TOOLBOX_PAGE_OCR_PROVIDER` | `qwen3-vl-page` | Whole-page VLM transcription (`document.ocr.page`) |
-| `TOOLBOX_ADJUDICATE_PROVIDER` | `qwen3-vl-judge` | Pairwise judge / region transcription (`document.adjudicate.*`) |
+| `TOOLBOX_PAGE_OCR_PROVIDER` | `qwen3-vl-8b` | Whole-page VLM transcription (`document.ocr.page`) |
+| `TOOLBOX_ADJUDICATE_PROVIDER` | `qwen3-vl-8b` | Pairwise judge / region transcription (`document.adjudicate.*`) |
+| `TOOLBOX_TABLE_PROVIDER` | `qwen3-vl-8b` | Table re-generation for the table specialist (`table.recognize`) |
 | `TOOLBOX_ORIENTATION_PROVIDER` | `rapidocr-orient` | Rotation detection (`image.page.orient`) |
 | `FUSION_HYBRID_PROVIDER` | `mineru-hyb` | MinerU hybrid-VLM provider id (the B source of the confirmed leaderboard best) |
 
@@ -355,9 +356,10 @@ service.py: _build_orchestrator()
 
 | Capability | Client | Providers | Purpose |
 |---|---|---|---|
-| `document.ocr.page` | `ToolboxPageOcrClient` | `qwen3-vl-page`, `dots-ocr-page`, `deepseek-ocr-page`, `teleocr-page` | Whole-page VLM transcription — the B source of the page hybrid |
-| `document.adjudicate.page` | `ToolboxAdjudicateClient` | `qwen3-vl-judge` | Pairwise judge between two candidate transcriptions (both orders, position debiasing) |
-| `document.adjudicate.region` | `ToolboxAdjudicateClient` | `qwen3-vl-judge` | Exact transcription of a region crop, turned into a differ decision |
+| `document.ocr.page` | `ToolboxPageOcrClient` | `qwen3-vl-8b` | Whole-page VLM transcription — the B source of the page hybrid |
+| `document.adjudicate.page` | `ToolboxAdjudicateClient` | `qwen3-vl-8b` | Pairwise judge between two candidate transcriptions (both orders, position debiasing); used by the `vlm-pairwise-judge` method |
+| `document.adjudicate.region` | `ToolboxAdjudicateClient` | `qwen3-vl-8b` | Exact transcription of a region crop, turned into a differ decision |
+| `table.recognize` | `ToolboxTableClient` | `qwen3-vl-8b` | Greedy plus seeded HTML generations of a table crop, for the table specialist |
 | `image.page.orient` | `ToolboxOrientationClient` | `rapidocr-orient` | Rotation 0/90/180/270 detection |
 
 The provider registrations live in the Toolbox repository; the Dr.DocBench job
