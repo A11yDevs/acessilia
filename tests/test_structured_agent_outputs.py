@@ -439,3 +439,69 @@ async def test_data_agent_uses_larger_token_budget_for_tables(monkeypatch) -> No
     assert result is not None and result.kind == "table"
     assert captured["model_kwargs"] == {"max_tokens": 8192}
     assert captured["output_schema"] is DataOutput
+
+
+def test_run_content_raises_when_the_run_failed() -> None:
+    """Agno reports provider errors as a run with status=error, not an exception."""
+    from agno.run.base import RunStatus
+
+    from backend.agents.run_helpers import AgentRunError, run_content
+
+    failed = type("Run", (), {"status": RunStatus.error, "content": "Invalid API Key"})()
+    with pytest.raises(AgentRunError, match="Invalid API Key"):
+        run_content(failed)
+
+    done = type("Run", (), {"status": RunStatus.completed, "content": {"a": 1}})()
+    assert run_content(done) == {"a": 1}
+    # Responses without a status (older fakes, plain objects) keep working.
+    assert run_content(type("Run", (), {"content": "x"})()) == "x"
+    # A plain string status is accepted too.
+    with pytest.raises(AgentRunError, match="x"):
+        run_content(type("Run", (), {"status": "error", "content": "x"})())
+    # A failed run without content still says why it raised.
+    with pytest.raises(AgentRunError, match="no error message"):
+        run_content(type("Run", (), {"status": RunStatus.error, "content": None})())
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("agent_module", ["vision_agent", "data_agent"])
+async def test_failed_run_is_logged_with_its_real_cause(monkeypatch, agent_module) -> None:
+    """A rejected key must be logged as such, not as a JSON validation error."""
+    import importlib
+
+    from agno.run.base import RunStatus
+
+    from backend.tools.logger import logger
+
+    module = importlib.import_module(f"backend.agents.{agent_module}")
+
+    class FakeAgent:
+        def __init__(self, **_kwargs):
+            pass
+
+        def run(self, **_kwargs):
+            return type("Run", (), {"status": RunStatus.error, "content": "Invalid API Key"})()
+
+    async def run_inline(function, *args):
+        return function(*args)
+
+    monkeypatch.setattr(module, "Agent", FakeAgent)
+    monkeypatch.setattr(module, "get_agno_model", lambda **_kwargs: object())
+    monkeypatch.setattr(module.asyncio, "to_thread", run_inline)
+    if agent_module == "data_agent":
+        monkeypatch.setattr(module, "load_region_prompt", lambda _key: "prompt")
+
+    messages: list[str] = []
+    sink = logger.add(lambda message: messages.append(str(message)), level="CRITICAL")
+    try:
+        if agent_module == "vision_agent":
+            result = await module.VisionAgent().describe_region(b"image", "embedded_image")
+        else:
+            result = await module.DataAgent().process_region(b"image", "table")
+    finally:
+        logger.remove(sink)
+
+    assert result is None
+    logged = "\n".join(messages)
+    assert "model run failed: Invalid API Key" in logged
+    assert "json_invalid" not in logged

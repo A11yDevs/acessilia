@@ -17,6 +17,7 @@ from backend.agents.output_schemas import (
     DataOutput,
     validate_structured_content,
 )
+from backend.agents.run_helpers import run_content
 from agno.agent import Agent
 from agno.media import Image
 
@@ -81,10 +82,12 @@ class DataAgent:
             )
 
             def _run_data():
-                return agent.run(
-                    input=prompt,
-                    images=[Image(content=image_bytes)],
-                ).content
+                return run_content(
+                    agent.run(
+                        input=prompt,
+                        images=[Image(content=image_bytes)],
+                    )
+                )
 
             content = await asyncio.to_thread(_run_data)
             result = validate_structured_content(content, DataOutput)
