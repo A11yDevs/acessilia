@@ -49,11 +49,6 @@ def _source_type(source_path: str) -> str:
 from docstruct.text.sanitize import sanitize_block_text
 from docstruct.text.sanitize import sanitize_text
 from docstruct.blocks.parser import parse_text_to_blocks
-from backend.tools.formula_tools import (
-    latex_to_mathml,
-    normalize_latex,
-    verbalize_latex_fallback,
-)
 
 
 def build_canonical_document(
