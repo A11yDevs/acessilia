@@ -161,3 +161,29 @@ acessilia-docstruct @ https://github.com/A11yDevs/acessilia/releases/download/do
 
 pip verifies the `#sha256=` fragment on download, also when the consumer
 installs without a lock file.
+
+### After the release
+
+Check the run and the published files before anyone depends on them:
+
+```bash
+gh run list --workflow docstruct-release.yml --limit 1   # then: gh run watch <id>
+gh release view docstruct-v<version>                     # the notes carry the pin
+gh release download docstruct-v<version> -D /tmp/docstruct-rel
+(cd /tmp/docstruct-rel && sha256sum -c SHA256SUMS)       # macOS: shasum -a 256 -c
+```
+
+The release is created by the last step, so a failed run publishes nothing. To
+retry, delete the tag (`git push --delete origin docstruct-v<version>` and
+`git tag -d docstruct-v<version>`), fix it in a PR and tag the new merge commit.
+A published version is never replaced: a fix ships as a new version.
+
+### Updating consumers
+
+Publishing does not change any consumer. Each one moves to the new version in
+its own PR, replacing the URL and the `#sha256=` with the ones in the release
+notes. For the Toolbox, see
+[Updating docstruct](https://github.com/A11yDevs/acessilia-toolbox/blob/develop/docs/dev-workflow.md#6-updating-docstruct) in its development workflow.
+The core installs this directory from its own checkout (editable in
+development, `pip install ./libs/docstruct` in CI and in its image), so it always
+runs the code of the same commit and needs no update.

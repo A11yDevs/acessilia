@@ -102,6 +102,22 @@ The PDDL domain lives under `backend/core/planning/domains/`. The JSON schemas (
 
 The codebase follows a pragmatic layered architecture with a top-down flow: Interface → Orchestration → Extraction → Canonical Document → Output. Infrastructure services and shared tools support multiple layers but do not own business decisions. A few controlled exceptions exist: `backend/adapters/exporters` is a thin compatibility wrapper over `backend/export`, and the orchestrator coordinates both processing and infrastructure concerns (cache, history).
 
+### Libraries and the Toolbox (`libs/`)
+
+The heavy models run in a separate service, the [Acessilia Toolbox](https://github.com/A11yDevs/acessilia-toolbox). Between it and this core sit two libraries kept in `libs/`. Dependencies only point down:
+
+| Layer | Package | Role | May depend on |
+|---|---|---|---|
+| 0 | `libs/docstruct` (`acessilia-docstruct`) | Pure document-structure algorithms (fusion, tables, reading order), no dependencies of its own | nothing |
+| 1 | Toolbox (separate repository) | Heavy providers, artifact storage, capability execution over REST/MCP | docstruct |
+| 2 | `libs/sdk` (`acessilia-sdk`) | Capability allowlist, HTTP transport, catalogue checks; configuration is passed in | the Toolbox's **published contract** (capability ids, versions, schemas), never its package |
+| 3 | Core (`backend/`) | Agents, PDDL planning, obligations, policies | SDK, docstruct |
+
+- **The core decides what to do and when; the SDK defines how to reach an operation; the Toolbox provides where and with which resources it runs.** Obligations, admissible methods and costs are the core's planning policy: the Toolbox reports what it found, and the core derives the obligations ([#138](https://github.com/A11yDevs/acessilia/pull/138)).
+- **The Toolbox catalogue only restricts.** Methods that call the Toolbox are checked against the live catalogue before a document is planned (`TOOLBOX_AVAILABILITY_GATE`); a capability outside the SDK allowlist is never made available. See [toolbox_integration.md](toolbox_integration.md).
+- **docstruct is distributed as a release wheel.** The core installs it from this checkout. The Toolbox pins the wheel of a `docstruct-vX.Y.Z` GitHub Release by URL and `#sha256=` ([Releases](../libs/docstruct/README.md#releases)). The SDK has a single consumer, the core, and is not published yet.
+- **Enforced by tests:** `libs/docstruct/tests/test_purity.py` and `libs/sdk/tests/test_purity.py` import every module with the upper layers refused; `tests/test_architecture_layers.py` fails if `backend` imports the Toolbox package.
+
 ---
 
 ## Main Processing Flow
