@@ -5,7 +5,6 @@ Ensures that only the PDDL+Toolbox pipeline can be used.
 from __future__ import annotations
 
 import os
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest

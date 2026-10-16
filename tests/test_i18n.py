@@ -127,6 +127,15 @@ def test_catalog_validator_flags_missing_translations() -> None:
     assert sorted(problems_partial) == sorted(expected_missing)
 
 
+def test_default_checked_in_catalog_tree_is_generated_by_repo_layout(tmp_path: Path) -> None:
+    """Check the production location and generate its layout without rewriting tracked catalogs."""
+    assert gen_locales.DEFAULT_LOCALES_DIR.resolve() == DEFAULT_REPOS_CATALOGS_DIR.resolve()
+    generated_root = tmp_path / "backend" / "locales"
+    gen_locales.build_locales(generated_root)
+    for locale in gen_locales.SUPPORTED_LOCALES:
+        assert (DEFAULT_REPOS_CATALOGS_DIR / locale / "LC_MESSAGES" / "messages.po").is_file()
+        for extension in ("po", "mo"):
+            assert (generated_root / locale / "LC_MESSAGES" / f"messages.{extension}").is_file()
 def test_checked_in_catalogs_match_what_the_generator_produces(tmp_path) -> None:
     """The checked-in ``.po`` sources must be exactly what ``build_locales`` writes.
 
@@ -220,3 +229,14 @@ def test_set_request_locale_overrides_server_locale(monkeypatch: pytest.MonkeyPa
     i8n.reset_request_locale(token)
     i8n._catalog_for.cache_clear()
     assert i8n.t("Downloading file...") == "Downloading file..."
+
+
+def test_generated_catalogs_preserve_versioned_messages(tmp_path):
+    from babel.messages.pofile import read_po
+    generated = gen_locales.build_locales(tmp_path)
+    for locale, (po_path, _) in generated.items():
+        with po_path.open("rb") as stream:
+            actual = {msg.id: msg.string for msg in read_po(stream) if msg.id}
+        with (DEFAULT_REPOS_CATALOGS_DIR / locale / "LC_MESSAGES/messages.po").open("rb") as stream:
+            expected = {msg.id: msg.string for msg in read_po(stream) if msg.id}
+        assert actual == expected

@@ -41,6 +41,31 @@ def _cache_path(key: str) -> Path:
     return CACHE_DIR / f"{key}.json"
 
 
+def processing_cache_configuration() -> dict[str, Any]:
+    """Configuration shared by whole-document and page-level result caches."""
+    from backend.config.settings import settings
+
+    fields = (
+        "ai_client", "ollama_model", "ollama_base_url", "openrouter_model",
+        "openrouter_base_url", "openrouter_max_tokens", "pipeline_engine", "structurer",
+        "fusion_mode", "fusion_secondary_provider", "fusion_hybrid_provider",
+        "toolbox_base_url", "toolbox_provider", "toolbox_layout_provider",
+        "toolbox_pdf_provider", "toolbox_math_recognize_provider", "toolbox_math_provider",
+        "toolbox_ocr_provider", "toolbox_page_ocr_provider", "toolbox_adjudicate_provider",
+        "toolbox_orientation_provider", "toolbox_media_inspect_provider",
+        "toolbox_media_inspect_enabled", "pdf_split_dpi", "jpg_quality", "max_page_width", "pymupdf_text_threshold", "callout_known_titles",
+        "pddl_execute_dry_run", "pddl_max_replans", "pddl_planner_backend",
+        "pddl_preferred_plan", "pddl_fast_downward", "pddl_fast_downward_alias",
+        "pddl_fast_downward_search",
+    )
+    configuration = {name: getattr(settings, name) for name in fields}
+    from backend.core.planning.domain_bundle import DomainBundle
+
+    domain = DomainBundle.load()
+    configuration["pddl_domain"] = (domain.domain_sha256, domain.description_sha256)
+    return configuration
+
+
 def options_cache_key(prefix: str, **options: Any) -> str:
     """Build a filesystem-safe cache variant from output-affecting options."""
     serialized = json.dumps(

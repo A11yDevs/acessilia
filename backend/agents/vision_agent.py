@@ -15,9 +15,8 @@ from backend.ai.models.ai_client import get_agno_model
 from backend.agents.output_schemas import (
     VISION_SCHEMA_INSTRUCTION,
     VisionOutput,
-    validate_structured_content,
+    validate_structured_run,
 )
-from backend.agents.run_helpers import run_content
 from agno.agent import Agent
 from agno.media import Image
 
@@ -90,15 +89,13 @@ class VisionAgent:
             )
 
             def _run_vision():
-                return run_content(
-                    agent.run(
-                        input=prompt,
-                        images=[Image(content=image_bytes)],
-                    )
+                return agent.run(
+                    input=prompt,
+                    images=[Image(content=image_bytes)],
                 )
 
-            content = await asyncio.to_thread(_run_vision)
-            return validate_structured_content(content, VisionOutput)
+            response = await asyncio.to_thread(_run_vision)
+            return validate_structured_run(response, VisionOutput)
 
         except Exception as error:
             import traceback

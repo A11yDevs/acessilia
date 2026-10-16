@@ -1,8 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import hashlib
+import json
+import math
+import os
 import re
+import tempfile
 from collections import Counter
 from collections.abc import Callable, Coroutine, Iterable
 from dataclasses import dataclass
@@ -11,9 +16,10 @@ from typing import Any
 
 import fitz
 from docstruct.fusion.tailjoin import is_page_number as _is_page_number
-from docstruct.tables.ast import effective_section_width
+from docstruct.tables.ast import effective_section_width, linearize_table_for_text
 from docstruct.text.norm_fix import norm_fix
 
+from backend.services.blocking import run_blocking
 from backend.agents.data_agent import DataAgent
 from backend.agents.output_schemas import DataOutput, VisionOutput
 from backend.agents.vision_agent import VisionAgent
@@ -21,6 +27,7 @@ from backend.core.agents.fusion_agent import FusionAgent
 from backend.core.agents.informational_structural import InformationalStructuralAgent
 from backend.core.execution.executor import ExecutorAgent, MethodRegistry
 from backend.core.execution.models import ExecutionReport, MethodResult
+from backend.core.execution.messages import EXE_COMPLETED_OBLIGATIONS_UNSATISFIED
 from backend.core.manifest.builder import (
     SECONDARY_EXTRACTION_KIND,
     _derive_processing_needs,
@@ -29,6 +36,7 @@ from backend.core.manifest.builder import (
 from backend.core.manifest.models import (
     Artifact,
     ManifestElement,
+    PageDescriptor,
     ProcessingManifest,
 )
 from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
@@ -40,7 +48,6 @@ from backend.i18n import t
 from backend.log_messages import (
     LOG_PDDL_ELEMENT_CROP_FAILED,
     LOG_PDDL_EMPTY_VISION_DESCRIPTION,
-    LOG_PDDL_IGNORED_OPTIONS,
     LOG_PDDL_IMAGES_ENRICHED,
     LOG_PDDL_PREFERRED_PLAN_MISSING,
     LOG_PDDL_TABLES_ENRICHED,
@@ -151,10 +158,9 @@ def _run_extract_fused(
     loop ativo (Agno Workflow, API), ``.result()`` ainda bloqueia o loop
     chamador até a fusão terminar. O contrato dos handlers permanece
     síncrono; quem invoca o executor a partir de código async deve rodar
-    o executor inteiro via ``await asyncio.to_thread(...)`` para não
+    o executor inteiro via ``await run_blocking(...)`` para não
     bloquear o event loop principal.
     """
-    import asyncio
     import concurrent.futures
 
     from backend.pipeline.fusion import extract_fused
@@ -291,12 +297,14 @@ def _handle_vision_description_method(
             message="Nenhuma imagem encontrada para a obrigação",
         )
 
-    # The canonical signal is the element text: `_enrich_picture_descriptions`
-    # writes the model description there, and the extractor may already deliver a
-    # valid caption. `_has_meaningful_text` is the same predicate the enrichment
-    # step uses to decide what still needs a description, so honouring anything
-    # else here would disagree with the work that actually ran.
-    undescribed = [el for el in elements if not _has_meaningful_text(el)]
+    undescribed = [
+        el for el in elements
+        if not (
+            bool((el.text or "").strip())
+            if el.metadata.get("vision_description_complete")
+            else _has_meaningful_text(el)
+        )
+    ]
     if undescribed:
         return MethodResult(
             success=False,
@@ -327,7 +335,20 @@ def _handle_pandoc_table_method(
             message="Nenhuma tabela encontrada para a obrigação",
         )
 
-    missing = [el for el in elements if not (el.metadata or {}).get("table_ast")]
+    missing = []
+    for element in elements:
+        try:
+            usable = _table_element_has_structured_content(element)
+            table_ast = element.metadata.get("table_ast")
+            if usable:
+                usable = any(
+                    value.strip() for row in _rows_from_table_ast(table_ast) for value in row
+                )
+                linearize_table_for_text({"table_ast": table_ast})
+        except (TypeError, ValueError, AttributeError):
+            usable = False
+        if not usable:
+            missing.append(element)
     if missing:
         return MethodResult(
             success=False,
@@ -379,31 +400,6 @@ def _handle_pandoc_code_method(
         success=True,
         validated=True,
         message=f"Código normalizado em {normalized} bloco(s)",
-    )
-
-
-def _handle_pymupdf_region_method(
-    manifest: ProcessingManifest, obligation_id: str
-) -> MethodResult:
-    """Require a region crop for every target so the region was actually inspected."""
-    elements = _target_elements(manifest, obligation_id)
-    if not elements:
-        return _missing_obligation(obligation_id)
-
-    missing = [el for el in elements if not (el.metadata or {}).get("region_crop")]
-    if missing:
-        return MethodResult(
-            success=False,
-            validated=False,
-            message=(
-                "Região não inspecionada (sem recorte): "
-                + ", ".join(el.id for el in missing)
-            ),
-        )
-    return MethodResult(
-        success=True,
-        validated=True,
-        message=f"Região inspecionada para {len(elements)} elemento(s)",
     )
 
 
@@ -476,6 +472,156 @@ def _handle_norm_fix_method(
         validated=True,
         message=f"Normalização determinística aplicada em {fixed} elemento(s)",
     )
+
+
+def _render_inspection_region(source: Path, element: ManifestElement) -> tuple[bytes, int, list[float]]:
+    """Render only the requested, validated source region; never trust crop metadata."""
+    provenance = element.provenance[0] if element.provenance else None
+    number = provenance.page_number if provenance else element.page_number
+    if provenance and element.page_number is not None and number != element.page_number:
+        raise ValueError("Region page identity is inconsistent")
+    with fitz.open(source) as document:
+        if number is None and document.page_count == 1:
+            number = 1
+        if type(number) is not int or not 1 <= number <= document.page_count:
+            raise ValueError("Region page is missing or out of range")
+        page = document.load_page(number - 1)
+        rectangle = page.rect
+        bbox = provenance.bbox if provenance else None
+        if bbox is not None:
+            values = (bbox.left, bbox.top, bbox.right, bbox.bottom)
+            if not all(math.isfinite(value) for value in values):
+                raise ValueError("Region coordinates must be finite")
+            if bbox.coord_origin not in {"TOPLEFT", "BOTTOMLEFT"}:
+                raise ValueError("Region coordinate origin is unknown")
+            top, bottom = bbox.top, bbox.bottom
+            if bbox.coord_origin == "BOTTOMLEFT":
+                top, bottom = page.rect.height - top, page.rect.height - bottom
+            rectangle = fitz.Rect(
+                min(bbox.left, bbox.right), min(top, bottom),
+                max(bbox.left, bbox.right), max(top, bottom),
+            ) & page.rect
+            if rectangle.is_empty or rectangle.width < 1 or rectangle.height < 1:
+                raise ValueError("Region does not intersect the source page")
+        if rectangle.width * rectangle.height * (160 / 72) ** 2 > 20_000_000:
+            raise ValueError("Region exceeds the render pixel limit")
+        return page.get_pixmap(clip=rectangle, dpi=160).tobytes("png"), number, list(rectangle)
+
+
+def _inspect_region(image: bytes, number: int, total_pages: int, mode: str) -> VisionOutput | None:
+    async def inspect():
+        return await VisionAgent(mode=mode).describe_region(
+            image_bytes=image, classification="embedded_image", page_num=number,
+            total_pages=total_pages, mode=mode,
+        )
+
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(inspect())
+    import concurrent.futures
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(lambda: asyncio.run(inspect())).result()
+
+
+def _save_region_artifact(content: bytes, scope: str, kind: str, suffix: str, media_type: str) -> Artifact:
+    from backend.config.settings import settings
+
+    digest = hashlib.sha256(content).hexdigest()
+    path = settings.data_dir / "artifacts" / "regions" / scope / f"{digest}.{suffix}"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=path.parent, delete=False) as stream:
+            temporary = Path(stream.name)
+            stream.write(content)
+        os.replace(temporary, path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+    return Artifact(
+        id=f"artifact-{kind}-{scope[:16]}-{digest[:16]}", kind=kind,
+        path=str(path), media_type=media_type, sha256=digest,
+    )
+
+
+def _handle_pymupdf_region_method(manifest: ProcessingManifest, obligation_id: str) -> MethodResult:
+    """Inspect real source pixels and update targets only after every result validates."""
+    elements = _target_elements(manifest, obligation_id)
+    if not elements:
+        return _missing_obligation(obligation_id)
+    try:
+        source = Path(manifest.source.path)
+        with source.open("rb") as stream:
+            if hashlib.file_digest(stream, "sha256").hexdigest() != manifest.source.sha256:
+                raise ValueError("Region source differs from the manifest")
+        inspected = []
+        for element in elements:
+            if element.type != "unknown":
+                raise ValueError("Region inspection requires an unknown target element")
+            image, number, rectangle = _render_inspection_region(source, element)
+            declared_pages = {
+                page.page_number for page in manifest.pages if element.id in page.element_ids
+            }
+            if declared_pages and declared_pages != {number}:
+                raise ValueError("Region page differs from the manifest page index")
+            output = _inspect_region(
+                image, number, max(len(manifest.pages), number),
+                str(manifest.extractor.configuration.get("region_inspection_mode", "medio")),
+            )
+            if not isinstance(output, VisionOutput):
+                raise ValueError(f"Region inspection failed for {element.id}")
+            output = VisionOutput.model_validate(output.model_dump())
+            text = output.description if output.kind == "description" else normalize_latex(output.formula_latex or "")
+            if not text.strip():
+                raise ValueError(f"Region inspection returned empty content for {element.id}")
+            inspected.append((element, image, number, rectangle, output, text))
+
+        artifacts = []
+        replacements = {}
+        for element, image, number, rectangle, output, text in inspected:
+            scope = hashlib.sha256(json.dumps([
+                manifest.manifest_id, manifest.source.sha256, manifest.revision, obligation_id, element.id,
+            ]).encode()).hexdigest()
+            crop = _save_region_artifact(image, scope, "region-crop", "png", "image/png")
+            evidence = {
+                "source_sha256": manifest.source.sha256, "element_id": element.id,
+                "page_number": number, "bbox": rectangle, "crop_sha256": crop.sha256,
+                "result": output.model_dump(),
+            }
+            record = _save_region_artifact(
+                json.dumps(evidence, ensure_ascii=False, sort_keys=True).encode(),
+                scope, "region-inspection", "json", "application/json",
+            )
+            replacement = element.model_copy(deep=True)
+            replacement.metadata.update(
+                original_type=element.type, vision_description_complete=True,
+                vision_language=output.language, vision_confidence=output.confidence,
+                vision_warnings=output.warnings, region_crop=crop.path,
+                region_inspection=record.id,
+            )
+            replacement.text = text
+            replacement.type = "formula" if output.kind == "formula" else "picture"
+            if replacement.type == "picture":
+                replacement.metadata["src"] = (
+                    "data:image/png;base64," + base64.b64encode(image).decode("ascii")
+                )
+            replacement.raw_label = replacement.type
+            replacement.page_number = number
+            replacements[element.id] = replacement
+            artifacts.extend([crop, record])
+        manifest.elements = [replacements.get(element.id, element) for element in manifest.elements]
+        manifest.summary.element_types = dict(Counter(element.type for element in manifest.elements))
+        return MethodResult(
+            success=True, validated=True,
+            message=f"Inspected {len(elements)} source region(s)", artifacts=artifacts,
+        )
+    except Exception as exc:
+        return MethodResult(
+            success=False, validated=False,
+            message=f"Region inspection failed: {type(exc).__name__}: {exc}",
+        )
 
 
 def _handle_repetition_guard_method(
@@ -1414,57 +1560,41 @@ def _handle_human_review_method(
 def _handle_deterministic_heading_repair_method(
     manifest: ProcessingManifest, obligation_id: str
 ) -> MethodResult:
-    """Clamp a heading whose level skips ahead of its predecessor.
-
-    The compiled obligation carries the previous level as evidence; the repair is
-    deterministic, so a missing level is a real failure rather than something to
-    guess at.
-    """
+    """Repair the full sequence, since fixing one heading can expose a later gap."""
     obligation = next(
         (o for o in manifest.obligations if o.id == obligation_id), None
     )
     if obligation is None:
         return _missing_obligation(obligation_id)
 
-    elements = {
-        el.id: el for el in _target_elements(manifest, obligation_id)
-    }
-    repaired = 0
-    for element in elements.values():
-        if element.type != "heading":
-            continue
-        previous = _previous_heading_level(manifest, element)
-        if previous and element.hierarchy_level > previous + 1:
-            element.hierarchy_level = previous + 1
-            element.metadata["heading_repaired"] = True
-        repaired += 1
-
-    if not repaired:
+    targets = _target_elements(manifest, obligation_id)
+    if not targets or any(element.type not in {"title", "heading"} for element in targets):
         return MethodResult(
             success=False,
             validated=False,
             message="Nenhum título encontrado para a obrigação",
         )
+    previous = 0
+    repaired = 0
+    for element in sorted(manifest.elements, key=lambda item: item.reading_order):
+        if element.type not in {"title", "heading"}:
+            continue
+        level = 1 if not previous else max(2, min(element.hierarchy_level, previous + 1, 6))
+        if previous and element.type == "title":
+            element.metadata["original_type"] = "title"
+            element.type = "heading"
+        if level != element.hierarchy_level:
+            element.metadata["original_heading_level"] = element.hierarchy_level
+            element.hierarchy_level = level
+            element.metadata["heading_repaired"] = True
+            repaired += 1
+        previous = level
+    manifest.summary.element_types = dict(Counter(element.type for element in manifest.elements))
     return MethodResult(
         success=True,
         validated=True,
-        message=f"Hierarquia de títulos verificada em {repaired} título(s)",
+        message=f"Hierarquia de títulos verificada; {repaired} título(s) reparado(s)",
     )
-
-
-def _previous_heading_level(
-    manifest: ProcessingManifest, element: ManifestElement
-) -> int:
-    """Level of the closest heading that precedes the element in reading order."""
-    previous = 0
-    for candidate in sorted(
-        (el for el in manifest.elements if el.type == "heading"),
-        key=lambda el: el.reading_order,
-    ):
-        if candidate.id == element.id:
-            return previous
-        previous = candidate.hierarchy_level
-    return previous
 
 
 DETERMINISTIC_METHOD_HANDLERS: dict[
@@ -1557,17 +1687,97 @@ def _handle_dual_provider_fusion_method(
             ),
         )
 
+    try:
+        elements = _fused_text_elements(manifest, obligation.target_ids, payload)
+    except (TypeError, ValueError) as exc:
+        return MethodResult(success=False, validated=False, message=str(exc))
+
     artifact = _persist_fusion_payload(
+        manifest,
         payload,
         obligation_id,
         kind="fusion-payload",
     )
+
+    manifest.elements = elements
+    page_ids = {element.page_number or 1 for element in elements}
+    existing_pages = {page.page_number: page for page in manifest.pages}
+    manifest.pages = [
+        PageDescriptor(
+            page_number=number,
+            width=existing_pages[number].width if number in existing_pages else None,
+            height=existing_pages[number].height if number in existing_pages else None,
+            element_ids=[element.id for element in elements if (element.page_number or 1) == number],
+        )
+        for number in sorted(page_ids)
+    ]
+    manifest.summary.page_count = len(manifest.pages)
+    manifest.summary.element_count = len(elements)
+    manifest.summary.element_types = dict(Counter(element.type for element in elements))
     return MethodResult(
         success=True,
         validated=True,
         message="Fusão dual-provider concluída com sucesso",
         artifacts=[artifact],
     )
+
+
+def _fused_text_elements(
+    manifest: ProcessingManifest, target_ids: list[str], payload: dict[str, Any]
+) -> list[ManifestElement]:
+    # The fusion adapter currently emits text-only blocks. It cannot safely
+    # replace a structured document or a subset with a whole-document result.
+    if any(element.type != "paragraph" for element in manifest.elements) or set(target_ids) != {
+        element.id for element in manifest.elements
+    }:
+        raise ValueError("Text fusion requires all paragraphs of a text-only manifest")
+    raw_elements = payload.get("document", {}).get("elements")
+    if not isinstance(raw_elements, list) or not raw_elements:
+        raise ValueError("Fusion returned no usable document elements")
+    originals = sorted(manifest.elements, key=lambda element: element.reading_order)
+    by_page: dict[int, list[dict[str, Any]]] = {}
+    for raw in raw_elements:
+        if not isinstance(raw, dict) or raw.get("type") != "paragraph":
+            raise ValueError("Fusion returned unsupported structured content")
+        text = raw.get("text")
+        if not isinstance(text, str) or not text.strip():
+            raise ValueError("Fusion returned an empty text block")
+        page = raw.get("page_number", raw.get("page"))
+        if page is None:
+            if len(manifest.pages) > 1:
+                raise ValueError("Fusion omitted page identity for a multipage document")
+            page = manifest.pages[0].page_number if manifest.pages else 1
+        if type(page) is not int or page < 1:
+            raise ValueError("Fusion returned an invalid page number")
+        by_page.setdefault(page, []).append(raw)
+    original_pages = {element.page_number or 1 for element in originals}
+    if not original_pages.issubset(by_page):
+        raise ValueError("Fusion omitted a source page")
+
+    result = []
+    for number, rows in sorted(by_page.items()):
+        old = [element for element in originals if (element.page_number or 1) == number]
+        # Keep every existing ID and reference; ambiguous mappings fail closed.
+        if len(rows) < len(old):
+            raise ValueError("Fusion cannot safely map fewer blocks to existing element references")
+        for index, raw in enumerate(rows):
+            if index < len(old):
+                element = old[index].model_copy(deep=True)
+                element.text = raw["text"]
+                element.page_number = number
+            else:
+                identifier = hashlib.sha256(json.dumps([
+                    manifest.manifest_id, number, index, raw["text"],
+                ]).encode()).hexdigest()[:24]
+                element = ManifestElement(
+                    id=f"element-fusion-{identifier}", type="paragraph", raw_label="paragraph",
+                    reading_order=len(result) + 1, hierarchy_level=0,
+                    page_number=number, text=raw["text"],
+                )
+            element.metadata["fusion_provider"] = payload["provider"]
+            element.reading_order = len(result) + 1
+            result.append(element)
+    return result
 
 
 def _handle_single_provider_method(
@@ -1614,6 +1824,7 @@ def _handle_single_provider_method(
         )
 
     artifact = _persist_fusion_payload(
+        manifest,
         payload,
         obligation_id,
         kind="single-provider-payload",
@@ -1627,27 +1838,38 @@ def _handle_single_provider_method(
 
 
 def _persist_fusion_payload(
+    manifest: ProcessingManifest,
     payload: dict[str, Any],
     obligation_id: str,
     *,
     kind: str,
 ) -> Artifact:
-    import json
-
+    """Write the payload atomically, addressed by its manifest scope and content."""
     from backend.config.settings import settings
 
-    safe_id = hashlib.sha256(obligation_id.encode("utf-8")).hexdigest()[:16]
-    output_path = settings.data_dir / "artifacts" / "fusion" / f"{safe_id}.json"
+    content = json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    digest = hashlib.sha256(content).hexdigest()
+    scope = hashlib.sha256(json.dumps([
+        manifest.manifest_id, manifest.source.document_id, manifest.source.sha256,
+        manifest.revision, obligation_id,
+    ]).encode()).hexdigest()
+    output_path = settings.data_dir / "artifacts" / "fusion" / scope / f"{digest}.json"
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=output_path.parent, delete=False) as stream:
+            temporary = Path(stream.name)
+            stream.write(content)
+        os.replace(temporary, output_path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
     return Artifact(
-        id=f"artifact-{kind}-{safe_id}",
+        id=f"artifact-{kind.removesuffix('-payload')}-{scope[:16]}-{digest[:16]}",
         kind=kind,
         path=str(output_path),
         media_type="application/json",
+        sha256=digest,
     )
 
 
@@ -1743,15 +1965,16 @@ class PddlAccessibilityOrchestrator:
         effective_mode = mode or "medio"
 
         if custom_prompt or thinking_mode:
-            logger.warning(t(LOG_PDDL_IGNORED_OPTIONS))
+            raise ValueError("Custom instructions and thinking mode are unavailable for this pipeline")
 
         if status_callback:
             await status_callback(t(STAGE_ANALYZING_STRUCTURAL))
-        manifest = await asyncio.to_thread(
+        manifest = await run_blocking(
             self.information_structural.process,
             file_path.resolve(),
             language="pt-BR",
         )
+        manifest.extractor.configuration["region_inspection_mode"] = effective_mode
 
         source_path = file_path.resolve()
         media_inspection = await inspect_source_media(source_path)
@@ -1785,7 +2008,7 @@ class PddlAccessibilityOrchestrator:
         availability = await toolbox_gate.decide(manifest)
         _log_availability(availability)
         gated = availability.unavailable_methods
-        plan, comparison = await asyncio.to_thread(
+        plan, comparison = await run_blocking(
             self._build_plan, manifest, extra_unavailable=gated
         )
 
@@ -1800,7 +2023,7 @@ class PddlAccessibilityOrchestrator:
         # whether the executor ran at all, so setting it to false produced a plan
         # that was never executed and a report of None. Real execution is now the
         # other branch instead of silence.
-        manifest, execution_report = await asyncio.to_thread(
+        manifest, execution_report = await run_blocking(
             self.executor.execute,
             plan,
             manifest,
@@ -1825,15 +2048,18 @@ class PddlAccessibilityOrchestrator:
                 self.max_replans,
                 execution_report.status,
             )
-            plan, comparison = await asyncio.to_thread(
+            plan, comparison = await run_blocking(
                 self._build_plan, manifest, extra_unavailable=gated
             )
-            manifest, execution_report = await asyncio.to_thread(
+            manifest, execution_report = await run_blocking(
                 self.executor.execute,
                 plan,
                 manifest,
                 dry_run=False,
             )
+
+        if execution_report.status not in {"completed", "dry-run-completed"}:
+            raise RuntimeError(_unsatisfied_execution_message(manifest))
 
         payload = build_pddl_structured_payload(
             file_path=file_path,
@@ -1919,13 +2145,14 @@ async def _enrich_picture_descriptions(
         element
         for element in manifest.elements
         if element.type == "picture"
-        and not _has_meaningful_text(element)
+        and not element.metadata.get("vision_description_complete")
     ]
     if not pictures and _is_mostly_visual_manifest(manifest):
         pictures = [
             element
             for element in manifest.elements
             if _is_placeholder_visual_element(element)
+            and not element.metadata.get("vision_description_complete")
         ]
 
     if (
@@ -1934,7 +2161,8 @@ async def _enrich_picture_descriptions(
         and len(manifest.pages) == 1
         and manifest.elements
     ):
-        pictures = [manifest.elements[0]]
+        pictures = [element for element in manifest.elements
+                    if not element.metadata.get("vision_description_complete")][:1]
 
     if not pictures:
         return
@@ -1948,7 +2176,7 @@ async def _enrich_picture_descriptions(
         if fallback_page_number is None and len(manifest.pages) == 1:
             fallback_page_number = manifest.pages[0].page_number
 
-        image_bytes, page_number = await asyncio.to_thread(
+        image_bytes, page_number = await run_blocking(
             _extract_picture_bytes,
             source_file,
             element,
@@ -1965,6 +2193,7 @@ async def _enrich_picture_descriptions(
             mode=mode,
         )
         if isinstance(vision_output, VisionOutput):
+            element.metadata["vision_description_complete"] = True
             element.metadata["vision_language"] = vision_output.language
             element.metadata["vision_confidence"] = vision_output.confidence
             element.metadata["vision_elements"] = list(vision_output.mentioned_elements)
@@ -2103,7 +2332,7 @@ async def _enrich_table_structures(
         if fallback_page_number is None and len(manifest.pages) == 1:
             fallback_page_number = manifest.pages[0].page_number
 
-        image_bytes, page_number = await asyncio.to_thread(
+        image_bytes, page_number = await run_blocking(
             _extract_picture_bytes,
             source_file,
             element,
@@ -2381,6 +2610,15 @@ def _has_meaningful_text(element: ManifestElement) -> bool:
     return True
 
 
+def _unsatisfied_execution_message(manifest: ProcessingManifest) -> str:
+    return t(EXE_COMPLETED_OBLIGATIONS_UNSATISFIED).format(
+        unsatisfied=", ".join(
+            obligation.id for obligation in manifest.obligations
+            if obligation.selected and obligation.status != "satisfied"
+        )
+    )
+
+
 def _log_availability(availability: toolbox_gate.AvailabilityDecision) -> None:
     if not availability.blocked:
         return
@@ -2420,6 +2658,8 @@ def build_pddl_structured_payload(
         technical_warnings.append(
             "Executor nao foi executado; somente manifesto e plano foram gerados."
         )
+    elif execution_report.status in {"failed", "replan-required"}:
+        technical_warnings.append(_unsatisfied_execution_message(manifest))
 
     if comparison is not None:
         technical_warnings.append(
@@ -2434,6 +2674,8 @@ def build_pddl_structured_payload(
         "source_path": str(file_path),
         "canonical_metadata": {
             "pipeline_engine": "pddl",
+            "pddl_validation_only": True,
+            "accessibility_verified": False,
             "pddl_manifest_id": manifest.manifest_id,
             "pddl_manifest_revision": manifest.revision,
             "pddl_plan_id": plan.plan_id,

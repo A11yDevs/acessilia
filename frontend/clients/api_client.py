@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+from collections import OrderedDict
 from pathlib import Path
 from typing import Any
 
@@ -26,9 +28,12 @@ class ApiClient:
         base_url: str,
         timeout: float = 60.0,
         api_key: str | None = None,
+        observability_token: str | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
+        self._observability_token = observability_token
+        self._job_tokens: OrderedDict[str, str] = OrderedDict()
         self._headers: dict[str, str] = {}
         if api_key:
             self._headers["X-API-Key"] = api_key
@@ -40,10 +45,25 @@ class ApiClient:
     def _raise_for_status(response: httpx.Response) -> None:
         if response.status_code >= 400:
             try:
-                detail = response.json().get("detail", response.text)
+                payload = response.json()
+                detail = (
+                    payload.get("detail", response.text)
+                    if isinstance(payload, dict)
+                    else response.text
+                )
             except ValueError:
                 detail = response.text
             raise ApiError(response.status_code, str(detail))
+
+    @staticmethod
+    def _json_object(response: httpx.Response) -> dict[str, Any]:
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            raise ApiError(502, "Invalid JSON response from API") from exc
+        if not isinstance(payload, dict):
+            raise ApiError(502, "Expected a JSON object from API")
+        return payload
 
     async def submit_job(
         self,
@@ -64,13 +84,7 @@ class ApiClient:
             data["custom_prompt"] = custom_prompt
         if email:
             data["email"] = email
-        files = {
-            "document_file": (
-                filename,
-                file_path.open("rb"),
-                "application/octet-stream",
-            )
-        }
+        files = {}
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             with file_path.open("rb") as file_handle:
                 files["document_file"] = (filename, file_handle, "application/octet-stream")
@@ -81,23 +95,44 @@ class ApiClient:
                     headers=self._headers,
                 )
         self._raise_for_status(response)
-        return response.json()
+        result = self._json_object(response)
+        task_id = result.get("task_id")
+        token = result.get("job_token")
+        if (
+            not isinstance(task_id, str)
+            or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", task_id)
+            or (token is not None and not isinstance(token, str))
+        ):
+            raise ApiError(502, "Invalid job receipt from API")
+        if result.get("job_token"):
+            self._job_tokens[result["task_id"]] = result["job_token"]
+            self._job_tokens.move_to_end(result["task_id"])
+            while len(self._job_tokens) > 256:
+                self._job_tokens.popitem(last=False)
+        return result
 
-    async def get_job_status(self, task_id: str) -> dict[str, Any]:
+    async def get_job_status(self, task_id: str, job_token: str | None = None) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.get(
-                self._url(f"/jobs/{task_id}"), headers=self._headers
+                self._url(f"/jobs/{task_id}"), headers=self._job_headers(task_id, job_token)
             )
         self._raise_for_status(response)
-        return response.json()
+        return self._json_object(response)
 
-    async def cancel_job(self, task_id: str) -> dict[str, Any]:
+    async def cancel_job(self, task_id: str, job_token: str | None = None) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.post(
-                self._url(f"/jobs/{task_id}/cancel"), headers=self._headers
+                self._url(f"/jobs/{task_id}/cancel"), headers=self._job_headers(task_id, job_token)
             )
         self._raise_for_status(response)
-        return response.json()
+        return self._json_object(response)
+
+    def _job_headers(self, task_id: str, token: str | None = None) -> dict[str, str]:
+        headers = dict(self._headers)
+        access_token = token or self._job_tokens.get(task_id)
+        if access_token:
+            headers["X-Job-Token"] = access_token
+        return headers
 
     async def get_download_info(self, token: str) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=self.timeout) as client:
@@ -105,7 +140,7 @@ class ApiClient:
                 self._url(f"/download/{token}"), headers=self._headers
             )
         self._raise_for_status(response)
-        return response.json()
+        return self._json_object(response)
 
     async def download_file(
         self, token: str, format: str, destination: Path
@@ -132,21 +167,27 @@ class ApiClient:
                 self._url("/health"), headers=self._headers
             )
         self._raise_for_status(response)
-        return response.json()
+        return self._json_object(response)
 
     async def history(self, limit: int = 20) -> list[dict[str, Any]]:
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.get(
-                self._url(f"/history?limit={limit}"), headers=self._headers
+                self._url(f"/history?limit={limit}"), headers=self._admin_headers()
             )
         self._raise_for_status(response)
         return response.json()
 
     async def stats(self) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.get(self._url("/stats"), headers=self._headers)
+            response = await client.get(self._url("/stats"), headers=self._admin_headers())
         self._raise_for_status(response)
-        return response.json()
+        return self._json_object(response)
+
+    def _admin_headers(self) -> dict[str, str]:
+        headers = dict(self._headers)
+        if self._observability_token:
+            headers["Authorization"] = f"Bearer {self._observability_token}"
+        return headers
 
 
 def get_default_client() -> ApiClient:

@@ -6,7 +6,6 @@ from typing import Any
 
 import fitz
 
-from backend.config.settings import settings
 from backend.tools.region_extractor import Region, extract_regions
 from backend.tools.structurer import BaseStructurer
 from backend.tools.toolbox_client import ToolboxClient

@@ -232,6 +232,7 @@ def build_processing_manifest(
         sha256=digest,
     )
     extractor = ExtractorRun(
+        name=extractor_name or "docling",
         version=extraction.version,
         started_at=extraction.started_at,
         completed_at=extraction.completed_at,
@@ -272,7 +273,7 @@ def _build_from_toolbox_json(
     The Toolbox already returns a complete ProcessingManifest-compatible JSON
     payload inside ``extraction.document["document"]``, so we parse it directly.
     """
-    data: dict[str, Any] = extraction.document["document"]
+    data: dict[str, Any] = dict(extraction.document["document"])
 
     data["manifest_id"] = data.get("manifest_id") or f"manifest-{digest[:16]}-r1"
 
@@ -289,6 +290,9 @@ def _build_from_toolbox_json(
 
     # Override extractor metadata with this run
     data["extractor"] = {
+        "name": data.get("extractor", {}).get(
+            "name", extraction.configuration.get("toolbox_provider") or "toolbox"
+        ),
         "version": extraction.version,
         "started_at": extraction.started_at.isoformat(),
         "completed_at": extraction.completed_at.isoformat(),
@@ -931,13 +935,15 @@ def _derive_processing_needs(
         )
 
     heading_levels = [
-        (element.id, element.hierarchy_level)
-        for element in elements
-        if element.type == "heading"
+        (element.id, 1 if element.type == "title" else element.hierarchy_level)
+        for element in sorted(elements, key=lambda item: item.reading_order)
+        if element.type in {"title", "heading"}
     ]
     previous = 0
     for element_id, level in heading_levels:
-        if previous and level > previous + 1:
+        invalid_first = not previous and level != 1
+        invalid_successor = previous and (level < 2 or level > min(previous + 1, 6))
+        if invalid_first or invalid_successor:
             suffix = element_id.removeprefix("element-")
             message = t(MSG_HEADING_GAP).format(previous=previous, level=level)
             observations.append(

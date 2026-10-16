@@ -42,6 +42,10 @@ def _isolate_paths(api_paths, monkeypatch):
     dts._connection = None
     hs._connection = None
     limiter.enabled = False
+    # These tests exercise processing/export behavior; authorization is covered
+    # without overrides in test_v2_security.py.
+    from backend.api.job_auth import require_job_access
+    monkeypatch.setitem(app.dependency_overrides, require_job_access, lambda: None)
 
 
 @pytest.fixture(scope="session")
@@ -231,8 +235,9 @@ def test_logs_return_empty_list_when_no_files_exist(client, monkeypatch):
     assert response.json() == {"files": []}
 
 
-def test_stats_empty(client):
-    resp = client.get("/api/v1/stats")
+def test_stats_empty(client, monkeypatch):
+    monkeypatch.setattr(settings, "observability_api_token", "audit-admin")
+    resp = client.get("/api/v1/stats", headers={"Authorization": "Bearer audit-admin"})
     assert resp.status_code == 200
     assert resp.json() == {
         "total": 0,
@@ -242,8 +247,9 @@ def test_stats_empty(client):
     }
 
 
-def test_history_empty(client):
-    resp = client.get("/api/v1/history")
+def test_history_empty(client, monkeypatch):
+    monkeypatch.setattr(settings, "observability_api_token", "audit-admin")
+    resp = client.get("/api/v1/history", headers={"Authorization": "Bearer audit-admin"})
     assert resp.status_code == 200
     assert resp.json() == []
 
@@ -301,7 +307,8 @@ def test_upload_ok_and_status_queued(client, monkeypatch):
     body = resp.json()
     assert body["position"] == 1
     task_id = body["task_id"]
-    assert len(task_id) == 8
+    assert len(task_id) == 32
+    assert body["job_token"]
 
     status = client.get(f"/api/v1/jobs/{task_id}")
     assert status.status_code == 200
@@ -344,7 +351,10 @@ def test_queued_position_is_recalculated(client, monkeypatch):
 
     status = client.get("/api/v1/jobs/queuedsecond")
     assert status.status_code == 200
-    assert status.json()["etapa_atual"] == "Aguardando na fila (Posicao: 1)"
+    from backend.i18n import t
+    from backend.stage_messages import STAGE_QUEUE_WAITING_POSITION
+
+    assert status.json()["etapa_atual"] == t(STAGE_QUEUE_WAITING_POSITION).format(position=1)
 
 
 def test_status_unknown(client):
@@ -848,13 +858,14 @@ async def test_job_executor_reports_optional_export_failure(
     if failed_format == "PDF/UA":
         assert not (output_dir / "audio.pdf_ua.pdf").exists()
 
-    expected_formats = {"txt", "docx", "pdf", "html", "zip", "drbench_md"}
+    expected_formats = {"txt", "docx", "pdf", "html", "zip"}
     if failed_format != "MP3":
         expected_formats.add("mp3")
     if failed_format != "PDF/UA":
         expected_formats.add("pdf_ua")
     assert set(registered_formats) == expected_formats
 
+    assert (output_dir / "audio.drbench.md").is_file()
     with zipfile.ZipFile(output_dir / "audio_acessivel.zip") as archive:
         expected_files = {"audio.txt", "audio.docx", "audio.pdf", "audio.html"}
         if failed_format != "MP3":

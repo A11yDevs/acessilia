@@ -11,6 +11,7 @@ import re
 from typing import Any
 
 from docstruct.profiles import OUTPUT_PROFILES
+from docstruct.sections import explicit_section_title
 from docstruct.tables.ast import effective_section_row_widths, row_header_column_count
 from docstruct.text.sanitize import contains_markdown_artifacts, contains_prompt_leak
 
@@ -109,9 +110,22 @@ def validate_canonical_document(document: dict[str, Any]) -> list[str]:
                 errors.extend(_validate_table_block(block))
             internal_links.extend(_extract_internal_links(block))
 
-    for section in document.get("sections", []):
-        walk_blocks(section.get("blocks", []))
-        _walk_sections(section.get("children", []), walk_blocks)
+    def walk_sections(sections: list[dict[str, Any]]) -> None:
+        for section in sections:
+            blocks = section.get("blocks", [])
+            if section.get("title"):
+                section_id = section.get("id")
+                explicit_title = explicit_section_title(section)
+                if section_id and (explicit_title is None or explicit_title.get("id") != section_id):
+                    if section_id in ids:
+                        errors.append(Finding(MSG_DUPLICATE_ID, block_id=section_id))
+                    ids.add(section_id)
+                if explicit_title is None:
+                    headings.append(int(section.get("level", 1)))
+            walk_blocks(blocks)
+            walk_sections(section.get("children", []))
+
+    walk_sections(document.get("sections", []))
 
     if headings.count(1) > 1:
         errors.append(Finding(MSG_MULTIPLE_H1))
@@ -211,9 +225,9 @@ def audit_canonical_document(document: dict[str, Any]) -> dict[str, list[str]]:
     # Check whether images carry alt text (when the schema supports it).
     def check_accessibility(blocks: list[dict[str, Any]]) -> None:
         for block in blocks:
-            if block.get("type") == "image" and not block.get("metadata", {}).get(
-                "alt"
-            ):
+            if block.get("type") == "image" and not str(
+                block.get("alt_text", block.get("text", "")) or ""
+            ).strip():
                 report["WARNING"].append(
                     Finding(MSG_IMAGE_MISSING_ALT, block_id=block.get("id"))
                 )

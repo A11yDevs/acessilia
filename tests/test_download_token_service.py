@@ -98,3 +98,62 @@ def test_download_token_stores_task_id_and_owner(tmp_path):
     assert info is not None
     assert info["task_id"] == "task-12345"
     assert info["owner"] == "user@example.com"
+
+
+@pytest.mark.parametrize("reference", ["same", "alias", "child", "parent"])
+def test_expired_token_cleanup_preserves_active_directory(tmp_path, reference):
+    output = tmp_path / "output" / "job"
+    active_dir = output / "child" if reference == "child" else output
+    expired_dir = output / "child" if reference == "parent" else output
+    active_dir.mkdir(parents=True)
+    expired_dir.mkdir(parents=True, exist_ok=True)
+    (active_dir / "doc.txt").write_text("valid result", encoding="utf-8")
+    if reference == "alias":
+        active_dir = active_dir / ".." / "job"
+    expired = asyncio.run(token_service.criar_token(expired_dir, "doc"))
+    valid = asyncio.run(token_service.criar_token(active_dir, "doc"))
+    connection = token_service._get_connection()
+    connection.execute(
+        "UPDATE download_tokens SET criado_em = datetime('now', '-8 days') WHERE token = ?",
+        (expired,),
+    )
+    connection.commit()
+
+    asyncio.run(token_service.limpar_tokens_expirados())
+
+    assert asyncio.run(token_service.obter_info_token(valid)) is not None
+    assert (active_dir / "doc.txt").read_text(encoding="utf-8") == "valid result"
+    assert connection.execute(
+        "SELECT 1 FROM download_tokens WHERE token = ?", (expired,)
+    ).fetchone() is None
+
+
+@pytest.mark.parametrize("location", ["owned", "prefix-sibling", "root", "symlink"])
+def test_cleanup_only_removes_expired_owned_subdirectories(tmp_path, location):
+    root = tmp_path / "output"
+    root.mkdir()
+    external = tmp_path / "external"
+    external.mkdir()
+    if location == "owned":
+        output = root / "job"
+        output.mkdir()
+    elif location == "prefix-sibling":
+        output = tmp_path / "output-unrelated"
+        output.mkdir()
+    elif location == "symlink":
+        output = root / "linked"
+        output.symlink_to(external, target_is_directory=True)
+    else:
+        output = root
+    (output / "doc.txt").write_text("result", encoding="utf-8")
+    expired = asyncio.run(token_service.criar_token(output, "doc"))
+    connection = token_service._get_connection()
+    connection.execute(
+        "UPDATE download_tokens SET criado_em = datetime('now', '-8 days') WHERE token = ?",
+        (expired,),
+    )
+    connection.commit()
+
+    asyncio.run(token_service.limpar_tokens_expirados())
+
+    assert output.exists() == (location != "owned")

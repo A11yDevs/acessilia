@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 import asyncio
 from pathlib import Path
 
@@ -12,7 +14,7 @@ def test_document_cache_key_changes_with_each_processing_option(monkeypatch):
 
     base = service._cache_version("normal", None, False)
 
-    assert "-v3_" in base
+    assert "-v9_" in base
     assert service._cache_version("detailed", None, False) != base
     assert service._cache_version("normal", "Describe charts", False) != base
     assert service._cache_version("normal", None, True) != base
@@ -163,3 +165,12 @@ def test_cache_key_sha256_full_hash_and_file_size(tmp_path):
 
 async def _async_noop(*_args, **_kwargs):
     return None
+
+
+@pytest.mark.parametrize("name", ["max_page_width", "pymupdf_text_threshold"])
+def test_image_settings_invalidate_processing_cache(monkeypatch, name):
+    from backend.config.settings import settings
+    from backend.services.cache import processing_cache_configuration, options_cache_key
+    before = options_cache_key("document", configuration=processing_cache_configuration())
+    monkeypatch.setattr(settings, name, getattr(settings, name) + 1)
+    assert options_cache_key("document", configuration=processing_cache_configuration()) != before

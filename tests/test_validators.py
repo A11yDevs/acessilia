@@ -53,8 +53,6 @@ def test_validate_file_invalid_ext(monkeypatch):
 
 
 def test_validate_file_rejects_docx_and_html_in_legacy(monkeypatch):
-    from backend.config.settings import settings
-
     monkeypatch.setattr(settings, "pipeline_engine", "legacy")
 
     for filename in ("documento.docx", "pagina.html"):
@@ -64,8 +62,6 @@ def test_validate_file_rejects_docx_and_html_in_legacy(monkeypatch):
 
 
 def test_validate_file_allows_docx_and_html_outside_legacy(monkeypatch):
-    from backend.config.settings import settings
-
     monkeypatch.setattr(settings, "pipeline_engine", "pddl")
 
     for filename in ("documento.docx", "pagina.html"):

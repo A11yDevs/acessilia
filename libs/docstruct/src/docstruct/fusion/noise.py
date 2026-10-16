@@ -18,7 +18,6 @@ from docstruct.fusion.similarity import (
     contain_frac,
     iou,
     sim,
-    swallows,
     union_box,
 )
 from docstruct.fusion.types import DiffBlock

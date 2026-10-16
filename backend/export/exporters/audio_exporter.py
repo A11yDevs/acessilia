@@ -31,6 +31,7 @@ async def export_mp3(
     Returns:
         Path: The output file path once the complete MP3 is assembled.
     """
+    chunks = []
     try:
         logger.debug(
             t(LOG_AUDIO_EXPORT_START).format(
@@ -76,8 +77,17 @@ async def export_mp3(
                     await progress_callback(percent)
                 return chunk_p
 
-        tasks = [process_chunk(i, chunk) for i, chunk in enumerate(chunks) if chunk]
-        temp_files = await asyncio.gather(*tasks)
+        tasks = [
+            asyncio.create_task(process_chunk(i, chunk))
+            for i, chunk in enumerate(chunks) if chunk
+        ]
+        try:
+            temp_files = await asyncio.gather(*tasks)
+        finally:
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
 
         with open(output_path, "wb") as final_file:
             for temp_path in temp_files:
@@ -87,9 +97,9 @@ async def export_mp3(
 
         logger.info(t(LOG_AUDIO_EXPORTED).format(path=output_path))
         return output_path
-    except Exception as e:
+    except (Exception, asyncio.CancelledError) as e:
         logger.error(t(LOG_AUDIO_EXPORT_ERROR).format(error=e))
-        for p in output_path.parent.glob(f"{output_path.stem}.part*.mp3"):
+        for p in (output_path.with_suffix(f".part{i}.mp3") for i in range(len(chunks))):
             try:
                 p.unlink()
             except Exception:

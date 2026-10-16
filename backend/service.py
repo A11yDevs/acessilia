@@ -4,20 +4,23 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Coroutine
 
-from backend.agents.orchestrator import AccessibilityOrchestrator
+from backend.agents.orchestrator import AccessibilityOrchestrator as AccessibilityOrchestrator
 from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
 from backend.agents.state_manager import TaskCancelledError, state_manager
-from backend.services.cache import get_cached, options_cache_key, set_cache
+from backend.services.cache import (
+    get_cached,
+    options_cache_key,
+    processing_cache_configuration,
+    set_cache,
+)
 from backend.services.history_service import (
     finalizar_conversao,
-    limpar_orfas,
     registrar_conversao,
 )
 from backend.config.settings import settings
 from backend.i18n import t
 from backend.log_messages import (
     LOG_CANONICAL_JSON_SAVE_FAILED,
-    LOG_CACHE_HIT,
     LOG_ORCHESTRATOR_EMPTY_AGENT_RESPONSE,
     LOG_PIPELINE_ERROR,
     LOG_TASK_CANCELLED_BY_USER,
@@ -55,7 +58,7 @@ def _resolved_structurer() -> str:
 
 def _build_orchestrator():
     if _normalized_engine() == "pddl":
-        structurer = _resolved_structurer()
+        _resolved_structurer()
         fast_downward = (
             Path(settings.pddl_fast_downward).expanduser()
             if settings.pddl_fast_downward.strip()
@@ -87,18 +90,12 @@ def _cache_version(
     engine = _normalized_engine()
     structurer = _resolved_structurer()
     return options_cache_key(
-        f"{settings.ai_client}-{engine}-{structurer}-v3",
+        f"{settings.ai_client}-{engine}-{structurer}-v9",
         mode=mode,
         custom_prompt=custom_prompt or "",
         thinking_mode=thinking_mode,
+        configuration=processing_cache_configuration(),
     )
-
-
-def _limpar_tarefas_orfas():
-    limpar_orfas()
-
-
-_limpar_tarefas_orfas()
 
 
 def _salvar_json_canonico(canonical_document: dict, source_name: str) -> None:
@@ -176,6 +173,13 @@ async def process(
     try:
         cache_variant = _cache_version(mode, custom_prompt, thinking_mode)
         cached = await get_cached(file_path, cache_variant)
+        if isinstance(cached, dict):
+            metadata = cached.get("canonical_metadata")
+            execution_status = metadata.get("pddl_execution_status") if isinstance(metadata, dict) else None
+            if execution_status in {"failed", "replan-required"} or (
+                not settings.pddl_execute_dry_run and execution_status == "dry-run-completed"
+            ):
+                cached = None
         if cached is not None:
             logger.info("Cache hit para {}", file_path.name)
             cached = _payload_for_source(cached, file_path)

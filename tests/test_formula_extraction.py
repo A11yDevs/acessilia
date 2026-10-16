@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from backend.agents.reader_agent import ReaderAgent
+from backend.agents.types import RegionTask
 from backend.tools.region_classifier import (
     classify_region,
     formula_already_extracted,
@@ -90,8 +91,6 @@ def test_duplicate_enriched_formulas_are_deduplicated(reader):
 
 
 def _image_task() -> "RegionTask":
-    from backend.agents.types import RegionTask
-
     region = Region(
         bbox=(10.0, 10.0, 200.0, 60.0),
         type="image",

@@ -15,9 +15,8 @@ from backend.config.settings import settings
 from backend.agents.output_schemas import (
     DATA_SCHEMA_INSTRUCTION,
     DataOutput,
-    validate_structured_content,
+    validate_structured_run,
 )
-from backend.agents.run_helpers import run_content
 from agno.agent import Agent
 from agno.media import Image
 
@@ -82,15 +81,13 @@ class DataAgent:
             )
 
             def _run_data():
-                return run_content(
-                    agent.run(
-                        input=prompt,
-                        images=[Image(content=image_bytes)],
-                    )
+                return agent.run(
+                    input=prompt,
+                    images=[Image(content=image_bytes)],
                 )
 
-            content = await asyncio.to_thread(_run_data)
-            result = validate_structured_content(content, DataOutput)
+            response = await asyncio.to_thread(_run_data)
+            result = validate_structured_run(response, DataOutput)
             if result.kind != classification:
                 raise ValueError(
                     f"DataAgent returned kind={result.kind!r} for classification={classification!r}"

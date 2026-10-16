@@ -361,7 +361,7 @@ class TestPandocTableValidates:
 
     def test_succeeds_with_a_table_ast(self) -> None:
         manifest = _manifest(
-            [_element("el-1", "table", metadata={"table_ast": {"rows": []}})],
+            [_element("el-1", "table", metadata={"table_ast": {"body": [{"cells": [{"text": "Value"}]}]}})],
             [_obligation("linearize-table", ["el-1"], ["pandoc-table"])],
         )
 
@@ -466,7 +466,7 @@ class TestRealExecutionReachesAMethod:
     @pytest.mark.parametrize(
         ("kind", "element_type", "method", "metadata"),
         [
-            ("linearize-table", "table", "pandoc-table", {"table_ast": {"rows": []}}),
+            ("linearize-table", "table", "pandoc-table", {"table_ast": {"body": [{"cells": [{"text": "Value"}]}]}}),
             ("describe-image", "picture", "vision-description", {"text": "Uma foto."}),
             ("preserve-code-semantics", "code", "pandoc-code", {}),
         ],

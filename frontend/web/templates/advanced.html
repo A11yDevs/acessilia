@@ -75,6 +75,7 @@
                 </div>
                 {% endif %}
 
+                <p role="status">{{ advanced_options_unavailable }}</p>
                 <form action="/advanced/process" method="post" enctype="multipart/form-data">
                     <div class="mb-3">
                         <label for="email" class="form-label">{{ index_email_label }}</label>
@@ -91,7 +92,7 @@
 
                     <div class="mb-3">
                         <label for="custom_prompt" class="form-label">{{ advanced_prompt_label }}</label>
-                        <textarea class="form-control" id="custom_prompt" name="custom_prompt"
+                        <textarea class="form-control" id="custom_prompt" name="custom_prompt" disabled
                                   rows="6" maxlength="6000"
                                   placeholder="{{ advanced_prompt_placeholder }}"
                                   aria-describedby="promptHelp"></textarea>
@@ -101,7 +102,7 @@
                     </div>
 
                     <div class="form-check mb-3">
-                        <input class="form-check-input" type="checkbox" id="thinking_mode" name="thinking_mode" value="true">
+                        <input class="form-check-input" type="checkbox" id="thinking_mode" name="thinking_mode" disabled value="true">
                         <label class="form-check-label" for="thinking_mode">
                             {{ advanced_thinking_label }}
                         </label>

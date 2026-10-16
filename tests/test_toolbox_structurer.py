@@ -6,7 +6,7 @@ com o pipeline legacy e que o fallback PyMuPDF funciona em falha.
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 import fitz
 import pytest

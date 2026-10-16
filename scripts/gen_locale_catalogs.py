@@ -113,7 +113,6 @@ from backend.log_messages import (
     LOG_EXPORT_PDF_START,
     LOG_EXPORT_PDF_UA_START,
     LOG_EXPORT_TXT_START,
-    LOG_PAGE_CONVERTED_TO_PNG,
     LOG_FATAL_ERROR_IN_BOT,
     LOG_IMAGE_PREPROCESS_FAILED,
     LOG_IMAGE_RESIZED,
@@ -270,6 +269,12 @@ from backend.pipeline.table_ast import (
     MSG_TABLE_TEXT_ROW,
 )
 from backend.stage_messages import (
+    STAGE_CANCELLATION_REQUESTED,
+    STAGE_RESTART_CANCELLED,
+    STAGE_RESTART_INTERRUPTED,
+    STAGE_RESTART_RESUBMIT,
+    STAGE_PENDING_UPLOAD_MISSING,
+
     STAGE_ANALYZING_FILE,
     STAGE_ANALYZING_STRUCTURAL,
     STAGE_CANCELLED_BY_USER,
@@ -299,6 +304,17 @@ from backend.stage_messages import (
 )
 from backend.tools.validators import MSG_FILE_TOO_LARGE, MSG_UNSUPPORTED_FORMAT
 from frontend.web.messages import (
+    WEB_JOB_TITLE,
+    WEB_JOB_PENDING,
+    WEB_JOB_DOWNLOAD,
+    WEB_JOB_EMAIL_FAILED,
+    WEB_JOB_EMAIL_SENT,
+    WEB_JOB_UNAVAILABLE,
+    WEB_JOB_STATUS,
+    WEB_JOB_ERRORS,
+    WEB_JOB_HOME,
+    WEB_JOB_EMAIL_UNKNOWN,
+    WEB_ERROR_INVALID_RECEIPT,
     WEB_AGENT_DATA_DESCRIPTION,
     WEB_AGENT_DATA_INSTRUCTIONS_FALLBACK,
     WEB_AGENT_OS_DESCRIPTION,
@@ -433,6 +449,23 @@ CATALOG_CREATION_DATE: datetime = datetime(
 #: Canonical English msgids surfaced to end users at runtime; every id must carry a non-blank pt_BR translation in
 #: TRANSLATIONS before catalogs are allowed to be written out, per the module's completeness-validation contract.
 MESSAGES: tuple[str, ...] = (
+    WEB_JOB_TITLE,
+    WEB_JOB_PENDING,
+    WEB_JOB_DOWNLOAD,
+    WEB_JOB_EMAIL_FAILED,
+    WEB_JOB_EMAIL_SENT,
+    WEB_JOB_UNAVAILABLE,
+    WEB_JOB_STATUS,
+    WEB_JOB_ERRORS,
+    WEB_JOB_HOME,
+    WEB_JOB_EMAIL_UNKNOWN,
+    STAGE_CANCELLATION_REQUESTED,
+    STAGE_RESTART_CANCELLED,
+    STAGE_RESTART_INTERRUPTED,
+    STAGE_RESTART_RESUBMIT,
+    STAGE_PENDING_UPLOAD_MISSING,
+    WEB_ERROR_INVALID_RECEIPT,
+    "Custom instructions and thinking mode are unavailable for this pipeline",
     "Processing your document…",
     "Job complete: your file is ready for download",
     MSG_UNSUPPORTED_FORMAT,
@@ -839,6 +872,23 @@ MESSAGES: tuple[str, ...] = (
 #: msgid -> localized text mappings per non-default locale; every id in MESSAGES must appear for each such locale.
 TRANSLATIONS: dict[str, dict[str, str]] = {
     "pt_BR": {
+        WEB_JOB_TITLE: 'Seu documento',
+        WEB_JOB_PENDING: 'Mantenha esta página aberta ou salve-a nos favoritos para acompanhar seu documento.',
+        WEB_JOB_DOWNLOAD: 'Baixar seus arquivos',
+        WEB_JOB_EMAIL_FAILED: 'Não foi possível enviar o e-mail. Você pode baixar seus arquivos aqui.',
+        WEB_JOB_EMAIL_SENT: 'O e-mail com o resultado foi enviado. Você também pode baixar seus arquivos aqui.',
+        WEB_JOB_UNAVAILABLE: 'O status está temporariamente indisponível. Atualize esta página para tentar novamente.',
+        WEB_JOB_STATUS: 'Status',
+        WEB_JOB_ERRORS: 'Avisos do processamento',
+        WEB_JOB_HOME: 'Enviar outro documento',
+        WEB_JOB_EMAIL_UNKNOWN: 'Não foi possível confirmar a entrega do e-mail. Você pode baixar seus arquivos aqui.',
+        STAGE_CANCELLATION_REQUESTED: 'Cancelamento solicitado; concluindo a operação atual com segurança',
+        STAGE_RESTART_CANCELLED: 'Cancelado durante a reinicialização',
+        STAGE_RESTART_INTERRUPTED: 'Processamento interrompido pela reinicialização',
+        STAGE_RESTART_RESUBMIT: 'Processamento interrompido pela reinicialização; envie novamente',
+        STAGE_PENDING_UPLOAD_MISSING: 'O arquivo pendente não existe mais',
+        WEB_ERROR_INVALID_RECEIPT: 'Recibo de processamento inválido retornado pela API',
+        "Custom instructions and thinking mode are unavailable for this pipeline": "Instruções personalizadas e modo de raciocínio estão indisponíveis neste pipeline",
         "Processing your document…": "Processando seu documento…",
         "Job complete: your file is ready for download": "Tarefa concluída: o arquivo está pronto para download",
         MSG_UNSUPPORTED_FORMAT: ("Formato de arquivo não suportado. Envie PDF, DOCX, HTML, PNG, JPG, " +

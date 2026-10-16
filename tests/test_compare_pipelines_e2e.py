@@ -11,21 +11,20 @@ Requires:
 Marked with @pytest.mark.e2e so they can be skipped in CI:
     pytest tests/ -m e2e
 """
+
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
 
 from scripts.compare_pipelines import (
-    _compare_documents,
-    _compute_verdict,
     _extract_formulas,
     _extract_tables,
     _extract_text,
     _flatten_blocks,
-    _jaccard_similarity,
     _summarize_document,
     run_comparison,
 )
@@ -35,7 +34,13 @@ from scripts.compare_pipelines import (
 # Fixtures
 # ---------------------------------------------------------------------------
 
-DATASET_DIR = Path(__file__).resolve().parents[1] / "tests" / "dataset"
+# Allow a shared versioned dataset without copying tests outside this checkout.
+DATASET_DIR = Path(
+    os.getenv(
+        "ACESSILIA_TEST_DATASET_DIR",
+        str(Path(__file__).resolve().parents[1] / "tests" / "dataset"),
+    )
+)
 
 REFERENCE_FIXTURES: list[tuple[str, str, Path, Path]] = [
     (

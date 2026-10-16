@@ -8,6 +8,7 @@ from backend.core.execution.executor import ExecutorAgent, MethodRegistry
 from backend.core.execution.models import MethodResult
 from backend.core.planning.planner_agent import PlannerAgent
 from tests.test_pddl_planning import make_manifest
+from backend.agents.pddl_orchestrator import _handle_human_review_method
 
 
 @pytest.mark.skipif(find_spec("agno") is None, reason="Agno não instalado")
@@ -42,6 +43,7 @@ def test_failed_method_is_recorded_and_replanning_uses_alternative():
         selected_roots=["o-describe"],
     )
     registry = MethodRegistry()
+    registry.register("human-review", _handle_human_review_method)
     registry.register(
         "docling",
         lambda _manifest, _obligation: MethodResult(
@@ -87,6 +89,7 @@ def test_handler_exception_is_recorded_as_failed_attempt_and_replan_is_requested
         selected_roots=["o-describe"],
     )
     registry = MethodRegistry()
+    registry.register("human-review", _handle_human_review_method)
     registry.register(
         "docling",
         lambda _manifest, _obligation: MethodResult(

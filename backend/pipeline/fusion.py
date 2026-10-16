@@ -8,6 +8,7 @@ This layer is the only one that knows both the toolbox and the lib; the
 lib stays pure. With FUSION_MODE=single (default) this module is not
 engaged.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -20,6 +21,7 @@ from backend.tools.toolbox_client import (
     ToolboxClient,
     ToolboxError,
     ToolboxProviderUnavailable,
+    ToolboxTimeout,
 )
 from docstruct.fusion import block_to_diff, merge_blocks
 from docstruct.fusion.types import DiffBlock
@@ -97,6 +99,9 @@ async def extract_fused(
     providers read it from there instead of receiving a new upload each; if the
     Toolbox no longer has it, the file is sent as before.
 
+    Retry a transient timeout/unavailability once, after both initial calls
+    finish. Successful extractions and invalid requests are not repeated.
+
     Fallback: if one provider reports a Toolbox error, uses the other result
     and logs which provider failed. Unexpected errors are propagated.
     """
@@ -105,6 +110,8 @@ async def extract_fused(
     policy = policy or FusionPolicy()
     primary = primary_provider or settings.toolbox_provider
     secondary = secondary_provider or settings.fusion_secondary_provider
+
+    failures: dict[str, Exception] = {}
 
     async def _extract(provider: str) -> dict | None:
         client = ToolboxClient(provider=provider)
@@ -122,6 +129,7 @@ async def extract_fused(
                     )
             return await client.extract_structure(file_path, language=language)
         except ToolboxError as exc:
+            failures[provider] = exc
             logger.info("Fusion: provider {} failed ({})", provider, type(exc).__name__)
             return None
         finally:
@@ -129,6 +137,25 @@ async def extract_fused(
 
     primary_res, secondary_res = await asyncio.gather(
         _extract(primary), _extract(secondary)
+    )
+
+    async def _retry_transient(provider: str, result: dict | None) -> dict | None:
+        error = failures.get(provider)
+        if result is None and isinstance(
+            error, (ToolboxTimeout, ToolboxProviderUnavailable)
+        ):
+            logger.info(
+                "Fusion: retrying provider {} once after transient {}",
+                provider,
+                type(error).__name__,
+            )
+            await asyncio.sleep(0.25)
+            return await _extract(provider)
+        return result
+
+    primary_res, secondary_res = await asyncio.gather(
+        _retry_transient(primary, primary_res),
+        _retry_transient(secondary, secondary_res),
     )
     if primary_res is None and secondary_res is None:
         raise ToolboxProviderUnavailable("No provider available for extraction")
@@ -169,7 +196,8 @@ def fuse_extraction_payloads(
         m_blocks = [_canonical_to_diff(b) for b in pages_m.get(page_key, [])]
         page_stats: Counter = Counter()
         m_pics = [
-            b["bbox"] for b in pages_m.get(page_key, [])
+            b["bbox"]
+            for b in pages_m.get(page_key, [])
             if b["type"] == "picture" and "bbox" in b
         ]
         out, page_stats = merge_blocks(
@@ -227,8 +255,9 @@ def fuse_extraction_payloads(
                 {
                     "type": "paragraph",
                     "text": md,
-                    "reading_order": i,
+                    "reading_order": i + 1,
                     "page": page_key,
+                    "page_number": page_key + 1,
                 }
                 for i, (page_key, md) in enumerate(merged_page_blocks)
             ]

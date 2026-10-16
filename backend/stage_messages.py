@@ -59,5 +59,15 @@ STAGE_ENRICHING_TABLES_OCR: str = "Enriching the tables with OCR (fallback)..."
 STAGE_GENERATING_PDDL_PLAN: str = "Generating the nominal PDDL plan..."
 #: PDDL-pipeline stage while the generated plan is validated in dry-run mode before execution.
 STAGE_VALIDATING_PLAN_DRY_RUN: str = "Validating the plan in dry-run mode..."
+
+STAGE_CANCELLATION_REQUESTED: str = "Cancellation requested; finishing the current operation safely"
+
+STAGE_RESTART_CANCELLED = 'Cancelled during restart'
+
+STAGE_RESTART_INTERRUPTED = 'Processing interrupted by restart'
+
+STAGE_RESTART_RESUBMIT = 'Processing interrupted by restart; submit again'
+
+STAGE_PENDING_UPLOAD_MISSING = 'Pending upload no longer exists'
 #: PDDL-pipeline stage while the generated plan is executed for real (PDDL_EXECUTE_DRY_RUN=false).
 STAGE_EXECUTING_PLAN: str = "Executing the plan..."

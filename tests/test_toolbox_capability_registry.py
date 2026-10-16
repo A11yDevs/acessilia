@@ -9,6 +9,7 @@ by ``libs/sdk/tests``.
 from __future__ import annotations
 
 import ast
+import dataclasses
 import os
 import re
 from pathlib import Path
@@ -109,7 +110,9 @@ def test_provider_settings_default_to_the_registry() -> None:
         assert setting in fields, f"Settings has no attribute {setting}"
         if setting.upper() in os.environ:
             continue  # overridden by the environment running the tests
-        assert fields[setting].default == default, setting
+        field = fields[setting]
+        value = field.default_factory() if field.default is dataclasses.MISSING else field.default
+        assert value == default, setting
 
 
 def test_every_provider_setting_is_used_by_a_capability() -> None:

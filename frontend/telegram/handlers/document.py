@@ -1,6 +1,7 @@
 import asyncio
 import tempfile
 import time
+import uuid
 from pathlib import Path
 
 from aiogram import Router, F
@@ -26,10 +27,8 @@ from backend.tools.validators import validate_file
 from frontend.telegram.adapters.status_tracker import StatusTracker
 from backend.config.settings import settings
 from frontend.telegram.messages import (
-    MSG_ACCESSIBLE_PACKAGE_READY,
     MSG_CONTACT_SERVER_FAILED,
     MSG_DOWNLOADING_FILE,
-    MSG_DOWNLOAD_LINK_EMAILED,
     MSG_FILE_RECEIVED,
     MSG_PHOTO_RECEIVED,
     MSG_PROCESS_FAILED_BASE,
@@ -100,7 +99,7 @@ async def handle_document(message: Message) -> None:
     if document is None:
         return
 
-    filename = document.file_name or "document"
+    filename = Path((document.file_name or "document").replace("\\", "/")).name
     file_size = document.file_size or 0
 
     valid, error_msg = validate_file(filename, file_size)
@@ -145,6 +144,7 @@ async def process_file(
         filename (str): Original filename to store and report inside the job; no default (required).
         mode (str): Description-detail preset requested by the user's last /detalhado|/medio|/baixo command (default: "normal").
     """
+    filename = Path(filename.replace("\\", "/")).name or "document"
     message_thread_id = message.message_thread_id
     tracker = StatusTracker(
         message.bot, message.chat.id, filename, message_thread_id=message_thread_id
@@ -153,8 +153,9 @@ async def process_file(
     email = user_context.user_emails.get(state_key)
 
     try:
+        settings.temp_dir.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(dir=settings.temp_dir) as tmpdir:
-            input_path = Path(tmpdir) / filename
+            input_path = Path(tmpdir) / f"{uuid.uuid4().hex}{Path(filename).suffix.lower()}"
             await tracker(t(MSG_DOWNLOADING_FILE))
             await download_file(message.bot, file_id, input_path)
 
@@ -177,7 +178,7 @@ async def process_file(
                     t(MSG_SUBMIT_FAILED).format(status_code=e.status_code, detail=e.detail)
                 )
                 return
-            except Exception as e:
+            except Exception:
                 logger.exception(t(LOG_TELEGRAM_API_CONTACT_FAILED))
                 await tracker.finish(success=False)
                 await message.answer(t(MSG_CONTACT_SERVER_FAILED))
@@ -195,7 +196,7 @@ async def process_file(
             )
 
         await _poll_job(message, tracker, task_id, email)
-    except Exception as e:
+    except Exception:
         logger.exception(t(LOG_TELEGRAM_FILE_PROCESSING_ERROR))
         await tracker.finish(success=False)
         await message.answer(t(MSG_PROCESSING_ERROR_GENERIC))
