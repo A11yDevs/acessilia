@@ -16,6 +16,7 @@ from typing import Any
 
 from backend.tools.logger import logger
 from backend.tools.toolbox_client import (
+    ToolboxArtifactNotFound,
     ToolboxClient,
     ToolboxError,
     ToolboxProviderUnavailable,
@@ -84,12 +85,17 @@ async def extract_fused(
     policy: FusionPolicy | None = None,
     primary_provider: str | None = None,
     secondary_provider: str | None = None,
+    artifact_id: str | None = None,
 ) -> dict[str, Any]:
     """Extract with the primary + secondary providers and merge the results.
 
     Returns a payload in the same shape as ``extract_structure`` (document
     with elements), so it plugs into the existing canonical bridge without
     changes to consumers.
+
+    When ``artifact_id`` names the document already stored in the Toolbox, both
+    providers read it from there instead of receiving a new upload each; if the
+    Toolbox no longer has it, the file is sent as before.
 
     Fallback: if one provider reports a Toolbox error, uses the other result
     and logs which provider failed. Unexpected errors are propagated.
@@ -103,10 +109,23 @@ async def extract_fused(
     async def _extract(provider: str) -> dict | None:
         client = ToolboxClient(provider=provider)
         try:
+            if artifact_id:
+                try:
+                    return await client.extract_structure(
+                        artifact_id=artifact_id, language=language
+                    )
+                except ToolboxArtifactNotFound:
+                    logger.info(
+                        "Fusion: artifact {} not in the Toolbox; uploading for {}",
+                        artifact_id,
+                        provider,
+                    )
             return await client.extract_structure(file_path, language=language)
         except ToolboxError as exc:
             logger.info("Fusion: provider {} failed ({})", provider, type(exc).__name__)
             return None
+        finally:
+            await client.close()
 
     primary_res, secondary_res = await asyncio.gather(
         _extract(primary), _extract(secondary)

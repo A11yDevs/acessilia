@@ -236,7 +236,7 @@ def test_pddl_replans_from_dual_to_single_provider(tmp_path, monkeypatch):
     monkeypatch.setattr("backend.config.settings.settings.data_dir", tmp_path)
     monkeypatch.setattr(
         "backend.agents.pddl_orchestrator._run_extract_fused",
-        lambda path: {
+        lambda path, **_kwargs: {
             "status": "succeeded",
             "provider": "docling",
             "document": {"elements": []},
@@ -308,3 +308,24 @@ def test_executor_wires_fusion_artifact_into_attempt(tmp_path, monkeypatch):
     artifact = next(a for a in updated.artifacts if a.id == artifact_id)
     assert artifact.kind == "fusion-payload"
     assert Path(artifact.path).exists()
+
+
+def test_dual_fusion_reuses_the_extractor_artifact(tmp_path, monkeypatch):
+    source = tmp_path / "source.pdf"
+    source.write_bytes(b"%PDF-test")
+    manifest = _make_manifest(tmp_path, source_path=source)
+    manifest.extractor.configuration["artifact_id"] = "art-42"
+    monkeypatch.setattr("backend.config.settings.settings.data_dir", tmp_path)
+    seen: dict[str, object] = {}
+
+    def fake_run(path, *, artifact_id=None):
+        seen["artifact_id"] = artifact_id
+        return {"status": "failed"}
+
+    monkeypatch.setattr(
+        "backend.agents.pddl_orchestrator._run_extract_fused", fake_run
+    )
+
+    _handle_dual_provider_fusion_method(manifest, "o-fuse")
+
+    assert seen["artifact_id"] == "art-42"

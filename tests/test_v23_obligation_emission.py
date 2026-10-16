@@ -133,7 +133,7 @@ def test_v23_obligations_do_not_emit_without_a_trigger():
     assert obligations == []
 
 
-def test_toolbox_manifest_keeps_existing_needs_and_adds_fusion_evidence(
+def test_toolbox_manifest_needs_are_derived_by_the_core(
     tmp_path: Path,
 ):
     source = tmp_path / "sample.pdf"
@@ -216,11 +216,102 @@ def test_toolbox_manifest_keeps_existing_needs_and_adds_fusion_evidence(
 
     manifest = build_processing_manifest(source, extraction)
 
-    assert manifest.obligations[0].id == "toolbox-obligation"
+    # Planning policy belongs to the core: the Toolbox's own obligation is
+    # dropped and the needs come from the core's rules plus fusion evidence.
+    assert "toolbox-obligation" not in {item.id for item in manifest.obligations}
     assert {item.kind for item in manifest.obligations} == {
-        "custom",
         "normalize-text",
         "adjudicate-page",
         "fuse-providers",
     }
     assert manifest.summary.obligation_count == len(manifest.obligations)
+    assert manifest.summary.observation_count == len(manifest.observations)
+
+
+def test_toolbox_table_obligation_uses_the_core_methods(tmp_path: Path):
+    """Older Toolbox images emit ``docling-table``, which the core never runs."""
+    source = tmp_path / "table.pdf"
+    source.write_bytes(b"%PDF-test")
+    timestamp = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    payload = {
+        "document": {
+            "title": "Table",
+            "language": "en",
+            "source": {
+                "document_id": "toolbox-doc",
+                "filename": "table.pdf",
+                "path": "table.pdf",
+                "media_type": "application/pdf",
+                "byte_size": 9,
+                "sha256": "0" * 64,
+            },
+            "extractor": {
+                "version": "1",
+                "started_at": timestamp.isoformat(),
+                "completed_at": timestamp.isoformat(),
+                "duration_ms": 1,
+                "configuration": {},
+            },
+            "pages": [{"page_number": 1, "element_ids": ["element-1"]}],
+            "elements": [
+                {
+                    "id": "element-1",
+                    "type": "table",
+                    "raw_label": "table",
+                    "reading_order": 1,
+                    "hierarchy_level": 0,
+                    "text": "a | b",
+                    "page_number": 1,
+                }
+            ],
+            "observations": [
+                {
+                    "id": "observation-linearize-table-1",
+                    "kind": "table-requires-processing",
+                    "severity": "warning",
+                    "message": "The table must have headers.",
+                    "target_ids": ["element-1"],
+                }
+            ],
+            "obligations": [
+                {
+                    "id": "obligation-linearize-table-1",
+                    "kind": "linearize-table",
+                    "target_ids": ["element-1"],
+                    "admissible_methods": [
+                        "docling-table",
+                        "pandoc-table",
+                        "human-review",
+                    ],
+                    "method_costs": {
+                        "docling-table": 10,
+                        "pandoc-table": 15,
+                        "human-review": 100,
+                    },
+                    "rationale": "The table must have headers.",
+                }
+            ],
+            "summary": {
+                "page_count": 1,
+                "element_count": 1,
+                "observation_count": 1,
+                "obligation_count": 1,
+                "element_types": {"table": 1},
+            },
+        }
+    }
+    extraction = SimpleNamespace(
+        document=payload,
+        version="1",
+        started_at=timestamp,
+        completed_at=timestamp,
+        duration_ms=1,
+        configuration={},
+    )
+
+    manifest = build_processing_manifest(source, extraction)
+
+    [table] = [o for o in manifest.obligations if o.kind == "linearize-table"]
+    assert table.admissible_methods == ["pandoc-table", "human-review"]
+    assert "docling-table" not in table.method_costs
+    assert len(manifest.observations) == manifest.summary.observation_count
