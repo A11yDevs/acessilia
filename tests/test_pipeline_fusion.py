@@ -267,5 +267,68 @@ class _FakeClient:
         self.provider = provider
         self._extract_fn = extract_fn
 
-    async def extract_structure(self, file_path, *, language="pt-BR", **kw):
+    async def extract_structure(self, file_path=None, *, language="pt-BR", **kw):
         return await self._extract_fn(self.provider)
+
+    async def close(self):
+        pass
+
+
+class _RecordingClient:
+    """Fake client that records how each provider received the document."""
+
+    calls: list[tuple[str, str | None, object]] = []
+    missing_artifact = False
+
+    def __init__(self, provider: str = "docling", **kw):
+        self.provider = provider
+
+    async def extract_structure(
+        self, file_path=None, *, artifact_id=None, language="pt-BR", **kw
+    ):
+        from backend.tools.toolbox_client import ToolboxArtifactNotFound
+
+        type(self).calls.append((self.provider, artifact_id, file_path))
+        if artifact_id and type(self).missing_artifact:
+            raise ToolboxArtifactNotFound("artifact expired")
+        return _payload([_el(f"texto {self.provider}", 0)])
+
+    async def close(self):
+        pass
+
+
+@pytest.mark.asyncio
+async def test_extract_fused_reuses_the_stored_artifact(monkeypatch):
+    _RecordingClient.calls = []
+    _RecordingClient.missing_artifact = False
+    monkeypatch.setattr("backend.pipeline.fusion.ToolboxClient", _RecordingClient)
+
+    await extract_fused(
+        "doc.pdf",
+        primary_provider="docling",
+        secondary_provider="mineru",
+        artifact_id="art-1",
+    )
+
+    assert sorted(_RecordingClient.calls) == [
+        ("docling", "art-1", None),
+        ("mineru", "art-1", None),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_extract_fused_uploads_when_the_artifact_is_gone(monkeypatch):
+    _RecordingClient.calls = []
+    _RecordingClient.missing_artifact = True
+    monkeypatch.setattr("backend.pipeline.fusion.ToolboxClient", _RecordingClient)
+
+    result = await extract_fused(
+        "doc.pdf",
+        primary_provider="docling",
+        secondary_provider="mineru",
+        artifact_id="art-1",
+    )
+
+    assert result["status"] == "succeeded"
+    uploads = sorted(c for c in _RecordingClient.calls if c[1] is None)
+    assert uploads == [("docling", None, "doc.pdf"), ("mineru", None, "doc.pdf")]

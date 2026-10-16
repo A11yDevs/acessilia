@@ -135,7 +135,9 @@ def _handle_latex_verbalizer_method(
     )
 
 
-def _run_extract_fused(source_path: Path) -> dict:
+def _run_extract_fused(
+    source_path: Path, *, artifact_id: str | None = None
+) -> dict:
     """Executa ``extract_fused`` respeitando o contexto de event loop.
 
     Detecta a presença de um event loop **antes** de criar a coroutine,
@@ -159,13 +161,15 @@ def _run_extract_fused(source_path: Path) -> dict:
     except RuntimeError:
         # Contexto síncrono (executor determinístico, CLI, testes):
         # não existe event loop ativo neste thread.
-        return asyncio.run(extract_fused(source_path))
+        return asyncio.run(extract_fused(source_path, artifact_id=artifact_id))
 
     # Já existe um event loop neste thread; como o handler é síncrono,
     # a coroutine é executada em um thread dedicado com seu próprio loop.
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
         return pool.submit(
-            lambda: asyncio.run(extract_fused(source_path))
+            lambda: asyncio.run(
+                extract_fused(source_path, artifact_id=artifact_id)
+            )
         ).result()
 
 
@@ -859,7 +863,9 @@ def _handle_dual_provider_fusion_method(
     Custo: a fusão reextrai o documento inteiro nos dois providers, sem
     reutilizar a evidência que o ``ToolboxManifestExtractor`` já coletou em
     ``FUSION_MODE=dual``. Cada passo ``fuse-providers`` paga, portanto, uma
-    extração dual completa (cache remoto da Toolbox à parte).
+    extração dual completa (cache remoto da Toolbox à parte). O documento não
+    é reenviado: os dois providers leem o ``artifact_id`` que o extrator
+    registrou em ``manifest.extractor.configuration``.
     """
     obligation = next(
         (o for o in manifest.obligations if o.id == obligation_id), None
@@ -871,8 +877,10 @@ def _handle_dual_provider_fusion_method(
             message=f"Obrigação não encontrada: {obligation_id}",
         )
     source_path = Path(manifest.source.path)
+    # Reuse the document the structure extractor already stored in the Toolbox.
+    artifact_id = (manifest.extractor.configuration or {}).get("artifact_id")
     try:
-        payload = _run_extract_fused(source_path)
+        payload = _run_extract_fused(source_path, artifact_id=artifact_id)
     except Exception as exc:  # noqa: BLE001
         return MethodResult(
             success=False,
