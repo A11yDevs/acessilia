@@ -492,7 +492,7 @@ class TestVlmPairwiseJudge:
 
     TEXT = "Texto da página com conteúdo suficiente para o juiz comparar."
 
-    def _manifest(self, tmp_path):
+    def _manifest(self, tmp_path, primary=TEXT, secondary=TEXT + " (variante)"):
         import fitz
 
         doc = fitz.open()
@@ -502,17 +502,19 @@ class TestVlmPairwiseJudge:
         doc.close()
         return _manifest(
             tmp_path,
-            [_el("p-1", "paragraph", self.TEXT, LEFT, 1)],
+            [_el("p-1", "paragraph", primary, LEFT, 1)],
             "adjudicate-page",
             ["vlm-pairwise-judge", "human-review"],
-            [_raw("paragraph", self.TEXT + " (variante)", LEFT, 1)],
+            [_raw("paragraph", secondary, LEFT, 1)],
         )
 
-    def _fake_judge(self, monkeypatch, p_b):
+    def _fake_judge(self, monkeypatch, p_b, document=None):
         seen = {}
 
         def judge(image, candidate_a, candidate_b):
             seen.update(image=image, a=candidate_a, b=candidate_b)
+            if document is not None:
+                return {"document": document}
             return {"document": {"pB": p_b, "pB_ab": p_b, "pA_ba": 1 - p_b, "model": "qwen3-vl-8b"}}
 
         monkeypatch.setattr("backend.agents.pddl_orchestrator._judge_page", judge)
@@ -560,6 +562,127 @@ class TestVlmPairwiseJudge:
 
         assert not result.success
         assert "indisponível" in result.message
+
+    @pytest.mark.parametrize(
+        "document",
+        [{}, {"pB": None}, {"pB": "n/a"}, {"pB": 1.5}, {"pB": -0.1}],
+        ids=["missing", "null", "not-a-number", "above-one", "below-zero"],
+    )
+    def test_answer_without_valid_pb_fails_instead_of_keeping_the_primary(
+        self, tmp_path, monkeypatch, document
+    ) -> None:
+        from backend.agents.pddl_orchestrator import _handle_vlm_pairwise_judge_method
+
+        manifest = self._manifest(tmp_path)
+        self._fake_judge(monkeypatch, None, document=document)
+
+        result = _handle_vlm_pairwise_judge_method(manifest, "o-1")
+
+        assert not result.success and not result.validated
+        assert "pB válido" in result.message
+        assert "page_judgement" not in manifest.elements[0].metadata
+
+    def test_agreeing_pages_keep_the_primary_without_calling_the_judge(
+        self, tmp_path, monkeypatch
+    ) -> None:
+        from backend.agents.pddl_orchestrator import _handle_vlm_pairwise_judge_method
+
+        manifest = self._manifest(tmp_path, secondary=self.TEXT)
+        seen = self._fake_judge(monkeypatch, 0.9)
+
+        result = _handle_vlm_pairwise_judge_method(manifest, "o-1")
+
+        assert result.success and result.validated
+        assert not seen
+        judgement = manifest.elements[0].metadata["page_judgement"]
+        assert judgement == {"choice": "docling", "pB": None, "reason": "agree"}
+
+    def test_page_without_both_transcriptions_is_not_judged(self, tmp_path, monkeypatch) -> None:
+        from backend.agents.pddl_orchestrator import _handle_vlm_pairwise_judge_method
+
+        manifest = self._manifest(tmp_path, secondary="")
+        seen = self._fake_judge(monkeypatch, 0.1)
+
+        result = _handle_vlm_pairwise_judge_method(manifest, "o-1")
+
+        assert not result.success
+        assert "Sem páginas com as duas transcrições" in result.message
+        assert not seen
+
+    def test_rejected_call_is_not_reported_as_unavailable(self, tmp_path, monkeypatch) -> None:
+        from backend.agents.pddl_orchestrator import _handle_vlm_pairwise_judge_method
+        from backend.tools.toolbox_client import ToolboxAuthenticationError
+
+        manifest = self._manifest(tmp_path)
+
+        def rejected(*_args):
+            raise ToolboxAuthenticationError("401")
+
+        monkeypatch.setattr("backend.agents.pddl_orchestrator._judge_page", rejected)
+
+        result = _handle_vlm_pairwise_judge_method(manifest, "o-1")
+
+        assert not result.success
+        assert "recusou" in result.message and "ToolboxAuthenticationError" in result.message
+
+    def test_unexpected_judge_error_is_not_labelled_as_rendering(
+        self, tmp_path, monkeypatch
+    ) -> None:
+        from backend.agents.pddl_orchestrator import _handle_vlm_pairwise_judge_method
+
+        manifest = self._manifest(tmp_path)
+
+        def broken(*_args):
+            raise TypeError("resposta inesperada")
+
+        monkeypatch.setattr("backend.agents.pddl_orchestrator._judge_page", broken)
+
+        with pytest.raises(TypeError):
+            _handle_vlm_pairwise_judge_method(manifest, "o-1")
+
+    def test_long_page_is_flagged_as_truncated(self, tmp_path, monkeypatch) -> None:
+        from backend.agents.pddl_orchestrator import (
+            _JUDGE_MAX_CHARS,
+            _handle_vlm_pairwise_judge_method,
+        )
+
+        words = [f"palavra{i}" for i in range(_JUDGE_MAX_CHARS // 8)]
+        manifest = self._manifest(
+            tmp_path, primary=" ".join(words), secondary=" ".join(reversed(words))
+        )
+        self._fake_judge(monkeypatch, 0.1)
+
+        _handle_vlm_pairwise_judge_method(manifest, "o-1")
+
+        assert manifest.elements[0].metadata["page_judgement"]["truncated"] is True
+
+    def test_judge_page_sends_the_png_through_the_adjudicate_client(
+        self, tmp_path, monkeypatch
+    ) -> None:
+        from backend.agents.pddl_orchestrator import _judge_page
+
+        calls = {}
+
+        class FakeClient:
+            async def judge_page(self, candidate_a, candidate_b, file_path=None, **kwargs):
+                calls.update(a=candidate_a, b=candidate_b, kwargs=kwargs)
+                calls["bytes"] = file_path.read_bytes()
+                calls["suffix"] = file_path.suffix
+                return {"document": {"pB": 0.3}}
+
+            async def close(self):
+                calls["closed"] = True
+
+        monkeypatch.setattr(
+            "backend.tools.toolbox_adjudicate_client.ToolboxAdjudicateClient", FakeClient
+        )
+
+        result = _judge_page(b"\x89PNG-fake", "A", "B")
+
+        assert result == {"document": {"pB": 0.3}}
+        assert calls["bytes"] == b"\x89PNG-fake" and calls["suffix"] == ".png"
+        assert (calls["a"], calls["b"]) == ("A", "B")
+        assert calls["closed"]
 
     def test_rendered_page_fits_the_server_slot(self, tmp_path) -> None:
         import fitz

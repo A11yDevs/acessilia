@@ -1153,21 +1153,45 @@ def _judge_page(image: bytes, candidate_a: str, candidate_b: str) -> dict[str, A
         return run_sync(call(path))
 
 
+#: Characters per candidate the Toolbox's judge reads (``judge_max_chars`` of
+#: ``qwen3-vl-8b`` in its ``providers-config.yaml``); beyond it the candidate is
+#: cut on the Toolbox side, so the verdict does not cover the whole page.
+_JUDGE_MAX_CHARS = 6000
+
+
+def _judge_probability(document: dict[str, Any]) -> float | None:
+    """``pB`` of a judge answer, or ``None`` when absent or outside [0, 1]."""
+    try:
+        p_b = float(document["pB"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    return p_b if 0.0 <= p_b <= 1.0 else None
+
+
 def _handle_vlm_pairwise_judge_method(
     manifest: ProcessingManifest, obligation_id: str
 ) -> MethodResult:
     """Pairwise VLM judge between the two providers' pages.
 
     The Toolbox (``document.adjudicate.page``) returns the position-debiased
-    probability that the secondary page is the more faithful transcription;
-    the decision uses docstruct's threshold. As with ``agreement-rule``, a kept
-    primary page satisfies the obligation, and a preferred secondary page is
-    recorded in ``page_judgement`` but not swapped in: the method fails and the
-    obligation goes to ``human-review``.
+    probability that the secondary page is the more faithful transcription.
+    Only pages where the two transcriptions diverge are judged
+    (``should_judge``); the others keep the primary page without a call. Of
+    docstruct's two-threshold rule (``decide_pair``) only the ``p_new >
+    DEFAULT_NEW_THR`` branch applies: there is no previous judge to consult
+    here. As with ``agreement-rule``, a kept primary page satisfies the
+    obligation, and a preferred secondary page is recorded in
+    ``page_judgement`` but not swapped in: the method fails and the obligation
+    goes to ``human-review``. An answer without a valid ``pB`` fails the method
+    instead of counting as a kept primary.
     """
-    from docstruct.fusion.judge import DEFAULT_NEW_THR
+    from docstruct.fusion.judge import DEFAULT_NEW_THR, should_judge
 
-    from backend.tools.toolbox_client import ToolboxError
+    from backend.tools.toolbox_client import (
+        ToolboxAuthenticationError,
+        ToolboxContractViolation,
+        ToolboxError,
+    )
 
     elements = _target_elements(manifest, obligation_id)
     if not elements:
@@ -1176,6 +1200,7 @@ def _handle_vlm_pairwise_judge_method(
     if failure is not None:
         return failure
 
+    primary_name = _CALIBRATED_PAIR[0]
     source_path = Path(manifest.source.path)
     judgements: dict[int, dict[str, Any]] = {}
     for page_number in sorted({e.page_number for e in elements if e.page_number}):
@@ -1189,30 +1214,63 @@ def _handle_vlm_pairwise_judge_method(
             for block in secondary.pages.get(page_number, [])
         )
         if not primary_md.strip() or not secondary_md.strip():
+            logger.info(
+                "vlm-pairwise-judge: página {} sem as duas transcrições; ignorada", page_number
+            )
             continue
+        if not should_judge(primary_md, secondary_md):
+            judgements[page_number] = {"choice": primary_name, "pB": None, "reason": "agree"}
+            continue
+
         try:
             image = _render_page_png(source_path, page_number)
-            result = _judge_page(image, primary_md, secondary_md)
-        except ToolboxError as exc:
-            return MethodResult(
-                success=False,
-                validated=False,
-                message=f"Juiz VLM indisponível: {type(exc).__name__}: {exc}",
-            )
         except Exception as exc:  # noqa: BLE001 - rendering a broken source
             return MethodResult(
                 success=False,
                 validated=False,
                 message=f"Página {page_number} não pôde ser renderizada: {exc}",
             )
+        truncated = max(len(primary_md), len(secondary_md)) > _JUDGE_MAX_CHARS
+        if truncated:
+            logger.warning(
+                "vlm-pairwise-judge: página {} passa de {} caracteres; "
+                "o juiz lê a transcrição truncada",
+                page_number,
+                _JUDGE_MAX_CHARS,
+            )
+        logger.info("vlm-pairwise-judge: julgando a página {}", page_number)
+        try:
+            result = _judge_page(image, primary_md, secondary_md)
+        except (ToolboxAuthenticationError, ToolboxContractViolation) as exc:
+            return MethodResult(
+                success=False,
+                validated=False,
+                message=f"Juiz VLM recusou a chamada: {type(exc).__name__}: {exc}",
+            )
+        except ToolboxError as exc:
+            return MethodResult(
+                success=False,
+                validated=False,
+                message=f"Juiz VLM indisponível: {type(exc).__name__}: {exc}",
+            )
         document = result.get("document") or {}
-        p_b = float(document.get("pB", 0.5))
+        p_b = _judge_probability(document)
+        if p_b is None:
+            return MethodResult(
+                success=False,
+                validated=False,
+                message=(
+                    f"Juiz VLM não devolveu pB válido para a página {page_number}: "
+                    f"{document.get('pB')!r}"
+                ),
+            )
         judgements[page_number] = {
-            "choice": secondary.provider if p_b > DEFAULT_NEW_THR else _CALIBRATED_PAIR[0],
+            "choice": secondary.provider if p_b > DEFAULT_NEW_THR else primary_name,
             "pB": p_b,
             "pB_ab": document.get("pB_ab"),
             "pA_ba": document.get("pA_ba"),
             "model": document.get("model"),
+            "truncated": truncated,
         }
 
     if not judgements:
@@ -1228,7 +1286,7 @@ def _handle_vlm_pairwise_judge_method(
     preferred = {
         page: judgement
         for page, judgement in judgements.items()
-        if judgement["choice"] != _CALIBRATED_PAIR[0]
+        if judgement["choice"] != primary_name
     }
     if preferred:
         return MethodResult(
@@ -1244,7 +1302,10 @@ def _handle_vlm_pairwise_judge_method(
         success=True,
         validated=True,
         message="Juiz VLM mantém o provider primário nas páginas "
-        + ", ".join(f"{page} (pB={j['pB']:.2f})" for page, j in sorted(judgements.items())),
+        + ", ".join(
+            f"{page} (pB={j['pB']:.2f})" if j["pB"] is not None else f"{page} (concordam)"
+            for page, j in sorted(judgements.items())
+        ),
     )
 
 
