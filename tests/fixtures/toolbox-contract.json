@@ -108,6 +108,12 @@
       ]
     },
     {
+      "id": "document.export.pdf_ua",
+      "providers": [
+        "pandoc-pdf-ua"
+      ]
+    },
+    {
       "id": "document.layout.analyze",
       "providers": [
         "docling-layout",
@@ -304,6 +310,12 @@
       "id": "nougat",
       "capabilities": [
         "document.structure.extract"
+      ]
+    },
+    {
+      "id": "pandoc-pdf-ua",
+      "capabilities": [
+        "document.export.pdf_ua"
       ]
     },
     {

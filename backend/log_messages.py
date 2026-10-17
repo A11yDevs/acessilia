@@ -433,6 +433,12 @@ LOG_READER_FULL_PAGE_FALLBACK: str = (
 #: Info logged by the reader agent after it has built all region tasks for a page; {page_num} is the page number, {count} the total task count, {text_count} the tasks sent to the editor, {vision_count} the tasks sent to the vision/data agents.
 LOG_PDF_EXPORTED: str = "PDF exported with bookmarks and page numbering: {output_path}"
 LOG_PDF_UA_EXPORTED: str = "PDF/UA exported: {output_path}"
+#: Info logged when the Toolbox rendered the PDF/UA; {output_path} the destination file path.
+LOG_PDF_UA_TOOLBOX_EXPORTED: str = "PDF/UA rendered by the Toolbox: {output_path}"
+#: Warning logged when the Toolbox PDF/UA export failed and the local pandoc + LaTeX fallback runs; {error} the Toolbox error.
+LOG_PDF_UA_TOOLBOX_FALLBACK: str = (
+    "PDF/UA export on the Toolbox failed ({error}); falling back to local pandoc + LaTeX"
+)
 LOG_TXT_EXPORTED: str = "TXT exported: {output_path}"
 LOG_DOCX_EXPORTED: str = "DOCX exported: {output_path}"
 LOG_READER_TASKS_SUMMARY: str = (
