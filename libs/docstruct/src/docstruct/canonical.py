@@ -405,25 +405,33 @@ def _normalize_heading_levels(blocks: list[dict[str, Any]]) -> None:
 
     Extractors often report every section header as level 1. The first
     heading becomes the single H1; each later heading becomes at least H2 and
-    at most one level deeper than the previous one. A changed level is kept in
-    ``metadata.original_heading_level``.
+    at most one level deeper than the previous one. Levels are always stored
+    as ``int``; a level that changed, or could not be read as a number, is kept
+    in ``metadata.original_heading_level``.
+
+    Trade-off: a genuinely flat source (every heading a top-level sibling)
+    becomes one H1 with the remaining headings nested under it as H2. That
+    changes the section tree, not only the numbers, but the audit requires a
+    single H1 and the source gives no better parent to choose.
     """
     previous = 0
     for block in blocks:
         if block.get("type") != "heading":
             continue
+        original = block.get("level", 1)
         try:
-            level = int(block.get("level", 1))
+            level = int(original)
+            readable = True
         except (TypeError, ValueError):
-            level = 1
+            level, readable = 1, False
         normalized = 1 if not previous else max(2, min(level, previous + 1, 6))
-        if normalized != block.get("level"):
+        if normalized != level or not readable:
             metadata = block.get("metadata")
             if not isinstance(metadata, dict):
                 metadata = {}
                 block["metadata"] = metadata
-            metadata.setdefault("original_heading_level", block.get("level"))
-            block["level"] = normalized
+            metadata.setdefault("original_heading_level", original)
+        block["level"] = normalized
         previous = normalized
 
 
