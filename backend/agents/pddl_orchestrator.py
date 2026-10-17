@@ -36,6 +36,7 @@ from backend.core.manifest.builder import (
 from backend.core.manifest.models import (
     Artifact,
     ManifestElement,
+    Obligation,
     PageDescriptor,
     ProcessingManifest,
 )
@@ -2649,9 +2650,10 @@ def _has_meaningful_text(element: ManifestElement) -> bool:
 #: human review) does not lose content, so the job finishes with a warning
 #: instead of failing. Heading levels are also normalized by the canonical
 #: builder, which keeps the exported document valid without the repair.
+#: `refine-reading-order` is deliberately absent: a wrong reading order is what
+#: a screen reader user hits first, so an open one still fails the job.
 NON_CRITICAL_OBLIGATION_KINDS = frozenset(
     {
-        "refine-reading-order",
         "repair-heading-hierarchy",
         "join-tail-blocks",
         "normalize-text",
@@ -2661,13 +2663,21 @@ NON_CRITICAL_OBLIGATION_KINDS = frozenset(
 )
 
 
+def _is_open_obligation(obligation: Obligation) -> bool:
+    """Whether the job selected the obligation and left it unsatisfied.
+
+    An exhausted obligation is left out of later replans, which clears its
+    `selected` flag; its `failed` status keeps it open.
+    """
+    return obligation.status != "satisfied" and (
+        obligation.selected or obligation.status == "failed"
+    )
+
+
 def _unsatisfied_selected_obligations(manifest: ProcessingManifest) -> list:
-    # An exhausted obligation is left out of later replans, which clears its
-    # `selected` flag; its `failed` status keeps it in this list.
     return [
         obligation for obligation in manifest.obligations
-        if obligation.status != "satisfied"
-        and (obligation.selected or obligation.status == "failed")
+        if _is_open_obligation(obligation)
     ]
 
 
@@ -2796,7 +2806,7 @@ def _unsatisfied_obligations(manifest: ProcessingManifest) -> list[dict[str, Any
     """
     unsatisfied: list[dict[str, Any]] = []
     for obligation in manifest.obligations:
-        if not obligation.selected or obligation.status == "satisfied":
+        if not _is_open_obligation(obligation):
             continue
         last = obligation.attempts[-1] if obligation.attempts else None
         unsatisfied.append(
