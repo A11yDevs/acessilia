@@ -5,13 +5,28 @@ Staging regression: Docling/Toolbox boxes for `001.pdf` use a bottom-left origin
 y grew downwards, so every page came out bottom to top, footers aside.
 """
 
+from types import SimpleNamespace
+
+import fitz
 import pytest
 
+from backend.agents.pddl_orchestrator import (
+    _clip_rect_from_provenance,
+    _element_bbox as orchestrator_bbox,
+    _SecondaryExtraction,
+)
 from backend.core.manifest.builder import (
     _normalized_element_bbox,
     _refine_reading_order,
+    _tag_known_title_callouts,
 )
-from backend.core.manifest.models import BoundingBox, ManifestElement, Provenance
+from backend.core.manifest.models import (
+    BoundingBox,
+    ManifestElement,
+    PageDescriptor,
+    Provenance,
+    is_bottom_left,
+)
 
 PAGE_HEIGHT = 842.0
 
@@ -127,3 +142,61 @@ def test_normalized_bbox_keeps_top_left_boxes():
 
     assert top == pytest.approx(106.73 / PAGE_HEIGHT)
     assert bottom == pytest.approx(118.18 / PAGE_HEIGHT)
+
+
+@pytest.mark.parametrize(
+    ("origin", "top", "bottom", "expected"),
+    [
+        ("BOTTOMLEFT", 10.0, 20.0, True),
+        ("TOPLEFT", 20.0, 10.0, False),
+        ("UNKNOWN", 20.0, 10.0, True),
+        ("UNKNOWN", 10.0, 20.0, False),
+        (None, 20.0, 10.0, True),
+        ("bottomleft", 10.0, 20.0, True),
+    ],
+)
+def test_origin_rule(origin, top, bottom, expected):
+    assert is_bottom_left(origin, top, bottom) is expected
+
+
+BOX = (56.0, 735.27, 108.40, 723.82)
+
+
+def _box_dict(origin):
+    left, top, right, bottom = BOX
+    return {"left": left, "top": top, "right": right, "bottom": bottom,
+            "coord_origin": origin}
+
+
+@pytest.mark.parametrize("origin", ["BOTTOMLEFT", "UNKNOWN"])
+def test_orchestrator_boxes_share_the_origin_rule(origin):
+    element = _element(1, "paragraph", "text", BOX, origin)
+    # The helper only reads the page sizes.
+    manifest = SimpleNamespace(pages=[
+        PageDescriptor(page_number=1, width=595.0, height=PAGE_HEIGHT,
+                       element_ids=[element.id])
+    ])
+    expected = (
+        56.0 / 595.0,
+        (PAGE_HEIGHT - 735.27) / PAGE_HEIGHT,
+        108.40 / 595.0,
+        (PAGE_HEIGHT - 723.82) / PAGE_HEIGHT,
+    )
+
+    assert orchestrator_bbox(element, manifest) == pytest.approx(expected)
+
+    secondary = _SecondaryExtraction(
+        provider="mineru", pages={}, sizes={1: (595.0, PAGE_HEIGHT)}
+    )
+    raw = {"page_number": 1, "provenance": [{"bbox": _box_dict(origin)}]}
+    assert secondary.bbox(raw) == pytest.approx(expected)
+
+    document = fitz.open()
+    try:
+        page = document.new_page(width=595.0, height=PAGE_HEIGHT)
+        rect = _clip_rect_from_provenance(page, element.provenance[0])
+    finally:
+        document.close()
+    assert (rect.y0, rect.y1) == pytest.approx(
+        (PAGE_HEIGHT - 735.27, PAGE_HEIGHT - 723.82)
+    )

@@ -32,6 +32,7 @@ from backend.core.manifest.models import (
     ProcessingManifest,
     Provenance,
     SourceDocument,
+    is_bottom_left,
 )
 
 
@@ -605,17 +606,6 @@ def _is_same_callout_cluster(previous: ManifestElement, current: ManifestElement
     return (overlap_width / min_width) >= 0.55
 
 
-def _is_bottom_left(bbox: BoundingBox) -> bool:
-    """Whether the box uses a y axis that grows upwards (PDF/Docling default).
-
-    An unknown origin is decided by the geometry: with y growing upwards the top
-    edge has the larger value.
-    """
-    if bbox.coord_origin == "BOTTOMLEFT":
-        return True
-    return bbox.coord_origin == "UNKNOWN" and bbox.top > bbox.bottom
-
-
 def _raw_bbox(element: ManifestElement) -> BoundingBox | None:
     if not element.provenance:
         return None
@@ -633,7 +623,7 @@ def _element_bbox(element: ManifestElement) -> tuple[float, float, float, float]
     bbox = _raw_bbox(element)
     if bbox is None:
         return None
-    if _is_bottom_left(bbox):
+    if is_bottom_left(bbox.coord_origin, bbox.top, bbox.bottom):
         return (bbox.left, -bbox.top, bbox.right, -bbox.bottom)
     return (bbox.left, bbox.top, bbox.right, bbox.bottom)
 
@@ -1218,7 +1208,7 @@ def _normalized_element_bbox(
         if not width or not height:
             return None
         left, top, right, bottom = bbox.left, bbox.top, bbox.right, bbox.bottom
-        if _is_bottom_left(bbox):
+        if is_bottom_left(bbox.coord_origin, top, bottom):
             top, bottom = height - top, height - bottom
         return (
             left / width,

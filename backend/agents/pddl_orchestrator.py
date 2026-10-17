@@ -38,6 +38,7 @@ from backend.core.manifest.models import (
     ManifestElement,
     PageDescriptor,
     ProcessingManifest,
+    is_bottom_left,
 )
 from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
 from backend.core.planning.domain_bundle import DomainBundle
@@ -239,7 +240,7 @@ def _element_bbox(
         if page is None or not page.width or not page.height:
             return None
         top, bottom = box.top, box.bottom
-        if box.coord_origin == "BOTTOMLEFT":
+        if is_bottom_left(box.coord_origin, top, bottom):
             top, bottom = page.height - top, page.height - bottom
         return (
             box.left / page.width,
@@ -492,6 +493,8 @@ def _render_inspection_region(source: Path, element: ManifestElement) -> tuple[b
             values = (bbox.left, bbox.top, bbox.right, bbox.bottom)
             if not all(math.isfinite(value) for value in values):
                 raise ValueError("Region coordinates must be finite")
+            # Unlike ordering, a crop certifies what the vision model describes,
+            # so it requires an explicit origin instead of inferring one.
             if bbox.coord_origin not in {"TOPLEFT", "BOTTOMLEFT"}:
                 raise ValueError("Region coordinate origin is unknown")
             top, bottom = bbox.top, bbox.bottom
@@ -869,7 +872,7 @@ class _SecondaryExtraction:
                 top, bottom = float(box["top"]), float(box["bottom"])
             except (KeyError, TypeError, ValueError):
                 return None
-            if box.get("coord_origin") == "BOTTOMLEFT":
+            if is_bottom_left(box.get("coord_origin"), top, bottom):
                 top, bottom = height - top, height - bottom
             return _ordered_box(
                 left / width, top / height, right / width, bottom / height
@@ -2538,7 +2541,7 @@ def _clip_rect_from_provenance(page: fitz.Page, provenance: Any) -> fitz.Rect:
     top = float(bbox.top)
     bottom = float(bbox.bottom)
 
-    if getattr(bbox, "coord_origin", "UNKNOWN") == "BOTTOMLEFT":
+    if is_bottom_left(getattr(bbox, "coord_origin", None), top, bottom):
         page_height = float(page.rect.height)
         top_from_top = page_height - top
         bottom_from_top = page_height - bottom
