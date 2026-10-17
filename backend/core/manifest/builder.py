@@ -619,6 +619,10 @@ def _element_bbox(element: ManifestElement) -> tuple[float, float, float, float]
     coordinates. A bottom-left box is mirrored (``y -> -y``): that keeps every
     comparison right without knowing the page height, which the Docling path
     does not have yet when the reading order is refined.
+
+    Only differences and orderings are meaningful: a mirrored ``top`` or
+    ``bottom`` is negative, so never compare it with a fixed position such as
+    ``0``. ``_normalized_element_bbox`` gives page fractions instead.
     """
     bbox = _raw_bbox(element)
     if bbox is None:
@@ -672,12 +676,12 @@ def _is_known_callout_body_candidate(
     bbox = _element_bbox(element)
     if bbox is None:
         return False
-    left, _, right, bottom = bbox
+    left, top, right, bottom = bbox
     width = right - left
     band_width = max(1.0, main_right - main_left)
     left_indent = left - main_left
     right_indent = main_right - right
-    if bottom <= 0:
+    if top >= bottom:  # degenerate box (screen coordinates, see _element_bbox)
         return False
     if width > band_width * 0.98:
         return False
