@@ -44,6 +44,7 @@ from backend.core.manifest.models import (
 from backend.core.planning.domain_bundle import DomainBundle
 from backend.core.planning.models import NominalPlan, PlanStep
 from backend.i18n import t
+from backend.tools.logger import logger
 
 
 MethodHandler = Callable[[ProcessingManifest, str], MethodResult]
@@ -108,11 +109,15 @@ class ExecutorAgent:
             def execute_step(_step_input, current: PlanStep = plan_step):
                 result = self._execute_step(current, plan, state)
                 failed = result.status == "failed"
+                # A failed obligation does not stop the workflow: the remaining
+                # independent obligations still run, and those depending on the
+                # failed one fail their own precondition check. complete-job
+                # still refuses to finish while any selected obligation is open.
                 return StepOutput(
                     content=result.model_dump(mode="json"),
                     success=not failed,
                     error=result.message if failed else None,
-                    stop=failed,
+                    stop=failed and current.action != "execute-obligation",
                 )
 
             workflow_steps.append(
@@ -337,7 +342,7 @@ class ExecutorAgent:
                             if attempt.status in {"failed", "rejected"}
                         }
                         obligation.status = "pending" if alternatives else "failed"
-                        state.replan_required = bool(alternatives)
+                        state.replan_required = state.replan_required or bool(alternatives)
                         raise RuntimeError(
                             f"{type(exc).__name__}: {exc}"
                         ) from exc
@@ -368,7 +373,7 @@ class ExecutorAgent:
                             if attempt.status in {"failed", "rejected"}
                         }
                         obligation.status = "pending" if alternatives else "failed"
-                        state.replan_required = bool(alternatives)
+                        state.replan_required = state.replan_required or bool(alternatives)
                         raise RuntimeError(
                             result.message or t(EXE_RESULT_REJECTED)
                         )
@@ -399,7 +404,18 @@ class ExecutorAgent:
         except Exception as exc:
             status = "failed"
             message = f"{type(exc).__name__}: {exc}"
-            state.failed_step_index = step.index
+            if state.failed_step_index is None:
+                state.failed_step_index = step.index
+            # The report only reaches the caller as obligation ids, so the cause
+            # of each failed step is logged here.
+            logger.warning(
+                "PDDL: passo {} ({}) falhou; obrigação={} método={}: {}",
+                step.index,
+                step.action,
+                step.obligation_id,
+                step.method,
+                message,
+            )
 
         result = ExecutionStepResult(
             index=step.index,
