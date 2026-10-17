@@ -3,7 +3,12 @@
 import pytest
 
 from backend.core.planning.models import NominalPlan, PlanStep
-from tests.test_pddl_actionability import _element, _manifest, _obligation, _orchestrator
+from tests.pddl_support import (
+    build_element as _element,
+    build_manifest as _manifest,
+    build_obligation as _obligation,
+    build_orchestrator as _orchestrator,
+)
 
 
 @pytest.mark.parametrize("kind,method", [

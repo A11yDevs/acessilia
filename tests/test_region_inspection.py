@@ -11,7 +11,12 @@ import pytest
 from backend.agents import pddl_orchestrator as pddl
 from backend.agents.output_schemas import VisionOutput
 from backend.core.manifest.models import BoundingBox, PageDescriptor, ProcessingManifest, Provenance
-from tests.test_pddl_actionability import _element, _manifest, _obligation, _orchestrator
+from tests.pddl_support import (
+    build_element as _element,
+    build_manifest as _manifest,
+    build_obligation as _obligation,
+    build_orchestrator as _orchestrator,
+)
 
 
 @pytest.fixture

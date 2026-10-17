@@ -9,7 +9,7 @@ from backend.core.manifest.pymupdf_extractor import PyMuPDFManifestExtractor
 from backend.core.manifest.builder import build_processing_manifest
 from backend.core.manifest.models import BoundingBox, Provenance
 from backend.agents.pddl_orchestrator import _extract_picture_bytes, _render_inspection_region
-from tests.test_pddl_actionability import _element
+from tests.pddl_support import build_element as _element
 
 
 def _make_sample_pdf(path: Path) -> None:

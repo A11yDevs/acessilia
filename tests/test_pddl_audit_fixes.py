@@ -5,7 +5,12 @@ from types import SimpleNamespace
 import pytest
 
 from backend.agents import pddl_orchestrator as pddl
-from tests.test_pddl_actionability import _element, _manifest, _obligation, _orchestrator
+from tests.pddl_support import (
+    build_element as _element,
+    build_manifest as _manifest,
+    build_obligation as _obligation,
+    build_orchestrator as _orchestrator,
+)
 from tests.test_pending_fixes import isolated_runtime as runtime_fixture
 
 isolated_runtime = runtime_fixture

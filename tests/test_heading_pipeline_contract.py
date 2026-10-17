@@ -10,7 +10,11 @@ from docstruct.validation import (
     validate_canonical_document, MSG_HEADING_LEVELS_SKIPPED,
     MSG_MISSING_FIRST_H1, MSG_MULTIPLE_H1,
 )
-from tests.test_pddl_actionability import _element, _manifest, _orchestrator
+from tests.pddl_support import (
+    build_element as _element,
+    build_manifest as _manifest,
+    build_orchestrator as _orchestrator,
+)
 
 
 @pytest.mark.parametrize("levels", [[1, 4, 5], [1, 3, 4], [1, 4, 5, 6]])
@@ -52,10 +56,13 @@ def test_title_is_heading_predecessor_when_deriving_repairs():
     ([2, 3], MSG_MISSING_FIRST_H1), ([1, 1], MSG_MULTIPLE_H1),
 ])
 def test_section_heading_levels_are_validated(levels, finding):
-    canonical = build_canonical_document({"pages": [{"blocks": [
-        {"id": f"h{i}", "type": "heading", "level": level, "text": f"Heading {i}"}
+    # The builder normalizes levels, so the invalid sequence is written directly.
+    canonical = build_canonical_document("Body content.")
+    canonical["sections"] = [
+        {"id": f"h{i}", "title": f"Heading {i}", "level": level,
+         "blocks": [], "children": []}
         for i, level in enumerate(levels)
-    ]}]})
+    ]
     findings = validate_canonical_document(canonical)
     assert any(message == finding for message, _ in findings)
     rendered = document_to_html(canonical, profile="html")
@@ -67,3 +74,50 @@ def test_legacy_explicit_heading_is_not_counted_twice():
     section = document["sections"][0]
     section["blocks"].insert(0, {"id": "legacy-title", "type": "heading", "level": 1, "text": section["title"]})
     assert not validate_canonical_document(document)
+
+
+@pytest.mark.parametrize("levels,expected", [
+    ([1, 1, 1], [1, 2, 2]),
+    ([2, 3], [1, 2]),
+    ([1, 4, 5], [1, 2, 3]),
+    ([1, 2, 1, 3], [1, 2, 2, 3]),
+])
+def test_builder_normalizes_heading_levels_for_the_audit(levels, expected):
+    # Extractors report every section header as level 1; with PDDL in dry-run
+    # the heading repair never runs, so the builder must yield one H1.
+    canonical = build_canonical_document({"pages": [{"blocks": [
+        {"id": f"h{i}", "type": "heading", "level": level, "text": f"Heading {i}"}
+        for i, level in enumerate(levels)
+    ]}]})
+
+    found: list[int] = []
+
+    def walk(sections):
+        for section in sections:
+            found.append(section["level"])
+            walk(section["children"])
+
+    walk(canonical["sections"])
+    assert found == expected
+    assert not validate_canonical_document(canonical)
+    first = canonical["sections"][0]
+    assert first["metadata"].get("original_heading_level") == (
+        levels[0] if levels[0] != 1 else None
+    )
+
+
+def test_builder_stores_levels_as_int_and_keeps_only_changed_originals():
+    canonical = build_canonical_document({"pages": [{"blocks": [
+        {"id": "h0", "type": "heading", "level": "1", "text": "Heading 0"},
+        {"id": "h1", "type": "heading", "level": "2", "text": "Heading 1"},
+        {"id": "h2", "type": "heading", "level": "1", "text": "Heading 2"},
+        {"id": "h3", "type": "heading", "level": "x", "text": "Heading 3"},
+    ]}]})
+
+    sections = [canonical["sections"][0], *canonical["sections"][0]["children"]]
+    assert [section["level"] for section in sections] == [1, 2, 2, 2]
+    originals = [
+        section["metadata"].get("original_heading_level") for section in sections
+    ]
+    # "1" and "2" are unchanged levels; "1" -> 2 changed; "x" is unreadable.
+    assert originals == [None, None, "1", "x"]

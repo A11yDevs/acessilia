@@ -36,6 +36,7 @@ from backend.core.manifest.builder import (
 from backend.core.manifest.models import (
     Artifact,
     ManifestElement,
+    Obligation,
     PageDescriptor,
     ProcessingManifest,
     is_bottom_left,
@@ -2044,6 +2045,22 @@ class PddlAccessibilityOrchestrator:
             and replans < self.max_replans
             and not self.execute_dry_run
         ):
+            # Steps after a failure still run, so one execution can leave an
+            # obligation exhausted (no method left) next to another that has an
+            # alternative. The planner rejects exhausted obligations, so they are
+            # left out of the replan; an exhausted critical one fails the job.
+            exhausted = [
+                obligation for obligation in manifest.obligations
+                if obligation.status == "failed"
+            ]
+            if any(
+                obligation.kind not in NON_CRITICAL_OBLIGATION_KINDS
+                for obligation in exhausted
+            ):
+                break
+            roots = _replannable_obligation_ids(manifest)
+            if not roots:
+                break
             replans += 1
             logger.info(
                 "PDDL: replanejando ({}/{}) após {}",
@@ -2052,7 +2069,10 @@ class PddlAccessibilityOrchestrator:
                 execution_report.status,
             )
             plan, comparison = await run_blocking(
-                self._build_plan, manifest, extra_unavailable=gated
+                self._build_plan,
+                manifest,
+                extra_unavailable=gated,
+                selected_roots=roots,
             )
             manifest, execution_report = await run_blocking(
                 self.executor.execute,
@@ -2062,7 +2082,19 @@ class PddlAccessibilityOrchestrator:
             )
 
         if execution_report.status not in {"completed", "dry-run-completed"}:
-            raise RuntimeError(_unsatisfied_execution_message(manifest))
+            unsatisfied = _unsatisfied_selected_obligations(manifest)
+            critical = [
+                obligation for obligation in unsatisfied
+                if obligation.kind not in NON_CRITICAL_OBLIGATION_KINDS
+            ]
+            if not unsatisfied or critical:
+                raise RuntimeError(_unsatisfied_execution_message(manifest))
+            # Only refinements are left open; the extracted content is still
+            # complete, so the document is delivered with a technical warning.
+            logger.warning(
+                "PDDL: concluindo com obrigações não críticas pendentes: {}",
+                ", ".join(obligation.id for obligation in unsatisfied),
+            )
 
         payload = build_pddl_structured_payload(
             file_path=file_path,
@@ -2083,6 +2115,7 @@ class PddlAccessibilityOrchestrator:
         manifest: ProcessingManifest,
         *,
         extra_unavailable: Iterable[str] = (),
+        selected_roots: Iterable[str] | None = None,
     ) -> tuple[NominalPlan, PlanningComparison | None]:
         # Tell the compiler which methods the executor can actually run. Without
         # this the planner happily emits steps for methods that have no handler,
@@ -2095,6 +2128,7 @@ class PddlAccessibilityOrchestrator:
         if self.planner_backend == "both":
             _, plans, comparison = self.planner.compare(
                 manifest,
+                selected_roots=selected_roots,
                 unavailable_methods=unavailable,
                 fast_downward=self.fast_downward,
                 fast_downward_alias=self.fast_downward_alias,
@@ -2111,6 +2145,7 @@ class PddlAccessibilityOrchestrator:
 
         _, plan = self.planner.plan(
             manifest,
+            selected_roots=selected_roots,
             unavailable_methods=unavailable,
             backend=self.planner_backend,
             fast_downward=self.fast_downward,
@@ -2613,11 +2648,72 @@ def _has_meaningful_text(element: ManifestElement) -> bool:
     return True
 
 
+#: Obligation kinds that only refine content the extraction already delivered.
+#: Leaving one open (every automatic method failed and it was escalated to
+#: human review) does not lose content, so the job finishes with a warning
+#: instead of failing. Heading levels are also normalized by the canonical
+#: builder, which keeps the exported document valid without the repair.
+#: `refine-reading-order` is deliberately absent: a wrong reading order is what
+#: a screen reader user hits first, so an open one still fails the job.
+NON_CRITICAL_OBLIGATION_KINDS = frozenset(
+    {
+        "repair-heading-hierarchy",
+        "join-tail-blocks",
+        "normalize-text",
+        "chunk-verse",
+        "extract-line-numbers",
+    }
+)
+
+
+def _is_open_obligation(obligation: Obligation) -> bool:
+    """Whether the job selected the obligation and left it unsatisfied.
+
+    An exhausted obligation is left out of later replans, which clears its
+    `selected` flag; its `failed` status keeps it open.
+    """
+    return obligation.status != "satisfied" and (
+        obligation.selected or obligation.status == "failed"
+    )
+
+
+def _unsatisfied_selected_obligations(manifest: ProcessingManifest) -> list:
+    return [
+        obligation for obligation in manifest.obligations
+        if _is_open_obligation(obligation)
+    ]
+
+
+def _replannable_obligation_ids(manifest: ProcessingManifest) -> list[str]:
+    """Open selected obligations that a new plan can still satisfy.
+
+    Exhausted obligations, and those depending on one, are excluded: the planner
+    rejects an obligation without an untried admissible method.
+    """
+    by_id = {obligation.id: obligation for obligation in manifest.obligations}
+
+    def blocked(obligation_id: str, seen: set[str]) -> bool:
+        if obligation_id in seen:
+            return False
+        seen.add(obligation_id)
+        obligation = by_id[obligation_id]
+        if obligation.status == "failed":
+            return True
+        return any(blocked(dependency, seen) for dependency in obligation.dependencies)
+
+    return [
+        obligation.id for obligation in manifest.obligations
+        if obligation.selected
+        and obligation.status != "satisfied"
+        and not blocked(obligation.id, set())
+    ]
+
+
 def _unsatisfied_execution_message(manifest: ProcessingManifest) -> str:
     return t(EXE_COMPLETED_OBLIGATIONS_UNSATISFIED).format(
         unsatisfied=", ".join(
-            obligation.id for obligation in manifest.obligations
-            if obligation.selected and obligation.status != "satisfied"
+            obligation.id
+            for obligation in _unsatisfied_selected_obligations(manifest)
         )
     )
 
@@ -2661,7 +2757,11 @@ def build_pddl_structured_payload(
         technical_warnings.append(
             "Executor nao foi executado; somente manifesto e plano foram gerados."
         )
-    elif execution_report.status in {"failed", "replan-required"}:
+    elif execution_report.status in {
+        "failed", "replan-required",
+    } or _unsatisfied_selected_obligations(manifest):
+        # A replan that leaves an exhausted refinement out can still report
+        # `completed`; the open obligation must reach the document anyway.
         technical_warnings.append(_unsatisfied_execution_message(manifest))
 
     if comparison is not None:
@@ -2709,7 +2809,7 @@ def _unsatisfied_obligations(manifest: ProcessingManifest) -> list[dict[str, Any
     """
     unsatisfied: list[dict[str, Any]] = []
     for obligation in manifest.obligations:
-        if not obligation.selected or obligation.status == "satisfied":
+        if not _is_open_obligation(obligation):
             continue
         last = obligation.attempts[-1] if obligation.attempts else None
         unsatisfied.append(
