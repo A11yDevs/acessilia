@@ -32,6 +32,7 @@ from backend.core.manifest.models import (
     ProcessingManifest,
     Provenance,
     SourceDocument,
+    is_bottom_left,
 )
 
 
@@ -605,12 +606,29 @@ def _is_same_callout_cluster(previous: ManifestElement, current: ManifestElement
     return (overlap_width / min_width) >= 0.55
 
 
-def _element_bbox(element: ManifestElement) -> tuple[float, float, float, float] | None:
+def _raw_bbox(element: ManifestElement) -> BoundingBox | None:
     if not element.provenance:
         return None
-    bbox = element.provenance[0].bbox
+    return element.provenance[0].bbox
+
+
+def _element_bbox(element: ManifestElement) -> tuple[float, float, float, float] | None:
+    """Element box with the y axis growing downwards, whatever the source origin.
+
+    Ordering and callout grouping compare ``top`` and ``bottom`` as screen
+    coordinates. A bottom-left box is mirrored (``y -> -y``): that keeps every
+    comparison right without knowing the page height, which the Docling path
+    does not have yet when the reading order is refined.
+
+    Only differences and orderings are meaningful: a mirrored ``top`` or
+    ``bottom`` is negative, so never compare it with a fixed position such as
+    ``0``. ``_normalized_element_bbox`` gives page fractions instead.
+    """
+    bbox = _raw_bbox(element)
     if bbox is None:
         return None
+    if is_bottom_left(bbox.coord_origin, bbox.top, bbox.bottom):
+        return (bbox.left, -bbox.top, bbox.right, -bbox.bottom)
     return (bbox.left, bbox.top, bbox.right, bbox.bottom)
 
 
@@ -658,12 +676,12 @@ def _is_known_callout_body_candidate(
     bbox = _element_bbox(element)
     if bbox is None:
         return False
-    left, _, right, bottom = bbox
+    left, top, right, bottom = bbox
     width = right - left
     band_width = max(1.0, main_right - main_left)
     left_indent = left - main_left
     right_indent = main_right - right
-    if bottom <= 0:
+    if top >= bottom:  # degenerate box (screen coordinates, see _element_bbox)
         return False
     if width > band_width * 0.98:
         return False
@@ -1184,7 +1202,7 @@ def _normalized_element_bbox(
         element: ManifestElement,
         page_sizes: dict[int, tuple[float | None, float | None]] | None,
 ) -> tuple[float, float, float, float] | None:
-        bbox = _element_bbox(element)
+        bbox = _raw_bbox(element)
         if bbox is None or element.page_number is None or page_sizes is None:
             return None
         size = page_sizes.get(element.page_number)
@@ -1193,12 +1211,8 @@ def _normalized_element_bbox(
         width, height = size
         if not width or not height:
             return None
-        left, top, right, bottom = bbox
-        provenance_bbox = next(
-            (item.bbox for item in element.provenance if item.bbox is not None),
-            None,
-        )
-        if provenance_bbox and provenance_bbox.coord_origin == "BOTTOMLEFT":
+        left, top, right, bottom = bbox.left, bbox.top, bbox.right, bbox.bottom
+        if is_bottom_left(bbox.coord_origin, top, bottom):
             top, bottom = height - top, height - bottom
         return (
             left / width,
