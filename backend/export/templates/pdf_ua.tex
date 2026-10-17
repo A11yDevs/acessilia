@@ -39,7 +39,9 @@ $else$
 $endif$
 }
 
-\usepackage{longtable,booktabs,array}
+\usepackage{longtable,booktabs,array,calc}
+% pandoc emite \def\LTcaptype{none} em tabelas sem legenda; longtable recente exige o contador.
+\newcounter{none}
 \setlength{\LTleft}{0pt}
 \setlength{\LTright}{0pt}
 \setlength{\tabcolsep}{4pt}
