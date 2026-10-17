@@ -16,11 +16,11 @@ from acessilia_sdk.toolbox import snapshot_from_payloads
 from backend.config.settings import settings
 from backend.core.manifest.builder import DEFAULT_METHOD_COSTS
 from backend.core.planning import toolbox_gate
-from tests.test_pddl_actionability import (
-    _element,
-    _manifest,
-    _obligation,
-    _orchestrator,
+from tests.pddl_support import (
+    build_element as _element,
+    build_manifest as _manifest,
+    build_obligation as _obligation,
+    build_orchestrator as _orchestrator,
 )
 
 CONTRACT_SNAPSHOT = Path(__file__).parent / "fixtures" / "toolbox-contract.json"

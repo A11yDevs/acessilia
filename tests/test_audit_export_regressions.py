@@ -14,7 +14,11 @@ from docstruct.validation import (
     audit_canonical_document, validate_canonical_document,
     MSG_MISSING_FIRST_H1, MSG_MULTIPLE_H1, MSG_IMAGE_MISSING_ALT,
 )
-from tests.test_pddl_actionability import _element, _manifest, _orchestrator
+from tests.pddl_support import (
+    build_element as _element,
+    build_manifest as _manifest,
+    build_orchestrator as _orchestrator,
+)
 from tests.test_region_inspection import inspection as inspection
 
 
