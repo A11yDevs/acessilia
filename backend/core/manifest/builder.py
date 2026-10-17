@@ -605,12 +605,36 @@ def _is_same_callout_cluster(previous: ManifestElement, current: ManifestElement
     return (overlap_width / min_width) >= 0.55
 
 
-def _element_bbox(element: ManifestElement) -> tuple[float, float, float, float] | None:
+def _is_bottom_left(bbox: BoundingBox) -> bool:
+    """Whether the box uses a y axis that grows upwards (PDF/Docling default).
+
+    An unknown origin is decided by the geometry: with y growing upwards the top
+    edge has the larger value.
+    """
+    if bbox.coord_origin == "BOTTOMLEFT":
+        return True
+    return bbox.coord_origin == "UNKNOWN" and bbox.top > bbox.bottom
+
+
+def _raw_bbox(element: ManifestElement) -> BoundingBox | None:
     if not element.provenance:
         return None
-    bbox = element.provenance[0].bbox
+    return element.provenance[0].bbox
+
+
+def _element_bbox(element: ManifestElement) -> tuple[float, float, float, float] | None:
+    """Element box with the y axis growing downwards, whatever the source origin.
+
+    Ordering and callout grouping compare ``top`` and ``bottom`` as screen
+    coordinates. A bottom-left box is mirrored (``y -> -y``): that keeps every
+    comparison right without knowing the page height, which the Docling path
+    does not have yet when the reading order is refined.
+    """
+    bbox = _raw_bbox(element)
     if bbox is None:
         return None
+    if _is_bottom_left(bbox):
+        return (bbox.left, -bbox.top, bbox.right, -bbox.bottom)
     return (bbox.left, bbox.top, bbox.right, bbox.bottom)
 
 
@@ -1184,7 +1208,7 @@ def _normalized_element_bbox(
         element: ManifestElement,
         page_sizes: dict[int, tuple[float | None, float | None]] | None,
 ) -> tuple[float, float, float, float] | None:
-        bbox = _element_bbox(element)
+        bbox = _raw_bbox(element)
         if bbox is None or element.page_number is None or page_sizes is None:
             return None
         size = page_sizes.get(element.page_number)
@@ -1193,12 +1217,8 @@ def _normalized_element_bbox(
         width, height = size
         if not width or not height:
             return None
-        left, top, right, bottom = bbox
-        provenance_bbox = next(
-            (item.bbox for item in element.provenance if item.bbox is not None),
-            None,
-        )
-        if provenance_bbox and provenance_bbox.coord_origin == "BOTTOMLEFT":
+        left, top, right, bottom = bbox.left, bbox.top, bbox.right, bbox.bottom
+        if _is_bottom_left(bbox):
             top, bottom = height - top, height - bottom
         return (
             left / width,
