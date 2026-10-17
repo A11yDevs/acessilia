@@ -56,6 +56,7 @@ PROVIDER_DEFAULTS: dict[str, str] = {
     "toolbox_table_provider": "qwen3-vl-8b",
     "toolbox_orientation_provider": "rapidocr-orient",
     "toolbox_media_inspect_provider": "pure-media-inspect",
+    "toolbox_pdf_ua_provider": "pandoc-pdf-ua",
 }
 
 
@@ -109,6 +110,12 @@ _CAPABILITIES: tuple[ToolboxCapability, ...] = (
         "media.inspect", 1, "Inspeção de mídia",
         provider_key="toolbox_media_inspect_provider",
         output_schema="media-inspection@1",
+    ),
+    # The PDF comes back as a stored artifact; the result carries its id.
+    ToolboxCapability(
+        "document.export.pdf_ua", 1, "Exportação PDF/UA",
+        provider_key="toolbox_pdf_ua_provider",
+        output_schema="pdf-export@1",
     ),
     # Vision-language capabilities (Dr.DocBench, PR #125), served by the
     # Toolbox's OpenAI-compatible VLM provider.

@@ -56,6 +56,7 @@ Legenda de **Caminho de chamada**: como o core alcança a capacidade.
 | `pdf.split` | `toolbox_pdf_client.py` | `TOOLBOX_PDF_PROVIDER=pymupdf-pdf` | `pymupdf-pdf` | `toolbox_pdf_tools.py` (valida e divide localmente) |
 | `pdf.render` | `toolbox_pdf_client.py` | `TOOLBOX_PDF_PROVIDER=pymupdf-pdf` | `pymupdf-pdf` | `toolbox_pdf_tools.py` (fallback local via PyMuPDF) |
 | `media.inspect` | `toolbox_media_inspect_client.py` | `TOOLBOX_MEDIA_INSPECT_PROVIDER=pure-media-inspect` | `pure-media-inspect` | `backend/tools/media_inspect.py`, controlado por `TOOLBOX_MEDIA_INSPECT_ENABLED` |
+| `document.export.pdf_ua` | `toolbox_pdf_ua_client.py` | `TOOLBOX_PDF_UA_PROVIDER=pandoc-pdf-ua` | `pandoc-pdf-ua` (sidecar `pdf-ua-render`) | `backend/export/pandoc_exporter.py` (Toolbox-first, PDF baixado de `/v1/artifacts`; fallback para pandoc + LaTeX locais), controlado por `TOOLBOX_PDF_UA_ENABLED` |
 | `artifact.store` / `artifact.retrieve` | `toolbox_client.py` REST `/v1/artifacts` | — | `minio`, `filesystem` | upload antes da extração |
 | `dataset.*` (8 capacidades) | `toolbox_client.py` REST `/v1/datasets` | — | `dataset-github`, `dataset-huggingface` | `toolbox_dataset_tools.py` (scripts do Dr.DocBench) |
 | `document.ocr.page` | `toolbox_page_ocr_client.py` | `TOOLBOX_PAGE_OCR_PROVIDER=qwen3-vl-8b` | `qwen3-vl-8b` (acessilia-toolbox#50) | publicada; nenhum método PDDL a chama ainda |
