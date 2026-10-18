@@ -184,6 +184,24 @@ class Settings:
             provider_default("toolbox_media_inspect_provider"),
         )
     )
+    toolbox_pdf_ua_provider: str = field(
+        default_factory=lambda: os.getenv(
+            "TOOLBOX_PDF_UA_PROVIDER", provider_default("toolbox_pdf_ua_provider")
+        )
+    )
+    # PDF/UA is rendered by the Toolbox (pinned Pandoc + TeX Live) first; the
+    # local pandoc/LaTeX install is only the fallback when it is unavailable.
+    toolbox_pdf_ua_enabled: bool = field(
+        default_factory=lambda: (
+            os.getenv("TOOLBOX_PDF_UA_ENABLED", "true").strip().lower()
+            in {"1", "true", "yes", "on", "sim"}
+        ),
+    )
+    # Matches the capability's timeout_hint_seconds (180) with margin, so a
+    # hung renderer falls back to the local toolchain within minutes.
+    toolbox_pdf_ua_timeout_seconds: int = field(
+        default_factory=lambda: int(os.getenv("TOOLBOX_PDF_UA_TIMEOUT_SECONDS", "300"))
+    )
     toolbox_media_inspect_enabled: bool = field(
         default_factory=lambda: (
             os.getenv("TOOLBOX_MEDIA_INSPECT_ENABLED", "true").strip().lower()
@@ -222,6 +240,11 @@ class Settings:
             os.getenv("TOOLBOX_USE_REMOTE_CACHE", "true").strip().lower()
             in {"1", "true", "yes", "on", "sim"}
         ),
+    )
+    # edge-tts voice for MP3 export. Microsoft retires voices from the
+    # catalogue (pt-BR-ThalitaNeural left it in 2026-10), so keep it swappable.
+    tts_voice: str = field(
+        default_factory=lambda: os.getenv("TTS_VOICE", "pt-BR-FranciscaNeural")
     )
     pddl_execute_dry_run: bool = field(
         default_factory=lambda: _bool_from_env_alias(

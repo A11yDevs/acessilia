@@ -233,6 +233,8 @@ def test_export_accessible_document_sanitizes_legacy_block_markdown():
 
 
 def test_export_accessible_document_pdf_ua_requires_pandoc(monkeypatch):
+    # Force the local renderer: with a reachable Toolbox it would never run.
+    monkeypatch.setattr("backend.export.pandoc_exporter.settings.toolbox_pdf_ua_enabled", False)
     monkeypatch.setattr("backend.export.pandoc_exporter._pandoc_bin", lambda: None)
     monkeypatch.setattr("backend.export.pandoc_exporter._xelatex_bin", lambda: "/usr/bin/xelatex")
     monkeypatch.setattr("backend.export.pandoc_exporter._lualatex_bin", lambda: "/usr/bin/lualatex")
@@ -249,6 +251,8 @@ def test_export_accessible_document_pdf_ua_requires_pandoc(monkeypatch):
 
 
 def test_export_accessible_document_pdf_ua_requires_latex_engine(monkeypatch):
+    # Force the local renderer: with a reachable Toolbox it would never run.
+    monkeypatch.setattr("backend.export.pandoc_exporter.settings.toolbox_pdf_ua_enabled", False)
     monkeypatch.setattr("backend.export.pandoc_exporter._pandoc_bin", lambda: "/usr/bin/pandoc")
     monkeypatch.setattr("backend.export.pandoc_exporter._xelatex_bin", lambda: None)
     monkeypatch.setattr("backend.export.pandoc_exporter._lualatex_bin", lambda: None)

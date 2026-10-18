@@ -16,13 +16,17 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from backend.config.settings import settings
 from backend.export.filters.pandoc_filters import strip_internal_audit_blocks
 from backend.i18n import t
+from backend.log_messages import LOG_PDF_UA_TOOLBOX_EXPORTED, LOG_PDF_UA_TOOLBOX_FALLBACK
 from backend.pipeline.canonical_builder import build_canonical_document
 from backend.pipeline.canonical_builder import sanitize_canonical_document
 from backend.pipeline.pandoc_ast_builder import build_pandoc_ast
 from backend.pipeline.validators import audit_canonical_document
 from backend.pipeline.validators import validate_export_profile
+from backend.tools.logger import logger
+from backend.tools.toolbox_client import ToolboxError
 
 #: Canonical English msgid for a default document title used when the caller passes none.
 MSG_DEFAULT_ACCESSIBLE_TITLE: str = "Accessible document"
@@ -40,6 +44,10 @@ MSG_LATEX_ENGINE_NOT_FOUND: str = (
 )
 #: Canonical English msgid template for a missing PDF/UA template file; {template_path} is substituted by callers after lookup.
 MSG_PDF_UA_TEMPLATE_NOT_FOUND: str = "PDF/UA template not found: {template_path}"
+#: Canonical English msgid template for a pdf_ua export that failed on the Toolbox and on the local fallback; {toolbox_error} and {local_error} are substituted by callers after lookup.
+MSG_PDF_UA_TOOLBOX_AND_LOCAL_FAILED: str = (
+    "PDF/UA export failed on the Toolbox ({toolbox_error}) and locally ({local_error})"
+)
 #: Canonical English msgid template for an audit failure; {findings} is substituted by callers after lookup.
 MSG_AUDIT_FAILED: str = "Audit failed: {findings}"
 #: Canonical English msgid template for an unsupported export format; {format_name} is substituted by callers after lookup.
@@ -138,12 +146,68 @@ def _render_with_pandoc(
     return output_path
 
 
-def _render_pdf_ua_with_pandoc(ast: dict[str, Any], output_path: Path) -> Path:
+#: BCP 47 language for PDF/UA metadata when the document declares none.
+DEFAULT_PDF_UA_LANG = "pt-BR"
+
+
+def _render_pdf_ua(
+    ast: dict[str, Any], output_path: Path, *, lang: str = DEFAULT_PDF_UA_LANG
+) -> Path:
+    """Renders PDF/UA on the Toolbox first, falling back to the local pandoc + LaTeX.
+
+    The Toolbox pins Pandoc and TeX Live in one image, so its output does not
+    depend on how this host's TeX installation was updated. The local toolchain
+    is used only when the Toolbox path is disabled or fails.
+
+    Args:
+        ast (dict): Pandoc JSON AST mapping for the canonical document.
+        output_path (Path): Destination PDF file path.
+        lang (str): BCP 47 tag written to the PDF metadata on both rendering paths.
+
+    Returns:
+        Path: The output_path where the PDF/UA file was written.
+
+    Raises:
+        RuntimeError: When the local fallback fails; if the Toolbox also failed, the message carries both causes.
+    """
+    toolbox_error: Exception | None = None
+    if settings.toolbox_pdf_ua_enabled:
+        from backend.tools.toolbox_pdf_ua_client import toolbox_export_pdf_ua
+
+        try:
+            toolbox_export_pdf_ua(ast, output_path, lang=lang)
+        except Exception as exc:  # noqa: BLE001 - any Toolbox failure must reach the fallback
+            toolbox_error = exc
+            if not isinstance(exc, ToolboxError):
+                # Not a mapped Toolbox failure (e.g. run_sync or a client bug):
+                # keep the traceback, but still render locally.
+                logger.opt(exception=exc).debug("Unexpected PDF/UA Toolbox error")
+            logger.warning(t(LOG_PDF_UA_TOOLBOX_FALLBACK).format(error=exc))
+        else:
+            logger.info(t(LOG_PDF_UA_TOOLBOX_EXPORTED).format(output_path=output_path))
+            return output_path
+
+    try:
+        return _render_pdf_ua_with_pandoc(ast, output_path, lang=lang)
+    except RuntimeError as local_error:
+        if toolbox_error is None:
+            raise
+        raise RuntimeError(
+            t(MSG_PDF_UA_TOOLBOX_AND_LOCAL_FAILED).format(
+                toolbox_error=toolbox_error, local_error=local_error
+            )
+        ) from local_error
+
+
+def _render_pdf_ua_with_pandoc(
+    ast: dict[str, Any], output_path: Path, *, lang: str = DEFAULT_PDF_UA_LANG
+) -> Path:
     """Renders a PDF/UA document via pandoc using the bundled accessible LaTeX template.
 
     Args:
         ast (dict): Pandoc JSON AST mapping for the canonical document.
         output_path (Path): Destination PDF file path.
+        lang (str): BCP 47 tag passed to the template as the document language.
 
     Returns:
         Path: The output_path where the PDF/UA file was written.
@@ -172,7 +236,7 @@ def _render_pdf_ua_with_pandoc(ast: dict[str, Any], output_path: Path) -> Path:
             f"--pdf-engine={engine}",
             f"--template={template_path}",
             "-V",
-            "lang=pt-BR",
+            f"lang={lang}",
         ],
     )
 
@@ -248,7 +312,9 @@ def export_accessible_document(
             title=title or "",
         )
     if format_name == "pdf_ua":
-        return _render_pdf_ua_with_pandoc(ast, output_path)
+        return _render_pdf_ua(
+            ast, output_path, lang=filtered.get("language") or DEFAULT_PDF_UA_LANG
+        )
     if format_name == "txt":
         from backend.export.renderers.txt_renderer import render_txt
 

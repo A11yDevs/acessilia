@@ -915,6 +915,14 @@ msgid "PDF/UA template not found: {template_path}"
 msgstr "PDF/UA template not found: {template_path}"
 
 #, python-brace-format
+msgid ""
+"PDF/UA export failed on the Toolbox ({toolbox_error}) and locally "
+"({local_error})"
+msgstr ""
+"PDF/UA export failed on the Toolbox ({toolbox_error}) and locally "
+"({local_error})"
+
+#, python-brace-format
 msgid "Audit failed: {findings}"
 msgstr "Audit failed: {findings}"
 
@@ -1385,6 +1393,18 @@ msgstr "PDF exported with bookmarks and page numbering: {output_path}"
 #, python-brace-format
 msgid "PDF/UA exported: {output_path}"
 msgstr "PDF/UA exported: {output_path}"
+
+#, python-brace-format
+msgid "PDF/UA rendered by the Toolbox: {output_path}"
+msgstr "PDF/UA rendered by the Toolbox: {output_path}"
+
+#, python-brace-format
+msgid ""
+"PDF/UA export on the Toolbox failed ({error}); falling back to local "
+"pandoc + LaTeX"
+msgstr ""
+"PDF/UA export on the Toolbox failed ({error}); falling back to local "
+"pandoc + LaTeX"
 
 #, python-brace-format
 msgid "TXT exported: {output_path}"
