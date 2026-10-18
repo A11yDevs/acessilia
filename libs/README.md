@@ -7,13 +7,13 @@ Shared Python packages that live in this repository, next to the core (`backend`
 | Package | Directory | In one sentence |
 |---|---|---|
 | `acessilia-docstruct` | [docstruct/](docstruct/) | **What** is computed on a document: pure structural algorithms. |
-| `acessilia-sdk` | [sdk/](sdk/) | **How** the core asks the Toolbox to run an operation: contracts, HTTP transport and clients. |
+| `acessilia-sdk` | [sdk/](sdk/) | **How** the core asks the Toolbox to run an operation: contracts, HTTP transport, clients, artifact references and failover. |
 
 ## docstruct vs. SDK
 
 | | **acessilia-docstruct** | **acessilia-sdk** |
 |---|---|---|
-| **What it is** | Document structure algorithms: canonical types (`CanonicalDocument`, `BBox`…), reading order, multi-provider fusion, text and LaTeX normalization, tables, validation | Uniform access to Toolbox capabilities: contract registry, HTTP transport (`execute_capability`), clients, catalog, errors |
+| **What it is** | Document structure algorithms: canonical types (`CanonicalDocument`, `BBox`…), reading order, multi-provider fusion, text and LaTeX normalization, tables, validation | Uniform access to Toolbox capabilities: contract registry, HTTP transport (`execute_capability`), clients, catalog, errors, artifact references, retries and failover |
 | **Nature** | Pure: no network, files, subprocess or settings | Performs I/O: asynchronous HTTP client |
 | **Dependencies** | None (`dependencies = []`) | `httpx` |
 | **Consumers** | The core (`backend/pipeline`, `tools`, `export`…) **and the Toolbox**, which runs these algorithms on its side | The core only, to talk to the Toolbox |
@@ -24,14 +24,15 @@ Shared Python packages that live in this repository, next to the core (`backend`
 
 ```
 backend (core) ──→ acessilia-sdk ──HTTP contract──→ Toolbox
-      │                  ┆                             │
-      │                  ┆ (planned: local executors)  │
+      │                  │                             │
       ▼                  ▼                             ▼
             acessilia-docstruct  ←─────────────────────┘
 ```
 
-Dependencies only point downward: docstruct imports nothing above it, and the
-SDK never imports the core or the Toolbox package.
+Dependencies only point downward: docstruct imports nothing above it, the SDK
+never imports the core or the Toolbox package, and the Toolbox never imports
+the SDK. The full matrix of responsibilities and allowed dependencies is in
+[ADR-0002](../docs/adr/0002-component-responsibilities.md).
 
 ## Why docstruct is not part of the SDK
 
@@ -49,11 +50,12 @@ The separation is intentional, and the purity tests enforce it:
    capability contracts. A single package would force a release of one whenever
    the other changes.
 
-The intended relationship is the reverse: **the SDK may use docstruct** for local
-executors (capabilities that can run in-process without the Toolbox) behind the
-same interface. If installing two packages is the concern, the SDK can expose
-docstruct as an optional extra (for example `acessilia-sdk[local]`), so the core
-gets both at once while the Toolbox keeps depending on docstruct alone.
+The intended relationship is the reverse: **the SDK may use docstruct's pure
+algorithms in-process**, for example to build or validate canonical models.
+That is not a local executor: operational capabilities (Pandoc, TeX Live,
+veraPDF, PyMuPDF rendering, media inspection, OCR, AI models) run only in the
+Toolbox, and the SDK has no local executors and no `[local]` extra for them
+([ADR-0003](../docs/adr/0003-remote-only-operational-capabilities.md)).
 
 ## Tests
 

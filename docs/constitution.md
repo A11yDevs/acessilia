@@ -1,5 +1,9 @@
 # Architectural Constitution
 
+You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](constitution.pt-br.md)
+
+- **Version:** 2.0.0 (2026-10-18). See the [changelog](#9-changelog).
+
 ## 1. Purpose
 Deliver document and image conversion to accessible formats through:
 - **Deterministic extraction and planning** (PDDL-based task ordering and validation)
@@ -10,9 +14,9 @@ Deliver document and image conversion to accessible formats through:
 ## 2. Non-negotiable principles
 1. Source-code alignment: every rule in this constitution must be traceable to real modules.
 2. Accessibility first: all outputs must support screen readers and semantic structure.
-3. Fault tolerance: the system must degrade gracefully with textual fallback when AI fails.
-4. Local and configurable operation: behavior must be driven by environment variables and local folders.
-5. Local-first extraction: text-based PDFs should prefer deterministic local extraction before invoking AI.
+3. Fault tolerance: the system must degrade gracefully with textual fallback when AI fails. Degradation is a visible, documented business decision. An operational capability never falls back silently to a different implementation (principles P4 and P6).
+4. Configurable operation: behavior must be driven by environment variables and local folders. Configuration selects where capabilities run (for example the Toolbox endpoint); it does not imply local execution (P4).
+5. Deterministic-first extraction: text-based PDFs should prefer deterministic extraction before invoking AI. Deterministic extraction runs as a Toolbox capability or a docstruct algorithm, not as a local operational executor in the core (P4).
 6. Hybrid determinism and intelligence: the system combines deterministic planning (PDDL processing, manifesto generation) with AI-driven execution to ensure reliability and flexibility. Deterministic functions are the source of truth; LLMs provide interpretation and description.
 7. Container-first validation: test suite must pass in Docker container (production-equivalent environment) before merge. Native environment testing is secondary and environment-specific.
 8. **English-first documentation with Brazilian Portuguese as official secondary language**: all source code (identifiers, comments, docstrings, log messages), Markdown documentation, issues, pull requests, and commit messages must be written in English — the mandatory, authoritative language. Brazilian Portuguese is the official secondary language: desirable for all documentation, and every `*.pt-br.md` mirror must be updated in the same PR whenever its English source changes. The English version is authoritative in case of divergence. Translation and support for other languages is an important secondary goal (internationalization/i18n) aimed at a broad, inclusive audience; localized content for other languages is welcome but never blocks a merge. User-facing content (Telegram messages, rendered output, prompts for the AI models) must be localized according to the user's locale — including English and Brazilian Portuguese, and extended to other languages as the i18n effort grows. Educational materials are a priority domain for internationalization: they should be produced in the audience's language whenever possible, with English and Brazilian Portuguese as the primary supported languages.
@@ -31,14 +35,14 @@ Deliver document and image conversion to accessible formats through:
       - `core/manifest/` – InformationalStructuralAgent; extracts processing manifesto
    
    c. **Agent Layer (Agno Multiagent):**
-      - ReaderAgent (Python) – structural extraction via Docling/PyMuPDF
+      - ReaderAgent (Python) – structural extraction through Toolbox capabilities (Docling, MinerU…); its remaining in-process PyMuPDF use is a tracked deviation ([ADR-0003](adr/0003-remote-only-operational-capabilities.md))
       - VisionAgent (Agno) – image descriptions
       - DataAgent (Agno) – tabular/formula text representation
       - EditorAgent (Python) – deduplication and accessibility tagging
    
    d. **Canonical Pipeline:**
       - `pipeline/` – canonical document construction and validation
-      - `export/filters` – Pandoc filters for accessibility
+      - `export/filters` – Pandoc AST filters for accessibility (pure transforms from docstruct; Pandoc itself runs in the Toolbox)
       - `export/renderers` – deterministic output rendering
       - `schemas/` – JSON/PDDL schemas for manifesto, plan, execution report
    
@@ -69,7 +73,7 @@ Deliver document and image conversion to accessible formats through:
    - Plan is deterministic output from planner (internal or fast-downward backend)
    - Execution report validates plan adherence and records task outcomes
 3. Processing mode changes prompt and verbosity behavior. The accepted values are `detalhado`, `medio` (with `normal` as an alias), `baixo` and `ocr`; an unknown value falls back to `medio`. They map to prompts in `backend/ai/prompts` and to verbosity profiles in `backend/pipeline/verbosity_manager.py`.
-4. Extraction is hybrid: local PDF text extraction first, then AI vision for scanned/no-text pages and image inputs.
+4. Extraction is hybrid: deterministic text extraction first, then AI vision for scanned/no-text pages and image inputs (see principle 2.5).
 5. Page and file cache are optimizations, not source of truth.
 6. Renderers must only consume validated canonical data.
 7. Planner invariants:
@@ -86,6 +90,7 @@ Deliver document and image conversion to accessible formats through:
    - Planner timeout: configurable TTL for plan generation; fallback to execution-without-plan if exceeded
    - Invalid problem: if manifesto → PDDL generation fails, log error and skip planning phase; execute deterministically
    - Planner crash: if external planner (fast-downward) fails, switch to internal planner backend
+6. Toolbox unavailability: availability comes from Toolbox replicas behind a load balancer, with bounded SDK retries for idempotent calls ([ADR-0006](adr/0006-availability-and-failover.md)). When a capability stays unavailable, the step fails or degrades visibly, and the cause is recorded in the job; there is no local fallback.
 
 ## 6. Architectural evolution
 1. Pipeline changes must update diagrams in docs/sequence and docs/state_machine, plus the architecture overview docs.
@@ -105,3 +110,108 @@ Deliver document and image conversion to accessible formats through:
    - Documentation: update `docs/pmv_agno_pddl.md` with new examples
 4. Changing the canonical schema or renderers requires updates in [README.md](../README.md), [architecture.md](architecture.md), [tests/README.md](../tests/README.md), and the PlantUML diagrams.
 5. Accessibility regression is treated as a critical defect.
+6. Adding a Toolbox capability or provider follows [toolbox_integration.md](toolbox_integration.md) §4, and decides where each piece of code goes with the guide in [ADR-0002](adr/0002-component-responsibilities.md#decision).
+7. A decision that changes responsibilities or dependencies between the core, the SDK, docstruct and the Toolbox, changes a public contract, or makes an exception to section 7, is recorded as an ADR in [docs/adr/](adr/README.md) before or with the change.
+
+## 7. Ecosystem architecture principles
+
+These principles govern how the four components of the ecosystem divide the
+work: the core (`backend/`), the SDK (`libs/sdk`), docstruct (`libs/docstruct`)
+and the [Acessilia Toolbox](https://github.com/A11yDevs/acessilia-toolbox). Each
+one links to the ADR that details it and says how compliance is checked. An
+exception requires an ADR that states its justification, scope, owner and exit
+criterion ([ADR process](adr/README.md#process)); it is reviewed by the owners
+of the affected components.
+
+**In one sentence:** the core decides and orchestrates; the SDK provides
+interfaces and access; docstruct implements reusable structural algorithms; the
+Toolbox executes operational capabilities.
+
+1. **P1 — One owner per functionality.**
+   - **Rule:** each functionality has one architectural owner and one
+     reference implementation. Python, REST and MCP interfaces may expose the
+     same implementation; components reuse shared libraries instead of copying
+     code.
+   - **Detail:** [ADR-0002](adr/0002-component-responsibilities.md).
+   - **Checked by:** review, and the duplication inventory of #152.
+2. **P2 — Separation of responsibilities.**
+   - **Rule:** the core holds agents, planning, strategies, policies and
+     flows. The SDK holds contracts, clients, adapters, artifact references and
+     access to reusable libraries, without mandatory heavy dependencies.
+     docstruct holds deterministic, infrastructure-free structural algorithms.
+     The Toolbox holds providers, conversion, rendering, OCR, validation,
+     artifacts, jobs, sidecars and REST/MCP interfaces.
+   - **Detail:** [ADR-0002](adr/0002-component-responsibilities.md).
+   - **Checked by:** review, using the "where does new code go?" guide.
+3. **P3 — Directional dependencies.**
+   - **Rule:** core → SDK, docstruct; SDK → docstruct and the Toolbox's
+     published contract; Toolbox → docstruct; docstruct → nothing in the
+     ecosystem. No circular dependencies, and no dependency on another
+     component's internals.
+   - **Detail:** [ADR-0002](adr/0002-component-responsibilities.md).
+   - **Checked by:** `tests/test_architecture_layers.py`,
+     `libs/docstruct/tests/test_purity.py` and `libs/sdk/tests/test_purity.py`.
+4. **P4 — Lightweight core, remote execution.**
+   - **Rule:** operations that need heavy dependencies or specialized
+     infrastructure run in the Toolbox. The production policy is `remote_only`.
+     The core adds no local fallbacks and installs no heavy dependency only to
+     offer one.
+   - **Detail:** [ADR-0003](adr/0003-remote-only-operational-capabilities.md).
+   - **Checked by:** review, and planned architecture tests that forbid heavy
+     imports and tool subprocesses in the core, with an allowlist that can only
+     shrink.
+5. **P5 — Reference-oriented processing.**
+   - **Rule:** persisted artifacts are processed where they are stored and
+     passed as typed, opaque `ArtifactRef` references. Materialization is
+     explicit and verified; references are immutable and scoped.
+   - **Detail:** [ADR-0005](adr/0005-artifact-references.md).
+   - **Checked by:** SDK tests (`libs/sdk/tests/test_failover.py`), and
+     contract tests once the Toolbox publishes `artifact-ref@1`.
+6. **P6 — Reliability without operational duplication.**
+   - **Rule:** availability comes from redundant infrastructure (replicas
+     behind a load balancer sharing storage), timeouts, bounded retries and
+     explicit failure handling, not from duplicate executors in the core. There
+     are no silent fallbacks.
+   - **Detail:** [ADR-0006](adr/0006-availability-and-failover.md).
+   - **Checked by:** SDK failover tests, and a planned end-to-end test with
+     replicas.
+7. **P7 — One source of truth per contract.**
+   - **Rule:** docstruct owns the canonical document models and schemas. The
+     Toolbox owns the operational API contracts (`ArtifactRef`, jobs,
+     capabilities). The SDK consumes the Toolbox's contracts, preferably
+     generated. The core uses the public contracts without redefining them.
+   - **Detail:** [ADR-0004](adr/0004-single-source-of-truth-for-contracts.md).
+   - **Checked by:** `scripts/check_capability_contract.py`.
+8. **P8 — Incremental evolution.**
+   - **Rule:** refactorings are small and verifiable. Extract and reuse code
+     before replacing it. Do not mix architectural and behavioral changes in
+     one pull request. New capabilities keep algorithms, policies and execution
+     apart.
+   - **Checked by:** review, and the regression, contract and integration tests
+     required by section 3.7.
+9. **P9 — Traceability and contract compatibility.**
+   - **Rule:** public contracts are versioned and tested. Document
+     transformations preserve provenance. Results identify the relevant
+     algorithm, provider and parameter versions. Structural changes stay
+     compatible or declare their migration.
+   - **Detail:** Toolbox constitution, principles 9 and 12.
+   - **Checked by:** the SDK's exact contract versions
+     (`TOOLBOX_CAPABILITIES`), and `scripts/check_capability_contract.py`.
+
+## 8. Related documents
+
+- [Architecture Decision Records](adr/README.md)
+- [Libraries (`libs/`)](../libs/README.md)
+- [Toolbox integration](toolbox_integration.md)
+- [Acessilia Toolbox constitution](https://github.com/A11yDevs/acessilia-toolbox/blob/main/docs/constitution.md)
+
+## 9. Changelog
+
+- **2.0.0 (2026-10-18):** added the ecosystem architecture principles P1–P9
+  (section 7) and the ADRs that detail them
+  ([#152](https://github.com/A11yDevs/acessilia/issues/152)). Aligned
+  principles 2.3–2.5, the ReaderAgent and filter descriptions in 3.1, contract
+  4.4, resilience 5.6 and evolution 6.6–6.7 with remote-only execution. The
+  version number and this changelog start here. The Brazilian Portuguese
+  mirror now covers the whole document.
+- **1.x:** earlier, unversioned revisions; see the git history of this file.

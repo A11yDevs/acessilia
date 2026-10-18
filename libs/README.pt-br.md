@@ -7,13 +7,13 @@ Pacotes Python compartilhados que vivem neste repositório, ao lado do core (`ba
 | Pacote | Diretório | Em uma frase |
 |---|---|---|
 | `acessilia-docstruct` | [docstruct/](docstruct/) | **O que** se calcula sobre um documento: algoritmos estruturais puros. |
-| `acessilia-sdk` | [sdk/](sdk/) | **Como** o core pede à Toolbox que execute uma operação: contratos, transporte HTTP e clientes. |
+| `acessilia-sdk` | [sdk/](sdk/) | **Como** o core pede à Toolbox que execute uma operação: contratos, transporte HTTP, clientes, referências de artefatos e failover. |
 
 ## docstruct vs. SDK
 
 | | **acessilia-docstruct** | **acessilia-sdk** |
 |---|---|---|
-| **O que é** | Algoritmos de estrutura de documentos: tipos canônicos (`CanonicalDocument`, `BBox`…), ordem de leitura, fusão de vários provedores, normalização de texto e LaTeX, tabelas, validação | Acesso uniforme às capacidades da Toolbox: registro de contratos, transporte HTTP (`execute_capability`), clientes, catálogo, erros |
+| **O que é** | Algoritmos de estrutura de documentos: tipos canônicos (`CanonicalDocument`, `BBox`…), ordem de leitura, fusão de vários provedores, normalização de texto e LaTeX, tabelas, validação | Acesso uniforme às capacidades da Toolbox: registro de contratos, transporte HTTP (`execute_capability`), clientes, catálogo, erros, referências de artefatos, retries e failover |
 | **Natureza** | Pura: sem rede, arquivos, subprocess ou settings | Faz I/O: cliente HTTP assíncrono |
 | **Dependências** | Nenhuma (`dependencies = []`) | `httpx` |
 | **Quem usa** | O core (`backend/pipeline`, `tools`, `export`…) **e a Toolbox**, que roda esses algoritmos do lado dela | Só o core, para falar com a Toolbox |
@@ -24,14 +24,15 @@ Pacotes Python compartilhados que vivem neste repositório, ao lado do core (`ba
 
 ```
 backend (core) ──→ acessilia-sdk ──contrato HTTP──→ Toolbox
-      │                  ┆                             │
-      │                  ┆ (previsto: execução local)  │
+      │                  │                             │
       ▼                  ▼                             ▼
             acessilia-docstruct  ←─────────────────────┘
 ```
 
 As dependências só apontam para baixo: a docstruct não importa nada acima dela,
-e a SDK nunca importa o core nem o pacote da Toolbox.
+a SDK nunca importa o core nem o pacote da Toolbox, e a Toolbox nunca importa a
+SDK. A matriz completa de responsabilidades e dependências permitidas está no
+[ADR-0002](../docs/adr/0002-component-responsibilities.pt-br.md).
 
 ## Por que a docstruct não faz parte da SDK
 
@@ -49,11 +50,13 @@ A separação é intencional, e os testes de pureza a garantem:
    contratos de capacidade da Toolbox. Um pacote único exigiria uma nova versão
    de um sempre que o outro mudasse.
 
-A relação prevista é a inversa: **a SDK pode usar a docstruct** em executores
-locais (capacidades que rodam no próprio processo, sem a Toolbox), atrás da
-mesma interface. Se o incômodo é instalar dois pacotes, a SDK pode expor a
-docstruct como extra opcional (por exemplo `acessilia-sdk[local]`): o core
-recebe as duas de uma vez, e a Toolbox continua dependendo só da docstruct.
+A relação prevista é a inversa: **a SDK pode usar os algoritmos puros da
+docstruct no próprio processo**, por exemplo para montar ou validar modelos
+canônicos. Isso não é um executor local: capacidades operacionais (Pandoc, TeX
+Live, veraPDF, renderização com PyMuPDF, inspeção de mídias, OCR, modelos de
+IA) rodam só na Toolbox, e a SDK não tem executores locais nem um extra
+`[local]` para elas
+([ADR-0003](../docs/adr/0003-remote-only-operational-capabilities.pt-br.md)).
 
 ## Testes
 
