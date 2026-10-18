@@ -9,7 +9,7 @@ Uniform access to Acessilia capabilities.
 ```
 core (backend)  →  acessilia-sdk  →  Toolbox HTTP contract
                          │
-                         └──────→  acessilia-docstruct (local executors, planned)
+                         └──────→  acessilia-docstruct (pure algorithms, in-process)
 ```
 
 - **The core decides what to do and when; the SDK defines how to reach an
@@ -19,6 +19,9 @@ core (backend)  →  acessilia-sdk  →  Toolbox HTTP contract
   `acessilia_toolbox`, and the Toolbox does not depend on the SDK.
 - The SDK never imports the core (`backend`) and reads no settings or
   environment: configuration is passed in by the caller.
+- The SDK has no local executors: operational capabilities run only in the
+  Toolbox ([ADR-0003](../../docs/adr/0003-remote-only-operational-capabilities.md)).
+  It may call docstruct's pure algorithms in-process.
 
 ## Public API
 

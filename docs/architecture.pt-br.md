@@ -110,10 +110,13 @@ Os modelos pesados rodam num serviço separado, a [Acessilia Toolbox](https://gi
 |---|---|---|---|
 | 0 | `libs/docstruct` (`acessilia-docstruct`) | Algoritmos puros de estrutura de documentos (fusão, tabelas, ordem de leitura), sem dependências próprias | nada |
 | 1 | Toolbox (repositório separado) | Providers pesados, armazenamento de artefatos, execução de capacidades por REST/MCP | docstruct |
-| 2 | `libs/sdk` (`acessilia-sdk`) | Allowlist de capacidades, transporte HTTP, verificações do catálogo; a configuração é injetada | o **contrato publicado** da Toolbox (IDs de capacidade, versões, schemas), nunca o pacote dela |
+| 2 | `libs/sdk` (`acessilia-sdk`) | Allowlist de capacidades, transporte HTTP, verificações do catálogo, referências de artefatos, retries e failover; a configuração é injetada | o **contrato publicado** da Toolbox (IDs de capacidade, versões, schemas), nunca o pacote dela |
 | 3 | Core (`backend/`) | Agentes, planejamento PDDL, obrigações, políticas | SDK, docstruct |
 
 - **O core decide o que fazer e quando; o SDK define como acessar uma operação; a Toolbox fornece onde e com quais recursos ela roda.** Obrigações, métodos admissíveis e custos são política de planejamento do core: a Toolbox relata o que encontrou, e o core deriva as obrigações ([#138](https://github.com/A11yDevs/acessilia/pull/138)).
+- **Capacidades operacionais rodam só na Toolbox.** A política de produção é `remote_only`: o core não mantém fallback local para Pandoc, TeX Live, veraPDF, renderização com PyMuPDF, inspeção de mídias ou OCR, e a Toolbox não depende do SDK ([ADR-0002](adr/0002-component-responsibilities.pt-br.md), [ADR-0003](adr/0003-remote-only-operational-capabilities.pt-br.md)).
+- **A disponibilidade vem de réplicas da Toolbox** atrás de um balanceador, que compartilham o armazenamento de artefatos, com retries limitados no SDK; o failover multi-endpoint do SDK fica reservado a deploys independentes ([ADR-0006](adr/0006-availability-and-failover.pt-br.md)). Artefatos persistidos trafegam como referências `ArtifactRef` ([ADR-0005](adr/0005-artifact-references.pt-br.md)).
+- **Uma fonte de verdade por contrato:** a docstruct é dona dos modelos documentais canônicos; a Toolbox, dos contratos operacionais da API; o SDK os consome ([ADR-0004](adr/0004-single-source-of-truth-for-contracts.pt-br.md)). Decisões que atravessam componentes ficam registradas em [docs/adr/](adr/README.pt-br.md).
 - **O catálogo da Toolbox só restringe.** Os métodos que chamam a Toolbox são conferidos contra o catálogo vivo antes de cada documento ser planejado (`TOOLBOX_AVAILABILITY_GATE`); uma capacidade fora da allowlist do SDK nunca fica disponível. Veja [toolbox_integration.pt-br.md](toolbox_integration.pt-br.md).
 - **A docstruct é distribuída como wheel de release.** O core a instala a partir deste checkout. A Toolbox fixa a wheel de um GitHub Release `docstruct-vX.Y.Z` pela URL e pelo `#sha256=` ([Releases](../libs/docstruct/README.pt-br.md#releases)). O SDK tem um único consumidor, o core, e ainda não é publicado.
 - **Garantido por testes:** `libs/docstruct/tests/test_purity.py` e `libs/sdk/tests/test_purity.py` importam todos os módulos com as camadas de cima bloqueadas; `tests/test_architecture_layers.py` falha se o `backend` importar o pacote da Toolbox.
@@ -151,7 +154,8 @@ O runtime AgentOS não faz parte de `ENABLED_INTERFACES`; ele é iniciado separa
 
 - **Framework Agno:** orquestração multiagente e interface unificada de LLM multimodal.
 - **Provedores de IA:** API Ollama (modelos locais como LLaVA/Qwen-VL) ou API OpenRouter (modelos em nuvem como Claude/GPT-4o).
-- **Bibliotecas de Processamento:** PyMuPDF, Docling, Pillow, OpenCV, reportlab, python-docx, pypdf, edge-tts, aiogram, FastAPI.
+- **Bibliotecas de Processamento:** reportlab, python-docx, pypdf, edge-tts, aiogram, FastAPI.
+- **Desvios em remoção** ([ADR-0003](adr/0003-remote-only-operational-capabilities.pt-br.md), [#150](https://github.com/A11yDevs/acessilia/issues/150)): PyMuPDF, Pillow e OpenCV ainda são importados no core, `tools/formula_worker.py` importa o Docling, e a imagem ainda instala Pandoc, TeX Live e veraPDF. O dono-alvo é a Toolbox, onde o Docling já roda como provider.
 
 ---
 

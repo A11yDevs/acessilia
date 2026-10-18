@@ -31,7 +31,7 @@ Checked against `https://www.acessilia3.inf.ufg.br/toolbox` on 2026-10-14:
 | `math.recognize`, `math.convert`, `math.verbalize` | Math tools/client; recognition, conversion, verbalization, and chained workflow E2E coverage | Integrated | Keep contract and E2E coverage |
 | `pdf.split`, `pdf.render` | PDF tools/client; direct and chained workflow E2E coverage | Integrated | Keep contract and E2E coverage |
 | `media.inspect` | Production caller in `backend/tools/media_inspect.py`; opt-in setting | Integrated, opt-in | Keep the explicit feature gate |
-| `document.export.pdf_ua` | Production caller in `backend/export/pandoc_exporter.py`; enabled by default with local fallback. Added after the snapshot above: checked live on 2026-10-17, after acessilia-toolbox#53 merged | Integrated | Keep the local fallback until every deployment runs `pdf-ua-render` |
+| `document.export.pdf_ua` | Production caller in `backend/export/pandoc_exporter.py`; enabled by default with local fallback. Added after the snapshot above: checked live on 2026-10-17, after acessilia-toolbox#53 merged | Integrated | Remove the local fallback in #150 (ADR-0003); every deployment must run `pdf-ua-render` first |
 | `artifact.store`, `artifact.retrieve` | Shared Toolbox client; used by extraction/upload paths | Integrated infrastructure | Keep covered by client contract tests |
 | `dataset.*` | Dataset tools are used by Dr.DocBench scripts, not the document runtime | Integrated for benchmarking; outside document runtime | Preserve script call paths and tests |
 | `image.page.orient` | Contract-valid client/provider; no production PDDL trigger | Pending modeling/activation | Derive an obligation from orientation evidence and validate the applied rotation |

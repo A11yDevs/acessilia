@@ -1,9 +1,10 @@
-"""Dependency direction between the Acessilia layers.
+"""Dependency direction between the Acessilia components (docs/adr/0002).
 
-docstruct (pure algorithms) → Toolbox (remote capabilities) → client → core.
-The core reaches the Toolbox through its published HTTP contract only, so the
-backend must never import the Toolbox package; docstruct guards its own side in
-``libs/docstruct/tests/test_purity.py``.
+core → SDK, docstruct; SDK → docstruct and the Toolbox's published contract;
+Toolbox → docstruct. The core reaches the Toolbox through the SDK and its
+published HTTP contract only, so the backend must never import the Toolbox
+package. docstruct and the SDK guard their own side in their
+``tests/test_purity.py``.
 """
 
 from __future__ import annotations
