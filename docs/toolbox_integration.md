@@ -180,8 +180,13 @@ matching attribute to `Settings` (`os.getenv("TOOLBOX_<X>_PROVIDER",
 provider_default("toolbox_<x>_provider"))`).
 
 **2. Write the client** as a subclass of `ToolboxCapabilityClient`, which
-already owns the connection, the Bearer header, `health()`, `close()`, the
-timeout/network error mapping and the response envelope check:
+already owns the connections, the Bearer header, `health()`, `close()`, the
+timeout/network error mapping, the response envelope check, bounded retries
+and failover between independent Toolbox endpoints (see
+[the SDK README](../libs/sdk/README.md#availability-and-failover)). A
+capability that returns an artifact must call `_execute_on` and download it
+with `download_artifact` through the HTTP client it returns, not through
+`self._client`:
 
 ```python
 """Specialized client for the <capability> Toolbox capability."""
