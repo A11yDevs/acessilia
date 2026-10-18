@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import random
 from collections.abc import Callable, Sequence
 from functools import partial
 from typing import Any, ClassVar
@@ -15,11 +17,15 @@ from acessilia_sdk.toolbox.catalog import (
     fetch_catalog,
     missing_requirements,
 )
-from acessilia_sdk.toolbox.endpoints import FAILOVER_ERRORS, ToolboxEndpoint
+from acessilia_sdk.toolbox.endpoints import (
+    FAILOVER_ERRORS,
+    ToolboxEndpoint,
+    parse_endpoints,
+)
 from acessilia_sdk.toolbox.errors import (
     ToolboxArtifactNotFound,
-    ToolboxCapabilityError,
     ToolboxError,
+    ToolboxIncompatibleEndpoint,
     ToolboxProviderUnavailable,
     ToolboxTimeout,
     ToolboxUnavailable,
@@ -39,6 +45,9 @@ DEFAULT_TIMEOUT_SECONDS = 3600
 #: tried. The SDK has no logger; the caller decides what to record.
 FailoverHook = Callable[[ToolboxEndpoint, ToolboxError], None]
 
+#: Indirection so tests can observe the backoff without waiting.
+_sleep = asyncio.sleep
+
 
 class ToolboxCapabilityClient:
     """Holds the connections, auth headers and provider of one capability family.
@@ -51,16 +60,29 @@ class ToolboxCapabilityClient:
     Pass ``base_url`` for one Toolbox, normally a load balancer in front of
     stateless replicas that share the artifact store: that is the primary way
     to stay available, and artifact ids stay valid across replicas. Pass
-    ``endpoints`` only to reach *independent* Toolbox deployments, tried in
-    order (see :mod:`acessilia_sdk.toolbox.endpoints`). A secondary endpoint
-    is used only when its catalogue publishes the capability at the contract
-    version this SDK expects, for the client's provider.
+    ``endpoints`` (``ToolboxEndpoint`` objects, URLs, or a comma-separated
+    string) only to reach *independent* Toolbox deployments, tried in order
+    (see :mod:`acessilia_sdk.toolbox.endpoints`). A secondary endpoint is used
+    only when its catalogue publishes the capability at the contract version
+    this SDK expects, for the client's provider; ``catalog_refresh_seconds``
+    and ``catalog_stale_seconds`` tune those secondary catalogues and have no
+    effect with a single endpoint. When only one endpoint was tried, its own
+    error is raised; ``ToolboxUnavailable`` is raised once two or more failed.
 
     ``retries`` re-sends a request to the same endpoint after a timeout or an
-    unavailable instance, before moving on. Enable it only for idempotent
-    capabilities. ``resend_file_on_missing_artifact`` sends the file again
-    when an endpoint does not know an ``artifact_id``; it is off by default,
-    so a missing artifact is reported instead of silently re-uploaded.
+    unavailable instance, waiting ``retry_backoff_seconds * 2**attempt`` with
+    jitter, before moving on. Enable it only for idempotent capabilities.
+
+    ``resend_file_on_missing_artifact`` sends the file again when an endpoint
+    does not know an ``artifact_id``. It only applies when the call passes
+    **both** the ``artifact_id`` and the file (``file_path`` or ``upload``);
+    calls that send one or the other are unaffected. It is off by default, so
+    a missing artifact is reported instead of silently re-uploaded.
+
+    ``self._client`` and ``self.base_url`` address the **primary** endpoint
+    only. A capability whose result must be fetched afterwards (an artifact)
+    must use :meth:`_execute_on` and fetch it through the HTTP client it
+    returns, or it will read from the wrong instance after a failover.
     """
 
     #: Provider key whose default applies when no ``provider`` is given.
@@ -70,38 +92,40 @@ class ToolboxCapabilityClient:
         self,
         *,
         base_url: str | None = None,
-        endpoints: Sequence[ToolboxEndpoint] | None = None,
+        endpoints: str | Sequence[str | ToolboxEndpoint] | None = None,
         provider: str | None = None,
         timeout_seconds: float | None = None,
         api_key: str | None = None,
         on_failover: FailoverHook | None = None,
         retries: int = 0,
+        retry_backoff_seconds: float = 0.5,
         resend_file_on_missing_artifact: bool = False,
         catalog_refresh_seconds: float = 60.0,
         catalog_stale_seconds: float = 900.0,
     ) -> None:
         if (base_url is None) == (endpoints is None):
             raise ValueError("Pass exactly one of base_url or endpoints")
-        if endpoints is None:
-            endpoints = (ToolboxEndpoint(base_url or "", api_key),)
-        if not endpoints:
-            raise ValueError("At least one Toolbox endpoint is required")
         if retries < 0:
             raise ValueError("retries must be zero or positive")
-        self.endpoints = tuple(endpoints)
+        if retry_backoff_seconds < 0:
+            raise ValueError("retry_backoff_seconds must be zero or positive")
+        self.endpoints = (
+            (ToolboxEndpoint(base_url or "", api_key),)
+            if endpoints is None
+            else _normalize_endpoints(endpoints)
+        )
         self.provider = provider or provider_default(self.provider_key)
         self.timeout_seconds = timeout_seconds or DEFAULT_TIMEOUT_SECONDS
         self.api_key = api_key or ""
         self.on_failover = on_failover
         self.retries = retries
+        self.retry_backoff_seconds = retry_backoff_seconds
         self.resend_file_on_missing_artifact = resend_file_on_missing_artifact
         self._clients = [
             httpx.AsyncClient(
                 base_url=endpoint.base_url,
                 timeout=httpx.Timeout(self.timeout_seconds),
-                headers=auth_headers(
-                    endpoint.api_key if endpoint.api_key is not None else self.api_key
-                ),
+                headers=self._headers_for(endpoint),
             )
             for endpoint in self.endpoints
         ]
@@ -116,7 +140,7 @@ class ToolboxCapabilityClient:
             )
             for http in self._clients[1:]
         ]
-        # The first endpoint, kept for callers that address one instance.
+        # The primary endpoint, kept for callers that address one instance.
         self.base_url = self.endpoints[0].base_url
         self._client = self._clients[0]
 
@@ -139,8 +163,8 @@ class ToolboxCapabilityClient:
     ) -> tuple[httpx.AsyncClient, dict[str, Any]]:
         """Execute with failover; return the HTTP client of the endpoint that served it.
 
-        A capability that returns an artifact must download it from that same
-        endpoint.
+        A capability that returns an artifact must download it through that
+        client, not through ``self._client``.
         """
         provider = provider or self.provider
         causes: list[tuple[str, ToolboxError]] = []
@@ -151,15 +175,11 @@ class ToolboxCapabilityClient:
                 result = await self._execute_with_retries(
                     http, capability_id, provider, kwargs
                 )
-            except (*FAILOVER_ERRORS, _IncompatibleEndpoint) as exc:
-                causes.append((endpoint.base_url, exc))
-                if self.on_failover is not None:
-                    self.on_failover(endpoint, exc)
+            except (*FAILOVER_ERRORS, ToolboxIncompatibleEndpoint) as exc:
+                self._record_failover(causes, endpoint, exc)
                 continue
             return http, result
-        if len(causes) == 1:
-            raise causes[0][1]
-        raise ToolboxUnavailable(causes)
+        raise _combined(causes)
 
     async def _execute_with_retries(
         self,
@@ -174,7 +194,13 @@ class ToolboxCapabilityClient:
             except FAILOVER_ERRORS:
                 if attempt == self.retries:
                     raise
+            await _sleep(self._backoff(attempt))
         raise AssertionError("unreachable")
+
+    def _backoff(self, attempt: int) -> float:
+        """Exponential delay with equal jitter, so retries do not move in lockstep."""
+        delay = self.retry_backoff_seconds * 2**attempt
+        return delay / 2 + random.uniform(0, delay / 2)
 
     async def _execute_once(
         self,
@@ -205,16 +231,18 @@ class ToolboxCapabilityClient:
         )
 
     async def health(self) -> dict[str, Any]:
-        """Health of the first endpoint that answers."""
+        """Health of the first endpoint that answers.
+
+        Fails over like :meth:`_execute` and calls ``on_failover``, but never
+        retries: a probe reports the current state instead of waiting it out.
+        """
         causes: list[tuple[str, ToolboxError]] = []
         for endpoint, http in zip(self.endpoints, self._clients):
             try:
                 return await _health(http, endpoint.base_url)
             except FAILOVER_ERRORS as exc:
-                causes.append((endpoint.base_url, exc))
-        if len(causes) == 1:
-            raise causes[0][1]
-        raise ToolboxUnavailable(causes)
+                self._record_failover(causes, endpoint, exc)
+        raise _combined(causes)
 
     async def close(self) -> None:
         """Libera as conexões HTTP."""
@@ -223,11 +251,50 @@ class ToolboxCapabilityClient:
 
     @property
     def _auth_headers(self) -> dict[str, str]:
-        return auth_headers(self.api_key)
+        """Auth header of the primary endpoint."""
+        return self._headers_for(self.endpoints[0])
+
+    def _headers_for(self, endpoint: ToolboxEndpoint) -> dict[str, str]:
+        return auth_headers(
+            endpoint.api_key if endpoint.api_key is not None else self.api_key
+        )
+
+    def _record_failover(
+        self,
+        causes: list[tuple[str, ToolboxError]],
+        endpoint: ToolboxEndpoint,
+        exc: ToolboxError,
+    ) -> None:
+        causes.append((endpoint.base_url, exc))
+        if self.on_failover is not None and len(self.endpoints) > 1:
+            self.on_failover(endpoint, exc)
 
 
-class _IncompatibleEndpoint(ToolboxCapabilityError):
-    """A secondary endpoint does not publish the capability as this SDK expects."""
+def _normalize_endpoints(
+    endpoints: str | Sequence[str | ToolboxEndpoint],
+) -> tuple[ToolboxEndpoint, ...]:
+    if isinstance(endpoints, str):
+        return parse_endpoints(endpoints)
+    normalized: list[ToolboxEndpoint] = []
+    for item in endpoints:
+        if isinstance(item, ToolboxEndpoint):
+            normalized.append(item)
+        elif isinstance(item, str):
+            normalized.append(ToolboxEndpoint(item))
+        else:
+            raise TypeError(
+                f"Toolbox endpoints must be URLs or ToolboxEndpoint, got {item!r}"
+            )
+    if not normalized:
+        raise ValueError("At least one Toolbox endpoint is required")
+    return tuple(normalized)
+
+
+def _combined(causes: list[tuple[str, ToolboxError]]) -> ToolboxError:
+    """The only failure itself, or every cause once two or more endpoints failed."""
+    if len(causes) == 1:
+        return causes[0][1]
+    return ToolboxUnavailable(causes)
 
 
 async def _require_compatible(
@@ -237,7 +304,7 @@ async def _require_compatible(
         await catalog.get(), [Requirement(capability_id, provider)]
     )
     if reasons:
-        raise _IncompatibleEndpoint("; ".join(reasons))
+        raise ToolboxIncompatibleEndpoint("; ".join(reasons))
 
 
 async def _health(http: httpx.AsyncClient, base_url: str) -> dict[str, Any]:

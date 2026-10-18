@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import pickle
 from pathlib import Path
 
 import httpx
@@ -15,12 +16,15 @@ from acessilia_sdk.toolbox import (
     ToolboxCapabilityClient,
     ToolboxContractViolation,
     ToolboxEndpoint,
+    ToolboxIncompatibleEndpoint,
     ToolboxProviderUnavailable,
     ToolboxTimeout,
     ToolboxUnavailable,
     download_artifact,
     parse_endpoints,
 )
+
+from acessilia_sdk.toolbox import client as client_module
 
 PRIMARY = "http://toolbox-a.test"
 SECONDARY = "http://toolbox-b.test"
@@ -34,6 +38,18 @@ class _OcrClient(ToolboxCapabilityClient):
 
 def _client(**kwargs) -> _OcrClient:
     return _OcrClient(endpoints=parse_endpoints(f"{PRIMARY}, {SECONDARY}"), **kwargs)
+
+
+@pytest.fixture
+def sleeps(monkeypatch) -> list[float]:
+    """Record backoff delays instead of waiting."""
+    delays: list[float] = []
+
+    async def fake_sleep(delay: float) -> None:
+        delays.append(delay)
+
+    monkeypatch.setattr(client_module, "_sleep", fake_sleep)
+    return delays
 
 
 def _publish_catalog(
@@ -73,6 +89,28 @@ def test_parse_endpoints_requires_one_url(value) -> None:
 def test_empty_base_url_fails_at_construction() -> None:
     with pytest.raises(ValueError, match="non-empty base_url"):
         _OcrClient(base_url="")
+
+
+@pytest.mark.parametrize(
+    "url", ["localhost:8002", "htp://toolbox.test", "toolbox.test", "http://"]
+)
+def test_malformed_base_url_fails_at_construction(url: str) -> None:
+    """A typo must not look like an outage and consume the failover."""
+    with pytest.raises(ValueError, match="absolute http"):
+        _OcrClient(base_url=url)
+
+
+def test_endpoints_accept_urls_and_a_comma_separated_string() -> None:
+    from_list = _OcrClient(endpoints=[PRIMARY, ToolboxEndpoint(SECONDARY, "k")])
+    from_string = _OcrClient(endpoints=f"{PRIMARY},{SECONDARY}")
+    assert from_list.endpoints == (ToolboxEndpoint(PRIMARY), ToolboxEndpoint(SECONDARY, "k"))
+    assert [e.base_url for e in from_string.endpoints] == [PRIMARY, SECONDARY]
+
+
+@pytest.mark.parametrize("value", [[], [42]])
+def test_endpoints_reject_empty_or_unknown_items(value) -> None:
+    with pytest.raises((ValueError, TypeError)):
+        _OcrClient(endpoints=value)
 
 
 def test_base_url_and_endpoints_are_exclusive() -> None:
@@ -131,6 +169,14 @@ async def test_reports_every_cause_when_all_instances_fail() -> None:
         assert isinstance(info.value, ToolboxProviderUnavailable)
     finally:
         await client.close()
+
+
+def test_unavailable_error_survives_pickling() -> None:
+    error = ToolboxUnavailable([(PRIMARY, ToolboxTimeout("slow"))])
+    restored = pickle.loads(pickle.dumps(error))
+    assert type(restored) is ToolboxUnavailable
+    assert str(restored) == str(error)
+    assert [url for url, _ in restored.causes] == [PRIMARY]
 
 
 @pytest.mark.asyncio
@@ -260,9 +306,11 @@ async def test_incompatible_secondary_is_skipped(catalog, reason) -> None:
             else:
                 _publish_catalog(router, SECONDARY, **catalog)
             secondary = router.post(SECONDARY + EXECUTE)
-            with pytest.raises(ToolboxUnavailable, match=reason):
+            with pytest.raises(ToolboxUnavailable, match=reason) as info:
                 await client._execute("document.ocr", artifact_id="a1")
         assert not secondary.called
+        assert isinstance(info.value.causes[1][1], ToolboxIncompatibleEndpoint)
+        assert "_Incompatible" not in str(info.value)
     finally:
         await client.close()
 
@@ -282,8 +330,8 @@ async def test_primary_is_used_without_reading_any_catalogue() -> None:
 
 
 @pytest.mark.asyncio
-async def test_retries_the_same_endpoint_a_bounded_number_of_times() -> None:
-    client = _OcrClient(base_url=PRIMARY, retries=2)
+async def test_retries_the_same_endpoint_a_bounded_number_of_times(sleeps) -> None:
+    client = _OcrClient(base_url=PRIMARY, retries=2, retry_backoff_seconds=1.0)
     try:
         with respx.mock() as router:
             route = router.post(PRIMARY + EXECUTE).mock(
@@ -295,12 +343,15 @@ async def test_retries_the_same_endpoint_a_bounded_number_of_times() -> None:
             )
             assert await client._execute("document.ocr", artifact_id="a1") == SUCCEEDED
         assert route.call_count == 3
+        # Exponential with equal jitter: [0.5, 1.0] then [1.0, 2.0].
+        assert len(sleeps) == 2
+        assert 0.5 <= sleeps[0] <= 1.0 and 1.0 <= sleeps[1] <= 2.0
     finally:
         await client.close()
 
 
 @pytest.mark.asyncio
-async def test_gives_up_after_the_last_retry() -> None:
+async def test_gives_up_after_the_last_retry(sleeps) -> None:
     client = _OcrClient(base_url=PRIMARY, retries=1)
     try:
         with respx.mock() as router:
@@ -310,12 +361,13 @@ async def test_gives_up_after_the_last_retry() -> None:
             with pytest.raises(ToolboxTimeout):
                 await client._execute("document.ocr", artifact_id="a1")
         assert route.call_count == 2
+        assert len(sleeps) == 1  # no wait after the last attempt
     finally:
         await client.close()
 
 
 @pytest.mark.asyncio
-async def test_contract_errors_are_not_retried() -> None:
+async def test_contract_errors_are_not_retried(sleeps) -> None:
     client = _OcrClient(base_url=PRIMARY, retries=3)
     try:
         with respx.mock() as router:
@@ -332,6 +384,77 @@ async def test_contract_errors_are_not_retried() -> None:
 def test_negative_retries_are_refused() -> None:
     with pytest.raises(ValueError, match="retries"):
         _OcrClient(base_url=PRIMARY, retries=-1)
+    with pytest.raises(ValueError, match="retry_backoff_seconds"):
+        _OcrClient(base_url=PRIMARY, retry_backoff_seconds=-1)
+
+
+@pytest.mark.asyncio
+async def test_on_failover_is_not_called_with_a_single_endpoint() -> None:
+    seen: list = []
+    client = _OcrClient(base_url=PRIMARY, on_failover=lambda ep, exc: seen.append(ep))
+    try:
+        with respx.mock() as router:
+            router.post(PRIMARY + EXECUTE).mock(side_effect=httpx.ConnectError("a"))
+            with pytest.raises(ToolboxProviderUnavailable):
+                await client._execute("document.ocr", artifact_id="a1")
+        assert seen == []
+    finally:
+        await client.close()
+
+
+@pytest.mark.asyncio
+async def test_health_fails_over_and_reports_it() -> None:
+    seen: list[str] = []
+    client = _client(on_failover=lambda ep, exc: seen.append(ep.base_url))
+    try:
+        with respx.mock() as router:
+            router.get(f"{PRIMARY}/v1/health").mock(side_effect=httpx.ConnectError("a"))
+            router.get(f"{SECONDARY}/v1/health").mock(
+                return_value=httpx.Response(200, json={"status": "ok"})
+            )
+            assert await client.health() == {"status": "ok"}
+        assert seen == [PRIMARY]
+    finally:
+        await client.close()
+
+
+@pytest.mark.asyncio
+async def test_health_on_a_single_endpoint_raises_its_own_error() -> None:
+    client = _OcrClient(base_url=PRIMARY, retries=3)
+    try:
+        with respx.mock() as router:
+            route = router.get(f"{PRIMARY}/v1/health").mock(
+                side_effect=httpx.ReadTimeout("slow")
+            )
+            with pytest.raises(ToolboxTimeout):
+                await client.health()
+        assert route.call_count == 1  # probes are never retried
+    finally:
+        await client.close()
+
+
+@pytest.mark.asyncio
+async def test_health_reports_every_cause_when_all_fail() -> None:
+    client = _client()
+    try:
+        with respx.mock() as router:
+            router.get(f"{PRIMARY}/v1/health").mock(side_effect=httpx.ConnectError("a"))
+            router.get(f"{SECONDARY}/v1/health").mock(
+                return_value=httpx.Response(503, json={"detail": "b"})
+            )
+            with pytest.raises(ToolboxUnavailable) as info:
+                await client.health()
+        assert [url for url, _ in info.value.causes] == [PRIMARY, SECONDARY]
+    finally:
+        await client.close()
+
+
+def test_auth_headers_follow_the_primary_endpoint_key() -> None:
+    client = _OcrClient(
+        endpoints=(ToolboxEndpoint(PRIMARY, "own"), ToolboxEndpoint(SECONDARY)),
+        api_key="shared",
+    )
+    assert client._auth_headers == {"Authorization": "Bearer own"}
 
 
 PDF = b"%PDF-1.7 test"
@@ -382,3 +505,75 @@ async def test_download_rejects_unexpected_magic(tmp_path: Path) -> None:
     with pytest.raises(ToolboxContractViolation, match="does not start"):
         await _download(tmp_path, ArtifactRef.parse(PDF_ID), PDF, b"\x89PNG")
     assert not any(tmp_path.iterdir())
+
+
+@pytest.mark.asyncio
+async def test_artifact_is_downloaded_from_the_endpoint_that_served_the_call(
+    tmp_path: Path,
+) -> None:
+    client = _client()
+    destination = tmp_path / "out.pdf"
+    try:
+        with respx.mock() as router:
+            _publish_catalog(router, SECONDARY)
+            router.post(PRIMARY + EXECUTE).mock(side_effect=httpx.ConnectError("a"))
+            router.post(SECONDARY + EXECUTE).mock(
+                return_value=httpx.Response(
+                    200, json={"status": "succeeded", "document": {"artifact_id": PDF_ID}}
+                )
+            )
+            secondary_get = router.get(f"{SECONDARY}/v1/artifacts/{PDF_ID}").mock(
+                return_value=httpx.Response(200, content=PDF)
+            )
+            http, result = await client._execute_on("document.ocr", artifact_id="a1")
+            ref = ArtifactRef.parse(result["document"]["artifact_id"])
+            await download_artifact(http, ref, destination, magic=b"%PDF-")
+        assert secondary_get.called
+        assert destination.read_bytes() == PDF
+    finally:
+        await client.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("mock", "error"),
+    [
+        ({"side_effect": httpx.ReadTimeout("slow")}, ToolboxTimeout),
+        ({"side_effect": httpx.ConnectError("refused")}, ToolboxProviderUnavailable),
+        (
+            {"return_value": httpx.Response(404, json={"detail": "gone"})},
+            ToolboxArtifactNotFound,
+        ),
+    ],
+)
+async def test_download_maps_toolbox_failures(tmp_path: Path, mock, error) -> None:
+    with respx.mock() as router:
+        router.get(f"{PRIMARY}/v1/artifacts/{PDF_ID}").mock(**mock)
+        async with httpx.AsyncClient(base_url=PRIMARY) as http:
+            with pytest.raises(error):
+                await download_artifact(
+                    http, ArtifactRef.parse(PDF_ID), tmp_path / "out.pdf"
+                )
+    assert not any(tmp_path.iterdir())
+
+
+@pytest.mark.asyncio
+async def test_download_reports_the_digest_before_the_magic(tmp_path: Path) -> None:
+    with pytest.raises(ToolboxContractViolation, match="does not match"):
+        await _download(tmp_path, ArtifactRef.parse(PDF_ID), b"not a pdf", b"%PDF-")
+    assert not any(tmp_path.iterdir())
+
+
+@pytest.mark.asyncio
+async def test_download_into_a_missing_directory_is_a_local_error(
+    tmp_path: Path,
+) -> None:
+    with respx.mock() as router:
+        router.get(f"{PRIMARY}/v1/artifacts/{PDF_ID}").mock(
+            return_value=httpx.Response(200, content=PDF)
+        )
+        async with httpx.AsyncClient(base_url=PRIMARY) as http:
+            with pytest.raises(FileNotFoundError):
+                await download_artifact(
+                    http, ArtifactRef.parse(PDF_ID), tmp_path / "missing" / "out.pdf"
+                )

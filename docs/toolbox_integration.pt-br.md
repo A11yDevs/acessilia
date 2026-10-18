@@ -179,8 +179,13 @@ Se a configuração de provider for nova, acrescente o default em
 (`os.getenv("TOOLBOX_<X>_PROVIDER", provider_default("toolbox_<x>_provider"))`).
 
 **2. Escrever o cliente** como subclasse de `ToolboxCapabilityClient`, que já
-cuida da conexão, do header Bearer, de `health()`, `close()`, do mapeamento de
-erros de timeout/rede e da validação do envelope de resposta:
+cuida das conexões, do header Bearer, de `health()`, `close()`, do mapeamento
+de erros de timeout/rede, da validação do envelope de resposta, de retries
+limitados e do failover entre endpoints independentes da Toolbox (ver
+[o README do SDK](../libs/sdk/README.pt-br.md#disponibilidade-e-failover)).
+Uma capacidade que retorna um artefato deve chamar `_execute_on` e baixá-lo
+com `download_artifact` pelo cliente HTTP que ele devolve, e não por
+`self._client`:
 
 ```python
 """Cliente especializado para a capacidade <capability> da Toolbox."""

@@ -1,12 +1,12 @@
 """Access to the Acessilia Toolbox through its published HTTP contract."""
 
+from acessilia_sdk.toolbox.artifacts import ArtifactRef, download_artifact
 from acessilia_sdk.toolbox.capabilities import (
     PROVIDER_DEFAULTS,
     TOOLBOX_CAPABILITIES,
     ToolboxCapability,
     provider_default,
 )
-from acessilia_sdk.toolbox.artifacts import ArtifactRef, download_artifact
 from acessilia_sdk.toolbox.catalog import (
     CatalogCache,
     CatalogSnapshot,
@@ -27,6 +27,7 @@ from acessilia_sdk.toolbox.errors import (
     ToolboxCapabilityError,
     ToolboxContractViolation,
     ToolboxError,
+    ToolboxIncompatibleEndpoint,
     ToolboxProviderUnavailable,
     ToolboxTimeout,
     ToolboxUnavailable,
@@ -57,6 +58,7 @@ __all__ = [
     "ToolboxContractViolation",
     "ToolboxEndpoint",
     "ToolboxError",
+    "ToolboxIncompatibleEndpoint",
     "ToolboxProviderUnavailable",
     "ToolboxTimeout",
     "ToolboxUnavailable",

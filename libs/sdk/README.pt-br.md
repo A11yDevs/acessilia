@@ -39,27 +39,42 @@ A forma principal de manter a disponibilidade é **um** `base_url` apontando
 para um balanceador na frente de réplicas stateless da Toolbox que compartilham
 o armazenamento de artefatos (MinIO) e o cache (Valkey): os ids de artefato
 continuam válidos qualquer que seja a réplica que responda. As operações nunca
-caem para execução local.
+caem para execução local. Um `base_url` precisa ser uma URL `http(s)`
+absoluta; qualquer outra coisa levanta `ValueError` na criação do cliente, em
+vez de parecer uma indisponibilidade depois.
 
 Além disso, o cliente oferece:
 
 - **`retries`**: reenvia a requisição ao mesmo endpoint após `ToolboxTimeout`
-  ou `ToolboxProviderUnavailable` (erro de rede, 503, 504). Desligado por
-  padrão; ligar só para capacidades idempotentes.
+  ou `ToolboxProviderUnavailable` (erro de rede, 503, 504), esperando
+  `retry_backoff_seconds * 2**attempt` com jitter. Desligado por padrão; ligar
+  só para capacidades idempotentes.
 - **`endpoints=`** (mecanismo secundário): para deploys *independentes* da
-  Toolbox, tentados em ordem. Um endpoint secundário só é usado se o catálogo
-  dele publicar a capacidade na versão de contrato esperada, para o provider do
-  cliente. Outros erros (4xx, violação de contrato) são iguais em todas as
-  instâncias e são levantados na hora. Quando todos os endpoints falham,
-  `ToolboxUnavailable` traz todas as causas.
+  Toolbox, tentados em ordem. Aceita objetos `ToolboxEndpoint`, URLs ou uma
+  string separada por vírgulas. Um endpoint secundário só é usado se o
+  catálogo dele publicar a capacidade na versão de contrato esperada, para o
+  provider do cliente; `catalog_refresh_seconds` e `catalog_stale_seconds`
+  ajustam esses catálogos e não têm efeito com um único endpoint. Outros erros
+  (4xx, violação de contrato) são iguais em todas as instâncias e são
+  levantados na hora.
+- **Erros**: quando só um endpoint foi tentado, o erro dele é levantado. A
+  partir de dois com falha, `ToolboxUnavailable` traz todas as causas (um
+  secundário pulado aparece como `ToolboxIncompatibleEndpoint`).
 - **`resend_file_on_missing_artifact`**: desligado por padrão, para que um
   `artifact_id` desconhecido por uma instância seja reportado, e não
-  reenviado silenciosamente.
+  reenviado silenciosamente. Só vale para chamadas que passam **ao mesmo
+  tempo** o `artifact_id` e o arquivo (`file_path` ou `upload`).
+- **`health()`** também faz failover e chama o hook, mas nunca repete.
 
-`on_failover(endpoint, error)` permite que quem chama registre cada failover.
-Capacidades que retornam um artefato usam `_execute_on`, que também devolve o
-cliente HTTP do endpoint que atendeu a chamada, e baixam o artefato dali.
-`ArtifactRef` é provisório até a Toolbox publicar `artifact-ref@1`.
+`on_failover(endpoint, error)` permite que quem chama registre cada failover;
+não é chamado quando há um único endpoint. `self._client` e `self.base_url`
+apontam só para o endpoint primário: capacidades que retornam um artefato
+devem usar `_execute_on`, que também devolve o cliente HTTP do endpoint que
+atendeu a chamada, e baixar o artefato por ele com `download_artifact`. Esse
+download é feito em streaming, conferido contra o SHA-256 (e um prefixo
+mágico opcional), sincronizado em disco e renomeado de forma atômica; erros do
+sistema de arquivos local se propagam como `OSError`. `ArtifactRef` é
+provisório até a Toolbox publicar `artifact-ref@1`.
 
 ## Adicionar uma capacidade
 

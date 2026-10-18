@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from urllib.parse import urlsplit
 
 from acessilia_sdk.toolbox.errors import (
     ToolboxError,
@@ -41,6 +42,13 @@ class ToolboxEndpoint:
         normalized = self.base_url.strip().rstrip("/")
         if not normalized:
             raise ValueError("Toolbox endpoint needs a non-empty base_url")
+        # A typo here would otherwise surface as a network error and be taken
+        # for an outage, consuming the failover.
+        parts = urlsplit(normalized)
+        if parts.scheme not in ("http", "https") or not parts.netloc:
+            raise ValueError(
+                f"Toolbox base_url must be an absolute http(s) URL, got {self.base_url!r}"
+            )
         object.__setattr__(self, "base_url", normalized)
 
 
