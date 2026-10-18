@@ -1,8 +1,8 @@
-"""Testes da exportação PDF/UA via Toolbox (document.export.pdf_ua).
+"""Tests for PDF/UA export through the Toolbox (document.export.pdf_ua).
 
-Cobre o cliente (execução, download do artefato e conferência do hash) e o
-exportador, que tenta a Toolbox primeiro e só usa pandoc + LaTeX locais como
-fallback.
+Covers the client (execution, artifact download and hash check) and the
+exporter, which tries the Toolbox first and uses local pandoc + LaTeX only as
+the fallback.
 """
 from __future__ import annotations
 
@@ -87,7 +87,7 @@ async def test_export_rejects_a_download_whose_hash_does_not_match(respx_mock, c
     )
     output = tmp_path / "doc.pdf"
 
-    with pytest.raises(ToolboxContractViolation, match="não corresponde"):
+    with pytest.raises(ToolboxContractViolation, match="does not match"):
         await client.export(AST, output)
     assert not output.exists()
 
@@ -104,7 +104,7 @@ async def test_export_rejects_a_non_pdf_result(respx_mock, client, tmp_path):
     respx_mock.post(EXECUTE_URL).mock(
         return_value=httpx.Response(200, json=envelope(media_type="image/png"))
     )
-    with pytest.raises(ToolboxContractViolation, match="esperado PDF"):
+    with pytest.raises(ToolboxContractViolation, match="expected PDF"):
         await client.export(AST, tmp_path / "doc.pdf")
 
 
@@ -115,6 +115,23 @@ async def test_unavailable_renderer_maps_to_provider_unavailable(respx_mock, cli
     )
     with pytest.raises(ToolboxProviderUnavailable):
         await client.export(AST, tmp_path / "doc.pdf")
+
+
+@pytest.mark.asyncio
+async def test_export_rejects_a_malformed_artifact_id_before_downloading(respx_mock, client, tmp_path):
+    respx_mock.post(EXECUTE_URL).mock(
+        return_value=httpx.Response(200, json=envelope(artifact_id="../../admin"))
+    )
+    with pytest.raises(ToolboxContractViolation, match="malformed artifact_id"):
+        await client.export(AST, tmp_path / "doc.pdf")
+    assert len(respx_mock.calls) == 1, "nothing is fetched for a malformed id"
+
+
+def test_client_uses_the_pdf_ua_timeout_not_the_shared_one(monkeypatch):
+    monkeypatch.setattr(settings, "toolbox_timeout_seconds", 3600)
+    monkeypatch.setattr(settings, "toolbox_pdf_ua_timeout_seconds", 300)
+    assert ToolboxPdfUaClient(base_url=BASE_URL).timeout_seconds == 300
+    assert ToolboxPdfUaClient(base_url=BASE_URL, timeout_seconds=30).timeout_seconds == 30
 
 
 def test_same_document_yields_the_same_upload_so_the_toolbox_cache_hits():
@@ -133,7 +150,7 @@ def test_same_document_yields_the_same_upload_so_the_toolbox_cache_hits():
     assert set(json.loads(pandoc_payload(first))) == {"pandoc-api-version", "meta", "blocks"}
 
 
-# ── Exportador: Toolbox primeiro, fallback local ────────────────────────
+# ── Exporter: Toolbox first, local fallback ─────────────────────────────
 
 
 def _export_pdf_ua(tmp_path: Path) -> Path:
@@ -176,7 +193,7 @@ def test_exporter_falls_back_to_local_latex_when_the_toolbox_fails(monkeypatch, 
     def failing_toolbox(ast, output_path, *, lang):
         raise ToolboxProviderUnavailable("pdf-ua-render offline")
 
-    def local(ast, output_path):
+    def local(ast, output_path, *, lang):
         output_path.write_bytes(b"%PDF-local")
         return output_path
 
@@ -188,13 +205,65 @@ def test_exporter_falls_back_to_local_latex_when_the_toolbox_fails(monkeypatch, 
     assert _export_pdf_ua(tmp_path).read_bytes() == b"%PDF-local"
 
 
+def test_exporter_falls_back_on_an_unexpected_toolbox_error(monkeypatch, tmp_path):
+    monkeypatch.setattr(settings, "toolbox_pdf_ua_enabled", True)
+
+    def broken_toolbox(ast, output_path, *, lang):
+        raise RuntimeError("event loop is closed")
+
+    def local(ast, output_path, *, lang):
+        output_path.write_bytes(b"%PDF-local")
+        return output_path
+
+    monkeypatch.setattr(
+        "backend.tools.toolbox_pdf_ua_client.toolbox_export_pdf_ua", broken_toolbox
+    )
+    monkeypatch.setattr(pandoc_exporter, "_render_pdf_ua_with_pandoc", local)
+
+    assert _export_pdf_ua(tmp_path).read_bytes() == b"%PDF-local"
+
+
+def test_exporter_takes_the_language_from_the_document(monkeypatch, tmp_path):
+    monkeypatch.setattr(settings, "toolbox_pdf_ua_enabled", False)
+    langs = []
+
+    def local(ast, output_path, *, lang):
+        langs.append(lang)
+        output_path.write_bytes(b"%PDF-local")
+        return output_path
+
+    monkeypatch.setattr(pandoc_exporter, "_render_pdf_ua_with_pandoc", local)
+    document = pandoc_exporter._ensure_document("# Report\n\nParagraph.\n", title="Report")
+    document["language"] = "en-US"
+
+    pandoc_exporter.export_accessible_document(
+        document, tmp_path / "doc.pdf_ua.pdf", format_name="pdf_ua", title="Report"
+    )
+
+    assert langs == ["en-US"]
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [(None, True), ("true", True), ("SIM", True), ("1", True), ("false", False), ("0", False), ("no", False)],
+)
+def test_toolbox_pdf_ua_enabled_is_parsed_from_the_environment(monkeypatch, raw, expected):
+    from backend.config.settings import Settings
+
+    if raw is None:
+        monkeypatch.delenv("TOOLBOX_PDF_UA_ENABLED", raising=False)
+    else:
+        monkeypatch.setenv("TOOLBOX_PDF_UA_ENABLED", raw)
+    assert Settings().toolbox_pdf_ua_enabled is expected
+
+
 def test_exporter_reports_both_causes_when_toolbox_and_local_fail(monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "toolbox_pdf_ua_enabled", True)
 
     def failing_toolbox(ast, output_path, *, lang):
         raise ToolboxProviderUnavailable("pdf-ua-render offline")
 
-    def failing_local(ast, output_path):
+    def failing_local(ast, output_path, *, lang):
         raise RuntimeError("Undefined control sequence")
 
     monkeypatch.setattr(
@@ -215,7 +284,7 @@ def test_exporter_skips_the_toolbox_when_disabled(monkeypatch, tmp_path):
     def toolbox_must_not_run(*args, **kwargs):
         raise AssertionError("Toolbox called although TOOLBOX_PDF_UA_ENABLED=false")
 
-    def local(ast, output_path):
+    def local(ast, output_path, *, lang):
         output_path.write_bytes(b"%PDF-local")
         return output_path
 

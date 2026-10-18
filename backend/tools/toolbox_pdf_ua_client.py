@@ -1,12 +1,13 @@
-"""Cliente especializado para a capacidade document.export.pdf_ua da Toolbox.
+"""Specialized client for the Toolbox document.export.pdf_ua capability.
 
-Envia o AST Pandoc (JSON) à Toolbox, que renderiza o PDF/UA com Pandoc e TeX
-Live fixados numa imagem própria. O PDF não volta embutido na resposta: a
-Toolbox o grava no armazenamento de artefatos (MinIO) e devolve só o
-``artifact_id``, que este cliente baixa por ``GET /v1/artifacts/{id}``.
+Sends the Pandoc AST (JSON) to the Toolbox, which renders PDF/UA with Pandoc
+and TeX Live pinned in its own image. The PDF is not embedded in the response:
+the Toolbox writes it to the artifact store (MinIO) and returns only the
+``artifact_id``, which this client downloads through ``GET /v1/artifacts/{id}``.
 
-O cache de execução da Toolbox (Valkey) cobre o AST, o idioma e as versões do
-toolchain; reexportar o mesmo documento reaproveita o PDF sem rodar o LaTeX.
+The Toolbox execution cache (Valkey) covers the AST, the language and the
+toolchain versions; re-exporting the same document reuses the PDF without
+running LaTeX.
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -32,28 +34,39 @@ from backend.tools.toolbox_client import (
 
 CAPABILITY = "document.export.pdf_ua"
 PDF_MEDIA_TYPE = "application/pdf"
-# O nome do upload entra na chave de cache da Toolbox: um nome fixo evita que
-# o mesmo documento, exportado por jobs diferentes, deixe de acertar o cache.
+# The upload filename is part of the Toolbox cache key: a fixed name keeps the
+# same document, exported by different jobs, hitting the cache.
 UPLOAD_FILENAME = "document.ast.json"
-# Únicas chaves do AST que o pandoc lê.
+# The only AST keys pandoc reads.
 PANDOC_AST_KEYS = ("pandoc-api-version", "meta", "blocks")
+# Same pattern as ``artifact_id`` in the Toolbox schema artifact/pdf-export@1.
+ARTIFACT_ID_RE = re.compile(r"^(?:sha256:)?(?P<digest>[0-9a-f]{64})$")
 
 
 def pandoc_payload(ast: dict[str, Any]) -> bytes:
-    """Serializa só a parte do AST que o pandoc lê, de forma determinística.
+    """Serializes only the part of the AST pandoc reads, deterministically.
 
-    ``build_pandoc_ast`` anexa ``source_document`` (o documento canônico, com
-    um ``id`` aleatório). O pandoc o ignora, mas ele mudaria o hash do upload a
-    cada execução e o cache da Toolbox nunca seria aproveitado.
+    ``build_pandoc_ast`` attaches ``source_document`` (the canonical document,
+    with a random ``id``). Pandoc ignores it, but it would change the upload
+    hash on every run and the Toolbox cache would never be reused.
     """
     trimmed = {key: ast[key] for key in PANDOC_AST_KEYS if key in ast}
     return json.dumps(trimmed, ensure_ascii=False, sort_keys=True).encode("utf-8")
 
 
 class ToolboxPdfUaClient(ToolboxCapabilityClient):
-    """Cliente para exportação PDF/UA via Acessilia Toolbox."""
+    """Client for PDF/UA export through the Acessilia Toolbox."""
 
     provider_key = "toolbox_pdf_ua_provider"
+
+    def __init__(self, *args: Any, timeout_seconds: int | None = None, **kwargs: Any):
+        # The shared Toolbox timeout (default one hour) would stall the export
+        # long before the local fallback runs if the renderer hangs.
+        super().__init__(
+            *args,
+            timeout_seconds=timeout_seconds or settings.toolbox_pdf_ua_timeout_seconds,
+            **kwargs,
+        )
 
     async def export(
         self,
@@ -63,17 +76,17 @@ class ToolboxPdfUaClient(ToolboxCapabilityClient):
         lang: str = "pt-BR",
         use_remote_cache: bool | None = None,
     ) -> dict[str, Any]:
-        """Renderiza ``ast`` em PDF/UA na Toolbox e grava o PDF em ``output_path``.
+        """Renders ``ast`` as PDF/UA on the Toolbox and writes the PDF to ``output_path``.
 
         Args:
-            ast: AST Pandoc em JSON, já sem imagens (só texto alternativo).
-            output_path: Destino do PDF baixado.
-            lang: Etiqueta BCP 47 gravada nos metadados do PDF.
-            use_remote_cache: Se False, força nova renderização na Toolbox.
+            ast: Pandoc JSON AST, already without images (alt text only).
+            output_path: Destination of the downloaded PDF.
+            lang: BCP 47 tag written to the PDF metadata.
+            use_remote_cache: When False, forces a fresh render on the Toolbox.
 
         Returns:
-            O ``document`` da resposta (schema artifact/pdf-export@1), com o
-            ``artifact_id``, o tamanho e as versões do toolchain.
+            The response ``document`` (schema artifact/pdf-export@1), with the
+            ``artifact_id``, the size and the toolchain versions.
         """
         use_cache = (
             use_remote_cache
@@ -90,16 +103,16 @@ class ToolboxPdfUaClient(ToolboxCapabilityClient):
         document = result.get("document")
         if not isinstance(document, dict):
             raise ToolboxContractViolation(
-                f"Resposta de {CAPABILITY} sem campo 'document'"
+                f"{CAPABILITY} response has no 'document' field"
             )
         artifact_id = document.get("artifact_id")
         if not isinstance(artifact_id, str) or not artifact_id:
             raise ToolboxContractViolation(
-                f"Resposta de {CAPABILITY} sem artifact_id do PDF"
+                f"{CAPABILITY} response has no PDF artifact_id"
             )
         if document.get("media_type") != PDF_MEDIA_TYPE:
             raise ToolboxContractViolation(
-                f"{CAPABILITY} devolveu {document.get('media_type')!r}, esperado PDF"
+                f"{CAPABILITY} returned {document.get('media_type')!r}, expected PDF"
             )
 
         await self._download(artifact_id, output_path)
@@ -107,7 +120,7 @@ class ToolboxPdfUaClient(ToolboxCapabilityClient):
         provenance = result.get("provenance")
         provenance = provenance if isinstance(provenance, dict) else {}
         logger.info(
-            "Toolbox: {} concluído ({} bytes, cache_hit={}, {} ms)",
+            "Toolbox: {} finished ({} bytes, cache_hit={}, {} ms)",
             CAPABILITY,
             document.get("size_bytes", "?"),
             provenance.get("cache_hit", False),
@@ -116,48 +129,49 @@ class ToolboxPdfUaClient(ToolboxCapabilityClient):
         return document
 
     async def _download(self, artifact_id: str, output_path: Path) -> None:
-        """Baixa o PDF e confere que os bytes têm o hash do ``artifact_id``.
+        """Downloads the PDF and checks that its bytes hash to ``artifact_id``.
 
-        O id é o SHA-256 do conteúdo, então a conferência detecta um download
-        truncado ou um objeto corrompido antes de entregá-lo ao usuário.
+        The id is the SHA-256 of the content, so the check catches a truncated
+        download or a corrupted object before it reaches the user.
         """
+        match = ARTIFACT_ID_RE.match(artifact_id)
+        if match is None:
+            raise ToolboxContractViolation(
+                f"{CAPABILITY} returned a malformed artifact_id {artifact_id!r}"
+            )
         try:
             response = await self._client.get(f"/v1/artifacts/{artifact_id}")
         except httpx.TimeoutException as e:
             raise ToolboxTimeout(
-                f"Timeout ao baixar o PDF {artifact_id} da Toolbox: {e}"
+                f"Timed out downloading PDF {artifact_id} from the Toolbox: {e}"
             ) from e
         except httpx.RequestError as e:
             raise ToolboxProviderUnavailable(
-                f"Toolbox indisponível em {self.base_url}: {e}"
+                f"Toolbox unavailable at {self.base_url}: {e}"
             ) from e
         _raise_for_error(response, "artifact.retrieve")
 
         content = response.content
-        digest = hashlib.sha256(content).hexdigest()
-        if artifact_id.removeprefix("sha256:") != digest:
+        if hashlib.sha256(content).hexdigest() != match["digest"]:
             raise ToolboxContractViolation(
-                f"PDF baixado não corresponde ao artifact_id {artifact_id}"
+                f"Downloaded PDF does not match artifact_id {artifact_id}"
             )
         if not content.startswith(b"%PDF-"):
-            raise ToolboxContractViolation(
-                f"Artefato {artifact_id} não é um PDF"
-            )
+            raise ToolboxContractViolation(f"Artifact {artifact_id} is not a PDF")
 
-        # Escrita atômica: um download interrompido não deixa PDF parcial.
+        # Atomic write: an interrupted download leaves no partial PDF behind.
         partial = output_path.with_name(f".{output_path.name}.part")
         partial.write_bytes(content)
         os.replace(partial, output_path)
 
 
-
 def toolbox_export_pdf_ua(
     ast: dict[str, Any], output_path: Path, *, lang: str = "pt-BR"
 ) -> dict[str, Any]:
-    """Versão síncrona de :meth:`ToolboxPdfUaClient.export` para o exportador.
+    """Synchronous form of :meth:`ToolboxPdfUaClient.export` for the exporter.
 
-    O cliente é criado e fechado dentro da corrotina: ``run_sync`` pode rodá-la
-    num event loop novo, e a conexão HTTP não deve sobreviver a ele.
+    The client is created and closed inside the coroutine: ``run_sync`` may run
+    it on a fresh event loop, and the HTTP connection must not outlive it.
     """
 
     async def _export() -> dict[str, Any]:

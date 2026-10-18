@@ -307,6 +307,7 @@ Defined in `backend/config/settings.py` and documented in `.env.example`:
 | `TOOLBOX_MEDIA_INSPECT_ENABLED` | `true` | Run `media.inspect` (Toolbox-first with local fallback) |
 | `TOOLBOX_PDF_UA_PROVIDER` | `pandoc-pdf-ua` | Provider for the `document.export.pdf_ua` capability |
 | `TOOLBOX_PDF_UA_ENABLED` | `true` | Render PDF/UA on the Toolbox (pinned Pandoc + TeX Live); local pandoc + LaTeX is the fallback |
+| `TOOLBOX_PDF_UA_TIMEOUT_SECONDS` | `300` | How long to wait for the Toolbox render before falling back to the local renderer |
 | `FUSION_MODE` | `single` | `single` (one provider) or `dual` (two providers + fusion) |
 | `FUSION_SECONDARY_PROVIDER` | `mineru` | Secondary provider for `FUSION_MODE=dual` |
 | `STRUCTURER` | `toolbox` | Per-page region engine (`toolbox`, `toolbox-layout`, `pymupdf`) |
