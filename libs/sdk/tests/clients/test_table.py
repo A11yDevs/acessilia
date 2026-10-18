@@ -8,7 +8,7 @@ import httpx
 import pytest
 import respx
 
-from backend.tools.toolbox_table_client import ToolboxTableClient
+from acessilia_sdk.toolbox.clients.table import ToolboxTableClient
 
 BASE = "http://toolbox.test"
 ROUTE = f"{BASE}/v1/capabilities/table.recognize:execute"

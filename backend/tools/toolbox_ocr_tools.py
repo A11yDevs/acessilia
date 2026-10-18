@@ -10,8 +10,8 @@ from pathlib import Path
 from typing import Any
 
 from backend.tools.logger import logger
-from backend.tools.toolbox_client import run_sync
-from backend.tools.toolbox_ocr_client import ToolboxOcrClient
+from acessilia_sdk.toolbox.clients import ToolboxOcrClient
+from backend.tools.toolbox_client import make_toolbox_client, run_sync
 
 
 def _run_async(coro) -> Any:
@@ -34,7 +34,7 @@ def toolbox_ocr_text(
 
 
 async def _ocr_async(file_path: Path, language: str, force_ocr: bool) -> str:
-    client = ToolboxOcrClient()
+    client = make_toolbox_client(ToolboxOcrClient)
     try:
         result = await client.ocr(
             file_path=file_path, language=language, force_ocr=force_ocr

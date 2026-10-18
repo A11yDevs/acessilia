@@ -23,13 +23,15 @@ from acessilia_sdk.toolbox.capabilities import (
     TOOLBOX_CAPABILITIES,
 )
 from backend.config import settings as settings_module
-from backend.tools.toolbox_adjudicate_client import ToolboxAdjudicateClient
-from backend.tools.toolbox_orientation_client import ToolboxOrientationClient
-from backend.tools.toolbox_page_ocr_client import ToolboxPageOcrClient
+from acessilia_sdk.toolbox.clients import (
+    ToolboxAdjudicateClient,
+    ToolboxOrientationClient,
+    ToolboxPageOcrClient,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BACKEND_DIR = REPO_ROOT / "backend"
-TOOLS_DIR = BACKEND_DIR / "tools"
+CLIENTS_DIR = REPO_ROOT / "libs" / "sdk" / "src" / "acessilia_sdk" / "toolbox" / "clients"
 BASE_URL = "http://toolbox.test"
 
 _EXECUTE_LITERAL_RE = re.compile(
@@ -38,9 +40,9 @@ _EXECUTE_LITERAL_RE = re.compile(
 
 
 def _capability_constants() -> dict[str, str]:
-    """``*CAPABILITY*`` string constants declared by the client modules."""
+    """``*CAPABILITY*`` string constants declared by the SDK client modules."""
     found: dict[str, str] = {}
-    for path in sorted(TOOLS_DIR.glob("toolbox_*.py")):
+    for path in sorted(CLIENTS_DIR.glob("*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in tree.body:
             if not isinstance(node, ast.Assign):
@@ -58,7 +60,7 @@ def _capability_constants() -> dict[str, str]:
 
 def test_client_capability_constants_are_registered_for_execute() -> None:
     constants = _capability_constants()
-    assert constants, "no capability constants found in backend/tools"
+    assert constants, "no capability constants found in the SDK clients"
     unregistered = {
         name: capability
         for name, capability in constants.items()
@@ -78,7 +80,7 @@ def test_no_module_hardcodes_an_execute_route() -> None:
     """
     offenders = [
         f"{path.relative_to(REPO_ROOT)}:{line}: {literal}"
-        for path in sorted(BACKEND_DIR.rglob("*.py"))
+        for path in sorted([*BACKEND_DIR.rglob("*.py"), *CLIENTS_DIR.glob("*.py")])
         for line, literal in _code_string_literals(path)
         if _EXECUTE_LITERAL_RE.search(literal)
     ]

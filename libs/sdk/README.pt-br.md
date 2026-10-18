@@ -30,6 +30,7 @@ core (backend)  →  acessilia-sdk  →  contrato HTTP da Toolbox
 | `acessilia_sdk.toolbox.capabilities` | `TOOLBOX_CAPABILITIES`, `ToolboxCapability`, `PROVIDER_DEFAULTS`, `provider_default` — allowlist dos contratos da Toolbox (só dados) |
 | `acessilia_sdk.toolbox.transport` | `execute_capability` — único caminho para `POST /v1/capabilities/{id}:execute`; `require_capability`, `raise_for_error`, `auth_headers`, `media_type_for` |
 | `acessilia_sdk.toolbox.client` | `ToolboxCapabilityClient` — base dos clientes por capacidade (conexões, header Bearer, provider, failover, `health`, `close`); `FailoverHook` |
+| `acessilia_sdk.toolbox.clients` | `ToolboxAdjudicateClient`, `ToolboxLayoutClient`, `ToolboxMathClient`, `ToolboxMediaInspectClient`, `ToolboxOcrClient`, `ToolboxOrientationClient`, `ToolboxPageOcrClient`, `ToolboxPdfClient`, `ToolboxPdfUaClient`, `ToolboxTableClient` — um cliente por família de capacidades; sem settings e sem logs |
 | `acessilia_sdk.toolbox.endpoints` | `ToolboxEndpoint`, `parse_endpoints`, `FAILOVER_ERRORS` — as instâncias da Toolbox que um cliente tenta, em ordem |
 | `acessilia_sdk.toolbox.artifacts` | `ArtifactRef`, `download_artifact` — artefatos endereçados por conteúdo e seu download verificado e atômico |
 | `acessilia_sdk.toolbox.catalog` | `fetch_catalog`, `CatalogSnapshot`, `Requirement`, `missing_requirements`, `CatalogCache` — o catálogo publicado, as verificações contra ele (que só restringem) e o cache do último snapshot válido |
@@ -84,8 +85,13 @@ provisório até a Toolbox publicar `artifact-ref@1`.
 1. Declarar em `TOOLBOX_CAPABILITIES` (id, versão do manifesto, rótulo de erro,
    chave de provider, schema de saída). Uma chave de provider nova também
    precisa de uma entrada em `PROVIDER_DEFAULTS`.
-2. Criar uma subclasse de `ToolboxCapabilityClient`, definir `provider_key` e
-   chamar `self._execute(capability_id, ...)`.
+2. Acrescentar um cliente em `acessilia_sdk/toolbox/clients/`: subclasse de
+   `ToolboxCapabilityClient`, com `provider_key` definido, chamando
+   `self._execute(capability_id, ...)` (ou `_execute_on` quando o resultado é um
+   artefato). Exportá-lo em `acessilia_sdk.toolbox.clients` e testá-lo em
+   `tests/clients/` com um `base_url` explícito.
+3. No core, criá-lo com `backend.tools.toolbox_client.make_toolbox_client`, que
+   repassa a configuração do `settings`.
 
 ## Testes
 

@@ -14,7 +14,7 @@ import fitz
 import pytest
 
 from backend.tools.region_extractor import Region
-from backend.tools.toolbox_layout_client import ToolboxLayoutClient
+from acessilia_sdk.toolbox.clients import ToolboxLayoutClient
 from backend.tools.toolbox_layout_structurer import ToolboxLayoutStructurer
 
 FIXTURE_PDF = Path(__file__).parent / "fixtures" / "tutorials" / "java-oo-3pgs.pdf"

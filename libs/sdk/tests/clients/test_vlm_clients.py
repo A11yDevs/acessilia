@@ -1,8 +1,8 @@
-"""Testes para os clientes Toolbox das capacidades da PR #125.
+"""Clients for the capabilities added in PR #125.
 
-Usa respostas HTTPX mockadas para validar URLs, parâmetros, timeout e parsing
-de erro. Cobre document.ocr.page, document.adjudicate.page,
-document.adjudicate.region e image.page.orient.
+Mocked HTTPX responses check URLs, parameters, timeouts and error parsing for
+document.ocr.page, document.adjudicate.page, document.adjudicate.region and
+image.page.orient.
 """
 from __future__ import annotations
 
@@ -14,16 +14,18 @@ from urllib.parse import unquote_plus
 import httpx
 import pytest
 
-from backend.tools.toolbox_adjudicate_client import ToolboxAdjudicateClient
-from backend.tools.toolbox_client import (
+from acessilia_sdk.toolbox import (
     ToolboxContractViolation,
     ToolboxProviderUnavailable,
     ToolboxTimeout,
 )
-from backend.tools.toolbox_orientation_client import ToolboxOrientationClient
-from backend.tools.toolbox_page_ocr_client import ToolboxPageOcrClient
+from acessilia_sdk.toolbox.clients import (
+    ToolboxAdjudicateClient,
+    ToolboxOrientationClient,
+    ToolboxPageOcrClient,
+)
 
-FIXTURE_IMAGE = Path(__file__).parent / "fixtures" / "tutorials" / "java-oo-3pgs.pdf"
+FIXTURE_IMAGE = Path(__file__).parent / "fixtures" / "sample.pdf"
 
 
 def _parameters_of(request: httpx.Request) -> str:
@@ -310,94 +312,3 @@ async def test_orientation_raises_on_timeout(respx_mock, orientation):
 
     with pytest.raises(ToolboxTimeout):
         await orientation.detect(file_path=FIXTURE_IMAGE)
-
-
-# ---------------------------------------------------------------------------
-# Provider registration (providers-config-vlm.yaml)
-# ---------------------------------------------------------------------------
-
-CONFIG_PATH = (
-    Path(__file__).resolve().parents[1]
-    / "scripts" / "drbench" / "experiments" / "slurm" / "providers-config-vlm.yaml"
-)
-
-PR125_CAPABILITIES = {
-    "document.ocr.page": {"qwen3-vl-page", "dots-ocr-page", "deepseek-ocr-page", "teleocr-page"},
-    "document.adjudicate.page": {"qwen3-vl-judge"},
-    "document.adjudicate.region": {"qwen3-vl-judge"},
-    "image.page.orient": {"rapidocr-orient"},
-}
-
-
-def _providers_by_capability() -> dict[str, set[str]]:
-    import yaml
-
-    data = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
-    out: dict[str, set[str]] = {}
-    for provider in data["providers"]:
-        for capability in provider["capabilities"]:
-            out.setdefault(capability, set()).add(provider["id"])
-    return out
-
-
-def test_pr125_capabilities_are_registered():
-    by_cap = _providers_by_capability()
-    for capability, providers in PR125_CAPABILITIES.items():
-        assert capability in by_cap, f"capacidade {capability} não registrada"
-        assert providers <= by_cap[capability], (
-            f"{capability}: faltam {providers - by_cap[capability]}"
-        )
-
-
-def test_pr125_providers_declare_their_capabilities():
-    import yaml
-
-    data = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
-    ids = {p["id"] for p in data["providers"]}
-    expected = set().union(*PR125_CAPABILITIES.values())
-    assert expected <= ids, f"providers ausentes: {expected - ids}"
-
-
-def test_client_capability_constants_match_the_config():
-    from backend.tools.toolbox_adjudicate_client import (
-        PAGE_CAPABILITY,
-        REGION_CAPABILITY,
-    )
-    from backend.tools.toolbox_orientation_client import (
-        CAPABILITY as ORIENTATION_CAPABILITY,
-    )
-    from backend.tools.toolbox_page_ocr_client import CAPABILITY as PAGE_OCR_CAPABILITY
-
-    by_cap = _providers_by_capability()
-    for capability in (
-        PAGE_OCR_CAPABILITY,
-        PAGE_CAPABILITY,
-        REGION_CAPABILITY,
-        ORIENTATION_CAPABILITY,
-    ):
-        assert capability in by_cap, f"{capability} não está no providers-config"
-
-
-# ---------------------------------------------------------------------------
-# mineru-hyb provider (the B source of the confirmed leaderboard best)
-# ---------------------------------------------------------------------------
-
-
-def test_mineru_hyb_provider_is_registered():
-    import yaml
-
-    data = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
-    providers = {p["id"]: p for p in data["providers"]}
-    assert "mineru-hyb" in providers
-    hyb = providers["mineru-hyb"]
-    assert hyb["config"]["backend"] == "hybrid-engine"
-    assert "document.structure.extract" in hyb["capabilities"]
-
-
-def test_mineru_hyb_is_usable_as_the_fusion_secondary_provider():
-    from backend.config.settings import settings
-
-    assert settings.fusion_hybrid_provider == "mineru-hyb"
-    # O default da fusão dual continua sendo o mineru clássico; adotar o híbrido
-    # é uma escolha explícita via FUSION_SECONDARY_PROVIDER.
-    assert settings.fusion_secondary_provider == "mineru"

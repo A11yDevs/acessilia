@@ -9,12 +9,12 @@ from pathlib import Path
 import httpx
 import pytest
 
-from backend.tools.toolbox_client import (
+from acessilia_sdk.toolbox import (
     ToolboxTimeout,
 )
-from backend.tools.toolbox_math_client import ToolboxMathClient
+from acessilia_sdk.toolbox.clients.math import ToolboxMathClient
 
-FIXTURE_IMAGE = Path(__file__).parent / "fixtures" / "tutorials" / "java-oo-3pgs.pdf"
+FIXTURE_IMAGE = Path(__file__).parent / "fixtures" / "sample.pdf"
 
 SAMPLE_RECOGNIZE_RESPONSE = {
     "status": "succeeded",

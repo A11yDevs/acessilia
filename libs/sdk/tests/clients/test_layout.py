@@ -9,14 +9,14 @@ from pathlib import Path
 import httpx
 import pytest
 
-from backend.tools.toolbox_client import (
+from acessilia_sdk.toolbox import (
     ToolboxContractViolation,
     ToolboxProviderUnavailable,
     ToolboxTimeout,
 )
-from backend.tools.toolbox_layout_client import ToolboxLayoutClient
+from acessilia_sdk.toolbox.clients.layout import ToolboxLayoutClient
 
-FIXTURE_PDF = Path(__file__).parent / "fixtures" / "tutorials" / "java-oo-3pgs.pdf"
+FIXTURE_PDF = Path(__file__).parent / "fixtures" / "sample.pdf"
 
 SAMPLE_LAYOUT_RESPONSE = {
     "status": "succeeded",

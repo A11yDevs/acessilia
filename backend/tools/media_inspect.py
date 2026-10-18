@@ -222,18 +222,26 @@ async def inspect_source_media(
     filename = source_path.name
 
     if settings.toolbox_media_inspect_enabled:
-        from backend.tools.toolbox_media_inspect_client import (
-            ToolboxMediaInspectClient,
-        )
+        from acessilia_sdk.toolbox.clients import ToolboxMediaInspectClient
+        from backend.tools.toolbox_client import make_toolbox_client
 
         owned_client = client is None
-        inspect_client = client or ToolboxMediaInspectClient()
+        inspect_client = client or make_toolbox_client(ToolboxMediaInspectClient)
         try:
             result = await inspect_client.inspect(
                 file_path=source_path,
-                use_remote_cache=use_remote_cache,
+                use_remote_cache=(
+                    use_remote_cache
+                    if use_remote_cache is not None
+                    else settings.toolbox_use_remote_cache
+                ),
             )
             if isinstance(result, dict):
+                logger.info(
+                    "Toolbox: media.inspect finished (nature={}, visual={})",
+                    result.get("artifact_nature", "?"),
+                    result.get("requires_visual_inspection", "?"),
+                )
                 return result
         except ToolboxError as exc:
             logger.warning(

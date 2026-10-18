@@ -1287,15 +1287,20 @@ def _judge_page(image: bytes, candidate_a: str, candidate_b: str) -> dict[str, A
     """Call document.adjudicate.page through the Toolbox (sync wrapper)."""
     import tempfile
 
-    from backend.tools.toolbox_adjudicate_client import ToolboxAdjudicateClient
-    from backend.tools.toolbox_client import run_sync
+    from acessilia_sdk.toolbox.clients import ToolboxAdjudicateClient
+    from backend.tools.toolbox_client import make_toolbox_client, run_sync
 
     async def call(path: Path) -> dict[str, Any]:
-        client = ToolboxAdjudicateClient()
+        client = make_toolbox_client(ToolboxAdjudicateClient)
         try:
-            return await client.judge_page(candidate_a, candidate_b, file_path=path)
+            result = await client.judge_page(candidate_a, candidate_b, file_path=path)
         finally:
             await client.close()
+        logger.info(
+            "Toolbox: page adjudication finished (pB={})",
+            result.get("document", {}).get("pB", "?"),
+        )
+        return result
 
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "page.png"

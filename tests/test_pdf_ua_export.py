@@ -1,8 +1,9 @@
-"""Tests for PDF/UA export through the Toolbox (document.export.pdf_ua).
+"""PDF/UA export through the Toolbox (document.export.pdf_ua) from the core.
 
-Covers the client (execution, artifact download and hash check) and the
-exporter, which tries the Toolbox first and uses local pandoc + LaTeX only as
-the fallback.
+The client itself is tested in ``libs/sdk/tests/clients/test_pdf_ua.py``.
+These tests cover how the core builds it from ``settings`` and the exporter,
+which tries the Toolbox first and still uses local pandoc + LaTeX as the
+fallback until #150 removes it (docs/adr/0003).
 """
 from __future__ import annotations
 
@@ -13,13 +14,11 @@ from pathlib import Path
 import httpx
 import pytest
 
+from acessilia_sdk.toolbox.clients import ToolboxPdfUaClient
+from acessilia_sdk.toolbox.clients.pdf_ua import pandoc_payload
 from backend.config.settings import settings
 from backend.export import pandoc_exporter
-from backend.tools.toolbox_client import (
-    ToolboxContractViolation,
-    ToolboxProviderUnavailable,
-)
-from backend.tools.toolbox_pdf_ua_client import ToolboxPdfUaClient, pandoc_payload
+from backend.tools.toolbox_client import ToolboxProviderUnavailable, make_toolbox_client
 
 BASE_URL = "http://localhost:8002"
 EXECUTE_URL = f"{BASE_URL}/v1/capabilities/document.export.pdf_ua:execute"
@@ -52,86 +51,11 @@ def envelope(artifact_id: str = PDF_ID, **document_overrides) -> dict:
     }
 
 
-@pytest.fixture
-def client() -> ToolboxPdfUaClient:
-    return ToolboxPdfUaClient(base_url=BASE_URL, provider="pandoc-pdf-ua", timeout_seconds=30)
-
-
-@pytest.mark.asyncio
-async def test_export_sends_the_ast_and_downloads_the_stored_pdf(respx_mock, client, tmp_path):
-    execute = respx_mock.post(EXECUTE_URL).mock(return_value=httpx.Response(200, json=envelope()))
-    download = respx_mock.get(f"{BASE_URL}/v1/artifacts/{PDF_ID}").mock(
-        return_value=httpx.Response(200, content=PDF)
-    )
-    output = tmp_path / "doc.pdf_ua.pdf"
-
-    document = await client.export(AST, output, lang="pt-BR")
-
-    assert output.read_bytes() == PDF
-    assert document["artifact_id"] == PDF_ID
-    assert execute.called and download.called
-    body = execute.calls.last.request.content
-    assert b"application/json" in body
-    assert pandoc_payload(AST) in body
-    assert b'filename="document.ast.json"' in body
-    assert b'{"lang": "pt-BR"}' in body
-    assert b"pandoc-pdf-ua" in body
-    assert not list(tmp_path.glob(".*.part"))
-
-
-@pytest.mark.asyncio
-async def test_export_rejects_a_download_whose_hash_does_not_match(respx_mock, client, tmp_path):
-    respx_mock.post(EXECUTE_URL).mock(return_value=httpx.Response(200, json=envelope()))
-    respx_mock.get(f"{BASE_URL}/v1/artifacts/{PDF_ID}").mock(
-        return_value=httpx.Response(200, content=PDF[:-3])
-    )
-    output = tmp_path / "doc.pdf"
-
-    with pytest.raises(ToolboxContractViolation, match="does not match"):
-        await client.export(AST, output)
-    assert not output.exists()
-
-
-@pytest.mark.asyncio
-async def test_export_requires_the_pdf_artifact_id(respx_mock, client, tmp_path):
-    respx_mock.post(EXECUTE_URL).mock(return_value=httpx.Response(200, json=envelope(artifact_id="")))
-    with pytest.raises(ToolboxContractViolation, match="artifact_id"):
-        await client.export(AST, tmp_path / "doc.pdf")
-
-
-@pytest.mark.asyncio
-async def test_export_rejects_a_non_pdf_result(respx_mock, client, tmp_path):
-    respx_mock.post(EXECUTE_URL).mock(
-        return_value=httpx.Response(200, json=envelope(media_type="image/png"))
-    )
-    with pytest.raises(ToolboxContractViolation, match="expected PDF"):
-        await client.export(AST, tmp_path / "doc.pdf")
-
-
-@pytest.mark.asyncio
-async def test_unavailable_renderer_maps_to_provider_unavailable(respx_mock, client, tmp_path):
-    respx_mock.post(EXECUTE_URL).mock(
-        return_value=httpx.Response(503, json={"detail": "pdf-ua-render is not reachable"})
-    )
-    with pytest.raises(ToolboxProviderUnavailable):
-        await client.export(AST, tmp_path / "doc.pdf")
-
-
-@pytest.mark.asyncio
-async def test_export_rejects_a_malformed_artifact_id_before_downloading(respx_mock, client, tmp_path):
-    respx_mock.post(EXECUTE_URL).mock(
-        return_value=httpx.Response(200, json=envelope(artifact_id="../../admin"))
-    )
-    with pytest.raises(ToolboxContractViolation, match="malformed artifact_id"):
-        await client.export(AST, tmp_path / "doc.pdf")
-    assert len(respx_mock.calls) == 1, "nothing is fetched for a malformed id"
-
-
 def test_client_uses_the_pdf_ua_timeout_not_the_shared_one(monkeypatch):
     monkeypatch.setattr(settings, "toolbox_timeout_seconds", 3600)
     monkeypatch.setattr(settings, "toolbox_pdf_ua_timeout_seconds", 300)
-    assert ToolboxPdfUaClient(base_url=BASE_URL).timeout_seconds == 300
-    assert ToolboxPdfUaClient(base_url=BASE_URL, timeout_seconds=30).timeout_seconds == 30
+    assert make_toolbox_client(ToolboxPdfUaClient).timeout_seconds == 300
+    assert make_toolbox_client(ToolboxPdfUaClient, timeout_seconds=30).timeout_seconds == 30
 
 
 def test_same_document_yields_the_same_upload_so_the_toolbox_cache_hits():
@@ -175,7 +99,7 @@ def test_exporter_uses_the_toolbox_and_skips_local_latex(monkeypatch, tmp_path):
         raise AssertionError("local LaTeX ran although the Toolbox succeeded")
 
     monkeypatch.setattr(
-        "backend.tools.toolbox_pdf_ua_client.toolbox_export_pdf_ua", fake_toolbox
+        "backend.export.pandoc_exporter.toolbox_export_pdf_ua", fake_toolbox
     )
     monkeypatch.setattr(pandoc_exporter, "_render_pdf_ua_with_pandoc", local_must_not_run)
 
@@ -198,7 +122,7 @@ def test_exporter_falls_back_to_local_latex_when_the_toolbox_fails(monkeypatch, 
         return output_path
 
     monkeypatch.setattr(
-        "backend.tools.toolbox_pdf_ua_client.toolbox_export_pdf_ua", failing_toolbox
+        "backend.export.pandoc_exporter.toolbox_export_pdf_ua", failing_toolbox
     )
     monkeypatch.setattr(pandoc_exporter, "_render_pdf_ua_with_pandoc", local)
 
@@ -216,7 +140,7 @@ def test_exporter_falls_back_on_an_unexpected_toolbox_error(monkeypatch, tmp_pat
         return output_path
 
     monkeypatch.setattr(
-        "backend.tools.toolbox_pdf_ua_client.toolbox_export_pdf_ua", broken_toolbox
+        "backend.export.pandoc_exporter.toolbox_export_pdf_ua", broken_toolbox
     )
     monkeypatch.setattr(pandoc_exporter, "_render_pdf_ua_with_pandoc", local)
 
@@ -267,7 +191,7 @@ def test_exporter_reports_both_causes_when_toolbox_and_local_fail(monkeypatch, t
         raise RuntimeError("Undefined control sequence")
 
     monkeypatch.setattr(
-        "backend.tools.toolbox_pdf_ua_client.toolbox_export_pdf_ua", failing_toolbox
+        "backend.export.pandoc_exporter.toolbox_export_pdf_ua", failing_toolbox
     )
     monkeypatch.setattr(pandoc_exporter, "_render_pdf_ua_with_pandoc", failing_local)
 
@@ -289,7 +213,7 @@ def test_exporter_skips_the_toolbox_when_disabled(monkeypatch, tmp_path):
         return output_path
 
     monkeypatch.setattr(
-        "backend.tools.toolbox_pdf_ua_client.toolbox_export_pdf_ua", toolbox_must_not_run
+        "backend.export.pandoc_exporter.toolbox_export_pdf_ua", toolbox_must_not_run
     )
     monkeypatch.setattr(pandoc_exporter, "_render_pdf_ua_with_pandoc", local)
 
@@ -298,9 +222,10 @@ def test_exporter_skips_the_toolbox_when_disabled(monkeypatch, tmp_path):
 
 @pytest.mark.respx(base_url=BASE_URL)
 def test_sync_wrapper_runs_without_an_event_loop(respx_mock, monkeypatch, tmp_path):
-    from backend.tools.toolbox_pdf_ua_client import toolbox_export_pdf_ua
+    from backend.export.pandoc_exporter import toolbox_export_pdf_ua
 
     monkeypatch.setattr(settings, "toolbox_base_url", BASE_URL)
+    monkeypatch.setattr(settings, "toolbox_base_urls", "")
     respx_mock.post(EXECUTE_URL).mock(return_value=httpx.Response(200, json=envelope()))
     respx_mock.get(f"{BASE_URL}/v1/artifacts/{PDF_ID}").mock(
         return_value=httpx.Response(200, content=PDF)

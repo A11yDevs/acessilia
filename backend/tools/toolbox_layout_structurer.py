@@ -16,7 +16,8 @@ import fitz
 from backend.tools.logger import logger
 from backend.tools.region_extractor import Region, extract_regions
 from backend.tools.structurer import BaseStructurer
-from backend.tools.toolbox_layout_client import ToolboxLayoutClient
+from acessilia_sdk.toolbox.clients import ToolboxLayoutClient
+from backend.tools.toolbox_client import make_toolbox_client
 
 # Mapeamento dos tipos de layout retornados pela Toolbox para os tipos de Region.
 LAYOUT_TO_REGION_TYPE: dict[str, str] = {
@@ -51,7 +52,7 @@ class ToolboxLayoutStructurer(BaseStructurer):
         *,
         client: ToolboxLayoutClient | None = None,
     ) -> None:
-        self._client = client or ToolboxLayoutClient()
+        self._client = client or make_toolbox_client(ToolboxLayoutClient)
         self._doc_cache: dict[str, dict[str, Any]] = {}
 
     @property
@@ -69,6 +70,12 @@ class ToolboxLayoutStructurer(BaseStructurer):
             del self._doc_cache[path_str]
 
         result = await self._client.analyze(file_path=file_path, language="pt-BR")
+        logger.info(
+            "Toolbox: layout analyzed ({} pages, {} regions, {} ms)",
+            result.get("document", {}).get("page_count", "?"),
+            result.get("document", {}).get("region_count", "?"),
+            result.get("provenance", {}).get("duration_ms", "?"),
+        )
 
         self._doc_cache[path_str] = {"data": result, "time": time.time()}
         return result

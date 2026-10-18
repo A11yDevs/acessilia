@@ -11,8 +11,8 @@ from pathlib import Path
 from typing import Any
 
 from backend.tools.logger import logger
-from backend.tools.toolbox_client import run_sync
-from backend.tools.toolbox_math_client import ToolboxMathClient
+from acessilia_sdk.toolbox.clients import ToolboxMathClient
+from backend.tools.toolbox_client import make_toolbox_client, run_sync
 
 
 def _run_async(coro) -> Any:
@@ -46,7 +46,7 @@ def toolbox_recognize_formula(image_bytes: bytes) -> list[dict[str, Any]]:
 
 
 async def _recognize_formula_async(file_path: Path) -> list[dict[str, Any]]:
-    client = ToolboxMathClient()
+    client = make_toolbox_client(ToolboxMathClient)
     try:
         result = await client.recognize(file_path=file_path)
         return result.get("document", {}).get("formulas", [])
@@ -72,7 +72,7 @@ def toolbox_convert_latex(latex: str, direction: str = "latex-to-mathml") -> str
 
 
 async def _convert_latex_async(latex: str, direction: str) -> str:
-    client = ToolboxMathClient()
+    client = make_toolbox_client(ToolboxMathClient)
     try:
         result = await client.convert(latex, direction=direction)
         doc = result.get("document", {})
@@ -99,7 +99,7 @@ def toolbox_verbalize_latex(latex: str, language: str = "pt-BR") -> str:
 
 
 async def _verbalize_latex_async(latex: str, language: str) -> str:
-    client = ToolboxMathClient()
+    client = make_toolbox_client(ToolboxMathClient)
     try:
         result = await client.verbalize(latex, language=language)
         return result.get("document", {}).get("verbalized", "")

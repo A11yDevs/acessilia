@@ -31,7 +31,7 @@ a capability because it is not currently activated.
 | Link | Artifact | Location |
 |---|---|---|
 | Registry entry | `ToolboxCapability` (id, version, provider setting, output schema) | `libs/sdk/src/acessilia_sdk/toolbox/capabilities.py` |
-| Client | `ToolboxCapabilityClient` subclass calling the registered id | `backend/tools/toolbox_*_client.py` |
+| Client | `ToolboxCapabilityClient` subclass calling the registered id, built in the core with `make_toolbox_client` | `libs/sdk/src/acessilia_sdk/toolbox/clients/*.py` |
 | Provider default | `PROVIDER_DEFAULTS`, read by `TOOLBOX_*_PROVIDER` in `Settings` | `libs/sdk/src/acessilia_sdk/toolbox/capabilities.py` |
 | Manifest | `capabilities/*.yaml` | `acessilia-toolbox` |
 | Provider registration | `providers-config.yaml` entry with an adapter | `acessilia-toolbox` |
@@ -49,22 +49,22 @@ Legend for **Call path**: how the core reaches the capability.
 | Capability | Core client | Core provider default | Toolbox provider | Call path |
 |---|---|---|---|---|
 | `document.structure.extract` | `toolbox_client.py` (`ToolboxClient.extract_structure`) | `TOOLBOX_PROVIDER=docling` | `docling`, `mineru`, `nougat`, `teleocr` | `ToolboxManifestExtractor` → PDDL extraction; with `FUSION_MODE=dual`, also compares the secondary provider and passes page evidence to the manifest builder |
-| `document.layout.analyze` | `toolbox_layout_client.py` | `TOOLBOX_LAYOUT_PROVIDER=docling-layout` | `docling-layout`, `mineru-layout` | `ToolboxLayoutStructurer` via `STRUCTURER=toolbox-layout` |
-| `document.ocr` | `toolbox_ocr_client.py` | `TOOLBOX_OCR_PROVIDER=docling-ocr` | `docling-ocr`, `mineru-ocr` | `toolbox_ocr_tools.py` (Agno wrapper) |
-| `math.recognize` | `toolbox_math_client.py` | `TOOLBOX_MATH_RECOGNIZE_PROVIDER=docling-math` | `docling-math`, `rapid-latex-ocr` | `toolbox_math_tools.py` |
-| `math.convert` | `toolbox_math_client.py` | `TOOLBOX_MATH_PROVIDER=pure-math` | `pure-math` | `toolbox_math_tools.py` |
-| `math.verbalize` | `toolbox_math_client.py` | `TOOLBOX_MATH_PROVIDER=pure-math` | `pure-math` | `toolbox_math_tools.py` |
-| `pdf.split` | `toolbox_pdf_client.py` | `TOOLBOX_PDF_PROVIDER=pymupdf-pdf` | `pymupdf-pdf` | `toolbox_pdf_tools.py` (validates, then splits locally) |
-| `pdf.render` | `toolbox_pdf_client.py` | `TOOLBOX_PDF_PROVIDER=pymupdf-pdf` | `pymupdf-pdf` | `toolbox_pdf_tools.py` (falls back to local PyMuPDF; deviation removed in #150, ADR-0003) |
-| `media.inspect` | `toolbox_media_inspect_client.py` | `TOOLBOX_MEDIA_INSPECT_PROVIDER=pure-media-inspect` | `pure-media-inspect` | `backend/tools/media_inspect.py` (local fallback; deviation removed in #150, ADR-0003), gated by `TOOLBOX_MEDIA_INSPECT_ENABLED` |
-| `document.export.pdf_ua` | `toolbox_pdf_ua_client.py` | `TOOLBOX_PDF_UA_PROVIDER=pandoc-pdf-ua` | `pandoc-pdf-ua` (sidecar `pdf-ua-render`) | `backend/export/pandoc_exporter.py` (Toolbox-first, PDF downloaded from `/v1/artifacts`; the local pandoc + LaTeX fallback is a deviation removed in #150, ADR-0003), gated by `TOOLBOX_PDF_UA_ENABLED` |
+| `document.layout.analyze` | `clients/layout.py` | `TOOLBOX_LAYOUT_PROVIDER=docling-layout` | `docling-layout`, `mineru-layout` | `ToolboxLayoutStructurer` via `STRUCTURER=toolbox-layout` |
+| `document.ocr` | `clients/ocr.py` | `TOOLBOX_OCR_PROVIDER=docling-ocr` | `docling-ocr`, `mineru-ocr` | `toolbox_ocr_tools.py` (Agno wrapper) |
+| `math.recognize` | `clients/math.py` | `TOOLBOX_MATH_RECOGNIZE_PROVIDER=docling-math` | `docling-math`, `rapid-latex-ocr` | `toolbox_math_tools.py` |
+| `math.convert` | `clients/math.py` | `TOOLBOX_MATH_PROVIDER=pure-math` | `pure-math` | `toolbox_math_tools.py` |
+| `math.verbalize` | `clients/math.py` | `TOOLBOX_MATH_PROVIDER=pure-math` | `pure-math` | `toolbox_math_tools.py` |
+| `pdf.split` | `clients/pdf.py` | `TOOLBOX_PDF_PROVIDER=pymupdf-pdf` | `pymupdf-pdf` | `toolbox_pdf_tools.py` (validates, then splits locally) |
+| `pdf.render` | `clients/pdf.py` | `TOOLBOX_PDF_PROVIDER=pymupdf-pdf` | `pymupdf-pdf` | `toolbox_pdf_tools.py` (falls back to local PyMuPDF; deviation removed in #150, ADR-0003) |
+| `media.inspect` | `clients/media_inspect.py` | `TOOLBOX_MEDIA_INSPECT_PROVIDER=pure-media-inspect` | `pure-media-inspect` | `backend/tools/media_inspect.py` (local fallback; deviation removed in #150, ADR-0003), gated by `TOOLBOX_MEDIA_INSPECT_ENABLED` |
+| `document.export.pdf_ua` | `clients/pdf_ua.py` | `TOOLBOX_PDF_UA_PROVIDER=pandoc-pdf-ua` | `pandoc-pdf-ua` (sidecar `pdf-ua-render`) | `backend/export/pandoc_exporter.py` (Toolbox-first, PDF downloaded from `/v1/artifacts`; the local pandoc + LaTeX fallback is a deviation removed in #150, ADR-0003), gated by `TOOLBOX_PDF_UA_ENABLED` |
 | `artifact.store` / `artifact.retrieve` | `toolbox_client.py` REST `/v1/artifacts` | — | `minio`, `filesystem` | upload before extraction |
 | `dataset.*` (8 capabilities) | `toolbox_client.py` REST `/v1/datasets` | — | `dataset-github`, `dataset-huggingface` | `toolbox_dataset_tools.py` (Dr.DocBench scripts) |
-| `document.ocr.page` | `toolbox_page_ocr_client.py` | `TOOLBOX_PAGE_OCR_PROVIDER=qwen3-vl-8b` | `qwen3-vl-8b` (acessilia-toolbox#50) | published; no PDDL method calls it yet |
-| `document.adjudicate.page` | `toolbox_adjudicate_client.py` | `TOOLBOX_ADJUDICATE_PROVIDER=qwen3-vl-8b` | `qwen3-vl-8b` (acessilia-toolbox#50) | `vlm-pairwise-judge` on `adjudicate-page`; thresholds to re-validate on the 8B model |
-| `document.adjudicate.region` | `toolbox_adjudicate_client.py` | `TOOLBOX_ADJUDICATE_PROVIDER=qwen3-vl-8b` | `qwen3-vl-8b` (acessilia-toolbox#50) | published; `rescue-omitted` handler pending |
-| `table.recognize` | `toolbox_table_client.py` | `TOOLBOX_TABLE_PROVIDER=qwen3-vl-8b` | `qwen3-vl-8b` (acessilia-toolbox#50) | published; `table-specialist` handler pending (selection rule to decide) |
-| `image.page.orient` | `toolbox_orientation_client.py` | `TOOLBOX_ORIENTATION_PROVIDER=rapidocr-orient` | `rapidocr-orient` | contract-valid; PDDL trigger and production effect validation pending |
+| `document.ocr.page` | `clients/page_ocr.py` | `TOOLBOX_PAGE_OCR_PROVIDER=qwen3-vl-8b` | `qwen3-vl-8b` (acessilia-toolbox#50) | published; no PDDL method calls it yet |
+| `document.adjudicate.page` | `clients/adjudicate.py` | `TOOLBOX_ADJUDICATE_PROVIDER=qwen3-vl-8b` | `qwen3-vl-8b` (acessilia-toolbox#50) | `vlm-pairwise-judge` on `adjudicate-page`; thresholds to re-validate on the 8B model |
+| `document.adjudicate.region` | `clients/adjudicate.py` | `TOOLBOX_ADJUDICATE_PROVIDER=qwen3-vl-8b` | `qwen3-vl-8b` (acessilia-toolbox#50) | published; `rescue-omitted` handler pending |
+| `table.recognize` | `clients/table.py` | `TOOLBOX_TABLE_PROVIDER=qwen3-vl-8b` | `qwen3-vl-8b` (acessilia-toolbox#50) | published; `table-specialist` handler pending (selection rule to decide) |
+| `image.page.orient` | `clients/orientation.py` | `TOOLBOX_ORIENTATION_PROVIDER=rapidocr-orient` | `rapidocr-orient` | contract-valid; PDDL trigger and production effect validation pending |
 | `accessibility.mark` | **absent** | — | `pure-accessibility` | pending: evidence-driven client and obligation/method/handler |
 | `chem.convert` | **absent** | — | `pure-chem` | pending: evidence-driven client and obligation/method/handler |
 | `chem.recognize` | **absent** | — | `docling-chem` | pending: evidence-driven client and obligation/method/handler |

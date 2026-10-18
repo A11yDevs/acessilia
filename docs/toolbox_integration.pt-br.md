@@ -160,7 +160,8 @@ no core**. Basta:
 ## 4. Cenário B — Nova capacidade (novo endpoint)
 
 Quando a Toolbox expõe uma **capacidade nova** (ex.: `document.layout.analyze`), o core
-precisa de um cliente especializado. Siga o padrão de `toolbox_layout_client.py`:
+precisa de um cliente especializado no SDK. Siga o padrão de
+`libs/sdk/src/acessilia_sdk/toolbox/clients/layout.py`:
 
 ### 4.1 Registrar a capacidade e escrever um cliente fino
 
@@ -182,7 +183,9 @@ Se a configuração de provider for nova, acrescente o default em
 `PROVIDER_DEFAULTS` e o atributo correspondente em `Settings`
 (`os.getenv("TOOLBOX_<X>_PROVIDER", provider_default("toolbox_<x>_provider"))`).
 
-**2. Escrever o cliente** como subclasse de `ToolboxCapabilityClient`, que já
+**2. Escrever o cliente** em `libs/sdk/src/acessilia_sdk/toolbox/clients/<x>.py`
+e exportá-lo em `acessilia_sdk.toolbox.clients`. Ele não lê settings nem
+registra logs. É uma subclasse de `ToolboxCapabilityClient`, que já
 cuida das conexões, do header Bearer, de `health()`, `close()`, do mapeamento
 de erros de timeout/rede, da validação do envelope de resposta, de retries
 limitados e do failover entre endpoints independentes da Toolbox (ver
@@ -192,14 +195,14 @@ com `download_artifact` pelo cliente HTTP que ele devolve, e não por
 `self._client`:
 
 ```python
-"""Cliente especializado para a capacidade <capability> da Toolbox."""
+"""Cliente da capacidade <capability> da Toolbox."""
 
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
 
-from backend.tools.toolbox_client import ToolboxCapabilityClient
+from acessilia_sdk.toolbox.client import ToolboxCapabilityClient
 
 CAPABILITY = "<capability>"
 
@@ -223,8 +226,28 @@ class Toolbox<X>Client(ToolboxCapabilityClient):
         )
 ```
 
+**3. Criá-lo no core** com `make_toolbox_client` (`backend/tools/toolbox_client.py`).
+Ela preenche os endpoints, o provider (do atributo do `settings` indicado por
+`provider_key`), o timeout, a chave de API e um hook que registra os failovers
+no log; argumentos nomeados os sobrescrevem:
+
+```python
+from acessilia_sdk.toolbox.clients import Toolbox<X>Client
+from backend.tools.toolbox_client import make_toolbox_client
+
+client = make_toolbox_client(Toolbox<X>Client)
+try:
+    result = await client.run(file_path=path)
+finally:
+    await client.close()
+```
+
+Os testes do cliente ficam em `libs/sdk/tests/clients/` e criam o cliente com
+um `base_url` explícito; testes de como o core o configura ficam em
+`tests/test_toolbox_client_factory.py`.
+
 Entradas de texto usam `upload=(nome, bytes, media_type)` no lugar de
-`file_path` (veja `toolbox_math_client.py`). `scripts/check_capability_contract.py`
+`file_path` (veja `acessilia_sdk/toolbox/clients/math.py`). `scripts/check_capability_contract.py`
 lê o registro, então o novo ID é conferido contra o catálogo da Toolbox sem
 outras mudanças; `tests/test_toolbox_capability_registry.py` falha se um cliente
 fixar uma rota `:execute` no código ou usar um ID não registrado.
@@ -276,7 +299,7 @@ disponível.
 A capacidade `media.inspect` (provider `pure-media-inspect`, PR
 `A11yDevs/acessilia-toolbox#33`) é consumida no core com o padrão do Cenário B:
 
-- **Cliente:** `backend/tools/toolbox_media_inspect_client.py`
+- **Cliente:** `acessilia_sdk.toolbox.clients.ToolboxMediaInspectClient`
   (`ToolboxMediaInspectClient` → `POST /v1/capabilities/media.inspect:execute`).
 - **Fallback local (desvio, removido na F3 da #150):** `backend/tools/media_inspect.py`
   (`inspect_source_media`, `inspect_media_payload`) — port determinístico em
@@ -304,7 +327,8 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 
 | Variável | Padrão | Descrição |
 |---|---|---|
-| `TOOLBOX_BASE_URL` | `http://localhost:8002` | URL base do serviço |
+| `TOOLBOX_BASE_URL` | `http://localhost:8002` | URL base do serviço; em produção, o balanceador na frente das réplicas (ADR-0006) |
+| `TOOLBOX_BASE_URLS` | *(vazio)* | URLs, separadas por vírgula, de deploys independentes da Toolbox, tentadas em ordem pelos clientes de capacidade; vazio significa só `TOOLBOX_BASE_URL` |
 | `TOOLBOX_PROVIDER` | `docling` | Provider principal de extração |
 | `TOOLBOX_API_KEY` | *(vazio)* | Chave para `Authorization: Bearer` |
 | `TOOLBOX_AVAILABILITY_GATE` | `observe` | Gate de disponibilidade: `observe`, `enforce` ou `off` (seção 4.3) |
@@ -352,13 +376,13 @@ service.py: _build_orchestrator()
 
 ## 7. Referências de código
 
-- `libs/sdk/src/acessilia_sdk/toolbox/` — registro de capacidades, transporte, classe base dos clientes e hierarquia de exceções (SDK)
-- `backend/tools/toolbox_client.py` — liga a classe base do SDK ao settings do core; `ToolboxClient` genérico (extração, artefatos, datasets)
-- `backend/tools/toolbox_layout_client.py` — modelo do Cenário B
+- `libs/sdk/src/acessilia_sdk/toolbox/` — registro de capacidades, transporte, classe base dos clientes, failover, artefatos e hierarquia de exceções (SDK)
+- `libs/sdk/src/acessilia_sdk/toolbox/clients/` — um cliente por família de capacidades; `layout.py` é o modelo do Cenário B
+- `backend/tools/toolbox_client.py` — `make_toolbox_client` (clientes do SDK configurados a partir do settings do core); `ToolboxClient` genérico (extração, artefatos, datasets)
 - `backend/tools/toolbox_ocr_tools.py`, `toolbox_math_tools.py`, `toolbox_pdf_tools.py` — wrappers Agno; `toolbox_pdf_tools.py` ainda tem fallback local, removido na #150 (ADR-0003)
-- `backend/tools/toolbox_page_ocr_client.py` — `document.ocr.page` (VLM de página inteira)
-- `backend/tools/toolbox_adjudicate_client.py` — `document.adjudicate.page` / `.region`
-- `backend/tools/toolbox_orientation_client.py` — `image.page.orient`
+- `clients/page_ocr.py` — `document.ocr.page` (VLM de página inteira)
+- `clients/adjudicate.py` — `document.adjudicate.page` / `.region`
+- `clients/orientation.py` — `image.page.orient`
 - `backend/tools/structurer.py` — `get_structurer()` e seleção de structurer
 - `backend/core/manifest/toolbox_extractor.py` — `ToolboxManifestExtractor`
 - `backend/pipeline/fusion.py` — `extract_fused()` (fusão dual)
