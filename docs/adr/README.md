@@ -30,13 +30,17 @@ ones here instead of restating them.
    execution mode (for example a local executor), changes a public contract, or
    is an exception to a principle of the [constitution](../constitution.md).
 2. **Format.** Copy [template.md](template.md). Use the next free number and a
-   short kebab-case slug: `NNNN-title.md`. Keep it short; link to issues and
-   code for detail.
+   short kebab-case slug in English: `NNNN-title.md`, with its mirror at
+   `NNNN-title.pt-br.md`. Keep it short; link to issues and code for detail.
 3. **Language.** English is normative. A `.pt-br.md` mirror is written in the
    same pull request, following principle 8 of the constitution.
-4. **Status.** `Proposed` while under review; `Accepted` once merged;
-   `Superseded by NNNN` or `Deprecated` later. An accepted ADR is not rewritten:
-   a changed decision gets a new ADR that supersedes it. Fixing typos and links
+4. **Status.** The status in the file is the state the ADR has once its pull
+   request is merged, because that pull request's review is the ADR's review
+   (step 5). A pull request that records a decision sets it to `Accepted`. Use
+   `Proposed` only to merge an ADR whose decision is still open, so it can be
+   discussed in follow-up pull requests. Later statuses are
+   `Superseded by NNNN` and `Deprecated`. An accepted ADR is not rewritten: a
+   changed decision gets a new ADR that supersedes it. Fixing typos and links
    is fine.
 5. **Review.** A cross-component ADR is reviewed by the owners of every
    component it affects. Each team keeps its technical autonomy inside its own

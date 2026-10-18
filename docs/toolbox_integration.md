@@ -74,10 +74,10 @@ All exceptions inherit from `ToolboxError` (defined in the SDK, `acessilia_sdk.t
 
 ### 2.1 Architectural difference
 
-| Aspect | Local tool (`libs/`) | Toolbox tool |
+| Aspect | Library (`libs/docstruct`) | Toolbox capability |
 |---|---|---|
 | **Where it runs** | In the core process (same machine/container) | Remote HTTP service (`TOOLBOX_BASE_URL`, port 8002) |
-| **Examples** | `libs/docstruct/` — `docstruct.fusion`, `docstruct.policy.FusionPolicy`, `docstruct.types.CanonicalBlock`; PyMuPDF fallback in `backend/tools/structurer.py` | `document.structure.extract`, `document.layout.analyze`, `document.ocr`, `math.*`, `pdf.split` |
+| **Examples** | `libs/docstruct/` — `docstruct.fusion`, `docstruct.policy.FusionPolicy`, `docstruct.types.CanonicalBlock` | `document.structure.extract`, `document.layout.analyze`, `document.ocr`, `math.*`, `pdf.split` |
 | **Interface** | Direct Python import (pure function/class) | `ToolboxClient` / specialized clients → `POST /v1/capabilities/{capability}:execute` |
 | **Failure** | Local Python exception | `ToolboxError` → typed subclasses |
 | **State/cache** | In memory / local disk | Artifact store (`/v1/artifacts`) + remote cache (`cache_key` in provenance) |
@@ -85,12 +85,19 @@ All exceptions inherit from `ToolboxError` (defined in the SDK, `acessilia_sdk.t
 
 ### 2.2 Decision policy
 
-**Implement locally (`libs/`) when:**
+The full guide is in [ADR-0002](adr/0002-component-responsibilities.md#decision).
+In short:
 
-- It is a pure transformation over already-canonical data (block fusion, grouping,
-  decision policies) — no network I/O needed.
-- It must run offline / without a network dependency.
-- It needs a deterministic guarantee and atomic versioning with the core.
+**Implement in docstruct (`libs/docstruct`) when:**
+
+- It is a pure, deterministic transformation over document structure (block
+  fusion, grouping, reading order, validation), with no I/O and no heavy
+  dependency.
+- It needs a deterministic guarantee and versioned releases shared by the core
+  and the Toolbox.
+
+Running offline is not by itself a reason to execute an operational tool in the
+core; that is an exception that needs an ADR.
 
 **Expose via the Toolbox when:**
 
@@ -98,25 +105,21 @@ All exceptions inherit from `ToolboxError` (defined in the SDK, `acessilia_sdk.t
 - It makes sense to share among multiple consumers (core, drbench, future clients).
 - It evolves on its own cadence (e.g. swapping the MinerU version without touching the core).
 
-### 2.3 The bridge: wrapper with local fallback
+### 2.3 No local fallback
 
-When a Toolbox capability has a local equivalent, the core uses an **Agno tool wrapper
-with local fallback**: it tries the Toolbox first and, if it is unavailable, degrades to
-the local implementation. This is exactly the pattern of `toolbox_ocr_tools.py`,
-`toolbox_math_tools.py`, and `toolbox_pdf_tools.py`.
+Operational capabilities run only in the Toolbox: the production policy is
+`remote_only`, and the core does not degrade to a local implementation when the
+Toolbox is unavailable ([ADR-0003](adr/0003-remote-only-operational-capabilities.md)).
+Availability comes from Toolbox replicas behind a load balancer and from the
+SDK's bounded retries ([ADR-0006](adr/0006-availability-and-failover.md)). When
+a capability stays unavailable, the core fails the step or degrades it visibly
+as a business decision, and records the cause.
 
-```
-                    ┌─────────────────────────────┐
-                    │  Agno tool (wrapper)        │
-                    │  backend/tools/toolbox_*_tools.py │
-                    └──────────────┬──────────────┘
-                       tries        │
-                       Toolbox      ▼
-                    ┌──────────────┐   failure → ┌──────────────────┐
-                    │ ToolboxClient │──────────▶│ Local impl        │
-                    │ (remote)      │            │ (libs/)           │
-                    └──────────────┘            └──────────────────┘
-```
+The "Toolbox first, local fallback" wrappers still in the code are **deviations
+being removed** in [#150](https://github.com/A11yDevs/acessilia/issues/150):
+`toolbox_pdf_tools.py`, `media_inspect.py`, the PDF/UA path in
+`backend/export/pandoc_exporter.py` and the two Toolbox structurers. Do not
+copy that pattern into new code; a local or offline executor needs its own ADR.
 
 ---
 
@@ -226,11 +229,11 @@ reads the registry, so the new id is checked against the Toolbox catalogue
 without further changes; `tests/test_toolbox_capability_registry.py` fails if a
 client hard-codes an `:execute` route or uses an unregistered id.
 
-### 4.2 Agno tool wrapper (optional, with local fallback)
+### 4.2 Agno tool wrapper (optional)
 
-If a local equivalent exists, create `backend/tools/toolbox_<x>_tools.py` following the
-`toolbox_ocr_tools.py` pattern: expose the capability as an Agno tool, try the Toolbox
-first, and degrade to the local implementation on failure.
+To expose the capability to an agent, create `backend/tools/toolbox_<x>_tools.py`
+that calls the client from 4.1 and turns `ToolboxError` into the tool's failure
+result. Do not add a local implementation behind it (see 2.3).
 
 ### 4.3 Pipeline integration (if applicable)
 
@@ -274,10 +277,10 @@ The `media.inspect` capability (provider `pure-media-inspect`, PR
 
 - **Client:** `backend/tools/toolbox_media_inspect_client.py`
   (`ToolboxMediaInspectClient` → `POST /v1/capabilities/media.inspect:execute`).
-- **Local fallback:** `backend/tools/media_inspect.py`
+- **Local fallback (deviation, removed in #150 F3):** `backend/tools/media_inspect.py`
   (`inspect_source_media`, `inspect_media_payload`) — deterministic Pillow/PyMuPDF
   port replicating the `artifact/media-inspection@1` schema when the Toolbox is
-  unavailable.
+  unavailable. It has already drifted from the Toolbox provider.
 - **Integration:** `backend/agents/pddl_orchestrator.py` calls
   `inspect_source_media()` after extraction and uses the `requires_visual_inspection`
   signal to inject a full-page `picture` element when the input is a standalone image
@@ -309,9 +312,9 @@ Defined in `backend/config/settings.py` and documented in `.env.example`:
 | `TOOLBOX_USE_ARTIFACT_STORE` | `true` | Upload the file to `/v1/artifacts` before extracting |
 | `TOOLBOX_USE_REMOTE_CACHE` | `true` | Use the remote cache (`no_cache=false`) |
 | `TOOLBOX_MEDIA_INSPECT_PROVIDER` | `pure-media-inspect` | Provider for the `media.inspect` capability |
-| `TOOLBOX_MEDIA_INSPECT_ENABLED` | `true` | Run `media.inspect` (Toolbox-first with local fallback) |
+| `TOOLBOX_MEDIA_INSPECT_ENABLED` | `true` | Run `media.inspect` or skip it. Today a local fallback still runs when the Toolbox fails; it is removed in #150 |
 | `TOOLBOX_PDF_UA_PROVIDER` | `pandoc-pdf-ua` | Provider for the `document.export.pdf_ua` capability |
-| `TOOLBOX_PDF_UA_ENABLED` | `true` | Render PDF/UA on the Toolbox (pinned Pandoc + TeX Live); local pandoc + LaTeX is the fallback |
+| `TOOLBOX_PDF_UA_ENABLED` | `true` | Render PDF/UA on the Toolbox (pinned Pandoc + TeX Live) or skip it. Today local pandoc + LaTeX still runs as a fallback; it is removed in #150 |
 | `TOOLBOX_PDF_UA_TIMEOUT_SECONDS` | `300` | How long to wait for the Toolbox render before falling back to the local renderer |
 | `FUSION_MODE` | `single` | `single` (one provider) or `dual` (two providers + fusion) |
 | `FUSION_SECONDARY_PROVIDER` | `mineru` | Secondary provider for `FUSION_MODE=dual` |
@@ -350,7 +353,7 @@ service.py: _build_orchestrator()
 - `libs/sdk/src/acessilia_sdk/toolbox/` — capability registry, transport, client base class and exception hierarchy (SDK)
 - `backend/tools/toolbox_client.py` — binds the SDK client base to the core settings; generic `ToolboxClient` (extraction, artifacts, datasets)
 - `backend/tools/toolbox_layout_client.py` — Scenario B template
-- `backend/tools/toolbox_ocr_tools.py`, `toolbox_math_tools.py`, `toolbox_pdf_tools.py` — wrappers with local fallback
+- `backend/tools/toolbox_ocr_tools.py`, `toolbox_math_tools.py`, `toolbox_pdf_tools.py` — Agno wrappers; `toolbox_pdf_tools.py` still has a local fallback, removed in #150 (ADR-0003)
 - `backend/tools/toolbox_page_ocr_client.py` — `document.ocr.page` (whole-page VLM)
 - `backend/tools/toolbox_adjudicate_client.py` — `document.adjudicate.page` / `.region`
 - `backend/tools/toolbox_orientation_client.py` — `image.page.orient`

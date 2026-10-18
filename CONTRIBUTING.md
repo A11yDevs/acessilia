@@ -65,6 +65,12 @@ git checkout -b feat/my-feature
 
 ### 2. Developing
 
+Before changing responsibilities or dependencies between the core, the SDK,
+docstruct and the Toolbox, check the
+[constitution](docs/constitution.md#7-ecosystem-architecture-principles) and the
+[Architecture Decision Records](docs/adr/README.md). Such a change, a new public
+contract, or an exception to a principle needs an ADR.
+
 Make atomic commits following the [commit convention](#commit-convention).
 
 ```bash

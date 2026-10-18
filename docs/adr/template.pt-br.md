@@ -1,6 +1,6 @@
 # NNNN. Título da decisão
 
-- **Status:** Proposto | Aceito | Substituído por [NNNN](NNNN-titulo.pt-br.md) | Obsoleto
+- **Status:** Proposto | Aceito | Substituído por [NNNN](NNNN-title.pt-br.md) | Obsoleto
 - **Data:** AAAA-MM-DD
 - **Componentes:** core, SDK, docstruct, Toolbox (os afetados)
 - **Issues:** #NNN

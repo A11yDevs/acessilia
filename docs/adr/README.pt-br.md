@@ -31,14 +31,20 @@ ADRs apontam para os daqui em vez de repeti-los.
    exceção a um princípio da [constituição](../constitution.pt-br.md).
 2. **Formato.** Copie o [template.md](template.md) (o
    [template.pt-br.md](template.pt-br.md) serve para o espelho). Use o próximo
-   número livre e um slug curto em kebab-case: `NNNN-titulo.md`. Seja breve e
-   aponte para issues e código para os detalhes.
+   número livre e um slug curto em kebab-case, em inglês: `NNNN-title.md`, com
+   o espelho em `NNNN-title.pt-br.md`. Seja breve e aponte para issues e código
+   para os detalhes.
 3. **Idioma.** O inglês é normativo. O espelho `.pt-br.md` é escrito no mesmo
    pull request, conforme o princípio 8 da constituição.
-4. **Status.** `Proposed` (proposto) durante a revisão; `Accepted` (aceito)
-   após o merge; depois, `Superseded by NNNN` (substituído) ou `Deprecated`
-   (obsoleto). Um ADR aceito não é reescrito: uma decisão alterada ganha um
-   novo ADR que o substitui. Corrigir erros de digitação e links é permitido.
+4. **Status.** O status no arquivo é o estado que o ADR terá depois do merge
+   do seu pull request, porque a revisão desse pull request é a revisão do ADR
+   (passo 5). Um pull request que registra uma decisão a marca como `Accepted`
+   (aceito). Use `Proposed` (proposto) só para fazer merge de um ADR cuja
+   decisão ainda está em aberto, para que ela seja discutida em pull requests
+   seguintes. Os status posteriores são `Superseded by NNNN` (substituído) e
+   `Deprecated` (obsoleto). Um ADR aceito não é reescrito: uma decisão alterada
+   ganha um novo ADR que o substitui. Corrigir erros de digitação e links é
+   permitido.
 5. **Revisão.** Um ADR que atravessa componentes é revisado pelos donos de
    todos os componentes afetados. Cada equipe mantém sua autonomia técnica
    dentro do próprio componente.

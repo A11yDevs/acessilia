@@ -2,7 +2,8 @@
 
 Também disponível em **inglês (EUA)**: [English version](constitution.md)
 
-- **Versão:** 2.0.0 (2026-10-18). Veja o [histórico de alterações](#9-histórico-de-alterações).
+- **Versão:** 2.0.0 (2026-10-18). Veja no [histórico de alterações](#9-histórico-de-alterações)
+  como as versões são numeradas.
 
 ## 1. Propósito
 Entregar a conversão de documentos e imagens para formatos acessíveis por meio de:
@@ -182,7 +183,10 @@ capacidades operacionais.
      capacidades). O SDK consome os contratos da Toolbox, de preferência
      gerados. O core usa os contratos públicos sem redefini-los.
    - **Detalhe:** [ADR-0004](adr/0004-single-source-of-truth-for-contracts.pt-br.md).
-   - **Verificado por:** `scripts/check_capability_contract.py`.
+   - **Verificado por:** `scripts/check_capability_contract.py`, para os
+     contratos operacionais que o SDK consome (IDs de capacidade, versões
+     exatas, providers). A propriedade dos modelos canônicos é verificada na
+     revisão e pelo inventário de duplicações da #152.
 8. **P8 — Evolução incremental.**
    - **Regra:** refatorações são pequenas e verificáveis. Extrair e reutilizar
      código antes de substituí-lo. Não misturar mudanças arquiteturais e
@@ -208,11 +212,24 @@ capacidades operacionais.
 
 ## 9. Histórico de alterações
 
-- **2.0.0 (2026-10-18):** acrescentados os princípios arquiteturais do
+As versões seguem `MAJOR.MINOR.PATCH`:
+
+- **MAJOR:** um princípio ou regra é acrescentado, removido ou muda de
+  sentido, de modo que código ou documentos que estavam em conformidade podem
+  deixar de estar.
+- **MINOR:** um acréscimo compatível, como uma seção, um exemplo ou uma
+  verificação nova.
+- **PATCH:** redação, links e traduções, sem mudança de sentido.
+
+O texto sem versão anterior a 2026-10-18 conta como **1.0.0**.
+
+- **2.0.0 (2026-10-18):** versão maior, porque os princípios 2.4 e 2.5 e o
+  contrato 4.4 mudam de sentido. acrescentados os princípios arquiteturais do
   ecossistema P1–P9 (seção 7) e os ADRs que os detalham
   ([#152](https://github.com/A11yDevs/acessilia/issues/152)). Alinhados à
   execução remota os princípios 2.3–2.5, as descrições do ReaderAgent e dos
-  filtros em 3.1, o contrato 4.4, a resiliência 5.6 e a evolução 6.6–6.7. O
-  número de versão e este histórico começam aqui. O espelho em português
+  filtros em 3.1, o contrato 4.4, a resiliência 5.6 e a evolução 6.6–6.7. Os
+  números de versão e este histórico começam aqui. O espelho em português
   brasileiro passa a cobrir o documento inteiro.
-- **1.x:** revisões anteriores, sem versão; veja o histórico git deste arquivo.
+- **1.0.0:** as revisões anteriores, sem versão; veja o histórico git deste
+  arquivo.

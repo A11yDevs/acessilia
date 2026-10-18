@@ -2,7 +2,8 @@
 
 You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](constitution.pt-br.md)
 
-- **Version:** 2.0.0 (2026-10-18). See the [changelog](#9-changelog).
+- **Version:** 2.0.0 (2026-10-18). See the [changelog](#9-changelog) for how
+  versions are numbered.
 
 ## 1. Purpose
 Deliver document and image conversion to accessible formats through:
@@ -181,7 +182,10 @@ Toolbox executes operational capabilities.
      capabilities). The SDK consumes the Toolbox's contracts, preferably
      generated. The core uses the public contracts without redefining them.
    - **Detail:** [ADR-0004](adr/0004-single-source-of-truth-for-contracts.md).
-   - **Checked by:** `scripts/check_capability_contract.py`.
+   - **Checked by:** `scripts/check_capability_contract.py` for the
+     operational contracts the SDK consumes (capability ids, exact versions,
+     providers). Ownership of the canonical models is checked in review and by
+     the duplication inventory of #152.
 8. **P8 — Incremental evolution.**
    - **Rule:** refactorings are small and verifiable. Extract and reuse code
      before replacing it. Do not mix architectural and behavioral changes in
@@ -207,11 +211,23 @@ Toolbox executes operational capabilities.
 
 ## 9. Changelog
 
-- **2.0.0 (2026-10-18):** added the ecosystem architecture principles P1–P9
+Versions follow `MAJOR.MINOR.PATCH`:
+
+- **MAJOR:** a principle or rule is added, removed, or changes meaning, so code
+  or documents that complied before may no longer comply.
+- **MINOR:** a compatible addition, such as a new section, example or
+  verification.
+- **PATCH:** wording, links and translations, with no change in meaning.
+
+The unversioned text before 2026-10-18 counts as **1.0.0**.
+
+- **2.0.0 (2026-10-18):** a major version, because principles 2.4 and 2.5 and
+  contract 4.4 change meaning. added the ecosystem architecture principles P1–P9
   (section 7) and the ADRs that detail them
   ([#152](https://github.com/A11yDevs/acessilia/issues/152)). Aligned
   principles 2.3–2.5, the ReaderAgent and filter descriptions in 3.1, contract
-  4.4, resilience 5.6 and evolution 6.6–6.7 with remote-only execution. The
-  version number and this changelog start here. The Brazilian Portuguese
+  4.4, resilience 5.6 and evolution 6.6–6.7 with remote-only execution.
+  Version numbers and this changelog start here. The Brazilian Portuguese
   mirror now covers the whole document.
-- **1.x:** earlier, unversioned revisions; see the git history of this file.
+- **1.0.0:** the earlier, unversioned revisions; see the git history of this
+  file.

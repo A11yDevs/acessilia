@@ -73,10 +73,10 @@ Todas herdam de `ToolboxError` (definida no SDK, `acessilia_sdk.toolbox.errors`,
 
 ### 2.1 Diferença arquitetural
 
-| Aspecto | Tool local (`libs/`) | Tool da Toolbox |
+| Aspecto | Biblioteca (`libs/docstruct`) | Capacidade da Toolbox |
 |---|---|---|
 | **Onde roda** | No processo do core (mesma máquina/container) | Serviço remoto HTTP (`TOOLBOX_BASE_URL`, porta 8002) |
-| **Exemplos** | `libs/docstruct/` — `docstruct.fusion`, `docstruct.policy.FusionPolicy`, `docstruct.types.CanonicalBlock`; fallback PyMuPDF em `backend/tools/structurer.py` | `document.structure.extract`, `document.layout.analyze`, `document.ocr`, `math.*`, `pdf.split` |
+| **Exemplos** | `libs/docstruct/` — `docstruct.fusion`, `docstruct.policy.FusionPolicy`, `docstruct.types.CanonicalBlock` | `document.structure.extract`, `document.layout.analyze`, `document.ocr`, `math.*`, `pdf.split` |
 | **Interface** | Import Python direto (função/classe pura) | `ToolboxClient` / clientes especializados → `POST /v1/capabilities/{capability}:execute` |
 | **Falha** | Exceção Python local | `ToolboxError` → subclasses tipadas |
 | **Estado/cache** | Em memória / disco local | Artifact store (`/v1/artifacts`) + cache remoto (`cache_key` na provenance) |
@@ -84,12 +84,19 @@ Todas herdam de `ToolboxError` (definida no SDK, `acessilia_sdk.toolbox.errors`,
 
 ### 2.2 Política de decisão
 
-**Implementar local (`libs/`) quando:**
+O guia completo está no [ADR-0002](adr/0002-component-responsibilities.pt-br.md#decisão).
+Em resumo:
 
-- É uma transformação pura sobre dados já canônicos (fusão de blocos, agrupamento,
-  políticas de decisão) — não precisa de I/O de rede.
-- Precisa rodar offline / sem dependência de rede.
-- Precisa de garantia determinística e versionamento atômico com o core.
+**Implementar na docstruct (`libs/docstruct`) quando:**
+
+- É uma transformação pura e determinística sobre a estrutura do documento
+  (fusão de blocos, agrupamento, ordem de leitura, validação), sem I/O e sem
+  dependência pesada.
+- Precisa de garantia determinística e de releases versionadas compartilhadas
+  pelo core e pela Toolbox.
+
+Rodar offline não é, por si só, motivo para executar uma ferramenta operacional
+no core; isso é uma exceção que exige um ADR.
 
 **Expor via Toolbox quando:**
 
@@ -97,25 +104,22 @@ Todas herdam de `ToolboxError` (definida no SDK, `acessilia_sdk.toolbox.errors`,
 - Faz sentido compartilhar entre múltiplos consumidores (core, drbench, clientes futuros).
 - Evolui em cadência própria (ex.: trocar a versão do MinerU sem tocar no core).
 
-### 2.3 A ponte: wrapper com fallback local
+### 2.3 Sem fallback local
 
-Quando uma capacidade da Toolbox tem equivalente local, o core usa um **wrapper de
-tool Agno com fallback local**: tenta a Toolbox primeiro e, se estiver indisponível,
-degrada para a implementação local. É exatamente o padrão de `toolbox_ocr_tools.py`,
-`toolbox_math_tools.py` e `toolbox_pdf_tools.py`.
+Capacidades operacionais rodam só na Toolbox: a política de produção é
+`remote_only`, e o core não degrada para uma implementação local quando a
+Toolbox está indisponível ([ADR-0003](adr/0003-remote-only-operational-capabilities.pt-br.md)).
+A disponibilidade vem de réplicas da Toolbox atrás de um balanceador e dos
+retries limitados do SDK ([ADR-0006](adr/0006-availability-and-failover.pt-br.md)).
+Quando uma capacidade continua indisponível, o core faz a etapa falhar ou a
+degrada de forma visível, como decisão de negócio, e registra a causa.
 
-```
-                    ┌─────────────────────────────┐
-                    │  Tool Agno (wrapper)        │
-                    │  backend/tools/toolbox_*_tools.py │
-                    └──────────────┬──────────────┘
-                       tenta        │
-                       Toolbox      ▼
-                    ┌──────────────┐   falha →  ┌──────────────────┐
-                    │ ToolboxClient │──────────▶│ Implementação     │
-                    │ (remoto)      │            │ local (libs/)     │
-                    └──────────────┘            └──────────────────┘
-```
+Os wrappers "Toolbox primeiro, fallback local" que ainda estão no código são
+**desvios em remoção** na [#150](https://github.com/A11yDevs/acessilia/issues/150):
+`toolbox_pdf_tools.py`, `media_inspect.py`, o caminho PDF/UA em
+`backend/export/pandoc_exporter.py` e os dois structurers da Toolbox. Não copie
+esse padrão em código novo; um executor local ou offline precisa de um ADR
+próprio.
 
 ---
 
@@ -225,11 +229,11 @@ lê o registro, então o novo ID é conferido contra o catálogo da Toolbox sem
 outras mudanças; `tests/test_toolbox_capability_registry.py` falha se um cliente
 fixar uma rota `:execute` no código ou usar um ID não registrado.
 
-### 4.2 Wrapper de tool Agno (opcional, com fallback local)
+### 4.2 Wrapper de tool Agno (opcional)
 
-Se existir equivalente local, crie `backend/tools/toolbox_<x>_tools.py` seguindo o
-padrão de `toolbox_ocr_tools.py`: expõe a capacidade como tool Agno, tenta a Toolbox
-primeiro e degrada para a implementação local em caso de falha.
+Para expor a capacidade a um agente, crie `backend/tools/toolbox_<x>_tools.py`
+chamando o cliente da seção 4.1 e convertendo `ToolboxError` no resultado de
+falha da tool. Não acrescente uma implementação local por trás dele (veja 2.3).
 
 ### 4.3 Integração no pipeline (se aplicável)
 
@@ -274,10 +278,10 @@ A capacidade `media.inspect` (provider `pure-media-inspect`, PR
 
 - **Cliente:** `backend/tools/toolbox_media_inspect_client.py`
   (`ToolboxMediaInspectClient` → `POST /v1/capabilities/media.inspect:execute`).
-- **Fallback local:** `backend/tools/media_inspect.py`
+- **Fallback local (desvio, removido na F3 da #150):** `backend/tools/media_inspect.py`
   (`inspect_source_media`, `inspect_media_payload`) — port determinístico em
   Pillow/PyMuPDF que replica o schema `artifact/media-inspection@1` quando a
-  Toolbox está indisponível.
+  Toolbox está indisponível. Ele já divergiu do provider da Toolbox.
 - **Integração:** `backend/agents/pddl_orchestrator.py` chama
   `inspect_source_media()` após a extração e usa o sinal
   `requires_visual_inspection` para injetar um elemento `picture` de página
@@ -310,9 +314,9 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 | `TOOLBOX_USE_ARTIFACT_STORE` | `true` | Envia o arquivo para `/v1/artifacts` antes de extrair |
 | `TOOLBOX_USE_REMOTE_CACHE` | `true` | Usa o cache remoto (`no_cache=false`) |
 | `TOOLBOX_MEDIA_INSPECT_PROVIDER` | `pure-media-inspect` | Provider da capacidade `media.inspect` |
-| `TOOLBOX_MEDIA_INSPECT_ENABLED` | `true` | Executa `media.inspect` (Toolbox-first com fallback local) |
+| `TOOLBOX_MEDIA_INSPECT_ENABLED` | `true` | Executa ou pula `media.inspect`. Hoje um fallback local ainda roda quando a Toolbox falha; ele é removido na #150 |
 | `TOOLBOX_PDF_UA_PROVIDER` | `pandoc-pdf-ua` | Provider da capacidade `document.export.pdf_ua` |
-| `TOOLBOX_PDF_UA_ENABLED` | `true` | Renderiza o PDF/UA na Toolbox (Pandoc + TeX Live fixados); pandoc + LaTeX locais ficam como fallback |
+| `TOOLBOX_PDF_UA_ENABLED` | `true` | Renderiza o PDF/UA na Toolbox (Pandoc + TeX Live fixados) ou pula a etapa. Hoje pandoc + LaTeX locais ainda rodam como fallback; ele é removido na #150 |
 | `TOOLBOX_PDF_UA_TIMEOUT_SECONDS` | `300` | Tempo máximo de espera pela renderização na Toolbox antes de cair no renderizador local |
 | `FUSION_MODE` | `single` | `single` (um provider) ou `dual` (dois providers + fusão) |
 | `FUSION_SECONDARY_PROVIDER` | `mineru` | Provider secundário para `FUSION_MODE=dual` |
@@ -351,7 +355,7 @@ service.py: _build_orchestrator()
 - `libs/sdk/src/acessilia_sdk/toolbox/` — registro de capacidades, transporte, classe base dos clientes e hierarquia de exceções (SDK)
 - `backend/tools/toolbox_client.py` — liga a classe base do SDK ao settings do core; `ToolboxClient` genérico (extração, artefatos, datasets)
 - `backend/tools/toolbox_layout_client.py` — modelo do Cenário B
-- `backend/tools/toolbox_ocr_tools.py`, `toolbox_math_tools.py`, `toolbox_pdf_tools.py` — wrappers com fallback local
+- `backend/tools/toolbox_ocr_tools.py`, `toolbox_math_tools.py`, `toolbox_pdf_tools.py` — wrappers Agno; `toolbox_pdf_tools.py` ainda tem fallback local, removido na #150 (ADR-0003)
 - `backend/tools/toolbox_page_ocr_client.py` — `document.ocr.page` (VLM de página inteira)
 - `backend/tools/toolbox_adjudicate_client.py` — `document.adjudicate.page` / `.region`
 - `backend/tools/toolbox_orientation_client.py` — `image.page.orient`
