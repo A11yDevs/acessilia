@@ -11,6 +11,17 @@ class ToolboxProviderUnavailable(ToolboxError):
     """Provedor da Toolbox está offline ou não respondeu."""
 
 
+class ToolboxUnavailable(ToolboxProviderUnavailable):
+    """No Toolbox endpoint could serve the request; ``causes`` holds each failure."""
+
+    def __init__(self, causes: list[tuple[str, ToolboxError]]) -> None:
+        self.causes = causes
+        details = "; ".join(
+            f"{url}: {type(exc).__name__}: {exc}" for url, exc in causes
+        )
+        super().__init__(f"No Toolbox endpoint available ({details})")
+
+
 class ToolboxTimeout(ToolboxError):
     """A requisição excedeu o timeout configurado."""
 
@@ -43,5 +54,6 @@ __all__ = [
     "ToolboxError",
     "ToolboxProviderUnavailable",
     "ToolboxTimeout",
+    "ToolboxUnavailable",
     "ToolboxUnsupportedMediaType",
 ]

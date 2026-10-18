@@ -6,6 +6,7 @@ from acessilia_sdk.toolbox.capabilities import (
     ToolboxCapability,
     provider_default,
 )
+from acessilia_sdk.toolbox.artifacts import ArtifactRef, download_artifact
 from acessilia_sdk.toolbox.catalog import (
     CatalogCache,
     CatalogSnapshot,
@@ -14,7 +15,12 @@ from acessilia_sdk.toolbox.catalog import (
     missing_requirements,
     snapshot_from_payloads,
 )
-from acessilia_sdk.toolbox.client import ToolboxCapabilityClient
+from acessilia_sdk.toolbox.client import FailoverHook, ToolboxCapabilityClient
+from acessilia_sdk.toolbox.endpoints import (
+    FAILOVER_ERRORS,
+    ToolboxEndpoint,
+    parse_endpoints,
+)
 from acessilia_sdk.toolbox.errors import (
     ToolboxArtifactNotFound,
     ToolboxAuthenticationError,
@@ -23,6 +29,7 @@ from acessilia_sdk.toolbox.errors import (
     ToolboxError,
     ToolboxProviderUnavailable,
     ToolboxTimeout,
+    ToolboxUnavailable,
     ToolboxUnsupportedMediaType,
 )
 from acessilia_sdk.toolbox.transport import (
@@ -34,8 +41,11 @@ from acessilia_sdk.toolbox.transport import (
 )
 
 __all__ = [
+    "ArtifactRef",
     "CatalogCache",
     "CatalogSnapshot",
+    "FAILOVER_ERRORS",
+    "FailoverHook",
     "PROVIDER_DEFAULTS",
     "Requirement",
     "TOOLBOX_CAPABILITIES",
@@ -45,15 +55,19 @@ __all__ = [
     "ToolboxCapabilityClient",
     "ToolboxCapabilityError",
     "ToolboxContractViolation",
+    "ToolboxEndpoint",
     "ToolboxError",
     "ToolboxProviderUnavailable",
     "ToolboxTimeout",
+    "ToolboxUnavailable",
     "ToolboxUnsupportedMediaType",
     "auth_headers",
+    "download_artifact",
     "execute_capability",
     "fetch_catalog",
     "missing_requirements",
     "media_type_for",
+    "parse_endpoints",
     "provider_default",
     "raise_for_error",
     "require_capability",
