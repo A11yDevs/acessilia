@@ -7,6 +7,87 @@ resolution-markers = [
 ]
 
 [[package]]
+name = "acessilia"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "acessilia-docstruct" },
+    { name = "acessilia-sdk" },
+    { name = "agno" },
+    { name = "aiogram" },
+    { name = "aiosmtplib" },
+    { name = "babel" },
+    { name = "edge-tts" },
+    { name = "fastapi" },
+    { name = "httpx" },
+    { name = "jinja2" },
+    { name = "jsonschema" },
+    { name = "latex2mathml" },
+    { name = "loguru" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
+    { name = "numpy", version = "2.5.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+    { name = "ollama" },
+    { name = "openai" },
+    { name = "opencv-python" },
+    { name = "pillow" },
+    { name = "pydantic" },
+    { name = "pymupdf" },
+    { name = "pypdf" },
+    { name = "python-docx" },
+    { name = "python-dotenv" },
+    { name = "python-multipart" },
+    { name = "reportlab" },
+    { name = "slowapi" },
+    { name = "sqlalchemy" },
+    { name = "uvicorn" },
+]
+
+[package.optional-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "rapidfuzz" },
+    { name = "respx" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "acessilia-docstruct", editable = "libs/docstruct" },
+    { name = "acessilia-sdk", editable = "libs/sdk" },
+    { name = "agno", specifier = "==3.0.5" },
+    { name = "aiogram", specifier = ">=3.13,<4" },
+    { name = "aiosmtplib", specifier = ">=5.1.2,<6" },
+    { name = "babel", specifier = ">=2.18.0,<3" },
+    { name = "edge-tts", specifier = ">=7.2.8,<8" },
+    { name = "fastapi", specifier = ">=0.115,<0.116" },
+    { name = "httpx", specifier = ">=0.27,<0.28" },
+    { name = "jinja2", specifier = ">=3.1.6,<4" },
+    { name = "jsonschema", specifier = ">=4.20,<5" },
+    { name = "latex2mathml", specifier = ">=3.77.0,<4" },
+    { name = "loguru", specifier = ">=0.7.3,<0.8" },
+    { name = "numpy", specifier = ">=2.4.6,<3" },
+    { name = "ollama", specifier = ">=0.6.2,<0.7" },
+    { name = "openai", specifier = ">=2.45.0,<3" },
+    { name = "opencv-python", specifier = ">=5.0.0.93,<6" },
+    { name = "pillow", specifier = ">=10.4,<11" },
+    { name = "pydantic", specifier = ">=2.10,<3" },
+    { name = "pymupdf", specifier = ">=1.24,<2" },
+    { name = "pypdf", specifier = ">=6.14.2,<7" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.1.1,<10" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=1.4.0,<2" },
+    { name = "python-docx", specifier = ">=1.1.2,<2" },
+    { name = "python-dotenv", specifier = ">=1.0,<2" },
+    { name = "python-multipart", specifier = ">=0.0.32,<0.1" },
+    { name = "rapidfuzz", marker = "extra == 'dev'", specifier = ">=3.9,<4" },
+    { name = "reportlab", specifier = ">=4.2,<5" },
+    { name = "respx", marker = "extra == 'dev'", specifier = ">=0.23.1,<0.24" },
+    { name = "slowapi", specifier = ">=0.1.10,<0.2" },
+    { name = "sqlalchemy", specifier = ">=2.0.51,<3" },
+    { name = "uvicorn", specifier = ">=0.30,<0.31" },
+]
+provides-extras = ["dev"]
+
+[[package]]
 name = "acessilia-docstruct"
 version = "0.2.0"
 source = { editable = "libs/docstruct" }
@@ -251,87 +332,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/7d/b2/51899539b6ceeeb42
 wheels = [
     { url = "https://files.pythonhosted.org/packages/77/f5/21d2de20e8b8b0408f0681956ca2c69f1320a3848ac50e6e7f39c6159675/babel-2.18.0-py3-none-any.whl", hash = "sha256:e2b422b277c2b9a9630c1d7903c2a00d0830c409c59ac8cae9081c92f1aeba35", size = 10196845, upload-time = "2026-02-01T12:30:53.445Z" },
 ]
-
-[[package]]
-name = "bot-acess"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "acessilia-docstruct" },
-    { name = "acessilia-sdk" },
-    { name = "agno" },
-    { name = "aiogram" },
-    { name = "aiosmtplib" },
-    { name = "babel" },
-    { name = "edge-tts" },
-    { name = "fastapi" },
-    { name = "httpx" },
-    { name = "jinja2" },
-    { name = "jsonschema" },
-    { name = "latex2mathml" },
-    { name = "loguru" },
-    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
-    { name = "numpy", version = "2.5.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
-    { name = "ollama" },
-    { name = "openai" },
-    { name = "opencv-python" },
-    { name = "pillow" },
-    { name = "pydantic" },
-    { name = "pymupdf" },
-    { name = "pypdf" },
-    { name = "python-docx" },
-    { name = "python-dotenv" },
-    { name = "python-multipart" },
-    { name = "reportlab" },
-    { name = "slowapi" },
-    { name = "sqlalchemy" },
-    { name = "uvicorn" },
-]
-
-[package.optional-dependencies]
-dev = [
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "rapidfuzz" },
-    { name = "respx" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "acessilia-docstruct", editable = "libs/docstruct" },
-    { name = "acessilia-sdk", editable = "libs/sdk" },
-    { name = "agno", specifier = "==3.0.5" },
-    { name = "aiogram", specifier = ">=3.13,<4" },
-    { name = "aiosmtplib", specifier = ">=5.1.2,<6" },
-    { name = "babel", specifier = ">=2.18.0,<3" },
-    { name = "edge-tts", specifier = ">=7.2.8,<8" },
-    { name = "fastapi", specifier = ">=0.115,<0.116" },
-    { name = "httpx", specifier = ">=0.27,<0.28" },
-    { name = "jinja2", specifier = ">=3.1.6,<4" },
-    { name = "jsonschema", specifier = ">=4.20,<5" },
-    { name = "latex2mathml", specifier = ">=3.77.0,<4" },
-    { name = "loguru", specifier = ">=0.7.3,<0.8" },
-    { name = "numpy", specifier = ">=2.4.6,<3" },
-    { name = "ollama", specifier = ">=0.6.2,<0.7" },
-    { name = "openai", specifier = ">=2.45.0,<3" },
-    { name = "opencv-python", specifier = ">=5.0.0.93,<6" },
-    { name = "pillow", specifier = ">=10.4,<11" },
-    { name = "pydantic", specifier = ">=2.10,<3" },
-    { name = "pymupdf", specifier = ">=1.24,<2" },
-    { name = "pypdf", specifier = ">=6.14.2,<7" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.1.1,<10" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=1.4.0,<2" },
-    { name = "python-docx", specifier = ">=1.1.2,<2" },
-    { name = "python-dotenv", specifier = ">=1.0,<2" },
-    { name = "python-multipart", specifier = ">=0.0.32,<0.1" },
-    { name = "rapidfuzz", marker = "extra == 'dev'", specifier = ">=3.9,<4" },
-    { name = "reportlab", specifier = ">=4.2,<5" },
-    { name = "respx", marker = "extra == 'dev'", specifier = ">=0.23.1,<0.24" },
-    { name = "slowapi", specifier = ">=0.1.10,<0.2" },
-    { name = "sqlalchemy", specifier = ">=2.0.51,<3" },
-    { name = "uvicorn", specifier = ">=0.30,<0.31" },
-]
-provides-extras = ["dev"]
 
 [[package]]
 name = "certifi"

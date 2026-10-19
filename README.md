@@ -51,7 +51,7 @@ cp .env.example .env   # configure the keys (AI, SMTP, Telegram)
 
 ```bash
 uv run python -m frontend.run
-# or: uv run bot-acess
+# or: uv run acessilia
 ```
 
 Starts the interfaces listed in `ENABLED_INTERFACES` (default: `api,telegram,web`):

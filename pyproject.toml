@@ -3,9 +3,9 @@ requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "bot-acess"
+name = "acessilia"
 version = "0.1.0"
-description = "Bot para extração e acessibilidade de documentos."
+description = "Extração, classificação e conversão de documentos (PDF, DOCX, imagens) em formatos acessíveis com LLMs, servidas por API REST, painel web, bot do Telegram e CLI."
 authors = [{name = "Jhonata"}]
 license = {text = "MIT"}
 readme = "README.md"
@@ -43,6 +43,11 @@ dependencies = [
     "acessilia-sdk",
 ]
 
+[project.urls]
+Homepage = "https://github.com/A11yDevs/acessilia"
+Repository = "https://github.com/A11yDevs/acessilia"
+Issues = "https://github.com/A11yDevs/acessilia/issues"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=9.1.1,<10",
@@ -53,6 +58,8 @@ dev = [
 ]
 
 [project.scripts]
+acessilia = "frontend.cli.run:main"
+# Alias deprecado do nome antigo; remover no próximo ciclo.
 bot-acess = "frontend.cli.run:main"
 
 [tool.uv.sources]
