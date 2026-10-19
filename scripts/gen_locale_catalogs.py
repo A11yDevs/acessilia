@@ -153,8 +153,8 @@ from backend.log_messages import (
     LOG_PDF_UA_GENERATION_FAILED,
     LOG_PDF_EXPORTED,
     LOG_PDF_UA_EXPORTED,
+    LOG_PDF_UA_SKIPPED_DISABLED,
     LOG_PDF_UA_TOOLBOX_EXPORTED,
-    LOG_PDF_UA_TOOLBOX_FALLBACK,
     LOG_TXT_EXPORTED,
     LOG_DOCX_EXPORTED,
     LOG_PIPELINE_ERROR,
@@ -248,12 +248,9 @@ from backend.pipeline.validators import (
 from backend.export.pandoc_exporter import (
     MSG_AUDIT_FAILED,
     MSG_DEFAULT_ACCESSIBLE_TITLE,
-    MSG_LATEX_ENGINE_NOT_FOUND,
     MSG_PANDOC_FAILED,
     MSG_PANDOC_NOT_FOUND,
-    MSG_PANDOC_REQUIRED_FOR_PDF_UA,
-    MSG_PDF_UA_TEMPLATE_NOT_FOUND,
-    MSG_PDF_UA_TOOLBOX_AND_LOCAL_FAILED,
+    MSG_PDF_UA_DISABLED,
     MSG_UNSUPPORTED_EXPORT_FORMAT,
 )
 from backend.export.renderers.html_renderer import (
@@ -666,10 +663,7 @@ MESSAGES: tuple[str, ...] = (
     MSG_DEFAULT_ACCESSIBLE_TITLE,
     MSG_PANDOC_NOT_FOUND,
     MSG_PANDOC_FAILED,
-    MSG_PANDOC_REQUIRED_FOR_PDF_UA,
-    MSG_LATEX_ENGINE_NOT_FOUND,
-    MSG_PDF_UA_TEMPLATE_NOT_FOUND,
-    MSG_PDF_UA_TOOLBOX_AND_LOCAL_FAILED,
+    MSG_PDF_UA_DISABLED,
     MSG_AUDIT_FAILED,
     MSG_UNSUPPORTED_EXPORT_FORMAT,
     # HTML renderer UI chrome (backend/export/renderers/html_renderer.py).
@@ -801,8 +795,8 @@ MESSAGES: tuple[str, ...] = (
     LOG_READER_IMAGE_READING,
     LOG_PDF_EXPORTED,
     LOG_PDF_UA_EXPORTED,
+    LOG_PDF_UA_SKIPPED_DISABLED,
     LOG_PDF_UA_TOOLBOX_EXPORTED,
-    LOG_PDF_UA_TOOLBOX_FALLBACK,
     LOG_TXT_EXPORTED,
     LOG_DOCX_EXPORTED,
     EMAIL_CONFIRMATION_SUBJECT,
@@ -1314,17 +1308,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         MSG_DEFAULT_ACCESSIBLE_TITLE: "Documento acessível",
         MSG_PANDOC_NOT_FOUND: "pandoc não encontrado no PATH",
         MSG_PANDOC_FAILED: "pandoc falhou ({to_format}): {stderr}",
-        MSG_PANDOC_REQUIRED_FOR_PDF_UA: (
-            "pandoc não encontrado no PATH. O formato pdf_ua exige pandoc + engine LaTeX."
-        ),
-        MSG_LATEX_ENGINE_NOT_FOUND: (
-            "Nenhuma engine LaTeX encontrada no PATH. O formato pdf_ua exige lualatex ou xelatex."
-        ),
-        MSG_PDF_UA_TEMPLATE_NOT_FOUND: (
-            "Template PDF/UA não encontrado: {template_path}"
-        ),
-        MSG_PDF_UA_TOOLBOX_AND_LOCAL_FAILED: (
-            "A exportação PDF/UA falhou na Toolbox ({toolbox_error}) e localmente ({local_error})"
+        MSG_PDF_UA_DISABLED: (
+            "A exportação PDF/UA está desativada (TOOLBOX_PDF_UA_ENABLED=false)"
         ),
         MSG_AUDIT_FAILED: "Auditoria falhou: {findings}",
         MSG_UNSUPPORTED_EXPORT_FORMAT: (
@@ -1561,10 +1546,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         LOG_PDF_UA_EXPORTED: "PDF/UA exportado: {output_path}",
         # Toolbox-first PDF/UA rendering; {output_path} the destination file path.
         LOG_PDF_UA_TOOLBOX_EXPORTED: "PDF/UA renderizado pela Toolbox: {output_path}",
-        # Toolbox PDF/UA failure before the local fallback; {error} the Toolbox error.
-        LOG_PDF_UA_TOOLBOX_FALLBACK: (
-            "A exportação PDF/UA na Toolbox falhou ({error}); usando pandoc + LaTeX locais"
-        ),
+        # Worker skips PDF/UA because the Toolbox capability is switched off.
+        LOG_PDF_UA_SKIPPED_DISABLED: "PDF/UA ignorado: TOOLBOX_PDF_UA_ENABLED está desativado",
         # TXT export wrapper debug line; {output_path} the destination file path.
         LOG_TXT_EXPORTED: "TXT exportado: {output_path}",
         # DOCX export wrapper debug line; {output_path} the destination file path.

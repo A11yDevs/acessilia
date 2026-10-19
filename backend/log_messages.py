@@ -435,10 +435,8 @@ LOG_PDF_EXPORTED: str = "PDF exported with bookmarks and page numbering: {output
 LOG_PDF_UA_EXPORTED: str = "PDF/UA exported: {output_path}"
 #: Info logged when the Toolbox rendered the PDF/UA; {output_path} the destination file path.
 LOG_PDF_UA_TOOLBOX_EXPORTED: str = "PDF/UA rendered by the Toolbox: {output_path}"
-#: Warning logged when the Toolbox PDF/UA export failed and the local pandoc + LaTeX fallback runs; {error} the Toolbox error.
-LOG_PDF_UA_TOOLBOX_FALLBACK: str = (
-    "PDF/UA export on the Toolbox failed ({error}); falling back to local pandoc + LaTeX"
-)
+#: Info logged when the worker skips PDF/UA because TOOLBOX_PDF_UA_ENABLED is false.
+LOG_PDF_UA_SKIPPED_DISABLED: str = "PDF/UA skipped: TOOLBOX_PDF_UA_ENABLED is false"
 LOG_TXT_EXPORTED: str = "TXT exported: {output_path}"
 LOG_DOCX_EXPORTED: str = "DOCX exported: {output_path}"
 LOG_READER_TASKS_SUMMARY: str = (
