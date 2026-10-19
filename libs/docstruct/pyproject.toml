@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "acessilia-docstruct"
-version = "0.2.0"
+version = "0.3.0"
 description = "Núcleo puro de processamento estrutural de documentos: tipos canônicos, geometria, fusão multi-provider e filtros de ruído."
 readme = "README.md"
 requires-python = ">=3.11"

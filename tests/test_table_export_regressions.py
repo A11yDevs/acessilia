@@ -198,9 +198,9 @@ def test_empty_row_remains_between_rows_with_rowspan() -> None:
         f"Obtido: {actual!r}"
     )
 
-def test_drbench_renderers_preserve_mixed_header_cells() -> None:
-    from scripts.drbench.markdown_converter import _render_table
-    from scripts.drbench.run_pipeline import table_ast_to_html
+def test_benchmark_renderers_preserve_mixed_header_cells() -> None:
+    from docstruct.export.markdown import render_table as _render_table
+    from scripts.bench.core import table_ast_to_html
 
     table_ast = {
         "header": [{"cells": [{"text": ""}, {"text": "Valor", "header": True, "scope": "col"}]}],
@@ -217,9 +217,9 @@ def test_drbench_renderers_preserve_mixed_header_cells() -> None:
     )
 
 
-def test_drbench_renderers_keep_unmarked_header_cells() -> None:
-    from scripts.drbench.markdown_converter import _render_table
-    from scripts.drbench.run_pipeline import table_ast_to_html
+def test_benchmark_renderers_keep_unmarked_header_cells() -> None:
+    from docstruct.export.markdown import render_table as _render_table
+    from scripts.bench.core import table_ast_to_html
 
     table_ast = {
         "header": [{"cells": [{"text": "Mês"}, {"text": "Valor"}]}],

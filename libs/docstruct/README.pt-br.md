@@ -40,6 +40,9 @@ Núcleo puro de processamento estrutural de documentos do Acessilia.
 | `docstruct.text` | `sanitize_text`, `merge_broken_paragraphs`, `normalize_code_text`, `classify_text_block` |
 | `docstruct.imaging.policy` | `upscale_factor`, `decide_orientation` (sem PIL/cv2) |
 | `docstruct.evaluation.holdout` | `partition`, `score`, `evaluate_candidate` |
+| `docstruct.evaluation.metrics` | `text_ed`, `reading_order_score`, `teds_score`, `cdm_score`, `overall_score`, `PageScores` — métricas locais de parsing de documentos |
+| `docstruct.evaluation.markdown` | `score_markdown_page` — uma página de markdown predito contra o ground truth |
+| `docstruct.export.markdown` | `document_to_markdown`, `render_table`, `bare_latex` — documento canônico → markdown de benchmark (tabelas HTML, matemática `$$`) |
 | `docstruct.profiles` | `OUTPUT_PROFILES`, `filter_blocks_for_profile`, `normalize_profile` |
 | `docstruct.validation` | `validate_canonical_document`, `validate_output_text`, `Finding` |
 

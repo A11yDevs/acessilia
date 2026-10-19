@@ -21,9 +21,10 @@ O sistema opera com o motor de pipeline `pddl` (o fluxo manifest → plan → ex
 8. [Ambiente de homologação (systemd timer)](homologacao-systemd.pt-br.md) — como as atualizações de homologação incorporam novas imagens do Docker automaticamente. (Inglês: [English guide](homologacao-systemd.md))
 9. [Relatório de revisão técnica — PR #14](pr-14-review.pt-br.md) — achados classificados por severidade e uma lista de verificação de aceite para a mudança de pipeline PDDL/Agno. (Inglês: [English report](pr-14-review.md))
 10. [Internacionalização (i18n)](i18n.pt-br.md) — o que é localizado, onde os arquivos de strings por locale ficam e guias passo a passo para adicionar strings, internacionalizar um arquivo e adicionar um novo locale. (English: [English guide](i18n.md))
-11. [Benchmark Dr.DocBench](drbench.pt-br.md) — benchmark de provedores de extração de estrutura (Docling vs MinerU), métricas e resultados. (English: [English guide](drbench.md))
-12. [Integração de ferramentas da Toolbox](toolbox_integration.pt-br.md) — como integrar ao core uma ferramenta nova da Toolbox: contrato HTTP, bibliotecas vs. capacidades da Toolbox e os dois cenários de integração. (English: [English guide](toolbox_integration.md))
-13. [Registros de Decisão Arquitetural](adr/README.pt-br.md) — decisões que atravessam componentes (responsabilidades, execução remota, contratos, referências de artefatos, disponibilidade) e como propor uma nova. (English: [English version](adr/README.md))
+11. [Harness de benchmark](bench.pt-br.md) — roda e pontua o core no Dr.DocBench (e em outros datasets) com `python -m scripts.bench`. (English: [English guide](bench.md))
+12. [Benchmark Dr.DocBench](drbench.pt-br.md) — benchmark de provedores de extração de estrutura (Docling vs MinerU), métricas e resultados. (English: [English guide](drbench.md))
+13. [Integração de ferramentas da Toolbox](toolbox_integration.pt-br.md) — como integrar ao core uma ferramenta nova da Toolbox: contrato HTTP, bibliotecas vs. capacidades da Toolbox e os dois cenários de integração. (English: [English guide](toolbox_integration.md))
+14. [Registros de Decisão Arquitetural](adr/README.pt-br.md) — decisões que atravessam componentes (responsabilidades, execução remota, contratos, referências de artefatos, disponibilidade) e como propor uma nova. (English: [English version](adr/README.md))
 
 ---
 

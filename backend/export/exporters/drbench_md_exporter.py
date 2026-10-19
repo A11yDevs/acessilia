@@ -7,6 +7,8 @@ benchmark requires raw markdown (HTML tables, LaTeX), not a rendered format.
 from pathlib import Path
 from typing import Any
 
+from docstruct.export.markdown import document_to_markdown
+
 from backend.tools.logger import logger
 
 
@@ -18,24 +20,21 @@ def export_drbench_md(
     """Export canonical text/content to a ``*.drbench.md`` benchmark file.
 
     Args:
-        text (str | dict): Raw markdown/text or a canonical document mapping.
+        text (str | dict): Raw markdown or a canonical document (with ``sections``).
         output_path (Path): Destination ``.drbench.md`` file path.
         title (str | None): Unused; kept for exporter signature compatibility.
 
     Returns:
         Path: The output_path where the .drbench.md file was written.
+
+    Raises:
+        ValueError: If ``text`` is a mapping that is not a canonical document,
+            instead of writing an empty file.
     """
     if isinstance(text, dict):
-        # Canonical document: concatenate markdown blocks if present.
-        blocks = text.get("markdown_blocks") or text.get("blocks") or []
-        if blocks and isinstance(blocks[0], dict):
-            content = "\n\n".join(
-                str(b.get("markdown") or b.get("text") or "") for b in blocks
-            )
-        else:
-            content = "\n\n".join(str(b) for b in blocks)
-        if not content:
-            content = text.get("text", "")
+        if "sections" not in text:
+            raise ValueError("drbench_md export needs a canonical document (no 'sections')")
+        content = document_to_markdown(text)
     else:
         content = text
 
