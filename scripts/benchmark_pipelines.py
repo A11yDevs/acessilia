@@ -81,21 +81,13 @@ def _summarize_document(document: dict[str, Any]) -> dict[str, Any]:
 
 
 async def _run_pddl(file_path: Path, tmpdir: Path) -> dict[str, Any]:
-    return await _run_pddl_with_extractor(file_path, tmpdir, extractor_backend="pymupdf")
-
-
-async def _run_pddl_with_extractor(
-    file_path: Path,
-    tmpdir: Path,
-    *,
-    extractor_backend: str,
-) -> dict[str, Any]:
+    # Structure extraction runs on the Toolbox, the only extractor the PDDL
+    # orchestrator accepts (docs/adr/0003).
     orchestrator = PddlAccessibilityOrchestrator(
         planner_backend="internal",
         preferred_plan="internal",
         execute_dry_run=True,
-        enable_ocr=extractor_backend == "docling",
-        extractor_backend=extractor_backend,
+        extractor_backend="toolbox",
     )
     structured = await orchestrator.executar(
         file_path=file_path,
@@ -181,13 +173,12 @@ async def run_benchmark(
     file_path: Path,
     output_dir: Path,
     export_formats: list[str],
-    pddl_extractor_backend: str,
 ) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     report: dict[str, Any] = {
         "source_file": str(file_path.resolve()),
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "pddl_extractor_backend": pddl_extractor_backend,
+        "pddl_extractor_backend": "toolbox",
         "engines": {},
     }
 
@@ -196,11 +187,7 @@ async def run_benchmark(
 
     pddl_start = time.perf_counter()
     try:
-        pddl = await _run_pddl_with_extractor(
-            file_path,
-            tmpdir,
-            extractor_backend=pddl_extractor_backend,
-        )
+        pddl = await _run_pddl(file_path, tmpdir)
         pddl_elapsed = round((time.perf_counter() - pddl_start) * 1000)
         pddl_structured_path = output_dir / "pddl.structured.json"
         pddl_structured_path.write_text(
@@ -264,12 +251,6 @@ def parse_args() -> argparse.Namespace:
         default="pdf",
         help="Formatos de saida por metodo, separados por virgula (ex.: pdf,pdf_ua,txt,docx).",
     )
-    parser.add_argument(
-        "--pddl-extractor-backend",
-        default="pymupdf",
-        choices=["pymupdf", "docling"],
-        help="Extrator estrutural do pipeline PDDL.",
-    )
     return parser.parse_args()
 
 
@@ -293,10 +274,13 @@ def main() -> int:
             file_path=file_path,
             output_dir=args.output_dir.resolve(),
             export_formats=export_formats,
-            pddl_extractor_backend=args.pddl_extractor_backend,
         )
     )
     print(f"Relatório: {report_path}")
+    pddl = json.loads(report_path.read_text(encoding="utf-8"))["engines"]["pddl"]
+    if pddl["status"] == "error":
+        print(f"Erro no pipeline PDDL: {pddl['error_type']}: {pddl['error']}")
+        return 1
     return 0
 
 
