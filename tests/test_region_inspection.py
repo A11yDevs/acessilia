@@ -292,3 +292,106 @@ async def test_complete_orchestration_uses_region_method_and_requested_mode(insp
     assert "A map" in result["text"]
     assert len(calls) == 1
     assert calls[0]["mode"] == "baixo"
+
+
+def _pixels(png: bytes) -> tuple[int, int, bytes]:
+    """Size and samples; the PNG metadata (e.g. resolution) may differ."""
+    pixmap = fitz.Pixmap(png)
+    return pixmap.width, pixmap.height, pixmap.samples
+
+
+@pytest.mark.parametrize("rotation", [0, 90, 180, 270])
+@pytest.mark.parametrize("origin", ["TOPLEFT", "BOTTOMLEFT"])
+def test_rotated_picture_provenance_renders_only_source_region(
+    tmp_path, rotation, origin, fake_toolbox_render
+):
+    source = tmp_path / "rotated.pdf"
+    image = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 8, 8), False)
+    image.clear_with(0)
+    with fitz.open() as pdf:
+        page = pdf.new_page(width=200, height=100)
+        page.insert_image(fitz.Rect(120, 20, 190, 80), stream=image.tobytes("png"), keep_proportion=False)
+        page.insert_text((120, 95), "TARGET", fontsize=10)
+        page.set_rotation(rotation)
+        pdf.save(source)
+    with fitz.open(source) as pdf:
+        page = pdf[0]
+        # Provenance is declared in the displayed (rotated) coordinate space.
+        expected = page.get_image_rects(page.get_images()[0][0])[0] * page.rotation_matrix
+        expected_png = page.get_pixmap(clip=expected, dpi=160).tobytes("png")
+        height = page.rect.height
+    element = _element("picture", "unknown")
+    element.provenance = [Provenance(page_number=1, bbox=BoundingBox(
+        left=expected.x0, right=expected.x1,
+        top=expected.y0 if origin == "TOPLEFT" else height-expected.y0,
+        bottom=expected.y1 if origin == "TOPLEFT" else height-expected.y1,
+        coord_origin=origin,
+    ))]
+    rendered, number, rectangle = pddl._render_inspection_region(source, element)
+    assert number == 1
+    assert rectangle == pytest.approx(list(expected))
+    assert _pixels(rendered) == _pixels(expected_png)
+    enriched, number = pddl._extract_picture_bytes(source, element, 1)
+    assert _pixels(enriched) == _pixels(expected_png)
+    assert max(fitz.Pixmap(rendered).samples) == 0  # black picture, no white page margin
+
+
+def _one_page_pdf(path: Path) -> Path:
+    with fitz.open() as pdf:
+        pdf.new_page(width=200, height=100)
+        pdf.save(path)
+    return path
+
+
+def _picture(left, top, right, bottom):
+    element = _element("picture", "picture")
+    element.provenance = [Provenance(page_number=1, bbox=BoundingBox(
+        left=left, top=top, right=right, bottom=bottom, coord_origin="TOPLEFT",
+    ))]
+    return element
+
+
+@pytest.mark.parametrize(
+    "box",
+    [
+        (300, 200, 400, 300),  # outside the page: refused by the Toolbox
+        (10, 10, 12, 60),  # a sliver
+    ],
+)
+def test_a_picture_box_that_is_not_a_picture_falls_back_to_the_page(
+    tmp_path, fake_toolbox_render, box
+):
+    source = _one_page_pdf(tmp_path / "doc.pdf")
+
+    image, number = pddl._extract_picture_bytes(source, _picture(*box), 1)
+
+    assert number == 1
+    assert fitz.Pixmap(image).width >= 200 * 160 / 72  # the whole page
+    first, page = fake_toolbox_render.parameters
+    assert "clip" in first and "clip" not in page
+
+
+def test_a_non_finite_picture_box_renders_the_page_once(tmp_path, fake_toolbox_render):
+    source = _one_page_pdf(tmp_path / "doc.pdf")
+
+    image, _ = pddl._extract_picture_bytes(source, _picture(10, float("nan"), 90, 60), 1)
+
+    assert image is not None
+    [parameters] = fake_toolbox_render.parameters
+    assert "clip" not in parameters
+
+
+def test_an_unavailable_toolbox_is_not_retried_as_a_page(tmp_path, monkeypatch):
+    from acessilia_sdk.toolbox import ToolboxProviderUnavailable
+
+    attempts = []
+
+    def unavailable(*args, **kwargs):
+        attempts.append(kwargs.get("clip"))
+        raise ToolboxProviderUnavailable("down")
+
+    monkeypatch.setattr(pddl, "_toolbox_render", unavailable)
+    source = _one_page_pdf(tmp_path / "doc.pdf")
+
+    assert pddl._extract_picture_bytes(source, _picture(10, 10, 90, 60), 1) == (None, 1)
+    assert attempts == [(10.0, 10.0, 90.0, 60.0)]

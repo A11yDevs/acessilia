@@ -54,14 +54,12 @@ language.
 - #150 removes the local paths, one capability per pull request, and then
   drops pandoc, TeX Live and veraPDF/JRE from `infra/Dockerfile`. The image
   size is measured before and after.
-- **Known deviations, tracked in the #152 audit:** the core still imports
-  PyMuPDF in eight modules, including `PyMuPDFStructurer`,
-  `pymupdf_extractor` and `image_tools`. The orchestrator's page and region
-  rendering left that list in #150 F5: it goes through `pdf.render@2`. It
-  also imports Pillow, OpenCV (`image_enhancer`), and docling without
-  declaring it (`formula_worker`). These are removed in follow-up issues before `pymupdf`,
-  `pillow` and `opencv-python` leave `pyproject.toml`.
-- **Planned verification (#152):** a core architecture test that forbids
-  `fitz`, `PIL`, `cv2` and `docling` imports, and `subprocess` calls to
-  pandoc, LaTeX engines or veraPDF. It keeps an allowlist of the current
-  offenders that can only shrink.
+- **Known deviations, tracked in the #152 audit:** none remain. #150 removed
+  the local executors one by one; the last, the local manifest extractors,
+  went in [#176](https://github.com/A11yDevs/acessilia/pull/176), and
+  `pymupdf` became a development dependency that tests use to build PDFs.
+- **Verification (#152):** `tests/test_architecture_layers.py` fails if
+  `backend/` or `frontend/` imports an operational library (`fitz`, `PIL`,
+  `cv2`, `docling`, `pypdf`, `docx`, `rapidocr`, `pypandoc`). It has no
+  offenders, so it keeps no allowlist. It does not check `subprocess` calls;
+  pandoc, TeX Live and veraPDF are no longer in the image.

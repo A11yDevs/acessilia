@@ -112,7 +112,7 @@ async def _async_noop(*_args, **_kwargs):
     return None
 
 
-@pytest.mark.parametrize("name", ["max_page_width", "pymupdf_text_threshold"])
+@pytest.mark.parametrize("name", ["max_page_width", "jpg_quality"])
 def test_image_settings_invalidate_processing_cache(monkeypatch, name):
     from backend.config.settings import settings
     from backend.services.cache import processing_cache_configuration, options_cache_key

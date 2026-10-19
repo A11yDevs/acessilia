@@ -270,8 +270,6 @@ API_OBSERVABILITY_NOT_CONFIGURED: str = "Observability access not configured"
 API_TOKEN_INVALID: str = "Invalid token"
 #: HTTP 403 detail body returned by observability endpoints when write access is attempted with a read-only token.
 API_TOKEN_READ_ONLY: str = "Token allows read-only access"
-#: FileNotFoundError text raised by the PyMuPDF manifest extractor when the source file is missing on disk at extraction time; {source_path} is the resolved missing path.
-MSG_SOURCE_FILE_MISSING: str = "Document not found: {source_path}"
 #: ValueError text raised by the manifest planner model when a planner outcome is recorded before execution actually began; no placeholders.
 MSG_PLANNER_NOT_STARTED: str = "The trial ended before starting"
 #: Manifest processing-needs rationale for picture elements, used as the LLM prompt obligation text per element type.

@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class ToolboxExtraction:
-    """Resultado da extração via Toolbox, análogo a DoclingExtraction.
+    """Resultado da extração via Toolbox.
 
     Em vez de um objeto docling.Document, carrega o JSON completo da resposta
     da Toolbox para que o builder possa iterar sobre elements/pages diretamente.
@@ -38,7 +38,8 @@ class ToolboxExtraction:
 class ToolboxManifestExtractor:
     """Extrator que consome a Acessilia Toolbox via REST.
 
-    Interface compatível com DoclingManifestExtractor.extract(source_path).
+    É o único extrator de manifesto do core: a extração roda na Toolbox
+    (docs/adr/0003).
     O método extract() é síncrono para compatibilidade com
     InformationalStructuralAgent.process() que roda dentro de asyncio.to_thread.
     """
