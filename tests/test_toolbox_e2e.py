@@ -18,6 +18,7 @@ import httpx
 import pytest
 import pytest_asyncio
 
+from acessilia_sdk.toolbox import ToolboxCapabilityError
 from acessilia_sdk.toolbox.clients import (
     ToolboxLayoutClient,
     ToolboxMathClient,
@@ -204,6 +205,47 @@ class TestPdfClientE2E:
         )
         assert page.clip == (0, 0, 100, 50)
         assert max(page.document["width_px"], page.document["height_px"]) <= 200
+
+    # The core no longer converts, intersects or bounds a region itself; these
+    # pin, against the real provider, what it relies on the Toolbox to do.
+
+    @pytest.mark.e2e
+    @pytest.mark.asyncio
+    async def test_a_bottom_left_clip_is_reported_top_left(
+        self, pdf_client: ToolboxPdfClient
+    ) -> None:
+        pdf = _get_pdf()
+        height = (await pdf_client.render(file_path=pdf, dpi=72)).document["page_height"]
+        page = await pdf_client.render(
+            file_path=pdf, dpi=72, clip=(50, 200, 300, 100), clip_origin="BOTTOMLEFT"
+        )
+        assert page.clip == pytest.approx((50, height - 200, 300, height - 100))
+
+    @pytest.mark.e2e
+    @pytest.mark.asyncio
+    async def test_max_side_wins_over_a_larger_dpi(
+        self, pdf_client: ToolboxPdfClient
+    ) -> None:
+        pdf = _get_pdf()
+        page = await pdf_client.render(file_path=pdf, dpi=300, max_side=400)
+        assert max(page.document["width_px"], page.document["height_px"]) <= 400
+        assert page.document["dpi"] < 300
+
+    @pytest.mark.e2e
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "request_kwargs",
+        [
+            {"clip": (10_000, 10_000, 10_100, 10_100)},  # outside the page
+            {"dpi": 600},  # above the 20 MP render limit for a document page
+        ],
+    )
+    async def test_the_toolbox_refuses_an_invalid_render(
+        self, pdf_client: ToolboxPdfClient, request_kwargs
+    ) -> None:
+        # InvalidInputError, HTTP 400: the core falls back on this refusal.
+        with pytest.raises(ToolboxCapabilityError):
+            await pdf_client.render(file_path=_get_pdf(), **request_kwargs)
 
 
 # ---------------------------------------------------------------------------

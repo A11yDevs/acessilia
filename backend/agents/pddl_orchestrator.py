@@ -12,7 +12,7 @@ from collections import Counter
 from collections.abc import Callable, Coroutine, Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from docstruct.fusion.tailjoin import is_page_number as _is_page_number
 from docstruct.tables.ast import effective_section_width, linearize_table_for_text
@@ -73,6 +73,9 @@ from backend.tools.formula_tools import (
 from backend.tools.logger import logger
 from backend.tools.media_inspect import inspect_source_media
 from backend.tools.toolbox_client import ToolboxError
+
+if TYPE_CHECKING:
+    from acessilia_sdk.toolbox.clients.pdf import ClipOrigin, RenderedPage
 
 
 def _formula_elements_for_obligation(
@@ -484,25 +487,25 @@ def _render_inspection_region(
     source: Path,
     element: ManifestElement,
     *,
-    page_count: int,
+    media_type: str | None = None,
     artifact_id: str | None = None,
 ) -> tuple[bytes, int, list[float]]:
     """Render only the requested, validated source region on the Toolbox.
 
     Crop metadata from the extractor is never trusted: the page identity and
     the box are checked here, and the Toolbox renders exactly that box and
-    reports the region it applied.
+    reports the region it applied. The page range is the document's, as the
+    Toolbox reports it, like every other render: a page beyond it is refused
+    there. An element without a page is accepted only in a one-page document.
     """
     provenance = element.provenance[0] if element.provenance else None
     number = provenance.page_number if provenance else element.page_number
     if provenance and element.page_number is not None and number != element.page_number:
         raise ValueError("Region page identity is inconsistent")
-    if number is None and page_count == 1:
-        number = 1
-    if type(number) is not int or not 1 <= number <= page_count:
+    if number is not None and (type(number) is not int or number < 1):
         raise ValueError("Region page is missing or out of range")
     clip: tuple[float, float, float, float] | None = None
-    origin = "TOPLEFT"
+    origin: ClipOrigin = "TOPLEFT"
     bbox = provenance.bbox if provenance else None
     if bbox is not None:
         values = (bbox.left, bbox.top, bbox.right, bbox.bottom)
@@ -514,9 +517,12 @@ def _render_inspection_region(
             raise ValueError("Region coordinate origin is unknown")
         clip, origin = values, bbox.coord_origin
     page = _toolbox_render(
-        source, number, dpi=160, clip=clip, clip_origin=origin, artifact_id=artifact_id
+        source, number or 1, media_type=media_type, dpi=160, clip=clip,
+        clip_origin=origin, artifact_id=artifact_id,
     )
-    return page.image, number, list(page.clip)
+    if number is None and page.page_count != 1:
+        raise ValueError("Region page is missing or out of range")
+    return page.image, number or 1, list(page.clip)
 
 def _inspect_region(image: bytes, number: int, total_pages: int, mode: str) -> VisionOutput | None:
     async def inspect():
@@ -573,7 +579,7 @@ def _handle_pymupdf_region_method(manifest: ProcessingManifest, obligation_id: s
             image, number, rectangle = _render_inspection_region(
                 source,
                 element,
-                page_count=max(len(manifest.pages), 1),
+                media_type=manifest.source.media_type,
                 artifact_id=_source_artifact_id(manifest),
             )
             declared_pages = {
@@ -639,32 +645,68 @@ def _handle_pymupdf_region_method(manifest: ProcessingManifest, obligation_id: s
         )
 
 
+#: Inputs ``pdf.render@2`` opens. The pipeline also accepts TIFF, BMP, GIF and
+#: WebP; the Toolbox does not render those, and there is no local fallback.
+_RENDERABLE_MEDIA_TYPES = frozenset({"application/pdf", "image/png", "image/jpeg"})
+
+
 def _source_artifact_id(manifest: ProcessingManifest) -> str | None:
-    """The Toolbox artifact of the source document, when the extractor stored one."""
+    """The Toolbox artifact of the source document, when the extractor stored one.
+
+    Artifact ids are content addressed, so the id is used only when its digest
+    is the manifest's source SHA-256: an id of any other document (a restored
+    or reassembled manifest, a wrong id) would have the Toolbox render pixels
+    the evidence does not describe. Otherwise the file itself is sent.
+    """
+    from acessilia_sdk.toolbox import ArtifactRef, ToolboxContractViolation
+
     value = (manifest.extractor.configuration or {}).get("artifact_id")
-    return value if isinstance(value, str) and value else None
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        ref = ArtifactRef.parse(value)
+    except ToolboxContractViolation:
+        return None
+    return value if ref.digest == manifest.source.sha256 else None
 
 
 def _toolbox_render(
     source: Path,
     page_number: int,
     *,
+    media_type: str | None = None,
     dpi: int,
     max_side: int | None = None,
     clip: tuple[float, float, float, float] | None = None,
-    clip_origin: str = "TOPLEFT",
+    clip_origin: ClipOrigin = "TOPLEFT",
     artifact_id: str | None = None,
-):
+) -> RenderedPage:
     """Render a page (or a region of it) on the Toolbox with ``pdf.render@2``.
 
     There is no local rendering (docs/adr/0003): the Toolbox converts, clips,
     bounds and refuses oversized renders, and reports what it applied. With
     ``artifact_id`` the source already stored by the extractor is referenced
     instead of uploaded; the file is sent only if the Toolbox no longer has it.
+
+    The upload is labelled from the file extension; ``media_type`` (the
+    manifest's) must agree with that label. Inputs outside
+    ``_RENDERABLE_MEDIA_TYPES`` are refused here with a ``ValueError``, before
+    any request, so the method fails with that reason and not a Toolbox error.
     """
     from acessilia_sdk.toolbox.clients import ToolboxPdfClient
+    from acessilia_sdk.toolbox.transport import media_type_for
 
     from backend.tools.toolbox_client import make_toolbox_client, run_sync
+
+    sent_as = media_type_for(source)
+    if media_type is not None and media_type != sent_as:
+        raise ValueError(
+            f"Source is {media_type} in the manifest but would be sent as {sent_as}"
+        )
+    if sent_as not in _RENDERABLE_MEDIA_TYPES:
+        raise ValueError(
+            f"pdf.render@2 renders PDF, PNG and JPEG inputs, not {sent_as}"
+        )
 
     async def render():
         client = make_toolbox_client(
@@ -689,11 +731,12 @@ def _toolbox_render(
 def _render_source_page(
     source: Path, media_type: str, number: int, artifact_id: str | None = None
 ) -> bytes:
-    """The PNG of page ``number`` of a PDF or raster input, rendered by the Toolbox."""
+    """The PNG of page ``number`` of a PDF, PNG or JPEG input, rendered by the Toolbox."""
     from backend.config.settings import settings
 
     return _toolbox_render(
-        source, number, dpi=settings.pdf_split_dpi, artifact_id=artifact_id
+        source, number, media_type=media_type, dpi=settings.pdf_split_dpi,
+        artifact_id=artifact_id,
     ).image
 
 def _inspect_page(image: bytes, number: int, total_pages: int, mode: str) -> PageInspectionOutput:
@@ -1453,15 +1496,19 @@ _JUDGE_PAGE_MAX_SIDE = 1600
 
 
 def _render_page_png(
-    source_path: Path, page_number: int, artifact_id: str | None = None
+    source_path: Path,
+    page_number: int,
+    artifact_id: str | None = None,
+    media_type: str | None = None,
 ) -> bytes:
-    """Page ``page_number`` (1-based) of a PDF or image as PNG, rendered by the Toolbox.
+    """Page ``page_number`` (1-based) of a PDF, PNG or JPEG as PNG, rendered by the Toolbox.
 
     At most 144 dpi, with the longest side bounded by ``_JUDGE_PAGE_MAX_SIDE``.
     """
     return _toolbox_render(
         source_path,
         page_number,
+        media_type=media_type,
         dpi=144,
         max_side=_JUDGE_PAGE_MAX_SIDE,
         artifact_id=artifact_id,
@@ -1563,7 +1610,10 @@ def _handle_vlm_pairwise_judge_method(
 
         try:
             image = _render_page_png(
-                source_path, page_number, _source_artifact_id(manifest)
+                source_path,
+                page_number,
+                _source_artifact_id(manifest),
+                manifest.source.media_type,
             )
         except Exception as exc:  # noqa: BLE001 - rendering a broken source
             return MethodResult(
@@ -1853,7 +1903,7 @@ def _handle_dual_provider_fusion_method(
         )
     source_path = Path(manifest.source.path)
     # Reuse the document the structure extractor already stored in the Toolbox.
-    artifact_id = (manifest.extractor.configuration or {}).get("artifact_id")
+    artifact_id = _source_artifact_id(manifest)
     try:
         payload = _run_extract_fused(source_path, artifact_id=artifact_id)
     except Exception as exc:  # noqa: BLE001
@@ -2424,6 +2474,7 @@ async def _enrich_picture_descriptions(
             element,
             fallback_page_number,
             _source_artifact_id(manifest),
+            manifest.source.media_type,
         )
         if not image_bytes:
             continue
@@ -2626,6 +2677,7 @@ async def _enrich_table_structures(
             element,
             fallback_page_number,
             _source_artifact_id(manifest),
+            manifest.source.media_type,
         )
         if not image_bytes:
             continue
@@ -2797,45 +2849,59 @@ def _extract_picture_bytes(
     element: ManifestElement,
     fallback_page_number: int | None,
     artifact_id: str | None = None,
+    media_type: str | None = None,
 ) -> tuple[bytes | None, int]:
+    """The picture's box rendered by the Toolbox, or its whole page.
+
+    A box the Toolbox refuses (outside the page) or a sliver of one is not a
+    picture, so the page is described instead. Any other failure, the Toolbox
+    being unavailable included, is not retried with the page: it is logged
+    with its cause and the element is left without an image.
+    """
+    from acessilia_sdk.toolbox import ToolboxCapabilityError, ToolboxIncompatibleEndpoint
+
     provenance = element.provenance[0] if element.provenance else None
     page_number = provenance.page_number if provenance is not None else (fallback_page_number or 0)
     if page_number < 1:
         return None, 0
 
+    def render(clip=None, origin: ClipOrigin = "TOPLEFT") -> RenderedPage:
+        return _toolbox_render(
+            source_file, page_number, media_type=media_type, dpi=160, clip=clip,
+            clip_origin=origin, artifact_id=artifact_id,
+        )
+
     clip, origin = _picture_clip(provenance)
     try:
-        page = _toolbox_render(
-            source_file, page_number, dpi=160, clip=clip, clip_origin=origin,
-            artifact_id=artifact_id,
-        )
+        if clip is None:
+            return render().image, page_number
+        try:
+            page = render(clip, origin)
+        except ToolboxIncompatibleEndpoint:
+            raise
+        except ToolboxCapabilityError:
+            # The Toolbox refuses (HTTP 400) a box that does not intersect the page.
+            return render().image, page_number
         left, top, right, bottom = page.clip
-        if clip is not None and (right - left < 4 or bottom - top < 4):
-            # A sliver of a box is not a picture: describe the page instead.
-            page = _toolbox_render(source_file, page_number, dpi=160, artifact_id=artifact_id)
+        if right - left < 4 or bottom - top < 4:
+            return render().image, page_number
         return page.image, page_number
     except Exception:
-        if clip is not None:
-            try:
-                # A box outside the page is refused by the Toolbox; like a
-                # sliver, fall back to the whole page.
-                page = _toolbox_render(
-                    source_file, page_number, dpi=160, artifact_id=artifact_id
-                )
-                return page.image, page_number
-            except Exception:
-                pass
         logger.exception(
             t(LOG_PDDL_ELEMENT_CROP_FAILED).format(element_id=element.id)
         )
         return None, page_number
 
 
-def _picture_clip(provenance: Any) -> tuple[tuple[float, float, float, float] | None, str]:
-    """The box of a picture to render, and its origin; no box means the whole page.
+def _picture_clip(
+    provenance: Any,
+) -> tuple[tuple[float, float, float, float] | None, ClipOrigin]:
+    """The box of a picture to render, and its origin; ``None`` means the whole page.
 
-    Pictures tolerate an inferred origin (``is_bottom_left``), unlike region
-    inspection, which certifies its crop and requires an explicit one.
+    Pictures are best effort, so a box that cannot be used (absent or with a
+    non-finite coordinate) degrades to the whole page instead of failing, and
+    the origin may be inferred (``is_bottom_left``). Region inspection, which
+    certifies its crop, refuses both instead.
     """
     bbox = getattr(provenance, "bbox", None)
     if bbox is None:
@@ -2845,7 +2911,7 @@ def _picture_clip(provenance: Any) -> tuple[tuple[float, float, float, float] | 
     )
     if not all(math.isfinite(value) for value in (left, top, right, bottom)):
         return None, "TOPLEFT"
-    origin = (
+    origin: ClipOrigin = (
         "BOTTOMLEFT"
         if is_bottom_left(getattr(bbox, "coord_origin", None), top, bottom)
         else "TOPLEFT"

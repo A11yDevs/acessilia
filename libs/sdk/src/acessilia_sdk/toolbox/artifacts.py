@@ -7,9 +7,12 @@ download can be checked before it reaches the caller.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import os
 import re
+from collections.abc import Callable, Iterator
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -24,6 +27,9 @@ from acessilia_sdk.toolbox.transport import raise_for_error
 
 #: Same pattern as ``artifact_id`` in the Toolbox artifact schemas.
 ARTIFACT_ID_RE = re.compile(r"^(?:sha256:)?(?P<digest>[0-9a-f]{64})$")
+
+#: Largest artifact :func:`read_artifact` holds in memory, in bytes.
+READ_ARTIFACT_MAX_BYTES = 64 * 1024 * 1024
 
 
 @dataclass(frozen=True)
@@ -70,15 +76,16 @@ async def download_artifact(
     """
     partial = destination.with_name(f".{destination.name}.part")
     try:
-        digest, head = await _stream_to(http, ref, partial, len(magic or b""))
-        if digest != ref.digest:
-            raise ToolboxContractViolation(
-                f"Downloaded content does not match artifact_id {ref.artifact_id}"
-            )
-        if magic is not None and not head.startswith(magic):
-            raise ToolboxContractViolation(
-                f"Artifact {ref.artifact_id} does not start with {magic!r}"
-            )
+
+        @contextlib.contextmanager
+        def to_partial() -> Iterator[Callable[[bytes], object]]:
+            with open(partial, "wb") as file:
+                yield file.write
+                file.flush()
+                os.fsync(file.fileno())
+
+        digest, head = await _stream(http, ref, to_partial, len(magic or b""))
+        _verify(ref, digest, head, magic)
         os.replace(partial, destination)
     except BaseException:
         partial.unlink(missing_ok=True)
@@ -91,38 +98,52 @@ async def read_artifact(
     ref: ArtifactRef,
     *,
     magic: bytes | None = None,
+    max_bytes: int = READ_ARTIFACT_MAX_BYTES,
 ) -> bytes:
     """``GET /v1/artifacts/{id}`` into memory, verified like :func:`download_artifact`.
 
-    For small artifacts the caller uses right away, such as a rendered page.
+    For small artifacts the caller uses right away, such as a rendered page. A
+    body larger than ``max_bytes`` is refused as soon as it passes the limit,
+    without being read to the end; large artifacts go to
+    :func:`download_artifact` instead.
     """
-    try:
-        response = await http.get(f"/v1/artifacts/{ref.artifact_id}")
-    except httpx.TimeoutException as e:
-        raise ToolboxTimeout(
-            f"Timed out downloading artifact {ref.artifact_id}: {e}"
-        ) from e
-    except httpx.RequestError as e:
-        raise ToolboxProviderUnavailable(
-            f"Toolbox unavailable at {http.base_url}: {e}"
-        ) from e
-    raise_for_error(response, "artifact.retrieve")
-    content = response.content
-    if hashlib.sha256(content).hexdigest() != ref.digest:
+    content = bytearray()
+
+    def keep(chunk: bytes) -> None:
+        content.extend(chunk)
+        if len(content) > max_bytes:
+            raise ToolboxContractViolation(
+                f"Artifact {ref.artifact_id} exceeds {max_bytes} bytes"
+            )
+
+    digest, head = await _stream(
+        http, ref, lambda: contextlib.nullcontext(keep), len(magic or b"")
+    )
+    _verify(ref, digest, head, magic)
+    return bytes(content)
+
+
+def _verify(ref: ArtifactRef, digest: str, head: bytes, magic: bytes | None) -> None:
+    """The content hashes to ``ref.digest`` and, when ``magic`` is given, starts with it."""
+    if digest != ref.digest:
         raise ToolboxContractViolation(
             f"Downloaded content does not match artifact_id {ref.artifact_id}"
         )
-    if magic is not None and not content.startswith(magic):
+    if magic is not None and not head.startswith(magic):
         raise ToolboxContractViolation(
             f"Artifact {ref.artifact_id} does not start with {magic!r}"
         )
-    return content
 
 
-async def _stream_to(
-    http: httpx.AsyncClient, ref: ArtifactRef, partial: Path, head_size: int
+async def _stream(
+    http: httpx.AsyncClient,
+    ref: ArtifactRef,
+    open_sink: Callable[[], AbstractContextManager[Callable[[bytes], object]]],
+    head_size: int,
 ) -> tuple[str, bytes]:
-    """Stream the artifact into ``partial``; return its hex digest and first bytes."""
+    """Stream the artifact into the sink ``open_sink`` gives; return its hex digest
+    and first bytes. The sink is opened only once the Toolbox answers with success.
+    """
     hasher = hashlib.sha256()
     head = b""
     try:
@@ -130,14 +151,12 @@ async def _stream_to(
             if not response.is_success:
                 await response.aread()
                 raise_for_error(response, "artifact.retrieve")
-            with open(partial, "wb") as file:
+            with open_sink() as sink:
                 async for chunk in response.aiter_bytes():
                     hasher.update(chunk)
                     if len(head) < head_size:
                         head += chunk[: head_size - len(head)]
-                    file.write(chunk)
-                file.flush()
-                os.fsync(file.fileno())
+                    sink(chunk)
     except httpx.TimeoutException as e:
         raise ToolboxTimeout(
             f"Timed out downloading artifact {ref.artifact_id}: {e}"
@@ -163,4 +182,10 @@ def _sync_directory(directory: Path) -> None:
         os.close(fd)
 
 
-__all__ = ["ARTIFACT_ID_RE", "ArtifactRef", "download_artifact", "read_artifact"]
+__all__ = [
+    "ARTIFACT_ID_RE",
+    "READ_ARTIFACT_MAX_BYTES",
+    "ArtifactRef",
+    "download_artifact",
+    "read_artifact",
+]

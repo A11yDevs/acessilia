@@ -74,8 +74,8 @@ def snapshot() -> dict:
 def test_snapshot_is_well_formed(snapshot: dict) -> None:
     assert snapshot["capabilities"], "snapshot has no capabilities"
     assert snapshot["providers"], "snapshot has no providers"
-    ids = [entry["id"] for entry in snapshot["capabilities"]]
-    assert len(ids) == len(set(ids)), "duplicate capability ids in the snapshot"
+    keys = [(entry["id"], entry["version"]) for entry in snapshot["capabilities"]]
+    assert len(keys) == len(set(keys)), "duplicate capability versions in the snapshot"
 
 
 def test_known_drift_is_unchanged(checker, snapshot: dict) -> None:
@@ -115,3 +115,14 @@ def test_unconsumed_capabilities_match_the_review(checker, snapshot: dict) -> No
         "the set of capabilities with no core client changed; "
         "update the verdicts in docs/toolbox_capability_matrix.md and this test"
     )
+
+
+def test_a_toolbox_without_the_sdk_contract_version_is_drift(checker) -> None:
+    """The SDK sends its exact version on execute; v1 alone fails pdf.render@2."""
+    core = checker.read_core_contract()
+    toolbox = checker.read_toolbox_snapshot(SNAPSHOT_PATH)
+    toolbox.versions["pdf.render"] = {1}
+
+    failures, _ = checker.compare(core, toolbox)
+
+    assert "core sends pdf.render@2 but the Toolbox publishes pdf.render@1" in failures

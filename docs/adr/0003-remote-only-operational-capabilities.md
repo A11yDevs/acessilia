@@ -55,10 +55,11 @@ language.
   drops pandoc, TeX Live and veraPDF/JRE from `infra/Dockerfile`. The image
   size is measured before and after.
 - **Known deviations, tracked in the #152 audit:** the core still imports
-  PyMuPDF in about eleven modules, including the orchestrator's page render,
-  `PyMuPDFStructurer`, `pymupdf_extractor` and `image_tools`. It also imports
-  Pillow, OpenCV (`image_enhancer`), and docling without declaring it
-  (`formula_worker`). These are removed in follow-up issues before `pymupdf`,
+  PyMuPDF in eight modules, including `PyMuPDFStructurer`,
+  `pymupdf_extractor` and `image_tools`. The orchestrator's page and region
+  rendering left that list in #150 F5: it goes through `pdf.render@2`. It
+  also imports Pillow, OpenCV (`image_enhancer`), and docling without
+  declaring it (`formula_worker`). These are removed in follow-up issues before `pymupdf`,
   `pillow` and `opencv-python` leave `pyproject.toml`.
 - **Planned verification (#152):** a core architecture test that forbids
   `fitz`, `PIL`, `cv2` and `docling` imports, and `subprocess` calls to

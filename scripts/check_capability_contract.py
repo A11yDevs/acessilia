@@ -5,6 +5,10 @@ that are declared in two different repositories. Nothing in either repository
 currently verifies that they still match, so a rename on one side silently
 produces a client that can only fail at runtime.
 
+Capabilities are compared with their contract version too: the SDK sends the
+exact version it was written against on every execute, so a Toolbox that does
+not publish that version fails every call to it.
+
 This script reads the core side from ``libs/sdk/src/acessilia_sdk/toolbox/capabilities.py``
 (the allowlist every Toolbox client goes through) and checks it against the
 Toolbox, either live (``--url``) or from a captured snapshot (``--snapshot``),
@@ -47,6 +51,8 @@ class CoreContract:
 
     #: capability id -> modules that declare it
     capabilities: dict[str, set[str]] = field(default_factory=dict)
+    #: capability id -> the exact contract version the SDK sends on execute
+    versions: dict[str, int] = field(default_factory=dict)
     #: provider id -> settings attribute default that points at it
     providers: dict[str, set[str]] = field(default_factory=dict)
 
@@ -55,6 +61,8 @@ class CoreContract:
 class ToolboxContract:
     capabilities: dict[str, set[str]]
     providers: dict[str, set[str]]
+    #: capability id -> published versions; an entry without one is version 1
+    versions: dict[str, set[int]] = field(default_factory=dict)
 
 
 def _load_registry():
@@ -78,6 +86,7 @@ def read_core_contract() -> CoreContract:
         contract.capabilities.setdefault(capability.id, set()).add(
             REGISTRY_MODULE
         )
+        contract.versions[capability.id] = capability.contract_version
 
     for setting, default in registry.PROVIDER_DEFAULTS.items():
         contract.providers.setdefault(default, set()).add(setting.upper())
@@ -110,11 +119,14 @@ def _fetch(url: str) -> object:
 
 def _from_payloads(capabilities: object, providers: object) -> ToolboxContract:
     caps: dict[str, set[str]] = {}
+    versions: dict[str, set[int]] = {}
     for entry in capabilities or []:
         if isinstance(entry, dict) and entry.get("id"):
-            caps[str(entry["id"])] = {
+            capability = str(entry["id"])
+            caps.setdefault(capability, set()).update(
                 str(item) for item in (entry.get("providers") or [])
-            }
+            )
+            versions.setdefault(capability, set()).add(int(entry.get("version") or 1))
 
     provs: dict[str, set[str]] = {}
     for entry in providers or []:
@@ -122,7 +134,7 @@ def _from_payloads(capabilities: object, providers: object) -> ToolboxContract:
             provs[str(entry["id"])] = {
                 str(item) for item in (entry.get("capabilities") or [])
             }
-    return ToolboxContract(capabilities=caps, providers=provs)
+    return ToolboxContract(capabilities=caps, providers=provs, versions=versions)
 
 
 def compare(
@@ -138,6 +150,15 @@ def compare(
             f"core consumes capability {capability!r} ({modules}) "
             f"but the Toolbox does not expose it"
         )
+
+    for capability in sorted(set(core.capabilities) & set(toolbox.capabilities)):
+        expected = core.versions.get(capability, 1)
+        published = toolbox.versions.get(capability, {1})
+        if expected not in published:
+            failures.append(
+                f"core sends {capability}@{expected} but the Toolbox publishes "
+                + ", ".join(f"{capability}@{version}" for version in sorted(published))
+            )
 
     missing_providers = sorted(set(core.providers) - set(toolbox.providers))
     for provider in missing_providers:

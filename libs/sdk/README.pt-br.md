@@ -32,7 +32,8 @@ core (backend)  →  acessilia-sdk  →  contrato HTTP da Toolbox
 | `acessilia_sdk.toolbox.client` | `ToolboxCapabilityClient` — base dos clientes por capacidade (conexões, header Bearer, provider, failover, `health`, `close`); `FailoverHook` |
 | `acessilia_sdk.toolbox.clients` | `ToolboxAdjudicateClient`, `ToolboxArtifactClient`, `ToolboxDatasetClient`, `ToolboxLayoutClient`, `ToolboxMathClient`, `ToolboxMediaInspectClient`, `ToolboxOcrClient`, `ToolboxOrientationClient`, `ToolboxPageOcrClient`, `ToolboxPdfClient`, `ToolboxPdfUaClient`, `ToolboxStructureClient`, `ToolboxTableClient` — um cliente por família de capacidades; sem settings e sem logs |
 | `acessilia_sdk.toolbox.endpoints` | `ToolboxEndpoint`, `parse_endpoints`, `FAILOVER_ERRORS` — as instâncias da Toolbox que um cliente tenta, em ordem |
-| `acessilia_sdk.toolbox.artifacts` | `ArtifactRef`, `download_artifact` — artefatos endereçados por conteúdo e seu download verificado e atômico |
+| `acessilia_sdk.toolbox.clients.pdf` | `RenderedPage` (o PNG de `ToolboxPdfClient.render`, o recorte aplicado e o resultado `image@2`), `ClipOrigin` |
+| `acessilia_sdk.toolbox.artifacts` | `ArtifactRef`, `download_artifact`, `read_artifact` — artefatos endereçados por conteúdo, seu download verificado e atômico para um arquivo e sua leitura verificada, com tamanho limitado, para a memória |
 | `acessilia_sdk.toolbox.catalog` | `fetch_catalog`, `CatalogSnapshot`, `Requirement`, `missing_requirements`, `CatalogCache` — o catálogo publicado, as verificações contra ele (que só restringem) e o cache do último snapshot válido |
 | `acessilia_sdk.toolbox.errors` | `ToolboxError` e subclasses, incluindo `ToolboxUnavailable` (todos os endpoints falharam; `causes` lista cada falha) |
 | `acessilia_sdk.runtime` | `run_sync` — executa uma coroutine a partir de código síncrono, dentro ou fora de um event loop |
@@ -74,10 +75,13 @@ Além disso, o cliente oferece:
 não é chamado quando há um único endpoint. `self._client` e `self.base_url`
 apontam só para o endpoint primário: capacidades que retornam um artefato
 devem usar `_execute_on`, que também devolve o cliente HTTP do endpoint que
-atendeu a chamada, e baixar o artefato por ele com `download_artifact`. Esse
-download é feito em streaming, conferido contra o SHA-256 (e um prefixo
-mágico opcional), sincronizado em disco e renomeado de forma atômica; erros do
-sistema de arquivos local se propagam como `OSError`. `ArtifactRef` é
+atendeu a chamada, e obter o artefato por ele: `download_artifact` grava em
+um arquivo, `read_artifact` lê um artefato pequeno para a memória (como faz
+`ToolboxPdfClient.render` com o PNG da página). Os dois leem o corpo em
+streaming e o conferem contra o SHA-256 (e um prefixo mágico opcional). O
+download é sincronizado em disco e renomeado de forma atômica, e erros do
+sistema de arquivos local se propagam como `OSError`; a leitura recusa um corpo
+acima de `max_bytes` (por padrão `READ_ARTIFACT_MAX_BYTES`, 64 MiB). `ArtifactRef` é
 provisório até a Toolbox publicar `artifact-ref@1`.
 
 ## Adicionar uma capacidade

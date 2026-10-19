@@ -310,11 +310,23 @@ def test_executor_wires_fusion_artifact_into_attempt(tmp_path, monkeypatch):
     assert Path(artifact.path).exists()
 
 
-def test_dual_fusion_reuses_the_extractor_artifact(tmp_path, monkeypatch):
+@pytest.mark.parametrize(
+    ("stored", "reused"),
+    [
+        # The extractor's artifact holds this very source (same digest).
+        ("sha256:" + "a" * 64, "sha256:" + "a" * 64),
+        # An id of another document, or not an artifact id, is not reused.
+        ("sha256:" + "b" * 64, None),
+        ("art-42", None),
+    ],
+)
+def test_dual_fusion_reuses_the_extractor_artifact_of_this_source(
+    tmp_path, monkeypatch, stored, reused
+):
     source = tmp_path / "source.pdf"
     source.write_bytes(b"%PDF-test")
     manifest = _make_manifest(tmp_path, source_path=source)
-    manifest.extractor.configuration["artifact_id"] = "art-42"
+    manifest.extractor.configuration["artifact_id"] = stored
     monkeypatch.setattr("backend.config.settings.settings.data_dir", tmp_path)
     seen: dict[str, object] = {}
 
@@ -328,4 +340,4 @@ def test_dual_fusion_reuses_the_extractor_artifact(tmp_path, monkeypatch):
 
     _handle_dual_provider_fusion_method(manifest, "o-fuse")
 
-    assert seen["artifact_id"] == "art-42"
+    assert seen["artifact_id"] == reused

@@ -4,6 +4,7 @@ Usa resp HTTPX mockadas para validar URLs, parâmetros, timeout e parsing de err
 """
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 import httpx
@@ -38,7 +39,7 @@ SAMPLE_SPLIT_RESPONSE = {
 }
 
 PNG = b"\x89PNG\r\n\x1a\nrendered-page"
-PNG_ID = "sha256:" + __import__("hashlib").sha256(PNG).hexdigest()
+PNG_ID = "sha256:" + hashlib.sha256(PNG).hexdigest()
 SAMPLE_RENDER_RESPONSE = {
     "status": "succeeded",
     "capability": "pdf.render@2",
@@ -175,16 +176,19 @@ async def test_render_returns_the_verified_png_and_the_applied_transformation(
     page = await client.render(file_path=FIXTURE_PDF, page_number=1)
 
     assert page.image == PNG
-    assert page.clip == (0, 0, 595, 842)
+    assert page.clip == (0.0, 0.0, 595.0, 842.0)
+    assert page.page_count == 3
     assert page.document["scale"] == 2.0
-    body = route.calls.last.request.content
-    assert b'name="version"' in body and b"\r\n\r\n2\r\n" in body
+    # The version field itself is covered by test_transport.
     assert _form_parameters(route) == {"page_number": 1, "dpi": 150}
 
 
 @pytest.mark.asyncio
 async def test_render_sends_clip_and_max_side(respx_mock, client):
-    route = _mock_render(respx_mock)
+    route = _mock_render(
+        respx_mock,
+        {**SAMPLE_RENDER_RESPONSE, "document": {**SAMPLE_RENDER_RESPONSE["document"], "page_number": 2}},
+    )
 
     await client.render(
         artifact_id="sha256:" + "a" * 64,
@@ -203,17 +207,49 @@ async def test_render_sends_clip_and_max_side(respx_mock, client):
     }
 
 
+_DOCUMENT = SAMPLE_RENDER_RESPONSE["document"]
+
+
+def _without(key: str) -> dict:
+    return {k: v for k, v in _DOCUMENT.items() if k != key}
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "document",
+    ("document", "message"),
     [
-        {**SAMPLE_RENDER_RESPONSE["document"], "media_type": "image/jpeg"},
-        {k: v for k, v in SAMPLE_RENDER_RESPONSE["document"].items() if k != "clip"},
+        ({**_DOCUMENT, "media_type": "image/jpeg"}, "not image/png"),
+        (_without("artifact_id"), "no image artifact"),
+        (_without("clip"), "applied clip"),
+        ({**_DOCUMENT, "clip": {"left": 0, "top": 0, "right": 595}}, "applied clip"),
+        ({**_DOCUMENT, "clip": {**_DOCUMENT["clip"], "bottom": None}}, "applied clip"),
+        ({**_DOCUMENT, "clip": {**_DOCUMENT["clip"], "bottom": "842"}}, "applied clip"),
+        (
+            {**_DOCUMENT, "clip": {**_DOCUMENT["clip"], "origin": "BOTTOMLEFT"}},
+            "applied clip",
+        ),
+        ({**_DOCUMENT, "page_number": 2}, "rendered page 2"),
+        (_without("page_count"), "page_count"),
+        ({**_DOCUMENT, "size_bytes": len(PNG) + 1}, "bytes"),
     ],
 )
-async def test_render_rejects_a_result_outside_the_v2_contract(respx_mock, client, document):
+async def test_render_rejects_a_result_outside_the_v2_contract(
+    respx_mock, client, document, message
+):
     _mock_render(respx_mock, {**SAMPLE_RENDER_RESPONSE, "document": document})
-    with pytest.raises(ToolboxContractViolation):
+    with pytest.raises(ToolboxContractViolation, match=message):
+        await client.render(file_path=FIXTURE_PDF)
+
+
+@pytest.mark.asyncio
+async def test_render_refuses_an_oversized_png(respx_mock, client, monkeypatch):
+    import functools
+
+    from acessilia_sdk.toolbox.clients import pdf
+
+    monkeypatch.setattr(pdf, "read_artifact", functools.partial(pdf.read_artifact, max_bytes=4))
+    _mock_render(respx_mock)
+    with pytest.raises(ToolboxContractViolation, match="exceeds 4 bytes"):
         await client.render(file_path=FIXTURE_PDF)
 
 

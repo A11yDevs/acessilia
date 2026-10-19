@@ -56,9 +56,10 @@ ignora o idioma pedido.
   tira pandoc, TeX Live e veraPDF/JRE do `infra/Dockerfile`. O tamanho da
   imagem é medido antes e depois.
 - **Desvios conhecidos, registrados na auditoria da #152:** o core ainda
-  importa o PyMuPDF em cerca de onze módulos, entre eles a renderização de
-  páginas do orquestrador, o `PyMuPDFStructurer`, o `pymupdf_extractor` e o
-  `image_tools`. Também importa o Pillow, o OpenCV (`image_enhancer`) e, sem
+  importa o PyMuPDF em oito módulos, entre eles o `PyMuPDFStructurer`,
+  o `pymupdf_extractor` e o `image_tools`. A renderização de páginas e regiões
+  do orquestrador saiu dessa lista na F5 da #150: ela passa pelo
+  `pdf.render@2`. Também importa o Pillow, o OpenCV (`image_enhancer`) e, sem
   declará-lo, o docling (`formula_worker`). Eles são removidos em issues de
   acompanhamento antes que `pymupdf`, `pillow` e `opencv-python` saiam do
   `pyproject.toml`.

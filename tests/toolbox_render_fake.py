@@ -4,8 +4,15 @@ Production code never renders locally (docs/adr/0003): pages and regions go to
 the Toolbox through the SDK. These tests still want real pixels, so the fake
 answers the Toolbox routes and renders with PyMuPDF here, following the same
 contract as the Toolbox provider (clip origin conversion, intersection,
-``max_side``, the 20 MP limit, refusals as HTTP 422). It also records every
-request, so tests can check what the core asked for.
+``max_side``, the 20 MP limit, refusals as HTTP 400 like the provider's
+``InvalidInputError``). It also records every request, so tests can check
+what the core asked for.
+
+It is a second implementation of the provider geometry, so it cannot catch a
+divergence from the real one: the provider's own tests live in
+acessilia-toolbox (``tests/unit/test_pdf_render_v2.py``), and the e2e tests in
+``tests/test_toolbox_e2e.py`` pin, against a live Toolbox, what the core relies
+on (``BOTTOMLEFT`` conversion, ``max_side``, the refusals).
 """
 
 from __future__ import annotations
@@ -61,7 +68,7 @@ def _form(request: httpx.Request) -> dict[str, tuple[bytes, str | None]]:
 
 
 def _refuse(detail: str) -> httpx.Response:
-    return httpx.Response(422, json={"detail": detail})
+    return httpx.Response(400, json={"detail": detail})
 
 
 def _render(fake: FakeRender, request: httpx.Request) -> httpx.Response:

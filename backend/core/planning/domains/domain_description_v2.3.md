@@ -618,4 +618,10 @@ Os três métodos que renderizam (`pymupdf-region`, `vision-page-inspection` e
 `vlm-pairwise-judge`) e o enriquecimento de imagens anterior ao plano usam
 `pdf.render@2`. Quando o extrator já guardou a fonte na Toolbox, a renderização
 referencia esse artefato (`artifact_id`) e só reenvia o arquivo se a Toolbox não
-o tiver mais.
+o tiver mais; o artefato só é referenciado quando seu digest é o SHA-256 da
+fonte do manifesto. O `pdf.render@2` abre PDF, PNG e JPEG: uma entrada TIFF,
+BMP, GIF ou WebP, aceita pelo pipeline, é recusada antes de chamar a Toolbox
+(não há conversão local), e o método que precisa da página falha com esse
+motivo, deixando a revisão humana como alternativa. A faixa de páginas é a do
+documento, informada pela Toolbox em cada renderização, igual para os três
+métodos.

@@ -50,9 +50,17 @@ def build(url: str) -> dict:
 
     return {
         "_comment": COMMENT,
+        # One entry per published version, as /v1/capabilities lists them: the
+        # core checks the exact contract version it was written against.
         "capabilities": [
-            {"id": entry["id"], "providers": sorted(entry.get("providers") or [])}
-            for entry in sorted(capabilities, key=lambda item: item["id"])
+            {
+                "id": entry["id"],
+                "version": entry.get("version", 1),
+                "providers": sorted(entry.get("providers") or []),
+            }
+            for entry in sorted(
+                capabilities, key=lambda item: (item["id"], item.get("version", 1))
+            )
         ],
         "providers": [
             {"id": entry["id"], "capabilities": sorted(entry.get("capabilities") or [])}

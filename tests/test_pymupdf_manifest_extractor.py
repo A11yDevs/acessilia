@@ -115,7 +115,7 @@ def test_rotated_picture_provenance_renders_only_source_region(
         coord_origin=origin,
     ))]
     # Rendered by the Toolbox (pdf.render@2); the fake renders real pixels.
-    rendered, number, rectangle = _render_inspection_region(source, element, page_count=1)
+    rendered, number, rectangle = _render_inspection_region(source, element)
     assert number == 1
     assert rectangle == pytest.approx(list(expected))
     assert _pixels(rendered) == _pixels(expected_png)
@@ -123,3 +123,66 @@ def test_rotated_picture_provenance_renders_only_source_region(
     assert _pixels(enriched) == _pixels(expected_png)
     pixmap = fitz.Pixmap(rendered)
     assert max(pixmap.samples) == 0  # black picture, no white page margin
+
+
+def _one_page_pdf(path: Path) -> Path:
+    with fitz.open() as pdf:
+        pdf.new_page(width=200, height=100)
+        pdf.save(path)
+    return path
+
+
+def _picture(left, top, right, bottom):
+    element = _element("picture", "picture")
+    element.provenance = [Provenance(page_number=1, bbox=BoundingBox(
+        left=left, top=top, right=right, bottom=bottom, coord_origin="TOPLEFT",
+    ))]
+    return element
+
+
+@pytest.mark.parametrize(
+    "box",
+    [
+        (300, 200, 400, 300),  # outside the page: refused by the Toolbox
+        (10, 10, 12, 60),  # a sliver
+    ],
+)
+def test_a_picture_box_that_is_not_a_picture_falls_back_to_the_page(
+    tmp_path, fake_toolbox_render, box
+):
+    source = _one_page_pdf(tmp_path / "doc.pdf")
+
+    image, number = _extract_picture_bytes(source, _picture(*box), 1)
+
+    assert number == 1
+    assert fitz.Pixmap(image).width >= 200 * 160 / 72  # the whole page
+    first, page = fake_toolbox_render.parameters
+    assert "clip" in first and "clip" not in page
+
+
+def test_a_non_finite_picture_box_renders_the_page_once(tmp_path, fake_toolbox_render):
+    source = _one_page_pdf(tmp_path / "doc.pdf")
+
+    image, _ = _extract_picture_bytes(source, _picture(10, float("nan"), 90, 60), 1)
+
+    assert image is not None
+    [parameters] = fake_toolbox_render.parameters
+    assert "clip" not in parameters
+
+
+def test_an_unavailable_toolbox_is_not_retried_as_a_page(tmp_path, monkeypatch):
+    from acessilia_sdk.toolbox import ToolboxProviderUnavailable
+
+    from backend.agents import pddl_orchestrator as pddl
+
+    attempts = []
+
+    def unavailable(*args, **kwargs):
+        attempts.append(kwargs.get("clip"))
+        raise ToolboxProviderUnavailable("down")
+
+    monkeypatch.setattr(pddl, "_toolbox_render", unavailable)
+    source = _one_page_pdf(tmp_path / "doc.pdf")
+
+    assert _extract_picture_bytes(source, _picture(10, 10, 90, 60), 1) == (None, 1)
+    assert attempts == [(10.0, 10.0, 90.0, 60.0)]

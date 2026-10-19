@@ -403,15 +403,38 @@ def test_a_source_the_toolbox_lost_is_sent_again(fake_toolbox_render, tmp_path):
 def test_a_raster_input_is_rendered_by_the_toolbox_as_its_single_page(
     fake_toolbox_render, tmp_path
 ):
-    from backend.tools.toolbox_client import ToolboxContractViolation
+    from backend.tools.toolbox_client import ToolboxCapabilityError
 
     image = tmp_path / "scan.png"
     image.write_bytes(PNG_PAGE)
 
     assert pddl._render_source_page(image, "image/png", 1).startswith(b"\x89PNG")
     assert fake_toolbox_render.requests[-1]["media_type"] == "image/png"
-    with pytest.raises(ToolboxContractViolation, match="out of range"):
+    with pytest.raises(ToolboxCapabilityError, match="out of range"):
         pddl._render_source_page(image, "image/png", 2)
+
+
+@pytest.mark.parametrize("suffix, media_type", [(".tif", "image/tiff"), (".webp", "image/webp")])
+def test_raster_formats_the_toolbox_does_not_render_are_refused_before_any_request(
+    fake_toolbox_render, tmp_path, suffix, media_type
+):
+    # The pipeline accepts them, but pdf.render@2 opens PDF, PNG and JPEG only.
+    image = tmp_path / f"scan{suffix}"
+    image.write_bytes(b"raster")
+
+    with pytest.raises(ValueError, match=f"not {media_type}"):
+        pddl._render_source_page(image, media_type, 1)
+    assert not fake_toolbox_render.requests
+
+
+def test_a_source_sent_unlike_its_manifest_media_type_is_refused(
+    fake_toolbox_render, tmp_path
+):
+    source = _real_pdf(tmp_path / "doc.pdf")
+
+    with pytest.raises(ValueError, match="would be sent as application/pdf"):
+        pddl._render_source_page(source, "image/png", 1)
+    assert not fake_toolbox_render.requests
 
 
 def test_a_render_without_an_image_is_a_contract_violation(monkeypatch, tmp_path):
@@ -425,7 +448,7 @@ def test_a_render_without_an_image_is_a_contract_violation(monkeypatch, tmp_path
         router.post("http://toolbox.test/v1/capabilities/pdf.render:execute").mock(
             return_value=httpx.Response(200, json={"status": "succeeded", "document": {}})
         )
-        with pytest.raises(ToolboxContractViolation, match="no PNG"):
+        with pytest.raises(ToolboxContractViolation, match="no image artifact"):
             pddl._render_source_page(source, "application/pdf", 1)
 
 
