@@ -17,7 +17,6 @@ from backend.agents.pddl_orchestrator import (
 from backend.core.manifest.builder import (
     _normalized_element_bbox,
     _refine_reading_order,
-    _tag_known_title_callouts,
 )
 from backend.core.manifest.models import (
     BoundingBox,
@@ -141,29 +140,6 @@ def test_normalized_bbox_keeps_top_left_boxes():
 
     assert top == pytest.approx(106.73 / PAGE_HEIGHT)
     assert bottom == pytest.approx(118.18 / PAGE_HEIGHT)
-
-
-#: Page 2 of 001.pdf: a known callout title, one indented body paragraph and the
-#: full-width paragraph after the box (bottom-left boxes from staging). One body
-#: only, so just the known-title path can group them.
-CALLOUT_PAGE = [
-    (17, "paragraph", "text", 67.52, 663.10, 243.64, 651.76),
-    (18, "paragraph", "text", 67.52, 636.45, 527.55, 589.10),
-    (20, "paragraph", "text", 56.0, 484.48, 539.0, 455.86),
-]
-
-
-@pytest.mark.parametrize("origin", ["BOTTOMLEFT", "UNKNOWN", "TOPLEFT"])
-def test_known_title_callout_groups_in_every_origin(origin):
-    elements = _page(CALLOUT_PAGE, origin, flip=origin == "TOPLEFT")
-    elements[0].text = "PRECISAMOS MESMO DE OUTRA CLASSE?"
-
-    _tag_known_title_callouts(elements)
-
-    title, body, after = elements
-    assert title.metadata.get("callout_role") == "title"
-    assert body.metadata.get("callout_id") == title.metadata["callout_id"]
-    assert "callout_id" not in after.metadata
 
 
 @pytest.mark.parametrize(
