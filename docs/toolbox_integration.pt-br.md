@@ -341,7 +341,7 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 | `TOOLBOX_MEDIA_INSPECT_ENABLED` | `true` | Executa ou pula `media.inspect`. Hoje um fallback local ainda roda quando a Toolbox falha; ele é removido na #150 |
 | `TOOLBOX_PDF_UA_PROVIDER` | `pandoc-pdf-ua` | Provider da capacidade `document.export.pdf_ua` |
 | `TOOLBOX_PDF_UA_ENABLED` | `true` | Renderiza o PDF/UA na Toolbox (Pandoc + TeX Live fixados) ou pula a etapa. Não há fallback local: com `false`, o worker pula o formato sem erro; uma falha na Toolbox é reportada como erro de exportação opcional |
-| `TOOLBOX_PDF_UA_TIMEOUT_SECONDS` | `300` | Tempo máximo de espera pela renderização na Toolbox antes de cair no renderizador local |
+| `TOOLBOX_PDF_UA_TIMEOUT_SECONDS` | `300` | Tempo máximo de espera pela renderização na Toolbox antes de reportar erro de exportação opcional |
 | `FUSION_MODE` | `single` | `single` (um provider) ou `dual` (dois providers + fusão) |
 | `FUSION_SECONDARY_PROVIDER` | `mineru` | Provider secundário para `FUSION_MODE=dual` |
 | `STRUCTURER` | `toolbox` | Motor de regiões por página (`toolbox`, `toolbox-layout`, `pymupdf`) |

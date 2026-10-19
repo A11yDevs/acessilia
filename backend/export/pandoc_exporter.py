@@ -154,7 +154,7 @@ def _render_pdf_ua(
 
     Raises:
         RuntimeError: When TOOLBOX_PDF_UA_ENABLED is false.
-        ToolboxError: When the Toolbox cannot render or deliver the PDF.
+        acessilia_sdk.toolbox.errors.ToolboxError: When the Toolbox cannot render or deliver the PDF.
     """
     if not settings.toolbox_pdf_ua_enabled:
         raise RuntimeError(t(MSG_PDF_UA_DISABLED))
@@ -186,10 +186,9 @@ def export_accessible_document(
         Path: The output_path where the formatted document was written.
 
     Raises:
-        ValueError: When the deterministic audit reports BLOCKER findings or when the export profile forbids any block; both messages are localized.
-
-    Raises:
-        ValueError: When format_name is not a recognized export format.
+        ValueError: When the deterministic audit reports BLOCKER findings, when the export profile forbids any block, or when format_name is not a recognized export format; the messages are localized.
+        RuntimeError: When format_name is "pdf_ua" and TOOLBOX_PDF_UA_ENABLED is false, or when pandoc fails while rendering docx.
+        acessilia_sdk.toolbox.errors.ToolboxError: When format_name is "pdf_ua" and the Toolbox cannot render or deliver the PDF.
     """
     document = _ensure_document(
         source_text_or_document, title=title or t(MSG_DEFAULT_ACCESSIBLE_TITLE)

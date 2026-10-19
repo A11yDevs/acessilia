@@ -195,8 +195,8 @@ class Settings:
             "TOOLBOX_PDF_UA_PROVIDER", provider_default("toolbox_pdf_ua_provider")
         )
     )
-    # PDF/UA is rendered by the Toolbox (pinned Pandoc + TeX Live) first; the
-    # local pandoc/LaTeX install is only the fallback when it is unavailable.
+    # PDF/UA is rendered only by the Toolbox (pinned Pandoc + TeX Live); there
+    # is no local fallback (docs/adr/0003). When false, the format is skipped.
     toolbox_pdf_ua_enabled: bool = field(
         default_factory=lambda: (
             os.getenv("TOOLBOX_PDF_UA_ENABLED", "true").strip().lower()
@@ -204,7 +204,7 @@ class Settings:
         ),
     )
     # Matches the capability's timeout_hint_seconds (180) with margin, so a
-    # hung renderer falls back to the local toolchain within minutes.
+    # hung renderer is reported as an optional export error within minutes.
     toolbox_pdf_ua_timeout_seconds: int = field(
         default_factory=lambda: int(os.getenv("TOOLBOX_PDF_UA_TIMEOUT_SECONDS", "300"))
     )

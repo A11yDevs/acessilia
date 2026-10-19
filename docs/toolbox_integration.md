@@ -339,7 +339,7 @@ Defined in `backend/config/settings.py` and documented in `.env.example`:
 | `TOOLBOX_MEDIA_INSPECT_ENABLED` | `true` | Run `media.inspect` or skip it. Today a local fallback still runs when the Toolbox fails; it is removed in #150 |
 | `TOOLBOX_PDF_UA_PROVIDER` | `pandoc-pdf-ua` | Provider for the `document.export.pdf_ua` capability |
 | `TOOLBOX_PDF_UA_ENABLED` | `true` | Render PDF/UA on the Toolbox (pinned Pandoc + TeX Live) or skip it. There is no local fallback: when `false`, the worker skips the format without an error; a Toolbox failure is reported as an optional export error |
-| `TOOLBOX_PDF_UA_TIMEOUT_SECONDS` | `300` | How long to wait for the Toolbox render before falling back to the local renderer |
+| `TOOLBOX_PDF_UA_TIMEOUT_SECONDS` | `300` | How long to wait for the Toolbox render before the export is reported as an optional error |
 | `FUSION_MODE` | `single` | `single` (one provider) or `dual` (two providers + fusion) |
 | `FUSION_SECONDARY_PROVIDER` | `mineru` | Secondary provider for `FUSION_MODE=dual` |
 | `STRUCTURER` | `toolbox` | Per-page region engine (`toolbox`, `toolbox-layout`, `pymupdf`) |
