@@ -22,7 +22,7 @@ ADRs apontam para os daqui em vez de repeti-los.
 | [0004](0004-single-source-of-truth-for-contracts.pt-br.md) | Uma fonte de verdade por contrato | Aceito |
 | [0005](0005-artifact-references.pt-br.md) | Processamento orientado a referências com `ArtifactRef` | Aceito |
 | [0006](0006-availability-and-failover.pt-br.md) | Disponibilidade por réplicas; failover no SDK como mecanismo secundário | Aceito |
-| [0007](0007-manifest-model-and-mathml-conversion.pt-br.md) | Modelo canônico do manifesto no docstruct; MathML e fórmulas faladas só pelo `math.convert` e pelo `math.verbalize` | Aceito |
+| [0007](0007-manifest-model-and-mathml-conversion.pt-br.md) | Modelo canônico do manifesto, e conversão para MathML e verbalização de fórmulas | Aceito |
 
 ## Processo
 

@@ -1,5 +1,7 @@
 # 0007. Canonical manifest model, and MathML conversion and verbalization of formulas
 
+You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](0007-manifest-model-and-mathml-conversion.pt-br.md)
+
 - **Status:** Accepted
 - **Date:** 2026-10-19
 - **Components:** core, SDK, docstruct, Toolbox
