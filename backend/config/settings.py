@@ -208,6 +208,23 @@ class Settings:
     toolbox_pdf_ua_timeout_seconds: int = field(
         default_factory=lambda: int(os.getenv("TOOLBOX_PDF_UA_TIMEOUT_SECONDS", "300"))
     )
+    toolbox_docx_provider: str = field(
+        default_factory=lambda: os.getenv(
+            "TOOLBOX_DOCX_PROVIDER", provider_default("toolbox_docx_provider")
+        )
+    )
+    # DOCX is rendered only by the Toolbox (pinned Pandoc); there is no local
+    # fallback (docs/adr/0003). When false, the format is skipped.
+    toolbox_docx_enabled: bool = field(
+        default_factory=lambda: (
+            os.getenv("TOOLBOX_DOCX_ENABLED", "true").strip().lower()
+            in {"1", "true", "yes", "on", "sim"}
+        ),
+    )
+    # Same margin over the capability's timeout_hint_seconds (180) as PDF/UA.
+    toolbox_docx_timeout_seconds: int = field(
+        default_factory=lambda: int(os.getenv("TOOLBOX_DOCX_TIMEOUT_SECONDS", "300"))
+    )
     # media.inspect runs only on the Toolbox (docs/adr/0003). When false, the
     # step is skipped; a Toolbox failure degrades the run visibly.
     toolbox_media_inspect_enabled: bool = field(

@@ -24,7 +24,6 @@ RUN apt-get update \
         libgl1 \
         libglib2.0-0 \
         libmagic1 \
-        pandoc \
         poppler-utils \
         texlive-fonts-recommended \
         texlive-fonts-extra \

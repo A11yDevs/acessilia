@@ -1,4 +1,4 @@
-"""DOCX export wrapper around the shared pandoc export entry point."""
+"""DOCX export wrapper around the shared export entry point; the Toolbox renders it."""
 
 from pathlib import Path
 from typing import Any
@@ -31,7 +31,6 @@ def export_docx(
         format_name="docx",
         title=filename or t(MSG_DEFAULT_ACCESSIBLE_TITLE),
         profile_name="docx",
-        filename=filename,
     )
     logger.debug(t(LOG_DOCX_EXPORTED).format(output_path=output_path))
     return result

@@ -116,8 +116,8 @@ degrada de forma visível, como decisão de negócio, e registra a causa.
 
 Os wrappers "Toolbox primeiro, fallback local" que ainda estão no código são
 **desvios em remoção** na [#150](https://github.com/A11yDevs/acessilia/issues/150):
-os dois structurers da Toolbox. A exportação PDF/UA e o `media.inspect` não têm
-mais fallback: rodam só na Toolbox, e o `toolbox_pdf_tools.py` foi removido. Não copie
+os dois structurers da Toolbox. As exportações DOCX e PDF/UA e o `media.inspect`
+não têm mais fallback: rodam só na Toolbox, e o `toolbox_pdf_tools.py` foi removido. Não copie
 esse padrão em código novo; um executor local ou offline precisa de um ADR
 próprio.
 
@@ -350,6 +350,9 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 | `TOOLBOX_PDF_UA_PROVIDER` | `pandoc-pdf-ua` | Provider da capacidade `document.export.pdf_ua` |
 | `TOOLBOX_PDF_UA_ENABLED` | `true` | Renderiza o PDF/UA na Toolbox (Pandoc + TeX Live fixados) ou pula a etapa. Não há fallback local: com `false`, o worker pula o formato sem erro; uma falha na Toolbox é reportada como erro de exportação opcional |
 | `TOOLBOX_PDF_UA_TIMEOUT_SECONDS` | `300` | Tempo máximo de espera pela renderização na Toolbox antes de reportar erro de exportação opcional |
+| `TOOLBOX_DOCX_PROVIDER` | `pandoc-docx` | Provider da capacidade `document.export.docx` |
+| `TOOLBOX_DOCX_ENABLED` | `true` | Renderiza o DOCX na Toolbox (Pandoc fixado) ou pula a etapa. Não há fallback local: com `false`, o worker pula o formato sem erro; uma falha da Toolbox é reportada como erro de exportação opcional |
+| `TOOLBOX_DOCX_TIMEOUT_SECONDS` | `300` | Tempo máximo de espera pela renderização na Toolbox antes de reportar erro de exportação opcional |
 | `FUSION_MODE` | `single` | `single` (um provider) ou `dual` (dois providers + fusão) |
 | `FUSION_SECONDARY_PROVIDER` | `mineru` | Provider secundário para `FUSION_MODE=dual` |
 | `STRUCTURER` | `toolbox` | Sem uso: escolhia o motor de regiões do pipeline legacy, que foi removido. Ainda compõe a chave de cache e será removida |

@@ -210,7 +210,7 @@ For production, use [producao-systemd.md](producao-systemd.md) or run
 
 ## 7. Image contents
 
-There is a single image, built from [infra/Dockerfile](../infra/Dockerfile). It does not install Docling or any local OCR or formula model: structural extraction (regions, tables, OCR) and formula recognition (`math.recognize`) run on the Toolbox. The image still installs Pandoc, TeX Live and veraPDF, which are due to be removed ([#150](https://github.com/A11yDevs/acessilia/issues/150)).
+There is a single image, built from [infra/Dockerfile](../infra/Dockerfile). It does not install Docling or any local OCR or formula model: structural extraction (regions, tables, OCR) and formula recognition (`math.recognize`) run on the Toolbox. DOCX and PDF/UA render on the Toolbox too. The image still installs TeX Live and veraPDF, which are due to be removed ([#150](https://github.com/A11yDevs/acessilia/issues/150)).
 
 ---
 

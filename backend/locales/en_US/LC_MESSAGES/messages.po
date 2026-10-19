@@ -912,12 +912,8 @@ msgstr ""
 msgid "Accessible document"
 msgstr "Accessible document"
 
-msgid "pandoc not found on PATH"
-msgstr "pandoc not found on PATH"
-
-#, python-brace-format
-msgid "pandoc failed ({to_format}): {stderr}"
-msgstr "pandoc failed ({to_format}): {stderr}"
+msgid "DOCX export is disabled (TOOLBOX_DOCX_ENABLED=false)"
+msgstr "DOCX export is disabled (TOOLBOX_DOCX_ENABLED=false)"
 
 msgid "PDF/UA export is disabled (TOOLBOX_PDF_UA_ENABLED=false)"
 msgstr "PDF/UA export is disabled (TOOLBOX_PDF_UA_ENABLED=false)"
@@ -1375,6 +1371,17 @@ msgstr "TXT exported: {output_path}"
 #, python-brace-format
 msgid "DOCX exported: {output_path}"
 msgstr "DOCX exported: {output_path}"
+
+#, python-brace-format
+msgid "Failed to generate DOCX: {error}"
+msgstr "Failed to generate DOCX: {error}"
+
+msgid "DOCX skipped: TOOLBOX_DOCX_ENABLED is false"
+msgstr "DOCX skipped: TOOLBOX_DOCX_ENABLED is false"
+
+#, python-brace-format
+msgid "DOCX rendered by the Toolbox: {output_path}"
+msgstr "DOCX rendered by the Toolbox: {output_path}"
 
 msgid "We received your file - Acessilia"
 msgstr "We received your file - Acessilia"

@@ -17,6 +17,8 @@ from backend.services.job_store import load_record, save_status, pending_records
 from backend.services.blocking import run_blocking
 from backend.i18n import t
 from backend.log_messages import (
+    LOG_DOCX_GENERATION_FAILED,
+    LOG_DOCX_SKIPPED_DISABLED,
     LOG_JOB_CANCELLED,
     LOG_JOB_COMPLETED,
     LOG_JOB_EXECUTOR_ERROR,
@@ -170,6 +172,45 @@ class JobExecutor:
                 pass
             raise
 
+    async def _optional_toolbox_export(
+        self,
+        task_id: str,
+        *,
+        enabled: bool,
+        stage: str,
+        progress: float,
+        export_fn,
+        canonical: dict[str, Any],
+        path: Path,
+        filename: str,
+        format_name: str,
+        failed_log: str,
+        skipped_log: str,
+        completed_formats: list[str],
+        optional_errors: list[str],
+    ) -> Path | None:
+        """Runs an export that only the Toolbox renders; returns its path, or None.
+
+        A failure is recorded as an optional export error instead of failing
+        the job, and switching the format off is a deployment choice, not an
+        error.
+        """
+        if not enabled:
+            logger.info(t(skipped_log))
+            return None
+        state_manager.atualizar(task_id, etapa=t(stage), progresso=progress)
+        try:
+            await self._run_in_executor(export_fn, canonical, path, filename)
+        except Exception as exc:
+            error_msg = t(failed_log).format(error=str(exc))
+            logger.warning(error_msg)
+            optional_errors.append(error_msg)
+            state_manager.atualizar(task_id, erro=error_msg)
+            _remove_partial_output(path)
+            return None
+        completed_formats.append(format_name)
+        return path
+
     async def run(self, job: ApiJob) -> None:
         task_id = job.task_id
         started_at = time.time()
@@ -245,46 +286,13 @@ class JobExecutor:
                 drbench_md_path = None
             state_manager.verificar_cancelamento(task_id)
 
-            state_manager.atualizar(task_id, etapa=t(STAGE_EXPORTING_DOCX), progresso=0.88)
-            docx_path = out_dir / f"{base}.docx"
-            await self._run_in_executor(export_docx, canonical, docx_path, job.filename)
-            completed_formats.append("docx")
-            state_manager.verificar_cancelamento(task_id)
-
-            state_manager.atualizar(task_id, etapa=t(STAGE_EXPORTING_PDF), progresso=0.91)
+            state_manager.atualizar(task_id, etapa=t(STAGE_EXPORTING_PDF), progresso=0.88)
             pdf_path = out_dir / f"{base}.pdf"
             await self._run_in_executor(export_pdf, canonical, pdf_path, job.filename)
             completed_formats.append("pdf")
             state_manager.verificar_cancelamento(task_id)
 
-            pdf_ua_path = None
-            if settings.toolbox_pdf_ua_enabled:
-                state_manager.atualizar(
-                    task_id, etapa=t(STAGE_EXPORTING_PDF_UA), progresso=0.92
-                )
-                pdf_ua_path = out_dir / f"{base}.pdf_ua.pdf"
-                try:
-                    await self._run_in_executor(
-                        export_pdf_ua,
-                        canonical,
-                        pdf_ua_path,
-                        job.filename,
-                    )
-                    completed_formats.append("pdf_ua")
-                except Exception as exc:
-                    error_msg = t(LOG_PDF_UA_GENERATION_FAILED).format(error=str(exc))
-                    logger.warning(error_msg)
-                    optional_errors.append(error_msg)
-                    state_manager.atualizar(task_id, erro=error_msg)
-                    _remove_partial_output(pdf_ua_path)
-                    pdf_ua_path = None
-            else:
-                # PDF/UA runs only on the Toolbox (docs/adr/0003); switching it
-                # off is a deployment choice, not an error.
-                logger.info(t(LOG_PDF_UA_SKIPPED_DISABLED))
-            state_manager.verificar_cancelamento(task_id)
-
-            state_manager.atualizar(task_id, etapa=t(STAGE_EXPORTING_HTML), progresso=0.93)
+            state_manager.atualizar(task_id, etapa=t(STAGE_EXPORTING_HTML), progresso=0.90)
             html_path = out_dir / f"{base}.html"
             await self._run_in_executor(
                 export_accessible_document,
@@ -295,6 +303,43 @@ class JobExecutor:
                 profile_name="html",
             )
             completed_formats.append("html")
+            state_manager.verificar_cancelamento(task_id)
+
+            # DOCX and PDF/UA run only on the Toolbox (docs/adr/0003) and come
+            # after the required formats, so a hung Toolbox cannot hold back
+            # TXT/PDF/HTML.
+            docx_path = await self._optional_toolbox_export(
+                task_id,
+                enabled=settings.toolbox_docx_enabled,
+                stage=STAGE_EXPORTING_DOCX,
+                progress=0.92,
+                export_fn=export_docx,
+                canonical=canonical,
+                path=out_dir / f"{base}.docx",
+                filename=job.filename,
+                format_name="docx",
+                failed_log=LOG_DOCX_GENERATION_FAILED,
+                skipped_log=LOG_DOCX_SKIPPED_DISABLED,
+                completed_formats=completed_formats,
+                optional_errors=optional_errors,
+            )
+            state_manager.verificar_cancelamento(task_id)
+
+            pdf_ua_path = await self._optional_toolbox_export(
+                task_id,
+                enabled=settings.toolbox_pdf_ua_enabled,
+                stage=STAGE_EXPORTING_PDF_UA,
+                progress=0.93,
+                export_fn=export_pdf_ua,
+                canonical=canonical,
+                path=out_dir / f"{base}.pdf_ua.pdf",
+                filename=job.filename,
+                format_name="pdf_ua",
+                failed_log=LOG_PDF_UA_GENERATION_FAILED,
+                skipped_log=LOG_PDF_UA_SKIPPED_DISABLED,
+                completed_formats=completed_formats,
+                optional_errors=optional_errors,
+            )
             state_manager.verificar_cancelamento(task_id)
 
             mp3_path = out_dir / f"{base}.mp3"
@@ -323,7 +368,9 @@ class JobExecutor:
             state_manager.verificar_cancelamento(task_id)
 
             zip_path = out_dir / f"{base}_acessivel.zip"
-            package_paths = [txt_path, docx_path, pdf_path, html_path]
+            package_paths = [txt_path, pdf_path, html_path]
+            if isinstance(docx_path, Path):
+                package_paths.append(docx_path)
             if isinstance(mp3_path, Path):
                 package_paths.append(mp3_path)
             if isinstance(pdf_ua_path, Path):

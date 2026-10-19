@@ -11,7 +11,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from docx import Document
 
 from backend.agents.pddl_orchestrator import _manifest_pages_to_payload
 from backend.core.manifest.builder import build_processing_manifest
@@ -23,7 +22,7 @@ from backend.pipeline.table_ast import rows_from_table_ast
 from backend.pipeline.validators import validate_canonical_document
 
 
-def test_toolbox_contract_retains_order_tables_and_math_through_exports(tmp_path):
+def test_toolbox_contract_retains_order_tables_and_math_through_exports(tmp_path, monkeypatch):
     response = json.loads(
         (Path(__file__).parent / "fixtures/toolbox-v2-contract.json").read_text()
     )
@@ -64,13 +63,21 @@ def test_toolbox_contract_retains_order_tables_and_math_through_exports(tmp_path
     assert (
         text.index("Before table") < text.index("Recife") < text.index("After picture")
     )
-    docx_path = export_docx(canonical, tmp_path / "sample.docx")
-    document = Document(docx_path)
-    assert [cell.text for cell in document.tables[0].rows[1].cells] == [
-        "Ana",
-        "",
-        "Recife",
-    ]
+    # DOCX renders on the Toolbox: check the table reaches the AST it receives.
+    sent = []
+
+    def fake_toolbox(ast, output_path, *, lang):
+        sent.append(ast)
+        output_path.write_bytes(b"PK\x03\x04")
+        return {}
+
+    monkeypatch.setattr("backend.export.pandoc_exporter.settings.toolbox_docx_enabled", True)
+    monkeypatch.setattr("backend.export.pandoc_exporter.toolbox_export_docx", fake_toolbox)
+    export_docx(canonical, tmp_path / "sample.docx")
+    [ast] = sent
+    [table] = [block for block in ast["blocks"] if block["t"] == "Table"]
+    rendered = json.dumps(table, ensure_ascii=False)
+    assert rendered.index("Ana") < rendered.index("Recife")
 
 
 @pytest.mark.parametrize("provider", ["docling", "mineru", "pymupdf", "custom-provider"])

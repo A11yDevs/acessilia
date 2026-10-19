@@ -96,6 +96,11 @@ class ToolboxCapabilityClient:
     #: ``None`` for clients of REST routes that take no provider (artifacts,
     #: datasets).
     provider_key: ClassVar[str | None] = None
+    #: Key of the caller's own timeout setting for this client, for exports
+    #: that should not wait as long as the shared timeout. ``None`` uses the
+    #: shared one. The SDK does not read it; callers that build clients from
+    #: settings do.
+    timeout_key: ClassVar[str | None] = None
 
     def __init__(
         self,
