@@ -5,7 +5,7 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 ## Purpose
 This documentation details the architecture of **Acessilia**, a document accessibility system that combines **deterministic planning** (PDDL-based task ordering and validation) with **Agno-coordinated multi-agent AI** for vision, data, and description tasks. Deterministic functions are the source of truth; LLMs provide interpretation and description.
 
-The system runs the `pddl` pipeline engine (the manifest → plan → execution flow), selected by the `PIPELINE_ENGINE` setting, whose default is `pddl`. The former `legacy` engine is disabled: `backend/service.py` accepts only `pddl` (the old `pmv` alias is normalized to it) and refuses any other value, and its code is due to be removed. See [architecture.md](architecture.md).
+The system runs the `pddl` pipeline engine (the manifest → plan → execution flow), selected by the `PIPELINE_ENGINE` setting, whose default is `pddl`. The former `legacy` engine is disabled: `backend/service.py` accepts only `pddl` (the old `pmv` alias is normalized to it) and refuses any other value; its code has been removed. See [architecture.md](architecture.md).
 
 ---
 
@@ -41,8 +41,8 @@ The planning-based pipeline and its incorporation are documented separately:
 
 Each diagram is a visual aid; the linked description summarizes its content in text.
 
-1. **Architecture & Multi-Agent Pipeline:** [architecture/architecture.puml](architecture/architecture.puml) — component and package structure of the backend/frontend pipeline.
-2. **Processing Sequence:** [sequence/document_processing_sequence.puml](sequence/document_processing_sequence.puml) — step-by-step flow of a document conversion, including the parallel vision/data agents.
+1. **Architecture:** [architecture/architecture.puml](architecture/architecture.puml) — components of the PDDL engine, the frontends, and the Toolbox and AI services they call.
+2. **Processing Sequence:** [sequence/document_processing_sequence.puml](sequence/document_processing_sequence.puml) — step-by-step flow of a document conversion: manifest extraction on the Toolbox, planning, plan execution and export.
 3. **Task State Machine:** [state_machine/task_state_machine.puml](state_machine/task_state_machine.puml) — lifecycle of a processing task (processing, done, error, cancelled).
 4. **Use Cases:** [use_cases/use_cases.puml](use_cases/use_cases.puml) — actors and the main user-facing operations.
 
@@ -52,7 +52,7 @@ Each diagram is a visual aid; the linked description summarizes its content in t
 
 - **`backend/`** — Interface-agnostic business logic.
   - `core/` — the planning layer: `manifest/` (Informational-Structural extraction through the Toolbox → `processing-manifest.json`), `planning/` (PlannerAgent → PDDL problem and `nominal-plan.json`), `execution/` (Executor via Agno Workflow → `execution-report.json`).
-  - `agents/` — the PDDL orchestrator and the agents it uses (`VisionAgent`, `DataAgent`), plus the disabled legacy orchestrator and its `ReaderAgent`/`EditorAgent`, due to be removed.
+  - `agents/` — the PDDL orchestrator and the agents it uses (`VisionAgent`, `DataAgent`).
   - `api/` — the standalone REST API (jobs, download, history, health).
   - `pipeline/` + `export/` — canonical document construction, validation, and format renderers.
   - `ai/`, `services/`, `tools/` — Agno model registry and prompts, infrastructure services (cache, queue, history, cleanup, email, tokens), and shared utilities.

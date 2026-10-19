@@ -568,8 +568,12 @@ msgstr "Documento não encontrado: {source_path}"
 msgid "Source file not found: {source_path}"
 msgstr "Arquivo de origem não encontrado: {source_path}"
 
-msgid "Docling is not installed. Run `uv pip install docling`."
-msgstr "Docling não está instalado. Execute `uv pip install docling`."
+msgid ""
+"No local Docling structurer: pass one explicitly, or extract the "
+"structure on the Toolbox."
+msgstr ""
+"Não há structurer Docling local: passe um explicitamente ou extraia a "
+"estrutura na Toolbox."
 
 msgid ""
 "Incompatible structurer: expected convert_document() or "
@@ -1307,10 +1311,6 @@ msgstr "Exportando PDF/UA para {path}"
 msgid "Exporting MP3 to {path}"
 msgstr "Exportando MP3 para {path}"
 
-#, python-brace-format
-msgid "Page converted to PNG: {size} bytes"
-msgstr "Página convertida para PNG: {size} bytes"
-
 msgid ""
 "PDDL pipeline ignores custom_prompt/thinking_mode; only the deterministic"
 " manifest/planning/execution flow runs"
@@ -1325,18 +1325,6 @@ msgstr "Pipeline PDDL: {count} imagem(ns) enriquecida(s) com descrição visual"
 #, python-brace-format
 msgid "Pipeline PDDL: {count} table(s) enriched with OCR/reconstruction"
 msgstr "Pipeline PDDL: {count} tabela(s) enriquecida(s) com OCR/reconstrução"
-
-#, python-brace-format
-msgid "PDF has {total} pages, processing {limit}"
-msgstr "PDF tem {total} páginas, processando {limit}"
-
-#, python-brace-format
-msgid "Page {page} saved: {name}"
-msgstr "Página {page} salva: {name}"
-
-#, python-brace-format
-msgid "{count} pages extracted to {tmpdir}"
-msgstr "{count} páginas extraídas para {tmpdir}"
 
 #, python-brace-format
 msgid "Failed to extract the image clip for element {element_id}"
@@ -1359,42 +1347,6 @@ msgstr "Hash da descrição do domínio diverge do plano"
 
 msgid "The selected closure diverges from the compiled problem"
 msgstr "Fechamento selecionado diverge do problema compilado"
-
-#, python-brace-format
-msgid ""
-"[page {page_num}] Extracted {count} region(s) on the page "
-"(structurer={structurer})"
-msgstr ""
-"[página {page_num}] Extraídas {count} região(ns) na página "
-"(structurer={structurer})"
-
-#, python-brace-format
-msgid "[page {page_num}] {count} clean-text region(s) (no vision AI)"
-msgstr "[página {page_num}] {count} região(ns) de texto limpo (sem IA de visão)"
-
-#, python-brace-format
-msgid "[page {page_num}] Region {idx} - type={type}, bbox={bbox}, target={target}"
-msgstr ""
-"[página {page_num}] Região {idx} - tipo={type}, bbox={bbox}, "
-"target={target}"
-
-#, python-brace-format
-msgid "[page {page_num}] No text extracted by regions, fallback to the full page"
-msgstr ""
-"[página {page_num}] Nenhum texto extraído por regiões, fallback para a "
-"página completa"
-
-#, python-brace-format
-msgid ""
-"[page {page_num}] {count} task(s) ({text_count} text, {vision_count} "
-"vision)"
-msgstr ""
-"[página {page_num}] {count} tarefas ({text_count} texto, {vision_count} "
-"visão)"
-
-#, python-brace-format
-msgid "[page {page_num}] reading image: {path}"
-msgstr "[página {page_num}] lendo imagem: {path}"
 
 #, python-brace-format
 msgid "PDF exported with bookmarks and page numbering: {output_path}"
@@ -1586,18 +1538,6 @@ msgid "[page {page_num}] Sending region to vision ({size} bytes, type={type})"
 msgstr "[página {page_num}] Enviando região para visão ({size} bytes, tipo={type})"
 
 #, python-brace-format
-msgid "[page {page_num}] EditorAgent: no consolidated text"
-msgstr "[página {page_num}] EditorAgent: nenhum texto consolidado"
-
-#, python-brace-format
-msgid "[page {page_num}] EditorAgent: {count} text parts consolidated"
-msgstr "[página {page_num}] EditorAgent: {count} partes de texto consolidadas"
-
-#, python-brace-format
-msgid "Failed to crop the region: {error}"
-msgstr "Falha ao recortar a região: {error}"
-
-#, python-brace-format
 msgid "Cache hit for {name}"
 msgstr "Cache: item existente para {name}"
 
@@ -1654,20 +1594,6 @@ msgstr "Job {task_id} cancelado"
 #, python-brace-format
 msgid "Error in JobExecutor for {task_id}"
 msgstr "Erro no JobExecutor para {task_id}"
-
-#, python-brace-format
-msgid "Image pre-processing error: {error}"
-msgstr "Erro no pré-processamento de imagem: {error}"
-
-#, python-brace-format
-msgid "Image resized: {old_width}x{old_height} -> {new_width}x{new_height}"
-msgstr ""
-"Imagem redimensionada: {old_width}x{old_height} -> "
-"{new_width}x{new_height}"
-
-#, python-brace-format
-msgid "Image rotated by {angle:.2f} degrees"
-msgstr "Imagem rotacionada em {angle:.2f} graus"
 
 #, python-brace-format
 msgid "Global error in the Web Panel: {error} | Path: {path}"
@@ -1729,42 +1655,6 @@ msgstr "Erro interno no servidor"
 
 msgid "Empty response from the agent"
 msgstr "Resposta vazia do agente"
-
-#, python-brace-format
-msgid "Empty response for page {page_num}"
-msgstr "Resposta vazia para página {page_num}"
-
-#, python-brace-format
-msgid "[page {page_num}] Cache hit (skipping AI)"
-msgstr "[página {page_num}] Cache: item existente (pulando IA)"
-
-#, python-brace-format
-msgid "Response for page {page_num} saved to {file_name}"
-msgstr "Resposta da página {page_num} salva em {file_name}"
-
-#, python-brace-format
-msgid "[page {page_num}] Waiting for {count} AI task(s) in parallel..."
-msgstr "[página {page_num}] Aguardando {count} tarefa(s) de IA em paralelo..."
-
-#, python-brace-format
-msgid "[page {page_num}] Task {idx} failed: {error}"
-msgstr "[página {page_num}] Tarefa {idx} falhou: {error}"
-
-#, python-brace-format
-msgid ""
-"AccessibilityWorkflow: processing {page_count} page(s) for {file_name} "
-"(reader={reader}, mode={mode})"
-msgstr ""
-"AccessibilityWorkflow: processando {page_count} página(s) para "
-"{file_name} (reader={reader}, mode={mode})"
-
-#, python-brace-format
-msgid ""
-"AccessibilityWorkflow: {total_pages} pages processed, {total_chars} chars"
-" in total"
-msgstr ""
-"AccessibilityWorkflow: {total_pages} páginas processadas, {total_chars} "
-"chars no total"
 
 msgid "Stale: process interrupted"
 msgstr "Obsoleta: processo interrompido"

@@ -2,7 +2,7 @@
 
 Também disponível em **inglês (EUA)**: [English version](constitution.md)
 
-- **Versão:** 2.0.0 (2026-10-18). Veja no [histórico de alterações](#9-histórico-de-alterações)
+- **Versão:** 2.0.1 (2026-10-19). Veja no [histórico de alterações](#9-histórico-de-alterações)
   como as versões são numeradas.
 
 ## 1. Propósito
@@ -36,10 +36,8 @@ Entregar a conversão de documentos e imagens para formatos acessíveis por meio
       - `core/manifest/` – InformationalStructuralAgent; extrai o manifesto de processamento
 
    c. **Camada de agentes (multiagente Agno):**
-      - ReaderAgent (Python) – extração estrutural por meio de capacidades da Toolbox (Docling, MinerU…); o uso restante de PyMuPDF no próprio processo é um desvio registrado ([ADR-0003](adr/0003-remote-only-operational-capabilities.pt-br.md))
       - VisionAgent (Agno) – descrições de imagens
       - DataAgent (Agno) – representação textual de tabelas e fórmulas
-      - EditorAgent (Python) – deduplicação e marcação de acessibilidade
 
    d. **Pipeline canônico:**
       - `pipeline/` – construção e validação do documento canônico
@@ -63,7 +61,7 @@ Entregar a conversão de documentos e imagens para formatos acessíveis por meio
 
 ## 4. Contratos de domínio
 1. Ciclo de vida do processamento de documentos (estendido para a fase de planejamento):
-   - **Fase de extração:** documento → ReaderAgent → processing-manifest.json
+   - **Fase de extração:** documento → InformationalStructuralAgent (estrutura extraída na Toolbox) → processing-manifest.json
    - **Fase de planejamento:** manifesto + restrições de domínio → PlannerAgent → nominal-plan.json
    - **Fase de execução:** plano + manifesto → executor (Agno Workflow) → execution-report.json
    - **Geração canônica:** resultados da execução → documento canônico (acessível)
@@ -223,6 +221,9 @@ As versões seguem `MAJOR.MINOR.PATCH`:
 
 O texto sem versão anterior a 2026-10-18 conta como **1.0.0**.
 
+- **2.0.1 (2026-10-19):** removidos o ReaderAgent e o EditorAgent da camada
+  de agentes em 3.1 e da fase de extração em 4.1, junto com o motor legacy
+  desativado ao qual pertenciam. Nenhum princípio muda.
 - **2.0.0 (2026-10-18):** versão maior, porque os princípios 2.4 e 2.5 e o
   contrato 4.4 mudam de sentido. acrescentados os princípios arquiteturais do
   ecossistema P1–P9 (seção 7) e os ADRs que os detalham

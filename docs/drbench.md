@@ -152,8 +152,8 @@ that consumes a model only enters when the Toolbox exposes the capability.**
 | Repetition guard | `docstruct.fusion.repetition` | on |
 | Header/footer at the end | `docstruct.fusion.hf_end` | on |
 | Text normalization | `docstruct.text.norm_fix` | on |
-| Upscale before OCR | `docstruct.imaging.policy` + `backend/tools/image_enhancer.py` | on |
-| Orientation correction | `docstruct.imaging.policy` + `backend/tools/image_enhancer.py` | on |
+| Upscale before OCR | `docstruct.imaging.policy` | on |
+| Orientation correction | `docstruct.imaging.policy` | on |
 | Pairwise VLM judge | `docstruct.fusion.judge` | off (consumes a model) |
 | Page selection/fusion | `docstruct.fusion.page_select` | off (consumes a model) |
 | Table specialist | `docstruct.fusion.table_specialist` | off (consumes a model) |

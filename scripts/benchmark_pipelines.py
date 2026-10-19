@@ -9,7 +9,6 @@ from importlib import import_module
 from pathlib import Path
 from typing import Any
 
-from backend.agents.orchestrator import AccessibilityOrchestrator
 from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
 from backend.pipeline.canonical_builder import build_canonical_document
 from backend.pipeline.verbosity_manager import verbosity_for_mode
@@ -81,42 +80,14 @@ def _summarize_document(document: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-async def _run_legacy(file_path: Path, mode: str, tmpdir: Path) -> dict[str, Any]:
-    orchestrator = AccessibilityOrchestrator(mode=mode)
-    structured = await orchestrator.executar(
-        file_path=file_path,
-        tmpdir=tmpdir,
-        structured_output=True,
-        mode=mode,
-    )
-    canonical = build_canonical_document(
-        structured,
-        title=file_path.stem,
-        language="pt-BR",
-        verbosity=verbosity_for_mode(mode),
-        source_name=file_path.name,
-        source_path=str(file_path),
-        audience=["reader"],
-    )
-    return {"structured": structured, "canonical": canonical}
-
-
 async def _run_pddl(file_path: Path, tmpdir: Path) -> dict[str, Any]:
-    return await _run_pddl_with_extractor(file_path, tmpdir, extractor_backend="pymupdf")
-
-
-async def _run_pddl_with_extractor(
-    file_path: Path,
-    tmpdir: Path,
-    *,
-    extractor_backend: str,
-) -> dict[str, Any]:
+    # Structure extraction runs on the Toolbox, the only extractor the PDDL
+    # orchestrator accepts (docs/adr/0003).
     orchestrator = PddlAccessibilityOrchestrator(
         planner_backend="internal",
         preferred_plan="internal",
         execute_dry_run=True,
-        enable_ocr=extractor_backend == "docling",
-        extractor_backend=extractor_backend,
+        extractor_backend="toolbox",
     )
     structured = await orchestrator.executar(
         file_path=file_path,
@@ -201,66 +172,22 @@ def _export_outputs(
 async def run_benchmark(
     file_path: Path,
     output_dir: Path,
-    mode: str,
     export_formats: list[str],
-    pddl_extractor_backend: str,
 ) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     report: dict[str, Any] = {
         "source_file": str(file_path.resolve()),
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "mode": mode,
-        "pddl_extractor_backend": pddl_extractor_backend,
+        "pddl_extractor_backend": "toolbox",
         "engines": {},
-        "comparison": {},
     }
 
     tmpdir = output_dir / "tmp"
     tmpdir.mkdir(parents=True, exist_ok=True)
 
-    legacy_start = time.perf_counter()
-    try:
-        legacy = await _run_legacy(file_path, mode, tmpdir)
-        legacy_elapsed = round((time.perf_counter() - legacy_start) * 1000)
-        legacy_structured_path = output_dir / "legacy.structured.json"
-        legacy_structured_path.write_text(
-            json.dumps(legacy["structured"], ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8",
-        )
-        legacy_canonical_path = output_dir / "legacy.canonical.json"
-        legacy_canonical_path.write_text(
-            json.dumps(legacy["canonical"], ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8",
-        )
-        legacy_exports, legacy_export_errors = _export_outputs(
-            canonical=legacy["canonical"],
-            output_dir=output_dir,
-            engine_name="legacy",
-            export_formats=export_formats,
-        )
-        report["engines"]["legacy"] = {
-            "status": "ok",
-            "elapsed_ms": legacy_elapsed,
-            "structured_path": str(legacy_structured_path.resolve()),
-            "canonical_path": str(legacy_canonical_path.resolve()),
-            "exports": legacy_exports,
-            "export_errors": legacy_export_errors,
-            "summary": _summarize_document(legacy["canonical"]),
-        }
-    except Exception as exc:
-        report["engines"]["legacy"] = {
-            "status": "error",
-            "error_type": type(exc).__name__,
-            "error": str(exc),
-        }
-
     pddl_start = time.perf_counter()
     try:
-        pddl = await _run_pddl_with_extractor(
-            file_path,
-            tmpdir,
-            extractor_backend=pddl_extractor_backend,
-        )
+        pddl = await _run_pddl(file_path, tmpdir)
         pddl_elapsed = round((time.perf_counter() - pddl_start) * 1000)
         pddl_structured_path = output_dir / "pddl.structured.json"
         pddl_structured_path.write_text(
@@ -298,22 +225,6 @@ async def run_benchmark(
     import shutil
     shutil.rmtree(tmpdir, ignore_errors=True)
 
-    legacy_summary = report["engines"].get("legacy", {}).get("summary")
-    pddl_summary = report["engines"].get("pddl", {}).get("summary")
-    if isinstance(legacy_summary, dict) and isinstance(pddl_summary, dict):
-        report["comparison"] = {
-            "elapsed_ms_delta_pddl_minus_legacy": report["engines"]["pddl"][
-                "elapsed_ms"
-            ]
-            - report["engines"]["legacy"]["elapsed_ms"],
-            "section_count_delta": pddl_summary["section_count"]
-            - legacy_summary["section_count"],
-            "block_count_delta": pddl_summary["block_count"]
-            - legacy_summary["block_count"],
-            "text_length_delta": pddl_summary["text_length"]
-            - legacy_summary["text_length"],
-        }
-
     report_path = output_dir / "benchmark_report.json"
     report_path.write_text(
         json.dumps(report, ensure_ascii=False, indent=2) + "\n",
@@ -325,7 +236,7 @@ async def run_benchmark(
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="benchmark-pipelines",
-        description="Benchmark simples entre pipeline legacy e PDDL.",
+        description="Benchmark of the PDDL pipeline: timing, structure summary and exports.",
     )
     parser.add_argument("file", type=Path, help="Arquivo de entrada (PDF/imagem)")
     parser.add_argument(
@@ -336,21 +247,9 @@ def parse_args() -> argparse.Namespace:
         help="Diretório de saída para o relatório e canônicos.",
     )
     parser.add_argument(
-        "--mode",
-        default="normal",
-        choices=["normal", "medio", "detalhado"],
-        help="Modo do pipeline legacy para comparação.",
-    )
-    parser.add_argument(
         "--export-formats",
         default="pdf",
         help="Formatos de saida por metodo, separados por virgula (ex.: pdf,pdf_ua,txt,docx).",
-    )
-    parser.add_argument(
-        "--pddl-extractor-backend",
-        default="pymupdf",
-        choices=["pymupdf", "docling"],
-        help="Extrator estrutural do pipeline PDDL.",
     )
     return parser.parse_args()
 
@@ -374,12 +273,14 @@ def main() -> int:
         run_benchmark(
             file_path=file_path,
             output_dir=args.output_dir.resolve(),
-            mode=args.mode,
             export_formats=export_formats,
-            pddl_extractor_backend=args.pddl_extractor_backend,
         )
     )
     print(f"Relatório: {report_path}")
+    pddl = json.loads(report_path.read_text(encoding="utf-8"))["engines"]["pddl"]
+    if pddl["status"] == "error":
+        print(f"Erro no pipeline PDDL: {pddl['error_type']}: {pddl['error']}")
+        return 1
     return 0
 
 

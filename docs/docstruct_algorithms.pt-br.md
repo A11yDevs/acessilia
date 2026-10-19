@@ -348,6 +348,6 @@ ou decidir re-inferência sem passar pelo planejador PDDL.
 - [pmv_agno_pddl.md](pmv_agno_pddl.md) — orquestração PDDL e o método
   `dual-provider-fusion`.
 - [architecture.md](architecture.md) — arquitetura do sistema.
-- [patterns.md](patterns.md) — padrões de design (padrão 12: agente de fusão
+- [patterns.md](patterns.md) — padrões de design (padrão 10: agente de fusão
   determinístico).
 - [drbench.md](drbench.md) — o benchmark Dr.DocBench que motivou o Tree Differ.

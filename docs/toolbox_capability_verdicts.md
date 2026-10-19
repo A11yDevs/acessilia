@@ -26,7 +26,7 @@ Checked against `https://www.acessilia3.inf.ufg.br/toolbox` on 2026-10-14:
 | Capability / family | Evidence in Acessilia | Verdict | Follow-up |
 |---|---|---|---|
 | `document.structure.extract` | Used by `ToolboxManifestExtractor`; exercised by pipeline comparison and fusion E2E tests | Integrated | Keep contract and E2E coverage |
-| `document.layout.analyze` | `ToolboxLayoutStructurer`; direct and workflow E2E coverage | Integrated | Keep contract and E2E coverage |
+| `document.layout.analyze` | SDK client with direct E2E coverage; its only core caller, `ToolboxLayoutStructurer`, went with the legacy pipeline | Pending PDDL integration | Map evidence, obligation and method, or retire the client |
 | `document.ocr` | Agno wrapper and OCR client; remote OCR E2E coverage | Integrated | Keep contract and E2E coverage |
 | `math.recognize`, `math.convert`, `math.verbalize` | Math tools/client; recognition, conversion, verbalization, and chained workflow E2E coverage | Integrated | Keep contract and E2E coverage |
 | `pdf.split`, `pdf.render` | SDK client with direct and chained workflow E2E coverage. `pdf.render@2` renders every orchestrator page and region (`pymupdf-region`, `vision-page-inspection`, `vlm-pairwise-judge` and the picture/table enrichment, #150 F5); `pdf.split` has no production caller since `toolbox_pdf_tools.py` was removed (#150 F4) | Contract kept | Keep contract and E2E coverage, including the `pdf.render@2` clip, `max_side` and refusals the core relies on |

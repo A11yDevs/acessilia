@@ -8,7 +8,7 @@ This release validates the minimal cycle:
 
 ```text
 document
-  → Informational-Structural Agent (Agno + Docling)
+  → Informational-Structural Agent (Agno + Toolbox)
   → processing-manifest.json
   → Planner Agent (Agno + PDDL tools)
   → problem.pddl
@@ -24,8 +24,6 @@ No LLM writes PDDL directly.
 ## macOS compatibility
 
 - Python 3.11 or 3.12;
-- `docling==2.0.0`;
-- `docling-core==2.0.0`;
 - `agno==3.0.5`;
 - Fast Downward optional.
 
@@ -35,9 +33,9 @@ uv run python scripts/generate_pmv_schemas.py
 uv run pytest
 ```
 
-Agno is pinned in `pyproject.toml` and locked in `uv.lock`. Docling is not a project
-dependency; install it into the environment with
-`uv pip install docling==2.0.0 docling-core==2.0.0`.
+Agno is pinned in `pyproject.toml` and locked in `uv.lock`. Structure extraction
+runs on the Acessilia Toolbox ([ADR-0003](adr/0003-remote-only-operational-capabilities.md)),
+so Docling is not installed locally.
 
 Fast Downward is only required when using `--planner fast-downward` or
 `--planner both`. The `internal` backend is the PMV's reference planner and works
@@ -50,6 +48,10 @@ without any external binary.
 deterministic implementation, which allows testing without an LLM call.
 An Agno model can be injected via the `model` argument; the CLI needs no API key
 because it invokes the deterministic tool directly.
+
+The structure comes from the Toolbox through `ToolboxManifestExtractor`, so the
+`manifest` and `pipeline` commands need a reachable Toolbox (`TOOLBOX_BASE_URL`,
+see `.env.example`).
 
 ```bash
 uv run python scripts/pmv.py manifest document.pdf \

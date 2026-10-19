@@ -2,7 +2,7 @@
 
 You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](constitution.pt-br.md)
 
-- **Version:** 2.0.0 (2026-10-18). See the [changelog](#9-changelog) for how
+- **Version:** 2.0.1 (2026-10-19). See the [changelog](#9-changelog) for how
   versions are numbered.
 
 ## 1. Purpose
@@ -36,10 +36,8 @@ Deliver document and image conversion to accessible formats through:
       - `core/manifest/` – InformationalStructuralAgent; extracts processing manifesto
    
    c. **Agent Layer (Agno Multiagent):**
-      - ReaderAgent (Python) – structural extraction through Toolbox capabilities (Docling, MinerU…); its remaining in-process PyMuPDF use is a tracked deviation ([ADR-0003](adr/0003-remote-only-operational-capabilities.md))
       - VisionAgent (Agno) – image descriptions
       - DataAgent (Agno) – tabular/formula text representation
-      - EditorAgent (Python) – deduplication and accessibility tagging
    
    d. **Canonical Pipeline:**
       - `pipeline/` – canonical document construction and validation
@@ -63,7 +61,7 @@ Deliver document and image conversion to accessible formats through:
 
 ## 4. Domain contracts
 1. Document processing lifecycle (extended for planning phase):
-   - **Extraction Phase:** Document → ReaderAgent → processing-manifest.json
+   - **Extraction Phase:** Document → InformationalStructuralAgent (structure extracted on the Toolbox) → processing-manifest.json
    - **Planning Phase:** manifesto + domain constraints → PlannerAgent → nominal-plan.json
    - **Execution Phase:** plan + manifesto → Executor (Agno Workflow) → execution-report.json
    - **Canonical Generation:** execution results → canonical document (accessible)
@@ -221,6 +219,9 @@ Versions follow `MAJOR.MINOR.PATCH`:
 
 The unversioned text before 2026-10-18 counts as **1.0.0**.
 
+- **2.0.1 (2026-10-19):** removed the ReaderAgent and EditorAgent from the
+  agent layer in 3.1 and from the extraction phase in 4.1, together with the
+  disabled legacy engine they belonged to. No principle changes.
 - **2.0.0 (2026-10-18):** a major version, because principles 2.4 and 2.5 and
   contract 4.4 change meaning. added the ecosystem architecture principles P1–P9
   (section 7) and the ADRs that detail them

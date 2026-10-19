@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from backend.core.agents.informational_structural import InformationalStructuralAgent
-from backend.core.manifest.docling_extractor import DoclingManifestExtractor
+from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
 from backend.core.manifest.schema import validate_manifest
 
 
@@ -19,7 +19,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="a11y-manifest",
         description=(
-            "Extrai a estrutura de um documento com Docling e gera um "
+            "Extrai a estrutura de um documento na Toolbox e gera um "
             "manifesto de processamento validado."
         ),
     )
@@ -38,7 +38,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--no-ocr",
         action="store_true",
-        help="Desabilita OCR no pipeline PDF do Docling.",
+        help="Desabilita OCR na extração da Toolbox.",
     )
     parser.add_argument(
         "--schema",
@@ -60,7 +60,7 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         agent = InformationalStructuralAgent(
-            DoclingManifestExtractor(enable_ocr=not args.no_ocr)
+            ToolboxManifestExtractor(enable_ocr=not args.no_ocr)
         )
         manifest = agent.process(source, language=args.language)
         payload = manifest.model_dump(mode="json", by_alias=True)

@@ -10,9 +10,9 @@ from typing import Any
 from backend.i18n import t
 
 MSG_SOURCE_NOT_FOUND = "Source file not found: {source_path}"
-#: Canonical English id for the hint raised when the optional Docling stack is absent from the environment.
+#: Canonical English id raised when no structurer is passed: the core has no local Docling.
 MSG_DOCLING_MISSING = (
-    "Docling is not installed. Run `uv pip install docling`."
+    "No local Docling structurer: pass one explicitly, or extract the structure on the Toolbox."
 )
 MSG_INCOMPATIBLE_STRUCTURER = (
     "Incompatible structurer: expected convert_document() or _process_document()."
@@ -70,12 +70,9 @@ class DoclingManifestExtractor:
         )
 
     def _build_structurer(self) -> Any:
-        from backend.tools.structurer import DOCLING_AVAILABLE, DoclingStructurer
-
-        if not DOCLING_AVAILABLE:
-            raise RuntimeError(t(MSG_DOCLING_MISSING))
-
-        return DoclingStructurer(enable_ocr=self.enable_ocr)
+        # The core has no local Docling structurer: extraction runs on the
+        # Toolbox (docs/adr/0003). A structurer must be passed in explicitly.
+        raise RuntimeError(t(MSG_DOCLING_MISSING))
 
     @staticmethod
     def _convert_document(structurer: Any, source_path: Path) -> Any:

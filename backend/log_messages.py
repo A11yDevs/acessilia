@@ -294,8 +294,6 @@ MSG_OBLIGATION_UNSTRUCTURED_PAGE: str = (
 )
 #: Observation message for heading-level skips found while validating the manifest; {previous} is the previous heading level and {level} the current one.
 MSG_HEADING_GAP: str = "Title hierarchy jumps from level {previous} to level {level}."
-#: Debug logged by the orchestrator when a page is served straight from the cache, skipping the AI pass; {page_num} is the page index.
-LOG_ORCHESTRATOR_PAGE_CACHE_SKIP: str = "[page {page_num}] Cache hit (skipping AI)"
 #: Warning logged when a mode prompt file is missing on disk and the loader falls back to the medio prompt; {path} is the missing prompt file path.
 LOG_PROMPT_FILE_NOT_FOUND: str = (
     "Prompt file not found at {path}, falling back to medio"
@@ -320,14 +318,6 @@ LOG_VISION_AGENT_SENDING_REGION: str = (
 LOG_VISION_AGENT_REGION_ERROR: str = (
     "[page {page_num}] VisionAgent error in region {type}: {error} | Traceback:\n{tb}"
 )
-#: Warning logged by the editor agent when a page produced no consolidated text; {page_num} is the page number.
-LOG_EDITOR_PAGE_EMPTY: str = "[page {page_num}] EditorAgent: no consolidated text"
-#: Info logged by the editor agent after consolidating a page; {page_num} is the page number, {count} the number of text parts kept.
-LOG_EDITOR_PAGE_CONSOLIDATED: str = (
-    "[page {page_num}] EditorAgent: {count} text parts consolidated"
-)
-#: Critical message logged when cropping a manifest region from a page image fails; {error} is the exception text.
-LOG_REGION_CROP_FAILED: str = "Failed to crop the region: {error}"
 #: Debug logged by the exporters adapter wrapper just before a plain-text export runs; {path} is the output file path.
 LOG_EXPORT_TXT_START: str = "Exporting TXT to {path}"
 #: Debug logged by the exporters adapter wrapper just before a DOCX export runs; {path} is the output file path.
@@ -338,49 +328,8 @@ LOG_EXPORT_PDF_START: str = "Exporting PDF to {path}"
 LOG_EXPORT_PDF_UA_START: str = "Exporting PDF/UA to {path}"
 #: Debug logged by the exporters adapter wrapper just before an MP3 audio export runs; {path} is the output file path.
 LOG_EXPORT_MP3_START: str = "Exporting MP3 to {path}"
-#: Debug logged after a PDF page rasterizes to PNG; {size} is the resulting PNG payload size in bytes.
-LOG_PAGE_CONVERTED_TO_PNG: str = "Page converted to PNG: {size} bytes"
-#: Info logged before a PDF is split into per-page files; {total} is the document's full page count, {limit} the number of pages that will be extracted.
-LOG_PDF_PAGE_COUNT_LOGGED: str = "PDF has {total} pages, processing {limit}"
-#: Debug logged each time one page of the source PDF is written to a standalone per-page file during the split.
-LOG_PDF_PAGE_SAVED: str = "Page {page} saved: {name}"
-#: Info logged once a PDF has been split into standalone per-page files; {count} is the number of pages extracted, {tmpdir} the destination directory name.
-LOG_PDF_PAGES_EXTRACTED: str = "{count} pages extracted to {tmpdir}"
-#: Debug logged when an image is shrunk to fit the vision model's maximum dimension; {old_width} and {old_height} are the original pixel dimensions, {new_width} and {new_height} the resized ones.
-LOG_IMAGE_RESIZED: str = "Image resized: {old_width}x{old_height} -> {new_width}x{new_height}"
-#: Debug logged during OCR pre-processing when the image is deskewed; {angle:.2f} is the detected correction angle in degrees.
-LOG_IMAGE_ROTATED: str = "Image rotated by {angle:.2f} degrees"
-#: Error logged when OCR image pre-processing fails; {error} is the exception text.
-LOG_IMAGE_PREPROCESS_FAILED: str = "Image pre-processing error: {error}"
-#: Debug logged when a small page is upscaled before OCR; {factor} is the scale factor, {old_width}/{old_height} the original dimensions.
-LOG_IMAGE_UPSCALED: str = "Image upscaled {factor}x: {old_width}x{old_height}"
-#: Debug logged when a page is rotated to correct its orientation; {angle} is the applied rotation in degrees.
-LOG_IMAGE_ORIENTED: str = "Image orientation corrected by {angle} degrees"
 #: Error raised when the language-agent returns an empty result for a document; no placeholders.
 LOG_ORCHESTRATOR_EMPTY_AGENT_RESPONSE: str = "Empty response from the agent"
-#: Warning logged when a page is processed but the model returns no usable text for it.
-LOG_ORCHESTRATOR_EMPTY_PAGE_RESPONSE: str = "Empty response for page {page_num}"
-#: Info logged after a processed page's response text is written to its temporary output file; {page_num} is the page number, {file_name} the output file name.
-LOG_ORCHESTRATOR_PAGE_RESPONSE_SAVED: str = (
-    "Response for page {page_num} saved to {file_name}"
-)
-#: Info logged once the full workflow finishes, summarizing how many pages were processed and the total character count.
-LOG_ORCHESTRATOR_WORKFLOW_SUMMARY: str = (
-    "AccessibilityWorkflow: {total_pages} pages processed, {total_chars} chars in total"
-)
-#: Info logged when a workflow run begins, naming the page count, source file, structurer, and effective mode.
-LOG_ORCHESTRATOR_WORKFLOW_START: str = (
-    "AccessibilityWorkflow: processing {page_count} page(s) for {file_name} "
-    "(reader={reader}, mode={mode})"
-)
-#: Info logged before the orchestrator awaits a page's parallel AI tasks; {page_num} is the page number, {count} the number of pending tasks.
-LOG_ORCHESTRATOR_WAITING_TASKS: str = (
-    "[page {page_num}] Waiting for {count} AI task(s) in parallel..."
-)
-#: Error logged when one of a page's parallel AI tasks fails; {page_num} is the page number, {idx} the failed task's index, {error} the exception.
-LOG_ORCHESTRATOR_TASK_FAILED: str = (
-    "[page {page_num}] Task {idx} failed: {error}"
-)
 #: Warning logged by the PDDL pipeline when a caller passes custom_prompt or thinking_mode, which the deterministic manifest/planning/execution flow does not use.
 LOG_PDDL_IGNORED_OPTIONS: str = (
     "PDDL pipeline ignores custom_prompt/thinking_mode; only the deterministic "
@@ -422,23 +371,6 @@ LOG_PDDL_DOMAIN_DESCRIPTION_HASH_MISMATCH: str = (
 LOG_PDDL_SELECTED_CLOSURE_MISMATCH: str = (
     "The selected closure diverges from the compiled problem"
 )
-#: Info logged by the reader agent after extracting regions from a PDF page; {page_num} is the page number, {count} the number of regions found, {structurer} the structurer's name.
-LOG_READER_PDF_REGIONS_EXTRACTED: str = (
-    "[page {page_num}] Extracted {count} region(s) on the page (structurer={structurer})"
-)
-#: Info logged by the reader agent when every region on a page is clean text sent straight to the editor agent without a vision pass; {page_num} is the page number, {count} the number of such regions.
-LOG_READER_CLEAN_TEXT_REGIONS: str = (
-    "[page {page_num}] {count} clean-text region(s) (no vision AI)"
-)
-#: Info logged by the reader agent for each vision/data region task it creates; {page_num} is the page number, {idx} the task sequence number, {type} the region classification, {bbox} the region bounding box, {target} the agent that will process the task.
-LOG_READER_REGION_TASK: str = (
-    "[page {page_num}] Region {idx} - type={type}, bbox={bbox}, target={target}"
-)
-#: Warning logged by the reader agent when no text could be extracted from any region on a page, so the whole page is sent to the vision agent; {page_num} is the page number.
-LOG_READER_FULL_PAGE_FALLBACK: str = (
-    "[page {page_num}] No text extracted by regions, fallback to the full page"
-)
-#: Info logged by the reader agent after it has built all region tasks for a page; {page_num} is the page number, {count} the total task count, {text_count} the tasks sent to the editor, {vision_count} the tasks sent to the vision/data agents.
 LOG_PDF_EXPORTED: str = "PDF exported with bookmarks and page numbering: {output_path}"
 LOG_PDF_UA_EXPORTED: str = "PDF/UA exported: {output_path}"
 #: Info logged when the Toolbox rendered the PDF/UA; {output_path} the destination file path.
@@ -460,17 +392,6 @@ LOG_MEDIA_INSPECT_FAILED: str = (
 )
 LOG_TXT_EXPORTED: str = "TXT exported: {output_path}"
 LOG_DOCX_EXPORTED: str = "DOCX exported: {output_path}"
-LOG_READER_TASKS_SUMMARY: str = (
-    "[page {page_num}] {count} task(s) ({text_count} text, {vision_count} vision)"
-)
-#: Debug logged by the reader agent for each image page before reading its bytes; {page_num} is the page number, {path} the per-page image file path.
-LOG_READER_IMAGE_READING: str = "[page {page_num}] reading image: {path}"
-#: Warning logged at service level when the configured docling structurer is unavailable and the PyMuPDF structurer is resolved instead.
-LOG_STRUCTURER_FALLBACK_PYMUPDF: str = (
-    "STRUCTURER=docling is set but docling is not installed. Using PyMuPDF."
-)
-#: Info logged when the PyMuPDF document structurer is selected directly.
-LOG_STRUCTURER_PYMUPDF: str = "Using structurer: PyMuPDF"
 #: Error raised when the optional Agno agent stack is absent and a workflow class import is required; no placeholders.
 LOG_AGNO_NOT_INSTALLED: str = (
     "Agno is not installed. Run `uv sync` before using the workflow Executor."

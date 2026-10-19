@@ -98,8 +98,6 @@ from backend.log_messages import (
     LOG_DATA_AGENT_REGION_ERROR,
     LOG_VISION_AGENT_REGION_ERROR,
     LOG_VISION_AGENT_SENDING_REGION,
-    LOG_EDITOR_PAGE_EMPTY,
-    LOG_EDITOR_PAGE_CONSOLIDATED,
     LOG_CLEANUP_ITEM_FAILED,
     LOG_CLEANUP_OUTPUT_FAILED,
     LOG_CLEANUP_PERIODIC_ERROR,
@@ -114,9 +112,6 @@ from backend.log_messages import (
     LOG_EXPORT_PDF_UA_START,
     LOG_EXPORT_TXT_START,
     LOG_FATAL_ERROR_IN_BOT,
-    LOG_IMAGE_PREPROCESS_FAILED,
-    LOG_IMAGE_RESIZED,
-    LOG_IMAGE_ROTATED,
     LOG_JOB_CANCELLED,
     LOG_JOB_COMPLETED,
     LOG_JOB_EXECUTOR_ERROR,
@@ -127,17 +122,9 @@ from backend.log_messages import (
     LOG_MP3_GENERATION_FAILED,
     LOG_NO_INTERFACE_ENABLED,
     LOG_ORCHESTRATOR_EMPTY_AGENT_RESPONSE,
-    LOG_ORCHESTRATOR_EMPTY_PAGE_RESPONSE,
-    LOG_ORCHESTRATOR_PAGE_CACHE_SKIP,
-    LOG_ORCHESTRATOR_PAGE_RESPONSE_SAVED,
-    LOG_ORCHESTRATOR_WAITING_TASKS,
-    LOG_ORCHESTRATOR_TASK_FAILED,
-    LOG_ORCHESTRATOR_WORKFLOW_START,
-    LOG_ORCHESTRATOR_WORKFLOW_SUMMARY,
     LOG_ORPHAN_TASKS_CLEANED,
     LOG_ORPHAN_TASKS_CLEANUP_FAILED,
     LOG_OUTPUT_DIR_REMOVED,
-    LOG_PAGE_CONVERTED_TO_PNG,
     LOG_PDDL_IGNORED_OPTIONS,
     LOG_PDDL_IMAGES_ENRICHED,
     LOG_PDDL_TABLES_ENRICHED,
@@ -147,9 +134,6 @@ from backend.log_messages import (
     LOG_PDDL_DOMAIN_HASH_MISMATCH,
     LOG_PDDL_DOMAIN_DESCRIPTION_HASH_MISMATCH,
     LOG_PDDL_SELECTED_CLOSURE_MISMATCH,
-    LOG_PDF_PAGE_COUNT_LOGGED,
-    LOG_PDF_PAGE_SAVED,
-    LOG_PDF_PAGES_EXTRACTED,
     LOG_PDF_UA_GENERATION_FAILED,
     LOG_PDF_EXPORTED,
     LOG_PDF_UA_EXPORTED,
@@ -161,14 +145,7 @@ from backend.log_messages import (
     LOG_TXT_EXPORTED,
     LOG_DOCX_EXPORTED,
     LOG_PIPELINE_ERROR,
-    LOG_REGION_CROP_FAILED,
     LOG_PROMPT_FILE_NOT_FOUND,
-    LOG_READER_PDF_REGIONS_EXTRACTED,
-    LOG_READER_CLEAN_TEXT_REGIONS,
-    LOG_READER_REGION_TASK,
-    LOG_READER_FULL_PAGE_FALLBACK,
-    LOG_READER_TASKS_SUMMARY,
-    LOG_READER_IMAGE_READING,
     LOG_QUEUE_ITEM_ENQUEUED,
     LOG_SMTP_NOT_CONFIGURED,
     LOG_STARTING_INTERFACES,
@@ -783,25 +760,15 @@ MESSAGES: tuple[str, ...] = (
     LOG_EXPORT_PDF_START,
     LOG_EXPORT_PDF_UA_START,
     LOG_EXPORT_MP3_START,
-    LOG_PAGE_CONVERTED_TO_PNG,
     LOG_PDDL_IGNORED_OPTIONS,
     LOG_PDDL_IMAGES_ENRICHED,
     LOG_PDDL_TABLES_ENRICHED,
-    LOG_PDF_PAGE_COUNT_LOGGED,
-    LOG_PDF_PAGE_SAVED,
-    LOG_PDF_PAGES_EXTRACTED,
     LOG_PDDL_ELEMENT_CROP_FAILED,
     LOG_PDDL_PREFERRED_PLAN_MISSING,
     LOG_PDDL_PROBLEM_HASH_MISMATCH,
     LOG_PDDL_DOMAIN_HASH_MISMATCH,
     LOG_PDDL_DOMAIN_DESCRIPTION_HASH_MISMATCH,
     LOG_PDDL_SELECTED_CLOSURE_MISMATCH,
-    LOG_READER_PDF_REGIONS_EXTRACTED,
-    LOG_READER_CLEAN_TEXT_REGIONS,
-    LOG_READER_REGION_TASK,
-    LOG_READER_FULL_PAGE_FALLBACK,
-    LOG_READER_TASKS_SUMMARY,
-    LOG_READER_IMAGE_READING,
     LOG_PDF_EXPORTED,
     LOG_PDF_UA_EXPORTED,
     LOG_PDF_UA_SKIPPED_DISABLED,
@@ -833,9 +800,6 @@ MESSAGES: tuple[str, ...] = (
     LOG_DATA_AGENT_REGION_ERROR,
     LOG_VISION_AGENT_REGION_ERROR,
     LOG_VISION_AGENT_SENDING_REGION,
-    LOG_EDITOR_PAGE_EMPTY,
-    LOG_EDITOR_PAGE_CONSOLIDATED,
-    LOG_REGION_CROP_FAILED,
     LOG_CACHE_HIT,
     LOG_CACHE_DEBUG_HIT,
     LOG_CACHE_DEBUG_SET,
@@ -851,9 +815,6 @@ MESSAGES: tuple[str, ...] = (
     LOG_JOB_COMPLETED,
     LOG_JOB_CANCELLED,
     LOG_JOB_EXECUTOR_ERROR,
-    LOG_IMAGE_PREPROCESS_FAILED,
-    LOG_IMAGE_RESIZED,
-    LOG_IMAGE_ROTATED,
     LOG_WEB_GLOBAL_ERROR,
     LOG_WEB_UPLOAD_ERROR,
     LOG_WEB_DOWNLOAD_QUERY_FAILED,
@@ -870,13 +831,6 @@ MESSAGES: tuple[str, ...] = (
     API_RATE_LIMIT_DETAIL,
     API_INTERNAL_ERROR_DETAIL,
     LOG_ORCHESTRATOR_EMPTY_AGENT_RESPONSE,
-    LOG_ORCHESTRATOR_EMPTY_PAGE_RESPONSE,
-    LOG_ORCHESTRATOR_PAGE_CACHE_SKIP,
-    LOG_ORCHESTRATOR_PAGE_RESPONSE_SAVED,
-    LOG_ORCHESTRATOR_WAITING_TASKS,
-    LOG_ORCHESTRATOR_TASK_FAILED,
-    LOG_ORCHESTRATOR_WORKFLOW_START,
-    LOG_ORCHESTRATOR_WORKFLOW_SUMMARY,
     LOG_STALE_PROCESS_INTERRUPTED,
     LOG_AGNO_NOT_INSTALLED,
 )
@@ -989,7 +943,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         # Docling extractor diagnostics (backend/core/manifest/docling_extractor.py).
         MSG_SOURCE_NOT_FOUND: "Arquivo de origem não encontrado: {source_path}",
         MSG_DOCLING_MISSING: (
-            "Docling não está instalado. Execute `uv pip install docling`."
+            "Não há structurer Docling local: passe um explicitamente ou extraia a "
+            "estrutura na Toolbox."
         ),
         MSG_INCOMPATIBLE_STRUCTURER: (
             "Structurer incompatível: esperado convert_document() ou _process_document()."
@@ -1506,7 +1461,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         LOG_EXPORT_PDF_START: "Exportando PDF para {path}",
         LOG_EXPORT_PDF_UA_START: "Exportando PDF/UA para {path}",
         LOG_EXPORT_MP3_START: "Exportando MP3 para {path}",
-        LOG_PAGE_CONVERTED_TO_PNG: "Página convertida para PNG: {size} bytes",
         LOG_PDDL_IGNORED_OPTIONS: (
             "Pipeline PDDL ignora custom_prompt/thinking_mode; "
             "apenas fluxo deterministico de manifesto/planejamento/execucao"
@@ -1536,30 +1490,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         LOG_PDDL_SELECTED_CLOSURE_MISMATCH: (
             "Fechamento selecionado diverge do problema compilado"
         ),
-        LOG_READER_PDF_REGIONS_EXTRACTED: (
-            "[página {page_num}] Extraídas {count} região(ns) na página (structurer={structurer})"
-        ),
-        LOG_READER_CLEAN_TEXT_REGIONS: (
-            "[página {page_num}] {count} região(ns) de texto limpo (sem IA de visão)"
-        ),
-        LOG_READER_REGION_TASK: (
-            "[página {page_num}] Região {idx} - tipo={type}, bbox={bbox}, target={target}"
-        ),
-        # reader full-page fallback warning; {page_num} the page number.
-        LOG_READER_FULL_PAGE_FALLBACK: (
-            "[página {page_num}] Nenhum texto extraído por regiões, fallback para a página completa"
-        ),
-        # reader per-page task summary line; {page_num} the page number, {count} total tasks, {text_count} editor-bound, {vision_count} vision-bound.
-        LOG_READER_TASKS_SUMMARY: (
-            "[página {page_num}] {count} tarefas ({text_count} texto, {vision_count} visão)"
-        ),
-        # reader image-page debug line; {page_num} the page number, {path} the per-page image file path.
-        LOG_READER_IMAGE_READING: "[página {page_num}] lendo imagem: {path}",
-
-        LOG_PDF_PAGE_COUNT_LOGGED: (
-            "PDF tem {total} páginas, processando {limit}"
-        ),
-        LOG_PDF_PAGE_SAVED: "Página {page} salva: {name}",
         # PDF export wrapper debug line; {output_path} the destination file path.
         LOG_PDF_EXPORTED: (
             "PDF exportado com marcadores e numeração de páginas: {output_path}"
@@ -1583,7 +1513,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         LOG_TXT_EXPORTED: "TXT exportado: {output_path}",
         # DOCX export wrapper debug line; {output_path} the destination file path.
         LOG_DOCX_EXPORTED: "DOCX exportado: {output_path}",
-        LOG_PDF_PAGES_EXTRACTED: "{count} páginas extraídas para {tmpdir}",
         # Confirmation/result e-mail subjects and bodies (pt-BR mirrors).
         EMAIL_CONFIRMATION_SUBJECT: "Recebemos o seu arquivo - Acessilia",
         EMAIL_CONFIRMATION_BODY: (
@@ -1647,11 +1576,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         LOG_VISION_AGENT_REGION_ERROR: (
             "[página {page_num}] Erro na região {type}: {error} | Traceback:\n{tb}"
         ),
-        LOG_EDITOR_PAGE_EMPTY: "[página {page_num}] EditorAgent: nenhum texto consolidado",
-        LOG_EDITOR_PAGE_CONSOLIDATED: (
-            "[página {page_num}] EditorAgent: {count} partes de texto consolidadas"
-        ),
-        LOG_REGION_CROP_FAILED: "Falha ao recortar a região: {error}",
         LOG_CACHE_HIT: "Cache: item existente para {name}",
         LOG_CACHE_DEBUG_HIT: "Cache: item existente: {key}",
         LOG_CACHE_DEBUG_SET: "Cache: item gravado: {key}",
@@ -1673,11 +1597,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         LOG_JOB_COMPLETED: "Job {task_id} concluído (source={source})",
         LOG_JOB_CANCELLED: "Job {task_id} cancelado",
         LOG_JOB_EXECUTOR_ERROR: "Erro no JobExecutor para {task_id}",
-        LOG_IMAGE_PREPROCESS_FAILED: "Erro no pré-processamento de imagem: {error}",
-        LOG_IMAGE_RESIZED: (
-            "Imagem redimensionada: {old_width}x{old_height} -> {new_width}x{new_height}"
-        ),
-        LOG_IMAGE_ROTATED: "Imagem rotacionada em {angle:.2f} graus",
         LOG_WEB_GLOBAL_ERROR: (
             "Erro global no Painel Web: {error} | Caminho: {path}"
         ),
@@ -1720,35 +1639,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         API_INTERNAL_ERROR_DETAIL: "Erro interno no servidor",
         # raised when the language-agent returns an empty result for a document.
         LOG_ORCHESTRATOR_EMPTY_AGENT_RESPONSE: "Resposta vazia do agente",
-        # orchestrator empty model-response warning; {page_num} is the page number.
-        LOG_ORCHESTRATOR_EMPTY_PAGE_RESPONSE: (
-            "Resposta vazia para página {page_num}"
-        ),
-        # orchestrator page-response saved info line; {page_num} is the page number, {file_name} the output file name.
-        LOG_ORCHESTRATOR_PAGE_RESPONSE_SAVED: (
-            "Resposta da página {page_num} salva em {file_name}"
-        ),
-        # orchestrator parallel-task wait line; {page_num} is the page number, {count} the number of pending AI tasks.
-        LOG_ORCHESTRATOR_WAITING_TASKS: (
-            "[página {page_num}] Aguardando {count} tarefa(s) de IA em paralelo..."
-        ),
-        # orchestrator failed-task error line; {page_num} is the page number, {idx} the failed task's index, {error} the exception.
-        LOG_ORCHESTRATOR_TASK_FAILED: (
-            "[página {page_num}] Tarefa {idx} falhou: {error}"
-        ),
-        # orchestrator workflow start line; {page_count} the page count, {file_name} the source file name, {reader} the structurer, {mode} the effective mode.
-        LOG_ORCHESTRATOR_WORKFLOW_START: (
-            "AccessibilityWorkflow: processando {page_count} página(s) para {file_name} "
-            "(reader={reader}, mode={mode})"
-        ),
-        # orchestrator workflow summary line; {total_pages} and {total_chars} are the run totals.
-        LOG_ORCHESTRATOR_WORKFLOW_SUMMARY: (
-            "AccessibilityWorkflow: {total_pages} páginas processadas, {total_chars} chars no total"
-        ),
-        # orchestrator page-cache debug line; {page_num} is the page index.
-        LOG_ORCHESTRATOR_PAGE_CACHE_SKIP: (
-            "[página {page_num}] Cache: item existente (pulando IA)"
-        ),
         LOG_STALE_PROCESS_INTERRUPTED: "Obsoleta: processo interrompido",
         LOG_AGNO_NOT_INSTALLED: (
             "Agno não está instalado. Execute `uv sync` antes de usar "

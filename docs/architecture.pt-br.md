@@ -7,7 +7,7 @@ O sistema converte documentos em formatos acessíveis por meio de um pipeline de
 
 O sistema combina **planejamento determinístico com execução guiada por IA**: as funções determinísticas (extração, geração do problema PDDL, validação de contrato) são a fonte da verdade, e os LLMs fornecem interpretação e descrição. Os documentos passam pelo motor de pipeline **`pddl`** (`PIPELINE_ENGINE`, padrão `pddl`): um manifesto de processamento é extraído, um plano PDDL é gerado e validado, e um executor Agno Workflow o aplica. Veja [pmv_agno_pddl.md](pmv_agno_pddl.md).
 
-O antigo motor **`legacy`** (`AccessibilityOrchestrator`: Reader → Vision/Data → Editor) está desativado: `backend/service.py` aceita apenas `pddl` (o antigo alias `pmv` é normalizado para ele) e recusa qualquer outro valor. O código dele ainda está no repositório e será removido.
+O antigo motor **`legacy`** (`AccessibilityOrchestrator`: Reader → Vision/Data → Editor) está desativado: `backend/service.py` aceita apenas `pddl` (o antigo alias `pmv` é normalizado para ele) e recusa qualquer outro valor. O código dele foi removido.
 
 ---
 
@@ -16,15 +16,9 @@ O antigo motor **`legacy`** (`AccessibilityOrchestrator`: Reader → Vision/Data
 ### 0. Backend (`backend/`) — lógica de negócio agnóstica de interface e pipeline de IA
 
 #### 0.1. Pipeline Multiagente e Orquestração (`backend/agents/`)
-Os itens marcados *(motor legacy, desativado)* só são alcançados pelo `AccessibilityOrchestrator` desativado; o motor PDDL não os usa.
-
-- [backend/agents/orchestrator.py](../backend/agents/orchestrator.py) *(motor legacy, desativado)*: `AccessibilityOrchestrator` coordena o pipeline de execução multiagente, a consulta de cache, o estado das tarefas, o histórico e os callbacks de status.
-- [backend/agents/reader_agent.py](../backend/agents/reader_agent.py) *(motor legacy, desativado)*: `ReaderAgent` realiza o parsing estrutural local-first de PDF/imagens (via PyMuPDF ou Docling), divide as páginas e classifica as regiões de conteúdo (imagem, tabela, fórmula, texto).
 - [backend/agents/vision_agent.py](../backend/agents/vision_agent.py): `VisionAgent` utiliza o Agno (`agno.agent.Agent`) e as capacidades multimodais do LLM (`agno.media.Image`) para produzir alt-text detalhado e descrições em áudio para elementos visuais e páginas escaneadas.
 - [backend/agents/data_agent.py](../backend/agents/data_agent.py): `DataAgent` utiliza o Agno (`agno.agent.Agent`) e as capacidades do LLM para converter tabelas complexas e fórmulas matemáticas em representações Markdown e LaTeX estruturadas.
-- [backend/agents/editor_agent.py](../backend/agents/editor_agent.py) *(motor legacy, desativado)*: `EditorAgent` higieniza o conteúdo e remove duplicatas de trechos repetidos por meio de impressões digitais de conteúdo (`content_fingerprint` em [backend/tools/text_tools.py](../backend/tools/text_tools.py), que normaliza o texto antes do hashing). A implementação atual usa `hash()` embutido do Python e deve ser trocada por um hashing estável mais tarde; o `ReaderAgent` usa as mesmas impressões digitais para descartar regiões repetidas entre páginas.
 - [backend/agents/state_manager.py](../backend/agents/state_manager.py): máquina de estados em memória para tarefas com suporte a cancelamento cooperativo.
-- [backend/agents/types.py](../backend/agents/types.py): contratos de dados compartilhados e tipos de tarefa (`RegionTask`).
 
 #### 0.2. Integração do Cliente de IA (`backend/ai/`)
 - [backend/ai/models/ai_client.py](../backend/ai/models/ai_client.py): inicializador central `get_agno_model()` que instancia envelopes de Model do Agno para Ollama ou OpenRouter com base nas configurações de ambiente.
@@ -40,11 +34,7 @@ Os itens marcados *(motor legacy, desativado)* só são alcançados pelo `Access
 #### 0.4. Ferramentas e Utilitários de Domínio (`backend/tools/`)
 - [backend/tools/logger.py](../backend/tools/logger.py): configuração centralizada do logger loguru.
 - [backend/tools/validators.py](../backend/tools/validators.py): validação de extensão e tamanho de arquivo.
-- [backend/tools/pdf_splitter.py](../backend/tools/pdf_splitter.py): divisor de PDF em páginas únicas.
-- [backend/tools/image_converter.py](../backend/tools/image_converter.py): conversão de página de PDF em PNG.
-- [backend/tools/image_enhancer.py](../backend/tools/image_enhancer.py): remoção de inclinação (deskew), contraste CLAHE e redução de ruído via OpenCV para páginas escaneadas.
 - [backend/tools/text_processor.py](../backend/tools/text_processor.py): normalização de texto e parsing de Markdown.
-- [backend/tools/image_tools.py](../backend/tools/image_tools.py): recorte de imagem e extração de regiões.
 - [backend/tools/prompt_tools.py](../backend/tools/prompt_tools.py): carregador de prompt e resolutor de templates.
 
 #### 0.5. Camada de Planejamento (`backend/core/`) — motor PDDL
@@ -89,7 +79,6 @@ O domínio PDDL vive em `backend/core/planning/domains/`. Os esquemas JSON (mani
 
 - [backend/pipeline/canonical_builder.py](../backend/pipeline/canonical_builder.py): constrói o documento canônico e a árvore de seções.
 - [backend/pipeline/sanitizer.py](../backend/pipeline/sanitizer.py): limpa o texto bruto, remove vazamentos de prompt e artefatos de Markdown.
-- [backend/pipeline/structure_parser.py](../backend/pipeline/structure_parser.py): parser compartilhado texto-para-blocos.
 - [backend/pipeline/validators.py](../backend/pipeline/validators.py): valida esquema, hierarquia de títulos, links e texto de saída; `audit_canonical_document` classifica problemas estruturais e de acessibilidade como `BLOCKER` ou `WARNING`.
 - [backend/export/pandoc_exporter.py](../backend/export/pandoc_exporter.py): coordenador único de exportação para validação, filtragem, criação do AST e despacho de renderizador; atua como guardiã determinística que interrompe a exportação quando a auditoria retorna qualquer `BLOCKER`.
 - [backend/export/renderers/](../backend/export/renderers/): renderizadores para TXT, DOCX, PDF e HTML.
@@ -153,8 +142,8 @@ O runtime AgentOS não faz parte de `ENABLED_INTERFACES`; ele é iniciado separa
 
 - **Framework Agno:** orquestração multiagente e interface unificada de LLM multimodal.
 - **Provedores de IA:** API Ollama (modelos locais como LLaVA/Qwen-VL) ou API OpenRouter (modelos em nuvem como Claude/GPT-4o).
-- **Bibliotecas de Processamento:** reportlab, python-docx, pypdf, edge-tts, aiogram, FastAPI.
-- **Desvios em remoção** ([ADR-0003](adr/0003-remote-only-operational-capabilities.pt-br.md), [#150](https://github.com/A11yDevs/acessilia/issues/150)): PyMuPDF, Pillow e OpenCV ainda são importados no core, `tools/formula_worker.py` importa o Docling, e a imagem ainda instala o Pandoc (usado no DOCX) e também TeX Live e veraPDF, que o core não usa mais desde que o PDF/UA passou a renderizar só na Toolbox. O dono-alvo é a Toolbox, onde o Docling já roda como provider.
+- **Bibliotecas de Processamento:** reportlab, python-docx, edge-tts, aiogram, FastAPI.
+- **Desvios em remoção** ([ADR-0003](adr/0003-remote-only-operational-capabilities.pt-br.md), [#150](https://github.com/A11yDevs/acessilia/issues/150)): o PyMuPDF ainda é importado pelo extrator do manifesto (`core/manifest/pymupdf_extractor.py`), as dependências ainda declaram Pillow, OpenCV e pypdf embora o backend não os importe mais, e a imagem ainda instala o Pandoc (usado no DOCX) e também TeX Live e veraPDF, que o core não usa mais desde que o PDF/UA passou a renderizar só na Toolbox. O dono-alvo é a Toolbox.
 
 ---
 

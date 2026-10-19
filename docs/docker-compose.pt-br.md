@@ -206,14 +206,9 @@ Para producao, use [producao-systemd.md](producao-systemd.md) ou rode
 
 ---
 
-## 7. Variantes de imagem
+## 7. Conteúdo da imagem
 
-| Variante | Tamanho aprox. | Docling local | Uso recomendado |
-|----------|----------------|---------------|-----------------|
-| **docling** | ~4-6 GB | ✅ Sim | Padrão; reconhecimento local de fórmulas |
-| **slim**   | ~2 GB   | ❌ Não | Testes rápidos, recursos limitados |
-
-Nas duas variantes a extração estrutural (regiões, tabelas, OCR) roda na Toolbox, não nesta imagem. No motor PDDL o Docling local serve apenas à cascata de imagens de fórmula (`FORMULA_IMAGE_CASCADE`, via [backend/tools/formula_worker.py](../backend/tools/formula_worker.py)), então a variante **slim** não tem essa etapa local do CodeFormula.
+Há uma única imagem, construída a partir de [infra/Dockerfile](../infra/Dockerfile). Ela não instala o Docling nem modelos locais de OCR ou de fórmulas: a extração estrutural (regiões, tabelas, OCR) e o reconhecimento de fórmulas (`math.recognize`) rodam na Toolbox. A imagem ainda instala Pandoc, TeX Live e veraPDF, que serão removidos ([#150](https://github.com/A11yDevs/acessilia/issues/150)).
 
 ---
 

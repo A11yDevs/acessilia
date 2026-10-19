@@ -68,7 +68,7 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 - Goal: avoid repeated file/page processing.
 - Implementation:
   - cache service: [backend/services/cache.py](../backend/services/cache.py)
-  - usage in flow: [backend/service.py](../backend/service.py) and [backend/agents/orchestrator.py](../backend/agents/orchestrator.py)
+  - usage in flow: [backend/service.py](../backend/service.py)
 
 ## UC-09 Safe single-instance operation
 - Primary actor: Operator.

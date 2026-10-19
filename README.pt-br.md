@@ -116,10 +116,7 @@ Ou abra-os diretamente no VS Code e execute as células com o suporte nativo a n
 
 ### Usando a imagem pronta
 
-Depois que o CI da `main` passa, o GitHub Actions publica automaticamente duas imagens Linux amd64 no GitHub Container Registry:
-
-- `main`: inclui Docling, RapidOCR e PyTorch CPU para análise estrutural completa;
-- `main-slim`: omite Docling, RapidOCR e PyTorch para uma distribuição menor.
+Quando a CI da `main` passa, o GitHub Actions publica automaticamente a imagem Linux amd64 `main` no GitHub Container Registry. A imagem não traz Docling nem modelos de OCR ou de fórmulas: a extração estrutural, o OCR e o reconhecimento de fórmulas rodam na Toolbox.
 
 ```bash
 docker pull ghcr.io/a11ydevs/acessilia:main
@@ -131,7 +128,7 @@ docker run --rm \
         ghcr.io/a11ydevs/acessilia:main
 ```
 
-Use `ghcr.io/a11ydevs/acessilia:main-slim` no mesmo comando para a variante slim. Para reproduzir uma versão exata, use `sha-<commit>` ou `sha-<commit>-slim`, mostradas na execução do workflow **Delivery**.
+Para reproduzir uma versão exata, use `sha-<commit>`, mostrada na execução do workflow **Delivery**.
 
 Para um servidor de producao com atualizacao automatica da `main`, use:
 
@@ -149,33 +146,14 @@ docker compose up -d --build
 
 O container expõe `8000` (API) e `8001` (web), persiste tudo em `./var` e roda o healthcheck em `/api/v1/health`.
 
-Para construir somente a variante slim:
+### Medindo o pipeline
+
+`scripts/benchmark_pipelines.py` executa o pipeline PDDL sobre um arquivo e grava um relatório com o tempo, um resumo da estrutura e os arquivos exportados:
 
 ```bash
-docker build -f infra/Dockerfile --build-arg WITH_DOCLING=false -t acessilia:slim .
-```
-
-### Cache de modelos Docling e RapidOCR
-
-Nenhum modelo é embutido nas imagens distribuídas. No primeiro processamento com Docling, os modelos são baixados em tempo de execução; por isso essa primeira conversão é mais lenta. O volume `/app/var` deve ser persistido para que execuções seguintes funcionem com os mesmos arquivos, inclusive sem rede.
-
-- Hugging Face: `/app/var/cache/huggingface` (`HF_HOME`)
-- RapidOCR: `/app/var/cache/rapidocr` (`RAPIDOCR_CACHE_DIR`)
-
-Comportamento:
-
-- Na primeira execução com Docling, os pesos são baixados para o volume ou copiados para ele.
-- Nas execuções seguintes, os arquivos são restaurados automaticamente antes de inicializar o `RapidOCR`.
-- Remover `./var` remove os caches e força um novo download.
-
-Exemplo:
-
-```bash
-docker run --rm -e STRUCTURER=docling -v "$PWD/var:/app/var" \
-        ghcr.io/a11ydevs/acessilia:main \
-        python scripts/benchmark_pipelines.py tests/fixtures/tutorials/java-oo-3pgs.pdf \
-        -o temp/output/regression-bench/java-oo-3pgs-offline/docling \
-        --mode normal --export-formats txt,pdf,pdf_ua --pddl-extractor-backend docling
+python scripts/benchmark_pipelines.py tests/fixtures/tutorials/java-oo-3pgs.pdf \
+        -o temp/output/benchmark/java-oo-3pgs \
+        --export-formats txt,pdf,pdf_ua
 ```
 
 ## Contribuindo

@@ -337,7 +337,7 @@ without going through the PDDL planner.
 - [pmv_agno_pddl.md](pmv_agno_pddl.md) — PDDL orchestration and the
   `dual-provider-fusion` method.
 - [architecture.md](architecture.md) — system architecture.
-- [patterns.md](patterns.md) — design patterns (pattern 12: deterministic
+- [patterns.md](patterns.md) — design patterns (pattern 10: deterministic
   fusion agent).
 - [drbench.md](drbench.md) — the Dr.DocBench benchmark that motivated the
   Tree Differ.

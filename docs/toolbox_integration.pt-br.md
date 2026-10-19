@@ -260,9 +260,6 @@ falha da tool. Não acrescente uma implementação local por trás dele (veja 2.
 
 ### 4.3 Integração no pipeline (se aplicável)
 
-- **Structurer** (`backend/tools/structurer.py`): se a capacidade produz regiões por
-  página, adicione um structurer novo em `get_structurer()` (ex.: `toolbox-layout` →
-  `ToolboxLayoutStructurer`).
 - **Fusão dual** (`backend/pipeline/fusion.py`): se a capacidade produz blocos
   canônicos, pode participar como provider em `extract_fused()`.
 - **Método PDDL** (`backend/core/planning/toolbox_gate.py`): se o handler de um
@@ -355,7 +352,7 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 | `TOOLBOX_PDF_UA_TIMEOUT_SECONDS` | `300` | Tempo máximo de espera pela renderização na Toolbox antes de reportar erro de exportação opcional |
 | `FUSION_MODE` | `single` | `single` (um provider) ou `dual` (dois providers + fusão) |
 | `FUSION_SECONDARY_PROVIDER` | `mineru` | Provider secundário para `FUSION_MODE=dual` |
-| `STRUCTURER` | `toolbox` | Motor de regiões do motor legacy desativado (`toolbox`, `toolbox-layout`, `pymupdf`). O motor PDDL o ignora na extração; ele ainda compõe a chave de cache |
+| `STRUCTURER` | `toolbox` | Sem uso: escolhia o motor de regiões do pipeline legacy, que foi removido. Ainda compõe a chave de cache e será removida |
 | `TOOLBOX_PAGE_OCR_PROVIDER` | `qwen3-vl-8b` | Transcrição VLM de página inteira (`document.ocr.page`) |
 | `TOOLBOX_ADJUDICATE_PROVIDER` | `qwen3-vl-8b` | Juiz pareado / transcrição de região (`document.adjudicate.*`) |
 | `TOOLBOX_TABLE_PROVIDER` | `qwen3-vl-8b` | Regeração de tabelas para o especialista de tabelas (`table.recognize`) |
@@ -395,7 +392,6 @@ service.py: _build_orchestrator()
 - `clients/page_ocr.py` — `document.ocr.page` (VLM de página inteira)
 - `clients/adjudicate.py` — `document.adjudicate.page` / `.region`
 - `clients/orientation.py` — `image.page.orient`
-- `backend/tools/structurer.py` — `get_structurer()` e seleção de structurer
 - `backend/core/manifest/toolbox_extractor.py` — `ToolboxManifestExtractor`
 - `backend/pipeline/fusion.py` — `extract_fused()` (fusão dual)
 - `backend/config/settings.py` — configuração da Toolbox
