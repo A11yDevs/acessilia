@@ -12,7 +12,7 @@ from backend.i18n import t
 MSG_SOURCE_NOT_FOUND = "Source file not found: {source_path}"
 #: Canonical English id for the hint raised when the optional Docling stack is absent from the environment.
 MSG_DOCLING_MISSING = (
-    "Docling is not installed. Run `poetry install` or `pip install docling`."
+    "Docling is not installed. Run `uv pip install docling`."
 )
 MSG_INCOMPATIBLE_STRUCTURER = (
     "Incompatible structurer: expected convert_document() or _process_document()."

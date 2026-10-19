@@ -10,10 +10,10 @@ Por constituição, o portão é o container: os testes devem passar dentro do D
 
 ```bash
 # Nativa
-poetry run pytest
+uv run pytest
 
 # Apenas um arquivo
-poetry run pytest tests/test_pddl_planning.py
+uv run pytest tests/test_pddl_planning.py
 
 # Container (o portão — o estágio `test` de infra/Dockerfile)
 docker build -f infra/Dockerfile --target test -t acessilia:test-docling .

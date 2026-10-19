@@ -5,15 +5,15 @@ and compares it against the PDDL+Toolbox pipeline output on the same input.
 
 Usage:
     # Single file with reference
-    poetry run python scripts/compare_pipelines.py tests/dataset/input/001.pdf \
+    uv run python scripts/compare_pipelines.py tests/dataset/input/001.pdf \
         --reference tests/dataset/intermediate/canonical-document/001.json
 
     # Batch mode (all dataset inputs)
-    poetry run python scripts/compare_pipelines.py tests/dataset/input/ --batch \
+    uv run python scripts/compare_pipelines.py tests/dataset/input/ --batch \
         --reference-dir tests/dataset/intermediate/canonical-document/
 
     # With custom output directory
-    poetry run python scripts/compare_pipelines.py input.pdf -o temp/output/comparison \
+    uv run python scripts/compare_pipelines.py input.pdf -o temp/output/comparison \
         --reference ref.json
 """
 

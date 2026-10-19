@@ -26,19 +26,18 @@ No LLM writes PDDL directly.
 - Python 3.11 or 3.12;
 - `docling==2.0.0`;
 - `docling-core==2.0.0`;
-- `agno==2.8.5`;
+- `agno==3.0.5`;
 - Fast Downward optional.
 
 ```bash
-poetry lock
-poetry install
-poetry run python scripts/generate_pmv_schemas.py
-poetry run pytest
+uv sync --extra dev
+uv run python scripts/generate_pmv_schemas.py
+uv run pytest
 ```
 
-The previous lock file was produced before Agno was added and does not include the new
-package. Regenerate it on your own macOS machine; the critical Docling and Agno versions
-are already pinned in `pyproject.toml`.
+Agno is pinned in `pyproject.toml` and locked in `uv.lock`. Docling is not a project
+dependency; install it into the environment with
+`uv pip install docling==2.0.0 docling-core==2.0.0`.
 
 Fast Downward is only required when using `--planner fast-downward` or
 `--planner both`. The `internal` backend is the PMV's reference planner and works
@@ -53,7 +52,7 @@ An Agno model can be injected via the `model` argument; the CLI needs no API key
 because it invokes the deterministic tool directly.
 
 ```bash
-poetry run a11y-pmv manifest document.pdf \
+uv run python scripts/pmv.py manifest document.pdf \
   -o output/processing-manifest.json \
   --no-ocr
 ```
@@ -85,7 +84,7 @@ The loader checks version, name, hashes and mandatory clauses. The compiler:
 6. validates the projection before invoking any planner.
 
 ```bash
-poetry run a11y-pmv plan output/processing-manifest.json \
+uv run python scripts/pmv.py plan output/processing-manifest.json \
   -o output
 ```
 
@@ -93,7 +92,7 @@ By default, obligations already marked as `selected` are the roots. If none are
 marked, all unsatisfied obligations are selected. To choose specific roots:
 
 ```bash
-poetry run a11y-pmv plan output/processing-manifest.json \
+uv run python scripts/pmv.py plan output/processing-manifest.json \
   -o output \
   --select obligation-describe-image-000012
 ```
@@ -103,7 +102,7 @@ poetry run a11y-pmv plan output/processing-manifest.json \
 Internal planner:
 
 ```bash
-poetry run a11y-pmv plan output/processing-manifest.json \
+uv run python scripts/pmv.py plan output/processing-manifest.json \
   -o output \
   --planner internal
 ```
@@ -111,7 +110,7 @@ poetry run a11y-pmv plan output/processing-manifest.json \
 Fast Downward:
 
 ```bash
-poetry run a11y-pmv plan output/processing-manifest.json \
+uv run python scripts/pmv.py plan output/processing-manifest.json \
   -o output \
   --planner fast-downward \
   --fast-downward /path/to/fast-downward.py \
@@ -132,7 +131,7 @@ validating the PMV.
 For differential studies:
 
 ```bash
-poetry run a11y-pmv plan output/processing-manifest.json \
+uv run python scripts/pmv.py plan output/processing-manifest.json \
   -o output \
   --planner both \
   --fast-downward /path/to/fast-downward.py \
@@ -218,7 +217,7 @@ in sequence and stops on the first error.
 Dry-run, without confirming effects:
 
 ```bash
-poetry run a11y-pmv execute \
+uv run python scripts/pmv.py execute \
   output/processing-manifest.json \
   output/nominal-plan.json \
   -o output/execution
@@ -227,7 +226,7 @@ poetry run a11y-pmv execute \
 Real execution requires handlers:
 
 ```bash
-poetry run a11y-pmv execute \
+uv run python scripts/pmv.py execute \
   output/processing-manifest.json \
   output/nominal-plan.json \
   -o output/execution \
@@ -325,7 +324,7 @@ planner only reaches for them when the deterministic path is unavailable.
 ## 6. End-to-end execution
 
 ```bash
-poetry run a11y-pmv pipeline document.pdf \
+uv run python scripts/pmv.py pipeline document.pdf \
   -o output/job-001 \
   --no-ocr \
   --planner both \
@@ -362,7 +361,7 @@ output/job-001/
 The three JSON Schemas are generated from the Pydantic models:
 
 ```bash
-poetry run python scripts/generate_pmv_schemas.py
+uv run python scripts/generate_pmv_schemas.py
 ```
 
 CI must fail if any generated file diverges from the versioned schemas.
