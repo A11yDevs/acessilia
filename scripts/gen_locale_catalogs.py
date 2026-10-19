@@ -40,11 +40,6 @@ from backend.core.execution.messages import (
     EXE_START_JOB_INVALID_STATE,
     EXE_UNKNOWN_ACTION,
 )
-from backend.core.manifest.docling_extractor import (
-    MSG_DOCLING_MISSING,
-    MSG_INCOMPATIBLE_STRUCTURER,
-    MSG_SOURCE_NOT_FOUND,
-)
 from backend.log_messages import (
     API_CANCEL_STATE_INVALID,
     API_FILE_NOT_FOUND,
@@ -183,7 +178,6 @@ from backend.log_messages import (
     LOG_WORKER_TASK_ERROR,
     LOG_WORKER_TASK_STARTING,
     MSG_PLANNER_NOT_STARTED,
-    MSG_SOURCE_FILE_MISSING,
     MSG_OBLIGATION_CODE,
     MSG_OBLIGATION_FORMULA,
     MSG_OBLIGATION_IMAGE,
@@ -552,13 +546,6 @@ MESSAGES: tuple[str, ...] = (
     MSG_OBLIGATION_UNSTRUCTURED_PAGE,
     MSG_OBSERVATION_PAGE_WITHOUT_STRUCTURE,
     MSG_HEADING_GAP,
-    MSG_SOURCE_FILE_MISSING,
-    # Docling-structural-attachment extraction diagnostics (backend/core/manifest/docling_extractor.py),
-    # surfaced as RuntimeError/ValueError text when the optional Docling stack is absent or its document
-    # structurer is incompatible; {source_path} substituted at call time via .format().
-    MSG_SOURCE_NOT_FOUND,
-    MSG_DOCLING_MISSING,
-    MSG_INCOMPATIBLE_STRUCTURER,
     # Nominal-plan executor error and status messages (backend/core/execution/messages.py),
     # raised or recorded by ExecutorAgent/MethodRegistry; placeholders substituted at call time.
     EXE_METHOD_NAME_REQUIRED,
@@ -944,15 +931,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "\n• Markdown"
             "\n• PDF pesquisável"
         ),
-        # Docling extractor diagnostics (backend/core/manifest/docling_extractor.py).
-        MSG_SOURCE_NOT_FOUND: "Arquivo de origem não encontrado: {source_path}",
-        MSG_DOCLING_MISSING: (
-            "Não há structurer Docling local: passe um explicitamente ou extraia a "
-            "estrutura na Toolbox."
-        ),
-        MSG_INCOMPATIBLE_STRUCTURER: (
-            "Structurer incompatível: esperado convert_document() ou _process_document()."
-        ),
         # Nominal-plan executor diagnostics (backend/core/execution/messages.py): pt-BR mirror preserving the original wording.
         EXE_METHOD_NAME_REQUIRED: "O nome do método não pode ser vazio",
         EXE_PLAN_DIFFERENT_DOMAIN: "O plano usa outro domínio PDDL",
@@ -1130,7 +1108,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "A hierarquia de títulos salta do nível {previous} para o nível {level}."
         ),
         # PyMuPDF extraction fallback when the source file is missing on disk at lookup time; substituted at call time via .format().
-        MSG_SOURCE_FILE_MISSING: ("Documento não encontrado: {source_path}"),
         # Model validation failure text for a planner outcome recorded before execution actually began.
         MSG_PLANNER_NOT_STARTED: ("A tentativa terminou antes de começar"),
         # Failure for execute-obligation steps missing required execution parameters in NominalPlan validation of PlanSteps.

@@ -143,7 +143,7 @@ The AgentOS runtime is not part of `ENABLED_INTERFACES`; it is started separatel
 - **Agno Framework:** multi-agent orchestration and unified multimodal LLM interface.
 - **AI Providers:** Ollama API (local models like LLaVA/Qwen-VL) or OpenRouter API (cloud models like Claude/GPT-4o).
 - **Processing Libraries:** reportlab, edge-tts, aiogram, FastAPI.
-- **Deviations being removed** ([ADR-0003](adr/0003-remote-only-operational-capabilities.md), [#150](https://github.com/A11yDevs/acessilia/issues/150)): PyMuPDF is still imported by the manifest extractor (`core/manifest/pymupdf_extractor.py`); its target owner is the Toolbox. Pandoc, TeX Live, veraPDF and the OCR and media libraries are no longer in the image, since DOCX and PDF/UA render only on the Toolbox; NumPy and OpenCV left the dependencies together with the Dr.DocBench experiment scripts (tag `drbench-2026-snapshot`); Pillow stays in the image as a requirement of reportlab.
+- **No local executors remain** ([ADR-0003](adr/0003-remote-only-operational-capabilities.md), [#150](https://github.com/A11yDevs/acessilia/issues/150)): the manifest is extracted only through `ToolboxManifestExtractor`, and PyMuPDF is a development dependency used by tests to build PDFs. `tests/test_architecture_layers.py` fails if `backend/` or `frontend/` imports an operational library (PyMuPDF, Pillow, OpenCV, Docling, pypdf, python-docx, RapidOCR). Pandoc, TeX Live, veraPDF and the OCR and media libraries are no longer in the image, since DOCX and PDF/UA render only on the Toolbox; NumPy and OpenCV left the dependencies together with the Dr.DocBench experiment scripts (tag `drbench-2026-snapshot`); Pillow stays in the image as a requirement of reportlab.
 
 ---
 

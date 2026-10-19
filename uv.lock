@@ -28,7 +28,6 @@ dependencies = [
     { name = "openai" },
     { name = "pillow" },
     { name = "pydantic" },
-    { name = "pymupdf" },
     { name = "python-dotenv" },
     { name = "python-multipart" },
     { name = "reportlab" },
@@ -39,6 +38,7 @@ dependencies = [
 
 [package.optional-dependencies]
 dev = [
+    { name = "pymupdf" },
     { name = "pypdf" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -65,7 +65,7 @@ requires-dist = [
     { name = "openai", specifier = ">=2.45.0,<3" },
     { name = "pillow", specifier = ">=10.4,<11" },
     { name = "pydantic", specifier = ">=2.10,<3" },
-    { name = "pymupdf", specifier = ">=1.24,<2" },
+    { name = "pymupdf", marker = "extra == 'dev'", specifier = ">=1.24,<2" },
     { name = "pypdf", marker = "extra == 'dev'", specifier = ">=6.14.2,<7" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.1.1,<10" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=1.4.0,<2" },

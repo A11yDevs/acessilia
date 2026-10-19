@@ -550,28 +550,6 @@ msgstr ""
 msgid "Title hierarchy jumps from level {previous} to level {level}."
 msgstr "Title hierarchy jumps from level {previous} to level {level}."
 
-#, python-brace-format
-msgid "Document not found: {source_path}"
-msgstr "Document not found: {source_path}"
-
-#, python-brace-format
-msgid "Source file not found: {source_path}"
-msgstr "Source file not found: {source_path}"
-
-msgid ""
-"No local Docling structurer: pass one explicitly, or extract the "
-"structure on the Toolbox."
-msgstr ""
-"No local Docling structurer: pass one explicitly, or extract the "
-"structure on the Toolbox."
-
-msgid ""
-"Incompatible structurer: expected convert_document() or "
-"_process_document()."
-msgstr ""
-"Incompatible structurer: expected convert_document() or "
-"_process_document()."
-
 msgid "Method name cannot be empty"
 msgstr "Method name cannot be empty"
 
