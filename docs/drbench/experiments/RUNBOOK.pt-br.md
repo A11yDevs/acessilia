@@ -24,8 +24,9 @@ de inferência. É isso que torna uma execução registrada reproduzível sem GP
 ## 1. Reconstruir o ambiente
 
 ```bash
-# Core + biblioteca, pinados pelo lockfile
-uv sync --frozen
+# Core + biblioteca + dependências de teste (pytest, numpy), pinados pelo lockfile;
+# acrescente --extra drbench para o OpenCV (scripts/drbench/experiments/differ/orient_pages.py)
+uv sync --frozen --extra dev
 
 # Os testes da biblioteca devem passar sem o backend instalado
 uv run pytest libs/docstruct/tests
@@ -35,7 +36,7 @@ uv run pytest libs/docstruct/tests
 uv run pytest -m "not e2e"
 ```
 
-O lockfile é `uv.lock` (91 pacotes). O `pyproject.toml` declara
+O lockfile é `uv.lock` (90 pacotes). O `pyproject.toml` declara
 `acessilia-docstruct` como fonte de caminho editável, então `uv sync` instala a
 biblioteca a partir de `libs/docstruct`.
 
