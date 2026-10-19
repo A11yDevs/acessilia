@@ -48,16 +48,8 @@ def _normalized_engine() -> str:
     )
 
 
-def _resolved_structurer() -> str:
-    structurer = settings.structurer.strip().lower()
-    if structurer in ("toolbox", "toolbox-layout", "toolbox_layout"):
-        logger.info("STRUCTURER={}: usando Acessilia Toolbox remota", structurer)
-    return structurer
-
-
 def _build_orchestrator():
     if _normalized_engine() == "pddl":
-        _resolved_structurer()
         fast_downward = (
             Path(settings.pddl_fast_downward).expanduser()
             if settings.pddl_fast_downward.strip()
@@ -87,9 +79,8 @@ def _cache_version(
     thinking_mode: bool = False,
 ) -> str:
     engine = _normalized_engine()
-    structurer = _resolved_structurer()
     return options_cache_key(
-        f"{settings.ai_client}-{engine}-{structurer}-v9",
+        f"{settings.ai_client}-{engine}-v10",
         mode=mode,
         custom_prompt=custom_prompt or "",
         thinking_mode=thinking_mode,
