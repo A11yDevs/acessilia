@@ -989,8 +989,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         # Docling extractor diagnostics (backend/core/manifest/docling_extractor.py).
         MSG_SOURCE_NOT_FOUND: "Arquivo de origem não encontrado: {source_path}",
         MSG_DOCLING_MISSING: (
-            "Docling não está instalado. Execute `poetry install` ou " +
-            "`pip install docling`."
+            "Docling não está instalado. Execute `uv pip install docling`."
         ),
         MSG_INCOMPATIBLE_STRUCTURER: (
             "Structurer incompatível: esperado convert_document() ou _process_document()."
@@ -1752,7 +1751,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         ),
         LOG_STALE_PROCESS_INTERRUPTED: "Obsoleta: processo interrompido",
         LOG_AGNO_NOT_INSTALLED: (
-            "Agno não está instalado. Execute `poetry install` antes de usar "
+            "Agno não está instalado. Execute `uv sync` antes de usar "
             "o workflow Executor."
         ),
     },

@@ -92,7 +92,7 @@ git rebase origin/develop
 Antes de abrir o Pull Request, garanta que os testes estão passando:
 
 ```bash
-poetry run pytest tests/ -v
+uv run pytest tests/ -v
 ```
 
 A esteira de CI rodará automaticamente os testes no GitHub. O PR só poderá ser revisado se **todos os testes estiverem verdes**.
@@ -353,19 +353,19 @@ DRY_RUN=1 ./scripts/setup-rulesets.sh
 # Clone e instale dependências
 git clone git@github.com:A11yDevs/acessilia.git
 cd acessilia
-poetry install
+uv sync --extra dev   # usa o Python 3.11 fixado em .python-version
 
 # Configure as variáveis de ambiente
 cp .env.example .env
 
 # Execute os testes para verificar se está tudo ok
-poetry run pytest
+uv run pytest
 ```
 
 ## Pull Requests
 
 1. Certifique-se de que sua branch está atualizada com a `develop` (`git rebase origin/develop`).
-2. Execute `poetry run pytest` e veja se todos os testes passam.
+2. Execute `uv run pytest` e veja se todos os testes passam.
 3. Descreva claramente o que o PR faz e qual problema resolve.
 4. Referencie issues relacionadas (ex.: `Closes #42`).
 5. Aguarde a revisão e ajuste se necessário.

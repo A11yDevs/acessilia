@@ -473,5 +473,5 @@ LOG_STRUCTURER_FALLBACK_PYMUPDF: str = (
 LOG_STRUCTURER_PYMUPDF: str = "Using structurer: PyMuPDF"
 #: Error raised when the optional Agno agent stack is absent and a workflow class import is required; no placeholders.
 LOG_AGNO_NOT_INSTALLED: str = (
-    "Agno is not installed. Run `poetry install` before using the workflow Executor."
+    "Agno is not installed. Run `uv sync` before using the workflow Executor."
 )

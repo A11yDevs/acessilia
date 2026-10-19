@@ -10,10 +10,10 @@ By constitution, the gate is the container: tests must pass inside Docker (produ
 
 ```bash
 # Native
-poetry run pytest
+uv run pytest
 
 # A single file only
-poetry run pytest tests/test_pddl_planning.py
+uv run pytest tests/test_pddl_planning.py
 
 # Container (the gate — the `test` stage of infra/Dockerfile)
 docker build -f infra/Dockerfile --target test -t acessilia:test-docling .
