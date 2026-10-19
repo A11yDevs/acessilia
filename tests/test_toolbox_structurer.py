@@ -161,3 +161,18 @@ def test_region_metadata_contains_source_toolbox(mock_client):
 
     for r in regions:
         assert r.metadata.get("source") == "toolbox"
+
+@pytest.mark.parametrize("use_remote_cache", [True, False])
+def test_fetch_forwards_the_remote_cache_setting(monkeypatch, use_remote_cache):
+    """TOOLBOX_USE_REMOTE_CACHE reaches the structure client."""
+    import asyncio
+
+    from backend.config.settings import settings
+
+    monkeypatch.setattr(settings, "toolbox_use_remote_cache", use_remote_cache)
+    client = AsyncMock(spec=ToolboxStructureClient)
+    client.extract_structure = AsyncMock(return_value=SAMPLE_TOOLBOX_RESPONSE)
+
+    asyncio.run(ToolboxStructurer(client=client)._fetch_document_structure(FIXTURE_PDF))
+
+    assert client.extract_structure.call_args.kwargs["use_remote_cache"] is use_remote_cache

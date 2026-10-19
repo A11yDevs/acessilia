@@ -151,7 +151,7 @@ no core**. Basta:
 
 ### Verificação
 
-- Unit: `tests/test_toolbox_client.py` (mock respx) — verifica que o provider é
+- Unit: `libs/sdk/tests/clients/test_structure.py` (mock respx) — verifica que o provider é
   enviado no form e que os erros HTTP são mapeados para as exceções tipadas.
 - E2E: `tests/test_toolbox_e2e.py` (marcador `e2e`) — contra `TOOLBOX_BASE_URL` real.
 
@@ -289,7 +289,7 @@ disponível.
 
 ### 4.4 Tests
 
-- **Unit** (mock respx): no estilo de `tests/test_toolbox_client.py` — verifica o
+- **Unit** (mock respx): em `libs/sdk/tests/clients/`, como os testes de cliente existentes — verifica o
   mapeamento de erros HTTP para exceções tipadas e o envio do provider.
 - **E2E** (marcador `e2e`): no estilo de `tests/test_toolbox_e2e.py` — contra
   `TOOLBOX_BASE_URL` real; é ignorado se a variável não estiver definida.

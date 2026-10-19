@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Any
 
 import httpx
 
 from acessilia_sdk.toolbox.artifacts import ArtifactRef, download_artifact
-from acessilia_sdk.toolbox.catalog import CatalogCache
-from acessilia_sdk.toolbox.client import ToolboxCapabilityClient, _require_published
+from acessilia_sdk.toolbox.client import ToolboxCapabilityClient
 from acessilia_sdk.toolbox.errors import ToolboxContractViolation
 from acessilia_sdk.toolbox.transport import media_type_for
 
@@ -22,17 +24,18 @@ class ToolboxArtifactClient(ToolboxCapabilityClient):
     async def upload(self, file_path: Path) -> str:
         """Store ``file_path`` and return its ``artifact_id``.
 
-        Replicas behind one load balancer share the store, so the id is valid
-        on all of them (docs/adr/0006).
+        The file is streamed from disk, reopened on each retry. Replicas behind
+        one load balancer share the store, so the id is valid on all of them
+        (docs/adr/0006).
         """
 
-        def files() -> dict[str, tuple[str, bytes, str]]:
-            return {
-                "file": (file_path.name, file_path.read_bytes(), media_type_for(file_path))
-            }
+        @contextmanager
+        def files() -> Iterator[dict[str, Any]]:
+            with open(file_path, "rb") as stream:
+                yield {"file": (file_path.name, stream, media_type_for(file_path))}
 
         _, response = await self._request_on(
-            "POST", "/v1/artifacts", capability_id=STORE_CAPABILITY, files=files
+            "POST", "/v1/artifacts", capability_id=STORE_CAPABILITY, files_factory=files
         )
         try:
             data = response.json()
@@ -50,16 +53,17 @@ class ToolboxArtifactClient(ToolboxCapabilityClient):
     async def download(
         self, artifact_id: str, destination: Path, *, magic: bytes | None = None
     ) -> None:
-        """Download ``artifact_id`` to ``destination``, checked against its digest."""
+        """Download ``artifact_id`` to ``destination``, checked against its digest.
+
+        The body is streamed by :func:`~acessilia_sdk.toolbox.artifacts.download_artifact`
+        from whichever endpoint answers.
+        """
         ref = ArtifactRef.parse(artifact_id)
 
         async def call(http: httpx.AsyncClient) -> None:
             await download_artifact(http, ref, destination, magic=magic)
 
-        async def check(catalog: CatalogCache) -> None:
-            await _require_published(catalog, RETRIEVE_CAPABILITY)
-
-        await self._with_failover(call, check)
+        await self._rest_with_failover(RETRIEVE_CAPABILITY, call)
 
 
 __all__ = ["RETRIEVE_CAPABILITY", "STORE_CAPABILITY", "ToolboxArtifactClient"]

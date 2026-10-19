@@ -125,7 +125,9 @@ async def extract_fused(
             if artifact_id:
                 try:
                     return await client.extract_structure(
-                        artifact_id=artifact_id, language=language
+                        artifact_id=artifact_id,
+                        language=language,
+                        use_remote_cache=settings.toolbox_use_remote_cache,
                     )
                 except ToolboxArtifactNotFound:
                     logger.info(
@@ -133,7 +135,11 @@ async def extract_fused(
                         artifact_id,
                         provider,
                     )
-            return await client.extract_structure(file_path, language=language)
+            return await client.extract_structure(
+                file_path,
+                language=language,
+                use_remote_cache=settings.toolbox_use_remote_cache,
+            )
         except ToolboxError as exc:
             failures[provider] = exc
             logger.info("Fusion: provider {} failed ({})", provider, type(exc).__name__)

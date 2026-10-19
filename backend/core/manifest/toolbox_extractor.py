@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any
 from backend.config.settings import settings
 from backend.tools.logger import logger
 from acessilia_sdk.toolbox.clients import ToolboxArtifactClient, ToolboxStructureClient
-from backend.tools.toolbox_client import ToolboxError, make_toolbox_client, toolbox_endpoints
+from backend.tools.toolbox_client import ToolboxError, make_toolbox_client
 
 if TYPE_CHECKING:
     from docstruct.policy import FusionPolicy
@@ -71,16 +71,6 @@ class ToolboxManifestExtractor:
             if use_remote_cache is not None
             else settings.toolbox_use_remote_cache
         )
-
-    @property
-    def provider(self) -> str:
-        """The primary structure-extraction provider."""
-        return self._client.provider if self._client else settings.toolbox_provider
-
-    @property
-    def base_url(self) -> str:
-        """The primary Toolbox endpoint."""
-        return self._client.base_url if self._client else toolbox_endpoints()[0].base_url
 
     def extract(self, source_path: Path) -> ToolboxExtraction:
         """Extrai a estrutura de um documento usando a Toolbox (síncrono).

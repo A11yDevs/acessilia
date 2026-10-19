@@ -10,6 +10,7 @@ from backend.tools.region_extractor import Region, extract_regions
 from backend.tools.structurer import BaseStructurer
 from acessilia_sdk.toolbox.clients import ToolboxStructureClient
 from backend.tools.toolbox_client import make_toolbox_client
+from backend.config.settings import settings
 from backend.tools.logger import logger
 
 
@@ -52,6 +53,7 @@ class ToolboxStructurer(BaseStructurer):
             result = await client.extract_structure(
                 file_path=file_path,
                 language="pt-BR",
+                use_remote_cache=settings.toolbox_use_remote_cache,
             )
         finally:
             if self._client is None:

@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import random
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
+from contextlib import AbstractContextManager
 from functools import partial
 from typing import Any, ClassVar, TypeVar
 
@@ -50,6 +51,9 @@ FailoverHook = Callable[[ToolboxEndpoint, ToolboxError], None]
 _sleep = asyncio.sleep
 
 T = TypeVar("T")
+
+#: Builds the multipart ``files`` mapping for one attempt (see ``_request_on``).
+FilesFactory = Callable[[], AbstractContextManager[Mapping[str, Any]]]
 
 
 class ToolboxCapabilityClient:
@@ -192,29 +196,29 @@ class ToolboxCapabilityClient:
         *,
         capability_id: str,
         timeout_seconds: float | None = None,
+        files_factory: FilesFactory | None = None,
         **kwargs: Any,
     ) -> tuple[httpx.AsyncClient, httpx.Response]:
         """A request to a dedicated REST route, with the same failover and retries.
 
-        ``capability_id`` names the ``rest`` capability the route implements;
-        it labels errors and, on a secondary endpoint, is checked against that
-        endpoint's catalogue. Returns the HTTP client of the endpoint that
-        answered and its successful response.
+        ``capability_id`` names the ``rest`` capability the route implements
+        (see :meth:`_rest_with_failover`). ``files_factory`` builds the
+        multipart files for each attempt: a callable returning a context
+        manager that yields the ``files`` mapping, so a file can be opened,
+        streamed and closed again on every retry. Other keyword arguments go
+        to ``httpx.AsyncClient.request``. Returns the HTTP client of the
+        endpoint that answered and its successful response.
         """
-        spec = TOOLBOX_CAPABILITIES.get(capability_id)
-        if spec is None or spec.transport != "rest":
-            raise ToolboxCapabilityError(
-                f"{capability_id} is not a registered REST capability"
-            )
         if timeout_seconds is not None:
             kwargs["timeout"] = httpx.Timeout(timeout_seconds)
-        files = kwargs.pop("files", None)
 
         async def call(http: httpx.AsyncClient) -> httpx.Response:
             try:
-                response = await http.request(
-                    method, path, files=files() if files else None, **kwargs
-                )
+                if files_factory is None:
+                    response = await http.request(method, path, **kwargs)
+                else:
+                    with files_factory() as files:
+                        response = await http.request(method, path, files=files, **kwargs)
             except httpx.TimeoutException as e:
                 raise ToolboxTimeout(f"Timed out on {method} {path}: {e}") from e
             except httpx.RequestError as e:
@@ -223,6 +227,27 @@ class ToolboxCapabilityClient:
                 ) from e
             raise_for_error(response, capability_id)
             return response
+
+        return await self._rest_with_failover(capability_id, call)
+
+    async def _rest_with_failover(
+        self,
+        capability_id: str,
+        call: Callable[[httpx.AsyncClient], Awaitable[T]],
+    ) -> tuple[httpx.AsyncClient, T]:
+        """Run ``call`` against a REST capability with failover and retries.
+
+        Only capabilities registered with ``transport="rest"`` are accepted. On
+        a secondary endpoint the capability must be published at the expected
+        version (REST capabilities have no provider to check). Use it directly
+        when ``call`` needs the HTTP client itself, for example to stream a
+        download; otherwise use :meth:`_request_on`.
+        """
+        spec = TOOLBOX_CAPABILITIES.get(capability_id)
+        if spec is None or spec.transport != "rest":
+            raise ToolboxCapabilityError(
+                f"{capability_id} is not a registered REST capability"
+            )
 
         async def check(catalog: CatalogCache) -> None:
             await _require_published(catalog, capability_id)
@@ -397,4 +422,9 @@ async def _health(http: httpx.AsyncClient, base_url: str) -> dict[str, Any]:
     return response.json()
 
 
-__all__ = ["DEFAULT_TIMEOUT_SECONDS", "FailoverHook", "ToolboxCapabilityClient"]
+__all__ = [
+    "DEFAULT_TIMEOUT_SECONDS",
+    "FailoverHook",
+    "FilesFactory",
+    "ToolboxCapabilityClient",
+]

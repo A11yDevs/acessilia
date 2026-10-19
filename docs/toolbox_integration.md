@@ -151,7 +151,7 @@ Just:
 
 ### Verification
 
-- Unit: `tests/test_toolbox_client.py` (respx mock) — verifies the provider is sent in
+- Unit: `libs/sdk/tests/clients/test_structure.py` (respx mock) — verifies the provider is sent in
   the form and that HTTP errors map to typed exceptions.
 - E2E: `tests/test_toolbox_e2e.py` (`e2e` marker) — against a real `TOOLBOX_BASE_URL`.
 
@@ -288,7 +288,7 @@ available.
 
 ### 4.4 Tests
 
-- **Unit** (respx mock): `tests/test_toolbox_client.py`-style — verifies the mapping of
+- **Unit** (respx mock): in `libs/sdk/tests/clients/`, like the existing client tests — verifies the mapping of
   HTTP errors to typed exceptions and the provider being sent.
 - **E2E** (`e2e` marker): `tests/test_toolbox_e2e.py`-style — against a real
   `TOOLBOX_BASE_URL`; skipped if the variable is not set.

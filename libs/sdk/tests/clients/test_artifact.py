@@ -102,3 +102,25 @@ async def test_download_not_found(respx_mock, client, tmp_path):
     )
     with pytest.raises(ToolboxArtifactNotFound):
         await client.download(ARTIFACT_ID, tmp_path / "out.pdf")
+
+
+@pytest.mark.asyncio
+async def test_upload_reopens_the_file_on_each_retry(respx_mock, monkeypatch):
+    from acessilia_sdk.toolbox import client as client_module
+
+    async def no_wait(_delay):
+        return None
+
+    monkeypatch.setattr(client_module, "_sleep", no_wait)
+    client = ToolboxArtifactClient(base_url=BASE_URL, retries=1)
+    route = respx_mock.post(f"{BASE_URL}/v1/artifacts").mock(
+        side_effect=[
+            httpx.Response(503, json={"detail": "busy"}),
+            httpx.Response(201, json={"artifact_id": ARTIFACT_ID}),
+        ]
+    )
+
+    assert await client.upload(FIXTURE_PDF) == ARTIFACT_ID
+
+    first, second = (call.request.content for call in route.calls)
+    assert CONTENT in first and CONTENT in second

@@ -7,6 +7,15 @@ from typing import Any
 from acessilia_sdk.toolbox.client import ToolboxCapabilityClient
 from acessilia_sdk.toolbox.errors import ToolboxContractViolation
 
+LIST_CAPABILITY = "dataset.list"
+DESCRIBE_CAPABILITY = "dataset.describe"
+LIST_SPLITS_CAPABILITY = "dataset.list_splits"
+LIST_ITEMS_CAPABILITY = "dataset.list_items"
+GET_ITEM_CAPABILITY = "dataset.get_item"
+GET_ARTIFACT_CAPABILITY = "dataset.get_artifact"
+SAMPLE_CAPABILITY = "dataset.sample"
+SYNC_CAPABILITY = "dataset.sync"
+
 #: ``dataset.sync`` re-mirrors whole datasets; it gets at least this timeout.
 SYNC_MIN_TIMEOUT_SECONDS = 1800
 
@@ -16,14 +25,14 @@ class ToolboxDatasetClient(ToolboxCapabilityClient):
 
     async def list_datasets(self) -> list[dict[str, Any]]:
         """``GET /v1/datasets``."""
-        return await self._json("GET", "/v1/datasets", "dataset.list")
+        return await self._json("GET", "/v1/datasets", LIST_CAPABILITY)
 
     async def describe_dataset(
         self, dataset_id: str, revision: str | None = None
     ) -> dict[str, Any]:
         """``GET /v1/datasets/{dataset_id}``."""
         return await self._json(
-            "GET", f"/v1/datasets/{dataset_id}", "dataset.describe", _revision(revision)
+            "GET", f"/v1/datasets/{dataset_id}", DESCRIBE_CAPABILITY, _revision(revision)
         )
 
     async def list_splits(
@@ -33,7 +42,7 @@ class ToolboxDatasetClient(ToolboxCapabilityClient):
         return await self._json(
             "GET",
             f"/v1/datasets/{dataset_id}/splits",
-            "dataset.list_splits",
+            LIST_SPLITS_CAPABILITY,
             _revision(revision),
         )
 
@@ -49,7 +58,7 @@ class ToolboxDatasetClient(ToolboxCapabilityClient):
         return await self._json(
             "GET",
             f"/v1/datasets/{dataset_id}/splits/{split}/items",
-            "dataset.list_items",
+            LIST_ITEMS_CAPABILITY,
             {"limit": limit, "offset": offset, **_revision(revision)},
         )
 
@@ -64,7 +73,7 @@ class ToolboxDatasetClient(ToolboxCapabilityClient):
         return await self._json(
             "GET",
             f"/v1/datasets/{dataset_id}/splits/{split}/items/{item_id}",
-            "dataset.get_item",
+            GET_ITEM_CAPABILITY,
             _revision(revision),
         )
 
@@ -80,7 +89,7 @@ class ToolboxDatasetClient(ToolboxCapabilityClient):
         _, response = await self._request_on(
             "GET",
             f"/v1/datasets/{dataset_id}/splits/{split}/items/{item_id}/artifacts/{artifact_path}",
-            capability_id="dataset.get_artifact",
+            capability_id=GET_ARTIFACT_CAPABILITY,
             params=_revision(revision),
         )
         return response.content
@@ -96,7 +105,7 @@ class ToolboxDatasetClient(ToolboxCapabilityClient):
         return await self._json(
             "GET",
             f"/v1/datasets/{dataset_id}/splits/{split}/sample",
-            "dataset.sample",
+            SAMPLE_CAPABILITY,
             {"n": n, **_revision(revision)},
         )
 
@@ -119,7 +128,7 @@ class ToolboxDatasetClient(ToolboxCapabilityClient):
         return await self._json(
             "POST",
             f"/v1/datasets/{dataset_id}/sync",
-            "dataset.sync",
+            SYNC_CAPABILITY,
             params,
             timeout_seconds=timeout_seconds
             or max(self.timeout_seconds, SYNC_MIN_TIMEOUT_SECONDS),
@@ -153,4 +162,15 @@ def _revision(revision: str | None) -> dict[str, Any]:
     return {"revision": revision} if revision else {}
 
 
-__all__ = ["SYNC_MIN_TIMEOUT_SECONDS", "ToolboxDatasetClient"]
+__all__ = [
+    "DESCRIBE_CAPABILITY",
+    "GET_ARTIFACT_CAPABILITY",
+    "GET_ITEM_CAPABILITY",
+    "LIST_CAPABILITY",
+    "LIST_ITEMS_CAPABILITY",
+    "LIST_SPLITS_CAPABILITY",
+    "SAMPLE_CAPABILITY",
+    "SYNC_CAPABILITY",
+    "SYNC_MIN_TIMEOUT_SECONDS",
+    "ToolboxDatasetClient",
+]

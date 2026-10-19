@@ -267,7 +267,7 @@ class _FakeClient:
 
 
 class _RecordingToolbox:
-    """Fake ``ToolboxClient`` factory that records, in order, how each
+    """Fake ``_structure_client`` factory that records, in order, how each
     provider received the document. State lives on the instance, so every
     test gets its own recorder."""
 
@@ -336,3 +336,33 @@ async def test_extract_fused_uploads_when_the_artifact_is_gone(monkeypatch):
             (provider, "art-1", None),
             (provider, None, "doc.pdf"),
         ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("use_remote_cache", [True, False])
+@pytest.mark.parametrize("artifact_id", [None, "sha256:abc"])
+async def test_extract_fused_forwards_the_remote_cache_setting(
+    monkeypatch, use_remote_cache, artifact_id
+):
+    """TOOLBOX_USE_REMOTE_CACHE reaches every extraction, by file or by artifact."""
+    from backend.config.settings import settings
+
+    monkeypatch.setattr(settings, "toolbox_use_remote_cache", use_remote_cache)
+    seen: list[object] = []
+
+    class Client:
+        def __init__(self, provider):
+            self.provider = provider
+
+        async def extract_structure(self, *args, **kwargs):
+            seen.append(kwargs.get("use_remote_cache"))
+            return _payload([_el("texto", 0)])
+
+        async def close(self):
+            pass
+
+    monkeypatch.setattr("backend.pipeline.fusion._structure_client", Client)
+
+    await extract_fused("arquivo.pdf", artifact_id=artifact_id)
+
+    assert seen == [use_remote_cache, use_remote_cache]
