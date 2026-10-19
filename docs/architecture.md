@@ -3,14 +3,11 @@
 You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](architecture.pt-br.md)
 
 ## Overview
-The system converts documents into accessible formats through a multi-agent extraction pipeline (local-first structural extraction with PyMuPDF/Docling plus Agno-powered multimodal AI vision and data agents), a canonical document pipeline, deterministic validation, and format-specific renderers. The architecture is modular: **backend/** holds the domain logic plus the REST API that exposes it, **frontend/** holds the interface clients (Telegram, Web, CLI) that talk to that API, and **infra/** holds the Dockerfile (the Compose file sits at the repository root).
+The system converts documents into accessible formats through a multi-agent extraction pipeline (structural extraction through Acessilia Toolbox capabilities plus Agno-powered multimodal AI vision and data agents), a canonical document pipeline, deterministic validation, and format-specific renderers. The architecture is modular: **backend/** holds the domain logic plus the REST API that exposes it, **frontend/** holds the interface clients (Telegram, Web, CLI) that talk to that API, and **infra/** holds the Dockerfile (the Compose file sits at the repository root).
 
-The system combines **deterministic planning with AI-driven execution**: deterministic functions (extraction, PDDL problem generation, contract validation) are the source of truth, and LLMs provide interpretation and description. Two pipeline engines coexist, selected by the `PIPELINE_ENGINE` setting:
+The system combines **deterministic planning with AI-driven execution**: deterministic functions (extraction, PDDL problem generation, contract validation) are the source of truth, and LLMs provide interpretation and description. Documents run through the **`pddl`** pipeline engine (`PIPELINE_ENGINE`, default `pddl`): a processing manifest is extracted, a PDDL plan is generated and validated, and an Agno Workflow executor applies it. See [pmv_agno_pddl.md](pmv_agno_pddl.md).
 
-- **`legacy`** (default): the direct orchestrated pipeline — `AccessibilityOrchestrator` runs Reader → Vision/Data → Editor.
-- **`pddl`**: the planning-based pipeline — a processing manifest is extracted, a PDDL plan is generated and validated, and an Agno Workflow executor applies it. See [pmv_agno_pddl.md](pmv_agno_pddl.md).
-
-Both engines converge on the same canonical document and the same renderers.
+The former **`legacy`** engine (`AccessibilityOrchestrator`: Reader → Vision/Data → Editor) is disabled: `backend/service.py` refuses any value other than `pddl`. Its code is still in the repository and is due to be removed.
 
 ---
 
@@ -128,11 +125,11 @@ The heavy models run in a separate service, the [Acessilia Toolbox](https://gith
 1. User submits a document via the REST API directly, or through the Telegram bot, Web panel, or CLI (which call the API).
 2. The interface handler validates the file extension and size.
 3. The file is saved and enqueued in `ProcessingQueue`.
-4. The worker dequeues the task and runs the pipeline for the active engine (`PIPELINE_ENGINE`): the `legacy` orchestrator (`AccessibilityOrchestrator.process()`, described below) or the `pddl` orchestrator (manifest → plan → execution). Both produce the same canonical document. The legacy flow:
-   - Registers task in `StateManager` and checks local text cache.
-   - **`ReaderAgent`** splits pages, extracts local text (PyMuPDF/Docling), and classifies regions (images, tables, formulas, text).
-   - **`VisionAgent`** and **`DataAgent`** run in parallel to describe visual elements and structure data using Agno `Agent` instances.
-   - **`EditorAgent`** sanitizes results, applies deduplicação via fingerprints, and inserts accessibility tags into the final canonical structure.
+4. The worker dequeues the task and runs the `pddl` orchestrator (`PddlAccessibilityOrchestrator`):
+   - Registers the task in `StateManager` and checks the processing cache.
+   - Extracts the processing manifest through the Toolbox (`document.structure.extract`), and inspects the source media (`media.inspect`).
+   - Enriches pictures and tables, builds and validates a PDDL plan for the manifest's obligations, and executes it, replanning when a method fails.
+   - Builds the canonical document from the executed manifest.
 5. Canonical validators verify schema adherence, heading hierarchy, and output safety.
 6. Renderers and export adapters build the output artifacts (TXT, DOCX, PDF, PDF/UA, HTML, MP3).
 7. Output files are packaged and delivered to the user (via Telegram message, Web download link, or email).

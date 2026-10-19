@@ -9,8 +9,8 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 - Role: normalize structured region payloads into a canonical document schema, validate structure and heading hierarchy, build intermediate AST, and dispatch to renderers.
 - Benefit: deterministic output and a single source of truth for all output exporters.
 
-### 2. Multi-Agent Pipeline Orchestration (legacy engine)
-- Implementation: [backend/agents/orchestrator.py](../backend/agents/orchestrator.py) (`AccessibilityOrchestrator`), used when `PIPELINE_ENGINE=legacy` (the default). The `pddl` engine uses the planning-based orchestration in pattern 10 instead.
+### 2. Multi-Agent Pipeline Orchestration (legacy engine, disabled)
+- Implementation: [backend/agents/orchestrator.py](../backend/agents/orchestrator.py) (`AccessibilityOrchestrator`). The `legacy` engine is disabled (`backend/service.py` accepts only `PIPELINE_ENGINE=pddl`) and is due to be removed; the running pipeline uses the planning-based orchestration in pattern 10.
 - Role: coordinates multi-agent lifecycle: local structural reading, parallel visual/data processing, text editing/deduplication, cache, history logging, and fallback.
 - Benefit: centralizes business rules and isolates step responsibilities.
 

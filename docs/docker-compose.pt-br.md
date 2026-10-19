@@ -149,11 +149,9 @@ AI_CLIENT=ollama
 OLLAMA_BASE_URL=http://host.docker.internal:11434/v1/chat/completions
 OLLAMA_MODEL=llama3.2-vision
 
-# Estruturação de documentos
-STRUCTURER=docling   # ou pymupdf (mais leve, sem dependências extras)
-
-# Pipeline
-PIPELINE_ENGINE=legacy
+# Pipeline: o PDDL é o único motor; a extração estrutural roda na Toolbox
+PIPELINE_ENGINE=pddl
+TOOLBOX_BASE_URL=http://host.docker.internal:8002
 ```
 
 > **Dica para Ollama local:** Use `host.docker.internal` no lugar de `localhost`
@@ -199,7 +197,7 @@ automático** via systemd timer. O script consulta a **GitHub API** a cada
 # Consulte docs/homologacao-systemd.md para instruções manuais
 ```
 
-Para producao, use [docs/producao-systemd.md](docs/producao-systemd.md) ou rode
+Para producao, use [docs/producao-systemd.md](producao-systemd.md) ou rode
 `./scripts/setup-producao.sh`. O ambiente rastreia `main` por padrao com
 `docker-compose.production.yml` e `scripts/production-update.sh`.
 

@@ -3,14 +3,11 @@
 Também disponível em **inglês (EUA)**: [English version](architecture.md)
 
 ## Visão geral
-O sistema converte documentos em formatos acessíveis por meio de um pipeline de extração multiagente (extração estrutural local-first com PyMuPDF/Docling, mais agentes de visão e de dados de IA multimodal conduzidos por Agno), um pipeline de documento canônico, validação determinística e renderizadores específicos de formato. A arquitetura é modular: **backend/** guarda a lógica de domínio e a API REST que a expõe, **frontend/** guarda os clientes de interface (Telegram, Web, CLI) que conversam com essa API, e **infra/** guarda o Dockerfile (o arquivo Compose fica na raiz do repositório).
+O sistema converte documentos em formatos acessíveis por meio de um pipeline de extração multiagente (extração estrutural por meio das capacidades da Acessilia Toolbox, mais agentes de visão e de dados de IA multimodal conduzidos por Agno), um pipeline de documento canônico, validação determinística e renderizadores específicos de formato. A arquitetura é modular: **backend/** guarda a lógica de domínio e a API REST que a expõe, **frontend/** guarda os clientes de interface (Telegram, Web, CLI) que conversam com essa API, e **infra/** guarda o Dockerfile (o arquivo Compose fica na raiz do repositório).
 
-O sistema combina **planejamento determinístico com execução guiada por IA**: as funções determinísticas (extração, geração do problema PDDL, validação de contrato) são a fonte da verdade, e os LLMs fornecem interpretação e descrição. Dois motores de pipeline coexistem, selecionados pela configuração `PIPELINE_ENGINE`:
+O sistema combina **planejamento determinístico com execução guiada por IA**: as funções determinísticas (extração, geração do problema PDDL, validação de contrato) são a fonte da verdade, e os LLMs fornecem interpretação e descrição. Os documentos passam pelo motor de pipeline **`pddl`** (`PIPELINE_ENGINE`, padrão `pddl`): um manifesto de processamento é extraído, um plano PDDL é gerado e validado, e um executor Agno Workflow o aplica. Veja [pmv_agno_pddl.md](pmv_agno_pddl.md).
 
-- **`legacy`** (padrão): o pipeline orquestrado direto — `AccessibilityOrchestrator` executa Reader → Vision/Data → Editor.
-- **`pddl`**: o pipeline baseado em planejamento — um manifesto de processamento é extraído, um plano PDDL é gerado e validado, e um executor Agno Workflow o aplica. Veja [pmv_agno_pddl.md](pmv_agno_pddl.md).
-
-Ambos os motores convergem para o mesmo documento canônico e os mesmos renderizadores.
+O antigo motor **`legacy`** (`AccessibilityOrchestrator`: Reader → Vision/Data → Editor) está desativado: `backend/service.py` recusa qualquer valor diferente de `pddl`. O código dele ainda está no repositório e será removido.
 
 ---
 
@@ -128,11 +125,11 @@ Os modelos pesados rodam num serviço separado, a [Acessilia Toolbox](https://gi
 1. O usuário envia um documento via API REST diretamente, ou por meio do bot Telegram, do painel Web ou da CLI (que chamam a API).
 2. O manipulador de interface valida a extensão e o tamanho do arquivo.
 3. O arquivo é salvo e colocado na `ProcessingQueue`.
-4. O worker retira a tarefa da fila e executa o pipeline para o motor ativo (`PIPELINE_ENGINE`): o orquestrador `legacy` (`AccessibilityOrchestrator.process()`, descrito abaixo) ou o orquestrador `pddl` (manifesto → plano → execução). Ambos produzem o mesmo documento canônico. O fluxo legacy:
-    - Registra a tarefa no `StateManager` e consulta o cache local de texto.
-    - **`ReaderAgent`** divide as páginas, extrai o texto local (PyMuPDF/Docling) e classifica as regiões (imagens, tabelas, fórmulas, texto).
-    - **`VisionAgent`** e **`DataAgent`** rodam em paralelo para descrever elementos visuais e estruturar dados usando instâncias de `Agent` do Agno.
-    - **`EditorAgent`** higieniza os resultados, aplica a deduplicação por impressões digitais e insere as tags de acessibilidade na estrutura canônica final.
+4. O worker retira a tarefa da fila e executa o orquestrador `pddl` (`PddlAccessibilityOrchestrator`):
+    - Registra a tarefa no `StateManager` e consulta o cache de processamento.
+    - Extrai o manifesto de processamento pela Toolbox (`document.structure.extract`) e inspeciona a mídia de origem (`media.inspect`).
+    - Enriquece imagens e tabelas, monta e valida um plano PDDL para as obrigações do manifesto e o executa, replanejando quando um método falha.
+    - Constrói o documento canônico a partir do manifesto executado.
 5. Os validadores canônicos verificam a adesão ao esquema, a hierarquia de títulos e a segurança da saída.
 6. Os renderizadores e adaptadores de exportação constroem os artefatos de saída (TXT, DOCX, PDF, PDF/UA, HTML, MP3).
 7. Os arquivos de saída são empacotados e entregues ao usuário (via mensagem Telegram, link de download na Web ou e-mail).

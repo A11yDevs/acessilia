@@ -5,7 +5,7 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 ## Purpose
 This documentation details the architecture of **Acessilia**, a document accessibility system that combines **deterministic planning** (PDDL-based task ordering and validation) with **Agno-coordinated multi-agent AI** for vision, data, and description tasks. Deterministic functions are the source of truth; LLMs provide interpretation and description.
 
-The system runs in one of two pipeline engines, selected by the `PIPELINE_ENGINE` setting: `legacy` (the direct orchestrated pipeline, default) or `pddl` (the manifest → plan → execution flow). See [architecture.md](architecture.md).
+The system runs the `pddl` pipeline engine (the manifest → plan → execution flow), selected by the `PIPELINE_ENGINE` setting, whose default is `pddl`. The former `legacy` engine is disabled: `backend/service.py` refuses any other value, and its code is due to be removed. See [architecture.md](architecture.md).
 
 ---
 
@@ -52,7 +52,7 @@ Each diagram is a visual aid; the linked description summarizes its content in t
 
 - **`backend/`** — Interface-agnostic business logic.
   - `core/` — the planning layer: `manifest/` (Informational-Structural extraction via Docling/PyMuPDF → `processing-manifest.json`), `planning/` (PlannerAgent → PDDL problem and `nominal-plan.json`), `execution/` (Executor via Agno Workflow → `execution-report.json`).
-  - `agents/` — the pipeline agents (`ReaderAgent`, `VisionAgent`, `DataAgent`, `EditorAgent`) and the legacy and PDDL orchestrators.
+  - `agents/` — the PDDL orchestrator and the agents it uses (`VisionAgent`, `DataAgent`), plus the disabled legacy orchestrator and its `ReaderAgent`/`EditorAgent`, due to be removed.
   - `api/` — the standalone REST API (jobs, download, history, health).
   - `pipeline/` + `export/` — canonical document construction, validation, and format renderers.
   - `ai/`, `services/`, `tools/` — Agno model registry and prompts, infrastructure services (cache, queue, history, cleanup, email, tokens), and shared utilities.

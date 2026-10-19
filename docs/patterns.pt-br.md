@@ -9,8 +9,8 @@ Também disponível em **inglês (EUA)**: [English version](patterns.md)
 - Papel: normalizar cargas de regiões estruturadas em um esquema de documento canônico, validar estrutura e hierarquia de títulos, construir o AST intermediário e despachar para os renderizadores.
 - Benefício: saída determinística e uma única fonte da verdade para todos os exportadores de saída.
 
-### 2. Orquestração de Pipeline Multiagente (motor legacy)
-- Implementação: [backend/agents/orchestrator.py](../backend/agents/orchestrator.py) (`AccessibilityOrchestrator`), usada quando `PIPELINE_ENGINE=legacy` (o padrão). O motor `pddl` usa a orquestração baseada em planejamento do padrão 10 em vez disso.
+### 2. Orquestração de Pipeline Multiagente (motor legacy, desativado)
+- Implementação: [backend/agents/orchestrator.py](../backend/agents/orchestrator.py) (`AccessibilityOrchestrator`). O motor `legacy` está desativado (`backend/service.py` aceita só `PIPELINE_ENGINE=pddl`) e será removido; o pipeline em uso segue a orquestração baseada em planejamento do padrão 10.
 - Papel: coordena o ciclo de vida multiagente: leitura estrutural local, processamento visual/de dados em paralelo, edição/deduplicação de texto, cache, registro de histórico e fallback.
 - Benefício: centraliza as regras de negócio e isola as responsabilidades de cada etapa.
 
