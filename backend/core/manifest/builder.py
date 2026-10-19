@@ -15,6 +15,8 @@ from backend.log_messages import (
     MSG_OBLIGATION_IMAGE,
     MSG_OBLIGATION_TABLE,
     MSG_OBLIGATION_UNKNOWN,
+    MSG_OBLIGATION_UNSTRUCTURED_PAGE,
+    MSG_OBSERVATION_PAGE_WITHOUT_STRUCTURE,
 )
 from backend.pipeline.sanitizer import sanitize_text
 from backend.pipeline.table_ast import normalize_table_ast
@@ -94,6 +96,7 @@ DEFAULT_METHOD_COSTS = {
     "latex-verbalizer": 20,
     "pandoc-code": 10,
     "pymupdf-region": 30,
+    "vision-page-inspection": 25,
     "deterministic-heading-repair": 5,
     "human-review": 100,
     # --- Capacidades da PR #125 (domínio v2.3) ---
@@ -168,6 +171,14 @@ V23_OBLIGATION_BY_KIND = {
 
 #: Artifact holding the secondary provider's extraction when FUSION_MODE=dual;
 #: the v2.3 methods that choose between providers read it.
+#: A page the extractor returned without any element gets a placeholder element
+#: of this raw label, an observation and a critical obligation: the page is
+#: inspected visually and either described or accepted as blank.
+UNSTRUCTURED_PAGE_LABEL = "unstructured-page"
+UNSTRUCTURED_PAGE_OBSERVATION_KIND = "page-without-structure"
+UNSTRUCTURED_PAGE_OBLIGATION_KIND = "inspect-unstructured-page"
+UNSTRUCTURED_PAGE_METHODS = ["vision-page-inspection", "human-review"]
+
 SECONDARY_EXTRACTION_KIND = "provider-extraction"
 SECONDARY_EXTRACTION_ARTIFACT_ID = "artifact-secondary-extraction"
 
@@ -240,7 +251,7 @@ def build_processing_manifest(
         duration_ms=extraction.duration_ms,
         configuration=extraction.configuration,
     )
-    return ProcessingManifest(
+    manifest = ProcessingManifest(
         manifest_id=f"manifest-{digest[:16]}-r1",
         created_at=extraction.completed_at,
         source=source,
@@ -259,6 +270,8 @@ def build_processing_manifest(
             element_types=element_types,
         ),
     )
+    append_unstructured_page_needs(manifest)
+    return manifest
 
 
 def _build_from_toolbox_json(
@@ -339,6 +352,7 @@ def _build_from_toolbox_json(
     observations.extend(v23_observations)
     obligations.extend(v23_obligations)
     _append_processing_needs(manifest, observations, obligations)
+    append_unstructured_page_needs(manifest)
     secondary = extraction.document.get("secondary_extraction")
     if isinstance(secondary, dict) and secondary.get("path"):
         manifest.artifacts.append(
@@ -913,6 +927,76 @@ def _build_pages(document: Any, elements: list[ManifestElement]) -> list[PageDes
     return pages
 
 
+def is_unstructured_page_placeholder(element: ManifestElement) -> bool:
+    """Whether ``element`` stands for a page the extractor left without structure."""
+    return element.raw_label == UNSTRUCTURED_PAGE_LABEL and bool(
+        element.metadata.get("unstructured_page")
+    )
+
+
+def append_unstructured_page_needs(manifest: ProcessingManifest) -> None:
+    """Give every page without elements a placeholder and a visual-inspection obligation.
+
+    An extractor can return a page with no element when it is blank, or when its
+    content is purely visual (a scan, a photo, a diagram). Telling them apart
+    needs a look at the page, so the page becomes an explicit planning need:
+    the critical ``inspect-unstructured-page`` obligation, satisfied by
+    describing the page or by accepting it as blank. Without it, the content of
+    such a page would be lost silently.
+    """
+    known = {element.id for element in manifest.elements}
+    next_order = max((element.reading_order for element in manifest.elements), default=0)
+    for page in sorted(manifest.pages, key=lambda item: item.page_number):
+        if page.element_ids:
+            continue
+        number = page.page_number
+        element_id = f"element-unstructured-page-{number:04d}"
+        if element_id in known:
+            continue
+        next_order += 1
+        element = ManifestElement(
+            id=element_id,
+            type="unknown",
+            raw_label=UNSTRUCTURED_PAGE_LABEL,
+            reading_order=next_order,
+            hierarchy_level=0,
+            text=None,
+            page_number=number,
+            metadata={"unstructured_page": True},
+        )
+        manifest.elements.append(element)
+        page.element_ids.append(element_id)
+        manifest.observations.append(
+            Observation(
+                id=f"observation-{UNSTRUCTURED_PAGE_OBSERVATION_KIND}-{number:04d}",
+                kind=UNSTRUCTURED_PAGE_OBSERVATION_KIND,
+                severity="warning",
+                message=t(MSG_OBSERVATION_PAGE_WITHOUT_STRUCTURE).format(page_number=number),
+                target_ids=[element_id],
+                evidence={"page_number": number},
+            )
+        )
+        manifest.obligations.append(
+            Obligation(
+                id=f"obligation-{UNSTRUCTURED_PAGE_OBLIGATION_KIND}-{number:04d}",
+                kind=UNSTRUCTURED_PAGE_OBLIGATION_KIND,
+                target_ids=[element_id],
+                admissible_methods=list(UNSTRUCTURED_PAGE_METHODS),
+                method_costs={
+                    method: DEFAULT_METHOD_COSTS.get(method, 50)
+                    for method in UNSTRUCTURED_PAGE_METHODS
+                },
+                rationale=t(MSG_OBLIGATION_UNSTRUCTURED_PAGE),
+            )
+        )
+    manifest.summary.element_count = len(manifest.elements)
+    manifest.summary.observation_count = len(manifest.observations)
+    manifest.summary.obligation_count = len(manifest.obligations)
+    manifest.summary.element_types = dict(
+        sorted(Counter(item.type for item in manifest.elements).items())
+    )
+
+
 def _derive_processing_needs(
     elements: list[ManifestElement],
 ) -> tuple[list[Observation], list[Obligation]]:
@@ -920,6 +1004,9 @@ def _derive_processing_needs(
     obligations: list[Obligation] = []
 
     for element in elements:
+        if is_unstructured_page_placeholder(element):
+            # Planned by append_unstructured_page_needs, not as an unknown region.
+            continue
         spec = OBLIGATION_BY_TYPE.get(element.type)
         if spec is None:
             continue

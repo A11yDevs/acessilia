@@ -21,7 +21,7 @@ from docstruct.text.norm_fix import norm_fix
 
 from backend.services.blocking import run_blocking
 from backend.agents.data_agent import DataAgent
-from backend.agents.output_schemas import DataOutput, VisionOutput
+from backend.agents.output_schemas import DataOutput, PageInspectionOutput, VisionOutput
 from backend.agents.vision_agent import VisionAgent
 from backend.core.agents.fusion_agent import FusionAgent
 from backend.core.agents.informational_structural import InformationalStructuralAgent
@@ -31,6 +31,7 @@ from backend.core.execution.messages import EXE_COMPLETED_OBLIGATIONS_UNSATISFIE
 from backend.core.manifest.builder import (
     SECONDARY_EXTRACTION_KIND,
     _derive_processing_needs,
+    is_unstructured_page_placeholder,
     reconcile_reclassified_element_processing_needs,
 )
 from backend.core.manifest.models import (
@@ -629,6 +630,152 @@ def _handle_pymupdf_region_method(manifest: ProcessingManifest, obligation_id: s
         return MethodResult(
             success=False, validated=False,
             message=f"Region inspection failed: {type(exc).__name__}: {exc}",
+        )
+
+
+def _render_source_page(source: Path, media_type: str, number: int) -> bytes:
+    """The PNG of page ``number``, rendered by the Toolbox (``pdf.render``).
+
+    A raster image input is its own single page and is sent as is. There is no
+    local rendering (docs/adr/0003).
+    """
+    if media_type.startswith("image/"):
+        if number != 1:
+            raise ValueError(f"An image input has one page, not page {number}")
+        return source.read_bytes()
+
+    from acessilia_sdk.toolbox.clients import ToolboxPdfClient
+
+    from backend.config.settings import settings
+    from backend.tools.toolbox_client import (
+        ToolboxContractViolation,
+        make_toolbox_client,
+        run_sync,
+    )
+
+    async def render() -> dict[str, Any]:
+        client = make_toolbox_client(ToolboxPdfClient)
+        try:
+            return await client.render(
+                file_path=source, page_number=number, dpi=settings.pdf_split_dpi
+            )
+        finally:
+            await client.close()
+
+    encoded = run_sync(render()).get("document", {}).get("image_bytes_base64")
+    if not encoded:
+        raise ToolboxContractViolation(f"pdf.render returned no image for page {number}")
+    return base64.b64decode(encoded)
+
+
+def _inspect_page(image: bytes, number: int, total_pages: int, mode: str) -> PageInspectionOutput:
+    from backend.tools.toolbox_client import run_sync
+
+    return run_sync(
+        VisionAgent(mode=mode).inspect_page(
+            image_bytes=image, page_num=number, total_pages=total_pages, mode=mode
+        )
+    )
+
+
+def _handle_vision_page_inspection_method(
+    manifest: ProcessingManifest, obligation_id: str
+) -> MethodResult:
+    """Look at a page the extractor left empty: describe it, or accept it as blank.
+
+    The page is rendered by the Toolbox and judged by the vision model. A page
+    with content replaces its placeholder with a ``picture`` that carries the
+    page image and its accessible description; a blank page keeps the
+    placeholder, marked ``blank_page`` so the canonical document skips it. The
+    manifest changes only after every target page validates. Any failure (the
+    Toolbox, the model, an invalid answer) fails the method, so a page is never
+    dropped silently; the obligation is critical.
+    """
+    elements = [
+        element
+        for element in _target_elements(manifest, obligation_id)
+        if is_unstructured_page_placeholder(element)
+    ]
+    if not elements:
+        return _missing_obligation(obligation_id)
+    try:
+        source = Path(manifest.source.path)
+        with source.open("rb") as stream:
+            if hashlib.file_digest(stream, "sha256").hexdigest() != manifest.source.sha256:
+                raise ValueError("Page source differs from the manifest")
+        total_pages = max(len(manifest.pages), 1)
+        mode = str(manifest.extractor.configuration.get("region_inspection_mode", "medio"))
+
+        inspected = []
+        for element in elements:
+            number = element.page_number or 1
+            image = _render_source_page(source, manifest.source.media_type, number)
+            output = PageInspectionOutput.model_validate(
+                _inspect_page(image, number, total_pages, mode).model_dump()
+            )
+            inspected.append((element, number, image, output))
+
+        artifacts: list[Artifact] = []
+        replacements: dict[str, ManifestElement] = {}
+        blank = 0
+        for element, number, image, output in inspected:
+            scope = hashlib.sha256(json.dumps([
+                manifest.manifest_id, manifest.source.sha256, manifest.revision,
+                obligation_id, element.id,
+            ]).encode()).hexdigest()
+            page_image = _save_region_artifact(image, scope, "page-render", "png", "image/png")
+            record = _save_region_artifact(
+                json.dumps(
+                    {
+                        "source_sha256": manifest.source.sha256,
+                        "element_id": element.id,
+                        "page_number": number,
+                        "page_image_sha256": page_image.sha256,
+                        "result": output.model_dump(),
+                    },
+                    ensure_ascii=False,
+                    sort_keys=True,
+                ).encode(),
+                scope, "page-inspection", "json", "application/json",
+            )
+            artifacts.extend([page_image, record])
+            replacement = element.model_copy(deep=True)
+            replacement.metadata.update(
+                page_inspection=record.id,
+                vision_language=output.language,
+                vision_confidence=output.confidence,
+                vision_warnings=list(output.warnings),
+            )
+            if output.kind == "blank":
+                replacement.metadata["blank_page"] = True
+                blank += 1
+            else:
+                replacement.type = "picture"
+                replacement.raw_label = "picture"
+                replacement.text = output.description
+                replacement.metadata.update(
+                    original_type=element.type,
+                    vision_description_complete=True,
+                    src="data:image/png;base64," + base64.b64encode(image).decode("ascii"),
+                )
+            replacements[element.id] = replacement
+
+        manifest.elements = [replacements.get(item.id, item) for item in manifest.elements]
+        manifest.summary.element_types = dict(Counter(item.type for item in manifest.elements))
+        return MethodResult(
+            success=True,
+            validated=True,
+            message=(
+                f"Inspected {len(inspected)} unstructured page(s): "
+                f"{len(inspected) - blank} described, {blank} blank"
+            ),
+            artifacts=artifacts,
+        )
+    except Exception as exc:
+        return MethodResult(
+            success=False,
+            validated=False,
+            message=f"Page inspection failed: {type(exc).__name__}: {exc}",
         )
 
 
@@ -1621,6 +1768,7 @@ DETERMINISTIC_METHOD_HANDLERS: dict[
     "pandoc-table": _handle_pandoc_table_method,
     "pandoc-code": _handle_pandoc_code_method,
     "pymupdf-region": _handle_pymupdf_region_method,
+    "vision-page-inspection": _handle_vision_page_inspection_method,
     "latex-normalizer": _handle_latex_normalizer_method,
     "norm-fix": _handle_norm_fix_method,
     "rep-guard": _handle_repetition_guard_method,
@@ -2220,7 +2368,8 @@ async def _enrich_picture_descriptions(
         and manifest.elements
     ):
         pictures = [element for element in manifest.elements
-                    if not element.metadata.get("vision_description_complete")][:1]
+                    if not element.metadata.get("vision_description_complete")
+                    and not is_unstructured_page_placeholder(element)][:1]
 
     if not pictures:
         return
@@ -2369,7 +2518,10 @@ def _inject_full_page_picture(
     has_visual_element = any(
         element.type in {"picture", "formula"} for element in manifest.elements
     )
-    if has_visual_element:
+    if has_visual_element or any(
+        is_unstructured_page_placeholder(element) for element in manifest.elements
+    ):
+        # An empty page is already planned for visual inspection.
         return
 
     max_reading_order = max(
@@ -2684,6 +2836,9 @@ def _is_ocr_noise(text: str) -> bool:
 
 
 def _is_placeholder_visual_element(element: ManifestElement) -> bool:
+    if is_unstructured_page_placeholder(element):
+        # Inspected by the planned vision-page-inspection method instead.
+        return False
     if element.type not in {"group", "unknown", "paragraph"}:
         return False
     text = (element.text or "").strip()
@@ -2919,6 +3074,10 @@ def _manifest_pages_to_payload(manifest: ProcessingManifest) -> list[dict[str, A
                     for element in manifest.elements
                     if (element.page_number or 1) == page.page_number
                 ]
+            # A page accepted as blank contributes nothing to the document.
+            block_elements = [
+                item for item in block_elements if not item.metadata.get("blank_page")
+            ]
             block_elements.sort(key=lambda item: item.reading_order)
             blocks = [_element_to_block(item) for item in block_elements]
             _dedupe_callout_titles(blocks)
@@ -2933,6 +3092,8 @@ def _manifest_pages_to_payload(manifest: ProcessingManifest) -> list[dict[str, A
 
     grouped: dict[int, list[ManifestElement]] = {}
     for element in manifest.elements:
+        if element.metadata.get("blank_page"):
+            continue
         page_number = element.page_number or 1
         grouped.setdefault(page_number, []).append(element)
 
