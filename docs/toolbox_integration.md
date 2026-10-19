@@ -48,14 +48,17 @@ A successful extraction response has the following shape:
 }
 ```
 
-**Key point:** the core **has no provider registry**. The `provider` is just a string
-sent in the form; the actual routing happens in the Toolbox `providers-config.yaml`.
+**Key point:** the core **does not register which providers exist**. Its only provider
+table is `PROVIDER_DEFAULTS` in `libs/sdk/src/acessilia_sdk/toolbox/capabilities.py`, which holds the
+default provider per capability. It does not list existing providers or route anything.
+The `provider` is just a string sent in the form; the actual routing happens in the
+Toolbox `providers-config.yaml`.
 Validation that a provider exists happens on the Toolbox side — when it fails, the core
 receives `ToolboxCapabilityError` or `ToolboxContractViolation`.
 
 ### Exception hierarchy
 
-All exceptions inherit from `ToolboxError` (defined in `backend/tools/toolbox_client.py`):
+All exceptions inherit from `ToolboxError` (defined in the SDK, `acessilia_sdk.toolbox.errors`, and re-exported by `backend/tools/toolbox_client.py`):
 
 - `ToolboxProviderUnavailable` — service/provider unavailable (e.g. HTTP 503)
 - `ToolboxTimeout` — exceeded `toolbox_timeout_seconds`
@@ -71,23 +74,30 @@ All exceptions inherit from `ToolboxError` (defined in `backend/tools/toolbox_cl
 
 ### 2.1 Architectural difference
 
-| Aspect | Local tool (`libs/`) | Toolbox tool |
+| Aspect | Library (`libs/docstruct`) | Toolbox capability |
 |---|---|---|
 | **Where it runs** | In the core process (same machine/container) | Remote HTTP service (`TOOLBOX_BASE_URL`, port 8002) |
-| **Examples** | `libs/docstruct/` — `docstruct.fusion`, `docstruct.policy.FusionPolicy`, `docstruct.types.CanonicalBlock`; PyMuPDF fallback in `backend/tools/structurer.py` | `document.structure.extract`, `document.layout.analyze`, `document.ocr`, `math.*`, `pdf.split` |
-| **Interface** | Direct Python import (pure function/class) | `ToolboxClient` / specialized clients → `POST /v1/capabilities/{capability}:execute` |
+| **Examples** | `libs/docstruct/` — `docstruct.fusion`, `docstruct.policy.FusionPolicy`, `docstruct.types.CanonicalBlock` | `document.structure.extract`, `document.layout.analyze`, `document.ocr`, `math.*`, `pdf.split` |
+| **Interface** | Direct Python import (pure function/class) | SDK clients (`acessilia_sdk.toolbox.clients`) built with `make_toolbox_client` → `POST /v1/capabilities/{capability}:execute` or the artifact and dataset routes |
 | **Failure** | Local Python exception | `ToolboxError` → typed subclasses |
 | **State/cache** | In memory / local disk | Artifact store (`/v1/artifacts`) + remote cache (`cache_key` in provenance) |
 | **Versioning** | Coupled to the core repo (same commit) | Independent (`provider_version` in provenance) |
 
 ### 2.2 Decision policy
 
-**Implement locally (`libs/`) when:**
+The full guide is in [ADR-0002](adr/0002-component-responsibilities.md#decision).
+In short:
 
-- It is a pure transformation over already-canonical data (block fusion, grouping,
-  decision policies) — no network I/O needed.
-- It must run offline / without a network dependency.
-- It needs a deterministic guarantee and atomic versioning with the core.
+**Implement in docstruct (`libs/docstruct`) when:**
+
+- It is a pure, deterministic transformation over document structure (block
+  fusion, grouping, reading order, validation), with no I/O and no heavy
+  dependency.
+- It needs a deterministic guarantee and versioned releases shared by the core
+  and the Toolbox.
+
+Running offline is not by itself a reason to execute an operational tool in the
+core; that is an exception that needs an ADR.
 
 **Expose via the Toolbox when:**
 
@@ -95,25 +105,21 @@ All exceptions inherit from `ToolboxError` (defined in `backend/tools/toolbox_cl
 - It makes sense to share among multiple consumers (core, drbench, future clients).
 - It evolves on its own cadence (e.g. swapping the MinerU version without touching the core).
 
-### 2.3 The bridge: wrapper with local fallback
+### 2.3 No local fallback
 
-When a Toolbox capability has a local equivalent, the core uses an **Agno tool wrapper
-with local fallback**: it tries the Toolbox first and, if it is unavailable, degrades to
-the local implementation. This is exactly the pattern of `toolbox_ocr_tools.py`,
-`toolbox_math_tools.py`, and `toolbox_pdf_tools.py`.
+Operational capabilities run only in the Toolbox: the production policy is
+`remote_only`, and the core does not degrade to a local implementation when the
+Toolbox is unavailable ([ADR-0003](adr/0003-remote-only-operational-capabilities.md)).
+Availability comes from Toolbox replicas behind a load balancer and from the
+SDK's bounded retries ([ADR-0006](adr/0006-availability-and-failover.md)). When
+a capability stays unavailable, the core fails the step or degrades it visibly
+as a business decision, and records the cause.
 
-```
-                    ┌─────────────────────────────┐
-                    │  Agno tool (wrapper)        │
-                    │  backend/tools/toolbox_*_tools.py │
-                    └──────────────┬──────────────┘
-                       tries        │
-                       Toolbox      ▼
-                    ┌──────────────┐   failure → ┌──────────────────┐
-                    │ ToolboxClient │──────────▶│ Local impl        │
-                    │ (remote)      │            │ (libs/)           │
-                    └──────────────┘            └──────────────────┘
-```
+The "Toolbox first, local fallback" wrappers still in the code are **deviations
+being removed** in [#150](https://github.com/A11yDevs/acessilia/issues/150):
+`toolbox_pdf_tools.py`, `media_inspect.py`, the PDF/UA path in
+`backend/export/pandoc_exporter.py` and the two Toolbox structurers. Do not
+copy that pattern into new code; a local or offline executor needs its own ADR.
 
 ---
 
@@ -145,7 +151,7 @@ Just:
 
 ### Verification
 
-- Unit: `tests/test_toolbox_client.py` (respx mock) — verifies the provider is sent in
+- Unit: `libs/sdk/tests/clients/test_structure.py` (respx mock) — verifies the provider is sent in
   the form and that HTTP errors map to typed exceptions.
 - E2E: `tests/test_toolbox_e2e.py` (`e2e` marker) — against a real `TOOLBOX_BASE_URL`.
 
@@ -154,111 +160,103 @@ Just:
 ## 4. Scenario B — New capability (new endpoint)
 
 When the Toolbox exposes a **new capability** (e.g. `document.layout.analyze`), the core
-needs a specialized client. Follow the `toolbox_layout_client.py` pattern:
+needs a specialized client in the SDK. Follow the pattern of
+`libs/sdk/src/acessilia_sdk/toolbox/clients/layout.py`:
 
-### 4.1 Specialized client
+### 4.1 Register the capability and write a thin client
 
-Create `backend/tools/toolbox_<x>_client.py`:
+Every Toolbox call goes through `execute_capability`
+(SDK, `libs/sdk`: `acessilia_sdk.toolbox.transport`), which refuses any capability that is not in
+the registry. Adding a capability takes three steps.
+
+**1. Declare it** in `libs/sdk/src/acessilia_sdk/toolbox/capabilities.py`:
 
 ```python
-"""Specialized client for the <capability> Toolbox capability."""
+ToolboxCapability(
+    "<capability>", 1, "<Label>",                # id, manifest version, error label
+    provider_key="toolbox_<x>_provider",     # Settings attribute / TOOLBOX_<X>_PROVIDER
+    output_schema="<schema>@1",                  # manifest output.schema
+),
+```
+
+If the provider setting is new, add its default to `PROVIDER_DEFAULTS` and the
+matching attribute to `Settings` (`os.getenv("TOOLBOX_<X>_PROVIDER",
+provider_default("toolbox_<x>_provider"))`).
+
+**2. Write the client** in `libs/sdk/src/acessilia_sdk/toolbox/clients/<x>.py`
+and export it from `acessilia_sdk.toolbox.clients`. It reads no settings and
+logs nothing. It subclasses `ToolboxCapabilityClient`, which
+already owns the connections, the Bearer header, `health()`, `close()`, the
+timeout/network error mapping, the response envelope check, bounded retries
+and failover between independent Toolbox endpoints (see
+[the SDK README](../libs/sdk/README.md#availability-and-failover)). A
+capability that returns an artifact must call `_execute_on` and download it
+with `download_artifact` through the HTTP client it returns, not through
+`self._client`:
+
+```python
+"""Client for the <capability> Toolbox capability."""
 
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
 
-import httpx
-
-from backend.config.settings import settings
-from backend.tools.toolbox_client import (
-    ToolboxContractViolation,
-    ToolboxProviderUnavailable,
-    ToolboxTimeout,
-    _media_type,
-    _raise_for_error,
-)
+from acessilia_sdk.toolbox.client import ToolboxCapabilityClient
 
 CAPABILITY = "<capability>"
-EXECUTE_PATH = f"/v1/capabilities/{CAPABILITY}:execute"
 
 
-class Toolbox<X>Client:
-    """Client for <capability> via the Acessilia Toolbox."""
+class Toolbox<X>Client(ToolboxCapabilityClient):
+    provider_key = "toolbox_<x>_provider"
 
-    def __init__(
-        self,
-        base_url: str | None = None,
-        provider: str | None = None,
-        timeout_seconds: int | None = None,
-        api_key: str | None = None,
-    ) -> None:
-        self.base_url = (base_url or settings.toolbox_base_url).rstrip("/")
-        self.provider = provider or settings.toolbox_provider
-        self.timeout_seconds = timeout_seconds or settings.toolbox_timeout_seconds
-        self.api_key = api_key if api_key is not None else settings.toolbox_api_key
-        headers: dict[str, str] = {}
-        if self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
-        self._client = httpx.AsyncClient(
-            base_url=self.base_url,
-            timeout=httpx.Timeout(self.timeout_seconds),
-            headers=headers,
-        )
-
-    async def execute(
+    async def run(
         self,
         file_path: Path | None = None,
         artifact_id: str | None = None,
         *,
-        language: str = "pt-BR",
         use_remote_cache: bool | None = None,
     ) -> dict[str, Any]:
-        if file_path is None and artifact_id is None:
-            raise ValueError("Provide file_path or artifact_id")
-
-        url = f"{self.base_url}{EXECUTE_PATH}"
-        try:
-            if artifact_id:
-                data: dict[str, Any] = {
-                    "artifact_id": artifact_id,
-                    "language": language,
-                    "provider": self.provider,
-                }
-                if use_remote_cache is False:
-                    data["no_cache"] = True
-                response = await self._client.post(url, data=data)
-            else:
-                with open(file_path, "rb") as f:
-                    files = {"file": (file_path.name, f, _media_type(file_path))}
-                    params: dict[str, Any] = {
-                        "language": language,
-                        "provider": self.provider,
-                    }
-                    if use_remote_cache is False:
-                        params["no_cache"] = True
-                    response = await self._client.post(url, files=files, data=params)
-
-            _raise_for_error(response, CAPABILITY)
-            result = response.json()
-            if result.get("status") != "succeeded":
-                raise ToolboxContractViolation(
-                    f"{CAPABILITY}: unexpected status {result.get('status')!r}"
-                )
-            return result
-        except httpx.TimeoutException as exc:
-            raise ToolboxTimeout(f"{CAPABILITY}: timeout") from exc
-        except httpx.HTTPStatusError as exc:
-            raise ToolboxProviderUnavailable(
-                f"{CAPABILITY}: HTTP {exc.response.status_code}"
-            ) from exc
+        return await self._execute(
+            CAPABILITY,
+            file_path=file_path,
+            artifact_id=artifact_id,
+            parameters={...},                      # optional, sent as JSON
+            no_cache=use_remote_cache is False,
+        )
 ```
 
-### 4.2 Agno tool wrapper (optional, with local fallback)
+**3. Build it in the core** with `make_toolbox_client` (`backend/tools/toolbox_client.py`).
+It fills the endpoints, the provider from the `settings` attribute named by
+`provider_key`, the timeout, the API key and a failover log hook; keyword
+arguments override them:
 
-If a local equivalent exists, create `backend/tools/toolbox_<x>_tools.py` following the
-`toolbox_ocr_tools.py` pattern: expose the capability as an Agno tool, try the Toolbox
-first, and degrade to the local implementation on failure.
+```python
+from acessilia_sdk.toolbox.clients import Toolbox<X>Client
+from backend.tools.toolbox_client import make_toolbox_client
+
+client = make_toolbox_client(Toolbox<X>Client)
+try:
+    result = await client.run(file_path=path)
+finally:
+    await client.close()
+```
+
+Client tests live in `libs/sdk/tests/clients/` and build the client with an
+explicit `base_url`; tests of how the core configures it belong in
+`tests/test_toolbox_client_factory.py`.
+
+Text inputs use `upload=(filename, content_bytes, media_type)` instead of
+`file_path` (see `acessilia_sdk/toolbox/clients/math.py`). `scripts/check_capability_contract.py`
+reads the registry, so the new id is checked against the Toolbox catalogue
+without further changes; `tests/test_toolbox_capability_registry.py` fails if a
+client hard-codes an `:execute` route or uses an unregistered id.
+
+### 4.2 Agno tool wrapper (optional)
+
+To expose the capability to an agent, create `backend/tools/toolbox_<x>_tools.py`
+that calls the client from 4.1 and turns `ToolboxError` into the tool's failure
+result. Do not add a local implementation behind it (see 2.3).
 
 ### 4.3 Pipeline integration (if applicable)
 
@@ -267,10 +265,30 @@ first, and degrade to the local implementation on failure.
   `ToolboxLayoutStructurer`).
 - **Dual fusion** (`backend/pipeline/fusion.py`): if the capability produces canonical
   blocks, it can participate as a provider in `extract_fused()`.
+- **PDDL method** (`backend/core/planning/toolbox_gate.py`): if a planning method's
+  handler calls the capability, declare it in `METHOD_TOOLBOX_REQUIREMENTS`
+  (capability and provider). The availability gate then checks it against the live
+  catalogue before each document is planned (see below).
+
+#### Availability gate
+
+Before planning a document the orchestrator takes one catalogue snapshot
+(`GET /v1/capabilities` + `/v1/providers`, cached for
+`TOOLBOX_CATALOG_REFRESH_SECONDS`) and checks every requested method listed in
+`METHOD_TOOLBOX_REQUIREMENTS`: the capability must be in the SDK allowlist, be
+published with the exact contract version, and the configured provider must be
+registered and implement it. The catalogue only restricts; it never makes a method
+available.
+
+| `TOOLBOX_AVAILABILITY_GATE` | Effect |
+|---|---|
+| `observe` (default) | Logs what would be removed and records it in `canonical_metadata.pddl_toolbox_availability`; the plan is unchanged |
+| `enforce` | Removes those methods from the plan and from every replan of the document. When the catalogue cannot be read and the last good snapshot is older than `TOOLBOX_CATALOG_STALE_SECONDS`, every method with Toolbox requirements is removed (fail closed) |
+| `off` | No check |
 
 ### 4.4 Tests
 
-- **Unit** (respx mock): `tests/test_toolbox_client.py`-style — verifies the mapping of
+- **Unit** (respx mock): in `libs/sdk/tests/clients/`, like the existing client tests — verifies the mapping of
   HTTP errors to typed exceptions and the provider being sent.
 - **E2E** (`e2e` marker): `tests/test_toolbox_e2e.py`-style — against a real
   `TOOLBOX_BASE_URL`; skipped if the variable is not set.
@@ -280,12 +298,12 @@ first, and degrade to the local implementation on failure.
 The `media.inspect` capability (provider `pure-media-inspect`, PR
 `A11yDevs/acessilia-toolbox#33`) is consumed in the core with the Scenario B pattern:
 
-- **Client:** `backend/tools/toolbox_media_inspect_client.py`
+- **Client:** `acessilia_sdk.toolbox.clients.ToolboxMediaInspectClient`
   (`ToolboxMediaInspectClient` → `POST /v1/capabilities/media.inspect:execute`).
-- **Local fallback:** `backend/tools/media_inspect.py`
+- **Local fallback (deviation, removed in #150 F3):** `backend/tools/media_inspect.py`
   (`inspect_source_media`, `inspect_media_payload`) — deterministic Pillow/PyMuPDF
   port replicating the `artifact/media-inspection@1` schema when the Toolbox is
-  unavailable.
+  unavailable. It has already drifted from the Toolbox provider.
 - **Integration:** `backend/agents/pddl_orchestrator.py` calls
   `inspect_source_media()` after extraction and uses the `requires_visual_inspection`
   signal to inject a full-page `picture` element when the input is a standalone image
@@ -307,19 +325,27 @@ Defined in `backend/config/settings.py` and documented in `.env.example`:
 
 | Variable | Default | Description |
 |---|---|---|
-| `TOOLBOX_BASE_URL` | `http://localhost:8002` | Service base URL |
+| `TOOLBOX_BASE_URL` | `http://localhost:8002` | Service base URL; in production, the load balancer in front of the replicas (ADR-0006) |
+| `TOOLBOX_BASE_URLS` | *(empty)* | Comma-separated URLs of independent Toolbox deployments, tried in order by the capability clients; empty means `TOOLBOX_BASE_URL` only |
 | `TOOLBOX_PROVIDER` | `docling` | Primary extraction provider |
 | `TOOLBOX_API_KEY` | *(empty)* | Key for `Authorization: Bearer` |
+| `TOOLBOX_AVAILABILITY_GATE` | `observe` | Availability gate: `observe`, `enforce` or `off` (section 4.3) |
+| `TOOLBOX_CATALOG_REFRESH_SECONDS` | `60` | How long a catalogue snapshot is reused |
+| `TOOLBOX_CATALOG_STALE_SECONDS` | `900` | How long the last good snapshot is served when the catalogue cannot be read |
 | `TOOLBOX_TIMEOUT_SECONDS` | `3600` | Request timeout |
 | `TOOLBOX_USE_ARTIFACT_STORE` | `true` | Upload the file to `/v1/artifacts` before extracting |
 | `TOOLBOX_USE_REMOTE_CACHE` | `true` | Use the remote cache (`no_cache=false`) |
 | `TOOLBOX_MEDIA_INSPECT_PROVIDER` | `pure-media-inspect` | Provider for the `media.inspect` capability |
-| `TOOLBOX_MEDIA_INSPECT_ENABLED` | `true` | Run `media.inspect` (Toolbox-first with local fallback) |
+| `TOOLBOX_MEDIA_INSPECT_ENABLED` | `true` | Run `media.inspect` or skip it. Today a local fallback still runs when the Toolbox fails; it is removed in #150 |
+| `TOOLBOX_PDF_UA_PROVIDER` | `pandoc-pdf-ua` | Provider for the `document.export.pdf_ua` capability |
+| `TOOLBOX_PDF_UA_ENABLED` | `true` | Render PDF/UA on the Toolbox (pinned Pandoc + TeX Live) or skip it. Today local pandoc + LaTeX still runs as a fallback; it is removed in #150 |
+| `TOOLBOX_PDF_UA_TIMEOUT_SECONDS` | `300` | How long to wait for the Toolbox render before falling back to the local renderer |
 | `FUSION_MODE` | `single` | `single` (one provider) or `dual` (two providers + fusion) |
 | `FUSION_SECONDARY_PROVIDER` | `mineru` | Secondary provider for `FUSION_MODE=dual` |
 | `STRUCTURER` | `toolbox` | Per-page region engine (`toolbox`, `toolbox-layout`, `pymupdf`) |
-| `TOOLBOX_PAGE_OCR_PROVIDER` | `qwen3-vl-page` | Whole-page VLM transcription (`document.ocr.page`) |
-| `TOOLBOX_ADJUDICATE_PROVIDER` | `qwen3-vl-judge` | Pairwise judge / region transcription (`document.adjudicate.*`) |
+| `TOOLBOX_PAGE_OCR_PROVIDER` | `qwen3-vl-8b` | Whole-page VLM transcription (`document.ocr.page`) |
+| `TOOLBOX_ADJUDICATE_PROVIDER` | `qwen3-vl-8b` | Pairwise judge / region transcription (`document.adjudicate.*`) |
+| `TOOLBOX_TABLE_PROVIDER` | `qwen3-vl-8b` | Table re-generation for the table specialist (`table.recognize`) |
 | `TOOLBOX_ORIENTATION_PROVIDER` | `rapidocr-orient` | Rotation detection (`image.page.orient`) |
 | `FUSION_HYBRID_PROVIDER` | `mineru-hyb` | MinerU hybrid-VLM provider id (the B source of the confirmed leaderboard best) |
 
@@ -348,12 +374,14 @@ service.py: _build_orchestrator()
 
 ## 7. Code references
 
-- `backend/tools/toolbox_client.py` — base client and exception hierarchy
-- `backend/tools/toolbox_layout_client.py` — Scenario B template
-- `backend/tools/toolbox_ocr_tools.py`, `toolbox_math_tools.py`, `toolbox_pdf_tools.py` — wrappers with local fallback
-- `backend/tools/toolbox_page_ocr_client.py` — `document.ocr.page` (whole-page VLM)
-- `backend/tools/toolbox_adjudicate_client.py` — `document.adjudicate.page` / `.region`
-- `backend/tools/toolbox_orientation_client.py` — `image.page.orient`
+- `libs/sdk/src/acessilia_sdk/toolbox/` — capability registry, transport, client base class, failover, artifacts and exception hierarchy (SDK)
+- `libs/sdk/src/acessilia_sdk/toolbox/clients/` — one client per capability family; `layout.py` is the Scenario B template
+- `backend/tools/toolbox_client.py` — `make_toolbox_client` (SDK clients configured from the core settings) and the re-exported error types
+- `clients/structure.py`, `clients/artifact.py`, `clients/dataset.py` — structure extraction, the artifact store and the dataset routes
+- `backend/tools/toolbox_ocr_tools.py`, `toolbox_math_tools.py`, `toolbox_pdf_tools.py` — Agno wrappers; `toolbox_pdf_tools.py` still has a local fallback, removed in #150 (ADR-0003)
+- `clients/page_ocr.py` — `document.ocr.page` (whole-page VLM)
+- `clients/adjudicate.py` — `document.adjudicate.page` / `.region`
+- `clients/orientation.py` — `image.page.orient`
 - `backend/tools/structurer.py` — `get_structurer()` and structurer selection
 - `backend/core/manifest/toolbox_extractor.py` — `ToolboxManifestExtractor`
 - `backend/pipeline/fusion.py` — `extract_fused()` (dual fusion)
@@ -364,9 +392,10 @@ service.py: _build_orchestrator()
 
 | Capability | Client | Providers | Purpose |
 |---|---|---|---|
-| `document.ocr.page` | `ToolboxPageOcrClient` | `qwen3-vl-page`, `dots-ocr-page`, `deepseek-ocr-page`, `teleocr-page` | Whole-page VLM transcription — the B source of the page hybrid |
-| `document.adjudicate.page` | `ToolboxAdjudicateClient` | `qwen3-vl-judge` | Pairwise judge between two candidate transcriptions (both orders, position debiasing) |
-| `document.adjudicate.region` | `ToolboxAdjudicateClient` | `qwen3-vl-judge` | Exact transcription of a region crop, turned into a differ decision |
+| `document.ocr.page` | `ToolboxPageOcrClient` | `qwen3-vl-8b` | Whole-page VLM transcription — the B source of the page hybrid |
+| `document.adjudicate.page` | `ToolboxAdjudicateClient` | `qwen3-vl-8b` | Pairwise judge between two candidate transcriptions (both orders, position debiasing); used by the `vlm-pairwise-judge` method |
+| `document.adjudicate.region` | `ToolboxAdjudicateClient` | `qwen3-vl-8b` | Exact transcription of a region crop, turned into a differ decision |
+| `table.recognize` | `ToolboxTableClient` | `qwen3-vl-8b` | Greedy plus seeded HTML generations of a table crop, for the table specialist |
 | `image.page.orient` | `ToolboxOrientationClient` | `rapidocr-orient` | Rotation 0/90/180/270 detection |
 
 The provider registrations live in the Toolbox repository; the Dr.DocBench job

@@ -7,7 +7,7 @@ import fitz
 import pytest
 
 from backend.core.manifest.schema import validate_manifest
-from backend.tools.toolbox_client import ToolboxClient
+from acessilia_sdk.toolbox.clients import ToolboxArtifactClient, ToolboxStructureClient
 from scripts import manifest, pmv
 
 
@@ -34,8 +34,8 @@ def test_manifest_cli_extracts_through_toolbox(cli, monkeypatch, tmp_path):
     }
     upload = AsyncMock(return_value="artifact-1")
     extract = AsyncMock(return_value=response)
-    monkeypatch.setattr(ToolboxClient, "upload_artifact", upload)
-    monkeypatch.setattr(ToolboxClient, "extract_structure", extract)
+    monkeypatch.setattr(ToolboxArtifactClient, "upload", upload)
+    monkeypatch.setattr(ToolboxStructureClient, "extract_structure", extract)
     from backend.config.settings import settings
     monkeypatch.setattr(settings, "toolbox_use_artifact_store", True)
     output = tmp_path / "manifest.json"
@@ -49,7 +49,7 @@ def test_manifest_cli_extracts_through_toolbox(cli, monkeypatch, tmp_path):
     assert payload["language"] == "en-US"
     assert payload["elements"][0]["text"] == "Accessible content"
     upload.assert_awaited_once_with(source.resolve())
-    assert extract.call_args.kwargs["language"] == "en-US"
+    assert extract.call_args.kwargs["language"] == "pt-BR"
     assert extract.call_args.kwargs["artifact_id"] == "artifact-1"
 
 

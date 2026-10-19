@@ -114,7 +114,8 @@ async def test_orchestrator_reuses_reader_across_phases_and_preserves_dry_run(so
 
     plan = _sample_plan().model_copy(update={"manifest_id": document.manifest_id, "selected_obligations": []})
 
-    def build_plan(result):
+    def build_plan(result, *, extra_unavailable=()):
+        assert not extra_unavailable
         assert result is document and result.elements[0].text == "A green rectangle"
         assert result.elements[1].metadata["table_ast"]["body"]
         assert all(reader._pool is None for reader, _ in states)

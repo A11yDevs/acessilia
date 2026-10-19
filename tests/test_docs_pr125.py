@@ -7,7 +7,6 @@ source and the Portuguese mirror have to stay in sync (constitution rule 8).
 from __future__ import annotations
 
 import importlib
-import re
 from pathlib import Path
 
 import pytest

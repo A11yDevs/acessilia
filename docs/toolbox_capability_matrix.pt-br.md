@@ -21,48 +21,55 @@ regerado com `scripts/capture_toolbox_contract.py`).
 
 ## Pontos de acionamento exigidos por capacidade
 
-Uma capacidade só é *acionável* no core quando os quatro elos existem. Uma capacidade
-sem qualquer elo é uma capacidade morta do ponto de vista do produto.
+Uma capacidade só é *acionável* no core quando os quatro elos existem. A falta
+de um elo identifica uma lacuna de integração; não prova que a capacidade seja
+morta. Para capacidades Dr.DocBench, investigue especialmente o caminho
+evidência → obrigação → `problem.pddl` → método → handler → efeito verificável,
+sem descartar a capacidade por falta de acionamento atual.
 
 | Elo | Artefato | Local |
 |---|---|---|
-| Cliente | `Toolbox*Client` com o id da capacidade | `backend/tools/toolbox_*_client.py` |
-| Default de provider | `TOOLBOX_*_PROVIDER` (ou `TOOLBOX_PROVIDER`) | `backend/config/settings.py` |
+| Entrada no registro | `ToolboxCapability` (id, versão, configuração de provider, schema de saída) | `libs/sdk/src/acessilia_sdk/toolbox/capabilities.py` |
+| Cliente | subclasse de `ToolboxCapabilityClient` chamando o id registrado, criada no core com `make_toolbox_client` | `libs/sdk/src/acessilia_sdk/toolbox/clients/*.py` |
+| Default de provider | `PROVIDER_DEFAULTS`, lido por `TOOLBOX_*_PROVIDER` no `Settings` | `libs/sdk/src/acessilia_sdk/toolbox/capabilities.py` |
 | Manifest | `capabilities/*.yaml` | `acessilia-toolbox` |
 | Registro do provider | entrada em `providers-config.yaml` com adapter | `acessilia-toolbox` |
 
 Para o trabalho guiado por planejamento há dois elos adicionais: a entrada de
-obrigação/método em `DEFAULT_METHOD_COSTS` (`backend/core/manifest/builder.py`) e um
-handler registrado em `PddlAccessibilityOrchestrator._build_executor`
-(`backend/agents/pddl_orchestrator.py`).
+obrigação/método em `DEFAULT_METHOD_COSTS` (`backend/core/manifest/builder.py`),
+um handler registrado em `PddlAccessibilityOrchestrator._build_executor`
+(`backend/agents/pddl_orchestrator.py`) e uma evidência real que faça o
+compilador emitir os fatos necessários em `problem.pddl`.
 
 ## Matriz
 
 Legenda de **Caminho de chamada**: como o core alcança a capacidade.
 
-| Capacidade | Cliente no core | Default de provider no core | Provider na Toolbox | Caminho de chamada |
+| Capacidade | Cliente | Default de provider no core | Provider na Toolbox | Caminho de chamada |
 |---|---|---|---|---|
-| `document.structure.extract` | `toolbox_client.py` (URL inline) | `TOOLBOX_PROVIDER=docling` | `docling`, `mineru`, `nougat`, `teleocr` | `ToolboxManifestExtractor` → extração do PDDL |
-| `document.layout.analyze` | `toolbox_layout_client.py` | `TOOLBOX_LAYOUT_PROVIDER=docling-layout` | `docling-layout`, `mineru-layout` | `ToolboxLayoutStructurer` via `STRUCTURER=toolbox-layout` |
-| `document.ocr` | `toolbox_ocr_client.py` | `TOOLBOX_OCR_PROVIDER=docling-ocr` | `docling-ocr`, `mineru-ocr` | `toolbox_ocr_tools.py` (wrapper Agno) |
-| `math.recognize` | `toolbox_math_client.py` | `TOOLBOX_MATH_RECOGNIZE_PROVIDER=docling-math` | `docling-math`, `rapid-latex-ocr` | `toolbox_math_tools.py` |
-| `math.convert` | `toolbox_math_client.py` | `TOOLBOX_MATH_PROVIDER=pure-math` | `pure-math` | `toolbox_math_tools.py` |
-| `math.verbalize` | `toolbox_math_client.py` | `TOOLBOX_MATH_PROVIDER=pure-math` | `pure-math` | `toolbox_math_tools.py` |
-| `pdf.split` | `toolbox_pdf_client.py` | `TOOLBOX_PDF_PROVIDER=pymupdf-pdf` | `pymupdf-pdf` | `toolbox_pdf_tools.py` (valida e divide localmente) |
-| `pdf.render` | `toolbox_pdf_client.py` | `TOOLBOX_PDF_PROVIDER=pymupdf-pdf` | `pymupdf-pdf` | `toolbox_pdf_tools.py` (fallback local via PyMuPDF) |
-| `media.inspect` | `toolbox_media_inspect_client.py` | `TOOLBOX_MEDIA_INSPECT_PROVIDER=pure-media-inspect` | `pure-media-inspect` | `backend/tools/media_inspect.py`, controlado por `TOOLBOX_MEDIA_INSPECT_ENABLED` |
-| `artifact.store` / `artifact.retrieve` | `toolbox_client.py` REST `/v1/artifacts` | — | `minio`, `filesystem` | upload antes da extração |
-| `dataset.*` (8 capacidades) | `toolbox_client.py` REST `/v1/datasets` | — | `dataset-github`, `dataset-huggingface` | `toolbox_dataset_tools.py` (scripts do Dr.DocBench) |
-| `document.ocr.page` | `toolbox_page_ocr_client.py` | `TOOLBOX_PAGE_OCR_PROVIDER=qwen3-vl-page` | **ausente** | **sem chamador** |
-| `document.adjudicate.page` | `toolbox_adjudicate_client.py` | `TOOLBOX_ADJUDICATE_PROVIDER=qwen3-vl-judge` | **ausente** | **sem chamador** |
-| `document.adjudicate.region` | `toolbox_adjudicate_client.py` | `TOOLBOX_ADJUDICATE_PROVIDER=qwen3-vl-judge` | **ausente** | **sem chamador** |
-| `image.page.orient` | `toolbox_orientation_client.py` | `TOOLBOX_ORIENTATION_PROVIDER=rapidocr-orient` | `rapidocr-orient` | contrato válido, **ainda sem chamador de produção** |
-| `accessibility.mark` | **ausente** | — | `pure-accessibility` | — |
-| `chem.convert` | **ausente** | — | `pure-chem` | — |
-| `chem.recognize` | **ausente** | — | `docling-chem` | — |
-| `code.normalize` | **ausente** | — | `pure-code` | — |
-| `text.postprocess` | **ausente** | — | `pure-text` | — |
-| `music.omr` | **ausente** | — | `homr`, `audiveris` | — |
+| `document.structure.extract` | `acessilia_sdk/toolbox/clients/structure.py` | `TOOLBOX_PROVIDER=docling` | `docling`, `mineru`, `nougat`, `teleocr` | `ToolboxManifestExtractor` → extração do PDDL; com `FUSION_MODE=dual`, também compara o provider secundário e repassa evidências por página ao builder do manifesto |
+| `document.layout.analyze` | `acessilia_sdk/toolbox/clients/layout.py` | `TOOLBOX_LAYOUT_PROVIDER=docling-layout` | `docling-layout`, `mineru-layout` | `ToolboxLayoutStructurer` via `STRUCTURER=toolbox-layout` |
+| `document.ocr` | `acessilia_sdk/toolbox/clients/ocr.py` | `TOOLBOX_OCR_PROVIDER=docling-ocr` | `docling-ocr`, `mineru-ocr` | `toolbox_ocr_tools.py` (wrapper Agno) |
+| `math.recognize` | `acessilia_sdk/toolbox/clients/math.py` | `TOOLBOX_MATH_RECOGNIZE_PROVIDER=docling-math` | `docling-math`, `rapid-latex-ocr` | `toolbox_math_tools.py` |
+| `math.convert` | `acessilia_sdk/toolbox/clients/math.py` | `TOOLBOX_MATH_PROVIDER=pure-math` | `pure-math` | `toolbox_math_tools.py` |
+| `math.verbalize` | `acessilia_sdk/toolbox/clients/math.py` | `TOOLBOX_MATH_PROVIDER=pure-math` | `pure-math` | `toolbox_math_tools.py` |
+| `pdf.split` | `acessilia_sdk/toolbox/clients/pdf.py` | `TOOLBOX_PDF_PROVIDER=pymupdf-pdf` | `pymupdf-pdf` | `toolbox_pdf_tools.py` (valida e divide localmente) |
+| `pdf.render` | `acessilia_sdk/toolbox/clients/pdf.py` | `TOOLBOX_PDF_PROVIDER=pymupdf-pdf` | `pymupdf-pdf` | `toolbox_pdf_tools.py` (fallback local via PyMuPDF; desvio removido na #150, ADR-0003) |
+| `media.inspect` | `acessilia_sdk/toolbox/clients/media_inspect.py` | `TOOLBOX_MEDIA_INSPECT_PROVIDER=pure-media-inspect` | `pure-media-inspect` | `backend/tools/media_inspect.py` (fallback local; desvio removido na #150, ADR-0003), controlado por `TOOLBOX_MEDIA_INSPECT_ENABLED` |
+| `document.export.pdf_ua` | `acessilia_sdk/toolbox/clients/pdf_ua.py` | `TOOLBOX_PDF_UA_PROVIDER=pandoc-pdf-ua` | `pandoc-pdf-ua` (sidecar `pdf-ua-render`) | `backend/export/pandoc_exporter.py` (Toolbox-first, PDF baixado de `/v1/artifacts`; o fallback para pandoc + LaTeX locais é um desvio removido na #150, ADR-0003), controlado por `TOOLBOX_PDF_UA_ENABLED` |
+| `artifact.store` / `artifact.retrieve` | `acessilia_sdk/toolbox/clients/artifact.py` (REST `/v1/artifacts`) | — | `minio`, `filesystem` | upload antes da extração |
+| `dataset.*` (8 capacidades) | `acessilia_sdk/toolbox/clients/dataset.py` (REST `/v1/datasets`) | — | `dataset-github`, `dataset-huggingface` | `toolbox_dataset_tools.py` (scripts do Dr.DocBench) |
+| `document.ocr.page` | `acessilia_sdk/toolbox/clients/page_ocr.py` | `TOOLBOX_PAGE_OCR_PROVIDER=qwen3-vl-8b` | `qwen3-vl-8b` (acessilia-toolbox#50) | publicada; nenhum método PDDL a chama ainda |
+| `document.adjudicate.page` | `acessilia_sdk/toolbox/clients/adjudicate.py` | `TOOLBOX_ADJUDICATE_PROVIDER=qwen3-vl-8b` | `qwen3-vl-8b` (acessilia-toolbox#50) | `vlm-pairwise-judge` em `adjudicate-page`; limiares a revalidar no modelo 8B |
+| `document.adjudicate.region` | `acessilia_sdk/toolbox/clients/adjudicate.py` | `TOOLBOX_ADJUDICATE_PROVIDER=qwen3-vl-8b` | `qwen3-vl-8b` (acessilia-toolbox#50) | publicada; handler do `rescue-omitted` pendente |
+| `table.recognize` | `acessilia_sdk/toolbox/clients/table.py` | `TOOLBOX_TABLE_PROVIDER=qwen3-vl-8b` | `qwen3-vl-8b` (acessilia-toolbox#50) | publicada; handler do `table-specialist` pendente (regra de seleção a decidir) |
+| `image.page.orient` | `acessilia_sdk/toolbox/clients/orientation.py` | `TOOLBOX_ORIENTATION_PROVIDER=rapidocr-orient` | `rapidocr-orient` | contrato válido; falta gatilho PDDL e validação do efeito em produção |
+| `accessibility.mark` | **ausente** | — | `pure-accessibility` | pendente: cliente e obrigação/método/handler acionados por evidência |
+| `chem.convert` | **ausente** | — | `pure-chem` | pendente: cliente e obrigação/método/handler acionados por evidência |
+| `chem.recognize` | **ausente** | — | `docling-chem` | pendente: cliente e obrigação/método/handler acionados por evidência |
+| `code.normalize` | **ausente** | — | `pure-code` | pendente: cliente e obrigação/método/handler acionados por evidência |
+| `text.postprocess` | **ausente** | — | `pure-text` | pendente: cliente e obrigação/método/handler acionados por evidência |
+| `music.omr` | **ausente** | — | `homr`, `audiveris` | pendente: cliente e obrigação/método/handler acionados por evidência |
 | `cache.get` / `cache.put` | — (interno) | — | `valkey` | cache interno da Toolbox; não é capacidade pública |
 
 ## Deriva confirmada (no momento da revisão)
@@ -70,19 +77,25 @@ Legenda de **Caminho de chamada**: como o core alcança a capacidade.
 Medida contra a Toolbox de homologação em execução com
 `python scripts/check_capability_contract.py --snapshot tests/fixtures/toolbox-contract.json`:
 
-1. Três capacidades são consumidas pelo core mas não existem no catálogo da
-   Toolbox: `document.ocr.page`, `document.adjudicate.page`,
-   `document.adjudicate.region`.
-2. Dois defaults de provider em `settings.py` apontam para providers que a Toolbox
-   não registra: `qwen3-vl-page`, `qwen3-vl-judge`.
-3. Seis capacidades não têm nenhum cliente no core (ver a matriz).
+1. A REST genérica publicada expõe
+   `POST /v1/capabilities/{capability_id}:execute`; os schemas específicos ficam
+   disponíveis em `GET /v1/capabilities/{capability_id}`. OpenAPI ao vivo:
+   `https://www.acessilia3.inf.ufg.br/toolbox/v1/openapi.json` (UI:
+   `/toolbox/v1/docs`). Ela não define rotas específicas por capacidade.
+2. Resolvido pelo acessilia-toolbox#50: `document.ocr.page`,
+   `document.adjudicate.page` e `document.adjudicate.region` são publicadas pelo
+   provider `qwen3-vl-8b`, e os defaults do SDK apontam para ele (antes citavam
+   `qwen3-vl-page` e `qwen3-vl-judge`, do perfil de 32B dos experimentos).
+3. O `KNOWN_DRIFT` está vazio contra o catálogo do develop da Toolbox; a
+   homologação ainda roda uma imagem anterior ao #50 até ser reimplantada.
+4. Seis capacidades não têm nenhum cliente no core (ver a matriz).
 
-A deriva de orientação foi resolvida: o cliente postava em
+A deriva de contrato de orientação foi resolvida: o cliente postava em
 `document.orientation.detect` com provider `rapidocr-orientation`, nenhum dos dois
 conhecido pela Toolbox, enquanto a Toolbox expõe `image.page.orient` implementada
 por `rapidocr-orient`. O cliente e o default agora batem com o catálogo. O cliente
-continua sem chamador de produção, então o veredito dele é
-"integrar ou aposentar", não "concluído".
+continua sem gatilho PDDL de produção; isso é uma lacuna de modelagem/integração,
+não motivo para aposentar uma capacidade Dr.DocBench.
 
 A deriva conhecida está fixada em `tests/test_toolbox_contract_drift.py`; qualquer
 deriva *nova* quebra a suíte, e corrigir um achado exige removê-lo da lista fixada.
@@ -131,12 +144,15 @@ saudável; desligá-lo pulava a execução em vez de expor a lacuna.
   registrado ou é reportado ao planejador como indisponível;
   `tests/test_pddl_actionability.py` falha para qualquer método que não seja nenhum
   dos dois.
-- **15 handlers registrados** (antes: 3 reais + 8 no-op): os 3 com modelo mais 12
-  handlers determinísticos cobrindo `vision-description`, `pandoc-table`,
-  `pandoc-code`, `pymupdf-region`, `latex-normalizer`, `norm-fix`,
+- **18 handlers registrados** (antes: 3 reais + 8 no-op): os 3 com modelo,
+  `single-provider` como fallback executável e 13 handlers determinísticos
+  cobrindo `vision-description`, `pandoc-table`,
+  `pandoc-code`, `pymupdf-region`, `latex-normalizer`, `norm-fix`, `rep-guard`,
   `line-number-extractor`, `verse-chunker`, `tailjoin`, `tailjoin-positioned`,
-  `deterministic-heading-repair`. Eles *validam* o trabalho que o pipeline já
-  realizou, em vez de fingir realizá-lo.
+  `xycut-order` e `deterministic-heading-repair`; `human-review` é o handler
+  explícito de escalonamento terminal.
+  `single-provider` é selecionado pelo replanejamento após a rejeição de uma
+  fusão dual; o teste de regressão verifica a execução e o artefato produzido.
 - **O no-op silencioso foi eliminado.** Um handler que declara sucesso precisa
   marcar `validated=True` sobre trabalho real.
 - **`human-review` tem semântica própria.** É o escalonamento terminal que toda
@@ -153,13 +169,25 @@ saudável; desligá-lo pulava a execução em vez de expor a lacuna.
   executor registrou, de modo que um método que falhou passa para o próximo
   admissível.
 
-Nove métodos permanecem **declarados indisponíveis** em vez de implementados:
-`skeleton-order`, `xycut-order`, `agreement-rule`, `rep-guard`, `rescue-omitted`,
-`single-provider`, `table-smart-fusion`, `table-specialist`, `vlm-pairwise-judge`.
-Todos são métodos v2.3 que dependem de divergência entre providers ou de um juiz
-VLM; o planejador nunca emite um passo para eles hoje. Estão listados como catraca
-em `KnownUnavailable` dentro do arquivo de teste, então implementar um deles quebra
-o teste até que seja removido da lista.
+### P2: obrigações v2.3 baseadas em evidências
+
+O builder do manifesto agora deriva obrigações v2.3 de evidências determinísticas:
+mudanças reais de normalização de texto/fórmula, reordenação de leitura, junções
+elegíveis de cauda, fragmentação de verso e extração de números marginais. As
+obrigações de fusão entre providers só são emitidas quando a extração carrega
+evidências de fusão por página; divergência de texto, blocos descartados, decisões
+de fonte de tabela e cortes de repetição não são inferidos a partir de um manifesto
+de provider único. As obrigações já fornecidas pela Toolbox são preservadas, e as
+novas são deduplicadas por tipo e alvo.
+
+O pipeline de fusão agora exporta contadores de decisão por página e a contagem de
+cortes por repetição, sem copiar o texto dos providers para o manifesto. Essas
+evidências permitem distinguir um problema observado de uma capacidade que apenas
+existe no catálogo PDDL. Sete métodos ainda não têm handler executável e continuam
+fora dos planos até os dados candidatos ou contratos REST necessários estarem
+disponíveis. Isso é uma pendência de integração, não uma decisão de descartar as
+capacidades Dr.DocBench. A especificação REST própria para OCR de página e
+adjudicação está pendente do responsável pelos serviços.
 
 ### Evidência ao vivo
 
@@ -176,15 +204,16 @@ status: completed
 Antes da correção a mesma entrada produzia `failed` com
 `RuntimeError: No handler registered for vision-description`.
 
-### Pendente
+### Gate de disponibilidade do planejador
 
-`_validate_methods` só levanta quando uma obrigação tem **zero** candidatos
-disponíveis. Quando um método declarado indisponível pelo compilador simplesmente
-desaparece do problema compilado enquanto a lista admissível do manifesto ainda o
-contém, o planejador ainda recebe um método que não pode rodar: o predicado
-`available` só é emitido para `available_methods`, e o `InternalReferencePlanner`
-filtra por ele, mas o `FastDownwardPlanner` depende da precondição do domínio.
-Ainda não corrigido.
+Métodos indisponíveis continuam na lista admissível do manifesto para manter a
+rastreabilidade, mas o compilador não emite `(available <método>)` para eles. A
+ação PDDL `execute-obligation` exige `(available ?m)`, então o Fast Downward não
+pode selecioná-los. O planejador interno aplica a mesma projeção diretamente, e
+o runtime valida planos externos contra ela antes da execução.
+`tests/test_pddl_planning.py::test_fast_downward_respects_unavailable_methods`
+regrede tanto os fatos de disponibilidade compilados quanto a rejeição de um
+plano externo inválido.
 
 ## Vereditos
 

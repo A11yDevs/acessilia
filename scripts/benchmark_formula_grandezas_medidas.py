@@ -18,14 +18,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import fitz
 
-from backend.tools.toolbox_client import ToolboxClient
+from acessilia_sdk.toolbox.clients import ToolboxStructureClient
+from backend.tools.toolbox_client import make_toolbox_client
 from backend.tools.toolbox_structurer import ToolboxStructurer
 
 PDF = Path("tests/fixtures/presentations/grandezas-e-medidas-42pgs.pdf")
 
 def main() -> None:
     structurer = ToolboxStructurer(
-        client=ToolboxClient(provider="docling"), allow_fallback=False,
+        client=make_toolbox_client(ToolboxStructureClient, provider="docling"), allow_fallback=False,
     )
 
     type_counts: Counter[str] = Counter()

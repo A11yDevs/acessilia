@@ -1,3 +1,5 @@
+from backend.services.blocking import offload
+from contextlib import contextmanager
 import json
 import sqlite3
 import uuid
@@ -76,7 +78,8 @@ def _get_connection():
     return _connection
 
 
-async def criar_token(
+@offload
+def criar_token(
     output_dir: Path,
     filename: str,
     formats: list = None,
@@ -100,7 +103,8 @@ async def criar_token(
     return token
 
 
-async def obter_info_token(token: str) -> dict | None:
+@offload
+def obter_info_token(token: str) -> dict | None:
     with _connection_lock:
         conn = _get_connection()
         cursor = conn.cursor()
@@ -155,28 +159,75 @@ async def obter_info_token(token: str) -> dict | None:
     }
 
 
-async def limpar_tokens_expirados(dias: int = TOKEN_EXPIRY_DAYS):
+@offload
+def limpar_tokens_expirados(dias: int = TOKEN_EXPIRY_DAYS):
     with _connection_lock:
         conn = _get_connection()
         cursor = conn.cursor()
         try:
+            conn.execute("BEGIN IMMEDIATE")
+            cutoff = f"-{dias} days"
             cursor.execute(
-                "SELECT output_dir FROM download_tokens WHERE criado_em < datetime('now', '-{} days')".format(dias)
+                "SELECT DISTINCT output_dir FROM download_tokens WHERE criado_em < datetime('now', ?)",
+                (cutoff,),
             )
-            rows = cursor.fetchall()
-        finally:
-            cursor.close()
-        for row in rows:
-            output_dir = Path(row["output_dir"])
-            if output_dir.exists():
-                if str(output_dir).startswith(str(settings.temp_dir)) or str(output_dir).startswith(str(settings.data_dir / "output")):
-                    shutil.rmtree(output_dir, ignore_errors=True)
-                    logger.debug(t(LOG_OUTPUT_DIR_REMOVED).format(name=output_dir))
-        cursor = conn.cursor()
-        try:
+            expired_dirs = [Path(row["output_dir"]) for row in cursor.fetchall()]
             cursor.execute(
-                "DELETE FROM download_tokens WHERE criado_em < datetime('now', '-{} days')".format(dias)
+                "SELECT DISTINCT output_dir FROM download_tokens WHERE criado_em >= datetime('now', ?)",
+                (cutoff,),
+            )
+            active_dirs = {Path(row["output_dir"]).resolve() for row in cursor.fetchall()}
+            for output_dir in expired_dirs:
+                _remove_unreferenced_output_directory(output_dir, active_dirs)
+            cursor.execute(
+                "DELETE FROM download_tokens WHERE criado_em < datetime('now', ?)",
+                (cutoff,),
             )
             conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
         finally:
             cursor.close()
+
+
+def _remove_unreferenced_output_directory(output_dir: Path, active_dirs: set[Path]) -> bool:
+    resolved = output_dir.resolve()
+    roots = (settings.temp_dir.resolve(), (settings.data_dir / "output").resolve())
+    if output_dir.is_symlink() or not any(root in resolved.parents for root in roots):
+        return False
+    if any(
+        resolved == active or resolved in active.parents or active in resolved.parents
+        for active in active_dirs
+    ):
+        return False
+    if not output_dir.is_dir():
+        return False
+    shutil.rmtree(output_dir)
+    logger.debug(t(LOG_OUTPUT_DIR_REMOVED).format(name=output_dir))
+    return True
+
+
+@contextmanager
+def active_download_directories():
+    """Hold token creation and expiry while a caller checks and removes files."""
+    with _connection_lock:
+        conn = _get_connection()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            rows = conn.execute(
+                "SELECT DISTINCT output_dir FROM download_tokens WHERE criado_em >= datetime('now', ?)",
+                (f"-{TOKEN_EXPIRY_DAYS} days",),
+            ).fetchall()
+            active_dirs = {Path(row["output_dir"]).resolve() for row in rows}
+            yield active_dirs
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
+
+def remove_unreferenced_output_directory(output_dir: Path) -> bool:
+    """Serialize retention checks and deletion with token creation, including other processes."""
+    with active_download_directories() as active_dirs:
+        return _remove_unreferenced_output_directory(output_dir, active_dirs)

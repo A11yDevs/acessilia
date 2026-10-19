@@ -18,13 +18,13 @@ from backend.service import _normalized_engine, _build_orchestrator
 class TestPipelineSelection:
     def test_normalized_engine_rejects_legacy(self):
         with patch("backend.service.settings.pipeline_engine", "legacy"):
-            with pytest.raises(RuntimeError, match="Unsupported PIPELINE_ENGINE"):
+            with pytest.raises(RuntimeError, match="Pipeline legado"):
                 _normalized_engine()
 
     def test_normalized_engine_raises_on_unknown(self):
         """_normalized_engine() must raise RuntimeError for unknown engine."""
         with patch("backend.service.settings.pipeline_engine", "unknown"):
-            with pytest.raises(RuntimeError, match="Unsupported PIPELINE_ENGINE"):
+            with pytest.raises(RuntimeError, match="Pipeline legado"):
                 _normalized_engine()
 
     def test_normalized_engine_accepts_pddl(self):
@@ -39,7 +39,7 @@ class TestPipelineSelection:
 
     def test_build_orchestrator_rejects_legacy(self):
         with patch("backend.service.settings.pipeline_engine", "legacy"):
-            with pytest.raises(RuntimeError, match="Unsupported PIPELINE_ENGINE"):
+            with pytest.raises(RuntimeError, match="Pipeline legado"):
                 _build_orchestrator()
 
     def test_build_orchestrator_returns_pddl_toolbox(self):

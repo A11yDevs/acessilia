@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from concurrent.futures import ProcessPoolExecutor
 from multiprocessing import get_context
 from multiprocessing.util import Finalize
@@ -17,23 +18,109 @@ from docstruct.regions.grouping import (  # noqa: F401
     CALLOUT_MIN_INDENT_RATIO,
     LIST_LINE_PATTERNS,
     MONOSPACE_FONTS,
-    _add_unknown_gaps,
-    _estimate_main_text_band,
+    _add_unknown_gaps as _shared_add_unknown_gaps,
     ENABLE_PYMUPDF_CALLOUT_MERGE,
-    _fill_gaps_with_unknown,
     _is_known_callout_title,
-    _is_same_callout_cluster,
-    _merge_bboxes,
-    _normalize_text_key,
-    _starts_with_list_marker,
+    _merge_callout_groups as _shared_merge_callout_groups,
 )
 from docstruct.types import Region
 
 from backend.config.settings import settings
-from backend.core.manifest.models import ManifestElement
+from backend.core.manifest.models import ManifestElement, is_bottom_left
 from backend.i18n import t
 from backend.log_messages import LOG_PDDL_ELEMENT_CROP_FAILED
 from backend.tools.logger import logger
+
+
+def _extract_picture_bytes(
+    source_file: Path,
+    element: ManifestElement,
+    fallback_page_number: int | None,
+) -> tuple[bytes | None, int]:
+    provenance = element.provenance[0] if element.provenance else None
+    page_number = provenance.page_number if provenance is not None else (fallback_page_number or 0)
+    if page_number < 1:
+        return None, 0
+    with fitz.open(source_file) as document:
+        return _crop_from_document(document, element, provenance, page_number)
+
+
+def _crop_from_document(
+    document: fitz.Document, element: ManifestElement, provenance: Any, page_number: int,
+) -> tuple[bytes | None, int]:
+    try:
+        page = document.load_page(page_number - 1)
+        rect = _clip_rect_from_provenance(page, provenance)
+        return page.get_pixmap(clip=rect, dpi=160, alpha=False).tobytes("png"), page_number
+    except Exception:
+        logger.exception(t(LOG_PDDL_ELEMENT_CROP_FAILED).format(element_id=element.id))
+        return None, page_number
+
+
+def _clip_rect_from_provenance(page: fitz.Page, provenance: Any) -> fitz.Rect:
+    bbox = getattr(provenance, "bbox", None)
+    if bbox is None:
+        return page.rect
+    left, right = sorted((float(bbox.left), float(bbox.right)))
+    top, bottom = float(bbox.top), float(bbox.bottom)
+    if is_bottom_left(getattr(bbox, "coord_origin", None), top, bottom):
+        top, bottom = page.rect.height - top, page.rect.height - bottom
+    rect = fitz.Rect(left, min(top, bottom), right, max(top, bottom)) & page.rect
+    return rect if rect.width >= 4 and rect.height >= 4 else page.rect
+
+
+_crop_document: fitz.Document | None = None
+_crop_source = ""
+
+
+def _initialize_crop_worker(source: str) -> None:
+    global _crop_source
+    _crop_source = source
+
+
+def _crop_in_worker(
+    element: ManifestElement, fallback_page_number: int | None,
+) -> tuple[bytes | None, int]:
+    global _crop_document
+    provenance = element.provenance[0] if element.provenance else None
+    page_number = provenance.page_number if provenance is not None else (fallback_page_number or 0)
+    if page_number < 1:
+        return None, 0
+    if _crop_document is None:
+        _crop_document = fitz.open(_crop_source)
+        Finalize(None, _crop_document.close, exitpriority=10)
+    return _crop_from_document(_crop_document, element, provenance, page_number)
+
+
+class PdfRegionReader:
+    """Reuse one lazy PyMuPDF document in an isolated process for a source PDF."""
+
+    def __init__(self, source: Path) -> None:
+        self._source = str(source)
+        self._pool: ProcessPoolExecutor | None = None
+
+    async def __aenter__(self) -> PdfRegionReader:
+        return self
+
+    async def __aexit__(self, *_exc: Any) -> None:
+        if self._pool is not None:
+            await asyncio.to_thread(self._pool.shutdown, wait=True, cancel_futures=True)
+            self._pool = None
+
+    async def crop(
+        self, element: ManifestElement, fallback_page_number: int | None,
+    ) -> tuple[bytes | None, int]:
+        page_number = element.provenance[0].page_number if element.provenance else (fallback_page_number or 0)
+        if page_number < 1:
+            return None, 0
+        if self._pool is None:
+            self._pool = ProcessPoolExecutor(
+                max_workers=1, mp_context=get_context("spawn"),
+                initializer=_initialize_crop_worker, initargs=(self._source,),
+            )
+        return await asyncio.get_running_loop().run_in_executor(
+            self._pool, _crop_in_worker, element, fallback_page_number,
+        )
 
 
 def _known_callout_titles() -> frozenset[str]:
@@ -50,12 +137,14 @@ def extract_regions(page: fitz.Page) -> list[Region]:
 
     image_map = _build_image_map(page)
 
-    blocks = page.get_text("dict", flags=fitz.TEXT_PRESERVE_WHITESPACE).get(
+    blocks = page.get_text(
+        "dict", flags=fitz.TEXT_PRESERVE_WHITESPACE | fitz.TEXT_PRESERVE_IMAGES
+    ).get(
         "blocks", []
     )
 
     for block in blocks:
-        bbox = tuple(block.get("bbox", (0, 0, 0, 0)))
+        bbox = tuple(fitz.Rect(block.get("bbox", (0, 0, 0, 0))) * page.rotation_matrix)
         block_type = block.get("type")
 
         if block_type == 0:
@@ -89,6 +178,26 @@ def _build_image_map(page: fitz.Page) -> dict[int, dict[str, Any]]:
         except Exception:
             pass
     return image_map
+
+
+def _starts_with_list_marker(text: str) -> bool:
+    stripped = text.strip()
+    for pattern in LIST_LINE_PATTERNS:
+        if stripped.startswith(pattern):
+            return True
+    # numbered list: "1." or "1)" but NOT "9.1" (section heading)
+    if len(stripped) > 1 and stripped[0].isdigit() and stripped[1] in (".", ")"):
+        if len(stripped) > 2 and stripped[2].isdigit():
+            return False
+        return True
+    if (
+        len(stripped) > 2
+        and stripped[0].isalpha()
+        and stripped[1] in (".", ")")
+        and stripped[2] == " "
+    ):
+        return True
+    return False
 
 
 def _text_block_to_region(
@@ -154,101 +263,34 @@ def _text_block_to_region(
 
 
 def _merge_callout_groups(regions: list[Region], page_width: float) -> list[Region]:
-    text_regions = [
-        region
-        for region in regions
-        if region.type == "text"
-        and region.text.strip()
-        and region.metadata.get("subtype") not in {"code"}
+    return _shared_merge_callout_groups(regions, page_width, _known_callout_titles())
+
+
+def _estimate_main_text_band(regions: list[Region]) -> tuple[float, float]:
+    widths = [(region.bbox[0], region.bbox[2], region.bbox[2] - region.bbox[0]) for region in regions]
+    if not widths:
+        return (0.0, 0.0)
+    max_width = max(width for _, _, width in widths)
+    references = [
+        (left, right)
+        for left, right, width in widths
+        if width >= max_width * 0.75
     ]
-    if len(text_regions) < CALLOUT_MIN_GROUP_SIZE:
-        return regions
+    if not references:
+        references = [(left, right) for left, right, _ in widths]
+    return (min(left for left, _ in references), max(right for _, right in references))
 
-    main_left, main_right = _estimate_main_text_band(text_regions)
-    band_width = main_right - main_left
-    if band_width <= 0:
-        return regions
 
-    indent_threshold = max(
-        CALLOUT_MIN_INDENT_PX,
-        max(page_width, band_width) * CALLOUT_MIN_INDENT_RATIO,
-    )
-
-    candidates: list[Region] = []
-    for region in sorted(text_regions, key=lambda item: (item.bbox[1], item.bbox[0])):
-        left, top, right, bottom = region.bbox
-        width = max(1.0, right - left)
-        left_indent = left - main_left
-        right_indent = main_right - right
-        combined_indent = max(0.0, left_indent) + max(0.0, right_indent)
-        if (
-            max(left_indent, right_indent) < indent_threshold
-            and combined_indent < (indent_threshold * 1.35)
-        ):
-            continue
-        if width > band_width * CALLOUT_MAX_WIDTH_RATIO:
-            continue
-        if top >= bottom:
-            continue
-        candidates.append(region)
-
-    if len(candidates) < CALLOUT_MIN_GROUP_SIZE:
-        return regions
-
-    groups: list[list[Region]] = []
-    current: list[Region] = [candidates[0]]
-    for region in candidates[1:]:
-        previous = current[-1]
-        if _is_same_callout_cluster(previous, region):
-            current.append(region)
-        else:
-            groups.append(current)
-            current = [region]
-    groups.append(current)
-
-    grouped_ids = {
-        id(region)
-        for group in groups
-        if len(group) >= CALLOUT_MIN_GROUP_SIZE
-        for region in group
-    }
-    result: list[Region] = [region for region in regions if id(region) not in grouped_ids]
-
-    for index, group in enumerate(groups, start=1):
-        sorted_group = sorted(group, key=lambda item: (item.bbox[1], item.bbox[0]))
-        callout_title = _extract_callout_title(sorted_group[0])
-        min_size = 2 if _is_known_callout_title(callout_title, _known_callout_titles()) else CALLOUT_MIN_GROUP_SIZE
-        if len(group) < min_size:
-            continue
-
-        x0 = min(region.bbox[0] for region in sorted_group)
-        y0 = min(region.bbox[1] for region in sorted_group)
-        x1 = max(region.bbox[2] for region in sorted_group)
-        y1 = max(region.bbox[3] for region in sorted_group)
-        merged_text = "\n".join(region.text.strip() for region in sorted_group if region.text.strip())
-
-        merged = Region(
-            bbox=(x0, y0, x1, y1),
-            type="text",
-            text=merged_text,
-            image_bytes=None,
-            confidence=max(region.confidence for region in sorted_group),
-            page_num=sorted_group[0].page_num,
-            metadata={
-                "total_chars": sum(int(region.metadata.get("total_chars", 0)) for region in sorted_group),
-                "text_density": max(float(region.metadata.get("text_density", 0.0)) for region in sorted_group),
-                "avg_font_size": max(float(region.metadata.get("avg_font_size", 0.0)) for region in sorted_group),
-                "line_count": sum(int(region.metadata.get("line_count", 1)) for region in sorted_group),
-                "subtype": "callout",
-                "callout_id": f"callout-p{sorted_group[0].page_num}-{index}",
-                "callout_type": "note",
-                "callout_title": callout_title,
-                "callout_source": "pymupdf-geometry",
-            },
-        )
-        result.append(merged)
-
-    return result
+def _is_same_callout_cluster(previous: Region, current: Region) -> bool:
+    prev_left, _, prev_right, prev_bottom = previous.bbox
+    curr_left, curr_top, curr_right, _ = current.bbox
+    if curr_top - prev_bottom > CALLOUT_MAX_VERTICAL_GAP:
+        return False
+    overlap_left = max(prev_left, curr_left)
+    overlap_right = min(prev_right, curr_right)
+    overlap = max(0.0, overlap_right - overlap_left)
+    min_width = max(1.0, min(prev_right - prev_left, curr_right - curr_left))
+    return (overlap / min_width) >= 0.55
 
 
 def _extract_callout_title(region: Region) -> str:
@@ -266,6 +308,11 @@ def _extract_callout_title(region: Region) -> str:
     return ""
 
 
+def _normalize_text_key(text: str) -> str:
+    return re.sub(r"\s+", " ", text.strip().lower())
+
+
+
 def _image_block_to_region(
     block: dict[str, Any],
     bbox: tuple[float, float, float, float],
@@ -276,16 +323,9 @@ def _image_block_to_region(
     if width_area < 200:
         return None
 
-    image_bytes: bytes | None = None
-    for xref, img_data in image_map.items():
-        img_w = img_data.get("width", 0)
-        img_h = img_data.get("height", 0)
-        page_area = width_area
-        img_area = img_w * img_h
-
-        if img_area > 0 and abs(page_area - img_area) / img_area < 0.5:
-            image_bytes = img_data.get("image")
-            break
+    image_bytes: bytes | None = block.get("image")
+    if image_bytes is None:
+        image_bytes = image_map.get(block.get("xref"), {}).get("image")
 
     return Region(
         bbox=bbox,
@@ -298,126 +338,63 @@ def _image_block_to_region(
     )
 
 
+def _fill_gaps_with_unknown(
+    page: fitz.Page,
+    regions: list[Region],
+    page_num: int,
+) -> None:
+    page_rect = page.rect
+    page_w = page_rect.width
+    page_h = page_rect.height
+
+    if not regions:
+        regions.append(
+            Region(
+                bbox=(0, 0, page_w, page_h),
+                type="unknown",
+                text="",
+                image_bytes=None,
+                confidence=0.0,
+                page_num=page_num,
+            )
+        )
+        return
+
+    # Bounding envelopes can cover real whitespace between separate columns.
+    covered = [r.bbox for r in regions]
+
+    _add_unknown_gaps(covered, page_w, page_h, regions, page_num)
+
+
+def _merge_bboxes(
+    bboxes: list[tuple[float, float, float, float]],
+) -> list[tuple[float, float, float, float]]:
+    if not bboxes:
+        return []
+    sorted_b = sorted(bboxes, key=lambda b: (b[1], b[0]))
+    merged = [list(sorted_b[0])]
+    for b in sorted_b[1:]:
+        if b[1] <= merged[-1][3] + 5:
+            merged[-1][2] = max(merged[-1][2], b[2])
+            merged[-1][3] = max(merged[-1][3], b[3])
+        else:
+            merged.append(list(b))
+    return [tuple(b) for b in merged]
+
+
+def _add_unknown_gaps(
+    covered: list[tuple[float, float, float, float]],
+    page_w: float,
+    page_h: float,
+    regions: list[Region],
+    page_num: int,
+) -> None:
+    _shared_add_unknown_gaps(covered, page_w, page_h, regions, page_num)
+
+
 def crop_region_to_image(
     page: fitz.Page, bbox: tuple[float, float, float, float], dpi: int = 200
 ) -> bytes:
     clip = fitz.Rect(bbox)
     pix = page.get_pixmap(dpi=dpi, clip=clip)
     return pix.tobytes("png")
-
-
-def _extract_picture_bytes(
-    source_file: Path,
-    element: ManifestElement,
-    fallback_page_number: int | None,
-) -> tuple[bytes | None, int]:
-    provenance = element.provenance[0] if element.provenance else None
-    page_number = provenance.page_number if provenance is not None else (fallback_page_number or 0)
-    if page_number < 1:
-        return None, 0
-
-    with fitz.open(source_file) as document:
-        return _crop_from_document(document, element, provenance, page_number)
-
-
-def _crop_from_document(
-    doc: fitz.Document, element: ManifestElement, provenance: Any, page_number: int,
-) -> tuple[bytes | None, int]:
-    try:
-        page = doc.load_page(page_number - 1)
-        rect = _clip_rect_from_provenance(page, provenance)
-        pixmap = page.get_pixmap(clip=rect, dpi=160, alpha=False)
-        return pixmap.tobytes("png"), page_number
-    except Exception:
-        logger.exception(
-            t(LOG_PDDL_ELEMENT_CROP_FAILED).format(element_id=element.id)
-        )
-        return None, page_number
-
-
-def _clip_rect_from_provenance(page: fitz.Page, provenance: Any) -> fitz.Rect:
-    bbox = getattr(provenance, "bbox", None)
-    if bbox is None:
-        return page.rect
-
-    left = float(bbox.left)
-    right = float(bbox.right)
-    top = float(bbox.top)
-    bottom = float(bbox.bottom)
-
-    if getattr(bbox, "coord_origin", "UNKNOWN") == "BOTTOMLEFT":
-        page_height = float(page.rect.height)
-        top_from_top = page_height - top
-        bottom_from_top = page_height - bottom
-        y0 = min(top_from_top, bottom_from_top)
-        y1 = max(top_from_top, bottom_from_top)
-    else:
-        y0 = min(top, bottom)
-        y1 = max(top, bottom)
-
-    x0 = min(left, right)
-    x1 = max(left, right)
-
-    rect = fitz.Rect(x0, y0, x1, y1) & page.rect
-    if rect.width < 4 or rect.height < 4:
-        return page.rect
-    return rect
-
-
-# Each spawned worker serves one source and owns its native document handle.
-_crop_document: fitz.Document | None = None
-_crop_source: str = ""
-
-
-def _initialize_crop_worker(source: str) -> None:
-    global _crop_source
-    _crop_source = source
-
-
-def _crop_in_worker(
-    element: ManifestElement, fallback_page_number: int | None,
-) -> tuple[bytes | None, int]:
-    global _crop_document
-    provenance = element.provenance[0] if element.provenance else None
-    page_number = provenance.page_number if provenance is not None else (fallback_page_number or 0)
-    if page_number < 1:
-        return None, 0
-    if _crop_document is None:
-        _crop_document = fitz.open(_crop_source)
-        Finalize(None, _crop_document.close, exitpriority=10)
-    return _crop_from_document(_crop_document, element, provenance, page_number)
-
-
-class PdfRegionReader:
-    """Lazy document crop session; native PyMuPDF access stays in one process.
-
-    Share the session across image/table enrichment and close it with async with.
-    Only one requested PNG is returned at a time, preserving provider ordering.
-    """
-
-    def __init__(self, source: Path) -> None:
-        self._source = str(source)
-        self._pool: ProcessPoolExecutor | None = None
-
-    async def __aenter__(self) -> PdfRegionReader:
-        return self
-
-    async def __aexit__(self, *_exc: Any) -> None:
-        if self._pool is not None:
-            await asyncio.to_thread(self._pool.shutdown, wait=True, cancel_futures=True)
-            self._pool = None
-
-    async def crop(
-        self, element: ManifestElement, fallback_page_number: int | None,
-    ) -> tuple[bytes | None, int]:
-        page_number = element.provenance[0].page_number if element.provenance else (fallback_page_number or 0)
-        if page_number < 1:
-            return None, 0
-        if self._pool is None:
-            self._pool = ProcessPoolExecutor(
-                max_workers=1, mp_context=get_context("spawn"),
-                initializer=_initialize_crop_worker, initargs=(self._source,),
-            )
-        return await asyncio.get_running_loop().run_in_executor(
-            self._pool, _crop_in_worker, element, fallback_page_number,
-        )

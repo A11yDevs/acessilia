@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import re
 from typing import Any
+from docstruct.sections import section_body_blocks, section_title_alias
 from xml.sax.saxutils import escape, quoteattr
 
 from reportlab.lib.enums import TA_CENTER
@@ -226,15 +227,18 @@ def _render_section(story, section: dict[str, Any], styles, profile_name: str) -
         style_name = {1: "A11yHeading1", 2: "Heading2"}.get(
             section.get("level", 1), "A11yHeading2"
         )
+        alias = section_title_alias(section)
+        alias_anchor = f'<a name={quoteattr(alias)}/>' if alias else ""
         paragraph = Paragraph(
             f'<a name={quoteattr(str(section.get("id", "")))}/>'
+            f'{alias_anchor}'
             f'{_escape_text(section["title"])}',
             styles[style_name],
         )
         paragraph._heading_id = section.get("id", "")
         paragraph._heading_level = section.get("level", 1)
         story.append(paragraph)
-    for block in filter_blocks_for_profile(section.get("blocks", []), profile_name):
+    for block in filter_blocks_for_profile(section_body_blocks(section), profile_name):
         _render_block(story, block, styles)
     for child in section.get("children", []):
         _render_section(story, child, styles, profile_name)

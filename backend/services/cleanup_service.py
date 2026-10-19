@@ -1,4 +1,3 @@
-import shutil
 import asyncio
 import time
 from pathlib import Path
@@ -7,15 +6,17 @@ from backend.i18n import t
 from backend.log_messages import (
     LOG_CLEANUP_OUTPUT_FAILED,
     LOG_CLEANUP_PERIODIC_ERROR,
-    LOG_OUTPUT_DIR_REMOVED,
 )
 from backend.tools.logger import logger
 from backend.agents.state_manager import state_manager
 from backend.config.settings import settings
 from backend.services.queue_service import unified_queue
+from backend.services.blocking import run_blocking
 from backend.services.download_token_service import (
     TOKEN_EXPIRY_DAYS,
     limpar_tokens_expirados,
+    remove_unreferenced_output_directory,
+    active_download_directories,
 )
 
 
@@ -28,8 +29,9 @@ IN_MEMORY_STATUS_MAX_AGE = FILE_MAX_AGE
 async def periodic_cleanup() -> None:
     while True:
         try:
-            _clean_temp_directory()
-            _clean_output_directory()
+            protected_paths = unified_queue.protected_file_paths()
+            await run_blocking(_clean_temp_directory, protected_paths)
+            await run_blocking(_clean_output_directory)
             _clean_in_memory_statuses()
             await limpar_tokens_expirados()
         except Exception:
@@ -65,22 +67,26 @@ def _is_stale(path: Path, now: float, max_age: int) -> bool:
     return False
 
 
-def _clean_temp_directory() -> None:
+def _clean_temp_directory(protected_paths: set[Path] | None = None) -> None:
     temp_dir = settings.temp_dir
     if not temp_dir.exists():
         return
 
     now = time.time()
-    protected_paths = unified_queue.protected_file_paths()
+    if protected_paths is None:
+        protected_paths = unified_queue.protected_file_paths()
 
-    def clean_item(item: Path) -> None:
-        if item.resolve() in protected_paths:
+    def clean_item(item: Path, active_dirs: set[Path]) -> None:
+        resolved = item.resolve()
+        if resolved in protected_paths or any(
+            resolved == active or active in resolved.parents for active in active_dirs
+        ):
             return
         try:
             stale = _is_stale(item, now, FILE_MAX_AGE)
             if item.is_dir() and not item.is_symlink():
                 for child in item.iterdir():
-                    clean_item(child)
+                    clean_item(child, active_dirs)
                 if stale and not any(item.iterdir()):
                     item.rmdir()
                     logger.debug("Diretório temporário removido: {}", item.name)
@@ -90,10 +96,11 @@ def _clean_temp_directory() -> None:
         except OSError as exc:
             logger.warning("Falha ao remover {}: {}", item.name, exc)
 
-    for item in temp_dir.iterdir():
-        if item.name in ("output", "cache", "web_output"):
-            continue
-        clean_item(item)
+    with active_download_directories() as active_dirs:
+        for item in temp_dir.iterdir():
+            if item.name in ("output", "cache", "web_output"):
+                continue
+            clean_item(item, active_dirs)
 
 
 def _clean_output_directory() -> None:
@@ -106,8 +113,7 @@ def _clean_output_directory() -> None:
     for item in output_dir.iterdir():
         if item.is_dir() and _is_stale(item, now, OUTPUT_MAX_AGE):
             try:
-                shutil.rmtree(item, ignore_errors=True)
-                logger.debug(t(LOG_OUTPUT_DIR_REMOVED).format(name=item.name))
+                remove_unreferenced_output_directory(item)
             except Exception as e:
                 logger.warning(
                     t(LOG_CLEANUP_OUTPUT_FAILED).format(name=item.name, error=e)

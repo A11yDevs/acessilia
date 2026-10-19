@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from typing import Any, Literal, TypeVar
 
+from agno.run.base import RunStatus
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from backend.agents.run_helpers import run_content
 
 VISION_SCHEMA_INSTRUCTION = (
     "Retorne somente o objeto estruturado solicitado: use kind='description' e "
@@ -240,6 +243,15 @@ class DataOutput(AgentOutput):
 
 StructuredOutput = VisionOutput | DataOutput
 OutputModel = TypeVar("OutputModel", bound=AgentOutput)
+
+
+def validate_structured_run(response: Any, schema: type[OutputModel]) -> OutputModel:
+    """Reject unsuccessful agent runs before interpreting their content."""
+    content = run_content(response)
+    status = getattr(response, "status", None)
+    if status is not None and status != RunStatus.completed:
+        raise RuntimeError(f"Agent run did not complete ({status}): {content}")
+    return validate_structured_content(content, schema)
 
 
 def validate_structured_content(content: Any, schema: type[OutputModel]) -> OutputModel:

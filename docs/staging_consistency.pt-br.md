@@ -71,7 +71,14 @@ do GHCR ser buscado, a checagem é estruturalmente incapaz de reportar "atualiza
 `ENV` pelo `Dockerfile` daquele repositório (linhas 13-15), mas nada os lê. O core pode
 provar seu commit depois de S1; a Toolbox não consegue.
 
-### S4 — O contrato de capacidades está quebrado entre o par implantado (alto)
+### S4 — O contrato de capacidades está quebrado entre o par implantado (alto, resolvido no código)
+
+> **Superado no código.** A Toolbox A11yDevs/acessilia-toolbox#50 publica o
+> provider `qwen3-vl-8b` para as três capacidades, e a A11yDevs/acessilia#144
+> aponta os defaults do core para ele; o comando de reprodução abaixo agora
+> informa `capability contract holds`. A homologação ainda roda uma imagem da
+> Toolbox anterior ao #50, então o par implantado continua quebrado até essa
+> imagem ser atualizada. O texto abaixo é o registro na data da captura.
 
 Contra a Toolbox em execução (26 capacidades, 25 providers):
 
@@ -96,7 +103,8 @@ python scripts/check_capability_contract.py --snapshot tests/fixtures/toolbox-co
 ```
 
 As três capacidades ausentes são os clientes da PR #125
-(`toolbox_page_ocr_client.py`, `toolbox_adjudicate_client.py`), que não têm
+(`libs/sdk/src/acessilia_sdk/toolbox/clients/page_ocr.py`,
+`libs/sdk/src/acessilia_sdk/toolbox/clients/adjudicate.py`), que não têm
 chamador de produção. O perfil de providers VLM que os serviria existe apenas como
 `scripts/drbench/experiments/slurm/providers-config-vlm.yaml` dentro do repositório do
 *core*, nunca no catálogo da Toolbox de onde a imagem é construída.

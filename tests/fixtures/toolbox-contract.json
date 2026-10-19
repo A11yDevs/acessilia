@@ -4,7 +4,7 @@
     {
       "id": "accessibility.mark",
       "providers": [
-        "pure-python"
+        "pure-accessibility"
       ]
     },
     {
@@ -36,7 +36,7 @@
     {
       "id": "code.normalize",
       "providers": [
-        "pure-python"
+        "pure-code"
       ]
     },
     {
@@ -96,6 +96,24 @@
       ]
     },
     {
+      "id": "document.adjudicate.page",
+      "providers": [
+        "qwen3-vl-8b"
+      ]
+    },
+    {
+      "id": "document.adjudicate.region",
+      "providers": [
+        "qwen3-vl-8b"
+      ]
+    },
+    {
+      "id": "document.export.pdf_ua",
+      "providers": [
+        "pandoc-pdf-ua"
+      ]
+    },
+    {
       "id": "document.layout.analyze",
       "providers": [
         "docling-layout",
@@ -107,6 +125,12 @@
       "providers": [
         "docling-ocr",
         "mineru-ocr"
+      ]
+    },
+    {
+      "id": "document.ocr.page",
+      "providers": [
+        "qwen3-vl-8b"
       ]
     },
     {
@@ -169,9 +193,15 @@
       ]
     },
     {
+      "id": "table.recognize",
+      "providers": [
+        "qwen3-vl-8b"
+      ]
+    },
+    {
       "id": "text.postprocess",
       "providers": [
-        "pure-python"
+        "pure-text"
       ]
     }
   ],
@@ -283,6 +313,12 @@
       ]
     },
     {
+      "id": "pandoc-pdf-ua",
+      "capabilities": [
+        "document.export.pdf_ua"
+      ]
+    },
+    {
       "id": "pure-accessibility",
       "capabilities": [
         "accessibility.mark"
@@ -324,6 +360,15 @@
       "capabilities": [
         "pdf.render",
         "pdf.split"
+      ]
+    },
+    {
+      "id": "qwen3-vl-8b",
+      "capabilities": [
+        "document.adjudicate.page",
+        "document.adjudicate.region",
+        "document.ocr.page",
+        "table.recognize"
       ]
     },
     {

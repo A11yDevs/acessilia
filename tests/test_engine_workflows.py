@@ -12,7 +12,7 @@ from backend.agents.state_manager import StateManager
 from backend.config.settings import settings
 from backend.export.pandoc_exporter import export_accessible_document
 from backend.pipeline.validators import validate_canonical_document
-from backend.tools.toolbox_client import ToolboxClient
+from acessilia_sdk.toolbox.clients import ToolboxArtifactClient, ToolboxStructureClient
 
 
 def test_pdf_to_canonical_and_exports(monkeypatch, tmp_path):
@@ -46,8 +46,8 @@ def test_pdf_to_canonical_and_exports(monkeypatch, tmp_path):
         },
     }
     extraction = AsyncMock(return_value=response)
-    monkeypatch.setattr(ToolboxClient, "upload_artifact", AsyncMock(return_value="pdf-1"))
-    monkeypatch.setattr(ToolboxClient, "extract_structure", extraction)
+    monkeypatch.setattr(ToolboxArtifactClient, "upload", AsyncMock(return_value="pdf-1"))
+    monkeypatch.setattr(ToolboxStructureClient, "extract_structure", extraction)
     monkeypatch.setattr(service, "get_cached", AsyncMock(return_value=None))
     monkeypatch.setattr(service, "set_cache", AsyncMock())
     monkeypatch.setattr(service, "registrar_conversao", AsyncMock())

@@ -65,6 +65,12 @@ git checkout -b feat/minha-feature
 
 ### 2. Desenvolver
 
+Antes de mudar responsabilidades ou dependências entre o core, o SDK, a
+docstruct e a Toolbox, consulte a
+[constituição](docs/constitution.pt-br.md#7-princípios-arquiteturais-do-ecossistema)
+e os [Registros de Decisão Arquitetural](docs/adr/README.pt-br.md). Uma mudança
+desse tipo, um novo contrato público ou uma exceção a um princípio exige um ADR.
+
 Faça commits atômicos seguindo a [convenção de commits](#convenção-de-commits).
 
 ```bash
@@ -184,6 +190,29 @@ da `develop`.
 
    Depois, remova (ou reverta) `TRACK_BRANCH` do `.env` de homologação para que
    o staging volte a rastrear a `develop`.
+
+### 5.2 Bibliotecas em `libs/` (docstruct e SDK)
+
+`libs/docstruct` (algoritmos puros de estrutura de documentos) e `libs/sdk`
+(acesso à Toolbox pelo contrato HTTP) são pacotes separados que vivem neste
+repositório. Eles seguem as camadas descritas em
+[architecture.pt-br.md](docs/architecture.pt-br.md#bibliotecas-e-a-toolbox-libs):
+
+- **Nada de imports para cima.** A `docstruct` não importa nada de `backend`, do
+  SDK nem de `acessilia_toolbox`; o SDK não importa `backend` nem
+  `acessilia_toolbox`. O `tests/test_purity.py` de cada biblioteca garante isso, e
+  o `tests/test_architecture_layers.py` impede o `backend` de importar o pacote da
+  Toolbox.
+- **Rode as suítes delas**, que o CI também roda:
+  `cd libs/docstruct && python -m pytest` e `cd libs/sdk && python -m pytest`.
+- **Mantenha os READMEs nos dois idiomas.** O
+  `tests/test_docstruct_readme_sync.py` confere o par da docstruct.
+- **A docstruct é publicada para outros repositórios.** Uma mudança que a
+  Toolbox deve receber precisa aumentar a versão e criar a tag
+  `docstruct-vX.Y.Z` depois do merge; veja
+  [Releases](libs/docstruct/README.pt-br.md#releases). A Toolbox passa para a
+  versão nova num PR próprio. O release da aplicação (seção 6) não publica a
+  docstruct, e um release da docstruct não mexe na aplicação.
 
 ### 6. Release (`release/*` → `main`)
 

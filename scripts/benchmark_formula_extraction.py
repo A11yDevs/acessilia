@@ -26,7 +26,8 @@ import cv2
 import fitz
 import numpy as np
 
-from backend.tools.toolbox_client import ToolboxClient
+from acessilia_sdk.toolbox.clients import ToolboxStructureClient
+from backend.tools.toolbox_client import make_toolbox_client
 from backend.tools.toolbox_structurer import ToolboxStructurer
 
 CODECOGS_URL = "https://latex.codecogs.com/png.image"
@@ -163,7 +164,7 @@ def main() -> None:
 
     print(f"{len(cases)} casos preparados. Gerando PDFs e rodando Docling...")
     structurer = ToolboxStructurer(
-        client=ToolboxClient(provider="docling"), allow_fallback=False,
+        client=make_toolbox_client(ToolboxStructureClient, provider="docling"), allow_fallback=False,
     )
     for case in cases:
         case.pdf_path = workdir / f"{case.name}_{case.variant}.pdf"

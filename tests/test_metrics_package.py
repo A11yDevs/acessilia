@@ -1,6 +1,6 @@
 import pytest
 
-from scripts.metrics.text_ed import text_ed, normalized_levenshtein, levenshtein
+from scripts.metrics.text_ed import text_ed, levenshtein
 from scripts.metrics.reading_order import reading_order_score
 from scripts.metrics.teds import teds_score
 from scripts.metrics.cdm import cdm_score

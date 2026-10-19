@@ -65,6 +65,12 @@ git checkout -b feat/my-feature
 
 ### 2. Developing
 
+Before changing responsibilities or dependencies between the core, the SDK,
+docstruct and the Toolbox, check the
+[constitution](docs/constitution.md#7-ecosystem-architecture-principles) and the
+[Architecture Decision Records](docs/adr/README.md). Such a change, a new public
+contract, or an exception to a principle needs an ADR.
+
 Make atomic commits following the [commit convention](#commit-convention).
 
 ```bash
@@ -178,6 +184,29 @@ ephemeral `release/x.y.z` branch based on `develop`.
 
    Then, remove (or revert) `TRACK_BRANCH` from the staging `.env` file so that staging
    goes back to tracking `develop`.
+
+### 5.2 Libraries in `libs/` (docstruct and SDK)
+
+`libs/docstruct` (pure document-structure algorithms) and `libs/sdk` (access to
+the Toolbox through its HTTP contract) are separate packages that live in this
+repository. They follow the layering described in
+[architecture.md](docs/architecture.md#libraries-and-the-toolbox-libs):
+
+- **No imports upward.** `docstruct` imports nothing from `backend`, the SDK or
+  `acessilia_toolbox`; the SDK imports neither `backend` nor
+  `acessilia_toolbox`. Each library's `tests/test_purity.py` enforces it, and
+  `tests/test_architecture_layers.py` keeps `backend` from importing the Toolbox
+  package.
+- **Run their own suites**, which CI also runs:
+  `cd libs/docstruct && python -m pytest` and `cd libs/sdk && python -m pytest`.
+- **Keep the READMEs in both languages.** `tests/test_docstruct_readme_sync.py`
+  checks the docstruct pair.
+- **docstruct is published for other repositories.** A change the Toolbox
+  should receive needs a version bump and a `docstruct-vX.Y.Z` tag after the
+  merge; see [Releases](libs/docstruct/README.md#releases). The Toolbox then
+  moves to the new version in its own PR. The application release (section 6)
+  does not publish docstruct, and a docstruct release does not touch the
+  application.
 
 ### 6. Release (`release/*` → `main`)
 

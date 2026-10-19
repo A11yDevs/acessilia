@@ -16,7 +16,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import fitz
 
-from backend.tools.toolbox_client import ToolboxClient
+from acessilia_sdk.toolbox.clients import ToolboxStructureClient
+from backend.tools.toolbox_client import make_toolbox_client
 from backend.tools.toolbox_structurer import ToolboxStructurer
 
 WORKDIR = Path("var/temp/benchmark_formulas")
@@ -55,7 +56,7 @@ def _best_math_page(doc: fitz.Document) -> int:
 def main() -> None:
     WORKDIR.mkdir(parents=True, exist_ok=True)
     structurer = ToolboxStructurer(
-        client=ToolboxClient(provider="docling"), allow_fallback=False,
+        client=make_toolbox_client(ToolboxStructureClient, provider="docling"), allow_fallback=False,
     )
     total_formulas = 0
     total_regions = 0

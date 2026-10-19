@@ -62,7 +62,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.no_ocr:
             raise ValueError("--no-ocr is unsupported by the current Toolbox provider.")
         agent = InformationalStructuralAgent(
-            ToolboxManifestExtractor(language=args.language)
+            ToolboxManifestExtractor()
         )
         manifest = agent.process(source, language=args.language)
         payload = manifest.model_dump(mode="json", by_alias=True)

@@ -52,6 +52,7 @@ class PyMuPDFManifestExtractor:
             configuration={
                 "extractor": "pymupdf",
                 "include_images": self.include_images,
+                "coordinate_space": "rotated-page",
             },
         )
 
@@ -82,11 +83,14 @@ class PyMuPDFManifestExtractor:
                     label = block["label"]
                     cleaned_text = block["text"]
                     charspan = (0, len(cleaned_text)) if cleaned_text else None
+                    # Text/image extraction returns unrotated coordinates, while
+                    # page.rect and downstream clips describe the displayed page.
+                    rectangle = fitz.Rect(block["bbox"]) * page.rotation_matrix
                     bbox = SimpleNamespace(
-                        l=float(block["bbox"][0]),
-                        t=float(block["bbox"][1]),
-                        r=float(block["bbox"][2]),
-                        b=float(block["bbox"][3]),
+                        l=float(rectangle.x0),
+                        t=float(rectangle.y0),
+                        r=float(rectangle.x1),
+                        b=float(rectangle.y1),
                         coord_origin=SimpleNamespace(value="TOPLEFT"),
                     )
                     prov = SimpleNamespace(page_no=page_idx, bbox=bbox, charspan=charspan)
@@ -106,7 +110,10 @@ class PyMuPDFManifestExtractor:
         return _PseudoDocument(items=items, pages=pages)
 
     def _extract_semantic_blocks(self, page: fitz.Page) -> tuple[list[dict[str, Any]], float]:
-        page_dict = page.get_text("dict", flags=fitz.TEXT_PRESERVE_WHITESPACE)
+        flags = fitz.TEXT_PRESERVE_WHITESPACE
+        if self.include_images:
+            flags |= fitz.TEXT_PRESERVE_IMAGES
+        page_dict = page.get_text("dict", flags=flags)
         blocks = page_dict.get("blocks", [])
 
         font_sizes: list[float] = []

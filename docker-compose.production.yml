@@ -11,7 +11,9 @@ services:
     env_file:
       - .env
     environment:
-      PIPELINE_ENGINE=pddl
+      PIPELINE_ENGINE: pddl
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "if echo \"$ENABLED_INTERFACES\" | grep -q 'api'; then curl -fsS http://localhost:8000/api/v1/health; else curl -fsS http://localhost:8001/; fi"]

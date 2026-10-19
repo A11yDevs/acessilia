@@ -21,6 +21,7 @@ from backend.pipeline.table_ast import normalize_table_ast
 from backend.pipeline.table_ast import rows_from_table_ast
 
 from backend.core.manifest.models import (
+    Artifact,
     BoundingBox,
     ExtractorRun,
     ManifestElement,
@@ -31,6 +32,7 @@ from backend.core.manifest.models import (
     ProcessingManifest,
     Provenance,
     SourceDocument,
+    is_bottom_left,
 )
 
 
@@ -164,6 +166,11 @@ V23_OBLIGATION_BY_KIND = {
     ),
 }
 
+#: Artifact holding the secondary provider's extraction when FUSION_MODE=dual;
+#: the v2.3 methods that choose between providers read it.
+SECONDARY_EXTRACTION_KIND = "provider-extraction"
+SECONDARY_EXTRACTION_ARTIFACT_ID = "artifact-secondary-extraction"
+
 CALL_OUT_MIN_GROUP_SIZE = 3
 CALL_OUT_MIN_INDENT_PX = 8.0
 CALL_OUT_MIN_INDENT_RATIO = 0.015
@@ -204,6 +211,16 @@ def build_processing_manifest(
     pages = _build_pages(extraction.document, elements)
     title = _infer_title(source_path, elements)
     observations, obligations = _derive_processing_needs(elements)
+    v23_observations, v23_obligations = _derive_v23_processing_needs(
+        elements,
+        page_sizes={
+            page.page_number: (page.width, page.height) for page in pages
+        },
+        fusion_evidence=getattr(extraction, "fusion_evidence", None),
+        fusion_stats=getattr(extraction, "fusion_stats", None),
+    )
+    observations.extend(v23_observations)
+    obligations.extend(v23_obligations)
     element_types = dict(sorted(Counter(e.type for e in elements).items()))
 
     source = SourceDocument(
@@ -216,6 +233,7 @@ def build_processing_manifest(
         sha256=digest,
     )
     extractor = ExtractorRun(
+        name=extractor_name or "docling",
         version=extraction.version,
         started_at=extraction.started_at,
         completed_at=extraction.completed_at,
@@ -256,7 +274,7 @@ def _build_from_toolbox_json(
     The Toolbox already returns a complete ProcessingManifest-compatible JSON
     payload inside ``extraction.document["document"]``, so we parse it directly.
     """
-    data: dict[str, Any] = extraction.document["document"]
+    data: dict[str, Any] = dict(extraction.document["document"])
 
     data["manifest_id"] = data.get("manifest_id") or f"manifest-{digest[:16]}-r1"
 
@@ -273,6 +291,9 @@ def _build_from_toolbox_json(
 
     # Override extractor metadata with this run
     data["extractor"] = {
+        "name": data.get("extractor", {}).get(
+            "name", extraction.configuration.get("toolbox_provider") or "toolbox"
+        ),
         "version": extraction.version,
         "started_at": extraction.started_at.isoformat(),
         "completed_at": extraction.completed_at.isoformat(),
@@ -283,6 +304,20 @@ def _build_from_toolbox_json(
     data.setdefault("language", language)
     data.setdefault("created_at", extraction.completed_at.isoformat())
 
+    # The Toolbox is a capability layer: deciding what a document needs and which
+    # methods may satisfy it is this core's planning policy. Whatever processing
+    # needs the payload carries (older Toolbox images derive their own, with
+    # methods the core does not implement) are discarded and derived below with
+    # the same rules as the Docling path.
+    data["observations"] = []
+    data["obligations"] = []
+    if isinstance(data.get("summary"), dict):
+        data["summary"] = {
+            **data["summary"],
+            "observation_count": 0,
+            "obligation_count": 0,
+        }
+
     manifest = ProcessingManifest.model_validate(data)
     if refine_reading_order:
         manifest.elements = _refine_reading_order(manifest.elements)
@@ -292,6 +327,29 @@ def _build_from_toolbox_json(
                 by_page.setdefault(elem.page_number, []).append(elem.id)
         for page in manifest.pages:
             page.element_ids = by_page.get(page.page_number, [])
+    observations, obligations = _derive_processing_needs(manifest.elements)
+    v23_observations, v23_obligations = _derive_v23_processing_needs(
+        manifest.elements,
+        page_sizes={
+            page.page_number: (page.width, page.height) for page in manifest.pages
+        },
+        fusion_evidence=extraction.document.get("fusion_evidence"),
+        fusion_stats=extraction.document.get("fusion_stats"),
+    )
+    observations.extend(v23_observations)
+    obligations.extend(v23_obligations)
+    _append_processing_needs(manifest, observations, obligations)
+    secondary = extraction.document.get("secondary_extraction")
+    if isinstance(secondary, dict) and secondary.get("path"):
+        manifest.artifacts.append(
+            Artifact(
+                id=SECONDARY_EXTRACTION_ARTIFACT_ID,
+                kind=SECONDARY_EXTRACTION_KIND,
+                path=str(secondary["path"]),
+                media_type="application/json",
+                sha256=secondary.get("sha256"),
+            )
+        )
     return manifest
 
 
@@ -548,12 +606,29 @@ def _is_same_callout_cluster(previous: ManifestElement, current: ManifestElement
     return (overlap_width / min_width) >= 0.55
 
 
-def _element_bbox(element: ManifestElement) -> tuple[float, float, float, float] | None:
+def _raw_bbox(element: ManifestElement) -> BoundingBox | None:
     if not element.provenance:
         return None
-    bbox = element.provenance[0].bbox
+    return element.provenance[0].bbox
+
+
+def _element_bbox(element: ManifestElement) -> tuple[float, float, float, float] | None:
+    """Element box with the y axis growing downwards, whatever the source origin.
+
+    Ordering and callout grouping compare ``top`` and ``bottom`` as screen
+    coordinates. A bottom-left box is mirrored (``y -> -y``): that keeps every
+    comparison right without knowing the page height, which the Docling path
+    does not have yet when the reading order is refined.
+
+    Only differences and orderings are meaningful: a mirrored ``top`` or
+    ``bottom`` is negative, so never compare it with a fixed position such as
+    ``0``. ``_normalized_element_bbox`` gives page fractions instead.
+    """
+    bbox = _raw_bbox(element)
     if bbox is None:
         return None
+    if is_bottom_left(bbox.coord_origin, bbox.top, bbox.bottom):
+        return (bbox.left, -bbox.top, bbox.right, -bbox.bottom)
     return (bbox.left, bbox.top, bbox.right, bbox.bottom)
 
 
@@ -601,12 +676,12 @@ def _is_known_callout_body_candidate(
     bbox = _element_bbox(element)
     if bbox is None:
         return False
-    left, _, right, bottom = bbox
+    left, top, right, bottom = bbox
     width = right - left
     band_width = max(1.0, main_right - main_left)
     left_indent = left - main_left
     right_indent = main_right - right
-    if bottom <= 0:
+    if top >= bottom:  # degenerate box (screen coordinates, see _element_bbox)
         return False
     if width > band_width * 0.98:
         return False
@@ -878,13 +953,15 @@ def _derive_processing_needs(
         )
 
     heading_levels = [
-        (element.id, element.hierarchy_level)
-        for element in elements
-        if element.type == "heading"
+        (element.id, 1 if element.type == "title" else element.hierarchy_level)
+        for element in sorted(elements, key=lambda item: item.reading_order)
+        if element.type in {"title", "heading"}
     ]
     previous = 0
     for element_id, level in heading_levels:
-        if previous and level > previous + 1:
+        invalid_first = not previous and level != 1
+        invalid_successor = previous and (level < 2 or level > min(previous + 1, 6))
+        if invalid_first or invalid_successor:
             suffix = element_id.removeprefix("element-")
             message = t(MSG_HEADING_GAP).format(previous=previous, level=level)
             observations.append(
@@ -916,6 +993,257 @@ def _derive_processing_needs(
     return observations, obligations
 
 
+def _derive_v23_processing_needs(
+    elements: list[ManifestElement],
+    *,
+    page_sizes: dict[int, tuple[float | None, float | None]] | None = None,
+    fusion_evidence: Any = None,
+    fusion_stats: Any = None,
+) -> tuple[list[Observation], list[Obligation]]:
+    """Emit v2.3 needs only when deterministic checks or fusion evidence support them."""
+    from docstruct.fusion.line_numbers import extract_line_numbers
+    from docstruct.fusion.tailjoin import join_tail, page_number_position, tailjoin3
+    from docstruct.fusion.types import DiffBlock
+    from docstruct.fusion.verse import verse_blocks
+    from docstruct.fusion.xycut import xycut_order
+    from docstruct.text.latex import normalize_latex
+    from docstruct.text.norm_fix import norm_fix
+
+    candidates: list[tuple[str, list[ManifestElement], dict[str, Any]]] = []
+    by_page: dict[int | None, list[ManifestElement]] = {}
+    for element in elements:
+        by_page.setdefault(element.page_number, []).append(element)
+
+    def add(
+        kind: str,
+        targets: list[ManifestElement],
+        evidence: dict[str, Any],
+    ) -> None:
+        valid_targets = [item for item in targets if item.id]
+        if valid_targets:
+            candidates.append((kind, valid_targets, evidence))
+
+    for element in elements:
+        text = element.text or ""
+        if element.type == "formula" and text:
+            normalized = normalize_latex(text)
+            if normalized != text:
+                add("normalize-formula", [element], {"before": text, "after": normalized})
+        elif element.type in {"paragraph", "heading", "title", "list_item", "caption"} and text:
+            normalized = norm_fix(text)
+            if normalized != text:
+                add("normalize-text", [element], {"before": text, "after": normalized})
+
+    for page_number, page_elements in by_page.items():
+        positioned = [
+            item for item in page_elements
+            if _normalized_element_bbox(item, page_sizes) is not None
+        ]
+        if len(positioned) > 1:
+            current = sorted(positioned, key=lambda item: item.reading_order)
+            boxes = [_normalized_element_bbox(item, page_sizes) for item in current]
+            order = xycut_order([box for box in boxes if box is not None])
+            if order != list(range(len(current))):
+                reordered_ids = [current[index].id for index in order]
+                add(
+                    "refine-reading-order",
+                    current,
+                    {
+                        "page_number": page_number,
+                        "order_before": [item.id for item in current],
+                        "order_after": reordered_ids,
+                    },
+                )
+
+        text_elements = [
+            item for item in page_elements
+            if item.text and item.type not in {"formula", "table", "picture"}
+        ]
+        if not text_elements:
+            continue
+        blocks = [
+            DiffBlock(
+                md=item.text or "",
+                kind="text",
+                box=_normalized_element_bbox(item, page_sizes),
+                text=item.text or "",
+                type=item.type,
+                role=(
+                    "header" if item.type == "page_header"
+                    else "footer" if item.type == "page_footer"
+                    else "page_number" if item.type == "page_number"
+                    else None
+                ),
+            )
+            for item in text_elements
+        ]
+
+        verse_stats: Counter = Counter()
+        verse_blocks(blocks, verse_stats, "manifest", 300, "records")
+        if verse_stats.get("verse-manifest-split", 0):
+            add(
+                "chunk-verse",
+                text_elements,
+                {"chunks": verse_stats["verse-manifest-chunks"]},
+            )
+
+        line_stats: Counter = Counter()
+        extract_line_numbers(blocks, line_stats, "manifest")
+        if line_stats.get("line-numbers-manifest-count", 0):
+            add(
+                "extract-line-numbers",
+                text_elements,
+                {"count": line_stats["line-numbers-manifest-count"]},
+            )
+
+        page_text = [item.text or "" for item in text_elements]
+        position = page_number_position(blocks)
+        if position is not None:
+            joined = tailjoin3(page_text, position, 50, 3, "keep")
+        else:
+            joined = join_tail(page_text, "end", 50, 3)
+        if joined != page_text:
+            tail_targets = text_elements[len(text_elements) - (len(page_text) - len(joined) + 1):]
+            add(
+                "join-tail-blocks",
+                tail_targets,
+                {"position": position, "before_count": len(page_text), "after_count": len(joined)},
+            )
+
+    stats = fusion_stats
+    if not isinstance(stats, dict) and isinstance(fusion_evidence, dict):
+        stats = fusion_evidence.get("stats")
+    if isinstance(fusion_evidence, dict):
+        pages = fusion_evidence.get("pages")
+        if isinstance(pages, list):
+            for page_data in pages:
+                if not isinstance(page_data, dict):
+                    continue
+                page_stats = page_data.get("stats")
+                page_number = page_data.get("page_number")
+                page_targets = by_page.get(page_number, [])
+                if not isinstance(page_stats, dict) or not page_targets:
+                    continue
+                _add_fusion_observations(add, page_targets, page_stats, page_number)
+    elif isinstance(stats, dict):
+        targets = [element for element in elements if element.text]
+        if targets:
+            _add_fusion_observations(add, targets, stats, None)
+
+    observations: list[Observation] = []
+    obligations: list[Obligation] = []
+    seen: set[tuple[str, tuple[str, ...]]] = set()
+    for kind, targets, evidence in candidates:
+        target_ids = list(dict.fromkeys(item.id for item in targets))
+        key = (kind, tuple(target_ids))
+        if key in seen:
+            continue
+        seen.add(key)
+        rationale, methods = V23_OBLIGATION_BY_KIND[kind]
+        suffix = "-".join(item.removeprefix("element-") for item in target_ids)
+        observations.append(
+            Observation(
+                id=f"observation-{kind}-{suffix}",
+                kind=f"{kind}-detected",
+                severity="warning",
+                message=rationale,
+                target_ids=target_ids,
+                evidence=evidence,
+            )
+        )
+        obligations.append(
+            Obligation(
+                id=f"obligation-{kind}-{suffix}",
+                kind=kind,
+                target_ids=target_ids,
+                admissible_methods=methods,
+                method_costs={
+                    method: DEFAULT_METHOD_COSTS.get(method, 50)
+                    for method in methods
+                },
+                rationale=rationale,
+            )
+        )
+    return observations, obligations
+
+
+def _add_fusion_observations(
+    add: Any,
+    targets: list[ManifestElement],
+    stats: dict[str, Any],
+    page_number: int | None,
+) -> None:
+    if not stats:
+        return
+    if stats.get("text_divergence"):
+        add("adjudicate-page", targets, {"page_number": page_number, "fusion_stats": stats})
+    if stats.get("provider_divergence"):
+        add("fuse-providers", targets, {"page_number": page_number, "fusion_stats": stats})
+    if any(key.startswith("dropped-") and value for key, value in stats.items()):
+        add("rescue-omitted-block", targets, {"page_number": page_number, "fusion_stats": stats})
+    if stats.get("table_divergence"):
+        table_targets = [item for item in targets if item.type == "table"]
+        if table_targets:
+            add(
+                "select-table-source",
+                table_targets,
+                {"page_number": page_number, "fusion_stats": stats},
+            )
+    cut_count = stats.get("repetition_tokens_cut", 0)
+    if cut_count:
+        add(
+            "guard-repetition",
+            targets,
+            {"page_number": page_number, "tokens_cut": cut_count},
+        )
+
+
+def _normalized_element_bbox(
+        element: ManifestElement,
+        page_sizes: dict[int, tuple[float | None, float | None]] | None,
+) -> tuple[float, float, float, float] | None:
+        bbox = _raw_bbox(element)
+        if bbox is None or element.page_number is None or page_sizes is None:
+            return None
+        size = page_sizes.get(element.page_number)
+        if size is None:
+            return None
+        width, height = size
+        if not width or not height:
+            return None
+        left, top, right, bottom = bbox.left, bbox.top, bbox.right, bbox.bottom
+        if is_bottom_left(bbox.coord_origin, top, bottom):
+            top, bottom = height - top, height - bottom
+        return (
+            left / width,
+            top / height,
+            right / width,
+            bottom / height,
+        )
+
+
+def _append_processing_needs(
+    manifest: ProcessingManifest,
+    observations: list[Observation],
+    obligations: list[Obligation],
+) -> None:
+    existing_observations = {item.id for item in manifest.observations}
+    existing_obligations = {item.id for item in manifest.obligations}
+    existing_pairs = {
+        (item.kind, tuple(item.target_ids)) for item in manifest.obligations
+    }
+    manifest.observations.extend(
+        item for item in observations if item.id not in existing_observations
+    )
+    for item in obligations:
+        pair = (item.kind, tuple(item.target_ids))
+        if item.id not in existing_obligations and pair not in existing_pairs:
+            manifest.obligations.append(item)
+            existing_pairs.add(pair)
+    manifest.summary.observation_count = len(manifest.observations)
+    manifest.summary.obligation_count = len(manifest.obligations)
+
+
 def reconcile_reclassified_element_processing_needs(
     manifest: ProcessingManifest,
     element: ManifestElement,
@@ -924,10 +1252,10 @@ def reconcile_reclassified_element_processing_needs(
 ) -> None:
     """Reconcile derived observations/obligations after an element changes type.
 
-    Toolbox manifests may carry obligations beyond the ones derived locally, so
-    rebuilding the complete list would discard provider-specific planning data.
-    This function replaces only the standard processing need associated with the
-    reclassified element and leaves unrelated/custom obligations untouched.
+    Only the standard processing need associated with the reclassified element
+    is replaced; every other observation/obligation (e.g. the v2.3 needs
+    derived from dual-provider fusion evidence) is kept untouched instead of
+    rebuilding the complete list.
     """
     if previous_type == element.type:
         return

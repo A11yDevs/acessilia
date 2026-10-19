@@ -6,10 +6,14 @@ from typing import Any, Callable, Coroutine
 
 from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
 from backend.agents.state_manager import TaskCancelledError, state_manager
-from backend.services.cache import get_cached, options_cache_key, set_cache
+from backend.services.cache import (
+    get_cached,
+    options_cache_key,
+    processing_cache_configuration,
+    set_cache,
+)
 from backend.services.history_service import (
     finalizar_conversao,
-    limpar_orfas,
     registrar_conversao,
 )
 from backend.config.settings import settings
@@ -39,7 +43,8 @@ def _normalized_engine() -> str:
     if engine in {"pddl", "pmv"}:
         return "pddl"
     raise RuntimeError(
-        f"Unsupported PIPELINE_ENGINE={engine!r}. Use pddl."
+        f"Pipeline legado ({engine}) foi desativado. "
+        f"Use PIPELINE_ENGINE=pddl para o pipeline PDDL+Toolbox."
     )
 
 
@@ -51,25 +56,26 @@ def _resolved_structurer() -> str:
 
 
 def _build_orchestrator():
-    _normalized_engine()
-    _resolved_structurer()
-    fast_downward = (
-        Path(settings.pddl_fast_downward).expanduser()
-        if settings.pddl_fast_downward.strip()
-        else None
-    )
-    alias = settings.pddl_fast_downward_alias.strip() or None
-    return PddlAccessibilityOrchestrator(
-        planner_backend=settings.pddl_planner_backend,
-        preferred_plan=settings.pddl_preferred_plan,
-        execute_dry_run=settings.pddl_execute_dry_run,
-        fast_downward=fast_downward,
-        fast_downward_alias=alias,
-        fast_downward_search=settings.pddl_fast_downward_search,
-        enable_ocr=False,
-        extractor_backend="toolbox",
-        max_replans=settings.pddl_max_replans,
-    )
+    if _normalized_engine() == "pddl":
+        _resolved_structurer()
+        fast_downward = (
+            Path(settings.pddl_fast_downward).expanduser()
+            if settings.pddl_fast_downward.strip()
+            else None
+        )
+        alias = settings.pddl_fast_downward_alias.strip() or None
+        return PddlAccessibilityOrchestrator(
+            planner_backend=settings.pddl_planner_backend,
+            preferred_plan=settings.pddl_preferred_plan,
+            execute_dry_run=settings.pddl_execute_dry_run,
+            fast_downward=fast_downward,
+            fast_downward_alias=alias,
+            fast_downward_search=settings.pddl_fast_downward_search,
+            enable_ocr=False,
+            extractor_backend="toolbox",
+            max_replans=settings.pddl_max_replans,
+        )
+    raise RuntimeError("Pipeline legado desativado — use PIPELINE_ENGINE=pddl")
 
 
 agente = _build_orchestrator()
@@ -83,14 +89,12 @@ def _cache_version(
     engine = _normalized_engine()
     structurer = _resolved_structurer()
     return options_cache_key(
-        f"{settings.ai_client}-{engine}-{structurer}-v3",
+        f"{settings.ai_client}-{engine}-{structurer}-v9",
         mode=mode,
         custom_prompt=custom_prompt or "",
         thinking_mode=thinking_mode,
+        configuration=processing_cache_configuration(),
     )
-
-
-limpar_orfas()
 
 
 def _salvar_json_canonico(canonical_document: dict, source_name: str) -> None:
@@ -168,6 +172,13 @@ async def process(
     try:
         cache_variant = _cache_version(mode, custom_prompt, thinking_mode)
         cached = await get_cached(file_path, cache_variant)
+        if isinstance(cached, dict):
+            metadata = cached.get("canonical_metadata")
+            execution_status = metadata.get("pddl_execution_status") if isinstance(metadata, dict) else None
+            if execution_status in {"failed", "replan-required"} or (
+                not settings.pddl_execute_dry_run and execution_status == "dry-run-completed"
+            ):
+                cached = None
         if cached is not None:
             logger.info("Cache hit para {}", file_path.name)
             cached = _payload_for_source(cached, file_path)
@@ -226,8 +237,19 @@ async def process(
             thinking_mode=thinking_mode,
         )
 
-        canonical_metadata, technical_warnings = _canonical_details(resultado)
-        raw_text = resultado["text"] if isinstance(resultado, dict) else resultado
+        canonical_metadata: dict[str, Any] | None = None
+        technical_warnings: list[str] | None = None
+        if isinstance(resultado, dict):
+            raw_text = resultado["text"]
+            payload_metadata = resultado.get("canonical_metadata")
+            if isinstance(payload_metadata, dict):
+                canonical_metadata = payload_metadata
+            payload_warnings = resultado.get("technical_warnings")
+            if isinstance(payload_warnings, list):
+                technical_warnings = [str(item) for item in payload_warnings]
+        else:
+            raw_text = resultado
+
         raw_text = merge_broken_paragraphs(raw_text)
 
         processed_result: str | dict[str, Any]

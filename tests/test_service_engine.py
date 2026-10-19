@@ -12,6 +12,7 @@ import importlib
 import pytest
 
 from backend.config.settings import settings
+import backend.service  # Load with the default engine before tests override settings.
 
 
 # ---------------------------------------------------------------------------
@@ -32,7 +33,7 @@ def test_normalized_engine_legacy(monkeypatch):
     monkeypatch.setattr(settings, "pipeline_engine", "legacy")
     from backend.service import _normalized_engine
 
-    with pytest.raises(RuntimeError, match="Unsupported PIPELINE_ENGINE"):
+    with pytest.raises(RuntimeError, match="Pipeline legado"):
         _normalized_engine()
 
 
@@ -56,7 +57,7 @@ def test_normalized_engine_rejects_unknown(monkeypatch):
     monkeypatch.setattr(settings, "pipeline_engine", "unknown-engine")
     from backend.service import _normalized_engine
 
-    with pytest.raises(RuntimeError, match="Unsupported PIPELINE_ENGINE"):
+    with pytest.raises(RuntimeError, match="Pipeline legado"):
         _normalized_engine()
 
 
@@ -69,7 +70,7 @@ def test_build_orchestrator_rejects_legacy(monkeypatch):
     monkeypatch.setattr(settings, "pipeline_engine", "legacy")
     from backend.service import _build_orchestrator
 
-    with pytest.raises(RuntimeError, match="Unsupported PIPELINE_ENGINE"):
+    with pytest.raises(RuntimeError, match="Pipeline legado"):
         _build_orchestrator()
 
 
@@ -160,6 +161,7 @@ def test_toolbox_settings_defaults():
 
     for key in (
         "TOOLBOX_BASE_URL",
+        "TOOLBOX_BASE_URLS",
         "TOOLBOX_PROVIDER",
         "TOOLBOX_TIMEOUT_SECONDS",
         "TOOLBOX_USE_ARTIFACT_STORE",
@@ -172,6 +174,7 @@ def test_toolbox_settings_defaults():
     fresh = cfg_mod.Settings()
 
     assert fresh.toolbox_base_url == "http://localhost:8002"
+    assert fresh.toolbox_base_urls == ""
     assert fresh.toolbox_provider == "docling"
     assert fresh.toolbox_timeout_seconds == 3600
     assert fresh.toolbox_use_artifact_store is True
@@ -199,7 +202,6 @@ def test_settings_pddl_defaults():
     ):
         os.environ.pop(key, None)
 
-    from dataclasses import fields
     import backend.config.settings as cfg_mod
 
     fresh = cfg_mod.Settings()

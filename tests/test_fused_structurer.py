@@ -1,7 +1,6 @@
 """Tests for the FusedStructurer wire-up (FUSION_MODE=dual)."""
 import asyncio
 
-import pytest
 
 from backend.config.settings import settings
 from backend.tools.structurer import FusedStructurer, get_structurer

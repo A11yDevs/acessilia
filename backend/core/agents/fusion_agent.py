@@ -40,7 +40,7 @@ from typing import Any
 from backend.core.agno_support import build_agent
 from docstruct.fusion.hf_end import move_hf_to_end
 from docstruct.fusion.line_numbers import extract_line_numbers
-from docstruct.fusion.repetition import collapse, guard_page
+from docstruct.fusion.repetition import collapse as collapse, guard_page
 from docstruct.fusion.tailjoin import join_tail, tailjoin3
 from docstruct.fusion.types import DiffBlock
 from docstruct.fusion.verse import verse_blocks

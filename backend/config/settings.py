@@ -5,6 +5,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from acessilia_sdk.toolbox.capabilities import provider_default
+
 load_dotenv()
 
 
@@ -15,7 +17,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 class Settings:
     bot_token: str = field(default_factory=lambda: os.getenv("BOT_TOKEN", ""))
     max_file_size_mb: int = 50
-    max_pages: int = int(os.getenv("MAX_PAGES", "50"))
+    max_pages: int = field(default_factory=lambda: int(os.getenv("MAX_PAGES", "50")))
     temp_dir: Path = field(
         default_factory=lambda: _path_from_env(
             "TEMP_DIR",
@@ -28,101 +30,215 @@ class Settings:
     logs_dir: Path = field(
         default_factory=lambda: _path_from_env("LOGS_DIR", BASE_DIR / "var" / "logs")
     )
-    request_timeout: int = int(os.getenv("REQUEST_TIMEOUT", "3600"))
-    log_level: str = os.getenv("LOG_LEVEL", "INFO")
-    observability_api_token: str = os.getenv("OBSERVABILITY_API_TOKEN", "")
+    request_timeout: int = field(
+        default_factory=lambda: int(os.getenv("REQUEST_TIMEOUT", "3600"))
+    )
+    log_level: str = field(default_factory=lambda: os.getenv("LOG_LEVEL", "INFO"))
+    observability_api_token: str = field(
+        default_factory=lambda: os.getenv("OBSERVABILITY_API_TOKEN", "")
+    )
     allowed_extensions: set[str] = field(default_factory=lambda: _default_extensions())
-    pdf_split_dpi: int = int(os.getenv("PDF_SPLIT_DPI", "150"))
-    ai_client: str = os.getenv("AI_CLIENT", "ollama")
-    ollama_api_key: str = os.getenv("OLLAMA_API_KEY", "")
-    ollama_model: str = os.getenv(
-        "OLLAMA_MODEL",
-        "nvidia/nemotron-nano-12b-v2-vl:free",
+    ai_client: str = field(default_factory=lambda: os.getenv("AI_CLIENT", "ollama"))
+    ollama_api_key: str = field(default_factory=lambda: os.getenv("OLLAMA_API_KEY", ""))
+    ollama_model: str = field(
+        default_factory=lambda: os.getenv(
+            "OLLAMA_MODEL",
+            "nvidia/nemotron-nano-12b-v2-vl:free",
+        )
     )
-    ollama_base_url: str = os.getenv(
-        "OLLAMA_BASE_URL",
-        "http://172.16.109.33:11434/api/chat",
+    ollama_base_url: str = field(
+        default_factory=lambda: os.getenv(
+            "OLLAMA_BASE_URL",
+            "http://172.16.109.33:11434/api/chat",
+        )
     )
-    openrouter_api_key: str = os.getenv("OPENROUTER_API_KEY", "")
-    openrouter_model: str = os.getenv(
-        "OPENROUTER_MODEL",
-        "nvidia/nemotron-nano-12b-v2-vl:free",
+    openrouter_api_key: str = field(
+        default_factory=lambda: os.getenv("OPENROUTER_API_KEY", "")
     )
-    openrouter_max_tokens: int = int(os.getenv("OPENROUTER_MAX_TOKENS", "4096"))
-    openrouter_base_url: str = os.getenv(
-        "OPENROUTER_BASE_URL",
-        "https://openrouter.ai/api/v1/chat/completions",
+    openrouter_model: str = field(
+        default_factory=lambda: os.getenv(
+            "OPENROUTER_MODEL",
+            "nvidia/nemotron-nano-12b-v2-vl:free",
+        )
     )
-    openrouter_site_url: str = os.getenv("OPENROUTER_SITE_URL", "")
-    openrouter_app_name: str = os.getenv(
-        "OPENROUTER_APP_NAME",
-        "a11y-devs-describer",
+    openrouter_max_tokens: int = field(
+        default_factory=lambda: int(os.getenv("OPENROUTER_MAX_TOKENS", "4096"))
     )
-    structurer: str = os.getenv("STRUCTURER", "toolbox")
-    pipeline_engine: str = os.getenv("PIPELINE_ENGINE", "pddl")
+    data_agent_max_tokens: int = field(
+        default_factory=lambda: int(os.getenv("DATA_AGENT_MAX_TOKENS", "8192"))
+    )
+    openrouter_base_url: str = field(
+        default_factory=lambda: os.getenv(
+            "OPENROUTER_BASE_URL",
+            "https://openrouter.ai/api/v1/chat/completions",
+        )
+    )
+    openrouter_site_url: str = field(
+        default_factory=lambda: os.getenv("OPENROUTER_SITE_URL", "")
+    )
+    openrouter_app_name: str = field(
+        default_factory=lambda: os.getenv(
+            "OPENROUTER_APP_NAME",
+            "a11y-devs-describer",
+        )
+    )
+    structurer: str = field(default_factory=lambda: os.getenv("STRUCTURER", "toolbox"))
+    pipeline_engine: str = field(
+        default_factory=lambda: os.getenv("PIPELINE_ENGINE", "pddl")
+    )
 
     # Fusão multi-provider (Fase 4 do plano docstruct)
     # "single": comportamento atual (um provider, fallback PyMuPDF).
     # "dual": extrai com dois providers e funde via docstruct.fusion.
-    fusion_mode: str = os.getenv("FUSION_MODE", "single")
-    fusion_secondary_provider: str = os.getenv("FUSION_SECONDARY_PROVIDER", "mineru")
+    fusion_mode: str = field(default_factory=lambda: os.getenv("FUSION_MODE", "single"))
+    fusion_secondary_provider: str = field(
+        default_factory=lambda: os.getenv("FUSION_SECONDARY_PROVIDER", "mineru")
+    )
     # Provider MinerU hybrid-VLM (MinerU 3.x, backend=hybrid-engine). É a fonte B
     # do melhor resultado confirmado no leaderboard do Dr.DocBench
     # (differ-v15-hyb, EvalAI 70.37). Use FUSION_SECONDARY_PROVIDER=mineru-hyb
     # para adotá-lo na fusão dual.
-    fusion_hybrid_provider: str = os.getenv("FUSION_HYBRID_PROVIDER", "mineru-hyb")
+    fusion_hybrid_provider: str = field(
+        default_factory=lambda: os.getenv("FUSION_HYBRID_PROVIDER", "mineru-hyb")
+    )
     # Domain-specific callout titles injected into the region grouping
     # heuristics (semicolon-separated). No document-specific constants in code.
-    callout_known_titles: str = os.getenv("CALLOUT_KNOWN_TITLES", "")
+    callout_known_titles: str = field(
+        default_factory=lambda: os.getenv("CALLOUT_KNOWN_TITLES", "")
+    )
 
     # Acessilia Toolbox settings
-    toolbox_base_url: str = os.getenv("TOOLBOX_BASE_URL", "http://localhost:8002")
+    toolbox_base_url: str = field(
+        default_factory=lambda: os.getenv("TOOLBOX_BASE_URL", "http://localhost:8002")
+    )
+    # Comma-separated URLs of *independent* Toolbox deployments, tried in order
+    # by the capability clients (docs/adr/0006). Empty means TOOLBOX_BASE_URL
+    # only, which should point at the load balancer in front of the replicas.
+    toolbox_base_urls: str = field(
+        default_factory=lambda: os.getenv("TOOLBOX_BASE_URLS", "")
+    )
     # Structural extraction keeps the historical TOOLBOX_PROVIDER variable for
     # backward compatibility. Specialized capabilities use providers bound to
-    # their own contracts in the Toolbox registry.
-    toolbox_provider: str = os.getenv("TOOLBOX_PROVIDER", "docling")
-    toolbox_layout_provider: str = os.getenv(
-        "TOOLBOX_LAYOUT_PROVIDER", "docling-layout"
+    # their own contracts in the Toolbox registry. Every default comes from
+    # libs/sdk/src/acessilia_sdk/toolbox/capabilities.py.
+    toolbox_provider: str = field(
+        default_factory=lambda: os.getenv(
+            "TOOLBOX_PROVIDER", provider_default("toolbox_provider")
+        )
     )
-    toolbox_pdf_provider: str = os.getenv(
-        "TOOLBOX_PDF_PROVIDER", "pymupdf-pdf"
+    toolbox_layout_provider: str = field(
+        default_factory=lambda: os.getenv(
+            "TOOLBOX_LAYOUT_PROVIDER", provider_default("toolbox_layout_provider")
+        )
     )
-    toolbox_math_recognize_provider: str = os.getenv(
-        "TOOLBOX_MATH_RECOGNIZE_PROVIDER", "docling-math"
+    toolbox_pdf_provider: str = field(
+        default_factory=lambda: os.getenv(
+            "TOOLBOX_PDF_PROVIDER", provider_default("toolbox_pdf_provider")
+        )
     )
-    toolbox_math_provider: str = os.getenv(
-        "TOOLBOX_MATH_PROVIDER", "pure-math"
+    toolbox_math_recognize_provider: str = field(
+        default_factory=lambda: os.getenv(
+            "TOOLBOX_MATH_RECOGNIZE_PROVIDER",
+            provider_default("toolbox_math_recognize_provider"),
+        )
     )
-    toolbox_ocr_provider: str = os.getenv(
-        "TOOLBOX_OCR_PROVIDER", "docling-ocr"
+    toolbox_math_provider: str = field(
+        default_factory=lambda: os.getenv(
+            "TOOLBOX_MATH_PROVIDER", provider_default("toolbox_math_provider")
+        )
     )
-    toolbox_page_ocr_provider: str = os.getenv(
-        "TOOLBOX_PAGE_OCR_PROVIDER", "qwen3-vl-page"
+    toolbox_ocr_provider: str = field(
+        default_factory=lambda: os.getenv(
+            "TOOLBOX_OCR_PROVIDER", provider_default("toolbox_ocr_provider")
+        )
     )
-    toolbox_adjudicate_provider: str = os.getenv(
-        "TOOLBOX_ADJUDICATE_PROVIDER", "qwen3-vl-judge"
+    toolbox_page_ocr_provider: str = field(
+        default_factory=lambda: os.getenv(
+            "TOOLBOX_PAGE_OCR_PROVIDER", provider_default("toolbox_page_ocr_provider")
+        )
     )
-    toolbox_orientation_provider: str = os.getenv(
-        "TOOLBOX_ORIENTATION_PROVIDER", "rapidocr-orient"
+    toolbox_adjudicate_provider: str = field(
+        default_factory=lambda: os.getenv(
+            "TOOLBOX_ADJUDICATE_PROVIDER", provider_default("toolbox_adjudicate_provider")
+        )
     )
-    toolbox_media_inspect_provider: str = os.getenv(
-        "TOOLBOX_MEDIA_INSPECT_PROVIDER", "pure-media-inspect"
+    toolbox_table_provider: str = field(
+        default_factory=lambda: os.getenv(
+            "TOOLBOX_TABLE_PROVIDER", provider_default("toolbox_table_provider")
+        )
+    )
+    toolbox_orientation_provider: str = field(
+        default_factory=lambda: os.getenv(
+            "TOOLBOX_ORIENTATION_PROVIDER", provider_default("toolbox_orientation_provider")
+        )
+    )
+    toolbox_media_inspect_provider: str = field(
+        default_factory=lambda: os.getenv(
+            "TOOLBOX_MEDIA_INSPECT_PROVIDER",
+            provider_default("toolbox_media_inspect_provider"),
+        )
+    )
+    toolbox_pdf_ua_provider: str = field(
+        default_factory=lambda: os.getenv(
+            "TOOLBOX_PDF_UA_PROVIDER", provider_default("toolbox_pdf_ua_provider")
+        )
+    )
+    # PDF/UA is rendered by the Toolbox (pinned Pandoc + TeX Live) first; the
+    # local pandoc/LaTeX install is only the fallback when it is unavailable.
+    toolbox_pdf_ua_enabled: bool = field(
+        default_factory=lambda: (
+            os.getenv("TOOLBOX_PDF_UA_ENABLED", "true").strip().lower()
+            in {"1", "true", "yes", "on", "sim"}
+        ),
+    )
+    # Matches the capability's timeout_hint_seconds (180) with margin, so a
+    # hung renderer falls back to the local toolchain within minutes.
+    toolbox_pdf_ua_timeout_seconds: int = field(
+        default_factory=lambda: int(os.getenv("TOOLBOX_PDF_UA_TIMEOUT_SECONDS", "300"))
     )
     toolbox_media_inspect_enabled: bool = field(
-        default_factory=lambda: os.getenv(
-            "TOOLBOX_MEDIA_INSPECT_ENABLED", "true"
-        ).strip().lower()
-        in {"1", "true", "yes", "on", "sim"},
+        default_factory=lambda: (
+            os.getenv("TOOLBOX_MEDIA_INSPECT_ENABLED", "true").strip().lower()
+            in {"1", "true", "yes", "on", "sim"}
+        ),
     )
-    toolbox_api_key: str = os.getenv("TOOLBOX_API_KEY", "")
-    toolbox_timeout_seconds: int = int(os.getenv("TOOLBOX_TIMEOUT_SECONDS", "3600"))
+    toolbox_api_key: str = field(
+        default_factory=lambda: os.getenv("TOOLBOX_API_KEY", "")
+    )
+    toolbox_timeout_seconds: int = field(
+        default_factory=lambda: int(os.getenv("TOOLBOX_TIMEOUT_SECONDS", "3600"))
+    )
+    # Availability gate for planning methods that call the Toolbox: "observe"
+    # only reports what the live catalogue would rule out, "enforce" removes
+    # those methods from the plan (failing closed without a catalogue), "off"
+    # skips the check.
+    toolbox_availability_gate: str = field(
+        default_factory=lambda: os.getenv(
+            "TOOLBOX_AVAILABILITY_GATE", "observe"
+        ).strip().lower()
+    )
+    toolbox_catalog_refresh_seconds: int = field(
+        default_factory=lambda: int(os.getenv("TOOLBOX_CATALOG_REFRESH_SECONDS", "60"))
+    )
+    toolbox_catalog_stale_seconds: int = field(
+        default_factory=lambda: int(os.getenv("TOOLBOX_CATALOG_STALE_SECONDS", "900"))
+    )
     toolbox_use_artifact_store: bool = field(
-        default_factory=lambda: os.getenv("TOOLBOX_USE_ARTIFACT_STORE", "true").strip().lower()
-        in {"1", "true", "yes", "on", "sim"},
+        default_factory=lambda: (
+            os.getenv("TOOLBOX_USE_ARTIFACT_STORE", "true").strip().lower()
+            in {"1", "true", "yes", "on", "sim"}
+        ),
     )
     toolbox_use_remote_cache: bool = field(
-        default_factory=lambda: os.getenv("TOOLBOX_USE_REMOTE_CACHE", "true").strip().lower()
-        in {"1", "true", "yes", "on", "sim"},
+        default_factory=lambda: (
+            os.getenv("TOOLBOX_USE_REMOTE_CACHE", "true").strip().lower()
+            in {"1", "true", "yes", "on", "sim"}
+        ),
+    )
+    # edge-tts voice for MP3 export. Microsoft retires voices from the
+    # catalogue (pt-BR-ThalitaNeural left it in 2026-10), so keep it swappable.
+    tts_voice: str = field(
+        default_factory=lambda: os.getenv("TTS_VOICE", "pt-BR-FranciscaNeural")
     )
     pddl_execute_dry_run: bool = field(
         default_factory=lambda: _bool_from_env_alias(
@@ -165,7 +281,9 @@ class Settings:
     )
 
     # Interface Settings
-    enabled_interfaces: str = os.getenv("ENABLED_INTERFACES", "api,telegram,web")
+    enabled_interfaces: str = field(
+        default_factory=lambda: os.getenv("ENABLED_INTERFACES", "api,telegram,web")
+    )
 
     # API Settings (lazy defaults: environment state at instantiation, not import time)
     api_host: str = field(
@@ -185,9 +303,9 @@ class Settings:
     )
 
     # Build info (injected via Docker build --build-arg or environment variables)
-    git_commit: str = os.getenv("GIT_COMMIT", "")
-    image_tag: str = os.getenv("IMAGE_TAG", "")
-    image_digest: str = os.getenv("IMAGE_DIGEST", "")
+    git_commit: str = field(default_factory=lambda: os.getenv("GIT_COMMIT", ""))
+    image_tag: str = field(default_factory=lambda: os.getenv("IMAGE_TAG", ""))
+    image_digest: str = field(default_factory=lambda: os.getenv("IMAGE_DIGEST", ""))
 
     # I18N Settings
     # Preferred runtime locale. Blank means "negotiate from the process
@@ -203,12 +321,14 @@ class Settings:
     )
 
     # SMTP Settings
-    smtp_server: str = os.getenv("SMTP_SERVER", "smtp.gmail.com")
-    smtp_port: int = int(os.getenv("SMTP_PORT", "587"))
-    smtp_user: str = os.getenv("SMTP_USER", "")
-    smtp_password: str = os.getenv("SMTP_PASSWORD", "")
-    smtp_from: str = os.getenv("SMTP_FROM", "")
-    smtp_name: str = os.getenv("SMTP_NAME", "Bot Acess")
+    smtp_server: str = field(
+        default_factory=lambda: os.getenv("SMTP_SERVER", "smtp.gmail.com")
+    )
+    smtp_port: int = field(default_factory=lambda: int(os.getenv("SMTP_PORT", "587")))
+    smtp_user: str = field(default_factory=lambda: os.getenv("SMTP_USER", ""))
+    smtp_password: str = field(default_factory=lambda: os.getenv("SMTP_PASSWORD", ""))
+    smtp_from: str = field(default_factory=lambda: os.getenv("SMTP_FROM", ""))
+    smtp_name: str = field(default_factory=lambda: os.getenv("SMTP_NAME", "Bot Acess"))
 
     def __post_init__(self) -> None:
         self.temp_dir.mkdir(parents=True, exist_ok=True)
@@ -275,8 +395,6 @@ def _path_from_env(env_var: str, default: Path) -> Path:
     if not path.is_absolute():
         path = BASE_DIR / path
     return path
-
-
 
 
 def _str_from_env_alias(env_vars: tuple[str, ...], default: str) -> str:

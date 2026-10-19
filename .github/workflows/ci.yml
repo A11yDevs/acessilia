@@ -64,6 +64,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install ./libs/docstruct --no-cache-dir
+          python -m pip install "./libs/sdk[dev]" --no-cache-dir
           python -m pip install ".[dev]" --no-cache-dir
 
       - name: Collect complete test suite
@@ -76,13 +77,21 @@ jobs:
         working-directory: libs/docstruct
         run: python -m pytest --junitxml=docstruct-test-results.xml
 
+      - name: Run SDK library test suite
+        working-directory: libs/sdk
+        run: python -m pytest --junitxml=sdk-test-results.xml
+
       - name: Reject unexpected skipped tests
         run: |
           python - <<'PY'
           from pathlib import Path
           from xml.etree import ElementTree
 
-          reports = [Path("test-results.xml"), Path("libs/docstruct/docstruct-test-results.xml")]
+          reports = [
+              Path("test-results.xml"),
+              Path("libs/docstruct/docstruct-test-results.xml"),
+              Path("libs/sdk/sdk-test-results.xml"),
+          ]
           skipped = 0
           for report in reports:
               root = ElementTree.parse(report).getroot()

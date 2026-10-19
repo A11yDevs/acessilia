@@ -178,7 +178,7 @@ def _run_manifest(
 ) -> ProcessingManifest:
     if no_ocr:
         raise ValueError("--no-ocr is unsupported by the current Toolbox provider.")
-    agent = InformationalStructuralAgent(ToolboxManifestExtractor(language=language))
+    agent = InformationalStructuralAgent(ToolboxManifestExtractor())
     manifest = agent.process(document.resolve(), language=language)
     payload = manifest.model_dump(mode="json", by_alias=True)
     errors = validate_manifest(payload, DEFAULT_MANIFEST_SCHEMA)

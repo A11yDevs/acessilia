@@ -9,7 +9,9 @@ from pathlib import Path
 import pytest
 
 from backend.agents.pddl_orchestrator import (
+    PddlAccessibilityOrchestrator,
     _handle_dual_provider_fusion_method,
+    _handle_single_provider_method,
 )
 from backend.core.execution.executor import ExecutorAgent, MethodRegistry
 from backend.core.manifest.models import (
@@ -80,7 +82,7 @@ def _dual_payload() -> dict:
     return {
         "status": "succeeded",
         "provider": "docling+mineru",
-        "document": {"elements": []},
+        "document": {"elements": [{"type": "paragraph", "text": "Recovered content"}]},
         "fusion_stats": {"pairs": 3, "matched": 25},
     }
 
@@ -166,6 +168,114 @@ def test_fusion_handler_fails_when_single_provider(tmp_path, monkeypatch):
     assert result.artifacts == []
 
 
+def test_single_provider_fallback_persists_a_successful_extraction(
+    tmp_path, monkeypatch
+):
+    source = tmp_path / "source.pdf"
+    source.write_bytes(b"%PDF-test")
+    manifest = _make_manifest(tmp_path, source_path=source)
+    monkeypatch.setattr("backend.config.settings.settings.data_dir", tmp_path)
+    monkeypatch.setattr(
+        "backend.agents.pddl_orchestrator._run_extract_single_provider",
+        lambda path: {
+            "status": "succeeded",
+            "provider": "docling",
+            "document": {"elements": [{"text": "extraído"}]},
+        },
+    )
+
+    result = _handle_single_provider_method(manifest, "o-fuse")
+
+    assert result.success is True
+    assert result.validated is True
+    assert "docling" in (result.message or "")
+    assert len(result.artifacts) == 1
+    artifact = result.artifacts[0]
+    assert artifact.kind == "single-provider-payload"
+    assert Path(artifact.path).is_file()
+    payload = json.loads(Path(artifact.path).read_text(encoding="utf-8"))
+    assert payload["document"]["elements"][0]["text"] == "extraído"
+
+
+@pytest.mark.parametrize(
+    ("payload", "expected_message"),
+    [
+        ({"status": "failed", "provider": "docling"}, "não confirmou"),
+        (
+            {"status": "succeeded", "provider": "docling+mineru"},
+            "não confirmou",
+        ),
+    ],
+)
+def test_single_provider_fallback_rejects_unverified_payload(
+    tmp_path, monkeypatch, payload, expected_message
+):
+    source = tmp_path / "source.pdf"
+    source.write_bytes(b"%PDF-test")
+    manifest = _make_manifest(tmp_path, source_path=source)
+    monkeypatch.setattr(
+        "backend.agents.pddl_orchestrator._run_extract_single_provider",
+        lambda path: payload,
+    )
+
+    result = _handle_single_provider_method(manifest, "o-fuse")
+
+    assert result.success is False
+    assert result.validated is False
+    assert expected_message in (result.message or "")
+    assert result.artifacts == []
+
+
+def test_pddl_replans_from_dual_to_single_provider(tmp_path, monkeypatch):
+    source = tmp_path / "source.pdf"
+    source.write_bytes(b"%PDF-test")
+    manifest = _make_manifest(tmp_path, source_path=source)
+    obligation = manifest.obligations[0]
+    obligation.admissible_methods.append("single-provider")
+    obligation.method_costs["single-provider"] = 20
+    monkeypatch.setattr("backend.config.settings.settings.data_dir", tmp_path)
+    monkeypatch.setattr(
+        "backend.agents.pddl_orchestrator._run_extract_fused",
+        lambda path, **_kwargs: {
+            "status": "succeeded",
+            "provider": "docling",
+            "document": {"elements": []},
+        },
+    )
+    monkeypatch.setattr(
+        "backend.agents.pddl_orchestrator._run_extract_single_provider",
+        lambda path: {
+            "status": "succeeded",
+            "provider": "docling",
+            "document": {"elements": [{"text": "fallback"}]},
+        },
+    )
+    executor = PddlAccessibilityOrchestrator._build_executor()
+
+    _, first_plan = PlannerAgent().plan(manifest, selected_roots=["o-fuse"])
+    after_first, first_report = executor.execute(
+        first_plan, manifest, dry_run=False
+    )
+
+    assert first_report.replan_required is True
+    assert [
+        step.method for step in first_report.steps if step.method is not None
+    ] == ["dual-provider-fusion"]
+
+    _, fallback_plan = PlannerAgent().plan(
+        after_first, selected_roots=["o-fuse"]
+    )
+    completed, fallback_report = executor.execute(
+        fallback_plan, after_first, dry_run=False
+    )
+
+    assert fallback_report.status == "completed"
+    assert [
+        step.method for step in fallback_report.steps if step.method is not None
+    ] == ["single-provider"]
+    assert completed.obligations[0].status == "satisfied"
+
+
 @pytest.mark.skipif(find_spec("agno") is None, reason="Agno não instalado")
 def test_executor_wires_fusion_artifact_into_attempt(tmp_path, monkeypatch):
     """Proveniência: o ExecutorAgent associa o artefato à tentativa."""
@@ -199,3 +309,23 @@ def test_executor_wires_fusion_artifact_into_attempt(tmp_path, monkeypatch):
     assert artifact.kind == "fusion-payload"
     assert Path(artifact.path).exists()
 
+
+def test_dual_fusion_reuses_the_extractor_artifact(tmp_path, monkeypatch):
+    source = tmp_path / "source.pdf"
+    source.write_bytes(b"%PDF-test")
+    manifest = _make_manifest(tmp_path, source_path=source)
+    manifest.extractor.configuration["artifact_id"] = "art-42"
+    monkeypatch.setattr("backend.config.settings.settings.data_dir", tmp_path)
+    seen: dict[str, object] = {}
+
+    def fake_run(path, *, artifact_id=None):
+        seen["artifact_id"] = artifact_id
+        return {"status": "failed"}
+
+    monkeypatch.setattr(
+        "backend.agents.pddl_orchestrator._run_extract_fused", fake_run
+    )
+
+    _handle_dual_provider_fusion_method(manifest, "o-fuse")
+
+    assert seen["artifact_id"] == "art-42"

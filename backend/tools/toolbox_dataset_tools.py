@@ -1,25 +1,25 @@
 """Toolbox-backed dataset access for Dr.DocBench benchmark runs.
 
-Thin synchronous wrappers over ToolboxClient dataset endpoints, following
+Thin synchronous wrappers over the SDK's ToolboxDatasetClient, following
 the same pattern as toolbox_ocr_tools.py. Provides page-image retrieval and
 ground-truth (markdown/OmniDocJSON) access for the ``dr-docbench`` dataset.
 """
 
 from __future__ import annotations
 
-import asyncio
 from pathlib import Path
 from typing import Any
 
 from backend.tools.logger import logger
-from backend.tools.toolbox_client import ToolboxClient, ToolboxError
+from acessilia_sdk.toolbox.clients import ToolboxDatasetClient
+from backend.tools.toolbox_client import ToolboxError, make_toolbox_client, run_sync
 
 DATASET_ID = "dr-docbench"
 
 
 def _run_async(coro) -> Any:
-    """Run an async coroutine from a sync context."""
-    return asyncio.run(coro)
+    """Run an async coroutine from a sync context, even inside a running loop."""
+    return run_sync(coro)
 
 
 def toolbox_list_drbench_items(
@@ -116,7 +116,7 @@ def _find_image_artifact(item: dict[str, Any]) -> dict[str, Any] | None:
 async def _list_items_async(
     dataset_id: str, split: str, limit: int, offset: int
 ) -> list[dict[str, Any]]:
-    client = ToolboxClient()
+    client = make_toolbox_client(ToolboxDatasetClient)
     try:
         return await client.list_items(dataset_id, split, limit=limit, offset=offset)
     finally:
@@ -124,7 +124,7 @@ async def _list_items_async(
 
 
 async def _get_item_async(dataset_id: str, split: str, item_id: str) -> dict[str, Any]:
-    client = ToolboxClient()
+    client = make_toolbox_client(ToolboxDatasetClient)
     try:
         return await client.get_item(dataset_id, split, item_id)
     finally:
@@ -134,7 +134,7 @@ async def _get_item_async(dataset_id: str, split: str, item_id: str) -> dict[str
 async def _get_artifact_async(
     dataset_id: str, split: str, item_id: str, artifact_path: str
 ) -> bytes:
-    client = ToolboxClient()
+    client = make_toolbox_client(ToolboxDatasetClient)
     try:
         return await client.get_dataset_artifact(
             dataset_id, split, item_id, artifact_path

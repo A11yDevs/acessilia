@@ -100,6 +100,7 @@ from backend.log_messages import (
     LOG_EMAIL_SEND_ERROR,
     LOG_EMAIL_SENT,
     LOG_FATAL_ERROR_IN_BOT,
+    LOG_IMAGE_PREPROCESS_FAILED,
     LOG_JOB_CANCELLED,
     LOG_JOB_COMPLETED,
     LOG_JOB_EXECUTOR_ERROR,
@@ -128,6 +129,8 @@ from backend.log_messages import (
     LOG_PDF_UA_GENERATION_FAILED,
     LOG_PDF_EXPORTED,
     LOG_PDF_UA_EXPORTED,
+    LOG_PDF_UA_TOOLBOX_EXPORTED,
+    LOG_PDF_UA_TOOLBOX_FALLBACK,
     LOG_TXT_EXPORTED,
     LOG_DOCX_EXPORTED,
     LOG_PIPELINE_ERROR,
@@ -217,6 +220,7 @@ from backend.export.pandoc_exporter import (
     MSG_PANDOC_NOT_FOUND,
     MSG_PANDOC_REQUIRED_FOR_PDF_UA,
     MSG_PDF_UA_TEMPLATE_NOT_FOUND,
+    MSG_PDF_UA_TOOLBOX_AND_LOCAL_FAILED,
     MSG_UNSUPPORTED_EXPORT_FORMAT,
 )
 from backend.export.renderers.html_renderer import (
@@ -235,6 +239,12 @@ from backend.pipeline.table_ast import (
     MSG_TABLE_TEXT_ROW,
 )
 from backend.stage_messages import (
+    STAGE_CANCELLATION_REQUESTED,
+    STAGE_RESTART_CANCELLED,
+    STAGE_RESTART_INTERRUPTED,
+    STAGE_RESTART_RESUBMIT,
+    STAGE_PENDING_UPLOAD_MISSING,
+
     STAGE_ANALYZING_FILE,
     STAGE_ANALYZING_STRUCTURAL,
     STAGE_CANCELLED_BY_USER,
@@ -264,6 +274,17 @@ from backend.stage_messages import (
 )
 from backend.tools.validators import MSG_FILE_TOO_LARGE, MSG_UNSUPPORTED_FORMAT
 from frontend.web.messages import (
+    WEB_JOB_TITLE,
+    WEB_JOB_PENDING,
+    WEB_JOB_DOWNLOAD,
+    WEB_JOB_EMAIL_FAILED,
+    WEB_JOB_EMAIL_SENT,
+    WEB_JOB_UNAVAILABLE,
+    WEB_JOB_STATUS,
+    WEB_JOB_ERRORS,
+    WEB_JOB_HOME,
+    WEB_JOB_EMAIL_UNKNOWN,
+    WEB_ERROR_INVALID_RECEIPT,
     WEB_AGENT_DATA_DESCRIPTION,
     WEB_AGENT_DATA_INSTRUCTIONS_FALLBACK,
     WEB_AGENT_OS_DESCRIPTION,
@@ -398,6 +419,23 @@ CATALOG_CREATION_DATE: datetime = datetime(
 #: Canonical English msgids surfaced to end users at runtime; every id must carry a non-blank pt_BR translation in
 #: TRANSLATIONS before catalogs are allowed to be written out, per the module's completeness-validation contract.
 MESSAGES: tuple[str, ...] = (
+    WEB_JOB_TITLE,
+    WEB_JOB_PENDING,
+    WEB_JOB_DOWNLOAD,
+    WEB_JOB_EMAIL_FAILED,
+    WEB_JOB_EMAIL_SENT,
+    WEB_JOB_UNAVAILABLE,
+    WEB_JOB_STATUS,
+    WEB_JOB_ERRORS,
+    WEB_JOB_HOME,
+    WEB_JOB_EMAIL_UNKNOWN,
+    STAGE_CANCELLATION_REQUESTED,
+    STAGE_RESTART_CANCELLED,
+    STAGE_RESTART_INTERRUPTED,
+    STAGE_RESTART_RESUBMIT,
+    STAGE_PENDING_UPLOAD_MISSING,
+    WEB_ERROR_INVALID_RECEIPT,
+    "Custom instructions and thinking mode are unavailable for this pipeline",
     "Processing your document…",
     "Job complete: your file is ready for download",
     MSG_UNSUPPORTED_FORMAT,
@@ -497,9 +535,6 @@ MESSAGES: tuple[str, ...] = (
     MSG_OBLIGATION_UNKNOWN,
     MSG_HEADING_GAP,
     MSG_SOURCE_FILE_MISSING,
-    # Structural extraction diagnostics,
-    # surfaced as RuntimeError/ValueError text when the optional Docling stack is absent or its document
-    # structurer is incompatible; {source_path} substituted at call time via .format().
     # Nominal-plan executor error and status messages (backend/core/execution/messages.py),
     # raised or recorded by ExecutorAgent/MethodRegistry; placeholders substituted at call time.
     EXE_METHOD_NAME_REQUIRED,
@@ -595,6 +630,7 @@ MESSAGES: tuple[str, ...] = (
     MSG_PANDOC_REQUIRED_FOR_PDF_UA,
     MSG_LATEX_ENGINE_NOT_FOUND,
     MSG_PDF_UA_TEMPLATE_NOT_FOUND,
+    MSG_PDF_UA_TOOLBOX_AND_LOCAL_FAILED,
     MSG_AUDIT_FAILED,
     MSG_UNSUPPORTED_EXPORT_FORMAT,
     # HTML renderer UI chrome (backend/export/renderers/html_renderer.py).
@@ -711,6 +747,8 @@ MESSAGES: tuple[str, ...] = (
     LOG_PDDL_SELECTED_CLOSURE_MISMATCH,
     LOG_PDF_EXPORTED,
     LOG_PDF_UA_EXPORTED,
+    LOG_PDF_UA_TOOLBOX_EXPORTED,
+    LOG_PDF_UA_TOOLBOX_FALLBACK,
     LOG_TXT_EXPORTED,
     LOG_DOCX_EXPORTED,
     EMAIL_CONFIRMATION_SUBJECT,
@@ -749,6 +787,7 @@ MESSAGES: tuple[str, ...] = (
     LOG_JOB_COMPLETED,
     LOG_JOB_CANCELLED,
     LOG_JOB_EXECUTOR_ERROR,
+    LOG_IMAGE_PREPROCESS_FAILED,
     LOG_WEB_GLOBAL_ERROR,
     LOG_WEB_UPLOAD_ERROR,
     LOG_WEB_DOWNLOAD_QUERY_FAILED,
@@ -772,6 +811,23 @@ MESSAGES: tuple[str, ...] = (
 #: msgid -> localized text mappings per non-default locale; every id in MESSAGES must appear for each such locale.
 TRANSLATIONS: dict[str, dict[str, str]] = {
     "pt_BR": {
+        WEB_JOB_TITLE: 'Seu documento',
+        WEB_JOB_PENDING: 'Mantenha esta página aberta ou salve-a nos favoritos para acompanhar seu documento.',
+        WEB_JOB_DOWNLOAD: 'Baixar seus arquivos',
+        WEB_JOB_EMAIL_FAILED: 'Não foi possível enviar o e-mail. Você pode baixar seus arquivos aqui.',
+        WEB_JOB_EMAIL_SENT: 'O e-mail com o resultado foi enviado. Você também pode baixar seus arquivos aqui.',
+        WEB_JOB_UNAVAILABLE: 'O status está temporariamente indisponível. Atualize esta página para tentar novamente.',
+        WEB_JOB_STATUS: 'Status',
+        WEB_JOB_ERRORS: 'Avisos do processamento',
+        WEB_JOB_HOME: 'Enviar outro documento',
+        WEB_JOB_EMAIL_UNKNOWN: 'Não foi possível confirmar a entrega do e-mail. Você pode baixar seus arquivos aqui.',
+        STAGE_CANCELLATION_REQUESTED: 'Cancelamento solicitado; concluindo a operação atual com segurança',
+        STAGE_RESTART_CANCELLED: 'Cancelado durante a reinicialização',
+        STAGE_RESTART_INTERRUPTED: 'Processamento interrompido pela reinicialização',
+        STAGE_RESTART_RESUBMIT: 'Processamento interrompido pela reinicialização; envie novamente',
+        STAGE_PENDING_UPLOAD_MISSING: 'O arquivo pendente não existe mais',
+        WEB_ERROR_INVALID_RECEIPT: 'Recibo de processamento inválido retornado pela API',
+        "Custom instructions and thinking mode are unavailable for this pipeline": "Instruções personalizadas e modo de raciocínio estão indisponíveis neste pipeline",
         "Processing your document…": "Processando seu documento…",
         "Job complete: your file is ready for download": "Tarefa concluída: o arquivo está pronto para download",
         MSG_UNSUPPORTED_FORMAT: ("Formato de arquivo não suportado. Envie PDF, DOCX, HTML, PNG, JPG, " +
@@ -1191,6 +1247,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         MSG_PDF_UA_TEMPLATE_NOT_FOUND: (
             "Template PDF/UA não encontrado: {template_path}"
         ),
+        MSG_PDF_UA_TOOLBOX_AND_LOCAL_FAILED: (
+            "A exportação PDF/UA falhou na Toolbox ({toolbox_error}) e localmente ({local_error})"
+        ),
         MSG_AUDIT_FAILED: "Auditoria falhou: {findings}",
         MSG_UNSUPPORTED_EXPORT_FORMAT: (
             "Formato de exportação não suportado: {format_name}"
@@ -1385,7 +1444,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         LOG_PDDL_SELECTED_CLOSURE_MISMATCH: (
             "Fechamento selecionado diverge do problema compilado"
         ),
-
         LOG_PDF_PAGE_COUNT_LOGGED: (
             "PDF tem {total} páginas, processando {limit}"
         ),
@@ -1396,6 +1454,12 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         ),
         # PDF/UA export wrapper debug line; {output_path} the destination file path.
         LOG_PDF_UA_EXPORTED: "PDF/UA exportado: {output_path}",
+        # Toolbox-first PDF/UA rendering; {output_path} the destination file path.
+        LOG_PDF_UA_TOOLBOX_EXPORTED: "PDF/UA renderizado pela Toolbox: {output_path}",
+        # Toolbox PDF/UA failure before the local fallback; {error} the Toolbox error.
+        LOG_PDF_UA_TOOLBOX_FALLBACK: (
+            "A exportação PDF/UA na Toolbox falhou ({error}); usando pandoc + LaTeX locais"
+        ),
         # TXT export wrapper debug line; {output_path} the destination file path.
         LOG_TXT_EXPORTED: "TXT exportado: {output_path}",
         # DOCX export wrapper debug line; {output_path} the destination file path.
@@ -1484,6 +1548,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         LOG_JOB_COMPLETED: "Job {task_id} concluído (source={source})",
         LOG_JOB_CANCELLED: "Job {task_id} cancelado",
         LOG_JOB_EXECUTOR_ERROR: "Erro no JobExecutor para {task_id}",
+        LOG_IMAGE_PREPROCESS_FAILED: "Erro no pré-processamento de imagem: {error}",
         LOG_WEB_GLOBAL_ERROR: (
             "Erro global no Painel Web: {error} | Caminho: {path}"
         ),
@@ -1526,6 +1591,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         API_INTERNAL_ERROR_DETAIL: "Erro interno no servidor",
         # raised when the language-agent returns an empty result for a document.
         LOG_ORCHESTRATOR_EMPTY_AGENT_RESPONSE: "Resposta vazia do agente",
+        # orchestrator empty model-response warning; {page_num} is the page number.
         LOG_STALE_PROCESS_INTERRUPTED: "Obsoleta: processo interrompido",
         LOG_AGNO_NOT_INSTALLED: (
             "Agno não está instalado. Execute `poetry install` antes de usar "

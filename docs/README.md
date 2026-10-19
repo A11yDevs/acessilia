@@ -11,8 +11,8 @@ The system uses the `pddl` engine (manifest → plan → execution), with the `p
 
 ## Navigation
 
-1. [Architectural Constitution](constitution.md) — non-negotiable principles and quality rules.
-2. [Architecture Specification](architecture.md) — layers, both pipeline engines, and processing flow.
+1. [Architectural Constitution](constitution.md) — non-negotiable principles and quality rules, including the ecosystem principles P1–P9 (section 7) that divide the work between the core, the SDK, docstruct and the Toolbox.
+2. [Architecture Specification](architecture.md) — layers, the PDDL pipeline, and processing flow.
 3. [Design & Integration Patterns](patterns.md) — recurring patterns and their rationale.
 4. [Use Cases](use_cases.md) — actors and user-facing operations.
 5. [Endpoints & APIs](endpoints.md) — the REST API, the Web panel, and the AgentOS runtime.
@@ -21,7 +21,8 @@ The system uses the `pddl` engine (manifest → plan → execution), with the `p
 8. [Production systemd timer](producao-systemd.md) — production setup, promotion and rollback procedure.
 9. [Internationalization (i18n)](i18n.md) — what is localized, where the locale strings files live, and step-by-step guides for adding strings, internationalizing a file, and adding a new locale.
 10. [Dr.DocBench benchmark](drbench.md) — structure-extraction provider benchmark (Docling vs MinerU), metrics and results.
-11. [Toolbox tool integration](toolbox_integration.md) — how to integrate a new Toolbox tool into the core: HTTP contract, local vs. remote tools, and the two integration scenarios. (Brazilian Portuguese: [versão em pt-BR](toolbox_integration.pt-br.md))
+11. [Toolbox tool integration](toolbox_integration.md) — how to integrate a new Toolbox tool into the core: HTTP contract, libraries vs. Toolbox capabilities, and the two integration scenarios. (Brazilian Portuguese: [versão em pt-BR](toolbox_integration.pt-br.md))
+12. [Architecture Decision Records](adr/README.md) — cross-component decisions (responsibilities, remote-only execution, contracts, artifact references, availability) and how to propose a new one. (Brazilian Portuguese: [versão em pt-BR](adr/README.pt-br.md))
 
 ---
 

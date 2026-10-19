@@ -5,11 +5,9 @@ from unittest.mock import AsyncMock
 import fitz
 import pytest
 
-from backend.tools.toolbox_client import (
-    ToolboxClient,
-    ToolboxContractViolation,
-    ToolboxProviderUnavailable,
-)
+from acessilia_sdk.toolbox import ToolboxContractViolation, ToolboxProviderUnavailable
+from acessilia_sdk.toolbox.clients import ToolboxStructureClient
+from backend.tools.toolbox_client import make_toolbox_client
 from backend.tools.toolbox_structurer import ToolboxStructurer
 
 
@@ -28,7 +26,7 @@ def formula_pdf(tmp_path, monkeypatch):
             "bbox": {"left": 72, "top": 60, "right": 160, "bottom": 80},
         }]},
     })
-    monkeypatch.setattr(ToolboxClient, "extract_structure", extraction)
+    monkeypatch.setattr(ToolboxStructureClient, "extract_structure", extraction)
     return source, extraction
 
 
@@ -37,7 +35,7 @@ def test_formula_comparison_reads_docling_regions(formula_pdf):
 
     source, extraction = formula_pdf
     case = Case("equation", "clean", "E=mc^2", source, pdf_path=source)
-    structurer = ToolboxStructurer(client=ToolboxClient(provider="docling"))
+    structurer = ToolboxStructurer(client=make_toolbox_client(ToolboxStructureClient))
     run_docling(case, structurer)
 
     assert structurer._client.provider == "docling"

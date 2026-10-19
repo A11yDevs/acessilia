@@ -6,19 +6,19 @@ to the Acessilia Toolbox. Falls back to local PyMuPDF on failure.
 
 from __future__ import annotations
 
-import asyncio
 import base64
 from pathlib import Path
 from typing import Any
 
 from backend.tools.logger import logger
 from backend.tools.pdf_splitter import split_pdf as _local_split_pdf
-from backend.tools.toolbox_pdf_client import ToolboxPdfClient
+from acessilia_sdk.toolbox.clients import ToolboxPdfClient
+from backend.tools.toolbox_client import make_toolbox_client, run_sync
 
 
 def _run_async(coro) -> Any:
-    """Run an async coroutine from a sync context."""
-    return asyncio.run(coro)
+    """Run an async coroutine from a sync context, even inside a running loop."""
+    return run_sync(coro)
 
 
 def toolbox_split_pdf(file_path: Path, tmpdir: Path, max_pages: int = 50) -> list[Path]:
@@ -42,7 +42,7 @@ def toolbox_split_pdf(file_path: Path, tmpdir: Path, max_pages: int = 50) -> lis
 
 
 async def _split_async(file_path: Path) -> dict:
-    client = ToolboxPdfClient()
+    client = make_toolbox_client(ToolboxPdfClient)
     try:
         return await client.split(file_path=file_path)
     finally:
@@ -77,7 +77,7 @@ def toolbox_render_page(pdf_path: Path, page_number: int = 1, dpi: int = 150) ->
 
 
 async def _render_async(pdf_path: Path, page_number: int, dpi: int) -> dict:
-    client = ToolboxPdfClient()
+    client = make_toolbox_client(ToolboxPdfClient)
     try:
         return await client.render(
             file_path=pdf_path, page_number=page_number, dpi=dpi

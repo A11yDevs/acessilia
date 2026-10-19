@@ -23,47 +23,54 @@ Toolbox (`--url`) or against the captured fixture
 ## Required capability entry points
 
 A capability is only *actionable* in the core when all four links exist. A
-capability missing any link is a dead capability from the product's point of view.
+missing link identifies an integration gap; it does not prove the capability is
+dead. For Dr.DocBench capabilities, investigate the evidence → obligation →
+`problem.pddl` → method → handler → verifiable-effect path, rather than dropping
+a capability because it is not currently activated.
 
 | Link | Artifact | Location |
 |---|---|---|
-| Client | `Toolbox*Client` with the capability id | `backend/tools/toolbox_*_client.py` |
-| Provider default | `TOOLBOX_*_PROVIDER` (or `TOOLBOX_PROVIDER`) | `backend/config/settings.py` |
+| Registry entry | `ToolboxCapability` (id, version, provider setting, output schema) | `libs/sdk/src/acessilia_sdk/toolbox/capabilities.py` |
+| Client | `ToolboxCapabilityClient` subclass calling the registered id, built in the core with `make_toolbox_client` | `libs/sdk/src/acessilia_sdk/toolbox/clients/*.py` |
+| Provider default | `PROVIDER_DEFAULTS`, read by `TOOLBOX_*_PROVIDER` in `Settings` | `libs/sdk/src/acessilia_sdk/toolbox/capabilities.py` |
 | Manifest | `capabilities/*.yaml` | `acessilia-toolbox` |
 | Provider registration | `providers-config.yaml` entry with an adapter | `acessilia-toolbox` |
 
-For planning-driven work there are two further links: the obligation/method entry
-in `DEFAULT_METHOD_COSTS` (`backend/core/manifest/builder.py`) and a registered
-handler in `PddlAccessibilityOrchestrator._build_executor`
-(`backend/agents/pddl_orchestrator.py`).
+For planning-driven work there are further links: the obligation/method entry in
+`DEFAULT_METHOD_COSTS` (`backend/core/manifest/builder.py`), a registered handler
+in `PddlAccessibilityOrchestrator._build_executor`
+(`backend/agents/pddl_orchestrator.py`), and real evidence that causes the
+compiler to emit the required facts in `problem.pddl`.
 
 ## Matrix
 
 Legend for **Call path**: how the core reaches the capability.
 
-| Capability | Core client | Core provider default | Toolbox provider | Call path |
+| Capability | Client | Core provider default | Toolbox provider | Call path |
 |---|---|---|---|---|
-| `document.structure.extract` | `toolbox_client.py` (inline URL) | `TOOLBOX_PROVIDER=docling` | `docling`, `mineru`, `nougat`, `teleocr` | `ToolboxManifestExtractor` → PDDL extraction |
-| `document.layout.analyze` | `toolbox_layout_client.py` | `TOOLBOX_LAYOUT_PROVIDER=docling-layout` | `docling-layout`, `mineru-layout` | `ToolboxLayoutStructurer` via `STRUCTURER=toolbox-layout` |
-| `document.ocr` | `toolbox_ocr_client.py` | `TOOLBOX_OCR_PROVIDER=docling-ocr` | `docling-ocr`, `mineru-ocr` | `toolbox_ocr_tools.py` (Agno wrapper) |
-| `math.recognize` | `toolbox_math_client.py` | `TOOLBOX_MATH_RECOGNIZE_PROVIDER=docling-math` | `docling-math`, `rapid-latex-ocr` | `toolbox_math_tools.py` |
-| `math.convert` | `toolbox_math_client.py` | `TOOLBOX_MATH_PROVIDER=pure-math` | `pure-math` | `toolbox_math_tools.py` |
-| `math.verbalize` | `toolbox_math_client.py` | `TOOLBOX_MATH_PROVIDER=pure-math` | `pure-math` | `toolbox_math_tools.py` |
-| `pdf.split` | `toolbox_pdf_client.py` | `TOOLBOX_PDF_PROVIDER=pymupdf-pdf` | `pymupdf-pdf` | `toolbox_pdf_tools.py` (validates, then splits locally) |
-| `pdf.render` | `toolbox_pdf_client.py` | `TOOLBOX_PDF_PROVIDER=pymupdf-pdf` | `pymupdf-pdf` | `toolbox_pdf_tools.py` (falls back to local PyMuPDF) |
-| `media.inspect` | `toolbox_media_inspect_client.py` | `TOOLBOX_MEDIA_INSPECT_PROVIDER=pure-media-inspect` | `pure-media-inspect` | `backend/tools/media_inspect.py`, gated by `TOOLBOX_MEDIA_INSPECT_ENABLED` |
-| `artifact.store` / `artifact.retrieve` | `toolbox_client.py` REST `/v1/artifacts` | — | `minio`, `filesystem` | upload before extraction |
-| `dataset.*` (8 capabilities) | `toolbox_client.py` REST `/v1/datasets` | — | `dataset-github`, `dataset-huggingface` | `toolbox_dataset_tools.py` (Dr.DocBench scripts) |
-| `document.ocr.page` | `toolbox_page_ocr_client.py` | `TOOLBOX_PAGE_OCR_PROVIDER=qwen3-vl-page` | **absent** | **no caller** |
-| `document.adjudicate.page` | `toolbox_adjudicate_client.py` | `TOOLBOX_ADJUDICATE_PROVIDER=qwen3-vl-judge` | **absent** | **no caller** |
-| `document.adjudicate.region` | `toolbox_adjudicate_client.py` | `TOOLBOX_ADJUDICATE_PROVIDER=qwen3-vl-judge` | **absent** | **no caller** |
-| `image.page.orient` | `toolbox_orientation_client.py` | `TOOLBOX_ORIENTATION_PROVIDER=rapidocr-orient` | `rapidocr-orient` | contract-valid, **no production caller yet** |
-| `accessibility.mark` | **absent** | — | `pure-accessibility` | — |
-| `chem.convert` | **absent** | — | `pure-chem` | — |
-| `chem.recognize` | **absent** | — | `docling-chem` | — |
-| `code.normalize` | **absent** | — | `pure-code` | — |
-| `text.postprocess` | **absent** | — | `pure-text` | — |
-| `music.omr` | **absent** | — | `homr`, `audiveris` | — |
+| `document.structure.extract` | `acessilia_sdk/toolbox/clients/structure.py` | `TOOLBOX_PROVIDER=docling` | `docling`, `mineru`, `nougat`, `teleocr` | `ToolboxManifestExtractor` → PDDL extraction; with `FUSION_MODE=dual`, also compares the secondary provider and passes page evidence to the manifest builder |
+| `document.layout.analyze` | `acessilia_sdk/toolbox/clients/layout.py` | `TOOLBOX_LAYOUT_PROVIDER=docling-layout` | `docling-layout`, `mineru-layout` | `ToolboxLayoutStructurer` via `STRUCTURER=toolbox-layout` |
+| `document.ocr` | `acessilia_sdk/toolbox/clients/ocr.py` | `TOOLBOX_OCR_PROVIDER=docling-ocr` | `docling-ocr`, `mineru-ocr` | `toolbox_ocr_tools.py` (Agno wrapper) |
+| `math.recognize` | `acessilia_sdk/toolbox/clients/math.py` | `TOOLBOX_MATH_RECOGNIZE_PROVIDER=docling-math` | `docling-math`, `rapid-latex-ocr` | `toolbox_math_tools.py` |
+| `math.convert` | `acessilia_sdk/toolbox/clients/math.py` | `TOOLBOX_MATH_PROVIDER=pure-math` | `pure-math` | `toolbox_math_tools.py` |
+| `math.verbalize` | `acessilia_sdk/toolbox/clients/math.py` | `TOOLBOX_MATH_PROVIDER=pure-math` | `pure-math` | `toolbox_math_tools.py` |
+| `pdf.split` | `acessilia_sdk/toolbox/clients/pdf.py` | `TOOLBOX_PDF_PROVIDER=pymupdf-pdf` | `pymupdf-pdf` | `toolbox_pdf_tools.py` (validates, then splits locally) |
+| `pdf.render` | `acessilia_sdk/toolbox/clients/pdf.py` | `TOOLBOX_PDF_PROVIDER=pymupdf-pdf` | `pymupdf-pdf` | `toolbox_pdf_tools.py` (falls back to local PyMuPDF; deviation removed in #150, ADR-0003) |
+| `media.inspect` | `acessilia_sdk/toolbox/clients/media_inspect.py` | `TOOLBOX_MEDIA_INSPECT_PROVIDER=pure-media-inspect` | `pure-media-inspect` | `backend/tools/media_inspect.py` (local fallback; deviation removed in #150, ADR-0003), gated by `TOOLBOX_MEDIA_INSPECT_ENABLED` |
+| `document.export.pdf_ua` | `acessilia_sdk/toolbox/clients/pdf_ua.py` | `TOOLBOX_PDF_UA_PROVIDER=pandoc-pdf-ua` | `pandoc-pdf-ua` (sidecar `pdf-ua-render`) | `backend/export/pandoc_exporter.py` (Toolbox-first, PDF downloaded from `/v1/artifacts`; the local pandoc + LaTeX fallback is a deviation removed in #150, ADR-0003), gated by `TOOLBOX_PDF_UA_ENABLED` |
+| `artifact.store` / `artifact.retrieve` | `acessilia_sdk/toolbox/clients/artifact.py` (REST `/v1/artifacts`) | — | `minio`, `filesystem` | upload before extraction |
+| `dataset.*` (8 capabilities) | `acessilia_sdk/toolbox/clients/dataset.py` (REST `/v1/datasets`) | — | `dataset-github`, `dataset-huggingface` | `toolbox_dataset_tools.py` (Dr.DocBench scripts) |
+| `document.ocr.page` | `acessilia_sdk/toolbox/clients/page_ocr.py` | `TOOLBOX_PAGE_OCR_PROVIDER=qwen3-vl-8b` | `qwen3-vl-8b` (acessilia-toolbox#50) | published; no PDDL method calls it yet |
+| `document.adjudicate.page` | `acessilia_sdk/toolbox/clients/adjudicate.py` | `TOOLBOX_ADJUDICATE_PROVIDER=qwen3-vl-8b` | `qwen3-vl-8b` (acessilia-toolbox#50) | `vlm-pairwise-judge` on `adjudicate-page`; thresholds to re-validate on the 8B model |
+| `document.adjudicate.region` | `acessilia_sdk/toolbox/clients/adjudicate.py` | `TOOLBOX_ADJUDICATE_PROVIDER=qwen3-vl-8b` | `qwen3-vl-8b` (acessilia-toolbox#50) | published; `rescue-omitted` handler pending |
+| `table.recognize` | `acessilia_sdk/toolbox/clients/table.py` | `TOOLBOX_TABLE_PROVIDER=qwen3-vl-8b` | `qwen3-vl-8b` (acessilia-toolbox#50) | published; `table-specialist` handler pending (selection rule to decide) |
+| `image.page.orient` | `acessilia_sdk/toolbox/clients/orientation.py` | `TOOLBOX_ORIENTATION_PROVIDER=rapidocr-orient` | `rapidocr-orient` | contract-valid; PDDL trigger and production effect validation pending |
+| `accessibility.mark` | **absent** | — | `pure-accessibility` | pending: evidence-driven client and obligation/method/handler |
+| `chem.convert` | **absent** | — | `pure-chem` | pending: evidence-driven client and obligation/method/handler |
+| `chem.recognize` | **absent** | — | `docling-chem` | pending: evidence-driven client and obligation/method/handler |
+| `code.normalize` | **absent** | — | `pure-code` | pending: evidence-driven client and obligation/method/handler |
+| `text.postprocess` | **absent** | — | `pure-text` | pending: evidence-driven client and obligation/method/handler |
+| `music.omr` | **absent** | — | `homr`, `audiveris` | pending: evidence-driven client and obligation/method/handler |
 | `cache.get` / `cache.put` | — (internal) | — | `valkey` | Toolbox-internal cache; not a public capability |
 
 ## Confirmed drift (as of the review)
@@ -71,19 +78,25 @@ Legend for **Call path**: how the core reaches the capability.
 Measured against the running staging Toolbox with
 `python scripts/check_capability_contract.py --snapshot tests/fixtures/toolbox-contract.json`:
 
-1. Three capabilities are consumed by the core but do not exist in the Toolbox
-   catalogue: `document.ocr.page`, `document.adjudicate.page`,
-   `document.adjudicate.region`.
-2. Two provider defaults in `settings.py` point at providers the Toolbox does
-   not register: `qwen3-vl-page`, `qwen3-vl-judge`.
-3. Six capabilities have no core client at all (see the matrix).
+1. The published generic REST API exposes
+   `POST /v1/capabilities/{capability_id}:execute`, with per-capability schemas
+   available from `GET /v1/capabilities/{capability_id}`. The live OpenAPI is
+   `https://www.acessilia3.inf.ufg.br/toolbox/v1/openapi.json` (UI:
+   `/toolbox/v1/docs`). This does not define capability-specific routes.
+2. Resolved by acessilia-toolbox#50: `document.ocr.page`,
+   `document.adjudicate.page` and `document.adjudicate.region` are published by
+   the `qwen3-vl-8b` provider, and the SDK defaults point at it (they named
+   `qwen3-vl-page` and `qwen3-vl-judge`, from the experiments' 32B profile).
+3. `KNOWN_DRIFT` is empty against the Toolbox develop catalogue; staging still
+   runs an image older than #50 until it is redeployed.
+4. Six capabilities have no core client at all (see the matrix).
 
-The orientation drift was resolved: the client posted to
+The orientation contract drift was resolved: the client posted to
 `document.orientation.detect` with provider `rapidocr-orientation`, neither of
 which the Toolbox knows, while the Toolbox exposes `image.page.orient`
 implemented by `rapidocr-orient`. The client and the default now match the
-catalogue. The client still has no production caller, so its verdict is
-"integrate or retire" rather than "done".
+catalogue. Its missing production trigger is a PDDL modeling/integration gap,
+not grounds to retire the Dr.DocBench capability.
 
 The known drift is pinned in `tests/test_toolbox_contract_drift.py`; any *new*
 drift fails the suite, and fixing a finding requires removing it from the pinned
@@ -133,12 +146,16 @@ gap.
 - **Every admissible method is accounted for.** Each one now resolves to a
   registered handler or is reported to the planner as unavailable;
   `tests/test_pddl_actionability.py` fails on any method that is neither.
-- **15 handlers registered** (was 3 real + 8 no-op): the 3 model-backed ones plus
-  12 deterministic handlers covering `vision-description`, `pandoc-table`,
-  `pandoc-code`, `pymupdf-region`, `latex-normalizer`, `norm-fix`,
+- **18 handlers registered** (was 3 real + 8 no-op): the 3 model-backed ones,
+  the single-provider fallback, the
+  13 deterministic handlers covering `vision-description`, `pandoc-table`,
+  `pandoc-code`, `pymupdf-region`, `latex-normalizer`, `norm-fix`, `rep-guard`,
   `line-number-extractor`, `verse-chunker`, `tailjoin`, `tailjoin-positioned`,
-  `deterministic-heading-repair`. They *validate* the work the pipeline already
-  performed instead of pretending to perform it.
+  `xycut-order`, and `deterministic-heading-repair`; `human-review` is the
+  explicit terminal escalation handler.
+  `single-provider` is the executable fallback after a rejected dual-provider
+  attempt; a regression test proves the PDDL replan selects it and records its
+  extraction artifact.
 - **The silent no-op is gone.** A handler that claims success must set
   `validated=True` on real work.
 - **`human-review` has its own semantics.** It is the terminal escalation every
@@ -154,13 +171,24 @@ gap.
   `PDDL_MAX_REPLANS` (default 2) times, reusing the `(tried ?o ?m)` state the
   executor recorded, so a failed method moves to the next admissible one.
 
-Nine methods remain **declared unavailable** rather than implemented:
-`skeleton-order`, `xycut-order`, `agreement-rule`, `rep-guard`, `rescue-omitted`,
-`single-provider`, `table-smart-fusion`, `table-specialist`, `vlm-pairwise-judge`.
-They are all v2.3 methods that depend on provider disagreement or a VLM judge; the
-planner never emits a step for them today. They are listed as a ratchet in
-`KnownUnavailable` inside the test file, so implementing one fails the test until
-it is removed from the list.
+### P2: evidence-driven v2.3 obligations
+
+The manifest builder now derives v2.3 obligations from deterministic evidence:
+text/formula normalization changes, a real reading-order reorder, eligible tail
+joins, verse chunking and marginal line-number extraction. Dual-provider
+obligations are emitted only when the extraction carries per-page fusion evidence;
+text disagreement, dropped blocks, table-source decisions and repetition cuts are
+not inferred from a single-provider manifest. The Toolbox's existing obligations
+are preserved, and derived v2.3 obligations are deduplicated by kind and target.
+
+The fusion pipeline now exports per-page decision counters and a repetition-cut
+count (without copying provider text into the manifest). This evidence allows the
+builder to distinguish an observed issue from a capability that merely exists in
+the PDDL catalog. Seven methods still lack executable handlers and remain
+excluded from plans until their required candidate data or Toolbox REST contracts
+are available. This is an integration backlog, not a decision to discard those
+Dr.DocBench capabilities. The specific REST/OpenAPI contracts for page OCR and
+adjudication are pending from the service owner.
 
 ### Live evidence
 
@@ -177,15 +205,16 @@ status: completed
 Before the fix the same input produced `failed` with
 `RuntimeError: No handler registered for vision-description`.
 
-### Deferred
+### Planner availability gate
 
-`_validate_methods` only raises when an obligation has **zero** available
-candidates. When a compiler-declared unavailable method simply disappears from the
-compiled problem while the manifest's admissible list still contains it, the
-planner is still offered a method that cannot run: the `available` predicate is
-emitted only for `available_methods`, and `InternalReferencePlanner` filters on it,
-but `FastDownwardPlanner` relies on the domain's precondition instead. Not yet
-fixed.
+Unavailable methods remain in the manifest's admissible-method list for
+traceability, but the compiler does not emit `(available <method>)` for them.
+The PDDL `execute-obligation` action requires `(available ?m)`, so Fast Downward
+cannot select those methods. The internal planner applies the same projection
+directly, and the runtime validates external plans against it before execution.
+`tests/test_pddl_planning.py::test_fast_downward_respects_unavailable_methods`
+regresses both the compiled availability facts and rejection of an invalid
+external plan.
 
 ## Verdicts
 

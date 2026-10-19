@@ -8,11 +8,28 @@ resolution-markers = [
 
 [[package]]
 name = "acessilia-docstruct"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "libs/docstruct" }
 
 [package.metadata]
 requires-dist = [{ name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" }]
+provides-extras = ["dev"]
+
+[[package]]
+name = "acessilia-sdk"
+version = "0.1.0"
+source = { editable = "libs/sdk" }
+dependencies = [
+    { name = "httpx" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "httpx", specifier = ">=0.27,<0.28" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=1.4.0,<2" },
+    { name = "respx", marker = "extra == 'dev'", specifier = ">=0.23.1,<0.24" },
+]
 provides-extras = ["dev"]
 
 [[package]]
@@ -241,6 +258,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "acessilia-docstruct" },
+    { name = "acessilia-sdk" },
     { name = "agno" },
     { name = "aiogram" },
     { name = "aiosmtplib" },
@@ -280,6 +298,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "acessilia-docstruct", editable = "libs/docstruct" },
+    { name = "acessilia-sdk", editable = "libs/sdk" },
     { name = "agno", specifier = "==3.0.5" },
     { name = "aiogram", specifier = ">=3.13,<4" },
     { name = "aiosmtplib", specifier = ">=5.1.2,<6" },

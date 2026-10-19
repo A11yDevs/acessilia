@@ -11,8 +11,8 @@ O sistema usa o motor `pddl` (manifesto → plano → execução), com o alias `
 
 ## Navegação
 
-1. [Constituição Arquitetural](constitution.pt-br.md) — princípios inegociáveis e regras de qualidade. (Inglês: [English version](constitution.md))
-2. [Especificação de Arquitetura](architecture.pt-br.md) — camadas, os dois motores de pipeline e o fluxo de processamento. (Inglês: [English version](architecture.md))
+1. [Constituição Arquitetural](constitution.pt-br.md) — princípios inegociáveis e regras de qualidade, incluindo os princípios do ecossistema P1–P9 (seção 7), que dividem o trabalho entre o core, o SDK, a docstruct e a Toolbox. (Inglês: [English version](constitution.md))
+2. [Especificação de Arquitetura](architecture.pt-br.md) — camadas, o pipeline PDDL e o fluxo de processamento. (Inglês: [English version](architecture.md))
 3. [Padrões de Design e Integração](patterns.pt-br.md) — padrões recorrentes e sua justificativa. (Inglês: [English version](patterns.md))
 4. [Casos de Uso](use_cases.pt-br.md) — atores e operações visíveis ao usuário. (Inglês: [English version](use_cases.md))
 5. [Endpoints e APIs](endpoints.pt-br.md) — a API REST, o painel web e o runtime AgentOS. (Inglês: [English version](endpoints.md))
@@ -22,7 +22,8 @@ O sistema usa o motor `pddl` (manifesto → plano → execução), com o alias `
 9. [Relatório de revisão técnica — PR #14](pr-14-review.pt-br.md) — achados classificados por severidade e uma lista de verificação de aceite para a mudança de pipeline PDDL/Agno. (Inglês: [English report](pr-14-review.md))
 10. [Internacionalização (i18n)](i18n.pt-br.md) — o que é localizado, onde os arquivos de strings por locale ficam e guias passo a passo para adicionar strings, internacionalizar um arquivo e adicionar um novo locale. (English: [English guide](i18n.md))
 11. [Benchmark Dr.DocBench](drbench.pt-br.md) — benchmark de provedores de extração de estrutura (Docling vs MinerU), métricas e resultados. (English: [English guide](drbench.md))
-12. [Integração de ferramentas da Toolbox](toolbox_integration.pt-br.md) — como integrar ao core uma ferramenta nova da Toolbox: contrato HTTP, tools locais vs. remotas e os dois cenários de integração. (English: [English guide](toolbox_integration.md))
+12. [Integração de ferramentas da Toolbox](toolbox_integration.pt-br.md) — como integrar ao core uma ferramenta nova da Toolbox: contrato HTTP, bibliotecas vs. capacidades da Toolbox e os dois cenários de integração. (English: [English guide](toolbox_integration.md))
+13. [Registros de Decisão Arquitetural](adr/README.pt-br.md) — decisões que atravessam componentes (responsabilidades, execução remota, contratos, referências de artefatos, disponibilidade) e como propor uma nova. (English: [English version](adr/README.md))
 
 ---
 

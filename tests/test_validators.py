@@ -52,9 +52,7 @@ def test_validate_file_invalid_ext(monkeypatch):
     assert "suportado" in msg.lower()
 
 
-def test_validate_file_allows_docx_and_html_in_pddl(monkeypatch):
-    from backend.config.settings import settings
-
+def test_validate_file_allows_docx_and_html(monkeypatch):
     monkeypatch.setattr(settings, "pipeline_engine", "pddl")
 
     for filename in ("documento.docx", "pagina.html"):

@@ -13,6 +13,8 @@ from typing import Any
 
 from backend.agents.state_manager import TaskCancelledError, state_manager
 from backend.config.settings import settings
+from backend.services.job_store import load_record, save_status, pending_records
+from backend.services.blocking import run_blocking
 from backend.i18n import t
 from backend.log_messages import (
     LOG_JOB_CANCELLED,
@@ -22,7 +24,12 @@ from backend.log_messages import (
     LOG_PDF_UA_GENERATION_FAILED,
 )
 from backend.stage_messages import (
+    STAGE_RESTART_CANCELLED,
+    STAGE_RESTART_INTERRUPTED,
+    STAGE_RESTART_RESUBMIT,
+    STAGE_PENDING_UPLOAD_MISSING,
     STAGE_CANCELLED_IN_QUEUE,
+    STAGE_CANCELLED_BY_USER,
     STAGE_EXPORTING_DOCX,
     STAGE_EXPORTING_DRBENCH_MD,
     STAGE_EXPORTING_HTML,
@@ -76,27 +83,50 @@ def register_queued_job(
     }
 
 
-def get_job_status(task_id: str) -> dict[str, Any] | None:
+def get_job_status(task_id: str, *, durable: bool = True) -> dict[str, Any] | None:
     task = state_manager.obter(task_id)
     if task is not None:
         return dict(task)
     queued = queued_jobs.get(task_id)
     if not queued:
-        return None
+        if not durable:
+            return None
+        record = load_record(task_id)
+        return record["status"] if record else None
     status = dict(queued)
     if status.get("status") == "queued":
         from backend.services.queue_service import unified_queue
 
         position = unified_queue.get_position(task_id)
         if position > 0:
-            status["etapa_atual"] = f"Aguardando na fila (Posicao: {position})"
+            status["etapa_atual"] = t(STAGE_QUEUE_WAITING_POSITION).format(position=position)
+    return status
+
+
+async def get_job_status_async(task_id: str) -> dict[str, Any] | None:
+    current = get_job_status(task_id, durable=False)
+    if current is not None:
+        return current
+    record = await run_blocking(load_record, task_id)
+    if record is None:
+        return None
+    status = record["status"]
+    if status.get("email_delivery") == "pending":
+        # No in-memory task owns delivery after a restart.
+        status["email_delivery"] = "unknown"
     return status
 
 
 def cancel_job_status(task_id: str) -> bool:
     task = state_manager.obter(task_id)
     if task is not None:
-        return state_manager.cancelar(task_id)
+        from backend.services.queue_service import unified_queue
+
+        active = task_id in unified_queue._active_tasks
+        accepted = state_manager.cancelar(task_id, pending=active)
+        if accepted and active:
+            unified_queue.cancel(task_id)
+        return accepted
     queued = queued_jobs.get(task_id)
     if queued is not None and queued.get("status") == "queued":
         from backend.services.queue_service import unified_queue
@@ -127,14 +157,23 @@ class JobExecutor:
     def __init__(self) -> None:
         self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=3)
 
-    def _run_in_executor(self, fn, *args, **kwargs):
+    async def _run_in_executor(self, fn, *args, **kwargs):
         loop = asyncio.get_running_loop()
-        return loop.run_in_executor(self._executor, functools.partial(fn, *args, **kwargs))
+        operation = loop.run_in_executor(self._executor, functools.partial(fn, *args, **kwargs))
+        try:
+            return await asyncio.shield(operation)
+        except asyncio.CancelledError:
+            try:
+                await operation
+            except Exception:
+                pass
+            raise
 
     async def run(self, job: ApiJob) -> None:
         task_id = job.task_id
         started_at = time.time()
         out_dir: Path | None = None
+        result_published = False
 
         async def status_callback(msg: str) -> None:
             state_manager.atualizar(task_id, etapa=msg)
@@ -145,6 +184,7 @@ class JobExecutor:
                 state_manager.criar_tarefa(
                     job.file_path, task_id=task_id, arquivo=job.filename
                 )
+            await run_blocking(save_status, task_id, get_job_status(task_id))
             await registrar_conversao(
                 task_id=task_id,
                 arquivo=job.filename,
@@ -198,7 +238,6 @@ class JobExecutor:
                 await self._run_in_executor(
                     export_drbench_md, canonical, drbench_md_path, job.filename
                 )
-                completed_formats.append("drbench_md")
             except Exception as exc:
                 logger.warning("drbench_md export failed: {}", exc)
                 _remove_partial_output(drbench_md_path)
@@ -301,7 +340,10 @@ class JobExecutor:
             state_manager.atualizar(
                 task_id, etapa=t(STAGE_PROCESSING_COMPLETED), progresso=1.0,
                 status="done", resultado=json.dumps(canonical, ensure_ascii=False),
+                email_delivery="pending" if job.email else None,
             )
+            result_published = True
+            await run_blocking(save_status, task_id, get_job_status(task_id))
             await finalizar_conversao(
                 task_id=task_id,
                 status="done",
@@ -311,13 +353,18 @@ class JobExecutor:
             )
 
             if job.email:
-                sent = await send_result_email(
-                    job.email,
-                    job.filename,
-                    download_url=download_url,
-                    completed_formats=completed_formats,
-                    warnings=optional_errors,
-                )
+                try:
+                    sent = await send_result_email(
+                        job.email,
+                        job.filename,
+                        download_url=download_url,
+                        completed_formats=completed_formats,
+                        warnings=optional_errors,
+                    )
+                except Exception:
+                    logger.warning("Result email delivery failed for job {}", task_id)
+                    sent = False
+                state_manager.atualizar(task_id, email_delivery="sent" if sent else "failed")
                 if not sent:
                     logger.warning("Resultado do job {} nao foi enviado por e-mail", task_id)
 
@@ -325,7 +372,13 @@ class JobExecutor:
                 t(LOG_JOB_COMPLETED).format(task_id=task_id, source=job.source)
             )
 
-        except TaskCancelledError:
+        except (TaskCancelledError, asyncio.CancelledError):
+            if result_published:
+                state_manager.atualizar(task_id, email_delivery="unknown" if job.email else None)
+                return
+            state_manager.atualizar(task_id, status="cancelled", etapa=t(STAGE_CANCELLED_BY_USER))
+            if out_dir is not None:
+                _remove_output_dir(out_dir)
             logger.info(t(LOG_JOB_CANCELLED).format(task_id=task_id))
             await finalizar_conversao(
                 task_id=task_id,
@@ -334,6 +387,9 @@ class JobExecutor:
             )
         except Exception as e:
             logger.exception(t(LOG_JOB_EXECUTOR_ERROR).format(task_id=task_id))
+            if result_published:
+                state_manager.atualizar(task_id, email_delivery="unknown" if job.email else None)
+                return
             if out_dir is not None:
                 _remove_output_dir(out_dir)
             state_manager.atualizar(
@@ -346,11 +402,17 @@ class JobExecutor:
                 tempo_segundos=time.time() - started_at,
             )
         finally:
-            if job.file_path.exists():
-                try:
-                    job.file_path.unlink()
-                except OSError:
-                    pass
+            try:
+                status = get_job_status(task_id)
+                if status is not None:
+                    await run_blocking(save_status, task_id, status)
+            finally:
+                if job.file_path.exists():
+                    try:
+                        job.file_path.unlink()
+                    except OSError:
+                        pass
+
 
 
 def _build_zip_package(zip_path: Path, out_paths: list[Path]) -> None:
@@ -388,3 +450,35 @@ def expirar_status_fila(max_age_seconds: int, now: float | None = None) -> int:
     for task_id in expired:
         queued_jobs.pop(task_id, None)
     return len(expired)
+
+
+async def recover_pending_jobs() -> None:
+    from backend.services.queue_service import unified_queue, QueueItem
+    from backend.api.routes.jobs import job_executor
+    for record in await run_blocking(pending_records):
+        task_id = record["task_id"]
+        status = record["status"]
+        if status["status"] == "cancelling":
+            status.update(status="cancelled", fim=time.time(), etapa_atual=t(STAGE_RESTART_CANCELLED))
+            await run_blocking(save_status, task_id, status)
+            Path(record["request"]["file_path"]).unlink(missing_ok=True)
+            await finalizar_conversao(task_id, status="cancelled")
+            continue
+        if status["status"] == "processing":
+            status.update(status="error", fim=time.time(), etapa_atual=t(STAGE_RESTART_INTERRUPTED))
+            status.setdefault("erros", []).append(t(STAGE_RESTART_RESUBMIT))
+            await run_blocking(save_status, task_id, status)
+            await finalizar_conversao(task_id, status="error", erro=t(STAGE_RESTART_INTERRUPTED))
+            continue
+        if unified_queue.get_position(task_id):
+            continue
+        payload = record["request"]
+        payload["file_path"] = Path(payload["file_path"])
+        payload["output_dir"] = Path(payload["output_dir"]) if payload.get("output_dir") else None
+        job = ApiJob(**payload)
+        if not job.file_path.is_file():
+            status.update(status="error", fim=time.time(), erros=[t(STAGE_PENDING_UPLOAD_MISSING)])
+            await run_blocking(save_status, task_id, status)
+            continue
+        queued_jobs[task_id] = status
+        await unified_queue.enqueue(QueueItem(file_path=job.file_path, filename=job.filename, source=job.source, task_id=task_id, callback=job_executor.run, callback_args={"job": job}))

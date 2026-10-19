@@ -48,6 +48,20 @@ class BoundingBox(StrictModel):
     coord_origin: Literal["TOPLEFT", "BOTTOMLEFT", "UNKNOWN"] = "UNKNOWN"
 
 
+def is_bottom_left(coord_origin: str | None, top: float, bottom: float) -> bool:
+    """Whether a box's y axis grows upwards (the PDF/Docling default).
+
+    An explicit origin wins. An unknown or missing one is decided by the
+    geometry: with y growing upwards the top edge has the larger value.
+    """
+    origin = str(coord_origin or "UNKNOWN").upper()
+    if origin == "BOTTOMLEFT":
+        return True
+    if origin == "TOPLEFT":
+        return False
+    return top > bottom
+
+
 class Provenance(StrictModel):
     page_number: int = Field(ge=1)
     bbox: BoundingBox | None = None
@@ -65,7 +79,7 @@ class SourceDocument(StrictModel):
 
 
 class ExtractorRun(StrictModel):
-    name: Literal["docling", "toolbox"] = "docling"
+    name: str = Field(default="docling", min_length=1)
     version: str = Field(min_length=1)
     started_at: datetime
     completed_at: datetime

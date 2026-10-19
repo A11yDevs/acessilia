@@ -3,9 +3,9 @@
 You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](architecture.pt-br.md)
 
 ## Overview
-The system converts documents into accessible formats through a multi-agent extraction pipeline (structural extraction through Acessilia Toolbox plus Agno-powered multimodal AI vision and data agents), a canonical document pipeline, deterministic validation, and format-specific renderers. The architecture is modular: **backend/** holds the domain logic plus the REST API that exposes it, **frontend/** holds the interface clients (Telegram, Web, CLI) that talk to that API, and **infra/** holds the Dockerfile (the Compose file sits at the repository root).
+The system converts documents into accessible formats through a multi-agent extraction pipeline (local-first structural extraction with PyMuPDF/Docling plus Agno-powered multimodal AI vision and data agents), a canonical document pipeline, deterministic validation, and format-specific renderers. The architecture is modular: **backend/** holds the domain logic plus the REST API that exposes it, **frontend/** holds the interface clients (Telegram, Web, CLI) that talk to that API, and **infra/** holds the Dockerfile (the Compose file sits at the repository root).
 
-The system combines **deterministic planning with AI-driven execution**. The only engine is `pddl`: it extracts a manifest through Acessilia Toolbox, enriches it with Vision/Data and generates a PDDL plan, then runs an Agno Workflow in dry-run or real execution mode. `PIPELINE_ENGINE` accepts `pddl` and its `pmv` alias; `legacy` and unknown names are rejected. See [pmv_agno_pddl.md](pmv_agno_pddl.md).
+The system combines **deterministic planning with AI-driven execution**: deterministic functions (extraction, PDDL problem generation, contract validation) are the source of truth, and LLMs provide interpretation and description. The active pipeline is `pddl` (the `pmv` alias is accepted): a processing manifest is extracted, a PDDL plan is generated and validated, and an Agno Workflow executor applies it. See [pmv_agno_pddl.md](pmv_agno_pddl.md).
 
 ---
 
@@ -14,10 +14,11 @@ The system combines **deterministic planning with AI-driven execution**. The onl
 ### 0. Backend (`backend/`) — Interface-agnostic business logic and AI pipeline
 
 #### 0.1. Multi-Agent Pipeline & Orchestration (`backend/agents/`)
-- [backend/agents/pddl_orchestrator.py](../backend/agents/pddl_orchestrator.py): coordinates Toolbox extraction, PDDL planning and validated execution.
+- [backend/agents/pddl_orchestrator.py](../backend/agents/pddl_orchestrator.py): the active PDDL orchestrator builds and executes the document plan.
 - [backend/agents/vision_agent.py](../backend/agents/vision_agent.py): `VisionAgent` utilizes Agno (`agno.agent.Agent`) and LLM multimodal capabilities (`agno.media.Image`) to produce detailed alt-text and audio descriptions for visual elements and scanned pages.
 - [backend/agents/data_agent.py](../backend/agents/data_agent.py): `DataAgent` utilizes Agno (`agno.agent.Agent`) and LLM capabilities to convert complex tables and mathematical formulas into structured Markdown and LaTeX representations.
 - [backend/agents/state_manager.py](../backend/agents/state_manager.py): in-memory task state machine with cooperative cancellation support.
+- [backend/agents/run_helpers.py](../backend/agents/run_helpers.py): shared helpers for running and cancelling blocking work.
 
 #### 0.2. AI Client Integration (`backend/ai/`)
 - [backend/ai/models/ai_client.py](../backend/ai/models/ai_client.py): central `get_agno_model()` initializer that instantiates Agno Model wrappers for Ollama or OpenRouter based on environment settings.
@@ -34,19 +35,21 @@ The system combines **deterministic planning with AI-driven execution**. The onl
 - [backend/tools/logger.py](../backend/tools/logger.py): centralized loguru logger setup.
 - [backend/tools/validators.py](../backend/tools/validators.py): file extension and size validation.
 - [backend/tools/pdf_splitter.py](../backend/tools/pdf_splitter.py): single-page PDF splitter.
-- [backend/tools/toolbox_pdf_tools.py](../backend/tools/toolbox_pdf_tools.py): remote PDF splitting/rendering with local PyMuPDF fallback.
+- [backend/tools/image_converter.py](../backend/tools/image_converter.py): PDF page to PNG conversion.
+- [backend/tools/image_enhancer.py](../backend/tools/image_enhancer.py): OpenCV deskew, CLAHE contrast, and denoise for scanned pages.
 - [backend/tools/text_processor.py](../backend/tools/text_processor.py): text normalization and Markdown parsing.
+- [backend/tools/image_tools.py](../backend/tools/image_tools.py): image cropping and region extraction.
 - [backend/tools/prompt_tools.py](../backend/tools/prompt_tools.py): prompt loader and template resolver.
 
 #### 0.5. Planning Layer (`backend/core/`) — PDDL engine
 
-The PDDL engine extracts the manifest through Toolbox and enriches images/tables with Vision/Data before planning. PDDL problem compilation and method contracts are deterministic; the executor validates the plan in dry-run mode or executes registered methods and replans after a failed attempt. `pmv` is an alias of `pddl`.
+Used when `PIPELINE_ENGINE=pddl`. It turns document structure into an explicit plan before any AI runs, so task ordering and dependencies are deterministic and auditable.
 
-- `backend/core/manifest/`: the Informational-Structural agent extracts a `processing-manifest.json` from the document (regions, types, and processing obligations) through Acessilia Toolbox.
+- `backend/core/manifest/`: the Informational-Structural agent extracts a `processing-manifest.json` from the document (regions, types, and processing obligations) via Docling or PyMuPDF extractors.
 - `backend/core/planning/`: the `PlannerAgent` compiles the manifest plus a PDDL domain into a problem, generates a `nominal-plan.json` (internal planner or Fast Downward backend), and validates it. PDDL problem generation is deterministic — no LLM writes PDDL.
-- `backend/core/execution/`: the Executor traverses the validated plan as an Agno Workflow and, produces an `execution-report.json` in dry-run or real mode. Dry runs simulate the steps; real runs execute registered handlers.
+- `backend/core/execution/`: the Executor applies the validated plan as an Agno Workflow, invoking the Vision/Data agents where the plan requires them, and produces an `execution-report.json`.
 - `backend/core/agents/fusion_agent.py`: the `FusionAgent` exposes deterministic Agno tools over the pure `docstruct` library — `fuse_providers`, `audit_document`, `classify_block`, and `needs_reinfer`. The `dual-provider-fusion` PDDL method reuses `backend.pipeline.fusion.extract_fused` and is only admissible when `FUSION_MODE=dual`. See [docstruct_algorithms.md](docstruct_algorithms.md) for how these algorithms work.
-- `backend/agents/pddl_orchestrator.py`: coordinates extraction → enrichment → planning → dry-run or real execution → output. Planning errors propagate.
+- `backend/agents/pddl_orchestrator.py`: coordinates the manifest → plan → execution phases, with fallback to deterministic extraction if planning fails.
 
 The PDDL domain lives under `backend/core/planning/domains/`. The JSON schemas (manifest, plan, comparison, execution report) live in `schemas/` at the repository root and are generated by `scripts/generate_pmv_schemas.py`.
 
@@ -64,7 +67,6 @@ The PDDL domain lives under `backend/core/planning/domains/`. The JSON schemas (
 
 #### Web Panel (`frontend/web/`)
 - [frontend/web/app.py](../frontend/web/app.py): server-rendered HTML panel. It is a thin client of the REST API — upload, status, and download are delegated to `backend/api` via `frontend/clients/api_client.py`.
-- [frontend/web/templates/base.html](../frontend/web/templates/base.html): shared HTML shell, styles and footer; the basic, advanced and download pages keep their own content.
 
 #### Command Line Interface (`frontend/cli/`)
 - [frontend/cli/run.py](../frontend/cli/run.py): CLI entrypoint for batch processing and standalone execution.
@@ -91,7 +93,26 @@ The PDDL domain lives under `backend/core/planning/domains/`. The JSON schemas (
 
 ## Layering & Dependency Direction
 
-The codebase follows a pragmatic layered architecture with a top-down flow: Interface → Orchestration → Extraction → Canonical Document → Output. Infrastructure services and shared tools support multiple layers but do not own business decisions. The processing service coordinates the workflow, cache and history; the worker calls the exporters in `backend/export` directly.
+The codebase follows a pragmatic layered architecture with a top-down flow: Interface → Orchestration → Extraction → Canonical Document → Output. Infrastructure services and shared tools support multiple layers but do not own business decisions. A few controlled exceptions exist: `backend/adapters/exporters` is a thin compatibility wrapper over `backend/export`, and the orchestrator coordinates both processing and infrastructure concerns (cache, history).
+
+### Libraries and the Toolbox (`libs/`)
+
+The heavy models run in a separate service, the [Acessilia Toolbox](https://github.com/A11yDevs/acessilia-toolbox). Between it and this core sit two libraries kept in `libs/`. Dependencies only point down:
+
+| Layer | Package | Role | May depend on |
+|---|---|---|---|
+| 0 | `libs/docstruct` (`acessilia-docstruct`) | Pure document-structure algorithms (fusion, tables, reading order), no dependencies of its own | nothing |
+| 1 | Toolbox (separate repository) | Heavy providers, artifact storage, capability execution over REST/MCP | docstruct |
+| 2 | `libs/sdk` (`acessilia-sdk`) | Capability allowlist, HTTP transport, catalogue checks, artifact references, retries and failover; configuration is passed in | the Toolbox's **published contract** (capability ids, versions, schemas), never its package |
+| 3 | Core (`backend/`) | Agents, PDDL planning, obligations, policies | SDK, docstruct |
+
+- **The core decides what to do and when; the SDK defines how to reach an operation; the Toolbox provides where and with which resources it runs.** Obligations, admissible methods and costs are the core's planning policy: the Toolbox reports what it found, and the core derives the obligations ([#138](https://github.com/A11yDevs/acessilia/pull/138)).
+- **Operational capabilities run only in the Toolbox.** The production policy is `remote_only`: the core keeps no local fallback for Pandoc, TeX Live, veraPDF, PyMuPDF rendering, media inspection or OCR, and the Toolbox does not depend on the SDK ([ADR-0002](adr/0002-component-responsibilities.md), [ADR-0003](adr/0003-remote-only-operational-capabilities.md)).
+- **Availability comes from Toolbox replicas** behind a load balancer that share the artifact store, with bounded SDK retries; the SDK's multi-endpoint failover is reserved for independent deployments ([ADR-0006](adr/0006-availability-and-failover.md)). Persisted artifacts travel as `ArtifactRef` references ([ADR-0005](adr/0005-artifact-references.md)).
+- **One source of truth per contract:** docstruct owns the canonical document models; the Toolbox owns the operational API contracts; the SDK consumes them ([ADR-0004](adr/0004-single-source-of-truth-for-contracts.md)). Cross-component decisions are recorded in [docs/adr/](adr/README.md).
+- **The Toolbox catalogue only restricts.** Methods that call the Toolbox are checked against the live catalogue before a document is planned (`TOOLBOX_AVAILABILITY_GATE`); a capability outside the SDK allowlist is never made available. See [toolbox_integration.md](toolbox_integration.md).
+- **docstruct is distributed as a release wheel.** The core installs it from this checkout. The Toolbox pins the wheel of a `docstruct-vX.Y.Z` GitHub Release by URL and `#sha256=` ([Releases](../libs/docstruct/README.md#releases)). The SDK has a single consumer, the core, and is not published yet.
+- **Enforced by tests:** `libs/docstruct/tests/test_purity.py` and `libs/sdk/tests/test_purity.py` import every module with the upper layers refused; `tests/test_architecture_layers.py` fails if `backend` imports the Toolbox package.
 
 ---
 
@@ -100,7 +121,7 @@ The codebase follows a pragmatic layered architecture with a top-down flow: Inte
 1. User submits a document via the REST API directly, or through the Telegram bot, Web panel, or CLI (which call the API).
 2. The interface handler validates the file extension and size.
 3. The file is saved and enqueued in `ProcessingQueue`.
-4. The worker calls `backend.service.process()`, which registers the task and checks the cache. The PDDL orchestrator extracts the manifest through Toolbox, generates and validates the plan, and executes the selected steps. Vision/Data enrich the planned regions; results feed the canonical document.
+4. The worker dequeues the task and runs the PDDL pipeline (manifest → plan → execution), producing the canonical document.
 5. Canonical validators verify schema adherence, heading hierarchy, and output safety.
 6. Renderers and export adapters build the output artifacts (TXT, DOCX, PDF, PDF/UA, HTML, MP3).
 7. Output files are packaged and delivered to the user (via Telegram message, Web download link, or email).
@@ -122,9 +143,8 @@ The AgentOS runtime is not part of `ENABLED_INTERFACES`; it is started separatel
 
 - **Agno Framework:** multi-agent orchestration and unified multimodal LLM interface.
 - **AI Providers:** Ollama API (local models like LLaVA/Qwen-VL) or OpenRouter API (cloud models like Claude/GPT-4o).
-- **Processing Libraries:** PyMuPDF, Docling, Pillow, OpenCV, reportlab, python-docx, edge-tts, aiogram, FastAPI.
-
-Local PDF splitting and rendering use PyMuPDF. Splitting preserves page order, geometry, links, annotations and form fields, with a default limit of 50 pages. Links to other extracted pages point to the sibling page PDFs; links beyond the limit point to the original source. The minimum supported PyMuPDF version is 1.28.2, validated for copying form fields and navigation on rotated, cropped pages. Named destinations and document-level outlines are not exported by this per-page operation.
+- **Processing Libraries:** reportlab, python-docx, pypdf, edge-tts, aiogram, FastAPI.
+- **Deviations being removed** ([ADR-0003](adr/0003-remote-only-operational-capabilities.md), [#150](https://github.com/A11yDevs/acessilia/issues/150)): PyMuPDF, Pillow and OpenCV are still imported in the core, `tools/formula_worker.py` imports Docling, and the image still installs Pandoc, TeX Live and veraPDF. Their target owner is the Toolbox, where Docling already runs as a provider.
 
 ---
 

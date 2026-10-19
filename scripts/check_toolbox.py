@@ -7,16 +7,33 @@ import asyncio
 import json
 import sys
 
-from backend.tools.toolbox_client import ToolboxClient
+import httpx
+from acessilia_sdk.toolbox import auth_headers
+from acessilia_sdk.toolbox.clients import ToolboxStructureClient
+from backend.tools.toolbox_client import make_toolbox_client
 
 
 async def check(base_url: str | None, provider: str | None) -> dict:
-    client = ToolboxClient(base_url=base_url, provider=provider)
+    client = make_toolbox_client(
+        ToolboxStructureClient,
+        **{"base_url": base_url, "provider": provider},
+    )
     try:
+        endpoint = client.endpoints[0]
+        async with httpx.AsyncClient(
+            base_url=endpoint.base_url,
+            headers=auth_headers(endpoint.api_key or client.api_key),
+            timeout=client.timeout_seconds,
+        ) as http:
+            response = await http.get("/v1/capabilities")
+            response.raise_for_status()
+            capabilities = response.json()
+            if isinstance(capabilities, dict):
+                capabilities = capabilities.get("capabilities", capabilities)
         return {
             "provider": client.provider,
             "health": await client.health(),
-            "capabilities": await client.capabilities(),
+            "capabilities": capabilities,
         }
     finally:
         await client.close()

@@ -15,11 +15,9 @@ from __future__ import annotations
 
 import re
 from collections import Counter
-from typing import Optional
 
 from docstruct.fusion._hungarian import linear_sum_assignment
 from docstruct.fusion.noise import (
-    DECOR_TYPES,
     decor_tail,
     demote_formulas,
     fuse_line_runs,
