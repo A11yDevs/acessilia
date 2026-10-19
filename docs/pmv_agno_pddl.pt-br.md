@@ -28,7 +28,7 @@ Nenhum LLM escreve PDDL diretamente.
 - Fast Downward opcional.
 
 ```bash
-uv sync --extra dev --extra drbench
+uv sync --extra dev
 uv run python scripts/generate_pmv_schemas.py
 uv run pytest
 ```

@@ -353,7 +353,7 @@ DRY_RUN=1 ./scripts/setup-rulesets.sh
 # Clone e instale dependências
 git clone git@github.com:A11yDevs/acessilia.git
 cd acessilia
-uv sync --extra dev --extra drbench   # usa o Python 3.11 fixado em .python-version
+uv sync --extra dev   # usa o Python 3.11 fixado em .python-version
 
 # Configure as variáveis de ambiente
 cp .env.example .env

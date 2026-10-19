@@ -24,8 +24,9 @@ inference JSON. That is what makes a recorded run reproducible without a GPU.
 ## 1. Rebuild the environment
 
 ```bash
-# Core + library, pinned by the lockfile
-uv sync --frozen
+# Core + library + test dependencies (pytest, numpy), pinned by the lockfile;
+# add --extra drbench for OpenCV (scripts/drbench/experiments/differ/orient_pages.py)
+uv sync --frozen --extra dev
 
 # Library tests must pass without the backend installed
 uv run pytest libs/docstruct/tests
@@ -35,7 +36,7 @@ uv run pytest libs/docstruct/tests
 uv run pytest -m "not e2e"
 ```
 
-The lockfile is `uv.lock` (91 packages). `pyproject.toml` declares
+The lockfile is `uv.lock` (90 packages). `pyproject.toml` declares
 `acessilia-docstruct` as an editable path source, so `uv sync` installs the
 library from `libs/docstruct`.
 

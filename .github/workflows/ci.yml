@@ -51,7 +51,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install ./libs/docstruct --no-cache-dir
           python -m pip install "./libs/sdk[dev]" --no-cache-dir
-          python -m pip install ".[dev,drbench]" --no-cache-dir
+          python -m pip install ".[dev]" --no-cache-dir
 
       - name: Collect complete test suite
         run: python -m pytest --collect-only -q -m "not e2e"

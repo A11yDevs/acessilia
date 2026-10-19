@@ -112,7 +112,7 @@ jobs:
             "http://127.0.0.1:${port}/api/v1/health"
 
       - name: Enforce local image size guardrail
-        run: python scripts/check_image_size.py local acessilia:delivery --limit-gb 9
+        run: python scripts/check_image_size.py local acessilia:delivery --limit-gb 0.5
 
       - name: Publish verified production image
         id: publish
@@ -140,7 +140,7 @@ jobs:
           DIGEST: ${{ steps.publish.outputs.digest }}
         run: |
           python scripts/check_image_size.py remote \
-            "${REGISTRY}/${IMAGE_NAME}@${DIGEST}" --limit-gb 9 | tee image-size.txt
+            "${REGISTRY}/${IMAGE_NAME}@${DIGEST}" --limit-gb 0.5 | tee image-size.txt
           {
             echo '```text'
             cat image-size.txt

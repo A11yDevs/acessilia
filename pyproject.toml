@@ -21,6 +21,8 @@ dependencies = [
     "pymupdf>=1.24,<2",
     "httpx>=0.27,<0.28",
     "reportlab>=4.2,<5",
+    # Hard requirement of reportlab; pinned here so the image and CI resolve the same major.
+    "pillow>=10.4,<11",
     "python-dotenv>=1.0,<2",
     "slowapi>=0.1.10,<0.2",
     "latex2mathml>=3.77.0,<4",
@@ -52,13 +54,13 @@ dev = [
     "rapidfuzz>=3.9,<4",
     # Reads the PDFs the renderer tests produce.
     "pypdf>=6.14.2,<7",
-]
-# Image and array libraries the Dr.DocBench experiment scripts use
-# (scripts/drbench/experiments); the application itself does not import them.
-drbench = [
+    # The Dr.DocBench differ (scripts/drbench/experiments/differ/tree_differ_v2.py) and its tests.
     "numpy>=2.4.6,<3",
-    "opencv-python>=5.0.0.93,<6",
-    "pillow>=10.4,<11",
+]
+# OpenCV for the Dr.DocBench page-orientation script
+# (scripts/drbench/experiments/differ/orient_pages.py); no test or application code imports it.
+drbench = [
+    "opencv-python-headless>=5.0.0.93,<6",
 ]
 
 [project.scripts]
