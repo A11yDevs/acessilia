@@ -160,13 +160,14 @@ Just:
 ## 4. Scenario B — New capability (new endpoint)
 
 When the Toolbox exposes a **new capability** (e.g. `document.layout.analyze`), the core
-needs a specialized client. Follow the `toolbox_layout_client.py` pattern:
+needs a specialized client in the SDK. Follow the pattern of
+`libs/sdk/src/acessilia_sdk/toolbox/clients/layout.py`:
 
 ### 4.1 Register the capability and write a thin client
 
 Every Toolbox call goes through `execute_capability`
 (SDK, `libs/sdk`: `acessilia_sdk.toolbox.transport`), which refuses any capability that is not in
-the registry. Adding a capability takes two steps.
+the registry. Adding a capability takes three steps.
 
 **1. Declare it** in `libs/sdk/src/acessilia_sdk/toolbox/capabilities.py`:
 
@@ -182,7 +183,9 @@ If the provider setting is new, add its default to `PROVIDER_DEFAULTS` and the
 matching attribute to `Settings` (`os.getenv("TOOLBOX_<X>_PROVIDER",
 provider_default("toolbox_<x>_provider"))`).
 
-**2. Write the client** as a subclass of `ToolboxCapabilityClient`, which
+**2. Write the client** in `libs/sdk/src/acessilia_sdk/toolbox/clients/<x>.py`
+and export it from `acessilia_sdk.toolbox.clients`. It reads no settings and
+logs nothing. It subclasses `ToolboxCapabilityClient`, which
 already owns the connections, the Bearer header, `health()`, `close()`, the
 timeout/network error mapping, the response envelope check, bounded retries
 and failover between independent Toolbox endpoints (see
@@ -192,14 +195,14 @@ with `download_artifact` through the HTTP client it returns, not through
 `self._client`:
 
 ```python
-"""Specialized client for the <capability> Toolbox capability."""
+"""Client for the <capability> Toolbox capability."""
 
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
 
-from backend.tools.toolbox_client import ToolboxCapabilityClient
+from acessilia_sdk.toolbox.client import ToolboxCapabilityClient
 
 CAPABILITY = "<capability>"
 
@@ -223,8 +226,28 @@ class Toolbox<X>Client(ToolboxCapabilityClient):
         )
 ```
 
+**3. Build it in the core** with `make_toolbox_client` (`backend/tools/toolbox_client.py`).
+It fills the endpoints, the provider from the `settings` attribute named by
+`provider_key`, the timeout, the API key and a failover log hook; keyword
+arguments override them:
+
+```python
+from acessilia_sdk.toolbox.clients import Toolbox<X>Client
+from backend.tools.toolbox_client import make_toolbox_client
+
+client = make_toolbox_client(Toolbox<X>Client)
+try:
+    result = await client.run(file_path=path)
+finally:
+    await client.close()
+```
+
+Client tests live in `libs/sdk/tests/clients/` and build the client with an
+explicit `base_url`; tests of how the core configures it belong in
+`tests/test_toolbox_client_factory.py`.
+
 Text inputs use `upload=(filename, content_bytes, media_type)` instead of
-`file_path` (see `toolbox_math_client.py`). `scripts/check_capability_contract.py`
+`file_path` (see `acessilia_sdk/toolbox/clients/math.py`). `scripts/check_capability_contract.py`
 reads the registry, so the new id is checked against the Toolbox catalogue
 without further changes; `tests/test_toolbox_capability_registry.py` fails if a
 client hard-codes an `:execute` route or uses an unregistered id.
@@ -275,7 +298,7 @@ available.
 The `media.inspect` capability (provider `pure-media-inspect`, PR
 `A11yDevs/acessilia-toolbox#33`) is consumed in the core with the Scenario B pattern:
 
-- **Client:** `backend/tools/toolbox_media_inspect_client.py`
+- **Client:** `acessilia_sdk.toolbox.clients.ToolboxMediaInspectClient`
   (`ToolboxMediaInspectClient` → `POST /v1/capabilities/media.inspect:execute`).
 - **Local fallback (deviation, removed in #150 F3):** `backend/tools/media_inspect.py`
   (`inspect_source_media`, `inspect_media_payload`) — deterministic Pillow/PyMuPDF
@@ -302,7 +325,8 @@ Defined in `backend/config/settings.py` and documented in `.env.example`:
 
 | Variable | Default | Description |
 |---|---|---|
-| `TOOLBOX_BASE_URL` | `http://localhost:8002` | Service base URL |
+| `TOOLBOX_BASE_URL` | `http://localhost:8002` | Service base URL; in production, the load balancer in front of the replicas (ADR-0006) |
+| `TOOLBOX_BASE_URLS` | *(empty)* | Comma-separated URLs of independent Toolbox deployments, tried in order by the capability clients; empty means `TOOLBOX_BASE_URL` only |
 | `TOOLBOX_PROVIDER` | `docling` | Primary extraction provider |
 | `TOOLBOX_API_KEY` | *(empty)* | Key for `Authorization: Bearer` |
 | `TOOLBOX_AVAILABILITY_GATE` | `observe` | Availability gate: `observe`, `enforce` or `off` (section 4.3) |
@@ -350,13 +374,13 @@ service.py: _build_orchestrator()
 
 ## 7. Code references
 
-- `libs/sdk/src/acessilia_sdk/toolbox/` — capability registry, transport, client base class and exception hierarchy (SDK)
-- `backend/tools/toolbox_client.py` — binds the SDK client base to the core settings; generic `ToolboxClient` (extraction, artifacts, datasets)
-- `backend/tools/toolbox_layout_client.py` — Scenario B template
+- `libs/sdk/src/acessilia_sdk/toolbox/` — capability registry, transport, client base class, failover, artifacts and exception hierarchy (SDK)
+- `libs/sdk/src/acessilia_sdk/toolbox/clients/` — one client per capability family; `layout.py` is the Scenario B template
+- `backend/tools/toolbox_client.py` — `make_toolbox_client` (SDK clients configured from the core settings); generic `ToolboxClient` (extraction, artifacts, datasets)
 - `backend/tools/toolbox_ocr_tools.py`, `toolbox_math_tools.py`, `toolbox_pdf_tools.py` — Agno wrappers; `toolbox_pdf_tools.py` still has a local fallback, removed in #150 (ADR-0003)
-- `backend/tools/toolbox_page_ocr_client.py` — `document.ocr.page` (whole-page VLM)
-- `backend/tools/toolbox_adjudicate_client.py` — `document.adjudicate.page` / `.region`
-- `backend/tools/toolbox_orientation_client.py` — `image.page.orient`
+- `clients/page_ocr.py` — `document.ocr.page` (whole-page VLM)
+- `clients/adjudicate.py` — `document.adjudicate.page` / `.region`
+- `clients/orientation.py` — `image.page.orient`
 - `backend/tools/structurer.py` — `get_structurer()` and structurer selection
 - `backend/core/manifest/toolbox_extractor.py` — `ToolboxManifestExtractor`
 - `backend/pipeline/fusion.py` — `extract_fused()` (dual fusion)

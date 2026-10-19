@@ -10,15 +10,15 @@ from pathlib import Path
 import pytest
 import respx
 
-from backend.tools.toolbox_client import (
+from acessilia_sdk.toolbox import (
     ToolboxContractViolation,
     ToolboxProviderUnavailable,
     ToolboxTimeout,
     ToolboxUnsupportedMediaType,
 )
-from backend.tools.toolbox_media_inspect_client import ToolboxMediaInspectClient
+from acessilia_sdk.toolbox.clients.media_inspect import ToolboxMediaInspectClient
 
-FIXTURE_IMAGE = Path(__file__).parent / "fixtures" / "images" / "sunset-skyline.jpeg"
+FIXTURE_IMAGE = Path(__file__).parent / "fixtures" / "sample.jpeg"
 
 SAMPLE_DOCUMENT = {
     "media_type": "image/jpeg",
@@ -120,12 +120,7 @@ async def test_inspect_sends_bearer_api_key(respx_mock):
 
 
 @pytest.mark.asyncio
-async def test_inspect_uses_global_remote_cache_setting_when_unspecified(
-    respx_mock, client, monkeypatch
-):
-    from backend.config.settings import settings
-
-    monkeypatch.setattr(settings, "toolbox_use_remote_cache", False)
+async def test_inspect_disables_the_remote_cache_on_request(respx_mock, client):
     route = respx_mock.post(
         "http://localhost:8002/v1/capabilities/media.inspect:execute"
     ).mock(
@@ -135,7 +130,7 @@ async def test_inspect_uses_global_remote_cache_setting_when_unspecified(
         )
     )
 
-    await client.inspect(file_path=FIXTURE_IMAGE)
+    await client.inspect(file_path=FIXTURE_IMAGE, use_remote_cache=False)
 
     assert b'name="no_cache"' in route.calls.last.request.content
     assert b"\r\n\r\ntrue\r\n" in route.calls.last.request.content

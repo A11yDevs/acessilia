@@ -150,6 +150,44 @@ def _render_with_pandoc(
 DEFAULT_PDF_UA_LANG = "pt-BR"
 
 
+def toolbox_export_pdf_ua(
+    ast: dict[str, Any], output_path: Path, *, lang: str = "pt-BR"
+) -> dict[str, Any]:
+    """Render ``ast`` as PDF/UA on the Toolbox and write it to ``output_path``.
+
+    Returns the ``artifact/pdf-export@1`` document. The client is created and
+    closed inside the coroutine: ``run_sync`` may run it on a fresh event
+    loop, and the HTTP connections must not outlive it.
+    """
+    from acessilia_sdk.toolbox.clients import ToolboxPdfUaClient
+
+    from backend.tools.toolbox_client import make_toolbox_client, run_sync
+
+    async def export() -> dict[str, Any]:
+        client = make_toolbox_client(ToolboxPdfUaClient)
+        try:
+            return await client.export(
+                ast,
+                output_path,
+                lang=lang,
+                use_remote_cache=settings.toolbox_use_remote_cache,
+            )
+        finally:
+            await client.close()
+
+    result = run_sync(export())
+    document = result.get("document", {})
+    provenance = result.get("provenance")
+    provenance = provenance if isinstance(provenance, dict) else {}
+    logger.info(
+        "Toolbox: document.export.pdf_ua finished ({} bytes, cache_hit={}, {} ms)",
+        document.get("size_bytes", "?"),
+        provenance.get("cache_hit", False),
+        provenance.get("duration_ms", "?"),
+    )
+    return document
+
+
 def _render_pdf_ua(
     ast: dict[str, Any], output_path: Path, *, lang: str = DEFAULT_PDF_UA_LANG
 ) -> Path:
@@ -172,8 +210,6 @@ def _render_pdf_ua(
     """
     toolbox_error: Exception | None = None
     if settings.toolbox_pdf_ua_enabled:
-        from backend.tools.toolbox_pdf_ua_client import toolbox_export_pdf_ua
-
         try:
             toolbox_export_pdf_ua(ast, output_path, lang=lang)
         except Exception as exc:  # noqa: BLE001 - any Toolbox failure must reach the fallback

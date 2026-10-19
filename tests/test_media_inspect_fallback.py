@@ -140,6 +140,38 @@ async def test_inspect_source_media_falls_back_after_toolbox_contract_error(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("setting", "explicit", "expected"),
+    [(True, None, True), (False, None, False), (True, False, False), (False, True, True)],
+)
+async def test_inspect_source_media_forwards_the_remote_cache_choice(
+    monkeypatch, setting, explicit, expected
+) -> None:
+    """TOOLBOX_USE_REMOTE_CACHE applies unless the caller passes its own choice."""
+    from backend.config import settings as settings_module
+
+    monkeypatch.setattr(settings_module.settings, "toolbox_media_inspect_enabled", True)
+    monkeypatch.setattr(settings_module.settings, "toolbox_use_remote_cache", setting)
+    seen = {}
+
+    class RecordingClient:
+        async def inspect(self, **kwargs):
+            seen.update(kwargs)
+            return {"artifact_nature": "standalone_image"}
+
+        async def close(self):
+            pass
+
+    await inspect_source_media(
+        Path(__file__).parent / "fixtures" / "images" / "sunset-skyline.jpeg",
+        client=RecordingClient(),
+        use_remote_cache=explicit,
+    )
+
+    assert seen["use_remote_cache"] is expected
+
+
+@pytest.mark.asyncio
 async def test_inspect_source_media_returns_none_for_missing_file() -> None:
     result = await inspect_source_media(Path("/tmp/nao-existe.png"))
     assert result is None

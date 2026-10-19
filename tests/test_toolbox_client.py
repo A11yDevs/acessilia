@@ -309,8 +309,13 @@ async def test_client_with_api_key_sends_auth_header(respx_mock):
 
 
 @pytest.mark.asyncio
-async def test_client_without_api_key_skips_auth_header(respx_mock, client):
+async def test_client_without_api_key_skips_auth_header(respx_mock):
     """Quando api_key não é fornecida, o header Authorization não deve ser enviado."""
+    # An empty key, not None: None falls back to TOOLBOX_API_KEY, which a
+    # local .env may set.
+    client = ToolboxClient(
+        base_url="http://localhost:8002", provider="docling", timeout_seconds=30, api_key=""
+    )
     route = respx_mock.get("http://localhost:8002/v1/capabilities")
     route.return_value = httpx.Response(200, json=[])
 

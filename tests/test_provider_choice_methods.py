@@ -673,8 +673,14 @@ class TestVlmPairwiseJudge:
             async def close(self):
                 calls["closed"] = True
 
+        from acessilia_sdk.toolbox.clients import ToolboxAdjudicateClient
+
+        def fake_factory(client_cls, **overrides):
+            calls["client_cls"] = client_cls
+            return FakeClient()
+
         monkeypatch.setattr(
-            "backend.tools.toolbox_adjudicate_client.ToolboxAdjudicateClient", FakeClient
+            "backend.tools.toolbox_client.make_toolbox_client", fake_factory
         )
 
         result = _judge_page(b"\x89PNG-fake", "A", "B")
@@ -683,6 +689,7 @@ class TestVlmPairwiseJudge:
         assert calls["bytes"] == b"\x89PNG-fake" and calls["suffix"] == ".png"
         assert (calls["a"], calls["b"]) == ("A", "B")
         assert calls["closed"]
+        assert calls["client_cls"] is ToolboxAdjudicateClient
 
     def test_rendered_page_fits_the_server_slot(self, tmp_path) -> None:
         import fitz

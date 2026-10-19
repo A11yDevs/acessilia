@@ -9,14 +9,14 @@ from pathlib import Path
 import httpx
 import pytest
 
-from backend.tools.toolbox_client import (
+from acessilia_sdk.toolbox import (
     ToolboxContractViolation,
     ToolboxProviderUnavailable,
     ToolboxTimeout,
 )
-from backend.tools.toolbox_ocr_client import ToolboxOcrClient
+from acessilia_sdk.toolbox.clients.ocr import ToolboxOcrClient
 
-FIXTURE_PDF = Path(__file__).parent / "fixtures" / "tutorials" / "java-oo-3pgs.pdf"
+FIXTURE_PDF = Path(__file__).parent / "fixtures" / "sample.pdf"
 
 SAMPLE_OCR_RESPONSE = {
     "status": "succeeded",

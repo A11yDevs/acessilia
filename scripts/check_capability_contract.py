@@ -166,7 +166,7 @@ def compare(
     )
     if unconsumed:
         notes.append(
-            "capabilities exposed by the Toolbox with no client in the core: "
+            "capabilities exposed by the Toolbox with no client in the SDK: "
             + ", ".join(unconsumed)
         )
 

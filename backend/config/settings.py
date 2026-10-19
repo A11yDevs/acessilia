@@ -123,6 +123,12 @@ class Settings:
     toolbox_base_url: str = field(
         default_factory=lambda: os.getenv("TOOLBOX_BASE_URL", "http://localhost:8002")
     )
+    # Comma-separated URLs of *independent* Toolbox deployments, tried in order
+    # by the capability clients (docs/adr/0006). Empty means TOOLBOX_BASE_URL
+    # only, which should point at the load balancer in front of the replicas.
+    toolbox_base_urls: str = field(
+        default_factory=lambda: os.getenv("TOOLBOX_BASE_URLS", "")
+    )
     # Structural extraction keeps the historical TOOLBOX_PROVIDER variable for
     # backward compatibility. Specialized capabilities use providers bound to
     # their own contracts in the Toolbox registry. Every default comes from
