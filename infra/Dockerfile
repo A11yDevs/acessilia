@@ -15,13 +15,12 @@ RUN set -eux \
 
 # Operational tools (TeX Live, veraPDF, OCR, media inspection) run on the
 # Toolbox, not here (docs/adr/0003), and so do the DOCX and PDF/UA exports.
-# curl serves the compose healthcheck.
+# curl serves the compose healthcheck. Every Python dependency ships a
+# linux/amd64 wheel, so no compiler is needed.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        build-essential \
         ca-certificates \
         curl \
-        fonts-dejavu \
     && rm -rf /var/lib/apt/lists/*
 
 ARG GIT_COMMIT=
