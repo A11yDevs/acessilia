@@ -43,6 +43,11 @@ dependencies = [
     "acessilia-sdk",
 ]
 
+[project.urls]
+Homepage = "https://github.com/A11yDevs/acessilia"
+Repository = "https://github.com/A11yDevs/acessilia"
+Issues = "https://github.com/A11yDevs/acessilia/issues"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=9.1.1,<10",
@@ -54,6 +59,8 @@ dev = [
 
 [project.scripts]
 acessilia = "frontend.cli.run:main"
+# Alias deprecado do nome antigo; remover no próximo ciclo.
+bot-acess = "frontend.cli.run:main"
 
 [tool.uv.sources]
 # O núcleo puro vive em libs/docstruct e é instalado editável a partir do repo.
