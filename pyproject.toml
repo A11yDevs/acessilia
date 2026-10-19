@@ -50,7 +50,8 @@ dev = [
     "pytest>=9.1.1,<10",
     "respx>=0.23.1,<0.24",
     "pytest-asyncio>=1.4.0,<2",
-    # Used by the Dr.DocBench page-level experiment scripts (scripts/drbench/experiments/pages).
+    # Used by the Dr.DocBench page-level experiment scripts (scripts/drbench/experiments/pages),
+    # and by docstruct's Levenshtein when installed (scripts/bench score).
     "rapidfuzz>=3.9,<4",
     # Reads the PDFs the renderer tests produce.
     "pypdf>=6.14.2,<7",

@@ -124,3 +124,44 @@ def test_cli_run_writes_markdown_and_blocks(tmp_path, monkeypatch):
     assert (run / "predictions" / f"{DOC}_p1.md").read_text() == "# Page 1\n\nBody 1\n"
     assert (run / "predictions" / f"{DOC}_p1.blocks.json").exists()
     assert json.loads((run / "report.json").read_text())["overall"] == pytest.approx(100.0)
+
+
+def _stub_toolbox(tmp_path, monkeypatch):
+    monkeypatch.setattr(cli, "VAR", tmp_path / "var")
+    monkeypatch.setattr(cli.toolbox, "extract_structure", lambda image, provider: {
+        "document": {"elements": [{"type": "text", "text": "Body", "reading_order": 0}]}})
+    return tmp_path / "var" / "drdocbench" / "dev" / "latest"
+
+
+def test_score_covers_only_the_pages_of_the_run(tmp_path, monkeypatch):
+    _tree(tmp_path / "data", pages=(1, 2, 3))
+    run = _stub_toolbox(tmp_path, monkeypatch)
+    data = ["--dataset", "drdocbench", "--root", str(tmp_path / "data")]
+
+    assert cli.main(["run", *data]) == 0
+    assert cli.main(["run", *data, "--sample", "1"]) == 0
+    assert cli.main(["score", *data]) == 0
+
+    assert sorted(p.name for p in (run / "predictions").glob("*.md")) == [f"{DOC}_p1.md"]
+    assert json.loads((run / "report.json").read_text())["pages"] == 1
+
+
+def test_score_without_ground_truth_fails(tmp_path, monkeypatch):
+    _tree(tmp_path / "data", pages=(1,), gt=False)
+    _stub_toolbox(tmp_path, monkeypatch)
+    data = ["--dataset", "drdocbench", "--root", str(tmp_path / "data")]
+
+    assert cli.main(["run", *data]) == 0
+    assert cli.main(["score", *data]) == 1
+
+
+def test_compare_prints_strict_json(tmp_path, capsys):
+    for name in ("base", "candidate"):
+        (tmp_path / name).mkdir()
+        (tmp_path / name / "pages.jsonl").write_text(json.dumps(
+            {"document_id": "doc", "page": 1, "text": 90.0, "reading_order": None, "teds": None}) + "\n")
+
+    cli.main(["compare", str(tmp_path / "base"), str(tmp_path / "candidate")])
+
+    out = json.loads(capsys.readouterr().out, parse_constant=lambda c: pytest.fail(f"non-JSON {c}"))
+    assert out["metric_deltas"]["tune_teds"] is None or out["metric_deltas"]["hold_teds"] is None

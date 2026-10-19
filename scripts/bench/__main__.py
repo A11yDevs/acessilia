@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
+import shutil
 import sys
 import time
 from pathlib import Path
@@ -25,7 +27,7 @@ from docstruct.export.markdown import document_to_markdown
 from backend.tools.toolbox_client import ToolboxError
 from scripts.bench import core, toolbox
 from scripts.bench.datasets import DATASETS
-from scripts.bench.report import compare_runs, score_run
+from scripts.bench.report import MANIFEST_FILE, compare_runs, score_run
 
 VAR = Path(__file__).resolve().parents[2] / "var" / "bench"
 
@@ -59,7 +61,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "compare":
         verdict = compare_runs(args.base, args.candidate)
-        print(json.dumps(verdict.__dict__, indent=2))
+        print(json.dumps(_finite(verdict.__dict__), indent=2))
         return 0 if verdict.accepted else 1
 
     dataset = DATASETS[args.dataset]
@@ -81,17 +83,30 @@ def main(argv: list[str] | None = None) -> int:
             pages = [p for p in pages if p.item_id == args.item]
         if args.sample:
             pages = pages[: args.sample]
-        return _run(pages, predictions, args.provider, args.save_raw)
+        return _run(pages, run_dir, args.provider, args.save_raw)
     if args.command == "score":
-        print(json.dumps(score_run(pages, predictions, run_dir), indent=2))
+        manifest = run_dir / MANIFEST_FILE
+        if manifest.exists():
+            selected = set(manifest.read_text(encoding="utf-8").split())
+            pages = [p for p in pages if p.item_id in selected]
+        report = score_run(pages, predictions, run_dir)
+        print(json.dumps(report, indent=2))
+        if not report["pages"]:
+            print(f"No page of the run has ground truth under {root}", file=sys.stderr)
+            return 1
         return 0
     zip_path = dataset.build_submission(pages, predictions, run_dir / "submission")
     print(f"Submission ready: {zip_path}")
     return 0
 
 
-def _run(pages, predictions: Path, provider: str | None, save_raw: bool) -> int:
-    predictions.mkdir(parents=True, exist_ok=True)
+def _run(pages, run_dir: Path, provider: str | None, save_raw: bool) -> int:
+    # A rerun replaces the previous one: stale predictions would be scored and
+    # submitted as if they belonged to this run.
+    predictions = run_dir / "predictions"
+    shutil.rmtree(predictions, ignore_errors=True)
+    predictions.mkdir(parents=True)
+    (run_dir / MANIFEST_FILE).write_text("".join(f"{p.item_id}\n" for p in pages), encoding="utf-8")
     ok = 0
     for page in pages:
         start = time.perf_counter()
@@ -112,6 +127,15 @@ def _run(pages, predictions: Path, provider: str | None, save_raw: bool) -> int:
         print(f"[OK] {page.item_id} ({time.perf_counter() - start:.1f}s)")
     print(f"Done: {ok}/{len(pages)} pages -> {predictions}")
     return 0 if ok else 1
+
+
+def _finite(value):
+    """``nan`` → ``None``, so the output is strict JSON."""
+    if isinstance(value, float) and math.isnan(value):
+        return None
+    if isinstance(value, dict):
+        return {k: _finite(v) for k, v in value.items()}
+    return value
 
 
 if __name__ == "__main__":

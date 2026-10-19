@@ -1,8 +1,9 @@
 """TEDS — Tree Edit Distance similarity for HTML tables (0–100).
 
-Uses the Zhang-Shasha algorithm over a simplified DOM tree. Compatible with
-the classic TEDS formulation: similarity = TED(T1, T2) / max(TED) weighted by
-node types (structure + text).
+Approximates TED with a sequence edit distance over the pre-order node lists
+of a simplified DOM tree (not Zhang-Shasha): exact for linear trees, an
+approximation for wide branching, enough to track deltas between runs. The
+similarity is ``1 - TED / (2 * max nodes)``, with costs for structure and text.
 """
 
 from __future__ import annotations
@@ -46,27 +47,17 @@ def parse_html_tree(html: str) -> Node:
     return builder.root
 
 
-def _postorder(node: Node):
-    """Zhang-Shasha postorder with leftmost leaf pointers."""
-    seq: list[Node] = []
-
-    def visit(n: Node) -> int:
-        idx = len(seq)
-        seq.append(n)
-        leftmost = idx
-        for child in n.children:
-            leftmost = min(leftmost, visit(child))
-        return leftmost
-
-    visit(node)
+def _preorder(node: Node) -> list[Node]:
+    """The tree's nodes in pre-order."""
+    seq = [node]
+    for child in node.children:
+        seq.extend(_preorder(child))
     return seq
 
 
 def _tree_edit_distance(t1: Node, t2: Node) -> int:
-    """Simplified Zhang-Shasha: treating each tree as a sequence (decomposition
-    is exact for degenerate/linear trees and an O(n·m) approximation for wide
-    branching — sufficient for benchmark delta tracking)."""
-    s1, s2 = _postorder(t1), _postorder(t2)
+    """Edit distance between the pre-order node sequences, O(n·m)."""
+    s1, s2 = _preorder(t1), _preorder(t2)
     n, m = len(s1), len(s2)
     dp = [[0] * (m + 1) for _ in range(n + 1)]
     for i in range(1, n + 1):
@@ -103,14 +94,12 @@ def teds_score(pred_html: str, gt_html: str) -> float | None:
 
     Returns None if either input contains no <table>.
     """
-    if "<table" not in pred_html.lower() and "<table" not in gt_html.lower():
+    if "<table" not in pred_html.lower() or "<table" not in gt_html.lower():
         return None
     t1 = parse_html_tree(pred_html)
     t2 = parse_html_tree(gt_html)
     ted = _tree_edit_distance(t1, t2)
-    max_nodes = max(_postorder(t1).__len__(), _postorder(t2).__len__())
-    if max_nodes == 0:
-        return None
+    max_nodes = max(len(_preorder(t1)), len(_preorder(t2)))  # >= 1: the root
     similarity = max(0.0, 1.0 - ted / (max_nodes * 2))
     return similarity * 100.0
 
