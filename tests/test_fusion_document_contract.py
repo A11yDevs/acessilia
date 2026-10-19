@@ -140,7 +140,7 @@ async def test_fusion_preserves_processing_manifest_page_numbers(monkeypatch):
                 ]
             }}
 
-    monkeypatch.setattr("backend.pipeline.fusion.ToolboxClient", Client)
+    monkeypatch.setattr("backend.pipeline.fusion._structure_client", Client)
     result = await extract_fused("doc.pdf", primary_provider="docling", secondary_provider="mineru")
     elements = result["document"]["elements"]
     assert {element["page_number"] for element in elements} == {1, 2}

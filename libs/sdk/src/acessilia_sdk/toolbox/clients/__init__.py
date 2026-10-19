@@ -7,6 +7,8 @@ it needs.
 """
 
 from acessilia_sdk.toolbox.clients.adjudicate import ToolboxAdjudicateClient
+from acessilia_sdk.toolbox.clients.artifact import ToolboxArtifactClient
+from acessilia_sdk.toolbox.clients.dataset import ToolboxDatasetClient
 from acessilia_sdk.toolbox.clients.layout import ToolboxLayoutClient
 from acessilia_sdk.toolbox.clients.math import ToolboxMathClient
 from acessilia_sdk.toolbox.clients.media_inspect import ToolboxMediaInspectClient
@@ -15,10 +17,13 @@ from acessilia_sdk.toolbox.clients.orientation import ToolboxOrientationClient
 from acessilia_sdk.toolbox.clients.page_ocr import ToolboxPageOcrClient
 from acessilia_sdk.toolbox.clients.pdf import ToolboxPdfClient
 from acessilia_sdk.toolbox.clients.pdf_ua import ToolboxPdfUaClient
+from acessilia_sdk.toolbox.clients.structure import ToolboxStructureClient
 from acessilia_sdk.toolbox.clients.table import ToolboxTableClient
 
 __all__ = [
     "ToolboxAdjudicateClient",
+    "ToolboxArtifactClient",
+    "ToolboxDatasetClient",
     "ToolboxLayoutClient",
     "ToolboxMathClient",
     "ToolboxMediaInspectClient",
@@ -27,5 +32,6 @@ __all__ = [
     "ToolboxPageOcrClient",
     "ToolboxPdfClient",
     "ToolboxPdfUaClient",
+    "ToolboxStructureClient",
     "ToolboxTableClient",
 ]

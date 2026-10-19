@@ -335,10 +335,11 @@ def run_page(
     import asyncio
     import json
 
-    from backend.tools.toolbox_client import ToolboxClient, ToolboxError
+    from acessilia_sdk.toolbox.clients import ToolboxStructureClient
+    from backend.tools.toolbox_client import ToolboxError, make_toolbox_client
 
     async def _execute() -> tuple[dict | None, float]:
-        client = ToolboxClient(provider=provider)
+        client = make_toolbox_client(ToolboxStructureClient, provider=provider)
         start = time.perf_counter()
         try:
             result = await client.extract_structure(file_path=page.image_path)

@@ -13,7 +13,8 @@ import pytest
 
 from backend.tools.region_extractor import Region
 from backend.tools.toolbox_structurer import ToolboxStructurer
-from backend.tools.toolbox_client import ToolboxClient, ToolboxProviderUnavailable
+from acessilia_sdk.toolbox.clients import ToolboxStructureClient
+from backend.tools.toolbox_client import ToolboxProviderUnavailable
 
 
 FIXTURE_PDF = Path(__file__).parent / "fixtures" / "tutorials" / "java-oo-3pgs.pdf"
@@ -58,7 +59,7 @@ SAMPLE_TOOLBOX_RESPONSE = {
 
 @pytest.fixture
 def mock_client():
-    client = AsyncMock(spec=ToolboxClient)
+    client = AsyncMock(spec=ToolboxStructureClient)
     client.base_url = "http://localhost:8002"
     client.provider = "docling"
     return client
@@ -160,3 +161,18 @@ def test_region_metadata_contains_source_toolbox(mock_client):
 
     for r in regions:
         assert r.metadata.get("source") == "toolbox"
+
+@pytest.mark.parametrize("use_remote_cache", [True, False])
+def test_fetch_forwards_the_remote_cache_setting(monkeypatch, use_remote_cache):
+    """TOOLBOX_USE_REMOTE_CACHE reaches the structure client."""
+    import asyncio
+
+    from backend.config.settings import settings
+
+    monkeypatch.setattr(settings, "toolbox_use_remote_cache", use_remote_cache)
+    client = AsyncMock(spec=ToolboxStructureClient)
+    client.extract_structure = AsyncMock(return_value=SAMPLE_TOOLBOX_RESPONSE)
+
+    asyncio.run(ToolboxStructurer(client=client)._fetch_document_structure(FIXTURE_PDF))
+
+    assert client.extract_structure.call_args.kwargs["use_remote_cache"] is use_remote_cache

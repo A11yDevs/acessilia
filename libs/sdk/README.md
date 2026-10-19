@@ -30,7 +30,7 @@ core (backend)  →  acessilia-sdk  →  Toolbox HTTP contract
 | `acessilia_sdk.toolbox.capabilities` | `TOOLBOX_CAPABILITIES`, `ToolboxCapability`, `PROVIDER_DEFAULTS`, `provider_default` — the allowlist of Toolbox contracts (pure data) |
 | `acessilia_sdk.toolbox.transport` | `execute_capability` — the only path to `POST /v1/capabilities/{id}:execute`; `require_capability`, `raise_for_error`, `auth_headers`, `media_type_for` |
 | `acessilia_sdk.toolbox.client` | `ToolboxCapabilityClient` — base for per-capability clients (connections, Bearer header, provider, failover, `health`, `close`); `FailoverHook` |
-| `acessilia_sdk.toolbox.clients` | `ToolboxAdjudicateClient`, `ToolboxLayoutClient`, `ToolboxMathClient`, `ToolboxMediaInspectClient`, `ToolboxOcrClient`, `ToolboxOrientationClient`, `ToolboxPageOcrClient`, `ToolboxPdfClient`, `ToolboxPdfUaClient`, `ToolboxTableClient` — one client per capability family; no settings, no logging |
+| `acessilia_sdk.toolbox.clients` | `ToolboxAdjudicateClient`, `ToolboxArtifactClient`, `ToolboxDatasetClient`, `ToolboxLayoutClient`, `ToolboxMathClient`, `ToolboxMediaInspectClient`, `ToolboxOcrClient`, `ToolboxOrientationClient`, `ToolboxPageOcrClient`, `ToolboxPdfClient`, `ToolboxPdfUaClient`, `ToolboxStructureClient`, `ToolboxTableClient` — one client per capability family; no settings, no logging |
 | `acessilia_sdk.toolbox.endpoints` | `ToolboxEndpoint`, `parse_endpoints`, `FAILOVER_ERRORS` — the Toolbox instances a client tries, in order |
 | `acessilia_sdk.toolbox.artifacts` | `ArtifactRef`, `download_artifact` — content-addressed artifacts and their verified, atomic download |
 | `acessilia_sdk.toolbox.catalog` | `fetch_catalog`, `CatalogSnapshot`, `Requirement`, `missing_requirements`, `CatalogCache` — the published catalogue, checks against it (it only restricts) and the last-good cache |
@@ -86,8 +86,11 @@ until the Toolbox publishes `artifact-ref@1`.
 2. Add a client in `acessilia_sdk/toolbox/clients/`: subclass
    `ToolboxCapabilityClient`, set `provider_key` and call
    `self._execute(capability_id, ...)` (or `_execute_on` when the result is an
-   artifact). Export it from `acessilia_sdk.toolbox.clients` and test it in
-   `tests/clients/` with an explicit `base_url`.
+   artifact). A capability reached through a dedicated REST route
+   (`transport="rest"`) uses `self._request_on(method, path, capability_id=...)`
+   instead and leaves `provider_key` unset. Both paths share the failover and
+   retry rules. Export the client from `acessilia_sdk.toolbox.clients` and test
+   it in `tests/clients/` with an explicit `base_url`.
 3. In the core, build it with `backend.tools.toolbox_client.make_toolbox_client`,
    which passes the configuration from `settings`.
 

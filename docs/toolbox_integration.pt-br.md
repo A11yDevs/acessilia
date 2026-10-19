@@ -77,7 +77,7 @@ Todas herdam de `ToolboxError` (definida no SDK, `acessilia_sdk.toolbox.errors`,
 |---|---|---|
 | **Onde roda** | No processo do core (mesma máquina/container) | Serviço remoto HTTP (`TOOLBOX_BASE_URL`, porta 8002) |
 | **Exemplos** | `libs/docstruct/` — `docstruct.fusion`, `docstruct.policy.FusionPolicy`, `docstruct.types.CanonicalBlock` | `document.structure.extract`, `document.layout.analyze`, `document.ocr`, `math.*`, `pdf.split` |
-| **Interface** | Import Python direto (função/classe pura) | `ToolboxClient` / clientes especializados → `POST /v1/capabilities/{capability}:execute` |
+| **Interface** | Import Python direto (função/classe pura) | Clientes do SDK (`acessilia_sdk.toolbox.clients`) criados com `make_toolbox_client` → `POST /v1/capabilities/{capability}:execute` ou as rotas de artefatos e datasets |
 | **Falha** | Exceção Python local | `ToolboxError` → subclasses tipadas |
 | **Estado/cache** | Em memória / disco local | Artifact store (`/v1/artifacts`) + cache remoto (`cache_key` na provenance) |
 | **Versionamento** | Acoplado ao repo do core (mesmo commit) | Independente (`provider_version` na provenance) |
@@ -151,7 +151,7 @@ no core**. Basta:
 
 ### Verificação
 
-- Unit: `tests/test_toolbox_client.py` (mock respx) — verifica que o provider é
+- Unit: `libs/sdk/tests/clients/test_structure.py` (mock respx) — verifica que o provider é
   enviado no form e que os erros HTTP são mapeados para as exceções tipadas.
 - E2E: `tests/test_toolbox_e2e.py` (marcador `e2e`) — contra `TOOLBOX_BASE_URL` real.
 
@@ -289,7 +289,7 @@ disponível.
 
 ### 4.4 Tests
 
-- **Unit** (mock respx): no estilo de `tests/test_toolbox_client.py` — verifica o
+- **Unit** (mock respx): em `libs/sdk/tests/clients/`, como os testes de cliente existentes — verifica o
   mapeamento de erros HTTP para exceções tipadas e o envio do provider.
 - **E2E** (marcador `e2e`): no estilo de `tests/test_toolbox_e2e.py` — contra
   `TOOLBOX_BASE_URL` real; é ignorado se a variável não estiver definida.
@@ -378,7 +378,8 @@ service.py: _build_orchestrator()
 
 - `libs/sdk/src/acessilia_sdk/toolbox/` — registro de capacidades, transporte, classe base dos clientes, failover, artefatos e hierarquia de exceções (SDK)
 - `libs/sdk/src/acessilia_sdk/toolbox/clients/` — um cliente por família de capacidades; `layout.py` é o modelo do Cenário B
-- `backend/tools/toolbox_client.py` — `make_toolbox_client` (clientes do SDK configurados a partir do settings do core); `ToolboxClient` genérico (extração, artefatos, datasets)
+- `backend/tools/toolbox_client.py` — `make_toolbox_client` (clientes do SDK configurados a partir do settings do core) e os tipos de erro reexportados
+- `clients/structure.py`, `clients/artifact.py`, `clients/dataset.py` — extração de estrutura, armazenamento de artefatos e as rotas de datasets
 - `backend/tools/toolbox_ocr_tools.py`, `toolbox_math_tools.py`, `toolbox_pdf_tools.py` — wrappers Agno; `toolbox_pdf_tools.py` ainda tem fallback local, removido na #150 (ADR-0003)
 - `clients/page_ocr.py` — `document.ocr.page` (VLM de página inteira)
 - `clients/adjudicate.py` — `document.adjudicate.page` / `.region`

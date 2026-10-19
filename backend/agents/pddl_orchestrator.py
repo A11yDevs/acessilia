@@ -188,10 +188,11 @@ def _run_extract_single_provider(source_path: Path) -> dict[str, Any]:
     """Extract through the configured Toolbox provider for the PDDL fallback."""
     import concurrent.futures
 
-    from backend.tools.toolbox_client import ToolboxClient
+    from acessilia_sdk.toolbox.clients import ToolboxStructureClient
+    from backend.tools.toolbox_client import make_toolbox_client
 
     async def extract() -> dict[str, Any]:
-        client = ToolboxClient()
+        client = make_toolbox_client(ToolboxStructureClient)
         try:
             return await client.extract_structure(
                 file_path=source_path,

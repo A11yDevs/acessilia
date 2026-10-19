@@ -58,18 +58,35 @@ def _capability_constants() -> dict[str, str]:
     return found
 
 
-def test_client_capability_constants_are_registered_for_execute() -> None:
+def _transport_of(module_name: str) -> str:
+    """``execute`` for clients that call ``_execute``; otherwise ``rest``."""
+    source = (CLIENTS_DIR / module_name).read_text(encoding="utf-8")
+    return "execute" if "self._execute" in source else "rest"
+
+
+def test_client_capability_constants_are_registered() -> None:
+    """Execute clients name ``execute`` capabilities; REST clients, ``rest`` ones.
+
+    Every capability the SDK registers must be named by some client, so the
+    REST contracts (artifacts, datasets) are covered too.
+
+    ``execute_capability`` and ``_request_on`` refuse the other transport, so
+    a constant in the wrong group could never be called.
+    """
     constants = _capability_constants()
     assert constants, "no capability constants found in the SDK clients"
     unregistered = {
         name: capability
         for name, capability in constants.items()
         if capability not in TOOLBOX_CAPABILITIES
-        or TOOLBOX_CAPABILITIES[capability].transport != "execute"
+        or TOOLBOX_CAPABILITIES[capability].transport
+        != _transport_of(name.split(":", 1)[0])
     }
     assert not unregistered, (
         f"client constants outside TOOLBOX_CAPABILITIES: {unregistered}"
     )
+    unnamed = set(TOOLBOX_CAPABILITIES) - set(constants.values())
+    assert not unnamed, f"registered capabilities no client names: {sorted(unnamed)}"
 
 
 def test_no_module_hardcodes_an_execute_route() -> None:

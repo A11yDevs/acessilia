@@ -24,14 +24,6 @@ def _el(text: str, order: int, page: int = 0, type_: str = "paragraph", **kw) ->
     return el
 
 
-class FakeToolbox:
-    provider = "docling"
-
-    def __init__(self):
-        from backend.tools.toolbox_client import ToolboxClient
-        self._client = ToolboxClient(provider="docling")
-
-
 class TestGroupByPage:
     def test_groups_by_page(self):
         payload = _payload([
@@ -74,7 +66,7 @@ class TestExtractFused:
             return _payload([_el("só mineru", 0)])
 
         monkeypatch.setattr(
-            "backend.pipeline.fusion.ToolboxClient",
+            "backend.pipeline.fusion._structure_client",
             _FakeClientFactory(extract_fn=fake_extract),
         )
         result = await extract_fused("arquivo.pdf")
@@ -87,7 +79,7 @@ class TestExtractFused:
             return None
 
         monkeypatch.setattr(
-            "backend.pipeline.fusion.ToolboxClient",
+            "backend.pipeline.fusion._structure_client",
             _FakeClientFactory(extract_fn=fake_extract),
         )
         from backend.tools.toolbox_client import ToolboxProviderUnavailable
@@ -101,7 +93,7 @@ class TestExtractFused:
             raise FileNotFoundError("arquivo ausente")
 
         monkeypatch.setattr(
-            "backend.pipeline.fusion.ToolboxClient",
+            "backend.pipeline.fusion._structure_client",
             _FakeClientFactory(extract_fn=fake_extract),
         )
 
@@ -124,7 +116,7 @@ class TestExtractFused:
             ])
 
         monkeypatch.setattr(
-            "backend.pipeline.fusion.ToolboxClient",
+            "backend.pipeline.fusion._structure_client",
             _FakeClientFactory(extract_fn=fake_extract),
         )
         result = await extract_fused("arquivo.pdf")
@@ -153,7 +145,7 @@ class TestExtractFused:
             ])
 
         monkeypatch.setattr(
-            "backend.pipeline.fusion.ToolboxClient",
+            "backend.pipeline.fusion._structure_client",
             _FakeClientFactory(extract_fn=fake_extract),
         )
         result = await extract_fused("arquivo.pdf")
@@ -169,7 +161,7 @@ class TestExtractFused:
             return [" ".join(["observacao"] * 6)], {}
 
         monkeypatch.setattr(
-            "backend.pipeline.fusion.ToolboxClient",
+            "backend.pipeline.fusion._structure_client",
             _FakeClientFactory(extract_fn=fake_extract),
         )
         monkeypatch.setattr("backend.pipeline.fusion.merge_blocks", fake_merge_blocks)
@@ -201,7 +193,7 @@ class TestExtractFused:
             return list(blocks), {}
 
         monkeypatch.setattr(
-            "backend.pipeline.fusion.ToolboxClient",
+            "backend.pipeline.fusion._structure_client",
             _FakeClientFactory(extract_fn=fake_extract),
         )
         monkeypatch.setattr("backend.pipeline.fusion.merge_blocks", fake_merge_blocks)
@@ -236,7 +228,7 @@ class TestExtractFused:
             return [docling[0].md], stats
 
         monkeypatch.setattr(
-            "backend.pipeline.fusion.ToolboxClient",
+            "backend.pipeline.fusion._structure_client",
             _FakeClientFactory(extract_fn=fake_extract),
         )
         monkeypatch.setattr("backend.pipeline.fusion.merge_blocks", fake_merge_blocks)
@@ -275,7 +267,7 @@ class _FakeClient:
 
 
 class _RecordingToolbox:
-    """Fake ``ToolboxClient`` factory that records, in order, how each
+    """Fake ``_structure_client`` factory that records, in order, how each
     provider received the document. State lives on the instance, so every
     test gets its own recorder."""
 
@@ -309,7 +301,7 @@ class _RecordingClient:
 @pytest.mark.asyncio
 async def test_extract_fused_reuses_the_stored_artifact(monkeypatch):
     toolbox = _RecordingToolbox()
-    monkeypatch.setattr("backend.pipeline.fusion.ToolboxClient", toolbox)
+    monkeypatch.setattr("backend.pipeline.fusion._structure_client", toolbox)
 
     await extract_fused(
         "doc.pdf",
@@ -327,7 +319,7 @@ async def test_extract_fused_reuses_the_stored_artifact(monkeypatch):
 @pytest.mark.asyncio
 async def test_extract_fused_uploads_when_the_artifact_is_gone(monkeypatch):
     toolbox = _RecordingToolbox(missing_artifact=True)
-    monkeypatch.setattr("backend.pipeline.fusion.ToolboxClient", toolbox)
+    monkeypatch.setattr("backend.pipeline.fusion._structure_client", toolbox)
 
     result = await extract_fused(
         "doc.pdf",
@@ -344,3 +336,33 @@ async def test_extract_fused_uploads_when_the_artifact_is_gone(monkeypatch):
             (provider, "art-1", None),
             (provider, None, "doc.pdf"),
         ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("use_remote_cache", [True, False])
+@pytest.mark.parametrize("artifact_id", [None, "sha256:abc"])
+async def test_extract_fused_forwards_the_remote_cache_setting(
+    monkeypatch, use_remote_cache, artifact_id
+):
+    """TOOLBOX_USE_REMOTE_CACHE reaches every extraction, by file or by artifact."""
+    from backend.config.settings import settings
+
+    monkeypatch.setattr(settings, "toolbox_use_remote_cache", use_remote_cache)
+    seen: list[object] = []
+
+    class Client:
+        def __init__(self, provider):
+            self.provider = provider
+
+        async def extract_structure(self, *args, **kwargs):
+            seen.append(kwargs.get("use_remote_cache"))
+            return _payload([_el("texto", 0)])
+
+        async def close(self):
+            pass
+
+    monkeypatch.setattr("backend.pipeline.fusion._structure_client", Client)
+
+    await extract_fused("arquivo.pdf", artifact_id=artifact_id)
+
+    assert seen == [use_remote_cache, use_remote_cache]

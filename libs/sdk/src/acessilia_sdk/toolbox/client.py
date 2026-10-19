@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import asyncio
 import random
-from collections.abc import Callable, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
+from contextlib import AbstractContextManager
 from functools import partial
-from typing import Any, ClassVar
+from typing import Any, ClassVar, TypeVar
 
 import httpx
 
-from acessilia_sdk.toolbox.capabilities import provider_default
+from acessilia_sdk.toolbox.capabilities import TOOLBOX_CAPABILITIES, provider_default
 from acessilia_sdk.toolbox.catalog import (
     CatalogCache,
     Requirement,
@@ -24,6 +25,7 @@ from acessilia_sdk.toolbox.endpoints import (
 )
 from acessilia_sdk.toolbox.errors import (
     ToolboxArtifactNotFound,
+    ToolboxCapabilityError,
     ToolboxError,
     ToolboxIncompatibleEndpoint,
     ToolboxProviderUnavailable,
@@ -47,6 +49,11 @@ FailoverHook = Callable[[ToolboxEndpoint, ToolboxError], None]
 
 #: Indirection so tests can observe the backoff without waiting.
 _sleep = asyncio.sleep
+
+T = TypeVar("T")
+
+#: Builds the multipart ``files`` mapping for one attempt (see ``_request_on``).
+FilesFactory = Callable[[], AbstractContextManager[Mapping[str, Any]]]
 
 
 class ToolboxCapabilityClient:
@@ -86,7 +93,9 @@ class ToolboxCapabilityClient:
     """
 
     #: Provider key whose default applies when no ``provider`` is given.
-    provider_key: ClassVar[str]
+    #: ``None`` for clients of REST routes that take no provider (artifacts,
+    #: datasets).
+    provider_key: ClassVar[str | None] = None
 
     def __init__(
         self,
@@ -114,7 +123,9 @@ class ToolboxCapabilityClient:
             if endpoints is None
             else _normalize_endpoints(endpoints)
         )
-        self.provider = provider or provider_default(self.provider_key)
+        self.provider = provider or (
+            provider_default(self.provider_key) if self.provider_key else None
+        )
         self.timeout_seconds = timeout_seconds or DEFAULT_TIMEOUT_SECONDS
         self.api_key = api_key or ""
         self.on_failover = on_failover
@@ -167,30 +178,108 @@ class ToolboxCapabilityClient:
         client, not through ``self._client``.
         """
         provider = provider or self.provider
+        if provider is None:
+            raise ValueError(f"{capability_id} needs a provider")
+
+        async def check(catalog: CatalogCache) -> None:
+            await _require_compatible(catalog, capability_id, provider)
+
+        return await self._with_failover(
+            lambda http: self._execute_once(http, capability_id, provider, kwargs),
+            check,
+        )
+
+    async def _request_on(
+        self,
+        method: str,
+        path: str,
+        *,
+        capability_id: str,
+        timeout_seconds: float | None = None,
+        files_factory: FilesFactory | None = None,
+        **kwargs: Any,
+    ) -> tuple[httpx.AsyncClient, httpx.Response]:
+        """A request to a dedicated REST route, with the same failover and retries.
+
+        ``capability_id`` names the ``rest`` capability the route implements
+        (see :meth:`_rest_with_failover`). ``files_factory`` builds the
+        multipart files for each attempt: a callable returning a context
+        manager that yields the ``files`` mapping, so a file can be opened,
+        streamed and closed again on every retry. Other keyword arguments go
+        to ``httpx.AsyncClient.request``. Returns the HTTP client of the
+        endpoint that answered and its successful response.
+        """
+        if timeout_seconds is not None:
+            kwargs["timeout"] = httpx.Timeout(timeout_seconds)
+
+        async def call(http: httpx.AsyncClient) -> httpx.Response:
+            try:
+                if files_factory is None:
+                    response = await http.request(method, path, **kwargs)
+                else:
+                    with files_factory() as files:
+                        response = await http.request(method, path, files=files, **kwargs)
+            except httpx.TimeoutException as e:
+                raise ToolboxTimeout(f"Timed out on {method} {path}: {e}") from e
+            except httpx.RequestError as e:
+                raise ToolboxProviderUnavailable(
+                    f"Toolbox unavailable at {http.base_url}: {e}"
+                ) from e
+            raise_for_error(response, capability_id)
+            return response
+
+        return await self._rest_with_failover(capability_id, call)
+
+    async def _rest_with_failover(
+        self,
+        capability_id: str,
+        call: Callable[[httpx.AsyncClient], Awaitable[T]],
+    ) -> tuple[httpx.AsyncClient, T]:
+        """Run ``call`` against a REST capability with failover and retries.
+
+        Only capabilities registered with ``transport="rest"`` are accepted. On
+        a secondary endpoint the capability must be published at the expected
+        version (REST capabilities have no provider to check). Use it directly
+        when ``call`` needs the HTTP client itself, for example to stream a
+        download; otherwise use :meth:`_request_on`.
+        """
+        spec = TOOLBOX_CAPABILITIES.get(capability_id)
+        if spec is None or spec.transport != "rest":
+            raise ToolboxCapabilityError(
+                f"{capability_id} is not a registered REST capability"
+            )
+
+        async def check(catalog: CatalogCache) -> None:
+            await _require_published(catalog, capability_id)
+
+        return await self._with_failover(call, check)
+
+    async def _with_failover(
+        self,
+        call: Callable[[httpx.AsyncClient], Awaitable[T]],
+        check: Callable[[CatalogCache], Awaitable[None]],
+    ) -> tuple[httpx.AsyncClient, T]:
+        """Run ``call`` on each endpoint in turn, with retries on each one.
+
+        ``check`` runs first on a secondary endpoint and raises
+        :class:`ToolboxIncompatibleEndpoint` to skip it.
+        """
         causes: list[tuple[str, ToolboxError]] = []
         for endpoint, http, catalog in zip(self.endpoints, self._clients, self._catalogs):
             try:
                 if catalog is not None:
-                    await _require_compatible(catalog, capability_id, provider)
-                result = await self._execute_with_retries(
-                    http, capability_id, provider, kwargs
-                )
+                    await check(catalog)
+                result = await self._with_retries(lambda: call(http))
             except (*FAILOVER_ERRORS, ToolboxIncompatibleEndpoint) as exc:
                 self._record_failover(causes, endpoint, exc)
                 continue
             return http, result
         raise _combined(causes)
 
-    async def _execute_with_retries(
-        self,
-        http: httpx.AsyncClient,
-        capability_id: str,
-        provider: str,
-        kwargs: dict[str, Any],
-    ) -> dict[str, Any]:
+    async def _with_retries(self, attempt_call: Callable[[], Awaitable[T]]) -> T:
         for attempt in range(self.retries + 1):
             try:
-                return await self._execute_once(http, capability_id, provider, kwargs)
+                return await attempt_call()
             except FAILOVER_ERRORS:
                 if attempt == self.retries:
                     raise
@@ -307,6 +396,19 @@ async def _require_compatible(
         raise ToolboxIncompatibleEndpoint("; ".join(reasons))
 
 
+async def _require_published(catalog: CatalogCache, capability_id: str) -> None:
+    """A REST capability has no provider: check only that it is published."""
+    snapshot = await catalog.get()
+    if snapshot is None:
+        raise ToolboxIncompatibleEndpoint(f"{capability_id}: Toolbox catalogue unavailable")
+    published = snapshot.capabilities.get(capability_id)
+    expected = TOOLBOX_CAPABILITIES[capability_id].contract_version
+    if published != expected:
+        raise ToolboxIncompatibleEndpoint(
+            f"{capability_id}: Toolbox publishes v{published}, client expects v{expected}"
+        )
+
+
 async def _health(http: httpx.AsyncClient, base_url: str) -> dict[str, Any]:
     try:
         response = await http.get("/v1/health")
@@ -320,4 +422,9 @@ async def _health(http: httpx.AsyncClient, base_url: str) -> dict[str, Any]:
     return response.json()
 
 
-__all__ = ["DEFAULT_TIMEOUT_SECONDS", "FailoverHook", "ToolboxCapabilityClient"]
+__all__ = [
+    "DEFAULT_TIMEOUT_SECONDS",
+    "FailoverHook",
+    "FilesFactory",
+    "ToolboxCapabilityClient",
+]
