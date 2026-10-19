@@ -12,6 +12,7 @@ com **build a partir do código-fonte** quanto com **imagens pré-publicadas no 
 
 - [Docker](https://docs.docker.com/get-docker/) (com Compose V2 integrado)
 - Acesso à internet para baixar imagens ou dependências
+- Uma [Acessilia Toolbox](https://github.com/A11yDevs/acessilia-toolbox) acessível (`TOOLBOX_BASE_URL`): o pipeline PDDL extrai a estrutura do documento nela, então o processamento falha sem ela
 
 ---
 
@@ -42,7 +43,7 @@ Isso constrói a imagem a partir do `infra/Dockerfile` com a variante **docling*
 
 ### Variante slim (sem Docling)
 
-Para uma imagem mais leve (~2 GB), sem OCR do Docling:
+Para uma imagem mais leve (~2 GB), sem os modelos locais do Docling (a extração estrutural roda na Toolbox nas duas variantes):
 
 ```bash
 docker compose build --build-arg WITH_DOCLING=false
@@ -149,11 +150,9 @@ AI_CLIENT=ollama
 OLLAMA_BASE_URL=http://host.docker.internal:11434/v1/chat/completions
 OLLAMA_MODEL=llama3.2-vision
 
-# Estruturação de documentos
-STRUCTURER=docling   # ou pymupdf (mais leve, sem dependências extras)
-
-# Pipeline
-PIPELINE_ENGINE=legacy
+# Pipeline: o PDDL é o único motor; a extração estrutural roda na Toolbox
+PIPELINE_ENGINE=pddl
+TOOLBOX_BASE_URL=http://host.docker.internal:8002
 ```
 
 > **Dica para Ollama local:** Use `host.docker.internal` no lugar de `localhost`
@@ -199,7 +198,7 @@ automático** via systemd timer. O script consulta a **GitHub API** a cada
 # Consulte docs/homologacao-systemd.md para instruções manuais
 ```
 
-Para producao, use [docs/producao-systemd.md](docs/producao-systemd.md) ou rode
+Para producao, use [producao-systemd.md](producao-systemd.md) ou rode
 `./scripts/setup-producao.sh`. O ambiente rastreia `main` por padrao com
 `docker-compose.production.yml` e `scripts/production-update.sh`.
 
@@ -209,17 +208,12 @@ Para producao, use [docs/producao-systemd.md](docs/producao-systemd.md) ou rode
 
 ## 7. Variantes de imagem
 
-| Variante | Tamanho aprox. | Docling | OCR | Uso recomendado |
-|----------|----------------|---------|-----|-----------------|
-| **docling** | ~4-6 GB | ✅ Sim | ✅ Nativo (CPU) | Precisão máxima em documentos |
-| **slim**   | ~2 GB   | ❌ Não | ❌ Fallback pymupdf | Testes rápidos, recursos limitados |
+| Variante | Tamanho aprox. | Docling local | Uso recomendado |
+|----------|----------------|---------------|-----------------|
+| **docling** | ~4-6 GB | ✅ Sim | Padrão; reconhecimento local de fórmulas |
+| **slim**   | ~2 GB   | ❌ Não | Testes rápidos, recursos limitados |
 
-A variante **docling** é a padrão e oferece:
-- Detecção de tabelas, figuras e fórmulas
-- OCR nativo CPU-only (sem GPU)
-- Extração estrutural mais precisa
-
-A variante **slim** faz fallback automático para `pymupdf` com um aviso no log.
+Nas duas variantes a extração estrutural (regiões, tabelas, OCR) roda na Toolbox, não nesta imagem. No motor PDDL o Docling local serve apenas à cascata de imagens de fórmula (`FORMULA_IMAGE_CASCADE`, via [backend/tools/formula_worker.py](../backend/tools/formula_worker.py)), então a variante **slim** não tem essa etapa local do CodeFormula.
 
 ---
 

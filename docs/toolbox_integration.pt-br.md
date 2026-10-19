@@ -353,7 +353,7 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 | `TOOLBOX_PDF_UA_TIMEOUT_SECONDS` | `300` | Tempo máximo de espera pela renderização na Toolbox antes de reportar erro de exportação opcional |
 | `FUSION_MODE` | `single` | `single` (um provider) ou `dual` (dois providers + fusão) |
 | `FUSION_SECONDARY_PROVIDER` | `mineru` | Provider secundário para `FUSION_MODE=dual` |
-| `STRUCTURER` | `toolbox` | Motor de regiões por página (`toolbox`, `toolbox-layout`, `pymupdf`) |
+| `STRUCTURER` | `toolbox` | Motor de regiões do motor legacy desativado (`toolbox`, `toolbox-layout`, `pymupdf`). O motor PDDL o ignora na extração; ele ainda compõe a chave de cache |
 | `TOOLBOX_PAGE_OCR_PROVIDER` | `qwen3-vl-8b` | Transcrição VLM de página inteira (`document.ocr.page`) |
 | `TOOLBOX_ADJUDICATE_PROVIDER` | `qwen3-vl-8b` | Juiz pareado / transcrição de região (`document.adjudicate.*`) |
 | `TOOLBOX_TABLE_PROVIDER` | `qwen3-vl-8b` | Regeração de tabelas para o especialista de tabelas (`table.recognize`) |

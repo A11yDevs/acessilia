@@ -9,8 +9,8 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 - Role: normalize structured region payloads into a canonical document schema, validate structure and heading hierarchy, build intermediate AST, and dispatch to renderers.
 - Benefit: deterministic output and a single source of truth for all output exporters.
 
-### 2. Multi-Agent Pipeline Orchestration (legacy engine)
-- Implementation: [backend/agents/orchestrator.py](../backend/agents/orchestrator.py) (`AccessibilityOrchestrator`), used when `PIPELINE_ENGINE=legacy` (the default). The `pddl` engine uses the planning-based orchestration in pattern 10 instead.
+### 2. Multi-Agent Pipeline Orchestration (legacy engine, disabled)
+- Implementation: [backend/agents/orchestrator.py](../backend/agents/orchestrator.py) (`AccessibilityOrchestrator`). The `legacy` engine is disabled (`backend/service.py` accepts only `PIPELINE_ENGINE=pddl`, normalizing the old `pmv` alias to it) and is due to be removed; the running pipeline uses the planning-based orchestration in pattern 10.
 - Role: coordinates multi-agent lifecycle: local structural reading, parallel visual/data processing, text editing/deduplication, cache, history logging, and fallback.
 - Benefit: centralizes business rules and isolates step responsibilities.
 
@@ -21,8 +21,8 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
   - OpenRouter (cloud API models like Claude/GPT-4o)
 - Benefit: AI model provider can be switched seamlessly via environment configuration without changing agent logic.
 
-### 4. Local-First Extraction Strategy
-- Implementation: [backend/agents/reader_agent.py](../backend/agents/reader_agent.py) using PyMuPDF and Docling.
+### 4. Local-First Extraction Strategy (legacy engine, disabled)
+- Implementation: [backend/agents/reader_agent.py](../backend/agents/reader_agent.py) using PyMuPDF and Docling. Only the disabled legacy engine uses it; the PDDL engine always extracts the structure on the Toolbox (pattern 10).
 - Role:
   - perform local deterministic PDF text and region extraction first,
   - call Agno vision/data agents only for scanned pages, images, complex tables, and formulas,
@@ -56,10 +56,10 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 - Implementation: [frontend/run.py](../frontend/run.py)
 - Benefit: prevents process collisions on the host machine.
 
-### 10. Deterministic Planning with PDDL (optional engine)
-- Implementation: [backend/core/manifest/](../backend/core/manifest/), [backend/core/planning/](../backend/core/planning/), [backend/core/execution/](../backend/core/execution/), coordinated by [backend/agents/pddl_orchestrator.py](../backend/agents/pddl_orchestrator.py). Active when `PIPELINE_ENGINE=pddl`.
+### 10. Deterministic Planning with PDDL (active engine)
+- Implementation: [backend/core/manifest/](../backend/core/manifest/), [backend/core/planning/](../backend/core/planning/), [backend/core/execution/](../backend/core/execution/), coordinated by [backend/agents/pddl_orchestrator.py](../backend/agents/pddl_orchestrator.py). This is the only active engine; the manifest is extracted through the Toolbox.
 - Role: separate *what to do* from *doing it*. A deterministic manifest describes the document's regions and obligations; a PDDL planner compiles it into a validated, ordered plan; an Agno Workflow executor applies the plan, calling the Vision/Data agents only where the plan requires. See [pmv_agno_pddl.md](pmv_agno_pddl.md).
-- Benefit: task ordering and dependencies become explicit and auditable, and planning stays deterministic (no LLM writes PDDL) while AI is confined to description. Falls back to deterministic extraction if planning fails.
+- Benefit: task ordering and dependencies become explicit and auditable, and planning stays deterministic (no LLM writes PDDL) while AI is confined to description. A planning failure fails the job; there is no fallback to deterministic extraction.
 
 ### 11. REST API with Interface Clients
 - Implementation: [backend/api/](../backend/api/); clients in [frontend/clients/api_client.py](../frontend/clients/api_client.py), consumed by the Telegram bot and Web panel.

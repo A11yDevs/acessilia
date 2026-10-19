@@ -46,7 +46,7 @@ Defined in [backend/api/app.py](../backend/api/app.py), with routes in [backend/
 Observations:
 
 - **Errors are always JSON** (`{"detail": "..."}`): `400` validation, `404` not found, `429` rate limit, `500` internal error. There is a global per-IP limit in addition to the per-route ones.
-- The `pipeline` field in history records which engine ran the job — `legacy` or `pddl` (see `PIPELINE_ENGINE` in [architecture.md](architecture.md)).
+- The `pipeline` field in history records the AI client and the engine that ran the job, as `<ai_client>-<engine>` (for example `ollama-pddl`). The engine is `pddl` for every current job, although jobs submitted through the API record the raw `PIPELINE_ENGINE` value, so the `pmv` alias shows up as `ollama-pmv`; `legacy` appears only in records from before that engine was disabled (see `PIPELINE_ENGINE` in [architecture.md](architecture.md)).
 - Standard interactive FastAPI docs at `GET /docs` and `GET /openapi.json`.
 
 ### Job access, processing options and recovery

@@ -9,8 +9,8 @@ Também disponível em **inglês (EUA)**: [English version](patterns.md)
 - Papel: normalizar cargas de regiões estruturadas em um esquema de documento canônico, validar estrutura e hierarquia de títulos, construir o AST intermediário e despachar para os renderizadores.
 - Benefício: saída determinística e uma única fonte da verdade para todos os exportadores de saída.
 
-### 2. Orquestração de Pipeline Multiagente (motor legacy)
-- Implementação: [backend/agents/orchestrator.py](../backend/agents/orchestrator.py) (`AccessibilityOrchestrator`), usada quando `PIPELINE_ENGINE=legacy` (o padrão). O motor `pddl` usa a orquestração baseada em planejamento do padrão 10 em vez disso.
+### 2. Orquestração de Pipeline Multiagente (motor legacy, desativado)
+- Implementação: [backend/agents/orchestrator.py](../backend/agents/orchestrator.py) (`AccessibilityOrchestrator`). O motor `legacy` está desativado (`backend/service.py` aceita só `PIPELINE_ENGINE=pddl`, normalizando para ele o antigo alias `pmv`) e será removido; o pipeline em uso segue a orquestração baseada em planejamento do padrão 10.
 - Papel: coordena o ciclo de vida multiagente: leitura estrutural local, processamento visual/de dados em paralelo, edição/deduplicação de texto, cache, registro de histórico e fallback.
 - Benefício: centraliza as regras de negócio e isola as responsabilidades de cada etapa.
 
@@ -21,8 +21,8 @@ Também disponível em **inglês (EUA)**: [English version](patterns.md)
   - OpenRouter (modelos de API em nuvem como Claude/GPT-4o)
 - Benefício: o provedor de modelo de IA pode ser trocado sem embaraço via configuração de ambiente, sem alterar a lógica dos agentes.
 
-### 4. Estratégia de Extração Local-First
-- Implementação: [backend/agents/reader_agent.py](../backend/agents/reader_agent.py) usando PyMuPDF e Docling.
+### 4. Estratégia de Extração Local-First (motor legacy, desativado)
+- Implementação: [backend/agents/reader_agent.py](../backend/agents/reader_agent.py) usando PyMuPDF e Docling. Só o motor legacy desativado a usa; o motor PDDL sempre extrai a estrutura na Toolbox (padrão 10).
 - Papel:
   - executar primeiro a extração determinística local de texto e regiões de PDF,
   - chamar os agentes de visão/dados do Agno apenas para páginas escaneadas, imagens, tabelas complexas e fórmulas,
@@ -56,10 +56,10 @@ Também disponível em **inglês (EUA)**: [English version](patterns.md)
 - Implementação: [frontend/run.py](../frontend/run.py)
 - Benefício: impede colisões de processos na máquina do host.
 
-### 10. Planejamento Determinístico com PDDL (motor opcional)
-- Implementação: [backend/core/manifest/](../backend/core/manifest/), [backend/core/planning/](../backend/core/planning/), [backend/core/execution/](../backend/core/execution/), coordenados por [backend/agents/pddl_orchestrator.py](../backend/agents/pddl_orchestrator.py). Ativo quando `PIPELINE_ENGINE=pddl`.
+### 10. Planejamento Determinístico com PDDL (motor ativo)
+- Implementação: [backend/core/manifest/](../backend/core/manifest/), [backend/core/planning/](../backend/core/planning/), [backend/core/execution/](../backend/core/execution/), coordenados por [backend/agents/pddl_orchestrator.py](../backend/agents/pddl_orchestrator.py). É o único motor ativo; o manifesto é extraído pela Toolbox.
 - Papel: separar *o que fazer* de *fazer*. Um manifesto determinístico descreve as regiões e obrigações do documento; um planejador PDDL o compila em um plano validado e ordenado; um executor Agno Workflow aplica o plano, chamando os agentes Vision/Data apenas onde o plano exige. Veja [pmv_agno_pddl.md](pmv_agno_pddl.md).
-- Benefício: a ordem e as dependências das tarefas ficam explícitas e auditáveis, e o planejamento permanece determinístico (nenhum LLM escreve PDDL) enquanto a IA fica restrita à descrição. Faz fallback para extração determinística caso o planejamento falhe.
+- Benefício: a ordem e as dependências das tarefas ficam explícitas e auditáveis, e o planejamento permanece determinístico (nenhum LLM escreve PDDL) enquanto a IA fica restrita à descrição. Uma falha no planejamento faz a tarefa falhar; não há fallback para extração determinística.
 
 ### 11. API REST com Clientes de Interface
 - Implementação: [backend/api/](../backend/api/); clientes em [frontend/clients/api_client.py](../frontend/clients/api_client.py), consumidos pelo bot Telegram e pelo painel Web.
