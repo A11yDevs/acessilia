@@ -24,6 +24,7 @@ The system runs the `pddl` pipeline engine (the manifest → plan → execution 
 11. [Dr.DocBench benchmark](drbench.md) — structure-extraction provider benchmark (Docling vs MinerU), metrics and results.
 12. [Toolbox tool integration](toolbox_integration.md) — how to integrate a new Toolbox tool into the core: HTTP contract, libraries vs. Toolbox capabilities, and the two integration scenarios. (Brazilian Portuguese: [versão em pt-BR](toolbox_integration.pt-br.md))
 13. [Architecture Decision Records](adr/README.md) — cross-component decisions (responsibilities, remote-only execution, contracts, artifact references, availability) and how to propose a new one. (Brazilian Portuguese: [versão em pt-BR](adr/README.pt-br.md))
+14. [Architecture audit, October 2026](architecture/audit-2026-10.md) — what is still implemented twice across the components, the remaining operational dependencies, the architectural guards and the initial metrics, with an owner and a destination for each finding. (Brazilian Portuguese: [versão em pt-BR](architecture/audit-2026-10.pt-br.md))
 
 ---
 
