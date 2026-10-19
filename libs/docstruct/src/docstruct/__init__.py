@@ -4,7 +4,7 @@ API pública estável. Tudo que não está aqui (``_internal``) pode mudar
 sem aviso. A lib não depende do backend Acessilia nem de I/O externo.
 """
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 from docstruct.geometry import content_fingerprint, merge_bboxes, overlaps_clean, union
 from docstruct.policy import FusionPolicy
