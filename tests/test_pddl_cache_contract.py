@@ -65,3 +65,31 @@ async def test_live_processing_rejects_incompatible_cached_execution(
     with pytest.raises(RuntimeError, match="Live validation"):
         await service.process(source, task_id="live-from-cache")
     assert calls == [True]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("cacheable", [True, False])
+async def test_degraded_processing_is_not_cached(
+    isolated_runtime, monkeypatch, tmp_path, cacheable
+):
+    """A run degraded by a Toolbox failure must not be replayed from the cache."""
+    from backend import service
+
+    source = tmp_path / "doc.pdf"
+    source.write_bytes(b"%PDF")
+    cached = []
+
+    async def no_cache(*args):
+        return None
+
+    async def execute(*args, **kwargs):
+        return {"text": "Live content", "cacheable": cacheable}
+
+    async def record(*args, **kwargs):
+        cached.append(True)
+
+    monkeypatch.setattr(service, "get_cached", no_cache)
+    monkeypatch.setattr(service, "set_cache", record)
+    monkeypatch.setattr(service, "agente", SimpleNamespace(executar=execute))
+    await service.process(source, task_id=f"degraded-{cacheable}")
+    assert cached == ([True] if cacheable else [])

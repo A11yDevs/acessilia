@@ -2785,6 +2785,7 @@ def build_pddl_structured_payload(
 ) -> dict[str, Any]:
     pages_payload = _manifest_pages_to_payload(manifest)
     text_output = _render_text_from_pages(pages_payload)
+    media_inspection_status = manifest.extractor.configuration.get("media_inspection")
 
     technical_warnings: list[str] = []
     if execution_report is None:
@@ -2829,8 +2830,12 @@ def build_pddl_structured_payload(
             else None,
             "pddl_unsatisfied_obligations": _unsatisfied_obligations(manifest),
             "pddl_toolbox_availability": toolbox_availability,
+            "media_inspection": media_inspection_status,
         },
         "technical_warnings": technical_warnings,
+        # A step degraded by a Toolbox failure must not be replayed from the
+        # cache once the Toolbox is back.
+        "cacheable": media_inspection_status != "failed",
     }
 
 

@@ -166,3 +166,30 @@ async def test_orchestrator_degrades_and_records_the_cause_on_failure(monkeypatc
         "media_inspection_error": "ToolboxError: toolbox down",
     }
 
+
+@pytest.mark.parametrize(
+    ("status", "cacheable"),
+    [("toolbox", True), ("disabled", True), ("failed", False), (None, True)],
+)
+def test_payload_records_the_status_and_skips_the_cache_on_failure(
+    monkeypatch, status, cacheable
+) -> None:
+    from backend.agents import pddl_orchestrator as pddl
+
+    configuration = {} if status is None else {"media_inspection": status}
+    manifest = SimpleNamespace(
+        extractor=SimpleNamespace(configuration=configuration),
+        manifest_id="m-1",
+        revision=1,
+        obligations=[],
+    )
+    plan = SimpleNamespace(plan_id="p-1", planner="internal", expected_total_cost=0)
+    monkeypatch.setattr(pddl, "_manifest_pages_to_payload", lambda _manifest: [])
+
+    payload = pddl.build_pddl_structured_payload(
+        file_path=IMAGE, manifest=manifest, plan=plan,
+        planner_backend="internal", execution_report=None, comparison=None,
+    )
+
+    assert payload["canonical_metadata"]["media_inspection"] == status
+    assert payload["cacheable"] is cacheable

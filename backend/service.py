@@ -275,7 +275,8 @@ async def process(
             technical_warnings=technical_warnings,
         )
 
-        await set_cache(file_path, processed_result, cache_variant)
+        if not isinstance(processed_result, dict) or processed_result.get("cacheable", True):
+            await set_cache(file_path, processed_result, cache_variant)
         _salvar_json_canonico(canonical_document, file_path.name)
 
         if not external_task_id:
