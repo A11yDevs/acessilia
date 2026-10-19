@@ -187,6 +187,18 @@ def test_toolbox_settings_defaults():
     assert fresh.toolbox_use_remote_cache is True
 
 
+@pytest.mark.parametrize(
+    "key", ["TOOLBOX_RETRIES", "TOOLBOX_RETRY_BACKOFF_SECONDS"]
+)
+def test_negative_toolbox_retry_settings_fail_at_load(monkeypatch, key):
+    """Um valor negativo falha ao carregar os settings, não no primeiro job."""
+    import backend.config.settings as cfg_mod
+
+    monkeypatch.setenv(key, "-1")
+    with pytest.raises(ValueError, match=key):
+        cfg_mod.Settings()
+
+
 # ---------------------------------------------------------------------------
 # Settings PDDL — defaults e aliases PMV_*
 # ---------------------------------------------------------------------------

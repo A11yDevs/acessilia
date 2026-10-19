@@ -1994,11 +1994,14 @@ class PddlAccessibilityOrchestrator:
             )
         except ToolboxError as exc:
             # The SDK already retried and failed over; there is no local
-            # extractor to fall back on (docs/adr/0003), so the job fails here
-            # with a message that names the capability and the cause.
+            # extractor to fall back on (docs/adr/0003), so the job fails here.
+            # The message reaches the end user, so it names the capability and
+            # the kind of failure only; the full cause, which carries internal
+            # Toolbox endpoints, goes to the log and stays chained.
+            logger.error("Structural extraction failed on the Toolbox: {}", exc)
             raise StructuralExtractionError(
                 t(STAGE_STRUCTURAL_EXTRACTION_FAILED).format(
-                    capability="document.structure.extract", error=exc
+                    capability="document.structure.extract", error=type(exc).__name__
                 )
             ) from exc
         manifest.extractor.configuration["region_inspection_mode"] = effective_mode

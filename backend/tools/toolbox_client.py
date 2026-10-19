@@ -74,10 +74,12 @@ def make_toolbox_client(client_cls: type[ClientT], **overrides: Any) -> ClientT:
 
     The provider comes from the ``settings`` attribute named by the class's
     ``provider_key``, so ``TOOLBOX_*_PROVIDER`` overrides keep working;
-    clients without a provider key (artifacts, datasets) get none. Every
-    client retries timeouts and unavailable instances ``TOOLBOX_RETRIES``
-    times with backoff. ``overrides`` win over settings; ``None`` values are ignored, and passing
+    clients without a provider key (artifacts, datasets) get none.
+    ``overrides`` win over settings; ``None`` values are ignored, and passing
     ``base_url`` replaces the configured endpoints.
+
+    Every client retries timeouts and unavailable instances on the same
+    endpoint, with backoff (``TOOLBOX_RETRIES``/``TOOLBOX_RETRY_BACKOFF_SECONDS``).
     """
     kwargs: dict[str, Any] = {
         "endpoints": toolbox_endpoints(),

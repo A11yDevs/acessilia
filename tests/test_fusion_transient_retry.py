@@ -60,11 +60,14 @@ def _payload(provider: str) -> dict:
 
 
 def _provider_of(request: httpx.Request) -> str:
+    """The value of the ``provider`` form field of a multipart execute call."""
     body = request.content.decode(errors="ignore")
     for provider in ("docling", "mineru"):
-        if f"\r\n\r\n{provider}\r\n" in body:
+        if f'name="provider"\r\n\r\n{provider}\r\n' in body:
             return provider
-    raise AssertionError("request without a known provider")
+    # Raised inside the mock handler, this surfaces as a transport error, so
+    # carry the body to make a change in the form encoding easy to spot.
+    raise AssertionError(f"request without a known provider field: {body[:500]!r}")
 
 
 def mock_toolbox(router, respond):
