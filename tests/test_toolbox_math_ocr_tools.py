@@ -1,4 +1,4 @@
-"""Tests for Toolbox-backed tools (PDF, Math, OCR).
+"""Tests for Toolbox-backed tools (Math, OCR).
 
 Sync functions wrapping async calls via asyncio.run().
 Uses respx for HTTP mocking.
@@ -18,14 +18,9 @@ from backend.tools.toolbox_math_tools import (
     toolbox_verbalize_latex,
 )
 from backend.tools.toolbox_ocr_tools import toolbox_ocr_text
-from backend.tools.toolbox_pdf_tools import toolbox_split_pdf, toolbox_render_page
 
 FIXTURE_PDF = Path(__file__).parent / "fixtures" / "tutorials" / "java-oo-3pgs.pdf"
 TOOLBOX_URL = settings.toolbox_base_url.rstrip("/")
-
-MINI_PNG_BASE64 = (
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
-)
 
 SAMPLE_MATH_CONVERT_RESPONSE = {
     "status": "succeeded",
@@ -60,91 +55,6 @@ SAMPLE_OCR_RESPONSE = {
         "language": "pt-BR",
     },
 }
-
-SAMPLE_SPLIT_RESPONSE = {
-    "status": "succeeded",
-    "capability": "pdf.split",
-    "provider": "docling",
-    "document": {
-        "source_filename": "java-oo-3pgs.pdf",
-        "page_count": 3,
-    },
-}
-
-SAMPLE_RENDER_RESPONSE = {
-    "status": "succeeded",
-    "capability": "pdf.render",
-    "provider": "docling",
-    "document": {
-        "page_number": 1,
-        "image_bytes_base64": MINI_PNG_BASE64,
-        "size_bytes": 68,
-    },
-}
-
-
-def _make_test_pdf(tmp_path: Path, pages: int = 2) -> Path:
-    """Create a minimal multi-page PDF for testing."""
-    import fitz
-
-    pdf_path = tmp_path / "test.pdf"
-    doc = fitz.open()
-    for _ in range(pages):
-        doc.new_page(width=200, height=200)
-    doc.save(str(pdf_path))
-    doc.close()
-    return pdf_path
-
-
-class TestPdfTools:
-    @respx.mock
-    def test_split_success(self, tmp_path):
-        route = respx.post(f"{TOOLBOX_URL}/v1/capabilities/pdf.split:execute")
-        route.return_value = httpx.Response(200, json=SAMPLE_SPLIT_RESPONSE)
-
-        pdf = _make_test_pdf(tmp_path, pages=3)
-        result = toolbox_split_pdf(pdf, tmp_path, max_pages=5)
-        assert len(result) == 3
-        for p in result:
-            assert p.exists()
-            assert p.suffix == ".pdf"
-
-    @respx.mock
-    def test_split_fallback(self, tmp_path):
-        """Toolbox offline → local-only split."""
-        respx.route().mock(side_effect=httpx.ConnectError("synthetic offline provider"))
-        pdf = _make_test_pdf(tmp_path, pages=2)
-        result = toolbox_split_pdf(pdf, tmp_path, max_pages=5)
-        assert len(result) == 2
-
-    @respx.mock
-    def test_render_success(self, tmp_path):
-        route = respx.post(f"{TOOLBOX_URL}/v1/capabilities/pdf.render:execute")
-        route.return_value = httpx.Response(200, json=SAMPLE_RENDER_RESPONSE)
-
-        pdf = _make_test_pdf(tmp_path)
-        result = toolbox_render_page(pdf, page_number=1)
-        assert isinstance(result, bytes)
-        assert result[:4] == b"\x89PNG"
-
-    @respx.mock
-    def test_render_fallback_page_number(self, tmp_path):
-        """Fallback renders the exact requested page (not just page 1)."""
-        respx.route().mock(side_effect=httpx.ConnectError("synthetic offline provider"))
-        pdf = _make_test_pdf(tmp_path, pages=2)
-        result = toolbox_render_page(pdf, page_number=2)
-        assert isinstance(result, bytes)
-        assert result[:4] == b"\x89PNG"
-
-    @respx.mock
-    def test_render_fallback(self, tmp_path):
-        """Toolbox offline → local PyMuPDF render."""
-        respx.route().mock(side_effect=httpx.ConnectError("synthetic offline provider"))
-        pdf = _make_test_pdf(tmp_path)
-        result = toolbox_render_page(pdf, page_number=1)
-        assert isinstance(result, bytes)
-        assert result[:4] == b"\x89PNG"
-
 
 class TestMathTools:
     @respx.mock

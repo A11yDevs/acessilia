@@ -53,8 +53,8 @@ Legenda de **Caminho de chamada**: como o core alcança a capacidade.
 | `math.recognize` | `acessilia_sdk/toolbox/clients/math.py` | `TOOLBOX_MATH_RECOGNIZE_PROVIDER=docling-math` | `docling-math`, `rapid-latex-ocr` | `toolbox_math_tools.py` |
 | `math.convert` | `acessilia_sdk/toolbox/clients/math.py` | `TOOLBOX_MATH_PROVIDER=pure-math` | `pure-math` | `toolbox_math_tools.py` |
 | `math.verbalize` | `acessilia_sdk/toolbox/clients/math.py` | `TOOLBOX_MATH_PROVIDER=pure-math` | `pure-math` | `toolbox_math_tools.py` |
-| `pdf.split` | `acessilia_sdk/toolbox/clients/pdf.py` | `TOOLBOX_PDF_PROVIDER=pymupdf-pdf` | `pymupdf-pdf` | `toolbox_pdf_tools.py` (valida e divide localmente) |
-| `pdf.render` | `acessilia_sdk/toolbox/clients/pdf.py` | `TOOLBOX_PDF_PROVIDER=pymupdf-pdf` | `pymupdf-pdf` | `toolbox_pdf_tools.py` (fallback local via PyMuPDF; desvio removido na #150, ADR-0003) |
+| `pdf.split` | `acessilia_sdk/toolbox/clients/pdf.py` | `TOOLBOX_PDF_PROVIDER=pymupdf-pdf` | `pymupdf-pdf` | sem chamador no core; o cliente fica pronto para quando a renderização de páginas sair do core (acompanhamento da #150) |
+| `pdf.render` | `acessilia_sdk/toolbox/clients/pdf.py` | `TOOLBOX_PDF_PROVIDER=pymupdf-pdf` | `pymupdf-pdf` | ainda sem chamador no core; o orquestrador ainda renderiza páginas localmente com PyMuPDF (desvio, ADR-0003) |
 | `media.inspect` | `acessilia_sdk/toolbox/clients/media_inspect.py` | `TOOLBOX_MEDIA_INSPECT_PROVIDER=pure-media-inspect` | `pure-media-inspect` | `backend/tools/media_inspect.py` (só na Toolbox; sem fallback local, ADR-0003), pulado quando `TOOLBOX_MEDIA_INSPECT_ENABLED=false` |
 | `document.export.pdf_ua` | `acessilia_sdk/toolbox/clients/pdf_ua.py` | `TOOLBOX_PDF_UA_PROVIDER=pandoc-pdf-ua` | `pandoc-pdf-ua` (sidecar `pdf-ua-render`) | `backend/export/pandoc_exporter.py` (só na Toolbox, PDF baixado e verificado de `/v1/artifacts`; sem fallback local, ADR-0003), pulado quando `TOOLBOX_PDF_UA_ENABLED=false` |
 | `artifact.store` / `artifact.retrieve` | `acessilia_sdk/toolbox/clients/artifact.py` (REST `/v1/artifacts`) | — | `minio`, `filesystem` | upload antes da extração |
