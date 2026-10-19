@@ -86,6 +86,39 @@ async def download_artifact(
     _sync_directory(destination.parent)
 
 
+async def read_artifact(
+    http: httpx.AsyncClient,
+    ref: ArtifactRef,
+    *,
+    magic: bytes | None = None,
+) -> bytes:
+    """``GET /v1/artifacts/{id}`` into memory, verified like :func:`download_artifact`.
+
+    For small artifacts the caller uses right away, such as a rendered page.
+    """
+    try:
+        response = await http.get(f"/v1/artifacts/{ref.artifact_id}")
+    except httpx.TimeoutException as e:
+        raise ToolboxTimeout(
+            f"Timed out downloading artifact {ref.artifact_id}: {e}"
+        ) from e
+    except httpx.RequestError as e:
+        raise ToolboxProviderUnavailable(
+            f"Toolbox unavailable at {http.base_url}: {e}"
+        ) from e
+    raise_for_error(response, "artifact.retrieve")
+    content = response.content
+    if hashlib.sha256(content).hexdigest() != ref.digest:
+        raise ToolboxContractViolation(
+            f"Downloaded content does not match artifact_id {ref.artifact_id}"
+        )
+    if magic is not None and not content.startswith(magic):
+        raise ToolboxContractViolation(
+            f"Artifact {ref.artifact_id} does not start with {magic!r}"
+        )
+    return content
+
+
 async def _stream_to(
     http: httpx.AsyncClient, ref: ArtifactRef, partial: Path, head_size: int
 ) -> tuple[str, bytes]:
@@ -130,4 +163,4 @@ def _sync_directory(directory: Path) -> None:
         os.close(fd)
 
 
-__all__ = ["ARTIFACT_ID_RE", "ArtifactRef", "download_artifact"]
+__all__ = ["ARTIFACT_ID_RE", "ArtifactRef", "download_artifact", "read_artifact"]

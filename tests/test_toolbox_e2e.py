@@ -180,14 +180,11 @@ class TestPdfClientE2E:
     @pytest.mark.asyncio
     async def test_render_page(self, pdf_client: ToolboxPdfClient) -> None:
         pdf = _get_pdf()
-        result = await pdf_client.render(file_path=pdf, page_number=1, dpi=150)
-        assert result["status"] == "succeeded"
-        doc = result.get("document", {})
-        assert doc.get("page_number") == 1
-        assert doc.get("width", 0) > 0
-        assert doc.get("height", 0) > 0
-        assert doc.get("image_bytes_base64") is not None
-        assert doc.get("size_bytes", 0) > 0
+        page = await pdf_client.render(file_path=pdf, page_number=1, dpi=150)
+        assert page.image.startswith(b"\x89PNG")
+        assert page.document["page_number"] == 1
+        assert page.document["page_width"] > 0 and page.document["page_height"] > 0
+        assert page.document["size_bytes"] == len(page.image)
 
     @pytest.mark.e2e
     @pytest.mark.asyncio
@@ -195,9 +192,18 @@ class TestPdfClientE2E:
         self, pdf_client: ToolboxPdfClient
     ) -> None:
         pdf = _get_pdf()
-        result = await pdf_client.render(file_path=pdf, page_number=1, dpi=300)
-        doc = result.get("document", {})
-        assert doc.get("size_bytes", 0) > 0
+        page = await pdf_client.render(file_path=pdf, page_number=1, dpi=300)
+        assert page.document["dpi"] == 300
+
+    @pytest.mark.e2e
+    @pytest.mark.asyncio
+    async def test_render_a_bounded_region(self, pdf_client: ToolboxPdfClient) -> None:
+        pdf = _get_pdf()
+        page = await pdf_client.render(
+            file_path=pdf, page_number=1, dpi=300, max_side=200, clip=(0, 0, 100, 50)
+        )
+        assert page.clip == (0, 0, 100, 50)
+        assert max(page.document["width_px"], page.document["height_px"]) <= 200
 
 
 # ---------------------------------------------------------------------------
@@ -286,10 +292,10 @@ class TestWorkflowE2E:
             page_count = split_result["document"]["page_count"]
             assert page_count >= 1
 
-            render_result = await pdf_client.render(
+            rendered = await pdf_client.render(
                 file_path=pdf, page_number=1, dpi=150
             )
-            assert render_result["document"]["page_number"] == 1
+            assert rendered.document["page_number"] == 1
 
             layout_result = await layout_client.analyze(file_path=pdf)
             assert layout_result["document"]["page_count"] == page_count

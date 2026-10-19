@@ -492,6 +492,11 @@ class TestVlmPairwiseJudge:
 
     TEXT = "Texto da página com conteúdo suficiente para o juiz comparar."
 
+    @pytest.fixture(autouse=True)
+    def _toolbox_render(self, fake_toolbox_render):
+        """Pages are rendered by the Toolbox (pdf.render@2); never reach a real one."""
+        return fake_toolbox_render
+
     def _manifest(self, tmp_path, primary=TEXT, secondary=TEXT + " (variante)"):
         import fitz
 

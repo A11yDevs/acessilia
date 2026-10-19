@@ -72,9 +72,17 @@ def test_image_inclusion_matches_configuration(tmp_path, include_images, with_te
     assert any(getattr(item, "text", "") == "Body text" for item in items) == with_text
 
 
+def _pixels(png: bytes) -> tuple[int, int, bytes]:
+    """Size and samples; the PNG metadata (e.g. resolution) may differ."""
+    pixmap = fitz.Pixmap(png)
+    return pixmap.width, pixmap.height, pixmap.samples
+
+
 @pytest.mark.parametrize("rotation", [0, 90, 180, 270])
 @pytest.mark.parametrize("origin", ["TOPLEFT", "BOTTOMLEFT"])
-def test_rotated_picture_provenance_renders_only_source_region(tmp_path, rotation, origin):
+def test_rotated_picture_provenance_renders_only_source_region(
+    tmp_path, rotation, origin, fake_toolbox_render
+):
     source = tmp_path / "rotated.pdf"
     image = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 8, 8), False)
     image.clear_with(0)
@@ -106,11 +114,12 @@ def test_rotated_picture_provenance_renders_only_source_region(tmp_path, rotatio
         bottom=box.b if origin == "TOPLEFT" else height-box.b,
         coord_origin=origin,
     ))]
-    rendered, number, rectangle = _render_inspection_region(source, element)
+    # Rendered by the Toolbox (pdf.render@2); the fake renders real pixels.
+    rendered, number, rectangle = _render_inspection_region(source, element, page_count=1)
     assert number == 1
     assert rectangle == pytest.approx(list(expected))
-    assert rendered == expected_png
+    assert _pixels(rendered) == _pixels(expected_png)
     enriched, number = _extract_picture_bytes(source, element, 1)
-    assert enriched == expected_png
+    assert _pixels(enriched) == _pixels(expected_png)
     pixmap = fitz.Pixmap(rendered)
     assert max(pixmap.samples) == 0  # black picture, no white page margin

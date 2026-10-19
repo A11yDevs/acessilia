@@ -1,4 +1,8 @@
-"""Real PDF rendering and plan execution with a simulated structured vision response."""
+"""Real page rendering and plan execution with a simulated structured vision response.
+
+Regions are rendered by the Toolbox (``pdf.render@2``); the fake in
+``tests/toolbox_render_fake.py`` renders real pixels behind the mocked HTTP.
+"""
 
 import hashlib
 import json
@@ -20,7 +24,7 @@ from tests.pddl_support import (
 
 
 @pytest.fixture
-def inspection(monkeypatch, tmp_path):
+def inspection(monkeypatch, tmp_path, fake_toolbox_render):
     from backend.config.settings import settings
 
     monkeypatch.setattr(settings, "data_dir", tmp_path / "data")
@@ -163,10 +167,10 @@ def test_bottom_left_coordinates_render_same_region(inspection):
     manifest, _, _ = inspection
     source = Path(manifest.source.path)
     element = manifest.elements[0]
-    top_left, _, _ = pddl._render_inspection_region(source, element)
+    top_left, _, _ = pddl._render_inspection_region(source, element, page_count=2)
     bbox = element.provenance[0].bbox
     bbox.top, bbox.bottom, bbox.coord_origin = 80, 30, "BOTTOMLEFT"
-    bottom_left, _, rectangle = pddl._render_inspection_region(source, element)
+    bottom_left, _, rectangle = pddl._render_inspection_region(source, element, page_count=2)
     assert top_left == bottom_left
     assert rectangle == [10, 20, 90, 70]
 
@@ -221,7 +225,7 @@ def test_pixel_limit_prevents_unbounded_render(inspection):
     manifest.elements[0].provenance = []
     result = pddl._handle_pymupdf_region_method(manifest, "o-1")
     assert not result.success
-    assert "pixel limit" in result.message
+    assert "pixels" in result.message
     assert not calls
 
 

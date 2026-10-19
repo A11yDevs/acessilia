@@ -146,6 +146,9 @@ async def execute_capability(
     if language is not None:
         form["language"] = language
     form["provider"] = provider
+    # Ask for the exact contract this client was written against; a Toolbox
+    # that publishes several versions would otherwise serve the latest.
+    form["version"] = spec.contract_version
     if parameters is not None:
         form["parameters"] = json.dumps(parameters)
     if no_cache:

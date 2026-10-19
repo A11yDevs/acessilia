@@ -7,12 +7,11 @@ y grew downwards, so every page came out bottom to top, footers aside.
 
 from types import SimpleNamespace
 
-import fitz
 import pytest
 
 from backend.agents.pddl_orchestrator import (
-    _clip_rect_from_provenance,
     _element_bbox as orchestrator_bbox,
+    _picture_clip,
     _SecondaryExtraction,
 )
 from backend.core.manifest.builder import (
@@ -214,12 +213,9 @@ def test_orchestrator_boxes_share_the_origin_rule(origin):
     raw = {"page_number": 1, "provenance": [{"bbox": _box_dict(origin)}]}
     assert secondary.bbox(raw) == pytest.approx(expected)
 
-    document = fitz.open()
-    try:
-        page = document.new_page(width=595.0, height=PAGE_HEIGHT)
-        rect = _clip_rect_from_provenance(page, element.provenance[0])
-    finally:
-        document.close()
-    assert (rect.y0, rect.y1) == pytest.approx(
-        (PAGE_HEIGHT - 735.27, PAGE_HEIGHT - 723.82)
-    )
+    # Picture crops run on the Toolbox (pdf.render@2), which converts the
+    # origin; the core must send the box untouched with the same origin rule.
+    clip, clip_origin = _picture_clip(element.provenance[0])
+    box = element.provenance[0].bbox
+    assert clip == (box.left, box.top, box.right, box.bottom)
+    assert clip_origin == "BOTTOMLEFT"
