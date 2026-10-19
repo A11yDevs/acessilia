@@ -1,4 +1,4 @@
-# 0007. Canonical manifest model and LaTeX-to-MathML conversion
+# 0007. Canonical manifest model, and MathML conversion and verbalization of formulas
 
 - **Status:** Accepted
 - **Date:** 2026-10-19
@@ -21,9 +21,11 @@ The audit found two questions that needed a decision:
    `backend/core/manifest/models.py` and in the Toolbox's
    `core/normalization/models.py`, under the same schema id; the Toolbox
    publishes it as `artifact/structured-document@1` (finding A1).
-2. **Where LaTeX → MathML conversion happens.** Today the core converts with
-   `latex2mathml` in `backend/tools/formula_tools.py`, and the Toolbox has its
-   own implementation behind `math.convert` (finding A3).
+2. **Where LaTeX → MathML conversion and the verbalization of formulas
+   happen.** Today the core converts with `latex2mathml` and verbalizes with
+   its own pt-BR rules, both in `backend/tools/formula_tools.py`, while the
+   Toolbox has its own implementations behind `math.convert` and
+   `math.verbalize`; the two verbalizers have diverged (finding A3).
 
 ## Decision
 
@@ -71,7 +73,7 @@ Constraints:
   into docstruct: only document concepts and invariants belong there.
   Execution metadata and planning policy stay with their own components.
 
-### 2. The core obtains MathML through `math.convert`, via the SDK
+### 2. The core obtains MathML and spoken text through the Toolbox, via the SDK
 
 **The core requests the conversion through the SDK, using the Toolbox
 capability `math.convert`.** The `latex2mathml` implementation stays in the
@@ -83,6 +85,12 @@ core (decides when to convert)
     → Toolbox / math.convert (execution)
       → pure-math provider / latex2mathml
 ```
+
+**Verbalization follows the same rule: the core obtains the spoken text of a
+formula through the SDK, using the Toolbox capability `math.verbalize`.** The
+verbalization rules live only in the Toolbox's `pure-math` provider; the core
+keeps none, and docstruct gets no verbalizer either. The core still decides
+when a formula needs a spoken alternative and what to do with the result.
 
 docstruct remains responsible for pure structural operations on LaTeX, such as
 normalization, delimiter removal and comparison. Being a pure-Python library
@@ -102,19 +110,20 @@ Rationale:
 5. **Evolution:** new converters can implement `math.convert` without changing
    planning or the structural algorithms.
 
-Failure handling: an unavailable or failing `math.convert` must be reported
+Failure handling: an unavailable or failing `math.convert` or `math.verbalize` must be reported
 explicitly to the core, which decides between failing, replanning or a
 documented degradation. There must be **no silent local fallback** to
-`latex2mathml` ([ADR-0003](0003-remote-only-operational-capabilities.md)).
+`latex2mathml` or to a local verbalizer
+([ADR-0003](0003-remote-only-operational-capabilities.md)).
 
 ### Resulting responsibilities
 
 | Component | Responsibility |
 |---|---|
 | docstruct | Structural models and invariants; normalization and pure algorithms over documents and formulas |
-| Toolbox | Publishing `artifact/structured-document@1`; adapting between representations; running `math.convert` and managing its provider |
+| Toolbox | Publishing `artifact/structured-document@1`; adapting between representations; running `math.convert` and `math.verbalize` and managing their provider |
 | SDK | Typed client for the published contracts; transport, references, error handling and retries |
-| core | PDDL planning, enrichment and accessibility decisions, calling `math.convert` and handling its results |
+| core | PDDL planning, enrichment and accessibility decisions, calling `math.convert` and `math.verbalize` and handling their results |
 
 ## Consequences
 
@@ -129,18 +138,24 @@ Implementation and acceptance criteria:
 3. **Preserve compatibility:** keep `artifact/structured-document@1` and its
    versioning rules; run contract tests with real fixtures before replacing
    existing models. Incompatible changes require a new versioned contract.
-4. **Migrate the conversion:** replace the core's direct `latex2mathml` calls
-   with calls through the SDK to `math.convert`, and remove the core's direct
+4. **Migrate the conversion and the verbalization:** replace the core's
+   direct `latex2mathml` calls and its own verbalizer
+   (`verbalize_latex_fallback`) with calls through the SDK to `math.convert`
+   and `math.verbalize`, and remove the core's direct `latex2mathml`
    dependency **after** confirming there is no other legitimate use.
-5. **Avoid duplication:** add no conversion extra to docstruct; keep only the
-   pure LaTeX normalization functions there.
+   `math.verbalize@1` produces pt-BR only, as the core's verbalizer does
+   today; verbalizing other languages needs a language parameter in a new
+   version of the capability.
+5. **Avoid duplication:** add no conversion extra and no verbalizer to
+   docstruct; keep only the pure LaTeX normalization functions there.
 6. **Verify in CI:** purity and dependency direction; conformance of the
    manifest to the published contract; semantic equivalence in the adapters;
-   and the handling of errors, unavailability and results of `math.convert`.
+   and the handling of errors, unavailability and results of `math.convert`
+   and `math.verbalize`.
 
 **Done when** there is a single semantic definition of the shared models, the
-Toolbox payload remains compatible, the core obtains MathML only through
-`math.convert` via the SDK, and tests prevent new dependencies or duplicated
+Toolbox payload remains compatible, the core obtains MathML and spoken text only
+through `math.convert` and `math.verbalize` via the SDK, and tests prevent new dependencies or duplicated
 implementations.
 
 Benefits: less coupling between layers, less duplicated code, more predictable
