@@ -106,3 +106,13 @@ def test_a_malformed_base_url_fails_loudly(monkeypatch):
 
     with pytest.raises(ValueError, match="absolute http"):
         make_toolbox_client(ToolboxOcrClient)
+
+
+def test_retries_come_from_settings(monkeypatch):
+    monkeypatch.setattr(settings, "toolbox_retries", 3)
+    monkeypatch.setattr(settings, "toolbox_retry_backoff_seconds", 0.25)
+
+    client = make_toolbox_client(ToolboxOcrClient)
+
+    assert (client.retries, client.retry_backoff_seconds) == (3, 0.25)
+    assert make_toolbox_client(ToolboxOcrClient, retries=0).retries == 0

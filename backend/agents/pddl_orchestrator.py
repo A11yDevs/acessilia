@@ -57,6 +57,7 @@ from backend.log_messages import (
 )
 from backend.stage_messages import (
     STAGE_ANALYZING_STRUCTURAL,
+    STAGE_STRUCTURAL_EXTRACTION_FAILED,
     STAGE_ENRICHING_IMAGE_DESCRIPTIONS,
     STAGE_ENRICHING_TABLES_OCR,
     STAGE_GENERATING_PDDL_PLAN,
@@ -71,6 +72,7 @@ from backend.tools.formula_tools import (
 )
 from backend.tools.logger import logger
 from backend.tools.media_inspect import inspect_source_media
+from backend.tools.toolbox_client import ToolboxError
 
 
 def _formula_elements_for_obligation(
@@ -1884,6 +1886,10 @@ def _persist_fusion_payload(
     )
 
 
+class StructuralExtractionError(RuntimeError):
+    """The Toolbox could not extract the document structure (job-level failure)."""
+
+
 class PddlAccessibilityOrchestrator:
     """Drives the PDDL pipeline: informational-extraction -> planner -> executor.
 
@@ -1980,11 +1986,21 @@ class PddlAccessibilityOrchestrator:
 
         if status_callback:
             await status_callback(t(STAGE_ANALYZING_STRUCTURAL))
-        manifest = await run_blocking(
-            self.information_structural.process,
-            file_path.resolve(),
-            language="pt-BR",
-        )
+        try:
+            manifest = await run_blocking(
+                self.information_structural.process,
+                file_path.resolve(),
+                language="pt-BR",
+            )
+        except ToolboxError as exc:
+            # The SDK already retried and failed over; there is no local
+            # extractor to fall back on (docs/adr/0003), so the job fails here
+            # with a message that names the capability and the cause.
+            raise StructuralExtractionError(
+                t(STAGE_STRUCTURAL_EXTRACTION_FAILED).format(
+                    capability="document.structure.extract", error=exc
+                )
+            ) from exc
         manifest.extractor.configuration["region_inspection_mode"] = effective_mode
 
         source_path = file_path.resolve()

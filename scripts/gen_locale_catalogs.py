@@ -280,6 +280,7 @@ from backend.stage_messages import (
 
     STAGE_ANALYZING_FILE,
     STAGE_ANALYZING_STRUCTURAL,
+    STAGE_STRUCTURAL_EXTRACTION_FAILED,
     STAGE_CANCELLED_BY_USER,
     STAGE_CANCELLED_IN_QUEUE,
     STAGE_ENQUEUED_WAITING,
@@ -496,6 +497,7 @@ MESSAGES: tuple[str, ...] = (
     STAGE_PREPARING_IMAGE,
     STAGE_PROCESSING_PAGE,
     STAGE_ANALYZING_STRUCTURAL,
+    STAGE_STRUCTURAL_EXTRACTION_FAILED,
     STAGE_ENRICHING_IMAGE_DESCRIPTIONS,
     STAGE_ENRICHING_TABLES_OCR,
     STAGE_GENERATING_PDDL_PLAN,
@@ -926,6 +928,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         STAGE_PROCESSING_PAGE: "📷 Processando a página {page_num} de {total_pages}...",
         STAGE_ANALYZING_STRUCTURAL: (
             "Analisando o documento com o agente estrutural..."
+        ),
+        STAGE_STRUCTURAL_EXTRACTION_FAILED: (
+            "A extração estrutural falhou na Toolbox ({capability}): {error}"
         ),
         STAGE_ENRICHING_IMAGE_DESCRIPTIONS: ("Enriquecendo as descrições de imagens..."),
         STAGE_ENRICHING_TABLES_OCR: ("Enriquecendo as tabelas com OCR (fallback)..."),

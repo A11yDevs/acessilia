@@ -29,8 +29,11 @@ def _reimport_service(monkeypatch, engine_value: str):
 
 
 def test_normalized_engine_legacy(monkeypatch):
-    monkeypatch.setattr(settings, "pipeline_engine", "legacy")
+    # Import first: importing backend.service builds the orchestrator, which
+    # would itself raise if the engine were already "legacy".
     from backend.service import _normalized_engine
+
+    monkeypatch.setattr(settings, "pipeline_engine", "legacy")
 
     with pytest.raises(RuntimeError, match="desativado"):
         _normalized_engine()
@@ -161,6 +164,8 @@ def test_toolbox_settings_defaults():
     for key in (
         "TOOLBOX_BASE_URL",
         "TOOLBOX_BASE_URLS",
+        "TOOLBOX_RETRIES",
+        "TOOLBOX_RETRY_BACKOFF_SECONDS",
         "TOOLBOX_PROVIDER",
         "TOOLBOX_TIMEOUT_SECONDS",
         "TOOLBOX_USE_ARTIFACT_STORE",
@@ -174,6 +179,8 @@ def test_toolbox_settings_defaults():
 
     assert fresh.toolbox_base_url == "http://localhost:8002"
     assert fresh.toolbox_base_urls == ""
+    assert fresh.toolbox_retries == 1
+    assert fresh.toolbox_retry_backoff_seconds == 0.5
     assert fresh.toolbox_provider == "docling"
     assert fresh.toolbox_timeout_seconds == 3600
     assert fresh.toolbox_use_artifact_store is True

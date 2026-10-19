@@ -21,7 +21,6 @@ from backend.tools.toolbox_client import (
     ToolboxArtifactNotFound,
     ToolboxError,
     ToolboxProviderUnavailable,
-    ToolboxTimeout,
     make_toolbox_client,
 )
 from docstruct.fusion import block_to_diff, merge_blocks
@@ -105,8 +104,9 @@ async def extract_fused(
     providers read it from there instead of receiving a new upload each; if the
     Toolbox no longer has it, the file is sent as before.
 
-    Retry a transient timeout/unavailability once, after both initial calls
-    finish. Successful extractions and invalid requests are not repeated.
+    Transient failures (timeouts, unavailable instances) are retried by the
+    SDK client (``TOOLBOX_RETRIES``, docs/adr/0006); invalid requests are not
+    repeated.
 
     Fallback: if one provider reports a Toolbox error, uses the other result
     and logs which provider failed. Unexpected errors are propagated.
@@ -149,25 +149,6 @@ async def extract_fused(
 
     primary_res, secondary_res = await asyncio.gather(
         _extract(primary), _extract(secondary)
-    )
-
-    async def _retry_transient(provider: str, result: dict | None) -> dict | None:
-        error = failures.get(provider)
-        if result is None and isinstance(
-            error, (ToolboxTimeout, ToolboxProviderUnavailable)
-        ):
-            logger.info(
-                "Fusion: retrying provider {} once after transient {}",
-                provider,
-                type(error).__name__,
-            )
-            await asyncio.sleep(0.25)
-            return await _extract(provider)
-        return result
-
-    primary_res, secondary_res = await asyncio.gather(
-        _retry_transient(primary, primary_res),
-        _retry_transient(secondary, secondary_res),
     )
     if primary_res is None and secondary_res is None:
         raise ToolboxProviderUnavailable("No provider available for extraction")

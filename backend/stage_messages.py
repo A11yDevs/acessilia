@@ -51,6 +51,10 @@ STAGE_PREPARING_IMAGE: str = "🖼️ Preparing the image..."
 STAGE_PROCESSING_PAGE: str = "📷 Processing page {page_num} of {total_pages}..."
 #: PDDL-pipeline stage while the document is analyzed by the informational-structural agent.
 STAGE_ANALYZING_STRUCTURAL: str = "Analyzing the document with the structural agent..."
+#: PDDL-pipeline job error when the Toolbox could not extract the document structure after its retries; {capability} and {error} substituted at call time.
+STAGE_STRUCTURAL_EXTRACTION_FAILED: str = (
+    "Structural extraction failed on the Toolbox ({capability}): {error}"
+)
 #: PDDL-pipeline stage while image descriptions are being enriched with the vision model.
 STAGE_ENRICHING_IMAGE_DESCRIPTIONS: str = "Enriching the image descriptions..."
 #: PDDL-pipeline stage while tables are being enriched with OCR as a fallback.
