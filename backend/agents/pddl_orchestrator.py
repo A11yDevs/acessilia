@@ -58,6 +58,7 @@ from backend.log_messages import (
 from backend.stage_messages import (
     STAGE_ANALYZING_STRUCTURAL,
     STAGE_STRUCTURAL_EXTRACTION_FAILED,
+    STAGE_DOCUMENT_TOO_MANY_PAGES,
     STAGE_ENRICHING_IMAGE_DESCRIPTIONS,
     STAGE_ENRICHING_TABLES_OCR,
     STAGE_GENERATING_PDDL_PLAN,
@@ -2123,6 +2124,32 @@ class StructuralExtractionError(RuntimeError):
     """The Toolbox could not extract the document structure (job-level failure)."""
 
 
+class DocumentTooLargeError(ValueError):
+    """The document has more pages than ``MAX_PAGES`` (job-level failure)."""
+
+
+def _check_page_limit(manifest: ProcessingManifest) -> None:
+    """Refuses a document with more pages than ``MAX_PAGES``.
+
+    It runs right after the structural extraction, the first point where the
+    page count is always known, and before planning and the vision-model
+    calls. Nothing is processed partially, and the message, which reaches the
+    end user, names the page count and the limit.
+
+    Raises:
+        DocumentTooLargeError: When the manifest has more pages than the limit.
+    """
+    from backend.config.settings import settings
+
+    page_count = len(manifest.pages)
+    if page_count > settings.max_pages:
+        raise DocumentTooLargeError(
+            t(STAGE_DOCUMENT_TOO_MANY_PAGES).format(
+                page_count=page_count, max_pages=settings.max_pages
+            )
+        )
+
+
 class PddlAccessibilityOrchestrator:
     """Drives the PDDL pipeline: informational-extraction -> planner -> executor.
 
@@ -2237,6 +2264,7 @@ class PddlAccessibilityOrchestrator:
                     capability="document.structure.extract", error=type(exc).__name__
                 )
             ) from exc
+        _check_page_limit(manifest)
         manifest.extractor.configuration["region_inspection_mode"] = effective_mode
 
         source_path = file_path.resolve()

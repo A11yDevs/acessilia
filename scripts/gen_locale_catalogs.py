@@ -256,6 +256,7 @@ from backend.stage_messages import (
     STAGE_ANALYZING_FILE,
     STAGE_ANALYZING_STRUCTURAL,
     STAGE_STRUCTURAL_EXTRACTION_FAILED,
+    STAGE_DOCUMENT_TOO_MANY_PAGES,
     STAGE_CANCELLED_BY_USER,
     STAGE_CANCELLED_IN_QUEUE,
     STAGE_ENQUEUED_WAITING,
@@ -473,6 +474,7 @@ MESSAGES: tuple[str, ...] = (
     STAGE_PROCESSING_PAGE,
     STAGE_ANALYZING_STRUCTURAL,
     STAGE_STRUCTURAL_EXTRACTION_FAILED,
+    STAGE_DOCUMENT_TOO_MANY_PAGES,
     STAGE_ENRICHING_IMAGE_DESCRIPTIONS,
     STAGE_ENRICHING_TABLES_OCR,
     STAGE_GENERATING_PDDL_PLAN,
@@ -880,6 +882,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         ),
         STAGE_STRUCTURAL_EXTRACTION_FAILED: (
             "A extração estrutural falhou na Toolbox ({capability}): {error}"
+        ),
+        STAGE_DOCUMENT_TOO_MANY_PAGES: (
+            "O documento tem {page_count} páginas, mais que o limite de {max_pages}."
         ),
         STAGE_ENRICHING_IMAGE_DESCRIPTIONS: ("Enriquecendo as descrições de imagens..."),
         STAGE_ENRICHING_TABLES_OCR: ("Enriquecendo as tabelas com OCR (fallback)..."),

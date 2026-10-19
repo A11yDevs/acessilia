@@ -14,7 +14,7 @@ def test_document_cache_key_changes_with_each_processing_option(monkeypatch):
 
     base = service._cache_version("normal", None, False)
 
-    assert "-v9_" in base
+    assert "-v10_" in base
     assert service._cache_version("detailed", None, False) != base
     assert service._cache_version("normal", "Describe charts", False) != base
     assert service._cache_version("normal", None, True) != base
@@ -112,8 +112,8 @@ async def _async_noop(*_args, **_kwargs):
     return None
 
 
-@pytest.mark.parametrize("name", ["max_page_width", "jpg_quality"])
-def test_image_settings_invalidate_processing_cache(monkeypatch, name):
+@pytest.mark.parametrize("name", ["pdf_split_dpi", "pddl_max_replans"])
+def test_output_affecting_settings_invalidate_processing_cache(monkeypatch, name):
     from backend.config.settings import settings
     from backend.services.cache import processing_cache_configuration, options_cache_key
     before = options_cache_key("document", configuration=processing_cache_configuration())

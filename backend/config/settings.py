@@ -17,6 +17,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 class Settings:
     bot_token: str = field(default_factory=lambda: os.getenv("BOT_TOKEN", ""))
     max_file_size_mb: int = 50
+    # Documents with more pages are refused after structural extraction,
+    # before planning and the vision-model calls. The limit is always enforced,
+    # so it must be positive.
     max_pages: int = field(default_factory=lambda: int(os.getenv("MAX_PAGES", "50")))
     temp_dir: Path = field(
         default_factory=lambda: _path_from_env(
@@ -38,12 +41,6 @@ class Settings:
         default_factory=lambda: os.getenv("OBSERVABILITY_API_TOKEN", "")
     )
     allowed_extensions: set[str] = field(default_factory=lambda: _default_extensions())
-    max_page_width: int = field(
-        default_factory=lambda: int(os.getenv("MAX_PAGE_WIDTH", "1600"))
-    )
-    jpg_quality: int = field(
-        default_factory=lambda: int(os.getenv("JPG_QUALITY", "85"))
-    )
     pdf_split_dpi: int = field(
         default_factory=lambda: int(os.getenv("PDF_SPLIT_DPI", "150"))
     )
@@ -91,7 +88,6 @@ class Settings:
             "a11y-devs-describer",
         )
     )
-    structurer: str = field(default_factory=lambda: os.getenv("STRUCTURER", "toolbox"))
     pipeline_engine: str = field(
         default_factory=lambda: os.getenv("PIPELINE_ENGINE", "pddl")
     )
@@ -109,11 +105,6 @@ class Settings:
     # para adotá-lo na fusão dual.
     fusion_hybrid_provider: str = field(
         default_factory=lambda: os.getenv("FUSION_HYBRID_PROVIDER", "mineru-hyb")
-    )
-    # Domain-specific callout titles injected into the region grouping
-    # heuristics (semicolon-separated). No document-specific constants in code.
-    callout_known_titles: str = field(
-        default_factory=lambda: os.getenv("CALLOUT_KNOWN_TITLES", "")
     )
 
     # Acessilia Toolbox settings
@@ -372,6 +363,8 @@ class Settings:
 
     def __post_init__(self) -> None:
         # Fail at startup, not inside the first job that builds a Toolbox client.
+        if self.max_pages < 1:
+            raise ValueError(f"MAX_PAGES must be positive, got {self.max_pages}")
         if self.toolbox_retries < 0:
             raise ValueError(f"TOOLBOX_RETRIES must be zero or positive, got {self.toolbox_retries}")
         if self.toolbox_retry_backoff_seconds < 0:

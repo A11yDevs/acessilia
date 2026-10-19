@@ -55,6 +55,10 @@ STAGE_ANALYZING_STRUCTURAL: str = "Analyzing the document with the structural ag
 STAGE_STRUCTURAL_EXTRACTION_FAILED: str = (
     "Structural extraction failed on the Toolbox ({capability}): {error}"
 )
+#: PDDL-pipeline job error when the document has more pages than MAX_PAGES; {page_count} and {max_pages} substituted at call time.
+STAGE_DOCUMENT_TOO_MANY_PAGES: str = (
+    "The document has {page_count} pages, more than the limit of {max_pages}."
+)
 #: PDDL-pipeline stage while image descriptions are being enriched with the vision model.
 STAGE_ENRICHING_IMAGE_DESCRIPTIONS: str = "Enriching the image descriptions..."
 #: PDDL-pipeline stage while tables are being enriched with OCR as a fallback.

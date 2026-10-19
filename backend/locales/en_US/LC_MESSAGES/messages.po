@@ -157,6 +157,10 @@ msgstr "Analyzing the document with the structural agent..."
 msgid "Structural extraction failed on the Toolbox ({capability}): {error}"
 msgstr "Structural extraction failed on the Toolbox ({capability}): {error}"
 
+#, python-brace-format
+msgid "The document has {page_count} pages, more than the limit of {max_pages}."
+msgstr "The document has {page_count} pages, more than the limit of {max_pages}."
+
 msgid "Enriching the image descriptions..."
 msgstr "Enriching the image descriptions..."
 
