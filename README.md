@@ -83,10 +83,10 @@ Full documentation — where the i18n files live, how to add a new string, how t
 
 ## Tests
 
-Install the development dependencies:
+Install the development dependencies; the `drbench` extra brings the image and array libraries the Dr.DocBench experiment scripts (and their tests) use:
 
 ```bash
-uv sync --extra dev
+uv sync --extra dev --extra drbench
 ```
 
 Run the full suite from `tests/`:

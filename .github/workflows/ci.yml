@@ -51,19 +51,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends \
             build-essential \
-            ffmpeg \
-            fonts-dejavu-core \
-            libgl1 \
-            libglib2.0-0 \
-            libmagic1 \
-            poppler-utils
+            fonts-dejavu-core
 
       - name: Install project dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install ./libs/docstruct --no-cache-dir
           python -m pip install "./libs/sdk[dev]" --no-cache-dir
-          python -m pip install ".[dev]" --no-cache-dir
+          python -m pip install ".[dev,drbench]" --no-cache-dir
 
       - name: Collect complete test suite
         run: python -m pytest --collect-only -q -m "not e2e"

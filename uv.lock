@@ -24,15 +24,10 @@ dependencies = [
     { name = "jsonschema" },
     { name = "latex2mathml" },
     { name = "loguru" },
-    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
-    { name = "numpy", version = "2.5.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "ollama" },
     { name = "openai" },
-    { name = "opencv-python" },
-    { name = "pillow" },
     { name = "pydantic" },
     { name = "pymupdf" },
-    { name = "pypdf" },
     { name = "python-dotenv" },
     { name = "python-multipart" },
     { name = "reportlab" },
@@ -43,10 +38,17 @@ dependencies = [
 
 [package.optional-dependencies]
 dev = [
+    { name = "pypdf" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "rapidfuzz" },
     { name = "respx" },
+]
+drbench = [
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
+    { name = "numpy", version = "2.5.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+    { name = "opencv-python" },
+    { name = "pillow" },
 ]
 
 [package.metadata]
@@ -64,14 +66,14 @@ requires-dist = [
     { name = "jsonschema", specifier = ">=4.20,<5" },
     { name = "latex2mathml", specifier = ">=3.77.0,<4" },
     { name = "loguru", specifier = ">=0.7.3,<0.8" },
-    { name = "numpy", specifier = ">=2.4.6,<3" },
+    { name = "numpy", marker = "extra == 'drbench'", specifier = ">=2.4.6,<3" },
     { name = "ollama", specifier = ">=0.6.2,<0.7" },
     { name = "openai", specifier = ">=2.45.0,<3" },
-    { name = "opencv-python", specifier = ">=5.0.0.93,<6" },
-    { name = "pillow", specifier = ">=10.4,<11" },
+    { name = "opencv-python", marker = "extra == 'drbench'", specifier = ">=5.0.0.93,<6" },
+    { name = "pillow", marker = "extra == 'drbench'", specifier = ">=10.4,<11" },
     { name = "pydantic", specifier = ">=2.10,<3" },
     { name = "pymupdf", specifier = ">=1.24,<2" },
-    { name = "pypdf", specifier = ">=6.14.2,<7" },
+    { name = "pypdf", marker = "extra == 'dev'", specifier = ">=6.14.2,<7" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.1.1,<10" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=1.4.0,<2" },
     { name = "python-dotenv", specifier = ">=1.0,<2" },
@@ -83,7 +85,7 @@ requires-dist = [
     { name = "sqlalchemy", specifier = ">=2.0.51,<3" },
     { name = "uvicorn", specifier = ">=0.30,<0.31" },
 ]
-provides-extras = ["dev"]
+provides-extras = ["dev", "drbench"]
 
 [[package]]
 name = "acessilia-docstruct"

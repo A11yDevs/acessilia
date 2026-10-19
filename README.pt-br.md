@@ -83,10 +83,10 @@ A documentação completa — onde ficam os arquivos de i18n, como adicionar uma
 
 ## Testes
 
-Instale as dependências de desenvolvimento:
+Instale as dependências de desenvolvimento; o extra `drbench` traz as bibliotecas de imagem e de arrays que os scripts de experimento do Dr.DocBench (e os testes deles) usam:
 
 ```bash
-uv sync --extra dev
+uv sync --extra dev --extra drbench
 ```
 
 Execute a suíte completa da pasta `tests/`:

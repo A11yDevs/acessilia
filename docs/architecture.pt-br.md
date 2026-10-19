@@ -143,7 +143,7 @@ O runtime AgentOS não faz parte de `ENABLED_INTERFACES`; ele é iniciado separa
 - **Framework Agno:** orquestração multiagente e interface unificada de LLM multimodal.
 - **Provedores de IA:** API Ollama (modelos locais como LLaVA/Qwen-VL) ou API OpenRouter (modelos em nuvem como Claude/GPT-4o).
 - **Bibliotecas de Processamento:** reportlab, edge-tts, aiogram, FastAPI.
-- **Desvios em remoção** ([ADR-0003](adr/0003-remote-only-operational-capabilities.pt-br.md), [#150](https://github.com/A11yDevs/acessilia/issues/150)): o PyMuPDF ainda é importado pelo extrator do manifesto (`core/manifest/pymupdf_extractor.py`), as dependências ainda declaram Pillow, OpenCV e pypdf embora o backend não os importe mais, e a imagem ainda instala TeX Live e veraPDF, que o core não usa mais desde que o PDF/UA e o DOCX passaram a renderizar só na Toolbox. O dono-alvo é a Toolbox.
+- **Desvios em remoção** ([ADR-0003](adr/0003-remote-only-operational-capabilities.pt-br.md), [#150](https://github.com/A11yDevs/acessilia/issues/150)): o PyMuPDF ainda é importado pelo extrator do manifesto (`core/manifest/pymupdf_extractor.py`); o dono-alvo é a Toolbox. Pandoc, TeX Live, veraPDF e as bibliotecas de OCR e de mídia já saíram da imagem, porque o DOCX e o PDF/UA só são renderizados na Toolbox; OpenCV, NumPy e Pillow ficam só no extra `drbench`, para os scripts de experimento.
 
 ---
 
