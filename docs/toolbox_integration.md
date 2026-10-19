@@ -352,7 +352,7 @@ Defined in `backend/config/settings.py` and documented in `.env.example`:
 | `TOOLBOX_PDF_UA_TIMEOUT_SECONDS` | `300` | How long to wait for the Toolbox render before the export is reported as an optional error |
 | `FUSION_MODE` | `single` | `single` (one provider) or `dual` (two providers + fusion) |
 | `FUSION_SECONDARY_PROVIDER` | `mineru` | Secondary provider for `FUSION_MODE=dual` |
-| `STRUCTURER` | `toolbox` | Region engine of the disabled legacy engine (`toolbox`, `toolbox-layout`, `pymupdf`). The PDDL engine ignores it for extraction; it is still part of the cache key |
+| `STRUCTURER` | `toolbox` | Unused: it chose the region engine of the legacy pipeline, which has been removed. It is still part of the cache key and is due to be removed |
 | `TOOLBOX_PAGE_OCR_PROVIDER` | `qwen3-vl-8b` | Whole-page VLM transcription (`document.ocr.page`) |
 | `TOOLBOX_ADJUDICATE_PROVIDER` | `qwen3-vl-8b` | Pairwise judge / region transcription (`document.adjudicate.*`) |
 | `TOOLBOX_TABLE_PROVIDER` | `qwen3-vl-8b` | Table re-generation for the table specialist (`table.recognize`) |

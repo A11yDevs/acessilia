@@ -73,13 +73,6 @@ EXEMPT_FILES: set[str] = {
 # Tuple of (relative_file_path, substring). Add new entries here when
 # adding intentional detection patterns that match Portuguese words.
 EXEMPT_STRINGS: list[tuple[str, str]] = [
-    # Callout detection — multi-language set (Portuguese)
-    ("backend/pipeline/structure_parser.py", "nota"),
-    ("backend/pipeline/structure_parser.py", "aviso"),
-    ("backend/pipeline/structure_parser.py", "dica"),
-    ("backend/pipeline/structure_parser.py", "importante"),
-    # Callout detection — warning types set
-    ("backend/pipeline/structure_parser.py", "warning_types"),
     # AI prompts — user-facing content, allowed by constitution
     ("backend/ai/prompts/vision_agent.py", "área"),
     ("backend/ai/prompts/vision_agent.py", "descrição"),

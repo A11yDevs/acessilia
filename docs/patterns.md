@@ -5,76 +5,60 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 ## Identified Patterns
 
 ### 1. Canonical Document Pipeline
-- Implementation: [backend/pipeline/canonical_builder.py](../backend/pipeline/canonical_builder.py), [backend/pipeline/validators.py](../backend/pipeline/validators.py), [backend/pipeline/structure_parser.py](../backend/pipeline/structure_parser.py), [backend/export/pandoc_exporter.py](../backend/export/pandoc_exporter.py)
+- Implementation: [backend/pipeline/canonical_builder.py](../backend/pipeline/canonical_builder.py), [backend/pipeline/validators.py](../backend/pipeline/validators.py), [backend/export/pandoc_exporter.py](../backend/export/pandoc_exporter.py)
 - Role: normalize structured region payloads into a canonical document schema, validate structure and heading hierarchy, build intermediate AST, and dispatch to renderers.
 - Benefit: deterministic output and a single source of truth for all output exporters.
 
-### 2. Multi-Agent Pipeline Orchestration (legacy engine, disabled)
-- Implementation: [backend/agents/orchestrator.py](../backend/agents/orchestrator.py) (`AccessibilityOrchestrator`). The `legacy` engine is disabled (`backend/service.py` accepts only `PIPELINE_ENGINE=pddl`, normalizing the old `pmv` alias to it) and is due to be removed; the running pipeline uses the planning-based orchestration in pattern 10.
-- Role: coordinates multi-agent lifecycle: local structural reading, parallel visual/data processing, text editing/deduplication, cache, history logging, and fallback.
-- Benefit: centralizes business rules and isolates step responsibilities.
-
-### 3. Strategy & Model Abstraction for AI (Agno)
+### 2. Strategy & Model Abstraction for AI (Agno)
 - Implementation: [backend/ai/models/ai_client.py](../backend/ai/models/ai_client.py) (`get_agno_model()`)
 - Strategies:
   - Ollama (local open-weights models like LLaVA/Qwen-VL)
   - OpenRouter (cloud API models like Claude/GPT-4o)
 - Benefit: AI model provider can be switched seamlessly via environment configuration without changing agent logic.
 
-### 4. Local-First Extraction Strategy (legacy engine, disabled)
-- Implementation: [backend/agents/reader_agent.py](../backend/agents/reader_agent.py) using PyMuPDF and Docling. Only the disabled legacy engine uses it; the PDDL engine always extracts the structure on the Toolbox (pattern 10).
-- Role:
-  - perform local deterministic PDF text and region extraction first,
-  - call Agno vision/data agents only for scanned pages, images, complex tables, and formulas,
-  - maintain page-level and region-level caching.
-- Benefit: lower latency, lower operational cost, and privacy preservation for text-native PDFs.
-
-### 5. Multi-Agent Specialization
+### 3. Multi-Agent Specialization
 - Implementation:
-  - [backend/agents/reader_agent.py](../backend/agents/reader_agent.py) (`ReaderAgent` - deterministic region splitting)
   - [backend/agents/vision_agent.py](../backend/agents/vision_agent.py) (`VisionAgent` - Agno LLM visual alt-text & audio descriptions)
   - [backend/agents/data_agent.py](../backend/agents/data_agent.py) (`DataAgent` - Agno LLM tables & math formulas)
-  - [backend/agents/editor_agent.py](../backend/agents/editor_agent.py) (`EditorAgent` - deterministic sanitization, fingerprint deduplication, and accessibility tagging)
 - Benefit: clean separation of concerns and parallel execution (`asyncio.gather`).
 
-### 6. Export Adapters & Renderers
+### 4. Export Adapters & Renderers
 - Implementation: [backend/export/pandoc_exporter.py](../backend/export/pandoc_exporter.py) with renderers in `backend/export/renderers/` (TXT, DOCX, PDF, HTML) and export adapters in `backend/export/exporters/` (MP3 via edge-tts, and the PDF/UA variant).
 - Benefit: identical canonical document produces multiple output formats cleanly.
 
-### 7. In-Memory State Machine & Cooperative Cancellation
+### 5. In-Memory State Machine & Cooperative Cancellation
 - Implementation: [backend/agents/state_manager.py](../backend/agents/state_manager.py)
 - Observed states: `processing`, `done`, `error`, `cancelled`.
 - Benefit: real-time progress tracking and cancellation support.
 
-### 8. Cache-Aside Pattern
+### 6. Cache-Aside Pattern
 - Implementation:
   - global file cache in `backend/services/cache.py`
-  - region cache in `backend/agents/orchestrator.py`
 - Benefit: eliminates duplicate LLM calls for unchanged documents or images.
 
-### 9. Single-Instance Execution & Process Lock
+### 7. Single-Instance Execution & Process Lock
 - Implementation: [frontend/run.py](../frontend/run.py)
 - Benefit: prevents process collisions on the host machine.
 
-### 10. Deterministic Planning with PDDL (active engine)
+### 8. Deterministic Planning with PDDL
 - Implementation: [backend/core/manifest/](../backend/core/manifest/), [backend/core/planning/](../backend/core/planning/), [backend/core/execution/](../backend/core/execution/), coordinated by [backend/agents/pddl_orchestrator.py](../backend/agents/pddl_orchestrator.py). This is the only active engine; the manifest is extracted through the Toolbox.
 - Role: separate *what to do* from *doing it*. A deterministic manifest describes the document's regions and obligations; a PDDL planner compiles it into a validated, ordered plan; an Agno Workflow executor applies the plan, calling the Vision/Data agents only where the plan requires. See [pmv_agno_pddl.md](pmv_agno_pddl.md).
 - Benefit: task ordering and dependencies become explicit and auditable, and planning stays deterministic (no LLM writes PDDL) while AI is confined to description. A planning failure fails the job; there is no fallback to deterministic extraction.
 
-### 11. REST API with Interface Clients
+### 9. REST API with Interface Clients
 - Implementation: [backend/api/](../backend/api/); clients in [frontend/clients/api_client.py](../frontend/clients/api_client.py), consumed by the Telegram bot and Web panel.
 - Benefit: one place owns the queue and pipeline; every interface (API callers, Telegram, Web, CLI) is a thin client, so behavior stays consistent across surfaces.
 
-### 12. Deterministic Fusion Agent (docstruct tools)
+### 10. Deterministic Fusion Agent (docstruct tools)
 - Implementation: [backend/core/agents/fusion_agent.py](../backend/core/agents/fusion_agent.py) (`FusionAgent`), wrapping the pure `docstruct` library (`libs/docstruct`).
 - Role: exposes four deterministic tools to Agno — `fuse_providers` (merge two toolbox providers via `docstruct.fusion`), `audit_document` (canonical-document audit), `classify_block` (region classification), and `needs_reinfer` (decide whether a region needs vision/orientation re-inference). Each capability has a pure `process_*` method (unit-testable without Agno) plus a thin JSON tool envelope.
-- Benefit: follows the `InformationalStructuralAgent` pattern — deterministic core, optional Agno envelope — so the fusion/audit logic stays testable and the LLM only selects which tool to call. The `dual-provider-fusion` PDDL method (pattern 10) reuses `backend.pipeline.fusion.extract_fused` and is only admissible when `FUSION_MODE=dual`. See [docstruct_algorithms.md](docstruct_algorithms.md) for the algorithm details.
+- Benefit: follows the `InformationalStructuralAgent` pattern — deterministic core, optional Agno envelope — so the fusion/audit logic stays testable and the LLM only selects which tool to call. The `dual-provider-fusion` PDDL method (pattern 8) reuses `backend.pipeline.fusion.extract_fused` and is only admissible when `FUSION_MODE=dual`. See [docstruct_algorithms.md](docstruct_algorithms.md) for the algorithm details.
 
 ---
 
 ## Architectural Evolution Roadmap
 
 1. **Dynamic Smart Orchestration (Future Feature):**
-   - The PDDL planning engine (pattern 10) is the first step toward explicit, deterministic task routing. The remaining goal is a dynamic router that also weighs document complexity, budget, and SLA to route between local Ollama models and cloud OpenRouter endpoints.
+   - The PDDL planning engine (pattern 8) is the first step toward explicit, deterministic task routing. The remaining goal is a dynamic router that also weighs document complexity, budget, and SLA to route between local Ollama models and cloud OpenRouter endpoints.
 2. **Parallel Agent Scaling:**
    - Expand `asyncio.gather` execution to support distributed worker queues for high-volume document pipelines.

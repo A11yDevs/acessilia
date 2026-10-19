@@ -989,7 +989,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         # Docling extractor diagnostics (backend/core/manifest/docling_extractor.py).
         MSG_SOURCE_NOT_FOUND: "Arquivo de origem não encontrado: {source_path}",
         MSG_DOCLING_MISSING: (
-            "Docling não está instalado. Execute `uv pip install docling`."
+            "Não há structurer Docling local: passe um explicitamente ou extraia a "
+            "estrutura na Toolbox."
         ),
         MSG_INCOMPATIBLE_STRUCTURER: (
             "Structurer incompatível: esperado convert_document() ou _process_document()."

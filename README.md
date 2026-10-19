@@ -116,10 +116,7 @@ Or open them directly in VS Code and execute cells with the built-in notebook su
 
 ### Using the ready-made images
 
-Once CI on `main` passes, GitHub Actions automatically publishes two Linux amd64 images to the GitHub Container Registry:
-
-- `main`: includes Docling, RapidOCR, and PyTorch CPU for full structural analysis;
-- `main-slim`: omits Docling, RapidOCR, and PyTorch for a smaller distribution.
+Once CI on `main` passes, GitHub Actions automatically publishes the `main` Linux amd64 image to the GitHub Container Registry. The image holds no Docling, OCR or formula model: structural extraction, OCR and formula recognition run on the Toolbox.
 
 ```bash
 docker pull ghcr.io/a11ydevs/acessilia:main
@@ -131,7 +128,7 @@ docker run --rm \
         ghcr.io/a11ydevs/acessilia:main
 ```
 
-Use `ghcr.io/a11ydevs/acessilia:main-slim` in the same command for the slim variant. To reproduce an exact version, use `sha-<commit>` or `sha-<commit>-slim`, as shown by the **Delivery** workflow run.
+To reproduce an exact version, use `sha-<commit>`, as shown by the **Delivery** workflow run.
 
 For a producion server that updates main automatically use:
 
@@ -149,89 +146,14 @@ docker compose up -d --build
 
 The container exposes `8000` (API) and `8001` (web), persists everything under `./var`, and runs its health check at `/api/v1/health`.
 
-To build only the slim variant:
+### Benchmarking the pipeline
+
+`scripts/benchmark_pipelines.py` runs the PDDL pipeline on one file and writes a report with its timing, a structure summary and the exported files:
 
 ```bash
-docker build -f infra/Dockerfile --build-arg WITH_DOCLING=false -t acessilia:slim .
-```
-
-### Docling and RapidOCR model cache
-
-All model weights are downloaded at runtime on first Docling use (the distributed images embed no models), which makes that first conversion slower. Persist the `/app/var` volume so later runs reuse the same files, even offline.
-
-### Configuração de fórmulas matemáticas
-
-O pipeline de acessibilização de fórmulas (PR #49) usa CodeFormula (~200M parâmetros, MIT) para extrair LaTeX de imagens. A referência de **~2 minutos por fórmula em CPU** é um relato histórico, não uma medição desta revisão nem uma garantia de latência.
-
-| Variável | Default | Descrição |
-|---|---|---|
-| `DOCLING_FORMULA_ENRICHMENT` | `true` | Habilita extração de fórmulas via Docling |
-| `FORMULA_IMAGE_CASCADE` | `true` | Habilita cascata OCR → CodeFormula para imagens |
-| `FORMULA_CODEFORMULA_TIMEOUT` | `120` | Orçamento em segundos por recorte CodeFormula da cascata, incluindo preparação, startup, importação, carga do modelo e inferência |
-
-Para desabilitar fórmulas ou ajustar o timeout, edite o `.env` sem mudar código:
-
-```bash
-DOCLING_FORMULA_ENRICHMENT=false  # desliga enriquecimento de página Docling
-FORMULA_IMAGE_CASCADE=false      # desliga a cascata independente de recortes
-FORMULA_CODEFORMULA_TIMEOUT=300  # orçamento de 5 minutos por recorte
-```
-
-A configuração é lida em cada chamada: aceita segundos numéricos positivos e
-finitos, inclusive frações. Ausência usa `120`; valores inválidos, vazios, zero,
-negativos, `nan` e infinitos geram aviso e usam `120`, sem falhar na importação.
-
-Cada recorte usa um processo Python novo, sem shell nem reutilização do modelo
-em memória do pai. O isolamento requer POSIX (Linux/macOS); em plataformas sem
-grupos de processos, a cascata registra aviso e retorna fallback sem iniciar o modelo.
-Ele herda a alocação e o ambiente existentes; não cria jobs
-Slurm nem reserva outros recursos. O custo de iniciar o interpretador e carregar
-o modelo novamente está dentro do orçamento, mesmo quando os pesos estão em cache.
-Downloads necessários à carga também consomem esse tempo.
-
-O orçamento começa antes da preparação dos temporários e da criação do processo;
-o tempo já gasto é descontado da espera. Ao expirar, o grupo do processo recebe
-`SIGKILL` e o filho direto é aguardado/recolhido antes do retorno. Essa limpeza
-também ocorre em sucesso ou erro. A criação de processo e operações do sistema
-operacional não são interrompíveis pelo timeout de Python: preparação, criação,
-limpeza/recolhimento e leitura final podem acrescentar overhead ao tempo observado
-da chamada. Não é uma garantia de retorno em exatamente N segundos sob falhas de SO.
-
-Não há pipes de saída a drenar: stdout/stderr do reconhecedor são descartados;
-um arquivo temporário separado recebe JSON limitado a 8192 bytes e LaTeX de até
-2000 caracteres. O pai limita a leitura e rejeita resultado excessivo ou inválido.
-Temporários são fechados em sucesso, timeout e erro. Falha, timeout, dependência
-ausente ou resultado inválido retornam `''`, permitindo o fallback da cascata;
-isso não declara a fórmula nem sua acessibilidade validadas.
-
-Esse timeout aplica-se **somente ao CodeFormula da cascata de recortes**, em CPU
-ou no acelerador escolhido pelo Docling. Não cobre o OCR anterior nem o
-enriquecimento Docling de página/documento inteiro controlado por
-`DOCLING_FORMULA_ENRICHMENT`.
-
-Os testes de isolamento usam mocks e filhos Python locais, sem importar/carregar
-Docling nos filhos de integração, sem rede, pesos ou inferência real. Os testes
-de conversão real via latex2mathml ficam separados pela marca `docling`.
-Esses testes não medem a latência de inferência real do CodeFormula.
-A heurística OCR continua aproximada, não uma prova de classificação.
-
-- Hugging Face: `/app/var/cache/huggingface` (`HF_HOME`)
-- RapidOCR: `/app/var/cache/rapidocr` (`RAPIDOCR_CACHE_DIR`)
-
-Behavior:
-
-- The first Docling run downloads (or copies) the weights into the volume.
-- Subsequent runs restore them automatically before `RapidOCR` starts up.
-- Deleting `./var` deletes the caches and forces a fresh download.
-
-Example:
-
-```bash
-docker run --rm -e STRUCTURER=docling -v "$PWD/var:/app/var" \
-        ghcr.io/a11ydevs/acessilia:main \
-        python scripts/benchmark_pipelines.py tests/fixtures/tutorials/java-oo-3pgs.pdf \
-        -o temp/output/regression-bench/java-oo-3pgs-offline/docling \
-        --mode normal --export-formats txt,pdf,pdf_ua --pddl-extractor-backend docling
+python scripts/benchmark_pipelines.py tests/fixtures/tutorials/java-oo-3pgs.pdf \
+        -o temp/output/benchmark/java-oo-3pgs \
+        --export-formats txt,pdf,pdf_ua
 ```
 
 ## Contributing

@@ -68,7 +68,7 @@ Também disponível em **inglês (EUA)**: [English version](use_cases.md)
 - Objetivo: evitar o processamento repetido de arquivos/páginas.
 - Implementação:
   - serviço de cache: [backend/services/cache.py](../backend/services/cache.py)
-  - uso no fluxo: [backend/service.py](../backend/service.py) e [backend/agents/orchestrator.py](../backend/agents/orchestrator.py)
+  - uso no fluxo: [backend/service.py](../backend/service.py)
 
 ## UC-09 Operação segura de instância única
 - Ator principal: Operador.

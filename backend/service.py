@@ -4,7 +4,6 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Coroutine
 
-from backend.agents.orchestrator import AccessibilityOrchestrator as AccessibilityOrchestrator
 from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
 from backend.agents.state_manager import TaskCancelledError, state_manager
 from backend.services.cache import (
