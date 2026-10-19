@@ -29,7 +29,7 @@ Verificado contra `https://www.acessilia3.inf.ufg.br/toolbox` em 2026-10-14:
 | `document.layout.analyze` | `ToolboxLayoutStructurer`; cobertura E2E direta e em fluxo | Integrada | Manter contrato e cobertura E2E |
 | `document.ocr` | Wrapper Agno e cliente; E2E remoto de OCR | Integrada | Manter contrato e cobertura E2E |
 | `math.recognize`, `math.convert`, `math.verbalize` | Ferramentas/cliente de matemática; E2E de reconhecimento, conversão, verbalização e fluxo encadeado | Integradas | Manter contrato e cobertura E2E |
-| `pdf.split`, `pdf.render` | Ferramentas/cliente PDF; E2E direto e encadeado | Integradas | Manter contrato e cobertura E2E |
+| `pdf.split`, `pdf.render` | Cliente do SDK com E2E direto e encadeado; sem chamador de produção desde a remoção de `toolbox_pdf_tools.py` (F4 da #150) | Contrato mantido | Manter contrato e cobertura E2E; ligar o `pdf.render` ao orquestrador quando o PyMuPDF sair do core |
 | `media.inspect` | Chamador de produção em `backend/tools/media_inspect.py`; configuração opt-in | Integrada, opt-in | Manter o gate explícito |
 | `document.export.pdf_ua` | Chamador de produção em `backend/export/pandoc_exporter.py`; ativo por padrão; só na Toolbox desde a F2 da #150, sem fallback local. Incluída após o snapshot acima: verificada ao vivo em 2026-10-17, depois do merge de acessilia-toolbox#53 | Integrada | Todo deploy precisa rodar o `pdf-ua-render`: sem ele, os jobs reportam o PDF/UA como erro de exportação opcional |
 | `artifact.store`, `artifact.retrieve` | Cliente Toolbox compartilhado; usado nos caminhos de upload/extração | Infraestrutura integrada | Manter cobertura de contrato do cliente |

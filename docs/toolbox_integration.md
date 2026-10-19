@@ -117,8 +117,8 @@ as a business decision, and records the cause.
 
 The "Toolbox first, local fallback" wrappers still in the code are **deviations
 being removed** in [#150](https://github.com/A11yDevs/acessilia/issues/150):
-`toolbox_pdf_tools.py` and the two Toolbox structurers. PDF/UA export and
-`media.inspect` no longer have one: they run only on the Toolbox. Do not
+the two Toolbox structurers. PDF/UA export and `media.inspect` no longer have
+one: they run only on the Toolbox, and `toolbox_pdf_tools.py` is gone. Do not
 copy that pattern into new code; a local or offline executor needs its own ADR.
 
 ---
@@ -386,7 +386,7 @@ service.py: _build_orchestrator()
 - `libs/sdk/src/acessilia_sdk/toolbox/clients/` — one client per capability family; `layout.py` is the Scenario B template
 - `backend/tools/toolbox_client.py` — `make_toolbox_client` (SDK clients configured from the core settings) and the re-exported error types
 - `clients/structure.py`, `clients/artifact.py`, `clients/dataset.py` — structure extraction, the artifact store and the dataset routes
-- `backend/tools/toolbox_ocr_tools.py`, `toolbox_math_tools.py`, `toolbox_pdf_tools.py` — Agno wrappers; `toolbox_pdf_tools.py` still has a local fallback, removed in #150 (ADR-0003)
+- `backend/tools/toolbox_ocr_tools.py`, `toolbox_math_tools.py` — Agno wrappers over the OCR and math clients
 - `clients/page_ocr.py` — `document.ocr.page` (whole-page VLM)
 - `clients/adjudicate.py` — `document.adjudicate.page` / `.region`
 - `clients/orientation.py` — `image.page.orient`
