@@ -2286,20 +2286,25 @@ async def _inspect_media_or_degrade(
     manifest: ProcessingManifest,
     source_path: Path,
 ) -> dict[str, Any] | None:
-    """Runs ``media.inspect`` and degrades visibly when the Toolbox fails.
+    """Runs ``media.inspect`` and degrades visibly when it fails.
 
-    The inspection only feeds the standalone-image heuristic, so a Toolbox
-    failure does not fail the job: the run continues without the signal, logs
-    a warning and records the cause in ``manifest.extractor.configuration``
-    (``media_inspection`` is ``toolbox``, ``disabled`` or ``failed``, plus
-    ``media_inspection_error`` on failure).
+    The inspection only feeds the standalone-image heuristic, so no failure of
+    the step fails the job: any ``Exception`` (a ``ToolboxError``, but also an
+    SDK bug or a client configuration error) makes the run continue without
+    the signal, logs a warning and records the cause. Cancellation is not
+    caught, since ``asyncio.CancelledError`` derives from ``BaseException``.
+
+    The outcome goes to ``manifest.extractor.configuration``:
+    ``media_inspection`` is ``toolbox``, ``disabled`` (by
+    ``TOOLBOX_MEDIA_INSPECT_ENABLED``), ``source_missing`` or ``failed``, plus
+    ``media_inspection_error`` on failure.
     """
-    from backend.tools.toolbox_client import ToolboxError
+    from backend.config.settings import settings
 
     configuration = manifest.extractor.configuration
     try:
         media_inspection = await inspect_source_media(source_path)
-    except ToolboxError as exc:
+    except Exception as exc:  # noqa: BLE001 - the step degrades, never fails the job
         cause = f"{type(exc).__name__}: {exc}"
         logger.warning(
             t(LOG_MEDIA_INSPECT_FAILED).format(
@@ -2309,9 +2314,13 @@ async def _inspect_media_or_degrade(
         configuration["media_inspection"] = "failed"
         configuration["media_inspection_error"] = cause
         return None
-    configuration["media_inspection"] = (
-        "disabled" if media_inspection is None else "toolbox"
-    )
+    if media_inspection is not None:
+        status = "toolbox"
+    elif not settings.toolbox_media_inspect_enabled:
+        status = "disabled"
+    else:
+        status = "source_missing"
+    configuration["media_inspection"] = status
     return media_inspection
 
 
@@ -2785,7 +2794,8 @@ def build_pddl_structured_payload(
 ) -> dict[str, Any]:
     pages_payload = _manifest_pages_to_payload(manifest)
     text_output = _render_text_from_pages(pages_payload)
-    media_inspection_status = manifest.extractor.configuration.get("media_inspection")
+    configuration = manifest.extractor.configuration
+    media_inspection_status = configuration.get("media_inspection")
 
     technical_warnings: list[str] = []
     if execution_report is None:
@@ -2830,7 +2840,12 @@ def build_pddl_structured_payload(
             else None,
             "pddl_unsatisfied_obligations": _unsatisfied_obligations(manifest),
             "pddl_toolbox_availability": toolbox_availability,
-            "media_inspection": media_inspection_status,
+            "pddl_media_inspection": {
+                "status": media_inspection_status,
+                "error": configuration.get("media_inspection_error"),
+            }
+            if media_inspection_status is not None
+            else None,
         },
         "technical_warnings": technical_warnings,
         # A step degraded by a Toolbox failure must not be replayed from the

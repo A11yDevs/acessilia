@@ -115,6 +115,18 @@ async def test_forwards_the_remote_cache_choice(
 
 
 @pytest.mark.asyncio
+async def test_a_missing_document_is_a_contract_violation(enabled) -> None:
+    """A client that returns no document must not crash past the client close."""
+    from backend.tools.toolbox_client import ToolboxContractViolation
+
+    client = RecordingClient()
+    client.result = None
+
+    with pytest.raises(ToolboxContractViolation):
+        await inspect_source_media(IMAGE, client=client)
+
+
+@pytest.mark.asyncio
 async def test_returns_none_for_missing_file(enabled) -> None:
     assert await inspect_source_media(Path("/tmp/does-not-exist.png")) is None
 
@@ -129,16 +141,27 @@ def _manifest() -> SimpleNamespace:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(("returned", "status"), [(INSPECTION, "toolbox"), (None, "disabled")])
+@pytest.mark.parametrize(
+    ("returned", "enabled_setting", "status"),
+    [
+        (INSPECTION, True, "toolbox"),
+        (None, False, "disabled"),
+        (None, True, "source_missing"),
+    ],
+)
 async def test_orchestrator_records_the_inspection_status(
-    monkeypatch, returned, status
+    monkeypatch, returned, enabled_setting, status
 ) -> None:
     from backend.agents import pddl_orchestrator as pddl
+    from backend.config import settings as settings_module
 
     async def fake(_path):
         return returned
 
     monkeypatch.setattr(pddl, "inspect_source_media", fake)
+    monkeypatch.setattr(
+        settings_module.settings, "toolbox_media_inspect_enabled", enabled_setting
+    )
     manifest = _manifest()
 
     result = await pddl._inspect_media_or_degrade(manifest, IMAGE)
@@ -148,12 +171,24 @@ async def test_orchestrator_records_the_inspection_status(
 
 
 @pytest.mark.asyncio
-async def test_orchestrator_degrades_and_records_the_cause_on_failure(monkeypatch) -> None:
+@pytest.mark.parametrize(
+    ("error", "cause"),
+    [
+        ("toolbox", "ToolboxError: toolbox down"),
+        ("other", "ValueError: bad config"),
+    ],
+)
+async def test_orchestrator_degrades_and_records_the_cause_on_failure(
+    monkeypatch, error, cause
+) -> None:
+    """Any exception degrades the step, not only a ToolboxError."""
     from backend.agents import pddl_orchestrator as pddl
     from backend.tools.toolbox_client import ToolboxError
 
     async def fail(_path):
-        raise ToolboxError("toolbox down")
+        if error == "toolbox":
+            raise ToolboxError("toolbox down")
+        raise ValueError("bad config")
 
     monkeypatch.setattr(pddl, "inspect_source_media", fail)
     manifest = _manifest()
@@ -163,8 +198,23 @@ async def test_orchestrator_degrades_and_records_the_cause_on_failure(monkeypatc
     assert result is None
     assert manifest.extractor.configuration == {
         "media_inspection": "failed",
-        "media_inspection_error": "ToolboxError: toolbox down",
+        "media_inspection_error": cause,
     }
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_does_not_swallow_cancellation(monkeypatch) -> None:
+    import asyncio
+
+    from backend.agents import pddl_orchestrator as pddl
+
+    async def cancelled(_path):
+        raise asyncio.CancelledError
+
+    monkeypatch.setattr(pddl, "inspect_source_media", cancelled)
+
+    with pytest.raises(asyncio.CancelledError):
+        await pddl._inspect_media_or_degrade(_manifest(), IMAGE)
 
 
 @pytest.mark.parametrize(
@@ -177,6 +227,8 @@ def test_payload_records_the_status_and_skips_the_cache_on_failure(
     from backend.agents import pddl_orchestrator as pddl
 
     configuration = {} if status is None else {"media_inspection": status}
+    if status == "failed":
+        configuration["media_inspection_error"] = "ToolboxError: down"
     manifest = SimpleNamespace(
         extractor=SimpleNamespace(configuration=configuration),
         manifest_id="m-1",
@@ -191,5 +243,13 @@ def test_payload_records_the_status_and_skips_the_cache_on_failure(
         planner_backend="internal", execution_report=None, comparison=None,
     )
 
-    assert payload["canonical_metadata"]["media_inspection"] == status
+    expected = (
+        None
+        if status is None
+        else {
+            "status": status,
+            "error": "ToolboxError: down" if status == "failed" else None,
+        }
+    )
+    assert payload["canonical_metadata"]["pddl_media_inspection"] == expected
     assert payload["cacheable"] is cacheable

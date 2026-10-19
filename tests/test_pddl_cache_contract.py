@@ -93,3 +93,36 @@ async def test_degraded_processing_is_not_cached(
     monkeypatch.setattr(service, "agente", SimpleNamespace(executar=execute))
     await service.process(source, task_id=f"degraded-{cacheable}")
     assert cached == ([True] if cacheable else [])
+
+
+@pytest.mark.asyncio
+async def test_cached_entry_with_failed_media_inspection_is_ignored(
+    isolated_runtime, monkeypatch, tmp_path
+):
+    """A degraded entry written before the `cacheable` flag is not replayed."""
+    from backend import service
+
+    source = tmp_path / "doc.pdf"
+    source.write_bytes(b"%PDF")
+    calls = []
+
+    async def degraded_cache(*args):
+        return {
+            "text": "Cached content",
+            "canonical_metadata": {
+                "pddl_media_inspection": {"status": "failed", "error": "ToolboxError: down"}
+            },
+        }
+
+    async def execute(*args, **kwargs):
+        calls.append(True)
+        return {"text": "Live content"}
+
+    async def record(*args, **kwargs):
+        pass
+
+    monkeypatch.setattr(service, "get_cached", degraded_cache)
+    monkeypatch.setattr(service, "set_cache", record)
+    monkeypatch.setattr(service, "agente", SimpleNamespace(executar=execute))
+    await service.process(source, task_id="degraded-from-cache")
+    assert calls == [True]

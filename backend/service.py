@@ -175,9 +175,20 @@ async def process(
         cached = await get_cached(file_path, cache_variant)
         if isinstance(cached, dict):
             metadata = cached.get("canonical_metadata")
-            execution_status = metadata.get("pddl_execution_status") if isinstance(metadata, dict) else None
-            if execution_status in {"failed", "replan-required"} or (
-                not settings.pddl_execute_dry_run and execution_status == "dry-run-completed"
+            if not isinstance(metadata, dict):
+                metadata = {}
+            execution_status = metadata.get("pddl_execution_status")
+            media_inspection = metadata.get("pddl_media_inspection")
+            # A run degraded by a Toolbox failure is marked `cacheable: false`
+            # and never written (see below); the check here keeps that
+            # invariant explicit for entries written before the flag existed.
+            media_inspection_failed = (
+                isinstance(media_inspection, dict) and media_inspection.get("status") == "failed"
+            )
+            if (
+                execution_status in {"failed", "replan-required"}
+                or (not settings.pddl_execute_dry_run and execution_status == "dry-run-completed")
+                or media_inspection_failed
             ):
                 cached = None
         if cached is not None:
@@ -277,6 +288,8 @@ async def process(
 
         if not isinstance(processed_result, dict) or processed_result.get("cacheable", True):
             await set_cache(file_path, processed_result, cache_variant)
+        else:
+            logger.debug("Resultado degradado nao cacheado para {}", file_path.name)
         _salvar_json_canonico(canonical_document, file_path.name)
 
         if not external_task_id:

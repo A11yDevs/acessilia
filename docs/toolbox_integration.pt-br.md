@@ -311,10 +311,18 @@ A capacidade `media.inspect` (provider `pure-media-inspect`, PR
   inteira quando a entrada é imagem isolada sem blocos visuais — garantindo a
   audiodescrição pelo VisionAgent.
 
-  O sinal só alimenta essa heurística, então uma falha na Toolbox não derruba o
-  job: o processamento segue sem ele, registra um aviso no log e grava o
-  resultado em `manifest.extractor.configuration` (`media_inspection`: `toolbox`,
-  `disabled` ou `failed`, mais `media_inspection_error` com a causa).
+  O sinal só alimenta essa heurística, então uma falha da etapa (qualquer
+  exceção, não só `ToolboxError`) não derruba o job: o processamento segue sem
+  ele, registra um aviso no log e grava o resultado em
+  `manifest.extractor.configuration` (`media_inspection`: `toolbox`, `disabled`,
+  `source_missing` ou `failed`, mais `media_inspection_error` com a causa). O
+  status e a causa também chegam ao documento em
+  `canonical_metadata.pddl_media_inspection` (`{"status": ..., "error": ...}`).
+
+  Uma execução degradada por falha **não é cacheada** (o payload leva
+  `cacheable: false`): do contrário, uma indisponibilidade transitória da
+  Toolbox repetiria uma imagem isolada sem audiodescrição depois que a Toolbox
+  voltasse.
 
 Os predicados PDDL `media_inspected`/`media_profile_classified` pertencem ao
 domínio da Toolbox; no core o sinal é consumido apenas como heurística de
@@ -339,7 +347,7 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 | `TOOLBOX_USE_ARTIFACT_STORE` | `true` | Envia o arquivo para `/v1/artifacts` antes de extrair |
 | `TOOLBOX_USE_REMOTE_CACHE` | `true` | Usa o cache remoto (`no_cache=false`) |
 | `TOOLBOX_MEDIA_INSPECT_PROVIDER` | `pure-media-inspect` | Provider da capacidade `media.inspect` |
-| `TOOLBOX_MEDIA_INSPECT_ENABLED` | `true` | Executa `media.inspect` na Toolbox ou pula a etapa. Não há fallback local: com `false`, a etapa é pulada; uma falha na Toolbox é registrada no log e no manifesto, e o processamento segue sem o sinal de imagem isolada |
+| `TOOLBOX_MEDIA_INSPECT_ENABLED` | `true` | Executa `media.inspect` na Toolbox ou pula a etapa. Não há fallback local: com `false`, a etapa é pulada; uma falha na Toolbox é registrada no log e no manifesto, o processamento segue sem o sinal de imagem isolada e o resultado degradado não é cacheado |
 | `TOOLBOX_PDF_UA_PROVIDER` | `pandoc-pdf-ua` | Provider da capacidade `document.export.pdf_ua` |
 | `TOOLBOX_PDF_UA_ENABLED` | `true` | Renderiza o PDF/UA na Toolbox (Pandoc + TeX Live fixados) ou pula a etapa. Não há fallback local: com `false`, o worker pula o formato sem erro; uma falha na Toolbox é reportada como erro de exportação opcional |
 | `TOOLBOX_PDF_UA_TIMEOUT_SECONDS` | `300` | Tempo máximo de espera pela renderização na Toolbox antes de reportar erro de exportação opcional |
