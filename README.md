@@ -49,7 +49,7 @@ cp .env.example .env   # configure the keys (AI, SMTP, Telegram)
 
 ```bash
 poetry run python -m frontend.run
-# or: poetry run bot-acess
+# or: poetry run acessilia
 ```
 
 Starts the interfaces listed in `ENABLED_INTERFACES` (default: `api,telegram,web`):

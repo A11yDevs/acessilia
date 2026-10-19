@@ -49,7 +49,7 @@ cp .env.example .env   # configure as chaves (IA, SMTP, Telegram)
 
 ```bash
 poetry run python -m frontend.run
-# ou: poetry run bot-acess
+# ou: poetry run acessilia
 ```
 
 Inicia as interfaces listadas em `ENABLED_INTERFACES` (padrão: `api,telegram,web`):
