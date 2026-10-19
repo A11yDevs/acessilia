@@ -1374,6 +1374,21 @@ msgstr "PDF/UA exported: {output_path}"
 msgid "PDF/UA skipped: TOOLBOX_PDF_UA_ENABLED is false"
 msgstr "PDF/UA skipped: TOOLBOX_PDF_UA_ENABLED is false"
 
+msgid "Media inspection skipped: TOOLBOX_MEDIA_INSPECT_ENABLED is false"
+msgstr "Media inspection skipped: TOOLBOX_MEDIA_INSPECT_ENABLED is false"
+
+#, python-brace-format
+msgid "Toolbox: media.inspect finished (nature={nature}, visual={visual})"
+msgstr "Toolbox: media.inspect finished (nature={nature}, visual={visual})"
+
+#, python-brace-format
+msgid ""
+"Media inspection unavailable for {filename}; continuing without the "
+"standalone-image signal: {error}"
+msgstr ""
+"Media inspection unavailable for {filename}; continuing without the "
+"standalone-image signal: {error}"
+
 #, python-brace-format
 msgid "PDF/UA rendered by the Toolbox: {output_path}"
 msgstr "PDF/UA rendered by the Toolbox: {output_path}"

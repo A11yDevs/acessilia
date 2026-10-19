@@ -208,6 +208,8 @@ class Settings:
     toolbox_pdf_ua_timeout_seconds: int = field(
         default_factory=lambda: int(os.getenv("TOOLBOX_PDF_UA_TIMEOUT_SECONDS", "300"))
     )
+    # media.inspect runs only on the Toolbox (docs/adr/0003). When false, the
+    # step is skipped; a Toolbox failure degrades the run visibly.
     toolbox_media_inspect_enabled: bool = field(
         default_factory=lambda: (
             os.getenv("TOOLBOX_MEDIA_INSPECT_ENABLED", "true").strip().lower()

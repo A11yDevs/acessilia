@@ -437,6 +437,19 @@ LOG_PDF_UA_EXPORTED: str = "PDF/UA exported: {output_path}"
 LOG_PDF_UA_TOOLBOX_EXPORTED: str = "PDF/UA rendered by the Toolbox: {output_path}"
 #: Info logged when the worker skips PDF/UA because TOOLBOX_PDF_UA_ENABLED is false.
 LOG_PDF_UA_SKIPPED_DISABLED: str = "PDF/UA skipped: TOOLBOX_PDF_UA_ENABLED is false"
+#: Info logged when media.inspect is skipped because TOOLBOX_MEDIA_INSPECT_ENABLED is false.
+LOG_MEDIA_INSPECT_SKIPPED_DISABLED: str = (
+    "Media inspection skipped: TOOLBOX_MEDIA_INSPECT_ENABLED is false"
+)
+#: Info logged when the Toolbox finished media.inspect; {nature} is the artifact nature, {visual} whether it requires visual inspection.
+LOG_MEDIA_INSPECT_TOOLBOX_FINISHED: str = (
+    "Toolbox: media.inspect finished (nature={nature}, visual={visual})"
+)
+#: Warning logged when media.inspect fails on the Toolbox and the run continues without the standalone-image signal; {filename} is the source file name, {error} the error class and message.
+LOG_MEDIA_INSPECT_FAILED: str = (
+    "Media inspection unavailable for {filename}; continuing without the "
+    "standalone-image signal: {error}"
+)
 LOG_TXT_EXPORTED: str = "TXT exported: {output_path}"
 LOG_DOCX_EXPORTED: str = "DOCX exported: {output_path}"
 LOG_READER_TASKS_SUMMARY: str = (

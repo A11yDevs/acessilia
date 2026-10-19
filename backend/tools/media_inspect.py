@@ -1,193 +1,22 @@
-"""Inspeção determinística de mídia — fallback local do media.inspect.
+"""Media inspection of the source file through the Toolbox ``media.inspect``.
 
-Reproduz, sem dependências de ML, a classificação do provider
-``pure-media-inspect`` da Toolbox (PR acessilia-toolbox#33), usando apenas
-Pillow e PyMuPDF (já dependências do projeto). O dicionário retornado segue o
-schema ``artifact/media-inspection@1``, de modo que o consumidor no orquestrador
-seja agnóstico à origem do sinal (Toolbox remota ou fallback local).
-
-Nada é adivinhado: um valor que não pode ser medido é reportado como ``None``
-junto do mecanismo que o produziu.
+The inspection runs only on the Toolbox (docs/adr/0003): there is no local
+fallback. With ``TOOLBOX_MEDIA_INSPECT_ENABLED=false`` the step is skipped,
+and a Toolbox failure propagates so the caller decides how to degrade and
+records the cause.
 """
 
 from __future__ import annotations
 
-import io
 from pathlib import Path
 from typing import Any
 
+from backend.i18n import t
+from backend.log_messages import (
+    LOG_MEDIA_INSPECT_SKIPPED_DISABLED,
+    LOG_MEDIA_INSPECT_TOOLBOX_FINISHED,
+)
 from backend.tools.logger import logger
-from backend.tools.toolbox_client import ToolboxError
-
-# Formato de contêiner -> MIME type (o map de Pillow omite formatos não
-# embutidos no binário em execução, então o map é explícito).
-MEDIA_TYPE_BY_FORMAT = {
-    "BMP": "image/bmp",
-    "GIF": "image/gif",
-    "JPEG": "image/jpeg",
-    "PNG": "image/png",
-    "TIFF": "image/tiff",
-    "WEBP": "image/webp",
-}
-
-
-def _dimensions(width: int, height: int) -> dict[str, Any]:
-    return {
-        "width": width,
-        "height": height,
-        "aspect_ratio": round(width / height, 4),
-    }
-
-
-def _pdf_page_count_from_content(payload: bytes) -> int:
-    """Conta objetos de página varrendo o content-stream do PDF (último recurso)."""
-    counted = payload.count(b"/Type /Page") - payload.count(b"/Type /Pages")
-    return max(1, counted)
-
-
-def _inspect_pdf(
-    payload: bytes, filename: str, media_type: str
-) -> dict[str, Any] | None:
-    """Inspeciona um PDF, usando PyMuPDF quando disponível.
-
-    Retorna ``None`` quando o payload não carrega estrutura PDF verificável.
-    """
-    import fitz
-
-    page_count = _pdf_page_count_from_content(payload)
-    page_count_source: str | None = "content_stream_scan"
-    dimensions: dict[str, Any] | None = None
-    dimensions_source: str | None = None
-    verified = payload.startswith(b"%PDF-")
-
-    document = None
-    try:
-        document = fitz.open(stream=payload, filetype="pdf")
-        opened_pages = len(document)
-        if opened_pages > 0:
-            verified = True
-            page_count = opened_pages
-            page_count_source = "pymupdf"
-            frame = document[0].rect
-            width, height = round(frame.width), round(frame.height)
-            if width > 0 and height > 0:
-                dimensions = _dimensions(width, height)
-                dimensions_source = "pymupdf"
-    except Exception as exc:  # noqa: BLE001
-        logger.debug("Falha ao abrir PDF via PyMuPDF: %s", exc)
-    finally:
-        if document is not None:
-            document.close()
-
-    if not verified:
-        return None
-
-    return {
-        "media_type": "application/pdf",
-        "declared_media_type": media_type or None,
-        "file_size_bytes": len(payload),
-        "is_image": False,
-        "is_pdf": True,
-        "page_count": page_count,
-        "page_count_source": page_count_source,
-        "dimensions": dimensions,
-        "dimensions_source": dimensions_source,
-        "color_mode": None,
-        "format": "PDF",
-        "artifact_nature": "paginated_document",
-        "requires_visual_inspection": False,
-        "metadata": {"filename": filename},
-    }
-
-
-def _unsupported_media(
-    payload: bytes, filename: str, media_type: str
-) -> dict[str, Any]:
-    """Reporta um artefato cujo contêiner não pôde ser identificado."""
-    return {
-        "media_type": "application/octet-stream",
-        "declared_media_type": media_type or None,
-        "file_size_bytes": len(payload),
-        "is_image": False,
-        "is_pdf": False,
-        "page_count": 1,
-        "page_count_source": None,
-        "dimensions": None,
-        "dimensions_source": None,
-        "color_mode": None,
-        "format": None,
-        "artifact_nature": "unknown",
-        "requires_visual_inspection": False,
-        "metadata": {"filename": filename},
-    }
-
-
-def inspect_media_payload(
-    payload: bytes,
-    filename: str,
-    media_type: str,
-) -> dict[str, Any]:
-    """Inspeção determinística sobre o payload de mídia.
-
-    Args:
-        payload: bytes brutos do artefato.
-        filename: nome original do arquivo (para extensão/metadados).
-        media_type: MIME type declarado pelo chamador.
-
-    Returns:
-        Dict compatível com artifact/media-inspection@1.
-    """
-    from PIL import Image, UnidentifiedImageError
-
-    size_bytes = len(payload)
-    is_pdf_signal = (
-        media_type == "application/pdf"
-        or filename.lower().endswith(".pdf")
-        or payload.startswith(b"%PDF-")
-    )
-    if is_pdf_signal:
-        document = _inspect_pdf(payload, filename, media_type)
-        if document is not None:
-            return document
-        return _unsupported_media(payload, filename, media_type)
-
-    try:
-        with Image.open(io.BytesIO(payload)) as image:
-            width, height = image.size
-            if width < 1 or height < 1:
-                return _unsupported_media(payload, filename, media_type)
-            frame_count = max(1, int(getattr(image, "n_frames", 1)))
-            format_name = image.format or "UNKNOWN"
-            color_mode = image.mode
-            detected_type = MEDIA_TYPE_BY_FORMAT.get(
-                format_name, f"image/{format_name.lower()}"
-            )
-    except UnidentifiedImageError:
-        return _unsupported_media(payload, filename, media_type)
-
-    if frame_count > 1:
-        nature = "paginated_document"
-    else:
-        # Geometry alone cannot distinguish a scanned page from a portrait
-        # infographic, so inspect every single-frame image.
-        nature = "standalone_image"
-
-    return {
-        "media_type": detected_type,
-        "declared_media_type": media_type or None,
-        "file_size_bytes": size_bytes,
-        "is_image": True,
-        "is_pdf": False,
-        "page_count": frame_count,
-        "page_count_source": "pillow",
-        "dimensions": _dimensions(width, height),
-        "dimensions_source": "pillow",
-        "color_mode": color_mode,
-        "format": format_name,
-        "artifact_nature": nature,
-        "requires_visual_inspection": nature != "scanned_page",
-        "metadata": {"filename": filename},
-    }
 
 
 async def inspect_source_media(
@@ -196,72 +25,56 @@ async def inspect_source_media(
     client: Any | None = None,
     use_remote_cache: bool | None = None,
 ) -> dict[str, Any] | None:
-    """Inspeciona a mídia do arquivo de origem (Toolbox-first + fallback local).
-
-    Tenta a capacidade ``media.inspect`` na Toolbox; se a Toolbox estiver
-    indisponível (ou retornar erro), degrada para a heurística local
-    determinística. Retorna ``None`` apenas quando nenhuma das duas vias
-    consegue produzir um resultado.
+    """Inspects the source file with the Toolbox ``media.inspect`` capability.
 
     Args:
-        source_path: caminho do arquivo a inspecionar.
-        client: instância opcional de ToolboxMediaInspectClient (evita recriar).
-        use_remote_cache: repassado ao cliente da Toolbox.
+        source_path (Path): File to inspect.
+        client (ToolboxMediaInspectClient | None): Optional client to reuse; when None one is created and closed here.
+        use_remote_cache (bool | None): Forwarded to the client; when None, TOOLBOX_USE_REMOTE_CACHE applies.
 
     Returns:
-        Dict de inspeção (artifact/media-inspection@1) ou None.
+        dict | None: The ``artifact/media-inspection@1`` document, or None when the file does not exist or TOOLBOX_MEDIA_INSPECT_ENABLED is false.
+
+    Raises:
+        acessilia_sdk.toolbox.errors.ToolboxError: When the Toolbox cannot inspect the file or returns no document.
     """
     source_path = source_path.resolve()
     if not source_path.is_file():
         return None
 
     from backend.config.settings import settings
-    from backend.tools.toolbox_client import _media_type
 
-    media_type = _media_type(source_path)
-    filename = source_path.name
-
-    if settings.toolbox_media_inspect_enabled:
-        from acessilia_sdk.toolbox.clients import ToolboxMediaInspectClient
-        from backend.tools.toolbox_client import make_toolbox_client
-
-        owned_client = client is None
-        inspect_client = client or make_toolbox_client(ToolboxMediaInspectClient)
-        try:
-            result = await inspect_client.inspect(
-                file_path=source_path,
-                use_remote_cache=(
-                    use_remote_cache
-                    if use_remote_cache is not None
-                    else settings.toolbox_use_remote_cache
-                ),
-            )
-            if isinstance(result, dict):
-                logger.info(
-                    "Toolbox: media.inspect finished (nature={}, visual={})",
-                    result.get("artifact_nature", "?"),
-                    result.get("requires_visual_inspection", "?"),
-                )
-                return result
-        except ToolboxError as exc:
-            logger.warning(
-                "Toolbox media.inspect indisponível, usando fallback local: %s",
-                exc,
-            )
-        finally:
-            if owned_client:
-                await inspect_client.close()
-
-    try:
-        return inspect_media_payload(
-            source_path.read_bytes(),
-            filename,
-            media_type,
-        )
-    except Exception as exc:  # noqa: BLE001
-        logger.warning(
-            "Inspeção local de mídia falhou para %s: %s",
-            filename,
-            exc,
-        )
+    if not settings.toolbox_media_inspect_enabled:
+        logger.info(t(LOG_MEDIA_INSPECT_SKIPPED_DISABLED))
         return None
+
+    from acessilia_sdk.toolbox.clients import ToolboxMediaInspectClient
+    from acessilia_sdk.toolbox.errors import ToolboxContractViolation
+
+    from backend.tools.toolbox_client import make_toolbox_client
+
+    owned_client = client is None
+    inspect_client = client or make_toolbox_client(ToolboxMediaInspectClient)
+    try:
+        result = await inspect_client.inspect(
+            file_path=source_path,
+            use_remote_cache=(
+                use_remote_cache
+                if use_remote_cache is not None
+                else settings.toolbox_use_remote_cache
+            ),
+        )
+    finally:
+        if owned_client:
+            await inspect_client.close()
+    if not isinstance(result, dict):
+        raise ToolboxContractViolation(
+            "media.inspect returned no inspection document"
+        )
+    logger.info(
+        t(LOG_MEDIA_INSPECT_TOOLBOX_FINISHED).format(
+            nature=result.get("artifact_nature", "?"),
+            visual=result.get("requires_visual_inspection", "?"),
+        )
+    )
+    return result

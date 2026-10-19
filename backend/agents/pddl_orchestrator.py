@@ -48,6 +48,7 @@ from backend.core.planning import toolbox_gate
 from backend.core.planning.planner_agent import PlannerAgent
 from backend.i18n import t
 from backend.log_messages import (
+    LOG_MEDIA_INSPECT_FAILED,
     LOG_PDDL_ELEMENT_CROP_FAILED,
     LOG_PDDL_EMPTY_VISION_DESCRIPTION,
     LOG_PDDL_IMAGES_ENRICHED,
@@ -1987,13 +1988,7 @@ class PddlAccessibilityOrchestrator:
         manifest.extractor.configuration["region_inspection_mode"] = effective_mode
 
         source_path = file_path.resolve()
-        media_inspection = await inspect_source_media(source_path)
-        if media_inspection is None:
-            logger.warning(
-                "Inspeção de mídia indisponível para %s; seguindo sem o "
-                "sinal de imagem isolada",
-                source_path.name,
-            )
+        media_inspection = await _inspect_media_or_degrade(manifest, source_path)
 
         if status_callback:
             await status_callback(t(STAGE_ENRICHING_IMAGE_DESCRIPTIONS))
@@ -2285,6 +2280,48 @@ async def _enrich_picture_descriptions(
 
     if enriched:
         logger.info(t(LOG_PDDL_IMAGES_ENRICHED).format(count=enriched))
+
+
+async def _inspect_media_or_degrade(
+    manifest: ProcessingManifest,
+    source_path: Path,
+) -> dict[str, Any] | None:
+    """Runs ``media.inspect`` and degrades visibly when it fails.
+
+    The inspection only feeds the standalone-image heuristic, so no failure of
+    the step fails the job: any ``Exception`` (a ``ToolboxError``, but also an
+    SDK bug or a client configuration error) makes the run continue without
+    the signal, logs a warning and records the cause. Cancellation is not
+    caught, since ``asyncio.CancelledError`` derives from ``BaseException``.
+
+    The outcome goes to ``manifest.extractor.configuration``:
+    ``media_inspection`` is ``toolbox``, ``disabled`` (by
+    ``TOOLBOX_MEDIA_INSPECT_ENABLED``), ``source_missing`` or ``failed``, plus
+    ``media_inspection_error`` on failure.
+    """
+    from backend.config.settings import settings
+
+    configuration = manifest.extractor.configuration
+    try:
+        media_inspection = await inspect_source_media(source_path)
+    except Exception as exc:  # noqa: BLE001 - the step degrades, never fails the job
+        cause = f"{type(exc).__name__}: {exc}"
+        logger.warning(
+            t(LOG_MEDIA_INSPECT_FAILED).format(
+                filename=source_path.name, error=cause
+            )
+        )
+        configuration["media_inspection"] = "failed"
+        configuration["media_inspection_error"] = cause
+        return None
+    if media_inspection is not None:
+        status = "toolbox"
+    elif not settings.toolbox_media_inspect_enabled:
+        status = "disabled"
+    else:
+        status = "source_missing"
+    configuration["media_inspection"] = status
+    return media_inspection
 
 
 def _inject_full_page_picture(
@@ -2757,6 +2794,8 @@ def build_pddl_structured_payload(
 ) -> dict[str, Any]:
     pages_payload = _manifest_pages_to_payload(manifest)
     text_output = _render_text_from_pages(pages_payload)
+    configuration = manifest.extractor.configuration
+    media_inspection_status = configuration.get("media_inspection")
 
     technical_warnings: list[str] = []
     if execution_report is None:
@@ -2801,8 +2840,17 @@ def build_pddl_structured_payload(
             else None,
             "pddl_unsatisfied_obligations": _unsatisfied_obligations(manifest),
             "pddl_toolbox_availability": toolbox_availability,
+            "pddl_media_inspection": {
+                "status": media_inspection_status,
+                "error": configuration.get("media_inspection_error"),
+            }
+            if media_inspection_status is not None
+            else None,
         },
         "technical_warnings": technical_warnings,
+        # A step degraded by a Toolbox failure must not be replayed from the
+        # cache once the Toolbox is back.
+        "cacheable": media_inspection_status != "failed",
     }
 
 

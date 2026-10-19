@@ -116,8 +116,8 @@ degrada de forma visível, como decisão de negócio, e registra a causa.
 
 Os wrappers "Toolbox primeiro, fallback local" que ainda estão no código são
 **desvios em remoção** na [#150](https://github.com/A11yDevs/acessilia/issues/150):
-`toolbox_pdf_tools.py`, `media_inspect.py` e os dois structurers da Toolbox. A
-exportação PDF/UA não tem mais fallback: renderiza só na Toolbox. Não copie
+`toolbox_pdf_tools.py` e os dois structurers da Toolbox. A exportação PDF/UA e
+o `media.inspect` não têm mais fallback: rodam só na Toolbox. Não copie
 esse padrão em código novo; um executor local ou offline precisa de um ADR
 próprio.
 
@@ -301,19 +301,28 @@ A capacidade `media.inspect` (provider `pure-media-inspect`, PR
 
 - **Cliente:** `acessilia_sdk.toolbox.clients.ToolboxMediaInspectClient`
   (`ToolboxMediaInspectClient` → `POST /v1/capabilities/media.inspect:execute`).
-- **Fallback local (desvio, removido na F3 da #150):** `backend/tools/media_inspect.py`
-  (`inspect_source_media`, `inspect_media_payload`) — port determinístico em
-  Pillow/PyMuPDF que replica o schema `artifact/media-inspection@1` quando a
-  Toolbox está indisponível. Ele já divergiu do provider da Toolbox.
+- **Wrapper no core:** `backend/tools/media_inspect.py` (`inspect_source_media`)
+  chama só a Toolbox; não há fallback local (ADR-0003, F3 da #150). Com
+  `TOOLBOX_MEDIA_INSPECT_ENABLED=false` ele devolve `None` sem chamar a Toolbox,
+  e uma falha na Toolbox levanta `ToolboxError`.
 - **Integração:** `backend/agents/pddl_orchestrator.py` chama
   `inspect_source_media()` após a extração e usa o sinal
   `requires_visual_inspection` para injetar um elemento `picture` de página
   inteira quando a entrada é imagem isolada sem blocos visuais — garantindo a
   audiodescrição pelo VisionAgent.
 
-  O fallback local não infere que uma imagem é uma página escaneada apenas por
-  suas dimensões ou proporção; imagens de um único frame são encaminhadas para
-  inspeção visual para não descartar infográficos ou ilustrações retrato.
+  O sinal só alimenta essa heurística, então uma falha da etapa (qualquer
+  exceção, não só `ToolboxError`) não derruba o job: o processamento segue sem
+  ele, registra um aviso no log e grava o resultado em
+  `manifest.extractor.configuration` (`media_inspection`: `toolbox`, `disabled`,
+  `source_missing` ou `failed`, mais `media_inspection_error` com a causa). O
+  status e a causa também chegam ao documento em
+  `canonical_metadata.pddl_media_inspection` (`{"status": ..., "error": ...}`).
+
+  Uma execução degradada por falha **não é cacheada** (o payload leva
+  `cacheable: false`): do contrário, uma indisponibilidade transitória da
+  Toolbox repetiria uma imagem isolada sem audiodescrição depois que a Toolbox
+  voltasse.
 
 Os predicados PDDL `media_inspected`/`media_profile_classified` pertencem ao
 domínio da Toolbox; no core o sinal é consumido apenas como heurística de
@@ -338,7 +347,7 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 | `TOOLBOX_USE_ARTIFACT_STORE` | `true` | Envia o arquivo para `/v1/artifacts` antes de extrair |
 | `TOOLBOX_USE_REMOTE_CACHE` | `true` | Usa o cache remoto (`no_cache=false`) |
 | `TOOLBOX_MEDIA_INSPECT_PROVIDER` | `pure-media-inspect` | Provider da capacidade `media.inspect` |
-| `TOOLBOX_MEDIA_INSPECT_ENABLED` | `true` | Executa ou pula `media.inspect`. Hoje um fallback local ainda roda quando a Toolbox falha; ele é removido na #150 |
+| `TOOLBOX_MEDIA_INSPECT_ENABLED` | `true` | Executa `media.inspect` na Toolbox ou pula a etapa. Não há fallback local: com `false`, a etapa é pulada; uma falha na Toolbox é registrada no log e no manifesto, o processamento segue sem o sinal de imagem isolada e o resultado degradado não é cacheado |
 | `TOOLBOX_PDF_UA_PROVIDER` | `pandoc-pdf-ua` | Provider da capacidade `document.export.pdf_ua` |
 | `TOOLBOX_PDF_UA_ENABLED` | `true` | Renderiza o PDF/UA na Toolbox (Pandoc + TeX Live fixados) ou pula a etapa. Não há fallback local: com `false`, o worker pula o formato sem erro; uma falha na Toolbox é reportada como erro de exportação opcional |
 | `TOOLBOX_PDF_UA_TIMEOUT_SECONDS` | `300` | Tempo máximo de espera pela renderização na Toolbox antes de reportar erro de exportação opcional |
