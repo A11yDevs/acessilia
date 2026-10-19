@@ -152,8 +152,8 @@ modelo só entra quando a Toolbox expõe a capacidade.**
 | Guarda de repetição | `docstruct.fusion.repetition` | ligado |
 | Cabeçalho/rodapé no fim | `docstruct.fusion.hf_end` | ligado |
 | Normalização de texto | `docstruct.text.norm_fix` | ligado |
-| Upscale antes do OCR | `docstruct.imaging.policy` + `backend/tools/image_enhancer.py` | ligado |
-| Correção de orientação | `docstruct.imaging.policy` + `backend/tools/image_enhancer.py` | ligado |
+| Upscale antes do OCR | `docstruct.imaging.policy` | ligado |
+| Correção de orientação | `docstruct.imaging.policy` | ligado |
 | Juiz pareado por VLM | `docstruct.fusion.judge` | desligado (consome modelo) |
 | Seleção/fusão de página | `docstruct.fusion.page_select` | desligado (consome modelo) |
 | Especialista de tabela | `docstruct.fusion.table_specialist` | desligado (consome modelo) |

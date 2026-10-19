@@ -26,7 +26,7 @@ Verificado contra `https://www.acessilia3.inf.ufg.br/toolbox` em 2026-10-14:
 | Capacidade / família | Evidência no Acessilia | Veredito | Próxima ação |
 |---|---|---|---|
 | `document.structure.extract` | Usada por `ToolboxManifestExtractor`; exercitada nos E2E de comparação e fusão | Integrada | Manter contrato e cobertura E2E |
-| `document.layout.analyze` | `ToolboxLayoutStructurer`; cobertura E2E direta e em fluxo | Integrada | Manter contrato e cobertura E2E |
+| `document.layout.analyze` | Cliente do SDK com E2E direto; o único chamador no core, `ToolboxLayoutStructurer`, saiu com o pipeline legacy | Pendente de integração PDDL | Mapear evidência, obrigação e método, ou aposentar o cliente |
 | `document.ocr` | Wrapper Agno e cliente; E2E remoto de OCR | Integrada | Manter contrato e cobertura E2E |
 | `math.recognize`, `math.convert`, `math.verbalize` | Ferramentas/cliente de matemática; E2E de reconhecimento, conversão, verbalização e fluxo encadeado | Integradas | Manter contrato e cobertura E2E |
 | `pdf.split`, `pdf.render` | Cliente do SDK com E2E direto e encadeado. O `pdf.render@2` renderiza todas as páginas e regiões do orquestrador (`pymupdf-region`, `vision-page-inspection`, `vlm-pairwise-judge` e o enriquecimento de imagens/tabelas, F5 da #150); o `pdf.split` não tem chamador de produção desde a remoção de `toolbox_pdf_tools.py` (F4 da #150) | Contrato mantido | Manter contrato e cobertura E2E, incluindo o `clip`, o `max_side` e as recusas do `pdf.render@2` de que o core depende |

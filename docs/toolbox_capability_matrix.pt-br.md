@@ -48,7 +48,7 @@ Legenda de **Caminho de chamada**: como o core alcança a capacidade.
 | Capacidade | Cliente | Default de provider no core | Provider na Toolbox | Caminho de chamada |
 |---|---|---|---|---|
 | `document.structure.extract` | `acessilia_sdk/toolbox/clients/structure.py` | `TOOLBOX_PROVIDER=docling` | `docling`, `mineru`, `nougat`, `teleocr` | `ToolboxManifestExtractor` → extração do PDDL; com `FUSION_MODE=dual`, também compara o provider secundário e repassa evidências por página ao builder do manifesto |
-| `document.layout.analyze` | `acessilia_sdk/toolbox/clients/layout.py` | `TOOLBOX_LAYOUT_PROVIDER=docling-layout` | `docling-layout`, `mineru-layout` | `ToolboxLayoutStructurer` via `STRUCTURER=toolbox-layout` |
+| `document.layout.analyze` | `acessilia_sdk/toolbox/clients/layout.py` | `TOOLBOX_LAYOUT_PROVIDER=docling-layout` | `docling-layout`, `mineru-layout` | sem chamador no core desde a remoção do pipeline legacy; o cliente do SDK e os testes E2E dele permanecem |
 | `document.ocr` | `acessilia_sdk/toolbox/clients/ocr.py` | `TOOLBOX_OCR_PROVIDER=docling-ocr` | `docling-ocr`, `mineru-ocr` | `toolbox_ocr_tools.py` (wrapper Agno) |
 | `math.recognize` | `acessilia_sdk/toolbox/clients/math.py` | `TOOLBOX_MATH_RECOGNIZE_PROVIDER=docling-math` | `docling-math`, `rapid-latex-ocr` | `toolbox_math_tools.py` |
 | `math.convert` | `acessilia_sdk/toolbox/clients/math.py` | `TOOLBOX_MATH_PROVIDER=pure-math` | `pure-math` | `toolbox_math_tools.py` |

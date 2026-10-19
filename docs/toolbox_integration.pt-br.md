@@ -260,9 +260,6 @@ falha da tool. Não acrescente uma implementação local por trás dele (veja 2.
 
 ### 4.3 Integração no pipeline (se aplicável)
 
-- **Structurer** (`backend/tools/structurer.py`): se a capacidade produz regiões por
-  página, adicione um structurer novo em `get_structurer()` (ex.: `toolbox-layout` →
-  `ToolboxLayoutStructurer`).
 - **Fusão dual** (`backend/pipeline/fusion.py`): se a capacidade produz blocos
   canônicos, pode participar como provider em `extract_fused()`.
 - **Método PDDL** (`backend/core/planning/toolbox_gate.py`): se o handler de um
@@ -395,7 +392,6 @@ service.py: _build_orchestrator()
 - `clients/page_ocr.py` — `document.ocr.page` (VLM de página inteira)
 - `clients/adjudicate.py` — `document.adjudicate.page` / `.region`
 - `clients/orientation.py` — `image.page.orient`
-- `backend/tools/structurer.py` — `get_structurer()` e seleção de structurer
 - `backend/core/manifest/toolbox_extractor.py` — `ToolboxManifestExtractor`
 - `backend/pipeline/fusion.py` — `extract_fused()` (fusão dual)
 - `backend/config/settings.py` — configuração da Toolbox

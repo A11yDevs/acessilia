@@ -260,9 +260,6 @@ result. Do not add a local implementation behind it (see 2.3).
 
 ### 4.3 Pipeline integration (if applicable)
 
-- **Structurer** (`backend/tools/structurer.py`): if the capability produces per-page
-  regions, add a new structurer in `get_structurer()` (e.g. `toolbox-layout` →
-  `ToolboxLayoutStructurer`).
 - **Dual fusion** (`backend/pipeline/fusion.py`): if the capability produces canonical
   blocks, it can participate as a provider in `extract_fused()`.
 - **PDDL method** (`backend/core/planning/toolbox_gate.py`): if a planning method's
@@ -392,7 +389,6 @@ service.py: _build_orchestrator()
 - `clients/page_ocr.py` — `document.ocr.page` (whole-page VLM)
 - `clients/adjudicate.py` — `document.adjudicate.page` / `.region`
 - `clients/orientation.py` — `image.page.orient`
-- `backend/tools/structurer.py` — `get_structurer()` and structurer selection
 - `backend/core/manifest/toolbox_extractor.py` — `ToolboxManifestExtractor`
 - `backend/pipeline/fusion.py` — `extract_fused()` (dual fusion)
 - `backend/config/settings.py` — Toolbox configuration

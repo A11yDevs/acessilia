@@ -41,8 +41,8 @@ The planning-based pipeline and its incorporation are documented separately:
 
 Each diagram is a visual aid; the linked description summarizes its content in text.
 
-1. **Architecture & Multi-Agent Pipeline:** [architecture/architecture.puml](architecture/architecture.puml) — component and package structure of the backend/frontend pipeline.
-2. **Processing Sequence:** [sequence/document_processing_sequence.puml](sequence/document_processing_sequence.puml) — step-by-step flow of a document conversion, including the parallel vision/data agents.
+1. **Architecture:** [architecture/architecture.puml](architecture/architecture.puml) — components of the PDDL engine, the frontends, and the Toolbox and AI services they call.
+2. **Processing Sequence:** [sequence/document_processing_sequence.puml](sequence/document_processing_sequence.puml) — step-by-step flow of a document conversion: manifest extraction on the Toolbox, planning, plan execution and export.
 3. **Task State Machine:** [state_machine/task_state_machine.puml](state_machine/task_state_machine.puml) — lifecycle of a processing task (processing, done, error, cancelled).
 4. **Use Cases:** [use_cases/use_cases.puml](use_cases/use_cases.puml) — actors and the main user-facing operations.
 

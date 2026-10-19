@@ -49,7 +49,7 @@ Legend for **Call path**: how the core reaches the capability.
 | Capability | Client | Core provider default | Toolbox provider | Call path |
 |---|---|---|---|---|
 | `document.structure.extract` | `acessilia_sdk/toolbox/clients/structure.py` | `TOOLBOX_PROVIDER=docling` | `docling`, `mineru`, `nougat`, `teleocr` | `ToolboxManifestExtractor` → PDDL extraction; with `FUSION_MODE=dual`, also compares the secondary provider and passes page evidence to the manifest builder |
-| `document.layout.analyze` | `acessilia_sdk/toolbox/clients/layout.py` | `TOOLBOX_LAYOUT_PROVIDER=docling-layout` | `docling-layout`, `mineru-layout` | `ToolboxLayoutStructurer` via `STRUCTURER=toolbox-layout` |
+| `document.layout.analyze` | `acessilia_sdk/toolbox/clients/layout.py` | `TOOLBOX_LAYOUT_PROVIDER=docling-layout` | `docling-layout`, `mineru-layout` | no core caller since the legacy pipeline was removed; the SDK client and its E2E tests remain |
 | `document.ocr` | `acessilia_sdk/toolbox/clients/ocr.py` | `TOOLBOX_OCR_PROVIDER=docling-ocr` | `docling-ocr`, `mineru-ocr` | `toolbox_ocr_tools.py` (Agno wrapper) |
 | `math.recognize` | `acessilia_sdk/toolbox/clients/math.py` | `TOOLBOX_MATH_RECOGNIZE_PROVIDER=docling-math` | `docling-math`, `rapid-latex-ocr` | `toolbox_math_tools.py` |
 | `math.convert` | `acessilia_sdk/toolbox/clients/math.py` | `TOOLBOX_MATH_PROVIDER=pure-math` | `pure-math` | `toolbox_math_tools.py` |
