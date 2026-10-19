@@ -13,7 +13,7 @@ from pathlib import Path
 
 CONFIG_PATH = (
     Path(__file__).resolve().parents[1]
-    / "scripts" / "drbench" / "experiments" / "slurm" / "providers-config-vlm.yaml"
+    / "scripts" / "bench" / "slurm" / "providers-config-vlm.yaml"
 )
 
 PR125_CAPABILITIES = {

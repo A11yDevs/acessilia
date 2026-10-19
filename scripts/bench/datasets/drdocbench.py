@@ -6,12 +6,14 @@ Local tree, as released on HuggingFace (2077AIDataFoundation/DrDocBench):
     <root>/<subject>/<document_id>/mds/<document_id>_<N>.md   (dev only)
 
 The EvalAI test package has no ``images/`` level; both layouts are read.
-Port of ``scripts/drbench/{download_gt,build_submission,page_record}.py``.
+Port of ``scripts/drbench/{download_gt,build_submission,page_record}.py``
+(tag drbench-2026-snapshot).
 """
 
 from __future__ import annotations
 
 import json
+import shutil
 import sys
 import zipfile
 from pathlib import Path
@@ -94,6 +96,22 @@ class DrDocBench:
         with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
             zf.writestr("predictions.jsonl", "\n".join(lines) + "\n")
         return zip_path
+
+
+    def build_official_tree(self, pages: list[BenchPage], predictions: Path, out: Path) -> int:
+        """Prediction tree of the official evaluator (``tools/multipage_pdf_validation.py``),
+        one-page windows: ``<out>/<subject>/<document_id>_page_<N>-<N>.md``."""
+        if out.exists():
+            shutil.rmtree(out)
+        n = 0
+        for p in pages:
+            src = predictions / f"{p.item_id}.md"
+            if src.exists():
+                dst = out / p.meta["subject"] / f"{p.document_id}_page_{p.page}-{p.page}.md"
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(src, dst)
+                n += 1
+        return n
 
 
 def _write(path: Path, data: bytes) -> None:

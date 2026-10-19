@@ -1,7 +1,8 @@
 """Toolbox structure payload → canonical document and persisted blocks.
 
-Port of the conversion in ``scripts/drbench/run_pipeline.py``. The payload is
-``structured-document@1``: a flat ``elements`` list in reading order.
+Port of the conversion in ``scripts/drbench/run_pipeline.py`` (tag
+drbench-2026-snapshot). The payload is ``structured-document@1``: a flat
+``elements`` list in reading order.
 """
 
 from __future__ import annotations

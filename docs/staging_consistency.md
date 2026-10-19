@@ -108,7 +108,7 @@ The three missing capabilities are the PR #125 clients
 `libs/sdk/src/acessilia_sdk/toolbox/clients/adjudicate.py`), which have no
 production caller. The VLM provider profile that would serve them exists only as
 `scripts/drbench/experiments/slurm/providers-config-vlm.yaml` inside the *core*
-repository, never in the Toolbox catalogue the image is built from.
+repository (now `scripts/bench/slurm/providers-config-vlm.yaml`), never in the Toolbox catalogue the image is built from.
 
 ### S5 — Staging tracks `develop` but its `.env` carries per-host divergence (informational)
 

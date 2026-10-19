@@ -4,7 +4,7 @@ The target is the markdown that document-parsing benchmarks (Dr.DocBench,
 OmniDocBench) compare against: ``#`` headings, tables as structured HTML
 (``table_ast`` with rowspan/colspan), display math as ``$$...$$``, fenced
 code, ``-`` list items and plain text; images carry no content. Port of
-``scripts/drbench/markdown_converter.py``.
+``scripts/drbench/markdown_converter.py`` (tag drbench-2026-snapshot).
 """
 from __future__ import annotations
 

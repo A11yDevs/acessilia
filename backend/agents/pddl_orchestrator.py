@@ -1055,7 +1055,7 @@ def _handle_tailjoin_method(
 # --- Methods that choose between the two providers of FUSION_MODE=dual -------
 #
 # table-smart-fusion, skeleton-order and agreement-rule port Dr.DocBench rules
-# (scripts/drbench/experiments/differ/tree_differ_v2.py and
+# (tree_differ_v2.py of the drbench-2026-snapshot tag and
 # docstruct.fusion.adjudication.decide_v1). They read the secondary provider's
 # extraction that the structure extractor keeps as a manifest artifact. The
 # rules were calibrated on the docling + mineru pair, so any other pair fails

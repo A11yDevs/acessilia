@@ -11,31 +11,21 @@ Versão em inglês: [drbench.md](drbench.md)
 
 ```
 página (imagem) → Toolbox capability document.structure.extract (provider)
-                → provider payload → árvore canônica (build_canonical_document)
-                → canonical_to_drbench_md → predictions/<item>.drbench.md
-                → eval_run (métricas) → reports/
+                → provider payload → árvore canônica (scripts/bench/core.py)
+                → docstruct.export.markdown → predictions/<item>.md
+                → docstruct.evaluation (métricas) → report.json, pages.jsonl, drilldown.csv
 ```
 
-O provedor é selecionado por `--provider` no `run_pipeline.py` (ex.: `docling`,
+O fluxo roda pelo harness de benchmark (`python -m scripts.bench`, ver
+[bench.md](bench.md)). O provedor é selecionado por `--provider` (ex.: `docling`,
 `mineru`) e repassado ao `ToolboxStructureClient` do SDK (via `make_toolbox_client`). A Toolbox roteia para o
 provider registrado em `providers-config.yaml` (endpoints `docling-serve` e
 `mineru-serve`).
 
-## Scripts (`scripts/drbench/`)
+## Métricas
 
-| Script | Função |
-|---|---|
-| `run_pipeline.py` | Gera predictions: baixa página, extrai via provider, converte para árvore canônica e escreve `*.drbench.md` |
-| `eval_run.py` | Pontua predictions contra o ground truth (Text ED, Reading Order, TEDS, CDM, Overall) |
-| `download_gt.py` | Download em lote do ground truth e imagens do dataset |
-| `build_submission.py` | Monta submission no formato EvalAI |
-| `markdown_converter.py` | Converte árvore canônica → markdown do benchmark |
-| `page_record.py` | Registro canônico de página (`DrBenchPage`) |
-
-## Métricas (`scripts/metrics/`)
-
-As métricas vivem **dentro deste repositório** (migradas do pacote externo
-`acessilia-metrics`), seguindo o contrato EvalAI do Dr.DocBench:
+As métricas ficam em `docstruct.evaluation.metrics` e seguem o contrato EvalAI
+do Dr.DocBench:
 
 | Métrica | Escopo | Escala |
 |---|---|---|
@@ -52,20 +42,17 @@ ao EvalAI.
 ## Como rodar
 
 ```bash
-# 1. Gerar predictions (provider docling ou mineru)
-python -m scripts.drbench.run_pipeline --split dev --sample 10 --provider mineru \
-    --out-dir var/drbench/predictions-mineru
-python -m scripts.drbench.run_pipeline --item <uuid>_p32 --provider docling
-
-# 2. Avaliar
-python -m scripts.drbench.eval_run \
-    --predictions var/drbench/predictions-mineru \
-    --gt-dir var/drbench/dev --provider mineru \
-    --report var/drbench/reports/mineru.json
+uv run python -m scripts.bench download --dataset drdocbench --split dev --limit 100
+uv run python -m scripts.bench run --dataset drdocbench --split dev --provider mineru --run mineru
+uv run python -m scripts.bench run --dataset drdocbench --split dev --provider docling --run docling
+uv run python -m scripts.bench score --dataset drdocbench --split dev --run mineru
 ```
 
-Saídas: `reports/<provider>.json` (agregado), `tracking.csv` (histórico),
-`drilldown-<provider>.csv` (por página).
+Saídas em `var/bench/drdocbench/dev/<run>/`: `report.json` (agregado),
+`pages.jsonl` e `drilldown.csv` (por página, piores primeiro). Em cluster
+Slurm, `scripts/bench/slurm/bench.sbatch` sobe o provider e a Toolbox dentro do
+job. Os scripts que produziram os resultados abaixo (`scripts/drbench/`) estão
+na tag `drbench-2026-snapshot`; ver [drbench/experiments/CODE.md](drbench/experiments/CODE.md).
 
 ## Resultados do ciclo Docling vs MinerU (2026-09-15)
 
@@ -111,7 +98,7 @@ Por página (overall):
 A árvore canônica de cada provider pode ser inspecionada lado a lado:
 
 ```python
-from scripts.drbench.run_pipeline import provider_payload_to_canonical
+from scripts.bench.core import payload_to_canonical
 from acessilia_sdk.toolbox.clients import ToolboxStructureClient
 from backend.tools.toolbox_client import make_toolbox_client
 
@@ -120,7 +107,7 @@ try:
     result = await client.extract_structure(file_path=page_image)
 finally:
     await client.close()
-canonical = provider_payload_to_canonical(result)
+canonical = payload_to_canonical(result)
 ```
 
 Notebook completo com a experimentação:

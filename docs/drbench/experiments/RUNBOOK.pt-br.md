@@ -23,20 +23,24 @@ de inferência. É isso que torna uma execução registrada reproduzível sem GP
 
 ## 1. Reconstruir o ambiente
 
+O código dos experimentos não está mais nos branches principais: tudo neste
+runbook roda a partir da tag `drbench-2026-snapshot` (o que cada script faz e
+para onde foi seu algoritmo: [CODE.pt-br.md](CODE.pt-br.md)).
+
 ```bash
-# Core + biblioteca + dependências de teste (pytest, numpy), pinados pelo lockfile;
-# acrescente --extra drbench para o OpenCV (scripts/drbench/experiments/differ/orient_pages.py)
+git checkout drbench-2026-snapshot
+
+# Core (numpy e OpenCV são dependências do core nesta tag) + biblioteca + pytest, pinados pelo lockfile
 uv sync --frozen --extra dev
 
 # Os testes da biblioteca devem passar sem o backend instalado
 uv run pytest libs/docstruct/tests
 
-# Testes do core (6 falhas pré-existentes em test_formula_enrichment.py e
-# test_pddl_orchestrator.py são esperadas; 0 skips)
+# Testes do core: 1383 passed, 0 skips
 uv run pytest -m "not e2e"
 ```
 
-O lockfile é `uv.lock` (90 pacotes). O `pyproject.toml` declara
+Na tag, o lockfile é `uv.lock` (90 pacotes). O `pyproject.toml` declara
 `acessilia-docstruct` como fonte de caminho editável, então `uv sync` instala a
 biblioteca a partir de `libs/docstruct`.
 
@@ -137,8 +141,8 @@ repositório (no scratch do cluster).
 
 ## 7. Referências
 
-- `scripts/drbench/experiments/eval/FROZEN_REPLAY.md` — formato do spec e disciplina
-- `scripts/drbench/experiments/README.md` — layout do workspace e relocação
+- [`FROZEN_REPLAY.md`](https://github.com/A11yDevs/acessilia/blob/drbench-2026-snapshot/scripts/drbench/experiments/eval/FROZEN_REPLAY.md) (tag `drbench-2026-snapshot`) — formato do spec e disciplina
+- [`CODE.pt-br.md`](CODE.pt-br.md) — o código dos experimentos, layout do workspace e relocação
 - `docs/drbench/experiments/SERVICES-LOOP.md` — serviços iniciados dentro de cada job
 - `docs/drbench/experiments/LOOP.md` — o loop de experimentos e suas decisões
 - `docs/drbench/experiments/SUBMISSIONS-LEADERBOARD.md` — submissões e scores

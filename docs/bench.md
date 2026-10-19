@@ -51,6 +51,26 @@ gains on tune, does not lose on holdout and no metric drops beyond the
 tolerance. It exits 1 when the candidate is rejected, including when one of the
 subsets has no scorable pages (too small a sample).
 
+## On a Slurm cluster
+
+`scripts/bench/slurm/` has three jobs; each sources `env.sh`, which needs `WS`
+(the workspace that holds `repos/acessilia`, `repos/acessilia-toolbox` and
+`data/`) and keeps every cache and run under it (`BENCH_VAR=$WS/bench`).
+Submit from `$WS` and pass the partition with `-p`.
+
+| Job | What |
+|---|---|
+| `setup.sbatch` | Toolbox, docling-serve and MinerU venvs and models, this repo's venv; optionally a HuggingFace dataset snapshot (`HF_DATASET`, `HF_PATTERN`, `DATASET_DIR`) |
+| `bench.sbatch` | starts the provider (`PROVIDER=docling\|mineru`) and the Toolbox inside the job, on ports derived from the job id, then `scripts.bench run --resume` and `score`; resubmitting the same `RUN` resumes |
+| `eval_official.sbatch` | builds the official evaluator's one-page tree for each run in `RUNS` and scores it with `$WS/repos/DrDocBench` (`CONFIG` is the evaluator config; `cdm_env.sh` for CDM) |
+
+```bash
+cd $WS
+sbatch -p <partition> -c 8 --mem 32G --time 04:00:00 --job-name mineru-dev \
+  --export=ALL,WS=$PWD,DATASET=drdocbench,ROOT=$PWD/data/drdocbench/dev,RUN=mineru,PROVIDER=mineru \
+  repos/acessilia/scripts/bench/slurm/bench.sbatch
+```
+
 ## Adding a dataset
 
 Write `scripts/bench/datasets/<name>.py` with a class that implements
@@ -68,5 +88,6 @@ markdown, convert it to markdown in `download` so that `score` applies as is.
 ## Dr.DocBench experiment snapshot
 
 The shared-task experiment code (fusion variants, Slurm jobs, frozen replay)
-is preserved at the tag `drbench-2026-snapshot`; its runbook is
-[`docs/drbench/experiments/RUNBOOK.md`](drbench/experiments/RUNBOOK.md).
+is preserved at the tag `drbench-2026-snapshot`: what each script did and where
+its algorithm went is in [CODE.md](drbench/experiments/CODE.md), and how to run
+it in the [runbook](drbench/experiments/RUNBOOK.md).

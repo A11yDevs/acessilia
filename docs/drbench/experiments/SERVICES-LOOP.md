@@ -20,4 +20,4 @@ accordingly. Health: `GET /health` (docling), `GET /openapi.json` (mineru), `GET
 Virtualenvs (Python 3.11, uv): `repos/acessilia-toolbox/{.venv,.venv-docling,.venv-mineru}`,
 `repos/acessilia/.venv`. Models: `$CACHE_ROOT/docling/models`,
 `$CACHE_ROOT/huggingface/hub/models--opendatalab--PDF-Extract-Kit-1.0`. Environment:
-`runs/slurm/env.sh` (parameterised — see `scripts/drbench/experiments/README.md`).
+`runs/slurm/env.sh` (parameterised — see [CODE.md](CODE.md)).

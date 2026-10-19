@@ -6,8 +6,9 @@
     python -m scripts.bench compare  var/bench/drdocbench/dev/<base> var/bench/drdocbench/dev/<candidate>
     python -m scripts.bench submit   --dataset drdocbench --split test
 
-Data lives in ``var/bench/<dataset>/<split>/data`` (``--root`` to override);
-each run in ``var/bench/<dataset>/<split>/<run>`` (``--run``, default ``latest``).
+Data lives in ``$BENCH_VAR/<dataset>/<split>/data`` (``--root`` to override);
+each run in ``$BENCH_VAR/<dataset>/<split>/<run>`` (``--run``, default ``latest``).
+``BENCH_VAR`` defaults to ``var/bench`` in the repository.
 Scores are local approximations for tracking deltas; use the benchmark's
 official evaluator for reported numbers.
 """
@@ -16,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -27,7 +29,7 @@ from scripts.bench import core, toolbox
 from scripts.bench.datasets import DATASETS
 from scripts.bench.report import compare_runs, score_run
 
-VAR = Path(__file__).resolve().parents[2] / "var" / "bench"
+VAR = Path(os.environ.get("BENCH_VAR") or Path(__file__).resolve().parents[2] / "var" / "bench")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -50,6 +52,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--item", help="a single item id")
     p.add_argument("--provider", help="Toolbox structure provider override")
     p.add_argument("--save-raw", action="store_true", help="also keep the Toolbox payload")
+    p.add_argument("--resume", action="store_true", help="skip pages that already have a prediction")
     dataset_command("score", "score a run against the ground truth")
     dataset_command("submit", "package a run in the benchmark's submission format")
     p = sub.add_parser("compare", help="tune/holdout acceptance of a candidate run")
@@ -79,6 +82,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "run":
         if args.item:
             pages = [p for p in pages if p.item_id == args.item]
+        if args.resume:
+            pages = [p for p in pages if not (predictions / f"{p.item_id}.md").exists()]
         if args.sample:
             pages = pages[: args.sample]
         return _run(pages, predictions, args.provider, args.save_raw)

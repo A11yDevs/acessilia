@@ -408,7 +408,7 @@ service.py: _build_orchestrator()
 | `image.page.orient` | `ToolboxOrientationClient` | `rapidocr-orient` | Rotation 0/90/180/270 detection |
 
 The provider registrations live in the Toolbox repository; the Dr.DocBench job
-config that mirrors them is `scripts/drbench/experiments/slurm/providers-config-vlm.yaml`.
+config that mirrors them is `scripts/bench/slurm/providers-config-vlm.yaml`.
 
 `mineru-hyb` (MinerU 3.x, `backend=hybrid-engine`) is registered as a
 `document.structure.extract` / `document.layout.analyze` / `document.ocr`

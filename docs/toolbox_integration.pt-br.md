@@ -412,7 +412,7 @@ service.py: _build_orchestrator()
 
 Os registros de provider vivem no repositório da Toolbox; a configuração de job
 do Dr.DocBench que os espelha é
-`scripts/drbench/experiments/slurm/providers-config-vlm.yaml`.
+`scripts/bench/slurm/providers-config-vlm.yaml`.
 
 O `mineru-hyb` (MinerU 3.x, `backend=hybrid-engine`) está registrado como
 provider de `document.structure.extract` / `document.layout.analyze` /
