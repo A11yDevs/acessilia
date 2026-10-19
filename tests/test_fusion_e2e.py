@@ -27,6 +27,7 @@ from pathlib import Path
 
 import httpx
 import pytest
+from acessilia_sdk.toolbox.transport import auth_headers
 
 from backend.agents.pddl_orchestrator import (
     _handle_dual_provider_fusion_method,
@@ -234,7 +235,9 @@ def _require_fusion_providers() -> None:
     for provider in ("docling", "mineru"):
         try:
             response = httpx.get(
-                f"{base_url}/v1/providers/{provider}/health", timeout=10
+                f"{base_url}/v1/providers/{provider}/health",
+                headers=auth_headers(os.getenv("TOOLBOX_API_KEY", "").strip()),
+                timeout=10,
             )
             healthy = (
                 response.status_code == 200
