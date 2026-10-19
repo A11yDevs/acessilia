@@ -46,18 +46,6 @@ jobs:
           restore-keys: |
             pip-${{ runner.os }}-py3.11-
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends \
-            build-essential \
-            ffmpeg \
-            fonts-dejavu-core \
-            libgl1 \
-            libglib2.0-0 \
-            libmagic1 \
-            poppler-utils
-
       - name: Install project dependencies
         run: |
           python -m pip install --upgrade pip

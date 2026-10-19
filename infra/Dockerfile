@@ -13,62 +13,15 @@ RUN set -eux \
                  sed -i '/^URIs: http:\/\/deb.debian.org\/debian$/s|http://deb.debian.org/debian|http://ftp.us.debian.org/debian|' /etc/apt/sources.list.d/debian.sources; \
              fi
 
+# Operational tools (TeX Live, veraPDF, OCR, media inspection) run on the
+# Toolbox, not here (docs/adr/0003), and so do the DOCX and PDF/UA exports.
+# curl serves the compose healthcheck. Every Python dependency ships a
+# linux/amd64 wheel, so no compiler is needed.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        build-essential \
         ca-certificates \
         curl \
-        default-jre-headless \
-        ffmpeg \
-        fonts-dejavu \
-        libgl1 \
-        libglib2.0-0 \
-        libmagic1 \
-        poppler-utils \
-        texlive-fonts-recommended \
-        texlive-fonts-extra \
-        texlive-latex-recommended \
-        texlive-luatex \
-        texlive-xetex \
-        unzip \
-        wget \
     && rm -rf /var/lib/apt/lists/*
-
-ARG VERAPDF_VERSION=1.30.2
-ARG VERAPDF_INSTALLER_REV=2
-ENV VERAPDF_HOME=/opt/verapdf
-
-RUN set -eux \
-    && echo "verapdf-installer-rev=${VERAPDF_INSTALLER_REV}" \
-    && wget -O /tmp/verapdf-installer.zip \
-        "https://software.verapdf.org/releases/1.30/verapdf-greenfield-${VERAPDF_VERSION}-installer.zip" \
-    && mkdir -p /tmp/verapdf-installer \
-    && unzip -q /tmp/verapdf-installer.zip -d /tmp/verapdf-installer \
-    && VERA_DIR="/tmp/verapdf-installer/verapdf-greenfield-${VERAPDF_VERSION}" \
-    && printf '%s\n' \
-        '<AutomatedInstallation langpack="eng">' \
-        '    <com.izforge.izpack.panels.htmlhello.HTMLHelloPanel id="welcome"/>' \
-        '    <com.izforge.izpack.panels.target.TargetPanel id="install_dir">' \
-        '        <installpath>/opt/verapdf</installpath>' \
-        '    </com.izforge.izpack.panels.target.TargetPanel>' \
-        '    <com.izforge.izpack.panels.packs.PacksPanel id="sdk_pack_select">' \
-        '        <pack index="0" name="veraPDF GUI" selected="true"/>' \
-        '        <pack index="1" name="veraPDF CLI" selected="true"/>' \
-        '    </com.izforge.izpack.panels.packs.PacksPanel>' \
-        '    <com.izforge.izpack.panels.install.InstallPanel id="install"/>' \
-        '    <com.izforge.izpack.panels.finish.FinishPanel id="finish"/>' \
-        '</AutomatedInstallation>' \
-        > /tmp/verapdf-installer/auto-install.xml \
-    && chmod +x "${VERA_DIR}/verapdf-install" \
-    && "${VERA_DIR}/verapdf-install" /tmp/verapdf-installer/auto-install.xml \
-    && test -d /opt/verapdf \
-    && ln -sf /opt/verapdf/verapdf /usr/local/bin/verapdf \
-    && if [ ! -x /usr/local/bin/verapdf ]; then \
-           CLI_PATH=$(find /opt/verapdf -maxdepth 2 -type f -name verapdf 2>/dev/null | head -n 1 || true); \
-           if [ -n "${CLI_PATH}" ]; then ln -sf "${CLI_PATH}" /usr/local/bin/verapdf; fi; \
-       fi \
-    && test -x /usr/local/bin/verapdf \
-    && rm -rf /tmp/verapdf-installer /tmp/verapdf-installer.zip
 
 ARG GIT_COMMIT=
 ARG IMAGE_TAG=

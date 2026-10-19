@@ -1,25 +1,54 @@
-__pycache__/
-*.py[cod]
-*.pyo
-*.pyd
-*.so
-*.egg-info/
-.eggs/
+# Docker matches these against the build context root: a pattern without
+# "**/" skips only the top-level path, so nested caches need "**/".
+
+# Python and tool caches, anywhere (libs/* keep their own .venv and caches)
+**/__pycache__/
+**/*.py[cod]
+**/*.so
+**/*.egg-info/
+**/.eggs/
+**/.venv/
+**/.venv-*/
+**/venv/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/.coverage
+**/coverage/
+**/htmlcov/
+**/.DS_Store
+
+# Secrets and local settings
+**/.env
+**/.env.*
 .git/
 .gitignore
-.venv/
-venv/
-.env
-.env.*
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-coverage/
-htmlcov/
-logs/
-var/
-temp/
-.DS_Store
 .idea/
 .vscode/
-*.log
+
+# Runtime, output and scratch directories (the image mounts /app/var)
+var/
+data/
+cache/
+temp/
+trash/
+output/
+logs/
+build/
+dist/
+**/*.log
+**/*.db
+**/*.sqlite
+**/*.sqlite3
+**/*.aux
+**/*.fdb_latexmk
+**/*.fls
+**/*.synctex.gz
+backend/locales/*/LC_MESSAGES/*.mo
+
+# Not read at runtime: the image installs no test dependencies, and docs,
+# CI config and the Dr.DocBench experiments are for development only.
+tests/
+docs/
+.github/
+scripts/drbench/
