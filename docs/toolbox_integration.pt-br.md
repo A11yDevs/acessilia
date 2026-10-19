@@ -116,8 +116,8 @@ degrada de forma visível, como decisão de negócio, e registra a causa.
 
 Os wrappers "Toolbox primeiro, fallback local" que ainda estão no código são
 **desvios em remoção** na [#150](https://github.com/A11yDevs/acessilia/issues/150):
-os dois structurers da Toolbox. A exportação PDF/UA e o `media.inspect` não têm
-mais fallback: rodam só na Toolbox, e o `toolbox_pdf_tools.py` foi removido. Não copie
+os dois structurers da Toolbox. As exportações DOCX e PDF/UA e o `media.inspect`
+não têm mais fallback: rodam só na Toolbox, e o `toolbox_pdf_tools.py` foi removido. Não copie
 esse padrão em código novo; um executor local ou offline precisa de um ADR
 próprio.
 

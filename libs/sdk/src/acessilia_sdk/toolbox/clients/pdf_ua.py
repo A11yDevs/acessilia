@@ -21,6 +21,7 @@ class ToolboxPdfUaClient(PandocExportClient):
     """PDF/UA export."""
 
     provider_key = "toolbox_pdf_ua_provider"
+    timeout_key = "toolbox_pdf_ua_timeout_seconds"
     capability = CAPABILITY
     media_type = PDF_MEDIA_TYPE
     format_name = "PDF"

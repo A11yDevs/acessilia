@@ -7,6 +7,7 @@ which renders PDF/UA only on the Toolbox, with no local fallback
 """
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
 from pathlib import Path
@@ -189,8 +190,18 @@ def test_the_core_has_no_local_pdf_ua_toolchain():
     ):
         assert not hasattr(pandoc_exporter, name), name
     assert not (Path(pandoc_exporter.__file__).parent / "templates" / "pdf_ua.tex").exists()
-    source = Path(pandoc_exporter.__file__).read_text(encoding="utf-8")
-    assert "subprocess" not in source and "shutil" not in source
+    tree = ast.parse(Path(pandoc_exporter.__file__).read_text(encoding="utf-8"))
+    imported = {
+        alias.name.split(".")[0]
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Import)
+        for alias in node.names
+    } | {
+        (node.module or "").split(".")[0]
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom)
+    }
+    assert not imported & {"subprocess", "shutil"}
 
 
 @pytest.mark.respx(base_url=BASE_URL)

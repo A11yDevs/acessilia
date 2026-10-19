@@ -112,6 +112,7 @@ def _render_docx(
     """
     if not settings.toolbox_docx_enabled:
         raise RuntimeError(t(MSG_DOCX_DISABLED))
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     toolbox_export_docx(ast, output_path, lang=lang)
     logger.info(t(LOG_DOCX_TOOLBOX_EXPORTED).format(output_path=output_path))
     return output_path
@@ -140,6 +141,7 @@ def _render_pdf_ua(
     """
     if not settings.toolbox_pdf_ua_enabled:
         raise RuntimeError(t(MSG_PDF_UA_DISABLED))
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     toolbox_export_pdf_ua(ast, output_path, lang=lang)
     logger.info(t(LOG_PDF_UA_TOOLBOX_EXPORTED).format(output_path=output_path))
     return output_path

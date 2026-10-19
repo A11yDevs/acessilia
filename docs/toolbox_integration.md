@@ -117,8 +117,8 @@ as a business decision, and records the cause.
 
 The "Toolbox first, local fallback" wrappers still in the code are **deviations
 being removed** in [#150](https://github.com/A11yDevs/acessilia/issues/150):
-the two Toolbox structurers. PDF/UA export and `media.inspect` no longer have
-one: they run only on the Toolbox, and `toolbox_pdf_tools.py` is gone. Do not
+the two Toolbox structurers. DOCX and PDF/UA export and `media.inspect` no
+longer have one: they run only on the Toolbox, and `toolbox_pdf_tools.py` is gone. Do not
 copy that pattern into new code; a local or offline executor needs its own ADR.
 
 ---

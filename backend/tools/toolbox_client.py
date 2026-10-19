@@ -30,11 +30,7 @@ from acessilia_sdk.toolbox import (
     ToolboxUnavailable,
     parse_endpoints,
 )
-from acessilia_sdk.toolbox.clients import (
-    ToolboxDocxClient,
-    ToolboxMathClient,
-    ToolboxPdfUaClient,
-)
+from acessilia_sdk.toolbox.clients import ToolboxMathClient
 from acessilia_sdk.toolbox.transport import media_type_for as _media_type
 from backend.config.settings import settings
 from backend.tools.logger import logger
@@ -64,15 +60,14 @@ def _log_failover(endpoint: ToolboxEndpoint, error: ToolboxError) -> None:
 
 def _class_defaults(client_cls: type[ToolboxCapabilityClient]) -> dict[str, Any]:
     """Settings that only some clients take."""
+    defaults: dict[str, Any] = {}
     if issubclass(client_cls, ToolboxMathClient):
-        return {"transform_provider": settings.toolbox_math_provider}
-    if issubclass(client_cls, ToolboxPdfUaClient):
-        # The shared Toolbox timeout (default one hour) is far too long for
-        # an export that renders in seconds.
-        return {"timeout_seconds": settings.toolbox_pdf_ua_timeout_seconds}
-    if issubclass(client_cls, ToolboxDocxClient):
-        return {"timeout_seconds": settings.toolbox_docx_timeout_seconds}
-    return {}
+        defaults["transform_provider"] = settings.toolbox_math_provider
+    if client_cls.timeout_key:
+        # Exports that render in seconds have their own timeout: the shared
+        # one (default one hour) is far too long for them.
+        defaults["timeout_seconds"] = getattr(settings, client_cls.timeout_key)
+    return defaults
 
 
 def make_toolbox_client(client_cls: type[ClientT], **overrides: Any) -> ClientT:

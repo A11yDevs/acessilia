@@ -8,6 +8,8 @@ which renders DOCX only on the Toolbox, with no local fallback
 from __future__ import annotations
 
 import hashlib
+import re
+import tomllib
 from pathlib import Path
 
 import httpx
@@ -70,7 +72,7 @@ def test_a_toolbox_failure_propagates_without_a_local_fallback(monkeypatch, tmp_
     monkeypatch.setattr(settings, "toolbox_docx_enabled", True)
 
     def toolbox_down(ast, output_path, *, lang):
-        raise ToolboxProviderUnavailable("pdf-ua-render offline")
+        raise ToolboxProviderUnavailable("docx renderer offline")
 
     monkeypatch.setattr("backend.export.pandoc_exporter.toolbox_export_docx", toolbox_down)
 
@@ -110,6 +112,31 @@ def test_toolbox_docx_enabled_is_parsed_from_the_environment(monkeypatch, raw, e
 def test_the_python_docx_renderer_is_gone():
     renderers = Path(pandoc_exporter.__file__).parent / "renderers"
     assert not (renderers / "docx_renderer.py").exists()
+    root = Path(__file__).resolve().parents[1]
+    dependencies = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+    project = dependencies["project"]
+    declared = project["dependencies"] + [
+        requirement
+        for group in project.get("optional-dependencies", {}).values()
+        for requirement in group
+    ]
+    assert not any(re.match(r"python-docx\b", requirement) for requirement in declared)
+    assert 'name = "python-docx"' not in (root / "uv.lock").read_text(encoding="utf-8")
+
+
+def test_the_destination_directory_is_created(monkeypatch, tmp_path):
+    monkeypatch.setattr(settings, "toolbox_docx_enabled", True)
+
+    def fake_toolbox(ast, output_path, *, lang):
+        assert output_path.parent.is_dir()
+        output_path.write_bytes(DOCX)
+        return {"artifact_id": DOCX_ID}
+
+    monkeypatch.setattr("backend.export.pandoc_exporter.toolbox_export_docx", fake_toolbox)
+    output = pandoc_exporter.export_accessible_document(
+        "# Relatório\n", tmp_path / "missing" / "doc.docx", format_name="docx"
+    )
+    assert output.read_bytes() == DOCX
 
 
 @pytest.mark.respx(base_url=BASE_URL)

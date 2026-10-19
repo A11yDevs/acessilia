@@ -17,6 +17,7 @@ class ToolboxDocxClient(PandocExportClient):
     """DOCX export."""
 
     provider_key = "toolbox_docx_provider"
+    timeout_key = "toolbox_docx_timeout_seconds"
     capability = CAPABILITY
     media_type = DOCX_MEDIA_TYPE
     format_name = "DOCX"
