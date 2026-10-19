@@ -22,6 +22,7 @@ ones here instead of restating them.
 | [0004](0004-single-source-of-truth-for-contracts.md) | One source of truth per contract | Accepted |
 | [0005](0005-artifact-references.md) | Reference-oriented processing with `ArtifactRef` | Accepted |
 | [0006](0006-availability-and-failover.md) | Availability through replicas; SDK failover as a secondary mechanism | Accepted |
+| [0007](0007-manifest-model-and-mathml-conversion.md) | Canonical manifest model, and MathML conversion and verbalization of formulas | Accepted |
 
 ## Process
 
