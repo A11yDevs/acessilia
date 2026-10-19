@@ -1107,7 +1107,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         MSG_HEADING_GAP: (
             "A hierarquia de títulos salta do nível {previous} para o nível {level}."
         ),
-        # PyMuPDF extraction fallback when the source file is missing on disk at lookup time; substituted at call time via .format().
         # Model validation failure text for a planner outcome recorded before execution actually began.
         MSG_PLANNER_NOT_STARTED: ("A tentativa terminou antes de começar"),
         # Failure for execute-obligation steps missing required execution parameters in NominalPlan validation of PlanSteps.

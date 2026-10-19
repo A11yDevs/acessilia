@@ -91,9 +91,6 @@ class Settings:
             "a11y-devs-describer",
         )
     )
-    pymupdf_text_threshold: int = field(
-        default_factory=lambda: int(os.getenv("PYMUPDF_TEXT_THRESHOLD", "100"))
-    )
     structurer: str = field(default_factory=lambda: os.getenv("STRUCTURER", "toolbox"))
     pipeline_engine: str = field(
         default_factory=lambda: os.getenv("PIPELINE_ENGINE", "pddl")
