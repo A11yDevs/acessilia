@@ -48,6 +48,7 @@ from backend.core.planning import toolbox_gate
 from backend.core.planning.planner_agent import PlannerAgent
 from backend.i18n import t
 from backend.log_messages import (
+    LOG_MEDIA_INSPECT_FAILED,
     LOG_PDDL_ELEMENT_CROP_FAILED,
     LOG_PDDL_EMPTY_VISION_DESCRIPTION,
     LOG_PDDL_IMAGES_ENRICHED,
@@ -1987,13 +1988,7 @@ class PddlAccessibilityOrchestrator:
         manifest.extractor.configuration["region_inspection_mode"] = effective_mode
 
         source_path = file_path.resolve()
-        media_inspection = await inspect_source_media(source_path)
-        if media_inspection is None:
-            logger.warning(
-                "Inspeção de mídia indisponível para %s; seguindo sem o "
-                "sinal de imagem isolada",
-                source_path.name,
-            )
+        media_inspection = await _inspect_media_or_degrade(manifest, source_path)
 
         if status_callback:
             await status_callback(t(STAGE_ENRICHING_IMAGE_DESCRIPTIONS))
@@ -2285,6 +2280,39 @@ async def _enrich_picture_descriptions(
 
     if enriched:
         logger.info(t(LOG_PDDL_IMAGES_ENRICHED).format(count=enriched))
+
+
+async def _inspect_media_or_degrade(
+    manifest: ProcessingManifest,
+    source_path: Path,
+) -> dict[str, Any] | None:
+    """Runs ``media.inspect`` and degrades visibly when the Toolbox fails.
+
+    The inspection only feeds the standalone-image heuristic, so a Toolbox
+    failure does not fail the job: the run continues without the signal, logs
+    a warning and records the cause in ``manifest.extractor.configuration``
+    (``media_inspection`` is ``toolbox``, ``disabled`` or ``failed``, plus
+    ``media_inspection_error`` on failure).
+    """
+    from backend.tools.toolbox_client import ToolboxError
+
+    configuration = manifest.extractor.configuration
+    try:
+        media_inspection = await inspect_source_media(source_path)
+    except ToolboxError as exc:
+        cause = f"{type(exc).__name__}: {exc}"
+        logger.warning(
+            t(LOG_MEDIA_INSPECT_FAILED).format(
+                filename=source_path.name, error=cause
+            )
+        )
+        configuration["media_inspection"] = "failed"
+        configuration["media_inspection_error"] = cause
+        return None
+    configuration["media_inspection"] = (
+        "disabled" if media_inspection is None else "toolbox"
+    )
+    return media_inspection
 
 
 def _inject_full_page_picture(

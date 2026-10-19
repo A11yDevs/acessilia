@@ -154,6 +154,9 @@ from backend.log_messages import (
     LOG_PDF_EXPORTED,
     LOG_PDF_UA_EXPORTED,
     LOG_PDF_UA_SKIPPED_DISABLED,
+    LOG_MEDIA_INSPECT_SKIPPED_DISABLED,
+    LOG_MEDIA_INSPECT_TOOLBOX_FINISHED,
+    LOG_MEDIA_INSPECT_FAILED,
     LOG_PDF_UA_TOOLBOX_EXPORTED,
     LOG_TXT_EXPORTED,
     LOG_DOCX_EXPORTED,
@@ -796,6 +799,9 @@ MESSAGES: tuple[str, ...] = (
     LOG_PDF_EXPORTED,
     LOG_PDF_UA_EXPORTED,
     LOG_PDF_UA_SKIPPED_DISABLED,
+    LOG_MEDIA_INSPECT_SKIPPED_DISABLED,
+    LOG_MEDIA_INSPECT_TOOLBOX_FINISHED,
+    LOG_MEDIA_INSPECT_FAILED,
     LOG_PDF_UA_TOOLBOX_EXPORTED,
     LOG_TXT_EXPORTED,
     LOG_DOCX_EXPORTED,
@@ -1548,6 +1554,15 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         LOG_PDF_UA_TOOLBOX_EXPORTED: "PDF/UA renderizado pela Toolbox: {output_path}",
         # Worker skips PDF/UA because the Toolbox capability is switched off.
         LOG_PDF_UA_SKIPPED_DISABLED: "PDF/UA ignorado: TOOLBOX_PDF_UA_ENABLED está desativado",
+        # media.inspect skipped because the Toolbox capability is switched off.
+        LOG_MEDIA_INSPECT_SKIPPED_DISABLED: "Inspeção de mídia ignorada: TOOLBOX_MEDIA_INSPECT_ENABLED está desativado",
+        # Toolbox finished media.inspect; {nature} the artifact nature, {visual} whether it needs visual inspection.
+        LOG_MEDIA_INSPECT_TOOLBOX_FINISHED: "Toolbox: media.inspect concluído (natureza={nature}, visual={visual})",
+        # media.inspect failed on the Toolbox; the run continues without the standalone-image signal.
+        LOG_MEDIA_INSPECT_FAILED: (
+            "Inspeção de mídia indisponível para {filename}; seguindo sem o "
+            "sinal de imagem isolada: {error}"
+        ),
         # TXT export wrapper debug line; {output_path} the destination file path.
         LOG_TXT_EXPORTED: "TXT exportado: {output_path}",
         # DOCX export wrapper debug line; {output_path} the destination file path.
