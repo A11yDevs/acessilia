@@ -69,9 +69,7 @@ def test_agent_builds_valid_manifest_and_candidate_obligation(tmp_path: Path):
     assert manifest.source.filename == "sample.pdf"
 
 
-def test_obligations_come_from_the_core_policy_not_the_payload(tmp_path: Path):
-    response = json.loads(TOOLBOX_RESPONSE.read_text(encoding="utf-8"))
-    response["document"]["obligations"] = [{"id": "foreign", "kind": "toolbox-only"}]
+def _build_from_response(tmp_path: Path, response: dict):
     timestamp = datetime(2026, 7, 27, tzinfo=timezone.utc)
     extraction = ToolboxExtraction(
         document=response,
@@ -83,10 +81,36 @@ def test_obligations_come_from_the_core_policy_not_the_payload(tmp_path: Path):
     )
     source = tmp_path / "sample.pdf"
     source.write_bytes(b"%PDF-test")
+    return build_processing_manifest(source, extraction)
 
-    manifest = build_processing_manifest(source, extraction)
+
+def test_obligations_come_from_the_core_policy_not_the_payload(tmp_path: Path):
+    response = json.loads(TOOLBOX_RESPONSE.read_text(encoding="utf-8"))
+    response["document"]["obligations"] = [{"id": "foreign", "kind": "toolbox-only"}]
+
+    manifest = _build_from_response(tmp_path, response)
 
     assert all(o.kind != "toolbox-only" for o in manifest.obligations)
+
+
+def test_callout_metadata_from_the_toolbox_passes_through(tmp_path: Path):
+    # The PDDL orchestrator turns these fields into note/warning blocks.
+    callout = {
+        "callout_id": "callout-1",
+        "callout_role": "body",
+        "callout_type": "warning",
+        "callout_title": "Atenção",
+    }
+    response = json.loads(TOOLBOX_RESPONSE.read_text(encoding="utf-8"))
+    element = next(
+        e for e in response["document"]["elements"] if e["id"] == "element-000004"
+    )
+    element["metadata"].update(callout)
+
+    manifest = _build_from_response(tmp_path, response)
+
+    built = next(e for e in manifest.elements if e.id == "element-000004")
+    assert {key: built.metadata.get(key) for key in callout} == callout
 
 
 def test_generated_schema_is_draft_2020_12():
@@ -115,3 +139,11 @@ def test_a_non_toolbox_extraction_is_refused(tmp_path: Path):
 
     with pytest.raises(TypeError, match="Toolbox JSON extraction"):
         build_processing_manifest(source, extraction)
+
+
+def test_an_extraction_without_a_document_is_refused(tmp_path: Path):
+    source = tmp_path / "sample.pdf"
+    source.write_bytes(b"%PDF-test")
+
+    with pytest.raises(TypeError, match="Toolbox JSON extraction"):
+        build_processing_manifest(source, SimpleNamespace(configuration={}))

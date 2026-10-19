@@ -4,7 +4,7 @@ import hashlib
 import mimetypes
 from collections import Counter
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from backend.i18n import t
 from backend.log_messages import (
@@ -27,6 +27,9 @@ from backend.core.manifest.models import (
     ProcessingManifest,
     is_bottom_left,
 )
+
+if TYPE_CHECKING:
+    from backend.core.manifest.toolbox_extractor import ToolboxExtraction
 
 
 OBLIGATION_BY_TYPE = {
@@ -157,7 +160,7 @@ SECONDARY_EXTRACTION_ARTIFACT_ID = "artifact-secondary-extraction"
 
 def build_processing_manifest(
     source_path: Path,
-    extraction: Any,
+    extraction: ToolboxExtraction,
     *,
     language: str = "pt-BR",
     refine_reading_order: bool = False,
@@ -171,10 +174,11 @@ def build_processing_manifest(
     Raises:
         TypeError: When the extraction is not a Toolbox JSON response.
     """
-    if not isinstance(extraction.document, dict):
+    document = getattr(extraction, "document", None)
+    if not isinstance(document, dict):
         raise TypeError(
             "build_processing_manifest expects the Toolbox JSON extraction, "
-            f"got {type(extraction.document).__name__}"
+            f"got {type(document).__name__}"
         )
     source_path = source_path.resolve()
     return _build_from_toolbox_json(
@@ -188,7 +192,7 @@ def build_processing_manifest(
 
 def _build_from_toolbox_json(
     source_path: Path,
-    extraction: Any,
+    extraction: ToolboxExtraction,
     *,
     digest: str,
     language: str,
