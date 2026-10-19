@@ -78,7 +78,7 @@ All exceptions inherit from `ToolboxError` (defined in the SDK, `acessilia_sdk.t
 |---|---|---|
 | **Where it runs** | In the core process (same machine/container) | Remote HTTP service (`TOOLBOX_BASE_URL`, port 8002) |
 | **Examples** | `libs/docstruct/` — `docstruct.fusion`, `docstruct.policy.FusionPolicy`, `docstruct.types.CanonicalBlock` | `document.structure.extract`, `document.layout.analyze`, `document.ocr`, `math.*`, `pdf.split` |
-| **Interface** | Direct Python import (pure function/class) | `ToolboxClient` / specialized clients → `POST /v1/capabilities/{capability}:execute` |
+| **Interface** | Direct Python import (pure function/class) | SDK clients (`acessilia_sdk.toolbox.clients`) built with `make_toolbox_client` → `POST /v1/capabilities/{capability}:execute` or the artifact and dataset routes |
 | **Failure** | Local Python exception | `ToolboxError` → typed subclasses |
 | **State/cache** | In memory / local disk | Artifact store (`/v1/artifacts`) + remote cache (`cache_key` in provenance) |
 | **Versioning** | Coupled to the core repo (same commit) | Independent (`provider_version` in provenance) |
@@ -376,7 +376,8 @@ service.py: _build_orchestrator()
 
 - `libs/sdk/src/acessilia_sdk/toolbox/` — capability registry, transport, client base class, failover, artifacts and exception hierarchy (SDK)
 - `libs/sdk/src/acessilia_sdk/toolbox/clients/` — one client per capability family; `layout.py` is the Scenario B template
-- `backend/tools/toolbox_client.py` — `make_toolbox_client` (SDK clients configured from the core settings); generic `ToolboxClient` (extraction, artifacts, datasets)
+- `backend/tools/toolbox_client.py` — `make_toolbox_client` (SDK clients configured from the core settings) and the re-exported error types
+- `clients/structure.py`, `clients/artifact.py`, `clients/dataset.py` — structure extraction, the artifact store and the dataset routes
 - `backend/tools/toolbox_ocr_tools.py`, `toolbox_math_tools.py`, `toolbox_pdf_tools.py` — Agno wrappers; `toolbox_pdf_tools.py` still has a local fallback, removed in #150 (ADR-0003)
 - `clients/page_ocr.py` — `document.ocr.page` (whole-page VLM)
 - `clients/adjudicate.py` — `document.adjudicate.page` / `.region`

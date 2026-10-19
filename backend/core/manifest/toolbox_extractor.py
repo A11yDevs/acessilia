@@ -11,7 +11,8 @@ from typing import TYPE_CHECKING, Any
 
 from backend.config.settings import settings
 from backend.tools.logger import logger
-from backend.tools.toolbox_client import ToolboxClient, ToolboxError
+from acessilia_sdk.toolbox.clients import ToolboxArtifactClient, ToolboxStructureClient
+from backend.tools.toolbox_client import ToolboxError, make_toolbox_client, toolbox_endpoints
 
 if TYPE_CHECKING:
     from docstruct.policy import FusionPolicy
@@ -45,13 +46,18 @@ class ToolboxManifestExtractor:
     def __init__(
         self,
         *,
-        client: ToolboxClient | None = None,
+        client: ToolboxStructureClient | None = None,
+        artifact_client: ToolboxArtifactClient | None = None,
         enable_ocr: bool = True,
         use_artifact_store: bool | None = None,
         use_remote_cache: bool | None = None,
         fusion_policy: FusionPolicy | None = None,
     ) -> None:
-        self._client = client or ToolboxClient()
+        # Clients passed in are reused and left open. Otherwise each extraction
+        # builds its own and closes them: extract() runs every document on a
+        # fresh event loop, and an HTTP connection must not outlive its loop.
+        self._client = client
+        self._artifact_client = artifact_client
         self.enable_ocr = enable_ocr
         # Policy for FUSION_MODE=dual; None keeps the fusion stack's default.
         self.fusion_policy = fusion_policy
@@ -67,8 +73,14 @@ class ToolboxManifestExtractor:
         )
 
     @property
-    def client(self) -> ToolboxClient:
-        return self._client
+    def provider(self) -> str:
+        """The primary structure-extraction provider."""
+        return self._client.provider if self._client else settings.toolbox_provider
+
+    @property
+    def base_url(self) -> str:
+        """The primary Toolbox endpoint."""
+        return self._client.base_url if self._client else toolbox_endpoints()[0].base_url
 
     def extract(self, source_path: Path) -> ToolboxExtraction:
         """Extrai a estrutura de um documento usando a Toolbox (síncrono).
@@ -80,6 +92,24 @@ class ToolboxManifestExtractor:
         return asyncio.run(self._extract_async(source_path))
 
     async def _extract_async(self, source_path: Path) -> ToolboxExtraction:
+        structure = self._client or make_toolbox_client(ToolboxStructureClient)
+        artifacts = self._artifact_client
+        if artifacts is None and self.use_artifact_store:
+            artifacts = make_toolbox_client(ToolboxArtifactClient)
+        try:
+            return await self._extract_with(structure, artifacts, source_path)
+        finally:
+            if self._client is None:
+                await structure.close()
+            if self._artifact_client is None and artifacts is not None:
+                await artifacts.close()
+
+    async def _extract_with(
+        self,
+        structure: ToolboxStructureClient,
+        artifacts: ToolboxArtifactClient | None,
+        source_path: Path,
+    ) -> ToolboxExtraction:
         source_path = source_path.resolve()
         if not source_path.is_file():
             raise FileNotFoundError(f"Documento não encontrado: {source_path}")
@@ -88,18 +118,24 @@ class ToolboxManifestExtractor:
         started_clock = perf_counter()
 
         artifact_id: str | None = None
-        if self.use_artifact_store:
-            artifact_id = await self._client.upload_artifact(source_path)
+        if self.use_artifact_store and artifacts is not None:
+            artifact_id = await artifacts.upload(source_path)
+            logger.info("Toolbox: artifact {} stored ({})", artifact_id, source_path.name)
 
-        result = await self._client.extract_structure(
+        result = await structure.extract_structure(
             file_path=None if artifact_id else source_path,
             artifact_id=artifact_id,
             language="pt-BR",
             use_remote_cache=self.use_remote_cache,
         )
+        logger.info(
+            "Toolbox: structure extracted ({} ms, provider={})",
+            result.get("provenance", {}).get("duration_ms", "?"),
+            result.get("provider", "?"),
+        )
         if settings.fusion_mode == "dual":
             secondary_provider = settings.fusion_secondary_provider
-            if secondary_provider == self._client.provider:
+            if secondary_provider == structure.provider:
                 logger.warning(
                     "Fusão dual ignorada: provider primário e secundário são ambos {}",
                     secondary_provider,
@@ -107,13 +143,8 @@ class ToolboxManifestExtractor:
             else:
                 from backend.pipeline.fusion import fuse_extraction_payloads
 
-                secondary_client = ToolboxClient(
-                    base_url=self._client.base_url,
-                    provider=secondary_provider,
-                    timeout_seconds=getattr(
-                        self._client, "timeout_seconds", None
-                    ),
-                    api_key=getattr(self._client, "api_key", None),
+                secondary_client = make_toolbox_client(
+                    ToolboxStructureClient, provider=secondary_provider
                 )
                 try:
                     secondary_result = await secondary_client.extract_structure(
@@ -132,7 +163,7 @@ class ToolboxManifestExtractor:
                     fusion = fuse_extraction_payloads(
                         result,
                         secondary_result,
-                        primary_provider=self._client.provider,
+                        primary_provider=structure.provider,
                         secondary_provider=secondary_provider,
                         policy=self.fusion_policy,
                     )
@@ -163,8 +194,8 @@ class ToolboxManifestExtractor:
                 "ocr": self.enable_ocr,
                 "table_structure": True,
                 "remote_services": True,
-                "toolbox_base_url": self._client.base_url,
-                "toolbox_provider": self._client.provider,
+                "toolbox_base_url": structure.base_url,
+                "toolbox_provider": structure.provider,
                 "use_artifact_store": self.use_artifact_store,
                 "use_remote_cache": self.use_remote_cache,
                 "artifact_id": artifact_id,

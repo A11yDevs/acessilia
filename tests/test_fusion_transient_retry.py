@@ -46,7 +46,7 @@ def install_clients(monkeypatch, fail):
                 },
             }
 
-    monkeypatch.setattr("backend.pipeline.fusion.ToolboxClient", Client)
+    monkeypatch.setattr("backend.pipeline.fusion._structure_client", Client)
     return calls
 
 

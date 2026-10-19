@@ -17,7 +17,7 @@ página (imagem) → Toolbox capability document.structure.extract (provider)
 ```
 
 O provedor é selecionado por `--provider` no `run_pipeline.py` (ex.: `docling`,
-`mineru`) e repassado ao `ToolboxClient(provider=...)`. A Toolbox roteia para o
+`mineru`) e repassado ao `ToolboxStructureClient` do SDK (via `make_toolbox_client`). A Toolbox roteia para o
 provider registrado em `providers-config.yaml` (endpoints `docling-serve` e
 `mineru-serve`).
 
@@ -112,10 +112,14 @@ A árvore canônica de cada provider pode ser inspecionada lado a lado:
 
 ```python
 from scripts.drbench.run_pipeline import provider_payload_to_canonical
-from backend.tools.toolbox_client import ToolboxClient
+from acessilia_sdk.toolbox.clients import ToolboxStructureClient
+from backend.tools.toolbox_client import make_toolbox_client
 
-client = ToolboxClient(provider="mineru")  # ou "docling"
-result = await client.extract_structure(file_path=page_image)
+client = make_toolbox_client(ToolboxStructureClient, provider="mineru")  # ou "docling"
+try:
+    result = await client.extract_structure(file_path=page_image)
+finally:
+    await client.close()
 canonical = provider_payload_to_canonical(result)
 ```
 

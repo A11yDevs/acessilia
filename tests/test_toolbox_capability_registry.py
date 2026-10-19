@@ -58,14 +58,20 @@ def _capability_constants() -> dict[str, str]:
     return found
 
 
-def test_client_capability_constants_are_registered_for_execute() -> None:
+def test_client_capability_constants_are_registered() -> None:
+    """Execute clients name ``execute`` capabilities; REST clients, ``rest`` ones.
+
+    ``execute_capability`` and ``_request_on`` refuse the other transport, so
+    a constant in the wrong group could never be called.
+    """
     constants = _capability_constants()
     assert constants, "no capability constants found in the SDK clients"
     unregistered = {
         name: capability
         for name, capability in constants.items()
         if capability not in TOOLBOX_CAPABILITIES
-        or TOOLBOX_CAPABILITIES[capability].transport != "execute"
+        or TOOLBOX_CAPABILITIES[capability].transport
+        != ("rest" if name.startswith("artifact.py:") else "execute")
     }
     assert not unregistered, (
         f"client constants outside TOOLBOX_CAPABILITIES: {unregistered}"

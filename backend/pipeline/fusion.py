@@ -16,12 +16,13 @@ from collections import Counter
 from typing import Any
 
 from backend.tools.logger import logger
+from acessilia_sdk.toolbox.clients import ToolboxStructureClient
 from backend.tools.toolbox_client import (
     ToolboxArtifactNotFound,
-    ToolboxClient,
     ToolboxError,
     ToolboxProviderUnavailable,
     ToolboxTimeout,
+    make_toolbox_client,
 )
 from docstruct.fusion import block_to_diff, merge_blocks
 from docstruct.fusion.types import DiffBlock
@@ -80,6 +81,11 @@ def _blocks_to_text(blocks: list[dict]) -> str:
     return "\n\n".join(parts)
 
 
+def _structure_client(provider: str) -> ToolboxStructureClient:
+    """A structure-extraction client for ``provider``, configured from settings."""
+    return make_toolbox_client(ToolboxStructureClient, provider=provider)
+
+
 async def extract_fused(
     file_path,
     *,
@@ -114,7 +120,7 @@ async def extract_fused(
     failures: dict[str, Exception] = {}
 
     async def _extract(provider: str) -> dict | None:
-        client = ToolboxClient(provider=provider)
+        client = _structure_client(provider)
         try:
             if artifact_id:
                 try:

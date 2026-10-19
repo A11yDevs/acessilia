@@ -15,7 +15,7 @@ from backend.core.manifest.toolbox_extractor import (
     ToolboxExtraction,
     ToolboxManifestExtractor,
 )
-from backend.tools.toolbox_client import ToolboxClient
+from acessilia_sdk.toolbox.clients import ToolboxArtifactClient, ToolboxStructureClient
 
 
 FIXTURE_PDF = Path(__file__).parent / "fixtures" / "tutorials" / "java-oo-3pgs.pdf"
@@ -87,19 +87,25 @@ SAMPLE_TOOLBOX_RESPONSE = {
 
 @pytest.fixture
 def mock_client():
-    client = AsyncMock(spec=ToolboxClient)
+    client = AsyncMock(spec=ToolboxStructureClient)
     client.base_url = "http://localhost:8002"
     client.provider = "docling"
     return client
 
 
-def test_extract_returns_toolbox_extraction(mock_client):
+@pytest.fixture
+def mock_artifact_client():
+    return AsyncMock(spec=ToolboxArtifactClient)
+
+
+def test_extract_returns_toolbox_extraction(mock_client, mock_artifact_client):
     """Verifica que extract() retorna um ToolboxExtraction com dados corretos."""
     mock_client.extract_structure = AsyncMock(return_value=SAMPLE_TOOLBOX_RESPONSE)
-    mock_client.upload_artifact = AsyncMock(return_value="sha256:abc123")
+    mock_artifact_client.upload = AsyncMock(return_value="sha256:abc123")
 
     extractor = ToolboxManifestExtractor(
         client=mock_client,
+        artifact_client=mock_artifact_client,
         use_artifact_store=True,
         use_remote_cache=True,
     )
@@ -116,17 +122,18 @@ def test_extract_returns_toolbox_extraction(mock_client):
     assert result.configuration["use_remote_cache"] is True
 
 
-def test_extract_without_artifact_store_skips_upload(mock_client):
+def test_extract_without_artifact_store_skips_upload(mock_client, mock_artifact_client):
     """Quando use_artifact_store=False, não chama upload."""
     mock_client.extract_structure = AsyncMock(return_value=SAMPLE_TOOLBOX_RESPONSE)
 
     extractor = ToolboxManifestExtractor(
         client=mock_client,
+        artifact_client=mock_artifact_client,
         use_artifact_store=False,
     )
     result = extractor.extract(FIXTURE_PDF)
 
-    mock_client.upload_artifact.assert_not_called()
+    mock_artifact_client.upload.assert_not_called()
     assert result.artifact_id is None
 
 
@@ -186,13 +193,13 @@ def test_dual_mode_attaches_page_evidence_without_replacing_manifest(
     mock_client.extract_structure = AsyncMock(return_value=SAMPLE_TOOLBOX_RESPONSE)
     secondary_response = deepcopy(SAMPLE_TOOLBOX_RESPONSE)
     secondary_response["document"]["elements"][1]["text"] += " Conteúdo divergente."
-    secondary_client = AsyncMock(spec=ToolboxClient)
+    secondary_client = AsyncMock(spec=ToolboxStructureClient)
     secondary_client.provider = "mineru"
     secondary_client.extract_structure.return_value = secondary_response
 
     monkeypatch.setattr(
-        "backend.core.manifest.toolbox_extractor.ToolboxClient",
-        lambda **kwargs: secondary_client,
+        "backend.core.manifest.toolbox_extractor.make_toolbox_client",
+        lambda client_cls, **kwargs: secondary_client,
     )
     result = ToolboxManifestExtractor(
         client=mock_client,
@@ -241,14 +248,14 @@ def test_dual_mode_passes_configured_fusion_policy(mock_client, monkeypatch):
     monkeypatch.setattr(settings, "fusion_mode", "dual")
     monkeypatch.setattr(settings, "fusion_secondary_provider", "mineru")
     mock_client.extract_structure = AsyncMock(return_value=SAMPLE_TOOLBOX_RESPONSE)
-    secondary_client = AsyncMock(spec=ToolboxClient)
+    secondary_client = AsyncMock(spec=ToolboxStructureClient)
     secondary_client.provider = "mineru"
     secondary_client.extract_structure.return_value = deepcopy(
         SAMPLE_TOOLBOX_RESPONSE
     )
     monkeypatch.setattr(
-        "backend.core.manifest.toolbox_extractor.ToolboxClient",
-        lambda **kwargs: secondary_client,
+        "backend.core.manifest.toolbox_extractor.make_toolbox_client",
+        lambda client_cls, **kwargs: secondary_client,
     )
     seen: dict = {}
 
@@ -279,14 +286,14 @@ def test_matching_dual_providers_do_not_create_fusion_obligations(
     monkeypatch.setattr(settings, "fusion_mode", "dual")
     monkeypatch.setattr(settings, "fusion_secondary_provider", "mineru")
     mock_client.extract_structure = AsyncMock(return_value=SAMPLE_TOOLBOX_RESPONSE)
-    secondary_client = AsyncMock(spec=ToolboxClient)
+    secondary_client = AsyncMock(spec=ToolboxStructureClient)
     secondary_client.provider = "mineru"
     secondary_client.extract_structure.return_value = deepcopy(
         SAMPLE_TOOLBOX_RESPONSE
     )
     monkeypatch.setattr(
-        "backend.core.manifest.toolbox_extractor.ToolboxClient",
-        lambda **kwargs: secondary_client,
+        "backend.core.manifest.toolbox_extractor.make_toolbox_client",
+        lambda client_cls, **kwargs: secondary_client,
     )
 
     result = ToolboxManifestExtractor(
@@ -313,13 +320,13 @@ def test_dual_mode_does_not_emit_evidence_when_secondary_provider_fails(
     monkeypatch.setattr(settings, "fusion_mode", "dual")
     monkeypatch.setattr(settings, "fusion_secondary_provider", "mineru")
     mock_client.extract_structure = AsyncMock(return_value=SAMPLE_TOOLBOX_RESPONSE)
-    secondary_client = AsyncMock(spec=ToolboxClient)
+    secondary_client = AsyncMock(spec=ToolboxStructureClient)
     secondary_client.extract_structure.side_effect = ToolboxProviderUnavailable(
         "provider indisponível"
     )
     monkeypatch.setattr(
-        "backend.core.manifest.toolbox_extractor.ToolboxClient",
-        lambda **kwargs: secondary_client,
+        "backend.core.manifest.toolbox_extractor.make_toolbox_client",
+        lambda client_cls, **kwargs: secondary_client,
     )
 
     result = ToolboxManifestExtractor(
@@ -343,3 +350,36 @@ def test_secondary_extraction_write_failure_does_not_fail_extraction(
     monkeypatch.setattr(settings, "data_dir", tmp_path)
 
     assert _persist_secondary_extraction({"elements": []}, "mineru") == {}
+
+
+def test_extract_builds_and_closes_its_own_clients(monkeypatch):
+    """Without injected clients, each extraction builds fresh ones and closes them.
+
+    extract() runs every document on a new event loop, so an HTTP connection
+    must not be kept between calls.
+    """
+    built: list = []
+
+    def factory(client_cls, **kwargs):
+        client = AsyncMock(spec=client_cls)
+        client.base_url = "http://localhost:8002"
+        client.provider = "docling"
+        client.extract_structure = AsyncMock(return_value=SAMPLE_TOOLBOX_RESPONSE)
+        client.upload = AsyncMock(return_value="sha256:abc123")
+        built.append((client_cls, client))
+        return client
+
+    monkeypatch.setattr(
+        "backend.core.manifest.toolbox_extractor.make_toolbox_client", factory
+    )
+    extractor = ToolboxManifestExtractor(use_artifact_store=True)
+
+    extractor.extract(FIXTURE_PDF)
+    extractor.extract(FIXTURE_PDF)
+
+    assert [cls for cls, _ in built] == [
+        ToolboxStructureClient, ToolboxArtifactClient,
+        ToolboxStructureClient, ToolboxArtifactClient,
+    ]
+    for _, client in built:
+        client.close.assert_awaited_once()

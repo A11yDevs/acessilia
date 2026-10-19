@@ -8,7 +8,8 @@ import fitz
 
 from backend.tools.region_extractor import Region, extract_regions
 from backend.tools.structurer import BaseStructurer
-from backend.tools.toolbox_client import ToolboxClient
+from acessilia_sdk.toolbox.clients import ToolboxStructureClient
+from backend.tools.toolbox_client import make_toolbox_client
 from backend.tools.logger import logger
 
 
@@ -23,10 +24,12 @@ class ToolboxStructurer(BaseStructurer):
     def __init__(
         self,
         *,
-        client: ToolboxClient | None = None,
+        client: ToolboxStructureClient | None = None,
         enable_ocr: bool = True,
     ) -> None:
-        self._client = client or ToolboxClient()
+        # A client passed in is reused. Otherwise each fetch builds and closes
+        # its own: pages are extracted on separate event loops.
+        self._client = client
         self._doc_cache: dict[str, dict[str, Any]] = {}
         self.enable_ocr = enable_ocr
 
@@ -44,10 +47,15 @@ class ToolboxStructurer(BaseStructurer):
                 return entry["data"]
             del self._doc_cache[path_str]
 
-        result = await self._client.extract_structure(
-            file_path=file_path,
-            language="pt-BR",
-        )
+        client = self._client or make_toolbox_client(ToolboxStructureClient)
+        try:
+            result = await client.extract_structure(
+                file_path=file_path,
+                language="pt-BR",
+            )
+        finally:
+            if self._client is None:
+                await client.close()
 
         self._doc_cache[path_str] = {"data": result, "time": time.time()}
         return result
