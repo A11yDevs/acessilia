@@ -759,7 +759,9 @@ async def test_job_executor_keeps_original_filename_in_status(api_paths, monkeyp
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("failed_format", [None, "MP3", "PDF/UA", "PDF/UA disabled"])
+@pytest.mark.parametrize(
+    "failed_format", [None, "MP3", "PDF/UA", "PDF/UA disabled", "DOCX", "DOCX disabled"]
+)
 async def test_job_executor_reports_optional_export_failure(
     api_paths, monkeypatch, failed_format
 ):
@@ -767,10 +769,13 @@ async def test_job_executor_reports_optional_export_failure(
     from backend.api.worker import ApiJob, JobExecutor
     from backend.config.settings import settings
 
-    # PDF/UA runs only on the Toolbox; switched off, it is skipped without an error.
+    # PDF/UA and DOCX run only on the Toolbox; switched off, each is skipped
+    # without an error.
     pdf_ua_disabled = failed_format == "PDF/UA disabled"
+    docx_disabled = failed_format == "DOCX disabled"
     monkeypatch.setattr(settings, "toolbox_pdf_ua_enabled", not pdf_ua_disabled)
-    if pdf_ua_disabled:
+    monkeypatch.setattr(settings, "toolbox_docx_enabled", not docx_disabled)
+    if pdf_ua_disabled or docx_disabled:
         failed_format = None
 
     task_id = "bug0011"
@@ -795,6 +800,12 @@ async def test_job_executor_reports_optional_export_failure(
 
         destination.write_bytes(b"partial pdf")
         raise ToolboxProviderUnavailable("pdf-ua-render unavailable")
+
+    def fail_docx(_canonical, destination, _filename):
+        from acessilia_sdk.toolbox import ToolboxProviderUnavailable
+
+        destination.write_bytes(b"partial docx")
+        raise ToolboxProviderUnavailable("docx renderer unavailable")
 
     async def write_mp3(_text, destination, **_kwargs):
         destination.write_bytes(b"audio")
@@ -823,6 +834,8 @@ async def test_job_executor_reports_optional_export_failure(
     monkeypatch.setattr("backend.api.worker.export_accessible_document", write_file)
     if failed_format == "PDF/UA":
         monkeypatch.setattr("backend.api.worker.export_pdf_ua", fail_pdf_ua)
+    if failed_format == "DOCX":
+        monkeypatch.setattr("backend.api.worker.export_docx", fail_docx)
     monkeypatch.setattr(
         "backend.api.worker.export_mp3",
         fail_mp3 if failed_format == "MP3" else write_mp3,
@@ -862,6 +875,7 @@ async def test_job_executor_reports_optional_export_failure(
         assert (
             "tts offline" in task["erros"][0]
             or "pdf-ua-render unavailable" in task["erros"][0]
+            or "docx renderer unavailable" in task["erros"][0]
         )
         expected_errors = task["erros"]
 
@@ -870,8 +884,13 @@ async def test_job_executor_reports_optional_export_failure(
     pdf_ua_produced = failed_format != "PDF/UA" and not pdf_ua_disabled
     if not pdf_ua_produced:
         assert not (output_dir / "audio.pdf_ua.pdf").exists()
+    docx_produced = failed_format != "DOCX" and not docx_disabled
+    if not docx_produced:
+        assert not (output_dir / "audio.docx").exists()
 
-    expected_formats = {"txt", "docx", "pdf", "html", "zip"}
+    expected_formats = {"txt", "pdf", "html", "zip"}
+    if docx_produced:
+        expected_formats.add("docx")
     if failed_format != "MP3":
         expected_formats.add("mp3")
     if pdf_ua_produced:
@@ -880,7 +899,9 @@ async def test_job_executor_reports_optional_export_failure(
 
     assert (output_dir / "audio.drbench.md").is_file()
     with zipfile.ZipFile(output_dir / "audio_acessivel.zip") as archive:
-        expected_files = {"audio.txt", "audio.docx", "audio.pdf", "audio.html"}
+        expected_files = {"audio.txt", "audio.pdf", "audio.html"}
+        if docx_produced:
+            expected_files.add("audio.docx")
         if failed_format != "MP3":
             expected_files.add("audio.mp3")
         if pdf_ua_produced:

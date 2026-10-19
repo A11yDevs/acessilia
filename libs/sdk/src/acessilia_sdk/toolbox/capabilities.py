@@ -57,6 +57,7 @@ PROVIDER_DEFAULTS: dict[str, str] = {
     "toolbox_orientation_provider": "rapidocr-orient",
     "toolbox_media_inspect_provider": "pure-media-inspect",
     "toolbox_pdf_ua_provider": "pandoc-pdf-ua",
+    "toolbox_docx_provider": "pandoc-docx",
 }
 
 
@@ -117,6 +118,12 @@ _CAPABILITIES: tuple[ToolboxCapability, ...] = (
         "document.export.pdf_ua", 1, "Exportação PDF/UA",
         provider_key="toolbox_pdf_ua_provider",
         output_schema="pdf-export@1",
+    ),
+    # The DOCX also comes back as a stored artifact.
+    ToolboxCapability(
+        "document.export.docx", 1, "Exportação DOCX",
+        provider_key="toolbox_docx_provider",
+        output_schema="docx-export@1",
     ),
     # Vision-language capabilities (Dr.DocBench, PR #125), served by the
     # Toolbox's OpenAI-compatible VLM provider.

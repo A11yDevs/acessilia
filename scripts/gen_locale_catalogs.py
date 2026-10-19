@@ -144,6 +144,9 @@ from backend.log_messages import (
     LOG_PDF_UA_TOOLBOX_EXPORTED,
     LOG_TXT_EXPORTED,
     LOG_DOCX_EXPORTED,
+    LOG_DOCX_GENERATION_FAILED,
+    LOG_DOCX_SKIPPED_DISABLED,
+    LOG_DOCX_TOOLBOX_EXPORTED,
     LOG_PIPELINE_ERROR,
     LOG_PROMPT_FILE_NOT_FOUND,
     LOG_QUEUE_ITEM_ENQUEUED,
@@ -230,8 +233,7 @@ from backend.pipeline.validators import (
 from backend.export.pandoc_exporter import (
     MSG_AUDIT_FAILED,
     MSG_DEFAULT_ACCESSIBLE_TITLE,
-    MSG_PANDOC_FAILED,
-    MSG_PANDOC_NOT_FOUND,
+    MSG_DOCX_DISABLED,
     MSG_PDF_UA_DISABLED,
     MSG_UNSUPPORTED_EXPORT_FORMAT,
 )
@@ -647,8 +649,7 @@ MESSAGES: tuple[str, ...] = (
     # (backend/export/pandoc_exporter.py), surfaced as RuntimeError/ValueError
     # text in logs and HTTP error details.
     MSG_DEFAULT_ACCESSIBLE_TITLE,
-    MSG_PANDOC_NOT_FOUND,
-    MSG_PANDOC_FAILED,
+    MSG_DOCX_DISABLED,
     MSG_PDF_UA_DISABLED,
     MSG_AUDIT_FAILED,
     MSG_UNSUPPORTED_EXPORT_FORMAT,
@@ -778,6 +779,9 @@ MESSAGES: tuple[str, ...] = (
     LOG_PDF_UA_TOOLBOX_EXPORTED,
     LOG_TXT_EXPORTED,
     LOG_DOCX_EXPORTED,
+    LOG_DOCX_GENERATION_FAILED,
+    LOG_DOCX_SKIPPED_DISABLED,
+    LOG_DOCX_TOOLBOX_EXPORTED,
     EMAIL_CONFIRMATION_SUBJECT,
     EMAIL_CONFIRMATION_BODY,
     EMAIL_RESULT_SUBJECT,
@@ -1283,8 +1287,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         # Pandoc exporter runtime errors and default document title
         # (pt-BR mirrors of the backend/export/pandoc_exporter.py ids above).
         MSG_DEFAULT_ACCESSIBLE_TITLE: "Documento acessível",
-        MSG_PANDOC_NOT_FOUND: "pandoc não encontrado no PATH",
-        MSG_PANDOC_FAILED: "pandoc falhou ({to_format}): {stderr}",
+        MSG_DOCX_DISABLED: (
+            "A exportação DOCX está desativada (TOOLBOX_DOCX_ENABLED=false)"
+        ),
         MSG_PDF_UA_DISABLED: (
             "A exportação PDF/UA está desativada (TOOLBOX_PDF_UA_ENABLED=false)"
         ),
@@ -1513,6 +1518,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         LOG_TXT_EXPORTED: "TXT exportado: {output_path}",
         # DOCX export wrapper debug line; {output_path} the destination file path.
         LOG_DOCX_EXPORTED: "DOCX exportado: {output_path}",
+        LOG_DOCX_TOOLBOX_EXPORTED: "DOCX renderizado pela Toolbox: {output_path}",
+        LOG_DOCX_SKIPPED_DISABLED: "DOCX ignorado: TOOLBOX_DOCX_ENABLED está desativado",
+        LOG_DOCX_GENERATION_FAILED: "Falha ao gerar o DOCX: {error}",
         # Confirmation/result e-mail subjects and bodies (pt-BR mirrors).
         EMAIL_CONFIRMATION_SUBJECT: "Recebemos o seu arquivo - Acessilia",
         EMAIL_CONFIRMATION_BODY: (

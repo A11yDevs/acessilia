@@ -3,9 +3,7 @@ from copy import deepcopy
 
 import fitz
 import pytest
-from docx import Document
 
-from backend.export.renderers.docx_renderer import render_docx
 from backend.export.renderers.pdf_renderer import render_pdf
 from backend.pipeline.canonical_builder import build_canonical_document
 from docstruct.export.html import document_to_html
@@ -58,10 +56,10 @@ def test_legacy_titles_render_once_and_keep_aliases(field, nested, same_id):
     assert document == before
 
 
-def test_legacy_title_deduplication_reaches_docx_and_pdf(tmp_path):
+def test_legacy_title_deduplication_reaches_pdf(tmp_path):
+    # DOCX renders on the Toolbox from the Pandoc AST, whose headers are
+    # checked above.
     document, _ = _legacy_document()
-    word = render_docx(document, tmp_path / "result.docx")
-    assert [p.text for p in Document(word).paragraphs].count("Heading") == 1
     pdf = render_pdf(document, tmp_path / "result.pdf", title="Document")
     with fitz.open(pdf) as rendered:
         text = "\n".join(page.get_text() for page in rendered)

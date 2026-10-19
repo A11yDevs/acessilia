@@ -17,6 +17,8 @@ from backend.services.job_store import load_record, save_status, pending_records
 from backend.services.blocking import run_blocking
 from backend.i18n import t
 from backend.log_messages import (
+    LOG_DOCX_GENERATION_FAILED,
+    LOG_DOCX_SKIPPED_DISABLED,
     LOG_JOB_CANCELLED,
     LOG_JOB_COMPLETED,
     LOG_JOB_EXECUTOR_ERROR,
@@ -245,10 +247,24 @@ class JobExecutor:
                 drbench_md_path = None
             state_manager.verificar_cancelamento(task_id)
 
-            state_manager.atualizar(task_id, etapa=t(STAGE_EXPORTING_DOCX), progresso=0.88)
-            docx_path = out_dir / f"{base}.docx"
-            await self._run_in_executor(export_docx, canonical, docx_path, job.filename)
-            completed_formats.append("docx")
+            docx_path = None
+            if settings.toolbox_docx_enabled:
+                state_manager.atualizar(task_id, etapa=t(STAGE_EXPORTING_DOCX), progresso=0.88)
+                docx_path = out_dir / f"{base}.docx"
+                try:
+                    await self._run_in_executor(export_docx, canonical, docx_path, job.filename)
+                    completed_formats.append("docx")
+                except Exception as exc:
+                    error_msg = t(LOG_DOCX_GENERATION_FAILED).format(error=str(exc))
+                    logger.warning(error_msg)
+                    optional_errors.append(error_msg)
+                    state_manager.atualizar(task_id, erro=error_msg)
+                    _remove_partial_output(docx_path)
+                    docx_path = None
+            else:
+                # DOCX runs only on the Toolbox (docs/adr/0003); switching it
+                # off is a deployment choice, not an error.
+                logger.info(t(LOG_DOCX_SKIPPED_DISABLED))
             state_manager.verificar_cancelamento(task_id)
 
             state_manager.atualizar(task_id, etapa=t(STAGE_EXPORTING_PDF), progresso=0.91)
@@ -323,7 +339,9 @@ class JobExecutor:
             state_manager.verificar_cancelamento(task_id)
 
             zip_path = out_dir / f"{base}_acessivel.zip"
-            package_paths = [txt_path, docx_path, pdf_path, html_path]
+            package_paths = [txt_path, pdf_path, html_path]
+            if isinstance(docx_path, Path):
+                package_paths.append(docx_path)
             if isinstance(mp3_path, Path):
                 package_paths.append(mp3_path)
             if isinstance(pdf_ua_path, Path):

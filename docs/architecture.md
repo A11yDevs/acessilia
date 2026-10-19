@@ -143,7 +143,7 @@ The AgentOS runtime is not part of `ENABLED_INTERFACES`; it is started separatel
 - **Agno Framework:** multi-agent orchestration and unified multimodal LLM interface.
 - **AI Providers:** Ollama API (local models like LLaVA/Qwen-VL) or OpenRouter API (cloud models like Claude/GPT-4o).
 - **Processing Libraries:** reportlab, python-docx, edge-tts, aiogram, FastAPI.
-- **Deviations being removed** ([ADR-0003](adr/0003-remote-only-operational-capabilities.md), [#150](https://github.com/A11yDevs/acessilia/issues/150)): PyMuPDF is still imported by the manifest extractor (`core/manifest/pymupdf_extractor.py`), the dependencies still declare Pillow, OpenCV and pypdf although the backend no longer imports them, and the image still installs Pandoc (used for DOCX) plus TeX Live and veraPDF, which the core no longer uses since PDF/UA renders only on the Toolbox. Their target owner is the Toolbox.
+- **Deviations being removed** ([ADR-0003](adr/0003-remote-only-operational-capabilities.md), [#150](https://github.com/A11yDevs/acessilia/issues/150)): PyMuPDF is still imported by the manifest extractor (`core/manifest/pymupdf_extractor.py`), the dependencies still declare Pillow, OpenCV and pypdf although the backend no longer imports them, and the image still installs TeX Live and veraPDF, which the core no longer uses since PDF/UA and DOCX render only on the Toolbox. Their target owner is the Toolbox.
 
 ---
 

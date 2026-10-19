@@ -124,6 +124,13 @@
       ]
     },
     {
+      "id": "document.export.docx",
+      "version": 1,
+      "providers": [
+        "pandoc-docx"
+      ]
+    },
+    {
       "id": "document.export.pdf_ua",
       "version": 1,
       "providers": [
@@ -348,6 +355,12 @@
       "id": "nougat",
       "capabilities": [
         "document.structure.extract"
+      ]
+    },
+    {
+      "id": "pandoc-docx",
+      "capabilities": [
+        "document.export.docx"
       ]
     },
     {

@@ -30,7 +30,11 @@ from acessilia_sdk.toolbox import (
     ToolboxUnavailable,
     parse_endpoints,
 )
-from acessilia_sdk.toolbox.clients import ToolboxMathClient, ToolboxPdfUaClient
+from acessilia_sdk.toolbox.clients import (
+    ToolboxDocxClient,
+    ToolboxMathClient,
+    ToolboxPdfUaClient,
+)
 from acessilia_sdk.toolbox.transport import media_type_for as _media_type
 from backend.config.settings import settings
 from backend.tools.logger import logger
@@ -66,6 +70,8 @@ def _class_defaults(client_cls: type[ToolboxCapabilityClient]) -> dict[str, Any]
         # The shared Toolbox timeout (default one hour) is far too long for
         # an export that renders in seconds.
         return {"timeout_seconds": settings.toolbox_pdf_ua_timeout_seconds}
+    if issubclass(client_cls, ToolboxDocxClient):
+        return {"timeout_seconds": settings.toolbox_docx_timeout_seconds}
     return {}
 
 

@@ -241,11 +241,7 @@ def test_export_accessible_document_pdf_ua_never_runs_local_pandoc(monkeypatch):
     def toolbox_down(ast, output_path, *, lang):
         raise ToolboxProviderUnavailable("pdf-ua-render offline")
 
-    def pandoc_must_not_run(*args, **kwargs):
-        raise AssertionError("pandoc ran for PDF/UA")
-
     monkeypatch.setattr("backend.export.pandoc_exporter.toolbox_export_pdf_ua", toolbox_down)
-    monkeypatch.setattr("backend.export.pandoc_exporter._render_with_pandoc", pandoc_must_not_run)
 
     with tempfile.TemporaryDirectory() as tmpdir:
         out = Path(tmpdir) / "saida.pdf_ua.pdf"

@@ -170,6 +170,8 @@ LOG_TELEGRAM_FILE_DOWNLOADING: str = "Downloading file: {file_path} -> {filename
 LOG_TELEGRAM_FILE_DOWNLOADED: str = "File downloaded: {filename} ({size} bytes)"
 #: Warning logged by the API worker when PDF/UA export failed; {error} is the reason.
 LOG_PDF_UA_GENERATION_FAILED: str = "Failed to generate PDF/UA: {error}"
+#: Warning logged (and reported as an optional export error) when the Toolbox cannot render the DOCX; {error} is the cause.
+LOG_DOCX_GENERATION_FAILED: str = "Failed to generate DOCX: {error}"
 #: Error logged by the API worker when MP3 audio export failed; {error} is the reason.
 LOG_MP3_GENERATION_FAILED: str = "Failed to generate MP3: {error}"
 #: Info logged when a job has finished processing and exporting; {task_id} identifies the job, {source} the channel.
@@ -392,6 +394,10 @@ LOG_MEDIA_INSPECT_FAILED: str = (
 )
 LOG_TXT_EXPORTED: str = "TXT exported: {output_path}"
 LOG_DOCX_EXPORTED: str = "DOCX exported: {output_path}"
+#: Info logged when the Toolbox rendered the DOCX; {output_path} is the written file.
+LOG_DOCX_TOOLBOX_EXPORTED: str = "DOCX rendered by the Toolbox: {output_path}"
+#: Info logged when the DOCX export is skipped because TOOLBOX_DOCX_ENABLED is false; no placeholders.
+LOG_DOCX_SKIPPED_DISABLED: str = "DOCX skipped: TOOLBOX_DOCX_ENABLED is false"
 #: Error raised when the optional Agno agent stack is absent and a workflow class import is required; no placeholders.
 LOG_AGNO_NOT_INSTALLED: str = (
     "Agno is not installed. Run `uv sync` before using the workflow Executor."

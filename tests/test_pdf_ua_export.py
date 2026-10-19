@@ -122,11 +122,6 @@ def test_a_toolbox_failure_propagates_without_a_local_fallback(
     monkeypatch.setattr(
         "backend.export.pandoc_exporter.toolbox_export_pdf_ua", failing_toolbox
     )
-    def pandoc_must_not_run(*args, **kwargs):
-        raise AssertionError("pandoc ran for PDF/UA")
-
-    monkeypatch.setattr(pandoc_exporter, "_render_with_pandoc", pandoc_must_not_run)
-
     with pytest.raises(type(error), match=str(error)):
         _export_pdf_ua(tmp_path)
 
@@ -184,6 +179,8 @@ def test_toolbox_pdf_ua_enabled_is_parsed_from_the_environment(monkeypatch, raw,
 def test_the_core_has_no_local_pdf_ua_toolchain():
     """The local pandoc + LaTeX path and its template are gone (docs/adr/0003)."""
     for name in (
+        "_render_with_pandoc",
+        "_pandoc_bin",
         "_render_pdf_ua_with_pandoc",
         "_pdf_ua_engine",
         "_pdf_ua_template_path",
@@ -192,6 +189,8 @@ def test_the_core_has_no_local_pdf_ua_toolchain():
     ):
         assert not hasattr(pandoc_exporter, name), name
     assert not (Path(pandoc_exporter.__file__).parent / "templates" / "pdf_ua.tex").exists()
+    source = Path(pandoc_exporter.__file__).read_text(encoding="utf-8")
+    assert "subprocess" not in source and "shutil" not in source
 
 
 @pytest.mark.respx(base_url=BASE_URL)

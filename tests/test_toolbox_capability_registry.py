@@ -59,8 +59,14 @@ def _capability_constants() -> dict[str, str]:
 
 
 def _transport_of(module_name: str) -> str:
-    """``execute`` for clients that call ``_execute``; otherwise ``rest``."""
+    """``execute`` for clients that call ``_execute``; otherwise ``rest``.
+
+    A client that inherits its call from a sibling base module (such as
+    ``pandoc_export``) is judged by that module's source too.
+    """
     source = (CLIENTS_DIR / module_name).read_text(encoding="utf-8")
+    for base in re.findall(r"from acessilia_sdk\.toolbox\.clients\.(\w+) import", source):
+        source += (CLIENTS_DIR / f"{base}.py").read_text(encoding="utf-8")
     return "execute" if "self._execute" in source else "rest"
 
 

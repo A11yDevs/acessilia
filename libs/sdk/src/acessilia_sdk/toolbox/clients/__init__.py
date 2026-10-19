@@ -9,6 +9,7 @@ it needs.
 from acessilia_sdk.toolbox.clients.adjudicate import ToolboxAdjudicateClient
 from acessilia_sdk.toolbox.clients.artifact import ToolboxArtifactClient
 from acessilia_sdk.toolbox.clients.dataset import ToolboxDatasetClient
+from acessilia_sdk.toolbox.clients.docx import ToolboxDocxClient
 from acessilia_sdk.toolbox.clients.layout import ToolboxLayoutClient
 from acessilia_sdk.toolbox.clients.math import ToolboxMathClient
 from acessilia_sdk.toolbox.clients.media_inspect import ToolboxMediaInspectClient
@@ -24,6 +25,7 @@ __all__ = [
     "ToolboxAdjudicateClient",
     "ToolboxArtifactClient",
     "ToolboxDatasetClient",
+    "ToolboxDocxClient",
     "ToolboxLayoutClient",
     "ToolboxMathClient",
     "ToolboxMediaInspectClient",

@@ -14,7 +14,6 @@ from pypdf import PdfReader
 import pytest
 
 import backend.i18n as i8n
-from backend.export.renderers.docx_renderer import render_docx
 from backend.export.renderers.html_renderer import render_html
 from backend.export.renderers.pdf_renderer import render_pdf
 from backend.export.renderers.txt_renderer import render_txt
@@ -209,17 +208,10 @@ def test_render_html_treats_explicit_scope_as_header_semantics():
     assert "<thead>" not in html
 
 
-def test_render_docx_and_pdf_create_files():
+def test_render_pdf_creates_a_file():
     with tempfile.TemporaryDirectory() as tmpdir:
-        docx_output = Path(tmpdir) / "saida.docx"
         pdf_output = Path(tmpdir) / "saida.pdf"
 
-        docx_result = render_docx(
-            _sample_document(),
-            docx_output,
-            profile_name="docx",
-            filename="arquivo.docx",
-        )
         pdf_result = render_pdf(
             _sample_document(),
             pdf_output,
@@ -227,8 +219,6 @@ def test_render_docx_and_pdf_create_files():
             title="Documento exemplo",
         )
 
-        assert docx_result.exists()
-        assert docx_result.suffix == ".docx"
         assert pdf_result.exists()
         assert pdf_result.stat().st_size > 0
 
