@@ -77,6 +77,9 @@ def make_toolbox_client(client_cls: type[ClientT], **overrides: Any) -> ClientT:
     clients without a provider key (artifacts, datasets) get none.
     ``overrides`` win over settings; ``None`` values are ignored, and passing
     ``base_url`` replaces the configured endpoints.
+
+    Every client retries timeouts and unavailable instances on the same
+    endpoint, with backoff (``TOOLBOX_RETRIES``/``TOOLBOX_RETRY_BACKOFF_SECONDS``).
     """
     kwargs: dict[str, Any] = {
         "endpoints": toolbox_endpoints(),
@@ -86,6 +89,8 @@ def make_toolbox_client(client_cls: type[ClientT], **overrides: Any) -> ClientT:
         "timeout_seconds": settings.toolbox_timeout_seconds,
         "api_key": settings.toolbox_api_key,
         "on_failover": _log_failover,
+        "retries": settings.toolbox_retries,
+        "retry_backoff_seconds": settings.toolbox_retry_backoff_seconds,
         **_class_defaults(client_cls),
     }
     overrides = {key: value for key, value in overrides.items() if value is not None}

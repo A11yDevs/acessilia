@@ -222,6 +222,18 @@ class Settings:
     toolbox_timeout_seconds: int = field(
         default_factory=lambda: int(os.getenv("TOOLBOX_TIMEOUT_SECONDS", "3600"))
     )
+    # Bounded retries after a timeout or an unavailable instance, on the same
+    # endpoint, with exponential backoff and jitter (docs/adr/0006). Toolbox
+    # capabilities are idempotent: pure functions of their input, or
+    # content-addressed for the artifact store. 0 disables retries. A timeout
+    # is retried too, so a hung call can take up to
+    # TOOLBOX_TIMEOUT_SECONDS * (TOOLBOX_RETRIES + 1) per endpoint.
+    toolbox_retries: int = field(
+        default_factory=lambda: int(os.getenv("TOOLBOX_RETRIES", "1"))
+    )
+    toolbox_retry_backoff_seconds: float = field(
+        default_factory=lambda: float(os.getenv("TOOLBOX_RETRY_BACKOFF_SECONDS", "0.5"))
+    )
     # Availability gate for planning methods that call the Toolbox: "observe"
     # only reports what the live catalogue would rule out, "enforce" removes
     # those methods from the plan (failing closed without a catalogue), "off"
@@ -345,6 +357,14 @@ class Settings:
     smtp_name: str = field(default_factory=lambda: os.getenv("SMTP_NAME", "Bot Acess"))
 
     def __post_init__(self) -> None:
+        # Fail at startup, not inside the first job that builds a Toolbox client.
+        if self.toolbox_retries < 0:
+            raise ValueError(f"TOOLBOX_RETRIES must be zero or positive, got {self.toolbox_retries}")
+        if self.toolbox_retry_backoff_seconds < 0:
+            raise ValueError(
+                "TOOLBOX_RETRY_BACKOFF_SECONDS must be zero or positive, "
+                f"got {self.toolbox_retry_backoff_seconds}"
+            )
         self.temp_dir.mkdir(parents=True, exist_ok=True)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.logs_dir.mkdir(parents=True, exist_ok=True)

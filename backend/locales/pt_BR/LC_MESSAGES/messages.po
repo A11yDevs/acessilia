@@ -163,6 +163,10 @@ msgstr "📷 Processando a página {page_num} de {total_pages}..."
 msgid "Analyzing the document with the structural agent..."
 msgstr "Analisando o documento com o agente estrutural..."
 
+#, python-brace-format
+msgid "Structural extraction failed on the Toolbox ({capability}): {error}"
+msgstr "A extração estrutural falhou na Toolbox ({capability}): {error}"
+
 msgid "Enriching the image descriptions..."
 msgstr "Enriquecendo as descrições de imagens..."
 
