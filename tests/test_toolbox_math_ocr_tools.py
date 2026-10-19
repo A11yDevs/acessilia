@@ -56,6 +56,7 @@ SAMPLE_OCR_RESPONSE = {
     },
 }
 
+
 class TestMathTools:
     @respx.mock
     def test_convert_success(self):
