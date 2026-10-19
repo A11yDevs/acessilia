@@ -19,14 +19,13 @@ from typing import Any
 from backend.config.settings import settings
 from backend.export.filters.pandoc_filters import strip_internal_audit_blocks
 from backend.i18n import t
-from backend.log_messages import LOG_PDF_UA_TOOLBOX_EXPORTED, LOG_PDF_UA_TOOLBOX_FALLBACK
+from backend.log_messages import LOG_PDF_UA_TOOLBOX_EXPORTED
 from backend.pipeline.canonical_builder import build_canonical_document
 from backend.pipeline.canonical_builder import sanitize_canonical_document
 from backend.pipeline.pandoc_ast_builder import build_pandoc_ast
 from backend.pipeline.validators import audit_canonical_document
 from backend.pipeline.validators import validate_export_profile
 from backend.tools.logger import logger
-from backend.tools.toolbox_client import ToolboxError
 
 #: Canonical English msgid for a default document title used when the caller passes none.
 MSG_DEFAULT_ACCESSIBLE_TITLE: str = "Accessible document"
@@ -34,20 +33,8 @@ MSG_DEFAULT_ACCESSIBLE_TITLE: str = "Accessible document"
 MSG_PANDOC_NOT_FOUND: str = "pandoc not found on PATH"
 #: Canonical English msgid template for a failed pandoc invocation; {to_format} and {stderr} are substituted by callers after lookup.
 MSG_PANDOC_FAILED: str = "pandoc failed ({to_format}): {stderr}"
-#: Canonical English msgid for a pdf_ua export where pandoc is missing.
-MSG_PANDOC_REQUIRED_FOR_PDF_UA: str = (
-    "pandoc not found on PATH. The pdf_ua format requires pandoc plus a LaTeX engine."
-)
-#: Canonical English msgid for a pdf_ua export where no LaTeX engine is available.
-MSG_LATEX_ENGINE_NOT_FOUND: str = (
-    "No LaTeX engine found on PATH. The pdf_ua format requires lualatex or xelatex."
-)
-#: Canonical English msgid template for a missing PDF/UA template file; {template_path} is substituted by callers after lookup.
-MSG_PDF_UA_TEMPLATE_NOT_FOUND: str = "PDF/UA template not found: {template_path}"
-#: Canonical English msgid template for a pdf_ua export that failed on the Toolbox and on the local fallback; {toolbox_error} and {local_error} are substituted by callers after lookup.
-MSG_PDF_UA_TOOLBOX_AND_LOCAL_FAILED: str = (
-    "PDF/UA export failed on the Toolbox ({toolbox_error}) and locally ({local_error})"
-)
+#: Canonical English msgid for a pdf_ua export requested while TOOLBOX_PDF_UA_ENABLED is false.
+MSG_PDF_UA_DISABLED: str = "PDF/UA export is disabled (TOOLBOX_PDF_UA_ENABLED=false)"
 #: Canonical English msgid template for an audit failure; {findings} is substituted by callers after lookup.
 MSG_AUDIT_FAILED: str = "Audit failed: {findings}"
 #: Canonical English msgid template for an unsupported export format; {format_name} is substituted by callers after lookup.
@@ -61,46 +48,6 @@ def _pandoc_bin() -> str | None:
         str | None: Absolute path of the pandoc executable when found on PATH, else None.
     """
     return shutil.which("pandoc")
-
-
-def _xelatex_bin() -> str | None:
-    """Returns the xelatex binary path, or None if it is not available on PATH.
-
-    Returns:
-        str | None: Absolute path of the xelatex executable when found on PATH, else None.
-    """
-    return shutil.which("xelatex")
-
-
-def _lualatex_bin() -> str | None:
-    """Returns the lualatex binary path, or None if it is not available on PATH.
-
-    Returns:
-        str | None: Absolute path of the lualatex executable when found on PATH, else None.
-    """
-    return shutil.which("lualatex")
-
-
-def _pdf_ua_engine() -> str | None:
-    """Selects the LaTeX engine used for PDF/UA rendering (prefers XeLaTeX).
-
-    Returns:
-        str | None: "xelatex" when available, otherwise "lualatex" when available, otherwise None when neither engine is on PATH.
-    """
-    if _xelatex_bin() is not None:
-        return "xelatex"
-    if _lualatex_bin() is not None:
-        return "lualatex"
-    return None
-
-
-def _pdf_ua_template_path() -> Path:
-    """Returns the path of the checked-in PDF/UA LaTeX template bundled with the exporter.
-
-    Returns:
-        Path: Path to backend/export/templates/pdf_ua.tex resolved relative to this module.
-    """
-    return Path(__file__).resolve().parent / "templates" / "pdf_ua.tex"
 
 
 def _render_with_pandoc(
@@ -191,90 +138,29 @@ def toolbox_export_pdf_ua(
 def _render_pdf_ua(
     ast: dict[str, Any], output_path: Path, *, lang: str = DEFAULT_PDF_UA_LANG
 ) -> Path:
-    """Renders PDF/UA on the Toolbox first, falling back to the local pandoc + LaTeX.
+    """Renders PDF/UA on the Toolbox, which pins Pandoc and TeX Live in its image.
 
-    The Toolbox pins Pandoc and TeX Live in one image, so its output does not
-    depend on how this host's TeX installation was updated. The local toolchain
-    is used only when the Toolbox path is disabled or fails.
+    There is no local fallback (docs/adr/0003): a Toolbox failure propagates
+    so the caller can report it, and TOOLBOX_PDF_UA_ENABLED=false makes the
+    format unavailable.
 
     Args:
         ast (dict): Pandoc JSON AST mapping for the canonical document.
         output_path (Path): Destination PDF file path.
-        lang (str): BCP 47 tag written to the PDF metadata on both rendering paths.
+        lang (str): BCP 47 tag written to the PDF metadata.
 
     Returns:
         Path: The output_path where the PDF/UA file was written.
 
     Raises:
-        RuntimeError: When the local fallback fails; if the Toolbox also failed, the message carries both causes.
+        RuntimeError: When TOOLBOX_PDF_UA_ENABLED is false.
+        acessilia_sdk.toolbox.errors.ToolboxError: When the Toolbox cannot render or deliver the PDF.
     """
-    toolbox_error: Exception | None = None
-    if settings.toolbox_pdf_ua_enabled:
-        try:
-            toolbox_export_pdf_ua(ast, output_path, lang=lang)
-        except Exception as exc:  # noqa: BLE001 - any Toolbox failure must reach the fallback
-            toolbox_error = exc
-            if not isinstance(exc, ToolboxError):
-                # Not a mapped Toolbox failure (e.g. run_sync or a client bug):
-                # keep the traceback, but still render locally.
-                logger.opt(exception=exc).debug("Unexpected PDF/UA Toolbox error")
-            logger.warning(t(LOG_PDF_UA_TOOLBOX_FALLBACK).format(error=exc))
-        else:
-            logger.info(t(LOG_PDF_UA_TOOLBOX_EXPORTED).format(output_path=output_path))
-            return output_path
-
-    try:
-        return _render_pdf_ua_with_pandoc(ast, output_path, lang=lang)
-    except RuntimeError as local_error:
-        if toolbox_error is None:
-            raise
-        raise RuntimeError(
-            t(MSG_PDF_UA_TOOLBOX_AND_LOCAL_FAILED).format(
-                toolbox_error=toolbox_error, local_error=local_error
-            )
-        ) from local_error
-
-
-def _render_pdf_ua_with_pandoc(
-    ast: dict[str, Any], output_path: Path, *, lang: str = DEFAULT_PDF_UA_LANG
-) -> Path:
-    """Renders a PDF/UA document via pandoc using the bundled accessible LaTeX template.
-
-    Args:
-        ast (dict): Pandoc JSON AST mapping for the canonical document.
-        output_path (Path): Destination PDF file path.
-        lang (str): BCP 47 tag passed to the template as the document language.
-
-    Returns:
-        Path: The output_path where the PDF/UA file was written.
-
-    Raises:
-        RuntimeError: When pandoc, a LaTeX engine, or the checked-in template is missing; messages are localized through backend.i18n.t.
-    """
-    pandoc = _pandoc_bin()
-    if pandoc is None:
-        raise RuntimeError(t(MSG_PANDOC_REQUIRED_FOR_PDF_UA))
-    engine = _pdf_ua_engine()
-    if engine is None:
-        raise RuntimeError(t(MSG_LATEX_ENGINE_NOT_FOUND))
-
-    template_path = _pdf_ua_template_path()
-    if not template_path.exists():
-        raise RuntimeError(t(MSG_PDF_UA_TEMPLATE_NOT_FOUND).format(template_path=template_path))
-
-    return _render_with_pandoc(
-        ast,
-        output_path,
-        "pdf",
-        extra_args=[
-            "--standalone",
-            "--no-highlight",
-            f"--pdf-engine={engine}",
-            f"--template={template_path}",
-            "-V",
-            f"lang={lang}",
-        ],
-    )
+    if not settings.toolbox_pdf_ua_enabled:
+        raise RuntimeError(t(MSG_PDF_UA_DISABLED))
+    toolbox_export_pdf_ua(ast, output_path, lang=lang)
+    logger.info(t(LOG_PDF_UA_TOOLBOX_EXPORTED).format(output_path=output_path))
+    return output_path
 
 
 def export_accessible_document(
@@ -300,10 +186,9 @@ def export_accessible_document(
         Path: The output_path where the formatted document was written.
 
     Raises:
-        ValueError: When the deterministic audit reports BLOCKER findings or when the export profile forbids any block; both messages are localized.
-
-    Raises:
-        ValueError: When format_name is not a recognized export format.
+        ValueError: When the deterministic audit reports BLOCKER findings, when the export profile forbids any block, or when format_name is not a recognized export format; the messages are localized.
+        RuntimeError: When format_name is "pdf_ua" and TOOLBOX_PDF_UA_ENABLED is false, or when pandoc fails while rendering docx.
+        acessilia_sdk.toolbox.errors.ToolboxError: When format_name is "pdf_ua" and the Toolbox cannot render or deliver the PDF.
     """
     document = _ensure_document(
         source_text_or_document, title=title or t(MSG_DEFAULT_ACCESSIBLE_TITLE)

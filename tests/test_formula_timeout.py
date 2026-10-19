@@ -69,10 +69,20 @@ def _mock_child(monkeypatch, payload=b'{"latex":"x=1"}', returncode=0):
     return process, launcher, killer
 
 
+def _fake_clock(monkeypatch, clock) -> None:
+    """Give formula_tools its own clock without touching the global ``time``.
+
+    Patching ``time.monotonic`` itself breaks every other thread in the run:
+    asyncio loops (such as the session TestClient's) read it too, consume the
+    fake values and fail later in unrelated tests.
+    """
+    monkeypatch.setattr(formula_tools, "time", SimpleNamespace(monotonic=lambda: next(clock)))
+
+
 def test_timeout_budget_includes_process_startup(monkeypatch, temporary_files):
     monkeypatch.setenv("FORMULA_CODEFORMULA_TIMEOUT", "10")
     clock = iter([100.0, 103.5])
-    monkeypatch.setattr(formula_tools.time, "monotonic", lambda: next(clock))
+    _fake_clock(monkeypatch, clock)
     process, _, killer = _mock_child(monkeypatch)
     assert formula_tools.extract_latex_from_image(b"crop") == "x=1"
     assert process.wait.call_args_list[0].kwargs["timeout"] == 6.5
@@ -84,7 +94,7 @@ def test_timeout_budget_includes_process_startup(monkeypatch, temporary_files):
 def test_startup_consuming_budget_is_timeout(monkeypatch, temporary_files):
     monkeypatch.setenv("FORMULA_CODEFORMULA_TIMEOUT", "1")
     clock = iter([100.0, 102.0])
-    monkeypatch.setattr(formula_tools.time, "monotonic", lambda: next(clock))
+    _fake_clock(monkeypatch, clock)
     process, _, killer = _mock_child(monkeypatch)
     assert formula_tools.extract_latex_from_image(b"crop") == ""
     killer.assert_called_once_with(process.pid, signal.SIGKILL)

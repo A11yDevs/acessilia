@@ -57,8 +57,7 @@ jobs:
             libglib2.0-0 \
             libmagic1 \
             pandoc \
-            poppler-utils \
-            texlive-xetex
+            poppler-utils
 
       - name: Install project dependencies
         run: |

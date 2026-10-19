@@ -2,8 +2,8 @@
 
 The client itself is tested in ``libs/sdk/tests/clients/test_pdf_ua.py``.
 These tests cover how the core builds it from ``settings`` and the exporter,
-which tries the Toolbox first and still uses local pandoc + LaTeX as the
-fallback until #150 removes it (docs/adr/0003).
+which renders PDF/UA only on the Toolbox, with no local fallback
+(docs/adr/0003).
 """
 from __future__ import annotations
 
@@ -74,7 +74,7 @@ def test_same_document_yields_the_same_upload_so_the_toolbox_cache_hits():
     assert set(json.loads(pandoc_payload(first))) == {"pandoc-api-version", "meta", "blocks"}
 
 
-# ── Exporter: Toolbox first, local fallback ─────────────────────────────
+# ── Exporter: Toolbox only ──────────────────────────────────────────────
 
 
 def _export_pdf_ua(tmp_path: Path) -> Path:
@@ -86,7 +86,7 @@ def _export_pdf_ua(tmp_path: Path) -> Path:
     )
 
 
-def test_exporter_uses_the_toolbox_and_skips_local_latex(monkeypatch, tmp_path):
+def test_exporter_renders_on_the_toolbox(monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "toolbox_pdf_ua_enabled", True)
     calls = []
 
@@ -95,13 +95,9 @@ def test_exporter_uses_the_toolbox_and_skips_local_latex(monkeypatch, tmp_path):
         output_path.write_bytes(PDF)
         return {"artifact_id": PDF_ID}
 
-    def local_must_not_run(*args, **kwargs):
-        raise AssertionError("local LaTeX ran although the Toolbox succeeded")
-
     monkeypatch.setattr(
         "backend.export.pandoc_exporter.toolbox_export_pdf_ua", fake_toolbox
     )
-    monkeypatch.setattr(pandoc_exporter, "_render_pdf_ua_with_pandoc", local_must_not_run)
 
     output = _export_pdf_ua(tmp_path)
 
@@ -111,52 +107,56 @@ def test_exporter_uses_the_toolbox_and_skips_local_latex(monkeypatch, tmp_path):
     assert ast["blocks"], "the canonical document reaches the Toolbox as a Pandoc AST"
 
 
-def test_exporter_falls_back_to_local_latex_when_the_toolbox_fails(monkeypatch, tmp_path):
+@pytest.mark.parametrize(
+    "error",
+    [ToolboxProviderUnavailable("pdf-ua-render offline"), RuntimeError("event loop is closed")],
+)
+def test_a_toolbox_failure_propagates_without_a_local_fallback(
+    monkeypatch, tmp_path, error
+):
     monkeypatch.setattr(settings, "toolbox_pdf_ua_enabled", True)
 
     def failing_toolbox(ast, output_path, *, lang):
-        raise ToolboxProviderUnavailable("pdf-ua-render offline")
-
-    def local(ast, output_path, *, lang):
-        output_path.write_bytes(b"%PDF-local")
-        return output_path
+        raise error
 
     monkeypatch.setattr(
         "backend.export.pandoc_exporter.toolbox_export_pdf_ua", failing_toolbox
     )
-    monkeypatch.setattr(pandoc_exporter, "_render_pdf_ua_with_pandoc", local)
+    def pandoc_must_not_run(*args, **kwargs):
+        raise AssertionError("pandoc ran for PDF/UA")
 
-    assert _export_pdf_ua(tmp_path).read_bytes() == b"%PDF-local"
+    monkeypatch.setattr(pandoc_exporter, "_render_with_pandoc", pandoc_must_not_run)
+
+    with pytest.raises(type(error), match=str(error)):
+        _export_pdf_ua(tmp_path)
 
 
-def test_exporter_falls_back_on_an_unexpected_toolbox_error(monkeypatch, tmp_path):
-    monkeypatch.setattr(settings, "toolbox_pdf_ua_enabled", True)
+def test_the_format_is_unavailable_when_disabled(monkeypatch, tmp_path):
+    monkeypatch.setattr(settings, "toolbox_pdf_ua_enabled", False)
 
-    def broken_toolbox(ast, output_path, *, lang):
-        raise RuntimeError("event loop is closed")
-
-    def local(ast, output_path, *, lang):
-        output_path.write_bytes(b"%PDF-local")
-        return output_path
+    def toolbox_must_not_run(*args, **kwargs):
+        raise AssertionError("Toolbox called although TOOLBOX_PDF_UA_ENABLED=false")
 
     monkeypatch.setattr(
-        "backend.export.pandoc_exporter.toolbox_export_pdf_ua", broken_toolbox
+        "backend.export.pandoc_exporter.toolbox_export_pdf_ua", toolbox_must_not_run
     )
-    monkeypatch.setattr(pandoc_exporter, "_render_pdf_ua_with_pandoc", local)
 
-    assert _export_pdf_ua(tmp_path).read_bytes() == b"%PDF-local"
+    with pytest.raises(RuntimeError, match="TOOLBOX_PDF_UA_ENABLED=false"):
+        _export_pdf_ua(tmp_path)
 
 
 def test_exporter_takes_the_language_from_the_document(monkeypatch, tmp_path):
-    monkeypatch.setattr(settings, "toolbox_pdf_ua_enabled", False)
+    monkeypatch.setattr(settings, "toolbox_pdf_ua_enabled", True)
     langs = []
 
-    def local(ast, output_path, *, lang):
+    def fake_toolbox(ast, output_path, *, lang):
         langs.append(lang)
-        output_path.write_bytes(b"%PDF-local")
-        return output_path
+        output_path.write_bytes(PDF)
+        return {}
 
-    monkeypatch.setattr(pandoc_exporter, "_render_pdf_ua_with_pandoc", local)
+    monkeypatch.setattr(
+        "backend.export.pandoc_exporter.toolbox_export_pdf_ua", fake_toolbox
+    )
     document = pandoc_exporter._ensure_document("# Report\n\nParagraph.\n", title="Report")
     document["language"] = "en-US"
 
@@ -181,43 +181,17 @@ def test_toolbox_pdf_ua_enabled_is_parsed_from_the_environment(monkeypatch, raw,
     assert Settings().toolbox_pdf_ua_enabled is expected
 
 
-def test_exporter_reports_both_causes_when_toolbox_and_local_fail(monkeypatch, tmp_path):
-    monkeypatch.setattr(settings, "toolbox_pdf_ua_enabled", True)
-
-    def failing_toolbox(ast, output_path, *, lang):
-        raise ToolboxProviderUnavailable("pdf-ua-render offline")
-
-    def failing_local(ast, output_path, *, lang):
-        raise RuntimeError("Undefined control sequence")
-
-    monkeypatch.setattr(
-        "backend.export.pandoc_exporter.toolbox_export_pdf_ua", failing_toolbox
-    )
-    monkeypatch.setattr(pandoc_exporter, "_render_pdf_ua_with_pandoc", failing_local)
-
-    with pytest.raises(RuntimeError) as excinfo:
-        _export_pdf_ua(tmp_path)
-    message = str(excinfo.value)
-    assert "pdf-ua-render offline" in message
-    assert "Undefined control sequence" in message
-
-
-def test_exporter_skips_the_toolbox_when_disabled(monkeypatch, tmp_path):
-    monkeypatch.setattr(settings, "toolbox_pdf_ua_enabled", False)
-
-    def toolbox_must_not_run(*args, **kwargs):
-        raise AssertionError("Toolbox called although TOOLBOX_PDF_UA_ENABLED=false")
-
-    def local(ast, output_path, *, lang):
-        output_path.write_bytes(b"%PDF-local")
-        return output_path
-
-    monkeypatch.setattr(
-        "backend.export.pandoc_exporter.toolbox_export_pdf_ua", toolbox_must_not_run
-    )
-    monkeypatch.setattr(pandoc_exporter, "_render_pdf_ua_with_pandoc", local)
-
-    assert _export_pdf_ua(tmp_path).read_bytes() == b"%PDF-local"
+def test_the_core_has_no_local_pdf_ua_toolchain():
+    """The local pandoc + LaTeX path and its template are gone (docs/adr/0003)."""
+    for name in (
+        "_render_pdf_ua_with_pandoc",
+        "_pdf_ua_engine",
+        "_pdf_ua_template_path",
+        "_xelatex_bin",
+        "_lualatex_bin",
+    ):
+        assert not hasattr(pandoc_exporter, name), name
+    assert not (Path(pandoc_exporter.__file__).parent / "templates" / "pdf_ua.tex").exists()
 
 
 @pytest.mark.respx(base_url=BASE_URL)

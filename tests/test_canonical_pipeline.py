@@ -232,16 +232,24 @@ def test_export_accessible_document_sanitizes_legacy_block_markdown():
         assert "Item B" in content
 
 
-def test_export_accessible_document_pdf_ua_requires_pandoc(monkeypatch):
-    # Force the local renderer: with a reachable Toolbox it would never run.
-    monkeypatch.setattr("backend.export.pandoc_exporter.settings.toolbox_pdf_ua_enabled", False)
-    monkeypatch.setattr("backend.export.pandoc_exporter._pandoc_bin", lambda: None)
-    monkeypatch.setattr("backend.export.pandoc_exporter._xelatex_bin", lambda: "/usr/bin/xelatex")
-    monkeypatch.setattr("backend.export.pandoc_exporter._lualatex_bin", lambda: "/usr/bin/lualatex")
+def test_export_accessible_document_pdf_ua_never_runs_local_pandoc(monkeypatch):
+    """PDF/UA is rendered only by the Toolbox (docs/adr/0003)."""
+    from backend.tools.toolbox_client import ToolboxProviderUnavailable
+
+    monkeypatch.setattr("backend.export.pandoc_exporter.settings.toolbox_pdf_ua_enabled", True)
+
+    def toolbox_down(ast, output_path, *, lang):
+        raise ToolboxProviderUnavailable("pdf-ua-render offline")
+
+    def pandoc_must_not_run(*args, **kwargs):
+        raise AssertionError("pandoc ran for PDF/UA")
+
+    monkeypatch.setattr("backend.export.pandoc_exporter.toolbox_export_pdf_ua", toolbox_down)
+    monkeypatch.setattr("backend.export.pandoc_exporter._render_with_pandoc", pandoc_must_not_run)
 
     with tempfile.TemporaryDirectory() as tmpdir:
         out = Path(tmpdir) / "saida.pdf_ua.pdf"
-        with pytest.raises(RuntimeError, match="pandoc"):
+        with pytest.raises(ToolboxProviderUnavailable):
             export_accessible_document(
                 "# Titulo\n\nParagrafo simples.",
                 out,
@@ -249,23 +257,6 @@ def test_export_accessible_document_pdf_ua_requires_pandoc(monkeypatch):
                 title="Titulo",
             )
 
-
-def test_export_accessible_document_pdf_ua_requires_latex_engine(monkeypatch):
-    # Force the local renderer: with a reachable Toolbox it would never run.
-    monkeypatch.setattr("backend.export.pandoc_exporter.settings.toolbox_pdf_ua_enabled", False)
-    monkeypatch.setattr("backend.export.pandoc_exporter._pandoc_bin", lambda: "/usr/bin/pandoc")
-    monkeypatch.setattr("backend.export.pandoc_exporter._xelatex_bin", lambda: None)
-    monkeypatch.setattr("backend.export.pandoc_exporter._lualatex_bin", lambda: None)
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        out = Path(tmpdir) / "saida.pdf_ua.pdf"
-        with pytest.raises(RuntimeError, match="lualatex or xelatex"):
-            export_accessible_document(
-                "# Titulo\n\nParagrafo simples.",
-                out,
-                format_name="pdf_ua",
-                title="Titulo",
-            )
 
 def test_export_accessible_document_html_preserves_mixed_header_cells():
     document = {

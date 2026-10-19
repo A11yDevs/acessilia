@@ -759,12 +759,19 @@ async def test_job_executor_keeps_original_filename_in_status(api_paths, monkeyp
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("failed_format", [None, "MP3", "PDF/UA"])
+@pytest.mark.parametrize("failed_format", [None, "MP3", "PDF/UA", "PDF/UA disabled"])
 async def test_job_executor_reports_optional_export_failure(
     api_paths, monkeypatch, failed_format
 ):
     from backend.agents.state_manager import state_manager
     from backend.api.worker import ApiJob, JobExecutor
+    from backend.config.settings import settings
+
+    # PDF/UA runs only on the Toolbox; switched off, it is skipped without an error.
+    pdf_ua_disabled = failed_format == "PDF/UA disabled"
+    monkeypatch.setattr(settings, "toolbox_pdf_ua_enabled", not pdf_ua_disabled)
+    if pdf_ua_disabled:
+        failed_format = None
 
     task_id = "bug0011"
     input_path = api_paths / "audio.pdf"
@@ -784,8 +791,10 @@ async def test_job_executor_reports_optional_export_failure(
         raise RuntimeError("tts offline")
 
     def fail_pdf_ua(_canonical, destination, _filename):
+        from acessilia_sdk.toolbox import ToolboxProviderUnavailable
+
         destination.write_bytes(b"partial pdf")
-        raise FileNotFoundError("pandoc unavailable")
+        raise ToolboxProviderUnavailable("pdf-ua-render unavailable")
 
     async def write_mp3(_text, destination, **_kwargs):
         destination.write_bytes(b"audio")
@@ -850,18 +859,22 @@ async def test_job_executor_reports_optional_export_failure(
     else:
         assert len(task["erros"]) == 1
         assert failed_format in task["erros"][0]
-        assert "tts offline" in task["erros"][0] or "pandoc unavailable" in task["erros"][0]
+        assert (
+            "tts offline" in task["erros"][0]
+            or "pdf-ua-render unavailable" in task["erros"][0]
+        )
         expected_errors = task["erros"]
 
     if failed_format == "MP3":
         assert not (output_dir / "audio.mp3").exists()
-    if failed_format == "PDF/UA":
+    pdf_ua_produced = failed_format != "PDF/UA" and not pdf_ua_disabled
+    if not pdf_ua_produced:
         assert not (output_dir / "audio.pdf_ua.pdf").exists()
 
     expected_formats = {"txt", "docx", "pdf", "html", "zip"}
     if failed_format != "MP3":
         expected_formats.add("mp3")
-    if failed_format != "PDF/UA":
+    if pdf_ua_produced:
         expected_formats.add("pdf_ua")
     assert set(registered_formats) == expected_formats
 
@@ -870,7 +883,7 @@ async def test_job_executor_reports_optional_export_failure(
         expected_files = {"audio.txt", "audio.docx", "audio.pdf", "audio.html"}
         if failed_format != "MP3":
             expected_files.add("audio.mp3")
-        if failed_format != "PDF/UA":
+        if pdf_ua_produced:
             expected_files.add("audio.pdf_ua.pdf")
         assert set(archive.namelist()) == expected_files
 

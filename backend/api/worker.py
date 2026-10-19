@@ -22,6 +22,7 @@ from backend.log_messages import (
     LOG_JOB_EXECUTOR_ERROR,
     LOG_MP3_GENERATION_FAILED,
     LOG_PDF_UA_GENERATION_FAILED,
+    LOG_PDF_UA_SKIPPED_DISABLED,
 )
 from backend.stage_messages import (
     STAGE_RESTART_CANCELLED,
@@ -256,23 +257,31 @@ class JobExecutor:
             completed_formats.append("pdf")
             state_manager.verificar_cancelamento(task_id)
 
-            state_manager.atualizar(task_id, etapa=t(STAGE_EXPORTING_PDF_UA), progresso=0.92)
-            pdf_ua_path = out_dir / f"{base}.pdf_ua.pdf"
-            try:
-                await self._run_in_executor(
-                    export_pdf_ua,
-                    canonical,
-                    pdf_ua_path,
-                    job.filename,
+            pdf_ua_path = None
+            if settings.toolbox_pdf_ua_enabled:
+                state_manager.atualizar(
+                    task_id, etapa=t(STAGE_EXPORTING_PDF_UA), progresso=0.92
                 )
-                completed_formats.append("pdf_ua")
-            except Exception as exc:
-                error_msg = t(LOG_PDF_UA_GENERATION_FAILED).format(error=str(exc))
-                logger.warning(error_msg)
-                optional_errors.append(error_msg)
-                state_manager.atualizar(task_id, erro=error_msg)
-                _remove_partial_output(pdf_ua_path)
-                pdf_ua_path = None
+                pdf_ua_path = out_dir / f"{base}.pdf_ua.pdf"
+                try:
+                    await self._run_in_executor(
+                        export_pdf_ua,
+                        canonical,
+                        pdf_ua_path,
+                        job.filename,
+                    )
+                    completed_formats.append("pdf_ua")
+                except Exception as exc:
+                    error_msg = t(LOG_PDF_UA_GENERATION_FAILED).format(error=str(exc))
+                    logger.warning(error_msg)
+                    optional_errors.append(error_msg)
+                    state_manager.atualizar(task_id, erro=error_msg)
+                    _remove_partial_output(pdf_ua_path)
+                    pdf_ua_path = None
+            else:
+                # PDF/UA runs only on the Toolbox (docs/adr/0003); switching it
+                # off is a deployment choice, not an error.
+                logger.info(t(LOG_PDF_UA_SKIPPED_DISABLED))
             state_manager.verificar_cancelamento(task_id)
 
             state_manager.atualizar(task_id, etapa=t(STAGE_EXPORTING_HTML), progresso=0.93)

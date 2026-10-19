@@ -896,31 +896,8 @@ msgstr "pandoc not found on PATH"
 msgid "pandoc failed ({to_format}): {stderr}"
 msgstr "pandoc failed ({to_format}): {stderr}"
 
-msgid ""
-"pandoc not found on PATH. The pdf_ua format requires pandoc plus a LaTeX "
-"engine."
-msgstr ""
-"pandoc not found on PATH. The pdf_ua format requires pandoc plus a LaTeX "
-"engine."
-
-msgid ""
-"No LaTeX engine found on PATH. The pdf_ua format requires lualatex or "
-"xelatex."
-msgstr ""
-"No LaTeX engine found on PATH. The pdf_ua format requires lualatex or "
-"xelatex."
-
-#, python-brace-format
-msgid "PDF/UA template not found: {template_path}"
-msgstr "PDF/UA template not found: {template_path}"
-
-#, python-brace-format
-msgid ""
-"PDF/UA export failed on the Toolbox ({toolbox_error}) and locally "
-"({local_error})"
-msgstr ""
-"PDF/UA export failed on the Toolbox ({toolbox_error}) and locally "
-"({local_error})"
+msgid "PDF/UA export is disabled (TOOLBOX_PDF_UA_ENABLED=false)"
+msgstr "PDF/UA export is disabled (TOOLBOX_PDF_UA_ENABLED=false)"
 
 #, python-brace-format
 msgid "Audit failed: {findings}"
@@ -1394,17 +1371,12 @@ msgstr "PDF exported with bookmarks and page numbering: {output_path}"
 msgid "PDF/UA exported: {output_path}"
 msgstr "PDF/UA exported: {output_path}"
 
+msgid "PDF/UA skipped: TOOLBOX_PDF_UA_ENABLED is false"
+msgstr "PDF/UA skipped: TOOLBOX_PDF_UA_ENABLED is false"
+
 #, python-brace-format
 msgid "PDF/UA rendered by the Toolbox: {output_path}"
 msgstr "PDF/UA rendered by the Toolbox: {output_path}"
-
-#, python-brace-format
-msgid ""
-"PDF/UA export on the Toolbox failed ({error}); falling back to local "
-"pandoc + LaTeX"
-msgstr ""
-"PDF/UA export on the Toolbox failed ({error}); falling back to local "
-"pandoc + LaTeX"
 
 #, python-brace-format
 msgid "TXT exported: {output_path}"
