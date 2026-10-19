@@ -151,10 +151,12 @@ As capacidades também são obrigações de primeira classe no domínio PDDL v2.
 tools dos agentes Agno (`FusionAgent`, `AdjudicationAgent`, `PageLevelAgent`,
 `OrderAdjudicationAgent`, `TableSpecialistAgent`).
 
-**Ressalva de método:** o gap dev→test observado é de ~8 pontos e o TEDS não
-transferiu (dev +5.9 → test +0.2). O melhor *confirmado* no leaderboard é
-`differ-v15-hyb` (EvalAI 70.37); o melhor de dev (87.33) nunca foi confirmado.
-Nenhum preset de benchmark é default. Ver
+**Ressalva de método:** a melhor submissão, `hyb-v29-judge2-televm-adf-tj3`
+(EvalAI 71.01, além do método do artigo), fez 87.33 no dev: um gap dev→test de
+16.3 pontos. Dentro do método do artigo, o melhor é `differ-v15-hyb` (EvalAI
+70.37, gap ~8), e o TEDS dele não transferiu (dev +5.9 → test +0.2). Nenhum
+preset de benchmark é default. Os dois resultados estão congelados em
+[`scripts/drbench/`](../scripts/drbench/README.pt-br.md). Ver
 [`docs/drbench/experiments/RUNBOOK.pt-br.md`](drbench/experiments/RUNBOOK.pt-br.md).
 
 ## Relacionados

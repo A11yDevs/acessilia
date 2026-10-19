@@ -123,8 +123,8 @@ is ~17% of the test split — that is why it is cheap relative to full OCR.
 
 ## 5. What to check before promoting a method
 
-1. **Confirm on the leaderboard.** The dev best (87.33) was never confirmed; the
-   observed dev→test gap is ~8 points. A dev gain is not a result.
+1. **Confirm on the leaderboard.** The dev best (87.33) scored 71.01 on test, a
+   16.3-point gap (~8 for `differ-v15-hyb`). A dev gain is not a result.
 2. **Check the metric that moved.** TEDS did not transfer (dev +5.9 → test +0.2);
    the real test gain came from reading order with the MinerU hybrid-VLM source.
 3. **Respect the holdout.** The split is by document (`md5(doc) % 3`). Acceptance

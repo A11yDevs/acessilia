@@ -357,7 +357,7 @@ Defined in `backend/config/settings.py` and documented in `.env.example`:
 | `TOOLBOX_ADJUDICATE_PROVIDER` | `qwen3-vl-8b` | Pairwise judge / region transcription (`document.adjudicate.*`) |
 | `TOOLBOX_TABLE_PROVIDER` | `qwen3-vl-8b` | Table re-generation for the table specialist (`table.recognize`) |
 | `TOOLBOX_ORIENTATION_PROVIDER` | `rapidocr-orient` | Rotation detection (`image.page.orient`) |
-| `FUSION_HYBRID_PROVIDER` | `mineru-hyb` | MinerU hybrid-VLM provider id (the B source of the confirmed leaderboard best) |
+| `FUSION_HYBRID_PROVIDER` | `mineru-hyb` | MinerU hybrid-VLM provider id (the B source of the best submission within the paper's method) |
 
 > `TOOLBOX_USE_ARTIFACT_STORE` and `TOOLBOX_USE_REMOTE_CACHE` directly affect the
 > extraction flow: with the artifact store on, the core uploads the file once and
@@ -412,7 +412,7 @@ config that mirrors them is `scripts/bench/slurm/providers-config-vlm.yaml`.
 
 `mineru-hyb` (MinerU 3.x, `backend=hybrid-engine`) is registered as a
 `document.structure.extract` / `document.layout.analyze` / `document.ocr`
-provider. It is the B source of the confirmed leaderboard best
+provider. It is the B source of the best submission within the paper's method
 (`differ-v15-hyb`, EvalAI 70.37): the real test gain came from reading order
 (+16.4) with this source, not from TEDS. Adopt it explicitly with
 `FUSION_SECONDARY_PROVIDER=mineru-hyb`; the dual-fusion default stays `mineru`.

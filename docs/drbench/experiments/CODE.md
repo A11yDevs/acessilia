@@ -8,6 +8,10 @@ branches. It is preserved, exactly as it ran, at the tag
 [`drbench-2026-snapshot`](https://github.com/A11yDevs/acessilia/tree/drbench-2026-snapshot/scripts/drbench); every link below points there. To run it, follow
 the [runbook](RUNBOOK.md).
 
+The submitted results themselves (the best submission and the paper's experiment, frozen with
+their EvalAI scores and a script to check and replay them) are in
+[`scripts/drbench/`](../../../scripts/drbench/README.md), the path the paper cites.
+
 What became part of the product lives elsewhere now:
 
 - the algorithms, as pure functions in [`libs/docstruct`](../../../libs/docstruct/README.md) (column *Now in* below);

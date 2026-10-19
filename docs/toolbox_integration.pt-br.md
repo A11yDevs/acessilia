@@ -360,7 +360,7 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 | `TOOLBOX_ADJUDICATE_PROVIDER` | `qwen3-vl-8b` | Juiz pareado / transcrição de região (`document.adjudicate.*`) |
 | `TOOLBOX_TABLE_PROVIDER` | `qwen3-vl-8b` | Regeração de tabelas para o especialista de tabelas (`table.recognize`) |
 | `TOOLBOX_ORIENTATION_PROVIDER` | `rapidocr-orient` | Detecção de rotação (`image.page.orient`) |
-| `FUSION_HYBRID_PROVIDER` | `mineru-hyb` | Id do provider MinerU hybrid-VLM (a fonte B do melhor confirmado no leaderboard) |
+| `FUSION_HYBRID_PROVIDER` | `mineru-hyb` | Id do provider MinerU hybrid-VLM (a fonte B da melhor submissão dentro do método do artigo) |
 
 > `TOOLBOX_USE_ARTIFACT_STORE` e `TOOLBOX_USE_REMOTE_CACHE` afetam diretamente o
 > fluxo de extração: com o artifact store ativo, o core envia o arquivo uma vez e
@@ -416,7 +416,7 @@ do Dr.DocBench que os espelha é
 
 O `mineru-hyb` (MinerU 3.x, `backend=hybrid-engine`) está registrado como
 provider de `document.structure.extract` / `document.layout.analyze` /
-`document.ocr`. É a fonte B do melhor confirmado no leaderboard
+`document.ocr`. É a fonte B da melhor submissão dentro do método do artigo
 (`differ-v15-hyb`, EvalAI 70.37): o ganho real no test veio da ordem de leitura
 (+16.4) com essa fonte, não do TEDS. Adote-o explicitamente com
 `FUSION_SECONDARY_PROVIDER=mineru-hyb`; o default da fusão dual continua `mineru`.

@@ -8,6 +8,10 @@ principais. Ele está preservado, exatamente como rodou, na tag
 [`drbench-2026-snapshot`](https://github.com/A11yDevs/acessilia/tree/drbench-2026-snapshot/scripts/drbench); todos os links abaixo apontam para ela. Para
 rodá-lo, siga o [runbook](RUNBOOK.pt-br.md).
 
+Os resultados submetidos em si (a melhor submissão e o experimento do artigo, congelados com
+os scores do EvalAI e um script para conferi-los e refazê-los) estão em
+[`scripts/drbench/`](../../../scripts/drbench/README.pt-br.md), o caminho citado no artigo.
+
 O que virou parte do produto mora em outro lugar agora:
 
 - os algoritmos, como funções puras em [`libs/docstruct`](../../../libs/docstruct/README.pt-br.md) (coluna *Agora em* abaixo);

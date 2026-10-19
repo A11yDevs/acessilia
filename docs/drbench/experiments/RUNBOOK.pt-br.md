@@ -124,8 +124,8 @@ O juiz só roda nas páginas onde as candidatas divergem (ratio < 0.97), o que �
 
 ## 5. O que verificar antes de promover um método
 
-1. **Confirme no leaderboard.** O melhor de dev (87.33) nunca foi confirmado; o
-   gap dev→test observado é de ~8 pontos. Ganho no dev não é resultado.
+1. **Confirme no leaderboard.** O melhor de dev (87.33) fez 71.01 no test, um gap
+   de 16.3 pontos (~8 no `differ-v15-hyb`). Ganho no dev não é resultado.
 2. **Verifique qual métrica se moveu.** O TEDS não transferiu (dev +5.9 → test
    +0.2); o ganho real no test veio da ordem de leitura com a fonte MinerU
    hybrid-VLM.
