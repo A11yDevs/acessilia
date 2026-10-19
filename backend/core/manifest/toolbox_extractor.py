@@ -22,8 +22,8 @@ if TYPE_CHECKING:
 class ToolboxExtraction:
     """Resultado da extração via Toolbox.
 
-    Em vez de um objeto docling.Document, carrega o JSON completo da resposta
-    da Toolbox para que o builder possa iterar sobre elements/pages diretamente.
+    Carrega o JSON completo da resposta da Toolbox, de onde o builder lê
+    elements e pages diretamente.
     """
     document: dict[str, Any]
     started_at: datetime
