@@ -107,7 +107,7 @@ def test_unconsumed_capabilities_match_the_review(checker, snapshot: dict) -> No
     _, notes = checker.compare(core, toolbox)
 
     assert len(notes) == 1
-    prefix = "capabilities exposed by the Toolbox with no client in the core: "
+    prefix = "capabilities exposed by the Toolbox with no client in the SDK: "
     assert notes[0].startswith(prefix)
     unconsumed = {item.strip() for item in notes[0][len(prefix) :].split(",")}
 

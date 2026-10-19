@@ -44,6 +44,27 @@ def test_base_urls_list_independent_deployments(monkeypatch):
     assert len(make_toolbox_client(ToolboxOcrClient).endpoints) == 2
 
 
+def test_base_urls_take_precedence_over_base_url(monkeypatch):
+    monkeypatch.setattr(settings, "toolbox_base_url", "http://balancer.test")
+    monkeypatch.setattr(settings, "toolbox_base_urls", f"{PRIMARY},{SECONDARY}")
+
+    assert [e.base_url for e in toolbox_endpoints()] == [PRIMARY, SECONDARY]
+
+
+@pytest.mark.parametrize("blank", ["", "   ", "\t"])
+def test_a_blank_list_falls_back_to_base_url(monkeypatch, blank):
+    monkeypatch.setattr(settings, "toolbox_base_urls", blank)
+
+    assert toolbox_endpoints() == (ToolboxEndpoint(PRIMARY),)
+
+
+def test_a_malformed_entry_in_the_list_fails_loudly(monkeypatch):
+    monkeypatch.setattr(settings, "toolbox_base_urls", f"{PRIMARY},localhost:8002")
+
+    with pytest.raises(ValueError, match="absolute http"):
+        toolbox_endpoints()
+
+
 def test_overrides_win_and_none_is_ignored():
     client = make_toolbox_client(
         ToolboxOcrClient, base_url=SECONDARY, provider=None, timeout_seconds=5

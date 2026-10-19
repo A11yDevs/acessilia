@@ -103,7 +103,8 @@ python scripts/check_capability_contract.py --snapshot tests/fixtures/toolbox-co
 ```
 
 As três capacidades ausentes são os clientes da PR #125
-(`toolbox_page_ocr_client.py`, `toolbox_adjudicate_client.py`), que não têm
+(`libs/sdk/src/acessilia_sdk/toolbox/clients/page_ocr.py`,
+`libs/sdk/src/acessilia_sdk/toolbox/clients/adjudicate.py`), que não têm
 chamador de produção. O perfil de providers VLM que os serviria existe apenas como
 `scripts/drbench/experiments/slurm/providers-config-vlm.yaml` dentro do repositório do
 *core*, nunca no catálogo da Toolbox de onde a imagem é construída.

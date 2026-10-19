@@ -104,7 +104,8 @@ python scripts/check_capability_contract.py --snapshot tests/fixtures/toolbox-co
 ```
 
 The three missing capabilities are the PR #125 clients
-(`toolbox_page_ocr_client.py`, `toolbox_adjudicate_client.py`), which have no
+(`libs/sdk/src/acessilia_sdk/toolbox/clients/page_ocr.py`,
+`libs/sdk/src/acessilia_sdk/toolbox/clients/adjudicate.py`), which have no
 production caller. The VLM provider profile that would serve them exists only as
 `scripts/drbench/experiments/slurm/providers-config-vlm.yaml` inside the *core*
 repository, never in the Toolbox catalogue the image is built from.

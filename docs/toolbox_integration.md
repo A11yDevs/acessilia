@@ -167,7 +167,7 @@ needs a specialized client in the SDK. Follow the pattern of
 
 Every Toolbox call goes through `execute_capability`
 (SDK, `libs/sdk`: `acessilia_sdk.toolbox.transport`), which refuses any capability that is not in
-the registry. Adding a capability takes two steps.
+the registry. Adding a capability takes three steps.
 
 **1. Declare it** in `libs/sdk/src/acessilia_sdk/toolbox/capabilities.py`:
 

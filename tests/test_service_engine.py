@@ -160,6 +160,7 @@ def test_toolbox_settings_defaults():
 
     for key in (
         "TOOLBOX_BASE_URL",
+        "TOOLBOX_BASE_URLS",
         "TOOLBOX_PROVIDER",
         "TOOLBOX_TIMEOUT_SECONDS",
         "TOOLBOX_USE_ARTIFACT_STORE",
@@ -172,6 +173,7 @@ def test_toolbox_settings_defaults():
     fresh = cfg_mod.Settings()
 
     assert fresh.toolbox_base_url == "http://localhost:8002"
+    assert fresh.toolbox_base_urls == ""
     assert fresh.toolbox_provider == "docling"
     assert fresh.toolbox_timeout_seconds == 3600
     assert fresh.toolbox_use_artifact_store is True

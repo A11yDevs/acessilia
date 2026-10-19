@@ -167,7 +167,7 @@ precisa de um cliente especializado no SDK. Siga o padrão de
 
 Toda chamada à Toolbox passa por `execute_capability`
 (SDK, `libs/sdk`: `acessilia_sdk.toolbox.transport`), que recusa qualquer capacidade fora do
-registro. Adicionar uma capacidade tem dois passos.
+registro. Adicionar uma capacidade tem três passos.
 
 **1. Declarar** em `libs/sdk/src/acessilia_sdk/toolbox/capabilities.py`:
 

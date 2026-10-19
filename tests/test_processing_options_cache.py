@@ -174,3 +174,11 @@ def test_image_settings_invalidate_processing_cache(monkeypatch, name):
     before = options_cache_key("document", configuration=processing_cache_configuration())
     monkeypatch.setattr(settings, name, getattr(settings, name) + 1)
     assert options_cache_key("document", configuration=processing_cache_configuration()) != before
+
+
+def test_toolbox_endpoints_invalidate_processing_cache(monkeypatch):
+    from backend.config.settings import settings
+    from backend.services.cache import processing_cache_configuration, options_cache_key
+    before = options_cache_key("document", configuration=processing_cache_configuration())
+    monkeypatch.setattr(settings, "toolbox_base_urls", "http://a.test,http://b.test")
+    assert options_cache_key("document", configuration=processing_cache_configuration()) != before

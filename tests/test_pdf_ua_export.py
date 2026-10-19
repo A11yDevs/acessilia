@@ -235,3 +235,26 @@ def test_sync_wrapper_runs_without_an_event_loop(respx_mock, monkeypatch, tmp_pa
 
     assert document["artifact_id"] == PDF_ID
     assert (tmp_path / "doc.pdf").read_bytes() == PDF
+
+
+@pytest.mark.respx(base_url=BASE_URL)
+@pytest.mark.parametrize("use_remote_cache", [True, False])
+def test_sync_wrapper_forwards_the_remote_cache_setting(
+    respx_mock, monkeypatch, tmp_path, use_remote_cache
+):
+    from backend.export.pandoc_exporter import toolbox_export_pdf_ua
+
+    monkeypatch.setattr(settings, "toolbox_base_url", BASE_URL)
+    monkeypatch.setattr(settings, "toolbox_base_urls", "")
+    monkeypatch.setattr(settings, "toolbox_use_remote_cache", use_remote_cache)
+    execute = respx_mock.post(EXECUTE_URL).mock(
+        return_value=httpx.Response(200, json=envelope())
+    )
+    respx_mock.get(f"{BASE_URL}/v1/artifacts/{PDF_ID}").mock(
+        return_value=httpx.Response(200, content=PDF)
+    )
+
+    toolbox_export_pdf_ua(AST, tmp_path / "doc.pdf")
+
+    body = execute.calls.last.request.content
+    assert (b'name="no_cache"' in body) is (not use_remote_cache)

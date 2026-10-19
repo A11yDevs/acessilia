@@ -49,7 +49,8 @@ def toolbox_endpoints() -> tuple[ToolboxEndpoint, ...]:
     ``TOOLBOX_BASE_URLS`` lists independent deployments, tried in order;
     without it, ``TOOLBOX_BASE_URL`` is the only endpoint (docs/adr/0006).
     """
-    return parse_endpoints(settings.toolbox_base_urls or settings.toolbox_base_url)
+    base_urls = settings.toolbox_base_urls.strip()
+    return parse_endpoints(base_urls or settings.toolbox_base_url)
 
 
 def _log_failover(endpoint: ToolboxEndpoint, error: ToolboxError) -> None:
