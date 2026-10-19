@@ -5,14 +5,14 @@ Você também pode ler esta documentação em **inglês**: [English](README.md)
 ## Propósito
 Esta documentação detalha a arquitetura do **Acessilia**, um sistema de acessibilidade de documentos que combina **planejamento determinístico** (ordenação e validação de tarefas baseada em PDDL) com **IA multiagente coordenada por Agno** para tarefas de visão, dados e descrição. As funções determinísticas são a fonte de verdade; os LLMs fornecem interpretação e descrição.
 
-O sistema opera com o motor de pipeline `pddl` (o fluxo manifest → plan → execution), selecionado pela opção `PIPELINE_ENGINE`, cujo padrão é `pddl`. O antigo motor `legacy` está desativado: `backend/service.py` recusa qualquer outro valor, e o código dele será removido. Veja [architecture.pt-br.md](architecture.pt-br.md).
+O sistema opera com o motor de pipeline `pddl` (o fluxo manifest → plan → execution), selecionado pela opção `PIPELINE_ENGINE`, cujo padrão é `pddl`. O antigo motor `legacy` está desativado: `backend/service.py` aceita apenas `pddl` (o antigo alias `pmv` é normalizado para ele) e recusa qualquer outro valor, e o código dele será removido. Veja [architecture.pt-br.md](architecture.pt-br.md).
 
 ---
 
 ## Navegação
 
 1. [Constituição Arquitetural](constitution.pt-br.md) — princípios inegociáveis e regras de qualidade, incluindo os princípios do ecossistema P1–P9 (seção 7), que dividem o trabalho entre o core, o SDK, a docstruct e a Toolbox. (Inglês: [English version](constitution.md))
-2. [Especificação de Arquitetura](architecture.pt-br.md) — camadas, os dois motores de pipeline e o fluxo de processamento. (Inglês: [English version](architecture.md))
+2. [Especificação de Arquitetura](architecture.pt-br.md) — camadas, o motor de pipeline PDDL e o fluxo de processamento. (Inglês: [English version](architecture.md))
 3. [Padrões de Design e Integração](patterns.pt-br.md) — padrões recorrentes e sua justificativa. (Inglês: [English version](patterns.md))
 4. [Casos de Uso](use_cases.pt-br.md) — atores e operações visíveis ao usuário. (Inglês: [English version](use_cases.md))
 5. [Endpoints e APIs](endpoints.pt-br.md) — a API REST, o painel web e o runtime AgentOS. (Inglês: [English version](endpoints.md))
@@ -51,7 +51,7 @@ Cada diagrama é um auxílio visual; a descrição vinculada resume seu conteúd
 ## Escopo Abrangido
 
 - **`backend/`** — Lógica de negócio agnóstica da interface.
-  - `core/` — a camada de planejamento: `manifest/` (extração Estrutural-Informational via Docling/PyMuPDF → `processing-manifest.json`), `planning/` (PlannerAgent → problema PDDL e `nominal-plan.json`), `execution/` (Executor via Agno Workflow → `execution-report.json`).
+  - `core/` — a camada de planejamento: `manifest/` (extração Informacional-Estrutural pela Toolbox → `processing-manifest.json`), `planning/` (PlannerAgent → problema PDDL e `nominal-plan.json`), `execution/` (Executor via Agno Workflow → `execution-report.json`).
   - `agents/` — o orquestrador PDDL e os agentes que ele usa (`VisionAgent`, `DataAgent`), além do orquestrador legacy desativado e seus `ReaderAgent`/`EditorAgent`, que serão removidos.
   - `api/` — a API REST standalone (jobs, download, history, health).
   - `pipeline/` + `export/` — construção, validação e renderizadores de formato do documento canônico.

@@ -7,7 +7,7 @@ O sistema converte documentos em formatos acessíveis por meio de um pipeline de
 
 O sistema combina **planejamento determinístico com execução guiada por IA**: as funções determinísticas (extração, geração do problema PDDL, validação de contrato) são a fonte da verdade, e os LLMs fornecem interpretação e descrição. Os documentos passam pelo motor de pipeline **`pddl`** (`PIPELINE_ENGINE`, padrão `pddl`): um manifesto de processamento é extraído, um plano PDDL é gerado e validado, e um executor Agno Workflow o aplica. Veja [pmv_agno_pddl.md](pmv_agno_pddl.md).
 
-O antigo motor **`legacy`** (`AccessibilityOrchestrator`: Reader → Vision/Data → Editor) está desativado: `backend/service.py` recusa qualquer valor diferente de `pddl`. O código dele ainda está no repositório e será removido.
+O antigo motor **`legacy`** (`AccessibilityOrchestrator`: Reader → Vision/Data → Editor) está desativado: `backend/service.py` aceita apenas `pddl` (o antigo alias `pmv` é normalizado para ele) e recusa qualquer outro valor. O código dele ainda está no repositório e será removido.
 
 ---
 
@@ -16,11 +16,13 @@ O antigo motor **`legacy`** (`AccessibilityOrchestrator`: Reader → Vision/Data
 ### 0. Backend (`backend/`) — lógica de negócio agnóstica de interface e pipeline de IA
 
 #### 0.1. Pipeline Multiagente e Orquestração (`backend/agents/`)
-- [backend/agents/orchestrator.py](../backend/agents/orchestrator.py): `AccessibilityOrchestrator` coordena o pipeline de execução multiagente, a consulta de cache, o estado das tarefas, o histórico e os callbacks de status.
-- [backend/agents/reader_agent.py](../backend/agents/reader_agent.py): `ReaderAgent` realiza o parsing estrutural local-first de PDF/imagens (via PyMuPDF ou Docling), divide as páginas e classifica as regiões de conteúdo (imagem, tabela, fórmula, texto).
+Os itens marcados *(motor legacy, desativado)* só são alcançados pelo `AccessibilityOrchestrator` desativado; o motor PDDL não os usa.
+
+- [backend/agents/orchestrator.py](../backend/agents/orchestrator.py) *(motor legacy, desativado)*: `AccessibilityOrchestrator` coordena o pipeline de execução multiagente, a consulta de cache, o estado das tarefas, o histórico e os callbacks de status.
+- [backend/agents/reader_agent.py](../backend/agents/reader_agent.py) *(motor legacy, desativado)*: `ReaderAgent` realiza o parsing estrutural local-first de PDF/imagens (via PyMuPDF ou Docling), divide as páginas e classifica as regiões de conteúdo (imagem, tabela, fórmula, texto).
 - [backend/agents/vision_agent.py](../backend/agents/vision_agent.py): `VisionAgent` utiliza o Agno (`agno.agent.Agent`) e as capacidades multimodais do LLM (`agno.media.Image`) para produzir alt-text detalhado e descrições em áudio para elementos visuais e páginas escaneadas.
 - [backend/agents/data_agent.py](../backend/agents/data_agent.py): `DataAgent` utiliza o Agno (`agno.agent.Agent`) e as capacidades do LLM para converter tabelas complexas e fórmulas matemáticas em representações Markdown e LaTeX estruturadas.
-- [backend/agents/editor_agent.py](../backend/agents/editor_agent.py): `EditorAgent` higieniza o conteúdo e remove duplicatas de trechos repetidos por meio de impressões digitais de conteúdo (`content_fingerprint` em [backend/tools/text_tools.py](../backend/tools/text_tools.py), que normaliza o texto antes do hashing). A implementação atual usa `hash()` embutido do Python e deve ser trocada por um hashing estável mais tarde; o `ReaderAgent` usa as mesmas impressões digitais para descartar regiões repetidas entre páginas.
+- [backend/agents/editor_agent.py](../backend/agents/editor_agent.py) *(motor legacy, desativado)*: `EditorAgent` higieniza o conteúdo e remove duplicatas de trechos repetidos por meio de impressões digitais de conteúdo (`content_fingerprint` em [backend/tools/text_tools.py](../backend/tools/text_tools.py), que normaliza o texto antes do hashing). A implementação atual usa `hash()` embutido do Python e deve ser trocada por um hashing estável mais tarde; o `ReaderAgent` usa as mesmas impressões digitais para descartar regiões repetidas entre páginas.
 - [backend/agents/state_manager.py](../backend/agents/state_manager.py): máquina de estados em memória para tarefas com suporte a cancelamento cooperativo.
 - [backend/agents/types.py](../backend/agents/types.py): contratos de dados compartilhados e tipos de tarefa (`RegionTask`).
 
@@ -47,13 +49,13 @@ O antigo motor **`legacy`** (`AccessibilityOrchestrator`: Reader → Vision/Data
 
 #### 0.5. Camada de Planejamento (`backend/core/`) — motor PDDL
 
-Usado quando `PIPELINE_ENGINE=pddl`. Ele transforma a estrutura do documento em um plano explícito antes de qualquer IA rodar, de modo que a ordem e as dependências das tarefas sejam determinísticas e auditáveis.
+Este é o único motor ativo. Ele transforma a estrutura do documento em um plano explícito antes de qualquer IA rodar, de modo que a ordem e as dependências das tarefas sejam determinísticas e auditáveis.
 
-- `backend/core/manifest/`: o agente Informacional-Estrutural extrai um `processing-manifest.json` do documento (regiões, tipos e obrigações de processamento) via extratores Docling ou PyMuPDF.
+- `backend/core/manifest/`: o agente Informacional-Estrutural extrai um `processing-manifest.json` do documento (regiões, tipos e obrigações de processamento) pela Toolbox (`ToolboxManifestExtractor`, capacidade `document.structure.extract`). Os extratores locais Docling/PyMuPDF estão desativados neste motor.
 - `backend/core/planning/`: o `PlannerAgent` compila o manifesto mais um domínio PDDL em um problema, gera um `nominal-plan.json` (planejador interno ou backend Fast Downward) e o valida. A geração do problema PDDL é determinística — nenhum LLM escreve PDDL.
 - `backend/core/execution/`: o Executor aplica o plano validado como um Agno Workflow, invocando os agentes Vision/Data onde o plano os exige, e produz um `execution-report.json`.
 - `backend/core/agents/fusion_agent.py`: o `FusionAgent` expõe ferramentas Agno determinísticas sobre a biblioteca pura `docstruct` — `fuse_providers`, `audit_document`, `classify_block` e `needs_reinfer`. O método PDDL `dual-provider-fusion` reutiliza `backend.pipeline.fusion.extract_fused` e só é admissível quando `FUSION_MODE=dual`. Veja [docstruct_algorithms.pt-br.md](docstruct_algorithms.pt-br.md) para saber como funcionam esses algoritmos.
-- `backend/agents/pddl_orchestrator.py`: coordena as fases manifesto → plano → execução, com fallback para extração determinística caso o planejamento falhe.
+- `backend/agents/pddl_orchestrator.py`: `PddlAccessibilityOrchestrator.executar()` coordena as fases manifesto → plano → execução. Uma falha no planejamento faz a tarefa falhar; não há fallback para extração determinística.
 
 O domínio PDDL vive em `backend/core/planning/domains/`. Os esquemas JSON (manifesto, plano, comparação, relatório de execução) ficam em `schemas/` na raiz do repositório e são gerados por `scripts/generate_pmv_schemas.py`.
 
@@ -125,14 +127,14 @@ Os modelos pesados rodam num serviço separado, a [Acessilia Toolbox](https://gi
 1. O usuário envia um documento via API REST diretamente, ou por meio do bot Telegram, do painel Web ou da CLI (que chamam a API).
 2. O manipulador de interface valida a extensão e o tamanho do arquivo.
 3. O arquivo é salvo e colocado na `ProcessingQueue`.
-4. O worker retira a tarefa da fila e executa o orquestrador `pddl` (`PddlAccessibilityOrchestrator`):
-    - Registra a tarefa no `StateManager` e consulta o cache de processamento.
+4. O worker retira a tarefa da fila; `backend/service.py::process` a registra no `StateManager` e consulta o cache de processamento.
+5. Se não houver cache, executa o orquestrador PDDL (`PddlAccessibilityOrchestrator.executar()`):
     - Extrai o manifesto de processamento pela Toolbox (`document.structure.extract`) e inspeciona a mídia de origem (`media.inspect`).
     - Enriquece imagens e tabelas, monta e valida um plano PDDL para as obrigações do manifesto e o executa, replanejando quando um método falha.
     - Constrói o documento canônico a partir do manifesto executado.
-5. Os validadores canônicos verificam a adesão ao esquema, a hierarquia de títulos e a segurança da saída.
-6. Os renderizadores e adaptadores de exportação constroem os artefatos de saída (TXT, DOCX, PDF, PDF/UA, HTML, MP3).
-7. Os arquivos de saída são empacotados e entregues ao usuário (via mensagem Telegram, link de download na Web ou e-mail).
+6. Os validadores canônicos verificam a adesão ao esquema, a hierarquia de títulos e a segurança da saída.
+7. Os renderizadores e adaptadores de exportação constroem os artefatos de saída (TXT, DOCX, PDF, PDF/UA, HTML, MP3).
+8. Os arquivos de saída são empacotados e entregues ao usuário (via mensagem Telegram, link de download na Web ou e-mail).
 
 ---
 

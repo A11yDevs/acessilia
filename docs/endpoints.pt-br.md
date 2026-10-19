@@ -46,7 +46,7 @@ Definida em [backend/api/app.py](../backend/api/app.py), com as rotas em [backen
 Observações:
 
 - **Erros sempre em JSON** (`{"detail": "..."}`): `400` validação, `404` não encontrado, `429` rate limit, `500` erro interno. Há um limite global por IP além dos por rota.
-- O campo `pipeline` no histórico registra qual motor rodou o job — `pddl` em todo job atual; `legacy` só aparece em registros de antes de esse motor ser desativado (veja `PIPELINE_ENGINE` em [architecture.pt-br.md](architecture.pt-br.md)).
+- O campo `pipeline` no histórico registra o cliente de IA e o motor que rodou o job, no formato `<ai_client>-<engine>` (por exemplo `ollama-pddl`). O motor é `pddl` em todo job atual, mas os jobs enviados pela API gravam o valor bruto de `PIPELINE_ENGINE`, então o alias `pmv` aparece como `ollama-pmv`; `legacy` só aparece em registros de antes de esse motor ser desativado (veja `PIPELINE_ENGINE` em [architecture.pt-br.md](architecture.pt-br.md)).
 - Documentação interativa padrão do FastAPI em `GET /docs` e `GET /openapi.json`.
 
 ### Acesso aos jobs, opções de processamento e recuperação

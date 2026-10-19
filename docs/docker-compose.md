@@ -12,6 +12,7 @@ This document describes how to run Acessilia locally using Docker, both with a
 
 - [Docker](https://docs.docker.com/get-docker/) (with integrated Compose V2)
 - Internet access to download images or dependencies
+- A reachable [Acessilia Toolbox](https://github.com/A11yDevs/acessilia-toolbox) (`TOOLBOX_BASE_URL`): the PDDL pipeline extracts the document structure there, so processing fails without it
 
 ---
 
@@ -42,7 +43,7 @@ This builds the image from `infra/Dockerfile` with the **docling** variant
 
 ### Slim variant (without Docling)
 
-For a smaller image (~2 GB) without Docling OCR:
+For a smaller image (~2 GB) without the local Docling models (structural extraction runs on the Toolbox in both variants):
 
 ```bash
 docker compose build --build-arg WITH_DOCLING=false
@@ -199,7 +200,7 @@ via a systemd timer. The script consults the **GitHub API** every
 # See docs/homologacao-systemd.md for manual instructions
 ```
 
-For production, use [docs/producao-systemd.md](producao-systemd.md) or run
+For production, use [producao-systemd.md](producao-systemd.md) or run
 `./scripts/setup-producao.sh`. The environment tracks `main` by default using
 `docker-compose.production.yml` and `scripts/production-update.sh`.
 
@@ -209,17 +210,12 @@ For production, use [docs/producao-systemd.md](producao-systemd.md) or run
 
 ## 7. Image variants
 
-| Variant   | Approx. size | Docling | OCR | Recommended use                |
-|-----------|--------------|---------|-----|--------------------------------|
-| **docling** | ~4-6 GB    | ✅ Yes | ✅ Native (CPU) | Maximum document precision |
-| **slim**   | ~2 GB      | ❌ No  | ❌ Fallback pymupdf | Fast tests, limited resources |
+| Variant   | Approx. size | Local Docling | Recommended use                |
+|-----------|--------------|---------------|--------------------------------|
+| **docling** | ~4-6 GB    | ✅ Yes | Default; local formula recognition |
+| **slim**   | ~2 GB      | ❌ No  | Fast tests, limited resources |
 
-The **docling** variant is the default and offers:
-- Table, figure, and formula detection
-- Native CPU-only OCR (no GPU)
-- More precise structural extraction
-
-The **slim** variant automatically falls back to `pymupdf` with a warning in the log.
+In both variants the structural extraction (regions, tables, OCR) runs on the Toolbox, not in this image. In the PDDL engine the local Docling serves only the formula image cascade (`FORMULA_IMAGE_CASCADE`, through [backend/tools/formula_worker.py](../backend/tools/formula_worker.py)), so the **slim** variant lacks that local CodeFormula step.
 
 ---
 
