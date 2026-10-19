@@ -13,6 +13,7 @@ from docstruct.evaluation.metrics import PageScores, overall_score
 from scripts.bench.datasets import BenchPage
 
 PAGES_FILE = "pages.jsonl"
+MANIFEST_FILE = "pages.txt"  # item ids a run covers, written by `run`
 
 
 def score_run(pages: list[BenchPage], predictions: Path, out: Path) -> dict:

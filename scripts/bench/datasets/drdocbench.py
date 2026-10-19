@@ -47,6 +47,9 @@ class DrDocBench:
             image_ref = next((r for r in refs if str(r.get("media_type", "")).startswith("image/")), None)
             if image_ref and not image.exists():
                 _write(image, toolbox.get_artifact(DATASET_ID, split, item_id, image_ref["path"]))
+            if not image.exists():
+                print(f"[WARN] {item_id}: no page image", file=sys.stderr)
+                continue
             if split == "dev" and not md.exists():
                 md_ref = next((r for r in refs if str(r.get("path", "")).endswith(".md")), None)
                 data = toolbox.get_artifact(DATASET_ID, split, item_id, md_ref["path"]) if md_ref else None

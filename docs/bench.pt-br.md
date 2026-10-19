@@ -45,12 +45,28 @@ uv run python -m scripts.bench submit --dataset drdocbench --split test --run ba
 
 `--root` aponta para uma árvore local existente em vez de `var/bench/.../data`;
 `run` também aceita `--sample N`, `--item <id>`, `--provider` e `--save-raw`.
+`run` substitui as predições anteriores da run e registra as páginas que cobriu
+em `pages.txt`; `score` pontua só essas páginas, então uma run com `--sample`
+não é pontuada contra o split inteiro. `score` sai com 1 quando nenhuma página
+tem ground truth (o split `test`, por exemplo). Já `--resume` continua uma run
+interrompida: as predições anteriores ficam e o `pages.txt` segue cobrindo todas
+as páginas da seleção.
+
+A pontuação calcula duas distâncias de Levenshtein por página. Sem o `rapidfuzz`
+(instalado pelo extra `dev`), o docstruct usa Python puro, que leva cerca de
+20 s para uma página de 3.000 caracteres.
 
 `compare` aplica o critério de aceite de `docstruct.evaluation.holdout`: o split
 é por documento (1/3 no holdout), e um candidato só é aceito se ganhar no tune,
 não perder no holdout e nenhuma métrica cair além da tolerância. Sai com 1
 quando o candidato é rejeitado, inclusive quando um dos subconjuntos não tem
-páginas pontuáveis (amostra pequena demais).
+páginas pontuáveis (amostra pequena demais) e quando uma métrica pontuada na
+base não tem nenhum valor no candidato (por exemplo, ele parou de emitir
+tabelas): sem isso a métrica sairia da média e contaria como ganho. Valores que
+não podem ser calculados saem como `null`.
+
+Uma métrica que some só em algumas páginas ainda deixa essas páginas fora da
+sua média; no `drilldown.csv` esse componente fica em branco nessas páginas.
 
 ## Em um cluster Slurm
 

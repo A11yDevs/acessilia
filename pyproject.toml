@@ -50,6 +50,9 @@ dev = [
     "pytest>=9.1.1,<10",
     "respx>=0.23.1,<0.24",
     "pytest-asyncio>=1.4.0,<2",
+    # Levenshtein accelerator of docstruct's text_ed; `scripts.bench score`
+    # falls back to pure Python without it (~20 s for a 3,000-character page).
+    "rapidfuzz>=3.9,<4",
     # Reads the PDFs the renderer tests produce.
     "pypdf>=6.14.2,<7",
 ]

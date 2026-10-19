@@ -153,3 +153,16 @@ class TestMissingMetrics:
         verdict = evaluate_candidate(base, cand)
         assert not verdict.accepted
         assert "sem páginas" in verdict.reason
+
+    def test_metric_that_vanishes_in_the_candidate_is_rejected(self):
+        # Parar de emitir tabelas não pode virar ganho de evalai.
+        verdict = evaluate_candidate(windows(teds=40.0), windows(teds=None))
+        assert not verdict.accepted
+        assert "tune_teds" in verdict.reason and "hold_teds" in verdict.reason
+
+    def test_disjoint_metrics_reject_without_crashing(self):
+        base = windows(text=None, reading_order=None, teds=60.0)
+        cand = windows(text=90.0, reading_order=None, teds=None)
+        verdict = evaluate_candidate(base, cand)
+        assert not verdict.accepted
+        assert "ausente" in verdict.reason

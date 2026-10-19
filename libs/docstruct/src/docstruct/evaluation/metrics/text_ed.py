@@ -2,11 +2,22 @@
 
 from __future__ import annotations
 
+try:  # optional accelerator; the library itself has no dependencies
+    from rapidfuzz.distance import Levenshtein as _rapidfuzz
+except ImportError:
+    _rapidfuzz = None
+
 MISSING = 1.0  # score when either side is empty and the other is not
 
 
 def levenshtein(a: str, b: str) -> int:
-    """Classic O(len(a)*len(b)) Levenshtein distance with two rows."""
+    """Levenshtein distance; ``rapidfuzz`` when installed, else pure Python.
+
+    The pure-Python path is O(len(a)*len(b)): about 10 s for two 3,000-character
+    pages, so install ``rapidfuzz`` to score a whole split.
+    """
+    if _rapidfuzz is not None:
+        return _rapidfuzz.distance(a, b)
     if a == b:
         return 0
     if not a:

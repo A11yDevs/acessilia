@@ -32,6 +32,16 @@ class TestTextED:
         assert levenshtein("flaw", "lawn") == 2
         assert levenshtein("gumbo", "gambol") == 2
 
+    def test_pure_python_path_matches(self, monkeypatch):
+        import importlib
+
+        module = importlib.import_module("docstruct.evaluation.metrics.text_ed")
+
+        pairs = [("flaw", "lawn"), ("gumbo", "gambol"), ("", "abc"), ("ação", "acao")]
+        fast = [levenshtein(a, b) for a, b in pairs]
+        monkeypatch.setattr(module, "_rapidfuzz", None)
+        assert [levenshtein(a, b) for a, b in pairs] == fast == [2, 2, 3, 2]
+
 
 class TestReadingOrder:
     def test_same_order_full_score(self):
@@ -57,6 +67,11 @@ class TestTEDS:
 
     def test_missing_table_none(self):
         assert teds_score("<p>no table</p>", "<p>no table</p>") is None
+
+    def test_one_side_without_table_none(self):
+        table = "<table><tbody><tr><td>1</td></tr></tbody></table>"
+        assert teds_score("<p>x</p>", table) is None
+        assert teds_score(table, "<p>x</p>") is None
 
     def test_structural_difference_lower(self):
         h1 = "<table><tbody><tr><td>a</td><td>b</td></tr></tbody></table>"
