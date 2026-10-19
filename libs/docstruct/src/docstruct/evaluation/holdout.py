@@ -16,6 +16,7 @@ Funções puras, sem I/O e sem dependências pesadas.
 from __future__ import annotations
 
 import hashlib
+import math
 import statistics
 from dataclasses import dataclass
 
@@ -47,7 +48,8 @@ def score(windows: dict[str, dict], subset: str, metrics: tuple[str, ...] = LOOP
     """Média por métrica e o ``evalai`` (média das métricas) em um subconjunto.
 
     ``subset`` é ``"tune"``, ``"hold"`` ou ``"all"``. Métricas ausentes
-    (``None``) não entram na média.
+    (``None``) não entram na média; uma métrica sem nenhum valor no subconjunto
+    fica ``nan`` e não entra no ``evalai``, que só é ``nan`` sem nenhuma.
     """
     out: dict[str, float] = {}
     for metric in metrics:
@@ -57,7 +59,8 @@ def score(windows: dict[str, dict], subset: str, metrics: tuple[str, ...] = LOOP
             if (subset == "all" or partition(key) == subset) and w.get(metric) is not None
         ]
         out[metric] = statistics.mean(values) if values else float("nan")
-    out["evalai"] = statistics.mean(out[m] for m in metrics)
+    present = [out[m] for m in metrics if not math.isnan(out[m])]
+    out["evalai"] = statistics.mean(present) if present else float("nan")
     return out
 
 
@@ -93,6 +96,13 @@ def evaluate_candidate(
     metric_deltas = {f"tune_{m}": tune_cand[m] - tune_base[m] for m in metrics}
     metric_deltas.update({f"hold_{m}": hold_cand[m] - hold_base[m] for m in metrics})
 
+    # nan não perde nem ganha de nada: sem páginas pontuáveis em um dos
+    # subconjuntos o critério não tem como ser verificado.
+    if math.isnan(tune_delta) or math.isnan(hold_delta):
+        return Verdict(
+            False, "sem páginas pontuáveis em tune ou hold",
+            tune_delta, hold_delta, metric_deltas,
+        )
     if tune_delta < min_tune_gain:
         return Verdict(
             False, f"Δtune {tune_delta:+.2f} < {min_tune_gain:+.2f}",
@@ -103,7 +113,8 @@ def evaluate_candidate(
             False, f"Δhold {hold_delta:+.2f} < {min_holdout_gain:+.2f}",
             tune_delta, hold_delta, metric_deltas,
         )
-    worst = min(metric_deltas.items(), key=lambda kv: kv[1])
+    comparable = [kv for kv in metric_deltas.items() if not math.isnan(kv[1])]
+    worst = min(comparable, key=lambda kv: kv[1])
     if worst[1] < -max_metric_loss:
         return Verdict(
             False, f"{worst[0]} {worst[1]:+.2f} < -{max_metric_loss:.2f}",

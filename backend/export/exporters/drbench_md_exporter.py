@@ -7,6 +7,8 @@ benchmark requires raw markdown (HTML tables, LaTeX), not a rendered format.
 from pathlib import Path
 from typing import Any
 
+from docstruct.export.markdown import document_to_markdown
+
 from backend.tools.logger import logger
 
 
@@ -25,19 +27,7 @@ def export_drbench_md(
     Returns:
         Path: The output_path where the .drbench.md file was written.
     """
-    if isinstance(text, dict):
-        # Canonical document: concatenate markdown blocks if present.
-        blocks = text.get("markdown_blocks") or text.get("blocks") or []
-        if blocks and isinstance(blocks[0], dict):
-            content = "\n\n".join(
-                str(b.get("markdown") or b.get("text") or "") for b in blocks
-            )
-        else:
-            content = "\n\n".join(str(b) for b in blocks)
-        if not content:
-            content = text.get("text", "")
-    else:
-        content = text
+    content = document_to_markdown(text) if isinstance(text, dict) else text
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(content, encoding="utf-8")

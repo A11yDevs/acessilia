@@ -134,3 +134,22 @@ class TestEvaluateCandidate:
         cand = {k: {**v, "text": v["text"] + 0.05} for k, v in base.items()}
         assert evaluate_candidate(base, cand).accepted is False
         assert evaluate_candidate(base, cand, min_tune_gain=0.0).accepted is True
+
+
+class TestMissingMetrics:
+    def test_metric_without_values_is_left_out_of_evalai(self):
+        result = score(windows(teds=None), "all")
+        assert result["teds"] != result["teds"]  # nan
+        assert result["evalai"] == pytest.approx(80.0)
+
+    def test_metric_without_values_does_not_block_a_real_gain(self):
+        verdict = evaluate_candidate(windows(teds=None), windows(text=82.0, teds=None))
+        assert verdict.accepted
+
+    def test_empty_subset_rejects_instead_of_accepting(self):
+        # Um documento só: um dos subconjuntos fica vazio.
+        base = {window("doc0"): {"text": 80.0, "reading_order": 80.0, "teds": 60.0}}
+        cand = {window("doc0"): {"text": 99.0, "reading_order": 99.0, "teds": 99.0}}
+        verdict = evaluate_candidate(base, cand)
+        assert not verdict.accepted
+        assert "sem páginas" in verdict.reason
