@@ -37,8 +37,13 @@ async def test_a_document_over_the_limit_fails_before_any_costly_step(monkeypatc
     monkeypatch.setattr(pddl, "inspect_source_media", _must_not_run)
     orchestrator = _orchestrator_with_pages(3)
 
-    with pytest.raises(pddl.DocumentTooLargeError) as info:
-        await orchestrator.executar(tmp_path / "doc.pdf", tmp_path)
+    # Pinned, so the expected English message holds on a pt_BR machine too.
+    token = i18n.set_request_locale("en_US")
+    try:
+        with pytest.raises(pddl.DocumentTooLargeError) as info:
+            await orchestrator.executar(tmp_path / "doc.pdf", tmp_path)
+    finally:
+        i18n.reset_request_locale(token)
 
     assert str(info.value) == "The document has 3 pages, more than the limit of 2."
 
@@ -54,6 +59,15 @@ def test_max_pages_is_read_from_the_environment(monkeypatch):
 
     monkeypatch.setenv("MAX_PAGES", "7")
     assert Settings().max_pages == 7
+
+
+@pytest.mark.parametrize("value", ["0", "-1"])
+def test_a_non_positive_max_pages_is_refused_at_startup(monkeypatch, value):
+    from backend.config.settings import Settings
+
+    monkeypatch.setenv("MAX_PAGES", value)
+    with pytest.raises(ValueError, match="MAX_PAGES must be positive"):
+        Settings()
 
 
 @pytest.mark.asyncio
