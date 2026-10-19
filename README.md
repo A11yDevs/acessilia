@@ -36,10 +36,12 @@ Main endpoints (`/api/v1`):
 
 ## Installation
 
-### Using Poetry (recommended)
+### Using uv (recommended)
+
+The repository pins Python 3.11 in `.python-version`, the same version CI and the Docker image use. `uv` reads that file, and downloads the interpreter if needed.
 
 ```bash
-poetry install
+uv sync
 cp .env.example .env   # configure the keys (AI, SMTP, Telegram)
 ```
 
@@ -48,7 +50,7 @@ cp .env.example .env   # configure the keys (AI, SMTP, Telegram)
 ### Everything in one command (API + web + Telegram)
 
 ```bash
-poetry run python -m frontend.run
+uv run python -m frontend.run
 # or: uv run acessilia
 ```
 
@@ -60,7 +62,7 @@ Starts the interfaces listed in `ENABLED_INTERFACES` (default: `api,telegram,web
 ### Standalone API (for multi-process deploys)
 
 ```bash
-poetry run python -m backend.api.run
+uv run python -m backend.api.run
 ```
 
 Afterward, the web panel and Telegram point at `API_BASE_URL` (default `http://localhost:8000`).
@@ -81,19 +83,19 @@ Full documentation — where the i18n files live, how to add a new string, how t
 
 ## Tests
 
-Install the development dependencies and the extras used by CI:
+Install the development dependencies:
 
 ```bash
-poetry install --with dev --extras docling
+uv sync --extra dev
 ```
 
 Run the full suite from `tests/`:
 
 ```bash
-poetry run pytest
+uv run pytest
 ```
 
-GitHub Actions repeats this validation on Python 3.11 in both the slim and Docling installs for every pull request targeting `main`; the Docling variant also converts a real PDF. Failures, errors, and skipped tests are all rejected. See the [contribution guide](CONTRIBUTING.md) to set up the environment and learn the review flow.
+GitHub Actions repeats this validation on Python 3.11 for every pull request targeting `main`, `develop`, or `release/**`. Failures, errors, and skipped tests are all rejected. See the [contribution guide](CONTRIBUTING.md) to set up the environment and learn the review flow.
 
 ## Interactive Notebooks
 
@@ -104,8 +106,8 @@ The [`docs/notebooks/`](docs/notebooks/) directory contains Jupyter notebooks th
 To run the notebooks:
 
 ```bash
-poetry install --with dev
-poetry run jupyter notebook docs/notebooks/
+uv sync --extra dev
+uv run --with jupyter jupyter notebook docs/notebooks/
 ```
 
 Or open them directly in VS Code and execute cells with the built-in notebook support.
@@ -237,7 +239,7 @@ docker run --rm -e STRUCTURER=docling -v "$PWD/var:/app/var" \
 1. Fork the repository.
 2. Create a feature branch.
 3. Write tests for new functionality.
-4. Run `poetry run pytest` and fix any failures, errors, or skipped tests.
+4. Run `uv run pytest` and fix any failures, errors, or skipped tests.
 5. Open a pull request.
 
 Detailed rules live in [CONTRIBUTING.md](CONTRIBUTING.md).

@@ -92,7 +92,7 @@ git rebase origin/develop
 Before opening the Pull Request, make sure all tests pass:
 
 ```bash
-poetry run pytest tests/ -v
+uv run pytest tests/ -v
 ```
 
 The CI pipeline runs the test suite automatically on GitHub; a PR can only be reviewed once **all tests are green**.
@@ -198,7 +198,7 @@ repository. They follow the layering described in
   `tests/test_architecture_layers.py` keeps `backend` from importing the Toolbox
   package.
 - **Run their own suites**, which CI also runs:
-  `cd libs/docstruct && python -m pytest` and `cd libs/sdk && python -m pytest`.
+  `cd libs/docstruct && uv run --extra dev pytest` and `cd libs/sdk && uv run --extra dev pytest`.
 - **Keep the READMEs in both languages.** `tests/test_docstruct_readme_sync.py`
   checks the docstruct pair.
 - **docstruct is published for other repositories.** A change the Toolbox
@@ -347,19 +347,19 @@ DRY_RUN=1 ./scripts/setup-rulesets.sh
 # Clone and install dependencies
 git clone git@github.com:A11yDevs/acessilia.git
 cd acessilia
-poetry install
+uv sync --extra dev   # uses the Python 3.11 pinned in .python-version
 
 # Configure environment variables
 cp .env.example .env
 
 # Run the tests to check that everything is OK
-poetry run pytest
+uv run pytest
 ```
 
 ## Pull requests
 
 1. Make sure your branch is up to date with `develop` (`git rebase origin/develop`).
-2. Run `poetry run pytest` and confirm all tests pass.
+2. Run `uv run pytest` and confirm all tests pass.
 3. Clearly describe what the PR does and which problem it solves.
 4. Reference any related issues (e.g.: `Closes #42`).
 5. Wait for review and adjust if needed.
