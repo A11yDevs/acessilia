@@ -209,6 +209,8 @@ from backend.log_messages import (
     MSG_OBLIGATION_IMAGE,
     MSG_OBLIGATION_TABLE,
     MSG_OBLIGATION_UNKNOWN,
+    MSG_OBLIGATION_UNSTRUCTURED_PAGE,
+    MSG_OBSERVATION_PAGE_WITHOUT_STRUCTURE,
     MSG_HEADING_GAP,
 )
 from backend.pipeline.validators import (
@@ -568,6 +570,8 @@ MESSAGES: tuple[str, ...] = (
     MSG_OBLIGATION_FORMULA,
     MSG_OBLIGATION_CODE,
     MSG_OBLIGATION_UNKNOWN,
+    MSG_OBLIGATION_UNSTRUCTURED_PAGE,
+    MSG_OBSERVATION_PAGE_WITHOUT_STRUCTURE,
     MSG_HEADING_GAP,
     MSG_SOURCE_FILE_MISSING,
     # Docling-structural-attachment extraction diagnostics (backend/core/manifest/docling_extractor.py),
@@ -1155,6 +1159,14 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "O bloco de código deve preservar indentação, linguagem e leitura literal."
         ),
         MSG_OBLIGATION_UNKNOWN: ("O elemento não classificado requer inspeção estrutural."),
+        MSG_OBLIGATION_UNSTRUCTURED_PAGE: (
+            "A página deve ser inspecionada visualmente: descrita quando tiver conteúdo, "
+            "ou aceita como em branco."
+        ),
+        MSG_OBSERVATION_PAGE_WITHOUT_STRUCTURE: (
+            "A página {page_number} não tem estrutura extraída; pode estar em branco ou ser "
+            "puramente visual."
+        ),
         # Observation message for heading-level skips found while validating the manifest; {previous}/{level} injected at call time.
         MSG_HEADING_GAP: (
             "A hierarquia de títulos salta do nível {previous} para o nível {level}."

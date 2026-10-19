@@ -531,6 +531,21 @@ msgstr "The code block must preserve indentation, language and literal reading."
 msgid "Unrecognized elements require structural inspection."
 msgstr "Unrecognized elements require structural inspection."
 
+msgid ""
+"The page must be inspected visually: described when it has content, or "
+"accepted as blank."
+msgstr ""
+"The page must be inspected visually: described when it has content, or "
+"accepted as blank."
+
+#, python-brace-format
+msgid ""
+"Page {page_number} has no extracted structure; it may be blank or purely "
+"visual."
+msgstr ""
+"Page {page_number} has no extracted structure; it may be blank or purely "
+"visual."
+
 #, python-brace-format
 msgid "Title hierarchy jumps from level {previous} to level {level}."
 msgstr "Title hierarchy jumps from level {previous} to level {level}."

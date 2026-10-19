@@ -57,6 +57,7 @@ permanece idêntica.
 | `chunk-verse` | `verse-chunker`, `human-review` | 5 / 100 | `docstruct.fusion.verse` |
 | `extract-line-numbers` | `line-number-extractor`, `human-review` | 5 / 100 | `docstruct.fusion.line_numbers` |
 | `normalize-text` | `norm-fix`, `human-review` | 5 / 100 | `docstruct.text.norm_fix` |
+| `inspect-unstructured-page` | `vision-page-inspection`, `human-review` | 25 / 100 | página sem estrutura extraída (#150 F5c) |
 
 Regras de compilação:
 
@@ -72,7 +73,13 @@ Regras de compilação:
 - `join-tail-blocks` deve preferir `tailjoin-positioned` quando a posição do
   número de página for conhecida, e `tailjoin` caso contrário;
 - cada obrigação nova depende de `extract` (a extração do provider), exceto
-  `fuse-providers`, que é a própria extração.
+  `fuse-providers`, que é a própria extração;
+- `inspect-unstructured-page` é emitida pelo builder do manifesto para cada
+  página que o extrator devolveu sem nenhum elemento. O alvo é um elemento
+  substituto (`raw_label` `unstructured-page`, tipo `unknown`), que não recebe a
+  obrigação `review-structure` dos elementos `unknown`. A obrigação é
+  **crítica**: se nenhum método a satisfizer, o job falha com a causa, em vez
+  de perder o conteúdo da página.
 
 ## 3. Arquitetura de integração
 
@@ -594,3 +601,14 @@ e registra PNG/JSON de evidência com hashes em `data_dir/artifacts/regions/`.
 Metadados `region_crop` recebidos do extrator não substituem essa execução.
 Fonte ausente/alterada, página/recorte inválido ou análise inválida retornam falha
 e permitem a alternativa de revisão humana. Dry-run continua sendo simulação.
+
+`vision-page-inspection` inspeciona uma página sem estrutura: valida a
+identidade SHA-256 da fonte, renderiza a página pela Toolbox (`pdf.render`; uma
+entrada raster é a própria página) e pede ao VisionAgent uma decisão
+estruturada (`PageInspectionOutput`). Com conteúdo, o substituto vira uma imagem
+descrita (texto acessível e a imagem da página); em branco, o substituto é
+marcado `blank_page` e fica fora do documento canônico. Registra PNG/JSON de
+evidência com hashes em `data_dir/artifacts/regions/`. Falha da Toolbox, do
+modelo ou uma resposta inválida retornam falha sem alterar o manifesto. Não há
+renderização local (ADR-0003). Por isso o gate de disponibilidade só exige `pdf.render` para
+fontes PDF; em dry-run o substituto não inspecionado não entra no documento.

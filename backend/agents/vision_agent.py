@@ -13,7 +13,9 @@ from backend.tools.logger import logger
 from backend.tools.prompt_tools import build_page_prompt, load_region_prompt, load_system_prompt
 from backend.ai.models.ai_client import get_agno_model
 from backend.agents.output_schemas import (
+    PAGE_INSPECTION_INSTRUCTION,
     VISION_SCHEMA_INSTRUCTION,
+    PageInspectionOutput,
     VisionOutput,
     validate_structured_run,
 )
@@ -109,3 +111,32 @@ class VisionAgent:
                 )
             )
             return None
+
+    async def inspect_page(
+        self,
+        image_bytes: bytes,
+        page_num: int,
+        total_pages: int,
+    ) -> PageInspectionOutput:
+        """Decide whether a page without extracted structure is blank, or describe it.
+
+        Unlike :meth:`describe_region`, a failure is raised instead of returning
+        None: the caller records it as a failed planning method, so the job
+        does not silently lose the page.
+        """
+        prompt = (
+            f"{build_page_prompt(self.system_prompt, total_pages, page_num, is_pdf=total_pages > 1)}"
+            f"\n\n{PAGE_INSPECTION_INSTRUCTION}"
+        )
+        agent = Agent(
+            name="VisionAgent",
+            model=get_agno_model(),
+            output_schema=PageInspectionOutput,
+            telemetry=False,
+        )
+
+        def _run() -> object:
+            return agent.run(input=prompt, images=[Image(content=image_bytes)])
+
+        response = await asyncio.to_thread(_run)
+        return validate_structured_run(response, PageInspectionOutput)

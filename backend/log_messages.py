@@ -284,6 +284,14 @@ MSG_OBLIGATION_FORMULA: str = (
 MSG_OBLIGATION_CODE: str = "The code block must preserve indentation, language and literal reading."
 #: Manifest processing-needs rationale for unknown/unrecognized elements, used as the LLM prompt obligation text per element type.
 MSG_OBLIGATION_UNKNOWN: str = "Unrecognized elements require structural inspection."
+#: Observation message for a page the structural extractor returned without any element; {page_number} is the page.
+MSG_OBSERVATION_PAGE_WITHOUT_STRUCTURE: str = (
+    "Page {page_number} has no extracted structure; it may be blank or purely visual."
+)
+#: Manifest processing-needs rationale for a page without extracted structure.
+MSG_OBLIGATION_UNSTRUCTURED_PAGE: str = (
+    "The page must be inspected visually: described when it has content, or accepted as blank."
+)
 #: Observation message for heading-level skips found while validating the manifest; {previous} is the previous heading level and {level} the current one.
 MSG_HEADING_GAP: str = "Title hierarchy jumps from level {previous} to level {level}."
 #: Debug logged by the orchestrator when a page is served straight from the cache, skipping the AI pass; {page_num} is the page index.

@@ -648,6 +648,17 @@ class TestEveryHandlerIsCallable:
             "adjudicate-page",
             [_element("el-1", "paragraph", text="texto")],
         ),
+        # Renders the page on the Toolbox and asks the vision model; the
+        # fixture's source does not exist, so it must fail, not raise. The
+        # positive cases live in tests/test_unstructured_pages.py.
+        "vision-page-inspection": (
+            "inspect-unstructured-page",
+            [
+                _element(
+                    "el-1", "unknown", metadata={"unstructured_page": True}
+                ).model_copy(update={"raw_label": "unstructured-page"})
+            ],
+        ),
         # Calls the Toolbox; the positive cases with a fake judge live in
         # tests/test_provider_choice_methods.py.
         "vlm-pairwise-judge": (

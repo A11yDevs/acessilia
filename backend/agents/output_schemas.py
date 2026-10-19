@@ -16,6 +16,15 @@ VISION_SCHEMA_INSTRUCTION = (
     "confidence, mentioned_elements e warnings."
 )
 
+PAGE_INSPECTION_INSTRUCTION = (
+    "O extrator estrutural não encontrou nenhum elemento nesta página. Decida se ela "
+    "tem conteúdo. Use kind='blank' quando a página estiver em branco: só fundo, "
+    "ruído de digitalização, sombra de dobra ou apenas o número da página. Caso "
+    "contrário, use kind='content' e, em description, transcreva o texto visível e "
+    "descreva os elementos visuais de forma acessível e completa. Sempre informe "
+    "language, confidence e warnings."
+)
+
 DATA_SCHEMA_INSTRUCTION = (
     "Retorne somente o objeto estruturado solicitado: use kind='table' com rows/cells "
     "para tabelas, incluindo caption e notes quando visíveis, ou kind='formula' com "
@@ -84,6 +93,38 @@ class VisionOutput(AgentOutput):
             raise ValueError("formula_latex is required when kind is 'formula'")
         if self.kind == "description" and self.formula_latex is not None:
             raise ValueError("formula_latex is only allowed when kind is 'formula'")
+        return self
+
+
+class PageInspectionOutput(AgentOutput):
+    """Visual inspection of a whole page the structural extractor left empty."""
+
+    kind: Literal["content", "blank"] = Field(
+        description="Whether the page has content to describe or is blank."
+    )
+    description: str = Field(
+        default="",
+        description="Accessible transcription and description of the page; empty when blank.",
+    )
+    language: str = Field(
+        min_length=2,
+        max_length=35,
+        description="Model-reported BCP 47 language tag of the description, or 'und'.",
+    )
+    confidence: float = Field(
+        ge=0.0,
+        le=1.0,
+        description="Model-reported confidence in the decision, from 0 to 1; metadata only.",
+    )
+    warnings: list[str] = Field(
+        default_factory=list,
+        description="Uncertainties such as faint, partial or illegible content.",
+    )
+
+    @model_validator(mode="after")
+    def validate_content(self) -> "PageInspectionOutput":
+        if self.kind == "content" and not self.description:
+            raise ValueError("description is required when kind is 'content'")
         return self
 
 

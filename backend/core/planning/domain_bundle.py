@@ -25,6 +25,7 @@ V23_OBLIGATION_KINDS = (
     "chunk-verse",
     "extract-line-numbers",
     "normalize-text",
+    "inspect-unstructured-page",
 )
 
 
