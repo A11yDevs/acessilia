@@ -117,7 +117,6 @@ class VisionAgent:
         image_bytes: bytes,
         page_num: int,
         total_pages: int,
-        mode: str | None = None,
     ) -> PageInspectionOutput:
         """Decide whether a page without extracted structure is blank, or describe it.
 
@@ -125,9 +124,8 @@ class VisionAgent:
         None: the caller records it as a failed planning method, so the job
         does not silently lose the page.
         """
-        base = load_system_prompt(mode or self.mode)
         prompt = (
-            f"{build_page_prompt(base, total_pages, page_num, is_pdf=total_pages > 1)}"
+            f"{build_page_prompt(self.system_prompt, total_pages, page_num, is_pdf=total_pages > 1)}"
             f"\n\n{PAGE_INSPECTION_INSTRUCTION}"
         )
         agent = Agent(

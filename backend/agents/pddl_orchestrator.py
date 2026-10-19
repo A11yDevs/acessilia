@@ -673,7 +673,7 @@ def _inspect_page(image: bytes, number: int, total_pages: int, mode: str) -> Pag
 
     return run_sync(
         VisionAgent(mode=mode).inspect_page(
-            image_bytes=image, page_num=number, total_pages=total_pages, mode=mode
+            image_bytes=image, page_num=number, total_pages=total_pages
         )
     )
 
@@ -710,9 +710,9 @@ def _handle_vision_page_inspection_method(
         for element in elements:
             number = element.page_number or 1
             image = _render_source_page(source, manifest.source.media_type, number)
-            output = PageInspectionOutput.model_validate(
-                _inspect_page(image, number, total_pages, mode).model_dump()
-            )
+            output = _inspect_page(image, number, total_pages, mode)
+            if not isinstance(output, PageInspectionOutput):
+                raise TypeError("Page inspection returned no structured output")
             inspected.append((element, number, image, output))
 
         artifacts: list[Artifact] = []
@@ -3054,6 +3054,16 @@ def _unsatisfied_obligations(manifest: ProcessingManifest) -> list[dict[str, Any
     return unsatisfied
 
 
+def _is_left_out_of_payload(element: ManifestElement) -> bool:
+    """A page accepted as blank, or a placeholder not yet inspected, adds nothing.
+
+    An inspected page with content is a ``picture``, no longer a placeholder.
+    A placeholder still present means the inspection did not run (dry-run), so
+    the page contributes no block rather than its raw label.
+    """
+    return bool(element.metadata.get("blank_page")) or is_unstructured_page_placeholder(element)
+
+
 def _manifest_pages_to_payload(manifest: ProcessingManifest) -> list[dict[str, Any]]:
     elements_by_id = {element.id: element for element in manifest.elements}
     pages: list[dict[str, Any]] = []
@@ -3074,9 +3084,8 @@ def _manifest_pages_to_payload(manifest: ProcessingManifest) -> list[dict[str, A
                     for element in manifest.elements
                     if (element.page_number or 1) == page.page_number
                 ]
-            # A page accepted as blank contributes nothing to the document.
             block_elements = [
-                item for item in block_elements if not item.metadata.get("blank_page")
+                item for item in block_elements if not _is_left_out_of_payload(item)
             ]
             block_elements.sort(key=lambda item: item.reading_order)
             blocks = [_element_to_block(item) for item in block_elements]
@@ -3092,7 +3101,7 @@ def _manifest_pages_to_payload(manifest: ProcessingManifest) -> list[dict[str, A
 
     grouped: dict[int, list[ManifestElement]] = {}
     for element in manifest.elements:
-        if element.metadata.get("blank_page"):
+        if _is_left_out_of_payload(element):
             continue
         page_number = element.page_number or 1
         grouped.setdefault(page_number, []).append(element)

@@ -62,6 +62,10 @@ METHOD_TOOLBOX_REQUIREMENTS: dict[str, Callable[[], list[Requirement]]] = {
     ],
 }
 
+#: Methods whose Toolbox requirements do not apply to raster inputs: an image is
+#: its own page, so ``vision-page-inspection`` never calls ``pdf.render`` for it.
+RASTER_LOCAL_METHODS = frozenset({"vision-page-inspection"})
+
 
 @dataclass(frozen=True)
 class AvailabilityDecision:
@@ -96,11 +100,15 @@ def gate_mode() -> str:
 
 
 def requested_methods(manifest: ProcessingManifest) -> set[str]:
-    return {
+    """Methods of the manifest whose Toolbox requirements apply to its source."""
+    methods = {
         method
         for obligation in manifest.obligations
         for method in obligation.admissible_methods
     }
+    if manifest.source.media_type.startswith("image/"):
+        methods -= RASTER_LOCAL_METHODS
+    return methods
 
 
 def evaluate(
@@ -164,6 +172,7 @@ async def decide(manifest: ProcessingManifest) -> AvailabilityDecision:
 
 __all__ = [
     "METHOD_TOOLBOX_REQUIREMENTS",
+    "RASTER_LOCAL_METHODS",
     "AvailabilityDecision",
     "catalog_cache",
     "decide",

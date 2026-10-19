@@ -167,6 +167,10 @@ V23_OBLIGATION_BY_KIND = {
         "Texto exige limpezas determinísticas (ligaduras, hífen, NBSP).",
         ["norm-fix", "human-review"],
     ),
+    "inspect-unstructured-page": (
+        "Página sem estrutura extraída exige inspeção visual.",
+        ["vision-page-inspection", "human-review"],
+    ),
 }
 
 #: Artifact holding the secondary provider's extraction when FUSION_MODE=dual;
@@ -177,7 +181,7 @@ V23_OBLIGATION_BY_KIND = {
 UNSTRUCTURED_PAGE_LABEL = "unstructured-page"
 UNSTRUCTURED_PAGE_OBSERVATION_KIND = "page-without-structure"
 UNSTRUCTURED_PAGE_OBLIGATION_KIND = "inspect-unstructured-page"
-UNSTRUCTURED_PAGE_METHODS = ["vision-page-inspection", "human-review"]
+UNSTRUCTURED_PAGE_METHODS = V23_OBLIGATION_BY_KIND[UNSTRUCTURED_PAGE_OBLIGATION_KIND][1]
 
 SECONDARY_EXTRACTION_KIND = "provider-extraction"
 SECONDARY_EXTRACTION_ARTIFACT_ID = "artifact-secondary-extraction"
@@ -945,9 +949,12 @@ def append_unstructured_page_needs(manifest: ProcessingManifest) -> None:
     such a page would be lost silently.
     """
     known = {element.id for element in manifest.elements}
+    # Same rule as the payload builder: a page without element_ids still has
+    # structure when elements point at it by page_number.
+    numbered = {element.page_number or 1 for element in manifest.elements}
     next_order = max((element.reading_order for element in manifest.elements), default=0)
     for page in sorted(manifest.pages, key=lambda item: item.page_number):
-        if page.element_ids:
+        if page.element_ids or page.page_number in numbered:
             continue
         number = page.page_number
         element_id = f"element-unstructured-page-{number:04d}"

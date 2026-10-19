@@ -610,4 +610,5 @@ descrita (texto acessível e a imagem da página); em branco, o substituto é
 marcado `blank_page` e fica fora do documento canônico. Registra PNG/JSON de
 evidência com hashes em `data_dir/artifacts/regions/`. Falha da Toolbox, do
 modelo ou uma resposta inválida retornam falha sem alterar o manifesto. Não há
-renderização local (ADR-0003).
+renderização local (ADR-0003). Por isso o gate de disponibilidade só exige `pdf.render` para
+fontes PDF; em dry-run o substituto não inspecionado não entra no documento.

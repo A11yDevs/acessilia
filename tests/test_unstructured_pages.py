@@ -107,6 +107,30 @@ def test_planning_is_idempotent():
     assert len(manifest.obligations) == 1
 
 
+def test_a_page_whose_elements_point_at_it_by_page_number_is_not_empty():
+    # Same rule as the payload builder, which falls back to page_number when a
+    # page has no element_ids: the page's real content must not be replaced.
+    manifest = build_manifest([build_element("el-1", "picture")], [])
+    manifest.pages[0].element_ids = []
+
+    append_unstructured_page_needs(manifest)
+
+    assert manifest.obligations == []
+    assert [e.id for e in manifest.elements] == ["el-1"]
+    [page] = pddl._manifest_pages_to_payload(manifest)
+    assert [block["type"] for block in page["blocks"]] == ["image"]
+
+
+def test_the_obligation_kind_is_in_the_v23_catalog():
+    from backend.core.manifest.builder import V23_OBLIGATION_BY_KIND
+    from backend.core.planning.domain_bundle import V23_OBLIGATION_KINDS
+
+    assert UNSTRUCTURED_PAGE_OBLIGATION_KIND in V23_OBLIGATION_KINDS
+    assert V23_OBLIGATION_BY_KIND[UNSTRUCTURED_PAGE_OBLIGATION_KIND][1] == [
+        "vision-page-inspection", "human-review",
+    ]
+
+
 def test_the_obligation_is_critical():
     assert UNSTRUCTURED_PAGE_OBLIGATION_KIND not in pddl.NON_CRITICAL_OBLIGATION_KINDS
 
@@ -114,6 +138,17 @@ def test_the_obligation_is_critical():
 def test_the_method_requires_pdf_render_on_the_toolbox():
     [requirement] = toolbox_gate.METHOD_TOOLBOX_REQUIREMENTS["vision-page-inspection"]()
     assert requirement.capability_id == "pdf.render"
+
+
+def test_a_raster_input_does_not_require_pdf_render():
+    manifest = build_manifest([build_element("el-1", "paragraph", text="x")], [])
+    manifest.pages.append(PageDescriptor(page_number=2))
+    append_unstructured_page_needs(manifest)
+    assert "vision-page-inspection" in toolbox_gate.requested_methods(manifest)
+
+    manifest.source.media_type = "image/png"
+
+    assert "vision-page-inspection" not in toolbox_gate.requested_methods(manifest)
 
 
 # ── Handler ─────────────────────────────────────────────────────────────
@@ -194,6 +229,19 @@ def test_a_blank_page_is_accepted_and_left_out_of_the_document(
     assert pages[1]["blocks"], "the page with content is kept"
 
 
+def test_an_uninspected_placeholder_adds_nothing_to_the_document(source_pdf):
+    # Dry-run returns the manifest unchanged, so the placeholder is still there;
+    # its raw label must not reach the document as a paragraph.
+    manifest, _, _ = _planned_manifest(source_pdf)
+
+    pages = {p["page_number"]: p for p in pddl._manifest_pages_to_payload(manifest)}
+
+    assert pages[2]["blocks"] == [] and pages[2]["text"] == ""
+    manifest.pages = []
+    texts = [b.get("text") for p in pddl._manifest_pages_to_payload(manifest) for b in p["blocks"]]
+    assert "unstructured-page" not in texts
+
+
 @pytest.mark.parametrize(
     "error",
     [RuntimeError("vision model unavailable"), ValueError("invalid structured output")],
@@ -220,6 +268,82 @@ def test_a_changed_source_is_refused(monkeypatch, source_pdf, isolated_artifacts
     result = pddl._handle_vision_page_inspection_method(manifest, obligation_id)
 
     assert not result.success and "differs" in result.message
+
+
+# ── Vision agent contract ───────────────────────────────────────────────
+
+
+def test_content_without_a_description_is_invalid():
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError, match="description is required"):
+        PageInspectionOutput(kind="content", language="pt-BR", confidence=0.9)
+    assert PageInspectionOutput(kind="blank", language="und", confidence=1).description == ""
+
+
+def test_inspect_page_asks_for_the_page_inspection_schema(monkeypatch):
+    import asyncio
+    from types import SimpleNamespace
+
+    from agno.run.base import RunStatus
+
+    from backend.agents import vision_agent
+    from backend.agents.output_schemas import PAGE_INSPECTION_INSTRUCTION
+
+    seen = {}
+
+    class FakeAgent:
+        def __init__(self, **kwargs):
+            seen["schema"] = kwargs["output_schema"]
+
+        def run(self, input, images):
+            seen["prompt"] = input
+            seen["images"] = [image.content for image in images]
+            return SimpleNamespace(
+                status=RunStatus.completed,
+                content={"kind": "blank", "language": "und", "confidence": 0.9},
+            )
+
+    monkeypatch.setattr(vision_agent, "Agent", FakeAgent)
+    monkeypatch.setattr(vision_agent, "get_agno_model", lambda: None)
+
+    output = asyncio.run(
+        vision_agent.VisionAgent().inspect_page(image_bytes=PNG, page_num=2, total_pages=3)
+    )
+
+    assert seen["schema"] is PageInspectionOutput
+    assert PAGE_INSPECTION_INSTRUCTION in seen["prompt"]
+    assert seen["images"] == [PNG]
+    assert isinstance(output, PageInspectionOutput) and output.kind == "blank"
+
+
+def test_a_model_answer_of_content_without_description_is_refused(monkeypatch):
+    import asyncio
+    from types import SimpleNamespace
+
+    from agno.run.base import RunStatus
+
+    from backend.agents import vision_agent
+
+    class FakeAgent:
+        def __init__(self, **kwargs):
+            pass
+
+        def run(self, input, images):
+            return SimpleNamespace(
+                status=RunStatus.completed,
+                content={"kind": "content", "language": "pt-BR", "confidence": 0.9},
+            )
+
+    monkeypatch.setattr(vision_agent, "Agent", FakeAgent)
+    monkeypatch.setattr(vision_agent, "get_agno_model", lambda: None)
+
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError, match="description is required"):
+        asyncio.run(
+            vision_agent.VisionAgent().inspect_page(image_bytes=PNG, page_num=1, total_pages=1)
+        )
 
 
 # ── Rendering ───────────────────────────────────────────────────────────
