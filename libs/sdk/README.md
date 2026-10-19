@@ -32,7 +32,8 @@ core (backend)  →  acessilia-sdk  →  Toolbox HTTP contract
 | `acessilia_sdk.toolbox.client` | `ToolboxCapabilityClient` — base for per-capability clients (connections, Bearer header, provider, failover, `health`, `close`); `FailoverHook` |
 | `acessilia_sdk.toolbox.clients` | `ToolboxAdjudicateClient`, `ToolboxArtifactClient`, `ToolboxDatasetClient`, `ToolboxLayoutClient`, `ToolboxMathClient`, `ToolboxMediaInspectClient`, `ToolboxOcrClient`, `ToolboxOrientationClient`, `ToolboxPageOcrClient`, `ToolboxPdfClient`, `ToolboxPdfUaClient`, `ToolboxStructureClient`, `ToolboxTableClient` — one client per capability family; no settings, no logging |
 | `acessilia_sdk.toolbox.endpoints` | `ToolboxEndpoint`, `parse_endpoints`, `FAILOVER_ERRORS` — the Toolbox instances a client tries, in order |
-| `acessilia_sdk.toolbox.artifacts` | `ArtifactRef`, `download_artifact` — content-addressed artifacts and their verified, atomic download |
+| `acessilia_sdk.toolbox.clients.pdf` | `RenderedPage` (the PNG of `ToolboxPdfClient.render`, the clip applied and the `image@2` result), `ClipOrigin` |
+| `acessilia_sdk.toolbox.artifacts` | `ArtifactRef`, `download_artifact`, `read_artifact` — content-addressed artifacts, their verified, atomic download to a file, and their verified, size-bounded read into memory |
 | `acessilia_sdk.toolbox.catalog` | `fetch_catalog`, `CatalogSnapshot`, `Requirement`, `missing_requirements`, `CatalogCache` — the published catalogue, checks against it (it only restricts) and the last-good cache |
 | `acessilia_sdk.toolbox.errors` | `ToolboxError` and its subclasses, including `ToolboxUnavailable` (every endpoint failed; `causes` lists each one) |
 | `acessilia_sdk.runtime` | `run_sync` — run a coroutine from sync code, inside or outside an event loop |
@@ -72,10 +73,13 @@ On top of that, the client offers:
 called when there is a single endpoint. `self._client` and `self.base_url`
 address the primary endpoint only: capabilities that return an artifact must
 use `_execute_on`, which also returns the HTTP client of the endpoint that
-served the call, and download the artifact through it with
-`download_artifact`. That download is streamed, checked against the
-SHA-256 (and an optional magic prefix), synced to disk and renamed atomically;
-local file system errors propagate as `OSError`. `ArtifactRef` is provisional
+served the call, and fetch the artifact through it: `download_artifact`
+writes it to a file, `read_artifact` reads a small one into memory (as
+`ToolboxPdfClient.render` does with the page PNG). Both stream the body and
+check it against the SHA-256 (and an optional magic prefix). The download is
+synced to disk and renamed atomically, and local file system errors propagate
+as `OSError`; the read refuses a body above `max_bytes`
+(`READ_ARTIFACT_MAX_BYTES`, 64 MiB, by default). `ArtifactRef` is provisional
 until the Toolbox publishes `artifact-ref@1`.
 
 ## Adding a capability

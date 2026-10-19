@@ -39,6 +39,16 @@ NOW = datetime(2026, 10, 19, tzinfo=timezone.utc)
 PNG = b"\x89PNG\r\n\x1a\nfake-page"
 
 
+def _png_page() -> bytes:
+    import fitz
+
+    with fitz.open() as doc:
+        return doc.new_page(width=200, height=100).get_pixmap(dpi=72).tobytes("png")
+
+
+PNG_PAGE = _png_page()
+
+
 def _extraction_with_empty_page() -> ToolboxExtraction:
     payload = deepcopy(SAMPLE_TOOLBOX_RESPONSE)
     payload["document"]["pages"].append(
@@ -140,15 +150,14 @@ def test_the_method_requires_pdf_render_on_the_toolbox():
     assert requirement.capability_id == "pdf.render"
 
 
-def test_a_raster_input_does_not_require_pdf_render():
+def test_a_raster_input_also_requires_pdf_render():
+    """pdf.render@2 renders raster inputs too, so images need it as well."""
     manifest = build_manifest([build_element("el-1", "paragraph", text="x")], [])
     manifest.pages.append(PageDescriptor(page_number=2))
     append_unstructured_page_needs(manifest)
-    assert "vision-page-inspection" in toolbox_gate.requested_methods(manifest)
-
     manifest.source.media_type = "image/png"
 
-    assert "vision-page-inspection" not in toolbox_gate.requested_methods(manifest)
+    assert "vision-page-inspection" in toolbox_gate.requested_methods(manifest)
 
 
 # ── Handler ─────────────────────────────────────────────────────────────
@@ -178,7 +187,7 @@ def _answer(monkeypatch, output=None, error=None):
             raise error
         return output
 
-    monkeypatch.setattr(pddl, "_render_source_page", lambda source, media, number: PNG)
+    monkeypatch.setattr(pddl, "_render_source_page", lambda *args: PNG)
     monkeypatch.setattr(pddl, "_inspect_page", inspect)
     return calls
 
@@ -349,49 +358,98 @@ def test_a_model_answer_of_content_without_description_is_refused(monkeypatch):
 # ── Rendering ───────────────────────────────────────────────────────────
 
 
-@pytest.fixture
-def toolbox(monkeypatch):
-    monkeypatch.setattr(settings, "toolbox_base_url", "http://toolbox.test")
-    monkeypatch.setattr(settings, "toolbox_base_urls", "")
-    monkeypatch.setattr(settings, "toolbox_api_key", "")
-    monkeypatch.setattr(settings, "toolbox_retries", 0)
+def _real_pdf(path: Path, pages: int = 2) -> Path:
+    import fitz
+
+    with fitz.open() as pdf:
+        for _ in range(pages):
+            pdf.new_page(width=200, height=100)
+        pdf.save(path)
+    return path
 
 
-def test_pdf_pages_are_rendered_by_the_toolbox(toolbox, source_pdf):
-    with respx.mock() as router:
-        route = router.post(
-            "http://toolbox.test/v1/capabilities/pdf.render:execute"
-        ).mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "status": "succeeded",
-                    "document": {"image_bytes_base64": base64.b64encode(PNG).decode()},
-                },
-            )
-        )
-        assert pddl._render_source_page(source_pdf, "application/pdf", 2) == PNG
-    assert b'{"page_number": 2' in route.calls.last.request.content
+def test_pdf_pages_are_rendered_by_the_toolbox(fake_toolbox_render, tmp_path):
+    source = _real_pdf(tmp_path / "doc.pdf")
+
+    image = pddl._render_source_page(source, "application/pdf", 2)
+
+    assert image.startswith(b"\x89PNG")
+    [request] = fake_toolbox_render.requests
+    assert request["version"] == "2"
+    assert request["parameters"] == {"page_number": 2, "dpi": settings.pdf_split_dpi}
 
 
-def test_a_render_without_an_image_is_a_contract_violation(toolbox, source_pdf):
+def test_the_stored_source_is_referenced_instead_of_uploaded(fake_toolbox_render, tmp_path):
+    source = _real_pdf(tmp_path / "doc.pdf")
+    stored = "sha256:" + hashlib.sha256(source.read_bytes()).hexdigest()
+    fake_toolbox_render.sources[stored] = (source.read_bytes(), "application/pdf")
+
+    pddl._render_source_page(source, "application/pdf", 1, stored)
+
+    [request] = fake_toolbox_render.requests
+    assert request["artifact_id"] == stored
+
+
+def test_a_source_the_toolbox_lost_is_sent_again(fake_toolbox_render, tmp_path):
+    source = _real_pdf(tmp_path / "doc.pdf")
+
+    image = pddl._render_source_page(source, "application/pdf", 1, "sha256:" + "0" * 64)
+
+    assert image.startswith(b"\x89PNG")
+    [request] = fake_toolbox_render.requests  # the 404 is not recorded as a render
+    assert request["artifact_id"] is None and request["media_type"] == "application/pdf"
+
+
+def test_a_raster_input_is_rendered_by_the_toolbox_as_its_single_page(
+    fake_toolbox_render, tmp_path
+):
+    from backend.tools.toolbox_client import ToolboxCapabilityError
+
+    image = tmp_path / "scan.png"
+    image.write_bytes(PNG_PAGE)
+
+    assert pddl._render_source_page(image, "image/png", 1).startswith(b"\x89PNG")
+    assert fake_toolbox_render.requests[-1]["media_type"] == "image/png"
+    with pytest.raises(ToolboxCapabilityError, match="out of range"):
+        pddl._render_source_page(image, "image/png", 2)
+
+
+@pytest.mark.parametrize("suffix, media_type", [(".tif", "image/tiff"), (".webp", "image/webp")])
+def test_raster_formats_the_toolbox_does_not_render_are_refused_before_any_request(
+    fake_toolbox_render, tmp_path, suffix, media_type
+):
+    # The pipeline accepts them, but pdf.render@2 opens PDF, PNG and JPEG only.
+    image = tmp_path / f"scan{suffix}"
+    image.write_bytes(b"raster")
+
+    with pytest.raises(ValueError, match=f"not {media_type}"):
+        pddl._render_source_page(image, media_type, 1)
+    assert not fake_toolbox_render.requests
+
+
+def test_a_source_sent_unlike_its_manifest_media_type_is_refused(
+    fake_toolbox_render, tmp_path
+):
+    source = _real_pdf(tmp_path / "doc.pdf")
+
+    with pytest.raises(ValueError, match="would be sent as application/pdf"):
+        pddl._render_source_page(source, "image/png", 1)
+    assert not fake_toolbox_render.requests
+
+
+def test_a_render_without_an_image_is_a_contract_violation(monkeypatch, tmp_path):
     from backend.tools.toolbox_client import ToolboxContractViolation
 
+    monkeypatch.setattr(settings, "toolbox_base_url", "http://toolbox.test")
+    monkeypatch.setattr(settings, "toolbox_base_urls", "")
+    monkeypatch.setattr(settings, "toolbox_retries", 0)
+    source = _real_pdf(tmp_path / "doc.pdf")
     with respx.mock() as router:
         router.post("http://toolbox.test/v1/capabilities/pdf.render:execute").mock(
             return_value=httpx.Response(200, json={"status": "succeeded", "document": {}})
         )
-        with pytest.raises(ToolboxContractViolation):
-            pddl._render_source_page(source_pdf, "application/pdf", 1)
-
-
-def test_a_raster_input_is_its_own_single_page(tmp_path):
-    image = tmp_path / "scan.png"
-    image.write_bytes(PNG)
-
-    assert pddl._render_source_page(image, "image/png", 1) == PNG
-    with pytest.raises(ValueError, match="one page"):
-        pddl._render_source_page(image, "image/png", 2)
+        with pytest.raises(ToolboxContractViolation, match="no image artifact"):
+            pddl._render_source_page(source, "application/pdf", 1)
 
 
 # ── Coexistence with the pre-planning heuristics ────────────────────────

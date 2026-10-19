@@ -76,10 +76,11 @@ _CAPABILITIES: tuple[ToolboxCapability, ...] = (
         provider_key="toolbox_pdf_provider",
         output_schema="page-collection@1",
     ),
+    # Version 2: clip, size bound, raster inputs, PNG by reference.
     ToolboxCapability(
-        "pdf.render", 1, "Renderização de PDF",
+        "pdf.render", 2, "Renderização de PDF",
         provider_key="toolbox_pdf_provider",
-        output_schema="image@1",
+        output_schema="image@2",
     ),
     ToolboxCapability(
         "math.recognize", 1, "Reconhecimento de fórmula",

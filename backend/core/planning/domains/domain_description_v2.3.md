@@ -595,20 +595,33 @@ substituídos por texto achatado nem certificados como processados.
 
 
 `pymupdf-region` está disponível para inspeção real: valida a identidade SHA-256
-da fonte, página e coordenadas, renderiza a região com PyMuPDF e solicita análise
-estruturada ao VisionAgent. Atualiza o elemento como imagem descrita ou fórmula
+da fonte, página e coordenadas, renderiza a região pela Toolbox (`pdf.render@2`
+com `clip`; o nome do método é histórico, não há PyMuPDF no core) e solicita
+análise estruturada ao VisionAgent. Atualiza o elemento como imagem descrita ou fórmula
 e registra PNG/JSON de evidência com hashes em `data_dir/artifacts/regions/`.
 Metadados `region_crop` recebidos do extrator não substituem essa execução.
 Fonte ausente/alterada, página/recorte inválido ou análise inválida retornam falha
 e permitem a alternativa de revisão humana. Dry-run continua sendo simulação.
 
 `vision-page-inspection` inspeciona uma página sem estrutura: valida a
-identidade SHA-256 da fonte, renderiza a página pela Toolbox (`pdf.render`; uma
-entrada raster é a própria página) e pede ao VisionAgent uma decisão
+identidade SHA-256 da fonte, renderiza a página pela Toolbox (`pdf.render@2`,
+que também renderiza entradas raster) e pede ao VisionAgent uma decisão
 estruturada (`PageInspectionOutput`). Com conteúdo, o substituto vira uma imagem
 descrita (texto acessível e a imagem da página); em branco, o substituto é
 marcado `blank_page` e fica fora do documento canônico. Registra PNG/JSON de
 evidência com hashes em `data_dir/artifacts/regions/`. Falha da Toolbox, do
 modelo ou uma resposta inválida retornam falha sem alterar o manifesto. Não há
-renderização local (ADR-0003). Por isso o gate de disponibilidade só exige `pdf.render` para
-fontes PDF; em dry-run o substituto não inspecionado não entra no documento.
+renderização local (ADR-0003); o gate de disponibilidade exige `pdf.render` para
+qualquer fonte. Em dry-run o substituto não inspecionado não entra no documento.
+
+Os três métodos que renderizam (`pymupdf-region`, `vision-page-inspection` e
+`vlm-pairwise-judge`) e o enriquecimento de imagens anterior ao plano usam
+`pdf.render@2`. Quando o extrator já guardou a fonte na Toolbox, a renderização
+referencia esse artefato (`artifact_id`) e só reenvia o arquivo se a Toolbox não
+o tiver mais; o artefato só é referenciado quando seu digest é o SHA-256 da
+fonte do manifesto. O `pdf.render@2` abre PDF, PNG e JPEG: uma entrada TIFF,
+BMP, GIF ou WebP, aceita pelo pipeline, é recusada antes de chamar a Toolbox
+(não há conversão local), e o método que precisa da página falha com esse
+motivo, deixando a revisão humana como alternativa. A faixa de páginas é a do
+documento, informada pela Toolbox em cada renderização, igual para os três
+métodos.

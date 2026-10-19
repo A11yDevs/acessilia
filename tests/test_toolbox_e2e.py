@@ -18,6 +18,7 @@ import httpx
 import pytest
 import pytest_asyncio
 
+from acessilia_sdk.toolbox import ToolboxCapabilityError
 from acessilia_sdk.toolbox.clients import (
     ToolboxLayoutClient,
     ToolboxMathClient,
@@ -180,14 +181,11 @@ class TestPdfClientE2E:
     @pytest.mark.asyncio
     async def test_render_page(self, pdf_client: ToolboxPdfClient) -> None:
         pdf = _get_pdf()
-        result = await pdf_client.render(file_path=pdf, page_number=1, dpi=150)
-        assert result["status"] == "succeeded"
-        doc = result.get("document", {})
-        assert doc.get("page_number") == 1
-        assert doc.get("width", 0) > 0
-        assert doc.get("height", 0) > 0
-        assert doc.get("image_bytes_base64") is not None
-        assert doc.get("size_bytes", 0) > 0
+        page = await pdf_client.render(file_path=pdf, page_number=1, dpi=150)
+        assert page.image.startswith(b"\x89PNG")
+        assert page.document["page_number"] == 1
+        assert page.document["page_width"] > 0 and page.document["page_height"] > 0
+        assert page.document["size_bytes"] == len(page.image)
 
     @pytest.mark.e2e
     @pytest.mark.asyncio
@@ -195,9 +193,59 @@ class TestPdfClientE2E:
         self, pdf_client: ToolboxPdfClient
     ) -> None:
         pdf = _get_pdf()
-        result = await pdf_client.render(file_path=pdf, page_number=1, dpi=300)
-        doc = result.get("document", {})
-        assert doc.get("size_bytes", 0) > 0
+        page = await pdf_client.render(file_path=pdf, page_number=1, dpi=300)
+        assert page.document["dpi"] == 300
+
+    @pytest.mark.e2e
+    @pytest.mark.asyncio
+    async def test_render_a_bounded_region(self, pdf_client: ToolboxPdfClient) -> None:
+        pdf = _get_pdf()
+        page = await pdf_client.render(
+            file_path=pdf, page_number=1, dpi=300, max_side=200, clip=(0, 0, 100, 50)
+        )
+        assert page.clip == (0, 0, 100, 50)
+        assert max(page.document["width_px"], page.document["height_px"]) <= 200
+
+    # The core no longer converts, intersects or bounds a region itself; these
+    # pin, against the real provider, what it relies on the Toolbox to do.
+
+    @pytest.mark.e2e
+    @pytest.mark.asyncio
+    async def test_a_bottom_left_clip_is_reported_top_left(
+        self, pdf_client: ToolboxPdfClient
+    ) -> None:
+        pdf = _get_pdf()
+        height = (await pdf_client.render(file_path=pdf, dpi=72)).document["page_height"]
+        page = await pdf_client.render(
+            file_path=pdf, dpi=72, clip=(50, 200, 300, 100), clip_origin="BOTTOMLEFT"
+        )
+        assert page.clip == pytest.approx((50, height - 200, 300, height - 100))
+
+    @pytest.mark.e2e
+    @pytest.mark.asyncio
+    async def test_max_side_wins_over_a_larger_dpi(
+        self, pdf_client: ToolboxPdfClient
+    ) -> None:
+        pdf = _get_pdf()
+        page = await pdf_client.render(file_path=pdf, dpi=300, max_side=400)
+        assert max(page.document["width_px"], page.document["height_px"]) <= 400
+        assert page.document["dpi"] < 300
+
+    @pytest.mark.e2e
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "request_kwargs",
+        [
+            {"clip": (10_000, 10_000, 10_100, 10_100)},  # outside the page
+            {"dpi": 600},  # above the 20 MP render limit for a document page
+        ],
+    )
+    async def test_the_toolbox_refuses_an_invalid_render(
+        self, pdf_client: ToolboxPdfClient, request_kwargs
+    ) -> None:
+        # InvalidInputError, HTTP 400: the core falls back on this refusal.
+        with pytest.raises(ToolboxCapabilityError):
+            await pdf_client.render(file_path=_get_pdf(), **request_kwargs)
 
 
 # ---------------------------------------------------------------------------
@@ -286,10 +334,10 @@ class TestWorkflowE2E:
             page_count = split_result["document"]["page_count"]
             assert page_count >= 1
 
-            render_result = await pdf_client.render(
+            rendered = await pdf_client.render(
                 file_path=pdf, page_number=1, dpi=150
             )
-            assert render_result["document"]["page_number"] == 1
+            assert rendered.document["page_number"] == 1
 
             layout_result = await layout_client.analyze(file_path=pdf)
             assert layout_result["document"]["page_count"] == page_count

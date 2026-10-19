@@ -3,12 +3,14 @@
   "capabilities": [
     {
       "id": "accessibility.mark",
+      "version": 1,
       "providers": [
         "pure-accessibility"
       ]
     },
     {
       "id": "artifact.retrieve",
+      "version": 1,
       "providers": [
         "filesystem",
         "minio"
@@ -16,6 +18,7 @@
     },
     {
       "id": "artifact.store",
+      "version": 1,
       "providers": [
         "filesystem",
         "minio"
@@ -23,24 +26,28 @@
     },
     {
       "id": "chem.convert",
+      "version": 1,
       "providers": [
         "pure-chem"
       ]
     },
     {
       "id": "chem.recognize",
+      "version": 1,
       "providers": [
         "docling-chem"
       ]
     },
     {
       "id": "code.normalize",
+      "version": 1,
       "providers": [
         "pure-code"
       ]
     },
     {
       "id": "dataset.describe",
+      "version": 1,
       "providers": [
         "dataset-github",
         "dataset-huggingface"
@@ -48,6 +55,7 @@
     },
     {
       "id": "dataset.get_artifact",
+      "version": 1,
       "providers": [
         "dataset-github",
         "dataset-huggingface"
@@ -55,6 +63,7 @@
     },
     {
       "id": "dataset.get_item",
+      "version": 1,
       "providers": [
         "dataset-github",
         "dataset-huggingface"
@@ -62,6 +71,7 @@
     },
     {
       "id": "dataset.list",
+      "version": 1,
       "providers": [
         "dataset-github",
         "dataset-huggingface"
@@ -69,6 +79,7 @@
     },
     {
       "id": "dataset.list_items",
+      "version": 1,
       "providers": [
         "dataset-github",
         "dataset-huggingface"
@@ -76,6 +87,7 @@
     },
     {
       "id": "dataset.list_splits",
+      "version": 1,
       "providers": [
         "dataset-github",
         "dataset-huggingface"
@@ -83,6 +95,7 @@
     },
     {
       "id": "dataset.sample",
+      "version": 1,
       "providers": [
         "dataset-github",
         "dataset-huggingface"
@@ -90,6 +103,7 @@
     },
     {
       "id": "dataset.sync",
+      "version": 1,
       "providers": [
         "dataset-github",
         "dataset-huggingface"
@@ -97,24 +111,28 @@
     },
     {
       "id": "document.adjudicate.page",
+      "version": 1,
       "providers": [
         "qwen3-vl-8b"
       ]
     },
     {
       "id": "document.adjudicate.region",
+      "version": 1,
       "providers": [
         "qwen3-vl-8b"
       ]
     },
     {
       "id": "document.export.pdf_ua",
+      "version": 1,
       "providers": [
         "pandoc-pdf-ua"
       ]
     },
     {
       "id": "document.layout.analyze",
+      "version": 1,
       "providers": [
         "docling-layout",
         "mineru-layout"
@@ -122,6 +140,7 @@
     },
     {
       "id": "document.ocr",
+      "version": 1,
       "providers": [
         "docling-ocr",
         "mineru-ocr"
@@ -129,12 +148,14 @@
     },
     {
       "id": "document.ocr.page",
+      "version": 1,
       "providers": [
         "qwen3-vl-8b"
       ]
     },
     {
       "id": "document.structure.extract",
+      "version": 1,
       "providers": [
         "docling",
         "mineru",
@@ -144,18 +165,21 @@
     },
     {
       "id": "image.page.orient",
+      "version": 1,
       "providers": [
         "rapidocr-orient"
       ]
     },
     {
       "id": "math.convert",
+      "version": 1,
       "providers": [
         "pure-math"
       ]
     },
     {
       "id": "math.recognize",
+      "version": 1,
       "providers": [
         "docling-math",
         "rapid-latex-ocr"
@@ -163,18 +187,21 @@
     },
     {
       "id": "math.verbalize",
+      "version": 1,
       "providers": [
         "pure-math"
       ]
     },
     {
       "id": "media.inspect",
+      "version": 1,
       "providers": [
         "pure-media-inspect"
       ]
     },
     {
       "id": "music.omr",
+      "version": 1,
       "providers": [
         "audiveris",
         "homr"
@@ -182,24 +209,35 @@
     },
     {
       "id": "pdf.render",
+      "version": 1,
+      "providers": [
+        "pymupdf-pdf"
+      ]
+    },
+    {
+      "id": "pdf.render",
+      "version": 2,
       "providers": [
         "pymupdf-pdf"
       ]
     },
     {
       "id": "pdf.split",
+      "version": 1,
       "providers": [
         "pymupdf-pdf"
       ]
     },
     {
       "id": "table.recognize",
+      "version": 1,
       "providers": [
         "qwen3-vl-8b"
       ]
     },
     {
       "id": "text.postprocess",
+      "version": 1,
       "providers": [
         "pure-text"
       ]

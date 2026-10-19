@@ -1,4 +1,8 @@
-"""Real PDF rendering and plan execution with a simulated structured vision response."""
+"""Real page rendering and plan execution with a simulated structured vision response.
+
+Regions are rendered by the Toolbox (``pdf.render@2``); the fake in
+``tests/toolbox_render_fake.py`` renders real pixels behind the mocked HTTP.
+"""
 
 import hashlib
 import json
@@ -20,7 +24,7 @@ from tests.pddl_support import (
 
 
 @pytest.fixture
-def inspection(monkeypatch, tmp_path):
+def inspection(monkeypatch, tmp_path, fake_toolbox_render):
     from backend.config.settings import settings
 
     monkeypatch.setattr(settings, "data_dir", tmp_path / "data")
@@ -210,7 +214,7 @@ def test_artifact_failure_cannot_certify_or_mutate_inspection(inspection, monkey
     assert manifest.model_dump() == original
 
 
-def test_pixel_limit_prevents_unbounded_render(inspection):
+def test_a_render_over_the_pixel_limit_fails_the_method(inspection, fake_toolbox_render):
     manifest, calls, _ = inspection
     source = Path(manifest.source.path).with_name("large.pdf")
     with fitz.open() as document:
@@ -221,8 +225,49 @@ def test_pixel_limit_prevents_unbounded_render(inspection):
     manifest.elements[0].provenance = []
     result = pddl._handle_pymupdf_region_method(manifest, "o-1")
     assert not result.success
-    assert "pixel limit" in result.message
+    # The core has no pixel guard of its own: the Toolbox refuses (HTTP 400)
+    # and the refusal reaches the method as a capability error.
+    assert len(fake_toolbox_render.requests) == 1
+    assert "ToolboxCapabilityError" in result.message
     assert not calls
+
+
+def test_an_element_without_a_page_is_inspected_only_in_a_one_page_document(inspection):
+    manifest, calls, _ = inspection
+    manifest.elements[0].provenance = []
+    manifest.elements[0].page_number = None
+    result = pddl._handle_pymupdf_region_method(manifest, "o-1")
+    assert not result.success
+    assert "Region page is missing or out of range" in result.message
+    assert not calls
+
+
+def test_a_page_beyond_the_document_is_refused_by_the_toolbox(inspection, fake_toolbox_render):
+    manifest, calls, _ = inspection
+    manifest.elements[0].provenance[0].page_number = 3
+    manifest.elements[0].page_number = 3
+    result = pddl._handle_pymupdf_region_method(manifest, "o-1")
+    assert not result.success
+    assert "out of range" in result.message
+    assert fake_toolbox_render.requests[0]["parameters"]["page_number"] == 3
+    assert not calls
+
+
+@pytest.mark.parametrize("same_document", [True, False])
+def test_the_stored_source_is_referenced_only_when_it_is_this_document(
+    inspection, fake_toolbox_render, same_document
+):
+    manifest, _, _ = inspection
+    source = Path(manifest.source.path)
+    digest = manifest.source.sha256 if same_document else "0" * 64
+    stored = f"sha256:{digest}"
+    fake_toolbox_render.sources[stored] = (source.read_bytes(), "application/pdf")
+    manifest.extractor.configuration["artifact_id"] = stored
+
+    assert pddl._handle_pymupdf_region_method(manifest, "o-1").success
+
+    [request] = fake_toolbox_render.requests
+    assert request["artifact_id"] == (stored if same_document else None)
 
 
 @pytest.mark.asyncio

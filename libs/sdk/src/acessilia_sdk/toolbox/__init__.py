@@ -1,6 +1,6 @@
 """Access to the Acessilia Toolbox through its published HTTP contract."""
 
-from acessilia_sdk.toolbox.artifacts import ArtifactRef, download_artifact
+from acessilia_sdk.toolbox.artifacts import ArtifactRef, download_artifact, read_artifact
 from acessilia_sdk.toolbox.capabilities import (
     PROVIDER_DEFAULTS,
     TOOLBOX_CAPABILITIES,
@@ -72,6 +72,7 @@ __all__ = [
     "parse_endpoints",
     "provider_default",
     "raise_for_error",
+    "read_artifact",
     "require_capability",
     "snapshot_from_payloads",
 ]

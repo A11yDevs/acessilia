@@ -79,6 +79,8 @@ async def test_artifact_request_sends_form_fields() -> None:
     assert form["provider"] == "docling-ocr"
     assert form["language"] == "pt-BR"
     assert form["no_cache"] == "true"
+    # The exact contract version the SDK was written against.
+    assert form["version"] == str(TOOLBOX_CAPABILITIES["document.ocr"].contract_version)
     assert json.loads(httpx.QueryParams(body)["parameters"]) == {"force_ocr": True}
 
 
