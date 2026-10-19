@@ -107,7 +107,7 @@ As três capacidades ausentes são os clientes da PR #125
 `libs/sdk/src/acessilia_sdk/toolbox/clients/adjudicate.py`), que não têm
 chamador de produção. O perfil de providers VLM que os serviria existe apenas como
 `scripts/drbench/experiments/slurm/providers-config-vlm.yaml` dentro do repositório do
-*core*, nunca no catálogo da Toolbox de onde a imagem é construída.
+*core* (hoje `scripts/bench/slurm/providers-config-vlm.yaml`), nunca no catálogo da Toolbox de onde a imagem é construída.
 
 ### S5 — Homologação rastreia `develop`, mas o `.env` tem divergência por host (informativo)
 

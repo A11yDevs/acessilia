@@ -47,7 +47,9 @@ uv run python -m scripts.bench submit --dataset drdocbench --split test --run ba
 `run` replaces the run's previous predictions and records the pages it covered
 in `pages.txt`; `score` scores only those pages, so a `--sample` run is not
 scored against the whole split. `score` exits 1 when no page has ground truth
-(the `test` split, for instance).
+(the `test` split, for instance). `--resume` continues an interrupted run
+instead: earlier predictions stay and `pages.txt` keeps covering every page the
+selection included.
 
 Scoring computes two Levenshtein distances per page. Without `rapidfuzz`
 (installed by the `dev` extra) docstruct falls back to pure Python, which takes
@@ -64,6 +66,26 @@ that cannot be computed are printed as `null`.
 
 A metric that disappears only on some pages still leaves those pages out of
 its mean; in `drilldown.csv` that component is blank on those pages.
+
+## On a Slurm cluster
+
+`scripts/bench/slurm/` has three jobs; each sources `env.sh`, which needs `WS`
+(the workspace that holds `repos/acessilia`, `repos/acessilia-toolbox` and
+`data/`) and keeps every cache and run under it (`BENCH_VAR=$WS/bench`).
+Submit from `$WS` and pass the partition with `-p`.
+
+| Job | What |
+|---|---|
+| `setup.sbatch` | Toolbox, docling-serve and MinerU venvs and models, this repo's venv; optionally a HuggingFace dataset snapshot (`HF_DATASET`, `HF_PATTERN`, `DATASET_DIR`) |
+| `bench.sbatch` | starts the provider (`PROVIDER=docling\|mineru`) and the Toolbox inside the job, on ports derived from the job id, then `scripts.bench run --resume` and `score`; resubmitting the same `RUN` resumes |
+| `eval_official.sbatch` | builds the official evaluator's one-page tree for each run in `RUNS` and scores it with `$WS/repos/DrDocBench` (`CONFIG` is the evaluator config; `cdm_env.sh` for CDM) |
+
+```bash
+cd $WS
+sbatch -p <partition> -c 8 --mem 32G --time 04:00:00 --job-name mineru-dev \
+  --export=ALL,WS=$PWD,DATASET=drdocbench,ROOT=$PWD/data/drdocbench/dev,RUN=mineru,PROVIDER=mineru \
+  repos/acessilia/scripts/bench/slurm/bench.sbatch
+```
 
 ## Adding a dataset
 
@@ -82,5 +104,6 @@ markdown, convert it to markdown in `download` so that `score` applies as is.
 ## Dr.DocBench experiment snapshot
 
 The shared-task experiment code (fusion variants, Slurm jobs, frozen replay)
-is preserved at the tag `drbench-2026-snapshot`; its runbook is
-[`docs/drbench/experiments/RUNBOOK.md`](drbench/experiments/RUNBOOK.md).
+is preserved at the tag `drbench-2026-snapshot`: what each script did and where
+its algorithm went is in [CODE.md](drbench/experiments/CODE.md), and how to run
+it in the [runbook](drbench/experiments/RUNBOOK.md).

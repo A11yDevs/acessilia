@@ -124,8 +124,8 @@ threshold retuning) are **not** in the defaults: they showed Δtune ≤ 0 and
 | `drbench_v12` | differ-v12 (calibrated on dev) | named, never default |
 | `drbench_v13` | v12 + pic-need-text + formula-text | named, never default |
 | `drbench_v14` | v13 + line-numbers + table-eq + verse-chunk 300 | named, never default |
-| `drbench_v15` | v14 + page judge + tailjoin `end/50/3/hdr` + rep-guard + hf-end + upscale + orientation | **confirmed leaderboard best** (EvalAI 70.37) |
-| `drbench_best_method` | v15 + judge2 thresholds + page swap + blank pages + norm-text | dev best (87.33), **never confirmed** — dev→test gap ≈ 8 pts |
+| `drbench_v15` | v14 + page judge + tailjoin `end/50/3/hdr` + rep-guard + hf-end + upscale + orientation | **best within the paper's method** (EvalAI 70.37) |
+| `drbench_best_method` | v15 + judge2 thresholds + page swap + blank pages + norm-text | dev best (87.33); **EvalAI 71.01**, the best submission (dev→test gap 16.3 pts) |
 
 `drbench_best_method` exists to make the loop's best method reproducible for
 future performance work. It must never become a default: the TEDS gain did not

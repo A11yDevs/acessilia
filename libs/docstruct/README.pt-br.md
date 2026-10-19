@@ -124,8 +124,8 @@ de prompts, reajuste de limiares) **não** entram nos defaults: mostraram
 | `drbench_v12` | differ-v12 (calibrado no dev) | nomeado, nunca default |
 | `drbench_v13` | v12 + pic-need-text + formula-text | nomeado, nunca default |
 | `drbench_v14` | v13 + line-numbers + table-eq + verse-chunk 300 | nomeado, nunca default |
-| `drbench_v15` | v14 + juiz de página + tailjoin `end/50/3/hdr` + rep-guard + hf-end + upscale + orientation | **melhor confirmado no leaderboard** (EvalAI 70.37) |
-| `drbench_best_method` | v15 + limiares do judge2 + page swap + páginas brancas + norm-text | melhor de dev (87.33), **nunca confirmado** — gap dev→test ≈ 8 pts |
+| `drbench_v15` | v14 + juiz de página + tailjoin `end/50/3/hdr` + rep-guard + hf-end + upscale + orientation | **melhor submissão dentro do método do artigo** (EvalAI 70.37) |
+| `drbench_best_method` | v15 + limiares do judge2 + page swap + páginas brancas + norm-text | melhor de dev (87.33); **EvalAI 71.01**, a melhor submissão (gap dev→test de 16.3 pts) |
 
 `drbench_best_method` existe para tornar o melhor método do loop reproduzível
 para trabalho futuro de performance. Ele nunca deve virar default: o ganho de

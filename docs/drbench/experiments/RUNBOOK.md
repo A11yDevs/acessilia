@@ -23,20 +23,24 @@ inference JSON. That is what makes a recorded run reproducible without a GPU.
 
 ## 1. Rebuild the environment
 
+The experiment code is no longer on the main branches: everything in this
+runbook runs from the tag `drbench-2026-snapshot` (what each script does and
+where its algorithm went: [CODE.md](CODE.md)).
+
 ```bash
-# Core + library + test dependencies (pytest, numpy), pinned by the lockfile;
-# add --extra drbench for OpenCV (scripts/drbench/experiments/differ/orient_pages.py)
+git checkout drbench-2026-snapshot
+
+# Core (numpy and OpenCV are core dependencies at this tag) + library + pytest, pinned by the lockfile
 uv sync --frozen --extra dev
 
 # Library tests must pass without the backend installed
 uv run pytest libs/docstruct/tests
 
-# Core tests (6 pre-existing failures in test_formula_enrichment.py and
-# test_pddl_orchestrator.py are expected; 0 skips)
+# Core tests: 1383 passed, 0 skips
 uv run pytest -m "not e2e"
 ```
 
-The lockfile is `uv.lock` (90 packages). `pyproject.toml` declares
+At the tag the lockfile is `uv.lock` (90 packages). `pyproject.toml` declares
 `acessilia-docstruct` as an editable path source, so `uv sync` installs the
 library from `libs/docstruct`.
 
@@ -119,8 +123,8 @@ is ~17% of the test split — that is why it is cheap relative to full OCR.
 
 ## 5. What to check before promoting a method
 
-1. **Confirm on the leaderboard.** The dev best (87.33) was never confirmed; the
-   observed dev→test gap is ~8 points. A dev gain is not a result.
+1. **Confirm on the leaderboard.** The dev best (87.33) scored 71.01 on test, a
+   16.3-point gap (~8 for `differ-v15-hyb`). A dev gain is not a result.
 2. **Check the metric that moved.** TEDS did not transfer (dev +5.9 → test +0.2);
    the real test gain came from reading order with the MinerU hybrid-VLM source.
 3. **Respect the holdout.** The split is by document (`md5(doc) % 3`). Acceptance
@@ -135,8 +139,8 @@ the repository (on the cluster scratch).
 
 ## 7. References
 
-- `scripts/drbench/experiments/eval/FROZEN_REPLAY.md` — spec format and discipline
-- `scripts/drbench/experiments/README.md` — workspace layout and relocation
+- [`FROZEN_REPLAY.md`](https://github.com/A11yDevs/acessilia/blob/drbench-2026-snapshot/scripts/drbench/experiments/eval/FROZEN_REPLAY.md) (tag `drbench-2026-snapshot`) — spec format and discipline
+- [`CODE.md`](CODE.md) — the experiment code, workspace layout and relocation
 - `docs/drbench/experiments/SERVICES-LOOP.md` — services started inside each job
 - `docs/drbench/experiments/LOOP.md` — the experiment loop and its decisions
 - `docs/drbench/experiments/SUBMISSIONS-LEADERBOARD.md` — submissions and scores

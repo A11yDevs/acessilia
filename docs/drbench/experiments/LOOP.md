@@ -2,7 +2,7 @@
 
 > Brazilian Portuguese version: [versão pt-BR](LOOP.pt-br.md)
 
-Base: v24-AOs (dev evalai_style_no_cdm 78.68; tune 79.13 / hold 76.91). Best on test: differ-v15-hyb 70.37.
+Base: v24-AOs (dev evalai_style_no_cdm 78.68; tune 79.13 / hold 76.91). Best on test: differ-v15-hyb 70.37 (later: hyb-v29-judge2-televm-adf-tj3, the outcome of this loop, scored 71.01; see `scripts/drbench/`).
 Score: `python3 scripts/loop_score.py BASE RUN...` (split by document md5%3: hold=0). Accepted: Δtune ≥ +0.10, Δhold ≥ 0, no metric −0.3.
 Freeze: 2026-10-10 06:00 local. GPU only h100n2 + gpu_audit.
 

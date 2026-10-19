@@ -190,7 +190,7 @@ class FusionPolicy:
     def drbench_v15(cls) -> "FusionPolicy":
         """Preset do differ-v15: v14 + o híbrido de página e a regra ``tj3``.
 
-        É o melhor confirmado no leaderboard (EvalAI 70.37, ``differ-v15-hyb``).
+        ``differ-v15-hyb`` é a melhor submissão dentro do método do artigo (EvalAI 70.37).
         Calibrado no dev do Dr.DocBench — NÃO usar como default de produção.
         """
         return cls(
@@ -215,14 +215,14 @@ class FusionPolicy:
         Composição: v13-pnt sobre ``docling-v3+rot`` x ``mineru-hyb+rot``, com
         seleção de página VLM, ``rep_guard``, adição de número de página, juiz
         pareado ``judge2`` (nova > 0.5, senão antiga > 0.2), TeleOCR com upscale
-        2x/1.5x e ``tailjoin3``.
+        2x nas páginas pequenas e médias (``up2m2``) e ``tailjoin3``.
 
-        **NUNCA usar como default.** Este resultado nunca foi confirmado no
-        leaderboard: o gap dev->test observado é de ~8 pontos, e o TEDS não
-        transferiu (dev +5.9 -> test +0.2). O melhor *confirmado* é
-        ``drbench_v15`` (EvalAI 70.37). Use este preset apenas para retomar os
-        testes de performance, sempre com confirmação no leaderboard antes de
-        qualquer promoção.
+        **NUNCA usar como default.** No teste fez EvalAI 71.01 (a melhor
+        submissão; ver ``scripts/drbench``), um gap dev->test de 16.3 pontos,
+        contra ~8 do ``drbench_v15`` (EvalAI 70.37); ganhou só 0.64 no teste,
+        vindos da ordem de leitura, e o TEDS caiu. Use este preset apenas para
+        retomar os testes de performance, sempre com confirmação no leaderboard
+        antes de qualquer promoção.
         """
         return cls(
             **{

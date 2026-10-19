@@ -50,18 +50,11 @@ dev = [
     "pytest>=9.1.1,<10",
     "respx>=0.23.1,<0.24",
     "pytest-asyncio>=1.4.0,<2",
-    # Used by the Dr.DocBench page-level experiment scripts (scripts/drbench/experiments/pages),
-    # and by docstruct's Levenshtein when installed (scripts/bench score).
+    # Levenshtein accelerator of docstruct's text_ed; `scripts.bench score`
+    # falls back to pure Python without it (~20 s for a 3,000-character page).
     "rapidfuzz>=3.9,<4",
     # Reads the PDFs the renderer tests produce.
     "pypdf>=6.14.2,<7",
-    # The Dr.DocBench differ (scripts/drbench/experiments/differ/tree_differ_v2.py) and its tests.
-    "numpy>=2.4.6,<3",
-]
-# OpenCV for the Dr.DocBench page-orientation script
-# (scripts/drbench/experiments/differ/orient_pages.py); no test or application code imports it.
-drbench = [
-    "opencv-python-headless>=5.0.0.93,<6",
 ]
 
 [project.scripts]

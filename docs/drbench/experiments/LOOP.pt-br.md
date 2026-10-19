@@ -2,7 +2,7 @@
 
 > English version: [English](LOOP.md)
 
-Base: v24-AOs (dev evalai_style_no_cdm 78.68; tune 79.13 / hold 76.91). Melhor no test: differ-v15-hyb 70.37.
+Base: v24-AOs (dev evalai_style_no_cdm 78.68; tune 79.13 / hold 76.91). Melhor no test: differ-v15-hyb 70.37 (depois: hyb-v29-judge2-televm-adf-tj3, resultado deste loop, fez 71.01; ver `scripts/drbench/`).
 Score: `python3 scripts/loop_score.py BASE RUN...` (split por documento md5%3: hold=0). Aceita: Δtune ≥ +0.10, Δhold ≥ 0, nenhuma métrica −0.3.
 Congelamento: 2026-10-10 06:00 local. GPU só h100n2 + gpu_audit.
 

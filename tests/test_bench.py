@@ -126,6 +126,40 @@ def test_cli_run_writes_markdown_and_blocks(tmp_path, monkeypatch):
     assert json.loads((run / "report.json").read_text())["overall"] == pytest.approx(100.0)
 
 
+def test_official_tree_uses_one_page_windows(tmp_path):
+    _tree(tmp_path / "data")
+    pages = DrDocBench().pages(tmp_path / "data")
+    preds = tmp_path / "preds"
+    preds.mkdir()
+    (preds / f"{DOC}_p2.md").write_text("two", encoding="utf-8")
+
+    assert DrDocBench().build_official_tree(pages, preds, tmp_path / "official") == 1
+    assert (tmp_path / "official" / "MATH" / f"{DOC}_page_2-2.md").read_text() == "two"
+
+
+def test_cli_resume_skips_existing_predictions(tmp_path, monkeypatch):
+    _tree(tmp_path / "data")
+    monkeypatch.setenv("BENCH_VAR", str(tmp_path / "var"))
+    monkeypatch.setattr(cli, "VAR", tmp_path / "var")
+    preds = tmp_path / "var" / "drdocbench" / "dev" / "latest" / "predictions"
+    preds.mkdir(parents=True)
+    (preds / f"{DOC}_p1.md").write_text("kept", encoding="utf-8")
+    seen = []
+    monkeypatch.setattr(cli.toolbox, "extract_structure",
+                        lambda image, provider: seen.append(image.name) or {"document": {"elements": []}})
+
+    assert cli.main(["run", "--dataset", "drdocbench", "--root", str(tmp_path / "data"), "--resume"]) == 0
+    assert seen == ["page_2.jpg"]
+    assert (preds / f"{DOC}_p1.md").read_text() == "kept"
+    # Resuming keeps the run covering both pages, not only the resumed ones.
+    manifest = (preds.parent / "pages.txt").read_text().split()
+    assert manifest == [f"{DOC}_p1", f"{DOC}_p2"]
+
+    # A finished run resumes as a no-op with success.
+    assert cli.main(["run", "--dataset", "drdocbench", "--root", str(tmp_path / "data"), "--resume"]) == 0
+    assert seen == ["page_2.jpg"]
+
+
 def _stub_toolbox(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "VAR", tmp_path / "var")
     monkeypatch.setattr(cli.toolbox, "extract_structure", lambda image, provider: {

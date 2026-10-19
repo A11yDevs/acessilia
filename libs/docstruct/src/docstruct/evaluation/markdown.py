@@ -2,7 +2,8 @@
 
 Both sides use the benchmark markdown that ``docstruct.export.markdown``
 emits: blocks separated by blank lines, tables as HTML ``<table>`` and display
-formulas as ``$$...$$``. Port of ``scripts/drbench/eval_run.py``.
+formulas as ``$$...$$``. Port of ``scripts/drbench/eval_run.py`` (tag
+drbench-2026-snapshot).
 """
 from __future__ import annotations
 

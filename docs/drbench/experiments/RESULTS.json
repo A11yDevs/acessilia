@@ -63,8 +63,8 @@
         "formula_cdm": 0.22,
         "overall": 70.37
       },
-      "confirmed_best": true,
-      "note": "TEDS did NOT transfer: dev +5.9 -> test +0.2. The real test gain came from reading order (+16.4, 55.91 -> 72.3) with the MinerU hybrid-VLM + rotation source."
+      "note": "TEDS did NOT transfer: dev +5.9 -> test +0.2. The real test gain came from reading order (+16.4, 55.91 -> 72.3) with the MinerU hybrid-VLM + rotation source.",
+      "best_within_paper_method": true
     },
     {
       "run": "differ-v20-vlmsel-20260927",
@@ -82,20 +82,40 @@
         "overall": 70.35
       },
       "note": "-0.02 vs v15-hyb; better reading order (+2.66), slightly worse text/TEDS."
+    },
+    {
+      "run": "hyb-v29-judge2-televm-adf-tj3-20261009",
+      "date": "2026-10-09",
+      "composition": "differ-v29-adf x teleocr-up2m2-vm-fb-adf, page chosen by the Qwen3-VL-32B judge (judge-televm pB > 0.5, else judge-tele pB > 0.2; 87 Tele pages), then tail-join tj3. Beyond the paper's method: uses Qwen3-VL-32B, TeleOCR and dots.ocr.",
+      "zip_sha256": "08ec980d4bc9ec27acdd494c5c676830169c5506085f9f445bbc327470353a64",
+      "predictions_jsonl_sha256": "2b83be1409b50a4051e2081dffc401cf501631b018c7f56b2d31513a883b11e3",
+      "pages": 509,
+      "dev986_md2md": {"overall": 87.33, "tune": 90.6, "hold": 83.11},
+      "evalai": {
+        "text_ed": 0.2708,
+        "table_teds": 56.16,
+        "formula_cdm": 0.16,
+        "reading_order": 75.87,
+        "overall": 71.01
+      },
+      "best_submission": true,
+      "frozen_in": "scripts/drbench/submissions/best",
+      "note": "Best EvalAI Overall. The gain over differ-v15-hyb (+0.64) came from reading order (+3.57); TEDS dropped (-2.15)."
     }
   ],
-  "dev_best_unconfirmed": {
-    "run": "hyb-v29-judge2-televm-adf-tj3",
-    "dev_overall": 87.33,
-    "tune": 90.60,
-    "hold": 83.11,
-    "confirmed": false,
-    "note": "Never submitted or confirmed on the leaderboard. The observed dev->test gap is ~8 points. Reproducible via FusionPolicy.drbench_best_method(), which is named and never a default."
-  },
   "gap_dev_to_test": {
-    "confirmed_best_dev986_md2md": 78.1,
-    "confirmed_best_evalai": 70.37,
-    "delta": 7.73,
-    "note": "The dev split evaluates isolated pages; the test split uses 34 documents x 15 contiguous pages. Part of the gap is the window, not the method."
+    "best_submission": {
+      "run": "hyb-v29-judge2-televm-adf-tj3-20261009",
+      "dev986_md2md": 87.33,
+      "evalai": 71.01,
+      "delta": 16.32
+    },
+    "best_within_paper_method": {
+      "run": "differ-v15-hyb-20260922",
+      "dev986_md2md": 78.1,
+      "evalai": 70.37,
+      "delta": 7.73
+    },
+    "note": "The dev split evaluates isolated pages; the test split uses 34 documents x 15 contiguous pages. Part of the gap is the window, not the method; over differ-v15-hyb, the multi-source pipeline gained 9.2 points on dev and 0.6 on test."
   }
 }

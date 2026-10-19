@@ -75,21 +75,10 @@ from docstruct.policy import FusionPolicy
 policy = replace(FusionPolicy.drbench_v13(), order_xycut="multicol", xycut_min_balance=0.7)
 ```
 
-Script de experimento do Dr.DocBench:
-
-```bash
-python -m scripts.drbench.experiments.differ.lib_fuse \
-  --docling runs/docling/predictions --mineru runs/mineru/predictions \
-  --out runs/fusion-xycut/predictions --policy v13 \
-  --xycut multicol --xycut-min-balance 0.7
-```
-
-Slurm:
-
-```bash
-sbatch --export=ALL,SPLIT=dev,POLICY=v13,XYCUT=multicol,XYCUT_MIN_BALANCE=0.7,RUN_NAME=lib-fuse-v13-xycut-bal07 \
-  scripts/drbench/experiments/slurm/lib_fuse.sbatch
-```
+O experimento do Dr.DocBench rodou com
+[`lib_fuse.py --xycut multicol --xycut-min-balance 0.7`](https://github.com/A11yDevs/acessilia/blob/drbench-2026-snapshot/scripts/drbench/experiments/differ/lib_fuse.py)
+(Slurm: [`lib_fuse.sbatch`](https://github.com/A11yDevs/acessilia/blob/drbench-2026-snapshot/scripts/drbench/experiments/slurm/lib_fuse.sbatch)), preservados
+na tag `drbench-2026-snapshot`; ver [drbench/experiments/CODE.pt-br.md](drbench/experiments/CODE.pt-br.md).
 
 `order_xycut` aceita `off` (padrão), `multicol` e `always` (todas as páginas;
 mantido só para comparação). As decisões são contadas no `decisions.csv`:

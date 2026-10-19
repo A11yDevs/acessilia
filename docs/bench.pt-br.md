@@ -48,7 +48,9 @@ uv run python -m scripts.bench submit --dataset drdocbench --split test --run ba
 `run` substitui as predições anteriores da run e registra as páginas que cobriu
 em `pages.txt`; `score` pontua só essas páginas, então uma run com `--sample`
 não é pontuada contra o split inteiro. `score` sai com 1 quando nenhuma página
-tem ground truth (o split `test`, por exemplo).
+tem ground truth (o split `test`, por exemplo). Já `--resume` continua uma run
+interrompida: as predições anteriores ficam e o `pages.txt` segue cobrindo todas
+as páginas da seleção.
 
 A pontuação calcula duas distâncias de Levenshtein por página. Sem o `rapidfuzz`
 (instalado pelo extra `dev`), o docstruct usa Python puro, que leva cerca de
@@ -65,6 +67,26 @@ não podem ser calculados saem como `null`.
 
 Uma métrica que some só em algumas páginas ainda deixa essas páginas fora da
 sua média; no `drilldown.csv` esse componente fica em branco nessas páginas.
+
+## Em um cluster Slurm
+
+`scripts/bench/slurm/` tem três jobs; cada um carrega o `env.sh`, que exige `WS`
+(o workspace com `repos/acessilia`, `repos/acessilia-toolbox` e `data/`) e mantém
+todos os caches e execuções dentro dele (`BENCH_VAR=$WS/bench`). Submeta a partir
+de `$WS` e passe a partição com `-p`.
+
+| Job | O quê |
+|---|---|
+| `setup.sbatch` | venvs e modelos da Toolbox, do docling-serve e do MinerU, venv deste repositório; opcionalmente um snapshot de dataset do HuggingFace (`HF_DATASET`, `HF_PATTERN`, `DATASET_DIR`) |
+| `bench.sbatch` | sobe o provider (`PROVIDER=docling\|mineru`) e a Toolbox dentro do job, em portas derivadas do id do job, e roda `scripts.bench run --resume` e `score`; submeter de novo o mesmo `RUN` retoma de onde parou |
+| `eval_official.sbatch` | monta a árvore de janelas de uma página do avaliador oficial para cada execução em `RUNS` e pontua com `$WS/repos/DrDocBench` (`CONFIG` é a configuração do avaliador; `cdm_env.sh` para o CDM) |
+
+```bash
+cd $WS
+sbatch -p <partition> -c 8 --mem 32G --time 04:00:00 --job-name mineru-dev \
+  --export=ALL,WS=$PWD,DATASET=drdocbench,ROOT=$PWD/data/drdocbench/dev,RUN=mineru,PROVIDER=mineru \
+  repos/acessilia/scripts/bench/slurm/bench.sbatch
+```
 
 ## Acrescentando um dataset
 
@@ -84,5 +106,7 @@ aplique sem mudanças.
 ## Snapshot dos experimentos do Dr.DocBench
 
 O código dos experimentos da shared task (variantes de fusão, jobs Slurm,
-replay congelado) está preservado na tag `drbench-2026-snapshot`; o runbook é
-[`docs/drbench/experiments/RUNBOOK.pt-br.md`](drbench/experiments/RUNBOOK.pt-br.md).
+replay congelado) está preservado na tag `drbench-2026-snapshot`: o que cada
+script fazia e para onde foi seu algoritmo está em
+[CODE.pt-br.md](drbench/experiments/CODE.pt-br.md), e como rodá-lo no
+[runbook](drbench/experiments/RUNBOOK.pt-br.md).

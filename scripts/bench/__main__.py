@@ -6,8 +6,9 @@
     python -m scripts.bench compare  var/bench/drdocbench/dev/<base> var/bench/drdocbench/dev/<candidate>
     python -m scripts.bench submit   --dataset drdocbench --split test
 
-Data lives in ``var/bench/<dataset>/<split>/data`` (``--root`` to override);
-each run in ``var/bench/<dataset>/<split>/<run>`` (``--run``, default ``latest``).
+Data lives in ``$BENCH_VAR/<dataset>/<split>/data`` (``--root`` to override);
+each run in ``$BENCH_VAR/<dataset>/<split>/<run>`` (``--run``, default ``latest``).
+``BENCH_VAR`` defaults to ``var/bench`` in the repository.
 Scores are local approximations for tracking deltas; use the benchmark's
 official evaluator for reported numbers.
 """
@@ -17,6 +18,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import shutil
 import sys
 import time
@@ -29,7 +31,7 @@ from scripts.bench import core, toolbox
 from scripts.bench.datasets import DATASETS
 from scripts.bench.report import MANIFEST_FILE, compare_runs, score_run
 
-VAR = Path(__file__).resolve().parents[2] / "var" / "bench"
+VAR = Path(os.environ.get("BENCH_VAR") or Path(__file__).resolve().parents[2] / "var" / "bench")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -52,6 +54,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--item", help="a single item id")
     p.add_argument("--provider", help="Toolbox structure provider override")
     p.add_argument("--save-raw", action="store_true", help="also keep the Toolbox payload")
+    p.add_argument("--resume", action="store_true", help="skip pages that already have a prediction")
     dataset_command("score", "score a run against the ground truth")
     dataset_command("submit", "package a run in the benchmark's submission format")
     p = sub.add_parser("compare", help="tune/holdout acceptance of a candidate run")
@@ -83,7 +86,7 @@ def main(argv: list[str] | None = None) -> int:
             pages = [p for p in pages if p.item_id == args.item]
         if args.sample:
             pages = pages[: args.sample]
-        return _run(pages, run_dir, args.provider, args.save_raw)
+        return _run(pages, run_dir, args.provider, args.save_raw, resume=args.resume)
     if args.command == "score":
         manifest = run_dir / MANIFEST_FILE
         if manifest.exists():
@@ -100,13 +103,25 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
-def _run(pages, run_dir: Path, provider: str | None, save_raw: bool) -> int:
-    # A rerun replaces the previous one: stale predictions would be scored and
-    # submitted as if they belonged to this run.
+def _run(selected, run_dir: Path, provider: str | None, save_raw: bool, *, resume: bool = False) -> int:
     predictions = run_dir / "predictions"
-    shutil.rmtree(predictions, ignore_errors=True)
-    predictions.mkdir(parents=True)
-    (run_dir / MANIFEST_FILE).write_text("".join(f"{p.item_id}\n" for p in pages), encoding="utf-8")
+    if resume:
+        # Resuming continues a run: earlier predictions stay and the manifest
+        # keeps covering every page the run ever intended to score.
+        pages = [p for p in selected if not (predictions / f"{p.item_id}.md").exists()]
+        covered = _manifest_ids(run_dir)
+        covered += [p.item_id for p in selected if p.item_id not in set(covered)]
+    else:
+        # A rerun replaces the previous one: stale predictions would be scored
+        # and submitted as if they belonged to this run.
+        shutil.rmtree(predictions, ignore_errors=True)
+        pages = selected
+        covered = [p.item_id for p in selected]
+    predictions.mkdir(parents=True, exist_ok=True)
+    (run_dir / MANIFEST_FILE).write_text("".join(f"{i}\n" for i in covered), encoding="utf-8")
+    if resume and not pages:
+        print(f"Nothing to do: every page of the selection has a prediction in {predictions}")
+        return 0
     ok = 0
     for page in pages:
         start = time.perf_counter()
@@ -127,6 +142,11 @@ def _run(pages, run_dir: Path, provider: str | None, save_raw: bool) -> int:
         print(f"[OK] {page.item_id} ({time.perf_counter() - start:.1f}s)")
     print(f"Done: {ok}/{len(pages)} pages -> {predictions}")
     return 0 if ok else 1
+
+
+def _manifest_ids(run_dir: Path) -> list[str]:
+    manifest = run_dir / MANIFEST_FILE
+    return manifest.read_text(encoding="utf-8").split() if manifest.exists() else []
 
 
 def _finite(value):
