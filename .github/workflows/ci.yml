@@ -22,6 +22,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # During BHS a release branch only takes bug fixes (CONTRIBUTING.md, 5.1);
+  # features, improvements and refactorings keep going to develop.
+  release-scope:
+    name: release accepts only fixes
+    if: github.event_name == 'pull_request' && startsWith(github.base_ref, 'release/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Reject branches that are not fixes
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          case "$HEAD_REF" in
+            fix/*|hotfix/*) echo "${HEAD_REF} -> ${BASE_REF}: ok" ;;
+            *)
+              echo "::error::${BASE_REF} only accepts fix/* and hotfix/* branches during BHS; target develop with ${HEAD_REF}."
+              exit 1
+              ;;
+          esac
+
   tests:
     name: tests (Python 3.11)
     runs-on: ubuntu-latest
