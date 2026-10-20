@@ -82,10 +82,12 @@ def test_capability_registry_is_pure_data() -> None:
 
 def test_runtime_dependencies_stay_within_httpx_and_docstruct() -> None:
     project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
-    declared = {
-        re.split(r"[\s<>=!~;\[@]", requirement, maxsplit=1)[0].lower()
+    names = (
+        re.split(r"[\s<>=!~;\[@]", requirement, maxsplit=1)[0]
         for requirement in project.get("dependencies", [])
-    }
+    )
+    # PEP 503 normalisation: acessilia_docstruct is acessilia-docstruct.
+    declared = {re.sub(r"[-_.]+", "-", name).lower() for name in names}
     assert declared <= set(ALLOWED_DEPENDENCIES), declared - set(ALLOWED_DEPENDENCIES)
 
 
