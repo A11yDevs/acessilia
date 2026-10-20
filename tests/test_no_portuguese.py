@@ -1,75 +1,58 @@
 """Regression test: no Portuguese (pt-BR) text in code or documentation.
 
-Exceptions allowed by the constitution (principle 8):
+Exceptions allowed by the constitution (principle 2.8):
 - User-facing content: Telegram messages, rendered output, AI prompts
 - Domain-specific educational materials where audience is Portuguese-speaking
-- Translation catalogs (*.po files in backend/locales/pt_BR/)
-- Portuguese documentation files (*.pt-br.md)
+- Translation catalogs (*.po files, and the pt-BR table in scripts/gen_locale_catalogs.py)
+- Portuguese documentation mirrors (*.pt-br.md) and the link to them
 - Fixture datasets containing real document content
 - Functional detection patterns (callout titles, chapter-heading regex)
   that are language-agnostic classifiers
 
-Add new exemptions here when adding intentional Portuguese detection patterns.
+The scan starts at the repository root and covers libs/ (#187). Lines that
+predate it are counted per file in ``tests/fixtures/portuguese_allowlist.json``:
+no file may go above its count, and a count must be lowered when its file is
+cleaned, so the allowlist only shrinks. Add an exemption below only for an
+intentional Portuguese string.
 """
 
 from __future__ import annotations
 
+import json
+import re
 from pathlib import Path
 
 import pytest
 
-PROJECT_ROOT = Path(__file__).resolve().parent
+REPO_ROOT = Path(__file__).resolve().parents[1]
+ALLOWLIST_PATH = REPO_ROOT / "tests" / "fixtures" / "portuguese_allowlist.json"
 
 # ── Exempt paths (entire directories) ──────────────────────────────
 EXEMPT_PATHS = {
     # Real document content — not source code.
-    PROJECT_ROOT / "fixtures" / "images",
-    PROJECT_ROOT / "fixtures" / "presentations",
-    PROJECT_ROOT / "fixtures" / "tutorials",
+    REPO_ROOT / "tests" / "fixtures" / "images",
+    REPO_ROOT / "tests" / "fixtures" / "presentations",
+    REPO_ROOT / "tests" / "fixtures" / "tutorials",
     # Translation catalogs — intentionally in Portuguese.
-    PROJECT_ROOT.parent / "backend" / "locales" / "pt_BR",
+    REPO_ROOT / "backend" / "locales" / "pt_BR",
 }
 
-# ── Exempt files (by relative path) ────────────────────────────────
-# Files with known fixture or generated content that may contain Portuguese.
+# ── Exempt files (relative to the repository root) ─────────────────
+# Every ``*.pt-br.md`` mirror is exempt as well.
 EXEMPT_FILES: set[str] = {
-    # Portuguese documentation — allowed by constitution.
-    "CONTRIBUTING.pt-br.md",
-    "README.pt-br.md",
-    "docs/README.pt-br.md",
-    "docs/architecture.pt-br.md",
-    "docs/architecture/audit-2026-10.pt-br.md",
-    "docs/constitution.pt-br.md",
-    "docs/adr/README.pt-br.md",
-    "docs/adr/template.pt-br.md",
-    "docs/adr/0001-record-architecture-decisions.pt-br.md",
-    "docs/adr/0002-component-responsibilities.pt-br.md",
-    "docs/adr/0003-remote-only-operational-capabilities.pt-br.md",
-    "docs/adr/0004-single-source-of-truth-for-contracts.pt-br.md",
-    "docs/adr/0005-artifact-references.pt-br.md",
-    "docs/adr/0006-availability-and-failover.pt-br.md",
-    "docs/adr/0007-manifest-model-and-mathml-conversion.pt-br.md",
-    "docs/docker-compose.pt-br.md",
-    "docs/endpoints.pt-br.md",
-    "docs/homologacao-systemd.pt-br.md",
-    "docs/i18n.pt-br.md",
-    "docs/old/MVP_CHANGES.pt-br.md",
-    "docs/old/PMV_2_1_CHANGES.pt-br.md",
-    "docs/old/PMV_2_CHANGES.pt-br.md",
-    "docs/patterns.pt-br.md",
-    "docs/plano_incorporacao_pddl_agno.pt-br.md",
-    "docs/pmv_agno_pddl.pt-br.md",
-    "docs/pr-14-review.pt-br.md",
-    "docs/use_cases.pt-br.md",
-    "tests/README.pt-br.md",
     # English i18n documentation — may reference Portuguese.
     "docs/i18n.md",
-    # Translation catalogs.
+    # Translation catalogs and the pt-BR table they are generated from.
     "backend/locales/en_US/LC_MESSAGES/messages.po",
     "backend/locales/pt_BR/LC_MESSAGES/messages.po",
+    "scripts/gen_locale_catalogs.py",
     # Test documentation — may reference Portuguese concepts.
     "README.md",
 }
+
+# Substrings exempt in every file: the link from an English page to its
+# pt-BR mirror ("[português brasileiro](page.pt-br.md)").
+GLOBAL_EXEMPT_STRINGS = ("português brasileiro",)
 
 # ── Known-functional Portuguese strings in source code ─────────────
 # Tuple of (relative_file_path, substring). Add new entries here when
@@ -234,85 +217,114 @@ for file_rel, substring in EXEMPT_STRINGS:
     _EXEMPT_BY_FILE.setdefault(file_rel, set()).add(substring)
 
 
-def _iter_project_files(root: Path) -> list[Path]:
-    """Walk source, docs and config files (skip exempt and __pycache__)."""
-    files: list[Path] = []
-    for pattern in (
-        "backend/**/*.py",
-        "frontend/**/*.py",
-        "docs/**/*.md",
-        "schemas/*.json",
-        "pyproject.toml",
-        "Dockerfile",
-        "infra/Dockerfile",
-        ".env.example",
-        "README.md",
-        "CONTRIBUTING.md",
-        ".github/workflows/*.yml",
-        "docker-compose*.yml",
-        "scripts/*.sh",
-        "scripts/*.py",
-    ):
-        found = list(root.glob(pattern))
-        for p in found:
-            rel = p.relative_to(root)
-            if any(rel.is_relative_to(ex) for ex in EXEMPT_PATHS):
-                continue
-            if "__pycache__" in p.parts:
-                continue
-            files.append(p)
-    return files
-
+#: Source, docs and config files the guard reads, relative to the repository root.
+SCAN_PATTERNS = (
+    "backend/**/*.py",
+    "frontend/**/*.py",
+    "libs/**/*.py",
+    "libs/**/*.md",
+    "libs/*/pyproject.toml",
+    "docs/**/*.md",
+    "schemas/*.json",
+    "pyproject.toml",
+    "infra/Dockerfile",
+    ".env.example",
+    "README.md",
+    "CONTRIBUTING.md",
+    ".github/**/*.yml",
+    ".github/**/*.md",
+    "docker-compose*.yml",
+    "scripts/**/*.sh",
+    "scripts/**/*.py",
+)
+_CHECKED_SUFFIXES = {".py", ".md", ".json", ".yaml", ".yml", ".toml"}
+_SKIPPED_PARTS = {"__pycache__", ".venv", "node_modules", "build"}
 
 # Patterns that match a Portuguese (accented) character.
-# Only check .py, .md, .json, .yaml, .toml files for accented strings.
-_PORTUGUESE_RE = pytest.importorskip("re").compile(r"[áàâãéèêíìóòôõúùûç]")
+_PORTUGUESE_RE = re.compile(r"[áàâãéèêíìóòôõúùûç]")
 
 
-@pytest.fixture(scope="session")
-def project_files() -> list[Path]:
-    return _iter_project_files(PROJECT_ROOT)
+def _iter_project_files(root: Path) -> list[Path]:
+    """Walk source, docs and config files (skip exempt paths and caches)."""
+    files: set[Path] = set()
+    for pattern in SCAN_PATTERNS:
+        for path in root.glob(pattern):
+            if _SKIPPED_PARTS.intersection(path.parts):
+                continue
+            if any(path.is_relative_to(exempt) for exempt in EXEMPT_PATHS):
+                continue
+            files.add(path)
+    return sorted(files)
 
 
-def test_no_portuguese_in_code(project_files: list[Path]) -> None:
-    """No source file should contain accented Portuguese strings,
-    except known exemptions in EXEMPT_STRINGS and EXEMPT_FILES."""
-    failures: list[str] = []
-    for filepath in project_files:
-        if filepath.suffix not in {".py", ".md", ".json", ".yaml", ".yml", ".toml"}:
+def _portuguese_lines(root: Path = REPO_ROOT) -> dict[str, list[str]]:
+    """Offending lines per file, relative to ``root``, after every exemption."""
+    found: dict[str, list[str]] = {}
+    for filepath in _iter_project_files(root):
+        if filepath.suffix not in _CHECKED_SUFFIXES:
             continue
-        if filepath.name == "pyproject.toml" and filepath.parent == PROJECT_ROOT:
+        rel = filepath.relative_to(root).as_posix()
+        if rel in EXEMPT_FILES or rel.endswith(".pt-br.md"):
             continue
-
-        rel = str(filepath.relative_to(PROJECT_ROOT))
-        if rel in EXEMPT_FILES:
-            continue
-        exempt_lines = _EXEMPT_BY_FILE.get(rel, set())
-
+        exempt = _EXEMPT_BY_FILE.get(rel, set()) | set(GLOBAL_EXEMPT_STRINGS)
         try:
             text = filepath.read_text(encoding="utf-8")
         except (UnicodeDecodeError, OSError):
             continue
-
         for lineno, line in enumerate(text.splitlines(), start=1):
-            line_stripped = line.strip()
-            if not line_stripped:
+            stripped = line.strip()
+            if not stripped or not _PORTUGUESE_RE.search(stripped):
                 continue
-            match = _PORTUGUESE_RE.search(line_stripped)
-            if not match:
+            if any(substring in stripped for substring in exempt):
                 continue
-            # Check if this line contains an exempt substring
-            if any(exempt in line_stripped for exempt in exempt_lines):
-                continue
-            failures.append(f"  {rel}:{lineno}: {line_stripped[:100]}")
+            found.setdefault(rel, []).append(f"{rel}:{lineno}: {stripped[:100]}")
+    return found
 
-    if failures:
-        fail_msg = (
-            f"Found {len(failures)} line(s) with Portuguese text.\n"
-            "If intentional, add an entry to EXEMPT_STRINGS in this test file.\n"
-            + "\n".join(failures)
-        )
-        pytest.fail(fail_msg)
+
+def _allowlist() -> dict[str, int]:
+    return json.loads(ALLOWLIST_PATH.read_text(encoding="utf-8"))["files"]
+
+
+@pytest.fixture(scope="session")
+def portuguese_lines() -> dict[str, list[str]]:
+    return _portuguese_lines()
+
+
+def test_the_scan_covers_the_whole_repository() -> None:
+    """The guard once read only tests/ (#187); it must reach every component."""
+    scanned = {path.relative_to(REPO_ROOT).parts[0] for path in _iter_project_files(REPO_ROOT)}
+    assert {"backend", "frontend", "libs", "docs", "scripts"} <= scanned
+
+
+def test_no_new_portuguese(portuguese_lines: dict[str, list[str]]) -> None:
+    """No file may hold more Portuguese lines than the allowlist records.
+
+    A file absent from the allowlist may hold none. If the text is
+    intentional (user-facing content, a detection pattern), add an exemption
+    to ``EXEMPT_STRINGS`` instead of raising the count.
+    """
+    allowed = _allowlist()
+    failures = [
+        f"{rel}: {len(lines)} line(s), {allowed.get(rel, 0)} allowed\n  "
+        + "\n  ".join(lines)
+        for rel, lines in sorted(portuguese_lines.items())
+        if len(lines) > allowed.get(rel, 0)
+    ]
+    assert not failures, "Portuguese text above the allowlist:\n" + "\n".join(failures)
+
+
+def test_the_allowlist_only_shrinks(portuguese_lines: dict[str, list[str]]) -> None:
+    """A count above what the file holds must be lowered, so it never comes back."""
+    stale = {
+        rel: (allowed, len(portuguese_lines.get(rel, [])))
+        for rel, allowed in _allowlist().items()
+        if len(portuguese_lines.get(rel, [])) < allowed
+    }
+    assert not stale, (
+        "Lower these counts in tests/fixtures/portuguese_allowlist.json "
+        "(remove the entry at 0): "
+        + ", ".join(f"{rel} {old} -> {new}" for rel, (old, new) in sorted(stale.items()))
+    )
 
 
 def test_exempt_paths_still_exist() -> None:
@@ -320,5 +332,4 @@ def test_exempt_paths_still_exist() -> None:
     for path in EXEMPT_PATHS:
         assert path.exists(), f"Exempt path {path} no longer exists"
     for rel in EXEMPT_FILES:
-        path = PROJECT_ROOT.parent / rel
-        assert path.exists(), f"Exempt file {rel} no longer exists"
+        assert (REPO_ROOT / rel).exists(), f"Exempt file {rel} no longer exists"
