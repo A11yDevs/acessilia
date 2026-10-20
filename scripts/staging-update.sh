@@ -1,36 +1,22 @@
 #!/usr/bin/env bash
-# staging-update.sh — Atualiza o container de homologação via GitHub API
+# staging-update.sh — Updates the staging container from GHCR via the GitHub API
 #
-# Checa o SHA do último commit na branch develop via GitHub API e
-# confirma que a imagem correspondente (tag sha-<7>) JÁ FOI PUBLICADA
-# no GHCR antes de atualizar. Evita atualizar para um commit cujo build
-# ainda está rodando ou falhou.
+# Reads the SHA of the latest commit on the tracked branch from the GitHub API
+# and updates only once the matching image (sha-<7> tag) HAS BEEN PUBLISHED on
+# GHCR, so staging never moves to a commit whose build is running or failed.
 #
-# Uso:
-#   ./scripts/staging-update.sh                     # Executa uma vez
-#   systemctl start staging-update.service           # Executa via systemd
+# On the staging server it runs from the clone through scripts/ops.sh
+# (`auto-update start`, which the timer installed by `auto-update setup`
+# calls); production-update.sh reuses it with production defaults.
 #
-# Instalação como user timer systemd (a cada 5 min):
-#   1. sudo cp scripts/staging-update.sh /opt/acessilia/scripts/
-#   2. Criar ~/.config/systemd/user/staging-update.service
-#   3. Criar ~/.config/systemd/user/staging-update.timer
-#   4. systemctl --user daemon-reload
-#   5. systemctl --user enable --now staging-update.timer
+# Prerequisites: Docker + Docker Compose, jq, and a .env in the deployment
+# directory (GHCR_TOKEN raises the GitHub API rate limit).
 #
-# Pré-requisitos:
-#   - Docker + Docker Compose instalados
-#   - jq instalado (sudo apt install jq)
-#   - docker login ghcr.io configurado
-#   - Variável GHCR_TOKEN definida (token com escopo read:packages)
-#   - Executar do diretório raiz do projeto
+# Tracked branch (Bug Hunting/Squashing):
+#   "develop" by default. During BHS `ops.sh track release/x.y.z` sets
+#   TRACK_BRANCH in .env; `ops.sh track develop` removes it again.
 #
-# Branch rastreada (Bug Hunting/Squashing):
-#   Por padrao rastreia "develop". Durante o ciclo de BHS, defina TRACK_BRANCH
-#   no .env (ex: TRACK_BRANCH=release/0.0.1) para apontar o staging para a
-#   branch de release efemera; ao encerrar o BHS, remova a variavel (ou volte
-#   para "develop") para retomar o rastreio normal.
-#
-# Parametrizacao para outros ambientes:
+# Parameters for other environments:
 #   DEPLOY_DIR=/opt/acessilia/production
 #   COMPOSE_FILE=docker-compose.production.yml
 #   CONTAINER_NAME=acessilia-production
