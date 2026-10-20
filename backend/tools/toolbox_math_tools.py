@@ -80,6 +80,14 @@ MSG_MATHML_UNAVAILABLE: str = "math.convert unavailable ({reason}): formulas kep
 MSG_SPEECH_UNAVAILABLE: str = (
     "math.verbalize unavailable ({reason}): formulas kept without spoken text"
 )
+#: Technical warning when math.convert rejected the LaTeX of some formulas.
+MSG_MATHML_REJECTED: str = (
+    "math.convert rejected the LaTeX of {count} formula(s): kept without MathML"
+)
+#: Technical warning when math.verbalize rejected the LaTeX of some formulas.
+MSG_SPEECH_REJECTED: str = (
+    "math.verbalize rejected the LaTeX of {count} formula(s): kept without spoken text"
+)
 
 
 def toolbox_convert_latex(latex: str, direction: str = "latex-to-mathml") -> str:
@@ -98,7 +106,8 @@ def toolbox_convert_latex(latex: str, direction: str = "latex-to-mathml") -> str
     """
     try:
         return _run_async(_convert_latex_async(latex, direction))
-    except ToolboxInvalidInput:
+    except ToolboxInvalidInput as exc:
+        logger.info("{} rejected the input ({}): {!r}", CONVERT_CAPABILITY, exc, latex)
         return ""
     except ToolboxError as exc:
         raise MathCapabilityUnavailable(CONVERT_CAPABILITY, exc) from exc
@@ -129,7 +138,8 @@ def toolbox_verbalize_latex(latex: str, language: str = "pt-BR") -> str:
     """
     try:
         return _run_async(_verbalize_latex_async(latex, language))
-    except ToolboxInvalidInput:
+    except ToolboxInvalidInput as exc:
+        logger.info("{} rejected the input ({}): {!r}", VERBALIZE_CAPABILITY, exc, latex)
         return ""
     except ToolboxError as exc:
         raise MathCapabilityUnavailable(VERBALIZE_CAPABILITY, exc) from exc
@@ -145,7 +155,9 @@ async def _verbalize_latex_async(latex: str, language: str) -> str:
 
 
 __all__ = [
+    "MSG_MATHML_REJECTED",
     "MSG_MATHML_UNAVAILABLE",
+    "MSG_SPEECH_REJECTED",
     "MSG_SPEECH_UNAVAILABLE",
     "MathCapabilityUnavailable",
     "toolbox_recognize_formula",

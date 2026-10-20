@@ -133,17 +133,21 @@ def test_canonical_document_enriches_math_blocks(toolbox_math):
     assert not document.get("technical_warnings")
 
 
-def test_rejected_formula_keeps_latex_without_warning(monkeypatch, toolbox_math):
-    """LaTeX que a Toolbox rejeita fica sem MathML; não é indisponibilidade."""
+def test_rejected_formula_keeps_latex_and_is_counted(monkeypatch, toolbox_math):
+    """LaTeX que a Toolbox rejeita fica sem MathML; o documento conta as fórmulas."""
     from backend.pipeline import canonical_builder
 
     monkeypatch.setattr(canonical_builder, "toolbox_convert_latex", lambda latex: "")
-    document = canonical_builder.build_canonical_document("$x=1$")
+    document = canonical_builder.build_canonical_document("$x=1$\n\n$y=2$")
     block = document["sections"][0]["blocks"][0]
     assert block["text"] == "x=1"
     assert "mathml" not in block.get("metadata", {})
     assert block["alt_text"].startswith("Fórmula:")
-    assert not document.get("technical_warnings")
+    # Rejection is not an outage: every formula is still tried.
+    assert toolbox_math["verbalize"] == ["x=1", "y=2"]
+    warnings = document["technical_warnings"]
+    assert len(warnings) == 1
+    assert "math.convert" in warnings[0] and "2" in warnings[0]
 
 
 def test_unavailable_capabilities_are_reported_once(monkeypatch):

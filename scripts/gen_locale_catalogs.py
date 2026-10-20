@@ -282,7 +282,12 @@ from backend.stage_messages import (
     STAGE_VALIDATING_PLAN_DRY_RUN,
     STAGE_EXECUTING_PLAN,
 )
-from backend.tools.toolbox_math_tools import MSG_MATHML_UNAVAILABLE, MSG_SPEECH_UNAVAILABLE
+from backend.tools.toolbox_math_tools import (
+    MSG_MATHML_REJECTED,
+    MSG_MATHML_UNAVAILABLE,
+    MSG_SPEECH_REJECTED,
+    MSG_SPEECH_UNAVAILABLE,
+)
 from backend.tools.validators import MSG_FILE_TOO_LARGE, MSG_UNSUPPORTED_FORMAT
 from frontend.web.messages import (
     WEB_JOB_TITLE,
@@ -432,6 +437,8 @@ CATALOG_CREATION_DATE: datetime = datetime(
 MESSAGES: tuple[str, ...] = (
     MSG_MATHML_UNAVAILABLE,
     MSG_SPEECH_UNAVAILABLE,
+    MSG_MATHML_REJECTED,
+    MSG_SPEECH_REJECTED,
     WEB_JOB_TITLE,
     WEB_JOB_PENDING,
     WEB_JOB_DOWNLOAD,
@@ -836,6 +843,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
     "pt_BR": {
         MSG_MATHML_UNAVAILABLE: 'math.convert indisponível ({reason}): fórmulas mantidas sem MathML',
         MSG_SPEECH_UNAVAILABLE: 'math.verbalize indisponível ({reason}): fórmulas mantidas sem texto falado',
+        MSG_MATHML_REJECTED: 'math.convert rejeitou o LaTeX de {count} fórmula(s): mantidas sem MathML',
+        MSG_SPEECH_REJECTED: 'math.verbalize rejeitou o LaTeX de {count} fórmula(s): mantidas sem texto falado',
         WEB_JOB_TITLE: 'Seu documento',
         WEB_JOB_PENDING: 'Mantenha esta página aberta ou salve-a nos favoritos para acompanhar seu documento.',
         WEB_JOB_DOWNLOAD: 'Baixar seus arquivos',

@@ -27,6 +27,18 @@ msgstr "math.convert indisponível ({reason}): fórmulas mantidas sem MathML"
 msgid "math.verbalize unavailable ({reason}): formulas kept without spoken text"
 msgstr "math.verbalize indisponível ({reason}): fórmulas mantidas sem texto falado"
 
+#, python-brace-format
+msgid "math.convert rejected the LaTeX of {count} formula(s): kept without MathML"
+msgstr "math.convert rejeitou o LaTeX de {count} fórmula(s): mantidas sem MathML"
+
+#, python-brace-format
+msgid ""
+"math.verbalize rejected the LaTeX of {count} formula(s): kept without "
+"spoken text"
+msgstr ""
+"math.verbalize rejeitou o LaTeX de {count} fórmula(s): mantidas sem texto"
+" falado"
+
 msgid "Your document"
 msgstr "Seu documento"
 
