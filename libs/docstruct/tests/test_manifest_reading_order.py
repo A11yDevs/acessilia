@@ -79,15 +79,19 @@ def test_ties_keep_the_incoming_rank():
     assert order_reading_items(items) == ["a", "b"]
 
 
-def test_known_defect_bottom_left_columns_without_a_banner_keep_input_order():
-    """Frozen for parity with the manifest builder; a fix is a separate change."""
+@pytest.mark.parametrize("origin", ["TOPLEFT", "BOTTOMLEFT"])
+def test_columns_without_a_banner_read_column_by_column(origin):
+    """The same page in either origin reads the same way (#214).
+
+    Bottom-left boxes are mirrored, so their tops are negative; the band
+    before the first banner used to start at a fixed ``-1.0`` and took none
+    of them, leaving the page in input order.
+    """
     rows = [("b1", (320, 100, 580, 140)), ("a1", (20, 100, 280, 140)),
             ("b2", (320, 160, 580, 200)), ("a2", (20, 160, 280, 200))]
-    top_left = [item(k, b, rank=n) for n, (k, b) in enumerate(rows, 1)]
-    bottom_left = [item(k, b, rank=n, origin="BOTTOMLEFT") for n, (k, b) in enumerate(rows, 1)]
+    elements = [item(k, b, rank=n, origin=origin) for n, (k, b) in enumerate(rows, 1)]
 
-    assert order_reading_items(top_left) == ["a1", "a2", "b1", "b2"]
-    assert order_reading_items(bottom_left) == ["b1", "a1", "b2", "a2"]
+    assert order_reading_items(elements) == ["a1", "a2", "b1", "b2"]
 
 
 def test_nothing_to_order():

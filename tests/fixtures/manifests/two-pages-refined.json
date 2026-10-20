@@ -41,10 +41,10 @@
       "width": 600.0,
       "height": 800.0,
       "element_ids": [
-        "element-000004",
         "element-000005",
-        "element-000006",
         "element-000007",
+        "element-000004",
+        "element-000006",
         "element-000008"
       ]
     }
@@ -135,38 +135,10 @@
       "metadata": {}
     },
     {
-      "id": "element-000004",
-      "type": "paragraph",
-      "raw_label": "paragraph",
-      "reading_order": 4,
-      "hierarchy_level": 1,
-      "text": "text 4",
-      "source_ref": null,
-      "parent_ref": null,
-      "parent_id": null,
-      "page_number": 2,
-      "confidence": null,
-      "provenance": [
-        {
-          "page_number": 2,
-          "bbox": {
-            "left": 320.0,
-            "top": 700.0,
-            "right": 580.0,
-            "bottom": 660.0,
-            "coord_origin": "BOTTOMLEFT"
-          },
-          "char_start": null,
-          "char_end": null
-        }
-      ],
-      "metadata": {}
-    },
-    {
       "id": "element-000005",
       "type": "paragraph",
       "raw_label": "paragraph",
-      "reading_order": 5,
+      "reading_order": 4,
       "hierarchy_level": 1,
       "text": "text 5",
       "source_ref": null,
@@ -191,38 +163,10 @@
       "metadata": {}
     },
     {
-      "id": "element-000006",
-      "type": "paragraph",
-      "raw_label": "paragraph",
-      "reading_order": 6,
-      "hierarchy_level": 1,
-      "text": "text 6",
-      "source_ref": null,
-      "parent_ref": null,
-      "parent_id": null,
-      "page_number": 2,
-      "confidence": null,
-      "provenance": [
-        {
-          "page_number": 2,
-          "bbox": {
-            "left": 320.0,
-            "top": 600.0,
-            "right": 580.0,
-            "bottom": 560.0,
-            "coord_origin": "BOTTOMLEFT"
-          },
-          "char_start": null,
-          "char_end": null
-        }
-      ],
-      "metadata": {}
-    },
-    {
       "id": "element-000007",
       "type": "paragraph",
       "raw_label": "paragraph",
-      "reading_order": 7,
+      "reading_order": 5,
       "hierarchy_level": 1,
       "text": "text 7",
       "source_ref": null,
@@ -237,6 +181,62 @@
             "left": 20.0,
             "top": 600.0,
             "right": 280.0,
+            "bottom": 560.0,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "char_start": null,
+          "char_end": null
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "element-000004",
+      "type": "paragraph",
+      "raw_label": "paragraph",
+      "reading_order": 6,
+      "hierarchy_level": 1,
+      "text": "text 4",
+      "source_ref": null,
+      "parent_ref": null,
+      "parent_id": null,
+      "page_number": 2,
+      "confidence": null,
+      "provenance": [
+        {
+          "page_number": 2,
+          "bbox": {
+            "left": 320.0,
+            "top": 700.0,
+            "right": 580.0,
+            "bottom": 660.0,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "char_start": null,
+          "char_end": null
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "element-000006",
+      "type": "paragraph",
+      "raw_label": "paragraph",
+      "reading_order": 7,
+      "hierarchy_level": 1,
+      "text": "text 6",
+      "source_ref": null,
+      "parent_ref": null,
+      "parent_id": null,
+      "page_number": 2,
+      "confidence": null,
+      "provenance": [
+        {
+          "page_number": 2,
+          "bbox": {
+            "left": 320.0,
+            "top": 600.0,
+            "right": 580.0,
             "bottom": 560.0,
             "coord_origin": "BOTTOMLEFT"
           },
@@ -275,72 +275,14 @@
       "metadata": {}
     }
   ],
-  "observations": [
-    {
-      "id": "observation-refine-reading-order-000004-000005-000006-000007-000008",
-      "kind": "refine-reading-order-detected",
-      "severity": "warning",
-      "message": "Ordem de leitura precisa seguir as colunas da página.",
-      "target_ids": [
-        "element-000004",
-        "element-000005",
-        "element-000006",
-        "element-000007",
-        "element-000008"
-      ],
-      "evidence": {
-        "page_number": 2,
-        "order_before": [
-          "element-000004",
-          "element-000005",
-          "element-000006",
-          "element-000007",
-          "element-000008"
-        ],
-        "order_after": [
-          "element-000005",
-          "element-000007",
-          "element-000004",
-          "element-000006",
-          "element-000008"
-        ]
-      }
-    }
-  ],
-  "obligations": [
-    {
-      "id": "obligation-refine-reading-order-000004-000005-000006-000007-000008",
-      "kind": "refine-reading-order",
-      "status": "candidate",
-      "selected": false,
-      "target_ids": [
-        "element-000004",
-        "element-000005",
-        "element-000006",
-        "element-000007",
-        "element-000008"
-      ],
-      "dependencies": [],
-      "admissible_methods": [
-        "xycut-order",
-        "skeleton-order",
-        "human-review"
-      ],
-      "method_costs": {
-        "xycut-order": 10,
-        "skeleton-order": 5,
-        "human-review": 100
-      },
-      "attempts": [],
-      "rationale": "Ordem de leitura precisa seguir as colunas da página."
-    }
-  ],
+  "observations": [],
+  "obligations": [],
   "artifacts": [],
   "summary": {
     "page_count": 2,
     "element_count": 8,
-    "observation_count": 1,
-    "obligation_count": 1,
+    "observation_count": 0,
+    "obligation_count": 0,
     "element_types": {
       "heading": 1,
       "page_footer": 1,

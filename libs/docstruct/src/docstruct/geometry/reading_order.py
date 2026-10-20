@@ -354,10 +354,12 @@ def _order_manifest_body(body: list[ReadingItem]) -> list[ReadingItem]:
                 ordered.append(item)
                 seen.add(item.key)
 
-    # Starts at -1.0, as the builder always did: with mirrored (negative)
-    # bottom-left tops, a band above the first banner is empty and its items
-    # fall through to the end. Changing that is a behaviour change (D6).
-    prev_top = -1.0
+    # Starts at -inf: a mirrored (negative) bottom-left top is a real
+    # position, so the first band must reach it (see ``OrientedBox.top_down``:
+    # never compare a mirrored coordinate with a fixed position). The former
+    # ``-1.0`` start, inherited from top-left-only code, read pages without a
+    # full-width banner in input order (#214).
+    prev_top = float("-inf")
     for banner, banner_box in full_width:
         read_band(
             [
