@@ -53,7 +53,7 @@ def _check_comparable(started: datetime, completed: datetime) -> None:
     Comparing them raises ``TypeError``, which pydantic does not turn into a
     ``ValidationError``.
     """
-    if (started.tzinfo is None) != (completed.tzinfo is None):
+    if (started.utcoffset() is None) != (completed.utcoffset() is None):
         raise ValueError(t(MSG_TIMESTAMPS_MIXED_TIMEZONES))
 
 
@@ -92,6 +92,11 @@ class ExtractorRun(StrictModel):
     completed_at: datetime
     duration_ms: int = Field(ge=0)
     configuration: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_interval(self) -> "ExtractorRun":
+        _check_comparable(self.started_at, self.completed_at)
+        return self
 
 
 class PageDescriptor(StrictModel):
@@ -206,7 +211,6 @@ class ProcessingManifest(StrictModel):
 
     @model_validator(mode="after")
     def validate_references(self) -> "ProcessingManifest":
-        _check_comparable(self.extractor.started_at, self.extractor.completed_at)
         if self.extractor.completed_at < self.extractor.started_at:
             raise ValueError("A extração terminou antes de começar")
 
