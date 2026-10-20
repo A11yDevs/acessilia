@@ -178,6 +178,7 @@ from backend.log_messages import (
     LOG_WORKER_TASK_ERROR,
     LOG_WORKER_TASK_STARTING,
     MSG_PLANNER_NOT_STARTED,
+    MSG_TIMESTAMPS_MIXED_TIMEZONES,
     MSG_OBLIGATION_CODE,
     MSG_OBLIGATION_FORMULA,
     MSG_OBLIGATION_IMAGE,
@@ -595,6 +596,7 @@ MESSAGES: tuple[str, ...] = (
     EXE_METHOD_ALREADY_TRIED,
     EXE_PREDECESSORS_UNSATISFIED,
     MSG_PLANNER_NOT_STARTED,
+    MSG_TIMESTAMPS_MIXED_TIMEZONES,
     MSG_EXECUTE_OBLIGATION_MISSING_FIELDS,
     MSG_ACTION_REJECTS_EXECUTION_PARAMETERS,
     MSG_PLAN_INDICES_CONSECUTIVE_FROM_ZERO,
@@ -1153,6 +1155,10 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         ),
         # Model validation failure text for a planner outcome recorded before execution actually began.
         MSG_PLANNER_NOT_STARTED: ("A tentativa terminou antes de começar"),
+        # Interval whose timestamps mix an aware and a naive datetime (manifest models).
+        MSG_TIMESTAMPS_MIXED_TIMEZONES: (
+            "Os horários de um intervalo devem ter todos fuso horário ou nenhum"
+        ),
         # Failure for execute-obligation steps missing required execution parameters in NominalPlan validation of PlanSteps.
         MSG_EXECUTE_OBLIGATION_MISSING_FIELDS: (
             "execute-obligation exige obligation_id, obligation_kind e method"

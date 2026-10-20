@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from backend.i18n import t
 from docstruct.geometry.boxes import is_bottom_left  # noqa: F401  (re-exported)
-from backend.log_messages import MSG_PLANNER_NOT_STARTED
+from backend.log_messages import MSG_PLANNER_NOT_STARTED, MSG_TIMESTAMPS_MIXED_TIMEZONES
 from docstruct.manifest import (  # noqa: F401  (msgids re-exported for the catalogs)
     MSG_CHAR_RANGE_REVERSED,
     MSG_DUPLICATE_ELEMENT_IDS,
@@ -45,6 +45,16 @@ ElementType = Literal[
 Severity = Literal["info", "warning", "error"]
 ObligationStatus = Literal["candidate", "pending", "in_progress", "satisfied", "failed"]
 AttemptStatus = Literal["succeeded", "failed", "rejected"]
+
+
+def _check_comparable(started: datetime, completed: datetime) -> None:
+    """Refuse an interval that mixes an aware and a naive timestamp.
+
+    Comparing them raises ``TypeError``, which pydantic does not turn into a
+    ``ValidationError``.
+    """
+    if (started.tzinfo is None) != (completed.tzinfo is None):
+        raise ValueError(t(MSG_TIMESTAMPS_MIXED_TIMEZONES))
 
 
 class StrictModel(BaseModel):
@@ -126,6 +136,7 @@ class ObligationAttempt(StrictModel):
 
     @model_validator(mode="after")
     def validate_interval(self) -> "ObligationAttempt":
+        _check_comparable(self.started_at, self.completed_at)
         if self.completed_at < self.started_at:
             raise ValueError(t(MSG_PLANNER_NOT_STARTED))
         return self
@@ -195,6 +206,7 @@ class ProcessingManifest(StrictModel):
 
     @model_validator(mode="after")
     def validate_references(self) -> "ProcessingManifest":
+        _check_comparable(self.extractor.started_at, self.extractor.completed_at)
         if self.extractor.completed_at < self.extractor.started_at:
             raise ValueError("A extração terminou antes de começar")
 

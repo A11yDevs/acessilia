@@ -272,6 +272,8 @@ API_TOKEN_INVALID: str = "Invalid token"
 API_TOKEN_READ_ONLY: str = "Token allows read-only access"
 #: ValueError text raised by the manifest planner model when a planner outcome is recorded before execution actually began; no placeholders.
 MSG_PLANNER_NOT_STARTED: str = "The trial ended before starting"
+#: ValueError text raised by the manifest models when an interval mixes a timezone-aware and a naive timestamp, which cannot be compared; no placeholders.
+MSG_TIMESTAMPS_MIXED_TIMEZONES: str = "Timestamps of an interval must all have a timezone or all lack one"
 #: Manifest processing-needs rationale for picture elements, used as the LLM prompt obligation text per element type.
 MSG_OBLIGATION_IMAGE: str = "The image must receive a description or be marked decorative."
 #: Manifest processing-needs rationale for table elements, used as the LLM prompt obligation text per element type.

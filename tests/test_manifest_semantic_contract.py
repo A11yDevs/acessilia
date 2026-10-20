@@ -235,3 +235,23 @@ def test_core_reports_docstruct_invariants_in_the_active_locale(monkeypatch, loc
     assert t(msgid).format(**kwargs) == expected
     with pytest.raises(ValidationError, match=re.escape(expected)):
         ProcessingManifest.model_validate(_break(BROKEN[case]))
+
+
+def _mixed_extraction(payload: dict) -> None:
+    payload["extractor"]["started_at"] = "2026-10-20T00:00:00"
+
+
+def test_mixed_timezones_are_a_validation_error_not_a_type_error() -> None:
+    from backend.core.manifest.models import ObligationAttempt
+
+    with pytest.raises(ValidationError):
+        ProcessingManifest.model_validate(_break(_mixed_extraction))
+    with pytest.raises(ValidationError):
+        ObligationAttempt.model_validate(
+            {
+                "method": "m",
+                "status": "failed",
+                "started_at": "2026-10-20T00:00:00",
+                "completed_at": "2026-10-20T00:00:00+00:00",
+            }
+        )

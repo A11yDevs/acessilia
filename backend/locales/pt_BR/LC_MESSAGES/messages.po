@@ -682,6 +682,9 @@ msgstr "Predecessoras não satisfeitas para {obligation_id}: {unsatisfied}"
 msgid "The trial ended before starting"
 msgstr "A tentativa terminou antes de começar"
 
+msgid "Timestamps of an interval must all have a timezone or all lack one"
+msgstr "Os horários de um intervalo devem ter todos fuso horário ou nenhum"
+
 msgid ""
 "The execute-obligation action requires obligation_id, obligation_kind and"
 " method"
