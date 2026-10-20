@@ -26,6 +26,11 @@ from backend.core.manifest.models import (
     Observation,
     ProcessingManifest,
 )
+from docstruct.placeholders import (
+    UNSTRUCTURED_PAGE_FLAG,
+    UNSTRUCTURED_PAGE_LABEL,
+    is_unstructured_page_placeholder as _is_placeholder,
+)
 from docstruct.geometry import (
     OrientedBox,
     ReadingItem,
@@ -152,9 +157,8 @@ V23_OBLIGATION_BY_KIND = {
 #: Artifact holding the secondary provider's extraction when FUSION_MODE=dual;
 #: the v2.3 methods that choose between providers read it.
 #: A page the extractor returned without any element gets a placeholder element
-#: of this raw label, an observation and a critical obligation: the page is
-#: inspected visually and either described or accepted as blank.
-UNSTRUCTURED_PAGE_LABEL = "unstructured-page"
+#: (``docstruct.placeholders``), an observation and a critical obligation: the
+#: page is inspected visually and either described or accepted as blank.
 UNSTRUCTURED_PAGE_OBSERVATION_KIND = "page-without-structure"
 UNSTRUCTURED_PAGE_OBLIGATION_KIND = "inspect-unstructured-page"
 UNSTRUCTURED_PAGE_METHODS = V23_OBLIGATION_BY_KIND[UNSTRUCTURED_PAGE_OBLIGATION_KIND][1]
@@ -342,9 +346,7 @@ def _refine_reading_order(elements: list[ManifestElement]) -> list[ManifestEleme
 
 def is_unstructured_page_placeholder(element: ManifestElement) -> bool:
     """Whether ``element`` stands for a page the extractor left without structure."""
-    return element.raw_label == UNSTRUCTURED_PAGE_LABEL and bool(
-        element.metadata.get("unstructured_page")
-    )
+    return _is_placeholder(element.raw_label, element.metadata)
 
 
 def append_unstructured_page_needs(manifest: ProcessingManifest) -> None:
@@ -378,7 +380,7 @@ def append_unstructured_page_needs(manifest: ProcessingManifest) -> None:
             hierarchy_level=0,
             text=None,
             page_number=number,
-            metadata={"unstructured_page": True},
+            metadata={UNSTRUCTURED_PAGE_FLAG: True},
         )
         manifest.elements.append(element)
         page.element_ids.append(element_id)

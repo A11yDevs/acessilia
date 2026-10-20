@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from docstruct.blocks.callouts import dedupe_callout_titles as _dedupe_callout_titles
 from docstruct.fusion.tailjoin import is_page_number as _is_page_number
 from docstruct.tables.ast import effective_section_width, linearize_table_for_text
 from docstruct.text.norm_fix import norm_fix
@@ -3383,21 +3384,6 @@ def _element_to_block(element: ManifestElement) -> dict[str, Any]:
         block.update({"type": "paragraph", "text": text or element.raw_label})
 
     return block
-
-
-def _dedupe_callout_titles(blocks: list[dict[str, Any]]) -> None:
-    seen_callout_ids: set[str] = set()
-    for block in blocks:
-        metadata = block.get("metadata") or {}
-        callout_id = str(metadata.get("callout_id") or "").strip()
-        if not callout_id:
-            continue
-        if block.get("type") not in {"note", "warning"}:
-            continue
-        if callout_id in seen_callout_ids:
-            block.pop("title", None)
-            continue
-        seen_callout_ids.add(callout_id)
 
 
 def _normalize_metadata_links(metadata: dict[str, Any]) -> dict[str, Any]:
