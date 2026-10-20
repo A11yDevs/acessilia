@@ -5,9 +5,12 @@ live in another repository (``acessilia-toolbox``). Nothing verified that those
 ids still exist, so a rename on either side produced a client that could only
 fail at runtime.
 
-``scripts/check_capability_contract.py`` compares the two sides. This module
-runs it offline against ``tests/fixtures/toolbox-contract.json`` and asserts an
-exact set of findings: the known drift is recorded here, and any *new* drift
+``scripts/check_capability_contract.py`` compares the two sides. CI runs it
+against the contract the Toolbox publishes (``contract/toolbox-contract.json``
+in its repository, #186). This module runs it offline against
+``tests/fixtures/toolbox-contract.json``, a copy of that file refreshed with
+``scripts/capture_toolbox_contract.py --ref develop``, and asserts an exact set
+of findings: the known drift is recorded here, and any *new* drift
 fails the suite. Fixing a finding requires removing it from the expected list,
 which is what makes the ratchet tighten over time.
 """
@@ -43,6 +46,7 @@ EXPECTED_UNCONSUMED = frozenset(
         "chem.recognize",
         "code.normalize",
         "music.omr",
+        "pdf.validate.pdf_ua",
         "text.postprocess",
     }
 )

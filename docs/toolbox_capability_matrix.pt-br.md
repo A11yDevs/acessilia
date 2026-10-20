@@ -15,9 +15,12 @@ acordo, então renomear uma capacidade no lado da Toolbox produzia um cliente qu
 podia falhar em tempo de execução — a falha aparecia como `ToolboxCapabilityError` em
 um documento de usuário, não como build quebrado.
 
-A matriz abaixo é o *contrato*. O verificador a compara com uma Toolbox em execução
-(`--url`) ou com o fixture capturado (`tests/fixtures/toolbox-contract.json`,
-regerado com `scripts/capture_toolbox_contract.py`).
+A matriz abaixo é o *contrato*. A Toolbox publica o lado dela como
+`contract/toolbox-contract.json`, no repositório e em cada release; a CI confere
+o registro do SDK contra o arquivo publicado na branch correspondente da
+Toolbox. O verificador também roda contra uma Toolbox em execução (`--url`) ou
+contra `tests/fixtures/toolbox-contract.json`, uma cópia do arquivo publicado
+atualizada com `scripts/capture_toolbox_contract.py --ref develop`.
 
 ## Pontos de acionamento exigidos por capacidade
 
@@ -71,6 +74,7 @@ Legenda de **Caminho de chamada**: como o core alcança a capacidade.
 | `code.normalize` | **ausente** | — | `pure-code` | pendente: cliente e obrigação/método/handler acionados por evidência |
 | `text.postprocess` | **ausente** | — | `pure-text` | pendente: cliente e obrigação/método/handler acionados por evidência |
 | `music.omr` | **ausente** | — | `homr`, `audiveris` | pendente: cliente e obrigação/método/handler acionados por evidência |
+| `pdf.validate.pdf_ua` | **ausente** | — | `verapdf` | pendente: o core poderia validar suas exportações PDF/UA antes de entregá-las |
 | `cache.get` / `cache.put` | — (interno) | — | `valkey` | cache interno da Toolbox; não é capacidade pública |
 
 ## Deriva confirmada (no momento da revisão)

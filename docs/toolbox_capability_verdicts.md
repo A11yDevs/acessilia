@@ -43,6 +43,7 @@ Checked against `https://www.acessilia3.inf.ufg.br/toolbox` on 2026-10-14:
 | `code.normalize` | Exposed by the Toolbox; core client and obligation/method/handler path are missing | Pending PDDL integration | Route observed code blocks to normalization and validate semantic preservation |
 | `text.postprocess` | Exposed by the Toolbox; core client and obligation/method/handler path are missing | Pending PDDL integration | Route text-noise signals to post-processing and validate the result |
 | `music.omr` | Exposed by the Toolbox; core client and obligation/method/handler path are missing | Pending PDDL integration | Route detected scores to OMR transcription and validate the musical artifact |
+| `pdf.validate.pdf_ua` | Exposed by the Toolbox (veraPDF sidecar, acessilia-toolbox#55); no core client | Not integrated | Decide whether the core validates each PDF/UA export and how a failed validation is reported |
 | `cache.get`, `cache.put` | Toolbox-internal implementation detail | Not a core capability | Keep internal; no core client is required |
 
 ## Release decision

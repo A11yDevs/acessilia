@@ -43,6 +43,7 @@ Verificado contra `https://www.acessilia3.inf.ufg.br/toolbox` em 2026-10-14:
 | `code.normalize` | Exposta pela Toolbox; falta cliente e caminho obrigação/método/handler | Pendente de integração PDDL | Ligar blocos de código observados à normalização e validar preservação semântica |
 | `text.postprocess` | Exposta pela Toolbox; falta cliente e caminho obrigação/método/handler | Pendente de integração PDDL | Ligar sinais de ruído textual à pós-correção e validar o texto resultante |
 | `music.omr` | Exposta pela Toolbox; falta cliente e caminho obrigação/método/handler | Pendente de integração PDDL | Ligar partituras detectadas à transcrição OMR e validar o artefato musical |
+| `pdf.validate.pdf_ua` | Exposta pela Toolbox (sidecar veraPDF, acessilia-toolbox#55); sem cliente no core | Não integrada | Decidir se o core valida cada exportação PDF/UA e como uma validação reprovada é reportada |
 | `cache.get`, `cache.put` | Detalhes de implementação internos da Toolbox | Não são capacidades do core | Manter internas; não é necessário cliente no core |
 
 ## Decisão para release

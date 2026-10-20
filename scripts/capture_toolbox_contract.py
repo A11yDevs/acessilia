@@ -1,14 +1,18 @@
-"""Capture the Toolbox capability/provider contract into a fixture.
+"""Refresh the Toolbox capability/provider contract fixture.
 
-Regenerates ``tests/fixtures/toolbox-contract.json`` from a running Toolbox so
-the offline contract check in CI keeps tracking the catalogue the core is
-expected to talk to. Only the identifiers the checker reads are kept; the
-Toolbox already masks provider credentials in ``/v1/providers``. When
-``TOOLBOX_API_KEY`` is set it is sent as a Bearer token.
+The Toolbox publishes its contract as ``contract/toolbox-contract.json`` in its
+repository and on every release (acessilia-toolbox#71); that file is the source
+of truth, and CI checks the SDK registry against it (#186).
+``tests/fixtures/toolbox-contract.json`` is a copy of it for the offline tests.
+
+``--ref`` copies the published file from a Toolbox branch or tag. ``--url``
+captures a running Toolbox instead, which also shows providers registered only
+in that deployment; when ``TOOLBOX_API_KEY`` is set it is sent as a Bearer
+token. Only the identifiers the checker reads are kept.
 
 Usage:
+    python scripts/capture_toolbox_contract.py --ref develop
     python scripts/capture_toolbox_contract.py --url http://localhost:8002
-    python scripts/capture_toolbox_contract.py --url https://host/toolbox --out tests/fixtures/toolbox-contract.json
 """
 
 from __future__ import annotations
@@ -23,6 +27,10 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUT = REPO_ROOT / "tests" / "fixtures" / "toolbox-contract.json"
+#: Where the Toolbox publishes its contract, per branch or tag.
+PUBLISHED_URL = (
+    "https://raw.githubusercontent.com/A11yDevs/acessilia-toolbox/{ref}/contract/toolbox-contract.json"
+)
 
 COMMENT = (
     "Toolbox capability/provider contract captured from a running toolbox. "
@@ -69,13 +77,31 @@ def build(url: str) -> dict:
     }
 
 
+def published(ref: str) -> dict:
+    """The contract the Toolbox publishes at ``ref``, with a comment naming it."""
+    data = _fetch(PUBLISHED_URL.format(ref=ref))
+    if not isinstance(data, dict) or "capabilities" not in data or "providers" not in data:
+        raise SystemExit(f"the Toolbox contract at {ref} is malformed")
+    return {
+        "_comment": (
+            f"Copy of the Toolbox's published contract (contract/toolbox-contract.json "
+            f"at {ref}). Refresh with scripts/capture_toolbox_contract.py --ref {ref}; "
+            "CI checks the SDK registry against the published file itself."
+        ),
+        "capabilities": data["capabilities"],
+        "providers": data["providers"],
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--url", required=True, help="base URL of a running Toolbox")
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--ref", help="Toolbox branch or tag whose published contract to copy")
+    source.add_argument("--url", help="base URL of a running Toolbox")
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
     args = parser.parse_args(argv)
 
-    payload = build(args.url)
+    payload = published(args.ref) if args.ref else build(args.url)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(
         json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
