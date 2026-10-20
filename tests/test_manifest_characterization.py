@@ -207,10 +207,11 @@ CASES: dict[str, tuple[list[ManifestElement], list[str]]] = {
         ),
         ["no-box", "no-box-2", "boxed"],
     ),
-    # Known defect, frozen for parity (#203, D6): with bottom-left boxes the
-    # mirrored tops are negative, the column pass starts at ``prev_top = -1.0``
-    # and takes none of them, so a page without a full-width banner keeps its
-    # input order. The same page in top-left boxes is read column by column.
+    # The column pass used to start at a fixed ``prev_top = -1.0``: with
+    # bottom-left boxes the mirrored tops are negative, the first band took
+    # none of them and a page without a full-width banner kept its input
+    # order. #214 starts the band at ``-inf``, so both origins read the same
+    # column-by-column order.
     "two columns without a banner, bottom-left": (
         [
             _element(row[0], row[1], origin="BOTTOMLEFT", reading_order=index)
@@ -224,7 +225,7 @@ CASES: dict[str, tuple[list[ManifestElement], list[str]]] = {
                 start=1,
             )
         ],
-        ["b1", "a1", "b2", "a2"],
+        ["a1", "a2", "b1", "b2"],
     ),
     "two columns without a banner, top-left": (
         _numbered(
@@ -463,21 +464,20 @@ def _wire(manifest: ProcessingManifest) -> dict:
 def test_refined_manifest_recomposes_page_element_ids(tmp_path: Path) -> None:
     manifest = _build(tmp_path, _two_page_response(), refine=True)
 
-    # Page 2 keeps the Toolbox order, not column order: its boxes are
-    # bottom-left, so their mirrored tops are negative, and the column pass
-    # only takes boxes below its ``prev_top = -1.0`` start. Every column then
-    # falls through to "unseen, in input order". This is today's behaviour,
-    # frozen for parity; fixing it is a separate change (#203, D6).
+    # Page 2 is read column by column now (#214): its boxes are bottom-left,
+    # so their mirrored tops are negative, and the column pass used to take
+    # only boxes below its ``prev_top = -1.0`` start, falling through to
+    # "unseen, in input order". The band starts at ``-inf`` instead.
     assert [element.id for element in manifest.elements] == [
         "element-000002", "element-000003", "element-000001",
-        "element-000004", "element-000005", "element-000006", "element-000007",
+        "element-000005", "element-000007", "element-000004", "element-000006",
         "element-000008",
     ]
     assert [element.reading_order for element in manifest.elements] == list(range(1, 9))
     assert {page.page_number: page.element_ids for page in manifest.pages} == {
         1: ["element-000002", "element-000003", "element-000001"],
-        2: ["element-000004", "element-000005", "element-000006",
-            "element-000007", "element-000008"],
+        2: ["element-000005", "element-000007", "element-000004",
+            "element-000006", "element-000008"],
     }
 
 
