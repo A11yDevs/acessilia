@@ -17,6 +17,7 @@ Núcleo puro de processamento estrutural de documentos do Acessilia.
 |---|---|
 | `docstruct.types` | `BBox`, `CanonicalBlock`, `CanonicalDocument`, `Region`, `BlockPairing`, `OrientationResult` |
 | `docstruct.geometry` | `content_fingerprint`, `overlaps_clean`, `merge_bboxes`, `union`, `intersection_area` |
+| `docstruct.geometry.boxes` | `OrientedBox`, `is_bottom_left` — caixas que mantêm a origem de coordenadas (`TOPLEFT`, `BOTTOMLEFT`, `UNKNOWN`), com conversões de cima para baixo e em frações da página |
 | `docstruct.geometry.reading_order` | `refine_reading_order` — refinamento de ordem de leitura sensível a colunas com isolamento de marginais e particionamento em 2/3 colunas |
 | `docstruct.policy` | `FusionPolicy` (+ presets: `drbench_v12`, `drbench_v13`) |
 | `docstruct.fusion` | `merge_blocks`, `block_to_diff`, `DiffBlock`, `ProviderBlocks`, `quality`, `is_junk` |

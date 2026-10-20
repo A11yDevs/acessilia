@@ -6,6 +6,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from backend.i18n import t
+from docstruct.geometry.boxes import is_bottom_left  # noqa: F401  (re-exported)
 from backend.log_messages import MSG_PLANNER_NOT_STARTED
 
 
@@ -46,20 +47,6 @@ class BoundingBox(StrictModel):
     right: float
     bottom: float
     coord_origin: Literal["TOPLEFT", "BOTTOMLEFT", "UNKNOWN"] = "UNKNOWN"
-
-
-def is_bottom_left(coord_origin: str | None, top: float, bottom: float) -> bool:
-    """Whether a box's y axis grows upwards (the PDF/Docling default).
-
-    An explicit origin wins. An unknown or missing one is decided by the
-    geometry: with y growing upwards the top edge has the larger value.
-    """
-    origin = str(coord_origin or "UNKNOWN").upper()
-    if origin == "BOTTOMLEFT":
-        return True
-    if origin == "TOPLEFT":
-        return False
-    return top > bottom
 
 
 class Provenance(StrictModel):
