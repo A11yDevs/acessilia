@@ -187,6 +187,15 @@ from backend.log_messages import (
     MSG_OBSERVATION_PAGE_WITHOUT_STRUCTURE,
     MSG_HEADING_GAP,
 )
+from backend.core.manifest.models import (
+    MSG_CHAR_RANGE_REVERSED,
+    MSG_DUPLICATE_ELEMENT_IDS,
+    MSG_DUPLICATE_PAGE_NUMBERS,
+    MSG_PAGE_UNKNOWN_ELEMENTS,
+    MSG_PARENT_CYCLE,
+    MSG_SELF_PARENT,
+    MSG_UNKNOWN_PARENT,
+)
 from backend.pipeline.validators import (
     MSG_BLOCK_NOT_ALLOWED_IN_PROFILE,
     MSG_CANONICAL_DOC_NOT_OBJECT,
@@ -838,6 +847,15 @@ MESSAGES: tuple[str, ...] = (
     LOG_ORCHESTRATOR_EMPTY_AGENT_RESPONSE,
     LOG_STALE_PROCESS_INTERRUPTED,
     LOG_AGNO_NOT_INSTALLED,
+    # Document invariants of the processing manifest (docstruct.manifest), raised
+    # by ProcessingManifest's validator in backend/core/manifest/models.py.
+    MSG_DUPLICATE_ELEMENT_IDS,
+    MSG_UNKNOWN_PARENT,
+    MSG_SELF_PARENT,
+    MSG_PARENT_CYCLE,
+    MSG_DUPLICATE_PAGE_NUMBERS,
+    MSG_PAGE_UNKNOWN_ELEMENTS,
+    MSG_CHAR_RANGE_REVERSED,
 )
 
 #: msgid -> localized text mappings per non-default locale; every id in MESSAGES must appear for each such locale.
@@ -1654,6 +1672,14 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "Agno não está instalado. Execute `uv sync` antes de usar "
             "o workflow Executor."
         ),
+        # Document invariants of the processing manifest (docstruct.manifest).
+        MSG_DUPLICATE_ELEMENT_IDS: "IDs de elementos duplicados: {element_ids}",
+        MSG_UNKNOWN_PARENT: "Elemento {element_id} referencia pai inexistente: {parent_id}",
+        MSG_SELF_PARENT: "Elemento {element_id} é pai de si mesmo",
+        MSG_PARENT_CYCLE: "Ciclo detectado na hierarquia de elementos",
+        MSG_DUPLICATE_PAGE_NUMBERS: "Números de página duplicados",
+        MSG_PAGE_UNKNOWN_ELEMENTS: "Página {page_number} referencia elementos inexistentes: {element_ids}",
+        MSG_CHAR_RANGE_REVERSED: "{path} termina em {char_end}, antes do início {char_start}",
     },
 }
 

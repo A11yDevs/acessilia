@@ -1667,6 +1667,32 @@ msgstr "Stale: process interrupted"
 msgid "Agno is not installed. Run `uv sync` before using the workflow Executor."
 msgstr "Agno is not installed. Run `uv sync` before using the workflow Executor."
 
+#, python-brace-format
+msgid "Duplicate element ids: {element_ids}"
+msgstr "Duplicate element ids: {element_ids}"
+
+#, python-brace-format
+msgid "Element {element_id} references a missing parent: {parent_id}"
+msgstr "Element {element_id} references a missing parent: {parent_id}"
+
+#, python-brace-format
+msgid "Element {element_id} is its own parent"
+msgstr "Element {element_id} is its own parent"
+
+msgid "Cycle detected in the element hierarchy"
+msgstr "Cycle detected in the element hierarchy"
+
+msgid "Duplicate page numbers"
+msgstr "Duplicate page numbers"
+
+#, python-brace-format
+msgid "Page {page_number} references unknown elements: {element_ids}"
+msgstr "Page {page_number} references unknown elements: {element_ids}"
+
+#, python-brace-format
+msgid "{path} ends at {char_end}, before its start {char_start}"
+msgstr "{path} ends at {char_end}, before its start {char_start}"
+
 msgid "document"
 msgid_plural "documents"
 msgstr[0] "document"

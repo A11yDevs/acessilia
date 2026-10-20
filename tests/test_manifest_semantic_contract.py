@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -150,6 +151,7 @@ BROKEN = {
     "page number 0 in provenance": _set("elements.0.provenance.0.page_number", 0),
     "unknown coordinate origin": _set("elements.0.provenance.0.bbox.coord_origin", "CENTER"),
     "negative char offset": _set("elements.0.provenance.0.char_start", -1),
+    "reversed char range": lambda p: p["elements"][0]["provenance"][0].update(char_start=5, char_end=2),
     "one-letter language": _set("language", "p"),
     "empty title": _set("title", ""),
 }
@@ -200,3 +202,36 @@ def test_core_adapter_revalidates_the_whole_manifest() -> None:
 
     with pytest.raises(ValidationError):
         with_structured_document(manifest, document)
+
+
+DOCUMENT_INVARIANT_MESSAGES = {
+    "duplicate element id": ("MSG_DUPLICATE_ELEMENT_IDS", {"element_ids": ["element-000002"]}),
+    "missing parent": ("MSG_UNKNOWN_PARENT", {"element_id": "element-000002", "parent_id": "nowhere"}),
+    "own parent": ("MSG_SELF_PARENT", {"element_id": "element-000002"}),
+    "parent cycle": ("MSG_PARENT_CYCLE", {}),
+    "duplicate page number": ("MSG_DUPLICATE_PAGE_NUMBERS", {}),
+    "page lists an unknown element": (
+        "MSG_PAGE_UNKNOWN_ELEMENTS", {"page_number": 1, "element_ids": ["ghost"]},
+    ),
+    "reversed char range": (
+        "MSG_CHAR_RANGE_REVERSED",
+        {"path": "elements[0].provenance[0]", "char_start": 5, "char_end": 2},
+    ),
+}
+
+
+@pytest.mark.parametrize("locale", ["en_US", "pt_BR"])
+@pytest.mark.parametrize("case", list(DOCUMENT_INVARIANT_MESSAGES))
+def test_core_reports_docstruct_invariants_in_the_active_locale(monkeypatch, locale, case):
+    import docstruct.manifest as model
+    from backend.i18n import t
+    from scripts.gen_locale_catalogs import TRANSLATIONS
+
+    monkeypatch.setenv("LOCALE", locale)
+    name, kwargs = DOCUMENT_INVARIANT_MESSAGES[case]
+    msgid = getattr(model, name)
+    expected = (TRANSLATIONS["pt_BR"][msgid] if locale == "pt_BR" else msgid).format(**kwargs)
+
+    assert t(msgid).format(**kwargs) == expected
+    with pytest.raises(ValidationError, match=re.escape(expected)):
+        ProcessingManifest.model_validate(_break(BROKEN[case]))
