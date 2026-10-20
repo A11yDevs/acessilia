@@ -140,6 +140,14 @@ WEB_AGENT_DATA_INSTRUCTIONS_FALLBACK: str = (
 # Private job receipt and result recovery.
 WEB_JOB_TITLE = "Your document"
 WEB_JOB_PENDING = "Keep this page open or bookmark it to follow your document."
+#: Notice telling the user they may close the page; the result is also delivered by email.
+#: {days} is filled at render time with the download-token expiry
+#: (backend.services.download_token_service.TOKEN_EXPIRY_DAYS) so the text never
+#: contradicts how long links and the receipt cookie actually last.
+WEB_JOB_CLOSE_INFO = (
+    "You can safely close this window. The result will also be sent to your "
+    "email address, and this page stays available in this browser for {days} days."
+)
 WEB_JOB_DOWNLOAD = "Download your files"
 WEB_JOB_EMAIL_FAILED = "The email could not be sent. You can download your files here."
 WEB_JOB_EMAIL_SENT = "The result email was sent. You can also download your files here."

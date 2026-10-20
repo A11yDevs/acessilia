@@ -127,6 +127,30 @@ def test_catalog_validator_flags_missing_translations() -> None:
     assert sorted(problems_partial) == sorted(expected_missing)
 
 
+def test_every_web_message_constant_has_a_pt_br_translation() -> None:
+    """
+    Every WEB_* user-facing constant exported by frontend.web.messages must be
+    registered in the generator's TRANSLATIONS table, otherwise it ships as the
+    untranslated English msgid to pt_BR users. This is the regression guard for
+    exactly what happened to WEB_JOB_CLOSE_INFO: a new constant added to
+    messages.py but never to gen_locale_catalogs, which the catalog-drift tests
+    could not catch because the msgid was absent from both sides.
+    """
+    import frontend.web.messages as web_messages
+
+    web_ids = {
+        value for name, value in vars(web_messages).items()
+        if name.startswith("WEB_") and isinstance(value, str)
+    }
+    assert web_ids, "frontend.web.messages must export WEB_* message constants"
+    pt_br = gen_locales.TRANSLATIONS["pt_BR"]
+    missing = sorted(web_ids - set(pt_br))
+    assert not missing, (
+        "WEB_* constants without a pt_BR entry in gen_locale_catalogs."
+        f"TRANSLATIONS: {missing}"
+    )
+
+
 def test_default_checked_in_catalog_tree_is_generated_by_repo_layout(tmp_path: Path) -> None:
     """Check the production location and generate its layout without rewriting tracked catalogs."""
     assert gen_locales.DEFAULT_LOCALES_DIR.resolve() == DEFAULT_REPOS_CATALOGS_DIR.resolve()

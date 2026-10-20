@@ -47,6 +47,16 @@ msgstr ""
 "Mantenha esta página aberta ou salve-a nos favoritos para acompanhar seu "
 "documento."
 
+#, python-brace-format
+msgid ""
+"You can safely close this window. The result will also be sent to your "
+"email address, and this page stays available in this browser for {days} "
+"days."
+msgstr ""
+"Você pode fechar esta janela com segurança. O resultado também será "
+"enviado para o seu e-mail, e esta página fica disponível neste navegador "
+"por {days} dias."
+
 msgid "Download your files"
 msgstr "Baixar seus arquivos"
 
