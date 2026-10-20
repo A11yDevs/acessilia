@@ -162,6 +162,19 @@ Implementação e critérios de aceite:
    tratamento de erros, indisponibilidade e resultados do `math.convert` e
    do `math.verbalize`.
 
+**Alcance da decisão 1, como a migração a aplica ([#203](https://github.com/A11yDevs/acessilia/issues/203)):**
+
+- Só o modelo semântico vai para a docstruct. O `ProcessingManifest` do core
+  também carrega estado de processo (obrigações, tentativas, status,
+  dependências, histórico); esse estado, e o manifesto como um todo, ficam no
+  core, que divide o `backend/core/manifest/models.py` em vez de
+  substituí-lo. Campos de identificação e origem são classificados um a um;
+  eles não são semântica estrutural por padrão.
+- Três versões são independentes: o schema `processing-manifest:1.1.0` do
+  core, o contrato `artifact/structured-document@1` da Toolbox e a versão do
+  pacote docstruct. Um bump da biblioteca nunca muda sozinho um payload de
+  wire; uma mudança de payload exige migração e versão próprias.
+
 **Concluído quando** existir uma única definição semântica dos modelos
 compartilhados, o payload da Toolbox continuar compatível, o core obtiver
 MathML e texto falado exclusivamente pelo `math.convert` e pelo

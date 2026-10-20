@@ -51,6 +51,9 @@ Cada contrato tem exatamente um dono. Os demais o consomem e não o redefinem:
 - A allowlist escrita à mão no SDK continua até existir a geração a partir dos
   schemas da Toolbox; enquanto isso, o script de contrato a mantém honesta.
 - As releases da docstruct são coordenadas: a Toolbox fixa uma wheel da
-  docstruct por versão e hash. Hoje ela fixa a v0.1.0 enquanto o core usa a
-  0.2.0, então uma release e um bump na Toolbox são necessários antes que os
-  modelos compartilhados possam convergir.
+  docstruct por versão e hash. Hoje o core (editável, a partir de
+  `libs/docstruct`) e a Toolbox (wheel e SHA-256 em `pyproject.toml` e
+  `uv.lock`) usam a 0.3.0. Os modelos compartilhados convergem na próxima
+  release, a 0.4.0: URL da wheel, versão, hash e `uv.lock` da Toolbox são
+  atualizados juntos, e os testes de integração entre os repositórios passam
+  antes que qualquer código de compatibilidade seja removido ([#203](https://github.com/A11yDevs/acessilia/issues/203)).

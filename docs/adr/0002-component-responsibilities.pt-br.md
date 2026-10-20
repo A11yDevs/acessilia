@@ -72,17 +72,24 @@ num provider da Toolbox).
 - **Garantido hoje:**
   - `tests/test_architecture_layers.py` (o core não importa a Toolbox).
   - `libs/docstruct/tests/test_purity.py` (a docstruct não importa o core, o
-    SDK nem a Toolbox).
-  - `libs/sdk/tests/test_purity.py` (o SDK não importa o core nem a Toolbox).
+    SDK nem a Toolbox, não declara dependência de runtime e não importa nada
+    fora da biblioteca padrão, exceto aceleradores opcionais protegidos, como
+    o `rapidfuzz`).
+  - `libs/sdk/tests/test_purity.py` (o SDK não importa o core nem a Toolbox,
+    e suas dependências ficam restritas a `httpx` e à docstruct).
 - **Previsto na #152:**
-  - um teste na Toolbox que proíba imports de `acessilia_sdk` e `backend`;
-  - um teste na docstruct que recuse qualquer import fora da biblioteca
-    padrão;
-  - uma verificação de que as dependências do SDK ficam restritas a `httpx` e
-    à docstruct.
-- **Desvios conhecidos:**
-  - O core ainda implementa executores operacionais (veja o
+  - um teste na Toolbox que proíba imports de `acessilia_sdk` e `backend`.
+- **Desvios conhecidos, registrados na [#203](https://github.com/A11yDevs/acessilia/issues/203):**
+  - O core ainda roda dois executores operacionais, o renderizador de PDF com
+    `reportlab` e o exportador de áudio com `edge-tts` (veja o
     [ADR-0003](0003-remote-only-operational-capabilities.pt-br.md)).
-  - Há código estrutural duplicado entre o core e a Toolbox: o manifest
-    builder e seus modelos, o agrupamento de callouts e a classificação de
-    mídias. Eles estão registrados na auditoria da #152.
+  - Os modelos semânticos do manifesto existem no core e na Toolbox.
+  - O agrupamento de callouts está implementado no builder de normalização
+    da Toolbox e em `docstruct.regions.grouping`.
+  - Alguns algoritmos puros ainda têm uma cópia no core ao lado da
+    docstruct: os perfis de exportação, a normalização conservadora de LaTeX
+    e a ordem de leitura do manifest builder.
+  - A classificação de mídias não está mais duplicada: o `media.inspect` roda
+    só na Toolbox desde a #160. Ele inspeciona mídias e artefatos, um papel
+    diferente do de `docstruct.regions.classify`, que classifica regiões
+    estruturais.
