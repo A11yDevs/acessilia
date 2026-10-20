@@ -2,7 +2,7 @@
 
 Também disponível em **inglês (EUA)**: [English version](constitution.md)
 
-- **Versão:** 2.0.1 (2026-10-19). Veja no [histórico de alterações](#9-histórico-de-alterações)
+- **Versão:** 2.0.2 (2026-10-20). Veja no [histórico de alterações](#9-histórico-de-alterações)
   como as versões são numeradas.
 
 ## 1. Propósito
@@ -132,7 +132,9 @@ capacidades operacionais.
      mesma implementação; os componentes reutilizam bibliotecas compartilhadas
      em vez de copiar código.
    - **Detalhe:** [ADR-0002](adr/0002-component-responsibilities.pt-br.md).
-   - **Verificado por:** revisão e o inventário de duplicações da #152.
+   - **Verificado por:** revisão, com o checklist de conformidade do template
+     de pull request, e o inventário de duplicações da
+     [auditoria de outubro de 2026](architecture/audit-2026-10.pt-br.md).
 2. **P2 — Separação de responsabilidades.**
    - **Regra:** o core reúne agentes, planejamento, estratégias, políticas e
      fluxos. O SDK reúne contratos, clientes, adaptadores, referências de
@@ -157,9 +159,11 @@ capacidades operacionais.
      core não acrescenta fallbacks locais nem instala dependência pesada só
      para oferecer um.
    - **Detalhe:** [ADR-0003](adr/0003-remote-only-operational-capabilities.pt-br.md).
-   - **Verificado por:** revisão e testes arquiteturais previstos que proíbem
-     imports pesados e subprocessos de ferramentas no core, com uma allowlist
-     que só pode diminuir.
+   - **Verificado por:** revisão e o `tests/test_architecture_layers.py`,
+     que falha se `backend/` importar o pacote da Toolbox, ou se `backend/`
+     ou `frontend/` importar uma biblioteca operacional. Ele não tem lista de
+     exceções: uma exceção exige uma ADR, e uma lista de exceções, depois de
+     criada, só pode diminuir.
 5. **P5 — Processamento orientado a referências.**
    - **Regra:** artefatos persistidos são processados onde estão armazenados e
      trafegam como referências `ArtifactRef` tipadas e opacas. A materialização
@@ -221,6 +225,10 @@ As versões seguem `MAJOR.MINOR.PATCH`:
 
 O texto sem versão anterior a 2026-10-18 conta como **1.0.0**.
 
+- **2.0.2 (2026-10-20):** a P1 e a P4 passam a apontar as verificações que
+  agora existem: o checklist de conformidade do template de pull request, a
+  auditoria de outubro de 2026 e o teste de imports operacionais. Nenhum
+  princípio muda.
 - **2.0.1 (2026-10-19):** removidos o ReaderAgent e o EditorAgent da camada
   de agentes em 3.1 e da fase de extração em 4.1, junto com o motor legacy
   desativado ao qual pertenciam. Nenhum princípio muda.

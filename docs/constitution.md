@@ -2,7 +2,7 @@
 
 You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](constitution.pt-br.md)
 
-- **Version:** 2.0.1 (2026-10-19). See the [changelog](#9-changelog) for how
+- **Version:** 2.0.2 (2026-10-20). See the [changelog](#9-changelog) for how
   versions are numbered.
 
 ## 1. Purpose
@@ -132,7 +132,9 @@ Toolbox executes operational capabilities.
      same implementation; components reuse shared libraries instead of copying
      code.
    - **Detail:** [ADR-0002](adr/0002-component-responsibilities.md).
-   - **Checked by:** review, and the duplication inventory of #152.
+   - **Checked by:** review, with the conformance checklist of the pull
+     request template, and the duplication inventory of the
+     [October 2026 audit](architecture/audit-2026-10.md).
 2. **P2 — Separation of responsibilities.**
    - **Rule:** the core holds agents, planning, strategies, policies and
      flows. The SDK holds contracts, clients, adapters, artifact references and
@@ -156,9 +158,11 @@ Toolbox executes operational capabilities.
      The core adds no local fallbacks and installs no heavy dependency only to
      offer one.
    - **Detail:** [ADR-0003](adr/0003-remote-only-operational-capabilities.md).
-   - **Checked by:** review, and planned architecture tests that forbid heavy
-     imports and tool subprocesses in the core, with an allowlist that can only
-     shrink.
+   - **Checked by:** review, and
+     `tests/test_architecture_layers.py`, which fails if `backend/` imports
+     the Toolbox package, or if `backend/` or `frontend/` imports an
+     operational library. It has no allowlist: an exception needs an ADR,
+     and an allowlist, once added, can only shrink.
 5. **P5 — Reference-oriented processing.**
    - **Rule:** persisted artifacts are processed where they are stored and
      passed as typed, opaque `ArtifactRef` references. Materialization is
@@ -219,6 +223,9 @@ Versions follow `MAJOR.MINOR.PATCH`:
 
 The unversioned text before 2026-10-18 counts as **1.0.0**.
 
+- **2.0.2 (2026-10-20):** P1 and P4 point at the checks that now exist: the
+  pull request template's conformance checklist, the October 2026 audit, and
+  the operational-import test. No principle changes.
 - **2.0.1 (2026-10-19):** removed the ReaderAgent and EditorAgent from the
   agent layer in 3.1 and from the extraction phase in 4.1, together with the
   disabled legacy engine they belonged to. No principle changes.
