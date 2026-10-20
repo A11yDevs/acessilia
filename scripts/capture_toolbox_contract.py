@@ -8,7 +8,8 @@ of truth, and CI checks the SDK registry against it (#186).
 ``--ref`` copies the published file from a Toolbox branch or tag. ``--url``
 captures a running Toolbox instead, which also shows providers registered only
 in that deployment; when ``TOOLBOX_API_KEY`` is set it is sent as a Bearer
-token. Only the identifiers the checker reads are kept.
+token. Both paths keep only the fields the checker reads, with entries and
+lists sorted so repeated captures of the same state produce identical files.
 
 Usage:
     python scripts/capture_toolbox_contract.py --ref develop
@@ -51,13 +52,10 @@ def _fetch(url: str) -> object:
         raise SystemExit(f"cannot reach the Toolbox at {url}: {exc}")
 
 
-def build(url: str) -> dict:
-    base = url.rstrip("/")
-    capabilities = _fetch(f"{base}/v1/capabilities")
-    providers = _fetch(f"{base}/v1/providers")
-
+def _normalize(capabilities: list, providers: list) -> dict:
+    """Only the fields the checker reads, sorted so repeated captures of the
+    same state produce identical files no matter which path produced them."""
     return {
-        "_comment": COMMENT,
         # One entry per published version, as /v1/capabilities lists them: the
         # core checks the exact contract version it was written against.
         "capabilities": [
@@ -77,19 +75,30 @@ def build(url: str) -> dict:
     }
 
 
+def build(url: str) -> dict:
+    base = url.rstrip("/")
+    capabilities = _fetch(f"{base}/v1/capabilities")
+    providers = _fetch(f"{base}/v1/providers")
+
+    return {"_comment": COMMENT, **_normalize(capabilities, providers)}
+
+
 def published(ref: str) -> dict:
-    """The contract the Toolbox publishes at ``ref``, with a comment naming it."""
+    """The contract the Toolbox publishes at ``ref``, normalized like ``build``."""
     data = _fetch(PUBLISHED_URL.format(ref=ref))
-    if not isinstance(data, dict) or "capabilities" not in data or "providers" not in data:
+    if (
+        not isinstance(data, dict)
+        or not isinstance(data.get("capabilities"), list)
+        or not isinstance(data.get("providers"), list)
+    ):
         raise SystemExit(f"the Toolbox contract at {ref} is malformed")
     return {
         "_comment": (
-            f"Copy of the Toolbox's published contract (contract/toolbox-contract.json "
+            "Copy of the Toolbox's published contract (contract/toolbox-contract.json "
             f"at {ref}). Refresh with scripts/capture_toolbox_contract.py --ref {ref}; "
             "CI checks the SDK registry against the published file itself."
         ),
-        "capabilities": data["capabilities"],
-        "providers": data["providers"],
+        **_normalize(data["capabilities"], data["providers"]),
     }
 
 

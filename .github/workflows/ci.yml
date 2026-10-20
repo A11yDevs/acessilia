@@ -64,11 +64,13 @@ jobs:
             main|release/*) TOOLBOX_REF=main ;;
             *) TOOLBOX_REF=develop ;;
           esac
+          # Same URL as PUBLISHED_URL in scripts/capture_toolbox_contract.py.
+          # curl stays here for --retry, which the script's urllib fetch lacks.
           url="https://raw.githubusercontent.com/A11yDevs/acessilia-toolbox/${TOOLBOX_REF}/contract/toolbox-contract.json"
           echo "Toolbox contract: $url"
           if ! curl --fail --silent --show-error --location --retry 3 \
               --output "$RUNNER_TEMP/toolbox-contract.json" "$url"; then
-            echo "::error::The Toolbox does not publish contract/toolbox-contract.json on ${TOOLBOX_REF}."
+            echo "::error::Failed to download the Toolbox contract from ${TOOLBOX_REF} (missing file or network error; see the curl output above)."
             exit 1
           fi
           python scripts/check_capability_contract.py --snapshot "$RUNNER_TEMP/toolbox-contract.json"
