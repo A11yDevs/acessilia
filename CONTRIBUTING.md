@@ -358,7 +358,7 @@ uv run pytest
 ## Pull requests
 
 1. Make sure your branch is up to date with `develop` (`git rebase origin/develop`).
-2. Run `uv run pytest` and confirm all tests pass.
+2. Run `uv run pytest` and confirm all tests pass. Code, docs and the PR are written in English (constitution, principle 2.8): `tests/test_no_portuguese.py` fails on new Portuguese text anywhere in the repository. Intentional Portuguese (user-facing strings, detection patterns, `*.pt-br.md` mirrors) gets an exemption in that test. When you clean a file listed in `tests/fixtures/portuguese_allowlist.json`, lower its count there.
 3. Fill in the [pull request template](.github/pull_request_template.md): why, what changes, how you verified it, and the **architecture conformance checklist** (principles P1–P9 of the [constitution](docs/constitution.md)).
 4. Reference any related issues. `Closes #42` closes the issue only when the PR merges into `main`, the default branch; for a PR into `develop`, close the issue by hand after the merge.
 5. Wait for review and adjust if needed.
