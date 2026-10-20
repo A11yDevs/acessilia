@@ -69,6 +69,27 @@ class TestMultiColumnReadingOrder:
 
         assert ids == ["c1_1", "c1_2", "c2_1", "c2_2", "c3_1", "c3_2"]
 
+    def test_short_right_column_headings_stay_two_columns(self):
+        # Mixed widths: short headings in both columns and right-column
+        # figures must not read as a phantom middle column (review of #214).
+        # The three-column test counted the short right-column headings as
+        # middle-column candidates; the three groups must be x-disjoint.
+        h1 = CanonicalBlock(id="h1", type="heading", text="H1", bbox=(0.0, 100.0, 150.0, 140.0), page_index=1)
+        p1 = CanonicalBlock(id="p1", type="paragraph", text="P1", bbox=(0.0, 160.0, 290.0, 400.0), page_index=1)
+        h2 = CanonicalBlock(id="h2", type="heading", text="H2", bbox=(0.0, 420.0, 150.0, 460.0), page_index=1)
+        p2 = CanonicalBlock(id="p2", type="paragraph", text="P2", bbox=(0.0, 480.0, 290.0, 720.0), page_index=1)
+        h3 = CanonicalBlock(id="h3", type="heading", text="H3", bbox=(310.0, 100.0, 420.0, 140.0), page_index=1)
+        p3 = CanonicalBlock(id="p3", type="paragraph", text="P3", bbox=(310.0, 160.0, 600.0, 400.0), page_index=1)
+        h4 = CanonicalBlock(id="h4", type="heading", text="H4", bbox=(310.0, 420.0, 420.0, 460.0), page_index=1)
+        figure = CanonicalBlock(id="figure", type="picture", text="", bbox=(400.0, 480.0, 560.0, 560.0), page_index=1)
+        caption = CanonicalBlock(id="caption", type="caption", text="Cap", bbox=(380.0, 580.0, 580.0, 620.0), page_index=1)
+        p4 = CanonicalBlock(id="p4", type="paragraph", text="P4", bbox=(310.0, 640.0, 600.0, 700.0), page_index=1)
+
+        refined = refine_reading_order([p4, caption, figure, h4, p3, h3, p2, h2, p1, h1])
+        ids = [b.id for b in refined]
+
+        assert ids == ["h1", "p1", "h2", "p2", "h3", "p3", "h4", "figure", "caption", "p4"]
+
     def test_full_width_banner_splits_sections(self):
         title = CanonicalBlock(id="title", type="heading", text="Full Title", bbox=(50.0, 50.0, 500.0, 80.0), page_index=1)
         c1_top = CanonicalBlock(id="c1_top", type="paragraph", text="Col 1 Top", bbox=(50.0, 100.0, 250.0, 200.0), page_index=1)
