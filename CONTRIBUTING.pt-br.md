@@ -115,32 +115,23 @@ Após o merge de um PR na `develop`, a **esteira de CD** (`.github/workflows/del
 constrói automaticamente uma imagem Docker e a publica no GHCR com as tags
 `develop` e `sha-<commit>`.
 
-O ambiente de homologação usa um **timer systemd** (`staging-update.timer`) que
-verifica a cada 60s se há uma nova imagem e reinicia o container automaticamente.
-Veja [docs/homologacao-systemd.md](docs/homologacao-systemd.md) para instruções
-detalhadas de instalação e gerenciamento.
-
-O setup completo do ambiente de homologação está em:
+O servidor de homologação roda a partir de um clone deste repositório e de um user timer
+do systemd (`acessilia-staging-update.timer`) que consulta a branch rastreada a cada
+5 minutos e atualiza o container quando a imagem de um commit novo está no GHCR. O
+`scripts/ops.sh` instala e opera esse ambiente; veja
+[docs/homologacao-systemd.pt-br.md](docs/homologacao-systemd.pt-br.md).
 
 - `docker-compose.staging.yml` — define o container
-- `scripts/staging-update.sh` — script de atualização
-- `scripts/setup-homologacao.sh` — script de configuração inicial
+- `scripts/ops.sh` — `auto-update setup|status|start|migrate`, `track` e os comandos de BHS
+- `scripts/staging-update.sh` — a atualização em si, rodada pelo `ops.sh auto-update start`
 
 ```bash
 # Consultar qual imagem está no ar (via API de health)
 curl http://homologacao:8000/api/v1/health | jq .
 
-# Ou puxar manualmente uma imagem específica para testar
- docker pull ghcr.io/a11ydevs/acessilia:sha-abc1234
-
-# Verificar qual tag está rodando no container
-docker inspect acessilia-staging | jq '.[0].Config.Image'
+# Ou, no servidor, o quadro completo
+./scripts/ops.sh auto-update status
 ```
-
-O setup completo do ambiente de homologação está em:
-
-- `docker-compose.staging.yml` — define o container + Watchtower
-- `scripts/setup-homologacao.sh` — script de configuração inicial
 
 ### 5.1 Bug Hunting/Squashing (BHS)
 
@@ -156,7 +147,7 @@ BHS juntos, com a mesma versão. **Corte o Toolbox primeiro**: o CI confere uma
 1. **Cut** — no início do BHS:
 
    ```bash
-   ./scripts/start_bhs_cycle.sh 0.2.0
+   ./scripts/ops.sh bhs start 0.2.0
    ```
 
    O script deriva `release/0.2.0` de `origin/develop`, faz nela o commit do
@@ -175,23 +166,25 @@ BHS juntos, com a mesma versão. **Corte o Toolbox primeiro**: o CI confere uma
    - A **esteira de CD** (`delivery.yml`) publica a imagem da `release/0.2.0` no
      GHCR com as tags `release-0.2.0` e `sha-<commit>`.
 
-3. **Staging aponta para a release** — defina `TRACK_BRANCH=release/0.2.0` no
-   `.env` do servidor de homologação e atualize os scripts, para que
-   `scripts/staging-update.sh` passe a rastrear a branch de release (tag de
-   imagem `release-0.2.0`) em vez da `develop`:
+3. **Staging aponta para a release** — no servidor de homologação, dentro do
+   clone (o Toolbox primeiro):
 
    ```bash
-   echo "TRACK_BRANCH=release/0.2.0" >> .env
-   ./scripts/update_scripts.sh
+   ./scripts/ops.sh track release/0.2.0
    ```
+
+   Ele faz checkout e pull da `release/0.2.0`, grava `TRACK_BRANCH` (e
+   `TRACK_TAG`) no `.env` e atualiza, e o staging passa a rodar a imagem
+   `release-0.2.0`. Rode `./scripts/ops.sh bhs status` na sua máquina para ver
+   o CI, a imagem e os PRs da release.
 
 4. **Fechamento do BHS** — quando a release estiver estável (feche o Toolbox
    primeiro: o CI da `main` confere o contrato da `main` do Toolbox):
 
    ```bash
-   ./scripts/finish_bhs_cycle.sh 0.2.0            # abre release/0.2.0 → main e chore/sync-release-0.2.0 → develop
+   ./scripts/ops.sh bhs finish 0.2.0            # abre release/0.2.0 → main e chore/sync-release-0.2.0 → develop
    # revise e mescle os dois PRs (release → main com "Create a merge commit")
-   ./scripts/finish_bhs_cycle.sh 0.2.0 --cleanup  # cria a tag v0.2.0 no merge da main e apaga as branches
+   ./scripts/ops.sh bhs finish 0.2.0 --cleanup  # cria a tag v0.2.0 no merge da main e apaga as branches
    ```
 
    As correções chegam à `develop` por `chore/sync-release-0.2.0`, derivada da
@@ -199,8 +192,9 @@ BHS juntos, com a mesma versão. **Corte o Toolbox primeiro**: o CI confere uma
    `release/0.2.0`, que vai para a `main`. Rodar o script de novo leva para a
    sync os fixes mesclados depois.
 
-   Depois, remova `TRACK_BRANCH` do `.env` de homologação para que o staging
-   volte a rastrear a `develop`.
+   Depois, no servidor de homologação, `./scripts/ops.sh track develop` volta a
+   rastrear a `develop` (só depois do merge do PR de sync: o `track` recusa uma
+   branch sem `scripts/ops.sh`).
 
 ### 5.2 Bibliotecas em `libs/` (docstruct e SDK)
 
@@ -232,7 +226,7 @@ Apenas mantenedores ([@marceloakira](https://github.com/marceloakira),
 [@fragaeduardo](https://github.com/fragaeduardo)) podem mesclar uma release na `main`.
 
 1. **QA homologou o BHS?** → siga em frente.
-2. Rode `./scripts/finish_bhs_cycle.sh x.y.z`, que abre o Pull Request de
+2. Rode `./scripts/ops.sh bhs finish x.y.z`, que abre o Pull Request de
    `release/x.y.z` para `main`.
 3. Solicite revisão de outro mantenedor.
 4. Após aprovação, faça o merge com **"Create a merge commit"**: a release
@@ -245,7 +239,7 @@ A versão já foi atualizada na branch de release no cut. Para criar a
 
 ```bash
 # 1. Crie a tag no merge da main (também apaga release/x.y.z e a branch de sync)
-./scripts/finish_bhs_cycle.sh 0.2.0 --cleanup
+./scripts/ops.sh bhs finish 0.2.0 --cleanup
 
 # 2. O workflow Release (release.yml) builda e publica 0.2.0, 0.2 e 0
 #    no GHCR, e cria a GitHub Release com changelog automático

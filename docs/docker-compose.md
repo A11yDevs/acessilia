@@ -193,12 +193,12 @@ via a systemd timer. The script consults the **GitHub API** every
 **5 minutes** and only runs `docker pull` when there is a new commit on `develop`.
 
 ```bash
-# Full setup (recommended)
-./scripts/setup-homologacao.sh
-
-# Or do it manually
-# See docs/homologacao-systemd.md for manual instructions
+# In a clone of the repository, with .env filled in
+./scripts/ops.sh auto-update setup
 ```
+
+See [homologacao-systemd.md](homologacao-systemd.md) for migrating an older install and
+for day-to-day management.
 
 For production, use [producao-systemd.md](producao-systemd.md) or run
 `./scripts/setup-producao.sh`. The environment tracks `main` by default using
