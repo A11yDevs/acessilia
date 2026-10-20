@@ -266,6 +266,25 @@ def test_bhs_start_cuts_the_release_with_the_version_bump(server, tmp_path):
     assert "already exists" in again.stderr
 
 
+def test_bhs_start_removes_its_temp_dir_when_the_worktree_fails(server, tmp_path):
+    bin_dir = tmp_path / "bin"
+    real_git = shutil.which("git")
+    (bin_dir / "git").write_text(
+        f"""#!/usr/bin/env bash
+[ "$1 $2" = "worktree add" ] && exit 1
+exec {real_git} "$@"
+"""
+    )
+    (bin_dir / "git").chmod(0o755)
+    temp = tmp_path / "temp"
+    temp.mkdir()
+
+    result = server["run"]("bhs", "start", "0.3.0", check=False, TMPDIR=str(temp))
+
+    assert result.returncode != 0
+    assert list(temp.iterdir()) == []
+
+
 def test_bhs_rejects_an_invalid_version(server):
     result = server["run"]("bhs", "start", "v0.3.0", check=False)
 
