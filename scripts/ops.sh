@@ -75,9 +75,11 @@ _check_version() {
 # .env helpers
 # ──────────────────────────────────────────────
 _env_get() {
-  # $1 = key; prints the value of its last assignment in .env (unquoted)
-  [ -f "$ENV_FILE" ] || return 0
-  { grep -E "^$1=" "$ENV_FILE" || true; } | tail -1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//'
+  # $1 = key, $2 = file (default: the clone's .env); prints the value of the
+  # key's last assignment, unquoted
+  local file="${2:-$ENV_FILE}"
+  [ -f "$file" ] || return 0
+  { grep -E "^$1=" "$file" || true; } | tail -1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//'
 }
 
 _env_set() {
@@ -332,9 +334,9 @@ _bhs_status() {
 # The clone's branch and TRACK_BRANCH must move together: the scripts and the
 # compose file come from the clone, the image from TRACK_BRANCH. TRACK_TAG is
 # written too, so a plain `docker compose` in the clone uses the same image.
-_track_checkout() {
+_check_trackable() {
+  # $1 = branch; fails unless the clone can switch to it
   local branch="$1"
-  _require_env_file
   if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
     _die "the clone has local changes to tracked files; commit, stash or discard them first."
   fi
@@ -345,6 +347,12 @@ _track_checkout() {
   # before the release is carried over) would leave the timer broken.
   git cat-file -e "origin/${branch}:scripts/ops.sh" 2>/dev/null \
     || _die "origin/${branch} has no scripts/ops.sh yet (merge the release's sync PR into it first)."
+}
+
+_track_checkout() {
+  local branch="$1"
+  _require_env_file
+  _check_trackable "$branch"
   git checkout --quiet "$branch"
   git pull --quiet --ff-only
 
@@ -391,6 +399,19 @@ _disable_legacy_unit() {
   rm -f "$service" "$UNIT_DIR/${LEGACY_UNIT}.timer"
 }
 
+# The timer runs as this user: it needs the Docker daemon, and linger to keep
+# running after logout. Granting either takes root, which this script never
+# asks for: run it as root yourself if that is what you want.
+_check_host() {
+  local user
+  user="$(id -un)"
+  docker info >/dev/null 2>&1 \
+    || _die "${user} cannot reach the Docker daemon (as root: usermod -aG docker ${user}, then log in again)."
+  if ! loginctl show-user "$user" 2>/dev/null | grep -q 'Linger=yes'; then
+    _info "⚠️  Linger is off for ${user}: the timer stops when ${user} logs out (as root: loginctl enable-linger ${user})."
+  fi
+}
+
 _auto_update_setup() {
   local tracked
   _need docker jq git curl systemctl
@@ -409,16 +430,7 @@ _auto_update_setup() {
     echo "     echo <token> | docker login ghcr.io -u <github-user> --password-stdin"
   fi
 
-  # User timer prerequisites: linger (the timer survives logout) and the
-  # docker group (the timer reaches the daemon).
-  if ! loginctl show-user "$USER" 2>/dev/null | grep -q 'Linger=yes'; then
-    _info "Enabling linger for $USER..."
-    sudo loginctl enable-linger "$USER"
-  fi
-  if ! id -nG | tr ' ' '\n' | grep -qx docker; then
-    _info "Adding $USER to the docker group (log out and back in for it to apply)..."
-    sudo usermod -aG docker "$USER"
-  fi
+  _check_host
 
   _disable_legacy_unit
 
@@ -501,31 +513,48 @@ _auto_update_status() {
   journalctl --user -u "${UNIT}.service" -n 10 --no-pager -o cat 2>/dev/null | sed 's/^/  /' || true
 }
 
-_read_old_env() {
-  # $1 = old staging dir; its .env is often root-owned with mode 600
-  if [ -r "$1/.env" ]; then
-    cat "$1/.env"
-  else
-    sudo cat "$1/.env"
-  fi
+_unreadable() {
+  # $1 = path; prints what under it the current user cannot read
+  find "$1" -print 2>/dev/null | while IFS= read -r path; do
+    [ -L "$path" ] && continue
+    if [ -d "$path" ]; then
+      { [ -r "$path" ] && [ -x "$path" ]; } || echo "$path"
+    else
+      [ -r "$path" ] || echo "$path"
+    fi
+  done
 }
 
 # Moves an install made by the former setup-homologacao.sh (scripts copied to
-# /opt/.../scripts, .env and var/ in /opt/.../staging) into this clone. The
-# old directory is left untouched.
+# /opt/.../scripts, .env and var/ in /opt/.../staging) into this clone.
+# Everything is checked before anything changes, so a refusal leaves the old
+# install running as it was, and a rerun after a failure resumes it. The old
+# directory is never modified.
 _auto_update_migrate() {
-  local old="${1:-}" project
+  local old="${1:-}" project branch unreadable user
   [ -n "$old" ] && [ -d "$old" ] || _die "usage: $0 auto-update migrate <old staging dir>   (e.g. /opt/acessilia/staging)"
   old="$(cd "$old" && pwd)"
   [ "$old" != "$ROOT" ] || _die "$old is this clone."
+  user="$(id -un)"
 
-  if [ -f "$ENV_FILE" ]; then
-    if ! _read_old_env "$old" | cmp -s - "$ENV_FILE"; then
-      _die "$ENV_FILE already exists and differs from $old/.env; keep the one you want and run again."
-    fi
-  else
+  [ -f "$old/.env" ] || _die "$old/.env not found."
+  unreadable="$(_unreadable "$old/.env"; if [ -d "$old/var" ]; then _unreadable "$old/var"; fi)"
+  if [ -n "$unreadable" ]; then
+    _die "${user} cannot read these files of the old install (first 10):
+$(echo "$unreadable" | head -10)
+Give ${user} read access to them (as root) and run again; nothing was changed."
+  fi
+  if [ -f "$ENV_FILE" ] && ! cmp -s "$old/.env" "$ENV_FILE"; then
+    _die "$ENV_FILE already exists and differs from $old/.env; keep the one you want and run again."
+  fi
+  branch="$(_env_get TRACK_BRANCH "$old/.env")"
+  branch="${branch:-$DEFAULT_BRANCH}"
+  _check_trackable "$branch"
+  _check_host
+
+  if [ ! -f "$ENV_FILE" ]; then
     _info "Copying $old/.env..."
-    _read_old_env "$old" > "$ENV_FILE" || { rm -f "$ENV_FILE"; _die "cannot read $old/.env"; }
+    cp "$old/.env" "$ENV_FILE"
     chmod 600 "$ENV_FILE"
   fi
 
@@ -544,10 +573,11 @@ _auto_update_migrate() {
     _info "Copying $old/var (the container is stopped meanwhile)..."
     docker stop "$CONTAINER_NAME" >/dev/null 2>&1 || true
     mkdir -p "$ROOT/var"
-    cp -a "$old/var/." "$ROOT/var/" 2>/dev/null || sudo cp -a "$old/var/." "$ROOT/var/"
+    cp -a "$old/var/." "$ROOT/var/" \
+      || _die "copying $old/var failed (see above). Run again once fixed, or bring the old container back with: docker start ${CONTAINER_NAME}"
   fi
 
-  _track_checkout "$(_tracked_branch)"
+  _track_checkout "$branch"
   _auto_update_setup
 
   echo ""

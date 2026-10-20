@@ -22,16 +22,17 @@ _STUBS = {
     "docker": _LOGGING_STUB
     + """case "$*" in
   "inspect"*) [ -n "${DOCKER_PROJECT:-}" ] && printf '%s\\n' "$DOCKER_PROJECT" || exit 1 ;;
+  info) [ -z "${DOCKER_DOWN:-}" ] || exit 1 ;;
   *) [ "$1" = compose ] && printf 'TRACK_TAG=%s\\n' "${TRACK_TAG:-}" >> "$OPS_LOG" ;;
 esac
 exit 0
 """,
     "systemctl": _LOGGING_STUB + "exit 0\n",
     "journalctl": _LOGGING_STUB + "exit 0\n",
-    "loginctl": "#!/usr/bin/env bash\necho Linger=yes\n",
-    "id": "#!/usr/bin/env bash\necho staff docker\n",
+    "loginctl": '#!/usr/bin/env bash\necho "Linger=${LINGER:-yes}"\n',
     "curl": "#!/usr/bin/env bash\nexit 7\n",
-    "sudo": _LOGGING_STUB + 'exec "$@"\n',
+    # ops.sh never escalates; a call would show up in the log and fail.
+    "sudo": _LOGGING_STUB + "exit 99\n",
 }
 
 
@@ -231,6 +232,82 @@ def test_migrate_keeps_project_name_env_and_data(server, tmp_path):
     assert _git("rev-parse", "--abbrev-ref", "HEAD", cwd=clone) == "release/0.2.0"
     assert (server["home"] / ".config/systemd/user/acessilia-staging-update.service").exists()
     assert (old / ".env").exists()
+
+
+def _old_install(tmp_path, track_branch="release/0.2.0"):
+    old = tmp_path / "opt-staging"
+    (old / "var" / "data").mkdir(parents=True)
+    (old / "var" / "data" / "jobs.db").write_text("data")
+    (old / ".env").write_text(f"GHCR_TOKEN=old-secret\nTRACK_BRANCH={track_branch}\n")
+    return old
+
+
+def _assert_nothing_changed(server):
+    assert not (server["clone"] / ".env").exists()
+    assert not (server["clone"] / "var").exists()
+    log = server["log"].read_text() if server["log"].exists() else ""
+    assert "docker stop" not in log
+    assert "systemctl" not in log
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root reads any file")
+def test_migrate_refuses_unreadable_files_before_changing_anything(server, tmp_path):
+    (server["clone"] / ".env").unlink()
+    old = _old_install(tmp_path)
+    secret = old / "var" / "data" / "jobs.db"
+    secret.chmod(0)
+    try:
+        result = server["run"]("auto-update", "migrate", str(old), check=False)
+    finally:
+        secret.chmod(0o644)
+
+    assert result.returncode == 1
+    assert str(secret) in result.stderr
+    assert "nothing was changed" in result.stderr
+    _assert_nothing_changed(server)
+
+
+def test_migrate_refuses_an_untrackable_branch_before_changing_anything(server, tmp_path):
+    (server["clone"] / ".env").unlink()
+    old = _old_install(tmp_path, track_branch="develop-without-ops")
+
+    result = server["run"]("auto-update", "migrate", str(old), check=False)
+
+    assert result.returncode == 1
+    assert "does not exist on origin" in result.stderr
+    _assert_nothing_changed(server)
+
+
+def test_migrate_resumes_after_a_partial_run(server, tmp_path):
+    clone = server["clone"]
+    old = _old_install(tmp_path)
+    # A previous run copied .env and part of var/, then stopped.
+    (clone / ".env").write_text((old / ".env").read_text())
+    (clone / "var").mkdir()
+
+    server["run"]("auto-update", "migrate", str(old))
+
+    assert (clone / "var" / "data" / "jobs.db").read_text() == "data"
+    assert "TRACK_TAG=release-0.2.0" in _env_lines(clone)
+
+
+def test_setup_warns_without_linger_and_never_escalates(server):
+    result = server["run"]("auto-update", "setup", LINGER="no")
+
+    assert "Linger is off" in result.stdout
+    assert "loginctl enable-linger" in result.stdout
+    assert "sudo" not in server["log"].read_text()
+
+
+def test_setup_requires_docker_access(server):
+    result = server["run"]("auto-update", "setup", check=False, DOCKER_DOWN="1")
+
+    assert result.returncode == 1
+    assert "cannot reach the Docker daemon" in result.stderr
+
+
+def test_ops_never_calls_sudo():
+    assert "sudo" not in (ROOT_DIR / "scripts" / "ops.sh").read_text()
 
 
 def test_migrate_refuses_a_different_env_in_the_clone(server, tmp_path):
