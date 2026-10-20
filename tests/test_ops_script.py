@@ -19,20 +19,48 @@ printf '%s %s\\n' "$(basename "$0")" "$*" >> "$OPS_LOG"
 """
 
 _STUBS = {
+    # Remembers `docker rm -f`, so a later inspect no longer finds the container.
     "docker": _LOGGING_STUB
     + """case "$*" in
-  "inspect"*) [ -n "${DOCKER_PROJECT:-}" ] && printf '%s\\n' "$DOCKER_PROJECT" || exit 1 ;;
+  inspect*project.working_dir*)
+    [ -n "${DOCKER_PROJECT:-}" ] && [ ! -e "$OPS_LOG.rm" ] || exit 1
+    printf '%s\\n' "${DOCKER_DIR:-/old/install}" ;;
+  inspect*)
+    [ -n "${DOCKER_PROJECT:-}" ] && [ ! -e "$OPS_LOG.rm" ] || exit 1
+    printf '%s\\n' "$DOCKER_PROJECT" ;;
+  "rm -f"*) touch "$OPS_LOG.rm" ;;
   info) [ -z "${DOCKER_DOWN:-}" ] || exit 1 ;;
+  "ps -a"*) printf '%b' "${DOCKER_PS:-}" ;;
+  *"config --services"*) printf '%s\\n' "${COMPOSE_SERVICES:-}" ;;
   *) [ "$1" = compose ] && printf 'TRACK_TAG=%s\\n' "${TRACK_TAG:-}" >> "$OPS_LOG" ;;
 esac
 exit 0
 """,
-    "systemctl": _LOGGING_STUB + "exit 0\n",
+    "systemctl": _LOGGING_STUB
+    + """case "$*" in
+  *show-environment*)
+    [ -z "${SYSTEMD_DOWN:-}" ] || exit 1
+    [ -z "${REQUIRE_XDG:-}" ] || [ -n "${XDG_RUNTIME_DIR:-}" ] || exit 1 ;;
+  *"disable --now"*) [ -z "${LEGACY_FAIL:-}" ] || exit 1 ;;
+esac
+exit 0
+""",
     "journalctl": _LOGGING_STUB + "exit 0\n",
     "loginctl": '#!/usr/bin/env bash\necho "Linger=${LINGER:-yes}"\n',
-    "curl": "#!/usr/bin/env bash\nexit 7\n",
-    # ops.sh never escalates; a call would show up in the log and fail.
+    # GitHub REST API fixtures for bhs status; anything else is unreachable.
+    "curl": _LOGGING_STUB
+    + """url="${*: -1}"
+case "$url" in
+  *api.github.com*actions/runs*) cat "$GH_FIXTURES/runs.json" ;;
+  *api.github.com*base=main*) cat "$GH_FIXTURES/main.json" ;;
+  *api.github.com*base=develop*) cat "$GH_FIXTURES/develop.json" ;;
+  *api.github.com*pulls*) cat "$GH_FIXTURES/open.json" ;;
+  *) exit 7 ;;
+esac
+""",
+    # ops.sh never escalates, and bhs status does not need the GitHub CLI.
     "sudo": _LOGGING_STUB + "exit 99\n",
+    "gh": _LOGGING_STUB + "exit 99\n",
 }
 
 
@@ -56,11 +84,14 @@ def server(tmp_path):
     env = os.environ.copy()
     env.pop("XDG_CONFIG_HOME", None)
     env.pop("TRACK_BRANCH", None)
+    env.pop("XDG_RUNTIME_DIR", None)
+    env.pop("GITHUB_TOKEN", None)
     env.update(
         {
             "HOME": str(home),
             "PATH": f"{bin_dir}:{env['PATH']}",
             "OPS_LOG": str(tmp_path / "ops.log"),
+            "OPS_RUN_USER_DIR": str(tmp_path / "run"),
             "GIT_CONFIG_NOSYSTEM": "1",
             "GIT_AUTHOR_NAME": "t",
             "GIT_AUTHOR_EMAIL": "t@example.com",
@@ -89,7 +120,7 @@ def server(tmp_path):
 
     clone = tmp_path / "clone"
     subprocess.run(["git", "clone", "-q", "-b", "develop", str(origin), str(clone)], check=True, env=env)
-    (clone / ".env").write_text("GHCR_TOKEN=secret\n")
+    (clone / ".env").write_text("GHCR_TOKEN=secret\nCOMPOSE_PROJECT_NAME=test-staging\n")
 
     def run(*args: str, check: bool = True, **extra: str) -> subprocess.CompletedProcess:
         return subprocess.run(
@@ -127,7 +158,7 @@ def test_track_develop_removes_the_override(server):
     server["run"]("track", "develop")
 
     assert _git("rev-parse", "--abbrev-ref", "HEAD", cwd=clone) == "develop"
-    assert _env_lines(clone) == ["GHCR_TOKEN=secret"]
+    assert _env_lines(clone) == ["GHCR_TOKEN=secret", "COMPOSE_PROJECT_NAME=test-staging"]
 
 
 def test_track_without_branch_pulls_the_tracked_one(server):
@@ -191,6 +222,10 @@ def test_setup_installs_units_that_run_from_the_clone(server):
         "[Unit]\nDescription=Update acessilia staging container\n"
     )
     (unit_dir / "staging-update.timer").write_text("[Timer]\n")
+    env_file = clone / ".env"
+    env_file.write_text(
+        "".join(f"{line}\n" for line in _env_lines(clone) if not line.startswith("COMPOSE_PROJECT_NAME="))
+    )
 
     server["run"]("auto-update", "setup")
 
@@ -214,7 +249,7 @@ def test_setup_requires_an_env_file(server):
     assert "cp .env.example .env" in result.stderr
 
 
-def test_migrate_keeps_project_name_env_and_data(server, tmp_path):
+def test_migrate_moves_to_its_own_project_with_env_and_data(server, tmp_path):
     clone = server["clone"]
     (clone / ".env").unlink()
     old = tmp_path / "opt-staging"
@@ -226,7 +261,10 @@ def test_migrate_keeps_project_name_env_and_data(server, tmp_path):
 
     lines = _env_lines(clone)
     assert "GHCR_TOKEN=old-secret" in lines
-    assert "COMPOSE_PROJECT_NAME=staging" in lines
+    # Acessilia's data is in ./var: it leaves the shared project and replaces
+    # the old container instead of inheriting the project name.
+    assert "COMPOSE_PROJECT_NAME=acessilia-staging" in lines
+    assert "docker rm -f acessilia-staging" in server["log"].read_text()
     assert "TRACK_TAG=release-0.2.0" in lines
     assert (clone / "var" / "data" / "jobs.db").read_text() == "data"
     assert _git("rev-parse", "--abbrev-ref", "HEAD", cwd=clone) == "release/0.2.0"
@@ -247,7 +285,7 @@ def _assert_nothing_changed(server):
     assert not (server["clone"] / "var").exists()
     log = server["log"].read_text() if server["log"].exists() else ""
     assert "docker stop" not in log
-    assert "systemctl" not in log
+    assert "disable --now" not in log
 
 
 @pytest.mark.skipif(os.geteuid() == 0, reason="root reads any file")
@@ -306,6 +344,86 @@ def test_setup_requires_docker_access(server):
     assert "cannot reach the Docker daemon" in result.stderr
 
 
+def _legacy_description() -> str:
+    script = (ROOT_DIR / "scripts" / "ops.sh").read_text()
+    return script.split('LEGACY_DESCRIPTION="', 1)[1].split('"', 1)[0]
+
+
+def test_track_refuses_a_container_of_another_project(server):
+    clone = server["clone"]
+
+    result = server["run"](
+        "track", "release/0.2.0", check=False, DOCKER_PROJECT="staging", DOCKER_DIR="/opt/x/staging"
+    )
+
+    assert result.returncode == 1
+    assert "belongs to compose project 'staging' (/opt/x/staging)" in result.stderr
+    assert "auto-update migrate /opt/x/staging" in result.stderr
+    assert _git("rev-parse", "--abbrev-ref", "HEAD", cwd=clone) == "develop"
+    assert not (clone / "engine-calls.txt").exists()
+
+
+def test_setup_refuses_a_container_of_another_project(server):
+    result = server["run"]("auto-update", "setup", check=False, DOCKER_PROJECT="staging")
+
+    assert result.returncode == 1
+    assert "belongs to compose project 'staging'" in result.stderr
+    assert "compose -f" not in server["log"].read_text()
+
+
+def test_setup_refuses_without_the_user_systemd_instance(server):
+    result = server["run"]("auto-update", "setup", check=False, SYSTEMD_DOWN="1")
+
+    assert result.returncode == 1
+    assert "cannot reach the systemd user instance" in result.stderr
+    assert "compose -f" not in server["log"].read_text()
+
+
+def test_setup_finds_the_user_systemd_instance_without_xdg(server, tmp_path):
+    (tmp_path / "run" / str(os.getuid())).mkdir(parents=True)
+
+    server["run"]("auto-update", "setup", REQUIRE_XDG="1")
+
+    assert "enable --now" in server["log"].read_text()
+
+
+def test_migrate_stops_when_the_old_timer_cannot_be_disabled(server, tmp_path):
+    (server["clone"] / ".env").unlink()
+    old = _old_install(tmp_path)
+    unit_dir = server["home"] / ".config" / "systemd" / "user"
+    unit_dir.mkdir(parents=True)
+    legacy = unit_dir / "staging-update.service"
+    legacy.write_text(f"[Unit]\nDescription={_legacy_description()}\n")
+
+    result = server["run"]("auto-update", "migrate", str(old), check=False, LEGACY_FAIL="1")
+
+    assert result.returncode == 1
+    assert "could not disable staging-update.timer" in result.stderr
+    assert legacy.exists()
+    assert "docker stop" not in server["log"].read_text()
+
+
+def test_bhs_status_uses_the_rest_api_without_gh(server, tmp_path):
+    fixtures = tmp_path / "gh"
+    fixtures.mkdir()
+    (fixtures / "runs.json").write_text(
+        '{"workflow_runs": [{"name": "CI", "status": "completed", "conclusion": "success"}]}'
+    )
+    (fixtures / "open.json").write_text('[{"number": 5, "title": "Fix x", "head": {"ref": "fix/x"}}]')
+    (fixtures / "main.json").write_text("[]")
+    (fixtures / "develop.json").write_text('[{"state": "closed", "merged_at": "2026-10-20T00:00:00Z"}]')
+
+    result = server["run"]("bhs", "status", GH_FIXTURES=str(fixtures))
+
+    assert "## release/0.2.0 @ " in result.stdout
+    assert "    CI: completed success" in result.stdout
+    assert "    #5 fix/x: Fix x" in result.stdout
+    assert "Closing PRs: main NONE, develop MERGED" in result.stdout
+    log = server["log"].read_text()
+    assert "Authorization: token secret" in log
+    assert "\ngh " not in f"\n{log}"
+
+
 def test_ops_never_calls_sudo():
     assert "sudo" not in (ROOT_DIR / "scripts" / "ops.sh").read_text()
 
@@ -319,7 +437,7 @@ def test_migrate_refuses_a_different_env_in_the_clone(server, tmp_path):
 
     assert result.returncode == 1
     assert "differs from" in result.stderr
-    assert _env_lines(server["clone"]) == ["GHCR_TOKEN=secret"]
+    assert _env_lines(server["clone"]) == ["GHCR_TOKEN=secret", "COMPOSE_PROJECT_NAME=test-staging"]
 
 
 def test_bhs_start_cuts_the_release_with_the_version_bump(server, tmp_path):
