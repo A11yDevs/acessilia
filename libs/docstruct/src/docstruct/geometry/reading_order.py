@@ -1,15 +1,23 @@
 """Column-aware reading order refinement and marginal isolation.
 
 Pure: zero external dependencies, standard library only.
-Refines block reading orders by isolating headers and footers,
-detecting multi-column gutters (2 and 3 columns) based on median block width,
-and ordering columns top-to-bottom without horizontal traversal.
+
+Two orderings live here until #203 (D6) settles on one, with metrics:
+
+- ``refine_reading_order`` orders loose blocks (dicts or objects). It detects
+  2 and 3 columns from the median block width.
+- ``order_reading_items`` is the processing manifest's ordering. It works on
+  ``ReadingItem`` values that keep the box origin, puts ``group`` elements
+  first, detects 2 columns only and breaks ties by the incoming order.
 """
 from __future__ import annotations
 
 import statistics
+from collections.abc import Hashable, Sequence
+from dataclasses import dataclass
 from typing import Any
 
+from docstruct.geometry.boxes import OrientedBox
 from docstruct.types import BBox
 
 _HEADER_TYPES = frozenset({"page_header", "header", "running_header", "running_head"})
@@ -220,3 +228,151 @@ def refine_reading_order(blocks: list[Any]) -> list[Any]:
         refined.extend(footers)
 
     return refined
+
+
+# --- Processing manifest ordering ---------------------------------------------
+
+GROUP = "group"
+HEADER = "header"
+FOOTER = "footer"
+BODY = "body"
+
+_MANIFEST_HEADERS = frozenset({"header", "page_header"})
+_MANIFEST_FOOTERS = frozenset({"footer", "page_footer", "page_number"})
+
+
+@dataclass(frozen=True)
+class ReadingItem:
+    """What the ordering needs to know about one element, and nothing else.
+
+    ``key`` identifies the element to the caller and must be unique. ``rank``
+    is its incoming reading order, which breaks ties.
+    """
+
+    key: Hashable
+    page: int | None
+    role: str
+    box: OrientedBox | None
+    rank: int
+
+
+def reading_role(element_type: str, raw_label: str) -> str:
+    """Role of a manifest element: ``group``, ``header``, ``footer`` or ``body``.
+
+    Headers and footers are recognized by their type or their raw label.
+    """
+    element_type, raw_label = element_type.lower(), raw_label.lower()
+    if element_type == GROUP:
+        return GROUP
+    if element_type in _MANIFEST_HEADERS or raw_label in _MANIFEST_HEADERS:
+        return HEADER
+    if element_type in _MANIFEST_FOOTERS or raw_label in _MANIFEST_FOOTERS:
+        return FOOTER
+    return BODY
+
+
+def order_reading_items(items: Sequence[ReadingItem]) -> list[Hashable]:
+    """Keys of ``items`` in reading order.
+
+    Items without a page come first, then pages in ascending order. A page
+    with a single item keeps it as is. Otherwise a page reads its groups (in
+    incoming order), its headers and footers sorted top to bottom and left
+    to right, and between them its body in column order (see
+    ``_order_manifest_body``). Boxes are compared in their top-down frame, so
+    every coordinate origin orders the same way.
+    """
+    by_page: dict[int | None, list[ReadingItem]] = {}
+    for item in items:
+        by_page.setdefault(item.page, []).append(item)
+
+    ordered: list[ReadingItem] = []
+    for page, page_items in sorted(
+        by_page.items(),
+        key=lambda pair: (0 if pair[0] is None else 1, pair[0] or 0),
+    ):
+        if page is None or len(page_items) <= 1:
+            ordered.extend(page_items)
+            continue
+        roles: dict[str, list[ReadingItem]] = {GROUP: [], HEADER: [], FOOTER: [], BODY: []}
+        for item in page_items:
+            roles[item.role].append(item)
+        for marginal in (roles[HEADER], roles[FOOTER]):
+            marginal.sort(key=lambda item: (*_top_left(item), item.rank))
+        ordered.extend(
+            roles[GROUP] + roles[HEADER] + _order_manifest_body(roles[BODY]) + roles[FOOTER]
+        )
+    return [item.key for item in ordered]
+
+
+def _box(item: ReadingItem) -> BBox | None:
+    return item.box.top_down() if item.box is not None else None
+
+
+def _top_left(item: ReadingItem) -> tuple[float, float]:
+    box = _box(item)
+    return (box[1], box[0]) if box is not None else (0.0, 0.0)
+
+
+def _order_manifest_body(body: list[ReadingItem]) -> list[ReadingItem]:
+    """Order body items around two-column gutters and full-width banners.
+
+    An item narrower than 75% of the content width is a column candidate;
+    the page has two columns when at least two candidates sit on each side of
+    the midline (5% tolerance). Then each band between full-width banners is
+    read left column first, then right, each top to bottom; items without a
+    box go last. A page without two columns reads top to bottom, left to
+    right.
+    """
+    boxed = [(item, box) for item in body if (box := _box(item)) is not None]
+    if len(boxed) < 2:
+        return sorted(body, key=lambda item: (_top_left(item)[0], item.rank))
+
+    min_left = min(box[0] for _, box in boxed)
+    max_right = max(box[2] for _, box in boxed)
+    page_width = max(1.0, max_right - min_left)
+    mid_x = min_left + 0.5 * page_width
+    narrow = [(item, box) for item, box in boxed if box[2] - box[0] < 0.75 * page_width]
+    left_column = [item for item, box in narrow if box[2] <= mid_x + 0.05 * page_width]
+    right_column = [item for item, box in narrow if box[0] >= mid_x - 0.05 * page_width]
+
+    if len(left_column) < 2 or len(right_column) < 2:
+        return sorted(body, key=lambda item: (*_top_left(item), item.rank))
+
+    full_width = sorted(
+        ((item, box) for item, box in boxed if box[2] - box[0] >= 0.75 * page_width),
+        key=lambda pair: pair[1][1],
+    )
+    ordered: list[ReadingItem] = []
+    seen: set[Hashable] = set()
+
+    def read_band(band: list[tuple[ReadingItem, BBox]]) -> None:
+        for in_left in (True, False):
+            column = [
+                (item, box) for item, box in band if ((box[0] + box[2]) / 2.0 < mid_x) == in_left
+            ]
+            for item, _ in sorted(column, key=lambda pair: (pair[1][1], pair[1][0])):
+                ordered.append(item)
+                seen.add(item.key)
+
+    # Starts at -1.0, as the builder always did: with mirrored (negative)
+    # bottom-left tops, a band above the first banner is empty and its items
+    # fall through to the end. Changing that is a behaviour change (D6).
+    prev_top = -1.0
+    for banner, banner_box in full_width:
+        read_band(
+            [
+                (item, box)
+                for item, box in narrow
+                if prev_top < box[1] < banner_box[1] and item.key not in seen
+            ]
+        )
+        ordered.append(banner)
+        seen.add(banner.key)
+        prev_top = banner_box[3]
+    read_band([(item, box) for item, box in narrow if box[1] > prev_top and item.key not in seen])
+
+    for item in body:
+        if item.key not in seen:
+            ordered.append(item)
+            seen.add(item.key)
+    return ordered

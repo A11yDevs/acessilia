@@ -2,7 +2,12 @@
 from __future__ import annotations
 
 from docstruct.geometry.boxes import OrientedBox, is_bottom_left
-from docstruct.geometry.reading_order import refine_reading_order
+from docstruct.geometry.reading_order import (
+    ReadingItem,
+    order_reading_items,
+    reading_role,
+    refine_reading_order,
+)
 from docstruct.types import BBox
 
 
@@ -58,11 +63,14 @@ def intersection_area(a: BBox, b: BBox) -> float:
 
 __all__ = [
     "OrientedBox",
+    "ReadingItem",
     "content_fingerprint",
     "intersection_area",
     "is_bottom_left",
     "merge_bboxes",
+    "order_reading_items",
     "overlaps_clean",
+    "reading_role",
     "refine_reading_order",
     "union",
 ]
