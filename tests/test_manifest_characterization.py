@@ -135,9 +135,9 @@ CASES: dict[str, tuple[list[ManifestElement], list[str]]] = {
         _two_columns("UNKNOWN"),
         TWO_COLUMN_ORDER,
     ),
-    # Today's builder detects two columns only. The middle column's centre sits
-    # on the midline, so it joins the right column and the two interleave row
-    # by row. Fixing that is a later, separate change (#203, D6).
+    # The builder used to detect two columns only (#214): the middle column's
+    # centre sat on the midline, so it joined the right column and the three
+    # interleave row by row. Three columns read column by column now.
     "three columns": (
         _numbered(
             [
@@ -149,7 +149,7 @@ CASES: dict[str, tuple[list[ManifestElement], list[str]]] = {
                 ("c2", (400, 160, 580, 200)),
             ]
         ),
-        ["a1", "a2", "b1", "c1", "b2", "c2"],
+        ["a1", "a2", "b1", "b2", "c1", "c2"],
     ),
     "headers and footers by type and by raw label": (
         _numbered(

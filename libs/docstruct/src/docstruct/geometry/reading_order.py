@@ -8,7 +8,7 @@ Two orderings live here until #203 (D6) settles on one, with metrics:
   2 and 3 columns from the median block width.
 - ``order_reading_items`` is the processing manifest's ordering. It works on
   ``ReadingItem`` values that keep the box origin, puts ``group`` elements
-  first, detects 2 columns only and breaks ties by the incoming order.
+  first, detects 2 and 3 columns and breaks ties by the incoming order.
 """
 from __future__ import annotations
 
@@ -314,14 +314,16 @@ def _top_left(item: ReadingItem) -> tuple[float, float]:
 
 
 def _order_manifest_body(body: list[ReadingItem]) -> list[ReadingItem]:
-    """Order body items around two-column gutters and full-width banners.
+    """Order body items around column gutters and full-width banners.
 
-    An item narrower than 75% of the content width is a column candidate;
-    the page has two columns when at least two candidates sit on each side of
-    the midline (5% tolerance). Then each band between full-width banners is
-    read left column first, then right, each top to bottom; items without a
-    box go last. A page without two columns reads top to bottom, left to
-    right.
+    An item narrower than 75% of the content width is a column candidate.
+    The page has three columns when at least two candidates fit inside each
+    third of the content width (5% tolerance), or two columns when at least
+    two candidates sit on each side of the midline — the three-column test
+    runs first, as in ``refine_reading_order``. Then each band between
+    full-width banners is read column by column, left first, each top to
+    bottom; items without a box go last. A page without columns reads top to
+    bottom, left to right.
     """
     boxed = [(item, box) for item in body if (box := _box(item)) is not None]
     if len(boxed) < 2:
@@ -331,12 +333,33 @@ def _order_manifest_body(body: list[ReadingItem]) -> list[ReadingItem]:
     max_right = max(box[2] for _, box in boxed)
     page_width = max(1.0, max_right - min_left)
     mid_x = min_left + 0.5 * page_width
+    third_1 = min_left + page_width / 3.0
+    third_2 = min_left + 2.0 * page_width / 3.0
     narrow = [(item, box) for item, box in boxed if box[2] - box[0] < 0.75 * page_width]
+
     left_column = [item for item, box in narrow if box[2] <= mid_x + 0.05 * page_width]
     right_column = [item for item, box in narrow if box[0] >= mid_x - 0.05 * page_width]
+    is_two_col = len(left_column) >= 2 and len(right_column) >= 2
 
-    if len(left_column) < 2 or len(right_column) < 2:
+    first_third = [
+        item for item, box in narrow if box[2] <= third_1 + 0.05 * page_width
+    ]
+    middle_third = [
+        item
+        for item, box in narrow
+        if third_1 - 0.05 * page_width <= box[0] and box[2] <= third_2 + 0.05 * page_width
+    ]
+    last_third = [item for item, box in narrow if box[0] >= third_2 - 0.05 * page_width]
+    is_three_col = (
+        len(first_third) >= 2 and len(middle_third) >= 2 and len(last_third) >= 2
+    )
+
+    if not is_two_col and not is_three_col:
         return sorted(body, key=lambda item: (*_top_left(item), item.rank))
+
+    # Column boundaries partition candidates by their centre; ``mid_x`` is
+    # only a boundary when the page is not three columns.
+    bounds = [third_1, third_2] if is_three_col else [mid_x]
 
     full_width = sorted(
         ((item, box) for item, box in boxed if box[2] - box[0] >= 0.75 * page_width),
@@ -346,9 +369,13 @@ def _order_manifest_body(body: list[ReadingItem]) -> list[ReadingItem]:
     seen: set[Hashable] = set()
 
     def read_band(band: list[tuple[ReadingItem, BBox]]) -> None:
-        for in_left in (True, False):
+        for index in range(len(bounds) + 1):
+            low = bounds[index - 1] if index else float("-inf")
+            high = bounds[index] if index < len(bounds) else float("inf")
             column = [
-                (item, box) for item, box in band if ((box[0] + box[2]) / 2.0 < mid_x) == in_left
+                (item, box)
+                for item, box in band
+                if low <= (box[0] + box[2]) / 2.0 < high
             ]
             for item, _ in sorted(column, key=lambda pair: (pair[1][1], pair[1][0])):
                 ordered.append(item)

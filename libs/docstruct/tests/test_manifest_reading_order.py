@@ -96,3 +96,50 @@ def test_columns_without_a_banner_read_column_by_column(origin):
 
 def test_nothing_to_order():
     assert order_reading_items([]) == []
+
+
+def three_columns(origin):
+    """Two rows of three columns, no banner; the middle column's centre sits
+    on the midline, which used to fold it into the right column (#214)."""
+    rows = [
+        ("c1", (400, 100, 580, 140)),
+        ("a1", (20, 100, 200, 140)),
+        ("b1", (210, 100, 390, 140)),
+        ("c2", (400, 160, 580, 200)),
+        ("a2", (20, 160, 200, 200)),
+        ("b2", (210, 160, 390, 200)),
+    ]
+    return [item(key, box, rank=n, origin=origin) for n, (key, box) in enumerate(rows, 1)]
+
+
+@pytest.mark.parametrize("origin", ["TOPLEFT", "BOTTOMLEFT"])
+def test_three_columns_read_column_by_column(origin):
+    assert order_reading_items(three_columns(origin)) == [
+        "a1", "a2", "b1", "b2", "c1", "c2",
+    ]
+
+
+@pytest.mark.parametrize("origin", ["TOPLEFT", "BOTTOMLEFT"])
+def test_three_columns_between_banners(origin):
+    elements = three_columns(origin)
+    banner = item("title", (20, 40, 580, 80), rank=0, origin=origin)
+    figure = item("figure", (20, 300, 580, 420), rank=7, origin=origin)
+    footer = item("footer", (20, 760, 580, 780), rank=8, role="footer", origin=origin)
+
+    assert order_reading_items([banner, *elements, figure, footer]) == [
+        "title", "a1", "a2", "b1", "b2", "c1", "c2", "figure", "footer",
+    ]
+
+
+def test_two_columns_with_a_wide_gutter_stay_two_columns():
+    """Columns contained in the outer thirds are two columns, not three:
+    the middle third must hold its own candidates to read as three."""
+    rows = [
+        ("b1", (410, 100, 580, 140)),
+        ("a1", (20, 100, 190, 140)),
+        ("b2", (410, 160, 580, 200)),
+        ("a2", (20, 160, 190, 200)),
+    ]
+    elements = [item(key, box, rank=n) for n, (key, box) in enumerate(rows, 1)]
+
+    assert order_reading_items(elements) == ["a1", "a2", "b1", "b2"]
