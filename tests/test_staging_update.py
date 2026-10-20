@@ -120,7 +120,9 @@ def test_staging_update_writes_digests_when_no_new_commit(tmp_path):
     (staging_dir / ".env").write_text("TRACK_BRANCH=develop\n")
 
     digest = "sha256:" + "a" * 64
-    (staging_dir / "var" / "data" / ".last_sha").write_text("1234567890abcdef")
+    (staging_dir / "var" / "data" / ".last_sha").write_text(
+        "develop 1234567890abcdef"
+    )
 
     script_path = staging_dir / "staging-update.sh"
     shutil.copy(ROOT_DIR / "scripts" / "staging-update.sh", script_path)
@@ -163,6 +165,57 @@ exit 0
     assert status["running_sha"] == "1234567890abcdef"
     assert status["latest_digest"] == digest
     assert status["running_digest"] == digest
+
+
+def test_staging_update_switches_image_when_track_branch_changes(tmp_path):
+    """A new tracked branch at the cached commit still switches the image.
+
+    At the start of BHS release/x.y.z can point at the same commit develop was
+    deployed from; comparing only the SHA left staging on the develop image.
+    """
+    staging_dir = tmp_path / "staging"
+    bin_dir = tmp_path / "bin"
+    staging_dir.mkdir()
+    bin_dir.mkdir()
+    (staging_dir / "var" / "data").mkdir(parents=True)
+    (staging_dir / "docker-compose.staging.yml").write_text("services: {}\n")
+    (staging_dir / ".env").write_text("TRACK_BRANCH=release/0.0.1\n")
+    cache_file = staging_dir / "var" / "data" / ".last_sha"
+    cache_file.write_text("develop 1234567890abcdef")
+
+    script_path = staging_dir / "staging-update.sh"
+    shutil.copy(ROOT_DIR / "scripts" / "staging-update.sh", script_path)
+    script_path.chmod(0o755)
+
+    _write_executable(
+        bin_dir / "curl",
+        """#!/usr/bin/env bash
+printf '{"sha":"1234567890abcdef"}'
+""",
+    )
+    _write_executable(
+        bin_dir / "docker",
+        """#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$STAGING_DIR/docker-args.txt"
+exit 0
+""",
+    )
+
+    env = os.environ.copy()
+    env.update(
+        {
+            "GHCR_TOKEN": "token-do-ambiente",
+            "PATH": f"{bin_dir}:{env['PATH']}",
+            "STAGING_DIR": str(staging_dir),
+        }
+    )
+
+    subprocess.run([str(script_path)], env=env, check=True, capture_output=True, text=True)
+
+    docker_calls = (staging_dir / "docker-args.txt").read_text()
+    assert "pull ghcr.io/a11ydevs/acessilia:release-0.0.1" in docker_calls
+    assert "compose -f docker-compose.staging.yml up -d --no-deps acessilia" in docker_calls
+    assert cache_file.read_text().strip() == "release/0.0.1 1234567890abcdef"
 
 
 def test_staging_update_falls_back_when_github_request_fails(tmp_path):

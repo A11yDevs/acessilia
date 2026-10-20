@@ -136,7 +136,7 @@
     "scripts/setup-homologacao.sh": 29,
     "scripts/setup-rulesets.sh": 13,
     "scripts/staging-update-wrapper.sh": 6,
-    "scripts/staging-update.sh": 14,
+    "scripts/staging-update.sh": 13,
     "scripts/start_bhs_cycle.sh": 6,
     "scripts/update_scripts.sh": 3,
     "tests/test_agno_executor.py": 3,
