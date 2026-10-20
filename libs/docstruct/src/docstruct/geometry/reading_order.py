@@ -8,7 +8,7 @@ Two orderings live here until #203 (D6) settles on one, with metrics:
   2 and 3 columns from the median block width.
 - ``order_reading_items`` is the processing manifest's ordering. It works on
   ``ReadingItem`` values that keep the box origin, puts ``group`` elements
-  first, detects 2 columns only and breaks ties by the incoming order.
+  first, detects 2 and 3 columns and breaks ties by the incoming order.
 """
 from __future__ import annotations
 
@@ -78,6 +78,42 @@ def _top_left_key(item: Any) -> tuple[float, float]:
     return (0.0, 0.0)
 
 
+def _column_bounds(candidates: list[BBox], min_left: float, page_width: float) -> list[float]:
+    """X boundaries that split candidate boxes into two or three columns.
+
+    Candidates are the narrow boxes of one page body; full-width banners are
+    not candidates. Three columns need at least two candidates inside each
+    third of the content width (5% tolerance) and the three groups pairwise
+    x-disjoint in column order — short items from a wider column do not make
+    a middle column (review of #214). Otherwise two columns need at least two
+    candidates on each side of the midline. Without columns, returns [].
+    """
+    tol = 0.05 * page_width
+    third_1 = min_left + page_width / 3.0
+    third_2 = min_left + 2.0 * page_width / 3.0
+    first = [box for box in candidates if box[2] <= third_1 + tol]
+    middle = [
+        box for box in candidates
+        if third_1 - tol <= box[0] and box[2] <= third_2 + tol
+    ]
+    last = [box for box in candidates if box[0] >= third_2 - tol]
+    if (
+        len(first) >= 2
+        and len(middle) >= 2
+        and len(last) >= 2
+        and max(box[2] for box in first) <= min(box[0] for box in middle)
+        and max(box[2] for box in middle) <= min(box[0] for box in last)
+    ):
+        return [third_1, third_2]
+
+    mid_x = min_left + 0.5 * page_width
+    left = [box for box in candidates if box[2] <= mid_x + tol]
+    right = [box for box in candidates if box[0] >= mid_x - tol]
+    if len(left) >= 2 and len(right) >= 2:
+        return [mid_x]
+    return []
+
+
 def _order_body_columns(body_elements: list[Any]) -> list[Any]:
     """Order page body elements respecting 2- or 3-column gutters and full-width banners."""
     elements_with_bbox = [e for e in body_elements if _extract_bbox(e) is not None]
@@ -96,30 +132,16 @@ def _order_body_columns(body_elements: list[Any]) -> list[Any]:
         return sorted(body_elements, key=_top_left_key)
 
     # Separate full-width banners (titles, wide figures/tables spanning >= 75% of content width)
-    narrow_elements = [
-        e for e in elements_with_bbox if (_extract_bbox(e)[2] - _extract_bbox(e)[0]) < (0.75 * page_width)  # type: ignore[index]
-    ]
+    narrow_elements: list[Any] = []
+    narrow_boxes: list[BBox] = []
+    for element in elements_with_bbox:
+        bbox = _extract_bbox(element)
+        if bbox is not None and bbox[2] - bbox[0] < (0.75 * page_width):
+            narrow_elements.append(element)
+            narrow_boxes.append(bbox)
 
-    # Check 3-column layout
-    third_1 = min_left + (1.0 / 3.0) * page_width
-    third_2 = min_left + (2.0 / 3.0) * page_width
-    c1_3 = [e for e in narrow_elements if _extract_bbox(e)[2] <= (third_1 + 0.05 * page_width)]  # type: ignore[index]
-    c2_3 = [
-        e for e in narrow_elements
-        if _extract_bbox(e)[0] >= (third_1 - 0.05 * page_width) and _extract_bbox(e)[2] <= (third_2 + 0.05 * page_width)  # type: ignore[index]
-    ]
-    c3_3 = [e for e in narrow_elements if _extract_bbox(e)[0] >= (third_2 - 0.05 * page_width)]  # type: ignore[index]
-
-    is_three_col = len(c1_3) >= 2 and len(c2_3) >= 2 and len(c3_3) >= 2
-
-    # Check 2-column layout
-    mid_x = min_left + 0.5 * page_width
-    c1_2 = [e for e in narrow_elements if _extract_bbox(e)[2] <= (mid_x + 0.05 * page_width)]  # type: ignore[index]
-    c2_2 = [e for e in narrow_elements if _extract_bbox(e)[0] >= (mid_x - 0.05 * page_width)]  # type: ignore[index]
-
-    is_two_col = len(c1_2) >= 2 and len(c2_2) >= 2
-
-    if not is_three_col and not is_two_col:
+    bounds = _column_bounds(narrow_boxes, min_left, page_width)
+    if not bounds:
         return sorted(body_elements, key=_top_left_key)
 
     full_width = [
@@ -132,26 +154,17 @@ def _order_body_columns(body_elements: list[Any]) -> list[Any]:
     prev_top = -1.0
 
     def partition_and_append(segment: list[Any]) -> None:
-        if is_three_col:
-            s1 = [e for e in segment if (_extract_bbox(e)[0] + _extract_bbox(e)[2]) / 2.0 < third_1]  # type: ignore[index]
-            s2 = [e for e in segment if third_1 <= (_extract_bbox(e)[0] + _extract_bbox(e)[2]) / 2.0 < third_2]  # type: ignore[index]
-            s3 = [e for e in segment if (_extract_bbox(e)[0] + _extract_bbox(e)[2]) / 2.0 >= third_2]  # type: ignore[index]
-            s1.sort(key=lambda e: (_extract_bbox(e)[1], _extract_bbox(e)[0]))  # type: ignore[index]
-            s2.sort(key=lambda e: (_extract_bbox(e)[1], _extract_bbox(e)[0]))  # type: ignore[index]
-            s3.sort(key=lambda e: (_extract_bbox(e)[1], _extract_bbox(e)[0]))  # type: ignore[index]
-            for col in (s1, s2, s3):
-                for el in col:
-                    ordered.append(el)
-                    seen_ids.add(id(el))
-        else:
-            s1 = [e for e in segment if (_extract_bbox(e)[0] + _extract_bbox(e)[2]) / 2.0 < mid_x]  # type: ignore[index]
-            s2 = [e for e in segment if (_extract_bbox(e)[0] + _extract_bbox(e)[2]) / 2.0 >= mid_x]  # type: ignore[index]
-            s1.sort(key=lambda e: (_extract_bbox(e)[1], _extract_bbox(e)[0]))  # type: ignore[index]
-            s2.sort(key=lambda e: (_extract_bbox(e)[1], _extract_bbox(e)[0]))  # type: ignore[index]
-            for col in (s1, s2):
-                for el in col:
-                    ordered.append(el)
-                    seen_ids.add(id(el))
+        for index in range(len(bounds) + 1):
+            low = bounds[index - 1] if index else float("-inf")
+            high = bounds[index] if index < len(bounds) else float("inf")
+            column = [
+                e for e in segment
+                if low <= (_extract_bbox(e)[0] + _extract_bbox(e)[2]) / 2.0 < high  # type: ignore[index]
+            ]
+            column.sort(key=lambda e: (_extract_bbox(e)[1], _extract_bbox(e)[0]))  # type: ignore[index]
+            for el in column:
+                ordered.append(el)
+                seen_ids.add(id(el))
 
     for fw in full_width:
         fw_top = _extract_bbox(fw)[1]  # type: ignore[index]
@@ -314,14 +327,25 @@ def _top_left(item: ReadingItem) -> tuple[float, float]:
 
 
 def _order_manifest_body(body: list[ReadingItem]) -> list[ReadingItem]:
-    """Order body items around two-column gutters and full-width banners.
+    """Order body items around column gutters and full-width banners.
 
-    An item narrower than 75% of the content width is a column candidate;
-    the page has two columns when at least two candidates sit on each side of
-    the midline (5% tolerance). Then each band between full-width banners is
-    read left column first, then right, each top to bottom; items without a
-    box go last. A page without two columns reads top to bottom, left to
-    right.
+    An item narrower than 75% of the content width is a column candidate.
+    ``_column_bounds`` (shared with ``refine_reading_order``) returns the
+    column boundaries: three columns when at least two candidates fit inside
+    each third of the content width (5% tolerance) and the three groups are
+    x-disjoint in column order, two columns when at least two candidates sit
+    on each side of the midline. On a three-column page each bound then moves
+    into the empty gutter between the two columns it separates, so the
+    boundaries follow unequal column widths. Then each band between
+    separators is read column by column, left first, each top to bottom;
+    items without a box go last. A page without columns reads top to bottom,
+    left to right.
+
+    Separators are the full-width banners and — on a three-column page — the
+    narrow items crossing a column bound: they span two columns, so reading
+    them inside the column their centre lands in takes them out of place
+    (review of #214). Two-column pages keep the centre bucketing they already
+    had.
     """
     boxed = [(item, box) for item in body if (box := _box(item)) is not None]
     if len(boxed) < 2:
@@ -330,25 +354,63 @@ def _order_manifest_body(body: list[ReadingItem]) -> list[ReadingItem]:
     min_left = min(box[0] for _, box in boxed)
     max_right = max(box[2] for _, box in boxed)
     page_width = max(1.0, max_right - min_left)
-    mid_x = min_left + 0.5 * page_width
     narrow = [(item, box) for item, box in boxed if box[2] - box[0] < 0.75 * page_width]
-    left_column = [item for item, box in narrow if box[2] <= mid_x + 0.05 * page_width]
-    right_column = [item for item, box in narrow if box[0] >= mid_x - 0.05 * page_width]
 
-    if len(left_column) < 2 or len(right_column) < 2:
+    bounds = _column_bounds([box for _, box in narrow], min_left, page_width)
+    if not bounds:
         return sorted(body, key=lambda item: (*_top_left(item), item.rank))
+
+    is_three_col = len(bounds) == 2
+    if is_three_col:
+        # The detected bounds sit at the thirds of the content width, which
+        # only matches the gutters of equal-width columns. Move each bound
+        # into the empty gutter between the two columns it separates, so
+        # full-width-of-column items do not count as crossing it; when the
+        # buckets overlap there is no gutter — a spanning item hides it, and
+        # the nominal bound stays so the spanning item reads as a separator.
+        buckets: list[list[BBox]] = [[] for _ in range(len(bounds) + 1)]
+        for _, box in narrow:
+            for index in range(len(bounds) + 1):
+                low = bounds[index - 1] if index else float("-inf")
+                high = bounds[index] if index < len(bounds) else float("inf")
+                if low <= (box[0] + box[2]) / 2.0 < high:
+                    buckets[index].append(box)
+                    break
+        for index in range(len(bounds)):
+            left_bucket, right_bucket = buckets[index], buckets[index + 1]
+            if left_bucket and right_bucket:
+                gutter_start = max(box[2] for box in left_bucket)
+                gutter_end = min(box[0] for box in right_bucket)
+                if gutter_start < gutter_end:
+                    bounds[index] = (gutter_start + gutter_end) / 2.0
 
     full_width = sorted(
         ((item, box) for item, box in boxed if box[2] - box[0] >= 0.75 * page_width),
         key=lambda pair: pair[1][1],
     )
+    separators = full_width
+    if is_three_col:
+        separators = sorted(
+            full_width
+            + [
+                (item, box)
+                for item, box in narrow
+                if any(box[0] < bound < box[2] for bound in bounds)
+            ],
+            key=lambda pair: pair[1][1],
+        )
+
     ordered: list[ReadingItem] = []
     seen: set[Hashable] = set()
 
     def read_band(band: list[tuple[ReadingItem, BBox]]) -> None:
-        for in_left in (True, False):
+        for index in range(len(bounds) + 1):
+            low = bounds[index - 1] if index else float("-inf")
+            high = bounds[index] if index < len(bounds) else float("inf")
             column = [
-                (item, box) for item, box in band if ((box[0] + box[2]) / 2.0 < mid_x) == in_left
+                (item, box)
+                for item, box in band
+                if low <= (box[0] + box[2]) / 2.0 < high
             ]
             for item, _ in sorted(column, key=lambda pair: (pair[1][1], pair[1][0])):
                 ordered.append(item)
@@ -360,17 +422,17 @@ def _order_manifest_body(body: list[ReadingItem]) -> list[ReadingItem]:
     # ``-1.0`` start, inherited from top-left-only code, read pages without a
     # full-width banner in input order (#214).
     prev_top = float("-inf")
-    for banner, banner_box in full_width:
+    for separator, separator_box in separators:
         read_band(
             [
                 (item, box)
                 for item, box in narrow
-                if prev_top < box[1] < banner_box[1] and item.key not in seen
+                if prev_top < box[1] < separator_box[1] and item.key not in seen
             ]
         )
-        ordered.append(banner)
-        seen.add(banner.key)
-        prev_top = banner_box[3]
+        ordered.append(separator)
+        seen.add(separator.key)
+        prev_top = separator_box[3]
     read_band([(item, box) for item, box in narrow if box[1] > prev_top and item.key not in seen])
 
     for item in body:

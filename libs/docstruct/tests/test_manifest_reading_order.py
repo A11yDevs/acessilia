@@ -96,3 +96,103 @@ def test_columns_without_a_banner_read_column_by_column(origin):
 
 def test_nothing_to_order():
     assert order_reading_items([]) == []
+
+
+def three_columns(origin):
+    """Two rows of three columns, no banner; the middle column's centre sits
+    on the midline, which used to fold it into the right column (#214)."""
+    rows = [
+        ("c1", (400, 100, 580, 140)),
+        ("a1", (20, 100, 200, 140)),
+        ("b1", (210, 100, 390, 140)),
+        ("c2", (400, 160, 580, 200)),
+        ("a2", (20, 160, 200, 200)),
+        ("b2", (210, 160, 390, 200)),
+    ]
+    return [item(key, box, rank=n, origin=origin) for n, (key, box) in enumerate(rows, 1)]
+
+
+@pytest.mark.parametrize("origin", ["TOPLEFT", "BOTTOMLEFT"])
+def test_three_columns_read_column_by_column(origin):
+    assert order_reading_items(three_columns(origin)) == [
+        "a1", "a2", "b1", "b2", "c1", "c2",
+    ]
+
+
+@pytest.mark.parametrize("origin", ["TOPLEFT", "BOTTOMLEFT"])
+def test_three_columns_between_banners(origin):
+    elements = three_columns(origin)
+    banner = item("title", (20, 40, 580, 80), rank=0, origin=origin)
+    figure = item("figure", (20, 300, 580, 420), rank=7, origin=origin)
+    footer = item("footer", (20, 760, 580, 780), rank=8, role="footer", origin=origin)
+
+    assert order_reading_items([banner, *elements, figure, footer]) == [
+        "title", "a1", "a2", "b1", "b2", "c1", "c2", "figure", "footer",
+    ]
+
+
+def test_two_columns_with_a_wide_gutter_stay_two_columns():
+    """Columns contained in the outer thirds are two columns, not three:
+    the middle third must hold its own candidates to read as three."""
+    rows = [
+        ("b1", (410, 100, 580, 140)),
+        ("a1", (20, 100, 190, 140)),
+        ("b2", (410, 160, 580, 200)),
+        ("a2", (20, 160, 190, 200)),
+    ]
+    elements = [item(key, box, rank=n) for n, (key, box) in enumerate(rows, 1)]
+
+    assert order_reading_items(elements) == ["a1", "a2", "b1", "b2"]
+
+
+@pytest.mark.parametrize("origin", ["TOPLEFT", "BOTTOMLEFT"])
+def test_two_columns_with_short_headings_stay_two_columns(origin):
+    """Mixed widths: short headings in both columns and right-column figures
+    do not make a phantom middle column (review of #214).
+
+    The first cut of the three-column test counted the short right-column
+    headings as middle-column candidates and read every right-column heading
+    ahead of the paragraphs it introduces.
+    """
+    rows = [
+        ("h1", (0, 100, 150, 140)),
+        ("p1", (0, 160, 290, 400)),
+        ("h2", (0, 420, 150, 460)),
+        ("p2", (0, 480, 290, 720)),
+        ("h3", (310, 100, 420, 140)),
+        ("p3", (310, 160, 600, 400)),
+        ("h4", (310, 420, 420, 460)),
+        ("figure", (400, 480, 560, 560)),
+        ("caption", (380, 580, 580, 620)),
+        ("p4", (310, 640, 600, 700)),
+    ]
+    elements = [item(key, box, rank=n, origin=origin) for n, (key, box) in enumerate(rows, 1)]
+
+    assert order_reading_items(elements) == [
+        "h1", "p1", "h2", "p2", "h3", "p3", "h4", "figure", "caption", "p4",
+    ]
+
+
+@pytest.mark.parametrize("origin", ["TOPLEFT", "BOTTOMLEFT"])
+def test_three_columns_item_crossing_a_bound_separates_bands(origin):
+    """A narrow item spanning two columns reads as a band separator, like a
+    full-width banner, not inside the column its centre lands in (review of
+    #214): column 2's text below it used to come first, and column 3's text
+    above it came before the column 2 text that precedes it visually."""
+    rows = [
+        ("a1", (20, 100, 200, 140)),
+        ("b1", (210, 100, 390, 140)),
+        ("c1", (400, 100, 580, 140)),
+        ("a2", (20, 160, 200, 200)),
+        ("b2", (210, 160, 390, 200)),
+        ("c2", (400, 160, 580, 200)),
+        ("figure", (210, 300, 580, 420)),
+        ("a3", (20, 460, 200, 500)),
+        ("b3", (210, 460, 390, 500)),
+        ("c3", (400, 460, 580, 500)),
+    ]
+    elements = [item(key, box, rank=n, origin=origin) for n, (key, box) in enumerate(rows, 1)]
+
+    assert order_reading_items(elements) == [
+        "a1", "a2", "b1", "b2", "c1", "c2", "figure", "a3", "b3", "c3",
+    ]
