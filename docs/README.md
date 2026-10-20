@@ -47,6 +47,8 @@ Each diagram is a visual aid; the linked description summarizes its content in t
 2. **Processing Sequence:** [sequence/document_processing_sequence.puml](sequence/document_processing_sequence.puml) — step-by-step flow of a document conversion: manifest extraction on the Toolbox, planning, plan execution and export.
 3. **Task State Machine:** [state_machine/task_state_machine.puml](state_machine/task_state_machine.puml) — lifecycle of a processing task (processing, done, error, cancelled).
 4. **Use Cases:** [use_cases/use_cases.puml](use_cases/use_cases.puml) — actors and the main user-facing operations.
+5. **Component Dependencies:** [architecture/dependencies.puml](architecture/dependencies.puml) — which of the core, the SDK, docstruct and the Toolbox may depend on which, and the tests that forbid the other directions. Text: [architecture/dependencies.md](architecture/dependencies.md).
+6. **Remote Call with Failover:** [sequence/remote_failover_sequence.puml](sequence/remote_failover_sequence.puml) — how the SDK retries, fails over between independent Toolbox deployments and reports a failure, with no local fallback. Text: [sequence/remote_failover_sequence.md](sequence/remote_failover_sequence.md).
 
 ---
 
