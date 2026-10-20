@@ -13,14 +13,14 @@ package "acessilia (this repository)" {
 
 package "acessilia-toolbox" {
   component "Toolbox\nREST/MCP gateway and providers\nexecutes operational capabilities" as Toolbox
-  component "Sidecars\npdf-ua-render, math-speech,\nverapdf-validate, ..." as Sidecars
+  component "Sidecars\npdf-ua-render (Pandoc, TeX Live)\nmath-speech (MathJax, MathCAT)" as Sidecars
 }
 
 interface "Published HTTP contract\n(capabilities, schemas, ArtifactRef)" as Contract
 
 Core --> SDK : imports
 Core --> Docstruct : imports
-SDK --> Docstruct : imports
+SDK ..> Docstruct : allowed, not used today
 SDK ..> Contract : calls over HTTP
 Toolbox -- Contract : publishes
 Toolbox --> Docstruct : imports (pinned wheel)
@@ -35,4 +35,9 @@ note bottom of Core
   (PyMuPDF, Pillow, OpenCV, Docling, pypdf,
   python-docx, RapidOCR): the import test fails.
 end note
+
+legend bottom
+  Red: three of the forbidden directions, drawn for legibility.
+  The full list, with the test guarding each one, is in dependencies.md.
+endlegend
 @enduml

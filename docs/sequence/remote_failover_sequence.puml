@@ -21,6 +21,7 @@ loop attempts = 1 + TOOLBOX_RETRIES
   else timeout, network error, 503 or 504
     Replicas --> SDK : failure
     SDK -> SDK : exponential backoff with jitter
+    note right of SDK : retries only for\nidempotent capabilities
   else any other error (4xx, 500, 502, contract violation)
     Replicas --> SDK : error
     SDK --> Core : raised at once (same on every endpoint)
