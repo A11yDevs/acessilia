@@ -21,6 +21,7 @@ Pure document-structure processing core for Acessilia.
 | `docstruct.placeholders` | `is_unstructured_page_placeholder`, `UNSTRUCTURED_PAGE_LABEL`, `UNSTRUCTURED_PAGE_FLAG` — the placeholder element that stands for a page extracted without structure |
 | `docstruct.blocks.callouts` | `dedupe_callout_titles` — a callout split across blocks keeps its title on the first block only |
 | `docstruct.geometry.reading_order` | `refine_reading_order` — column-aware reading order refinement with marginal isolation and 2-/3-column gutter partitioning; `order_reading_items`, `ReadingItem`, `reading_role` — the processing manifest's reading order (groups first, headers and footers isolated, 2 columns between full-width banners), on boxes that keep their origin |
+| `docstruct.manifest` | `StructuredDocument`, `DocumentElement`, `PageDescriptor`, `Provenance`, `BoundingBox`, `field_specs`, `validate_structured_document`, payload adapters — the processing manifest's document part: normative types and invariants that wire schemas are checked against |
 | `docstruct.policy` | `FusionPolicy` (+ presets: `drbench_v12`, `drbench_v13`) |
 | `docstruct.fusion` | `merge_blocks`, `block_to_diff`, `DiffBlock`, `ProviderBlocks`, `quality`, `is_junk` |
 | `docstruct.fusion.xycut` | `xycut_order`, `count_columns`, `column_balance`, `reorder` — optional XY-cut reading order (`FusionPolicy.order_xycut`) |
