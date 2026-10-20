@@ -15,7 +15,7 @@
     "backend/core/execution/executor.py": 1,
     "backend/core/manifest/__init__.py": 1,
     "backend/core/manifest/builder.py": 15,
-    "backend/core/manifest/models.py": 16,
+    "backend/core/manifest/models.py": 13,
     "backend/core/manifest/toolbox_extractor.py": 11,
     "backend/core/planning/__init__.py": 1,
     "backend/core/planning/comparison.py": 6,

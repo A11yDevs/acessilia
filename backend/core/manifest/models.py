@@ -8,6 +8,15 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from backend.i18n import t
 from docstruct.geometry.boxes import is_bottom_left  # noqa: F401  (re-exported)
 from backend.log_messages import MSG_PLANNER_NOT_STARTED
+from docstruct.manifest import (  # noqa: F401  (msgids re-exported for the catalogs)
+    MSG_DUPLICATE_ELEMENT_IDS,
+    MSG_DUPLICATE_PAGE_NUMBERS,
+    MSG_PAGE_UNKNOWN_ELEMENTS,
+    MSG_PARENT_CYCLE,
+    MSG_SELF_PARENT,
+    MSG_UNKNOWN_PARENT,
+    document_invariant_findings,
+)
 
 
 SCHEMA_VERSION = "1.1.0"
@@ -188,9 +197,12 @@ class ProcessingManifest(StrictModel):
         if self.extractor.completed_at < self.extractor.started_at:
             raise ValueError("A extração terminou antes de começar")
 
-        element_ids = [element.id for element in self.elements]
-        if len(element_ids) != len(set(element_ids)):
-            raise ValueError("IDs de elementos duplicados")
+        # Document invariants are docstruct's (#203): unique element ids,
+        # existing non-self parents, an acyclic hierarchy, unique page numbers
+        # and pages that list known elements.
+        if findings := document_invariant_findings(self.pages, self.elements):
+            msgid, kwargs = findings[0]
+            raise ValueError(t(msgid).format(**kwargs))
 
         observation_ids = [observation.id for observation in self.observations]
         if len(observation_ids) != len(set(observation_ids)):
@@ -204,39 +216,7 @@ class ProcessingManifest(StrictModel):
         if len(artifact_ids) != len(set(artifact_ids)):
             raise ValueError("IDs de artefatos duplicados")
 
-        known_elements = set(element_ids)
-        parent_graph: dict[str, str] = {}
-        for element in self.elements:
-            if element.parent_id is None:
-                continue
-            if element.parent_id not in known_elements:
-                raise ValueError(
-                    f"Elemento {element.id} referencia pai inexistente: "
-                    f"{element.parent_id}"
-                )
-            if element.parent_id == element.id:
-                raise ValueError(f"Elemento {element.id} é pai de si mesmo")
-            parent_graph[element.id] = element.parent_id
-
-        for element_id in parent_graph:
-            ancestors: set[str] = set()
-            current = element_id
-            while current in parent_graph:
-                if current in ancestors:
-                    raise ValueError("Ciclo detectado na hierarquia de elementos")
-                ancestors.add(current)
-                current = parent_graph[current]
-
-        page_numbers = [page.page_number for page in self.pages]
-        if len(page_numbers) != len(set(page_numbers)):
-            raise ValueError("Números de página duplicados")
-        for page in self.pages:
-            unknown = set(page.element_ids) - known_elements
-            if unknown:
-                raise ValueError(
-                    f"Página {page.page_number} referencia elementos inexistentes: "
-                    f"{sorted(unknown)}"
-                )
+        known_elements = {element.id for element in self.elements}
         for observation in self.observations:
             unknown = set(observation.target_ids) - known_elements
             if unknown:

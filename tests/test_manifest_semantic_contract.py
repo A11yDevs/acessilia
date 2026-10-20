@@ -14,6 +14,7 @@ contract test checks the two mechanically instead:
 from __future__ import annotations
 
 import copy
+import re
 import json
 from pathlib import Path
 
@@ -200,3 +201,32 @@ def test_core_adapter_revalidates_the_whole_manifest() -> None:
 
     with pytest.raises(ValidationError):
         with_structured_document(manifest, document)
+
+
+DOCUMENT_INVARIANT_MESSAGES = {
+    "duplicate element id": ("MSG_DUPLICATE_ELEMENT_IDS", {}),
+    "missing parent": ("MSG_UNKNOWN_PARENT", {"element_id": "element-000002", "parent_id": "nowhere"}),
+    "own parent": ("MSG_SELF_PARENT", {"element_id": "element-000002"}),
+    "parent cycle": ("MSG_PARENT_CYCLE", {}),
+    "duplicate page number": ("MSG_DUPLICATE_PAGE_NUMBERS", {}),
+    "page lists an unknown element": (
+        "MSG_PAGE_UNKNOWN_ELEMENTS", {"page_number": 1, "element_ids": ["ghost"]},
+    ),
+}
+
+
+@pytest.mark.parametrize("locale", ["en_US", "pt_BR"])
+@pytest.mark.parametrize("case", list(DOCUMENT_INVARIANT_MESSAGES))
+def test_core_reports_docstruct_invariants_in_the_active_locale(monkeypatch, locale, case):
+    import docstruct.manifest as model
+    from backend.i18n import t
+    from scripts.gen_locale_catalogs import TRANSLATIONS
+
+    monkeypatch.setenv("LOCALE", locale)
+    name, kwargs = DOCUMENT_INVARIANT_MESSAGES[case]
+    msgid = getattr(model, name)
+    expected = (TRANSLATIONS["pt_BR"][msgid] if locale == "pt_BR" else msgid).format(**kwargs)
+
+    assert t(msgid).format(**kwargs) == expected
+    with pytest.raises(ValidationError, match=re.escape(expected)):
+        ProcessingManifest.model_validate(_break(BROKEN[case]))
