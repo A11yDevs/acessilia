@@ -83,12 +83,16 @@ num provider da Toolbox).
   - O core ainda roda dois executores operacionais, o renderizador de PDF com
     `reportlab` e o exportador de áudio com `edge-tts` (veja o
     [ADR-0003](0003-remote-only-operational-capabilities.pt-br.md)).
-  - Os modelos semânticos do manifesto existem no core e na Toolbox.
   - O agrupamento de callouts está implementado no builder de normalização
-    da Toolbox e em `docstruct.regions.grouping`.
-  - Alguns algoritmos puros ainda têm uma cópia no core ao lado da
-    docstruct: os perfis de exportação, a normalização conservadora de LaTeX
-    e a ordem de leitura do manifest builder.
+    da Toolbox e em `docstruct.regions.grouping`
+    ([acessilia-toolbox#72](https://github.com/A11yDevs/acessilia-toolbox/issues/72)).
+- **Resolvido pela #203:** as cópias que o core tinha dos perfis de
+  exportação, da normalização conservadora de LaTeX, da ordem de leitura do
+  manifesto e da sua geometria agora delegam à docstruct, e o
+  `tests/test_docstruct_bridges.py` falha diante de qualquer cópia nova. O
+  modelo documental e os invariantes do manifesto ficam em
+  `docstruct.manifest`. Os modelos Pydantic do core e da Toolbox permanecem
+  só como modelos de wire da 1.1.0, verificados contra ele.
   - A classificação de mídias não está mais duplicada: o `media.inspect` roda
     só na Toolbox desde a #160. Ele inspeciona mídias e artefatos, um papel
     diferente do de `docstruct.regions.classify`, que classifica regiões

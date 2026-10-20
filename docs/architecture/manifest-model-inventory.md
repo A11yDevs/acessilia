@@ -75,3 +75,12 @@ Both copies declare the same `$id`. Today they publish different schemas and acc
 - **The Toolbox keeps:** its envelope and `artifact/structured-document@1`. Its document part converges on the same docstruct definition when it moves to docstruct 0.4.0 ([ADR-0004](../adr/0004-single-source-of-truth-for-contracts.md)).
 - **Decide first (D1):** how the JSON Schema of the document part is produced from docstruct (generated, or verified mechanically), and which `description` and `deprecated` marks the single 1.1.0 schema keeps.
 - **Decide first:** whether the Toolbox adopts the missing invariants within 1.1.0. They tighten validation, so some payloads that validate today would no longer validate. The alternative is to keep them core-only until a new schema version.
+
+## Outcome (2026-10-20)
+
+The decisions were taken on [#203](https://github.com/A11yDevs/acessilia/issues/203) and carried out:
+
+- **D1:** `docstruct.manifest` (docstruct 0.4.0) is the normative source of the document part. The wire schema is not generated from it. Each repository's contract test checks it against `docstruct.manifest.field_specs` instead: `tests/test_manifest_semantic_contract.py` in the core, `tests/unit/test_structured_document_contract.py` in the Toolbox.
+- **One schema:** both components publish the identical 1.1.0 schema. The `description` is the text first published (see `schemas/processing_manifest.schema.json`), and `obligations` has no `deprecated` mark.
+- **The same invariants:** both validate the document part through `docstruct.manifest.document_invariant_findings`. The Toolbox adopted the process invariants it lacked. This was treated as a conformance fix of 1.1.0: none of the 31 real payloads checked (historical manifests and recorded snapshots) was rejected, so no new schema version was needed.
+- **Differences 1 and 2 above are resolved.** Difference 3 remains by design: the core resolves messages through its i18n catalog, and the Toolbox keeps English messages.
