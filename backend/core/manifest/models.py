@@ -330,9 +330,10 @@ class ProcessingManifest(StrictModel):
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "$id": SCHEMA_ID,
             "title": "ProcessingManifest",
+            # Verbatim: the description of processing-manifest 1.1.0 as first
+            # published. The core and the Toolbox publish this same text (#203).
             "description": (
-                "Manifesto operacional gerado pelo Agente "
-                "Informacional-Estrutural do Acessília."
+                "Manifesto operacional gerado pelo extrator estrutural do Acessília."
             ),
         },
     )
