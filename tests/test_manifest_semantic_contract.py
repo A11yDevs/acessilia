@@ -235,3 +235,34 @@ def test_core_reports_docstruct_invariants_in_the_active_locale(monkeypatch, loc
     assert t(msgid).format(**kwargs) == expected
     with pytest.raises(ValidationError, match=re.escape(expected)):
         ProcessingManifest.model_validate(_break(BROKEN[case]))
+
+
+MIXED_INTERVALS = {
+    "naive start, aware end": ("2026-10-20T00:00:00", "2026-10-20T00:00:00+00:00"),
+    "aware start, naive end": ("2026-10-20T00:00:00+00:00", "2026-10-20T00:00:00"),
+}
+
+
+@pytest.mark.parametrize("case", list(MIXED_INTERVALS))
+def test_mixed_timezones_are_a_validation_error_not_a_type_error(case) -> None:
+    from backend.core.manifest.models import ExtractorRun, ObligationAttempt
+    from backend.i18n import t
+    from backend.log_messages import MSG_TIMESTAMPS_MIXED_TIMEZONES
+
+    started_at, completed_at = MIXED_INTERVALS[case]
+    expected = re.escape(t(MSG_TIMESTAMPS_MIXED_TIMEZONES))
+
+    def mix(payload: dict) -> None:
+        payload["extractor"]["started_at"] = started_at
+        payload["extractor"]["completed_at"] = completed_at
+
+    with pytest.raises(ValidationError, match=expected):
+        ProcessingManifest.model_validate(_break(mix))
+    with pytest.raises(ValidationError, match=expected):
+        ExtractorRun.model_validate(
+            {"version": "1", "started_at": started_at, "completed_at": completed_at, "duration_ms": 0}
+        )
+    with pytest.raises(ValidationError, match=expected):
+        ObligationAttempt.model_validate(
+            {"method": "m", "status": "failed", "started_at": started_at, "completed_at": completed_at}
+        )
