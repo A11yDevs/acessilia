@@ -1,5 +1,5 @@
 <!--
-Write the pull request in English (constitution, principle 2.8).
+Write the pull request in English (the constitution's English-first rule, section 2).
 Delete the sections that do not apply; keep the checklist.
 -->
 
@@ -9,10 +9,7 @@ Delete the sections that do not apply; keep the checklist.
 
 Part of #
 
-<!--
-"Closes #N" only closes the issue when the PR merges into the default branch
-(main). For a PR into develop, close the issue by hand after the merge.
--->
+> `Closes #N` only closes the issue when the pull request merges into `main`, the default branch. For a pull request into `develop`, close the issue by hand after the merge.
 
 ## What changes
 
@@ -35,6 +32,6 @@ Principles P1–P9 are in [docs/constitution.md, section 7](https://github.com/A
 
 ## Quality
 
-- [ ] `uv run pytest` passes with no unexpected skip, and new behaviour has tests.
+- [ ] `uv run pytest -m "not e2e"` (the command CI runs) passes with no unexpected skip, and new behaviour has tests.
 - [ ] User-facing strings go through `backend.i18n` with their pt-BR translation in `scripts/gen_locale_catalogs.py`, and the catalogs are regenerated.
 - [ ] Every changed `.md` file has its `.pt-br.md` mirror updated in this pull request.

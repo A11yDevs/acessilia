@@ -160,8 +160,10 @@ capacidades operacionais.
      para oferecer um.
    - **Detalhe:** [ADR-0003](adr/0003-remote-only-operational-capabilities.pt-br.md).
    - **Verificado por:** revisão e o `tests/test_architecture_layers.py`,
-     que falha se `backend/` ou `frontend/` importar uma biblioteca
-     operacional.
+     que falha se `backend/` importar o pacote da Toolbox, ou se `backend/`
+     ou `frontend/` importar uma biblioteca operacional. Ele não tem lista de
+     exceções: uma exceção exige uma ADR, e uma lista de exceções, depois de
+     criada, só pode diminuir.
 5. **P5 — Processamento orientado a referências.**
    - **Regra:** artefatos persistidos são processados onde estão armazenados e
      trafegam como referências `ArtifactRef` tipadas e opacas. A materialização

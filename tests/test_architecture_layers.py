@@ -43,6 +43,8 @@ def test_backend_does_not_import_the_toolbox_package() -> None:
 #: Libraries that run operations (rendering, OCR, conversion, extraction). They
 #: belong to the Toolbox; the core reaches them through its capabilities
 #: (docs/adr/0003). Tests may still use some of them to build fixtures.
+#: There is no allowlist of exceptions (constitution, P4): one needs an ADR,
+#: and once added it can only shrink.
 OPERATIONAL_LIBRARIES = (
     "cv2",
     "docling",

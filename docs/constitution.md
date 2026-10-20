@@ -159,8 +159,10 @@ Toolbox executes operational capabilities.
      offer one.
    - **Detail:** [ADR-0003](adr/0003-remote-only-operational-capabilities.md).
    - **Checked by:** review, and
-     `tests/test_architecture_layers.py`, which fails if `backend/` or
-     `frontend/` imports an operational library.
+     `tests/test_architecture_layers.py`, which fails if `backend/` imports
+     the Toolbox package, or if `backend/` or `frontend/` imports an
+     operational library. It has no allowlist: an exception needs an ADR,
+     and an allowlist, once added, can only shrink.
 5. **P5 — Reference-oriented processing.**
    - **Rule:** persisted artifacts are processed where they are stored and
      passed as typed, opaque `ArtifactRef` references. Materialization is
