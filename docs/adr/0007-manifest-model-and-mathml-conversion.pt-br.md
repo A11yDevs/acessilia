@@ -2,7 +2,7 @@
 
 Também disponível em **inglês (EUA)**: [English version](0007-manifest-model-and-mathml-conversion.md)
 
-- **Status:** Aceito
+- **Status:** Aceito. O provider citado na decisão 2 (`pure-math` com `latex2mathml`) foi substituído pela [0008](0008-math-capabilities-on-mathjax-and-mathcat.pt-br.md); as decisões continuam valendo.
 - **Data:** 2026-10-19
 - **Componentes:** core, SDK, docstruct, Toolbox
 - **Issues:** [#152](https://github.com/A11yDevs/acessilia/issues/152); achados A1 e A3 da [auditoria de outubro de 2026](../architecture/audit-2026-10.pt-br.md)

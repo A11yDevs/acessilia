@@ -2,7 +2,7 @@
 
 You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](0007-manifest-model-and-mathml-conversion.pt-br.md)
 
-- **Status:** Accepted
+- **Status:** Accepted. The provider named in decision 2 (`pure-math` with `latex2mathml`) is superseded by [0008](0008-math-capabilities-on-mathjax-and-mathcat.md); the decisions stand.
 - **Date:** 2026-10-19
 - **Components:** core, SDK, docstruct, Toolbox
 - **Issues:** [#152](https://github.com/A11yDevs/acessilia/issues/152); findings A1 and A3 of the [October 2026 audit](../architecture/audit-2026-10.md)
