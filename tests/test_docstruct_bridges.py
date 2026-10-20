@@ -41,6 +41,7 @@ BRIDGES = {
     "backend/pipeline/canonical_builder.py": ADAPTER,
     "backend/pipeline/table_ast.py": ADAPTER,
     "backend/pipeline/validators.py": ADAPTER,
+    "backend/tools/formula_tools.py": ADAPTER,
 }
 
 #: A bridge says so in its docstring; this keeps the registry complete.

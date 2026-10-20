@@ -1,40 +1,30 @@
 """LaTeX normalization and the presentation of spoken formulas.
 
+Core migrated to docstruct.text.latex: ``normalize_latex`` is docstruct's
+conservative ``bare_latex`` (strip one pair of outer delimiters, collapse
+whitespace, never rewrite the math) and ``ensure_math_delimiters`` is
+re-exported. This adapter keeps the core's ``wrap_latex`` default
+(``display=False``, unlike docstruct's) and the "Fórmula:" label, which is
+presentation.
+
 Recognition, MathML conversion and speech run on the Toolbox
 (``math.recognize``, ``math.convert``, ``math.verbalize``; see
-backend/tools/toolbox_math_tools.py and ADR-0007). This module only reshapes
-LaTeX strings and labels spoken text.
+backend/tools/toolbox_math_tools.py and ADR-0007).
 """
 
 from __future__ import annotations
 
+from docstruct.text.latex import (  # noqa: F401
+    bare_latex as normalize_latex,
+    ensure_math_delimiters,
+)
 
-def ensure_math_delimiters(latex: str) -> str:
-    """Garante $...$ para que o parser estrutural reconheça o bloco como math."""
-    text = latex.strip()
-    if not text:
-        return text
-    if (text.startswith("$") and text.endswith("$")) or (
-        text.startswith("\\[") and text.endswith("\\]")
-    ):
-        return text
-    return f"${text}$"
-
-
-def normalize_latex(latex: str) -> str:
-    """Strip outer math delimiters and collapse whitespace without rewriting math."""
-    text = latex.strip()
-    if text.startswith("$$") and text.endswith("$$") and len(text) > 4:
-        text = text[2:-2]
-    elif text.startswith("$") and text.endswith("$") and len(text) > 2:
-        text = text[1:-1]
-    elif text.startswith("\\[") and text.endswith("\\]"):
-        text = text[2:-2]
-    elif text.startswith("\\(") and text.endswith("\\)"):
-        text = text[2:-2]
-    if not text.strip("$ "):
-        return ""
-    return " ".join(text.split())
+__all__ = [
+    "ensure_math_delimiters",
+    "label_spoken_formula",
+    "normalize_latex",
+    "wrap_latex",
+]
 
 
 def wrap_latex(latex: str, display: bool = False) -> str:

@@ -11,28 +11,9 @@ from __future__ import annotations
 from typing import Any
 
 from docstruct.tables.ast import table_ast_from_block
+from docstruct.text.latex import bare_latex
 
 _HEADER_SCOPES = {"row", "col", "rowgroup", "colgroup"}
-
-
-def bare_latex(latex: str) -> str:
-    """Strip one pair of outer math delimiters and collapse whitespace.
-
-    Leaves the expression itself untouched, unlike
-    ``docstruct.text.latex.normalize_latex``, which rewrites symbols.
-    """
-    text = latex.strip()
-    if text.startswith("$$") and text.endswith("$$") and len(text) > 4:
-        text = text[2:-2]
-    elif text.startswith("$") and text.endswith("$") and len(text) > 2:
-        text = text[1:-1]
-    elif (text.startswith("\\[") and text.endswith("\\]")) or (
-        text.startswith("\\(") and text.endswith("\\)")
-    ):
-        text = text[2:-2]
-    if not text.strip("$ "):
-        return ""
-    return " ".join(text.split())
 
 
 def document_to_markdown(document: dict[str, Any]) -> str:

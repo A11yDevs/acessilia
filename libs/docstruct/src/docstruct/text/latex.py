@@ -3,6 +3,10 @@
 Pure: zero external dependencies, standard library only.
 Provides formula delimiter stripping, math symbol normalization,
 OCR wrapper pruning, and standardized spacing.
+
+Two normalizations coexist on purpose: ``bare_latex`` is conservative (it
+strips one pair of outer delimiters and collapses whitespace, leaving the
+expression untouched); ``normalize_latex`` rewrites symbols and spacing.
 """
 from __future__ import annotations
 
@@ -70,6 +74,42 @@ _UNICODE_MATH_MAP: dict[str, str] = {
     "Ψ": r"\Psi",
     "Ω": r"\Omega",
 }
+
+
+def bare_latex(latex: str) -> str:
+    """Strip one pair of outer math delimiters and collapse whitespace.
+
+    Leaves the expression itself untouched, unlike ``normalize_latex``, which
+    rewrites symbols. Returns ``""`` when nothing but delimiters is left.
+    """
+    text = latex.strip()
+    if text.startswith("$$") and text.endswith("$$") and len(text) > 4:
+        text = text[2:-2]
+    elif text.startswith("$") and text.endswith("$") and len(text) > 2:
+        text = text[1:-1]
+    elif (text.startswith("\\[") and text.endswith("\\]")) or (
+        text.startswith("\\(") and text.endswith("\\)")
+    ):
+        text = text[2:-2]
+    if not text.strip("$ "):
+        return ""
+    return " ".join(text.split())
+
+
+def ensure_math_delimiters(latex: str) -> str:
+    """Wrap ``latex`` in ``$...$`` unless it is already ``$``- or ``\\[``-delimited.
+
+    Structural parsers recognize a block as math by its delimiters. Blank
+    input stays blank.
+    """
+    text = latex.strip()
+    if not text:
+        return text
+    if (text.startswith("$") and text.endswith("$")) or (
+        text.startswith("\\[") and text.endswith("\\]")
+    ):
+        return text
+    return f"${text}$"
 
 
 def strip_latex_delimiters(text: str) -> str:

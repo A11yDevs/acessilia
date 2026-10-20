@@ -97,3 +97,34 @@ class TestWrapLatex:
         assert wrap_latex(None) == ""
         assert wrap_latex("") == ""
         assert wrap_latex("   ") == ""
+
+
+class TestConservativeHelpers:
+    """``bare_latex`` and ``ensure_math_delimiters`` never rewrite the math."""
+
+    def test_bare_latex_strips_one_pair_and_collapses_whitespace(self):
+        from docstruct.text.latex import bare_latex
+
+        assert bare_latex("  $$ x ^ { 2 }\n+  1 $$  ") == "x ^ { 2 } + 1"
+        assert bare_latex("$$$a$$$") == "$a$"
+        assert bare_latex(r"\[ \alpha \]") == r"\alpha"
+        assert bare_latex(r"\( a \)") == "a"
+        assert bare_latex("α ^ { 2 }") == "α ^ { 2 }"
+        assert bare_latex("") == ""
+        assert bare_latex("$ $") == ""
+
+    def test_markdown_export_uses_the_same_function(self):
+        from docstruct.export import markdown
+        from docstruct.text import latex
+
+        assert markdown.bare_latex is latex.bare_latex
+
+    def test_ensure_math_delimiters(self):
+        from docstruct.text.latex import ensure_math_delimiters
+
+        assert ensure_math_delimiters("  x + 1 ") == "$x + 1$"
+        assert ensure_math_delimiters("$x$") == "$x$"
+        assert ensure_math_delimiters("$$x$$") == "$$x$$"
+        assert ensure_math_delimiters(r"\[x\]") == r"\[x\]"
+        assert ensure_math_delimiters(r"\(x\)") == r"$\(x\)$"
+        assert ensure_math_delimiters("   ") == ""
