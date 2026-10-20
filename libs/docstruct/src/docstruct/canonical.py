@@ -48,6 +48,7 @@ def _source_type(source_path: str) -> str:
 from docstruct.text.sanitize import sanitize_block_text
 from docstruct.text.sanitize import sanitize_text
 from docstruct.blocks.parser import parse_text_to_blocks
+from docstruct.tables.ast import raw_rows_from_table_ast
 
 
 def build_canonical_document(
@@ -290,7 +291,7 @@ def _sanitize_structured_blocks(
             if table_ast:
                 clean["table_ast"] = table_ast
                 if not clean.get("rows"):
-                    clean["rows"] = _rows_from_table_ast(table_ast)
+                    clean["rows"] = raw_rows_from_table_ast(table_ast)
 
         children = clean.get("children")
         if isinstance(children, list):
@@ -359,24 +360,6 @@ def _table_ast_from_rows(rows: list[list[str]]) -> dict[str, Any]:
         if cells:
             body.append({"cells": cells})
     return {"body": body}
-
-
-def _rows_from_table_ast(table_ast: dict[str, Any]) -> list[list[str]]:
-    rows: list[list[str]] = []
-    for section_name in ("header", "body", "footer"):
-        section = table_ast.get(section_name)
-        if not isinstance(section, list):
-            continue
-        for row in section:
-            if not isinstance(row, dict):
-                continue
-            cells = row.get("cells")
-            if not isinstance(cells, list):
-                continue
-            row_values = [str(cell.get("text", "")).strip() for cell in cells if isinstance(cell, dict)]
-            if row_values:
-                rows.append(row_values)
-    return rows
 
 
 def _make_id(prefix: str, text: str, counter: int) -> str:

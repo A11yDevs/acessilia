@@ -138,3 +138,21 @@ class TestAnalyzeTableComplexity:
     def test_table_ast_types(self):
         assert issubclass(TableASTError, Exception)
         assert get_origin(TableAST) is dict
+
+
+def test_raw_rows_from_table_ast_reads_the_ast_as_given():
+    from docstruct.tables.ast import raw_rows_from_table_ast
+
+    table_ast = {
+        "header": [{"cells": [{"text": " A "}, {"text": "B"}]}],
+        "body": [
+            {"cells": [{"text": 1}, "not a cell", {}]},
+            "not a row",
+            {"cells": "not a list"},
+            {"cells": []},
+        ],
+        "footer": {"not": "a list"},
+    }
+
+    assert raw_rows_from_table_ast(table_ast) == [["A", "B"], ["1", ""]]
+    assert raw_rows_from_table_ast({}) == []

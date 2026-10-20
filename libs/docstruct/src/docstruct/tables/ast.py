@@ -385,6 +385,29 @@ def rows_from_table_ast(table_ast: Any) -> list[list[str]]:
     return rows
 
 
+def raw_rows_from_table_ast(table_ast: dict[str, Any]) -> list[list[str]]:
+    """Cell texts row by row, from the AST exactly as given.
+
+    Unlike ``rows_from_table_ast``, the AST is not normalized first: rows and
+    cells that are not dicts are skipped, and so are rows left empty.
+    """
+    rows: list[list[str]] = []
+    for section_name in ("header", "body", "footer"):
+        section = table_ast.get(section_name)
+        if not isinstance(section, list):
+            continue
+        for row in section:
+            if not isinstance(row, dict):
+                continue
+            cells = row.get("cells")
+            if not isinstance(cells, list):
+                continue
+            row_values = [str(cell.get("text", "")).strip() for cell in cells if isinstance(cell, dict)]
+            if row_values:
+                rows.append(row_values)
+    return rows
+
+
 def table_ast_from_block(block: dict[str, Any]) -> dict[str, Any] | None:
     table_ast = normalize_table_ast(block.get("table_ast"))
     if table_ast is not None:
