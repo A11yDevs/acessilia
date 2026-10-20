@@ -19,8 +19,8 @@ The ecosystem has four components; [ADR-0002](../adr/0002-component-responsibili
 
 - The core must not import the Toolbox package (`tests/test_architecture_layers.py`).
 - The core must not import an operational library: PyMuPDF, Pillow, OpenCV, Docling, pypdf, python-docx or RapidOCR (same test). Operational work runs on the Toolbox ([ADR-0003](../adr/0003-remote-only-operational-capabilities.md)).
-- docstruct must not import the core, the SDK or the Toolbox (`libs/docstruct/tests/test_purity.py`).
-- The SDK must not import the core or the Toolbox (`libs/sdk/tests/test_purity.py`).
-- The Toolbox must not import the SDK or the core. No test guards this yet; it is tracked in [#188](https://github.com/A11yDevs/acessilia/issues/188).
+- docstruct must not import anything outside the Python standard library: it declares no runtime dependency, and an optional accelerator (today only `rapidfuzz`) must be guarded by `except ImportError` and work without it (`libs/docstruct/tests/test_purity.py`).
+- The SDK must not import the core or the Toolbox, and its runtime dependencies and imports stay within the standard library, `httpx` and docstruct (`libs/sdk/tests/test_purity.py`).
+- The Toolbox must not import the SDK or the core (`tests/unit/test_architecture.py` in the Toolbox repository).
 
 There is no dependency cycle.

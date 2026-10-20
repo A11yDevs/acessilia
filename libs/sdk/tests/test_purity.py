@@ -8,11 +8,18 @@ refuses them.
 
 from __future__ import annotations
 
+import ast
+import re
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
-SRC = Path(__file__).resolve().parents[1] / "src"
+ROOT = Path(__file__).resolve().parents[1]
+SRC = ROOT / "src"
+#: The only runtime dependencies the SDK may have (ADR-0002, P2): the HTTP
+#: client, and docstruct for shared pure algorithms.
+ALLOWED_DEPENDENCIES = {"httpx": "httpx", "acessilia-docstruct": "docstruct"}
 FORBIDDEN = ("backend", "acessilia_toolbox")
 
 _PROBE = f"""
@@ -71,3 +78,33 @@ def test_capability_registry_is_pure_data() -> None:
         for alias in node.names
     }
     assert imported <= {"__future__", "dataclasses", "typing"}, imported
+
+
+def test_runtime_dependencies_stay_within_httpx_and_docstruct() -> None:
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+    declared = {
+        re.split(r"[\s<>=!~;\[@]", requirement, maxsplit=1)[0].lower()
+        for requirement in project.get("dependencies", [])
+    }
+    assert declared <= set(ALLOWED_DEPENDENCIES), declared - set(ALLOWED_DEPENDENCIES)
+
+
+def test_imports_stay_within_the_standard_library_httpx_and_docstruct() -> None:
+    allowed = set(sys.stdlib_module_names) | set(ALLOWED_DEPENDENCIES.values()) | {
+        "acessilia_sdk"
+    }
+    offenders = []
+    for path in sorted(SRC.rglob("*.py")):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if isinstance(node, ast.Import):
+                names = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom) and node.module and not node.level:
+                names = [node.module]
+            else:
+                continue
+            offenders += [
+                f"{path.relative_to(SRC)}:{node.lineno}: {name}"
+                for name in names
+                if name.split(".")[0] not in allowed
+            ]
+    assert not offenders, offenders
