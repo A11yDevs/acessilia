@@ -292,6 +292,7 @@ from backend.tools.validators import MSG_FILE_TOO_LARGE, MSG_UNSUPPORTED_FORMAT
 from frontend.web.messages import (
     WEB_JOB_TITLE,
     WEB_JOB_PENDING,
+    WEB_JOB_CLOSE_INFO,
     WEB_JOB_DOWNLOAD,
     WEB_JOB_EMAIL_FAILED,
     WEB_JOB_EMAIL_SENT,
@@ -441,6 +442,7 @@ MESSAGES: tuple[str, ...] = (
     MSG_SPEECH_REJECTED,
     WEB_JOB_TITLE,
     WEB_JOB_PENDING,
+    WEB_JOB_CLOSE_INFO,
     WEB_JOB_DOWNLOAD,
     WEB_JOB_EMAIL_FAILED,
     WEB_JOB_EMAIL_SENT,
@@ -847,6 +849,11 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         MSG_SPEECH_REJECTED: 'math.verbalize rejeitou o LaTeX de {count} fórmula(s): mantidas sem texto falado',
         WEB_JOB_TITLE: 'Seu documento',
         WEB_JOB_PENDING: 'Mantenha esta página aberta ou salve-a nos favoritos para acompanhar seu documento.',
+        WEB_JOB_CLOSE_INFO: (
+            'Você pode fechar esta janela com segurança. O resultado também será '
+            'enviado para o seu e-mail, e esta página fica disponível neste '
+            'navegador por {days} dias.'
+        ),
         WEB_JOB_DOWNLOAD: 'Baixar seus arquivos',
         WEB_JOB_EMAIL_FAILED: 'Não foi possível enviar o e-mail. Você pode baixar seus arquivos aqui.',
         WEB_JOB_EMAIL_SENT: 'O e-mail com o resultado foi enviado. Você também pode baixar seus arquivos aqui.',

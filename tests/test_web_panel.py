@@ -4,12 +4,14 @@ from fastapi.testclient import TestClient
 pytest.importorskip("fastapi.testclient")
 
 from backend.i18n import t  # noqa: E402
+from backend.services.download_token_service import TOKEN_EXPIRY_DAYS  # noqa: E402
 from frontend.clients.api_client import ApiError  # noqa: E402
 from frontend.web import app as web_module  # noqa: E402
 from frontend.web.messages import (  # noqa: E402
     WEB_ADVANCED_HEADLINE,
     WEB_ERROR_INTERNAL,
     WEB_INDEX_HEADLINE,
+    WEB_JOB_CLOSE_INFO,
     WEB_JOB_PENDING,
 )
 
@@ -120,7 +122,8 @@ def test_upload_submits_via_api(web_client):
     )
     assert resp.status_code == 200
     assert resp.url.path == "/jobs/web12345"
-    assert t(WEB_JOB_PENDING) in resp.text
+    assert t(WEB_JOB_CLOSE_INFO).format(days=TOKEN_EXPIRY_DAYS) in resp.text
+    assert t(WEB_JOB_PENDING) not in resp.text
     assert "private-web-token" not in resp.text
     assert len(web_client.fake.submitted) == 1
     sub = web_client.fake.submitted[0]
@@ -314,6 +317,47 @@ def test_receipt_recovers_result_after_refresh(web_client, monkeypatch, delivery
         assert page.headers["referrer-policy"] == "no-referrer"
         assert "private-web-token" not in page.text
         assert 'http-equiv="refresh"' not in page.text
+
+
+@pytest.mark.parametrize(("status_value", "delivery", "shows_close_info", "shows_pending"), [
+    ("queued", None, True, False),
+    ("processing", None, True, False),
+    ("processing", "pending", True, False),
+    ("done", "pending", True, False),
+    ("done", "sent", False, False),
+    ("done", "failed", False, False),
+    ("done", "unknown", False, False),
+    ("error", None, False, False),
+    ("cancelled", None, False, False),
+    ("cancelling", None, False, True),
+])
+def test_receipt_close_info_only_while_the_email_promise_holds(
+    web_client, monkeypatch, status_value, delivery, shows_close_info, shows_pending
+):
+    """The "you can safely close this window" notice must appear only while the
+    email promise still holds (job queued/processing or email still pending).
+
+    For finished jobs the delivery alerts already tell the user what happened,
+    and for error/cancelled jobs no result email is sent at all, so promising
+    one would contradict the page. When the notice shows, it must replace
+    WEB_JOB_PENDING instead of stacking with it, and while the job is
+    cancelling (no close-info promise) the pending guidance still applies.
+    """
+    web_client.post("/process", files={"document_file": ("doc.pdf", _fake_pdf_bytes(), "application/pdf")},
+        data={"email": "test@example.com"})
+
+    async def status(task_id, job_token=None):
+        assert job_token == "private-web-token"
+        return {"arquivo": "doc.pdf", "status": status_value, "etapa_atual": "…",
+            "email_delivery": delivery,
+            "download_url": "http://web.invalid/download/tok", "erros": []}
+
+    monkeypatch.setattr(web_client.fake, "get_job_status", status)
+    page = web_client.get("/jobs/web12345")
+    assert page.status_code == 200
+    close_info = t(WEB_JOB_CLOSE_INFO).format(days=TOKEN_EXPIRY_DAYS)
+    assert (close_info in page.text) is shows_close_info
+    assert (t(WEB_JOB_PENDING) in page.text) is shows_pending
 
 
 def test_receipt_survives_temporary_api_failure(web_client, monkeypatch):

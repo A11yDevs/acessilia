@@ -27,6 +27,7 @@ from slowapi.errors import RateLimitExceeded
 
 from backend.config.settings import settings
 from backend.i18n import t, active_locale
+from backend.services.download_token_service import TOKEN_EXPIRY_DAYS
 from backend.log_messages import (
     LOG_WEB_API_UPLOAD_ERROR,
     LOG_WEB_DOWNLOAD_QUERY_FAILED,
@@ -391,7 +392,7 @@ async def _submit_via_api(
     response = RedirectResponse(url=receipt_path, status_code=303)
     response.set_cookie(
         "acessilia_job", result["job_token"], path=receipt_path,
-        max_age=7 * 24 * 60 * 60, httponly=True, samesite="lax",
+        max_age=TOKEN_EXPIRY_DAYS * 24 * 60 * 60, httponly=True, samesite="lax",
         secure=request.url.scheme == "https",
     )
     response.headers["Cache-Control"] = "no-store"
@@ -425,7 +426,7 @@ async def job_receipt(request: Request, task_id: str):
         context={**_web_strings(), "job": job, "download_path": download_path,
             "refresh": refresh, "unavailable": unavailable,
             "job_title": t(WEB_JOB_TITLE), "job_pending": t(WEB_JOB_PENDING),
-            "job_close_info": t(WEB_JOB_CLOSE_INFO),
+            "job_close_info": t(WEB_JOB_CLOSE_INFO).format(days=TOKEN_EXPIRY_DAYS),
             "job_download": t(WEB_JOB_DOWNLOAD), "job_email_failed": t(WEB_JOB_EMAIL_FAILED),
             "job_email_sent": t(WEB_JOB_EMAIL_SENT), "job_email_unknown": t(WEB_JOB_EMAIL_UNKNOWN), "job_unavailable": t(WEB_JOB_UNAVAILABLE),
             "job_status": t(WEB_JOB_STATUS), "job_errors": t(WEB_JOB_ERRORS),

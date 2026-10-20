@@ -45,6 +45,16 @@ msgstr "Your document"
 msgid "Keep this page open or bookmark it to follow your document."
 msgstr "Keep this page open or bookmark it to follow your document."
 
+#, python-brace-format
+msgid ""
+"You can safely close this window. The result will also be sent to your "
+"email address, and this page stays available in this browser for {days} "
+"days."
+msgstr ""
+"You can safely close this window. The result will also be sent to your "
+"email address, and this page stays available in this browser for {days} "
+"days."
+
 msgid "Download your files"
 msgstr "Download your files"
 
