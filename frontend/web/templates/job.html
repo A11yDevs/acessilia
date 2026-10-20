@@ -6,26 +6,91 @@
     <meta name="referrer" content="no-referrer">
     {% if refresh %}<meta http-equiv="refresh" content="5">{% endif %}
     <title>{{ job_title }}</title>
+    <link rel="icon" type="image/png" href="/static/logo.png">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            color: #212529;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .container {
+            max-width: 600px;
+            margin-top: 50px;
+        }
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .card-header {
+            background-color: #0d6efd;
+            color: white;
+            border-radius: 15px 15px 0 0 !important;
+            padding: 20px;
+            text-align: center;
+        }
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+        /* Accessibility: contrast and focus visibility */
+        :focus {
+            outline: 3px solid #ffc107 !important;
+            outline-offset: 2px;
+        }
+    </style>
 </head>
 <body>
-    <main class="container mt-5" style="max-width: 48rem; margin: 2rem auto; padding: 1rem;">
-        <h1>{{ job_title }}</h1>
-        {% if unavailable %}
-        <p role="alert">{{ job_unavailable }}</p>
-        {% else %}
-        <h2>{{ job.arquivo }}</h2>
-        <p>{{ job_status }}: {{ job.etapa_atual or job.status }}</p>
-        {% if refresh %}<p>{{ job_pending }}</p>{% endif %}
-        {% if job.email_delivery == 'failed' %}<p role="alert">{{ job_email_failed }}</p>{% endif %}
-        {% if job.email_delivery == 'unknown' %}<p role="alert">{{ job_email_unknown }}</p>{% endif %}
-        {% if job.email_delivery == 'sent' %}<p>{{ job_email_sent }}</p>{% endif %}
-        {% if download_path %}<p><a href="{{ download_path }}">{{ job_download }}</a></p>{% endif %}
-        {% if job.erros %}
-        <h2>{{ job_errors }}</h2>
-        <ul>{% for error in job.erros %}<li>{{ error }}</li>{% endfor %}</ul>
-        {% endif %}
-        {% endif %}
-        <p><a href="/">{{ job_home }}</a></p>
+    <main class="container" role="main">
+        <div class="card">
+            <header class="card-header">
+                <div class="text-start mb-2">
+                    <img src="/static/logo.png"
+                         alt="{{ logo_alt }}"
+                         style="max-width: 180px; height: auto;">
+                </div>
+                <h1 class="h3 mb-0">{{ job_title }}</h1>
+            </header>
+            <div class="card-body p-4">
+                {% if unavailable %}
+                <div class="alert alert-warning" role="alert">
+                    {{ job_unavailable }}
+                </div>
+                {% else %}
+                <h2 class="h5">{{ job.arquivo }}</h2>
+                <p>{{ job_status }}: {{ job.etapa_atual or job.status }}</p>
+
+                <div class="alert alert-info" role="status">
+                    {{ job_close_info }}
+                </div>
+
+                {% if refresh %}<p>{{ job_pending }}</p>{% endif %}
+                {% if job.email_delivery == 'failed' %}<div class="alert alert-warning" role="alert">{{ job_email_failed }}</div>{% endif %}
+                {% if job.email_delivery == 'unknown' %}<div class="alert alert-warning" role="alert">{{ job_email_unknown }}</div>{% endif %}
+                {% if job.email_delivery == 'sent' %}<div class="alert alert-success" role="status">{{ job_email_sent }}</div>{% endif %}
+                {% if download_path %}
+                <div class="d-grid gap-2 mt-4">
+                    <a href="{{ download_path }}" class="btn btn-primary btn-lg">{{ job_download }}</a>
+                </div>
+                {% endif %}
+                {% if job.erros %}
+                <h2 class="h5 mt-4">{{ job_errors }}</h2>
+                <ul>{% for error in job.erros %}<li>{{ error }}</li>{% endfor %}</ul>
+                {% endif %}
+                {% endif %}
+                <div class="text-center mt-3">
+                    <a href="/" class="btn btn-outline-secondary">{{ job_home }}</a>
+                </div>
+            </div>
+        </div>
+        <footer class="footer">
+            <p>&copy; 2026 Acessilia - {{ footer }}</p>
+        </footer>
     </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
