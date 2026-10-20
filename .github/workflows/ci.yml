@@ -54,14 +54,17 @@ jobs:
           python -m pip install ".[dev]" --no-cache-dir
 
       # The SDK registry must match the contract the Toolbox publishes on the
-      # branch this code is deployed with: main and release/** run against the
-      # Toolbox's main, everything else against its develop (#186).
+      # branch this code is deployed with (#186): main runs against the
+      # Toolbox's main, release/x.y.z against the Toolbox's release/x.y.z
+      # (both are cut together for BHS, the Toolbox first) and everything else
+      # against its develop.
       - name: Check the Toolbox capability contract
         env:
           TARGET_BRANCH: ${{ github.base_ref || github.ref_name }}
         run: |
           case "$TARGET_BRANCH" in
-            main|release/*) TOOLBOX_REF=main ;;
+            main) TOOLBOX_REF=main ;;
+            release/*) TOOLBOX_REF="$TARGET_BRANCH" ;;
             *) TOOLBOX_REF=develop ;;
           esac
           # Same URL as PUBLISHED_URL in scripts/capture_toolbox_contract.py.
