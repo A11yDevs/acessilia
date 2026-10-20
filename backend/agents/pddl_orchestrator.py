@@ -15,7 +15,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from docstruct.fusion.tailjoin import is_page_number as _is_page_number
-from docstruct.tables.ast import effective_section_width, linearize_table_for_text
+from docstruct.tables.ast import (
+    effective_section_width,
+    linearize_table_for_text,
+    raw_rows_from_table_ast as _rows_from_table_ast,
+)
 from docstruct.text.norm_fix import norm_fix
 
 from backend.services.blocking import run_blocking
@@ -3517,28 +3521,6 @@ def _table_ast_from_rows(rows: list[list[str]]) -> dict[str, Any]:
         if cells:
             body.append({"cells": cells})
     return {"body": body}
-
-
-def _rows_from_table_ast(table_ast: dict[str, Any]) -> list[list[str]]:
-    rows: list[list[str]] = []
-    for section_name in ("header", "body", "footer"):
-        section = table_ast.get(section_name)
-        if not isinstance(section, list):
-            continue
-        for row in section:
-            if not isinstance(row, dict):
-                continue
-            cells = row.get("cells")
-            if not isinstance(cells, list):
-                continue
-            row_values = [
-                str(cell.get("text", "")).strip()
-                for cell in cells
-                if isinstance(cell, dict)
-            ]
-            if row_values:
-                rows.append(row_values)
-    return rows
 
 
 # Backward compatibility with the PMV naming.

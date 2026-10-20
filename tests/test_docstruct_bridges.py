@@ -57,9 +57,7 @@ MIN_COMPARED_NODES = 25
 
 #: Copies of docstruct functions still in the core, each removed by a later
 #: #203 step. Remove the entry with the copy; the test fails on stale entries.
-KNOWN_COPIES = {
-    "backend/agents/pddl_orchestrator.py:_rows_from_table_ast",
-}
+KNOWN_COPIES: set[str] = set()
 
 
 def _tree(relative: str) -> ast.Module:
