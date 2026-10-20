@@ -25,6 +25,7 @@ The system runs the `pddl` pipeline engine (the manifest → plan → execution 
 12. [Toolbox tool integration](toolbox_integration.md) — how to integrate a new Toolbox tool into the core: HTTP contract, libraries vs. Toolbox capabilities, and the two integration scenarios. (Brazilian Portuguese: [versão em pt-BR](toolbox_integration.pt-br.md))
 13. [Architecture Decision Records](adr/README.md) — cross-component decisions (responsibilities, remote-only execution, contracts, artifact references, availability, the manifest model and MathML conversion and verbalization of formulas) and how to propose a new one. (Brazilian Portuguese: [versão em pt-BR](adr/README.pt-br.md))
 14. [Architecture audit, October 2026](architecture/audit-2026-10.md) — what is still implemented twice across the components, the remaining operational dependencies, the architectural guards and the initial metrics, with an owner and a destination for each finding. (Brazilian Portuguese: [versão em pt-BR](architecture/audit-2026-10.pt-br.md))
+15. [Processing manifest model inventory](architecture/manifest-model-inventory.md) — every class and field of the manifest sorted into document, origin, process and envelope, with the invariants and the differences between the core's and the Toolbox's copies (#203, stage 5). (Brazilian Portuguese: [pt-BR version](architecture/manifest-model-inventory.pt-br.md))
 
 ---
 
