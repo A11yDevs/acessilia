@@ -55,13 +55,22 @@ ignora o idioma pedido.
 - A #150 remove os caminhos locais, uma capacidade por pull request, e depois
   tira pandoc, TeX Live e veraPDF/JRE do `infra/Dockerfile`. O tamanho da
   imagem é medido antes e depois.
-- **Desvios conhecidos, registrados na auditoria da #152:** não resta
-  nenhum. A #150 removeu os executores locais um a um; os últimos, os
+- A #150 removeu um a um os executores locais que cobria; os últimos, os
   extratores locais de manifesto, saíram na
   [#176](https://github.com/A11yDevs/acessilia/pull/176), e o `pymupdf`
   virou uma dependência de desenvolvimento, usada pelos testes para gerar PDFs.
+- **Desvios conhecidos, registrados na [#203](https://github.com/A11yDevs/acessilia/issues/203):** restam dois executores
+  locais, então o `remote_only` ainda não está completo:
+  - `backend/export/renderers/pdf_renderer.py` renderiza PDF com `reportlab`;
+  - `backend/export/exporters/audio_exporter.py` sintetiza MP3 com
+    `edge-tts`.
+
+  Cada um é substituído por uma capacidade da Toolbox acessada pelo SDK.
+  Quando um caminho sai, sua biblioteca entra na lista abaixo e deixa as
+  dependências de runtime do core.
 - **Verificação (#152):** o `tests/test_architecture_layers.py` falha se
   `backend/` ou `frontend/` importar uma biblioteca operacional (`fitz`,
   `PIL`, `cv2`, `docling`, `pypdf`, `docx`, `rapidocr`, `pypandoc`). Ele não
-  tem ofensores, então não mantém allowlist. Ele não verifica chamadas
+  tem ofensores, então não mantém allowlist; `reportlab` e `edge_tts` ainda
+  não estão na lista. Ele não verifica chamadas
   `subprocess`; pandoc, TeX Live e veraPDF já não estão na imagem.

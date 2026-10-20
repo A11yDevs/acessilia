@@ -155,6 +155,19 @@ Implementation and acceptance criteria:
    and the handling of errors, unavailability and results of `math.convert`
    and `math.verbalize`.
 
+**Scope of decision 1, as the migration applies it ([#203](https://github.com/A11yDevs/acessilia/issues/203)):**
+
+- Only the semantic model moves to docstruct. The core's
+  `ProcessingManifest` also carries process state (obligations, attempts,
+  statuses, dependencies, history); that state, and the manifest as a whole,
+  stay in the core, which splits `backend/core/manifest/models.py` instead of
+  replacing it. Identification and origin fields are classified one by one;
+  they are not structural semantics by default.
+- Three versions are independent: the core's `processing-manifest:1.1.0`
+  schema, the Toolbox's `artifact/structured-document@1` contract, and the
+  docstruct package version. A library bump never changes a wire payload by
+  itself; a payload change needs its own migration and version.
+
 **Done when** there is a single semantic definition of the shared models, the
 Toolbox payload remains compatible, the core obtains MathML and spoken text only
 through `math.convert` and `math.verbalize` via the SDK, and tests prevent new dependencies or duplicated

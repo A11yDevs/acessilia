@@ -71,16 +71,24 @@ provider).
 - **Enforced today:**
   - `tests/test_architecture_layers.py` (the core does not import the Toolbox).
   - `libs/docstruct/tests/test_purity.py` (docstruct does not import the core,
-    the SDK or the Toolbox).
+    the SDK or the Toolbox, declares no runtime dependency, and imports
+    nothing outside the standard library except guarded optional
+    accelerators such as `rapidfuzz`).
   - `libs/sdk/tests/test_purity.py` (the SDK does not import the core or the
-    Toolbox).
+    Toolbox, and its dependencies stay within `httpx` and docstruct).
 - **Planned in #152:**
-  - a Toolbox test forbidding `acessilia_sdk` and `backend` imports;
-  - a docstruct test refusing any non-standard-library import;
-  - a check that the SDK's dependencies stay within `httpx` and docstruct.
-- **Known deviations:**
-  - The core still implements operational executors (see
+  - a Toolbox test forbidding `acessilia_sdk` and `backend` imports.
+- **Known deviations, tracked in [#203](https://github.com/A11yDevs/acessilia/issues/203):**
+  - The core still runs two operational executors, the `reportlab` PDF
+    renderer and the `edge-tts` audio exporter (see
     [ADR-0003](0003-remote-only-operational-capabilities.md)).
-  - Structural code is duplicated between the core and the Toolbox: the
-    manifest builder and models, callout clustering, and media classification.
-    These are tracked in the #152 audit.
+  - The manifest's semantic models exist both in the core and in the Toolbox.
+  - Callout clustering is implemented both in the Toolbox's normalization
+    builder and in `docstruct.regions.grouping`.
+  - Some pure algorithms still have a copy in the core next to docstruct:
+    the export profiles, the conservative LaTeX normalization and the
+    reading order of the manifest builder.
+  - Media classification is no longer duplicated: `media.inspect` runs only
+    on the Toolbox since #160. It inspects media and artifacts, which is a
+    different job from `docstruct.regions.classify`, which classifies
+    structural regions.

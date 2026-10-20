@@ -54,12 +54,22 @@ language.
 - #150 removes the local paths, one capability per pull request, and then
   drops pandoc, TeX Live and veraPDF/JRE from `infra/Dockerfile`. The image
   size is measured before and after.
-- **Known deviations, tracked in the #152 audit:** none remain. #150 removed
-  the local executors one by one; the last, the local manifest extractors,
-  went in [#176](https://github.com/A11yDevs/acessilia/pull/176), and
-  `pymupdf` became a development dependency that tests use to build PDFs.
+- #150 removed the local executors it covered one by one; the last, the
+  local manifest extractors, went in
+  [#176](https://github.com/A11yDevs/acessilia/pull/176), and `pymupdf`
+  became a development dependency that tests use to build PDFs.
+- **Known deviations, tracked in [#203](https://github.com/A11yDevs/acessilia/issues/203):** two local executors remain, so
+  `remote_only` is not complete yet:
+  - `backend/export/renderers/pdf_renderer.py` renders PDF with `reportlab`;
+  - `backend/export/exporters/audio_exporter.py` synthesizes MP3 with
+    `edge-tts`.
+
+  Each is replaced by a Toolbox capability reached through the SDK. Once a
+  path is gone, its library joins the list below and leaves the core's
+  runtime dependencies.
 - **Verification (#152):** `tests/test_architecture_layers.py` fails if
   `backend/` or `frontend/` imports an operational library (`fitz`, `PIL`,
   `cv2`, `docling`, `pypdf`, `docx`, `rapidocr`, `pypandoc`). It has no
-  offenders, so it keeps no allowlist. It does not check `subprocess` calls;
+  offenders, so it keeps no allowlist; `reportlab` and `edge_tts` are not on
+  the list yet. It does not check `subprocess` calls;
   pandoc, TeX Live and veraPDF are no longer in the image.

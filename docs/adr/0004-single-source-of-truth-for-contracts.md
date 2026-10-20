@@ -51,5 +51,9 @@ redefine it:
 - The SDK's hand-written allowlist stays until generation from the Toolbox
   schemas exists; the contract script keeps it honest meanwhile.
 - docstruct releases are coordinated: the Toolbox pins a docstruct wheel by
-  version and hash. Today it pins v0.1.0 while the core uses 0.2.0, so a
-  release and a Toolbox bump are needed before shared models can converge.
+  version and hash. Today the core (editable, from `libs/docstruct`) and the
+  Toolbox (wheel and SHA-256 in `pyproject.toml` and `uv.lock`) both use
+  0.3.0. Shared models converge in the next release, 0.4.0: the Toolbox's
+  wheel URL, version, hash and `uv.lock` are updated together, and
+  cross-repository integration tests pass before any compatibility code is
+  removed ([#203](https://github.com/A11yDevs/acessilia/issues/203)).
