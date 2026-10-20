@@ -3,10 +3,12 @@ import pytest
 
 from docstruct.geometry import OrientedBox
 from docstruct.manifest import (
+    MSG_CHAR_RANGE_REVERSED,
     MSG_DUPLICATE_ELEMENT_IDS,
     MSG_DUPLICATE_PAGE_NUMBERS,
     MSG_FIELD_NOT_ALLOWED,
     MSG_FIELD_OUT_OF_RANGE,
+    MSG_FIELD_WRONG_TYPE,
     MSG_PAGE_UNKNOWN_ELEMENTS,
     MSG_PARENT_CYCLE,
     MSG_SELF_PARENT,
@@ -76,6 +78,10 @@ def test_boxes_keep_their_origin_and_are_oriented_boxes():
         lambda p: p["pages"][0].update(rotation=90),
         lambda p: p["elements"][0]["provenance"][0]["bbox"].update(z=1),
         lambda p: p["elements"][0].pop("id"),
+        lambda p: p.pop("language"),
+        lambda p: p.pop("elements"),
+        lambda p: p["pages"].append("page 2"),
+        lambda p: p["elements"][0].update(provenance={"page_number": 1}),
     ],
 )
 def test_unknown_or_missing_fields_are_refused(change):
@@ -110,6 +116,48 @@ def test_document_invariants():
     assert findings_for(lambda p: p["elements"][0].update(parent_id="b")) == [MSG_PARENT_CYCLE]
     assert findings_for(lambda p: p["pages"].append(dict(p["pages"][0]))) == [MSG_DUPLICATE_PAGE_NUMBERS]
     assert findings_for(lambda p: p["pages"][0]["element_ids"].append("z")) == [MSG_PAGE_UNKNOWN_ELEMENTS]
+    reversed_range = lambda p: p["elements"][0]["provenance"][0].update(char_start=10, char_end=5)
+    assert findings_for(reversed_range) == [MSG_CHAR_RANGE_REVERSED]
+
+
+def test_long_parent_chains_are_acyclic():
+    data = payload()
+    data["pages"][0]["element_ids"] = []
+    template = data["elements"][1]
+    data["elements"] = [
+        {**template, "id": str(n), "parent_id": str(n - 1) if n else None} for n in range(2000)
+    ]
+
+    assert validate_structured_document(structured_document_from_payload(data)) == []
+
+
+def test_duplicate_element_ids_are_named():
+    data = payload()
+    data["elements"].append(dict(data["elements"][1]))
+    (finding,) = validate_structured_document(structured_document_from_payload(data))
+
+    assert finding == (MSG_DUPLICATE_ELEMENT_IDS, {"element_ids": ["b"]})
+
+
+@pytest.mark.parametrize(
+    ("change", "path"),
+    [
+        (lambda p: p["elements"][0].update(reading_order="1"), "elements[0].reading_order"),
+        (lambda p: p["elements"][0].update(reading_order=True), "elements[0].reading_order"),
+        (lambda p: p["elements"][0].update(id=123), "elements[0].id"),
+        (lambda p: p["elements"][0].update(raw_label=None), "elements[0].raw_label"),
+        (lambda p: p["pages"][0].update(width="wide"), "pages[0].width"),
+        (lambda p: p["pages"][0]["element_ids"].append({"id": "a"}), "pages[0].element_ids[2]"),
+        (lambda p: p["elements"][0].update(metadata=[]), "elements[0].metadata"),
+        (lambda p: p.update(title=7), "title"),
+    ],
+)
+def test_wrong_json_types_are_findings_not_errors(change, path):
+    data = payload()
+    change(data)
+    findings = validate_structured_document(structured_document_from_payload(data))
+
+    assert [(msgid, kwargs["path"]) for msgid, kwargs in findings] == [(MSG_FIELD_WRONG_TYPE, path)]
 
 
 def test_field_constraints():

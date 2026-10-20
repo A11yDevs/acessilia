@@ -123,6 +123,12 @@ def _duplicate_element(payload):
     payload["elements"][1]["id"] = payload["elements"][0]["id"]
 
 
+def _empty_id(payload):
+    # The page drops the id too, so only the length bound is broken.
+    payload["elements"][0]["id"] = ""
+    payload["pages"][0]["element_ids"].pop(0)
+
+
 def _cycle(payload):
     first, second = payload["elements"][0], payload["elements"][1]
     first["parent_id"], second["parent_id"] = second["id"], first["id"]
@@ -137,9 +143,7 @@ BROKEN = {
     "page lists an unknown element": lambda p: p["pages"][0]["element_ids"].append("ghost"),
     "reading order below 1": _set("elements.0.reading_order", 0),
     "negative hierarchy level": _set("elements.0.hierarchy_level", -1),
-    "empty id": lambda p: p["elements"][0].update(id="") or p["pages"][0]["element_ids"].remove(
-        p["pages"][0]["element_ids"][0]
-    ),
+    "empty id": _empty_id,
     "unknown element type": _set("elements.0.type", "sidebar"),
     "confidence above 1": _set("elements.0.confidence", 1.5),
     "zero page width": _set("pages.0.width", 0),

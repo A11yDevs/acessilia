@@ -19,6 +19,7 @@ from __future__ import annotations
 import dataclasses
 import types
 import typing
+from collections import Counter
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Literal
@@ -170,10 +171,15 @@ def _type_spec(hint: Any) -> dict[str, Any]:
 def structured_document_from_payload(payload: Mapping[str, Any]) -> StructuredDocument:
     """The document part of a manifest payload (other top-level keys are ignored).
 
-    Strict like the wire schema: an unknown or missing field inside a page,
-    element, provenance or box raises ``ValueError``. Values are taken as
-    they are, without coercion, so ``*_to_payload`` gives them back unchanged.
+    Strict like the wire schema: an unknown or missing field, at the top
+    level or inside a page, element, provenance or box, raises ``ValueError``.
+    Values are taken as they are, without coercion, so ``*_to_payload`` gives
+    them back unchanged; a value of the wrong JSON type is reported by
+    ``validate_structured_document``.
     """
+    missing = [item.name for item in dataclasses.fields(StructuredDocument) if item.name not in payload]
+    if missing:
+        raise ValueError(f"document: missing fields {missing}")
     return StructuredDocument(
         title=payload["title"],
         language=payload["language"],
@@ -187,7 +193,9 @@ def structured_document_to_payload(document: StructuredDocument) -> dict[str, An
     return _dump(document)
 
 
-def _build(cls: type, data: Mapping[str, Any]) -> Any:
+def _build(cls: type, data: Any) -> Any:
+    if not isinstance(data, Mapping):
+        raise ValueError(f"{WIRE_NAMES[cls]}: expected an object, got {data!r}")
     names = {item.name for item in dataclasses.fields(cls)}
     unknown = set(data) - names
     if unknown:
@@ -198,6 +206,8 @@ def _build(cls: type, data: Mapping[str, Any]) -> Any:
         target = _payload_target(hints[name])
         if target is not None and value is not None:
             if typing.get_origin(hints[name]) is list:
+                if not isinstance(value, list):
+                    raise ValueError(f"{WIRE_NAMES[cls]}: {name} must be an array, got {value!r}")
                 value = [_build(target, entry) for entry in value]
             else:
                 value = _build(target, value)
@@ -227,14 +237,16 @@ def _dump(value: Any) -> Any:
 
 # --- Validation ---------------------------------------------------------------
 
+MSG_FIELD_WRONG_TYPE: str = "{path} = {value!r} is not of type {expected}"
 MSG_FIELD_OUT_OF_RANGE: str = "{path} = {value!r} breaks {rule}"
 MSG_FIELD_NOT_ALLOWED: str = "{path} = {value!r} is not one of {allowed}"
-MSG_DUPLICATE_ELEMENT_IDS: str = "Duplicate element ids"
+MSG_DUPLICATE_ELEMENT_IDS: str = "Duplicate element ids: {element_ids}"
 MSG_UNKNOWN_PARENT: str = "Element {element_id} references a missing parent: {parent_id}"
 MSG_SELF_PARENT: str = "Element {element_id} is its own parent"
 MSG_PARENT_CYCLE: str = "Cycle detected in the element hierarchy"
 MSG_DUPLICATE_PAGE_NUMBERS: str = "Duplicate page numbers"
 MSG_PAGE_UNKNOWN_ELEMENTS: str = "Page {page_number} references unknown elements: {element_ids}"
+MSG_CHAR_RANGE_REVERSED: str = "{path} ends at {char_end}, before its start {char_start}"
 
 _RULES = {
     "ge": lambda value, bound: value >= bound,
@@ -249,11 +261,15 @@ def validate_structured_document(document: StructuredDocument) -> list[tuple[str
     """Every field constraint and document invariant ``document`` breaks.
 
     Findings are ``(msgid, kwargs)`` pairs, as in ``docstruct.validation``;
-    an empty list means the document is valid. Field constraints come first,
-    then, in this order: unique element ids, existing parents that are not
-    the element itself, an acyclic hierarchy, unique page numbers, and pages
-    that list known elements only.
+    an empty list means the document is valid. Field types come first: since
+    the payload adapters do not coerce, a value of the wrong JSON type is a
+    finding, and the bounds and invariants, which assume the right types, are
+    then not checked. Otherwise field bounds and enums come next, then the
+    invariants of ``document_invariant_findings``.
     """
+    findings = _type_findings(document, "")
+    if findings:
+        return findings
     findings = _field_findings(document, "")
     findings.extend(document_invariant_findings(document.pages, document.elements))
     return findings
@@ -264,13 +280,19 @@ def document_invariant_findings(
 ) -> list[tuple[str, dict[str, Any]]]:
     """The document invariants alone, on anything with the fields they read.
 
-    Pages need ``page_number`` and ``element_ids``; elements need ``id`` and
-    ``parent_id``. Wire models can therefore be checked without conversion.
+    In this order: unique element ids, existing parents that are not the
+    element itself, an acyclic hierarchy, unique page numbers, pages that
+    list known elements only, and provenance character ranges that do not end
+    before they start. Pages need ``page_number`` and ``element_ids``;
+    elements need ``id``, ``parent_id`` and ``provenance`` (with
+    ``char_start`` and ``char_end``). Wire models can therefore be checked
+    without conversion.
     """
     findings: list[tuple[str, dict[str, Any]]] = []
     element_ids = [element.id for element in elements]
-    if len(element_ids) != len(set(element_ids)):
-        findings.append(Finding(MSG_DUPLICATE_ELEMENT_IDS))
+    duplicated_ids = [id_ for id_, count in Counter(element_ids).items() if count > 1]
+    if duplicated_ids:
+        findings.append(Finding(MSG_DUPLICATE_ELEMENT_IDS, element_ids=sorted(duplicated_ids)))
 
     known = set(element_ids)
     parent_graph: dict[str, str] = {}
@@ -301,19 +323,78 @@ def document_invariant_findings(
                     element_ids=sorted(unknown),
                 )
             )
+
+    for index, element in enumerate(elements):
+        for position, provenance in enumerate(element.provenance):
+            start, end = provenance.char_start, provenance.char_end
+            if start is not None and end is not None and end < start:
+                findings.append(
+                    Finding(
+                        MSG_CHAR_RANGE_REVERSED,
+                        path=f"elements[{index}].provenance[{position}]",
+                        char_start=start,
+                        char_end=end,
+                    )
+                )
     return findings
 
 
 def _has_cycle(parent_graph: dict[str, str]) -> bool:
+    """Whether following parents ever loops, visiting each element once."""
+    cleared: set[str] = set()
     for start in parent_graph:
-        seen: set[str] = set()
+        path: set[str] = set()
         current = start
-        while current in parent_graph:
-            if current in seen:
+        while current in parent_graph and current not in cleared:
+            if current in path:
                 return True
-            seen.add(current)
+            path.add(current)
             current = parent_graph[current]
+        cleared |= path
     return False
+
+
+def _type_findings(value: Any, path: str) -> list[tuple[str, dict[str, Any]]]:
+    findings: list[tuple[str, dict[str, Any]]] = []
+    specs = field_specs(type(value))
+    for item in dataclasses.fields(value):
+        current = getattr(value, item.name)
+        where = f"{path}.{item.name}" if path else item.name
+        findings.extend(_value_type_findings(current, specs[item.name], where))
+    return findings
+
+
+def _value_type_findings(value: Any, spec: dict[str, Any], path: str) -> list[tuple[str, dict[str, Any]]]:
+    if value is None:
+        if spec["nullable"]:
+            return []
+        return [Finding(MSG_FIELD_WRONG_TYPE, path=path, value=value, expected=spec["type"])]
+    if spec["type"] == "ref":
+        # The payload adapters already built nested objects as their types.
+        return _type_findings(value, path) if dataclasses.is_dataclass(value) else [
+            Finding(MSG_FIELD_WRONG_TYPE, path=path, value=value, expected=spec["ref"])
+        ]
+    if not _is_json_type(value, spec["type"]):
+        return [Finding(MSG_FIELD_WRONG_TYPE, path=path, value=value, expected=spec["type"])]
+    findings: list[tuple[str, dict[str, Any]]] = []
+    if spec["type"] == "array":
+        for index, entry in enumerate(value):
+            findings.extend(_value_type_findings(entry, spec["items"], f"{path}[{index}]"))
+    return findings
+
+
+def _is_json_type(value: Any, json_type: str) -> bool:
+    if isinstance(value, bool):
+        return json_type == "boolean"
+    expected = {
+        "string": str,
+        "integer": int,
+        "number": (int, float),
+        "boolean": bool,
+        "array": list,
+        "object": dict,
+    }[json_type]
+    return isinstance(value, expected)
 
 
 def _field_findings(value: Any, path: str) -> list[tuple[str, dict[str, Any]]]:
@@ -357,10 +438,12 @@ __all__ = [
     "CoordOrigin",
     "DocumentElement",
     "ElementType",
+    "MSG_CHAR_RANGE_REVERSED",
     "MSG_DUPLICATE_ELEMENT_IDS",
     "MSG_DUPLICATE_PAGE_NUMBERS",
     "MSG_FIELD_NOT_ALLOWED",
     "MSG_FIELD_OUT_OF_RANGE",
+    "MSG_FIELD_WRONG_TYPE",
     "MSG_PAGE_UNKNOWN_ELEMENTS",
     "MSG_PARENT_CYCLE",
     "MSG_SELF_PARENT",
