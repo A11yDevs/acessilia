@@ -42,9 +42,14 @@ A branch rastreada é a `develop`, ou o `TRACK_BRANCH` do `.env` durante o ciclo
 - Docker e Docker Compose, `git`, `curl` e `jq` (`sudo apt install jq`)
 - `docker login ghcr.io` com um token de escopo `read:packages` (crie em
   https://github.com/settings/tokens/new?scopes=read:packages)
-- O `setup` habilita, com `sudo`, o **linger** do usuário (o timer sobrevive ao logout) e a
-  entrada no **grupo `docker`** (o timer acessa o daemon sem `sudo`; faça logout e login
-  quando ele for adicionado)
+- O usuário que roda o timer precisa, concedido uma vez por um administrador:
+  - estar no **grupo `docker`** (`usermod -aG docker <usuário>`, depois login de novo): o
+    `setup` e o `migrate` se recusam a rodar sem acesso ao daemon do Docker;
+  - de **linger** (`loginctl enable-linger <usuário>`), para o timer continuar rodando após
+    o logout: o `setup` avisa quando ele está desligado.
+
+  O `ops.sh` nunca chama `sudo`; se algo precisar rodar como root, rode esse comando (ou o
+  próprio `ops.sh`) como root.
 
 ## Primeira instalação
 
@@ -71,7 +76,11 @@ cd ~/acessilia
 ./scripts/ops.sh auto-update migrate /opt/acessilia/staging
 ```
 
-O `migrate` copia o `.env` (sem sobrescrever um `.env` diferente no clone) e o `var/`
+O `migrate` primeiro confere tudo de que precisa: que consegue ler o `.env` antigo e todo o
+`var/` (ele lista o que não consegue ler), que o clone não tem um `.env` diferente, que a
+branch do `TRACK_BRANCH` pode ser usada e que o Docker está acessível. Qualquer falha o faz
+parar antes de mudar qualquer coisa, e uma execução interrompida depois pode simplesmente ser
+repetida. Em seguida copia o `.env` e o `var/`
 (parando o container nesse meio-tempo), mantém o nome do projeto compose do container em
 execução para que o compose o assuma em vez de colidir com ele, remove o timer antigo
 `staging-update`, faz checkout da branch do `TRACK_BRANCH` e roda o `setup`. O

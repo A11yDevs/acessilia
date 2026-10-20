@@ -41,9 +41,14 @@ The tracked branch is `develop`, or `TRACK_BRANCH` from `.env` during the BHS cy
 - Docker and Docker Compose, `git`, `curl` and `jq` (`sudo apt install jq`)
 - `docker login ghcr.io` with a token with the `read:packages` scope (create it at
   https://github.com/settings/tokens/new?scopes=read:packages)
-- `setup` enables, with `sudo`, **linger** for the user (the timer survives logout) and
-  membership in the **`docker` group** (the timer reaches the Docker daemon without `sudo`;
-  log out and back in once it is added)
+- The user that runs the timer needs, granted once by an administrator:
+  - membership in the **`docker` group** (`usermod -aG docker <user>`, then log in again):
+    `setup` and `migrate` refuse to run without access to the Docker daemon;
+  - **linger** (`loginctl enable-linger <user>`), so the timer keeps running after logout:
+    `setup` warns when it is off.
+
+  `ops.sh` never calls `sudo`; if something must run as root, run that command (or
+  `ops.sh` itself) as root.
 
 ## First install
 
@@ -70,7 +75,11 @@ cd ~/acessilia
 ./scripts/ops.sh auto-update migrate /opt/acessilia/staging
 ```
 
-`migrate` copies `.env` (refusing to overwrite a different `.env` in the clone) and `var/`
+`migrate` first checks everything it needs: that it can read the old `.env` and all of
+`var/` (it lists what it cannot read), that the clone has no different `.env`, that the
+branch in `TRACK_BRANCH` can be checked out, and that Docker is reachable. Any failure stops
+it before anything changes, and a run interrupted later can simply be repeated. It then
+copies `.env` and `var/`
 (stopping the container meanwhile), keeps the compose project name of the running container
 so compose takes it over instead of clashing with it, removes the old `staging-update` timer,
 checks out the branch in `TRACK_BRANCH` and runs `setup`. `/opt/acessilia/staging` is left
