@@ -32,7 +32,7 @@ Núcleo puro de processamento estrutural de documentos do Acessilia.
 | `docstruct.fusion.oracle` | `oracle_page`, `best_score`, `summarize` |
 | `docstruct.fusion.hf_end` | `move_hf_to_end`, `move_body_hf_to_tail` |
 | `docstruct.fusion.table_specialist` | `extract_table`, `norm_table`, `select_table`, `select_greedy` |
-| `docstruct.text.latex` | `strip_latex_delimiters`, `normalize_latex`, `wrap_latex` — normalização canônica e padronização de fórmulas LaTeX |
+| `docstruct.text.latex` | `bare_latex`, `ensure_math_delimiters`, `strip_latex_delimiters`, `normalize_latex`, `wrap_latex` — normalização canônica e padronização de fórmulas LaTeX |
 | `docstruct.text.normalize` | `norm` — limpezas determinísticas de texto |
 | `docstruct.text.norm_fix` | `norm_fix` — reparos pós-normalização |
 | `docstruct.adapters.mineru` | `clean_mineru_text`, `format_mineru_block_text`, `extract_mineru_blocks` — parsing de `middle_json` do MinerU, espaçamento, de-hifenização e formatação de fórmulas/tabelas |
@@ -42,7 +42,7 @@ Núcleo puro de processamento estrutural de documentos do Acessilia.
 | `docstruct.evaluation.holdout` | `partition`, `score`, `evaluate_candidate` |
 | `docstruct.evaluation.metrics` | `text_ed`, `reading_order_score`, `teds_score`, `cdm_score`, `overall_score`, `PageScores` — métricas locais de parsing de documentos |
 | `docstruct.evaluation.markdown` | `score_markdown_page` — uma página de markdown predito contra o ground truth |
-| `docstruct.export.markdown` | `document_to_markdown`, `render_table`, `bare_latex` — documento canônico → markdown de benchmark (tabelas HTML, matemática `$$`) |
+| `docstruct.export.markdown` | `document_to_markdown`, `render_table`, `bare_latex` (de `docstruct.text.latex`) — documento canônico → markdown de benchmark (tabelas HTML, matemática `$$`) |
 | `docstruct.profiles` | `OUTPUT_PROFILES`, `filter_blocks_for_profile`, `normalize_profile` |
 | `docstruct.validation` | `validate_canonical_document`, `validate_output_text`, `Finding` |
 
@@ -55,7 +55,9 @@ Módulos planejados (fases 2–3): `blocks/`, `regions/`, `tables/`, `math/`, `r
 Rotinas canônicas para padronização e higienização de fórmulas matemáticas:
 - `strip_latex_delimiters(text)`: Remove delimitadores inline (`$...$`, `\(...\)`) e display (`$$...$$`, `\[...\]`).
 - `normalize_latex(text)`: Converte caracteres Unicode em seus equivalentes ASCII (e.g., letras gregas, expoentes, operadores), padroniza macros comuns (e.g., `\bm` para `\mathbf`, `\bold` para `\mathbf`) e colapsa espaços redundantes.
-- `wrap_latex(text, display=False)`: Envolve expressões LaTeX brutas nos delimitadores padrão (`$...$` ou `$$...$$`).
+- `wrap_latex(text, display=True)`: Envolve expressões LaTeX brutas nos delimitadores padrão (`$$...$$` por padrão, `$...$` com `display=False`).
+- `bare_latex(text)`: Normalização conservadora: remove um par de delimitadores externos e colapsa espaços, sem reescrever a expressão.
+- `ensure_math_delimiters(text)`: Envolve o texto em `$...$`, a menos que ele já esteja delimitado por `$` ou `\[...\]`.
 
 ### Adaptador MinerU (`docstruct.adapters.mineru`)
 

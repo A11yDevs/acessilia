@@ -32,7 +32,7 @@ Pure document-structure processing core for Acessilia.
 | `docstruct.fusion.oracle` | `oracle_page`, `best_score`, `summarize` |
 | `docstruct.fusion.hf_end` | `move_hf_to_end`, `move_body_hf_to_tail` |
 | `docstruct.fusion.table_specialist` | `extract_table`, `norm_table`, `select_table`, `select_greedy` |
-| `docstruct.text.latex` | `strip_latex_delimiters`, `normalize_latex`, `wrap_latex` — canonical LaTeX formula normalization and standardization |
+| `docstruct.text.latex` | `bare_latex`, `ensure_math_delimiters`, `strip_latex_delimiters`, `normalize_latex`, `wrap_latex` — canonical LaTeX formula normalization and standardization |
 | `docstruct.text.normalize` | `norm` — deterministic text cleanups |
 | `docstruct.text.norm_fix` | `norm_fix` — post-normalization repairs |
 | `docstruct.adapters.mineru` | `clean_mineru_text`, `format_mineru_block_text`, `extract_mineru_blocks` — MinerU `middle_json` parsing, spacing, de-hyphenation, and formula/table formatting |
@@ -42,7 +42,7 @@ Pure document-structure processing core for Acessilia.
 | `docstruct.evaluation.holdout` | `partition`, `score`, `evaluate_candidate` |
 | `docstruct.evaluation.metrics` | `text_ed`, `reading_order_score`, `teds_score`, `cdm_score`, `overall_score`, `PageScores` — local document-parsing metrics |
 | `docstruct.evaluation.markdown` | `score_markdown_page` — one predicted markdown page against its ground truth |
-| `docstruct.export.markdown` | `document_to_markdown`, `render_table`, `bare_latex` — canonical document → benchmark markdown (HTML tables, `$$` math) |
+| `docstruct.export.markdown` | `document_to_markdown`, `render_table`, `bare_latex` (from `docstruct.text.latex`) — canonical document → benchmark markdown (HTML tables, `$$` math) |
 | `docstruct.profiles` | `OUTPUT_PROFILES`, `filter_blocks_for_profile`, `normalize_profile` |
 | `docstruct.validation` | `validate_canonical_document`, `validate_output_text`, `Finding` |
 
@@ -55,7 +55,9 @@ Planned modules (phases 2–3): `blocks/`, `regions/`, `tables/`, `math/`, `rend
 Canonical routines for standardizing and cleaning mathematical formulas:
 - `strip_latex_delimiters(text)`: Removes enclosing inline (`$...$`, `\(...\)`) and display (`$$...$$`, `\[...\]`) delimiters.
 - `normalize_latex(text)`: Standardizes Unicode symbols to ASCII equivalents (e.g., Greek characters, exponents, operators), canonicalizes common macros (such as `\bm` to `\mathbf`, `\bold` to `\mathbf`), and collapses redundant whitespace.
-- `wrap_latex(text, display=False)`: Wraps raw LaTeX expressions in standard delimiters (`$...$` or `$$...$$`).
+- `wrap_latex(text, display=True)`: Wraps raw LaTeX expressions in standard delimiters (`$$...$$` by default, `$...$` with `display=False`).
+- `bare_latex(text)`: Conservative normalization: strips one pair of outer delimiters and collapses whitespace, without rewriting the expression.
+- `ensure_math_delimiters(text)`: Wraps text in `$...$` unless it is already delimited by `$` or `\[...\]`.
 
 ### MinerU Adapter (`docstruct.adapters.mineru`)
 
