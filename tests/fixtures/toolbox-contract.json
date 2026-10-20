@@ -1,5 +1,5 @@
 {
-  "_comment": "Toolbox capability/provider contract captured from a running toolbox. Regenerate with scripts/capture_toolbox_contract.py. Only the fields the core's contract checker reads are kept, so the fixture stays stable. Mixed capture: document.export.docx and pandoc-docx were added by hand (#172) instead of recapturing, to keep the unrelated pdf.validate.pdf_ua/teleocr drift out; the next full regeneration supersedes this note. Also by hand (acessilia-toolbox#66): pure-math renamed to math-speech, the provider that now serves math.convert and math.verbalize.",
+  "_comment": "Copy of the Toolbox's published contract (contract/toolbox-contract.json at develop). Refresh with scripts/capture_toolbox_contract.py --ref develop; CI checks the SDK registry against the published file itself.",
   "capabilities": [
     {
       "id": "accessibility.mark",
@@ -166,8 +166,7 @@
       "providers": [
         "docling",
         "mineru",
-        "nougat",
-        "teleocr"
+        "nougat"
       ]
     },
     {
@@ -233,6 +232,13 @@
       "version": 1,
       "providers": [
         "pymupdf-pdf"
+      ]
+    },
+    {
+      "id": "pdf.validate.pdf_ua",
+      "version": 1,
+      "providers": [
+        "verapdf"
       ]
     },
     {
@@ -439,6 +445,12 @@
       "capabilities": [
         "cache.get",
         "cache.put"
+      ]
+    },
+    {
+      "id": "verapdf",
+      "capabilities": [
+        "pdf.validate.pdf_ua"
       ]
     }
   ]

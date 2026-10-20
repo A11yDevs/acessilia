@@ -15,10 +15,12 @@ renaming a capability on the Toolbox side produced a client that could only fail
 at runtime — the failure surfaced as a `ToolboxCapabilityError` on a customer
 document, not as a broken build.
 
-The matrix below is the *contract*. The checker compares it against a live
-Toolbox (`--url`) or against the captured fixture
-(`tests/fixtures/toolbox-contract.json`, regenerated with
-`scripts/capture_toolbox_contract.py`).
+The matrix below is the *contract*. The Toolbox publishes its side as
+`contract/toolbox-contract.json`, in its repository and on every release; CI
+checks the SDK registry against the file published on the matching Toolbox
+branch. The checker also runs against a live Toolbox (`--url`) or against
+`tests/fixtures/toolbox-contract.json`, a copy of the published file refreshed
+with `scripts/capture_toolbox_contract.py --ref develop`.
 
 ## Required capability entry points
 
@@ -72,6 +74,7 @@ Legend for **Call path**: how the core reaches the capability.
 | `code.normalize` | **absent** | — | `pure-code` | pending: evidence-driven client and obligation/method/handler |
 | `text.postprocess` | **absent** | — | `pure-text` | pending: evidence-driven client and obligation/method/handler |
 | `music.omr` | **absent** | — | `homr`, `audiveris` | pending: evidence-driven client and obligation/method/handler |
+| `pdf.validate.pdf_ua` | **absent** | — | `verapdf` | pending: the core could validate its PDF/UA exports before delivering them |
 | `cache.get` / `cache.put` | — (internal) | — | `valkey` | Toolbox-internal cache; not a public capability |
 
 ## Confirmed drift (as of the review)

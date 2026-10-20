@@ -53,6 +53,28 @@ jobs:
           python -m pip install "./libs/sdk[dev]" --no-cache-dir
           python -m pip install ".[dev]" --no-cache-dir
 
+      # The SDK registry must match the contract the Toolbox publishes on the
+      # branch this code is deployed with: main and release/** run against the
+      # Toolbox's main, everything else against its develop (#186).
+      - name: Check the Toolbox capability contract
+        env:
+          TARGET_BRANCH: ${{ github.base_ref || github.ref_name }}
+        run: |
+          case "$TARGET_BRANCH" in
+            main|release/*) TOOLBOX_REF=main ;;
+            *) TOOLBOX_REF=develop ;;
+          esac
+          # Same URL as PUBLISHED_URL in scripts/capture_toolbox_contract.py.
+          # curl stays here for --retry, which the script's urllib fetch lacks.
+          url="https://raw.githubusercontent.com/A11yDevs/acessilia-toolbox/${TOOLBOX_REF}/contract/toolbox-contract.json"
+          echo "Toolbox contract: $url"
+          if ! curl --fail --silent --show-error --location --retry 3 \
+              --output "$RUNNER_TEMP/toolbox-contract.json" "$url"; then
+            echo "::error::Failed to download the Toolbox contract from ${TOOLBOX_REF} (missing file or network error; see the curl output above)."
+            exit 1
+          fi
+          python scripts/check_capability_contract.py --snapshot "$RUNNER_TEMP/toolbox-contract.json"
+
       - name: Collect complete test suite
         run: python -m pytest --collect-only -q -m "not e2e"
 
