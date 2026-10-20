@@ -648,7 +648,7 @@
   "$id": "urn:a11y-devs:schema:processing-manifest:1.1.0",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
-  "description": "Manifesto operacional gerado pelo Agente Informacional-Estrutural do Acessília.",
+  "description": "Manifesto operacional gerado pelo extrator estrutural do Acessília.",
   "properties": {
     "$schema": {
       "default": "urn:a11y-devs:schema:processing-manifest:1.1.0",
