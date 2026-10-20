@@ -21,8 +21,8 @@ O ecossistema tem quatro componentes; a [ADR-0002](../adr/0002-component-respons
 
 - O core não pode importar o pacote da Toolbox (`tests/test_architecture_layers.py`).
 - O core não pode importar biblioteca operacional: PyMuPDF, Pillow, OpenCV, Docling, pypdf, python-docx ou RapidOCR (mesmo teste). O trabalho operacional roda na Toolbox ([ADR-0003](../adr/0003-remote-only-operational-capabilities.pt-br.md)).
-- O docstruct não pode importar o core, o SDK nem a Toolbox (`libs/docstruct/tests/test_purity.py`).
-- O SDK não pode importar o core nem a Toolbox (`libs/sdk/tests/test_purity.py`).
-- A Toolbox não pode importar o SDK nem o core. Ainda não há teste para isso; está registrado na [#188](https://github.com/A11yDevs/acessilia/issues/188).
+- O docstruct não pode importar nada fora da biblioteca padrão do Python: não declara dependência de runtime, e um acelerador opcional (hoje só o `rapidfuzz`) precisa estar protegido por `except ImportError` e funcionar sem ele (`libs/docstruct/tests/test_purity.py`).
+- O SDK não pode importar o core nem a Toolbox, e suas dependências de runtime e imports ficam na biblioteca padrão, no `httpx` e no docstruct (`libs/sdk/tests/test_purity.py`).
+- A Toolbox não pode importar o SDK nem o core (`tests/unit/test_architecture.py` no repositório da Toolbox).
 
 Não há ciclo de dependências.

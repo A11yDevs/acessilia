@@ -28,7 +28,7 @@ Toolbox --> Sidecars : HTTP
 
 Core -[#red,dashed]-> Toolbox : <color:red>forbidden: import\n<color:red>(tests/test_architecture_layers.py)
 Docstruct -[#red,dashed]-> SDK : <color:red>forbidden\n<color:red>(docstruct test_purity.py)
-Toolbox -[#red,dashed]-> SDK : <color:red>forbidden
+Toolbox -[#red,dashed]-> SDK : <color:red>forbidden\n<color:red>(Toolbox test_architecture.py)
 
 note bottom of Core
   No operational library in backend/ or frontend/
