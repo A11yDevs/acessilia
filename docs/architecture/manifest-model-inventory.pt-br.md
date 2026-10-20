@@ -77,3 +77,12 @@ As duas cópias declaram o mesmo `$id`. Hoje elas publicam schemas diferentes e 
 - **A Toolbox mantém:** seu envelope e o `artifact/structured-document@1`. Sua parte de documento converge para a mesma definição da docstruct quando ela passar para a docstruct 0.4.0 ([ADR-0004](../adr/0004-single-source-of-truth-for-contracts.pt-br.md)).
 - **Decidir antes (D1):** como o JSON Schema da parte de documento é produzido a partir da docstruct (gerado ou verificado mecanicamente), e quais marcas de `description` e `deprecated` o schema 1.1.0 único mantém.
 - **Decidir antes:** se a Toolbox adota os invariantes que faltam ainda dentro da 1.1.0. Eles apertam a validação, então alguns payloads que validam hoje deixariam de validar. A alternativa é mantê-los só no core até uma nova versão do schema.
+
+## Resultado (2026-10-20)
+
+As decisões foram tomadas na [#203](https://github.com/A11yDevs/acessilia/issues/203) e executadas:
+
+- **D1:** o `docstruct.manifest` (docstruct 0.4.0) é a fonte normativa da parte de documento. O schema de wire não é gerado a partir dele. O teste de contrato de cada repositório o verifica contra `docstruct.manifest.field_specs`: `tests/test_manifest_semantic_contract.py` no core, `tests/unit/test_structured_document_contract.py` na Toolbox.
+- **Um schema:** os dois componentes publicam o mesmo schema 1.1.0. A `description` é a publicada originalmente ("Manifesto operacional gerado pelo extrator estrutural do Acessília."), e `obligations` não tem marca `deprecated`.
+- **Os mesmos invariantes:** os dois validam a parte de documento por `docstruct.manifest.document_invariant_findings`. A Toolbox adotou os invariantes de processo que lhe faltavam. Isso foi tratado como correção de conformidade da 1.1.0: nenhum dos 31 payloads reais verificados (manifestos históricos e snapshots gravados) foi rejeitado, então nenhuma nova versão de schema foi necessária.
+- **As diferenças 1 e 2 acima estão resolvidas.** A diferença 3 permanece por design: o core resolve as mensagens pelo seu catálogo de i18n, e a Toolbox mantém mensagens em inglês.

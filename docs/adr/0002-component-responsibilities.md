@@ -82,12 +82,15 @@ provider).
   - The core still runs two operational executors, the `reportlab` PDF
     renderer and the `edge-tts` audio exporter (see
     [ADR-0003](0003-remote-only-operational-capabilities.md)).
-  - The manifest's semantic models exist both in the core and in the Toolbox.
   - Callout clustering is implemented both in the Toolbox's normalization
-    builder and in `docstruct.regions.grouping`.
-  - Some pure algorithms still have a copy in the core next to docstruct:
-    the export profiles, the conservative LaTeX normalization and the
-    reading order of the manifest builder.
+    builder and in `docstruct.regions.grouping`
+    ([acessilia-toolbox#72](https://github.com/A11yDevs/acessilia-toolbox/issues/72)).
+- **Resolved by #203:** the core's copies of the export profiles, the
+  conservative LaTeX normalization, the manifest's reading order and its
+  geometry now delegate to docstruct, and `tests/test_docstruct_bridges.py`
+  fails on any new copy. The manifest's document model and invariants live
+  in `docstruct.manifest`. The core's and the Toolbox's Pydantic models
+  remain only as the 1.1.0 wire models, checked against it.
   - Media classification is no longer duplicated: `media.inspect` runs only
     on the Toolbox since #160. It inspects media and artifacts, which is a
     different job from `docstruct.regions.classify`, which classifies

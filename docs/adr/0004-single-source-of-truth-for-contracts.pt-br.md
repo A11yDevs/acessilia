@@ -53,7 +53,8 @@ Cada contrato tem exatamente um dono. Os demais o consomem e não o redefinem:
 - As releases da docstruct são coordenadas: a Toolbox fixa uma wheel da
   docstruct por versão e hash. Hoje o core (editável, a partir de
   `libs/docstruct`) e a Toolbox (wheel e SHA-256 em `pyproject.toml` e
-  `uv.lock`) usam a 0.3.0. Os modelos compartilhados convergem na próxima
-  release, a 0.4.0: URL da wheel, versão, hash e `uv.lock` da Toolbox são
-  atualizados juntos, e os testes de integração entre os repositórios passam
-  antes que qualquer código de compatibilidade seja removido ([#203](https://github.com/A11yDevs/acessilia/issues/203)).
+  `uv.lock`) usam a 0.4.0. Essa release traz o modelo documental do
+  manifesto (`docstruct.manifest`). Os modelos de wire do core e da Toolbox
+  são verificados contra ele no teste de contrato de cada repositório, e os
+  dois publicam o mesmo schema 1.1.0
+  ([#203](https://github.com/A11yDevs/acessilia/issues/203)).
