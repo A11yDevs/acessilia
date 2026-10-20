@@ -189,10 +189,14 @@ if [ -z "$LATEST_SHA" ] || [ "$LATEST_SHA" = "null" ]; then
   exit 0
 fi
 
-# Compara com o SHA da última execução
+# Compare with the branch and SHA of the last execution. The branch is part of
+# the key because a newly tracked branch (e.g. the BHS cut) can point at the
+# same commit: comparing only the SHA kept the container on the previous
+# branch's image until the next commit.
+CACHE_KEY="$GITHUB_BRANCH $LATEST_SHA"
 if [ -f "$CACHE_FILE" ]; then
-  CACHED_SHA=$(cat "$CACHE_FILE")
-  if [ "$CACHED_SHA" = "$LATEST_SHA" ]; then
+  CACHED_KEY=$(cat "$CACHE_FILE")
+  if [ "$CACHED_KEY" = "$CACHE_KEY" ]; then
     # Record the running and published digests even when there is nothing to
     # update: /api/v1/health derives `up_to_date` from them, and leaving them
     # empty made the check structurally unable to report "up to date".
@@ -244,7 +248,7 @@ echo "[staging-update] 🚀 Reiniciando container..."
 docker compose -f "$COMPOSE_FILE" up -d --no-deps acessilia
 
 # so grava o cache apos o restart ter sucesso (set -e aborta antes em caso de falha)
-echo "$LATEST_SHA" > "$CACHE_FILE"
+echo "$CACHE_KEY" > "$CACHE_FILE"
 
 docker image prune -f
 

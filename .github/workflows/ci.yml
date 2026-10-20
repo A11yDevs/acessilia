@@ -22,6 +22,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # During BHS a release branch only takes bug fixes (CONTRIBUTING.md, 5.1);
+  # features, improvements and refactorings keep going to develop.
+  release-scope:
+    name: release accepts only fixes
+    if: github.event_name == 'pull_request' && startsWith(github.base_ref, 'release/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Reject branches that are not fixes
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          case "$HEAD_REF" in
+            fix/*|hotfix/*) echo "${HEAD_REF} -> ${BASE_REF}: ok" ;;
+            *)
+              echo "::error::${BASE_REF} only accepts fix/* and hotfix/* branches during BHS; target develop with ${HEAD_REF}."
+              exit 1
+              ;;
+          esac
+
   tests:
     name: tests (Python 3.11)
     runs-on: ubuntu-latest
@@ -54,14 +76,17 @@ jobs:
           python -m pip install ".[dev]" --no-cache-dir
 
       # The SDK registry must match the contract the Toolbox publishes on the
-      # branch this code is deployed with: main and release/** run against the
-      # Toolbox's main, everything else against its develop (#186).
+      # branch this code is deployed with (#186): main runs against the
+      # Toolbox's main, release/x.y.z against the Toolbox's release/x.y.z
+      # (both are cut together for BHS, the Toolbox first) and everything else
+      # against its develop.
       - name: Check the Toolbox capability contract
         env:
           TARGET_BRANCH: ${{ github.base_ref || github.ref_name }}
         run: |
           case "$TARGET_BRANCH" in
-            main|release/*) TOOLBOX_REF=main ;;
+            main) TOOLBOX_REF=main ;;
+            release/*) TOOLBOX_REF="$TARGET_BRANCH" ;;
             *) TOOLBOX_REF=develop ;;
           esac
           # Same URL as PUBLISHED_URL in scripts/capture_toolbox_contract.py.
