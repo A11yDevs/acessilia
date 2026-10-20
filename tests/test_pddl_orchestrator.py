@@ -751,11 +751,24 @@ def test_picture_reclassified_as_formula_reconciles_processing_needs(
     formula_block = payload["pages"][0]["blocks"][1]
     assert formula_block["type"] == "math"
 
+    # MathML comes from the Toolbox's math.convert (ADR-0007); simulate it so
+    # the test needs no running Toolbox.
+    from backend.pipeline import canonical_builder
+
+    converted: list[str] = []
+    monkeypatch.setattr(
+        canonical_builder,
+        "toolbox_convert_latex",
+        lambda latex: converted.append(latex) or "<math><mi>E</mi></math>",
+    )
+    monkeypatch.setattr(canonical_builder, "toolbox_verbalize_latex", lambda latex: "E")
+
     document = build_canonical_document(payload)
     canonical_formula = document["sections"][0]["blocks"][0]
     assert canonical_formula["type"] == "math"
     assert canonical_formula["text"] == r"E=mc^2"
-    assert canonical_formula["metadata"]["mathml"]
+    assert converted == [r"E=mc^2"]
+    assert canonical_formula["metadata"]["mathml"] == "<math><mi>E</mi></math>"
 
 
 def test_standalone_image_injects_full_page_picture_for_vision(
