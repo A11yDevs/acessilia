@@ -23,6 +23,7 @@ ones here instead of restating them.
 | [0005](0005-artifact-references.md) | Reference-oriented processing with `ArtifactRef` | Accepted |
 | [0006](0006-availability-and-failover.md) | Availability through replicas; SDK failover as a secondary mechanism | Accepted |
 | [0007](0007-manifest-model-and-mathml-conversion.md) | Canonical manifest model, and MathML conversion and verbalization of formulas | Accepted |
+| [0008](0008-math-capabilities-on-mathjax-and-mathcat.md) | The math capabilities run on MathJax and MathCAT | Accepted |
 
 ## Process
 
