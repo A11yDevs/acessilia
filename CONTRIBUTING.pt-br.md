@@ -162,8 +162,7 @@ da `develop`.
      (em vez de `develop`).
    - PRs `feat/*` continuam mirando `develop` normalmente — a `develop` nunca é
      bloqueada, pois o escopo da release já foi travado no cut.
-   - A **esteira de CI** (`ci.yml`) roda os mesmos testes slim/docling em PRs e
-     pushes para `release/**`.
+   - A **esteira de CI** (`ci.yml`) roda os mesmos testes em PRs para `release/**`.
    - A **esteira de CD** (`delivery.yml`) publica a imagem da `release/0.0.1` no
      GHCR com as tags `release-0.0.1` e `sha-<commit>`.
 
@@ -238,8 +237,8 @@ git checkout main && git pull
 git tag v0.1.0
 git push origin v0.1.0
 
-# 3. O workflow Release (release.yml) builda, publica 0.1.0, 0.1, 0
-#    e variantes -slim no GHCR, e cria a GitHub Release com changelog automático
+# 3. O workflow Release (release.yml) builda e publica 0.1.0, 0.1 e 0
+#    no GHCR, e cria a GitHub Release com changelog automático
 ```
 
 Depois do release, mergeie `main` de volta para `develop`:
@@ -366,36 +365,37 @@ uv run pytest
 
 1. Certifique-se de que sua branch está atualizada com a `develop` (`git rebase origin/develop`).
 2. Execute `uv run pytest` e veja se todos os testes passam.
-3. Descreva claramente o que o PR faz e qual problema resolve.
-4. Referencie issues relacionadas (ex.: `Closes #42`).
+3. Preencha o [template de pull request](.github/pull_request_template.md): por que, o que muda, como você verificou e o **checklist de conformidade arquitetural** (princípios P1–P9 da [constituição](docs/constitution.pt-br.md)).
+4. Referencie as issues relacionadas. `Closes #42` só fecha a issue quando o PR é mesclado na `main`, a branch padrão; num PR para a `develop`, feche a issue à mão depois do merge.
 5. Aguarde a revisão e ajuste se necessário.
 
 ## Integração contínua (CI/CD)
 
 A esteira de CI/CD está definida em três workflows:
 
-- **`.github/workflows/ci.yml`** — executa os testes em duas variantes (`slim` e `docling`) para todo PR direcionado à `main` ou `develop`, e após pushes nessas branches.
-- **`.github/workflows/delivery.yml`** — após o CI passar, constrói e publica imagens Docker no GHCR.
-- **`.github/workflows/release.yml`** — quando um mantenedor cria uma tag `v*`, builda, publica e cria GitHub Release.
+- **`.github/workflows/ci.yml`** — em todo PR para `main`, `develop` ou `release/**`, e após pushes nessas branches, roda as suítes de teste do core, da docstruct e do SDK no Python 3.11 e rejeita testes pulados inesperados.
+- **`.github/workflows/delivery.yml`** — depois que o CI passa num push, constrói a imagem, roda um smoke test de saúde e uma verificação de tamanho, e a publica no GHCR.
+- **`.github/workflows/release.yml`** — quando um mantenedor cria uma tag `v*`, builda, publica e cria a GitHub Release.
 
 | Workflow | Evento | Ação |
 |----------|--------|------|
-| **CI** | PR para `main` ou `develop` | Testa as variantes slim e docling |
-| **CI** | Push na `main` ou `develop` | Testa as variantes slim e docling |
-| **Delivery** | CI concluído na `main` | Build, smoke test + push: `main`, `latest`, `sha-xxx`, `main-slim`, `sha-xxx-slim` |
-| **Delivery** | CI concluído na `develop` | Build, smoke test + push: `develop`, `sha-xxx`, `develop-slim`, `sha-xxx-slim` |
-| **Release** | Tag `v*` criada no git | Build, smoke test + push: `X.Y.Z`, `X.Y`, `X` e variantes `-slim` + GitHub Release |
+| **CI** | PR para `main`, `develop` ou `release/**` | Suítes de teste do core, da docstruct e do SDK |
+| **CI** | Push na `main`, `develop` ou `release/**` | As mesmas suítes, e depois a Delivery |
+| **Delivery** | CI concluído na `main` | Build, smoke test + push: `main`, `latest`, `sha-xxx` |
+| **Delivery** | CI concluído na `develop` | Build, smoke test + push: `develop`, `sha-xxx` |
+| **Delivery** | CI concluído na `release/x.y.z` | Build, smoke test + push: `release-x.y.z`, `sha-xxx` |
+| **Release** | Tag `v*` criada no git | Build, smoke test + push: `X.Y.Z`, `X.Y`, `X` + GitHub Release |
 
 São publicadas as seguintes referências no `ghcr.io/a11ydevs/acessilia`:
 
 | Tag | Branch de origem | Finalidade |
 |-----|-----------------|------------|
-| `develop` / `develop-slim` | `develop` | Homologação (atualizada via systemd timer) |
-| `main` / `main-slim` | `main` | Produção (CD) |
-| `latest` / `latest-slim` | `main` | Produção (aponta pro último) |
-| `sha-<commit>` / `sha-<commit>-slim` | `main` ou `develop` | Referência imutável |
-| `X.Y.Z` / `X.Y.Z-slim` | Tag git `v*` | Release oficial versionada |
-| `X.Y` / `X.Y-slim`, `X` / `X-slim` | Tag git `v*` | Alias semântico da release mais recente nessa linha |
+| `develop` | `develop` | Homologação (atualizada via systemd timer) |
+| `main` | `main` | Produção (CD) |
+| `latest` | `main` | Produção (aponta pro último) |
+| `sha-<commit>` | `main` ou `develop` | Referência imutável |
+| `X.Y.Z` | Tag git `v*` | Release oficial versionada |
+| `X.Y`, `X` | Tag git `v*` | Alias semântico da release mais recente nessa linha |
 
 ## Dúvidas?
 

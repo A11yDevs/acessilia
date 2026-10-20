@@ -157,8 +157,7 @@ ephemeral `release/x.y.z` branch based on `develop`.
      (instead of `develop`).
    - `feat/*` PRs continue targeting `develop` as usual—`develop` is never blocked,
      since the release scope was locked at the time of the cut.
-   - The **CI pipeline** (`ci.yml`) runs the same slim/docling tests on PRs and pushes
-     to `release/**`.
+   - The **CI pipeline** (`ci.yml`) runs the same tests on PRs to `release/**`.
    - The **CD pipeline** (`delivery.yml`) publishes the `release/0.0.1` image to GHCR
      with the tags `release-0.0.1` and `sha-<commit>`.
 
@@ -232,8 +231,8 @@ git checkout main && git pull
 git tag v0.1.0
 git push origin v0.1.0
 
-# 3. The Release workflow (release.yml) builds, publishes 0.1.0, 0.1, 0
-#    and -slim variants to the GHCR, and creates a GitHub Release with an automatic changelog
+# 3. The Release workflow (release.yml) builds and publishes 0.1.0, 0.1 and 0
+#    to the GHCR, and creates a GitHub Release with an automatic changelog
 ```
 
 After a release, merge `main` back into `develop`:
@@ -360,34 +359,37 @@ uv run pytest
 
 1. Make sure your branch is up to date with `develop` (`git rebase origin/develop`).
 2. Run `uv run pytest` and confirm all tests pass.
-3. Clearly describe what the PR does and which problem it solves.
-4. Reference any related issues (e.g.: `Closes #42`).
+3. Fill in the [pull request template](.github/pull_request_template.md): why, what changes, how you verified it, and the **architecture conformance checklist** (principles P1–P9 of the [constitution](docs/constitution.md)).
+4. Reference any related issues. `Closes #42` closes the issue only when the PR merges into `main`, the default branch; for a PR into `develop`, close the issue by hand after the merge.
 5. Wait for review and adjust if needed.
 
 ## Continuous integration (CI/CD)
 
 The CI/CD pipeline is defined by three workflows:
 
-- **`.github/workflows/ci.yml`** — runs the tests in two variants (`slim` and `docling`) on every PR targeting `main` or `develop`, as well as after pushes to those branches.
-- **`.github/workflows/delivery.yml`** — once CI passes, builds and publishes Docker images to GHCR.
-- **`.github/workflows/release.yml`** — when a maintainer creates a `v*` tag, it builds, publishes, and creates the GitHub Release.
+- **`.github/workflows/ci.yml`** — on every PR to `main`, `develop` or `release/**`, and after pushes to those branches, runs the core, docstruct and SDK test suites on Python 3.11 and rejects unexpected skipped tests.
+- **`.github/workflows/delivery.yml`** — after CI passes on a push, builds the image, runs a health smoke test and a size guardrail, and publishes it to GHCR.
+- **`.github/workflows/release.yml`** — when a maintainer creates a `v*` tag, builds, publishes and creates the GitHub Release.
 
 | Workflow | Event | Action |
 |----------|-------|--------|
-| **CI** | PR against `main` or `develop` | Tests the slim and docling variants |
-| **CI** | Push to `main` or `develop` | Tests the slim and docling variants |
-| **Delivery** | CI completed on `main` | Build, smoke test + push: `main`, `latest`, `sha-xxx`, `main-slim`, `sha-xxx-slim` |
-| **Delivery** | CI completed on `develop` | Build, smoke test + push: `develop`, `sha-xxx`, `develop-slim`, `sha-xxx-slim` |
-| **Release** | `v*` tag created in git | Build, smoke test + push: `X.Y.Z`, `X.Y`, `X` and `-slim` variants + GitHub Release |
+| **CI** | PR to `main`, `develop` or `release/**` | Core, docstruct and SDK test suites |
+| **CI** | Push to `main`, `develop` or `release/**` | Same suites, then Delivery |
+| **Delivery** | CI completed on `main` | Build, smoke test + push: `main`, `latest`, `sha-xxx` |
+| **Delivery** | CI completed on `develop` | Build, smoke test + push: `develop`, `sha-xxx` |
+| **Delivery** | CI completed on `release/x.y.z` | Build, smoke test + push: `release-x.y.z`, `sha-xxx` |
+| **Release** | `v*` tag created in git | Build, smoke test + push: `X.Y.Z`, `X.Y`, `X` + GitHub Release |
+
+The following references are published in `ghcr.io/a11ydevs/acessilia`:
 
 | Tag | Source branch | Purpose |
 |-----|---------------|---------|
-| `develop` / `develop-slim` | `develop` | Staging (refreshed by the systemd timer) |
-| `main` / `main-slim` | `main` | Production (CD) |
-| `latest` / `latest-slim` | `main` | Production (tracks main with a moving ref) |
-| `sha-<commit>` / `sha-<commit>-slim` | `main` or `develop` | Immutable reference |
-| `X.Y.Z` / `X.Y.Z-slim` | git tag `v*` | Official versioned release |
-| `X.Y` / `X.Y-slim`, `X` / `X-slim` | git tag `v*` | Semantic alias of the most recent release in this line |
+| `develop` | `develop` | Staging (refreshed by the systemd timer) |
+| `main` | `main` | Production (CD) |
+| `latest` | `main` | Production (tracks main with a moving ref) |
+| `sha-<commit>` | `main` or `develop` | Immutable reference |
+| `X.Y.Z` | git tag `v*` | Official versioned release |
+| `X.Y`, `X` | git tag `v*` | Semantic alias of the most recent release in this line |
 
 ## Questions?
 
