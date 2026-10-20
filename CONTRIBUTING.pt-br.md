@@ -146,49 +146,61 @@ O setup completo do ambiente de homologação está em:
 
 Antes de cada release, há um ciclo de **Bug Hunting/Squashing (BHS)**: um período em
 que o staging testa exatamente o candidato a release, sem misturar features ainda
-em desenvolvimento. Para isso, criamos uma branch efêmera `release/x.y.z` a partir
-da `develop`.
+em desenvolvimento. Para isso, derivamos da `develop` uma branch efêmera
+`release/x.y.z`, que passa a ser a candidata a substituir a `main`.
 
-1. **Cut** — no início do BHS, corte a branch de release a partir da `develop`:
+A acessilia e o [Toolbox](https://github.com/A11yDevs/acessilia-toolbox) fazem o
+BHS juntos, com a mesma versão. **Corte o Toolbox primeiro**: o CI confere uma
+`release/x.y.z` contra o contrato de capabilities da `release/x.y.z` do Toolbox.
+
+1. **Cut** — no início do BHS:
 
    ```bash
-   git checkout develop && git pull
-   git checkout -b release/0.0.1 origin/develop
-   git push origin release/0.0.1
+   ./scripts/start_bhs_cycle.sh 0.2.0
    ```
+
+   O script deriva `release/0.2.0` de `origin/develop`, faz nela o commit do
+   aumento de versão (`pyproject.toml` e `uv.lock`) e a publica, num worktree
+   temporário: o seu checkout não é tocado. Ele recusa uma versão cuja branch
+   ou tag `v` já existe.
 
 2. **Durante o BHS**:
-   - PRs `fix/*` que corrigem bugs encontrados no staging vão para `release/0.0.1`
-     (em vez de `develop`).
-   - PRs `feat/*` continuam mirando `develop` normalmente — a `develop` nunca é
-     bloqueada, pois o escopo da release já foi travado no cut.
+   - PRs `fix/*` (ou `hotfix/*`) que corrigem bugs encontrados no staging vão
+     para `release/0.2.0` (em vez de `develop`). O job de CI `release-scope`
+     rejeita PRs de qualquer outra branch.
+   - PRs `feat/*`, `refactor/*` e demais continuam mirando `develop`
+     normalmente — a `develop` nunca é bloqueada, pois o escopo da release já
+     foi travado no cut.
    - A **esteira de CI** (`ci.yml`) roda os mesmos testes em PRs para `release/**`.
-   - A **esteira de CD** (`delivery.yml`) publica a imagem da `release/0.0.1` no
-     GHCR com as tags `release-0.0.1` e `sha-<commit>`.
+   - A **esteira de CD** (`delivery.yml`) publica a imagem da `release/0.2.0` no
+     GHCR com as tags `release-0.2.0` e `sha-<commit>`.
 
-3. **Staging aponta para a release** — defina `TRACK_BRANCH=release/0.0.1` no
-   `.env` do servidor de homologação para que `scripts/staging-update.sh` passe
-   a rastrear a branch de release (tag de imagem `release-0.0.1`) em vez da
-   `develop`:
-
-   ```bash
-   echo "TRACK_BRANCH=release/0.0.1" >> .env
-   ```
-
-4. **Fechamento do BHS** — quando a release estiver estável:
+3. **Staging aponta para a release** — defina `TRACK_BRANCH=release/0.2.0` no
+   `.env` do servidor de homologação e atualize os scripts, para que
+   `scripts/staging-update.sh` passe a rastrear a branch de release (tag de
+   imagem `release-0.2.0`) em vez da `develop`:
 
    ```bash
-   # Merge para main (gera a release oficial, ver seção 6)
-   # Abra um PR de release/0.0.1 → main e mescle após aprovação
-
-   # Propaga as correções para develop
-   # Abra um PR de release/0.0.1 → develop e mescle após aprovação
-
-   git push origin --delete release/0.0.1
+   echo "TRACK_BRANCH=release/0.2.0" >> .env
+   ./scripts/update_scripts.sh
    ```
 
-   Depois, remova (ou reverta) `TRACK_BRANCH` do `.env` de homologação para que
-   o staging volte a rastrear a `develop`.
+4. **Fechamento do BHS** — quando a release estiver estável (feche o Toolbox
+   primeiro: o CI da `main` confere o contrato da `main` do Toolbox):
+
+   ```bash
+   ./scripts/finish_bhs_cycle.sh 0.2.0            # abre release/0.2.0 → main e chore/sync-release-0.2.0 → develop
+   # revise e mescle os dois PRs (release → main com "Create a merge commit")
+   ./scripts/finish_bhs_cycle.sh 0.2.0 --cleanup  # cria a tag v0.2.0 no merge da main e apaga as branches
+   ```
+
+   As correções chegam à `develop` por `chore/sync-release-0.2.0`, derivada da
+   release: resolva os conflitos com a `develop` nela, nunca em
+   `release/0.2.0`, que vai para a `main`. Rodar o script de novo leva para a
+   sync os fixes mesclados depois.
+
+   Depois, remova `TRACK_BRANCH` do `.env` de homologação para que o staging
+   volte a rastrear a `develop`.
 
 ### 5.2 Bibliotecas em `libs/` (docstruct e SDK)
 
@@ -219,25 +231,23 @@ Apenas mantenedores ([@marceloakira](https://github.com/marceloakira),
 [@jhonata192](https://github.com/jhonata192) e
 [@fragaeduardo](https://github.com/fragaeduardo)) podem mesclar uma release na `main`.
 
-1. **QA homologou?** → siga em frente.
-2. Abra um Pull Request de `release/x.y.z` para `main` no GitHub.
+1. **QA homologou o BHS?** → siga em frente.
+2. Rode `./scripts/finish_bhs_cycle.sh x.y.z`, que abre o Pull Request de
+   `release/x.y.z` para `main`.
 3. Solicite revisão de outro mantenedor.
-4. Após aprovação, faça o merge (preferencialmente "Create a merge commit").
+4. Após aprovação, faça o merge com **"Create a merge commit"**: a release
+   substitui a `main`, e squash ou rebase descartariam a história dela.
 5. A **esteira de CD** na `main` publica as tags `main`, `latest` e `sha-<commit>`.
 6. Promova o ambiente produtivo conforme [docs/producao-systemd.md](docs/producao-systemd.md).
 
-Para criar uma **Release oficial** com versão semântica:
+A versão já foi atualizada na branch de release no cut. Para criar a
+**Release oficial** com versão semântica:
 
 ```bash
-# 1. Garanta que a versão no pyproject.toml foi atualizada na branch de release
-#    (ex: 0.1.0 para a branch release/0.1.0)
-git checkout main && git pull
+# 1. Crie a tag no merge da main (também apaga release/x.y.z e a branch de sync)
+./scripts/finish_bhs_cycle.sh 0.2.0 --cleanup
 
-# 2. Crie a tag semântica
-git tag v0.1.0
-git push origin v0.1.0
-
-# 3. O workflow Release (release.yml) builda e publica 0.1.0, 0.1 e 0
+# 2. O workflow Release (release.yml) builda e publica 0.2.0, 0.2 e 0
 #    no GHCR, e cria a GitHub Release com changelog automático
 ```
 

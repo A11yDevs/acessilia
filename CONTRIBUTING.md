@@ -141,47 +141,62 @@ The complete staging environment setup lives in:
 
 Before each release, there is a **Bug Hunting/Squashing (BHS)** cycle:
 a period during which the staging environment tests the specific release candidate,
-without mixing in features still under development. To achieve this, we create an
-ephemeral `release/x.y.z` branch based on `develop`.
+without mixing in features still under development. To achieve this, we fork an
+ephemeral `release/x.y.z` branch from `develop`; it becomes the candidate to
+replace `main`.
 
-1. **Cut** — at the start of the BHS, cut the release branch from `develop`:
+Acessilia and the [Toolbox](https://github.com/A11yDevs/acessilia-toolbox) run BHS
+together, with the same version. **Cut the Toolbox first**: CI checks a
+`release/x.y.z` branch against the capability contract of the Toolbox's
+`release/x.y.z`.
+
+1. **Cut** — at the start of the BHS:
 
    ```bash
-   git checkout develop && git pull
-   git checkout -b release/0.0.1 origin/develop
-   git push origin release/0.0.1
+   ./scripts/start_bhs_cycle.sh 0.2.0
    ```
+
+   The script forks `release/0.2.0` from `origin/develop`, commits the version
+   bump (`pyproject.toml` and `uv.lock`) on it and pushes it, in a temporary
+   worktree, so your checkout is left untouched. It refuses a version whose
+   branch or `v` tag already exists.
 
 2. **During BHS**:
-   - `fix/*` PRs that address bugs found in staging are targeted at `release/0.0.1`
-     (instead of `develop`).
-   - `feat/*` PRs continue targeting `develop` as usual—`develop` is never blocked,
-     since the release scope was locked at the time of the cut.
+   - `fix/*` (or `hotfix/*`) PRs that address bugs found in staging are targeted
+     at `release/0.2.0` (instead of `develop`). The `release-scope` CI job
+     rejects PRs from any other branch.
+   - `feat/*`, `refactor/*` and other PRs continue targeting `develop` as
+     usual—`develop` is never blocked, since the release scope was locked at the
+     time of the cut.
    - The **CI pipeline** (`ci.yml`) runs the same tests on PRs to `release/**`.
-   - The **CD pipeline** (`delivery.yml`) publishes the `release/0.0.1` image to GHCR
-     with the tags `release-0.0.1` and `sha-<commit>`.
+   - The **CD pipeline** (`delivery.yml`) publishes the `release/0.2.0` image to GHCR
+     with the tags `release-0.2.0` and `sha-<commit>`.
 
-3. **Point Staging to the release** — set `TRACK_BRANCH=release/0.0.1` in the
-   staging server's `.env` file so that `scripts/staging-update.sh` starts tracking
-   the release branch (image tag `release-0.0.1`) instead of `develop`:
-
-   ```bash
-   echo "TRACK_BRANCH=release/0.0.1" >> .env
-   ```
-
-4. **Closing the BHS** — once the release is stable:
+3. **Point Staging to the release** — set `TRACK_BRANCH=release/0.2.0` in the
+   staging server's `.env` file and refresh the scripts, so that
+   `scripts/staging-update.sh` starts tracking the release branch (image tag
+   `release-0.2.0`) instead of `develop`:
 
    ```bash
-   # Merge into main (generates the official release; see section 6)
-   # Open a PR from release/0.0.1 to main and merge after approval
-
-   # Propagate fixes to develop
-   # Open a PR from release/0.0.1 to develop and merge after approval
-
-   git push origin --delete release/0.0.1
+   echo "TRACK_BRANCH=release/0.2.0" >> .env
+   ./scripts/update_scripts.sh
    ```
 
-   Then, remove (or revert) `TRACK_BRANCH` from the staging `.env` file so that staging
+4. **Closing the BHS** — once the release is stable (close the Toolbox first:
+   CI on `main` checks the Toolbox's `main` contract):
+
+   ```bash
+   ./scripts/finish_bhs_cycle.sh 0.2.0            # opens release/0.2.0 → main and chore/sync-release-0.2.0 → develop
+   # review and merge both PRs (release → main with "Create a merge commit")
+   ./scripts/finish_bhs_cycle.sh 0.2.0 --cleanup  # tags v0.2.0 on the merge into main, deletes the branches
+   ```
+
+   Fixes reach `develop` through `chore/sync-release-0.2.0`, forked from the
+   release: resolve conflicts with `develop` there, never on `release/0.2.0`,
+   which goes to `main`. Running the script again carries fixes merged
+   afterwards over to the sync branch.
+
+   Then, remove `TRACK_BRANCH` from the staging `.env` file so that staging
    goes back to tracking `develop`.
 
 ### 5.2 Libraries in `libs/` (docstruct and SDK)
@@ -213,25 +228,23 @@ Only maintainers ([@marceloakira](https://github.com/marceloakira),
 [@jhonata192](https://github.com/jhonata192) and
 [@fragaeduardo](https://github.com/fragaeduardo)) may merge a release into `main`.
 
-1. **Did QA sign off?** → proceed.
-2. Open a Pull Request from `release/x.y.z` to `main` on GitHub.
+1. **Did QA sign off on the BHS?** → proceed.
+2. Run `./scripts/finish_bhs_cycle.sh x.y.z`, which opens the Pull Request from
+   `release/x.y.z` to `main`.
 3. Ask another maintainer for review.
-4. After approval, merge it (preferably "Create a merge commit").
+4. After approval, merge it with **"Create a merge commit"**: the release
+   replaces `main`, and squash or rebase would discard its history.
 5. The **CD pipeline** on `main` publishes tags `main`, `latest`, and `sha-<commit>`.
 6. Promote the production environment as described in [docs/producao-systemd.md](docs/producao-systemd.md).
 
-To cut an **official release** with a semantic version:
+The version was already bumped on the release branch when it was cut. To cut
+the **official release** with a semantic version:
 
 ```bash
-# 1. Ensure the version in pyproject.toml has been updated on the release branch
-#    (ex: 0.1.0 for branch release/0.1.0)
-git checkout main && git pull
+# 1. Tag the merge into main (also deletes release/x.y.z and its sync branch)
+./scripts/finish_bhs_cycle.sh 0.2.0 --cleanup
 
-# 2. Create the semantic tag
-git tag v0.1.0
-git push origin v0.1.0
-
-# 3. The Release workflow (release.yml) builds and publishes 0.1.0, 0.1 and 0
+# 2. The Release workflow (release.yml) builds and publishes 0.2.0, 0.2 and 0
 #    to the GHCR, and creates a GitHub Release with an automatic changelog
 ```
 
