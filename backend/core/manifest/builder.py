@@ -25,8 +25,8 @@ from backend.core.manifest.models import (
     Obligation,
     Observation,
     ProcessingManifest,
-    is_bottom_left,
 )
+from docstruct.geometry import OrientedBox
 
 if TYPE_CHECKING:
     from backend.core.manifest.toolbox_extractor import ToolboxExtraction
@@ -288,23 +288,22 @@ def _raw_bbox(element: ManifestElement) -> BoundingBox | None:
     return element.provenance[0].bbox
 
 
-def _element_bbox(element: ManifestElement) -> tuple[float, float, float, float] | None:
-    """Element box with the y axis growing downwards, whatever the source origin.
-
-    Reading-order refinement compares ``top`` and ``bottom`` as screen
-    coordinates. A bottom-left box is mirrored (``y -> -y``): that keeps every
-    comparison right without knowing the page height.
-
-    Only differences and orderings are meaningful: a mirrored ``top`` or
-    ``bottom`` is negative, so never compare it with a fixed position such as
-    ``0``. ``_normalized_element_bbox`` gives page fractions instead.
-    """
+def _oriented_bbox(element: ManifestElement) -> OrientedBox | None:
     bbox = _raw_bbox(element)
     if bbox is None:
         return None
-    if is_bottom_left(bbox.coord_origin, bbox.top, bbox.bottom):
-        return (bbox.left, -bbox.top, bbox.right, -bbox.bottom)
-    return (bbox.left, bbox.top, bbox.right, bbox.bottom)
+    return OrientedBox(bbox.left, bbox.top, bbox.right, bbox.bottom, bbox.coord_origin)
+
+
+def _element_bbox(element: ManifestElement) -> tuple[float, float, float, float] | None:
+    """Element box with the y axis growing downwards, whatever the source origin.
+
+    See ``docstruct.geometry.OrientedBox.top_down``: only differences and
+    orderings are meaningful. ``_normalized_element_bbox`` gives page
+    fractions instead.
+    """
+    box = _oriented_bbox(element)
+    return box.top_down() if box is not None else None
 
 
 def _refine_reading_order(elements: list[ManifestElement]) -> list[ManifestElement]:
@@ -863,24 +862,13 @@ def _normalized_element_bbox(
         element: ManifestElement,
         page_sizes: dict[int, tuple[float | None, float | None]] | None,
 ) -> tuple[float, float, float, float] | None:
-        bbox = _raw_bbox(element)
-        if bbox is None or element.page_number is None or page_sizes is None:
+        box = _oriented_bbox(element)
+        if box is None or element.page_number is None or page_sizes is None:
             return None
         size = page_sizes.get(element.page_number)
         if size is None:
             return None
-        width, height = size
-        if not width or not height:
-            return None
-        left, top, right, bottom = bbox.left, bbox.top, bbox.right, bbox.bottom
-        if is_bottom_left(bbox.coord_origin, top, bottom):
-            top, bottom = height - top, height - bottom
-        return (
-            left / width,
-            top / height,
-            right / width,
-            bottom / height,
-        )
+        return box.page_fractions(*size)
 
 
 def _append_processing_needs(
