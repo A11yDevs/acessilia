@@ -1683,8 +1683,9 @@ msgstr ""
 "Agno não está instalado. Execute `uv sync` antes de usar o workflow "
 "Executor."
 
-msgid "Duplicate element ids"
-msgstr "IDs de elementos duplicados"
+#, python-brace-format
+msgid "Duplicate element ids: {element_ids}"
+msgstr "IDs de elementos duplicados: {element_ids}"
 
 #, python-brace-format
 msgid "Element {element_id} references a missing parent: {parent_id}"
@@ -1703,6 +1704,10 @@ msgstr "Números de página duplicados"
 #, python-brace-format
 msgid "Page {page_number} references unknown elements: {element_ids}"
 msgstr "Página {page_number} referencia elementos inexistentes: {element_ids}"
+
+#, python-brace-format
+msgid "{path} ends at {char_end}, before its start {char_start}"
+msgstr "{path} termina em {char_end}, antes do início {char_start}"
 
 msgid "document"
 msgid_plural "documents"

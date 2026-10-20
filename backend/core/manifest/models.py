@@ -9,6 +9,7 @@ from backend.i18n import t
 from docstruct.geometry.boxes import is_bottom_left  # noqa: F401  (re-exported)
 from backend.log_messages import MSG_PLANNER_NOT_STARTED
 from docstruct.manifest import (  # noqa: F401  (msgids re-exported for the catalogs)
+    MSG_CHAR_RANGE_REVERSED,
     MSG_DUPLICATE_ELEMENT_IDS,
     MSG_DUPLICATE_PAGE_NUMBERS,
     MSG_PAGE_UNKNOWN_ELEMENTS,
@@ -198,8 +199,9 @@ class ProcessingManifest(StrictModel):
             raise ValueError("A extração terminou antes de começar")
 
         # Document invariants are docstruct's (#203): unique element ids,
-        # existing non-self parents, an acyclic hierarchy, unique page numbers
-        # and pages that list known elements.
+        # existing non-self parents, an acyclic hierarchy, unique page numbers,
+        # pages that list known elements and provenance character ranges that
+        # do not end before they start.
         if findings := document_invariant_findings(self.pages, self.elements):
             msgid, kwargs = findings[0]
             raise ValueError(t(msgid).format(**kwargs))
