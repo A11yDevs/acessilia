@@ -1,0 +1,50 @@
+@startuml remote_failover_sequence
+skinparam shadowing false
+
+title Remote capability call with retries and failover (ADR-0003, ADR-0006)
+
+participant "Core\n(pipeline step)" as Core
+participant "SDK client\n(ToolboxCapabilityClient)" as SDK
+participant "Endpoint 1: load balancer\n(TOOLBOX_BASE_URL)" as LB
+participant "Toolbox replicas\n(stateless, shared MinIO + Valkey)" as Replicas
+participant "Endpoint 2: independent Toolbox\n(TOOLBOX_BASE_URLS, optional)" as Secondary
+
+Core -> SDK : capability call\n(e.g. math.convert)
+
+== Endpoint 1: no catalogue check ==
+loop attempts = 1 + TOOLBOX_RETRIES
+  SDK -> LB : POST /v1/capabilities/{id}:execute
+  LB -> Replicas : any healthy replica
+  alt success
+    Replicas --> SDK : result (artifact by reference)
+    SDK --> Core : result, and the client of the endpoint that served it
+  else timeout, network error, 503 or 504
+    Replicas --> SDK : failure
+    SDK -> SDK : exponential backoff with jitter
+  else any other error (4xx, 500, 502, contract violation)
+    Replicas --> SDK : error
+    SDK --> Core : raised at once (same on every endpoint)
+  end
+end
+
+== Endpoint 2: only after endpoint 1 failed, and only for independent deployments ==
+SDK -> Secondary : GET /v1/capabilities, /v1/providers (cached)
+alt capability, version or provider not published
+  SDK -> SDK : skip endpoint (ToolboxIncompatibleEndpoint)
+else compatible
+  SDK -> Secondary : same request, same retries
+  Secondary --> SDK : result or failure
+end
+
+alt every endpoint failed
+  SDK --> Core : the only failure, or ToolboxUnavailable(causes)
+  note over Core
+    No local fallback (ADR-0003). The core decides:
+    structure extraction fails the job;
+    PDF/UA and DOCX become optional export errors;
+    math enrichment and media inspection degrade
+    with a recorded warning; a failed PDDL method
+    can be replanned.
+  end note
+end
+@enduml

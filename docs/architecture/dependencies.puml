@@ -1,0 +1,38 @@
+@startuml dependencies
+skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam packageStyle rectangle
+
+title Component dependencies (ADR-0002)
+
+package "acessilia (this repository)" {
+  component "Core\nbackend/, frontend/\nplans and orchestrates" as Core
+  component "SDK\nlibs/sdk (acessilia-sdk)\ncontracts and Toolbox clients" as SDK
+  component "docstruct\nlibs/docstruct (acessilia-docstruct)\npure structural algorithms and models" as Docstruct
+}
+
+package "acessilia-toolbox" {
+  component "Toolbox\nREST/MCP gateway and providers\nexecutes operational capabilities" as Toolbox
+  component "Sidecars\npdf-ua-render, math-speech,\nverapdf-validate, ..." as Sidecars
+}
+
+interface "Published HTTP contract\n(capabilities, schemas, ArtifactRef)" as Contract
+
+Core --> SDK : imports
+Core --> Docstruct : imports
+SDK --> Docstruct : imports
+SDK ..> Contract : calls over HTTP
+Toolbox -- Contract : publishes
+Toolbox --> Docstruct : imports (pinned wheel)
+Toolbox --> Sidecars : HTTP
+
+Core -[#red,dashed]-> Toolbox : <color:red>forbidden: import\n<color:red>(tests/test_architecture_layers.py)
+Docstruct -[#red,dashed]-> SDK : <color:red>forbidden\n<color:red>(docstruct test_purity.py)
+Toolbox -[#red,dashed]-> SDK : <color:red>forbidden
+
+note bottom of Core
+  No operational library in backend/ or frontend/
+  (PyMuPDF, Pillow, OpenCV, Docling, pypdf,
+  python-docx, RapidOCR): the import test fails.
+end note
+@enduml
