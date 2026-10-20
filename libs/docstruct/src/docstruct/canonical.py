@@ -18,8 +18,8 @@ from copy import deepcopy
 class MathEnricher:
     """Protocol for LaTeX enrichment (normalize / MathML / verbalization).
 
-    The lib stays pure: the backend injects an implementation that may use
-    latex2mathml, subprocess workers or OCR.
+    The lib stays pure: the backend injects an implementation (the core's
+    calls the Toolbox's ``math.convert`` and ``math.verbalize``).
     """
 
     def normalize(self, latex: str) -> str:

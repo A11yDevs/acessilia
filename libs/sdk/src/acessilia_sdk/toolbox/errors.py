@@ -31,6 +31,14 @@ class ToolboxCapabilityError(ToolboxError):
     """Capacidade inválida ou não disponível na Toolbox."""
 
 
+class ToolboxInvalidInput(ToolboxCapabilityError):
+    """The Toolbox rejected the input itself (HTTP 400, code ``invalid_input``).
+
+    For example LaTeX that ``math.convert`` cannot parse: the request reached a
+    working provider, so retrying or failing over will not help.
+    """
+
+
 class ToolboxAuthenticationError(ToolboxError):
     """Autenticação falhou — chave inválida ou ausente."""
 
@@ -64,6 +72,7 @@ __all__ = [
     "ToolboxContractViolation",
     "ToolboxError",
     "ToolboxIncompatibleEndpoint",
+    "ToolboxInvalidInput",
     "ToolboxProviderUnavailable",
     "ToolboxTimeout",
     "ToolboxUnavailable",

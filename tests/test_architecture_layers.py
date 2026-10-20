@@ -48,6 +48,7 @@ OPERATIONAL_LIBRARIES = (
     "docling",
     "docx",
     "fitz",
+    "latex2mathml",
     "pymupdf",
     "PIL",
     "pypdf",

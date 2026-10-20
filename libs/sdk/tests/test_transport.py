@@ -16,6 +16,7 @@ from acessilia_sdk.toolbox import (
     ToolboxCapabilityClient,
     ToolboxCapabilityError,
     ToolboxContractViolation,
+    ToolboxInvalidInput,
     ToolboxProviderUnavailable,
     ToolboxTimeout,
     execute_capability,
@@ -111,6 +112,16 @@ async def test_file_upload_uses_the_extension_media_type(tmp_path: Path) -> None
         (httpx.Response(401, json={"detail": "no"}), ToolboxAuthenticationError, "Autenticação"),
         (httpx.Response(404, json={"detail": "x"}), ToolboxArtifactNotFound, "não encontrado"),
         (httpx.Response(503, json={"detail": "x"}), ToolboxProviderUnavailable, "indisponível"),
+        (
+            httpx.Response(400, json={"code": "invalid_input", "message": "LaTeX rejected"}),
+            ToolboxInvalidInput,
+            "Entrada inválida.*LaTeX rejected",
+        ),
+        (
+            httpx.Response(400, json={"code": "capability_not_found", "message": "x"}),
+            ToolboxCapabilityError,
+            "Capacidade inválida",
+        ),
     ],
 )
 async def test_maps_failures_to_toolbox_errors(response, error, message) -> None:
@@ -180,3 +191,11 @@ async def test_client_without_key_sends_no_authorization() -> None:
 def test_registry_ids_are_unique_and_versioned() -> None:
     assert all(spec.contract_version >= 1 for spec in TOOLBOX_CAPABILITIES.values())
     assert all(spec.id == key for key, spec in TOOLBOX_CAPABILITIES.items())
+
+
+def test_invalid_input_is_a_capability_error_and_does_not_fail_over() -> None:
+    """Callers catching ToolboxCapabilityError keep working; bad input is not an outage."""
+    from acessilia_sdk.toolbox.endpoints import FAILOVER_ERRORS
+
+    assert issubclass(ToolboxInvalidInput, ToolboxCapabilityError)
+    assert not issubclass(ToolboxInvalidInput, FAILOVER_ERRORS)

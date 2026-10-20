@@ -24,6 +24,7 @@ from acessilia_sdk.toolbox.errors import (
     ToolboxCapabilityError,
     ToolboxContractViolation,
     ToolboxError,
+    ToolboxInvalidInput,
     ToolboxProviderUnavailable,
     ToolboxTimeout,
     ToolboxUnsupportedMediaType,
@@ -63,9 +64,11 @@ def raise_for_error(response: httpx.Response, context: str) -> None:
         return
 
     status = response.status_code
+    code = ""
     try:
         body = response.json()
         detail = body.get("detail", body.get("message", ""))
+        code = str(body.get("code", ""))
     except Exception:
         detail = response.text[:500]
 
@@ -87,6 +90,8 @@ def raise_for_error(response: httpx.Response, context: str) -> None:
         raise ToolboxContractViolation(
             f"Requisição inválida ({context}): {detail}"
         )
+    if status == 400 and code == "invalid_input":
+        raise ToolboxInvalidInput(f"Entrada inválida ({context}): {detail}")
     if status == 400:
         raise ToolboxCapabilityError(
             f"Capacidade inválida ({context}): {detail}"

@@ -1,4 +1,9 @@
-"""Testes do enriquecimento de fórmulas: MathML, verbalização, renderização e PDDL."""
+"""Testes do enriquecimento de fórmulas: MathML, verbalização, renderização e PDDL.
+
+MathML e texto falado vêm só da Toolbox (math.convert, math.verbalize; ADR-0007):
+os testes simulam essas capacidades e conferem que a indisponibilidade é
+explícita, sem conversão local.
+"""
 
 from datetime import datetime, timezone
 
@@ -6,13 +11,43 @@ import pytest
 
 from backend.export.renderers.html_renderer import _render_block as render_html_block
 from backend.export.renderers.txt_renderer import _render_block as render_txt_block
-from backend.pipeline.canonical_builder import build_canonical_document
 from backend.pipeline.validators import validate_canonical_document
-from backend.tools.formula_tools import (
-    latex_to_mathml,
-    normalize_latex,
-    verbalize_latex_fallback,
-)
+from backend.tools.formula_tools import label_spoken_formula, normalize_latex
+from backend.tools.toolbox_math_tools import MathCapabilityUnavailable
+from acessilia_sdk.toolbox import ToolboxProviderUnavailable
+
+FAKE_MATHML = '<math xmlns="http://www.w3.org/1998/Math/MathML"><mi>E</mi></math>'
+
+
+def _unavailable(capability):
+    def call(latex):
+        call.calls.append(latex)
+        raise MathCapabilityUnavailable(capability, ToolboxProviderUnavailable("offline"))
+
+    call.calls = []
+    return call
+
+
+@pytest.fixture
+def toolbox_math(monkeypatch):
+    """Simula math.convert e math.verbalize no builder canônico e no PDDL."""
+    from backend.agents import pddl_orchestrator
+    from backend.pipeline import canonical_builder
+
+    calls = {"convert": [], "verbalize": []}
+
+    def convert(latex, direction="latex-to-mathml"):
+        calls["convert"].append(latex)
+        return FAKE_MATHML
+
+    def verbalize(latex, language="pt-BR"):
+        calls["verbalize"].append(latex)
+        return "maiúscula e é igual a, m c ao quadrado"
+
+    for module in (canonical_builder, pddl_orchestrator):
+        monkeypatch.setattr(module, "toolbox_convert_latex", convert)
+        monkeypatch.setattr(module, "toolbox_verbalize_latex", verbalize)
+    return calls
 
 
 # ── formula_tools ──
@@ -25,170 +60,16 @@ def test_normalize_latex_strips_delimiters():
     assert normalize_latex("  x  =  1  ") == "x = 1"
 
 
-def test_latex_to_mathml_converts_valid_latex():
-    mathml = latex_to_mathml(r"$x=\frac{-b\pm\sqrt{b^2-4ac}}{2a}$")
-    assert mathml.startswith("<math")
-    assert "<mfrac>" in mathml
+def test_label_spoken_formula():
+    assert label_spoken_formula("a sobre b") == "Fórmula: a sobre b"
+    assert label_spoken_formula("  ") == ""
 
 
-def test_latex_to_mathml_handles_spaced_codeformula_output():
-    mathml = latex_to_mathml(r"E = m c ^ { 2 }")
-    assert mathml.startswith("<math")
-
-
-def test_latex_to_mathml_empty_input():
-    assert latex_to_mathml("") == ""
-    assert latex_to_mathml("$$") == ""
-
-
-def test_latex_to_mathml_warns_when_library_missing(monkeypatch):
-    """Quando latex2mathml não está instalado, emite warning e retorna vazio."""
-    import builtins
-
+def test_core_has_no_local_converter_or_verbalizer():
     from backend.tools import formula_tools
 
-    real_import = builtins.__import__
-
-    def fake_import(name, *args, **kwargs):
-        if name == "latex2mathml.converter":
-            raise ModuleNotFoundError("private dependency detail", name="latex2mathml")
-        return real_import(name, *args, **kwargs)
-
-    monkeypatch.setattr(builtins, "__import__", fake_import)
-    records = []
-    sink = formula_tools.logger.add(lambda message: records.append(message.record))
-    try:
-        assert formula_tools.latex_to_mathml(r"$private_source=1$") == ""
-    finally:
-        formula_tools.logger.remove(sink)
-
-    assert len(records) == 1
-    assert records[0]["level"].name == "WARNING"
-    assert "latex2mathml indisponível" in records[0]["message"]
-    assert "private" not in records[0]["message"]
-    assert records[0]["exception"] is None
-
-
-def test_latex_to_mathml_conversion_error_falls_back_without_source_leak(monkeypatch):
-    import sys
-    from types import ModuleType
-
-    from backend.tools import formula_tools
-
-    package = ModuleType("latex2mathml")
-    converter = ModuleType("latex2mathml.converter")
-
-    def fail(latex):
-        raise ValueError(f"private conversion detail: {latex}")
-
-    converter.convert = fail
-    package.converter = converter
-    monkeypatch.setitem(sys.modules, "latex2mathml", package)
-    monkeypatch.setitem(sys.modules, "latex2mathml.converter", converter)
-    records = []
-    sink = formula_tools.logger.add(lambda message: records.append(message.record))
-    try:
-        assert formula_tools.latex_to_mathml("private_source=1") == ""
-    finally:
-        formula_tools.logger.remove(sink)
-
-    assert len(records) == 1
-    assert "Conversão LaTeX→MathML falhou" in records[0]["message"]
-    assert "indisponível" not in records[0]["message"]
-    assert "private" not in records[0]["message"]
-    assert records[0]["exception"] is None
-
-
-def test_latex_to_mathml_unexpected_import_error_still_falls_back(monkeypatch):
-    import builtins
-
-    real_import = builtins.__import__
-
-    def fail_import(name, *args, **kwargs):
-        if name == "latex2mathml.converter":
-            raise RuntimeError("broken optional installation")
-        return real_import(name, *args, **kwargs)
-
-    monkeypatch.setattr(builtins, "__import__", fail_import)
-    assert latex_to_mathml("x=1") == ""
-
-
-def test_latex_to_mathml_malformed_conversion_returns_empty():
-    assert latex_to_mathml(r"\frac{") == ""
-
-
-def test_verbalize_latex_fallback_portuguese():
-    spoken = verbalize_latex_fallback(r"$x=\frac{a}{b}$")
-    assert spoken.startswith("Fórmula:")
-    assert "igual a" in spoken
-    assert "a sobre b" in spoken
-    assert "\\" not in spoken
-    assert "{" not in spoken
-
-
-def test_verbalize_fraction_simple_uses_sobre():
-    assert verbalize_latex_fallback(r"\frac{a}{b}") == "Fórmula: a sobre b"
-
-
-def test_verbalize_nested_fraction_uses_dividido_por():
-    spoken = verbalize_latex_fallback(r"\frac{\frac{a}{b}}{c}")
-    assert spoken == "Fórmula: a sobre b, dividido por c"
-
-
-def test_verbalize_compound_exponent_spoken_as_group():
-    assert verbalize_latex_fallback(r"x^{n+1}") == "Fórmula: x elevado a n mais 1"
-
-
-def test_verbalize_roots_by_index():
-    assert verbalize_latex_fallback(r"\sqrt{x}") == "Fórmula: raiz quadrada de x"
-    assert verbalize_latex_fallback(r"\sqrt[3]{x}") == "Fórmula: raiz cúbica de x"
-    assert verbalize_latex_fallback(r"\sqrt[n]{x}") == "Fórmula: raiz de índice n de x"
-
-
-def test_verbalize_keeps_renderer_fixture_string():
-    assert verbalize_latex_fallback("E=mc^2") == "Fórmula: E igual a m c elevado a 2"
-
-
-def test_verbalize_subscripts():
-    assert verbalize_latex_fallback(r"x_{i}") == "Fórmula: x índice i"
-    assert verbalize_latex_fallback(r"a_{ij}") == "Fórmula: a índice i j"
-
-
-def test_verbalize_preserves_symbol_table():
-    spoken = verbalize_latex_fallback(
-        r"\sum \prod \int \lim \infty \pm \times \cdot \div \leq \geq \neq \approx "
-        r"\alpha \beta \pi \theta \lambda \mu \sigma \omega \Delta \partial \nabla"
-    )
-    for word in (
-        "somatório", "produtório", "integral", "limite", "infinito", "mais ou menos",
-        "vezes", "dividido por", "menor ou igual a", "maior ou igual a", "diferente de",
-        "aproximadamente", "alfa", "beta", "pi", "teta", "lambda", "mi", "sigma", "ômega",
-        "delta", "derivada parcial", "nabla",
-    ):
-        assert word in spoken
-    matrix = verbalize_latex_fallback(r"\begin{pmatrix} a & b \\ c & d \end{pmatrix}")
-    assert matrix == "Fórmula: matriz: a, b; c, d fim da matriz"
-    assert verbalize_latex_fallback(r"a\,b") == "Fórmula: a b"
-
-
-def test_verbalize_drops_unknown_commands_but_speaks_content():
-    spoken = verbalize_latex_fallback(r"\mathbf{v}=\left(a+b\right)")
-    assert spoken.startswith("Fórmula:")
-    assert "v igual a" in spoken
-    assert "a mais b" in spoken
-    assert "\\" not in spoken
-
-
-def test_verbalize_unbalanced_input_degrades_gracefully():
-    spoken = verbalize_latex_fallback(r"\frac{a")
-    assert spoken.startswith("Fórmula:")
-    assert "a" in spoken
-    assert "{" not in spoken
-    assert "\\" not in spoken
-
-
-def test_verbalize_latex_fallback_empty():
-    assert verbalize_latex_fallback("") == ""
+    assert not hasattr(formula_tools, "latex_to_mathml")
+    assert not hasattr(formula_tools, "verbalize_latex_fallback")
 
 
 # ── canonical_builder: enriquecimento ──
@@ -202,7 +83,7 @@ def test_enrichment_skips_non_math_without_changing_document(monkeypatch):
     def unexpected(*args):
         pytest.fail("Non-math blocks must not invoke formula helpers")
 
-    for name in ("normalize_latex", "latex_to_mathml", "verbalize_latex_fallback"):
+    for name in ("normalize_latex", "latex_to_mathml", "verbalize_latex"):
         monkeypatch.setattr(canonical_builder, name, unexpected)
     sections = [{"blocks": [{"type": "paragraph", "text": "Texto"}],
                  "children": [{"blocks": [{"type": "code", "text": "x=1"}]}]}]
@@ -229,19 +110,9 @@ def test_enrichment_reaches_nested_math_and_preserves_alt_text(monkeypatch):
     assert block == {"type": "math", "text": "x=1", "alt_text": "Descrição existente"}
 
 
-def test_canonical_document_keeps_formula_when_conversion_unavailable(monkeypatch):
-    from backend.pipeline import canonical_builder
+def test_canonical_document_enriches_math_blocks(toolbox_math):
+    from backend.pipeline.canonical_builder import build_canonical_document
 
-    monkeypatch.setattr(canonical_builder, "latex_to_mathml", lambda latex: "")
-    document = canonical_builder.build_canonical_document("$x=1$")
-    block = document["sections"][0]["blocks"][0]
-    assert block["type"] == "math"
-    assert block["text"] == "x=1"
-    assert block["alt_text"].startswith("Fórmula:")
-    assert "mathml" not in block.get("metadata", {})
-
-
-def test_canonical_document_enriches_math_blocks():
     document = build_canonical_document(
         "# Física\n\nConsidere:\n\n$E=mc^2$\n", title="Física"
     )
@@ -255,9 +126,55 @@ def test_canonical_document_enriches_math_blocks():
     ]
     assert len(math_blocks) == 1
     block = math_blocks[0]
-    assert block["text"] == "E=mc^2"  # delimitadores removidos
-    assert block["metadata"]["mathml"].startswith("<math")
+    assert block["text"] == "E=mc^2"  # delimitadores removidos antes da Toolbox
+    assert toolbox_math == {"convert": ["E=mc^2"], "verbalize": ["E=mc^2"]}
+    assert block["metadata"]["mathml"] == FAKE_MATHML
+    assert block["alt_text"] == "Fórmula: maiúscula e é igual a, m c ao quadrado"
+    assert not document.get("technical_warnings")
+
+
+def test_rejected_formula_keeps_latex_and_is_counted(monkeypatch, toolbox_math):
+    """LaTeX que a Toolbox rejeita fica sem MathML; o documento conta as fórmulas."""
+    from backend.pipeline import canonical_builder
+
+    monkeypatch.setattr(canonical_builder, "toolbox_convert_latex", lambda latex: "")
+    document = canonical_builder.build_canonical_document("$x=1$\n\n$y=2$")
+    block = document["sections"][0]["blocks"][0]
+    assert block["text"] == "x=1"
+    assert "mathml" not in block.get("metadata", {})
     assert block["alt_text"].startswith("Fórmula:")
+    # Rejection is not an outage: every formula is still tried.
+    assert toolbox_math["verbalize"] == ["x=1", "y=2"]
+    warnings = document["technical_warnings"]
+    assert len(warnings) == 1
+    assert "math.convert" in warnings[0] and "2" in warnings[0]
+
+
+def test_unavailable_capabilities_are_reported_once(monkeypatch):
+    """Sem fallback local: a fórmula fica com o LaTeX e o documento avisa."""
+    from backend.pipeline import canonical_builder
+
+    convert = _unavailable("math.convert")
+    verbalize = _unavailable("math.verbalize")
+    monkeypatch.setattr(canonical_builder, "toolbox_convert_latex", convert)
+    monkeypatch.setattr(canonical_builder, "toolbox_verbalize_latex", verbalize)
+
+    document = canonical_builder.build_canonical_document("$x=1$\n\n$y=2$\n\n$z=3$")
+
+    math_blocks = [
+        b for section in document["sections"] for b in section.get("blocks", [])
+        if b.get("type") == "math"
+    ]
+    assert [b["text"] for b in math_blocks] == ["x=1", "y=2", "z=3"]
+    assert all("mathml" not in b.get("metadata", {}) for b in math_blocks)
+    assert all(not b.get("alt_text") for b in math_blocks)
+    # One attempt per capability: an outage costs one timeout, not one per formula.
+    assert convert.calls == ["x=1"]
+    assert verbalize.calls == ["x=1"]
+    warnings = document["technical_warnings"]
+    assert len(warnings) == 2
+    assert any("math.convert" in w and "ToolboxProviderUnavailable" in w for w in warnings)
+    assert any("math.verbalize" in w for w in warnings)
 
 
 # ── renderers ──
@@ -368,24 +285,58 @@ def _manifest_with_formula():
     )
 
 
-def test_pddl_mathml_handler_enriches_formula_element():
+def test_pddl_mathml_handler_enriches_formula_element(toolbox_math):
     from backend.agents.pddl_orchestrator import _handle_mathml_method
 
     manifest = _manifest_with_formula()
     result = _handle_mathml_method(manifest, "o-f")
 
     assert result.success
-    assert manifest.elements[0].metadata["mathml"].startswith("<math")
+    assert toolbox_math["convert"] == ["E=mc^2"]
+    assert manifest.elements[0].metadata["mathml"] == FAKE_MATHML
 
 
-def test_pddl_latex_verbalizer_handler():
+def test_pddl_latex_verbalizer_handler(toolbox_math):
     from backend.agents.pddl_orchestrator import _handle_latex_verbalizer_method
 
     manifest = _manifest_with_formula()
     result = _handle_latex_verbalizer_method(manifest, "o-f")
 
     assert result.success
-    assert "igual a" in manifest.elements[0].metadata["verbalization"]
+    assert manifest.elements[0].metadata["verbalization"] == (
+        "Fórmula: maiúscula e é igual a, m c ao quadrado"
+    )
+
+
+@pytest.mark.parametrize(
+    ("handler", "patched", "capability"),
+    [
+        ("_handle_mathml_method", "toolbox_convert_latex", "math.convert"),
+        ("_handle_latex_verbalizer_method", "toolbox_verbalize_latex", "math.verbalize"),
+    ],
+)
+def test_pddl_handlers_fail_explicitly_when_capability_unavailable(
+    monkeypatch, handler, patched, capability
+):
+    from backend.agents import pddl_orchestrator
+
+    monkeypatch.setattr(pddl_orchestrator, patched, _unavailable(capability))
+    manifest = _manifest_with_formula()
+    result = getattr(pddl_orchestrator, handler)(manifest, "o-f")
+
+    assert not result.success
+    assert capability in result.message
+    assert manifest.elements[0].metadata == {}
+
+
+def test_pddl_mathml_handler_rejected_formula_is_partial(monkeypatch, toolbox_math):
+    from backend.agents import pddl_orchestrator
+
+    monkeypatch.setattr(pddl_orchestrator, "toolbox_convert_latex", lambda latex: "")
+    result = pddl_orchestrator._handle_mathml_method(_manifest_with_formula(), "o-f")
+
+    assert not result.success
+    assert "0/1" in result.message
 
 
 def test_pddl_handlers_fail_for_unknown_obligation():

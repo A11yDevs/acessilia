@@ -13,6 +13,7 @@ import respx
 
 from backend.config.settings import settings
 from backend.tools.toolbox_math_tools import (
+    MathCapabilityUnavailable,
     toolbox_convert_latex,
     toolbox_recognize_formula,
     toolbox_verbalize_latex,
@@ -25,7 +26,7 @@ TOOLBOX_URL = settings.toolbox_base_url.rstrip("/")
 SAMPLE_MATH_CONVERT_RESPONSE = {
     "status": "succeeded",
     "capability": "math.convert",
-    "provider": "pure-math",
+    "provider": "math-speech",
     "document": {
         "latex": "E = mc^2",
         "mathml": "<math><mi>E</mi><mo>=</mo><mi>m</mi><msup><mi>c</mi><mn>2</mn></msup></math>",
@@ -36,7 +37,7 @@ SAMPLE_MATH_CONVERT_RESPONSE = {
 SAMPLE_MATH_VERBALIZE_RESPONSE = {
     "status": "succeeded",
     "capability": "math.verbalize",
-    "provider": "pure-math",
+    "provider": "math-speech",
     "document": {
         "latex": "E = mc^2",
         "verbalized": "E igual a m c elevado a 2",
@@ -69,11 +70,23 @@ class TestMathTools:
         assert "<math>" in result
 
     @respx.mock
-    def test_convert_fallback(self):
-        """Toolbox unavailable → empty string."""
+    def test_convert_unavailable_is_explicit(self):
+        """Toolbox unavailable → an error, never a silent local fallback (ADR-0007)."""
         respx.route().mock(side_effect=httpx.ConnectError("synthetic offline provider"))
-        result = toolbox_convert_latex("E = mc^2")
-        assert result == ""
+        with pytest.raises(MathCapabilityUnavailable) as excinfo:
+            toolbox_convert_latex("E = mc^2")
+        assert excinfo.value.capability == "math.convert"
+        assert excinfo.value.reason == "ToolboxProviderUnavailable"
+
+    @respx.mock
+    def test_convert_rejected_latex_is_empty(self):
+        """Invalid input is a formula without MathML, not an outage."""
+        respx.post(f"{TOOLBOX_URL}/v1/capabilities/math.convert:execute").mock(
+            return_value=httpx.Response(
+                400, json={"code": "invalid_input", "message": "invalid_latex: MissingCloseBrace"}
+            )
+        )
+        assert toolbox_convert_latex(r"\frac{a}{") == ""
 
     @respx.mock
     def test_verbalize_success(self):
@@ -86,10 +99,18 @@ class TestMathTools:
         assert "elevado" in result
 
     @respx.mock
-    def test_verbalize_fallback(self):
+    def test_verbalize_unavailable_is_explicit(self):
         respx.route().mock(side_effect=httpx.ConnectError("synthetic offline provider"))
-        result = toolbox_verbalize_latex("E = mc^2")
-        assert result == ""
+        with pytest.raises(MathCapabilityUnavailable) as excinfo:
+            toolbox_verbalize_latex("E = mc^2")
+        assert excinfo.value.capability == "math.verbalize"
+
+    @respx.mock
+    def test_verbalize_rejected_latex_is_empty(self):
+        respx.post(f"{TOOLBOX_URL}/v1/capabilities/math.verbalize:execute").mock(
+            return_value=httpx.Response(400, json={"code": "invalid_input", "message": "x"})
+        )
+        assert toolbox_verbalize_latex(r"\frac{a}{") == ""
 
     @respx.mock
     def test_recognize_fallback(self):

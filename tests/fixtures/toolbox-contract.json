@@ -1,5 +1,5 @@
 {
-  "_comment": "Toolbox capability/provider contract captured from a running toolbox. Regenerate with scripts/capture_toolbox_contract.py. Only the fields the core's contract checker reads are kept, so the fixture stays stable. Mixed capture: document.export.docx and pandoc-docx were added by hand (#172) instead of recapturing, to keep the unrelated pdf.validate.pdf_ua/teleocr drift out; the next full regeneration supersedes this note.",
+  "_comment": "Toolbox capability/provider contract captured from a running toolbox. Regenerate with scripts/capture_toolbox_contract.py. Only the fields the core's contract checker reads are kept, so the fixture stays stable. Mixed capture: document.export.docx and pandoc-docx were added by hand (#172) instead of recapturing, to keep the unrelated pdf.validate.pdf_ua/teleocr drift out; the next full regeneration supersedes this note. Also by hand (acessilia-toolbox#66): pure-math renamed to math-speech, the provider that now serves math.convert and math.verbalize.",
   "capabilities": [
     {
       "id": "accessibility.mark",
@@ -181,7 +181,7 @@
       "id": "math.convert",
       "version": 1,
       "providers": [
-        "pure-math"
+        "math-speech"
       ]
     },
     {
@@ -196,7 +196,7 @@
       "id": "math.verbalize",
       "version": 1,
       "providers": [
-        "pure-math"
+        "math-speech"
       ]
     },
     {
@@ -327,6 +327,13 @@
       ]
     },
     {
+      "id": "math-speech",
+      "capabilities": [
+        "math.convert",
+        "math.verbalize"
+      ]
+    },
+    {
       "id": "mineru",
       "capabilities": [
         "document.structure.extract"
@@ -385,13 +392,6 @@
       "id": "pure-code",
       "capabilities": [
         "code.normalize"
-      ]
-    },
-    {
-      "id": "pure-math",
-      "capabilities": [
-        "math.convert",
-        "math.verbalize"
       ]
     },
     {
