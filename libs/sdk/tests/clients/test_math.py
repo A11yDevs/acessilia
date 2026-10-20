@@ -41,7 +41,7 @@ SAMPLE_RECOGNIZE_RESPONSE = {
 SAMPLE_CONVERT_RESPONSE = {
     "status": "succeeded",
     "capability": "math.convert",
-    "provider": "pure-math",
+    "provider": "math-speech",
     "document": {
         "latex": "E = mc^2",
         "mathml": '<math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>E</mi><mo>=</mo><mi>m</mi><msup><mi>c</mi><mn>2</mn></msup></mrow></math>',
@@ -56,7 +56,7 @@ SAMPLE_CONVERT_RESPONSE = {
 SAMPLE_VERBALIZE_RESPONSE = {
     "status": "succeeded",
     "capability": "math.verbalize",
-    "provider": "pure-math",
+    "provider": "math-speech",
     "document": {
         "latex": "E = mc^2",
         "verbalized": "E igual a m c elevado a 2",
@@ -156,7 +156,7 @@ async def test_convert_sends_multipart_form(respx_mock, client):
 
     request = route.calls.last.request
     assert request.url.query == b""
-    assert b"pure-math" in request.content
+    assert b"math-speech" in request.content
     assert b"latex-to-mathml" in request.content
     assert b"formula.tex" in request.content
     assert b"E = mc^2" in request.content
@@ -213,7 +213,7 @@ async def test_verbalize_sends_multipart_form(respx_mock, client):
 
     request = route.calls.last.request
     assert request.url.query == b""
-    assert b"pure-math" in request.content
+    assert b"math-speech" in request.content
     assert b"pt-BR" in request.content
     assert b"formula.tex" in request.content
     assert b"E = mc^2" in request.content

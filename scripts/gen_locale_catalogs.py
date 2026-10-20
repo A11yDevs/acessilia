@@ -282,6 +282,7 @@ from backend.stage_messages import (
     STAGE_VALIDATING_PLAN_DRY_RUN,
     STAGE_EXECUTING_PLAN,
 )
+from backend.tools.toolbox_math_tools import MSG_MATHML_UNAVAILABLE, MSG_SPEECH_UNAVAILABLE
 from backend.tools.validators import MSG_FILE_TOO_LARGE, MSG_UNSUPPORTED_FORMAT
 from frontend.web.messages import (
     WEB_JOB_TITLE,
@@ -429,6 +430,8 @@ CATALOG_CREATION_DATE: datetime = datetime(
 #: Canonical English msgids surfaced to end users at runtime; every id must carry a non-blank pt_BR translation in
 #: TRANSLATIONS before catalogs are allowed to be written out, per the module's completeness-validation contract.
 MESSAGES: tuple[str, ...] = (
+    MSG_MATHML_UNAVAILABLE,
+    MSG_SPEECH_UNAVAILABLE,
     WEB_JOB_TITLE,
     WEB_JOB_PENDING,
     WEB_JOB_DOWNLOAD,
@@ -831,6 +834,8 @@ MESSAGES: tuple[str, ...] = (
 #: msgid -> localized text mappings per non-default locale; every id in MESSAGES must appear for each such locale.
 TRANSLATIONS: dict[str, dict[str, str]] = {
     "pt_BR": {
+        MSG_MATHML_UNAVAILABLE: 'math.convert indisponível ({reason}): fórmulas mantidas sem MathML',
+        MSG_SPEECH_UNAVAILABLE: 'math.verbalize indisponível ({reason}): fórmulas mantidas sem texto falado',
         WEB_JOB_TITLE: 'Seu documento',
         WEB_JOB_PENDING: 'Mantenha esta página aberta ou salve-a nos favoritos para acompanhar seu documento.',
         WEB_JOB_DOWNLOAD: 'Baixar seus arquivos',

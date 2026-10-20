@@ -1,8 +1,10 @@
-"""Toolbox-backed math formula recognition.
+"""Toolbox-backed math: recognition, LaTeX/MathML conversion and speech.
 
-Replaces the local CodeFormula + RapidOCR cascade with a remote call
-to the Acessilia Toolbox math.recognize capability. Falls back to
-returning empty results on failure.
+``math.recognize`` replaces the local CodeFormula + RapidOCR cascade and
+returns no formulas on failure. ``math.convert`` and ``math.verbalize`` are
+the only source of MathML and spoken text in the core (ADR-0007): an
+unavailable capability raises ``MathCapabilityUnavailable`` instead of falling
+back to a local converter.
 """
 
 from __future__ import annotations
@@ -11,7 +13,9 @@ from pathlib import Path
 from typing import Any
 
 from backend.tools.logger import logger
+from acessilia_sdk.toolbox import ToolboxError, ToolboxInvalidInput
 from acessilia_sdk.toolbox.clients import ToolboxMathClient
+from acessilia_sdk.toolbox.clients.math import CONVERT_CAPABILITY, VERBALIZE_CAPABILITY
 from backend.tools.toolbox_client import make_toolbox_client, run_sync
 
 
@@ -54,21 +58,50 @@ async def _recognize_formula_async(file_path: Path) -> list[dict[str, Any]]:
         await client.close()
 
 
+class MathCapabilityUnavailable(RuntimeError):
+    """``math.convert`` or ``math.verbalize`` could not serve a request.
+
+    Raised for an unreachable, failing or misconfigured Toolbox, never for an
+    expression the Toolbox rejected. ADR-0007 forbids a silent local fallback:
+    the caller decides between failing, replanning and a documented
+    degradation. ``reason`` is the SDK error class, safe to show; the message
+    may carry Toolbox details and is meant for logs.
+    """
+
+    def __init__(self, capability: str, error: ToolboxError) -> None:
+        super().__init__(f"{capability}: {type(error).__name__}: {error}")
+        self.capability = capability
+        self.reason = type(error).__name__
+
+
+#: Technical warning and method message when math.convert is unavailable.
+MSG_MATHML_UNAVAILABLE: str = "math.convert unavailable ({reason}): formulas kept without MathML"
+#: Technical warning and method message when math.verbalize is unavailable.
+MSG_SPEECH_UNAVAILABLE: str = (
+    "math.verbalize unavailable ({reason}): formulas kept without spoken text"
+)
+
+
 def toolbox_convert_latex(latex: str, direction: str = "latex-to-mathml") -> str:
-    """Convert LaTeX to MathML or vice-versa via Toolbox.
+    """Convert LaTeX to MathML (or MathML to LaTeX) through ``math.convert``.
 
     Args:
-        latex: LaTeX or MathML expression.
-        direction: "latex-to-mathml" or "mathml-to-latex".
+        latex: LaTeX expression, or MathML for ``mathml-to-latex``.
+        direction: ``latex-to-mathml`` or ``mathml-to-latex``.
 
     Returns:
-        Converted string, or empty string on failure.
+        The converted expression, or ``""`` when the Toolbox rejected the
+        input as invalid (a formula without MathML, not a failure).
+
+    Raises:
+        MathCapabilityUnavailable: the capability could not serve the request.
     """
     try:
         return _run_async(_convert_latex_async(latex, direction))
-    except Exception as e:
-        logger.warning("Toolbox Math convert failed ({}), returning empty", e)
+    except ToolboxInvalidInput:
         return ""
+    except ToolboxError as exc:
+        raise MathCapabilityUnavailable(CONVERT_CAPABILITY, exc) from exc
 
 
 async def _convert_latex_async(latex: str, direction: str) -> str:
@@ -82,20 +115,24 @@ async def _convert_latex_async(latex: str, direction: str) -> str:
 
 
 def toolbox_verbalize_latex(latex: str, language: str = "pt-BR") -> str:
-    """Convert LaTeX to natural language text via Toolbox.
+    """Speak a LaTeX expression through ``math.verbalize`` (pt-BR).
 
     Args:
         latex: LaTeX expression.
-        language: Target language (default: pt-BR).
+        language: Target language; ``math.verbalize@1`` speaks pt-BR only.
 
     Returns:
-        Verbalized text, or empty string on failure.
+        The spoken text, or ``""`` when the Toolbox rejected the input.
+
+    Raises:
+        MathCapabilityUnavailable: the capability could not serve the request.
     """
     try:
         return _run_async(_verbalize_latex_async(latex, language))
-    except Exception as e:
-        logger.warning("Toolbox Math verbalize failed ({}), returning empty", e)
+    except ToolboxInvalidInput:
         return ""
+    except ToolboxError as exc:
+        raise MathCapabilityUnavailable(VERBALIZE_CAPABILITY, exc) from exc
 
 
 async def _verbalize_latex_async(latex: str, language: str) -> str:
@@ -108,6 +145,9 @@ async def _verbalize_latex_async(latex: str, language: str) -> str:
 
 
 __all__ = [
+    "MSG_MATHML_UNAVAILABLE",
+    "MSG_SPEECH_UNAVAILABLE",
+    "MathCapabilityUnavailable",
     "toolbox_recognize_formula",
     "toolbox_convert_latex",
     "toolbox_verbalize_latex",

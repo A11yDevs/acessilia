@@ -66,13 +66,16 @@ from backend.stage_messages import (
     STAGE_EXECUTING_PLAN,
 )
 from backend.tools.code_tools import normalize_code_text
-from backend.tools.formula_tools import (
-    latex_to_mathml,
-    normalize_latex,
-    verbalize_latex_fallback,
-)
+from backend.tools.formula_tools import label_spoken_formula, normalize_latex
 from backend.tools.logger import logger
 from backend.tools.media_inspect import inspect_source_media
+from backend.tools.toolbox_math_tools import (
+    MSG_MATHML_UNAVAILABLE,
+    MSG_SPEECH_UNAVAILABLE,
+    MathCapabilityUnavailable,
+    toolbox_convert_latex,
+    toolbox_verbalize_latex,
+)
 from backend.tools.toolbox_client import ToolboxError
 
 if TYPE_CHECKING:
@@ -96,7 +99,11 @@ def _formula_elements_for_obligation(
 def _handle_mathml_method(
     manifest: ProcessingManifest, obligation_id: str
 ) -> MethodResult:
-    """Converte o LaTeX das fórmulas alvo em MathML (metadata.mathml)."""
+    """Converte o LaTeX das fórmulas alvo em MathML (metadata.mathml) via math.convert.
+
+    Uma math.convert indisponível falha o método explicitamente (sem conversão
+    local, ADR-0007), para o executor tentar outro método ou replanejar.
+    """
     elements = _formula_elements_for_obligation(manifest, obligation_id)
     if not elements:
         return MethodResult(
@@ -106,7 +113,16 @@ def _handle_mathml_method(
         )
     converted = 0
     for element in elements:
-        mathml = latex_to_mathml(element.text or "")
+        latex = normalize_latex(element.text or "")
+        try:
+            mathml = toolbox_convert_latex(latex) if latex else ""
+        except MathCapabilityUnavailable as exc:
+            logger.warning("Handler mathml: {}", exc)
+            return MethodResult(
+                success=False,
+                validated=False,
+                message=t(MSG_MATHML_UNAVAILABLE).format(reason=exc.reason),
+            )
         if mathml:
             element.metadata["mathml"] = mathml
             converted += 1
@@ -126,7 +142,11 @@ def _handle_mathml_method(
 def _handle_latex_verbalizer_method(
     manifest: ProcessingManifest, obligation_id: str
 ) -> MethodResult:
-    """Gera verbalização pt-BR determinística das fórmulas (metadata.verbalization)."""
+    """Gera a verbalização pt-BR das fórmulas (metadata.verbalization) via math.verbalize.
+
+    Uma math.verbalize indisponível falha o método explicitamente (sem
+    verbalizador local, ADR-0007).
+    """
     elements = _formula_elements_for_obligation(manifest, obligation_id)
     if not elements:
         return MethodResult(
@@ -137,7 +157,15 @@ def _handle_latex_verbalizer_method(
     verbalized = 0
     for element in elements:
         latex = normalize_latex(element.text or "")
-        spoken = verbalize_latex_fallback(latex) if latex else ""
+        try:
+            spoken = label_spoken_formula(toolbox_verbalize_latex(latex)) if latex else ""
+        except MathCapabilityUnavailable as exc:
+            logger.warning("Handler latex-verbalizer: {}", exc)
+            return MethodResult(
+                success=False,
+                validated=False,
+                message=t(MSG_SPEECH_UNAVAILABLE).format(reason=exc.reason),
+            )
         if spoken:
             element.metadata["verbalization"] = spoken
             verbalized += 1

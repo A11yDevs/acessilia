@@ -19,6 +19,14 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.18.0\n"
 
+#, python-brace-format
+msgid "math.convert unavailable ({reason}): formulas kept without MathML"
+msgstr "math.convert indisponível ({reason}): fórmulas mantidas sem MathML"
+
+#, python-brace-format
+msgid "math.verbalize unavailable ({reason}): formulas kept without spoken text"
+msgstr "math.verbalize indisponível ({reason}): fórmulas mantidas sem texto falado"
+
 msgid "Your document"
 msgstr "Seu documento"
 
