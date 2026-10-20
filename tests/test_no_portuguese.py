@@ -9,7 +9,7 @@ Exceptions allowed by the constitution (principle 2.8):
 - Functional detection patterns (callout titles, chapter-heading regex)
   that are language-agnostic classifiers
 
-The scan starts at the repository root and covers libs/ (#187). Lines that
+The scan starts at the repository root and covers libs/ and tests/ (#187). Lines that
 predate it are counted per file in ``tests/fixtures/portuguese_allowlist.json``:
 no file may go above its count, and a count must be lowered when its file is
 cleaned, so the allowlist only shrinks. Add an exemption below only for an
@@ -46,9 +46,13 @@ EXEMPT_FILES: set[str] = {
     "backend/locales/en_US/LC_MESSAGES/messages.po",
     "backend/locales/pt_BR/LC_MESSAGES/messages.po",
     "scripts/gen_locale_catalogs.py",
-    # Test documentation — may reference Portuguese concepts.
-    "README.md",
+    # This guard — it lists the exempt Portuguese strings.
+    "tests/test_no_portuguese.py",
 }
+
+# Local clone of the separate acessilia-dataset repository (git-ignored):
+# real document content, absent in CI.
+UNTRACKED_PATHS = {REPO_ROOT / "tests" / "dataset"}
 
 # Substrings exempt in every file: the link from an English page to its
 # pt-BR mirror ("[português brasileiro](page.pt-br.md)").
@@ -236,8 +240,9 @@ SCAN_PATTERNS = (
     "docker-compose*.yml",
     "scripts/**/*.sh",
     "scripts/**/*.py",
+    "tests/**/*.py",
+    "tests/**/*.md",
 )
-_CHECKED_SUFFIXES = {".py", ".md", ".json", ".yaml", ".yml", ".toml"}
 _SKIPPED_PARTS = {"__pycache__", ".venv", "node_modules", "build"}
 
 # Patterns that match a Portuguese (accented) character.
@@ -251,7 +256,7 @@ def _iter_project_files(root: Path) -> list[Path]:
         for path in root.glob(pattern):
             if _SKIPPED_PARTS.intersection(path.parts):
                 continue
-            if any(path.is_relative_to(exempt) for exempt in EXEMPT_PATHS):
+            if any(path.is_relative_to(exempt) for exempt in EXEMPT_PATHS | UNTRACKED_PATHS):
                 continue
             files.add(path)
     return sorted(files)
@@ -261,8 +266,6 @@ def _portuguese_lines(root: Path = REPO_ROOT) -> dict[str, list[str]]:
     """Offending lines per file, relative to ``root``, after every exemption."""
     found: dict[str, list[str]] = {}
     for filepath in _iter_project_files(root):
-        if filepath.suffix not in _CHECKED_SUFFIXES:
-            continue
         rel = filepath.relative_to(root).as_posix()
         if rel in EXEMPT_FILES or rel.endswith(".pt-br.md"):
             continue
@@ -292,8 +295,13 @@ def portuguese_lines() -> dict[str, list[str]]:
 
 def test_the_scan_covers_the_whole_repository() -> None:
     """The guard once read only tests/ (#187); it must reach every component."""
-    scanned = {path.relative_to(REPO_ROOT).parts[0] for path in _iter_project_files(REPO_ROOT)}
-    assert {"backend", "frontend", "libs", "docs", "scripts"} <= scanned
+    files = _iter_project_files(REPO_ROOT)
+    scanned = {path.relative_to(REPO_ROOT).parts[0] for path in files}
+    assert {"backend", "frontend", "libs", "docs", "scripts", "tests"} <= scanned
+    # Files without a source suffix are read too, and none is exempt whole.
+    for name in (".env.example", "infra/Dockerfile", "README.md"):
+        assert REPO_ROOT / name in files
+        assert name not in EXEMPT_FILES
 
 
 def test_no_new_portuguese(portuguese_lines: dict[str, list[str]]) -> None:
