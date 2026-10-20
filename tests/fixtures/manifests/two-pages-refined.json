@@ -1,0 +1,351 @@
+{
+  "$schema": "urn:a11y-devs:schema:processing-manifest:1.1.0",
+  "schema_version": "1.1.0",
+  "manifest_id": "manifest-3c87d37f1dbea690-r1",
+  "revision": 1,
+  "status": "extracted",
+  "created_at": "2026-09-06T00:00:00Z",
+  "source": {
+    "document_id": "doc-3c87d37f1dbea690",
+    "filename": "sample.pdf",
+    "path": "<source>",
+    "media_type": "application/pdf",
+    "byte_size": 9,
+    "sha256": "3c87d37f1dbea6909f917ce437c390fb8e655a774387d9e69301c0b2283d5b63"
+  },
+  "extractor": {
+    "name": "docling",
+    "version": "toolbox-test",
+    "started_at": "2026-10-20T00:00:00Z",
+    "completed_at": "2026-10-20T00:00:00Z",
+    "duration_ms": 5,
+    "configuration": {
+      "ocr": false
+    }
+  },
+  "title": "toolbox_v2_input",
+  "language": "en-US",
+  "pages": [
+    {
+      "page_number": 1,
+      "width": 600.0,
+      "height": 800.0,
+      "element_ids": [
+        "element-000002",
+        "element-000003",
+        "element-000001"
+      ]
+    },
+    {
+      "page_number": 2,
+      "width": 600.0,
+      "height": 800.0,
+      "element_ids": [
+        "element-000004",
+        "element-000005",
+        "element-000006",
+        "element-000007",
+        "element-000008"
+      ]
+    }
+  ],
+  "elements": [
+    {
+      "id": "element-000002",
+      "type": "page_header",
+      "raw_label": "page_header",
+      "reading_order": 1,
+      "hierarchy_level": 1,
+      "text": "text 2",
+      "source_ref": null,
+      "parent_ref": null,
+      "parent_id": null,
+      "page_number": 1,
+      "confidence": null,
+      "provenance": [
+        {
+          "page_number": 1,
+          "bbox": {
+            "left": 20.0,
+            "top": 790.0,
+            "right": 580.0,
+            "bottom": 770.0,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "char_start": null,
+          "char_end": null
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "element-000003",
+      "type": "heading",
+      "raw_label": "section_header",
+      "reading_order": 2,
+      "hierarchy_level": 1,
+      "text": "text 3",
+      "source_ref": null,
+      "parent_ref": null,
+      "parent_id": null,
+      "page_number": 1,
+      "confidence": null,
+      "provenance": [
+        {
+          "page_number": 1,
+          "bbox": {
+            "left": 20.0,
+            "top": 700.0,
+            "right": 580.0,
+            "bottom": 660.0,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "char_start": null,
+          "char_end": null
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "element-000001",
+      "type": "paragraph",
+      "raw_label": "paragraph",
+      "reading_order": 3,
+      "hierarchy_level": 1,
+      "text": "text 1",
+      "source_ref": null,
+      "parent_ref": null,
+      "parent_id": null,
+      "page_number": 1,
+      "confidence": null,
+      "provenance": [
+        {
+          "page_number": 1,
+          "bbox": {
+            "left": 20.0,
+            "top": 500.0,
+            "right": 580.0,
+            "bottom": 460.0,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "char_start": null,
+          "char_end": null
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "element-000004",
+      "type": "paragraph",
+      "raw_label": "paragraph",
+      "reading_order": 4,
+      "hierarchy_level": 1,
+      "text": "text 4",
+      "source_ref": null,
+      "parent_ref": null,
+      "parent_id": null,
+      "page_number": 2,
+      "confidence": null,
+      "provenance": [
+        {
+          "page_number": 2,
+          "bbox": {
+            "left": 320.0,
+            "top": 700.0,
+            "right": 580.0,
+            "bottom": 660.0,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "char_start": null,
+          "char_end": null
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "element-000005",
+      "type": "paragraph",
+      "raw_label": "paragraph",
+      "reading_order": 5,
+      "hierarchy_level": 1,
+      "text": "text 5",
+      "source_ref": null,
+      "parent_ref": null,
+      "parent_id": null,
+      "page_number": 2,
+      "confidence": null,
+      "provenance": [
+        {
+          "page_number": 2,
+          "bbox": {
+            "left": 20.0,
+            "top": 700.0,
+            "right": 280.0,
+            "bottom": 660.0,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "char_start": null,
+          "char_end": null
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "element-000006",
+      "type": "paragraph",
+      "raw_label": "paragraph",
+      "reading_order": 6,
+      "hierarchy_level": 1,
+      "text": "text 6",
+      "source_ref": null,
+      "parent_ref": null,
+      "parent_id": null,
+      "page_number": 2,
+      "confidence": null,
+      "provenance": [
+        {
+          "page_number": 2,
+          "bbox": {
+            "left": 320.0,
+            "top": 600.0,
+            "right": 580.0,
+            "bottom": 560.0,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "char_start": null,
+          "char_end": null
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "element-000007",
+      "type": "paragraph",
+      "raw_label": "paragraph",
+      "reading_order": 7,
+      "hierarchy_level": 1,
+      "text": "text 7",
+      "source_ref": null,
+      "parent_ref": null,
+      "parent_id": null,
+      "page_number": 2,
+      "confidence": null,
+      "provenance": [
+        {
+          "page_number": 2,
+          "bbox": {
+            "left": 20.0,
+            "top": 600.0,
+            "right": 280.0,
+            "bottom": 560.0,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "char_start": null,
+          "char_end": null
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "element-000008",
+      "type": "page_footer",
+      "raw_label": "page_number",
+      "reading_order": 8,
+      "hierarchy_level": 1,
+      "text": "text 8",
+      "source_ref": null,
+      "parent_ref": null,
+      "parent_id": null,
+      "page_number": 2,
+      "confidence": null,
+      "provenance": [
+        {
+          "page_number": 2,
+          "bbox": {
+            "left": 20.0,
+            "top": 30.0,
+            "right": 580.0,
+            "bottom": 10.0,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "char_start": null,
+          "char_end": null
+        }
+      ],
+      "metadata": {}
+    }
+  ],
+  "observations": [
+    {
+      "id": "observation-refine-reading-order-000004-000005-000006-000007-000008",
+      "kind": "refine-reading-order-detected",
+      "severity": "warning",
+      "message": "Ordem de leitura precisa seguir as colunas da página.",
+      "target_ids": [
+        "element-000004",
+        "element-000005",
+        "element-000006",
+        "element-000007",
+        "element-000008"
+      ],
+      "evidence": {
+        "page_number": 2,
+        "order_before": [
+          "element-000004",
+          "element-000005",
+          "element-000006",
+          "element-000007",
+          "element-000008"
+        ],
+        "order_after": [
+          "element-000005",
+          "element-000007",
+          "element-000004",
+          "element-000006",
+          "element-000008"
+        ]
+      }
+    }
+  ],
+  "obligations": [
+    {
+      "id": "obligation-refine-reading-order-000004-000005-000006-000007-000008",
+      "kind": "refine-reading-order",
+      "status": "candidate",
+      "selected": false,
+      "target_ids": [
+        "element-000004",
+        "element-000005",
+        "element-000006",
+        "element-000007",
+        "element-000008"
+      ],
+      "dependencies": [],
+      "admissible_methods": [
+        "xycut-order",
+        "skeleton-order",
+        "human-review"
+      ],
+      "method_costs": {
+        "xycut-order": 10,
+        "skeleton-order": 5,
+        "human-review": 100
+      },
+      "attempts": [],
+      "rationale": "Ordem de leitura precisa seguir as colunas da página."
+    }
+  ],
+  "artifacts": [],
+  "summary": {
+    "page_count": 2,
+    "element_count": 8,
+    "observation_count": 1,
+    "obligation_count": 1,
+    "element_types": {
+      "heading": 1,
+      "page_footer": 1,
+      "page_header": 1,
+      "paragraph": 5
+    }
+  }
+}

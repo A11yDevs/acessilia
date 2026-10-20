@@ -25,7 +25,17 @@ from backend.core.manifest.models import (
     Obligation,
     Observation,
     ProcessingManifest,
-    is_bottom_left,
+)
+from docstruct.placeholders import (
+    UNSTRUCTURED_PAGE_FLAG,
+    UNSTRUCTURED_PAGE_LABEL,
+    is_unstructured_page_placeholder as _is_placeholder,
+)
+from docstruct.geometry import (
+    OrientedBox,
+    ReadingItem,
+    order_reading_items,
+    reading_role,
 )
 
 if TYPE_CHECKING:
@@ -147,9 +157,8 @@ V23_OBLIGATION_BY_KIND = {
 #: Artifact holding the secondary provider's extraction when FUSION_MODE=dual;
 #: the v2.3 methods that choose between providers read it.
 #: A page the extractor returned without any element gets a placeholder element
-#: of this raw label, an observation and a critical obligation: the page is
-#: inspected visually and either described or accepted as blank.
-UNSTRUCTURED_PAGE_LABEL = "unstructured-page"
+#: (``docstruct.placeholders``), an observation and a critical obligation: the
+#: page is inspected visually and either described or accepted as blank.
 UNSTRUCTURED_PAGE_OBSERVATION_KIND = "page-without-structure"
 UNSTRUCTURED_PAGE_OBLIGATION_KIND = "inspect-unstructured-page"
 UNSTRUCTURED_PAGE_METHODS = V23_OBLIGATION_BY_KIND[UNSTRUCTURED_PAGE_OBLIGATION_KIND][1]
@@ -288,221 +297,56 @@ def _raw_bbox(element: ManifestElement) -> BoundingBox | None:
     return element.provenance[0].bbox
 
 
-def _element_bbox(element: ManifestElement) -> tuple[float, float, float, float] | None:
-    """Element box with the y axis growing downwards, whatever the source origin.
-
-    Reading-order refinement compares ``top`` and ``bottom`` as screen
-    coordinates. A bottom-left box is mirrored (``y -> -y``): that keeps every
-    comparison right without knowing the page height.
-
-    Only differences and orderings are meaningful: a mirrored ``top`` or
-    ``bottom`` is negative, so never compare it with a fixed position such as
-    ``0``. ``_normalized_element_bbox`` gives page fractions instead.
-    """
+def _oriented_bbox(element: ManifestElement) -> OrientedBox | None:
     bbox = _raw_bbox(element)
     if bbox is None:
         return None
-    if is_bottom_left(bbox.coord_origin, bbox.top, bbox.bottom):
-        return (bbox.left, -bbox.top, bbox.right, -bbox.bottom)
-    return (bbox.left, bbox.top, bbox.right, bbox.bottom)
+    return OrientedBox(bbox.left, bbox.top, bbox.right, bbox.bottom, bbox.coord_origin)
+
+
+def _element_bbox(element: ManifestElement) -> tuple[float, float, float, float] | None:
+    """Element box with the y axis growing downwards, whatever the source origin.
+
+    See ``docstruct.geometry.OrientedBox.top_down``: only differences and
+    orderings are meaningful. ``_normalized_element_bbox`` gives page
+    fractions instead.
+    """
+    box = _oriented_bbox(element)
+    return box.top_down() if box is not None else None
 
 
 def _refine_reading_order(elements: list[ManifestElement]) -> list[ManifestElement]:
-    """Refine reading order with column-aware gutter partitioning and marginals isolation.
+    """Reorder elements as ``docstruct.geometry.order_reading_items`` reads them.
 
-    Ensures headers stay at the top, footers/page numbers stay at the base (never
-    interleaved inside paragraphs), and body blocks follow a clean multi-column
-    reading order (reading column 1 before column 2/3).
+    Headers stay at the top of their page, footers and page numbers at the
+    bottom, and the body follows its columns. ``reading_order`` is renumbered
+    from 1. The same element objects are returned.
     """
     if not elements:
         return elements
 
-    by_page: dict[int | None, list[ManifestElement]] = {}
-    for elem in elements:
-        by_page.setdefault(elem.page_number, []).append(elem)
-
-    refined: list[ManifestElement] = []
-    for page_no, page_elements in sorted(
-        by_page.items(),
-        key=lambda pair: (0 if pair[0] is None else 1, pair[0] or 0),
-    ):
-        if page_no is None or len(page_elements) <= 1:
-            refined.extend(page_elements)
-            continue
-
-        groups: list[ManifestElement] = []
-        headers: list[ManifestElement] = []
-        footers: list[ManifestElement] = []
-        body: list[ManifestElement] = []
-
-        for e in page_elements:
-            etype = str(e.type).lower()
-            raw = str(e.raw_label).lower()
-            is_header = etype in ("header", "page_header") or raw in ("header", "page_header")
-            is_footer = (
-                etype in ("footer", "page_footer", "page_number")
-                or raw in ("footer", "page_footer", "page_number")
+    by_id = {element.id: element for element in elements}
+    order = order_reading_items(
+        [
+            ReadingItem(
+                key=element.id,
+                page=element.page_number,
+                role=reading_role(str(element.type), str(element.raw_label)),
+                box=_oriented_bbox(element),
+                rank=element.reading_order,
             )
-            if etype == "group":
-                groups.append(e)
-            elif is_header:
-                headers.append(e)
-            elif is_footer:
-                footers.append(e)
-            else:
-                body.append(e)
-
-        # Sort headers top-to-bottom, left-to-right
-        headers.sort(
-            key=lambda item: (
-                _element_bbox(item)[1] if _element_bbox(item) else 0.0,
-                _element_bbox(item)[0] if _element_bbox(item) else 0.0,
-                item.reading_order,
-            )
-        )
-
-        # Sort footers top-to-bottom, left-to-right
-        footers.sort(
-            key=lambda item: (
-                _element_bbox(item)[1] if _element_bbox(item) else 0.0,
-                _element_bbox(item)[0] if _element_bbox(item) else 0.0,
-                item.reading_order,
-            )
-        )
-
-        sorted_body = _order_body_elements_by_column(body)
-        refined.extend(groups + headers + sorted_body + footers)
-
-    for index, elem in enumerate(refined, start=1):
-        elem.reading_order = index
-
+            for element in elements
+        ]
+    )
+    refined = [by_id[key] for key in order]
+    for index, element in enumerate(refined, start=1):
+        element.reading_order = index
     return refined
-
-
-def _order_body_elements_by_column(body: list[ManifestElement]) -> list[ManifestElement]:
-    """Order body elements respecting multi-column gutters and full-width banners."""
-    elements_with_bbox = [e for e in body if _element_bbox(e) is not None]
-    if len(elements_with_bbox) < 2:
-        return sorted(
-            body,
-            key=lambda e: (
-                _element_bbox(e)[1] if _element_bbox(e) else 0.0,
-                e.reading_order,
-            ),
-        )
-
-    min_left = min(_element_bbox(e)[0] for e in elements_with_bbox)
-    max_right = max(_element_bbox(e)[2] for e in elements_with_bbox)
-    page_width = max(1.0, max_right - min_left)
-
-    # Detect multi-column candidates (width < 75% of content width)
-    narrow_elements = [
-        e
-        for e in elements_with_bbox
-        if (_element_bbox(e)[2] - _element_bbox(e)[0]) < (0.75 * page_width)
-    ]
-
-    mid_x = min_left + 0.5 * page_width
-    col1 = [
-        e
-        for e in narrow_elements
-        if _element_bbox(e)[2] <= (mid_x + 0.05 * page_width)
-    ]
-    col2 = [
-        e
-        for e in narrow_elements
-        if _element_bbox(e)[0] >= (mid_x - 0.05 * page_width)
-    ]
-
-    is_multi_column = len(col1) >= 2 and len(col2) >= 2
-
-    if not is_multi_column:
-        return sorted(
-            body,
-            key=lambda e: (
-                _element_bbox(e)[1] if _element_bbox(e) else 0.0,
-                _element_bbox(e)[0] if _element_bbox(e) else 0.0,
-                e.reading_order,
-            ),
-        )
-
-    full_width = [
-        e
-        for e in elements_with_bbox
-        if (_element_bbox(e)[2] - _element_bbox(e)[0]) >= (0.75 * page_width)
-    ]
-    full_width.sort(key=lambda e: _element_bbox(e)[1])
-
-    ordered: list[ManifestElement] = []
-    seen_ids: set[str] = set()
-    prev_top = -1.0
-
-    for fw in full_width:
-        fw_top = _element_bbox(fw)[1]
-        segment = [
-            e
-            for e in narrow_elements
-            if prev_top < _element_bbox(e)[1] < fw_top and e.id not in seen_ids
-        ]
-        seg_c1 = [
-            e
-            for e in segment
-            if (_element_bbox(e)[0] + _element_bbox(e)[2]) / 2.0 < mid_x
-        ]
-        seg_c2 = [
-            e
-            for e in segment
-            if (_element_bbox(e)[0] + _element_bbox(e)[2]) / 2.0 >= mid_x
-        ]
-        seg_c1.sort(key=lambda e: (_element_bbox(e)[1], _element_bbox(e)[0]))
-        seg_c2.sort(key=lambda e: (_element_bbox(e)[1], _element_bbox(e)[0]))
-        for el in seg_c1:
-            ordered.append(el)
-            seen_ids.add(el.id)
-        for el in seg_c2:
-            ordered.append(el)
-            seen_ids.add(el.id)
-        ordered.append(fw)
-        seen_ids.add(fw.id)
-        prev_top = _element_bbox(fw)[3]
-
-    remainder = [
-        e
-        for e in narrow_elements
-        if _element_bbox(e)[1] > prev_top and e.id not in seen_ids
-    ]
-    rem_c1 = [
-        e
-        for e in remainder
-        if (_element_bbox(e)[0] + _element_bbox(e)[2]) / 2.0 < mid_x
-    ]
-    rem_c2 = [
-        e
-        for e in remainder
-        if (_element_bbox(e)[0] + _element_bbox(e)[2]) / 2.0 >= mid_x
-    ]
-    rem_c1.sort(key=lambda e: (_element_bbox(e)[1], _element_bbox(e)[0]))
-    rem_c2.sort(key=lambda e: (_element_bbox(e)[1], _element_bbox(e)[0]))
-    for el in rem_c1:
-        ordered.append(el)
-        seen_ids.add(el.id)
-    for el in rem_c2:
-        ordered.append(el)
-        seen_ids.add(el.id)
-
-    for e in body:
-        if e.id not in seen_ids:
-            ordered.append(e)
-            seen_ids.add(e.id)
-
-    return ordered
 
 
 def is_unstructured_page_placeholder(element: ManifestElement) -> bool:
     """Whether ``element`` stands for a page the extractor left without structure."""
-    return element.raw_label == UNSTRUCTURED_PAGE_LABEL and bool(
-        element.metadata.get("unstructured_page")
-    )
+    return _is_placeholder(element.raw_label, element.metadata)
 
 
 def append_unstructured_page_needs(manifest: ProcessingManifest) -> None:
@@ -536,7 +380,7 @@ def append_unstructured_page_needs(manifest: ProcessingManifest) -> None:
             hierarchy_level=0,
             text=None,
             page_number=number,
-            metadata={"unstructured_page": True},
+            metadata={UNSTRUCTURED_PAGE_FLAG: True},
         )
         manifest.elements.append(element)
         page.element_ids.append(element_id)
@@ -863,24 +707,13 @@ def _normalized_element_bbox(
         element: ManifestElement,
         page_sizes: dict[int, tuple[float | None, float | None]] | None,
 ) -> tuple[float, float, float, float] | None:
-        bbox = _raw_bbox(element)
-        if bbox is None or element.page_number is None or page_sizes is None:
+        box = _oriented_bbox(element)
+        if box is None or element.page_number is None or page_sizes is None:
             return None
         size = page_sizes.get(element.page_number)
         if size is None:
             return None
-        width, height = size
-        if not width or not height:
-            return None
-        left, top, right, bottom = bbox.left, bbox.top, bbox.right, bbox.bottom
-        if is_bottom_left(bbox.coord_origin, top, bottom):
-            top, bottom = height - top, height - bottom
-        return (
-            left / width,
-            top / height,
-            right / width,
-            bottom / height,
-        )
+        return box.page_fractions(*size)
 
 
 def _append_processing_needs(
