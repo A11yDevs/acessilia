@@ -50,6 +50,10 @@ The tracked branch is `develop`, or `TRACK_BRANCH` from `.env` during the BHS cy
   `ops.sh` never calls `sudo`; if something must run as root, run that command (or
   `ops.sh` itself) as root.
 
+  A session opened with `su` has no `XDG_RUNTIME_DIR`; `ops.sh` then uses
+  `/run/user/<uid>` by itself. When that does not exist either (no linger, no login),
+  `setup` and `migrate` stop and say so.
+
 ## First install
 
 ```bash
@@ -77,12 +81,14 @@ cd ~/acessilia
 
 `migrate` first checks everything it needs: that it can read the old `.env` and all of
 `var/` (it lists what it cannot read), that the clone has no different `.env`, that the
-branch in `TRACK_BRANCH` can be checked out, and that Docker is reachable. Any failure stops
-it before anything changes, and a run interrupted later can simply be repeated. It then
-copies `.env` and `var/`
-(stopping the container meanwhile), keeps the compose project name of the running container
-so compose takes it over instead of clashing with it, removes the old `staging-update` timer,
-checks out the branch in `TRACK_BRANCH` and runs `setup`. `/opt/acessilia/staging` is left
+branch in `TRACK_BRANCH` can be checked out, and that Docker and the user's systemd instance
+are reachable. Any failure stops it before anything changes, and a run interrupted later can
+simply be repeated. It then disables the old `staging-update` timer (stopping if it cannot),
+copies `.env` and `var/` (stopping the container meanwhile), moves staging to its own compose
+project `acessilia-staging` — replacing the old container, whose data is now in `./var` —
+checks out the branch in `TRACK_BRANCH` and runs `setup`. The old installs kept Acessilia
+and the Toolbox in one project named `staging`; leaving it means a `--remove-orphans` here
+can no longer delete the Toolbox's containers. `/opt/acessilia/staging` is left
 untouched; remove it once staging works.
 
 ## Updating the scripts
@@ -119,4 +125,4 @@ GHCR image over it.
 | Timer doesn't run after logout | Linger is disabled | `sudo loginctl enable-linger $USER` |
 | `image sha-xxxxxxx not yet published` | CI is still building the commit | wait for the next check |
 | API fails (fallback enabled) | GitHub API unavailable | the script falls back to a direct `docker pull` |
-| `Container name already in use` | Another compose project owns the container | set `COMPOSE_PROJECT_NAME` in `.env` to that project (`docker inspect acessilia-staging --format '{{ index .Config.Labels "com.docker.compose.project" }}'`) or use `auto-update migrate` |
+| `acessilia-staging belongs to compose project '…' (dir)` | Another install owns the container | `./scripts/ops.sh auto-update migrate <dir>` |

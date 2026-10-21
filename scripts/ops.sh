@@ -6,7 +6,8 @@
 # updates the scripts, and the containers run the images CI publishes on GHCR.
 #
 # Usage:
-#   BHS, on a maintainer's machine (push access and an authenticated `gh`):
+#   BHS (start/finish on a maintainer's machine with push access and an
+#   authenticated `gh`; status anywhere, with git, curl and jq):
 #     ./scripts/ops.sh bhs start <x.y.z>              cut release/x.y.z from develop
 #     ./scripts/ops.sh bhs finish <x.y.z> [--cleanup] open the closing PRs / tag and clean up
 #     ./scripts/ops.sh bhs status [<x.y.z>]           CI, image and PRs of the open releases
@@ -38,6 +39,10 @@ HEALTH_URL="http://localhost:8000/api/v1/health"
 UNIT="acessilia-staging-update"
 # Unit installed by the former setup-homologacao.sh, replaced by $UNIT.
 LEGACY_UNIT="staging-update"
+# Whether migrate keeps the compose project name of the running install. The
+# Toolbox must, so compose takes over its named volumes (MinIO data, model
+# caches); Acessilia keeps its data in ./var and moves to its own project.
+KEEP_PROJECT_NAME=false
 LEGACY_DESCRIPTION="Update acessilia staging container"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -45,10 +50,19 @@ ENV_FILE="$ROOT/.env"
 STATUS_FILE="$ROOT/var/data/staging-status.json"
 UNIT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 
+# Sessions opened with su (not a login) have no XDG_RUNTIME_DIR, so systemctl --user
+# cannot find the user's systemd instance, which still runs (linger) under
+# /run/user/<uid>.
+RUN_USER_DIR="${OPS_RUN_USER_DIR:-/run/user}/$(id -u)"
+if [ -z "${XDG_RUNTIME_DIR:-}" ] && [ -d "$RUN_USER_DIR" ]; then
+  export XDG_RUNTIME_DIR="$RUN_USER_DIR"
+  export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=${XDG_RUNTIME_DIR}/bus}"
+fi
+
 cd "$ROOT"
 
 _usage() {
-  sed -n '8,21p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '8,22p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 _die() {
@@ -196,7 +210,9 @@ _bhs_finish() {
   local version="${1:-}" mode="${2:-open}" branch sync_branch tag merge_sha parents
   _check_version "$version"
   [[ "$mode" =~ ^(open|--cleanup)$ ]] || _die "unknown option '$mode' (expected --cleanup)."
-  _need git gh
+  command -v gh >/dev/null 2>&1 \
+    || _die "gh not found: bhs finish runs on a maintainer's machine with an authenticated GitHub CLI."
+  _need git
   branch="release/${version}"
   sync_branch="chore/sync-release-${version}"
   tag="v${version}"
@@ -285,9 +301,29 @@ Resolve conflicts on this branch (\`${sync_branch}\`), never on \`${branch}\`: t
 # ──────────────────────────────────────────────
 # bhs status
 # ──────────────────────────────────────────────
+_gh_api() {
+  # $1 = path under the repository. GitHub's REST API without the GitHub CLI,
+  # so bhs status also runs on the staging server. The repositories are
+  # public; a token (GITHUB_TOKEN, or GHCR_TOKEN from .env) only raises the
+  # rate limit.
+  local token auth=()
+  token="${GITHUB_TOKEN:-$(_env_get GHCR_TOKEN)}"
+  if [ -n "$token" ]; then
+    auth=(-H "Authorization: token ${token}")
+  fi
+  curl -fsS ${auth[@]+"${auth[@]}"} -H "Accept: application/vnd.github+json" \
+    "https://api.github.com/repos/${REPO}/$1"
+}
+
+_pr_state() {
+  # $1 = head branch, $2 = base branch; state of the most recent PR
+  _gh_api "pulls?state=all&head=${REPO%%/*}:$1&base=$2" \
+    | jq -r '.[0] | if . == null then "NONE" elif .merged_at then "MERGED" elif .state == "open" then "OPEN" else "CLOSED" end'
+}
+
 _bhs_status() {
   local branches branch sha version
-  _need git gh
+  _need git curl jq
   git fetch origin --quiet --prune
 
   if [ -n "${1:-}" ]; then
@@ -310,9 +346,8 @@ _bhs_status() {
     version="${branch#release/}"
     echo "## ${branch} @ ${sha:0:7}"
     echo "  Workflows on this commit:"
-    gh run list -R "$REPO" --branch "$branch" --commit "$sha" \
-      --json workflowName,status,conclusion \
-      --jq 'if length == 0 then "    (none yet)" else .[] | "    \(.workflowName): \(.status) \(.conclusion)" end'
+    _gh_api "actions/runs?branch=${branch}&head_sha=${sha}" \
+      | jq -r '.workflow_runs | if length == 0 then "    (none yet)" else .[] | "    \(.name): \(.status) \(.conclusion // "-")" end'
     if command -v docker >/dev/null 2>&1; then
       if docker manifest inspect "${IMAGE}:sha-${sha:0:7}" >/dev/null 2>&1; then
         echo "  Image: ${IMAGE}:sha-${sha:0:7} published"
@@ -321,10 +356,9 @@ _bhs_status() {
       fi
     fi
     echo "  Open PRs into ${branch}:"
-    gh pr list -R "$REPO" --base "$branch" --state open \
-      --json number,title,headRefName \
-      --jq 'if length == 0 then "    (none)" else .[] | "    #\(.number) \(.headRefName): \(.title)" end'
-    echo "  Closing PRs: main $(_pr_field "$branch" main '.state // "NONE"'), develop $(_pr_field "chore/sync-release-${version}" develop '.state // "NONE"')"
+    _gh_api "pulls?state=open&base=${branch}" \
+      | jq -r 'if length == 0 then "    (none)" else .[] | "    #\(.number) \(.head.ref): \(.title)" end'
+    echo "  Closing PRs: main $(_pr_state "$branch" main), develop $(_pr_state "chore/sync-release-${version}" develop)"
   done
 }
 
@@ -369,7 +403,7 @@ _track_checkout() {
 _track() {
   # Without a branch, pulls the one already tracked (updates the scripts).
   local branch="${1:-}"
-  _require_env_file
+  _require_project
   _track_checkout "${branch:-$(_tracked_branch)}"
   # A new process: the pull above may have updated this script.
   "$ROOT/scripts/ops.sh" auto-update start
@@ -378,9 +412,20 @@ _track() {
 # ──────────────────────────────────────────────
 # auto-update
 # ──────────────────────────────────────────────
+_require_project() {
+  # Fails unless .env names this clone's compose project and no other
+  # project owns the container.
+  local project
+  _require_env_file
+  project="$(_env_get COMPOSE_PROJECT_NAME)"
+  [ -n "$project" ] \
+    || _die "COMPOSE_PROJECT_NAME is not set in .env: run ./scripts/ops.sh auto-update setup (or migrate <old dir>) first."
+  _check_project "$project"
+}
+
 _auto_update_start() {
   local head tracked
-  _require_env_file
+  _require_project
   head="$(git rev-parse --abbrev-ref HEAD)"
   tracked="$(_tracked_branch)"
   if [ "$head" != "$tracked" ]; then
@@ -394,9 +439,14 @@ _auto_update_start() {
 _disable_legacy_unit() {
   local service="$UNIT_DIR/${LEGACY_UNIT}.service"
   [ -f "$service" ] && grep -qx "Description=${LEGACY_DESCRIPTION}" "$service" || return 0
-  _info "Removing the ${LEGACY_UNIT} timer installed by the former setup-homologacao.sh..."
-  systemctl --user disable --now "${LEGACY_UNIT}.timer" >/dev/null 2>&1 || true
+  _info "Disabling the ${LEGACY_UNIT} timer installed by the former setup-homologacao.sh..."
+  # Deleting the files of a timer that is still loaded would leave it firing
+  # the old install's update.
+  systemctl --user disable --now "${LEGACY_UNIT}.timer" \
+    || _die "could not disable ${LEGACY_UNIT}.timer; it keeps updating the old install until it is."
+  systemctl --user stop "${LEGACY_UNIT}.service" 2>/dev/null || true
   rm -f "$service" "$UNIT_DIR/${LEGACY_UNIT}.timer"
+  systemctl --user daemon-reload
 }
 
 # The timer runs as this user: it needs the Docker daemon, and linger to keep
@@ -407,9 +457,26 @@ _check_host() {
   user="$(id -un)"
   docker info >/dev/null 2>&1 \
     || _die "${user} cannot reach the Docker daemon (as root: usermod -aG docker ${user}, then log in again)."
+  systemctl --user show-environment >/dev/null 2>&1 \
+    || _die "cannot reach the systemd user instance of ${user}: log in as ${user} directly (e.g. ssh), or have linger enabled (as root: loginctl enable-linger ${user})."
   if ! loginctl show-user "$user" 2>/dev/null | grep -q 'Linger=yes'; then
     _info "⚠️  Linger is off for ${user}: the timer stops when ${user} logs out (as root: loginctl enable-linger ${user})."
   fi
+}
+
+_container_label() {
+  # $1 = label; value on the running ${CONTAINER_NAME} container, if any
+  docker inspect "$CONTAINER_NAME" --format "{{ index .Config.Labels \"$1\" }}" 2>/dev/null || true
+}
+
+# A container of the same name in another compose project makes every
+# `compose up` here fail with a name conflict; say which install owns it.
+_check_project() {
+  local project="$1" running dir
+  running="$(_container_label com.docker.compose.project)"
+  [ -z "$running" ] || [ "$running" = "$project" ] && return 0
+  dir="$(_container_label com.docker.compose.project.working_dir)"
+  _die "${CONTAINER_NAME} belongs to compose project '${running}' (${dir:-unknown dir}), not to '${project}': move that install here with ./scripts/ops.sh auto-update migrate ${dir:-<its dir>}, or set COMPOSE_PROJECT_NAME=${running} in .env if it is this clone's."
 }
 
 _auto_update_setup() {
@@ -417,11 +484,16 @@ _auto_update_setup() {
   _need docker jq git curl systemctl
   docker compose version >/dev/null 2>&1 || _die "Docker Compose not found."
   _require_env_file
+  _check_host
 
   # A fixed project name keeps the containers and volumes independent of the
   # clone's directory name.
+  local project
+  project="$(_env_get COMPOSE_PROJECT_NAME)"
+  project="${project:-$COMPOSE_PROJECT}"
+  _check_project "$project"
   if [ -z "$(_env_get COMPOSE_PROJECT_NAME)" ]; then
-    _env_set COMPOSE_PROJECT_NAME "$COMPOSE_PROJECT"
+    _env_set COMPOSE_PROJECT_NAME "$project"
   fi
   chmod 600 "$ENV_FILE"
 
@@ -429,8 +501,6 @@ _auto_update_setup() {
     _info "⚠️  Not logged in to ghcr.io; if pulls fail, run:"
     echo "     echo <token> | docker login ghcr.io -u <github-user> --password-stdin"
   fi
-
-  _check_host
 
   _disable_legacy_unit
 
@@ -513,6 +583,21 @@ _auto_update_status() {
   journalctl --user -u "${UNIT}.service" -n 10 --no-pager -o cat 2>/dev/null | sed 's/^/  /' || true
 }
 
+_warn_shared_project() {
+  # $1 = compose project; warns about containers of other stacks in it, which
+  # `compose down --remove-orphans` here would delete
+  local ours others
+  ours="$(docker compose -f "$COMPOSE_FILE" config --services 2>/dev/null || true)"
+  others="$(docker ps -a --filter "label=com.docker.compose.project=$1" \
+    --format '{{.Names}} {{.Label "com.docker.compose.service"}}' 2>/dev/null \
+    | while read -r name service; do
+        grep -qx "$service" <<<"$ours" || echo "$name"
+      done)"
+  [ -n "$others" ] || return 0
+  _info "⚠️  Compose project '$1' also holds containers of another stack: $(echo "$others" | tr '\n' ' ')"
+  _info "    Move that stack to its own project, and never run --remove-orphans here meanwhile."
+}
+
 _unreadable() {
   # $1 = path; prints what under it the current user cannot read
   find "$1" -print 2>/dev/null | while IFS= read -r path; do
@@ -558,14 +643,18 @@ Give ${user} read access to them (as root) and run again; nothing was changed."
     chmod 600 "$ENV_FILE"
   fi
 
-  # Keeping the old compose project name lets compose take over the running
-  # containers and their named volumes instead of creating new ones.
-  project=$(docker inspect "$CONTAINER_NAME" \
-    --format '{{ index .Config.Labels "com.docker.compose.project" }}' 2>/dev/null || true)
-  if [ -n "$project" ] && [ -z "$(_env_get COMPOSE_PROJECT_NAME)" ]; then
-    _info "Keeping the compose project name '${project}'."
-    _env_set COMPOSE_PROJECT_NAME "$project"
+  project="$(_container_label com.docker.compose.project)"
+  if [ -z "$(_env_get COMPOSE_PROJECT_NAME)" ]; then
+    if [ "$KEEP_PROJECT_NAME" = true ] && [ -n "$project" ]; then
+      # Compose then takes over the running containers and their named
+      # volumes instead of creating new, empty ones.
+      _info "Keeping the compose project name '${project}'."
+      _env_set COMPOSE_PROJECT_NAME "$project"
+    else
+      _env_set COMPOSE_PROJECT_NAME "$COMPOSE_PROJECT"
+    fi
   fi
+  _warn_shared_project "$(_env_get COMPOSE_PROJECT_NAME)"
 
   _disable_legacy_unit
 
@@ -575,6 +664,13 @@ Give ${user} read access to them (as root) and run again; nothing was changed."
     mkdir -p "$ROOT/var"
     cp -a "$old/var/." "$ROOT/var/" \
       || _die "copying $old/var failed (see above). Run again once fixed, or bring the old container back with: docker start ${CONTAINER_NAME}"
+  fi
+
+  # The old container belongs to another project once this clone uses its own;
+  # compose cannot take it over, so it is replaced (its data is now in ./var).
+  if [ -n "$project" ] && [ "$project" != "$(_env_get COMPOSE_PROJECT_NAME)" ]; then
+    _info "Replacing ${CONTAINER_NAME} of compose project '${project}'..."
+    docker rm -f "$CONTAINER_NAME" >/dev/null
   fi
 
   _track_checkout "$branch"

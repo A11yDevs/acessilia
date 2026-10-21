@@ -51,6 +51,10 @@ A branch rastreada é a `develop`, ou o `TRACK_BRANCH` do `.env` durante o ciclo
   O `ops.sh` nunca chama `sudo`; se algo precisar rodar como root, rode esse comando (ou o
   próprio `ops.sh`) como root.
 
+  Uma sessão aberta com `su` não tem `XDG_RUNTIME_DIR`; o `ops.sh` então usa
+  `/run/user/<uid>` sozinho. Quando nem isso existe (sem linger e sem login), o `setup` e o
+  `migrate` param e avisam.
+
 ## Primeira instalação
 
 ```bash
@@ -78,12 +82,15 @@ cd ~/acessilia
 
 O `migrate` primeiro confere tudo de que precisa: que consegue ler o `.env` antigo e todo o
 `var/` (ele lista o que não consegue ler), que o clone não tem um `.env` diferente, que a
-branch do `TRACK_BRANCH` pode ser usada e que o Docker está acessível. Qualquer falha o faz
-parar antes de mudar qualquer coisa, e uma execução interrompida depois pode simplesmente ser
-repetida. Em seguida copia o `.env` e o `var/`
-(parando o container nesse meio-tempo), mantém o nome do projeto compose do container em
-execução para que o compose o assuma em vez de colidir com ele, remove o timer antigo
-`staging-update`, faz checkout da branch do `TRACK_BRANCH` e roda o `setup`. O
+branch do `TRACK_BRANCH` pode ser usada e que o Docker e o systemd do usuário estão
+acessíveis. Qualquer falha o faz parar antes de mudar qualquer coisa, e uma execução
+interrompida depois pode simplesmente ser repetida. Em seguida desliga o timer antigo
+`staging-update` (e para se não conseguir), copia o `.env` e o `var/` (parando o container
+nesse meio-tempo), passa a homologação para o projeto compose próprio `acessilia-staging` —
+substituindo o container antigo, cujos dados agora estão em `./var` —, faz checkout da branch
+do `TRACK_BRANCH` e roda o `setup`. As instalações antigas deixavam a acessilia e o Toolbox
+num mesmo projeto chamado `staging`; saindo dele, um `--remove-orphans` aqui não apaga mais
+os containers do Toolbox. O
 `/opt/acessilia/staging` não é alterado; apague-o quando a homologação estiver funcionando.
 
 ## Atualizando os scripts
@@ -120,4 +127,4 @@ atualização puxa a imagem do GHCR por cima dela.
 | Timer não roda após logout | Linger desabilitado | `sudo loginctl enable-linger $USER` |
 | `image sha-xxxxxxx not yet published` | O CI ainda está construindo o commit | aguarde a próxima checagem |
 | API falha (fallback ativado) | API do GitHub indisponível | o script cai num `docker pull` direto |
-| `Container name already in use` | Outro projeto compose é dono do container | defina no `.env` o `COMPOSE_PROJECT_NAME` desse projeto (`docker inspect acessilia-staging --format '{{ index .Config.Labels "com.docker.compose.project" }}'`) ou use o `auto-update migrate` |
+| `acessilia-staging belongs to compose project '…' (dir)` | Outra instalação é dona do container | `./scripts/ops.sh auto-update migrate <dir>` |
