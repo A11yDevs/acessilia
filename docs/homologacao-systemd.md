@@ -13,6 +13,7 @@ Everything goes through `scripts/ops.sh`:
 |---------|--------------|
 | `./scripts/ops.sh auto-update setup` | Starts the stack and installs the timer |
 | `./scripts/ops.sh auto-update status` | Clone branch, tracked branch, timer, last check, health, recent runs |
+| `./scripts/ops.sh auto-update check` | Verifies the timer (installed for this clone, enabled, old timer gone), its recent runs (last one succeeded, last check recent, latest commit deployed) and the deployment (branch, container, image, health); exit status 1 on a problem |
 | `./scripts/ops.sh auto-update start` | Updates now (what the timer runs) |
 | `./scripts/ops.sh track [<branch>]` | Follows a branch: `git pull` of the clone and `TRACK_BRANCH` in `.env`, then updates; without a branch, pulls the tracked one |
 | `./scripts/ops.sh auto-update migrate <dir>` | Moves an install made by the former `setup-homologacao.sh` into the clone |
@@ -106,6 +107,7 @@ never drifts from the repository.
 
 ```bash
 ./scripts/ops.sh auto-update status          # overview
+./scripts/ops.sh auto-update check           # pass/fail verdict on the timer and its runs
 ./scripts/ops.sh auto-update start           # update now
 journalctl --user -u acessilia-staging-update.service -n 50 --no-pager
 systemctl --user stop acessilia-staging-update.timer     # pause updates

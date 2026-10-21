@@ -17,6 +17,8 @@
 #                                                     without one, pull the tracked branch
 #     ./scripts/ops.sh auto-update setup              start the stack and install the timer
 #     ./scripts/ops.sh auto-update status             clone, timer, deployed image and health
+#     ./scripts/ops.sh auto-update check              verify timer, recent runs and deployment
+#                                                     (exit status 1 on a problem)
 #     ./scripts/ops.sh auto-update start              update now (what the timer runs)
 #     ./scripts/ops.sh auto-update migrate <old dir>  move an /opt/.../staging install here
 #
@@ -49,6 +51,9 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ENV_FILE="$ROOT/.env"
 STATUS_FILE="$ROOT/var/data/staging-status.json"
 UNIT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+# Seconds between timer runs; `check` reports a last check older than three
+# intervals as stale.
+UPDATE_INTERVAL=300
 
 # Sessions opened with su (not a login) have no XDG_RUNTIME_DIR, so systemctl --user
 # cannot find the user's systemd instance, which still runs (linger) under
@@ -62,7 +67,7 @@ fi
 cd "$ROOT"
 
 _usage() {
-  sed -n '8,22p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '8,24p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 _die() {
@@ -523,11 +528,11 @@ SERVICE
 
   cat > "$UNIT_DIR/${UNIT}.timer" <<TIMER
 [Unit]
-Description=Check ${COMPOSE_PROJECT} updates every 5 minutes
+Description=Check ${COMPOSE_PROJECT} updates every $((UPDATE_INTERVAL / 60)) minutes
 
 [Timer]
 OnBootSec=30s
-OnUnitActiveSec=300s
+OnUnitActiveSec=${UPDATE_INTERVAL}s
 
 [Install]
 WantedBy=timers.target
@@ -539,6 +544,153 @@ TIMER
   echo ""
   _info "✅ Auto-update installed: ${UNIT}.timer checks ${tracked} every 5 minutes."
   echo "  Status: ./scripts/ops.sh auto-update status"
+}
+
+CHECK_PROBLEMS=0
+CHECK_WARNINGS=0
+
+_check_ok() {
+  echo "  ✅ $*"
+}
+
+_check_warn() {
+  echo "  ⚠️  $*"
+  CHECK_WARNINGS=$((CHECK_WARNINGS + 1))
+}
+
+_check_problem() {
+  echo "  ❌ $*"
+  CHECK_PROBLEMS=$((CHECK_PROBLEMS + 1))
+}
+
+_unit_property() {
+  # $1 = unit, $2 = property
+  systemctl --user show "$1" -p "$2" --value 2>/dev/null || true
+}
+
+# Pass/fail counterpart of `status`, usable from monitoring: every line is a
+# verdict, and the exit status is 1 when anything needs fixing.
+_auto_update_check() {
+  local user exec_start enabled active result code exited checked age latest running
+  local head tracked project image tag behind
+  user="$(id -un)"
+  tracked="$(_tracked_branch)"
+
+  echo "Timer (${UNIT}.timer):"
+  if ! systemctl --user show-environment >/dev/null 2>&1; then
+    _check_problem "cannot reach the systemd user instance of ${user} (log in directly, or enable linger)"
+  else
+    exec_start="$(grep -E '^ExecStart=' "$UNIT_DIR/${UNIT}.service" 2>/dev/null || true)"
+    if [ "$exec_start" = "ExecStart=${ROOT}/scripts/ops.sh auto-update start" ]; then
+      _check_ok "runs ${ROOT}/scripts/ops.sh"
+    elif [ -z "$exec_start" ]; then
+      _check_problem "not installed: run ./scripts/ops.sh auto-update setup"
+    else
+      _check_problem "runs ${exec_start#ExecStart=}, not this clone: run ./scripts/ops.sh auto-update setup"
+    fi
+    if [ "$(_unit_property "${UNIT}.service" NeedDaemonReload)" = yes ]; then
+      _check_warn "unit files changed since systemd loaded them: systemctl --user daemon-reload"
+    fi
+    enabled="$(systemctl --user is-enabled "${UNIT}.timer" 2>/dev/null || true)"
+    active="$(systemctl --user is-active "${UNIT}.timer" 2>/dev/null || true)"
+    if [ "$enabled" = enabled ] && [ "$active" = active ]; then
+      _check_ok "enabled and active; next run $(_unit_property "${UNIT}.timer" NextElapseUSecRealtime)"
+    else
+      _check_problem "timer is ${enabled:-unknown}/${active:-unknown}: systemctl --user enable --now ${UNIT}.timer"
+    fi
+    if [ "$(systemctl --user is-active "${LEGACY_UNIT}.timer" 2>/dev/null || true)" = active ]; then
+      _check_problem "the old ${LEGACY_UNIT}.timer is still active and updates another install: systemctl --user disable --now ${LEGACY_UNIT}.timer"
+    fi
+    if loginctl show-user "$user" 2>/dev/null | grep -q 'Linger=yes'; then
+      _check_ok "linger on: the timer keeps running after logout"
+    else
+      _check_warn "linger off: the timer stops when ${user} logs out (as root: loginctl enable-linger ${user})"
+    fi
+  fi
+
+  echo ""
+  echo "Runs:"
+  exited="$(_unit_property "${UNIT}.service" ExecMainExitTimestamp)"
+  result="$(_unit_property "${UNIT}.service" Result)"
+  code="$(_unit_property "${UNIT}.service" ExecMainStatus)"
+  if [ -z "$exited" ]; then
+    _check_warn "the update has not run yet"
+  elif [ "$result" = success ] && [ "${code:-0}" = 0 ]; then
+    _check_ok "last run succeeded (${exited})"
+  else
+    _check_problem "last run failed at ${exited} (result ${result:-?}, exit ${code:-?}): see journalctl --user -u ${UNIT}.service, or run ./scripts/ops.sh auto-update start"
+  fi
+  if [ ! -f "$STATUS_FILE" ]; then
+    _check_problem "no ${STATUS_FILE#"$ROOT"/} yet: the update never got as far as checking GitHub"
+  else
+    checked="$(jq -r '.last_check // empty | fromdateiso8601' "$STATUS_FILE" 2>/dev/null || true)"
+    if [ -z "$checked" ]; then
+      _check_problem "${STATUS_FILE#"$ROOT"/} has no valid last_check"
+    else
+      age=$(( $(date -u +%s) - checked ))
+      if [ "$age" -gt $((UPDATE_INTERVAL * 3)) ]; then
+        _check_problem "last check $((age / 60)) min ago, longer than three timer intervals"
+      else
+        _check_ok "last check $((age / 60)) min ago"
+      fi
+    fi
+    latest="$(jq -r '.latest_sha // empty' "$STATUS_FILE")"
+    running="$(jq -r '.running_sha // empty' "$STATUS_FILE")"
+    if [ -n "$latest" ] && [ "$latest" = "$running" ]; then
+      _check_ok "running the latest commit of ${tracked} (${latest:0:7})"
+    elif [ -n "$latest" ]; then
+      _check_warn "latest commit ${latest:0:7} of ${tracked} not deployed yet (its image may still be building)"
+    else
+      _check_warn "the last check could not read the latest commit from GitHub"
+    fi
+  fi
+
+  echo ""
+  echo "Deployment:"
+  head="$(git rev-parse --abbrev-ref HEAD)"
+  if [ "$head" = "$tracked" ]; then
+    _check_ok "clone on ${tracked}, the tracked branch"
+  else
+    _check_problem "clone on ${head}, but staging tracks ${tracked}: ./scripts/ops.sh track ${tracked}"
+  fi
+  if git fetch origin --quiet "$head" 2>/dev/null; then
+    behind="$(git rev-list --count "HEAD..origin/${head}")"
+    if [ "$behind" != 0 ]; then
+      _check_warn "clone ${behind} commit(s) behind origin/${head}: ./scripts/ops.sh track"
+    fi
+  fi
+  project="$(_env_get COMPOSE_PROJECT_NAME)"
+  if [ -z "$(_container_label com.docker.compose.project)" ]; then
+    _check_problem "container ${CONTAINER_NAME} does not exist: ./scripts/ops.sh auto-update setup"
+  else
+    if [ "$(_container_label com.docker.compose.project)" = "$project" ] && [ -n "$project" ]; then
+      _check_ok "container ${CONTAINER_NAME} belongs to compose project '${project}'"
+    else
+      _check_problem "container ${CONTAINER_NAME} belongs to project '$(_container_label com.docker.compose.project)', .env says '${project}'"
+    fi
+    if [ "$(docker inspect "$CONTAINER_NAME" --format '{{.State.Running}}' 2>/dev/null || true)" != true ]; then
+      _check_problem "container ${CONTAINER_NAME} is not running"
+    fi
+    tag="${tracked//\//-}"
+    image="$(docker inspect "$CONTAINER_NAME" --format '{{.Config.Image}}' 2>/dev/null || true)"
+    if [ "$image" = "${IMAGE}:${tag}" ]; then
+      _check_ok "image ${image}"
+    else
+      _check_problem "image ${image:-unknown}, expected ${IMAGE}:${tag}"
+    fi
+  fi
+  if curl -fsS --max-time 5 "$HEALTH_URL" >/dev/null 2>&1; then
+    _check_ok "health endpoint answers (${HEALTH_URL})"
+  else
+    _check_problem "health endpoint does not answer (${HEALTH_URL})"
+  fi
+
+  echo ""
+  if [ "$CHECK_PROBLEMS" -gt 0 ]; then
+    _info "❌ ${CHECK_PROBLEMS} problem(s), ${CHECK_WARNINGS} warning(s)."
+    return 1
+  fi
+  _info "✅ Auto-update OK (${CHECK_WARNINGS} warning(s))."
 }
 
 _auto_update_status() {
@@ -694,6 +846,7 @@ case "${1:-help}" in
     case "${2:-}" in
       setup) _auto_update_setup ;;
       status) _auto_update_status ;;
+      check) _auto_update_check ;;
       start) _auto_update_start ;;
       migrate) _auto_update_migrate "${3:-}" ;;
       *) _usage; exit 1 ;;

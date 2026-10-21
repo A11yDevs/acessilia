@@ -1,5 +1,6 @@
 """scripts/ops.sh against a local git origin and stubbed system commands."""
 
+import datetime
 import os
 import shutil
 import subprocess
@@ -22,6 +23,12 @@ _STUBS = {
     # Remembers `docker rm -f`, so a later inspect no longer finds the container.
     "docker": _LOGGING_STUB
     + """case "$*" in
+  inspect*State.Running*)
+    [ -n "${DOCKER_PROJECT:-}" ] || exit 1
+    printf '%s\\n' "${DOCKER_RUNNING:-true}" ;;
+  inspect*Config.Image*)
+    [ -n "${DOCKER_PROJECT:-}" ] || exit 1
+    printf '%s\\n' "${DOCKER_IMAGE:-}" ;;
   inspect*project.working_dir*)
     [ -n "${DOCKER_PROJECT:-}" ] && [ ! -e "$OPS_LOG.rm" ] || exit 1
     printf '%s\\n' "${DOCKER_DIR:-/old/install}" ;;
@@ -36,12 +43,31 @@ _STUBS = {
 esac
 exit 0
 """,
+    # `--user <command> <unit> [-p <property> --value]`; SC_* variables set
+    # what the timer reports, the legacy staging-update.timer is gone unless
+    # SC_LEGACY_ACTIVE says otherwise.
     "systemctl": _LOGGING_STUB
-    + """case "$*" in
-  *show-environment*)
+    + """case "$2" in
+  show-environment)
     [ -z "${SYSTEMD_DOWN:-}" ] || exit 1
     [ -z "${REQUIRE_XDG:-}" ] || [ -n "${XDG_RUNTIME_DIR:-}" ] || exit 1 ;;
-  *"disable --now"*) [ -z "${LEGACY_FAIL:-}" ] || exit 1 ;;
+  disable) [ -z "${LEGACY_FAIL:-}" ] || exit 1 ;;
+  is-enabled)
+    v="${SC_ENABLED:-enabled}"
+    [ "$3" = staging-update.timer ] && v=not-found
+    echo "$v"; [ "$v" = enabled ] || exit 1 ;;
+  is-active)
+    v="${SC_ACTIVE:-active}"
+    [ "$3" = staging-update.timer ] && v="${SC_LEGACY_ACTIVE:-inactive}"
+    echo "$v"; [ "$v" = active ] || exit 1 ;;
+  show)
+    case "${5:-}" in
+      Result) echo "${SC_RESULT:-success}" ;;
+      ExecMainStatus) echo "${SC_STATUS:-0}" ;;
+      ExecMainExitTimestamp) echo "${SC_EXIT_TS-Tue 2026-10-20 20:38:55 -03}" ;;
+      NextElapseUSecRealtime) echo "Tue 2026-10-20 20:43:55 -03" ;;
+      NeedDaemonReload) echo "${SC_RELOAD:-no}" ;;
+    esac ;;
 esac
 exit 0
 """,
@@ -55,6 +81,7 @@ case "$url" in
   *api.github.com*base=main*) cat "$GH_FIXTURES/main.json" ;;
   *api.github.com*base=develop*) cat "$GH_FIXTURES/develop.json" ;;
   *api.github.com*pulls*) cat "$GH_FIXTURES/open.json" ;;
+  *health*) [ -n "${HEALTH_UP:-}" ] || exit 7; echo '{"status": "healthy"}' ;;
   *) exit 7 ;;
 esac
 """,
@@ -422,6 +449,102 @@ def test_bhs_status_uses_the_rest_api_without_gh(server, tmp_path):
     log = server["log"].read_text()
     assert "Authorization: token secret" in log
     assert "\ngh " not in f"\n{log}"
+
+
+def _healthy_install(server, **extra):
+    """A clone set up from origin, as `check` expects to find it."""
+    clone, home = server["clone"], server["home"]
+    server["run"]("track", "release/0.2.0")
+    unit_dir = home / ".config" / "systemd" / "user"
+    unit_dir.mkdir(parents=True, exist_ok=True)
+    (unit_dir / f"{_unit_name()}.service").write_text(
+        f"[Service]\nExecStart={clone}/scripts/ops.sh auto-update start\n"
+    )
+    sha = _git("rev-parse", "HEAD", cwd=clone)
+    now = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    status = clone / "var" / "data" / "staging-status.json"
+    status.parent.mkdir(parents=True, exist_ok=True)
+    status.write_text(
+        f'{{"latest_sha": "{sha}", "running_sha": "{sha}", "last_check": "{now}"}}'
+    )
+    env = {
+        "DOCKER_PROJECT": "test-staging",
+        "DOCKER_IMAGE": "ghcr.io/a11ydevs/acessilia:release-0.2.0",
+        "HEALTH_UP": "1",
+    }
+    env.update(extra)
+    return env
+
+
+def _unit_name() -> str:
+    script = (ROOT_DIR / "scripts" / "ops.sh").read_text()
+    return script.split('\nUNIT="', 1)[1].split('"', 1)[0]
+
+
+def test_check_passes_on_a_healthy_install(server):
+    env = _healthy_install(server)
+
+    result = server["run"]("auto-update", "check", **env)
+
+    assert "❌" not in result.stdout
+    assert "Auto-update OK" in result.stdout
+    assert "next run Tue 2026-10-20 20:43:55 -03" in result.stdout
+    assert "running the latest commit of release/0.2.0" in result.stdout
+
+
+@pytest.mark.parametrize(
+    ("extra", "expected"),
+    [
+        ({"SC_RESULT": "exit-code", "SC_STATUS": "1"}, "last run failed at"),
+        ({"SC_ENABLED": "disabled", "SC_ACTIVE": "inactive"}, "timer is disabled/inactive"),
+        ({"SC_LEGACY_ACTIVE": "active"}, "the old staging-update.timer is still active"),
+        ({"DOCKER_RUNNING": "false"}, "is not running"),
+        ({"DOCKER_IMAGE": "ghcr.io/a11ydevs/acessilia:develop"}, "expected ghcr.io/a11ydevs/acessilia:release-0.2.0"),
+        ({"DOCKER_PROJECT": "staging"}, "belongs to project 'staging', .env says 'test-staging'"),
+        ({"HEALTH_UP": ""}, "health endpoint does not answer"),
+        ({"SYSTEMD_DOWN": "1"}, "cannot reach the systemd user instance"),
+    ],
+)
+def test_check_reports_each_problem(server, extra, expected):
+    env = _healthy_install(server, **extra)
+
+    result = server["run"]("auto-update", "check", check=False, **env)
+
+    assert result.returncode == 1
+    assert expected in result.stdout
+
+
+def test_check_reports_a_stale_last_check(server):
+    env = _healthy_install(server)
+    status = server["clone"] / "var" / "data" / "staging-status.json"
+    status.write_text(status.read_text().replace('"last_check": "', '"last_check": "2020-01-01T00:00:00Z", "x": "'))
+
+    result = server["run"]("auto-update", "check", check=False, **env)
+
+    assert result.returncode == 1
+    assert "longer than three timer intervals" in result.stdout
+
+
+def test_check_reports_a_timer_running_another_clone(server):
+    env = _healthy_install(server)
+    unit = server["home"] / ".config" / "systemd" / "user" / f"{_unit_name()}.service"
+    unit.write_text("[Service]\nExecStart=/somewhere/else/scripts/ops.sh auto-update start\n")
+
+    result = server["run"]("auto-update", "check", check=False, **env)
+
+    assert result.returncode == 1
+    assert "runs /somewhere/else/scripts/ops.sh auto-update start, not this clone" in result.stdout
+
+
+def test_check_only_warns_while_the_latest_image_builds(server):
+    env = _healthy_install(server)
+    status = server["clone"] / "var" / "data" / "staging-status.json"
+    status.write_text(status.read_text().replace('"running_sha": "', '"running_sha": "old'))
+
+    result = server["run"]("auto-update", "check", **env)
+
+    assert "not deployed yet" in result.stdout
+    assert "Auto-update OK (1 warning(s))" in result.stdout
 
 
 def test_ops_never_calls_sudo():
