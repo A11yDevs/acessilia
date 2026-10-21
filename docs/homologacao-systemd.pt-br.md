@@ -14,6 +14,7 @@ Tudo passa pelo `scripts/ops.sh`:
 |---------|-----------|
 | `./scripts/ops.sh auto-update setup` | Sobe a stack e instala o timer |
 | `./scripts/ops.sh auto-update status` | Branch do clone, branch rastreada, timer, última checagem, health, execuções recentes |
+| `./scripts/ops.sh auto-update check` | Verifica o timer (instalado para este clone, habilitado, timer antigo removido), as execuções recentes (a última deu certo, checagem recente, último commit no ar) e a implantação (branch, container, imagem, health); termina com status 1 se houver problema |
 | `./scripts/ops.sh auto-update start` | Atualiza agora (o que o timer executa) |
 | `./scripts/ops.sh track [<branch>]` | Passa a seguir uma branch: `git pull` do clone e `TRACK_BRANCH` no `.env`, e atualiza; sem branch, faz pull da já rastreada |
 | `./scripts/ops.sh auto-update migrate <dir>` | Traz para o clone uma instalação feita pelo antigo `setup-homologacao.sh` |
@@ -108,6 +109,7 @@ para que o servidor nunca se afaste do repositório.
 
 ```bash
 ./scripts/ops.sh auto-update status          # visão geral
+./scripts/ops.sh auto-update check           # veredito sobre o timer e suas execuções
 ./scripts/ops.sh auto-update start           # atualiza agora
 journalctl --user -u acessilia-staging-update.service -n 50 --no-pager
 systemctl --user stop acessilia-staging-update.timer     # pausa as atualizações
