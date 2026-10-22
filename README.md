@@ -45,6 +45,8 @@ uv sync
 cp .env.example .env   # configure the keys (AI, SMTP, Telegram)
 ```
 
+After pulling, `uv run python scripts/sync_env.py` appends the keys added to `.env.example` since your `.env` was created and lists the keys of your `.env` that look deprecated (`--check` only reports).
+
 ## Running It
 
 ### Everything in one command (API + web + Telegram)

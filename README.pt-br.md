@@ -45,6 +45,8 @@ uv sync
 cp .env.example .env   # configure as chaves (IA, SMTP, Telegram)
 ```
 
+Depois de um `git pull`, `uv run python scripts/sync_env.py` acrescenta as chaves adicionadas ao `.env.example` desde a criação do seu `.env` e lista as chaves do seu `.env` que parecem depreciadas (`--check` apenas relata).
+
 ## Execução
 
 ### Tudo em um comando (API + web + Telegram)
