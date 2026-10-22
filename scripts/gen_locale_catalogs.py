@@ -66,6 +66,8 @@ from backend.log_messages import (
     EMAIL_RESULT_BODY_ATTACHED,
     EMAIL_RESULT_BODY_WITH_LINK,
     EMAIL_RESULT_SUBJECT,
+    EMAIL_FAILURE_BODY,
+    EMAIL_FAILURE_SUBJECT,
     EMAIL_RESULT_WARNINGS_HEADER,
     LOG_AGNO_NOT_INSTALLED,
     LOG_API_ERROR,
@@ -291,6 +293,14 @@ from backend.stage_messages import (
     STAGE_SPLITTING_PDF_PAGES,
     STAGE_VALIDATING_PLAN_DRY_RUN,
     STAGE_EXECUTING_PLAN,
+    STAGE_DESCRIBING_IMAGE,
+    STAGE_RECOGNIZING_TABLE,
+    STAGE_EXECUTING_PLAN_STEP,
+    STAGE_PAGE,
+    STAGE_PAGES,
+    STAGE_PAGE_UNKNOWN,
+    STAGE_FAILED_DURING,
+    STAGE_RESTART_INTERRUPTED_DURING,
 )
 from backend.tools.toolbox_math_tools import (
     MSG_MATHML_REJECTED,
@@ -502,6 +512,14 @@ MESSAGES: tuple[str, ...] = (
     STAGE_GENERATING_PDDL_PLAN,
     STAGE_VALIDATING_PLAN_DRY_RUN,
     STAGE_EXECUTING_PLAN,
+    STAGE_DESCRIBING_IMAGE,
+    STAGE_RECOGNIZING_TABLE,
+    STAGE_EXECUTING_PLAN_STEP,
+    STAGE_PAGE,
+    STAGE_PAGES,
+    STAGE_PAGE_UNKNOWN,
+    STAGE_FAILED_DURING,
+    STAGE_RESTART_INTERRUPTED_DURING,
     # Telegram bot command responses (frontend/telegram/handlers/start.py).
     MSG_EMAIL_HINT,
     MSG_EMAIL_CONFIGURED,
@@ -797,6 +815,8 @@ MESSAGES: tuple[str, ...] = (
     EMAIL_CONFIRMATION_SUBJECT,
     EMAIL_CONFIRMATION_BODY,
     EMAIL_RESULT_SUBJECT,
+    EMAIL_FAILURE_BODY,
+    EMAIL_FAILURE_SUBJECT,
     EMAIL_RESULT_BODY_WITH_LINK,
     EMAIL_RESULT_BODY_ATTACHED,
     EMAIL_FORMAT_TXT,
@@ -934,6 +954,26 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "Validando o plano em modo dry-run..."
         ),
         STAGE_EXECUTING_PLAN: "Executando o plano...",
+        STAGE_DESCRIBING_IMAGE: "Descrevendo a imagem {current} de {total} ({pages})...",
+        STAGE_RECOGNIZING_TABLE: "Reconhecendo a tabela {current} de {total} ({pages})...",
+        STAGE_EXECUTING_PLAN_STEP: "Executando o plano: passo {current} de {total}, {pages} ({kind})...",
+        STAGE_PAGE: "página {page}",
+        STAGE_PAGES: "páginas {pages}",
+        STAGE_PAGE_UNKNOWN: "página não identificada",
+        STAGE_FAILED_DURING: "{error} (falhou durante: {stage})",
+        STAGE_RESTART_INTERRUPTED_DURING: (
+            "O processamento foi interrompido por uma reinicialização do servidor durante: "
+            "{stage}. Envie o arquivo novamente."
+        ),
+        EMAIL_FAILURE_SUBJECT: "Não foi possível processar o seu arquivo - Acessilia",
+        EMAIL_FAILURE_BODY: (
+            "Olá!\n\n"
+            "Infelizmente, o processamento do arquivo '{filename}' não pôde ser concluído.\n\n"
+            "Motivo: {error}\n\n"
+            "Você pode enviar o arquivo novamente. Se o problema persistir, encaminhe esta "
+            "mensagem para a equipe Acessilia para que possamos investigar.\n\n"
+            "Atenciosamente,\nA equipe Acessilia"
+        ),
         MSG_EMAIL_HINT: "Por favor, informe o e-mail: /email seu@email.com",
         MSG_EMAIL_CONFIGURED:
             "E-mail {email} configurado! Agora envie o documento para ser enviado para este e-mail.",

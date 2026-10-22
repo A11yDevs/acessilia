@@ -118,6 +118,17 @@ EMAIL_RESULT_BODY_ATTACHED: str = (
     "{warnings}\n\n"
     "Best regards,\nThe Acessilia Team"
 )
+#: Subject line of the email sent when a job fails or is interrupted.
+EMAIL_FAILURE_SUBJECT: str = "Your file could not be processed - Acessilia"
+#: Body of the failure email; {filename} is the source file name and {error} the job error, which names the stage it failed in.
+EMAIL_FAILURE_BODY: str = (
+    "Hello!\n\n"
+    "Unfortunately, the processing of the file '{filename}' could not be completed.\n\n"
+    "Reason: {error}\n\n"
+    "You can submit the file again. If the problem persists, forward this message "
+    "to the Acessilia team so we can investigate.\n\n"
+    "Best regards,\nThe Acessilia Team"
+)
 #: Localized display name of the plain-text (TXT) output artifact, listed in the result email's completed-formats block.
 EMAIL_FORMAT_TXT: str = "Plain Text (TXT)"
 #: Localized display name of the Word (DOCX) output artifact, listed in the result email's completed-formats block.

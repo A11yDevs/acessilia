@@ -79,3 +79,21 @@ STAGE_RESTART_RESUBMIT = 'Processing interrupted by restart; submit again'
 STAGE_PENDING_UPLOAD_MISSING = 'Pending upload no longer exists'
 #: PDDL-pipeline stage while the generated plan is executed for real (PDDL_EXECUTE_DRY_RUN=false).
 STAGE_EXECUTING_PLAN: str = "Executing the plan..."
+#: Live stage while one image is described by the vision model; {current}/{total} count the images, {pages} is a STAGE_PAGE* label.
+STAGE_DESCRIBING_IMAGE: str = "Describing image {current} of {total} ({pages})..."
+#: Live stage while one table is rebuilt from its region image; {current}/{total} count the tables, {pages} is a STAGE_PAGE* label.
+STAGE_RECOGNIZING_TABLE: str = "Recognizing table {current} of {total} ({pages})..."
+#: Live stage while one plan step runs; {current}/{total} count the plan steps, {pages} is a STAGE_PAGE* label and {kind} the obligation kind.
+STAGE_EXECUTING_PLAN_STEP: str = "Executing the plan: step {current} of {total}, {pages} ({kind})..."
+#: Location label for work on a single page; {page} is the 1-based page number.
+STAGE_PAGE: str = "page {page}"
+#: Location label for work spanning several pages; {pages} is a comma-separated list of page numbers.
+STAGE_PAGES: str = "pages {pages}"
+#: Location label for work whose page the extraction did not identify.
+STAGE_PAGE_UNKNOWN: str = "page not identified"
+#: Job error that names the stage the job was in when it failed; {error} is the failure and {stage} the last live stage.
+STAGE_FAILED_DURING: str = "{error} (failed during: {stage})"
+#: Job error after a server restart interrupted a job; {stage} is the last live stage recorded before the restart.
+STAGE_RESTART_INTERRUPTED_DURING: str = (
+    "Processing was interrupted by a server restart during: {stage}. Submit the file again."
+)
