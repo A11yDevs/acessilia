@@ -5,7 +5,22 @@ from pathlib import Path
 
 from backend.i18n import t
 from backend.log_messages import LOG_TASK_CANCELLED_BY_USER
-from backend.stage_messages import STAGE_CANCELLED_BY_USER, STAGE_CANCELLATION_REQUESTED
+from backend.stage_messages import (
+    STAGE_CANCELLED_BY_USER,
+    STAGE_CANCELLATION_REQUESTED,
+    STAGE_FAILED_DURING,
+)
+
+
+def trim_stage(stage: str | None) -> str:
+    """A live stage label ready to quote in a sentence (no trailing ellipsis)."""
+    return (stage or "").strip().rstrip(".…").strip()
+
+
+def describe_failure(error: str, stage: str | None) -> str:
+    """The job error with the stage it failed in, when one is known."""
+    stage = trim_stage(stage)
+    return t(STAGE_FAILED_DURING).format(error=error, stage=stage) if stage else error
 
 
 class StateManager:
@@ -73,11 +88,18 @@ class StateManager:
             return
         self.atualizar(task_id, progresso=1.0, status="done", resultado=resultado)
 
-    def errar(self, task_id: str, erro: str) -> None:
+    def errar(self, task_id: str, erro: str) -> str:
+        """Mark the task failed, naming the stage it was in; returns the recorded error.
+
+        The stage is read before anything overwrites it with a failure label,
+        so the error says which page or plan step the job was on.
+        """
         task = self._tasks.get(task_id)
         if not task or task.get("status") == "cancelled":
-            return
+            return erro
+        erro = describe_failure(erro, task.get("etapa_atual"))
         self.atualizar(task_id, status="error", erro=erro)
+        return erro
 
     def listar_tarefas(self) -> list[dict]:
         return list(self._tasks.values())
