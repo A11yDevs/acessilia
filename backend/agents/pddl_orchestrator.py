@@ -230,33 +230,6 @@ def _run_extract_fused(
         ).result()
 
 
-def _run_extract_single_provider(source_path: Path) -> dict[str, Any]:
-    """Extract through the configured Toolbox provider for the PDDL fallback."""
-    import concurrent.futures
-
-    from acessilia_sdk.toolbox.clients import ToolboxStructureClient
-    from backend.tools.toolbox_client import make_toolbox_client
-
-    async def extract() -> dict[str, Any]:
-        client = make_toolbox_client(ToolboxStructureClient)
-        try:
-            return await client.extract_structure(
-                file_path=source_path,
-                language="pt-BR",
-                use_remote_cache=False,
-            )
-        finally:
-            await client.close()
-
-    try:
-        asyncio.get_running_loop()
-    except RuntimeError:
-        return asyncio.run(extract())
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-        return pool.submit(lambda: asyncio.run(extract())).result()
-
-
 def _fusion_agent() -> FusionAgent:
     """Fusion agent used to reach the deterministic fusion primitives.
 
@@ -2069,7 +2042,16 @@ def _fused_text_elements(
 def _handle_single_provider_method(
     manifest: ProcessingManifest, obligation_id: str
 ) -> MethodResult:
-    """Run the configured provider as a real fallback after dual fusion fails."""
+    """Accept the configured provider's extraction the manifest was built from.
+
+    The manifest's elements already are that single-provider extraction,
+    recorded by ``ToolboxManifestExtractor`` with its provider and provenance.
+    This method used to extract the whole document again, uploaded anew and
+    with the Toolbox cache off, once per ``fuse-providers`` step, and changed
+    nothing in the manifest: a full extraction of cost for no content.
+    """
+    from backend.config.settings import settings
+
     obligation = next(
         (item for item in manifest.obligations if item.id == obligation_id), None
     )
@@ -2082,44 +2064,32 @@ def _handle_single_provider_method(
             message="single-provider só é válido para fuse-providers",
         )
 
-    source_path = Path(manifest.source.path)
-    if not source_path.is_file():
+    provider = str(manifest.extractor.configuration.get("toolbox_provider") or "")
+    if not provider or "+" in provider:
         return MethodResult(
             success=False,
             validated=False,
-            message=f"Documento-fonte indisponível: {source_path}",
+            message="The manifest does not record a single-provider extraction",
         )
-    try:
-        payload = _run_extract_single_provider(source_path)
-    except Exception as exc:  # noqa: BLE001
+    if provider != settings.toolbox_provider:
         return MethodResult(
             success=False,
             validated=False,
             message=(
-                "Extração single-provider falhou: "
-                f"{type(exc).__name__}: {exc}"
+                f"The manifest was extracted by {provider}, not by the configured "
+                f"provider ({settings.toolbox_provider})"
             ),
         )
-
-    provider = str(payload.get("provider") or "")
-    if payload.get("status") != "succeeded" or not provider or "+" in provider:
+    if not manifest.elements:
         return MethodResult(
             success=False,
             validated=False,
-            message="A Toolbox não confirmou uma extração de provider único",
+            message="The manifest extraction has no elements",
         )
-
-    artifact = _persist_fusion_payload(
-        manifest,
-        payload,
-        obligation_id,
-        kind="single-provider-payload",
-    )
     return MethodResult(
         success=True,
         validated=True,
-        message=f"Fallback single-provider concluído ({provider})",
-        artifacts=[artifact],
+        message=f"Single-provider extraction of the manifest accepted ({provider})",
     )
 
 
@@ -3074,6 +3044,11 @@ def _has_meaningful_text(element: ManifestElement) -> bool:
 #: a screen reader user hits first, so an open one still fails the job.
 NON_CRITICAL_OBLIGATION_KINDS = frozenset(
     {
+        # The adjudication verdict is recorded but cannot be applied (a page
+        # swap would reopen the manifest mid-plan), and the extracted content
+        # is complete either way, so a verdict for the secondary provider must
+        # not fail the job.
+        "adjudicate-page",
         "repair-heading-hierarchy",
         "join-tail-blocks",
         "normalize-text",

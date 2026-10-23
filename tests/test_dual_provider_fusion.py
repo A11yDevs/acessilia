@@ -168,62 +168,53 @@ def test_fusion_handler_fails_when_single_provider(tmp_path, monkeypatch):
     assert result.artifacts == []
 
 
-def test_single_provider_fallback_persists_a_successful_extraction(
+def _forbid_toolbox(monkeypatch):
+    """The single-provider fallback must reuse the manifest, never re-extract."""
+
+    def fail(*_args, **_kwargs):
+        raise AssertionError("single-provider called the Toolbox")
+
+    monkeypatch.setattr("backend.tools.toolbox_client.make_toolbox_client", fail)
+
+
+def test_single_provider_accepts_the_manifest_extraction_without_the_toolbox(
     tmp_path, monkeypatch
 ):
-    source = tmp_path / "source.pdf"
-    source.write_bytes(b"%PDF-test")
-    manifest = _make_manifest(tmp_path, source_path=source)
-    monkeypatch.setattr("backend.config.settings.settings.data_dir", tmp_path)
-    monkeypatch.setattr(
-        "backend.agents.pddl_orchestrator._run_extract_single_provider",
-        lambda path: {
-            "status": "succeeded",
-            "provider": "docling",
-            "document": {"elements": [{"text": "extraído"}]},
-        },
-    )
+    manifest = _make_manifest(tmp_path)
+    manifest.extractor.configuration["toolbox_provider"] = "docling"
+    monkeypatch.setattr("backend.config.settings.settings.toolbox_provider", "docling")
+    _forbid_toolbox(monkeypatch)
 
     result = _handle_single_provider_method(manifest, "o-fuse")
 
     assert result.success is True
     assert result.validated is True
     assert "docling" in (result.message or "")
-    assert len(result.artifacts) == 1
-    artifact = result.artifacts[0]
-    assert artifact.kind == "single-provider-payload"
-    assert Path(artifact.path).is_file()
-    payload = json.loads(Path(artifact.path).read_text(encoding="utf-8"))
-    assert payload["document"]["elements"][0]["text"] == "extraído"
+    assert result.artifacts == []
 
 
 @pytest.mark.parametrize(
-    ("payload", "expected_message"),
+    ("recorded", "expected_message"),
     [
-        ({"status": "failed", "provider": "docling"}, "não confirmou"),
-        (
-            {"status": "succeeded", "provider": "docling+mineru"},
-            "não confirmou",
-        ),
+        (None, "does not record"),
+        ("docling+mineru", "does not record"),
+        ("mineru", "not by the configured provider"),
     ],
 )
-def test_single_provider_fallback_rejects_unverified_payload(
-    tmp_path, monkeypatch, payload, expected_message
+def test_single_provider_rejects_an_extraction_it_cannot_vouch_for(
+    tmp_path, monkeypatch, recorded, expected_message
 ):
-    source = tmp_path / "source.pdf"
-    source.write_bytes(b"%PDF-test")
-    manifest = _make_manifest(tmp_path, source_path=source)
-    monkeypatch.setattr(
-        "backend.agents.pddl_orchestrator._run_extract_single_provider",
-        lambda path: payload,
-    )
+    manifest = _make_manifest(tmp_path)
+    if recorded is not None:
+        manifest.extractor.configuration["toolbox_provider"] = recorded
+    monkeypatch.setattr("backend.config.settings.settings.toolbox_provider", "docling")
+    _forbid_toolbox(monkeypatch)
 
     result = _handle_single_provider_method(manifest, "o-fuse")
 
     assert result.success is False
     assert result.validated is False
     assert expected_message in (result.message or "")
-    assert result.artifacts == []
 
 
 def test_pddl_replans_from_dual_to_single_provider(tmp_path, monkeypatch):
@@ -242,14 +233,8 @@ def test_pddl_replans_from_dual_to_single_provider(tmp_path, monkeypatch):
             "document": {"elements": []},
         },
     )
-    monkeypatch.setattr(
-        "backend.agents.pddl_orchestrator._run_extract_single_provider",
-        lambda path: {
-            "status": "succeeded",
-            "provider": "docling",
-            "document": {"elements": [{"text": "fallback"}]},
-        },
-    )
+    manifest.extractor.configuration["toolbox_provider"] = "docling"
+    monkeypatch.setattr("backend.config.settings.settings.toolbox_provider", "docling")
     executor = PddlAccessibilityOrchestrator._build_executor()
 
     _, first_plan = PlannerAgent().plan(manifest, selected_roots=["o-fuse"])
