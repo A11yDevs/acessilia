@@ -680,12 +680,9 @@ class TestEveryHandlerIsCallable:
             elements, [_obligation(kind, [elements[0].id], [method])]
         )
         if method == "single-provider":
-            source_path = tmp_path / "source.pdf"
-            source_path.write_bytes(b"%PDF-test")
-            manifest.source.path = str(source_path)
+            manifest.extractor.configuration["toolbox_provider"] = "docling"
             monkeypatch.setattr(
-                "backend.agents.pddl_orchestrator._run_extract_single_provider",
-                lambda _: {"status": "succeeded", "provider": "docling"},
+                "backend.config.settings.settings.toolbox_provider", "docling"
             )
         handler = DETERMINISTIC_METHOD_HANDLERS.get(
             method, PddlAccessibilityOrchestrator._build_executor().registry.get(method)

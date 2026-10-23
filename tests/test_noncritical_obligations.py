@@ -180,6 +180,25 @@ async def test_job_finishes_with_warning_when_only_refinements_remain(
 
 
 @pytest.mark.asyncio
+async def test_a_judge_verdict_for_the_secondary_provider_does_not_fail_the_job(
+    monkeypatch, tmp_path
+):
+    """The page swap is not applied, so the verdict is a warning, not a failure."""
+    orchestrator = _orchestrator(max_replans=2)
+    orchestrator.executor.registry.register("vlm-pairwise-judge", _failing)
+    adjudication = _open_obligation(
+        "o-adjudicate", "adjudicate-page", ["vlm-pairwise-judge", "human-review"]
+    )
+
+    payload = await _run(
+        orchestrator, _headings_manifest(adjudication), monkeypatch, tmp_path
+    )
+
+    assert _open_ids(payload) == ["o-adjudicate"]
+    assert any("o-adjudicate" in warning for warning in payload["technical_warnings"])
+
+
+@pytest.mark.asyncio
 async def test_open_reading_order_still_fails_the_job(monkeypatch, tmp_path):
     with pytest.raises(RuntimeError, match="o-order"):
         await _run(

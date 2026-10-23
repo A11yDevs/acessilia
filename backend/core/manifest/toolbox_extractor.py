@@ -132,7 +132,10 @@ class ToolboxManifestExtractor:
                     secondary_provider,
                 )
             else:
-                from backend.pipeline.fusion import fuse_extraction_payloads
+                from backend.pipeline.fusion import (
+                    apply_page_routes,
+                    fuse_extraction_payloads,
+                )
 
                 secondary_client = make_toolbox_client(
                     ToolboxStructureClient, provider=secondary_provider
@@ -158,12 +161,20 @@ class ToolboxManifestExtractor:
                         secondary_provider=secondary_provider,
                         policy=self.fusion_policy,
                     )
+                    replaced: dict[int, list[dict[str, Any]]] = {}
+                    if settings.fusion_apply_page_routes:
+                        result, replaced = apply_page_routes(
+                            result,
+                            secondary_result,
+                            fusion["fusion_evidence"]["pages"],
+                            secondary_provider=secondary_provider,
+                        )
                     result = {
                         **result,
                         "fusion_stats": fusion["fusion_stats"],
                         "fusion_evidence": fusion["fusion_evidence"],
                         "secondary_extraction": _persist_secondary_extraction(
-                            secondary_result, secondary_provider
+                            secondary_result, secondary_provider, replaced
                         ),
                     }
                 finally:
@@ -198,7 +209,9 @@ class ToolboxManifestExtractor:
 
 
 def _persist_secondary_extraction(
-    payload: dict[str, Any], provider: str
+    payload: dict[str, Any],
+    provider: str,
+    replaced_primary: dict[int, list[dict[str, Any]]] | None = None,
 ) -> dict[str, str]:
     """Keep the secondary provider's extraction for the planning methods.
 
@@ -211,11 +224,14 @@ def _persist_secondary_extraction(
     A write failure does not fail the extraction: the manifest goes without the
     artifact and those methods report it as unavailable.
     """
-    content = json.dumps(
-        {"provider": provider, "document": payload},
-        ensure_ascii=False,
-        sort_keys=True,
-    ).encode("utf-8")
+    record: dict[str, Any] = {"provider": provider, "document": payload}
+    if replaced_primary:
+        # The primary provider's elements of the pages taken from this provider,
+        # so the VLM judge can still compare both transcriptions of those pages.
+        record["replaced_primary_pages"] = {
+            str(page): elements for page, elements in replaced_primary.items()
+        }
+    content = json.dumps(record, ensure_ascii=False, sort_keys=True).encode("utf-8")
     digest = hashlib.sha256(content).hexdigest()
     path = settings.data_dir / "artifacts" / "fusion" / f"secondary-{digest[:16]}.json"
     try:

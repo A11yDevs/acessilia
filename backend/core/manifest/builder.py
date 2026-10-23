@@ -504,8 +504,13 @@ def _derive_v23_processing_needs(
     page_sizes: dict[int, tuple[float | None, float | None]] | None = None,
     fusion_evidence: Any = None,
     fusion_stats: Any = None,
+    fusion_judge_max_pages: int | None = None,
 ) -> tuple[list[Observation], list[Obligation]]:
-    """Emit v2.3 needs only when deterministic checks or fusion evidence support them."""
+    """Emit v2.3 needs only when deterministic checks or fusion evidence support them.
+
+    ``fusion_judge_max_pages`` caps how many pages get the VLM judge
+    (FUSION_JUDGE_MAX_PAGES when None).
+    """
     from docstruct.fusion.line_numbers import extract_line_numbers
     from docstruct.fusion.tailjoin import join_tail, page_number_position, tailjoin3
     from docstruct.fusion.types import DiffBlock
@@ -514,7 +519,9 @@ def _derive_v23_processing_needs(
     from docstruct.text.latex import normalize_latex
     from docstruct.text.norm_fix import norm_fix
 
-    candidates: list[tuple[str, list[ManifestElement], dict[str, Any]]] = []
+    candidates: list[
+        tuple[str, list[ManifestElement], dict[str, Any], list[str] | None]
+    ] = []
     by_page: dict[int | None, list[ManifestElement]] = {}
     for element in elements:
         by_page.setdefault(element.page_number, []).append(element)
@@ -523,10 +530,11 @@ def _derive_v23_processing_needs(
         kind: str,
         targets: list[ManifestElement],
         evidence: dict[str, Any],
+        methods: list[str] | None = None,
     ) -> None:
         valid_targets = [item for item in targets if item.id]
         if valid_targets:
-            candidates.append((kind, valid_targets, evidence))
+            candidates.append((kind, valid_targets, evidence, methods))
 
     for element in elements:
         text = element.text or ""
@@ -618,9 +626,14 @@ def _derive_v23_processing_needs(
     stats = fusion_stats
     if not isinstance(stats, dict) and isinstance(fusion_evidence, dict):
         stats = fusion_evidence.get("stats")
+    if fusion_judge_max_pages is None:
+        from backend.config.settings import settings
+
+        fusion_judge_max_pages = settings.fusion_judge_max_pages
     if isinstance(fusion_evidence, dict):
         pages = fusion_evidence.get("pages")
         if isinstance(pages, list):
+            entries: list[tuple[int, dict[str, Any], list[ManifestElement]]] = []
             for page_data in pages:
                 if not isinstance(page_data, dict):
                     continue
@@ -629,23 +642,50 @@ def _derive_v23_processing_needs(
                 page_targets = by_page.get(page_number, [])
                 if not isinstance(page_stats, dict) or not page_targets:
                     continue
-                _add_fusion_observations(add, page_targets, page_stats, page_number)
+                entries.append((page_number, page_stats, page_targets))
+            judged = _pages_for_vlm_judge(entries, fusion_judge_max_pages)
+            fused_targets: list[ManifestElement] = []
+            fused_pages: list[int] = []
+            for page_number, page_stats, page_targets in entries:
+                _add_fusion_observations(
+                    add,
+                    page_targets,
+                    page_stats,
+                    page_number,
+                    judge=page_number in judged,
+                )
+                if page_stats.get("provider_divergence"):
+                    fused_targets.extend(page_targets)
+                    fused_pages.append(page_number)
+            # One obligation per document: each fuse-providers step works on the
+            # whole document, so one per page repeated the same extraction.
+            if fused_targets:
+                add("fuse-providers", fused_targets, {"pages": fused_pages})
     elif isinstance(stats, dict):
         targets = [element for element in elements if element.text]
         if targets:
-            _add_fusion_observations(add, targets, stats, None)
+            _add_fusion_observations(
+                add,
+                targets,
+                stats,
+                None,
+                judge=fusion_judge_max_pages > 0 and _needs_vlm_judge(stats),
+            )
+            if stats.get("provider_divergence"):
+                add("fuse-providers", targets, {"page_number": None, "fusion_stats": stats})
 
     observations: list[Observation] = []
     obligations: list[Obligation] = []
     seen: set[tuple[str, tuple[str, ...]]] = set()
-    for kind, targets, evidence in candidates:
+    for kind, targets, evidence, methods_override in candidates:
         target_ids = list(dict.fromkeys(item.id for item in targets))
         key = (kind, tuple(target_ids))
         if key in seen:
             continue
         seen.add(key)
         rationale, methods = V23_OBLIGATION_BY_KIND[kind]
-        suffix = "-".join(item.removeprefix("element-") for item in target_ids)
+        methods = methods_override or methods
+        suffix = _obligation_suffix(target_ids)
         observations.append(
             Observation(
                 id=f"observation-{kind}-{suffix}",
@@ -672,18 +712,89 @@ def _derive_v23_processing_needs(
     return observations, obligations
 
 
+#: Longest id suffix spelled out from the target ids; past it the suffix is a
+#: digest, since a document-level obligation targets every element of every
+#: divergent page and its id goes into the manifest, the PDDL problem and plan.
+MAX_ID_SUFFIX = 80
+
+
+def _obligation_suffix(target_ids: list[str]) -> str:
+    suffix = "-".join(item.removeprefix("element-") for item in target_ids)
+    if len(suffix) <= MAX_ID_SUFFIX:
+        return suffix
+    digest = hashlib.sha256("\n".join(target_ids).encode("utf-8")).hexdigest()
+    return f"{len(target_ids)}-targets-{digest[:12]}"
+
+
+#: Methods of an adjudicate-page obligation. The deterministic router already
+#: ran on the evidence (``route``), and re-running it as agreement-rule would
+#: only repeat its answer, so the obligation goes straight to the VLM judge.
+VLM_JUDGE_METHODS = ["vlm-pairwise-judge", "human-review"]
+
+
+def _needs_vlm_judge(stats: dict[str, Any]) -> bool:
+    """Whether the deterministic router leaves the page to the VLM judge.
+
+    ``decide_v1`` settles a page from a structural fact (one side nearly empty,
+    a table or formula only one provider found) or keeps docling by default;
+    only its preference rules, where both providers have a table or a formula
+    (``both_table->mineru``, ``both_formula->mineru``), are worth a model call,
+    and only when the two pages differ (``provider_divergence``, over all the
+    page's content: ``text_divergence`` leaves tables and formulas out, so a
+    page whose prose matches and whose tables differ would never be judged).
+    Evidence recorded before the router ran has no ``route`` and stays eligible
+    on ``text_divergence``, as before.
+    """
+    route = stats.get("route")
+    if route is None:
+        return bool(stats.get("text_divergence"))
+    return (
+        bool(stats.get("provider_divergence"))
+        and route != "docling"
+        and str(stats.get("route_reason", "")).startswith("both_")
+    )
+
+
+def _pages_for_vlm_judge(
+    entries: list[tuple[int, dict[str, Any], list[ManifestElement]]],
+    budget: int,
+) -> set[int]:
+    """The ``budget`` ambiguous pages the providers disagree on the most.
+
+    Ranked by ``similarity``, the measure ``_needs_vlm_judge`` gates on
+    (``text_similarity`` for evidence recorded before the router ran).
+    """
+    ambiguous = sorted(
+        (
+            float(
+                stats.get("similarity" if "route" in stats else "text_similarity", 0.0)
+            ),
+            page_number,
+        )
+        for page_number, stats, _ in entries
+        if isinstance(page_number, int) and _needs_vlm_judge(stats)
+    )
+    return {page_number for _, page_number in ambiguous[: max(budget, 0)]}
+
+
 def _add_fusion_observations(
     add: Any,
     targets: list[ManifestElement],
     stats: dict[str, Any],
     page_number: int | None,
+    *,
+    judge: bool,
 ) -> None:
+    """Per-page fusion needs; ``fuse-providers`` is emitted once by the caller."""
     if not stats:
         return
-    if stats.get("text_divergence"):
-        add("adjudicate-page", targets, {"page_number": page_number, "fusion_stats": stats})
-    if stats.get("provider_divergence"):
-        add("fuse-providers", targets, {"page_number": page_number, "fusion_stats": stats})
+    if judge:
+        add(
+            "adjudicate-page",
+            targets,
+            {"page_number": page_number, "fusion_stats": stats},
+            VLM_JUDGE_METHODS,
+        )
     if any(key.startswith("dropped-") and value for key, value in stats.items()):
         add("rescue-omitted-block", targets, {"page_number": page_number, "fusion_stats": stats})
     if stats.get("table_divergence"):
