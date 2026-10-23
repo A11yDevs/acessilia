@@ -48,6 +48,10 @@ from backend.tools.logger import logger
 
 
 MethodHandler = Callable[[ProcessingManifest, str], MethodResult]
+#: Called before each plan step runs, as ``progress(step, position, total)`` with a
+#: 1-based position. It runs on the executor's thread and before the step's
+#: handler, so the last call names the step a crash happened in.
+StepProgress = Callable[[PlanStep, int, int], None]
 
 
 class MethodRegistry:
@@ -84,6 +88,7 @@ class _ExecutionState:
     results: list[ExecutionStepResult]
     failed_step_index: int | None = None
     replan_required: bool = False
+    progress: StepProgress | None = None
 
 
 class ExecutorAgent:
@@ -105,8 +110,13 @@ class ExecutorAgent:
     ):
         Workflow, Step, _, StepOutput = require_workflow_classes()
         workflow_steps = []
-        for plan_step in plan.steps:
-            def execute_step(_step_input, current: PlanStep = plan_step):
+        total = len(plan.steps)
+        for position, plan_step in enumerate(plan.steps, start=1):
+            def execute_step(
+                _step_input, current: PlanStep = plan_step, position: int = position
+            ):
+                if state.progress is not None:
+                    state.progress(current, position, total)
                 result = self._execute_step(current, plan, state)
                 failed = result.status == "failed"
                 # A failed obligation does not stop the workflow: the remaining
@@ -139,6 +149,7 @@ class ExecutorAgent:
         manifest: ProcessingManifest,
         *,
         dry_run: bool = False,
+        progress: StepProgress | None = None,
     ) -> tuple[ProcessingManifest, ExecutionReport]:
         self._validate_binding(plan, manifest)
         working = deepcopy(manifest)
@@ -150,6 +161,7 @@ class ExecutorAgent:
             manifest=working,
             dry_run=dry_run,
             results=[],
+            progress=progress,
         )
         workflow = self.build_workflow(plan, state)
         workflow.run(

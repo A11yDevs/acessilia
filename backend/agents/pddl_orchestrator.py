@@ -29,7 +29,7 @@ from backend.agents.output_schemas import DataOutput, PageInspectionOutput, Visi
 from backend.agents.vision_agent import VisionAgent
 from backend.core.agents.fusion_agent import FusionAgent
 from backend.core.agents.informational_structural import InformationalStructuralAgent
-from backend.core.execution.executor import ExecutorAgent, MethodRegistry
+from backend.core.execution.executor import ExecutorAgent, MethodRegistry, StepProgress
 from backend.core.execution.models import ExecutionReport, MethodResult
 from backend.core.execution.messages import EXE_COMPLETED_OBLIGATIONS_UNSATISFIED
 from backend.core.manifest.builder import (
@@ -48,7 +48,7 @@ from backend.core.manifest.models import (
 )
 from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
 from backend.core.planning.domain_bundle import DomainBundle
-from backend.core.planning.models import NominalPlan, PlanningComparison
+from backend.core.planning.models import NominalPlan, PlanningComparison, PlanStep
 from backend.core.planning import toolbox_gate
 from backend.core.planning.planner_agent import PlannerAgent
 from backend.i18n import t
@@ -69,6 +69,12 @@ from backend.stage_messages import (
     STAGE_GENERATING_PDDL_PLAN,
     STAGE_VALIDATING_PLAN_DRY_RUN,
     STAGE_EXECUTING_PLAN,
+    STAGE_DESCRIBING_IMAGE,
+    STAGE_RECOGNIZING_TABLE,
+    STAGE_EXECUTING_PLAN_STEP,
+    STAGE_PAGE,
+    STAGE_PAGES,
+    STAGE_PAGE_UNKNOWN,
 )
 from backend.tools.code_tools import normalize_code_text
 from backend.tools.formula_tools import label_spoken_formula, normalize_latex
@@ -2266,7 +2272,7 @@ class PddlAccessibilityOrchestrator:
         self,
         file_path: Path,
         tmpdir: Path,
-        status_callback: Callable[[str], Coroutine] | None = None,
+        status_callback: Callable[[str], Coroutine[Any, Any, None]] | None = None,
         mode: str | None = None,
         structured_output: bool = False,
         custom_prompt: str | None = None,
@@ -2310,6 +2316,7 @@ class PddlAccessibilityOrchestrator:
             source_path,
             mode=effective_mode,
             media_inspection=media_inspection,
+            status_callback=status_callback,
         )
 
         if status_callback:
@@ -2317,6 +2324,7 @@ class PddlAccessibilityOrchestrator:
         await _enrich_table_structures(
             manifest,
             file_path.resolve(),
+            status_callback=status_callback,
         )
 
         if status_callback:
@@ -2341,11 +2349,13 @@ class PddlAccessibilityOrchestrator:
         # whether the executor ran at all, so setting it to false produced a plan
         # that was never executed and a report of None. Real execution is now the
         # other branch instead of silence.
+        loop = asyncio.get_running_loop()
         manifest, execution_report = await run_blocking(
             self.executor.execute,
             plan,
             manifest,
             dry_run=self.execute_dry_run,
+            progress=_plan_progress(manifest, status_callback, loop),
         )
 
         # A `replan-required` report means the executor recorded `(tried ?o ?m)`
@@ -2393,6 +2403,7 @@ class PddlAccessibilityOrchestrator:
                 plan,
                 manifest,
                 dry_run=False,
+                progress=_plan_progress(manifest, status_callback, loop),
             )
 
         if execution_report.status not in {"completed", "dry-run-completed"}:
@@ -2490,6 +2501,7 @@ async def _enrich_picture_descriptions(
     *,
     mode: str,
     media_inspection: dict[str, Any] | None = None,
+    status_callback: Callable[[str], Coroutine[Any, Any, None]] | None = None,
 ) -> None:
     _inject_full_page_picture(manifest, media_inspection)
 
@@ -2524,11 +2536,19 @@ async def _enrich_picture_descriptions(
     total_pages = len(manifest.pages)
     enriched = 0
 
-    for element in pictures:
+    for position, element in enumerate(pictures, start=1):
         fallback_page_number = element.page_number
         if fallback_page_number is None and len(manifest.pages) == 1:
             fallback_page_number = manifest.pages[0].page_number
 
+        if status_callback:
+            await status_callback(
+                t(STAGE_DESCRIBING_IMAGE).format(
+                    current=position,
+                    total=len(pictures),
+                    pages=_pages_label([fallback_page_number]),
+                )
+            )
         image_bytes, page_number = await run_blocking(
             _extract_picture_bytes,
             source_file,
@@ -2712,6 +2732,8 @@ def _inject_full_page_picture(
 async def _enrich_table_structures(
     manifest: ProcessingManifest,
     source_file: Path,
+    *,
+    status_callback: Callable[[str], Coroutine[Any, Any, None]] | None = None,
 ) -> None:
     table_elements = [
         element
@@ -2723,7 +2745,7 @@ async def _enrich_table_structures(
 
     data_agent = DataAgent()
     enriched = 0
-    for element in table_elements:
+    for position, element in enumerate(table_elements, start=1):
         if _backfill_table_from_existing_text(element):
             enriched += 1
             continue
@@ -2732,6 +2754,14 @@ async def _enrich_table_structures(
         if fallback_page_number is None and len(manifest.pages) == 1:
             fallback_page_number = manifest.pages[0].page_number
 
+        if status_callback:
+            await status_callback(
+                t(STAGE_RECOGNIZING_TABLE).format(
+                    current=position,
+                    total=len(table_elements),
+                    pages=_pages_label([fallback_page_number]),
+                )
+            )
         image_bytes, page_number = await run_blocking(
             _extract_picture_bytes,
             source_file,
@@ -3099,10 +3129,84 @@ def _replannable_obligation_ids(manifest: ProcessingManifest) -> list[str]:
 def _unsatisfied_execution_message(manifest: ProcessingManifest) -> str:
     return t(EXE_COMPLETED_OBLIGATIONS_UNSATISFIED).format(
         unsatisfied=", ".join(
-            obligation.id
+            f"{obligation.id} ({_pages_label(_obligation_pages(manifest, obligation.id))})"
             for obligation in _unsatisfied_selected_obligations(manifest)
         )
     )
+
+
+def _pages_label(pages: Iterable[int | None]) -> str:
+    """Localized location of a unit of work, e.g. "page 3" or "pages 3, 4"."""
+    numbers = sorted({page for page in pages if page})
+    if not numbers:
+        return t(STAGE_PAGE_UNKNOWN)
+    if len(numbers) == 1:
+        return t(STAGE_PAGE).format(page=numbers[0])
+    return t(STAGE_PAGES).format(pages=", ".join(str(page) for page in numbers))
+
+
+def _obligation_pages(manifest: ProcessingManifest, obligation_id: str) -> list[int | None]:
+    obligation = next(
+        (item for item in manifest.obligations if item.id == obligation_id), None
+    )
+    if obligation is None:
+        return []
+    page_by_element = {element.id: element.page_number for element in manifest.elements}
+    return [page_by_element.get(target) for target in obligation.target_ids]
+
+
+def _plan_progress(
+    manifest: ProcessingManifest,
+    status_callback: Callable[[str], Coroutine[Any, Any, None]] | None,
+    loop: asyncio.AbstractEventLoop,
+) -> StepProgress | None:
+    """Report each obligation step, with its pages, through ``status_callback``.
+
+    The executor runs on a worker thread while the callback is a coroutine of
+    the event loop, so the report is scheduled on ``loop`` and awaited from the
+    thread: the step only starts once its stage is recorded, which is what lets
+    a job killed mid-step still say which step and page it was on. A failing
+    report, including a broken translation of the label, is logged and never
+    fails the step.
+
+    The user sees only the step and its pages; the obligation kind and method
+    are internal names, so they go to the debug log.
+    """
+    if status_callback is None:
+        return None
+    page_by_element = {element.id: element.page_number for element in manifest.elements}
+    pages_by_obligation = {
+        obligation.id: [page_by_element.get(target) for target in obligation.target_ids]
+        for obligation in manifest.obligations
+    }
+
+    def report(step: PlanStep, position: int, total: int) -> None:
+        if step.action != "execute-obligation" or step.obligation_id is None:
+            return
+        pages = pages_by_obligation.get(step.obligation_id, [])
+        logger.debug(
+            "PDDL: step {}/{} {} via {}, pages {}",
+            position,
+            total,
+            step.obligation_id,
+            step.method,
+            pages,
+        )
+        try:
+            message = t(STAGE_EXECUTING_PLAN_STEP).format(
+                current=position, total=total, pages=_pages_label(pages)
+            )
+            asyncio.run_coroutine_threadsafe(status_callback(message), loop).result(
+                timeout=_PROGRESS_REPORT_TIMEOUT_SECONDS
+            )
+        except Exception as exc:  # noqa: BLE001 - progress must not fail the plan
+            logger.warning("PDDL: progress of step {} not recorded: {}", position, exc)
+
+    return report
+
+
+#: Upper bound on how long a plan step waits for its progress to be recorded.
+_PROGRESS_REPORT_TIMEOUT_SECONDS = 10.0
 
 
 def _log_availability(availability: toolbox_gate.AvailabilityDecision) -> None:

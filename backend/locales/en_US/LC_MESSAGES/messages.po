@@ -206,6 +206,41 @@ msgstr "Validating the plan in dry-run mode..."
 msgid "Executing the plan..."
 msgstr "Executing the plan..."
 
+#, python-brace-format
+msgid "Describing image {current} of {total} ({pages})..."
+msgstr "Describing image {current} of {total} ({pages})..."
+
+#, python-brace-format
+msgid "Recognizing table {current} of {total} ({pages})..."
+msgstr "Recognizing table {current} of {total} ({pages})..."
+
+#, python-brace-format
+msgid "Executing the plan: step {current} of {total} ({pages})..."
+msgstr "Executing the plan: step {current} of {total} ({pages})..."
+
+#, python-brace-format
+msgid "page {page}"
+msgstr "page {page}"
+
+#, python-brace-format
+msgid "pages {pages}"
+msgstr "pages {pages}"
+
+msgid "page not identified"
+msgstr "page not identified"
+
+#, python-brace-format
+msgid "{error} (failed during: {stage})"
+msgstr "{error} (failed during: {stage})"
+
+#, python-brace-format
+msgid ""
+"Processing was interrupted by a server restart during: {stage}. Submit "
+"the file again."
+msgstr ""
+"Processing was interrupted by a server restart during: {stage}. Submit "
+"the file again."
+
 msgid "Please provide an e-mail address: /email you@example.com"
 msgstr "Please provide an e-mail address: /email you@example.com"
 
@@ -1431,6 +1466,37 @@ msgstr ""
 
 msgid "Your accessible file is ready! - Acessilia"
 msgstr "Your accessible file is ready! - Acessilia"
+
+#, python-brace-format
+msgid ""
+"Hello!\n"
+"\n"
+"Unfortunately, the processing of the file '{filename}' could not be "
+"completed.\n"
+"\n"
+"Reason: {error}\n"
+"\n"
+"You can submit the file again. If the problem persists, forward this "
+"message to the Acessilia team so we can investigate.\n"
+"\n"
+"Best regards,\n"
+"The Acessilia Team"
+msgstr ""
+"Hello!\n"
+"\n"
+"Unfortunately, the processing of the file '{filename}' could not be "
+"completed.\n"
+"\n"
+"Reason: {error}\n"
+"\n"
+"You can submit the file again. If the problem persists, forward this "
+"message to the Acessilia team so we can investigate.\n"
+"\n"
+"Best regards,\n"
+"The Acessilia Team"
+
+msgid "Your file could not be processed - Acessilia"
+msgstr "Your file could not be processed - Acessilia"
 
 #, python-brace-format
 msgid ""

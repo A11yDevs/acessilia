@@ -266,7 +266,9 @@ async def _poll_job(
             erros = status.get("erros") or []
             msg = t(MSG_PROCESS_FAILED_BASE)
             if erros:
-                msg += f"\n{erros[0]}"
+                # The fatal error is the last one; earlier entries are optional
+                # export warnings recorded before it.
+                msg += f"\n{erros[-1]}"
             await _send_with_retry(
                 message.bot,
                 message.chat.id,

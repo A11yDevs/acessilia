@@ -950,5 +950,7 @@ async def test_job_executor_records_early_process_failure(api_paths, monkeypatch
     rows = await hs.listar_historico(10)
     [row] = [row for row in rows if row["task_id"] == task_id]
     assert row["status"] == "error"
-    assert row["erro"] == "cache inacessivel"
+    # The error names the stage the job was in, once, in both places.
+    assert row["erro"].startswith("cache inacessivel")
+    assert task["erros"] == [row["erro"]]
     assert row["concluido_em"] is not None

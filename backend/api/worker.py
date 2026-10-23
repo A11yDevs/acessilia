@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from backend.agents.state_manager import TaskCancelledError, state_manager
+from backend.agents.state_manager import TaskCancelledError, state_manager, trim_stage
 from backend.config.settings import settings
 from backend.services.job_store import load_record, save_status, pending_records
 from backend.services.blocking import run_blocking
@@ -29,6 +29,7 @@ from backend.log_messages import (
 from backend.stage_messages import (
     STAGE_RESTART_CANCELLED,
     STAGE_RESTART_INTERRUPTED,
+    STAGE_RESTART_INTERRUPTED_DURING,
     STAGE_RESTART_RESUBMIT,
     STAGE_PENDING_UPLOAD_MISSING,
     STAGE_CANCELLED_IN_QUEUE,
@@ -52,7 +53,11 @@ from backend.export.exporters.txt_exporter import export_txt
 from backend.export.exporters.drbench_md_exporter import export_drbench_md
 from backend.export.pandoc_exporter import export_accessible_document
 from backend.services.download_token_service import criar_token
-from backend.services.email_service import send_confirmation_email, send_result_email
+from backend.services.email_service import (
+    send_confirmation_email,
+    send_failure_email,
+    send_result_email,
+)
 from backend.services.history_service import finalizar_conversao, registrar_conversao
 from backend.tools.logger import logger
 
@@ -219,6 +224,16 @@ class JobExecutor:
 
         async def status_callback(msg: str) -> None:
             state_manager.atualizar(task_id, etapa=msg)
+            # Persisted on every stage: a process killed mid-job (out of memory,
+            # a crash in a native library) loses the in-memory state, and
+            # recover_pending_jobs can then still tell the user where it stopped.
+            status = get_job_status(task_id)
+            if status is None:
+                return
+            try:
+                await run_blocking(save_status, task_id, status)
+            except Exception as exc:  # noqa: BLE001 - progress must not fail the job
+                logger.warning("Job {}: stage not persisted: {}", task_id, exc)
 
         try:
             queued_jobs.pop(task_id, None)
@@ -448,15 +463,21 @@ class JobExecutor:
                 return
             if out_dir is not None:
                 _remove_output_dir(out_dir)
-            state_manager.atualizar(
-                task_id, status="error", erro=str(e), etapa=t(STAGE_PROCESSING_FAILURE)
-            )
+            task = state_manager.obter(task_id)
+            if task is not None and task.get("status") == "error" and task.get("erros"):
+                # process() already recorded the error with the stage it failed in.
+                error = task["erros"][-1]
+            else:
+                error = state_manager.errar(task_id, str(e) or type(e).__name__)
+            state_manager.atualizar(task_id, etapa=t(STAGE_PROCESSING_FAILURE))
             await finalizar_conversao(
                 task_id=task_id,
                 status="error",
-                erro=str(e),
+                erro=error,
                 tempo_segundos=time.time() - started_at,
             )
+            if job.email:
+                await send_failure_email(job.email, job.filename, error)
         finally:
             try:
                 status = get_job_status(task_id)
@@ -521,10 +542,21 @@ async def recover_pending_jobs() -> None:
             await finalizar_conversao(task_id, status="cancelled")
             continue
         if status["status"] == "processing":
+            # The last stage was persisted before the process died, so the
+            # error names the page or plan step the job was on.
+            stage = trim_stage(status.get("etapa_atual"))
+            error = (
+                t(STAGE_RESTART_INTERRUPTED_DURING).format(stage=stage)
+                if stage
+                else t(STAGE_RESTART_RESUBMIT)
+            )
             status.update(status="error", fim=time.time(), etapa_atual=t(STAGE_RESTART_INTERRUPTED))
-            status.setdefault("erros", []).append(t(STAGE_RESTART_RESUBMIT))
+            status.setdefault("erros", []).append(error)
             await run_blocking(save_status, task_id, status)
-            await finalizar_conversao(task_id, status="error", erro=t(STAGE_RESTART_INTERRUPTED))
+            await finalizar_conversao(task_id, status="error", erro=error)
+            email = record["request"].get("email")
+            if email:
+                await send_failure_email(email, record["request"].get("filename", ""), error)
             continue
         if unified_queue.get_position(task_id):
             continue

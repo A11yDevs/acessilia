@@ -5,6 +5,8 @@ from backend.i18n import t
 from backend.log_messages import (
     EMAIL_CONFIRMATION_BODY,
     EMAIL_CONFIRMATION_SUBJECT,
+    EMAIL_FAILURE_BODY,
+    EMAIL_FAILURE_SUBJECT,
     EMAIL_FORMAT_DOCX,
     EMAIL_FORMAT_HTML,
     EMAIL_FORMAT_MP3,
@@ -79,6 +81,12 @@ async def send_email_notification(
 async def send_confirmation_email(to_email: str, filename: str) -> bool:
     subject = t(EMAIL_CONFIRMATION_SUBJECT)
     body = t(EMAIL_CONFIRMATION_BODY).format(filename=filename)
+    return await send_email_notification(to_email, subject, body)
+
+
+async def send_failure_email(to_email: str, filename: str, error: str) -> bool:
+    subject = t(EMAIL_FAILURE_SUBJECT)
+    body = t(EMAIL_FAILURE_BODY).format(filename=filename, error=error)
     return await send_email_notification(to_email, subject, body)
 
 

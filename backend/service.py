@@ -311,12 +311,12 @@ async def process(
 
     except Exception as e:
         logger.error(t(LOG_PIPELINE_ERROR).format(error_type=type(e).__name__, error=e))
-        state_manager.errar(task_id, str(e))
+        erro = state_manager.errar(task_id, str(e) or type(e).__name__)
 
         await finalizar_conversao(
             task_id=task_id,
             status="error",
-            erro=str(e),
+            erro=erro,
             tempo_segundos=time.time() - inicio,
         )
 
