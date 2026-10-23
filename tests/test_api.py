@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import zipfile
 from pathlib import Path
@@ -73,6 +74,81 @@ def test_health(client):
     assert body["status"] == "ok"
     assert body["model_client"] == settings.ai_client
     assert "queue_size" in body
+
+
+def _write_staging_status(last_check: str) -> None:
+    digest = "sha256:" + "d" * 64
+    (settings.data_dir / "staging-status.json").write_text(
+        json.dumps(
+            {
+                "latest_sha": "79d9a0c",
+                "running_sha": "79d9a0c",
+                "last_check": last_check,
+                "last_update": "2026-10-22T17:41:54Z",
+                "latest_digest": digest,
+                "running_digest": digest,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+@pytest.mark.parametrize(
+    "last_check,stale",
+    [
+        ("", False),  # no updater reports here
+        ("2026-10-23T00:40:00Z", False),
+        ("2026-10-23T00:35:00Z", True),  # 15 min and 1 s before "now"
+        ("not a date", True),
+        ("2026-10-23T00:44:00", True),  # no timezone: cannot be compared
+    ],
+)
+def test_update_check_staleness(last_check, stale):
+    from datetime import UTC, datetime
+
+    from backend.api.routes.health import _update_check_is_stale
+
+    now = datetime(2026, 10, 23, 0, 50, 1, tzinfo=UTC)
+    assert _update_check_is_stale(last_check, now=now) is stale
+
+
+def test_health_is_not_up_to_date_when_the_updater_stopped_checking(client, monkeypatch):
+    """The staging timer failed for hours while /health kept saying up_to_date."""
+    from datetime import UTC, datetime, timedelta
+
+    async def reachable() -> bool:
+        return True
+
+    monkeypatch.setattr("backend.api.routes.health._check_model_reachable", reachable)
+
+    fresh = (datetime.now(UTC) - timedelta(minutes=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    _write_staging_status(fresh)
+    body = client.get("/api/v1/health").json()
+    assert (body["up_to_date"], body["update_check_stale"]) == (True, False)
+
+    _write_staging_status("2026-10-22T17:41:54Z")
+    body = client.get("/api/v1/health").json()
+    assert (body["up_to_date"], body["update_check_stale"]) == (False, True)
+    assert body["update_available"] is False
+
+
+def test_health_survives_a_malformed_staging_status(client, monkeypatch):
+    """A non-string last_check must not turn /health itself into a 500."""
+
+    async def reachable() -> bool:
+        return True
+
+    monkeypatch.setattr("backend.api.routes.health._check_model_reachable", reachable)
+
+    status_file = settings.data_dir / "staging-status.json"
+    status_file.write_text(json.dumps({"last_check": 12345, "latest_digest": 7}), encoding="utf-8")
+    response = client.get("/api/v1/health")
+    assert response.status_code == 200
+    body = response.json()
+    assert (body["last_check"], body["update_check_stale"], body["up_to_date"]) == ("12345", True, False)
+
+    status_file.write_text("[]", encoding="utf-8")
+    assert client.get("/api/v1/health").status_code == 200
 
 
 def test_health_access_filter_keeps_failures_and_other_requests():

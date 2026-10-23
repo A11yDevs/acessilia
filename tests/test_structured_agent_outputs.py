@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from types import SimpleNamespace
 
 from agno.run.base import RunStatus
@@ -57,6 +58,59 @@ def test_vision_description_normalizes_empty_optional_formula() -> None:
     )
 
     assert output.formula_latex is None
+
+
+def _vision_json(**fields) -> str:
+    payload = {
+        "language": "pt-BR",
+        "confidence": 0.9,
+        "mentioned_elements": [],
+        "warnings": [],
+        **fields,
+    }
+    return json.dumps(payload)
+
+
+def test_a_description_that_also_carries_a_formula_keeps_the_description() -> None:
+    """006.pdf, page 29: kind='description' with formula_latex='NaCl' failed the job."""
+    output = validate_structured_content(
+        _vision_json(
+            kind="description",
+            description="Cubic crystals of sodium chloride (NaCl).",
+            formula_latex="NaCl",
+        ),
+        VisionOutput,
+    )
+
+    assert output.kind == "description"
+    assert output.description.startswith("Cubic crystals of sodium chloride")
+    assert output.formula_latex is None
+    assert output.warnings == [
+        "formula_latex dropped because kind is 'description': NaCl"
+    ]
+    # The orchestrator revalidates the dumped output; that must be a no-op.
+    assert VisionOutput.model_validate(output.model_dump()) == output
+
+
+@pytest.mark.parametrize("description", ["", "   "])
+def test_a_description_with_only_a_formula_becomes_a_formula(description: str) -> None:
+    # A whitespace-only description counts as absent because AgentOutput strips
+    # strings; this pins that, since it decides which branch applies.
+    output = validate_structured_content(
+        _vision_json(kind="description", description=description, formula_latex="E=mc^2"),
+        VisionOutput,
+    )
+
+    assert (output.kind, output.formula_latex) == ("formula", "E=mc^2")
+    assert output.warnings == [
+        "kind changed from 'description' to 'formula': only formula_latex was provided"
+    ]
+    assert VisionOutput.model_validate(output.model_dump()) == output
+
+
+def test_a_description_with_neither_text_nor_formula_is_still_rejected() -> None:
+    with pytest.raises(ValidationError, match="description is required"):
+        validate_structured_content(_vision_json(kind="description"), VisionOutput)
 
 
 def test_json_content_is_validated_into_the_requested_schema() -> None:
@@ -294,6 +348,140 @@ async def test_vision_agent_requests_and_returns_its_output_schema(monkeypatch) 
     assert captured["output_schema"] is VisionOutput
     assert isinstance(result, VisionOutput)
     assert result.description == "Um círculo azul."
+
+
+#: What qwen3-vl-8b returned for an image on page 25 of 006.pdf: a formula padded
+#: with "\\text{ }" until max_tokens cut the JSON string off.
+TRUNCATED_FORMULA = '{\n  "kind": "formula",\n  "formula_latex": "x = ' + "\\\\text{ }" * 200
+
+
+def _scripted_vision_agent(monkeypatch, answers: list[object]):
+    from backend.agents import vision_agent as vision_module
+
+    calls: list[dict] = []
+
+    class FakeAgent:
+        def __init__(self, **_kwargs):
+            pass
+
+        def run(self, **kwargs):
+            calls.append(kwargs)
+            answer = answers[len(calls) - 1]
+            if isinstance(answer, Exception):
+                raise answer
+            return type("Response", (), {"content": answer})()
+
+    async def run_inline(function, *args):
+        return function(*args)
+
+    monkeypatch.setattr(vision_module, "Agent", FakeAgent)
+    monkeypatch.setattr(vision_module, "get_agno_model", lambda: object())
+    monkeypatch.setattr(vision_module.asyncio, "to_thread", run_inline)
+    return vision_module, calls
+
+
+VALID_FORMULA = {
+    "kind": "formula",
+    "formula_latex": "x = y",
+    "language": "pt-BR",
+    "confidence": 0.8,
+    "mentioned_elements": [],
+    "warnings": [],
+}
+
+
+@pytest.mark.asyncio
+async def test_vision_agent_retries_a_truncated_answer(monkeypatch) -> None:
+    from backend.tools.logger import logger
+
+    vision_module, calls = _scripted_vision_agent(
+        monkeypatch, [TRUNCATED_FORMULA, VALID_FORMULA]
+    )
+    infos: list[str] = []
+    sink = logger.add(infos.append, level="INFO", format="{message}")
+    try:
+        result = await vision_module.VisionAgent().describe_region(
+            b"image", "embedded_image", page_num=25
+        )
+    finally:
+        logger.remove(sink)
+
+    assert isinstance(result, VisionOutput)
+    assert result.formula_latex == "x = y"
+    assert len(calls) == 2
+    assert vision_module.RETRY_INSTRUCTION not in calls[0]["input"]
+    assert calls[1]["input"].endswith(vision_module.RETRY_INSTRUCTION)
+    # Every try sends the image again: that is what a retry costs.
+    assert all([image.content for image in call["images"]] == [b"image"] for call in calls)
+    # A recovered region is logged, so the retry rate can be measured.
+    assert any("2/2" in message and "embedded_image" in message for message in infos)
+
+
+@pytest.mark.asyncio
+async def test_vision_agent_gives_up_after_its_attempts(monkeypatch) -> None:
+    from backend.agents.vision_agent import REGION_ATTEMPTS
+    from backend.tools.logger import logger
+
+    vision_module, calls = _scripted_vision_agent(
+        monkeypatch, [TRUNCATED_FORMULA] * REGION_ATTEMPTS
+    )
+    critical: list[str] = []
+    warnings: list[str] = []
+    sinks = [
+        logger.add(critical.append, level="CRITICAL", format="{message}"),
+        logger.add(
+            warnings.append,
+            level="WARNING",
+            format="{message}",
+            filter=lambda record: record["level"].name == "WARNING",
+        ),
+    ]
+    try:
+        result = await vision_module.VisionAgent().describe_region(
+            b"image", "embedded_image", page_num=25
+        )
+    finally:
+        for sink in sinks:
+            logger.remove(sink)
+
+    assert result is None
+    assert len(calls) == REGION_ATTEMPTS
+    assert len(critical) == 1
+    assert len(warnings) == REGION_ATTEMPTS - 1
+    # The retry warning names the cause, without the rejected answer itself.
+    for message in warnings:
+        assert "Invalid JSON" in message and "line 3" in message
+        assert "\\text{ }" not in message
+        assert len(message) < 500
+
+
+@pytest.mark.asyncio
+async def test_vision_agent_does_not_retry_a_provider_failure(monkeypatch) -> None:
+    vision_module, calls = _scripted_vision_agent(
+        monkeypatch, [TimeoutError("read timed out"), VALID_FORMULA]
+    )
+
+    result = await vision_module.VisionAgent().describe_region(
+        b"image", "embedded_image", page_num=25
+    )
+
+    assert result is None
+    assert len(calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_inspect_page_retries_a_truncated_answer(monkeypatch) -> None:
+    from backend.agents.output_schemas import PageInspectionOutput
+
+    truncated = '{\n  "kind": "content",\n  "description": "' + "a " * 200
+    blank = {"kind": "blank", "language": "und", "confidence": 0.9}
+    vision_module, calls = _scripted_vision_agent(monkeypatch, [truncated, blank])
+
+    output = await vision_module.VisionAgent().inspect_page(b"image", page_num=2, total_pages=3)
+
+    assert isinstance(output, PageInspectionOutput) and output.kind == "blank"
+    assert len(calls) == 2
+    assert calls[1]["input"].endswith(vision_module.RETRY_INSTRUCTION)
 
 
 @pytest.mark.asyncio

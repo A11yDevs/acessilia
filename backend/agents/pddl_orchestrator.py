@@ -10,7 +10,7 @@ import re
 import tempfile
 from collections import Counter
 from collections.abc import Callable, Coroutine, Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -228,33 +228,6 @@ def _run_extract_fused(
                 extract_fused(source_path, artifact_id=artifact_id)
             )
         ).result()
-
-
-def _run_extract_single_provider(source_path: Path) -> dict[str, Any]:
-    """Extract through the configured Toolbox provider for the PDDL fallback."""
-    import concurrent.futures
-
-    from acessilia_sdk.toolbox.clients import ToolboxStructureClient
-    from backend.tools.toolbox_client import make_toolbox_client
-
-    async def extract() -> dict[str, Any]:
-        client = make_toolbox_client(ToolboxStructureClient)
-        try:
-            return await client.extract_structure(
-                file_path=source_path,
-                language="pt-BR",
-                use_remote_cache=False,
-            )
-        finally:
-            await client.close()
-
-    try:
-        asyncio.get_running_loop()
-    except RuntimeError:
-        return asyncio.run(extract())
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-        return pool.submit(lambda: asyncio.run(extract())).result()
 
 
 def _fusion_agent() -> FusionAgent:
@@ -1121,6 +1094,9 @@ class _SecondaryExtraction:
     #: page number -> raw elements of the secondary provider, in reading order.
     pages: dict[int, list[dict[str, Any]]]
     sizes: dict[int, tuple[float, float]]
+    #: page number -> primary elements of a page the manifest took from the
+    #: secondary provider (fusion.apply_page_routes), in reading order.
+    replaced_primary: dict[int, list[dict[str, Any]]] = field(default_factory=dict)
 
     def bbox(self, element: dict[str, Any]) -> _Box | None:
         """Normalized box of a raw Toolbox element (same frame as _element_bbox)."""
@@ -1206,7 +1182,18 @@ def _load_secondary_extraction(
         page = _page_number(element.get("page_number"))
         if page is not None:
             pages.setdefault(page, []).append(element)
-    return _SecondaryExtraction(str(data.get("provider") or ""), pages, sizes), ""
+    replaced: dict[int, list[dict[str, Any]]] = {}
+    for key, rows in (data.get("replaced_primary_pages") or {}).items():
+        page = _page_number(key)
+        if page is not None and isinstance(rows, list):
+            replaced[page] = sorted(
+                (row for row in rows if isinstance(row, dict)),
+                key=lambda row: row.get("reading_order") or 0,
+            )
+    return (
+        _SecondaryExtraction(str(data.get("provider") or ""), pages, sizes, replaced),
+        "",
+    )
 
 
 def _provider_pair_problem(
@@ -1601,15 +1588,20 @@ def _handle_vlm_pairwise_judge_method(
 
     The Toolbox (``document.adjudicate.page``) returns the position-debiased
     probability that the secondary page is the more faithful transcription.
-    Only pages where the two transcriptions diverge are judged
-    (``should_judge``); the others keep the primary page without a call. Of
+    Candidate A is the page the manifest carries and B the other provider's:
+    the secondary page, or, on a page the deterministic router already took
+    from the secondary provider (its elements carry that ``metadata.provider``),
+    the primary elements it replaced. Such a page without the replaced elements
+    in the artifact is skipped: comparing it with the secondary page would
+    compare MinerU with itself and report a confirmation. Only pages
+    where the two transcriptions diverge are judged (``should_judge``). Of
     docstruct's two-threshold rule (``decide_pair``) only the ``p_new >
     DEFAULT_NEW_THR`` branch applies: there is no previous judge to consult
-    here. As with ``agreement-rule``, a kept primary page satisfies the
-    obligation, and a preferred secondary page is recorded in
-    ``page_judgement`` but not swapped in: the method fails and the obligation
-    goes to ``human-review``. An answer without a valid ``pB`` fails the method
-    instead of counting as a kept primary.
+    here. A confirmed page satisfies the obligation; a preferred alternative is
+    recorded in ``page_judgement`` but not swapped in (that would reopen the
+    manifest mid-plan), so the method fails and the non-critical obligation
+    becomes a technical warning. An answer without a valid ``pB`` fails the
+    method instead of counting as a confirmation.
     """
     from docstruct.fusion.judge import DEFAULT_NEW_THR, should_judge
 
@@ -1630,14 +1622,36 @@ def _handle_vlm_pairwise_judge_method(
     source_path = Path(manifest.source.path)
     judgements: dict[int, dict[str, Any]] = {}
     for page_number in sorted({e.page_number for e in elements if e.page_number}):
-        primary_md = _page_markdown(
-            (element.type, element.text)
+        page_elements = [
+            element
             for element in sorted(manifest.elements, key=lambda e: e.reading_order)
             if element.page_number == page_number
+        ]
+        adopted = any(
+            element.metadata.get("provider") == secondary.provider
+            for element in page_elements
+        )
+        if adopted:
+            if page_number not in secondary.replaced_primary:
+                logger.warning(
+                    "vlm-pairwise-judge: page {} came from {}, but the artifact does not "
+                    "keep the {} page it replaced; skipped",
+                    page_number,
+                    secondary.provider,
+                    primary_name,
+                )
+                continue
+            content, other = secondary.provider, primary_name
+            other_blocks = secondary.replaced_primary[page_number]
+        else:
+            content, other = primary_name, secondary.provider
+            other_blocks = secondary.pages.get(page_number, [])
+        primary_md = _page_markdown(
+            (element.type, element.text) for element in page_elements
         )
         secondary_md = _page_markdown(
             (str(block.get("type") or ""), block.get("text"))
-            for block in secondary.pages.get(page_number, [])
+            for block in other_blocks
         )
         if not primary_md.strip() or not secondary_md.strip():
             logger.info(
@@ -1645,7 +1659,9 @@ def _handle_vlm_pairwise_judge_method(
             )
             continue
         if not should_judge(primary_md, secondary_md):
-            judgements[page_number] = {"choice": primary_name, "pB": None, "reason": "agree"}
+            judgements[page_number] = {
+                "content": content, "choice": content, "pB": None, "reason": "agree",
+            }
             continue
 
         try:
@@ -1696,7 +1712,8 @@ def _handle_vlm_pairwise_judge_method(
                 ),
             )
         judgements[page_number] = {
-            "choice": secondary.provider if p_b > DEFAULT_NEW_THR else primary_name,
+            "content": content,
+            "choice": other if p_b > DEFAULT_NEW_THR else content,
             "pB": p_b,
             "pB_ab": document.get("pB_ab"),
             "pA_ba": document.get("pA_ba"),
@@ -1717,24 +1734,29 @@ def _handle_vlm_pairwise_judge_method(
     preferred = {
         page: judgement
         for page, judgement in judgements.items()
-        if judgement["choice"] != primary_name
+        if judgement["choice"] != judgement["content"]
     }
     if preferred:
         return MethodResult(
             success=False,
             validated=False,
             message=(
-                "Juiz VLM prefere o provider secundário ("
-                + ", ".join(f"p{page}: pB={j['pB']:.2f}" for page, j in sorted(preferred.items()))
+                "Juiz VLM prefere o outro provider ("
+                + ", ".join(
+                    f"p{page}: {j['choice']} pB={j['pB']:.2f}"
+                    for page, j in sorted(preferred.items())
+                )
                 + "); a troca de página não é aplicada automaticamente"
             ),
         )
     return MethodResult(
         success=True,
         validated=True,
-        message="Juiz VLM mantém o provider primário nas páginas "
+        message="Juiz VLM confirma a página aplicada: "
         + ", ".join(
-            f"{page} (pB={j['pB']:.2f})" if j["pB"] is not None else f"{page} (concordam)"
+            f"{page} ({j['content']}, pB={j['pB']:.2f})"
+            if j["pB"] is not None
+            else f"{page} ({j['content']}, concordam)"
             for page, j in sorted(judgements.items())
         ),
     )
@@ -2069,7 +2091,19 @@ def _fused_text_elements(
 def _handle_single_provider_method(
     manifest: ProcessingManifest, obligation_id: str
 ) -> MethodResult:
-    """Run the configured provider as a real fallback after dual fusion fails."""
+    """Satisfy ``fuse-providers`` with the extraction the manifest already carries.
+
+    There is nothing to re-run: the manifest's elements are the configured
+    provider's extraction, with the pages the deterministic router took from
+    the secondary provider in dual mode (``fusion.apply_page_routes``). The
+    method does not claim a single-provider document; it checks only that the
+    manifest was extracted by the configured provider and has content. It used
+    to extract the whole document again, uploaded anew and with the Toolbox
+    cache off, once per ``fuse-providers`` step, and changed nothing in the
+    manifest: a full extraction of cost for no content.
+    """
+    from backend.config.settings import settings
+
     obligation = next(
         (item for item in manifest.obligations if item.id == obligation_id), None
     )
@@ -2082,44 +2116,35 @@ def _handle_single_provider_method(
             message="single-provider só é válido para fuse-providers",
         )
 
-    source_path = Path(manifest.source.path)
-    if not source_path.is_file():
+    provider = str(manifest.extractor.configuration.get("toolbox_provider") or "")
+    if not provider:
         return MethodResult(
             success=False,
             validated=False,
-            message=f"Documento-fonte indisponível: {source_path}",
+            message="The manifest does not record the provider it was extracted by",
         )
-    try:
-        payload = _run_extract_single_provider(source_path)
-    except Exception as exc:  # noqa: BLE001
+    if provider != settings.toolbox_provider:
         return MethodResult(
             success=False,
             validated=False,
             message=(
-                "Extração single-provider falhou: "
-                f"{type(exc).__name__}: {exc}"
+                f"The manifest was extracted by {provider}, not by the configured "
+                f"provider ({settings.toolbox_provider})"
             ),
         )
-
-    provider = str(payload.get("provider") or "")
-    if payload.get("status") != "succeeded" or not provider or "+" in provider:
+    if not manifest.elements:
         return MethodResult(
             success=False,
             validated=False,
-            message="A Toolbox não confirmou uma extração de provider único",
+            message="The manifest extraction has no elements",
         )
-
-    artifact = _persist_fusion_payload(
-        manifest,
-        payload,
-        obligation_id,
-        kind="single-provider-payload",
-    )
     return MethodResult(
         success=True,
         validated=True,
-        message=f"Fallback single-provider concluído ({provider})",
-        artifacts=[artifact],
+        message=(
+            f"The manifest already carries the extraction ({provider}); "
+            "nothing to re-extract"
+        ),
     )
 
 
@@ -3081,6 +3106,11 @@ def _has_meaningful_text(element: ManifestElement) -> bool:
 #: a screen reader user hits first, so an open one still fails the job.
 NON_CRITICAL_OBLIGATION_KINDS = frozenset(
     {
+        # The adjudication verdict is recorded but cannot be applied (a page
+        # swap would reopen the manifest mid-plan), and the extracted content
+        # is complete either way, so a verdict for the secondary provider must
+        # not fail the job.
+        "adjudicate-page",
         "repair-heading-hierarchy",
         "join-tail-blocks",
         "normalize-text",

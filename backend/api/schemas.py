@@ -80,4 +80,7 @@ class HealthResponse(BaseModel):
     last_check: str = ""
     last_update: str = ""
     update_available: bool = False
+    #: True when the auto-updater's last check is too old to trust; up_to_date is
+    #: then false, since nothing confirms the running image is still the latest.
+    update_check_stale: bool = False
     up_to_date: bool = False

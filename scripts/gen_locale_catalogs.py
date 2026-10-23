@@ -94,6 +94,8 @@ from backend.log_messages import (
     LOG_DATA_AGENT_PROCESSING_REGION,
     LOG_DATA_AGENT_REGION_ERROR,
     LOG_VISION_AGENT_REGION_ERROR,
+    LOG_VISION_AGENT_REGION_RECOVERED,
+    LOG_VISION_AGENT_REGION_RETRY,
     LOG_VISION_AGENT_SENDING_REGION,
     LOG_CLEANUP_ITEM_FAILED,
     LOG_CLEANUP_OUTPUT_FAILED,
@@ -835,6 +837,8 @@ MESSAGES: tuple[str, ...] = (
     LOG_DATA_AGENT_PROCESSING_REGION,
     LOG_DATA_AGENT_REGION_ERROR,
     LOG_VISION_AGENT_REGION_ERROR,
+    LOG_VISION_AGENT_REGION_RECOVERED,
+    LOG_VISION_AGENT_REGION_RETRY,
     LOG_VISION_AGENT_SENDING_REGION,
     LOG_CACHE_HIT,
     LOG_CACHE_DEBUG_HIT,
@@ -1649,6 +1653,14 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         ),
         LOG_VISION_AGENT_REGION_ERROR: (
             "[página {page_num}] Erro na região {type}: {error} | Traceback:\n{tb}"
+        ),
+        LOG_VISION_AGENT_REGION_RETRY: (
+            "[página {page_num}] Resposta inutilizável do modelo de visão para a região {type}; "
+            "tentando de novo ({attempt}/{attempts}): {error}"
+        ),
+        LOG_VISION_AGENT_REGION_RECOVERED: (
+            "[página {page_num}] O modelo de visão respondeu a região {type} na "
+            "tentativa {attempt}/{attempts}"
         ),
         LOG_CACHE_HIT: "Cache: item existente para {name}",
         LOG_CACHE_DEBUG_HIT: "Cache: item existente: {key}",

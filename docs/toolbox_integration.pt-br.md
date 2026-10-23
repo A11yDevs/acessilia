@@ -360,6 +360,8 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 | `TOOLBOX_TABLE_PROVIDER` | `qwen3-vl-8b` | Regeração de tabelas para o especialista de tabelas (`table.recognize`) |
 | `TOOLBOX_ORIENTATION_PROVIDER` | `rapidocr-orient` | Detecção de rotação (`image.page.orient`) |
 | `FUSION_HYBRID_PROVIDER` | `mineru-hyb` | Id do provider MinerU hybrid-VLM (a fonte B da melhor submissão dentro do método do artigo) |
+| `FUSION_JUDGE_MAX_PAGES` | `5` | Páginas por documento que o juiz VLM pode verificar em `FUSION_MODE=dual`: só as que o roteador determinístico não decide (os dois providers acharam tabela ou fórmula) e que divergem, das menos similares para as mais. O veredito é registrado, não aplicado; uma discordância é um aviso técnico. `0` desliga o juiz |
+| `FUSION_APPLY_PAGE_ROUTES` | `true` | Em `FUSION_MODE=dual`, usa a página do provider secundário onde o roteador determinístico a prefere (tabelas, fórmulas, página primária quase vazia); o texto corrido fica com `TOOLBOX_PROVIDER`. `false` mantém todas as páginas do provider primário |
 
 > `TOOLBOX_USE_ARTIFACT_STORE` e `TOOLBOX_USE_REMOTE_CACHE` afetam diretamente o
 > fluxo de extração: com o artifact store ativo, o core envia o arquivo uma vez e
