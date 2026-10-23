@@ -118,7 +118,7 @@ Os modelos pesados rodam num serviço separado, a [Acessilia Toolbox](https://gi
 3. O arquivo é salvo e colocado na `ProcessingQueue`.
 4. O worker retira a tarefa da fila; `backend/service.py::process` a registra no `StateManager` e consulta o cache de processamento.
 5. Se não houver cache, executa o orquestrador PDDL (`PddlAccessibilityOrchestrator.executar()`):
-    - Extrai o manifesto de processamento pela Toolbox (`document.structure.extract`) e inspeciona a mídia de origem (`media.inspect`).
+    - Inspeciona a mídia de origem (`media.inspect`) e extrai o manifesto de processamento pela Toolbox (`document.structure.extract`); uma apresentação é extraída sem fusão dual e estruturada slide a slide.
     - Enriquece imagens e tabelas, monta e valida um plano PDDL para as obrigações do manifesto e o executa, replanejando quando um método falha.
     - Constrói o documento canônico a partir do manifesto executado.
 6. Os validadores canônicos verificam a adesão ao esquema, a hierarquia de títulos e a segurança da saída.

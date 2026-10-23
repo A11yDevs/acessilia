@@ -238,6 +238,11 @@ class Settings:
     pdf_ua_audit_max_rules: int = field(
         default_factory=lambda: int(os.getenv("PDF_UA_AUDIT_MAX_RULES", "10"))
     )
+    # Share of a slide its pictures must cover for a presentation slide to be
+    # described by the vision model as one image instead of read as text.
+    slide_visual_coverage: float = field(
+        default_factory=lambda: float(os.getenv("SLIDE_VISUAL_COVERAGE", "0.5"))
+    )
     toolbox_docx_provider: str = field(
         default_factory=lambda: os.getenv(
             "TOOLBOX_DOCX_PROVIDER", provider_default("toolbox_docx_provider")
@@ -417,6 +422,11 @@ class Settings:
         if self.pdf_ua_audit_max_rules < 0:
             raise ValueError(
                 f"PDF_UA_AUDIT_MAX_RULES must be zero or positive, got {self.pdf_ua_audit_max_rules}"
+            )
+        if not 0 < self.slide_visual_coverage <= 1:
+            raise ValueError(
+                "SLIDE_VISUAL_COVERAGE must be greater than 0 and at most 1, "
+                f"got {self.slide_visual_coverage}"
             )
         self.temp_dir.mkdir(parents=True, exist_ok=True)
         self.data_dir.mkdir(parents=True, exist_ok=True)

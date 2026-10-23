@@ -136,10 +136,6 @@ def test_local_fallback_is_gone() -> None:
     assert not hasattr(media_inspect, "MEDIA_TYPE_BY_FORMAT")
 
 
-def _manifest() -> SimpleNamespace:
-    return SimpleNamespace(extractor=SimpleNamespace(configuration={}))
-
-
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("returned", "enabled_setting", "status"),
@@ -162,12 +158,10 @@ async def test_orchestrator_records_the_inspection_status(
     monkeypatch.setattr(
         settings_module.settings, "toolbox_media_inspect_enabled", enabled_setting
     )
-    manifest = _manifest()
-
-    result = await pddl._inspect_media_or_degrade(manifest, IMAGE)
+    result, configuration = await pddl._inspect_media(IMAGE)
 
     assert result == returned
-    assert manifest.extractor.configuration == {"media_inspection": status}
+    assert configuration == {"media_inspection": status}
 
 
 @pytest.mark.asyncio
@@ -191,12 +185,10 @@ async def test_orchestrator_degrades_and_records_the_cause_on_failure(
         raise ValueError("bad config")
 
     monkeypatch.setattr(pddl, "inspect_source_media", fail)
-    manifest = _manifest()
-
-    result = await pddl._inspect_media_or_degrade(manifest, IMAGE)
+    result, configuration = await pddl._inspect_media(IMAGE)
 
     assert result is None
-    assert manifest.extractor.configuration == {
+    assert configuration == {
         "media_inspection": "failed",
         "media_inspection_error": cause,
     }
@@ -214,7 +206,7 @@ async def test_orchestrator_does_not_swallow_cancellation(monkeypatch) -> None:
     monkeypatch.setattr(pddl, "inspect_source_media", cancelled)
 
     with pytest.raises(asyncio.CancelledError):
-        await pddl._inspect_media_or_degrade(_manifest(), IMAGE)
+        await pddl._inspect_media(IMAGE)
 
 
 @pytest.mark.parametrize(
@@ -249,6 +241,8 @@ def test_payload_records_the_status_and_skips_the_cache_on_failure(
         else {
             "status": status,
             "error": "ToolboxError: down" if status == "failed" else None,
+            "document_genre": None,
+            "genre_signals": [],
         }
     )
     assert payload["canonical_metadata"]["pddl_media_inspection"] == expected

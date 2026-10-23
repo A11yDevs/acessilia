@@ -302,9 +302,22 @@ The `media.inspect` capability (provider `pure-media-inspect`, PR
   `TOOLBOX_MEDIA_INSPECT_ENABLED=false` it returns `None` without calling the
   Toolbox, and a Toolbox failure raises `ToolboxError`.
 - **Integration:** `backend/agents/pddl_orchestrator.py` calls
-  `inspect_source_media()` after extraction and uses the `requires_visual_inspection`
-  signal to inject a full-page `picture` element when the input is a standalone image
-  with no visual blocks — ensuring the VisionAgent audiodescribes it.
+  `inspect_source_media()` **before** extraction and uses two signals:
+  - `document_genre` (`pure-media-inspect` 1.1.0+): a PDF reported as a
+    `presentation` is extracted by the configured provider alone (no
+    dual-provider fusion) and structured slide by slide
+    (`backend/core/manifest/slides.py`): one H1 for the deck, an H2
+    "Slide N of T: <title>" (or "Slide N of T") per slide, reading order kept
+    within each slide. A slide whose pictures cover at least
+    `SLIDE_VISUAL_COVERAGE` (0.5) of it (their union, a full-page background
+    left out) and whose text lies on those pictures (text beside them covers at
+    most 5% of the slide) becomes one picture of the whole slide, described with
+    the page prompt instead of read as text; the replaced text is kept in
+    `metadata.replaced_text`. A slide nothing was extracted from becomes one too.
+    A Toolbox without the field, or a failed inspection, means a document.
+  - `requires_visual_inspection`, to inject a full-page `picture` element when the
+    input is a standalone image with no visual blocks — ensuring the VisionAgent
+    audiodescribes it.
 
   The signal only feeds this heuristic, so a failure of the step (any
   exception, not only `ToolboxError`) does not fail the job: the run continues
@@ -312,7 +325,8 @@ The `media.inspect` capability (provider `pure-media-inspect`, PR
   `manifest.extractor.configuration` (`media_inspection`: `toolbox`, `disabled`,
   `source_missing` or `failed`, plus `media_inspection_error` with the cause).
   The status and the cause also reach the document as
-  `canonical_metadata.pddl_media_inspection` (`{"status": ..., "error": ...}`).
+  `canonical_metadata.pddl_media_inspection` (`{"status": ..., "error": ...,
+  "document_genre": ..., "genre_signals": [...]}`).
 
   A run degraded by a failure is **not cached** (the payload carries
   `cacheable: false`): otherwise a transient Toolbox outage would replay a
@@ -344,6 +358,7 @@ Defined in `backend/config/settings.py` and documented in `.env.example`:
 | `TOOLBOX_USE_REMOTE_CACHE` | `true` | Use the remote cache (`no_cache=false`) |
 | `TOOLBOX_MEDIA_INSPECT_PROVIDER` | `pure-media-inspect` | Provider for the `media.inspect` capability |
 | `TOOLBOX_MEDIA_INSPECT_ENABLED` | `true` | Run `media.inspect` on the Toolbox or skip it. There is no local fallback: when `false`, the step is skipped; a Toolbox failure is logged and recorded in the manifest, the run continues without the standalone-image signal, and the degraded result is not cached |
+| `SLIDE_VISUAL_COVERAGE` | `0.5` | Share of a slide its pictures must cover for a presentation slide (`document_genre=presentation`) to be described as one image instead of read as text |
 | `TOOLBOX_PDF_UA_PROVIDER` | `pandoc-pdf-ua` | Provider for the `document.export.pdf_ua` capability |
 | `TOOLBOX_PDF_UA_ENABLED` | `true` | Render PDF/UA on the Toolbox (pinned Pandoc + TeX Live) or skip it. There is no local fallback: when `false`, the worker skips the format without an error; a Toolbox failure is reported as an optional export error |
 | `TOOLBOX_PDF_UA_TIMEOUT_SECONDS` | `300` | How long to wait for the Toolbox render before the export is reported as an optional error |

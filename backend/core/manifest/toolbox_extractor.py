@@ -73,22 +73,27 @@ class ToolboxManifestExtractor:
             else settings.toolbox_use_remote_cache
         )
 
-    def extract(self, source_path: Path) -> ToolboxExtraction:
+    def extract(self, source_path: Path, *, dual_fusion: bool = True) -> ToolboxExtraction:
         """Extrai a estrutura de um documento usando a Toolbox (síncrono).
 
         Executa chamadas HTTP assíncronas via asyncio.run() em thread separada,
         compatível com o fluxo existente que chama extract() dentro de
-        asyncio.to_thread().
+        asyncio.to_thread(). With ``dual_fusion=False`` the secondary provider
+        is not called even in FUSION_MODE=dual (a presentation).
         """
-        return asyncio.run(self._extract_async(source_path))
+        return asyncio.run(self._extract_async(source_path, dual_fusion=dual_fusion))
 
-    async def _extract_async(self, source_path: Path) -> ToolboxExtraction:
+    async def _extract_async(
+        self, source_path: Path, *, dual_fusion: bool = True
+    ) -> ToolboxExtraction:
         structure = self._client or make_toolbox_client(ToolboxStructureClient)
         artifacts = self._artifact_client
         if artifacts is None and self.use_artifact_store:
             artifacts = make_toolbox_client(ToolboxArtifactClient)
         try:
-            return await self._extract_with(structure, artifacts, source_path)
+            return await self._extract_with(
+                structure, artifacts, source_path, dual_fusion=dual_fusion
+            )
         finally:
             if self._client is None:
                 await structure.close()
@@ -100,6 +105,8 @@ class ToolboxManifestExtractor:
         structure: ToolboxStructureClient,
         artifacts: ToolboxArtifactClient | None,
         source_path: Path,
+        *,
+        dual_fusion: bool = True,
     ) -> ToolboxExtraction:
         source_path = source_path.resolve()
         if not source_path.is_file():
@@ -124,7 +131,7 @@ class ToolboxManifestExtractor:
             result.get("provenance", {}).get("duration_ms", "?"),
             result.get("provider", "?"),
         )
-        if settings.fusion_mode == "dual":
+        if settings.fusion_mode == "dual" and dual_fusion:
             secondary_provider = settings.fusion_secondary_provider
             if secondary_provider == structure.provider:
                 logger.warning(

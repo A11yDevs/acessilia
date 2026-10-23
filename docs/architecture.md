@@ -118,7 +118,7 @@ The heavy models run in a separate service, the [Acessilia Toolbox](https://gith
 3. The file is saved and enqueued in `ProcessingQueue`.
 4. The worker dequeues the task; `backend/service.py::process` registers it in `StateManager` and checks the processing cache.
 5. On a cache miss, it runs the PDDL orchestrator (`PddlAccessibilityOrchestrator.executar()`):
-   - Extracts the processing manifest through the Toolbox (`document.structure.extract`), and inspects the source media (`media.inspect`).
+   - Inspects the source media (`media.inspect`) and extracts the processing manifest through the Toolbox (`document.structure.extract`); a slide deck is extracted without dual-provider fusion and structured slide by slide.
    - Enriches pictures and tables, builds and validates a PDDL plan for the manifest's obligations, and executes it, replanning when a method fails.
    - Builds the canonical document from the executed manifest.
 6. Canonical validators verify schema adherence, heading hierarchy, and output safety.

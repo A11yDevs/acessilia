@@ -196,6 +196,8 @@ from backend.log_messages import (
     MSG_OBLIGATION_IMAGE,
     MSG_OBLIGATION_TABLE,
     MSG_OBLIGATION_UNKNOWN,
+    MSG_SLIDE_HEADING,
+    MSG_SLIDE_HEADING_WITH_TITLE,
     MSG_OBLIGATION_UNSTRUCTURED_PAGE,
     MSG_OBSERVATION_PAGE_WITHOUT_STRUCTURE,
     MSG_HEADING_GAP,
@@ -591,6 +593,8 @@ MESSAGES: tuple[str, ...] = (
     MSG_OBLIGATION_FORMULA,
     MSG_OBLIGATION_CODE,
     MSG_OBLIGATION_UNKNOWN,
+    MSG_SLIDE_HEADING,
+    MSG_SLIDE_HEADING_WITH_TITLE,
     MSG_OBLIGATION_UNSTRUCTURED_PAGE,
     MSG_OBSERVATION_PAGE_WITHOUT_STRUCTURE,
     MSG_HEADING_GAP,
@@ -1194,6 +1198,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "O bloco de código deve preservar indentação, linguagem e leitura literal."
         ),
         MSG_OBLIGATION_UNKNOWN: ("O elemento não classificado requer inspeção estrutural."),
+        MSG_SLIDE_HEADING: "Slide {number} de {total}",
+        MSG_SLIDE_HEADING_WITH_TITLE: "Slide {number} de {total}: {title}",
         MSG_OBLIGATION_UNSTRUCTURED_PAGE: (
             "A página deve ser inspecionada visualmente: descrita quando tiver conteúdo, "
             "ou aceita como em branco."

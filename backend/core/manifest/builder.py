@@ -28,6 +28,7 @@ from backend.core.manifest.models import (
     Observation,
     ProcessingManifest,
 )
+from backend.core.manifest.slides import DEFAULT_VISUAL_COVERAGE, structure_as_slides
 from docstruct.placeholders import (
     UNSTRUCTURED_PAGE_FLAG,
     UNSTRUCTURED_PAGE_LABEL,
@@ -175,12 +176,16 @@ def build_processing_manifest(
     *,
     language: str = "pt-BR",
     refine_reading_order: bool = False,
+    presentation: bool = False,
+    slide_visual_coverage: float = DEFAULT_VISUAL_COVERAGE,
 ) -> ProcessingManifest:
     """Builds the processing manifest from the Toolbox structural extraction.
 
     The Toolbox is the only extractor (docs/adr/0003): ``extraction.document``
     is its JSON response, whose elements already carry callouts, code text and
-    table structure. This core adds its own planning policy on top.
+    table structure. This core adds its own planning policy on top. A
+    ``presentation`` is structured slide by slide (``slides.structure_as_slides``)
+    before its processing needs are derived.
 
     Raises:
         TypeError: When the extraction is not a Toolbox JSON response.
@@ -198,6 +203,8 @@ def build_processing_manifest(
         digest=_sha256(source_path),
         language=language,
         refine_reading_order=refine_reading_order,
+        presentation=presentation,
+        slide_visual_coverage=slide_visual_coverage,
     )
 
 
@@ -208,6 +215,8 @@ def _build_from_toolbox_json(
     digest: str,
     language: str,
     refine_reading_order: bool = False,
+    presentation: bool = False,
+    slide_visual_coverage: float = DEFAULT_VISUAL_COVERAGE,
 ) -> ProcessingManifest:
     """Build a ProcessingManifest from a pre-built Toolbox JSON response.
 
@@ -266,6 +275,13 @@ def _build_from_toolbox_json(
                 by_page.setdefault(elem.page_number, []).append(elem.id)
         for page in manifest.pages:
             page.element_ids = by_page.get(page.page_number, [])
+    if presentation:
+        page_sizes = {page.page_number: (page.width, page.height) for page in manifest.pages}
+        structure_as_slides(
+            manifest,
+            visual_coverage=slide_visual_coverage,
+            page_fractions=lambda element: _normalized_element_bbox(element, page_sizes),
+        )
     observations, obligations = _derive_processing_needs(manifest.elements)
     v23_observations, v23_obligations = _derive_v23_processing_needs(
         manifest.elements,

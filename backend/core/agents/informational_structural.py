@@ -45,11 +45,22 @@ class InformationalStructuralAgent:
         source_path: Path,
         *,
         language: str = "pt-BR",
+        presentation: bool = False,
     ) -> ProcessingManifest:
-        extraction = self.extractor.extract(source_path)
+        """Extract ``source_path`` and build its manifest.
+
+        A ``presentation`` is extracted by the configured provider alone (no
+        dual-provider fusion, which compares running text across pages) and
+        structured slide by slide.
+        """
+        from backend.config.settings import settings
+
+        extraction = self.extractor.extract(source_path, dual_fusion=not presentation)
         return build_processing_manifest(
             source_path,
             extraction,
             language=language,
             refine_reading_order=True,
+            presentation=presentation,
+            slide_visual_coverage=settings.slide_visual_coverage,
         )
