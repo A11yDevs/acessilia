@@ -727,7 +727,7 @@ _auto_update_status() {
   echo ""
   echo "Health (${HEALTH_URL}):"
   curl -fsS --max-time 5 "$HEALTH_URL" 2>/dev/null \
-    | jq 'with_entries(select(.key | IN("status", "image_tag", "git_commit", "up_to_date", "update_available")))' 2>/dev/null \
+    | jq 'with_entries(select(.key | IN("status", "image_tag", "git_commit", "up_to_date", "update_available", "update_check_stale")))' 2>/dev/null \
     | sed 's/^/  /' || echo "  (unreachable)"
 
   echo ""
