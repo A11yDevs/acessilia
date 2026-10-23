@@ -314,7 +314,7 @@ def test_inspect_page_asks_for_the_page_inspection_schema(monkeypatch):
             )
 
     monkeypatch.setattr(vision_agent, "Agent", FakeAgent)
-    monkeypatch.setattr(vision_agent, "get_agno_model", lambda: None)
+    monkeypatch.setattr(vision_agent, "get_agno_model", lambda **_kwargs: None)
 
     output = asyncio.run(
         vision_agent.VisionAgent().inspect_page(image_bytes=PNG, page_num=2, total_pages=3)
@@ -345,7 +345,7 @@ def test_a_model_answer_of_content_without_description_is_refused(monkeypatch):
             )
 
     monkeypatch.setattr(vision_agent, "Agent", FakeAgent)
-    monkeypatch.setattr(vision_agent, "get_agno_model", lambda: None)
+    monkeypatch.setattr(vision_agent, "get_agno_model", lambda **_kwargs: None)
 
     from pydantic import ValidationError
 

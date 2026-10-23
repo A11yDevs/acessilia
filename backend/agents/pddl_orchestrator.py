@@ -302,10 +302,10 @@ def _handle_vision_description_method(
     """Require every picture target to already carry a description.
 
     The description itself is produced before planning (`_enrich_picture_descriptions`
-    tries the vision model and falls back to a deterministic description), so this
-    method validates that the work the planner is asking for actually happened
-    instead of pretending to perform it. A picture that is still undescribed is a
-    real failure and keeps the next admissible method available.
+    asks the vision model), so this method validates that the work the planner is
+    asking for actually happened instead of pretending to perform it. A picture
+    that is still undescribed is a real failure and keeps the next admissible
+    method available; `describe-image` is non-critical, so it does not fail the job.
     """
     elements = [
         el
@@ -3122,6 +3122,11 @@ NON_CRITICAL_OBLIGATION_KINDS = frozenset(
         # is delivered and the result e-mail names the pages of the omitted
         # block. Remove the kind from here once the handler lands (#236).
         "rescue-omitted-block",
+        # The vision model is the only automatic method, and a degenerate
+        # answer repeats on every try: in 006.pdf two images out of 40 failed
+        # a 42-page document. The picture is exported with the generic alt
+        # text and the result e-mail names its page.
+        "describe-image",
     }
 )
 

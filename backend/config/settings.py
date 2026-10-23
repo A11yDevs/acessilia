@@ -75,6 +75,9 @@ class Settings:
     data_agent_max_tokens: int = field(
         default_factory=lambda: int(os.getenv("DATA_AGENT_MAX_TOKENS", "8192"))
     )
+    vision_region_max_tokens: int = field(
+        default_factory=lambda: int(os.getenv("VISION_REGION_MAX_TOKENS", "1500"))
+    )
     openrouter_base_url: str = field(
         default_factory=lambda: os.getenv(
             "OPENROUTER_BASE_URL",

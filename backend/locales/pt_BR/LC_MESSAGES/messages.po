@@ -1638,6 +1638,14 @@ msgstr ""
 "região {type}; tentando de novo ({attempt}/{attempts}): {error}"
 
 #, python-brace-format
+msgid ""
+"[page {page_num}] Vision answer for region {type} was cut off by "
+"max_tokens; description recovered ({chars} characters)"
+msgstr ""
+"[página {page_num}] Resposta do modelo de visão para a região {type} "
+"cortada pelo limite de tokens; descrição recuperada ({chars} caracteres)"
+
+#, python-brace-format
 msgid "[page {page_num}] Sending region to vision ({size} bytes, type={type})"
 msgstr "[página {page_num}] Enviando região para visão ({size} bytes, tipo={type})"
 

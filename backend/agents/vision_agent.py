@@ -2,14 +2,19 @@
 
 import asyncio
 import functools
+import json
+import re
 
+from docstruct.fusion.repetition import collapse
 from pydantic import ValidationError
 
+from backend.config.settings import settings
 from backend.i18n import t
 from backend.log_messages import (
     LOG_VISION_AGENT_REGION_ERROR,
     LOG_VISION_AGENT_REGION_RECOVERED,
     LOG_VISION_AGENT_REGION_RETRY,
+    LOG_VISION_AGENT_REGION_SALVAGED,
     LOG_VISION_AGENT_SENDING_REGION,
 )
 from backend.tools.region_classifier import region_prompt_key
@@ -30,9 +35,11 @@ from agno.media import Image
 
 #: Tries per region or page. Sampled models sometimes fall into a repetition
 #: loop (the same LaTeX token over and over in a formula) until max_tokens cuts
-#: the JSON off, and an image left undescribed fails the whole document
-#: (``describe-image`` and ``inspect-unstructured-pages`` are critical, and
-#: ``describe-image`` has no other vision method to fall back to).
+#: the JSON off. An image left undescribed is exported with a generic alt text
+#: (``describe-image`` is non-critical); an unstructured page left uninspected
+#: still fails the document (``inspect-unstructured-pages`` is critical).
+#: When every try is cut off, ``_salvage_truncated_description`` recovers the
+#: description from the last one if it got that far.
 #:
 #: Only an answer that fails schema validation is retried; timeouts, provider
 #: errors and incomplete runs fail at once, since repeating them without
@@ -106,12 +113,32 @@ class VisionAgent:
             prompt = region_prompt if region_prompt else self.system_prompt
 
         prompt = f"{prompt}\n\n{VISION_SCHEMA_INSTRUCTION}"
+        # A whole page may need the general budget to be transcribed; a region
+        # gets the smaller one, which also bounds what a degenerate try costs.
+        max_tokens = (
+            None if classification.startswith("full_page") else settings.vision_region_max_tokens
+        )
 
         try:
             return await _run_with_retry(
-                prompt, image_bytes, VisionOutput, page_num=page_num, label=classification
+                prompt, image_bytes, VisionOutput, page_num=page_num, label=classification,
+                max_tokens=max_tokens,
             )
         except Exception as error:
+            salvaged = (
+                _salvage_truncated_description(error)
+                if isinstance(error, ValidationError)
+                else None
+            )
+            if salvaged is not None:
+                logger.warning(
+                    t(LOG_VISION_AGENT_REGION_SALVAGED).format(
+                        page_num=page_num,
+                        type=classification,
+                        chars=len(salvaged.description),
+                    )
+                )
+                return salvaged
             import traceback
             tb = traceback.format_exc()
             logger.critical(
@@ -152,6 +179,7 @@ async def _run_with_retry(
     *,
     page_num: int,
     label: str,
+    max_tokens: int | None = None,
 ) -> OutputModel:
     """Ask the vision model for ``schema``, retrying an answer that fails validation.
 
@@ -169,7 +197,7 @@ async def _run_with_retry(
         )
         agent = Agent(
             name="VisionAgent",
-            model=get_agno_model(),
+            model=get_agno_model(max_tokens=max_tokens),
             output_schema=schema,
             telemetry=False,
         )
@@ -203,6 +231,78 @@ async def _run_with_retry(
             )
         return output
     raise AssertionError("REGION_ATTEMPTS must be at least 1")
+
+
+#: Shortest salvaged description kept; a shorter prefix is a fragment, not an
+#: accessible description.
+SALVAGE_MIN_CHARS = 40
+
+#: Recorded in the salvaged answer's warnings, so the evidence says the
+#: description is a recovered prefix and not what the model meant to send.
+SALVAGE_WARNING = "description recovered from an answer cut off by max_tokens"
+
+
+def _salvage_truncated_description(error: ValidationError) -> VisionOutput | None:
+    """The description of an answer that every try left as invalid JSON.
+
+    A degenerate answer loops until max_tokens cuts the JSON off, and a retry
+    with the same image usually loops again. The loop is often in a later
+    field: in 006.pdf, page 23 (a periodic table), the description was whole
+    and ``mentioned_elements`` listed element names until the cut. The
+    description is kept with its repetition collapsed, its confidence set to 0
+    and a warning. Only a ``description`` is salvaged: a cut formula is wrong
+    LaTeX, not a shorter one.
+    """
+    raw = next(
+        (item["input"] for item in error.errors() if isinstance(item.get("input"), str)),
+        None,
+    )
+    if raw is None or not re.search(r'"kind"\s*:\s*"description"', raw):
+        return None
+    start = re.search(r'"description"\s*:\s*"', raw)
+    if start is None:
+        return None
+    try:
+        text, closed = _json_string_prefix(raw[start.end():])
+    except ValueError:
+        return None
+    text, _ = collapse(text, [], reps=5, max_n=12)
+    if not closed:
+        # Cut mid-sentence: keep the sentences that ended.
+        end = max(text.rfind(mark) for mark in (". ", ".\n", "! ", "? "))
+        text = text[: end + 1] if end > 0 else text
+    text = text.strip()
+    if len(text) < SALVAGE_MIN_CHARS:
+        return None
+    language = re.search(r'"language"\s*:\s*"([A-Za-z]{2,3}(?:-[A-Za-z0-9]{1,8})*)"', raw)
+    return VisionOutput(
+        kind="description",
+        description=text,
+        language=language.group(1) if language else "und",
+        confidence=0.0,
+        warnings=[SALVAGE_WARNING],
+    )
+
+
+def _json_string_prefix(rest: str) -> tuple[str, bool]:
+    """Decode the JSON string that ``rest`` starts inside of, up to its end or the cut.
+
+    Returns the text and whether the string was closed. An escape the cut left
+    incomplete is dropped. Raises ``ValueError`` for an invalid escape.
+    """
+    index = 0
+    while index < len(rest):
+        char = rest[index]
+        if char == '"':
+            return json.loads(f'"{rest[:index]}"', strict=False), True
+        if char == "\\":
+            width = 6 if rest[index + 1 : index + 2] == "u" else 2
+            if index + width > len(rest):
+                break
+            index += width
+            continue
+        index += 1
+    return json.loads(f'"{rest[:index]}"', strict=False), False
 
 
 def _short_error(error: ValidationError, limit: int = 300) -> str:

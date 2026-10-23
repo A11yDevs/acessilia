@@ -340,6 +340,11 @@ LOG_VISION_AGENT_REGION_RETRY: str = (
 LOG_VISION_AGENT_REGION_RECOVERED: str = (
     "[page {page_num}] Vision model answered region {type} on try {attempt}/{attempts}"
 )
+#: Warning logged when every try of a region came back as invalid JSON and its description was recovered from the last one; {page_num} and {type} name the region, {chars} is the recovered length.
+LOG_VISION_AGENT_REGION_SALVAGED: str = (
+    "[page {page_num}] Vision answer for region {type} was cut off by max_tokens; "
+    "description recovered ({chars} characters)"
+)
 #: Debug logged by the exporters adapter wrapper just before a plain-text export runs; {path} is the output file path.
 LOG_EXPORT_TXT_START: str = "Exporting TXT to {path}"
 #: Debug logged by the exporters adapter wrapper just before a DOCX export runs; {path} is the output file path.

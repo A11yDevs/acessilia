@@ -64,12 +64,12 @@ def test_unusable_table_does_not_satisfy_obligation(ast):
 def failed_manifest(methods):
     return _manifest(
         [_element("paragraph", "paragraph", text="A document with content."),
-         _element("image", "picture")],
-        [_obligation("describe-image", ["image"], methods)],
+         _element("table", "table")],
+        [_obligation("linearize-table", ["table"], methods)],
     )
 
 
-@pytest.mark.parametrize("methods", [["human-review"], ["vision-description", "human-review"]])
+@pytest.mark.parametrize("methods", [["human-review"], ["pandoc-table", "human-review"]])
 def test_diagnostic_payload_warns_about_failed_or_pending_execution(tmp_path, methods):
     manifest = failed_manifest(methods)
     manifest.obligations[0].method_costs = {method: i + 1 for i, method in enumerate(methods)}
@@ -82,11 +82,11 @@ def test_diagnostic_payload_warns_about_failed_or_pending_execution(tmp_path, me
         planner_backend="internal", execution_report=report, comparison=None,
     )
     assert payload["technical_warnings"]
-    assert "describe-image" in payload["technical_warnings"][0]
+    assert "linearize-table" in payload["technical_warnings"][0]
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("methods", [["human-review"], ["vision-description", "human-review"]])
+@pytest.mark.parametrize("methods", [["human-review"], ["pandoc-table", "human-review"]])
 async def test_orchestration_rejects_failed_or_exhausted_plan(monkeypatch, tmp_path, methods):
     manifest = failed_manifest(methods)
     manifest.obligations[0].method_costs = {method: i + 1 for i, method in enumerate(methods)}
@@ -99,7 +99,7 @@ async def test_orchestration_rejects_failed_or_exhausted_plan(monkeypatch, tmp_p
     monkeypatch.setattr(pddl, "inspect_source_media", noop)
     monkeypatch.setattr(pddl, "_enrich_picture_descriptions", noop)
     monkeypatch.setattr(pddl, "_enrich_table_structures", noop)
-    with pytest.raises(RuntimeError, match="describe-image"):
+    with pytest.raises(RuntimeError, match="linearize-table"):
         await orchestrator.executar(tmp_path / "doc.pdf", tmp_path, structured_output=True)
 
 
@@ -137,7 +137,7 @@ async def test_failed_plan_marks_api_job_error_without_caching_or_download(
         await executor.run(worker.ApiJob("failed-plan", source, "doc.pdf"))
         status = manager.obter("failed-plan")
         assert status["status"] == "error"
-        assert any("describe-image" in error for error in status["erros"])
+        assert any("linearize-table" in error for error in status["erros"])
         assert not status.get("download_url")
         assert job_store.load_record("failed-plan")["status"]["status"] == "error"
         assert not source.exists()

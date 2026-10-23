@@ -1624,6 +1624,14 @@ msgstr ""
 "{type}; trying again ({attempt}/{attempts}): {error}"
 
 #, python-brace-format
+msgid ""
+"[page {page_num}] Vision answer for region {type} was cut off by "
+"max_tokens; description recovered ({chars} characters)"
+msgstr ""
+"[page {page_num}] Vision answer for region {type} was cut off by "
+"max_tokens; description recovered ({chars} characters)"
+
+#, python-brace-format
 msgid "[page {page_num}] Sending region to vision ({size} bytes, type={type})"
 msgstr "[page {page_num}] Sending region to vision ({size} bytes, type={type})"
 

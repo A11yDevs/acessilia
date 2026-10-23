@@ -338,7 +338,7 @@ async def test_vision_agent_requests_and_returns_its_output_schema(monkeypatch) 
         return function(*args)
 
     monkeypatch.setattr(vision_module, "Agent", FakeAgent)
-    monkeypatch.setattr(vision_module, "get_agno_model", lambda: object())
+    monkeypatch.setattr(vision_module, "get_agno_model", lambda **_kwargs: object())
     monkeypatch.setattr(vision_module.asyncio, "to_thread", run_inline)
 
     result = await vision_module.VisionAgent().describe_region(
@@ -375,7 +375,7 @@ def _scripted_vision_agent(monkeypatch, answers: list[object]):
         return function(*args)
 
     monkeypatch.setattr(vision_module, "Agent", FakeAgent)
-    monkeypatch.setattr(vision_module, "get_agno_model", lambda: object())
+    monkeypatch.setattr(vision_module, "get_agno_model", lambda **_kwargs: object())
     monkeypatch.setattr(vision_module.asyncio, "to_thread", run_inline)
     return vision_module, calls
 
@@ -467,6 +467,88 @@ async def test_vision_agent_does_not_retry_a_provider_failure(monkeypatch) -> No
 
     assert result is None
     assert len(calls) == 1
+
+
+#: 006.pdf, page 23 (a periodic table): the description was whole and
+#: mentioned_elements listed element names until max_tokens cut the JSON off.
+TRUNCATED_IN_A_LATER_FIELD = (
+    '{\n  "kind": "description",\n'
+    '  "description": "The image shows the Periodic Table of the Elements on a '
+    'blue background, arranged in groups and periods.",\n'
+    '  "language": "en",\n  "confidence": 0.9,\n  "mentioned_elements": [\n'
+    + "".join(f'    "Ununennium {index}",\n' for index in range(300))
+    + '    "Ununen'
+)
+
+#: The description itself loops ("Ununennium" over and over) and is cut mid-word.
+TRUNCATED_IN_THE_DESCRIPTION = (
+    '{\n  "kind": "description",\n'
+    '  "description": "The Periodic Table of the Elements on a blue background. '
+    'The elements are: '
+    + "Ununennium, " * 300
+    + 'Unun'
+)
+
+
+@pytest.mark.asyncio
+async def test_a_description_cut_off_in_a_later_field_is_salvaged(monkeypatch) -> None:
+    from backend.agents.vision_agent import REGION_ATTEMPTS, SALVAGE_WARNING
+
+    vision_module, calls = _scripted_vision_agent(
+        monkeypatch, [TRUNCATED_IN_A_LATER_FIELD] * REGION_ATTEMPTS
+    )
+
+    result = await vision_module.VisionAgent().describe_region(
+        b"image", "embedded_image", page_num=23
+    )
+
+    assert isinstance(result, VisionOutput)
+    assert result.kind == "description"
+    assert result.description == (
+        "The image shows the Periodic Table of the Elements on a blue background, "
+        "arranged in groups and periods."
+    )
+    assert result.language == "en"
+    # Recovered, not what the model meant to send: the evidence says so.
+    assert result.confidence == 0.0
+    assert result.warnings == [SALVAGE_WARNING]
+    assert len(calls) == REGION_ATTEMPTS
+
+
+@pytest.mark.asyncio
+async def test_a_looping_description_is_salvaged_without_the_loop(monkeypatch) -> None:
+    from backend.agents.vision_agent import REGION_ATTEMPTS
+
+    vision_module, _ = _scripted_vision_agent(
+        monkeypatch, [TRUNCATED_IN_THE_DESCRIPTION] * REGION_ATTEMPTS
+    )
+
+    result = await vision_module.VisionAgent().describe_region(
+        b"image", "embedded_image", page_num=23
+    )
+
+    assert isinstance(result, VisionOutput)
+    # The repetition collapses and the cut sentence is dropped.
+    assert result.description == "The Periodic Table of the Elements on a blue background."
+    assert result.language == "und"
+
+
+@pytest.mark.asyncio
+async def test_a_region_gets_its_own_token_budget(monkeypatch) -> None:
+    from backend.config.settings import settings
+
+    vision_module, _ = _scripted_vision_agent(monkeypatch, [VALID_FORMULA])
+    budgets: list = []
+    monkeypatch.setattr(
+        vision_module,
+        "get_agno_model",
+        lambda **kwargs: budgets.append(kwargs.get("max_tokens")),
+    )
+    monkeypatch.setattr(settings, "vision_region_max_tokens", 1234)
+
+    await vision_module.VisionAgent().describe_region(b"image", "embedded_image")
+
+    assert budgets == [1234]
 
 
 @pytest.mark.asyncio
