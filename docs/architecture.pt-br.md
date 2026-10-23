@@ -82,7 +82,7 @@ O domínio PDDL vive em `backend/core/planning/domains/`. Os esquemas JSON (mani
 - [backend/pipeline/validators.py](../backend/pipeline/validators.py): valida esquema, hierarquia de títulos, links e texto de saída; `audit_canonical_document` classifica problemas estruturais e de acessibilidade como `BLOCKER` ou `WARNING`.
 - [backend/export/pandoc_exporter.py](../backend/export/pandoc_exporter.py): coordenador único de exportação para validação, filtragem, criação do AST e despacho de renderizador; atua como guardiã determinística que interrompe a exportação quando a auditoria retorna qualquer `BLOCKER`.
 - [backend/export/renderers/](../backend/export/renderers/): renderizadores para TXT, DOCX, PDF e HTML.
-- [backend/export/exporters/](../backend/export/exporters/): os adaptadores de exportação chamados pelo worker, incluindo `audio_exporter.py`, que produz o MP3 via edge-tts, e `pdf_exporter.py`, que produz tanto o PDF comum quanto a variante PDF/UA.
+- [backend/export/exporters/](../backend/export/exporters/): os adaptadores de exportação chamados pelo worker, incluindo `audio_exporter.py`, que produz o MP3 via edge-tts, e `pdf_exporter.py`, que produz o PDF/UA, o único PDF. [backend/tools/pdf_ua_audit.py](../backend/tools/pdf_ua_audit.py) o audita com o veraPDF na Toolbox (`pdf.validate.pdf_ua`) para o e-mail de resultado.
 
 ---
 
@@ -142,7 +142,7 @@ O runtime AgentOS não faz parte de `ENABLED_INTERFACES`; ele é iniciado separa
 
 - **Framework Agno:** orquestração multiagente e interface unificada de LLM multimodal.
 - **Provedores de IA:** API Ollama (modelos locais como LLaVA/Qwen-VL) ou API OpenRouter (modelos em nuvem como Claude/GPT-4o).
-- **Bibliotecas de Processamento:** reportlab, edge-tts, aiogram, FastAPI.
+- **Bibliotecas de Processamento:** edge-tts, aiogram, FastAPI.
 - **Não restam executores locais** ([ADR-0003](adr/0003-remote-only-operational-capabilities.pt-br.md), [#150](https://github.com/A11yDevs/acessilia/issues/150)): o manifesto é extraído só pelo `ToolboxManifestExtractor`, e o PyMuPDF é uma dependência de desenvolvimento, usada pelos testes para gerar PDFs. O `tests/test_architecture_layers.py` falha se `backend/` ou `frontend/` importar uma biblioteca operacional (PyMuPDF, Pillow, OpenCV, Docling, pypdf, python-docx, RapidOCR). Pandoc, TeX Live, veraPDF e as bibliotecas de OCR e de mídia já saíram da imagem, porque o DOCX e o PDF/UA só são renderizados na Toolbox; o NumPy e o OpenCV saíram das dependências junto com os scripts de experimento do Dr.DocBench (tag `drbench-2026-snapshot`); o Pillow segue na imagem como requisito do reportlab.
 
 ---

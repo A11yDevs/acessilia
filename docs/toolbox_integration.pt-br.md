@@ -350,6 +350,10 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 | `TOOLBOX_PDF_UA_PROVIDER` | `pandoc-pdf-ua` | Provider da capacidade `document.export.pdf_ua` |
 | `TOOLBOX_PDF_UA_ENABLED` | `true` | Renderiza o PDF/UA na Toolbox (Pandoc + TeX Live fixados) ou pula a etapa. Não há fallback local: com `false`, o worker pula o formato sem erro; uma falha na Toolbox é reportada como erro de exportação opcional |
 | `TOOLBOX_PDF_UA_TIMEOUT_SECONDS` | `300` | Tempo máximo de espera pela renderização na Toolbox antes de reportar erro de exportação opcional |
+| `TOOLBOX_PDF_VALIDATE_PROVIDER` | `verapdf` | Provider da capacidade `pdf.validate.pdf_ua` |
+| `TOOLBOX_PDF_VALIDATE_ENABLED` | `true` | Audita o PDF/UA com o veraPDF (PDF/UA-1) na Toolbox. O e-mail de resultado resume as regras não atendidas e o relatório completo vai no pacote ZIP; com `false`, não há auditoria; uma falha na Toolbox não impede a entrega e o e-mail diz que a auditoria ficou indisponível |
+| `TOOLBOX_PDF_VALIDATE_TIMEOUT_SECONDS` | `330` | Tempo máximo de espera pela validação, acima do `timeout_hint_seconds` da capacidade (300) |
+| `PDF_UA_AUDIT_MAX_RULES` | `10` | Regras não atendidas listadas no e-mail; as demais ficam só no relatório do pacote |
 | `TOOLBOX_DOCX_PROVIDER` | `pandoc-docx` | Provider da capacidade `document.export.docx` |
 | `TOOLBOX_DOCX_ENABLED` | `true` | Renderiza o DOCX na Toolbox (Pandoc fixado) ou pula a etapa. Não há fallback local: com `false`, o worker pula o formato sem erro; uma falha da Toolbox é reportada como erro de exportação opcional |
 | `TOOLBOX_DOCX_TIMEOUT_SECONDS` | `300` | Tempo máximo de espera pela renderização na Toolbox antes de reportar erro de exportação opcional |

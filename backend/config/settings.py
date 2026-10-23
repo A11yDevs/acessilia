@@ -215,6 +215,29 @@ class Settings:
     toolbox_pdf_ua_timeout_seconds: int = field(
         default_factory=lambda: int(os.getenv("TOOLBOX_PDF_UA_TIMEOUT_SECONDS", "300"))
     )
+    toolbox_pdf_validate_provider: str = field(
+        default_factory=lambda: os.getenv(
+            "TOOLBOX_PDF_VALIDATE_PROVIDER",
+            provider_default("toolbox_pdf_validate_provider"),
+        )
+    )
+    # The PDF/UA is audited with veraPDF on the Toolbox (pdf.validate.pdf_ua)
+    # and the result e-mail summarizes it. When false, no audit is made.
+    toolbox_pdf_validate_enabled: bool = field(
+        default_factory=lambda: (
+            os.getenv("TOOLBOX_PDF_VALIDATE_ENABLED", "true").strip().lower()
+            in {"1", "true", "yes", "on", "sim"}
+        ),
+    )
+    # Above the capability's timeout_hint_seconds (300), like the exports.
+    toolbox_pdf_validate_timeout_seconds: int = field(
+        default_factory=lambda: int(os.getenv("TOOLBOX_PDF_VALIDATE_TIMEOUT_SECONDS", "330"))
+    )
+    # Failed rules the result e-mail lists; the rest are in the report packaged
+    # with the files.
+    pdf_ua_audit_max_rules: int = field(
+        default_factory=lambda: int(os.getenv("PDF_UA_AUDIT_MAX_RULES", "10"))
+    )
     toolbox_docx_provider: str = field(
         default_factory=lambda: os.getenv(
             "TOOLBOX_DOCX_PROVIDER", provider_default("toolbox_docx_provider")

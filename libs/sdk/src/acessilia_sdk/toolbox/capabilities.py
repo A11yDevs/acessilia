@@ -57,6 +57,7 @@ PROVIDER_DEFAULTS: dict[str, str] = {
     "toolbox_orientation_provider": "rapidocr-orient",
     "toolbox_media_inspect_provider": "pure-media-inspect",
     "toolbox_pdf_ua_provider": "pandoc-pdf-ua",
+    "toolbox_pdf_validate_provider": "verapdf",
     "toolbox_docx_provider": "pandoc-docx",
 }
 
@@ -118,6 +119,12 @@ _CAPABILITIES: tuple[ToolboxCapability, ...] = (
         "document.export.pdf_ua", 1, "Exportação PDF/UA",
         provider_key="toolbox_pdf_ua_provider",
         output_schema="pdf-export@1",
+    ),
+    # veraPDF; a non-compliant PDF is a successful result listing failed rules.
+    ToolboxCapability(
+        "pdf.validate.pdf_ua", 1, "PDF/UA validation",
+        provider_key="toolbox_pdf_validate_provider",
+        output_schema="pdf-validation-report@1",
     ),
     # The DOCX also comes back as a stored artifact.
     ToolboxCapability(

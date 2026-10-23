@@ -68,6 +68,12 @@ from backend.log_messages import (
     EMAIL_FAILURE_BODY,
     EMAIL_FAILURE_SUBJECT,
     EMAIL_RESULT_WARNINGS_HEADER,
+    EMAIL_RESULT_AUDIT_HEADER,
+    EMAIL_AUDIT_COMPLIANT,
+    EMAIL_AUDIT_NON_COMPLIANT,
+    EMAIL_AUDIT_RULE,
+    EMAIL_AUDIT_MORE_RULES,
+    EMAIL_AUDIT_UNAVAILABLE,
     LOG_AGNO_NOT_INSTALLED,
     LOG_API_ERROR,
     LOG_API_INTERFACE_ENABLED,
@@ -136,6 +142,9 @@ from backend.log_messages import (
     LOG_PDF_UA_GENERATION_FAILED,
     LOG_PDF_UA_EXPORTED,
     LOG_PDF_UA_SKIPPED_DISABLED,
+    LOG_PDF_UA_AUDIT_SKIPPED_DISABLED,
+    LOG_PDF_UA_AUDIT_FINISHED,
+    LOG_PDF_UA_AUDIT_FAILED,
     LOG_MEDIA_INSPECT_SKIPPED_DISABLED,
     LOG_MEDIA_INSPECT_TOOLBOX_FINISHED,
     LOG_MEDIA_INSPECT_FAILED,
@@ -273,6 +282,7 @@ from backend.stage_messages import (
     STAGE_EXPORTING_DOCX,
     STAGE_EXPORTING_HTML,
     STAGE_EXPORTING_PDF_UA,
+    STAGE_AUDITING_PDF_UA,
     STAGE_EXPORTING_TXT,
     STAGE_GENERATING_AUDIO,
     STAGE_GENERATING_PDDL_PLAN,
@@ -491,6 +501,7 @@ MESSAGES: tuple[str, ...] = (
     STAGE_EXPORTING_TXT,
     STAGE_EXPORTING_DOCX,
     STAGE_EXPORTING_PDF_UA,
+    STAGE_AUDITING_PDF_UA,
     STAGE_EXPORTING_HTML,
     STAGE_GENERATING_AUDIO,
     STAGE_PROCESSING_COMPLETED,
@@ -793,6 +804,9 @@ MESSAGES: tuple[str, ...] = (
     LOG_PDDL_SELECTED_CLOSURE_MISMATCH,
     LOG_PDF_UA_EXPORTED,
     LOG_PDF_UA_SKIPPED_DISABLED,
+    LOG_PDF_UA_AUDIT_SKIPPED_DISABLED,
+    LOG_PDF_UA_AUDIT_FINISHED,
+    LOG_PDF_UA_AUDIT_FAILED,
     LOG_MEDIA_INSPECT_SKIPPED_DISABLED,
     LOG_MEDIA_INSPECT_TOOLBOX_FINISHED,
     LOG_MEDIA_INSPECT_FAILED,
@@ -816,6 +830,12 @@ MESSAGES: tuple[str, ...] = (
     EMAIL_FORMAT_MP3,
     EMAIL_FORMAT_ZIP,
     EMAIL_RESULT_WARNINGS_HEADER,
+    EMAIL_RESULT_AUDIT_HEADER,
+    EMAIL_AUDIT_COMPLIANT,
+    EMAIL_AUDIT_NON_COMPLIANT,
+    EMAIL_AUDIT_RULE,
+    EMAIL_AUDIT_MORE_RULES,
+    EMAIL_AUDIT_UNAVAILABLE,
     LOG_CANONICAL_JSON_SAVE_FAILED,
     LOG_TASK_CANCELLED_BY_USER,
     LOG_PIPELINE_ERROR,
@@ -920,6 +940,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         STAGE_EXPORTING_TXT: ("Exportando a versão em texto puro (TXT)..."),
         STAGE_EXPORTING_DOCX: ("Exportando o documento Word acessível (DOCX)..."),
         STAGE_EXPORTING_PDF_UA: ("Exportando o PDF/UA acessível com marcações..."),
+        STAGE_AUDITING_PDF_UA: "Auditando o PDF/UA com o veraPDF...",
         STAGE_EXPORTING_HTML: ("Exportando a versão em HTML semântico..."),
         STAGE_GENERATING_AUDIO: (
             "Gerando a versão em áudio falado... {percent}%"
@@ -1555,6 +1576,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         LOG_PDF_UA_TOOLBOX_EXPORTED: "PDF/UA renderizado pela Toolbox: {output_path}",
         # Worker skips PDF/UA because the Toolbox capability is switched off.
         LOG_PDF_UA_SKIPPED_DISABLED: "PDF/UA ignorado: TOOLBOX_PDF_UA_ENABLED está desativado",
+        LOG_PDF_UA_AUDIT_SKIPPED_DISABLED: "Auditoria do PDF/UA ignorada: TOOLBOX_PDF_VALIDATE_ENABLED está desativado",
+        LOG_PDF_UA_AUDIT_FINISHED: "Auditoria do PDF/UA concluída (conforme={compliant}, regras não atendidas={rules})",
+        LOG_PDF_UA_AUDIT_FAILED: "Falha na auditoria do PDF/UA: {error}",
         # media.inspect skipped because the Toolbox capability is switched off.
         LOG_MEDIA_INSPECT_SKIPPED_DISABLED: "Inspeção de mídia ignorada: TOOLBOX_MEDIA_INSPECT_ENABLED está desativado",
         # Toolbox finished media.inspect; {nature} the artifact nature, {visual} whether it needs visual inspection.
@@ -1610,6 +1634,12 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         EMAIL_RESULT_WARNINGS_HEADER: (
             "Alguns formatos opcionais não foram gerados:"
         ),
+        EMAIL_RESULT_AUDIT_HEADER: "Auditoria de acessibilidade do PDF (veraPDF):",
+        EMAIL_AUDIT_COMPLIANT: "{profile}: conforme",
+        EMAIL_AUDIT_NON_COMPLIANT: "{profile}: {rules} regra(s) não atendida(s) ({checks} ocorrência(s))",
+        EMAIL_AUDIT_RULE: "{specification}, cláusula {clause} (teste {test}): {description} ({checks} ocorrência(s))",
+        EMAIL_AUDIT_MORE_RULES: "... e mais {count} regra(s), listadas no relatório do pacote ZIP",
+        EMAIL_AUDIT_UNAVAILABLE: "Auditoria indisponível: {error}",
         LOG_CANONICAL_JSON_SAVE_FAILED: (
             "Não foi possível salvar o JSON canônico: {error}"
         ),

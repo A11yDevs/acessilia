@@ -17,12 +17,14 @@ from backend.services.job_store import load_record, save_status, pending_records
 from backend.services.blocking import run_blocking
 from backend.i18n import t
 from backend.log_messages import (
+    EMAIL_AUDIT_UNAVAILABLE,
     LOG_DOCX_GENERATION_FAILED,
     LOG_DOCX_SKIPPED_DISABLED,
     LOG_JOB_CANCELLED,
     LOG_JOB_COMPLETED,
     LOG_JOB_EXECUTOR_ERROR,
     LOG_MP3_GENERATION_FAILED,
+    LOG_PDF_UA_AUDIT_FAILED,
     LOG_PDF_UA_GENERATION_FAILED,
     LOG_PDF_UA_SKIPPED_DISABLED,
 )
@@ -33,6 +35,7 @@ from backend.stage_messages import (
     STAGE_RESTART_RESUBMIT,
     STAGE_PENDING_UPLOAD_MISSING,
     STAGE_CANCELLED_IN_QUEUE,
+    STAGE_AUDITING_PDF_UA,
     STAGE_CANCELLED_BY_USER,
     STAGE_EXPORTING_DOCX,
     STAGE_EXPORTING_DRBENCH_MD,
@@ -51,6 +54,7 @@ from backend.export.exporters.txt_exporter import export_txt
 from backend.export.exporters.drbench_md_exporter import export_drbench_md
 from backend.export.pandoc_exporter import export_accessible_document
 from backend.services.download_token_service import criar_token
+from backend.tools.pdf_ua_audit import audit_pdf_ua, summarize_audit
 from backend.services.email_service import (
     send_confirmation_email,
     send_failure_email,
@@ -214,6 +218,30 @@ class JobExecutor:
         completed_formats.append(format_name)
         return path
 
+    async def _audit_pdf_ua(
+        self, task_id: str, pdf_path: Path, report_path: Path
+    ) -> tuple[list[str], Path | None]:
+        """veraPDF audit of the PDF/UA: the e-mail lines and the packaged report.
+
+        Like the optional exports, a failed audit does not fail the job: the
+        e-mail says it is unavailable, naming only the kind of failure, since
+        the full cause carries internal Toolbox endpoints and goes to the log.
+        """
+        state_manager.atualizar(task_id, etapa=t(STAGE_AUDITING_PDF_UA), progresso=0.94)
+        try:
+            report = await audit_pdf_ua(pdf_path)
+        except Exception as exc:
+            logger.warning(t(LOG_PDF_UA_AUDIT_FAILED).format(error=exc))
+            return [t(EMAIL_AUDIT_UNAVAILABLE).format(error=type(exc).__name__)], None
+        if report is None:
+            return [], None
+        await run_blocking(
+            report_path.write_text,
+            json.dumps(report, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        return summarize_audit(report, max_rules=settings.pdf_ua_audit_max_rules), report_path
+
     async def run(self, job: ApiJob) -> None:
         task_id = job.task_id
         started_at = time.time()
@@ -350,6 +378,14 @@ class JobExecutor:
             )
             state_manager.verificar_cancelamento(task_id)
 
+            audit_lines: list[str] = []
+            audit_path: Path | None = None
+            if isinstance(pdf_ua_path, Path):
+                audit_lines, audit_path = await self._audit_pdf_ua(
+                    task_id, pdf_ua_path, out_dir / f"{base}.pdf_ua.verapdf.json"
+                )
+                state_manager.verificar_cancelamento(task_id)
+
             mp3_path = out_dir / f"{base}.mp3"
             if txt_path.exists():
                 clean_text = txt_path.read_text(encoding="utf-8")
@@ -383,6 +419,8 @@ class JobExecutor:
                 package_paths.append(mp3_path)
             if isinstance(pdf_ua_path, Path):
                 package_paths.append(pdf_ua_path)
+            if isinstance(audit_path, Path):
+                package_paths.append(audit_path)
 
             await self._run_in_executor(
                 _build_zip_package,
@@ -424,6 +462,7 @@ class JobExecutor:
                         download_url=download_url,
                         completed_formats=completed_formats,
                         warnings=[*optional_errors, *_open_obligations_warning(canonical)],
+                        audit=audit_lines,
                     )
                 except Exception:
                     logger.warning("Result email delivery failed for job {}", task_id)

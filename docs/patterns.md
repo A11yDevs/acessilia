@@ -23,7 +23,7 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 - Benefit: clean separation of concerns and parallel execution (`asyncio.gather`).
 
 ### 4. Export Adapters & Renderers
-- Implementation: [backend/export/pandoc_exporter.py](../backend/export/pandoc_exporter.py) with renderers in `backend/export/renderers/` (TXT, PDF, HTML) and export adapters in `backend/export/exporters/` (MP3 via edge-tts; DOCX and the PDF/UA variant, rendered on the Toolbox).
+- Implementation: [backend/export/pandoc_exporter.py](../backend/export/pandoc_exporter.py) with renderers in `backend/export/renderers/` (TXT, HTML) and export adapters in `backend/export/exporters/` (MP3 via edge-tts; DOCX and PDF/UA, the only PDF, rendered on the Toolbox, which also audits the PDF/UA with veraPDF).
 - Benefit: identical canonical document produces multiple output formats cleanly.
 
 ### 5. In-Memory State Machine & Cooperative Cancellation

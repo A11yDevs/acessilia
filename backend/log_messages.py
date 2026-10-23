@@ -143,6 +143,18 @@ EMAIL_FORMAT_MP3: str = "Audio Description (MP3)"
 EMAIL_FORMAT_ZIP: str = "ZIP Package"
 #: Intro line of the optional warning block appended to the result email body when one or more optional export formats failed; has no placeholders.
 EMAIL_RESULT_WARNINGS_HEADER: str = "Some optional formats were not generated:"
+#: Header of the result email's section with the veraPDF audit of the PDF/UA.
+EMAIL_RESULT_AUDIT_HEADER: str = "Accessibility audit of the PDF (veraPDF):"
+#: Audit verdict line of a compliant PDF/UA; {profile} names the profile (PDF/UA-1).
+EMAIL_AUDIT_COMPLIANT: str = "{profile}: compliant"
+#: Audit verdict line of a non-compliant PDF/UA; {profile} the profile, {rules} failed rules, {checks} failing objects in all.
+EMAIL_AUDIT_NON_COMPLIANT: str = "{profile}: {rules} rule(s) not met ({checks} occurrence(s))"
+#: One failed rule of the audit; {specification}, {clause} and {test} locate it in ISO 14289, {description} is veraPDF's (English), {checks} its failing objects.
+EMAIL_AUDIT_RULE: str = "{specification}, clause {clause} (test {test}): {description} ({checks} occurrence(s))"
+#: Last audit line when more rules failed than the e-mail lists; {count} is how many are left out.
+EMAIL_AUDIT_MORE_RULES: str = "... and {count} more rule(s), listed in the report in the ZIP package"
+#: Audit line when the PDF/UA could not be validated; {error} is the short cause.
+EMAIL_AUDIT_UNAVAILABLE: str = "Audit unavailable: {error}"
 #: Info logged when a canonical-JSON persistence attempt raised; the exception text follows.
 LOG_CANONICAL_JSON_SAVE_FAILED: str = "Could not save the canonical JSON: {error}"
 #: Info logged when a processing job is cancelled by the user; {task_id} identifies the job.
@@ -404,6 +416,12 @@ LOG_PDF_UA_EXPORTED: str = "PDF/UA exported: {output_path}"
 LOG_PDF_UA_TOOLBOX_EXPORTED: str = "PDF/UA rendered by the Toolbox: {output_path}"
 #: Info logged when the worker skips PDF/UA because TOOLBOX_PDF_UA_ENABLED is false.
 LOG_PDF_UA_SKIPPED_DISABLED: str = "PDF/UA skipped: TOOLBOX_PDF_UA_ENABLED is false"
+#: Info logged when the PDF/UA audit is skipped because TOOLBOX_PDF_VALIDATE_ENABLED is false.
+LOG_PDF_UA_AUDIT_SKIPPED_DISABLED: str = "PDF/UA audit skipped: TOOLBOX_PDF_VALIDATE_ENABLED is false"
+#: Info logged when veraPDF validated the PDF/UA; {compliant} is the verdict, {rules} the failed rules.
+LOG_PDF_UA_AUDIT_FINISHED: str = "PDF/UA audit finished (compliant={compliant}, failed rules={rules})"
+#: Warning logged when the PDF/UA audit failed; {error} is the reason. The job is still delivered.
+LOG_PDF_UA_AUDIT_FAILED: str = "PDF/UA audit failed: {error}"
 #: Info logged when media.inspect is skipped because TOOLBOX_MEDIA_INSPECT_ENABLED is false.
 LOG_MEDIA_INSPECT_SKIPPED_DISABLED: str = (
     "Media inspection skipped: TOOLBOX_MEDIA_INSPECT_ENABLED is false"

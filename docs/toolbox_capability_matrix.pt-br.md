@@ -60,6 +60,7 @@ Legenda de **Caminho de chamada**: como o core alcança a capacidade.
 | `pdf.render` | `acessilia_sdk/toolbox/clients/pdf.py` | `TOOLBOX_PDF_PROVIDER=pymupdf-pdf` | `pymupdf-pdf` | versão 2 (clip, `max_side`, PNG/JPEG, PNG por referência): métodos PDDL `vision-page-inspection`, `pymupdf-region` (recorte de região) e `vlm-pairwise-judge` (página com tamanho limitado), e o enriquecimento de imagens anterior ao plano; sem renderização local no orquestrador |
 | `media.inspect` | `acessilia_sdk/toolbox/clients/media_inspect.py` | `TOOLBOX_MEDIA_INSPECT_PROVIDER=pure-media-inspect` | `pure-media-inspect` | `backend/tools/media_inspect.py` (só na Toolbox; sem fallback local, ADR-0003), pulado quando `TOOLBOX_MEDIA_INSPECT_ENABLED=false` |
 | `document.export.pdf_ua` | `acessilia_sdk/toolbox/clients/pdf_ua.py` | `TOOLBOX_PDF_UA_PROVIDER=pandoc-pdf-ua` | `pandoc-pdf-ua` (sidecar `pdf-ua-render`) | `backend/export/pandoc_exporter.py` (só na Toolbox, PDF baixado e verificado de `/v1/artifacts`; sem fallback local, ADR-0003), pulado quando `TOOLBOX_PDF_UA_ENABLED=false` |
+| `pdf.validate.pdf_ua` | `acessilia_sdk/toolbox/clients/pdf_validate.py` | `TOOLBOX_PDF_VALIDATE_PROVIDER=verapdf` | `verapdf` (sidecar `verapdf-validate`) | `backend/tools/pdf_ua_audit.py`: o worker audita o PDF/UA exportado (PDF/UA-1), resume no e-mail de resultado e empacota o relatório; uma falha não derruba o job; pulado quando `TOOLBOX_PDF_VALIDATE_ENABLED=false` |
 | `document.export.docx` | `acessilia_sdk/toolbox/clients/docx.py` | `TOOLBOX_DOCX_PROVIDER=pandoc-docx` | `pandoc-docx` (rota `/render/docx` do sidecar `pdf-ua-render`) | `backend/export/pandoc_exporter.py` (só na Toolbox, DOCX baixado e verificado de `/v1/artifacts`; sem fallback local, ADR-0003), pulado quando `TOOLBOX_DOCX_ENABLED=false` |
 | `artifact.store` / `artifact.retrieve` | `acessilia_sdk/toolbox/clients/artifact.py` (REST `/v1/artifacts`) | — | `minio`, `filesystem` | upload antes da extração |
 | `dataset.*` (8 capacidades) | `acessilia_sdk/toolbox/clients/dataset.py` (REST `/v1/datasets`) | — | `dataset-github`, `dataset-huggingface` | `toolbox_dataset_tools.py` (scripts do Dr.DocBench) |
@@ -74,7 +75,6 @@ Legenda de **Caminho de chamada**: como o core alcança a capacidade.
 | `code.normalize` | **ausente** | — | `pure-code` | pendente: cliente e obrigação/método/handler acionados por evidência |
 | `text.postprocess` | **ausente** | — | `pure-text` | pendente: cliente e obrigação/método/handler acionados por evidência |
 | `music.omr` | **ausente** | — | `homr`, `audiveris` | pendente: cliente e obrigação/método/handler acionados por evidência |
-| `pdf.validate.pdf_ua` | **ausente** | — | `verapdf` | pendente: o core poderia validar suas exportações PDF/UA antes de entregá-las |
 | `cache.get` / `cache.put` | — (interno) | — | `valkey` | cache interno da Toolbox; não é capacidade pública |
 
 ## Deriva confirmada (no momento da revisão)

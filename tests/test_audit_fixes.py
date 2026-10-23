@@ -51,7 +51,7 @@ def test_core_rejects_unbounded_header_columns(metadata):
 
 @pytest.mark.asyncio
 async def test_shutdown_while_sending_email_preserves_completed_download(
-    isolated_runtime, monkeypatch, tmp_path
+    isolated_runtime, monkeypatch, tmp_path, fake_pdf_ua_audit
 ):
     import asyncio
 

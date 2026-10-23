@@ -151,6 +151,9 @@ msgstr "Exporting the accessible Word document (DOCX)..."
 msgid "Exporting the tagged accessible PDF/UA..."
 msgstr "Exporting the tagged accessible PDF/UA..."
 
+msgid "Auditing the PDF/UA with veraPDF..."
+msgstr "Auditing the PDF/UA with veraPDF..."
+
 msgid "Exporting the semantic HTML version..."
 msgstr "Exporting the semantic HTML version..."
 
@@ -1381,6 +1384,17 @@ msgstr "PDF/UA exported: {output_path}"
 msgid "PDF/UA skipped: TOOLBOX_PDF_UA_ENABLED is false"
 msgstr "PDF/UA skipped: TOOLBOX_PDF_UA_ENABLED is false"
 
+msgid "PDF/UA audit skipped: TOOLBOX_PDF_VALIDATE_ENABLED is false"
+msgstr "PDF/UA audit skipped: TOOLBOX_PDF_VALIDATE_ENABLED is false"
+
+#, python-brace-format
+msgid "PDF/UA audit finished (compliant={compliant}, failed rules={rules})"
+msgstr "PDF/UA audit finished (compliant={compliant}, failed rules={rules})"
+
+#, python-brace-format
+msgid "PDF/UA audit failed: {error}"
+msgstr "PDF/UA audit failed: {error}"
+
 msgid "Media inspection skipped: TOOLBOX_MEDIA_INSPECT_ENABLED is false"
 msgstr "Media inspection skipped: TOOLBOX_MEDIA_INSPECT_ENABLED is false"
 
@@ -1544,6 +1558,33 @@ msgstr "ZIP Package"
 
 msgid "Some optional formats were not generated:"
 msgstr "Some optional formats were not generated:"
+
+msgid "Accessibility audit of the PDF (veraPDF):"
+msgstr "Accessibility audit of the PDF (veraPDF):"
+
+#, python-brace-format
+msgid "{profile}: compliant"
+msgstr "{profile}: compliant"
+
+#, python-brace-format
+msgid "{profile}: {rules} rule(s) not met ({checks} occurrence(s))"
+msgstr "{profile}: {rules} rule(s) not met ({checks} occurrence(s))"
+
+#, python-brace-format
+msgid ""
+"{specification}, clause {clause} (test {test}): {description} ({checks} "
+"occurrence(s))"
+msgstr ""
+"{specification}, clause {clause} (test {test}): {description} ({checks} "
+"occurrence(s))"
+
+#, python-brace-format
+msgid "... and {count} more rule(s), listed in the report in the ZIP package"
+msgstr "... and {count} more rule(s), listed in the report in the ZIP package"
+
+#, python-brace-format
+msgid "Audit unavailable: {error}"
+msgstr "Audit unavailable: {error}"
 
 #, python-brace-format
 msgid "Could not save the canonical JSON: {error}"

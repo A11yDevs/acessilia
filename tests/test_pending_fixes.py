@@ -187,7 +187,9 @@ async def test_failed_enqueue_removes_durable_request_and_upload(isolated_runtim
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("sent", [True, False, None])
-async def test_email_delivery_status_does_not_lose_download(isolated_runtime, monkeypatch, tmp_path, sent):
+async def test_email_delivery_status_does_not_lose_download(
+    isolated_runtime, monkeypatch, tmp_path, sent, fake_pdf_ua_audit
+):
     _, manager = isolated_runtime
     source = tmp_path / "doc.pdf"
     source.write_bytes(b"%PDF")
@@ -233,7 +235,7 @@ async def test_email_delivery_status_does_not_lose_download(isolated_runtime, mo
 
 @pytest.mark.asyncio
 async def test_result_email_reports_open_obligations_of_a_delivered_document(
-    isolated_runtime, monkeypatch, tmp_path
+    isolated_runtime, monkeypatch, tmp_path, fake_pdf_ua_audit
 ):
     """A block dropped by fusion is delivered without it; the e-mail says so."""
     source = tmp_path / "doc.pdf"
