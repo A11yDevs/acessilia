@@ -87,6 +87,15 @@ class VisionOutput(AgentOutput):
 
     @model_validator(mode="after")
     def validate_content(self) -> "VisionOutput":
+        # Models sometimes label a region 'description' and fill formula_latex as
+        # well (006.pdf, page 29: a description plus formula_latex='NaCl'). The
+        # answer is usable, so it is reconciled instead of discarded: consumers
+        # read only the field that matches kind.
+        if self.kind == "description" and self.formula_latex is not None:
+            if self.description:
+                self.formula_latex = None
+            else:
+                self.kind = "formula"
         if self.kind == "description" and not self.description:
             raise ValueError("description is required when kind is 'description'")
         if self.kind == "formula" and not self.formula_latex:

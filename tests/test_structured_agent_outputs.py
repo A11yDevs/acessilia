@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from types import SimpleNamespace
 
 from agno.run.base import RunStatus
@@ -57,6 +58,46 @@ def test_vision_description_normalizes_empty_optional_formula() -> None:
     )
 
     assert output.formula_latex is None
+
+
+def _vision_json(**fields) -> str:
+    payload = {
+        "language": "pt-BR",
+        "confidence": 0.9,
+        "mentioned_elements": [],
+        "warnings": [],
+        **fields,
+    }
+    return json.dumps(payload)
+
+
+def test_a_description_that_also_carries_a_formula_keeps_the_description() -> None:
+    """006.pdf, page 29: kind='description' with formula_latex='NaCl' failed the job."""
+    output = validate_structured_content(
+        _vision_json(
+            kind="description",
+            description="Cubic crystals of sodium chloride (NaCl).",
+            formula_latex="NaCl",
+        ),
+        VisionOutput,
+    )
+
+    assert output.kind == "description"
+    assert output.description.startswith("Cubic crystals of sodium chloride")
+    assert output.formula_latex is None
+
+
+def test_a_description_with_only_a_formula_becomes_a_formula() -> None:
+    output = validate_structured_content(
+        _vision_json(kind="description", formula_latex="E=mc^2"), VisionOutput
+    )
+
+    assert (output.kind, output.formula_latex) == ("formula", "E=mc^2")
+
+
+def test_a_description_with_neither_text_nor_formula_is_still_rejected() -> None:
+    with pytest.raises(ValidationError, match="description is required"):
+        validate_structured_content(_vision_json(kind="description"), VisionOutput)
 
 
 def test_json_content_is_validated_into_the_requested_schema() -> None:
