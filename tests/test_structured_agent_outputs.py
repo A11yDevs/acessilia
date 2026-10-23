@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from types import SimpleNamespace
 
 from agno.run.base import RunStatus
@@ -57,6 +58,59 @@ def test_vision_description_normalizes_empty_optional_formula() -> None:
     )
 
     assert output.formula_latex is None
+
+
+def _vision_json(**fields) -> str:
+    payload = {
+        "language": "pt-BR",
+        "confidence": 0.9,
+        "mentioned_elements": [],
+        "warnings": [],
+        **fields,
+    }
+    return json.dumps(payload)
+
+
+def test_a_description_that_also_carries_a_formula_keeps_the_description() -> None:
+    """006.pdf, page 29: kind='description' with formula_latex='NaCl' failed the job."""
+    output = validate_structured_content(
+        _vision_json(
+            kind="description",
+            description="Cubic crystals of sodium chloride (NaCl).",
+            formula_latex="NaCl",
+        ),
+        VisionOutput,
+    )
+
+    assert output.kind == "description"
+    assert output.description.startswith("Cubic crystals of sodium chloride")
+    assert output.formula_latex is None
+    assert output.warnings == [
+        "formula_latex dropped because kind is 'description': NaCl"
+    ]
+    # The orchestrator revalidates the dumped output; that must be a no-op.
+    assert VisionOutput.model_validate(output.model_dump()) == output
+
+
+@pytest.mark.parametrize("description", ["", "   "])
+def test_a_description_with_only_a_formula_becomes_a_formula(description: str) -> None:
+    # A whitespace-only description counts as absent because AgentOutput strips
+    # strings; this pins that, since it decides which branch applies.
+    output = validate_structured_content(
+        _vision_json(kind="description", description=description, formula_latex="E=mc^2"),
+        VisionOutput,
+    )
+
+    assert (output.kind, output.formula_latex) == ("formula", "E=mc^2")
+    assert output.warnings == [
+        "kind changed from 'description' to 'formula': only formula_latex was provided"
+    ]
+    assert VisionOutput.model_validate(output.model_dump()) == output
+
+
+def test_a_description_with_neither_text_nor_formula_is_still_rejected() -> None:
+    with pytest.raises(ValidationError, match="description is required"):
+        validate_structured_content(_vision_json(kind="description"), VisionOutput)
 
 
 def test_json_content_is_validated_into_the_requested_schema() -> None:
