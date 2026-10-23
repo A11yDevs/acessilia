@@ -685,7 +685,7 @@ def _derive_v23_processing_needs(
         seen.add(key)
         rationale, methods = V23_OBLIGATION_BY_KIND[kind]
         methods = methods_override or methods
-        suffix = "-".join(item.removeprefix("element-") for item in target_ids)
+        suffix = _obligation_suffix(target_ids)
         observations.append(
             Observation(
                 id=f"observation-{kind}-{suffix}",
@@ -712,6 +712,20 @@ def _derive_v23_processing_needs(
     return observations, obligations
 
 
+#: Longest id suffix spelled out from the target ids; past it the suffix is a
+#: digest, since a document-level obligation targets every element of every
+#: divergent page and its id goes into the manifest, the PDDL problem and plan.
+MAX_ID_SUFFIX = 80
+
+
+def _obligation_suffix(target_ids: list[str]) -> str:
+    suffix = "-".join(item.removeprefix("element-") for item in target_ids)
+    if len(suffix) <= MAX_ID_SUFFIX:
+        return suffix
+    digest = hashlib.sha256("\n".join(target_ids).encode("utf-8")).hexdigest()
+    return f"{len(target_ids)}-targets-{digest[:12]}"
+
+
 #: Methods of an adjudicate-page obligation. The deterministic router already
 #: ran on the evidence (``route``), and re-running it as agreement-rule would
 #: only repeat its answer, so the obligation goes straight to the VLM judge.
@@ -724,24 +738,39 @@ def _needs_vlm_judge(stats: dict[str, Any]) -> bool:
     ``decide_v1`` settles a page from a structural fact (one side nearly empty,
     a table or formula only one provider found) or keeps docling by default;
     only its preference rules, where both providers have a table or a formula
-    (``both_table->mineru``, ``both_formula->mineru``), are worth a model call.
-    Evidence recorded before the router ran has no ``route`` and stays eligible.
+    (``both_table->mineru``, ``both_formula->mineru``), are worth a model call,
+    and only when the two pages differ (``provider_divergence``, over all the
+    page's content: ``text_divergence`` leaves tables and formulas out, so a
+    page whose prose matches and whose tables differ would never be judged).
+    Evidence recorded before the router ran has no ``route`` and stays eligible
+    on ``text_divergence``, as before.
     """
-    if not stats.get("text_divergence"):
-        return False
     route = stats.get("route")
     if route is None:
-        return True
-    return route != "docling" and str(stats.get("route_reason", "")).startswith("both_")
+        return bool(stats.get("text_divergence"))
+    return (
+        bool(stats.get("provider_divergence"))
+        and route != "docling"
+        and str(stats.get("route_reason", "")).startswith("both_")
+    )
 
 
 def _pages_for_vlm_judge(
     entries: list[tuple[int, dict[str, Any], list[ManifestElement]]],
     budget: int,
 ) -> set[int]:
-    """The ``budget`` ambiguous pages the providers disagree on the most."""
+    """The ``budget`` ambiguous pages the providers disagree on the most.
+
+    Ranked by ``similarity``, the measure ``_needs_vlm_judge`` gates on
+    (``text_similarity`` for evidence recorded before the router ran).
+    """
     ambiguous = sorted(
-        (float(stats.get("text_similarity", 0.0)), page_number)
+        (
+            float(
+                stats.get("similarity" if "route" in stats else "text_similarity", 0.0)
+            ),
+            page_number,
+        )
         for page_number, stats, _ in entries
         if isinstance(page_number, int) and _needs_vlm_judge(stats)
     )

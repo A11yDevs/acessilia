@@ -570,6 +570,27 @@ class TestVlmPairwiseJudge:
         assert judgement["choice"] == ("mineru" if confirmed else "docling")
         assert result.success is confirmed
 
+    def test_a_taken_page_without_the_replaced_docling_page_is_not_judged(
+        self, tmp_path, monkeypatch
+    ) -> None:
+        """The element provenance, not the artifact, says where the page came from.
+
+        Without the replaced docling page the only alternative would be the
+        MinerU page itself, and comparing it with itself would report a
+        confirmation.
+        """
+        from backend.agents.pddl_orchestrator import _handle_vlm_pairwise_judge_method
+
+        manifest = self._manifest(tmp_path, primary=self.TEXT + " (mineru)")
+        manifest.elements[0].metadata["provider"] = "mineru"
+        seen = self._fake_judge(monkeypatch, 0.1)
+
+        result = _handle_vlm_pairwise_judge_method(manifest, "o-1")
+
+        assert not result.success and not result.validated
+        assert not seen
+        assert "page_judgement" not in manifest.elements[0].metadata
+
     def test_preferred_secondary_is_recorded_and_escalated(self, tmp_path, monkeypatch) -> None:
         from backend.agents.pddl_orchestrator import _handle_vlm_pairwise_judge_method
 

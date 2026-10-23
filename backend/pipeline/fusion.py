@@ -12,9 +12,10 @@ engaged.
 from __future__ import annotations
 
 import asyncio
-import difflib
 from collections import Counter
 from typing import Any
+
+from rapidfuzz import fuzz
 
 from backend.tools.logger import logger
 from acessilia_sdk.toolbox.clients import ToolboxStructureClient
@@ -219,9 +220,10 @@ def fuse_extraction_payloads(
         evidence_stats = dict(page_stats)
         evidence_stats["provider_count"] = 2
         # Divergence is a similarity below the judge's own gate (should_judge,
-        # 0.97), not inequality: two extractors almost never agree on every
-        # token or block label, and exact comparison flagged nearly every page,
-        # each one becoming adjudication and fusion work.
+        # 0.97, on the same character scale), not inequality: two extractors
+        # almost never agree on every token or block label, and exact comparison
+        # flagged nearly every page, each one becoming adjudication and fusion
+        # work.
         similarity = _similarity(docling_text, mineru_text)
         text_similarity = _similarity(
             "\n\n".join(b.text for b in d_blocks if b.kind in TEXT_KINDS),
@@ -298,35 +300,49 @@ def apply_page_routes(
 
     Returns the payload the manifest is built from and, for each replaced page,
     the primary elements it replaced, kept so the VLM judge can compare the two.
-    The secondary elements get ids of their own (both providers number from 1)
-    and ``metadata.provider``; reading order is renumbered across the document.
-    Without a routed page, the primary payload is returned unchanged.
+    The secondary elements get ids of their own (both providers number from 1),
+    ``metadata.provider`` and boxes in the primary page's frame; reading order
+    is renumbered across the document. Without a routed page, the primary
+    payload is returned unchanged.
     """
     primary_doc = primary_res.get("document") or {}
     secondary_doc = secondary_res.get("document") or {}
     secondary_by_page = _elements_by_page(secondary_doc.get("elements") or [])
-    routed = {
-        page["page_number"]
+    preferred = {
+        page.get("page_number")
         for page in page_evidence
         if (page.get("stats") or {}).get("route") == "mineru"
-        and secondary_by_page.get(page.get("page_number"))
     }
+    routed = {number for number in preferred if secondary_by_page.get(number)}
+    if preferred - routed:
+        logger.warning(
+            "Fusion: {} has no elements on pages {} the router sent to it; "
+            "they stay with the primary provider",
+            secondary_provider,
+            sorted(preferred - routed, key=str),
+        )
     if not routed:
         return primary_res, {}
 
     primary_by_page = _elements_by_page(primary_doc.get("elements") or [])
     unpaged = [
         element for element in primary_doc.get("elements") or []
-        if isinstance(element, dict) and not isinstance(element.get("page_number"), int)
+        if isinstance(element, dict) and _element_page_number(element) is None
     ]
+    scales = _page_scales(
+        primary_doc.get("pages") or [], secondary_doc.get("pages") or [], routed
+    )
+    adopted = _adopt_elements(
+        {number: secondary_by_page[number] for number in routed},
+        secondary_provider,
+        scales,
+    )
     replaced: dict[int, list[dict[str, Any]]] = {}
     elements: list[dict[str, Any]] = []
     for page_number in sorted(set(primary_by_page) | routed):
         if page_number in routed:
             replaced[page_number] = primary_by_page.get(page_number, [])
-            elements.extend(
-                _adopt_elements(secondary_by_page[page_number], secondary_provider)
-            )
+            elements.extend(adopted[page_number])
         else:
             elements.extend(dict(element) for element in primary_by_page[page_number])
     elements.extend(dict(element) for element in unpaged)
@@ -346,7 +362,7 @@ def apply_page_routes(
             pages.setdefault(page["page_number"], dict(page))
     for number, page in pages.items():
         page["element_ids"] = [
-            element["id"] for element in elements if element.get("page_number") == number
+            element["id"] for element in elements if _element_page_number(element) == number
         ]
     document = {
         **primary_doc,
@@ -369,53 +385,136 @@ def apply_page_routes(
     return {**primary_res, "document": document}, replaced
 
 
+def _element_page_number(element: dict[str, Any]) -> int | None:
+    """1-based page of a payload element, read like ``_group_by_page`` reads it.
+
+    The fusion evidence numbers pages this way, so routing has to as well: a
+    payload carrying only the 0-based ``page`` would otherwise match no route.
+    """
+    page = element.get("page_number")
+    if isinstance(page, int):
+        return page
+    page = element.get("page")
+    return page + 1 if isinstance(page, int) else None
+
+
 def _elements_by_page(elements: list[Any]) -> dict[int, list[dict[str, Any]]]:
     by_page: dict[int, list[dict[str, Any]]] = {}
     for element in sorted(
         (e for e in elements if isinstance(e, dict)),
         key=lambda e: e.get("reading_order") or 0,
     ):
-        page = element.get("page_number")
-        if isinstance(page, int):
+        page = _element_page_number(element)
+        if page is not None:
             by_page.setdefault(page, []).append(element)
     return by_page
 
 
+def _page_scales(
+    primary_pages: list[Any], secondary_pages: list[Any], routed: set[int]
+) -> dict[int, tuple[float, float]]:
+    """Factors taking a routed page's secondary boxes into the primary page frame.
+
+    The manifest keeps the primary page descriptor, and its boxes are normalised
+    against that page's size downstream, so a provider rendering the page at
+    another size would otherwise misplace every adopted box.
+    """
+
+    def sizes(pages: list[Any]) -> dict[int, tuple[float, float]]:
+        return {
+            page["page_number"]: (float(page["width"]), float(page["height"]))
+            for page in pages
+            if isinstance(page, dict)
+            and page.get("page_number") in routed
+            and isinstance(page.get("width"), (int, float))
+            and isinstance(page.get("height"), (int, float))
+            and page["width"] > 0
+            and page["height"] > 0
+        }
+
+    primary, secondary = sizes(primary_pages), sizes(secondary_pages)
+    return {
+        number: (primary[number][0] / width, primary[number][1] / height)
+        for number, (width, height) in secondary.items()
+        if number in primary and primary[number] != (width, height)
+    }
+
+
+def _scaled_box(box: Any, scale: tuple[float, float]) -> Any:
+    sx, sy = scale
+    if isinstance(box, dict):
+        return {
+            **box,
+            **{
+                key: box[key] * (sx if key in {"left", "right"} else sy)
+                for key in ("left", "top", "right", "bottom")
+                if isinstance(box.get(key), (int, float))
+            },
+        }
+    if isinstance(box, (list, tuple)) and len(box) == 4 and all(
+        isinstance(value, (int, float)) for value in box
+    ):
+        return [box[0] * sx, box[1] * sy, box[2] * sx, box[3] * sy]
+    return box
+
+
 def _adopt_elements(
-    elements: list[dict[str, Any]], provider: str
-) -> list[dict[str, Any]]:
-    """Copies of a secondary page's elements with ids the primary cannot clash with."""
+    pages: dict[int, list[dict[str, Any]]],
+    provider: str,
+    scales: dict[int, tuple[float, float]],
+) -> dict[int, list[dict[str, Any]]]:
+    """Copies of the routed secondary pages' elements, ready for the manifest.
+
+    Ids are mapped across all routed pages before parents are, so a group that
+    spans two taken pages keeps its parent; a parent on a page that was not
+    taken is dropped. An element without an id gets one from its page and
+    position, unique in the document.
+    """
     ids = {
         element["id"]: f"{provider}-{element['id']}"
+        for elements in pages.values()
         for element in elements
         if element.get("id")
     }
-    adopted = []
-    for element in elements:
-        copy = dict(element)
-        copy["id"] = ids.get(element.get("id"), f"{provider}-{len(adopted)}")
-        # A parent on another page belongs to a page that was not taken.
-        copy["parent_id"] = ids.get(element.get("parent_id"))
-        copy["metadata"] = {**(element.get("metadata") or {}), "provider": provider}
-        adopted.append(copy)
+    adopted: dict[int, list[dict[str, Any]]] = {}
+    for number, elements in pages.items():
+        scale = scales.get(number)
+        copies = []
+        for position, element in enumerate(elements, start=1):
+            copy = dict(element)
+            copy["id"] = ids.get(element.get("id"), f"{provider}-p{number}-{position}")
+            copy["parent_id"] = ids.get(element.get("parent_id"))
+            copy["metadata"] = {**(element.get("metadata") or {}), "provider": provider}
+            if scale is not None:
+                if "bbox" in copy:
+                    copy["bbox"] = _scaled_box(copy["bbox"], scale)
+                if isinstance(copy.get("provenance"), list):
+                    copy["provenance"] = [
+                        {**item, "bbox": _scaled_box(item["bbox"], scale)}
+                        if isinstance(item, dict) and item.get("bbox") is not None
+                        else item
+                        for item in copy["provenance"]
+                    ]
+            copies.append(copy)
+        adopted[number] = copies
     return adopted
 
 
 def _similarity(a: str, b: str) -> float:
-    """Word-level similarity in ``[0, 1]`` of two page transcriptions.
+    """Character similarity in ``[0, 1]`` of two page transcriptions.
 
-    docstruct's ``ratio`` (character LCS, the metric ``should_judge`` uses) is
-    pure Python and takes about 2 s on a 3,500-character page, so running it on
-    every page of a long document would stall the extraction for minutes. The
-    word-level SequenceMatcher ratio over the same ``page_norm`` text tracks it
-    closely (0.947 against 0.949 on a sample page) in under a millisecond.
+    The metric ``should_judge`` compares with 0.97: docstruct's ``ratio``
+    (character LCS over ``page_norm``), which equals ``rapidfuzz.fuzz.ratio``.
+    docstruct's own implementation is pure Python and takes about 2 s on a
+    3,500-character page; rapidfuzz takes well under a millisecond, so the
+    evidence and the judge agree on which pages diverge.
     """
-    words_a, words_b = page_norm(a).split(), page_norm(b).split()
-    if not words_a and not words_b:
+    norm_a, norm_b = page_norm(a), page_norm(b)
+    if not norm_a and not norm_b:
         return 1.0
-    if not words_a or not words_b:
+    if not norm_a or not norm_b:
         return 0.0
-    return difflib.SequenceMatcher(None, words_a, words_b, autojunk=False).ratio()
+    return fuzz.ratio(norm_a, norm_b) / 100
 
 
 def _page_content_signature(

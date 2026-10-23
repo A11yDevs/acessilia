@@ -197,7 +197,6 @@ def test_single_provider_accepts_the_manifest_extraction_without_the_toolbox(
     ("recorded", "expected_message"),
     [
         (None, "does not record"),
-        ("docling+mineru", "does not record"),
         ("mineru", "not by the configured provider"),
     ],
 )

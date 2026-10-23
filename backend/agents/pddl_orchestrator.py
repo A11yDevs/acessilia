@@ -1590,7 +1590,10 @@ def _handle_vlm_pairwise_judge_method(
     probability that the secondary page is the more faithful transcription.
     Candidate A is the page the manifest carries and B the other provider's:
     the secondary page, or, on a page the deterministic router already took
-    from the secondary provider, the primary elements it replaced. Only pages
+    from the secondary provider (its elements carry that ``metadata.provider``),
+    the primary elements it replaced. Such a page without the replaced elements
+    in the artifact is skipped: comparing it with the secondary page would
+    compare MinerU with itself and report a confirmation. Only pages
     where the two transcriptions diverge are judged (``should_judge``). Of
     docstruct's two-threshold rule (``decide_pair``) only the ``p_new >
     DEFAULT_NEW_THR`` branch applies: there is no previous judge to consult
@@ -1619,16 +1622,32 @@ def _handle_vlm_pairwise_judge_method(
     source_path = Path(manifest.source.path)
     judgements: dict[int, dict[str, Any]] = {}
     for page_number in sorted({e.page_number for e in elements if e.page_number}):
-        if page_number in secondary.replaced_primary:
+        page_elements = [
+            element
+            for element in sorted(manifest.elements, key=lambda e: e.reading_order)
+            if element.page_number == page_number
+        ]
+        adopted = any(
+            element.metadata.get("provider") == secondary.provider
+            for element in page_elements
+        )
+        if adopted:
+            if page_number not in secondary.replaced_primary:
+                logger.warning(
+                    "vlm-pairwise-judge: page {} came from {}, but the artifact does not "
+                    "keep the {} page it replaced; skipped",
+                    page_number,
+                    secondary.provider,
+                    primary_name,
+                )
+                continue
             content, other = secondary.provider, primary_name
             other_blocks = secondary.replaced_primary[page_number]
         else:
             content, other = primary_name, secondary.provider
             other_blocks = secondary.pages.get(page_number, [])
         primary_md = _page_markdown(
-            (element.type, element.text)
-            for element in sorted(manifest.elements, key=lambda e: e.reading_order)
-            if element.page_number == page_number
+            (element.type, element.text) for element in page_elements
         )
         secondary_md = _page_markdown(
             (str(block.get("type") or ""), block.get("text"))
@@ -2072,13 +2091,16 @@ def _fused_text_elements(
 def _handle_single_provider_method(
     manifest: ProcessingManifest, obligation_id: str
 ) -> MethodResult:
-    """Accept the configured provider's extraction the manifest was built from.
+    """Satisfy ``fuse-providers`` with the extraction the manifest already carries.
 
-    The manifest's elements already are that single-provider extraction,
-    recorded by ``ToolboxManifestExtractor`` with its provider and provenance.
-    This method used to extract the whole document again, uploaded anew and
-    with the Toolbox cache off, once per ``fuse-providers`` step, and changed
-    nothing in the manifest: a full extraction of cost for no content.
+    There is nothing to re-run: the manifest's elements are the configured
+    provider's extraction, with the pages the deterministic router took from
+    the secondary provider in dual mode (``fusion.apply_page_routes``). The
+    method does not claim a single-provider document; it checks only that the
+    manifest was extracted by the configured provider and has content. It used
+    to extract the whole document again, uploaded anew and with the Toolbox
+    cache off, once per ``fuse-providers`` step, and changed nothing in the
+    manifest: a full extraction of cost for no content.
     """
     from backend.config.settings import settings
 
@@ -2095,11 +2117,11 @@ def _handle_single_provider_method(
         )
 
     provider = str(manifest.extractor.configuration.get("toolbox_provider") or "")
-    if not provider or "+" in provider:
+    if not provider:
         return MethodResult(
             success=False,
             validated=False,
-            message="The manifest does not record a single-provider extraction",
+            message="The manifest does not record the provider it was extracted by",
         )
     if provider != settings.toolbox_provider:
         return MethodResult(
@@ -2119,7 +2141,10 @@ def _handle_single_provider_method(
     return MethodResult(
         success=True,
         validated=True,
-        message=f"Single-provider extraction of the manifest accepted ({provider})",
+        message=(
+            f"The manifest already carries the extraction ({provider}); "
+            "nothing to re-extract"
+        ),
     )
 
 

@@ -283,6 +283,23 @@ def test_dual_mode_takes_the_page_the_router_sends_to_mineru(
             "element-000001",
             "element-000002",
         ]
+
+        # The mixed document is still a valid manifest the planner can use, and
+        # its elements say which provider they came from (the VLM judge reads it).
+        from backend.core.manifest.builder import build_processing_manifest
+        from backend.core.planning.domain_bundle import DomainBundle
+        from backend.core.planning.pddl_processor import PddlProblemCompiler
+
+        manifest = build_processing_manifest(FIXTURE_PDF, deepcopy(result))
+        assert [e.id for e in manifest.elements] == [
+            "mineru-element-000001",
+            "mineru-element-000002",
+        ]
+        assert all(e.metadata["provider"] == "mineru" for e in manifest.elements)
+        assert manifest.pages[0].element_ids == [e.id for e in manifest.elements]
+        assert any(item.kind == "fuse-providers" for item in manifest.obligations)
+        compiled = PddlProblemCompiler(DomainBundle.load()).compile(manifest)
+        assert "fuse-providers" in compiled.text
     else:
         assert result.document["document"] == SAMPLE_TOOLBOX_RESPONSE["document"]
         assert "replaced_primary_pages" not in stored

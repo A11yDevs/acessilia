@@ -46,7 +46,7 @@ permanece idêntica.
 
 | Obrigação | Métodos | Custo | Origem |
 |---|---|---|---|
-| `adjudicate-page` | `vlm-pairwise-judge`, `agreement-rule`, `human-review` | 40 / 5 / 100 | juiz pareado por VLM (LOOP #25/#29/#44/#45) |
+| `adjudicate-page` | `vlm-pairwise-judge`, `human-review` | 40 / 100 | juiz pareado por VLM (LOOP #25/#29/#44/#45) |
 | `fuse-providers` | `dual-provider-fusion`, `single-provider`, `human-review` | 60 / 20 / 100 | fusão multi-provider (`docstruct.fusion`) |
 | `refine-reading-order` | `xycut-order`, `skeleton-order`, `human-review` | 10 / 5 / 100 | XY-cut e ordem do skeleton |
 | `normalize-formula` | `latex-normalizer`, `mathml`, `human-review` | 10 / 10 / 100 | `docstruct.text.latex` |
@@ -69,7 +69,19 @@ Regras de compilação:
   via `table-specialist`) têm custo alto e só devem ser emitidas como
   admissíveis quando a política correspondente estiver ativa
   (`page_judge`, `table_specialist`);
-- `fuse-providers` só é admissível quando `FUSION_MODE=dual`, como na v2.2;
+- `adjudicate-page` não admite `agreement-rule`: o roteador determinístico
+  (`decide_v1`) já roda na extração e grava `route`/`route_reason` na
+  evidência, e repeti-lo como método só repetiria a resposta. O builder emite a
+  obrigação apenas nas páginas que o roteador não decide (`both_table`,
+  `both_formula`) e que divergem (`provider_divergence`, similaridade de
+  caracteres abaixo de 0,97, a mesma régua de `should_judge`), limitadas às
+  `FUSION_JUDGE_MAX_PAGES` menos similares. A obrigação não é crítica: o
+  veredito é registrado em `page_judgement`, mas a troca de página não é
+  aplicada;
+- `fuse-providers` só é admissível quando `FUSION_MODE=dual`, como na v2.2, e
+  é emitida uma vez por documento, com as páginas divergentes na evidência. O
+  método `single-provider` a satisfaz com a extração que o manifesto já traz,
+  sem extrair de novo;
 - `join-tail-blocks` deve preferir `tailjoin-positioned` quando a posição do
   número de página for conhecida, e `tailjoin` caso contrário;
 - cada obrigação nova depende de `extract` (a extração do provider), exceto
