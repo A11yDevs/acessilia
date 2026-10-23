@@ -303,10 +303,18 @@ A capacidade `media.inspect` (provider `pure-media-inspect`, PR
   `TOOLBOX_MEDIA_INSPECT_ENABLED=false` ele devolve `None` sem chamar a Toolbox,
   e uma falha na Toolbox levanta `ToolboxError`.
 - **Integração:** `backend/agents/pddl_orchestrator.py` chama
-  `inspect_source_media()` após a extração e usa o sinal
-  `requires_visual_inspection` para injetar um elemento `picture` de página
-  inteira quando a entrada é imagem isolada sem blocos visuais — garantindo a
-  audiodescrição pelo VisionAgent.
+  `inspect_source_media()` **antes** da extração e usa dois sinais:
+  - `document_genre` (`pure-media-inspect` 1.1.0+): um PDF informado como
+    `presentation` é extraído só pelo provider configurado (sem fusão dual) e
+    estruturado slide a slide (`backend/core/manifest/slides.py`): um H1 para a
+    apresentação, um H2 "Slide N de T: <título>" (ou "Slide N de T") por slide,
+    ordem de leitura restrita a cada slide, e um slide cujas imagens cobrem ao
+    menos `SLIDE_VISUAL_COVERAGE` (0,5) dele vira uma imagem do slide inteiro,
+    descrita com o prompt de página em vez de lida como texto. Uma Toolbox sem o
+    campo, ou uma inspeção que falhou, significa documento.
+  - `requires_visual_inspection`, para injetar um elemento `picture` de página
+    inteira quando a entrada é imagem isolada sem blocos visuais — garantindo a
+    audiodescrição pelo VisionAgent.
 
   O sinal só alimenta essa heurística, então uma falha da etapa (qualquer
   exceção, não só `ToolboxError`) não derruba o job: o processamento segue sem
@@ -314,7 +322,8 @@ A capacidade `media.inspect` (provider `pure-media-inspect`, PR
   `manifest.extractor.configuration` (`media_inspection`: `toolbox`, `disabled`,
   `source_missing` ou `failed`, mais `media_inspection_error` com a causa). O
   status e a causa também chegam ao documento em
-  `canonical_metadata.pddl_media_inspection` (`{"status": ..., "error": ...}`).
+  `canonical_metadata.pddl_media_inspection` (`{"status": ..., "error": ...,
+  "document_genre": ..., "genre_signals": [...]}`).
 
   Uma execução degradada por falha **não é cacheada** (o payload leva
   `cacheable: false`): do contrário, uma indisponibilidade transitória da
@@ -347,6 +356,7 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 | `TOOLBOX_USE_REMOTE_CACHE` | `true` | Usa o cache remoto (`no_cache=false`) |
 | `TOOLBOX_MEDIA_INSPECT_PROVIDER` | `pure-media-inspect` | Provider da capacidade `media.inspect` |
 | `TOOLBOX_MEDIA_INSPECT_ENABLED` | `true` | Executa `media.inspect` na Toolbox ou pula a etapa. Não há fallback local: com `false`, a etapa é pulada; uma falha na Toolbox é registrada no log e no manifesto, o processamento segue sem o sinal de imagem isolada e o resultado degradado não é cacheado |
+| `SLIDE_VISUAL_COVERAGE` | `0.5` | Fração do slide que as imagens precisam cobrir para um slide de apresentação (`document_genre=presentation`) ser descrito como uma imagem em vez de lido como texto |
 | `TOOLBOX_PDF_UA_PROVIDER` | `pandoc-pdf-ua` | Provider da capacidade `document.export.pdf_ua` |
 | `TOOLBOX_PDF_UA_ENABLED` | `true` | Renderiza o PDF/UA na Toolbox (Pandoc + TeX Live fixados) ou pula a etapa. Não há fallback local: com `false`, o worker pula o formato sem erro; uma falha na Toolbox é reportada como erro de exportação opcional |
 | `TOOLBOX_PDF_UA_TIMEOUT_SECONDS` | `300` | Tempo máximo de espera pela renderização na Toolbox antes de reportar erro de exportação opcional |

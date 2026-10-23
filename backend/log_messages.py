@@ -297,6 +297,10 @@ MSG_OBLIGATION_FORMULA: str = (
 MSG_OBLIGATION_CODE: str = "The code block must preserve indentation, language and literal reading."
 #: Manifest processing-needs rationale for unknown/unrecognized elements, used as the LLM prompt obligation text per element type.
 MSG_OBLIGATION_UNKNOWN: str = "Unrecognized elements require structural inspection."
+#: Heading that opens a slide of a presentation that has a title; {number} is the slide, {total} the slides in the deck, {title} the slide title.
+MSG_SLIDE_HEADING_WITH_TITLE: str = "Slide {number} of {total}: {title}"
+#: Heading that opens a slide of a presentation without a title; {number} is the slide, {total} the slides in the deck.
+MSG_SLIDE_HEADING: str = "Slide {number} of {total}"
 #: Observation message for a page the structural extractor returned without any element; {page_number} is the page.
 MSG_OBSERVATION_PAGE_WITHOUT_STRUCTURE: str = (
     "Page {page_number} has no extracted structure; it may be blank or purely visual."

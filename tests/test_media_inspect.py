@@ -249,6 +249,8 @@ def test_payload_records_the_status_and_skips_the_cache_on_failure(
         else {
             "status": status,
             "error": "ToolboxError: down" if status == "failed" else None,
+            "document_genre": None,
+            "genre_signals": [],
         }
     )
     assert payload["canonical_metadata"]["pddl_media_inspection"] == expected

@@ -610,6 +610,14 @@ msgstr "O bloco de código deve preservar indentação, linguagem e leitura lite
 msgid "Unrecognized elements require structural inspection."
 msgstr "O elemento não classificado requer inspeção estrutural."
 
+#, python-brace-format
+msgid "Slide {number} of {total}"
+msgstr "Slide {number} de {total}"
+
+#, python-brace-format
+msgid "Slide {number} of {total}: {title}"
+msgstr "Slide {number} de {total}: {title}"
+
 msgid ""
 "The page must be inspected visually: described when it has content, or "
 "accepted as blank."

@@ -2308,13 +2308,20 @@ class PddlAccessibilityOrchestrator:
         if custom_prompt or thinking_mode:
             raise ValueError("Custom instructions and thinking mode are unavailable for this pipeline")
 
+        source_path = file_path.resolve()
+        # media.inspect runs first: a slide deck is extracted and structured
+        # slide by slide, which has to be decided before extraction.
+        media_inspection, media_configuration = await _inspect_media(source_path)
+        presentation = _is_presentation(media_inspection)
+
         if status_callback:
             await status_callback(t(STAGE_ANALYZING_STRUCTURAL))
         try:
             manifest = await run_blocking(
                 self.information_structural.process,
-                file_path.resolve(),
+                source_path,
                 language="pt-BR",
+                presentation=presentation,
             )
         except ToolboxError as exc:
             # The SDK already retried and failed over; there is no local
@@ -2330,9 +2337,7 @@ class PddlAccessibilityOrchestrator:
             ) from exc
         _check_page_limit(manifest)
         manifest.extractor.configuration["region_inspection_mode"] = effective_mode
-
-        source_path = file_path.resolve()
-        media_inspection = await _inspect_media_or_degrade(manifest, source_path)
+        manifest.extractor.configuration.update(media_configuration)
 
         if status_callback:
             await status_callback(t(STAGE_ENRICHING_IMAGE_DESCRIPTIONS))
@@ -2591,7 +2596,10 @@ async def _enrich_picture_descriptions(
 
         vision_output = await vision.describe_region(
             image_bytes=image_bytes,
-            classification="embedded_image",
+            # A whole presentation slide gets the page prompt and budget.
+            classification=(
+                "full_page_image" if element.metadata.get("slide_visual") else "embedded_image"
+            ),
             page_num=page_number,
             total_pages=total_pages,
             mode=mode,
@@ -2651,22 +2659,33 @@ async def _inspect_media_or_degrade(
     manifest: ProcessingManifest,
     source_path: Path,
 ) -> dict[str, Any] | None:
+    """``_inspect_media``, recording its outcome in ``manifest.extractor.configuration``."""
+    media_inspection, configuration = await _inspect_media(source_path)
+    manifest.extractor.configuration.update(configuration)
+    return media_inspection
+
+
+async def _inspect_media(
+    source_path: Path,
+) -> tuple[dict[str, Any] | None, dict[str, Any]]:
     """Runs ``media.inspect`` and degrades visibly when it fails.
 
-    The inspection only feeds the standalone-image heuristic, so no failure of
-    the step fails the job: any ``Exception`` (a ``ToolboxError``, but also an
-    SDK bug or a client configuration error) makes the run continue without
-    the signal, logs a warning and records the cause. Cancellation is not
-    caught, since ``asyncio.CancelledError`` derives from ``BaseException``.
+    The inspection feeds the standalone-image heuristic and the presentation
+    decision, and neither is required, so no failure of the step fails the
+    job: any ``Exception`` (a ``ToolboxError``, but also an SDK bug or a client
+    configuration error) makes the run continue without the signal, logs a
+    warning and records the cause. Cancellation is not caught, since
+    ``asyncio.CancelledError`` derives from ``BaseException``.
 
-    The outcome goes to ``manifest.extractor.configuration``:
-    ``media_inspection`` is ``toolbox``, ``disabled`` (by
+    Returns the inspection and the outcome for
+    ``manifest.extractor.configuration``, since it runs before the manifest
+    exists: ``media_inspection`` is ``toolbox``, ``disabled`` (by
     ``TOOLBOX_MEDIA_INSPECT_ENABLED``), ``source_missing`` or ``failed``, plus
-    ``media_inspection_error`` on failure.
+    ``media_inspection_error`` on failure, and ``document_genre`` with its
+    ``genre_signals`` when the Toolbox reports them.
     """
     from backend.config.settings import settings
 
-    configuration = manifest.extractor.configuration
     try:
         media_inspection = await inspect_source_media(source_path)
     except Exception as exc:  # noqa: BLE001 - the step degrades, never fails the job
@@ -2676,17 +2695,30 @@ async def _inspect_media_or_degrade(
                 filename=source_path.name, error=cause
             )
         )
-        configuration["media_inspection"] = "failed"
-        configuration["media_inspection_error"] = cause
-        return None
+        return None, {"media_inspection": "failed", "media_inspection_error": cause}
     if media_inspection is not None:
         status = "toolbox"
     elif not settings.toolbox_media_inspect_enabled:
         status = "disabled"
     else:
         status = "source_missing"
-    configuration["media_inspection"] = status
-    return media_inspection
+    configuration: dict[str, Any] = {"media_inspection": status}
+    if isinstance(media_inspection, dict) and media_inspection.get("document_genre"):
+        configuration["document_genre"] = media_inspection["document_genre"]
+        configuration["genre_signals"] = list(media_inspection.get("genre_signals") or [])
+    return media_inspection, configuration
+
+
+def _is_presentation(media_inspection: dict[str, Any] | None) -> bool:
+    """Whether ``media.inspect`` reported a slide deck.
+
+    A Toolbox older than pure-media-inspect 1.1.0 reports no genre, and a
+    failed inspection reports nothing: both are treated as a document.
+    """
+    return (
+        isinstance(media_inspection, dict)
+        and media_inspection.get("document_genre") == "presentation"
+    )
 
 
 def _inject_full_page_picture(
@@ -3376,6 +3408,9 @@ def build_pddl_structured_payload(
             "pddl_media_inspection": {
                 "status": media_inspection_status,
                 "error": configuration.get("media_inspection_error"),
+                # Why a deck was structured slide by slide (or not).
+                "document_genre": configuration.get("document_genre"),
+                "genre_signals": configuration.get("genre_signals", []),
             }
             if media_inspection_status is not None
             else None,

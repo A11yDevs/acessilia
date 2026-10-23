@@ -31,7 +31,7 @@ TOOLBOX_RESPONSE = Path(__file__).parent / "fixtures" / "toolbox-v2-contract.jso
 class FakeExtractor:
     """Returns a recorded Toolbox ``document.structure.extract`` response."""
 
-    def extract(self, _: Path) -> ToolboxExtraction:
+    def extract(self, _: Path, **_kwargs) -> ToolboxExtraction:
         timestamp = datetime(2026, 7, 27, tzinfo=timezone.utc)
         return ToolboxExtraction(
             document=json.loads(TOOLBOX_RESPONSE.read_text(encoding="utf-8")),

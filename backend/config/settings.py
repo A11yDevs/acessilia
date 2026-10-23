@@ -215,6 +215,11 @@ class Settings:
     toolbox_pdf_ua_timeout_seconds: int = field(
         default_factory=lambda: int(os.getenv("TOOLBOX_PDF_UA_TIMEOUT_SECONDS", "300"))
     )
+    # Share of a slide its pictures must cover for a presentation slide to be
+    # described by the vision model as one image instead of read as text.
+    slide_visual_coverage: float = field(
+        default_factory=lambda: float(os.getenv("SLIDE_VISUAL_COVERAGE", "0.5"))
+    )
     toolbox_docx_provider: str = field(
         default_factory=lambda: os.getenv(
             "TOOLBOX_DOCX_PROVIDER", provider_default("toolbox_docx_provider")
