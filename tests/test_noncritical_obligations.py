@@ -293,35 +293,65 @@ async def test_job_still_fails_when_a_critical_obligation_remains(
         await _run(_orchestrator(max_replans=2), manifest, monkeypatch, tmp_path)
 
 
+def _two_images_manifest():
+    """A picture on page 23 and one on page 24, each with its own obligation."""
+    images = []
+    obligations = []
+    for name, page in (("image", 23), ("other", 24)):
+        image = build_element(name, "picture", reading_order=page)
+        image.page_number = page
+        images.append(image)
+        obligation = _describe_image(
+            ["vision-description", "human-review"],
+            {"vision-description": 20, "human-review": 100},
+        )
+        obligation.id = f"o-describe-{name}"
+        obligation.target_ids = [name]
+        obligations.append(obligation)
+    return _headings_manifest(*obligations, extra_elements=images)
+
+
+def _describes(*described_ids):
+    def handler(manifest, obligation_id):
+        if obligation_id in described_ids:
+            return _succeeding(manifest, obligation_id)
+        return _failing(manifest, obligation_id)
+
+    return handler
+
+
 @pytest.mark.asyncio
 async def test_an_image_the_model_could_not_describe_does_not_fail_the_job(
     monkeypatch, tmp_path
 ):
     """006.pdf: two degenerate vision answers out of 40 failed 42 pages."""
-    image = build_element("image", "picture", reading_order=10)
-    image.page_number = 23
-    manifest = _headings_manifest(
-        _describe_image(
-            ["vision-description", "human-review"],
-            {"vision-description": 20, "human-review": 100},
-        ),
-        extra_elements=[image],
-    )
     orchestrator = _orchestrator(max_replans=2)
-    orchestrator.executor.registry.register("vision-description", _failing)
+    orchestrator.executor.registry.register(
+        "vision-description", _describes("o-describe-other")
+    )
 
-    payload = await _run(orchestrator, manifest, monkeypatch, tmp_path)
+    payload = await _run(orchestrator, _two_images_manifest(), monkeypatch, tmp_path)
 
-    assert _open_ids(payload) == ["o-describe"]
-    [alt_text] = [
+    assert _open_ids(payload) == ["o-describe-image"]
+    alt_texts = [
         block["alt_text"]
         for page in payload["pages"]
         for block in page["blocks"]
         if block["type"] == "image"
     ]
-    assert alt_text
+    assert len(alt_texts) == 2 and all(alt_texts)
     summary = payload["canonical_metadata"]["pddl_unsatisfied_summary"]
     assert f"describe-image ({t(STAGE_PAGE).format(page=23)})" in summary
+
+
+@pytest.mark.asyncio
+async def test_a_document_with_no_image_described_still_fails(monkeypatch, tmp_path):
+    """No description at all is a broken model or key, not sampling."""
+    orchestrator = _orchestrator(max_replans=2)
+    orchestrator.executor.registry.register("vision-description", _describes())
+
+    with pytest.raises(RuntimeError, match="describe-image"):
+        await _run(orchestrator, _two_images_manifest(), monkeypatch, tmp_path)
 
 
 @pytest.mark.asyncio

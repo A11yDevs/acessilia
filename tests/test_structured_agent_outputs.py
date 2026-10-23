@@ -533,11 +533,31 @@ async def test_a_looping_description_is_salvaged_without_the_loop(monkeypatch) -
     assert result.language == "und"
 
 
+BLANK_PAGE = {"kind": "blank", "language": "und", "confidence": 0.9}
+
+
 @pytest.mark.asyncio
-async def test_a_region_gets_its_own_token_budget(monkeypatch) -> None:
+@pytest.mark.parametrize(
+    "call, answer, budget",
+    [
+        # A picture description gets the region budget.
+        (lambda agent: agent.describe_region(b"image", "embedded_image"), VALID_FORMULA, 1234),
+        # A whole page and a region inspected for review-structure may need
+        # transcribing: they keep the general budget.
+        (lambda agent: agent.describe_region(b"image", "full_page_image"), VALID_FORMULA, None),
+        (
+            lambda agent: agent.describe_region(b"image", "embedded_image", full_budget=True),
+            VALID_FORMULA,
+            None,
+        ),
+        (lambda agent: agent.inspect_page(b"image", page_num=1, total_pages=1), BLANK_PAGE, None),
+    ],
+    ids=["picture", "full-page", "region-inspection", "page-inspection"],
+)
+async def test_the_token_budget_of_each_vision_call(monkeypatch, call, answer, budget) -> None:
     from backend.config.settings import settings
 
-    vision_module, _ = _scripted_vision_agent(monkeypatch, [VALID_FORMULA])
+    vision_module, _ = _scripted_vision_agent(monkeypatch, [answer])
     budgets: list = []
     monkeypatch.setattr(
         vision_module,
@@ -546,9 +566,34 @@ async def test_a_region_gets_its_own_token_budget(monkeypatch) -> None:
     )
     monkeypatch.setattr(settings, "vision_region_max_tokens", 1234)
 
-    await vision_module.VisionAgent().describe_region(b"image", "embedded_image")
+    await call(vision_module.VisionAgent())
 
-    assert budgets == [1234]
+    assert budgets == [budget]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "answer",
+    [
+        # Complete, but with an unquoted label inside the description.
+        '{"kind": "description", "description": "A bar chart of monthly revenue '
+        'for the whole year, labelled "Revenue" on its axis.", "language": "en", '
+        '"confidence": 0.9}',
+        # Complete, but with an invalid escape.
+        '{"kind": "description", "description": "A bar chart of monthly revenue '
+        'for the whole year \\q with its axis.", "language": "en", "confidence": 0.9}',
+    ],
+    ids=["inner-quote", "invalid-escape"],
+)
+async def test_an_answer_malformed_before_its_end_is_not_salvaged(monkeypatch, answer) -> None:
+    """Only a cut answer is salvaged; a malformed one would be kept as a fragment."""
+    from backend.agents.vision_agent import REGION_ATTEMPTS
+
+    vision_module, _ = _scripted_vision_agent(monkeypatch, [answer] * REGION_ATTEMPTS)
+
+    result = await vision_module.VisionAgent().describe_region(b"image", "embedded_image")
+
+    assert result is None
 
 
 @pytest.mark.asyncio

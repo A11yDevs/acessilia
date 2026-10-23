@@ -97,6 +97,7 @@ from backend.log_messages import (
     LOG_VISION_AGENT_REGION_RECOVERED,
     LOG_VISION_AGENT_REGION_RETRY,
     LOG_VISION_AGENT_REGION_SALVAGED,
+    LOG_MANIFEST_STRUCTURAL_CONTAINER_SKIPPED,
     LOG_VISION_AGENT_SENDING_REGION,
     LOG_CLEANUP_ITEM_FAILED,
     LOG_CLEANUP_OUTPUT_FAILED,
@@ -841,6 +842,7 @@ MESSAGES: tuple[str, ...] = (
     LOG_VISION_AGENT_REGION_RECOVERED,
     LOG_VISION_AGENT_REGION_RETRY,
     LOG_VISION_AGENT_REGION_SALVAGED,
+    LOG_MANIFEST_STRUCTURAL_CONTAINER_SKIPPED,
     LOG_VISION_AGENT_SENDING_REGION,
     LOG_CACHE_HIT,
     LOG_CACHE_DEBUG_HIT,
@@ -1664,9 +1666,13 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "[página {page_num}] O modelo de visão respondeu a região {type} na "
             "tentativa {attempt}/{attempts}"
         ),
+        LOG_MANIFEST_STRUCTURAL_CONTAINER_SKIPPED: (
+            "Manifesto: sem review-structure para {element_id} ({raw_label}): "
+            "ele agrupa outros elementos e não tem região"
+        ),
         LOG_VISION_AGENT_REGION_SALVAGED: (
             "[página {page_num}] Resposta do modelo de visão para a região {type} "
-            "cortada pelo limite de tokens; descrição recuperada ({chars} caracteres)"
+            "cortada antes do fim; descrição recuperada ({chars} caracteres)"
         ),
         LOG_CACHE_HIT: "Cache: item existente para {name}",
         LOG_CACHE_DEBUG_HIT: "Cache: item existente: {key}",

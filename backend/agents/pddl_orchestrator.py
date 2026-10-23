@@ -541,7 +541,7 @@ def _inspect_region(image: bytes, number: int, total_pages: int, mode: str) -> V
     async def inspect():
         return await VisionAgent(mode=mode).describe_region(
             image_bytes=image, classification="embedded_image", page_num=number,
-            total_pages=total_pages, mode=mode,
+            total_pages=total_pages, mode=mode, full_budget=True,
         )
 
     try:
@@ -2402,10 +2402,7 @@ class PddlAccessibilityOrchestrator:
                 obligation for obligation in manifest.obligations
                 if obligation.status == "failed"
             ]
-            if any(
-                obligation.kind not in NON_CRITICAL_OBLIGATION_KINDS
-                for obligation in exhausted
-            ):
+            if any(_blocks_delivery(obligation, manifest) for obligation in exhausted):
                 break
             roots = _replannable_obligation_ids(manifest)
             if not roots:
@@ -2435,7 +2432,7 @@ class PddlAccessibilityOrchestrator:
             unsatisfied = _unsatisfied_selected_obligations(manifest)
             critical = [
                 obligation for obligation in unsatisfied
-                if obligation.kind not in NON_CRITICAL_OBLIGATION_KINDS
+                if _blocks_delivery(obligation, manifest)
             ]
             if not unsatisfied or critical:
                 # The ids name every target element and run to kilobytes on a
@@ -3125,10 +3122,29 @@ NON_CRITICAL_OBLIGATION_KINDS = frozenset(
         # The vision model is the only automatic method, and a degenerate
         # answer repeats on every try: in 006.pdf two images out of 40 failed
         # a 42-page document. The picture is exported with the generic alt
-        # text and the result e-mail names its page.
+        # text and the result e-mail names its page. Unless no picture at all
+        # was described: see _blocks_delivery.
         "describe-image",
     }
 )
+
+
+def _blocks_delivery(obligation: Obligation, manifest: ProcessingManifest) -> bool:
+    """Whether an open obligation fails the job instead of leaving a warning.
+
+    ``describe-image`` is non-critical while some picture was described: a few
+    degenerate answers are sampling (2 of 40 in 006.pdf). With none described,
+    the model is unreachable or misconfigured (``describe_region`` turns a
+    timeout or an auth error into ``None``), and every picture would silently
+    get the generic alt text, so the job fails. A document with a single
+    picture its one description failed on fails too.
+    """
+    if obligation.kind == "describe-image":
+        return not any(
+            other.kind == "describe-image" and other.status == "satisfied"
+            for other in manifest.obligations
+        )
+    return obligation.kind not in NON_CRITICAL_OBLIGATION_KINDS
 
 
 def _is_open_obligation(obligation: Obligation) -> bool:

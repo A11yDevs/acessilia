@@ -83,6 +83,7 @@ class VisionAgent:
         total_pages: int = 0,
         mode: str | None = None,
         custom_prompt: str | None = None,
+        full_budget: bool = False,
     ) -> VisionOutput | None:
         """Describe a single visual region of a page with the vision model.
 
@@ -93,6 +94,7 @@ class VisionAgent:
             total_pages (int): Total page count of the source document for page prompts (default 0).
             mode (str | None): Prompting mode override for this call; falls back to the instance default when None (default None).
             custom_prompt (str | None): Fully custom prompt that, when given, replaces all selection logic (default None).
+            full_budget (bool): Use the general token budget instead of VISION_REGION_MAX_TOKENS, for a region that may need transcribing (default False).
 
         Returns:
             A validated visual result, or None when inference or validation fails.
@@ -113,10 +115,13 @@ class VisionAgent:
             prompt = region_prompt if region_prompt else self.system_prompt
 
         prompt = f"{prompt}\n\n{VISION_SCHEMA_INSTRUCTION}"
-        # A whole page may need the general budget to be transcribed; a region
+        # A whole page, or a region inspected for review-structure (scanned text,
+        # a table), may need the general budget to be transcribed; a picture
         # gets the smaller one, which also bounds what a degenerate try costs.
         max_tokens = (
-            None if classification.startswith("full_page") else settings.vision_region_max_tokens
+            None
+            if full_budget or classification.startswith("full_page")
+            else settings.vision_region_max_tokens
         )
 
         try:
@@ -239,22 +244,30 @@ SALVAGE_MIN_CHARS = 40
 
 #: Recorded in the salvaged answer's warnings, so the evidence says the
 #: description is a recovered prefix and not what the model meant to send.
-SALVAGE_WARNING = "description recovered from an answer cut off by max_tokens"
+SALVAGE_WARNING = "description recovered from an answer cut off before its end"
 
 
 def _salvage_truncated_description(error: ValidationError) -> VisionOutput | None:
-    """The description of an answer that every try left as invalid JSON.
+    """The description of an answer that every try left cut off.
 
     A degenerate answer loops until max_tokens cuts the JSON off, and a retry
     with the same image usually loops again. The loop is often in a later
     field: in 006.pdf, page 23 (a periodic table), the description was whole
     and ``mentioned_elements`` listed element names until the cut. The
     description is kept with its repetition collapsed, its confidence set to 0
-    and a warning. Only a ``description`` is salvaged: a cut formula is wrong
-    LaTeX, not a shorter one.
+    and a warning. Only a cut answer is salvaged: JSON that is malformed
+    elsewhere (an invalid escape, a stray character) was not cut, and nothing
+    says which part of it to trust. Only a ``description`` is salvaged: a cut
+    formula is wrong LaTeX, not a shorter one.
     """
     raw = next(
-        (item["input"] for item in error.errors() if isinstance(item.get("input"), str)),
+        (
+            item["input"]
+            for item in error.errors()
+            if item["type"] == "json_invalid"
+            and str((item.get("ctx") or {}).get("error", "")).startswith("EOF while parsing")
+            and isinstance(item.get("input"), str)
+        ),
         None,
     )
     if raw is None or not re.search(r'"kind"\s*:\s*"description"', raw):
@@ -288,7 +301,9 @@ def _json_string_prefix(rest: str) -> tuple[str, bool]:
     """Decode the JSON string that ``rest`` starts inside of, up to its end or the cut.
 
     Returns the text and whether the string was closed. An escape the cut left
-    incomplete is dropped. Raises ``ValueError`` for an invalid escape.
+    incomplete is dropped. Raises ``ValueError`` for an invalid escape. The
+    first unescaped quote closes the string: one inside the description would
+    have failed parsing there, not at the end, so the answer is not salvaged.
     """
     index = 0
     while index < len(rest):

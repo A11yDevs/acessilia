@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from backend.core.manifest.builder import _derive_processing_needs
 from backend.core.manifest.models import BoundingBox, Provenance
+from backend.tools.logger import logger
 from tests.pddl_support import build_element
 
 
@@ -38,10 +39,29 @@ def _review_targets(elements) -> list[str]:
 
 def test_a_group_without_a_region_is_not_reviewed():
     group = _key_value_group()
-    observations, obligations = _derive_processing_needs([group, _child(group.id)])
+    messages: list[str] = []
+    sink = logger.add(messages.append, level="DEBUG", format="{message}")
+    try:
+        observations, obligations = _derive_processing_needs([group, _child(group.id)])
+    finally:
+        logger.remove(sink)
 
     assert not obligations
     assert not observations
+    # The skip leaves a trail naming the node.
+    assert any(group.id in message and "key_value_area" in message for message in messages)
+
+
+def test_the_children_of_a_skipped_group_keep_their_obligations():
+    group = _key_value_group()
+    picture = build_element("element-000111", "picture", reading_order=2)
+    picture.parent_id = group.id
+
+    _, obligations = _derive_processing_needs([group, picture])
+
+    assert [(o.kind, o.target_ids) for o in obligations] == [
+        ("describe-image", [picture.id])
+    ]
 
 
 def test_an_unknown_leaf_is_still_reviewed():
