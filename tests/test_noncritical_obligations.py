@@ -12,9 +12,12 @@ from types import SimpleNamespace
 import pytest
 
 from backend.agents import pddl_orchestrator as pddl
+from backend.core.execution.messages import EXE_COMPLETED_OBLIGATIONS_UNSATISFIED
 from backend.core.execution.models import MethodResult
 from backend.core.manifest.builder import _derive_processing_needs
 from backend.core.manifest.models import Obligation
+from backend.i18n import t
+from backend.stage_messages import STAGE_PAGE_UNKNOWN, STAGE_PAGES
 from backend.tools.logger import logger
 from tests.pddl_support import build_element, build_manifest, build_orchestrator
 
@@ -174,7 +177,7 @@ async def test_job_finishes_with_warning_when_only_refinements_remain(
     assert payload["canonical_metadata"]["pddl_execution_status"] in {
         "failed", "replan-required",
     }
-    assert any("o-refine" in warning for warning in payload["technical_warnings"])
+    assert any("normalize-text" in warning for warning in payload["technical_warnings"])
     assert _open_ids(payload) == ["o-refine"]
     assert _heading_levels(payload) == [1, 2, 2]
 
@@ -193,29 +196,49 @@ async def test_an_omitted_block_with_no_rescue_method_does_not_fail_the_job(
     )
 
     assert _open_ids(payload) == ["o-rescue"]
+    # Delivered, not dropped silently: the omitted block is reported, and the
+    # summary the result e-mail carries names it.
+    assert any(
+        "rescue-omitted-block" in warning for warning in payload["technical_warnings"]
+    )
+    assert "rescue-omitted-block" in (
+        payload["canonical_metadata"]["pddl_unsatisfied_summary"]
+    )
 
 
 def test_the_job_error_groups_open_obligations_by_kind_and_page():
     """006.pdf's e-mail listed every obligation id with all its target elements."""
     order = _reading_order()
-    order.status = "failed"
+    # A second obligation of the same kind: its page merges into the group.
+    second_order = _open_obligation(
+        "o-order-2", "refine-reading-order", ["xycut-order", "human-review"]
+    )
+    second_order.target_ids = ["heading-1"]
     describe = _describe_image(["human-review"], {"human-review": 100})
-    describe.status = "failed"
+    for obligation in (order, second_order, describe):
+        obligation.status = "failed"
     manifest = _headings_manifest(
         order,
+        second_order,
         describe,
         extra_elements=[build_element("image", "picture", reading_order=10)],
     )
+    open_ids = {"o-order", "o-order-2", "o-describe"}
     for obligation in manifest.obligations:
-        obligation.selected = obligation.id in {"o-order", "o-describe"}
-    manifest.elements[-1].page_number = None
+        obligation.selected = obligation.id in open_ids
+    elements = {element.id: element for element in manifest.elements}
+    elements["heading-1"].page_number = 2
+    elements["image"].page_number = None
 
     summary = pddl._unsatisfied_summary(manifest)
 
-    assert "refine-reading-order (" in summary
-    assert "describe-image (" in summary
-    assert "heading-0" not in summary
-    assert "o-order" not in summary
+    expected = "; ".join([
+        f"refine-reading-order ({t(STAGE_PAGES).format(pages='1, 2')})",
+        f"describe-image ({t(STAGE_PAGE_UNKNOWN)})",
+    ])
+    assert summary == t(EXE_COMPLETED_OBLIGATIONS_UNSATISFIED).format(
+        unsatisfied=expected
+    )
 
 
 @pytest.mark.asyncio
@@ -234,7 +257,7 @@ async def test_a_judge_verdict_for_the_secondary_provider_does_not_fail_the_job(
     )
 
     assert _open_ids(payload) == ["o-adjudicate"]
-    assert any("o-adjudicate" in warning for warning in payload["technical_warnings"])
+    assert any("adjudicate-page" in warning for warning in payload["technical_warnings"])
 
 
 @pytest.mark.asyncio
@@ -285,8 +308,8 @@ async def test_replan_skips_exhausted_refinement_and_rescues_critical_one(
     payload = await _run(orchestrator, manifest, monkeypatch, tmp_path)
 
     assert payload["canonical_metadata"]["pddl_execution_status"] == "completed"
-    assert any("o-refine" in warning for warning in payload["technical_warnings"])
+    assert any("normalize-text" in warning for warning in payload["technical_warnings"])
     assert not any(
-        "o-describe" in warning for warning in payload["technical_warnings"]
+        "describe-image" in warning for warning in payload["technical_warnings"]
     )
     assert _open_ids(payload) == ["o-refine"]

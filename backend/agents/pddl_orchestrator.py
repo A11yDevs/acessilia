@@ -3118,8 +3118,9 @@ NON_CRITICAL_OBLIGATION_KINDS = frozenset(
         "extract-line-numbers",
         # No handler implements `rescue-omitted` yet, so its only path is
         # human review: as a critical kind it failed every dual-fusion job
-        # with an omitted block. The block is reported, the content the
-        # primary provider extracted is delivered.
+        # with an omitted block. The content the primary provider extracted
+        # is delivered and the result e-mail names the pages of the omitted
+        # block. Remove the kind from here once the handler lands (#236).
         "rescue-omitted-block",
     }
 )
@@ -3166,15 +3167,6 @@ def _replannable_obligation_ids(manifest: ProcessingManifest) -> list[str]:
         and obligation.status != "satisfied"
         and not blocked(obligation.id, set())
     ]
-
-
-def _unsatisfied_execution_message(manifest: ProcessingManifest) -> str:
-    return t(EXE_COMPLETED_OBLIGATIONS_UNSATISFIED).format(
-        unsatisfied=", ".join(
-            f"{obligation.id} ({_pages_label(_obligation_pages(manifest, obligation.id))})"
-            for obligation in _unsatisfied_selected_obligations(manifest)
-        )
-    )
 
 
 def _unsatisfied_summary(manifest: ProcessingManifest) -> str:
@@ -3320,8 +3312,9 @@ def build_pddl_structured_payload(
         "failed", "replan-required",
     } or _unsatisfied_selected_obligations(manifest):
         # A replan that leaves an exhausted refinement out can still report
-        # `completed`; the open obligation must reach the document anyway.
-        technical_warnings.append(_unsatisfied_execution_message(manifest))
+        # `completed`; the open obligation must reach the document anyway. The
+        # ids are in `pddl_unsatisfied_obligations`, so the warning stays short.
+        technical_warnings.append(_unsatisfied_summary(manifest))
 
     if comparison is not None:
         technical_warnings.append(
@@ -3353,6 +3346,11 @@ def build_pddl_structured_payload(
             if comparison
             else None,
             "pddl_unsatisfied_obligations": _unsatisfied_obligations(manifest),
+            # The open obligations a delivered document still has, for the
+            # result e-mail: the job page and e-mail show no technical warning.
+            "pddl_unsatisfied_summary": _unsatisfied_summary(manifest)
+            if _unsatisfied_selected_obligations(manifest)
+            else None,
             "pddl_toolbox_availability": toolbox_availability,
             "pddl_media_inspection": {
                 "status": media_inspection_status,

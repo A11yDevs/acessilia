@@ -82,7 +82,7 @@ def test_diagnostic_payload_warns_about_failed_or_pending_execution(tmp_path, me
         planner_backend="internal", execution_report=report, comparison=None,
     )
     assert payload["technical_warnings"]
-    assert "o-1" in payload["technical_warnings"][0]
+    assert "describe-image" in payload["technical_warnings"][0]
 
 
 @pytest.mark.asyncio
