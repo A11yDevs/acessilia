@@ -533,6 +533,82 @@ async def test_a_looping_description_is_salvaged_without_the_loop(monkeypatch) -
     assert result.language == "und"
 
 
+def test_a_description_over_the_region_budget_is_truncated_and_warns() -> None:
+    from backend.agents.vision_agent import (
+        DESCRIPTION_CHARS_PER_TOKEN,
+        _truncate_description,
+    )
+    from backend.config.settings import settings
+    from backend.i18n import t
+    from backend.log_messages import MSG_VISION_TRUNCATION_NOTICE
+
+    limit_chars = settings.vision_region_max_tokens * DESCRIPTION_CHARS_PER_TOKEN
+    output = VisionOutput(
+        kind="description",
+        description="a" * (limit_chars + 100),
+        language="en",
+        confidence=0.9,
+    )
+
+    truncated = _truncate_description(output, page_num=18, region_type="embedded_image")
+
+    assert len(truncated.description) == limit_chars
+    assert truncated.description.endswith("\n\n" + t(MSG_VISION_TRUNCATION_NOTICE))
+    assert truncated.warnings == [
+        "description truncated to the "
+        f"{settings.vision_region_max_tokens}-token budget ({limit_chars} characters kept)"
+    ]
+
+
+def test_a_description_within_the_region_budget_is_kept_whole() -> None:
+    from backend.agents.vision_agent import _truncate_description
+
+    output = VisionOutput(
+        kind="description", description="Short description.", language="en", confidence=0.9
+    )
+
+    kept = _truncate_description(output, page_num=18, region_type="embedded_image")
+
+    assert kept.description == "Short description."
+    assert kept.warnings == []
+
+
+@pytest.mark.asyncio
+async def test_a_rate_limited_region_waits_and_is_retried(monkeypatch) -> None:
+    vision_module, calls = _scripted_vision_agent(
+        monkeypatch,
+        [RuntimeError("HTTP 429: rate limit exceeded, retry later"), VALID_FORMULA],
+    )
+    monkeypatch.setattr(vision_module, "_RATE_LIMIT_RETRY_SECONDS", 0)
+
+    result = await vision_module.VisionAgent().describe_region(
+        b"image", "embedded_image", page_num=7
+    )
+
+    assert isinstance(result, VisionOutput)
+    assert result.formula_latex == "x = y"
+    # The rate-limited try was not the last one: the region was asked again.
+    assert len(calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_an_identical_region_reuses_the_cached_description(monkeypatch, tmp_path) -> None:
+    from backend.config.settings import settings
+    from backend.services import cache as cache_module
+
+    vision_module, calls = _scripted_vision_agent(monkeypatch, [VALID_FORMULA])
+    monkeypatch.setattr(settings, "vision_region_cache_enabled", True)
+    monkeypatch.setattr(cache_module, "CACHE_DIR", tmp_path / "cache")
+
+    first = await vision_module.VisionAgent().describe_region(b"image", "embedded_image")
+    second = await vision_module.VisionAgent().describe_region(b"image", "embedded_image")
+
+    assert isinstance(first, VisionOutput)
+    assert second.model_dump(mode="json") == first.model_dump(mode="json")
+    # The second identical call never reached the model.
+    assert len(calls) == 1
+
+
 BLANK_PAGE = {"kind": "blank", "language": "und", "confidence": 0.9}
 
 

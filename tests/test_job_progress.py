@@ -20,6 +20,7 @@ from backend.i18n import t
 from backend.stage_messages import (
     STAGE_EXECUTING_PLAN_STEP,
     STAGE_PAGE,
+    STAGE_PAGE_OF,
     STAGE_PAGE_UNKNOWN,
     STAGE_PAGES,
     STAGE_RESTART_INTERRUPTED_DURING,
@@ -69,6 +70,14 @@ def sent_failures(monkeypatch):
 class TestPagesLabel:
     def test_single_page(self):
         assert _pages_label([3, 3, None]) == t(STAGE_PAGE).format(page=3)
+
+    def test_single_page_of_a_multi_page_document_names_the_total(self):
+        assert _pages_label([3, 3, None], 42) == t(STAGE_PAGE_OF).format(
+            page=3, total_pages=42
+        )
+
+    def test_single_page_of_a_one_page_document_keeps_the_plain_label(self):
+        assert _pages_label([1, 1, None], 1) == t(STAGE_PAGE).format(page=1)
 
     def test_several_pages_are_sorted_and_deduplicated(self):
         assert _pages_label([5, 2, 5]) == t(STAGE_PAGES).format(pages="2, 5")

@@ -79,14 +79,16 @@ STAGE_RESTART_RESUBMIT = 'Processing interrupted by restart; submit again'
 STAGE_PENDING_UPLOAD_MISSING = 'Pending upload no longer exists'
 #: PDDL-pipeline stage while the generated plan is executed for real (PDDL_EXECUTE_DRY_RUN=false).
 STAGE_EXECUTING_PLAN: str = "Executing the plan..."
-#: Live stage while one image is described by the vision model; {current}/{total} count the images, {pages} is a STAGE_PAGE* label.
-STAGE_DESCRIBING_IMAGE: str = "Describing image {current} of {total} ({pages})..."
-#: Live stage while one table is rebuilt from its region image; {current}/{total} count the tables, {pages} is a STAGE_PAGE* label.
-STAGE_RECOGNIZING_TABLE: str = "Recognizing table {current} of {total} ({pages})..."
+#: Live stage while one image is described by the vision model; {current}/{total} count the images, {pages} is a STAGE_PAGE* label spelled out as location so the image count cannot be read as a page count.
+STAGE_DESCRIBING_IMAGE: str = "Describing image {current} of {total} (this image is on {pages})..."
+#: Live stage while one table is rebuilt from its region image; {current}/{total} count the tables, {pages} is a STAGE_PAGE* label spelled out as location so the table count cannot be read as a page count.
+STAGE_RECOGNIZING_TABLE: str = "Recognizing table {current} of {total} (this table is on {pages})..."
 #: Live stage while one plan step runs; {current}/{total} count the plan steps and {pages} is a STAGE_PAGE* label.
 STAGE_EXECUTING_PLAN_STEP: str = "Executing the plan: step {current} of {total} ({pages})..."
 #: Location label for work on a single page; {page} is the 1-based page number.
 STAGE_PAGE: str = "page {page}"
+#: Location label for a single page of a multi-page document, naming the total; {page} is the 1-based page number and {total_pages} the document page count. Used instead of STAGE_PAGE so users can tell image counts apart from page counts.
+STAGE_PAGE_OF: str = "page {page} of {total_pages}"
 #: Location label for work spanning several pages; {pages} is a comma-separated list of page numbers.
 STAGE_PAGES: str = "pages {pages}"
 #: Location label for work whose page the extraction did not identify.

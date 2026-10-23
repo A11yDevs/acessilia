@@ -59,6 +59,7 @@ from backend.log_messages import (
     LOG_PDDL_IMAGES_ENRICHED,
     LOG_PDDL_PREFERRED_PLAN_MISSING,
     LOG_PDDL_TABLES_ENRICHED,
+    LOG_VISION_ELEMENT_DESCRIPTION,
 )
 from backend.stage_messages import (
     STAGE_ANALYZING_STRUCTURAL,
@@ -73,6 +74,7 @@ from backend.stage_messages import (
     STAGE_RECOGNIZING_TABLE,
     STAGE_EXECUTING_PLAN_STEP,
     STAGE_PAGE,
+    STAGE_PAGE_OF,
     STAGE_PAGES,
     STAGE_PAGE_UNKNOWN,
 )
@@ -2569,88 +2571,121 @@ async def _enrich_picture_descriptions(
 
     vision = VisionAgent(mode=mode)
     total_pages = len(manifest.pages)
-    enriched = 0
+    from backend.config.settings import settings
 
-    for position, element in enumerate(pictures, start=1):
+    # Descriptions are independent, so they run concurrently, bounded by
+    # VISION_CONCURRENCY to stay inside what the model provider accepts (a
+    # rate-limited hosted API, or a local Ollama that queues beyond its own
+    # parallelism). The semaphore grants slots FIFO, so the progress messages
+    # keep their order; a later image may still finish first, and completion
+    # order is not reported.
+    slots = asyncio.Semaphore(max(1, settings.vision_concurrency))
+
+    async def describe_one(position: int, element: ManifestElement) -> bool:
+        """Describe one picture and fold the answer into it; True when enriched."""
         fallback_page_number = element.page_number
         if fallback_page_number is None and len(manifest.pages) == 1:
             fallback_page_number = manifest.pages[0].page_number
 
-        if status_callback:
-            await status_callback(
-                t(STAGE_DESCRIBING_IMAGE).format(
-                    current=position,
-                    total=len(pictures),
-                    pages=_pages_label([fallback_page_number]),
+        async with slots:
+            if status_callback:
+                await status_callback(
+                    t(STAGE_DESCRIBING_IMAGE).format(
+                        current=position,
+                        total=len(pictures),
+                        pages=_pages_label([fallback_page_number], len(manifest.pages)),
+                    )
                 )
+            image_bytes, page_number = await run_blocking(
+                _extract_picture_bytes,
+                source_file,
+                element,
+                fallback_page_number,
+                _source_artifact_id(manifest),
+                manifest.source.media_type,
             )
-        image_bytes, page_number = await run_blocking(
-            _extract_picture_bytes,
-            source_file,
-            element,
-            fallback_page_number,
-            _source_artifact_id(manifest),
-            manifest.source.media_type,
-        )
-        if not image_bytes:
-            continue
+            if not image_bytes:
+                return False
 
-        vision_output = await vision.describe_region(
-            image_bytes=image_bytes,
-            # A whole presentation slide gets the page prompt and budget.
-            classification=(
-                "full_page_image" if element.metadata.get("slide_visual") else "embedded_image"
-            ),
-            page_num=page_number,
-            total_pages=total_pages,
-            mode=mode,
-        )
-        if isinstance(vision_output, VisionOutput):
-            element.metadata["vision_description_complete"] = True
-            element.metadata["vision_language"] = vision_output.language
-            element.metadata["vision_confidence"] = vision_output.confidence
-            element.metadata["vision_elements"] = list(vision_output.mentioned_elements)
-            if vision_output.warnings:
-                element.metadata["vision_warnings"] = list(vision_output.warnings)
+            vision_output = await vision.describe_region(
+                image_bytes=image_bytes,
+                # A whole presentation slide gets the page prompt and budget.
+                classification=(
+                    "full_page_image" if element.metadata.get("slide_visual") else "embedded_image"
+                ),
+                page_num=page_number,
+                total_pages=total_pages,
+                mode=mode,
+            )
 
-            if vision_output.kind == "formula":
-                element.text = vision_output.formula_latex or ""
-                if element.type != "formula":
-                    previous_type = element.type
-                    element.metadata["original_type"] = element.type
-                    element.type = "formula"
-                    element.raw_label = "formula"
-                    reconcile_reclassified_element_processing_needs(
-                        manifest,
-                        element,
-                        previous_type=previous_type,
-                    )
-            else:
-                element.text = vision_output.description
-                if element.type != "picture":
-                    previous_type = element.type
-                    element.metadata["original_type"] = element.type
-                    element.type = "picture"
-                    element.raw_label = "picture"
-                    reconcile_reclassified_element_processing_needs(
-                        manifest,
-                        element,
-                        previous_type=previous_type,
-                    )
-            if element.page_number is None and page_number >= 1:
-                element.page_number = page_number
-            # A model that answers with an empty description used to be counted as
-            # an enrichment, producing an element that still had no text and an
-            # obligation that could not be satisfied. Report it so the operator
-            # sees the model refused instead of a silent gap.
-            if _has_meaningful_text(element):
-                enriched += 1
-            else:
-                logger.warning(
-                    t(LOG_PDDL_EMPTY_VISION_DESCRIPTION).format(
-                        element_id=element.id
-                    )
+        if not isinstance(vision_output, VisionOutput):
+            return False
+
+        logger.debug(
+            t(LOG_VISION_ELEMENT_DESCRIPTION).format(
+                element_id=element.id,
+                page_num=page_number,
+                chars=len(vision_output.description),
+                description=vision_output.description,
+            )
+        )
+        element.metadata["vision_description_complete"] = True
+        element.metadata["vision_language"] = vision_output.language
+        element.metadata["vision_confidence"] = vision_output.confidence
+        element.metadata["vision_elements"] = list(vision_output.mentioned_elements)
+        if vision_output.warnings:
+            element.metadata["vision_warnings"] = list(vision_output.warnings)
+
+        if vision_output.kind == "formula":
+            element.text = vision_output.formula_latex or ""
+            if element.type != "formula":
+                previous_type = element.type
+                element.metadata["original_type"] = element.type
+                element.type = "formula"
+                element.raw_label = "formula"
+                reconcile_reclassified_element_processing_needs(
+                    manifest,
+                    element,
+                    previous_type=previous_type,
                 )
+        else:
+            element.text = vision_output.description
+            if element.type != "picture":
+                previous_type = element.type
+                element.metadata["original_type"] = element.type
+                element.type = "picture"
+                element.raw_label = "picture"
+                reconcile_reclassified_element_processing_needs(
+                    manifest,
+                    element,
+                    previous_type=previous_type,
+                )
+        if element.page_number is None and page_number >= 1:
+            element.page_number = page_number
+        # A model that answers with an empty description used to be counted as
+        # an enrichment, producing an element that still had no text and an
+        # obligation that could not be satisfied. Report it so the operator
+        # sees the model refused instead of a silent gap.
+        if _has_meaningful_text(element):
+            return True
+        logger.warning(
+            t(LOG_PDDL_EMPTY_VISION_DESCRIPTION).format(
+                element_id=element.id
+            )
+        )
+        return False
+
+    # The fold above touches only its own element and runs without awaits, so
+    # concurrent folds cannot interleave; gather keeps the shared manifest
+    # consistent while the model calls overlap.
+    enriched = sum(
+        await asyncio.gather(
+            *(
+                describe_one(position, element)
+                for position, element in enumerate(pictures, start=1)
+            )
+        )
+    )
 
     if enriched:
         logger.info(t(LOG_PDDL_IMAGES_ENRICHED).format(count=enriched))
@@ -2811,7 +2846,7 @@ async def _enrich_table_structures(
                 t(STAGE_RECOGNIZING_TABLE).format(
                     current=position,
                     total=len(table_elements),
-                    pages=_pages_label([fallback_page_number]),
+                    pages=_pages_label([fallback_page_number], len(manifest.pages)),
                 )
             )
         image_bytes, page_number = await run_blocking(
@@ -3237,12 +3272,23 @@ def _unsatisfied_summary(manifest: ProcessingManifest) -> str:
     return t(EXE_COMPLETED_OBLIGATIONS_UNSATISFIED).format(unsatisfied="; ".join(groups))
 
 
-def _pages_label(pages: Iterable[int | None]) -> str:
-    """Localized location of a unit of work, e.g. "page 3" or "pages 3, 4"."""
+def _pages_label(
+    pages: Iterable[int | None], total_pages: int | None = None
+) -> str:
+    """Localized location of a unit of work, e.g. "page 3" or "pages 3, 4".
+
+    When the document's page count is known and the work sits on a single page,
+    the label also names the total, e.g. "page 3 of 12": progress messages pair
+    that with image or step counters ("image 11 of 37 (page 18 of 42)"), and
+    without the total users could read 37 as the page count. Single-page
+    documents keep the plain "page 1" label because "of 1" adds nothing.
+    """
     numbers = sorted({page for page in pages if page})
     if not numbers:
         return t(STAGE_PAGE_UNKNOWN)
     if len(numbers) == 1:
+        if total_pages is not None and total_pages > 1:
+            return t(STAGE_PAGE_OF).format(page=numbers[0], total_pages=total_pages)
         return t(STAGE_PAGE).format(page=numbers[0])
     return t(STAGE_PAGES).format(pages=", ".join(str(page) for page in numbers))
 
@@ -3296,7 +3342,9 @@ def _plan_progress(
         )
         try:
             message = t(STAGE_EXECUTING_PLAN_STEP).format(
-                current=position, total=total, pages=_pages_label(pages)
+                current=position,
+                total=total,
+                pages=_pages_label(pages, len(manifest.pages)),
             )
             asyncio.run_coroutine_threadsafe(status_callback(message), loop).result(
                 timeout=_PROGRESS_REPORT_TIMEOUT_SECONDS

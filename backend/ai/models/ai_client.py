@@ -34,7 +34,7 @@ def get_agno_model(*, max_tokens: int | None = None):
                 else settings.openrouter_max_tokens
             ),
             extra_headers=extra_headers if extra_headers else None,
-            timeout=float(settings.request_timeout),
+            timeout=float(settings.model_call_timeout_seconds),
         )
     else:
         from agno.models.ollama import Ollama
@@ -54,5 +54,5 @@ def get_agno_model(*, max_tokens: int | None = None):
             host=host,
             options=options,
             api_key=settings.ollama_api_key or "not-needed",
-            timeout=float(settings.request_timeout),
+            timeout=float(settings.model_call_timeout_seconds),
         )

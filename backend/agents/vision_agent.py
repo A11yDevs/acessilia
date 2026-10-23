@@ -2,6 +2,7 @@
 
 import asyncio
 import functools
+import hashlib
 import json
 import re
 
@@ -11,17 +12,21 @@ from pydantic import ValidationError
 from backend.config.settings import settings
 from backend.i18n import t
 from backend.log_messages import (
+    LOG_VISION_AGENT_DESCRIPTION_TRUNCATED,
+    LOG_VISION_AGENT_RATE_LIMIT_RETRY,
     LOG_VISION_AGENT_REGION_ERROR,
     LOG_VISION_AGENT_REGION_RECOVERED,
     LOG_VISION_AGENT_REGION_RETRY,
     LOG_VISION_AGENT_REGION_SALVAGED,
     LOG_VISION_AGENT_SENDING_REGION,
+    MSG_VISION_TRUNCATION_NOTICE,
 )
 from backend.tools.region_classifier import region_prompt_key
 from backend.tools.logger import logger
 
 from backend.tools.prompt_tools import build_page_prompt, load_region_prompt, load_system_prompt
 from backend.ai.models.ai_client import get_agno_model
+from backend.services.cache import get_cached_bytes, options_cache_key, set_cache_bytes
 from backend.agents.output_schemas import (
     PAGE_INSPECTION_INSTRUCTION,
     VISION_SCHEMA_INSTRUCTION,
@@ -97,7 +102,10 @@ class VisionAgent:
             full_budget (bool): Use the general token budget instead of VISION_REGION_MAX_TOKENS, for a region that may need transcribing (default False).
 
         Returns:
-            A validated visual result, or None when inference or validation fails.
+            A validated visual result, or None when inference or validation fails. A
+            description longer than the region token budget is truncated with a
+            recorded warning; regions on the general budget (``full_budget``) are
+            never truncated, because a cut there would lose document content.
         """
         effective_mode = mode or self.mode
 
@@ -124,8 +132,19 @@ class VisionAgent:
             else settings.vision_region_max_tokens
         )
 
+        cache_extra = _region_cache_extra(prompt, effective_mode, max_tokens)
+        if settings.vision_region_cache_enabled:
+            cached = await get_cached_bytes(
+                image_bytes, extra=cache_extra, ttl=VISION_CACHE_TTL_SECONDS
+            )
+            if cached is not None:
+                try:
+                    return VisionOutput.model_validate(cached)
+                except ValidationError:
+                    pass  # stale or incompatible stored payload: describe again
+
         try:
-            return await _run_with_retry(
+            output = await _run_with_retry(
                 prompt, image_bytes, VisionOutput, page_num=page_num, label=classification,
                 max_tokens=max_tokens,
             )
@@ -136,6 +155,10 @@ class VisionAgent:
                 else None
             )
             if salvaged is not None:
+                if max_tokens is not None:
+                    salvaged = _truncate_description(
+                        salvaged, page_num=page_num, region_type=classification
+                    )
                 logger.warning(
                     t(LOG_VISION_AGENT_REGION_SALVAGED).format(
                         page_num=page_num,
@@ -155,6 +178,15 @@ class VisionAgent:
                 )
             )
             return None
+        if max_tokens is not None:
+            output = _truncate_description(
+                output, page_num=page_num, region_type=classification
+            )
+        if settings.vision_region_cache_enabled:
+            await set_cache_bytes(
+                image_bytes, output.model_dump(mode="json"), extra=cache_extra
+            )
+        return output
 
     async def inspect_page(
         self,
@@ -209,7 +241,13 @@ async def _run_with_retry(
         run = functools.partial(
             agent.run, input=attempt_prompt, images=[Image(content=image_bytes)]
         )
-        response = await asyncio.to_thread(run)
+        try:
+            response = await asyncio.to_thread(run)
+        except Exception as error:
+            if _is_rate_limited(error) and attempt < REGION_ATTEMPTS:
+                await _back_off_after_rate_limit(page_num, label, attempt)
+                continue
+            raise
         try:
             output = validate_structured_run(response, schema)
         except ValidationError as error:
@@ -225,6 +263,11 @@ async def _run_with_retry(
                 )
             )
             continue
+        except RuntimeError as error:
+            if _is_rate_limited(error) and attempt < REGION_ATTEMPTS:
+                await _back_off_after_rate_limit(page_num, label, attempt)
+                continue
+            raise
         if attempt > 1:
             logger.info(
                 t(LOG_VISION_AGENT_REGION_RECOVERED).format(
@@ -236,6 +279,121 @@ async def _run_with_retry(
             )
         return output
     raise AssertionError("REGION_ATTEMPTS must be at least 1")
+
+
+#: Pattern identifying a provider rate-limit rejection (HTTP 429), whether the
+#: provider SDK raises it as an exception or ends the run with it as the error
+#: content; matched case-insensitively against the error text.
+_RATE_LIMIT_PATTERN = re.compile(r"\b429\b|rate[ _-]?limit", re.IGNORECASE)
+
+#: Seconds waited before the try that follows a rate-limit rejection, growing
+#: linearly with the failed attempt (20s, then 40s).
+_RATE_LIMIT_RETRY_SECONDS = 20
+
+
+def _is_rate_limited(error: BaseException) -> bool:
+    """Whether a provider failure looks like an HTTP 429 rate-limit rejection."""
+    return bool(_RATE_LIMIT_PATTERN.search(str(error)))
+
+
+async def _back_off_after_rate_limit(page_num: int, label: str, attempt: int) -> None:
+    """Log a rate-limit rejection and wait before the next try.
+
+    Unlike an unusable answer, a rate limit says nothing about the image, so
+    the retry is not a new sample of the same question but a queued one; the
+    wait keeps the extra load off the provider instead of doubling it.
+    """
+    delay = _RATE_LIMIT_RETRY_SECONDS * attempt
+    logger.warning(
+        t(LOG_VISION_AGENT_RATE_LIMIT_RETRY).format(
+            page_num=page_num,
+            type=label,
+            attempt=attempt + 1,
+            attempts=REGION_ATTEMPTS,
+            delay=delay,
+        )
+    )
+    await asyncio.sleep(delay)
+
+
+#: Rough characters-per-token ratio for bounding a description's length. No
+#: tokenizer is loaded for this check, so the cap is an approximation: its
+#: point is bounding a runaway answer (some providers do not honor max_tokens
+#: strictly), not metering exact tokens.
+DESCRIPTION_CHARS_PER_TOKEN = 4
+
+#: Recorded in the truncated answer's warnings, so the evidence says the
+#: description is a capped prefix and not what the model meant to send.
+DESCRIPTION_TRUNCATION_WARNING = (
+    "description truncated to the {limit}-token budget ({chars} characters kept)"
+)
+
+
+def _truncate_description(
+    output: VisionOutput, *, page_num: int, region_type: str
+) -> VisionOutput:
+    """Cap a description at the region token budget, warning when it cuts.
+
+    ``max_tokens`` normally already bounds the answer, but some providers do
+    not honor it strictly, and a runaway description would otherwise reach the
+    exports and the audio verbatim. The cap is applied to the final text, in
+    characters estimated from the token budget; regions on the general budget
+    (``full_budget``) are excluded by the caller, because a cut there would
+    lose document content.
+
+    The truncated text ends with a reader-facing notice stating that the image
+    is informationally very extensive and many details were not described, so
+    nobody mistakes the bounded text for a complete description. The notice
+    counts against the cap, so the total stays within the budget.
+    """
+    limit_chars = settings.vision_region_max_tokens * DESCRIPTION_CHARS_PER_TOKEN
+    if len(output.description) <= limit_chars:
+        return output
+    notice = t(MSG_VISION_TRUNCATION_NOTICE)
+    body_limit = max(0, limit_chars - len(notice) - 2)
+    output.description = output.description[:body_limit].rstrip() + "\n\n" + notice
+    output.warnings.append(
+        DESCRIPTION_TRUNCATION_WARNING.format(
+            limit=settings.vision_region_max_tokens, chars=len(output.description)
+        )
+    )
+    logger.warning(
+        t(LOG_VISION_AGENT_DESCRIPTION_TRUNCATED).format(
+            page_num=page_num,
+            type=region_type,
+            limit=settings.vision_region_max_tokens,
+            chars=len(output.description),
+        )
+    )
+    return output
+
+
+#: TTL of a stored region description. Answers are sampled, not deterministic,
+#: but a description is content, not state: re-describing the same image after
+#: a restart or a retry adds cost without new information.
+VISION_CACHE_TTL_SECONDS = 7 * 24 * 3600
+
+
+def _region_cache_extra(prompt: str, mode: str, max_tokens: int | None) -> str:
+    """Cache variant covering everything the answer depends on besides the image.
+
+    The final prompt (system prompt, region instructions, schema instruction,
+    any page numbers baked into a page prompt) plus the model and the budget
+    fully determine what is asked; calls that agree on all of these may share
+    an answer.
+    """
+    model = (
+        settings.openrouter_model
+        if settings.ai_client == "openrouter"
+        else settings.ollama_model
+    )
+    return options_cache_key(
+        "vision_region",
+        model=model,
+        mode=mode,
+        budget=max_tokens,
+        prompt_sha256=hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
+    )
 
 
 #: Shortest salvaged description kept; a shorter prefix is a fragment, not an

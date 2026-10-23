@@ -10,6 +10,20 @@ from tests.toolbox_render_fake import fake_toolbox_render  # noqa: F401
 
 
 @pytest.fixture(autouse=True)
+def _vision_cache_stays_out_of_tests(monkeypatch):
+    """Keep region-description cache hits out of the test suite.
+
+    The cache is keyed on the image bytes, and several tests script identical
+    inputs with different answers; a shared cache directory would leak one
+    test's answer into another. Tests that exercise the cache re-enable it and
+    point ``backend.services.cache.CACHE_DIR`` at their own ``tmp_path``.
+    """
+    from backend.config.settings import settings
+
+    monkeypatch.setattr(settings, "vision_region_cache_enabled", False)
+
+
+@pytest.fixture(autouse=True)
 def _renders_stay_off_a_real_toolbox(request, monkeypatch):
     """Fail a non-e2e test that renders or validates against a real Toolbox.
 

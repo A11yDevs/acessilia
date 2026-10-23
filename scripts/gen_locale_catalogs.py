@@ -98,12 +98,15 @@ from backend.log_messages import (
     LOG_DATA_AGENT_PROMPT_NOT_FOUND,
     LOG_DATA_AGENT_PROCESSING_REGION,
     LOG_DATA_AGENT_REGION_ERROR,
+    LOG_VISION_AGENT_DESCRIPTION_TRUNCATED,
+    LOG_VISION_AGENT_RATE_LIMIT_RETRY,
     LOG_VISION_AGENT_REGION_ERROR,
     LOG_VISION_AGENT_REGION_RECOVERED,
     LOG_VISION_AGENT_REGION_RETRY,
     LOG_VISION_AGENT_REGION_SALVAGED,
     LOG_MANIFEST_STRUCTURAL_CONTAINER_SKIPPED,
     LOG_VISION_AGENT_SENDING_REGION,
+    LOG_VISION_ELEMENT_DESCRIPTION,
     LOG_CLEANUP_ITEM_FAILED,
     LOG_CLEANUP_OUTPUT_FAILED,
     LOG_CLEANUP_PERIODIC_ERROR,
@@ -191,6 +194,7 @@ from backend.log_messages import (
     LOG_WORKER_TASK_STARTING,
     MSG_PLANNER_NOT_STARTED,
     MSG_TIMESTAMPS_MIXED_TIMEZONES,
+    MSG_VISION_TRUNCATION_NOTICE,
     MSG_OBLIGATION_CODE,
     MSG_OBLIGATION_FORMULA,
     MSG_OBLIGATION_IMAGE,
@@ -304,6 +308,7 @@ from backend.stage_messages import (
     STAGE_RECOGNIZING_TABLE,
     STAGE_EXECUTING_PLAN_STEP,
     STAGE_PAGE,
+    STAGE_PAGE_OF,
     STAGE_PAGES,
     STAGE_PAGE_UNKNOWN,
     STAGE_FAILED_DURING,
@@ -524,6 +529,7 @@ MESSAGES: tuple[str, ...] = (
     STAGE_RECOGNIZING_TABLE,
     STAGE_EXECUTING_PLAN_STEP,
     STAGE_PAGE,
+    STAGE_PAGE_OF,
     STAGE_PAGES,
     STAGE_PAGE_UNKNOWN,
     STAGE_FAILED_DURING,
@@ -625,6 +631,7 @@ MESSAGES: tuple[str, ...] = (
     EXE_PREDECESSORS_UNSATISFIED,
     MSG_PLANNER_NOT_STARTED,
     MSG_TIMESTAMPS_MIXED_TIMEZONES,
+    MSG_VISION_TRUNCATION_NOTICE,
     MSG_EXECUTE_OBLIGATION_MISSING_FIELDS,
     MSG_ACTION_REJECTS_EXECUTION_PARAMETERS,
     MSG_PLAN_INDICES_CONSECUTIVE_FROM_ZERO,
@@ -847,12 +854,15 @@ MESSAGES: tuple[str, ...] = (
     LOG_DATA_AGENT_PROMPT_NOT_FOUND,
     LOG_DATA_AGENT_PROCESSING_REGION,
     LOG_DATA_AGENT_REGION_ERROR,
+    LOG_VISION_AGENT_DESCRIPTION_TRUNCATED,
+    LOG_VISION_AGENT_RATE_LIMIT_RETRY,
     LOG_VISION_AGENT_REGION_ERROR,
     LOG_VISION_AGENT_REGION_RECOVERED,
     LOG_VISION_AGENT_REGION_RETRY,
     LOG_VISION_AGENT_REGION_SALVAGED,
     LOG_MANIFEST_STRUCTURAL_CONTAINER_SKIPPED,
     LOG_VISION_AGENT_SENDING_REGION,
+    LOG_VISION_ELEMENT_DESCRIPTION,
     LOG_CACHE_HIT,
     LOG_CACHE_DEBUG_HIT,
     LOG_CACHE_DEBUG_SET,
@@ -971,10 +981,11 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "Validando o plano em modo dry-run..."
         ),
         STAGE_EXECUTING_PLAN: "Executando o plano...",
-        STAGE_DESCRIBING_IMAGE: "Descrevendo a imagem {current} de {total} ({pages})...",
-        STAGE_RECOGNIZING_TABLE: "Reconhecendo a tabela {current} de {total} ({pages})...",
+        STAGE_DESCRIBING_IMAGE: "Descrevendo a imagem {current} de {total} (esta imagem está na {pages})...",
+        STAGE_RECOGNIZING_TABLE: "Reconhecendo a tabela {current} de {total} (esta tabela está na {pages})...",
         STAGE_EXECUTING_PLAN_STEP: "Executando o plano: passo {current} de {total} ({pages})...",
         STAGE_PAGE: "página {page}",
+        STAGE_PAGE_OF: "página {page} de {total_pages}",
         STAGE_PAGES: "páginas {pages}",
         STAGE_PAGE_UNKNOWN: "página não identificada",
         STAGE_FAILED_DURING: "{error} (falhou durante: {stage})",
@@ -1188,6 +1199,10 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         API_TOKEN_READ_ONLY: "Token permite somente leitura",
         # Manifest processing-needs rationale texts used in LLM prompt obligations per element type.
         MSG_OBLIGATION_IMAGE: ("A imagem deve receber descrição ou ser marcada como decorativa."),
+        MSG_VISION_TRUNCATION_NOTICE: (
+            "Observação: esta imagem é informativamente muito extensa; a descrição "
+            "foi limitada ao orçamento disponível e muitos detalhes não foram descritos."
+        ),
         MSG_OBLIGATION_TABLE: (
             "A tabela deve ter cabeçalhos e ordem de leitura verificáveis."
         ),
@@ -1684,6 +1699,18 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         LOG_VISION_AGENT_REGION_SALVAGED: (
             "[página {page_num}] Resposta do modelo de visão para a região {type} "
             "cortada antes do fim; descrição recuperada ({chars} caracteres)"
+        ),
+        LOG_VISION_AGENT_RATE_LIMIT_RETRY: (
+            "[página {page_num}] O provedor do modelo limitou a taxa da região {type}; "
+            "aguardando {delay}s antes de tentar de novo ({attempt}/{attempts})"
+        ),
+        LOG_VISION_AGENT_DESCRIPTION_TRUNCATED: (
+            "[página {page_num}] A descrição da visão para a região {type} passou do "
+            "orçamento de {limit} tokens e foi truncada ({chars} caracteres mantidos)"
+        ),
+        LOG_VISION_ELEMENT_DESCRIPTION: (
+            "[página {page_num}] Descrição de visão do elemento {element_id} "
+            "({chars} caracteres): {description}"
         ),
         LOG_CACHE_HIT: "Cache: item existente para {name}",
         LOG_CACHE_DEBUG_HIT: "Cache: item existente: {key}",
