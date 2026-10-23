@@ -231,6 +231,52 @@ async def test_email_delivery_status_does_not_lose_download(isolated_runtime, mo
     assert (settings.data_dir / "output/delivery/doc_acessivel.zip").is_file()
 
 
+@pytest.mark.asyncio
+async def test_result_email_reports_open_obligations_of_a_delivered_document(
+    isolated_runtime, monkeypatch, tmp_path
+):
+    """A block dropped by fusion is delivered without it; the e-mail says so."""
+    source = tmp_path / "doc.pdf"
+    source.write_bytes(b"%PDF")
+    job_store.save_request("open", "capability", {}, {"status": "queued"})
+    summary = "Open obligations: rescue-omitted-block (page 3)"
+
+    async def process(*a, **kw):
+        return {
+            "title": "Example",
+            "sections": [],
+            "metadata": {"pddl_unsatisfied_summary": summary},
+        }
+
+    def export(document, destination, *a, **kw):
+        destination.write_text("output")
+
+    async def audio(text, destination, **kw):
+        destination.write_bytes(b"audio")
+
+    async def confirmation(*a):
+        return False
+
+    warnings: list[str] = []
+
+    async def result(*a, **kw):
+        warnings.extend(kw["warnings"])
+        return True
+
+    monkeypatch.setattr("backend.service.process", process)
+    for name in ["export_txt", "export_docx", "export_pdf", "export_pdf_ua", "export_drbench_md", "export_accessible_document"]:
+        monkeypatch.setattr(worker, name, export)
+    monkeypatch.setattr(worker, "export_mp3", audio)
+    monkeypatch.setattr(worker, "send_confirmation_email", confirmation)
+    monkeypatch.setattr(worker, "send_result_email", result)
+    executor = worker.JobExecutor()
+    try:
+        await executor.run(worker.ApiJob("open", source, "doc.pdf", email="test@example.invalid"))
+    finally:
+        executor._executor.shutdown(wait=True)
+    assert warnings == [summary]
+
+
 def test_terminal_job_is_not_overwritten_by_delayed_cancel(isolated_runtime):
     job_store.save_request("race", "secret", {}, {"status": "processing"})
     job_store.save_status("race", {"status": "cancelled", "fim": 10})

@@ -430,7 +430,7 @@ class JobExecutor:
                         job.filename,
                         download_url=download_url,
                         completed_formats=completed_formats,
-                        warnings=optional_errors,
+                        warnings=[*optional_errors, *_open_obligations_warning(canonical)],
                     )
                 except Exception:
                     logger.warning("Result email delivery failed for job {}", task_id)
@@ -499,6 +499,17 @@ def _build_zip_package(zip_path: Path, out_paths: list[Path]) -> None:
         for out_path in out_paths:
             if out_path.exists():
                 archive.write(out_path, arcname=out_path.name)
+
+
+def _open_obligations_warning(canonical: dict[str, Any]) -> list[str]:
+    """The PDDL obligations a delivered document still has open, for the e-mail.
+
+    Only non-critical ones reach a delivered document (a dropped block, an
+    unapplied adjudication), and nothing else tells the user about them.
+    """
+    metadata = canonical.get("metadata")
+    summary = metadata.get("pddl_unsatisfied_summary") if isinstance(metadata, dict) else None
+    return [summary] if isinstance(summary, str) and summary else []
 
 
 def _remove_partial_output(path: Path) -> None:

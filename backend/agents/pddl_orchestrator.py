@@ -2438,7 +2438,14 @@ class PddlAccessibilityOrchestrator:
                 if obligation.kind not in NON_CRITICAL_OBLIGATION_KINDS
             ]
             if not unsatisfied or critical:
-                raise RuntimeError(_unsatisfied_execution_message(manifest))
+                # The ids name every target element and run to kilobytes on a
+                # long document, so they go to the log; the job error, which
+                # reaches the user by e-mail, says what is open and where.
+                logger.warning(
+                    "PDDL: unsatisfied obligations: {}",
+                    ", ".join(obligation.id for obligation in unsatisfied),
+                )
+                raise RuntimeError(_unsatisfied_summary(manifest))
             # Only refinements are left open; the extracted content is still
             # complete, so the document is delivered with a technical warning.
             logger.warning(
@@ -3109,6 +3116,12 @@ NON_CRITICAL_OBLIGATION_KINDS = frozenset(
         "normalize-text",
         "chunk-verse",
         "extract-line-numbers",
+        # No handler implements `rescue-omitted` yet, so its only path is
+        # human review: as a critical kind it failed every dual-fusion job
+        # with an omitted block. The content the primary provider extracted
+        # is delivered and the result e-mail names the pages of the omitted
+        # block. Remove the kind from here once the handler lands (#236).
+        "rescue-omitted-block",
     }
 )
 
@@ -3156,13 +3169,28 @@ def _replannable_obligation_ids(manifest: ProcessingManifest) -> list[str]:
     ]
 
 
-def _unsatisfied_execution_message(manifest: ProcessingManifest) -> str:
-    return t(EXE_COMPLETED_OBLIGATIONS_UNSATISFIED).format(
-        unsatisfied=", ".join(
-            f"{obligation.id} ({_pages_label(_obligation_pages(manifest, obligation.id))})"
-            for obligation in _unsatisfied_selected_obligations(manifest)
-        )
-    )
+def _unsatisfied_summary(manifest: ProcessingManifest) -> str:
+    """The open obligations grouped by kind with their pages.
+
+    "refine-reading-order (pages 1, 7, 11); describe-image (page 18)" instead of
+    one id per obligation, each listing every target element.
+    """
+    pages: dict[str, set[int]] = {}
+    unknown: set[str] = set()
+    for obligation in _unsatisfied_selected_obligations(manifest):
+        numbers = {
+            page for page in _obligation_pages(manifest, obligation.id) if page
+        }
+        pages.setdefault(obligation.kind, set()).update(numbers)
+        if not numbers:
+            unknown.add(obligation.kind)
+    groups = []
+    for kind, numbers in pages.items():
+        labels = [_pages_label(numbers)] if numbers else []
+        if kind in unknown:
+            labels.append(t(STAGE_PAGE_UNKNOWN))
+        groups.append(f"{kind} ({', '.join(labels)})")
+    return t(EXE_COMPLETED_OBLIGATIONS_UNSATISFIED).format(unsatisfied="; ".join(groups))
 
 
 def _pages_label(pages: Iterable[int | None]) -> str:
@@ -3284,8 +3312,9 @@ def build_pddl_structured_payload(
         "failed", "replan-required",
     } or _unsatisfied_selected_obligations(manifest):
         # A replan that leaves an exhausted refinement out can still report
-        # `completed`; the open obligation must reach the document anyway.
-        technical_warnings.append(_unsatisfied_execution_message(manifest))
+        # `completed`; the open obligation must reach the document anyway. The
+        # ids are in `pddl_unsatisfied_obligations`, so the warning stays short.
+        technical_warnings.append(_unsatisfied_summary(manifest))
 
     if comparison is not None:
         technical_warnings.append(
@@ -3317,6 +3346,11 @@ def build_pddl_structured_payload(
             if comparison
             else None,
             "pddl_unsatisfied_obligations": _unsatisfied_obligations(manifest),
+            # The open obligations a delivered document still has, for the
+            # result e-mail: the job page and e-mail show no technical warning.
+            "pddl_unsatisfied_summary": _unsatisfied_summary(manifest)
+            if _unsatisfied_selected_obligations(manifest)
+            else None,
             "pddl_toolbox_availability": toolbox_availability,
             "pddl_media_inspection": {
                 "status": media_inspection_status,

@@ -82,7 +82,7 @@ def test_diagnostic_payload_warns_about_failed_or_pending_execution(tmp_path, me
         planner_backend="internal", execution_report=report, comparison=None,
     )
     assert payload["technical_warnings"]
-    assert "o-1" in payload["technical_warnings"][0]
+    assert "describe-image" in payload["technical_warnings"][0]
 
 
 @pytest.mark.asyncio
@@ -99,7 +99,7 @@ async def test_orchestration_rejects_failed_or_exhausted_plan(monkeypatch, tmp_p
     monkeypatch.setattr(pddl, "inspect_source_media", noop)
     monkeypatch.setattr(pddl, "_enrich_picture_descriptions", noop)
     monkeypatch.setattr(pddl, "_enrich_table_structures", noop)
-    with pytest.raises(RuntimeError, match="o-1"):
+    with pytest.raises(RuntimeError, match="describe-image"):
         await orchestrator.executar(tmp_path / "doc.pdf", tmp_path, structured_output=True)
 
 
@@ -137,7 +137,7 @@ async def test_failed_plan_marks_api_job_error_without_caching_or_download(
         await executor.run(worker.ApiJob("failed-plan", source, "doc.pdf"))
         status = manager.obter("failed-plan")
         assert status["status"] == "error"
-        assert any("o-1" in error for error in status["erros"])
+        assert any("describe-image" in error for error in status["erros"])
         assert not status.get("download_url")
         assert job_store.load_record("failed-plan")["status"]["status"] == "error"
         assert not source.exists()
