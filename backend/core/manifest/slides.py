@@ -21,6 +21,7 @@ from __future__ import annotations
 import re
 from collections import Counter
 from collections.abc import Callable
+from itertools import pairwise
 
 from backend.core.manifest.models import ManifestElement, ProcessingManifest
 from backend.i18n import t
@@ -229,7 +230,7 @@ def _union_area(boxes: list[tuple[float, float, float, float]]) -> float:
     """Area covered by ``boxes``, overlaps counted once."""
     xs = sorted({x for box in boxes for x in (box[0], box[2])})
     area = 0.0
-    for left, right in zip(xs, xs[1:]):
+    for left, right in pairwise(xs):
         spans = sorted(
             (box[1], box[3]) for box in boxes if box[0] <= left and box[2] >= right
         )

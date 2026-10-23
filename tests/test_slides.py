@@ -7,7 +7,7 @@ assertions hold under any supported server locale.
 from __future__ import annotations
 
 import copy
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -16,7 +16,7 @@ from backend.core.manifest.toolbox_extractor import ToolboxExtraction
 from backend.i18n import t
 from backend.log_messages import MSG_SLIDE_HEADING, MSG_SLIDE_HEADING_WITH_TITLE
 
-NOW = datetime(2026, 10, 23, tzinfo=timezone.utc)
+NOW = datetime(2026, 10, 23, tzinfo=UTC)
 WIDTH, HEIGHT = 960, 540
 
 
@@ -319,7 +319,10 @@ def test_a_presentation_is_not_fused_with_a_second_provider(monkeypatch):
 
     from backend.config.settings import settings
     from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
-    from tests.test_toolbox_manifest_extractor import FIXTURE_PDF, SAMPLE_TOOLBOX_RESPONSE
+    from tests.test_toolbox_manifest_extractor import (
+        FIXTURE_PDF,
+        SAMPLE_TOOLBOX_RESPONSE,
+    )
 
     monkeypatch.setattr(settings, "fusion_mode", "dual")
     client = AsyncMock(spec=ToolboxStructureClient)
@@ -375,9 +378,10 @@ async def test_media_inspection_decides_the_structure_before_extraction(
 ):
     from types import SimpleNamespace
 
+    from docstruct.validation import validate_canonical_document
+
     from backend.agents import pddl_orchestrator as pddl
     from backend.pipeline.canonical_builder import build_canonical_document
-    from docstruct.validation import validate_canonical_document
     from tests.pddl_support import build_orchestrator
 
     calls = []

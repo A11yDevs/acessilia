@@ -35,7 +35,6 @@ def _record_steps(monkeypatch) -> list[str]:
 
     async def inspect(*_args, **_kwargs):
         calls.append("media.inspect")
-        return None
 
     async def describe(*_args, **_kwargs):
         calls.append("describe")
