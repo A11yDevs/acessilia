@@ -226,21 +226,28 @@ class JobExecutor:
         Like the optional exports, a failed audit does not fail the job: the
         e-mail says it is unavailable, naming only the kind of failure, since
         the full cause carries internal Toolbox endpoints and goes to the log.
+        That covers a report the e-mail cannot summarize and a report that
+        cannot be written, not only a Toolbox failure. A user cancel ends the
+        wait at once.
         """
         state_manager.atualizar(task_id, etapa=t(STAGE_AUDITING_PDF_UA), progresso=0.94)
         try:
-            report = await audit_pdf_ua(pdf_path)
+            report = await _until_cancelled(task_id, audit_pdf_ua(pdf_path))
+            if report is None:
+                return [], None
+            lines = summarize_audit(report, max_rules=settings.pdf_ua_audit_max_rules)
+            await run_blocking(
+                report_path.write_text,
+                json.dumps(report, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+        except TaskCancelledError:
+            raise
         except Exception as exc:
             logger.warning(t(LOG_PDF_UA_AUDIT_FAILED).format(error=exc))
+            _remove_partial_output(report_path)
             return [t(EMAIL_AUDIT_UNAVAILABLE).format(error=type(exc).__name__)], None
-        if report is None:
-            return [], None
-        await run_blocking(
-            report_path.write_text,
-            json.dumps(report, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
-        return summarize_audit(report, max_rules=settings.pdf_ua_audit_max_rules), report_path
+        return lines, report_path
 
     async def run(self, job: ApiJob) -> None:
         task_id = job.task_id
@@ -378,16 +385,17 @@ class JobExecutor:
             )
             state_manager.verificar_cancelamento(task_id)
 
-            audit_lines: list[str] = []
-            audit_path: Path | None = None
-            if isinstance(pdf_ua_path, Path):
-                audit_lines, audit_path = await self._audit_pdf_ua(
+            async def audit() -> tuple[list[str], Path | None]:
+                if not isinstance(pdf_ua_path, Path):
+                    return [], None
+                return await self._audit_pdf_ua(
                     task_id, pdf_ua_path, out_dir / f"{base}.pdf_ua.verapdf.json"
                 )
-                state_manager.verificar_cancelamento(task_id)
 
-            mp3_path = out_dir / f"{base}.mp3"
-            if txt_path.exists():
+            async def mp3() -> Path | None:
+                if not txt_path.exists():
+                    return None
+                mp3_path = out_dir / f"{base}.mp3"
                 clean_text = txt_path.read_text(encoding="utf-8")
 
                 async def audio_progress(percent: int) -> None:
@@ -398,17 +406,26 @@ class JobExecutor:
                     )
 
                 try:
-                    await export_mp3(
-                        clean_text, mp3_path, progress_callback=audio_progress
+                    await _until_cancelled(
+                        task_id,
+                        export_mp3(clean_text, mp3_path, progress_callback=audio_progress),
                     )
-                    completed_formats.append("mp3")
+                except TaskCancelledError:
+                    raise
                 except Exception as e:
                     error_msg = t(LOG_MP3_GENERATION_FAILED).format(error=str(e))
                     logger.error(error_msg)
                     optional_errors.append(error_msg)
                     state_manager.atualizar(task_id, erro=error_msg)
                     _remove_partial_output(mp3_path)
-                    mp3_path = None
+                    return None
+                completed_formats.append("mp3")
+                return mp3_path
+
+            # The MP3 needs only the TXT, so it runs alongside the audit: a slow
+            # veraPDF does not add its whole wait to the delivery. Both end on
+            # a user cancel.
+            (audit_lines, audit_path), mp3_path = await asyncio.gather(audit(), mp3())
             state_manager.verificar_cancelamento(task_id)
 
             zip_path = out_dir / f"{base}_acessivel.zip"
@@ -542,6 +559,27 @@ def _open_obligations_warning(canonical: dict[str, Any]) -> list[str]:
     metadata = canonical.get("metadata")
     summary = metadata.get("pddl_unsatisfied_summary") if isinstance(metadata, dict) else None
     return [summary] if isinstance(summary, str) and summary else []
+
+
+async def _until_cancelled(task_id: str, awaitable: Any) -> Any:
+    """Awaits ``awaitable``, abandoning it as soon as the user cancels the task.
+
+    Raises:
+        TaskCancelledError: When the task is cancelled before ``awaitable`` ends.
+    """
+    event = state_manager.evento_cancelamento(task_id)
+    work = asyncio.ensure_future(awaitable)
+    if event is None:
+        return await work
+    cancelled = asyncio.ensure_future(event.wait())
+    try:
+        await asyncio.wait({work, cancelled}, return_when=asyncio.FIRST_COMPLETED)
+    finally:
+        cancelled.cancel()
+        if not work.done():
+            work.cancel()
+    state_manager.verificar_cancelamento(task_id)
+    return work.result()
 
 
 def _remove_partial_output(path: Path) -> None:

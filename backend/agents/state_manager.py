@@ -123,6 +123,10 @@ class StateManager:
         event = self._cancel_events.get(task_id)
         return event is not None and event.is_set()
 
+    def evento_cancelamento(self, task_id: str) -> asyncio.Event | None:
+        """The event set when the task is cancelled, so a long wait can end on it; None for an unknown task."""
+        return self._cancel_events.get(task_id)
+
     def verificar_cancelamento(self, task_id: str) -> None:
         """Check whether the given task was cancelled, raising a localized cancellation error when it was.
 

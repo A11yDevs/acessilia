@@ -7,6 +7,8 @@ import respx
 
 from frontend.clients.api_client import ApiClient
 from backend.config.settings import settings
+from backend.i18n import t
+from backend.log_messages import LOG_PDF_UA_GENERATION_FAILED
 from frontend.telegram import user_context
 from frontend.telegram.handlers import document as doc_module
 from frontend.telegram.handlers import start as start_module
@@ -186,7 +188,7 @@ def test_document_flow_sends_download_link(doc_module_isolated, pdf_ua_failed):
     content = _fake_pdf_bytes()
     status = _done_status()
     if pdf_ua_failed:
-        status["erros"] = ["Falha ao gerar PDF/UA: pandoc indisponivel"]
+        status["erros"] = [t(LOG_PDF_UA_GENERATION_FAILED).format(error="pandoc indisponivel")]
     _mock_job_api(status)
     bot = _FakeBot(content)
     msg = _FakeMessage(bot, document=_FakeDocument("doc.pdf", len(content), "file1"))

@@ -414,6 +414,10 @@ class Settings:
                 "TOOLBOX_RETRY_BACKOFF_SECONDS must be zero or positive, "
                 f"got {self.toolbox_retry_backoff_seconds}"
             )
+        if self.pdf_ua_audit_max_rules < 0:
+            raise ValueError(
+                f"PDF_UA_AUDIT_MAX_RULES must be zero or positive, got {self.pdf_ua_audit_max_rules}"
+            )
         self.temp_dir.mkdir(parents=True, exist_ok=True)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.logs_dir.mkdir(parents=True, exist_ok=True)

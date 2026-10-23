@@ -19,9 +19,6 @@ dependencies = [
     "uvicorn>=0.30,<0.31",
     "aiogram>=3.13,<4",
     "httpx>=0.27,<0.28",
-    # Builds the page images the Toolbox end-to-end tests send; pinned so the
-    # image and CI resolve the same major.
-    "pillow>=10.4,<11",
     "python-dotenv>=1.0,<2",
     "slowapi>=0.1.10,<0.2",
     "python-multipart>=0.0.32,<0.1",
@@ -52,8 +49,8 @@ dev = [
     "pytest>=9.1.1,<10",
     "respx>=0.23.1,<0.24",
     "pytest-asyncio>=1.4.0,<2",
-    # Reads the PDFs the renderer tests produce.
-    "pypdf>=6.14.2,<7",
+    # Builds the page images the Toolbox end-to-end tests send.
+    "pillow>=10.4,<11",
     # Builds and renders test PDFs (tests/toolbox_render_fake.py and fixtures);
     # the application renders and extracts only on the Toolbox.
     "pymupdf>=1.24,<2",

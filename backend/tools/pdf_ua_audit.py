@@ -79,7 +79,9 @@ def summarize_audit(report: dict[str, Any], *, max_rules: int) -> list[str]:
     final line counts the rest, which the packaged report carries. Rule
     descriptions are veraPDF's, in English.
     """
-    profile = PROFILE_LABELS.get(str(report.get("profile")), str(report.get("profile") or ""))
+    max_rules = max(max_rules, 0)
+    profile = report.get("profile")
+    profile = PROFILE_LABELS.get(str(profile), str(profile or "PDF/UA"))
     failures = sorted(
         report.get("failures") or [],
         key=lambda rule: -int(rule.get("failed_checks") or 0),
@@ -101,7 +103,7 @@ def summarize_audit(report: dict[str, Any], *, max_rules: int) -> list[str]:
             description=" ".join(str(rule.get("description", "")).split()),
             checks=int(rule.get("failed_checks") or 0),
         )
-        for rule in failures[: max(max_rules, 0)]
+        for rule in failures[:max_rules]
     )
     if len(failures) > max_rules:
         lines.append(t(EMAIL_AUDIT_MORE_RULES).format(count=len(failures) - max_rules))

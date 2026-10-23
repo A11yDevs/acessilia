@@ -6,7 +6,9 @@ hold under any supported server locale.
 
 from __future__ import annotations
 
+import asyncio
 import json
+from pathlib import Path
 
 import pytest
 
@@ -87,6 +89,31 @@ def test_rules_beyond_the_cap_are_counted_not_listed():
         _rule_line(rules[1]),
         t(EMAIL_AUDIT_MORE_RULES).format(count=3),
     ]
+
+
+@pytest.mark.parametrize("max_rules", [0, -1])
+def test_a_zero_or_negative_cap_lists_no_rule_and_counts_them_all(max_rules):
+    rules = [_rule("7.1", number, 1) for number in range(1, 4)]
+
+    lines = summarize_audit(_non_compliant(*rules), max_rules=max_rules)
+
+    assert lines[1:] == [t(EMAIL_AUDIT_MORE_RULES).format(count=3)]
+
+
+def test_a_report_without_a_profile_still_names_the_standard():
+    report = {key: value for key, value in COMPLIANT_PDF_UA_REPORT.items() if key != "profile"}
+
+    assert summarize_audit(report, max_rules=10) == [
+        t(EMAIL_AUDIT_COMPLIANT).format(profile="PDF/UA")
+    ]
+
+
+def test_a_negative_cap_is_refused_at_startup(monkeypatch):
+    from backend.config.settings import Settings
+
+    monkeypatch.setenv("PDF_UA_AUDIT_MAX_RULES", "-1")
+    with pytest.raises(ValueError, match="PDF_UA_AUDIT_MAX_RULES"):
+        Settings()
 
 
 @pytest.mark.asyncio
@@ -187,3 +214,86 @@ async def test_the_result_email_carries_the_audit_before_the_warnings(monkeypatc
     section = f"{t(EMAIL_RESULT_AUDIT_HEADER)}\n{audit[0]}\n- {_rule_line(rule)}"
     assert section in body
     assert body.index(section) < body.index("- DOCX failed")
+
+
+async def _run_audit_step(tmp_path, task_id: str = "task") -> tuple[list[str], Path | None]:
+    from backend.api import worker
+
+    executor = worker.JobExecutor()
+    try:
+        return await executor._audit_pdf_ua(
+            task_id, tmp_path / "doc.pdf_ua.pdf", tmp_path / "doc.pdf_ua.verapdf.json"
+        )
+    finally:
+        executor._executor.shutdown(wait=True)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("failures", "error"),
+    [(["oops"], "AttributeError"), ([{"failed_checks": "N/A"}], "ValueError")],
+)
+async def test_a_report_that_cannot_be_summarized_does_not_fail_the_job(
+    monkeypatch, tmp_path, failures, error
+):
+    from backend.api import worker
+
+    async def audit(_pdf_path, **_kwargs):
+        return {**COMPLIANT_PDF_UA_REPORT, "compliant": False, "failures": failures}
+
+    monkeypatch.setattr(worker, "audit_pdf_ua", audit)
+
+    lines, path = await _run_audit_step(tmp_path)
+
+    assert lines == [t(EMAIL_AUDIT_UNAVAILABLE).format(error=error)]
+    assert path is None
+    assert not (tmp_path / "doc.pdf_ua.verapdf.json").exists()
+
+
+@pytest.mark.asyncio
+async def test_a_report_that_cannot_be_written_does_not_fail_the_job(monkeypatch, tmp_path):
+    from backend.api import worker
+
+    async def audit(_pdf_path, **_kwargs):
+        return COMPLIANT_PDF_UA_REPORT
+
+    def write_text(self, *_args, **_kwargs):
+        raise OSError("No space left on device")
+
+    monkeypatch.setattr(worker, "audit_pdf_ua", audit)
+    monkeypatch.setattr(Path, "write_text", write_text)
+
+    lines, path = await _run_audit_step(tmp_path)
+
+    assert lines == [t(EMAIL_AUDIT_UNAVAILABLE).format(error="OSError")]
+    assert path is None
+
+
+@pytest.mark.asyncio
+async def test_a_cancel_ends_the_audit_wait(monkeypatch, tmp_path):
+    from backend.agents.state_manager import TaskCancelledError, state_manager
+    from backend.api import worker
+
+    started = asyncio.Event()
+    abandoned = asyncio.Event()
+
+    async def audit(_pdf_path, **_kwargs):
+        started.set()
+        try:
+            await asyncio.sleep(3600)
+        except asyncio.CancelledError:
+            abandoned.set()
+            raise
+
+    monkeypatch.setattr(worker, "audit_pdf_ua", audit)
+    task_id = state_manager.criar_tarefa(tmp_path / "doc.pdf", task_id="audit-cancel")
+
+    async def cancel_once_started():
+        await started.wait()
+        state_manager.cancelar(task_id)
+
+    canceller = asyncio.create_task(cancel_once_started())
+    with pytest.raises(TaskCancelledError):
+        await asyncio.wait_for(_run_audit_step(tmp_path, task_id), timeout=5)
+    await canceller
+    await asyncio.wait_for(abandoned.wait(), timeout=1)

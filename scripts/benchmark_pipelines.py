@@ -153,6 +153,9 @@ def _export_outputs(
                     "export_docx",
                 )
                 export_docx(canonical, output_path, filename=canonical.get("title", engine_name))
+            elif fmt == "pdf":
+                export_errors.append("Formato pdf removido: use pdf_ua, o unico PDF exportado")
+                continue
             else:
                 export_errors.append(f"Formato nao suportado no benchmark: {fmt}")
                 continue

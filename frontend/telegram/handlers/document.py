@@ -19,6 +19,7 @@ from backend.log_messages import (
     LOG_TELEGRAM_API_JOB_REJECTED,
     LOG_TELEGRAM_API_CONTACT_FAILED,
     LOG_TELEGRAM_FILE_PROCESSING_ERROR,
+    LOG_PDF_UA_GENERATION_FAILED,
     LOG_TELEGRAM_JOB_STATUS_QUERY_FAILED,
     LOG_TELEGRAM_RATE_LIMIT_WAIT,
     LOG_TELEGRAM_SEND_FAILED_AFTER_RETRIES,
@@ -248,8 +249,10 @@ async def _poll_job(
             url = status.get("download_url")
             if url:
                 msg = f"✅ Pacote acessível gerado!\n\n📥 Link para download (válido por 7 dias):\n{url}"
-                if any("Falha ao gerar PDF/UA:" in erro for erro in status.get("erros", [])):
-                    msg += "\n\n⚠️ Não foi possível gerar o PDF/UA. Esse formato não está incluído no pacote."
+                # The worker records the failure in the server locale.
+                pdf_ua_failed = t(LOG_PDF_UA_GENERATION_FAILED).split("{error}")[0]
+                if any(erro.startswith(pdf_ua_failed) for erro in status.get("erros", [])):
+                    msg += "\n\n⚠️ Não foi possível gerar o PDF/UA, o único PDF do pacote: o pacote segue sem PDF."
                 if email:
                     msg += f"\n\nE-mail configurado: {email}"
                 await _send_with_retry(
