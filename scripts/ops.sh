@@ -52,7 +52,8 @@ ENV_FILE="$ROOT/.env"
 STATUS_FILE="$ROOT/var/data/staging-status.json"
 UNIT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 # Seconds between timer runs; `check` reports a last check older than three
-# intervals as stale.
+# intervals as stale. Keep UPDATE_CHECK_STALE_SECONDS in
+# backend/api/routes/health.py in sync when changing it.
 UPDATE_INTERVAL=300
 
 # Sessions opened with su (not a login) have no XDG_RUNTIME_DIR, so systemctl --user
@@ -727,7 +728,7 @@ _auto_update_status() {
   echo ""
   echo "Health (${HEALTH_URL}):"
   curl -fsS --max-time 5 "$HEALTH_URL" 2>/dev/null \
-    | jq 'with_entries(select(.key | IN("status", "image_tag", "git_commit", "up_to_date", "update_available")))' 2>/dev/null \
+    | jq 'with_entries(select(.key | IN("status", "image_tag", "git_commit", "up_to_date", "update_available", "update_check_stale")))' 2>/dev/null \
     | sed 's/^/  /' || echo "  (unreachable)"
 
   echo ""

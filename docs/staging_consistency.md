@@ -60,6 +60,18 @@ after detecting a new commit. On the "no new commit" path (line ~162) it writes 
 status with empty digests. Since the digest comparison cannot work without the GHCR
 side being fetched, the check is structurally unable to report "up to date".
 
+Follow-up: `/health` now also reports `update_check_stale`, true when `last_check`
+is older than three timer intervals (15 min) or unreadable, and `up_to_date` is
+false while it holds. Caveats for consumers:
+
+- `up_to_date: false` no longer implies `update_available: true`: with the updater
+  stopped, both are false. Monitors that alert only on `update_available` will not
+  fire in that case; alert on `update_check_stale` too.
+- It detects an updater that **stopped** checking, not one that checks but fails
+  (for example GHCR unreachable while the timer keeps writing `last_check`).
+- `last_check` is written with the host clock and compared with the container's;
+  a skew above 15 min reports a false stale.
+
 ### S3 — The Toolbox image reports no build identity (medium)
 
 ```json
