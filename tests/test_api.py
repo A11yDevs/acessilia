@@ -132,6 +132,25 @@ def test_health_is_not_up_to_date_when_the_updater_stopped_checking(client, monk
     assert body["update_available"] is False
 
 
+def test_health_survives_a_malformed_staging_status(client, monkeypatch):
+    """A non-string last_check must not turn /health itself into a 500."""
+
+    async def reachable() -> bool:
+        return True
+
+    monkeypatch.setattr("backend.api.routes.health._check_model_reachable", reachable)
+
+    status_file = settings.data_dir / "staging-status.json"
+    status_file.write_text(json.dumps({"last_check": 12345, "latest_digest": 7}), encoding="utf-8")
+    response = client.get("/api/v1/health")
+    assert response.status_code == 200
+    body = response.json()
+    assert (body["last_check"], body["update_check_stale"], body["up_to_date"]) == ("12345", True, False)
+
+    status_file.write_text("[]", encoding="utf-8")
+    assert client.get("/api/v1/health").status_code == 200
+
+
 def test_health_access_filter_keeps_failures_and_other_requests():
     def record(path, status):
         return logging.LogRecord(

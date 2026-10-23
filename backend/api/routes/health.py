@@ -17,6 +17,8 @@ router = APIRouter(tags=["health"])
 #: The auto-update timer runs every 300 s (UPDATE_INTERVAL in scripts/ops.sh);
 #: like `ops.sh auto-update check`, a last check older than three intervals means
 #: the updater stopped, so its view of GHCR can no longer vouch for the image.
+#: If UPDATE_INTERVAL changes in ops.sh, update this too, or /health reports
+#: false staleness between legitimate checks.
 UPDATE_CHECK_STALE_SECONDS = 3 * 300
 
 
@@ -33,10 +35,21 @@ def _read_staging_status() -> dict:
     status_file = settings.data_dir / "staging-status.json"
     try:
         if status_file.exists():
-            return json.loads(status_file.read_text(encoding="utf-8"))
+            status = json.loads(status_file.read_text(encoding="utf-8"))
+            if isinstance(status, dict):
+                return status
     except Exception:
         pass
     return {}
+
+
+def _staging_str(staging: dict, key: str) -> str:
+    """A string field of the status file; any other value (a malformed writer)
+    becomes its text, so /health reports it instead of failing on it."""
+    value = staging.get(key)
+    if value is None:
+        return ""
+    return value if isinstance(value, str) else str(value)
 
 
 def _update_check_is_stale(last_check: str, now: datetime | None = None) -> bool:
@@ -80,10 +93,10 @@ async def health(request: Request):
         else settings.openrouter_model
     )
     staging = _read_staging_status()
-    ghcr_latest = staging.get("latest_digest", "")
-    running_digest = staging.get("running_digest", "") or settings.image_digest
-    last_update = staging.get("last_update", "")
-    last_check = staging.get("last_check", "")
+    ghcr_latest = _staging_str(staging, "latest_digest")
+    running_digest = _staging_str(staging, "running_digest") or settings.image_digest
+    last_update = _staging_str(staging, "last_update")
+    last_check = _staging_str(staging, "last_check")
     # update_available: there is a newer image on GHCR than the one currently running.
     # Compares the last check (ghcr_latest) with the commit of the running image.
     update_available = bool(ghcr_latest and running_digest and ghcr_latest != running_digest)

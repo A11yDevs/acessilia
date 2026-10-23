@@ -52,7 +52,8 @@ ENV_FILE="$ROOT/.env"
 STATUS_FILE="$ROOT/var/data/staging-status.json"
 UNIT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 # Seconds between timer runs; `check` reports a last check older than three
-# intervals as stale.
+# intervals as stale. Keep UPDATE_CHECK_STALE_SECONDS in
+# backend/api/routes/health.py in sync when changing it.
 UPDATE_INTERVAL=300
 
 # Sessions opened with su (not a login) have no XDG_RUNTIME_DIR, so systemctl --user
