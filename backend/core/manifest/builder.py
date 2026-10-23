@@ -415,15 +415,37 @@ def append_unstructured_page_needs(manifest: ProcessingManifest) -> None:
     )
 
 
+def _is_structural_container(
+    element: ManifestElement, parent_ids: set[str | None]
+) -> bool:
+    """An unknown element that only groups others and has no region of its own.
+
+    The Toolbox maps Docling's group labels other than lists (``key_value_area``,
+    ``form_area``) to ``unknown`` instead of ``group``. Such a node has no
+    provenance, so region inspection cannot render it and its review-structure
+    obligation could only be escalated, failing the job; its children carry the
+    content and get their own obligations. An unknown leaf, or one with a
+    region, is still reviewed.
+    """
+    return (
+        element.type == "unknown"
+        and not element.provenance
+        and element.id in parent_ids
+    )
+
+
 def _derive_processing_needs(
     elements: list[ManifestElement],
 ) -> tuple[list[Observation], list[Obligation]]:
     observations: list[Observation] = []
     obligations: list[Obligation] = []
+    parent_ids = {element.parent_id for element in elements if element.parent_id}
 
     for element in elements:
         if is_unstructured_page_placeholder(element):
             # Planned by append_unstructured_page_needs, not as an unknown region.
+            continue
+        if _is_structural_container(element, parent_ids):
             continue
         spec = OBLIGATION_BY_TYPE.get(element.type)
         if spec is None:
