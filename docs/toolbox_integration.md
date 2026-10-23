@@ -357,6 +357,8 @@ Defined in `backend/config/settings.py` and documented in `.env.example`:
 | `TOOLBOX_TABLE_PROVIDER` | `qwen3-vl-8b` | Table re-generation for the table specialist (`table.recognize`) |
 | `TOOLBOX_ORIENTATION_PROVIDER` | `rapidocr-orient` | Rotation detection (`image.page.orient`) |
 | `FUSION_HYBRID_PROVIDER` | `mineru-hyb` | MinerU hybrid-VLM provider id (the B source of the best submission within the paper's method) |
+| `FUSION_JUDGE_MAX_PAGES` | `5` | Pages per document the VLM judge may check in `FUSION_MODE=dual`: only the ones the deterministic router cannot settle (both providers found a table or a formula) and that diverge, least similar first. The verdict is recorded, not applied; a disagreement is a technical warning. `0` turns the judge off |
+| `FUSION_APPLY_PAGE_ROUTES` | `true` | In `FUSION_MODE=dual`, take the secondary provider's page where the deterministic router prefers it (tables, formulas, a nearly empty primary page); running text stays with `TOOLBOX_PROVIDER`. `false` keeps every page from the primary provider |
 
 > `TOOLBOX_USE_ARTIFACT_STORE` and `TOOLBOX_USE_REMOTE_CACHE` directly affect the
 > extraction flow: with the artifact store on, the core uploads the file once and
