@@ -1608,6 +1608,14 @@ msgstr ""
 "{tb}"
 
 #, python-brace-format
+msgid ""
+"[page {page_num}] Unusable answer from the vision model for region "
+"{type}; trying again ({attempt}/{attempts}): {error}"
+msgstr ""
+"[page {page_num}] Unusable answer from the vision model for region "
+"{type}; trying again ({attempt}/{attempts}): {error}"
+
+#, python-brace-format
 msgid "[page {page_num}] Sending region to vision ({size} bytes, type={type})"
 msgstr "[page {page_num}] Sending region to vision ({size} bytes, type={type})"
 

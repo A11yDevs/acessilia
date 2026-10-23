@@ -331,6 +331,11 @@ LOG_VISION_AGENT_SENDING_REGION: str = (
 LOG_VISION_AGENT_REGION_ERROR: str = (
     "[page {page_num}] VisionAgent error in region {type}: {error} | Traceback:\n{tb}"
 )
+#: Warning logged when the vision model's answer is unusable and the region is asked again; {page_num}, {type}, {attempt}/{attempts} and {error} describe the failed try.
+LOG_VISION_AGENT_REGION_RETRY: str = (
+    "[page {page_num}] Unusable answer from the vision model for region {type}; "
+    "trying again ({attempt}/{attempts}): {error}"
+)
 #: Debug logged by the exporters adapter wrapper just before a plain-text export runs; {path} is the output file path.
 LOG_EXPORT_TXT_START: str = "Exporting TXT to {path}"
 #: Debug logged by the exporters adapter wrapper just before a DOCX export runs; {path} is the output file path.

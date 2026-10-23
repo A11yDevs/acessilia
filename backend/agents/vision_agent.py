@@ -5,6 +5,7 @@ import asyncio
 from backend.i18n import t
 from backend.log_messages import (
     LOG_VISION_AGENT_REGION_ERROR,
+    LOG_VISION_AGENT_REGION_RETRY,
     LOG_VISION_AGENT_SENDING_REGION,
 )
 from backend.tools.region_classifier import region_prompt_key
@@ -21,6 +22,19 @@ from backend.agents.output_schemas import (
 )
 from agno.agent import Agent
 from agno.media import Image
+
+#: Tries per region. Sampled models sometimes fall into a repetition loop
+#: (``\text{ }\text{ }...`` in a formula) until max_tokens cuts the JSON off;
+#: a fresh call usually answers normally, and an image left undescribed fails
+#: the whole document (``describe-image`` is a critical obligation).
+REGION_ATTEMPTS = 2
+
+#: Appended to the prompt of a retry, after an invalid or truncated answer.
+RETRY_INSTRUCTION = (
+    "Your previous answer was invalid or cut off. Answer again with complete, "
+    "valid JSON. Keep description and formula_latex concise, and never pad them "
+    "with repeated tokens such as \\text{ } or spaces."
+)
 
 
 class VisionAgent:
@@ -74,43 +88,56 @@ class VisionAgent:
 
         prompt = f"{prompt}\n\n{VISION_SCHEMA_INSTRUCTION}"
 
-        try:
-            logger.debug(
-                t(LOG_VISION_AGENT_SENDING_REGION).format(
-                    page_num=page_num,
-                    size=len(image_bytes),
-                    type=classification,
-                )
-            )
-
-            agent = Agent(
-                name="VisionAgent",
-                model=get_agno_model(),
-                output_schema=VisionOutput,
-                telemetry=False,
-            )
-
-            def _run_vision():
-                return agent.run(
-                    input=prompt,
-                    images=[Image(content=image_bytes)],
+        for attempt in range(1, REGION_ATTEMPTS + 1):
+            attempt_prompt = prompt if attempt == 1 else f"{prompt}\n\n{RETRY_INSTRUCTION}"
+            try:
+                logger.debug(
+                    t(LOG_VISION_AGENT_SENDING_REGION).format(
+                        page_num=page_num,
+                        size=len(image_bytes),
+                        type=classification,
+                    )
                 )
 
-            response = await asyncio.to_thread(_run_vision)
-            return validate_structured_run(response, VisionOutput)
-
-        except Exception as error:
-            import traceback
-            tb = traceback.format_exc()
-            logger.critical(
-                t(LOG_VISION_AGENT_REGION_ERROR).format(
-                    page_num=page_num,
-                    type=classification,
-                    error=error,
-                    tb=tb,
+                agent = Agent(
+                    name="VisionAgent",
+                    model=get_agno_model(),
+                    output_schema=VisionOutput,
+                    telemetry=False,
                 )
-            )
-            return None
+
+                def _run_vision(agent=agent, attempt_prompt=attempt_prompt):
+                    return agent.run(
+                        input=attempt_prompt,
+                        images=[Image(content=image_bytes)],
+                    )
+
+                response = await asyncio.to_thread(_run_vision)
+                return validate_structured_run(response, VisionOutput)
+
+            except Exception as error:
+                if attempt < REGION_ATTEMPTS:
+                    logger.warning(
+                        t(LOG_VISION_AGENT_REGION_RETRY).format(
+                            page_num=page_num,
+                            type=classification,
+                            attempt=attempt + 1,
+                            attempts=REGION_ATTEMPTS,
+                            error=_short_error(error),
+                        )
+                    )
+                    continue
+                import traceback
+                tb = traceback.format_exc()
+                logger.critical(
+                    t(LOG_VISION_AGENT_REGION_ERROR).format(
+                        page_num=page_num,
+                        type=classification,
+                        error=error,
+                        tb=tb,
+                    )
+                )
+        return None
 
     async def inspect_page(
         self,
@@ -140,3 +167,9 @@ class VisionAgent:
 
         response = await asyncio.to_thread(_run)
         return validate_structured_run(response, PageInspectionOutput)
+
+
+def _short_error(error: Exception, limit: int = 300) -> str:
+    """The first line of an error, capped: a truncated answer can be 10 kB long."""
+    text = str(error).splitlines()[0] if str(error) else type(error).__name__
+    return text if len(text) <= limit else f"{text[:limit]}…"

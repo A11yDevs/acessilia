@@ -296,6 +296,90 @@ async def test_vision_agent_requests_and_returns_its_output_schema(monkeypatch) 
     assert result.description == "Um círculo azul."
 
 
+#: What qwen3-vl-8b returned for an image on page 25 of 006.pdf: a formula padded
+#: with "\\text{ }" until max_tokens cut the JSON string off.
+TRUNCATED_FORMULA = '{\n  "kind": "formula",\n  "formula_latex": "x = ' + "\\\\text{ }" * 200
+
+
+def _scripted_vision_agent(monkeypatch, answers: list):
+    from backend.agents import vision_agent as vision_module
+
+    prompts: list[str] = []
+
+    class FakeAgent:
+        def __init__(self, **_kwargs):
+            pass
+
+        def run(self, **kwargs):
+            prompts.append(kwargs["input"])
+            return type("Response", (), {"content": answers[len(prompts) - 1]})()
+
+    async def run_inline(function, *args):
+        return function(*args)
+
+    monkeypatch.setattr(vision_module, "Agent", FakeAgent)
+    monkeypatch.setattr(vision_module, "get_agno_model", lambda: object())
+    monkeypatch.setattr(vision_module.asyncio, "to_thread", run_inline)
+    return vision_module, prompts
+
+
+@pytest.mark.asyncio
+async def test_vision_agent_retries_a_truncated_answer(monkeypatch) -> None:
+    valid = {
+        "kind": "formula",
+        "formula_latex": "x = y",
+        "language": "pt-BR",
+        "confidence": 0.8,
+        "mentioned_elements": [],
+        "warnings": [],
+    }
+    vision_module, prompts = _scripted_vision_agent(monkeypatch, [TRUNCATED_FORMULA, valid])
+
+    result = await vision_module.VisionAgent().describe_region(
+        b"image", "embedded_image", page_num=25
+    )
+
+    assert isinstance(result, VisionOutput)
+    assert result.formula_latex == "x = y"
+    assert len(prompts) == 2
+    assert vision_module.RETRY_INSTRUCTION not in prompts[0]
+    assert prompts[1].endswith(vision_module.RETRY_INSTRUCTION)
+
+
+@pytest.mark.asyncio
+async def test_vision_agent_gives_up_after_its_attempts(monkeypatch) -> None:
+    from backend.agents.vision_agent import REGION_ATTEMPTS
+    from backend.tools.logger import logger
+
+    vision_module, prompts = _scripted_vision_agent(
+        monkeypatch, [TRUNCATED_FORMULA] * REGION_ATTEMPTS
+    )
+    critical: list[str] = []
+    warnings: list[str] = []
+    sinks = [
+        logger.add(lambda m: critical.append(str(m)), level="CRITICAL"),
+        logger.add(
+            lambda m: warnings.append(str(m)),
+            level="WARNING",
+            filter=lambda record: record["level"].name == "WARNING",
+        ),
+    ]
+    try:
+        result = await vision_module.VisionAgent().describe_region(
+            b"image", "embedded_image", page_num=25
+        )
+    finally:
+        for sink in sinks:
+            logger.remove(sink)
+
+    assert result is None
+    assert len(prompts) == REGION_ATTEMPTS
+    assert len(critical) == 1
+    assert len(warnings) == REGION_ATTEMPTS - 1
+    # The retry warning names the failure without dumping the 10 kB answer.
+    assert all(len(line) < 1000 for line in warnings)
+
+
 @pytest.mark.asyncio
 async def test_data_agent_rejects_output_for_the_wrong_region_kind(monkeypatch) -> None:
     from backend.agents import data_agent as data_module
