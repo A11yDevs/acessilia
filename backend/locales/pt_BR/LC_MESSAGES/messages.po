@@ -1623,6 +1623,14 @@ msgstr ""
 
 #, python-brace-format
 msgid ""
+"[page {page_num}] Vision model answered region {type} on try "
+"{attempt}/{attempts}"
+msgstr ""
+"[página {page_num}] O modelo de visão respondeu a região {type} na "
+"tentativa {attempt}/{attempts}"
+
+#, python-brace-format
+msgid ""
 "[page {page_num}] Unusable answer from the vision model for region "
 "{type}; trying again ({attempt}/{attempts}): {error}"
 msgstr ""

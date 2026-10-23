@@ -1,10 +1,14 @@
 """VisionAgent — generation of accessible audio descriptions for images."""
 
 import asyncio
+import functools
+
+from pydantic import ValidationError
 
 from backend.i18n import t
 from backend.log_messages import (
     LOG_VISION_AGENT_REGION_ERROR,
+    LOG_VISION_AGENT_REGION_RECOVERED,
     LOG_VISION_AGENT_REGION_RETRY,
     LOG_VISION_AGENT_SENDING_REGION,
 )
@@ -16,6 +20,7 @@ from backend.ai.models.ai_client import get_agno_model
 from backend.agents.output_schemas import (
     PAGE_INSPECTION_INSTRUCTION,
     VISION_SCHEMA_INSTRUCTION,
+    OutputModel,
     PageInspectionOutput,
     VisionOutput,
     validate_structured_run,
@@ -23,17 +28,31 @@ from backend.agents.output_schemas import (
 from agno.agent import Agent
 from agno.media import Image
 
-#: Tries per region. Sampled models sometimes fall into a repetition loop
-#: (``\text{ }\text{ }...`` in a formula) until max_tokens cuts the JSON off;
-#: a fresh call usually answers normally, and an image left undescribed fails
-#: the whole document (``describe-image`` is a critical obligation).
+#: Tries per region or page. Sampled models sometimes fall into a repetition
+#: loop (the same LaTeX token over and over in a formula) until max_tokens cuts
+#: the JSON off, and an image left undescribed fails the whole document
+#: (``describe-image`` and ``inspect-unstructured-pages`` are critical, and
+#: ``describe-image`` has no other vision method to fall back to).
+#:
+#: Only an answer that fails schema validation is retried; timeouts, provider
+#: errors and incomplete runs fail at once, since repeating them without
+#: backoff costs up to another REQUEST_TIMEOUT and doubles the load.
+#:
+#: This retry is deliberately kept instead of tuning temperature or repetition
+#: penalties: changing those affects every answer and needs measuring first,
+#: which the recovery INFO log makes possible. With Ollama the seed is fixed
+#: (``get_agno_model``), so the retry differs from the first try only by
+#: RETRY_INSTRUCTION; that changes the prompt and therefore the sampled tokens,
+#: but a loop that does not depend on the prompt will still fail twice.
 REGION_ATTEMPTS = 2
 
-#: Appended to the prompt of a retry, after an invalid or truncated answer.
+#: Appended to the prompt of a retry. Each try is a fresh Agent with no
+#: history, so it is phrased as a plain instruction, not as feedback on an
+#: answer the model never saw; and it asks for no padding rather than for
+#: brevity, since a long formula must still be transcribed whole.
 RETRY_INSTRUCTION = (
-    "Your previous answer was invalid or cut off. Answer again with complete, "
-    "valid JSON. Keep description and formula_latex concise, and never pad them "
-    "with repeated tokens such as \\text{ } or spaces."
+    "Responda com um objeto JSON completo e válido, fechando todas as strings e "
+    "chaves. Não repita tokens nem preencha campos com repetições ou espaços."
 )
 
 
@@ -88,56 +107,22 @@ class VisionAgent:
 
         prompt = f"{prompt}\n\n{VISION_SCHEMA_INSTRUCTION}"
 
-        for attempt in range(1, REGION_ATTEMPTS + 1):
-            attempt_prompt = prompt if attempt == 1 else f"{prompt}\n\n{RETRY_INSTRUCTION}"
-            try:
-                logger.debug(
-                    t(LOG_VISION_AGENT_SENDING_REGION).format(
-                        page_num=page_num,
-                        size=len(image_bytes),
-                        type=classification,
-                    )
+        try:
+            return await _run_with_retry(
+                prompt, image_bytes, VisionOutput, page_num=page_num, label=classification
+            )
+        except Exception as error:
+            import traceback
+            tb = traceback.format_exc()
+            logger.critical(
+                t(LOG_VISION_AGENT_REGION_ERROR).format(
+                    page_num=page_num,
+                    type=classification,
+                    error=error,
+                    tb=tb,
                 )
-
-                agent = Agent(
-                    name="VisionAgent",
-                    model=get_agno_model(),
-                    output_schema=VisionOutput,
-                    telemetry=False,
-                )
-
-                def _run_vision(agent=agent, attempt_prompt=attempt_prompt):
-                    return agent.run(
-                        input=attempt_prompt,
-                        images=[Image(content=image_bytes)],
-                    )
-
-                response = await asyncio.to_thread(_run_vision)
-                return validate_structured_run(response, VisionOutput)
-
-            except Exception as error:
-                if attempt < REGION_ATTEMPTS:
-                    logger.warning(
-                        t(LOG_VISION_AGENT_REGION_RETRY).format(
-                            page_num=page_num,
-                            type=classification,
-                            attempt=attempt + 1,
-                            attempts=REGION_ATTEMPTS,
-                            error=_short_error(error),
-                        )
-                    )
-                    continue
-                import traceback
-                tb = traceback.format_exc()
-                logger.critical(
-                    t(LOG_VISION_AGENT_REGION_ERROR).format(
-                        page_num=page_num,
-                        type=classification,
-                        error=error,
-                        tb=tb,
-                    )
-                )
-        return None
+            )
+            return None
 
     async def inspect_page(
         self,
@@ -155,21 +140,80 @@ class VisionAgent:
             f"{build_page_prompt(self.system_prompt, total_pages, page_num, is_pdf=total_pages > 1)}"
             f"\n\n{PAGE_INSPECTION_INSTRUCTION}"
         )
+        return await _run_with_retry(
+            prompt, image_bytes, PageInspectionOutput, page_num=page_num, label="page_inspection"
+        )
+
+
+async def _run_with_retry(
+    prompt: str,
+    image_bytes: bytes,
+    schema: type[OutputModel],
+    *,
+    page_num: int,
+    label: str,
+) -> OutputModel:
+    """Ask the vision model for ``schema``, retrying an answer that fails validation.
+
+    Raises the last validation error when every attempt fails, and any other
+    error (timeout, provider failure, incomplete run) at once.
+    """
+    for attempt in range(1, REGION_ATTEMPTS + 1):
+        attempt_prompt = prompt if attempt == 1 else f"{prompt}\n\n{RETRY_INSTRUCTION}"
+        logger.debug(
+            t(LOG_VISION_AGENT_SENDING_REGION).format(
+                page_num=page_num,
+                size=len(image_bytes),
+                type=label,
+            )
+        )
         agent = Agent(
             name="VisionAgent",
             model=get_agno_model(),
-            output_schema=PageInspectionOutput,
+            output_schema=schema,
             telemetry=False,
         )
+        run = functools.partial(
+            agent.run, input=attempt_prompt, images=[Image(content=image_bytes)]
+        )
+        response = await asyncio.to_thread(run)
+        try:
+            output = validate_structured_run(response, schema)
+        except ValidationError as error:
+            if attempt == REGION_ATTEMPTS:
+                raise
+            logger.warning(
+                t(LOG_VISION_AGENT_REGION_RETRY).format(
+                    page_num=page_num,
+                    type=label,
+                    attempt=attempt + 1,
+                    attempts=REGION_ATTEMPTS,
+                    error=_short_error(error),
+                )
+            )
+            continue
+        if attempt > 1:
+            logger.info(
+                t(LOG_VISION_AGENT_REGION_RECOVERED).format(
+                    page_num=page_num,
+                    type=label,
+                    attempt=attempt,
+                    attempts=REGION_ATTEMPTS,
+                )
+            )
+        return output
+    raise AssertionError("REGION_ATTEMPTS must be at least 1")
 
-        def _run() -> object:
-            return agent.run(input=prompt, images=[Image(content=image_bytes)])
 
-        response = await asyncio.to_thread(_run)
-        return validate_structured_run(response, PageInspectionOutput)
+def _short_error(error: ValidationError, limit: int = 300) -> str:
+    """The causes of a validation error on one line, without the rejected answer.
 
-
-def _short_error(error: Exception, limit: int = 300) -> str:
-    """The first line of an error, capped: a truncated answer can be 10 kB long."""
-    text = str(error).splitlines()[0] if str(error) else type(error).__name__
+    ``str(error)`` starts with a bare header ("1 validation error for ...") and
+    embeds the answer itself, which can be 10 kB long.
+    """
+    causes = "; ".join(
+        f"{'.'.join(map(str, item['loc']))}: {item['msg']}" if item["loc"] else item["msg"]
+        for item in error.errors(include_url=False, include_input=False)
+    )
+    text = " ".join(causes.split()) or type(error).__name__
     return text if len(text) <= limit else f"{text[:limit]}…"

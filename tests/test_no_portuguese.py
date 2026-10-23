@@ -91,6 +91,9 @@ EXEMPT_STRINGS: list[tuple[str, str]] = [
     ("backend/ai/prompts/vision_agent.py", "capítulos"),
     ("backend/ai/prompts/vision_agent.py", "seções"),
     ("backend/ai/prompts/vision_agent.py", "títulos"),
+    # Vision retry instruction — an AI prompt, in the language of the region prompts
+    ("backend/agents/vision_agent.py", "Responda com um objeto JSON completo e válido"),
+    ("backend/agents/vision_agent.py", "Não repita tokens nem preencha campos"),
     # Data agent prompts — user-facing content
     ("backend/ai/prompts/data_agent.py", "tabela"),
     ("backend/ai/prompts/data_agent.py", "fórmula"),
