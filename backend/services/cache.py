@@ -37,6 +37,11 @@ def _cache_key(path: Path, extra: str = "") -> str:
     return f"{digest}_{file_size}_{extra}"
 
 
+def _content_key(content: bytes, extra: str = "") -> str:
+    """Cache key for bytes held in memory, hashed instead of read from a path."""
+    return f"{hashlib.sha256(content).hexdigest()}_{len(content)}_{extra}"
+
+
 def _cache_path(key: str) -> Path:
     return CACHE_DIR / f"{key}.json"
 
@@ -79,8 +84,21 @@ def options_cache_key(prefix: str, **options: Any) -> str:
 
 
 async def get_cached(path: Path, extra: str = "", ttl: int = 3600) -> Any:
+    return await _read_cached(_cache_key(path, extra), ttl)
+
+
+async def get_cached_bytes(content: bytes, extra: str = "", ttl: int = 3600) -> Any:
+    """Cached payload for binary content held in memory, keyed on its SHA-256.
+
+    Mirrors :func:`get_cached` for callers that never materialize the content
+    as a file (a cropped region image), so identical content across pages or
+    reruns reuses the stored answer.
+    """
+    return await _read_cached(_content_key(content, extra), ttl)
+
+
+async def _read_cached(key: str, ttl: int) -> Any:
     _ensure_cache_dir()
-    key = _cache_key(path, extra)
     cp = _cache_path(key)
     try:
         async with aiofiles.open(str(cp), "r", encoding="utf-8") as f:
@@ -107,15 +125,30 @@ async def get_cached(path: Path, extra: str = "", ttl: int = 3600) -> Any:
 
 
 async def set_cache(path: Path, payload: Any, extra: str = "") -> None:
+    await _write_cached(_cache_key(path, extra), payload)
+
+
+async def set_cache_bytes(content: bytes, payload: Any, extra: str = "") -> None:
+    """Store a payload for binary content held in memory; see :func:`get_cached_bytes`."""
+    await _write_cached(_content_key(content, extra), payload)
+
+
+async def _write_cached(key: str, payload: Any) -> None:
     _ensure_cache_dir()
-    key = _cache_key(path, extra)
     cp = _cache_path(key)
+    tmp = Path(str(cp) + ".tmp")
     try:
         data = {"timestamp": time.time(), "payload": payload}
         if isinstance(payload, str):
             data["text"] = payload
-        async with aiofiles.open(str(cp), "w", encoding="utf-8") as f:
+        async with aiofiles.open(str(tmp), "w", encoding="utf-8") as f:
             await f.write(json.dumps(data, ensure_ascii=False))
+        # The rename makes the write atomic for concurrent readers: they see
+        # either the previous complete file or this one, never a half-written
+        # JSON that a parallel reader would parse-fail and delete. A process
+        # killed mid-write leaves only the temporary file behind, which the
+        # periodic cache sweep removes by age.
+        await aiofiles.os.replace(str(tmp), str(cp))
         logger.debug(t(LOG_CACHE_DEBUG_SET).format(key=key))
     except Exception as e:
         logger.warning(t(LOG_CACHE_SAVE_FAILED).format(error=e))

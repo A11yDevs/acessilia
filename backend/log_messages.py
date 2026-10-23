@@ -364,6 +364,26 @@ LOG_VISION_AGENT_REGION_SALVAGED: str = (
     "[page {page_num}] Vision answer for region {type} was cut off before its end; "
     "description recovered ({chars} characters)"
 )
+#: Warning logged when the model provider rate-limits a region call and the agent waits before trying again; {page_num} and {type} name the region, {retry}/{retries} the rate-limit retry budget, {delay} the wait in seconds.
+LOG_VISION_AGENT_RATE_LIMIT_RETRY: str = (
+    "[page {page_num}] The model provider rate-limited region {type}; "
+    "waiting {delay}s before trying again (rate-limit retry {retry}/{retries})"
+)
+#: Warning logged when a vision description is longer than the region token budget and was cut to it; {page_num} and {type} name the region, {limit} the budget in tokens, {chars} the kept character count.
+LOG_VISION_AGENT_DESCRIPTION_TRUNCATED: str = (
+    "[page {page_num}] Vision description for region {type} exceeded the "
+    "{limit}-token budget and was truncated ({chars} characters kept)"
+)
+#: Debug logged by the orchestrator with a picture element's whole vision description; {element_id} identifies the element, {page_num} its page, {chars} the description length and {description} the full text, so an unusually long description can be traced to its source.
+LOG_VISION_ELEMENT_DESCRIPTION: str = (
+    "[page {page_num}] Vision description of element {element_id} "
+    "({chars} characters): {description}"
+)
+#: Notice appended to the end of a vision description that was truncated to the region budget, so the reader of the alt text knows the description is bounded and many details were left out. This is document content, not a log line; it is resolved through t() so it follows the user's locale.
+MSG_VISION_TRUNCATION_NOTICE: str = (
+    "Note: this image is informationally very extensive; the description was "
+    "limited to the available budget and many details were not described."
+)
 #: Debug logged by the exporters adapter wrapper just before a plain-text export runs; {path} is the output file path.
 LOG_EXPORT_TXT_START: str = "Exporting TXT to {path}"
 #: Debug logged by the exporters adapter wrapper just before a DOCX export runs; {path} is the output file path.

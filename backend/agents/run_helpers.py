@@ -9,6 +9,20 @@ class AgentRunError(RuntimeError):
     """An Agno run that ended in error (provider unreachable, rejected key, ...)."""
 
 
+class RunIncompleteError(RuntimeError):
+    """An Agno run that ended without completing (provider error, cancellation...).
+
+    Carries the run's status and content so callers can classify the failure —
+    a rate-limit rejection reads differently from a timeout — without parsing
+    arbitrary model output.
+    """
+
+    def __init__(self, status: object, content: object) -> None:
+        super().__init__(f"Agent run did not complete ({status}): {content}")
+        self.status = status
+        self.content = content
+
+
 def run_content(output: Any) -> Any:
     """Content of an Agno run, raising when the run itself failed.
 

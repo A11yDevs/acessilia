@@ -7,7 +7,7 @@ from typing import Any, Literal, TypeVar
 from agno.run.base import RunStatus
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from backend.agents.run_helpers import run_content
+from backend.agents.run_helpers import RunIncompleteError, run_content
 
 VISION_SCHEMA_INSTRUCTION = (
     "Retorne somente o objeto estruturado solicitado: use kind='description' e "
@@ -315,7 +315,7 @@ def validate_structured_run(response: Any, schema: type[OutputModel]) -> OutputM
     content = run_content(response)
     status = getattr(response, "status", None)
     if status is not None and status != RunStatus.completed:
-        raise RuntimeError(f"Agent run did not complete ({status}): {content}")
+        raise RunIncompleteError(status, content)
     return validate_structured_content(content, schema)
 
 

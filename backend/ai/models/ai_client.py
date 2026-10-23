@@ -3,17 +3,28 @@ from backend.config.settings import settings
 
 
 
-def get_agno_model(*, max_tokens: int | None = None):
+def get_agno_model(
+    *, max_tokens: int | None = None, timeout_seconds: int | None = None
+):
     """Build the Agno model instance that matches the active settings configuration.
 
     The provider is chosen by ``settings.ai_client``: the value ``"openrouter"`` selects
     the OpenRouter hosted-API client, and any other value selects the local Ollama client, so the
     returned model is always the one the rest of the runtime expects for the configured backend.
 
+    Args:
+        max_tokens (int | None): Output token cap for this client; when None, ``OPENROUTER_MAX_TOKENS`` applies (``num_predict`` for Ollama).
+        timeout_seconds (int | None): Per-call HTTP timeout for this client; when None, ``MODEL_CALL_TIMEOUT_SECONDS`` applies. Callers whose answers can legitimately run long (the DataAgent transcribing tables on a local Ollama) pass their own, larger budget explicitly.
+
     Returns:
         Any: The configured Agno client instance; an ``OpenRouter`` model when
         ``settings.ai_client == "openrouter"`` or an ``Ollama`` model otherwise, ready to be passed to an Agno agent.
     """
+    timeout = (
+        timeout_seconds
+        if timeout_seconds is not None
+        else settings.model_call_timeout_seconds
+    )
     if settings.ai_client == "openrouter":
         from agno.models.openrouter import OpenRouter
 
@@ -34,7 +45,7 @@ def get_agno_model(*, max_tokens: int | None = None):
                 else settings.openrouter_max_tokens
             ),
             extra_headers=extra_headers if extra_headers else None,
-            timeout=float(settings.request_timeout),
+            timeout=float(timeout),
         )
     else:
         from agno.models.ollama import Ollama
@@ -54,5 +65,5 @@ def get_agno_model(*, max_tokens: int | None = None):
             host=host,
             options=options,
             api_key=settings.ollama_api_key or "not-needed",
-            timeout=float(settings.request_timeout),
+            timeout=float(timeout),
         )

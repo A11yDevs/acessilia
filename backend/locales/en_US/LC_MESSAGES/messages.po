@@ -207,12 +207,12 @@ msgid "Executing the plan..."
 msgstr "Executing the plan..."
 
 #, python-brace-format
-msgid "Describing image {current} of {total} ({pages})..."
-msgstr "Describing image {current} of {total} ({pages})..."
+msgid "Describing image {current} of {total} (this image is on {pages})..."
+msgstr "Describing image {current} of {total} (this image is on {pages})..."
 
 #, python-brace-format
-msgid "Recognizing table {current} of {total} ({pages})..."
-msgstr "Recognizing table {current} of {total} ({pages})..."
+msgid "Recognizing table {current} of {total} (this table is on {pages})..."
+msgstr "Recognizing table {current} of {total} (this table is on {pages})..."
 
 #, python-brace-format
 msgid "Executing the plan: step {current} of {total} ({pages})..."
@@ -221,6 +221,10 @@ msgstr "Executing the plan: step {current} of {total} ({pages})..."
 #, python-brace-format
 msgid "page {page}"
 msgstr "page {page}"
+
+#, python-brace-format
+msgid "page {page} of {total_pages}"
+msgstr "page {page} of {total_pages}"
 
 #, python-brace-format
 msgid "pages {pages}"
@@ -717,6 +721,13 @@ msgstr "The trial ended before starting"
 
 msgid "Timestamps of an interval must all have a timezone or all lack one"
 msgstr "Timestamps of an interval must all have a timezone or all lack one"
+
+msgid ""
+"Note: this image is informationally very extensive; the description was "
+"limited to the available budget and many details were not described."
+msgstr ""
+"Note: this image is informationally very extensive; the description was "
+"limited to the available budget and many details were not described."
 
 msgid ""
 "The execute-obligation action requires obligation_id, obligation_kind and"
@@ -1628,6 +1639,22 @@ msgstr ""
 
 #, python-brace-format
 msgid ""
+"[page {page_num}] Vision description for region {type} exceeded the "
+"{limit}-token budget and was truncated ({chars} characters kept)"
+msgstr ""
+"[page {page_num}] Vision description for region {type} exceeded the "
+"{limit}-token budget and was truncated ({chars} characters kept)"
+
+#, python-brace-format
+msgid ""
+"[page {page_num}] The model provider rate-limited region {type}; waiting "
+"{delay}s before trying again (rate-limit retry {retry}/{retries})"
+msgstr ""
+"[page {page_num}] The model provider rate-limited region {type}; waiting "
+"{delay}s before trying again (rate-limit retry {retry}/{retries})"
+
+#, python-brace-format
+msgid ""
 "[page {page_num}] VisionAgent error in region {type}: {error} | "
 "Traceback:\n"
 "{tb}"
@@ -1671,6 +1698,14 @@ msgstr ""
 #, python-brace-format
 msgid "[page {page_num}] Sending region to vision ({size} bytes, type={type})"
 msgstr "[page {page_num}] Sending region to vision ({size} bytes, type={type})"
+
+#, python-brace-format
+msgid ""
+"[page {page_num}] Vision description of element {element_id} ({chars} "
+"characters): {description}"
+msgstr ""
+"[page {page_num}] Vision description of element {element_id} ({chars} "
+"characters): {description}"
 
 #, python-brace-format
 msgid "Cache hit for {name}"
