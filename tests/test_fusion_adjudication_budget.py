@@ -16,7 +16,7 @@ from backend.core.manifest.builder import (
     _derive_v23_processing_needs,
 )
 from backend.core.manifest.models import ManifestElement
-from backend.pipeline.fusion import fuse_extraction_payloads
+from backend.pipeline.fusion import apply_page_routes, fuse_extraction_payloads
 
 PROSE = (
     "The reaction rate depends on the concentration of the reactants and on the "
@@ -153,3 +153,112 @@ class TestAdjudicationBudget:
         del legacy["stats"]["route"]
 
         assert _judged_pages(_obligations([legacy], budget=1)) == ["element-1"]
+
+
+def _doc_element(element_id: str, page: int, order: int, text: str, **extra) -> dict:
+    return {
+        "id": element_id,
+        "type": "paragraph",
+        "raw_label": "paragraph",
+        "reading_order": order,
+        "hierarchy_level": 0,
+        "text": text,
+        "page_number": page,
+        **extra,
+    }
+
+
+def _doc(elements: list[dict], pages: int) -> dict:
+    return {
+        "provider": "test",
+        "document": {
+            "elements": elements,
+            "pages": [
+                {"page_number": n, "width": 100, "height": 100, "element_ids": []}
+                for n in range(1, pages + 1)
+            ],
+            "summary": {
+                "page_count": pages,
+                "element_count": len(elements),
+                "observation_count": 0,
+                "obligation_count": 0,
+                "element_types": {},
+            },
+        },
+    }
+
+
+def _routes(*routes: str) -> list[dict]:
+    return [
+        {"page_number": number, "stats": {"route": route}}
+        for number, route in enumerate(routes, start=1)
+    ]
+
+
+class TestPageRoutes:
+    PRIMARY = _doc(
+        [
+            _doc_element("element-000001", 1, 1, "docling page 1"),
+            _doc_element("element-000002", 2, 2, "docling table page 2"),
+            _doc_element("element-000003", 3, 3, "docling page 3"),
+        ],
+        pages=3,
+    )
+    SECONDARY = _doc(
+        [
+            _doc_element("element-000001", 1, 1, "mineru page 1"),
+            _doc_element("element-000002", 2, 2, "mineru caption page 2"),
+            _doc_element(
+                "element-000003", 2, 3, "mineru table page 2", parent_id="element-000002"
+            ),
+            _doc_element("element-000004", 3, 4, "mineru page 3"),
+        ],
+        pages=3,
+    )
+
+    def test_the_routed_page_takes_the_secondary_elements(self):
+        evidence = _routes("docling", "mineru", "docling")
+
+        payload, replaced = apply_page_routes(
+            self.PRIMARY, self.SECONDARY, evidence, secondary_provider="mineru"
+        )
+
+        document = payload["document"]
+        assert [(e["id"], e["text"], e["reading_order"]) for e in document["elements"]] == [
+            ("element-000001", "docling page 1", 1),
+            ("mineru-element-000002", "mineru caption page 2", 2),
+            ("mineru-element-000003", "mineru table page 2", 3),
+            ("element-000003", "docling page 3", 4),
+        ]
+        taken = [e for e in document["elements"] if e["page_number"] == 2]
+        assert all(e["metadata"]["provider"] == "mineru" for e in taken)
+        assert taken[1]["parent_id"] == "mineru-element-000002"
+        assert document["pages"][1]["element_ids"] == [
+            "mineru-element-000002",
+            "mineru-element-000003",
+        ]
+        assert document["summary"]["element_count"] == 4
+        assert [e["id"] for e in replaced[2]] == ["element-000002"]
+        assert evidence[1]["stats"]["applied"] == "mineru"
+        assert "applied" not in evidence[0]["stats"]
+
+    def test_without_a_routed_page_the_primary_payload_is_untouched(self):
+        payload, replaced = apply_page_routes(
+            self.PRIMARY,
+            self.SECONDARY,
+            _routes("docling", "docling", "docling"),
+            secondary_provider="mineru",
+        )
+
+        assert payload is self.PRIMARY
+        assert replaced == {}
+
+    def test_a_route_to_an_empty_secondary_page_is_ignored(self):
+        secondary = _doc([_doc_element("element-000001", 1, 1, "mineru page 1")], pages=3)
+
+        payload, replaced = apply_page_routes(
+            self.PRIMARY, secondary, _routes("docling", "mineru"), secondary_provider="mineru"
+        )
+
+        assert payload is self.PRIMARY
+        assert replaced == {}

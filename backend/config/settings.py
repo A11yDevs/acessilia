@@ -113,6 +113,15 @@ class Settings:
     fusion_judge_max_pages: int = field(
         default_factory=lambda: int(os.getenv("FUSION_JUDGE_MAX_PAGES", "5"))
     )
+    # Take the secondary provider's page where the deterministic router prefers
+    # it (tables, formulas, a nearly empty primary page); false keeps every page
+    # from the primary provider, as before.
+    fusion_apply_page_routes: bool = field(
+        default_factory=lambda: (
+            os.getenv("FUSION_APPLY_PAGE_ROUTES", "true").strip().lower()
+            in {"1", "true", "yes", "on", "sim"}
+        )
+    )
 
     # Acessilia Toolbox settings
     toolbox_base_url: str = field(

@@ -281,6 +281,126 @@ def _canonical_to_diff(block: dict):
     return block_to_diff(CanonicalBlock(**_canon_kwargs(block)))
 
 
+def apply_page_routes(
+    primary_res: dict[str, Any],
+    secondary_res: dict[str, Any],
+    page_evidence: list[dict[str, Any]],
+    *,
+    secondary_provider: str,
+) -> tuple[dict[str, Any], dict[int, list[dict[str, Any]]]]:
+    """Put the secondary provider's page where the deterministic router prefers it.
+
+    ``decide_v1`` names its second candidate "mineru": it routes a page there
+    when the primary side is nearly empty, when only the secondary found a table
+    or a formula, or when both did (MinerU's tables scored higher in the
+    experiments: TEDS 62.3 against 39.1). Text pages stay with the primary
+    provider, which scored higher on running text.
+
+    Returns the payload the manifest is built from and, for each replaced page,
+    the primary elements it replaced, kept so the VLM judge can compare the two.
+    The secondary elements get ids of their own (both providers number from 1)
+    and ``metadata.provider``; reading order is renumbered across the document.
+    Without a routed page, the primary payload is returned unchanged.
+    """
+    primary_doc = primary_res.get("document") or {}
+    secondary_doc = secondary_res.get("document") or {}
+    secondary_by_page = _elements_by_page(secondary_doc.get("elements") or [])
+    routed = {
+        page["page_number"]
+        for page in page_evidence
+        if (page.get("stats") or {}).get("route") == "mineru"
+        and secondary_by_page.get(page.get("page_number"))
+    }
+    if not routed:
+        return primary_res, {}
+
+    primary_by_page = _elements_by_page(primary_doc.get("elements") or [])
+    unpaged = [
+        element for element in primary_doc.get("elements") or []
+        if isinstance(element, dict) and not isinstance(element.get("page_number"), int)
+    ]
+    replaced: dict[int, list[dict[str, Any]]] = {}
+    elements: list[dict[str, Any]] = []
+    for page_number in sorted(set(primary_by_page) | routed):
+        if page_number in routed:
+            replaced[page_number] = primary_by_page.get(page_number, [])
+            elements.extend(
+                _adopt_elements(secondary_by_page[page_number], secondary_provider)
+            )
+        else:
+            elements.extend(dict(element) for element in primary_by_page[page_number])
+    elements.extend(dict(element) for element in unpaged)
+    for order, element in enumerate(elements, start=1):
+        element["reading_order"] = order
+    for page in page_evidence:
+        if page.get("page_number") in routed:
+            page.setdefault("stats", {})["applied"] = secondary_provider
+
+    pages = {
+        page["page_number"]: dict(page)
+        for page in primary_doc.get("pages") or []
+        if isinstance(page, dict) and isinstance(page.get("page_number"), int)
+    }
+    for page in secondary_doc.get("pages") or []:
+        if isinstance(page, dict) and page.get("page_number") in routed:
+            pages.setdefault(page["page_number"], dict(page))
+    for number, page in pages.items():
+        page["element_ids"] = [
+            element["id"] for element in elements if element.get("page_number") == number
+        ]
+    document = {
+        **primary_doc,
+        "elements": elements,
+        "pages": [pages[number] for number in sorted(pages)],
+    }
+    if isinstance(primary_doc.get("summary"), dict):
+        document["summary"] = {
+            **primary_doc["summary"],
+            "page_count": len(pages),
+            "element_count": len(elements),
+            "element_types": dict(Counter(str(e.get("type")) for e in elements)),
+        }
+    logger.info(
+        "Fusion: {} pages taken from {} by the deterministic router: {}",
+        len(routed),
+        secondary_provider,
+        sorted(routed),
+    )
+    return {**primary_res, "document": document}, replaced
+
+
+def _elements_by_page(elements: list[Any]) -> dict[int, list[dict[str, Any]]]:
+    by_page: dict[int, list[dict[str, Any]]] = {}
+    for element in sorted(
+        (e for e in elements if isinstance(e, dict)),
+        key=lambda e: e.get("reading_order") or 0,
+    ):
+        page = element.get("page_number")
+        if isinstance(page, int):
+            by_page.setdefault(page, []).append(element)
+    return by_page
+
+
+def _adopt_elements(
+    elements: list[dict[str, Any]], provider: str
+) -> list[dict[str, Any]]:
+    """Copies of a secondary page's elements with ids the primary cannot clash with."""
+    ids = {
+        element["id"]: f"{provider}-{element['id']}"
+        for element in elements
+        if element.get("id")
+    }
+    adopted = []
+    for element in elements:
+        copy = dict(element)
+        copy["id"] = ids.get(element.get("id"), f"{provider}-{len(adopted)}")
+        # A parent on another page belongs to a page that was not taken.
+        copy["parent_id"] = ids.get(element.get("parent_id"))
+        copy["metadata"] = {**(element.get("metadata") or {}), "provider": provider}
+        adopted.append(copy)
+    return adopted
+
+
 def _similarity(a: str, b: str) -> float:
     """Word-level similarity in ``[0, 1]`` of two page transcriptions.
 

@@ -240,6 +240,54 @@ def test_dual_mode_attaches_page_evidence_without_replacing_manifest(
     assert json.loads(stored) == {"provider": "mineru", "document": secondary_response}
 
 
+@pytest.mark.parametrize("apply_routes", [True, False])
+def test_dual_mode_takes_the_page_the_router_sends_to_mineru(
+    mock_client, monkeypatch, apply_routes
+):
+    """MinerU's page replaces docling's where the deterministic router prefers it."""
+    import json
+
+    from backend.config.settings import settings
+
+    monkeypatch.setattr(settings, "fusion_mode", "dual")
+    monkeypatch.setattr(settings, "fusion_secondary_provider", "mineru")
+    monkeypatch.setattr(settings, "fusion_apply_page_routes", apply_routes)
+    monkeypatch.setattr(
+        "backend.pipeline.fusion.decide_v1",
+        lambda primary, secondary: ("mineru", "both_formula->mineru"),
+    )
+    mock_client.extract_structure = AsyncMock(return_value=SAMPLE_TOOLBOX_RESPONSE)
+    secondary_response = deepcopy(SAMPLE_TOOLBOX_RESPONSE)
+    secondary_response["document"]["elements"][1]["text"] = "MinerU transcription."
+    secondary_client = AsyncMock(spec=ToolboxStructureClient)
+    secondary_client.provider = "mineru"
+    secondary_client.extract_structure.return_value = secondary_response
+    monkeypatch.setattr(
+        "backend.core.manifest.toolbox_extractor.make_toolbox_client",
+        lambda client_cls, **kwargs: secondary_client,
+    )
+
+    result = ToolboxManifestExtractor(
+        client=mock_client, use_artifact_store=False
+    ).extract(FIXTURE_PDF)
+
+    elements = result.document["document"]["elements"]
+    stored = json.loads(Path(result.document["secondary_extraction"]["path"]).read_bytes())
+    if apply_routes:
+        assert [e["id"] for e in elements] == [
+            "mineru-element-000001",
+            "mineru-element-000002",
+        ]
+        assert elements[1]["text"] == "MinerU transcription."
+        assert [e["id"] for e in stored["replaced_primary_pages"]["1"]] == [
+            "element-000001",
+            "element-000002",
+        ]
+    else:
+        assert result.document["document"] == SAMPLE_TOOLBOX_RESPONSE["document"]
+        assert "replaced_primary_pages" not in stored
+
+
 def test_dual_mode_passes_configured_fusion_policy(mock_client, monkeypatch):
     from docstruct.policy import FusionPolicy
 

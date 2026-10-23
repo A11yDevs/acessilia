@@ -10,7 +10,7 @@ import re
 import tempfile
 from collections import Counter
 from collections.abc import Callable, Coroutine, Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -1094,6 +1094,9 @@ class _SecondaryExtraction:
     #: page number -> raw elements of the secondary provider, in reading order.
     pages: dict[int, list[dict[str, Any]]]
     sizes: dict[int, tuple[float, float]]
+    #: page number -> primary elements of a page the manifest took from the
+    #: secondary provider (fusion.apply_page_routes), in reading order.
+    replaced_primary: dict[int, list[dict[str, Any]]] = field(default_factory=dict)
 
     def bbox(self, element: dict[str, Any]) -> _Box | None:
         """Normalized box of a raw Toolbox element (same frame as _element_bbox)."""
@@ -1179,7 +1182,18 @@ def _load_secondary_extraction(
         page = _page_number(element.get("page_number"))
         if page is not None:
             pages.setdefault(page, []).append(element)
-    return _SecondaryExtraction(str(data.get("provider") or ""), pages, sizes), ""
+    replaced: dict[int, list[dict[str, Any]]] = {}
+    for key, rows in (data.get("replaced_primary_pages") or {}).items():
+        page = _page_number(key)
+        if page is not None and isinstance(rows, list):
+            replaced[page] = sorted(
+                (row for row in rows if isinstance(row, dict)),
+                key=lambda row: row.get("reading_order") or 0,
+            )
+    return (
+        _SecondaryExtraction(str(data.get("provider") or ""), pages, sizes, replaced),
+        "",
+    )
 
 
 def _provider_pair_problem(
@@ -1574,15 +1588,17 @@ def _handle_vlm_pairwise_judge_method(
 
     The Toolbox (``document.adjudicate.page``) returns the position-debiased
     probability that the secondary page is the more faithful transcription.
-    Only pages where the two transcriptions diverge are judged
-    (``should_judge``); the others keep the primary page without a call. Of
+    Candidate A is the page the manifest carries and B the other provider's:
+    the secondary page, or, on a page the deterministic router already took
+    from the secondary provider, the primary elements it replaced. Only pages
+    where the two transcriptions diverge are judged (``should_judge``). Of
     docstruct's two-threshold rule (``decide_pair``) only the ``p_new >
     DEFAULT_NEW_THR`` branch applies: there is no previous judge to consult
-    here. As with ``agreement-rule``, a kept primary page satisfies the
-    obligation, and a preferred secondary page is recorded in
-    ``page_judgement`` but not swapped in: the method fails and the obligation
-    goes to ``human-review``. An answer without a valid ``pB`` fails the method
-    instead of counting as a kept primary.
+    here. A confirmed page satisfies the obligation; a preferred alternative is
+    recorded in ``page_judgement`` but not swapped in (that would reopen the
+    manifest mid-plan), so the method fails and the non-critical obligation
+    becomes a technical warning. An answer without a valid ``pB`` fails the
+    method instead of counting as a confirmation.
     """
     from docstruct.fusion.judge import DEFAULT_NEW_THR, should_judge
 
@@ -1603,6 +1619,12 @@ def _handle_vlm_pairwise_judge_method(
     source_path = Path(manifest.source.path)
     judgements: dict[int, dict[str, Any]] = {}
     for page_number in sorted({e.page_number for e in elements if e.page_number}):
+        if page_number in secondary.replaced_primary:
+            content, other = secondary.provider, primary_name
+            other_blocks = secondary.replaced_primary[page_number]
+        else:
+            content, other = primary_name, secondary.provider
+            other_blocks = secondary.pages.get(page_number, [])
         primary_md = _page_markdown(
             (element.type, element.text)
             for element in sorted(manifest.elements, key=lambda e: e.reading_order)
@@ -1610,7 +1632,7 @@ def _handle_vlm_pairwise_judge_method(
         )
         secondary_md = _page_markdown(
             (str(block.get("type") or ""), block.get("text"))
-            for block in secondary.pages.get(page_number, [])
+            for block in other_blocks
         )
         if not primary_md.strip() or not secondary_md.strip():
             logger.info(
@@ -1618,7 +1640,9 @@ def _handle_vlm_pairwise_judge_method(
             )
             continue
         if not should_judge(primary_md, secondary_md):
-            judgements[page_number] = {"choice": primary_name, "pB": None, "reason": "agree"}
+            judgements[page_number] = {
+                "content": content, "choice": content, "pB": None, "reason": "agree",
+            }
             continue
 
         try:
@@ -1669,7 +1693,8 @@ def _handle_vlm_pairwise_judge_method(
                 ),
             )
         judgements[page_number] = {
-            "choice": secondary.provider if p_b > DEFAULT_NEW_THR else primary_name,
+            "content": content,
+            "choice": other if p_b > DEFAULT_NEW_THR else content,
             "pB": p_b,
             "pB_ab": document.get("pB_ab"),
             "pA_ba": document.get("pA_ba"),
@@ -1690,24 +1715,29 @@ def _handle_vlm_pairwise_judge_method(
     preferred = {
         page: judgement
         for page, judgement in judgements.items()
-        if judgement["choice"] != primary_name
+        if judgement["choice"] != judgement["content"]
     }
     if preferred:
         return MethodResult(
             success=False,
             validated=False,
             message=(
-                "Juiz VLM prefere o provider secundário ("
-                + ", ".join(f"p{page}: pB={j['pB']:.2f}" for page, j in sorted(preferred.items()))
+                "Juiz VLM prefere o outro provider ("
+                + ", ".join(
+                    f"p{page}: {j['choice']} pB={j['pB']:.2f}"
+                    for page, j in sorted(preferred.items())
+                )
                 + "); a troca de página não é aplicada automaticamente"
             ),
         )
     return MethodResult(
         success=True,
         validated=True,
-        message="Juiz VLM mantém o provider primário nas páginas "
+        message="Juiz VLM confirma a página aplicada: "
         + ", ".join(
-            f"{page} (pB={j['pB']:.2f})" if j["pB"] is not None else f"{page} (concordam)"
+            f"{page} ({j['content']}, pB={j['pB']:.2f})"
+            if j["pB"] is not None
+            else f"{page} ({j['content']}, concordam)"
             for page, j in sorted(judgements.items())
         ),
     )
