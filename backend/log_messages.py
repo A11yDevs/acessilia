@@ -340,6 +340,16 @@ LOG_VISION_AGENT_REGION_RETRY: str = (
 LOG_VISION_AGENT_REGION_RECOVERED: str = (
     "[page {page_num}] Vision model answered region {type} on try {attempt}/{attempts}"
 )
+#: Debug logged when the manifest builder derives no processing need for an unknown element that only groups others and has no region (a Docling key_value_area); {element_id} and {raw_label} name it.
+LOG_MANIFEST_STRUCTURAL_CONTAINER_SKIPPED: str = (
+    "Manifest: no review-structure for {element_id} ({raw_label}): "
+    "it groups other elements and has no region"
+)
+#: Warning logged when every try of a region came back cut off and its description was recovered from the last one; {page_num} and {type} name the region, {chars} is the recovered length.
+LOG_VISION_AGENT_REGION_SALVAGED: str = (
+    "[page {page_num}] Vision answer for region {type} was cut off before its end; "
+    "description recovered ({chars} characters)"
+)
 #: Debug logged by the exporters adapter wrapper just before a plain-text export runs; {path} is the output file path.
 LOG_EXPORT_TXT_START: str = "Exporting TXT to {path}"
 #: Debug logged by the exporters adapter wrapper just before a DOCX export runs; {path} is the output file path.

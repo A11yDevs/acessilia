@@ -17,7 +17,7 @@ from backend.core.execution.models import MethodResult
 from backend.core.manifest.builder import _derive_processing_needs
 from backend.core.manifest.models import Obligation
 from backend.i18n import t
-from backend.stage_messages import STAGE_PAGE_UNKNOWN, STAGE_PAGES
+from backend.stage_messages import STAGE_PAGE, STAGE_PAGE_UNKNOWN, STAGE_PAGES
 from backend.tools.logger import logger
 from tests.pddl_support import build_element, build_manifest, build_orchestrator
 
@@ -275,18 +275,87 @@ async def test_open_reading_order_still_fails_the_job(monkeypatch, tmp_path):
 async def test_job_still_fails_when_a_critical_obligation_remains(
     monkeypatch, tmp_path
 ):
+    table = Obligation(
+        id="o-table",
+        kind="linearize-table",
+        target_ids=["table"],
+        admissible_methods=["human-review"],
+        method_costs={"human-review": 100},
+        rationale="Linearizar a tabela",
+    )
     manifest = _headings_manifest(
         _text_refinement(),
-        _describe_image(["human-review"], {"human-review": 100}),
-        extra_elements=[build_element("image", "picture", reading_order=10)],
+        table,
+        extra_elements=[build_element("table", "table", reading_order=10)],
     )
 
-    with pytest.raises(RuntimeError, match="describe-image"):
+    with pytest.raises(RuntimeError, match="linearize-table"):
         await _run(_orchestrator(max_replans=2), manifest, monkeypatch, tmp_path)
 
 
+def _two_images_manifest():
+    """A picture on page 23 and one on page 24, each with its own obligation."""
+    images = []
+    obligations = []
+    for name, page in (("image", 23), ("other", 24)):
+        image = build_element(name, "picture", reading_order=page)
+        image.page_number = page
+        images.append(image)
+        obligation = _describe_image(
+            ["vision-description", "human-review"],
+            {"vision-description": 20, "human-review": 100},
+        )
+        obligation.id = f"o-describe-{name}"
+        obligation.target_ids = [name]
+        obligations.append(obligation)
+    return _headings_manifest(*obligations, extra_elements=images)
+
+
+def _describes(*described_ids):
+    def handler(manifest, obligation_id):
+        if obligation_id in described_ids:
+            return _succeeding(manifest, obligation_id)
+        return _failing(manifest, obligation_id)
+
+    return handler
+
+
 @pytest.mark.asyncio
-async def test_replan_skips_exhausted_refinement_and_rescues_critical_one(
+async def test_an_image_the_model_could_not_describe_does_not_fail_the_job(
+    monkeypatch, tmp_path
+):
+    """006.pdf: two degenerate vision answers out of 40 failed 42 pages."""
+    orchestrator = _orchestrator(max_replans=2)
+    orchestrator.executor.registry.register(
+        "vision-description", _describes("o-describe-other")
+    )
+
+    payload = await _run(orchestrator, _two_images_manifest(), monkeypatch, tmp_path)
+
+    assert _open_ids(payload) == ["o-describe-image"]
+    alt_texts = [
+        block["alt_text"]
+        for page in payload["pages"]
+        for block in page["blocks"]
+        if block["type"] == "image"
+    ]
+    assert len(alt_texts) == 2 and all(alt_texts)
+    summary = payload["canonical_metadata"]["pddl_unsatisfied_summary"]
+    assert f"describe-image ({t(STAGE_PAGE).format(page=23)})" in summary
+
+
+@pytest.mark.asyncio
+async def test_a_document_with_no_image_described_still_fails(monkeypatch, tmp_path):
+    """No description at all is a broken model or key, not sampling."""
+    orchestrator = _orchestrator(max_replans=2)
+    orchestrator.executor.registry.register("vision-description", _describes())
+
+    with pytest.raises(RuntimeError, match="describe-image"):
+        await _run(orchestrator, _two_images_manifest(), monkeypatch, tmp_path)
+
+
+@pytest.mark.asyncio
+async def test_replan_skips_exhausted_refinement_and_rescues_another_one(
     monkeypatch, tmp_path
 ):
     # One execution exhausts the refinement (human review only) while the image

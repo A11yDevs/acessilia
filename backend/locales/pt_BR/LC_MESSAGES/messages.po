@@ -1638,6 +1638,22 @@ msgstr ""
 "região {type}; tentando de novo ({attempt}/{attempts}): {error}"
 
 #, python-brace-format
+msgid ""
+"[page {page_num}] Vision answer for region {type} was cut off before its "
+"end; description recovered ({chars} characters)"
+msgstr ""
+"[página {page_num}] Resposta do modelo de visão para a região {type} "
+"cortada antes do fim; descrição recuperada ({chars} caracteres)"
+
+#, python-brace-format
+msgid ""
+"Manifest: no review-structure for {element_id} ({raw_label}): it groups "
+"other elements and has no region"
+msgstr ""
+"Manifesto: sem review-structure para {element_id} ({raw_label}): ele "
+"agrupa outros elementos e não tem região"
+
+#, python-brace-format
 msgid "[page {page_num}] Sending region to vision ({size} bytes, type={type})"
 msgstr "[página {page_num}] Enviando região para visão ({size} bytes, tipo={type})"
 

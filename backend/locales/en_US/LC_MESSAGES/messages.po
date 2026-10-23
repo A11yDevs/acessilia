@@ -1624,6 +1624,22 @@ msgstr ""
 "{type}; trying again ({attempt}/{attempts}): {error}"
 
 #, python-brace-format
+msgid ""
+"[page {page_num}] Vision answer for region {type} was cut off before its "
+"end; description recovered ({chars} characters)"
+msgstr ""
+"[page {page_num}] Vision answer for region {type} was cut off before its "
+"end; description recovered ({chars} characters)"
+
+#, python-brace-format
+msgid ""
+"Manifest: no review-structure for {element_id} ({raw_label}): it groups "
+"other elements and has no region"
+msgstr ""
+"Manifest: no review-structure for {element_id} ({raw_label}): it groups "
+"other elements and has no region"
+
+#, python-brace-format
 msgid "[page {page_num}] Sending region to vision ({size} bytes, type={type})"
 msgstr "[page {page_num}] Sending region to vision ({size} bytes, type={type})"
 

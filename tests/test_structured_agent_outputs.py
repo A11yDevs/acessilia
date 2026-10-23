@@ -338,7 +338,7 @@ async def test_vision_agent_requests_and_returns_its_output_schema(monkeypatch) 
         return function(*args)
 
     monkeypatch.setattr(vision_module, "Agent", FakeAgent)
-    monkeypatch.setattr(vision_module, "get_agno_model", lambda: object())
+    monkeypatch.setattr(vision_module, "get_agno_model", lambda **_kwargs: object())
     monkeypatch.setattr(vision_module.asyncio, "to_thread", run_inline)
 
     result = await vision_module.VisionAgent().describe_region(
@@ -375,7 +375,7 @@ def _scripted_vision_agent(monkeypatch, answers: list[object]):
         return function(*args)
 
     monkeypatch.setattr(vision_module, "Agent", FakeAgent)
-    monkeypatch.setattr(vision_module, "get_agno_model", lambda: object())
+    monkeypatch.setattr(vision_module, "get_agno_model", lambda **_kwargs: object())
     monkeypatch.setattr(vision_module.asyncio, "to_thread", run_inline)
     return vision_module, calls
 
@@ -467,6 +467,133 @@ async def test_vision_agent_does_not_retry_a_provider_failure(monkeypatch) -> No
 
     assert result is None
     assert len(calls) == 1
+
+
+#: 006.pdf, page 23 (a periodic table): the description was whole and
+#: mentioned_elements listed element names until max_tokens cut the JSON off.
+TRUNCATED_IN_A_LATER_FIELD = (
+    '{\n  "kind": "description",\n'
+    '  "description": "The image shows the Periodic Table of the Elements on a '
+    'blue background, arranged in groups and periods.",\n'
+    '  "language": "en",\n  "confidence": 0.9,\n  "mentioned_elements": [\n'
+    + "".join(f'    "Ununennium {index}",\n' for index in range(300))
+    + '    "Ununen'
+)
+
+#: The description itself loops ("Ununennium" over and over) and is cut mid-word.
+TRUNCATED_IN_THE_DESCRIPTION = (
+    '{\n  "kind": "description",\n'
+    '  "description": "The Periodic Table of the Elements on a blue background. '
+    'The elements are: '
+    + "Ununennium, " * 300
+    + 'Unun'
+)
+
+
+@pytest.mark.asyncio
+async def test_a_description_cut_off_in_a_later_field_is_salvaged(monkeypatch) -> None:
+    from backend.agents.vision_agent import REGION_ATTEMPTS, SALVAGE_WARNING
+
+    vision_module, calls = _scripted_vision_agent(
+        monkeypatch, [TRUNCATED_IN_A_LATER_FIELD] * REGION_ATTEMPTS
+    )
+
+    result = await vision_module.VisionAgent().describe_region(
+        b"image", "embedded_image", page_num=23
+    )
+
+    assert isinstance(result, VisionOutput)
+    assert result.kind == "description"
+    assert result.description == (
+        "The image shows the Periodic Table of the Elements on a blue background, "
+        "arranged in groups and periods."
+    )
+    assert result.language == "en"
+    # Recovered, not what the model meant to send: the evidence says so.
+    assert result.confidence == 0.0
+    assert result.warnings == [SALVAGE_WARNING]
+    assert len(calls) == REGION_ATTEMPTS
+
+
+@pytest.mark.asyncio
+async def test_a_looping_description_is_salvaged_without_the_loop(monkeypatch) -> None:
+    from backend.agents.vision_agent import REGION_ATTEMPTS
+
+    vision_module, _ = _scripted_vision_agent(
+        monkeypatch, [TRUNCATED_IN_THE_DESCRIPTION] * REGION_ATTEMPTS
+    )
+
+    result = await vision_module.VisionAgent().describe_region(
+        b"image", "embedded_image", page_num=23
+    )
+
+    assert isinstance(result, VisionOutput)
+    # The repetition collapses and the cut sentence is dropped.
+    assert result.description == "The Periodic Table of the Elements on a blue background."
+    assert result.language == "und"
+
+
+BLANK_PAGE = {"kind": "blank", "language": "und", "confidence": 0.9}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "call, answer, budget",
+    [
+        # A picture description gets the region budget.
+        (lambda agent: agent.describe_region(b"image", "embedded_image"), VALID_FORMULA, 1234),
+        # A whole page and a region inspected for review-structure may need
+        # transcribing: they keep the general budget.
+        (lambda agent: agent.describe_region(b"image", "full_page_image"), VALID_FORMULA, None),
+        (
+            lambda agent: agent.describe_region(b"image", "embedded_image", full_budget=True),
+            VALID_FORMULA,
+            None,
+        ),
+        (lambda agent: agent.inspect_page(b"image", page_num=1, total_pages=1), BLANK_PAGE, None),
+    ],
+    ids=["picture", "full-page", "region-inspection", "page-inspection"],
+)
+async def test_the_token_budget_of_each_vision_call(monkeypatch, call, answer, budget) -> None:
+    from backend.config.settings import settings
+
+    vision_module, _ = _scripted_vision_agent(monkeypatch, [answer])
+    budgets: list = []
+    monkeypatch.setattr(
+        vision_module,
+        "get_agno_model",
+        lambda **kwargs: budgets.append(kwargs.get("max_tokens")),
+    )
+    monkeypatch.setattr(settings, "vision_region_max_tokens", 1234)
+
+    await call(vision_module.VisionAgent())
+
+    assert budgets == [budget]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "answer",
+    [
+        # Complete, but with an unquoted label inside the description.
+        '{"kind": "description", "description": "A bar chart of monthly revenue '
+        'for the whole year, labelled "Revenue" on its axis.", "language": "en", '
+        '"confidence": 0.9}',
+        # Complete, but with an invalid escape.
+        '{"kind": "description", "description": "A bar chart of monthly revenue '
+        'for the whole year \\q with its axis.", "language": "en", "confidence": 0.9}',
+    ],
+    ids=["inner-quote", "invalid-escape"],
+)
+async def test_an_answer_malformed_before_its_end_is_not_salvaged(monkeypatch, answer) -> None:
+    """Only a cut answer is salvaged; a malformed one would be kept as a fragment."""
+    from backend.agents.vision_agent import REGION_ATTEMPTS
+
+    vision_module, _ = _scripted_vision_agent(monkeypatch, [answer] * REGION_ATTEMPTS)
+
+    result = await vision_module.VisionAgent().describe_region(b"image", "embedded_image")
+
+    assert result is None
 
 
 @pytest.mark.asyncio
