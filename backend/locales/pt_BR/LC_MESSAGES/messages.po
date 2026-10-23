@@ -225,8 +225,8 @@ msgid "Recognizing table {current} of {total} ({pages})..."
 msgstr "Reconhecendo a tabela {current} de {total} ({pages})..."
 
 #, python-brace-format
-msgid "Executing the plan: step {current} of {total}, {pages} ({kind})..."
-msgstr "Executando o plano: passo {current} de {total}, {pages} ({kind})..."
+msgid "Executing the plan: step {current} of {total} ({pages})..."
+msgstr "Executando o plano: passo {current} de {total} ({pages})..."
 
 #, python-brace-format
 msgid "page {page}"

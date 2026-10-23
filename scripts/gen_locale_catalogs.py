@@ -956,7 +956,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         STAGE_EXECUTING_PLAN: "Executando o plano...",
         STAGE_DESCRIBING_IMAGE: "Descrevendo a imagem {current} de {total} ({pages})...",
         STAGE_RECOGNIZING_TABLE: "Reconhecendo a tabela {current} de {total} ({pages})...",
-        STAGE_EXECUTING_PLAN_STEP: "Executando o plano: passo {current} de {total}, {pages} ({kind})...",
+        STAGE_EXECUTING_PLAN_STEP: "Executando o plano: passo {current} de {total} ({pages})...",
         STAGE_PAGE: "página {page}",
         STAGE_PAGES: "páginas {pages}",
         STAGE_PAGE_UNKNOWN: "página não identificada",

@@ -2272,7 +2272,7 @@ class PddlAccessibilityOrchestrator:
         self,
         file_path: Path,
         tmpdir: Path,
-        status_callback: Callable[[str], Coroutine] | None = None,
+        status_callback: Callable[[str], Coroutine[Any, Any, None]] | None = None,
         mode: str | None = None,
         structured_output: bool = False,
         custom_prompt: str | None = None,
@@ -2501,7 +2501,7 @@ async def _enrich_picture_descriptions(
     *,
     mode: str,
     media_inspection: dict[str, Any] | None = None,
-    status_callback: Callable[[str], Coroutine] | None = None,
+    status_callback: Callable[[str], Coroutine[Any, Any, None]] | None = None,
 ) -> None:
     _inject_full_page_picture(manifest, media_inspection)
 
@@ -2733,7 +2733,7 @@ async def _enrich_table_structures(
     manifest: ProcessingManifest,
     source_file: Path,
     *,
-    status_callback: Callable[[str], Coroutine] | None = None,
+    status_callback: Callable[[str], Coroutine[Any, Any, None]] | None = None,
 ) -> None:
     table_elements = [
         element
@@ -3157,7 +3157,7 @@ def _obligation_pages(manifest: ProcessingManifest, obligation_id: str) -> list[
 
 def _plan_progress(
     manifest: ProcessingManifest,
-    status_callback: Callable[[str], Coroutine] | None,
+    status_callback: Callable[[str], Coroutine[Any, Any, None]] | None,
     loop: asyncio.AbstractEventLoop,
 ) -> StepProgress | None:
     """Report each obligation step, with its pages, through ``status_callback``.
@@ -3166,21 +3166,36 @@ def _plan_progress(
     the event loop, so the report is scheduled on ``loop`` and awaited from the
     thread: the step only starts once its stage is recorded, which is what lets
     a job killed mid-step still say which step and page it was on. A failing
-    report is logged and never fails the step.
+    report, including a broken translation of the label, is logged and never
+    fails the step.
+
+    The user sees only the step and its pages; the obligation kind and method
+    are internal names, so they go to the debug log.
     """
     if status_callback is None:
         return None
+    page_by_element = {element.id: element.page_number for element in manifest.elements}
+    pages_by_obligation = {
+        obligation.id: [page_by_element.get(target) for target in obligation.target_ids]
+        for obligation in manifest.obligations
+    }
 
     def report(step: PlanStep, position: int, total: int) -> None:
         if step.action != "execute-obligation" or step.obligation_id is None:
             return
-        message = t(STAGE_EXECUTING_PLAN_STEP).format(
-            current=position,
-            total=total,
-            pages=_pages_label(_obligation_pages(manifest, step.obligation_id)),
-            kind=step.obligation_kind,
+        pages = pages_by_obligation.get(step.obligation_id, [])
+        logger.debug(
+            "PDDL: step {}/{} {} via {}, pages {}",
+            position,
+            total,
+            step.obligation_id,
+            step.method,
+            pages,
         )
         try:
+            message = t(STAGE_EXECUTING_PLAN_STEP).format(
+                current=position, total=total, pages=_pages_label(pages)
+            )
             asyncio.run_coroutine_threadsafe(status_callback(message), loop).result(
                 timeout=_PROGRESS_REPORT_TIMEOUT_SECONDS
             )

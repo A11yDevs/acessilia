@@ -129,9 +129,10 @@ async def test_plan_progress_names_the_obligation_pages_from_the_executor_thread
             current=4,
             total=9,
             pages=t(STAGE_PAGES).format(pages="2, 5"),
-            kind="adjudicate-page",
         )
     ]
+    # The obligation kind is internal jargon; the user only sees step and pages.
+    assert "adjudicate-page" not in messages[0]
 
 
 @pytest.mark.asyncio
@@ -153,6 +154,33 @@ async def test_a_failing_progress_report_does_not_fail_the_step():
         method="verse-chunker",
     )
     await asyncio.to_thread(report, step, 1, 1)
+
+
+@pytest.mark.asyncio
+async def test_a_broken_label_translation_does_not_fail_the_step(monkeypatch):
+    manifest = _manifest(
+        [_element("a", "paragraph", text="x")],
+        [_obligation("chunk-verse", ["a"], ["verse-chunker"])],
+    )
+    messages: list[str] = []
+
+    async def status_callback(message: str) -> None:
+        messages.append(message)
+
+    # A catalog entry with a placeholder the code does not pass.
+    monkeypatch.setattr(
+        "backend.agents.pddl_orchestrator.t", lambda msgid: "{missing} {current}"
+    )
+    report = _plan_progress(manifest, status_callback, asyncio.get_running_loop())
+    step = PlanStep(
+        index=1,
+        action="execute-obligation",
+        obligation_id="o-1",
+        obligation_kind="chunk-verse",
+        method="verse-chunker",
+    )
+    await asyncio.to_thread(report, step, 1, 1)
+    assert messages == []
 
 
 @pytest.mark.asyncio
@@ -218,3 +246,8 @@ async def test_restart_reports_the_last_persisted_stage_and_emails_the_user(
     assert status["status"] == "error"
     assert status["erros"] == [expected]
     assert sent_failures == [("user@example.com", "006.pdf", expected)]
+
+    # The error is saved before the e-mail goes out, so a server in a crash
+    # loop does not e-mail the same interrupted job again on every restart.
+    await recover_pending_jobs()
+    assert len(sent_failures) == 1

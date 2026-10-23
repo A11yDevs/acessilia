@@ -83,8 +83,8 @@ STAGE_EXECUTING_PLAN: str = "Executing the plan..."
 STAGE_DESCRIBING_IMAGE: str = "Describing image {current} of {total} ({pages})..."
 #: Live stage while one table is rebuilt from its region image; {current}/{total} count the tables, {pages} is a STAGE_PAGE* label.
 STAGE_RECOGNIZING_TABLE: str = "Recognizing table {current} of {total} ({pages})..."
-#: Live stage while one plan step runs; {current}/{total} count the plan steps, {pages} is a STAGE_PAGE* label and {kind} the obligation kind.
-STAGE_EXECUTING_PLAN_STEP: str = "Executing the plan: step {current} of {total}, {pages} ({kind})..."
+#: Live stage while one plan step runs; {current}/{total} count the plan steps and {pages} is a STAGE_PAGE* label.
+STAGE_EXECUTING_PLAN_STEP: str = "Executing the plan: step {current} of {total} ({pages})..."
 #: Location label for work on a single page; {page} is the 1-based page number.
 STAGE_PAGE: str = "page {page}"
 #: Location label for work spanning several pages; {pages} is a comma-separated list of page numbers.
