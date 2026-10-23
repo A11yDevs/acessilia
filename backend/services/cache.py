@@ -53,7 +53,7 @@ def processing_cache_configuration() -> dict[str, Any]:
         "toolbox_pdf_provider", "toolbox_math_recognize_provider", "toolbox_math_provider",
         "toolbox_ocr_provider", "toolbox_page_ocr_provider", "toolbox_adjudicate_provider",
         "toolbox_orientation_provider", "toolbox_media_inspect_provider",
-        "toolbox_media_inspect_enabled", "pdf_split_dpi",
+        "toolbox_media_inspect_enabled", "slide_visual_coverage", "pdf_split_dpi",
         "pddl_execute_dry_run", "pddl_max_replans", "pddl_planner_backend",
         "pddl_preferred_plan", "pddl_fast_downward", "pddl_fast_downward_alias",
         "pddl_fast_downward_search",

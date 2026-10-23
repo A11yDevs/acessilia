@@ -6,6 +6,7 @@ assertions hold under any supported server locale.
 
 from __future__ import annotations
 
+import copy
 from datetime import datetime, timezone
 
 import pytest
@@ -101,6 +102,17 @@ def _build(source, *, presentation=True):
     )
 
 
+def _build_edited(source, extraction):
+    """Build an extraction whose elements or pages a test changed."""
+    document = extraction.document["document"]
+    document["summary"].update(
+        page_count=len(document["pages"]), element_count=len(document["elements"])
+    )
+    return build_processing_manifest(
+        source, extraction, refine_reading_order=True, presentation=True
+    )
+
+
 def _headings(manifest):
     return [
         (element.hierarchy_level, element.text, element.page_number)
@@ -147,8 +159,9 @@ def test_a_mostly_visual_slide_becomes_one_picture_of_the_whole_slide(source):
     # No box: the whole page is rendered for the vision model.
     assert picture.provenance == []
     assert picture.metadata["replaced_element_ids"] == ["e-7", "e-8"]
-    # The extracted caption text is not kept; the description replaces it.
+    # The description replaces the extracted text, which is kept as evidence.
     assert not any(e.text == "Source: IBGE" for e in manifest.elements)
+    assert picture.metadata["replaced_text"] == "Source: IBGE"
     [describe] = [o for o in manifest.obligations if o.target_ids == [picture.id]]
     assert describe.kind == "describe-image"
 
@@ -159,6 +172,99 @@ def test_a_slide_with_a_small_picture_keeps_its_content(source):
     texts = [e.text for e in manifest.elements if e.page_number == 2]
     assert "Growth of 10%." in texts
     assert any(e.id == "e-6" and e.type == "picture" for e in manifest.elements)
+
+
+@pytest.mark.parametrize(
+    "beside",
+    [
+        _element("e-9", "list_item", 3, 9, (620, 60, 900, 200), "First point."),
+        _element("e-9", "table", 3, 9, (620, 60, 900, 300), "A | B"),
+    ],
+    ids=["bullets", "table"],
+)
+def test_a_slide_with_text_beside_its_picture_keeps_its_content(source, beside):
+    extraction = _deck()
+    document = extraction.document["document"]
+    # The picture alone covers 0.6 of the slide: only the text beside it keeps
+    # the slide as text.
+    document["elements"][6]["provenance"][0]["bbox"].update(
+        left=0, top=0, right=WIDTH * 0.6, bottom=HEIGHT
+    )
+    control = _build_edited(source, copy.deepcopy(extraction))
+    assert any(e.metadata.get("slide_visual") for e in control.elements)
+    document["elements"].append(beside)
+    document["pages"][2]["element_ids"].append("e-9")
+
+    manifest = _build_edited(source, extraction)
+
+    assert not any(e.metadata.get("slide_visual") for e in manifest.elements)
+    assert any(e.id == "e-9" for e in manifest.elements)
+
+
+def test_a_background_picture_does_not_turn_a_text_slide_into_a_picture(source):
+    extraction = _deck()
+    document = extraction.document["document"]
+    document["elements"].append(_element("e-9", "picture", 1, 9, (0, 0, WIDTH, HEIGHT)))
+    document["pages"][0]["element_ids"].append("e-9")
+
+    manifest = _build_edited(source, extraction)
+
+    assert "Course goals." in [e.text for e in manifest.elements if e.page_number == 1]
+    assert not any(
+        e.metadata.get("slide_visual") for e in manifest.elements if e.page_number == 1
+    )
+
+
+def test_overlapping_pictures_are_counted_once(source):
+    """Two pictures of 0.3 of the slide that mostly overlap cover less than half."""
+    extraction = _deck()
+    document = extraction.document["document"]
+    document["elements"][6]["provenance"][0]["bbox"].update(
+        left=0, top=0, right=WIDTH * 0.6, bottom=HEIGHT * 0.5
+    )
+    document["elements"].append(
+        _element("e-9", "picture", 3, 9, (WIDTH * 0.1, 0, WIDTH * 0.7, HEIGHT * 0.5))
+    )
+    document["pages"][2]["element_ids"].append("e-9")
+
+    manifest = _build_edited(source, extraction)
+
+    assert not any(e.metadata.get("slide_visual") for e in manifest.elements)
+
+
+def test_a_slide_nothing_was_extracted_from_is_still_described(source):
+    extraction = _deck()
+    document = extraction.document["document"]
+    document["pages"].append(
+        {"page_number": 4, "width": WIDTH, "height": HEIGHT, "element_ids": []}
+    )
+
+    manifest = _build_edited(source, extraction)
+
+    heading, picture = [e for e in manifest.elements if e.page_number == 4]
+    assert heading.text == t(MSG_SLIDE_HEADING).format(number=4, total=4)
+    assert picture.type == "picture" and picture.metadata["slide_visual"] is True
+    [describe] = [o for o in manifest.obligations if o.target_ids == [picture.id]]
+    assert describe.kind == "describe-image"
+
+
+def test_the_deck_title_comes_from_the_first_slide_only(source):
+    extraction = _deck()
+    elements = extraction.document["document"]["elements"]
+    elements[0]["type"] = elements[0]["raw_label"] = "paragraph"
+
+    manifest = _build_edited(source, extraction)
+
+    assert _headings(manifest)[0] == (1, "lecture", 1)
+
+
+@pytest.mark.parametrize("value", ["0", "-0.1", "1.5"])
+def test_a_slide_visual_coverage_out_of_range_is_refused_at_startup(monkeypatch, value):
+    from backend.config.settings import Settings
+
+    monkeypatch.setenv("SLIDE_VISUAL_COVERAGE", value)
+    with pytest.raises(ValueError, match="SLIDE_VISUAL_COVERAGE"):
+        Settings()
 
 
 @pytest.mark.parametrize(

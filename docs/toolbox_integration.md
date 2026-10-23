@@ -307,11 +307,14 @@ The `media.inspect` capability (provider `pure-media-inspect`, PR
     `presentation` is extracted by the configured provider alone (no
     dual-provider fusion) and structured slide by slide
     (`backend/core/manifest/slides.py`): one H1 for the deck, an H2
-    "Slide N de T: <title>" (or "Slide N de T") per slide, reading order kept
-    within each slide, and a slide whose pictures cover at least
-    `SLIDE_VISUAL_COVERAGE` (0.5) of it becomes one picture of the whole slide,
-    described with the page prompt instead of read as text. A Toolbox without the
-    field, or a failed inspection, means a document.
+    "Slide N of T: <title>" (or "Slide N of T") per slide, reading order kept
+    within each slide. A slide whose pictures cover at least
+    `SLIDE_VISUAL_COVERAGE` (0.5) of it (their union, a full-page background
+    left out) and whose text lies on those pictures (text beside them covers at
+    most 5% of the slide) becomes one picture of the whole slide, described with
+    the page prompt instead of read as text; the replaced text is kept in
+    `metadata.replaced_text`. A slide nothing was extracted from becomes one too.
+    A Toolbox without the field, or a failed inspection, means a document.
   - `requires_visual_inspection`, to inject a full-page `picture` element when the
     input is a standalone image with no visual blocks — ensuring the VisionAgent
     audiodescribes it.

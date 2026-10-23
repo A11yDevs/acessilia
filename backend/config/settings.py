@@ -423,6 +423,11 @@ class Settings:
             raise ValueError(
                 f"PDF_UA_AUDIT_MAX_RULES must be zero or positive, got {self.pdf_ua_audit_max_rules}"
             )
+        if not 0 < self.slide_visual_coverage <= 1:
+            raise ValueError(
+                "SLIDE_VISUAL_COVERAGE must be greater than 0 and at most 1, "
+                f"got {self.slide_visual_coverage}"
+            )
         self.temp_dir.mkdir(parents=True, exist_ok=True)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.logs_dir.mkdir(parents=True, exist_ok=True)

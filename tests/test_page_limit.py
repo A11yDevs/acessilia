@@ -2,8 +2,9 @@
 
 The limit is checked right after the structural extraction, the first point
 where the page count is always known. A refused document fails the job with a
-localized message that names the page count and the limit; nothing is planned,
-inspected or described.
+localized message that names the page count and the limit; nothing is planned
+or described. Only ``media.inspect`` runs before it, since whether the source
+is a slide deck decides how it is extracted.
 """
 
 from __future__ import annotations
@@ -27,14 +28,28 @@ def _orchestrator_with_pages(count: int):
     return orchestrator
 
 
-async def _must_not_run(*args, **kwargs):
-    raise AssertionError("the pipeline continued past the page limit")
+def _record_steps(monkeypatch) -> list[str]:
+    """The steps that ran, recorded rather than raised: ``_inspect_media``
+    turns any exception into a degraded inspection, which would hide a guard."""
+    calls: list[str] = []
+
+    async def inspect(*_args, **_kwargs):
+        calls.append("media.inspect")
+        return None
+
+    async def describe(*_args, **_kwargs):
+        calls.append("describe")
+
+    monkeypatch.setattr(pddl, "inspect_source_media", inspect)
+    monkeypatch.setattr(pddl, "_enrich_picture_descriptions", describe)
+    monkeypatch.setattr(pddl, "_enrich_table_structures", describe)
+    return calls
 
 
 @pytest.mark.asyncio
 async def test_a_document_over_the_limit_fails_before_any_costly_step(monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "max_pages", 2)
-    monkeypatch.setattr(pddl, "inspect_source_media", _must_not_run)
+    calls = _record_steps(monkeypatch)
     orchestrator = _orchestrator_with_pages(3)
 
     # Pinned, so the expected English message holds on a pt_BR machine too.
@@ -46,6 +61,7 @@ async def test_a_document_over_the_limit_fails_before_any_costly_step(monkeypatc
         i18n.reset_request_locale(token)
 
     assert str(info.value) == "The document has 3 pages, more than the limit of 2."
+    assert calls == ["media.inspect"]
 
 
 @pytest.mark.parametrize("count", [1, 2])
@@ -73,7 +89,7 @@ def test_a_non_positive_max_pages_is_refused_at_startup(monkeypatch, value):
 @pytest.mark.asyncio
 async def test_the_message_is_translated_with_both_numbers(monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "max_pages", 50)
-    monkeypatch.setattr(pddl, "inspect_source_media", _must_not_run)
+    _record_steps(monkeypatch)
     orchestrator = _orchestrator_with_pages(120)
 
     token = i18n.set_request_locale("pt_BR")

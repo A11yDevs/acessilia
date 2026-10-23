@@ -5,13 +5,14 @@ a screen reader user navigates to. When ``media.inspect`` says the source is a
 presentation, the builder reshapes the extraction before deriving its
 processing needs:
 
-- the deck gets one H1 (its first slide title, or the file name), since the
-  canonical document must start with a single main heading;
+- the deck gets one H1 (the title of its first slide, or the file name), since
+  the canonical document must start with a single main heading;
 - every slide opens with an H2 "Slide N of T: <title>", or "Slide N of T" when
   the slide has no title, and the slide's other headings move under it;
-- a slide whose pictures cover most of the page becomes one picture of the
-  whole slide, which the vision model describes, instead of the fragments of
-  text the extractor read off it;
+- a slide whose pictures cover most of the page, and whose text was read off
+  those pictures, becomes one picture of the whole slide, which the vision
+  model describes, instead of the fragments of text the extractor read off it;
+  a slide nothing was extracted from becomes one too, so it is still described;
 - reading order is numbered slide by slide, so it never crosses a slide.
 """
 
@@ -28,6 +29,18 @@ from backend.log_messages import MSG_SLIDE_HEADING, MSG_SLIDE_HEADING_WITH_TITLE
 #: Default share of the slide its pictures must cover for the slide to be
 #: described as an image rather than read as text (SLIDE_VISUAL_COVERAGE).
 DEFAULT_VISUAL_COVERAGE = 0.5
+
+#: A picture covering this much of the slide is its background, not its
+#: content: a template's backdrop would otherwise turn every slide into a
+#: picture. 006.pdf's largest content picture covers 0.82 of its slide.
+_BACKGROUND_COVERAGE = 0.95
+
+#: Largest share of the slide the text outside its pictures may cover for the
+#: slide to be described as an image. Text read off a picture (labels of a
+#: chart, a screenshot) lies inside it, and a caption or a source line is
+#: small; bullets or a table beside a picture are not. In 006.pdf's visual
+#: slides that text covers at most 0.013 of the slide.
+_MAX_TEXT_OUTSIDE = 0.05
 
 #: Heading levels: the deck title, each slide, and headings inside a slide.
 DECK_LEVEL, SLIDE_LEVEL, INNER_LEVEL = 1, 2, 3
@@ -72,7 +85,7 @@ def structure_as_slides(
     for position, number in enumerate(numbers, start=1):
         slide = by_page[number]
         title = _slide_title(slide)
-        if deck_title is None and title is not None and (title.text or "").strip():
+        if position == 1 and title is not None and (title.text or "").strip():
             deck_title = title.text.strip()
         heading = _slide_heading(slide, title, number, position, total)
         body = [element for element in slide if element is not heading]
@@ -82,7 +95,9 @@ def structure_as_slides(
                     element.metadata["original_type"] = "title"
                     element.type = "heading"
                 element.hierarchy_level = max(element.hierarchy_level, INNER_LEVEL)
-        if _is_visual(body, visual_coverage, page_fractions):
+        if not slide or _is_visual(body, visual_coverage, page_fractions):
+            # A slide nothing was extracted from may be a scan or a photo; the
+            # heading would hide it from the unstructured-page inspection.
             body = [_whole_slide_picture(number, body)]
         ordered.append(heading)
         ordered.extend(body)
@@ -169,8 +184,14 @@ def _slide_heading(
 def _is_visual(
     body: list[ManifestElement], threshold: float, page_fractions: PageFractions
 ) -> bool:
-    """Whether the slide's pictures cover at least ``threshold`` of it."""
-    coverage = 0.0
+    """Whether the slide is mostly a picture its text was read off.
+
+    The union of its pictures, a background left out, must cover at least
+    ``threshold`` of the slide, and the text outside them at most
+    ``_MAX_TEXT_OUTSIDE``. Text without a box keeps the slide as text, since
+    where it lies is unknown.
+    """
+    pictures = []
     for element in body:
         if element.type != "picture":
             continue
@@ -178,14 +199,63 @@ def _is_visual(
         if box is None:
             continue
         left, top, right, bottom = box
-        coverage += max(0.0, min(right, 1.0) - max(left, 0.0)) * max(
-            0.0, min(bottom, 1.0) - max(top, 0.0)
+        box = (max(left, 0.0), max(top, 0.0), min(right, 1.0), min(bottom, 1.0))
+        if 0 < _area(box) < _BACKGROUND_COVERAGE:
+            pictures.append(box)
+    if _union_area(pictures) < threshold:
+        return False
+    outside = []
+    for element in body:
+        if (
+            element.type == "picture"
+            or element.raw_label in _DECORATION
+            or not (element.text or "").strip()
+        ):
+            continue
+        box = page_fractions(element)
+        if box is None:
+            return False
+        if not any(_contains(picture, box) for picture in pictures):
+            outside.append(box)
+    return _union_area(outside) <= _MAX_TEXT_OUTSIDE
+
+
+def _area(box: tuple[float, float, float, float]) -> float:
+    left, top, right, bottom = box
+    return max(0.0, right - left) * max(0.0, bottom - top)
+
+
+def _union_area(boxes: list[tuple[float, float, float, float]]) -> float:
+    """Area covered by ``boxes``, overlaps counted once."""
+    xs = sorted({x for box in boxes for x in (box[0], box[2])})
+    area = 0.0
+    for left, right in zip(xs, xs[1:]):
+        spans = sorted(
+            (box[1], box[3]) for box in boxes if box[0] <= left and box[2] >= right
         )
-    return coverage >= threshold
+        covered, reach = 0.0, 0.0
+        for top, bottom in spans:
+            top = max(top, reach)
+            if bottom > top:
+                covered += bottom - top
+                reach = bottom
+        area += (right - left) * covered
+    return area
+
+
+def _contains(
+    picture: tuple[float, float, float, float], box: tuple[float, float, float, float]
+) -> bool:
+    """Whether the center of ``box`` lies within ``picture``."""
+    x, y = (box[0] + box[2]) / 2, (box[1] + box[3]) / 2
+    return picture[0] <= x <= picture[2] and picture[1] <= y <= picture[3]
 
 
 def _whole_slide_picture(number: int, replaced: list[ManifestElement]) -> ManifestElement:
-    """One picture of the whole slide, without a box, so the page is rendered whole."""
+    """One picture of the whole slide, without a box, so the page is rendered whole.
+
+    The text of the elements it replaces is kept in ``replaced_text``.
+    """
     return ManifestElement(
         id=f"element-slide-{number:04d}-visual",
         type="picture",
@@ -196,5 +266,10 @@ def _whole_slide_picture(number: int, replaced: list[ManifestElement]) -> Manife
         metadata={
             "slide_visual": True,
             "replaced_element_ids": [element.id for element in replaced],
+            "replaced_text": "\n".join(
+                text
+                for element in replaced
+                if element.type != "picture" and (text := (element.text or "").strip())
+            ),
         },
     )

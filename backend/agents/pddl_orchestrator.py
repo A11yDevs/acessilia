@@ -2197,7 +2197,8 @@ def _check_page_limit(manifest: ProcessingManifest) -> None:
 
     It runs right after the structural extraction, the first point where the
     page count is always known, and before planning and the vision-model
-    calls. Nothing is processed partially, and the message, which reaches the
+    calls. Only ``media.inspect`` runs before it, since whether the source is
+    a slide deck decides how it is extracted. Nothing is processed partially, and the message, which reaches the
     end user, names the page count and the limit.
 
     Raises:
@@ -2653,16 +2654,6 @@ async def _enrich_picture_descriptions(
 
     if enriched:
         logger.info(t(LOG_PDDL_IMAGES_ENRICHED).format(count=enriched))
-
-
-async def _inspect_media_or_degrade(
-    manifest: ProcessingManifest,
-    source_path: Path,
-) -> dict[str, Any] | None:
-    """``_inspect_media``, recording its outcome in ``manifest.extractor.configuration``."""
-    media_inspection, configuration = await _inspect_media(source_path)
-    manifest.extractor.configuration.update(configuration)
-    return media_inspection
 
 
 async def _inspect_media(

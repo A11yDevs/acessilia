@@ -308,10 +308,13 @@ A capacidade `media.inspect` (provider `pure-media-inspect`, PR
     `presentation` é extraído só pelo provider configurado (sem fusão dual) e
     estruturado slide a slide (`backend/core/manifest/slides.py`): um H1 para a
     apresentação, um H2 "Slide N de T: <título>" (ou "Slide N de T") por slide,
-    ordem de leitura restrita a cada slide, e um slide cujas imagens cobrem ao
-    menos `SLIDE_VISUAL_COVERAGE` (0,5) dele vira uma imagem do slide inteiro,
-    descrita com o prompt de página em vez de lida como texto. Uma Toolbox sem o
-    campo, ou uma inspeção que falhou, significa documento.
+    ordem de leitura restrita a cada slide. Um slide cujas imagens cobrem ao
+    menos `SLIDE_VISUAL_COVERAGE` (0,5) dele (a união delas, sem contar um fundo
+    de página inteira) e cujo texto está sobre essas imagens (o texto ao lado
+    cobre no máximo 5% do slide) vira uma imagem do slide inteiro, descrita com o
+    prompt de página em vez de lida como texto; o texto substituído fica em
+    `metadata.replaced_text`. Um slide do qual nada foi extraído também vira uma.
+    Uma Toolbox sem o campo, ou uma inspeção que falhou, significa documento.
   - `requires_visual_inspection`, para injetar um elemento `picture` de página
     inteira quando a entrada é imagem isolada sem blocos visuais — garantindo a
     audiodescrição pelo VisionAgent.
