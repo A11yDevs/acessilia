@@ -1667,10 +1667,11 @@ msgstr ""
 #, python-brace-format
 msgid ""
 "[page {page_num}] The model provider rate-limited region {type}; waiting "
-"{delay}s before trying again ({attempt}/{attempts})"
+"{delay}s before trying again (rate-limit retry {retry}/{retries})"
 msgstr ""
 "[página {page_num}] O provedor do modelo limitou a taxa da região {type};"
-" aguardando {delay}s antes de tentar de novo ({attempt}/{attempts})"
+" aguardando {delay}s antes de tentar de novo (reintenção por limite de "
+"taxa {retry}/{retries})"
 
 #, python-brace-format
 msgid ""

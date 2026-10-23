@@ -70,7 +70,9 @@ def _build_data_instructions() -> str:
 
 vision_agent = Agent(
     name="VisionAgent",
-    model=get_agno_model(),
+    # Chat answers may legitimately run long on a local Ollama; keep the
+    # historical REQUEST_TIMEOUT ceiling instead of the tighter model default.
+    model=get_agno_model(timeout_seconds=settings.request_timeout),
     instructions=f"{load_system_prompt('medio')}\n\n{VISION_SCHEMA_INSTRUCTION}",
     output_schema=VisionOutput,
     db=_db,
@@ -81,7 +83,7 @@ vision_agent = Agent(
 
 data_agent = Agent(
     name="DataAgent",
-    model=get_agno_model(),
+    model=get_agno_model(timeout_seconds=settings.request_timeout),
     instructions=f"{_build_data_instructions()}\n\n{DATA_SCHEMA_INSTRUCTION}",
     output_schema=DataOutput,
     db=_db,

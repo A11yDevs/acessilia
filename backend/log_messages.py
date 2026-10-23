@@ -364,10 +364,10 @@ LOG_VISION_AGENT_REGION_SALVAGED: str = (
     "[page {page_num}] Vision answer for region {type} was cut off before its end; "
     "description recovered ({chars} characters)"
 )
-#: Warning logged when the model provider rate-limits a region call and the agent waits before trying again; {page_num} and {type} name the region, {attempt}/{attempts} the next try, {delay} the wait in seconds.
+#: Warning logged when the model provider rate-limits a region call and the agent waits before trying again; {page_num} and {type} name the region, {retry}/{retries} the rate-limit retry budget, {delay} the wait in seconds.
 LOG_VISION_AGENT_RATE_LIMIT_RETRY: str = (
     "[page {page_num}] The model provider rate-limited region {type}; "
-    "waiting {delay}s before trying again ({attempt}/{attempts})"
+    "waiting {delay}s before trying again (rate-limit retry {retry}/{retries})"
 )
 #: Warning logged when a vision description is longer than the region token budget and was cut to it; {page_num} and {type} name the region, {limit} the budget in tokens, {chars} the kept character count.
 LOG_VISION_AGENT_DESCRIPTION_TRUNCATED: str = (

@@ -2540,6 +2540,8 @@ async def _enrich_picture_descriptions(
     media_inspection: dict[str, Any] | None = None,
     status_callback: Callable[[str], Coroutine[Any, Any, None]] | None = None,
 ) -> None:
+    from backend.config.settings import settings
+
     _inject_full_page_picture(manifest, media_inspection)
 
     pictures = [
@@ -2571,15 +2573,17 @@ async def _enrich_picture_descriptions(
 
     vision = VisionAgent(mode=mode)
     total_pages = len(manifest.pages)
-    from backend.config.settings import settings
 
     # Descriptions are independent, so they run concurrently, bounded by
     # VISION_CONCURRENCY to stay inside what the model provider accepts (a
     # rate-limited hosted API, or a local Ollama that queues beyond its own
-    # parallelism). The semaphore grants slots FIFO, so the progress messages
-    # keep their order; a later image may still finish first, and completion
-    # order is not reported.
+    # parallelism). The progress callback is serialized separately: two
+    # admitted tasks would otherwise interleave the state writes behind it
+    # (the API's status persistence, the Telegram progress message), and even
+    # serialized the emission order may vary with completion, so nothing here
+    # promises FIFO delivery.
     slots = asyncio.Semaphore(max(1, settings.vision_concurrency))
+    progress_lock = asyncio.Lock()
 
     async def describe_one(position: int, element: ManifestElement) -> bool:
         """Describe one picture and fold the answer into it; True when enriched."""
@@ -2589,13 +2593,14 @@ async def _enrich_picture_descriptions(
 
         async with slots:
             if status_callback:
-                await status_callback(
-                    t(STAGE_DESCRIBING_IMAGE).format(
-                        current=position,
-                        total=len(pictures),
-                        pages=_pages_label([fallback_page_number], len(manifest.pages)),
+                async with progress_lock:
+                    await status_callback(
+                        t(STAGE_DESCRIBING_IMAGE).format(
+                            current=position,
+                            total=len(pictures),
+                            pages=_pages_label([fallback_page_number], len(manifest.pages)),
+                        )
                     )
-                )
             image_bytes, page_number = await run_blocking(
                 _extract_picture_bytes,
                 source_file,
@@ -2676,16 +2681,16 @@ async def _enrich_picture_descriptions(
         return False
 
     # The fold above touches only its own element and runs without awaits, so
-    # concurrent folds cannot interleave; gather keeps the shared manifest
-    # consistent while the model calls overlap.
-    enriched = sum(
-        await asyncio.gather(
-            *(
-                describe_one(position, element)
-                for position, element in enumerate(pictures, start=1)
-            )
-        )
-    )
+    # concurrent folds cannot interleave. The TaskGroup cancels the sibling
+    # descriptions when one of them fails and re-raises as an ExceptionGroup,
+    # matching the sequential stage this replaced — the first failure aborted
+    # the stage — without leaving tasks mutating the manifest after it failed.
+    async with asyncio.TaskGroup() as group:
+        tasks = [
+            group.create_task(describe_one(position, element))
+            for position, element in enumerate(pictures, start=1)
+        ]
+    enriched = sum(task.result() for task in tasks)
 
     if enriched:
         logger.info(t(LOG_PDDL_IMAGES_ENRICHED).format(count=enriched))

@@ -18,6 +18,7 @@ from backend.config.settings import settings
 from backend.core.planning.models import PlanStep
 from backend.i18n import t
 from backend.stage_messages import (
+    STAGE_DESCRIBING_IMAGE,
     STAGE_EXECUTING_PLAN_STEP,
     STAGE_PAGE,
     STAGE_PAGE_OF,
@@ -70,7 +71,6 @@ def sent_failures(monkeypatch):
 class TestPagesLabel:
     def test_single_page(self):
         assert _pages_label([3, 3, None]) == t(STAGE_PAGE).format(page=3)
-
     def test_single_page_of_a_multi_page_document_names_the_total(self):
         assert _pages_label([3, 3, None], 42) == t(STAGE_PAGE_OF).format(
             page=3, total_pages=42
@@ -84,6 +84,23 @@ class TestPagesLabel:
 
     def test_unknown_page(self):
         assert _pages_label([None]) == t(STAGE_PAGE_UNKNOWN)
+
+
+def test_the_image_progress_message_names_the_location_with_the_page_total():
+    from backend.i18n import reset_request_locale, set_request_locale
+
+    token = set_request_locale("en_US")
+    try:
+        assert (
+            t(STAGE_DESCRIBING_IMAGE).format(
+                current=11,
+                total=37,
+                pages=t(STAGE_PAGE_OF).format(page=18, total_pages=42),
+            )
+            == "Describing image 11 of 37 (this image is on page 18 of 42)..."
+        )
+    finally:
+        reset_request_locale(token)
 
 
 def test_executor_reports_each_step_before_running_it():

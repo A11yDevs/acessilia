@@ -136,12 +136,19 @@ async def set_cache_bytes(content: bytes, payload: Any, extra: str = "") -> None
 async def _write_cached(key: str, payload: Any) -> None:
     _ensure_cache_dir()
     cp = _cache_path(key)
+    tmp = Path(str(cp) + ".tmp")
     try:
         data = {"timestamp": time.time(), "payload": payload}
         if isinstance(payload, str):
             data["text"] = payload
-        async with aiofiles.open(str(cp), "w", encoding="utf-8") as f:
+        async with aiofiles.open(str(tmp), "w", encoding="utf-8") as f:
             await f.write(json.dumps(data, ensure_ascii=False))
+        # The rename makes the write atomic for concurrent readers: they see
+        # either the previous complete file or this one, never a half-written
+        # JSON that a parallel reader would parse-fail and delete. A process
+        # killed mid-write leaves only the temporary file behind, which the
+        # periodic cache sweep removes by age.
+        await aiofiles.os.replace(str(tmp), str(cp))
         logger.debug(t(LOG_CACHE_DEBUG_SET).format(key=key))
     except Exception as e:
         logger.warning(t(LOG_CACHE_SAVE_FAILED).format(error=e))

@@ -550,8 +550,12 @@ def test_a_description_over_the_region_budget_is_truncated_and_warns() -> None:
         confidence=0.9,
     )
 
-    truncated = _truncate_description(output, page_num=18, region_type="embedded_image")
+    truncated, was_truncated = _truncate_description(
+        output, page_num=18, region_type="embedded_image",
+        limit_tokens=settings.vision_region_max_tokens,
+    )
 
+    assert was_truncated
     assert len(truncated.description) == limit_chars
     assert truncated.description.endswith("\n\n" + t(MSG_VISION_TRUNCATION_NOTICE))
     assert truncated.warnings == [
@@ -562,22 +566,51 @@ def test_a_description_over_the_region_budget_is_truncated_and_warns() -> None:
 
 def test_a_description_within_the_region_budget_is_kept_whole() -> None:
     from backend.agents.vision_agent import _truncate_description
+    from backend.config.settings import settings
 
     output = VisionOutput(
         kind="description", description="Short description.", language="en", confidence=0.9
     )
 
-    kept = _truncate_description(output, page_num=18, region_type="embedded_image")
+    kept, was_truncated = _truncate_description(
+        output, page_num=18, region_type="embedded_image",
+        limit_tokens=settings.vision_region_max_tokens,
+    )
 
+    assert not was_truncated
     assert kept.description == "Short description."
     assert kept.warnings == []
 
 
 @pytest.mark.asyncio
-async def test_a_rate_limited_region_waits_and_is_retried(monkeypatch) -> None:
-    vision_module, calls = _scripted_vision_agent(
+async def test_a_region_on_the_general_budget_is_never_truncated(monkeypatch) -> None:
+    from backend.config.settings import settings
+
+    description = "a" * (settings.vision_region_max_tokens * 100)
+    vision_module, _ = _scripted_vision_agent(
         monkeypatch,
-        [RuntimeError("HTTP 429: rate limit exceeded, retry later"), VALID_FORMULA],
+        [{"kind": "description", "description": description, "language": "en", "confidence": 0.9}],
+    )
+
+    result = await vision_module.VisionAgent().describe_region(
+        b"image", "embedded_image", full_budget=True
+    )
+
+    # Transcription content: a cut there would lose document text.
+    assert isinstance(result, VisionOutput)
+    assert result.description == description
+    assert result.warnings == []
+
+
+@pytest.mark.asyncio
+async def test_a_rate_limited_region_waits_and_is_retried(monkeypatch) -> None:
+    from backend.agents.vision_agent import REGION_ATTEMPTS, _RATE_LIMIT_RETRIES
+
+    class RateLimited(Exception):
+        status_code = 429
+
+    vision_module, calls = _scripted_vision_agent(
+        monkeypatch, [RateLimited("HTTP 429")] * _RATE_LIMIT_RETRIES + [VALID_FORMULA]
     )
     monkeypatch.setattr(vision_module, "_RATE_LIMIT_RETRY_SECONDS", 0)
 
@@ -587,8 +620,76 @@ async def test_a_rate_limited_region_waits_and_is_retried(monkeypatch) -> None:
 
     assert isinstance(result, VisionOutput)
     assert result.formula_latex == "x = y"
-    # The rate-limited try was not the last one: the region was asked again.
+    # The rate-limit retries are a budget of their own: they did not consume
+    # any of the answer tries, and the answer came on the first real try.
+    assert len(calls) == _RATE_LIMIT_RETRIES + 1
+
+
+@pytest.mark.asyncio
+async def test_a_rate_limit_budget_exhausted_degrades_the_region(monkeypatch) -> None:
+    from backend.agents.vision_agent import _RATE_LIMIT_RETRIES
+
+    class RateLimited(Exception):
+        status_code = 429
+
+    vision_module, calls = _scripted_vision_agent(
+        monkeypatch, [RateLimited("HTTP 429")] * (_RATE_LIMIT_RETRIES + 1)
+    )
+    monkeypatch.setattr(vision_module, "_RATE_LIMIT_RETRY_SECONDS", 0)
+
+    result = await vision_module.VisionAgent().describe_region(
+        b"image", "embedded_image", page_num=7
+    )
+
+    assert result is None
+    assert len(calls) == _RATE_LIMIT_RETRIES + 1
+
+
+@pytest.mark.asyncio
+async def test_an_incomplete_run_rejected_as_a_rate_limit_is_retried(monkeypatch) -> None:
+    vision_module, calls = _scripted_vision_agent(
+        monkeypatch,
+        [
+            type("Incomplete", (), {"status": "cancelled", "content": "429 Too Many Requests"})(),
+            VALID_FORMULA,
+        ],
+    )
+    monkeypatch.setattr(vision_module, "_RATE_LIMIT_RETRY_SECONDS", 0)
+
+    result = await vision_module.VisionAgent().describe_region(
+        b"image", "embedded_image", page_num=7
+    )
+
+    assert isinstance(result, VisionOutput)
     assert len(calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_completed_content_mentioning_429_is_not_mistaken_for_a_rate_limit(
+    monkeypatch,
+) -> None:
+    vision_module, calls = _scripted_vision_agent(
+        monkeypatch,
+        [
+            {
+                "kind": "description",
+                "description": "A rodovia 429 tem uma placa de rate limit na entrada.",
+                "language": "pt-BR",
+                "confidence": 0.9,
+                "mentioned_elements": [],
+                "warnings": [],
+            }
+        ],
+    )
+
+    result = await vision_module.VisionAgent().describe_region(
+        b"image", "embedded_image", page_num=7
+    )
+
+    # The 429 text lives in the model's answer, not in a provider failure: the
+    # answer validates on the first try, with no backoff and no extra call.
+    assert isinstance(result, VisionOutput)
+    assert len(calls) == 1
 
 
 @pytest.mark.asyncio
@@ -607,6 +708,80 @@ async def test_an_identical_region_reuses_the_cached_description(monkeypatch, tm
     assert second.model_dump(mode="json") == first.model_dump(mode="json")
     # The second identical call never reached the model.
     assert len(calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_truncated_description_is_not_cached(monkeypatch, tmp_path) -> None:
+    from backend.config.settings import settings
+    from backend.services import cache as cache_module
+
+    long_answer = {
+        "kind": "description",
+        "description": "a" * (settings.vision_region_max_tokens * 100),
+        "language": "en",
+        "confidence": 0.9,
+        "mentioned_elements": [],
+        "warnings": [],
+    }
+    vision_module, calls = _scripted_vision_agent(monkeypatch, [long_answer, long_answer])
+    monkeypatch.setattr(settings, "vision_region_cache_enabled", True)
+    monkeypatch.setattr(cache_module, "CACHE_DIR", tmp_path / "cache")
+
+    first = await vision_module.VisionAgent().describe_region(b"image", "embedded_image")
+    second = await vision_module.VisionAgent().describe_region(b"image", "embedded_image")
+
+    # A truncated answer is degraded: a rerun asks the model again instead of
+    # being served the same cut text for the TTL.
+    assert len(calls) == 2
+    assert first is not None and second is not None
+    assert first.description == second.description
+
+
+@pytest.mark.asyncio
+async def test_a_salvaged_description_is_not_cached(monkeypatch, tmp_path) -> None:
+    from backend.agents.vision_agent import REGION_ATTEMPTS
+    from backend.config.settings import settings
+    from backend.services import cache as cache_module
+
+    vision_module, calls = _scripted_vision_agent(
+        monkeypatch, [TRUNCATED_IN_A_LATER_FIELD] * (2 * REGION_ATTEMPTS)
+    )
+    monkeypatch.setattr(settings, "vision_region_cache_enabled", True)
+    monkeypatch.setattr(cache_module, "CACHE_DIR", tmp_path / "cache")
+
+    first = await vision_module.VisionAgent().describe_region(b"image", "embedded_image")
+    second = await vision_module.VisionAgent().describe_region(b"image", "embedded_image")
+
+    assert isinstance(first, VisionOutput) and isinstance(second, VisionOutput)
+    assert first.warnings and second.warnings
+    # Both calls reached the model: the salvaged prefix is never stored.
+    assert len(calls) == 2 * REGION_ATTEMPTS
+
+
+def test_the_region_cache_key_varies_with_what_the_answer_depends_on(monkeypatch) -> None:
+    from backend.agents.vision_agent import _region_cache_extra
+    from backend.config.settings import settings
+    from backend.i18n import reset_request_locale, set_request_locale
+
+    monkeypatch.setattr(settings, "ai_client", "openrouter")
+    monkeypatch.setattr(settings, "openrouter_model", "test/model")
+
+    token = set_request_locale("en_US")
+    base = _region_cache_extra("a prompt", "medio", 2000)
+    reset_request_locale(token)
+
+    assert _region_cache_extra("another prompt", "medio", 2000) != base
+    assert _region_cache_extra("a prompt", "detalhado", 2000) != base
+    assert _region_cache_extra("a prompt", "medio", 1500) != base
+    # The same model name under another client is a different ask.
+    monkeypatch.setattr(settings, "ai_client", "ollama")
+    monkeypatch.setattr(settings, "ollama_model", "test/model")
+    assert _region_cache_extra("a prompt", "medio", 2000) != base
+    # The stored notice text is localized, so the locale is part of the key.
+    token = set_request_locale("pt_BR")
+    localized = _region_cache_extra("a prompt", "medio", 2000)
+    reset_request_locale(token)
+    assert localized != base
 
 
 BLANK_PAGE = {"kind": "blank", "language": "und", "confidence": 0.9}
@@ -748,11 +923,17 @@ async def test_data_agent_uses_larger_token_budget_for_tables(monkeypatch) -> No
     monkeypatch.setattr(data_module, "load_region_prompt", lambda _key: "prompt")
     monkeypatch.setattr(data_module.asyncio, "to_thread", run_inline)
     monkeypatch.setattr(data_module.settings, "data_agent_max_tokens", 8192)
+    monkeypatch.setattr(data_module.settings, "data_agent_timeout_seconds", 3600)
 
     result = await data_module.DataAgent().process_region(b"image", "table")
 
     assert result is not None and result.kind == "table"
-    assert captured["model_kwargs"] == {"max_tokens": 8192}
+    # Table transcription keeps the long ceiling: a local Ollama may run long
+    # with the 8192-token budget.
+    assert captured["model_kwargs"] == {
+        "max_tokens": 8192,
+        "timeout_seconds": 3600,
+    }
     assert captured["output_schema"] is DataOutput
 
 

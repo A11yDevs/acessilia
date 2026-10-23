@@ -75,6 +75,13 @@ class Settings:
     data_agent_max_tokens: int = field(
         default_factory=lambda: int(os.getenv("DATA_AGENT_MAX_TOKENS", "8192"))
     )
+    # Table transcription on a local Ollama can run long with the 8192-token
+    # budget, so the DataAgent keeps the historical 1h ceiling instead of the
+    # tighter MODEL_CALL_TIMEOUT_SECONDS: long but legitimate generations
+    # survive there, while vision regions degrade fast.
+    data_agent_timeout_seconds: int = field(
+        default_factory=lambda: int(os.getenv("DATA_AGENT_TIMEOUT_SECONDS", "3600"))
+    )
     vision_region_max_tokens: int = field(
         default_factory=lambda: int(os.getenv("VISION_REGION_MAX_TOKENS", "2000"))
     )
@@ -89,7 +96,8 @@ class Settings:
     # below REQUEST_TIMEOUT: a normal region answer takes 45-90s and a
     # legitimate full-budget generation stays under ~7 minutes, so a call
     # still running after this bound is hung, and the region degrades instead
-    # of stalling the job for up to REQUEST_TIMEOUT.
+    # of stalling the job for up to REQUEST_TIMEOUT. Callers with longer
+    # legitimate answers override it (DATA_AGENT_TIMEOUT_SECONDS for tables).
     model_call_timeout_seconds: int = field(
         default_factory=lambda: int(os.getenv("MODEL_CALL_TIMEOUT_SECONDS", "600"))
     )

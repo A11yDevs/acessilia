@@ -1702,7 +1702,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         ),
         LOG_VISION_AGENT_RATE_LIMIT_RETRY: (
             "[página {page_num}] O provedor do modelo limitou a taxa da região {type}; "
-            "aguardando {delay}s antes de tentar de novo ({attempt}/{attempts})"
+            "aguardando {delay}s antes de tentar de novo "
+            "(reintenção por limite de taxa {retry}/{retries})"
         ),
         LOG_VISION_AGENT_DESCRIPTION_TRUNCATED: (
             "[página {page_num}] A descrição da visão para a região {type} passou do "

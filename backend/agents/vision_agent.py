@@ -10,7 +10,7 @@ from docstruct.fusion.repetition import collapse
 from pydantic import ValidationError
 
 from backend.config.settings import settings
-from backend.i18n import t
+from backend.i18n import active_locale, t
 from backend.log_messages import (
     LOG_VISION_AGENT_DESCRIPTION_TRUNCATED,
     LOG_VISION_AGENT_RATE_LIMIT_RETRY,
@@ -32,6 +32,7 @@ from backend.agents.output_schemas import (
     VISION_SCHEMA_INSTRUCTION,
     OutputModel,
     PageInspectionOutput,
+    RunIncompleteError,
     VisionOutput,
     validate_structured_run,
 )
@@ -46,9 +47,11 @@ from agno.media import Image
 #: When every try is cut off, ``_salvage_truncated_description`` recovers the
 #: description from the last one if it got that far.
 #:
-#: Only an answer that fails schema validation is retried; timeouts, provider
-#: errors and incomplete runs fail at once, since repeating them without
-#: backoff costs up to another REQUEST_TIMEOUT and doubles the load.
+#: Only an answer that fails schema validation consumes one of the tries; a
+#: rate-limit rejection gets its own backed-off budget instead, since it says
+#: the provider is busy, not that the image is hard. Timeouts and other
+#: provider failures fail at once, since repeating them without backoff
+#: doubles the load.
 #:
 #: This retry is deliberately kept instead of tuning temperature or repetition
 #: penalties: changing those affects every answer and needs measuring first,
@@ -156,8 +159,11 @@ class VisionAgent:
             )
             if salvaged is not None:
                 if max_tokens is not None:
-                    salvaged = _truncate_description(
-                        salvaged, page_num=page_num, region_type=classification
+                    salvaged, _ = _truncate_description(
+                        salvaged,
+                        page_num=page_num,
+                        region_type=classification,
+                        limit_tokens=max_tokens,
                     )
                 logger.warning(
                     t(LOG_VISION_AGENT_REGION_SALVAGED).format(
@@ -178,11 +184,15 @@ class VisionAgent:
                 )
             )
             return None
+        truncated = False
         if max_tokens is not None:
-            output = _truncate_description(
-                output, page_num=page_num, region_type=classification
+            output, truncated = _truncate_description(
+                output,
+                page_num=page_num,
+                region_type=classification,
+                limit_tokens=max_tokens,
             )
-        if settings.vision_region_cache_enabled:
+        if settings.vision_region_cache_enabled and _cacheable(output, truncated):
             await set_cache_bytes(
                 image_bytes, output.model_dump(mode="json"), extra=cache_extra
             )
@@ -218,12 +228,17 @@ async def _run_with_retry(
     label: str,
     max_tokens: int | None = None,
 ) -> OutputModel:
-    """Ask the vision model for ``schema``, retrying an answer that fails validation.
+    """Ask the vision model for ``schema``, retrying answers that fail validation.
 
-    Raises the last validation error when every attempt fails, and any other
-    error (timeout, provider failure, incomplete run) at once.
+    A region gets ``REGION_ATTEMPTS`` tries; a rate-limit rejection does not
+    consume one of them — it says the provider is busy, nothing about the
+    answer — and gets its own smaller budget of backed-off retries instead.
+    Any other error (timeout, provider failure, incomplete run) fails at once.
     """
-    for attempt in range(1, REGION_ATTEMPTS + 1):
+    attempt = 0
+    rate_limit_retries = 0
+    while attempt < REGION_ATTEMPTS:
+        attempt += 1
         attempt_prompt = prompt if attempt == 1 else f"{prompt}\n\n{RETRY_INSTRUCTION}"
         logger.debug(
             t(LOG_VISION_AGENT_SENDING_REGION).format(
@@ -244,8 +259,10 @@ async def _run_with_retry(
         try:
             response = await asyncio.to_thread(run)
         except Exception as error:
-            if _is_rate_limited(error) and attempt < REGION_ATTEMPTS:
-                await _back_off_after_rate_limit(page_num, label, attempt)
+            if _is_rate_limited(error) and rate_limit_retries < _RATE_LIMIT_RETRIES:
+                rate_limit_retries += 1
+                attempt -= 1  # a rate limit says nothing about the answer
+                await _wait_out_rate_limit(page_num, label, error, rate_limit_retries)
                 continue
             raise
         try:
@@ -263,9 +280,11 @@ async def _run_with_retry(
                 )
             )
             continue
-        except RuntimeError as error:
-            if _is_rate_limited(error) and attempt < REGION_ATTEMPTS:
-                await _back_off_after_rate_limit(page_num, label, attempt)
+        except RunIncompleteError as error:
+            if _is_rate_limited(error) and rate_limit_retries < _RATE_LIMIT_RETRIES:
+                rate_limit_retries += 1
+                attempt -= 1  # a rate limit says nothing about the answer
+                await _wait_out_rate_limit(page_num, label, error, rate_limit_retries)
                 continue
             raise
         if attempt > 1:
@@ -281,35 +300,68 @@ async def _run_with_retry(
     raise AssertionError("REGION_ATTEMPTS must be at least 1")
 
 
-#: Pattern identifying a provider rate-limit rejection (HTTP 429), whether the
-#: provider SDK raises it as an exception or ends the run with it as the error
-#: content; matched case-insensitively against the error text.
+#: Pattern identifying a provider rate-limit rejection (HTTP 429) in the error
+#: text an incomplete run carries — the provider's own error message, not
+#: model content, which never reaches this check.
 _RATE_LIMIT_PATTERN = re.compile(r"\b429\b|rate[ _-]?limit", re.IGNORECASE)
 
-#: Seconds waited before the try that follows a rate-limit rejection, growing
-#: linearly with the failed attempt (20s, then 40s).
+#: Extra tries granted to rate-limit rejections, on top of ``REGION_ATTEMPTS``:
+#: a 429 says the provider is busy, nothing about the image, so it should not
+#: consume one of the answer tries. The wait grows with each rejection and the
+#: budget bounds it, so a saturated provider cannot stall the job forever.
+_RATE_LIMIT_RETRIES = 2
+
+#: Seconds before the first retry that follows a rate-limit rejection.
 _RATE_LIMIT_RETRY_SECONDS = 20
 
 
 def _is_rate_limited(error: BaseException) -> bool:
-    """Whether a provider failure looks like an HTTP 429 rate-limit rejection."""
-    return bool(_RATE_LIMIT_PATTERN.search(str(error)))
+    """Whether a provider failure looks like an HTTP 429 rate-limit rejection.
+
+    Typed signals first — an SDK exception carrying the HTTP status — and the
+    error text as a fallback, scoped to incomplete runs: their content is the
+    provider's error message, where a 429 shows up, while completed model
+    content never takes this path.
+    """
+    if getattr(error, "status_code", None) == 429:
+        return True
+    if getattr(getattr(error, "response", None), "status_code", None) == 429:
+        return True
+    return isinstance(error, RunIncompleteError) and bool(
+        _RATE_LIMIT_PATTERN.search(str(error))
+    )
 
 
-async def _back_off_after_rate_limit(page_num: int, label: str, attempt: int) -> None:
+def _rate_limit_delay_seconds(error: BaseException, retry: int) -> int:
+    """Seconds to wait after a rate-limit rejection.
+
+    The provider's ``Retry-After`` wins when the SDK exposes it; otherwise the
+    wait grows linearly with the retry count.
+    """
+    headers = getattr(getattr(error, "response", None), "headers", None) or {}
+    retry_after = headers.get("Retry-After") if hasattr(headers, "get") else None
+    try:
+        return max(1, int(retry_after))
+    except (TypeError, ValueError):
+        return _RATE_LIMIT_RETRY_SECONDS * retry
+
+
+async def _wait_out_rate_limit(
+    page_num: int, label: str, error: BaseException, retry: int
+) -> None:
     """Log a rate-limit rejection and wait before the next try.
 
     Unlike an unusable answer, a rate limit says nothing about the image, so
     the retry is not a new sample of the same question but a queued one; the
     wait keeps the extra load off the provider instead of doubling it.
     """
-    delay = _RATE_LIMIT_RETRY_SECONDS * attempt
+    delay = _rate_limit_delay_seconds(error, retry)
     logger.warning(
         t(LOG_VISION_AGENT_RATE_LIMIT_RETRY).format(
             page_num=page_num,
             type=label,
-            attempt=attempt + 1,
-            attempts=REGION_ATTEMPTS,
+            retry=retry,
+            retries=_RATE_LIMIT_RETRIES,
             delay=delay,
         )
     )
@@ -330,42 +382,61 @@ DESCRIPTION_TRUNCATION_WARNING = (
 
 
 def _truncate_description(
-    output: VisionOutput, *, page_num: int, region_type: str
-) -> VisionOutput:
-    """Cap a description at the region token budget, warning when it cuts.
+    output: VisionOutput, *, page_num: int, region_type: str, limit_tokens: int
+) -> tuple[VisionOutput, bool]:
+    """Cap a description at the given token budget; True when it cut.
 
     ``max_tokens`` normally already bounds the answer, but some providers do
     not honor it strictly, and a runaway description would otherwise reach the
     exports and the audio verbatim. The cap is applied to the final text, in
-    characters estimated from the token budget; regions on the general budget
-    (``full_budget``) are excluded by the caller, because a cut there would
-    lose document content.
+    characters estimated from the token budget the call site passed
+    (``limit_tokens``); regions on the general budget (``full_budget``) are
+    excluded by the caller, because a cut there would lose document content.
+
+    The estimate is deliberately rough: ``DESCRIPTION_CHARS_PER_TOKEN``
+    overestimates characters per token for Portuguese, so a capped text may
+    still exceed the token budget it approximates. The point is bounding a
+    runaway answer, not metering exact tokens.
 
     The truncated text ends with a reader-facing notice stating that the image
     is informationally very extensive and many details were not described, so
     nobody mistakes the bounded text for a complete description. The notice
-    counts against the cap, so the total stays within the budget.
+    counts against the character cap, so the total stays within it.
     """
-    limit_chars = settings.vision_region_max_tokens * DESCRIPTION_CHARS_PER_TOKEN
+    limit_chars = limit_tokens * DESCRIPTION_CHARS_PER_TOKEN
     if len(output.description) <= limit_chars:
-        return output
+        return output, False
     notice = t(MSG_VISION_TRUNCATION_NOTICE)
     body_limit = max(0, limit_chars - len(notice) - 2)
     output.description = output.description[:body_limit].rstrip() + "\n\n" + notice
     output.warnings.append(
         DESCRIPTION_TRUNCATION_WARNING.format(
-            limit=settings.vision_region_max_tokens, chars=len(output.description)
+            limit=limit_tokens, chars=len(output.description)
         )
     )
     logger.warning(
         t(LOG_VISION_AGENT_DESCRIPTION_TRUNCATED).format(
             page_num=page_num,
             type=region_type,
-            limit=settings.vision_region_max_tokens,
+            limit=limit_tokens,
             chars=len(output.description),
         )
     )
-    return output
+    return output, True
+
+
+def _cacheable(output: VisionOutput, truncated: bool) -> bool:
+    """Whether a validated answer is worth storing for reruns.
+
+    A truncated description is a degraded answer — caching it would serve the
+    same cut text for the TTL instead of trying for something better, the same
+    reason a salvaged answer is never stored. Validation already rejects an
+    empty description, so anything that reaches here and survives these two
+    checks carries real content.
+    """
+    if truncated:
+        return False
+    return bool((output.description or output.formula_latex or "").strip())
 
 
 #: TTL of a stored region description. Answers are sampled, not deterministic,
@@ -378,9 +449,11 @@ def _region_cache_extra(prompt: str, mode: str, max_tokens: int | None) -> str:
     """Cache variant covering everything the answer depends on besides the image.
 
     The final prompt (system prompt, region instructions, schema instruction,
-    any page numbers baked into a page prompt) plus the model and the budget
-    fully determine what is asked; calls that agree on all of these may share
-    an answer.
+    any page numbers baked into a page prompt) plus the client, the model, the
+    budget and the active locale fully determine what is asked and how the
+    stored text reads; the version marks the truncation/salvage behavior, so a
+    change there starts fresh entries instead of serving answers stored under
+    the old rules. Calls that agree on all of these may share an answer.
     """
     model = (
         settings.openrouter_model
@@ -389,9 +462,12 @@ def _region_cache_extra(prompt: str, mode: str, max_tokens: int | None) -> str:
     )
     return options_cache_key(
         "vision_region",
+        version="v1",
+        ai_client=settings.ai_client,
         model=model,
         mode=mode,
         budget=max_tokens,
+        locale=active_locale(),
         prompt_sha256=hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
     )
 
