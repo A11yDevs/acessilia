@@ -37,7 +37,6 @@ from backend.stage_messages import (
     STAGE_EXPORTING_DOCX,
     STAGE_EXPORTING_DRBENCH_MD,
     STAGE_EXPORTING_HTML,
-    STAGE_EXPORTING_PDF,
     STAGE_EXPORTING_PDF_UA,
     STAGE_EXPORTING_TXT,
     STAGE_GENERATING_AUDIO,
@@ -47,7 +46,6 @@ from backend.stage_messages import (
 )
 from backend.export.exporters.audio_exporter import export_mp3
 from backend.export.exporters.docx_exporter import export_docx
-from backend.export.exporters.pdf_exporter import export_pdf
 from backend.export.exporters.pdf_exporter import export_pdf_ua
 from backend.export.exporters.txt_exporter import export_txt
 from backend.export.exporters.drbench_md_exporter import export_drbench_md
@@ -301,12 +299,6 @@ class JobExecutor:
                 drbench_md_path = None
             state_manager.verificar_cancelamento(task_id)
 
-            state_manager.atualizar(task_id, etapa=t(STAGE_EXPORTING_PDF), progresso=0.88)
-            pdf_path = out_dir / f"{base}.pdf"
-            await self._run_in_executor(export_pdf, canonical, pdf_path, job.filename)
-            completed_formats.append("pdf")
-            state_manager.verificar_cancelamento(task_id)
-
             state_manager.atualizar(task_id, etapa=t(STAGE_EXPORTING_HTML), progresso=0.90)
             html_path = out_dir / f"{base}.html"
             await self._run_in_executor(
@@ -322,7 +314,8 @@ class JobExecutor:
 
             # DOCX and PDF/UA run only on the Toolbox (docs/adr/0003) and come
             # after the required formats, so a hung Toolbox cannot hold back
-            # TXT/PDF/HTML.
+            # TXT/HTML. PDF/UA is the only PDF: a failure leaves the job
+            # without one, with a warning in the result e-mail.
             docx_path = await self._optional_toolbox_export(
                 task_id,
                 enabled=settings.toolbox_docx_enabled,
@@ -383,7 +376,7 @@ class JobExecutor:
             state_manager.verificar_cancelamento(task_id)
 
             zip_path = out_dir / f"{base}_acessivel.zip"
-            package_paths = [txt_path, pdf_path, html_path]
+            package_paths = [txt_path, html_path]
             if isinstance(docx_path, Path):
                 package_paths.append(docx_path)
             if isinstance(mp3_path, Path):

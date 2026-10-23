@@ -66,6 +66,7 @@ from frontend.web.messages import (
     WEB_FORMAT_HTML,
     WEB_FORMAT_MP3,
     WEB_FORMAT_PDF,
+    WEB_FORMAT_PDF_UA,
     WEB_FORMAT_TXT,
     WEB_FORMAT_ZIP,
     WEB_FOOTER,
@@ -123,6 +124,8 @@ MAX_CUSTOM_PROMPT_CHARS = 6000
 DOWNLOAD_MEDIA_TYPES = {
     "txt": "text/plain; charset=utf-8",
     "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    # Only PDF/UA is produced now; "pdf" serves links issued before that,
+    # which stay valid for TOKEN_EXPIRY_DAYS.
     "pdf": "application/pdf",
     "pdf_ua": "application/pdf",
     "html": "text/html; charset=utf-8",
@@ -227,6 +230,7 @@ def _web_strings() -> dict:
         "format_txt": t(WEB_FORMAT_TXT),
         "format_docx": t(WEB_FORMAT_DOCX),
         "format_pdf": t(WEB_FORMAT_PDF),
+        "format_pdf_ua": t(WEB_FORMAT_PDF_UA),
         "format_html": t(WEB_FORMAT_HTML),
         "format_mp3": t(WEB_FORMAT_MP3),
         "format_zip": t(WEB_FORMAT_ZIP),

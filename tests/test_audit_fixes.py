@@ -82,7 +82,6 @@ async def test_shutdown_while_sending_email_preserves_completed_download(
     for name in [
         "export_txt",
         "export_docx",
-        "export_pdf",
         "export_pdf_ua",
         "export_drbench_md",
         "export_accessible_document",

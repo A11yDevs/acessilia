@@ -807,7 +807,6 @@ async def test_job_executor_keeps_original_filename_in_status(api_paths, monkeyp
     monkeypatch.setattr("backend.service.process", fake_process)
     monkeypatch.setattr("backend.api.worker.export_txt", write_file)
     monkeypatch.setattr("backend.api.worker.export_docx", write_file)
-    monkeypatch.setattr("backend.api.worker.export_pdf", write_file)
     monkeypatch.setattr("backend.api.worker.export_pdf_ua", write_file)
     monkeypatch.setattr("backend.api.worker.export_accessible_document", write_file)
     monkeypatch.setattr("backend.api.worker.export_mp3", write_mp3)
@@ -905,7 +904,6 @@ async def test_job_executor_reports_optional_export_failure(
     monkeypatch.setattr("backend.api.worker.export_txt", write_file)
     monkeypatch.setattr("backend.api.worker.export_drbench_md", write_file)
     monkeypatch.setattr("backend.api.worker.export_docx", write_file)
-    monkeypatch.setattr("backend.api.worker.export_pdf", write_file)
     monkeypatch.setattr("backend.api.worker.export_pdf_ua", write_file)
     monkeypatch.setattr("backend.api.worker.export_accessible_document", write_file)
     if failed_format == "PDF/UA":
@@ -964,7 +962,7 @@ async def test_job_executor_reports_optional_export_failure(
     if not docx_produced:
         assert not (output_dir / "audio.docx").exists()
 
-    expected_formats = {"txt", "pdf", "html", "zip"}
+    expected_formats = {"txt", "html", "zip"}
     if docx_produced:
         expected_formats.add("docx")
     if failed_format != "MP3":
@@ -975,7 +973,7 @@ async def test_job_executor_reports_optional_export_failure(
 
     assert (output_dir / "audio.drbench.md").is_file()
     with zipfile.ZipFile(output_dir / "audio_acessivel.zip") as archive:
-        expected_files = {"audio.txt", "audio.pdf", "audio.html"}
+        expected_files = {"audio.txt", "audio.html"}
         if docx_produced:
             expected_files.add("audio.docx")
         if failed_format != "MP3":

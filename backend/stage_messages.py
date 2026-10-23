@@ -29,8 +29,6 @@ STAGE_EXPORTING_TXT: str = "Exporting the plain text version (TXT)..."
 STAGE_EXPORTING_DOCX: str = "Exporting the accessible Word document (DOCX)..."
 #: Live stage while the benchmark markdown (*.drbench.md) is being written.
 STAGE_EXPORTING_DRBENCH_MD: str = "Exporting the benchmark markdown (Dr.DocBench)..."
-#: Live stage while the exported result files are being rendered as a standard PDF.
-STAGE_EXPORTING_PDF: str = "Exporting the PDF..."
 #: Live stage while the exported result files are being rendered as a tagged accessible PDF/UA.
 STAGE_EXPORTING_PDF_UA: str = "Exporting the tagged accessible PDF/UA..."
 #: Live stage while the exported result files are being rendered as semantic HTML.

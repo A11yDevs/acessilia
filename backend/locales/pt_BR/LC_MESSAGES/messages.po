@@ -158,9 +158,6 @@ msgstr "Exportando a versão em texto puro (TXT)..."
 msgid "Exporting the accessible Word document (DOCX)..."
 msgstr "Exportando o documento Word acessível (DOCX)..."
 
-msgid "Exporting the PDF..."
-msgstr "Exportando o PDF..."
-
 msgid "Exporting the tagged accessible PDF/UA..."
 msgstr "Exportando o PDF/UA acessível com marcações..."
 
@@ -995,12 +992,6 @@ msgstr "Metadados técnicos"
 msgid "Image description"
 msgstr "Descrição da imagem"
 
-msgid "Note"
-msgstr "Nota"
-
-msgid "Warning"
-msgstr "Aviso"
-
 #, python-brace-format
 msgid "Table: {caption}"
 msgstr "Tabela: {caption}"
@@ -1089,6 +1080,9 @@ msgstr "Documento Word (DOCX)"
 
 msgid "Accessible PDF"
 msgstr "PDF Acessível"
+
+msgid "Accessible PDF (PDF/UA)"
+msgstr "PDF Acessível (PDF/UA)"
 
 msgid "Web Page (HTML)"
 msgstr "Página Web (HTML)"
@@ -1346,10 +1340,6 @@ msgid "Exporting DOCX to {path}"
 msgstr "Exportando DOCX para {path}"
 
 #, python-brace-format
-msgid "Exporting PDF to {path}"
-msgstr "Exportando PDF para {path}"
-
-#, python-brace-format
 msgid "Exporting PDF/UA to {path}"
 msgstr "Exportando PDF/UA para {path}"
 
@@ -1393,10 +1383,6 @@ msgstr "Hash da descrição do domínio diverge do plano"
 
 msgid "The selected closure diverges from the compiled problem"
 msgstr "Fechamento selecionado diverge do problema compilado"
-
-#, python-brace-format
-msgid "PDF exported with bookmarks and page numbering: {output_path}"
-msgstr "PDF exportado com marcadores e numeração de páginas: {output_path}"
 
 #, python-brace-format
 msgid "PDF/UA exported: {output_path}"
@@ -1562,12 +1548,6 @@ msgstr ""
 
 msgid "Plain Text (TXT)"
 msgstr "Texto Puro (TXT)"
-
-msgid "PDF"
-msgstr "PDF Acessível"
-
-msgid "PDF/UA"
-msgstr "PDF/UA"
 
 msgid "ZIP Package"
 msgstr "Pacote ZIP"

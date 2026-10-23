@@ -10,7 +10,6 @@ from backend.log_messages import (
     EMAIL_FORMAT_DOCX,
     EMAIL_FORMAT_HTML,
     EMAIL_FORMAT_MP3,
-    EMAIL_FORMAT_PDF,
     EMAIL_FORMAT_PDF_UA,
     EMAIL_FORMAT_TXT,
     EMAIL_FORMAT_ZIP,
@@ -30,7 +29,6 @@ from backend.config.settings import settings
 FORMAT_LABELS = {
     "txt": EMAIL_FORMAT_TXT,
     "docx": EMAIL_FORMAT_DOCX,
-    "pdf": EMAIL_FORMAT_PDF,
     "pdf_ua": EMAIL_FORMAT_PDF_UA,
     "html": EMAIL_FORMAT_HTML,
     "mp3": EMAIL_FORMAT_MP3,
@@ -101,7 +99,7 @@ async def send_result_email(
     subject = t(EMAIL_RESULT_SUBJECT)
     labels = [
         t(FORMAT_LABELS[format_name])
-        for format_name in (completed_formats or ["txt", "docx", "pdf", "pdf_ua", "html", "mp3"])
+        for format_name in (completed_formats or ["txt", "docx", "pdf_ua", "html", "mp3"])
         if format_name in FORMAT_LABELS
     ]
     warnings_text = ""

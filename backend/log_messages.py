@@ -133,10 +133,8 @@ EMAIL_FAILURE_BODY: str = (
 EMAIL_FORMAT_TXT: str = "Plain Text (TXT)"
 #: Localized display name of the Word (DOCX) output artifact, listed in the result email's completed-formats block.
 EMAIL_FORMAT_DOCX: str = "Word Document (DOCX)"
-#: Localized display name of the non-tagged PDF output artifact, listed in the result email's completed-formats block.
-EMAIL_FORMAT_PDF: str = "PDF"
 #: Localized display name of the tagged PDF/UA output artifact, listed in the result email's completed-formats block.
-EMAIL_FORMAT_PDF_UA: str = "PDF/UA"
+EMAIL_FORMAT_PDF_UA: str = "Accessible PDF (PDF/UA)"
 #: Localized display name of the web-page (HTML) output artifact, listed in the result email's completed-formats block.
 EMAIL_FORMAT_HTML: str = "Web Page (HTML)"
 #: Localized display name of the spoken-audio (MP3) output artifact, listed in the result email's completed-formats block.
@@ -354,8 +352,6 @@ LOG_VISION_AGENT_REGION_SALVAGED: str = (
 LOG_EXPORT_TXT_START: str = "Exporting TXT to {path}"
 #: Debug logged by the exporters adapter wrapper just before a DOCX export runs; {path} is the output file path.
 LOG_EXPORT_DOCX_START: str = "Exporting DOCX to {path}"
-#: Debug logged by the exporters adapter wrapper just before a PDF export runs; {path} is the output file path.
-LOG_EXPORT_PDF_START: str = "Exporting PDF to {path}"
 #: Debug logged by the exporters adapter wrapper just before a PDF/UA export runs; {path} is the output file path.
 LOG_EXPORT_PDF_UA_START: str = "Exporting PDF/UA to {path}"
 #: Debug logged by the exporters adapter wrapper just before an MP3 audio export runs; {path} is the output file path.
@@ -403,7 +399,6 @@ LOG_PDDL_DOMAIN_DESCRIPTION_HASH_MISMATCH: str = (
 LOG_PDDL_SELECTED_CLOSURE_MISMATCH: str = (
     "The selected closure diverges from the compiled problem"
 )
-LOG_PDF_EXPORTED: str = "PDF exported with bookmarks and page numbering: {output_path}"
 LOG_PDF_UA_EXPORTED: str = "PDF/UA exported: {output_path}"
 #: Info logged when the Toolbox rendered the PDF/UA; {output_path} the destination file path.
 LOG_PDF_UA_TOOLBOX_EXPORTED: str = "PDF/UA rendered by the Toolbox: {output_path}"
