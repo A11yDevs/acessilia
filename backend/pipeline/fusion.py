@@ -12,6 +12,7 @@ engaged.
 from __future__ import annotations
 
 import asyncio
+import difflib
 from collections import Counter
 from typing import Any
 
@@ -24,8 +25,14 @@ from backend.tools.toolbox_client import (
     make_toolbox_client,
 )
 from docstruct.fusion import block_to_diff, merge_blocks
+from docstruct.fusion.adjudication import decide_v1
+from docstruct.fusion.judge import DEFAULT_MAX_RATIO
+from docstruct.fusion.page_select import page_norm
 from docstruct.fusion.types import DiffBlock
 from docstruct.policy import FusionPolicy
+
+#: Kinds whose text decides whether the two providers transcribed a page alike.
+TEXT_KINDS = frozenset({"text", "heading", "title"})
 
 
 def _element_to_canonical_block(el: dict, page_index: int) -> dict:
@@ -211,18 +218,25 @@ def fuse_extraction_payloads(
         out = guarded_blocks
         evidence_stats = dict(page_stats)
         evidence_stats["provider_count"] = 2
-        evidence_stats["provider_divergence"] = (
-            _page_content_signature(d_blocks)
-            != _page_content_signature(m_blocks)
+        # Divergence is a similarity below the judge's own gate (should_judge,
+        # 0.97), not inequality: two extractors almost never agree on every
+        # token or block label, and exact comparison flagged nearly every page,
+        # each one becoming adjudication and fusion work.
+        similarity = _similarity(docling_text, mineru_text)
+        text_similarity = _similarity(
+            "\n\n".join(b.text for b in d_blocks if b.kind in TEXT_KINDS),
+            "\n\n".join(b.text for b in m_blocks if b.kind in TEXT_KINDS),
         )
-        evidence_stats["text_divergence"] = (
-            _page_content_signature(
-                d_blocks, kinds={"text", "heading", "title"}
-            )
-            != _page_content_signature(
-                m_blocks, kinds={"text", "heading", "title"}
-            )
-        )
+        evidence_stats["similarity"] = round(similarity, 4)
+        evidence_stats["text_similarity"] = round(text_similarity, 4)
+        evidence_stats["provider_divergence"] = similarity < DEFAULT_MAX_RATIO
+        evidence_stats["text_divergence"] = text_similarity < DEFAULT_MAX_RATIO
+        # Deterministic adjudication (docstruct's v1 page router), recorded with
+        # the evidence so the manifest builder can leave the VLM judge for the
+        # pages the rule cannot settle.
+        route, route_reason = decide_v1(docling_text, mineru_text)
+        evidence_stats["route"] = route
+        evidence_stats["route_reason"] = route_reason
         evidence_stats["table_divergence"] = (
             _page_content_signature(d_blocks, kinds={"table"})
             != _page_content_signature(m_blocks, kinds={"table"})
@@ -265,6 +279,23 @@ def _canonical_to_diff(block: dict):
     from docstruct.types import CanonicalBlock
 
     return block_to_diff(CanonicalBlock(**_canon_kwargs(block)))
+
+
+def _similarity(a: str, b: str) -> float:
+    """Word-level similarity in ``[0, 1]`` of two page transcriptions.
+
+    docstruct's ``ratio`` (character LCS, the metric ``should_judge`` uses) is
+    pure Python and takes about 2 s on a 3,500-character page, so running it on
+    every page of a long document would stall the extraction for minutes. The
+    word-level SequenceMatcher ratio over the same ``page_norm`` text tracks it
+    closely (0.947 against 0.949 on a sample page) in under a millisecond.
+    """
+    words_a, words_b = page_norm(a).split(), page_norm(b).split()
+    if not words_a and not words_b:
+        return 1.0
+    if not words_a or not words_b:
+        return 0.0
+    return difflib.SequenceMatcher(None, words_a, words_b, autojunk=False).ratio()
 
 
 def _page_content_signature(
