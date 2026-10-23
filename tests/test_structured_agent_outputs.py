@@ -85,14 +85,27 @@ def test_a_description_that_also_carries_a_formula_keeps_the_description() -> No
     assert output.kind == "description"
     assert output.description.startswith("Cubic crystals of sodium chloride")
     assert output.formula_latex is None
+    assert output.warnings == [
+        "formula_latex dropped because kind is 'description': NaCl"
+    ]
+    # The orchestrator revalidates the dumped output; that must be a no-op.
+    assert VisionOutput.model_validate(output.model_dump()) == output
 
 
-def test_a_description_with_only_a_formula_becomes_a_formula() -> None:
+@pytest.mark.parametrize("description", ["", "   "])
+def test_a_description_with_only_a_formula_becomes_a_formula(description: str) -> None:
+    # A whitespace-only description counts as absent because AgentOutput strips
+    # strings; this pins that, since it decides which branch applies.
     output = validate_structured_content(
-        _vision_json(kind="description", formula_latex="E=mc^2"), VisionOutput
+        _vision_json(kind="description", description=description, formula_latex="E=mc^2"),
+        VisionOutput,
     )
 
     assert (output.kind, output.formula_latex) == ("formula", "E=mc^2")
+    assert output.warnings == [
+        "kind changed from 'description' to 'formula': only formula_latex was provided"
+    ]
+    assert VisionOutput.model_validate(output.model_dump()) == output
 
 
 def test_a_description_with_neither_text_nor_formula_is_still_rejected() -> None:

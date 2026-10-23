@@ -12,8 +12,9 @@ from backend.agents.run_helpers import run_content
 VISION_SCHEMA_INSTRUCTION = (
     "Retorne somente o objeto estruturado solicitado: use kind='description' e "
     "description para conteúdo visual/textual, ou kind='formula' e formula_latex "
-    "quando a região for predominantemente uma fórmula. Sempre informe language, "
-    "confidence, mentioned_elements e warnings."
+    "quando a região for predominantemente uma fórmula. Não preencha formula_latex "
+    "quando kind='description'. Sempre informe language, confidence, "
+    "mentioned_elements e warnings."
 )
 
 PAGE_INSPECTION_INSTRUCTION = (
@@ -90,11 +91,25 @@ class VisionOutput(AgentOutput):
         # Models sometimes label a region 'description' and fill formula_latex as
         # well (006.pdf, page 29: a description plus formula_latex='NaCl'). The
         # answer is usable, so it is reconciled instead of discarded: consumers
-        # read only the field that matches kind.
+        # read only the field that matches kind. With a description, the region
+        # stays a description and the LaTeX is dropped; with only the LaTeX, the
+        # region becomes a formula, so the element is built as type='formula'.
+        # Either way a warning keeps the model's original answer in the evidence,
+        # which records the reconciled object. The reconciled object no longer
+        # meets the condition, so revalidating it changes nothing.
+        # The inverse, kind='formula' with a description and no formula_latex, is
+        # still rejected: there the content kind asks for is missing, not extra.
         if self.kind == "description" and self.formula_latex is not None:
             if self.description:
+                self.warnings.append(
+                    f"formula_latex dropped because kind is 'description': {self.formula_latex}"
+                )
                 self.formula_latex = None
             else:
+                self.warnings.append(
+                    "kind changed from 'description' to 'formula': "
+                    "only formula_latex was provided"
+                )
                 self.kind = "formula"
         if self.kind == "description" and not self.description:
             raise ValueError("description is required when kind is 'description'")
