@@ -10,11 +10,11 @@ from backend.log_messages import (
     EMAIL_FORMAT_DOCX,
     EMAIL_FORMAT_HTML,
     EMAIL_FORMAT_MP3,
-    EMAIL_FORMAT_PDF,
     EMAIL_FORMAT_PDF_UA,
     EMAIL_FORMAT_TXT,
     EMAIL_FORMAT_ZIP,
     EMAIL_RESULT_BODY_ATTACHED,
+    EMAIL_RESULT_AUDIT_HEADER,
     EMAIL_RESULT_BODY_WITH_LINK,
     EMAIL_RESULT_SUBJECT,
     EMAIL_RESULT_WARNINGS_HEADER,
@@ -30,7 +30,6 @@ from backend.config.settings import settings
 FORMAT_LABELS = {
     "txt": EMAIL_FORMAT_TXT,
     "docx": EMAIL_FORMAT_DOCX,
-    "pdf": EMAIL_FORMAT_PDF,
     "pdf_ua": EMAIL_FORMAT_PDF_UA,
     "html": EMAIL_FORMAT_HTML,
     "mp3": EMAIL_FORMAT_MP3,
@@ -97,16 +96,26 @@ async def send_result_email(
     download_url: str | None = None,
     completed_formats: list[str] | None = None,
     warnings: list[str] | None = None,
+    audit: list[str] | None = None,
 ) -> bool:
+    """Send the result e-mail: the formats, the PDF/UA audit and any warnings.
+
+    ``audit`` is ``summarize_audit``'s lines, the verdict first and then one
+    line per failed rule, or the single line saying the audit is unavailable.
+    """
     subject = t(EMAIL_RESULT_SUBJECT)
     labels = [
         t(FORMAT_LABELS[format_name])
-        for format_name in (completed_formats or ["txt", "docx", "pdf", "pdf_ua", "html", "mp3"])
+        for format_name in (completed_formats or ["txt", "docx", "pdf_ua", "html", "mp3"])
         if format_name in FORMAT_LABELS
     ]
     warnings_text = ""
+    if audit:
+        verdict, *rules = audit
+        warnings_text += "\n\n" + t(EMAIL_RESULT_AUDIT_HEADER) + "\n" + verdict
+        warnings_text += "".join(f"\n- {rule}" for rule in rules)
     if warnings:
-        warnings_text = "\n\n" + t(EMAIL_RESULT_WARNINGS_HEADER) + "\n"
+        warnings_text += "\n\n" + t(EMAIL_RESULT_WARNINGS_HEADER) + "\n"
         warnings_text += "\n".join(f"- {warning}" for warning in warnings)
     if download_url:
         body = t(EMAIL_RESULT_BODY_WITH_LINK).format(

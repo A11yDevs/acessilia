@@ -59,7 +59,6 @@ from backend.log_messages import (
     EMAIL_FORMAT_DOCX,
     EMAIL_FORMAT_HTML,
     EMAIL_FORMAT_MP3,
-    EMAIL_FORMAT_PDF,
     EMAIL_FORMAT_PDF_UA,
     EMAIL_FORMAT_TXT,
     EMAIL_FORMAT_ZIP,
@@ -69,6 +68,12 @@ from backend.log_messages import (
     EMAIL_FAILURE_BODY,
     EMAIL_FAILURE_SUBJECT,
     EMAIL_RESULT_WARNINGS_HEADER,
+    EMAIL_RESULT_AUDIT_HEADER,
+    EMAIL_AUDIT_COMPLIANT,
+    EMAIL_AUDIT_NON_COMPLIANT,
+    EMAIL_AUDIT_RULE,
+    EMAIL_AUDIT_MORE_RULES,
+    EMAIL_AUDIT_UNAVAILABLE,
     LOG_AGNO_NOT_INSTALLED,
     LOG_API_ERROR,
     LOG_API_INTERFACE_ENABLED,
@@ -109,7 +114,6 @@ from backend.log_messages import (
     LOG_EMAIL_SENT,
     LOG_EXPORT_DOCX_START,
     LOG_EXPORT_MP3_START,
-    LOG_EXPORT_PDF_START,
     LOG_EXPORT_PDF_UA_START,
     LOG_EXPORT_TXT_START,
     LOG_FATAL_ERROR_IN_BOT,
@@ -136,9 +140,11 @@ from backend.log_messages import (
     LOG_PDDL_DOMAIN_DESCRIPTION_HASH_MISMATCH,
     LOG_PDDL_SELECTED_CLOSURE_MISMATCH,
     LOG_PDF_UA_GENERATION_FAILED,
-    LOG_PDF_EXPORTED,
     LOG_PDF_UA_EXPORTED,
     LOG_PDF_UA_SKIPPED_DISABLED,
+    LOG_PDF_UA_AUDIT_SKIPPED_DISABLED,
+    LOG_PDF_UA_AUDIT_FINISHED,
+    LOG_PDF_UA_AUDIT_FAILED,
     LOG_MEDIA_INSPECT_SKIPPED_DISABLED,
     LOG_MEDIA_INSPECT_TOOLBOX_FINISHED,
     LOG_MEDIA_INSPECT_FAILED,
@@ -252,11 +258,6 @@ from backend.export.renderers.html_renderer import (
     MSG_HTML_TABLE_OF_CONTENTS,
     MSG_HTML_TECHNICAL_METADATA,
 )
-from backend.export.renderers.pdf_renderer import (
-    MSG_PDF_NOTE_LABEL,
-    MSG_PDF_TABLE_OF_CONTENTS,
-    MSG_PDF_WARNING_LABEL,
-)
 from backend.pipeline.table_ast import (
     MSG_TABLE_TEXT_CAPTION,
     MSG_TABLE_TEXT_FOOTER,
@@ -280,8 +281,8 @@ from backend.stage_messages import (
     STAGE_ENRICHING_TABLES_OCR,
     STAGE_EXPORTING_DOCX,
     STAGE_EXPORTING_HTML,
-    STAGE_EXPORTING_PDF,
     STAGE_EXPORTING_PDF_UA,
+    STAGE_AUDITING_PDF_UA,
     STAGE_EXPORTING_TXT,
     STAGE_GENERATING_AUDIO,
     STAGE_GENERATING_PDDL_PLAN,
@@ -354,6 +355,7 @@ from frontend.web.messages import (
     WEB_FORMAT_HTML,
     WEB_FORMAT_MP3,
     WEB_FORMAT_PDF,
+    WEB_FORMAT_PDF_UA,
     WEB_FORMAT_TXT,
     WEB_FORMAT_ZIP,
     WEB_FOOTER,
@@ -498,8 +500,8 @@ MESSAGES: tuple[str, ...] = (
     STAGE_PROCESSING_FAILED_LABEL,
     STAGE_EXPORTING_TXT,
     STAGE_EXPORTING_DOCX,
-    STAGE_EXPORTING_PDF,
     STAGE_EXPORTING_PDF_UA,
+    STAGE_AUDITING_PDF_UA,
     STAGE_EXPORTING_HTML,
     STAGE_GENERATING_AUDIO,
     STAGE_PROCESSING_COMPLETED,
@@ -691,10 +693,6 @@ MESSAGES: tuple[str, ...] = (
     MSG_HTML_TABLE_OF_CONTENTS,
     MSG_HTML_TECHNICAL_METADATA,
     MSG_HTML_IMAGE_DESCRIPTION,
-    # PDF renderer UI chrome (backend/export/renderers/pdf_renderer.py).
-    MSG_PDF_TABLE_OF_CONTENTS,
-    MSG_PDF_NOTE_LABEL,
-    MSG_PDF_WARNING_LABEL,
     # TXT table line templates (backend/pipeline/table_ast.py).
     MSG_TABLE_TEXT_CAPTION,
     MSG_TABLE_TEXT_ROW,
@@ -725,6 +723,7 @@ MESSAGES: tuple[str, ...] = (
     WEB_FORMAT_TXT,
     WEB_FORMAT_DOCX,
     WEB_FORMAT_PDF,
+    WEB_FORMAT_PDF_UA,
     WEB_FORMAT_HTML,
     WEB_FORMAT_MP3,
     WEB_FORMAT_ZIP,
@@ -792,7 +791,6 @@ MESSAGES: tuple[str, ...] = (
     LOG_EMAIL_SEND_ERROR,
     LOG_EXPORT_TXT_START,
     LOG_EXPORT_DOCX_START,
-    LOG_EXPORT_PDF_START,
     LOG_EXPORT_PDF_UA_START,
     LOG_EXPORT_MP3_START,
     LOG_PDDL_IGNORED_OPTIONS,
@@ -804,9 +802,11 @@ MESSAGES: tuple[str, ...] = (
     LOG_PDDL_DOMAIN_HASH_MISMATCH,
     LOG_PDDL_DOMAIN_DESCRIPTION_HASH_MISMATCH,
     LOG_PDDL_SELECTED_CLOSURE_MISMATCH,
-    LOG_PDF_EXPORTED,
     LOG_PDF_UA_EXPORTED,
     LOG_PDF_UA_SKIPPED_DISABLED,
+    LOG_PDF_UA_AUDIT_SKIPPED_DISABLED,
+    LOG_PDF_UA_AUDIT_FINISHED,
+    LOG_PDF_UA_AUDIT_FAILED,
     LOG_MEDIA_INSPECT_SKIPPED_DISABLED,
     LOG_MEDIA_INSPECT_TOOLBOX_FINISHED,
     LOG_MEDIA_INSPECT_FAILED,
@@ -825,12 +825,17 @@ MESSAGES: tuple[str, ...] = (
     EMAIL_RESULT_BODY_ATTACHED,
     EMAIL_FORMAT_TXT,
     EMAIL_FORMAT_DOCX,
-    EMAIL_FORMAT_PDF,
     EMAIL_FORMAT_PDF_UA,
     EMAIL_FORMAT_HTML,
     EMAIL_FORMAT_MP3,
     EMAIL_FORMAT_ZIP,
     EMAIL_RESULT_WARNINGS_HEADER,
+    EMAIL_RESULT_AUDIT_HEADER,
+    EMAIL_AUDIT_COMPLIANT,
+    EMAIL_AUDIT_NON_COMPLIANT,
+    EMAIL_AUDIT_RULE,
+    EMAIL_AUDIT_MORE_RULES,
+    EMAIL_AUDIT_UNAVAILABLE,
     LOG_CANONICAL_JSON_SAVE_FAILED,
     LOG_TASK_CANCELLED_BY_USER,
     LOG_PIPELINE_ERROR,
@@ -934,8 +939,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         STAGE_PROCESSING_FAILED_LABEL: "❌ Não foi possível processar o arquivo.",
         STAGE_EXPORTING_TXT: ("Exportando a versão em texto puro (TXT)..."),
         STAGE_EXPORTING_DOCX: ("Exportando o documento Word acessível (DOCX)..."),
-        STAGE_EXPORTING_PDF: "Exportando o PDF...",
         STAGE_EXPORTING_PDF_UA: ("Exportando o PDF/UA acessível com marcações..."),
+        STAGE_AUDITING_PDF_UA: "Auditando o PDF/UA com o veraPDF...",
         STAGE_EXPORTING_HTML: ("Exportando a versão em HTML semântico..."),
         STAGE_GENERATING_AUDIO: (
             "Gerando a versão em áudio falado... {percent}%"
@@ -1375,10 +1380,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         MSG_HTML_TABLE_OF_CONTENTS: "Sumário",
         MSG_HTML_TECHNICAL_METADATA: "Metadados técnicos",
         MSG_HTML_IMAGE_DESCRIPTION: "Descrição da imagem",
-        # PDF renderer UI chrome (pt-BR mirrors of the MSG_PDF_* ids above).
-        MSG_PDF_TABLE_OF_CONTENTS: "Sumário",
-        MSG_PDF_NOTE_LABEL: "Nota",
-        MSG_PDF_WARNING_LABEL: "Aviso",
         # TXT table line templates (pt-BR mirrors of the MSG_TABLE_TEXT_* ids above).
         MSG_TABLE_TEXT_CAPTION: "Tabela: {caption}",
         MSG_TABLE_TEXT_ROW: "Linha {row_index}: {joined}",
@@ -1420,6 +1421,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         WEB_FORMAT_TXT: "Texto (TXT)",
         WEB_FORMAT_DOCX: "Documento Word (DOCX)",
         WEB_FORMAT_PDF: "PDF Acessível",
+        WEB_FORMAT_PDF_UA: "PDF Acessível (PDF/UA)",
         WEB_FORMAT_HTML: "Página Web (HTML)",
         WEB_FORMAT_MP3: "Audiodescrição (MP3)",
         WEB_FORMAT_ZIP: "Pacote completo (ZIP)",
@@ -1537,7 +1539,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         LOG_EMAIL_SEND_ERROR: "Erro ao enviar e-mail para {to_email}: {error}",
         LOG_EXPORT_TXT_START: "Exportando TXT para {path}",
         LOG_EXPORT_DOCX_START: "Exportando DOCX para {path}",
-        LOG_EXPORT_PDF_START: "Exportando PDF para {path}",
         LOG_EXPORT_PDF_UA_START: "Exportando PDF/UA para {path}",
         LOG_EXPORT_MP3_START: "Exportando MP3 para {path}",
         LOG_PDDL_IGNORED_OPTIONS: (
@@ -1569,16 +1570,15 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         LOG_PDDL_SELECTED_CLOSURE_MISMATCH: (
             "Fechamento selecionado diverge do problema compilado"
         ),
-        # PDF export wrapper debug line; {output_path} the destination file path.
-        LOG_PDF_EXPORTED: (
-            "PDF exportado com marcadores e numeração de páginas: {output_path}"
-        ),
         # PDF/UA export wrapper debug line; {output_path} the destination file path.
         LOG_PDF_UA_EXPORTED: "PDF/UA exportado: {output_path}",
         # Toolbox-first PDF/UA rendering; {output_path} the destination file path.
         LOG_PDF_UA_TOOLBOX_EXPORTED: "PDF/UA renderizado pela Toolbox: {output_path}",
         # Worker skips PDF/UA because the Toolbox capability is switched off.
         LOG_PDF_UA_SKIPPED_DISABLED: "PDF/UA ignorado: TOOLBOX_PDF_UA_ENABLED está desativado",
+        LOG_PDF_UA_AUDIT_SKIPPED_DISABLED: "Auditoria do PDF/UA ignorada: TOOLBOX_PDF_VALIDATE_ENABLED está desativado",
+        LOG_PDF_UA_AUDIT_FINISHED: "Auditoria do PDF/UA concluída (conforme={compliant}, regras não atendidas={rules})",
+        LOG_PDF_UA_AUDIT_FAILED: "Falha na auditoria do PDF/UA: {error}",
         # media.inspect skipped because the Toolbox capability is switched off.
         LOG_MEDIA_INSPECT_SKIPPED_DISABLED: "Inspeção de mídia ignorada: TOOLBOX_MEDIA_INSPECT_ENABLED está desativado",
         # Toolbox finished media.inspect; {nature} the artifact nature, {visual} whether it needs visual inspection.
@@ -1627,14 +1627,19 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         ),
         EMAIL_FORMAT_TXT: "Texto Puro (TXT)",
         EMAIL_FORMAT_DOCX: "Documento Word (DOCX)",
-        EMAIL_FORMAT_PDF: "PDF Acessível",
-        EMAIL_FORMAT_PDF_UA: "PDF/UA",
+        EMAIL_FORMAT_PDF_UA: "PDF Acessível (PDF/UA)",
         EMAIL_FORMAT_HTML: "Página Web (HTML)",
         EMAIL_FORMAT_MP3: "Audiodescrição (MP3)",
         EMAIL_FORMAT_ZIP: "Pacote ZIP",
         EMAIL_RESULT_WARNINGS_HEADER: (
             "Alguns formatos opcionais não foram gerados:"
         ),
+        EMAIL_RESULT_AUDIT_HEADER: "Auditoria de acessibilidade do PDF (veraPDF):",
+        EMAIL_AUDIT_COMPLIANT: "{profile}: conforme",
+        EMAIL_AUDIT_NON_COMPLIANT: "{profile}: {rules} regra(s) não atendida(s) ({checks} ocorrência(s))",
+        EMAIL_AUDIT_RULE: "{specification}, cláusula {clause} (teste {test}): {description} ({checks} ocorrência(s))",
+        EMAIL_AUDIT_MORE_RULES: "... e mais {count} regra(s), listadas no relatório do pacote ZIP",
+        EMAIL_AUDIT_UNAVAILABLE: "Auditoria indisponível: {error}",
         LOG_CANONICAL_JSON_SAVE_FAILED: (
             "Não foi possível salvar o JSON canônico: {error}"
         ),

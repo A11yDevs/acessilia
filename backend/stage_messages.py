@@ -29,10 +29,10 @@ STAGE_EXPORTING_TXT: str = "Exporting the plain text version (TXT)..."
 STAGE_EXPORTING_DOCX: str = "Exporting the accessible Word document (DOCX)..."
 #: Live stage while the benchmark markdown (*.drbench.md) is being written.
 STAGE_EXPORTING_DRBENCH_MD: str = "Exporting the benchmark markdown (Dr.DocBench)..."
-#: Live stage while the exported result files are being rendered as a standard PDF.
-STAGE_EXPORTING_PDF: str = "Exporting the PDF..."
 #: Live stage while the exported result files are being rendered as a tagged accessible PDF/UA.
 STAGE_EXPORTING_PDF_UA: str = "Exporting the tagged accessible PDF/UA..."
+#: Live stage while veraPDF audits the exported PDF/UA on the Toolbox.
+STAGE_AUDITING_PDF_UA: str = "Auditing the PDF/UA with veraPDF..."
 #: Live stage while the exported result files are being rendered as semantic HTML.
 STAGE_EXPORTING_HTML: str = "Exporting the semantic HTML version..."
 #: Live stage while the spoken-audio (MP3) rendition of the extracted text is being generated; {percent} substituted at call time.

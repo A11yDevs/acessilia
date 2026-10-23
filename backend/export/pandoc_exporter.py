@@ -160,7 +160,7 @@ def export_accessible_document(
     Args:
         source_text_or_document (str | dict): Raw markdown/text or an already-built canonical document mapping to export.
         output_path (Path): Destination file path for the rendered output.
-        format_name (str): Target format key: "html", "docx", "pdf", "pdf_ua" or "txt".
+        format_name (str): Target format key: "html", "docx", "pdf_ua" or "txt".
         title (str | None): Document title override; when None the localized default title from MSG_DEFAULT_ACCESSIBLE_TITLE is used.
         profile_name (str | None): Export verbosity profile applied to block filtering and validation; falls back to format_name when None.
 
@@ -196,15 +196,6 @@ def export_accessible_document(
     lang = filtered.get("language") or DEFAULT_EXPORT_LANG
     if format_name == "docx":
         return _render_docx(ast, output_path, lang=lang)
-    if format_name == "pdf":
-        from backend.export.renderers.pdf_renderer import render_pdf
-
-        return render_pdf(
-            filtered,
-            output_path,
-            profile_name=profile,
-            title=title or "",
-        )
     if format_name == "pdf_ua":
         return _render_pdf_ua(ast, output_path, lang=lang)
     if format_name == "txt":

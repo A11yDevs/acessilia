@@ -187,7 +187,9 @@ async def test_failed_enqueue_removes_durable_request_and_upload(isolated_runtim
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("sent", [True, False, None])
-async def test_email_delivery_status_does_not_lose_download(isolated_runtime, monkeypatch, tmp_path, sent):
+async def test_email_delivery_status_does_not_lose_download(
+    isolated_runtime, monkeypatch, tmp_path, sent, fake_pdf_ua_audit
+):
     _, manager = isolated_runtime
     source = tmp_path / "doc.pdf"
     source.write_bytes(b"%PDF")
@@ -211,7 +213,7 @@ async def test_email_delivery_status_does_not_lose_download(isolated_runtime, mo
         return sent
 
     monkeypatch.setattr("backend.service.process", process)
-    for name in ["export_txt", "export_docx", "export_pdf", "export_pdf_ua", "export_drbench_md", "export_accessible_document"]:
+    for name in ["export_txt", "export_docx", "export_pdf_ua", "export_drbench_md", "export_accessible_document"]:
         monkeypatch.setattr(worker, name, export)
     monkeypatch.setattr(worker, "export_mp3", audio)
     monkeypatch.setattr(worker, "send_confirmation_email", confirmation)
@@ -233,7 +235,7 @@ async def test_email_delivery_status_does_not_lose_download(isolated_runtime, mo
 
 @pytest.mark.asyncio
 async def test_result_email_reports_open_obligations_of_a_delivered_document(
-    isolated_runtime, monkeypatch, tmp_path
+    isolated_runtime, monkeypatch, tmp_path, fake_pdf_ua_audit
 ):
     """A block dropped by fusion is delivered without it; the e-mail says so."""
     source = tmp_path / "doc.pdf"
@@ -264,7 +266,7 @@ async def test_result_email_reports_open_obligations_of_a_delivered_document(
         return True
 
     monkeypatch.setattr("backend.service.process", process)
-    for name in ["export_txt", "export_docx", "export_pdf", "export_pdf_ua", "export_drbench_md", "export_accessible_document"]:
+    for name in ["export_txt", "export_docx", "export_pdf_ua", "export_drbench_md", "export_accessible_document"]:
         monkeypatch.setattr(worker, name, export)
     monkeypatch.setattr(worker, "export_mp3", audio)
     monkeypatch.setattr(worker, "send_confirmation_email", confirmation)

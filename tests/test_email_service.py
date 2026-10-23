@@ -42,7 +42,7 @@ async def test_result_email_lists_only_completed_formats(monkeypatch):
         "test@example.invalid",
         "doc.pdf",
         download_url="https://acessilia.example/download/tok",
-        completed_formats=["txt", "docx", "pdf", "html", "zip"],
+        completed_formats=["txt", "docx", "html", "zip"],
         warnings=["Falha ao gerar MP3: tts offline"],
     )
 

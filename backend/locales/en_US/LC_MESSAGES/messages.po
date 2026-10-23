@@ -148,11 +148,11 @@ msgstr "Exporting the plain text version (TXT)..."
 msgid "Exporting the accessible Word document (DOCX)..."
 msgstr "Exporting the accessible Word document (DOCX)..."
 
-msgid "Exporting the PDF..."
-msgstr "Exporting the PDF..."
-
 msgid "Exporting the tagged accessible PDF/UA..."
 msgstr "Exporting the tagged accessible PDF/UA..."
+
+msgid "Auditing the PDF/UA with veraPDF..."
+msgstr "Auditing the PDF/UA with veraPDF..."
 
 msgid "Exporting the semantic HTML version..."
 msgstr "Exporting the semantic HTML version..."
@@ -985,12 +985,6 @@ msgstr "Technical metadata"
 msgid "Image description"
 msgstr "Image description"
 
-msgid "Note"
-msgstr "Note"
-
-msgid "Warning"
-msgstr "Warning"
-
 #, python-brace-format
 msgid "Table: {caption}"
 msgstr "Table: {caption}"
@@ -1079,6 +1073,9 @@ msgstr "Word Document (DOCX)"
 
 msgid "Accessible PDF"
 msgstr "Accessible PDF"
+
+msgid "Accessible PDF (PDF/UA)"
+msgstr "Accessible PDF (PDF/UA)"
 
 msgid "Web Page (HTML)"
 msgstr "Web Page (HTML)"
@@ -1334,10 +1331,6 @@ msgid "Exporting DOCX to {path}"
 msgstr "Exporting DOCX to {path}"
 
 #, python-brace-format
-msgid "Exporting PDF to {path}"
-msgstr "Exporting PDF to {path}"
-
-#, python-brace-format
 msgid "Exporting PDF/UA to {path}"
 msgstr "Exporting PDF/UA to {path}"
 
@@ -1385,15 +1378,22 @@ msgid "The selected closure diverges from the compiled problem"
 msgstr "The selected closure diverges from the compiled problem"
 
 #, python-brace-format
-msgid "PDF exported with bookmarks and page numbering: {output_path}"
-msgstr "PDF exported with bookmarks and page numbering: {output_path}"
-
-#, python-brace-format
 msgid "PDF/UA exported: {output_path}"
 msgstr "PDF/UA exported: {output_path}"
 
 msgid "PDF/UA skipped: TOOLBOX_PDF_UA_ENABLED is false"
 msgstr "PDF/UA skipped: TOOLBOX_PDF_UA_ENABLED is false"
+
+msgid "PDF/UA audit skipped: TOOLBOX_PDF_VALIDATE_ENABLED is false"
+msgstr "PDF/UA audit skipped: TOOLBOX_PDF_VALIDATE_ENABLED is false"
+
+#, python-brace-format
+msgid "PDF/UA audit finished (compliant={compliant}, failed rules={rules})"
+msgstr "PDF/UA audit finished (compliant={compliant}, failed rules={rules})"
+
+#, python-brace-format
+msgid "PDF/UA audit failed: {error}"
+msgstr "PDF/UA audit failed: {error}"
 
 msgid "Media inspection skipped: TOOLBOX_MEDIA_INSPECT_ENABLED is false"
 msgstr "Media inspection skipped: TOOLBOX_MEDIA_INSPECT_ENABLED is false"
@@ -1553,17 +1553,38 @@ msgstr ""
 msgid "Plain Text (TXT)"
 msgstr "Plain Text (TXT)"
 
-msgid "PDF"
-msgstr "PDF"
-
-msgid "PDF/UA"
-msgstr "PDF/UA"
-
 msgid "ZIP Package"
 msgstr "ZIP Package"
 
 msgid "Some optional formats were not generated:"
 msgstr "Some optional formats were not generated:"
+
+msgid "Accessibility audit of the PDF (veraPDF):"
+msgstr "Accessibility audit of the PDF (veraPDF):"
+
+#, python-brace-format
+msgid "{profile}: compliant"
+msgstr "{profile}: compliant"
+
+#, python-brace-format
+msgid "{profile}: {rules} rule(s) not met ({checks} occurrence(s))"
+msgstr "{profile}: {rules} rule(s) not met ({checks} occurrence(s))"
+
+#, python-brace-format
+msgid ""
+"{specification}, clause {clause} (test {test}): {description} ({checks} "
+"occurrence(s))"
+msgstr ""
+"{specification}, clause {clause} (test {test}): {description} ({checks} "
+"occurrence(s))"
+
+#, python-brace-format
+msgid "... and {count} more rule(s), listed in the report in the ZIP package"
+msgstr "... and {count} more rule(s), listed in the report in the ZIP package"
+
+#, python-brace-format
+msgid "Audit unavailable: {error}"
+msgstr "Audit unavailable: {error}"
 
 #, python-brace-format
 msgid "Could not save the canonical JSON: {error}"

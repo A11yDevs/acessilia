@@ -161,7 +161,7 @@
     "tests/test_pipeline_validation.py": 2,
     "tests/test_processing_manifest.py": 1,
     "tests/test_provider_choice_methods.py": 10,
-    "tests/test_renderers.py": 9,
+    "tests/test_renderers.py": 4,
     "tests/test_service_engine.py": 1,
     "tests/test_structural_extraction_failure.py": 1,
     "tests/test_structured_agent_outputs.py": 7,
