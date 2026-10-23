@@ -108,6 +108,11 @@ class Settings:
     fusion_hybrid_provider: str = field(
         default_factory=lambda: os.getenv("FUSION_HYBRID_PROVIDER", "mineru-hyb")
     )
+    # Pages per document the VLM judge may adjudicate in dual fusion: the
+    # deterministic router settles the rest, and 0 turns the judge off.
+    fusion_judge_max_pages: int = field(
+        default_factory=lambda: int(os.getenv("FUSION_JUDGE_MAX_PAGES", "5"))
+    )
 
     # Acessilia Toolbox settings
     toolbox_base_url: str = field(
