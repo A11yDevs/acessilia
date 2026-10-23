@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import importlib.util
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -164,6 +165,48 @@ class TestExtraKeys:
             "FUSION_MODE", REPO_ROOT
         )
         assert sync_env.references("NO_SUCH_KEY_ANYWHERE_42", REPO_ROOT) == []
+
+
+class TestShellSafety:
+    """The server scripts ``source`` .env in bash with ``set -euo pipefail``.
+
+    ``PDDL_FAST_DOWNWARD_SEARCH=astar(blind())`` copied unquoted from the example
+    stopped the staging auto-update timer with a syntax error.
+    """
+
+    def test_unquoted_spaces_and_shell_characters_are_flagged(self, sync_env):
+        text = (
+            "SMTP_NAME=A11y Acessibilidade\n"
+            "SEARCH=astar(blind())\n"
+            "QUOTED='astar(blind())'\n"
+            'DOUBLE="A11y Acessibilidade"\n'
+            "PLAIN=http://localhost:8000/v1?a=b\n"
+            "WITH_COMMENT=docling  # the default\n"
+            "#DISABLED=a b\n"
+            "EMPTY=\n"
+        )
+        assert sync_env.shell_unsafe_keys(text) == ["SMTP_NAME", "SEARCH"]
+
+    def test_check_fails_on_values_bash_cannot_source(self, sync_env, files, capsys):
+        example, env = files
+        env.write_text(EXAMPLE + "SMTP_NAME=A11y Acessibilidade\n", encoding="utf-8")
+
+        assert _run(sync_env, example, env, "--check") == 1
+        assert "! SMTP_NAME" in capsys.readouterr().out
+
+    @pytest.mark.skipif(shutil.which("bash") is None, reason="bash not installed")
+    def test_repository_example_sources_in_bash_like_the_server_scripts(self):
+        result = subprocess.run(
+            ["bash", "-c", 'set -euo pipefail; set -a; source "$1"; set +a', "_",
+             str(EXAMPLE_PATH)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert result.returncode == 0, result.stderr
+
+    def test_repository_example_has_no_unsafe_values(self, sync_env):
+        assert sync_env.shell_unsafe_keys(EXAMPLE_PATH.read_text(encoding="utf-8")) == []
 
 
 def test_repository_example_has_no_duplicates(sync_env):
