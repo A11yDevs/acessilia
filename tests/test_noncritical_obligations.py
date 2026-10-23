@@ -180,8 +180,47 @@ async def test_job_finishes_with_warning_when_only_refinements_remain(
 
 
 @pytest.mark.asyncio
+async def test_an_omitted_block_with_no_rescue_method_does_not_fail_the_job(
+    monkeypatch, tmp_path
+):
+    """`rescue-omitted` has no handler, so only human review was left to fail."""
+    rescue = _open_obligation(
+        "o-rescue", "rescue-omitted-block", ["rescue-omitted", "human-review"]
+    )
+
+    payload = await _run(
+        _orchestrator(max_replans=2), _headings_manifest(rescue), monkeypatch, tmp_path
+    )
+
+    assert _open_ids(payload) == ["o-rescue"]
+
+
+def test_the_job_error_groups_open_obligations_by_kind_and_page():
+    """006.pdf's e-mail listed every obligation id with all its target elements."""
+    order = _reading_order()
+    order.status = "failed"
+    describe = _describe_image(["human-review"], {"human-review": 100})
+    describe.status = "failed"
+    manifest = _headings_manifest(
+        order,
+        describe,
+        extra_elements=[build_element("image", "picture", reading_order=10)],
+    )
+    for obligation in manifest.obligations:
+        obligation.selected = obligation.id in {"o-order", "o-describe"}
+    manifest.elements[-1].page_number = None
+
+    summary = pddl._unsatisfied_summary(manifest)
+
+    assert "refine-reading-order (" in summary
+    assert "describe-image (" in summary
+    assert "heading-0" not in summary
+    assert "o-order" not in summary
+
+
+@pytest.mark.asyncio
 async def test_open_reading_order_still_fails_the_job(monkeypatch, tmp_path):
-    with pytest.raises(RuntimeError, match="o-order"):
+    with pytest.raises(RuntimeError, match="refine-reading-order"):
         await _run(
             _orchestrator(max_replans=2),
             _headings_manifest(_reading_order()),
@@ -200,7 +239,7 @@ async def test_job_still_fails_when_a_critical_obligation_remains(
         extra_elements=[build_element("image", "picture", reading_order=10)],
     )
 
-    with pytest.raises(RuntimeError, match="o-describe"):
+    with pytest.raises(RuntimeError, match="describe-image"):
         await _run(_orchestrator(max_replans=2), manifest, monkeypatch, tmp_path)
 
 

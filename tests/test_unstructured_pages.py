@@ -511,8 +511,8 @@ def test_the_plan_inspects_the_page_and_the_document_keeps_it(
 
 
 def test_a_failed_inspection_fails_the_job(monkeypatch, source_pdf, isolated_artifacts, tmp_path):
-    manifest, obligation_id, _ = _planned_manifest(source_pdf)
+    manifest, _, _ = _planned_manifest(source_pdf)
     _answer(monkeypatch, error=RuntimeError("vision model unavailable"))
 
-    with pytest.raises(RuntimeError, match=obligation_id):
+    with pytest.raises(RuntimeError, match=r"inspect-unstructured-page \("):
         _run(monkeypatch, tmp_path, manifest, max_replans=1)
