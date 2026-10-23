@@ -111,8 +111,10 @@ WEB_DOWNLOAD_VALID_NOTE: str = "Link valid for 7 days."
 WEB_FORMAT_TXT: str = "Text (TXT)"
 #: File-type label for the accessible Word document (DOCX) rendition.
 WEB_FORMAT_DOCX: str = "Word Document (DOCX)"
-#: File-type label for the accessible PDF rendition.
+#: File-type label for the PDF a job made before PDF/UA became the only PDF; download links stay valid for TOKEN_EXPIRY_DAYS.
 WEB_FORMAT_PDF: str = "Accessible PDF"
+#: File-type label for the tagged accessible PDF/UA rendition.
+WEB_FORMAT_PDF_UA: str = "Accessible PDF (PDF/UA)"
 #: File-type label for the semantic HTML page rendition.
 WEB_FORMAT_HTML: str = "Web Page (HTML)"
 #: File-type label for the audio-description (MP3) rendition.

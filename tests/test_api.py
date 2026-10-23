@@ -777,7 +777,9 @@ async def test_process_preserves_existing_cancelled_state(api_paths):
 
 
 @pytest.mark.asyncio
-async def test_job_executor_keeps_original_filename_in_status(api_paths, monkeypatch):
+async def test_job_executor_keeps_original_filename_in_status(
+    api_paths, monkeypatch, fake_pdf_ua_audit
+):
     from backend.agents.state_manager import state_manager
     from backend.api.worker import ApiJob, JobExecutor
 
@@ -807,7 +809,6 @@ async def test_job_executor_keeps_original_filename_in_status(api_paths, monkeyp
     monkeypatch.setattr("backend.service.process", fake_process)
     monkeypatch.setattr("backend.api.worker.export_txt", write_file)
     monkeypatch.setattr("backend.api.worker.export_docx", write_file)
-    monkeypatch.setattr("backend.api.worker.export_pdf", write_file)
     monkeypatch.setattr("backend.api.worker.export_pdf_ua", write_file)
     monkeypatch.setattr("backend.api.worker.export_accessible_document", write_file)
     monkeypatch.setattr("backend.api.worker.export_mp3", write_mp3)
@@ -839,7 +840,7 @@ async def test_job_executor_keeps_original_filename_in_status(api_paths, monkeyp
     "failed_format", [None, "MP3", "PDF/UA", "PDF/UA disabled", "DOCX", "DOCX disabled"]
 )
 async def test_job_executor_reports_optional_export_failure(
-    api_paths, monkeypatch, failed_format
+    api_paths, monkeypatch, failed_format, fake_pdf_ua_audit
 ):
     from backend.agents.state_manager import state_manager
     from backend.api.worker import ApiJob, JobExecutor
@@ -905,7 +906,6 @@ async def test_job_executor_reports_optional_export_failure(
     monkeypatch.setattr("backend.api.worker.export_txt", write_file)
     monkeypatch.setattr("backend.api.worker.export_drbench_md", write_file)
     monkeypatch.setattr("backend.api.worker.export_docx", write_file)
-    monkeypatch.setattr("backend.api.worker.export_pdf", write_file)
     monkeypatch.setattr("backend.api.worker.export_pdf_ua", write_file)
     monkeypatch.setattr("backend.api.worker.export_accessible_document", write_file)
     if failed_format == "PDF/UA":
@@ -964,7 +964,7 @@ async def test_job_executor_reports_optional_export_failure(
     if not docx_produced:
         assert not (output_dir / "audio.docx").exists()
 
-    expected_formats = {"txt", "pdf", "html", "zip"}
+    expected_formats = {"txt", "html", "zip"}
     if docx_produced:
         expected_formats.add("docx")
     if failed_format != "MP3":
@@ -975,19 +975,26 @@ async def test_job_executor_reports_optional_export_failure(
 
     assert (output_dir / "audio.drbench.md").is_file()
     with zipfile.ZipFile(output_dir / "audio_acessivel.zip") as archive:
-        expected_files = {"audio.txt", "audio.pdf", "audio.html"}
+        expected_files = {"audio.txt", "audio.html"}
         if docx_produced:
             expected_files.add("audio.docx")
         if failed_format != "MP3":
             expected_files.add("audio.mp3")
         if pdf_ua_produced:
-            expected_files.add("audio.pdf_ua.pdf")
+            expected_files.update({"audio.pdf_ua.pdf", "audio.pdf_ua.verapdf.json"})
         assert set(archive.namelist()) == expected_files
 
     assert len(sent_emails) == 1
     assert sent_emails[0]["download_url"].endswith("/download/tok")
     assert sent_emails[0]["completed_formats"] == registered_formats
     assert sent_emails[0]["warnings"] == expected_errors
+    # Only a PDF/UA that exists is audited, and its verdict reaches the e-mail.
+    assert fake_pdf_ua_audit == ([output_dir / "audio.pdf_ua.pdf"] if pdf_ua_produced else [])
+    from backend.i18n import t
+    from backend.log_messages import EMAIL_AUDIT_COMPLIANT
+
+    compliant = t(EMAIL_AUDIT_COMPLIANT).format(profile="PDF/UA-1")
+    assert sent_emails[0]["audit"] == ([compliant] if pdf_ua_produced else [])
 
 
 @pytest.mark.asyncio

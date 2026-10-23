@@ -26,6 +26,8 @@ TOKEN_EXPIRY_DAYS = 7
 FORMAT_EXTENSIONS = {
     "txt": "texto",
     "docx": "word",
+    # Only PDF/UA is produced now; "pdf" lists the files of jobs made before
+    # that, whose links stay valid for TOKEN_EXPIRY_DAYS.
     "pdf": "pdf",
     "pdf_ua": "pdf/ua",
     "html": "html",

@@ -33,6 +33,7 @@ Verificado contra `https://www.acessilia3.inf.ufg.br/toolbox` em 2026-10-14:
 | `media.inspect` | Chamador de produção em `backend/tools/media_inspect.py`; configuração opt-in | Integrada, opt-in | Manter o gate explícito |
 | `document.export.pdf_ua` | Chamador de produção em `backend/export/pandoc_exporter.py`; ativo por padrão; só na Toolbox desde a F2 da #150, sem fallback local. Incluída após o snapshot acima: verificada ao vivo em 2026-10-17, depois do merge de acessilia-toolbox#53 | Integrada | Todo deploy precisa rodar o `pdf-ua-render`: sem ele, os jobs reportam o PDF/UA como erro de exportação opcional |
 | `document.export.docx` | Chamador de produção em `backend/export/pandoc_exporter.py`; ativo por padrão; só na Toolbox desde a F6 da #150, no lugar do Pandoc local e do renderizador python-docx. Incluída após o snapshot acima, com acessilia-toolbox#59 | Integrada | Mesma exigência de deploy do PDF/UA: sem o `pdf-ua-render`, os jobs reportam o DOCX como erro de exportação opcional |
+| `pdf.validate.pdf_ua` | Chamador de produção em `backend/tools/pdf_ua_audit.py`: o worker audita cada exportação PDF/UA contra o PDF/UA-1, resume no e-mail de resultado e empacota o relatório do veraPDF; ativo por padrão. Incluída após o snapshot acima, com acessilia-toolbox#55 | Integrada | Todo deploy precisa rodar o `verapdf-validate`: sem ele, os jobs seguem entregues, com "Auditoria indisponível" em todo e-mail de resultado |
 | `artifact.store`, `artifact.retrieve` | Cliente Toolbox compartilhado; usado nos caminhos de upload/extração | Infraestrutura integrada | Manter cobertura de contrato do cliente |
 | `dataset.*` | Ferramentas usadas pelos scripts Dr.DocBench, não pelo runtime de documentos | Integradas ao benchmark; fora do runtime de documentos | Preservar o caminho dos scripts e seus testes |
 | `image.page.orient` | Cliente/provider válidos; falta gatilho PDDL de produção | Pendente de modelagem/acionamento | Derivar obrigação por evidência de orientação e validar a rotação aplicada |
@@ -43,7 +44,6 @@ Verificado contra `https://www.acessilia3.inf.ufg.br/toolbox` em 2026-10-14:
 | `code.normalize` | Exposta pela Toolbox; falta cliente e caminho obrigação/método/handler | Pendente de integração PDDL | Ligar blocos de código observados à normalização e validar preservação semântica |
 | `text.postprocess` | Exposta pela Toolbox; falta cliente e caminho obrigação/método/handler | Pendente de integração PDDL | Ligar sinais de ruído textual à pós-correção e validar o texto resultante |
 | `music.omr` | Exposta pela Toolbox; falta cliente e caminho obrigação/método/handler | Pendente de integração PDDL | Ligar partituras detectadas à transcrição OMR e validar o artefato musical |
-| `pdf.validate.pdf_ua` | Exposta pela Toolbox (sidecar veraPDF, acessilia-toolbox#55); sem cliente no core | Não integrada | Decidir se o core valida cada exportação PDF/UA e como uma validação reprovada é reportada |
 | `cache.get`, `cache.put` | Detalhes de implementação internos da Toolbox | Não são capacidades do core | Manter internas; não é necessário cliente no core |
 
 ## Decisão para release

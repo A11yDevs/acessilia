@@ -20,6 +20,8 @@ router = APIRouter(prefix="/download", tags=["download"])
 MEDIA_TYPES = {
     "txt": "text/plain; charset=utf-8",
     "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    # Only PDF/UA is produced now; "pdf" serves links issued before that,
+    # which stay valid for TOKEN_EXPIRY_DAYS.
     "pdf": "application/pdf",
     "pdf_ua": "application/pdf",
     "html": "text/html; charset=utf-8",

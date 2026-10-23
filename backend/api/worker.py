@@ -17,12 +17,14 @@ from backend.services.job_store import load_record, save_status, pending_records
 from backend.services.blocking import run_blocking
 from backend.i18n import t
 from backend.log_messages import (
+    EMAIL_AUDIT_UNAVAILABLE,
     LOG_DOCX_GENERATION_FAILED,
     LOG_DOCX_SKIPPED_DISABLED,
     LOG_JOB_CANCELLED,
     LOG_JOB_COMPLETED,
     LOG_JOB_EXECUTOR_ERROR,
     LOG_MP3_GENERATION_FAILED,
+    LOG_PDF_UA_AUDIT_FAILED,
     LOG_PDF_UA_GENERATION_FAILED,
     LOG_PDF_UA_SKIPPED_DISABLED,
 )
@@ -33,11 +35,11 @@ from backend.stage_messages import (
     STAGE_RESTART_RESUBMIT,
     STAGE_PENDING_UPLOAD_MISSING,
     STAGE_CANCELLED_IN_QUEUE,
+    STAGE_AUDITING_PDF_UA,
     STAGE_CANCELLED_BY_USER,
     STAGE_EXPORTING_DOCX,
     STAGE_EXPORTING_DRBENCH_MD,
     STAGE_EXPORTING_HTML,
-    STAGE_EXPORTING_PDF,
     STAGE_EXPORTING_PDF_UA,
     STAGE_EXPORTING_TXT,
     STAGE_GENERATING_AUDIO,
@@ -47,12 +49,12 @@ from backend.stage_messages import (
 )
 from backend.export.exporters.audio_exporter import export_mp3
 from backend.export.exporters.docx_exporter import export_docx
-from backend.export.exporters.pdf_exporter import export_pdf
 from backend.export.exporters.pdf_exporter import export_pdf_ua
 from backend.export.exporters.txt_exporter import export_txt
 from backend.export.exporters.drbench_md_exporter import export_drbench_md
 from backend.export.pandoc_exporter import export_accessible_document
 from backend.services.download_token_service import criar_token
+from backend.tools.pdf_ua_audit import audit_pdf_ua, summarize_audit
 from backend.services.email_service import (
     send_confirmation_email,
     send_failure_email,
@@ -216,6 +218,37 @@ class JobExecutor:
         completed_formats.append(format_name)
         return path
 
+    async def _audit_pdf_ua(
+        self, task_id: str, pdf_path: Path, report_path: Path
+    ) -> tuple[list[str], Path | None]:
+        """veraPDF audit of the PDF/UA: the e-mail lines and the packaged report.
+
+        Like the optional exports, a failed audit does not fail the job: the
+        e-mail says it is unavailable, naming only the kind of failure, since
+        the full cause carries internal Toolbox endpoints and goes to the log.
+        That covers a report the e-mail cannot summarize and a report that
+        cannot be written, not only a Toolbox failure. A user cancel ends the
+        wait at once.
+        """
+        state_manager.atualizar(task_id, etapa=t(STAGE_AUDITING_PDF_UA), progresso=0.94)
+        try:
+            report = await _until_cancelled(task_id, audit_pdf_ua(pdf_path))
+            if report is None:
+                return [], None
+            lines = summarize_audit(report, max_rules=settings.pdf_ua_audit_max_rules)
+            await run_blocking(
+                report_path.write_text,
+                json.dumps(report, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+        except TaskCancelledError:
+            raise
+        except Exception as exc:
+            logger.warning(t(LOG_PDF_UA_AUDIT_FAILED).format(error=exc))
+            _remove_partial_output(report_path)
+            return [t(EMAIL_AUDIT_UNAVAILABLE).format(error=type(exc).__name__)], None
+        return lines, report_path
+
     async def run(self, job: ApiJob) -> None:
         task_id = job.task_id
         started_at = time.time()
@@ -301,12 +334,6 @@ class JobExecutor:
                 drbench_md_path = None
             state_manager.verificar_cancelamento(task_id)
 
-            state_manager.atualizar(task_id, etapa=t(STAGE_EXPORTING_PDF), progresso=0.88)
-            pdf_path = out_dir / f"{base}.pdf"
-            await self._run_in_executor(export_pdf, canonical, pdf_path, job.filename)
-            completed_formats.append("pdf")
-            state_manager.verificar_cancelamento(task_id)
-
             state_manager.atualizar(task_id, etapa=t(STAGE_EXPORTING_HTML), progresso=0.90)
             html_path = out_dir / f"{base}.html"
             await self._run_in_executor(
@@ -322,7 +349,8 @@ class JobExecutor:
 
             # DOCX and PDF/UA run only on the Toolbox (docs/adr/0003) and come
             # after the required formats, so a hung Toolbox cannot hold back
-            # TXT/PDF/HTML.
+            # TXT/HTML. PDF/UA is the only PDF: a failure leaves the job
+            # without one, with a warning in the result e-mail.
             docx_path = await self._optional_toolbox_export(
                 task_id,
                 enabled=settings.toolbox_docx_enabled,
@@ -357,8 +385,17 @@ class JobExecutor:
             )
             state_manager.verificar_cancelamento(task_id)
 
-            mp3_path = out_dir / f"{base}.mp3"
-            if txt_path.exists():
+            async def audit() -> tuple[list[str], Path | None]:
+                if not isinstance(pdf_ua_path, Path):
+                    return [], None
+                return await self._audit_pdf_ua(
+                    task_id, pdf_ua_path, out_dir / f"{base}.pdf_ua.verapdf.json"
+                )
+
+            async def mp3() -> Path | None:
+                if not txt_path.exists():
+                    return None
+                mp3_path = out_dir / f"{base}.mp3"
                 clean_text = txt_path.read_text(encoding="utf-8")
 
                 async def audio_progress(percent: int) -> None:
@@ -369,27 +406,38 @@ class JobExecutor:
                     )
 
                 try:
-                    await export_mp3(
-                        clean_text, mp3_path, progress_callback=audio_progress
+                    await _until_cancelled(
+                        task_id,
+                        export_mp3(clean_text, mp3_path, progress_callback=audio_progress),
                     )
-                    completed_formats.append("mp3")
+                except TaskCancelledError:
+                    raise
                 except Exception as e:
                     error_msg = t(LOG_MP3_GENERATION_FAILED).format(error=str(e))
                     logger.error(error_msg)
                     optional_errors.append(error_msg)
                     state_manager.atualizar(task_id, erro=error_msg)
                     _remove_partial_output(mp3_path)
-                    mp3_path = None
+                    return None
+                completed_formats.append("mp3")
+                return mp3_path
+
+            # The MP3 needs only the TXT, so it runs alongside the audit: a slow
+            # veraPDF does not add its whole wait to the delivery. Both end on
+            # a user cancel.
+            (audit_lines, audit_path), mp3_path = await asyncio.gather(audit(), mp3())
             state_manager.verificar_cancelamento(task_id)
 
             zip_path = out_dir / f"{base}_acessivel.zip"
-            package_paths = [txt_path, pdf_path, html_path]
+            package_paths = [txt_path, html_path]
             if isinstance(docx_path, Path):
                 package_paths.append(docx_path)
             if isinstance(mp3_path, Path):
                 package_paths.append(mp3_path)
             if isinstance(pdf_ua_path, Path):
                 package_paths.append(pdf_ua_path)
+            if isinstance(audit_path, Path):
+                package_paths.append(audit_path)
 
             await self._run_in_executor(
                 _build_zip_package,
@@ -431,6 +479,7 @@ class JobExecutor:
                         download_url=download_url,
                         completed_formats=completed_formats,
                         warnings=[*optional_errors, *_open_obligations_warning(canonical)],
+                        audit=audit_lines,
                     )
                 except Exception:
                     logger.warning("Result email delivery failed for job {}", task_id)
@@ -510,6 +559,27 @@ def _open_obligations_warning(canonical: dict[str, Any]) -> list[str]:
     metadata = canonical.get("metadata")
     summary = metadata.get("pddl_unsatisfied_summary") if isinstance(metadata, dict) else None
     return [summary] if isinstance(summary, str) and summary else []
+
+
+async def _until_cancelled(task_id: str, awaitable: Any) -> Any:
+    """Awaits ``awaitable``, abandoning it as soon as the user cancels the task.
+
+    Raises:
+        TaskCancelledError: When the task is cancelled before ``awaitable`` ends.
+    """
+    event = state_manager.evento_cancelamento(task_id)
+    work = asyncio.ensure_future(awaitable)
+    if event is None:
+        return await work
+    cancelled = asyncio.ensure_future(event.wait())
+    try:
+        await asyncio.wait({work, cancelled}, return_when=asyncio.FIRST_COMPLETED)
+    finally:
+        cancelled.cancel()
+        if not work.done():
+            work.cancel()
+    state_manager.verificar_cancelamento(task_id)
+    return work.result()
 
 
 def _remove_partial_output(path: Path) -> None:
