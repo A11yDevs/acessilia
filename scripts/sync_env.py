@@ -18,12 +18,18 @@ unnoticed. This script compares the two files:
 A key commented out in ``.env`` (``#KEY=``, no space after the ``#``) counts as
 present, so a value someone chose to disable is not added again.
 
+The staging and production scripts ``source`` ``.env`` in bash with ``set -e``,
+so an unquoted value with spaces or shell characters (``SMTP_NAME=A11y
+Acessibilidade``, ``astar(blind())``) stops the auto-update timer. Such values
+are reported for quoting; compose and dotenv strip the quotes.
+
 Usage:
     python scripts/sync_env.py            # appends the missing keys and reports
     python scripts/sync_env.py --check    # changes nothing; exit 1 if keys are missing
     python scripts/sync_env.py --env /opt/acessilia/.env --example .env.example
 
-Exit status is 0, or 1 when ``--check`` finds missing keys.
+Exit status is 0, or 1 when ``--check`` finds missing keys or values that need
+quoting.
 """
 
 from __future__ import annotations
@@ -113,6 +119,30 @@ def duplicated_keys(text: str) -> list[str]:
                 duplicates.append(key)
             seen.add(key)
     return duplicates
+
+
+#: Characters bash treats specially in an unquoted assignment value.
+_SHELL_SPECIAL = re.compile(r"[\s()&;|<>`]")
+
+
+def shell_unsafe_keys(text: str) -> list[str]:
+    """Set keys whose unquoted value bash cannot ``source`` as a plain assignment.
+
+    A value fully wrapped in single or double quotes is safe, and so is a
+    trailing `` # comment``, which bash ignores.
+    """
+    unsafe: list[str] = []
+    for line in text.splitlines():
+        match = _ASSIGNMENT.match(line)
+        if not match or match.group("comment") is not None:
+            continue
+        value = line[match.end():].strip()
+        if value[:1] in {"'", '"'} and len(value) > 1 and value[-1] == value[0]:
+            continue
+        value = re.split(r"\s+#", value, maxsplit=1)[0]
+        if _SHELL_SPECIAL.search(value) and match.group("key") not in unsafe:
+            unsafe.append(match.group("key"))
+    return unsafe
 
 
 def missing_block(example_text: str, env_keys: dict[str, bool]) -> tuple[list[str], str]:
@@ -226,7 +256,17 @@ def main(argv: list[str] | None = None) -> int:
         for key in duplicates:
             print(f"  ! {key}")
 
-    return 1 if args.check and missing else 0
+    unsafe = shell_unsafe_keys(env_text)
+    if unsafe:
+        print()
+        print(
+            f"Values in {args.env.name} that bash cannot source unquoted; the server "
+            "scripts fail on them, so wrap each value in quotes (KEY='value'):"
+        )
+        for key in unsafe:
+            print(f"  ! {key}")
+
+    return 1 if args.check and (missing or unsafe) else 0
 
 
 if __name__ == "__main__":
