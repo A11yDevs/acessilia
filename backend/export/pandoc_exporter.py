@@ -18,10 +18,12 @@ from backend.config.settings import settings
 from backend.export.filters.pandoc_filters import strip_internal_audit_blocks
 from backend.i18n import t
 from backend.log_messages import LOG_DOCX_TOOLBOX_EXPORTED
+from backend.log_messages import LOG_PDF_UA_MATH_DEGRADED
 from backend.log_messages import LOG_PDF_UA_TOOLBOX_EXPORTED
 from backend.pipeline.canonical_builder import build_canonical_document
 from backend.pipeline.canonical_builder import sanitize_canonical_document
 from backend.pipeline.pandoc_ast_builder import build_pandoc_ast
+from backend.pipeline.pandoc_ast_builder import degrade_math_to_text
 from backend.pipeline.validators import audit_canonical_document
 from backend.pipeline.validators import validate_export_profile
 from backend.tools.logger import logger
@@ -137,12 +139,25 @@ def _render_pdf_ua(
 
     Raises:
         RuntimeError: When TOOLBOX_PDF_UA_ENABLED is false.
-        acessilia_sdk.toolbox.errors.ToolboxError: When the Toolbox cannot render or deliver the PDF.
+        acessilia_sdk.toolbox.errors.ToolboxError: When the Toolbox cannot render or deliver the PDF. An input
+            rejection (``ToolboxInvalidInput``) gets one retry with the math exported as literal text, so a
+            formula the LaTeX compiler rejects cannot lose the whole document; a second rejection propagates.
     """
     if not settings.toolbox_pdf_ua_enabled:
         raise RuntimeError(t(MSG_PDF_UA_DISABLED))
+    from acessilia_sdk.toolbox.errors import ToolboxInvalidInput
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    toolbox_export_pdf_ua(ast, output_path, lang=lang)
+    try:
+        toolbox_export_pdf_ua(ast, output_path, lang=lang)
+    except ToolboxInvalidInput as exc:
+        # ToolboxInvalidInput means the request reached a healthy renderer and
+        # the AST itself is the problem: math its LaTeX compiler rejects, e.g.
+        # \chemfig from a chemical structure a vision model classified as a
+        # formula. The retry is a deterministic degradation, not a failover —
+        # the formulas go as literal text, the way the HTML and TXT renderers
+        # already show them.
+        logger.warning(t(LOG_PDF_UA_MATH_DEGRADED).format(error=exc))
+        toolbox_export_pdf_ua(degrade_math_to_text(ast), output_path, lang=lang)
     logger.info(t(LOG_PDF_UA_TOOLBOX_EXPORTED).format(output_path=output_path))
     return output_path
 

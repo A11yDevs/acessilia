@@ -5,12 +5,51 @@ document dict -> Pandoc JSON AST (in-memory dict), no I/O.
 """
 from __future__ import annotations
 
+import re
 from typing import Any
 from docstruct.sections import section_body_blocks, section_title_alias
 
 from docstruct.tables.ast import effective_section_width, row_header_column_count
 from docstruct.tables.ast import split_header_and_body
 from docstruct.tables.ast import table_ast_from_block
+
+
+#: Control sequences that read files, execute programs or change TeX's
+#: internals. Math text comes from OCR and vision models, and the PDF/UA
+#: renderer compiles it with LaTeX: beyond an undefined control sequence
+#: losing the whole document (``\chemfig`` from a misclassified chemical
+#: structure, for instance), ``\write18`` and friends must never reach a
+#: LaTeX compilation. A math block carrying one degrades to plain text, the
+#: same representation the renderers already show for an unverbalized
+#: formula. Names match whole macros only, so ``\longleftarrow`` is kept.
+_LATEX_UNSAFE_MACROS = frozenset(
+    {
+        "catcode",
+        "csname",
+        "directlua",
+        "documentclass",
+        "include",
+        "includegraphics",
+        "input",
+        "luaexec",
+        "openin",
+        "openout",
+        "read",
+        "readline",
+        "special",
+        "usepackage",
+        "write",
+    }
+)
+
+_LATEX_MACRO_RE = re.compile(r"\\([a-zA-Z]+)")
+
+
+def _has_unsafe_latex_macro(latex: str) -> bool:
+    """Whether the LaTeX carries a macro the renderers must not compile."""
+    return any(
+        name in _LATEX_UNSAFE_MACROS for name in _LATEX_MACRO_RE.findall(latex)
+    )
 
 
 def build_pandoc_ast(document: dict[str, Any]) -> dict[str, Any]:
@@ -104,10 +143,13 @@ def _block_to_ast(block: dict[str, Any]) -> list[dict[str, Any]]:
             }
         ]
     if block_type == "math":
+        latex = str(block.get("text", ""))
+        if _has_unsafe_latex_macro(latex):
+            return [{"t": "Para", "c": _meta_inlines(latex)}]
         return [
             {
                 "t": "Para",
-                "c": [{"t": "Math", "c": [{"t": "InlineMath"}, block.get("text", "")]}],
+                "c": [{"t": "Math", "c": [{"t": "InlineMath"}, latex]}],
             }
         ]
     if block_type in {"quote", "details", "note", "warning"}:
@@ -129,6 +171,50 @@ def _meta_inlines(text: str) -> list[dict[str, Any]]:
             inlines.append({"t": "Space"})
         inlines.append({"t": "Str", "c": chunk})
     return inlines
+
+
+def degrade_math_to_text(document_ast: dict[str, Any]) -> dict[str, Any]:
+    """A copy of the Pandoc AST whose Math inlines carry the formula as text.
+
+    The Toolbox compiles the PDF/UA AST with LaTeX, and math its compiler
+    rejects (a macro the template does not load, e.g. ``\\chemfig`` from a
+    chemical structure a vision model classified as a formula) fails the
+    whole document. The fallback exports the formula source as literal text
+    — the same representation the HTML and TXT renderers already show — so
+    one block cannot lose the PDF. The builder only emits ``Math`` inside
+    ``Para`` blocks, which is the scope covered here; the input AST is left
+    untouched.
+    """
+    return {
+        **document_ast,
+        "blocks": [
+            _degrade_block(block) for block in document_ast.get("blocks", [])
+        ],
+    }
+
+
+def _degrade_block(block: Any) -> Any:
+    if not isinstance(block, dict):
+        return block
+    kind = block.get("t")
+    content = block.get("c")
+    if kind in {"Para", "Plain"} and isinstance(content, list):
+        inlines: list[Any] = []
+        for inline in content:
+            if isinstance(inline, dict) and inline.get("t") == "Math":
+                latex = ""
+                if isinstance(inline.get("c"), list) and len(inline["c"]) > 1:
+                    latex = str(inline["c"][1])
+                inlines.extend(_meta_inlines(latex))
+            else:
+                inlines.append(inline)
+        return {"t": kind, "c": inlines}
+    if kind == "Div" and isinstance(content, list) and len(content) == 2:
+        return {
+            "t": kind,
+            "c": [content[0], [_degrade_block(b) for b in content[1]]],
+        }
+    return block
 
 
 def _table_to_pandoc_ast(table_ast: dict[str, Any]) -> dict[str, Any]:

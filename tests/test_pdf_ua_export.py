@@ -10,6 +10,7 @@ from __future__ import annotations
 import ast
 import hashlib
 import json
+import re
 from pathlib import Path
 
 import httpx
@@ -17,6 +18,12 @@ import pytest
 
 from acessilia_sdk.toolbox.clients import ToolboxPdfUaClient
 from acessilia_sdk.toolbox.clients.pdf_ua import pandoc_payload
+from acessilia_sdk.toolbox.errors import (
+    ToolboxCapabilityError,
+    ToolboxInvalidInput,
+    ToolboxProviderUnavailable,
+    ToolboxTimeout,
+)
 from backend.config.settings import settings
 from backend.export import pandoc_exporter
 from backend.tools.toolbox_client import ToolboxProviderUnavailable, make_toolbox_client
@@ -242,3 +249,113 @@ def test_sync_wrapper_forwards_the_remote_cache_setting(
 
     body = execute.calls.last.request.content
     assert (b'name="no_cache"' in body) is (not use_remote_cache)
+
+
+# ── Math the renderer rejects: degrade to text and retry once ───────────
+
+
+MATH_DOCUMENT = {
+    "id": "doc-1",
+    "schema_version": "1.0.0",
+    "title": "Report",
+    "language": "pt-BR",
+    "sections": [
+        {
+            "id": "sec-1",
+            "level": 1,
+            "title": "Formulas",
+            "blocks": [
+                {
+                    "id": "m-1",
+                    "type": "math",
+                    "text": "\\chemfig{*6((-SO_2O^-Na^+)-=-=)=-=(-N=N-C(=O-O^-Na^+)-N(-C(-OH)=N)=-=)}",
+                }
+            ],
+            "children": [],
+        }
+    ],
+}
+
+
+def _ast_has_math(ast: dict) -> bool:
+    return any(
+        isinstance(inline, dict) and inline.get("t") == "Math"
+        for block in ast["blocks"]
+        if isinstance(block.get("c"), list)
+        for inline in block["c"]
+    )
+
+
+def _export_math_document(tmp_path: Path) -> Path:
+    return pandoc_exporter.export_accessible_document(
+        MATH_DOCUMENT,
+        tmp_path / "doc.pdf_ua.pdf",
+        format_name="pdf_ua",
+        title="Report",
+    )
+
+
+def test_a_math_rejection_degrades_to_text_and_retries_once(monkeypatch, tmp_path):
+    """006.pdf: a chemical structure the vision model classified as a formula
+    exports LaTeX its compiler rejects (\\chemfig is an undefined control
+    sequence). ToolboxInvalidInput says the renderer is healthy and the AST is
+    the problem, so the retry is a deterministic degradation: the formulas go
+    as literal text, and one block no longer loses the whole PDF."""
+    monkeypatch.setattr(settings, "toolbox_pdf_ua_enabled", True)
+    calls = []
+
+    def fake_toolbox(ast, output_path, *, lang):
+        calls.append(ast)
+        if len(calls) == 1:
+            raise ToolboxInvalidInput(
+                "PDF/UA renderer rejected the AST: pandoc failed: Undefined control sequence"
+            )
+        output_path.write_bytes(PDF)
+        return {"artifact_id": PDF_ID}
+
+    monkeypatch.setattr(
+        "backend.export.pandoc_exporter.toolbox_export_pdf_ua", fake_toolbox
+    )
+
+    output = _export_math_document(tmp_path)
+
+    assert output.read_bytes() == PDF
+    first, second = calls
+    assert _ast_has_math(first), "the first attempt keeps the formula as math"
+    assert not _ast_has_math(second), "the retry carries no Math inline"
+    texts = [
+        inline["c"]
+        for block in second["blocks"]
+        if block.get("t") == "Para"
+        for inline in block["c"]
+        if isinstance(inline, dict) and inline.get("t") == "Str"
+    ]
+    assert any("chemfig" in text for text in texts), "the formula source survives as text"
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        ToolboxProviderUnavailable("pdf-ua-render offline"),
+        ToolboxTimeout("the export timed out"),
+        ToolboxCapabilityError("capability drifted"),
+    ],
+)
+def test_only_an_input_rejection_retries(monkeypatch, tmp_path, error):
+    """A healthy renderer rejecting the input retries with degraded math; an
+    outage or a contract drift does not — retrying would only add latency."""
+    monkeypatch.setattr(settings, "toolbox_pdf_ua_enabled", True)
+    calls = []
+
+    def failing_toolbox(ast, output_path, *, lang):
+        calls.append(ast)
+        raise error
+
+    monkeypatch.setattr(
+        "backend.export.pandoc_exporter.toolbox_export_pdf_ua", failing_toolbox
+    )
+
+    with pytest.raises(type(error), match=re.escape(str(error))):
+        _export_math_document(tmp_path)
+
+    assert len(calls) == 1

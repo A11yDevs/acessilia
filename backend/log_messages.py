@@ -438,6 +438,11 @@ LOG_PDDL_SELECTED_CLOSURE_MISMATCH: str = (
 LOG_PDF_UA_EXPORTED: str = "PDF/UA exported: {output_path}"
 #: Info logged when the Toolbox rendered the PDF/UA; {output_path} the destination file path.
 LOG_PDF_UA_TOOLBOX_EXPORTED: str = "PDF/UA rendered by the Toolbox: {output_path}"
+#: Warning logged when the Toolbox rejected the PDF/UA AST's math and the export retries with the
+#: formulas as literal text; {error} is the Toolbox's rejection cause.
+LOG_PDF_UA_MATH_DEGRADED: str = (
+    "The Toolbox rejected the PDF/UA math; retrying with formulas as literal text: {error}"
+)
 #: Info logged when the worker skips PDF/UA because TOOLBOX_PDF_UA_ENABLED is false.
 LOG_PDF_UA_SKIPPED_DISABLED: str = "PDF/UA skipped: TOOLBOX_PDF_UA_ENABLED is false"
 #: Info logged when the PDF/UA audit is skipped because TOOLBOX_PDF_VALIDATE_ENABLED is false.

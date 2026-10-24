@@ -152,6 +152,7 @@ from backend.log_messages import (
     LOG_MEDIA_INSPECT_TOOLBOX_FINISHED,
     LOG_MEDIA_INSPECT_FAILED,
     LOG_PDF_UA_TOOLBOX_EXPORTED,
+    LOG_PDF_UA_MATH_DEGRADED,
     LOG_TXT_EXPORTED,
     LOG_DOCX_EXPORTED,
     LOG_DOCX_GENERATION_FAILED,
@@ -822,6 +823,7 @@ MESSAGES: tuple[str, ...] = (
     LOG_MEDIA_INSPECT_TOOLBOX_FINISHED,
     LOG_MEDIA_INSPECT_FAILED,
     LOG_PDF_UA_TOOLBOX_EXPORTED,
+    LOG_PDF_UA_MATH_DEGRADED,
     LOG_TXT_EXPORTED,
     LOG_DOCX_EXPORTED,
     LOG_DOCX_GENERATION_FAILED,
@@ -1595,6 +1597,10 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         LOG_PDF_UA_EXPORTED: "PDF/UA exportado: {output_path}",
         # Toolbox-first PDF/UA rendering; {output_path} the destination file path.
         LOG_PDF_UA_TOOLBOX_EXPORTED: "PDF/UA renderizado pela Toolbox: {output_path}",
+        # The Toolbox rejected the AST's math and the export retries with the formulas as text; {error} the cause.
+        LOG_PDF_UA_MATH_DEGRADED: (
+            "A Toolbox rejeitou a matemática do PDF/UA; tentando de novo com as fórmulas como texto: {error}"
+        ),
         # Worker skips PDF/UA because the Toolbox capability is switched off.
         LOG_PDF_UA_SKIPPED_DISABLED: "PDF/UA ignorado: TOOLBOX_PDF_UA_ENABLED está desativado",
         LOG_PDF_UA_AUDIT_SKIPPED_DISABLED: "Auditoria do PDF/UA ignorada: TOOLBOX_PDF_VALIDATE_ENABLED está desativado",
