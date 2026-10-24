@@ -191,6 +191,9 @@ msgstr "Structural extraction failed on the Toolbox ({capability}): {error}"
 msgid "The document has {page_count} pages, more than the limit of {max_pages}."
 msgstr "The document has {page_count} pages, more than the limit of {max_pages}."
 
+msgid "Enriching the formulas..."
+msgstr "Enriching the formulas..."
+
 msgid "Enriching the image descriptions..."
 msgstr "Enriching the image descriptions..."
 
@@ -209,6 +212,10 @@ msgstr "Executing the plan..."
 #, python-brace-format
 msgid "Describing image {current} of {total} (this image is on {pages})..."
 msgstr "Describing image {current} of {total} (this image is on {pages})..."
+
+#, python-brace-format
+msgid "Recognizing formula {current} of {total} (this formula is on {pages})..."
+msgstr "Recognizing formula {current} of {total} (this formula is on {pages})..."
 
 #, python-brace-format
 msgid "Recognizing table {current} of {total} (this table is on {pages})..."

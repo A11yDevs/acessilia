@@ -59,6 +59,8 @@ STAGE_STRUCTURAL_EXTRACTION_FAILED: str = (
 STAGE_DOCUMENT_TOO_MANY_PAGES: str = (
     "The document has {page_count} pages, more than the limit of {max_pages}."
 )
+#: PDDL-pipeline stage while formulas the extractor left without LaTeX are being recognized.
+STAGE_ENRICHING_FORMULAS: str = "Enriching the formulas..."
 #: PDDL-pipeline stage while image descriptions are being enriched with the vision model.
 STAGE_ENRICHING_IMAGE_DESCRIPTIONS: str = "Enriching the image descriptions..."
 #: PDDL-pipeline stage while tables are being enriched with OCR as a fallback.
@@ -81,6 +83,8 @@ STAGE_PENDING_UPLOAD_MISSING = 'Pending upload no longer exists'
 STAGE_EXECUTING_PLAN: str = "Executing the plan..."
 #: Live stage while one image is described by the vision model; {current}/{total} count the images, {pages} is a STAGE_PAGE* label spelled out as location so the image count cannot be read as a page count.
 STAGE_DESCRIBING_IMAGE: str = "Describing image {current} of {total} (this image is on {pages})..."
+#: Live stage while one formula is recognized from its region image; {current}/{total} count the formulas, {pages} is a STAGE_PAGE* label spelled out as location so the formula count cannot be read as a page count.
+STAGE_RECOGNIZING_FORMULA: str = "Recognizing formula {current} of {total} (this formula is on {pages})..."
 #: Live stage while one table is rebuilt from its region image; {current}/{total} count the tables, {pages} is a STAGE_PAGE* label spelled out as location so the table count cannot be read as a page count.
 STAGE_RECOGNIZING_TABLE: str = "Recognizing table {current} of {total} (this table is on {pages})..."
 #: Live stage while one plan step runs; {current}/{total} count the plan steps and {pages} is a STAGE_PAGE* label.
