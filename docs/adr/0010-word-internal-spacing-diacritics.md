@@ -6,7 +6,7 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 - **Date:** 2026-10-24
 - **Components:** docstruct, core
 - **Issues:** #244
-- **Amends:** the phase-B scope of [ADR-0009](0009-legacy-unicode-repair.md): spacing diacritics are no longer report-only.
+- **Amends:** the phase-B scope of [ADR-0009](0009-legacy-unicode-repair.md): spacing diacritics are no longer report-only, and the `source_font_risk` prerequisite is withdrawn.
 
 ## Context
 
@@ -54,6 +54,10 @@ precomposed characters. The defect is upstream, in the text the core receives.
   URLs and `$...$` spans are never rewritten. The decision records
   `needs_review=True` when spacing was involved, so the audit keeps the
   ambiguity visible.
+- **The evidence is textual, not font metadata.** The word-internal shape is
+  the signal; `source_font_risk` is withdrawn from the repair context. A future
+  Toolbox preflight can reintroduce a font gate with real data, but this
+  decision does not pretend to have it.
 - **The core owns the policy.** The docstruct API exposes
   `allow_spacing_diacritics` and `allow_standalone_spacing_diacritics`; only the
   core decides when the document evidence is sufficient.
@@ -67,7 +71,12 @@ precomposed characters. The defect is upstream, in the text the core receives.
   word-internal legacy shape keeps its standalone examples untouched, because
   the document-level threshold is not met.
 - **The opt-in and the audit remain.** `off` and `detect` keep their previous
-  behavior; `repair` still marks spacing edits for review.
+  behavior. `needs_review` means a signal remains unrepaired; an element that
+  was fully repaired is not flagged, and the handler records `edited` plus the
+  rule names in `element.metadata["unicode_repair"]`.
+- **Cached results are invalidated.** The domain description changes, so its
+  SHA-256 (part of the processing cache key) changes too; a result produced
+  before this decision is not reused.
 - **Phase D is still needed.** A clean canonical text does not prove the
   exported PDF/UA is clean; comparing the canonical text with the re-extracted
   output remains the next gate.

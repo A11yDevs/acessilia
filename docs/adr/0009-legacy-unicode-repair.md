@@ -6,6 +6,7 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 - **Date:** 2026-10-23
 - **Components:** docstruct, core
 - **Issues:** —
+- **Amended by:** [ADR-0010](0010-word-internal-spacing-diacritics.md) for the spacing-diacritic scope and the `source_font_risk` premise.
 
 ## Context
 

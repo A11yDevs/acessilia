@@ -644,6 +644,7 @@ def _derive_v23_processing_needs(
             legacy_evidence["combining_marks"] += detection.combining_marks
             legacy_evidence["dotless"] += detection.dotless
             legacy_evidence["spacing_diacritics"] += detection.spacing_diacritics
+            legacy_evidence["spacing_word_internal"] += detection.spacing_word_internal
             legacy_evidence["replacement_characters"] += (
                 detection.replacement_characters
             )

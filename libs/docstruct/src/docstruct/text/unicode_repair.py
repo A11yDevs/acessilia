@@ -24,7 +24,6 @@ from __future__ import annotations
 import re
 import unicodedata
 from dataclasses import dataclass
-from typing import Literal
 
 #: Block types the repair may act on. The others are preserved byte by byte,
 #: even when they contain the same sequences.
@@ -80,15 +79,11 @@ class Detection:
     def has_signal(self) -> bool:
         return bool(
             self.combining_runs
+            or self.combining_marks
             or self.dotless
             or self.spacing_diacritics
             or self.replacement_characters
         )
-
-    @property
-    def needs_review(self) -> bool:
-        """Whether some signal is known to be left unrepaired by this phase."""
-        return bool(self.spacing_diacritics or self.replacement_characters)
 
 
 @dataclass(frozen=True)
@@ -99,7 +94,6 @@ class UnicodeRepairContext:
     block_type: str = "prose"
     page: int | None = None
     provider: str | None = None
-    source_font_risk: Literal["low", "medium", "high", "unknown"] = "unknown"
     #: Spacing diacritics are ambiguous; they only enter with explicit evidence.
     allow_spacing_diacritics: bool = False
     #: Standalone accents (an accent separated from its word) share the
@@ -132,16 +126,17 @@ class UnicodeRepairDecision:
 
 
 def detect_legacy_unicode(text: str) -> Detection:
-    """Count the legacy extraction signals without changing ``text``."""
+    """Count the legacy extraction signals outside protected spans."""
     if not text:
         return Detection()
+    visible = _without_protected(text)
     return Detection(
-        combining_runs=len(_COMBINING_RUN.findall(text)),
-        combining_marks=sum(1 for char in text if 0x0300 <= ord(char) <= 0x036F),
-        dotless=len(_DOTLESS_MARKS.findall(text)),
-        spacing_diacritics=len(_SPACING_DIACRITIC.findall(text)),
-        spacing_word_internal=len(_SPACING_WORD_INTERNAL.findall(text)),
-        replacement_characters=text.count("\ufffd"),
+        combining_runs=len(_COMBINING_RUN.findall(visible)),
+        combining_marks=sum(1 for char in visible if 0x0300 <= ord(char) <= 0x036F),
+        dotless=len(_DOTLESS_MARKS.findall(visible)),
+        spacing_diacritics=len(_SPACING_DIACRITIC.findall(visible)),
+        spacing_word_internal=len(_SPACING_WORD_INTERNAL.findall(visible)),
+        replacement_characters=visible.count("\ufffd"),
     )
 
 
@@ -165,16 +160,24 @@ def repair_legacy_unicode(
             original=text,
             repaired=text,
             detection=detection,
-            needs_review=detection.needs_review,
             skipped_reason=f"block-type:{ctx.block_type}",
         )
 
     protected = _protected_spans(text)
     language = ctx.language.split("-", 1)[0].lower()
     edits: list[Edit] = []
+    blocked: set[int] = set()
+
+    if ctx.allow_spacing_diacritics:
+        spacing_edits, blocked = _spacing_edits(
+            text,
+            protected,
+            include_standalone=ctx.allow_standalone_spacing_diacritics,
+        )
+        edits.extend(spacing_edits)
 
     for match in _COMBINING_RUN.finditer(text):
-        if _overlaps(match.span(), protected):
+        if match.start() in blocked or _overlaps(match.span(), protected):
             continue
         if match.group("dotless"):
             if language in DOTLESS_IS_LETTER:
@@ -195,21 +198,14 @@ def repair_legacy_unicode(
                 continue
             edits.append(Edit("nfc", match.start(), match.end(), match.group(0), composed))
 
-    if ctx.allow_spacing_diacritics and ctx.source_font_risk in {"medium", "high"}:
-        edits.extend(
-            _spacing_edits(
-                text,
-                protected,
-                include_standalone=ctx.allow_standalone_spacing_diacritics,
-            )
-        )
-
     edits = _non_overlapping(edits)
     repaired = _apply(text, edits)
-    needs_review = (
-        detection.needs_review
-        or _has_combining(repaired)
-        or (language in DOTLESS_IS_LETTER and detection.dotless > 0)
+    # Review means something is still wrong, not that something was edited.
+    residual = detect_legacy_unicode(repaired)
+    needs_review = bool(
+        residual.spacing_diacritics
+        or residual.combining_marks
+        or detection.replacement_characters
     )
     return UnicodeRepairDecision(
         original=text,
@@ -227,20 +223,29 @@ def _spacing_edits(
     protected: list[tuple[int, int]],
     *,
     include_standalone: bool,
-) -> list[Edit]:
-    """Spacing diacritics, only when the font is the available evidence.
+) -> tuple[list[Edit], set[int]]:
+    """Spacing diacritics, with the word-internal pattern as the evidence.
 
     Word-internal accents are matched by default. Standalone accents are only
     included when the caller supplies document-level evidence, because the
     same shape appears in prose that discusses an accent (``o sinal ´ e``).
+
+    A base followed by a combining mark is left untouched and its position is
+    returned as blocked, so the NFC rule does not compose only half of the
+    pair and leave a loose mark behind.
     """
     edits: list[Edit] = []
+    blocked: set[int] = set()
     pattern = _SPACING_DIACRITIC if include_standalone else _SPACING_WORD_INTERNAL
     for match in pattern.finditer(text):
         if _overlaps(match.span(), protected):
             continue
         accent, base = match.group(0)[0], match.group(0)[-1]
         if base not in _SPACING_BASES[accent]:
+            continue
+        base_end = match.end()
+        if base_end < len(text) and 0x0300 <= ord(text[base_end]) <= 0x036F:
+            blocked.add(base_end - 1)
             continue
         composed = unicodedata.normalize(
             "NFC", _dotless_base(base) + _SPACING_MARKS[accent]
@@ -250,7 +255,7 @@ def _spacing_edits(
         edits.append(
             Edit("spacing-diacritic", match.start(), match.end(), match.group(0), composed)
         )
-    return edits
+    return edits, blocked
 
 
 def _dotless_base(char: str) -> str:
@@ -266,6 +271,17 @@ def _protected_spans(text: str) -> list[tuple[int, int]]:
     return sorted(spans)
 
 
+def _without_protected(text: str) -> str:
+    """Blank the protected spans so detection only counts repairable text."""
+    spans = _protected_spans(text)
+    if not spans:
+        return text
+    chars = list(text)
+    for start, end in spans:
+        chars[start:end] = " " * (end - start)
+    return "".join(chars)
+
+
 def _overlaps(span: tuple[int, int], protected: list[tuple[int, int]]) -> bool:
     start, end = span
     return any(start < other_end and other_start < end for other_start, other_end in protected)
@@ -274,9 +290,10 @@ def _overlaps(span: tuple[int, int], protected: list[tuple[int, int]]) -> bool:
 def _non_overlapping(edits: list[Edit]) -> list[Edit]:
     """Keep the first edit of each overlap, in text order.
 
-    ``dotless`` and ``nfc`` come from the same regex and never overlap; a
-    spacing edit can share the base letter with a combining run, and the
-    earlier (already composed) edit wins.
+    Spacing edits are collected before the combining rules. A combining run
+    that shares a base with a spacing edit is either blocked (when a mark
+    follows the base) or fully covered by the spacing edit, so the composed
+    sequence wins without leaving a loose mark behind.
     """
     accepted: list[Edit] = []
     for edit in sorted(edits, key=lambda item: (item.start, item.end)):

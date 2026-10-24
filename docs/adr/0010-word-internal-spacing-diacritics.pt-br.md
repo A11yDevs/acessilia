@@ -6,7 +6,7 @@ Também disponível em **inglês (EUA)**: [English version](0010-word-internal-s
 - **Data:** 2026-10-24
 - **Componentes:** docstruct, core
 - **Issues:** #244
-- **Emenda:** o escopo da fase B do [ADR-0009](0009-legacy-unicode-repair.pt-br.md): acentos espaçadores deixam de ser apenas detectados.
+- **Emenda:** o escopo da fase B do [ADR-0009](0009-legacy-unicode-repair.pt-br.md): acentos espaçadores deixam de ser apenas detectados, e a premissa de `source_font_risk` é retirada.
 
 ## Contexto
 
@@ -56,6 +56,10 @@ texto que o core recebe.
   trechos `$...$` nunca são reescritos. A decisão registra
   `needs_review=True` quando houve acento espaçador, para manter a ambiguidade
   visível na auditoria.
+- **A evidência é textual, não metadado de fonte.** A forma interna à palavra é
+  o sinal; `source_font_risk` é retirado do contexto de reparo. Um preflight
+  futuro da Toolbox pode reintroduzir um gate de fonte com dados reais, mas
+  esta decisão não finge tê-los.
 - **A política é do core.** A API da docstruct expõe
   `allow_spacing_diacritics` e `allow_standalone_spacing_diacritics`; só o core
   decide quando a evidência do documento é suficiente.
@@ -71,8 +75,12 @@ texto que o core recebe.
   tem a forma interna à palavra mantém seus exemplos isolados intactos, porque
   o limiar de documento não é atingido.
 - **O opt-in e a auditoria continuam.** `off` e `detect` mantêm o
-  comportamento anterior; `repair` ainda marca as edições de espaçamento para
-  revisão.
+  comportamento anterior. `needs_review` significa que sobrou um sinal sem
+  reparo; um elemento totalmente reparado não é marcado, e o handler registra
+  `edited` e os nomes das regras em `element.metadata["unicode_repair"]`.
+- **Resultados em cache são invalidados.** A descrição do domínio muda, então
+  seu SHA-256 (parte da chave do cache de processamento) muda também; um
+  resultado produzido antes desta decisão não é reaproveitado.
 - **A fase D continua necessária.** Um texto canônico limpo não prova que o
   PDF/UA exportado está limpo; comparar o canônico com a reextração da saída
   segue como o próximo gate.

@@ -6,6 +6,7 @@ Também disponível em **inglês (EUA)**: [English version](0009-legacy-unicode-
 - **Data:** 2026-10-23
 - **Componentes:** docstruct, core
 - **Issues:** —
+- **Emendado por:** [ADR-0010](0010-word-internal-spacing-diacritics.pt-br.md) quanto ao escopo de acentos espaçadores e à premissa de `source_font_risk`.
 
 ## Contexto
 

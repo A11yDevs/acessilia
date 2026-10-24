@@ -88,17 +88,12 @@ class TestSpacingDiacritics:
         assert decision.needs_review is True
         assert decision.skipped_reason == "no-applicable-rule"
 
-    def test_requires_font_evidence(self):
+    def test_explicit_enablement_is_the_evidence(self):
         decision = _decision(SPACING_NAO, allow_spacing_diacritics=True)
-        assert decision.repaired == SPACING_NAO
-        assert decision.needs_review is True
+        assert decision.repaired == NAO
 
-    def test_enabled_with_high_risk_font(self):
-        decision = _decision(
-            SPACING_CALCULO,
-            allow_spacing_diacritics=True,
-            source_font_risk="high",
-        )
+    def test_enabled_by_the_caller(self):
+        decision = _decision(SPACING_CALCULO, allow_spacing_diacritics=True)
         assert decision.repaired == CALCULO
         assert [edit.rule for edit in decision.edits] == ["spacing-diacritic"]
 
@@ -106,7 +101,6 @@ class TestSpacingDiacritics:
         decision = _decision(
             f"{SPACING_NAO} e {SPACING_FUNCAO}",
             allow_spacing_diacritics=True,
-            source_font_risk="high",
         )
         assert decision.repaired == f"{NAO} e {FUNCAO}"
 
@@ -114,18 +108,13 @@ class TestSpacingDiacritics:
         decision = _decision(
             "Bras\u00b4 \u0131lia",
             allow_spacing_diacritics=True,
-            source_font_risk="high",
         )
         assert decision.repaired == BRASILIA
-        assert decision.needs_review is True
+        assert decision.needs_review is False
 
     def test_standalone_accent_is_not_repaired(self):
         text = "o sinal \u00b4 e usado"
-        decision = _decision(
-            text,
-            allow_spacing_diacritics=True,
-            source_font_risk="high",
-        )
+        decision = _decision(text, allow_spacing_diacritics=True)
         assert decision.repaired == text
         assert decision.needs_review is True
 
@@ -135,18 +124,20 @@ class TestSpacingDiacritics:
             text,
             allow_spacing_diacritics=True,
             allow_standalone_spacing_diacritics=True,
-            source_font_risk="high",
         )
         assert decision.repaired == "o sinal \u00e9 usado"
+        assert decision.needs_review is False
 
     def test_backtick_is_never_an_accent(self):
         text = "use `a` como variavel"
-        decision = _decision(
-            text,
-            allow_spacing_diacritics=True,
-            source_font_risk="high",
-        )
+        assert _decision(text, allow_spacing_diacritics=True).repaired == text
+
+    def test_base_with_a_following_combining_mark_is_left_untouched(self):
+        text = "C\u00b4 a\u0301lculo"
+        decision = _decision(text, allow_spacing_diacritics=True)
         assert decision.repaired == text
+        assert decision.edits == ()
+        assert decision.needs_review is True
 
 
 class TestProtectedContent:
@@ -167,7 +158,11 @@ class TestProtectedContent:
         text = "`" + NFD_BRASILIA + "`"
         decision = _decision(text)
         assert decision.repaired == text
-        assert decision.needs_review is True
+        assert decision.needs_review is False
+
+    def test_protected_spans_do_not_count_as_signal(self):
+        assert detect_legacy_unicode("`C\u00b4 alculo`").spacing_diacritics == 0
+        assert detect_legacy_unicode("https://x.test/C\u00b4 alculo").spacing_diacritics == 0
 
 
 class TestLanguageAndSafety:
@@ -193,9 +188,12 @@ class TestLanguageAndSafety:
         assert detection.spacing_word_internal == 1
         assert detection.replacement_characters == 1
         assert detection.has_signal is True
-        assert detection.needs_review is True
 
     def test_detection_without_signals(self):
         detection = detect_legacy_unicode("Clean text with correct accents.")
         assert detection.has_signal is False
-        assert detection.needs_review is False
+
+    def test_isolated_combining_mark_is_reported(self):
+        detection = detect_legacy_unicode("\u0338")
+        assert detection.combining_marks == 1
+        assert detection.has_signal is True
