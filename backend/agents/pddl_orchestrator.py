@@ -22,7 +22,11 @@ from docstruct.tables.ast import (
     raw_rows_from_table_ast as _rows_from_table_ast,
 )
 from docstruct.text.norm_fix import norm_fix
-from docstruct.text.unicode_repair import UnicodeRepairContext, repair_legacy_unicode
+from docstruct.text.unicode_repair import (
+    UnicodeRepairContext,
+    detect_legacy_unicode,
+    repair_legacy_unicode,
+)
 
 from backend.services.blocking import run_blocking
 from backend.agents.data_agent import DataAgent
@@ -510,6 +514,12 @@ _UNICODE_REPAIR_BLOCK_TYPES = {
     "footnote": "prose",
 }
 
+#: Word-internal spaced accents needed before standalone ones (an accent
+#: separated from its word) are treated as the same extraction defect. A
+#: document that merely mentions an accent has none of the word-internal shape,
+#: so it keeps its text; a legacy TeX extraction has hundreds.
+_UNICODE_STANDALONE_SPACING_MIN = 5
+
 
 def _handle_unicode_repair_method(
     manifest: ProcessingManifest, obligation_id: str
@@ -527,20 +537,45 @@ def _handle_unicode_repair_method(
         return _missing_obligation(obligation_id)
 
     language = manifest.language or "pt-BR"
-    inspected = 0
-    repaired = 0
-    review = 0
+    eligible: list[tuple[ManifestElement, str]] = []
+    detections = {}
     for element in elements:
         block_type = _UNICODE_REPAIR_BLOCK_TYPES.get(element.type)
         if block_type is None or not element.text:
             continue
-        inspected += 1
+        eligible.append((element, block_type))
+        detections[element.id] = detect_legacy_unicode(element.text)
+
+    if not eligible:
+        return MethodResult(
+            success=False,
+            validated=False,
+            message="Nenhum texto elegível para reparo Unicode",
+        )
+
+    word_internal = sum(
+        detection.spacing_word_internal for detection in detections.values()
+    )
+    allow_standalone = word_internal >= _UNICODE_STANDALONE_SPACING_MIN
+    inspected = len(eligible)
+    repaired = 0
+    review = 0
+    for element, block_type in eligible:
+        detection = detections[element.id]
+        # A word-internal spacing accent (``C´ alculo``) is legacy extraction
+        # evidence. Standalone accents (separated from their word) are only
+        # included when the document has enough of the word-internal shape;
+        # the lib never touches protected spans.
+        allow_spacing = detection.spacing_diacritics > 0
         decision = repair_legacy_unicode(
             element.text,
             context=UnicodeRepairContext(
                 language=language,
                 block_type=block_type,
                 page=element.page_number,
+                source_font_risk="high" if allow_spacing else "unknown",
+                allow_spacing_diacritics=allow_spacing,
+                allow_standalone_spacing_diacritics=allow_spacing and allow_standalone,
             ),
         )
         if decision.repaired != element.text:
@@ -554,13 +589,6 @@ def _handle_unicode_repair_method(
         }
         if decision.needs_review:
             review += 1
-
-    if not inspected:
-        return MethodResult(
-            success=False,
-            validated=False,
-            message="Nenhum texto elegível para reparo Unicode",
-        )
     return MethodResult(
         success=True,
         validated=True,

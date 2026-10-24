@@ -184,7 +184,7 @@ trabalho de benchmark produziu, todas como funções puras:
 | `fusion.hf_end` | a convenção do GT de cabeçalho/rodapé no fim |
 | `fusion.table_specialist` | o medoide de tabela (gerar-comparar-adjudicar) |
 | `text.normalize`, `text.norm_fix`, `text.latex` | primitivas de normalização de texto |
-| `text.unicode_repair` | reparo conservador de NFC e i sem ponto em PDFs TeX legados (só prosa) |
+| `text.unicode_repair` | reparo conservador de NFC, i sem ponto e acentos espaçadores em PDFs TeX legados (só prosa) |
 | `imaging.policy` | decisões puras de upscale/orientação (sem PIL/cv2) |
 | `docstruct.fusion.verse` | chunk verse/record blocks so the evaluator can re-group them |
 | `docstruct.fusion.line_numbers` | pull marginal verse line numbers into their own blocks |
@@ -199,7 +199,7 @@ trabalho de benchmark produziu, todas como funções puras:
 | `docstruct.fusion.table_specialist` | the generate-compare-adjudicate table medoid |
 | `docstruct.text.normalize` | the shared comparison normalizer |
 | `docstruct.text.norm_fix` | deterministic text cleanups (ligatures, hyphen, NBSP) |
-| `docstruct.text.unicode_repair` | conservative NFC + dotless-i repair for legacy TeX PDFs |
+| `docstruct.text.unicode_repair` | conservative NFC, dotless-i and spacing repair for legacy TeX PDFs |
 | `docstruct.text.latex` | LaTeX normalization |
 | `docstruct.imaging.policy` | pure upscale/orientation decisions (no PIL/cv2) |
 | `docstruct.evaluation.holdout` | the tune/holdout split and the acceptance criteria |

@@ -110,6 +110,35 @@ class TestSpacingDiacritics:
         )
         assert decision.repaired == f"{NAO} e {FUNCAO}"
 
+    def test_word_internal_dotless_base(self):
+        decision = _decision(
+            "Bras\u00b4 \u0131lia",
+            allow_spacing_diacritics=True,
+            source_font_risk="high",
+        )
+        assert decision.repaired == BRASILIA
+        assert decision.needs_review is True
+
+    def test_standalone_accent_is_not_repaired(self):
+        text = "o sinal \u00b4 e usado"
+        decision = _decision(
+            text,
+            allow_spacing_diacritics=True,
+            source_font_risk="high",
+        )
+        assert decision.repaired == text
+        assert decision.needs_review is True
+
+    def test_standalone_accent_with_document_evidence(self):
+        text = "o sinal \u00b4 e usado"
+        decision = _decision(
+            text,
+            allow_spacing_diacritics=True,
+            allow_standalone_spacing_diacritics=True,
+            source_font_risk="high",
+        )
+        assert decision.repaired == "o sinal \u00e9 usado"
+
     def test_backtick_is_never_an_accent(self):
         text = "use `a` como variavel"
         decision = _decision(
@@ -161,6 +190,7 @@ class TestLanguageAndSafety:
         assert detection.combining_marks == 2
         assert detection.dotless == 1
         assert detection.spacing_diacritics == 1
+        assert detection.spacing_word_internal == 1
         assert detection.replacement_characters == 1
         assert detection.has_signal is True
         assert detection.needs_review is True

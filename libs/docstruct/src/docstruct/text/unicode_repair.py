@@ -39,11 +39,19 @@ _MARKS = "\u0300-\u036f"
 _COMBINING_RUN = re.compile(rf"(?P<dotless>[ıȷ][{_MARKS}]+)|(?P<run>[^\W\d_][{_MARKS}]+)")
 _DOTLESS_MARKS = re.compile(rf"[ıȷ][{_MARKS}]+")
 _SPACING_DIACRITIC = re.compile(r"[´ˆ˜¸][\u00a0 \t]*[A-Za-zıȷ]")
+#: The accent is glued to the preceding letter (``C´ alculo``). This is the
+#: shape a legacy TeX extraction produces; a standalone accent used as
+#: punctuation or metalinguistic example is not matched.
+_SPACING_WORD_INTERNAL = re.compile(
+    r"(?<=[^\W\d_])[´ˆ˜¸][\u00a0 \t]*[A-Za-zıȷ]"
+)
 
 _SPACING_MARKS = {"´": "\u0301", "ˆ": "\u0302", "˜": "\u0303", "¸": "\u0327"}
 _SPACING_BASES = {
-    "´": set("AEIOUaeiou"),
-    "ˆ": set("AEIOUaeiou"),
+    # ``ı``/``ȷ`` appear in TeX extraction (``Bras´ ılia``); the base is
+    # normalised before composition.
+    "´": set("AEIOUaeiouıȷ"),
+    "ˆ": set("AEIOUaeiouıȷ"),
     "˜": set("AaOoNn"),
     "¸": set("Cc"),
 }
@@ -65,6 +73,7 @@ class Detection:
     combining_marks: int = 0
     dotless: int = 0
     spacing_diacritics: int = 0
+    spacing_word_internal: int = 0
     replacement_characters: int = 0
 
     @property
@@ -93,6 +102,11 @@ class UnicodeRepairContext:
     source_font_risk: Literal["low", "medium", "high", "unknown"] = "unknown"
     #: Spacing diacritics are ambiguous; they only enter with explicit evidence.
     allow_spacing_diacritics: bool = False
+    #: Standalone accents (an accent separated from its word) share the
+    #: extraction defect, but the caller must supply document-level evidence
+    #: (many word-internal cases) so prose that mentions an accent is not
+    #: rewritten.
+    allow_standalone_spacing_diacritics: bool = False
 
 
 @dataclass(frozen=True)
@@ -126,6 +140,7 @@ def detect_legacy_unicode(text: str) -> Detection:
         combining_marks=sum(1 for char in text if 0x0300 <= ord(char) <= 0x036F),
         dotless=len(_DOTLESS_MARKS.findall(text)),
         spacing_diacritics=len(_SPACING_DIACRITIC.findall(text)),
+        spacing_word_internal=len(_SPACING_WORD_INTERNAL.findall(text)),
         replacement_characters=text.count("\ufffd"),
     )
 
@@ -181,7 +196,13 @@ def repair_legacy_unicode(
             edits.append(Edit("nfc", match.start(), match.end(), match.group(0), composed))
 
     if ctx.allow_spacing_diacritics and ctx.source_font_risk in {"medium", "high"}:
-        edits.extend(_spacing_edits(text, protected))
+        edits.extend(
+            _spacing_edits(
+                text,
+                protected,
+                include_standalone=ctx.allow_standalone_spacing_diacritics,
+            )
+        )
 
     edits = _non_overlapping(edits)
     repaired = _apply(text, edits)
@@ -201,10 +222,21 @@ def repair_legacy_unicode(
     )
 
 
-def _spacing_edits(text: str, protected: list[tuple[int, int]]) -> list[Edit]:
-    """Spacing diacritics, only when the font is the available evidence."""
+def _spacing_edits(
+    text: str,
+    protected: list[tuple[int, int]],
+    *,
+    include_standalone: bool,
+) -> list[Edit]:
+    """Spacing diacritics, only when the font is the available evidence.
+
+    Word-internal accents are matched by default. Standalone accents are only
+    included when the caller supplies document-level evidence, because the
+    same shape appears in prose that discusses an accent (``o sinal ´ e``).
+    """
     edits: list[Edit] = []
-    for match in _SPACING_DIACRITIC.finditer(text):
+    pattern = _SPACING_DIACRITIC if include_standalone else _SPACING_WORD_INTERNAL
+    for match in pattern.finditer(text):
         if _overlaps(match.span(), protected):
             continue
         accent, base = match.group(0)[0], match.group(0)[-1]

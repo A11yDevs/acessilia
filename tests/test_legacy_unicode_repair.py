@@ -79,16 +79,14 @@ class TestManifestEmission:
 
         assert element.text == BRASILIA
 
-    def test_spacing_only_does_not_emit_in_phase_b(self, monkeypatch):
+    def test_spacing_only_emits_and_repairs(self, monkeypatch):
         monkeypatch.setattr(settings, "legacy_unicode_repair", "repair")
         observations, obligations = _derive_v23_processing_needs(
             [_element(SPACING_CALCULO)]
         )
 
-        assert "repair-legacy-unicode" not in _kinds(obligations)
-        assert "repair-legacy-unicode-detected" not in {
-            item.kind for item in observations
-        }
+        assert "repair-legacy-unicode" in _kinds(obligations)
+        assert observations[0].evidence["spacing_diacritics"] == 1
 
     def test_invalid_mode_falls_back_to_off(self, monkeypatch):
         monkeypatch.setattr(settings, "legacy_unicode_repair", "banana")
@@ -120,6 +118,42 @@ class TestHandler:
         assert element.metadata["unicode_repair"]["rules"] == ["dotless-base"]
         assert element.metadata["unicode_repair"]["edits"] == 1
         assert element.metadata["unicode_repair"]["confidence"] is None
+
+    def test_repairs_word_internal_spacing_diacritics(self):
+        element = _element("Bras\u00b4 \u0131lia, C\u00b4 alculo e Voc\u02c6 e")
+        manifest = build_manifest([element], [_obligation()])
+
+        result = pddl._handle_unicode_repair_method(manifest, "o-unicode")
+
+        assert result.success is True
+        assert element.text == "Bras\u00edlia, C\u00e1lculo e Voc\u00ea"
+        assert "spacing-diacritic" in element.metadata["unicode_repair"]["rules"]
+
+    def test_standalone_accent_is_left_untouched(self):
+        text = "o sinal \u00b4 e usado"
+        element = _element(text)
+        manifest = build_manifest([element], [_obligation()])
+
+        result = pddl._handle_unicode_repair_method(manifest, "o-unicode")
+
+        assert result.success is True
+        assert element.text == text
+        assert element.metadata["unicode_repair"]["rules"] == []
+        assert element.metadata["unicode_repair"]["needs_review"] is True
+
+    def test_standalone_accent_is_repaired_with_document_evidence(self):
+        text = (
+            "C\u00b4 alculo, Matem\u00b4 atica, fun\u00b8 c\u02dc ao, "
+            "n\u02dc ao, Voc\u02c6 e, posi\u00b8 c\u02dc ao \u00b4 e"
+        )
+        element = _element(text)
+        manifest = build_manifest([element], [_obligation()])
+
+        result = pddl._handle_unicode_repair_method(manifest, "o-unicode")
+
+        assert result.success is True
+        assert element.text.endswith("posi\u00e7\u00e3o \u00e9")
+        assert "spacing-diacritic" in element.metadata["unicode_repair"]["rules"]
 
     def test_idempotent(self):
         element = _element(f"{BRASILIA} e {CALCULO}")
