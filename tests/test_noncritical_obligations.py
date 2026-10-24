@@ -354,6 +354,98 @@ async def test_a_document_with_no_image_described_still_fails(monkeypatch, tmp_p
         await _run(orchestrator, _two_images_manifest(), monkeypatch, tmp_path)
 
 
+FORMULA_OBLIGATION_METHODS = {
+    "verbalize-formula": ["mathml", "latex-verbalizer", "human-review"],
+    "normalize-formula": ["latex-normalizer", "mathml", "human-review"],
+}
+
+
+def _formula_manifest(text, kind="verbalize-formula"):
+    """A formula-target obligation whose automatic methods all fail."""
+    formula = build_element("formula", "formula", text=text)
+    formula.page_number = 26
+    methods = FORMULA_OBLIGATION_METHODS[kind]
+    obligation = Obligation(
+        id="o-formula",
+        kind=kind,
+        target_ids=["formula"],
+        admissible_methods=methods,
+        method_costs={
+            method: 100 if method == "human-review" else 10 for method in methods
+        },
+        rationale="Formula must be accessible",
+    )
+    return build_manifest([formula], [obligation])
+
+
+def _failing_formula_methods(orchestrator):
+    for method in ("mathml", "latex-verbalizer", "latex-normalizer"):
+        orchestrator.executor.registry.register(method, _failing)
+
+
+@pytest.mark.asyncio
+async def test_an_unverbalized_formula_keeps_its_latex_and_does_not_fail_the_job(
+    monkeypatch, tmp_path
+):
+    """006.pdf, page 26: chemical structures the Toolbox cannot verbalize.
+
+    Both automatic methods fail and human review is the only option left. The
+    formula is still exported as LaTeX, so the job delivers with a warning
+    instead of failing the whole 42-page document.
+    """
+    orchestrator = _orchestrator(max_replans=2)
+    _failing_formula_methods(orchestrator)
+
+    payload = await _run(
+        orchestrator, _formula_manifest("$E=mc^2$"), monkeypatch, tmp_path
+    )
+
+    assert _open_ids(payload) == ["o-formula"]
+    assert any(
+        "verbalize-formula" in warning for warning in payload["technical_warnings"]
+    )
+    summary = payload["canonical_metadata"]["pddl_unsatisfied_summary"]
+    assert f"verbalize-formula ({t(STAGE_PAGE).format(page=26)})" in summary
+
+
+@pytest.mark.asyncio
+async def test_an_unnormalized_formula_keeps_its_latex_and_does_not_fail_the_job(
+    monkeypatch, tmp_path
+):
+    """`normalize-formula` is the same degradation: the element keeps its text."""
+    orchestrator = _orchestrator(max_replans=2)
+    _failing_formula_methods(orchestrator)
+
+    payload = await _run(
+        orchestrator,
+        _formula_manifest("$E=mc^2$", kind="normalize-formula"),
+        monkeypatch,
+        tmp_path,
+    )
+
+    assert _open_ids(payload) == ["o-formula"]
+    assert any(
+        "normalize-formula" in warning for warning in payload["technical_warnings"]
+    )
+    summary = payload["canonical_metadata"]["pddl_unsatisfied_summary"]
+    assert f"normalize-formula ({t(STAGE_PAGE).format(page=26)})" in summary
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["verbalize-formula", "normalize-formula"])
+async def test_a_formula_with_no_readable_content_still_fails(
+    monkeypatch, tmp_path, kind
+):
+    """With no LaTeX, MathML or speech there is nothing to deliver."""
+    orchestrator = _orchestrator(max_replans=2)
+    _failing_formula_methods(orchestrator)
+
+    with pytest.raises(RuntimeError, match=kind):
+        await _run(
+            orchestrator, _formula_manifest(None, kind=kind), monkeypatch, tmp_path
+        )
+
+
 @pytest.mark.asyncio
 async def test_replan_skips_exhausted_refinement_and_rescues_another_one(
     monkeypatch, tmp_path
