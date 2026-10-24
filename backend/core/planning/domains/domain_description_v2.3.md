@@ -57,12 +57,14 @@ permanece idêntica.
 | `chunk-verse` | `verse-chunker`, `human-review` | 5 / 100 | `docstruct.fusion.verse` |
 | `extract-line-numbers` | `line-number-extractor`, `human-review` | 5 / 100 | `docstruct.fusion.line_numbers` |
 | `normalize-text` | `norm-fix`, `human-review` | 5 / 100 | `docstruct.text.norm_fix` |
+| `repair-legacy-unicode` | `unicode-repair`, `human-review` | 5 / 100 | `docstruct.text.unicode_repair` (NFD e i sem ponto) |
 | `inspect-unstructured-page` | `vision-page-inspection`, `human-review` | 25 / 100 | página sem estrutura extraída (#150 F5c) |
 
 Regras de compilação:
 
 - as obrigações determinísticas (`guard-repetition`, `join-tail-blocks`,
-  `chunk-verse`, `extract-line-numbers`, `normalize-text`, `normalize-formula`,
+  `chunk-verse`, `extract-line-numbers`, `normalize-text`,
+  `repair-legacy-unicode`, `normalize-formula`,
   `refine-reading-order`) têm custo baixo e devem ser preferidas pelo planner
   sempre que admissíveis;
 - as obrigações que consomem modelo (`adjudicate-page`, `select-table-source`

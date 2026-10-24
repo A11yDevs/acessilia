@@ -567,6 +567,10 @@ class TestEveryHandlerIsCallable:
             "normalize-text",
             [_element("el-1", "paragraph", text="useful\u00a0text with fi ligature")],
         ),
+        "unicode-repair": (
+            "repair-legacy-unicode",
+            [_element("el-1", "paragraph", text="Bras\u0131\u0301lia")],
+        ),
         "rep-guard": (
             "guard-repetition",
             [_element("el-1", "paragraph", text="5 5 5 5 5 5")],
