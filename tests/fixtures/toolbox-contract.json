@@ -188,6 +188,7 @@
       "version": 1,
       "providers": [
         "docling-math",
+        "pp-formulanet",
         "rapid-latex-ocr"
       ]
     },
@@ -380,6 +381,12 @@
       "id": "pandoc-pdf-ua",
       "capabilities": [
         "document.export.pdf_ua"
+      ]
+    },
+    {
+      "id": "pp-formulanet",
+      "capabilities": [
+        "math.recognize"
       ]
     },
     {

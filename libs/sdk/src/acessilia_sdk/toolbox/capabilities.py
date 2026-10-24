@@ -48,7 +48,7 @@ PROVIDER_DEFAULTS: dict[str, str] = {
     "toolbox_provider": "docling",
     "toolbox_layout_provider": "docling-layout",
     "toolbox_pdf_provider": "pymupdf-pdf",
-    "toolbox_math_recognize_provider": "docling-math",
+    "toolbox_math_recognize_provider": "pp-formulanet",
     "toolbox_math_provider": "math-speech",
     "toolbox_ocr_provider": "docling-ocr",
     "toolbox_page_ocr_provider": "qwen3-vl-8b",

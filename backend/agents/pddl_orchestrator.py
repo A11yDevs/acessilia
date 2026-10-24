@@ -88,6 +88,7 @@ from backend.tools.toolbox_math_tools import (
     MSG_SPEECH_UNAVAILABLE,
     MathCapabilityUnavailable,
     toolbox_convert_latex,
+    toolbox_recognize_formula,
     toolbox_verbalize_latex,
 )
 from backend.tools.toolbox_client import ToolboxError
@@ -2425,6 +2426,7 @@ class PddlAccessibilityOrchestrator:
             media_inspection=media_inspection,
             status_callback=status_callback,
         )
+        await _enrich_formula_latex(manifest, source_path, mode=effective_mode)
 
         if status_callback:
             await status_callback(t(STAGE_ENRICHING_TABLES_OCR))
@@ -2768,6 +2770,175 @@ async def _enrich_picture_descriptions(
 
     if enriched:
         logger.info(t(LOG_PDDL_IMAGES_ENRICHED).format(count=enriched))
+
+
+def _formula_recognition_crop(
+    source_file: Path,
+    element: ManifestElement,
+    *,
+    artifact_id: str | None = None,
+    media_type: str | None = None,
+) -> tuple[bytes | None, int]:
+    """Crop to feed the formula recognizer, or ``None`` when there is no usable box.
+
+    A whole page is deliberately not a fallback: the chip models expect a
+    formula and would invent one from a page of prose. Region inspection
+    already saved a crop for its targets, so that file is reused when present;
+    everything else is rendered from the element's provenance box.
+    """
+    provenance = element.provenance[0] if element.provenance else None
+    page_number = (
+        provenance.page_number if provenance is not None else (element.page_number or 0)
+    )
+
+    saved = element.metadata.get("region_crop")
+    if isinstance(saved, str) and saved:
+        try:
+            return Path(saved).read_bytes(), page_number
+        except OSError:
+            logger.warning("Formula crop unreadable for {}: {}", element.id, saved)
+
+    if page_number < 1:
+        return None, 0
+    clip, origin = _picture_clip(provenance)
+    if clip is None:
+        return None, page_number
+    try:
+        page = _toolbox_render(
+            source_file,
+            page_number,
+            media_type=media_type,
+            dpi=200,
+            clip=clip,
+            clip_origin=origin,
+            artifact_id=artifact_id,
+        )
+    except Exception as exc:
+        # A DOCX has no page to render, and the Toolbox may refuse the box;
+        # both leave the formula without a crop instead of failing the job.
+        logger.warning(
+            "Formula crop failed for {} ({}): {}", element.id, type(exc).__name__, exc
+        )
+        return None, page_number
+    left, top, right, bottom = page.clip
+    if right - left < 4 or bottom - top < 4:
+        return None, page_number
+    return page.image, page_number
+
+
+def _best_formula_candidate(candidates: Iterable[dict[str, Any]]) -> dict[str, Any] | None:
+    """The candidate with the highest confidence, or the first one without a score.
+
+    ``math.recognize`` returns one entry per detected expression; a chip should
+    hold one, but the best-scored is the safer choice when it holds several.
+    """
+    best: dict[str, Any] | None = None
+    best_score = -1.0
+    for candidate in candidates:
+        latex = normalize_latex(str(candidate.get("latex") or ""))
+        if not latex:
+            continue
+        confidence = candidate.get("confidence")
+        score = float(confidence) if isinstance(confidence, (int, float)) else 0.0
+        if best is None or score > best_score:
+            best = {**candidate, "latex": latex}
+            best_score = score
+    return best
+
+
+async def _enrich_formula_latex(
+    manifest: ProcessingManifest,
+    source_file: Path,
+    *,
+    mode: str,
+) -> None:
+    """Fill formulas the extractor left without LaTeX.
+
+    ``math.recognize`` (PP-FormulaNet) runs first; the vision model is the
+    fallback, so a Toolbox outage degrades to the behavior the pipeline had
+    before instead of leaving the formula without content. Recognition runs
+    before planning, like the picture descriptions, so the ``mathml`` and
+    ``latex-verbalizer`` methods then work on real LaTeX.
+
+    An outage is paid once per document: the first ``MathCapabilityUnavailable``
+    stops recognition and sends the remaining formulas straight to vision.
+    """
+    formulas = [
+        element
+        for element in manifest.elements
+        if element.type == "formula" and not normalize_latex(element.text or "")
+    ]
+    if not formulas:
+        return
+    # Without a page to render there is no crop to recognize. DOCX/PPTX
+    # formulas stay as the extractor delivered them instead of paying one
+    # failed render per formula.
+    if manifest.source.media_type not in _RENDERABLE_MEDIA_TYPES:
+        return
+
+    vision = VisionAgent(mode=mode)
+    total_pages = len(manifest.pages)
+    artifact_id = _source_artifact_id(manifest)
+    math_available = True
+    recognized = 0
+
+    for element in formulas:
+        image_bytes, page_number = await run_blocking(
+            _formula_recognition_crop,
+            source_file,
+            element,
+            artifact_id=artifact_id,
+            media_type=manifest.source.media_type,
+        )
+        if not image_bytes:
+            continue
+
+        candidates: list[dict[str, Any]] = []
+        if math_available:
+            try:
+                candidates = await run_blocking(
+                    toolbox_recognize_formula,
+                    image_bytes,
+                    raise_on_unavailable=True,
+                )
+            except MathCapabilityUnavailable as exc:
+                math_available = False
+                logger.warning(
+                    "math.recognize unavailable during formula enrichment ({}); "
+                    "falling back to the vision model",
+                    exc.reason,
+                )
+
+        best = _best_formula_candidate(candidates)
+        method = "math.recognize"
+        latex = str(best["latex"]) if best is not None else ""
+        confidence = best.get("confidence") if best is not None else None
+
+        if not latex:
+            method = "vision"
+            output = await vision.describe_region(
+                image_bytes=image_bytes,
+                classification="formula",
+                page_num=page_number,
+                total_pages=total_pages,
+                mode=mode,
+                full_budget=True,
+            )
+            if output is not None and output.kind == "formula":
+                latex = normalize_latex(output.formula_latex or "")
+                confidence = output.confidence
+
+        if not latex:
+            continue
+        element.text = latex
+        element.metadata["formula_recognition"] = {
+            "method": method,
+            "confidence": confidence,
+        }
+        recognized += 1
+
+    if recognized:
+        logger.info("LaTeX recognized for {} formula(s)", recognized)
 
 
 async def _inspect_media(

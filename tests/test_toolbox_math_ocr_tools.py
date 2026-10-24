@@ -119,6 +119,15 @@ class TestMathTools:
         result = toolbox_recognize_formula(b"not-a-real-image")
         assert result == []
 
+    @respx.mock
+    def test_recognize_unavailable_can_be_explicit(self):
+        """Batch callers opt into the error so an outage costs one timeout."""
+        respx.route().mock(side_effect=httpx.ConnectError("synthetic offline provider"))
+        with pytest.raises(MathCapabilityUnavailable) as excinfo:
+            toolbox_recognize_formula(b"not-a-real-image", raise_on_unavailable=True)
+        assert excinfo.value.capability == "math.recognize"
+        assert excinfo.value.reason == "ToolboxProviderUnavailable"
+
 
 class TestOcrTools:
     @respx.mock
