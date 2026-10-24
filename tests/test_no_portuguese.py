@@ -216,6 +216,12 @@ EXEMPT_STRINGS: list[tuple[str, str]] = [
     ("schemas/nominal_plan.schema.json", "Acessilia"),
     ("schemas/planning_comparison.schema.json", "Acessilia"),
     ("schemas/processing_manifest.schema.json", "Acessilia"),
+    # Legacy Unicode repair — user-facing execution messages and observations
+    ("backend/agents/pddl_orchestrator.py", "Nenhum texto elegível para reparo Unicode"),
+    ("backend/agents/pddl_orchestrator.py", "Reparo Unicode aplicado em"),
+    ("backend/agents/pddl_orchestrator.py", "para revisão"),
+    ("backend/agents/pddl_orchestrator.py", "Texto com sinais de Unicode legado"),
+    ("backend/core/manifest/builder.py", "Texto extraído de PDF legado contém Unicode"),
 ]
 
 # Build the exempt set from strings so we can check quickly.

@@ -22,6 +22,7 @@ from docstruct.tables.ast import (
     raw_rows_from_table_ast as _rows_from_table_ast,
 )
 from docstruct.text.norm_fix import norm_fix
+from docstruct.text.unicode_repair import UnicodeRepairContext, repair_legacy_unicode
 
 from backend.services.blocking import run_blocking
 from backend.agents.data_agent import DataAgent
@@ -495,6 +496,78 @@ def _handle_norm_fix_method(
         success=True,
         validated=True,
         message=f"Normalização determinística aplicada em {fixed} elemento(s)",
+    )
+
+
+#: Manifest element type -> block type accepted by the Unicode repair. Types
+#: absent here (formula, code, table, picture) are never rewritten.
+_UNICODE_REPAIR_BLOCK_TYPES = {
+    "paragraph": "prose",
+    "heading": "heading",
+    "title": "heading",
+    "list_item": "prose",
+    "caption": "prose",
+    "footnote": "prose",
+}
+
+
+def _handle_unicode_repair_method(
+    manifest: ProcessingManifest, obligation_id: str
+) -> MethodResult:
+    """Repair NFD and dotless-i text from legacy TeX extraction.
+
+    Only manifest elements the compiler selected are touched, and only in
+    prose-like block types. Spacing diacritics stay out of this phase: the lib
+    detects them but rewrites only with font evidence, which the Toolbox does
+    not report yet. The decision metadata keeps the rule names and result for
+    audit without copying the whole text into the manifest.
+    """
+    elements = _target_elements(manifest, obligation_id)
+    if not elements:
+        return _missing_obligation(obligation_id)
+
+    language = manifest.language or "pt-BR"
+    inspected = 0
+    repaired = 0
+    review = 0
+    for element in elements:
+        block_type = _UNICODE_REPAIR_BLOCK_TYPES.get(element.type)
+        if block_type is None or not element.text:
+            continue
+        inspected += 1
+        decision = repair_legacy_unicode(
+            element.text,
+            context=UnicodeRepairContext(
+                language=language,
+                block_type=block_type,
+                page=element.page_number,
+            ),
+        )
+        if decision.repaired != element.text:
+            element.text = decision.repaired
+            repaired += 1
+        element.metadata["unicode_repair"] = {
+            "rules": sorted({edit.rule for edit in decision.edits}),
+            "edits": len(decision.edits),
+            "needs_review": decision.needs_review,
+            "confidence": decision.confidence,
+        }
+        if decision.needs_review:
+            review += 1
+
+    if not inspected:
+        return MethodResult(
+            success=False,
+            validated=False,
+            message="Nenhum texto elegível para reparo Unicode",
+        )
+    return MethodResult(
+        success=True,
+        validated=True,
+        message=(
+            f"Reparo Unicode aplicado em {repaired}/{inspected} elemento(s); "
+            f"{review} para revisão"
+        ),
     )
 
 
@@ -1920,6 +1993,7 @@ DETERMINISTIC_METHOD_HANDLERS: dict[
     "vision-page-inspection": _handle_vision_page_inspection_method,
     "latex-normalizer": _handle_latex_normalizer_method,
     "norm-fix": _handle_norm_fix_method,
+    "unicode-repair": _handle_unicode_repair_method,
     "rep-guard": _handle_repetition_guard_method,
     "line-number-extractor": _handle_extract_line_numbers_method,
     "verse-chunker": _handle_chunk_verse_method,
@@ -3174,6 +3248,7 @@ NON_CRITICAL_OBLIGATION_KINDS = frozenset(
         "repair-heading-hierarchy",
         "join-tail-blocks",
         "normalize-text",
+        "repair-legacy-unicode",
         "chunk-verse",
         "extract-line-numbers",
         # No handler implements `rescue-omitted` yet, so its only path is
@@ -3446,6 +3521,23 @@ def build_pddl_structured_payload(
     if comparison is not None:
         technical_warnings.append(
             f"Comparacao de planners: {comparison.comparison.verdict}."
+        )
+
+    observations = getattr(manifest, "observations", [])
+    obligations = getattr(manifest, "obligations", [])
+    if any(
+        observation.kind == "repair-legacy-unicode-detected"
+        for observation in observations
+    ) and not any(
+        obligation.kind == "repair-legacy-unicode"
+        for obligation in obligations
+    ):
+        # Only the observation exists: LEGACY_UNICODE_REPAIR=detect. The
+        # warning names the switch because the job delivers the text as
+        # extracted, NFD and dotless-i included.
+        technical_warnings.append(
+            "Texto com sinais de Unicode legado (NFD, i sem ponto ou acento espaçador); "
+            "reparo desabilitado (LEGACY_UNICODE_REPAIR=detect)."
         )
 
     return {

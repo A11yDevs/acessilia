@@ -38,6 +38,7 @@ DOCUMENTED_MODULES = (
     "docstruct.fusion.table_specialist",
     "docstruct.text.normalize",
     "docstruct.text.norm_fix",
+    "docstruct.text.unicode_repair",
     "docstruct.text.latex",
     "docstruct.imaging.policy",
     "docstruct.evaluation.holdout",

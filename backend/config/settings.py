@@ -129,6 +129,13 @@ class Settings:
     pipeline_engine: str = field(
         default_factory=lambda: os.getenv("PIPELINE_ENGINE", "pddl")
     )
+    # Legacy PDF Unicode repair (phase B): "off", "detect" or "repair".
+    # "detect" only records the observation and the warning; "repair" applies
+    # NFC and the dotless-i rule to prose blocks only. The default preserves
+    # the previous behavior.
+    legacy_unicode_repair: str = field(
+        default_factory=lambda: os.getenv("LEGACY_UNICODE_REPAIR", "off").strip().lower()
+    )
 
     # Fusão multi-provider (Fase 4 do plano docstruct)
     # "single": comportamento atual (um provider, fallback PyMuPDF).

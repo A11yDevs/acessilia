@@ -95,6 +95,7 @@ DEFAULT_METHOD_COSTS = {
     "verse-chunker": 5,
     "line-number-extractor": 5,
     "norm-fix": 5,
+    "unicode-repair": 5,
     "rescue-omitted": 15,
     "table-smart-fusion": 20,
     "single-provider": 20,
@@ -150,6 +151,10 @@ V23_OBLIGATION_BY_KIND = {
     "normalize-text": (
         "Texto exige limpezas determinísticas (ligaduras, hífen, NBSP).",
         ["norm-fix", "human-review"],
+    ),
+    "repair-legacy-unicode": (
+        "Texto extraído de PDF legado contém Unicode mal composto (NFD ou i sem ponto).",
+        ["unicode-repair", "human-review"],
     ),
     "inspect-unstructured-page": (
         "Página sem estrutura extraída exige inspeção visual.",
@@ -552,11 +557,14 @@ def _derive_v23_processing_needs(
     fusion_evidence: Any = None,
     fusion_stats: Any = None,
     fusion_judge_max_pages: int | None = None,
+    legacy_unicode_repair: str | None = None,
 ) -> tuple[list[Observation], list[Obligation]]:
     """Emit v2.3 needs only when deterministic checks or fusion evidence support them.
 
     ``fusion_judge_max_pages`` caps how many pages get the VLM judge
-    (FUSION_JUDGE_MAX_PAGES when None).
+    (FUSION_JUDGE_MAX_PAGES when None). ``legacy_unicode_repair`` is
+    ``off``/``detect``/``repair`` (LEGACY_UNICODE_REPAIR when None); only
+    ``repair`` emits the obligation, while ``detect`` keeps the observation.
     """
     from docstruct.fusion.line_numbers import extract_line_numbers
     from docstruct.fusion.tailjoin import join_tail, page_number_position, tailjoin3
@@ -565,9 +573,10 @@ def _derive_v23_processing_needs(
     from docstruct.fusion.xycut import xycut_order
     from docstruct.text.latex import normalize_latex
     from docstruct.text.norm_fix import norm_fix
+    from docstruct.text.unicode_repair import detect_legacy_unicode
 
     candidates: list[
-        tuple[str, list[ManifestElement], dict[str, Any], list[str] | None]
+        tuple[str, list[ManifestElement], dict[str, Any], list[str] | None, bool]
     ] = []
     by_page: dict[int | None, list[ManifestElement]] = {}
     for element in elements:
@@ -578,10 +587,12 @@ def _derive_v23_processing_needs(
         targets: list[ManifestElement],
         evidence: dict[str, Any],
         methods: list[str] | None = None,
+        *,
+        obligation: bool = True,
     ) -> None:
         valid_targets = [item for item in targets if item.id]
         if valid_targets:
-            candidates.append((kind, valid_targets, evidence, methods))
+            candidates.append((kind, valid_targets, evidence, methods, obligation))
 
     for element in elements:
         text = element.text or ""
@@ -593,6 +604,51 @@ def _derive_v23_processing_needs(
             normalized = norm_fix(text)
             if normalized != text:
                 add("normalize-text", [element], {"before": text, "after": normalized})
+
+    if legacy_unicode_repair is None:
+        from backend.config.settings import settings
+
+        legacy_unicode_repair = settings.legacy_unicode_repair
+    unicode_mode = str(legacy_unicode_repair or "off").strip().lower()
+    if unicode_mode not in {"off", "detect", "repair"}:
+        unicode_mode = "off"
+    if unicode_mode != "off":
+        legacy_targets: list[ManifestElement] = []
+        legacy_evidence: Counter = Counter()
+        for element in elements:
+            if element.type not in {
+                "paragraph",
+                "heading",
+                "title",
+                "list_item",
+                "caption",
+                "footnote",
+            } or not element.text:
+                continue
+            detection = detect_legacy_unicode(element.text)
+            if not detection.has_signal:
+                continue
+            repairable = bool(detection.combining_runs or detection.dotless)
+            # Phase B rewrites only NFC and dotless-i; spacing diacritics stay
+            # report-only until font evidence exists.
+            if unicode_mode == "repair" and not repairable:
+                continue
+            legacy_targets.append(element)
+            legacy_evidence["elements"] += 1
+            legacy_evidence["combining_runs"] += detection.combining_runs
+            legacy_evidence["combining_marks"] += detection.combining_marks
+            legacy_evidence["dotless"] += detection.dotless
+            legacy_evidence["spacing_diacritics"] += detection.spacing_diacritics
+            legacy_evidence["replacement_characters"] += (
+                detection.replacement_characters
+            )
+        if legacy_targets:
+            add(
+                "repair-legacy-unicode",
+                legacy_targets,
+                dict(legacy_evidence),
+                obligation=unicode_mode == "repair",
+            )
 
     for page_number, page_elements in by_page.items():
         positioned = [
@@ -724,7 +780,7 @@ def _derive_v23_processing_needs(
     observations: list[Observation] = []
     obligations: list[Obligation] = []
     seen: set[tuple[str, tuple[str, ...]]] = set()
-    for kind, targets, evidence, methods_override in candidates:
+    for kind, targets, evidence, methods_override, emit_obligation in candidates:
         target_ids = list(dict.fromkeys(item.id for item in targets))
         key = (kind, tuple(target_ids))
         if key in seen:
@@ -743,6 +799,8 @@ def _derive_v23_processing_needs(
                 evidence=evidence,
             )
         )
+        if not emit_obligation:
+            continue
         obligations.append(
             Obligation(
                 id=f"obligation-{kind}-{suffix}",

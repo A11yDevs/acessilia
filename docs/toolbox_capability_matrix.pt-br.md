@@ -149,10 +149,11 @@ saudável; desligá-lo pulava a execução em vez de expor a lacuna.
   registrado ou é reportado ao planejador como indisponível;
   `tests/test_pddl_actionability.py` falha para qualquer método que não seja nenhum
   dos dois.
-- **18 handlers registrados** (antes: 3 reais + 8 no-op): os 3 com modelo,
-  `single-provider` como fallback executável e 13 handlers determinísticos
+- **19 handlers registrados** (antes: 3 reais + 8 no-op): os 3 com modelo,
+  `single-provider` como fallback executável e 14 handlers determinísticos
   cobrindo `vision-description`, `pandoc-table`,
-  `pandoc-code`, `pymupdf-region`, `latex-normalizer`, `norm-fix`, `rep-guard`,
+  `pandoc-code`, `pymupdf-region`, `latex-normalizer`, `norm-fix`,
+  `unicode-repair`, `rep-guard`,
   `line-number-extractor`, `verse-chunker`, `tailjoin`, `tailjoin-positioned`,
   `xycut-order` e `deterministic-heading-repair`; `human-review` é o handler
   explícito de escalonamento terminal.
