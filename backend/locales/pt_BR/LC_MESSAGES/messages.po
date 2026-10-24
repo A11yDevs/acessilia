@@ -1448,6 +1448,14 @@ msgid "PDF/UA rendered by the Toolbox: {output_path}"
 msgstr "PDF/UA renderizado pela Toolbox: {output_path}"
 
 #, python-brace-format
+msgid ""
+"The Toolbox rejected the PDF/UA math; retrying with formulas as literal "
+"text: {error}"
+msgstr ""
+"A Toolbox rejeitou a matemática do PDF/UA; tentando de novo com as "
+"fórmulas como texto: {error}"
+
+#, python-brace-format
 msgid "TXT exported: {output_path}"
 msgstr "TXT exportado: {output_path}"
 
