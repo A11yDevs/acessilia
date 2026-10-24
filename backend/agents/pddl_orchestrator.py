@@ -3506,7 +3506,7 @@ def build_pddl_structured_payload(
         # warning names the switch because the job delivers the text as
         # extracted, NFD and dotless-i included.
         technical_warnings.append(
-            "Texto com sinais de Unicode legado (NFD ou i sem ponto); "
+            "Texto com sinais de Unicode legado (NFD, i sem ponto ou acento espaçador); "
             "reparo desabilitado (LEGACY_UNICODE_REPAIR=detect)."
         )
 

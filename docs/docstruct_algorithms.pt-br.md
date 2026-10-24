@@ -185,7 +185,6 @@ trabalho de benchmark produziu, todas como funções puras:
 | `fusion.table_specialist` | o medoide de tabela (gerar-comparar-adjudicar) |
 | `text.normalize`, `text.norm_fix`, `text.latex` | primitivas de normalização de texto |
 | `text.unicode_repair` | reparo conservador de NFC e i sem ponto em PDFs TeX legados (só prosa) |
-| `text.unicode_repair` | reparo conservador de NFC e i sem ponto em PDFs TeX legados (só prosa) |
 | `imaging.policy` | decisões puras de upscale/orientação (sem PIL/cv2) |
 | `docstruct.fusion.verse` | chunk verse/record blocks so the evaluator can re-group them |
 | `docstruct.fusion.line_numbers` | pull marginal verse line numbers into their own blocks |

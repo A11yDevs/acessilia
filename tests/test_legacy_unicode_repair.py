@@ -10,7 +10,7 @@ from backend.agents import pddl_orchestrator as pddl
 from backend.config.settings import settings
 from backend.core.manifest.builder import _derive_v23_processing_needs
 from backend.core.manifest.models import Obligation
-from tests.pddl_support import build_element, build_manifest
+from tests.pddl_support import build_element, build_manifest, build_orchestrator
 
 BRASILIA = "Bras\u0131\u0301lia"
 CALCULO = "Ca\u0301lculo"
@@ -149,6 +149,39 @@ class TestHandler:
 
         assert result.success is False
         assert "o-ausente" in (result.message or "")
+
+
+class TestDetectModeTechnicalWarning:
+    """``detect`` leaves the text as extracted, so the payload must warn."""
+
+    @staticmethod
+    def _payload(tmp_path, monkeypatch, *, mode: str):
+        monkeypatch.setattr(settings, "legacy_unicode_repair", mode)
+        observations, obligations = _derive_v23_processing_needs([_element(BRASILIA)])
+        manifest = build_manifest([_element(BRASILIA)], obligations)
+        manifest.observations = observations
+        orchestrator = build_orchestrator()
+        plan, _ = orchestrator._build_plan(manifest)
+        return pddl.build_pddl_structured_payload(
+            file_path=tmp_path / "legado.pdf", manifest=manifest, plan=plan,
+            planner_backend="internal", execution_report=None, comparison=None,
+        )
+
+    def test_detect_warns_that_the_text_is_delivered_unrepaired(
+        self, tmp_path, monkeypatch
+    ):
+        warnings = self._payload(tmp_path, monkeypatch, mode="detect")[
+            "technical_warnings"
+        ]
+
+        assert any("LEGACY_UNICODE_REPAIR=detect" in warning for warning in warnings)
+
+    def test_repair_does_not_warn(self, tmp_path, monkeypatch):
+        warnings = self._payload(tmp_path, monkeypatch, mode="repair")[
+            "technical_warnings"
+        ]
+
+        assert not any("Unicode legado" in warning for warning in warnings)
 
 
 def test_kind_is_not_critical():

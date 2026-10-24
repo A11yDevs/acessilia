@@ -153,7 +153,7 @@ V23_OBLIGATION_BY_KIND = {
         ["norm-fix", "human-review"],
     ),
     "repair-legacy-unicode": (
-        "Texto extraído de PDF legado contém Unicode decompatibilizado (NFD ou i sem ponto).",
+        "Texto extraído de PDF legado contém Unicode mal composto (NFD ou i sem ponto).",
         ["unicode-repair", "human-review"],
     ),
     "inspect-unstructured-page": (
@@ -639,6 +639,9 @@ def _derive_v23_processing_needs(
             legacy_evidence["combining_marks"] += detection.combining_marks
             legacy_evidence["dotless"] += detection.dotless
             legacy_evidence["spacing_diacritics"] += detection.spacing_diacritics
+            legacy_evidence["replacement_characters"] += (
+                detection.replacement_characters
+            )
         if legacy_targets:
             add(
                 "repair-legacy-unicode",
