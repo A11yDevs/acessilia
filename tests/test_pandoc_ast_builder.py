@@ -193,6 +193,11 @@ def _math_blocks(ast: dict) -> list:
     "latex",
     [
         r"\input{secret.txt}",
+        r"\@@input secret.txt",
+        r"\InputIfFileExists{secret.txt}{}{}",
+        r"\verbatiminput{secret.txt}",
+        r"\lstinputlisting{secret.txt}",
+        r"\import{./sub/}{secret}",
         r"\write18{rm -rf /}",
         r"\directlua{os.execute('id')}",
         r"\openout0=x ",
@@ -250,3 +255,50 @@ def test_degrade_math_to_text_keeps_the_non_math_blocks():
     texts = [_para_text(block) for block in degraded["blocks"] if block.get("t") == "Para"]
     assert "Before the formula." in texts[0]
     assert "chemfig" in texts[1]
+
+
+def test_degrade_math_to_text_visits_quotes_divs_and_table_cells():
+    """The walk covers the whole payload. build_pandoc_ast does not emit Math
+    in these places today, but degrade_math_to_text is public API and must
+    keep the promise if the builder ever does."""
+    math = {"t": "Math", "c": [{"t": "InlineMath"}, "H_2O"]}
+    ast = {
+        "pandoc-api-version": [1, 23, 1],
+        "meta": {},
+        "blocks": [
+            {"t": "BlockQuote", "c": [{"t": "Para", "c": [dict(math)]}]},
+            {"t": "Div", "c": [["d", [], []], [{"t": "Plain", "c": [dict(math)]}]]},
+            {
+                "t": "Table",
+                "c": [
+                    ["", [], []],
+                    [[], []],
+                    [],
+                    [
+                        ["", [], []],
+                        [[["", [], []], [], 1, 1, [{"t": "Plain", "c": [dict(math)]}]]],
+                    ],
+                    [],
+                    [],
+                ],
+            },
+        ],
+    }
+
+    def _math_nodes(node):
+        if isinstance(node, list):
+            return [found for child in node for found in _math_nodes(child)]
+        if isinstance(node, dict):
+            if node.get("t") == "Math":
+                return [node]
+            payload = node["c"] if "c" in node else node.get("blocks", [])
+            return _math_nodes(payload)
+        return []
+
+    degraded = degrade_math_to_text(ast)
+
+    assert _math_nodes(ast) and len(_math_nodes(degraded)) == 0
+    quote_para = degraded["blocks"][0]["c"][0]
+    assert quote_para["c"][0] == {"t": "Str", "c": "H_2O"}
+    div_plain = degraded["blocks"][1]["c"][1][0]
+    assert div_plain["c"][0] == {"t": "Str", "c": "H_2O"}

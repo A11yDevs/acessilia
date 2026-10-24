@@ -151,13 +151,20 @@ def _render_pdf_ua(
         toolbox_export_pdf_ua(ast, output_path, lang=lang)
     except ToolboxInvalidInput as exc:
         # ToolboxInvalidInput means the request reached a healthy renderer and
-        # the AST itself is the problem: math its LaTeX compiler rejects, e.g.
-        # \chemfig from a chemical structure a vision model classified as a
-        # formula. The retry is a deterministic degradation, not a failover —
-        # the formulas go as literal text, the way the HTML and TXT renderers
-        # already show them.
+        # the AST itself is the problem — but not every rejection is about
+        # math. When the AST carries no Math inline left (the builder guard
+        # already exports the dangerous ones as text), the degradation changes
+        # nothing and a retry would resend the identical request, so the
+        # rejection propagates instead.
+        degraded = degrade_math_to_text(ast)
+        if degraded == ast:
+            raise
+        # Math the renderer's LaTeX compiler rejects, e.g. \chemfig from a
+        # chemical structure a vision model classified as a formula. The retry
+        # is a deterministic degradation, not a failover — the formulas go as
+        # literal text, the way the HTML and TXT renderers already show them.
         logger.warning(t(LOG_PDF_UA_MATH_DEGRADED).format(error=exc))
-        toolbox_export_pdf_ua(degrade_math_to_text(ast), output_path, lang=lang)
+        toolbox_export_pdf_ua(degraded, output_path, lang=lang)
     logger.info(t(LOG_PDF_UA_TOOLBOX_EXPORTED).format(output_path=output_path))
     return output_path
 

@@ -21,7 +21,6 @@ from acessilia_sdk.toolbox.clients.pdf_ua import pandoc_payload
 from acessilia_sdk.toolbox.errors import (
     ToolboxCapabilityError,
     ToolboxInvalidInput,
-    ToolboxProviderUnavailable,
     ToolboxTimeout,
 )
 from backend.config.settings import settings
@@ -357,5 +356,53 @@ def test_only_an_input_rejection_retries(monkeypatch, tmp_path, error):
 
     with pytest.raises(type(error), match=re.escape(str(error))):
         _export_math_document(tmp_path)
+
+    assert len(calls) == 1
+
+
+def test_a_second_rejection_propagates(monkeypatch, tmp_path):
+    """One retry is the whole contract: if the degraded AST is rejected too,
+    that is a real failure, not another degradation to attempt."""
+    monkeypatch.setattr(settings, "toolbox_pdf_ua_enabled", True)
+    calls = []
+
+    def failing_toolbox(ast, output_path, *, lang):
+        calls.append(ast)
+        raise ToolboxInvalidInput(f"pandoc failed (attempt {len(calls)})")
+
+    monkeypatch.setattr(
+        "backend.export.pandoc_exporter.toolbox_export_pdf_ua", failing_toolbox
+    )
+
+    with pytest.raises(
+        ToolboxInvalidInput, match=re.escape("pandoc failed (attempt 2)")
+    ):
+        _export_math_document(tmp_path)
+
+    assert len(calls) == 2
+
+
+def test_an_ast_without_math_does_not_retry(monkeypatch, tmp_path):
+    """ToolboxInvalidInput covers any 400 invalid_input, not only math: when
+    the degradation changes nothing, a retry would resend the identical
+    request — double the latency of a 42-page render for the same rejection."""
+    monkeypatch.setattr(settings, "toolbox_pdf_ua_enabled", True)
+    calls = []
+
+    def failing_toolbox(ast, output_path, *, lang):
+        calls.append(ast)
+        raise ToolboxInvalidInput("pandoc failed")
+
+    monkeypatch.setattr(
+        "backend.export.pandoc_exporter.toolbox_export_pdf_ua", failing_toolbox
+    )
+
+    with pytest.raises(ToolboxInvalidInput, match="pandoc failed"):
+        pandoc_exporter.export_accessible_document(
+            "# Report\n\nParagraph.\n",
+            tmp_path / "doc.pdf_ua.pdf",
+            format_name="pdf_ua",
+            title="Report",
+        )
 
     assert len(calls) == 1

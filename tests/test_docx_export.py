@@ -168,3 +168,48 @@ def test_sync_wrapper_downloads_the_stored_docx(respx_mock, monkeypatch, tmp_pat
     assert document["artifact_id"] == DOCX_ID
     assert (tmp_path / "doc.docx").read_bytes() == DOCX
     assert b"pandoc-docx" in execute.calls.last.request.content
+
+
+def test_the_math_guard_reaches_the_docx_too(monkeypatch, tmp_path):
+    """build_pandoc_ast is shared with PDF/UA: a math macro the renderers must
+    not compile (\write18, \input, ...) goes as text in every Pandoc-rendered
+    format, not only where LaTeX runs."""
+    monkeypatch.setattr(settings, "toolbox_docx_enabled", True)
+    captured = []
+
+    def fake_toolbox(ast, output_path, *, lang):
+        captured.append(ast)
+        output_path.write_bytes(DOCX)
+        return {"artifact_id": DOCX_ID}
+
+    monkeypatch.setattr("backend.export.pandoc_exporter.toolbox_export_docx", fake_toolbox)
+
+    document = {
+        "id": "doc-1",
+        "schema_version": "1.0.0",
+        "title": "Report",
+        "language": "pt-BR",
+        "sections": [
+            {
+                "id": "sec-1",
+                "level": 1,
+                "title": "Formulas",
+                "blocks": [{"id": "m-1", "type": "math", "text": r"\write18{rm -rf /}"}],
+                "children": [],
+            }
+        ],
+    }
+
+    pandoc_exporter.export_accessible_document(
+        document, tmp_path / "doc.docx", format_name="docx", title="Report"
+    )
+
+    ast, = captured
+    maths = [
+        inline
+        for block in ast["blocks"]
+        if isinstance(block.get("c"), list)
+        for inline in block["c"]
+        if isinstance(inline, dict) and inline.get("t") == "Math"
+    ]
+    assert not maths

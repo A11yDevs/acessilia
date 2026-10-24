@@ -18,8 +18,11 @@ from docstruct.tables.ast import table_ast_from_block
 #: internals. Math text comes from OCR and vision models, and the PDF/UA
 #: renderer compiles it with LaTeX: beyond an undefined control sequence
 #: losing the whole document (``\chemfig`` from a misclassified chemical
-#: structure, for instance), ``\write18`` and friends must never reach a
-#: LaTeX compilation. A math block carrying one degrades to plain text, the
+#: structure, for instance), ``\write18`` and friends have no business in a
+#: compilation. This list is defense in depth against the common primitives,
+#: not a sandbox — the boundary is the Toolbox's own LaTeX configuration
+#: (no shell escape, restricted file access) plus the degrade-and-retry of
+#: the PDF/UA export. A math block carrying one degrades to plain text, the
 #: same representation the renderers already show for an unverbalized
 #: formula. Names match whole macros only, so ``\longleftarrow`` is kept.
 _LATEX_UNSAFE_MACROS = frozenset(
@@ -28,9 +31,12 @@ _LATEX_UNSAFE_MACROS = frozenset(
         "csname",
         "directlua",
         "documentclass",
+        "import",
         "include",
         "includegraphics",
         "input",
+        "inputiffileexists",
+        "lstinputlisting",
         "luaexec",
         "openin",
         "openout",
@@ -38,17 +44,21 @@ _LATEX_UNSAFE_MACROS = frozenset(
         "readline",
         "special",
         "usepackage",
+        "verbatiminput",
         "write",
     }
 )
 
-_LATEX_MACRO_RE = re.compile(r"\\([a-zA-Z]+)")
+# ``@`` covers the \makeatletter forms: \@@input is the file-reading
+# primitive behind \input.
+_LATEX_MACRO_RE = re.compile(r"\\([a-zA-Z@]+)")
 
 
 def _has_unsafe_latex_macro(latex: str) -> bool:
     """Whether the LaTeX carries a macro the renderers must not compile."""
     return any(
-        name in _LATEX_UNSAFE_MACROS for name in _LATEX_MACRO_RE.findall(latex)
+        name.lstrip("@").lower() in _LATEX_UNSAFE_MACROS
+        for name in _LATEX_MACRO_RE.findall(latex)
     )
 
 
@@ -181,40 +191,40 @@ def degrade_math_to_text(document_ast: dict[str, Any]) -> dict[str, Any]:
     chemical structure a vision model classified as a formula) fails the
     whole document. The fallback exports the formula source as literal text
     — the same representation the HTML and TXT renderers already show — so
-    one block cannot lose the PDF. The builder only emits ``Math`` inside
-    ``Para`` blocks, which is the scope covered here; the input AST is left
-    untouched.
+    one block cannot lose the PDF. The walk covers the whole payload (a
+    ``Math`` inside a quote, a ``Div`` or a table cell degrades too), and the
+    input AST is left untouched. With no ``Math`` inline the copy equals the
+    input, which callers use to skip a pointless retry.
     """
     return {
         **document_ast,
         "blocks": [
-            _degrade_block(block) for block in document_ast.get("blocks", [])
+            _degrade_node(block) for block in document_ast.get("blocks", [])
         ],
     }
 
 
-def _degrade_block(block: Any) -> Any:
-    if not isinstance(block, dict):
-        return block
-    kind = block.get("t")
-    content = block.get("c")
-    if kind in {"Para", "Plain"} and isinstance(content, list):
-        inlines: list[Any] = []
-        for inline in content:
-            if isinstance(inline, dict) and inline.get("t") == "Math":
+def _degrade_node(node: Any) -> Any:
+    """Rebuild ``node`` with every ``Math`` inline replaced by its text.
+
+    Lists and dicts come back with the same shape: a ``Math`` inline expands
+    into the text inlines that replace it in place, everything else is
+    walked through ``c`` and rebuilt.
+    """
+    if isinstance(node, list):
+        rebuilt: list[Any] = []
+        for item in node:
+            if isinstance(item, dict) and item.get("t") == "Math":
                 latex = ""
-                if isinstance(inline.get("c"), list) and len(inline["c"]) > 1:
-                    latex = str(inline["c"][1])
-                inlines.extend(_meta_inlines(latex))
+                if isinstance(item.get("c"), list) and len(item["c"]) > 1:
+                    latex = str(item["c"][1])
+                rebuilt.extend(_meta_inlines(latex))
             else:
-                inlines.append(inline)
-        return {"t": kind, "c": inlines}
-    if kind == "Div" and isinstance(content, list) and len(content) == 2:
-        return {
-            "t": kind,
-            "c": [content[0], [_degrade_block(b) for b in content[1]]],
-        }
-    return block
+                rebuilt.append(_degrade_node(item))
+        return rebuilt
+    if isinstance(node, dict) and "c" in node:
+        return {**node, "c": _degrade_node(node["c"])}
+    return node
 
 
 def _table_to_pandoc_ast(table_ast: dict[str, Any]) -> dict[str, Any]:
