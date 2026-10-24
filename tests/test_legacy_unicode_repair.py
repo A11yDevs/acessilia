@@ -113,6 +113,28 @@ class TestManifestEmission:
 
         assert "repair-legacy-unicode" not in _kinds(obligations)
 
+    def test_page_header_is_a_target(self, monkeypatch):
+        monkeypatch.setattr(settings, "legacy_unicode_repair", "repair")
+        observations, obligations = _derive_v23_processing_needs(
+            [_element(SPACING_CALCULO, "page_header")]
+        )
+
+        assert "repair-legacy-unicode" in _kinds(obligations)
+
+    def test_table_cells_are_a_target(self, monkeypatch):
+        monkeypatch.setattr(settings, "legacy_unicode_repair", "repair")
+        table = build_element(
+            "element-table",
+            "table",
+            metadata={
+                "table_ast": {"body": [{"cells": [{"text": SPACING_CALCULO}]}]}
+            },
+        )
+        observations, obligations = _derive_v23_processing_needs([table])
+
+        assert "repair-legacy-unicode" in _kinds(obligations)
+        assert observations[0].evidence["spacing_word_internal"] == 1
+
 
 class TestHandler:
     def test_repairs_and_records_provenance(self):
@@ -138,6 +160,46 @@ class TestHandler:
         assert result.success is True
         assert element.text == "Bras\u00edlia, C\u00e1lculo e Voc\u00ea"
         assert "spacing-diacritic" in element.metadata["unicode_repair"]["rules"]
+
+    def test_repairs_page_header(self):
+        element = _element(SPACING_CALCULO, "page_header")
+        manifest = build_manifest([element], [_obligation()])
+
+        result = pddl._handle_unicode_repair_method(manifest, "o-unicode")
+
+        assert result.success is True
+        assert element.text == "C\u00e1lculo"
+
+    def test_repairs_table_cells_and_caption(self):
+        table = build_element(
+            "element-table",
+            "table",
+            metadata={
+                "table_ast": {
+                    "caption": "Tabela C\u00b4 alculo",
+                    "body": [
+                        {
+                            "cells": [
+                                {"text": "velocidade m\u00b4 edia"},
+                                {"text": "n\u00b4 umero"},
+                            ]
+                        }
+                    ],
+                }
+            },
+        )
+        manifest = build_manifest([table], [_obligation("element-table")])
+
+        result = pddl._handle_unicode_repair_method(manifest, "o-unicode")
+
+        assert result.success is True
+        table_ast = table.metadata["table_ast"]
+        assert table_ast["caption"] == "Tabela C\u00e1lculo"
+        assert [cell["text"] for cell in table_ast["body"][0]["cells"]] == [
+            "velocidade m\u00e9dia",
+            "n\u00famero",
+        ]
+        assert table.metadata["unicode_repair"]["edited"] is True
 
     def test_standalone_accent_is_left_untouched(self):
         text = "o sinal \u00b4 e usado"

@@ -38,7 +38,9 @@ precomposed characters. The defect is upstream, in the text the core receives.
 
 - **Spacing repair is part of `repair` mode.** When `LEGACY_UNICODE_REPAIR=repair`,
   the core enables spacing repair for prose-like blocks (`paragraph`, `heading`,
-  `title`, `list_item`, `caption`, `footnote`).
+  `title`, `list_item`, `caption`, `footnote`), page headers/footers, and the
+  caption and cells of tables. Tables carry their text in the cell AST, so the
+  core walks the sections instead of reading `element.text`.
 - **Two tiers, based on where the accent appears.**
   - *Word-internal*: the accent is glued to the preceding letter (`C´ alculo`,
     `Bras´ ılia`). This is the shape a legacy TeX extraction produces; it is
@@ -66,7 +68,11 @@ precomposed characters. The defect is upstream, in the text the core receives.
 
 - **The reference sample is repaired end to end.** In the extraction above,
   all 206 spacing diacritics are rewritten across 36 of the 53 eligible
-  elements; the known words from the sample come out correct.
+  elements, and the page headers and the two table cells (which the first
+  revision missed) are now covered too; the known words from the sample come
+  out correct. The only residual signals are six isolated `U+0338` overlays
+  (a separate math-extraction defect), which this phase reports but does not
+  rewrite.
 - **Accent-heavy prose is protected.** A text about accents that has no
   word-internal legacy shape keeps its standalone examples untouched, because
   the document-level threshold is not met.

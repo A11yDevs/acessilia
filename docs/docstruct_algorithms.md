@@ -175,7 +175,7 @@ benchmark work produced, all as pure functions:
 | `fusion.hf_end` | the ground-truth header/footer-at-end convention |
 | `fusion.table_specialist` | the generate-compare-adjudicate table medoid |
 | `text.normalize`, `text.norm_fix`, `text.latex` | text normalization primitives |
-| `text.unicode_repair` | conservative NFC, dotless-i and spacing repair for legacy TeX PDFs (prose only) |
+| `text.unicode_repair` | conservative NFC, dotless-i and spacing repair for legacy TeX PDFs (prose, headers and table cells) |
 | `imaging.policy` | pure upscale/orientation decisions (no PIL/cv2) |
 | `docstruct.fusion.verse` | chunk verse/record blocks so the evaluator can re-group them |
 | `docstruct.fusion.line_numbers` | pull marginal verse line numbers into their own blocks |

@@ -40,7 +40,9 @@ texto que o core recebe.
 - **O reparo de acentos espaçadores faz parte do modo `repair`.** Com
   `LEGACY_UNICODE_REPAIR=repair`, o core habilita o reparo de acentos
   espaçadores nos blocos de prosa (`paragraph`, `heading`, `title`,
-  `list_item`, `caption`, `footnote`).
+  `list_item`, `caption`, `footnote`), nos cabeçalhos/rodapés de página e na
+  legenda e nas células de tabelas. Tabelas guardam o texto na AST de células,
+  então o core percorre as seções em vez de ler `element.text`.
 - **Duas camadas, conforme a posição do acento.**
   - *Interno à palavra*: o acento está colado à letra anterior (`C´ alculo`,
     `Bras´ ılia`). É a forma que a extração TeX legada produz; é reparado sempre
@@ -67,10 +69,13 @@ texto que o core recebe.
 ## Consequências
 
 - **A amostra de referência é reparada de ponta a ponta.** Na extração acima,
-  os 206 acentos espaçadores são reescritos em 36 dos 53 elementos elegíveis;
-  as palavras conhecidas (`Brasília`, `Cálculo`, `Matemática`, `função`,
-  `não é`, `difícil`, `posição`, `Você`, `instantânea`, `Porém`) saem
-  corretas.
+  os 206 acentos espaçadores são reescritos em 36 dos 53 elementos elegíveis,
+  e os cabeçalhos de página e as duas células de tabela (que a primeira versão
+  deixou de fora) também passam a ser cobertos; as palavras conhecidas
+  (`Brasília`, `Cálculo`, `Matemática`, `função`, `não é`, `difícil`,
+  `posição`, `Você`, `instantânea`, `Porém`) saem corretas. Os únicos sinais
+  residuais são seis overlays isolados `U+0338` (outro defeito de extração
+  matemática), que esta fase reporta mas não reescreve.
 - **Prosa sobre acentos fica protegida.** Um texto que discute acentos e não
   tem a forma interna à palavra mantém seus exemplos isolados intactos, porque
   o limiar de documento não é atingido.

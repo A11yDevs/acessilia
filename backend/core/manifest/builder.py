@@ -40,6 +40,7 @@ from docstruct.geometry import (
     order_reading_items,
     reading_role,
 )
+from docstruct.tables.ast import raw_rows_from_table_ast as _rows_from_table_ast
 
 if TYPE_CHECKING:
     from backend.core.manifest.toolbox_extractor import ToolboxExtraction
@@ -550,6 +551,46 @@ def _derive_processing_needs(
     return observations, obligations
 
 
+#: Element types whose text the Unicode repair may rewrite. Tables carry their
+#: content in the cell AST and are read through ``unicode_repair_text``.
+UNICODE_REPAIR_ELEMENT_TYPES = frozenset(
+    {
+        "paragraph",
+        "heading",
+        "title",
+        "list_item",
+        "caption",
+        "footnote",
+        "page_header",
+        "page_footer",
+        "table",
+    }
+)
+
+
+def unicode_repair_text(element: ManifestElement) -> str:
+    """Text the Unicode detection/repair sees for ``element``.
+
+    Page headers/footers are ordinary prose. A table has no ``element.text``:
+    its content lives in the cell AST (plus an optional caption).
+    """
+    if element.type == "table":
+        table_ast = element.metadata.get("table_ast")
+        if not isinstance(table_ast, dict):
+            return ""
+        parts = [
+            value
+            for row in _rows_from_table_ast(table_ast)
+            for value in row
+            if value
+        ]
+        caption = table_ast.get("caption")
+        if isinstance(caption, str) and caption.strip():
+            parts.append(caption)
+        return " ".join(parts)
+    return element.text or ""
+
+
 def _derive_v23_processing_needs(
     elements: list[ManifestElement],
     *,
@@ -616,16 +657,12 @@ def _derive_v23_processing_needs(
         legacy_targets: list[ManifestElement] = []
         legacy_evidence: Counter = Counter()
         for element in elements:
-            if element.type not in {
-                "paragraph",
-                "heading",
-                "title",
-                "list_item",
-                "caption",
-                "footnote",
-            } or not element.text:
+            if element.type not in UNICODE_REPAIR_ELEMENT_TYPES:
                 continue
-            detection = detect_legacy_unicode(element.text)
+            text = unicode_repair_text(element)
+            if not text:
+                continue
+            detection = detect_legacy_unicode(text)
             if not detection.has_signal:
                 continue
             repairable = bool(
