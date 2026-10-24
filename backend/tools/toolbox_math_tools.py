@@ -1,10 +1,11 @@
 """Toolbox-backed math: recognition, LaTeX/MathML conversion and speech.
 
 ``math.recognize`` replaces the local CodeFormula + RapidOCR cascade and
-returns no formulas on failure. ``math.convert`` and ``math.verbalize`` are
-the only source of MathML and spoken text in the core (ADR-0007): an
-unavailable capability raises ``MathCapabilityUnavailable`` instead of falling
-back to a local converter.
+returns no formulas when nothing is recognized; callers that batch many crops
+can ask for an explicit ``MathCapabilityUnavailable`` instead. ``math.convert``
+and ``math.verbalize`` are the only source of MathML and spoken text in the
+core (ADR-0007): an unavailable capability raises ``MathCapabilityUnavailable``
+instead of falling back to a local converter.
 """
 
 from __future__ import annotations
@@ -15,7 +16,11 @@ from typing import Any
 from backend.tools.logger import logger
 from acessilia_sdk.toolbox import ToolboxError, ToolboxInvalidInput
 from acessilia_sdk.toolbox.clients import ToolboxMathClient
-from acessilia_sdk.toolbox.clients.math import CONVERT_CAPABILITY, VERBALIZE_CAPABILITY
+from acessilia_sdk.toolbox.clients.math import (
+    CONVERT_CAPABILITY,
+    RECOGNIZE_CAPABILITY,
+    VERBALIZE_CAPABILITY,
+)
 from backend.tools.toolbox_client import make_toolbox_client, run_sync
 
 
@@ -24,14 +29,25 @@ def _run_async(coro) -> Any:
     return run_sync(coro)
 
 
-def toolbox_recognize_formula(image_bytes: bytes) -> list[dict[str, Any]]:
+def toolbox_recognize_formula(
+    image_bytes: bytes, *, raise_on_unavailable: bool = False
+) -> list[dict[str, Any]]:
     """Recognize mathematical formulas in an image via Toolbox.
 
     Args:
         image_bytes: PNG/JPEG image bytes containing a formula.
+        raise_on_unavailable: Raise ``MathCapabilityUnavailable`` when the
+            capability cannot serve the request, instead of returning an empty
+            list. Callers processing many crops use it to stop after one
+            outage instead of paying the timeout once per crop.
 
     Returns:
-        List of {latex, confidence, page, bbox} dicts, or empty list on failure.
+        List of {latex, confidence, page, bbox} dicts, or empty list when no
+        formula was recognized or the image was rejected.
+
+    Raises:
+        MathCapabilityUnavailable: the capability could not serve the request
+            and ``raise_on_unavailable`` is true.
     """
     import tempfile
 
@@ -40,8 +56,16 @@ def toolbox_recognize_formula(image_bytes: bytes) -> list[dict[str, Any]]:
     tmp.write_bytes(image_bytes)
     try:
         return _run_async(_recognize_formula_async(tmp))
-    except Exception as e:
-        logger.warning("Toolbox Math recognize failed ({}), returning empty", e)
+    except ToolboxInvalidInput as exc:
+        logger.info("{} rejected the image ({})", RECOGNIZE_CAPABILITY, exc)
+        return []
+    except ToolboxError as exc:
+        if raise_on_unavailable:
+            raise MathCapabilityUnavailable(RECOGNIZE_CAPABILITY, exc) from exc
+        logger.warning("Toolbox Math recognize failed ({}), returning empty", exc)
+        return []
+    except Exception as exc:
+        logger.warning("Toolbox Math recognize failed ({}), returning empty", exc)
         return []
     finally:
         tmp.unlink(missing_ok=True)

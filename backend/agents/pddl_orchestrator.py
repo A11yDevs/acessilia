@@ -72,12 +72,14 @@ from backend.stage_messages import (
     STAGE_ANALYZING_STRUCTURAL,
     STAGE_STRUCTURAL_EXTRACTION_FAILED,
     STAGE_DOCUMENT_TOO_MANY_PAGES,
+    STAGE_ENRICHING_FORMULAS,
     STAGE_ENRICHING_IMAGE_DESCRIPTIONS,
     STAGE_ENRICHING_TABLES_OCR,
     STAGE_GENERATING_PDDL_PLAN,
     STAGE_VALIDATING_PLAN_DRY_RUN,
     STAGE_EXECUTING_PLAN,
     STAGE_DESCRIBING_IMAGE,
+    STAGE_RECOGNIZING_FORMULA,
     STAGE_RECOGNIZING_TABLE,
     STAGE_EXECUTING_PLAN_STEP,
     STAGE_PAGE,
@@ -94,6 +96,7 @@ from backend.tools.toolbox_math_tools import (
     MSG_SPEECH_UNAVAILABLE,
     MathCapabilityUnavailable,
     toolbox_convert_latex,
+    toolbox_recognize_formula,
     toolbox_verbalize_latex,
 )
 from backend.tools.toolbox_client import ToolboxError
@@ -2545,6 +2548,12 @@ class PddlAccessibilityOrchestrator:
             media_inspection=media_inspection,
             status_callback=status_callback,
         )
+        await _enrich_formula_latex(
+            manifest,
+            source_path,
+            mode=effective_mode,
+            status_callback=status_callback,
+        )
 
         if status_callback:
             await status_callback(t(STAGE_ENRICHING_TABLES_OCR))
@@ -2888,6 +2897,239 @@ async def _enrich_picture_descriptions(
 
     if enriched:
         logger.info(t(LOG_PDDL_IMAGES_ENRICHED).format(count=enriched))
+
+
+def _formula_recognition_crop(
+    source_file: Path,
+    element: ManifestElement,
+    *,
+    artifact_id: str | None = None,
+    media_type: str | None = None,
+) -> tuple[bytes | None, int]:
+    """Crop to feed the formula recognizer, or ``None`` when there is no usable box.
+
+    A whole page is deliberately not a fallback: the chip models expect a
+    formula and would invent one from a page of prose. A saved
+    ``region_crop`` is reused when present, so a restored or resumed manifest
+    does not pay another render; in the normal flow region inspection runs
+    after planning, so a formula reaches this function without one (unless
+    its text normalizes to empty). Everything else is rendered from the
+    element's provenance box.
+    """
+    provenance = element.provenance[0] if element.provenance else None
+    page_number = (
+        provenance.page_number if provenance is not None else (element.page_number or 0)
+    )
+
+    saved = element.metadata.get("region_crop")
+    if isinstance(saved, str) and saved:
+        try:
+            return Path(saved).read_bytes(), page_number
+        except OSError:
+            logger.warning("Formula crop unreadable for {}: {}", element.id, saved)
+
+    if page_number < 1:
+        return None, 0
+    clip, origin = _picture_clip(provenance)
+    if clip is None:
+        return None, page_number
+    try:
+        page = _toolbox_render(
+            source_file,
+            page_number,
+            media_type=media_type,
+            dpi=200,
+            clip=clip,
+            clip_origin=origin,
+            artifact_id=artifact_id,
+        )
+    except Exception as exc:
+        # A DOCX has no page to render, and the Toolbox may refuse the box;
+        # both leave the formula without a crop instead of failing the job.
+        logger.warning(
+            "Formula crop failed for {} ({}): {}", element.id, type(exc).__name__, exc
+        )
+        return None, page_number
+    left, top, right, bottom = page.clip
+    if right - left < 4 or bottom - top < 4:
+        return None, page_number
+    return page.image, page_number
+
+
+def _best_formula_candidate(candidates: Iterable[dict[str, Any]]) -> dict[str, Any] | None:
+    """The candidate with the highest confidence, or the first one without a score.
+
+    ``math.recognize`` returns one entry per detected expression; a chip should
+    hold one, but the best-scored is the safer choice when it holds several.
+    """
+    best: dict[str, Any] | None = None
+    best_score = -1.0
+    for candidate in candidates:
+        latex = normalize_latex(str(candidate.get("latex") or ""))
+        if not latex:
+            continue
+        confidence = candidate.get("confidence")
+        score = float(confidence) if isinstance(confidence, (int, float)) else 0.0
+        if best is None or score > best_score:
+            best = {**candidate, "latex": latex}
+            best_score = score
+    return best
+
+
+async def _enrich_formula_latex(
+    manifest: ProcessingManifest,
+    source_file: Path,
+    *,
+    mode: str,
+    status_callback: Callable[[str], Coroutine[Any, Any, None]] | None = None,
+) -> None:
+    """Fill formulas the extractor left without LaTeX.
+
+    ``math.recognize`` (PP-FormulaNet) runs first; the vision model is the
+    fallback, so a Toolbox outage degrades to the behavior the pipeline had
+    before instead of leaving the formula without content. Recognition runs
+    before planning, like the picture descriptions, so the ``mathml`` and
+    ``latex-verbalizer`` methods then work on real LaTeX.
+
+    Crops are independent, so they run concurrently, bounded by
+    ``VISION_CONCURRENCY`` for the same reason as the picture descriptions:
+    the vision fallback shares that provider budget. An outage is still paid
+    once per document: the first ``MathCapabilityUnavailable`` sets a flag the
+    remaining formulas read before calling recognition, and the probe itself
+    is serialized so concurrent crops cannot each pay the same timeout.
+
+    Two formulas on the same page still pay two renders: the Toolbox applies
+    the clip, and caching a whole page to crop it locally would move pixel
+    work into the core (ADR-0003), so page-level render reuse stays a
+    follow-up.
+    """
+    from backend.config.settings import settings
+
+    formulas = [
+        element
+        for element in manifest.elements
+        if element.type == "formula" and not normalize_latex(element.text or "")
+    ]
+    if not formulas:
+        return
+    # Without a page to render there is no crop to recognize. DOCX/PPTX
+    # formulas stay as the extractor delivered them instead of paying one
+    # failed render per formula.
+    if manifest.source.media_type not in _RENDERABLE_MEDIA_TYPES:
+        return
+
+    if status_callback:
+        await status_callback(t(STAGE_ENRICHING_FORMULAS))
+
+    vision = VisionAgent(mode=mode)
+    total_pages = len(manifest.pages)
+    artifact_id = _source_artifact_id(manifest)
+    slots = asyncio.Semaphore(max(1, settings.vision_concurrency))
+    progress_lock = asyncio.Lock()
+    math_probe = asyncio.Lock()
+    math_ready = asyncio.Event()
+    math_available = True
+
+    async def call(image_bytes: bytes) -> list[dict[str, Any]]:
+        """One recognition call; an outage turns the flag off and means no LaTeX."""
+        nonlocal math_available
+        try:
+            return await run_blocking(
+                toolbox_recognize_formula,
+                image_bytes,
+                raise_on_unavailable=True,
+            )
+        except MathCapabilityUnavailable as exc:
+            math_available = False
+            logger.warning(
+                "math.recognize unavailable during formula enrichment ({}); "
+                "falling back to the vision model",
+                exc.reason,
+            )
+            return []
+
+    async def recognize(image_bytes: bytes) -> list[dict[str, Any]]:
+        """Recognize one crop, unless the document already found the outage.
+
+        The first call is serialized and every other crop waits for its
+        answer, so a batch that starts with the capability down pays the
+        outage once instead of once per crop; after it succeeds, the remaining
+        calls only read the flag and run concurrently.
+        """
+        if not math_ready.is_set():
+            async with math_probe:
+                if not math_ready.is_set():
+                    try:
+                        return await call(image_bytes)
+                    finally:
+                        math_ready.set()
+        if not math_available:
+            return []
+        return await call(image_bytes)
+
+    async def enrich_one(position: int, element: ManifestElement) -> bool:
+        """Recognize one formula and fold the answer into it; True when filled."""
+        async with slots:
+            if status_callback:
+                async with progress_lock:
+                    await status_callback(
+                        t(STAGE_RECOGNIZING_FORMULA).format(
+                            current=position,
+                            total=len(formulas),
+                            pages=_pages_label([element.page_number], total_pages),
+                        )
+                    )
+            image_bytes, page_number = await run_blocking(
+                _formula_recognition_crop,
+                source_file,
+                element,
+                artifact_id=artifact_id,
+                media_type=manifest.source.media_type,
+            )
+            if not image_bytes:
+                return False
+
+            best = _best_formula_candidate(await recognize(image_bytes))
+            method = "math.recognize"
+            latex = str(best["latex"]) if best is not None else ""
+            confidence = best.get("confidence") if best is not None else None
+
+            if not latex:
+                method = "vision"
+                output = await vision.describe_region(
+                    image_bytes=image_bytes,
+                    classification="formula",
+                    page_num=page_number,
+                    total_pages=total_pages,
+                    mode=mode,
+                    full_budget=True,
+                )
+                if output is not None and output.kind == "formula":
+                    latex = normalize_latex(output.formula_latex or "")
+                    confidence = output.confidence
+
+        if not latex:
+            return False
+        element.text = latex
+        element.metadata["formula_recognition"] = {
+            "method": method,
+            "confidence": confidence,
+        }
+        return True
+
+    # The fold above touches only its own element and runs without awaits, so
+    # concurrent folds cannot interleave. The TaskGroup cancels the sibling
+    # crops when one of them fails and re-raises as an ExceptionGroup, like the
+    # picture descriptions; no task keeps mutating the manifest after it failed.
+    async with asyncio.TaskGroup() as group:
+        tasks = [
+            group.create_task(enrich_one(position, element))
+            for position, element in enumerate(formulas, start=1)
+        ]
+    recognized = sum(task.result() for task in tasks)
+
+    if recognized:
+        logger.info("LaTeX recognized for {} formula(s)", recognized)
 
 
 async def _inspect_media(

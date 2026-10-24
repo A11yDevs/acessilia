@@ -88,7 +88,9 @@ class Settings:
     # How many picture descriptions run concurrently inside one job. The
     # UnifiedQueue already serializes jobs, so this bounds the load on the
     # model provider: 2 is safe for rate-limited hosted APIs and for a local
-    # Ollama (whose server queues anything beyond its own parallelism).
+    # Ollama (whose server queues anything beyond its own parallelism). The
+    # formula recognition stage shares the bound because its fallback is the
+    # same vision model.
     vision_concurrency: int = field(
         default_factory=lambda: int(os.getenv("VISION_CONCURRENCY", "2"))
     )
