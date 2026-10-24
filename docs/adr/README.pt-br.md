@@ -24,6 +24,7 @@ ADRs apontam para os daqui em vez de repeti-los.
 | [0006](0006-availability-and-failover.pt-br.md) | Disponibilidade por réplicas; failover no SDK como mecanismo secundário | Aceito |
 | [0007](0007-manifest-model-and-mathml-conversion.pt-br.md) | Modelo canônico do manifesto, e conversão para MathML e verbalização de fórmulas | Aceito |
 | [0008](0008-math-capabilities-on-mathjax-and-mathcat.pt-br.md) | As capacidades de matemática rodam sobre MathJax e MathCAT | Aceito |
+| [0009](0009-legacy-unicode-repair.pt-br.md) | A reparação Unicode de PDFs legados é um estágio puro da docstruct orquestrado pelo core | Aceito |
 
 ## Processo
 

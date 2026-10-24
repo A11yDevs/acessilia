@@ -150,10 +150,11 @@ gap.
 - **Every admissible method is accounted for.** Each one now resolves to a
   registered handler or is reported to the planner as unavailable;
   `tests/test_pddl_actionability.py` fails on any method that is neither.
-- **18 handlers registered** (was 3 real + 8 no-op): the 3 model-backed ones,
+- **19 handlers registered** (was 3 real + 8 no-op): the 3 model-backed ones,
   the single-provider fallback, the
-  13 deterministic handlers covering `vision-description`, `pandoc-table`,
-  `pandoc-code`, `pymupdf-region`, `latex-normalizer`, `norm-fix`, `rep-guard`,
+  14 deterministic handlers covering `vision-description`, `pandoc-table`,
+  `pandoc-code`, `pymupdf-region`, `latex-normalizer`, `norm-fix`,
+  `unicode-repair`, `rep-guard`,
   `line-number-extractor`, `verse-chunker`, `tailjoin`, `tailjoin-positioned`,
   `xycut-order`, and `deterministic-heading-repair`; `human-review` is the
   explicit terminal escalation handler.
