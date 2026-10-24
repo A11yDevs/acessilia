@@ -628,9 +628,14 @@ def _derive_v23_processing_needs(
             detection = detect_legacy_unicode(element.text)
             if not detection.has_signal:
                 continue
-            repairable = bool(detection.combining_runs or detection.dotless)
-            # Phase B rewrites only NFC and dotless-i; spacing diacritics stay
-            # report-only until font evidence exists.
+            repairable = bool(
+                detection.combining_runs
+                or detection.dotless
+                or detection.spacing_diacritics
+            )
+            # Phase B rewrites NFC, dotless-i and spacing diacritics; the
+            # handler limits standalone accents to documents with enough
+            # word-internal evidence. Replacement characters stay report-only.
             if unicode_mode == "repair" and not repairable:
                 continue
             legacy_targets.append(element)
@@ -639,6 +644,7 @@ def _derive_v23_processing_needs(
             legacy_evidence["combining_marks"] += detection.combining_marks
             legacy_evidence["dotless"] += detection.dotless
             legacy_evidence["spacing_diacritics"] += detection.spacing_diacritics
+            legacy_evidence["spacing_word_internal"] += detection.spacing_word_internal
             legacy_evidence["replacement_characters"] += (
                 detection.replacement_characters
             )

@@ -9,7 +9,7 @@ from __future__ import annotations
 from backend.agents import pddl_orchestrator as pddl
 from backend.config.settings import settings
 from backend.core.manifest.builder import _derive_v23_processing_needs
-from backend.core.manifest.models import Obligation
+from backend.core.manifest.models import Observation, Obligation
 from tests.pddl_support import build_element, build_manifest, build_orchestrator
 
 BRASILIA = "Bras\u0131\u0301lia"
@@ -21,11 +21,12 @@ def _element(text: str, element_type: str = "paragraph"):
     return build_element("element-1", element_type, text=text)
 
 
-def _obligation(target: str = "element-1") -> Obligation:
+def _obligation(target: str | list[str] = "element-1") -> Obligation:
+    target_ids = [target] if isinstance(target, str) else target
     return Obligation(
         id="o-unicode",
         kind="repair-legacy-unicode",
-        target_ids=[target],
+        target_ids=target_ids,
         admissible_methods=["unicode-repair", "human-review"],
         method_costs={"unicode-repair": 5, "human-review": 100},
         rationale="Legacy text needs Unicode repair",
@@ -79,16 +80,21 @@ class TestManifestEmission:
 
         assert element.text == BRASILIA
 
-    def test_spacing_only_does_not_emit_in_phase_b(self, monkeypatch):
+    def test_spacing_only_emits_and_repairs(self, monkeypatch):
         monkeypatch.setattr(settings, "legacy_unicode_repair", "repair")
-        observations, obligations = _derive_v23_processing_needs(
-            [_element(SPACING_CALCULO)]
-        )
+        element = _element(SPACING_CALCULO)
+        observations, obligations = _derive_v23_processing_needs([element])
 
-        assert "repair-legacy-unicode" not in _kinds(obligations)
-        assert "repair-legacy-unicode-detected" not in {
-            item.kind for item in observations
-        }
+        assert "repair-legacy-unicode" in _kinds(obligations)
+        assert observations[0].evidence["spacing_diacritics"] == 1
+        assert observations[0].evidence["spacing_word_internal"] == 1
+
+        manifest = build_manifest([element], obligations)
+        result = pddl._handle_unicode_repair_method(
+            manifest, obligations[0].id
+        )
+        assert result.success is True
+        assert element.text == "C\u00e1lculo"
 
     def test_invalid_mode_falls_back_to_off(self, monkeypatch):
         monkeypatch.setattr(settings, "legacy_unicode_repair", "banana")
@@ -119,7 +125,123 @@ class TestHandler:
         assert element.text == "Bras\u00edlia"
         assert element.metadata["unicode_repair"]["rules"] == ["dotless-base"]
         assert element.metadata["unicode_repair"]["edits"] == 1
+        assert element.metadata["unicode_repair"]["edited"] is True
+        assert element.metadata["unicode_repair"]["needs_review"] is False
         assert element.metadata["unicode_repair"]["confidence"] is None
+
+    def test_repairs_word_internal_spacing_diacritics(self):
+        element = _element("Bras\u00b4 \u0131lia, C\u00b4 alculo e Voc\u02c6 e")
+        manifest = build_manifest([element], [_obligation()])
+
+        result = pddl._handle_unicode_repair_method(manifest, "o-unicode")
+
+        assert result.success is True
+        assert element.text == "Bras\u00edlia, C\u00e1lculo e Voc\u00ea"
+        assert "spacing-diacritic" in element.metadata["unicode_repair"]["rules"]
+
+    def test_standalone_accent_is_left_untouched(self):
+        text = "o sinal \u00b4 e usado"
+        element = _element(text)
+        manifest = build_manifest([element], [_obligation()])
+
+        result = pddl._handle_unicode_repair_method(manifest, "o-unicode")
+
+        assert result.success is True
+        assert element.text == text
+        assert element.metadata["unicode_repair"]["rules"] == []
+        assert element.metadata["unicode_repair"]["needs_review"] is True
+
+    def test_standalone_accent_is_repaired_with_document_evidence(self):
+        text = (
+            "C\u00b4 alculo, Matem\u00b4 atica, fun\u00b8 c\u02dc ao, "
+            "n\u02dc ao, Voc\u02c6 e, posi\u00b8 c\u02dc ao \u00b4 e"
+        )
+        element = _element(text)
+        manifest = build_manifest([element], [_obligation()])
+
+        result = pddl._handle_unicode_repair_method(manifest, "o-unicode")
+
+        assert result.success is True
+        assert element.text.endswith("posi\u00e7\u00e3o \u00e9")
+        assert "spacing-diacritic" in element.metadata["unicode_repair"]["rules"]
+
+    def test_threshold_uses_all_targets_of_the_obligation(self):
+        first = _element("C\u00b4 alculo Matem\u00b4 atica fun\u00b8 c\u02dc ao n\u02dc ao")
+        second = build_element(
+            "element-2",
+            "paragraph",
+            text="o sinal \u00b4 e usado",
+            reading_order=2,
+        )
+        manifest = build_manifest(
+            [first, second], [_obligation(["element-1", "element-2"])]
+        )
+
+        pddl._handle_unicode_repair_method(manifest, "o-unicode")
+
+        assert second.text == "o sinal \u00e9 usado"
+
+    def test_standalone_threshold_boundary(self):
+        for count, expected in (
+            (4, "o sinal \u00b4 e usado"),
+            (5, "o sinal \u00e9 usado"),
+        ):
+            first = _element(" ".join(["C\u00b4 alculo"] * count))
+            second = build_element(
+                "element-2",
+                "paragraph",
+                text="o sinal \u00b4 e usado",
+                reading_order=2,
+            )
+            manifest = build_manifest(
+                [first, second], [_obligation(["element-1", "element-2"])]
+            )
+
+            pddl._handle_unicode_repair_method(manifest, "o-unicode")
+
+            assert second.text == expected, count
+
+    def test_protected_spans_do_not_reach_the_threshold(self):
+        first = _element(" ".join(["`C\u00b4 alculo`"] * 5))
+        second = build_element(
+            "element-2",
+            "paragraph",
+            text="o sinal \u00b4 e usado",
+            reading_order=2,
+        )
+        manifest = build_manifest(
+            [first, second], [_obligation(["element-1", "element-2"])]
+        )
+
+        pddl._handle_unicode_repair_method(manifest, "o-unicode")
+
+        assert second.text == "o sinal \u00b4 e usado"
+
+    def test_observation_evidence_sets_the_document_threshold(self):
+        first = _element("C\u00b4 alculo")
+        second = build_element(
+            "element-2",
+            "paragraph",
+            text="o sinal \u00b4 e usado",
+            reading_order=2,
+        )
+        manifest = build_manifest(
+            [first, second], [_obligation(["element-1", "element-2"])]
+        )
+        manifest.observations.append(
+            Observation(
+                id="observation-repair-legacy-unicode",
+                kind="repair-legacy-unicode-detected",
+                severity="warning",
+                message="legacy Unicode",
+                target_ids=["element-1", "element-2"],
+                evidence={"spacing_word_internal": 5},
+            )
+        )
+
+        pddl._handle_unicode_repair_method(manifest, "o-unicode")
+
+        assert second.text == "o sinal \u00e9 usado"
 
     def test_idempotent(self):
         element = _element(f"{BRASILIA} e {CALCULO}")

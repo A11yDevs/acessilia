@@ -22,7 +22,12 @@ from docstruct.tables.ast import (
     raw_rows_from_table_ast as _rows_from_table_ast,
 )
 from docstruct.text.norm_fix import norm_fix
-from docstruct.text.unicode_repair import UnicodeRepairContext, repair_legacy_unicode
+from docstruct.text.unicode_repair import (
+    Detection,
+    UnicodeRepairContext,
+    detect_legacy_unicode,
+    repair_legacy_unicode,
+)
 
 from backend.services.blocking import run_blocking
 from backend.agents.data_agent import DataAgent
@@ -510,43 +515,90 @@ _UNICODE_REPAIR_BLOCK_TYPES = {
     "footnote": "prose",
 }
 
+#: Word-internal spaced accents needed before standalone ones (an accent
+#: separated from its word) are treated as the same extraction defect. A
+#: document that merely mentions an accent has none of the word-internal shape,
+#: so it keeps its text; a legacy TeX extraction has hundreds.
+_UNICODE_STANDALONE_SPACING_MIN = 5
+
 
 def _handle_unicode_repair_method(
     manifest: ProcessingManifest, obligation_id: str
 ) -> MethodResult:
-    """Repair NFD and dotless-i text from legacy TeX extraction.
+    """Repair legacy Unicode: NFD, dotless i and spacing diacritics.
 
-    Only manifest elements the compiler selected are touched, and only in
-    prose-like block types. Spacing diacritics stay out of this phase: the lib
-    detects them but rewrites only with font evidence, which the Toolbox does
-    not report yet. The decision metadata keeps the rule names and result for
-    audit without copying the whole text into the manifest.
+    Only selected, prose-like elements are touched. Word-internal spacing
+    accents are repaired whenever the element shows them; standalone accents
+    are only repaired when the document has enough word-internal evidence
+    (recorded in the manifest observation). The decision metadata records the
+    edits and keeps ``needs_review`` for signals that remain, without copying
+    the whole text into the manifest.
     """
     elements = _target_elements(manifest, obligation_id)
     if not elements:
         return _missing_obligation(obligation_id)
 
     language = manifest.language or "pt-BR"
-    inspected = 0
-    repaired = 0
-    review = 0
+    eligible: list[tuple[ManifestElement, str]] = []
+    detections: dict[str, Detection] = {}
     for element in elements:
         block_type = _UNICODE_REPAIR_BLOCK_TYPES.get(element.type)
         if block_type is None or not element.text:
             continue
-        inspected += 1
+        eligible.append((element, block_type))
+        detections[element.id] = detect_legacy_unicode(element.text)
+
+    if not eligible:
+        return MethodResult(
+            success=False,
+            validated=False,
+            message="Nenhum texto elegível para reparo Unicode",
+        )
+
+    # The threshold is document-level. The builder emits one obligation for all
+    # eligible elements, and records the count in its observation; read it from
+    # there so a future split of the obligation cannot change the decision.
+    observation = next(
+        (
+            item
+            for item in getattr(manifest, "observations", [])
+            if item.kind == "repair-legacy-unicode-detected"
+        ),
+        None,
+    )
+    if observation is not None and "spacing_word_internal" in observation.evidence:
+        word_internal = int(observation.evidence["spacing_word_internal"])
+    else:
+        word_internal = sum(
+            detection.spacing_word_internal for detection in detections.values()
+        )
+    allow_standalone = word_internal >= _UNICODE_STANDALONE_SPACING_MIN
+    inspected = len(eligible)
+    repaired = 0
+    review = 0
+    for element, block_type in eligible:
+        detection = detections[element.id]
+        original = element.text or ""
+        # A word-internal spacing accent (``C´ alculo``) is legacy extraction
+        # evidence. Standalone accents (separated from their word) are only
+        # included when the document has enough of the word-internal shape;
+        # the lib never touches protected spans.
+        allow_spacing = detection.spacing_diacritics > 0
         decision = repair_legacy_unicode(
-            element.text,
+            original,
             context=UnicodeRepairContext(
                 language=language,
                 block_type=block_type,
                 page=element.page_number,
+                allow_spacing_diacritics=allow_spacing,
+                allow_standalone_spacing_diacritics=allow_spacing and allow_standalone,
             ),
         )
-        if decision.repaired != element.text:
+        if decision.repaired != original:
             element.text = decision.repaired
             repaired += 1
         element.metadata["unicode_repair"] = {
+            "edited": decision.repaired != original,
             "rules": sorted({edit.rule for edit in decision.edits}),
             "edits": len(decision.edits),
             "needs_review": decision.needs_review,
@@ -554,13 +606,6 @@ def _handle_unicode_repair_method(
         }
         if decision.needs_review:
             review += 1
-
-    if not inspected:
-        return MethodResult(
-            success=False,
-            validated=False,
-            message="Nenhum texto elegível para reparo Unicode",
-        )
     return MethodResult(
         success=True,
         validated=True,
