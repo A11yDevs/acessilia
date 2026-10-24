@@ -43,6 +43,7 @@ from backend.core.manifest.builder import (
     _derive_processing_needs,
     is_unstructured_page_placeholder,
     reconcile_reclassified_element_processing_needs,
+    unicode_repair_text,
 )
 from backend.core.manifest.models import (
     Artifact,
@@ -513,13 +514,67 @@ _UNICODE_REPAIR_BLOCK_TYPES = {
     "list_item": "prose",
     "caption": "prose",
     "footnote": "prose",
+    "page_header": "prose",
+    "page_footer": "prose",
 }
+
+#: Sections of a table AST whose cells carry text.
+_TABLE_SECTIONS = ("header", "body", "footer")
 
 #: Word-internal spaced accents needed before standalone ones (an accent
 #: separated from its word) are treated as the same extraction defect. A
 #: document that merely mentions an accent has none of the word-internal shape,
 #: so it keeps its text; a legacy TeX extraction has hundreds.
 _UNICODE_STANDALONE_SPACING_MIN = 5
+
+
+def _repair_table_cells(
+    element: ManifestElement, context: UnicodeRepairContext
+) -> tuple[bool, set[str], int, bool]:
+    """Repair a table caption and every cell in place.
+
+    Returns ``(edited, rules, edits, needs_review)``. The table keeps its
+    structure; only the text of the caption and of the cells changes.
+    """
+    table_ast = element.metadata.get("table_ast")
+    if not isinstance(table_ast, dict):
+        return False, set(), 0, False
+
+    edited = False
+    rules: set[str] = set()
+    edits = 0
+    review = False
+
+    def repair_text(current: str) -> str:
+        nonlocal edited, edits, review
+        decision = repair_legacy_unicode(current, context=context)
+        if decision.repaired != current:
+            edited = True
+        rules.update(edit.rule for edit in decision.edits)
+        edits += len(decision.edits)
+        review = review or decision.needs_review
+        return decision.repaired
+
+    caption = table_ast.get("caption")
+    if isinstance(caption, str) and caption:
+        table_ast["caption"] = repair_text(caption)
+    for section_name in _TABLE_SECTIONS:
+        section = table_ast.get(section_name)
+        if not isinstance(section, list):
+            continue
+        for row in section:
+            if not isinstance(row, dict):
+                continue
+            cells = row.get("cells")
+            if not isinstance(cells, list):
+                continue
+            for cell in cells:
+                if not isinstance(cell, dict):
+                    continue
+                text = cell.get("text")
+                if isinstance(text, str) and text:
+                    cell["text"] = repair_text(text)
+    return edited, rules, edits, review
 
 
 def _handle_unicode_repair_method(
@@ -542,11 +597,17 @@ def _handle_unicode_repair_method(
     eligible: list[tuple[ManifestElement, str]] = []
     detections: dict[str, Detection] = {}
     for element in elements:
-        block_type = _UNICODE_REPAIR_BLOCK_TYPES.get(element.type)
-        if block_type is None or not element.text:
+        text = unicode_repair_text(element)
+        if not text:
             continue
+        if element.type == "table":
+            block_type = "table"
+        else:
+            block_type = _UNICODE_REPAIR_BLOCK_TYPES.get(element.type)
+            if block_type is None:
+                continue
         eligible.append((element, block_type))
-        detections[element.id] = detect_legacy_unicode(element.text)
+        detections[element.id] = detect_legacy_unicode(text)
 
     if not eligible:
         return MethodResult(
@@ -584,16 +645,30 @@ def _handle_unicode_repair_method(
         # included when the document has enough of the word-internal shape;
         # the lib never touches protected spans.
         allow_spacing = detection.spacing_diacritics > 0
-        decision = repair_legacy_unicode(
-            original,
-            context=UnicodeRepairContext(
-                language=language,
-                block_type=block_type,
-                page=element.page_number,
-                allow_spacing_diacritics=allow_spacing,
-                allow_standalone_spacing_diacritics=allow_spacing and allow_standalone,
-            ),
+        context = UnicodeRepairContext(
+            language=language,
+            block_type="prose" if block_type == "table" else block_type,
+            page=element.page_number,
+            allow_spacing_diacritics=allow_spacing,
+            allow_standalone_spacing_diacritics=allow_spacing and allow_standalone,
         )
+        if block_type == "table":
+            edited, rules, edits, needs_review = _repair_table_cells(
+                element, context
+            )
+            if edited:
+                repaired += 1
+            if needs_review:
+                review += 1
+            element.metadata["unicode_repair"] = {
+                "edited": edited,
+                "rules": sorted(rules),
+                "edits": edits,
+                "needs_review": needs_review,
+                "confidence": None,
+            }
+            continue
+        decision = repair_legacy_unicode(original, context=context)
         if decision.repaired != original:
             element.text = decision.repaired
             repaired += 1

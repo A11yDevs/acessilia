@@ -131,8 +131,8 @@ class Settings:
     )
     # Legacy PDF Unicode repair (phase B): "off", "detect" or "repair".
     # "detect" only records the observation and the warning; "repair" applies
-    # NFC, the dotless-i rule and spacing diacritics to prose blocks only.
-    # The default preserves the previous behavior.
+    # NFC, the dotless-i rule and spacing diacritics to prose, headers/footers
+    # and table cells. The default preserves the previous behavior.
     legacy_unicode_repair: str = field(
         default_factory=lambda: os.getenv("LEGACY_UNICODE_REPAIR", "off").strip().lower()
     )

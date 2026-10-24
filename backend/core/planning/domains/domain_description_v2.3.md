@@ -57,7 +57,7 @@ permanece idêntica.
 | `chunk-verse` | `verse-chunker`, `human-review` | 5 / 100 | `docstruct.fusion.verse` |
 | `extract-line-numbers` | `line-number-extractor`, `human-review` | 5 / 100 | `docstruct.fusion.line_numbers` |
 | `normalize-text` | `norm-fix`, `human-review` | 5 / 100 | `docstruct.text.norm_fix` |
-| `repair-legacy-unicode` | `unicode-repair`, `human-review` | 5 / 100 | `docstruct.text.unicode_repair` (NFD, i sem ponto e acentos espaçadores) |
+| `repair-legacy-unicode` | `unicode-repair`, `human-review` | 5 / 100 | `docstruct.text.unicode_repair` (NFD, i sem ponto, acentos espaçadores, cabeçalhos e células de tabela) |
 | `inspect-unstructured-page` | `vision-page-inspection`, `human-review` | 25 / 100 | página sem estrutura extraída (#150 F5c) |
 
 Regras de compilação:
