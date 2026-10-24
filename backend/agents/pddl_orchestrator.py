@@ -3192,6 +3192,28 @@ NON_CRITICAL_OBLIGATION_KINDS = frozenset(
 )
 
 
+def _formula_has_readable_content(
+    obligation: Obligation, manifest: ProcessingManifest
+) -> bool:
+    """Whether every target formula still carries something readable.
+
+    A formula the Toolbox could not verbalize is exported as its LaTeX: the
+    canonical builder and the renderers fall back to it when ``math.verbalize``
+    is unavailable or rejects the input, so the document keeps the content.
+    That is a degradation, not a lost document. A formula with neither LaTeX
+    nor a stored MathML/verbalization has nothing to deliver, so its obligation
+    stays critical.
+    """
+    target_ids = set(obligation.target_ids)
+    targets = [element for element in manifest.elements if element.id in target_ids]
+    return bool(targets) and all(
+        bool(normalize_latex(element.text or ""))
+        or bool(str(element.metadata.get("mathml") or "").strip())
+        or bool(str(element.metadata.get("verbalization") or "").strip())
+        for element in targets
+    )
+
+
 def _blocks_delivery(obligation: Obligation, manifest: ProcessingManifest) -> bool:
     """Whether an open obligation fails the job instead of leaving a warning.
 
@@ -3201,12 +3223,19 @@ def _blocks_delivery(obligation: Obligation, manifest: ProcessingManifest) -> bo
     timeout or an auth error into ``None``), and every picture would silently
     get the generic alt text, so the job fails. A document with a single
     picture its one description failed on fails too.
+
+    ``verbalize-formula`` is non-critical while the target formulas keep their
+    LaTeX: without MathML or spoken text the exported document still shows the
+    formula source, and the result e-mail names the page. With no readable
+    content at all there is nothing to deliver, so the obligation fails the job.
     """
     if obligation.kind == "describe-image":
         return not any(
             other.kind == "describe-image" and other.status == "satisfied"
             for other in manifest.obligations
         )
+    if obligation.kind == "verbalize-formula":
+        return not _formula_has_readable_content(obligation, manifest)
     return obligation.kind not in NON_CRITICAL_OBLIGATION_KINDS
 
 
