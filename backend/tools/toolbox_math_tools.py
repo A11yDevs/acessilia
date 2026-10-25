@@ -42,8 +42,10 @@ def toolbox_recognize_formula(
             outage instead of paying the timeout once per crop.
 
     Returns:
-        List of {latex, confidence, page, bbox} dicts, or empty list when no
-        formula was recognized or the image was rejected.
+        List of formula dicts, each with a non-empty ``latex`` and, when the
+        provider reports them, ``confidence``, ``page`` and ``bbox`` (see
+        ``recognized_formulas``); empty when no formula was recognized or the
+        image was rejected.
 
     Raises:
         MathCapabilityUnavailable: the capability could not serve the request
@@ -90,21 +92,26 @@ def recognized_formulas(document: Any) -> list[dict[str, Any]]:
     expression, ``{latex, confidence?, bbox?}``. ``docling-math`` lists the
     formulas of a page, ``{formulas: [{latex, confidence, page, bbox}], ...}``.
     Reading only the list made every chip-model answer look like "nothing
-    recognized", so both shapes become the list.
+    recognized", so both shapes become the list. In both, an entry without a
+    non-empty ``latex`` is not a formula and is left out.
     """
     if not isinstance(document, dict):
         return []
     formulas = document.get("formulas")
     if isinstance(formulas, list):
-        return [f for f in formulas if isinstance(f, dict)]
-    latex = document.get("latex")
-    if isinstance(latex, str) and latex.strip():
+        return [f for f in formulas if isinstance(f, dict) and _has_latex(f)]
+    if _has_latex(document):
         return [{
             key: document[key]
             for key in ("latex", "confidence", "page", "bbox")
             if key in document
         }]
     return []
+
+
+def _has_latex(entry: dict[str, Any]) -> bool:
+    latex = entry.get("latex")
+    return isinstance(latex, str) and bool(latex.strip())
 
 
 class MathCapabilityUnavailable(RuntimeError):
@@ -209,6 +216,7 @@ __all__ = [
     "MSG_SPEECH_REJECTED",
     "MSG_SPEECH_UNAVAILABLE",
     "MathCapabilityUnavailable",
+    "recognized_formulas",
     "toolbox_recognize_formula",
     "toolbox_convert_latex",
     "toolbox_verbalize_latex",

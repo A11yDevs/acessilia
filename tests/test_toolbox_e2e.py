@@ -26,6 +26,7 @@ from acessilia_sdk.toolbox.clients import (
     ToolboxPdfClient,
 )
 from backend.tools.toolbox_client import make_toolbox_client
+from backend.tools.toolbox_math_tools import recognized_formulas
 
 TOOLBOX_BASE_URL = os.getenv("TOOLBOX_BASE_URL", "").strip()
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -288,10 +289,11 @@ class TestMathClientE2E:
             result = await math_client.recognize(file_path=tmp)
             assert result["status"] == "succeeded"
             # The document shape depends on the provider (artifact/latex@1 or
-            # a docling formula list); the core reads both the same way.
-            from backend.tools.toolbox_math_tools import recognized_formulas
-
-            for formula in recognized_formulas(result.get("document")):
+            # a docling formula list); the core reads both the same way. The
+            # image holds a formula, so recognizing none is a regression.
+            recognized = recognized_formulas(result.get("document"))
+            assert recognized, f"no formula recognized (provider: {result.get('provider')})"
+            for formula in recognized:
                 assert formula.get("latex")
         finally:
             tmp.unlink(missing_ok=True)
