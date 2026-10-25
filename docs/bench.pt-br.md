@@ -135,6 +135,11 @@ O placar (`scorecard.md`, `scorecard.json`) informa:
 - expressões inline e cabeçalhos/células de tabela entregues como matemática;
 - as verificações de texto, estrutura e fala, com cada falha listada.
 
+Com `--pdf-ua` (e sempre no `run`), as verificações de texto rodam nas duas
+saídas e entra a verificação de títulos auto-numerados; por isso o placar
+começa pelas saídas que pontuou: compare dois placares só quando essa linha
+for igual.
+
 Uma PR que muda como matemática, reparo de texto ou estrutura chegam às saídas
 cola o placar antes e depois na descrição. `tests/test_math_case_e2e.py`
 (`-m e2e`) roda o caso e trava o que já passa.

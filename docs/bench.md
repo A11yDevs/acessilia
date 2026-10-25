@@ -132,6 +132,10 @@ The scorecard (`scorecard.md`, `scorecard.json`) reports:
 - inline expressions and table headers/cells delivered as math;
 - the text, structure and speech checks, with each failure listed.
 
+With `--pdf-ua` (and always with `run`) the text checks run on both outputs
+and the auto-numbered-headings check is added, so the scorecard starts with
+the outputs it scored: compare two scorecards only when that row matches.
+
 A PR that changes how math, text repair or structure reach the outputs pastes
 the scorecard before and after in its description. `tests/test_math_case_e2e.py`
 (`-m e2e`) runs the case and locks what already passes.

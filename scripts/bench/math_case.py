@@ -56,10 +56,20 @@ MATCH_CDM = 80.0
 STRUCTURE_TOKENS = frozenset({
     "^", "_", "\\frac", "\\dfrac", "\\tfrac", "\\lim", "\\to", "\\mathbb", "\\neq", "\\ne",
     "\\geq", "\\ge", "\\leq", "\\le", "\\in", "\\cup", "\\infty", "\\cdot", "\\cdots",
-    "\\tag", "\\mathrm", "\\text", "\\quad", "\\{", "\\}",
+    "\\tag", "\\mathrm", "\\text", "\\quad", "\\lbrace", "\\rbrace",
 })
 
-_INLINE_MATH = re.compile(r"(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)|\\\((.+?)\\\)", re.S)
+#: Set braces as commands. The CDM tokenizer turns every brace, escaped ones
+#: included, into a token boundary, so ``\{``/``\}`` would never reach the
+#: recall; their command spellings survive it.
+_SET_BRACES = (("\\{", "\\lbrace "), ("\\}", "\\rbrace "))
+
+#: A math span in a text: ``$$...$$``, ``\[...\]``, ``$...$`` or ``\(...\)``.
+#: Display delimiters count too, because a cell or a paragraph that carries
+#: a whole formula as display math still delivers it as math.
+_MATH_SPAN = re.compile(
+    r"\$\$(.+?)\$\$|\\\[(.+?)\\\]|(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)|\\\((.+?)\\\)", re.S
+)
 
 
 @dataclass
@@ -77,6 +87,10 @@ class Scorecard:
     text: list[Check] = field(default_factory=list)
     structure: list[Check] = field(default_factory=list)
     speech: list[Check] = field(default_factory=list)
+    #: Outputs the text checks ran on. With the PDF/UA the text checks double
+    #: and the structure checks gain the auto-numbering one, so two scorecards
+    #: compare only when they scored the same outputs.
+    outputs: list[str] = field(default_factory=list)
 
     def summary(self) -> dict[str, Any]:
         def mean(values: list[float]) -> float | None:
@@ -89,6 +103,7 @@ class Scorecard:
             return f"{sum(c.passed for c in checks)}/{len(checks)}"
 
         return {
+            "outputs": list(self.outputs),
             "display_formulas": len(self.display),
             "display_found": share([d["matched"] is not None for d in self.display]),
             "display_cdm": mean([d["cdm"] for d in self.display]),
@@ -122,6 +137,7 @@ class Scorecard:
     def to_markdown(self) -> str:
         s = self.summary()
         rows = [
+            ("Outputs scored", ", ".join(s["outputs"]) or "—"),
             ("Display formulas found", _pct(s["display_found"])),
             ("Display CDM (mean)", _num(s["display_cdm"])),
             ("Display structure-token recall (mean)", _num(s["display_structure_recall"])),
@@ -230,7 +246,7 @@ def _table_shape(block: dict[str, Any]) -> tuple[int, int]:
 
 
 def _inline_spans(text: str) -> list[str]:
-    return [bare_latex(a or b) for a, b in _INLINE_MATH.findall(text)]
+    return [bare_latex(next(g for g in groups if g)) for groups in _MATH_SPAN.findall(text)]
 
 
 # ── Scoring ─────────────────────────────────────────────────────────
@@ -238,10 +254,16 @@ def _inline_spans(text: str) -> list[str]:
 
 def structure_recall(predicted: str, expected: str) -> float | None:
     """Share of the expected structural tokens the prediction keeps (0-100)."""
-    wanted = Counter(t for t in _tokens(expected) if t in STRUCTURE_TOKENS)
+
+    def structural(latex: str) -> Counter[str]:
+        for brace, command in _SET_BRACES:
+            latex = latex.replace(brace, command)
+        return Counter(t for t in _tokens(latex) if t in STRUCTURE_TOKENS)
+
+    wanted = structural(expected)
     if not wanted:
         return None
-    got = Counter(t for t in _tokens(predicted) if t in STRUCTURE_TOKENS)
+    got = structural(predicted)
     return round(100.0 * sum((wanted & got).values()) / sum(wanted.values()), 1)
 
 
@@ -455,7 +477,10 @@ def _list_runs(blocks: list[dict[str, Any]], page: int) -> list[dict[str, Any]]:
     """Consecutive list blocks of a page merged into one list.
 
     The core emits one ``list`` block per list item, so a list is a run of
-    adjacent list blocks.
+    adjacent list blocks. A ``math`` block between two of them does not end
+    the run: a display formula inside an item (item 1 of the page 4 list
+    holds one) comes out as its own block between the items. Any other block
+    ends it.
     """
     runs: list[dict[str, Any]] = []
     current: dict[str, Any] | None = None
@@ -466,7 +491,7 @@ def _list_runs(blocks: list[dict[str, Any]], page: int) -> list[dict[str, Any]]:
                 runs.append(current)
             current["ordered"] = current["ordered"] and bool(block.get("ordered"))
             current["items"] += [str(i) for i in block.get("items") or [] if isinstance(i, str)]
-        else:
+        elif block.get("type") != "math":
             current = None
     return runs
 
@@ -502,6 +527,7 @@ def score_case(
     targets = {"txt": txt}
     if pdf_text is not None:
         targets["pdf_ua"] = pdf_text
+    card.outputs = list(targets)
     card.text = _text_checks(expectations.get("text", {}), targets)
     card.structure = _structure_checks(
         expectations.get("structure", {}), document, blocks, card.display, pdf_text

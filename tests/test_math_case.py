@@ -183,3 +183,40 @@ def test_score_command_writes_the_scorecard(tmp_path, capsys):
     report = json.loads((tmp_path / "out" / "scorecard.json").read_text(encoding="utf-8"))
     assert report["summary"]["display_formulas"] == 1
     assert (tmp_path / "out" / "scorecard.md").exists()
+
+
+def test_structure_recall_sees_set_braces():
+    # The CDM tokenizer drops every brace; the recall must still see \{ \}.
+    assert math_case.structure_recall(r"h \in R : h \geq 0", r"\{h \in R : h \geq 0\}") == 50.0
+    assert math_case.structure_recall(r"\{h \in R : h \geq 0\}", r"\{h \in R : h \geq 0\}") == 100.0
+
+
+def test_display_delimiters_in_a_table_cell_count_as_math():
+    for cell in (r"$$h \neq 0$$", r"\[h \neq 0\]"):
+        document = _document([_table(2, [[cell, "v"], ["1", "2"]])])
+        card = math_case.score_case([ROWS[5]], {}, document, txt="")
+
+        assert card.tables[0]["as_math"], cell
+
+
+def test_a_formula_inside_a_list_item_does_not_split_the_list():
+    document = _document([
+        _block("l1", "list", 2, ordered=True, items=["First item, whose formula is"]),
+        _block("m", "math", 2, text=r"\frac{a}{b}"),
+        _block("l2", "list", 2, ordered=True, items=["Second item"]),
+        _block("p", "paragraph", 2, text="After the list."),
+        _block("l3", "list", 2, ordered=True, items=["Another list"]),
+    ])
+    card = math_case.score_case([], {"structure": EXPECTATIONS["structure"]}, document, txt="")
+
+    check = next(c for c in card.structure if c.id == "ordered-list:p2")
+    assert check.passed, check.detail
+
+
+def test_the_scorecard_says_which_outputs_it_scored():
+    txt_only = math_case.score_case([], EXPECTATIONS, GOOD, txt="h ≠ 0\n")
+    both = math_case.score_case([], EXPECTATIONS, GOOD, txt="h ≠ 0\n", pdf_text="h ≠ 0\n")
+
+    assert txt_only.summary()["outputs"] == ["txt"]
+    assert both.summary()["outputs"] == ["txt", "pdf_ua"]
+    assert "| Outputs scored | txt, pdf_ua |" in both.to_markdown()
