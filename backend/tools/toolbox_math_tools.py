@@ -77,9 +77,34 @@ async def _recognize_formula_async(file_path: Path) -> list[dict[str, Any]]:
     client = make_toolbox_client(ToolboxMathClient)
     try:
         result = await client.recognize(file_path=file_path)
-        return result.get("document", {}).get("formulas", [])
+        return recognized_formulas(result.get("document"))
     finally:
         await client.close()
+
+
+def recognized_formulas(document: Any) -> list[dict[str, Any]]:
+    """The formulas of a ``math.recognize`` document, as a list.
+
+    ``math.recognize@1`` providers answer in two shapes. The chip models
+    (``pp-formulanet``, ``rapid-latex-ocr``) follow ``artifact/latex@1``: one
+    expression, ``{latex, confidence?, bbox?}``. ``docling-math`` lists the
+    formulas of a page, ``{formulas: [{latex, confidence, page, bbox}], ...}``.
+    Reading only the list made every chip-model answer look like "nothing
+    recognized", so both shapes become the list.
+    """
+    if not isinstance(document, dict):
+        return []
+    formulas = document.get("formulas")
+    if isinstance(formulas, list):
+        return [f for f in formulas if isinstance(f, dict)]
+    latex = document.get("latex")
+    if isinstance(latex, str) and latex.strip():
+        return [{
+            key: document[key]
+            for key in ("latex", "confidence", "page", "bbox")
+            if key in document
+        }]
+    return []
 
 
 class MathCapabilityUnavailable(RuntimeError):

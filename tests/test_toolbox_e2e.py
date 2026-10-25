@@ -287,10 +287,12 @@ class TestMathClientE2E:
         try:
             result = await math_client.recognize(file_path=tmp)
             assert result["status"] == "succeeded"
-            doc = result.get("document", {})
-            assert doc.get("formula_count", 0) >= 0
-            if doc["formula_count"] > 0:
-                assert doc["formulas"][0].get("latex")
+            # The document shape depends on the provider (artifact/latex@1 or
+            # a docling formula list); the core reads both the same way.
+            from backend.tools.toolbox_math_tools import recognized_formulas
+
+            for formula in recognized_formulas(result.get("document")):
+                assert formula.get("latex")
         finally:
             tmp.unlink(missing_ok=True)
 
