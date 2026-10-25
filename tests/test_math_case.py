@@ -1,0 +1,173 @@
+"""Scorecard of the whole-document math case (scripts/bench/math_case.py).
+
+The case files are synthetic and written per test, so the suite does not need
+the acessilia-dataset clone; tests/test_math_case_e2e.py runs the real one.
+"""
+
+import json
+
+import pytest
+
+from scripts.bench import math_case
+
+ROWS = [
+    {"id": "p1-d01", "page": "1", "kind": "display", "expected_latex": r"s(t) = \frac{1}{2} a t^2"},
+    {"id": "p1-d02", "page": "1", "kind": "display", "expected_latex": r"v(t) = v_0 + a t \tag{1}"},
+    {"id": "p2-d01", "page": "2", "kind": "display", "expected_latex": r"\lim_{h \to 0} f(h) = 12"},
+    {"id": "p1-i01", "page": "1", "kind": "inline", "expected_latex": r"s_0 \in \mathbb{R}"},
+    {"id": "p1-i02", "page": "1", "kind": "inline", "expected_latex": r"t^3"},
+    {"id": "p2-t01", "page": "2", "kind": "table-header", "expected_latex": r"h \neq 0"},
+    {"id": "p2-t02", "page": "2", "kind": "table-cell", "expected_latex": "-0{,}0833"},
+]
+
+EXPECTATIONS = {
+    "text": {
+        "must_match": [{"id": "not-equal", "pattern": "≠"}],
+        "must_not_match": [
+            {"id": "orphan-negation", "pattern": "(?<![=<>∈])\\u0338"},
+            {"id": "page-number-line", "pattern": "(?m)^\\s*[1-5]\\s*$"},
+        ],
+    },
+    "structure": {
+        "headings": [{"text": "Calculus", "level": 1}, {"text": "Task", "level": 2}],
+        "auto_numbered_headings": False,
+        "ordered_lists": [{"page": 2, "items": 2, "first_item_starts": "First"}],
+        "tables": [{"page": 2, "rows": 2, "columns": 2}],
+        "equation_numbers": [{"formula": "p1-d02", "number": "1"}],
+    },
+    "speech": {"formulas": [{"formula": "p2-d01", "any_of": ["limit"]}]},
+}
+
+
+def _block(id_, type_, page, **fields):
+    return {"id": id_, "type": type_, "source_location": {"page_number": page}, **fields}
+
+
+def _document(blocks, sections=None):
+    return {"sections": sections or [{"id": "s1", "title": "Calculus", "level": 1, "blocks": blocks}]}
+
+
+def _table(page, cells):
+    return _block("t", "table", page, table_ast={
+        "header": [{"cells": [{"text": cells[0][0]}, {"text": cells[0][1]}]}],
+        "body": [{"cells": [{"text": c} for c in row]} for row in cells[1:]],
+    })
+
+
+GOOD = _document([], sections=[
+    {"id": "s1", "title": "Calculus", "level": 1, "blocks": [
+        _block("m1", "math", 1, text=r"$$s(t) = \frac{1}{2} a t^2$$", alt_text="s of t",
+               metadata={"mathml": "<math/>", "formula_recognition": {"method": "math.recognize"}}),
+        # The equation number comes as metadata instead of a \tag.
+        _block("m2", "math", 1, text=r"v(t) = v_0 + a t", metadata={"equation_number": "1"}),
+        _block("p1", "paragraph", 1, text=r"where $s_0 \in \mathbb{R}$ and $t^3$ hold"),
+    ]},
+    {"id": "s2", "title": "Task", "level": 2, "blocks": [
+        _block("l1", "list", 2, ordered=True, items=["First item"]),
+        _block("l2", "list", 2, ordered=True, items=["Second item"]),
+        _table(2, [[r"$h \neq 0$", "value"], ["1", "−0,0833 (approx.)"]]),
+        _block("m3", "math", 2, text=r"\lim_{h \to 0} f(h) = 12", alt_text="the limit of f"),
+    ]},
+])
+
+# What a text-layer extraction delivers today.
+FLAT = _document([
+    _block("m1", "math", 1, text="s(t) = 1\n2\nat2"),
+    _block("p1", "paragraph", 1, text="where s 0 ∈ R and t 3 hold"),
+    _block("l1", "list", 2, ordered=False, items=["First item"]),
+    _block("l2", "list", 2, ordered=False, items=["Second item"]),
+    _table(2, [["h = 0", "value"], ["1", "0 , 0833"]]),
+])
+
+
+def test_a_faithful_document_passes_every_check():
+    card = math_case.score_case(
+        ROWS, EXPECTATIONS, GOOD, txt="h ≠ 0\nbody\n", pdf_text="Calculus\nTask\nh ≠ 0\n"
+    )
+    summary = card.summary()
+
+    assert summary["display_found"] == 100.0
+    # p1-d02 keeps its subscript but not the \tag: (100 + 50 + 100) / 3.
+    assert summary["display_structure_recall"] == pytest.approx(83.3)
+    assert summary["display_with_mathml"] == pytest.approx(33.3)
+    assert summary["display_methods"] == {"math.recognize": 1, "extractor": 2}
+    assert summary["inline_as_math"] == 100.0
+    assert summary["table_math_cells"] == 100.0
+    assert [c for c in (*card.text, *card.structure, *card.speech) if not c.passed] == []
+
+
+def test_a_flattened_document_scores_the_losses():
+    card = math_case.score_case(ROWS, EXPECTATIONS, FLAT, txt="h = 0\n̸\n2\n")
+    summary = card.summary()
+    failed = {c.id for c in (*card.text, *card.structure, *card.speech) if not c.passed}
+
+    flat = card.display[0]
+    assert flat["matched"] == "m1"
+    assert flat["structure_recall"] == 0.0
+    # Bag-of-token CDM still credits the letters; the structure recall does not.
+    assert flat["cdm"] > 90
+    assert summary["display_found"] == pytest.approx(33.3)
+    assert summary["inline_as_math"] == 0.0
+    assert summary["table_math_cells"] == 0.0
+    assert failed == {
+        "txt:not-equal", "txt:orphan-negation", "txt:page-number-line",
+        "heading:Task", "ordered-list:p2", "equation-number:p1-d02", "speech:p2-d01",
+    }
+
+
+def test_formulas_match_on_their_own_page_only():
+    document = _document([_block("m", "math", 2, text=r"s(t) = \frac{1}{2} a t^2")])
+    card = math_case.score_case(ROWS[:1], {}, document, txt="")
+
+    assert card.display[0]["matched"] is None
+    assert card.display[0]["cdm"] == 0.0
+
+
+def test_one_block_is_never_matched_to_two_formulas():
+    rows = [dict(ROWS[0], id="a"), dict(ROWS[0], id="b")]
+    document = _document([_block("m", "math", 1, text=r"s(t) = \frac{1}{2} a t^2")])
+    card = math_case.score_case(rows, {}, document, txt="")
+
+    assert sorted(d["matched"] or "" for d in card.display) == ["", "m"]
+
+
+def test_auto_numbered_headings_are_reported_from_the_pdf_text():
+    card = math_case.score_case([], EXPECTATIONS, GOOD, txt="", pdf_text="1 Calculus\n1.1 Task\n")
+
+    check = next(c for c in card.structure if c.id == "headings:not-auto-numbered")
+    assert not check.passed
+    assert "Calculus" in check.detail
+
+
+def test_structure_recall_ignores_formulas_without_structure():
+    assert math_case.structure_recall("x + 1", "x + 1") is None
+    assert math_case.structure_recall(r"x^{2}", r"x^2 + y_1") == 50.0
+
+
+def test_load_case_names_the_missing_clone(tmp_path):
+    with pytest.raises(FileNotFoundError, match="acessilia-dataset"):
+        math_case.load_case(tmp_path)
+
+
+def test_score_command_writes_the_scorecard(tmp_path, capsys):
+    case = tmp_path / "dataset" / "input" / "math-reference"
+    case.mkdir(parents=True)
+    with open(case / "ground_truth.csv", "w", encoding="utf-8", newline="") as fh:
+        fh.write("id,manifest_id,page,kind,expected_latex,context,notes\n")
+        fh.write('p1-d01,036,1,display,"x^2",,\n')
+    (case / "expectations.json").write_text(json.dumps({"text": {}}), encoding="utf-8")
+    canonical = tmp_path / "doc.json"
+    canonical.write_text(json.dumps(_document([_block("m", "math", 1, text="x^2")])), encoding="utf-8")
+    txt = tmp_path / "doc.txt"
+    txt.write_text("x", encoding="utf-8")
+
+    code = math_case.main([
+        "--dataset", str(tmp_path / "dataset"), "score",
+        "--canonical", str(canonical), "--txt", str(txt), "--out", str(tmp_path / "out"),
+    ])
+
+    assert code == 0
+    assert "| Display CDM (mean) | 100.0 |" in capsys.readouterr().out
+    report = json.loads((tmp_path / "out" / "scorecard.json").read_text(encoding="utf-8"))
+    assert report["summary"]["display_formulas"] == 1
+    assert (tmp_path / "out" / "scorecard.md").exists()

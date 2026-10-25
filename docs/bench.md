@@ -101,6 +101,41 @@ Write `scripts/bench/datasets/<name>.py` with a class that implements
 Predictions and scoring are shared: when the dataset's ground truth is not
 markdown, convert it to markdown in `download` so that `score` applies as is.
 
+## Math reference case
+
+`python -m scripts.bench.math_case` scores one whole document instead of a
+page dataset: `velocidade-instantanea.pdf` (id `036` in
+[acessilia-dataset](https://github.com/A11yDevs/acessilia-dataset), under
+`input/math-reference/`), a five-page pdfTeX calculus handout with inline and
+display math, a numbered equation and math in table headers. Its ground truth
+lists the expected LaTeX of every formula (`ground_truth.csv`) and the text,
+structure and speech checks formulas do not cover (`expectations.json`).
+
+```bash
+# Process the PDF through the core, then score it (Toolbox and model provider needed)
+uv run python -m scripts.bench.math_case run --out var/bench/math-reference/<run>
+
+# Score outputs you already have: the canonical document JSON and the TXT,
+# optionally the PDF/UA (needs pdftotext)
+uv run python -m scripts.bench.math_case score --canonical doc.json --txt doc.txt --pdf-ua doc.pdf_ua.pdf
+```
+
+The dataset clone is read from `tests/dataset` or `ACESSILIA_TEST_DATASET_DIR`.
+The scorecard (`scorecard.md`, `scorecard.json`) reports:
+
+- display formulas, paired with the ground truth on the same page: CDM, the
+  recall of structural tokens (`\frac`, `^`, `_`, `\lim`, `\mathbb`...), MathML,
+  spoken form and where the LaTeX came from (`extractor`, `math.recognize`,
+  `vision`). The structure recall is the number to watch: a formula flattened
+  from the PDF text layer keeps its letters, so its bag-of-token CDM stays
+  high, but it loses every structural token;
+- inline expressions and table headers/cells delivered as math;
+- the text, structure and speech checks, with each failure listed.
+
+A PR that changes how math, text repair or structure reach the outputs pastes
+the scorecard before and after in its description. `tests/test_math_case_e2e.py`
+(`-m e2e`) runs the case and locks what already passes.
+
 ## Dr.DocBench experiment snapshot
 
 The shared-task experiment code (fusion variants, Slurm jobs, frozen replay)
