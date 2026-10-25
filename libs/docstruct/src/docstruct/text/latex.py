@@ -11,6 +11,8 @@ expression untouched); ``normalize_latex`` rewrites symbols and spacing.
 from __future__ import annotations
 
 import re
+import unicodedata
+from collections import Counter
 
 # Enclosing delimiter patterns for stripping
 _DISPLAY_DELIM_RE = re.compile(r"^\s*\$\$(.*)\$\$\s*$", re.DOTALL)
@@ -253,3 +255,73 @@ def wrap_latex(expr: str | None, *, display: bool = True) -> str:
         return trimmed
     inner = strip_latex_delimiters(trimmed)
     return f"${inner}$"
+
+
+# ── Text-layer formulas ─────────────────────────────────────────────
+
+#: Markup that only LaTeX has: a command or a sub/superscript. Text extracted
+#: from a PDF's text layer has none of it, even when the page shows a fraction
+#: or an exponent. Braces are not markup here: set notation puts them in the
+#: text layer too (``{h ∈ R : h ≥ −2}``).
+_LATEX_MARKUP_RE = re.compile(r"\\[A-Za-z]+|[\^_]")
+
+#: LaTeX commands whose rendering is visible text, as the text layer shows it.
+_COMMAND_GLYPHS: dict[str, str] = {
+    **{command: char for char, command in _UNICODE_MATH_MAP.items()},
+    r"\neq": "≠", r"\leq": "≤", r"\geq": "≥", r"\in": "∈", r"\notin": "∉",
+    r"\cup": "∪", r"\cap": "∩", r"\to": "→", r"\rightarrow": "→", r"\ldots": "…",
+    r"\cdots": "⋯", r"\varepsilon": "ε", r"\varphi": "φ",
+    **{f"\\{name}": name for name in (
+        "lim", "sin", "cos", "tan", "log", "ln", "exp", "max", "min", "sup", "inf", "det",
+    )},
+}
+_COMMAND_RE = re.compile(r"\\[A-Za-z]+")
+
+#: Symbols that a reader hears, besides letters and digits; spacing,
+#: grouping and punctuation are left out because the two sides lay them out
+#: differently.
+_VISIBLE_SYMBOLS = frozenset("=+-<>≠≤≥∈∉∪∩→∞×÷±·∑∏∫∂√…⋯")
+
+
+def has_latex_markup(text: str | None) -> bool:
+    """Whether ``text`` is LaTeX, not just math characters.
+
+    It is when it carries math delimiters (``$x=1$``: whoever wrote them wrote
+    LaTeX) or LaTeX markup. A formula an extractor took from the PDF text layer
+    (``s(t) = s0 + v0t + 1 2 at2``) has neither, while even a short LaTeX
+    expression usually has markup (``t^3``). An undelimited expression with no
+    structure (``x = 1``) also reads as text; recognizing it again costs a
+    call but loses nothing.
+    """
+    text = " ".join((text or "").split())
+    bare = bare_latex(text)
+    return bool(bare) and (bare != text or bool(_LATEX_MARKUP_RE.search(bare)))
+
+
+def _visible_symbols(text: str, *, latex: bool) -> list[str]:
+    if latex:
+        text = _COMMAND_RE.sub(lambda m: f" {_COMMAND_GLYPHS.get(m.group(0), '')} ", text)
+    # NFC composes a detached long solidus with "=" into "≠".
+    text = unicodedata.normalize("NFC", text).replace("\u2212", "-")
+    return [ch for ch in text if ch.isalnum() or ch in _VISIBLE_SYMBOLS]
+
+
+def latex_text_agreement(latex: str, text: str) -> float | None:
+    """F1 (0-1) between the visible symbols of ``latex`` and of ``text``.
+
+    Compares what a reader of each would see: letters, digits and math
+    symbols, with LaTeX commands rendered as their glyphs (``\\alpha`` → α,
+    ``\\lim`` → lim) and structure (``\\frac``, ``^``, braces) ignored, because
+    the text layer has no structure to compare. A recognition that reads the
+    same formula as the text layer scores near 1 even when it restores
+    fractions and exponents; one that invents or drops terms scores lower.
+    A change of a single symbol barely moves it, so it does not guard against
+    a recognizer "correcting" one digit of the printed formula. ``None`` when
+    neither side has a visible symbol.
+    """
+    left = Counter(_visible_symbols(bare_latex(latex), latex=True))
+    right = Counter(_visible_symbols(text, latex=False))
+    total = sum(left.values()) + sum(right.values())
+    if not total:
+        return None
+    return 2 * sum((left & right).values()) / total

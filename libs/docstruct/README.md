@@ -36,7 +36,7 @@ Pure document-structure processing core for Acessilia.
 | `docstruct.fusion.oracle` | `oracle_page`, `best_score`, `summarize` |
 | `docstruct.fusion.hf_end` | `move_hf_to_end`, `move_body_hf_to_tail` |
 | `docstruct.fusion.table_specialist` | `extract_table`, `norm_table`, `select_table`, `select_greedy` |
-| `docstruct.text.latex` | `bare_latex`, `ensure_math_delimiters`, `strip_latex_delimiters`, `normalize_latex`, `wrap_latex` — canonical LaTeX formula normalization and standardization |
+| `docstruct.text.latex` | `bare_latex`, `ensure_math_delimiters`, `has_latex_markup`, `latex_text_agreement`, `strip_latex_delimiters`, `normalize_latex`, `wrap_latex` — canonical LaTeX formula normalization and standardization |
 | `docstruct.text.normalize` | `norm` — deterministic text cleanups |
 | `docstruct.text.norm_fix` | `norm_fix` — post-normalization repairs |
 | `docstruct.adapters.mineru` | `clean_mineru_text`, `format_mineru_block_text`, `extract_mineru_blocks` — MinerU `middle_json` parsing, spacing, de-hyphenation, and formula/table formatting |
@@ -62,6 +62,8 @@ Canonical routines for standardizing and cleaning mathematical formulas:
 - `wrap_latex(text, display=True)`: Wraps raw LaTeX expressions in standard delimiters (`$$...$$` by default, `$...$` with `display=False`).
 - `bare_latex(text)`: Conservative normalization: strips one pair of outer delimiters and collapses whitespace, without rewriting the expression.
 - `ensure_math_delimiters(text)`: Wraps text in `$...$` unless it is already delimited by `$` or `\[...\]`.
+- `has_latex_markup(text)`: Whether a formula's text is LaTeX (math delimiters, a command, `^` or `_`) or only math characters, as a PDF text layer gives them (`s(t) = s0 + v0t + 1 2 at2`). Braces alone are not markup: set notation has them in the text layer too.
+- `latex_text_agreement(latex, text)`: F1 (0–1) between the letters, digits and math symbols of a LaTeX formula (commands rendered as their glyphs, `\alpha` → α) and of text-layer text, ignoring structure. It tells a recognition of the same formula from a misread; a single changed symbol barely moves it.
 
 ### MinerU Adapter (`docstruct.adapters.mineru`)
 

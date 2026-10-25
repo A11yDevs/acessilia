@@ -21,6 +21,7 @@ from docstruct.tables.ast import (
     linearize_table_for_text,
     raw_rows_from_table_ast as _rows_from_table_ast,
 )
+from docstruct.text.latex import has_latex_markup, latex_text_agreement
 from docstruct.text.norm_fix import norm_fix
 from docstruct.text.unicode_repair import (
     Detection,
@@ -2983,13 +2984,26 @@ async def _enrich_formula_latex(
     mode: str,
     status_callback: Callable[[str], Coroutine[Any, Any, None]] | None = None,
 ) -> None:
-    """Fill formulas the extractor left without LaTeX.
+    """Give LaTeX to formulas the extractor delivered without it.
+
+    That covers formulas with no text and, in born-digital PDFs, formulas
+    whose text is the PDF text layer (``s(t) = s0 + v0t + 1 2 at2``): it
+    keeps the symbols but not the fractions, exponents and limits, so MathML
+    and speech built from it lose the structure. ``has_latex_markup`` tells
+    the two apart.
 
     ``math.recognize`` (PP-FormulaNet) runs first; the vision model is the
     fallback, so a Toolbox outage degrades to the behavior the pipeline had
     before instead of leaving the formula without content. Recognition runs
     before planning, like the picture descriptions, so the ``mathml`` and
     ``latex-verbalizer`` methods then work on real LaTeX.
+
+    When the formula has text-layer text, a recognition must agree with it
+    (``latex_text_agreement`` ≥ ``FORMULA_TEXT_AGREEMENT_MIN``): PP-FormulaNet
+    reports no confidence, and the text layer is the only independent reading
+    of the same formula. A recognition below it is a misread; the next one is
+    tried, and when none agrees the formula keeps its text-layer version, which
+    is flat but faithful.
 
     Crops are independent, so they run concurrently, bounded by
     ``VISION_CONCURRENCY`` for the same reason as the picture descriptions:
@@ -3008,7 +3022,7 @@ async def _enrich_formula_latex(
     formulas = [
         element
         for element in manifest.elements
-        if element.type == "formula" and not normalize_latex(element.text or "")
+        if element.type == "formula" and not has_latex_markup(element.text)
     ]
     if not formulas:
         return
@@ -3041,10 +3055,12 @@ async def _enrich_formula_latex(
             )
         except MathCapabilityUnavailable as exc:
             math_available = False
+            # The full message names the provider and its HTTP status; the
+            # class alone ("ToolboxError") hides a failing sidecar.
             logger.warning(
                 "math.recognize unavailable during formula enrichment ({}); "
                 "falling back to the vision model",
-                exc.reason,
+                exc,
             )
             return []
 
@@ -3089,9 +3105,25 @@ async def _enrich_formula_latex(
             if not image_bytes:
                 return False
 
+            text_layer = normalize_latex(element.text or "")
+            rejected: dict[str, float] = {}
+            agreement: float | None = None
+
+            def accept(method: str, latex: str) -> str:
+                """``latex`` when it agrees with the text layer, else ``""``."""
+                nonlocal agreement
+                if not latex or not text_layer:
+                    return latex
+                score = latex_text_agreement(latex, text_layer)
+                if score is not None and score < settings.formula_text_agreement_min:
+                    rejected[method] = round(score, 3)
+                    return ""
+                agreement = None if score is None else round(score, 3)
+                return latex
+
             best = _best_formula_candidate(await recognize(image_bytes))
             method = "math.recognize"
-            latex = str(best["latex"]) if best is not None else ""
+            latex = accept(method, str(best["latex"]) if best is not None else "")
             confidence = best.get("confidence") if best is not None else None
 
             if not latex:
@@ -3105,16 +3137,29 @@ async def _enrich_formula_latex(
                     full_budget=True,
                 )
                 if output is not None and output.kind == "formula":
-                    latex = normalize_latex(output.formula_latex or "")
+                    latex = accept(method, normalize_latex(output.formula_latex or ""))
                     confidence = output.confidence
 
+        if rejected:
+            logger.info(
+                "Formula {} (page {}): recognition disagrees with the text layer {}",
+                element.id, page_number, rejected,
+            )
         if not latex:
+            if rejected:
+                element.metadata["formula_recognition"] = {
+                    "method": "text-layer",
+                    "rejected": rejected,
+                }
             return False
+        recognition: dict[str, Any] = {"method": method, "confidence": confidence}
+        if text_layer:
+            element.metadata["formula_text_layer"] = text_layer
+            recognition["text_agreement"] = agreement
+        if rejected:
+            recognition["rejected"] = rejected
         element.text = latex
-        element.metadata["formula_recognition"] = {
-            "method": method,
-            "confidence": confidence,
-        }
+        element.metadata["formula_recognition"] = recognition
         return True
 
     # The fold above touches only its own element and runs without awaits, so

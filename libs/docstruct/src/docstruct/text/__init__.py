@@ -6,6 +6,8 @@ from docstruct.text.code_reflow import normalize_code_text
 from docstruct.text.latex import (
     bare_latex,
     ensure_math_delimiters,
+    has_latex_markup,
+    latex_text_agreement,
     normalize_latex,
     strip_latex_delimiters,
     wrap_latex,
@@ -30,6 +32,8 @@ __all__ = [
     "classify_text_block",
     "detect_legacy_unicode",
     "ensure_math_delimiters",
+    "has_latex_markup",
+    "latex_text_agreement",
     "merge_broken_paragraphs",
     "normalize_code_text",
     "normalize_latex",

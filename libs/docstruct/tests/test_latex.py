@@ -1,7 +1,13 @@
 """Tests for canonical LaTeX normalization in docstruct.text.latex."""
 from __future__ import annotations
 
-from docstruct.text.latex import normalize_latex, strip_latex_delimiters, wrap_latex
+from docstruct.text.latex import (
+    has_latex_markup,
+    latex_text_agreement,
+    normalize_latex,
+    strip_latex_delimiters,
+    wrap_latex,
+)
 
 
 class TestStripLatexDelimiters:
@@ -128,3 +134,46 @@ class TestConservativeHelpers:
         assert ensure_math_delimiters(r"\[x\]") == r"\[x\]"
         assert ensure_math_delimiters(r"\(x\)") == r"$\(x\)$"
         assert ensure_math_delimiters("   ") == ""
+
+
+class TestHasLatexMarkup:
+    def test_text_layer_formulas_are_not_latex(self):
+        assert not has_latex_markup("s(t) = s0 + v0t + 1\n2\nat2, t > 0,")
+        assert not has_latex_markup("∀y(xCy → ∃z(yCz ∧ z ∈ αi))")
+
+    def test_set_braces_from_the_text_layer_are_not_markup(self):
+        assert not has_latex_markup("Dom(vm2) = [−2, 0) ∪ (0, +∞) = {h ∈ R : h ≥ −2}")
+
+    def test_commands_and_scripts_are_latex(self):
+        assert has_latex_markup(r"\frac{1}{2}")
+        assert has_latex_markup("t^3")
+        assert has_latex_markup("s_0")
+
+    def test_delimited_text_is_latex(self):
+        assert has_latex_markup("$x=1$")
+        assert has_latex_markup(r"\(x\)")
+
+    def test_empty_is_not_latex(self):
+        assert not has_latex_markup(None)
+        assert not has_latex_markup("  ")
+        assert not has_latex_markup("$$")
+
+
+class TestLatexTextAgreement:
+    def test_the_same_formula_agrees_despite_its_structure(self):
+        latex = r"s(t) = s_0 + v_0 t + \frac{1}{2} a t^2, \quad t > 0,"
+        assert latex_text_agreement(latex, "s(t) = s0 + v0t + 1\n2\nat2, t > 0,") == 1.0
+
+    def test_commands_count_as_their_glyphs(self):
+        latex = r"\lim_{h \to 0} \alpha \neq \infty"
+        assert latex_text_agreement(latex, "lim h→0 α ≠ ∞") == 1.0
+
+    def test_a_detached_negation_composes_and_minus_signs_match(self):
+        assert latex_text_agreement(r"h \neq -2", "h =\u0338 \u22122") == 1.0
+
+    def test_a_different_formula_disagrees(self):
+        score = latex_text_agreement("x^2 + y^2 = 1", "s(t) = s0 + v0t + 1 2 at2")
+        assert score < 0.5
+
+    def test_nothing_visible_is_not_scored(self):
+        assert latex_text_agreement(r"\quad", "  ") is None

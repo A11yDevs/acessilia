@@ -36,7 +36,7 @@ Núcleo puro de processamento estrutural de documentos do Acessilia.
 | `docstruct.fusion.oracle` | `oracle_page`, `best_score`, `summarize` |
 | `docstruct.fusion.hf_end` | `move_hf_to_end`, `move_body_hf_to_tail` |
 | `docstruct.fusion.table_specialist` | `extract_table`, `norm_table`, `select_table`, `select_greedy` |
-| `docstruct.text.latex` | `bare_latex`, `ensure_math_delimiters`, `strip_latex_delimiters`, `normalize_latex`, `wrap_latex` — normalização canônica e padronização de fórmulas LaTeX |
+| `docstruct.text.latex` | `bare_latex`, `ensure_math_delimiters`, `has_latex_markup`, `latex_text_agreement`, `strip_latex_delimiters`, `normalize_latex`, `wrap_latex` — normalização canônica e padronização de fórmulas LaTeX |
 | `docstruct.text.normalize` | `norm` — limpezas determinísticas de texto |
 | `docstruct.text.norm_fix` | `norm_fix` — reparos pós-normalização |
 | `docstruct.adapters.mineru` | `clean_mineru_text`, `format_mineru_block_text`, `extract_mineru_blocks` — parsing de `middle_json` do MinerU, espaçamento, de-hifenização e formatação de fórmulas/tabelas |
@@ -62,6 +62,8 @@ Rotinas canônicas para padronização e higienização de fórmulas matemática
 - `wrap_latex(text, display=True)`: Envolve expressões LaTeX brutas nos delimitadores padrão (`$$...$$` por padrão, `$...$` com `display=False`).
 - `bare_latex(text)`: Normalização conservadora: remove um par de delimitadores externos e colapsa espaços, sem reescrever a expressão.
 - `ensure_math_delimiters(text)`: Envolve o texto em `$...$`, a menos que ele já esteja delimitado por `$` ou `\[...\]`.
+- `has_latex_markup(text)`: Diz se o texto de uma fórmula é LaTeX (delimitadores matemáticos, um comando, `^` ou `_`) ou só caracteres matemáticos, como a camada de texto de um PDF os entrega (`s(t) = s0 + v0t + 1 2 at2`). Chaves sozinhas não contam: a notação de conjunto também as traz na camada de texto.
+- `latex_text_agreement(latex, text)`: F1 (0–1) entre as letras, dígitos e símbolos matemáticos de uma fórmula LaTeX (comandos lidos como seus glifos, `\alpha` → α) e os de um texto da camada de texto, ignorando a estrutura. Distingue um reconhecimento da mesma fórmula de uma leitura errada; a troca de um único símbolo quase não o altera.
 
 ### Adaptador MinerU (`docstruct.adapters.mineru`)
 

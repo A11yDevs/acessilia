@@ -1,5 +1,8 @@
 """Formula crops the extractor left without LaTeX are recognized before planning.
 
+"Without LaTeX" includes text-layer text (``s(t) = s0 + v0t + 1 2 at2``): a
+recognition replaces it only when it agrees with it.
+
 ``math.recognize`` (PP-FormulaNet) runs first and the vision model is the
 fallback, so a Toolbox outage degrades to the previous behavior instead of
 leaving the formula without content.
@@ -429,3 +432,101 @@ def test_a_failed_render_leaves_the_formula_without_a_crop(monkeypatch):
     monkeypatch.setattr(pddl, "_toolbox_render", failed)
 
     assert pddl._formula_recognition_crop(Path("/tmp/doc.pdf"), element) == (None, 1)
+
+
+TEXT_LAYER = "s(t) = s0 + v0t + 1\n2\nat2, t > 0,"
+FAITHFUL = r"s(t) = s_0 + v_0 t + \frac{1}{2} a t^2, \quad t > 0,"
+MISREAD = r"x^2 + y^2 = 1"
+
+
+def _recognizer(monkeypatch, latex):
+    calls = []
+
+    def recognize(image, *, raise_on_unavailable=False):
+        calls.append(image)
+        return [{"latex": latex}]
+
+    monkeypatch.setattr(pddl, "toolbox_recognize_formula", recognize)
+    return calls
+
+
+@pytest.mark.asyncio
+async def test_a_text_layer_formula_is_replaced_by_its_recognition(monkeypatch, cropped):
+    manifest = _formula_manifest(TEXT_LAYER)
+    calls = _recognizer(monkeypatch, FAITHFUL)
+
+    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+
+    element = manifest.elements[0]
+    assert calls == [b"png"]
+    assert element.text == FAITHFUL
+    assert element.metadata["formula_text_layer"] == "s(t) = s0 + v0t + 1 2 at2, t > 0,"
+    assert element.metadata["formula_recognition"] == {
+        "method": "math.recognize",
+        "confidence": None,
+        "text_agreement": 1.0,
+    }
+    assert FakeVision.calls == []
+
+
+@pytest.mark.asyncio
+async def test_a_misread_falls_back_to_vision(monkeypatch, cropped):
+    manifest = _formula_manifest(TEXT_LAYER)
+    _recognizer(monkeypatch, MISREAD)
+    FakeVision.output = VisionOutput(
+        kind="formula", formula_latex=FAITHFUL, language="und", confidence=0.8
+    )
+
+    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+
+    element = manifest.elements[0]
+    recognition = element.metadata["formula_recognition"]
+    assert element.text == FAITHFUL
+    assert recognition["method"] == "vision"
+    assert recognition["text_agreement"] == 1.0
+    assert recognition["rejected"]["math.recognize"] < 0.5
+
+
+@pytest.mark.asyncio
+async def test_without_an_agreeing_recognition_the_text_layer_stays(monkeypatch, cropped):
+    manifest = _formula_manifest(TEXT_LAYER)
+    _recognizer(monkeypatch, MISREAD)
+    FakeVision.output = VisionOutput(
+        kind="formula", formula_latex=r"\int_0^1 f", language="und", confidence=0.8
+    )
+
+    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+
+    element = manifest.elements[0]
+    assert element.text == TEXT_LAYER
+    assert "formula_text_layer" not in element.metadata
+    recognition = element.metadata["formula_recognition"]
+    assert recognition["method"] == "text-layer"
+    assert set(recognition["rejected"]) == {"math.recognize", "vision"}
+
+
+@pytest.mark.asyncio
+async def test_the_agreement_floor_is_configurable(monkeypatch, cropped):
+    from backend.config.settings import settings
+
+    monkeypatch.setattr(settings, "formula_text_agreement_min", 0.0)
+    manifest = _formula_manifest(TEXT_LAYER)
+    _recognizer(monkeypatch, MISREAD)
+
+    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+
+    assert manifest.elements[0].text == MISREAD
+    assert FakeVision.calls == []
+
+
+@pytest.mark.asyncio
+async def test_a_formula_without_text_has_nothing_to_agree_with(monkeypatch, cropped):
+    manifest = _formula_manifest()
+    _recognizer(monkeypatch, MISREAD)
+
+    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+
+    element = manifest.elements[0]
+    assert element.text == MISREAD
+    assert "formula_text_layer" not in element.metadata
+    assert "text_agreement" not in element.metadata["formula_recognition"]
