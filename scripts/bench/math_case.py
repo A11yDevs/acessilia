@@ -362,35 +362,59 @@ def _structure_checks(
 ) -> list[Check]:
     checks = []
 
-    headings: list[tuple[str, int]] = []
+    # (text, level, page); the page is None when the document does not say.
+    headings: list[tuple[str, int, int | None]] = []
 
     def collect(sections: list[Any]) -> None:
         for section in sections:
             if isinstance(section, dict):
-                headings.append((str(section.get("title") or "").strip(), int(section.get("level") or 1)))
+                headings.append((
+                    str(section.get("title") or "").strip(),
+                    int(section.get("level") or 1),
+                    _page(section),
+                ))
                 collect(section.get("children") or [])
 
     collect(document.get("sections") or [])
     headings += [
-        (str(b.get("text") or "").strip(), int(b.get("level") or 1))
+        (str(b.get("text") or "").strip(), int(b.get("level") or 1), _page(b))
         for b in blocks if b.get("type") == "heading"
     ]
     for spec in expectations.get("headings", []):
-        levels = [level for text, level in headings if text == spec["text"]]
-        ok = spec["level"] in levels
+        found = [
+            (level, page) for text, level, page in headings
+            if text == spec["text"] and (page is None or spec.get("page") in (None, page))
+        ]
+        ok = any(level == spec["level"] for level, _ in found)
         checks.append(Check(
             f"heading:{spec['text']}", ok,
-            "" if ok else (f"found at level {levels}" if levels else "not a heading"),
+            "" if ok else (f"found at level {[lv for lv, _ in found]}" if found else "not a heading"),
         ))
 
     if expectations.get("auto_numbered_headings") is False and pdf_text is not None:
         numbered = [
-            text for text, _ in headings
+            text for text, _, _ in headings
             if text and re.search(rf"(?m)^\s*\d+(\.\d+)*\s+{re.escape(text)}\s*$", pdf_text)
         ]
         checks.append(Check(
             "headings:not-auto-numbered", not numbered,
             f"numbered: {numbered}" if numbered else "",
+        ))
+
+    # A lone digit line in the text also comes from flattened fractions and
+    # table values, so page numbers are checked on the blocks: a page number
+    # left in the body is a block of page N whose whole text is N.
+    furniture = expectations.get("page_numbers") or {}
+    if furniture.get("is_furniture"):
+        leaked = sorted({
+            page for b in blocks
+            if (page := _page(b)) in furniture.get("pages", [])
+            and b.get("type") not in {"math", "table"}
+            and str(b.get("text") or "").strip() == str(page)
+        })
+        checks.append(Check(
+            "page-numbers:not-in-body", not leaked,
+            f"pages {leaked}" if leaked else "",
         ))
 
     for spec in expectations.get("ordered_lists", []):

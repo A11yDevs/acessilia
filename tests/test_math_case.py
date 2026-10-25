@@ -25,11 +25,11 @@ EXPECTATIONS = {
         "must_match": [{"id": "not-equal", "pattern": "≠"}],
         "must_not_match": [
             {"id": "orphan-negation", "pattern": "(?<![=<>∈])\\u0338"},
-            {"id": "page-number-line", "pattern": "(?m)^\\s*[1-5]\\s*$"},
         ],
     },
     "structure": {
-        "headings": [{"text": "Calculus", "level": 1}, {"text": "Task", "level": 2}],
+        "headings": [{"page": 1, "text": "Calculus", "level": 1}, {"page": 2, "text": "Task", "level": 2}],
+        "page_numbers": {"pages": [1, 2], "is_furniture": True},
         "auto_numbered_headings": False,
         "ordered_lists": [{"page": 2, "items": 2, "first_item_starts": "First"}],
         "tables": [{"page": 2, "rows": 2, "columns": 2}],
@@ -61,6 +61,8 @@ GOOD = _document([], sections=[
         # The equation number comes as metadata instead of a \tag.
         _block("m2", "math", 1, text=r"v(t) = v_0 + a t", metadata={"equation_number": "1"}),
         _block("p1", "paragraph", 1, text=r"where $s_0 \in \mathbb{R}$ and $t^3$ hold"),
+        # A lone digit that is not its page's number: a flattened numerator.
+        _block("n1", "paragraph", 1, text="2"),
     ]},
     {"id": "s2", "title": "Task", "level": 2, "blocks": [
         _block("l1", "list", 2, ordered=True, items=["First item"]),
@@ -77,6 +79,7 @@ FLAT = _document([
     _block("l1", "list", 2, ordered=False, items=["First item"]),
     _block("l2", "list", 2, ordered=False, items=["Second item"]),
     _table(2, [["h = 0", "value"], ["1", "0 , 0833"]]),
+    _block("n2", "paragraph", 2, text="2"),
 ])
 
 
@@ -110,7 +113,7 @@ def test_a_flattened_document_scores_the_losses():
     assert summary["inline_as_math"] == 0.0
     assert summary["table_math_cells"] == 0.0
     assert failed == {
-        "txt:not-equal", "txt:orphan-negation", "txt:page-number-line",
+        "txt:not-equal", "txt:orphan-negation", "page-numbers:not-in-body",
         "heading:Task", "ordered-list:p2", "equation-number:p1-d02", "speech:p2-d01",
     }
 
@@ -129,6 +132,15 @@ def test_one_block_is_never_matched_to_two_formulas():
     card = math_case.score_case(rows, {}, document, txt="")
 
     assert sorted(d["matched"] or "" for d in card.display) == ["", "m"]
+
+
+def test_a_heading_on_another_page_does_not_count():
+    document = _document([_block("h", "heading", 3, text="Task", level=2)], sections=[])
+    card = math_case.score_case([], EXPECTATIONS, document, txt="")
+
+    check = next(c for c in card.structure if c.id == "heading:Task")
+    assert not check.passed
+    assert check.detail == "not a heading"
 
 
 def test_auto_numbered_headings_are_reported_from_the_pdf_text():
