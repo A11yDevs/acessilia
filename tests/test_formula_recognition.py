@@ -252,8 +252,8 @@ async def test_a_vision_description_does_not_fill_the_formula(monkeypatch, cropp
     assert "formula_recognition" not in manifest.elements[0].metadata
 
 
-def test_best_candidate_prefers_the_highest_confidence():
-    best = pddl._best_formula_candidate(
+def test_candidates_are_normalized_and_ranked_by_confidence():
+    ranked = pddl._ranked_formula_candidates(
         [
             {"latex": "$a$", "confidence": 0.4},
             {"latex": "$$b$$", "confidence": 0.9},
@@ -261,10 +261,23 @@ def test_best_candidate_prefers_the_highest_confidence():
         ]
     )
 
-    assert best is not None
-    assert best["latex"] == "b"
-    assert pddl._best_formula_candidate([]) is None
-    assert pddl._best_formula_candidate([{"latex": ""}]) is None
+    assert [c["latex"] for c in ranked] == ["b", "a"]
+    assert pddl._ranked_formula_candidates([]) == []
+    assert pddl._ranked_formula_candidates([{"latex": ""}]) == []
+
+
+def test_a_confidence_that_is_not_a_finite_number_ranks_as_none():
+    ranked = pddl._ranked_formula_candidates(
+        [
+            {"latex": "nan", "confidence": float("nan")},
+            {"latex": "inf", "confidence": float("inf")},
+            {"latex": "bool", "confidence": True},
+            {"latex": "real", "confidence": 0.2},
+        ]
+    )
+
+    assert [c["latex"] for c in ranked] == ["real", "nan", "inf", "bool"]
+    assert [c["confidence"] for c in ranked] == [0.2, None, None, None]
 
 
 @pytest.mark.asyncio
@@ -560,6 +573,64 @@ async def test_a_recognition_without_evidence_is_refused(monkeypatch, cropped):
         "method": "text-layer",
         "rejected": {"math.recognize": None},
     }
+
+
+def _recognizer_answers(monkeypatch, candidates):
+    calls = []
+
+    def recognize(image, *, raise_on_unavailable=False):
+        calls.append(image)
+        return candidates
+
+    monkeypatch.setattr(pddl, "toolbox_recognize_formula", recognize)
+    return calls
+
+
+@pytest.mark.asyncio
+async def test_a_lower_ranked_candidate_that_agrees_is_used(monkeypatch, cropped):
+    """The gate tries every candidate before paying for vision (#269)."""
+    manifest = _formula_manifest(TEXT_LAYER)
+    _recognizer_answers(monkeypatch, [
+        {"latex": MISREAD, "confidence": 0.9},
+        {"latex": FAITHFUL, "confidence": 0.6},
+    ])
+
+    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+
+    element = manifest.elements[0]
+    recognition = element.metadata["formula_recognition"]
+    assert element.text == FAITHFUL
+    assert recognition["method"] == "math.recognize"
+    assert recognition["rank"] == 2
+    assert recognition["confidence"] == 0.6
+    assert set(recognition["rejected"]) == {"math.recognize"}
+    assert FakeVision.calls == []
+
+
+@pytest.mark.asyncio
+async def test_vision_runs_only_when_no_candidate_agrees(monkeypatch, cropped):
+    manifest = _formula_manifest(TEXT_LAYER)
+    _recognizer_answers(monkeypatch, [
+        {"latex": MISREAD, "confidence": 0.9},
+        {"latex": r"\int_0^1 f", "confidence": 0.5},
+    ])
+    FakeVision.output = VisionOutput(
+        kind="formula", formula_latex=FAITHFUL, language="und", confidence=0.8
+    )
+
+    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+
+    recognition = manifest.elements[0].metadata["formula_recognition"]
+    assert recognition["method"] == "vision"
+    assert set(recognition["rejected"]) == {"math.recognize", "math.recognize#2"}
+    assert len(FakeVision.calls) == 1
+
+
+def test_candidates_rank_by_confidence_and_keep_ties_in_order():
+    ranked = pddl._ranked_formula_candidates([
+        {"latex": "a"}, {"latex": "b", "confidence": 0.7}, {"latex": " "}, {"latex": "c"},
+    ])
+    assert [c["latex"] for c in ranked] == ["b", "a", "c"]
 
 
 @pytest.mark.asyncio
