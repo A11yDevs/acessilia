@@ -581,6 +581,7 @@ async def test_bare_scripts_in_the_text_layer_are_recognized(monkeypatch, croppe
 
 @pytest.mark.asyncio
 async def test_latex_with_grouped_scripts_is_left_alone(monkeypatch, cropped):
+    """Grouped scripts are markup: the formula keeps its LaTeX without a call (#268)."""
     manifest = _formula_manifest("x^{2} + y_{1}")
     calls = _recognizer(monkeypatch, "anything")
 
