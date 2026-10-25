@@ -1,6 +1,7 @@
 import hashlib
 import json
 import time
+from uuid import uuid4
 from pathlib import Path
 from typing import Any
 
@@ -137,22 +138,31 @@ async def set_cache_bytes(content: bytes, payload: Any, extra: str = "") -> None
 async def _write_cached(key: str, payload: Any) -> None:
     _ensure_cache_dir()
     cp = _cache_path(key)
-    tmp = Path(str(cp) + ".tmp")
+    tmp = CACHE_DIR / f".cache-{uuid4().hex}.tmp"
+    temporary_created = False
     try:
         data = {"timestamp": time.time(), "payload": payload}
         if isinstance(payload, str):
             data["text"] = payload
-        async with aiofiles.open(str(tmp), "w", encoding="utf-8") as f:
+        async with aiofiles.open(str(tmp), "x", encoding="utf-8") as f:
+            temporary_created = True
             await f.write(json.dumps(data, ensure_ascii=False))
-        # The rename makes the write atomic for concurrent readers: they see
-        # either the previous complete file or this one, never a half-written
-        # JSON that a parallel reader would parse-fail and delete. A process
-        # killed mid-write leaves only the temporary file behind, which the
-        # periodic cache sweep removes by age.
+        # Each writer owns a separate temporary file in the same directory.
+        # Replacing the entry publishes one complete JSON even when another
+        # writer is saving the same key. A process killed mid-write leaves
+        # only its temporary file, which the periodic sweep removes by age.
         await aiofiles.os.replace(str(tmp), str(cp))
         logger.debug(t(LOG_CACHE_DEBUG_SET).format(key=key))
     except Exception as e:
         logger.warning(t(LOG_CACHE_SAVE_FAILED).format(error=e))
+    finally:
+        if temporary_created:
+            try:
+                await aiofiles.os.remove(str(tmp))
+            except FileNotFoundError:
+                pass
+            except OSError as e:
+                logger.warning(t(LOG_CACHE_SAVE_FAILED).format(error=e))
 
 
 async def clear_cache() -> int:

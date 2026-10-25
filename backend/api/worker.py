@@ -62,6 +62,7 @@ from backend.services.email_service import (
 )
 from backend.services.history_service import finalizar_conversao, registrar_conversao
 from backend.tools.logger import logger
+from backend.tools.filenames import output_stem
 
 queued_jobs: dict[str, dict[str, Any]] = {}
 
@@ -310,7 +311,7 @@ class JobExecutor:
 
             state_manager.atualizar(task_id, status="processing")
 
-            base = Path(job.filename).stem
+            base = output_stem(job.filename)
             out_dir = job.output_dir or (settings.data_dir / "output" / task_id)
             out_dir.mkdir(parents=True, exist_ok=True)
             completed_formats: list[str] = []
@@ -637,7 +638,10 @@ async def recover_pending_jobs() -> None:
             await finalizar_conversao(task_id, status="error", erro=error)
             email = record["request"].get("email")
             if email:
-                await send_failure_email(email, record["request"].get("filename", ""), error)
+                try:
+                    await send_failure_email(email, record["request"].get("filename", ""), error)
+                except Exception:
+                    logger.warning("Failure notification could not be sent for interrupted job {}", task_id)
             continue
         if unified_queue.get_position(task_id):
             continue

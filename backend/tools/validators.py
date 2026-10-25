@@ -1,6 +1,8 @@
 """Upload validation helpers plus their localized user-facing reason messages."""
 
 from pathlib import Path
+from email.headerregistry import Address
+from email.errors import HeaderParseError
 
 from backend.i18n import t
 from backend.config.settings import settings
@@ -11,6 +13,17 @@ MSG_UNSUPPORTED_FORMAT: str = (
 )
 #: Canonical English msgid template for the oversized-file error; {limit} is substituted by callers after lookup.
 MSG_FILE_TOO_LARGE: str = "File too large. Limit: {limit} MB."
+
+
+def is_email_address_allowed(address: str) -> bool:
+    """Accept one mailbox address without display names or header controls."""
+    if any(character in address for character in "\r\n\x00"):
+        return False
+    try:
+        mailbox = Address(addr_spec=address)
+    except (ValueError, HeaderParseError):
+        return False
+    return bool(mailbox.username and mailbox.domain)
 
 
 def is_extension_allowed(filename: str) -> bool:

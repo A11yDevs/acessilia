@@ -44,23 +44,23 @@ async def send_email_notification(
         logger.warning(t(LOG_SMTP_NOT_CONFIGURED).format(to_email=to_email))
         return False
 
-    message = EmailMessage()
-    message["From"] = f"{settings.smtp_name} <{settings.smtp_from}>"
-    message["To"] = to_email
-    message["Subject"] = subject
-    message.set_content(body)
-
-    if attachment_path and attachment_path.exists():
-        with open(attachment_path, "rb") as f:
-            file_data = f.read()
-            message.add_attachment(
-                file_data,
-                maintype="application",
-                subtype="zip",
-                filename=attachment_path.name,
-            )
-
     try:
+        message = EmailMessage()
+        message["From"] = f"{settings.smtp_name} <{settings.smtp_from}>"
+        message["To"] = to_email
+        message["Subject"] = subject
+        message.set_content(body)
+
+        if attachment_path and attachment_path.exists():
+            with open(attachment_path, "rb") as f:
+                file_data = f.read()
+                message.add_attachment(
+                    file_data,
+                    maintype="application",
+                    subtype="zip",
+                    filename=attachment_path.name,
+                )
+
         await aiosmtplib.send(
             message,
             hostname=settings.smtp_server,

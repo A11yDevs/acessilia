@@ -13,6 +13,21 @@ from backend.services.email_service import send_result_email
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("recipient", ["invalid\nrecipient@example.test", "invalid\rrecipient@example.test"])
+async def test_invalid_legacy_recipient_returns_false_without_smtp(monkeypatch, recipient):
+    from unittest.mock import AsyncMock
+    from backend.services import email_service
+
+    monkeypatch.setattr(settings, "smtp_user", "audit@example.test")
+    monkeypatch.setattr(settings, "smtp_password", "fake-password")
+    send = AsyncMock()
+    monkeypatch.setattr(email_service.aiosmtplib, "send", send)
+
+    assert await email_service.send_failure_email(recipient, "doc.pdf", "interrupted") is False
+    send.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_result_email_reports_missing_smtp(monkeypatch):
     monkeypatch.setattr(settings, "smtp_user", "")
     monkeypatch.setattr(settings, "smtp_password", "")
