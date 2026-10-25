@@ -560,3 +560,31 @@ async def test_a_recognition_without_evidence_is_refused(monkeypatch, cropped):
         "method": "text-layer",
         "rejected": {"math.recognize": None},
     }
+
+
+@pytest.mark.asyncio
+async def test_bare_scripts_in_the_text_layer_are_recognized(monkeypatch, cropped):
+    """A caret in the text layer is not LaTeX: the formula is recognized and gated (#268)."""
+    text_layer = "vm2(h) = (s(2 + h) − s(2)) / ((2 + h) − 2) = ((2 + h)^3 − 2^8) / h"
+    recognized = r"vm_{2}(h)=\frac{s(2+h)-s(2)}{(2+h)-2}=\frac{(2+h)^{3}-2^{8}}{h}"
+    manifest = _formula_manifest(text_layer)
+    calls = _recognizer(monkeypatch, recognized)
+
+    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+
+    element = manifest.elements[0]
+    assert calls == [b"png"]
+    assert element.text == recognized
+    assert element.metadata["formula_text_layer"] == text_layer
+    assert element.metadata["formula_recognition"]["text_agreement"] >= 0.9
+
+
+@pytest.mark.asyncio
+async def test_latex_with_grouped_scripts_is_left_alone(monkeypatch, cropped):
+    manifest = _formula_manifest("x^{2} + y_{1}")
+    calls = _recognizer(monkeypatch, "anything")
+
+    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+
+    assert calls == []
+    assert manifest.elements[0].text == "x^{2} + y_{1}"

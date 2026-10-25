@@ -259,11 +259,13 @@ def wrap_latex(expr: str | None, *, display: bool = True) -> str:
 
 # ── Text-layer formulas ─────────────────────────────────────────────
 
-#: Markup that only LaTeX has: a command or a sub/superscript. Text extracted
-#: from a PDF's text layer has none of it, even when the page shows a fraction
-#: or an exponent. Braces are not markup here: set notation puts them in the
-#: text layer too (``{h ∈ R : h ≥ −2}``).
-_LATEX_MARKUP_RE = re.compile(r"\\[A-Za-z]+|[\^_]")
+#: Markup that only LaTeX has: a command, or a sub/superscript applied to a
+#: group (``x^{2}``, ``v_{0}``). Text extracted from a PDF's text layer has none
+#: of it, even when the page shows a fraction or an exponent. A bare ``^`` or
+#: ``_`` is not enough: text layers and code-style text carry them too
+#: (``2^8``, ``v_0``, ``CO_2``). Braces alone are not markup either: set
+#: notation puts them in the text layer (``{h ∈ R : h ≥ −2}``).
+_LATEX_MARKUP_RE = re.compile(r"\\[A-Za-z]+|[\^_]\s*\{")
 
 #: Named functions whose glyph is their name. LaTeX spells them ``\sin``; a
 #: recognizer may keep the printed name as ``\operatorname{s e n}``.
@@ -323,11 +325,12 @@ def has_latex_markup(text: str | None) -> bool:
     """Whether ``text`` is LaTeX, not just math characters.
 
     It is when it carries math delimiters (``$x=1$``: whoever wrote them wrote
-    LaTeX) or LaTeX markup. A formula an extractor took from the PDF text layer
-    (``s(t) = s0 + v0t + 1 2 at2``) has neither, while even a short LaTeX
-    expression usually has markup (``t^3``). An undelimited expression with no
-    structure (``x = 1``) also reads as text; recognizing it again costs a
-    call but loses nothing.
+    LaTeX), a command (``\\frac``) or a script applied to a group (``x^{2}``).
+    A formula an extractor took from the PDF text layer (``s(t) = s0 + v0t + 1
+    2 at2``) has none of them. Undelimited expressions with only bare scripts
+    (``2^8``, ``v_0``) or no structure at all (``x = 1``) read as text too:
+    recognizing them again costs a call, and the caller's agreement check keeps
+    the extractor's version when the recognition reads something else.
     """
     text = " ".join((text or "").split())
     bare = bare_latex(text)

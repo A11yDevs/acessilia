@@ -62,7 +62,7 @@ Canonical routines for standardizing and cleaning mathematical formulas:
 - `wrap_latex(text, display=True)`: Wraps raw LaTeX expressions in standard delimiters (`$$...$$` by default, `$...$` with `display=False`).
 - `bare_latex(text)`: Conservative normalization: strips one pair of outer delimiters and collapses whitespace, without rewriting the expression.
 - `ensure_math_delimiters(text)`: Wraps text in `$...$` unless it is already delimited by `$` or `\[...\]`.
-- `has_latex_markup(text)`: Whether a formula's text is LaTeX (math delimiters, a command, `^` or `_`) or only math characters, as a PDF text layer gives them (`s(t) = s0 + v0t + 1 2 at2`). Braces alone are not markup: set notation has them in the text layer too.
+- `has_latex_markup(text)`: Whether a formula's text is LaTeX (math delimiters, a command, or `^`/`_` applied to a group such as `x^{2}`) or only math characters, as a PDF text layer gives them (`s(t) = s0 + v0t + 1 2 at2`). Bare scripts (`2^8`, `v_0`) and braces alone are not markup: text layers and set notation carry them too.
 - `latex_text_agreement(latex, text)`: F1 (0–1) between the letters, digits and math symbols of a LaTeX formula (commands rendered as their glyphs, `\alpha` → α) and of text-layer text, ignoring structure. Unicode scripts and ligatures are folded (`x²` reads as `x2`, like `x^2`), and Portuguese function names match their LaTeX command (`sen x` ↔ `\sin x`, `tg` ↔ `\tan`). It tells a recognition of the same formula from a misread; a single changed symbol barely moves it. `None` means no evidence either way.
 
 ### MinerU Adapter (`docstruct.adapters.mineru`)

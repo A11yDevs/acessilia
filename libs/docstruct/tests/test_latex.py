@@ -146,8 +146,15 @@ class TestHasLatexMarkup:
 
     def test_commands_and_scripts_are_latex(self):
         assert has_latex_markup(r"\frac{1}{2}")
-        assert has_latex_markup("t^3")
-        assert has_latex_markup("s_0")
+        assert has_latex_markup("t^{3}")
+        assert has_latex_markup("s_{0}")
+        assert has_latex_markup(r"x^\alpha")
+
+    def test_bare_scripts_are_not_latex(self):
+        """Text layers and code-style text carry bare ^ and _ too (#268)."""
+        assert not has_latex_markup("2^8")
+        assert not has_latex_markup("v_0 + at")
+        assert not has_latex_markup("CO_2")
 
     def test_delimited_text_is_latex(self):
         assert has_latex_markup("$x=1$")
