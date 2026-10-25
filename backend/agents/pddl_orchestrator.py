@@ -3003,7 +3003,16 @@ async def _enrich_formula_latex(
     reports no confidence, and the text layer is the only independent reading
     of the same formula. A recognition below it is a misread; the next one is
     tried, and when none agrees the formula keeps its text-layer version, which
-    is flat but faithful.
+    is flat but faithful. The text layer is the reference, not the truth: a
+    garbled one can refuse a correct reading, which ``formula_text_layer`` and
+    ``rejected`` leave on record.
+
+    During a ``math.recognize`` outage, text-layer formulas also go to the
+    vision model, so an outage now costs one vision call per formula that has
+    text, not only per empty one. That is deliberate: on the reference case the
+    vision readings took the structure of 16 flat formulas from nothing to a
+    98.4 structure-token recall. When vision disagrees with the text layer too,
+    the call bought nothing and the formula stays flat.
 
     Crops are independent, so they run concurrently, bounded by
     ``VISION_CONCURRENCY`` for the same reason as the picture descriptions:
@@ -3105,20 +3114,27 @@ async def _enrich_formula_latex(
             if not image_bytes:
                 return False
 
-            text_layer = normalize_latex(element.text or "")
-            rejected: dict[str, float] = {}
+            original_text = element.text or ""
+            text_layer = normalize_latex(original_text)
+            # None records a recognition refused for lack of evidence.
+            rejected: dict[str, float | None] = {}
             agreement: float | None = None
 
             def accept(method: str, latex: str) -> str:
-                """``latex`` when it agrees with the text layer, else ``""``."""
+                """``latex`` when it agrees with the text layer, else ``""``.
+
+                With text-layer text but no visible symbol on either side
+                (``()``), there is no evidence the recognition read the same
+                formula, so it is refused like a disagreement.
+                """
                 nonlocal agreement
                 if not latex or not text_layer:
                     return latex
                 score = latex_text_agreement(latex, text_layer)
-                if score is not None and score < settings.formula_text_agreement_min:
-                    rejected[method] = round(score, 3)
+                if score is None or score < settings.formula_text_agreement_min:
+                    rejected[method] = None if score is None else round(score, 3)
                     return ""
-                agreement = None if score is None else round(score, 3)
+                agreement = round(score, 3)
                 return latex
 
             best = _best_formula_candidate(await recognize(image_bytes))
@@ -3154,7 +3170,8 @@ async def _enrich_formula_latex(
             return False
         recognition: dict[str, Any] = {"method": method, "confidence": confidence}
         if text_layer:
-            element.metadata["formula_text_layer"] = text_layer
+            # The replaced text exactly as the extractor delivered it.
+            element.metadata["formula_text_layer"] = original_text
             recognition["text_agreement"] = agreement
         if rejected:
             recognition["rejected"] = rejected

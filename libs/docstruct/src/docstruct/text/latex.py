@@ -265,22 +265,58 @@ def wrap_latex(expr: str | None, *, display: bool = True) -> str:
 #: text layer too (``{h ∈ R : h ≥ −2}``).
 _LATEX_MARKUP_RE = re.compile(r"\\[A-Za-z]+|[\^_]")
 
+#: Named functions whose glyph is their name. LaTeX spells them ``\sin``; a
+#: recognizer may keep the printed name as ``\operatorname{s e n}``.
+_FUNCTION_NAMES = (
+    "lim", "sin", "cos", "tan", "cot", "sec", "csc", "arcsin", "arccos", "arctan",
+    "sinh", "cosh", "tanh", "log", "ln", "exp", "max", "min", "sup", "inf", "det",
+)
+
 #: LaTeX commands whose rendering is visible text, as the text layer shows it.
+#: This is the single source of the symbols the agreement compares: a symbol
+#: missing here is invisible on both sides, so a recognition that swaps or
+#: drops it would go unnoticed.
 _COMMAND_GLYPHS: dict[str, str] = {
     **{command: char for char, command in _UNICODE_MATH_MAP.items()},
-    r"\neq": "≠", r"\leq": "≤", r"\geq": "≥", r"\in": "∈", r"\notin": "∉",
-    r"\cup": "∪", r"\cap": "∩", r"\to": "→", r"\rightarrow": "→", r"\ldots": "…",
-    r"\cdots": "⋯", r"\varepsilon": "ε", r"\varphi": "φ",
-    **{f"\\{name}": name for name in (
-        "lim", "sin", "cos", "tan", "log", "ln", "exp", "max", "min", "sup", "inf", "det",
-    )},
+    # Relations
+    r"\neq": "≠", r"\leq": "≤", r"\geq": "≥", r"\equiv": "≡", r"\sim": "∼",
+    r"\simeq": "≃", r"\cong": "≅", r"\propto": "∝", r"\parallel": "∥", r"\perp": "⊥",
+    # Sets
+    r"\in": "∈", r"\notin": "∉", r"\ni": "∋", r"\cup": "∪", r"\cap": "∩",
+    r"\subset": "⊂", r"\subseteq": "⊆", r"\supset": "⊃", r"\supseteq": "⊇",
+    r"\setminus": "∖", r"\emptyset": "∅", r"\varnothing": "∅",
+    # Logic
+    r"\wedge": "∧", r"\land": "∧", r"\vee": "∨", r"\lor": "∨", r"\neg": "¬",
+    r"\lnot": "¬", r"\forall": "∀", r"\exists": "∃",
+    # Arrows
+    r"\to": "→", r"\rightarrow": "→", r"\leftarrow": "←", r"\gets": "←",
+    r"\leftrightarrow": "↔", r"\Rightarrow": "⇒", r"\implies": "⇒",
+    r"\Leftarrow": "⇐", r"\Leftrightarrow": "⇔", r"\iff": "⇔", r"\mapsto": "↦",
+    # Operators and others
+    r"\circ": "∘", r"\nabla": "∇", r"\angle": "∠", r"\ldots": "…", r"\cdots": "⋯",
+    r"\varepsilon": "ε", r"\varphi": "φ",
+    **{f"\\{name}": name for name in _FUNCTION_NAMES},
 }
 _COMMAND_RE = re.compile(r"\\[A-Za-z]+")
+_OPERATORNAME_RE = re.compile(r"\\operatorname\*?\s*\{([^{}]*)\}")
 
 #: Symbols that a reader hears, besides letters and digits; spacing,
 #: grouping and punctuation are left out because the two sides lay them out
-#: differently.
-_VISIBLE_SYMBOLS = frozenset("=+-<>≠≤≥∈∉∪∩→∞×÷±·∑∏∫∂√…⋯")
+#: differently. Derived from the glyph table so the two cannot drift apart.
+_VISIBLE_SYMBOLS = frozenset("=+-<>") | frozenset(
+    glyph for glyph in _COMMAND_GLYPHS.values() if len(glyph) == 1 and not glyph.isalnum()
+)
+
+#: Portuguese names of functions, as pt-BR material prints them, mapped to
+#: the names LaTeX uses; applied to both sides, so ``sen x`` and ``\sin x``
+#: (or ``\operatorname{sen} x``) read the same.
+_FUNCTION_ALIASES = {
+    "sen": "sin", "tg": "tan", "cotg": "cot", "cossec": "csc", "arcsen": "arcsin",
+    "arctg": "arctan", "senh": "sinh", "tgh": "tanh", "máx": "max", "mín": "min",
+}
+_FUNCTION_ALIAS_RE = re.compile(
+    r"(?<![^\W\d_])(" + "|".join(sorted(_FUNCTION_ALIASES, key=len, reverse=True)) + r")(?![^\W\d_])"
+)
 
 
 def has_latex_markup(text: str | None) -> bool:
@@ -300,9 +336,16 @@ def has_latex_markup(text: str | None) -> bool:
 
 def _visible_symbols(text: str, *, latex: bool) -> list[str]:
     if latex:
+        # \operatorname{s e n} prints its argument as a name; drop the spaces
+        # so the name can be aliased like a command.
+        text = _OPERATORNAME_RE.sub(lambda m: " " + "".join(m.group(1).split()) + " ", text)
         text = _COMMAND_RE.sub(lambda m: f" {_COMMAND_GLYPHS.get(m.group(0), '')} ", text)
-    # NFC composes a detached long solidus with "=" into "≠".
-    text = unicodedata.normalize("NFC", text).replace("\u2212", "-")
+    # NFKC folds what text layers deliver as compatibility characters: x² and
+    # v₀ read as x2 and v0 (as x^2 and v_0 do once structure is ignored), and
+    # the ﬁ ligature as fi. It also composes a detached long solidus with "="
+    # into "≠".
+    text = unicodedata.normalize("NFKC", text).replace("\u2212", "-")
+    text = _FUNCTION_ALIAS_RE.sub(lambda m: _FUNCTION_ALIASES[m.group(1)], text)
     return [ch for ch in text if ch.isalnum() or ch in _VISIBLE_SYMBOLS]
 
 
@@ -317,7 +360,11 @@ def latex_text_agreement(latex: str, text: str) -> float | None:
     fractions and exponents; one that invents or drops terms scores lower.
     A change of a single symbol barely moves it, so it does not guard against
     a recognizer "correcting" one digit of the printed formula. ``None`` when
-    neither side has a visible symbol.
+    neither side has a visible symbol: there is no evidence either way.
+
+    The text layer is the reference, not the truth: a garbled or truncated
+    text layer lowers the score of a correct reading and can make a caller
+    keep the text-layer error. Callers should record what they rejected.
     """
     left = Counter(_visible_symbols(bare_latex(latex), latex=True))
     right = Counter(_visible_symbols(text, latex=False))

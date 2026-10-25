@@ -175,5 +175,33 @@ class TestLatexTextAgreement:
         score = latex_text_agreement("x^2 + y^2 = 1", "s(t) = s0 + v0t + 1 2 at2")
         assert score < 0.5
 
+    def test_unicode_scripts_and_ligatures_fold(self):
+        assert latex_text_agreement("x^2", "x²") == 1.0
+        assert latex_text_agreement("v_0", "v₀") == 1.0
+        assert latex_text_agreement(r"\operatorname{fi}", "ﬁ") == 1.0
+
+    def test_logic_and_set_symbols_are_compared(self):
+        assert latex_text_agreement(r"\neg x", "¬x") == 1.0
+        assert latex_text_agreement(r"\neg x", "x") < 1.0
+        assert latex_text_agreement(r"x \wedge y", "x ∧ y") == 1.0
+        assert latex_text_agreement(r"x \wedge y", "x ∨ y") < 1.0
+        assert latex_text_agreement(r"\forall x \exists y", "∀x ∃y") == 1.0
+        assert latex_text_agreement(r"A \subseteq B \cup \emptyset", "A ⊆ B ∪ ∅") == 1.0
+
+    def test_every_single_glyph_is_a_visible_symbol(self):
+        """The compared symbols come from the glyph table, so they cannot drift."""
+        from docstruct.text.latex import _COMMAND_GLYPHS, _VISIBLE_SYMBOLS
+
+        for glyph in _COMMAND_GLYPHS.values():
+            if len(glyph) == 1 and not glyph.isalnum():
+                assert glyph in _VISIBLE_SYMBOLS, glyph
+
+    def test_portuguese_function_names_match_latex(self):
+        assert latex_text_agreement(r"\tan x", "tg x") == 1.0
+        assert latex_text_agreement(r"\sin x", "sen x") == 1.0
+        assert latex_text_agreement(r"\max f", "máx f") == 1.0
+        assert latex_text_agreement(r"\operatorname{t g} x", "tg x") == 1.0
+        assert latex_text_agreement(r"\operatorname*{l i m}_{h \to 0}", "lim h→0") == 1.0
+
     def test_nothing_visible_is_not_scored(self):
         assert latex_text_agreement(r"\quad", "  ") is None

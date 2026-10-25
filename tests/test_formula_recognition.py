@@ -460,7 +460,8 @@ async def test_a_text_layer_formula_is_replaced_by_its_recognition(monkeypatch, 
     element = manifest.elements[0]
     assert calls == [b"png"]
     assert element.text == FAITHFUL
-    assert element.metadata["formula_text_layer"] == "s(t) = s0 + v0t + 1 2 at2, t > 0,"
+    # The replaced text exactly as the extractor delivered it, newlines included.
+    assert element.metadata["formula_text_layer"] == TEXT_LAYER
     assert element.metadata["formula_recognition"] == {
         "method": "math.recognize",
         "confidence": None,
@@ -530,3 +531,32 @@ async def test_a_formula_without_text_has_nothing_to_agree_with(monkeypatch, cro
     assert element.text == MISREAD
     assert "formula_text_layer" not in element.metadata
     assert "text_agreement" not in element.metadata["formula_recognition"]
+
+
+@pytest.mark.asyncio
+async def test_unicode_scripts_in_the_text_layer_agree(monkeypatch, cropped):
+    """Word-exported text layers carry x² and v₀ for x^2 and v_0."""
+    manifest = _formula_manifest("s(t) = s₀ + v₀t + ½at², t > 0")
+    _recognizer(monkeypatch, r"s(t) = s_0 + v_0 t + \frac{1}{2} a t^2, \quad t > 0")
+
+    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+
+    recognition = manifest.elements[0].metadata["formula_recognition"]
+    assert recognition["method"] == "math.recognize"
+    assert recognition["text_agreement"] >= 0.9
+
+
+@pytest.mark.asyncio
+async def test_a_recognition_without_evidence_is_refused(monkeypatch, cropped):
+    """Text-layer text with no visible symbol gives no evidence either way."""
+    manifest = _formula_manifest("( )")
+    _recognizer(monkeypatch, "()")
+
+    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+
+    element = manifest.elements[0]
+    assert element.text == "( )"
+    assert element.metadata["formula_recognition"] == {
+        "method": "text-layer",
+        "rejected": {"math.recognize": None},
+    }
