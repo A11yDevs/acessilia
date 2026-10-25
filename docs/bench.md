@@ -132,7 +132,7 @@ The scorecard (`scorecard.md`, `scorecard.json`) reports:
 - inline expressions and table headers/cells delivered as math;
 - the text, structure and speech checks, with each failure listed.
 
-With `--pdf-ua` (and always with `run`) the text checks run on both outputs
+With `--pdf-ua` (and with `run`, unless `--no-pdf-ua`) the text checks run on both outputs
 and the auto-numbered-headings check is added, so the scorecard starts with
 the outputs it scored: compare two scorecards only when that row matches.
 

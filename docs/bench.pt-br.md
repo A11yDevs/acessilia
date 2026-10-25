@@ -135,7 +135,7 @@ O placar (`scorecard.md`, `scorecard.json`) informa:
 - expressões inline e cabeçalhos/células de tabela entregues como matemática;
 - as verificações de texto, estrutura e fala, com cada falha listada.
 
-Com `--pdf-ua` (e sempre no `run`), as verificações de texto rodam nas duas
+Com `--pdf-ua` (e no `run`, a não ser com `--no-pdf-ua`), as verificações de texto rodam nas duas
 saídas e entra a verificação de títulos auto-numerados; por isso o placar
 começa pelas saídas que pontuou: compare dois placares só quando essa linha
 for igual.
