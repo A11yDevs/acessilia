@@ -2957,24 +2957,31 @@ def _formula_recognition_crop(
     return page.image, page_number
 
 
-def _best_formula_candidate(candidates: Iterable[dict[str, Any]]) -> dict[str, Any] | None:
-    """The candidate with the highest confidence, or the first one without a score.
+def _ranked_formula_candidates(candidates: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Candidates with LaTeX, normalized, by decreasing confidence.
 
     ``math.recognize`` returns one entry per detected expression; a chip should
-    hold one, but the best-scored is the safer choice when it holds several.
+    hold one, but a provider may return several. A confidence that is not a
+    finite number (missing, a bool, NaN, infinity) becomes ``None`` in the
+    candidate and ranks as 0, so the order stays total and no such value
+    reaches the manifest; ties keep the provider's order.
     """
-    best: dict[str, Any] | None = None
-    best_score = -1.0
+    ranked: list[tuple[float, dict[str, Any]]] = []
     for candidate in candidates:
         latex = normalize_latex(str(candidate.get("latex") or ""))
         if not latex:
             continue
         confidence = candidate.get("confidence")
-        score = float(confidence) if isinstance(confidence, (int, float)) else 0.0
-        if best is None or score > best_score:
-            best = {**candidate, "latex": latex}
-            best_score = score
-    return best
+        if (
+            isinstance(confidence, bool)
+            or not isinstance(confidence, (int, float))
+            or not math.isfinite(confidence)
+        ):
+            confidence = None
+        score = 0.0 if confidence is None else float(confidence)
+        ranked.append((score, {**candidate, "latex": latex, "confidence": confidence}))
+    ranked.sort(key=lambda pair: -pair[0])
+    return [candidate for _, candidate in ranked]
 
 
 async def _enrich_formula_latex(
@@ -3013,6 +3020,16 @@ async def _enrich_formula_latex(
     vision readings took the structure of 16 flat formulas from nothing to a
     98.4 structure-token recall. When vision disagrees with the text layer too,
     the call bought nothing and the formula stays flat.
+
+    Each recognized formula records ``metadata["formula_recognition"]``:
+    ``method`` (the capability that gave the LaTeX: ``math.recognize`` or
+    ``vision``; ``text-layer`` when nothing agreed), ``confidence``,
+    ``text_agreement`` when there was text-layer text, ``rank`` when a
+    ``math.recognize`` candidate other than the best-ranked one was used, and
+    ``rejected``: refused readings keyed by method, with ``#n`` for the n-th
+    ranked candidate (``math.recognize#2``), valued by their agreement
+    (``None`` for no evidence). Consumers must read those keys as
+    ``method`` or ``method#rank`` strings.
 
     Crops are independent, so they run concurrently, bounded by
     ``VISION_CONCURRENCY`` for the same reason as the picture descriptions:
@@ -3137,10 +3154,21 @@ async def _enrich_formula_latex(
                 agreement = round(score, 3)
                 return latex
 
-            best = _best_formula_candidate(await recognize(image_bytes))
+            # Every candidate gets its turn at the gate before vision is paid:
+            # a lower-ranked one that agrees with the text layer is still a
+            # recognition of this crop. Refusals are recorded per rank
+            # ("math.recognize", "math.recognize#2", ...).
             method = "math.recognize"
-            latex = accept(method, str(best["latex"]) if best is not None else "")
-            confidence = best.get("confidence") if best is not None else None
+            latex = ""
+            confidence = None
+            accepted_rank = 1
+            candidates = _ranked_formula_candidates(await recognize(image_bytes))
+            for rank, candidate in enumerate(candidates, start=1):
+                latex = accept(method if rank == 1 else f"{method}#{rank}", candidate["latex"])
+                if latex:
+                    confidence = candidate["confidence"]
+                    accepted_rank = rank
+                    break
 
             if not latex:
                 method = "vision"
@@ -3169,6 +3197,8 @@ async def _enrich_formula_latex(
                 }
             return False
         recognition: dict[str, Any] = {"method": method, "confidence": confidence}
+        if method == "math.recognize" and accepted_rank > 1:
+            recognition["rank"] = accepted_rank
         if text_layer:
             # The replaced text exactly as the extractor delivered it.
             element.metadata["formula_text_layer"] = original_text
