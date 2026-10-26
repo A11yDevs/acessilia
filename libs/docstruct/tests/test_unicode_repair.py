@@ -219,7 +219,6 @@ class TestLegacyTexArtifacts:
 
     def test_split_ligature_is_joined(self):
         assert self.repaired("quando h fi ca perto") == "quando h fica perto"
-        assert self.repaired("to defi ne it") == "to define it"
         assert self.repaired("o fl uxo") == "o fluxo"
 
     def test_rules_record_their_edits(self):
@@ -236,6 +235,28 @@ class TestLegacyTexArtifacts:
     def test_code_quotes_and_hyphenated_words_are_kept(self):
         for text in ("casa `a` x", "a letra ‘a’ e", "som hi-fi sound", "Wi-Fi network",
                      "a fi Nal", "use `code` aqui"):
+            assert self.repaired(text) == text, text
+
+    def test_a_quotation_or_code_opening_with_a_is_not_a_crase(self):
+        """The opener has a closer further on: a quotation or inline code."""
+        for text in (
+            "o texto diz \u2018 a medida foi aprovada\u2019 no dia 5",
+            "\u2018a alternativa\u2019 foi escolhida",
+            "`a = b` e o codigo",
+            "prefixo `a medida` fecha no fim",
+            "5` a casos",
+        ):
+            assert self.repaired(text) == text, text
+
+    def test_only_a_bare_initial_ligature_is_joined(self):
+        """Longer heads are whole words; ffi/ffl never start one; hi fi is a compound."""
+        for text in (
+            "o wifi funciona e a outra",
+            "o projeto selfi na parede",
+            "o hi fi system tocava",
+            "o ffi cial foi emitido",
+            "to defi ne it",
+        ):
             assert self.repaired(text) == text, text
 
     def test_two_crases_do_not_protect_the_text_between_them(self):
