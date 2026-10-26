@@ -1482,6 +1482,10 @@ msgid "Artifact upload unavailable ({error}); extracting from the source file."
 msgstr "Artifact upload unavailable ({error}); extracting from the source file."
 
 #, python-brace-format
+msgid "Structural provider {provider} failed ({error}); extraction is degraded."
+msgstr "Structural provider {provider} failed ({error}); extraction is degraded."
+
+#, python-brace-format
 msgid "PDF/UA rendered by the Toolbox: {output_path}"
 msgstr "PDF/UA rendered by the Toolbox: {output_path}"
 

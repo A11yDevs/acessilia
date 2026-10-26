@@ -556,3 +556,50 @@ def test_permanent_upload_failure_is_not_bypassed(mock_client, mock_artifact_cli
             client=mock_client, artifact_client=mock_artifact_client, use_artifact_store=True,
         ).extract(FIXTURE_PDF, dual_fusion=False)
     mock_client.extract_structure.assert_not_awaited()
+
+
+@pytest.mark.parametrize("primary_ok,secondary_ok", [(True, True), (True, False), (False, True), (False, False)])
+def test_dual_extraction_handles_each_provider_independently(
+    mock_client, monkeypatch, primary_ok, secondary_ok
+):
+    from backend.config.settings import settings
+    from acessilia_sdk.toolbox.errors import ToolboxProviderUnavailable, ToolboxUnavailable
+
+    monkeypatch.setattr(settings, "fusion_mode", "dual")
+    monkeypatch.setattr(settings, "fusion_secondary_provider", "mineru")
+    primary = deepcopy(SAMPLE_TOOLBOX_RESPONSE)
+    secondary_payload = deepcopy(SAMPLE_TOOLBOX_RESPONSE)
+    secondary_payload["provider"] = "mineru"
+    secondary_payload["provenance"]["cache_key"] = "secondary-key"
+    secondary_payload["provenance"]["provider_version"] = "secondary-version"
+    if primary_ok:
+        mock_client.extract_structure.return_value = primary
+    else:
+        mock_client.extract_structure.side_effect = ToolboxProviderUnavailable("primary down")
+    secondary = AsyncMock(spec=ToolboxStructureClient)
+    secondary.provider = "mineru"
+    secondary.base_url = "http://localhost:8002"
+    if secondary_ok:
+        secondary.extract_structure.return_value = secondary_payload
+    else:
+        secondary.extract_structure.side_effect = ToolboxProviderUnavailable("secondary down")
+    monkeypatch.setattr("backend.core.manifest.toolbox_extractor.make_toolbox_client", lambda *a, **k: secondary)
+    extractor = ToolboxManifestExtractor(client=mock_client, use_artifact_store=False)
+    if not primary_ok and not secondary_ok:
+        with pytest.raises(ToolboxUnavailable) as info:
+            extractor.extract(FIXTURE_PDF)
+        assert len(info.value.causes) == 2
+    else:
+        result = extractor.extract(FIXTURE_PDF)
+        assert result.configuration["toolbox_provider"] == ("docling" if primary_ok else "mineru")
+        if not primary_ok:
+            assert result.cache_key == "secondary-key"
+            assert result.version == "secondary-version"
+        if not (primary_ok and secondary_ok):
+            assert result.configuration["extraction_degraded"] is True
+            assert "fusion_evidence" not in result.document
+        else:
+            assert "fusion_evidence" in result.document
+    mock_client.extract_structure.assert_awaited_once()
+    secondary.extract_structure.assert_awaited_once()
+    secondary.close.assert_awaited_once()

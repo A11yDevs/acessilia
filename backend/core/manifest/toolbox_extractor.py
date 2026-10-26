@@ -13,13 +13,17 @@ from acessilia_sdk.toolbox.clients import ToolboxArtifactClient, ToolboxStructur
 
 from backend.config.settings import settings
 from backend.i18n import t
-from backend.log_messages import LOG_ARTIFACT_UPLOAD_DEGRADED
+from backend.log_messages import (
+    LOG_ARTIFACT_UPLOAD_DEGRADED,
+    LOG_STRUCTURAL_PROVIDER_DEGRADED,
+)
 from backend.tools.logger import logger
 from backend.tools.toolbox_client import (
     ToolboxCapabilityClient,
     ToolboxError,
     ToolboxProviderUnavailable,
     ToolboxTimeout,
+    ToolboxUnavailable,
     make_toolbox_client,
 )
 
@@ -164,23 +168,41 @@ class ToolboxManifestExtractor:
             except (ToolboxTimeout, ToolboxProviderUnavailable) as exc:
                 upload_error = type(exc).__name__
                 use_artifact_store = False
-                logger.warning(t(LOG_ARTIFACT_UPLOAD_DEGRADED).format(error=upload_error))
+                logger.warning(
+                    t(LOG_ARTIFACT_UPLOAD_DEGRADED).format(error=upload_error)
+                )
             else:
                 logger.info(
                     "Toolbox: artifact {} stored ({})", artifact_id, source_path.name
                 )
 
-        result = await structure.extract_structure(
-            file_path=None if artifact_id else source_path,
-            artifact_id=artifact_id,
-            language="pt-BR",
-            use_remote_cache=self.use_remote_cache,
+        extraction_failures: dict[str, str] = {}
+        primary_error: ToolboxError | None = None
+        final_provider = structure.provider
+        final_base_url = structure.base_url
+        dual_enabled = (
+            settings.fusion_mode == "dual"
+            and dual_fusion
+            and settings.fusion_secondary_provider != structure.provider
         )
-        logger.info(
-            "Toolbox: structure extracted ({} ms, provider={})",
-            result.get("provenance", {}).get("duration_ms", "?"),
-            result.get("provider", "?"),
-        )
+        try:
+            result = await structure.extract_structure(
+                file_path=None if artifact_id else source_path,
+                artifact_id=artifact_id,
+                language="pt-BR",
+                use_remote_cache=self.use_remote_cache,
+            )
+        except ToolboxError as exc:
+            if not dual_enabled:
+                raise
+            primary_error = exc
+            extraction_failures[structure.provider] = type(exc).__name__
+            result = None
+            logger.warning(
+                t(LOG_STRUCTURAL_PROVIDER_DEGRADED).format(
+                    provider=structure.provider, error=type(exc).__name__
+                )
+            )
         if settings.fusion_mode == "dual" and dual_fusion:
             secondary_provider = settings.fusion_secondary_provider
             if secondary_provider == structure.provider:
@@ -212,38 +234,59 @@ class ToolboxManifestExtractor:
                         use_remote_cache=self.use_remote_cache,
                     )
                 except ToolboxError as exc:
+                    if primary_error is not None:
+                        raise ToolboxUnavailable(
+                            [
+                                (
+                                    f"{structure.base_url} ({structure.provider})",
+                                    primary_error,
+                                ),
+                                (
+                                    f"{secondary_client.base_url} "
+                                    f"({secondary_provider})",
+                                    exc,
+                                ),
+                            ]
+                        ) from exc
+                    extraction_failures[secondary_provider] = type(exc).__name__
                     logger.warning(
-                        "Fusão dual sem evidência: provider {} falhou ({})",
-                        secondary_provider,
-                        type(exc).__name__,
+                        t(LOG_STRUCTURAL_PROVIDER_DEGRADED).format(
+                            provider=secondary_provider, error=type(exc).__name__
+                        )
                     )
                 else:
-                    fusion = fuse_extraction_payloads(
-                        result,
-                        secondary_result,
-                        primary_provider=structure.provider,
-                        secondary_provider=secondary_provider,
-                        policy=self.fusion_policy,
-                    )
-                    replaced: dict[int, list[dict[str, Any]]] = {}
-                    if settings.fusion_apply_page_routes:
-                        result, replaced = apply_page_routes(
+                    if result is None:
+                        result = secondary_result
+                        final_provider = secondary_provider
+                        final_base_url = secondary_client.base_url
+                    else:
+                        fusion = fuse_extraction_payloads(
                             result,
                             secondary_result,
-                            fusion["fusion_evidence"]["pages"],
+                            primary_provider=structure.provider,
                             secondary_provider=secondary_provider,
+                            policy=self.fusion_policy,
                         )
-                    result = {
-                        **result,
-                        "fusion_stats": fusion["fusion_stats"],
-                        "fusion_evidence": fusion["fusion_evidence"],
-                        "secondary_extraction": _persist_secondary_extraction(
-                            secondary_result, secondary_provider, replaced
-                        ),
-                    }
+                        replaced: dict[int, list[dict[str, Any]]] = {}
+                        if settings.fusion_apply_page_routes:
+                            result, replaced = apply_page_routes(
+                                result,
+                                secondary_result,
+                                fusion["fusion_evidence"]["pages"],
+                                secondary_provider=secondary_provider,
+                            )
+                        result = {
+                            **result,
+                            "fusion_stats": fusion["fusion_stats"],
+                            "fusion_evidence": fusion["fusion_evidence"],
+                            "secondary_extraction": _persist_secondary_extraction(
+                                secondary_result, secondary_provider, replaced
+                            ),
+                        }
                 finally:
                     await secondary_client.close()
 
+        assert result is not None
         duration_ms = round((perf_counter() - started_clock) * 1000)
         completed_at = datetime.now(timezone.utc)
 
@@ -260,8 +303,16 @@ class ToolboxManifestExtractor:
                 "ocr": self.enable_ocr,
                 "table_structure": True,
                 "remote_services": True,
-                "toolbox_base_url": structure.base_url,
-                "toolbox_provider": structure.provider,
+                "toolbox_base_url": final_base_url,
+                "toolbox_provider": final_provider,
+                **(
+                    {
+                        "extraction_degraded": True,
+                        "extraction_failures": extraction_failures,
+                    }
+                    if extraction_failures
+                    else {}
+                ),
                 "use_artifact_store": use_artifact_store,
                 **({"artifact_upload_error": upload_error} if upload_error else {}),
                 "use_remote_cache": self.use_remote_cache,

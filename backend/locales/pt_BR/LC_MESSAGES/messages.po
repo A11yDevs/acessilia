@@ -1500,6 +1500,12 @@ msgstr ""
 "original."
 
 #, python-brace-format
+msgid "Structural provider {provider} failed ({error}); extraction is degraded."
+msgstr ""
+"O provedor estrutural {provider} falhou ({error}); a extração está "
+"degradada."
+
+#, python-brace-format
 msgid "PDF/UA rendered by the Toolbox: {output_path}"
 msgstr "PDF/UA renderizado pela Toolbox: {output_path}"
 

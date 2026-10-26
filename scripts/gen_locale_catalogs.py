@@ -163,6 +163,7 @@ from backend.log_messages import (
     LOG_MEDIA_INSPECT_TOOLBOX_FINISHED,
     LOG_MEDIA_INSPECT_FAILED,
     LOG_ARTIFACT_UPLOAD_DEGRADED,
+    LOG_STRUCTURAL_PROVIDER_DEGRADED,
     LOG_PDF_UA_TOOLBOX_EXPORTED,
     LOG_PDF_UA_MATH_DEGRADED,
     LOG_TXT_EXPORTED,
@@ -833,6 +834,7 @@ MESSAGES: tuple[str, ...] = (
     LOG_MEDIA_INSPECT_TOOLBOX_FINISHED,
     LOG_MEDIA_INSPECT_FAILED,
     LOG_ARTIFACT_UPLOAD_DEGRADED,
+    LOG_STRUCTURAL_PROVIDER_DEGRADED,
     LOG_PDF_UA_TOOLBOX_EXPORTED,
     LOG_PDF_UA_MATH_DEGRADED,
     LOG_TXT_EXPORTED,
@@ -1641,6 +1643,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         # Toolbox finished media.inspect; {nature} the artifact nature, {visual} whether it needs visual inspection.
         LOG_MEDIA_INSPECT_TOOLBOX_FINISHED: "Toolbox: media.inspect concluído (natureza={nature}, visual={visual})",
         # media.inspect failed on the Toolbox; the run continues without the standalone-image signal.
+        LOG_STRUCTURAL_PROVIDER_DEGRADED: "O provedor estrutural {provider} falhou ({error}); a extração está degradada.",
         LOG_ARTIFACT_UPLOAD_DEGRADED: "Upload do artefato indisponível ({error}); extraindo a partir do arquivo original.",
         LOG_MEDIA_INSPECT_FAILED: (
             "Inspeção de mídia indisponível para {filename}; seguindo sem o "
