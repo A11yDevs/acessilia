@@ -135,6 +135,16 @@ async def set_cache(path: Path, payload: Any, extra: str = "") -> None:
     await _write_cached(_cache_key(path, extra), payload)
 
 
+async def drop_cache(path: Path, extra: str = "") -> None:
+    """Remove the entry for ``path``, if any; a run that must not be cached supersedes it."""
+    try:
+        await aiofiles.os.remove(str(_cache_path(_cache_key(path, extra))))
+    except OSError:
+        # Nothing to drop, or it cannot be dropped: a refused entry is
+        # refused again on read, so the run need not fail over it.
+        pass
+
+
 async def set_cache_bytes(content: bytes, payload: Any, extra: str = "") -> None:
     """Store a payload for binary content held in memory; see :func:`get_cached_bytes`."""
     await _write_cached(_content_key(content, extra), payload)

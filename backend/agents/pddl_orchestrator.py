@@ -70,7 +70,7 @@ from backend.core.planning.domain_bundle import DomainBundle
 from backend.core.planning.models import NominalPlan, PlanningComparison, PlanStep
 from backend.core.planning import toolbox_gate
 from backend.core.planning.planner_agent import PlannerAgent
-from backend.i18n import t
+from backend.i18n import n, t
 from backend.log_messages import (
     LOG_MEDIA_INSPECT_FAILED,
     LOG_PDDL_ELEMENT_CROP_FAILED,
@@ -126,6 +126,17 @@ if TYPE_CHECKING:
 #: Canonical English msgid for the alt text of a picture the vision model left
 #: undescribed; why it was left so goes to the operator, not the reader.
 MSG_UNDESCRIBED_PICTURE_ALT: str = "Image without a text description."
+
+#: Canonical English singular/plural msgids for the document's warning on the
+#: pictures and tables a failure left without a description or a reading.
+MSG_PICTURES_NOT_DESCRIBED: tuple[str, str] = (
+    "{count} image could not be described.",
+    "{count} images could not be described.",
+)
+MSG_TABLES_NOT_READ: tuple[str, str] = (
+    "{count} table could not be read.",
+    "{count} tables could not be read.",
+)
 
 
 def _formula_elements_for_obligation(
@@ -3831,6 +3842,7 @@ async def _enrich_table_structures(
             manifest.source.media_type,
         )
         if not image_bytes:
+            _record_table_read_failure(element, "crop_unavailable")
             if reason is not None:
                 _keep_misread_table(element, page_number, reason, "no image of the table", 0)
             continue
@@ -3839,6 +3851,7 @@ async def _enrich_table_structures(
         # rows on one try and read the table whole on the next.
         attempts = _TABLE_REREAD_ATTEMPTS if reason is not None else 1
         table_output = None
+        answered = False
         why = "no table was read"
         for attempt in range(1, attempts + 1):
             candidate = await data_agent.process_region(
@@ -3847,6 +3860,7 @@ async def _enrich_table_structures(
                 page_num=page_number,
                 fallback_text=element.text or "",
             )
+            answered = answered or isinstance(candidate, DataOutput)
             if not isinstance(candidate, DataOutput) or candidate.kind != "table":
                 continue
             if reason is not None:
@@ -3858,10 +3872,16 @@ async def _enrich_table_structures(
             table_output = candidate
             break
         if table_output is None:
+            # A reading refused as worse than the table, or an answer that it
+            # is not a table, is the model's answer; only no answer at all is
+            # a failure a rerun may not repeat.
+            if not answered:
+                _record_table_read_failure(element, "model_failed")
             if reason is not None:
                 _keep_misread_table(element, page_number, reason, why, attempt)
             continue
 
+        element.metadata.pop("table_read_failure", None)
         rows = table_output.table_rows()
         table_ast = table_output.table_ast()
         if reason is not None:
@@ -3895,6 +3915,16 @@ async def _enrich_table_structures(
 
     if enriched:
         logger.info(t(LOG_PDDL_TABLES_ENRICHED).format(count=enriched))
+
+
+#: Why a table was left unread, recorded in metadata["table_read_failure"]: the
+#: crop could not be rendered, or the data agent returned no answer at all.
+TableReadFailure = Literal["crop_unavailable", "model_failed"]
+
+
+def _record_table_read_failure(element: ManifestElement, reason: TableReadFailure) -> None:
+    """Mark ``element`` as a table no reading came back for, and say why."""
+    element.metadata["table_read_failure"] = reason
 
 
 def _keep_misread_table(
@@ -4501,6 +4531,11 @@ def build_pddl_structured_payload(
             f"Comparacao de planners: {comparison.comparison.verdict}."
         )
 
+    visual_failures = _visual_failures(manifest)
+    for kind, msgids in (("pictures", MSG_PICTURES_NOT_DESCRIBED), ("tables", MSG_TABLES_NOT_READ)):
+        if count := sum((visual_failures or {}).get(kind, {}).values()):
+            technical_warnings.append(n(*msgids, count).format(count=count))
+
     observations = getattr(manifest, "observations", [])
     obligations = getattr(manifest, "obligations", [])
     if any(
@@ -4549,6 +4584,9 @@ def build_pddl_structured_payload(
             if _unsatisfied_selected_obligations(manifest)
             else None,
             "pddl_toolbox_availability": toolbox_availability,
+            # Pictures and tables left undescribed or unread, by reason; a rerun
+            # once the model provider or the Toolbox is back may deliver them.
+            "pddl_visual_failures": visual_failures,
             "pddl_media_inspection": {
                 "status": media_inspection_status,
                 "error": configuration.get("media_inspection_error"),
@@ -4560,10 +4598,53 @@ def build_pddl_structured_payload(
             else None,
         },
         "technical_warnings": technical_warnings,
-        # A step degraded by a Toolbox failure must not be replayed from the
-        # cache once the Toolbox is back.
-        "cacheable": media_inspection_status != "failed",
+        # A step degraded by a Toolbox or model failure must not be replayed
+        # from the cache once the service is back.
+        "cacheable": media_inspection_status != "failed"
+        and not records_visual_failures(visual_failures),
     }
+
+
+#: Why a picture or table left without a description or a reading may come
+#: out differently on a rerun: the model provider or the Toolbox was down. An
+#: empty description is the model's answer, as is a refused table reading, and
+#: would come back the same, so it neither counts nor keeps a run uncached.
+_RETRYABLE_VISUAL_FAILURES = frozenset({"crop_unavailable", "model_failed"})
+
+
+def _visual_failures(manifest: ProcessingManifest) -> dict[str, dict[str, int]] | None:
+    """Pictures left undescribed and tables left unread, counted by reason.
+
+    A picture counts whatever its type: the vision stage also describes the
+    placeholders of a mostly visual document, and an element becomes a
+    ``picture`` only once the model answers. None when nothing failed.
+    """
+    elements = getattr(manifest, "elements", [])
+    counts = {
+        "pictures": Counter(
+            reason for element in elements
+            if (reason := element.metadata.get("vision_failure_reason")) in _RETRYABLE_VISUAL_FAILURES
+        ),
+        "tables": Counter(
+            reason for element in elements
+            if (reason := element.metadata.get("table_read_failure")) in _RETRYABLE_VISUAL_FAILURES
+        ),
+    }
+    failures = {kind: dict(by_reason) for kind, by_reason in counts.items() if by_reason}
+    return failures or None
+
+
+def records_visual_failures(failures: Any) -> bool:
+    """Whether ``canonical_metadata.pddl_visual_failures`` records any failure.
+
+    A run that does is not cached, and a cached entry that does is not
+    replayed; both sides read the record through this one check.
+    """
+    return isinstance(failures, dict) and any(
+        isinstance(by_reason, dict)
+        and any(isinstance(count, int) and count > 0 for count in by_reason.values())
+        for by_reason in failures.values()
+    )
 
 
 def _unsatisfied_obligations(manifest: ProcessingManifest) -> list[dict[str, Any]]:

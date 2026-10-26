@@ -1950,3 +1950,15 @@ msgid_plural "documents"
 msgstr[0] "documento"
 msgstr[1] "documentos"
 
+#, python-brace-format
+msgid "{count} image could not be described."
+msgid_plural "{count} images could not be described."
+msgstr[0] "{count} imagem não pôde ser descrita."
+msgstr[1] "{count} imagens não puderam ser descritas."
+
+#, python-brace-format
+msgid "{count} table could not be read."
+msgid_plural "{count} tables could not be read."
+msgstr[0] "{count} tabela não pôde ser lida."
+msgstr[1] "{count} tabelas não puderam ser lidas."
+

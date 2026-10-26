@@ -359,6 +359,21 @@ The `media.inspect` capability (provider `pure-media-inspect`, PR
   `cacheable: false`): otherwise a transient Toolbox outage would replay a
   standalone image without its audio description after the Toolbox recovers.
 
+  The same holds for the pictures and tables a failure left without a
+  description or a reading. They are counted by reason in
+  `canonical_metadata.pddl_visual_failures`
+  (`{"pictures": {"model_failed": 1, "crop_unavailable": 2}, "tables": {"model_failed": 1}}`,
+  `null` when nothing failed): `model_failed` when the vision model or the
+  data agent gave no answer, `crop_unavailable` when the Toolbox could not
+  render the crop. A picture counts whatever its element type, since the
+  placeholders of a mostly visual document are described too; the reason sits
+  in `metadata.vision_failure_reason`, and a table's in
+  `metadata.table_read_failure`. The document says how many images could not
+  be described and how many tables could not be read. An empty description
+  and a table reading refused as worse than the table are the model's answers,
+  so they neither count nor keep the run uncached. A cached entry that records
+  a failure is not replayed, and a rerun that is still degraded drops it.
+
 The PDDL predicates `media_inspected`/`media_profile_classified` belong to the Toolbox
 domain; the core consumes the signal only as an enrichment heuristic and it does not
 enter the planning problem.

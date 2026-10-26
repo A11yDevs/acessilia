@@ -14,7 +14,7 @@ import re
 
 from docstruct.blocks.classify import extract_plain_heading
 from docstruct.text.math_spans import split_inline_math
-from docstruct.text.sanitize import sanitize_block_text
+from docstruct.text.sanitize import BEFORE_WORD, sanitize_block_text
 
 
 def parse_text_to_blocks(text: str, id_factory: Callable[[int], str] | None = None) -> list[dict[str, Any]]:
@@ -49,7 +49,7 @@ def parse_text_to_blocks(text: str, id_factory: Callable[[int], str] | None = No
             blocks.append(block)
             i = consumed
             continue
-        if re.match(r"^(?:[-*+]\s+)", stripped):
+        if re.match(rf"^[-*+]\s+{BEFORE_WORD}", stripped):
             blocks.append(
                 {
                     "type": "list",

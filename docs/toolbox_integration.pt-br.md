@@ -361,6 +361,22 @@ A capacidade `media.inspect` (provider `pure-media-inspect`, PR
   Toolbox repetiria uma imagem isolada sem audiodescrição depois que a Toolbox
   voltasse.
 
+  O mesmo vale para as imagens e tabelas que uma falha deixou sem descrição ou
+  sem leitura. Elas são contadas por motivo em
+  `canonical_metadata.pddl_visual_failures`
+  (`{"pictures": {"model_failed": 1, "crop_unavailable": 2}, "tables": {"model_failed": 1}}`,
+  `null` quando nada falhou): `model_failed` quando o modelo de visão ou o
+  agente de dados não respondeu, `crop_unavailable` quando a Toolbox não
+  conseguiu renderizar o recorte. Uma imagem conta qualquer que seja o tipo do
+  elemento, já que os placeholders de um documento majoritariamente visual
+  também são descritos; o motivo fica em `metadata.vision_failure_reason`, e o
+  de uma tabela em `metadata.table_read_failure`. O documento informa quantas
+  imagens não puderam ser descritas e quantas tabelas não puderam ser lidas.
+  Uma descrição vazia e uma leitura de tabela recusada por ser pior que a
+  tabela são respostas do modelo, então não contam nem impedem o cache. Uma
+  entrada em cache que registra falha não é reaproveitada, e uma nova execução
+  ainda degradada a descarta.
+
 Os predicados PDDL `media_inspected`/`media_profile_classified` pertencem ao
 domínio da Toolbox; no core o sinal é consumido apenas como heurística de
 enriquecimento e não entra no problema de planejamento.
