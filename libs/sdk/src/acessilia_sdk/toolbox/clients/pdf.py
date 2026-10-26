@@ -1,4 +1,4 @@
-"""Client for ``pdf.split`` and ``pdf.render``."""
+"""Client for ``pdf.split``, ``pdf.render`` and ``document.text.spans``."""
 
 from __future__ import annotations
 
@@ -13,6 +13,9 @@ from acessilia_sdk.toolbox.errors import ToolboxContractViolation
 
 SPLIT_CAPABILITY = "pdf.split"
 RENDER_CAPABILITY = "pdf.render"
+TEXT_SPANS_CAPABILITY = "document.text.spans"
+#: Pages ``document.text.spans@1`` reads per call at most.
+TEXT_SPANS_MAX_PAGES = 200
 
 
 #: Origin of the coordinates of a requested ``clip``.
@@ -150,10 +153,48 @@ class ToolboxPdfClient(ToolboxCapabilityClient):
             )
         return RenderedPage(image=image, clip=clip_applied, document=document)
 
+    async def text_spans(
+        self,
+        file_path: Path | None = None,
+        artifact_id: str | None = None,
+        *,
+        pages: list[int] | None = None,
+        use_remote_cache: bool | None = None,
+    ) -> dict[str, Any]:
+        """The text layer of a PDF with fonts and geometry (``document.text.spans@1``).
+
+        Returns the ``artifact/text-spans@1`` document: ``page_count``,
+        ``coord_origin`` (``TOPLEFT``) and ``pages``, each with ``page_number``,
+        ``width``, ``height``, ``rotation`` and ``lines`` of ``spans``
+        (``text``, ``font``, ``size``, ``flags``, ``bbox``, ``origin``). At most
+        ``TEXT_SPANS_MAX_PAGES`` pages per call.
+        """
+        parameters: dict[str, Any] = {}
+        if pages is not None:
+            parameters["pages"] = pages
+        result = await self._execute(
+            TEXT_SPANS_CAPABILITY,
+            file_path=file_path,
+            artifact_id=artifact_id,
+            parameters=parameters,
+            no_cache=use_remote_cache is False,
+        )
+        document = result.get("document")
+        context = f"{TEXT_SPANS_CAPABILITY}@1"
+        if not isinstance(document, dict) or not isinstance(document.get("pages"), list):
+            raise ToolboxContractViolation(f"{context} response has no pages")
+        if document.get("coord_origin") != "TOPLEFT":
+            raise ToolboxContractViolation(
+                f"{context} returned coordinates from {document.get('coord_origin')!r}"
+            )
+        return document
+
 
 __all__ = [
     "RENDER_CAPABILITY",
     "SPLIT_CAPABILITY",
+    "TEXT_SPANS_CAPABILITY",
+    "TEXT_SPANS_MAX_PAGES",
     "ClipOrigin",
     "RenderedPage",
     "ToolboxPdfClient",

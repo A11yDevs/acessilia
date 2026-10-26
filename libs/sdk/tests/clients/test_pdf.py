@@ -313,3 +313,53 @@ async def test_auth_header_is_sent_when_configured(respx_mock):
     await client.split(file_path=FIXTURE_PDF)
 
     assert route.calls.last.request.headers["Authorization"] == "Bearer secret-key"
+
+# ---------------------------------------------------------------------------
+# document.text.spans
+# ---------------------------------------------------------------------------
+
+SAMPLE_SPANS_RESPONSE = {
+    "status": "succeeded",
+    "capability": "document.text.spans",
+    "provider": "pymupdf-pdf",
+    "document": {
+        "page_count": 3,
+        "coord_origin": "TOPLEFT",
+        "pages": [
+            {
+                "page_number": 2, "width": 612.0, "height": 792.0, "rotation": 0,
+                "lines": [{"bbox": [64.9, 214.0, 532.7, 230.8], "spans": [
+                    {"text": "s", "font": "CMMI12", "size": 11.96, "flags": 4,
+                     "bbox": [498.96, 216.99, 504.47, 228.95], "origin": [498.96, 225.96]},
+                ]}],
+            }
+        ],
+    },
+}
+
+
+def _mock_spans(respx_mock, response=None):
+    route = respx_mock.post("http://localhost:8002/v1/capabilities/document.text.spans:execute")
+    route.return_value = httpx.Response(200, json=response or SAMPLE_SPANS_RESPONSE)
+    return route
+
+
+@pytest.mark.asyncio
+async def test_text_spans_sends_the_pages_and_returns_the_document(respx_mock, client):
+    route = _mock_spans(respx_mock)
+
+    document = await client.text_spans(file_path=FIXTURE_PDF, pages=[2])
+
+    assert document["pages"][0]["lines"][0]["spans"][0]["font"] == "CMMI12"
+    assert _form_parameters(route) == {"pages": [2]}
+
+
+@pytest.mark.asyncio
+async def test_text_spans_refuses_another_coordinate_origin(respx_mock, client):
+    _mock_spans(
+        respx_mock,
+        {**SAMPLE_SPANS_RESPONSE, "document": {**SAMPLE_SPANS_RESPONSE["document"], "coord_origin": "BOTTOMLEFT"}},
+    )
+
+    with pytest.raises(ToolboxContractViolation):
+        await client.text_spans(file_path=FIXTURE_PDF)
