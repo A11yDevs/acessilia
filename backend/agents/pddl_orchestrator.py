@@ -23,6 +23,12 @@ from docstruct.tables.ast import (
 )
 from docstruct.text.latex import has_latex_markup, latex_text_agreement
 from docstruct.text.norm_fix import norm_fix
+from docstruct.text.negation_overlay import (
+    compose_negation,
+    is_detached_overlay,
+    locate_in_grid,
+    locate_in_text,
+)
 from docstruct.text.unicode_repair import (
     Detection,
     UnicodeRepairContext,
@@ -581,6 +587,120 @@ def _repair_table_cells(
     return edited, rules, edits, review
 
 
+#: Slack, in PDF points, when finding the element a negation slash lies in.
+_OVERLAY_HOST_TOLERANCE = 1.5
+#: A text line is about this many slash heights tall (glyph plus leading).
+_OVERLAY_LINE_HEIGHTS = 1.25
+
+
+def _bbox(element: ManifestElement) -> tuple[int, Any] | None:
+    for provenance in element.provenance or []:
+        if provenance.bbox is not None:
+            return provenance.page_number, provenance.bbox
+    return None
+
+
+def _vertical(box: Any) -> tuple[float, float]:
+    """``(upper, lower)`` edges in a downward axis, whatever the box's origin."""
+    if box.coord_origin == "BOTTOMLEFT":
+        return -box.top, -box.bottom
+    return min(box.top, box.bottom), max(box.top, box.bottom)
+
+
+def _table_rows(element: ManifestElement) -> list[list[dict[str, Any]]]:
+    table_ast = element.metadata.get("table_ast")
+    if not isinstance(table_ast, dict):
+        return []
+    return [
+        [cell for cell in row.get("cells") or [] if isinstance(cell, dict)]
+        for section in _TABLE_SECTIONS
+        for row in table_ast.get(section) or []
+        if isinstance(row, dict)
+    ]
+
+
+def _reattach_negation_overlays(manifest: ProcessingManifest) -> dict[str, int]:
+    """Give each detached ``≠`` slash back to the relation it negates.
+
+    A legacy TeX text layer may extract the slash TeX lays over ``=`` as its own
+    element (``U+0338`` alone), leaving ``h = 0`` where the page says
+    ``h ≠ 0``. The slash's box is the only link back: the element containing it
+    is found on the same page, the slash's position inside it is estimated, and
+    ``docstruct.text.negation_overlay`` picks the relation only when the choice
+    is unambiguous — composing the wrong ``=`` would invert a true statement.
+    A formula whose text is already LaTeX (recognized, #253) is not touched.
+
+    Every slash element is then left out of the payload (``negation_overlay``
+    metadata, with the outcome), since a lone combining mark says nothing to a
+    reader. Returns the count per outcome.
+    """
+    outcomes: dict[str, int] = {}
+    overlays = [element for element in manifest.elements if is_detached_overlay(element.text)]
+    for overlay in overlays:
+        located = _bbox(overlay)
+        outcome, host_id = "no-host", None
+        if located is not None:
+            page, box = located
+            x = (box.left + box.right) / 2
+            upper, lower = _vertical(box)
+            y = (upper + lower) / 2
+            slash_height = (lower - upper) or 12.0
+            hosts = []
+            for element in manifest.elements:
+                if element is overlay or is_detached_overlay(element.text):
+                    continue
+                other = _bbox(element)
+                if other is None or other[0] != page:
+                    continue
+                top, bottom = _vertical(other[1])
+                if (
+                    other[1].left - _OVERLAY_HOST_TOLERANCE <= x <= other[1].right + _OVERLAY_HOST_TOLERANCE
+                    and top - _OVERLAY_HOST_TOLERANCE <= y <= bottom + _OVERLAY_HOST_TOLERANCE
+                ):
+                    hosts.append((element, other[1], top, bottom))
+            if len(hosts) > 1:
+                outcome = "ambiguous-host"
+            elif hosts:
+                host, host_box, top, bottom = hosts[0]
+                host_id = host.id
+                height = max(bottom - top, 1e-6)
+                width = max(host_box.right - host_box.left, 1e-6)
+                y_fraction = min(max((y - top) / height, 0.0), 1.0)
+                x_fraction = (x - host_box.left) / width
+                outcome = "ambiguous"
+                if host.type == "table":
+                    rows = _table_rows(host)
+                    columns = max((len(row) for row in rows), default=0)
+                    found = locate_in_grid(
+                        [[str(cell.get("text") or "") for cell in row] for row in rows],
+                        row_position=y_fraction * len(rows),
+                        column_position=x_fraction * columns,
+                    ) if rows and columns else None
+                    if found is not None:
+                        row, column, index = found
+                        cell = rows[row][column]
+                        cell["text"] = compose_negation(str(cell["text"]), index)
+                        outcome = "composed"
+                elif host.type == "formula" and has_latex_markup(host.text):
+                    outcome = "host-is-latex"
+                elif host.text:
+                    lines = max(1, round(height / (slash_height * _OVERLAY_LINE_HEIGHTS)))
+                    index = locate_in_text(
+                        host.text, lines=lines, line_position=y_fraction * lines,
+                        x_fraction=x_fraction,
+                    )
+                    if index is not None:
+                        host.text = compose_negation(host.text, index)
+                        outcome = "composed"
+                if outcome == "composed":
+                    host.metadata["negation_overlays"] = host.metadata.get("negation_overlays", 0) + 1
+        overlay.metadata["negation_overlay"] = {"outcome": outcome, "host": host_id}
+        outcomes[outcome] = outcomes.get(outcome, 0) + 1
+    if outcomes:
+        logger.info("Detached negation slashes: {}", outcomes)
+    return outcomes
+
+
 def _handle_unicode_repair_method(
     manifest: ProcessingManifest, obligation_id: str
 ) -> MethodResult:
@@ -597,12 +717,16 @@ def _handle_unicode_repair_method(
     if not elements:
         return _missing_obligation(obligation_id)
 
+    # Before the per-element repair, so the reattached ``≠`` is in the text
+    # the repair reads, and the slash elements are not counted for review.
+    _reattach_negation_overlays(manifest)
+
     language = manifest.language or "pt-BR"
     eligible: list[tuple[ManifestElement, str]] = []
     detections: dict[str, Detection] = {}
     for element in elements:
         text = unicode_repair_text(element)
-        if not text:
+        if not text or is_detached_overlay(element.text):
             continue
         if element.type == "table":
             block_type = "table"
@@ -4074,11 +4198,18 @@ def _unsatisfied_obligations(manifest: ProcessingManifest) -> list[dict[str, Any
 def _is_left_out_of_payload(element: ManifestElement) -> bool:
     """A page accepted as blank, or a placeholder not yet inspected, adds nothing.
 
+    Nor does a detached negation slash: it was given back to its relation, or
+    could not be, and alone it says nothing to a reader.
+
     An inspected page with content is a ``picture``, no longer a placeholder.
     A placeholder still present means the inspection did not run (dry-run), so
     the page contributes no block rather than its raw label.
     """
-    return bool(element.metadata.get("blank_page")) or is_unstructured_page_placeholder(element)
+    return (
+        bool(element.metadata.get("blank_page"))
+        or bool(element.metadata.get("negation_overlay"))
+        or is_unstructured_page_placeholder(element)
+    )
 
 
 def _manifest_pages_to_payload(manifest: ProcessingManifest) -> list[dict[str, Any]]:

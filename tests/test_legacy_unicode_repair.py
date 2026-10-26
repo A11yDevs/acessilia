@@ -9,7 +9,7 @@ from __future__ import annotations
 from backend.agents import pddl_orchestrator as pddl
 from backend.config.settings import settings
 from backend.core.manifest.builder import _derive_v23_processing_needs
-from backend.core.manifest.models import Observation, Obligation
+from backend.core.manifest.models import BoundingBox, Observation, Obligation, Provenance
 from tests.pddl_support import build_element, build_manifest, build_orchestrator
 
 BRASILIA = "Bras\u0131\u0301lia"
@@ -397,3 +397,89 @@ class TestDetectModeTechnicalWarning:
 
 def test_kind_is_not_critical():
     assert "repair-legacy-unicode" in pddl.NON_CRITICAL_OBLIGATION_KINDS
+
+
+
+# ── Detached negation slashes (U+0338 extracted as its own element) ─────────
+
+
+def _placed(element_id, element_type, box, *, text=None, metadata=None, page=1):
+    element = build_element(element_id, element_type, text=text, metadata=metadata)
+    left, top, right, bottom = box
+    element.provenance = [
+        Provenance(
+            page_number=page,
+            bbox=BoundingBox(left=left, top=top, right=right, bottom=bottom, coord_origin="BOTTOMLEFT"),
+        )
+    ]
+    return element
+
+
+def _slash(x, y):
+    return _placed("slash-1", "paragraph", (x, y + 6, x, y - 6), text="̸")
+
+
+def _repair(*elements):
+    manifest = build_manifest(list(elements), [_obligation([e.id for e in elements])])
+    pddl._handle_unicode_repair_method(manifest, "o-unicode")
+    return manifest
+
+
+class TestNegationOverlays:
+    PARAGRAPH = (
+        "para cada valor h = 0, a velocidade entre o instante inicial t = 2 e o "
+        "instante final t = 2 + h e mais texto para a segunda linha do paragrafo"
+    )
+
+    def test_slash_is_composed_into_its_relation_and_left_out(self):
+        host = _placed("element-1", "paragraph", (65, 488, 533, 442), text=self.PARAGRAPH)
+        slash = _slash(205, 480)  # first line, where "h = 0" is
+
+        _repair(host, slash)
+
+        assert host.text.startswith("para cada valor h ≠ 0,")
+        assert "t = 2 e" in host.text and "t = 2 + h" in host.text
+        assert host.metadata["negation_overlays"] == 1
+        assert slash.metadata["negation_overlay"] == {"outcome": "composed", "host": "element-1"}
+        assert pddl._is_left_out_of_payload(slash)
+
+    def test_table_header_cell_is_composed(self):
+        table = _placed("element-1", "table", (188, 430, 409, 286), metadata={"table_ast": {"body": [
+            {"cells": [{"text": "h = 0"}, {"text": "t = 2+ h"}, {"text": "media"}]},
+            {"cells": [{"text": "2"}, {"text": "4"}, {"text": "28"}]},
+        ]}})
+        slash = _slash(205, 419)
+
+        _repair(table, slash)
+
+        cells = table.metadata["table_ast"]["body"][0]["cells"]
+        assert [cell["text"] for cell in cells] == ["h ≠ 0", "t = 2+ h", "media"]
+
+    def test_a_recognized_formula_is_not_touched(self):
+        formula = _placed("element-1", "formula", (144, 675, 453, 663), text=r"h \neq 0")
+        slash = _slash(425, 669)
+
+        _repair(formula, slash)
+
+        assert formula.text == r"h \neq 0"
+        assert slash.metadata["negation_overlay"]["outcome"] == "host-is-latex"
+        assert pddl._is_left_out_of_payload(slash)
+
+    def test_an_ambiguous_slash_changes_nothing(self):
+        host = _placed("element-1", "paragraph", (100, 112, 200, 100), text="a = b = c")
+        slash = _slash(150, 106)  # midway between the two "="
+
+        _repair(host, slash)
+
+        assert host.text == "a = b = c"
+        assert slash.metadata["negation_overlay"]["outcome"] == "ambiguous"
+        assert pddl._is_left_out_of_payload(slash)
+
+    def test_a_slash_outside_any_element_is_only_left_out(self):
+        host = _placed("element-1", "paragraph", (100, 112, 200, 100), text="h = 0")
+        slash = _slash(400, 300)
+
+        _repair(host, slash)
+
+        assert host.text == "h = 0"
+        assert slash.metadata["negation_overlay"] == {"outcome": "no-host", "host": None}
