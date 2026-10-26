@@ -185,6 +185,7 @@ trabalho de benchmark produziu, todas como funções puras:
 | `fusion.table_specialist` | o medoide de tabela (gerar-comparar-adjudicar) |
 | `text.normalize`, `text.norm_fix`, `text.latex` | primitivas de normalização de texto |
 | `text.unicode_repair` | reparo conservador de NFC, i sem ponto e acentos espaçadores em PDFs TeX legados (prosa, cabeçalhos e células de tabela); com evidência no nível do documento, também a crase (`` ` a`` → `à`) e ligaduras partidas (`fi ca` → `fica`) |
+| `text.math_spans` | separa a prosa em pedaços de texto e de math inline `$…$` / `\(…\)` (regra `tex_math_dollars` do Pandoc; `R$ 10,00` continua texto) |
 | `text.negation_overlay` | devolve a barra solta do `≠` (U+0338 extraído como elemento próprio) à relação que ela nega, pela posição; só quando a escolha é inequívoca |
 | `imaging.policy` | decisões puras de upscale/orientação (sem PIL/cv2) |
 | `docstruct.fusion.verse` | chunk verse/record blocks so the evaluator can re-group them |
@@ -203,6 +204,7 @@ trabalho de benchmark produziu, todas como funções puras:
 | `docstruct.text.unicode_repair` | conservative NFC, dotless-i, spacing, crase and split-ligature repair for legacy TeX PDFs |
 | `docstruct.text.negation_overlay` | reattaches a detached negation slash to its relation by position (unambiguous cases only) |
 | `docstruct.text.latex` | LaTeX normalization |
+| `docstruct.text.math_spans` | inline math spans in prose |
 | `docstruct.imaging.policy` | pure upscale/orientation decisions (no PIL/cv2) |
 | `docstruct.evaluation.holdout` | the tune/holdout split and the acceptance criteria |
 

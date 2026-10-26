@@ -16,10 +16,13 @@ from copy import deepcopy
 
 
 class MathEnricher:
-    """Protocol for LaTeX enrichment (normalize / MathML / verbalization).
+    """Protocol for LaTeX enrichment (normalize / MathML / two verbalizations).
 
     The lib stays pure: the backend injects an implementation (the core's
-    calls the Toolbox's ``math.convert`` and ``math.verbalize``).
+    calls the Toolbox's ``math.convert`` and ``math.verbalize``). ``verbalize``
+    speaks a math block, labelled as a formula; ``verbalize_inline`` speaks a
+    formula read inside a sentence. Implementations are duck-typed, so
+    ``verbalize_inline`` is optional: without it inline spans get no speech.
     """
 
     def normalize(self, latex: str) -> str:
@@ -200,12 +203,16 @@ def _enrich_inline_math(
             mathml = math_enricher.to_mathml(latex)
             if mathml:
                 entry["mathml"] = mathml
-            speech = math_enricher.verbalize_inline(latex)
+            verbalize_inline = getattr(math_enricher, "verbalize_inline", None)
+            speech = verbalize_inline(latex) if verbalize_inline else ""
             if speech:
                 entry["speech"] = speech
             cache[source] = entry
         entries[source] = dict(cache[source])
-    block.setdefault("metadata", {})["inline_math"] = list(entries.values())
+    metadata = block.get("metadata")
+    if not isinstance(metadata, dict):
+        metadata = block["metadata"] = {}
+    metadata["inline_math"] = list(entries.values())
 
 
 

@@ -79,13 +79,18 @@ def _render_block(block: dict[str, Any], formula_label: str = DEFAULT_FORMULA_LA
 
 
 def _prose_text(text: str, block: dict[str, Any]) -> str:
-    """Prose whose ``$…$`` spans are read: their speech, else their bare LaTeX.
+    """Prose whose ``$…$`` spans are read: their speech, else their bare LaTeX
+    (normalized when the canonical enrichment saw it).
 
     The TXT is also what the MP3 speaks, so a formula inside a sentence is
     read in it ("s de t igual a t ao cubo") rather than spelled with dollars.
     """
     entries = inline_math_entries(block)
     return "".join(
-        str(entries.get(piece, {}).get("speech") or piece) if is_math else piece
+        _spoken(entries.get(piece, {}), piece) if is_math else piece
         for piece, is_math in split_inline_math(str(text))
     )
+
+
+def _spoken(entry: dict[str, Any], source: str) -> str:
+    return str(entry.get("speech") or entry.get("latex") or source)

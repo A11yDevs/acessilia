@@ -210,9 +210,11 @@ def _render_block(
 def _prose_html(text: str, block: dict[str, Any]) -> str:
     """Escaped prose whose ``$…$`` spans are rendered as inline math.
 
-    A span with MathML becomes that MathML; one without keeps its LaTeX as
-    text, without the delimiters, and is labelled with its speech when the
-    enrichment produced one, as a math block without MathML is.
+    Each span is a ``role="math"`` element labelled with its speech, as a math
+    block is: the MathML when the enrichment produced it, else the
+    (normalized) LaTeX without delimiters. A document that did not go through
+    the canonical enrichment has no entries, and its spans keep the LaTeX,
+    still marked as math.
     """
     entries = inline_math_entries(block)
     parts: list[str] = []
@@ -221,14 +223,12 @@ def _prose_html(text: str, block: dict[str, Any]) -> str:
             parts.append(escape(piece))
             continue
         entry = entries.get(piece, {})
-        speech = escape(str(entry.get("speech") or ""))
-        mathml = _safe_mathml(entry.get("mathml", ""))
-        if mathml:
-            parts.append(mathml)
-        elif speech:
-            parts.append(f'<span role="math" aria-label="{speech}">{escape(piece)}</span>')
-        else:
-            parts.append(escape(piece))
+        speech = str(entry.get("speech") or "")
+        label = f' aria-label="{escape(speech)}"' if speech else ""
+        content = _safe_mathml(entry.get("mathml", "")) or escape(
+            str(entry.get("latex") or piece)
+        )
+        parts.append(f'<span role="math"{label}>{content}</span>')
     return "".join(parts)
 
 

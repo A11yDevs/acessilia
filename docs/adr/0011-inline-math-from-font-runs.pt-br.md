@@ -29,20 +29,22 @@ Opções consideradas para a detecção:
 
 ## Decisão
 
-- **A representação é `$…$` na prosa.** Math inline em parágrafo, item de lista ou callout é escrito no texto como `$…$` (ou `\(…\)`). A regra de separação é `docstruct.text.math_spans`: o `tex_math_dollars` do Pandoc, mais a exigência de que o `$` de abertura não venha depois de letra ou dígito, para que `R$ 10,00` continue texto.
+- **A representação é `$…$` na prosa.** Math inline em parágrafo, item de lista ou callout é escrito no texto como `$…$` (ou `\(…\)`). A regra de separação é `docstruct.text.math_spans`: o `tex_math_dollars` do Pandoc, mais a exigência de que o `$` de abertura não venha depois de um caractere de palavra (letra, dígito ou `_`), de uma barra invertida ou de outro `$`, para que `R$ 10,00` continue texto. Em texto puro, uma linha com um span `$…$` no meio da prosa é um parágrafo, não um bloco math (`docstruct.blocks.parser`).
 - **O enriquecimento canônico converte cada span uma vez.** Ele chama `math.convert` e `math.verbalize`, com cache por documento, e guarda o resultado em `block.metadata["inline_math"]` como `{source, latex, mathml?, speech?}`, indexado pelo LaTeX de origem. A fala inline não leva o rótulo "Fórmula:" (`MathEnricher.verbalize_inline`).
 - **Os exportadores devem renderizar o span como math, nunca com os delimitadores literais:**
   - **AST Pandoc** (PDF/UA, DOCX): `InlineMath`, envolto no span de alt de fórmula quando há fala.
-  - **HTML:** o MathML sanitizado. Sem MathML, o LaTeX rotulado com a fala.
+  - **HTML:** um span `role="math"` rotulado com a fala, como num bloco math. Ele contém o MathML sanitizado, ou o LaTeX quando não há MathML.
   - **TXT/MP3:** a fala. Sem fala, o LaTeX sem delimitadores.
 - **A detecção lê as fontes matemáticas do PDF** (opção 3). Ler fontes é operacional, então pelo [ADR-0003](0003-remote-only-operational-capabilities.pt-br.md) é uma capability da Toolbox (`document.text.spans`). Montar o LaTeX a partir dos spans é um algoritmo puro da docstruct. O core casa cada corrida com o texto do elemento e insere o `$…$`. Uma corrida que ele não consegue casar deixa o texto como está.
 
 ## Consequências
 
-- Qualquer produtor que escreva `$…$` (OCR de página, MinerU, o detector de fontes) passa a ter saída em math sem trabalho extra.
+- Qualquer produtor que escreva `$…$` (OCR de página, MinerU, o detector de fontes) passa a ter saída em math sem trabalho extra, desde que o documento passe pelo build canônico com um enricher de math.
+- A conversão só acontece no build canônico. Um documento canônico que o pulou (por exemplo, um passado aos exportadores como dict) não tem `inline_math`. Seus spans ainda viram math no AST Pandoc, mas o HTML marca o LaTeX com `role="math"` sem MathML nem fala, e o TXT lê o LaTeX sem delimitadores. A exportação não chama a Toolbox de novo.
 - Um span que o `math.convert` rejeita ainda vira math no AST Pandoc. O degrade-and-retry do PDF/UA (`degrade_math_to_text`) cobre uma falha de compilação, como já faz para blocos math.
 - A detecção só cobre PDFs com fonte matemática na camada de texto (TeX e a maior parte da math tipografada). Páginas escaneadas passam pelo modelo de OCR de página, que já emite `$…$`.
 - Fora do escopo:
   - `inline_math_promote` (um parágrafo só de math vira display) continua sem uso.
   - O `FORMULA_RE` do roteador de fusão continua ignorando um `$` simples.
+  - Células e legendas de tabela mantêm o `$…$` como texto (a #260 cuida de math em tabelas).
 - Conformidade: `tests/test_inline_math.py` cobre a regra de separação e cada exportador. A detecção é medida pelo scorecard de referência de math; a meta é "Inline expressions as math" ≥ 90% no caso 036.

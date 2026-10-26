@@ -23,7 +23,10 @@ _INLINE_MATH_RE = re.compile(
     re.DOTALL,
 )
 
-#: Block types whose text is prose that can carry inline math.
+#: Block types whose text is prose that can carry inline math. The HTML, TXT
+#: and Pandoc AST exporters render these types through their ``_prose_*``
+#: helper: a new prose type goes here and in the three exporters. Table cells
+#: and captions are not covered yet (#260).
 INLINE_MATH_BLOCK_TYPES = frozenset(
     {"paragraph", "list", "quote", "details", "note", "warning"}
 )

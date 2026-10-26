@@ -176,6 +176,7 @@ benchmark work produced, all as pure functions:
 | `fusion.table_specialist` | the generate-compare-adjudicate table medoid |
 | `text.normalize`, `text.norm_fix`, `text.latex` | text normalization primitives |
 | `text.unicode_repair` | conservative NFC, dotless-i and spacing repair for legacy TeX PDFs (prose, headers and table cells); with document-level evidence, also the crase (`` ` a`` → `à`) and split ligatures (`fi ca` → `fica`) |
+| `text.math_spans` | splits prose into text and inline `$…$` / `\(…\)` math pieces (Pandoc's `tex_math_dollars` rule; `R$ 10,00` stays text) |
 | `text.negation_overlay` | gives a detached `≠` slash (U+0338 extracted as its own element) back to the relation it negates, from its position; only when the choice is unambiguous |
 | `imaging.policy` | pure upscale/orientation decisions (no PIL/cv2) |
 | `docstruct.fusion.verse` | chunk verse/record blocks so the evaluator can re-group them |
@@ -194,6 +195,7 @@ benchmark work produced, all as pure functions:
 | `docstruct.text.unicode_repair` | conservative NFC, dotless-i, spacing, crase and split-ligature repair for legacy TeX PDFs |
 | `docstruct.text.negation_overlay` | reattaches a detached negation slash to its relation by position (unambiguous cases only) |
 | `docstruct.text.latex` | LaTeX normalization |
+| `docstruct.text.math_spans` | inline math spans in prose |
 | `docstruct.imaging.policy` | pure upscale/orientation decisions (no PIL/cv2) |
 | `docstruct.evaluation.holdout` | the tune/holdout split and the acceptance criteria |
 
