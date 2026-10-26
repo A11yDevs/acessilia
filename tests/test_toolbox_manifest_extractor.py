@@ -522,3 +522,37 @@ def test_secondary_on_another_deployment_receives_source_not_primary_artifact(
         use_remote_cache=True,
     )
     secondary.close.assert_awaited_once()
+
+
+@pytest.mark.parametrize("failure_name", ["ToolboxTimeout", "ToolboxProviderUnavailable"])
+def test_transient_upload_failure_uses_direct_extraction(
+    mock_client, mock_artifact_client, failure_name
+):
+    from acessilia_sdk.toolbox import errors
+
+    mock_artifact_client.upload.side_effect = getattr(errors, failure_name)("upload unavailable")
+    mock_client.extract_structure.return_value = SAMPLE_TOOLBOX_RESPONSE
+    result = ToolboxManifestExtractor(
+        client=mock_client, artifact_client=mock_artifact_client, use_artifact_store=True,
+    ).extract(FIXTURE_PDF, dual_fusion=False)
+    mock_client.extract_structure.assert_awaited_once_with(
+        file_path=FIXTURE_PDF.resolve(), artifact_id=None, language="pt-BR", use_remote_cache=True,
+    )
+    assert result.artifact_id is None
+    assert result.configuration["use_artifact_store"] is False
+    assert result.configuration["artifact_upload_error"] == failure_name
+
+
+@pytest.mark.parametrize("failure_name", [
+    "ToolboxAuthenticationError", "ToolboxInvalidInput", "ToolboxContractViolation",
+])
+def test_permanent_upload_failure_is_not_bypassed(mock_client, mock_artifact_client, failure_name):
+    from acessilia_sdk.toolbox import errors
+
+    failure = getattr(errors, failure_name)("permanent failure")
+    mock_artifact_client.upload.side_effect = failure
+    with pytest.raises(type(failure)):
+        ToolboxManifestExtractor(
+            client=mock_client, artifact_client=mock_artifact_client, use_artifact_store=True,
+        ).extract(FIXTURE_PDF, dual_fusion=False)
+    mock_client.extract_structure.assert_not_awaited()

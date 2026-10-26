@@ -1494,6 +1494,12 @@ msgstr ""
 "imagem isolada: {error}"
 
 #, python-brace-format
+msgid "Artifact upload unavailable ({error}); extracting from the source file."
+msgstr ""
+"Upload do artefato indisponível ({error}); extraindo a partir do arquivo "
+"original."
+
+#, python-brace-format
 msgid "PDF/UA rendered by the Toolbox: {output_path}"
 msgstr "PDF/UA renderizado pela Toolbox: {output_path}"
 

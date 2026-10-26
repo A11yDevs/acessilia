@@ -12,10 +12,14 @@ from typing import TYPE_CHECKING, Any
 from acessilia_sdk.toolbox.clients import ToolboxArtifactClient, ToolboxStructureClient
 
 from backend.config.settings import settings
+from backend.i18n import t
+from backend.log_messages import LOG_ARTIFACT_UPLOAD_DEGRADED
 from backend.tools.logger import logger
 from backend.tools.toolbox_client import (
     ToolboxCapabilityClient,
     ToolboxError,
+    ToolboxProviderUnavailable,
+    ToolboxTimeout,
     make_toolbox_client,
 )
 
@@ -148,16 +152,23 @@ class ToolboxManifestExtractor:
         started_clock = perf_counter()
 
         artifact_id: str | None = None
+        upload_error: str | None = None
         use_artifact_store = (
             self.use_artifact_store
             and artifacts is not None
             and _one_artifact_endpoint(structure, artifacts)
         )
         if use_artifact_store and artifacts is not None:
-            artifact_id = await artifacts.upload(source_path)
-            logger.info(
-                "Toolbox: artifact {} stored ({})", artifact_id, source_path.name
-            )
+            try:
+                artifact_id = await artifacts.upload(source_path)
+            except (ToolboxTimeout, ToolboxProviderUnavailable) as exc:
+                upload_error = type(exc).__name__
+                use_artifact_store = False
+                logger.warning(t(LOG_ARTIFACT_UPLOAD_DEGRADED).format(error=upload_error))
+            else:
+                logger.info(
+                    "Toolbox: artifact {} stored ({})", artifact_id, source_path.name
+                )
 
         result = await structure.extract_structure(
             file_path=None if artifact_id else source_path,
@@ -252,6 +263,7 @@ class ToolboxManifestExtractor:
                 "toolbox_base_url": structure.base_url,
                 "toolbox_provider": structure.provider,
                 "use_artifact_store": use_artifact_store,
+                **({"artifact_upload_error": upload_error} if upload_error else {}),
                 "use_remote_cache": self.use_remote_cache,
                 "artifact_id": artifact_id,
                 "cache_key": cache_key,

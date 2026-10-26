@@ -1478,6 +1478,10 @@ msgstr ""
 "standalone-image signal: {error}"
 
 #, python-brace-format
+msgid "Artifact upload unavailable ({error}); extracting from the source file."
+msgstr "Artifact upload unavailable ({error}); extracting from the source file."
+
+#, python-brace-format
 msgid "PDF/UA rendered by the Toolbox: {output_path}"
 msgstr "PDF/UA rendered by the Toolbox: {output_path}"
 
