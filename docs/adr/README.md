@@ -26,6 +26,7 @@ ones here instead of restating them.
 | [0008](0008-math-capabilities-on-mathjax-and-mathcat.md) | The math capabilities run on MathJax and MathCAT | Accepted |
 | [0009](0009-legacy-unicode-repair.md) | Legacy PDF Unicode repair is a pure docstruct stage orchestrated by the core | Accepted |
 | [0010](0010-word-internal-spacing-diacritics.md) | Word-internal spacing diacritics are repaired; standalone ones require document evidence | Accepted |
+| [0011](0011-inline-math-from-font-runs.md) | Inline math is carried as `$…$` in prose and detected from the PDF's math fonts | Accepted |
 
 ## Process
 

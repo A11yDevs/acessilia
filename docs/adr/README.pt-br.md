@@ -26,6 +26,7 @@ ADRs apontam para os daqui em vez de repeti-los.
 | [0008](0008-math-capabilities-on-mathjax-and-mathcat.pt-br.md) | As capacidades de matemática rodam sobre MathJax e MathCAT | Aceito |
 | [0009](0009-legacy-unicode-repair.pt-br.md) | A reparação Unicode de PDFs legados é um estágio puro da docstruct orquestrado pelo core | Aceito |
 | [0010](0010-word-internal-spacing-diacritics.pt-br.md) | Acentos espaçadores internos à palavra são reparados; os isolados exigem evidência no documento | Aceito |
+| [0011](0011-inline-math-from-font-runs.pt-br.md) | Math inline viaja como `$…$` na prosa e é detectado pelas fontes matemáticas do PDF | Aceito |
 
 ## Processo
 
