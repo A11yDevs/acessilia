@@ -221,11 +221,6 @@ EXEMPT_STRINGS: list[tuple[str, str]] = [
     ("backend/agents/pddl_orchestrator.py", "Reparo Unicode aplicado em"),
     ("backend/agents/pddl_orchestrator.py", "para revisão"),
     ("backend/agents/pddl_orchestrator.py", "Texto com sinais de Unicode legado"),
-    # Undescribed picture — the alt text the document carries, with its reason
-    ("backend/agents/pddl_orchestrator.py", "Imagem sem descrição textual: {reason}."),
-    ("backend/agents/pddl_orchestrator.py", "não foi possível recortar a imagem da página"),
-    ("backend/agents/pddl_orchestrator.py", "o modelo de visão não respondeu"),
-    ("backend/agents/pddl_orchestrator.py", "o modelo de visão devolveu uma descrição vazia"),
     ("backend/core/manifest/builder.py", "Texto extraído de PDF legado contém Unicode"),
     # Text-layer formula agreement — Portuguese function names (máx, mín) that
     # pt-BR material prints, matched as a detection pattern

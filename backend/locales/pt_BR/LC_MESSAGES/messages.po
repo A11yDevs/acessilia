@@ -1035,6 +1035,9 @@ msgstr "Sumário"
 msgid "Technical metadata"
 msgstr "Metadados técnicos"
 
+msgid "Image without a text description."
+msgstr "Imagem sem descrição textual."
+
 msgid "Image description"
 msgstr "Descrição da imagem"
 
@@ -1675,6 +1678,14 @@ msgstr ""
 "[página {page_num}] O provedor do modelo limitou a taxa da região {type};"
 " aguardando {delay}s antes de tentar de novo (reintenção por limite de "
 "taxa {retry}/{retries})"
+
+#, python-brace-format
+msgid ""
+"[page {page_num}] Region {type} got no answer in time ({error}); trying "
+"again (timeout retry {retry}/{retries})"
+msgstr ""
+"[página {page_num}] A região {type} não teve resposta a tempo ({error}); "
+"tentando de novo (reintenção por tempo esgotado {retry}/{retries})"
 
 #, python-brace-format
 msgid ""

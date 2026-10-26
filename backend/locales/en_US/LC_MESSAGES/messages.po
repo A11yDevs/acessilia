@@ -1021,6 +1021,9 @@ msgstr "Contents"
 msgid "Technical metadata"
 msgstr "Technical metadata"
 
+msgid "Image without a text description."
+msgstr "Image without a text description."
+
 msgid "Image description"
 msgstr "Image description"
 
@@ -1653,6 +1656,14 @@ msgid ""
 msgstr ""
 "[page {page_num}] The model provider rate-limited region {type}; waiting "
 "{delay}s before trying again (rate-limit retry {retry}/{retries})"
+
+#, python-brace-format
+msgid ""
+"[page {page_num}] Region {type} got no answer in time ({error}); trying "
+"again (timeout retry {retry}/{retries})"
+msgstr ""
+"[page {page_num}] Region {type} got no answer in time ({error}); trying "
+"again (timeout retry {retry}/{retries})"
 
 #, python-brace-format
 msgid ""
