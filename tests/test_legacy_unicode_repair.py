@@ -9,7 +9,7 @@ from __future__ import annotations
 from backend.agents import pddl_orchestrator as pddl
 from backend.config.settings import settings
 from backend.core.manifest.builder import _derive_v23_processing_needs
-from backend.core.manifest.models import Observation, Obligation
+from backend.core.manifest.models import BoundingBox, Observation, Obligation, Provenance
 from tests.pddl_support import build_element, build_manifest, build_orchestrator
 
 BRASILIA = "Bras\u0131\u0301lia"
@@ -397,3 +397,185 @@ class TestDetectModeTechnicalWarning:
 
 def test_kind_is_not_critical():
     assert "repair-legacy-unicode" in pddl.NON_CRITICAL_OBLIGATION_KINDS
+
+
+
+# ── Detached negation slashes (U+0338 extracted as its own element) ─────────
+
+
+def _placed(element_id, element_type, box, *, text=None, metadata=None, page=1):
+    element = build_element(element_id, element_type, text=text, metadata=metadata)
+    left, top, right, bottom = box
+    element.provenance = [
+        Provenance(
+            page_number=page,
+            bbox=BoundingBox(left=left, top=top, right=right, bottom=bottom, coord_origin="BOTTOMLEFT"),
+        )
+    ]
+    return element
+
+
+def _slash(x, y, *, slash_id="slash-1", page=1):
+    return _placed(slash_id, "paragraph", (x, y + 6, x, y - 6), text="\u0338", page=page)
+
+
+def _repair(*elements):
+    manifest = build_manifest(list(elements), [_obligation([e.id for e in elements])])
+    pddl._handle_unicode_repair_method(manifest, "o-unicode")
+    return manifest
+
+
+class TestNegationOverlays:
+    PARAGRAPH = (
+        "para cada valor h = 0, a velocidade entre o instante inicial t = 2 e o "
+        "instante final t = 2 + h e mais texto para a segunda linha do paragrafo"
+    )
+
+    def test_slash_is_composed_into_its_relation_and_left_out(self):
+        host = _placed("element-1", "paragraph", (65, 488, 533, 442), text=self.PARAGRAPH)
+        slash = _slash(205, 480)  # first line, where "h = 0" is
+
+        _repair(host, slash)
+
+        assert host.text.startswith("para cada valor h ≠ 0,")
+        assert "t = 2 e" in host.text and "t = 2 + h" in host.text
+        assert host.metadata["negation_overlays"] == 1
+        assert slash.metadata["negation_overlay"] == {"outcome": "composed", "host": "element-1"}
+        assert pddl._is_left_out_of_payload(slash)
+
+    def test_table_header_cell_is_composed(self):
+        table = _placed("element-1", "table", (188, 430, 409, 286), metadata={"table_ast": {"body": [
+            {"cells": [{"text": "h = 0"}, {"text": "t = 2+ h"}, {"text": "media"}]},
+            {"cells": [{"text": "2"}, {"text": "4"}, {"text": "28"}]},
+        ]}})
+        slash = _slash(205, 419)
+
+        _repair(table, slash)
+
+        cells = table.metadata["table_ast"]["body"][0]["cells"]
+        assert [cell["text"] for cell in cells] == ["h ≠ 0", "t = 2+ h", "media"]
+
+    def test_a_recognized_formula_is_not_touched(self):
+        formula = _placed("element-1", "formula", (144, 675, 453, 663), text=r"h \neq 0")
+        slash = _slash(425, 669)
+
+        _repair(formula, slash)
+
+        assert formula.text == r"h \neq 0"
+        assert slash.metadata["negation_overlay"]["outcome"] == "host-is-latex"
+        assert pddl._is_left_out_of_payload(slash)
+
+    def test_an_ambiguous_slash_changes_nothing(self):
+        host = _placed("element-1", "paragraph", (100, 112, 200, 100), text="a = b = c")
+        slash = _slash(150, 106)  # midway between the two "="
+
+        _repair(host, slash)
+
+        assert host.text == "a = b = c"
+        assert slash.metadata["negation_overlay"]["outcome"] == "ambiguous"
+        assert pddl._is_left_out_of_payload(slash)
+
+    def test_a_slash_outside_any_element_is_only_left_out(self):
+        host = _placed("element-1", "paragraph", (100, 112, 200, 100), text="h = 0")
+        slash = _slash(400, 300)
+
+        _repair(host, slash)
+
+        assert host.text == "h = 0"
+        assert slash.metadata["negation_overlay"] == {"outcome": "no-host", "host": None}
+
+
+    # Review of #274: outcomes and boundaries not covered above.
+
+    def test_a_slash_in_two_overlapping_elements_is_ambiguous(self):
+        first = _placed("element-1", "paragraph", (100, 112, 300, 100), text="h = 0")
+        second = _placed("element-2", "paragraph", (150, 115, 350, 98), text="x = 1")
+        slash = _slash(200, 106)
+
+        _repair(first, second, slash)
+
+        assert first.text == "h = 0" and second.text == "x = 1"
+        assert slash.metadata["negation_overlay"] == {"outcome": "ambiguous-host", "host": None}
+
+    def test_two_slashes_on_one_host_are_both_composed(self):
+        text = "a = 1 e mais um bom trecho de texto para separar b = 2"
+        host = _placed("element-1", "paragraph", (100, 112, 100 + len(text) * 5, 100), text=text)
+        first = _slash(100 + text.index("=") * 5, 106, slash_id="slash-1")
+        second = _slash(100 + text.rindex("=") * 5, 106, slash_id="slash-2")
+
+        _repair(host, first, second)
+
+        assert host.text == text.replace("=", "≠")
+        assert host.metadata["negation_overlays"] == 2
+
+    def test_a_host_on_another_page_is_not_a_host(self):
+        host = _placed("element-1", "paragraph", (100, 112, 200, 100), text="h = 0", page=2)
+        slash = _slash(130, 106, page=1)
+
+        _repair(host, slash)
+
+        assert host.text == "h = 0"
+        assert slash.metadata["negation_overlay"] == {"outcome": "no-host", "host": None}
+
+    def test_a_host_without_a_relation_is_no_candidate(self):
+        host = _placed("element-1", "paragraph", (100, 112, 200, 100), text="sem relacao aqui")
+        slash = _slash(150, 106)
+
+        _repair(host, slash)
+
+        assert slash.metadata["negation_overlay"] == {"outcome": "no-candidate", "host": "element-1"}
+
+    def test_a_cell_with_two_relations_is_refused_even_with_a_neighbour(self):
+        table = _placed("element-1", "table", (100, 120, 300, 100), metadata={"table_ast": {"body": [
+            {"cells": [{"text": "a = b = c"}, {"text": "x = 1"}]},
+        ]}})
+        slash = _slash(130, 110)  # over the first, two-relation cell
+
+        _repair(table, slash)
+
+        cells = table.metadata["table_ast"]["body"][0]["cells"]
+        assert [cell["text"] for cell in cells] == ["a = b = c", "x = 1"]
+        assert slash.metadata["negation_overlay"]["outcome"] == "ambiguous"
+
+    def test_a_spanning_cell_keeps_the_columns_aligned(self):
+        """A colspan=2 cell takes two column slots, so the slash over the third
+        column finds the cell drawn there, not the one at AST index 2."""
+        table = _placed("element-1", "table", (100, 140, 400, 100), metadata={"table_ast": {"body": [
+            {"cells": [{"text": "titulo", "colspan": 2}, {"text": "h = 0"}]},
+            {"cells": [{"text": "1"}, {"text": "2"}, {"text": "t = 3"}]},
+        ]}})
+        slash = _slash(350, 130)  # row 0, third column
+
+        _repair(table, slash)
+
+        rows = table.metadata["table_ast"]["body"]
+        assert rows[0]["cells"][1]["text"] == "h ≠ 0"
+        assert rows[1]["cells"][2]["text"] == "t = 3"
+
+    def test_running_the_repair_again_keeps_the_first_outcome(self):
+        host = _placed("element-1", "paragraph", (65, 488, 533, 442), text=self.PARAGRAPH)
+        slash = _slash(205, 480)
+        manifest = build_manifest([host, slash], [_obligation(["element-1", "slash-1"])])
+
+        pddl._handle_unicode_repair_method(manifest, "o-unicode")
+        pddl._handle_unicode_repair_method(manifest, "o-unicode")
+
+        assert host.text.count("≠") == 1
+        assert host.metadata["negation_overlays"] == 1
+        assert slash.metadata["negation_overlay"] == {"outcome": "composed", "host": "element-1"}
+
+    def test_a_slash_over_a_spanning_cell_does_not_pick_its_neighbour(self):
+        """Over the second column of a colspan=2 cell. Counting AST cells as
+        columns would put the neighbour's centre right under the slash and
+        negate it with confidence; on the visual grid the call is close, so it
+        is refused."""
+        table = _placed("element-1", "table", (100, 140, 400, 100), metadata={"table_ast": {"body": [
+            {"cells": [{"text": "x = 1", "colspan": 2}, {"text": "y = 2"}]},
+            {"cells": [{"text": "1"}, {"text": "2"}, {"text": "3"}]},
+        ]}})
+        slash = _slash(240, 130)  # row 0, visual column 1.4
+
+        _repair(table, slash)
+
+        cells = table.metadata["table_ast"]["body"][0]["cells"]
+        assert [cell["text"] for cell in cells] == ["x = 1", "y = 2"]
