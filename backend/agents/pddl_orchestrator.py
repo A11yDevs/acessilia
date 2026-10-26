@@ -353,7 +353,10 @@ def _handle_vision_description_method(
             validated=False,
             message=(
                 "Imagem sem descrição textual: "
-                + ", ".join(el.id for el in undescribed)
+                + ", ".join(
+                    f"{el.id} ({reason})" if (reason := _vision_failure_reason(el)) else el.id
+                    for el in undescribed
+                )
             ),
         )
     return MethodResult(
@@ -2914,6 +2917,31 @@ class PddlAccessibilityOrchestrator:
         return sorted(requested - registered)
 
 
+# Calls per picture: the first, and one more after a provider error.
+_PICTURE_DESCRIPTION_ATTEMPTS = 2
+
+# Why a picture is left undescribed, as recorded in
+# metadata["vision_failure_reason"], worded for the reader of the alt text.
+_VISION_FAILURE_REASONS = {
+    "crop_unavailable": "não foi possível recortar a imagem da página",
+    "model_failed": "o modelo de visão não respondeu",
+    "empty_description": "o modelo de visão devolveu uma descrição vazia",
+}
+
+
+def _vision_failure_reason(element: ManifestElement) -> str | None:
+    """The reader-facing reason a picture was left undescribed, when one was recorded."""
+    return _VISION_FAILURE_REASONS.get(element.metadata.get("vision_failure_reason", ""))
+
+
+def _undescribed_picture_alt(element: ManifestElement) -> str:
+    """Alt text for a picture without a description, saying why when known."""
+    reason = _vision_failure_reason(element)
+    if reason:
+        return f"Imagem sem descrição textual: {reason}."
+    return "Imagem detectada sem descricao textual."
+
+
 async def _enrich_picture_descriptions(
     manifest: ProcessingManifest,
     source_file: Path,
@@ -2992,20 +3020,31 @@ async def _enrich_picture_descriptions(
                 manifest.source.media_type,
             )
             if not image_bytes:
+                element.metadata["vision_failure_reason"] = "crop_unavailable"
                 return False
 
-            vision_output = await vision.describe_region(
-                image_bytes=image_bytes,
-                # A whole presentation slide gets the page prompt and budget.
-                classification=(
-                    "full_page_image" if element.metadata.get("slide_visual") else "embedded_image"
-                ),
-                page_num=page_number,
-                total_pages=total_pages,
-                mode=mode,
-            )
+            # _run_with_retry only retries answers that fail validation; a
+            # provider error (a timeout, a rate limit under a whole deck's
+            # load) ends the call, so it gets one more try here.
+            vision_output = None
+            for _ in range(_PICTURE_DESCRIPTION_ATTEMPTS):
+                vision_output = await vision.describe_region(
+                    image_bytes=image_bytes,
+                    # A whole presentation slide gets the page prompt and budget.
+                    classification=(
+                        "full_page_image"
+                        if element.metadata.get("slide_visual")
+                        else "embedded_image"
+                    ),
+                    page_num=page_number,
+                    total_pages=total_pages,
+                    mode=mode,
+                )
+                if isinstance(vision_output, VisionOutput):
+                    break
 
         if not isinstance(vision_output, VisionOutput):
+            element.metadata["vision_failure_reason"] = "model_failed"
             return False
 
         logger.debug(
@@ -3036,7 +3075,9 @@ async def _enrich_picture_descriptions(
                     previous_type=previous_type,
                 )
         else:
-            element.text = vision_output.description
+            # An empty answer must not erase text the extractor already had.
+            if vision_output.description.strip():
+                element.text = vision_output.description
             if element.type != "picture":
                 previous_type = element.type
                 element.metadata["original_type"] = element.type
@@ -3054,7 +3095,9 @@ async def _enrich_picture_descriptions(
         # obligation that could not be satisfied. Report it so the operator
         # sees the model refused instead of a silent gap.
         if _has_meaningful_text(element):
+            element.metadata.pop("vision_failure_reason", None)
             return True
+        element.metadata["vision_failure_reason"] = "empty_description"
         logger.warning(
             t(LOG_PDDL_EMPTY_VISION_DESCRIPTION).format(
                 element_id=element.id
@@ -4403,7 +4446,7 @@ def _element_to_block(element: ManifestElement) -> dict[str, Any]:
         block.update(
             {
                 "type": "image",
-                "alt_text": text or "Imagem detectada sem descricao textual.",
+                "alt_text": text or _undescribed_picture_alt(element),
             }
         )
     elif element.type == "code":
