@@ -86,6 +86,10 @@ LOG_SMTP_NOT_CONFIGURED: str = (
 LOG_EMAIL_SENT: str = "E-mail sent successfully to {to_email}."
 #: Error logged after a notification email delivery attempt failed; {to_email} is the recipient, {error} the reason.
 LOG_EMAIL_SEND_ERROR: str = "Error sending e-mail to {to_email}: {error}"
+#: Warning logged when the failure-notification path raises before the mailer can report a delivery result; {task_id} identifies the job, {error} the reason.
+LOG_FAILURE_EMAIL_FAILED: str = "Failure e-mail for job {task_id} could not be sent: {error}"
+#: Warning logged when the mailer reports a failure notification was not delivered; {task_id} identifies the job.
+LOG_FAILURE_EMAIL_NOT_SENT: str = "Failure e-mail for job {task_id} was not sent"
 #: Subject line of the confirmation email sent when a source document has been received.
 EMAIL_CONFIRMATION_SUBJECT: str = "We received your file - Acessilia"
 #: Body of the confirmation email sent when a source document has been received; {filename} is the submitted file name.

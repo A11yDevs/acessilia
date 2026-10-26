@@ -68,6 +68,19 @@ def sent_failures(monkeypatch):
     return sent
 
 
+@pytest.fixture
+def warning_messages():
+    """Collect loguru warnings so a swallowed notification error stays visible."""
+    from loguru import logger as loguru_logger
+
+    messages: list[str] = []
+    handler_id = loguru_logger.add(
+        lambda message: messages.append(str(message)), level="WARNING"
+    )
+    yield messages
+    loguru_logger.remove(handler_id)
+
+
 class TestPagesLabel:
     def test_single_page(self):
         assert _pages_label([3, 3, None]) == t(STAGE_PAGE).format(page=3)
@@ -244,7 +257,9 @@ async def test_pipeline_failure_names_the_stage_once_and_emails_the_user(
     expected = describe_failure("vision model crashed", stage)
     assert persisted_mid_run == [stage]
     assert state_manager.obter(task_id)["erros"] == [expected]
+    assert state_manager.obter(task_id)["email_delivery"] == "sent"
     assert load_record(task_id)["status"]["erros"] == [expected]
+    assert load_record(task_id)["status"]["email_delivery"] == "sent"
     assert sent_failures == [("user@example.com", "006.pdf", expected)]
 
 
@@ -271,9 +286,91 @@ async def test_restart_reports_the_last_persisted_stage_and_emails_the_user(
     )
     assert status["status"] == "error"
     assert status["erros"] == [expected]
+    assert status["email_delivery"] == "sent"
     assert sent_failures == [("user@example.com", "006.pdf", expected)]
 
     # The error is saved before the e-mail goes out, so a server in a crash
     # loop does not e-mail the same interrupted job again on every restart.
     await recover_pending_jobs()
     assert len(sent_failures) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_broken_failure_email_keeps_the_job_error_and_records_the_failure(
+    job_db, monkeypatch, warning_messages
+):
+    """A mailer that raises must not mask the pipeline error or fail the job twice."""
+    from backend import service
+    from backend.api.worker import ApiJob, JobExecutor
+    from backend.services.job_store import load_record, save_request
+
+    task_id = "broken-mailer"
+    input_path = job_db / "006.pdf"
+    input_path.write_bytes(b"%PDF-1.4\n%%EOF\n")
+    output_dir = job_db / "output" / task_id
+    save_request(task_id, "token", {}, {"status": "queued"})
+
+    async def fail_pipeline(*args, **kwargs):
+        raise RuntimeError("vision model crashed")
+
+    async def broken_mailer(to_email, filename, error):
+        raise OSError("smtp offline")
+
+    monkeypatch.setattr(service.agente, "executar", fail_pipeline)
+    monkeypatch.setattr("backend.api.worker.send_failure_email", broken_mailer)
+
+    await JobExecutor().run(
+        ApiJob(
+            task_id=task_id,
+            file_path=input_path,
+            filename="006.pdf",
+            email="user@example.com",
+            output_dir=output_dir,
+        )
+    )
+
+    task = state_manager.obter(task_id)
+    assert task["status"] == "error"
+    [expected] = task["erros"]
+    assert "vision model crashed" in expected
+    assert task["email_delivery"] == "failed"
+    durable = load_record(task_id)["status"]
+    assert durable["status"] == "error"
+    assert durable["erros"] == [expected]
+    assert durable["email_delivery"] == "failed"
+    assert any(task_id in message for message in warning_messages)
+
+
+@pytest.mark.asyncio
+async def test_restart_records_a_failure_email_that_could_not_be_sent(
+    job_db, monkeypatch, warning_messages
+):
+    from backend.api.worker import recover_pending_jobs
+    from backend.services.job_store import load_record, save_request
+
+    async def broken_mailer(to_email, filename, error):
+        return False
+
+    monkeypatch.setattr("backend.api.worker.send_failure_email", broken_mailer)
+    save_request(
+        "killed-broken-mailer",
+        "token",
+        {
+            "file_path": str(job_db / "006.pdf"),
+            "filename": "006.pdf",
+            "email": "user@example.com",
+        },
+        {
+            "task_id": "killed-broken-mailer",
+            "status": "processing",
+            "etapa_atual": "",
+            "erros": [],
+        },
+    )
+
+    await recover_pending_jobs()
+
+    status = load_record("killed-broken-mailer")["status"]
+    assert status["status"] == "error"
+    assert status["email_delivery"] == "failed"
+    assert any("killed-broken-mailer" in message for message in warning_messages)

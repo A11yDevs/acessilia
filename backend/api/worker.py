@@ -20,6 +20,8 @@ from backend.log_messages import (
     EMAIL_AUDIT_UNAVAILABLE,
     LOG_DOCX_GENERATION_FAILED,
     LOG_DOCX_SKIPPED_DISABLED,
+    LOG_FAILURE_EMAIL_FAILED,
+    LOG_FAILURE_EMAIL_NOT_SENT,
     LOG_JOB_CANCELLED,
     LOG_JOB_COMPLETED,
     LOG_JOB_EXECUTOR_ERROR,
@@ -75,6 +77,40 @@ def _file_size_or_zero(path: Path) -> int:
 
 def build_download_url(token: str) -> str:
     return f"{settings.web_base_url.rstrip('/')}/download/{token}"
+
+
+async def _notify_failure(
+    task_id: str, *, email: str | None, filename: str, error: str
+) -> bool:
+    """Tell the user a job failed without ever changing the job's outcome.
+
+    The failure e-mail is the only feedback a user gets after the confirmation
+    e-mail, so it is attempted even when the mailer raises. Neither a failed
+    delivery nor a broken message may mask the pipeline error that is already
+    recorded: the caller only records ``email_delivery`` and moves on.
+
+    Args:
+        task_id: Job identifier used in the warning log.
+        email: Recipient address; ``None`` means the job has no e-mail to notify.
+        filename: Source file name shown in the message.
+        error: Job error already shown to the user, naming the failed stage.
+
+    Returns:
+        bool: ``True`` when the mailer reports delivery, ``False`` otherwise
+        (no recipient, a raised exception, or an explicit delivery failure).
+    """
+    if not email:
+        return False
+    try:
+        sent = await send_failure_email(email, filename, error)
+    except Exception as exc:  # noqa: BLE001 - the job error must not be masked
+        logger.warning(
+            t(LOG_FAILURE_EMAIL_FAILED).format(task_id=task_id, error=exc)
+        )
+        return False
+    if not sent:
+        logger.warning(t(LOG_FAILURE_EMAIL_NOT_SENT).format(task_id=task_id))
+    return sent
 
 
 def register_queued_job(
@@ -526,7 +562,15 @@ class JobExecutor:
                 tempo_segundos=time.time() - started_at,
             )
             if job.email:
-                await send_failure_email(job.email, job.filename, error)
+                sent = await _notify_failure(
+                    task_id,
+                    email=job.email,
+                    filename=job.filename,
+                    error=error,
+                )
+                state_manager.atualizar(
+                    task_id, email_delivery="sent" if sent else "failed"
+                )
         finally:
             try:
                 status = get_job_status(task_id)
@@ -637,7 +681,14 @@ async def recover_pending_jobs() -> None:
             await finalizar_conversao(task_id, status="error", erro=error)
             email = record["request"].get("email")
             if email:
-                await send_failure_email(email, record["request"].get("filename", ""), error)
+                sent = await _notify_failure(
+                    task_id,
+                    email=email,
+                    filename=record["request"].get("filename", ""),
+                    error=error,
+                )
+                status["email_delivery"] = "sent" if sent else "failed"
+                await run_blocking(save_status, task_id, status)
             continue
         if unified_queue.get_position(task_id):
             continue

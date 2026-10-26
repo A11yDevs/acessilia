@@ -319,6 +319,34 @@ def test_receipt_recovers_result_after_refresh(web_client, monkeypatch, delivery
         assert 'http-equiv="refresh"' not in page.text
 
 
+@pytest.mark.parametrize("delivery", ["sent", "failed"])
+def test_receipt_explains_the_failure_email(web_client, monkeypatch, delivery):
+    """A failed job must not promise a result e-mail: the failure copy is different."""
+    from frontend.web.messages import (
+        WEB_JOB_EMAIL_SENT,
+        WEB_JOB_FAILURE_EMAIL_FAILED,
+        WEB_JOB_FAILURE_EMAIL_SENT,
+    )
+
+    web_client.post("/process", files={"document_file": ("doc.pdf", _fake_pdf_bytes(), "application/pdf")},
+        data={"email": "test@example.com"})
+
+    async def status(task_id, job_token=None):
+        return {"arquivo": "doc.pdf", "status": "error", "email_delivery": delivery,
+            "download_url": None, "erros": ["pipeline failed"]}
+
+    monkeypatch.setattr(web_client.fake, "get_job_status", status)
+    page = web_client.get("/jobs/web12345")
+
+    expected = t(
+        WEB_JOB_FAILURE_EMAIL_SENT if delivery == "sent" else WEB_JOB_FAILURE_EMAIL_FAILED
+    )
+    assert expected in page.text
+    # The result-mail copy mentions downloading files that do not exist here.
+    assert t(WEB_JOB_EMAIL_SENT) not in page.text
+    assert "pipeline failed" in page.text
+
+
 @pytest.mark.parametrize(("status_value", "delivery", "shows_close_info", "shows_pending"), [
     ("queued", None, True, False),
     ("processing", None, True, False),
