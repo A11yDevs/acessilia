@@ -44,10 +44,14 @@ class ToolboxArtifactClient(ToolboxCapabilityClient):
                 f"{STORE_CAPABILITY} response is not valid JSON"
             ) from e
         artifact_id = (
-            (data.get("artifact_id") or data.get("id")) if isinstance(data, dict) else None
+            (data.get("artifact_id") or data.get("id"))
+            if isinstance(data, dict)
+            else None
         )
         if not artifact_id:
-            raise ToolboxContractViolation(f"{STORE_CAPABILITY} response has no artifact_id")
+            raise ToolboxContractViolation(
+                f"{STORE_CAPABILITY} response has no artifact_id"
+            )
         return str(artifact_id)
 
     async def download(
@@ -63,7 +67,9 @@ class ToolboxArtifactClient(ToolboxCapabilityClient):
         async def call(http: httpx.AsyncClient) -> None:
             await download_artifact(http, ref, destination, magic=magic)
 
-        await self._rest_with_failover(RETRIEVE_CAPABILITY, call)
+        await self._rest_with_failover(
+            RETRIEVE_CAPABILITY, call, missing_artifact_failover=True
+        )
 
 
 __all__ = ["RETRIEVE_CAPABILITY", "STORE_CAPABILITY", "ToolboxArtifactClient"]

@@ -103,7 +103,10 @@ def test_malformed_base_url_fails_at_construction(url: str) -> None:
 def test_endpoints_accept_urls_and_a_comma_separated_string() -> None:
     from_list = _OcrClient(endpoints=[PRIMARY, ToolboxEndpoint(SECONDARY, "k")])
     from_string = _OcrClient(endpoints=f"{PRIMARY},{SECONDARY}")
-    assert from_list.endpoints == (ToolboxEndpoint(PRIMARY), ToolboxEndpoint(SECONDARY, "k"))
+    assert from_list.endpoints == (
+        ToolboxEndpoint(PRIMARY),
+        ToolboxEndpoint(SECONDARY, "k"),
+    )
     assert [e.base_url for e in from_string.endpoints] == [PRIMARY, SECONDARY]
 
 
@@ -133,9 +136,11 @@ async def test_fails_over_when_an_instance_cannot_serve(failure) -> None:
     client = _client(on_failover=lambda ep, exc: seen.append((ep.base_url, type(exc))))
     try:
         with respx.mock() as router:
-            mock = {"side_effect": failure} if isinstance(failure, Exception) else {
-                "return_value": failure
-            }
+            mock = (
+                {"side_effect": failure}
+                if isinstance(failure, Exception)
+                else {"return_value": failure}
+            )
             router.post(PRIMARY + EXECUTE).mock(**mock)
             _publish_catalog(router, SECONDARY)
             secondary = router.post(SECONDARY + EXECUTE).mock(
@@ -519,7 +524,8 @@ async def test_artifact_is_downloaded_from_the_endpoint_that_served_the_call(
             router.post(PRIMARY + EXECUTE).mock(side_effect=httpx.ConnectError("a"))
             router.post(SECONDARY + EXECUTE).mock(
                 return_value=httpx.Response(
-                    200, json={"status": "succeeded", "document": {"artifact_id": PDF_ID}}
+                    200,
+                    json={"status": "succeeded", "document": {"artifact_id": PDF_ID}},
                 )
             )
             secondary_get = router.get(f"{SECONDARY}/v1/artifacts/{PDF_ID}").mock(
@@ -577,3 +583,68 @@ async def test_download_into_a_missing_directory_is_a_local_error(
                 await download_artifact(
                     http, ArtifactRef.parse(PDF_ID), tmp_path / "missing" / "out.pdf"
                 )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("secondary_status", [200, 404, 503])
+async def test_artifact_download_searches_another_endpoint_after_not_found(
+    tmp_path, secondary_status
+):
+    from acessilia_sdk.toolbox.clients import ToolboxArtifactClient
+
+    client = ToolboxArtifactClient(endpoints=[PRIMARY, SECONDARY], retries=0)
+    destination = tmp_path / "result.pdf"
+    destination.write_bytes(b"previous complete file")
+    try:
+        with respx.mock() as router:
+            router.get(SECONDARY + "/v1/capabilities").respond(
+                200,
+                json=[{"id": "artifact.retrieve", "version": 1}],
+            )
+            router.get(SECONDARY + "/v1/providers").respond(200, json=[])
+            first = router.get(f"{PRIMARY}/v1/artifacts/{PDF_ID}").respond(
+                404, json={"code": "artifact_not_found"}
+            )
+            second = router.get(f"{SECONDARY}/v1/artifacts/{PDF_ID}")
+            if secondary_status == 200:
+                second.respond(200, content=PDF)
+                await client.download(PDF_ID, destination, magic=b"%PDF-")
+                assert destination.read_bytes() == PDF
+            else:
+                second.respond(secondary_status, json={"code": "artifact_not_found"})
+                error = (
+                    ToolboxArtifactNotFound
+                    if secondary_status == 404
+                    else ToolboxUnavailable
+                )
+                with pytest.raises(error):
+                    await client.download(PDF_ID, destination, magic=b"%PDF-")
+                assert destination.read_bytes() == b"previous complete file"
+            assert first.call_count == second.call_count == 1
+            assert list(tmp_path.iterdir()) == [destination]
+    finally:
+        await client.close()
+
+
+@pytest.mark.asyncio
+async def test_successful_but_corrupt_download_is_not_retried_on_another_endpoint(
+    tmp_path,
+):
+    from acessilia_sdk.toolbox.clients import ToolboxArtifactClient
+
+    client = ToolboxArtifactClient(endpoints=[PRIMARY, SECONDARY], retries=0)
+    destination = tmp_path / "result.pdf"
+    try:
+        with respx.mock(assert_all_called=False) as router:
+            router.get(f"{PRIMARY}/v1/artifacts/{PDF_ID}").respond(
+                200, content=b"corrupt"
+            )
+            second = router.get(f"{SECONDARY}/v1/artifacts/{PDF_ID}").respond(
+                200, content=PDF
+            )
+            with pytest.raises(ToolboxContractViolation):
+                await client.download(PDF_ID, destination)
+            assert not second.called
+            assert not destination.exists()
+    finally:
+        await client.close()

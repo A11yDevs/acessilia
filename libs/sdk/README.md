@@ -103,3 +103,8 @@ until the Toolbox publishes `artifact-ref@1`.
 ```bash
 cd libs/sdk && python -m pytest
 ```
+
+Artifact downloads by ID also try the next compatible endpoint after a 404.
+This exception is limited to `ToolboxArtifactClient.download`: other 4xx errors
+and capability calls keep their existing behavior. When every endpoint returns
+404, the SDK raises `ToolboxArtifactNotFound`; integrity failures are not retried.

@@ -105,3 +105,8 @@ provisório até a Toolbox publicar `artifact-ref@1`.
 ```bash
 cd libs/sdk && python -m pytest
 ```
+
+Downloads por identificador também procuram no próximo endpoint compatível após
+um 404. Essa exceção vale somente para `ToolboxArtifactClient.download`: outros
+erros 4xx e chamadas de capacidade mantêm seu comportamento. Se todos retornarem
+404, o SDK lança `ToolboxArtifactNotFound`; falhas de integridade não são repetidas.
