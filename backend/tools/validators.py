@@ -13,6 +13,8 @@ MSG_UNSUPPORTED_FORMAT: str = (
 )
 #: Canonical English msgid template for the oversized-file error; {limit} is substituted by callers after lookup.
 MSG_FILE_TOO_LARGE: str = "File too large. Limit: {limit} MB."
+#: Canonical English msgid for an invalid optional job-notification recipient.
+MSG_INVALID_EMAIL_ADDRESS: str = "Invalid email address"
 
 
 def is_email_address_allowed(address: str) -> bool:

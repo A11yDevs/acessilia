@@ -182,6 +182,41 @@ async def test_invalid_recipient_is_rejected_before_upload(isolated, email):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "locale,expected",
+    [
+        ("en_US", "Invalid email address"),
+        ("pt_BR", "Endere\u00e7o de e-mail inv\u00e1lido"),
+    ],
+)
+async def test_invalid_recipient_error_is_localized(isolated, monkeypatch, tmp_path, locale, expected):
+    from backend import i18n
+    from scripts.gen_locale_catalogs import build_locales
+
+    catalogs = tmp_path / "locales"
+    build_locales(catalogs)
+    monkeypatch.setattr(i18n, "LOCALE_CATALOGS_DIR", catalogs)
+    i18n._catalog_for.cache_clear()
+    token = i18n.set_request_locale(locale)
+    try:
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(create_app()), base_url="http://test"
+        ) as client:
+            response = await client.post(
+                "/api/v1/jobs",
+                files={"document_file": ("doc.pdf", b"%PDF", "application/pdf")},
+                data={"email": "a@["},
+            )
+        assert response.status_code == 422
+        assert response.json() == {"detail": expected}
+        assert isolated.qsize() == 0
+        assert not (settings.temp_dir / "uploads").exists()
+    finally:
+        i18n.reset_request_locale(token)
+        i18n._catalog_for.cache_clear()
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("email", ["", "   ", "reader@example.test", "reader+tag@example.test", " reader@example.test "])
 async def test_valid_or_optional_recipient_is_accepted(isolated, email):
     async with httpx.AsyncClient(

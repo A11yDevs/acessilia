@@ -34,7 +34,12 @@ from backend.services.job_store import delete_request, save_request, save_status
 from backend.services.blocking import run_blocking
 from backend.services.queue_service import QueueItem, unified_queue
 from backend.tools.logger import logger
-from backend.tools.validators import MSG_FILE_TOO_LARGE, is_email_address_allowed, validate_file
+from backend.tools.validators import (
+    MSG_FILE_TOO_LARGE,
+    MSG_INVALID_EMAIL_ADDRESS,
+    is_email_address_allowed,
+    validate_file,
+)
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -99,7 +104,7 @@ async def submit_job(
 
     email = (email or "").strip()
     if email and not is_email_address_allowed(email):
-        raise HTTPException(status_code=422, detail="Invalid email address")
+        raise HTTPException(status_code=422, detail=t(MSG_INVALID_EMAIL_ADDRESS))
 
     file_path = await run_in_threadpool(_save_upload, document_file)
     task_id = uuid.uuid4().hex
