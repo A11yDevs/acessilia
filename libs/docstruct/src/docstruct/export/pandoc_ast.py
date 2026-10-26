@@ -53,6 +53,10 @@ _LATEX_UNSAFE_MACROS = frozenset(
 # primitive behind \input.
 _LATEX_MACRO_RE = re.compile(r"\\([a-zA-Z@]+)")
 
+#: Class of the span that carries a formula's spoken form to the PDF/UA
+#: renderer, which writes it as the Formula element's alternate text.
+FORMULA_ALT_CLASS = "accessilia-formula"
+
 
 def _has_unsafe_latex_macro(latex: str) -> bool:
     """Whether the LaTeX carries a macro the renderers must not compile."""
@@ -156,12 +160,20 @@ def _block_to_ast(block: dict[str, Any]) -> list[dict[str, Any]]:
         latex = str(block.get("text", ""))
         if _has_unsafe_latex_macro(latex):
             return [{"t": "Para", "c": _meta_inlines(latex)}]
-        return [
-            {
-                "t": "Para",
-                "c": [{"t": "Math", "c": [{"t": "InlineMath"}, latex]}],
+        # A math block is a formula of its own, so it is display math.
+        math = {"t": "Math", "c": [{"t": "DisplayMath"}, latex]}
+        alt_text = str(block.get("alt_text") or "").strip()
+        if alt_text:
+            # The PDF/UA renderer gives a formula in this span its spoken form
+            # as the Formula element's alternate text, instead of the LaTeX
+            # source a screen reader would otherwise announce
+            # (acessilia-toolbox docs/pdf-ua-export.md, "Formula alternate
+            # text"). Other writers render the span's content as is.
+            math = {
+                "t": "Span",
+                "c": [["", [FORMULA_ALT_CLASS], [["alt", alt_text]]], [math]],
             }
-        ]
+        return [{"t": "Para", "c": [math]}]
     if block_type in {"quote", "details", "note", "warning"}:
         return [
             {

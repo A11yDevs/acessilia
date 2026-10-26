@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from backend.pipeline.pandoc_ast_builder import build_pandoc_ast, degrade_math_to_text
@@ -302,3 +304,33 @@ def test_degrade_math_to_text_visits_quotes_divs_and_table_cells():
     assert quote_para["c"][0] == {"t": "Str", "c": "H_2O"}
     div_plain = degraded["blocks"][1]["c"][1][0]
     assert div_plain["c"][0] == {"t": "Str", "c": "H_2O"}
+
+
+def test_a_math_block_is_display_math():
+    ast = build_pandoc_ast(_math_document(r"E=mc^2"))
+
+    (math,) = _math_blocks(ast)
+    assert math["c"][0] == {"t": "DisplayMath"}
+
+
+def test_a_formula_with_speech_carries_it_to_the_pdf_ua_renderer():
+    """The span is what the renderer turns into the Formula's alternate text (#256)."""
+    document = _math_document(r"\frac{a}{b}")
+    document["sections"][0]["blocks"][0]["alt_text"] = "Formula: a over b"
+
+    ast = build_pandoc_ast(document)
+
+    para = next(block for block in ast["blocks"] if block["t"] == "Para")
+    (span,) = para["c"]
+    assert span["t"] == "Span"
+    assert span["c"][0] == ["", ["accessilia-formula"], [["alt", "Formula: a over b"]]]
+    assert span["c"][1] == [{"t": "Math", "c": [{"t": "DisplayMath"}, r"\frac{a}{b}"]}]
+
+
+def test_degrading_a_formula_with_speech_removes_its_math():
+    document = _math_document(r"\frac{a}{b}")
+    document["sections"][0]["blocks"][0]["alt_text"] = "Formula: a over b"
+
+    degraded = degrade_math_to_text(build_pandoc_ast(document))
+
+    assert "Math" not in json.dumps(degraded)

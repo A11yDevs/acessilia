@@ -363,3 +363,42 @@ def test_html_renderer_mathml_sanitizado():
     assert "&lt;script&gt;" not in html
     assert ">x=1</p>" in html
     assert "<script>" not in html
+
+
+
+class _CountingEnricher:
+    """A MathEnricher that records every call."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str]] = []
+
+    def normalize(self, latex: str) -> str:
+        return latex
+
+    def to_mathml(self, latex: str) -> str:
+        self.calls.append(("to_mathml", latex))
+        return "<math/>"
+
+    def verbalize(self, latex: str) -> str:
+        self.calls.append(("verbalize", latex))
+        return "Formula: new"
+
+
+def test_canonical_enrichment_reuses_what_the_plan_produced():
+    """The plan already called math.convert/math.verbalize; the canonical build
+    must not call them again for the same formula (#257)."""
+    from docstruct.canonical import _enrich_math_blocks
+
+    planned = {"type": "math", "text": "x^2", "metadata": {
+        "mathml": "<math>planned</math>", "verbalization": "Formula: x squared"}}
+    unplanned = {"type": "math", "text": "y^2", "metadata": {}}
+    sections = [{"blocks": [planned, unplanned], "children": []}]
+    enricher = _CountingEnricher()
+
+    _enrich_math_blocks(sections, enricher)
+
+    assert planned["metadata"]["mathml"] == "<math>planned</math>"
+    assert planned["alt_text"] == "Formula: x squared"
+    assert unplanned["metadata"]["mathml"] == "<math/>"
+    assert unplanned["alt_text"] == "Formula: new"
+    assert enricher.calls == [("to_mathml", "y^2"), ("verbalize", "y^2")]

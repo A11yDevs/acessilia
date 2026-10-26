@@ -123,7 +123,11 @@ def _enrich_math_blocks(
     """Normalize LaTeX and add MathML + accessible verbalization to math blocks.
 
     Uses the injected ``math_enricher``; without one, only normalization is
-    applied when available.
+    applied when available. What a block already carries is not computed
+    again: ``metadata["mathml"]`` skips the conversion, and an empty
+    ``alt_text`` is filled from ``metadata["verbalization"]`` before asking
+    the enricher. A caller that produced them earlier (the core's PDDL plan
+    does) so pays one conversion and one verbalization per formula, not two.
     """
     if not sections:
         return
@@ -135,11 +139,15 @@ def _enrich_math_blocks(
             if math_enricher is not None:
                 latex = math_enricher.normalize(latex)
                 block["text"] = latex
-                mathml = math_enricher.to_mathml(latex)
-                if mathml:
-                    block.setdefault("metadata", {})["mathml"] = mathml
+                metadata = block.get("metadata") or {}
+                if not metadata.get("mathml"):
+                    mathml = math_enricher.to_mathml(latex)
+                    if mathml:
+                        block.setdefault("metadata", {})["mathml"] = mathml
                 if not block.get("alt_text"):
-                    block["alt_text"] = math_enricher.verbalize(latex)
+                    block["alt_text"] = (
+                        metadata.get("verbalization") or math_enricher.verbalize(latex)
+                    )
         _enrich_math_blocks(section.get("children", []), math_enricher)
 
 
