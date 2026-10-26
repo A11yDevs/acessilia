@@ -35,7 +35,7 @@ Opções consideradas para a detecção:
   - **AST Pandoc** (PDF/UA, DOCX): `InlineMath`, envolto no span de alt de fórmula quando há fala.
   - **HTML:** um span `role="math"` rotulado com a fala, como num bloco math. Ele contém o MathML sanitizado, ou o LaTeX quando não há MathML.
   - **TXT/MP3:** a fala. Sem fala, o LaTeX sem delimitadores.
-- **A detecção lê as fontes matemáticas do PDF** (opção 3). Ler fontes é operacional, então pelo [ADR-0003](0003-remote-only-operational-capabilities.pt-br.md) é uma capability da Toolbox (`document.text.spans`). Montar o LaTeX a partir dos spans é um algoritmo puro da docstruct. O core casa cada corrida com o texto do elemento e insere o `$…$`. Uma corrida que ele não consegue casar deixa o texto como está.
+- **A detecção lê as fontes matemáticas do PDF** (opção 3). Ler fontes é operacional, então pelo [ADR-0003](0003-remote-only-operational-capabilities.pt-br.md) é uma capability da Toolbox (`document.text.spans`). Montar o LaTeX a partir dos spans é um algoritmo puro da docstruct. O core casa cada corrida com o texto do elemento e insere o `$…$`. Uma corrida que ele não consegue casar deixa o texto como está. `INLINE_MATH_DETECTION` (`fonts`, o padrão, ou `off`) liga o passo e faz parte da chave do cache de processamento. Uma barra de negação que uma corrida compõe (`h \neq 0`) fica registrada no seu elemento de barra solta, para que a reanexação das barras soltas no reparo Unicode não componha outro `=` do parágrafo.
 
 ## Consequências
 

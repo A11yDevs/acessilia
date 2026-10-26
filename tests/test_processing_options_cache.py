@@ -130,3 +130,14 @@ def test_toolbox_endpoints_invalidate_processing_cache(monkeypatch):
     before = options_cache_key("document", configuration=processing_cache_configuration())
     monkeypatch.setattr(settings, "toolbox_base_urls", "http://a.test,http://b.test")
     assert options_cache_key("document", configuration=processing_cache_configuration()) != before
+
+
+def test_inline_math_detection_invalidates_processing_cache(monkeypatch):
+    """Turning the detection off must not serve a result that has its $…$ (#265)."""
+    from backend.config.settings import settings
+    from backend.services.cache import processing_cache_configuration, options_cache_key
+
+    monkeypatch.setattr(settings, "inline_math_detection", "fonts")
+    before = options_cache_key("document", configuration=processing_cache_configuration())
+    monkeypatch.setattr(settings, "inline_math_detection", "off")
+    assert options_cache_key("document", configuration=processing_cache_configuration()) != before

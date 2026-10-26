@@ -146,6 +146,12 @@ class Settings:
     legacy_unicode_repair: str = field(
         default_factory=lambda: os.getenv("LEGACY_UNICODE_REPAIR", "off").strip().lower()
     )
+    # Inline math in the prose of a PDF (#265, ADR 0011): "fonts" reads the text
+    # layer's math fonts and baselines through the Toolbox's document.text.spans
+    # and writes each expression as $…$; "off" leaves the text as extracted.
+    inline_math_detection: str = field(
+        default_factory=lambda: os.getenv("INLINE_MATH_DETECTION", "fonts").strip().lower()
+    )
 
     # Fusão multi-provider (Fase 4 do plano docstruct)
     # "single": comportamento atual (um provider, fallback PyMuPDF).

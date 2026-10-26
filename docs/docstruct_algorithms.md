@@ -177,6 +177,7 @@ benchmark work produced, all as pure functions:
 | `text.normalize`, `text.norm_fix`, `text.latex` | text normalization primitives |
 | `text.unicode_repair` | conservative NFC, dotless-i and spacing repair for legacy TeX PDFs (prose, headers and table cells); with document-level evidence, also the crase (`` ` a`` → `à`) and split ligatures (`fi ca` → `fica`) |
 | `text.math_spans` | splits prose into text and inline `$…$` / `\(…\)` math pieces (Pandoc's `tex_math_dollars` rule; `R$ 10,00` stays text) |
+| `text.inline_math` | finds inline math in a PDF text layer from its math fonts (`CMMI`, `CMSY`, `MSBM`…) and script baselines, rebuilds its LaTeX, and splices it into the extracted text as `$…$` where both character sequences align (ADR 0011) |
 | `text.negation_overlay` | gives a detached `≠` slash (U+0338 extracted as its own element) back to the relation it negates, from its position; only when the choice is unambiguous |
 | `imaging.policy` | pure upscale/orientation decisions (no PIL/cv2) |
 | `docstruct.fusion.verse` | chunk verse/record blocks so the evaluator can re-group them |
@@ -196,6 +197,7 @@ benchmark work produced, all as pure functions:
 | `docstruct.text.negation_overlay` | reattaches a detached negation slash to its relation by position (unambiguous cases only) |
 | `docstruct.text.latex` | LaTeX normalization |
 | `docstruct.text.math_spans` | inline math spans in prose |
+| `docstruct.text.inline_math` | inline math from text-layer fonts and baselines |
 | `docstruct.imaging.policy` | pure upscale/orientation decisions (no PIL/cv2) |
 | `docstruct.evaluation.holdout` | the tune/holdout split and the acceptance criteria |
 

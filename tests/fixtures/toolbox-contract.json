@@ -1,5 +1,5 @@
 {
-  "_comment": "Copy of the Toolbox's published contract (contract/toolbox-contract.json at develop). Refresh with scripts/capture_toolbox_contract.py --ref develop; CI checks the SDK registry against the published file itself.",
+  "_comment": "Copy of the Toolbox's published contract (contract/toolbox-contract.json at release/0.2.0). Refresh with scripts/capture_toolbox_contract.py --ref release/0.2.0; CI checks the SDK registry against the published file itself.",
   "capabilities": [
     {
       "id": "accessibility.mark",
@@ -167,6 +167,13 @@
         "docling",
         "mineru",
         "nougat"
+      ]
+    },
+    {
+      "id": "document.text.spans",
+      "version": 1,
+      "providers": [
+        "pymupdf-pdf"
       ]
     },
     {
@@ -422,6 +429,7 @@
     {
       "id": "pymupdf-pdf",
       "capabilities": [
+        "document.text.spans",
         "pdf.render",
         "pdf.split"
       ]

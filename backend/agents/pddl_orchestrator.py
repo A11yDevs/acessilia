@@ -23,6 +23,7 @@ from docstruct.tables.ast import (
     linearize_table_for_text,
     raw_rows_from_table_ast as _rows_from_table_ast,
 )
+from docstruct.text.inline_math import TextSpan, detect_inline_math, splice_inline_math
 from docstruct.text.latex import has_latex_markup, latex_text_agreement
 from docstruct.text.norm_fix import norm_fix
 from docstruct.text.negation_overlay import (
@@ -2743,6 +2744,7 @@ class PddlAccessibilityOrchestrator:
             media_inspection=media_inspection,
             status_callback=status_callback,
         )
+        await _mark_inline_math(manifest, source_path)
         await _enrich_formula_latex(
             manifest,
             source_path,
@@ -3210,6 +3212,167 @@ def _ranked_formula_candidates(candidates: Iterable[dict[str, Any]]) -> list[dic
         ranked.append((score, {**candidate, "latex": latex, "confidence": confidence}))
     ranked.sort(key=lambda pair: -pair[0])
     return [candidate for _, candidate in ranked]
+
+
+#: Element types whose text the exporters render as prose with inline math.
+_INLINE_MATH_ELEMENT_TYPES = frozenset({"paragraph", "list_item", "caption", "footnote"})
+#: Points a span's centre may lie outside its element's box.
+_INLINE_MATH_BOX_TOLERANCE = 2.0
+
+
+async def _mark_inline_math(manifest: ProcessingManifest, source_path: Path) -> dict[str, int]:
+    """Write the inline math of PDF prose as ``$…$``, from the text layer's fonts (#265).
+
+    Docling reports no inline formula region for a typeset PDF, so
+    ``s(t) = t³`` arrives as ``s ( t ) = t 3``. The text layer still has the
+    fonts and baselines (ADR 0011): the Toolbox's ``document.text.spans``
+    returns them, ``docstruct.text.inline_math`` finds each run of math in an
+    element's lines and rebuilds its LaTeX, and splices it into the element's
+    text where both character sequences align. The canonical enrichment then
+    converts each span (MathML, speech).
+
+    A negation slash the run composed into its relation (``h \neq 0``) is
+    recorded on its detached-slash element (``negation_overlay`` outcome
+    ``inline-math``), so the later reattachment does not compose another
+    ``=`` of the paragraph. Returns ``{elements, marked, unmatched}``; the
+    detection is skipped for other media, with ``INLINE_MATH_DETECTION=off``
+    and when the Toolbox cannot read the spans.
+    """
+    from acessilia_sdk.toolbox.errors import ToolboxError
+
+    from backend.config.settings import settings
+    from backend.tools.text_spans import fetch_text_spans
+
+    counts = {"elements": 0, "marked": 0, "unmatched": 0}
+    if settings.inline_math_detection != "fonts" or manifest.source.media_type != "application/pdf":
+        return counts
+    candidates = [
+        element
+        for element in manifest.elements
+        if element.type in _INLINE_MATH_ELEMENT_TYPES
+        and (element.text or "").strip()
+        and "inline_math_detection" not in element.metadata
+        and any(provenance.bbox is not None for provenance in element.provenance)
+    ]
+    pages = sorted(
+        {
+            provenance.page_number
+            for element in candidates
+            for provenance in element.provenance
+            if provenance.bbox is not None
+        }
+    )
+    if not pages:
+        return counts
+    try:
+        spans = await fetch_text_spans(
+            source_path, pages, artifact_id=_source_artifact_id(manifest)
+        )
+    except ToolboxError as exc:
+        logger.info("Inline math detection skipped: document.text.spans failed ({})", exc)
+        manifest.extractor.configuration["inline_math_detection"] = "unavailable"
+        return counts
+
+    heights = {page.page_number: page.height for page in manifest.pages}
+    overlays = [element for element in manifest.elements if is_detached_overlay(element.text)]
+    for element in candidates:
+        lines = _element_span_lines(element, spans, heights)
+        detection = detect_inline_math(lines)
+        if not detection.runs:
+            continue
+        result = splice_inline_math(element.text or "", detection)
+        counts["elements"] += 1
+        counts["marked"] += len(result.marked)
+        counts["unmatched"] += len(result.unmatched)
+        element.metadata["inline_math_detection"] = {
+            "marked": len(result.marked),
+            "unmatched": len(result.unmatched),
+        }
+        if not result.marked:
+            continue
+        element.text = result.text
+        page = next(p.page_number for p in element.provenance if p.bbox is not None)
+        for run in result.marked:
+            for slash in run.negations:
+                _claim_negation_overlay(overlays, element, slash, page, spans, heights)
+    manifest.extractor.configuration["inline_math_detection"] = "fonts"
+    if counts["elements"]:
+        logger.info("Inline math from the text layer's fonts: {}", counts)
+    return counts
+
+
+def _top_left_box(
+    box: Any, page: int, spans: dict[int, dict[str, Any]], heights: dict[int, float | None]
+) -> tuple[float, float, float, float] | None:
+    """``(left, top, right, bottom)`` of a manifest box, top-left origin, in points."""
+    if box.coord_origin == "BOTTOMLEFT":
+        height = (spans.get(page) or {}).get("height") or heights.get(page)
+        if not height:
+            return None
+        return box.left, height - box.top, box.right, height - box.bottom
+    if box.coord_origin == "TOPLEFT":
+        return box.left, box.top, box.right, box.bottom
+    return None
+
+
+def _element_span_lines(
+    element: ManifestElement,
+    spans: dict[int, dict[str, Any]],
+    heights: dict[int, float | None],
+) -> list[list[TextSpan]]:
+    """The element's text-layer lines, in order: spans whose centre lies in its boxes.
+
+    A rotated page is left out: its spans are in the unrotated space, which the
+    element's box may not be.
+    """
+    lines: list[list[TextSpan]] = []
+    for provenance in element.provenance:
+        page = spans.get(provenance.page_number)
+        if provenance.bbox is None or page is None or page.get("rotation"):
+            continue
+        box = _top_left_box(provenance.bbox, provenance.page_number, spans, heights)
+        if box is None:
+            continue
+        left, top, right, bottom = box
+        top, bottom = min(top, bottom), max(top, bottom)
+        margin = _INLINE_MATH_BOX_TOLERANCE
+        for line in page.get("lines") or []:
+            inside = []
+            for span in line.get("spans") or []:
+                x0, y0, x1, y1 = span["bbox"]
+                x, y = (x0 + x1) / 2, (y0 + y1) / 2
+                if left - margin <= x <= right + margin and top - margin <= y <= bottom + margin:
+                    inside.append(TextSpan.from_dict(span))
+            if inside:
+                lines.append(inside)
+    return lines
+
+
+def _claim_negation_overlay(
+    overlays: list[ManifestElement],
+    host: ManifestElement,
+    slash: tuple[float, float, float, float],
+    page: int,
+    spans: dict[int, dict[str, Any]],
+    heights: dict[int, float | None],
+) -> None:
+    """Record the detached slash at ``slash`` as composed by the inline math of ``host``."""
+    x, y = (slash[0] + slash[2]) / 2, (slash[1] + slash[3]) / 2
+    for overlay in overlays:
+        if "negation_overlay" in overlay.metadata:
+            continue
+        located = _bbox(overlay, page)
+        if located is None:
+            continue
+        box = _top_left_box(located[1], page, spans, heights)
+        if box is None:
+            continue
+        left, top, right, bottom = box
+        top, bottom = min(top, bottom), max(top, bottom)
+        margin = _OVERLAY_HOST_TOLERANCE * 2
+        if left - margin <= x <= right + margin and top - margin <= y <= bottom + margin:
+            overlay.metadata["negation_overlay"] = {"outcome": "inline-math", "host": host.id}
+            return
 
 
 async def _enrich_formula_latex(

@@ -84,6 +84,12 @@ _CAPABILITIES: tuple[ToolboxCapability, ...] = (
         provider_key="toolbox_pdf_provider",
         output_schema="image@2",
     ),
+    # The text layer with fonts and baselines, read for inline math (#265).
+    ToolboxCapability(
+        "document.text.spans", 1, "Text spans",
+        provider_key="toolbox_pdf_provider",
+        output_schema="text-spans@1",
+    ),
     ToolboxCapability(
         "math.recognize", 1, "Reconhecimento de fórmula",
         provider_key="toolbox_math_recognize_provider",
