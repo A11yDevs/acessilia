@@ -791,3 +791,90 @@ def test_the_slide_heading_is_never_reordered_after_a_grown_picture(source):
         for o in manifest.obligations
         if o.kind == "refine-reading-order"
     )
+
+
+def _across(text, spans):
+    """A paragraph whose provenance spans slides: (page, start, end, box) per entry."""
+    element = _element("x-1", "paragraph", spans[0][0], 20, spans[0][3], text)
+    element["provenance"] = [
+        {
+            "page_number": page,
+            "char_start": start,
+            "char_end": end,
+            "bbox": {"left": box[0], "top": box[1], "right": box[2], "bottom": box[3], "coord_origin": "TOPLEFT"},
+        }
+        for page, start, end, box in spans
+    ]
+    return element
+
+
+def test_text_read_across_two_slides_is_split_back_into_each(source):
+    """006.pdf: slide 29's caption and slide 41's text came out as one element (#291)."""
+    caption = "Cela unitaria - agrupamento minimo de ions"
+    other = "A formula quimica encontrada para a vitamina C"
+    extraction = _deck()
+    document = extraction.document["document"]
+    document["elements"].append(
+        _across(
+            f"{caption} {other}",
+            [
+                (1, 0, len(caption), (60, 400, 900, 430)),
+                (2, len(caption) + 1, len(caption) + 1 + len(other), (60, 260, 900, 290)),
+            ],
+        )
+    )
+    document["pages"][0]["element_ids"].append("x-1")
+
+    manifest = _build_edited(source, extraction)
+
+    parts = {e.page_number: e.text for e in manifest.elements if e.metadata.get("split_from") == "x-1"}
+    assert parts == {1: caption, 2: other}
+    assert not any(e.id == "x-1" for e in manifest.elements)
+    # Slide 2 keeps its own text and gets the part of x-1 that is its.
+    texts = [e.text for e in manifest.elements if e.page_number == 2]
+    assert other in texts and "Growth of 10%." in texts
+
+
+def test_a_slide_whose_only_text_was_split_in_is_read_as_a_picture(source):
+    """006.pdf slide 41: its text came out inside slide 29's caption, short a line."""
+    caption = "Cela unitaria - agrupamento minimo de ions"
+    other = "A formula quimica encontrada para a vitamina C"
+    extraction = _deck()
+    document = extraction.document["document"]
+    document["pages"].append({"page_number": 4, "width": WIDTH, "height": HEIGHT, "element_ids": []})
+    document["elements"].append(
+        _across(
+            f"{caption} {other}",
+            [
+                (1, 0, len(caption), (60, 400, 900, 430)),
+                (4, len(caption) + 1, len(caption) + 1 + len(other), (60, 260, 900, 290)),
+            ],
+        )
+    )
+    document["pages"][0]["element_ids"].append("x-1")
+
+    manifest = _build_edited(source, extraction)
+
+    [picture] = [e for e in manifest.elements if e.page_number == 4 and e.type == "picture"]
+    assert picture.metadata["slide_visual"] is True
+    assert picture.metadata["replaced_text"] == other
+    assert caption in [e.text for e in manifest.elements if e.page_number == 1]
+
+
+@pytest.mark.parametrize(
+    "spans",
+    [
+        [(1, 0, 10, (60, 400, 900, 430)), (2, None, None, (60, 260, 900, 290))],
+        [(1, 0, 30, (60, 400, 900, 430)), (2, 20, 40, (60, 260, 900, 290))],
+    ],
+    ids=["no-offsets", "overlapping-offsets"],
+)
+def test_text_across_slides_without_usable_offsets_stays_whole(source, spans):
+    extraction = _deck()
+    document = extraction.document["document"]
+    document["elements"].append(_across("Some text read across two slides here", spans))
+    document["pages"][0]["element_ids"].append("x-1")
+
+    manifest = _build_edited(source, extraction)
+
+    assert any(e.id == "x-1" for e in manifest.elements)

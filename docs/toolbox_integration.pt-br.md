@@ -314,6 +314,10 @@ A capacidade `media.inspect` (provider `pure-media-inspect`, PR
     cobre no máximo 5% do slide) vira uma imagem do slide inteiro, descrita com o
     prompt de página em vez de lida como texto; o texto substituído fica em
     `metadata.replaced_text`. Um slide do qual nada foi extraído também vira uma.
+    Um elemento que o extrator leu atravessando dois slides é antes separado
+    em um elemento por slide, nas posições de caractere da sua proveniência;
+    um slide cujo único texto veio dessa separação também é lido como uma
+    imagem, com o texto separado guardado em `replaced_text`.
     Num slide lido como texto, um rótulo cujo centro está sobre uma imagem que
     cobre menos de 95% do slide (uma maior é o fundo) é incorporado a ela: sai
     do texto corrido, fica em `metadata.figure_labels` da imagem (ids em
