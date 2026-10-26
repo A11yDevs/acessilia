@@ -169,7 +169,7 @@ async def process(
                 metadata = {}
             execution_status = metadata.get("pddl_execution_status")
             media_inspection = metadata.get("pddl_media_inspection")
-            # A run degraded by a Toolbox failure is marked `cacheable: false`
+            # A run degraded by a Toolbox or model failure is marked `cacheable: false`
             # and never written (see below); the check here keeps that
             # invariant explicit for entries written before the flag existed.
             media_inspection_failed = (
@@ -179,6 +179,7 @@ async def process(
                 execution_status in {"failed", "replan-required"}
                 or (not settings.pddl_execute_dry_run and execution_status == "dry-run-completed")
                 or media_inspection_failed
+                or metadata.get("pddl_model_failures")
             ):
                 cached = None
         if cached is not None:

@@ -3839,7 +3839,7 @@ async def _enrich_table_structures(
         # rows on one try and read the table whole on the next.
         attempts = _TABLE_REREAD_ATTEMPTS if reason is not None else 1
         table_output = None
-        why = "no table was read"
+        why = _TABLE_NOT_READ
         for attempt in range(1, attempts + 1):
             candidate = await data_agent.process_region(
                 image_bytes=image_bytes,
@@ -3917,6 +3917,9 @@ def _keep_misread_table(
 #: invented table, shares few), and it must keep most of the misread one's
 #: words (on 006.pdf the model once returned only the header row).
 _TABLE_REREAD_MIN_SHARED = 0.5
+
+#: Why a misread table was kept when the data agent returned no table at all.
+_TABLE_NOT_READ = "no table was read"
 
 #: Readings asked for a misread table before it is kept as it is.
 _TABLE_REREAD_ATTEMPTS = 3
@@ -4501,6 +4504,13 @@ def build_pddl_structured_payload(
             f"Comparacao de planners: {comparison.comparison.verdict}."
         )
 
+    model_failures = _model_failures(manifest)
+    if model_failures:
+        technical_warnings.append(
+            "Modelo de visao falhou: {pictures} imagem(ns) sem descricao, "
+            "{tables} tabela(s) sem releitura; resultado nao cacheado.".format(**model_failures)
+        )
+
     observations = getattr(manifest, "observations", [])
     obligations = getattr(manifest, "obligations", [])
     if any(
@@ -4549,6 +4559,9 @@ def build_pddl_structured_payload(
             if _unsatisfied_selected_obligations(manifest)
             else None,
             "pddl_toolbox_availability": toolbox_availability,
+            # Pictures and tables the vision model could not process; a rerun
+            # once the provider is back may deliver them.
+            "pddl_model_failures": model_failures,
             "pddl_media_inspection": {
                 "status": media_inspection_status,
                 "error": configuration.get("media_inspection_error"),
@@ -4560,10 +4573,34 @@ def build_pddl_structured_payload(
             else None,
         },
         "technical_warnings": technical_warnings,
-        # A step degraded by a Toolbox failure must not be replayed from the
-        # cache once the Toolbox is back.
-        "cacheable": media_inspection_status != "failed",
+        # A step degraded by a Toolbox or model failure must not be replayed
+        # from the cache once the service is back.
+        "cacheable": media_inspection_status != "failed" and not model_failures,
     }
+
+
+def _model_failures(manifest: ProcessingManifest) -> dict[str, int] | None:
+    """Pictures left undescribed and misread tables left unread by the vision model.
+
+    A picture counts whatever its recorded reason; a table only when no reading
+    came back at all (``table_review.why == "no table was read"``): a reading
+    refused as worse than the table is the model's answer, not its failure,
+    and rereading it on every run would cost a call each time for nothing.
+    None when nothing failed.
+    """
+    elements = getattr(manifest, "elements", [])
+    pictures = sum(
+        1 for element in elements
+        if element.type == "picture" and element.metadata.get("vision_failure_reason")
+    )
+    tables = sum(
+        1 for element in elements
+        if element.type == "table"
+        and (element.metadata.get("table_review") or {}).get("why") == _TABLE_NOT_READ
+    )
+    if not pictures and not tables:
+        return None
+    return {"pictures": pictures, "tables": tables}
 
 
 def _unsatisfied_obligations(manifest: ProcessingManifest) -> list[dict[str, Any]]:
