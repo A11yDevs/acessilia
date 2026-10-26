@@ -64,6 +64,7 @@ from backend.services.email_service import (
 )
 from backend.services.history_service import finalizar_conversao, registrar_conversao
 from backend.tools.logger import logger
+from backend.tools.filenames import output_stem
 
 queued_jobs: dict[str, dict[str, Any]] = {}
 
@@ -373,7 +374,7 @@ class JobExecutor:
 
             state_manager.atualizar(task_id, status="processing")
 
-            base = Path(job.filename).stem
+            base = output_stem(job.filename)
             out_dir = job.output_dir or (settings.data_dir / "output" / task_id)
             out_dir.mkdir(parents=True, exist_ok=True)
             completed_formats: list[str] = []

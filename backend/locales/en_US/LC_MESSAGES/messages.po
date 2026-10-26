@@ -127,6 +127,9 @@ msgstr ""
 msgid "File too large. Limit: {limit} MB."
 msgstr "File too large. Limit: {limit} MB."
 
+msgid "Invalid email address"
+msgstr "Invalid email address"
+
 #, python-brace-format
 msgid "Waiting in the queue (Position: {position})"
 msgstr "Waiting in the queue (Position: {position})"

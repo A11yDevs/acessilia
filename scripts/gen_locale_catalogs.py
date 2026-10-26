@@ -325,7 +325,7 @@ from backend.tools.toolbox_math_tools import (
     MSG_SPEECH_REJECTED,
     MSG_SPEECH_UNAVAILABLE,
 )
-from backend.tools.validators import MSG_FILE_TOO_LARGE, MSG_UNSUPPORTED_FORMAT
+from backend.tools.validators import MSG_FILE_TOO_LARGE, MSG_INVALID_EMAIL_ADDRESS, MSG_UNSUPPORTED_FORMAT
 from frontend.web.messages import (
     WEB_JOB_TITLE,
     WEB_JOB_PENDING,
@@ -504,6 +504,7 @@ MESSAGES: tuple[str, ...] = (
     "Job complete: your file is ready for download",
     MSG_UNSUPPORTED_FORMAT,
     MSG_FILE_TOO_LARGE,
+    MSG_INVALID_EMAIL_ADDRESS,
     # Pipeline processing-stage labels surfaced to end users as live progress
     # (backend/service.py, backend/agents/*, backend/api/worker.py).
     STAGE_QUEUE_WAITING_POSITION,
@@ -959,6 +960,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         MSG_UNSUPPORTED_FORMAT: ("Formato de arquivo não suportado. Envie PDF, DOCX, HTML, PNG, JPG, " +
                                 "TIFF, BMP ou WEBP."),
         MSG_FILE_TOO_LARGE: "Arquivo muito grande. Limite: {limit} MB.",
+        MSG_INVALID_EMAIL_ADDRESS: "Endereço de e-mail inválido",
         # Pipeline processing-stage labels (pt-BR mirrors of the stage msgids
         # declared above), surfaced as the live progress text of each job.
         STAGE_QUEUE_WAITING_POSITION: "Aguardando na fila (Posição: {position})",
