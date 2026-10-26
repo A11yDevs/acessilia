@@ -293,8 +293,9 @@ class Settings:
     slide_visual_coverage: float = field(
         default_factory=lambda: float(os.getenv("SLIDE_VISUAL_COVERAGE", "0.5"))
     )
-    # On a slide read as text, fold the short text lying on a picture (its
-    # labels) into that picture, whose description transcribes them in place.
+    # On a slide read as text, fold the short text lying on or just around a
+    # picture (its labels) into that picture, whose description transcribes
+    # them in place, and merge the pictures a caption row spans.
     slide_fold_figure_labels: bool = field(
         default_factory=lambda: (
             os.getenv("SLIDE_FOLD_FIGURE_LABELS", "true").strip().lower()

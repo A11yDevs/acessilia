@@ -31,6 +31,7 @@ from backend.core.manifest.models import (
 from backend.core.manifest.slides import (
     DEFAULT_FOLD_FIGURE_LABELS,
     DEFAULT_VISUAL_COVERAGE,
+    is_slide_heading,
     structure_as_slides,
 )
 from docstruct.placeholders import (
@@ -702,9 +703,14 @@ def _derive_v23_processing_needs(
             )
 
     for page_number, page_elements in by_page.items():
+        # A slide's own heading opens the slide whatever its box, folding on
+        # or off: a picture whose crop grew above-left of it would otherwise
+        # be read first (slides.py, _absorb_near_pictures). The deck title has
+        # no box, so it is never positioned.
         positioned = [
             item for item in page_elements
             if _normalized_element_bbox(item, page_sizes) is not None
+            and not is_slide_heading(item)
         ]
         if len(positioned) > 1:
             current = sorted(positioned, key=lambda item: item.reading_order)
