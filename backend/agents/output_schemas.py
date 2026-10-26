@@ -12,7 +12,8 @@ from backend.agents.run_helpers import RunIncompleteError, run_content
 VISION_SCHEMA_INSTRUCTION = (
     "Retorne somente o objeto estruturado solicitado: use kind='description' e "
     "description para conteúdo visual/textual, ou kind='formula' e formula_latex "
-    "quando a região for predominantemente uma fórmula. Não preencha formula_latex "
+    "quando a região for predominantemente uma fórmula matemática (um desenho de "
+    "molécula é kind='description'). Não preencha formula_latex "
     "quando kind='description'. Sempre informe language, confidence, "
     "mentioned_elements e warnings."
 )
