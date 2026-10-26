@@ -18,7 +18,7 @@ def get_agno_model(
     Args:
         max_tokens (int | None): Output token cap for this client; when None, ``OPENROUTER_MAX_TOKENS`` applies (``num_predict`` for Ollama).
         timeout_seconds (int | None): Per-call HTTP timeout for this client; when None, ``MODEL_CALL_TIMEOUT_SECONDS`` applies. Callers whose answers can legitimately run long (the DataAgent transcribing tables on a local Ollama) pass their own, larger budget explicitly.
-        max_retries (int | None): HTTP-level retries the provider SDK may run on its own; when None, the SDK default applies. A caller that owns its retry policy passes ``0`` so one call is one attempt: the OpenAI SDK's default of 2 retries applies the full timeout again on every try and re-sends the whole image, which can triple the wait a caller already bounds.
+        max_retries (int | None): HTTP-level retries the provider SDK may run on its own; when None, the SDK default applies (Agno drops ``None`` client params before building the SDK client). A caller that owns its retry policy passes ``0`` so one call is one attempt: the OpenAI SDK's default of 2 retries applies the full timeout again on every try and re-sends the whole image, which can triple the wait a caller already bounds.
 
     Returns:
         Any: The configured Agno client instance; an ``OpenRouter`` model when

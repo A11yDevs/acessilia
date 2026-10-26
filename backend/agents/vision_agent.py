@@ -79,6 +79,12 @@ RETRY_INSTRUCTION = (
 #: what the job actually waits for, so a hung call degrades the region instead
 #: of stalling the pipeline. It sits above the HTTP timeout so an ordinary one
 #: still arrives as the provider's own error.
+#:
+#: An abandoned call is not killed (Python cannot kill a thread): until the
+#: provider resolves it keeps its worker thread, its open connection and its
+#: per-call client, on the default executor shared with ``run_blocking`` and
+#: the DataAgent. Isolating model calls on their own executor is tracked in
+#: issue #276.
 CALL_DEADLINE_GRACE_SECONDS = 30
 
 
