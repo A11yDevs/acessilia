@@ -273,6 +273,7 @@ from backend.export.pandoc_exporter import (
 )
 from backend.agents.pddl_orchestrator import (
     MSG_PICTURES_NOT_DESCRIBED,
+    MSG_LETTERHEAD_TEXT,
     MSG_TABLES_NOT_READ,
     MSG_UNDESCRIBED_PICTURE_ALT,
 )
@@ -719,6 +720,7 @@ MESSAGES: tuple[str, ...] = (
     MSG_HTML_TABLE_OF_CONTENTS,
     MSG_HTML_TECHNICAL_METADATA,
     MSG_UNDESCRIBED_PICTURE_ALT,
+    MSG_LETTERHEAD_TEXT,
     MSG_HTML_IMAGE_DESCRIPTION,
     # TXT table line templates (backend/pipeline/table_ast.py).
     MSG_TABLE_TEXT_CAPTION,
@@ -1424,6 +1426,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         MSG_HTML_TABLE_OF_CONTENTS: "Sumário",
         MSG_HTML_TECHNICAL_METADATA: "Metadados técnicos",
         MSG_UNDESCRIBED_PICTURE_ALT: "Imagem sem descrição textual.",
+        MSG_LETTERHEAD_TEXT: "Logotipo. {lines}.",
         MSG_HTML_IMAGE_DESCRIPTION: "Descrição da imagem",
         # TXT table line templates (pt-BR mirrors of the MSG_TABLE_TEXT_* ids above).
         MSG_TABLE_TEXT_CAPTION: "Tabela: {caption}",

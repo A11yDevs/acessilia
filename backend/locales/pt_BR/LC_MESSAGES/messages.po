@@ -1038,6 +1038,10 @@ msgstr "Metadados técnicos"
 msgid "Image without a text description."
 msgstr "Imagem sem descrição textual."
 
+#, python-brace-format
+msgid "Logo. {lines}."
+msgstr "Logotipo. {lines}."
+
 msgid "Image description"
 msgstr "Descrição da imagem"
 

@@ -1024,6 +1024,10 @@ msgstr "Technical metadata"
 msgid "Image without a text description."
 msgstr "Image without a text description."
 
+#, python-brace-format
+msgid "Logo. {lines}."
+msgstr "Logo. {lines}."
+
 msgid "Image description"
 msgstr "Image description"
 

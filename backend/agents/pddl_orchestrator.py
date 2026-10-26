@@ -127,6 +127,10 @@ if TYPE_CHECKING:
 #: undescribed; why it was left so goes to the operator, not the reader.
 MSG_UNDESCRIBED_PICTURE_ALT: str = "Image without a text description."
 
+#: Canonical English msgid for an institutional header read as one paragraph:
+#: the logo, then its header lines; {lines} is substituted by callers after lookup.
+MSG_LETTERHEAD_TEXT: str = "Logo. {lines}."
+
 #: Canonical English singular/plural msgids for the document's warning on the
 #: pictures and tables a failure left without a description or a reading.
 MSG_PICTURES_NOT_DESCRIBED: tuple[str, str] = (
@@ -4776,10 +4780,91 @@ def _page_number_ids(manifest: ProcessingManifest) -> set[str]:
     return marked
 
 
+#: Height share of the page by which a picture may miss a header line and
+#: still sit beside it (the line's box is tighter than the logo's).
+_LETTERHEAD_TOLERANCE = 0.01
+
+
+def _letterhead_groups(
+    manifest: ProcessingManifest, page_numbers: set[str]
+) -> dict[str, list[ManifestElement]]:
+    """Logos and the page header lines beside them, keyed by the first in reading order.
+
+    An institutional header ("University of X / Department of Y" next to the
+    logo) reaches the manifest as page_header lines and an unrelated picture,
+    so the reader got the lines apart and a long description of a logo that
+    repeats them. A picture whose height overlaps a header line joins every
+    header line it overlaps; a page header without a picture is left as is.
+    """
+    #: page number -> its header lines and pictures, with their boxes.
+    lines: dict[int, list[tuple[ManifestElement, tuple[float, ...]]]] = {}
+    pictures: dict[int, list[tuple[ManifestElement, tuple[float, ...]]]] = {}
+    for element in manifest.elements:
+        if _is_left_out_of_payload(element) or element.id in page_numbers:
+            continue
+        bbox = _element_bbox(element, manifest)
+        if bbox is None:
+            continue
+        page = element.page_number or 1
+        if element.type == "picture":
+            pictures.setdefault(page, []).append((element, bbox))
+        elif (
+            reading_role(str(element.type), str(element.raw_label)) == "header"
+            and (element.text or "").strip()
+        ):
+            lines.setdefault(page, []).append((element, bbox))
+
+    groups: dict[str, list[ManifestElement]] = {}
+    for page, page_pictures in pictures.items():
+        members: dict[str, ManifestElement] = {}
+        for picture, picture_box in page_pictures:
+            beside = [
+                line
+                for line, line_box in lines.get(page, [])
+                if line_box[1] <= picture_box[3] + _LETTERHEAD_TOLERANCE
+                and picture_box[1] <= line_box[3] + _LETTERHEAD_TOLERANCE
+            ]
+            if beside:
+                members[picture.id] = picture
+                members.update((line.id, line) for line in beside)
+        if members:
+            ordered = sorted(members.values(), key=lambda item: item.reading_order)
+            groups[ordered[0].id] = ordered
+    return groups
+
+
+def _letterhead_block(members: list[ManifestElement]) -> dict[str, Any]:
+    """One paragraph for a logo and its header lines, in place of the first of them."""
+    block = _element_to_block(members[0])
+    lines = [
+        (member.text or "").strip().rstrip(".,;")
+        for member in members
+        if member.type != "picture"
+    ]
+    block["type"] = "paragraph"
+    block["text"] = t(MSG_LETTERHEAD_TEXT).format(lines=", ".join(lines))
+    block.pop("alt_text", None)
+    block["metadata"]["role"] = "header"
+    block["metadata"]["letterhead_members"] = [member.id for member in members]
+    return block
+
+
 def _manifest_pages_to_payload(manifest: ProcessingManifest) -> list[dict[str, Any]]:
     elements_by_id = {element.id: element for element in manifest.elements}
     page_numbers = _page_number_ids(manifest)
+    letterheads = _letterhead_groups(manifest, page_numbers)
+    #: Letterhead members other than the first, which carries the whole group.
+    merged = {
+        member.id
+        for members in letterheads.values()
+        for member in members[1:]
+    }
     pages: list[dict[str, Any]] = []
+
+    def to_block(element: ManifestElement) -> dict[str, Any]:
+        if element.id in letterheads:
+            return _letterhead_block(letterheads[element.id])
+        return _element_to_block(element)
 
     if manifest.pages:
         sorted_pages = sorted(manifest.pages, key=lambda page: page.page_number)
@@ -4800,10 +4885,12 @@ def _manifest_pages_to_payload(manifest: ProcessingManifest) -> list[dict[str, A
             block_elements = [
                 item
                 for item in block_elements
-                if not _is_left_out_of_payload(item) and item.id not in page_numbers
+                if not _is_left_out_of_payload(item)
+                and item.id not in page_numbers
+                and item.id not in merged
             ]
             block_elements.sort(key=lambda item: item.reading_order)
-            blocks = [_element_to_block(item) for item in block_elements]
+            blocks = [to_block(item) for item in block_elements]
             _dedupe_callout_titles(blocks)
             pages.append(
                 {
@@ -4816,7 +4903,11 @@ def _manifest_pages_to_payload(manifest: ProcessingManifest) -> list[dict[str, A
 
     grouped: dict[int, list[ManifestElement]] = {}
     for element in manifest.elements:
-        if _is_left_out_of_payload(element) or element.id in page_numbers:
+        if (
+            _is_left_out_of_payload(element)
+            or element.id in page_numbers
+            or element.id in merged
+        ):
             continue
         page_number = element.page_number or 1
         grouped.setdefault(page_number, []).append(element)
@@ -4826,7 +4917,7 @@ def _manifest_pages_to_payload(manifest: ProcessingManifest) -> list[dict[str, A
             grouped[page_number],
             key=lambda item: item.reading_order,
         )
-        blocks = [_element_to_block(item) for item in page_elements]
+        blocks = [to_block(item) for item in page_elements]
         _dedupe_callout_titles(blocks)
         pages.append(
             {
