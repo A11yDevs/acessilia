@@ -1024,6 +1024,15 @@ msgstr "Technical metadata"
 msgid "Image without a text description."
 msgstr "Image without a text description."
 
+msgid "image"
+msgstr "image"
+
+msgid "table"
+msgstr "table"
+
+msgid "formula"
+msgstr "formula"
+
 msgid "Image description"
 msgstr "Image description"
 

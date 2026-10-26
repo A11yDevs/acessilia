@@ -272,6 +272,11 @@ from backend.export.pandoc_exporter import (
     MSG_UNSUPPORTED_EXPORT_FORMAT,
 )
 from backend.agents.pddl_orchestrator import MSG_UNDESCRIBED_PICTURE_ALT
+from backend.export.markers import (
+    MSG_OBJECT_MARKER_FORMULA,
+    MSG_OBJECT_MARKER_IMAGE,
+    MSG_OBJECT_MARKER_TABLE,
+)
 from backend.export.renderers.html_renderer import (
     MSG_HTML_IMAGE_DESCRIPTION,
     MSG_HTML_TABLE_OF_CONTENTS,
@@ -715,6 +720,9 @@ MESSAGES: tuple[str, ...] = (
     MSG_HTML_TABLE_OF_CONTENTS,
     MSG_HTML_TECHNICAL_METADATA,
     MSG_UNDESCRIBED_PICTURE_ALT,
+    MSG_OBJECT_MARKER_IMAGE,
+    MSG_OBJECT_MARKER_TABLE,
+    MSG_OBJECT_MARKER_FORMULA,
     MSG_HTML_IMAGE_DESCRIPTION,
     # TXT table line templates (backend/pipeline/table_ast.py).
     MSG_TABLE_TEXT_CAPTION,
@@ -1420,6 +1428,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         MSG_HTML_TABLE_OF_CONTENTS: "Sumário",
         MSG_HTML_TECHNICAL_METADATA: "Metadados técnicos",
         MSG_UNDESCRIBED_PICTURE_ALT: "Imagem sem descrição textual.",
+        MSG_OBJECT_MARKER_IMAGE: "imagem",
+        MSG_OBJECT_MARKER_TABLE: "tabela",
+        MSG_OBJECT_MARKER_FORMULA: "fórmula",
         MSG_HTML_IMAGE_DESCRIPTION: "Descrição da imagem",
         # TXT table line templates (pt-BR mirrors of the MSG_TABLE_TEXT_* ids above).
         MSG_TABLE_TEXT_CAPTION: "Tabela: {caption}",

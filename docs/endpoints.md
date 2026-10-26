@@ -20,7 +20,7 @@ Defined in [backend/api/app.py](../backend/api/app.py), with routes in [backend/
 
 | Method | Route | What it does | Response | Limit |
 |--------|-------|--------------|----------|-------|
-| POST | `/api/v1/jobs` | Submits a document for processing. Form fields: `document_file`, `mode` (`detalhado`, `medio`, `normal`, `baixo` or `ocr`; default `normal`), `custom_prompt` (must be empty), `thinking_mode` (must be false), `email`, `source`. Validates extension/size and enqueues. | `202` with `task_id`, `job_token`, `position` and message. `400` for invalid input; `422` for unsupported processing options. | 5/min |
+| POST | `/api/v1/jobs` | Submits a document for processing. Form fields: `document_file`, `mode` (`detalhado`, `medio`, `normal`, `baixo` or `ocr`; default `normal`), `custom_prompt` (must be empty), `thinking_mode` (must be false), `email`, `source`, `object_markers` (optional boolean: enclose each described picture, table and formula of the delivered formats in `[label]` … `[/label]` paragraphs; omitted, `OBJECT_MARKERS_ENABLED` decides). Validates extension/size and enqueues. | `202` with `task_id`, `job_token`, `position` and message. `400` for invalid input; `422` for unsupported processing options. | 5/min |
 | GET | `/api/v1/jobs/{task_id}` | Checks the state of a job. Requires `X-Job-Token`. | JSON `JobStatus`: `task_id`, `arquivo`, `status`, `progresso` (0–1), `etapa_atual`, `erros[]`, `download_url` (when ready), `email_delivery`, `criado_em`, `fim`. | 60/min |
 | POST | `/api/v1/jobs/{task_id}/cancel` | Requests job cancellation. Requires `X-Job-Token`. | JSON `{task_id, status}`. | 10/min |
 
