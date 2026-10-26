@@ -640,8 +640,12 @@ async def recover_pending_jobs() -> None:
             if email:
                 try:
                     await send_failure_email(email, record["request"].get("filename", ""), error)
-                except Exception:
-                    logger.warning("Failure notification could not be sent for interrupted job {}", task_id)
+                except Exception as exc:
+                    logger.warning(
+                        "Failure notification could not be sent for interrupted job {} ({})",
+                        task_id,
+                        exc,
+                    )
             continue
         if unified_queue.get_position(task_id):
             continue
