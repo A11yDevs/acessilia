@@ -31,6 +31,10 @@ class MathEnricher:
     def verbalize(self, latex: str) -> str:
         return ""
 
+    def verbalize_inline(self, latex: str) -> str:
+        """Speech of a formula read inside a sentence, without the formula label."""
+        return ""
+
 
 def _default_doc_id() -> str:
     """Deterministic default document id (backend injects uuid-based)."""
@@ -49,6 +53,9 @@ from docstruct.text.sanitize import sanitize_block_text
 from docstruct.text.sanitize import sanitize_text
 from docstruct.blocks.parser import parse_text_to_blocks
 from docstruct.tables.ast import raw_rows_from_table_ast
+from docstruct.text.math_spans import block_prose
+from docstruct.text.math_spans import inline_math_entries
+from docstruct.text.math_spans import inline_math_sources
 
 
 def build_canonical_document(
@@ -119,8 +126,12 @@ def build_canonical_document(
 def _enrich_math_blocks(
     sections: list[dict[str, Any]],
     math_enricher: "MathEnricher | None" = None,
+    inline_cache: dict[str, dict[str, str]] | None = None,
 ) -> None:
     """Normalize LaTeX and add MathML + accessible verbalization to math blocks.
+
+    Prose blocks get the same for their inline ``$…$`` spans
+    (``_enrich_inline_math``).
 
     Uses the injected ``math_enricher``; without one, only normalization is
     applied when available. What a block already carries is not computed
@@ -138,8 +149,12 @@ def _enrich_math_blocks(
     """
     if not sections:
         return
+    if inline_cache is None:
+        inline_cache = {}
     for section in sections:
         for block in section.get("blocks", []):
+            if math_enricher is not None:
+                _enrich_inline_math(block, math_enricher, inline_cache)
             if block.get("type") != "math":
                 continue
             latex = block.get("text", "")
@@ -155,7 +170,42 @@ def _enrich_math_blocks(
                     block["alt_text"] = (
                         metadata.get("verbalization") or math_enricher.verbalize(latex)
                     )
-        _enrich_math_blocks(section.get("children", []), math_enricher)
+        _enrich_math_blocks(section.get("children", []), math_enricher, inline_cache)
+
+
+def _enrich_inline_math(
+    block: dict[str, Any],
+    math_enricher: "MathEnricher",
+    cache: dict[str, dict[str, str]],
+) -> None:
+    """Convert the inline math spans of a prose block into ``metadata["inline_math"]``.
+
+    Each entry is ``{source, latex, mathml?, speech?}``, keyed by the span's
+    LaTeX as written in the text (the exporters look it up there). The same
+    formula repeats a lot in a text (``s(t)``), so conversions are cached for
+    the whole document; spans the block already carries are kept.
+    """
+    sources = [
+        source for text in block_prose(block) for source in inline_math_sources(text)
+    ]
+    if not sources:
+        return
+    entries = inline_math_entries(block)
+    for source in sources:
+        if source in entries:
+            continue
+        if source not in cache:
+            latex = math_enricher.normalize(source)
+            entry = {"source": source, "latex": latex}
+            mathml = math_enricher.to_mathml(latex)
+            if mathml:
+                entry["mathml"] = mathml
+            speech = math_enricher.verbalize_inline(latex)
+            if speech:
+                entry["speech"] = speech
+            cache[source] = entry
+        entries[source] = dict(cache[source])
+    block.setdefault("metadata", {})["inline_math"] = list(entries.values())
 
 
 

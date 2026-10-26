@@ -12,6 +12,8 @@ from docstruct.sections import section_body_blocks, section_title_alias
 from docstruct.tables.ast import effective_section_width, row_header_column_count
 from docstruct.tables.ast import split_header_and_body
 from docstruct.tables.ast import table_ast_from_block
+from docstruct.text.math_spans import inline_math_entries
+from docstruct.text.math_spans import split_inline_math
 
 
 #: Control sequences that read files, execute programs or change TeX's
@@ -123,7 +125,7 @@ def _block_to_ast(block: dict[str, Any]) -> list[dict[str, Any]]:
             }
         ]
     if block_type == "paragraph":
-        return [{"t": "Para", "c": _meta_inlines(block.get("text", ""))}]
+        return [{"t": "Para", "c": _prose_inlines(block.get("text", ""), block)}]
     if block_type == "code":
         return [
             {
@@ -139,7 +141,7 @@ def _block_to_ast(block: dict[str, Any]) -> list[dict[str, Any]]:
             {
                 "t": "BulletList",
                 "c": [
-                    [{"t": "Para", "c": _meta_inlines(str(item))}]
+                    [{"t": "Para", "c": _prose_inlines(str(item), block)}]
                     for item in block.get("items", [])
                 ],
             }
@@ -182,7 +184,7 @@ def _block_to_ast(block: dict[str, Any]) -> list[dict[str, Any]]:
         return [
             {
                 "t": "BlockQuote",
-                "c": [{"t": "Para", "c": _meta_inlines(block.get("text", ""))}],
+                "c": [{"t": "Para", "c": _prose_inlines(block.get("text", ""), block)}],
             }
         ]
     return [{"t": "Para", "c": _meta_inlines(block.get("text", ""))}]
@@ -197,6 +199,45 @@ def _meta_inlines(text: str) -> list[dict[str, Any]]:
             inlines.append({"t": "Space"})
         inlines.append({"t": "Str", "c": chunk})
     return inlines
+
+
+def _prose_inlines(text: str, block: dict[str, Any]) -> list[dict[str, Any]]:
+    """Inlines of a prose text whose ``$…$`` spans become ``InlineMath``.
+
+    A span the canonical enrichment converted takes its normalized LaTeX and,
+    with a spoken form, the same alt span as display math, so the PDF/UA
+    Formula element is announced by its speech. One carrying an unsafe macro
+    stays text, as a math block does.
+    """
+    entries = inline_math_entries(block)
+    inlines: list[dict[str, Any]] = []
+    for piece, is_math in split_inline_math(str(text)):
+        if not is_math:
+            if piece[:1].isspace() and inlines and inlines[-1] != _SPACE:
+                inlines.append({"t": "Space"})
+            inlines.extend(_meta_inlines(piece))
+            if piece[-1:].isspace() and inlines and inlines[-1] != _SPACE:
+                inlines.append({"t": "Space"})
+            continue
+        entry = entries.get(piece, {})
+        latex = str(entry.get("latex") or piece)
+        if _has_unsafe_latex_macro(latex):
+            inlines.extend(_meta_inlines(latex))
+            continue
+        math: dict[str, Any] = {"t": "Math", "c": [{"t": "InlineMath"}, latex]}
+        speech = str(entry.get("speech") or "").strip()
+        if speech:
+            math = {
+                "t": "Span",
+                "c": [["", [FORMULA_ALT_CLASS], [["alt", speech]]], [math]],
+            }
+        inlines.append(math)
+    if inlines and inlines[-1] == _SPACE:
+        inlines.pop()
+    return inlines
+
+
+_SPACE = {"t": "Space"}
 
 
 def degrade_math_to_text(document_ast: dict[str, Any]) -> dict[str, Any]:
