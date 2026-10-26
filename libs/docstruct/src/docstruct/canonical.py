@@ -426,9 +426,10 @@ def _sanitize_table_ast(raw: dict[str, Any]) -> dict[str, Any]:
 
 
 def _table_ast_from_rows(rows: list[list[str]]) -> dict[str, Any]:
+    """Build a table AST from rows the caller has already sanitized."""
     body = []
     for row in rows:
-        cells = [{"text": sanitize_block_text(str(cell))} for cell in row]
+        cells = [{"text": str(cell)} for cell in row]
         if cells:
             body.append({"cells": cells})
     return {"body": body}
