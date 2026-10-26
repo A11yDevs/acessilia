@@ -4774,10 +4774,17 @@ def _text_kept_by_picture(element: ManifestElement) -> list[ManifestElement]:
     keeps the text it replaced (``replaced_text``), a text slide's labels are
     folded into the picture they lie on or beside (``figure_labels``). Its
     description was to carry that text; without one, the text goes back to
-    the slide after the picture, as it stood before, instead of being lost
-    (006.pdf v5, slide 41) or listed as the picture's alt text (slides 16, 31).
+    the slide after the picture, as it stood before, instead of being lost or
+    listed as the picture's alt text (006.pdf v5, slides 16 and 31).
+
+    Only the vision model's description carries that text: an alt the
+    extractor gave the picture, which a failed call leaves in place, does not.
+    The paragraphs carry the picture's source location; the labels' own boxes
+    left with the elements they were folded from.
     """
-    if element.type != "picture" or (element.text or "").strip():
+    if element.type != "picture" or (
+        element.metadata.get("vision_description_complete") and (element.text or "").strip()
+    ):
         return []
     replaced = element.metadata.get("replaced_text")
     texts = (
