@@ -35,7 +35,7 @@ Options considered for detection:
   - **Pandoc AST** (PDF/UA, DOCX): `InlineMath`, wrapped in the formula alt span when it has speech.
   - **HTML:** a `role="math"` span labelled with the speech, as a math block is. It holds the sanitized MathML, or the LaTeX when there is none.
   - **TXT/MP3:** the speech. Without speech, the bare LaTeX.
-- **Detection reads the PDF's math fonts** (option 3). Font reading is operational, so under [ADR-0003](0003-remote-only-operational-capabilities.md) it is a Toolbox capability (`document.text.spans`). Building LaTeX from the spans is a pure docstruct algorithm. The core matches each run to the element's text and splices in `$…$`. A run it cannot match leaves the text unchanged.
+- **Detection reads the PDF's math fonts** (option 3). Font reading is operational, so under [ADR-0003](0003-remote-only-operational-capabilities.md) it is a Toolbox capability (`document.text.spans`). Building LaTeX from the spans is a pure docstruct algorithm. The core matches each run to the element's text and splices in `$…$`. A run it cannot match leaves the text unchanged. `INLINE_MATH_DETECTION` (`fonts`, the default, or `off`) selects the step, and it is part of the processing cache key. A negation slash that a run composes (`h \neq 0`) is recorded on its detached-slash element, so the Unicode repair's reattachment of detached slashes does not compose another `=` of the paragraph.
 
 ## Consequences
 

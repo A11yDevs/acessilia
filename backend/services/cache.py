@@ -59,7 +59,7 @@ def processing_cache_configuration() -> dict[str, Any]:
         "ai_client", "ollama_model", "ollama_base_url", "openrouter_model",
         "openrouter_base_url", "openrouter_max_tokens", "pipeline_engine",
         "fusion_mode", "fusion_secondary_provider", "fusion_hybrid_provider",
-        "legacy_unicode_repair", "formula_text_agreement_min",
+        "legacy_unicode_repair", "inline_math_detection", "formula_text_agreement_min",
         "toolbox_base_url", "toolbox_base_urls", "toolbox_provider", "toolbox_layout_provider",
         "toolbox_pdf_provider", "toolbox_math_recognize_provider", "toolbox_math_provider",
         "toolbox_ocr_provider", "toolbox_page_ocr_provider", "toolbox_adjudicate_provider",
