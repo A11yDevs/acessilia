@@ -15,7 +15,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from docstruct.blocks.callouts import dedupe_callout_titles as _dedupe_callout_titles
+from docstruct.fusion.similarity import PAGENUM_RE
 from docstruct.fusion.tailjoin import is_page_number as _is_page_number
+from docstruct.geometry import reading_role
 from docstruct.tables.ast import (
     effective_section_width,
     linearize_table_for_text,
@@ -4246,14 +4248,11 @@ def _unsatisfied_obligations(manifest: ProcessingManifest) -> list[dict[str, Any
     return unsatisfied
 
 
-def _is_left_out_of_payload(
-    element: ManifestElement, manifest: ProcessingManifest | None = None
-) -> bool:
+def _is_left_out_of_payload(element: ManifestElement) -> bool:
     """A page accepted as blank, or a placeholder not yet inspected, adds nothing.
 
     Nor does a detached negation slash: it was given back to its relation, or
-    could not be, and alone it says nothing to a reader. Nor does a page
-    number (see ``_is_page_number_furniture``).
+    could not be, and alone it says nothing to a reader.
 
     An inspected page with content is a ``picture``, no longer a placeholder.
     A placeholder still present means the inspection did not run (dry-run), so
@@ -4263,7 +4262,6 @@ def _is_left_out_of_payload(
         bool(element.metadata.get("blank_page"))
         or bool(element.metadata.get("negation_overlay"))
         or is_unstructured_page_placeholder(element)
-        or _is_page_number_furniture(element, manifest)
     )
 
 
@@ -4274,34 +4272,88 @@ _PAGE_NUMBER_TYPES = frozenset({"paragraph", "page_header", "page_footer", "unkn
 #: is read as a page number (the margin `docstruct.fusion.noise.decor_role`
 #: uses for the same decision).
 _PAGE_NUMBER_MARGIN = 0.12
+#: Longest furniture text read as a decorated page number (``- 5 -``,
+#: ``Page 5``), as in `decor_role`.
+_PAGE_NUMBER_MAX_LEN = 16
 
 
-def _is_page_number_furniture(
-    element: ManifestElement, manifest: ProcessingManifest | None
-) -> bool:
-    """Whether ``element`` is a page number rather than body text.
+def _is_decorated_page_number(text: str) -> bool:
+    """A page number with the decoration or repetition extractors leave on it.
 
-    A screen reader would announce it in the middle of the text. The extractor
-    marks it as furniture (``page_header``/``page_footer`` or Docling's
-    ``content_layer``) or, when it does not, leaves it as a paragraph that only
-    its position in the top or bottom margin tells apart from a standalone
-    number of the body.
+    Accepts ``- 5 -``, ``5.`` and ``Page 5`` (``PAGENUM_RE``, the matcher of
+    `decor_role`) and the same number repeated (``281 281``), but only digits
+    and the Roman letters `is_page_number` knows, so ``mid`` is not a number.
     """
-    if element.type not in _PAGE_NUMBER_TYPES or not _is_page_number(element.text or ""):
+    text = text.strip()
+    match = PAGENUM_RE.match(text) if len(text) <= _PAGE_NUMBER_MAX_LEN else None
+    if match and _is_page_number(match.group(1)):
+        return True
+    tokens = set(text.split())
+    return len(tokens) == 1 and _is_page_number(tokens.pop())
+
+
+def _is_marked_furniture(element: ManifestElement) -> bool:
+    """Whether the extractor marked ``element`` as page header/footer.
+
+    Read from the type, the raw label (an element typed ``paragraph`` may keep
+    ``page_footer`` there) or Docling's ``content_layer``.
+    """
+    return (
+        _element_role(element) in {"header", "footer", "page_number"}
+        or reading_role(str(element.type), str(element.raw_label)) != "body"
+        or element.metadata.get("content_layer") == "furniture"
+    )
+
+
+def _is_page_number_in_margin(
+    element: ManifestElement, manifest: ProcessingManifest
+) -> bool:
+    """A bare number in the top or bottom margin, which may be a page number.
+
+    A single uppercase Roman letter (``I``, ``V``, ``X``...) is read as text.
+    """
+    text = (element.text or "").strip()
+    if not _is_page_number(text) or (len(text) == 1 and text.isupper()):
         return False
-    if _element_role(element) in {"header", "footer", "page_number"}:
-        return True
-    if element.metadata.get("content_layer") == "furniture":
-        return True
-    bbox = _element_bbox(element, manifest) if manifest is not None else None
+    bbox = _element_bbox(element, manifest)
     if bbox is None:
         return False
     center = (bbox[1] + bbox[3]) / 2
     return not _PAGE_NUMBER_MARGIN <= center <= 1 - _PAGE_NUMBER_MARGIN
 
 
+def _page_number_ids(manifest: ProcessingManifest) -> set[str]:
+    """Elements that are page numbers rather than body text.
+
+    A screen reader would announce them in the middle of the text. A number
+    the extractor marked as furniture is one. Otherwise only its position in
+    the top or bottom margin tells it apart from a number of the body, and a
+    page has one page number: the margin decides only on a page without a
+    marked one and with a single candidate, so chart axis labels or a footnote
+    marker next to the page number stay.
+    """
+    marked: set[str] = set()
+    #: page number -> its page number candidates, marked or in the margin.
+    candidates: dict[int, list[str]] = {}
+    for element in manifest.elements:
+        if element.type not in _PAGE_NUMBER_TYPES:
+            continue
+        page = element.page_number or 1
+        if _is_marked_furniture(element):
+            if _is_decorated_page_number(element.text or ""):
+                marked.add(element.id)
+                candidates.setdefault(page, []).append(element.id)
+        elif _is_page_number_in_margin(element, manifest):
+            candidates.setdefault(page, []).append(element.id)
+    for ids in candidates.values():
+        if len(ids) == 1:
+            marked.update(ids)
+    return marked
+
+
 def _manifest_pages_to_payload(manifest: ProcessingManifest) -> list[dict[str, Any]]:
     elements_by_id = {element.id: element for element in manifest.elements}
+    page_numbers = _page_number_ids(manifest)
     pages: list[dict[str, Any]] = []
 
     if manifest.pages:
@@ -4323,7 +4375,7 @@ def _manifest_pages_to_payload(manifest: ProcessingManifest) -> list[dict[str, A
             block_elements = [
                 item
                 for item in block_elements
-                if not _is_left_out_of_payload(item, manifest)
+                if not _is_left_out_of_payload(item) and item.id not in page_numbers
             ]
             block_elements.sort(key=lambda item: item.reading_order)
             blocks = [_element_to_block(item) for item in block_elements]
@@ -4339,7 +4391,7 @@ def _manifest_pages_to_payload(manifest: ProcessingManifest) -> list[dict[str, A
 
     grouped: dict[int, list[ManifestElement]] = {}
     for element in manifest.elements:
-        if _is_left_out_of_payload(element, manifest):
+        if _is_left_out_of_payload(element) or element.id in page_numbers:
             continue
         page_number = element.page_number or 1
         grouped.setdefault(page_number, []).append(element)
