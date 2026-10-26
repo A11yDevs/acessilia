@@ -1421,6 +1421,22 @@ msgid "Pipeline PDDL: {count} table(s) enriched with OCR/reconstruction"
 msgstr "Pipeline PDDL: {count} tabela(s) enriquecida(s) com OCR/reconstrução"
 
 #, python-brace-format
+msgid ""
+"Table {element_id} (page {page}) looked misread ({reason}); replaced with"
+" the reading from its image"
+msgstr ""
+"A tabela {element_id} (página {page}) parecia mal lida ({reason}); "
+"substituída pela leitura da sua imagem"
+
+#, python-brace-format
+msgid ""
+"Table {element_id} (page {page}) looked misread ({reason}); the reading "
+"from its image was not used ({why})"
+msgstr ""
+"A tabela {element_id} (página {page}) parecia mal lida ({reason}); a "
+"leitura da sua imagem não foi usada ({why})"
+
+#, python-brace-format
 msgid "Failed to extract the image clip for element {element_id}"
 msgstr "Falha ao extrair recorte de imagem para elemento {element_id}"
 

@@ -23,6 +23,7 @@ from docstruct.tables.ast import (
     linearize_table_for_text,
     raw_rows_from_table_ast as _rows_from_table_ast,
 )
+from docstruct.tables.garble import table_garble_reason
 from docstruct.text.inline_math import TextSpan, detect_inline_math, splice_inline_math
 from docstruct.text.latex import has_latex_markup, latex_text_agreement
 from docstruct.text.norm_fix import norm_fix
@@ -82,6 +83,8 @@ from backend.log_messages import (
     LOG_PDDL_IMAGES_ENRICHED,
     LOG_PDDL_PREFERRED_PLAN_MISSING,
     LOG_PDDL_TABLES_ENRICHED,
+    LOG_PDDL_TABLE_REREAD_ACCEPTED,
+    LOG_PDDL_TABLE_REREAD_REJECTED,
     LOG_VISION_ELEMENT_DESCRIPTION,
 )
 from backend.stage_messages import (
@@ -3777,10 +3780,24 @@ async def _enrich_table_structures(
     *,
     status_callback: Callable[[str], Coroutine[Any, Any, None]] | None = None,
 ) -> None:
+    from backend.config.settings import settings
+
+    # A table read in the wrong shape (rows collapsed into one, cells doubled)
+    # has structure but not the right one; it is read again from its image.
+    garbled: dict[str, str] = {}
+    if settings.table_visual_review:
+        for element in manifest.elements:
+            if element.type == "table" and _table_element_has_structured_content(element):
+                reason = table_garble_reason(
+                    _rows_from_table_ast(element.metadata["table_ast"])
+                )
+                if reason:
+                    garbled[element.id] = reason
     table_elements = [
         element
         for element in manifest.elements
-        if element.type == "table" and not _table_element_has_structured_content(element)
+        if element.type == "table"
+        and (element.id in garbled or not _table_element_has_structured_content(element))
     ]
     if not table_elements:
         return
@@ -3788,7 +3805,8 @@ async def _enrich_table_structures(
     data_agent = DataAgent()
     enriched = 0
     for position, element in enumerate(table_elements, start=1):
-        if _backfill_table_from_existing_text(element):
+        reason = garbled.get(element.id)
+        if reason is None and _backfill_table_from_existing_text(element):
             enriched += 1
             continue
 
@@ -3815,17 +3833,52 @@ async def _enrich_table_structures(
         if not image_bytes:
             continue
 
-        table_output = await data_agent.process_region(
-            image_bytes=image_bytes,
-            classification="table",
-            page_num=page_number,
-            fallback_text=element.text or "",
-        )
-        if not isinstance(table_output, DataOutput) or table_output.kind != "table":
+        # A misread table gets a few readings: the model may drop columns or
+        # rows on one try and read the table whole on the next.
+        attempts = _TABLE_REREAD_ATTEMPTS if reason is not None else 1
+        table_output = None
+        why = "no table was read"
+        for attempt in range(1, attempts + 1):
+            candidate = await data_agent.process_region(
+                image_bytes=image_bytes,
+                classification="table",
+                page_num=page_number,
+                fallback_text=element.text or "",
+            )
+            if not isinstance(candidate, DataOutput) or candidate.kind != "table":
+                continue
+            if reason is not None:
+                why = _table_reread_disqualified(
+                    element.metadata["table_ast"], candidate.table_rows()
+                )
+                if why:
+                    continue
+            table_output = candidate
+            break
+        if table_output is None:
+            if reason is not None:
+                element.metadata["table_review"] = {
+                    "reason": reason, "outcome": "kept", "why": why, "attempts": attempts,
+                }
+                logger.warning(
+                    t(LOG_PDDL_TABLE_REREAD_REJECTED).format(
+                        element_id=element.id, page=page_number, reason=reason, why=why,
+                    )
+                )
             continue
 
         rows = table_output.table_rows()
         table_ast = table_output.table_ast()
+        if reason is not None:
+            element.metadata["table_ast_replaced"] = element.metadata["table_ast"]
+            element.metadata["table_review"] = {
+                "reason": reason, "outcome": "replaced", "attempts": attempt,
+            }
+            logger.info(
+                t(LOG_PDDL_TABLE_REREAD_ACCEPTED).format(
+                    element_id=element.id, page=page_number, reason=reason,
+                )
+            )
 
         element.metadata["table_ast"] = table_ast
         element.metadata["table_linearization_hint"] = "data-agent-structured"
@@ -3847,6 +3900,46 @@ async def _enrich_table_structures(
 
     if enriched:
         logger.info(t(LOG_PDDL_TABLES_ENRICHED).format(count=enriched))
+
+
+#: Share of the words two readings of a table must share, each way, for the
+#: new one to replace the misread one: it is the same table read better, so
+#: most of its words were there, misplaced (a crop of the wrong region, or an
+#: invented table, shares few), and it must keep most of the misread one's
+#: words (on 006.pdf the model once returned only the header row).
+_TABLE_REREAD_MIN_SHARED = 0.5
+
+#: Readings asked for a misread table before it is kept as it is.
+_TABLE_REREAD_ATTEMPTS = 3
+
+_TABLE_WORD = re.compile(r"\w{2,}")
+
+
+def _table_reread_disqualified(
+    misread_ast: dict[str, Any], rows: list[list[str]]
+) -> str | None:
+    """Why a new reading of a misread table must not replace it, or None."""
+    reason = table_garble_reason(rows)
+    if reason:
+        return f"the new reading is misread too: {reason}"
+    misread_rows = _rows_from_table_ast(misread_ast)
+    width = max((len(row) for row in rows), default=0)
+    misread_width = max((len(row) for row in misread_rows), default=0)
+    if width < misread_width:
+        return f"the new reading has {width} column(s), the table {misread_width}"
+    words = {word for row in rows for cell in row for word in _TABLE_WORD.findall(cell.casefold())}
+    if not words:
+        return "the new reading has no text"
+    misread = {
+        word for row in misread_rows for cell in row for word in _TABLE_WORD.findall(cell.casefold())
+    }
+    shared = len(words & misread) / len(words)
+    if shared < _TABLE_REREAD_MIN_SHARED:
+        return f"only {shared:.0%} of its words are in the table it would replace"
+    kept = len(words & misread) / len(misread) if misread else 1.0
+    if kept < _TABLE_REREAD_MIN_SHARED:
+        return f"it keeps only {kept:.0%} of the words of the table it would replace"
+    return None
 
 
 def _table_element_has_structured_content(element: ManifestElement) -> bool:
