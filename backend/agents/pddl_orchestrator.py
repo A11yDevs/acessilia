@@ -4246,11 +4246,14 @@ def _unsatisfied_obligations(manifest: ProcessingManifest) -> list[dict[str, Any
     return unsatisfied
 
 
-def _is_left_out_of_payload(element: ManifestElement) -> bool:
+def _is_left_out_of_payload(
+    element: ManifestElement, manifest: ProcessingManifest | None = None
+) -> bool:
     """A page accepted as blank, or a placeholder not yet inspected, adds nothing.
 
     Nor does a detached negation slash: it was given back to its relation, or
-    could not be, and alone it says nothing to a reader.
+    could not be, and alone it says nothing to a reader. Nor does a page
+    number (see ``_is_page_number_furniture``).
 
     An inspected page with content is a ``picture``, no longer a placeholder.
     A placeholder still present means the inspection did not run (dry-run), so
@@ -4260,7 +4263,41 @@ def _is_left_out_of_payload(element: ManifestElement) -> bool:
         bool(element.metadata.get("blank_page"))
         or bool(element.metadata.get("negation_overlay"))
         or is_unstructured_page_placeholder(element)
+        or _is_page_number_furniture(element, manifest)
     )
+
+
+#: Types a page number can arrive as. A number inside a table, list, heading
+#: or formula is content, wherever it sits on the page.
+_PAGE_NUMBER_TYPES = frozenset({"paragraph", "page_header", "page_footer", "unknown"})
+#: Share of the page height at the top and at the bottom where a lone number
+#: is read as a page number (the margin `docstruct.fusion.noise.decor_role`
+#: uses for the same decision).
+_PAGE_NUMBER_MARGIN = 0.12
+
+
+def _is_page_number_furniture(
+    element: ManifestElement, manifest: ProcessingManifest | None
+) -> bool:
+    """Whether ``element`` is a page number rather than body text.
+
+    A screen reader would announce it in the middle of the text. The extractor
+    marks it as furniture (``page_header``/``page_footer`` or Docling's
+    ``content_layer``) or, when it does not, leaves it as a paragraph that only
+    its position in the top or bottom margin tells apart from a standalone
+    number of the body.
+    """
+    if element.type not in _PAGE_NUMBER_TYPES or not _is_page_number(element.text or ""):
+        return False
+    if _element_role(element) in {"header", "footer", "page_number"}:
+        return True
+    if element.metadata.get("content_layer") == "furniture":
+        return True
+    bbox = _element_bbox(element, manifest) if manifest is not None else None
+    if bbox is None:
+        return False
+    center = (bbox[1] + bbox[3]) / 2
+    return not _PAGE_NUMBER_MARGIN <= center <= 1 - _PAGE_NUMBER_MARGIN
 
 
 def _manifest_pages_to_payload(manifest: ProcessingManifest) -> list[dict[str, Any]]:
@@ -4284,7 +4321,9 @@ def _manifest_pages_to_payload(manifest: ProcessingManifest) -> list[dict[str, A
                     if (element.page_number or 1) == page.page_number
                 ]
             block_elements = [
-                item for item in block_elements if not _is_left_out_of_payload(item)
+                item
+                for item in block_elements
+                if not _is_left_out_of_payload(item, manifest)
             ]
             block_elements.sort(key=lambda item: item.reading_order)
             blocks = [_element_to_block(item) for item in block_elements]
@@ -4300,7 +4339,7 @@ def _manifest_pages_to_payload(manifest: ProcessingManifest) -> list[dict[str, A
 
     grouped: dict[int, list[ManifestElement]] = {}
     for element in manifest.elements:
-        if _is_left_out_of_payload(element):
+        if _is_left_out_of_payload(element, manifest):
             continue
         page_number = element.page_number or 1
         grouped.setdefault(page_number, []).append(element)
