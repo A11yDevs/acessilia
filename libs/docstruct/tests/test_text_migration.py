@@ -157,21 +157,25 @@ class TestParagraphs:
         assert "description" in kinds
 
 
-class TestTableCellSanitize:
-    """A cell's leading "- " or "1." is data, not a list marker (#260)."""
+class TestLeadingMarkerSanitize:
+    """A leading "- " or "1. " before a number or formula is data (#260)."""
 
-    def test_cell_keeps_minus_sign(self):
-        assert sanitize_block_text("- 0 , 0833 (aproximadamente)", "table_cell") == (
+    def test_minus_sign_survives(self):
+        assert sanitize_block_text("- 0 , 0833 (aproximadamente)") == (
             "- 0 , 0833 (aproximadamente)"
         )
+        assert sanitize_block_text("- 0,08 (aprox.)") == "- 0,08 (aprox.)"
 
-    def test_cell_keeps_numbering(self):
-        assert sanitize_block_text("1. ", "table_cell") == "1."
-        assert sanitize_block_text("(2) x", "table_cell") == "(2) x"
+    def test_formula_after_minus_survives(self):
+        assert sanitize_block_text(r"- \frac{1}{2}", "math") == r"- \frac{1}{2}"
 
-    def test_cell_markdown_still_stripped(self):
-        assert sanitize_block_text("**- 3**", "table_cell") == "- 3"
+    def test_numbering_before_a_number_survives(self):
+        assert sanitize_block_text("1. 5") == "1. 5"
+        assert sanitize_block_text("1. ") == "1."
 
-    def test_prose_list_marker_still_stripped(self):
-        assert sanitize_block_text("- item") == "item"
-        assert sanitize_block_text("1. item") == "item"
+    def test_markdown_still_stripped(self):
+        assert sanitize_block_text("**- 3**") == "- 3"
+
+    def test_list_marker_before_a_word_still_stripped(self):
+        for marker in ("-", "*", "+", "1.", "2)", "(3)"):
+            assert sanitize_block_text(f"{marker} item") == "item"
