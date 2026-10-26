@@ -32,6 +32,7 @@ from backend.core.manifest.slides import (
     DEFAULT_FOLD_FIGURE_LABELS,
     DEFAULT_VISUAL_COVERAGE,
     is_slide_heading,
+    split_across_slides,
     structure_as_slides,
 )
 from docstruct.placeholders import (
@@ -281,6 +282,8 @@ def _build_from_toolbox_json(
         }
 
     manifest = ProcessingManifest.model_validate(data)
+    if presentation:
+        split_across_slides(manifest)
     if refine_reading_order:
         manifest.elements = _refine_reading_order(manifest.elements)
         by_page: dict[int, list[str]] = {}
