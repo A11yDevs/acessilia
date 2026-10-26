@@ -18,6 +18,11 @@ MSG_FILE_TOO_LARGE: str = "File too large. Limit: {limit} MB."
 def is_email_address_allowed(address: str) -> bool:
     """Validate one mailbox address without display names or header controls.
 
+    Internationalized email addresses are not fully supported: non-ASCII
+    local parts (before the @) are rejected. Some Unicode domains may be
+    accepted by the parser, but this helper does not perform IDNA conversion
+    or verify SMTPUTF8 support in the delivery service.
+
     Args:
         address (str): Mailbox address to validate, without surrounding whitespace.
 
