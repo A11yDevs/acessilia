@@ -2,6 +2,8 @@
 
 import asyncio
 import json
+import os
+import time
 from contextlib import asynccontextmanager
 
 import pytest
@@ -71,6 +73,62 @@ async def test_concurrent_writes_to_same_key_publish_complete_payload(tmp_path, 
     assert await cache.get_cached_bytes(b"same image") in (long_payload, short_payload)
     assert len(set(paths)) == 2
     assert len(list(tmp_path.glob("*.json"))) == 1
+    assert not list(tmp_path.glob("*.tmp"))
+
+
+@pytest.mark.asyncio
+async def test_clear_cache_removes_stale_temporaries_but_keeps_recent_ones(tmp_path, monkeypatch):
+    monkeypatch.setattr(cache, "CACHE_DIR", tmp_path)
+    await cache.set_cache_bytes(b"image", {"answer": "cached"})
+    for name in ("old.json.tmp", ".cache-orphan.tmp"):
+        path = tmp_path / name
+        path.write_text("partial", encoding="utf-8")
+        old = time.time() - cache.CACHE_TEMP_MAX_AGE_SECONDS - 60
+        os.utime(path, (old, old))
+    recent = tmp_path / ".cache-recent.tmp"
+    recent.write_text("in progress elsewhere", encoding="utf-8")
+
+    assert await cache.clear_cache() == 3
+    assert list(tmp_path.iterdir()) == [recent]
+
+
+@pytest.mark.asyncio
+async def test_clear_cache_preserves_even_an_old_active_temporary(tmp_path, monkeypatch):
+    monkeypatch.setattr(cache, "CACHE_DIR", tmp_path)
+    original_open = cache.aiofiles.open
+    writing = asyncio.Event()
+    release = asyncio.Event()
+
+    class PausedFile:
+        def __init__(self, stream):
+            self.stream = stream
+
+        async def write(self, text):
+            await self.stream.write(text)
+            await self.stream.flush()
+            writing.set()
+            await release.wait()
+
+    @asynccontextmanager
+    async def paused_open(*args, **kwargs):
+        async with original_open(*args, **kwargs) as stream:
+            yield PausedFile(stream)
+
+    with monkeypatch.context() as writes:
+        writes.setattr(cache.aiofiles, "open", paused_open)
+        task = asyncio.create_task(cache.set_cache_bytes(b"image", {"answer": "complete"}))
+        try:
+            await asyncio.wait_for(writing.wait(), timeout=10)
+            temporary = next(tmp_path.glob("*.tmp"))
+            old = time.time() - cache.CACHE_TEMP_MAX_AGE_SECONDS - 60
+            os.utime(temporary, (old, old))
+            assert await cache.clear_cache() == 0
+            assert temporary.exists()
+        finally:
+            release.set()
+            await asyncio.wait_for(task, timeout=10)
+
+    assert await cache.get_cached_bytes(b"image") == {"answer": "complete"}
     assert not list(tmp_path.glob("*.tmp"))
 
 

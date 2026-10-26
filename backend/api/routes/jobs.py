@@ -97,9 +97,9 @@ async def submit_job(
             detail="Custom instructions and thinking mode are unavailable for this pipeline",
         )
 
+    email = (email or "").strip()
     if email and not is_email_address_allowed(email):
         raise HTTPException(status_code=422, detail="Invalid email address")
-    email = email.strip()
 
     file_path = await run_in_threadpool(_save_upload, document_file)
     task_id = uuid.uuid4().hex

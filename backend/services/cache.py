@@ -18,6 +18,10 @@ from backend.log_messages import (
 from backend.tools.logger import logger
 
 CACHE_DIR = Path("var/temp/cache")
+# Match the periodic sweep's retention; fresh temporaries may belong to
+# another process. Track this process's writers regardless of file age.
+CACHE_TEMP_MAX_AGE_SECONDS = 7 * 24 * 60 * 60
+_active_cache_writes: set[Path] = set()
 
 
 def _ensure_cache_dir() -> None:
@@ -140,6 +144,8 @@ async def _write_cached(key: str, payload: Any) -> None:
     cp = _cache_path(key)
     tmp = CACHE_DIR / f".cache-{uuid4().hex}.tmp"
     temporary_created = False
+    active_path = tmp.resolve()
+    _active_cache_writes.add(active_path)
     try:
         data = {"timestamp": time.time(), "payload": payload}
         if isinstance(payload, str):
@@ -156,21 +162,38 @@ async def _write_cached(key: str, payload: Any) -> None:
     except Exception as e:
         logger.warning(t(LOG_CACHE_SAVE_FAILED).format(error=e))
     finally:
-        if temporary_created:
-            try:
-                await aiofiles.os.remove(str(tmp))
-            except FileNotFoundError:
-                pass
-            except OSError as e:
-                logger.warning(t(LOG_CACHE_SAVE_FAILED).format(error=e))
+        try:
+            if temporary_created:
+                try:
+                    await aiofiles.os.remove(str(tmp))
+                except FileNotFoundError:
+                    pass
+                except OSError as e:
+                    logger.warning(t(LOG_CACHE_SAVE_FAILED).format(error=e))
+        finally:
+            _active_cache_writes.discard(active_path)
 
 
 async def clear_cache() -> int:
+    """Remove published entries and stale temporaries, preserving active writes."""
     _ensure_cache_dir()
     count = 0
+    now = time.time()
     for f in CACHE_DIR.iterdir():
-        if f.suffix == ".json":
-            await aiofiles.os.remove(str(f))
-            count += 1
+        if f.resolve() in _active_cache_writes:
+            continue
+        try:
+            if not f.is_file():
+                continue
+            stale_temporary = (
+                f.suffix == ".tmp"
+                and now - f.stat().st_mtime > CACHE_TEMP_MAX_AGE_SECONDS
+            )
+            if f.suffix == ".json" or stale_temporary:
+                await aiofiles.os.remove(str(f))
+                count += 1
+        except FileNotFoundError:
+            # A writer or periodic sweep may have already replaced/removed it.
+            continue
     logger.info(t(LOG_CACHE_CLEARED).format(count=count))
     return count

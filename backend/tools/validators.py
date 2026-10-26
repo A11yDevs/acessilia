@@ -16,12 +16,22 @@ MSG_FILE_TOO_LARGE: str = "File too large. Limit: {limit} MB."
 
 
 def is_email_address_allowed(address: str) -> bool:
-    """Accept one mailbox address without display names or header controls."""
+    """Validate one mailbox address without display names or header controls.
+
+    Args:
+        address (str): Mailbox address to validate, without surrounding whitespace.
+
+    Returns:
+        bool: Whether the address has a valid mailbox structure and domain.
+            This does not check DNS or whether the mailbox exists.
+    """
     if any(character in address for character in "\r\n\x00"):
         return False
     try:
         mailbox = Address(addr_spec=address)
-    except (ValueError, HeaderParseError):
+    # Python 3.12's parser can raise AttributeError for incomplete domain
+    # literals such as a@[. Treat that parser failure as invalid input too.
+    except (ValueError, HeaderParseError, AttributeError):
         return False
     return bool(mailbox.username and mailbox.domain)
 

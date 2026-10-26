@@ -165,7 +165,7 @@ async def test_interrupted_work_is_terminal_instead_of_replayed(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("email", ["invalid\nrecipient@example.test", "invalid\rrecipient@example.test", "not-an-address", "a@example.test,b@example.test"])
+@pytest.mark.parametrize("email", ["invalid\nrecipient@example.test", "invalid\rrecipient@example.test", "not-an-address", "a@example.test,b@example.test", "a@[", "a@[x"])
 async def test_invalid_recipient_is_rejected_before_upload(isolated, email):
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(create_app()), base_url="http://test"
@@ -182,7 +182,7 @@ async def test_invalid_recipient_is_rejected_before_upload(isolated, email):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("email", ["", "reader@example.test", "reader+tag@example.test"])
+@pytest.mark.parametrize("email", ["", "   ", "reader@example.test", "reader+tag@example.test", " reader@example.test "])
 async def test_valid_or_optional_recipient_is_accepted(isolated, email):
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(create_app()), base_url="http://test"
@@ -194,6 +194,9 @@ async def test_valid_or_optional_recipient_is_accepted(isolated, email):
         )
     assert response.status_code == 202
     assert isolated.qsize() == 1
+
+    record = load_record(response.json()["task_id"])
+    assert record["request"]["email"] == (email.strip() or None)
 
 
 @pytest.mark.asyncio
