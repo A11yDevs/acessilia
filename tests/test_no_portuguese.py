@@ -222,6 +222,10 @@ EXEMPT_STRINGS: list[tuple[str, str]] = [
     ("backend/agents/pddl_orchestrator.py", "para revisão"),
     ("backend/agents/pddl_orchestrator.py", "Texto com sinais de Unicode legado"),
     ("backend/core/manifest/builder.py", "Texto extraído de PDF legado contém Unicode"),
+    # Text-layer formula agreement — Portuguese function names (máx, mín) that
+    # pt-BR material prints, matched as a detection pattern
+    ("libs/docstruct/src/docstruct/text/latex.py", "máx"),
+    ("libs/docstruct/tests/test_latex.py", "máx"),
 ]
 
 # Build the exempt set from strings so we can check quickly.

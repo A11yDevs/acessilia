@@ -94,6 +94,14 @@ class Settings:
     vision_concurrency: int = field(
         default_factory=lambda: int(os.getenv("VISION_CONCURRENCY", "2"))
     )
+    # Minimum agreement (0-1 F1 of letters, digits and math symbols) between
+    # a recognized formula and the text-layer text it replaces. Below it the
+    # recognition is taken as a misread and the formula keeps its text; the
+    # correct LaTeX of the reference case scores 0.87-1.0 against its text
+    # layer, a formula read from the wrong crop around 0.3.
+    formula_text_agreement_min: float = field(
+        default_factory=lambda: float(os.getenv("FORMULA_TEXT_AGREEMENT_MIN", "0.75"))
+    )
     # Per-call HTTP timeout for the model clients (OpenRouter/Ollama), far
     # below REQUEST_TIMEOUT: a normal region answer takes 45-90s and a
     # legitimate full-budget generation stays under ~7 minutes, so a call

@@ -21,6 +21,7 @@ from docstruct.tables.ast import (
     linearize_table_for_text,
     raw_rows_from_table_ast as _rows_from_table_ast,
 )
+from docstruct.text.latex import has_latex_markup, latex_text_agreement
 from docstruct.text.norm_fix import norm_fix
 from docstruct.text.unicode_repair import (
     Detection,
@@ -2956,24 +2957,31 @@ def _formula_recognition_crop(
     return page.image, page_number
 
 
-def _best_formula_candidate(candidates: Iterable[dict[str, Any]]) -> dict[str, Any] | None:
-    """The candidate with the highest confidence, or the first one without a score.
+def _ranked_formula_candidates(candidates: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Candidates with LaTeX, normalized, by decreasing confidence.
 
     ``math.recognize`` returns one entry per detected expression; a chip should
-    hold one, but the best-scored is the safer choice when it holds several.
+    hold one, but a provider may return several. A confidence that is not a
+    finite number (missing, a bool, NaN, infinity) becomes ``None`` in the
+    candidate and ranks as 0, so the order stays total and no such value
+    reaches the manifest; ties keep the provider's order.
     """
-    best: dict[str, Any] | None = None
-    best_score = -1.0
+    ranked: list[tuple[float, dict[str, Any]]] = []
     for candidate in candidates:
         latex = normalize_latex(str(candidate.get("latex") or ""))
         if not latex:
             continue
         confidence = candidate.get("confidence")
-        score = float(confidence) if isinstance(confidence, (int, float)) else 0.0
-        if best is None or score > best_score:
-            best = {**candidate, "latex": latex}
-            best_score = score
-    return best
+        if (
+            isinstance(confidence, bool)
+            or not isinstance(confidence, (int, float))
+            or not math.isfinite(confidence)
+        ):
+            confidence = None
+        score = 0.0 if confidence is None else float(confidence)
+        ranked.append((score, {**candidate, "latex": latex, "confidence": confidence}))
+    ranked.sort(key=lambda pair: -pair[0])
+    return [candidate for _, candidate in ranked]
 
 
 async def _enrich_formula_latex(
@@ -2983,13 +2991,45 @@ async def _enrich_formula_latex(
     mode: str,
     status_callback: Callable[[str], Coroutine[Any, Any, None]] | None = None,
 ) -> None:
-    """Fill formulas the extractor left without LaTeX.
+    """Give LaTeX to formulas the extractor delivered without it.
+
+    That covers formulas with no text and, in born-digital PDFs, formulas
+    whose text is the PDF text layer (``s(t) = s0 + v0t + 1 2 at2``): it
+    keeps the symbols but not the fractions, exponents and limits, so MathML
+    and speech built from it lose the structure. ``has_latex_markup`` tells
+    the two apart.
 
     ``math.recognize`` (PP-FormulaNet) runs first; the vision model is the
     fallback, so a Toolbox outage degrades to the behavior the pipeline had
     before instead of leaving the formula without content. Recognition runs
     before planning, like the picture descriptions, so the ``mathml`` and
     ``latex-verbalizer`` methods then work on real LaTeX.
+
+    When the formula has text-layer text, a recognition must agree with it
+    (``latex_text_agreement`` ≥ ``FORMULA_TEXT_AGREEMENT_MIN``): PP-FormulaNet
+    reports no confidence, and the text layer is the only independent reading
+    of the same formula. A recognition below it is a misread; the next one is
+    tried, and when none agrees the formula keeps its text-layer version, which
+    is flat but faithful. The text layer is the reference, not the truth: a
+    garbled one can refuse a correct reading, which ``formula_text_layer`` and
+    ``rejected`` leave on record.
+
+    During a ``math.recognize`` outage, text-layer formulas also go to the
+    vision model, so an outage now costs one vision call per formula that has
+    text, not only per empty one. That is deliberate: on the reference case the
+    vision readings took the structure of 16 flat formulas from nothing to a
+    98.4 structure-token recall. When vision disagrees with the text layer too,
+    the call bought nothing and the formula stays flat.
+
+    Each recognized formula records ``metadata["formula_recognition"]``:
+    ``method`` (the capability that gave the LaTeX: ``math.recognize`` or
+    ``vision``; ``text-layer`` when nothing agreed), ``confidence``,
+    ``text_agreement`` when there was text-layer text, ``rank`` when a
+    ``math.recognize`` candidate other than the best-ranked one was used, and
+    ``rejected``: refused readings keyed by method, with ``#n`` for the n-th
+    ranked candidate (``math.recognize#2``), valued by their agreement
+    (``None`` for no evidence). Consumers must read those keys as
+    ``method`` or ``method#rank`` strings.
 
     Crops are independent, so they run concurrently, bounded by
     ``VISION_CONCURRENCY`` for the same reason as the picture descriptions:
@@ -3008,7 +3048,7 @@ async def _enrich_formula_latex(
     formulas = [
         element
         for element in manifest.elements
-        if element.type == "formula" and not normalize_latex(element.text or "")
+        if element.type == "formula" and not has_latex_markup(element.text)
     ]
     if not formulas:
         return
@@ -3041,10 +3081,12 @@ async def _enrich_formula_latex(
             )
         except MathCapabilityUnavailable as exc:
             math_available = False
+            # The full message names the provider and its HTTP status; the
+            # class alone ("ToolboxError") hides a failing sidecar.
             logger.warning(
                 "math.recognize unavailable during formula enrichment ({}); "
                 "falling back to the vision model",
-                exc.reason,
+                exc,
             )
             return []
 
@@ -3089,10 +3131,44 @@ async def _enrich_formula_latex(
             if not image_bytes:
                 return False
 
-            best = _best_formula_candidate(await recognize(image_bytes))
+            original_text = element.text or ""
+            text_layer = normalize_latex(original_text)
+            # None records a recognition refused for lack of evidence.
+            rejected: dict[str, float | None] = {}
+            agreement: float | None = None
+
+            def accept(method: str, latex: str) -> str:
+                """``latex`` when it agrees with the text layer, else ``""``.
+
+                With text-layer text but no visible symbol on either side
+                (``()``), there is no evidence the recognition read the same
+                formula, so it is refused like a disagreement.
+                """
+                nonlocal agreement
+                if not latex or not text_layer:
+                    return latex
+                score = latex_text_agreement(latex, text_layer)
+                if score is None or score < settings.formula_text_agreement_min:
+                    rejected[method] = None if score is None else round(score, 3)
+                    return ""
+                agreement = round(score, 3)
+                return latex
+
+            # Every candidate gets its turn at the gate before vision is paid:
+            # a lower-ranked one that agrees with the text layer is still a
+            # recognition of this crop. Refusals are recorded per rank
+            # ("math.recognize", "math.recognize#2", ...).
             method = "math.recognize"
-            latex = str(best["latex"]) if best is not None else ""
-            confidence = best.get("confidence") if best is not None else None
+            latex = ""
+            confidence = None
+            accepted_rank = 1
+            candidates = _ranked_formula_candidates(await recognize(image_bytes))
+            for rank, candidate in enumerate(candidates, start=1):
+                latex = accept(method if rank == 1 else f"{method}#{rank}", candidate["latex"])
+                if latex:
+                    confidence = candidate["confidence"]
+                    accepted_rank = rank
+                    break
 
             if not latex:
                 method = "vision"
@@ -3105,16 +3181,32 @@ async def _enrich_formula_latex(
                     full_budget=True,
                 )
                 if output is not None and output.kind == "formula":
-                    latex = normalize_latex(output.formula_latex or "")
+                    latex = accept(method, normalize_latex(output.formula_latex or ""))
                     confidence = output.confidence
 
+        if rejected:
+            logger.info(
+                "Formula {} (page {}): recognition disagrees with the text layer {}",
+                element.id, page_number, rejected,
+            )
         if not latex:
+            if rejected:
+                element.metadata["formula_recognition"] = {
+                    "method": "text-layer",
+                    "rejected": rejected,
+                }
             return False
+        recognition: dict[str, Any] = {"method": method, "confidence": confidence}
+        if method == "math.recognize" and accepted_rank > 1:
+            recognition["rank"] = accepted_rank
+        if text_layer:
+            # The replaced text exactly as the extractor delivered it.
+            element.metadata["formula_text_layer"] = original_text
+            recognition["text_agreement"] = agreement
+        if rejected:
+            recognition["rejected"] = rejected
         element.text = latex
-        element.metadata["formula_recognition"] = {
-            "method": method,
-            "confidence": confidence,
-        }
+        element.metadata["formula_recognition"] = recognition
         return True
 
     # The fold above touches only its own element and runs without awaits, so
