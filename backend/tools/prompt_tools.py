@@ -15,6 +15,11 @@ MODE_MAP = {
     "ocr": "ocr.md",
 }
 
+#: Chemistry rules appended to the prompts whose answer may be a description
+#: (a picture, a whole page): a drawn molecule is described, not transcribed
+#: as a formula. Kept apart so both kinds of prompt share one wording.
+CHEMISTRY_PROMPT = "quimica.md"
+
 REGION_PROMPT_MAP = {
     "regiao_imagem": "regiao_imagem.md",
     "regiao_texto_escaneado": "regiao_texto_escaneado.md",
@@ -50,6 +55,15 @@ def load_region_prompt(region_type: str) -> str:
     if prompt_path.exists():
         return prompt_path.read_text(encoding="utf-8")
     return ""
+
+def load_chemistry_prompt() -> str:
+    """The shared chemistry rules, or an empty string when the file is absent."""
+    prompt_path = PROMPTS_DIR / CHEMISTRY_PROMPT
+    if prompt_path.exists():
+        return prompt_path.read_text(encoding="utf-8")
+    logger.warning(t(LOG_PROMPT_FILE_NOT_FOUND).format(path=str(prompt_path)))
+    return ""
+
 
 def build_page_prompt(system_prompt: str, total_pages: int, page_num: int, is_pdf: bool) -> str:
     advanced_instructions = (

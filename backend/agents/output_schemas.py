@@ -12,7 +12,8 @@ from backend.agents.run_helpers import RunIncompleteError, run_content
 VISION_SCHEMA_INSTRUCTION = (
     "Retorne somente o objeto estruturado solicitado: use kind='description' e "
     "description para conteúdo visual/textual, ou kind='formula' e formula_latex "
-    "quando a região for predominantemente uma fórmula. Não preencha formula_latex "
+    "quando a região for predominantemente uma fórmula matemática (um desenho de "
+    "molécula é kind='description'). Não preencha formula_latex "
     "quando kind='description'. Sempre informe language, confidence, "
     "mentioned_elements e warnings."
 )
@@ -43,7 +44,7 @@ class VisionOutput(AgentOutput):
     """Structured visual description, optionally representing a formula."""
 
     kind: Literal["description", "formula"] = Field(
-        description="Whether the region is a visual description or a mathematical formula."
+        description="Whether the region is a visual description or a mathematical formula; a drawn molecule is a description."
     )
     description: str = Field(
         default="",
@@ -71,7 +72,7 @@ class VisionOutput(AgentOutput):
     )
     formula_latex: str | None = Field(
         default=None,
-        description="LaTeX when the region contains predominantly a mathematical formula.",
+        description="LaTeX when the region contains predominantly a mathematical formula, never for a drawn molecule or a written chemical formula.",
     )
     warnings: list[str] = Field(
         default_factory=list,
