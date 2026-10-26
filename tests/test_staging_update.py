@@ -249,8 +249,6 @@ def test_staging_update_retries_a_transient_pull_failure(tmp_path):
 printf '{"sha":"1234567890abcdef"}'
 """,
     )
-    # The retry delay is real; keep the test fast without changing the script.
-    _write_executable(bin_dir / "sleep", "#!/usr/bin/env bash\nexit 0\n")
     _write_executable(
         bin_dir / "docker",
         """#!/usr/bin/env bash
@@ -275,6 +273,7 @@ exit 0
         {
             "GHCR_TOKEN": "token-do-ambiente",
             "PATH": f"{bin_dir}:{env['PATH']}",
+            "PULL_RETRY_DELAY": "0",
             "STAGING_DIR": str(staging_dir),
         }
     )

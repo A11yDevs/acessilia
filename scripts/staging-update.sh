@@ -90,16 +90,17 @@ _registry_digest() {
 #: Attempts per pull. GHCR can answer the manifest request and still fail the
 #: tag pull with a transient 5xx, a rate limit or a token refresh; retrying
 #: keeps one bad response from leaving staging behind for a whole interval.
-PULL_ATTEMPTS=3
+PULL_ATTEMPTS="${PULL_ATTEMPTS:-3}"
 PULL_RETRY_DELAY="${PULL_RETRY_DELAY:-5}"
 
 _pull_image() {
   # $1 = image reference. The Docker error goes to the journal, where the
   # systemd failure is read; suppressing it left only "Falha ao puxar" and no
-  # cause.
+  # cause. A successful pull keeps its progress on stdout, as before.
   local ref="$1" attempt output
   for ((attempt = 1; attempt <= PULL_ATTEMPTS; attempt++)); do
     if output=$(docker pull "$ref" 2>&1); then
+      printf '%s\n' "$output"
       return 0
     fi
     echo "[staging-update] ⚠️  Falha ao puxar $ref (tentativa $attempt/$PULL_ATTEMPTS)." >&2
