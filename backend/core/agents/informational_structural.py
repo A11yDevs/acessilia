@@ -63,4 +63,5 @@ class InformationalStructuralAgent:
             refine_reading_order=True,
             presentation=presentation,
             slide_visual_coverage=settings.slide_visual_coverage,
+            slide_fold_figure_labels=settings.slide_fold_figure_labels,
         )
