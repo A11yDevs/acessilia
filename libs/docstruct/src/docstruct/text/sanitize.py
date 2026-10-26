@@ -55,8 +55,11 @@ def sanitize_block_text(text: str, block_type: str | None = None) -> str:
     cleaned = re.sub(r"(?<!\*)\*(?!\s)(.+?)(?<!\s)\*(?!\*)", r"\1", cleaned)
     cleaned = re.sub(r"__([^_]+)__", r"\1", cleaned)
     cleaned = re.sub(r"(?m)^\s*#{1,6}\s+", "", cleaned)
-    cleaned = re.sub(r"(?m)^\s*[-*+]\s+", "", cleaned)
-    cleaned = re.sub(r"(?m)^\s*(?:\d+\.\s+|\d+\)\s+|\(\d+\)\s+)", "", cleaned)
+    if block_type != "table_cell":
+        # A list marker in prose; in a table cell "- 0,08" is a negative
+        # number and "1." a value, so cells keep them (#260).
+        cleaned = re.sub(r"(?m)^\s*[-*+]\s+", "", cleaned)
+        cleaned = re.sub(r"(?m)^\s*(?:\d+\.\s+|\d+\)\s+|\(\d+\)\s+)", "", cleaned)
     cleaned = re.sub(r"(?m)^\s*```+\s*$", "", cleaned)
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
     return cleaned.strip()

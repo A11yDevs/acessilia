@@ -353,7 +353,7 @@ def _sanitize_structured_blocks(
             for row in clean["rows"]:
                 if not isinstance(row, list):
                     continue
-                rows.append([sanitize_block_text(str(cell)) for cell in row])
+                rows.append([sanitize_block_text(str(cell), "table_cell") for cell in row])
             clean["rows"] = rows
             if rows and not isinstance(clean.get("table_ast"), dict):
                 clean["table_ast"] = _table_ast_from_rows(rows)
@@ -395,7 +395,7 @@ def _sanitize_table_ast(raw: dict[str, Any]) -> dict[str, Any]:
             for cell in cells:
                 if not isinstance(cell, dict) or "text" not in cell:
                     continue
-                text = sanitize_block_text(str(cell.get("text", "")))
+                text = sanitize_block_text(str(cell.get("text", "")), "table_cell")
                 normalized_cell: dict[str, Any] = {"text": text}
                 if isinstance(cell.get("header"), bool):
                     normalized_cell["header"] = cell["header"]
@@ -428,7 +428,7 @@ def _sanitize_table_ast(raw: dict[str, Any]) -> dict[str, Any]:
 def _table_ast_from_rows(rows: list[list[str]]) -> dict[str, Any]:
     body = []
     for row in rows:
-        cells = [{"text": sanitize_block_text(str(cell))} for cell in row]
+        cells = [{"text": sanitize_block_text(str(cell), "table_cell")} for cell in row]
         if cells:
             body.append({"cells": cells})
     return {"body": body}
