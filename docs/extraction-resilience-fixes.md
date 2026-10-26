@@ -33,12 +33,17 @@ the failure preserves both causes. Unexpected programming errors are not hidden.
 Functional regressions were exercised before and after changes. The focused
 core suite passed 81 tests and the SDK passed 250 tests. These checks are not
 an evaluation of extraction quality. No dataset benchmark or production rollout
-was performed. The full core run passed 1,771 tests, excluded 51 E2E tests, and retained one
-golden-manifest mismatch that also reproduces on the unchanged base revision.
-That existing failure remains outside these corrections; the full suite is not green.
+was performed. The previously observed golden-manifest mismatch has been
+addressed by request-time translation and an explicit canonical test locale;
+see [manifest localization](manifest-localization.md).
+
 
 The changes avoid unnecessary extraction, preserve useful results during
 recoverable failures and prevent cross-deployment artifact assumptions in the
 initial input. They do not make independent storage systems share objects or
-guarantee availability when every provider is down. The PR remains a draft for
-review, with its complete test status recorded in the description.
+guarantee availability when every provider is down. Further work is committed on the fork work branch without opening or updating
+pull requests. The complete test status is recorded below.
+
+Latest complete core validation after the localization correction: **1,775 passed,
+51 E2E tests deselected**, with no failures. The separate SDK validation remains
+250 passing tests; no SDK behavior changed in the localization correction.

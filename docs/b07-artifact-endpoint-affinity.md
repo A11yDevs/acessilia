@@ -42,8 +42,7 @@ another configured deployment. No dataset benchmark or production rollout has
 been performed. The remaining Core/SDK corrections are described in
 [the consolidated report](extraction-resilience-fixes.md).
 
-Full core validation: 1,771 passed, 51 E2E tests deselected, and one existing
-golden-manifest mismatch in
-`test_manifest_wire_payload_matches_the_golden_file[toolbox-v2-contract]`.
-The same test fails on an unmodified archive of the base commit; it was not
-introduced by B07. The PR remains a draft and does not claim a green full suite.
+The original full-suite run exposed a preexisting golden-manifest mismatch.
+Its import-time localization cause and subsequent correction are documented in
+[manifest localization](manifest-localization.md). Current validation is recorded
+in the [consolidated report](extraction-resilience-fixes.md).

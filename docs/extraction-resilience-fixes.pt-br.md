@@ -34,13 +34,18 @@ o erro preserva as duas causas. Erros inesperados de programação não são ocu
 As regressões foram exercitadas antes e depois das alterações. Passaram os
 81 testes direcionados do Core e os 250 testes do SDK. Isso não constitui
 avaliação da qualidade da extração. Nenhum benchmark de dataset ou rollout foi
-executado. Na suíte completa do Core, passaram 1.771 testes, 51 E2E foram excluídos e
-permaneceu uma divergência de manifesto que também ocorre na revisão-base sem
-alterações. Essa falha preexistente está fora destas correções; a suíte completa
-ainda não está totalmente aprovada.
+executado. A divergência anterior do manifesto foi tratada com tradução no
+momento da requisição e idioma explícito no teste de referência; consulte a
+[nota de localização](manifest-localization.pt-br.md).
+
 
 As mudanças evitam extrações desnecessárias, preservam resultados úteis diante
 de falhas recuperáveis e retiram a dependência de artefatos entre implantações
 independentes na entrada inicial. Elas não tornam armazenamentos independentes
 compartilhados nem garantem disponibilidade quando todos os provedores falham.
-O PR permanece em rascunho para revisão, com o resultado completo dos testes na descrição.
+O trabalho adicional é commitado na branch de trabalho do fork, sem abrir ou
+atualizar PRs. O resultado completo dos testes fica registrado abaixo.
+
+Validação completa atual do Core após a correção de localização: **1.775 testes
+aprovados, 51 E2E excluídos**, sem falhas. A validação separada do SDK permanece
+em 250 testes aprovados; a correção de localização não alterou seu comportamento.

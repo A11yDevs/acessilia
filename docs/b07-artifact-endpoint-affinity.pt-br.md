@@ -44,9 +44,7 @@ somente em outra implantação configurada. Não houve benchmark de dataset nem
 implantação em produção. As demais correções do Core/SDK estão descritas no
 [relatório consolidado](extraction-resilience-fixes.pt-br.md).
 
-Na suíte completa do Core, passaram 1.771 testes, 51 testes E2E foram excluídos
-e houve uma divergência preexistente no manifesto de referência em
-`test_manifest_wire_payload_matches_the_golden_file[toolbox-v2-contract]`.
-O mesmo teste falha em uma cópia sem alterações do commit-base; o B07 não
-introduziu essa falha. O PR permanece em rascunho e não apresenta a suíte
-completa como aprovada.
+A execução original da suíte completa identificou uma divergência preexistente
+no manifesto de referência. Sua causa e correção estão documentadas na
+[nota de localização do manifesto](manifest-localization.pt-br.md). A validação
+atual está no [relatório consolidado](extraction-resilience-fixes.pt-br.md).
