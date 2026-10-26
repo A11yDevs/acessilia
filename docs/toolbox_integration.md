@@ -329,10 +329,11 @@ The `media.inspect` capability (provider `pure-media-inspect`, PR
     pictures side by side (a caption row read through their columns) merges
     them into the first one (`metadata.merged_picture_ids`); a sentence stays.
     A caption is taken in only then, or when it lies on or beside such a
-    merged picture and across its width. If the picture is left undescribed,
-    its labels are its alt text (`SLIDE_FOLD_FIGURE_LABELS`). Whatever that
-    setting, the slide heading is left out of reading-order refinement, so a
-    picture never moves before it.
+    merged picture and across its width (`SLIDE_FOLD_FIGURE_LABELS`). If the
+    picture is left undescribed, its labels go back to the slide as paragraphs
+    after it. The text a whole-slide picture replaced goes back the same way,
+    whatever that setting. Either way, the slide heading is left out of
+    reading-order refinement, so a picture never moves before it.
     A Toolbox without the field, or a failed inspection, means a document.
   - `requires_visual_inspection`, to inject a full-page `picture` element when the
     input is a standalone image with no visual blocks — ensuring the VisionAgent
