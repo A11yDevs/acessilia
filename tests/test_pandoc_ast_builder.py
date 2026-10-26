@@ -333,4 +333,12 @@ def test_degrading_a_formula_with_speech_removes_its_math():
 
     degraded = degrade_math_to_text(build_pandoc_ast(document))
 
-    assert "Math" not in json.dumps(degraded)
+    # Only the blocks reach Pandoc (the AST also carries the source document).
+    payload = json.dumps(degraded["blocks"])
+    assert "Math" not in payload
+    # Without a formula there is nothing for the alternate text to describe:
+    # the span is unwrapped, and its text is the formula source.
+    assert "accessilia-formula" not in payload
+    assert "Formula: a over b" not in payload
+    para = next(block for block in degraded["blocks"] if block["t"] == "Para")
+    assert "\\frac{a}{b}" in _para_text(para)

@@ -128,6 +128,13 @@ def _enrich_math_blocks(
     ``alt_text`` is filled from ``metadata["verbalization"]`` before asking
     the enricher. A caller that produced them earlier (the core's PDDL plan
     does) so pays one conversion and one verbalization per formula, not two.
+
+    Invariant for those callers: ``metadata["mathml"]`` and
+    ``metadata["verbalization"]`` must describe the block's text after the
+    enricher's ``normalize`` (the core's plan converts ``normalize_latex`` of
+    the same text). Nothing ties them to the text afterwards, so a producer
+    that converts another form of the LaTeX would ship MathML or speech that
+    does not match the formula.
     """
     if not sections:
         return

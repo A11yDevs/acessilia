@@ -160,7 +160,10 @@ def _block_to_ast(block: dict[str, Any]) -> list[dict[str, Any]]:
         latex = str(block.get("text", ""))
         if _has_unsafe_latex_macro(latex):
             return [{"t": "Para", "c": _meta_inlines(latex)}]
-        # A math block is a formula of its own, so it is display math.
+        # A math block is a formula of its own, so it is display math. This
+        # reaches every Pandoc writer: DOCX typesets it as a display equation
+        # (oMathPara) where it used to be inline. (The HTML export does not go
+        # through this AST.)
         math = {"t": "Math", "c": [{"t": "DisplayMath"}, latex]}
         alt_text = str(block.get("alt_text") or "").strip()
         if alt_text:
@@ -168,7 +171,8 @@ def _block_to_ast(block: dict[str, Any]) -> list[dict[str, Any]]:
             # as the Formula element's alternate text, instead of the LaTeX
             # source a screen reader would otherwise announce
             # (acessilia-toolbox docs/pdf-ua-export.md, "Formula alternate
-            # text"). Other writers render the span's content as is.
+            # text"). Other writers ignore the span and render its content;
+            # DOCX keeps no alternate text for equations.
             math = {
                 "t": "Span",
                 "c": [["", [FORMULA_ALT_CLASS], [["alt", alt_text]]], [math]],
@@ -221,7 +225,10 @@ def _degrade_node(node: Any) -> Any:
 
     Lists and dicts come back with the same shape: a ``Math`` inline expands
     into the text inlines that replace it in place, everything else is
-    walked through ``c`` and rebuilt.
+    walked through ``c`` and rebuilt. A formula span (``FORMULA_ALT_CLASS``)
+    is unwrapped too: once its formula is text there is no Formula element
+    for the alternate text, and an ``alt`` left on plain text would be
+    behaviour nobody asked for.
     """
     if isinstance(node, list):
         rebuilt: list[Any] = []
@@ -231,12 +238,24 @@ def _degrade_node(node: Any) -> Any:
                 if isinstance(item.get("c"), list) and len(item["c"]) > 1:
                     latex = str(item["c"][1])
                 rebuilt.extend(_meta_inlines(latex))
+            elif _is_formula_span(item):
+                rebuilt.extend(_degrade_node(item["c"][1]))
             else:
                 rebuilt.append(_degrade_node(item))
         return rebuilt
     if isinstance(node, dict) and "c" in node:
         return {**node, "c": _degrade_node(node["c"])}
     return node
+
+
+def _is_formula_span(node: Any) -> bool:
+    if not isinstance(node, dict) or node.get("t") != "Span":
+        return False
+    content = node.get("c")
+    if not (isinstance(content, list) and len(content) == 2 and isinstance(content[0], list)):
+        return False
+    attributes = content[0]
+    return len(attributes) > 1 and FORMULA_ALT_CLASS in (attributes[1] or [])
 
 
 def _table_to_pandoc_ast(table_ast: dict[str, Any]) -> dict[str, Any]:

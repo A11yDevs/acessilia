@@ -365,7 +365,6 @@ def test_html_renderer_mathml_sanitizado():
     assert "<script>" not in html
 
 
-
 class _CountingEnricher:
     """A MathEnricher that records every call."""
 
