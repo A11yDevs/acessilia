@@ -4570,10 +4570,13 @@ def _element_to_block(element: ManifestElement) -> dict[str, Any]:
             }
         )
     elif element.type == "picture":
+        # A text slide's labels folded into the picture (slides.py) left the
+        # running text; with no description they are all the reader gets.
+        labels = "; ".join(element.metadata.get("figure_labels", []))
         block.update(
             {
                 "type": "image",
-                "alt_text": text or t(MSG_UNDESCRIBED_PICTURE_ALT),
+                "alt_text": text or labels or t(MSG_UNDESCRIBED_PICTURE_ALT),
             }
         )
     elif element.type == "code":

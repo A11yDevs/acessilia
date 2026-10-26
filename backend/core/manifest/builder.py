@@ -28,7 +28,11 @@ from backend.core.manifest.models import (
     Observation,
     ProcessingManifest,
 )
-from backend.core.manifest.slides import DEFAULT_VISUAL_COVERAGE, structure_as_slides
+from backend.core.manifest.slides import (
+    DEFAULT_FOLD_FIGURE_LABELS,
+    DEFAULT_VISUAL_COVERAGE,
+    structure_as_slides,
+)
 from docstruct.placeholders import (
     UNSTRUCTURED_PAGE_FLAG,
     UNSTRUCTURED_PAGE_LABEL,
@@ -184,6 +188,7 @@ def build_processing_manifest(
     refine_reading_order: bool = False,
     presentation: bool = False,
     slide_visual_coverage: float = DEFAULT_VISUAL_COVERAGE,
+    slide_fold_figure_labels: bool = DEFAULT_FOLD_FIGURE_LABELS,
 ) -> ProcessingManifest:
     """Builds the processing manifest from the Toolbox structural extraction.
 
@@ -211,6 +216,7 @@ def build_processing_manifest(
         refine_reading_order=refine_reading_order,
         presentation=presentation,
         slide_visual_coverage=slide_visual_coverage,
+        slide_fold_figure_labels=slide_fold_figure_labels,
     )
 
 
@@ -223,6 +229,7 @@ def _build_from_toolbox_json(
     refine_reading_order: bool = False,
     presentation: bool = False,
     slide_visual_coverage: float = DEFAULT_VISUAL_COVERAGE,
+    slide_fold_figure_labels: bool = DEFAULT_FOLD_FIGURE_LABELS,
 ) -> ProcessingManifest:
     """Build a ProcessingManifest from a pre-built Toolbox JSON response.
 
@@ -286,6 +293,7 @@ def _build_from_toolbox_json(
         structure_as_slides(
             manifest,
             visual_coverage=slide_visual_coverage,
+            fold_figure_labels=slide_fold_figure_labels,
             page_fractions=lambda element: _normalized_element_bbox(element, page_sizes),
         )
     observations, obligations = _derive_processing_needs(manifest.elements)

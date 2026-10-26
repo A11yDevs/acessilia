@@ -13,6 +13,10 @@ processing needs:
   those pictures, becomes one picture of the whole slide, which the vision
   model describes, instead of the fragments of text the extractor read off it;
   a slide nothing was extracted from becomes one too, so it is still described;
+- on a slide read as text, short text lying on a picture (the labels of a
+  diagram, the cells of a chart read one by one) is folded into that picture,
+  whose description transcribes it in place, instead of standing as loose
+  paragraphs out of their place;
 - reading order is numbered slide by slide, so it never crosses a slide.
 """
 
@@ -43,6 +47,25 @@ _BACKGROUND_COVERAGE = 0.95
 #: slides that text covers at most 0.013 of the slide.
 _MAX_TEXT_OUTSIDE = 0.05
 
+#: Default for folding the labels on a text slide's pictures into them
+#: (SLIDE_FOLD_FIGURE_LABELS).
+DEFAULT_FOLD_FIGURE_LABELS = True
+
+#: Most words of three letters or more a text on a picture may have to be one
+#: of its labels. 006.pdf's labels ("1nm", "Transistor (2003)", "Mg2+",
+#: "1 2 3 … 18") have at most two.
+_LABEL_MAX_WORDS = 3
+
+#: A text with a word of three letters or more that ends like a sentence
+#: ("Cresceu 10%.") or names something ("Fonte: IBGE, 2024") is the author's
+#: own, even when short; garbled OCR such as "p3." or "2." is not.
+_SENTENCE = re.compile(r"[.!?]$|:\s")
+
+#: Element types a picture's label can have been extracted as. A formula, a
+#: table or a list keeps its own structure; a caption is the author's text
+#: (a source, "Figure 3 — …"), not something read off the picture.
+_LABEL_TYPES = {"paragraph", "heading", "title", "unknown"}
+
 #: Heading levels: the deck title, each slide, and headings inside a slide.
 DECK_LEVEL, SLIDE_LEVEL, INNER_LEVEL = 1, 2, 3
 
@@ -60,12 +83,15 @@ def structure_as_slides(
     manifest: ProcessingManifest,
     *,
     visual_coverage: float = DEFAULT_VISUAL_COVERAGE,
+    fold_figure_labels: bool = DEFAULT_FOLD_FIGURE_LABELS,
     page_fractions: PageFractions,
 ) -> None:
     """Reshape ``manifest`` in place so each page is one slide.
 
     ``page_fractions(element)`` returns the element's box as fractions of its
     page, or ``None``; the builder passes its own normalization.
+    ``fold_figure_labels`` folds the labels on a text slide's pictures into
+    them (SLIDE_FOLD_FIGURE_LABELS).
     """
     numbers = sorted(page.page_number for page in manifest.pages)
     if not numbers:
@@ -100,6 +126,8 @@ def structure_as_slides(
             # A slide nothing was extracted from may be a scan or a photo; the
             # heading would hide it from the unstructured-page inspection.
             body = [_whole_slide_picture(number, body)]
+        elif fold_figure_labels:
+            body = _fold_figure_labels(body, page_fractions)
         ordered.append(heading)
         ordered.extend(body)
 
@@ -192,17 +220,7 @@ def _is_visual(
     ``_MAX_TEXT_OUTSIDE``. Text without a box keeps the slide as text, since
     where it lies is unknown.
     """
-    pictures = []
-    for element in body:
-        if element.type != "picture":
-            continue
-        box = page_fractions(element)
-        if box is None:
-            continue
-        left, top, right, bottom = box
-        box = (max(left, 0.0), max(top, 0.0), min(right, 1.0), min(bottom, 1.0))
-        if 0 < _area(box) < _BACKGROUND_COVERAGE:
-            pictures.append(box)
+    pictures = [box for _, box in _content_pictures(body, page_fractions)]
     if _union_area(pictures) < threshold:
         return False
     outside = []
@@ -219,6 +237,77 @@ def _is_visual(
         if not any(_contains(picture, box) for picture in pictures):
             outside.append(box)
     return _union_area(outside) <= _MAX_TEXT_OUTSIDE
+
+
+def _content_pictures(
+    body: list[ManifestElement], page_fractions: PageFractions
+) -> list[tuple[ManifestElement, tuple[float, float, float, float]]]:
+    """The slide's pictures with their boxes clipped to the slide, background left out.
+
+    A picture without a box is left out too, since where it lies is unknown.
+    """
+    pictures = []
+    for element in body:
+        if element.type != "picture":
+            continue
+        box = page_fractions(element)
+        if box is None:
+            continue
+        left, top, right, bottom = box
+        box = (max(left, 0.0), max(top, 0.0), min(right, 1.0), min(bottom, 1.0))
+        if 0 < _area(box) < _BACKGROUND_COVERAGE:
+            pictures.append((element, box))
+    return pictures
+
+
+def _fold_figure_labels(
+    body: list[ManifestElement], page_fractions: PageFractions
+) -> list[ManifestElement]:
+    """``body`` without the labels lying on its pictures, each kept by its picture.
+
+    A label is short text (at most ``_LABEL_MAX_WORDS`` words of three letters
+    or more, not a sentence) whose box centre lies on a picture that is not the
+    slide's background: text over a backdrop is the slide's own. The vision
+    model reads it off the picture with the rest (the picture prompt asks for
+    every legible text), so it is not handed over; its text is kept, in reading
+    order, in the picture's ``figure_labels`` and its id in
+    ``figure_label_ids``. A label on nested pictures goes to the smallest, the
+    one it most likely names. Should the picture be left undescribed, those
+    labels are its alt text (``_element_to_block``), so they are not lost.
+
+    Handing the labels to the model was tried on 006.pdf and made it worse: a
+    structural formula's atom letters ("H", "O", "SOH") pushed it to transcribe
+    the drawing as a formula, garbled or cut off.
+    """
+    pictures = _content_pictures(body, page_fractions)
+    if not pictures:
+        return body
+    kept = []
+    for element in body:
+        text = (element.text or "").strip()
+        box = page_fractions(element) if element.type in _LABEL_TYPES else None
+        hosts = [
+            (picture, picture_box)
+            for picture, picture_box in pictures
+            if box is not None and _contains(picture_box, box)
+        ]
+        if (
+            not text
+            or not hosts
+            or element.raw_label in _DECORATION
+            or not _reads_as_label(text)
+        ):
+            kept.append(element)
+            continue
+        host, _ = min(hosts, key=lambda pair: _area(pair[1]))
+        host.metadata.setdefault("figure_labels", []).append(text)
+        host.metadata.setdefault("figure_label_ids", []).append(element.id)
+    return kept
+
+
+def _reads_as_label(text: str) -> bool:
+    words = sum(1 for word in text.split() if sum(char.isalpha() for char in word) >= 3)
+    return words <= _LABEL_MAX_WORDS and not (words and _SENTENCE.search(text))
 
 
 def _area(box: tuple[float, float, float, float]) -> float:

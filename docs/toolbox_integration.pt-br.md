@@ -314,6 +314,15 @@ A capacidade `media.inspect` (provider `pure-media-inspect`, PR
     cobre no máximo 5% do slide) vira uma imagem do slide inteiro, descrita com o
     prompt de página em vez de lida como texto; o texto substituído fica em
     `metadata.replaced_text`. Um slide do qual nada foi extraído também vira uma.
+    Num slide lido como texto, um rótulo cujo centro está sobre uma imagem que
+    cobre menos de 95% do slide (uma maior é o fundo) é incorporado a ela: sai
+    do texto corrido, fica em `metadata.figure_labels` da imagem (ids em
+    `metadata.figure_label_ids`) e a descrição da imagem o transcreve no lugar.
+    Um rótulo é um parágrafo, cabeçalho ou título com no máximo três palavras de
+    três letras ou mais que não se lê como frase (terminando em `.`, `!` ou `?`,
+    ou com `: `); legendas, fórmulas, tabelas e itens de lista ficam. Se a
+    imagem ficar sem descrição, seus rótulos viram o texto alternativo
+    (`SLIDE_FOLD_FIGURE_LABELS`).
     Uma Toolbox sem o campo, ou uma inspeção que falhou, significa documento.
   - `requires_visual_inspection`, para injetar um elemento `picture` de página
     inteira quando a entrada é imagem isolada sem blocos visuais — garantindo a
@@ -360,6 +369,7 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 | `TOOLBOX_MEDIA_INSPECT_PROVIDER` | `pure-media-inspect` | Provider da capacidade `media.inspect` |
 | `TOOLBOX_MEDIA_INSPECT_ENABLED` | `true` | Executa `media.inspect` na Toolbox ou pula a etapa. Não há fallback local: com `false`, a etapa é pulada; uma falha na Toolbox é registrada no log e no manifesto, o processamento segue sem o sinal de imagem isolada e o resultado degradado não é cacheado |
 | `SLIDE_VISUAL_COVERAGE` | `0.5` | Fração do slide que as imagens precisam cobrir para um slide de apresentação (`document_genre=presentation`) ser descrito como uma imagem em vez de lido como texto |
+| `SLIDE_FOLD_FIGURE_LABELS` | `true` | Num slide de apresentação lido como texto, incorpora à imagem o texto curto sobre ela, cuja descrição o transcreve no lugar |
 | `TOOLBOX_PDF_UA_PROVIDER` | `pandoc-pdf-ua` | Provider da capacidade `document.export.pdf_ua` |
 | `TOOLBOX_PDF_UA_ENABLED` | `true` | Renderiza o PDF/UA na Toolbox (Pandoc + TeX Live fixados) ou pula a etapa. Não há fallback local: com `false`, o worker pula o formato sem erro; uma falha na Toolbox é reportada como erro de exportação opcional |
 | `TOOLBOX_PDF_UA_TIMEOUT_SECONDS` | `300` | Tempo máximo de espera pela renderização na Toolbox antes de reportar erro de exportação opcional |

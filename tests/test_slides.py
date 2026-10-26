@@ -102,14 +102,14 @@ def _build(source, *, presentation=True):
     )
 
 
-def _build_edited(source, extraction):
+def _build_edited(source, extraction, **options):
     """Build an extraction whose elements or pages a test changed."""
     document = extraction.document["document"]
     document["summary"].update(
         page_count=len(document["pages"]), element_count=len(document["elements"])
     )
     return build_processing_manifest(
-        source, extraction, refine_reading_order=True, presentation=True
+        source, extraction, refine_reading_order=True, presentation=True, **options
     )
 
 
@@ -427,3 +427,143 @@ async def test_media_inspection_decides_the_structure_before_extraction(
     canonical = build_canonical_document(payload)
     # One H1, then H2 per slide: the canonical document is valid.
     assert not validate_canonical_document(canonical)
+
+
+def _with_labels(*extra):
+    """The deck with ``extra`` elements added to slide 2, whose picture e-6
+    spans (700, 300) to (900, 500)."""
+    extraction = _deck()
+    document = extraction.document["document"]
+    document["elements"].extend(extra)
+    document["pages"][1]["element_ids"].extend(element["id"] for element in extra)
+    return extraction
+
+
+def test_labels_on_a_picture_are_folded_into_it(source):
+    """006.pdf slide 1: a scale diagram's labels stood as loose paragraphs."""
+    extraction = _with_labels(
+        _element("l-1", "paragraph", 2, 7, (720, 320, 760, 340), "1nm"),
+        _element("l-2", "paragraph", 2, 8, (780, 320, 830, 340), "10nm"),
+        _element("l-3", "paragraph", 2, 9, (720, 460, 880, 480), "Lithography resolution"),
+    )
+
+    manifest = _build_edited(source, extraction)
+
+    [picture] = [e for e in manifest.elements if e.id == "e-6"]
+    assert picture.metadata["figure_labels"] == ["1nm", "10nm", "Lithography resolution"]
+    assert picture.metadata["figure_label_ids"] == ["l-1", "l-2", "l-3"]
+    ids = {e.id for e in manifest.elements}
+    assert not ids & {"l-1", "l-2", "l-3"}
+    [page] = [p for p in manifest.pages if p.page_number == 2]
+    assert not set(page.element_ids) & {"l-1", "l-2", "l-3"}
+    assert not any(
+        set(o.target_ids) & {"l-1", "l-2", "l-3"} for o in manifest.obligations
+    )
+    # The text beside the picture is the slide's own.
+    assert "Growth of 10%." in [e.text for e in manifest.elements]
+
+
+@pytest.mark.parametrize(
+    "on_picture",
+    [
+        _element(
+            "l-1", "paragraph", 2, 7, (710, 320, 890, 380),
+            "The measured growth was steady across every region we surveyed.",
+        ),
+        _element("l-1", "formula", 2, 7, (710, 320, 890, 380), "x = y"),
+        _element("l-1", "list_item", 2, 7, (710, 320, 890, 380), "First point."),
+        _element("l-1", "caption", 2, 7, (710, 460, 890, 480), "Figure 3"),
+        _element("l-1", "paragraph", 2, 7, (710, 320, 890, 340), "Grew 10%."),
+        _element("l-1", "paragraph", 2, 7, (710, 320, 890, 340), "Source: IBGE, 2024"),
+    ],
+    ids=["sentence", "formula", "list-item", "caption", "short-sentence", "source-line"],
+)
+def test_content_on_a_picture_that_is_not_a_label_stays(source, on_picture):
+    manifest = _build_edited(source, _with_labels(on_picture))
+
+    assert any(e.id == "l-1" for e in manifest.elements)
+    [picture] = [e for e in manifest.elements if e.id == "e-6"]
+    assert "figure_labels" not in picture.metadata
+
+
+def test_a_label_on_nested_pictures_goes_to_the_smallest(source):
+    extraction = _with_labels(
+        _element("p-2", "picture", 2, 7, (740, 340, 800, 400)),
+        _element("l-1", "paragraph", 2, 8, (760, 360, 780, 380), "ADN"),
+    )
+
+    manifest = _build_edited(source, extraction)
+
+    pictures = {e.id: e for e in manifest.elements if e.type == "picture"}
+    assert pictures["p-2"].metadata["figure_labels"] == ["ADN"]
+    assert "figure_labels" not in pictures["e-6"].metadata
+
+
+def test_labels_stay_when_folding_is_off(source):
+    extraction = _with_labels(
+        _element("l-1", "paragraph", 2, 7, (720, 320, 760, 340), "1nm"),
+    )
+
+    manifest = _build_edited(source, extraction, slide_fold_figure_labels=False)
+
+    assert any(e.id == "l-1" for e in manifest.elements)
+
+
+def test_garbled_ocr_ending_in_a_period_is_still_a_label(source):
+    """006.pdf slide 31 read "P3-" and "Sn4+" as "p3." and "4."."""
+    extraction = _with_labels(
+        _element("l-1", "paragraph", 2, 7, (720, 320, 760, 340), "p3."),
+        _element("l-2", "paragraph", 2, 8, (780, 320, 830, 340), "4."),
+    )
+
+    manifest = _build_edited(source, extraction)
+
+    [picture] = [e for e in manifest.elements if e.id == "e-6"]
+    assert picture.metadata["figure_labels"] == ["p3.", "4."]
+
+
+def test_text_on_a_background_picture_is_not_folded(source):
+    extraction = _with_labels(
+        # Slightly past the slide's edges, as an extractor reports a backdrop:
+        # clipped to the slide, it still covers it all.
+        _element("bg", "picture", 2, 7, (-10, -10, WIDTH + 10, HEIGHT + 10)),
+        _element("l-1", "paragraph", 2, 8, (100, 300, 160, 320), "1nm"),
+    )
+
+    manifest = _build_edited(source, extraction)
+
+    assert any(e.id == "l-1" for e in manifest.elements)
+    [background] = [e for e in manifest.elements if e.id == "bg"]
+    assert "figure_labels" not in background.metadata
+
+
+def test_a_picture_without_a_box_hosts_no_label(source):
+    extraction = _with_labels(
+        _element("l-1", "paragraph", 2, 7, (720, 320, 760, 340), "1nm"),
+    )
+    [picture] = [
+        e for e in extraction.document["document"]["elements"] if e["id"] == "e-6"
+    ]
+    picture["provenance"] = []
+
+    manifest = _build_edited(source, extraction)
+
+    assert any(e.id == "l-1" for e in manifest.elements)
+
+
+def test_an_undescribed_picture_gives_its_labels_as_alt_text(source):
+    """The labels left the running text; a failed description must not drop them."""
+    from backend.agents.pddl_orchestrator import _element_to_block
+
+    manifest = _build_edited(
+        source,
+        _with_labels(
+            _element("l-1", "paragraph", 2, 7, (720, 320, 760, 340), "1nm"),
+            _element("l-2", "paragraph", 2, 8, (780, 320, 830, 340), "10nm"),
+        ),
+    )
+    [picture] = [e for e in manifest.elements if e.id == "e-6"]
+
+    assert _element_to_block(picture)["alt_text"] == "1nm; 10nm"
+    picture.text = "A scale from 1nm to 10nm."
+    assert _element_to_block(picture)["alt_text"] == "A scale from 1nm to 10nm."
