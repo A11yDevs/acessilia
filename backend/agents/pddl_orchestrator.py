@@ -2590,27 +2590,39 @@ class DocumentTooLargeError(ValueError):
     """The document has more pages than ``MAX_PAGES`` (job-level failure)."""
 
 
-def _check_page_limit(manifest: ProcessingManifest) -> None:
-    """Refuses a document with more pages than ``MAX_PAGES``.
-
-    It runs right after the structural extraction, the first point where the
-    page count is always known, and before planning and the vision-model
-    calls. Only ``media.inspect`` runs before it, since whether the source is
-    a slide deck decides how it is extracted. Nothing is processed partially, and the message, which reaches the
-    end user, names the page count and the limit.
-
-    Raises:
-        DocumentTooLargeError: When the manifest has more pages than the limit.
-    """
+def _check_page_count(page_count: int) -> None:
     from backend.config.settings import settings
 
-    page_count = len(manifest.pages)
     if page_count > settings.max_pages:
         raise DocumentTooLargeError(
             t(STAGE_DOCUMENT_TOO_MANY_PAGES).format(
                 page_count=page_count, max_pages=settings.max_pages
             )
         )
+
+
+def _check_page_limit_before_extraction(inspection: dict[str, Any] | None) -> None:
+    """Reject only PDF counts verified by the existing remote PDF parser.
+
+    Scanned content streams, unknown counts and non-PDF formats are not a
+    reliable early limit. They retain the authoritative post-extraction check.
+    No local operational parser is introduced (ADR-0003).
+    """
+    if not isinstance(inspection, dict):
+        return
+    count = inspection.get("page_count")
+    if (
+        inspection.get("is_pdf") is True
+        and inspection.get("page_count_source") == "pymupdf"
+        and type(count) is int
+        and count > 0
+    ):
+        _check_page_count(count)
+
+
+def _check_page_limit(manifest: ProcessingManifest) -> None:
+    """Authoritative limit after extraction, including formats without preflight."""
+    _check_page_count(len(manifest.pages))
 
 
 class PddlAccessibilityOrchestrator:
@@ -2711,6 +2723,7 @@ class PddlAccessibilityOrchestrator:
         # media.inspect runs first: a slide deck is extracted and structured
         # slide by slide, which has to be decided before extraction.
         media_inspection, media_configuration = await _inspect_media(source_path)
+        _check_page_limit_before_extraction(media_inspection)
         presentation = _is_presentation(media_inspection)
 
         if status_callback:
