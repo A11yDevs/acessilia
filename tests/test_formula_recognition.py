@@ -142,37 +142,86 @@ async def test_unavailable_recognizer_falls_back_to_vision(monkeypatch, cropped)
     assert FakeVision.calls[0]["full_budget"] is True
 
 
+def _capture_logs(level: str) -> tuple[list[tuple[str, str]], int]:
+    from backend.tools.logger import logger
+
+    records: list[tuple[str, str]] = []
+    sink = logger.add(
+        lambda message: records.append(
+            (message.record["level"].name, message.record["message"])
+        ),
+        level=level,
+    )
+    return records, sink
+
+
 @pytest.mark.asyncio
 async def test_a_recognizer_answering_without_latex_is_logged(monkeypatch, cropped):
     """A page-level provider (docling-math) finds nothing in a chip and is not
-    an outage, so this line is the only trace of the vision fallback."""
+    an outage: each fallback is a DEBUG line and the document gets one INFO
+    line that names the provider."""
+    from backend.config.settings import settings
     from backend.tools.logger import logger
 
-    manifest = _formula_manifest()
+    manifest = _formula_manifest(None, None)
     FakeVision.output = VisionOutput(
         kind="formula", formula_latex="x^2", language="und", confidence=0.7
     )
-    monkeypatch.setattr(pddl, "toolbox_recognize_formula", lambda *a, **k: [])
-    from backend.config.settings import settings
-
+    calls = _recognizer_answers(monkeypatch, [])
     monkeypatch.setattr(settings, "toolbox_math_recognize_provider", "docling-math")
-    messages: list[str] = []
-    sink = logger.add(messages.append, level="INFO", format="{message}")
+    records, sink = _capture_logs("DEBUG")
     try:
         await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
     finally:
         logger.remove(sink)
 
-    assert manifest.elements[0].metadata["formula_recognition"]["method"] == "vision"
+    assert calls == [b"png", b"png"]
+    assert len(FakeVision.calls) == 2
+    assert [
+        element.metadata["formula_recognition"]["method"] for element in manifest.elements
+    ] == ["vision", "vision"]
+    per_formula = [
+        message for level, message in records
+        if level == "DEBUG" and "math.recognize (docling-math) returned no LaTeX" in message
+    ]
+    assert len(per_formula) == 2
+    assert any("formula-0" in message for message in per_formula)
+    summary = [
+        message for level, message in records
+        if level == "INFO" and "fell back to the vision model" in message
+    ]
+    assert summary == [
+        "2 of 2 formula(s) fell back to the vision model after "
+        "math.recognize (docling-math) returned no LaTeX"
+    ]
+
+
+@pytest.mark.asyncio
+async def test_an_empty_provider_setting_logs_the_registry_default(monkeypatch, cropped):
+    from acessilia_sdk.toolbox.capabilities import provider_default
+
+    from backend.config.settings import settings
+    from backend.tools.logger import logger
+
+    manifest = _formula_manifest()
+    _recognizer_answers(monkeypatch, [])
+    monkeypatch.setattr(settings, "toolbox_math_recognize_provider", "")
+    records, sink = _capture_logs("INFO")
+    try:
+        await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+    finally:
+        logger.remove(sink)
+
+    default = provider_default("toolbox_math_recognize_provider")
+    assert default
     assert any(
-        "math.recognize (docling-math) returned no LaTeX" in message
-        and "formula-0" in message
-        for message in messages
+        f"math.recognize ({default}) returned no LaTeX" in message
+        for _, message in records
     )
 
 
 @pytest.mark.asyncio
-async def test_an_outage_does_not_log_each_empty_recognition(monkeypatch, cropped):
+async def test_an_outage_logs_no_empty_answer_line(monkeypatch, cropped):
     from backend.tools.logger import logger
 
     manifest = _formula_manifest(None, None)
@@ -183,13 +232,17 @@ async def test_an_outage_does_not_log_each_empty_recognition(monkeypatch, croppe
         )
 
     monkeypatch.setattr(pddl, "toolbox_recognize_formula", recognize)
-    messages: list[str] = []
-    sink = logger.add(messages.append, level="INFO", format="{message}")
+    records, sink = _capture_logs("DEBUG")
     try:
         await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
     finally:
         logger.remove(sink)
 
+    messages = [message for _, message in records]
+    assert any(
+        "math.recognize unavailable during formula enrichment" in message
+        for message in messages
+    )
     assert not any("returned no LaTeX" in message for message in messages)
 
 

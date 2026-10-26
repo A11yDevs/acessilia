@@ -3199,6 +3199,12 @@ async def _enrich_formula_latex(
     98.4 structure-token recall. When vision disagrees with the text layer too,
     the call bought nothing and the formula stays flat.
 
+    A provider can also answer without LaTeX, which is not an outage: a
+    page-level one such as ``docling-math`` finds no formula in a chip, so
+    every formula goes to vision. Each such fallback is logged at DEBUG, and
+    one INFO line per document counts them and names the provider, so the
+    misconfiguration reads in one line instead of one per formula.
+
     Each recognized formula records ``metadata["formula_recognition"]``:
     ``method`` (the capability that gave the LaTeX: ``math.recognize`` or
     ``vision``; ``text-layer`` when nothing agreed), ``confidence``,
@@ -3221,6 +3227,8 @@ async def _enrich_formula_latex(
     work into the core (ADR-0003), so page-level render reuse stays a
     follow-up.
     """
+    from acessilia_sdk.toolbox.capabilities import provider_default
+
     from backend.config.settings import settings
 
     formulas = [
@@ -3247,6 +3255,12 @@ async def _enrich_formula_latex(
     math_probe = asyncio.Lock()
     math_ready = asyncio.Event()
     math_available = True
+    # Resolved like ``ToolboxCapabilityClient``: an empty setting means the
+    # registry default, which is the provider the request actually asked.
+    recognize_provider = settings.toolbox_math_recognize_provider or provider_default(
+        "toolbox_math_recognize_provider"
+    )
+    empty_answers = 0
 
     async def call(image_bytes: bytes) -> list[dict[str, Any]]:
         """One recognition call; an outage turns the flag off and means no LaTeX."""
@@ -3289,6 +3303,7 @@ async def _enrich_formula_latex(
 
     async def enrich_one(position: int, element: ManifestElement) -> bool:
         """Recognize one formula and fold the answer into it; True when filled."""
+        nonlocal empty_answers
         async with slots:
             if status_callback:
                 async with progress_lock:
@@ -3342,14 +3357,17 @@ async def _enrich_formula_latex(
             accepted_rank = 1
             candidates = _ranked_formula_candidates(await recognize(image_bytes))
             if not candidates and math_available:
-                # A provider that answers without LaTeX is not an outage, so
-                # nothing else records it; a page-level provider such as
-                # docling-math finds no formula in a chip and sends every
-                # formula to vision.
-                logger.info(
+                # An outage already warned once and skips this. An empty list
+                # is usually an answer without LaTeX, which nothing else
+                # records; a rejected crop or a transport error reaches it too,
+                # but those were logged by ``toolbox_recognize_formula``. No
+                # await separates ``recognize`` from this check, so the flag
+                # and the counter cannot race with sibling crops.
+                empty_answers += 1
+                logger.debug(
                     "Formula {} (page {}): math.recognize ({}) returned no LaTeX; "
                     "falling back to the vision model",
-                    element.id, page_number, settings.toolbox_math_recognize_provider,
+                    element.id, page_number, recognize_provider,
                 )
             for rank, candidate in enumerate(candidates, start=1):
                 latex = accept(method if rank == 1 else f"{method}#{rank}", candidate["latex"])
@@ -3410,6 +3428,12 @@ async def _enrich_formula_latex(
 
     if recognized:
         logger.info("LaTeX recognized for {} formula(s)", recognized)
+    if empty_answers:
+        logger.info(
+            "{} of {} formula(s) fell back to the vision model after "
+            "math.recognize ({}) returned no LaTeX",
+            empty_answers, len(formulas), recognize_provider,
+        )
 
 
 async def _inspect_media(
