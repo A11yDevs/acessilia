@@ -16,7 +16,7 @@ from backend.services import download_token_service, queue_service
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("stem", ["report", "a" * 250, "á" * 250], ids=["short", "long-ascii", "long-unicode"])
+@pytest.mark.parametrize("stem", ["report", "a" * 250, "\u00e1" * 250], ids=["short", "long-ascii", "long-unicode"])
 async def test_long_filename_can_be_exported_and_downloaded(tmp_path, monkeypatch, stem):
     from backend import service
     from backend.agents.state_manager import StateManager
@@ -92,10 +92,11 @@ async def test_long_filename_can_be_exported_and_downloaded(tmp_path, monkeypatc
 def test_output_stem_preserves_short_names_and_distinguishes_long_names():
     from backend.tools.filenames import MAX_OUTPUT_STEM_BYTES, output_stem
 
-    assert output_stem("relatório-final.pdf") == "relatório-final"
-    first = output_stem("á" * 250 + "a.pdf")
-    second = output_stem("á" * 250 + "b.pdf")
+    assert output_stem("report-final.pdf") == "report-final"
+    assert output_stem("report-\u00e1.pdf") == "report-\u00e1"
+    first = output_stem("\u00e1" * 250 + "a.pdf")
+    second = output_stem("\u00e1" * 250 + "b.pdf")
     assert first != second
-    assert first == output_stem("á" * 250 + "a.pdf")
+    assert first == output_stem("\u00e1" * 250 + "a.pdf")
     assert len(first.encode("utf-8")) <= MAX_OUTPUT_STEM_BYTES
     assert len(second.encode("utf-8")) <= MAX_OUTPUT_STEM_BYTES
