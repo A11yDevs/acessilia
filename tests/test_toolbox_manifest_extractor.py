@@ -448,3 +448,77 @@ def test_extract_builds_and_closes_its_own_clients(monkeypatch):
     ]
     for _, client in built:
         client.close.assert_awaited_once()
+
+
+def test_multi_endpoint_extraction_builds_no_artifact_upload_client(monkeypatch):
+    from acessilia_sdk.toolbox import ToolboxEndpoint
+
+    built = []
+
+    def factory(client_cls, **kwargs):
+        assert client_cls is ToolboxStructureClient
+        client = AsyncMock(spec=client_cls)
+        client.base_url = "http://toolbox-a.test"
+        client.endpoints = (
+            ToolboxEndpoint(client.base_url),
+            ToolboxEndpoint("http://toolbox-b.test"),
+        )
+        client.provider = "docling"
+        client.extract_structure.return_value = SAMPLE_TOOLBOX_RESPONSE
+        built.append(client)
+        return client
+
+    monkeypatch.setattr(
+        "backend.core.manifest.toolbox_extractor.make_toolbox_client", factory
+    )
+    result = ToolboxManifestExtractor(use_artifact_store=True).extract(
+        FIXTURE_PDF, dual_fusion=False
+    )
+    assert len(built) == 1
+    built[0].extract_structure.assert_awaited_once_with(
+        file_path=FIXTURE_PDF.resolve(),
+        artifact_id=None,
+        language="pt-BR",
+        use_remote_cache=True,
+    )
+    built[0].close.assert_awaited_once()
+    assert result.configuration["use_artifact_store"] is False
+
+
+def test_secondary_on_another_deployment_receives_source_not_primary_artifact(
+    mock_client, mock_artifact_client, monkeypatch
+):
+    from acessilia_sdk.toolbox import ToolboxEndpoint
+    from backend.config.settings import settings
+
+    monkeypatch.setattr(settings, "fusion_mode", "dual")
+    monkeypatch.setattr(settings, "fusion_secondary_provider", "mineru")
+    mock_client.endpoints = (ToolboxEndpoint("http://toolbox-a.test"),)
+    mock_artifact_client.endpoints = mock_client.endpoints
+    mock_artifact_client.upload.return_value = "sha256:primary"
+    mock_client.extract_structure.return_value = SAMPLE_TOOLBOX_RESPONSE
+    secondary = AsyncMock(spec=ToolboxStructureClient)
+    secondary.provider = "mineru"
+    secondary.endpoints = (ToolboxEndpoint("http://toolbox-b.test"),)
+    secondary.extract_structure.return_value = deepcopy(SAMPLE_TOOLBOX_RESPONSE)
+    monkeypatch.setattr(
+        "backend.core.manifest.toolbox_extractor.make_toolbox_client",
+        lambda client_cls, **kwargs: secondary,
+    )
+    result = ToolboxManifestExtractor(
+        client=mock_client,
+        artifact_client=mock_artifact_client,
+        use_artifact_store=True,
+    ).extract(FIXTURE_PDF)
+    assert result.artifact_id == "sha256:primary"
+    assert (
+        mock_client.extract_structure.call_args.kwargs["artifact_id"]
+        == "sha256:primary"
+    )
+    secondary.extract_structure.assert_awaited_once_with(
+        file_path=FIXTURE_PDF.resolve(),
+        artifact_id=None,
+        language="pt-BR",
+        use_remote_cache=True,
+    )
+    secondary.close.assert_awaited_once()

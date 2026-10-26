@@ -9,13 +9,38 @@ from pathlib import Path
 from time import perf_counter
 from typing import TYPE_CHECKING, Any
 
+from acessilia_sdk.toolbox.clients import ToolboxArtifactClient, ToolboxStructureClient
+
 from backend.config.settings import settings
 from backend.tools.logger import logger
-from acessilia_sdk.toolbox.clients import ToolboxArtifactClient, ToolboxStructureClient
-from backend.tools.toolbox_client import ToolboxError, make_toolbox_client
+from backend.tools.toolbox_client import (
+    ToolboxCapabilityClient,
+    ToolboxError,
+    make_toolbox_client,
+)
 
 if TYPE_CHECKING:
     from docstruct.policy import FusionPolicy
+
+
+def _one_artifact_endpoint(*clients: ToolboxCapabilityClient | None) -> bool:
+    """IDs are reusable only within one configured Toolbox deployment.
+
+    Multiple URLs represent independent deployments (ADR-0006), so the source
+    must accompany extraction instead of relying on an upload client choosing
+    the same deployment. A single URL may address a shared-storage balancer.
+    """
+    urls: set[str] = set()
+    for client in clients:
+        if client is None:
+            continue
+        endpoints = getattr(client, "endpoints", ())
+        client_urls = {endpoint.base_url for endpoint in endpoints}
+        base_url = getattr(client, "base_url", None)
+        if not client_urls and isinstance(base_url, str):
+            client_urls.add(base_url.rstrip("/"))
+        urls.update(client_urls)
+    return len(urls) <= 1
 
 
 @dataclass(frozen=True)
@@ -25,6 +50,7 @@ class ToolboxExtraction:
     Carrega o JSON completo da resposta da Toolbox, de onde o builder lê
     elements e pages diretamente.
     """
+
     document: dict[str, Any]
     started_at: datetime
     completed_at: datetime
@@ -73,7 +99,9 @@ class ToolboxManifestExtractor:
             else settings.toolbox_use_remote_cache
         )
 
-    def extract(self, source_path: Path, *, dual_fusion: bool = True) -> ToolboxExtraction:
+    def extract(
+        self, source_path: Path, *, dual_fusion: bool = True
+    ) -> ToolboxExtraction:
         """Extrai a estrutura de um documento usando a Toolbox (síncrono).
 
         Executa chamadas HTTP assíncronas via asyncio.run() em thread separada,
@@ -88,7 +116,11 @@ class ToolboxManifestExtractor:
     ) -> ToolboxExtraction:
         structure = self._client or make_toolbox_client(ToolboxStructureClient)
         artifacts = self._artifact_client
-        if artifacts is None and self.use_artifact_store:
+        if (
+            artifacts is None
+            and self.use_artifact_store
+            and _one_artifact_endpoint(structure)
+        ):
             artifacts = make_toolbox_client(ToolboxArtifactClient)
         try:
             return await self._extract_with(
@@ -116,9 +148,16 @@ class ToolboxManifestExtractor:
         started_clock = perf_counter()
 
         artifact_id: str | None = None
-        if self.use_artifact_store and artifacts is not None:
+        use_artifact_store = (
+            self.use_artifact_store
+            and artifacts is not None
+            and _one_artifact_endpoint(structure, artifacts)
+        )
+        if use_artifact_store and artifacts is not None:
             artifact_id = await artifacts.upload(source_path)
-            logger.info("Toolbox: artifact {} stored ({})", artifact_id, source_path.name)
+            logger.info(
+                "Toolbox: artifact {} stored ({})", artifact_id, source_path.name
+            )
 
         result = await structure.extract_structure(
             file_path=None if artifact_id else source_path,
@@ -148,9 +187,16 @@ class ToolboxManifestExtractor:
                     ToolboxStructureClient, provider=secondary_provider
                 )
                 try:
+                    secondary_artifact_id = (
+                        artifact_id
+                        if _one_artifact_endpoint(
+                            structure, artifacts, secondary_client
+                        )
+                        else None
+                    )
                     secondary_result = await secondary_client.extract_structure(
-                        file_path=None if artifact_id else source_path,
-                        artifact_id=artifact_id,
+                        file_path=None if secondary_artifact_id else source_path,
+                        artifact_id=secondary_artifact_id,
                         language="pt-BR",
                         use_remote_cache=self.use_remote_cache,
                     )
@@ -205,7 +251,7 @@ class ToolboxManifestExtractor:
                 "remote_services": True,
                 "toolbox_base_url": structure.base_url,
                 "toolbox_provider": structure.provider,
-                "use_artifact_store": self.use_artifact_store,
+                "use_artifact_store": use_artifact_store,
                 "use_remote_cache": self.use_remote_cache,
                 "artifact_id": artifact_id,
                 "cache_key": cache_key,
