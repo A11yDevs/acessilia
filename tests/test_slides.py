@@ -567,3 +567,122 @@ def test_an_undescribed_picture_gives_its_labels_as_alt_text(source):
     assert _element_to_block(picture)["alt_text"] == "1nm; 10nm"
     picture.text = "A scale from 1nm to 10nm."
     assert _element_to_block(picture)["alt_text"] == "A scale from 1nm to 10nm."
+
+
+def _source_box(element):
+    box = element.provenance[0].bbox
+    return (box.left, box.top, box.right, box.bottom)
+
+
+def test_a_label_beside_a_picture_grows_its_crop(source):
+    """006.pdf slide 12: the nuclide notation sat beside the lamp it came with."""
+    extraction = _with_labels(
+        _element("l-1", "paragraph", 2, 7, (920, 360, 950, 400), "E Z"),
+    )
+
+    manifest = _build_edited(source, extraction)
+
+    assert not any(e.id == "l-1" for e in manifest.elements)
+    [picture] = [e for e in manifest.elements if e.id == "e-6"]
+    assert picture.metadata["figure_labels"] == ["E Z"]
+    # The crop the vision model describes now shows the notation.
+    assert _source_box(picture) == (700, 300, 950, 500)
+
+
+@pytest.mark.parametrize(
+    "beside",
+    [
+        _element("l-1", "caption", 2, 7, (700, 510, 900, 530), "Figure 3"),
+        _element("l-1", "paragraph", 2, 7, (700, 510, 900, 530), "Grew 10%."),
+        # Further off than the margin: a heading naming the picture.
+        _element("l-1", "heading", 2, 7, (700, 230, 900, 250), "Results 2024"),
+    ],
+    ids=["caption-under-one-picture", "sentence", "heading-further-off"],
+)
+def test_text_beside_a_picture_that_is_not_a_label_stays(source, beside):
+    manifest = _build_edited(source, _with_labels(beside))
+
+    assert any(e.id == "l-1" for e in manifest.elements)
+    [picture] = [e for e in manifest.elements if e.id == "e-6"]
+    assert _source_box(picture) == (700, 300, 900, 500)
+
+
+def test_a_caption_across_two_pictures_merges_them(source):
+    """006.pdf slide 18: the sources under four tiles were read across them."""
+    extraction = _with_labels(
+        _element("p-2", "picture", 2, 7, (500, 300, 680, 500)),
+        _element("c-1", "caption", 2, 8, (520, 505, 880, 525), "Tabela CRC Handbook"),
+        _element("c-2", "caption", 2, 9, (520, 525, 660, 535), "SBQ 2010"),
+    )
+
+    manifest = _build_edited(source, extraction)
+
+    ids = {e.id for e in manifest.elements}
+    assert "e-6" not in ids and not ids & {"c-1", "c-2"}
+    [picture] = [e for e in manifest.elements if e.id == "p-2"]
+    assert picture.metadata["merged_picture_ids"] == ["e-6"]
+    assert picture.metadata["figure_labels"] == ["Tabela CRC Handbook", "SBQ 2010"]
+    assert _source_box(picture) == (500, 300, 900, 535)
+
+
+def test_pictures_with_different_origins_are_not_merged(source):
+    extraction = _with_labels(
+        _element("p-2", "picture", 2, 7, (500, 300, 680, 500)),
+        _element("c-1", "caption", 2, 8, (520, 505, 880, 525), "Tabela CRC Handbook"),
+    )
+    [picture] = [
+        e for e in extraction.document["document"]["elements"] if e["id"] == "p-2"
+    ]
+    bbox = picture["provenance"][0]["bbox"]
+    bbox.update(coord_origin="BOTTOMLEFT", top=HEIGHT - 300, bottom=HEIGHT - 500)
+
+    manifest = _build_edited(source, extraction)
+
+    ids = {e.id for e in manifest.elements}
+    assert {"e-6", "p-2", "c-1"} <= ids
+
+
+def test_absorbing_is_off_with_the_folding(source):
+    extraction = _with_labels(
+        _element("l-1", "paragraph", 2, 7, (920, 360, 950, 400), "E Z"),
+    )
+
+    manifest = _build_edited(source, extraction, slide_fold_figure_labels=False)
+
+    assert any(e.id == "l-1" for e in manifest.elements)
+
+
+def test_the_slide_heading_is_never_reordered_after_a_grown_picture(source):
+    """006.pdf slide 12: the lamp's crop grew to the notation and was read first."""
+    extraction = _deck()
+    document = extraction.document["document"]
+    # Slide 12's boxes: a small title right of a lamp whose top is a little
+    # higher, the notation beside the lamp, two paragraphs below.
+    document["elements"][0]["provenance"][0]["bbox"].update(
+        left=130, top=55, right=259, bottom=82
+    )
+    document["elements"][1]["provenance"][0]["bbox"].update(
+        left=107, top=209, right=775, bottom=272
+    )
+    document["elements"].extend(
+        [
+            _element("p-1", "picture", 1, 3, (49, 52, 125, 158)),
+            _element("l-1", "paragraph", 1, 4, (192, 108, 230, 157), "E Z"),
+            _element("e-9", "paragraph", 1, 5, (107, 276, 773, 336), "A = mass number."),
+        ]
+    )
+    document["pages"][0]["element_ids"].extend(["p-1", "l-1", "e-9"])
+
+    manifest = _build_edited(source, extraction)
+
+    [picture] = [e for e in manifest.elements if e.id == "p-1"]
+    assert _source_box(picture) == (49, 52, 230, 158)
+    headings = {
+        e.id for e in manifest.elements
+        if e.metadata.get("slide_role") in {"slide_heading", "deck_title"}
+    }
+    assert not any(
+        set(o.target_ids) & headings
+        for o in manifest.obligations
+        if o.kind == "refine-reading-order"
+    )

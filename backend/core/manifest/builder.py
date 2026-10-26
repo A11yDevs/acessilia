@@ -702,9 +702,13 @@ def _derive_v23_processing_needs(
             )
 
     for page_number, page_elements in by_page.items():
+        # A slide's own heading (and the deck title) opens the slide whatever
+        # its box: a picture whose crop grew above-left of it would otherwise
+        # be read first (slides.py, _absorb_near_pictures).
         positioned = [
             item for item in page_elements
             if _normalized_element_bbox(item, page_sizes) is not None
+            and item.metadata.get("slide_role") not in {"slide_heading", "deck_title"}
         ]
         if len(positioned) > 1:
             current = sorted(positioned, key=lambda item: item.reading_order)

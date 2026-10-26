@@ -16,7 +16,9 @@ processing needs:
 - on a slide read as text, short text lying on a picture (the labels of a
   diagram, the cells of a chart read one by one) is folded into that picture,
   whose description transcribes it in place, instead of standing as loose
-  paragraphs out of their place;
+  paragraphs out of their place; a label just beside a picture grows the
+  picture's crop to take it in, and text spanning several pictures (a caption
+  row read across their columns) merges them into one;
 - reading order is numbered slide by slide, so it never crosses a slide.
 """
 
@@ -27,7 +29,7 @@ from collections import Counter
 from collections.abc import Callable
 from itertools import pairwise
 
-from backend.core.manifest.models import ManifestElement, ProcessingManifest
+from backend.core.manifest.models import BoundingBox, ManifestElement, ProcessingManifest
 from backend.i18n import t
 from backend.log_messages import MSG_SLIDE_HEADING, MSG_SLIDE_HEADING_WITH_TITLE
 
@@ -60,6 +62,12 @@ _LABEL_MAX_WORDS = 3
 #: ("Cresceu 10%.") or names something ("Fonte: IBGE, 2024") is the author's
 #: own, even when short; garbled OCR such as "p3." or "2." is not.
 _SENTENCE = re.compile(r"[.!?]$|:\s")
+
+#: How far beside a picture, as a share of the slide, a label still belongs to
+#: it. 006.pdf slide 12's nuclide notation ("E Z") lies 0.07 to the right of
+#: the lamp it was pasted with; a heading naming a picture sits further off
+#: (slide 26's "Tartrazina", 0.11 above its drawing) and stays.
+_NEAR_MARGIN = 0.08
 
 #: Element types a picture's label can have been extracted as. A formula, a
 #: table or a list keeps its own structure; a caption is the author's text
@@ -128,6 +136,7 @@ def structure_as_slides(
             body = [_whole_slide_picture(number, body)]
         elif fold_figure_labels:
             body = _fold_figure_labels(body, page_fractions)
+            body = _absorb_near_pictures(body, page_fractions)
         ordered.append(heading)
         ordered.extend(body)
 
@@ -303,6 +312,155 @@ def _fold_figure_labels(
         host.metadata.setdefault("figure_labels", []).append(text)
         host.metadata.setdefault("figure_label_ids", []).append(element.id)
     return kept
+
+
+def _absorb_near_pictures(
+    body: list[ManifestElement], page_fractions: PageFractions
+) -> list[ManifestElement]:
+    """``body`` with the fragments just beside its pictures taken into them.
+
+    A label (see ``_fold_figure_labels``) within ``_NEAR_MARGIN`` of a picture
+    goes to the nearest one, and the picture's box grows to cover it, so the
+    crop the vision model describes shows the label in place. Text whose span
+    covers several pictures across (a caption row read through their columns,
+    006.pdf slide 18) merges them into the first one, whose box covers them all;
+    a caption is taken in only then, or when it lies on or beside such a merged
+    picture (the rest of that row), since a caption under one picture is the
+    author's own text. A
+    picture whose box cannot be grown (no box, or a different origin) takes
+    nothing. Taken text is kept in ``figure_labels`` like a folded label, and
+    the merged pictures' ids in ``merged_picture_ids``.
+    """
+    # Boxes by picture id; a merged picture's id leaves it.
+    pictures = {picture.id: box for picture, box in _content_pictures(body, page_fractions)}
+    if not pictures:
+        return body
+    by_id = {element.id: element for element in body}
+    removed: set[str] = set()
+    changed = True
+    while changed:
+        changed = False
+        for element in body:
+            if element.id in removed or element.id in pictures:
+                continue
+            text = (element.text or "").strip()
+            box = page_fractions(element)
+            if (
+                not text
+                or box is None
+                or element.type not in _LABEL_TYPES | {"caption"}
+                or element.raw_label in _DECORATION
+            ):
+                continue
+            label = _reads_as_label(text)
+            near = [
+                picture
+                for picture, picture_box in pictures.items()
+                if _overlaps(_expanded(picture_box, _NEAR_MARGIN), box)
+            ]
+            spanned = [p for p in near if _spans_across(box, pictures[p])]
+            near_merged = [p for p in near if by_id[p].metadata.get("merged_picture_ids")]
+            if len(spanned) >= 2 and (label or element.type == "caption"):
+                host = _merge_pictures([by_id[p] for p in spanned], pictures, removed)
+            elif near_merged and (label or element.type == "caption"):
+                host = by_id[near_merged[0]]
+            elif near and label and element.type != "caption":
+                host = by_id[min(near, key=lambda p: _distance(pictures[p], box))]
+            else:
+                continue
+            if host is None or not _grow(host, element):
+                continue
+            pictures[host.id] = _union(pictures[host.id], box)
+            host.metadata.setdefault("figure_labels", []).append(text)
+            host.metadata.setdefault("figure_label_ids", []).append(element.id)
+            removed.add(element.id)
+            changed = True
+    return [element for element in body if element.id not in removed]
+
+
+def _merge_pictures(
+    spanned: list[ManifestElement],
+    pictures: dict[str, tuple[float, float, float, float]],
+    removed: set[str],
+) -> ManifestElement | None:
+    """Merge ``spanned`` into the first in reading order; None if a box cannot grow."""
+    host, *others = sorted(spanned, key=lambda p: p.reading_order)
+    if not all(_growable(host, other) for other in others):
+        return None
+    for other in others:
+        _grow(host, other)
+        pictures[host.id] = _union(pictures[host.id], pictures.pop(other.id))
+        host.metadata.setdefault("merged_picture_ids", []).append(other.id)
+        for key in ("figure_labels", "figure_label_ids"):
+            if other.metadata.get(key):
+                host.metadata.setdefault(key, []).extend(other.metadata[key])
+        removed.add(other.id)
+    return host
+
+
+def _growable(host: ManifestElement, other: ManifestElement) -> bool:
+    """Whether both source boxes exist and share an origin, so one can cover the other."""
+    if not host.provenance or not other.provenance:
+        return False
+    first, second = host.provenance[0].bbox, other.provenance[0].bbox
+    return first is not None and second is not None and first.coord_origin == second.coord_origin
+
+
+def _grow(host: ManifestElement, other: ManifestElement) -> bool:
+    """Grow ``host``'s source box to cover ``other``'s; False when it cannot."""
+    if not _growable(host, other):
+        return False
+    first, second = host.provenance[0].bbox, other.provenance[0].bbox
+    upward = first.coord_origin == "BOTTOMLEFT"
+    host.provenance[0].bbox = BoundingBox(
+        left=min(first.left, second.left),
+        right=max(first.right, second.right),
+        top=max(first.top, second.top) if upward else min(first.top, second.top),
+        bottom=min(first.bottom, second.bottom) if upward else max(first.bottom, second.bottom),
+        coord_origin=first.coord_origin,
+    )
+    return True
+
+
+def _expanded(
+    box: tuple[float, float, float, float], margin: float
+) -> tuple[float, float, float, float]:
+    return (box[0] - margin, box[1] - margin, box[2] + margin, box[3] + margin)
+
+
+def _overlaps(
+    first: tuple[float, float, float, float], second: tuple[float, float, float, float]
+) -> bool:
+    return (
+        min(first[2], second[2]) > max(first[0], second[0])
+        and min(first[3], second[3]) > max(first[1], second[1])
+    )
+
+
+def _spans_across(
+    box: tuple[float, float, float, float], picture: tuple[float, float, float, float]
+) -> bool:
+    """Whether ``box`` shares part of ``picture``'s width."""
+    return min(box[2], picture[2]) > max(box[0], picture[0])
+
+
+def _distance(
+    first: tuple[float, float, float, float], second: tuple[float, float, float, float]
+) -> float:
+    across = max(0.0, max(first[0], second[0]) - min(first[2], second[2]))
+    down = max(0.0, max(first[1], second[1]) - min(first[3], second[3]))
+    return across + down
+
+
+def _union(
+    first: tuple[float, float, float, float], second: tuple[float, float, float, float]
+) -> tuple[float, float, float, float]:
+    return (
+        min(first[0], second[0]),
+        min(first[1], second[1]),
+        max(first[2], second[2]),
+        max(first[3], second[3]),
+    )
 
 
 def _reads_as_label(text: str) -> bool:
