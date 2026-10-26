@@ -38,19 +38,11 @@ from backend.log_messages import (
 )
 from backend.tools.access_log_filter import AccessLogFilter
 from backend.tools.logger import logger
+from backend.tools.validators import MSG_FILE_TOO_LARGE
 from frontend.clients.api_client import ApiError
 from frontend.clients import default_client
 from frontend.web.messages import (
     WEB_ERROR_INVALID_RECEIPT,
-    WEB_ADVANCED_BACK_LINK,
-    WEB_ADVANCED_HEADLINE,
-    WEB_ADVANCED_INTRO,
-    WEB_ADVANCED_PROMPT_HELP,
-    WEB_ADVANCED_PROMPT_LABEL,
-    WEB_ADVANCED_PROMPT_PLACEHOLDER,
-    WEB_ADVANCED_SUBHEAD,
-    WEB_ADVANCED_THINKING_LABEL,
-    WEB_ADVANCED_TITLE,
     WEB_DOWNLOAD_HEADLINE,
     WEB_DOWNLOAD_NO_FORMATS,
     WEB_DOWNLOAD_SUBHEAD,
@@ -60,7 +52,6 @@ from frontend.web.messages import (
     WEB_ERROR_DOWNLOAD_INVALID,
     WEB_ERROR_DOWNLOAD_UNAVAILABLE,
     WEB_ERROR_INTERNAL,
-    WEB_ERROR_PROMPT_TOO_LONG,
     WEB_ERROR_UPLOAD_GENERIC,
     WEB_FORMAT_DOCX,
     WEB_FORMAT_HTML,
@@ -70,7 +61,6 @@ from frontend.web.messages import (
     WEB_FORMAT_TXT,
     WEB_FORMAT_ZIP,
     WEB_FOOTER,
-    WEB_INDEX_ADVANCED_LINK,
     WEB_INDEX_DOC_LABEL,
     WEB_INDEX_EMAIL_HELP,
     WEB_INDEX_EMAIL_LABEL,
@@ -122,7 +112,6 @@ client = default_client
 WEB_UPLOAD_DIR = settings.temp_dir / "web_uploads"
 WEB_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-MAX_CUSTOM_PROMPT_CHARS = 6000
 DOWNLOAD_MEDIA_TYPES = {
     "txt": "text/plain; charset=utf-8",
     "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -211,19 +200,8 @@ def _web_strings() -> dict:
         "index_email_help": t(WEB_INDEX_EMAIL_HELP),
         "index_doc_label": t(WEB_INDEX_DOC_LABEL),
         "index_submit": t(WEB_INDEX_SUBMIT_BUTTON),
-        "index_advanced_link": t(WEB_INDEX_ADVANCED_LINK),
         "footer": t(WEB_FOOTER),
         "logo_alt": t(WEB_LOGO_ALT),
-        "advanced_title": t(WEB_ADVANCED_TITLE),
-        "advanced_headline": t(WEB_ADVANCED_HEADLINE),
-        "advanced_subhead": t(WEB_ADVANCED_SUBHEAD),
-        "advanced_intro": t(WEB_ADVANCED_INTRO),
-        "advanced_prompt_label": t(WEB_ADVANCED_PROMPT_LABEL),
-        "advanced_prompt_placeholder": t(WEB_ADVANCED_PROMPT_PLACEHOLDER),
-        "advanced_options_unavailable": t("Custom instructions and thinking mode are unavailable for this pipeline"),
-        "advanced_prompt_help": t(WEB_ADVANCED_PROMPT_HELP),
-        "advanced_thinking_label": t(WEB_ADVANCED_THINKING_LABEL),
-        "advanced_back_link": t(WEB_ADVANCED_BACK_LINK),
         "download_title": t(WEB_DOWNLOAD_TITLE),
         "download_headline": t(WEB_DOWNLOAD_HEADLINE),
         "download_subhead": t(WEB_DOWNLOAD_SUBHEAD),
@@ -251,7 +229,7 @@ def _save_upload(upload: UploadFile) -> Path:
                 if total_size > settings.max_file_size_bytes:
                     raise HTTPException(
                         status_code=413,
-                        detail=f"Arquivo excede o limite de {settings.max_file_size_mb} MB.",
+                        detail=t(MSG_FILE_TOO_LARGE).format(limit=settings.max_file_size_mb),
                     )
                 buffer.write(chunk)
     except Exception:
@@ -291,30 +269,6 @@ async def index(
     )
 
 
-@app.get("/advanced", response_class=HTMLResponse)
-@limiter.limit("30/minute")
-async def advanced_page(
-    request: Request,
-    position: int | None = Query(None, ge=1),
-    email: str | None = Query(None),
-):
-    """Render the advanced upload panel, optionally with the post-queue success notice.
-
-    Args:
-        request (Request): The in-flight HTTP request, used to resolve templates and the active locale.
-        position (int | None): Queue position carried by a success redirect; defaults to None.
-        email (str | None): Deliver-to e-mail carried by a success redirect; defaults to None.
-
-    Returns:
-        TemplateResponse: The rendered advanced page with localized strings and the success notice when present.
-    """
-    return templates.TemplateResponse(
-        request=request,
-        name="advanced.html",
-        context={**_web_strings(), **_submission_context(position, email)},
-    )
-
-
 def _submission_context(position: int | None, email: str | None) -> dict[str, str]:
     """Build the localized success notice shown after a file is added to the queue.
 
@@ -337,27 +291,27 @@ async def upload_page():
     return RedirectResponse(url="/", status_code=303)
 
 
+# The advanced panel was retired in 0.2.0; keep old bookmarks landing on the
+# home page for one release. Remove in 0.3.0.
+@app.get("/advanced", include_in_schema=False)
 @app.get("/advanced/process", include_in_schema=False)
-async def advanced_upload_page():
-    return RedirectResponse(url="/advanced", status_code=303)
+async def retired_advanced_page():
+    return RedirectResponse(url="/", status_code=303)
 
 
 async def _submit_via_api(
     request: Request,
-    template_name: str,
     document_file: UploadFile,
     email: str,
     mode: str,
-    custom_prompt: str | None = None,
-    thinking_mode: bool = False,
 ):
     try:
         file_path = await run_in_threadpool(_save_upload, document_file)
     except HTTPException as e:
         return templates.TemplateResponse(
             request=request,
-            name=template_name,
-            context={"error": e.detail},
+            name="index.html",
+            context={**_web_strings(), "error": e.detail},
             status_code=e.status_code,
         )
     try:
@@ -365,8 +319,6 @@ async def _submit_via_api(
             file_path,
             document_file.filename or "documento",
             mode=mode,
-            custom_prompt=custom_prompt,
-            thinking_mode=thinking_mode,
             email=email,
             source="web",
         )
@@ -378,14 +330,14 @@ async def _submit_via_api(
         )
         return templates.TemplateResponse(
             request=request,
-            name=template_name,
+            name="index.html",
             context={**_web_strings(), "error": t(WEB_ERROR_API_UPLOAD).format(status_code=e.status_code, detail=e.detail)},
         )
     except Exception as e:
         logger.error(t(LOG_WEB_UPLOAD_ERROR).format(error=str(e)))
         return templates.TemplateResponse(
             request=request,
-            name=template_name,
+            name="index.html",
             context={**_web_strings(), "error": t(WEB_ERROR_UPLOAD_GENERIC)}
         )
     finally:
@@ -449,42 +401,9 @@ async def handle_upload(
 ):
     return await _submit_via_api(
         request,
-        template_name="index.html",
         document_file=document_file,
         email=email,
         mode="normal",
-    )
-
-
-@app.post("/advanced/process", response_class=HTMLResponse)
-@limiter.limit("5/minute")
-async def handle_advanced_upload(
-    request: Request,
-    email: str = Form(...),
-    document_file: UploadFile = File(...),
-    custom_prompt: str = Form(""),
-    thinking_mode: bool = Form(False),
-):
-    prompt = custom_prompt.strip()
-    if len(prompt) > MAX_CUSTOM_PROMPT_CHARS:
-        return templates.TemplateResponse(
-            request=request,
-            name="advanced.html",
-            context={**_web_strings(), "error": t(WEB_ERROR_PROMPT_TOO_LONG)}
-        )
-    if prompt or thinking_mode:
-        return templates.TemplateResponse(
-            request=request, name="advanced.html", status_code=422,
-            context={**_web_strings(), "error": t("Custom instructions and thinking mode are unavailable for this pipeline")},
-        )
-    return await _submit_via_api(
-        request,
-        template_name="advanced.html",
-        document_file=document_file,
-        email=email,
-        mode="normal",
-        custom_prompt=prompt or None,
-        thinking_mode=thinking_mode,
     )
 
 
