@@ -64,6 +64,16 @@ msgstr "The email could not be sent. You can download your files here."
 msgid "The result email was sent. You can also download your files here."
 msgstr "The result email was sent. You can also download your files here."
 
+msgid ""
+"We could not send the email about this failure; the notices below show "
+"what happened."
+msgstr ""
+"We could not send the email about this failure; the notices below show "
+"what happened."
+
+msgid "We sent you an email about this failure."
+msgstr "We sent you an email about this failure."
+
 msgid "Job status is temporarily unavailable. Refresh this page to try again."
 msgstr "Job status is temporarily unavailable. Refresh this page to try again."
 
@@ -1347,6 +1357,14 @@ msgstr "E-mail sent successfully to {to_email}."
 #, python-brace-format
 msgid "Error sending e-mail to {to_email}: {error}"
 msgstr "Error sending e-mail to {to_email}: {error}"
+
+#, python-brace-format
+msgid "Failure e-mail for job {task_id} could not be sent: {error}"
+msgstr "Failure e-mail for job {task_id} could not be sent: {error}"
+
+#, python-brace-format
+msgid "Failure e-mail for job {task_id} was not sent"
+msgstr "Failure e-mail for job {task_id} was not sent"
 
 #, python-brace-format
 msgid "Exporting TXT to {path}"

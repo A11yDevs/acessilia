@@ -153,6 +153,10 @@ WEB_JOB_CLOSE_INFO = (
 WEB_JOB_DOWNLOAD = "Download your files"
 WEB_JOB_EMAIL_FAILED = "The email could not be sent. You can download your files here."
 WEB_JOB_EMAIL_SENT = "The result email was sent. You can also download your files here."
+WEB_JOB_FAILURE_EMAIL_SENT = "We sent you an email about this failure."
+WEB_JOB_FAILURE_EMAIL_FAILED = (
+    "We could not send the email about this failure; the notices below show what happened."
+)
 WEB_JOB_UNAVAILABLE = "Job status is temporarily unavailable. Refresh this page to try again."
 WEB_JOB_STATUS = "Status"
 WEB_JOB_ERRORS = "Processing notices"

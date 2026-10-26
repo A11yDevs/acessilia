@@ -22,7 +22,7 @@ docker run --rm -v "$PWD:/app" -w /app acessilia:test-docling pytest tests/
 
 ## Fixtures
 
-`fixtures/` guarda os PDFs e imagens de exemplo, usados tanto pelos testes quanto pelos cenários de carga e benchmarks em `scripts/`.
+`fixtures/` guarda os PDFs e imagens de exemplo, usados tanto pelos testes quanto pelos cenários de carga e benchmarks em `scripts/`. `fixtures/failures/` guarda documentos corrompidos inertes usados por `test_job_failure_e2e.py` para reproduzir a falha do pipeline e o e-mail de falha; veja o [README](fixtures/failures/README.md). Não há flag de debug envolvida: os arquivos vivem apenas na árvore de testes.
 
 ## Documentação relacionada
 - [Arquitetura](../docs/architecture.md)

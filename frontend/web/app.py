@@ -88,6 +88,8 @@ from frontend.web.messages import (
     WEB_JOB_EMAIL_FAILED,
     WEB_JOB_EMAIL_SENT,
     WEB_JOB_EMAIL_UNKNOWN,
+    WEB_JOB_FAILURE_EMAIL_FAILED,
+    WEB_JOB_FAILURE_EMAIL_SENT,
     WEB_JOB_UNAVAILABLE,
     WEB_JOB_STATUS,
     WEB_JOB_ERRORS,
@@ -433,6 +435,8 @@ async def job_receipt(request: Request, task_id: str):
             "job_close_info": t(WEB_JOB_CLOSE_INFO).format(days=TOKEN_EXPIRY_DAYS),
             "job_download": t(WEB_JOB_DOWNLOAD), "job_email_failed": t(WEB_JOB_EMAIL_FAILED),
             "job_email_sent": t(WEB_JOB_EMAIL_SENT), "job_email_unknown": t(WEB_JOB_EMAIL_UNKNOWN), "job_unavailable": t(WEB_JOB_UNAVAILABLE),
+            "job_failure_email_sent": t(WEB_JOB_FAILURE_EMAIL_SENT),
+            "job_failure_email_failed": t(WEB_JOB_FAILURE_EMAIL_FAILED),
             "job_status": t(WEB_JOB_STATUS), "job_errors": t(WEB_JOB_ERRORS),
             "job_home": t(WEB_JOB_HOME)},
     )
