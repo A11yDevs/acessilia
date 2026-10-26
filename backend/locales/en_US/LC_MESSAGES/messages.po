@@ -1362,6 +1362,42 @@ msgid "Pipeline PDDL: {count} image(s) enriched with visual description"
 msgstr "Pipeline PDDL: {count} image(s) enriched with visual description"
 
 #, python-brace-format
+msgid ""
+"math.recognize unavailable during formula enrichment ({error}); falling "
+"back to the vision model"
+msgstr ""
+"math.recognize unavailable during formula enrichment ({error}); falling "
+"back to the vision model"
+
+#, python-brace-format
+msgid ""
+"Formula {element_id} (page {page}): math.recognize ({provider}) returned "
+"no LaTeX; falling back to the vision model"
+msgstr ""
+"Formula {element_id} (page {page}): math.recognize ({provider}) returned "
+"no LaTeX; falling back to the vision model"
+
+#, python-brace-format
+msgid ""
+"Formula {element_id} (page {page}): recognition disagrees with the text "
+"layer {rejected}"
+msgstr ""
+"Formula {element_id} (page {page}): recognition disagrees with the text "
+"layer {rejected}"
+
+#, python-brace-format
+msgid "LaTeX recognized for {count} formula(s)"
+msgstr "LaTeX recognized for {count} formula(s)"
+
+#, python-brace-format
+msgid ""
+"{count} of {total} formula(s) fell back to the vision model after "
+"math.recognize ({provider}) returned no LaTeX"
+msgstr ""
+"{count} of {total} formula(s) fell back to the vision model after "
+"math.recognize ({provider}) returned no LaTeX"
+
+#, python-brace-format
 msgid "Pipeline PDDL: {count} table(s) enriched with OCR/reconstruction"
 msgstr "Pipeline PDDL: {count} table(s) enriched with OCR/reconstruction"
 

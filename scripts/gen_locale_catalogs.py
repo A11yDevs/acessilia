@@ -136,6 +136,11 @@ from backend.log_messages import (
     LOG_ORPHAN_TASKS_CLEANED,
     LOG_ORPHAN_TASKS_CLEANUP_FAILED,
     LOG_OUTPUT_DIR_REMOVED,
+    LOG_PDDL_FORMULA_RECOGNIZE_EMPTY,
+    LOG_PDDL_FORMULA_RECOGNIZE_UNAVAILABLE,
+    LOG_PDDL_FORMULA_TEXT_LAYER_DISAGREES,
+    LOG_PDDL_FORMULAS_FELL_BACK_TO_VISION,
+    LOG_PDDL_FORMULAS_RECOGNIZED,
     LOG_PDDL_IGNORED_OPTIONS,
     LOG_PDDL_IMAGES_ENRICHED,
     LOG_PDDL_TABLES_ENRICHED,
@@ -799,6 +804,11 @@ MESSAGES: tuple[str, ...] = (
     LOG_EXPORT_MP3_START,
     LOG_PDDL_IGNORED_OPTIONS,
     LOG_PDDL_IMAGES_ENRICHED,
+    LOG_PDDL_FORMULA_RECOGNIZE_UNAVAILABLE,
+    LOG_PDDL_FORMULA_RECOGNIZE_EMPTY,
+    LOG_PDDL_FORMULA_TEXT_LAYER_DISAGREES,
+    LOG_PDDL_FORMULAS_RECOGNIZED,
+    LOG_PDDL_FORMULAS_FELL_BACK_TO_VISION,
     LOG_PDDL_TABLES_ENRICHED,
     LOG_PDDL_ELEMENT_CROP_FAILED,
     LOG_PDDL_PREFERRED_PLAN_MISSING,
@@ -1555,6 +1565,22 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         ),
         LOG_PDDL_IMAGES_ENRICHED: (
             "Pipeline PDDL: {count} imagem(ns) enriquecida(s) com descrição visual"
+        ),
+        LOG_PDDL_FORMULA_RECOGNIZE_UNAVAILABLE: (
+            "math.recognize indisponível no enriquecimento de fórmulas ({error}); "
+            "usando o modelo de visão"
+        ),
+        LOG_PDDL_FORMULA_RECOGNIZE_EMPTY: (
+            "Fórmula {element_id} (página {page}): math.recognize ({provider}) não retornou LaTeX; "
+            "usando o modelo de visão"
+        ),
+        LOG_PDDL_FORMULA_TEXT_LAYER_DISAGREES: (
+            "Fórmula {element_id} (página {page}): o reconhecimento diverge da camada de texto {rejected}"
+        ),
+        LOG_PDDL_FORMULAS_RECOGNIZED: "LaTeX reconhecido para {count} fórmula(s)",
+        LOG_PDDL_FORMULAS_FELL_BACK_TO_VISION: (
+            "{count} de {total} fórmula(s) recorreram ao modelo de visão porque "
+            "math.recognize ({provider}) não retornou LaTeX"
         ),
         LOG_PDDL_TABLES_ENRICHED: (
             "Pipeline PDDL: {count} tabela(s) enriquecida(s) com OCR/reconstrução"

@@ -421,6 +421,27 @@ LOG_PDDL_ELEMENT_CROP_FAILED: str = (
 LOG_PDDL_EMPTY_VISION_DESCRIPTION: str = (
     "Vision model returned an empty description for element {element_id}"
 )
+#: Warning logged once per document when math.recognize is unavailable during formula enrichment; {error} is the full failure message, naming the provider and its HTTP status.
+LOG_PDDL_FORMULA_RECOGNIZE_UNAVAILABLE: str = (
+    "math.recognize unavailable during formula enrichment ({error}); "
+    "falling back to the vision model"
+)
+#: Debug logged per formula when math.recognize answered without LaTeX; {element_id} is the formula, {page} its page and {provider} the recognition provider asked.
+LOG_PDDL_FORMULA_RECOGNIZE_EMPTY: str = (
+    "Formula {element_id} (page {page}): math.recognize ({provider}) returned no LaTeX; "
+    "falling back to the vision model"
+)
+#: Info logged when every recognition of a formula was refused for disagreeing with its text layer; {element_id} is the formula, {page} its page and {rejected} the refused readings with their agreement.
+LOG_PDDL_FORMULA_TEXT_LAYER_DISAGREES: str = (
+    "Formula {element_id} (page {page}): recognition disagrees with the text layer {rejected}"
+)
+#: Info logged after formula enrichment; {count} is the number of formulas that received LaTeX by any method.
+LOG_PDDL_FORMULAS_RECOGNIZED: str = "LaTeX recognized for {count} formula(s)"
+#: Info logged once per document when math.recognize answered without LaTeX for some formulas; {count} of {total} formulas fell back to vision and {provider} is the recognition provider asked.
+LOG_PDDL_FORMULAS_FELL_BACK_TO_VISION: str = (
+    "{count} of {total} formula(s) fell back to the vision model after "
+    "math.recognize ({provider}) returned no LaTeX"
+)
 #: Error raised when the preferred planner backend produced no valid plan in both mode; {backend} is the preferred backend's name.
 LOG_PDDL_PREFERRED_PLAN_MISSING: str = (
     "Preferred planner backend {backend} did not produce a valid plan in both mode"

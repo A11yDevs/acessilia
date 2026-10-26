@@ -21,6 +21,11 @@ from backend.agents import pddl_orchestrator as pddl
 from backend.agents.output_schemas import VisionOutput
 from backend.core.manifest.models import BoundingBox, ManifestElement, Provenance
 from backend.i18n import t
+from backend.log_messages import (
+    LOG_PDDL_FORMULA_RECOGNIZE_EMPTY,
+    LOG_PDDL_FORMULA_RECOGNIZE_UNAVAILABLE,
+    LOG_PDDL_FORMULAS_FELL_BACK_TO_VISION,
+)
 from backend.stage_messages import (
     STAGE_ENRICHING_FORMULAS,
     STAGE_PAGE,
@@ -140,6 +145,109 @@ async def test_unavailable_recognizer_falls_back_to_vision(monkeypatch, cropped)
     assert len(FakeVision.calls) == 1
     assert FakeVision.calls[0]["classification"] == "formula"
     assert FakeVision.calls[0]["full_budget"] is True
+
+
+def _capture_logs(level: str) -> tuple[list[tuple[str, str]], int]:
+    from backend.tools.logger import logger
+
+    records: list[tuple[str, str]] = []
+    sink = logger.add(
+        lambda message: records.append(
+            (message.record["level"].name, message.record["message"])
+        ),
+        level=level,
+    )
+    return records, sink
+
+
+@pytest.mark.asyncio
+async def test_a_recognizer_answering_without_latex_is_logged(monkeypatch, cropped):
+    """A page-level provider (docling-math) finds nothing in a chip and is not
+    an outage: each fallback is a DEBUG line and the document gets one INFO
+    line that names the provider."""
+    from backend.config.settings import settings
+    from backend.tools.logger import logger
+
+    manifest = _formula_manifest(None, None)
+    FakeVision.output = VisionOutput(
+        kind="formula", formula_latex="x^2", language="und", confidence=0.7
+    )
+    calls = _recognizer_answers(monkeypatch, [])
+    monkeypatch.setattr(settings, "toolbox_math_recognize_provider", "docling-math")
+    records, sink = _capture_logs("DEBUG")
+    try:
+        await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+    finally:
+        logger.remove(sink)
+
+    assert calls == [b"png", b"png"]
+    assert len(FakeVision.calls) == 2
+    assert [
+        element.metadata["formula_recognition"]["method"] for element in manifest.elements
+    ] == ["vision", "vision"]
+    per_formula = [
+        t(LOG_PDDL_FORMULA_RECOGNIZE_EMPTY).format(
+            element_id=element.id, page=1, provider="docling-math"
+        )
+        for element in manifest.elements
+    ]
+    assert sorted(message for level, message in records if level == "DEBUG") == sorted(
+        per_formula
+    )
+    summary = t(LOG_PDDL_FORMULAS_FELL_BACK_TO_VISION).format(
+        count=2, total=2, provider="docling-math"
+    )
+    assert [message for level, message in records if level == "INFO"].count(summary) == 1
+
+
+@pytest.mark.asyncio
+async def test_an_empty_provider_setting_logs_the_registry_default(monkeypatch, cropped):
+    from acessilia_sdk.toolbox.capabilities import provider_default
+
+    from backend.config.settings import settings
+    from backend.tools.logger import logger
+
+    manifest = _formula_manifest()
+    _recognizer_answers(monkeypatch, [])
+    monkeypatch.setattr(settings, "toolbox_math_recognize_provider", "")
+    records, sink = _capture_logs("INFO")
+    try:
+        await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+    finally:
+        logger.remove(sink)
+
+    default = provider_default("toolbox_math_recognize_provider")
+    assert default
+    assert (
+        "INFO",
+        t(LOG_PDDL_FORMULAS_FELL_BACK_TO_VISION).format(count=1, total=1, provider=default),
+    ) in records
+
+
+@pytest.mark.asyncio
+async def test_an_outage_logs_no_empty_answer_line(monkeypatch, cropped):
+    from backend.tools.logger import logger
+
+    manifest = _formula_manifest(None, None)
+
+    def recognize(image, *, raise_on_unavailable=False):
+        raise MathCapabilityUnavailable(
+            "math.recognize", ToolboxProviderUnavailable("offline")
+        )
+
+    monkeypatch.setattr(pddl, "toolbox_recognize_formula", recognize)
+    records, sink = _capture_logs("DEBUG")
+    try:
+        await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+    finally:
+        logger.remove(sink)
+
+    messages = [message for _, message in records]
+    unavailable = t(LOG_PDDL_FORMULA_RECOGNIZE_UNAVAILABLE).split("({error})")[0]
+    assert sum(message.startswith(unavailable) for message in messages) == 1
+    empty = t(LOG_PDDL_FORMULA_RECOGNIZE_EMPTY).split("({provider})")[1]
+    fell_back = t(LOG_PDDL_FORMULAS_FELL_BACK_TO_VISION).split("({provider})")[1]
+    assert not any(message.endswith((empty, fell_back)) for message in messages)
 
 
 @pytest.mark.asyncio
