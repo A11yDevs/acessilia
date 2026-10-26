@@ -5,11 +5,12 @@ stays in the backend; this module produces the lines only.
 """
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any
 
 from docstruct.profiles import filter_blocks_for_profile
 from docstruct.sections import section_body_blocks
-from docstruct.tables.ast import linearize_table_for_text
+from docstruct.tables.ast import linearize_table_for_text, table_ast_from_block
 from docstruct.text.math_spans import inline_math_entries, split_inline_math
 
 DEFAULT_FORMULA_LABEL = "Fórmula: {text}"
@@ -68,7 +69,7 @@ def _render_block(block: dict[str, Any], formula_label: str = DEFAULT_FORMULA_LA
         prefix = "1." if block.get("ordered") else "-"
         return [f"{prefix} {_prose_text(str(item), block)}" for item in block.get("items", [])]
     if block_type == "table":
-        return linearize_table_for_text(block)
+        return linearize_table_for_text(_spoken_table(block))
     if block_type == "image":
         return [block.get("alt_text") or block.get("text", "")]
     if block_type == "math":
@@ -90,6 +91,24 @@ def _prose_text(text: str, block: dict[str, Any]) -> str:
         _spoken(entries.get(piece, {}), piece) if is_math else piece
         for piece, is_math in split_inline_math(str(text))
     )
+
+
+def _spoken_table(block: dict[str, Any]) -> dict[str, Any]:
+    """A copy of the table block whose caption and cells have their ``$…$``
+    spans read (``_prose_text``), so the linearized rows speak the formulas."""
+    table_ast = table_ast_from_block(block)
+    if table_ast is None:
+        return block
+    table_ast = deepcopy(table_ast)
+    caption = table_ast.get("caption")
+    if isinstance(caption, str):
+        table_ast["caption"] = _prose_text(caption, block)
+    for section in ("header", "body", "footer"):
+        for row in table_ast.get(section) or []:
+            for cell in row.get("cells") or []:
+                if isinstance(cell, dict) and isinstance(cell.get("text"), str):
+                    cell["text"] = _prose_text(cell["text"], block)
+    return {**block, "table_ast": table_ast}
 
 
 def _spoken(entry: dict[str, Any], source: str) -> str:
