@@ -321,15 +321,19 @@ A capacidade `media.inspect` (provider `pure-media-inspect`, PR
     Um rótulo é um parágrafo, cabeçalho ou título com no máximo três palavras de
     três letras ou mais que não se lê como frase (terminando em `.`, `!` ou `?`,
     ou com `: `); legendas, fórmulas, tabelas e itens de lista ficam. Um rótulo
-    a até 8% do slide ao lado de uma imagem também é incorporado, e a caixa da
-    imagem cresce para cobri-lo, de modo que o recorte descrito pelo modelo de
-    visão o mostra. Um texto que atravessa várias imagens (uma linha de legenda
-    lida através das colunas delas) as funde na primeira
-    (`metadata.merged_picture_ids`); uma legenda só é incorporada nesse caso,
-    ou quando está sobre ou ao lado de uma imagem fundida. O cabeçalho do slide
-    fica fora do refinamento da ordem de leitura, para que uma imagem alargada
-    nunca passe à frente dele. Se a imagem ficar sem descrição, seus rótulos
-    viram o texto alternativo (`SLIDE_FOLD_FIGURE_LABELS`).
+    extraído como parágrafo a até 8% do slide em volta de uma imagem (de
+    qualquer lado, medido da caixa original da imagem) também é incorporado, e
+    a caixa da imagem cresce para cobri-lo, de modo que o recorte descrito pelo
+    modelo de visão o mostra; um cabeçalho só é incorporado quando está sobre a
+    imagem. Um rótulo ou legenda que atravessa várias imagens lado a lado (uma
+    linha de legenda lida através das colunas delas) as funde na primeira
+    (`metadata.merged_picture_ids`); uma frase fica. Uma legenda só é
+    incorporada nesse caso, ou quando está sobre ou ao lado de uma imagem
+    fundida e atravessa a largura dela. Se a imagem ficar sem descrição, seus
+    rótulos viram o texto alternativo (`SLIDE_FOLD_FIGURE_LABELS`).
+    Independentemente dessa configuração, o cabeçalho do slide fica fora do
+    refinamento da ordem de leitura, para que nenhuma imagem passe à frente
+    dele.
     Uma Toolbox sem o campo, ou uma inspeção que falhou, significa documento.
   - `requires_visual_inspection`, para injetar um elemento `picture` de página
     inteira quando a entrada é imagem isolada sem blocos visuais — garantindo a
@@ -376,7 +380,7 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 | `TOOLBOX_MEDIA_INSPECT_PROVIDER` | `pure-media-inspect` | Provider da capacidade `media.inspect` |
 | `TOOLBOX_MEDIA_INSPECT_ENABLED` | `true` | Executa `media.inspect` na Toolbox ou pula a etapa. Não há fallback local: com `false`, a etapa é pulada; uma falha na Toolbox é registrada no log e no manifesto, o processamento segue sem o sinal de imagem isolada e o resultado degradado não é cacheado |
 | `SLIDE_VISUAL_COVERAGE` | `0.5` | Fração do slide que as imagens precisam cobrir para um slide de apresentação (`document_genre=presentation`) ser descrito como uma imagem em vez de lido como texto |
-| `SLIDE_FOLD_FIGURE_LABELS` | `true` | Num slide de apresentação lido como texto, incorpora à imagem o texto curto sobre ela ou logo ao lado (fundindo as imagens que uma linha de legenda atravessa), cuja descrição o transcreve no lugar |
+| `SLIDE_FOLD_FIGURE_LABELS` | `true` | Num slide de apresentação lido como texto, incorpora à imagem o texto curto sobre ela ou logo em volta (fundindo as imagens que uma linha de legenda atravessa), cuja descrição o transcreve no lugar |
 | `TOOLBOX_PDF_UA_PROVIDER` | `pandoc-pdf-ua` | Provider da capacidade `document.export.pdf_ua` |
 | `TOOLBOX_PDF_UA_ENABLED` | `true` | Renderiza o PDF/UA na Toolbox (Pandoc + TeX Live fixados) ou pula a etapa. Não há fallback local: com `false`, o worker pula o formato sem erro; uma falha na Toolbox é reportada como erro de exportação opcional |
 | `TOOLBOX_PDF_UA_TIMEOUT_SECONDS` | `300` | Tempo máximo de espera pela renderização na Toolbox antes de reportar erro de exportação opcional |

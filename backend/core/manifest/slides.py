@@ -16,9 +16,10 @@ processing needs:
 - on a slide read as text, short text lying on a picture (the labels of a
   diagram, the cells of a chart read one by one) is folded into that picture,
   whose description transcribes it in place, instead of standing as loose
-  paragraphs out of their place; a label just beside a picture grows the
-  picture's crop to take it in, and text spanning several pictures (a caption
-  row read across their columns) merges them into one;
+  paragraphs out of their place; a label just around a picture grows the
+  picture's crop to take it in, and a label or caption spanning several
+  pictures side by side (a caption row read across their columns) merges them
+  into one;
 - reading order is numbered slide by slide, so it never crosses a slide.
 """
 
@@ -32,6 +33,7 @@ from itertools import pairwise
 from backend.core.manifest.models import BoundingBox, ManifestElement, ProcessingManifest
 from backend.i18n import t
 from backend.log_messages import MSG_SLIDE_HEADING, MSG_SLIDE_HEADING_WITH_TITLE
+from docstruct.geometry import is_bottom_left, union
 
 #: Default share of the slide its pictures must cover for the slide to be
 #: described as an image rather than read as text (SLIDE_VISUAL_COVERAGE).
@@ -63,16 +65,24 @@ _LABEL_MAX_WORDS = 3
 #: own, even when short; garbled OCR such as "p3." or "2." is not.
 _SENTENCE = re.compile(r"[.!?]$|:\s")
 
-#: How far beside a picture, as a share of the slide, a label still belongs to
-#: it. 006.pdf slide 12's nuclide notation ("E Z") lies 0.07 to the right of
-#: the lamp it was pasted with; a heading naming a picture sits further off
-#: (slide 26's "Tartrazina", 0.11 above its drawing) and stays.
+#: How far from a picture, on any side and as a share of the slide, a label
+#: still belongs to it. 006.pdf slide 12's nuclide notation ("E Z") lies 0.07
+#: to the right of the lamp it was pasted with.
 _NEAR_MARGIN = 0.08
 
 #: Element types a picture's label can have been extracted as. A formula, a
 #: table or a list keeps its own structure; a caption is the author's text
 #: (a source, "Figure 3 — …"), not something read off the picture.
 _LABEL_TYPES = {"paragraph", "heading", "title", "unknown"}
+
+#: Element types a label just around a picture can have been extracted as. A
+#: heading near a picture names it (006.pdf slide 26's "Tartrazina", above its
+#: drawing) and is the reader's way around the slide, so it is folded only
+#: when it lies on the picture.
+_NEAR_LABEL_TYPES = {"paragraph", "unknown"}
+
+#: ``metadata["slide_role"]`` of the H2 that opens each slide.
+_SLIDE_HEADING = "slide_heading"
 
 #: Heading levels: the deck title, each slide, and headings inside a slide.
 DECK_LEVEL, SLIDE_LEVEL, INNER_LEVEL = 1, 2, 3
@@ -98,8 +108,9 @@ def structure_as_slides(
 
     ``page_fractions(element)`` returns the element's box as fractions of its
     page, or ``None``; the builder passes its own normalization.
-    ``fold_figure_labels`` folds the labels on a text slide's pictures into
-    them (SLIDE_FOLD_FIGURE_LABELS).
+    ``fold_figure_labels`` folds the labels on and just around a text slide's
+    pictures into them, merging the pictures a caption row spans
+    (SLIDE_FOLD_FIGURE_LABELS).
     """
     numbers = sorted(page.page_number for page in manifest.pages)
     if not numbers:
@@ -205,7 +216,7 @@ def _slide_heading(
         title.text = t(MSG_SLIDE_HEADING_WITH_TITLE).format(
             number=position, total=total, title=text
         )
-        title.metadata["slide_role"] = "slide_heading"
+        title.metadata["slide_role"] = _SLIDE_HEADING
         return title
     return ManifestElement(
         id=f"element-slide-{number:04d}",
@@ -215,8 +226,13 @@ def _slide_heading(
         hierarchy_level=SLIDE_LEVEL,
         text=t(MSG_SLIDE_HEADING).format(number=position, total=total),
         page_number=number,
-        metadata={"slide_role": "slide_heading"},
+        metadata={"slide_role": _SLIDE_HEADING},
     )
+
+
+def is_slide_heading(element: ManifestElement) -> bool:
+    """Whether ``element`` is the H2 that opens its slide."""
+    return element.metadata.get("slide_role") == _SLIDE_HEADING
 
 
 def _is_visual(
@@ -317,24 +333,29 @@ def _fold_figure_labels(
 def _absorb_near_pictures(
     body: list[ManifestElement], page_fractions: PageFractions
 ) -> list[ManifestElement]:
-    """``body`` with the fragments just beside its pictures taken into them.
+    """``body`` with the fragments just around its pictures taken into them.
 
-    A label (see ``_fold_figure_labels``) within ``_NEAR_MARGIN`` of a picture
-    goes to the nearest one, and the picture's box grows to cover it, so the
-    crop the vision model describes shows the label in place. Text whose span
-    covers several pictures across (a caption row read through their columns,
-    006.pdf slide 18) merges them into the first one, whose box covers them all;
-    a caption is taken in only then, or when it lies on or beside such a merged
-    picture (the rest of that row), since a caption under one picture is the
-    author's own text. A
-    picture whose box cannot be grown (no box, or a different origin) takes
-    nothing. Taken text is kept in ``figure_labels`` like a folded label, and
-    the merged pictures' ids in ``merged_picture_ids``.
+    A label (see ``_fold_figure_labels``) extracted as a paragraph within
+    ``_NEAR_MARGIN`` of a picture's own box goes to the nearest one, and the
+    picture's box grows to cover it, so the crop the vision model describes
+    shows the label in place; the margin is measured from the box the picture
+    had, so labels do not chain across the slide. A label or caption whose span
+    covers several pictures side by side (a caption row read through their
+    columns, 006.pdf slide 18) merges them into the first one, whose box covers
+    them all; a caption is taken in only then, or when it lies on or beside
+    such a merged picture and across its width (the rest of that row), since a
+    caption under one picture is the author's own text. A picture whose box
+    cannot be grown (no box, or a different orientation) takes nothing. Taken
+    text is kept in ``figure_labels`` like a folded label, and the merged
+    pictures' ids in ``merged_picture_ids``.
     """
-    # Boxes by picture id; a merged picture's id leaves it.
+    # Boxes by picture id, grown as text is taken in; a merged picture's id
+    # leaves it. ``reach`` keeps each picture's own box (merged ones joined),
+    # which a label's distance is measured from.
     pictures = {picture.id: box for picture, box in _content_pictures(body, page_fractions)}
     if not pictures:
         return body
+    reach = dict(pictures)
     by_id = {element.id: element for element in body}
     removed: set[str] = set()
     changed = True
@@ -348,29 +369,41 @@ def _absorb_near_pictures(
             if (
                 not text
                 or box is None
-                or element.type not in _LABEL_TYPES | {"caption"}
+                or element.type not in _NEAR_LABEL_TYPES | {"caption"}
                 or element.raw_label in _DECORATION
             ):
                 continue
             label = _reads_as_label(text)
+            caption = element.type == "caption"
             near = [
                 picture
                 for picture, picture_box in pictures.items()
                 if _overlaps(_expanded(picture_box, _NEAR_MARGIN), box)
             ]
             spanned = [p for p in near if _spans_across(box, pictures[p])]
-            near_merged = [p for p in near if by_id[p].metadata.get("merged_picture_ids")]
-            if len(spanned) >= 2 and (label or element.type == "caption"):
-                host = _merge_pictures([by_id[p] for p in spanned], pictures, removed)
-            elif near_merged and (label or element.type == "caption"):
-                host = by_id[near_merged[0]]
-            elif near and label and element.type != "caption":
-                host = by_id[min(near, key=lambda p: _distance(pictures[p], box))]
+            near_merged = [
+                p for p in spanned if by_id[p].metadata.get("merged_picture_ids")
+            ]
+            near_own = [
+                picture
+                for picture, picture_box in reach.items()
+                if _overlaps(_expanded(picture_box, _NEAR_MARGIN), box)
+            ]
+            if (
+                len(spanned) >= 2
+                and (label or caption)
+                and _side_by_side([pictures[p] for p in spanned])
+            ):
+                host = _merge_pictures([by_id[p] for p in spanned], pictures, reach, removed)
+            elif near_merged and (label or caption):
+                host = by_id[min(near_merged, key=lambda p: _distance(pictures[p], box))]
+            elif near_own and label and not caption:
+                host = by_id[min(near_own, key=lambda p: _distance(reach[p], box))]
             else:
                 continue
             if host is None or not _grow(host, element):
                 continue
-            pictures[host.id] = _union(pictures[host.id], box)
+            pictures[host.id] = union(pictures[host.id], box)
             host.metadata.setdefault("figure_labels", []).append(text)
             host.metadata.setdefault("figure_label_ids", []).append(element.id)
             removed.add(element.id)
@@ -381,16 +414,27 @@ def _absorb_near_pictures(
 def _merge_pictures(
     spanned: list[ManifestElement],
     pictures: dict[str, tuple[float, float, float, float]],
+    reach: dict[str, tuple[float, float, float, float]],
     removed: set[str],
 ) -> ManifestElement | None:
-    """Merge ``spanned`` into the first in reading order; None if a box cannot grow."""
+    """Merge ``spanned`` into the first in reading order; None if a box cannot grow.
+
+    A merged picture's own text (an alt the extraction gave it) and labels go
+    to the host's ``figure_labels``, and its id, with those it had merged, to
+    ``merged_picture_ids``.
+    """
     host, *others = sorted(spanned, key=lambda p: p.reading_order)
     if not all(_growable(host, other) for other in others):
         return None
     for other in others:
         _grow(host, other)
-        pictures[host.id] = _union(pictures[host.id], pictures.pop(other.id))
+        pictures[host.id] = union(pictures[host.id], pictures.pop(other.id))
+        reach[host.id] = union(reach[host.id], reach.pop(other.id))
         host.metadata.setdefault("merged_picture_ids", []).append(other.id)
+        host.metadata["merged_picture_ids"].extend(other.metadata.get("merged_picture_ids", []))
+        if text := (other.text or "").strip():
+            host.metadata.setdefault("figure_labels", []).append(text)
+            host.metadata.setdefault("figure_label_ids", []).append(other.id)
         for key in ("figure_labels", "figure_label_ids"):
             if other.metadata.get(key):
                 host.metadata.setdefault(key, []).extend(other.metadata[key])
@@ -399,11 +443,19 @@ def _merge_pictures(
 
 
 def _growable(host: ManifestElement, other: ManifestElement) -> bool:
-    """Whether both source boxes exist and share an origin, so one can cover the other."""
+    """Whether both source boxes exist and their y axes run the same way."""
     if not host.provenance or not other.provenance:
         return False
     first, second = host.provenance[0].bbox, other.provenance[0].bbox
-    return first is not None and second is not None and first.coord_origin == second.coord_origin
+    return (
+        first is not None
+        and second is not None
+        and _upward(first) == _upward(second)
+    )
+
+
+def _upward(box: BoundingBox) -> bool:
+    return is_bottom_left(box.coord_origin, box.top, box.bottom)
 
 
 def _grow(host: ManifestElement, other: ManifestElement) -> bool:
@@ -411,7 +463,7 @@ def _grow(host: ManifestElement, other: ManifestElement) -> bool:
     if not _growable(host, other):
         return False
     first, second = host.provenance[0].bbox, other.provenance[0].bbox
-    upward = first.coord_origin == "BOTTOMLEFT"
+    upward = _upward(first)
     host.provenance[0].bbox = BoundingBox(
         left=min(first.left, second.left),
         right=max(first.right, second.right),
@@ -444,23 +496,17 @@ def _spans_across(
     return min(box[2], picture[2]) > max(box[0], picture[0])
 
 
+def _side_by_side(boxes: list[tuple[float, float, float, float]]) -> bool:
+    """Whether ``boxes`` share a horizontal band, so text spans them across."""
+    return min(box[3] for box in boxes) > max(box[1] for box in boxes)
+
+
 def _distance(
     first: tuple[float, float, float, float], second: tuple[float, float, float, float]
 ) -> float:
     across = max(0.0, max(first[0], second[0]) - min(first[2], second[2]))
     down = max(0.0, max(first[1], second[1]) - min(first[3], second[3]))
     return across + down
-
-
-def _union(
-    first: tuple[float, float, float, float], second: tuple[float, float, float, float]
-) -> tuple[float, float, float, float]:
-    return (
-        min(first[0], second[0]),
-        min(first[1], second[1]),
-        max(first[2], second[2]),
-        max(first[3], second[3]),
-    )
 
 
 def _reads_as_label(text: str) -> bool:
