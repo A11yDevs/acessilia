@@ -57,7 +57,7 @@ Observações:
 - Cancelamento ativo sinaliza `cancelling` enquanto termina a limpeza; `cancelled` indica o encerramento. Operações assíncronas são interrompidas. Threads já iniciadas são aguardadas antes de remover seus arquivos; cancelar não mata uma thread nem encerra remotamente o provider. Trabalho síncrono continua limitado pelos timeouts configurados dos providers.
 - A persistência SQLite executa fora do loop assíncrono. Falha ao enfileirar remove a solicitação persistida e o upload; gravações atrasadas não substituem estados terminais. No reinício, `cancelling` é finalizado como `cancelled`.
 - O painel redireciona o envio para `/jobs/{task_id}` e mantém o token em cookie HttpOnly, SameSite=Lax, limitado àquela página, com Secure em HTTPS. A página não coloca o token em URLs ou HTML, não usa cache e permite acompanhar/baixar o resultado mesmo se o e-mail falhar. O cookie dura sete dias; o link salvo exige o mesmo navegador e cookie. `email_delivery` informa `pending`, `sent`, `failed` ou `unknown` (entrega não confirmada após reinício) tanto para o e-mail de resultado quanto para o e-mail de falha enviado quando um job termina em `error`.
-- `custom_prompt` não vazio e `thinking_mode=true` retornam 422 no pipeline ativo. Os controles correspondentes ficam desabilitados no painel avançado. Os campos ainda são aceitos com valores vazios/falsos por compatibilidade.
+- `custom_prompt` não vazio e `thinking_mode=true` retornam 422 no pipeline ativo. Os campos ainda são aceitos com valores vazios/falsos por compatibilidade.
 - Pedidos pendentes são persistidos antes do 202 em `DATA_DIR/history.db`. No reinício, jobs enfileirados com upload disponível voltam à fila; jobs que estavam processando são marcados como interrompidos, exigindo reenvio. Jobs concluídos mantêm seu status/link persistido; os downloads continuam sujeitos à expiração normal. Upload ausente produz erro explícito.
 - Use um único worker de API por `DATA_DIR`, em armazenamento local persistente. A trava `api-worker.lock` impede inicialização concorrente no mesmo diretório; não há suporte a réplicas com filas independentes nem a uma fila distribuída. O Compose usa o volume persistente existente em `var/`.
 - Plano/dry-run PDDL não é certificado de acessibilidade: metadados incluem `pddl_validation_only=true` e `accessibility_verified=false`. Métodos sem implementação não declaram sucesso real. Os enriquecimentos e exportadores executam fora dessa simulação.
@@ -71,9 +71,7 @@ Definido em [frontend/web/app.py](../frontend/web/app.py). É um app **renderiza
 | Método | Rota | O que faz | Retorno |
 |--------|------|-----------|---------|
 | GET | `/` | Página inicial com o formulário de envio. | HTML. |
-| GET | `/advanced` | Página avançada; controles de prompt/thinking não suportados ficam desabilitados. | HTML. |
 | POST | `/process` | Recebe o formulário e repassa o upload para `POST /api/v1/jobs`. | `303` para `/jobs/{task_id}` com cookie privado; HTML em caso de erro. |
-| POST | `/advanced/process` | Mesmo envio; `custom_prompt` não vazio ou `thinking_mode` verdadeiro retorna 422. | HTML. |
 | GET | `/jobs/{task_id}` | Acompanha o job e permite recuperar seus arquivos. Exige o cookie privado da submissão. | HTML com atualização automática enquanto pendente; `404` sem autorização, `503` se a API estiver indisponível. |
 | GET | `/download/{token}` | Página de download; consulta a API e monta os links para `/api/v1/download/...`. | HTML listando os formatos. `404` se o token expirou. |
 | — | `/static/*` | Arquivos estáticos (CSS, JS, imagens). | O arquivo. |

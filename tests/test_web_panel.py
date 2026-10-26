@@ -8,7 +8,6 @@ from backend.services.download_token_service import TOKEN_EXPIRY_DAYS  # noqa: E
 from frontend.clients.api_client import ApiError  # noqa: E402
 from frontend.web import app as web_module  # noqa: E402
 from frontend.web.messages import (  # noqa: E402
-    WEB_ADVANCED_HEADLINE,
     WEB_ERROR_INTERNAL,
     WEB_INDEX_HEADLINE,
     WEB_JOB_CLOSE_INFO,
@@ -102,15 +101,11 @@ def test_index_page(web_client):
     assert t(WEB_INDEX_HEADLINE) in resp.text
 
 
-def test_advanced_page(web_client):
-    """The advanced panel page must render its localized headline text.
-
-    Same reason as test_index_page: assert on the localized WEB_ADVANCED_HEADLINE
-    constant so the check survives locale switches.
-    """
-    resp = web_client.get("/advanced")
-    assert resp.status_code == 200
-    assert t(WEB_ADVANCED_HEADLINE) in resp.text
+def test_advanced_mode_is_gone(web_client):
+    """The retired advanced panel is neither linked from the home page nor served."""
+    assert 'href="/advanced"' not in web_client.get("/").text
+    assert web_client.get("/advanced").status_code == 404
+    assert web_client.post("/advanced/process", data={"email": "test@example.com"}).status_code == 404
 
 
 def test_upload_submits_via_api(web_client):
@@ -152,32 +147,6 @@ def test_upload_rejects_oversized_file_before_api_submission(web_client, monkeyp
     assert "limite de 1 MB" in resp.text
     assert web_client.fake.submitted == []
     assert list(web_module.WEB_UPLOAD_DIR.iterdir()) == []
-
-
-def test_advanced_upload_rejects_unsupported_options(web_client):
-    resp = web_client.post(
-        "/advanced/process",
-        files={"document_file": ("doc.pdf", _fake_pdf_bytes(), "application/pdf")},
-        data={
-            "email": "test@example.com",
-            "custom_prompt": "Explique em detalhes",
-            "thinking_mode": "true",
-        },
-    )
-    assert resp.status_code == 422
-    assert 'action="/advanced/process"' in resp.text
-    assert web_client.fake.submitted == []
-
-
-def test_advanced_upload_oversized_prompt(web_client):
-    resp = web_client.post(
-        "/advanced/process",
-        files={"document_file": ("doc.pdf", _fake_pdf_bytes(), "application/pdf")},
-        data={"email": "test@example.com", "custom_prompt": "x" * 6001},
-    )
-    assert resp.status_code == 200
-    assert "6000" in resp.text
-    assert web_client.fake.submitted == []
 
 
 def test_download_page_delegates_to_api(web_client):

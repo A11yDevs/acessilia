@@ -345,15 +345,6 @@ from frontend.web.messages import (
     WEB_AGENT_DATA_INSTRUCTIONS_FALLBACK,
     WEB_AGENT_OS_DESCRIPTION,
     WEB_AGENT_VISION_DESCRIPTION,
-    WEB_ADVANCED_BACK_LINK,
-    WEB_ADVANCED_HEADLINE,
-    WEB_ADVANCED_INTRO,
-    WEB_ADVANCED_PROMPT_HELP,
-    WEB_ADVANCED_PROMPT_LABEL,
-    WEB_ADVANCED_PROMPT_PLACEHOLDER,
-    WEB_ADVANCED_SUBHEAD,
-    WEB_ADVANCED_THINKING_LABEL,
-    WEB_ADVANCED_TITLE,
     WEB_DOWNLOAD_HEADLINE,
     WEB_DOWNLOAD_NO_FORMATS,
     WEB_DOWNLOAD_SUBHEAD,
@@ -363,7 +354,6 @@ from frontend.web.messages import (
     WEB_ERROR_DOWNLOAD_INVALID,
     WEB_ERROR_DOWNLOAD_UNAVAILABLE,
     WEB_ERROR_INTERNAL,
-    WEB_ERROR_PROMPT_TOO_LONG,
     WEB_ERROR_UPLOAD_GENERIC,
     WEB_FORMAT_DOCX,
     WEB_FORMAT_HTML,
@@ -373,7 +363,6 @@ from frontend.web.messages import (
     WEB_FORMAT_TXT,
     WEB_FORMAT_ZIP,
     WEB_FOOTER,
-    WEB_INDEX_ADVANCED_LINK,
     WEB_INDEX_DOC_LABEL,
     WEB_INDEX_EMAIL_HELP,
     WEB_INDEX_EMAIL_LABEL,
@@ -727,16 +716,6 @@ MESSAGES: tuple[str, ...] = (
     WEB_INDEX_EMAIL_HELP,
     WEB_INDEX_DOC_LABEL,
     WEB_INDEX_SUBMIT_BUTTON,
-    WEB_INDEX_ADVANCED_LINK,
-    WEB_ADVANCED_TITLE,
-    WEB_ADVANCED_HEADLINE,
-    WEB_ADVANCED_SUBHEAD,
-    WEB_ADVANCED_INTRO,
-    WEB_ADVANCED_PROMPT_LABEL,
-    WEB_ADVANCED_PROMPT_PLACEHOLDER,
-    WEB_ADVANCED_PROMPT_HELP,
-    WEB_ADVANCED_THINKING_LABEL,
-    WEB_ADVANCED_BACK_LINK,
     WEB_DOWNLOAD_TITLE,
     WEB_DOWNLOAD_HEADLINE,
     WEB_DOWNLOAD_SUBHEAD,
@@ -758,7 +737,6 @@ MESSAGES: tuple[str, ...] = (
     WEB_ERROR_INTERNAL,
     WEB_ERROR_API_UPLOAD,
     WEB_ERROR_UPLOAD_GENERIC,
-    WEB_ERROR_PROMPT_TOO_LONG,
     WEB_ERROR_DOWNLOAD_INVALID,
     WEB_ERROR_DOWNLOAD_UNAVAILABLE,
     WEB_RATE_LIMIT_EXCEEDED,
@@ -1435,23 +1413,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         WEB_INDEX_EMAIL_HELP: "Enviaremos o arquivo final para este endereço.",
         WEB_INDEX_DOC_LABEL: "Anexar Documento (PDF ou Imagem)",
         WEB_INDEX_SUBMIT_BUTTON: "Tornar Acessível",
-        WEB_INDEX_ADVANCED_LINK: "Modo Avançado",
-        WEB_ADVANCED_TITLE: "Modo Avançado - Acessilia",
-        WEB_ADVANCED_HEADLINE: "Modo Avançado",
-        WEB_ADVANCED_SUBHEAD: "Prompt personalizado",
-        WEB_ADVANCED_INTRO: "Personalize o prompt enviado ao modelo de IA.",
-        WEB_ADVANCED_PROMPT_LABEL: "Prompt Personalizado",
-        WEB_ADVANCED_PROMPT_PLACEHOLDER: (
-            "Digite seu prompt personalizado aqui. Ele substituirá completamente o prompt padrão do sistema."
-        ),
-        WEB_ADVANCED_PROMPT_HELP: (
-            "Máximo de 6000 caracteres. Texto puro apenas (sem formatação). "
-            "Este prompt substitui o prompt padrão do sistema para todas as páginas."
-        ),
-        WEB_ADVANCED_THINKING_LABEL: (
-            "Ativar Modo Pensamento (raciocínio interno do modelo)"
-        ),
-        WEB_ADVANCED_BACK_LINK: "Voltar ao modo normal",
         WEB_DOWNLOAD_TITLE: "Download - Acessilia",
         WEB_DOWNLOAD_HEADLINE: "Download",
         WEB_DOWNLOAD_SUBHEAD: "Escolha o formato desejado",
@@ -1486,9 +1447,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         WEB_ERROR_API_UPLOAD: "Erro da API ({status_code}): {detail}",
         WEB_ERROR_UPLOAD_GENERIC: (
             "Ocorreu um erro ao enviar o arquivo para a API. Tente novamente."
-        ),
-        WEB_ERROR_PROMPT_TOO_LONG: (
-            "Prompt personalizado excede o limite de 6000 caracteres."
         ),
         WEB_ERROR_DOWNLOAD_INVALID: "Link inválido ou expirado",
         WEB_ERROR_DOWNLOAD_UNAVAILABLE: "Serviço de download indisponível",

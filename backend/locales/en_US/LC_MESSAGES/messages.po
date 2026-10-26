@@ -1054,38 +1054,6 @@ msgstr "Attach a Document (PDF or Image)"
 msgid "Make Accessible"
 msgstr "Make Accessible"
 
-msgid "Advanced Mode"
-msgstr "Advanced Mode"
-
-msgid "Advanced Mode - Acessilia"
-msgstr "Advanced Mode - Acessilia"
-
-msgid "Custom Prompt"
-msgstr "Custom Prompt"
-
-msgid "Customize the prompt sent to the AI model."
-msgstr "Customize the prompt sent to the AI model."
-
-msgid ""
-"Type your custom prompt here. It will completely replace the system's "
-"default prompt."
-msgstr ""
-"Type your custom prompt here. It will completely replace the system's "
-"default prompt."
-
-msgid ""
-"Up to 6000 characters. Plain text only (no formatting). This prompt "
-"replaces the system's default prompt on every page."
-msgstr ""
-"Up to 6000 characters. Plain text only (no formatting). This prompt "
-"replaces the system's default prompt on every page."
-
-msgid "Enable Thinking Mode (the model's internal reasoning)"
-msgstr "Enable Thinking Mode (the model's internal reasoning)"
-
-msgid "Back to normal mode"
-msgstr "Back to normal mode"
-
 msgid "Download - Acessilia"
 msgstr "Download - Acessilia"
 
@@ -1179,9 +1147,6 @@ msgstr "API error ({status_code}): {detail}"
 
 msgid "An error occurred sending the file to the API. Please try again."
 msgstr "An error occurred sending the file to the API. Please try again."
-
-msgid "The custom prompt exceeds the limit of 6000 characters."
-msgstr "The custom prompt exceeds the limit of 6000 characters."
 
 msgid "The download service is temporarily unavailable"
 msgstr "The download service is temporarily unavailable"
