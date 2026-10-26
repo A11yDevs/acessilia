@@ -20,6 +20,13 @@ from tests.pddl_support import build_element as _element
 from tests.pddl_support import build_manifest as _manifest
 
 
+@pytest.fixture(autouse=True)
+def _review_on(monkeypatch):
+    """The review is on by default; a ``TABLE_VISUAL_REVIEW`` in the
+    environment must not decide these tests."""
+    monkeypatch.setattr(settings, "table_visual_review", True)
+
+
 def _ast(rows: list[list[str]]) -> dict:
     header, *body = rows
     return {
@@ -58,7 +65,7 @@ def _reading(rows: list[list[str]]) -> DataOutput:
     )
 
 
-def _run(monkeypatch, rows, reading):
+def _run(monkeypatch, rows, reading, image=b"image"):
     """Enrich a table read as ``rows``; ``reading`` answers every call, or each
     call in turn when it is a list."""
     from backend.agents import pddl_orchestrator as pddl_module
@@ -78,7 +85,7 @@ def _run(monkeypatch, rows, reading):
         return function(*args)
 
     monkeypatch.setattr(pddl_module, "DataAgent", FakeDataAgent)
-    monkeypatch.setattr(pddl_module, "_extract_picture_bytes", lambda *_args: (b"image", 1))
+    monkeypatch.setattr(pddl_module, "_extract_picture_bytes", lambda *_args: (image, 1))
     monkeypatch.setattr(pddl_module.asyncio, "to_thread", run_inline)
     asyncio.run(_enrich_table_structures(manifest, Path("/tmp/deck.pdf")))
     return table, calls
@@ -148,6 +155,17 @@ def test_a_misread_table_gets_another_reading_after_a_bad_one(monkeypatch):
     assert len(calls) == 2
     assert len(_body(table)) == 10
     assert table.metadata["table_review"]["attempts"] == 2
+
+
+def test_a_misread_table_without_an_image_is_kept_on_record(monkeypatch):
+    table, calls = _run(monkeypatch, COLLAPSED, _reading([["a"]]), image=None)
+
+    assert calls == []
+    assert table.metadata["table_ast"] == _ast(COLLAPSED)
+    assert table.metadata["table_review"] == {
+        "reason": "collapsed_rows", "outcome": "kept", "why": "no image of the table",
+        "attempts": 0,
+    }
 
 
 def test_a_table_read_well_is_not_read_again(monkeypatch):

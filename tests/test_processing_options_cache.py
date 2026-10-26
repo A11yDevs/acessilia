@@ -113,7 +113,8 @@ async def _async_noop(*_args, **_kwargs):
 
 
 @pytest.mark.parametrize(
-    "name", ["pdf_split_dpi", "pddl_max_replans", "slide_fold_figure_labels"]
+    "name",
+    ["pdf_split_dpi", "pddl_max_replans", "slide_fold_figure_labels", "table_visual_review"],
 )
 def test_output_affecting_settings_invalidate_processing_cache(monkeypatch, name):
     from backend.config.settings import settings

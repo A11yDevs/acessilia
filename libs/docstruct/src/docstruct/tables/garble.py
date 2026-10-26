@@ -5,7 +5,9 @@ Two shapes come back from slide decks often enough to be worth naming:
 - **collapsed rows** — every row of a column landed in one cell, so a row's
   cells each hold the same number of values ("yota zeta exa …" beside
   "Y Z E …" beside "10²⁴ 10²¹ 10¹⁸ …"). 006.pdf slide 5 read its two prefix
-  tables as one row of ten values per cell.
+  tables as one row of ten values per cell. A cell must hold more than twice
+  as many values as the table has rows, so a short table with long header
+  cells ("Summary of main findings" over two rows) is not named.
 - **duplicated cells** — each cell holds its text twice ("34.97 34.97"), as
   when two overlapping text layers are read together. 006.pdf slide 15 read
   its chlorine isotope table that way.
@@ -38,13 +40,13 @@ def table_garble_reason(rows: list[list[str]]) -> TableGarbleReason | None:
 
 
 def _collapsed(rows: list[list[str]]) -> bool:
-    """A row whose cells all hold the same number of values, more than the table has rows."""
+    """A row whose cells all hold the same number of values, over twice the table's rows."""
     for row in rows:
         counts = {len(cell.split()) for cell in row if cell.strip()}
         filled = sum(1 for cell in row if cell.strip())
         if filled >= 2 and len(counts) == 1:
             (values,) = counts
-            if values >= COLLAPSED_MIN_VALUES and len(rows) < values:
+            if values >= COLLAPSED_MIN_VALUES and values > 2 * len(rows):
                 return True
     return False
 

@@ -3831,6 +3831,8 @@ async def _enrich_table_structures(
             manifest.source.media_type,
         )
         if not image_bytes:
+            if reason is not None:
+                _keep_misread_table(element, page_number, reason, "no image of the table", 0)
             continue
 
         # A misread table gets a few readings: the model may drop columns or
@@ -3857,14 +3859,7 @@ async def _enrich_table_structures(
             break
         if table_output is None:
             if reason is not None:
-                element.metadata["table_review"] = {
-                    "reason": reason, "outcome": "kept", "why": why, "attempts": attempts,
-                }
-                logger.warning(
-                    t(LOG_PDDL_TABLE_REREAD_REJECTED).format(
-                        element_id=element.id, page=page_number, reason=reason, why=why,
-                    )
-                )
+                _keep_misread_table(element, page_number, reason, why, attempt)
             continue
 
         rows = table_output.table_rows()
@@ -3900,6 +3895,20 @@ async def _enrich_table_structures(
 
     if enriched:
         logger.info(t(LOG_PDDL_TABLES_ENRICHED).format(count=enriched))
+
+
+def _keep_misread_table(
+    element: ManifestElement, page_number: int, reason: str, why: str, attempts: int
+) -> None:
+    """Record that a misread table stays as it was read, and why."""
+    element.metadata["table_review"] = {
+        "reason": reason, "outcome": "kept", "why": why, "attempts": attempts,
+    }
+    logger.warning(
+        t(LOG_PDDL_TABLE_REREAD_REJECTED).format(
+            element_id=element.id, page=page_number, reason=reason, why=why,
+        )
+    )
 
 
 #: Share of the words two readings of a table must share, each way, for the

@@ -41,11 +41,13 @@ def test_a_table_whose_cells_are_doubled_is_named():
         [["City", "State", "County"], ["New York City", "New York State", "Kings County NY"]],
         # Four values per cell, but the table already has as many rows.
         [["a b c d", "e f g h"]] * 4,
+        # A two-row table whose header cells have four words each.
+        [["Summary of main findings", "Outcome of the study"], ["No effect", "Closed"]],
         # One cell repeated is a coincidence, not a doubled layer.
         [["Total Total", "12"], ["Mean", "3"], ["Max", "7"]],
         [],
     ],
-    ids=["clean", "three-word-names", "enough-rows", "one-repeat", "empty"],
+    ids=["clean", "three-word-names", "enough-rows", "long-header", "one-repeat", "empty"],
 )
 def test_a_table_read_well_is_not_named(rows):
     assert table_garble_reason(rows) is None
