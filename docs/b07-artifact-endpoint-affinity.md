@@ -30,8 +30,8 @@ selection and output-artifact routing remain unchanged. See
 [ADR-0012](adr/0012-source-files-for-independent-toolboxes.md).
 
 **Validation:** the two automatic-policy regression cases failed before the
-fix; the explicit direct-file controls passed. The focused core suite now has
-36 passing tests; all 246 SDK tests passed. HTTP tests intercept real SDK client
+fix; the explicit direct-file controls passed. The original focused regression run passed
+36 tests; the latest complete SDK run passed 250 tests. HTTP tests intercept real SDK client
 requests and check source bytes, absence of artifact uploads, normal execution
 and extraction failover. Unit controls cover single-endpoint compatibility,
 client lifecycle and a secondary provider on a different deployment. These
@@ -39,10 +39,10 @@ checks are functional tests, not dataset evaluation or measured quality gains.
 
 **Conclusion:** initial extraction no longer depends on an ID stored only in
 another configured deployment. No dataset benchmark or production rollout has
-been performed. Output downloads (B05) and other Trilha B findings remain
-separate pending work in the consolidated PRs.
+been performed. The remaining Core/SDK corrections are described in
+[the consolidated report](extraction-resilience-fixes.md).
 
-Full core validation: 1,754 passed, 51 E2E tests deselected, and one existing
+Full core validation: 1,771 passed, 51 E2E tests deselected, and one existing
 golden-manifest mismatch in
 `test_manifest_wire_payload_matches_the_golden_file[toolbox-v2-contract]`.
 The same test fails on an unmodified archive of the base commit; it was not

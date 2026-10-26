@@ -436,7 +436,8 @@ async def _require_published(catalog: CatalogCache, capability_id: str) -> None:
     expected = TOOLBOX_CAPABILITIES[capability_id].contract_version
     if published != expected:
         raise ToolboxIncompatibleEndpoint(
-            f"{capability_id}: Toolbox publishes v{published}, client expects v{expected}"
+            f"{capability_id}: Toolbox publishes v{published}, "
+            f"client expects v{expected}"
         )
 
 

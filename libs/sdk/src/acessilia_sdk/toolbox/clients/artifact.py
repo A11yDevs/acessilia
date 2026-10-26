@@ -1,4 +1,4 @@
-"""Client for the artifact store: ``POST /v1/artifacts`` and ``GET /v1/artifacts/{id}``."""
+"""Client for storing and retrieving artifacts through ``/v1/artifacts``."""
 
 from __future__ import annotations
 
@@ -59,8 +59,8 @@ class ToolboxArtifactClient(ToolboxCapabilityClient):
     ) -> None:
         """Download ``artifact_id`` to ``destination``, checked against its digest.
 
-        The body is streamed by :func:`~acessilia_sdk.toolbox.artifacts.download_artifact`
-        from whichever endpoint answers.
+        The body is streamed by ``download_artifact`` from whichever endpoint
+        answers.
         """
         ref = ArtifactRef.parse(artifact_id)
 
