@@ -112,12 +112,15 @@ async def _async_noop(*_args, **_kwargs):
     return None
 
 
-@pytest.mark.parametrize("name", ["pdf_split_dpi", "pddl_max_replans"])
+@pytest.mark.parametrize(
+    "name", ["pdf_split_dpi", "pddl_max_replans", "slide_fold_figure_labels"]
+)
 def test_output_affecting_settings_invalidate_processing_cache(monkeypatch, name):
     from backend.config.settings import settings
     from backend.services.cache import processing_cache_configuration, options_cache_key
     before = options_cache_key("document", configuration=processing_cache_configuration())
-    monkeypatch.setattr(settings, name, getattr(settings, name) + 1)
+    value = getattr(settings, name)
+    monkeypatch.setattr(settings, name, not value if isinstance(value, bool) else value + 1)
     assert options_cache_key("document", configuration=processing_cache_configuration()) != before
 
 

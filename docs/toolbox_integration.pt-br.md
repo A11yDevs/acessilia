@@ -314,10 +314,14 @@ A capacidade `media.inspect` (provider `pure-media-inspect`, PR
     cobre no máximo 5% do slide) vira uma imagem do slide inteiro, descrita com o
     prompt de página em vez de lida como texto; o texto substituído fica em
     `metadata.replaced_text`. Um slide do qual nada foi extraído também vira uma.
-    Num slide lido como texto, um texto curto cujo centro está sobre uma imagem
-    (que não seja um fundo de página inteira) é incorporado a ela: sai do texto
-    corrido, fica em `metadata.figure_labels` (ids em
-    `metadata.figure_label_ids`) e a descrição da imagem o transcreve no lugar
+    Num slide lido como texto, um rótulo cujo centro está sobre uma imagem que
+    cobre menos de 95% do slide (uma maior é o fundo) é incorporado a ela: sai
+    do texto corrido, fica em `metadata.figure_labels` da imagem (ids em
+    `metadata.figure_label_ids`) e a descrição da imagem o transcreve no lugar.
+    Um rótulo é um parágrafo, cabeçalho ou título com no máximo três palavras de
+    três letras ou mais que não se lê como frase (terminando em `.`, `!` ou `?`,
+    ou com `: `); legendas, fórmulas, tabelas e itens de lista ficam. Se a
+    imagem ficar sem descrição, seus rótulos viram o texto alternativo
     (`SLIDE_FOLD_FIGURE_LABELS`).
     Uma Toolbox sem o campo, ou uma inspeção que falhou, significa documento.
   - `requires_visual_inspection`, para injetar um elemento `picture` de página

@@ -444,7 +444,7 @@ def test_labels_on_a_picture_are_folded_into_it(source):
     extraction = _with_labels(
         _element("l-1", "paragraph", 2, 7, (720, 320, 760, 340), "1nm"),
         _element("l-2", "paragraph", 2, 8, (780, 320, 830, 340), "10nm"),
-        _element("l-3", "caption", 2, 9, (720, 460, 880, 480), "Lithography resolution"),
+        _element("l-3", "paragraph", 2, 9, (720, 460, 880, 480), "Lithography resolution"),
     )
 
     manifest = _build_edited(source, extraction)
@@ -472,8 +472,11 @@ def test_labels_on_a_picture_are_folded_into_it(source):
         ),
         _element("l-1", "formula", 2, 7, (710, 320, 890, 380), "x = y"),
         _element("l-1", "list_item", 2, 7, (710, 320, 890, 380), "First point."),
+        _element("l-1", "caption", 2, 7, (710, 460, 890, 480), "Figure 3"),
+        _element("l-1", "paragraph", 2, 7, (710, 320, 890, 340), "Grew 10%."),
+        _element("l-1", "paragraph", 2, 7, (710, 320, 890, 340), "Source: IBGE, 2024"),
     ],
-    ids=["sentence", "formula", "list-item"],
+    ids=["sentence", "formula", "list-item", "caption", "short-sentence", "source-line"],
 )
 def test_content_on_a_picture_that_is_not_a_label_stays(source, on_picture):
     manifest = _build_edited(source, _with_labels(on_picture))
@@ -504,3 +507,63 @@ def test_labels_stay_when_folding_is_off(source):
     manifest = _build_edited(source, extraction, slide_fold_figure_labels=False)
 
     assert any(e.id == "l-1" for e in manifest.elements)
+
+
+def test_garbled_ocr_ending_in_a_period_is_still_a_label(source):
+    """006.pdf slide 31 read "P3-" and "Sn4+" as "p3." and "4."."""
+    extraction = _with_labels(
+        _element("l-1", "paragraph", 2, 7, (720, 320, 760, 340), "p3."),
+        _element("l-2", "paragraph", 2, 8, (780, 320, 830, 340), "4."),
+    )
+
+    manifest = _build_edited(source, extraction)
+
+    [picture] = [e for e in manifest.elements if e.id == "e-6"]
+    assert picture.metadata["figure_labels"] == ["p3.", "4."]
+
+
+def test_text_on_a_background_picture_is_not_folded(source):
+    extraction = _with_labels(
+        # Slightly past the slide's edges, as an extractor reports a backdrop:
+        # clipped to the slide, it still covers it all.
+        _element("bg", "picture", 2, 7, (-10, -10, WIDTH + 10, HEIGHT + 10)),
+        _element("l-1", "paragraph", 2, 8, (100, 300, 160, 320), "1nm"),
+    )
+
+    manifest = _build_edited(source, extraction)
+
+    assert any(e.id == "l-1" for e in manifest.elements)
+    [background] = [e for e in manifest.elements if e.id == "bg"]
+    assert "figure_labels" not in background.metadata
+
+
+def test_a_picture_without_a_box_hosts_no_label(source):
+    extraction = _with_labels(
+        _element("l-1", "paragraph", 2, 7, (720, 320, 760, 340), "1nm"),
+    )
+    [picture] = [
+        e for e in extraction.document["document"]["elements"] if e["id"] == "e-6"
+    ]
+    picture["provenance"] = []
+
+    manifest = _build_edited(source, extraction)
+
+    assert any(e.id == "l-1" for e in manifest.elements)
+
+
+def test_an_undescribed_picture_gives_its_labels_as_alt_text(source):
+    """The labels left the running text; a failed description must not drop them."""
+    from backend.agents.pddl_orchestrator import _element_to_block
+
+    manifest = _build_edited(
+        source,
+        _with_labels(
+            _element("l-1", "paragraph", 2, 7, (720, 320, 760, 340), "1nm"),
+            _element("l-2", "paragraph", 2, 8, (780, 320, 830, 340), "10nm"),
+        ),
+    )
+    [picture] = [e for e in manifest.elements if e.id == "e-6"]
+
+    assert _element_to_block(picture)["alt_text"] == "1nm; 10nm"
+    picture.text = "A scale from 1nm to 10nm."
+    assert _element_to_block(picture)["alt_text"] == "A scale from 1nm to 10nm."

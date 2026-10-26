@@ -314,11 +314,15 @@ The `media.inspect` capability (provider `pure-media-inspect`, PR
     most 5% of the slide) becomes one picture of the whole slide, described with
     the page prompt instead of read as text; the replaced text is kept in
     `metadata.replaced_text`. A slide nothing was extracted from becomes one too.
-    On a slide read as text, short text whose centre lies on a picture (not a
-    full-page background) is folded into that picture: it leaves the running
-    text, which keeps it in `metadata.figure_labels` (ids in
-    `metadata.figure_label_ids`), and the picture's description transcribes it
-    in place (`SLIDE_FOLD_FIGURE_LABELS`).
+    On a slide read as text, a label whose centre lies on a picture covering
+    less than 95% of the slide (a larger one is the background) is folded into
+    that picture: it leaves the running text and is kept in the picture's
+    `metadata.figure_labels` (ids in `metadata.figure_label_ids`), and the
+    picture's description transcribes it in place. A label is a paragraph,
+    heading or title of at most three words of three letters or more that does
+    not read as a sentence (ending in `.`, `!` or `?`, or with `: `); captions,
+    formulas, tables and list items stay. If the picture is left undescribed,
+    its labels are its alt text (`SLIDE_FOLD_FIGURE_LABELS`).
     A Toolbox without the field, or a failed inspection, means a document.
   - `requires_visual_inspection`, to inject a full-page `picture` element when the
     input is a standalone image with no visual blocks — ensuring the VisionAgent
