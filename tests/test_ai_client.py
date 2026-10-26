@@ -48,6 +48,26 @@ def test_openrouter_model_receives_agent_specific_max_tokens(monkeypatch) -> Non
     assert captured["max_tokens"] == 8192
 
 
+def test_openrouter_model_can_disable_the_sdk_retries(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_openrouter(**kwargs):
+        captured.update(kwargs)
+        return object()
+
+    monkeypatch.setattr(openrouter, "OpenRouter", fake_openrouter)
+    monkeypatch.setattr(settings, "ai_client", "openrouter")
+    monkeypatch.setattr(settings, "openrouter_model", "test/model")
+    monkeypatch.setattr(settings, "openrouter_api_key", "test-key")
+    monkeypatch.setattr(settings, "openrouter_base_url", "https://example.test/v1/chat/completions")
+    monkeypatch.setattr(settings, "openrouter_site_url", "")
+    monkeypatch.setattr(settings, "openrouter_app_name", "")
+
+    ai_client.get_agno_model(max_retries=0)
+
+    assert captured["max_retries"] == 0
+
+
 def test_ollama_model_receives_agent_specific_prediction_limit(monkeypatch) -> None:
     captured: dict[str, object] = {}
 
