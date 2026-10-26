@@ -84,6 +84,12 @@ def locate_in_grid(
     candidates are compared by the distance from the slash to the centre of
     their column, with the same margin as :func:`locate_in_text`, and a cell
     holding more than one candidate is ambiguous.
+
+    Every column counts as equally wide and ``rows`` must already be laid on
+    the visual column grid (a cell spanning two columns takes two slots, the
+    second empty): a table AST carries no column widths, so a very wide column
+    next to a narrow one shifts the estimate, and the margin is what refuses
+    the close calls this produces.
     """
     row = int(row_position)
     if not 0 <= row < len(rows):

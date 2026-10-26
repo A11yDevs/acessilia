@@ -28,6 +28,7 @@ from docstruct.text.negation_overlay import (
     is_detached_overlay,
     locate_in_grid,
     locate_in_text,
+    negates,
 )
 from docstruct.text.unicode_repair import (
     Detection,
@@ -593,9 +594,14 @@ _OVERLAY_HOST_TOLERANCE = 1.5
 _OVERLAY_LINE_HEIGHTS = 1.25
 
 
-def _bbox(element: ManifestElement) -> tuple[int, Any] | None:
+def _bbox(element: ManifestElement, page: int | None = None) -> tuple[int, Any] | None:
+    """``(page, box)`` of the element: on ``page`` when given, else the first boxed one.
+
+    An element can carry provenances on more than one page; a slash is only
+    compared with the part of an element that lies on the slash's own page.
+    """
     for provenance in element.provenance or []:
-        if provenance.bbox is not None:
+        if provenance.bbox is not None and page in (None, provenance.page_number):
             return provenance.page_number, provenance.bbox
     return None
 
@@ -607,16 +613,30 @@ def _vertical(box: Any) -> tuple[float, float]:
     return min(box.top, box.bottom), max(box.top, box.bottom)
 
 
-def _table_rows(element: ManifestElement) -> list[list[dict[str, Any]]]:
+def _table_grid(element: ManifestElement) -> list[list[tuple[str, dict[str, Any] | None]]]:
+    """The table's rows on its visual column grid: a cell spanning ``n`` columns
+    takes ``n`` slots, its text in the first, so a slash's column position
+    matches the cell under it. Row spans are not expanded (the slash's row is
+    estimated from the AST rows), and every column is taken as equally wide —
+    the AST carries no widths; ``locate_in_grid``'s margin refuses close calls.
+    """
     table_ast = element.metadata.get("table_ast")
     if not isinstance(table_ast, dict):
         return []
-    return [
-        [cell for cell in row.get("cells") or [] if isinstance(cell, dict)]
-        for section in _TABLE_SECTIONS
-        for row in table_ast.get(section) or []
-        if isinstance(row, dict)
-    ]
+    grid: list[list[tuple[str, dict[str, Any] | None]]] = []
+    for section in _TABLE_SECTIONS:
+        for row in table_ast.get(section) or []:
+            if not isinstance(row, dict):
+                continue
+            slots: list[tuple[str, dict[str, Any] | None]] = []
+            for cell in row.get("cells") or []:
+                if not isinstance(cell, dict):
+                    continue
+                span = max(1, int(cell.get("colspan") or 1))
+                slots.append((str(cell.get("text") or ""), cell))
+                slots.extend(("", None) for _ in range(span - 1))
+            grid.append(slots)
+    return grid
 
 
 def _reattach_negation_overlays(manifest: ProcessingManifest) -> dict[str, int]:
@@ -631,11 +651,23 @@ def _reattach_negation_overlays(manifest: ProcessingManifest) -> dict[str, int]:
     A formula whose text is already LaTeX (recognized, #253) is not touched.
 
     Every slash element is then left out of the payload (``negation_overlay``
-    metadata, with the outcome), since a lone combining mark says nothing to a
-    reader. Returns the count per outcome.
+    metadata, with the outcome: ``composed``, ``host-is-latex``, ``ambiguous``,
+    ``no-candidate``, ``ambiguous-host`` or ``no-host``), since a lone
+    combining mark says nothing to a reader. A slash already recorded is
+    skipped, so running the handler again (a plan retry) keeps the first
+    outcome instead of re-reading a host whose text it already changed.
+    Returns the count per outcome.
+
+    This runs only with the repair obligation (``LEGACY_UNICODE_REPAIR=repair``).
+    ``detect`` keeps its meaning — report, deliver as extracted — so there the
+    slash elements stay in the outputs, like every other legacy artifact.
     """
     outcomes: dict[str, int] = {}
-    overlays = [element for element in manifest.elements if is_detached_overlay(element.text)]
+    overlays = [
+        element
+        for element in manifest.elements
+        if is_detached_overlay(element.text) and "negation_overlay" not in element.metadata
+    ]
     for overlay in overlays:
         located = _bbox(overlay)
         outcome, host_id = "no-host", None
@@ -649,8 +681,8 @@ def _reattach_negation_overlays(manifest: ProcessingManifest) -> dict[str, int]:
             for element in manifest.elements:
                 if element is overlay or is_detached_overlay(element.text):
                     continue
-                other = _bbox(element)
-                if other is None or other[0] != page:
+                other = _bbox(element, page)
+                if other is None:
                     continue
                 top, bottom = _vertical(other[1])
                 if (
@@ -665,33 +697,11 @@ def _reattach_negation_overlays(manifest: ProcessingManifest) -> dict[str, int]:
                 host_id = host.id
                 height = max(bottom - top, 1e-6)
                 width = max(host_box.right - host_box.left, 1e-6)
+                # The host tolerance lets a slash sit just outside the box:
+                # clamp once, so the text and the grid paths see the same span.
                 y_fraction = min(max((y - top) / height, 0.0), 1.0)
-                x_fraction = (x - host_box.left) / width
-                outcome = "ambiguous"
-                if host.type == "table":
-                    rows = _table_rows(host)
-                    columns = max((len(row) for row in rows), default=0)
-                    found = locate_in_grid(
-                        [[str(cell.get("text") or "") for cell in row] for row in rows],
-                        row_position=y_fraction * len(rows),
-                        column_position=x_fraction * columns,
-                    ) if rows and columns else None
-                    if found is not None:
-                        row, column, index = found
-                        cell = rows[row][column]
-                        cell["text"] = compose_negation(str(cell["text"]), index)
-                        outcome = "composed"
-                elif host.type == "formula" and has_latex_markup(host.text):
-                    outcome = "host-is-latex"
-                elif host.text:
-                    lines = max(1, round(height / (slash_height * _OVERLAY_LINE_HEIGHTS)))
-                    index = locate_in_text(
-                        host.text, lines=lines, line_position=y_fraction * lines,
-                        x_fraction=x_fraction,
-                    )
-                    if index is not None:
-                        host.text = compose_negation(host.text, index)
-                        outcome = "composed"
+                x_fraction = min(max((x - host_box.left) / width, 0.0), 1.0)
+                outcome = _compose_in_host(host, x_fraction, y_fraction, height, slash_height)
                 if outcome == "composed":
                     host.metadata["negation_overlays"] = host.metadata.get("negation_overlays", 0) + 1
         overlay.metadata["negation_overlay"] = {"outcome": outcome, "host": host_id}
@@ -699,6 +709,47 @@ def _reattach_negation_overlays(manifest: ProcessingManifest) -> dict[str, int]:
     if outcomes:
         logger.info("Detached negation slashes: {}", outcomes)
     return outcomes
+
+
+def _compose_in_host(
+    host: ManifestElement,
+    x_fraction: float,
+    y_fraction: float,
+    height: float,
+    slash_height: float,
+) -> str:
+    """Negate the relation under the slash in ``host``; returns the outcome."""
+    if host.type == "table":
+        grid = _table_grid(host)
+        if not any(negates(char) for row in grid for text, _ in row for char in text):
+            return "no-candidate"
+        columns = max((len(row) for row in grid), default=0)
+        found = locate_in_grid(
+            [[text for text, _ in row] for row in grid],
+            row_position=y_fraction * len(grid),
+            column_position=x_fraction * columns,
+        )
+        if found is None:
+            return "ambiguous"
+        row, column, index = found
+        cell = grid[row][column][1]
+        if cell is None:
+            return "ambiguous"
+        cell["text"] = compose_negation(str(cell["text"]), index)
+        return "composed"
+    if host.type == "formula" and has_latex_markup(host.text):
+        return "host-is-latex"
+    text = host.text or ""
+    if not any(negates(char) for char in text):
+        return "no-candidate"
+    lines = max(1, round(height / (slash_height * _OVERLAY_LINE_HEIGHTS)))
+    index = locate_in_text(
+        text, lines=lines, line_position=y_fraction * lines, x_fraction=x_fraction
+    )
+    if index is None:
+        return "ambiguous"
+    host.text = compose_negation(text, index)
+    return "composed"
 
 
 def _handle_unicode_repair_method(
