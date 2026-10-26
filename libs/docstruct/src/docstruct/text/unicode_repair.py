@@ -51,16 +51,20 @@ _SPACING_WORD_INTERNAL = re.compile(
 
 #: TeX's grave accent extracted apart from its letter, as the crase ``à``
 #: alone (``\`a``): a backtick or a left quote, then ``a``/``A`` standing as a
-#: word. Only the crase, the one grave word in Portuguese. A closing backtick
-#: or quote after the letter means inline code or a quoted letter (`` `a` ``,
-#: ``‘a’``), not an accent.
-_GRAVE_CRASE = re.compile(r"(?<![^\W\d_])[`‘][\u00a0 \t]*([aA])(?![^\W\d_])(?![`’'])")
-#: A word whose fi/fl ligature the extractor ended with a space: ``fi ca``,
-#: ``defi ne``. The head is not preceded by a letter, digit, underscore or
-#: hyphen (``hi-fi sound`` stays), and the tail must start in lower case.
-_SPLIT_LIGATURE = re.compile(
-    r"(?<![\w-])(?P<head>[^\W\d_]*?(?:ffi|ffl|fi|fl))[\u00a0 ](?P<tail>[^\W\d_]+)"
-)
+#: word, not after a letter or digit. Only the crase, the one grave word in
+#: Portuguese. A closing backtick or quote right after the letter means inline
+#: code or a quoted letter (`` `a` ``, ``‘a’``); a closer further on is checked
+#: in ``_crase_matches`` (``‘ a medida foi aprovada’``, `` `a = b` ``).
+_GRAVE_CRASE = re.compile(r"(?<!\w)[`‘][  \t]*([aA])(?![^\W\d_])(?![`’'])")
+#: A word whose initial fi/fl ligature the extractor ended with a space:
+#: ``fi ca``, ``fl uxo``, the shape TeX text layers produce. Only the bare
+#: ligature at the start of a word: a longer head (``wifi funciona``,
+#: ``selfi na``) is a complete word, and ``ffi``/``ffl`` never start one
+#: (``o ffi cial`` would become ``o fficial``; visibly broken is better). Not
+#: after a hyphen (``hi-fi``), and the tail must start in lower case.
+_SPLIT_LIGATURE = re.compile(r"(?<![\w-])(?P<head>fi|fl)[  ](?P<tail>[^\W\d_]+)")
+#: The spaced spellings of hi-fi/wi-fi: ``hi fi system`` is not a split word.
+_FI_COMPOUND_BEFORE = re.compile(r"(?i)(?:^|\W)(?:hi|wi)[  ]$")
 
 _SPACING_MARKS = {"´": "\u0301", "ˆ": "\u0302", "˜": "\u0303", "¸": "\u0327"}
 _SPACING_BASES = {
@@ -186,9 +190,7 @@ def repair_legacy_unicode(
             skipped_reason=f"block-type:{ctx.block_type}",
         )
 
-    crase_matches = (
-        list(_GRAVE_CRASE.finditer(text)) if ctx.allow_legacy_tex_artifacts else []
-    )
+    crase_matches = _crase_matches(text) if ctx.allow_legacy_tex_artifacts else []
     # A crase backtick is TeX's accent, not a code delimiter: mask it before
     # finding protected spans, or two crases in one paragraph would protect
     # (and freeze) everything between them.
@@ -303,9 +305,36 @@ def _legacy_tex_edits(
     for match in _SPLIT_LIGATURE.finditer(text):
         if not match.group("tail")[0].islower() or _overlaps(match.span(), protected):
             continue
+        if _FI_COMPOUND_BEFORE.search(text[: match.start()]):
+            continue
         joined = match.group("head") + match.group("tail")
         edits.append(Edit("split-ligature", match.start(), match.end(), match.group(0), joined))
     return edits
+
+
+def _crase_matches(text: str) -> list[re.Match[str]]:
+    """Crase candidates whose backtick or quote does not open a span closed later.
+
+    ``‘ a medida foi aprovada’`` and `` `a = b` `` start with the same shape as
+    a crase, but a closer further on (a right quote, or a backtick that is not
+    itself a crase) shows the mark opens a quotation or inline code. Two TeX
+    crases in one paragraph do not close each other.
+    """
+    candidates = list(_GRAVE_CRASE.finditer(text))
+    crase_backticks = {match.start() for match in candidates if match.group(0)[0] == "`"}
+    accepted = []
+    for match in candidates:
+        rest = text[match.end() :]
+        if match.group(0)[0] == "‘":
+            if "’" in rest:
+                continue
+        elif any(
+            char == "`" and match.end() + offset not in crase_backticks
+            for offset, char in enumerate(rest)
+        ):
+            continue
+        accepted.append(match)
+    return accepted
 
 
 def _mask(text: str, positions: list[int]) -> str:
