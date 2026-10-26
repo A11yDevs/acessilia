@@ -26,6 +26,7 @@ from backend.stage_messages import STAGE_QUEUE_WAITING_POSITION
 from backend.log_messages import (
     API_CANCEL_STATE_INVALID,
     API_JOB_QUEUED,
+    API_OPTIONS_UNAVAILABLE,
     API_PROMPT_TOO_LONG,
     API_TASK_NOT_FOUND,
     LOG_API_JOB_ENQUEUED,
@@ -94,7 +95,7 @@ async def submit_job(
     if prompt or thinking_mode:
         raise HTTPException(
             status_code=422,
-            detail="Custom instructions and thinking mode are unavailable for this pipeline",
+            detail=t(API_OPTIONS_UNAVAILABLE),
         )
 
     file_path = await run_in_threadpool(_save_upload, document_file)

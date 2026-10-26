@@ -38,6 +38,7 @@ from backend.log_messages import (
 )
 from backend.tools.access_log_filter import AccessLogFilter
 from backend.tools.logger import logger
+from backend.tools.validators import MSG_FILE_TOO_LARGE
 from frontend.clients.api_client import ApiError
 from frontend.clients import default_client
 from frontend.web.messages import (
@@ -228,7 +229,7 @@ def _save_upload(upload: UploadFile) -> Path:
                 if total_size > settings.max_file_size_bytes:
                     raise HTTPException(
                         status_code=413,
-                        detail=f"Arquivo excede o limite de {settings.max_file_size_mb} MB.",
+                        detail=t(MSG_FILE_TOO_LARGE).format(limit=settings.max_file_size_mb),
                     )
                 buffer.write(chunk)
     except Exception:
@@ -290,9 +291,16 @@ async def upload_page():
     return RedirectResponse(url="/", status_code=303)
 
 
+# The advanced panel was retired in 0.2.0; keep old bookmarks landing on the
+# home page for one release. Remove in 0.3.0.
+@app.get("/advanced", include_in_schema=False)
+@app.get("/advanced/process", include_in_schema=False)
+async def retired_advanced_page():
+    return RedirectResponse(url="/", status_code=303)
+
+
 async def _submit_via_api(
     request: Request,
-    template_name: str,
     document_file: UploadFile,
     email: str,
     mode: str,
@@ -302,8 +310,8 @@ async def _submit_via_api(
     except HTTPException as e:
         return templates.TemplateResponse(
             request=request,
-            name=template_name,
-            context={"error": e.detail},
+            name="index.html",
+            context={**_web_strings(), "error": e.detail},
             status_code=e.status_code,
         )
     try:
@@ -322,14 +330,14 @@ async def _submit_via_api(
         )
         return templates.TemplateResponse(
             request=request,
-            name=template_name,
+            name="index.html",
             context={**_web_strings(), "error": t(WEB_ERROR_API_UPLOAD).format(status_code=e.status_code, detail=e.detail)},
         )
     except Exception as e:
         logger.error(t(LOG_WEB_UPLOAD_ERROR).format(error=str(e)))
         return templates.TemplateResponse(
             request=request,
-            name=template_name,
+            name="index.html",
             context={**_web_strings(), "error": t(WEB_ERROR_UPLOAD_GENERIC)}
         )
     finally:
@@ -393,7 +401,6 @@ async def handle_upload(
 ):
     return await _submit_via_api(
         request,
-        template_name="index.html",
         document_file=document_file,
         email=email,
         mode="normal",

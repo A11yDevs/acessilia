@@ -279,6 +279,8 @@ API_TASK_NOT_FOUND: str = "Task not found"
 API_JOB_QUEUED: str = "File queued (Position: {position})."
 #: HTTP 400 detail body returned by the API when a custom prompt exceeds the accepted length; {limit} carries the character count.
 API_PROMPT_TOO_LONG: str = "The custom prompt exceeds the limit of {limit} characters."
+#: HTTP 422 detail body returned by the API when a submission asks for a custom prompt or thinking mode, which the active pipeline does not support.
+API_OPTIONS_UNAVAILABLE: str = "Custom instructions and thinking mode are unavailable for this pipeline"
 #: HTTP 404 detail body returned by the API download endpoints when a download token lookup misses.
 API_LINK_INVALID: str = "The download link is invalid or has expired"
 #: HTTP 400 detail body returned by the API download endpoints when a request names a format the service cannot produce.

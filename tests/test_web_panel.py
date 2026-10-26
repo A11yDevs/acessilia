@@ -5,11 +5,13 @@ pytest.importorskip("fastapi.testclient")
 
 from backend.i18n import t  # noqa: E402
 from backend.services.download_token_service import TOKEN_EXPIRY_DAYS  # noqa: E402
+from backend.tools.validators import MSG_FILE_TOO_LARGE  # noqa: E402
 from frontend.clients.api_client import ApiError  # noqa: E402
 from frontend.web import app as web_module  # noqa: E402
 from frontend.web.messages import (  # noqa: E402
     WEB_ERROR_INTERNAL,
     WEB_INDEX_HEADLINE,
+    WEB_INDEX_TITLE,
     WEB_JOB_CLOSE_INFO,
     WEB_JOB_PENDING,
 )
@@ -102,10 +104,15 @@ def test_index_page(web_client):
 
 
 def test_advanced_mode_is_gone(web_client):
-    """The retired advanced panel is neither linked from the home page nor served."""
-    assert 'href="/advanced"' not in web_client.get("/").text
-    assert web_client.get("/advanced").status_code == 404
-    assert web_client.post("/advanced/process", data={"email": "test@example.com"}).status_code == 404
+    """The retired advanced panel is not linked, and its old URLs land on the home page."""
+    home = web_client.get("/")
+    assert home.status_code == 200
+    assert "/advanced" not in home.text
+    for path in ("/advanced", "/advanced/process"):
+        resp = web_client.get(path, follow_redirects=False)
+        assert resp.status_code == 303
+        assert resp.headers["location"] == "/"
+    assert web_client.post("/advanced/process").status_code == 405
 
 
 def test_upload_submits_via_api(web_client):
@@ -144,7 +151,8 @@ def test_upload_rejects_oversized_file_before_api_submission(web_client, monkeyp
     )
 
     assert resp.status_code == 413
-    assert "limite de 1 MB" in resp.text
+    assert t(MSG_FILE_TOO_LARGE).format(limit=1) in resp.text
+    assert f"<title>{t(WEB_INDEX_TITLE)}</title>" in resp.text
     assert web_client.fake.submitted == []
     assert list(web_module.WEB_UPLOAD_DIR.iterdir()) == []
 
