@@ -323,6 +323,7 @@ def test_receipt_recovers_result_after_refresh(web_client, monkeypatch, delivery
 def test_receipt_explains_the_failure_email(web_client, monkeypatch, delivery):
     """A failed job must not promise a result e-mail: the failure copy is different."""
     from frontend.web.messages import (
+        WEB_JOB_EMAIL_FAILED,
         WEB_JOB_EMAIL_SENT,
         WEB_JOB_FAILURE_EMAIL_FAILED,
         WEB_JOB_FAILURE_EMAIL_SENT,
@@ -342,8 +343,11 @@ def test_receipt_explains_the_failure_email(web_client, monkeypatch, delivery):
         WEB_JOB_FAILURE_EMAIL_SENT if delivery == "sent" else WEB_JOB_FAILURE_EMAIL_FAILED
     )
     assert expected in page.text
-    # The result-mail copy mentions downloading files that do not exist here.
+    # Neither result-mail copy may render: the ``failed`` one offers downloads
+    # that do not exist here, and the ``sent`` one promises a result e-mail.
     assert t(WEB_JOB_EMAIL_SENT) not in page.text
+    assert t(WEB_JOB_EMAIL_FAILED) not in page.text
+    assert 'href="/download/' not in page.text
     assert "pipeline failed" in page.text
 
 

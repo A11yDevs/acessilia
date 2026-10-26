@@ -24,6 +24,7 @@ from backend.stage_messages import (
     STAGE_PAGE_OF,
     STAGE_PAGE_UNKNOWN,
     STAGE_PAGES,
+    STAGE_PENDING_UPLOAD_MISSING,
     STAGE_RESTART_INTERRUPTED_DURING,
 )
 from tests.pddl_support import (
@@ -374,3 +375,83 @@ async def test_restart_records_a_failure_email_that_could_not_be_sent(
     assert status["status"] == "error"
     assert status["email_delivery"] == "failed"
     assert any("killed-broken-mailer" in message for message in warning_messages)
+
+
+@pytest.mark.asyncio
+async def test_restart_emails_when_the_pending_upload_is_missing(job_db, sent_failures):
+    """A queued job whose upload vanished must still tell the user it failed."""
+    from backend.api.worker import recover_pending_jobs
+    from backend.services.history_service import listar_historico
+    from backend.services.job_store import load_record, save_request
+
+    save_request(
+        "missing-upload",
+        "token",
+        {
+            "task_id": "missing-upload",
+            "file_path": str(job_db / "gone.pdf"),
+            "output_dir": None,
+            "filename": "gone.pdf",
+            "email": "user@example.com",
+        },
+        {"task_id": "missing-upload", "status": "queued", "erros": []},
+    )
+
+    await recover_pending_jobs()
+
+    expected = t(STAGE_PENDING_UPLOAD_MISSING)
+    status = load_record("missing-upload")["status"]
+    assert status["status"] == "error"
+    assert status["erros"] == [expected]
+    assert status["email_delivery"] == "sent"
+    assert sent_failures == [("user@example.com", "gone.pdf", expected)]
+    # The executor never ran, so recovery itself has to create the history row.
+    rows = await listar_historico(10)
+    [row] = [r for r in rows if r["task_id"] == "missing-upload"]
+    assert row["status"] == "error"
+    assert row["erro"] == expected
+
+
+@pytest.mark.asyncio
+async def test_failure_is_durable_before_the_email_and_history_does_not_block_it(
+    job_db, monkeypatch
+):
+    """A crash after the send must not re-notify, and a DB failure must not silence the mail."""
+    from backend import service
+    from backend.api.worker import ApiJob, JobExecutor
+    from backend.services.job_store import load_record, save_request
+
+    task_id = "durable-before-email"
+    input_path = job_db / "006.pdf"
+    input_path.write_bytes(b"%PDF-1.4\n%%EOF\n")
+    save_request(task_id, "token", {}, {"status": "queued"})
+    durable_status_at_send: list[str] = []
+
+    async def fail_pipeline(*args, **kwargs):
+        raise RuntimeError("vision model crashed")
+
+    async def record_email(to_email, filename, error):
+        durable_status_at_send.append(load_record(task_id)["status"]["status"])
+        return True
+
+    async def broken_history(*args, **kwargs):
+        raise OSError("history database is locked")
+
+    monkeypatch.setattr(service.agente, "executar", fail_pipeline)
+    monkeypatch.setattr("backend.api.worker.send_failure_email", record_email)
+    monkeypatch.setattr("backend.api.worker.finalizar_conversao", broken_history)
+
+    await JobExecutor().run(
+        ApiJob(
+            task_id=task_id,
+            file_path=input_path,
+            filename="006.pdf",
+            email="user@example.com",
+            output_dir=job_db / "output" / task_id,
+        )
+    )
+
+    assert durable_status_at_send == ["error"]
+    status = load_record(task_id)["status"]
+    assert status["status"] == "error"
+    assert status["email_delivery"] == "sent"
