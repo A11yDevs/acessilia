@@ -10,6 +10,7 @@ from typing import Any
 from docstruct.profiles import filter_blocks_for_profile
 from docstruct.sections import section_body_blocks
 from docstruct.tables.ast import linearize_table_for_text
+from docstruct.text.math_spans import inline_math_entries, split_inline_math
 
 DEFAULT_FORMULA_LABEL = "Fórmula: {text}"
 
@@ -60,12 +61,12 @@ def _render_block(block: dict[str, Any], formula_label: str = DEFAULT_FORMULA_LA
     if block_type == "heading":
         return [block.get("title", block.get("text", ""))]
     if block_type == "paragraph":
-        return [block.get("text", "")]
+        return [_prose_text(block.get("text", ""), block)]
     if block_type == "code":
         return [block.get("text", "")]
     if block_type == "list":
         prefix = "1." if block.get("ordered") else "-"
-        return [f"{prefix} {item}" for item in block.get("items", [])]
+        return [f"{prefix} {_prose_text(str(item), block)}" for item in block.get("items", [])]
     if block_type == "table":
         return linearize_table_for_text(block)
     if block_type == "image":
@@ -73,5 +74,23 @@ def _render_block(block: dict[str, Any], formula_label: str = DEFAULT_FORMULA_LA
     if block_type == "math":
         return [block.get("alt_text") or formula_label.format(text=block.get('text', ''))]
     if block_type in {"details", "note", "warning", "quote"}:
-        return [block.get("text", "")]
+        return [_prose_text(block.get("text", ""), block)]
     return [block.get("text", "")]
+
+
+def _prose_text(text: str, block: dict[str, Any]) -> str:
+    """Prose whose ``$…$`` spans are read: their speech, else their bare LaTeX
+    (normalized when the canonical enrichment saw it).
+
+    The TXT is also what the MP3 speaks, so a formula inside a sentence is
+    read in it ("s de t igual a t ao cubo") rather than spelled with dollars.
+    """
+    entries = inline_math_entries(block)
+    return "".join(
+        _spoken(entries.get(piece, {}), piece) if is_math else piece
+        for piece, is_math in split_inline_math(str(text))
+    )
+
+
+def _spoken(entry: dict[str, Any], source: str) -> str:
+    return str(entry.get("speech") or entry.get("latex") or source)

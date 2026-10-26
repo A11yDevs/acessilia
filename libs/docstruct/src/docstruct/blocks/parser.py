@@ -13,6 +13,7 @@ from typing import Any, Callable
 import re
 
 from docstruct.blocks.classify import extract_plain_heading
+from docstruct.text.math_spans import split_inline_math
 from docstruct.text.sanitize import sanitize_block_text
 
 
@@ -136,6 +137,8 @@ _LATEX_COMMANDS = (
 def _looks_like_math_line(line: str) -> bool:
     if len(line) > 2000:
         return False
+    if _is_prose_with_inline_math(line):
+        return False
     if line.startswith("$") and line.endswith("$") and len(line) > 2:
         return True
     if line.startswith("\\[") and line.endswith("\\]"):
@@ -144,6 +147,20 @@ def _looks_like_math_line(line: str) -> bool:
         return True
     # Saída do CodeFormula sem comandos: expoentes/índices com chaves
     return "^ {" in line or "_ {" in line or "^{" in line or "_{" in line
+
+
+def _is_prose_with_inline_math(line: str) -> bool:
+    """A sentence with ``$…$`` spans in it is a paragraph, not a formula.
+
+    The LaTeX in the span (``s_{0}``, ``\\frac``) would otherwise make the
+    whole line a math block, prose included; as a paragraph its spans are
+    rendered as inline math.
+    """
+    pieces = split_inline_math(line)
+    return any(is_math for _, is_math in pieces) and any(
+        not is_math and any(char.isalpha() for char in piece)
+        for piece, is_math in pieces
+    )
 
 
 def _extract_plain_heading(

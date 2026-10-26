@@ -15,6 +15,7 @@ from docstruct.export.filters import apply_output_profile_filter
 from docstruct.profiles import normalize_profile
 from docstruct.sections import section_body_blocks, section_title_alias
 from docstruct.tables.ast import split_header_and_body, table_ast_from_block
+from docstruct.text.math_spans import inline_math_entries, split_inline_math
 
 
 @dataclass
@@ -140,7 +141,7 @@ def _render_block(
         anchor = f'<span id="{escape(alias)}"></span>' if alias else ""
         return f'{anchor}<h{level} id="{block_id}">{escape(block.get("title", block.get("text", "")))}</h{level}>'
     if block_type == "paragraph":
-        return f'<p id="{block_id}">{escape(block.get("text", ""))}</p>'
+        return f'<p id="{block_id}">{_prose_html(block.get("text", ""), block)}</p>'
     if block_type == "code":
         return (
             f'<pre id="{block_id}"><code>{escape(block.get("text", ""))}</code></pre>'
@@ -148,7 +149,7 @@ def _render_block(
     if block_type == "list":
         tag = "ol" if block.get("ordered") else "ul"
         items = "".join(
-            f"<li>{escape(str(item))}</li>" for item in block.get("items", [])
+            f"<li>{_prose_html(str(item), block)}</li>" for item in block.get("items", [])
         )
         return f'<{tag} id="{block_id}">{items}</{tag}>'
     if block_type == "table":
@@ -198,12 +199,37 @@ def _render_block(
         )
     if block_type in {"details", "note", "warning", "quote"}:
         summary = escape(block.get("title", block_type.title()))
-        content = escape(block.get("text", ""))
+        content = _prose_html(block.get("text", ""), block)
         if profile.get("collapsible"):
             return f'<details id="{block_id}"><summary>{summary}</summary><p>{content}</p></details>'
         return f'<section id="{block_id}"><h2>{summary}</h2><p>{content}</p></section>'
     return f'<p id="{block_id}">{escape(block.get("text", ""))}</p>'
 
+
+
+def _prose_html(text: str, block: dict[str, Any]) -> str:
+    """Escaped prose whose ``$…$`` spans are rendered as inline math.
+
+    Each span is a ``role="math"`` element labelled with its speech, as a math
+    block is: the MathML when the enrichment produced it, else the
+    (normalized) LaTeX without delimiters. A document that did not go through
+    the canonical enrichment has no entries, and its spans keep the LaTeX,
+    still marked as math.
+    """
+    entries = inline_math_entries(block)
+    parts: list[str] = []
+    for piece, is_math in split_inline_math(str(text)):
+        if not is_math:
+            parts.append(escape(piece))
+            continue
+        entry = entries.get(piece, {})
+        speech = str(entry.get("speech") or "")
+        label = f' aria-label="{escape(speech)}"' if speech else ""
+        content = _safe_mathml(entry.get("mathml", "")) or escape(
+            str(entry.get("latex") or piece)
+        )
+        parts.append(f'<span role="math"{label}>{content}</span>')
+    return "".join(parts)
 
 
 def _render_html_table_row(row: dict[str, Any], *, header: bool) -> str:
