@@ -271,7 +271,11 @@ from backend.export.pandoc_exporter import (
     MSG_PDF_UA_DISABLED,
     MSG_UNSUPPORTED_EXPORT_FORMAT,
 )
-from backend.agents.pddl_orchestrator import MSG_UNDESCRIBED_PICTURE_ALT
+from backend.agents.pddl_orchestrator import (
+    MSG_PICTURES_NOT_DESCRIBED,
+    MSG_TABLES_NOT_READ,
+    MSG_UNDESCRIBED_PICTURE_ALT,
+)
 from backend.export.renderers.html_renderer import (
     MSG_HTML_IMAGE_DESCRIPTION,
     MSG_HTML_TABLE_OF_CONTENTS,
@@ -1830,10 +1834,17 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
     },
 }
 
-#: Canonical English singular/plural msgid pair, then a per-locale mapping of localized pairs with the same index ordering.
-PLURAL_MESSAGES: tuple[tuple[str, str], dict[str, tuple[str, str]]] = (
-    ("document", "documents"),
-    {"pt_BR": ("documento", "documentos")},
+#: Each entry: a canonical English singular/plural msgid pair, then a per-locale mapping of localized pairs with the same index ordering.
+PLURAL_MESSAGES: tuple[tuple[tuple[str, str], dict[str, tuple[str, str]]], ...] = (
+    (("document", "documents"), {"pt_BR": ("documento", "documentos")}),
+    (
+        MSG_PICTURES_NOT_DESCRIBED,
+        {"pt_BR": ("{count} imagem não pôde ser descrita.", "{count} imagens não puderam ser descritas.")},
+    ),
+    (
+        MSG_TABLES_NOT_READ,
+        {"pt_BR": ("{count} tabela não pôde ser lida.", "{count} tabelas não puderam ser lidas.")},
+    ),
 )
 
 
@@ -1905,14 +1916,14 @@ def build_locales(locales_dir: Path = DEFAULT_LOCALES_DIR) -> dict[str, tuple[Pa
         if locale == DEFAULT_LOCALE:
             for msgid in MESSAGES:
                 catalog.add(msgid, msgid)
-            (singular_en, plural_en) = PLURAL_MESSAGES[0]
-            catalog.add((singular_en, plural_en), [singular_en, plural_en])
+            for pair, _localized in PLURAL_MESSAGES:
+                catalog.add(pair, list(pair))
         else:
             table = TRANSLATIONS[locale]
             for msgid in MESSAGES:
                 catalog.add(msgid, table[msgid])
-            (localized_sing, localized_plur) = PLURAL_MESSAGES[1][locale]
-            catalog.add(PLURAL_MESSAGES[0], [localized_sing, localized_plur])
+            for pair, localized in PLURAL_MESSAGES:
+                catalog.add(pair, list(localized[locale]))
         result[locale] = _write_catalog(locale, catalog, locales_dir)
     return result
 

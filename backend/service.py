@@ -4,9 +4,13 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Coroutine
 
-from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
+from backend.agents.pddl_orchestrator import (
+    PddlAccessibilityOrchestrator,
+    records_visual_failures,
+)
 from backend.agents.state_manager import TaskCancelledError, state_manager
 from backend.services.cache import (
+    drop_cache,
     get_cached,
     options_cache_key,
     processing_cache_configuration,
@@ -179,7 +183,7 @@ async def process(
                 execution_status in {"failed", "replan-required"}
                 or (not settings.pddl_execute_dry_run and execution_status == "dry-run-completed")
                 or media_inspection_failed
-                or metadata.get("pddl_model_failures")
+                or records_visual_failures(metadata.get("pddl_visual_failures"))
             ):
                 cached = None
         if cached is not None:
@@ -280,6 +284,9 @@ async def process(
         if not isinstance(processed_result, dict) or processed_result.get("cacheable", True):
             await set_cache(file_path, processed_result, cache_variant)
         else:
+            # An entry refused above would otherwise be read and refused again
+            # on every request while the reruns stay degraded.
+            await drop_cache(file_path, cache_variant)
             logger.debug("Resultado degradado nao cacheado para {}", file_path.name)
         _salvar_json_canonico(canonical_document, file_path.name)
 
