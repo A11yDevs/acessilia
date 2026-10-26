@@ -87,22 +87,53 @@ _registry_digest() {
     || true
 }
 
+#: Attempts per pull. GHCR can answer the manifest request and still fail the
+#: tag pull with a transient 5xx, a rate limit or a token refresh; retrying
+#: keeps one bad response from leaving staging behind for a whole interval.
+PULL_ATTEMPTS="${PULL_ATTEMPTS:-3}"
+PULL_RETRY_DELAY="${PULL_RETRY_DELAY:-5}"
+
+_pull_image() {
+  # $1 = image reference. The Docker error goes to the journal, where the
+  # systemd failure is read; suppressing it left only "Falha ao puxar" and no
+  # cause. A successful pull keeps its progress on stdout, as before.
+  local ref="$1" attempt output
+  for ((attempt = 1; attempt <= PULL_ATTEMPTS; attempt++)); do
+    if output=$(docker pull "$ref" 2>&1); then
+      printf '%s\n' "$output"
+      return 0
+    fi
+    echo "[staging-update] ⚠️  Falha ao puxar $ref (tentativa $attempt/$PULL_ATTEMPTS)." >&2
+    printf '%s\n' "$output" >&2
+    if [ "$attempt" -lt "$PULL_ATTEMPTS" ]; then
+      sleep "$PULL_RETRY_DELAY"
+    fi
+  done
+  return 1
+}
+
 # Digests for the status file. /api/v1/health compares the published digest
 # against the running one to decide `update_available`/`up_to_date`, so both
 # have to be written on every check, not only when an update happens.
 _collect_digests() {
   # $1 = tag published for the tracked branch, $2 = sha-tagged reference
   local track_ref="$1" sha_ref="$2"
-  LATEST_DIGEST=$(_registry_digest "$sha_ref")
+  # Prefer the local images: `docker image inspect` reports the manifest-list
+  # digest compose runs, while `docker manifest inspect --verbose` reports the
+  # platform manifest digest. Mixing the two made /health believe the published
+  # and running images differed and report `update_available` forever.
+  LATEST_DIGEST=$(_image_digest "$sha_ref")
   if [ -z "$LATEST_DIGEST" ]; then
-    LATEST_DIGEST=$(_image_digest "$sha_ref")
+    LATEST_DIGEST=$(_image_digest "$track_ref")
   fi
   RUNNING_DIGEST=$(_image_digest "$track_ref")
-  if [ -n "$LATEST_DIGEST" ] && [ -z "$RUNNING_DIGEST" ]; then
-    # A local copy of the tracked tag is authoritative when GHCR cannot be
-    # reached; without it the health check would compare a digest against
-    # nothing and never report "up to date".
+  if [ -z "$RUNNING_DIGEST" ]; then
     RUNNING_DIGEST=$(_image_digest "$sha_ref")
+  fi
+  if [ -z "$LATEST_DIGEST" ]; then
+    # No local copy: the registry digest is the only evidence left, and the
+    # health check will stay "unknown" until a pull records the local one.
+    LATEST_DIGEST=$(_registry_digest "$sha_ref")
   fi
 }
 
@@ -164,7 +195,7 @@ LATEST_DIGEST=""
 # Se não conseguiu obter o SHA, faz pull direto (fallback seguro)
 if [ -z "$LATEST_SHA" ] || [ "$LATEST_SHA" = "null" ]; then
   echo "[staging-update] ⚠️  Falha ao consultar GitHub API. Fazendo pull direto..."
-  docker pull "$IMAGE_TAG" 2>/dev/null || {
+  _pull_image "$IMAGE_TAG" || {
     echo "[staging-update] ❌ Falha ao puxar $IMAGE_TAG"
     exit 1
   }
@@ -212,23 +243,24 @@ fi
 # ──────────────────────────────────────────────
 echo "[staging-update] 🔄 Novo commit detectado: $SHA7. Atualizando..."
 
-docker pull "$IMAGE_TAG" 2>/dev/null || {
+# One pull is enough: the sha tag above only proves the build for this commit
+# finished, and the delivery workflow publishes it together with the branch tag
+# that compose uses. Pulling both sent the same manifest to the registry twice;
+# when the second pull failed, the script aborted even though the image it
+# needed was already local.
+_pull_image "$IMAGE_TAG" || {
   echo "[staging-update] ❌ Falha ao puxar $IMAGE_TAG"
   exit 1
 }
 
-# Puxa a tag sha- para extrair o digest (mesmo metodo do RUNNING_DIGEST)
-docker pull "$SHA_TAG" 2>/dev/null || {
-  echo "[staging-update] ❌ Falha ao puxar $SHA_TAG"
-  exit 1
-}
-
-# Extrai ambos os digests por docker image inspect (config digest)
-LATEST_DIGEST=$(docker image inspect "$SHA_TAG" --format '{{.RepoDigests}}' \
-  | grep -oE 'sha256:[a-f0-9]{64}' | head -1 || echo "")
-
-RUNNING_DIGEST=$(docker image inspect "$IMAGE_TAG" --format '{{.RepoDigests}}' \
-  | grep -oE 'sha256:[a-f0-9]{64}' | head -1 || echo "")
+# The pulled branch image is the one compose starts, so its digest is both the
+# published and the running digest. The registry lookup is a fallback for a
+# Docker that does not record RepoDigests.
+LATEST_DIGEST=$(_image_digest "$IMAGE_TAG")
+if [ -z "$LATEST_DIGEST" ]; then
+  LATEST_DIGEST=$(_registry_digest "$SHA_TAG")
+fi
+RUNNING_DIGEST="$LATEST_DIGEST"
 
 echo "[staging-update] 🚀 Reiniciando container..."
 docker compose -f "$COMPOSE_FILE" up -d --no-deps acessilia
