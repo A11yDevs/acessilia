@@ -298,7 +298,8 @@ def _fold_figure_labels(
     order, in the picture's ``figure_labels`` and its id in
     ``figure_label_ids``. A label on nested pictures goes to the smallest, the
     one it most likely names. Should the picture be left undescribed, those
-    labels are its alt text (``_element_to_block``), so they are not lost.
+    labels go back to the slide as paragraphs after it
+    (``pddl_orchestrator._text_kept_by_picture``), so they are not lost.
 
     Handing the labels to the model was tried on 006.pdf and made it worse: a
     structural formula's atom letters ("H", "O", "SOH") pushed it to transcribe

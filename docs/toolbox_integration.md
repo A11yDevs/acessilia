@@ -330,7 +330,8 @@ The `media.inspect` capability (provider `pure-media-inspect`, PR
     them into the first one (`metadata.merged_picture_ids`); a sentence stays.
     A caption is taken in only then, or when it lies on or beside such a
     merged picture and across its width. If the picture is left undescribed,
-    its labels are its alt text (`SLIDE_FOLD_FIGURE_LABELS`). Whatever that
+    its labels go back to the slide as paragraphs after it, and so does the
+    text a whole-slide picture replaced (`SLIDE_FOLD_FIGURE_LABELS`). Whatever that
     setting, the slide heading is left out of reading-order refinement, so a
     picture never moves before it.
     A Toolbox without the field, or a failed inspection, means a document.

@@ -330,7 +330,8 @@ A capacidade `media.inspect` (provider `pure-media-inspect`, PR
     (`metadata.merged_picture_ids`); uma frase fica. Uma legenda só é
     incorporada nesse caso, ou quando está sobre ou ao lado de uma imagem
     fundida e atravessa a largura dela. Se a imagem ficar sem descrição, seus
-    rótulos viram o texto alternativo (`SLIDE_FOLD_FIGURE_LABELS`).
+    rótulos voltam ao slide como parágrafos depois dela, assim como o texto
+    que uma imagem do slide inteiro substituiu (`SLIDE_FOLD_FIGURE_LABELS`).
     Independentemente dessa configuração, o cabeçalho do slide fica fora do
     refinamento da ordem de leitura, para que nenhuma imagem passe à frente
     dele.

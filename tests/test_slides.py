@@ -551,9 +551,16 @@ def test_a_picture_without_a_box_hosts_no_label(source):
     assert any(e.id == "l-1" for e in manifest.elements)
 
 
-def test_an_undescribed_picture_gives_its_labels_as_alt_text(source):
-    """The labels left the running text; a failed description must not drop them."""
-    from backend.agents.pddl_orchestrator import _element_to_block
+def test_an_undescribed_picture_gives_its_labels_back_as_paragraphs(source):
+    """The labels left the running text; a failed description must not drop them.
+
+    006.pdf v5 listed them as the picture's alt text ("Aquecedor para vaporizar
+    a; amostra; ..."); they go back to the slide after the picture instead.
+    """
+    from backend.agents.pddl_orchestrator import (
+        MSG_UNDESCRIBED_PICTURE_ALT,
+        _manifest_pages_to_payload,
+    )
 
     manifest = _build_edited(
         source,
@@ -562,11 +569,32 @@ def test_an_undescribed_picture_gives_its_labels_as_alt_text(source):
             _element("l-2", "paragraph", 2, 8, (780, 320, 830, 340), "10nm"),
         ),
     )
-    [picture] = [e for e in manifest.elements if e.id == "e-6"]
 
-    assert _element_to_block(picture)["alt_text"] == "1nm; 10nm"
+    [page] = [p for p in _manifest_pages_to_payload(manifest) if p["page_number"] == 2]
+    blocks = [(b["type"], b.get("alt_text") or b.get("text")) for b in page["blocks"]]
+    image = blocks.index(("image", t(MSG_UNDESCRIBED_PICTURE_ALT)))
+    assert blocks[image + 1 : image + 3] == [("paragraph", "1nm"), ("paragraph", "10nm")]
+
+    [picture] = [e for e in manifest.elements if e.id == "e-6"]
     picture.text = "A scale from 1nm to 10nm."
-    assert _element_to_block(picture)["alt_text"] == "A scale from 1nm to 10nm."
+    [page] = [p for p in _manifest_pages_to_payload(manifest) if p["page_number"] == 2]
+    texts = [b.get("alt_text") or b.get("text") for b in page["blocks"]]
+    assert "A scale from 1nm to 10nm." in texts and "1nm" not in texts
+
+
+def test_an_undescribed_slide_picture_gives_back_the_text_it_replaced(source):
+    """006.pdf v5 slide 41: a slide read as one picture lost all its text."""
+    from backend.agents.pddl_orchestrator import _manifest_pages_to_payload
+
+    manifest = _build(source)
+    [picture] = [e for e in manifest.elements if e.metadata.get("slide_visual")]
+
+    [page] = [
+        p for p in _manifest_pages_to_payload(manifest)
+        if p["page_number"] == picture.page_number
+    ]
+    texts = [b.get("text") for b in page["blocks"] if b["type"] == "paragraph"]
+    assert "Source: IBGE" in texts
 
 
 def _source_box(element):
