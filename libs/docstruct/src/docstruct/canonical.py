@@ -494,6 +494,7 @@ def _normalize_heading_levels(blocks: list[dict[str, Any]]) -> None:
 def _build_sections(blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
     root: list[dict[str, Any]] = []
     stack: list[dict[str, Any]] = []
+    preamble: dict[str, Any] | None = None
     generated_count = 0
 
     def new_section(heading: dict[str, Any]) -> dict[str, Any]:
@@ -524,18 +525,21 @@ def _build_sections(blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
         if stack:
             stack[-1]["blocks"].append(block)
+        elif preamble is not None:
+            preamble["blocks"].append(block)
         else:
+            # Blocks before the first heading share one untitled section; one
+            # section per block became one empty, numbered heading per block.
             generated_count += 1
-            root.append(
-                {
-                    "id": block.get("id", f"sectionless-{generated_count}"),
-                    "title": "",
-                    "level": 1,
-                    "source_location": deepcopy(block.get("source_location", {})),
-                    "metadata": {},
-                    "blocks": [block],
-                    "children": [],
-                }
-            )
+            preamble = {
+                "id": block.get("id", f"sectionless-{generated_count}"),
+                "title": "",
+                "level": 1,
+                "source_location": deepcopy(block.get("source_location", {})),
+                "metadata": {},
+                "blocks": [block],
+                "children": [],
+            }
+            root.append(preamble)
 
     return root
