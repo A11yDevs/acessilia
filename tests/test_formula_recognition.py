@@ -21,6 +21,11 @@ from backend.agents import pddl_orchestrator as pddl
 from backend.agents.output_schemas import VisionOutput
 from backend.core.manifest.models import BoundingBox, ManifestElement, Provenance
 from backend.i18n import t
+from backend.log_messages import (
+    LOG_PDDL_FORMULA_RECOGNIZE_EMPTY,
+    LOG_PDDL_FORMULA_RECOGNIZE_UNAVAILABLE,
+    LOG_PDDL_FORMULAS_FELL_BACK_TO_VISION,
+)
 from backend.stage_messages import (
     STAGE_ENRICHING_FORMULAS,
     STAGE_PAGE,
@@ -181,19 +186,18 @@ async def test_a_recognizer_answering_without_latex_is_logged(monkeypatch, cropp
         element.metadata["formula_recognition"]["method"] for element in manifest.elements
     ] == ["vision", "vision"]
     per_formula = [
-        message for level, message in records
-        if level == "DEBUG" and "math.recognize (docling-math) returned no LaTeX" in message
+        t(LOG_PDDL_FORMULA_RECOGNIZE_EMPTY).format(
+            element_id=element.id, page=1, provider="docling-math"
+        )
+        for element in manifest.elements
     ]
-    assert len(per_formula) == 2
-    assert any("formula-0" in message for message in per_formula)
-    summary = [
-        message for level, message in records
-        if level == "INFO" and "fell back to the vision model" in message
-    ]
-    assert summary == [
-        "2 of 2 formula(s) fell back to the vision model after "
-        "math.recognize (docling-math) returned no LaTeX"
-    ]
+    assert sorted(message for level, message in records if level == "DEBUG") == sorted(
+        per_formula
+    )
+    summary = t(LOG_PDDL_FORMULAS_FELL_BACK_TO_VISION).format(
+        count=2, total=2, provider="docling-math"
+    )
+    assert [message for level, message in records if level == "INFO"].count(summary) == 1
 
 
 @pytest.mark.asyncio
@@ -214,10 +218,10 @@ async def test_an_empty_provider_setting_logs_the_registry_default(monkeypatch, 
 
     default = provider_default("toolbox_math_recognize_provider")
     assert default
-    assert any(
-        f"math.recognize ({default}) returned no LaTeX" in message
-        for _, message in records
-    )
+    assert (
+        "INFO",
+        t(LOG_PDDL_FORMULAS_FELL_BACK_TO_VISION).format(count=1, total=1, provider=default),
+    ) in records
 
 
 @pytest.mark.asyncio
@@ -239,11 +243,11 @@ async def test_an_outage_logs_no_empty_answer_line(monkeypatch, cropped):
         logger.remove(sink)
 
     messages = [message for _, message in records]
-    assert any(
-        "math.recognize unavailable during formula enrichment" in message
-        for message in messages
-    )
-    assert not any("returned no LaTeX" in message for message in messages)
+    unavailable = t(LOG_PDDL_FORMULA_RECOGNIZE_UNAVAILABLE).split("({error})")[0]
+    assert sum(message.startswith(unavailable) for message in messages) == 1
+    empty = t(LOG_PDDL_FORMULA_RECOGNIZE_EMPTY).split("({provider})")[1]
+    fell_back = t(LOG_PDDL_FORMULAS_FELL_BACK_TO_VISION).split("({provider})")[1]
+    assert not any(message.endswith((empty, fell_back)) for message in messages)
 
 
 @pytest.mark.asyncio

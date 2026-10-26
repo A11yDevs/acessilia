@@ -71,6 +71,11 @@ from backend.log_messages import (
     LOG_MEDIA_INSPECT_FAILED,
     LOG_PDDL_ELEMENT_CROP_FAILED,
     LOG_PDDL_EMPTY_VISION_DESCRIPTION,
+    LOG_PDDL_FORMULA_RECOGNIZE_EMPTY,
+    LOG_PDDL_FORMULA_RECOGNIZE_UNAVAILABLE,
+    LOG_PDDL_FORMULA_TEXT_LAYER_DISAGREES,
+    LOG_PDDL_FORMULAS_FELL_BACK_TO_VISION,
+    LOG_PDDL_FORMULAS_RECOGNIZED,
     LOG_PDDL_IMAGES_ENRICHED,
     LOG_PDDL_PREFERRED_PLAN_MISSING,
     LOG_PDDL_TABLES_ENRICHED,
@@ -3275,11 +3280,7 @@ async def _enrich_formula_latex(
             math_available = False
             # The full message names the provider and its HTTP status; the
             # class alone ("ToolboxError") hides a failing sidecar.
-            logger.warning(
-                "math.recognize unavailable during formula enrichment ({}); "
-                "falling back to the vision model",
-                exc,
-            )
+            logger.warning(t(LOG_PDDL_FORMULA_RECOGNIZE_UNAVAILABLE).format(error=exc))
             return []
 
     async def recognize(image_bytes: bytes) -> list[dict[str, Any]]:
@@ -3365,9 +3366,9 @@ async def _enrich_formula_latex(
                 # and the counter cannot race with sibling crops.
                 empty_answers += 1
                 logger.debug(
-                    "Formula {} (page {}): math.recognize ({}) returned no LaTeX; "
-                    "falling back to the vision model",
-                    element.id, page_number, recognize_provider,
+                    t(LOG_PDDL_FORMULA_RECOGNIZE_EMPTY).format(
+                        element_id=element.id, page=page_number, provider=recognize_provider,
+                    )
                 )
             for rank, candidate in enumerate(candidates, start=1):
                 latex = accept(method if rank == 1 else f"{method}#{rank}", candidate["latex"])
@@ -3392,8 +3393,9 @@ async def _enrich_formula_latex(
 
         if rejected:
             logger.info(
-                "Formula {} (page {}): recognition disagrees with the text layer {}",
-                element.id, page_number, rejected,
+                t(LOG_PDDL_FORMULA_TEXT_LAYER_DISAGREES).format(
+                    element_id=element.id, page=page_number, rejected=rejected,
+                )
             )
         if not latex:
             if rejected:
@@ -3427,12 +3429,12 @@ async def _enrich_formula_latex(
     recognized = sum(task.result() for task in tasks)
 
     if recognized:
-        logger.info("LaTeX recognized for {} formula(s)", recognized)
+        logger.info(t(LOG_PDDL_FORMULAS_RECOGNIZED).format(count=recognized))
     if empty_answers:
         logger.info(
-            "{} of {} formula(s) fell back to the vision model after "
-            "math.recognize ({}) returned no LaTeX",
-            empty_answers, len(formulas), recognize_provider,
+            t(LOG_PDDL_FORMULAS_FELL_BACK_TO_VISION).format(
+                count=empty_answers, total=len(formulas), provider=recognize_provider,
+            )
         )
 
 
