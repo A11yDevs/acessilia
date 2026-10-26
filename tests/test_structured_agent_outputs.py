@@ -1096,3 +1096,48 @@ async def test_failed_run_is_logged_with_its_real_cause(monkeypatch, agent_modul
     logged = "\n".join(messages)
     assert "model run failed: Invalid API Key" in logged
     assert "json_invalid" not in logged
+
+
+def _assembled_prompt(monkeypatch, classification: str) -> str:
+    """The prompt describe_region sends for ``classification``, prompt files included."""
+    import asyncio
+
+    from backend.agents import vision_agent as vision_module
+    from backend.config.settings import settings
+
+    sent = []
+
+    async def capture(prompt, *_args, **_kwargs):
+        sent.append(prompt)
+        return vision_module.VisionOutput.model_validate(VALID_FORMULA)
+
+    monkeypatch.setattr(vision_module, "_run_with_retry", capture)
+    monkeypatch.setattr(settings, "vision_region_cache_enabled", False)
+    asyncio.run(
+        vision_module.VisionAgent().describe_region(b"image", classification, page_num=1)
+    )
+    return sent[0]
+
+
+@pytest.mark.parametrize(
+    "classification", ["embedded_image", "full_page_image", "full_page_fallback"]
+)
+def test_a_picture_or_page_prompt_carries_the_chemistry_rules(monkeypatch, classification):
+    """006.pdf slides 25-26: drawn molecules came back as LaTeX formulas."""
+    from backend.agents.output_schemas import VISION_SCHEMA_INSTRUCTION
+    from backend.tools.prompt_tools import load_chemistry_prompt
+
+    chemistry = load_chemistry_prompt()
+    prompt = _assembled_prompt(monkeypatch, classification)
+
+    assert 'kind="description"' in chemistry
+    assert chemistry in prompt
+    assert VISION_SCHEMA_INSTRUCTION in prompt
+
+
+def test_a_formula_prompt_stays_without_the_chemistry_rules(monkeypatch):
+    # Its answer is only kept as a formula, and the data agent shares it with a
+    # schema that has no description.
+    from backend.tools.prompt_tools import load_chemistry_prompt
+
+    assert load_chemistry_prompt() not in _assembled_prompt(monkeypatch, "formula")

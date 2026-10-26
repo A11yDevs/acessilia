@@ -25,7 +25,12 @@ from backend.log_messages import (
 from backend.tools.region_classifier import region_prompt_key
 from backend.tools.logger import logger
 
-from backend.tools.prompt_tools import build_page_prompt, load_region_prompt, load_system_prompt
+from backend.tools.prompt_tools import (
+    build_page_prompt,
+    load_chemistry_prompt,
+    load_region_prompt,
+    load_system_prompt,
+)
 from backend.ai.models.ai_client import get_agno_model
 from backend.services.cache import get_cached_bytes, options_cache_key, set_cache_bytes
 from backend.agents.output_schemas import (
@@ -63,6 +68,15 @@ from agno.media import Image
 #: RETRY_INSTRUCTION; that changes the prompt and therefore the sampled tokens,
 #: but a loop that does not depend on the prompt will still fail twice.
 REGION_ATTEMPTS = 2
+
+#: Regions whose answer may be a description get the chemistry rules: a drawn
+#: molecule is described, not transcribed as a formula (006.pdf slides 25-26).
+#: A formula region is left out: its answer is only kept when it is a formula,
+#: and the data agent reads the same prompt with a schema that has no
+#: description.
+_CHEMISTRY_CLASSIFICATIONS = frozenset(
+    {"embedded_image", "full_page_image", "full_page_fallback"}
+)
 
 #: Appended to the prompt of a retry. Each try is a fresh Agent with no
 #: history, so it is phrased as a plain instruction, not as feedback on an
@@ -145,6 +159,8 @@ class VisionAgent:
             region_prompt = load_region_prompt(prompt_key)
             prompt = region_prompt if region_prompt else self.system_prompt
 
+        if not custom_prompt and classification in _CHEMISTRY_CLASSIFICATIONS:
+            prompt = f"{prompt}\n{load_chemistry_prompt()}"
         prompt = f"{prompt}\n\n{VISION_SCHEMA_INSTRUCTION}"
         # A whole page, or a region inspected for review-structure (scanned text,
         # a table), may need the general budget to be transcribed; a picture

@@ -26,11 +26,6 @@ Para fórmulas matemáticas:
 - Exemplo de formula_latex: x=\frac{-b\pm\sqrt{b^2-4ac}}{2a}
 - Preserve expoentes, índices, frações, integrais, somatórios, matrizes e letras gregas.
 - Nesse caso, não descreva a fórmula em palavras e não acrescente nenhum outro texto.
-Para estruturas químicas:
-- Um desenho de molécula (fórmula estrutural com átomos ligados por traços, anéis, cunhas, modelo de esferas e bastões ou de preenchimento espacial, cadeia de polímero entre colchetes) não é uma fórmula matemática: use kind="description" e não preencha formula_latex.
-- Descreva os átomos e grupos visíveis, as ligações entre eles (simples, duplas, triplas, cunhas) e os anéis, na ordem de leitura do desenho.
-- Transcreva os rótulos de átomos, cargas e índices como aparecem (por exemplo, O⁻Na⁺, SO₃, n subscrito fora dos colchetes).
-- Informe a fórmula molecular somente se ela estiver escrita na imagem.
 Para gráficos, diagramas e tabelas:
 - Identifique o tipo do elemento.
 - Transcreva títulos, legendas, rótulos, eixos e unidades quando legíveis.
