@@ -68,6 +68,16 @@ msgstr ""
 "O e-mail com o resultado foi enviado. Você também pode baixar seus "
 "arquivos aqui."
 
+msgid ""
+"We could not send the email about this failure; the notices below show "
+"what happened."
+msgstr ""
+"Não foi possível enviar o e-mail sobre esta falha; os avisos abaixo "
+"mostram o que aconteceu."
+
+msgid "We sent you an email about this failure."
+msgstr "Enviamos um e-mail sobre esta falha."
+
 msgid "Job status is temporarily unavailable. Refresh this page to try again."
 msgstr ""
 "O status está temporariamente indisponível. Atualize esta página para "
@@ -1366,6 +1376,14 @@ msgstr "E-mail enviado com sucesso para {to_email}."
 #, python-brace-format
 msgid "Error sending e-mail to {to_email}: {error}"
 msgstr "Erro ao enviar e-mail para {to_email}: {error}"
+
+#, python-brace-format
+msgid "Failure e-mail for job {task_id} could not be sent: {error}"
+msgstr "Não foi possível enviar o e-mail de falha do job {task_id}: {error}"
+
+#, python-brace-format
+msgid "Failure e-mail for job {task_id} was not sent"
+msgstr "O e-mail de falha do job {task_id} não foi enviado"
 
 #, python-brace-format
 msgid "Exporting TXT to {path}"

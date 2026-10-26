@@ -51,7 +51,9 @@ from agno.media import Image
 #: rate-limit rejection gets its own backed-off budget instead, since it says
 #: the provider is busy, not that the image is hard. Timeouts and other
 #: provider failures fail at once, since repeating them without backoff
-#: doubles the load.
+#: doubles the load. The provider SDK's own retries are turned off for that
+#: reason: its default of 2 would silently rerun a 600s timeout twice with the
+#: whole image again.
 #:
 #: This retry is deliberately kept instead of tuning temperature or repetition
 #: penalties: changing those affects every answer and needs measuring first,
@@ -69,6 +71,21 @@ RETRY_INSTRUCTION = (
     "Responda com um objeto JSON completo e válido, fechando todas as strings e "
     "chaves. Não repita tokens nem preencha campos com repetições ou espaços."
 )
+
+#: Seconds added to the client's HTTP timeout for the hard deadline around one
+#: model call. That timeout bounds the HTTP exchange, but httpx applies it per
+#: read: a provider (or a proxy in front of it) that trickles bytes keeps
+#: resetting it, and the call outlives the configured bound. This deadline is
+#: what the job actually waits for, so a hung call degrades the region instead
+#: of stalling the pipeline. It sits above the HTTP timeout so an ordinary one
+#: still arrives as the provider's own error.
+#:
+#: An abandoned call is not killed (Python cannot kill a thread): until the
+#: provider resolves it keeps its worker thread, its open connection and its
+#: per-call client, on the default executor shared with ``run_blocking`` and
+#: the DataAgent. Isolating model calls on their own executor is tracked in
+#: issue #276.
+CALL_DEADLINE_GRACE_SECONDS = 30
 
 
 class VisionAgent:
@@ -234,6 +251,9 @@ async def _run_with_retry(
     consume one of them — it says the provider is busy, nothing about the
     answer — and gets its own smaller budget of backed-off retries instead.
     Any other error (timeout, provider failure, incomplete run) fails at once.
+    Each call also has a hard wall-clock deadline, because the client's HTTP
+    timeout is applied per read and a provider that trickles bytes can outlive
+    it.
     """
     attempt = 0
     rate_limit_retries = 0
@@ -249,15 +269,25 @@ async def _run_with_retry(
         )
         agent = Agent(
             name="VisionAgent",
-            model=get_agno_model(max_tokens=max_tokens),
+            model=get_agno_model(max_tokens=max_tokens, max_retries=0),
             output_schema=schema,
             telemetry=False,
         )
         run = functools.partial(
             agent.run, input=attempt_prompt, images=[Image(content=image_bytes)]
         )
+        deadline = settings.model_call_timeout_seconds + CALL_DEADLINE_GRACE_SECONDS
+        call = asyncio.ensure_future(asyncio.to_thread(run))
         try:
-            response = await asyncio.to_thread(run)
+            response = await asyncio.wait_for(call, timeout=deadline)
+        except TimeoutError as error:
+            # ``wait_for`` cancels the awaited task on expiry; a provider's own
+            # TimeoutError leaves it finished, so only that case is ours.
+            if not call.cancelled():
+                raise
+            raise TimeoutError(
+                f"no answer within the {deadline}s call deadline"
+            ) from error
         except Exception as error:
             if _is_rate_limited(error) and rate_limit_retries < _RATE_LIMIT_RETRIES:
                 rate_limit_retries += 1

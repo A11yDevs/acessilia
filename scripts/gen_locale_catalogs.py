@@ -119,6 +119,8 @@ from backend.log_messages import (
     LOG_EXPORT_MP3_START,
     LOG_EXPORT_PDF_UA_START,
     LOG_EXPORT_TXT_START,
+    LOG_FAILURE_EMAIL_FAILED,
+    LOG_FAILURE_EMAIL_NOT_SENT,
     LOG_FATAL_ERROR_IN_BOT,
     LOG_JOB_CANCELLED,
     LOG_JOB_COMPLETED,
@@ -331,6 +333,8 @@ from frontend.web.messages import (
     WEB_JOB_DOWNLOAD,
     WEB_JOB_EMAIL_FAILED,
     WEB_JOB_EMAIL_SENT,
+    WEB_JOB_FAILURE_EMAIL_FAILED,
+    WEB_JOB_FAILURE_EMAIL_SENT,
     WEB_JOB_UNAVAILABLE,
     WEB_JOB_STATUS,
     WEB_JOB_ERRORS,
@@ -482,6 +486,8 @@ MESSAGES: tuple[str, ...] = (
     WEB_JOB_DOWNLOAD,
     WEB_JOB_EMAIL_FAILED,
     WEB_JOB_EMAIL_SENT,
+    WEB_JOB_FAILURE_EMAIL_FAILED,
+    WEB_JOB_FAILURE_EMAIL_SENT,
     WEB_JOB_UNAVAILABLE,
     WEB_JOB_STATUS,
     WEB_JOB_ERRORS,
@@ -806,6 +812,8 @@ MESSAGES: tuple[str, ...] = (
     LOG_SMTP_NOT_CONFIGURED,
     LOG_EMAIL_SENT,
     LOG_EMAIL_SEND_ERROR,
+    LOG_FAILURE_EMAIL_FAILED,
+    LOG_FAILURE_EMAIL_NOT_SENT,
     LOG_EXPORT_TXT_START,
     LOG_EXPORT_DOCX_START,
     LOG_EXPORT_PDF_UA_START,
@@ -936,6 +944,10 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         WEB_JOB_ERRORS: 'Avisos do processamento',
         WEB_JOB_HOME: 'Enviar outro documento',
         WEB_JOB_EMAIL_UNKNOWN: 'Não foi possível confirmar a entrega do e-mail. Você pode baixar seus arquivos aqui.',
+        WEB_JOB_FAILURE_EMAIL_SENT: 'Enviamos um e-mail sobre esta falha.',
+        WEB_JOB_FAILURE_EMAIL_FAILED: (
+            'Não foi possível enviar o e-mail sobre esta falha; os avisos abaixo mostram o que aconteceu.'
+        ),
         STAGE_CANCELLATION_REQUESTED: 'Cancelamento solicitado; concluindo a operação atual com segurança',
         STAGE_RESTART_CANCELLED: 'Cancelado durante a reinicialização',
         STAGE_RESTART_INTERRUPTED: 'Processamento interrompido pela reinicialização',
@@ -1568,6 +1580,12 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         ),
         LOG_EMAIL_SENT: "E-mail enviado com sucesso para {to_email}.",
         LOG_EMAIL_SEND_ERROR: "Erro ao enviar e-mail para {to_email}: {error}",
+        LOG_FAILURE_EMAIL_FAILED: (
+            "Não foi possível enviar o e-mail de falha do job {task_id}: {error}"
+        ),
+        LOG_FAILURE_EMAIL_NOT_SENT: (
+            "O e-mail de falha do job {task_id} não foi enviado"
+        ),
         LOG_EXPORT_TXT_START: "Exportando TXT para {path}",
         LOG_EXPORT_DOCX_START: "Exportando DOCX para {path}",
         LOG_EXPORT_PDF_UA_START: "Exportando PDF/UA para {path}",

@@ -626,6 +626,58 @@ async def test_a_rate_limited_region_waits_and_is_retried(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
+async def test_a_hung_model_call_is_abandoned_at_the_deadline(monkeypatch) -> None:
+    """The HTTP timeout is per read; a call that never answers must still end."""
+    import time
+
+    from backend.agents import vision_agent as vision_module
+    from backend.config.settings import settings
+
+    class HangingAgent:
+        def __init__(self, **_kwargs):
+            pass
+
+        def run(self, **_kwargs):
+            time.sleep(1)
+            raise AssertionError("the caller should already have given up")
+
+    monkeypatch.setattr(vision_module, "Agent", HangingAgent)
+    monkeypatch.setattr(vision_module, "get_agno_model", lambda **_kwargs: object())
+    monkeypatch.setattr(settings, "model_call_timeout_seconds", 0)
+    monkeypatch.setattr(vision_module, "CALL_DEADLINE_GRACE_SECONDS", 0.05)
+    monkeypatch.setattr(settings, "vision_region_cache_enabled", False)
+
+    started = time.monotonic()
+    result = await vision_module.VisionAgent().describe_region(
+        b"image", "full_page_image", page_num=14
+    )
+
+    assert result is None
+    assert time.monotonic() - started < 2
+
+
+@pytest.mark.asyncio
+async def test_a_provider_timeout_is_not_rewritten_as_the_deadline(monkeypatch) -> None:
+    """A call that raises TimeoutError itself finishes; only an expiry is ours."""
+    from backend.agents import vision_agent as vision_module
+    from backend.config.settings import settings
+
+    class ProviderTimeoutAgent:
+        def __init__(self, **_kwargs):
+            pass
+
+        def run(self, **_kwargs):
+            raise TimeoutError("provider gave up")
+
+    monkeypatch.setattr(vision_module, "Agent", ProviderTimeoutAgent)
+    monkeypatch.setattr(vision_module, "get_agno_model", lambda **_kwargs: object())
+    monkeypatch.setattr(settings, "vision_region_cache_enabled", False)
+
+    with pytest.raises(TimeoutError, match="provider gave up"):
+        await vision_module.VisionAgent().inspect_page(b"image", 1, 1)
+
+
+@pytest.mark.asyncio
 async def test_a_rate_limit_budget_exhausted_degrades_the_region(monkeypatch) -> None:
     from backend.agents.vision_agent import _RATE_LIMIT_RETRIES
 

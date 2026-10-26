@@ -7,9 +7,45 @@ active locale's Babel catalog (backend.i18n.t) so the assertions stay correct un
 import pytest
 
 from backend.i18n import t
-from backend.log_messages import EMAIL_FORMAT_MP3, EMAIL_FORMAT_TXT
+from backend.log_messages import EMAIL_FAILURE_SUBJECT, EMAIL_FORMAT_MP3, EMAIL_FORMAT_TXT
 from backend.config.settings import settings
-from backend.services.email_service import send_result_email
+from backend.services.email_service import send_failure_email, send_result_email
+
+
+@pytest.mark.asyncio
+async def test_failure_email_reports_missing_smtp(monkeypatch):
+    monkeypatch.setattr(settings, "smtp_user", "")
+    monkeypatch.setattr(settings, "smtp_password", "")
+
+    sent = await send_failure_email(
+        "test@example.invalid", "doc.pdf", "the pipeline raised"
+    )
+
+    assert sent is False
+
+
+@pytest.mark.asyncio
+async def test_failure_email_names_the_file_and_the_reason(monkeypatch):
+    from backend.services import email_service
+
+    sent_messages = []
+
+    async def fake_send(to_email, subject, body, attachment_path=None):
+        sent_messages.append((to_email, subject, body))
+        return True
+
+    monkeypatch.setattr(email_service, "send_email_notification", fake_send)
+
+    sent = await send_failure_email(
+        "test@example.invalid", "006.pdf", "vision model crashed (page 4)"
+    )
+
+    assert sent is True
+    [(to_email, subject, body)] = sent_messages
+    assert to_email == "test@example.invalid"
+    assert subject == t(EMAIL_FAILURE_SUBJECT)
+    assert "006.pdf" in body
+    assert "vision model crashed (page 4)" in body
 
 
 @pytest.mark.asyncio

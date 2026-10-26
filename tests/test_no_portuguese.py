@@ -222,6 +222,16 @@ EXEMPT_STRINGS: list[tuple[str, str]] = [
     ("backend/agents/pddl_orchestrator.py", "para revisão"),
     ("backend/agents/pddl_orchestrator.py", "Texto com sinais de Unicode legado"),
     ("backend/core/manifest/builder.py", "Texto extraído de PDF legado contém Unicode"),
+    # Text-layer formula agreement — Portuguese function names (máx, mín) that
+    # pt-BR material prints, matched as a detection pattern
+    ("libs/docstruct/src/docstruct/text/latex.py", "máx"),
+    ("libs/docstruct/tests/test_latex.py", "máx"),
+    # Legacy TeX repair — the Portuguese crase (à) is what the grave-crase
+    # rule produces, so its code, docs and tests carry it
+    ("libs/docstruct/src/docstruct/text/unicode_repair.py", "à"),
+    ("libs/docstruct/tests/test_unicode_repair.py", "à"),
+    ("tests/test_legacy_unicode_repair.py", "à medida"),
+    ("docs/docstruct_algorithms.md", "→ `à`"),
 ]
 
 # Build the exempt set from strings so we can check quickly.

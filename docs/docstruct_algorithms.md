@@ -175,7 +175,8 @@ benchmark work produced, all as pure functions:
 | `fusion.hf_end` | the ground-truth header/footer-at-end convention |
 | `fusion.table_specialist` | the generate-compare-adjudicate table medoid |
 | `text.normalize`, `text.norm_fix`, `text.latex` | text normalization primitives |
-| `text.unicode_repair` | conservative NFC, dotless-i and spacing repair for legacy TeX PDFs (prose, headers and table cells) |
+| `text.unicode_repair` | conservative NFC, dotless-i and spacing repair for legacy TeX PDFs (prose, headers and table cells); with document-level evidence, also the crase (`` ` a`` → `à`) and split ligatures (`fi ca` → `fica`) |
+| `text.negation_overlay` | gives a detached `≠` slash (U+0338 extracted as its own element) back to the relation it negates, from its position; only when the choice is unambiguous |
 | `imaging.policy` | pure upscale/orientation decisions (no PIL/cv2) |
 | `docstruct.fusion.verse` | chunk verse/record blocks so the evaluator can re-group them |
 | `docstruct.fusion.line_numbers` | pull marginal verse line numbers into their own blocks |
@@ -190,7 +191,8 @@ benchmark work produced, all as pure functions:
 | `docstruct.fusion.table_specialist` | the generate-compare-adjudicate table medoid |
 | `docstruct.text.normalize` | the shared comparison normalizer |
 | `docstruct.text.norm_fix` | deterministic text cleanups (ligatures, hyphen, NBSP) |
-| `docstruct.text.unicode_repair` | conservative NFC, dotless-i and spacing repair for legacy TeX PDFs |
+| `docstruct.text.unicode_repair` | conservative NFC, dotless-i, spacing, crase and split-ligature repair for legacy TeX PDFs |
+| `docstruct.text.negation_overlay` | reattaches a detached negation slash to its relation by position (unambiguous cases only) |
 | `docstruct.text.latex` | LaTeX normalization |
 | `docstruct.imaging.policy` | pure upscale/orientation decisions (no PIL/cv2) |
 | `docstruct.evaluation.holdout` | the tune/holdout split and the acceptance criteria |

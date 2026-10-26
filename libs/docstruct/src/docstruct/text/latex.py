@@ -11,6 +11,8 @@ expression untouched); ``normalize_latex`` rewrites symbols and spacing.
 from __future__ import annotations
 
 import re
+import unicodedata
+from collections import Counter
 
 # Enclosing delimiter patterns for stripping
 _DISPLAY_DELIM_RE = re.compile(r"^\s*\$\$(.*)\$\$\s*$", re.DOTALL)
@@ -253,3 +255,123 @@ def wrap_latex(expr: str | None, *, display: bool = True) -> str:
         return trimmed
     inner = strip_latex_delimiters(trimmed)
     return f"${inner}$"
+
+
+# ── Text-layer formulas ─────────────────────────────────────────────
+
+#: Markup that only LaTeX has: a command, or a sub/superscript applied to a
+#: group (``x^{2}``, ``v_{0}``). Text extracted from a PDF's text layer has none
+#: of it, even when the page shows a fraction or an exponent. A bare ``^`` or
+#: ``_`` is not enough: text layers and code-style text carry them too
+#: (``2^8``, ``v_0``, ``CO_2``). Braces alone are not markup either: set
+#: notation puts them in the text layer (``{h ∈ R : h ≥ −2}``).
+_LATEX_MARKUP_RE = re.compile(r"\\[A-Za-z]+|[\^_]\s*\{")
+
+#: Named functions whose glyph is their name. LaTeX spells them ``\sin``; a
+#: recognizer may keep the printed name as ``\operatorname{s e n}``.
+_FUNCTION_NAMES = (
+    "lim", "sin", "cos", "tan", "cot", "sec", "csc", "arcsin", "arccos", "arctan",
+    "sinh", "cosh", "tanh", "log", "ln", "exp", "max", "min", "sup", "inf", "det",
+)
+
+#: LaTeX commands whose rendering is visible text, as the text layer shows it.
+#: This is the single source of the symbols the agreement compares: a symbol
+#: missing here is invisible on both sides, so a recognition that swaps or
+#: drops it would go unnoticed.
+_COMMAND_GLYPHS: dict[str, str] = {
+    **{command: char for char, command in _UNICODE_MATH_MAP.items()},
+    # Relations
+    r"\neq": "≠", r"\leq": "≤", r"\geq": "≥", r"\equiv": "≡", r"\sim": "∼",
+    r"\simeq": "≃", r"\cong": "≅", r"\propto": "∝", r"\parallel": "∥", r"\perp": "⊥",
+    # Sets
+    r"\in": "∈", r"\notin": "∉", r"\ni": "∋", r"\cup": "∪", r"\cap": "∩",
+    r"\subset": "⊂", r"\subseteq": "⊆", r"\supset": "⊃", r"\supseteq": "⊇",
+    r"\setminus": "∖", r"\emptyset": "∅", r"\varnothing": "∅",
+    # Logic
+    r"\wedge": "∧", r"\land": "∧", r"\vee": "∨", r"\lor": "∨", r"\neg": "¬",
+    r"\lnot": "¬", r"\forall": "∀", r"\exists": "∃",
+    # Arrows
+    r"\to": "→", r"\rightarrow": "→", r"\leftarrow": "←", r"\gets": "←",
+    r"\leftrightarrow": "↔", r"\Rightarrow": "⇒", r"\implies": "⇒",
+    r"\Leftarrow": "⇐", r"\Leftrightarrow": "⇔", r"\iff": "⇔", r"\mapsto": "↦",
+    # Operators and others
+    r"\circ": "∘", r"\nabla": "∇", r"\angle": "∠", r"\ldots": "…", r"\cdots": "⋯",
+    r"\varepsilon": "ε", r"\varphi": "φ",
+    **{f"\\{name}": name for name in _FUNCTION_NAMES},
+}
+_COMMAND_RE = re.compile(r"\\[A-Za-z]+")
+_OPERATORNAME_RE = re.compile(r"\\operatorname\*?\s*\{([^{}]*)\}")
+
+#: Symbols that a reader hears, besides letters and digits; spacing,
+#: grouping and punctuation are left out because the two sides lay them out
+#: differently. Derived from the glyph table so the two cannot drift apart.
+_VISIBLE_SYMBOLS = frozenset("=+-<>") | frozenset(
+    glyph for glyph in _COMMAND_GLYPHS.values() if len(glyph) == 1 and not glyph.isalnum()
+)
+
+#: Portuguese names of functions, as pt-BR material prints them, mapped to
+#: the names LaTeX uses; applied to both sides, so ``sen x`` and ``\sin x``
+#: (or ``\operatorname{sen} x``) read the same.
+_FUNCTION_ALIASES = {
+    "sen": "sin", "tg": "tan", "cotg": "cot", "cossec": "csc", "arcsen": "arcsin",
+    "arctg": "arctan", "senh": "sinh", "tgh": "tanh", "máx": "max", "mín": "min",
+}
+_FUNCTION_ALIAS_RE = re.compile(
+    r"(?<![^\W\d_])(" + "|".join(sorted(_FUNCTION_ALIASES, key=len, reverse=True)) + r")(?![^\W\d_])"
+)
+
+
+def has_latex_markup(text: str | None) -> bool:
+    """Whether ``text`` is LaTeX, not just math characters.
+
+    It is when it carries math delimiters (``$x=1$``: whoever wrote them wrote
+    LaTeX), a command (``\\frac``) or a script applied to a group (``x^{2}``).
+    A formula an extractor took from the PDF text layer (``s(t) = s0 + v0t + 1
+    2 at2``) has none of them. Undelimited expressions with only bare scripts
+    (``2^8``, ``v_0``) or no structure at all (``x = 1``) read as text too:
+    recognizing them again costs a call, and the caller's agreement check keeps
+    the extractor's version when the recognition reads something else.
+    """
+    text = " ".join((text or "").split())
+    bare = bare_latex(text)
+    return bool(bare) and (bare != text or bool(_LATEX_MARKUP_RE.search(bare)))
+
+
+def _visible_symbols(text: str, *, latex: bool) -> list[str]:
+    if latex:
+        # \operatorname{s e n} prints its argument as a name; drop the spaces
+        # so the name can be aliased like a command.
+        text = _OPERATORNAME_RE.sub(lambda m: " " + "".join(m.group(1).split()) + " ", text)
+        text = _COMMAND_RE.sub(lambda m: f" {_COMMAND_GLYPHS.get(m.group(0), '')} ", text)
+    # NFKC folds what text layers deliver as compatibility characters: x² and
+    # v₀ read as x2 and v0 (as x^2 and v_0 do once structure is ignored), and
+    # the ﬁ ligature as fi. It also composes a detached long solidus with "="
+    # into "≠".
+    text = unicodedata.normalize("NFKC", text).replace("\u2212", "-")
+    text = _FUNCTION_ALIAS_RE.sub(lambda m: _FUNCTION_ALIASES[m.group(1)], text)
+    return [ch for ch in text if ch.isalnum() or ch in _VISIBLE_SYMBOLS]
+
+
+def latex_text_agreement(latex: str, text: str) -> float | None:
+    """F1 (0-1) between the visible symbols of ``latex`` and of ``text``.
+
+    Compares what a reader of each would see: letters, digits and math
+    symbols, with LaTeX commands rendered as their glyphs (``\\alpha`` → α,
+    ``\\lim`` → lim) and structure (``\\frac``, ``^``, braces) ignored, because
+    the text layer has no structure to compare. A recognition that reads the
+    same formula as the text layer scores near 1 even when it restores
+    fractions and exponents; one that invents or drops terms scores lower.
+    A change of a single symbol barely moves it, so it does not guard against
+    a recognizer "correcting" one digit of the printed formula. ``None`` when
+    neither side has a visible symbol: there is no evidence either way.
+
+    The text layer is the reference, not the truth: a garbled or truncated
+    text layer lowers the score of a correct reading and can make a caller
+    keep the text-layer error. Callers should record what they rejected.
+    """
+    left = Counter(_visible_symbols(bare_latex(latex), latex=True))
+    right = Counter(_visible_symbols(text, latex=False))
+    total = sum(left.values()) + sum(right.values())
+    if not total:
+        return None
+    return 2 * sum((left & right).values()) / total
