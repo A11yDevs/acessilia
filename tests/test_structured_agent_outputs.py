@@ -457,8 +457,10 @@ async def test_vision_agent_gives_up_after_its_attempts(monkeypatch) -> None:
 
 @pytest.mark.asyncio
 async def test_vision_agent_does_not_retry_a_provider_failure(monkeypatch) -> None:
+    # A timeout gets one more try (see the timeout tests below); any other
+    # provider error may be permanent and fails at once.
     vision_module, calls = _scripted_vision_agent(
-        monkeypatch, [TimeoutError("read timed out"), VALID_FORMULA]
+        monkeypatch, [RuntimeError("HTTP 500 from the provider"), VALID_FORMULA]
     )
 
     result = await vision_module.VisionAgent().describe_region(
@@ -675,6 +677,47 @@ async def test_a_provider_timeout_is_not_rewritten_as_the_deadline(monkeypatch) 
 
     with pytest.raises(TimeoutError, match="provider gave up"):
         await vision_module.VisionAgent().inspect_page(b"image", 1, 1)
+
+
+@pytest.mark.asyncio
+async def test_a_call_that_times_out_is_tried_once_more(monkeypatch) -> None:
+    """A stalled provider says nothing about the image, like a rate limit."""
+    from backend.config.settings import settings
+
+    vision_module, calls = _scripted_vision_agent(
+        monkeypatch, [TimeoutError("provider gave up"), VALID_FORMULA]
+    )
+    monkeypatch.setattr(settings, "vision_region_cache_enabled", False)
+
+    result = await vision_module.VisionAgent().describe_region(
+        b"image", "embedded_image", page_num=14
+    )
+
+    assert result is not None and result.formula_latex == "x = y"
+    assert len(calls) == 2
+    # The timeout retry did not consume an answer try: the retry instruction
+    # is for unusable answers only.
+    assert calls[1]["input"] == calls[0]["input"]
+
+
+@pytest.mark.asyncio
+async def test_a_call_that_keeps_timing_out_reports_the_error(monkeypatch) -> None:
+    from backend.agents.vision_agent import _TIMEOUT_RETRIES
+    from backend.config.settings import settings
+
+    vision_module, calls = _scripted_vision_agent(
+        monkeypatch, [TimeoutError("provider gave up")] * (_TIMEOUT_RETRIES + 1)
+    )
+    monkeypatch.setattr(settings, "vision_region_cache_enabled", False)
+    errors: list[str] = []
+
+    result = await vision_module.VisionAgent().describe_region(
+        b"image", "embedded_image", page_num=14, errors=errors
+    )
+
+    assert result is None
+    assert len(calls) == _TIMEOUT_RETRIES + 1
+    assert errors == ["TimeoutError: provider gave up"]
 
 
 @pytest.mark.asyncio

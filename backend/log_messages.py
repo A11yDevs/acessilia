@@ -375,6 +375,11 @@ LOG_VISION_AGENT_RATE_LIMIT_RETRY: str = (
     "[page {page_num}] The model provider rate-limited region {type}; "
     "waiting {delay}s before trying again (rate-limit retry {retry}/{retries})"
 )
+#: Warning logged when a region call runs out of time and the agent tries it once more; {page_num} and {type} name the region, {retry}/{retries} the timeout retry budget, {error} the timeout.
+LOG_VISION_AGENT_TIMEOUT_RETRY: str = (
+    "[page {page_num}] Region {type} got no answer in time ({error}); "
+    "trying again (timeout retry {retry}/{retries})"
+)
 #: Warning logged when a vision description is longer than the region token budget and was cut to it; {page_num} and {type} name the region, {limit} the budget in tokens, {chars} the kept character count.
 LOG_VISION_AGENT_DESCRIPTION_TRUNCATED: str = (
     "[page {page_num}] Vision description for region {type} exceeded the "

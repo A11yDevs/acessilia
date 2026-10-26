@@ -14,6 +14,7 @@ from backend.i18n import active_locale, t
 from backend.log_messages import (
     LOG_VISION_AGENT_DESCRIPTION_TRUNCATED,
     LOG_VISION_AGENT_RATE_LIMIT_RETRY,
+    LOG_VISION_AGENT_TIMEOUT_RETRY,
     LOG_VISION_AGENT_REGION_ERROR,
     LOG_VISION_AGENT_REGION_RECOVERED,
     LOG_VISION_AGENT_REGION_RETRY,
@@ -109,6 +110,7 @@ class VisionAgent:
         mode: str | None = None,
         custom_prompt: str | None = None,
         full_budget: bool = False,
+        errors: list[str] | None = None,
     ) -> VisionOutput | None:
         """Describe a single visual region of a page with the vision model.
 
@@ -120,6 +122,7 @@ class VisionAgent:
             mode (str | None): Prompting mode override for this call; falls back to the instance default when None (default None).
             custom_prompt (str | None): Fully custom prompt that, when given, replaces all selection logic (default None).
             full_budget (bool): Use the general token budget instead of VISION_REGION_MAX_TOKENS, for a region that may need transcribing (default False).
+            errors (list[str] | None): When given, receives a one-line summary of the error that made the call return None, for a caller that records why (default None).
 
         Returns:
             A validated visual result, or None when inference or validation fails. A
@@ -190,6 +193,8 @@ class VisionAgent:
                     )
                 )
                 return salvaged
+            if errors is not None:
+                errors.append(_failure_summary(error))
             import traceback
             tb = traceback.format_exc()
             logger.critical(
@@ -249,14 +254,17 @@ async def _run_with_retry(
 
     A region gets ``REGION_ATTEMPTS`` tries; a rate-limit rejection does not
     consume one of them — it says the provider is busy, nothing about the
-    answer — and gets its own smaller budget of backed-off retries instead.
-    Any other error (timeout, provider failure, incomplete run) fails at once.
+    answer — and gets its own smaller budget of backed-off retries instead. A
+    call that runs out of time gets ``_TIMEOUT_RETRIES`` more, on the same
+    grounds: a stalled provider says nothing about the image. Any other error
+    (provider failure, incomplete run) fails at once.
     Each call also has a hard wall-clock deadline, because the client's HTTP
     timeout is applied per read and a provider that trickles bytes can outlive
     it.
     """
     attempt = 0
     rate_limit_retries = 0
+    timeout_retries = 0
     while attempt < REGION_ATTEMPTS:
         attempt += 1
         attempt_prompt = prompt if attempt == 1 else f"{prompt}\n\n{RETRY_INSTRUCTION}"
@@ -283,11 +291,27 @@ async def _run_with_retry(
         except TimeoutError as error:
             # ``wait_for`` cancels the awaited task on expiry; a provider's own
             # TimeoutError leaves it finished, so only that case is ours.
-            if not call.cancelled():
+            timeout = (
+                TimeoutError(f"no answer within the {deadline}s call deadline")
+                if call.cancelled()
+                else error
+            )
+            if timeout_retries < _TIMEOUT_RETRIES:
+                timeout_retries += 1
+                attempt -= 1  # a stalled provider says nothing about the answer
+                logger.warning(
+                    t(LOG_VISION_AGENT_TIMEOUT_RETRY).format(
+                        page_num=page_num,
+                        type=label,
+                        retry=timeout_retries,
+                        retries=_TIMEOUT_RETRIES,
+                        error=timeout,
+                    )
+                )
+                continue
+            if timeout is error:
                 raise
-            raise TimeoutError(
-                f"no answer within the {deadline}s call deadline"
-            ) from error
+            raise timeout from error
         except Exception as error:
             if _is_rate_limited(error) and rate_limit_retries < _RATE_LIMIT_RETRIES:
                 rate_limit_retries += 1
@@ -343,6 +367,11 @@ _RATE_LIMIT_RETRIES = 2
 
 #: Seconds before the first retry that follows a rate-limit rejection.
 _RATE_LIMIT_RETRY_SECONDS = 20
+
+#: Extra tries granted to a call that runs out of time, on top of
+#: ``REGION_ATTEMPTS``. Kept at one: each try may wait the whole call deadline,
+#: so a provider that stays stalled costs a picture two deadlines, not more.
+_TIMEOUT_RETRIES = 1
 
 
 def _is_rate_limited(error: BaseException) -> bool:
@@ -582,6 +611,14 @@ def _json_string_prefix(rest: str) -> tuple[str, bool]:
             continue
         index += 1
     return json.loads(f'"{rest[:index]}"', strict=False), False
+
+
+def _failure_summary(error: BaseException, limit: int = 300) -> str:
+    """One line naming a failed call's error, short enough for element metadata."""
+    if isinstance(error, ValidationError):
+        return f"{type(error).__name__}: {_short_error(error, limit)}"
+    text = " ".join(f"{type(error).__name__}: {error}".split())
+    return text if len(text) <= limit else f"{text[:limit]}…"
 
 
 def _short_error(error: ValidationError, limit: int = 300) -> str:

@@ -101,6 +101,7 @@ from backend.log_messages import (
     LOG_DATA_AGENT_REGION_ERROR,
     LOG_VISION_AGENT_DESCRIPTION_TRUNCATED,
     LOG_VISION_AGENT_RATE_LIMIT_RETRY,
+    LOG_VISION_AGENT_TIMEOUT_RETRY,
     LOG_VISION_AGENT_REGION_ERROR,
     LOG_VISION_AGENT_REGION_RECOVERED,
     LOG_VISION_AGENT_REGION_RETRY,
@@ -268,6 +269,7 @@ from backend.export.pandoc_exporter import (
     MSG_PDF_UA_DISABLED,
     MSG_UNSUPPORTED_EXPORT_FORMAT,
 )
+from backend.agents.pddl_orchestrator import MSG_UNDESCRIBED_PICTURE_ALT
 from backend.export.renderers.html_renderer import (
     MSG_HTML_IMAGE_DESCRIPTION,
     MSG_HTML_TABLE_OF_CONTENTS,
@@ -710,6 +712,7 @@ MESSAGES: tuple[str, ...] = (
     # HTML renderer UI chrome (backend/export/renderers/html_renderer.py).
     MSG_HTML_TABLE_OF_CONTENTS,
     MSG_HTML_TECHNICAL_METADATA,
+    MSG_UNDESCRIBED_PICTURE_ALT,
     MSG_HTML_IMAGE_DESCRIPTION,
     # TXT table line templates (backend/pipeline/table_ast.py).
     MSG_TABLE_TEXT_CAPTION,
@@ -860,6 +863,7 @@ MESSAGES: tuple[str, ...] = (
     LOG_DATA_AGENT_REGION_ERROR,
     LOG_VISION_AGENT_DESCRIPTION_TRUNCATED,
     LOG_VISION_AGENT_RATE_LIMIT_RETRY,
+    LOG_VISION_AGENT_TIMEOUT_RETRY,
     LOG_VISION_AGENT_REGION_ERROR,
     LOG_VISION_AGENT_REGION_RECOVERED,
     LOG_VISION_AGENT_REGION_RETRY,
@@ -1411,6 +1415,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         # HTML renderer UI chrome (pt-BR mirrors of the MSG_HTML_* ids above).
         MSG_HTML_TABLE_OF_CONTENTS: "Sumário",
         MSG_HTML_TECHNICAL_METADATA: "Metadados técnicos",
+        MSG_UNDESCRIBED_PICTURE_ALT: "Imagem sem descrição textual.",
         MSG_HTML_IMAGE_DESCRIPTION: "Descrição da imagem",
         # TXT table line templates (pt-BR mirrors of the MSG_TABLE_TEXT_* ids above).
         MSG_TABLE_TEXT_CAPTION: "Tabela: {caption}",
@@ -1721,6 +1726,10 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "[página {page_num}] O provedor do modelo limitou a taxa da região {type}; "
             "aguardando {delay}s antes de tentar de novo "
             "(reintenção por limite de taxa {retry}/{retries})"
+        ),
+        LOG_VISION_AGENT_TIMEOUT_RETRY: (
+            "[página {page_num}] A região {type} não teve resposta a tempo ({error}); "
+            "tentando de novo (reintenção por tempo esgotado {retry}/{retries})"
         ),
         LOG_VISION_AGENT_DESCRIPTION_TRUNCATED: (
             "[página {page_num}] A descrição da visão para a região {type} passou do "
