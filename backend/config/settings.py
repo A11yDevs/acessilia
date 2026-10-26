@@ -302,18 +302,18 @@ class Settings:
     # On a slide read as text, fold the short text lying on or just around a
     # picture (its labels) into that picture, whose description transcribes
     # them in place, and merge the pictures a caption row spans.
+    slide_fold_figure_labels: bool = field(
+        default_factory=lambda: (
+            os.getenv("SLIDE_FOLD_FIGURE_LABELS", "true").strip().lower()
+            in {"1", "true", "yes", "on", "sim"}
+        )
+    )
     # Read again from its image a table that came back in the wrong shape
     # (rows collapsed into one, cells doubled), and use the new reading when it
     # is the same table read better.
     table_visual_review: bool = field(
         default_factory=lambda: (
             os.getenv("TABLE_VISUAL_REVIEW", "true").strip().lower()
-            in {"1", "true", "yes", "on", "sim"}
-        )
-    )
-    slide_fold_figure_labels: bool = field(
-        default_factory=lambda: (
-            os.getenv("SLIDE_FOLD_FIGURE_LABELS", "true").strip().lower()
             in {"1", "true", "yes", "on", "sim"}
         )
     )
