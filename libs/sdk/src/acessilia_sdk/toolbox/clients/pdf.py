@@ -187,7 +187,43 @@ class ToolboxPdfClient(ToolboxCapabilityClient):
             raise ToolboxContractViolation(
                 f"{context} returned coordinates from {document.get('coord_origin')!r}"
             )
+        for page in document["pages"]:
+            _check_text_spans_page(page, context)
         return document
+
+
+def _is_number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _is_point_list(value: Any, length: int) -> bool:
+    return isinstance(value, list) and len(value) == length and all(_is_number(item) for item in value)
+
+
+def _check_text_spans_page(page: Any, context: str) -> None:
+    """Refuse a page whose spans lack what readers of ``text-spans@1`` use."""
+    if not isinstance(page, dict) or isinstance(page.get("page_number"), bool) or not isinstance(
+        page.get("page_number"), int
+    ):
+        raise ToolboxContractViolation(f"{context} returned a page without a page_number")
+    number = page["page_number"]
+    lines = page.get("lines", [])
+    if not isinstance(lines, list):
+        raise ToolboxContractViolation(f"{context} page {number} has no list of lines")
+    for line in lines:
+        spans = line.get("spans", []) if isinstance(line, dict) else None
+        if not isinstance(spans, list):
+            raise ToolboxContractViolation(f"{context} page {number} has a line without spans")
+        for span in spans:
+            if not (
+                isinstance(span, dict)
+                and isinstance(span.get("text"), str)
+                and isinstance(span.get("font"), str)
+                and _is_number(span.get("size"))
+                and _is_point_list(span.get("bbox"), 4)
+                and _is_point_list(span.get("origin"), 2)
+            ):
+                raise ToolboxContractViolation(f"{context} page {number} has a malformed span: {span!r}")
 
 
 __all__ = [

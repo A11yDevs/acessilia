@@ -78,7 +78,7 @@ def test_prose_gets_its_inline_math_and_formulas_are_left_alone(spans):
 
     counts = _run(manifest)
 
-    paragraph, slash, formula = manifest.elements
+    paragraph, _, formula = manifest.elements
     assert paragraph.text == r"inicial ´ e $s_0\in\mathbb{R}$, $h\neq0$"
     assert paragraph.metadata["inline_math_detection"] == {"marked": 2, "unmatched": 0}
     assert formula.text == "x = 1"

@@ -1,4 +1,4 @@
-"""Inline math found in a PDF text layer from its fonts and baselines (ADR 0011).
+r"""Inline math found in a PDF text layer from its fonts and baselines (ADR 0011).
 
 A typeset PDF keeps no trace of the ``$…$`` its author wrote, but its glyphs
 do: TeX sets variables in a math italic font (``CMMI``), symbols in ``CMSY``,
@@ -22,7 +22,8 @@ A run:
   function (``lim``, ``sen``) and the smaller letters of a script;
 - stops at a text-font word, and at a ``,`` or ``;`` outside brackets
   (``s(t), v(t)`` is two runs, ``[-2, 0)`` one), unless what precedes has no
-  relation and what follows has one (``s_0, a \in \mathbb{R}``);
+  relation and what follows has one (``s_0, a \in \mathbb{R}``) or the ``,``
+  is a decimal separator between digits (``x = 3,5``);
 - drops the punctuation, spaces and unmatched brackets at its ends.
 """
 from __future__ import annotations
@@ -160,14 +161,15 @@ def detect_inline_math(lines: Iterable[Sequence[TextSpan]]) -> InlineMathDetecti
         if not glyphs:
             continue
         body = _body_size(glyphs)
-        _classify(glyphs, body)
+        baseline = _body_baseline(glyphs, body)
+        _classify(glyphs, body, baseline)
         offsets = []
         for glyph in glyphs:
             offsets.append(len(flat))
             flat.extend(fold(glyph.char))
         offsets.append(len(flat))
         for first, last in _runs(glyphs):
-            run = _build_run(glyphs[first : last + 1], body)
+            run = _build_run(glyphs[first : last + 1], body, baseline)
             if run is None:
                 continue
             latex, negations = run
@@ -281,8 +283,7 @@ def _is_script(span: TextSpan, body: float, baseline: float) -> bool:
     return span.size <= body * SCRIPT_SIZE_RATIO and abs(span.origin[1] - baseline) >= body * SCRIPT_SHIFT_RATIO
 
 
-def _classify(glyphs: list[_Glyph], body: float) -> None:
-    baseline = _body_baseline(glyphs, body)
+def _classify(glyphs: list[_Glyph], body: float, baseline: float) -> None:
     for glyph in glyphs:
         char, span = glyph.char, glyph.span
         if char.isspace():
@@ -343,6 +344,7 @@ def _runs(glyphs: list[_Glyph]) -> list[tuple[int, int]]:
                 char in _SEPARATORS
                 and depth == 0
                 and glyphs[index].kind == "punct"
+                and not _is_decimal_separator(glyphs, index)
                 and not _joins_a_relation(glyphs, start, index)
             ):
                 break
@@ -352,13 +354,27 @@ def _runs(glyphs: list[_Glyph]) -> list[tuple[int, int]]:
     return runs
 
 
+def _is_decimal_separator(glyphs: list[_Glyph], index: int) -> bool:
+    """Whether the glyph is a ``,`` between two digits (``3,5``, ``1.000,50``)."""
+    return (
+        glyphs[index].char == ","
+        and 0 < index < len(glyphs) - 1
+        and glyphs[index - 1].char.isdigit()
+        and glyphs[index + 1].char.isdigit()
+    )
+
+
 def _joins_a_relation(glyphs: list[_Glyph], start: int, separator: int) -> bool:
     """Whether the separator lists variables for a relation that follows it."""
     if any(glyph.char in _RELATIONS for glyph in glyphs[start:separator]):
         return False
     index = separator + 1
     while index < len(glyphs) and glyphs[index].kind != "prose":
-        if glyphs[index].char in _SEPARATORS and glyphs[index].kind == "punct":
+        if (
+            glyphs[index].char in _SEPARATORS
+            and glyphs[index].kind == "punct"
+            and not _is_decimal_separator(glyphs, index)
+        ):
             return False
         if glyphs[index].char in _RELATIONS:
             return True
@@ -394,32 +410,39 @@ def _trimmed(glyphs: list[_Glyph], first: int, last: int) -> list[tuple[int, int
 
 
 def _build_run(
-    glyphs: list[_Glyph], line_body: float
+    glyphs: list[_Glyph], line_body: float, line_baseline: float
 ) -> tuple[str, list[tuple[float, float, float, float]]] | None:
-    """LaTeX of a run: scripts by size and baseline, glyphs mapped to commands."""
+    """LaTeX of a run: scripts by size and baseline, glyphs mapped to commands.
+
+    Scripts are measured against the line's body, as ``_classify`` did: a
+    large delimiter or operator in the run (``\\left(``, ``\\sum``) is not
+    the body its neighbours are scripts of. A run ending on a negation slash
+    has no relation to compose it into and is left to the slash reattachment.
+    """
     visible = [glyph for glyph in glyphs if not glyph.char.isspace()]
     if not visible:
         return None
-    body = max(glyph.span.size for glyph in visible)
-    baseline = _body_baseline(visible, body) or visible[0].span.origin[1]
+    baseline = line_baseline or visible[0].span.origin[1]
     tokens: list[tuple[str, str]] = []  # (level, latex)
     negations: list[tuple[float, float, float, float]] = []
-    negate = False
+    slash: tuple[float, float, float, float] | None = None
     for glyph in visible:
         if glyph.kind == "function" and not glyph.function:
             continue  # the rest of a function name
         if glyph.char == _NEGATION:
-            negate = True
-            negations.append(glyph.box)
+            slash = glyph.box
             continue
         token = glyph.function or _token(glyph)
-        if negate:
+        if slash is not None:
             token = _NEGATED.get(glyph.char, rf"\not{token}")
-            negate = False
+            negations.append(slash)
+            slash = None
         level = "0"
-        if _is_script(glyph.span, body, baseline):
+        if _is_script(glyph.span, line_body, baseline):
             level = "^" if glyph.span.origin[1] < baseline else "_"
         tokens.append((level, token))
+    if slash is not None:
+        return None
     return _join(tokens), negations
 
 

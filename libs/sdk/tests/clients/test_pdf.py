@@ -355,6 +355,21 @@ async def test_text_spans_sends_the_pages_and_returns_the_document(respx_mock, c
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("missing", ["text", "font", "size", "bbox", "origin"])
+async def test_text_spans_refuses_a_malformed_span(respx_mock, client, missing):
+    page = SAMPLE_SPANS_RESPONSE["document"]["pages"][0]
+    span = {key: value for key, value in page["lines"][0]["spans"][0].items() if key != missing}
+    malformed = {**page, "lines": [{**page["lines"][0], "spans": [span]}]}
+    _mock_spans(
+        respx_mock,
+        {**SAMPLE_SPANS_RESPONSE, "document": {**SAMPLE_SPANS_RESPONSE["document"], "pages": [malformed]}},
+    )
+
+    with pytest.raises(ToolboxContractViolation):
+        await client.text_spans(file_path=FIXTURE_PDF)
+
+
+@pytest.mark.asyncio
 async def test_text_spans_refuses_another_coordinate_origin(respx_mock, client):
     _mock_spans(
         respx_mock,

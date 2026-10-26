@@ -66,6 +66,26 @@ def test_negation_slash_composes_its_relation():
     assert len(run.negations) == 1
 
 
+def test_a_slash_with_no_relation_after_it_drops_the_run():
+    line = _line(("cada", "CMR12"), ("h", "CMMI12"), ("̸", "CMSY10"), ("a", "CMR12"))
+
+    assert detect_inline_math([line]).runs == []
+
+
+def test_a_large_delimiter_does_not_make_its_neighbours_scripts():
+    line = _line(("seja", "CMR12"), ("x", "CMMI12"), ("(", "CMR12", 16.0, 220.0), ("y", "CMMI12"),
+                 (")", "CMR12", 16.0, 220.0), ("= 1", "CMR12"), ("para", "CMR12"))
+
+    assert _latex(line) == ["x(y)=1"]
+
+
+@pytest.mark.parametrize("number", ["3,5", "1.000,50"])
+def test_a_decimal_comma_stays_in_the_run(number):
+    line = _line(("vale", "CMR12"), ("x", "CMMI12"), (f"= {number}", "CMR12"), ("m", "CMR12"))
+
+    assert _latex(line) == [f"x={number}"]
+
+
 def test_text_digits_or_parentheses_alone_are_not_math():
     line = _line(("2", "CMR12"), ("(acelera¸c˜ao", "CMR12"), ("constante).", "CMR12"))
 
@@ -154,4 +174,3 @@ def test_relations_use_the_long_commands():
     line = _line(("h", "CMMI12"), ("≥", "CMSY10"), ("−", "CMSY10"), ("2", "CMR12"))
 
     assert _latex(line) == [r"h\geq-2"]
-
