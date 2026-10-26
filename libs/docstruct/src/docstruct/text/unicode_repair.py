@@ -13,8 +13,12 @@ The module is pure and conservative by design:
 - it does not reinterpret spacing diacritics (``C´ alculo``) by default, because
   that form also appears in metalinguistic text and code; that repair needs
   font/geometry evidence and must be enabled explicitly;
-- it does not handle ligatures, NBSP or hyphenation: those stay in
-  :mod:`docstruct.text.norm_fix`, so there is a single implementation.
+- it does not handle ligature characters (``ﬁ``), NBSP or hyphenation:
+  those stay in :mod:`docstruct.text.norm_fix`, so there is a single
+  implementation. What it does handle, with document-level evidence only,
+  are two more TeX extraction artifacts: the grave accent of the Portuguese
+  crase extracted apart from its letter (``` a medida`` → ``à medida``) and
+  a ligature split from the rest of its word (``fi ca`` → ``fica``).
 
 Every edit carries its rule and the offsets in the original text, so the core
 can audit the transformation without storing an opaque copy of the text.
@@ -44,6 +48,23 @@ _SPACING_DIACRITIC = re.compile(r"[´ˆ˜¸][\u00a0 \t]*[A-Za-zıȷ]")
 _SPACING_WORD_INTERNAL = re.compile(
     r"(?<=[^\W\d_])[´ˆ˜¸][\u00a0 \t]*[A-Za-zıȷ]"
 )
+
+#: TeX's grave accent extracted apart from its letter, as the crase ``à``
+#: alone (``\`a``): a backtick or a left quote, then ``a``/``A`` standing as a
+#: word, not after a letter or digit. Only the crase, the one grave word in
+#: Portuguese. A closing backtick or quote right after the letter means inline
+#: code or a quoted letter (`` `a` ``, ``‘a’``); a closer further on is checked
+#: in ``_crase_matches`` (``‘ a medida foi aprovada’``, `` `a = b` ``).
+_GRAVE_CRASE = re.compile(r"(?<!\w)[`‘][  \t]*([aA])(?![^\W\d_])(?![`’'])")
+#: A word whose initial fi/fl ligature the extractor ended with a space:
+#: ``fi ca``, ``fl uxo``, the shape TeX text layers produce. Only the bare
+#: ligature at the start of a word: a longer head (``wifi funciona``,
+#: ``selfi na``) is a complete word, and ``ffi``/``ffl`` never start one
+#: (``o ffi cial`` would become ``o fficial``; visibly broken is better). Not
+#: after a hyphen (``hi-fi``), and the tail must start in lower case.
+_SPLIT_LIGATURE = re.compile(r"(?<![\w-])(?P<head>fi|fl)[  ](?P<tail>[^\W\d_]+)")
+#: The spaced spellings of hi-fi/wi-fi: ``hi fi system`` is not a split word.
+_FI_COMPOUND_BEFORE = re.compile(r"(?i)(?:^|\W)(?:hi|wi)[  ]$")
 
 _SPACING_MARKS = {"´": "\u0301", "ˆ": "\u0302", "˜": "\u0303", "¸": "\u0327"}
 _SPACING_BASES = {
@@ -101,6 +122,12 @@ class UnicodeRepairContext:
     #: (many word-internal cases) so prose that mentions an accent is not
     #: rewritten.
     allow_standalone_spacing_diacritics: bool = False
+    #: The crase and split-ligature rules (``` a`` → ``à``, ``fi ca`` →
+    #: ``fica``). Both shapes also occur in text that is not a TeX extraction
+    #: (a lone backtick, ``hi fi``), so the caller enables them only with
+    #: document-level evidence of a legacy TeX text layer. With it, a crase
+    #: backtick is not taken as the start of an inline-code span.
+    allow_legacy_tex_artifacts: bool = False
 
 
 @dataclass(frozen=True)
@@ -163,10 +190,17 @@ def repair_legacy_unicode(
             skipped_reason=f"block-type:{ctx.block_type}",
         )
 
-    protected = _protected_spans(text)
+    crase_matches = _crase_matches(text) if ctx.allow_legacy_tex_artifacts else []
+    # A crase backtick is TeX's accent, not a code delimiter: mask it before
+    # finding protected spans, or two crases in one paragraph would protect
+    # (and freeze) everything between them.
+    protected = _protected_spans(_mask(text, [m.start() for m in crase_matches]))
     language = ctx.language.split("-", 1)[0].lower()
     edits: list[Edit] = []
     blocked: set[int] = set()
+
+    if ctx.allow_legacy_tex_artifacts:
+        edits.extend(_legacy_tex_edits(text, crase_matches, protected))
 
     if ctx.allow_spacing_diacritics:
         spacing_edits, blocked = _spacing_edits(
@@ -256,6 +290,60 @@ def _spacing_edits(
             Edit("spacing-diacritic", match.start(), match.end(), match.group(0), composed)
         )
     return edits, blocked
+
+
+def _legacy_tex_edits(
+    text: str, crase_matches: list[re.Match[str]], protected: list[tuple[int, int]]
+) -> list[Edit]:
+    """Crase accents and split ligatures outside protected spans."""
+    edits: list[Edit] = []
+    for match in crase_matches:
+        if _overlaps(match.span(), protected):
+            continue
+        composed = "À" if match.group(1) == "A" else "à"
+        edits.append(Edit("grave-crase", match.start(), match.end(), match.group(0), composed))
+    for match in _SPLIT_LIGATURE.finditer(text):
+        if not match.group("tail")[0].islower() or _overlaps(match.span(), protected):
+            continue
+        if _FI_COMPOUND_BEFORE.search(text[: match.start()]):
+            continue
+        joined = match.group("head") + match.group("tail")
+        edits.append(Edit("split-ligature", match.start(), match.end(), match.group(0), joined))
+    return edits
+
+
+def _crase_matches(text: str) -> list[re.Match[str]]:
+    """Crase candidates whose backtick or quote does not open a span closed later.
+
+    ``‘ a medida foi aprovada’`` and `` `a = b` `` start with the same shape as
+    a crase, but a closer further on (a right quote, or a backtick that is not
+    itself a crase) shows the mark opens a quotation or inline code. Two TeX
+    crases in one paragraph do not close each other.
+    """
+    candidates = list(_GRAVE_CRASE.finditer(text))
+    crase_backticks = {match.start() for match in candidates if match.group(0)[0] == "`"}
+    accepted = []
+    for match in candidates:
+        rest = text[match.end() :]
+        if match.group(0)[0] == "‘":
+            if "’" in rest:
+                continue
+        elif any(
+            char == "`" and match.end() + offset not in crase_backticks
+            for offset, char in enumerate(rest)
+        ):
+            continue
+        accepted.append(match)
+    return accepted
+
+
+def _mask(text: str, positions: list[int]) -> str:
+    if not positions:
+        return text
+    chars = list(text)
+    for position in positions:
+        chars[position] = " "
+    return "".join(chars)
 
 
 def _dotless_base(char: str) -> str:
