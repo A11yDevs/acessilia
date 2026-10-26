@@ -418,6 +418,16 @@ LOG_PDDL_IMAGES_ENRICHED: str = (
 LOG_PDDL_TABLES_ENRICHED: str = (
     "Pipeline PDDL: {count} table(s) enriched with OCR/reconstruction"
 )
+#: Info logged when a table that looked misread was read again from its image and the new reading replaced it; {element_id} and {page} name it, {reason} the misreading.
+LOG_PDDL_TABLE_REREAD_ACCEPTED: str = (
+    "Table {element_id} (page {page}) looked misread ({reason}); "
+    "replaced with the reading from its image"
+)
+#: Warning logged when a table that looked misread was read again from its image but the new reading was not used; {element_id}, {page} and {reason} as above, {why} what disqualified the new reading.
+LOG_PDDL_TABLE_REREAD_REJECTED: str = (
+    "Table {element_id} (page {page}) looked misread ({reason}); "
+    "the reading from its image was not used ({why})"
+)
 #: Exception logged when extracting an element's image clip from the source PDF for the PDDL pipeline fails; {element_id} is the failing element's id.
 LOG_PDDL_ELEMENT_CROP_FAILED: str = (
     "Failed to extract the image clip for element {element_id}"

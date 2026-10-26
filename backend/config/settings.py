@@ -308,6 +308,15 @@ class Settings:
             in {"1", "true", "yes", "on", "sim"}
         )
     )
+    # Read again from its image a table that came back in the wrong shape
+    # (rows collapsed into one, cells doubled), and use the new reading when it
+    # is the same table read better.
+    table_visual_review: bool = field(
+        default_factory=lambda: (
+            os.getenv("TABLE_VISUAL_REVIEW", "true").strip().lower()
+            in {"1", "true", "yes", "on", "sim"}
+        )
+    )
     toolbox_docx_provider: str = field(
         default_factory=lambda: os.getenv(
             "TOOLBOX_DOCX_PROVIDER", provider_default("toolbox_docx_provider")
