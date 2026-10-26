@@ -584,7 +584,7 @@ def _repair_table_cells(
 def _handle_unicode_repair_method(
     manifest: ProcessingManifest, obligation_id: str
 ) -> MethodResult:
-    """Repair legacy Unicode: NFD, dotless i and spacing diacritics.
+    """Repair legacy Unicode: NFD, dotless i, spacing diacritics, the crase and split ligatures.
 
     Only selected, prose-like elements are touched. Word-internal spacing
     accents are repaired whenever the element shows them; standalone accents
@@ -647,7 +647,9 @@ def _handle_unicode_repair_method(
         # A word-internal spacing accent (``C´ alculo``) is legacy extraction
         # evidence. Standalone accents (separated from their word) are only
         # included when the document has enough of the word-internal shape;
-        # the lib never touches protected spans.
+        # the lib never touches protected spans. The crase and split-ligature
+        # rules rest on that same document-level evidence alone: an element
+        # may carry ``` a`` or ``fi ca`` without any spaced accent of its own.
         allow_spacing = detection.spacing_diacritics > 0
         context = UnicodeRepairContext(
             language=language,
@@ -655,6 +657,7 @@ def _handle_unicode_repair_method(
             page=element.page_number,
             allow_spacing_diacritics=allow_spacing,
             allow_standalone_spacing_diacritics=allow_spacing and allow_standalone,
+            allow_legacy_tex_artifacts=allow_standalone,
         )
         if block_type == "table":
             edited, rules, edits, needs_review = _repair_table_cells(

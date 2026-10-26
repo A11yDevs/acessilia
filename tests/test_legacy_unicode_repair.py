@@ -227,6 +227,33 @@ class TestHandler:
         assert element.text.endswith("posi\u00e7\u00e3o \u00e9")
         assert "spacing-diacritic" in element.metadata["unicode_repair"]["rules"]
 
+    def test_crase_and_split_ligature_need_document_evidence(self):
+        """The rules rest on the document's evidence, not the element's own accents."""
+        evidence = _element("C´ alculo Matem´ atica fun¸ c˜ ao n˜ ao")
+        plain = build_element(
+            "element-2",
+            "paragraph",
+            text="mais precisa ` a medida que h fi ca perto",
+            reading_order=2,
+        )
+        manifest = build_manifest(
+            [evidence, plain], [_obligation(["element-1", "element-2"])]
+        )
+
+        pddl._handle_unicode_repair_method(manifest, "o-unicode")
+
+        assert plain.text == "mais precisa à medida que h fica perto"
+        assert set(plain.metadata["unicode_repair"]["rules"]) == {"grave-crase", "split-ligature"}
+
+    def test_crase_is_kept_without_document_evidence(self):
+        text = "mais precisa ` a medida, o sinal ´ e"
+        element = _element(text)
+        manifest = build_manifest([element], [_obligation()])
+
+        pddl._handle_unicode_repair_method(manifest, "o-unicode")
+
+        assert element.text.startswith("mais precisa ` a medida")
+
     def test_threshold_uses_all_targets_of_the_obligation(self):
         first = _element("C\u00b4 alculo Matem\u00b4 atica fun\u00b8 c\u02dc ao n\u02dc ao")
         second = build_element(

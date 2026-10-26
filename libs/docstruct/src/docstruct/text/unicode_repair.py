@@ -13,8 +13,12 @@ The module is pure and conservative by design:
 - it does not reinterpret spacing diacritics (``C´ alculo``) by default, because
   that form also appears in metalinguistic text and code; that repair needs
   font/geometry evidence and must be enabled explicitly;
-- it does not handle ligatures, NBSP or hyphenation: those stay in
-  :mod:`docstruct.text.norm_fix`, so there is a single implementation.
+- it does not handle ligature characters (``ﬁ``), NBSP or hyphenation:
+  those stay in :mod:`docstruct.text.norm_fix`, so there is a single
+  implementation. What it does handle, with document-level evidence only,
+  are two more TeX extraction artifacts: the grave accent of the Portuguese
+  crase extracted apart from its letter (``` a medida`` → ``à medida``) and
+  a ligature split from the rest of its word (``fi ca`` → ``fica``).
 
 Every edit carries its rule and the offsets in the original text, so the core
 can audit the transformation without storing an opaque copy of the text.
@@ -43,6 +47,19 @@ _SPACING_DIACRITIC = re.compile(r"[´ˆ˜¸][\u00a0 \t]*[A-Za-zıȷ]")
 #: punctuation or metalinguistic example is not matched.
 _SPACING_WORD_INTERNAL = re.compile(
     r"(?<=[^\W\d_])[´ˆ˜¸][\u00a0 \t]*[A-Za-zıȷ]"
+)
+
+#: TeX's grave accent extracted apart from its letter, as the crase ``à``
+#: alone (``\`a``): a backtick or a left quote, then ``a``/``A`` standing as a
+#: word. Only the crase, the one grave word in Portuguese. A closing backtick
+#: or quote after the letter means inline code or a quoted letter (`` `a` ``,
+#: ``‘a’``), not an accent.
+_GRAVE_CRASE = re.compile(r"(?<![^\W\d_])[`‘][\u00a0 \t]*([aA])(?![^\W\d_])(?![`’'])")
+#: A word whose fi/fl ligature the extractor ended with a space: ``fi ca``,
+#: ``defi ne``. The head is not preceded by a letter, digit, underscore or
+#: hyphen (``hi-fi sound`` stays), and the tail must start in lower case.
+_SPLIT_LIGATURE = re.compile(
+    r"(?<![\w-])(?P<head>[^\W\d_]*?(?:ffi|ffl|fi|fl))[\u00a0 ](?P<tail>[^\W\d_]+)"
 )
 
 _SPACING_MARKS = {"´": "\u0301", "ˆ": "\u0302", "˜": "\u0303", "¸": "\u0327"}
@@ -101,6 +118,12 @@ class UnicodeRepairContext:
     #: (many word-internal cases) so prose that mentions an accent is not
     #: rewritten.
     allow_standalone_spacing_diacritics: bool = False
+    #: The crase and split-ligature rules (``` a`` → ``à``, ``fi ca`` →
+    #: ``fica``). Both shapes also occur in text that is not a TeX extraction
+    #: (a lone backtick, ``hi fi``), so the caller enables them only with
+    #: document-level evidence of a legacy TeX text layer. With it, a crase
+    #: backtick is not taken as the start of an inline-code span.
+    allow_legacy_tex_artifacts: bool = False
 
 
 @dataclass(frozen=True)
@@ -163,10 +186,19 @@ def repair_legacy_unicode(
             skipped_reason=f"block-type:{ctx.block_type}",
         )
 
-    protected = _protected_spans(text)
+    crase_matches = (
+        list(_GRAVE_CRASE.finditer(text)) if ctx.allow_legacy_tex_artifacts else []
+    )
+    # A crase backtick is TeX's accent, not a code delimiter: mask it before
+    # finding protected spans, or two crases in one paragraph would protect
+    # (and freeze) everything between them.
+    protected = _protected_spans(_mask(text, [m.start() for m in crase_matches]))
     language = ctx.language.split("-", 1)[0].lower()
     edits: list[Edit] = []
     blocked: set[int] = set()
+
+    if ctx.allow_legacy_tex_artifacts:
+        edits.extend(_legacy_tex_edits(text, crase_matches, protected))
 
     if ctx.allow_spacing_diacritics:
         spacing_edits, blocked = _spacing_edits(
@@ -256,6 +288,33 @@ def _spacing_edits(
             Edit("spacing-diacritic", match.start(), match.end(), match.group(0), composed)
         )
     return edits, blocked
+
+
+def _legacy_tex_edits(
+    text: str, crase_matches: list[re.Match[str]], protected: list[tuple[int, int]]
+) -> list[Edit]:
+    """Crase accents and split ligatures outside protected spans."""
+    edits: list[Edit] = []
+    for match in crase_matches:
+        if _overlaps(match.span(), protected):
+            continue
+        composed = "À" if match.group(1) == "A" else "à"
+        edits.append(Edit("grave-crase", match.start(), match.end(), match.group(0), composed))
+    for match in _SPLIT_LIGATURE.finditer(text):
+        if not match.group("tail")[0].islower() or _overlaps(match.span(), protected):
+            continue
+        joined = match.group("head") + match.group("tail")
+        edits.append(Edit("split-ligature", match.start(), match.end(), match.group(0), joined))
+    return edits
+
+
+def _mask(text: str, positions: list[int]) -> str:
+    if not positions:
+        return text
+    chars = list(text)
+    for position in positions:
+        chars[position] = " "
+    return "".join(chars)
 
 
 def _dotless_base(char: str) -> str:

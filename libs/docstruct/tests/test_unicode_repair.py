@@ -197,3 +197,52 @@ class TestLanguageAndSafety:
         detection = detect_legacy_unicode("\u0338")
         assert detection.combining_marks == 1
         assert detection.has_signal is True
+
+
+
+class TestLegacyTexArtifacts:
+    """The crase and split-ligature rules, enabled only with document evidence."""
+
+    ON = UnicodeRepairContext(
+        allow_spacing_diacritics=True,
+        allow_standalone_spacing_diacritics=True,
+        allow_legacy_tex_artifacts=True,
+    )
+
+    def repaired(self, text, context=None):
+        return repair_legacy_unicode(text, context=context or self.ON).repaired
+
+    def test_crase_is_composed(self):
+        assert self.repaired("precisa ` a medida") == "precisa à medida"
+        assert self.repaired("`A medida que") == "À medida que"
+        assert self.repaired("precisa ‘ a medida") == "precisa à medida"
+
+    def test_split_ligature_is_joined(self):
+        assert self.repaired("quando h fi ca perto") == "quando h fica perto"
+        assert self.repaired("to defi ne it") == "to define it"
+        assert self.repaired("o fl uxo") == "o fluxo"
+
+    def test_rules_record_their_edits(self):
+        decision = repair_legacy_unicode("` a e fi ca", context=self.ON)
+        assert {edit.rule for edit in decision.edits} == {"grave-crase", "split-ligature"}
+
+    def test_off_without_document_evidence(self):
+        context = UnicodeRepairContext(
+            allow_spacing_diacritics=True, allow_standalone_spacing_diacritics=True
+        )
+        assert self.repaired("precisa ` a medida", context) == "precisa ` a medida"
+        assert self.repaired("quando h fi ca perto", context) == "quando h fi ca perto"
+
+    def test_code_quotes_and_hyphenated_words_are_kept(self):
+        for text in ("casa `a` x", "a letra ‘a’ e", "som hi-fi sound", "Wi-Fi network",
+                     "a fi Nal", "use `code` aqui"):
+            assert self.repaired(text) == text, text
+
+    def test_two_crases_do_not_protect_the_text_between_them(self):
+        """A pair of crase backticks is not an inline-code span."""
+        text = "` a medida e ` a esquerda, m´ edia"
+        assert self.repaired(text) == "à medida e à esquerda, média"
+
+    def test_idempotent(self):
+        once = self.repaired("precisa ` a medida e fi ca")
+        assert self.repaired(once) == once
