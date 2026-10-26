@@ -21,12 +21,15 @@ processing needs:
   pictures side by side (a caption row read across their columns) merges them
   into one;
 - text the extractor read across two slides as one element is split back
-  into one element per slide, at the character offsets its provenance gives;
+  into one element per slide, at the character offsets its provenance gives
+  (``split_across_slides``, run before the reading order is refined so each
+  part is placed by its own box on its slide);
 - reading order is numbered slide by slide, so it never crosses a slide.
 """
 
 from __future__ import annotations
 
+import copy
 import re
 from collections import Counter
 from collections.abc import Callable
@@ -122,9 +125,6 @@ def structure_as_slides(
     numbers = sorted(page.page_number for page in manifest.pages)
     if not numbers:
         return
-    manifest.elements = [
-        part for element in manifest.elements for part in _split_across_slides(element)
-    ]
     total = len(numbers)
     by_page: dict[int, list[ManifestElement]] = {number: [] for number in numbers}
     loose: list[ManifestElement] = []
@@ -153,7 +153,7 @@ def structure_as_slides(
                 element.hierarchy_level = max(element.hierarchy_level, INNER_LEVEL)
         if (
             not slide
-            or _only_text_split_in(slide)
+            or _only_text_split_in(body)
             or _is_visual(body, visual_coverage, page_fractions)
         ):
             # A slide nothing was extracted from may be a scan or a photo; the
@@ -190,6 +190,35 @@ def structure_as_slides(
     manifest.summary.element_types = dict(Counter(element.type for element in elements))
 
 
+#: The types whose exported content is their text alone: a table is exported
+#: from its ``table_ast``, so cutting its text would leave both parts whole.
+_SPLITTABLE = {
+    "paragraph", "heading", "title", "caption", "list_item", "code", "formula", "unknown",
+}
+
+
+def split_across_slides(manifest: ProcessingManifest) -> None:
+    """Split, in place, each element read across slides into one element per slide.
+
+    Run before the reading order is refined, so each part is ordered by its own
+    box on its slide instead of keeping the place of the element on the first.
+    """
+    parents = {element.parent_id for element in manifest.elements if element.parent_id}
+    manifest.elements = [
+        part
+        for element in manifest.elements
+        for part in (
+            [element] if element.id in parents else _split_across_slides(element)
+        )
+    ]
+    for page in manifest.pages:
+        page.element_ids = [
+            element.id
+            for element in manifest.elements
+            if element.page_number == page.page_number
+        ]
+
+
 def _split_across_slides(element: ManifestElement) -> list[ManifestElement]:
     """``element`` as one element per slide its text was read on.
 
@@ -197,12 +226,14 @@ def _split_across_slides(element: ManifestElement) -> list[ManifestElement]:
     slide 29's caption and slide 41's text, provenance on both pages, #291);
     filed under its first page, the second slide lost its text. Each
     provenance entry gives the page and the characters of the text it covers,
-    so the text is cut there. An element on one page, or whose offsets do not
-    cut its text into ordered, non-empty parts, is returned as it is.
+    so the text is cut there. An element on one page, of a type not exported
+    from its text, or whose offsets do not cover its text in ordered,
+    non-empty parts (text between or around them would be lost) is returned
+    as it is.
     """
     text = element.text or ""
     pages = {entry.page_number for entry in element.provenance}
-    if len(pages) < 2 or not text.strip():
+    if len(pages) < 2 or element.type not in _SPLITTABLE or not text.strip():
         return [element]
     if any(entry.char_start is None or entry.char_end is None for entry in element.provenance):
         return [element]
@@ -213,16 +244,21 @@ def _split_across_slides(element: ManifestElement) -> list[ManifestElement]:
             runs[-1].append(entry)
         else:
             runs.append([entry])
-    parts: list[ManifestElement] = []
+    spans: list[tuple[int, int]] = []
     previous_end = 0
-    for index, run in enumerate(runs, start=1):
+    for run in runs:
         start, end = run[0].char_start, max(entry.char_end for entry in run)
-        if start < previous_end or end <= start:
+        if start < previous_end or end <= start or text[previous_end:start].strip():
             return [element]
+        spans.append((start, end))
+        previous_end = end
+    if text[previous_end:].strip():
+        return [element]
+    parts: list[ManifestElement] = []
+    for index, (run, (start, end)) in enumerate(zip(runs, spans, strict=True), start=1):
         piece = text[start:end].strip()
         if not piece:
             return [element]
-        previous_end = end
         parts.append(
             element.model_copy(
                 update={
@@ -230,7 +266,7 @@ def _split_across_slides(element: ManifestElement) -> list[ManifestElement]:
                     "text": piece,
                     "page_number": run[0].page_number,
                     "provenance": [entry.model_copy(deep=True) for entry in run],
-                    "metadata": {**element.metadata, "split_from": element.id},
+                    "metadata": {**copy.deepcopy(element.metadata), "split_from": element.id},
                 },
                 deep=True,
             )
@@ -238,13 +274,22 @@ def _split_across_slides(element: ManifestElement) -> list[ManifestElement]:
     return parts
 
 
-def _only_text_split_in(slide: list[ManifestElement]) -> bool:
-    """Whether everything on the slide was split off an element read across slides.
+def _only_text_split_in(body: list[ManifestElement]) -> bool:
+    """Whether all the slide's own text was split off an element read across slides.
 
     006.pdf slide 41: the extractor read nothing of its own there, and the part
     of slide 29's element that belonged to it misses a line of formulas.
+    Running headers and footers, pictures and the slide's title are left out;
+    a slide with no other text stays as it is.
     """
-    return bool(slide) and all(element.metadata.get("split_from") for element in slide)
+    text = [
+        element
+        for element in body
+        if element.type != "picture"
+        and element.raw_label not in _DECORATION
+        and (element.text or "").strip()
+    ]
+    return bool(text) and all(element.metadata.get("split_from") for element in text)
 
 
 def _slide_title(slide: list[ManifestElement]) -> ManifestElement | None:

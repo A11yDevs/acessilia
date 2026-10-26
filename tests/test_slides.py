@@ -12,6 +12,8 @@ from datetime import UTC, datetime
 import pytest
 
 from backend.core.manifest.builder import build_processing_manifest
+from backend.core.manifest.models import ProcessingManifest
+from backend.core.manifest.slides import is_slide_heading
 from backend.core.manifest.toolbox_extractor import ToolboxExtraction
 from backend.i18n import t
 from backend.log_messages import MSG_SLIDE_HEADING, MSG_SLIDE_HEADING_WITH_TITLE
@@ -793,9 +795,9 @@ def test_the_slide_heading_is_never_reordered_after_a_grown_picture(source):
     )
 
 
-def _across(text, spans):
-    """A paragraph whose provenance spans slides: (page, start, end, box) per entry."""
-    element = _element("x-1", "paragraph", spans[0][0], 20, spans[0][3], text)
+def _across(text, spans, kind="paragraph"):
+    """An element whose provenance spans slides: (page, start, end, box) per entry."""
+    element = _element("x-1", kind, spans[0][0], 20, spans[0][3], text)
     element["provenance"] = [
         {
             "page_number": page,
@@ -866,8 +868,11 @@ def test_a_slide_whose_only_text_was_split_in_is_read_as_a_picture(source):
     [
         [(1, 0, 10, (60, 400, 900, 430)), (2, None, None, (60, 260, 900, 290))],
         [(1, 0, 30, (60, 400, 900, 430)), (2, 20, 40, (60, 260, 900, 290))],
+        [(1, 0, 10, (60, 400, 900, 430)), (2, 18, 37, (60, 260, 900, 290))],
+        [(1, 5, 10, (60, 400, 900, 430)), (2, 11, 37, (60, 260, 900, 290))],
+        [(1, 0, 10, (60, 400, 900, 430)), (2, 11, 25, (60, 260, 900, 290))],
     ],
-    ids=["no-offsets", "overlapping-offsets"],
+    ids=["no-offsets", "overlapping-offsets", "text-between", "text-before", "text-after"],
 )
 def test_text_across_slides_without_usable_offsets_stays_whole(source, spans):
     extraction = _deck()
@@ -878,3 +883,149 @@ def test_text_across_slides_without_usable_offsets_stays_whole(source, spans):
     manifest = _build_edited(source, extraction)
 
     assert any(e.id == "x-1" for e in manifest.elements)
+
+
+def test_the_lines_of_each_slide_make_one_part(source):
+    """Several provenance entries on a page, the lines of one slide, stay together."""
+    lines = ["First line one", "first line two", "Second line one", "second line two"]
+    text = " ".join(lines)
+    spans, start = [], 0
+    for page, line, top in zip((1, 1, 2, 2), lines, (400, 440, 260, 300), strict=True):
+        spans.append((page, start, start + len(line), (60, top, 900, top + 30)))
+        start += len(line) + 1
+    extraction = _deck()
+    document = extraction.document["document"]
+    document["elements"].append(_across(text, spans))
+    document["pages"][0]["element_ids"].append("x-1")
+
+    manifest = _build_edited(source, extraction)
+
+    parts = {e.page_number: e for e in manifest.elements if e.metadata.get("split_from") == "x-1"}
+    assert parts[1].text == "First line one first line two"
+    assert parts[2].text == "Second line one second line two"
+    assert [entry.page_number for entry in parts[2].provenance] == [2, 2]
+
+
+def test_a_part_is_read_where_it_lies_on_its_slide(source):
+    """A part at the foot of slide 2 is read after that slide's own text."""
+    extraction = _deck()
+    document = extraction.document["document"]
+    document["elements"].append(
+        _across(
+            "Opening words Closing words",
+            [(1, 0, 13, (60, 400, 900, 430)), (2, 14, 27, (60, 460, 400, 490))],
+        )
+    )
+    document["pages"][0]["element_ids"].append("x-1")
+
+    manifest = _build_edited(source, extraction)
+
+    slide = [e.text for e in manifest.elements if e.page_number == 2]
+    assert slide.index("Details") < slide.index("Growth of 10%.") < slide.index("Closing words")
+
+
+def test_a_split_heading_does_not_take_the_title_of_its_slide(source):
+    extraction = _deck()
+    document = extraction.document["document"]
+    document["elements"].append(
+        _across(
+            "Overview Conclusion",
+            [(1, 0, 8, (60, 400, 900, 430)), (2, 9, 19, (60, 460, 400, 490))],
+            kind="heading",
+        )
+    )
+    document["pages"][0]["element_ids"].append("x-1")
+
+    manifest = _build_edited(source, extraction)
+
+    [title] = [e for e in manifest.elements if e.page_number == 2 and is_slide_heading(e)]
+    assert title.metadata["slide_title"] == "Results"
+
+
+def test_a_table_read_across_slides_stays_whole(source):
+    """A table is exported from its table_ast: cutting its text would duplicate it."""
+    extraction = _deck()
+    document = extraction.document["document"]
+    document["elements"].append(
+        _across("a b c d", [(1, 0, 3, (60, 400, 900, 430)), (2, 4, 7, (60, 260, 900, 290))], kind="table")
+    )
+    document["pages"][0]["element_ids"].append("x-1")
+
+    manifest = _build_edited(source, extraction)
+
+    assert any(e.id == "x-1" for e in manifest.elements)
+    assert not any(e.metadata.get("split_from") for e in manifest.elements)
+
+
+def test_an_element_with_children_is_not_split(source):
+    """Its children would point at an id that no longer exists."""
+    extraction = _deck()
+    document = extraction.document["document"]
+    document["elements"].append(
+        _across("Opening words Closing words", [(1, 0, 13, (60, 400, 900, 430)), (2, 14, 27, (60, 460, 400, 490))])
+    )
+    child = _element("x-2", "list_item", 1, 21, (60, 440, 900, 460), "A point")
+    child["parent_id"] = "x-1"
+    document["elements"].append(child)
+    document["pages"][0]["element_ids"].extend(["x-1", "x-2"])
+
+    manifest = _build_edited(source, extraction)
+
+    assert any(e.id == "x-1" for e in manifest.elements)
+    ProcessingManifest.model_validate(manifest.model_dump(mode="json"))
+
+
+def test_split_parts_do_not_share_metadata(source):
+    extraction = _deck()
+    document = extraction.document["document"]
+    element = _across("Opening words Closing words", [(1, 0, 13, (60, 400, 900, 430)), (2, 14, 27, (60, 460, 400, 490))])
+    element["metadata"] = {"unicode_repair": {"spans": [1]}}
+    document["elements"].append(element)
+    document["pages"][0]["element_ids"].append("x-1")
+
+    manifest = _build_edited(source, extraction)
+
+    first, second = (e for e in manifest.elements if e.metadata.get("split_from") == "x-1")
+    first.metadata["unicode_repair"]["spans"].append(2)
+    assert second.metadata["unicode_repair"] == {"spans": [1]}
+
+
+def _slide_four(source, other_elements, spans_kind="paragraph"):
+    caption, other = "Cela unitaria", "A formula quimica"
+    extraction = _deck()
+    document = extraction.document["document"]
+    document["pages"].append(
+        {"page_number": 4, "width": WIDTH, "height": HEIGHT, "element_ids": [e["id"] for e in other_elements]}
+    )
+    document["elements"].extend(other_elements)
+    document["elements"].append(
+        _across(
+            f"{caption} {other}",
+            [(1, 0, len(caption), (60, 400, 900, 430)), (4, len(caption) + 1, len(caption) + 1 + len(other), (60, 260, 900, 290))],
+            kind=spans_kind,
+        )
+    )
+    document["pages"][0]["element_ids"].append("x-1")
+    return _build_edited(source, extraction)
+
+
+def test_a_footer_and_a_logo_do_not_keep_a_split_in_slide_as_text(source):
+    manifest = _slide_four(
+        source,
+        [
+            {**_element("f-1", "page_footer", 4, 30, (900, 510, 940, 530), "41"), "raw_label": "page_footer"},
+            _element("l-1", "picture", 4, 31, (20, 500, 80, 530)),
+        ],
+    )
+
+    [picture] = [e for e in manifest.elements if e.page_number == 4 and e.metadata.get("slide_visual")]
+    assert "A formula quimica" in picture.metadata["replaced_text"]
+
+
+def test_a_slide_whose_only_split_in_text_is_its_title_stays_as_text(source):
+    """The heading leaves the body; a whole-slide picture would replace nothing."""
+    manifest = _slide_four(source, [], spans_kind="heading")
+
+    assert not any(e.page_number == 4 and e.metadata.get("slide_visual") for e in manifest.elements)
+    [title] = [e for e in manifest.elements if e.page_number == 4 and is_slide_heading(e)]
+    assert title.metadata["slide_title"] == "A formula quimica"
