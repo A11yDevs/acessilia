@@ -143,6 +143,57 @@ async def test_unavailable_recognizer_falls_back_to_vision(monkeypatch, cropped)
 
 
 @pytest.mark.asyncio
+async def test_a_recognizer_answering_without_latex_is_logged(monkeypatch, cropped):
+    """A page-level provider (docling-math) finds nothing in a chip and is not
+    an outage, so this line is the only trace of the vision fallback."""
+    from backend.tools.logger import logger
+
+    manifest = _formula_manifest()
+    FakeVision.output = VisionOutput(
+        kind="formula", formula_latex="x^2", language="und", confidence=0.7
+    )
+    monkeypatch.setattr(pddl, "toolbox_recognize_formula", lambda *a, **k: [])
+    from backend.config.settings import settings
+
+    monkeypatch.setattr(settings, "toolbox_math_recognize_provider", "docling-math")
+    messages: list[str] = []
+    sink = logger.add(messages.append, level="INFO", format="{message}")
+    try:
+        await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+    finally:
+        logger.remove(sink)
+
+    assert manifest.elements[0].metadata["formula_recognition"]["method"] == "vision"
+    assert any(
+        "math.recognize (docling-math) returned no LaTeX" in message
+        and "formula-0" in message
+        for message in messages
+    )
+
+
+@pytest.mark.asyncio
+async def test_an_outage_does_not_log_each_empty_recognition(monkeypatch, cropped):
+    from backend.tools.logger import logger
+
+    manifest = _formula_manifest(None, None)
+
+    def recognize(image, *, raise_on_unavailable=False):
+        raise MathCapabilityUnavailable(
+            "math.recognize", ToolboxProviderUnavailable("offline")
+        )
+
+    monkeypatch.setattr(pddl, "toolbox_recognize_formula", recognize)
+    messages: list[str] = []
+    sink = logger.add(messages.append, level="INFO", format="{message}")
+    try:
+        await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+    finally:
+        logger.remove(sink)
+
+    assert not any("returned no LaTeX" in message for message in messages)
+
+
+@pytest.mark.asyncio
 async def test_an_outage_is_paid_once_per_document(monkeypatch, cropped):
     manifest = _formula_manifest(None, None)
     calls = []

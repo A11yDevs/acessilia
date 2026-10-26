@@ -3341,6 +3341,16 @@ async def _enrich_formula_latex(
             confidence = None
             accepted_rank = 1
             candidates = _ranked_formula_candidates(await recognize(image_bytes))
+            if not candidates and math_available:
+                # A provider that answers without LaTeX is not an outage, so
+                # nothing else records it; a page-level provider such as
+                # docling-math finds no formula in a chip and sends every
+                # formula to vision.
+                logger.info(
+                    "Formula {} (page {}): math.recognize ({}) returned no LaTeX; "
+                    "falling back to the vision model",
+                    element.id, page_number, settings.toolbox_math_recognize_provider,
+                )
             for rank, candidate in enumerate(candidates, start=1):
                 latex = accept(method if rank == 1 else f"{method}#{rank}", candidate["latex"])
                 if latex:
