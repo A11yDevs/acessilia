@@ -43,6 +43,7 @@ def test_math_reference_case(monkeypatch):
         pytest.skip(f"math reference case not found: {pdf}")
     rows, expectations = math_case.load_case(root)
     monkeypatch.setattr(settings, "legacy_unicode_repair", "repair")
+    monkeypatch.setattr(settings, "pddl_execute_dry_run", False)
 
     canonical_path, txt_path, pdf_ua_path = asyncio.run(math_case._process(pdf, OUT, pdf_ua=True))
     card = math_case.score_case(
