@@ -322,6 +322,14 @@ class Settings:
             in {"1", "true", "yes", "on", "sim"}
         )
     )
+    # Enclose each described picture, table and formula of the delivered
+    # formats in "[label]" … "[/label]" paragraphs; a job may override it.
+    object_markers_enabled: bool = field(
+        default_factory=lambda: (
+            os.getenv("OBJECT_MARKERS_ENABLED", "false").strip().lower()
+            in {"1", "true", "yes", "on", "sim"}
+        )
+    )
     # Read again from its image a table that came back in the wrong shape
     # (rows collapsed into one, cells doubled), and use the new reading when it
     # is the same table read better.

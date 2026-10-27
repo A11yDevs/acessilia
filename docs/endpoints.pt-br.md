@@ -20,7 +20,7 @@ Definida em [backend/api/app.py](../backend/api/app.py), com as rotas em [backen
 
 | Método | Rota | O que faz | Retorno | Limite |
 |--------|------|-----------|---------|--------|
-| POST | `/api/v1/jobs` | Envia um documento para processar. Campos do form: `document_file`, `mode` (`detalhado`, `medio`, `normal`, `baixo` ou `ocr`; padrão `normal`), `custom_prompt` (deve ser vazio), `thinking_mode` (deve ser falso), `email`, `source`. Valida extensão/tamanho e enfileira. | `202` com `task_id`, `job_token`, `position` e mensagem. `400` para entrada inválida; `422` para opções não suportadas. | 5/min |
+| POST | `/api/v1/jobs` | Envia um documento para processar. Campos do form: `document_file`, `mode` (`detalhado`, `medio`, `normal`, `baixo` ou `ocr`; padrão `normal`), `custom_prompt` (deve ser vazio), `thinking_mode` (deve ser falso), `email`, `source`, `object_markers` (booleano opcional: envolve cada imagem descrita, tabela e fórmula dos formatos entregues em parágrafos `[rótulo]` … `[/rótulo]`; omitido, vale `OBJECT_MARKERS_ENABLED`). Valida extensão/tamanho e enfileira. | `202` com `task_id`, `job_token`, `position` e mensagem. `400` para entrada inválida; `422` para opções não suportadas. | 5/min |
 | GET | `/api/v1/jobs/{task_id}` | Consulta o estado de um job. Requer `X-Job-Token`. | JSON `JobStatus`: `task_id`, `arquivo`, `status`, `progresso` (0–1), `etapa_atual`, `erros[]`, `download_url` (quando pronto), `email_delivery`, `criado_em`, `fim`. | 60/min |
 | POST | `/api/v1/jobs/{task_id}/cancel` | Solicita o cancelamento de um job. Requer `X-Job-Token`. | JSON `{task_id, status}`. | 10/min |
 

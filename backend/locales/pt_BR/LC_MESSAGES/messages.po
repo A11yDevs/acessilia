@@ -1042,6 +1042,15 @@ msgstr "Imagem sem descrição textual."
 msgid "Logo. {lines}."
 msgstr "Logotipo. {lines}."
 
+msgid "image"
+msgstr "imagem"
+
+msgid "table"
+msgstr "tabela"
+
+msgid "formula"
+msgstr "fórmula"
+
 msgid "Image description"
 msgstr "Descrição da imagem"
 
