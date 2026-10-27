@@ -91,16 +91,22 @@ def build_pandoc_ast(document: dict[str, Any]) -> dict[str, Any]:
 
 
 def _section_to_blocks(section: dict[str, Any]) -> list[dict[str, Any]]:
-    blocks = [
-        {
-            "t": "Header",
-            "c": [
-                section.get("level", 1),
-                [section.get("id", ""), [], []],
-                _meta_inlines(section.get("title", "")),
-            ],
-        }
-    ]
+    # An untitled section (the text before the first heading) gets no Header:
+    # an empty one is tagged as an empty H1, as the HTML and text exports skip it.
+    blocks = (
+        [
+            {
+                "t": "Header",
+                "c": [
+                    section.get("level", 1),
+                    [section.get("id", ""), [], []],
+                    _meta_inlines(section.get("title", "")),
+                ],
+            }
+        ]
+        if section.get("title")
+        else []
+    )
     alias = section_title_alias(section)
     if alias:
         blocks.insert(0, {"t": "Div", "c": [[alias, [], []], []]})
