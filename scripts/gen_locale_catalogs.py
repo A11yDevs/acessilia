@@ -289,7 +289,6 @@ from backend.export.markers import (
 from backend.export.renderers.html_renderer import (
     MSG_HTML_IMAGE_DESCRIPTION,
     MSG_HTML_TABLE_OF_CONTENTS,
-    MSG_HTML_TECHNICAL_METADATA,
 )
 from backend.pipeline.table_ast import (
     MSG_TABLE_TEXT_CAPTION,
@@ -727,7 +726,6 @@ MESSAGES: tuple[str, ...] = (
     MSG_UNSUPPORTED_EXPORT_FORMAT,
     # HTML renderer UI chrome (backend/export/renderers/html_renderer.py).
     MSG_HTML_TABLE_OF_CONTENTS,
-    MSG_HTML_TECHNICAL_METADATA,
     MSG_UNDESCRIBED_PICTURE_ALT,
     MSG_LETTERHEAD_TEXT,
     MSG_OBJECT_MARKER_IMAGE,
@@ -1437,7 +1435,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         ),
         # HTML renderer UI chrome (pt-BR mirrors of the MSG_HTML_* ids above).
         MSG_HTML_TABLE_OF_CONTENTS: "Sumário",
-        MSG_HTML_TECHNICAL_METADATA: "Metadados técnicos",
         MSG_UNDESCRIBED_PICTURE_ALT: "Imagem sem descrição textual.",
         MSG_LETTERHEAD_TEXT: "Logotipo. {lines}.",
         MSG_OBJECT_MARKER_IMAGE: "imagem",
