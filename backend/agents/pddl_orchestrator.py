@@ -255,7 +255,7 @@ def _handle_latex_verbalizer_method(
 
 
 def _run_extract_fused(
-    source_path: Path, *, artifact_id: str | None = None
+    source_path: Path, *, artifact_id: str | None = None, policy=None
 ) -> dict:
     """Executa ``extract_fused`` respeitando o contexto de event loop.
 
@@ -279,14 +279,14 @@ def _run_extract_fused(
     except RuntimeError:
         # Contexto síncrono (executor determinístico, CLI, testes):
         # não existe event loop ativo neste thread.
-        return asyncio.run(extract_fused(source_path, artifact_id=artifact_id))
+        return asyncio.run(extract_fused(source_path, artifact_id=artifact_id, policy=policy))
 
     # Já existe um event loop neste thread; como o handler é síncrono,
     # a coroutine é executada em um thread dedicado com seu próprio loop.
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
         return pool.submit(
             lambda: asyncio.run(
-                extract_fused(source_path, artifact_id=artifact_id)
+                extract_fused(source_path, artifact_id=artifact_id, policy=policy)
             )
         ).result()
 
@@ -2376,7 +2376,10 @@ def _reusable_fusion_payload(manifest: ProcessingManifest) -> dict | None:
         record = json.loads(content)
         if record["source_sha256"] != manifest.source.sha256:
             return None
-        if record.get("policy") != asdict(FusionPolicy()):
+        expected_policy = manifest.extractor.configuration.get("fusion_policy")
+        if expected_policy is None:
+            expected_policy = asdict(FusionPolicy())
+        if record.get("policy") != expected_policy:
             return None
         if json.dumps(record["configuration"], sort_keys=True) != json.dumps(processing_cache_configuration(), sort_keys=True):
             return None
@@ -2418,7 +2421,14 @@ def _handle_dual_provider_fusion_method(
     try:
         payload = _reusable_fusion_payload(manifest)
         if payload is None:
-            payload = _run_extract_fused(source_path, artifact_id=artifact_id)
+            from docstruct.policy import FusionPolicy
+
+            policy_config = manifest.extractor.configuration.get("fusion_policy")
+            policy = FusionPolicy.from_dict(policy_config) if policy_config else None
+            if policy is None:
+                payload = _run_extract_fused(source_path, artifact_id=artifact_id)
+            else:
+                payload = _run_extract_fused(source_path, artifact_id=artifact_id, policy=policy)
     except Exception as exc:  # noqa: BLE001
         return MethodResult(
             success=False,

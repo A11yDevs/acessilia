@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from time import perf_counter
@@ -217,6 +217,7 @@ class ToolboxManifestExtractor:
             configuration={
                 "fusion": result.get("fusion"),
                 "fusion_reuse": result.get("fusion_reuse"),
+                "fusion_policy": asdict(self.fusion_policy) if self.fusion_policy else None,
                 "ocr": self.enable_ocr,
                 "table_structure": True,
                 "remote_services": True,

@@ -325,3 +325,78 @@ def test_route_uses_structure_when_text_agrees(kind):
     stats = result['fusion_evidence']['pages'][0]['stats']
     assert stats['route'] == 'mineru'
     assert stats['route_reason'] == 'secondary_structure_superset'
+
+
+def test_reuse_accepts_effective_custom_policy(tmp_path, monkeypatch):
+    from dataclasses import asdict
+
+    from docstruct.policy import FusionPolicy
+
+    from backend.agents import pddl_orchestrator as pddl
+    from backend.core.manifest.toolbox_extractor import _persist_fusion_reuse
+    from tests.test_dual_provider_fusion import _dual_payload, _make_manifest
+
+    manifest = _make_manifest(tmp_path)
+    source = Path(manifest.source.path)
+    source.write_bytes(b'%PDF-policy')
+    manifest.source.sha256 = hashlib.sha256(source.read_bytes()).hexdigest()
+    monkeypatch.setattr(settings, 'data_dir', tmp_path)
+    policy = FusionPolicy(align_tau=0.4)
+    payload = _dual_payload()
+    manifest.extractor.configuration['fusion_reuse'] = _persist_fusion_reuse(source, payload, policy)
+    manifest.extractor.configuration['fusion_policy'] = asdict(policy)
+    assert pddl._reusable_fusion_payload(manifest) == payload
+    manifest.extractor.configuration['fusion_policy'] = asdict(FusionPolicy(align_tau=0.8))
+    assert pddl._reusable_fusion_payload(manifest) is None
+
+
+def test_reextract_uses_effective_custom_policy(tmp_path, monkeypatch):
+    from dataclasses import asdict
+
+    from docstruct.policy import FusionPolicy
+
+    from backend.agents import pddl_orchestrator as pddl
+    from tests.test_dual_provider_fusion import _dual_payload, _make_manifest
+
+    manifest = _make_manifest(tmp_path)
+    policy = FusionPolicy(align_tau=0.4)
+    manifest.extractor.configuration['fusion_policy'] = asdict(policy)
+    seen = []
+    def extract(path, *, artifact_id=None, policy=None):
+        seen.append(policy)
+        return _dual_payload()
+    monkeypatch.setattr(pddl, '_run_extract_fused', extract)
+    monkeypatch.setattr(settings, 'data_dir', tmp_path)
+    assert pddl._handle_dual_provider_fusion_method(manifest, 'o-fuse').success
+    assert seen == [policy]
+
+
+def test_handler_reuses_matching_policy_and_reextracts_with_changed_policy(tmp_path, monkeypatch):
+    from dataclasses import asdict
+
+    from docstruct.policy import FusionPolicy
+
+    from backend.agents import pddl_orchestrator as pddl
+    from backend.core.manifest.toolbox_extractor import _persist_fusion_reuse
+    from tests.test_dual_provider_fusion import _dual_payload, _make_manifest
+
+    manifest = _make_manifest(tmp_path)
+    source = Path(manifest.source.path)
+    source.write_bytes(b'%PDF-policy-integration')
+    manifest.source.sha256 = hashlib.sha256(source.read_bytes()).hexdigest()
+    monkeypatch.setattr(settings, 'data_dir', tmp_path)
+    original = FusionPolicy(align_tau=0.4)
+    changed = FusionPolicy(align_tau=0.8)
+    payload = _dual_payload()
+    manifest.extractor.configuration['fusion_reuse'] = _persist_fusion_reuse(source, payload, original)
+    manifest.extractor.configuration['fusion_policy'] = asdict(original)
+    calls = []
+    def extract(path, *, artifact_id=None, policy=None):
+        calls.append(policy)
+        return payload
+    monkeypatch.setattr(pddl, '_run_extract_fused', extract)
+    assert pddl._handle_dual_provider_fusion_method(manifest, 'o-fuse').success
+    assert not calls
+    manifest.extractor.configuration['fusion_policy'] = asdict(changed)
+    assert pddl._handle_dual_provider_fusion_method(manifest, 'o-fuse').success
+    assert calls == [changed]
