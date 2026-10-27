@@ -48,8 +48,12 @@ from scripts.bench.math_case import dataset_dir
 
 CASE_DIR = Path("input") / "presentation-reference"
 
-#: A slide heading as the exporters write it, in pt-BR or English.
-SLIDE_HEADING = re.compile(r"^\s*(?:\d+(?:\.\d+)*\s+)?Slide (\d+) (?:de|of) (\d+)\b", re.MULTILINE)
+#: A slide heading as the exporters write it, in pt-BR or English. A page
+#: break also starts a line: ``pdftotext -raw`` may end the previous page with
+#: its footer number and no newline ("1\f1.3 Slide 3 de 42").
+SLIDE_HEADING = re.compile(
+    r"(?:^|(?<=\f))\s*(?:\d+(?:\.\d+)*\s+)?Slide (\d+) (?:de|of) (\d+)\b", re.MULTILINE
+)
 
 #: Share of an image's terms its description must hold to count as described.
 TERM_RECALL_PASS = 0.6

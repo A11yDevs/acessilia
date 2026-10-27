@@ -108,6 +108,13 @@ def test_a_wrapped_header_cell_is_found_in_the_stream_order():
     assert "Rows found only in stream order: 0 → 1" in slide_case.compare(layout_only, both)
 
 
+def test_a_heading_right_after_a_page_break_starts_its_slide():
+    # pdftotext -raw ends a page with its footer number and no newline.
+    text = "1.1 Slide 1 de 2\nintro\n1\f1.2 Slide 2 de 2\nPrefix symbol power\n"
+
+    assert slide_case.split_slides(text).keys() == {1, 2}
+
+
 def test_a_row_the_layout_reads_right_is_not_marked_as_stream_order():
     card = slide_case.score_text(ROWS, EXPECTATIONS, GOOD, "out", stream_text=GOOD)
 
