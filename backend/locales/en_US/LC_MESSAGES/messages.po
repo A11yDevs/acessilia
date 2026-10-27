@@ -1058,8 +1058,8 @@ msgstr "Your E-mail"
 msgid "We will send the final files to this address."
 msgstr "We will send the final files to this address."
 
-msgid "Attach a Document (PDF or Image)"
-msgstr "Attach a Document (PDF or Image)"
+msgid "Attach a Document (PDF, HTML or Image)"
+msgstr "Attach a Document (PDF, HTML or Image)"
 
 msgid "Make Accessible"
 msgstr "Make Accessible"

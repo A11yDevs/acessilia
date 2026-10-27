@@ -33,6 +33,13 @@ def test_cache_tracks_fusion_and_model_revision(monkeypatch, name, value):
     )
 
 
+@pytest.mark.parametrize("extension", [".bmp", ".gif", ".webp"])
+def test_unsupported_inputs_rejected_before_job_creation(extension):
+    from backend.tools.validators import validate_file
+
+    assert validate_file("input" + extension, 100)[0] is False
+
+
 @pytest.mark.parametrize("kind", ["table", "picture", "formula"])
 def test_empty_structural_elements_contribute_to_fusion_evidence(kind):
     from backend.pipeline.fusion import _group_by_page, fuse_extraction_payloads

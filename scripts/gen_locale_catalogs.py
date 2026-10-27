@@ -1441,7 +1441,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         ),
         WEB_INDEX_EMAIL_LABEL: "Seu E-mail",
         WEB_INDEX_EMAIL_HELP: "Enviaremos o arquivo final para este endereço.",
-        WEB_INDEX_DOC_LABEL: "Anexar Documento (PDF ou Imagem)",
+        WEB_INDEX_DOC_LABEL: "Anexar Documento (PDF, HTML ou Imagem)",
         WEB_INDEX_SUBMIT_BUTTON: "Tornar Acessível",
         WEB_DOWNLOAD_TITLE: "Download - Acessilia",
         WEB_DOWNLOAD_HEADLINE: "Download",

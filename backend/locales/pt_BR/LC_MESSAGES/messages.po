@@ -1072,8 +1072,8 @@ msgstr "Seu E-mail"
 msgid "We will send the final files to this address."
 msgstr "Enviaremos o arquivo final para este endereço."
 
-msgid "Attach a Document (PDF or Image)"
-msgstr "Anexar Documento (PDF ou Imagem)"
+msgid "Attach a Document (PDF, HTML or Image)"
+msgstr "Anexar Documento (PDF, HTML ou Imagem)"
 
 msgid "Make Accessible"
 msgstr "Tornar Acessível"

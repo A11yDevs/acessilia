@@ -557,9 +557,6 @@ def _default_extensions() -> set[str]:
         ".jpeg",
         ".tiff",
         ".tif",
-        ".bmp",
-        ".gif",
-        ".webp",
         ".docx",
         ".html",
     }
