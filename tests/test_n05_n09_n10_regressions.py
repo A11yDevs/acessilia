@@ -19,6 +19,53 @@ from backend.config.settings import settings
 from backend.services import cache, cleanup_service
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "token,method,expected",
+    [
+        (b"invalid", "GET", 401),
+        ("inválido".encode(), "GET", 401),
+        (b"secret", "GET", 200),
+        (b"secret", "HEAD", 200),
+        (b"secret", "POST", 403),
+        (None, "GET", 401),
+    ],
+)
+async def test_observability_auth_handles_untrusted_token(
+    monkeypatch, token, method, expected
+):
+    monkeypatch.setattr(settings, "observability_api_token", "secret")
+    app = FastAPI()
+
+    @app.api_route(
+        "/probe",
+        methods=["GET", "HEAD", "POST"],
+        dependencies=[Depends(require_observability_token)],
+    )
+    def probe():
+        return {"ok": True}
+
+    headers = [(b"Authorization", b"Bearer " + token)] if token is not None else []
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app, raise_app_exceptions=False),
+        base_url="http://test",
+    ) as client:
+        response = await client.request(method, "/probe", headers=headers)
+    assert response.status_code == expected
+    if expected == 401:
+        assert response.headers["www-authenticate"] == "Bearer"
+
+
+@pytest.mark.asyncio
+async def test_unconfigured_observability_remains_unavailable(monkeypatch):
+    from fastapi import HTTPException, Request
+
+    monkeypatch.setattr(settings, "observability_api_token", "")
+    with pytest.raises(HTTPException) as error:
+        require_observability_token(Request({"type": "http", "method": "GET"}), None)
+    assert error.value.status_code == 503
+
+
 @pytest.mark.parametrize("prefix", ["", "sha256:"])
 @pytest.mark.parametrize("suffix", ["\n", "\r\n", " ", "\t", "\x00"])
 def test_artifact_id_rejects_trailing_characters(prefix, suffix):
