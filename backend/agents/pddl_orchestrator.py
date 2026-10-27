@@ -70,7 +70,7 @@ from backend.core.planning.domain_bundle import DomainBundle
 from backend.core.planning.models import NominalPlan, PlanningComparison, PlanStep
 from backend.core.planning import toolbox_gate
 from backend.core.planning.planner_agent import PlannerAgent
-from backend.i18n import n, t
+from backend.i18n import locale_for_user, n, reset_request_locale, set_request_locale, t
 from backend.log_messages import (
     LOG_MEDIA_INSPECT_FAILED,
     LOG_PDDL_ELEMENT_CROP_FAILED,
@@ -4783,6 +4783,44 @@ def _page_number_ids(manifest: ProcessingManifest) -> set[str]:
 #: Height share of the page by which a picture may miss a header line and
 #: still sit beside it (the line's box is tighter than the logo's).
 _LETTERHEAD_TOLERANCE = 0.01
+#: Width share of the page a header line may stand away from the picture and
+#: still be beside it; a running header across the page is not.
+_LETTERHEAD_MAX_GAP = 0.05
+#: Tallest picture, as a share of the page height, read as a logo: a figure
+#: crossing the header band is content, and keeps its description.
+_LETTERHEAD_MAX_HEIGHT = _PAGE_NUMBER_MARGIN
+
+
+def _is_page_header_line(
+    element: ManifestElement, bbox: tuple[float, ...]
+) -> bool:
+    """A non-empty line the extractor marked as page header.
+
+    Read from the type and raw label, like the page number filter. Docling's
+    ``content_layer`` does not tell header from footer, so a ``furniture``
+    line counts only in the top margin.
+    """
+    if not (element.text or "").strip():
+        return False
+    if (
+        _element_role(element) == "header"
+        or reading_role(str(element.type), str(element.raw_label)) == "header"
+    ):
+        return True
+    return (
+        element.metadata.get("content_layer") == "furniture"
+        and (bbox[1] + bbox[3]) / 2 < _PAGE_NUMBER_MARGIN
+    )
+
+
+def _is_beside(picture_box: tuple[float, ...], line_box: tuple[float, ...]) -> bool:
+    """Whether a header line overlaps the picture's height and stands next to it."""
+    horizontal_gap = max(line_box[0] - picture_box[2], picture_box[0] - line_box[2])
+    return (
+        line_box[1] <= picture_box[3] + _LETTERHEAD_TOLERANCE
+        and picture_box[1] <= line_box[3] + _LETTERHEAD_TOLERANCE
+        and horizontal_gap <= _LETTERHEAD_MAX_GAP
+    )
 
 
 def _letterhead_groups(
@@ -4793,10 +4831,11 @@ def _letterhead_groups(
     An institutional header ("University of X / Department of Y" next to the
     logo) reaches the manifest as page_header lines and an unrelated picture,
     so the reader got the lines apart and a long description of a logo that
-    repeats them. A picture whose height overlaps a header line joins every
-    header line it overlaps; a page header without a picture is left as is.
+    repeats them. A logo-sized picture joins the header lines beside it; two
+    pictures form one group only when they share a line, so two institutions'
+    headers on a page stay apart. A page header without a picture is left as is.
     """
-    #: page number -> its header lines and pictures, with their boxes.
+    #: page number -> its header lines and logo-sized pictures, with their boxes.
     lines: dict[int, list[tuple[ManifestElement, tuple[float, ...]]]] = {}
     pictures: dict[int, list[tuple[ManifestElement, tuple[float, ...]]]] = {}
     for element in manifest.elements:
@@ -4807,42 +4846,59 @@ def _letterhead_groups(
             continue
         page = element.page_number or 1
         if element.type == "picture":
-            pictures.setdefault(page, []).append((element, bbox))
-        elif (
-            reading_role(str(element.type), str(element.raw_label)) == "header"
-            and (element.text or "").strip()
-        ):
+            if bbox[3] - bbox[1] <= _LETTERHEAD_MAX_HEIGHT:
+                pictures.setdefault(page, []).append((element, bbox))
+        elif _is_page_header_line(element, bbox):
             lines.setdefault(page, []).append((element, bbox))
 
     groups: dict[str, list[ManifestElement]] = {}
     for page, page_pictures in pictures.items():
-        members: dict[str, ManifestElement] = {}
+        components: list[dict[str, ManifestElement]] = []
         for picture, picture_box in page_pictures:
             beside = [
                 line
                 for line, line_box in lines.get(page, [])
-                if line_box[1] <= picture_box[3] + _LETTERHEAD_TOLERANCE
-                and picture_box[1] <= line_box[3] + _LETTERHEAD_TOLERANCE
+                if _is_beside(picture_box, line_box)
             ]
-            if beside:
-                members[picture.id] = picture
-                members.update((line.id, line) for line in beside)
-        if members:
-            ordered = sorted(members.values(), key=lambda item: item.reading_order)
+            if not beside:
+                continue
+            component = {picture.id: picture}
+            component.update((line.id, line) for line in beside)
+            for other in [item for item in components if item.keys() & component.keys()]:
+                component.update(other)
+                components.remove(other)
+            components.append(component)
+        for component in components:
+            ordered = sorted(component.values(), key=lambda item: item.reading_order)
             groups[ordered[0].id] = ordered
     return groups
 
 
-def _letterhead_block(members: list[ManifestElement]) -> dict[str, Any]:
-    """One paragraph for a logo and its header lines, in place of the first of them."""
+def _letterhead_block(
+    members: list[ManifestElement], language: str | None
+) -> dict[str, Any]:
+    """One paragraph for a logo and its header lines, in place of the first of them.
+
+    The paragraph replaces the picture too: the outputs never showed the
+    logo's pixels (Pandoc writes an image block as a paragraph of its alt
+    text), only the description this paragraph stands for. The text is in
+    the document's language, not the interface's. ``role`` and
+    ``letterhead_members`` record the merge for audit; no renderer reads
+    them, so the PDF/UA tag stays ``P``.
+    """
     block = _element_to_block(members[0])
     lines = [
         (member.text or "").strip().rstrip(".,;")
         for member in members
         if member.type != "picture"
     ]
+    token = set_request_locale(locale_for_user(language))
+    try:
+        template = t(MSG_LETTERHEAD_TEXT)
+    finally:
+        reset_request_locale(token)
     block["type"] = "paragraph"
-    block["text"] = t(MSG_LETTERHEAD_TEXT).format(lines=", ".join(lines))
+    block["text"] = template.format(lines=", ".join(lines))
     block.pop("alt_text", None)
     block["metadata"]["role"] = "header"
     block["metadata"]["letterhead_members"] = [member.id for member in members]
@@ -4860,7 +4916,8 @@ def _manifest_pages_to_payload(manifest: ProcessingManifest) -> list[dict[str, A
         for member in members[1:]
     }
     letterhead_blocks = {
-        key: _letterhead_block(members) for key, members in letterheads.items()
+        key: _letterhead_block(members, manifest.language)
+        for key, members in letterheads.items()
     }
     pages: list[dict[str, Any]] = []
 
