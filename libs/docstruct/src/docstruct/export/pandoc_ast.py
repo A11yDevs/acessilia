@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import re
 from typing import Any
+from docstruct.blocks.lists import list_numbering, list_start
 from docstruct.sections import section_body_blocks, section_title_alias
 
 from docstruct.tables.ast import effective_section_width, row_header_column_count
@@ -143,15 +144,15 @@ def _block_to_ast(block: dict[str, Any]) -> list[dict[str, Any]]:
             }
         ]
     if block_type == "list":
-        return [
-            {
-                "t": "BulletList",
-                "c": [
-                    [{"t": "Para", "c": _prose_inlines(str(item), block)}]
-                    for item in block.get("items", [])
-                ],
-            }
+        items = [
+            [{"t": "Para", "c": _prose_inlines(str(item), block)}]
+            for item in block.get("items", [])
         ]
+        if block.get("ordered"):
+            style = _ORDERED_LIST_STYLES[list_numbering(block)]
+            attributes = [list_start(block), {"t": style}, {"t": "Period"}]
+            return [{"t": "OrderedList", "c": [attributes, items]}]
+        return [{"t": "BulletList", "c": items}]
     if block_type == "table":
         table_ast = table_ast_from_block(block)
         if table_ast is None:
@@ -244,6 +245,13 @@ def _prose_inlines(text: str, block: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 _SPACE = {"t": "Space"}
+_ORDERED_LIST_STYLES = {
+    "decimal": "Decimal",
+    "lower-alpha": "LowerAlpha",
+    "upper-alpha": "UpperAlpha",
+    "lower-roman": "LowerRoman",
+    "upper-roman": "UpperRoman",
+}
 
 
 def degrade_math_to_text(document_ast: dict[str, Any]) -> dict[str, Any]:
