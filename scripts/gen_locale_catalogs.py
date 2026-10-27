@@ -10,6 +10,7 @@ project i18n goal of requiring zero or minimal code changes per added language.
 from __future__ import annotations
 
 import argparse
+import string
 import sys
 from collections.abc import Sequence
 from datetime import datetime, timedelta, timezone
@@ -273,6 +274,7 @@ from backend.export.pandoc_exporter import (
 )
 from backend.agents.pddl_orchestrator import (
     MSG_PICTURES_NOT_DESCRIBED,
+    MSG_LETTERHEAD_TEXT,
     MSG_TABLES_NOT_READ,
     MSG_UNDESCRIBED_PICTURE_ALT,
 )
@@ -719,6 +721,7 @@ MESSAGES: tuple[str, ...] = (
     MSG_HTML_TABLE_OF_CONTENTS,
     MSG_HTML_TECHNICAL_METADATA,
     MSG_UNDESCRIBED_PICTURE_ALT,
+    MSG_LETTERHEAD_TEXT,
     MSG_HTML_IMAGE_DESCRIPTION,
     # TXT table line templates (backend/pipeline/table_ast.py).
     MSG_TABLE_TEXT_CAPTION,
@@ -1424,6 +1427,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         MSG_HTML_TABLE_OF_CONTENTS: "Sumário",
         MSG_HTML_TECHNICAL_METADATA: "Metadados técnicos",
         MSG_UNDESCRIBED_PICTURE_ALT: "Imagem sem descrição textual.",
+        MSG_LETTERHEAD_TEXT: "Logotipo. {lines}.",
         MSG_HTML_IMAGE_DESCRIPTION: "Descrição da imagem",
         # TXT table line templates (pt-BR mirrors of the MSG_TABLE_TEXT_* ids above).
         MSG_TABLE_TEXT_CAPTION: "Tabela: {caption}",
@@ -1856,7 +1860,7 @@ def _validate(translations: dict[str, dict[str, str]], locales: tuple[str, ...])
         locales (tuple): Every supported locale identifier under validation, e.g. the default :data:`SUPPORTED_LOCALES` or an alternate tuple injected by tests.
 
     Returns:
-        list: Problem descriptions, empty when every non-default locale covers all MESSAGES ids with non-blank values.
+        list: Problem descriptions, empty when every non-default locale covers all MESSAGES ids with non-blank values that keep the msgid's ``{name}`` placeholders.
     """
     problems: list[str] = []
     for locale in locales:
@@ -1869,7 +1873,26 @@ def _validate(translations: dict[str, dict[str, str]], locales: tuple[str, ...])
             else [msgid for msgid in MESSAGES if msgid not in table or not str(table[msgid]).strip()]
         )
         problems.extend(f"missing or blank entry: {x!r}" for x in missing)
+        if isinstance(table, dict):
+            problems.extend(
+                f"placeholders differ from the msgid: {msgid!r}"
+                for msgid in MESSAGES
+                if str(table.get(msgid) or "").strip()
+                and _placeholders(table[msgid]) != _placeholders(msgid)
+            )
     return problems
+
+
+def _placeholders(text: str) -> set[str] | None:
+    """The ``{name}`` fields of ``text``, or ``None`` when its braces do not parse.
+
+    A translation that drops or renames a field the caller fills with
+    ``.format(...)`` would raise at run time, not when the catalog is built.
+    """
+    try:
+        return {field for _, field, _, _ in string.Formatter().parse(text) if field is not None}
+    except ValueError:
+        return None
 
 
 def _write_catalog(locale: str, catalog, locales_dir: Path) -> tuple[Path, Path]:
