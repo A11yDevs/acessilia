@@ -378,6 +378,17 @@ A capacidade `media.inspect` (provider `pure-media-inspect`, PR
   entrada em cache que registra falha não é reaproveitada, e uma nova execução
   ainda degradada a descarta.
 
+  Antes de uma imagem ou tabela ficar assim, o seu estágio tenta mais uma vez:
+  depois de `VISION_RETRY_PASS_DELAY_SECONDS` (60), os objetos sem descrição ou
+  leitura utilizável (e as imagens que o modelo respondeu vazias) são enviados
+  de novo, um de cada vez. Um provedor que continua falhando não é chamado para
+  cada objeto: depois de `VISION_BREAKER_THRESHOLD` (3) chamadas seguidas sem
+  resposta utilizável, as demais chamadas de imagem, fórmula e tabela do job
+  são puladas e registradas como `model_failed`, com
+  `metadata.vision_failure_detail` informando que foram puladas. A primeira
+  chamada da segunda passada passa mesmo assim, para testar se o provedor
+  voltou.
+
 Os predicados PDDL `media_inspected`/`media_profile_classified` pertencem ao
 domínio da Toolbox; no core o sinal é consumido apenas como heurística de
 enriquecimento e não entra no problema de planejamento.
