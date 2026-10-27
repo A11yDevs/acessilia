@@ -10,7 +10,7 @@ import re
 import tempfile
 from collections import Counter
 from collections.abc import Callable, Coroutine, Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -24,8 +24,15 @@ from docstruct.tables.ast import (
     raw_rows_from_table_ast as _rows_from_table_ast,
 )
 from docstruct.tables.garble import table_garble_reason
-from docstruct.text.inline_math import TextSpan, detect_inline_math, splice_inline_math
+from docstruct.text.inline_math import (
+    InlineMathDetection,
+    TextSpan,
+    assign_runs_to_cells,
+    detect_inline_math,
+    splice_inline_math,
+)
 from docstruct.text.latex import has_latex_markup, latex_text_agreement
+from docstruct.text.math_spans import mask_inline_math
 from docstruct.text.norm_fix import norm_fix
 from docstruct.text.negation_overlay import (
     compose_negation,
@@ -756,14 +763,19 @@ def _compose_in_host(
     height: float,
     slash_height: float,
 ) -> str:
-    """Negate the relation under the slash in ``host``; returns the outcome."""
+    """Negate the relation under the slash in ``host``; returns the outcome.
+
+    A relation inside an inline ``$…$`` span is not a candidate: the font
+    detection built that span from the text layer, slash included (#260).
+    """
     if host.type == "table":
         grid = _table_grid(host)
-        if not any(negates(char) for row in grid for text, _ in row for char in text):
+        texts = [[mask_inline_math(text) for text, _ in row] for row in grid]
+        if not any(negates(char) for row in texts for text in row for char in text):
             return "no-candidate"
         columns = max((len(row) for row in grid), default=0)
         found = locate_in_grid(
-            [[text for text, _ in row] for row in grid],
+            texts,
             row_position=y_fraction * len(grid),
             column_position=x_fraction * columns,
         )
@@ -778,11 +790,12 @@ def _compose_in_host(
     if host.type == "formula" and has_latex_markup(host.text):
         return "host-is-latex"
     text = host.text or ""
-    if not any(negates(char) for char in text):
+    prose = mask_inline_math(text)
+    if not any(negates(char) for char in prose):
         return "no-candidate"
     lines = max(1, round(height / (slash_height * _OVERLAY_LINE_HEIGHTS)))
     index = locate_in_text(
-        text, lines=lines, line_position=y_fraction * lines, x_fraction=x_fraction
+        prose, lines=lines, line_position=y_fraction * lines, x_fraction=x_fraction
     )
     if index is None:
         return "ambiguous"
@@ -2772,7 +2785,8 @@ class PddlAccessibilityOrchestrator:
             status_callback=status_callback,
             breaker=breaker,
         )
-        await _mark_inline_math(manifest, source_path)
+        text_spans = _TextSpanReader(manifest, source_path)
+        await _mark_inline_math(manifest, source_path, text_spans)
         await _enrich_formula_latex(
             manifest,
             source_path,
@@ -2789,6 +2803,8 @@ class PddlAccessibilityOrchestrator:
             status_callback=status_callback,
             breaker=breaker,
         )
+        # After the table enrichment, which can replace a table's cells.
+        await _mark_table_inline_math(manifest, source_path, text_spans)
 
         if status_callback:
             await status_callback(t(STAGE_GENERATING_PDDL_PLAN))
@@ -3310,7 +3326,70 @@ _INLINE_MATH_ELEMENT_TYPES = frozenset({"paragraph", "list_item", "caption", "fo
 _INLINE_MATH_BOX_TOLERANCE = 2.0
 
 
-async def _mark_inline_math(manifest: ProcessingManifest, source_path: Path) -> dict[str, int]:
+class _TextSpanReader:
+    """The text layer's spans of one document, each page fetched once (#260).
+
+    The prose and table steps of the inline math detection run at different
+    points of the pipeline; reading through one reader, a page is requested
+    from the Toolbox once, and a capability that failed is not asked again.
+    """
+
+    def __init__(self, manifest: ProcessingManifest, source_path: Path) -> None:
+        self._manifest = manifest
+        self._source_path = source_path
+        self._pages: dict[int, dict[str, Any]] = {}
+        self._failed = False
+
+    async def pages(self, wanted: Iterable[int]) -> dict[int, dict[str, Any]] | None:
+        """The spans of every page read so far, ``wanted`` included; ``None`` when
+        the Toolbox cannot read them (recorded as ``unavailable``)."""
+        from acessilia_sdk.toolbox.errors import ToolboxError
+
+        from backend.tools.text_spans import fetch_text_spans
+
+        if self._failed:
+            return None
+        missing = sorted(set(wanted) - set(self._pages))
+        if missing:
+            try:
+                self._pages.update(
+                    await fetch_text_spans(
+                        self._source_path, missing, artifact_id=_source_artifact_id(self._manifest)
+                    )
+                )
+            except ToolboxError as exc:
+                logger.info("Inline math detection skipped: document.text.spans failed ({})", exc)
+                self._manifest.extractor.configuration["inline_math_detection"] = "unavailable"
+                self._failed = True
+                return None
+        return self._pages
+
+
+def _inline_math_enabled(manifest: ProcessingManifest) -> bool:
+    from backend.config.settings import settings
+
+    return (
+        settings.inline_math_detection == "fonts"
+        and manifest.source.media_type == "application/pdf"
+    )
+
+
+def _boxed_pages(elements: Iterable[ManifestElement]) -> list[int]:
+    return sorted(
+        {
+            provenance.page_number
+            for element in elements
+            for provenance in element.provenance
+            if provenance.bbox is not None
+        }
+    )
+
+
+async def _mark_inline_math(
+    manifest: ProcessingManifest,
+    source_path: Path,
+    text_spans: _TextSpanReader | None = None,
+) -> dict[str, int]:
     """Write the inline math of PDF prose as ``$…$``, from the text layer's fonts (#265).
 
     Docling reports no inline formula region for a typeset PDF, so
@@ -3328,13 +3407,8 @@ async def _mark_inline_math(manifest: ProcessingManifest, source_path: Path) -> 
     detection is skipped for other media, with ``INLINE_MATH_DETECTION=off``
     and when the Toolbox cannot read the spans.
     """
-    from acessilia_sdk.toolbox.errors import ToolboxError
-
-    from backend.config.settings import settings
-    from backend.tools.text_spans import fetch_text_spans
-
     counts = {"elements": 0, "marked": 0, "unmatched": 0}
-    if settings.inline_math_detection != "fonts" or manifest.source.media_type != "application/pdf":
+    if not _inline_math_enabled(manifest):
         return counts
     candidates = [
         element
@@ -3344,30 +3418,17 @@ async def _mark_inline_math(manifest: ProcessingManifest, source_path: Path) -> 
         and "inline_math_detection" not in element.metadata
         and any(provenance.bbox is not None for provenance in element.provenance)
     ]
-    pages = sorted(
-        {
-            provenance.page_number
-            for element in candidates
-            for provenance in element.provenance
-            if provenance.bbox is not None
-        }
-    )
+    pages = _boxed_pages(candidates)
     if not pages:
         return counts
-    try:
-        spans = await fetch_text_spans(
-            source_path, pages, artifact_id=_source_artifact_id(manifest)
-        )
-    except ToolboxError as exc:
-        logger.info("Inline math detection skipped: document.text.spans failed ({})", exc)
-        manifest.extractor.configuration["inline_math_detection"] = "unavailable"
+    spans = await (text_spans or _TextSpanReader(manifest, source_path)).pages(pages)
+    if spans is None:
         return counts
 
     heights = {page.page_number: page.height for page in manifest.pages}
     overlays = [element for element in manifest.elements if is_detached_overlay(element.text)]
     for element in candidates:
-        lines = _element_span_lines(element, spans, heights)
-        detection = detect_inline_math(lines)
+        detection = _detect_by_page(element, spans, heights)
         if not detection.runs:
             continue
         result = splice_inline_math(element.text or "", detection)
@@ -3381,13 +3442,82 @@ async def _mark_inline_math(manifest: ProcessingManifest, source_path: Path) -> 
         if not result.marked:
             continue
         element.text = result.text
-        page = next(p.page_number for p in element.provenance if p.bbox is not None)
         for run in result.marked:
             for slash in run.negations:
-                _claim_negation_overlay(overlays, element, slash, page, spans, heights)
+                _claim_negation_overlay(overlays, element, slash, run.page, spans, heights)
     manifest.extractor.configuration["inline_math_detection"] = "fonts"
     if counts["elements"]:
         logger.info("Inline math from the text layer's fonts: {}", counts)
+    return counts
+
+
+async def _mark_table_inline_math(
+    manifest: ProcessingManifest,
+    source_path: Path,
+    text_spans: _TextSpanReader | None = None,
+) -> dict[str, int]:
+    """Write the inline math of PDF table cells as ``$…$`` (#260).
+
+    The prose step's detection over the table's text-layer lines, run after
+    the table enrichment so a table read again keeps its marks. A table's
+    cells carry no boxes: ``assign_runs_to_cells`` gives each run to the cell
+    whose text holds it, and each cell is spliced on its own. A fraction set
+    in a header cell (two stacked script-size lines) becomes ``\\frac``.
+    Returns ``{elements, marked, unmatched}``, skipping as the prose step does.
+    """
+    counts = {"elements": 0, "marked": 0, "unmatched": 0}
+    if not _inline_math_enabled(manifest):
+        return counts
+    tables = [
+        element
+        for element in manifest.elements
+        if element.type == "table"
+        and isinstance(element.metadata.get("table_ast"), dict)
+        and "inline_math_detection" not in element.metadata
+        and any(provenance.bbox is not None for provenance in element.provenance)
+    ]
+    pages = _boxed_pages(tables)
+    if not pages:
+        return counts
+    spans = await (text_spans or _TextSpanReader(manifest, source_path)).pages(pages)
+    if spans is None:
+        return counts
+
+    heights = {page.page_number: page.height for page in manifest.pages}
+    overlays = [element for element in manifest.elements if is_detached_overlay(element.text)]
+    for table in tables:
+        detection = _detect_by_page(table, spans, heights)
+        if not detection.runs:
+            continue
+        cells = [
+            cell
+            for section in _TABLE_SECTIONS
+            for row in table.metadata["table_ast"].get(section) or []
+            if isinstance(row, dict)
+            for cell in row.get("cells") or []
+            if isinstance(cell, dict) and isinstance(cell.get("text"), str)
+        ]
+        detections, left_out = assign_runs_to_cells(detection, [cell["text"] for cell in cells])
+        marked, unmatched = [], list(left_out)
+        for cell, cell_detection in zip(cells, detections):
+            if not cell_detection.runs:
+                continue
+            result = splice_inline_math(cell["text"], cell_detection)
+            cell["text"] = result.text
+            marked.extend(result.marked)
+            unmatched.extend(result.unmatched)
+        counts["elements"] += 1
+        counts["marked"] += len(marked)
+        counts["unmatched"] += len(unmatched)
+        table.metadata["inline_math_detection"] = {
+            "marked": len(marked),
+            "unmatched": len(unmatched),
+        }
+        for run in marked:
+            for slash in run.negations:
+                _claim_negation_overlay(overlays, table, slash, run.page, spans, heights)
+    if counts["elements"]:
+        logger.info("Inline math of table cells from the text layer's fonts: {}", counts)
     return counts
 
 
@@ -3405,18 +3535,45 @@ def _top_left_box(
     return None
 
 
+def _detect_by_page(
+    element: ManifestElement,
+    spans: dict[int, dict[str, Any]],
+    heights: dict[int, float | None],
+) -> InlineMathDetection:
+    """``detect_inline_math`` over the element's lines, page by page, as one detection.
+
+    Each page is read on its own, so a fraction never pairs lines of two pages
+    (baselines are per-page coordinates), and each run carries its page, where
+    its negation slashes are claimed: a table is the element that spans pages.
+    """
+    detection = InlineMathDetection()
+    pages = dict.fromkeys(p.page_number for p in element.provenance if p.bbox is not None)
+    for page in pages:
+        read = detect_inline_math(_element_span_lines(element, spans, heights, page))
+        offset = len(detection.flat)
+        detection.flat += read.flat
+        detection.runs.extend(
+            replace(run, start=run.start + offset, end=run.end + offset, page=page)
+            for run in read.runs
+        )
+    return detection
+
+
 def _element_span_lines(
     element: ManifestElement,
     spans: dict[int, dict[str, Any]],
     heights: dict[int, float | None],
+    page_number: int,
 ) -> list[list[TextSpan]]:
-    """The element's text-layer lines, in order: spans whose centre lies in its boxes.
+    """The element's text-layer lines on a page, in order: spans whose centre lies in its boxes.
 
     A rotated page is left out: its spans are in the unrotated space, which the
     element's box may not be.
     """
     lines: list[list[TextSpan]] = []
     for provenance in element.provenance:
+        if provenance.page_number != page_number:
+            continue
         page = spans.get(provenance.page_number)
         if provenance.bbox is None or page is None or page.get("rotation"):
             continue
