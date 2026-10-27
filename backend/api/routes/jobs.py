@@ -68,6 +68,8 @@ def _save_upload(upload: UploadFile) -> Path:
                         ),
                     )
                 buffer.write(chunk)
+        if total == 0:
+            raise HTTPException(status_code=400, detail=t("Empty file"))
     except Exception:
         file_path.unlink(missing_ok=True)
         raise

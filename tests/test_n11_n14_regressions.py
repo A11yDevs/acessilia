@@ -56,3 +56,54 @@ async def test_readiness_rejects_invalid_contract_and_tries_next_endpoint(
     assert seen == (["first.test", "second.test"] if fallback else ["first.test"])
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "payload,filename,expected",
+    [
+        (b"", "input.pdf", 400),
+        (b"%PDF-fixture", "input.pdf", 202),
+        (b"x" * 33, "input.pdf", 413),
+        (b"<p>HTML</p>", "input.html", 202),
+        (b"", "input.html", 400),
+    ],
+)
+async def test_upload_rejects_empty_and_oversized_before_persistence_or_queue(
+    tmp_path, monkeypatch, payload, filename, expected
+):
+    queued, persisted = [], []
+
+    async def enqueue(item):
+        queued.append(item)
+        return len(queued)
+
+    monkeypatch.setattr(settings, "temp_dir", tmp_path)
+    monkeypatch.setattr(settings, "max_file_size_mb", 32 / (1024 * 1024))
+    monkeypatch.setattr(limiter, "enabled", False)
+    monkeypatch.setattr(
+        jobs, "unified_queue", SimpleNamespace(qsize=lambda: 0, enqueue=enqueue)
+    )
+    monkeypatch.setattr(worker, "queued_jobs", {})
+    monkeypatch.setattr(jobs, "save_request", lambda *args: persisted.append(args[0]))
+    monkeypatch.setattr(jobs, "save_status", lambda *args: None)
+    app = FastAPI()
+    app.state.limiter = limiter
+    app.include_router(jobs.router)
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app), base_url="http://core.test"
+    ) as client:
+        response = await client.post(
+            "/jobs",
+            files={
+                "document_file": (
+                    filename,
+                    payload,
+                    "text/html" if filename.endswith(".html") else "application/pdf",
+                )
+            },
+        )
+    assert response.status_code == expected
+    assert len(queued) == len(persisted) == (1 if expected == 202 else 0)
+    paths = list((tmp_path / "uploads").iterdir())
+    assert len(paths) == (1 if expected == 202 else 0)
+    if expected == 202:
+        assert paths[0].read_bytes() == payload
