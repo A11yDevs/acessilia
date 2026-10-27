@@ -1425,6 +1425,14 @@ msgstr ""
 "from its image was not used ({why})"
 
 #, python-brace-format
+msgid ""
+"{failures} vision calls in a row got no usable answer; skipping the "
+"remaining calls of this job"
+msgstr ""
+"{failures} vision calls in a row got no usable answer; skipping the "
+"remaining calls of this job"
+
+#, python-brace-format
 msgid "Failed to extract the image clip for element {element_id}"
 msgstr "Failed to extract the image clip for element {element_id}"
 
@@ -1942,4 +1950,32 @@ msgid "{count} table could not be read."
 msgid_plural "{count} tables could not be read."
 msgstr[0] "{count} table could not be read."
 msgstr[1] "{count} tables could not be read."
+
+#, python-brace-format
+msgid ""
+"{count} picture without a usable description from the model; trying again"
+" in {delay}s"
+msgid_plural ""
+"{count} pictures without a usable description from the model; trying "
+"again in {delay}s"
+msgstr[0] ""
+"{count} picture without a usable description from the model; trying again"
+" in {delay}s"
+msgstr[1] ""
+"{count} pictures without a usable description from the model; trying "
+"again in {delay}s"
+
+#, python-brace-format
+msgid ""
+"{count} table without a usable reading from the model; trying again in "
+"{delay}s"
+msgid_plural ""
+"{count} tables without a usable reading from the model; trying again in "
+"{delay}s"
+msgstr[0] ""
+"{count} table without a usable reading from the model; trying again in "
+"{delay}s"
+msgstr[1] ""
+"{count} tables without a usable reading from the model; trying again in "
+"{delay}s"
 
