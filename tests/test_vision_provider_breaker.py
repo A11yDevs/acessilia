@@ -109,7 +109,7 @@ def test_the_breaker_opens_after_failures_in_a_row_and_an_answer_closes_it():
     assert not breaker.open
     breaker.record(False)
     assert breaker.open
-    assert breaker.skip_detail() == "skipped: the provider failed 2 calls in a row"
+    assert breaker.skip_detail() == "skipped: 2 vision calls in a row got no usable answer"
 
     breaker.probe()
     assert not breaker.open
@@ -158,7 +158,7 @@ async def test_a_provider_that_stays_down_costs_the_threshold_and_one_probe(
     assert reasons == ["model_failed"] * 5
     details = [p.metadata["vision_failure_detail"] for p in manifest.elements]
     assert details[0] == "TimeoutError: no answer"
-    assert details[-1] == "skipped: the provider failed 2 calls in a row"
+    assert details[-1] == "skipped: 2 vision calls in a row got no usable answer"
 
 
 @pytest.mark.asyncio
@@ -248,8 +248,8 @@ async def test_an_unused_answer_on_the_second_pass_is_not_left_as_a_failure(
     # The model answered; the job cannot use the answer (`kind` is not a
     # table), but that says the provider is up, so the failure the first pass
     # recorded must not stay on the element to keep the run out of the cache.
-    _UNUSABLE = DataOutput(kind="formula", latex="E=mc^2", language="pt-BR", confidence=0.9)
-    data_calls = _data(monkeypatch, [None, _UNUSABLE])
+    unusable = DataOutput(kind="formula", latex="E=mc^2", language="pt-BR", confidence=0.9)
+    data_calls = _data(monkeypatch, [None, unusable])
     monkeypatch.setattr(
         "backend.agents.pddl_orchestrator._extract_picture_bytes",
         lambda *_args, **_kwargs: (b"image-bytes", 1),
@@ -345,11 +345,11 @@ async def test_a_breaker_opened_by_the_pictures_skips_the_formula_fallback(
         "backend.agents.pddl_orchestrator._formula_recognition_crop",
         lambda *_args, **_kwargs: (b"png", 1),
     )
-    tables = _manifest([_element("pic-1", "picture"), _element("pic-2", "picture")], [])
+    pictures = _manifest([_element("pic-1", "picture"), _element("pic-2", "picture")], [])
     formulas = _manifest([_element("formula-1", "formula")], [])
     breaker = ProviderBreaker(settings.vision_breaker_threshold)
 
-    await _enrich_picture_descriptions(tables, tmp_path / "doc.pdf", mode="medio", breaker=breaker)
+    await _enrich_picture_descriptions(pictures, tmp_path / "doc.pdf", mode="medio", breaker=breaker)
     await _enrich_formula_latex(
         formulas, tmp_path / "doc.pdf", mode="medio", breaker=breaker
     )

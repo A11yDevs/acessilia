@@ -1422,11 +1422,11 @@ msgstr ""
 
 #, python-brace-format
 msgid ""
-"Vision provider failed {failures} calls in a row; skipping the remaining "
-"calls of this job"
+"{failures} vision calls in a row got no usable answer; skipping the "
+"remaining calls of this job"
 msgstr ""
-"Vision provider failed {failures} calls in a row; skipping the remaining "
-"calls of this job"
+"{failures} vision calls in a row got no usable answer; skipping the "
+"remaining calls of this job"
 
 #, python-brace-format
 msgid "Failed to extract the image clip for element {element_id}"

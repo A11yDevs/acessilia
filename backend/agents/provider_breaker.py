@@ -41,7 +41,7 @@ class ProviderBreaker:
 
     def skip_detail(self) -> str:
         """Why a call was skipped, for metadata["vision_failure_detail"]."""
-        return f"skipped: the provider failed {self._streak} calls in a row"
+        return f"skipped: {self._streak} vision calls in a row got no usable answer"
 
     def record(self, answered: bool) -> None:
         """Count a call: an answer closes the breaker, no usable answer adds a failure."""

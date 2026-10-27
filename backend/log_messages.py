@@ -428,9 +428,9 @@ LOG_PDDL_TABLE_REREAD_REJECTED: str = (
     "Table {element_id} (page {page}) looked misread ({reason}); "
     "the reading from its image was not used ({why})"
 )
-#: Warning logged when the vision provider failed {failures} calls in a row and the remaining vision calls of the job are skipped.
+#: Warning logged when {failures} vision calls in a row got no usable answer and the remaining vision calls of the job are skipped.
 LOG_PROVIDER_BREAKER_OPEN: str = (
-    "Vision provider failed {failures} calls in a row; "
+    "{failures} vision calls in a row got no usable answer; "
     "skipping the remaining calls of this job"
 )
 #: Warning logged before the picture stage tries again what failed; {count} is how many pictures (empty answers included), {delay} the seconds waited first.

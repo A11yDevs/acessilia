@@ -1438,11 +1438,11 @@ msgstr ""
 
 #, python-brace-format
 msgid ""
-"Vision provider failed {failures} calls in a row; skipping the remaining "
-"calls of this job"
+"{failures} vision calls in a row got no usable answer; skipping the "
+"remaining calls of this job"
 msgstr ""
-"O provedor de visão falhou {failures} chamadas seguidas; as chamadas "
-"restantes deste job serão puladas"
+"{failures} chamadas de visão seguidas sem resposta utilizável; as "
+"chamadas restantes deste job serão puladas"
 
 #, python-brace-format
 msgid "Failed to extract the image clip for element {element_id}"

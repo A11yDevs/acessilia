@@ -1611,7 +1611,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "a leitura da sua imagem não foi usada ({why})"
         ),
         LOG_PROVIDER_BREAKER_OPEN: (
-            "O provedor de visão falhou {failures} chamadas seguidas; "
+            "{failures} chamadas de visão seguidas sem resposta utilizável; "
             "as chamadas restantes deste job serão puladas"
         ),
         LOG_PDDL_ELEMENT_CROP_FAILED: (

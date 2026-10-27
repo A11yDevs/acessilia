@@ -3950,7 +3950,10 @@ async def _enrich_table_structures(
         if not image_bytes:
             _record_table_read_failure(element, "crop_unavailable")
             if reason is not None:
-                _keep_misread_table(element, page_number, reason, "no image of the table", 0)
+                _keep_misread_table(
+                    element, page_number, reason, "no image of the table",
+                    _table_review_attempts(element, 0),
+                )
             return False
 
         # A misread table gets a few readings: the model may drop columns or
