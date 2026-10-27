@@ -1018,9 +1018,6 @@ msgstr "Unsupported export format: {format_name}"
 msgid "Contents"
 msgstr "Contents"
 
-msgid "Technical metadata"
-msgstr "Technical metadata"
-
 msgid "Image without a text description."
 msgstr "Image without a text description."
 

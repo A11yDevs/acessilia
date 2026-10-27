@@ -25,7 +25,6 @@ class HtmlLabels:
 
     default_title: str = "Accessible document"
     table_of_contents: str = "Contents"
-    technical_metadata: str = "Technical metadata"
     image_description: str = "Image description"
     extra: dict[str, str] = field(default_factory=dict)
 
@@ -357,7 +356,6 @@ def document_to_html(
         "table{border-collapse:collapse;background:#fff}",
         "th,td{border:1px solid #999;padding:.35rem .75rem;text-align:left;vertical-align:top}",
         "th{background:#f3f4f6}",
-        "aside.meta{background:#f3f4f6;border-left:4px solid #7c3aed;padding:.75rem 1rem;margin:1.5rem 0}",
         "</style>",
         "</head>",
         "<body>",
@@ -373,11 +371,5 @@ def document_to_html(
             )
         html.append("</ul></nav>")
     html.extend(body)
-    if profile_dict.get("interactive"):
-        html.append(
-            f'<aside class="meta"><h2>{escape(labels.technical_metadata)}</h2><p>'
-            + escape(str(document.get("metadata", {})))
-            + "</p></aside>"
-        )
     html.append("</main></body></html>")
     return "\n".join(html) + "\n"

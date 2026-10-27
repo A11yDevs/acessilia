@@ -1032,9 +1032,6 @@ msgstr "Formato de exportação não suportado: {format_name}"
 msgid "Contents"
 msgstr "Sumário"
 
-msgid "Technical metadata"
-msgstr "Metadados técnicos"
-
 msgid "Image without a text description."
 msgstr "Imagem sem descrição textual."
 
