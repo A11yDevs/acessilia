@@ -357,10 +357,27 @@ def test_text_before_the_first_heading_gets_no_empty_header():
 
     preamble = canonical["sections"][0]
     assert preamble["title"] == ""
+    assert preamble["id"] == "sectionless-1"
     assert [block["id"] for block in preamble["blocks"]] == ["line-1", "logo", "line-2"]
 
     blocks = build_pandoc_ast(canonical)["blocks"]
     headers = [block for block in blocks if block["t"] == "Header"]
     assert len(headers) == 1
-    assert headers[0]["c"][2]
-    assert [block["t"] for block in blocks[:3]] == ["Para", "Para", "Para"]
+    assert headers[0]["c"][0] == 1
+    assert _para_text({"c": headers[0]["c"][2]}) == "Calculus 1"
+    assert [_para_text(block) for block in blocks[:3]] == [
+        "University of Brasilia", "Logo", "Department of Mathematics",
+    ]
+
+
+def test_a_document_without_headings_gets_no_header():
+    canonical = build_canonical_document({"pages": [{"blocks": [
+        {"id": "first", "type": "paragraph", "text": "First"},
+        {"id": "second", "type": "paragraph", "text": "Second"},
+        {"id": "third", "type": "paragraph", "text": "Third"},
+    ]}]})
+
+    assert len(canonical["sections"]) == 1
+    blocks = build_pandoc_ast(canonical)["blocks"]
+    assert [block["t"] for block in blocks] == ["Para", "Para", "Para"]
+    assert [_para_text(block) for block in blocks] == ["First", "Second", "Third"]

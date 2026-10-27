@@ -521,6 +521,7 @@ def _build_sections(blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
             else:
                 root.append(section)
             stack.append(section)
+            preamble = None  # only blocks before the first heading go there
             continue
 
         if stack:
@@ -530,12 +531,14 @@ def _build_sections(blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
         else:
             # Blocks before the first heading share one untitled section; one
             # section per block became one empty, numbered heading per block.
+            # It spans several blocks, so it borrows neither the first block's
+            # id nor its location; each block keeps its own.
             generated_count += 1
             preamble = {
-                "id": block.get("id", f"sectionless-{generated_count}"),
+                "id": f"sectionless-{generated_count}",
                 "title": "",
                 "level": 1,
-                "source_location": deepcopy(block.get("source_location", {})),
+                "source_location": {},
                 "metadata": {},
                 "blocks": [block],
                 "children": [],
