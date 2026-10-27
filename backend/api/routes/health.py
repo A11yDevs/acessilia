@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 
 import httpx
 from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
 
 from backend.api.limiter import limiter
 from backend.api.schemas import HealthResponse
@@ -13,6 +14,31 @@ from backend.config.settings import settings
 from backend.services.queue_service import unified_queue
 
 router = APIRouter(tags=["health"])
+
+
+@router.get("/ready")
+async def ready() -> JSONResponse:
+    """Readiness follows the mandatory extraction chain, without inference."""
+    endpoints = [url.strip() for url in settings.toolbox_base_urls.split(",") if url.strip()]
+    endpoints = endpoints or [settings.toolbox_base_url]
+    providers = {settings.toolbox_provider}
+    if settings.fusion_mode == "dual":
+        providers.add(settings.fusion_secondary_provider)
+    async with httpx.AsyncClient(timeout=3.0) as client:
+        for endpoint in endpoints:
+            try:
+                for provider in sorted(providers):
+                    response = await client.get(
+                        endpoint.rstrip("/") + "/v1/ready", params={"provider": provider}
+                    )
+                    body = response.json() if response.status_code == 200 else None
+                    if not isinstance(body, dict) or body.get("status") != "ready":
+                        break
+                else:
+                    return JSONResponse({"status": "ready"})
+            except (httpx.HTTPError, ValueError):
+                continue
+    return JSONResponse({"status": "unavailable", "dependency": "toolbox"}, status_code=503)
 
 #: The auto-update timer runs every 300 s (UPDATE_INTERVAL in scripts/ops.sh);
 #: like `ops.sh auto-update check`, a last check older than three intervals means

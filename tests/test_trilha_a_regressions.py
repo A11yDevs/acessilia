@@ -221,6 +221,25 @@ def test_dual_fusion_reuses_verified_inputs(tmp_path, monkeypatch, corrupt):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("healthy", [True, False])
+async def test_core_readiness_follows_toolbox(monkeypatch, healthy):
+    from backend.api.routes import health
+
+    original = httpx.AsyncClient
+    transport = httpx.MockTransport(
+        lambda _: httpx.Response(
+            200 if healthy else 503,
+            json={"status": "ready" if healthy else "unavailable"},
+        )
+    )
+    monkeypatch.setattr(
+        health.httpx, "AsyncClient", lambda **kw: original(transport=transport, **kw)
+    )
+    response = await health.ready()
+    assert response.status_code == (200 if healthy else 503)
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "status,kind,human_review,expected_calls",
     [
