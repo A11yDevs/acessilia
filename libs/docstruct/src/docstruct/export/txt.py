@@ -5,7 +5,6 @@ stays in the backend; this module produces the lines only.
 """
 from __future__ import annotations
 
-from copy import deepcopy
 from typing import Any
 
 from docstruct.profiles import filter_blocks_for_profile
@@ -95,11 +94,13 @@ def _prose_text(text: str, block: dict[str, Any]) -> str:
 
 def _spoken_table(block: dict[str, Any]) -> dict[str, Any]:
     """A copy of the table block whose caption and cells have their ``$…$``
-    spans read (``_prose_text``), so the linearized rows speak the formulas."""
+    spans read (``_prose_text``), so the linearized rows speak the formulas.
+
+    ``table_ast_from_block`` returns a fresh normalized AST, so ``block`` is
+    not mutated."""
     table_ast = table_ast_from_block(block)
     if table_ast is None:
         return block
-    table_ast = deepcopy(table_ast)
     caption = table_ast.get("caption")
     if isinstance(caption, str):
         table_ast["caption"] = _prose_text(caption, block)

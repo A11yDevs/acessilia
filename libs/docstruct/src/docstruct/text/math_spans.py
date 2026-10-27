@@ -1,10 +1,10 @@
 """Inline math spans in block text (``$…$`` and ``\\(…\\)``).
 
-A paragraph, list item or callout can carry formulas inside its prose: the
-page OCR model writes them as ``$…$``, and the core marks the inline math it
-finds in the text layer the same way. The canonical enrichment converts each
-span once (``metadata["inline_math"]``) and the exporters render it as math
-instead of the literal delimiters.
+A paragraph, list item, callout or table (its caption and cells) can carry
+formulas inside its prose: the page OCR model writes them as ``$…$``, and the
+core marks the inline math it finds in the text layer the same way. The
+canonical enrichment converts each span once (``metadata["inline_math"]``)
+and the exporters render it as math instead of the literal delimiters.
 
 The ``$`` rule is Pandoc's ``tex_math_dollars`` plus one guard for Portuguese
 prose: the opening ``$`` is not followed by a space, the closing one is not
