@@ -313,3 +313,15 @@ async def test_pddl_recovery_policy_controls_real_cache_replay(
     await service.process(source, task_id="third-submission")
     assert agent.calls == expected_calls
     assert len(list(cache.CACHE_DIR.glob("*.json"))) == 1
+
+@pytest.mark.parametrize('kind', ['table', 'picture', 'formula'])
+def test_route_uses_structure_when_text_agrees(kind):
+    from backend.pipeline.fusion import fuse_extraction_payloads
+
+    text = {'type': 'paragraph', 'text': 'Texto da pagina com conteudo suficiente', 'page': 0}
+    primary = {'document': {'elements': [text]}}
+    secondary = {'document': {'elements': [text, {'type': kind, 'text': '', 'page': 0, 'bbox': [0, 0, 1, 1]}]}}
+    result = fuse_extraction_payloads(primary, secondary, primary_provider='docling', secondary_provider='mineru')
+    stats = result['fusion_evidence']['pages'][0]['stats']
+    assert stats['route'] == 'mineru'
+    assert stats['route_reason'] == 'secondary_structure_superset'

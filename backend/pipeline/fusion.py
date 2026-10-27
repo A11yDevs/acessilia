@@ -253,6 +253,28 @@ def fuse_extraction_payloads(
         # the evidence so the manifest builder can leave the VLM judge for the
         # pages the rule cannot settle.
         route, route_reason = decide_v1(docling_text, mineru_text)
+        # A whole-page swap is safe only when running text agrees exactly and
+        # the secondary retains every primary structure, including duplicates.
+        # Other structural disagreements require adjudication rather than a
+        # guessed page replacement that might discard unique content.
+        if structure_d != structure_m:
+            def structure_content(blocks: list[dict]) -> Counter:
+                return Counter(
+                    json.dumps(
+                        {"type": b["type"], "bbox": b.get("bbox"), "text": b["text"]},
+                        sort_keys=True,
+                    )
+                    for b in blocks if b["type"] in STRUCTURAL_TYPES
+                )
+
+            primary_counts = structure_content(pages_d.get(page_key, []))
+            secondary_counts = structure_content(pages_m.get(page_key, []))
+            primary_text = "\n\n".join(b.text for b in d_blocks if b.kind in TEXT_KINDS)
+            secondary_text = "\n\n".join(b.text for b in m_blocks if b.kind in TEXT_KINDS)
+            if primary_text == secondary_text and not primary_counts - secondary_counts:
+                route, route_reason = "mineru", "secondary_structure_superset"
+            else:
+                route, route_reason = "docling", "structure_ambiguous"
         evidence_stats["route"] = route
         evidence_stats["route_reason"] = route_reason
         evidence_stats["table_divergence"] = (

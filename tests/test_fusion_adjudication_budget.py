@@ -498,3 +498,60 @@ class TestPageRoutes:
             "mineru-element-000002",
             "mineru-element-000003",
         ]
+
+
+def test_additional_table_same_type_routes_to_secondary():
+    primary = _payload(PROSE)
+    primary['document']['elements'].append({'type': 'table', 'text': '', 'page': 0, 'bbox': [0, 0, 10, 10]})
+    secondary = _payload(PROSE)
+    secondary['document']['elements'].extend([
+        {'type': 'table', 'text': '', 'page': 0, 'bbox': [0, 0, 10, 10]},
+        {'type': 'table', 'text': '', 'page': 0, 'bbox': [0, 20, 10, 30]},
+    ])
+    [stats] = _evidence(primary, secondary)
+    assert stats['route'] == 'mineru'
+    assert stats['route_reason'] == 'secondary_structure_superset'
+
+
+def test_structural_conflict_with_different_text_requires_review():
+    primary = _payload(PROSE)
+    primary['document']['elements'].append({'type': 'picture', 'text': '', 'page': 0, 'bbox': [0, 0, 10, 10]})
+    secondary = _payload('Different prose that must not overwrite the primary.')
+    secondary['document']['elements'].append({'type': 'table', 'text': '', 'page': 0, 'bbox': [0, 20, 10, 30]})
+    [stats] = _evidence(primary, secondary)
+    assert (stats['route'], stats['route_reason']) == ('docling', 'structure_ambiguous')
+    evidence = [{'page_number': 1, 'stats': stats}]
+    [review] = [o for o in _obligations(evidence, 0) if o.kind == 'adjudicate-page']
+    assert review.admissible_methods == ['human-review']
+    [judge] = [o for o in _obligations(evidence, 1) if o.kind == 'adjudicate-page']
+    assert judge.admissible_methods == VLM_JUDGE_METHODS
+
+
+def test_secondary_with_extra_table_cannot_discard_primary_table_content():
+    primary = _payload(PROSE)
+    primary['document']['elements'].append({'type': 'table', 'text': 'primary values', 'page': 0, 'bbox': [0, 0, 10, 10]})
+    secondary = _payload(PROSE)
+    secondary['document']['elements'].extend([
+        {'type': 'table', 'text': 'different values', 'page': 0, 'bbox': [0, 0, 10, 10]},
+        {'type': 'table', 'text': '', 'page': 0, 'bbox': [0, 20, 10, 30]},
+    ])
+    [stats] = _evidence(primary, secondary)
+    assert (stats['route'], stats['route_reason']) == ('docling', 'structure_ambiguous')
+
+
+def test_structure_evidence_routes_the_page_and_preserves_primary_text():
+    primary = _doc([_doc_element('p1', 1, 1, PROSE)], pages=1)
+    table = {
+        'id': 't1', 'type': 'table', 'text': '', 'reading_order': 2,
+        'page_number': 1, 'bbox': [10, 10, 50, 50],
+    }
+    secondary = _doc([_doc_element('p2', 1, 1, PROSE), table], pages=1)
+    fused = fuse_extraction_payloads(
+        primary, secondary, primary_provider='docling', secondary_provider='mineru'
+    )
+    routed, replaced = apply_page_routes(
+        primary, secondary, fused['fusion_evidence']['pages'], secondary_provider='mineru'
+    )
+    assert [item['text'] for item in routed['document']['elements']] == [PROSE, '']
+    assert routed['document']['elements'][1]['type'] == 'table'
+    assert replaced[1] == primary['document']['elements']

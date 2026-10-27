@@ -914,6 +914,8 @@ def _needs_vlm_judge(stats: dict[str, Any]) -> bool:
     route = stats.get("route")
     if route is None:
         return bool(stats.get("text_divergence"))
+    if stats.get("route_reason") == "structure_ambiguous":
+        return True
     return (
         bool(stats.get("provider_divergence"))
         and route != "docling"
@@ -960,6 +962,13 @@ def _add_fusion_observations(
             targets,
             {"page_number": page_number, "fusion_stats": stats},
             VLM_JUDGE_METHODS,
+        )
+    elif stats.get("route_reason") == "structure_ambiguous":
+        add(
+            "adjudicate-page",
+            targets,
+            {"page_number": page_number, "fusion_stats": stats},
+            ["human-review"],
         )
     if any(key.startswith("dropped-") and value for key, value in stats.items()):
         add("rescue-omitted-block", targets, {"page_number": page_number, "fusion_stats": stats})
