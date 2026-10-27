@@ -72,6 +72,56 @@ def test_a_degraded_output_fails_where_a_reader_loses_something():
     assert card.violations == {1: ["label-list-alt"], 2: ["undescribed-picture"]}
 
 
+#: A header cell that wraps, as pdftotext -layout prints 006.pdf slide 15:
+#: its second line lands between the cells of the next line.
+WRAPPED_LAYOUT = """1.1 Slide 1 de 2
+1.2 Slide 2 de 2
+            power of
+Prefix      symbol    ten
+yota        Y          10²⁴
+"""
+WRAPPED_STREAM = """1.1 Slide 1 de 2
+1.2 Slide 2 de 2
+Prefix
+symbol
+power of ten
+yota Y 10²⁴
+"""
+
+
+def test_a_wrapped_header_cell_is_found_in_the_stream_order():
+    rows = [
+        {"id": "h", "page": "2", "kind": "table-header", "expected": "Prefix | symbol | power of ten"},
+    ]
+
+    layout_only = slide_case.score_text(rows, EXPECTATIONS, WRAPPED_LAYOUT, "out")
+    both = slide_case.score_text(
+        rows, EXPECTATIONS, WRAPPED_LAYOUT, "out", stream_text=WRAPPED_STREAM
+    )
+
+    assert not layout_only.objects[0].passed
+    assert both.objects[0].passed
+
+
+#: 006.pdf v5 slide 5 in stream order: the last names, then every symbol and
+#: power, close enough for "deca | da | 10¹" to fit in ROW_GAP.
+COLLAPSED_STREAM = """1.1 Slide 1 de 2
+1.2 Slide 2 de 2
+Prefix symbol power
+yota zeta
+Y Z 10²⁴ 10²¹
+"""
+
+
+def test_the_stream_order_does_not_rescue_a_collapsed_table():
+    card = slide_case.score_text(
+        ROWS, EXPECTATIONS, DEGRADED, "out", stream_text=COLLAPSED_STREAM
+    )
+    failed = {o.id for o in card.objects if not o.passed}
+
+    assert {"s02-t01-r01", "s02-t01-r02"} <= failed
+
+
 def test_a_printed_list_spaced_before_its_semicolons_is_not_a_label_list():
     text = "1.1 Slide 1 de 2\nNaCl ; C ; Na ; Fe; Al2O3 ; Fe3O4\n1.2 Slide 2 de 2\n"
 

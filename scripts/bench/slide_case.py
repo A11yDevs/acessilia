@@ -10,7 +10,10 @@ expectations.json}`` of the dataset clone at ``$ACESSILIA_TEST_DATASET_DIR``
 deck.
 
 The output is read as a reader gets it: plain text (TXT, or the PDF/UA through
-``pdftotext -layout``) split into one section per ``Slide N de 42`` heading. Every
+``pdftotext -layout``) split into one section per ``Slide N de 42`` heading. A
+table row of a PDF/UA may also be found in its content-stream order
+(``pdftotext -raw``): there a cell that wraps onto two lines stays whole,
+where the layout interleaves its second line with the next cell. Every
 ground-truth object is checked inside its slide's section:
 
 - ``text``: the passage is there;
@@ -206,8 +209,8 @@ def _terms_recall(expected: str, section: str) -> tuple[float, list[str]]:
     return (1 - len(missing) / len(terms) if terms else 1.0), missing
 
 
-def _row_found(cells: list[str], section: str) -> bool:
-    """Whether the non-empty ``cells`` occur in order, at most ``ROW_GAP`` apart."""
+def _row_found(cells: list[str], section: str, gap: int = ROW_GAP) -> bool:
+    """Whether the non-empty ``cells`` occur in order, at most ``gap`` apart."""
     wanted = [normalize(cell) for cell in cells if normalize(cell)]
     if not wanted:
         return True
@@ -219,7 +222,7 @@ def _row_found(cells: list[str], section: str) -> bool:
         position, ok = first + len(wanted[0]), True
         for cell in wanted[1:]:
             found = section.find(cell, position)
-            if found < 0 or found - position > ROW_GAP:
+            if found < 0 or found - position > gap:
                 ok = False
                 break
             position = found + len(cell)
@@ -228,11 +231,14 @@ def _row_found(cells: list[str], section: str) -> bool:
         start = first + 1
 
 
-def score_object(row: dict[str, str], section: str, *, fallback: bool = False) -> ObjectResult:
+def score_object(
+    row: dict[str, str], section: str, *, fallback: bool = False, row_gap: int = ROW_GAP
+) -> ObjectResult:
     """One ground-truth object against its slide's normalized section.
 
     ``fallback`` says the slide shows an undescribed picture; its pictures then
-    pass only with every term.
+    pass only with every term. ``row_gap`` bounds the characters between two
+    cells of a table row.
     """
     kind, expected = row["kind"], row["expected"]
     base = {"id": row["id"], "page": int(row["page"]), "kind": kind}
@@ -247,7 +253,7 @@ def score_object(row: dict[str, str], section: str, *, fallback: bool = False) -
             detail=f"missing: {'; '.join(missing)}" if missing else "",
         )
     if kind in {"table-header", "table-row"}:
-        found = _row_found(expected.split(" | "), section)
+        found = _row_found(expected.split(" | "), section, row_gap)
         return ObjectResult(**base, passed=found, score=float(found), detail="" if found else "row not found whole")
     if kind == "formula":
         words = _latex_words(expected)
@@ -260,13 +266,34 @@ def score_object(row: dict[str, str], section: str, *, fallback: bool = False) -
 
 
 def score_text(
-    rows: list[dict[str, str]], expectations: dict[str, Any], text: str, output: str
+    rows: list[dict[str, str]],
+    expectations: dict[str, Any],
+    text: str,
+    output: str,
+    *,
+    stream_text: str | None = None,
 ) -> Scorecard:
+    """Score ``text``; a table row it misses may still be found in ``stream_text``.
+
+    ``stream_text`` is the same output in content-stream order (a PDF/UA through
+    ``pdftotext -raw``). The layout keeps each row on its line, but a header
+    cell that wraps ("Atomic Mass of the Isotope / (u)", 006.pdf slide 15)
+    has its second line interleaved with the next cell; the stream order keeps
+    it whole. There the cells must be next to each other: a collapsed table
+    lists every name before any symbol, but its last name and the first symbol
+    and power can still fall within ``ROW_GAP`` (006.pdf slide 5, "hecto deca
+    / ... h da 10^24").
+    """
     slide_count = int(expectations.get("structure", {}).get("slide_count", 0)) or max(
         int(row["page"]) for row in rows
     )
     sections = split_slides(text)
     normalized = {page: normalize(body) for page, body in sections.items()}
+    streamed = (
+        {page: normalize(body) for page, body in split_slides(stream_text).items()}
+        if stream_text is not None
+        else {}
+    )
     card = Scorecard(output=output, slides_found=len(sections), slide_count=slide_count)
     for rule in expectations.get("text", {}).get("must_not_match", []):
         pattern = re.compile(rule["pattern"], re.MULTILINE)
@@ -278,26 +305,37 @@ def score_text(
             continue
         page = int(row["page"])
         fallback = bool(FALLBACK_VIOLATIONS & set(card.violations.get(page, [])))
-        card.objects.append(score_object(row, normalized.get(page, ""), fallback=fallback))
+        result = score_object(row, normalized.get(page, ""), fallback=fallback)
+        if not result.passed and row["kind"] in {"table-header", "table-row"} and page in streamed:
+            result = score_object(row, streamed[page], fallback=fallback, row_gap=0)
+        card.objects.append(result)
     return card
 
 
-def pdf_layout_text(path: Path) -> str:
+def pdf_layout_text(path: Path, mode: str = "-layout") -> str:
     """Text of a PDF/UA with its layout kept (``pdftotext -layout``).
 
     Without ``-layout`` poppler reads a table column by column, so no row
-    could ever be found whole; with it each row stays on its line.
+    could ever be found whole; with it each row stays on its line. ``-raw``
+    gives the content-stream order instead, for ``score_text``'s
+    ``stream_text``.
     """
     if shutil.which("pdftotext") is None:
         raise RuntimeError("pdftotext (poppler-utils) is required to score a PDF/UA output")
     return subprocess.run(
-        ["pdftotext", "-layout", "-enc", "UTF-8", str(path), "-"],
+        ["pdftotext", mode, "-enc", "UTF-8", str(path), "-"],
         check=True, capture_output=True, text=True,
     ).stdout
 
 
 def read_output(path: Path) -> str:
     return pdf_layout_text(path) if path.suffix.lower() == ".pdf" else path.read_text(encoding="utf-8")
+
+
+def score_output(rows: list[dict[str, str]], expectations: dict[str, Any], path: Path) -> Scorecard:
+    """Score a PDF/UA (with its stream order for table rows) or a TXT output."""
+    stream = pdf_layout_text(path, "-raw") if path.suffix.lower() == ".pdf" else None
+    return score_text(rows, expectations, read_output(path), path.name, stream_text=stream)
 
 
 def compare(base: Scorecard, candidate: Scorecard) -> str:
@@ -347,14 +385,11 @@ def main(argv: list[str] | None = None) -> int:
 
     rows, expectations = load_case(args.dataset or dataset_dir())
     if args.command == "compare":
-        cards = [
-            score_text(rows, expectations, read_output(path), path.name)
-            for path in (args.base, args.candidate)
-        ]
+        cards = [score_output(rows, expectations, path) for path in (args.base, args.candidate)]
         print(compare(*cards), end="")
         return 0
     path = args.pdf_ua or args.txt
-    card = score_text(rows, expectations, read_output(path), path.name)
+    card = score_output(rows, expectations, path)
     print(card.to_markdown(), end="")
     if args.out is not None:
         args.out.mkdir(parents=True, exist_ok=True)
