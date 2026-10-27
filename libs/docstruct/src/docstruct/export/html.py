@@ -349,7 +349,7 @@ def document_to_html(
         ".table-wrap{overflow-x:auto;margin:1rem 0}",
         "table{border-collapse:collapse;background:#fff}",
         "th,td{border:1px solid #999;padding:.35rem .75rem;text-align:left;vertical-align:top}",
-        "thead th{background:#f3f4f6}",
+        "th{background:#f3f4f6}",
         "aside.meta{background:#f3f4f6;border-left:4px solid #7c3aed;padding:.75rem 1rem;margin:1.5rem 0}",
         "</style>",
         "</head>",

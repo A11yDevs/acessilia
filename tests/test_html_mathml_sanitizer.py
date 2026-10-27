@@ -1,5 +1,7 @@
 """MathML the HTML export accepts, and what it still refuses."""
 
+import pytest
+
 from docstruct.export.html import _safe_mathml, document_to_html
 
 NS = 'xmlns="http://www.w3.org/1998/Math/MathML"'
@@ -31,12 +33,37 @@ def test_spacing_from_quad_renders_as_mathml() -> None:
 
 
 def test_mspace_sizes_are_accepted() -> None:
-    mathml = f'<math {NS}><mspace width="0.167em" height="1ex" depth="0.5ex"/></math>'
+    mathml = f'<math {NS}><mspace width="1em" height="1ex" depth="0.5ex"/></math>'
 
-    assert _safe_mathml(mathml) is not None
+    safe = _safe_mathml(mathml)
+
+    assert safe is not None
+    for attribute in ('width="1em"', 'height="1ex"', 'depth="0.5ex"'):
+        assert attribute in safe, attribute
+
+
+@pytest.mark.parametrize(
+    "element",
+    [
+        '<mpadded voffset="0.2em"><mi>x</mi></mpadded>',
+        '<mo minsize="1.2em" maxsize="1.2em">(</mo>',
+        '<mtable columnwidth="auto"><mtr><mtd><mi>x</mi></mtd></mtr></mtable>',
+    ],
+)
+def test_presentational_sizes_are_accepted(element: str) -> None:
+    assert _safe_mathml(f"<math {NS}>{element}</math>") is not None
 
 
 def test_active_attributes_are_still_refused() -> None:
     for attribute in ('href="https://example.com"', 'onclick="alert(1)"', 'style="x"'):
         mathml = f'<math {NS}><mspace width="1em" {attribute}/></math>'
         assert _safe_mathml(mathml) is None, attribute
+
+
+def test_refused_mathml_falls_back_to_the_latex_source() -> None:
+    refused = QUAD_MATHML.replace('width="1em"', 'width="1em" href="https://example.com"')
+
+    html = document_to_html(_math_document(refused), profile="html")
+
+    assert "<math" not in html
+    assert r"\quad" in html

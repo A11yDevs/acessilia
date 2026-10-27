@@ -271,6 +271,23 @@ def test_promoted_header_row_with_default_cell_flags_uses_column_headers() -> No
     )
 
 
+def test_header_row_with_only_invalid_scopes_uses_column_headers() -> None:
+    """An unknown ``scope`` is not a header mark, so it cannot leave <td> in <thead>."""
+    document = _document_with_table({
+        "header": [{"cells": [
+            {"text": "Month", "scope": "banana"}, {"text": "Value", "scope": "banana"},
+        ]}],
+        "body": [{"cells": [{"text": "January"}, {"text": "10"}]}],
+    })
+
+    assert _render_table(document) == (
+        '<table id="table-1">'
+        '<thead><tr><th scope="col">Month</th><th scope="col">Value</th></tr></thead>'
+        '<tbody><tr><td>January</td><td>10</td></tr></tbody>'
+        '</table>'
+    )
+
+
 def test_html_table_has_cell_borders_and_scrolls_on_narrow_screens() -> None:
     html = document_to_html(
         _document_with_table({"body": [{"cells": [{"text": "a"}, {"text": "b"}]}]}),
@@ -278,5 +295,6 @@ def test_html_table_has_cell_borders_and_scrolls_on_narrow_screens() -> None:
     )
 
     assert "th,td{border:1px solid" in html
+    assert "\nth{background:" in html
     assert '<div class="table-wrap"><table id="table-1">' in html
     assert ".table-wrap{overflow-x:auto" in html
