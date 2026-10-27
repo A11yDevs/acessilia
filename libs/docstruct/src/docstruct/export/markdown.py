@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from docstruct.blocks.lists import list_start
 from docstruct.tables.ast import table_ast_from_block
 from docstruct.text.latex import bare_latex
 
@@ -63,7 +64,12 @@ def _render_block(block: dict[str, Any]) -> str:
     if btype == "table":
         return render_table(block)
     if btype == "list":
-        return "\n".join(f"- {str(i).strip()}" for i in block.get("items", []) if str(i).strip())
+        items = [str(i).strip() for i in block.get("items", []) if str(i).strip()]
+        if not block.get("ordered"):
+            return "\n".join(f"- {item}" for item in items)
+        return "\n".join(
+            f"{number}. {item}" for number, item in enumerate(items, start=list_start(block))
+        )
     if btype == "image":
         return ""
     return (block.get("text") or "").strip()

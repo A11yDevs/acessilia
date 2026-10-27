@@ -11,6 +11,7 @@ from html import escape
 from typing import Any
 from xml.etree import ElementTree
 
+from docstruct.blocks.lists import list_start
 from docstruct.export.filters import apply_output_profile_filter
 from docstruct.profiles import normalize_profile
 from docstruct.sections import section_body_blocks, section_title_alias
@@ -149,10 +150,12 @@ def _render_block(
         )
     if block_type == "list":
         tag = "ol" if block.get("ordered") else "ul"
+        start = list_start(block) if tag == "ol" else 1
+        start_attr = f' start="{start}"' if start != 1 else ""
         items = "".join(
             f"<li>{_prose_html(str(item), block)}</li>" for item in block.get("items", [])
         )
-        return f'<{tag} id="{block_id}">{items}</{tag}>'
+        return f'<{tag} id="{block_id}"{start_attr}>{items}</{tag}>'
     if block_type == "table":
         table_ast = table_ast_from_block(block)
         if table_ast is None:

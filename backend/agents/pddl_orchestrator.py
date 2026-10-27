@@ -5300,14 +5300,65 @@ def _elements_to_blocks(
     An element in ``replacements`` (the first member of a letterhead) gives
     way to its block, which already stands for the picture's text.
     """
+    callout_titles = _callout_titles(elements)
     blocks: list[dict[str, Any]] = []
     for element in elements:
         if element.id in replacements:
             blocks.append(replacements[element.id])
             continue
-        blocks.append(_element_to_block(element))
+        blocks.append(_element_to_block(element, callout_titles))
         blocks.extend(_element_to_block(kept) for kept in _text_kept_by_picture(element))
-    return blocks
+    return _merge_list_blocks(blocks)
+
+
+def _callout_titles(elements: list[ManifestElement]) -> dict[str, str]:
+    """Each callout's title, read from its title element's text as it stands now.
+
+    The Toolbox copies the title into ``metadata.callout_title`` when it groups
+    the callout, before any repair; the text-repair methods then fix the
+    title element's text only, so the copy keeps the broken accents
+    ("observa¸ c˜ oes").
+    """
+    return {
+        str(element.metadata["callout_id"]): (element.text or "").strip()
+        for element in elements
+        if element.metadata.get("callout_id")
+        and str(element.metadata.get("callout_role", "")).lower() == "title"
+        and (element.text or "").strip()
+    }
+
+
+def _merge_list_blocks(blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Blocks with each run of items from one source list joined into one list.
+
+    Each list item becomes a list block of its own. Consecutive ones that share
+    their Docling list (``parent_id``) and kind are one list; an item kept
+    apart by a formula or a paragraph stays a list of its own, whose ``start``
+    carries the numbering on.
+    """
+    merged: list[dict[str, Any]] = []
+    for block in blocks:
+        previous = merged[-1] if merged else None
+        parent_id = (block.get("metadata") or {}).get("parent_id")
+        if (
+            previous is not None
+            and parent_id
+            and block.get("type") == previous.get("type") == "list"
+            and block.get("ordered") == previous.get("ordered")
+            and (previous.get("metadata") or {}).get("parent_id") == parent_id
+        ):
+            previous["items"].extend(block.get("items", []))
+            continue
+        merged.append(block)
+    return merged
+
+
+def _list_start(marker: Any) -> int | None:
+    """The number an ordered item's marker ("2.", "3)") gives, when it is not 1."""
+    digits = str(marker or "").strip().rstrip(".)")
+    if digits.isdigit() and int(digits) > 1:
+        return int(digits)
+    return None
 
 
 def _text_kept_by_picture(element: ManifestElement) -> list[ManifestElement]:
@@ -5351,7 +5402,9 @@ def _text_kept_by_picture(element: ManifestElement) -> list[ManifestElement]:
     ]
 
 
-def _element_to_block(element: ManifestElement) -> dict[str, Any]:
+def _element_to_block(
+    element: ManifestElement, callout_titles: dict[str, str] | None = None
+) -> dict[str, Any]:
     provenance = element.provenance[0] if element.provenance else None
     metadata: dict[str, Any] = {
         "raw_label": element.raw_label,
@@ -5379,7 +5432,9 @@ def _element_to_block(element: ManifestElement) -> dict[str, Any]:
     callout_id = metadata.get("callout_id")
     callout_role = str(metadata.get("callout_role", "")).lower()
     callout_type = str(metadata.get("callout_type", "note")).lower()
-    callout_title = str(metadata.get("callout_title", "")).strip()
+    callout_title = (callout_titles or {}).get(str(callout_id)) or str(
+        metadata.get("callout_title", "")
+    ).strip()
     callout_block_type = "warning" if callout_type in {"warning", "aviso", "importante", "caution"} else "note"
     block: dict[str, Any] = {
         "id": element.id,
@@ -5406,13 +5461,17 @@ def _element_to_block(element: ManifestElement) -> dict[str, Any]:
             }
         )
     elif element.type == "list_item":
+        ordered = bool(metadata.get("enumerated"))
         block.update(
             {
                 "type": "list",
-                "ordered": False,
+                "ordered": ordered,
                 "items": [text] if text else [],
             }
         )
+        start = _list_start(metadata.get("marker")) if ordered else None
+        if start is not None:
+            block["start"] = start
     elif element.type == "table":
         table_ast = _table_ast_from_metadata(metadata)
         rows = _rows_from_table_ast(table_ast) if table_ast else None
