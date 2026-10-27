@@ -376,12 +376,13 @@ The `media.inspect` capability (provider `pure-media-inspect`, PR
   a failure is not replayed, and a rerun that is still degraded drops it.
 
   Before a picture or table is left that way, its stage tries it once more:
-  after `VISION_RETRY_PASS_DELAY_SECONDS` (60), the objects the model gave no
-  answer for (and pictures it answered empty) are sent again, one at a time.
-  A provider that keeps failing is not called for every object: after
-  `VISION_BREAKER_THRESHOLD` (3) calls in a row without an answer, the rest of
-  the job's picture and table calls are skipped and recorded as `model_failed`,
-  with `metadata.vision_failure_detail` saying they were skipped. The first
+  after `VISION_RETRY_PASS_DELAY_SECONDS` (60), the objects left without a
+  usable description or reading (and pictures the model answered empty) are
+  sent again, one at a time. A provider that keeps failing is not called for
+  every object: after `VISION_BREAKER_THRESHOLD` (3) calls in a row without a
+  usable answer, the rest of the job's picture, formula and table calls are
+  skipped and recorded as `model_failed`, with
+  `metadata.vision_failure_detail` saying they were skipped. The first
   call of the second pass gets through anyway, to test whether the provider
   came back.
 

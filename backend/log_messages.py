@@ -433,9 +433,19 @@ LOG_PROVIDER_BREAKER_OPEN: str = (
     "Vision provider failed {failures} calls in a row; "
     "skipping the remaining calls of this job"
 )
-#: Warning logged before a vision stage tries again what failed; {count} is how many objects, {kind} "pictures" or "tables", {delay} the seconds waited first.
-LOG_PDDL_VISION_RETRY_PASS: str = (
-    "{count} {kind} without an answer from the model; trying again in {delay}s"
+#: Warning logged before the picture stage tries again what failed; {count} is how many pictures (empty answers included), {delay} the seconds waited first.
+LOG_PDDL_VISION_RETRY_PASS_PICTURES: tuple[str, str] = (
+    "{count} picture without a usable description from the model; "
+    "trying again in {delay}s",
+    "{count} pictures without a usable description from the model; "
+    "trying again in {delay}s",
+)
+#: Warning logged before the table stage tries again what failed; {count} is how many tables, {delay} the seconds waited first.
+LOG_PDDL_VISION_RETRY_PASS_TABLES: tuple[str, str] = (
+    "{count} table without a usable reading from the model; "
+    "trying again in {delay}s",
+    "{count} tables without a usable reading from the model; "
+    "trying again in {delay}s",
 )
 #: Exception logged when extracting an element's image clip from the source PDF for the PDDL pipeline fails; {element_id} is the failing element's id.
 LOG_PDDL_ELEMENT_CROP_FAILED: str = (

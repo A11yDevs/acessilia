@@ -102,8 +102,9 @@ class Settings:
         default_factory=lambda: int(os.getenv("VISION_BREAKER_THRESHOLD", "3"))
     )
     # Seconds a vision stage waits before trying once more, one at a time,
-    # the pictures or tables the model gave no answer for. The first of those
-    # calls tests the provider: when it fails again, the rest are skipped.
+    # the pictures or tables left without a usable description or reading
+    # (an empty answer included). The first of those calls tests the
+    # provider: when it fails again, the rest are skipped.
     vision_retry_pass_delay_seconds: int = field(
         default_factory=lambda: int(os.getenv("VISION_RETRY_PASS_DELAY_SECONDS", "60"))
     )

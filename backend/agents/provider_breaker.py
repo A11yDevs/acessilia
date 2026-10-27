@@ -3,14 +3,20 @@
 006.pdf v5 lost most of its descriptions to a provider that went down partway
 through the job, and every remaining picture still paid up to two call
 deadlines before it degraded. The breaker counts provider failures in a row
-across the vision stages of one job (pictures, then tables); after
-``threshold`` of them it opens and the remaining calls are skipped, recorded
-as ``model_failed`` with the reason, so the job degrades at once instead of
-waiting on each call.
+across the vision stages of one job (pictures, then formulas, then tables);
+after ``threshold`` of them it opens and the remaining calls are skipped,
+recorded as ``model_failed`` with the reason, so the job degrades at once
+instead of waiting on each call.
 
-Only a call that got no answer counts. An answer the job does not use (an
-empty description, a table reading refused as worse) is the model working,
-and resets the count.
+Only a call that got no usable answer counts. An answer the job does not
+use (an empty description, a table reading refused as worse) is the model
+working, and resets the count.
+
+A known limitation: the callers return None both when the provider gave
+nothing and when an answer came back but failed validation, so a model
+that misreads systematically can open the breaker without being down. The
+first call of a retry pass gets through an open breaker, so a wrong
+verdict costs one call, not one per remaining object.
 """
 
 from __future__ import annotations
@@ -38,7 +44,7 @@ class ProviderBreaker:
         return f"skipped: the provider failed {self._streak} calls in a row"
 
     def record(self, answered: bool) -> None:
-        """Count a call: an answer closes the breaker, no answer adds a failure."""
+        """Count a call: an answer closes the breaker, no usable answer adds a failure."""
         if answered:
             self._streak = 0
             return
