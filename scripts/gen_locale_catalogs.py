@@ -147,6 +147,8 @@ from backend.log_messages import (
     LOG_PDDL_TABLES_ENRICHED,
     LOG_PDDL_TABLE_REREAD_ACCEPTED,
     LOG_PDDL_TABLE_REREAD_REJECTED,
+    LOG_PROVIDER_BREAKER_OPEN,
+    LOG_PDDL_VISION_RETRY_PASS,
     LOG_PDDL_ELEMENT_CROP_FAILED,
     LOG_PDDL_PREFERRED_PLAN_MISSING,
     LOG_PDDL_PROBLEM_HASH_MISMATCH,
@@ -821,6 +823,8 @@ MESSAGES: tuple[str, ...] = (
     LOG_PDDL_TABLES_ENRICHED,
     LOG_PDDL_TABLE_REREAD_ACCEPTED,
     LOG_PDDL_TABLE_REREAD_REJECTED,
+    LOG_PROVIDER_BREAKER_OPEN,
+    LOG_PDDL_VISION_RETRY_PASS,
     LOG_PDDL_ELEMENT_CROP_FAILED,
     LOG_PDDL_PREFERRED_PLAN_MISSING,
     LOG_PDDL_PROBLEM_HASH_MISMATCH,
@@ -1605,6 +1609,13 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         LOG_PDDL_TABLE_REREAD_REJECTED: (
             "A tabela {element_id} (página {page}) parecia mal lida ({reason}); "
             "a leitura da sua imagem não foi usada ({why})"
+        ),
+        LOG_PROVIDER_BREAKER_OPEN: (
+            "O provedor de visão falhou {failures} chamadas seguidas; "
+            "as chamadas restantes deste job serão puladas"
+        ),
+        LOG_PDDL_VISION_RETRY_PASS: (
+            "{count} {kind} sem resposta do modelo; nova tentativa em {delay}s"
         ),
         LOG_PDDL_ELEMENT_CROP_FAILED: (
             "Falha ao extrair recorte de imagem para elemento {element_id}"

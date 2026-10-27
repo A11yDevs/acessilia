@@ -375,6 +375,16 @@ The `media.inspect` capability (provider `pure-media-inspect`, PR
   so they neither count nor keep the run uncached. A cached entry that records
   a failure is not replayed, and a rerun that is still degraded drops it.
 
+  Before a picture or table is left that way, its stage tries it once more:
+  after `VISION_RETRY_PASS_DELAY_SECONDS` (60), the objects the model gave no
+  answer for (and pictures it answered empty) are sent again, one at a time.
+  A provider that keeps failing is not called for every object: after
+  `VISION_BREAKER_THRESHOLD` (3) calls in a row without an answer, the rest of
+  the job's picture and table calls are skipped and recorded as `model_failed`,
+  with `metadata.vision_failure_detail` saying they were skipped. The first
+  call of the second pass gets through anyway, to test whether the provider
+  came back.
+
 The PDDL predicates `media_inspected`/`media_profile_classified` belong to the Toolbox
 domain; the core consumes the signal only as an enrichment heuristic and it does not
 enter the planning problem.

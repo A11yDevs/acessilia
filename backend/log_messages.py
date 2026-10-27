@@ -428,6 +428,15 @@ LOG_PDDL_TABLE_REREAD_REJECTED: str = (
     "Table {element_id} (page {page}) looked misread ({reason}); "
     "the reading from its image was not used ({why})"
 )
+#: Warning logged when the vision provider failed {failures} calls in a row and the remaining vision calls of the job are skipped.
+LOG_PROVIDER_BREAKER_OPEN: str = (
+    "Vision provider failed {failures} calls in a row; "
+    "skipping the remaining calls of this job"
+)
+#: Warning logged before a vision stage tries again what failed; {count} is how many objects, {kind} "pictures" or "tables", {delay} the seconds waited first.
+LOG_PDDL_VISION_RETRY_PASS: str = (
+    "{count} {kind} without an answer from the model; trying again in {delay}s"
+)
 #: Exception logged when extracting an element's image clip from the source PDF for the PDDL pipeline fails; {element_id} is the failing element's id.
 LOG_PDDL_ELEMENT_CROP_FAILED: str = (
     "Failed to extract the image clip for element {element_id}"

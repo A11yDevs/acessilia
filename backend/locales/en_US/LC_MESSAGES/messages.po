@@ -1421,6 +1421,18 @@ msgstr ""
 "from its image was not used ({why})"
 
 #, python-brace-format
+msgid ""
+"Vision provider failed {failures} calls in a row; skipping the remaining "
+"calls of this job"
+msgstr ""
+"Vision provider failed {failures} calls in a row; skipping the remaining "
+"calls of this job"
+
+#, python-brace-format
+msgid "{count} {kind} without an answer from the model; trying again in {delay}s"
+msgstr "{count} {kind} without an answer from the model; trying again in {delay}s"
+
+#, python-brace-format
 msgid "Failed to extract the image clip for element {element_id}"
 msgstr "Failed to extract the image clip for element {element_id}"
 

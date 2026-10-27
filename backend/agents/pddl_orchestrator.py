@@ -44,6 +44,7 @@ from docstruct.text.unicode_repair import (
 from backend.services.blocking import run_blocking
 from backend.agents.data_agent import DataAgent
 from backend.agents.output_schemas import DataOutput, PageInspectionOutput, VisionOutput
+from backend.agents.provider_breaker import ProviderBreaker
 from backend.agents.vision_agent import VisionAgent
 from backend.core.agents.fusion_agent import FusionAgent
 from backend.core.agents.informational_structural import InformationalStructuralAgent
@@ -83,6 +84,7 @@ from backend.log_messages import (
     LOG_PDDL_IMAGES_ENRICHED,
     LOG_PDDL_PREFERRED_PLAN_MISSING,
     LOG_PDDL_TABLES_ENRICHED,
+    LOG_PDDL_VISION_RETRY_PASS,
     LOG_PDDL_TABLE_REREAD_ACCEPTED,
     LOG_PDDL_TABLE_REREAD_REJECTED,
     LOG_VISION_ELEMENT_DESCRIPTION,
@@ -2751,12 +2753,18 @@ class PddlAccessibilityOrchestrator:
 
         if status_callback:
             await status_callback(t(STAGE_ENRICHING_IMAGE_DESCRIPTIONS))
+        # Pictures and tables go to the same provider, so one that went down
+        # during the pictures is not called again for every table.
+        from backend.config.settings import settings
+
+        breaker = ProviderBreaker(settings.vision_breaker_threshold)
         await _enrich_picture_descriptions(
             manifest,
             source_path,
             mode=effective_mode,
             media_inspection=media_inspection,
             status_callback=status_callback,
+            breaker=breaker,
         )
         await _mark_inline_math(manifest, source_path)
         await _enrich_formula_latex(
@@ -2772,6 +2780,7 @@ class PddlAccessibilityOrchestrator:
             manifest,
             file_path.resolve(),
             status_callback=status_callback,
+            breaker=breaker,
         )
 
         if status_callback:
@@ -2971,6 +2980,7 @@ async def _enrich_picture_descriptions(
     mode: str,
     media_inspection: dict[str, Any] | None = None,
     status_callback: Callable[[str], Coroutine[Any, Any, None]] | None = None,
+    breaker: ProviderBreaker | None = None,
 ) -> None:
     from backend.config.settings import settings
 
@@ -3004,6 +3014,7 @@ async def _enrich_picture_descriptions(
         return
 
     vision = VisionAgent(mode=mode)
+    breaker = breaker or ProviderBreaker(settings.vision_breaker_threshold)
     total_pages = len(manifest.pages)
 
     # Descriptions are independent, so they run concurrently, bounded by
@@ -3033,6 +3044,9 @@ async def _enrich_picture_descriptions(
                             pages=_pages_label([fallback_page_number], len(manifest.pages)),
                         )
                     )
+            if breaker.open:
+                _record_vision_failure(element, "model_failed", breaker.skip_detail())
+                return False
             image_bytes, page_number = await run_blocking(
                 _extract_picture_bytes,
                 source_file,
@@ -3057,6 +3071,7 @@ async def _enrich_picture_descriptions(
                 mode=mode,
                 errors=errors,
             )
+            breaker.record(isinstance(vision_output, VisionOutput))
 
         if not isinstance(vision_output, VisionOutput):
             _record_vision_failure(element, "model_failed", errors[-1] if errors else None)
@@ -3139,9 +3154,56 @@ async def _enrich_picture_descriptions(
             for position, element in enumerate(pictures, start=1)
         ]
     enriched = sum(task.result() for task in tasks)
+    enriched += await _retry_unanswered(
+        [
+            (position, element)
+            for position, element in enumerate(pictures, start=1)
+            if element.metadata.get("vision_failure_reason") in _RETRIED_VISION_FAILURES
+        ],
+        describe_one,
+        kind="pictures",
+        breaker=breaker,
+    )
 
     if enriched:
         logger.info(t(LOG_PDDL_IMAGES_ENRICHED).format(count=enriched))
+
+
+#: Picture failures a second try may fix: the provider gave no answer, or an
+#: empty one (empty answers are never cached, so the try reaches the model). A
+#: crop that could not be rendered will not render the second time either.
+_RETRIED_VISION_FAILURES = frozenset({"model_failed", "empty_description"})
+
+
+async def _retry_unanswered(
+    failed: list[tuple[int, ManifestElement]],
+    attempt: Callable[[int, ManifestElement], Coroutine[Any, Any, bool]],
+    *,
+    kind: str,
+    breaker: ProviderBreaker,
+) -> int:
+    """Try once more, one at a time, what a vision stage got no answer for.
+
+    A provider that failed for a while (006.pdf v5 lost every picture after
+    slide 10) may be back after a wait. The breaker lets the first try through
+    even when open, and a failure of it opens the breaker again, so a provider
+    that is still down costs one call, not one per object. Returns how many
+    objects the pass enriched.
+    """
+    from backend.config.settings import settings
+
+    if not failed:
+        return 0
+    delay = max(0, settings.vision_retry_pass_delay_seconds)
+    logger.warning(
+        t(LOG_PDDL_VISION_RETRY_PASS).format(count=len(failed), kind=kind, delay=delay)
+    )
+    await asyncio.sleep(delay)
+    breaker.probe()
+    enriched = 0
+    for position, element in failed:
+        enriched += await attempt(position, element)
+    return enriched
 
 
 def _formula_recognition_crop(
@@ -3790,6 +3852,7 @@ async def _enrich_table_structures(
     source_file: Path,
     *,
     status_callback: Callable[[str], Coroutine[Any, Any, None]] | None = None,
+    breaker: ProviderBreaker | None = None,
 ) -> None:
     from backend.config.settings import settings
 
@@ -3814,12 +3877,13 @@ async def _enrich_table_structures(
         return
 
     data_agent = DataAgent()
-    enriched = 0
-    for position, element in enumerate(table_elements, start=1):
+    breaker = breaker or ProviderBreaker(settings.vision_breaker_threshold)
+
+    async def read_one(position: int, element: ManifestElement) -> bool:
+        """Read one table from its image, or keep it as it is; True when enriched."""
         reason = garbled.get(element.id)
         if reason is None and _backfill_table_from_existing_text(element):
-            enriched += 1
-            continue
+            return True
 
         fallback_page_number = element.page_number
         if fallback_page_number is None and len(manifest.pages) == 1:
@@ -3845,7 +3909,7 @@ async def _enrich_table_structures(
             _record_table_read_failure(element, "crop_unavailable")
             if reason is not None:
                 _keep_misread_table(element, page_number, reason, "no image of the table", 0)
-            continue
+            return False
 
         # A misread table gets a few readings: the model may drop columns or
         # rows on one try and read the table whole on the next.
@@ -3853,13 +3917,21 @@ async def _enrich_table_structures(
         table_output = None
         answered = False
         why = "no table was read"
+        attempt = 0
         for attempt in range(1, attempts + 1):
+            if breaker.open:
+                why = breaker.skip_detail()
+                attempt -= 1  # this try was not made
+                break
             candidate = await data_agent.process_region(
                 image_bytes=image_bytes,
                 classification="table",
                 page_num=page_number,
                 fallback_text=element.text or "",
             )
+            # The data agent returns None for any failure, an unusable answer
+            # included, so the breaker may count one of those too.
+            breaker.record(candidate is not None)
             answered = answered or isinstance(candidate, DataOutput)
             if not isinstance(candidate, DataOutput) or candidate.kind != "table":
                 continue
@@ -3879,7 +3951,7 @@ async def _enrich_table_structures(
                 _record_table_read_failure(element, "model_failed")
             if reason is not None:
                 _keep_misread_table(element, page_number, reason, why, attempt)
-            continue
+            return False
 
         element.metadata.pop("table_read_failure", None)
         rows = table_output.table_rows()
@@ -3911,7 +3983,21 @@ async def _enrich_table_structures(
         element.text = ""
         if element.page_number is None and page_number >= 1:
             element.page_number = page_number
-        enriched += 1
+        return True
+
+    enriched = 0
+    for position, element in enumerate(table_elements, start=1):
+        enriched += await read_one(position, element)
+    enriched += await _retry_unanswered(
+        [
+            (position, element)
+            for position, element in enumerate(table_elements, start=1)
+            if element.metadata.get("table_read_failure") == "model_failed"
+        ],
+        read_one,
+        kind="tables",
+        breaker=breaker,
+    )
 
     if enriched:
         logger.info(t(LOG_PDDL_TABLES_ENRICHED).format(count=enriched))

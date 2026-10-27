@@ -1437,6 +1437,18 @@ msgstr ""
 "leitura da sua imagem não foi usada ({why})"
 
 #, python-brace-format
+msgid ""
+"Vision provider failed {failures} calls in a row; skipping the remaining "
+"calls of this job"
+msgstr ""
+"O provedor de visão falhou {failures} chamadas seguidas; as chamadas "
+"restantes deste job serão puladas"
+
+#, python-brace-format
+msgid "{count} {kind} without an answer from the model; trying again in {delay}s"
+msgstr "{count} {kind} sem resposta do modelo; nova tentativa em {delay}s"
+
+#, python-brace-format
 msgid "Failed to extract the image clip for element {element_id}"
 msgstr "Falha ao extrair recorte de imagem para elemento {element_id}"
 
