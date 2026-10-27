@@ -246,3 +246,37 @@ def test_explicit_full_row_replaces_conflicting_rowspan():
     assert linearize_table_for_text({"table_ast": table}) == [
         "Row 1: H1: A; H2: B", "Row 2: H1: C; H2: D", "Row 3: H1: E; H2: F",
     ]
+
+
+def test_promoted_header_row_with_default_cell_flags_uses_column_headers() -> None:
+    """The normalizer's ``header: False``/``scope: none`` defaults are not marks.
+
+    A Docling table without header flags has its first row promoted to the
+    header; its cells still carry the defaults and must come out as column
+    headers, not data cells inside <thead> (the calculus reference document).
+    """
+    default = {"header": False, "scope": "none"}
+    document = _document_with_table({
+        "body": [
+            {"cells": [{"text": "h", **default}, {"text": "t", **default}]},
+            {"cells": [{"text": "2", **default}, {"text": "4", **default}]},
+        ],
+    })
+
+    assert _render_table(document) == (
+        '<table id="table-1">'
+        '<thead><tr><th scope="col">h</th><th scope="col">t</th></tr></thead>'
+        '<tbody><tr><td>2</td><td>4</td></tr></tbody>'
+        '</table>'
+    )
+
+
+def test_html_table_has_cell_borders_and_scrolls_on_narrow_screens() -> None:
+    html = document_to_html(
+        _document_with_table({"body": [{"cells": [{"text": "a"}, {"text": "b"}]}]}),
+        profile="html",
+    )
+
+    assert "th,td{border:1px solid" in html
+    assert '<div class="table-wrap"><table id="table-1">' in html
+    assert ".table-wrap{overflow-x:auto" in html
