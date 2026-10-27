@@ -238,6 +238,12 @@ def _prose_html(text: str, block: dict[str, Any]) -> str:
     return "".join(parts)
 
 
+def _marks_header(cell: dict[str, Any]) -> bool:
+    """True when a cell positively declares itself a header (flag or header scope)."""
+    scope = str(cell.get("scope", "")).strip().lower()
+    return cell.get("header") is True or scope in {"row", "col", "rowgroup", "colgroup"}
+
+
 def _render_html_table_row(
     row: dict[str, Any], *, header: bool, block: dict[str, Any] | None = None
 ) -> str:
@@ -255,9 +261,11 @@ def _render_html_table_row(
         str: The "<tr>...</tr>" fragment, or an empty string when the row has no valid cells.
     """
     cells = row.get("cells", []) if isinstance(row, dict) else []
+    # Providers that do not detect header cells emit ``header: False`` on every
+    # cell; only a positive mark (header=True or a header scope) makes a <thead>
+    # row follow per-cell metadata.
     unmarked_header_row = header and not any(
-        isinstance(cell, dict) and ("header" in cell or "scope" in cell)
-        for cell in cells
+        isinstance(cell, dict) and _marks_header(cell) for cell in cells
     )
     rendered_cells: list[str] = []
     for cell in cells:

@@ -93,8 +93,12 @@ def render_table(block: dict[str, Any]) -> str:
 
 def _render_row(row: dict[str, Any], *, header: bool) -> str:
     row_cells = row.get("cells", [])
+    # Only a positive mark (header=True or a header scope) makes a <thead> row
+    # follow per-cell metadata; ``header: False`` on every cell means "not detected".
     unmarked_header_row = header and not any(
-        isinstance(cell, dict) and ("header" in cell or "scope" in cell) for cell in row_cells
+        isinstance(cell, dict)
+        and (cell.get("header") is True or str(cell.get("scope", "")).strip().lower() in _HEADER_SCOPES)
+        for cell in row_cells
     )
     cells = []
     for cell in row_cells:

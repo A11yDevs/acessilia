@@ -134,6 +134,22 @@ def test_explicit_unmarked_header_row_still_uses_column_header_cells() -> None:
     )
 
 
+def test_header_row_with_every_cell_flagged_false_uses_column_headers() -> None:
+    # Providers that do not detect header cells flag every cell header=False;
+    # a <thead> row like that must still render <th scope="col"> for screen readers.
+    document = _document_with_table({
+        "header": [{"cells": [{"text": "Curso", "header": False}, {"text": "2026", "header": False}]}],
+        "body": [{"cells": [{"text": "Letras", "header": False}, {"text": "71", "header": False}]}],
+    })
+
+    assert _render_table(document) == (
+        '<table id="table-1">'
+        '<thead><tr><th scope="col">Curso</th><th scope="col">2026</th></tr></thead>'
+        '<tbody><tr><td>Letras</td><td>71</td></tr></tbody>'
+        '</table>'
+    )
+
+
 def test_explicit_data_cell_in_header_row_remains_data() -> None:
     document = _document_with_table({
         "header": [{"cells": [
