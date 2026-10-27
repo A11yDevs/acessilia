@@ -84,7 +84,8 @@ _MATHML_ATTRIBUTES = frozenset(
     "fence separator form accent accentunder largeop movablelimits lspace rspace "
     "linethickness bevelled notation rowalign columnalign rowspacing columnspacing "
     "rowlines columnlines frame framespacing equalrows equalcolumns columnspan rowspan "
-    "scriptlevel displaystyle encoding".split()
+    "scriptlevel displaystyle encoding width height depth voffset minsize maxsize "
+    "columnwidth".split()
 )
 
 
@@ -184,7 +185,10 @@ def _render_block(
             )
             tfoot = f"<tfoot>{tfoot_rows}</tfoot>"
 
-        return f'<table id="{block_id}">{caption_html}{thead}{tbody}{tfoot}</table>'
+        return (
+            f'<div class="table-wrap"><table id="{block_id}">'
+            f"{caption_html}{thead}{tbody}{tfoot}</table></div>"
+        )
     if block_type == "image":
         alt = escape(block.get("alt_text", block.get("text", "")))
         desc = escape(block.get("long_description", ""))
@@ -238,6 +242,9 @@ def _prose_html(text: str, block: dict[str, Any]) -> str:
     return "".join(parts)
 
 
+_HEADER_SCOPES = frozenset({"row", "col", "rowgroup", "colgroup"})
+
+
 def _render_html_table_row(
     row: dict[str, Any], *, header: bool, block: dict[str, Any] | None = None
 ) -> str:
@@ -245,8 +252,10 @@ def _render_html_table_row(
 
     Args:
         row (dict): Row mapping with a "cells" list; each cell is a dict with "text" plus optional "scope", "rowspan", "colspan".
-        header (bool): Whether the row belongs to <thead>. A row without
-            cell-level header metadata uses column headers; marked rows follow
+        header (bool): Whether the row belongs to <thead>. A row with no
+            cell marked as a header (``header: True`` or a header scope) uses
+            column headers, so the ``header: False`` defaults a promoted first
+            row carries do not turn it into data cells; marked rows follow
             each cell's own metadata.
         block (dict | None): The table block, whose converted inline math
             (``metadata["inline_math"]``) renders the cells' ``$…$`` spans.
@@ -256,7 +265,11 @@ def _render_html_table_row(
     """
     cells = row.get("cells", []) if isinstance(row, dict) else []
     unmarked_header_row = header and not any(
-        isinstance(cell, dict) and ("header" in cell or "scope" in cell)
+        isinstance(cell, dict)
+        and (
+            bool(cell.get("header"))
+            or str(cell.get("scope", "")).strip().lower() in _HEADER_SCOPES
+        )
         for cell in cells
     )
     rendered_cells: list[str] = []
@@ -265,17 +278,14 @@ def _render_html_table_row(
             continue
         text = _prose_html(str(cell.get("text", "")).strip(), block or {})
         scope = str(cell.get("scope", "")).strip().lower()
-        cell_is_header = unmarked_header_row or bool(cell.get("header")) or scope in {
-            "row",
-            "col",
-            "rowgroup",
-            "colgroup",
-        }
+        cell_is_header = (
+            unmarked_header_row or bool(cell.get("header")) or scope in _HEADER_SCOPES
+        )
         tag = "th" if cell_is_header else "td"
 
         attrs: list[str] = []
         if tag == "th":
-            if scope in {"row", "col", "rowgroup", "colgroup"}:
+            if scope in _HEADER_SCOPES:
                 attrs.append(f'scope="{scope}"')
             else:
                 default_scope = "col" if header else "row"
@@ -336,6 +346,10 @@ def document_to_html(
         "pre{overflow:auto;background:#111;color:#f4f4f4;padding:1rem;border-radius:10px}",
         "code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}",
         "details{background:#fff;border:1px solid #ddd;border-radius:10px;padding:.75rem 1rem;margin:1rem 0}",
+        ".table-wrap{overflow-x:auto;margin:1rem 0}",
+        "table{border-collapse:collapse;background:#fff}",
+        "th,td{border:1px solid #999;padding:.35rem .75rem;text-align:left;vertical-align:top}",
+        "th{background:#f3f4f6}",
         "aside.meta{background:#f3f4f6;border-left:4px solid #7c3aed;padding:.75rem 1rem;margin:1.5rem 0}",
         "</style>",
         "</head>",
