@@ -65,3 +65,27 @@ def test_a_type_without_a_label_is_not_marked():
 
     inner = marked["sections"][0]["children"][0]["blocks"]
     assert _texts(inner) == ["x = y", "table"]
+
+
+def test_blocks_without_an_id_get_markers_with_ids_of_their_own():
+    document = {
+        "sections": [
+            {
+                "blocks": [
+                    {"type": "image", "alt_text": "One."},
+                    {"type": "image", "alt_text": "Two."},
+                ],
+                "children": [{"blocks": [{"type": "math", "text": "x"}]}],
+            }
+        ]
+    }
+
+    marked = wrap_object_markers(document, LABELS)
+
+    [section] = marked["sections"]
+    ids = [block["id"] for block in [*section["blocks"], *section["children"][0]["blocks"]] if "id" in block]
+    assert ids == [
+        "object-1-marker-open", "object-1-marker-close",
+        "object-2-marker-open", "object-2-marker-close",
+        "object-3-marker-open", "object-3-marker-close",
+    ]

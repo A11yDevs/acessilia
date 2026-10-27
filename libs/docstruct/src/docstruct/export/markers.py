@@ -9,12 +9,9 @@ them from one pass over the canonical document. Pure functions, no I/O.
 from __future__ import annotations
 
 import copy
-from collections.abc import Mapping
+import itertools
+from collections.abc import Iterator, Mapping
 from typing import Any
-
-#: Canonical block types that hold an object the pipeline verbalized or
-#: transformed, in the order their labels are listed.
-MARKED_BLOCK_TYPES = ("image", "table", "math")
 
 
 def wrap_object_markers(
@@ -24,31 +21,36 @@ def wrap_object_markers(
 
     ``labels`` maps a block type to the word its markers carry ("image" →
     "imagem" gives "[imagem]" … "[/imagem]"); types left out are not marked.
+    The markers take their ids from the block's; a block without one gets a
+    numbered "object-N", so the marked document keeps its ids unique.
     """
     marked = copy.deepcopy(document)
+    unnamed = itertools.count(1)
     for section in marked.get("sections", []):
-        _wrap_section(section, labels)
+        _wrap_section(section, labels, unnamed)
     return marked
 
 
-def _wrap_section(section: dict[str, Any], labels: Mapping[str, str]) -> None:
+def _wrap_section(
+    section: dict[str, Any], labels: Mapping[str, str], unnamed: Iterator[int]
+) -> None:
     blocks = []
     for block in section.get("blocks", []):
         label = labels.get(block.get("type", ""))
         if not label:
             blocks.append(block)
             continue
-        identifier = block.get("id") or "object"
+        identifier = block.get("id") or f"object-{next(unnamed)}"
         blocks.append(_marker(f"{identifier}-marker-open", f"[{label}]"))
         blocks.append(block)
         blocks.append(_marker(f"{identifier}-marker-close", f"[/{label}]"))
     section["blocks"] = blocks
     for child in section.get("children", []):
-        _wrap_section(child, labels)
+        _wrap_section(child, labels, unnamed)
 
 
 def _marker(identifier: str, text: str) -> dict[str, Any]:
     return {"id": identifier, "type": "paragraph", "text": text, "metadata": {"object_marker": True}}
 
 
-__all__ = ["MARKED_BLOCK_TYPES", "wrap_object_markers"]
+__all__ = ["wrap_object_markers"]

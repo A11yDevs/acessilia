@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import json
+
 import httpx
 import pytest
 
+from backend.api import worker
 from backend.api.app import create_app
 from backend.config.settings import settings
 from backend.export.markers import (
@@ -15,7 +18,9 @@ from backend.export.markers import (
 )
 from backend.export.pandoc_exporter import export_accessible_document
 from backend.i18n import t
+from backend.services import job_store
 from backend.services.job_store import load_record
+from tests.test_pending_fixes import isolated_runtime  # noqa: F401  (fixture)
 from tests.test_v2_security import isolated  # noqa: F401  (fixture)
 
 
@@ -109,8 +114,63 @@ def test_the_job_choice_wins_over_the_setting(monkeypatch, setting, job, marked)
     assert (len(result["sections"][0]["blocks"]) == 8) is marked
 
 
-def test_markers_are_off_by_default():
+def test_markers_are_off_by_default(monkeypatch):
+    monkeypatch.delenv("OBJECT_MARKERS_ENABLED", raising=False)
+
     assert settings.__class__().object_markers_enabled is False
+
+
+@pytest.mark.asyncio
+async def test_the_worker_marks_what_a_reader_gets_and_stores_the_document_unmarked(
+    isolated_runtime, monkeypatch, tmp_path, fake_pdf_ua_audit  # noqa: F811
+):
+    _, manager = isolated_runtime
+    source = tmp_path / "doc.pdf"
+    source.write_bytes(b"%PDF")
+    job_store.save_request("marked", "capability", {}, {"status": "queued"})
+    exported: dict[str, dict] = {}
+
+    async def process(*a, **kw):
+        return _canonical()
+
+    def recorder(name):
+        def export(document, destination, *a, **kw):
+            exported[kw.get("format_name", name)] = document
+            destination.write_text("output")
+
+        return export
+
+    async def audio(text, destination, **kw):
+        destination.write_bytes(b"audio")
+
+    async def no_email(*a, **kw):
+        return False
+
+    monkeypatch.setattr("backend.service.process", process)
+    for name in ["export_txt", "export_docx", "export_pdf_ua", "export_drbench_md", "export_accessible_document"]:
+        monkeypatch.setattr(worker, name, recorder(name))
+    monkeypatch.setattr(worker, "export_mp3", audio)
+    monkeypatch.setattr(worker, "send_confirmation_email", no_email)
+    monkeypatch.setattr(worker, "send_result_email", no_email)
+    monkeypatch.setattr(settings, "toolbox_docx_enabled", True)
+    monkeypatch.setattr(settings, "toolbox_pdf_ua_enabled", True)
+    executor = worker.JobExecutor()
+    try:
+        await executor.run(worker.ApiJob("marked", source, "doc.pdf", object_markers=True))
+    finally:
+        executor._executor.shutdown(wait=True)
+
+    def markers(document):
+        return [block["text"] for block in document["sections"][0]["blocks"] if block.get("metadata", {}).get("object_marker")]
+
+    image, table = t(MSG_OBJECT_MARKER_IMAGE), t(MSG_OBJECT_MARKER_TABLE)
+    expected = [f"[{image}]", f"[/{image}]", f"[{table}]", f"[/{table}]"]
+    assert manager.obter("marked")["status"] == "done"
+    for name in ["export_txt", "html", "export_docx", "export_pdf_ua"]:
+        assert markers(exported[name]) == expected, name
+    assert markers(exported["export_drbench_md"]) == []
+    stored = json.loads(manager.obter("marked")["resultado"])
+    assert markers(stored) == []
 
 
 @pytest.mark.asyncio

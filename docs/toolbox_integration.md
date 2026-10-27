@@ -415,6 +415,7 @@ Defined in `backend/config/settings.py` and documented in `.env.example`:
 | `SLIDE_VISUAL_COVERAGE` | `0.5` | Share of a slide its pictures must cover for a presentation slide (`document_genre=presentation`) to be described as one image instead of read as text |
 | `SLIDE_FOLD_FIGURE_LABELS` | `true` | On a presentation slide read as text, fold the short text lying on or just around a picture into it (merging pictures a caption row spans), whose description transcribes it in place |
 | `TABLE_VISUAL_REVIEW` | `true` | Read again from its image a table that came back in the wrong shape (rows collapsed into one cell per column, or every cell doubled), and use the new reading when it is the same table read better |
+| `OBJECT_MARKERS_ENABLED` | `false` | Enclose each described picture, table and formula of the delivered formats (HTML, TXT and its audio, DOCX, PDF/UA) in `[label]` … `[/label]` paragraphs, labels in the server locale; a job may override it with the `object_markers` form field of `POST /api/v1/jobs` |
 | `TOOLBOX_PDF_UA_PROVIDER` | `pandoc-pdf-ua` | Provider for the `document.export.pdf_ua` capability |
 | `TOOLBOX_PDF_UA_ENABLED` | `true` | Render PDF/UA on the Toolbox (pinned Pandoc + TeX Live) or skip it. There is no local fallback: when `false`, the worker skips the format without an error; a Toolbox failure is reported as an optional export error |
 | `TOOLBOX_PDF_UA_TIMEOUT_SECONDS` | `300` | How long to wait for the Toolbox render before the export is reported as an optional error |
