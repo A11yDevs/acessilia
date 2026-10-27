@@ -56,9 +56,9 @@ PARAGRAPH = [_span("then", "CMR12", 11.96, (60.0, 201.0, 85.0, 213.0), 210.0),
              _span(" x", "CMMI12", 11.96, (85.0, 201.0, 95.0, 213.0), 210.0)]
 
 
-def _box(left, top, right, bottom):
+def _box(left, top, right, bottom, page=1):
     # Docling boxes come with a bottom-left origin.
-    return [Provenance(page_number=1, bbox=BoundingBox(
+    return [Provenance(page_number=page, bbox=BoundingBox(
         left=left, top=HEIGHT - top, right=right, bottom=HEIGHT - bottom, coord_origin="BOTTOMLEFT"))]
 
 
@@ -215,3 +215,34 @@ def test_an_unclaimed_slash_is_not_composed_inside_a_marked_cell(spans):
 
     assert _texts(manifest.elements[1]) == before
     assert outcomes == {"no-candidate": 1}
+
+
+def test_a_slash_on_a_tables_second_page_is_claimed_there(monkeypatch, spans):
+    async def fetch(source_path, pages, *, artifact_id=None, client=None):
+        # Page 1 holds the table's first rows, set as plain text.
+        first = [_span("rows", "CMR12", 11.96, (180.0, 700.0, 210.0, 712.0), 709.0)]
+        return {
+            page: {"page_number": page, "width": 612.0, "height": HEIGHT, "rotation": 0,
+                   "lines": [{"bbox": [0, 0, 0, 0], "spans": line}
+                             for line in ([first] if page == 1 else LINES)]}
+            for page in pages
+        }
+
+    monkeypatch.setattr("backend.tools.text_spans.fetch_text_spans", fetch)
+    manifest = _manifest()
+    table, slash = manifest.elements[1], manifest.elements[2]
+    table.provenance = _box(173, 695, 453, 715) + _box(173, 254, 453, 311, page=2)
+    table.metadata["table_ast"]["body"].insert(0, _cells("rows"))
+    slash.provenance = _box(185, 260, 189, 274, page=2)
+    # An overlay at the same place on page 1 is not the slash.
+    other = build_element("other", "paragraph", text="̸", reading_order=4)
+    other.provenance = _box(185, 260, 189, 274)
+    manifest.elements.append(other)
+    manifest.pages.append(PageDescriptor(page_number=2, height=HEIGHT, width=612.0,
+                                         element_ids=["t1", "slash"]))
+
+    _run(manifest)
+
+    assert _texts(table)[1] == r"$h\neq0$"
+    assert slash.metadata["negation_overlay"] == {"outcome": "inline-math", "host": "t1"}
+    assert "negation_overlay" not in other.metadata

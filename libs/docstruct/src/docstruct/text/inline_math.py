@@ -59,6 +59,11 @@ SCRIPT_SHIFT_RATIO = 0.1
 #: wider one's width, and their baselines at most this many sizes apart.
 FRACTION_CENTRE_RATIO = 0.25
 FRACTION_GAP_RATIO = 2.0
+#: A math-font decimal comma is at most this fraction of its size away from
+#: each digit. TeX's space after a math comma is a sixth of an em, but glyph
+#: boxes split a span's width evenly, so the space before ``0833`` in
+#: ``−0, 0833`` measures about 0.43 of the size.
+DECIMAL_GAP_RATIO = 0.5
 
 _NEGATION = "̸"
 _PUNCTUATION = frozenset(",.;:")
@@ -124,6 +129,8 @@ class InlineMathRun:
     bbox: tuple[float, float, float, float]
     #: Boxes of the negation slashes the run composed into its relation.
     negations: tuple[tuple[float, float, float, float], ...] = ()
+    #: The page the run was read on, for a caller that reads several (0: unset).
+    page: int = 0
 
 
 @dataclass
@@ -233,8 +240,11 @@ def assign_runs_to_cells(
     text holds it, a cell that is exactly the run first (``h`` goes to the
     ``h`` cell, not to ``2 + h``). Cells with the same text take the run's
     occurrences in reading order; a run that cells with different texts both
-    hold is left out rather than guessed. Each cell's detection carries only
-    its runs, so ``splice_inline_math`` aligns them with the cell alone.
+    hold is left out rather than guessed. Once a cell is exactly the run, only
+    such cells take it: with cells ``h`` and ``2 + h``, a second ``h`` run is
+    left out, not given to ``2 + h``, which a run of its own (``2+h``) would
+    have taken whole. Each cell's detection carries only its runs, so
+    ``splice_inline_math`` aligns them with the cell alone.
     """
     folded = ["".join(fold(char) for char in cell) for cell in cells]
     taken: list[list[InlineMathRun]] = [[] for _ in cells]
@@ -494,8 +504,11 @@ def _is_decimal_separator(glyphs: list[_Glyph], index: int) -> bool:
 
     TeX sets a math ``,`` as punctuation, with a space after it, so a math-font
     comma may have spaces between it and its digits (``$-0,0833$``); a
-    text-font comma followed by a space is the prose's (``2, 3``). Callers
-    ask outside brackets only, where ``[-2, 0)`` is an interval.
+    text-font comma followed by a space is the prose's (``2, 3``). Spaces
+    count only up to ``DECIMAL_GAP_RATIO``, so a comma does not reach a digit
+    of the next column. Callers ask outside brackets only, where ``[-2, 0)``
+    is an interval. A math list right after a relation (``$x = 1, 2$``) is set
+    like a decimal and still reads as one.
     """
     if glyphs[index].char != ",":
         return False
@@ -505,11 +518,18 @@ def _is_decimal_separator(glyphs: list[_Glyph], index: int) -> bool:
             before -= 1
         while after < len(glyphs) and glyphs[after].kind == "space":
             after += 1
-    return (
+    if not (
         before >= 0
         and after < len(glyphs)
         and glyphs[before].char.isdigit()
         and glyphs[after].char.isdigit()
+    ):
+        return False
+    # A digit in the next column is not the comma's (``x = 1,`` … ``2``).
+    gap = DECIMAL_GAP_RATIO * glyphs[index].span.size
+    return (
+        glyphs[index].box[0] - glyphs[before].box[2] <= gap
+        and glyphs[after].box[0] - glyphs[index].box[2] <= gap
     )
 
 

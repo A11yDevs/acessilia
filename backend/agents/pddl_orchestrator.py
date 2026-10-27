@@ -10,7 +10,7 @@ import re
 import tempfile
 from collections import Counter
 from collections.abc import Callable, Coroutine, Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -25,6 +25,7 @@ from docstruct.tables.ast import (
 )
 from docstruct.tables.garble import table_garble_reason
 from docstruct.text.inline_math import (
+    InlineMathDetection,
     TextSpan,
     assign_runs_to_cells,
     detect_inline_math,
@@ -3351,8 +3352,7 @@ async def _mark_inline_math(
     heights = {page.page_number: page.height for page in manifest.pages}
     overlays = [element for element in manifest.elements if is_detached_overlay(element.text)]
     for element in candidates:
-        lines = _element_span_lines(element, spans, heights)
-        detection = detect_inline_math(lines)
+        detection = _detect_by_page(element, spans, heights)
         if not detection.runs:
             continue
         result = splice_inline_math(element.text or "", detection)
@@ -3366,10 +3366,9 @@ async def _mark_inline_math(
         if not result.marked:
             continue
         element.text = result.text
-        page = next(p.page_number for p in element.provenance if p.bbox is not None)
         for run in result.marked:
             for slash in run.negations:
-                _claim_negation_overlay(overlays, element, slash, page, spans, heights)
+                _claim_negation_overlay(overlays, element, slash, run.page, spans, heights)
     manifest.extractor.configuration["inline_math_detection"] = "fonts"
     if counts["elements"]:
         logger.info("Inline math from the text layer's fonts: {}", counts)
@@ -3411,7 +3410,7 @@ async def _mark_table_inline_math(
     heights = {page.page_number: page.height for page in manifest.pages}
     overlays = [element for element in manifest.elements if is_detached_overlay(element.text)]
     for table in tables:
-        detection = detect_inline_math(_element_span_lines(table, spans, heights))
+        detection = _detect_by_page(table, spans, heights)
         if not detection.runs:
             continue
         cells = [
@@ -3438,10 +3437,9 @@ async def _mark_table_inline_math(
             "marked": len(marked),
             "unmatched": len(unmatched),
         }
-        page = next(p.page_number for p in table.provenance if p.bbox is not None)
         for run in marked:
             for slash in run.negations:
-                _claim_negation_overlay(overlays, table, slash, page, spans, heights)
+                _claim_negation_overlay(overlays, table, slash, run.page, spans, heights)
     if counts["elements"]:
         logger.info("Inline math of table cells from the text layer's fonts: {}", counts)
     return counts
@@ -3461,18 +3459,45 @@ def _top_left_box(
     return None
 
 
+def _detect_by_page(
+    element: ManifestElement,
+    spans: dict[int, dict[str, Any]],
+    heights: dict[int, float | None],
+) -> InlineMathDetection:
+    """``detect_inline_math`` over the element's lines, page by page, as one detection.
+
+    Each page is read on its own, so a fraction never pairs lines of two pages
+    (baselines are per-page coordinates), and each run carries its page, where
+    its negation slashes are claimed: a table is the element that spans pages.
+    """
+    detection = InlineMathDetection()
+    pages = dict.fromkeys(p.page_number for p in element.provenance if p.bbox is not None)
+    for page in pages:
+        read = detect_inline_math(_element_span_lines(element, spans, heights, page))
+        offset = len(detection.flat)
+        detection.flat += read.flat
+        detection.runs.extend(
+            replace(run, start=run.start + offset, end=run.end + offset, page=page)
+            for run in read.runs
+        )
+    return detection
+
+
 def _element_span_lines(
     element: ManifestElement,
     spans: dict[int, dict[str, Any]],
     heights: dict[int, float | None],
+    page_number: int,
 ) -> list[list[TextSpan]]:
-    """The element's text-layer lines, in order: spans whose centre lies in its boxes.
+    """The element's text-layer lines on a page, in order: spans whose centre lies in its boxes.
 
     A rotated page is left out: its spans are in the unrotated space, which the
     element's box may not be.
     """
     lines: list[list[TextSpan]] = []
     for provenance in element.provenance:
+        if provenance.page_number != page_number:
+            continue
         page = spans.get(provenance.page_number)
         if provenance.bbox is None or page is None or page.get("rotation"):
             continue

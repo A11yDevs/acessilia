@@ -67,6 +67,8 @@ def mask_inline_math(text: str, fill: str = " ") -> str:
     ``text``: a caller that searches the prose for a character (a relation to
     negate) does not find one inside a formula.
     """
+    if len(fill) != 1:
+        raise ValueError("fill must be one character, to keep the indexes")
     return _INLINE_MATH_RE.sub(lambda match: fill * len(match.group(0)), text)
 
 

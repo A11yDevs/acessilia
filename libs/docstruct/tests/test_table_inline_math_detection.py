@@ -4,6 +4,8 @@ The spans are the reference case's second table (page 5), as the Toolbox's
 ``document.text.spans`` returns them, with the prose words in English: the
 fonts, sizes and boxes are the real ones.
 """
+import pytest
+
 from docstruct.text.inline_math import (
     InlineMathDetection,
     InlineMathRun,
@@ -12,6 +14,7 @@ from docstruct.text.inline_math import (
     detect_inline_math,
     splice_inline_math,
 )
+from docstruct.text.math_spans import mask_inline_math
 
 
 def _spans(*parts):
@@ -107,6 +110,16 @@ def test_a_math_comma_with_tex_spacing_between_digits_is_decimal():
     assert _latex([line]) == ["x=2,5"]
 
 
+def test_a_math_comma_does_not_reach_a_digit_in_the_next_column():
+    line = _spans(("x", "CMMI12", 11.96, (100.0, 261.0, 106.0, 273.0), 270.0),
+                  (" = 1", "CMR12", 11.96, (106.0, 261.0, 128.0, 273.0), 270.0),
+                  (",", "CMMI12", 11.96, (128.0, 261.0, 131.0, 273.0), 270.0),
+                  (" ", "CMR12", 11.96, (131.0, 261.0, 281.0, 273.0), 270.0),
+                  ("2", "CMR12", 11.96, (281.0, 261.0, 287.0, 273.0), 270.0))
+
+    assert _latex([line]) == ["x=1"]
+
+
 def test_a_text_comma_followed_by_a_space_is_prose():
     line = _spans(("x", "CMMI12", 11.96, (100.0, 261.0, 106.0, 273.0), 270.0),
                   (" = 2,", "CMR12", 11.96, (106.0, 261.0, 131.0, 273.0), 270.0),
@@ -148,6 +161,15 @@ def test_identical_cells_take_the_occurrences_in_order():
     assert detections[2].runs[0].start == 0
 
 
+def test_a_run_a_cell_is_exactly_goes_to_no_other_cell():
+    detection = InlineMathDetection(flat="hh", runs=[_run("h"), _run("h")])
+
+    detections, left_out = assign_runs_to_cells(detection, ["h", "2 + h"])
+
+    assert [len(cell.runs) for cell in detections] == [1, 0]
+    assert left_out == detection.runs[1:]
+
+
 def test_a_run_two_different_cells_hold_is_left_out():
     detection = InlineMathDetection(flat="h", runs=[_run("h")])
 
@@ -158,8 +180,6 @@ def test_a_run_two_different_cells_hold_is_left_out():
 
 
 def test_masking_blanks_the_math_spans_and_keeps_the_indexes():
-    from docstruct.text.math_spans import mask_inline_math
-
     text = "final time $t=3+h$ and h = 0"
 
     masked = mask_inline_math(text)
@@ -167,3 +187,8 @@ def test_masking_blanks_the_math_spans_and_keeps_the_indexes():
     assert len(masked) == len(text)
     assert "=" not in masked[:18]
     assert masked.index("=") == text.rindex("=")
+
+
+def test_masking_refuses_a_fill_that_would_shift_the_indexes():
+    with pytest.raises(ValueError):
+        mask_inline_math("$x$", fill="..")
