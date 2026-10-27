@@ -40,6 +40,38 @@ def test_unsupported_inputs_rejected_before_job_creation(extension):
     assert validate_file("input" + extension, 100)[0] is False
 
 
+@pytest.mark.asyncio
+async def test_concurrent_downloads_have_independent_temporary_files(tmp_path):
+    from acessilia_sdk.toolbox.artifacts import ArtifactRef, download_artifact
+
+    arrived = 0
+    ready = asyncio.Event()
+    payload = b"%PDF-concurrent"
+    ref = ArtifactRef.parse(hashlib.sha256(payload).hexdigest())
+
+    class Stream(httpx.AsyncByteStream):
+        async def __aiter__(self):
+            nonlocal arrived
+            yield payload[:5]
+            arrived += 1
+            if arrived == 2:
+                ready.set()
+            await asyncio.wait_for(ready.wait(), 2)
+            yield payload[5:]
+
+    async with httpx.AsyncClient(
+        base_url="http://toolbox",
+        transport=httpx.MockTransport(
+            lambda request: httpx.Response(200, stream=Stream())
+        ),
+    ) as client:
+        await asyncio.gather(
+            *(download_artifact(client, ref, tmp_path / "out.pdf") for _ in range(2))
+        )
+    assert (tmp_path / "out.pdf").read_bytes() == payload
+    assert list(tmp_path.iterdir()) == [tmp_path / "out.pdf"]
+
+
 @pytest.mark.parametrize("kind", ["table", "picture", "formula"])
 def test_empty_structural_elements_contribute_to_fusion_evidence(kind):
     from backend.pipeline.fusion import _group_by_page, fuse_extraction_payloads

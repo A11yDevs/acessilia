@@ -19,6 +19,20 @@ from backend.config.settings import settings
 from backend.services import cache, cleanup_service
 
 
+@pytest.mark.parametrize("prefix", ["", "sha256:"])
+@pytest.mark.parametrize("suffix", ["\n", "\r\n", " ", "\t", "\x00"])
+def test_artifact_id_rejects_trailing_characters(prefix, suffix):
+    with pytest.raises(ToolboxContractViolation):
+        ArtifactRef.parse(prefix + "a" * 64 + suffix)
+
+
+@pytest.mark.parametrize("prefix", ["", "sha256:"])
+def test_artifact_id_accepts_exact_digest(prefix):
+    ref = ArtifactRef.parse(prefix + "a" * 64)
+    assert ref.digest == "a" * 64
+    assert ref.artifact_id == prefix + "a" * 64
+
+
 def _publish_in_process(directory, attempting, finished):
     cache.CACHE_DIR = Path(directory)
     original = cache._publish_cache
