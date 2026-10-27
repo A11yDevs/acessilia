@@ -101,6 +101,34 @@ def test_a_wrapped_header_cell_is_found_in_the_stream_order():
 
     assert not layout_only.objects[0].passed
     assert both.objects[0].passed
+    # The report tells a row the layout lost from one it reads right.
+    assert both.objects[0].detail == slide_case.STREAM_ORDER_DETAIL
+    assert both.summary()["stream_order"] == 1
+    assert "| Rows found only in stream order | 1 |" in both.to_markdown()
+    assert "Rows found only in stream order: 0 → 1" in slide_case.compare(layout_only, both)
+
+
+def test_a_row_the_layout_reads_right_is_not_marked_as_stream_order():
+    card = slide_case.score_text(ROWS, EXPECTATIONS, GOOD, "out", stream_text=GOOD)
+
+    assert card.summary()["stream_order"] == 0
+
+
+def test_compare_shows_a_row_that_moved_to_the_stream_order():
+    rows = [
+        {"id": "h", "page": "2", "kind": "table-header", "expected": "Prefix | symbol | power of ten"},
+    ]
+    layout_ok = WRAPPED_STREAM.replace("Prefix\nsymbol\npower of ten", "Prefix symbol power of ten")
+    base = slide_case.score_text(rows, EXPECTATIONS, layout_ok, "v4", stream_text=WRAPPED_STREAM)
+    candidate = slide_case.score_text(
+        rows, EXPECTATIONS, WRAPPED_LAYOUT, "v5", stream_text=WRAPPED_STREAM
+    )
+
+    report = slide_case.compare(base, candidate)
+
+    # Same score, but the layout lost the row: the slide is still listed.
+    assert "| 2 · | 1/1 | 1/1 | +0 | 0 → 1 |  |" in report
+    assert "Slides worse: none" in report
 
 
 #: 006.pdf v5 slide 5 in stream order: the last names, then every symbol and
