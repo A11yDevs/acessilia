@@ -29,8 +29,8 @@ Options considered for detection:
 
 ## Decision
 
-- **The representation is `$…$` in prose.** Inline math in a paragraph, list item or callout is written in its text as `$…$` (or `\(…\)`). The splitting rule is `docstruct.text.math_spans`: Pandoc's `tex_math_dollars`, plus an opening `$` that must not follow a word character (letter, digit or `_`), a backslash or another `$`, so `R$ 10,00` stays text. In plain text, a line with a `$…$` span inside prose is a paragraph, not a math block (`docstruct.blocks.parser`).
-- **The canonical enrichment converts each span once.** It calls `math.convert` and `math.verbalize`, with results cached per document, and stores them in `block.metadata["inline_math"]` as `{source, latex, mathml?, speech?}` keyed by the source LaTeX. Inline speech carries no formula label (`MathEnricher.verbalize_inline`).
+- **The representation is `$…$` in prose.** Inline math in a paragraph, list item, callout or table is written in its text as `$…$` (or `\(…\)`). A table's prose is its caption plus the text of each cell (#260). The splitting rule is `docstruct.text.math_spans`: Pandoc's `tex_math_dollars`, plus an opening `$` that must not follow a word character (letter, digit or `_`), a backslash or another `$`, so `R$ 10,00` stays text. In plain text, a line with a `$…$` span inside prose is a paragraph, not a math block (`docstruct.blocks.parser`).
+- **The canonical enrichment converts each span once.** It calls `math.convert` and `math.verbalize`, with results cached per document, and stores them in `block.metadata["inline_math"]` as `{source, latex, mathml?, speech?}` keyed by the source LaTeX. For a table the entries stay on the block, not on its cells, because the export sanitizer rebuilds every cell dict. Inline speech carries no formula label (`MathEnricher.verbalize_inline`).
 - **Exporters must render a span as math, never as literal delimiters:**
   - **Pandoc AST** (PDF/UA, DOCX): `InlineMath`, wrapped in the formula alt span when it has speech.
   - **HTML:** a `role="math"` span labelled with the speech, as a math block is. It holds the sanitized MathML, or the LaTeX when there is none.
@@ -46,5 +46,4 @@ Options considered for detection:
 - Out of scope:
   - `inline_math_promote` (a paragraph made only of math turned into display math) is still unused.
   - The fusion router's `FORMULA_RE` still ignores a single `$`.
-  - Table cells and captions keep their `$…$` as text (#260 covers math in tables).
-- Compliance: `tests/test_inline_math.py` covers the splitting rule and each exporter. The detection is measured by the math reference scorecard; the target is "Inline expressions as math" ≥ 90% on case 036.
+- Compliance: `tests/test_inline_math.py` covers the splitting rule and each exporter, and `tests/test_table_inline_math.py` covers table cells and captions. The detection is measured by the math reference scorecard; the target is "Inline expressions as math" ≥ 90% on case 036.

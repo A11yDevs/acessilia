@@ -29,8 +29,8 @@ Opções consideradas para a detecção:
 
 ## Decisão
 
-- **A representação é `$…$` na prosa.** Math inline em parágrafo, item de lista ou callout é escrito no texto como `$…$` (ou `\(…\)`). A regra de separação é `docstruct.text.math_spans`: o `tex_math_dollars` do Pandoc, mais a exigência de que o `$` de abertura não venha depois de um caractere de palavra (letra, dígito ou `_`), de uma barra invertida ou de outro `$`, para que `R$ 10,00` continue texto. Em texto puro, uma linha com um span `$…$` no meio da prosa é um parágrafo, não um bloco math (`docstruct.blocks.parser`).
-- **O enriquecimento canônico converte cada span uma vez.** Ele chama `math.convert` e `math.verbalize`, com cache por documento, e guarda o resultado em `block.metadata["inline_math"]` como `{source, latex, mathml?, speech?}`, indexado pelo LaTeX de origem. A fala inline não leva o rótulo "Fórmula:" (`MathEnricher.verbalize_inline`).
+- **A representação é `$…$` na prosa.** Math inline em parágrafo, item de lista, callout ou tabela é escrito no texto como `$…$` (ou `\(…\)`). A prosa de uma tabela é a sua legenda mais o texto de cada célula (#260). A regra de separação é `docstruct.text.math_spans`: o `tex_math_dollars` do Pandoc, mais a exigência de que o `$` de abertura não venha depois de um caractere de palavra (letra, dígito ou `_`), de uma barra invertida ou de outro `$`, para que `R$ 10,00` continue texto. Em texto puro, uma linha com um span `$…$` no meio da prosa é um parágrafo, não um bloco math (`docstruct.blocks.parser`).
+- **O enriquecimento canônico converte cada span uma vez.** Ele chama `math.convert` e `math.verbalize`, com cache por documento, e guarda o resultado em `block.metadata["inline_math"]` como `{source, latex, mathml?, speech?}`, indexado pelo LaTeX de origem. Numa tabela as entradas ficam no bloco, não nas células, porque o sanitizador da exportação reconstrói cada dict de célula. A fala inline não leva o rótulo "Fórmula:" (`MathEnricher.verbalize_inline`).
 - **Os exportadores devem renderizar o span como math, nunca com os delimitadores literais:**
   - **AST Pandoc** (PDF/UA, DOCX): `InlineMath`, envolto no span de alt de fórmula quando há fala.
   - **HTML:** um span `role="math"` rotulado com a fala, como num bloco math. Ele contém o MathML sanitizado, ou o LaTeX quando não há MathML.
@@ -46,5 +46,4 @@ Opções consideradas para a detecção:
 - Fora do escopo:
   - `inline_math_promote` (um parágrafo só de math vira display) continua sem uso.
   - O `FORMULA_RE` do roteador de fusão continua ignorando um `$` simples.
-  - Células e legendas de tabela mantêm o `$…$` como texto (a #260 cuida de math em tabelas).
-- Conformidade: `tests/test_inline_math.py` cobre a regra de separação e cada exportador. A detecção é medida pelo scorecard de referência de math; a meta é "Inline expressions as math" ≥ 90% no caso 036.
+- Conformidade: `tests/test_inline_math.py` cobre a regra de separação e cada exportador, e `tests/test_table_inline_math.py` cobre células e legendas de tabela. A detecção é medida pelo scorecard de referência de math; a meta é "Inline expressions as math" ≥ 90% no caso 036.
