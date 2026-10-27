@@ -2344,6 +2344,31 @@ DETERMINISTIC_METHOD_HANDLERS: dict[
 }
 
 
+def _reusable_fusion_payload(manifest: ProcessingManifest) -> dict | None:
+    from dataclasses import asdict
+
+    from docstruct.policy import FusionPolicy
+
+    from backend.services.cache import processing_cache_configuration
+
+    ref = manifest.extractor.configuration.get("fusion_reuse") or {}
+    try:
+        content = Path(ref["path"]).read_bytes()
+        if hashlib.sha256(content).hexdigest() != ref["sha256"]:
+            return None
+        record = json.loads(content)
+        if record["source_sha256"] != manifest.source.sha256:
+            return None
+        if record.get("policy") != asdict(FusionPolicy()):
+            return None
+        if json.dumps(record["configuration"], sort_keys=True) != json.dumps(processing_cache_configuration(), sort_keys=True):
+            return None
+        payload = record["payload"]
+        return payload if isinstance(payload, dict) else None
+    except (OSError, KeyError, TypeError, ValueError):
+        return None
+
+
 def _handle_dual_provider_fusion_method(
     manifest: ProcessingManifest, obligation_id: str
 ) -> MethodResult:
@@ -2358,14 +2383,8 @@ def _handle_dual_provider_fusion_method(
     Em modo single (FUSION_MODE=single) o método não é admissível e não
     deve ser selecionado pelo compilador.
 
-    Custo: a fusão reextrai o documento inteiro nos dois providers, sem
-    reutilizar a evidência que o ``ToolboxManifestExtractor`` já coletou em
-    ``FUSION_MODE=dual``. Cada passo ``fuse-providers`` paga, portanto, uma
-    extração dual completa (cache remoto da Toolbox à parte). Em regra o
-    documento não é reenviado: os dois providers leem o ``artifact_id`` que o
-    extrator registrou em ``manifest.extractor.configuration``. Se a Toolbox
-    não tiver mais esse artefato (expirado/removido), ``extract_fused`` faz o
-    upload do arquivo como fallback.
+    Reutiliza a fusão inicial quando hash, documento e configuração coincidem.
+    Evidência ausente, corrompida ou incompatível provoca reextração dual.
     """
     obligation = next(
         (o for o in manifest.obligations if o.id == obligation_id), None
@@ -2380,7 +2399,9 @@ def _handle_dual_provider_fusion_method(
     # Reuse the document the structure extractor already stored in the Toolbox.
     artifact_id = _source_artifact_id(manifest)
     try:
-        payload = _run_extract_fused(source_path, artifact_id=artifact_id)
+        payload = _reusable_fusion_payload(manifest)
+        if payload is None:
+            payload = _run_extract_fused(source_path, artifact_id=artifact_id)
     except Exception as exc:  # noqa: BLE001
         return MethodResult(
             success=False,
@@ -4516,15 +4537,19 @@ def build_pddl_structured_payload(
     text_output = _render_text_from_pages(pages_payload)
     configuration = manifest.extractor.configuration
     media_inspection_status = configuration.get("media_inspection")
+    fusion_status = configuration.get("fusion") or {}
+    unsatisfied_obligations = _unsatisfied_obligations(manifest)
 
     technical_warnings: list[str] = []
+    if fusion_status.get("status") == "degraded":
+        technical_warnings.append("Fusão dual incompleta: falha do provedor secundário; reexecução necessária.")
     if execution_report is None:
         technical_warnings.append(
             "Executor nao foi executado; somente manifesto e plano foram gerados."
         )
     elif execution_report.status in {
         "failed", "replan-required",
-    } or _unsatisfied_selected_obligations(manifest):
+    } or unsatisfied_obligations:
         # A replan that leaves an exhausted refinement out can still report
         # `completed`; the open obligation must reach the document anyway. The
         # ids are in `pddl_unsatisfied_obligations`, so the warning stays short.
@@ -4581,13 +4606,14 @@ def build_pddl_structured_payload(
             "pddl_comparison_verdict": comparison.comparison.verdict
             if comparison
             else None,
-            "pddl_unsatisfied_obligations": _unsatisfied_obligations(manifest),
+            "pddl_unsatisfied_obligations": unsatisfied_obligations,
             # The open obligations a delivered document still has, for the
             # result e-mail: the job page and e-mail show no technical warning.
             "pddl_unsatisfied_summary": _unsatisfied_summary(manifest)
-            if _unsatisfied_selected_obligations(manifest)
+            if unsatisfied_obligations
             else None,
             "pddl_toolbox_availability": toolbox_availability,
+            "pddl_fusion": fusion_status or None,
             # Pictures and tables left undescribed or unread, by reason; a rerun
             # once the model provider or the Toolbox is back may deliver them.
             "pddl_visual_failures": visual_failures,
@@ -4604,8 +4630,16 @@ def build_pddl_structured_payload(
         "technical_warnings": technical_warnings,
         # A step degraded by a Toolbox or model failure must not be replayed
         # from the cache once the service is back.
-        "cacheable": media_inspection_status != "failed"
-        and not records_visual_failures(visual_failures),
+        "cacheable": (
+            media_inspection_status != "failed"
+            and fusion_status.get("status") != "degraded"
+            and execution_report is not None
+            and execution_report.status in {"completed", "dry-run-completed"}
+            and not any(
+                item["recovery"] != "human-review" for item in unsatisfied_obligations
+            )
+            and not records_visual_failures(visual_failures)
+        ),
     }
 
 
@@ -4672,6 +4706,10 @@ def _unsatisfied_obligations(manifest: ProcessingManifest) -> list[dict[str, Any
                 "last_method": last.method if last else None,
                 "last_message": last.message if last else None,
                 "escalated": bool(last and last.method == "human-review"),
+                "recovery": (
+                    "human-review" if last and last.method == "human-review"
+                    and obligation.kind in NON_CRITICAL_OBLIGATION_KINDS else "retry"
+                ),
             }
         )
     return unsatisfied

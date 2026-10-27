@@ -137,7 +137,9 @@ def _payload(manifest):
     plan = SimpleNamespace(plan_id="p-1", planner="internal", expected_total_cost=0)
     return pddl.build_pddl_structured_payload(
         file_path=Path("deck.pdf"), manifest=manifest, plan=plan,
-        planner_backend="internal", execution_report=None, comparison=None,
+        planner_backend="internal",
+        execution_report=SimpleNamespace(status="completed", execution_id="test"),
+        comparison=None,
     )
 
 
@@ -304,3 +306,41 @@ def test_records_visual_failures(failures, recorded):
     from backend.agents.pddl_orchestrator import records_visual_failures
 
     assert records_visual_failures(failures) is recorded
+
+
+@pytest.mark.parametrize("fusion_degraded", [False, True])
+@pytest.mark.parametrize("visual_failed", [False, True])
+@pytest.mark.parametrize("execution_status", [None, "completed", "failed", "replan-required"])
+def test_merged_cache_policy_requires_success_across_all_stages(
+    fusion_degraded, visual_failed, execution_status
+):
+    """Visual recovery and fusion/execution recovery must both survive integration."""
+    from backend.agents.pddl_orchestrator import build_pddl_structured_payload
+    from tests.pddl_support import build_element, build_manifest
+    from tests.test_pddl_orchestrator import _sample_plan
+
+    manifest = build_manifest(
+        [build_element("picture-1", "picture", metadata=(
+            {"vision_failure_reason": "model_failed"} if visual_failed else {}
+        ))], [],
+    )
+    manifest.extractor.configuration["fusion"] = {
+        "status": "degraded" if fusion_degraded else "completed",
+    }
+    payload = build_pddl_structured_payload(
+        file_path=Path("deck.pdf"), manifest=manifest, plan=_sample_plan(),
+        planner_backend="internal",
+        execution_report=(
+            SimpleNamespace(status=execution_status, execution_id="merged-policy")
+            if execution_status is not None else None
+        ),
+        comparison=None,
+    )
+    metadata = payload["canonical_metadata"]
+    assert metadata["pddl_fusion"]["status"] == (
+        "degraded" if fusion_degraded else "completed"
+    )
+    assert bool(metadata["pddl_visual_failures"]) is visual_failed
+    assert payload["cacheable"] is (
+        execution_status == "completed" and not fusion_degraded and not visual_failed
+    )

@@ -153,6 +153,11 @@ class Settings:
         default_factory=lambda: os.getenv("INLINE_MATH_DETECTION", "fonts").strip().lower()
     )
 
+    # Bump on remote model deployments that retain the same URL/model name.
+    processing_model_revision: str = field(
+        default_factory=lambda: os.getenv("PROCESSING_MODEL_REVISION", "")
+    )
+
     # Fusão multi-provider (Fase 4 do plano docstruct)
     # "single": comportamento atual (um provider, fallback PyMuPDF).
     # "dual": extrai com dois providers e funde via docstruct.fusion.

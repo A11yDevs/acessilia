@@ -12,6 +12,7 @@ engaged.
 from __future__ import annotations
 
 import asyncio
+import json
 from collections import Counter
 from typing import Any
 
@@ -41,6 +42,11 @@ def _element_to_canonical_block(el: dict, page_index: int) -> dict:
     etype = str(el.get("type", "")).lower()
     text = (el.get("text") or "").strip()
     bbox = el.get("bbox")
+    provenance = el.get("provenance") or []
+    if not bbox and provenance:
+        bbox = provenance[0].get("bbox")
+    if isinstance(bbox, dict):
+        bbox = [bbox.get(key) for key in ("left", "top", "right", "bottom")]
     block: dict[str, Any] = {
         "type": etype or "paragraph",
         "text": text,
@@ -193,13 +199,16 @@ def fuse_extraction_payloads(
     from docstruct.fusion.repetition import guard_page
 
     for page_key in sorted(set(pages_d) | set(pages_m)):
-        d_blocks = [_canonical_to_diff(b) for b in pages_d.get(page_key, [])]
-        m_blocks = [_canonical_to_diff(b) for b in pages_m.get(page_key, [])]
+        # Text alignment and structural presence are separate evidence. Empty
+        # figures/tables must survive comparison without becoming paragraphs.
+        d_blocks = [_canonical_to_diff(b) for b in pages_d.get(page_key, []) if b["text"]]
+        m_blocks = [_canonical_to_diff(b) for b in pages_m.get(page_key, []) if b["text"]]
         page_stats: Counter = Counter()
         m_pics = [
-            b["bbox"]
+            diff.box
             for b in pages_m.get(page_key, [])
             if b["type"] == "picture" and "bbox" in b
+            if (diff := _canonical_to_diff(b)).box is not None
         ]
         out, page_stats = merge_blocks(
             d_blocks, m_blocks, policy, min_len=0, m_pics=m_pics, stats=page_stats
@@ -231,7 +240,14 @@ def fuse_extraction_payloads(
         )
         evidence_stats["similarity"] = round(similarity, 4)
         evidence_stats["text_similarity"] = round(text_similarity, 4)
-        evidence_stats["provider_divergence"] = similarity < DEFAULT_MAX_RATIO
+        structure_d = _structure_signature(pages_d.get(page_key, []))
+        structure_m = _structure_signature(pages_m.get(page_key, []))
+        evidence_stats["structure_divergence"] = structure_d != structure_m
+        evidence_stats["structure_counts"] = {
+            primary_provider: dict(Counter(b["type"] for b in pages_d.get(page_key, []) if b["type"] in STRUCTURAL_TYPES)),
+            secondary_provider: dict(Counter(b["type"] for b in pages_m.get(page_key, []) if b["type"] in STRUCTURAL_TYPES)),
+        }
+        evidence_stats["provider_divergence"] = similarity < DEFAULT_MAX_RATIO or structure_d != structure_m
         evidence_stats["text_divergence"] = text_similarity < DEFAULT_MAX_RATIO
         # Deterministic adjudication (docstruct's v1 page router), recorded with
         # the evidence so the manifest builder can leave the VLM judge for the
@@ -242,6 +258,8 @@ def fuse_extraction_payloads(
         evidence_stats["table_divergence"] = (
             _page_content_signature(d_blocks, kinds={"table"})
             != _page_content_signature(m_blocks, kinds={"table"})
+            or _structure_signature(pages_d.get(page_key, []), kinds={"table"})
+            != _structure_signature(pages_m.get(page_key, []), kinds={"table"})
         )
         if repetition_tokens_cut:
             evidence_stats["repetition_tokens_cut"] = repetition_tokens_cut
@@ -544,12 +562,20 @@ def _canon_kwargs(block: dict) -> dict:
     }
 
 
+STRUCTURAL_TYPES = {"picture", "table", "formula"}
+
+
+def _structure_signature(blocks: list[dict], *, kinds: set[str] = STRUCTURAL_TYPES) -> list[str]:
+    return sorted(json.dumps({"type": b["type"], "bbox": b.get("bbox")}, sort_keys=True)
+                  for b in blocks if b["type"] in kinds)
+
+
 def _group_by_page(payload: dict) -> dict[int, list[dict]]:
     """Group payload elements by page (default: page 0)."""
     doc = payload.get("document", payload)
     groups: dict[int, list[dict]] = {}
     for el in doc.get("elements") or []:
-        if not (el.get("text") or "").strip():
+        if not (el.get("text") or "").strip() and el.get("type") not in STRUCTURAL_TYPES:
             continue
         if el.get("page_number") is not None:
             page = max(0, int(el["page_number"]) - 1)
