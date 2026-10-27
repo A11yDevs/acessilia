@@ -60,6 +60,16 @@ def inline_math_sources(text: str) -> list[str]:
     return [piece for piece, is_math in split_inline_math(text) if is_math]
 
 
+def mask_inline_math(text: str, fill: str = " ") -> str:
+    """``text`` with each inline math span, delimiters included, blanked out.
+
+    Same length as ``text``, so an index into the result is an index into
+    ``text``: a caller that searches the prose for a character (a relation to
+    negate) does not find one inside a formula.
+    """
+    return _INLINE_MATH_RE.sub(lambda match: fill * len(match.group(0)), text)
+
+
 def block_prose(block: dict[str, Any]) -> list[str]:
     """The prose strings of a block that can carry inline math."""
     if block.get("type") not in INLINE_MATH_BLOCK_TYPES:
@@ -103,5 +113,6 @@ __all__ = [
     "block_prose",
     "inline_math_entries",
     "inline_math_sources",
+    "mask_inline_math",
     "split_inline_math",
 ]
