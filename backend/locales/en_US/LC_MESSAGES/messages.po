@@ -1018,15 +1018,21 @@ msgstr "Unsupported export format: {format_name}"
 msgid "Contents"
 msgstr "Contents"
 
-msgid "Technical metadata"
-msgstr "Technical metadata"
-
 msgid "Image without a text description."
 msgstr "Image without a text description."
 
 #, python-brace-format
 msgid "Logo. {lines}."
 msgstr "Logo. {lines}."
+
+msgid "image"
+msgstr "image"
+
+msgid "table"
+msgstr "table"
+
+msgid "formula"
+msgstr "formula"
 
 msgid "Image description"
 msgstr "Image description"

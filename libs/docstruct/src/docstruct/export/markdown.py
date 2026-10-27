@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from docstruct.blocks.lists import list_start
 from docstruct.tables.ast import table_ast_from_block
 from docstruct.text.latex import bare_latex
 
@@ -63,7 +64,15 @@ def _render_block(block: dict[str, Any]) -> str:
     if btype == "table":
         return render_table(block)
     if btype == "list":
-        return "\n".join(f"- {str(i).strip()}" for i in block.get("items", []) if str(i).strip())
+        # Numbered by source position, so an empty item dropped here leaves
+        # the same numbers as in the other exports; CommonMark lists are
+        # decimal only, so a lettered or roman list keeps its numbers.
+        lines = []
+        for number, item in enumerate(block.get("items", []), start=list_start(block)):
+            marker = f"{number}." if block.get("ordered") else "-"
+            if str(item).strip():
+                lines.append(f"{marker} {str(item).strip()}")
+        return "\n".join(lines)
     if btype == "image":
         return ""
     return (block.get("text") or "").strip()

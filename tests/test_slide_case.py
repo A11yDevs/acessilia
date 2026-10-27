@@ -72,6 +72,91 @@ def test_a_degraded_output_fails_where_a_reader_loses_something():
     assert card.violations == {1: ["label-list-alt"], 2: ["undescribed-picture"]}
 
 
+#: A header cell that wraps, as pdftotext -layout prints 006.pdf slide 15:
+#: its second line lands between the cells of the next line.
+WRAPPED_LAYOUT = """1.1 Slide 1 de 2
+1.2 Slide 2 de 2
+            power of
+Prefix      symbol    ten
+yota        Y          10²⁴
+"""
+WRAPPED_STREAM = """1.1 Slide 1 de 2
+1.2 Slide 2 de 2
+Prefix
+symbol
+power of ten
+yota Y 10²⁴
+"""
+
+
+def test_a_wrapped_header_cell_is_found_in_the_stream_order():
+    rows = [
+        {"id": "h", "page": "2", "kind": "table-header", "expected": "Prefix | symbol | power of ten"},
+    ]
+
+    layout_only = slide_case.score_text(rows, EXPECTATIONS, WRAPPED_LAYOUT, "out")
+    both = slide_case.score_text(
+        rows, EXPECTATIONS, WRAPPED_LAYOUT, "out", stream_text=WRAPPED_STREAM
+    )
+
+    assert not layout_only.objects[0].passed
+    assert both.objects[0].passed
+    # The report tells a row the layout lost from one it reads right.
+    assert both.objects[0].detail == slide_case.STREAM_ORDER_DETAIL
+    assert both.summary()["stream_order"] == 1
+    assert "| Rows found only in stream order | 1 |" in both.to_markdown()
+    assert "Rows found only in stream order: 0 → 1" in slide_case.compare(layout_only, both)
+
+
+def test_a_heading_right_after_a_page_break_starts_its_slide():
+    # pdftotext -raw ends a page with its footer number and no newline.
+    text = "1.1 Slide 1 de 2\nintro\n1\f1.2 Slide 2 de 2\nPrefix symbol power\n"
+
+    assert slide_case.split_slides(text).keys() == {1, 2}
+
+
+def test_a_row_the_layout_reads_right_is_not_marked_as_stream_order():
+    card = slide_case.score_text(ROWS, EXPECTATIONS, GOOD, "out", stream_text=GOOD)
+
+    assert card.summary()["stream_order"] == 0
+
+
+def test_compare_shows_a_row_that_moved_to_the_stream_order():
+    rows = [
+        {"id": "h", "page": "2", "kind": "table-header", "expected": "Prefix | symbol | power of ten"},
+    ]
+    layout_ok = WRAPPED_STREAM.replace("Prefix\nsymbol\npower of ten", "Prefix symbol power of ten")
+    base = slide_case.score_text(rows, EXPECTATIONS, layout_ok, "v4", stream_text=WRAPPED_STREAM)
+    candidate = slide_case.score_text(
+        rows, EXPECTATIONS, WRAPPED_LAYOUT, "v5", stream_text=WRAPPED_STREAM
+    )
+
+    report = slide_case.compare(base, candidate)
+
+    # Same score, but the layout lost the row: the slide is still listed.
+    assert "| 2 · | 1/1 | 1/1 | +0 | 0 → 1 |  |" in report
+    assert "Slides worse: none" in report
+
+
+#: 006.pdf v5 slide 5 in stream order: the last names, then every symbol and
+#: power, close enough for "deca | da | 10¹" to fit in ROW_GAP.
+COLLAPSED_STREAM = """1.1 Slide 1 de 2
+1.2 Slide 2 de 2
+Prefix symbol power
+yota zeta
+Y Z 10²⁴ 10²¹
+"""
+
+
+def test_the_stream_order_does_not_rescue_a_collapsed_table():
+    card = slide_case.score_text(
+        ROWS, EXPECTATIONS, DEGRADED, "out", stream_text=COLLAPSED_STREAM
+    )
+    failed = {o.id for o in card.objects if not o.passed}
+
+    assert {"s02-t01-r01", "s02-t01-r02"} <= failed
+
+
 def test_a_printed_list_spaced_before_its_semicolons_is_not_a_label_list():
     text = "1.1 Slide 1 de 2\nNaCl ; C ; Na ; Fe; Al2O3 ; Fe3O4\n1.2 Slide 2 de 2\n"
 
