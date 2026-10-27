@@ -314,6 +314,14 @@ The `media.inspect` capability (provider `pure-media-inspect`, PR
     most 5% of the slide) becomes one picture of the whole slide, described with
     the page prompt instead of read as text; the replaced text is kept in
     `metadata.replaced_text`. A slide nothing was extracted from becomes one too.
+    An element the extractor read across two slides is first split into one
+    element per slide at the character offsets of its provenance, before the
+    reading order is refined, so each part is ordered by its own box on its
+    slide. Only text elements without children are split, and only when the
+    offsets cover all of the text; otherwise the element stays whole. A slide
+    whose only text, its title and running headers and footers aside, came
+    from such a split is read as one picture as well, the split text kept in
+    `replaced_text`.
     On a slide read as text, a label whose centre lies on a picture covering
     less than 95% of the slide (a larger one is the background) is folded into
     that picture: it leaves the running text and is kept in the picture's
@@ -329,10 +337,11 @@ The `media.inspect` capability (provider `pure-media-inspect`, PR
     pictures side by side (a caption row read through their columns) merges
     them into the first one (`metadata.merged_picture_ids`); a sentence stays.
     A caption is taken in only then, or when it lies on or beside such a
-    merged picture and across its width. If the picture is left undescribed,
-    its labels are its alt text (`SLIDE_FOLD_FIGURE_LABELS`). Whatever that
-    setting, the slide heading is left out of reading-order refinement, so a
-    picture never moves before it.
+    merged picture and across its width (`SLIDE_FOLD_FIGURE_LABELS`). If the
+    picture is left undescribed, its labels go back to the slide as paragraphs
+    after it. The text a whole-slide picture replaced goes back the same way,
+    whatever that setting. Either way, the slide heading is left out of
+    reading-order refinement, so a picture never moves before it.
     A Toolbox without the field, or a failed inspection, means a document.
   - `requires_visual_inspection`, to inject a full-page `picture` element when the
     input is a standalone image with no visual blocks — ensuring the VisionAgent

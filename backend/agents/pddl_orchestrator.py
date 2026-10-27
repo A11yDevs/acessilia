@@ -4859,12 +4859,10 @@ def _manifest_pages_to_payload(manifest: ProcessingManifest) -> list[dict[str, A
         for members in letterheads.values()
         for member in members[1:]
     }
+    letterhead_blocks = {
+        key: _letterhead_block(members) for key, members in letterheads.items()
+    }
     pages: list[dict[str, Any]] = []
-
-    def to_block(element: ManifestElement) -> dict[str, Any]:
-        if element.id in letterheads:
-            return _letterhead_block(letterheads[element.id])
-        return _element_to_block(element)
 
     if manifest.pages:
         sorted_pages = sorted(manifest.pages, key=lambda page: page.page_number)
@@ -4890,7 +4888,7 @@ def _manifest_pages_to_payload(manifest: ProcessingManifest) -> list[dict[str, A
                 and item.id not in merged
             ]
             block_elements.sort(key=lambda item: item.reading_order)
-            blocks = [to_block(item) for item in block_elements]
+            blocks = _elements_to_blocks(block_elements, letterhead_blocks)
             _dedupe_callout_titles(blocks)
             pages.append(
                 {
@@ -4917,7 +4915,7 @@ def _manifest_pages_to_payload(manifest: ProcessingManifest) -> list[dict[str, A
             grouped[page_number],
             key=lambda item: item.reading_order,
         )
-        blocks = [to_block(item) for item in page_elements]
+        blocks = _elements_to_blocks(page_elements, letterhead_blocks)
         _dedupe_callout_titles(blocks)
         pages.append(
             {
@@ -4928,6 +4926,65 @@ def _manifest_pages_to_payload(manifest: ProcessingManifest) -> list[dict[str, A
         )
 
     return pages
+
+
+def _elements_to_blocks(
+    elements: list[ManifestElement], replacements: dict[str, dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Blocks of ``elements`` in order, with the text an undescribed picture held.
+
+    An element in ``replacements`` (the first member of a letterhead) gives
+    way to its block, which already stands for the picture's text.
+    """
+    blocks: list[dict[str, Any]] = []
+    for element in elements:
+        if element.id in replacements:
+            blocks.append(replacements[element.id])
+            continue
+        blocks.append(_element_to_block(element))
+        blocks.extend(_element_to_block(kept) for kept in _text_kept_by_picture(element))
+    return blocks
+
+
+def _text_kept_by_picture(element: ManifestElement) -> list[ManifestElement]:
+    """The text a picture took from the slide, as paragraphs, when it went undescribed.
+
+    Slide structuring hands text to a picture: a slide read as one picture
+    keeps the text it replaced (``replaced_text``), a text slide's labels are
+    folded into the picture they lie on or beside (``figure_labels``). Its
+    description was to carry that text; without one, the text goes back to
+    the slide after the picture, as it stood before, instead of being lost or
+    listed as the picture's alt text (006.pdf v5, slides 16 and 31).
+
+    Only the vision model's description carries that text: an alt the
+    extractor gave the picture, which a failed call leaves in place, does not.
+    The paragraphs carry the picture's source location; the labels' own boxes
+    left with the elements they were folded from.
+    """
+    if element.type != "picture" or (
+        element.metadata.get("vision_description_complete") and (element.text or "").strip()
+    ):
+        return []
+    replaced = element.metadata.get("replaced_text")
+    texts = (
+        [line for line in replaced.splitlines() if line.strip()]
+        if isinstance(replaced, str) and replaced.strip()
+        else list(element.metadata.get("figure_labels") or [])
+    )
+    return [
+        ManifestElement(
+            id=f"{element.id}-kept-{index:03d}",
+            type="paragraph",
+            raw_label="paragraph",
+            reading_order=element.reading_order,
+            hierarchy_level=element.hierarchy_level,
+            text=text,
+            page_number=element.page_number,
+            provenance=list(element.provenance),
+            metadata={"kept_from_undescribed_picture": element.id},
+        )
+        for index, text in enumerate(texts, start=1)
+    ]
 
 
 def _element_to_block(element: ManifestElement) -> dict[str, Any]:
@@ -5007,13 +5064,10 @@ def _element_to_block(element: ManifestElement) -> dict[str, Any]:
             }
         )
     elif element.type == "picture":
-        # A text slide's labels folded into the picture (slides.py) left the
-        # running text; with no description they are all the reader gets.
-        labels = "; ".join(element.metadata.get("figure_labels", []))
         block.update(
             {
                 "type": "image",
-                "alt_text": text or labels or t(MSG_UNDESCRIBED_PICTURE_ALT),
+                "alt_text": text or t(MSG_UNDESCRIBED_PICTURE_ALT),
             }
         )
     elif element.type == "code":

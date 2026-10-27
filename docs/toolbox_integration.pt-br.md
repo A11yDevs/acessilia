@@ -314,6 +314,14 @@ A capacidade `media.inspect` (provider `pure-media-inspect`, PR
     cobre no máximo 5% do slide) vira uma imagem do slide inteiro, descrita com o
     prompt de página em vez de lida como texto; o texto substituído fica em
     `metadata.replaced_text`. Um slide do qual nada foi extraído também vira uma.
+    Um elemento que o extrator leu atravessando dois slides é antes separado
+    em um elemento por slide, nas posições de caractere da sua proveniência,
+    antes do refinamento da ordem de leitura, de modo que cada parte é
+    ordenada pela sua própria caixa no seu slide. Só elementos de texto sem
+    filhos são separados, e só quando as posições cobrem todo o texto; caso
+    contrário o elemento fica inteiro. Um slide cujo único texto, fora o
+    título e os cabeçalhos e rodapés, veio dessa separação também é lido como
+    uma imagem, com o texto separado guardado em `replaced_text`.
     Num slide lido como texto, um rótulo cujo centro está sobre uma imagem que
     cobre menos de 95% do slide (uma maior é o fundo) é incorporado a ela: sai
     do texto corrido, fica em `metadata.figure_labels` da imagem (ids em
@@ -329,11 +337,12 @@ A capacidade `media.inspect` (provider `pure-media-inspect`, PR
     linha de legenda lida através das colunas delas) as funde na primeira
     (`metadata.merged_picture_ids`); uma frase fica. Uma legenda só é
     incorporada nesse caso, ou quando está sobre ou ao lado de uma imagem
-    fundida e atravessa a largura dela. Se a imagem ficar sem descrição, seus
-    rótulos viram o texto alternativo (`SLIDE_FOLD_FIGURE_LABELS`).
-    Independentemente dessa configuração, o cabeçalho do slide fica fora do
-    refinamento da ordem de leitura, para que nenhuma imagem passe à frente
-    dele.
+    fundida e atravessa a largura dela (`SLIDE_FOLD_FIGURE_LABELS`). Se a
+    imagem ficar sem descrição, seus rótulos voltam ao slide como parágrafos
+    depois dela. O texto que uma imagem do slide inteiro substituiu volta do
+    mesmo modo, independentemente dessa configuração. Em qualquer caso, o
+    cabeçalho do slide fica fora do refinamento da ordem de leitura, para que
+    nenhuma imagem passe à frente dele.
     Uma Toolbox sem o campo, ou uma inspeção que falhou, significa documento.
   - `requires_visual_inspection`, para injetar um elemento `picture` de página
     inteira quando a entrada é imagem isolada sem blocos visuais — garantindo a

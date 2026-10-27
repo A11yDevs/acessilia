@@ -160,22 +160,28 @@ def _render_block(
 
         caption = table_ast.get("caption")
         caption_html = (
-            f"<caption>{escape(str(caption))}</caption>"
+            f"<caption>{_prose_html(caption, block)}</caption>"
             if isinstance(caption, str) and caption.strip()
             else ""
         )
 
         thead = ""
         if header_rows:
-            thead_rows = "".join(_render_html_table_row(row, header=True) for row in header_rows)
+            thead_rows = "".join(
+                _render_html_table_row(row, header=True, block=block) for row in header_rows
+            )
             thead = f"<thead>{thead_rows}</thead>"
 
-        tbody_rows = "".join(_render_html_table_row(row, header=False) for row in body_rows)
+        tbody_rows = "".join(
+            _render_html_table_row(row, header=False, block=block) for row in body_rows
+        )
         tbody = f"<tbody>{tbody_rows}</tbody>" if tbody_rows else ""
 
         tfoot = ""
         if footer_rows:
-            tfoot_rows = "".join(_render_html_table_row(row, header=False) for row in footer_rows)
+            tfoot_rows = "".join(
+                _render_html_table_row(row, header=False, block=block) for row in footer_rows
+            )
             tfoot = f"<tfoot>{tfoot_rows}</tfoot>"
 
         return f'<table id="{block_id}">{caption_html}{thead}{tbody}{tfoot}</table>'
@@ -232,7 +238,9 @@ def _prose_html(text: str, block: dict[str, Any]) -> str:
     return "".join(parts)
 
 
-def _render_html_table_row(row: dict[str, Any], *, header: bool) -> str:
+def _render_html_table_row(
+    row: dict[str, Any], *, header: bool, block: dict[str, Any] | None = None
+) -> str:
     """Renders one table row (dict of cells) into a <tr> fragment, skipping empty or non-dict cells.
 
     Args:
@@ -240,6 +248,8 @@ def _render_html_table_row(row: dict[str, Any], *, header: bool) -> str:
         header (bool): Whether the row belongs to <thead>. A row without
             cell-level header metadata uses column headers; marked rows follow
             each cell's own metadata.
+        block (dict | None): The table block, whose converted inline math
+            (``metadata["inline_math"]``) renders the cells' ``$…$`` spans.
 
     Returns:
         str: The "<tr>...</tr>" fragment, or an empty string when the row has no valid cells.
@@ -253,7 +263,7 @@ def _render_html_table_row(row: dict[str, Any], *, header: bool) -> str:
     for cell in cells:
         if not isinstance(cell, dict):
             continue
-        text = escape(str(cell.get("text", "")).strip())
+        text = _prose_html(str(cell.get("text", "")).strip(), block or {})
         scope = str(cell.get("scope", "")).strip().lower()
         cell_is_header = unmarked_header_row or bool(cell.get("header")) or scope in {
             "row",

@@ -150,7 +150,7 @@ def _block_to_ast(block: dict[str, Any]) -> list[dict[str, Any]]:
         table_ast = table_ast_from_block(block)
         if table_ast is None:
             return []
-        return [_table_to_pandoc_ast(table_ast)]
+        return [_table_to_pandoc_ast(table_ast, block)]
     if block_type == "image":
         return [
             {
@@ -299,7 +299,12 @@ def _is_formula_span(node: Any) -> bool:
     return len(attributes) > 1 and FORMULA_ALT_CLASS in (attributes[1] or [])
 
 
-def _table_to_pandoc_ast(table_ast: dict[str, Any]) -> dict[str, Any]:
+def _table_to_pandoc_ast(
+    table_ast: dict[str, Any], block: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    """A Pandoc ``Table``; ``block``'s converted inline math renders the ``$…$``
+    of the caption and cells as ``InlineMath`` (#260)."""
+    block = block or {}
     header_rows, body_rows, footer_rows = split_header_and_body(table_ast)
     row_head_columns = row_header_column_count(body_rows)
 
@@ -315,19 +320,23 @@ def _table_to_pandoc_ast(table_ast: dict[str, Any]) -> dict[str, Any]:
     ]
 
     caption_text = table_ast.get("caption")
-    short_caption = _meta_inlines(caption_text) if isinstance(caption_text, str) and caption_text.strip() else None
+    short_caption = (
+        _prose_inlines(caption_text, block)
+        if isinstance(caption_text, str) and caption_text.strip()
+        else None
+    )
     caption = [short_caption, []]
 
-    head = [["", [], []], [_pandoc_row(row, header=True) for row in header_rows]]
+    head = [["", [], []], [_pandoc_row(row, header=True, block=block) for row in header_rows]]
     bodies = [
         [
             ["", [], []],
             row_head_columns,
             [],
-            [_pandoc_row(row, header=False) for row in body_rows],
+            [_pandoc_row(row, header=False, block=block) for row in body_rows],
         ]
     ]
-    foot = [["", [], []], [_pandoc_row(row, header=False) for row in footer_rows]]
+    foot = [["", [], []], [_pandoc_row(row, header=False, block=block) for row in footer_rows]]
 
     return {
         "t": "Table",
@@ -342,12 +351,12 @@ def _table_to_pandoc_ast(table_ast: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _pandoc_row(row: dict[str, Any], *, header: bool) -> list[Any]:
+def _pandoc_row(row: dict[str, Any], *, header: bool, block: dict[str, Any]) -> list[Any]:
     cells = row.get("cells", []) if isinstance(row, dict) else []
     return [
         ["", [], []],
         [
-            _pandoc_cell(cell, header=header or _cell_is_header(cell))
+            _pandoc_cell(cell, header=header or _cell_is_header(cell), block=block)
             for cell in cells
             if isinstance(cell, dict)
         ],
@@ -364,7 +373,7 @@ def _cell_is_header(cell: dict[str, Any]) -> bool:
     }
 
 
-def _pandoc_cell(cell: dict[str, Any], *, header: bool) -> list[Any]:
+def _pandoc_cell(cell: dict[str, Any], *, header: bool, block: dict[str, Any]) -> list[Any]:
     text = str(cell.get("text", "")).strip()
     rowspan = cell.get("rowspan") if isinstance(cell.get("rowspan"), int) else 1
     colspan = cell.get("colspan") if isinstance(cell.get("colspan"), int) else 1
@@ -383,5 +392,5 @@ def _pandoc_cell(cell: dict[str, Any], *, header: bool) -> list[Any]:
         alignment,
         max(1, int(rowspan)),
         max(1, int(colspan)),
-        [{"t": block_kind, "c": _meta_inlines(text)}],
+        [{"t": block_kind, "c": _prose_inlines(text, block)}],
     ]
