@@ -29,13 +29,14 @@ Options considered for detection:
 
 ## Decision
 
-- **The representation is `$…$` in prose.** Inline math in a paragraph, list item or callout is written in its text as `$…$` (or `\(…\)`). The splitting rule is `docstruct.text.math_spans`: Pandoc's `tex_math_dollars`, plus an opening `$` that must not follow a word character (letter, digit or `_`), a backslash or another `$`, so `R$ 10,00` stays text. In plain text, a line with a `$…$` span inside prose is a paragraph, not a math block (`docstruct.blocks.parser`).
-- **The canonical enrichment converts each span once.** It calls `math.convert` and `math.verbalize`, with results cached per document, and stores them in `block.metadata["inline_math"]` as `{source, latex, mathml?, speech?}` keyed by the source LaTeX. Inline speech carries no formula label (`MathEnricher.verbalize_inline`).
+- **The representation is `$…$` in prose.** Inline math in a paragraph, list item, callout or table is written in its text as `$…$` (or `\(…\)`). A table's prose is its caption plus the text of each cell (#260). The splitting rule is `docstruct.text.math_spans`: Pandoc's `tex_math_dollars`, plus an opening `$` that must not follow a word character (letter, digit or `_`), a backslash or another `$`, so `R$ 10,00` stays text. In plain text, a line with a `$…$` span inside prose is a paragraph, not a math block (`docstruct.blocks.parser`).
+- **The canonical enrichment converts each span once.** It calls `math.convert` and `math.verbalize`, with results cached per document, and stores them in `block.metadata["inline_math"]` as `{source, latex, mathml?, speech?}` keyed by the source LaTeX. For a table the entries stay on the block, not on its cells, because the export sanitizer rebuilds every cell dict. Inline speech carries no formula label (`MathEnricher.verbalize_inline`).
 - **Exporters must render a span as math, never as literal delimiters:**
   - **Pandoc AST** (PDF/UA, DOCX): `InlineMath`, wrapped in the formula alt span when it has speech.
   - **HTML:** a `role="math"` span labelled with the speech, as a math block is. It holds the sanitized MathML, or the LaTeX when there is none.
   - **TXT/MP3:** the speech. Without speech, the bare LaTeX.
 - **Detection reads the PDF's math fonts** (option 3). Font reading is operational, so under [ADR-0003](0003-remote-only-operational-capabilities.md) it is a Toolbox capability (`document.text.spans`). Building LaTeX from the spans is a pure docstruct algorithm. The core matches each run to the element's text and splices in `$…$`. A run it cannot match leaves the text unchanged. `INLINE_MATH_DETECTION` (`fonts`, the default, or `off`) selects the step, and it is part of the processing cache key. A negation slash that a run composes (`h \neq 0`) is recorded on its detached-slash element, so the Unicode repair's reattachment of detached slashes does not compose another `=` of the paragraph.
+- **Table cells are detected from the same spans** (#260). The step runs after the table enrichment, because a table read again from its image gets new cells. Cells carry no boxes, so each run of the table's lines goes to the cell whose text holds it (`assign_runs_to_cells`). A cell that is exactly the run comes first, and a run that cells with different texts both hold is left out. Two lines that are each one run, smaller than the text around them and stacked on each other's centre, become one `\frac` run: a fraction in a header cell has no rule in the text layer. A math-font decimal comma may have TeX's space before its digits (`$-0,0833$`); it stays a bare `,`, because `math.convert` misreads `0{,}0833` as `0,083` and `3`. The prose and table steps read the spans through one reader, so each page is fetched once.
 
 ## Consequences
 
@@ -46,5 +47,4 @@ Options considered for detection:
 - Out of scope:
   - `inline_math_promote` (a paragraph made only of math turned into display math) is still unused.
   - The fusion router's `FORMULA_RE` still ignores a single `$`.
-  - Table cells and captions keep their `$…$` as text (#260 covers math in tables).
-- Compliance: `tests/test_inline_math.py` covers the splitting rule and each exporter. The detection is measured by the math reference scorecard; the target is "Inline expressions as math" ≥ 90% on case 036.
+- Compliance: `tests/test_inline_math.py` covers the splitting rule and each exporter, and `tests/test_table_inline_math.py` covers table cells and captions; `tests/test_table_inline_math_marking.py` and `libs/docstruct/tests/test_table_inline_math_detection.py` cover the detection in cells. The detection is measured by the math reference scorecard; the target is "Inline expressions as math" ≥ 90% on case 036.

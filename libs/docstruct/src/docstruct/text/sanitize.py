@@ -16,6 +16,10 @@ PROMPT_LEAK_PATTERNS = [
     r"(?i)assistant note",
 ]
 
+# Lookahead for a letter: what a list marker introduces, unlike a number or
+# a formula, which a leading "-" belongs to.
+BEFORE_WORD = r"(?=[^\W\d_])"
+
 MARKDOWN_ARTIFACT_PATTERNS = [
     r"(?m)^(#{1,6})\s+",
     r"(?m)^(\s*[-*+]\s+)",
@@ -55,8 +59,12 @@ def sanitize_block_text(text: str, block_type: str | None = None) -> str:
     cleaned = re.sub(r"(?<!\*)\*(?!\s)(.+?)(?<!\s)\*(?!\*)", r"\1", cleaned)
     cleaned = re.sub(r"__([^_]+)__", r"\1", cleaned)
     cleaned = re.sub(r"(?m)^\s*#{1,6}\s+", "", cleaned)
-    cleaned = re.sub(r"(?m)^\s*[-*+]\s+", "", cleaned)
-    cleaned = re.sub(r"(?m)^\s*(?:\d+\.\s+|\d+\)\s+|\(\d+\)\s+)", "", cleaned)
+    # A leading "- " or "1. " is a list marker only before a word; before a
+    # number or formula it is data ("- 0,08" is negative, "- \frac" too) (#260).
+    cleaned = re.sub(rf"(?m)^[ \t]*[-*+][ \t]+{BEFORE_WORD}", "", cleaned)
+    cleaned = re.sub(
+        rf"(?m)^[ \t]*(?:\d+\.|\d+\)|\(\d+\))[ \t]+{BEFORE_WORD}", "", cleaned
+    )
     cleaned = re.sub(r"(?m)^\s*```+\s*$", "", cleaned)
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
     return cleaned.strip()

@@ -24,6 +24,14 @@ def _vision_cache_stays_out_of_tests(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _vision_retry_pass_without_wait(monkeypatch):
+    """Run the vision retry pass without its wait, so a failing test stays fast."""
+    from backend.config.settings import settings
+
+    monkeypatch.setattr(settings, "vision_retry_pass_delay_seconds", 0)
+
+
+@pytest.fixture(autouse=True)
 def _renders_stay_off_a_real_toolbox(request, monkeypatch):
     """Fail a non-e2e test that renders or validates against a real Toolbox.
 

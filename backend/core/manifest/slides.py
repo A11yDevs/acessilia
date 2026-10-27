@@ -20,17 +20,27 @@ processing needs:
   picture's crop to take it in, and a label or caption spanning several
   pictures side by side (a caption row read across their columns) merges them
   into one;
+- text the extractor read across two slides as one element is split back
+  into one element per slide, at the character offsets its provenance gives
+  (``split_across_slides``, run before the reading order is refined so each
+  part is placed by its own box on its slide);
 - reading order is numbered slide by slide, so it never crosses a slide.
 """
 
 from __future__ import annotations
 
+import copy
 import re
 from collections import Counter
 from collections.abc import Callable
 from itertools import pairwise
 
-from backend.core.manifest.models import BoundingBox, ManifestElement, ProcessingManifest
+from backend.core.manifest.models import (
+    BoundingBox,
+    ManifestElement,
+    ProcessingManifest,
+    Provenance,
+)
 from backend.i18n import t
 from backend.log_messages import MSG_SLIDE_HEADING, MSG_SLIDE_HEADING_WITH_TITLE
 from docstruct.geometry import is_bottom_left, union
@@ -141,9 +151,16 @@ def structure_as_slides(
                     element.metadata["original_type"] = "title"
                     element.type = "heading"
                 element.hierarchy_level = max(element.hierarchy_level, INNER_LEVEL)
-        if not slide or _is_visual(body, visual_coverage, page_fractions):
+        if (
+            not slide
+            or _only_text_split_in(body)
+            or _is_visual(body, visual_coverage, page_fractions)
+        ):
             # A slide nothing was extracted from may be a scan or a photo; the
-            # heading would hide it from the unstructured-page inspection.
+            # heading would hide it from the unstructured-page inspection. A
+            # slide whose only text was split off another slide's element was
+            # read no better: the vision model reads it whole, and the split
+            # text stays in replaced_text for when it cannot.
             body = [_whole_slide_picture(number, body)]
         elif fold_figure_labels:
             body = _fold_figure_labels(body, page_fractions)
@@ -171,6 +188,108 @@ def structure_as_slides(
         ]
     manifest.summary.element_count = len(elements)
     manifest.summary.element_types = dict(Counter(element.type for element in elements))
+
+
+#: The types whose exported content is their text alone: a table is exported
+#: from its ``table_ast``, so cutting its text would leave both parts whole.
+_SPLITTABLE = {
+    "paragraph", "heading", "title", "caption", "list_item", "code", "formula", "unknown",
+}
+
+
+def split_across_slides(manifest: ProcessingManifest) -> None:
+    """Split, in place, each element read across slides into one element per slide.
+
+    Run before the reading order is refined, so each part is ordered by its own
+    box on its slide instead of keeping the place of the element on the first.
+    """
+    parents = {element.parent_id for element in manifest.elements if element.parent_id}
+    manifest.elements = [
+        part
+        for element in manifest.elements
+        for part in (
+            [element] if element.id in parents else _split_across_slides(element)
+        )
+    ]
+    for page in manifest.pages:
+        page.element_ids = [
+            element.id
+            for element in manifest.elements
+            if element.page_number == page.page_number
+        ]
+
+
+def _split_across_slides(element: ManifestElement) -> list[ManifestElement]:
+    """``element`` as one element per slide its text was read on.
+
+    The extractor can join text from two slides into one element (006.pdf:
+    slide 29's caption and slide 41's text, provenance on both pages, #291);
+    filed under its first page, the second slide lost its text. Each
+    provenance entry gives the page and the characters of the text it covers,
+    so the text is cut there. An element on one page, of a type not exported
+    from its text, or whose offsets do not cover its text in ordered,
+    non-empty parts (text between or around them would be lost) is returned
+    as it is.
+    """
+    text = element.text or ""
+    pages = {entry.page_number for entry in element.provenance}
+    if len(pages) < 2 or element.type not in _SPLITTABLE or not text.strip():
+        return [element]
+    if any(entry.char_start is None or entry.char_end is None for entry in element.provenance):
+        return [element]
+    # Consecutive entries on one page (the lines of one slide) make one part.
+    runs: list[list[Provenance]] = []
+    for entry in sorted(element.provenance, key=lambda entry: entry.char_start):
+        if runs and runs[-1][0].page_number == entry.page_number:
+            runs[-1].append(entry)
+        else:
+            runs.append([entry])
+    spans: list[tuple[int, int]] = []
+    previous_end = 0
+    for run in runs:
+        start, end = run[0].char_start, max(entry.char_end for entry in run)
+        if start < previous_end or end <= start or text[previous_end:start].strip():
+            return [element]
+        spans.append((start, end))
+        previous_end = end
+    if text[previous_end:].strip():
+        return [element]
+    parts: list[ManifestElement] = []
+    for index, (run, (start, end)) in enumerate(zip(runs, spans, strict=True), start=1):
+        piece = text[start:end].strip()
+        if not piece:
+            return [element]
+        parts.append(
+            element.model_copy(
+                update={
+                    "id": f"{element.id}-part-{index}",
+                    "text": piece,
+                    "page_number": run[0].page_number,
+                    "provenance": [entry.model_copy(deep=True) for entry in run],
+                    "metadata": {**copy.deepcopy(element.metadata), "split_from": element.id},
+                },
+                deep=True,
+            )
+        )
+    return parts
+
+
+def _only_text_split_in(body: list[ManifestElement]) -> bool:
+    """Whether all the slide's own text was split off an element read across slides.
+
+    006.pdf slide 41: the extractor read nothing of its own there, and the part
+    of slide 29's element that belonged to it misses a line of formulas.
+    Running headers and footers, pictures and the slide's title are left out;
+    a slide with no other text stays as it is.
+    """
+    text = [
+        element
+        for element in body
+        if element.type != "picture"
+        and element.raw_label not in _DECORATION
+        and (element.text or "").strip()
+    ]
+    return bool(text) and all(element.metadata.get("split_from") for element in text)
 
 
 def _slide_title(slide: list[ManifestElement]) -> ManifestElement | None:
@@ -298,7 +417,8 @@ def _fold_figure_labels(
     order, in the picture's ``figure_labels`` and its id in
     ``figure_label_ids``. A label on nested pictures goes to the smallest, the
     one it most likely names. Should the picture be left undescribed, those
-    labels are its alt text (``_element_to_block``), so they are not lost.
+    labels go back to the slide as paragraphs after it
+    (``pddl_orchestrator._text_kept_by_picture``), so they are not lost.
 
     Handing the labels to the model was tried on 006.pdf and made it worse: a
     structural formula's atom letters ("H", "O", "SOH") pushed it to transcribe

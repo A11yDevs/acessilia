@@ -10,6 +10,7 @@ project i18n goal of requiring zero or minimal code changes per added language.
 from __future__ import annotations
 
 import argparse
+import string
 import sys
 from collections.abc import Sequence
 from datetime import datetime, timedelta, timezone
@@ -147,6 +148,9 @@ from backend.log_messages import (
     LOG_PDDL_TABLES_ENRICHED,
     LOG_PDDL_TABLE_REREAD_ACCEPTED,
     LOG_PDDL_TABLE_REREAD_REJECTED,
+    LOG_PROVIDER_BREAKER_OPEN,
+    LOG_PDDL_VISION_RETRY_PASS_PICTURES,
+    LOG_PDDL_VISION_RETRY_PASS_TABLES,
     LOG_PDDL_ELEMENT_CROP_FAILED,
     LOG_PDDL_PREFERRED_PLAN_MISSING,
     LOG_PDDL_PROBLEM_HASH_MISMATCH,
@@ -271,7 +275,12 @@ from backend.export.pandoc_exporter import (
     MSG_PDF_UA_DISABLED,
     MSG_UNSUPPORTED_EXPORT_FORMAT,
 )
-from backend.agents.pddl_orchestrator import MSG_UNDESCRIBED_PICTURE_ALT
+from backend.agents.pddl_orchestrator import (
+    MSG_PICTURES_NOT_DESCRIBED,
+    MSG_LETTERHEAD_TEXT,
+    MSG_TABLES_NOT_READ,
+    MSG_UNDESCRIBED_PICTURE_ALT,
+)
 from backend.export.markers import (
     MSG_OBJECT_MARKER_FORMULA,
     MSG_OBJECT_MARKER_IMAGE,
@@ -720,6 +729,7 @@ MESSAGES: tuple[str, ...] = (
     MSG_HTML_TABLE_OF_CONTENTS,
     MSG_HTML_TECHNICAL_METADATA,
     MSG_UNDESCRIBED_PICTURE_ALT,
+    MSG_LETTERHEAD_TEXT,
     MSG_OBJECT_MARKER_IMAGE,
     MSG_OBJECT_MARKER_TABLE,
     MSG_OBJECT_MARKER_FORMULA,
@@ -825,6 +835,7 @@ MESSAGES: tuple[str, ...] = (
     LOG_PDDL_TABLES_ENRICHED,
     LOG_PDDL_TABLE_REREAD_ACCEPTED,
     LOG_PDDL_TABLE_REREAD_REJECTED,
+    LOG_PROVIDER_BREAKER_OPEN,
     LOG_PDDL_ELEMENT_CROP_FAILED,
     LOG_PDDL_PREFERRED_PLAN_MISSING,
     LOG_PDDL_PROBLEM_HASH_MISMATCH,
@@ -1428,6 +1439,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         MSG_HTML_TABLE_OF_CONTENTS: "Sumário",
         MSG_HTML_TECHNICAL_METADATA: "Metadados técnicos",
         MSG_UNDESCRIBED_PICTURE_ALT: "Imagem sem descrição textual.",
+        MSG_LETTERHEAD_TEXT: "Logotipo. {lines}.",
         MSG_OBJECT_MARKER_IMAGE: "imagem",
         MSG_OBJECT_MARKER_TABLE: "tabela",
         MSG_OBJECT_MARKER_FORMULA: "fórmula",
@@ -1612,6 +1624,10 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         LOG_PDDL_TABLE_REREAD_REJECTED: (
             "A tabela {element_id} (página {page}) parecia mal lida ({reason}); "
             "a leitura da sua imagem não foi usada ({why})"
+        ),
+        LOG_PROVIDER_BREAKER_OPEN: (
+            "{failures} chamadas de visão seguidas sem resposta utilizável; "
+            "as chamadas restantes deste job serão puladas"
         ),
         LOG_PDDL_ELEMENT_CROP_FAILED: (
             "Falha ao extrair recorte de imagem para elemento {element_id}"
@@ -1841,10 +1857,35 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
     },
 }
 
-#: Canonical English singular/plural msgid pair, then a per-locale mapping of localized pairs with the same index ordering.
-PLURAL_MESSAGES: tuple[tuple[str, str], dict[str, tuple[str, str]]] = (
-    ("document", "documents"),
-    {"pt_BR": ("documento", "documentos")},
+#: Each entry: a canonical English singular/plural msgid pair, then a per-locale mapping of localized pairs with the same index ordering.
+PLURAL_MESSAGES: tuple[tuple[tuple[str, str], dict[str, tuple[str, str]]], ...] = (
+    (("document", "documents"), {"pt_BR": ("documento", "documentos")}),
+    (
+        MSG_PICTURES_NOT_DESCRIBED,
+        {"pt_BR": ("{count} imagem não pôde ser descrita.", "{count} imagens não puderam ser descritas.")},
+    ),
+    (
+        MSG_TABLES_NOT_READ,
+        {"pt_BR": ("{count} tabela não pôde ser lida.", "{count} tabelas não puderam ser lidas.")},
+    ),
+    (
+        LOG_PDDL_VISION_RETRY_PASS_PICTURES,
+        {
+            "pt_BR": (
+                "{count} imagem sem descrição utilizável do modelo; nova tentativa em {delay}s",
+                "{count} imagens sem descrição utilizável do modelo; nova tentativa em {delay}s",
+            )
+        },
+    ),
+    (
+        LOG_PDDL_VISION_RETRY_PASS_TABLES,
+        {
+            "pt_BR": (
+                "{count} tabela sem leitura utilizável do modelo; nova tentativa em {delay}s",
+                "{count} tabelas sem leitura utilizável do modelo; nova tentativa em {delay}s",
+            )
+        },
+    ),
 )
 
 
@@ -1856,7 +1897,7 @@ def _validate(translations: dict[str, dict[str, str]], locales: tuple[str, ...])
         locales (tuple): Every supported locale identifier under validation, e.g. the default :data:`SUPPORTED_LOCALES` or an alternate tuple injected by tests.
 
     Returns:
-        list: Problem descriptions, empty when every non-default locale covers all MESSAGES ids with non-blank values.
+        list: Problem descriptions, empty when every non-default locale covers all MESSAGES ids with non-blank values that keep the msgid's ``{name}`` placeholders.
     """
     problems: list[str] = []
     for locale in locales:
@@ -1869,7 +1910,26 @@ def _validate(translations: dict[str, dict[str, str]], locales: tuple[str, ...])
             else [msgid for msgid in MESSAGES if msgid not in table or not str(table[msgid]).strip()]
         )
         problems.extend(f"missing or blank entry: {x!r}" for x in missing)
+        if isinstance(table, dict):
+            problems.extend(
+                f"placeholders differ from the msgid: {msgid!r}"
+                for msgid in MESSAGES
+                if str(table.get(msgid) or "").strip()
+                and _placeholders(table[msgid]) != _placeholders(msgid)
+            )
     return problems
+
+
+def _placeholders(text: str) -> set[str] | None:
+    """The ``{name}`` fields of ``text``, or ``None`` when its braces do not parse.
+
+    A translation that drops or renames a field the caller fills with
+    ``.format(...)`` would raise at run time, not when the catalog is built.
+    """
+    try:
+        return {field for _, field, _, _ in string.Formatter().parse(text) if field is not None}
+    except ValueError:
+        return None
 
 
 def _write_catalog(locale: str, catalog, locales_dir: Path) -> tuple[Path, Path]:
@@ -1916,14 +1976,14 @@ def build_locales(locales_dir: Path = DEFAULT_LOCALES_DIR) -> dict[str, tuple[Pa
         if locale == DEFAULT_LOCALE:
             for msgid in MESSAGES:
                 catalog.add(msgid, msgid)
-            (singular_en, plural_en) = PLURAL_MESSAGES[0]
-            catalog.add((singular_en, plural_en), [singular_en, plural_en])
+            for pair, _localized in PLURAL_MESSAGES:
+                catalog.add(pair, list(pair))
         else:
             table = TRANSLATIONS[locale]
             for msgid in MESSAGES:
                 catalog.add(msgid, table[msgid])
-            (localized_sing, localized_plur) = PLURAL_MESSAGES[1][locale]
-            catalog.add(PLURAL_MESSAGES[0], [localized_sing, localized_plur])
+            for pair, localized in PLURAL_MESSAGES:
+                catalog.add(pair, list(localized[locale]))
         result[locale] = _write_catalog(locale, catalog, locales_dir)
     return result
 

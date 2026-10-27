@@ -94,6 +94,20 @@ class Settings:
     vision_concurrency: int = field(
         default_factory=lambda: int(os.getenv("VISION_CONCURRENCY", "2"))
     )
+    # Vision calls that fail in a row before the rest of the job's vision
+    # calls (pictures and tables) are skipped and degrade at once, so a
+    # provider that went down does not cost every remaining object up to two
+    # call deadlines. 0 never skips.
+    vision_breaker_threshold: int = field(
+        default_factory=lambda: int(os.getenv("VISION_BREAKER_THRESHOLD", "3"))
+    )
+    # Seconds a vision stage waits before trying once more, one at a time,
+    # the pictures or tables left without a usable description or reading
+    # (an empty answer included). The first of those calls tests the
+    # provider: when it fails again, the rest are skipped.
+    vision_retry_pass_delay_seconds: int = field(
+        default_factory=lambda: int(os.getenv("VISION_RETRY_PASS_DELAY_SECONDS", "60"))
+    )
     # Minimum agreement (0-1 F1 of letters, digits and math symbols) between
     # a recognized formula and the text-layer text it replaces. Below it the
     # recognition is taken as a misread and the formula keeps its text; the
