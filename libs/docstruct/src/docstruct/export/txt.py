@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from docstruct.blocks.lists import list_start
+from docstruct.blocks.lists import item_label, list_numbering, list_start
 from docstruct.profiles import filter_blocks_for_profile
 from docstruct.sections import section_body_blocks
 from docstruct.tables.ast import linearize_table_for_text, table_ast_from_block
@@ -69,8 +69,9 @@ def _render_block(block: dict[str, Any], formula_label: str = DEFAULT_FORMULA_LA
         items = block.get("items", [])
         if not block.get("ordered"):
             return [f"- {_prose_text(str(item), block)}" for item in items]
+        numbering = list_numbering(block)
         return [
-            f"{number}. {_prose_text(str(item), block)}"
+            f"{item_label(number, numbering)}. {_prose_text(str(item), block)}"
             for number, item in enumerate(items, start=list_start(block))
         ]
     if block_type == "table":

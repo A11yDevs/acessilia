@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 from docstruct.blocks.callouts import dedupe_callout_titles as _dedupe_callout_titles
+from docstruct.blocks.lists import item_label, list_numbering, list_start, marker_numbering
 from docstruct.fusion.similarity import PAGENUM_RE
 from docstruct.fusion.tailjoin import is_page_number as _is_page_number
 from docstruct.geometry import reading_role
@@ -5318,6 +5319,9 @@ def _callout_titles(elements: list[ManifestElement]) -> dict[str, str]:
     the callout, before any repair; the text-repair methods then fix the
     title element's text only, so the copy keeps the broken accents
     ("observa¸ c˜ oes").
+
+    Read per page: the Toolbox groups callouts page by page, so a callout's
+    title and content never sit on different pages.
     """
     return {
         str(element.metadata["callout_id"]): (element.text or "").strip()
@@ -5335,6 +5339,10 @@ def _merge_list_blocks(blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
     their Docling list (``parent_id``) and kind are one list; an item kept
     apart by a formula or a paragraph stays a list of its own, whose ``start``
     carries the numbering on.
+
+    The joined list keeps the first item's identity and provenance (``id``,
+    ``manifest_element_id``, ``source_location``); the later items lend it
+    their text only. Nothing reads provenance per item.
     """
     merged: list[dict[str, Any]] = []
     for block in blocks:
@@ -5351,14 +5359,6 @@ def _merge_list_blocks(blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
             continue
         merged.append(block)
     return merged
-
-
-def _list_start(marker: Any) -> int | None:
-    """The number an ordered item's marker ("2.", "3)") gives, when it is not 1."""
-    digits = str(marker or "").strip().rstrip(".)")
-    if digits.isdigit() and int(digits) > 1:
-        return int(digits)
-    return None
 
 
 def _text_kept_by_picture(element: ManifestElement) -> list[ManifestElement]:
@@ -5469,9 +5469,13 @@ def _element_to_block(
                 "items": [text] if text else [],
             }
         )
-        start = _list_start(metadata.get("marker")) if ordered else None
-        if start is not None:
-            block["start"] = start
+        numbering = marker_numbering(metadata.get("marker")) if ordered else None
+        if numbering is not None:
+            start, style = numbering
+            if start > 1:
+                block["start"] = start
+            if style != "decimal":
+                block["numbering"] = style
     elif element.type == "table":
         table_ast = _table_ast_from_metadata(metadata)
         rows = _rows_from_table_ast(table_ast) if table_ast else None
@@ -5528,8 +5532,10 @@ def _render_text_from_blocks(blocks: list[dict[str, Any]]) -> str:
             prefix = "#" * max(1, min(level, 6))
             lines.append(f"{prefix} {block.get('text', '').strip()}")
         elif block_type == "list":
-            for item in block.get("items", []):
-                lines.append(f"- {str(item).strip()}")
+            numbering = list_numbering(block)
+            for number, item in enumerate(block.get("items", []), start=list_start(block)):
+                marker = f"{item_label(number, numbering)}." if block.get("ordered") else "-"
+                lines.append(f"{marker} {str(item).strip()}")
         elif block_type == "table":
             rows = block.get("rows")
             if not rows and isinstance(block.get("table_ast"), dict):

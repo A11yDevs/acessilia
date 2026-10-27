@@ -37,7 +37,7 @@ def _element(index: int, kind: str, text: str, **metadata: Any) -> ManifestEleme
     )
 
 
-def _blocks(elements: list[ManifestElement]) -> list[dict[str, Any]]:
+def _page(elements: list[ManifestElement]) -> dict[str, Any]:
     # The Docling lists the items name as their parent, kept off the page.
     all_elements = elements + [
         ManifestElement(
@@ -81,7 +81,11 @@ def _blocks(elements: list[ManifestElement]) -> list[dict[str, Any]]:
         execution_report=None,
         comparison=None,
     )
-    return payload["pages"][0]["blocks"]
+    return payload["pages"][0]
+
+
+def _blocks(elements: list[ManifestElement]) -> list[dict[str, Any]]:
+    return _page(elements)["blocks"]
 
 
 def _item(index: int, text: str, marker: str, parent: str, **metadata: Any) -> ManifestElement:
@@ -133,6 +137,29 @@ def test_an_item_after_a_formula_carries_the_numbering_on() -> None:
     assert blocks[2]["items"] == ["It is undefined at zero.", "These ideas come back."]
 
 
+def test_a_lettered_item_after_a_formula_keeps_its_letter() -> None:
+    blocks = _blocks([
+        _item(1, "Rewrite the expression", "a)", "group-a"),
+        _element(2, "formula", r"\frac{s(t+h)-s(t)}{h}"),
+        _item(3, "It is undefined at zero.", "b)", "group-b"),
+    ])
+
+    assert blocks[0]["numbering"] == "lower-alpha" and "start" not in blocks[0]
+    assert blocks[2]["numbering"] == "lower-alpha" and blocks[2]["start"] == 2
+
+
+def test_page_text_numbers_an_ordered_list() -> None:
+    page = _page([
+        _item(1, "Rewrite the expression", "i.", "group-a"),
+        _element(2, "formula", r"\frac{s(t+h)-s(t)}{h}"),
+        _item(3, "It is undefined at zero.", "ii.", "group-b"),
+        _item(4, "These ideas come back.", "iii.", "group-b"),
+    ])
+
+    assert page["blocks"][2]["numbering"] == "lower-roman"
+    assert "ii. It is undefined at zero.\niii. These ideas come back." in page["text"]
+
+
 def test_bullet_items_stay_unordered() -> None:
     first = _element(1, "list_item", "A bullet.", marker="-")
     first.parent_id = "group-a"
@@ -164,3 +191,25 @@ def test_exporters_keep_the_start_of_an_ordered_list() -> None:
         if block["t"] == "OrderedList"
     )
     assert pandoc["c"][0] == [2, {"t": "Decimal"}, {"t": "Period"}]
+
+
+def test_exporters_keep_the_style_of_a_lettered_list() -> None:
+    lettered = {**ORDERED, "numbering": "upper-alpha"}
+
+    assert '<ol id="list-1" start="2" type="A">' in document_to_html(
+        _document(lettered), profile="html"
+    )
+    lines = document_to_txt_lines(_document(lettered))
+    assert "B. b" in lines and "C. c" in lines
+    pandoc = next(
+        block for block in build_pandoc_ast(_document(lettered))["blocks"]
+        if block["t"] == "OrderedList"
+    )
+    assert pandoc["c"][0] == [2, {"t": "UpperAlpha"}, {"t": "Period"}]
+
+
+def test_markdown_numbers_items_by_their_position() -> None:
+    """An empty item it drops leaves the numbers the other exports give."""
+    with_gap = {**ORDERED, "items": ["b", "", "d"]}
+
+    assert "2. b\n4. d" in document_to_markdown(_document(with_gap))
