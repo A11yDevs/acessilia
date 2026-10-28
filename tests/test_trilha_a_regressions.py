@@ -120,6 +120,42 @@ def test_secondary_failure_reaches_result_configuration(monkeypatch, tmp_path):
     assert result.configuration["fusion"]["failed_providers"] == ["mineru"]
 
 
+def test_identical_providers_are_skipped_without_disabling_cache(monkeypatch, tmp_path):
+    from backend.agents.pddl_orchestrator import build_pddl_structured_payload
+    from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
+    from tests.test_pddl_orchestrator import _sample_manifest, _sample_plan
+    from tests.test_toolbox_manifest_extractor import SAMPLE_TOOLBOX_RESPONSE
+
+    source = tmp_path / "doc.pdf"
+    source.write_bytes(b"%PDF")
+    monkeypatch.setattr(settings, "fusion_mode", "dual")
+    monkeypatch.setattr(settings, "fusion_secondary_provider", "docling")
+    primary = SimpleNamespace(
+        provider="docling",
+        base_url="http://toolbox",
+        extract_structure=AsyncMock(return_value=deepcopy(SAMPLE_TOOLBOX_RESPONSE)),
+    )
+
+    extracted = ToolboxManifestExtractor(
+        client=primary, use_artifact_store=False
+    ).extract(source)
+
+    assert extracted.configuration["fusion"]["status"] == "skipped"
+    assert extracted.configuration["fusion"]["reason"] == "identical-providers"
+    manifest = _sample_manifest()
+    manifest.obligations = []
+    manifest.extractor.configuration["fusion"] = extracted.configuration["fusion"]
+    result = build_pddl_structured_payload(
+        file_path=source,
+        manifest=manifest,
+        plan=_sample_plan(),
+        planner_backend="internal",
+        execution_report=SimpleNamespace(status="completed", execution_id="test"),
+        comparison=None,
+    )
+    assert result["cacheable"] is True
+
+
 @pytest.mark.parametrize(
     "status,open_kind,last_method,expected",
     [

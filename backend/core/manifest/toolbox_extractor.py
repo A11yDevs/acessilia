@@ -135,11 +135,11 @@ class ToolboxManifestExtractor:
             secondary_provider = settings.fusion_secondary_provider
             if secondary_provider == structure.provider:
                 result = {**result, "fusion": {
-                    "status": "degraded", "providers": [structure.provider],
+                    "status": "skipped", "providers": [structure.provider],
                     "failed_providers": [], "reason": "identical-providers",
                 }}
                 logger.warning(
-                    "Fusão dual ignorada: provider primário e secundário são ambos {}",
+                    "Fusão dual ignorada por configuração duplicada: provider {}",
                     secondary_provider,
                 )
             else:
