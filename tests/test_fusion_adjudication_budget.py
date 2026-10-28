@@ -513,6 +513,50 @@ def test_additional_table_same_type_routes_to_secondary():
     assert stats['route_reason'] == 'secondary_structure_superset'
 
 
+def test_bbox_precision_does_not_create_structural_divergence():
+    primary = _payload(PROSE)
+    primary['document']['elements'].append(
+        {'type': 'picture', 'text': '', 'page': 0, 'bbox': [0, 0, 10, 10]}
+    )
+    secondary = _payload(PROSE)
+    secondary['document']['elements'].append(
+        {'type': 'picture', 'text': '', 'page': 0, 'bbox': [0.5, 0, 10.5, 10]}
+    )
+
+    [stats] = _evidence(primary, secondary)
+
+    assert stats['structure_divergence'] is False
+    assert stats['provider_divergence'] is False
+    assert stats['route_reason'] == 'default_docling'
+
+
+def test_structural_superset_preserves_near_empty_decide_v1_route():
+    primary = _payload('Short text.')
+    secondary = _payload(PROSE)
+    secondary['document']['elements'].append(
+        {'type': 'picture', 'text': '', 'page': 0, 'bbox': [0, 0, 10, 10]}
+    )
+
+    [stats] = _evidence(primary, secondary)
+
+    assert stats['route'] == 'mineru'
+    assert stats['route_reason'] == 'docling_near_empty'
+
+
+def test_unique_secondary_structure_routes_when_prose_has_one_character_difference():
+    primary = _payload(PROSE)
+    secondary = _payload(PROSE[:-1] + '!')
+    secondary['document']['elements'].append(
+        {'type': 'table', 'text': '', 'page': 0, 'bbox': [0, 0, 10, 10]}
+    )
+
+    [stats] = _evidence(primary, secondary)
+
+    assert stats['text_similarity'] >= 0.97
+    assert stats['route'] == 'mineru'
+    assert stats['route_reason'] == 'secondary_structure_superset'
+
+
 def test_structural_conflict_with_different_text_requires_review():
     primary = _payload(PROSE)
     primary['document']['elements'].append({'type': 'picture', 'text': '', 'page': 0, 'bbox': [0, 0, 10, 10]})

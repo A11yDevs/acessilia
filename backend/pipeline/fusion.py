@@ -12,7 +12,6 @@ engaged.
 from __future__ import annotations
 
 import asyncio
-import json
 from collections import Counter
 from typing import Any
 
@@ -253,25 +252,33 @@ def fuse_extraction_payloads(
         # the evidence so the manifest builder can leave the VLM judge for the
         # pages the rule cannot settle.
         route, route_reason = decide_v1(docling_text, mineru_text)
-        # A whole-page swap is safe only when running text agrees exactly and
-        # the secondary retains every primary structure, including duplicates.
-        # Other structural disagreements require adjudication rather than a
-        # guessed page replacement that might discard unique content.
-        if structure_d != structure_m:
+        # Structural evidence complements the deterministic text/table/formula
+        # rules; it must not override their near-empty or explicit table/formula
+        # decisions. Bounding boxes are provider-specific, so compare type and
+        # normalized content instead of exact coordinates.
+        if structure_d != structure_m and route_reason == "default_docling":
             def structure_content(blocks: list[dict]) -> Counter:
                 return Counter(
-                    json.dumps(
-                        {"type": b["type"], "bbox": b.get("bbox"), "text": b["text"]},
-                        sort_keys=True,
-                    )
+                    (b["type"], " ".join((b.get("text") or "").split()))
                     for b in blocks if b["type"] in STRUCTURAL_TYPES
                 )
 
-            primary_counts = structure_content(pages_d.get(page_key, []))
-            secondary_counts = structure_content(pages_m.get(page_key, []))
-            primary_text = "\n\n".join(b.text for b in d_blocks if b.kind in TEXT_KINDS)
-            secondary_text = "\n\n".join(b.text for b in m_blocks if b.kind in TEXT_KINDS)
-            if primary_text == secondary_text and not primary_counts - secondary_counts:
+            primary_content = structure_content(pages_d.get(page_key, []))
+            secondary_content = structure_content(pages_m.get(page_key, []))
+            primary_structure_counts = Counter(
+                b["type"] for b in pages_d.get(page_key, []) if b["type"] in STRUCTURAL_TYPES
+            )
+            secondary_structure_counts = Counter(
+                b["type"] for b in pages_m.get(page_key, []) if b["type"] in STRUCTURAL_TYPES
+            )
+            secondary_adds_structure = bool(
+                secondary_structure_counts - primary_structure_counts
+            )
+            if (
+                secondary_adds_structure
+                and not primary_content - secondary_content
+                and text_similarity >= DEFAULT_MAX_RATIO
+            ):
                 route, route_reason = "mineru", "secondary_structure_superset"
             else:
                 route, route_reason = "docling", "structure_ambiguous"
@@ -587,9 +594,11 @@ def _canon_kwargs(block: dict) -> dict:
 STRUCTURAL_TYPES = {"picture", "table", "formula"}
 
 
-def _structure_signature(blocks: list[dict], *, kinds: set[str] = STRUCTURAL_TYPES) -> list[str]:
-    return sorted(json.dumps({"type": b["type"], "bbox": b.get("bbox")}, sort_keys=True)
-                  for b in blocks if b["type"] in kinds)
+def _structure_signature(
+    blocks: list[dict], *, kinds: set[str] = STRUCTURAL_TYPES
+) -> list[tuple[str, int]]:
+    """Count structural elements by kind without comparing provider-specific boxes."""
+    return sorted(Counter(b["type"] for b in blocks if b["type"] in kinds).items())
 
 
 def _group_by_page(payload: dict) -> dict[int, list[dict]]:
