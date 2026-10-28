@@ -29,7 +29,9 @@ async def test_readiness_rejects_invalid_contract_and_tries_next_endpoint(
         return httpx.Response(
             200,
             content=json.dumps(
-                {"status": "ready"} if request.url.host == "second.test" else body
+                {"provider": settings.toolbox_provider, "healthy": True}
+                if request.url.host == "second.test"
+                else body
             ).encode(),
             headers={"content-type": "application/json"},
         )

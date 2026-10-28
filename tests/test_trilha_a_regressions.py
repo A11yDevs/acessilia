@@ -225,18 +225,34 @@ def test_dual_fusion_reuses_verified_inputs(tmp_path, monkeypatch, corrupt):
 async def test_core_readiness_follows_toolbox(monkeypatch, healthy):
     from backend.api.routes import health
 
+    requests = []
     original = httpx.AsyncClient
-    transport = httpx.MockTransport(
-        lambda _: httpx.Response(
-            200 if healthy else 503,
-            json={"status": "ready" if healthy else "unavailable"},
+
+    def respond(request):
+        requests.append(request)
+        return httpx.Response(
+            200,
+            json={
+                "provider": request.url.path.rsplit("/", 2)[-2],
+                "healthy": healthy,
+                "checked_at": "2026-10-28T00:00:00Z",
+            },
         )
-    )
+
+    transport = httpx.MockTransport(respond)
+    monkeypatch.setattr(health.settings, "toolbox_base_urls", "")
+    monkeypatch.setattr(health.settings, "toolbox_base_url", "http://toolbox.test")
+    monkeypatch.setattr(health.settings, "toolbox_provider", "docling")
+    monkeypatch.setattr(health.settings, "fusion_mode", "single")
+    monkeypatch.setattr(health.settings, "toolbox_api_key", "test-key")
     monkeypatch.setattr(
         health.httpx, "AsyncClient", lambda **kw: original(transport=transport, **kw)
     )
     response = await health.ready()
     assert response.status_code == (200 if healthy else 503)
+    assert len(requests) == 1
+    assert requests[0].url.path == "/v1/providers/docling/health"
+    assert requests[0].headers["Authorization"] == "Bearer test-key"
 
 
 @pytest.mark.asyncio

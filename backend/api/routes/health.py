@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import socket
 from datetime import UTC, datetime
+from urllib.parse import quote
 
 import httpx
 from fastapi import APIRouter, Request
@@ -24,15 +25,26 @@ async def ready() -> JSONResponse:
     providers = {settings.toolbox_provider}
     if settings.fusion_mode == "dual":
         providers.add(settings.fusion_secondary_provider)
+    headers = (
+        {"Authorization": f"Bearer {settings.toolbox_api_key}"}
+        if settings.toolbox_api_key
+        else {}
+    )
     async with httpx.AsyncClient(timeout=3.0) as client:
         for endpoint in endpoints:
             try:
                 for provider in sorted(providers):
                     response = await client.get(
-                        endpoint.rstrip("/") + "/v1/ready", params={"provider": provider}
+                        endpoint.rstrip("/")
+                        + f"/v1/providers/{quote(provider, safe='')}/health",
+                        headers=headers,
                     )
                     body = response.json() if response.status_code == 200 else None
-                    if not isinstance(body, dict) or body.get("status") != "ready":
+                    if (
+                        not isinstance(body, dict)
+                        or body.get("provider") != provider
+                        or body.get("healthy") is not True
+                    ):
                         break
                 else:
                     return JSONResponse({"status": "ready"})
