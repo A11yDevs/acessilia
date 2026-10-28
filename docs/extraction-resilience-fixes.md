@@ -48,9 +48,10 @@ quality or a complete production conversion pipeline.
 
 ## Validation and review
 
-[GitHub Actions run 40422442942](https://github.com/MatheusMuniz23/acessilia/actions/runs/40422442942)
-validated commit `d8751d03c5e8eaf55080463a4311893536a3f7f8`: 1,775 Core tests,
-796 Docstruct tests and 250 SDK tests passed. The normal workflow excluded 51
+[GitHub Actions run 40728598705](https://github.com/A11yDevs/acessilia/actions/runs/40728598705)
+validated the release PR merge candidate for head
+`ee81a23eadce9397aa57c92b6af0965194526be5`: 1,899 Core tests,
+833 Docstruct tests and 250 SDK tests passed. The normal workflow excluded 51
 E2E tests and reported no unexpected skipped tests. These counts describe that
 specific run, not a guarantee about later commits.
 

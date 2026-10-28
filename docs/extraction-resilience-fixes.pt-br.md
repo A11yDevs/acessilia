@@ -50,9 +50,10 @@ qualidade da extração ou toda a conversão de produção.
 
 ## Validação e revisão
 
-A [execução 40422442942 do GitHub Actions](https://github.com/MatheusMuniz23/acessilia/actions/runs/40422442942)
-validou o commit `d8751d03c5e8eaf55080463a4311893536a3f7f8`: passaram 1.775
-testes do Core, 796 do Docstruct e 250 do SDK. O workflow normal excluiu 51
+A [execução 40728598705 do GitHub Actions](https://github.com/A11yDevs/acessilia/actions/runs/40728598705)
+validou o candidato a merge do PR na release, com head
+`ee81a23eadce9397aa57c92b6af0965194526be5`: passaram 1.899
+testes do Core, 833 do Docstruct e 250 do SDK. O workflow normal excluiu 51
 E2E e não encontrou testes ignorados inesperadamente. Essas contagens se
 referem àquela execução específica, não a commits posteriores.
 
