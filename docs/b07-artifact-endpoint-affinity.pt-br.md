@@ -31,8 +31,7 @@ de artefatos de saída permanecem iguais. Consulte a
 [ADR-0012](adr/0012-source-files-for-independent-toolboxes.pt-br.md).
 
 **Validação:** os dois casos de regressão da política automática falharam antes
-da correção; os controles com envio direto explícito passaram. A validação inicial passou
-36 testes direcionados do Core; a validação atual passou todos os 250 testes do SDK. Os testes HTTP
+da correção; os controles com envio direto explícito passaram. Os testes HTTP
 interceptam requisições dos clientes reais e verificam os bytes do arquivo,
 ausência de upload de artefato, execução normal e troca após falha. Os controles
 unitários cobrem compatibilidade com endpoint único, fechamento dos clientes e

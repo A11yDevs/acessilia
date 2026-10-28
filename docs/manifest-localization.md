@@ -35,8 +35,7 @@ translation defect and the test's implicit environment assumption; it does not
 merely regenerate the expected snapshot or force production to use English.
 
 These are functional checks using synthetic fixtures, not dataset evaluation.
-No deployment or pull-request update is part of this correction. The complete
-suite result is recorded in the consolidated report after validation.
-
-Complete core validation after the fix: **1,775 passed, 51 E2E tests deselected**,
-no failures. The golden JSON fixtures remain unchanged.
+The correction is included in [PR #309](https://github.com/A11yDevs/acessilia/pull/309).
+Complete CI evidence is linked in the
+[consolidated report](extraction-resilience-fixes.md). No production deployment
+was performed. The golden JSON fixtures remain unchanged.

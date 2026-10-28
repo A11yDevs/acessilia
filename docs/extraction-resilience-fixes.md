@@ -28,22 +28,38 @@ existing fusion; a single successful provider supplies the result with explicit
 degradation and matching provenance/cache information. If neither succeeds,
 the failure preserves both causes. Unexpected programming errors are not hidden.
 
-## Validation and conclusion
+## Storage-outage compatibility
 
-Functional regressions were exercised before and after changes. The focused
-core suite passed 81 tests and the SDK passed 250 tests. These checks are not
-an evaluation of extraction quality. No dataset benchmark or production rollout
-was performed. The previously observed golden-manifest mismatch has been
-addressed by request-time translation and an explicit canonical test locale;
-see [manifest localization](manifest-localization.md).
+Direct input avoids the initial artifact upload, but extraction can still fail
+if the Toolbox requires storage for its output JSON. Continuing through this
+outage requires the complementary change in
+[Toolbox PR #100](https://github.com/A11yDevs/acessilia-toolbox/pull/100):
+on a temporary storage failure, an inline-only extraction returns its JSON
+without claiming a stored download or caching the unpersisted result.
+Required binary outputs and by-reference capabilities still require storage;
+permanent input or contract errors are not bypassed.
 
+A cross-project regression in the Toolbox exercises the real Core extractor
+and SDK against a real local Toolbox HTTP server in separate Python
+environments. Both the initial upload and JSON persistence fail, while a stub
+extractor succeeds. The Core receives the inline document and records the
+upload failure. This verifies transport and orchestration, not extraction
+quality or a complete production conversion pipeline.
 
-The changes avoid unnecessary extraction, preserve useful results during
-recoverable failures and prevent cross-deployment artifact assumptions in the
-initial input. They do not make independent storage systems share objects or
-guarantee availability when every provider is down. Further work is committed on the fork work branch without opening or updating
-pull requests. The complete test status is recorded below.
+## Validation and review
 
-Latest complete core validation after the localization correction: **1,775 passed,
-51 E2E tests deselected**, with no failures. The separate SDK validation remains
-250 passing tests; no SDK behavior changed in the localization correction.
+[GitHub Actions run 40422442942](https://github.com/MatheusMuniz23/acessilia/actions/runs/40422442942)
+validated commit `d8751d03c5e8eaf55080463a4311893536a3f7f8`: 1,775 Core tests,
+796 Docstruct tests and 250 SDK tests passed. The normal workflow excluded 51
+E2E tests and reported no unexpected skipped tests. These counts describe that
+specific run, not a guarantee about later commits.
+
+The corrections are under review in
+[Core PR #309](https://github.com/A11yDevs/acessilia/pull/309). The earlier
+golden-manifest mismatch was addressed by request-time translation and an
+explicit canonical test locale; see [manifest localization](manifest-localization.md).
+
+No dataset benchmark or production rollout was performed. Independent storage
+systems do not become shared, and availability is not guaranteed when all
+providers fail. Storage-outage continuity requires deploying the complementary
+Toolbox change alongside the Core fallback.

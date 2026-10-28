@@ -34,8 +34,7 @@ A mudança corrige o defeito de tradução em execução e a suposição implíc
 teste; não apenas substitui o arquivo esperado nem força inglês em produção.
 
 São verificações funcionais com fixtures sintéticas, não avaliação de dataset.
-Esta correção não inclui implantação nem atualização de PR. O resultado da
-suíte completa fica registrado no relatório consolidado após a validação.
-
-Validação completa do Core após a correção: **1.775 testes aprovados, 51 E2E
-excluídos**, sem falhas. Os arquivos JSON de referência não foram modificados.
+A correção está no [PR #309](https://github.com/A11yDevs/acessilia/pull/309).
+A evidência completa do CI está vinculada no
+[relatório consolidado](extraction-resilience-fixes.pt-br.md). Não houve
+implantação em produção. Os arquivos JSON de referência não foram modificados.

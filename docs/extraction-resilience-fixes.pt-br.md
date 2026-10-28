@@ -29,23 +29,41 @@ a fusão existente é preservada. Um único sucesso fornece o resultado com
 degradação explícita e proveniência/cache correspondentes. Se ambos falham,
 o erro preserva as duas causas. Erros inesperados de programação não são ocultados.
 
-## Validação e conclusão
+## Compatibilidade durante falhas do armazenamento
 
-As regressões foram exercitadas antes e depois das alterações. Passaram os
-81 testes direcionados do Core e os 250 testes do SDK. Isso não constitui
-avaliação da qualidade da extração. Nenhum benchmark de dataset ou rollout foi
-executado. A divergência anterior do manifesto foi tratada com tradução no
-momento da requisição e idioma explícito no teste de referência; consulte a
+O envio direto evita o upload inicial, mas a extração ainda pode falhar se a
+Toolbox exigir armazenamento para o JSON de saída. A continuidade depende da
+alteração complementar no
+[PR #100 da Toolbox](https://github.com/A11yDevs/acessilia-toolbox/pull/100):
+em uma falha temporária do armazenamento, uma extração com saída inline devolve
+o JSON sem anunciar um download persistido nem armazenar esse resultado no
+cache. Saídas binárias obrigatórias e capacidades por referência continuam
+dependendo do armazenamento; erros permanentes de entrada ou contrato não são
+contornados.
+
+Uma regressão entre projetos na Toolbox executa o extrator real do Core e o
+SDK contra um servidor HTTP local real da Toolbox, em ambientes Python
+separados. O upload inicial e a persistência do JSON falham, enquanto um
+extrator simulado funciona. O Core recebe o documento inline e registra a
+falha do upload. Isso verifica transporte e orquestração, sem avaliar a
+qualidade da extração ou toda a conversão de produção.
+
+## Validação e revisão
+
+A [execução 40422442942 do GitHub Actions](https://github.com/MatheusMuniz23/acessilia/actions/runs/40422442942)
+validou o commit `d8751d03c5e8eaf55080463a4311893536a3f7f8`: passaram 1.775
+testes do Core, 796 do Docstruct e 250 do SDK. O workflow normal excluiu 51
+E2E e não encontrou testes ignorados inesperadamente. Essas contagens se
+referem àquela execução específica, não a commits posteriores.
+
+As alterações estão em revisão no
+[PR #309 do Core](https://github.com/A11yDevs/acessilia/pull/309). A divergência
+anterior do manifesto foi corrigida com tradução por requisição e idioma
+explícito no teste de referência; consulte a
 [nota de localização](manifest-localization.pt-br.md).
 
-
-As mudanças evitam extrações desnecessárias, preservam resultados úteis diante
-de falhas recuperáveis e retiram a dependência de artefatos entre implantações
-independentes na entrada inicial. Elas não tornam armazenamentos independentes
-compartilhados nem garantem disponibilidade quando todos os provedores falham.
-O trabalho adicional é commitado na branch de trabalho do fork, sem abrir ou
-atualizar PRs. O resultado completo dos testes fica registrado abaixo.
-
-Validação completa atual do Core após a correção de localização: **1.775 testes
-aprovados, 51 E2E excluídos**, sem falhas. A validação separada do SDK permanece
-em 250 testes aprovados; a correção de localização não alterou seu comportamento.
+Nenhum benchmark de dataset ou rollout de produção foi realizado. Os
+armazenamentos independentes não se tornam compartilhados, e não há garantia
+de disponibilidade quando todos os provedores falham. A continuidade durante
+a falha do armazenamento exige implantar a alteração complementar da Toolbox
+junto ao fallback do Core.

@@ -30,8 +30,7 @@ selection and output-artifact routing remain unchanged. See
 [ADR-0012](adr/0012-source-files-for-independent-toolboxes.md).
 
 **Validation:** the two automatic-policy regression cases failed before the
-fix; the explicit direct-file controls passed. The original focused regression run passed
-36 tests; the latest complete SDK run passed 250 tests. HTTP tests intercept real SDK client
+fix; the explicit direct-file controls passed. HTTP tests intercept real SDK client
 requests and check source bytes, absence of artifact uploads, normal execution
 and extraction failover. Unit controls cover single-endpoint compatibility,
 client lifecycle and a secondary provider on a different deployment. These
