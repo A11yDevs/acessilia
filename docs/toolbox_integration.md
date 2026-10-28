@@ -314,6 +314,14 @@ The `media.inspect` capability (provider `pure-media-inspect`, PR
     most 5% of the slide) becomes one picture of the whole slide, described with
     the page prompt instead of read as text; the replaced text is kept in
     `metadata.replaced_text`. A slide nothing was extracted from becomes one too.
+    An element the extractor read across two slides is first split into one
+    element per slide at the character offsets of its provenance, before the
+    reading order is refined, so each part is ordered by its own box on its
+    slide. Only text elements without children are split, and only when the
+    offsets cover all of the text; otherwise the element stays whole. A slide
+    whose only text, its title and running headers and footers aside, came
+    from such a split is read as one picture as well, the split text kept in
+    `replaced_text`.
     On a slide read as text, a label whose centre lies on a picture covering
     less than 95% of the slide (a larger one is the background) is folded into
     that picture: it leaves the running text and is kept in the picture's
@@ -329,10 +337,11 @@ The `media.inspect` capability (provider `pure-media-inspect`, PR
     pictures side by side (a caption row read through their columns) merges
     them into the first one (`metadata.merged_picture_ids`); a sentence stays.
     A caption is taken in only then, or when it lies on or beside such a
-    merged picture and across its width. If the picture is left undescribed,
-    its labels are its alt text (`SLIDE_FOLD_FIGURE_LABELS`). Whatever that
-    setting, the slide heading is left out of reading-order refinement, so a
-    picture never moves before it.
+    merged picture and across its width (`SLIDE_FOLD_FIGURE_LABELS`). If the
+    picture is left undescribed, its labels go back to the slide as paragraphs
+    after it. The text a whole-slide picture replaced goes back the same way,
+    whatever that setting. Either way, the slide heading is left out of
+    reading-order refinement, so a picture never moves before it.
     A Toolbox without the field, or a failed inspection, means a document.
   - `requires_visual_inspection`, to inject a full-page `picture` element when the
     input is a standalone image with no visual blocks — ensuring the VisionAgent
@@ -350,6 +359,32 @@ The `media.inspect` capability (provider `pure-media-inspect`, PR
   A run degraded by a failure is **not cached** (the payload carries
   `cacheable: false`): otherwise a transient Toolbox outage would replay a
   standalone image without its audio description after the Toolbox recovers.
+
+  The same holds for the pictures and tables a failure left without a
+  description or a reading. They are counted by reason in
+  `canonical_metadata.pddl_visual_failures`
+  (`{"pictures": {"model_failed": 1, "crop_unavailable": 2}, "tables": {"model_failed": 1}}`,
+  `null` when nothing failed): `model_failed` when the vision model or the
+  data agent gave no answer, `crop_unavailable` when the Toolbox could not
+  render the crop. A picture counts whatever its element type, since the
+  placeholders of a mostly visual document are described too; the reason sits
+  in `metadata.vision_failure_reason`, and a table's in
+  `metadata.table_read_failure`. The document says how many images could not
+  be described and how many tables could not be read. An empty description
+  and a table reading refused as worse than the table are the model's answers,
+  so they neither count nor keep the run uncached. A cached entry that records
+  a failure is not replayed, and a rerun that is still degraded drops it.
+
+  Before a picture or table is left that way, its stage tries it once more:
+  after `VISION_RETRY_PASS_DELAY_SECONDS` (60), the objects left without a
+  usable description or reading (and pictures the model answered empty) are
+  sent again, one at a time. A provider that keeps failing is not called for
+  every object: after `VISION_BREAKER_THRESHOLD` (3) calls in a row without a
+  usable answer, the rest of the job's picture, formula and table calls are
+  skipped and recorded as `model_failed`, with
+  `metadata.vision_failure_detail` saying they were skipped. The first
+  call of the second pass gets through anyway, to test whether the provider
+  came back.
 
 The PDDL predicates `media_inspected`/`media_profile_classified` belong to the Toolbox
 domain; the core consumes the signal only as an enrichment heuristic and it does not
@@ -380,6 +415,7 @@ Defined in `backend/config/settings.py` and documented in `.env.example`:
 | `SLIDE_VISUAL_COVERAGE` | `0.5` | Share of a slide its pictures must cover for a presentation slide (`document_genre=presentation`) to be described as one image instead of read as text |
 | `SLIDE_FOLD_FIGURE_LABELS` | `true` | On a presentation slide read as text, fold the short text lying on or just around a picture into it (merging pictures a caption row spans), whose description transcribes it in place |
 | `TABLE_VISUAL_REVIEW` | `true` | Read again from its image a table that came back in the wrong shape (rows collapsed into one cell per column, or every cell doubled), and use the new reading when it is the same table read better |
+| `OBJECT_MARKERS_ENABLED` | `false` | Enclose each described picture, table and formula of the delivered formats (HTML, TXT and its audio, DOCX, PDF/UA) in `[label]` … `[/label]` paragraphs, labels in the server locale; a job may override it with the `object_markers` form field of `POST /api/v1/jobs` |
 | `TOOLBOX_PDF_UA_PROVIDER` | `pandoc-pdf-ua` | Provider for the `document.export.pdf_ua` capability |
 | `TOOLBOX_PDF_UA_ENABLED` | `true` | Render PDF/UA on the Toolbox (pinned Pandoc + TeX Live) or skip it. There is no local fallback: when `false`, the worker skips the format without an error; a Toolbox failure is reported as an optional export error |
 | `TOOLBOX_PDF_UA_TIMEOUT_SECONDS` | `300` | How long to wait for the Toolbox render before the export is reported as an optional error |

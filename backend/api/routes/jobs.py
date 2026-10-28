@@ -84,6 +84,7 @@ async def submit_job(
     thinking_mode: bool = Form(False),
     email: str = Form(""),
     source: str = Form("api"),
+    object_markers: bool | None = Form(None),
 ):
     filename = Path(document_file.filename or "documento").name
     valid, error_msg = validate_file(filename, settings.max_file_size_bytes)
@@ -119,6 +120,7 @@ async def submit_job(
         thinking_mode=thinking_mode,
         email=email or None,
         source=source,
+        object_markers=object_markers,
     )
     item = QueueItem(
         file_path=file_path,

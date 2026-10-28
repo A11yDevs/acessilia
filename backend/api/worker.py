@@ -54,6 +54,7 @@ from backend.export.exporters.docx_exporter import export_docx
 from backend.export.exporters.pdf_exporter import export_pdf_ua
 from backend.export.exporters.txt_exporter import export_txt
 from backend.export.exporters.drbench_md_exporter import export_drbench_md
+from backend.export.markers import with_object_markers
 from backend.export.pandoc_exporter import export_accessible_document
 from backend.services.download_token_service import criar_token
 from backend.tools.pdf_ua_audit import audit_pdf_ua, summarize_audit
@@ -225,6 +226,8 @@ class ApiJob:
     email: str | None = None
     source: str = "api"
     output_dir: Path | None = None
+    #: Enclose the delivered objects in markers; None follows OBJECT_MARKERS_ENABLED.
+    object_markers: bool | None = None
 
 
 class JobExecutor:
@@ -382,7 +385,10 @@ class JobExecutor:
 
             state_manager.atualizar(task_id, etapa=t(STAGE_EXPORTING_TXT), progresso=0.85)
             txt_path = out_dir / f"{base}.txt"
-            await self._run_in_executor(export_txt, canonical, txt_path, job.filename)
+            # The formats a reader gets carry the object markers when the job
+            # asks for them; the benchmark markdown and the stored result do not.
+            delivered = with_object_markers(canonical, job.object_markers)
+            await self._run_in_executor(export_txt, delivered, txt_path, job.filename)
             completed_formats.append("txt")
             state_manager.verificar_cancelamento(task_id)
 
@@ -402,7 +408,7 @@ class JobExecutor:
             html_path = out_dir / f"{base}.html"
             await self._run_in_executor(
                 export_accessible_document,
-                canonical,
+                delivered,
                 html_path,
                 format_name="html",
                 title=base,
@@ -421,7 +427,7 @@ class JobExecutor:
                 stage=STAGE_EXPORTING_DOCX,
                 progress=0.92,
                 export_fn=export_docx,
-                canonical=canonical,
+                canonical=delivered,
                 path=out_dir / f"{base}.docx",
                 filename=job.filename,
                 format_name="docx",
@@ -438,7 +444,7 @@ class JobExecutor:
                 stage=STAGE_EXPORTING_PDF_UA,
                 progress=0.93,
                 export_fn=export_pdf_ua,
-                canonical=canonical,
+                canonical=delivered,
                 path=out_dir / f"{base}.pdf_ua.pdf",
                 filename=job.filename,
                 format_name="pdf_ua",
