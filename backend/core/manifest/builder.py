@@ -282,6 +282,13 @@ def _build_from_toolbox_json(
         }
 
     manifest = ProcessingManifest.model_validate(data)
+    secondary = extraction.document.get("secondary_extraction")
+    secondary_path = (
+        str(secondary["path"])
+        if isinstance(secondary, dict) and secondary.get("path")
+        else ""
+    )
+    has_secondary_extraction = bool(secondary_path.strip())
     if presentation:
         split_across_slides(manifest)
     if refine_reading_order:
@@ -308,18 +315,18 @@ def _build_from_toolbox_json(
         },
         fusion_evidence=extraction.document.get("fusion_evidence"),
         fusion_stats=extraction.document.get("fusion_stats"),
+        secondary_extraction_available=has_secondary_extraction,
     )
     observations.extend(v23_observations)
     obligations.extend(v23_obligations)
     _append_processing_needs(manifest, observations, obligations)
     append_unstructured_page_needs(manifest)
-    secondary = extraction.document.get("secondary_extraction")
-    if isinstance(secondary, dict) and secondary.get("path"):
+    if has_secondary_extraction:
         manifest.artifacts.append(
             Artifact(
                 id=SECONDARY_EXTRACTION_ARTIFACT_ID,
                 kind=SECONDARY_EXTRACTION_KIND,
-                path=str(secondary["path"]),
+                path=secondary_path,
                 media_type="application/json",
                 sha256=secondary.get("sha256"),
             )
@@ -611,6 +618,7 @@ def _derive_v23_processing_needs(
     fusion_stats: Any = None,
     fusion_judge_max_pages: int | None = None,
     legacy_unicode_repair: str | None = None,
+    secondary_extraction_available: bool = False,
 ) -> tuple[list[Observation], list[Obligation]]:
     """Emit v2.3 needs only when deterministic checks or fusion evidence support them.
 
@@ -618,6 +626,8 @@ def _derive_v23_processing_needs(
     (FUSION_JUDGE_MAX_PAGES when None). ``legacy_unicode_repair`` is
     ``off``/``detect``/``repair`` (LEGACY_UNICODE_REPAIR when None); only
     ``repair`` emits the obligation, while ``detect`` keeps the observation.
+    ``skeleton-order`` is admissible only when the secondary extraction is
+    recorded for this document.
     """
     from docstruct.fusion.line_numbers import extract_line_numbers
     from docstruct.fusion.tailjoin import join_tail, page_number_position, tailjoin3
@@ -846,8 +856,10 @@ def _derive_v23_processing_needs(
         if key in seen:
             continue
         seen.add(key)
-        rationale, methods = V23_OBLIGATION_BY_KIND[kind]
-        methods = methods_override or methods
+        rationale, default_methods = V23_OBLIGATION_BY_KIND[kind]
+        methods = list(methods_override or default_methods)
+        if kind == "refine-reading-order" and not secondary_extraction_available:
+            methods = [method for method in methods if method != "skeleton-order"]
         suffix = _obligation_suffix(target_ids)
         observations.append(
             Observation(

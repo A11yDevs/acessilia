@@ -48,7 +48,7 @@ permanece idêntica.
 |---|---|---|---|
 | `adjudicate-page` | `vlm-pairwise-judge`, `human-review` | 40 / 100 | juiz pareado por VLM (LOOP #25/#29/#44/#45) |
 | `fuse-providers` | `dual-provider-fusion`, `single-provider`, `human-review` | 60 / 20 / 100 | fusão multi-provider (`docstruct.fusion`) |
-| `refine-reading-order` | `xycut-order`, `skeleton-order`, `human-review` | 10 / 5 / 100 | XY-cut e ordem do skeleton |
+| `refine-reading-order` | `xycut-order`, `skeleton-order` (se houver extração secundária), `human-review` | 10 / 5 / 100 | XY-cut e ordem do skeleton |
 | `normalize-formula` | `latex-normalizer`, `mathml`, `human-review` | 10 / 10 / 100 | `docstruct.text.latex` |
 | `rescue-omitted-block` | `rescue-omitted`, `human-review` | 15 / 100 | `rescue_omitted` do differ |
 | `guard-repetition` | `rep-guard`, `human-review` | 5 / 100 | `docstruct.fusion.repetition` |
