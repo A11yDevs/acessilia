@@ -356,6 +356,12 @@ LOG_VISION_AGENT_REGION_RETRY: str = (
     "[page {page_num}] Unusable answer from the vision model for region {type}; "
     "trying again ({attempt}/{attempts}): {error}"
 )
+#: Warning logged when the provider rejects a region for exceeding its context window; {page_num} and {type} name the region, {size_before}/{size_after} are the image byte sizes, {max_tokens} is the reduced output cap or provider default, and {error} is the provider failure.
+LOG_VISION_AGENT_CONTEXT_RETRY: str = (
+    "[page {page_num}] Context limit exceeded for region {type}; retrying once "
+    "with a smaller image ({size_before} -> {size_after} bytes) and "
+    "max_tokens={max_tokens}: {error}"
+)
 #: Info logged when a vision answer validates only after a retry; {page_num}, {type} and {attempt}/{attempts} name the region and the try that worked, so the retry rate can be measured.
 LOG_VISION_AGENT_REGION_RECOVERED: str = (
     "[page {page_num}] Vision model answered region {type} on try {attempt}/{attempts}"
