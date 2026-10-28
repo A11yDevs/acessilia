@@ -27,7 +27,10 @@ def _math_document(mathml: str) -> dict:
 def test_spacing_from_quad_renders_as_mathml() -> None:
     html = document_to_html(_math_document(QUAD_MATHML), profile="html")
 
-    assert '<div id="eq-1" role="math" aria-label="v equals a"><math' in html
+    assert (
+        '<div id="eq-1"><math xmlns="http://www.w3.org/1998/Math/MathML" '
+        'aria-label="v equals a" display="block">' in html
+    )
     assert 'width="1em"' in html
     assert r"\quad" not in html
 

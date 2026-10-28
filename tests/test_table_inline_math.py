@@ -91,8 +91,14 @@ def test_enrichment_converts_the_cells_spans_on_the_block():
 def test_html_renders_cell_and_caption_math():
     html = document_to_html(_document(_table(inline_math=ENTRIES)))
 
-    assert f'<caption>Mean speed with <span role="math" aria-label="h not equal to zero">{MATHML}</span></caption>' in html
-    assert f'<th scope="col"><span role="math" aria-label="h not equal to zero">{MATHML}</span></th>' in html
+    assert (
+        '<caption>Mean speed with <math xmlns="http://www.w3.org/1998/Math/MathML" '
+        'aria-label="h not equal to zero"><mi>h</mi></math></caption>' in html
+    )
+    assert (
+        '<th scope="col"><math xmlns="http://www.w3.org/1998/Math/MathML" '
+        'aria-label="h not equal to zero"><mi>h</mi></math></th>' in html
+    )
     assert f'mean speed <span role="math" aria-label="a fraction">{FRACTION}</span>' in html
     assert '<span role="math" aria-label="minus zero point zero eight three three">-0{,}0833</span> (approximately)</td>' in html
     assert "$" not in _table_html(html)
@@ -174,7 +180,10 @@ def test_sanitized_canonical_document_still_renders_the_cells_math():
     document = sanitize_canonical_document(build_canonical_document(payload, title="t", math_enricher=_Enricher()))
 
     html = document_to_html(document)
-    assert f'<th scope="col"><span role="math" aria-label="speech of h \\neq 0">{MATHML}</span></th>' in html
+    assert (
+        '<th scope="col"><math xmlns="http://www.w3.org/1998/Math/MathML" '
+        'aria-label="speech of h \\neq 0"><mi>h</mi></math></th>' in html
+    )
     assert "$" not in _table_html(html)
     assert "$" not in "\n".join(document_to_txt_lines(document))
     table = next(item for item in build_pandoc_ast(document)["blocks"] if item["t"] == "Table")

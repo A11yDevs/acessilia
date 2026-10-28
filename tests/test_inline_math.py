@@ -134,7 +134,10 @@ def test_degrading_removes_inline_math():
 def test_html_renders_inline_mathml_labelled_by_its_speech():
     html = document_to_html(_enriched("seja $s(t)$ &"))
 
-    assert f'seja <span role="math" aria-label="s de t">{MATHML}</span>' in html
+    assert (
+        'seja <math xmlns="http://www.w3.org/1998/Math/MathML" '
+        'aria-label="s de t"><mi>t</mi></math>' in html
+    )
     assert "$" not in html
     assert "&amp;" in html
 
@@ -217,7 +220,10 @@ def test_the_canonical_build_wires_each_prose_type_to_its_own_formula():
     assert "nota fala d" in txt
     html = document_to_html(document)
     for letter in "abcd":
-        assert f'<span role="math" aria-label="fala {letter}"><math xmlns="http://www.w3.org/1998/Math/MathML"><mi>{letter}</mi>' in html
+        assert (
+            f'<math xmlns="http://www.w3.org/1998/Math/MathML" '
+            f'aria-label="fala {letter}"><mi>{letter}</mi>' in html
+        )
     ast = json.dumps(build_pandoc_ast(document)["blocks"])
     for latex in ("a+1", "b+2", "c+3", "d+4"):
         assert json.dumps({"t": "Math", "c": [{"t": "InlineMath"}, latex]}) in ast
@@ -258,4 +264,3 @@ def test_a_sentence_with_inline_math_is_not_a_math_block(line, block_type):
     (block,) = parse_text_to_blocks(line)
 
     assert block["type"] == block_type
-

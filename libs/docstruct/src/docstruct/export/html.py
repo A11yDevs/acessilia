@@ -89,7 +89,9 @@ _MATHML_ATTRIBUTES = frozenset(
 )
 
 
-def _safe_mathml(value: Any) -> str | None:
+def _safe_mathml(
+    value: Any, *, aria_label: str = "", display: str = ""
+) -> str | None:
     """Accept a bounded MathML tree without active markup, URLs or entities."""
     if not isinstance(value, str) or len(value) > 100000 or "<!" in value:
         return None
@@ -116,6 +118,10 @@ def _safe_mathml(value: Any) -> str | None:
             return None
         node.tag = tag
     root.set("xmlns", namespace[1:-1])
+    if aria_label:
+        root.set("aria-label", aria_label)
+    if display:
+        root.set("display", display)
     return ElementTree.tostring(root, encoding="unicode")
 
 
@@ -205,9 +211,13 @@ def _render_block(
         return f'<figure id="{block_id}"><img alt="{alt}" src="{escape(block.get("metadata", {}).get("src", ""))}">{details}</figure>'
     if block_type == "math":
         alt = escape(block.get("alt_text", ""))
-        mathml = _safe_mathml((block.get("metadata") or {}).get("mathml", ""))
+        mathml = _safe_mathml(
+            (block.get("metadata") or {}).get("mathml", ""),
+            aria_label=block.get("alt_text", ""),
+            display="block",
+        )
         if mathml:
-            return f'<div id="{block_id}" role="math" aria-label="{alt}">{mathml}</div>'
+            return f'<div id="{block_id}">{mathml}</div>'
         return (
             f'<p id="{block_id}" role="math" aria-label="{alt}">'
             f'{escape(block.get("text", ""))}</p>'
@@ -239,11 +249,13 @@ def _prose_html(text: str, block: dict[str, Any]) -> str:
             continue
         entry = entries.get(piece, {})
         speech = str(entry.get("speech") or "")
-        label = f' aria-label="{escape(speech)}"' if speech else ""
-        content = _safe_mathml(entry.get("mathml", "")) or escape(
-            str(entry.get("latex") or piece)
-        )
-        parts.append(f'<span role="math"{label}>{content}</span>')
+        mathml = _safe_mathml(entry.get("mathml", ""), aria_label=speech)
+        if mathml:
+            parts.append(mathml)
+        else:
+            label = f' aria-label="{escape(speech)}"' if speech else ""
+            content = escape(str(entry.get("latex") or piece))
+            parts.append(f'<span role="math"{label}>{content}</span>')
     return "".join(parts)
 
 
