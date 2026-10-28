@@ -175,9 +175,7 @@ async def test_direct_file_extraction_does_not_require_shared_artifact_storage(
             execute_b = router.post(B + f"/v1/capabilities/{CAPABILITY}:execute").mock(
                 side_effect=extract
             )
-            result = await extractor._extract_with(
-                structure, artifacts, source, dual_fusion=False
-            )
+            result = await extractor._extract_async(source, dual_fusion=False)
             assert result.document["status"] == "succeeded"
             assert result.artifact_id is None
             assert not upload_a.called and not upload_b.called

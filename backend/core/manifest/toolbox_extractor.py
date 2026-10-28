@@ -31,13 +31,8 @@ if TYPE_CHECKING:
     from docstruct.policy import FusionPolicy
 
 
-def _one_artifact_endpoint(*clients: ToolboxCapabilityClient | None) -> bool:
-    """IDs are reusable only within one configured Toolbox deployment.
-
-    Multiple URLs represent independent deployments (ADR-0006), so the source
-    must accompany extraction instead of relying on an upload client choosing
-    the same deployment. A single URL may address a shared-storage balancer.
-    """
+def _artifact_endpoint_urls(*clients: ToolboxCapabilityClient | None) -> set[str]:
+    """Collect deployment URLs, including the legacy single-base-url fallback."""
     urls: set[str] = set()
     for client in clients:
         if client is None:
@@ -48,7 +43,17 @@ def _one_artifact_endpoint(*clients: ToolboxCapabilityClient | None) -> bool:
         if not client_urls and isinstance(base_url, str):
             client_urls.add(base_url.rstrip("/"))
         urls.update(client_urls)
-    return len(urls) <= 1
+    return urls
+
+
+def _one_artifact_endpoint(*clients: ToolboxCapabilityClient | None) -> bool:
+    """IDs are reusable only within one configured Toolbox deployment.
+
+    Multiple URLs represent independent deployments (ADR-0006), so the source
+    must accompany extraction instead of relying on an upload client choosing
+    the same deployment. A single URL may address a shared-storage balancer.
+    """
+    return len(_artifact_endpoint_urls(*clients)) <= 1
 
 
 @dataclass(frozen=True)
@@ -121,15 +126,24 @@ class ToolboxManifestExtractor:
     ) -> ToolboxExtraction:
         structure = self._client or make_toolbox_client(ToolboxStructureClient)
         artifacts = self._artifact_client
-        if (
-            artifacts is None
-            and self.use_artifact_store
-            and _one_artifact_endpoint(structure)
-        ):
-            artifacts = make_toolbox_client(ToolboxArtifactClient)
         try:
+            # Inspect each primary/upload client's URLs once. The final policy
+            # uses the actual upload client, which may differ from an injected
+            # structure client even when each has only one endpoint.
+            structure_urls = (
+                _artifact_endpoint_urls(structure) if self.use_artifact_store else set()
+            )
+            if artifacts is None and self.use_artifact_store and len(structure_urls) <= 1:
+                artifacts = make_toolbox_client(ToolboxArtifactClient)
+            use_artifact_store = (
+                self.use_artifact_store
+                and artifacts is not None
+                and len(structure_urls | _artifact_endpoint_urls(artifacts)) <= 1
+            )
             return await self._extract_with(
-                structure, artifacts, source_path, dual_fusion=dual_fusion
+                structure, artifacts, source_path,
+                use_artifact_store=use_artifact_store,
+                dual_fusion=dual_fusion,
             )
         finally:
             if self._client is None:
@@ -143,6 +157,7 @@ class ToolboxManifestExtractor:
         artifacts: ToolboxArtifactClient | None,
         source_path: Path,
         *,
+        use_artifact_store: bool,
         dual_fusion: bool = True,
     ) -> ToolboxExtraction:
         source_path = source_path.resolve()
@@ -154,11 +169,6 @@ class ToolboxManifestExtractor:
 
         artifact_id: str | None = None
         upload_error: str | None = None
-        use_artifact_store = (
-            self.use_artifact_store
-            and artifacts is not None
-            and _one_artifact_endpoint(structure, artifacts)
-        )
         if self.use_artifact_store and not use_artifact_store:
             logger.info(t(LOG_ARTIFACT_STORE_DIRECT_INPUT))
         if use_artifact_store and artifacts is not None:

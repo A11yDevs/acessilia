@@ -485,6 +485,39 @@ def test_multi_endpoint_extraction_builds_no_artifact_upload_client(monkeypatch)
     assert result.configuration["use_artifact_store"] is False
 
 
+@pytest.mark.parametrize("artifact_url", ["http://toolbox-a.test", "http://toolbox-b.test"])
+def test_created_upload_client_must_share_the_structure_endpoint(
+    mock_client, mock_artifact_client, monkeypatch, artifact_url
+):
+    from acessilia_sdk.toolbox import ToolboxEndpoint
+
+    mock_client.endpoints = (ToolboxEndpoint("http://toolbox-a.test"),)
+    mock_client.extract_structure.return_value = SAMPLE_TOOLBOX_RESPONSE
+    mock_artifact_client.endpoints = (ToolboxEndpoint(artifact_url),)
+    mock_artifact_client.upload.return_value = "sha256:stored"
+    factory = Mock(return_value=mock_artifact_client)
+    monkeypatch.setattr("backend.core.manifest.toolbox_extractor.make_toolbox_client", factory)
+
+    result = ToolboxManifestExtractor(client=mock_client, use_artifact_store=True).extract(
+        FIXTURE_PDF, dual_fusion=False
+    )
+
+    factory.assert_called_once_with(ToolboxArtifactClient)
+    same_deployment = artifact_url == "http://toolbox-a.test"
+    if same_deployment:
+        mock_artifact_client.upload.assert_awaited_once_with(FIXTURE_PDF.resolve())
+    else:
+        mock_artifact_client.upload.assert_not_awaited()
+    assert result.configuration["use_artifact_store"] is same_deployment
+    assert result.artifact_id == ("sha256:stored" if same_deployment else None)
+    mock_client.extract_structure.assert_awaited_once_with(
+        file_path=None if same_deployment else FIXTURE_PDF.resolve(),
+        artifact_id=result.artifact_id, language="pt-BR", use_remote_cache=True,
+    )
+    mock_artifact_client.close.assert_awaited_once()
+    mock_client.close.assert_not_awaited()
+
+
 def test_secondary_on_another_deployment_receives_source_not_primary_artifact(
     mock_client, mock_artifact_client, monkeypatch
 ):
