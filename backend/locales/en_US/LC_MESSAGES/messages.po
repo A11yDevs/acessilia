@@ -1485,6 +1485,23 @@ msgstr "Artifact upload unavailable ({error}); extracting from the source file."
 msgid "Structural provider {provider} failed ({error}); extraction is degraded."
 msgstr "Structural provider {provider} failed ({error}); extraction is degraded."
 
+msgid ""
+"Artifact storage bypassed for independent Toolbox endpoints; the source "
+"file will be sent again for extraction, fusion and text spans."
+msgstr ""
+"Artifact storage bypassed for independent Toolbox endpoints; the source "
+"file will be sent again for extraction, fusion and text spans."
+
+#, python-brace-format
+msgid ""
+"Structural extraction used only {provider} because another provider was "
+"unavailable. The document requires review; dual-provider comparison was "
+"not available."
+msgstr ""
+"Structural extraction used only {provider} because another provider was "
+"unavailable. The document requires review; dual-provider comparison was "
+"not available."
+
 #, python-brace-format
 msgid "PDF/UA rendered by the Toolbox: {output_path}"
 msgstr "PDF/UA rendered by the Toolbox: {output_path}"

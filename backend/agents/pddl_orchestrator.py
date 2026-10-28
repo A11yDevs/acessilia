@@ -86,6 +86,7 @@ from backend.log_messages import (
     LOG_PDDL_TABLE_REREAD_ACCEPTED,
     LOG_PDDL_TABLE_REREAD_REJECTED,
     LOG_VISION_ELEMENT_DESCRIPTION,
+    MSG_STRUCTURAL_EXTRACTION_DEGRADED,
 )
 from backend.stage_messages import (
     STAGE_ANALYZING_STRUCTURAL,
@@ -2591,6 +2592,16 @@ class DocumentTooLargeError(ValueError):
 
 
 def _check_page_count(page_count: int) -> None:
+    """Reject an oversized document as a whole with a user-facing message.
+
+    A verified PDF count may be checked before costly extraction. The
+    authoritative manifest count is checked afterwards for every format,
+    including those without a reliable preflight count. Neither check allows
+    partial processing beyond MAX_PAGES.
+
+    Raises:
+        DocumentTooLargeError: When the page count exceeds MAX_PAGES.
+    """
     from backend.config.settings import settings
 
     if page_count > settings.max_pages:
@@ -4531,6 +4542,14 @@ def build_pddl_structured_payload(
             "reparo desabilitado (LEGACY_UNICODE_REPAIR=detect)."
         )
 
+    extraction_degraded = configuration.get("extraction_degraded") is True
+    if extraction_degraded:
+        technical_warnings.append(
+            t(MSG_STRUCTURAL_EXTRACTION_DEGRADED).format(
+                provider=configuration.get("toolbox_provider", manifest.extractor.name)
+            )
+        )
+
     return {
         "text": text_output,
         "pages": pages_payload,
@@ -4562,6 +4581,13 @@ def build_pddl_structured_payload(
             if _unsatisfied_selected_obligations(manifest)
             else None,
             "pddl_toolbox_availability": toolbox_availability,
+            **(
+                {
+                    "pddl_extraction_degraded": True,
+                    "pddl_extraction_failures": configuration.get("extraction_failures", {}),
+                }
+                if extraction_degraded else {}
+            ),
             "pddl_media_inspection": {
                 "status": media_inspection_status,
                 "error": configuration.get("media_inspection_error"),
@@ -4575,7 +4601,7 @@ def build_pddl_structured_payload(
         "technical_warnings": technical_warnings,
         # A step degraded by a Toolbox failure must not be replayed from the
         # cache once the Toolbox is back.
-        "cacheable": media_inspection_status != "failed",
+        "cacheable": media_inspection_status != "failed" and not extraction_degraded,
     }
 
 

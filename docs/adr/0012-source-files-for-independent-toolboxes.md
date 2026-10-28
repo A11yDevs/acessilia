@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-10-26
 - **Components:** core; existing SDK and Toolbox transports unchanged
-- **Reference:** Trilha B, B07
+- **Reference:** [PR #309](https://github.com/A11yDevs/acessilia/pull/309)
 
 ## Context
 
@@ -33,7 +33,14 @@ Each direct extraction attempt/provider may transfer the source again. The
 initial source artifact ID is unset for multi-endpoint extraction, and the
 reported `use_artifact_store` configuration reflects actual use. The source
 file must remain available until the extraction calls finish. Output artifacts
-and later processing stages still need their own routing guarantees (B05).
+and later processing stages still need their own routing guarantees (ADR-0013).
+
+The policy logs when artifact storage is bypassed despite being enabled.
+Fusion and text-span calls may then send the full source again. Before rollout,
+operators must check the deployed `TOOLBOX_BASE_URLS` in staging and production,
+confirm whether URLs are independent deployments or replicas behind one shared
+storage endpoint, and exercise representative large PDFs in staging. The empty
+value in `.env.example` does not establish the deployed topology.
 
 Tests reproduce the independent-client selection failure and verify normal and
 failed-primary direct input, no upload-client creation, single-endpoint

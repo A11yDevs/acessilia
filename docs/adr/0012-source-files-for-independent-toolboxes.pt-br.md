@@ -3,7 +3,13 @@
 - **Status:** Accepted (aceito após a revisão e o merge)
 - **Data:** 26/10/2026
 - **Componentes:** Core; transportes existentes do SDK e da Toolbox permanecem iguais
-- **Referência:** Trilha B, B07
+- **Referência:** [PR #309](https://github.com/A11yDevs/acessilia/pull/309)
+
+Antes da implantação, é necessário confirmar o valor efetivo de
+`TOOLBOX_BASE_URLS` em staging e produção. O valor vazio de `.env.example` não
+comprova a topologia real. Com URLs independentes, fusão e text spans podem
+reenviar o arquivo completo; valide PDFs grandes em staging. A política agora
+registra em log quando dispensa o artifact store apesar de estar habilitado.
 
 ## Contexto
 

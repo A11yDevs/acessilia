@@ -164,6 +164,8 @@ from backend.log_messages import (
     LOG_MEDIA_INSPECT_FAILED,
     LOG_ARTIFACT_UPLOAD_DEGRADED,
     LOG_STRUCTURAL_PROVIDER_DEGRADED,
+    LOG_ARTIFACT_STORE_DIRECT_INPUT,
+    MSG_STRUCTURAL_EXTRACTION_DEGRADED,
     LOG_PDF_UA_TOOLBOX_EXPORTED,
     LOG_PDF_UA_MATH_DEGRADED,
     LOG_TXT_EXPORTED,
@@ -835,6 +837,8 @@ MESSAGES: tuple[str, ...] = (
     LOG_MEDIA_INSPECT_FAILED,
     LOG_ARTIFACT_UPLOAD_DEGRADED,
     LOG_STRUCTURAL_PROVIDER_DEGRADED,
+    LOG_ARTIFACT_STORE_DIRECT_INPUT,
+    MSG_STRUCTURAL_EXTRACTION_DEGRADED,
     LOG_PDF_UA_TOOLBOX_EXPORTED,
     LOG_PDF_UA_MATH_DEGRADED,
     LOG_TXT_EXPORTED,
@@ -1643,11 +1647,23 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         # Toolbox finished media.inspect; {nature} the artifact nature, {visual} whether it needs visual inspection.
         LOG_MEDIA_INSPECT_TOOLBOX_FINISHED: "Toolbox: media.inspect concluído (natureza={nature}, visual={visual})",
         # media.inspect failed on the Toolbox; the run continues without the standalone-image signal.
-        LOG_STRUCTURAL_PROVIDER_DEGRADED: "O provedor estrutural {provider} falhou ({error}); a extração está degradada.",
-        LOG_ARTIFACT_UPLOAD_DEGRADED: "Upload do artefato indisponível ({error}); extraindo a partir do arquivo original.",
         LOG_MEDIA_INSPECT_FAILED: (
             "Inspeção de mídia indisponível para {filename}; seguindo sem o "
             "sinal de imagem isolada: {error}"
+        ),
+        # One structural provider is unavailable; {provider} identifies it and {error} its error class.
+        LOG_STRUCTURAL_PROVIDER_DEGRADED: "O provedor estrutural {provider} falhou ({error}); a extração está degradada.",
+        # Upload failed transiently; {error} is the error class, direct input remains available.
+        LOG_ARTIFACT_UPLOAD_DEGRADED: "Upload do artefato indisponível ({error}); extraindo a partir do arquivo original.",
+        # Independent URLs cannot share artifact IDs; the source is sent again for later stages.
+        LOG_ARTIFACT_STORE_DIRECT_INPUT: (
+            "Armazenamento de artefatos contornado para endpoints independentes da Toolbox; "
+            "o arquivo original será reenviado para extração, fusão e text spans."
+        ),
+        # Delivered warning: {provider} supplied the only available structural extraction.
+        MSG_STRUCTURAL_EXTRACTION_DEGRADED: (
+            "A extração estrutural usou apenas {provider} porque outro provedor estava indisponível. "
+            "O documento exige revisão; a comparação entre dois provedores não estava disponível."
         ),
         # TXT export wrapper debug line; {output_path} the destination file path.
         LOG_TXT_EXPORTED: "TXT exportado: {output_path}",

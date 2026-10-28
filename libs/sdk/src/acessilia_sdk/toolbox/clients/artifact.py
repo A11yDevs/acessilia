@@ -1,4 +1,4 @@
-"""Client for storing and retrieving artifacts through ``/v1/artifacts``."""
+"""Client for the artifact store: ``POST /v1/artifacts`` and ``GET /v1/artifacts/{id}``."""
 
 from __future__ import annotations
 
@@ -44,14 +44,10 @@ class ToolboxArtifactClient(ToolboxCapabilityClient):
                 f"{STORE_CAPABILITY} response is not valid JSON"
             ) from e
         artifact_id = (
-            (data.get("artifact_id") or data.get("id"))
-            if isinstance(data, dict)
-            else None
+            (data.get("artifact_id") or data.get("id")) if isinstance(data, dict) else None
         )
         if not artifact_id:
-            raise ToolboxContractViolation(
-                f"{STORE_CAPABILITY} response has no artifact_id"
-            )
+            raise ToolboxContractViolation(f"{STORE_CAPABILITY} response has no artifact_id")
         return str(artifact_id)
 
     async def download(
@@ -59,8 +55,8 @@ class ToolboxArtifactClient(ToolboxCapabilityClient):
     ) -> None:
         """Download ``artifact_id`` to ``destination``, checked against its digest.
 
-        The body is streamed by ``download_artifact`` from whichever endpoint
-        answers.
+        The body is streamed by :func:`~acessilia_sdk.toolbox.artifacts.download_artifact`
+        from whichever endpoint answers.
         """
         ref = ArtifactRef.parse(artifact_id)
 

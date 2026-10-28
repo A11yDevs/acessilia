@@ -9,15 +9,15 @@ from pathlib import Path
 from time import perf_counter
 from typing import TYPE_CHECKING, Any
 
-from acessilia_sdk.toolbox.clients import ToolboxArtifactClient, ToolboxStructureClient
-
 from backend.config.settings import settings
 from backend.i18n import t
 from backend.log_messages import (
     LOG_ARTIFACT_UPLOAD_DEGRADED,
+    LOG_ARTIFACT_STORE_DIRECT_INPUT,
     LOG_STRUCTURAL_PROVIDER_DEGRADED,
 )
 from backend.tools.logger import logger
+from acessilia_sdk.toolbox.clients import ToolboxArtifactClient, ToolboxStructureClient
 from backend.tools.toolbox_client import (
     ToolboxCapabilityClient,
     ToolboxError,
@@ -58,7 +58,6 @@ class ToolboxExtraction:
     Carrega o JSON completo da resposta da Toolbox, de onde o builder lê
     elements e pages diretamente.
     """
-
     document: dict[str, Any]
     started_at: datetime
     completed_at: datetime
@@ -107,9 +106,7 @@ class ToolboxManifestExtractor:
             else settings.toolbox_use_remote_cache
         )
 
-    def extract(
-        self, source_path: Path, *, dual_fusion: bool = True
-    ) -> ToolboxExtraction:
+    def extract(self, source_path: Path, *, dual_fusion: bool = True) -> ToolboxExtraction:
         """Extrai a estrutura de um documento usando a Toolbox (síncrono).
 
         Executa chamadas HTTP assíncronas via asyncio.run() em thread separada,
@@ -162,6 +159,8 @@ class ToolboxManifestExtractor:
             and artifacts is not None
             and _one_artifact_endpoint(structure, artifacts)
         )
+        if self.use_artifact_store and not use_artifact_store:
+            logger.info(t(LOG_ARTIFACT_STORE_DIRECT_INPUT))
         if use_artifact_store and artifacts is not None:
             try:
                 artifact_id = await artifacts.upload(source_path)
@@ -192,7 +191,7 @@ class ToolboxManifestExtractor:
                 language="pt-BR",
                 use_remote_cache=self.use_remote_cache,
             )
-        except ToolboxError as exc:
+        except (ToolboxTimeout, ToolboxProviderUnavailable) as exc:
             if not dual_enabled:
                 raise
             primary_error = exc
@@ -227,6 +226,8 @@ class ToolboxManifestExtractor:
                         )
                         else None
                     )
+                    if artifact_id is not None and secondary_artifact_id is None:
+                        logger.info(t(LOG_ARTIFACT_STORE_DIRECT_INPUT))
                     secondary_result = await secondary_client.extract_structure(
                         file_path=None if secondary_artifact_id else source_path,
                         artifact_id=secondary_artifact_id,
@@ -234,6 +235,10 @@ class ToolboxManifestExtractor:
                         use_remote_cache=self.use_remote_cache,
                     )
                 except ToolboxError as exc:
+                    if not isinstance(exc, (ToolboxTimeout, ToolboxProviderUnavailable)):
+                        if primary_error is not None:
+                            raise exc from primary_error
+                        raise
                     if primary_error is not None:
                         raise ToolboxUnavailable(
                             [

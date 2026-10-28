@@ -1505,6 +1505,24 @@ msgstr ""
 "O provedor estrutural {provider} falhou ({error}); a extração está "
 "degradada."
 
+msgid ""
+"Artifact storage bypassed for independent Toolbox endpoints; the source "
+"file will be sent again for extraction, fusion and text spans."
+msgstr ""
+"Armazenamento de artefatos contornado para endpoints independentes da "
+"Toolbox; o arquivo original será reenviado para extração, fusão e text "
+"spans."
+
+#, python-brace-format
+msgid ""
+"Structural extraction used only {provider} because another provider was "
+"unavailable. The document requires review; dual-provider comparison was "
+"not available."
+msgstr ""
+"A extração estrutural usou apenas {provider} porque outro provedor estava"
+" indisponível. O documento exige revisão; a comparação entre dois "
+"provedores não estava disponível."
+
 #, python-brace-format
 msgid "PDF/UA rendered by the Toolbox: {output_path}"
 msgstr "PDF/UA renderizado pela Toolbox: {output_path}"

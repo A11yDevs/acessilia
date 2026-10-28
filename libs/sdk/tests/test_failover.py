@@ -586,7 +586,7 @@ async def test_download_into_a_missing_directory_is_a_local_error(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("secondary_status", [200, 404, 503])
+@pytest.mark.parametrize("secondary_status", [200, 404, 503, "timeout"])
 async def test_artifact_download_searches_another_endpoint_after_not_found(
     tmp_path, secondary_status
 ):
@@ -611,14 +611,20 @@ async def test_artifact_download_searches_another_endpoint_after_not_found(
                 await client.download(PDF_ID, destination, magic=b"%PDF-")
                 assert destination.read_bytes() == PDF
             else:
-                second.respond(secondary_status, json={"code": "artifact_not_found"})
+                if secondary_status == "timeout":
+                    second.mock(side_effect=httpx.ReadTimeout("secondary timed out"))
+                else:
+                    second.respond(secondary_status, json={"code": "artifact_not_found"})
                 error = (
                     ToolboxArtifactNotFound
                     if secondary_status == 404
                     else ToolboxUnavailable
                 )
-                with pytest.raises(error):
+                with pytest.raises(error) as caught:
                     await client.download(PDF_ID, destination, magic=b"%PDF-")
+                if secondary_status == "timeout":
+                    assert isinstance(caught.value.causes[0][1], ToolboxArtifactNotFound)
+                    assert isinstance(caught.value.causes[1][1], ToolboxTimeout)
                 assert destination.read_bytes() == b"previous complete file"
             assert first.call_count == second.call_count == 1
             assert list(tmp_path.iterdir()) == [destination]

@@ -223,9 +223,7 @@ class ToolboxCapabilityClient:
                     response = await http.request(method, path, **kwargs)
                 else:
                     with files_factory() as files:
-                        response = await http.request(
-                            method, path, files=files, **kwargs
-                        )
+                        response = await http.request(method, path, files=files, **kwargs)
             except httpx.TimeoutException as e:
                 raise ToolboxTimeout(f"Timed out on {method} {path}: {e}") from e
             except httpx.RequestError as e:
@@ -284,9 +282,7 @@ class ToolboxCapabilityClient:
         )
         if missing_artifact_failover:
             errors = (*errors, ToolboxArtifactNotFound)
-        for endpoint, http, catalog in zip(
-            self.endpoints, self._clients, self._catalogs
-        ):
+        for endpoint, http, catalog in zip(self.endpoints, self._clients, self._catalogs):
             try:
                 if catalog is not None:
                     await check(catalog)
@@ -429,15 +425,12 @@ async def _require_published(catalog: CatalogCache, capability_id: str) -> None:
     """A REST capability has no provider: check only that it is published."""
     snapshot = await catalog.get()
     if snapshot is None:
-        raise ToolboxIncompatibleEndpoint(
-            f"{capability_id}: Toolbox catalogue unavailable"
-        )
+        raise ToolboxIncompatibleEndpoint(f"{capability_id}: Toolbox catalogue unavailable")
     published = snapshot.capabilities.get(capability_id)
     expected = TOOLBOX_CAPABILITIES[capability_id].contract_version
     if published != expected:
         raise ToolboxIncompatibleEndpoint(
-            f"{capability_id}: Toolbox publishes v{published}, "
-            f"client expects v{expected}"
+            f"{capability_id}: Toolbox publishes v{published}, client expects v{expected}"
         )
 
 
