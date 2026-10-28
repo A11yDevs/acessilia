@@ -53,6 +53,25 @@ def _clean_cache_directory() -> None:
         logger.debug("Entradas de cache expiradas removidas: {}", removed)
 
 
+def _clean_fusion_artifact_directory() -> None:
+    """Remove persisted fusion inputs after the cache retention period."""
+    artifact_dir = settings.data_dir / "artifacts" / "fusion"
+    if not artifact_dir.exists():
+        return
+
+    now = time.time()
+    removed = 0
+    for item in artifact_dir.iterdir():
+        try:
+            if item.is_file() and now - item.stat().st_mtime > CACHE_MAX_AGE:
+                item.unlink()
+                removed += 1
+        except OSError as exc:
+            logger.warning("Could not remove fusion artifact {}: {}", item.name, exc)
+    if removed:
+        logger.debug("Expired fusion artifacts removed: {}", removed)
+
+
 async def periodic_cleanup() -> None:
     while True:
         try:
@@ -60,6 +79,7 @@ async def periodic_cleanup() -> None:
             await run_blocking(_clean_temp_directory, protected_paths)
             await run_blocking(_clean_output_directory)
             await run_blocking(_clean_cache_directory)
+            await run_blocking(_clean_fusion_artifact_directory)
             _clean_in_memory_statuses()
             await limpar_tokens_expirados()
         except Exception:
