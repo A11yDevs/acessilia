@@ -7,6 +7,7 @@ from typing import Optional
 from docstruct.fusion.similarity import PAGENUM_RE
 from docstruct.fusion.types import DiffBlock
 from docstruct.types import BBox, CanonicalBlock
+from docstruct.text.math_spans import inline_math_sources
 
 TABLE_RE = re.compile(r"<table", re.IGNORECASE)
 FORMULA_RE = re.compile(r"\$\$")
@@ -40,7 +41,7 @@ def classify_kind(type_: str, md: str) -> str:
     t = (type_ or "unknown").lower()
     if t == "table" or TABLE_RE.search(md):
         return "table"
-    if t == "formula" or FORMULA_RE.search(md):
+    if t == "formula" or FORMULA_RE.search(md) or inline_math_sources(md):
         return "formula"
     if t in ("heading", "title", "section_header"):
         return "heading"

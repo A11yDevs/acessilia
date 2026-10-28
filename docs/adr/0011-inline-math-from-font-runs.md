@@ -43,8 +43,8 @@ Options considered for detection:
 - Any producer that writes `$…$` (page OCR, MinerU, the font detector) gets math output with no extra work, as long as the document goes through the canonical build with a math enricher.
 - The conversion happens only in the canonical build. A canonical document that skipped it (one passed to the exporters as a dict, for instance) has no `inline_math`. Its spans still render as math in the Pandoc AST, but HTML marks the LaTeX `role="math"` without MathML or speech, and TXT reads the bare LaTeX. The export does not call the Toolbox again.
 - A span `math.convert` rejects still renders as math in the Pandoc AST. The PDF/UA degrade-and-retry (`degrade_math_to_text`) covers a compilation failure, as it does for math blocks.
+- The fusion router, block classifier and text oracle use the shared inline-math parser, so single-dollar spans count as formulas without treating currency such as `R$ 10,00` as math.
 - Detection only covers PDFs with a math font in the text layer (TeX and most typeset math). Scanned pages go through the page OCR model, which already emits `$…$`.
 - Out of scope:
   - `inline_math_promote` (a paragraph made only of math turned into display math) is still unused.
-  - The fusion router's `FORMULA_RE` still ignores a single `$`.
 - Compliance: `tests/test_inline_math.py` covers the splitting rule and each exporter, and `tests/test_table_inline_math.py` covers table cells and captions; `tests/test_table_inline_math_marking.py` and `libs/docstruct/tests/test_table_inline_math_detection.py` cover the detection in cells. The detection is measured by the math reference scorecard; the target is "Inline expressions as math" ≥ 90% on case 036.

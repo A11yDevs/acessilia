@@ -21,6 +21,7 @@ import re
 from collections import Counter
 
 from docstruct.text.normalize import norm
+from docstruct.text.math_spans import inline_math_sources
 
 TABLE_RE = re.compile(r"<table", re.I)
 FORMULA_RE = re.compile(r"\$\$|\\\[")
@@ -39,7 +40,7 @@ def kind_of(block: str) -> str:
     """Classifica um bloco do GT: ``"table"``, ``"formula"`` ou ``"text"``."""
     if TABLE_RE.search(block):
         return "table"
-    if FORMULA_RE.search(block):
+    if FORMULA_RE.search(block) or inline_math_sources(block):
         return "formula"
     return "text"
 

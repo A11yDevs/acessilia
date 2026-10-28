@@ -43,8 +43,8 @@ Opções consideradas para a detecção:
 - Qualquer produtor que escreva `$…$` (OCR de página, MinerU, o detector de fontes) passa a ter saída em math sem trabalho extra, desde que o documento passe pelo build canônico com um enricher de math.
 - A conversão só acontece no build canônico. Um documento canônico que o pulou (por exemplo, um passado aos exportadores como dict) não tem `inline_math`. Seus spans ainda viram math no AST Pandoc, mas o HTML marca o LaTeX com `role="math"` sem MathML nem fala, e o TXT lê o LaTeX sem delimitadores. A exportação não chama a Toolbox de novo.
 - Um span que o `math.convert` rejeita ainda vira math no AST Pandoc. O degrade-and-retry do PDF/UA (`degrade_math_to_text`) cobre uma falha de compilação, como já faz para blocos math.
+- O roteador de fusão, o classificador de blocos e o oráculo de texto usam o parser compartilhado de math inline; spans com um `$` passam a contar como fórmulas sem classificar moedas como `R$ 10,00` como math.
 - A detecção só cobre PDFs com fonte matemática na camada de texto (TeX e a maior parte da math tipografada). Páginas escaneadas passam pelo modelo de OCR de página, que já emite `$…$`.
 - Fora do escopo:
   - `inline_math_promote` (um parágrafo só de math vira display) continua sem uso.
-  - O `FORMULA_RE` do roteador de fusão continua ignorando um `$` simples.
 - Conformidade: `tests/test_inline_math.py` cobre a regra de separação e cada exportador, e `tests/test_table_inline_math.py` cobre células e legendas de tabela; `tests/test_table_inline_math_marking.py` e `libs/docstruct/tests/test_table_inline_math_detection.py` cobrem a detecção nas células. A detecção é medida pelo scorecard de referência de math; a meta é "Inline expressions as math" ≥ 90% no caso 036.
