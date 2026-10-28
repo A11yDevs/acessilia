@@ -145,6 +145,26 @@ class TestMergeBlocks:
         assert any("CH" in o for o in out)
         assert stats.get("formula->text-docling", 0) == 1
 
+    def test_standalone_inline_math_is_promoted_before_formula_text_demote(self):
+        from docstruct.types import CanonicalBlock
+
+        block = block_to_diff(CanonicalBlock(id="1", type="paragraph", text="$x+1$"))
+
+        out, stats = merge_blocks([block], [], FusionPolicy(), min_len=0)
+
+        assert out == ["$$ x+1 $$"]
+        assert stats.get("formula->text-docling", 0) == 0
+
+    def test_inline_math_in_prose_is_preserved(self):
+        from docstruct.types import CanonicalBlock
+
+        text = "The expression $x+1$ remains inline."
+        block = block_to_diff(CanonicalBlock(id="1", type="paragraph", text=text))
+
+        out, _ = merge_blocks([block], [], FusionPolicy(), min_len=0)
+
+        assert out == [text]
+
     def test_junk_filter(self):
         policy = FusionPolicy(junk_filter=True)
         D = [mk("!!! ### ??? %%% ^^"), mk("texto real aqui ok")]
@@ -394,6 +414,4 @@ def test_decor_tail_same_line_sorts_ltr():
     # Mesmo com cy ligeiramente menor em DATE (0.028 vs 0.030), a quantização ordena por cx
     res = decor_tail([b_name, b_class, b_date], [])
     assert res == ["NAME", "CLASS", "DATE"]
-
-
 
