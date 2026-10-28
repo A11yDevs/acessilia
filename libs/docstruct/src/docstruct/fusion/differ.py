@@ -32,6 +32,7 @@ from docstruct.fusion.similarity import PAGENUM_RE, center, contain_frac, iou, i
 from docstruct.fusion.types import DiffBlock
 from docstruct.fusion.xycut import reorder as xycut_reorder
 from docstruct.policy import FusionPolicy
+from docstruct.text.math_spans import split_inline_math
 
 
 def _is_spurious_text_pair(d: DiffBlock, m: DiffBlock) -> bool:
@@ -126,14 +127,26 @@ def _finalize(
     ``merge_blocks`` (normal e fallbacks) tenham comportamento consistente.
     """
     if policy.order_xycut != "off":
-        return xycut_reorder(
+        ordered = xycut_reorder(
             items,
             mode=policy.order_xycut,
             min_columns=policy.xycut_min_columns,
             min_balance=policy.xycut_min_balance,
             stats=stats,
         )
-    return [md for _, md in items]
+    else:
+        ordered = [md for _, md in items]
+    if policy.inline_math_promote:
+        promoted = []
+        for md in ordered:
+            pieces = split_inline_math(md.strip())
+            promoted.append(
+                f"$$ {pieces[0][0]} $$"
+                if len(pieces) == 1 and pieces[0][1]
+                else md
+            )
+        return promoted
+    return ordered
 
 
 def merge_blocks(
