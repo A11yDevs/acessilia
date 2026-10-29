@@ -364,12 +364,20 @@ async def test_a_breaker_opened_by_the_pictures_skips_the_formula_fallback(
 
 @pytest.mark.asyncio
 async def test_the_second_pass_waits_the_configured_delay(monkeypatch, tmp_path):
+    import asyncio
+    from types import SimpleNamespace
+
     waits = []
 
     async def record_sleep(seconds):
         waits.append(seconds)
 
-    monkeypatch.setattr("backend.agents.pddl_orchestrator.asyncio.sleep", record_sleep)
+    # Replace only this module's asyncio reference. Patching asyncio.sleep on
+    # the shared module also removes the queue worker's yielding poll delay,
+    # which can starve other event loops and hang the complete test suite.
+    monkeypatch.setattr(
+        pddl, "asyncio", SimpleNamespace(**{**vars(asyncio), "sleep": record_sleep})
+    )
     monkeypatch.setattr(settings, "vision_retry_pass_delay_seconds", 5)
     calls = _vision(monkeypatch, [_DESCRIPTION, None, _DESCRIPTION])
     manifest = _pictures(2)
