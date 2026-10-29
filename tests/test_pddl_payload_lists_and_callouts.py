@@ -267,6 +267,55 @@ def test_recovered_exercise_keeps_its_preamble_before_its_questions(source_order
         assert page["text"].count(text) == 1
 
 
+@pytest.mark.parametrize(
+    "markers",
+    [("-",) * 3, ("•",) * 3, ("1.",) * 3, ("i.",) * 3, ("?",) * 3, ("a)", "b)", "-")],
+    ids=["dashes", "bullets", "decimal", "roman", "unsupported", "mixed"],
+)
+def test_empty_items_with_incompatible_markers_leave_sibling_text_alone(markers) -> None:
+    items = [
+        _item(index, "", marker, "unrelated-list")
+        for index, marker in enumerate(markers, start=1)
+    ]
+    source_text = "Reference examples: a) Alpha b) Beta c) Gamma"
+
+    page = _page([*items, _element(4, "paragraph", source_text)])
+
+    assert [block["type"] for block in page["blocks"]] == ["paragraph"]
+    assert page["blocks"][0]["text"] == source_text
+
+
+@pytest.mark.parametrize("markers", [("a)", "b)", "c)"), ("", "", "")])
+def test_empty_items_do_not_take_text_from_another_section(markers) -> None:
+    items = [
+        _item(index, "", marker, "exercise-list")
+        for index, marker in enumerate(markers, start=2)
+    ]
+    source_text = "Reference examples: a) Alpha b) Beta c) Gamma"
+    page = _page([
+        _element(1, "heading", "Exercise"),
+        *items,
+        _element(5, "heading", "Reference examples"),
+        _element(6, "paragraph", source_text),
+    ])
+
+    assert [block["type"] for block in page["blocks"]] == ["heading", "heading", "paragraph"]
+    assert page["blocks"][-1]["text"] == source_text
+
+
+def test_empty_items_without_markers_can_recover_text_in_their_section() -> None:
+    page = _page([
+        _element(1, "heading", "Exercise"),
+        *[_item(index, "", "", "exercise-list") for index in (2, 3, 4)],
+        _element(5, "paragraph", "Calculate: a) Alpha b) Beta c) Gamma"),
+    ])
+
+    assert [block["type"] for block in page["blocks"]] == ["heading", "paragraph", "list"]
+    assert page["blocks"][1]["text"] == "Calculate:"
+    assert page["blocks"][2]["items"] == ["Alpha", "Beta", "Gamma"]
+    assert page["blocks"][2]["numbering"] == "lower-alpha"
+
+
 def test_page_text_numbers_an_ordered_list() -> None:
     page = _page([
         _item(1, "Rewrite the expression", "i.", "group-a"),

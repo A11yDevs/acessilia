@@ -5344,8 +5344,9 @@ def _recover_empty_lettered_list_items(
 
     Some extractors emit empty ``list_item`` elements while leaving the actual
     ``a) ... b) ... c)`` text in a paragraph on the same page. Move that text
-    only when one paragraph has the exact marker sequence of one fully empty
-    list group. Ambiguous or partial matches stay untouched.
+    only when one paragraph in the same heading section has the exact marker
+    sequence of one fully empty list group. Explicit non-alphabetic markers,
+    ambiguous matches and partial matches stay untouched.
 
     Returns item-id -> (text, marker) and source-paragraph-id -> remaining
     prefix, and first-item-id -> preamble to emit before that item. The
@@ -5353,15 +5354,22 @@ def _recover_empty_lettered_list_items(
     preamble after the first item moves before it, keeping the exercise's
     introduction ahead of its questions.
     """
+    sections: dict[str, int] = {}
+    section = 0
     groups: dict[str, list[ManifestElement]] = {}
     for element in elements:
+        if element.type in {"title", "heading"}:
+            section += 1
+        sections[element.id] = section
         if element.type == "list_item" and element.parent_id:
             groups.setdefault(element.parent_id, []).append(element)
 
     empty_groups = {
         parent_id: sorted(items, key=lambda item: item.reading_order)
         for parent_id, items in groups.items()
-        if len(items) >= 2 and all(not (item.text or "").strip() for item in items)
+        if len(items) >= 2
+        and all(not (item.text or "").strip() for item in items)
+        and len({sections[item.id] for item in items}) == 1
     }
     if not empty_groups:
         return {}, {}, {}
@@ -5380,7 +5388,7 @@ def _recover_empty_lettered_list_items(
         for item in items:
             marker = str(item.metadata.get("marker") or "").strip()
             parsed = marker_numbering(marker) if marker else None
-            if parsed is not None and not parsed[1].endswith("-alpha"):
+            if marker and (parsed is None or not parsed[1].endswith("-alpha")):
                 known_markers = []
                 break
             known_markers.append(parsed)
@@ -5388,6 +5396,8 @@ def _recover_empty_lettered_list_items(
             continue
 
         for source in sources:
+            if sections[source.id] != sections[items[0].id]:
+                continue
             source_text = source.text or ""
             markers = list(_LETTERED_LIST_SOURCE_MARKER.finditer(source_text))
             if len(markers) != len(items):
