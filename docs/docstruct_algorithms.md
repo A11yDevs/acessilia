@@ -339,7 +339,34 @@ without going through the PDDL planner.
 
 ---
 
-## 6. Related documentation
+## 6. Display-equation numbers
+
+`docstruct.text.equations` separates a trailing `\tag{1}`, `\quad(1)` or
+unambiguous `(1)` from a display formula. The core applies this when building
+the processing manifest and when accepting OCR or vision recognition. The
+canonical builder applies the same rule to structured math blocks.
+
+The expression stays in `text`; the original identifier stays in
+`metadata.equation_number`. A valid existing identifier takes precedence over
+recognition output. Converters and verbalizers receive the expression without
+its label, and recognition agreement compares expressions without the label.
+
+PDF/UA's Pandoc AST and benchmark Markdown restore an explicit `\tag{1}`.
+DOCX uses `\qquad\text{(1)}` instead, because Pandoc's Word math converter
+does not accept a standalone `\tag`. HTML shows the number beside the formula
+and includes it in the accessible label; the visible number is hidden from
+assistive technology to avoid announcing that label twice. TXT and its audio
+consumers retain the number in the spoken representation. Repeated rendering
+does not duplicate a label.
+
+This is conservative suffix recognition, not arbitrary TeX parsing. It does
+not create missing numbers, renumber equations, or resolve references into
+hyperlinks. Parentheses that could complete an operation, such as `x = (1)`
+or `x = y + (1)`, remain part of the expression. Unseparated `f(1)` also stays
+unchanged. Identifiers are limited to digits with optional dotted components
+and letter suffixes or an appendix prefix, such as `1`, `2.3`, `4a` and `A.1`.
+
+## 7. Related documentation
 
 - [libs/docstruct/README.md](../../libs/docstruct/README.md) — public API.
 - [pmv_agno_pddl.md](pmv_agno_pddl.md) — PDDL orchestration and the

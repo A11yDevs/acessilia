@@ -33,6 +33,7 @@ from docstruct.text.inline_math import (
     splice_inline_math,
 )
 from docstruct.text.latex import has_latex_markup, latex_text_agreement
+from docstruct.text.equations import preserve_equation_number, split_equation_number
 from docstruct.text.math_spans import mask_inline_math
 from docstruct.text.norm_fix import norm_fix
 from docstruct.text.negation_overlay import (
@@ -3697,6 +3698,9 @@ async def _enrich_formula_latex(
 
     from backend.config.settings import settings
 
+    for element in manifest.elements:
+        if element.type == "formula" and element.text:
+            element.text = preserve_equation_number(element.text, element.metadata)
     formulas = [
         element
         for element in manifest.elements
@@ -3803,7 +3807,8 @@ async def _enrich_formula_latex(
                 nonlocal agreement
                 if not latex or not text_layer:
                     return latex
-                score = latex_text_agreement(latex, text_layer)
+                expression, _ = split_equation_number(latex)
+                score = latex_text_agreement(expression, text_layer)
                 if score is None or score < settings.formula_text_agreement_min:
                     rejected[method] = None if score is None else round(score, 3)
                     return ""
@@ -3886,7 +3891,7 @@ async def _enrich_formula_latex(
             recognition["text_agreement"] = agreement
         if rejected:
             recognition["rejected"] = rejected
-        element.text = latex
+        element.text = preserve_equation_number(latex, element.metadata)
         element.metadata["formula_recognition"] = recognition
         return True
 

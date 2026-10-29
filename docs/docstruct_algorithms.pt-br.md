@@ -350,7 +350,35 @@ ou decidir re-inferência sem passar pelo planejador PDDL.
 
 ---
 
-## 6. Documentação relacionada
+## 6. Números de equações em destaque
+
+`docstruct.text.equations` separa um sufixo `\tag{1}`, `\quad(1)` ou `(1)`
+não ambíguo de uma fórmula em destaque. O core aplica isso ao construir o
+manifesto de processamento e ao aceitar reconhecimento por OCR ou visão.
+O construtor canônico aplica a mesma regra aos blocos matemáticos estruturados.
+
+A expressão permanece em `text`; o identificador original fica em
+`metadata.equation_number`. Um identificador existente e válido tem prioridade
+sobre o resultado do reconhecimento. Conversores e verbalizadores recebem a
+expressão sem o rótulo, e a concordância do reconhecimento compara expressões
+sem o rótulo.
+
+A AST Pandoc do PDF/UA e o Markdown do benchmark restauram `\tag{1}`.
+O DOCX usa `\qquad\text{(1)}`, pois o conversor de matemática do Word do
+Pandoc não aceita `\tag` isolado. O HTML mostra o número ao lado da fórmula
+e o inclui no rótulo acessível; o número visual fica oculto da tecnologia
+assistiva para evitar a repetição desse rótulo. O TXT e seus consumidores de
+áudio mantêm o número na representação falada. Renderizações repetidas não
+duplicam o rótulo.
+
+A detecção de sufixos é conservadora, sem interpretar TeX arbitrário. Ela não
+cria números ausentes, renumera equações nem transforma referências em links.
+Parênteses que podem completar uma operação, como `x = (1)` e `x = y + (1)`,
+continuam na expressão. `f(1)` sem separação também fica intacto. Os
+identificadores aceitam dígitos com componentes separados por pontos e sufixo
+de letra ou prefixo de apêndice, como `1`, `2.3`, `4a` e `A.1`.
+
+## 7. Documentação relacionada
 
 - [libs/docstruct/README.md](../../libs/docstruct/README.md) — API pública.
 - [pmv_agno_pddl.md](pmv_agno_pddl.md) — orquestração PDDL e o método

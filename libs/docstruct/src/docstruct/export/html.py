@@ -17,6 +17,7 @@ from docstruct.profiles import normalize_profile
 from docstruct.sections import section_body_blocks, section_title_alias
 from docstruct.tables.ast import split_header_and_body, table_ast_from_block
 from docstruct.text.math_spans import inline_math_entries, split_inline_math
+from docstruct.text.equations import equation_number, numbered_speech
 
 
 @dataclass
@@ -204,13 +205,20 @@ def _render_block(
         )
         return f'<figure id="{block_id}"><img alt="{alt}" src="{escape(block.get("metadata", {}).get("src", ""))}">{details}</figure>'
     if block_type == "math":
-        alt = escape(block.get("alt_text", ""))
+        metadata = block.get("metadata") or {}
+        number = equation_number(metadata)
+        speech = block.get("alt_text") or (block.get("text", "") if number else "")
+        alt = escape(numbered_speech(str(speech), metadata))
+        number_html = (
+            f'<span class="equation-number" aria-hidden="true">({escape(number)})</span>'
+            if number else ""
+        )
         mathml = _safe_mathml((block.get("metadata") or {}).get("mathml", ""))
         if mathml:
-            return f'<div id="{block_id}" role="math" aria-label="{alt}">{mathml}</div>'
+            return f'<div id="{block_id}" role="math" aria-label="{alt}">{mathml}{number_html}</div>'
         return (
             f'<p id="{block_id}" role="math" aria-label="{alt}">'
-            f'{escape(block.get("text", ""))}</p>'
+            f'{escape(block.get("text", ""))}{number_html}</p>'
         )
     if block_type in {"details", "note", "warning", "quote"}:
         summary = escape(block.get("title", block_type.title()))

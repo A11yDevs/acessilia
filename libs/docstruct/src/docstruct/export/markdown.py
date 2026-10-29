@@ -13,6 +13,7 @@ from typing import Any
 from docstruct.blocks.lists import list_start
 from docstruct.tables.ast import table_ast_from_block
 from docstruct.text.latex import bare_latex
+from docstruct.text.equations import numbered_latex
 
 _HEADER_SCOPES = {"row", "col", "rowgroup", "colgroup"}
 
@@ -56,7 +57,7 @@ def _render_block(block: dict[str, Any]) -> str:
         text = (block.get("text") or "").strip()
         return f"{'#' * max(1, min(level, 6))} {text}" if text else ""
     if btype == "math":
-        latex = bare_latex(block.get("text") or "")
+        latex = numbered_latex(bare_latex(block.get("text") or ""), block.get("metadata") or {})
         return f"$$\n{latex}\n$$" if latex else ""
     if btype == "code":
         language = (block.get("language") or "").strip()

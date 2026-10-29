@@ -59,6 +59,7 @@ from docstruct.tables.ast import raw_rows_from_table_ast
 from docstruct.text.math_spans import block_prose
 from docstruct.text.math_spans import inline_math_entries
 from docstruct.text.math_spans import inline_math_sources
+from docstruct.text.equations import equation_number, numbered_speech, preserve_equation_number
 
 
 def build_canonical_document(
@@ -160,6 +161,10 @@ def _enrich_math_blocks(
                 _enrich_inline_math(block, math_enricher, inline_cache)
             if block.get("type") != "math":
                 continue
+            metadata = block.get("metadata") or {}
+            block["text"] = preserve_equation_number(str(block.get("text") or ""), metadata)
+            if metadata:
+                block["metadata"] = metadata
             latex = block.get("text", "")
             if math_enricher is not None:
                 latex = math_enricher.normalize(latex)
@@ -173,6 +178,8 @@ def _enrich_math_blocks(
                     block["alt_text"] = (
                         metadata.get("verbalization") or math_enricher.verbalize(latex)
                     )
+            if equation_number(metadata):
+                block["alt_text"] = numbered_speech(str(block.get("alt_text") or latex), metadata)
         _enrich_math_blocks(section.get("children", []), math_enricher, inline_cache)
 
 

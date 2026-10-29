@@ -19,6 +19,7 @@ from backend.log_messages import (
     MSG_OBSERVATION_PAGE_WITHOUT_STRUCTURE,
 )
 from backend.tools.logger import logger
+from docstruct.text.equations import preserve_equation_number
 
 from backend.core.manifest.models import (
     Artifact,
@@ -282,6 +283,9 @@ def _build_from_toolbox_json(
         }
 
     manifest = ProcessingManifest.model_validate(data)
+    for element in manifest.elements:
+        if element.type == "formula" and element.text:
+            element.text = preserve_equation_number(element.text, element.metadata)
     if presentation:
         split_across_slides(manifest)
     if refine_reading_order:

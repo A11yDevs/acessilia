@@ -81,6 +81,26 @@ def test_a_toolbox_failure_propagates_without_a_local_fallback(monkeypatch, tmp_
     assert not (tmp_path / "doc.docx").exists()
 
 
+def test_numbered_equation_reaches_docx_renderer_without_unsupported_tag(monkeypatch, tmp_path):
+    from docstruct.canonical import build_canonical_document
+
+    monkeypatch.setattr(settings, "toolbox_docx_enabled", True)
+    calls = []
+
+    def render(ast, output_path, *, lang):
+        calls.append(ast)
+        output_path.write_bytes(DOCX)
+        return {"artifact_id": DOCX_ID}
+
+    monkeypatch.setattr(pandoc_exporter, "toolbox_export_docx", render)
+    document = build_canonical_document("$$x=y$$", title="Equation")
+    block = document["sections"][0]["blocks"][0]
+    block["metadata"] = {"equation_number": "1"}
+    _export_docx(tmp_path, document)
+    span = calls[0]["blocks"][0]["c"][0]
+    assert span["c"][1][0]["c"][1] == r"x=y\qquad\text{(1)}"
+
+
 def test_the_format_is_unavailable_when_disabled(monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "toolbox_docx_enabled", False)
 
