@@ -18,7 +18,7 @@ def get_agno_model(
     the runtime expects for the configured backend.
 
     Args:
-        max_tokens (int | None): Output token cap for this client; when None, ``OPENROUTER_MAX_TOKENS`` applies (``num_predict`` for Ollama).
+        max_tokens (int | None): Output token cap for this client; when None, ``OPENROUTER_MAX_TOKENS`` applies to the OpenRouter and Toolbox clients alike (``num_predict`` for Ollama).
         timeout_seconds (int | None): Per-call HTTP timeout for this client; when None, ``MODEL_CALL_TIMEOUT_SECONDS`` applies. Callers whose answers can legitimately run long (the DataAgent transcribing tables on a local Ollama) pass their own, larger budget explicitly.
         max_retries (int | None): HTTP-level retries the provider SDK may run on its own; when None, the SDK default applies (Agno drops ``None`` client params before building the SDK client). A caller that owns its retry policy passes ``0`` so one call is one attempt: the OpenAI SDK's default of 2 retries applies the full timeout again on every try and re-sends the whole image, which can triple the wait a caller already bounds.
 
@@ -35,13 +35,17 @@ def get_agno_model(
     if settings.ai_client == "toolbox":
         from agno.models.openai.like import OpenAILike
 
+        from acessilia_sdk.toolbox import vlm_gateway_base_url
+        from backend.tools.toolbox_client import toolbox_vlm_endpoint
+
         # The model id is the Toolbox provider id and the key the Toolbox's own:
         # the VLM server's key stays with the Toolbox. The timeout also covers
         # the wait for one of the provider's slots.
+        endpoint = toolbox_vlm_endpoint()
         return OpenAILike(
             id=settings.toolbox_vlm_provider,
-            api_key=settings.toolbox_api_key or "not-needed",
-            base_url=f"{settings.toolbox_base_url.rstrip('/')}/v1/vlm",
+            api_key=endpoint.api_key or settings.toolbox_api_key or "not-needed",
+            base_url=vlm_gateway_base_url(endpoint),
             max_tokens=(
                 max_tokens
                 if max_tokens is not None

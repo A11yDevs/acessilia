@@ -5,7 +5,9 @@ import zipfile
 from pathlib import Path
 from types import SimpleNamespace
 
+import httpx
 import pytest
+import respx
 from fastapi import HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials
 from fastapi.testclient import TestClient
@@ -1041,33 +1043,47 @@ async def test_job_executor_records_early_process_failure(api_paths, monkeypatch
 
 @pytest.mark.parametrize(
     "status, payload, reachable",
-    [(200, {"healthy": True}, True), (200, {"healthy": False}, False), (401, {}, False)],
+    [
+        (200, {"healthy": True}, True),
+        (200, {"healthy": False}, False),
+        # A body that is not the Toolbox's ProviderHealth reads as unreachable.
+        (200, ["healthy"], False),
+        (200, {"status": "ok"}, False),
+        (401, {}, False),
+    ],
 )
+@respx.mock
 def test_toolbox_model_is_reachable_when_the_toolbox_reports_its_vlm_healthy(
     monkeypatch, status, payload, reachable
 ):
-    import httpx
-
     from backend.api.routes import health
 
-    seen: list[httpx.Request] = []
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        seen.append(request)
-        return httpx.Response(status, json=payload)
-
-    real_client = httpx.AsyncClient
-
-    def client(**kwargs):
-        return real_client(transport=httpx.MockTransport(handler), **kwargs)
-
-    monkeypatch.setattr(health.httpx, "AsyncClient", client)
+    route = respx.get("http://toolbox:8002/v1/providers/qwen3-vl-8b/health").mock(
+        return_value=httpx.Response(status, json=payload)
+    )
     monkeypatch.setattr(settings, "ai_client", "toolbox")
     monkeypatch.setattr(settings, "toolbox_base_url", "http://toolbox:8002")
+    monkeypatch.setattr(settings, "toolbox_base_urls", "")
     monkeypatch.setattr(settings, "toolbox_api_key", "toolbox-key")
     monkeypatch.setattr(settings, "toolbox_vlm_provider", "qwen3-vl-8b")
 
     assert asyncio.run(health._check_model_reachable()) is reachable
-    (request,) = seen
-    assert str(request.url) == "http://toolbox:8002/v1/providers/qwen3-vl-8b/health"
-    assert request.headers["authorization"] == "Bearer toolbox-key"
+    assert route.calls.last.request.headers["authorization"] == "Bearer toolbox-key"
+
+
+@respx.mock
+def test_toolbox_model_health_probes_the_endpoint_the_agents_use(monkeypatch):
+    """No key means an anonymous Toolbox; with a failover list, its first entry."""
+    from backend.api.routes import health
+
+    route = respx.get("http://primary:8002/v1/providers/qwen3-vl-8b/health").mock(
+        return_value=httpx.Response(200, json={"healthy": True})
+    )
+    monkeypatch.setattr(settings, "ai_client", "toolbox")
+    monkeypatch.setattr(settings, "toolbox_base_url", "http://unused:8002")
+    monkeypatch.setattr(settings, "toolbox_base_urls", "http://primary:8002,http://secondary:8002")
+    monkeypatch.setattr(settings, "toolbox_api_key", "")
+    monkeypatch.setattr(settings, "toolbox_vlm_provider", "qwen3-vl-8b")
+
+    assert asyncio.run(health._check_model_reachable()) is True
+    assert "authorization" not in route.calls.last.request.headers

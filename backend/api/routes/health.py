@@ -7,11 +7,13 @@ from datetime import UTC, datetime
 import httpx
 from fastapi import APIRouter, Request
 
+from acessilia_sdk.toolbox import vlm_provider_healthy
 from backend.ai.models.ai_client import active_model_name
 from backend.api.limiter import limiter
 from backend.api.schemas import HealthResponse
 from backend.config.settings import settings
 from backend.services.queue_service import unified_queue
+from backend.tools.toolbox_client import toolbox_vlm_endpoint
 
 router = APIRouter(tags=["health"])
 
@@ -21,6 +23,12 @@ router = APIRouter(tags=["health"])
 #: If UPDATE_INTERVAL changes in ops.sh, update this too, or /health reports
 #: false staleness between legitimate checks.
 UPDATE_CHECK_STALE_SECONDS = 3 * 300
+
+#: The Toolbox gives the VLM server 10 s to answer its own health probe, so the
+#: 3 s of the other clients would report a slow but healthy model as down. The
+#: container's healthcheck gives this whole route 10 s (docker-compose*.yml),
+#: which caps the wait below the Toolbox's.
+TOOLBOX_VLM_HEALTH_TIMEOUT_SECONDS = 8.0
 
 
 def _get_container_id() -> str:
@@ -72,18 +80,15 @@ def _update_check_is_stale(last_check: str, now: datetime | None = None) -> bool
 
 
 async def _check_model_reachable() -> bool:
+    if settings.ai_client == "toolbox":
+        return await vlm_provider_healthy(
+            toolbox_vlm_endpoint(),
+            settings.toolbox_vlm_provider,
+            api_key=settings.toolbox_api_key,
+            timeout_seconds=TOOLBOX_VLM_HEALTH_TIMEOUT_SECONDS,
+        )
     try:
         async with httpx.AsyncClient(timeout=3.0) as http:
-            if settings.ai_client == "toolbox":
-                base = settings.toolbox_base_url.rstrip("/")
-                url = f"{base}/v1/providers/{settings.toolbox_vlm_provider}/health"
-                headers = (
-                    {"Authorization": f"Bearer {settings.toolbox_api_key}"}
-                    if settings.toolbox_api_key
-                    else {}
-                )
-                response = await http.get(url, headers=headers)
-                return response.status_code == 200 and response.json().get("healthy") is True
             if settings.ai_client == "ollama":
                 url = settings.ollama_base_url.replace("/api/chat", "/api/tags")
                 response = await http.get(url)

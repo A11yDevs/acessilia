@@ -29,8 +29,10 @@ services:
       # The agents reach the VLM only through the Toolbox, which shares the
       # model server's few parallel slots between them and its own VLM
       # capabilities. Calling the server directly overran those slots and
-      # stalled it. Like TOOLBOX_BASE_URL, this entry wins over .env.
+      # stalled it. Like TOOLBOX_BASE_URL, these entries win over .env, so the
+      # OPENROUTER_*, OLLAMA_* and VLM_* variables in .env are no longer read.
       AI_CLIENT: toolbox
+      TOOLBOX_VLM_PROVIDER: ${STAGING_TOOLBOX_VLM_PROVIDER:-qwen3-vl-8b}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped

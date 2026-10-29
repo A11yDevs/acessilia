@@ -529,6 +529,11 @@ def _region_cache_extra(prompt: str, mode: str, max_tokens: int | None) -> str:
     stored text reads; the version marks the truncation/salvage behavior, so a
     change there starts fresh entries instead of serving answers stored under
     the old rules. Calls that agree on all of these may share an answer.
+
+    With ``AI_CLIENT=toolbox`` the model is the Toolbox provider id, not the
+    weights it serves: the Toolbox names those in the provider's ``version``,
+    which this key cannot see. When the weights behind the same provider id
+    change, bump ``version`` here too (docs/adr/0012).
     """
     return options_cache_key(
         "vision_region",
