@@ -1037,3 +1037,37 @@ async def test_job_executor_records_early_process_failure(api_paths, monkeypatch
     assert row["erro"].startswith("cache inacessivel")
     assert task["erros"] == [row["erro"]]
     assert row["concluido_em"] is not None
+
+
+@pytest.mark.parametrize(
+    "status, payload, reachable",
+    [(200, {"healthy": True}, True), (200, {"healthy": False}, False), (401, {}, False)],
+)
+def test_toolbox_model_is_reachable_when_the_toolbox_reports_its_vlm_healthy(
+    monkeypatch, status, payload, reachable
+):
+    import httpx
+
+    from backend.api.routes import health
+
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(status, json=payload)
+
+    real_client = httpx.AsyncClient
+
+    def client(**kwargs):
+        return real_client(transport=httpx.MockTransport(handler), **kwargs)
+
+    monkeypatch.setattr(health.httpx, "AsyncClient", client)
+    monkeypatch.setattr(settings, "ai_client", "toolbox")
+    monkeypatch.setattr(settings, "toolbox_base_url", "http://toolbox:8002")
+    monkeypatch.setattr(settings, "toolbox_api_key", "toolbox-key")
+    monkeypatch.setattr(settings, "toolbox_vlm_provider", "qwen3-vl-8b")
+
+    assert asyncio.run(health._check_model_reachable()) is reachable
+    (request,) = seen
+    assert str(request.url) == "http://toolbox:8002/v1/providers/qwen3-vl-8b/health"
+    assert request.headers["authorization"] == "Bearer toolbox-key"

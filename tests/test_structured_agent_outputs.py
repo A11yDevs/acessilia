@@ -872,6 +872,10 @@ def test_the_region_cache_key_varies_with_what_the_answer_depends_on(monkeypatch
     monkeypatch.setattr(settings, "ai_client", "ollama")
     monkeypatch.setattr(settings, "ollama_model", "test/model")
     assert _region_cache_extra("a prompt", "medio", 2000) != base
+    monkeypatch.setattr(settings, "ai_client", "toolbox")
+    monkeypatch.setattr(settings, "toolbox_vlm_provider", "test/model")
+    assert _region_cache_extra("a prompt", "medio", 2000) != base
+    monkeypatch.setattr(settings, "ai_client", "openrouter")
     # The stored notice text is localized, so the locale is part of the key.
     token = set_request_locale("pt_BR")
     localized = _region_cache_extra("a prompt", "medio", 2000)

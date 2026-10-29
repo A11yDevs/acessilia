@@ -26,6 +26,11 @@ services:
       # value and the default would never apply. Set STAGING_TOOLBOX_BASE_URL to
       # use a Toolbox that lives elsewhere.
       TOOLBOX_BASE_URL: ${STAGING_TOOLBOX_BASE_URL:-http://host.docker.internal:8002}
+      # The agents reach the VLM only through the Toolbox, which shares the
+      # model server's few parallel slots between them and its own VLM
+      # capabilities. Calling the server directly overran those slots and
+      # stalled it. Like TOOLBOX_BASE_URL, this entry wins over .env.
+      AI_CLIENT: toolbox
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped

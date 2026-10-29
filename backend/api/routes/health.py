@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 import httpx
 from fastapi import APIRouter, Request
 
+from backend.ai.models.ai_client import active_model_name
 from backend.api.limiter import limiter
 from backend.api.schemas import HealthResponse
 from backend.config.settings import settings
@@ -73,6 +74,16 @@ def _update_check_is_stale(last_check: str, now: datetime | None = None) -> bool
 async def _check_model_reachable() -> bool:
     try:
         async with httpx.AsyncClient(timeout=3.0) as http:
+            if settings.ai_client == "toolbox":
+                base = settings.toolbox_base_url.rstrip("/")
+                url = f"{base}/v1/providers/{settings.toolbox_vlm_provider}/health"
+                headers = (
+                    {"Authorization": f"Bearer {settings.toolbox_api_key}"}
+                    if settings.toolbox_api_key
+                    else {}
+                )
+                response = await http.get(url, headers=headers)
+                return response.status_code == 200 and response.json().get("healthy") is True
             if settings.ai_client == "ollama":
                 url = settings.ollama_base_url.replace("/api/chat", "/api/tags")
                 response = await http.get(url)
@@ -87,11 +98,7 @@ async def _check_model_reachable() -> bool:
 @router.get("/health", response_model=HealthResponse)
 @limiter.limit("30/minute")
 async def health(request: Request):
-    model_name = (
-        settings.ollama_model
-        if settings.ai_client == "ollama"
-        else settings.openrouter_model
-    )
+    model_name = active_model_name()
     staging = _read_staging_status()
     ghcr_latest = _staging_str(staging, "latest_digest")
     running_digest = _staging_str(staging, "running_digest") or settings.image_digest

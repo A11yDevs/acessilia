@@ -84,3 +84,29 @@ def test_ollama_model_receives_agent_specific_prediction_limit(monkeypatch) -> N
     ai_client.get_agno_model(max_tokens=8192)
 
     assert captured["options"]["num_predict"] == 8192
+
+
+def test_toolbox_model_targets_the_vlm_gateway_with_the_toolbox_key(monkeypatch) -> None:
+    from agno.models.openai import like
+
+    captured: dict[str, object] = {}
+
+    def fake_openai_like(**kwargs):
+        captured.update(kwargs)
+        return object()
+
+    monkeypatch.setattr(like, "OpenAILike", fake_openai_like)
+    monkeypatch.setattr(settings, "ai_client", "toolbox")
+    monkeypatch.setattr(settings, "toolbox_base_url", "http://toolbox:8002/")
+    monkeypatch.setattr(settings, "toolbox_api_key", "toolbox-key")
+    monkeypatch.setattr(settings, "toolbox_vlm_provider", "qwen3-vl-8b")
+    monkeypatch.setattr(settings, "openrouter_max_tokens", 4096)
+
+    ai_client.get_agno_model(max_tokens=2000, max_retries=0)
+
+    assert captured["base_url"] == "http://toolbox:8002/v1/vlm"
+    assert captured["api_key"] == "toolbox-key"
+    assert captured["id"] == "qwen3-vl-8b"
+    assert captured["max_tokens"] == 2000
+    assert captured["max_retries"] == 0
+    assert ai_client.active_model_name() == "qwen3-vl-8b"

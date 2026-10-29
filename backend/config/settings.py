@@ -206,6 +206,11 @@ class Settings:
     toolbox_base_urls: str = field(
         default_factory=lambda: os.getenv("TOOLBOX_BASE_URLS", "")
     )
+    # With AI_CLIENT=toolbox, the Toolbox VLM provider that serves the agents'
+    # chats (POST /v1/vlm/chat/completions on TOOLBOX_BASE_URL).
+    toolbox_vlm_provider: str = field(
+        default_factory=lambda: os.getenv("TOOLBOX_VLM_PROVIDER", "qwen3-vl-8b")
+    )
     # Structural extraction keeps the historical TOOLBOX_PROVIDER variable for
     # backward compatibility. Specialized capabilities use providers bound to
     # their own contracts in the Toolbox registry. Every default comes from
