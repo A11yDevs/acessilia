@@ -5302,12 +5302,14 @@ def _elements_to_blocks(
     way to its block, which already stands for the picture's text.
     """
     callout_titles = _callout_titles(elements)
-    recovered_items, consumed_text = _recover_empty_lettered_list_items(elements)
+    recovered_items, consumed_text, preambles = _recover_empty_lettered_list_items(elements)
     blocks: list[dict[str, Any]] = []
     for element in elements:
         if element.id in replacements:
             blocks.append(replacements[element.id])
             continue
+        if preamble := preambles.get(element.id):
+            blocks.append(_element_to_block(preamble, callout_titles))
         text = consumed_text.get(element.id)
         if text is not None:
             if not text:
@@ -5337,7 +5339,7 @@ _LETTERED_LIST_SOURCE_MARKER = re.compile(
 
 def _recover_empty_lettered_list_items(
     elements: list[ManifestElement],
-) -> tuple[dict[str, tuple[str, str]], dict[str, str]]:
+) -> tuple[dict[str, tuple[str, str]], dict[str, str], dict[str, ManifestElement]]:
     """Recover a fully extracted lettered list from a sibling text element.
 
     Some extractors emit empty ``list_item`` elements while leaving the actual
@@ -5346,8 +5348,10 @@ def _recover_empty_lettered_list_items(
     list group. Ambiguous or partial matches stay untouched.
 
     Returns item-id -> (text, marker) and source-paragraph-id -> remaining
-    prefix. The paragraph's list text is consumed once, avoiding duplicate
-    output; its preamble, when present, remains in place.
+    prefix, and first-item-id -> preamble to emit before that item. The
+    paragraph's list text is consumed once, avoiding duplicate output. A
+    preamble after the first item moves before it, keeping the exercise's
+    introduction ahead of its questions.
     """
     groups: dict[str, list[ManifestElement]] = {}
     for element in elements:
@@ -5360,7 +5364,7 @@ def _recover_empty_lettered_list_items(
         if len(items) >= 2 and all(not (item.text or "").strip() for item in items)
     }
     if not empty_groups:
-        return {}, {}
+        return {}, {}, {}
 
     sources = [
         element
@@ -5430,6 +5434,8 @@ def _recover_empty_lettered_list_items(
 
     recovered: dict[str, tuple[str, str]] = {}
     consumed: dict[str, str] = {}
+    preambles: dict[str, ManifestElement] = {}
+    positions = {element.id: index for index, element in enumerate(elements)}
     for parent_id, matches in matches_by_group.items():
         if group_counts[parent_id] != 1:
             continue
@@ -5440,9 +5446,13 @@ def _recover_empty_lettered_list_items(
             empty_groups[parent_id], marked_texts, strict=True
         ):
             recovered[item.id] = (text, marker)
+        first_item = empty_groups[parent_id][0]
+        if prefix and positions[source.id] > positions[first_item.id]:
+            preambles[first_item.id] = source.model_copy(update={"text": prefix})
+            prefix = ""
         consumed[source.id] = prefix
 
-    return recovered, consumed
+    return recovered, consumed, preambles
 
 
 def _callout_titles(elements: list[ManifestElement]) -> dict[str, str]:

@@ -234,6 +234,39 @@ def test_an_empty_list_item_without_recoverable_text_is_not_exported() -> None:
     assert not any(block.get("type") == "list" for block in blocks)
 
 
+@pytest.mark.parametrize("source_order", [2, 4, 7], ids=["before", "between", "after"])
+def test_recovered_exercise_keeps_its_preamble_before_its_questions(source_order: int) -> None:
+    heading = _element(1, "heading", "Slide 37 of 42: vitamin C", slide_role="slide_heading")
+    heading.hierarchy_level = 2
+    source = _element(
+        source_order,
+        "paragraph",
+        "Calculate the following: a) First question b) Second question c) Third question",
+    )
+    elements = [
+        heading,
+        _item(3, "", "a)", "exercise-list"),
+        _item(5, "", "b)", "exercise-list"),
+        _item(6, "", "c)", "exercise-list"),
+        source,
+        _element(8, "picture", "Structural formula"),
+    ]
+    original = [element.model_dump() for element in elements]
+
+    page = _page(elements)
+
+    assert [element.model_dump() for element in elements] == original
+    assert [block["type"] for block in page["blocks"]] == [
+        "heading", "paragraph", "list", "image"
+    ]
+    assert page["blocks"][0]["level"] == 2
+    assert page["blocks"][1]["id"] == source.id
+    assert page["blocks"][1]["text"] == "Calculate the following:"
+    assert page["blocks"][2]["items"] == ["First question", "Second question", "Third question"]
+    for text in ["Calculate the following:", "First question", "Second question", "Third question"]:
+        assert page["text"].count(text) == 1
+
+
 def test_page_text_numbers_an_ordered_list() -> None:
     page = _page([
         _item(1, "Rewrite the expression", "i.", "group-a"),
