@@ -859,6 +859,13 @@ def test_the_slide_heading_is_never_reordered_after_a_grown_picture(source):
 
     [picture] = [e for e in manifest.elements if e.id == "p-1"]
     assert _source_box(picture) == (49, 52, 230, 158)
+    slide_elements = [
+        e
+        for e in manifest.elements
+        if e.page_number == 1 and e.metadata.get("slide_role") != "deck_title"
+    ]
+    assert is_slide_heading(slide_elements[0])
+    assert slide_elements[0].type == "heading"
     headings = {
         e.id for e in manifest.elements
         if e.metadata.get("slide_role") in {"slide_heading", "deck_title"}
@@ -910,6 +917,36 @@ def test_text_read_across_two_slides_is_split_back_into_each(source):
     # Slide 2 keeps its own text and gets the part of x-1 that is its.
     texts = [e.text for e in manifest.elements if e.page_number == 2]
     assert other in texts and "Growth of 10%." in texts
+
+
+@pytest.mark.parametrize("top", [450, 510], ids=["on-picture", "beside-picture"])
+def test_split_labels_stay_as_text_when_the_picture_is_described(source, top):
+    """006.pdf 26/37: a split part can name pictures in separate columns."""
+    from backend.agents.pddl_orchestrator import _manifest_pages_to_payload
+
+    labels = "Molecule macromolecule"
+    exercise = "For vitamin C, calculate the following:"
+    extraction = _with_labels(
+        _element("left-picture", "picture", 2, 9, (60, 300, 300, 500)),
+        _across(
+            f"{labels} {exercise}",
+            [
+                (2, 0, 8, (80, top, 200, top + 20)),
+                (2, 9, len(labels), (720, 450, 880, 480)),
+                (3, len(labels) + 1, len(labels) + 1 + len(exercise), (60, 100, 650, 140)),
+            ],
+        ),
+    )
+    manifest = _build_edited(source, extraction)
+    assert any(e.page_number == 2 and e.text == labels for e in manifest.elements)
+    for element in manifest.elements:
+        if element.page_number == 2 and element.type == "picture":
+            element.text = "A chemical structure."
+            element.metadata["vision_description_complete"] = True
+
+    page = next(p for p in _manifest_pages_to_payload(manifest) if p["page_number"] == 2)
+    assert page["text"].count(labels) == 1
+    assert exercise not in page["text"]
 
 
 def test_a_slide_whose_only_text_was_split_in_is_read_as_a_picture(source):

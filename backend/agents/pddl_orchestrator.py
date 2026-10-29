@@ -5302,14 +5302,147 @@ def _elements_to_blocks(
     way to its block, which already stands for the picture's text.
     """
     callout_titles = _callout_titles(elements)
+    recovered_items, consumed_text = _recover_empty_lettered_list_items(elements)
     blocks: list[dict[str, Any]] = []
     for element in elements:
         if element.id in replacements:
             blocks.append(replacements[element.id])
             continue
-        blocks.append(_element_to_block(element, callout_titles))
+        text = consumed_text.get(element.id)
+        if text is not None:
+            if not text:
+                continue
+            element = element.model_copy(update={"text": text})
+        recovered = recovered_items.get(element.id)
+        if recovered is not None:
+            item_text, marker = recovered
+            metadata = {**element.metadata, "enumerated": True, "marker": marker}
+            element = element.model_copy(
+                update={"text": item_text, "metadata": metadata}
+            )
+        block = _element_to_block(element, callout_titles)
+        if block.get("type") != "list" or any(
+            isinstance(item, str) and item.strip()
+            for item in block.get("items", [])
+        ):
+            blocks.append(block)
         blocks.extend(_element_to_block(kept) for kept in _text_kept_by_picture(element))
     return _merge_list_blocks(blocks)
+
+
+_LETTERED_LIST_SOURCE_MARKER = re.compile(
+    r"(?<![\w])(?P<marker>[A-Za-z])\)(?=\s)"
+)
+
+
+def _recover_empty_lettered_list_items(
+    elements: list[ManifestElement],
+) -> tuple[dict[str, tuple[str, str]], dict[str, str]]:
+    """Recover a fully extracted lettered list from a sibling text element.
+
+    Some extractors emit empty ``list_item`` elements while leaving the actual
+    ``a) ... b) ... c)`` text in a paragraph on the same page. Move that text
+    only when one paragraph has the exact marker sequence of one fully empty
+    list group. Ambiguous or partial matches stay untouched.
+
+    Returns item-id -> (text, marker) and source-paragraph-id -> remaining
+    prefix. The paragraph's list text is consumed once, avoiding duplicate
+    output; its preamble, when present, remains in place.
+    """
+    groups: dict[str, list[ManifestElement]] = {}
+    for element in elements:
+        if element.type == "list_item" and element.parent_id:
+            groups.setdefault(element.parent_id, []).append(element)
+
+    empty_groups = {
+        parent_id: sorted(items, key=lambda item: item.reading_order)
+        for parent_id, items in groups.items()
+        if len(items) >= 2 and all(not (item.text or "").strip() for item in items)
+    }
+    if not empty_groups:
+        return {}, {}
+
+    sources = [
+        element
+        for element in elements
+        if element.type in {"paragraph", "unknown"} and (element.text or "").strip()
+    ]
+    matches_by_group: dict[
+        str, list[tuple[ManifestElement, list[tuple[str, str]], str]]
+    ] = {parent_id: [] for parent_id in empty_groups}
+
+    for parent_id, items in empty_groups.items():
+        known_markers: list[tuple[int, str] | None] = []
+        for item in items:
+            marker = str(item.metadata.get("marker") or "").strip()
+            parsed = marker_numbering(marker) if marker else None
+            if parsed is not None and not parsed[1].endswith("-alpha"):
+                known_markers = []
+                break
+            known_markers.append(parsed)
+        if not known_markers:
+            continue
+
+        for source in sources:
+            source_text = source.text or ""
+            markers = list(_LETTERED_LIST_SOURCE_MARKER.finditer(source_text))
+            if len(markers) != len(items):
+                continue
+            parsed_markers = [
+                marker_numbering(f"{match.group('marker')})") for match in markers
+            ]
+            if any(
+                marker is None or not marker[1].endswith("-alpha")
+                for marker in parsed_markers
+            ):
+                continue
+            typed_markers = [marker for marker in parsed_markers if marker is not None]
+            style = typed_markers[0][1]
+            first_number = typed_markers[0][0]
+            if any(marker[1] != style for marker in typed_markers) or [
+                marker[0] for marker in typed_markers
+            ] != list(range(first_number, first_number + len(items))):
+                continue
+            if any(
+                known is not None and known != actual
+                for known, actual in zip(known_markers, typed_markers, strict=True)
+            ):
+                continue
+
+            item_texts = []
+            for index, match in enumerate(markers):
+                end = markers[index + 1].start() if index + 1 < len(markers) else len(source_text)
+                item_texts.append(source_text[match.end() : end].strip())
+            if not all(item_texts):
+                continue
+            prefix = source_text[: markers[0].start()].strip()
+            marker_texts = [match.group("marker") + ")" for match in markers]
+            matches_by_group[parent_id].append(
+                (source, list(zip(marker_texts, item_texts, strict=True)), prefix)
+            )
+
+    group_counts: dict[str, int] = {}
+    source_counts: dict[str, int] = {}
+    for parent_id, matches in matches_by_group.items():
+        group_counts[parent_id] = len(matches)
+        for source, _, _ in matches:
+            source_counts[source.id] = source_counts.get(source.id, 0) + 1
+
+    recovered: dict[str, tuple[str, str]] = {}
+    consumed: dict[str, str] = {}
+    for parent_id, matches in matches_by_group.items():
+        if group_counts[parent_id] != 1:
+            continue
+        source, marked_texts, prefix = matches[0]
+        if source_counts[source.id] != 1:
+            continue
+        for item, (marker, text) in zip(
+            empty_groups[parent_id], marked_texts, strict=True
+        ):
+            recovered[item.id] = (text, marker)
+        consumed[source.id] = prefix
+
+    return recovered, consumed
 
 
 def _callout_titles(elements: list[ManifestElement]) -> dict[str, str]:
@@ -5442,7 +5575,11 @@ def _element_to_block(
         "metadata": metadata,
     }
 
-    if callout_id and callout_role != "title":
+    if (
+        callout_id
+        and callout_role != "title"
+        and metadata.get("slide_role") not in {"slide_heading", "deck_title"}
+    ):
         block.update(
             {
                 "type": callout_block_type,

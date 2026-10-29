@@ -6,6 +6,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from backend.agents.pddl_orchestrator import build_pddl_structured_payload
 from backend.core.manifest.models import (
     ExtractorRun,
@@ -110,6 +112,33 @@ def test_callout_title_comes_from_the_repaired_title_text() -> None:
     assert note["title"] == "Notes on the r\u00e9sum\u00e9:"
 
 
+@pytest.mark.parametrize("slide_role,level", [("slide_heading", 2), ("deck_title", 1)])
+@pytest.mark.parametrize("callout_type", ["note", "warning"])
+def test_slide_heading_takes_precedence_over_inherited_callout(
+    slide_role: str, level: int, callout_type: str
+) -> None:
+    heading = _element(
+        1, "title" if level == 1 else "heading", "Slide 37 of 42: vitamin C",
+        slide_role=slide_role, callout_id="callout-auto-000045",
+        callout_role="content", callout_type=callout_type, callout_title="OH",
+    )
+    heading.hierarchy_level = level
+    page = _page([
+        heading,
+        _element(2, "paragraph", "A real callout.", callout_id="callout-auto-000045",
+                 callout_role="content", callout_type=callout_type, callout_title="OH"),
+    ])
+
+    assert page["blocks"][0]["type"] == "heading"
+    assert page["blocks"][0]["level"] == level
+    assert page["blocks"][1]["type"] == callout_type
+    assert page["blocks"][1]["title"] == "OH"
+    ast = build_pandoc_ast({"title": "Deck", "language": "en", "sections": [
+        {"id": "slide-37", "blocks": page["blocks"]},
+    ]})
+    assert any(block["t"] == "Header" and block["c"][0] == level for block in ast["blocks"])
+
+
 def test_numbered_items_of_one_list_become_one_ordered_list() -> None:
     blocks = _blocks([
         _item(1, "First remark.", "1.", "group-a"),
@@ -146,6 +175,63 @@ def test_a_lettered_item_after_a_formula_keeps_its_letter() -> None:
 
     assert blocks[0]["numbering"] == "lower-alpha" and "start" not in blocks[0]
     assert blocks[2]["numbering"] == "lower-alpha" and blocks[2]["start"] == 2
+
+
+def test_empty_lettered_items_recover_text_from_a_sibling_paragraph() -> None:
+    heading = _element(
+        1,
+        "heading",
+        "Slide 37 of 42: vitamin C",
+        slide_role="slide_heading",
+    )
+    heading.hierarchy_level = 2
+    items = [
+        _item(3, "", "a)", "exercise-list"),
+        _item(4, "", "b)", "exercise-list"),
+        _item(5, "", "c)", "exercise-list"),
+    ]
+    item_text = (
+        "a) minimum formula of vitamin C "
+        "b) mass percent composition of the minimum formula "
+        "c) mass percent composition of the molecular formula"
+    )
+    page = _page(
+        [
+            heading,
+            _element(2, "paragraph", "Calculate the following for vitamin C:"),
+            *items,
+            _element(6, "paragraph", item_text),
+            _element(7, "picture", "Structure of the vitamin C molecule"),
+            _element(8, "caption", "Structural formula"),
+        ]
+    )
+
+    blocks = page["blocks"]
+    assert blocks[0]["type"] == "heading"
+    assert blocks[0]["level"] == 2
+    assert blocks[0]["text"] == "Slide 37 of 42: vitamin C"
+    [list_block] = [block for block in blocks if block["type"] == "list"]
+    assert list_block["numbering"] == "lower-alpha"
+    assert list_block["items"] == [
+        "minimum formula of vitamin C",
+        "mass percent composition of the minimum formula",
+        "mass percent composition of the molecular formula",
+    ]
+    assert not any(
+        block.get("type") == "list"
+        and not any(str(item).strip() for item in block.get("items", []))
+        for block in blocks
+    )
+    for item in list_block["items"]:
+        assert page["text"].count(item) == 1
+    assert "Calculate the following for vitamin C:" in page["text"]
+    assert "a) minimum formula" not in page["text"]
+
+
+def test_an_empty_list_item_without_recoverable_text_is_not_exported() -> None:
+    blocks = _blocks([_item(1, "  ", "a)", "exercise-list")])
+
+    assert not any(block.get("type") == "list" for block in blocks)
 
 
 def test_page_text_numbers_an_ordered_list() -> None:
