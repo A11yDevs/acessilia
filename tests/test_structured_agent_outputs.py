@@ -1120,7 +1120,7 @@ def _assembled_prompt(monkeypatch, classification: str) -> str:
 
 
 @pytest.mark.parametrize(
-    "classification", ["embedded_image", "full_page_image", "full_page_fallback"]
+    "classification", ["embedded_image", "full_page_image", "full_page_fallback", "formula_candidate"]
 )
 def test_a_picture_or_page_prompt_carries_the_chemistry_rules(monkeypatch, classification):
     """006.pdf slides 25-26: drawn molecules came back as LaTeX formulas."""

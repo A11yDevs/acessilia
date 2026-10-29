@@ -21,6 +21,7 @@ MODE_MAP = {
 CHEMISTRY_PROMPT = "quimica.md"
 
 REGION_PROMPT_MAP = {
+    "formula_candidate": "formula_candidate.md",
     "regiao_imagem": "regiao_imagem.md",
     "regiao_texto_escaneado": "regiao_texto_escaneado.md",
     "regiao_tabela": "regiao_tabela.md",

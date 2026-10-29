@@ -2778,6 +2778,9 @@ class PddlAccessibilityOrchestrator:
         from backend.config.settings import settings
 
         breaker = ProviderBreaker(settings.vision_breaker_threshold)
+        await _classify_formula_regions(
+            manifest, source_path, mode=effective_mode, breaker=breaker,
+        )
         await _enrich_picture_descriptions(
             manifest,
             source_path,
@@ -3623,6 +3626,95 @@ def _claim_negation_overlay(
             return
 
 
+def _reclassify_formula_picture(
+    manifest: ProcessingManifest, element: ManifestElement, output: VisionOutput,
+) -> None:
+    """Keep the source evidence and reuse a non-mathematical description."""
+    element.metadata["original_type"] = element.type
+    element.metadata["original_text"] = element.text
+    element.metadata["original_raw_label"] = element.raw_label
+    element.type = "picture"
+    element.raw_label = "picture"
+    element.text = output.description
+    element.metadata["vision_description_complete"] = True
+    element.metadata["vision_language"] = output.language
+    element.metadata["vision_confidence"] = output.confidence
+    element.metadata["vision_elements"] = list(output.mentioned_elements)
+    element.metadata["vision_warnings"] = list(output.warnings)
+    reconcile_reclassified_element_processing_needs(manifest, element, previous_type="formula")
+
+
+async def _classify_formula_regions(
+    manifest: ProcessingManifest,
+    source_file: Path,
+    *,
+    mode: str,
+    breaker: ProviderBreaker,
+) -> None:
+    """Check extractor formula labels before a mathematical recognizer sees them.
+
+    A drawing is described once and reconciled as a picture before planning.
+    Unresolved candidates keep their source content and require human review;
+    they must not be interpreted as confirmed mathematics after vision fails.
+    """
+    from backend.config.settings import settings
+
+    if manifest.source.media_type not in _RENDERABLE_MEDIA_TYPES:
+        return
+    candidates = [
+        element for element in manifest.elements
+        if element.type == "formula" and not has_latex_markup(element.text)
+    ]
+    if not candidates:
+        return
+    slots = asyncio.Semaphore(max(1, settings.vision_concurrency))
+    vision = VisionAgent(mode=mode)
+
+    async def classify(element: ManifestElement) -> None:
+        async with slots:
+            output = None
+            errors: list[str] = []
+            reason = "provider_blocked"
+            if not breaker.open:
+                reason = "crop_unavailable"
+                image, page = await run_blocking(
+                    _formula_recognition_crop, source_file, element,
+                    artifact_id=_source_artifact_id(manifest),
+                    media_type=manifest.source.media_type,
+                )
+                if image:
+                    reason = "model_failed"
+                    output = await vision.describe_region(
+                        image_bytes=image, classification="formula_candidate",
+                        page_num=page, total_pages=len(manifest.pages), mode=mode,
+                        full_budget=True, errors=errors,
+                    )
+                    breaker.record(isinstance(output, VisionOutput))
+            status = "unresolved"
+            if output is not None:
+                reason = "classification_uncertain" if output.classification_uncertain else "empty_description"
+            if isinstance(output, VisionOutput) and not output.classification_uncertain:
+                if output.kind == "formula":
+                    status = "math"
+                elif output.description.strip():
+                    status = "picture"
+                    _reclassify_formula_picture(manifest, element, output)
+            element.metadata["formula_classification"] = {
+                "status": status,
+                "reason": reason if status == "unresolved" else None,
+                "warnings": list(output.warnings) if output is not None else errors,
+            }
+            if status == "unresolved":
+                for obligation in manifest.obligations:
+                    if obligation.kind == "verbalize-formula" and element.id in obligation.target_ids:
+                        obligation.admissible_methods = ["human-review"]
+                        obligation.method_costs = {"human-review": 100}
+
+    async with asyncio.TaskGroup() as group:
+        for element in candidates:
+            group.create_task(classify(element))
+
+
 async def _enrich_formula_latex(
     manifest: ProcessingManifest,
     source_file: Path,
@@ -3701,6 +3793,7 @@ async def _enrich_formula_latex(
         element
         for element in manifest.elements
         if element.type == "formula" and not has_latex_markup(element.text)
+        and element.metadata.get("formula_classification", {}).get("status") != "unresolved"
     ]
     if not formulas:
         return
@@ -3857,9 +3950,14 @@ async def _enrich_formula_latex(
                         mode=mode,
                         full_budget=True,
                     )
-                    # An answer the job cannot use (a description, a formula
-                    # without LaTeX) still counts as the model working.
+                    # A non-mathematical description can also correct the label.
                     breaker.record(output is not None)
+                if (
+                    output is not None and output.kind == "description"
+                    and output.description.strip() and not output.classification_uncertain
+                ):
+                    _reclassify_formula_picture(manifest, element, output)
+                    return False
                 if output is not None and output.kind == "formula":
                     latex = accept(method, normalize_latex(output.formula_latex or ""))
                     confidence = output.confidence

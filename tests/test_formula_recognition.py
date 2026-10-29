@@ -342,7 +342,7 @@ async def test_a_formula_without_a_crop_is_skipped(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_a_vision_description_does_not_fill_the_formula(monkeypatch, cropped):
+async def test_a_vision_description_reclassifies_the_formula(monkeypatch, cropped):
     manifest = _formula_manifest()
     FakeVision.output = VisionOutput(
         kind="description", description="A chart", language="en", confidence=0.9
@@ -356,7 +356,10 @@ async def test_a_vision_description_does_not_fill_the_formula(monkeypatch, cropp
 
     await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
 
-    assert manifest.elements[0].text is None
+    assert manifest.elements[0].text == "A chart"
+    assert manifest.elements[0].type == "picture"
+    assert manifest.elements[0].metadata["vision_description_complete"] is True
+    assert manifest.obligations[0].kind == "describe-image"
     assert "formula_recognition" not in manifest.elements[0].metadata
 
 
