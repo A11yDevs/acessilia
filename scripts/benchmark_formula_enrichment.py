@@ -69,7 +69,7 @@ def main() -> None:
             verbal = (block.get("alt_text") or "(vazio)")[:45]
             try:
                 html = render_html(block, {})
-                html_ok = "sim" if 'role="math"' in html else "parcial"
+                html_ok = "sim" if "<math" in html else "parcial"
             except Exception as e:
                 html_ok = f"ERRO: {e}"
             txt_out = (render_txt(block) or ["(vazio)"])[0][:35]

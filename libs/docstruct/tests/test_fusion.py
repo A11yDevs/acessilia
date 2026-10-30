@@ -1,6 +1,8 @@
 """Testes do núcleo de fusão: Húngaro puro, conversão e merge_blocks."""
 from collections import Counter
 
+import pytest
+
 from docstruct.fusion._hungarian import linear_sum_assignment
 from docstruct.fusion.convert import block_to_diff, normalize_bbox
 from docstruct.fusion.differ import merge_blocks
@@ -145,14 +147,15 @@ class TestMergeBlocks:
         assert any("CH" in o for o in out)
         assert stats.get("formula->text-docling", 0) == 1
 
-    def test_standalone_inline_math_is_promoted_before_formula_text_demote(self):
+    def test_standalone_inline_math_is_not_demoted_to_text(self):
         from docstruct.types import CanonicalBlock
 
         block = block_to_diff(CanonicalBlock(id="1", type="paragraph", text="$x+1$"))
 
         out, stats = merge_blocks([block], [], FusionPolicy(), min_len=0)
 
-        assert out == ["$$ x+1 $$"]
+        # Promotion to display math belongs to the canonical build (#296).
+        assert out == ["$x+1$"]
         assert stats.get("formula->text-docling", 0) == 0
 
     def test_inline_math_in_prose_is_preserved(self):
@@ -164,6 +167,44 @@ class TestMergeBlocks:
         out, _ = merge_blocks([block], [], FusionPolicy(), min_len=0)
 
         assert out == [text]
+
+    def test_truncated_prose_with_inline_math_does_not_beat_the_full_paragraph(self):
+        from dataclasses import replace
+
+        from docstruct.types import CanonicalBlock
+
+        short = "The formula is $x+1$."
+        full = (
+            "The formula is $x+1$, and the rest of the paragraph goes on to "
+            "explain what it stands for in the problem."
+        )
+        d = block_to_diff(CanonicalBlock(id="d", type="paragraph", text=short))
+        m = block_to_diff(CanonicalBlock(id="m", type="paragraph", text=full))
+
+        assert d.kind == m.kind == "text"
+        box = (0.1, 0.1, 0.9, 0.2)
+        d, m = replace(d, box=box), replace(m, box=box)
+        out, stats = merge_blocks([d], [m], FusionPolicy(), min_len=0)
+
+        assert out == [full]
+        assert stats.get("pair-formula->docling", 0) == 0
+
+    def test_comparable_prose_prefers_the_side_that_kept_inline_math(self):
+        from dataclasses import replace
+
+        from docstruct.types import CanonicalBlock
+
+        with_math = "Let the speed be given by $v = d/t$ over the interval considered."
+        without = "Let the speed be given by v = d/t over the interval considered."
+        d = block_to_diff(CanonicalBlock(id="d", type="paragraph", text=with_math))
+        m = block_to_diff(CanonicalBlock(id="m", type="paragraph", text=without))
+
+        box = (0.1, 0.1, 0.9, 0.2)
+        d, m = replace(d, box=box), replace(m, box=box)
+        out, stats = merge_blocks([d], [m], FusionPolicy(), min_len=0)
+
+        assert out == [with_math]
+        assert stats["pair-text-auto->docling(inline-math)"] == 1
 
     def test_junk_filter(self):
         policy = FusionPolicy(junk_filter=True)
@@ -415,3 +456,22 @@ def test_decor_tail_same_line_sorts_ltr():
     res = decor_tail([b_name, b_class, b_date], [])
     assert res == ["NAME", "CLASS", "DATE"]
 
+
+
+@pytest.mark.parametrize(
+    "md,kind",
+    [
+        ("$x+1$", "formula"),
+        ("  $s(t) = t^3$  ", "formula"),
+        ("The formula is $x+1$ in the text.", "text"),
+        ("$x$.", "text"),
+        ("costs R$ 10,00", "text"),
+        ("R$5 or R$ 3", "text"),
+    ],
+)
+def test_classify_kind_takes_only_whole_inline_math_as_formula(md, kind):
+    from docstruct.fusion.convert import classify_kind
+    from docstruct.fusion.oracle import kind_of
+
+    assert classify_kind("paragraph", md) == kind
+    assert kind_of(md) == kind

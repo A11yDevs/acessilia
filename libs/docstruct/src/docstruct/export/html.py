@@ -92,7 +92,12 @@ _MATHML_ATTRIBUTES = frozenset(
 def _safe_mathml(
     value: Any, *, aria_label: str = "", display: str = ""
 ) -> str | None:
-    """Accept a bounded MathML tree without active markup, URLs or entities."""
+    """Accept a bounded MathML tree without active markup, URLs or entities.
+
+    ``aria_label`` (the formula's speech) and ``display`` (``"block"`` for a
+    math block) are set on the ``<math>`` root itself, so the speech belongs to
+    the MathML and is announced once while its tree stays navigable (#321).
+    """
     if not isinstance(value, str) or len(value) > 100000 or "<!" in value:
         return None
     try:
@@ -235,11 +240,12 @@ def _render_block(
 def _prose_html(text: str, block: dict[str, Any]) -> str:
     """Escaped prose whose ``$…$`` spans are rendered as inline math.
 
-    Each span is a ``role="math"`` element labelled with its speech, as a math
-    block is: the MathML when the enrichment produced it, else the
-    (normalized) LaTeX without delimiters. A document that did not go through
-    the canonical enrichment has no entries, and its spans keep the LaTeX,
-    still marked as math.
+    Each span is its MathML, labelled with its speech on the ``<math>`` element,
+    as a math block is, when the enrichment produced it; else a
+    ``role="math"`` span labelled with the speech around the (normalized)
+    LaTeX without delimiters. A document that did not go through the canonical
+    enrichment has no entries, and its spans keep the LaTeX, still marked as
+    math.
     """
     entries = inline_math_entries(block)
     parts: list[str] = []
