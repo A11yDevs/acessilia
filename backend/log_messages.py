@@ -356,6 +356,16 @@ LOG_VISION_AGENT_REGION_RETRY: str = (
     "[page {page_num}] Unusable answer from the vision model for region {type}; "
     "trying again ({attempt}/{attempts}): {error}"
 )
+#: Warning logged when the provider rejects a region for exceeding its context window; {page_num} and {type} name the region, {size_before}/{size_after} are the image byte sizes, {max_tokens} is the reduced output cap or provider default, and {error} is the provider failure.
+LOG_VISION_AGENT_CONTEXT_RETRY: str = (
+    "[page {page_num}] Context limit exceeded for region {type}; retrying once "
+    "with a smaller image ({size_before} -> {size_after} bytes) and "
+    "max_tokens={max_tokens}: {error}"
+)
+#: Warning logged when the Toolbox cannot render the smaller image a context recovery needs; {error} is the cause, and the original context error stands.
+LOG_VISION_CONTEXT_DOWNSCALE_FAILED: str = (
+    "Vision context recovery could not reduce its image: {error}"
+)
 #: Info logged when a vision answer validates only after a retry; {page_num}, {type} and {attempt}/{attempts} name the region and the try that worked, so the retry rate can be measured.
 LOG_VISION_AGENT_REGION_RECOVERED: str = (
     "[page {page_num}] Vision model answered region {type} on try {attempt}/{attempts}"
@@ -534,4 +544,27 @@ LOG_DOCX_SKIPPED_DISABLED: str = "DOCX skipped: TOOLBOX_DOCX_ENABLED is false"
 #: Error raised when the optional Agno agent stack is absent and a workflow class import is required; no placeholders.
 LOG_AGNO_NOT_INSTALLED: str = (
     "Agno is not installed. Run `uv sync` before using the workflow Executor."
+)
+
+#: Upload persistence failed transiently; extraction will receive the source file.
+LOG_ARTIFACT_UPLOAD_DEGRADED: str = "Artifact upload unavailable ({error}); extracting from the source file."
+
+#: FUSION_MODE=dual names the primary provider as its secondary too; fusion is skipped.
+LOG_DUAL_FUSION_SKIPPED_IDENTICAL_PROVIDERS: str = (
+    "Dual fusion skipped: the primary and secondary providers are both {provider}."
+)
+
+#: One structural provider failed; use the other provider when available.
+LOG_STRUCTURAL_PROVIDER_DEGRADED: str = "Structural provider {provider} failed ({error}); extraction is degraded."
+
+#: Multiple independent Toolbox URLs require direct input; configured artifact storage is bypassed.
+LOG_ARTIFACT_STORE_DIRECT_INPUT: str = (
+    "Artifact storage bypassed for independent Toolbox endpoints; "
+    "the source file will be sent again for extraction, fusion and text spans."
+)
+
+#: Delivered document warning when only one structural provider succeeded; {provider} is its identifier.
+MSG_STRUCTURAL_EXTRACTION_DEGRADED: str = (
+    "Structural extraction used only {provider} because the other provider failed. "
+    "The document requires review; dual-provider comparison was not available."
 )

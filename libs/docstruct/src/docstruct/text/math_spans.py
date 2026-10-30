@@ -60,6 +60,17 @@ def inline_math_sources(text: str) -> list[str]:
     return [piece for piece, is_math in split_inline_math(text) if is_math]
 
 
+def whole_inline_math(text: str) -> str | None:
+    """The LaTeX of ``text`` when all of it is one inline math span, else ``None``.
+
+    ``$s(t) = t^3$`` is; ``$x$.`` and ``seja $x$`` are prose with a formula.
+    """
+    pieces = split_inline_math(text.strip())
+    if len(pieces) == 1 and pieces[0][1]:
+        return pieces[0][0]
+    return None
+
+
 def mask_inline_math(text: str, fill: str = " ") -> str:
     """``text`` with each inline math span, delimiters included, blanked out.
 
@@ -117,4 +128,5 @@ __all__ = [
     "inline_math_sources",
     "mask_inline_math",
     "split_inline_math",
+    "whole_inline_math",
 ]

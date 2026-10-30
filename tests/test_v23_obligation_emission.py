@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -7,6 +8,7 @@ from types import SimpleNamespace
 from backend.core.manifest.builder import build_processing_manifest
 from backend.core.manifest.builder import _derive_v23_processing_needs
 from backend.core.manifest.models import BoundingBox, ManifestElement, Provenance
+from tests.pddl_support import build_orchestrator
 
 
 def _element(
@@ -315,3 +317,118 @@ def test_toolbox_table_obligation_uses_the_core_methods(tmp_path: Path):
     assert table.admissible_methods == ["pandoc-table", "human-review"]
     assert "docling-table" not in table.method_costs
     assert len(manifest.observations) == manifest.summary.observation_count
+
+
+def _reading_order_manifest(
+    tmp_path: Path, *, secondary_path: Path | None = None, remove_secondary: bool = False
+):
+    source = tmp_path / "reading-order.pdf"
+    source.write_bytes(b"%PDF-test")
+    timestamp = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    elements = [
+        _positioned_element("element-1", "Left top", 1, (10, 10, 40, 20)),
+        _positioned_element("element-2", "Right top", 2, (60, 10, 90, 20)),
+        _positioned_element("element-3", "Left bottom", 3, (10, 30, 40, 40)),
+        _positioned_element("element-4", "Right bottom", 4, (60, 30, 90, 40)),
+    ]
+    extraction_document = {
+        "document": {
+            "manifest_id": "manifest-reading-order",
+            "title": "Reading order",
+            "language": "en",
+            "source": {
+                "document_id": "toolbox-doc",
+                "filename": source.name,
+                "path": str(source),
+                "media_type": "application/pdf",
+                "byte_size": source.stat().st_size,
+                "sha256": "0" * 64,
+            },
+            "extractor": {
+                "version": "1",
+                "started_at": timestamp.isoformat(),
+                "completed_at": timestamp.isoformat(),
+                "duration_ms": 1,
+                "configuration": {},
+            },
+            "pages": [
+                {
+                    "page_number": 3,
+                    "width": 100,
+                    "height": 100,
+                    "element_ids": [element.id for element in elements],
+                }
+            ],
+            "elements": [element.model_dump(mode="json") for element in elements],
+            "observations": [],
+            "obligations": [],
+            "summary": {
+                "page_count": 1,
+                "element_count": len(elements),
+                "observation_count": 0,
+                "obligation_count": 0,
+                "element_types": {"paragraph": len(elements)},
+            },
+        }
+    }
+    if secondary_path is not None:
+        secondary_bytes = b"{}"
+        secondary_path.write_bytes(secondary_bytes)
+        extraction_document["secondary_extraction"] = {
+            "path": str(secondary_path),
+            "sha256": hashlib.sha256(secondary_bytes).hexdigest(),
+        }
+        if remove_secondary:
+            secondary_path.unlink()
+    extraction = SimpleNamespace(
+        document=extraction_document,
+        version="1",
+        started_at=timestamp,
+        completed_at=timestamp,
+        duration_ms=1,
+        configuration={},
+    )
+    return build_processing_manifest(source, extraction)
+
+
+def test_skeleton_order_is_planned_only_when_secondary_extraction_is_recorded(
+    tmp_path: Path,
+):
+    single_manifest = _reading_order_manifest(tmp_path)
+    [single_obligation] = [
+        item
+        for item in single_manifest.obligations
+        if item.kind == "refine-reading-order"
+    ]
+
+    assert single_obligation.admissible_methods == ["xycut-order", "human-review"]
+    assert "skeleton-order" not in single_obligation.method_costs
+    plan, _ = build_orchestrator()._build_plan(single_manifest)
+    assert [step.method for step in plan.steps if step.method] == ["xycut-order"]
+
+    dual_manifest = _reading_order_manifest(
+        tmp_path, secondary_path=tmp_path / "secondary.json"
+    )
+    [dual_obligation] = [
+        item
+        for item in dual_manifest.obligations
+        if item.kind == "refine-reading-order"
+    ]
+    assert dual_obligation.admissible_methods == [
+        "xycut-order",
+        "skeleton-order",
+        "human-review",
+    ]
+    assert dual_manifest.artifacts[0].kind == "provider-extraction"
+
+
+def test_skeleton_order_is_not_planned_when_the_recorded_file_is_gone(tmp_path: Path):
+    secondary = tmp_path / "secondary.json"
+    manifest = _reading_order_manifest(tmp_path, secondary_path=secondary, remove_secondary=True)
+
+    [obligation] = [
+        item for item in manifest.obligations if item.kind == "refine-reading-order"
+    ]
+    assert obligation.admissible_methods == ["xycut-order", "human-review"]
+    # The record is kept, so the handler can still say what went missing.
+    assert manifest.artifacts[0].path == str(secondary)

@@ -20,19 +20,28 @@ pelo agente de dados permanece intacto.
   classificador não substitui o resultado do reconhecedor matemático.
 - **Conteúdo não matemático:** muda o elemento para `picture`, preserva sua
   localização, tipo, rótulo e texto originais e reaproveita a descrição acessível.
-  Reconcilia suas obrigações usando
-  `reconcile_reclassified_element_processing_needs`. A etapa de imagens ignora
-  essa descrição já concluída, evitando uma segunda solicitação visual.
-- **Indefinido:** preserva o conteúdo e a região originais, registra metadados,
-  não executa reconhecimento matemático e restringe a obrigação à revisão
-  humana. Essa escalada explícita pode impedir a conclusão automática do job;
-  ela não confirma que a região seja matemática.
+  O recorte lido pelo modelo vira a imagem (`metadata.src`), então a exportação
+  mostra o desenho descrito. Reconcilia suas obrigações usando
+  `reconcile_reclassified_element_processing_needs`, que também remove as
+  necessidades exclusivas de fórmula (`normalize-formula`). A etapa de imagens
+  ignora essa descrição já concluída, evitando uma segunda solicitação visual.
+- **Indefinido** (o modelo marca `classification_uncertain`): preserva o
+  conteúdo e a região originais, registra metadados, não executa reconhecimento
+  matemático, restringe `verbalize-formula` à revisão humana e remove
+  `normalize-formula`. Essa escalada explícita pode impedir a conclusão
+  automática do job; ela não confirma que a região seja matemática.
+- **Não classificado** (sem resposta: provedor bloqueado, recorte indisponível,
+  falha da chamada visual): não é evidência contra matemática, então a região
+  segue o caminho de fórmula que tinha antes desta checagem (`math.recognize` e
+  depois o fallback visual). Uma indisponibilidade do provedor de visão não
+  manda, portanto, todas as fórmulas do documento para revisão humana.
 
-O classificador sinaliza incerteza com `classification_uncertain`. A confiança
-informada pelo modelo continua sendo metadado, não um critério calibrado de
-aceitação. Recorte indisponível, falha visual ou bloqueio do provedor também
-deixam a classificação indefinida. Uma descrição útil devolvida pelo fallback
-visual matemático também reclassifica a região como imagem.
+`metadata.formula_classification` registra `status` (`math`, `picture`,
+`unresolved` ou `unclassified`), `reason`, a `confidence` do modelo e seus
+`warnings`. A confiança informada pelo modelo continua sendo metadado, não um
+critério calibrado de aceitação. Uma descrição útil devolvida pelo fallback
+visual matemático também reclassifica a região como imagem, com
+`reason: "recognition_fallback"` (`"candidate_inspection"` nesta checagem).
 
 ## Custo operacional e limites
 
@@ -42,7 +51,8 @@ do prompt. Classificação e reconhecimento podem solicitar o mesmo recorte
 separadamente. Não é instalado um modelo químico, nem inferida a identidade
 molecular a partir de um desenho.
 
-Regiões que já contêm LaTeX e tipos de origem não renderizáveis seguem seus
+Regiões que já contêm LaTeX (inclusive um rótulo como `\tag{1}`, registrado
+em `metadata.latex_markup`) e tipos de origem não renderizáveis seguem seus
 caminhos anteriores. A proteção não corrige moléculas já convertidas em LaTeX
 pelo extrator antes de chegar ao Core.
 

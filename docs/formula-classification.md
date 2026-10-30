@@ -20,19 +20,28 @@ data agent remains unchanged.
   classifier's LaTeX does not replace the mathematical recognizer's result.
 - **Non-mathematical content:** change the element to `picture`, retain its
   location, original type, label and text, and reuse the accessible description.
-  Reconcile its processing obligations with
-  `reconcile_reclassified_element_processing_needs`. The picture-enrichment pass
-  skips this completed description, avoiding another visual request.
-- **Unresolved:** retain the source content and region, record classification
-  metadata, skip mathematical recognition, and restrict the formula obligation
-  to `human-review`. This is an explicit escalation and may prevent automatic
+  The crop the model read becomes the picture (`metadata.src`), so the export
+  shows the drawing it describes. Reconcile its processing obligations with
+  `reconcile_reclassified_element_processing_needs`, which also drops the
+  formula-only needs (`normalize-formula`). The picture-enrichment pass skips
+  this completed description, avoiding another visual request.
+- **Unresolved** (the model sets `classification_uncertain`): retain the source
+  content and region, record classification metadata, skip mathematical
+  recognition, restrict `verbalize-formula` to `human-review` and drop
+  `normalize-formula`. This is an explicit escalation and may prevent automatic
   job completion; it does not certify the region as mathematics.
+- **Unclassified** (no answer: an open provider breaker, no crop, a failed
+  visual request): this is no evidence against mathematics, so the region keeps
+  the formula path it took before this check (`math.recognize`, then the vision
+  fallback). An outage of the vision provider therefore does not send every
+  formula of a document to human review.
 
-The classifier explicitly signals uncertainty with `classification_uncertain`.
-Model-reported confidence remains metadata, not a calibrated acceptance gate.
-Missing crops, failed visual requests and an open provider breaker also leave
-the classification unresolved. A usable description returned by the existing
-mathematical vision fallback likewise reclassifies the region as a picture.
+`metadata.formula_classification` records `status` (`math`, `picture`,
+`unresolved` or `unclassified`), `reason`, the model's `confidence` and its
+`warnings`. Model-reported confidence remains metadata, not a calibrated
+acceptance gate. A usable description returned by the mathematical vision
+fallback likewise reclassifies the region as a picture, recorded with
+`reason: "recognition_fallback"` (`"candidate_inspection"` for this check).
 
 ## Operational cost and limits
 
@@ -42,7 +51,8 @@ infrastructure. The classification and subsequent recognition may request the
 same crop separately. No chemical recognition model or chemistry capability is
 installed, and no molecular identity is inferred from a drawing.
 
-Formula regions already carrying LaTeX and non-renderable source types keep
+Formula regions already carrying LaTeX (including a label such as `\tag{1}`,
+recorded as `metadata.latex_markup`) and non-renderable source types keep
 their existing paths. This protection does not correct an extractor that has
 already converted a molecule to LaTeX before the Core receives it.
 

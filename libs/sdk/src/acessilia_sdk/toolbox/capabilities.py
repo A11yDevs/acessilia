@@ -61,6 +61,13 @@ PROVIDER_DEFAULTS: dict[str, str] = {
     "toolbox_docx_provider": "pandoc-docx",
 }
 
+#: Default provider for each provider key of a Toolbox route that is not a
+#: capability: the VLM chat gateway (:mod:`acessilia_sdk.toolbox.vlm`). The
+#: core's contract check verifies these ids like ``PROVIDER_DEFAULTS``.
+ROUTE_PROVIDER_DEFAULTS: dict[str, str] = {
+    "toolbox_vlm_provider": "qwen3-vl-8b",
+}
+
 
 _CAPABILITIES: tuple[ToolboxCapability, ...] = (
     ToolboxCapability(
@@ -197,11 +204,14 @@ for _capability in _CAPABILITIES:
 
 def provider_default(key: str) -> str:
     """Default provider id for a provider key."""
+    if key in ROUTE_PROVIDER_DEFAULTS:
+        return ROUTE_PROVIDER_DEFAULTS[key]
     return PROVIDER_DEFAULTS[key]
 
 
 __all__ = [
     "PROVIDER_DEFAULTS",
+    "ROUTE_PROVIDER_DEFAULTS",
     "TOOLBOX_CAPABILITIES",
     "ToolboxCapability",
     "provider_default",

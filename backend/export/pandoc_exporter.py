@@ -214,7 +214,7 @@ def export_accessible_document(
         from backend.export.renderers.html_renderer import render_html
 
         return render_html(filtered, output_path, profile_name=profile)
-    ast = build_pandoc_ast(filtered)
+    ast = build_pandoc_ast(filtered, target_format=format_name)
     lang = filtered.get("language") or DEFAULT_EXPORT_LANG
     if format_name == "docx":
         return _render_docx(ast, output_path, lang=lang)

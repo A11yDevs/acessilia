@@ -111,6 +111,7 @@ async def test_file_upload_uses_the_extension_media_type(tmp_path: Path) -> None
         (httpx.Response(200, json={"status": "failed"}), ToolboxContractViolation, "OCR falhou"),
         (httpx.Response(401, json={"detail": "no"}), ToolboxAuthenticationError, "Autenticação"),
         (httpx.Response(404, json={"detail": "x"}), ToolboxArtifactNotFound, "não encontrado"),
+        (httpx.Response(502, json={"detail": "gateway"}), ToolboxProviderUnavailable, "gateway"),
         (httpx.Response(503, json={"detail": "x"}), ToolboxProviderUnavailable, "indisponível"),
         (
             httpx.Response(400, json={"code": "invalid_input", "message": "LaTeX rejected"}),

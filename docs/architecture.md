@@ -21,7 +21,7 @@ The former **`legacy`** engine (`AccessibilityOrchestrator`: Reader → Vision/D
 - [backend/agents/state_manager.py](../backend/agents/state_manager.py): in-memory task state machine with cooperative cancellation support.
 
 #### 0.2. AI Client Integration (`backend/ai/`)
-- [backend/ai/models/ai_client.py](../backend/ai/models/ai_client.py): central `get_agno_model()` initializer that instantiates Agno Model wrappers for Ollama or OpenRouter based on environment settings.
+- [backend/ai/models/ai_client.py](../backend/ai/models/ai_client.py): central `get_agno_model()` initializer that instantiates Agno Model wrappers for Ollama, OpenRouter or the Toolbox VLM gateway (`AI_CLIENT=toolbox`, [ADR-0012](adr/0012-agents-reach-the-vlm-through-the-toolbox.md)) based on environment settings.
 
 #### 0.3. Infrastructure Services (`backend/services/`)
 - [backend/services/cache.py](../backend/services/cache.py): file-hash-based text cache in `var/temp/cache`.
@@ -141,7 +141,7 @@ The AgentOS runtime is not part of `ENABLED_INTERFACES`; it is started separatel
 ## External Dependencies
 
 - **Agno Framework:** multi-agent orchestration and unified multimodal LLM interface.
-- **AI Providers:** Ollama API (local models like LLaVA/Qwen-VL) or OpenRouter API (cloud models like Claude/GPT-4o).
+- **AI Providers:** Ollama API (local models like LLaVA/Qwen-VL), OpenRouter API (cloud models like Claude/GPT-4o), or the Toolbox VLM gateway, which relays the chats to a Toolbox VLM provider under its concurrency limit.
 - **Processing Libraries:** edge-tts, aiogram, FastAPI.
 - **No local executors remain** ([ADR-0003](adr/0003-remote-only-operational-capabilities.md), [#150](https://github.com/A11yDevs/acessilia/issues/150)): the manifest is extracted only through `ToolboxManifestExtractor`, and PyMuPDF is a development dependency used by tests to build PDFs. `tests/test_architecture_layers.py` fails if `backend/` or `frontend/` imports an operational library (PyMuPDF, Pillow, OpenCV, Docling, pypdf, python-docx, RapidOCR). Pandoc, TeX Live, veraPDF and the OCR and media libraries are no longer in the image, since DOCX and PDF/UA render only on the Toolbox; NumPy and OpenCV left the dependencies together with the Dr.DocBench experiment scripts (tag `drbench-2026-snapshot`); Pillow and pypdf left the runtime dependencies with reportlab and the local PDF renderer, and Pillow remains only in the `dev` extra, for the page images the Toolbox end-to-end tests send.
 

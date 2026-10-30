@@ -142,3 +142,16 @@ async def test_rest_calls_skip_a_secondary_that_does_not_publish_the_route():
         assert isinstance(info.value.causes[1][1], ToolboxIncompatibleEndpoint)
     finally:
         await client.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("path", ["input/plain.pdf", "input/lesson#1.pdf", "input/lesson?1.pdf", "input/literal%2F.pdf", "input/a b.pdf", "input/álgebra.pdf"])
+async def test_dataset_artifact_path_is_encoded_without_changing_filename(respx_mock, client, path):
+    from urllib.parse import quote
+
+    route = respx_mock.get(f"{ITEMS}/p1/artifacts/{quote(path, safe='/')}").mock(return_value=httpx.Response(200, content=b"fixture"))
+    assert await client.get_dataset_artifact("dr-docbench", "dev", "p1", path) == b"fixture"
+    request = route.calls.last.request
+    assert request.url.path == "/v1/datasets/dr-docbench/splits/dev/items/p1/artifacts/" + path
+    assert not request.url.query
+    assert not request.url.fragment
