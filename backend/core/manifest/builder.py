@@ -119,6 +119,13 @@ DEFAULT_METHOD_COSTS = {
 
 # Obrigações introduzidas na versão 2.3 do domínio PDDL (PR #125).
 # kind -> (rationale, métodos admissíveis)
+#: v2.3 needs the builder emits only for an element of this type, on its own
+#: text: once the element is another type they no longer apply, and their
+#: methods (``latex-normalizer`` filters formulas) would find no target.
+TYPE_BOUND_V23_KINDS: dict[str, frozenset[str]] = {
+    "formula": frozenset({"normalize-formula"}),
+}
+
 V23_OBLIGATION_BY_KIND = {
     "adjudicate-page": (
         "Página com divergência entre providers exige adjudicação.",
@@ -1077,10 +1084,12 @@ def reconcile_reclassified_element_processing_needs(
 ) -> None:
     """Reconcile derived observations/obligations after an element changes type.
 
-    Only the standard processing need associated with the reclassified element
-    is replaced; every other observation/obligation (e.g. the v2.3 needs
-    derived from dual-provider fusion evidence) is kept untouched instead of
-    rebuilding the complete list.
+    The standard processing need associated with the reclassified element is
+    replaced, and the v2.3 needs bound to its previous type
+    (``TYPE_BOUND_V23_KINDS``, such as ``normalize-formula``) are dropped;
+    every other observation/obligation (e.g. the v2.3 needs derived from
+    dual-provider fusion evidence) is kept untouched instead of rebuilding the
+    complete list.
     """
     if previous_type == element.type:
         return
@@ -1097,6 +1106,8 @@ def reconcile_reclassified_element_processing_needs(
         f"{previous_type}-requires-processing" if previous_spec is not None else None
     )
     current_observation_kind = f"{element.type}-requires-processing"
+    bound_kinds = TYPE_BOUND_V23_KINDS.get(previous_type, frozenset())
+    bound_observation_kinds = {f"{kind}-detected" for kind in bound_kinds}
     suffix = element.id.removeprefix("element-")
     current_obligation_id = f"obligation-{current_kind}-{suffix}"
     current_observation_id = f"observation-{current_kind}-{suffix}"
@@ -1108,10 +1119,9 @@ def reconcile_reclassified_element_processing_needs(
         targets_only_element = obligation.target_ids == [element.id]
         if targets_only_element and obligation.kind == current_kind:
             has_current_obligation = True
-        if (
-            targets_only_element
-            and previous_kind is not None
-            and obligation.kind == previous_kind
+        if targets_only_element and (
+            (previous_kind is not None and obligation.kind == previous_kind)
+            or obligation.kind in bound_kinds
         ):
             removed_obligation_ids.add(obligation.id)
             continue
@@ -1154,10 +1164,12 @@ def reconcile_reclassified_element_processing_needs(
         targets_only_element = observation.target_ids == [element.id]
         if targets_only_element and observation.kind == current_observation_kind:
             has_current_observation = True
-        if (
-            targets_only_element
-            and previous_observation_kind is not None
-            and observation.kind == previous_observation_kind
+        if targets_only_element and (
+            (
+                previous_observation_kind is not None
+                and observation.kind == previous_observation_kind
+            )
+            or observation.kind in bound_observation_kinds
         ):
             continue
         retained_observations.append(observation)

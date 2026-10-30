@@ -43,6 +43,11 @@ class AgentOutput(BaseModel):
 class VisionOutput(AgentOutput):
     """Structured visual description, optionally representing a formula."""
 
+    classification_uncertain: bool = Field(
+        default=False,
+        description="For formula-candidate inspection only: true when the region cannot be reliably classified as mathematics or described as non-mathematical content.",
+    )
+
     kind: Literal["description", "formula"] = Field(
         description="Whether the region is a visual description or a mathematical formula; a drawn molecule is a description."
     )

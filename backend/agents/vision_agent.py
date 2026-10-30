@@ -77,11 +77,10 @@ _CONTEXT_RETRY_IMAGE_SCALE = 0.5
 
 #: Regions whose answer may be a description get the chemistry rules: a drawn
 #: molecule is described, not transcribed as a formula (006.pdf slides 25-26).
-#: A formula region is left out: its answer is only kept when it is a formula,
-#: and the data agent reads the same prompt with a schema that has no
-#: description.
+#: Formula candidates use a separate classification prompt; the mathematical
+#: transcription prompt remains shared with the data agent.
 _CHEMISTRY_CLASSIFICATIONS = frozenset(
-    {"embedded_image", "full_page_image", "full_page_fallback"}
+    {"embedded_image", "full_page_image", "full_page_fallback", "formula_candidate"}
 )
 
 #: Appended to the prompt of a retry. Each try is a fresh Agent with no
@@ -154,6 +153,10 @@ class VisionAgent:
 
         if custom_prompt:
             prompt = custom_prompt
+        elif classification == "formula_candidate":
+            # A missing prompt file loads as "": fall back like the region
+            # prompts do, so the request keeps its instructions.
+            prompt = load_region_prompt("formula_candidate") or self.system_prompt
         elif classification == "full_page_fallback":
             base = load_system_prompt(effective_mode)
             prompt = build_page_prompt(base, total_pages, page_num, is_pdf=True)

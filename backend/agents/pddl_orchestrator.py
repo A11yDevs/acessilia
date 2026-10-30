@@ -62,6 +62,7 @@ from backend.core.execution.models import ExecutionReport, MethodResult
 from backend.core.execution.messages import EXE_COMPLETED_OBLIGATIONS_UNSATISFIED
 from backend.core.manifest.builder import (
     SECONDARY_EXTRACTION_KIND,
+    TYPE_BOUND_V23_KINDS,
     _derive_processing_needs,
     is_unstructured_page_placeholder,
     reconcile_reclassified_element_processing_needs,
@@ -2835,6 +2836,9 @@ class PddlAccessibilityOrchestrator:
         from backend.config.settings import settings
 
         breaker = ProviderBreaker(settings.vision_breaker_threshold)
+        await _classify_formula_regions(
+            manifest, source_path, mode=effective_mode, breaker=breaker,
+        )
         await _enrich_picture_descriptions(
             manifest,
             source_path,
@@ -3680,6 +3684,143 @@ def _claim_negation_overlay(
             return
 
 
+def _reclassify_formula_picture(
+    manifest: ProcessingManifest,
+    element: ManifestElement,
+    output: VisionOutput,
+    image: bytes,
+    *,
+    source: str,
+) -> None:
+    """Keep the source evidence and reuse a non-mathematical description.
+
+    The crop the model read becomes the picture (``metadata.src``), as for a
+    region inspection, so the export shows the drawing it describes.
+    ``source`` records which call reclassified it: the candidate inspection
+    or the vision fallback of the formula recognition.
+    """
+    element.metadata["original_type"] = element.type
+    element.metadata["original_text"] = element.text
+    element.metadata["original_raw_label"] = element.raw_label
+    element.type = "picture"
+    element.raw_label = "picture"
+    element.text = output.description
+    element.metadata["vision_description_complete"] = True
+    element.metadata["vision_language"] = output.language
+    element.metadata["vision_confidence"] = output.confidence
+    element.metadata["vision_elements"] = list(output.mentioned_elements)
+    element.metadata["vision_warnings"] = list(output.warnings)
+    element.metadata["src"] = "data:image/png;base64," + base64.b64encode(image).decode("ascii")
+    element.metadata["formula_classification"] = {
+        "status": "picture",
+        "reason": source,
+        "confidence": output.confidence,
+        "warnings": list(output.warnings),
+    }
+    reconcile_reclassified_element_processing_needs(manifest, element, previous_type="formula")
+
+
+def _escalate_unresolved_formula(
+    manifest: ProcessingManifest, element: ManifestElement
+) -> None:
+    """Hand a region the model could not classify to a person, not to the math path.
+
+    Its ``verbalize-formula`` goes to ``human-review``; ``normalize-formula``
+    is dropped, since normalizing LaTeX the model could not tell is a formula
+    would treat it as one.
+    """
+    retained = []
+    for obligation in manifest.obligations:
+        if obligation.target_ids == [element.id]:
+            if obligation.kind in TYPE_BOUND_V23_KINDS["formula"]:
+                continue
+            if obligation.kind == "verbalize-formula":
+                obligation.admissible_methods = ["human-review"]
+                obligation.method_costs = {"human-review": 100}
+        retained.append(obligation)
+    manifest.obligations = retained
+    manifest.summary.obligation_count = len(manifest.obligations)
+
+
+async def _classify_formula_regions(
+    manifest: ProcessingManifest,
+    source_file: Path,
+    *,
+    mode: str,
+    breaker: ProviderBreaker,
+) -> None:
+    """Check extractor formula labels before a mathematical recognizer sees them.
+
+    A drawing is described once and reconciled as a picture before planning.
+    A candidate the model explicitly cannot classify (``classification_uncertain``)
+    keeps its source content and goes to human review. A call that gives no
+    answer (open breaker, no crop, model failure, empty description) is no
+    evidence against mathematics: the candidate stays ``unclassified`` and
+    takes the formula path it took before this check, whose vision fallback
+    can still reclassify it.
+    """
+    from backend.config.settings import settings
+
+    if manifest.source.media_type not in _RENDERABLE_MEDIA_TYPES:
+        return
+    candidates = [
+        element for element in manifest.elements
+        if element.type == "formula"
+        and not has_latex_markup(element.text)
+        and not element.metadata.get("latex_markup")
+    ]
+    if not candidates:
+        return
+    slots = asyncio.Semaphore(max(1, settings.vision_concurrency))
+    vision = VisionAgent(mode=mode)
+
+    async def classify(element: ManifestElement) -> None:
+        async with slots:
+            output = None
+            errors: list[str] = []
+            reason = "provider_blocked"
+            if not breaker.open:
+                reason = "crop_unavailable"
+                image, page = await run_blocking(
+                    _formula_recognition_crop, source_file, element,
+                    artifact_id=_source_artifact_id(manifest),
+                    media_type=manifest.source.media_type,
+                )
+                if image:
+                    reason = "model_failed"
+                    output = await vision.describe_region(
+                        image_bytes=image, classification="formula_candidate",
+                        page_num=page, total_pages=len(manifest.pages), mode=mode,
+                        full_budget=True, errors=errors,
+                    )
+                    breaker.record(isinstance(output, VisionOutput))
+            status = "unclassified"
+            if isinstance(output, VisionOutput):
+                if output.classification_uncertain:
+                    status, reason = "unresolved", "classification_uncertain"
+                elif output.kind == "formula":
+                    status, reason = "math", None
+                elif output.description.strip():
+                    _reclassify_formula_picture(
+                        manifest, element, output, image, source="candidate_inspection"
+                    )
+                    return
+                else:
+                    reason = "empty_description"
+            element.metadata["formula_classification"] = {
+                "status": status,
+                "reason": reason,
+                "confidence": output.confidence if output is not None else None,
+                "warnings": list(output.warnings) if output is not None else errors,
+            }
+            if status == "unresolved":
+                _escalate_unresolved_formula(manifest, element)
+
+    async with asyncio.TaskGroup() as group:
+        for element in candidates:
+            group.create_task(classify(element))
+
+
 async def _enrich_formula_latex(
     manifest: ProcessingManifest,
     source_file: Path,
@@ -3762,6 +3903,7 @@ async def _enrich_formula_latex(
         if element.type == "formula"
         and not has_latex_markup(element.text)
         and not element.metadata.get("latex_markup")
+        and element.metadata.get("formula_classification", {}).get("status") != "unresolved"
     ]
     if not formulas:
         return
@@ -3919,9 +4061,16 @@ async def _enrich_formula_latex(
                         mode=mode,
                         full_budget=True,
                     )
-                    # An answer the job cannot use (a description, a formula
-                    # without LaTeX) still counts as the model working.
+                    # A non-mathematical description can also correct the label.
                     breaker.record(output is not None)
+                if (
+                    output is not None and output.kind == "description"
+                    and output.description.strip() and not output.classification_uncertain
+                ):
+                    _reclassify_formula_picture(
+                        manifest, element, output, image_bytes, source="recognition_fallback"
+                    )
+                    return False
                 if output is not None and output.kind == "formula":
                     latex = accept(method, normalize_latex(output.formula_latex or ""))
                     confidence = output.confidence
