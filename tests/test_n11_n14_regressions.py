@@ -59,6 +59,40 @@ async def test_readiness_rejects_invalid_contract_and_tries_next_endpoint(
 
 
 @pytest.mark.asyncio
+async def test_readiness_probes_each_structural_provider_with_the_toolbox_key(monkeypatch):
+    original = httpx.AsyncClient
+    seen = []
+
+    def upstream(request):
+        seen.append((request.url.path, request.headers.get("authorization")))
+        provider = request.url.path.split("/")[-2]
+        return httpx.Response(200, json={"provider": provider, "healthy": True})
+
+    monkeypatch.setattr(settings, "toolbox_base_urls", "http://first.test")
+    monkeypatch.setattr(settings, "toolbox_api_key", "global-key")
+    monkeypatch.setattr(settings, "toolbox_provider", "docling")
+    monkeypatch.setattr(settings, "fusion_mode", "dual")
+    monkeypatch.setattr(settings, "fusion_secondary_provider", "mineru")
+    monkeypatch.setattr(
+        health.httpx,
+        "AsyncClient",
+        lambda **kwargs: original(transport=httpx.MockTransport(upstream), **kwargs),
+    )
+    app = FastAPI()
+    app.include_router(health.router)
+    async with original(
+        transport=httpx.ASGITransport(app, raise_app_exceptions=False),
+        base_url="http://core.test",
+    ) as client:
+        response = await client.get("/ready")
+    assert response.status_code == 200
+    assert seen == [
+        ("/v1/providers/docling/health", "Bearer global-key"),
+        ("/v1/providers/mineru/health", "Bearer global-key"),
+    ]
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "payload,filename,expected",
     [

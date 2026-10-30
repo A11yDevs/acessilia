@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import socket
 from datetime import UTC, datetime
-from urllib.parse import quote
 
 import httpx
 from fastapi import APIRouter, Request
@@ -15,45 +14,35 @@ from backend.api.limiter import limiter
 from backend.api.schemas import HealthResponse
 from backend.config.settings import settings
 from backend.services.queue_service import unified_queue
-from backend.tools.toolbox_client import toolbox_vlm_endpoint
+from backend.tools.toolbox_client import toolbox_endpoints, toolbox_vlm_endpoint
 
 router = APIRouter(tags=["health"])
 
 
 @router.get("/ready")
 async def ready() -> JSONResponse:
-    """Readiness follows the mandatory extraction chain, without inference."""
-    endpoints = [url.strip() for url in settings.toolbox_base_urls.split(",") if url.strip()]
-    endpoints = endpoints or [settings.toolbox_base_url]
+    """Readiness follows the mandatory extraction chain, without inference.
+
+    Ready when one Toolbox endpoint reports every structural provider the
+    extraction needs healthy (``/v1/providers/{provider}/health``, the probe
+    the VLM health check uses too).
+    """
     providers = {settings.toolbox_provider}
     if settings.fusion_mode == "dual":
         providers.add(settings.fusion_secondary_provider)
-    headers = (
-        {"Authorization": f"Bearer {settings.toolbox_api_key}"}
-        if settings.toolbox_api_key
-        else {}
-    )
-    async with httpx.AsyncClient(timeout=3.0) as client:
-        for endpoint in endpoints:
-            try:
-                for provider in sorted(providers):
-                    response = await client.get(
-                        endpoint.rstrip("/")
-                        + f"/v1/providers/{quote(provider, safe='')}/health",
-                        headers=headers,
-                    )
-                    body = response.json() if response.status_code == 200 else None
-                    if (
-                        not isinstance(body, dict)
-                        or body.get("provider") != provider
-                        or body.get("healthy") is not True
-                    ):
-                        break
-                else:
-                    return JSONResponse({"status": "ready"})
-            except (httpx.HTTPError, ValueError):
-                continue
+    for endpoint in toolbox_endpoints():
+        for provider in sorted(providers):
+            if not await vlm_provider_healthy(
+                endpoint,
+                provider,
+                api_key=settings.toolbox_api_key,
+                timeout_seconds=3.0,
+            ):
+                break
+        else:
+            return JSONResponse({"status": "ready"})
     return JSONResponse({"status": "unavailable", "dependency": "toolbox"}, status_code=503)
+
 
 #: The auto-update timer runs every 300 s (UPDATE_INTERVAL in scripts/ops.sh);
 #: like `ops.sh auto-update check`, a last check older than three intervals means
