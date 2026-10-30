@@ -264,3 +264,71 @@ def test_a_sentence_with_inline_math_is_not_a_math_block(line, block_type):
     (block,) = parse_text_to_blocks(line)
 
     assert block["type"] == block_type
+
+
+def _payload(*blocks):
+    return {"pages": [{"page_number": 1, "blocks": list(blocks)}]}
+
+
+def _blocks(document):
+    return [block for section in document["sections"] for block in section["blocks"]]
+
+
+def test_a_paragraph_of_one_span_becomes_display_math_in_the_html():
+    payload = _payload({"id": "p1", "type": "paragraph", "text": "$s(t) = t^3$"})
+
+    document = build_canonical_document(payload, title="t", math_enricher=_Enricher())
+
+    (block,) = _blocks(document)
+    assert block["type"] == "math"
+    assert block["text"] == "s(t)=t^3"
+    assert block["metadata"]["inline_math_promoted"] is True
+    html = document_to_html(document)
+    assert (
+        '<div id="p1"><math xmlns="http://www.w3.org/1998/Math/MathML" '
+        'aria-label="Formula: s(t)=t^3" display="block">' in html
+    )
+    assert "$" not in html
+
+
+def test_promotion_reuses_the_conversion_the_span_already_carries():
+    entry = {"source": "s(t)", "latex": "s(t)", "mathml": MATHML, "speech": "s de t"}
+    payload = _payload(
+        {"id": "p1", "type": "paragraph", "text": "$s(t)$", "metadata": {"inline_math": [entry]}}
+    )
+    enricher = _Enricher()
+
+    document = build_canonical_document(payload, title="t", math_enricher=enricher)
+
+    (block,) = _blocks(document)
+    assert (block["type"], block["text"], block["alt_text"]) == ("math", "s(t)", "s de t")
+    assert block["metadata"]["mathml"] == MATHML
+    assert "inline_math" not in block["metadata"]
+    assert enricher.calls == []
+
+
+@pytest.mark.parametrize(
+    "block",
+    [
+        {"id": "p1", "type": "paragraph", "text": "$s(t)$."},
+        {"id": "p1", "type": "paragraph", "text": "let $s(t)$"},
+        {"id": "p1", "type": "paragraph", "text": "costs R$ 10,00"},
+        {"id": "p1", "type": "list", "items": ["$s(t)$"], "text": "$s(t)$"},
+    ],
+)
+def test_only_a_paragraph_made_of_one_span_is_promoted(block):
+    document = build_canonical_document(_payload(block), title="t", math_enricher=_Enricher())
+
+    assert _blocks(document)[0]["type"] == block["type"]
+
+
+def test_promotion_can_be_turned_off():
+    payload = _payload({"id": "p1", "type": "paragraph", "text": "$s(t)$"})
+
+    document = build_canonical_document(
+        payload, title="t", math_enricher=_Enricher(), inline_math_promote=False
+    )
+
+    (block,) = _blocks(document)
+    assert block["type"] == "paragraph"
+    assert block["metadata"]["inline_math"][0]["source"] == "s(t)"
