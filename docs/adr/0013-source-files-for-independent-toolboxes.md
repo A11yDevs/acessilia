@@ -1,4 +1,4 @@
-# 0012. Send source files to independent Toolbox deployments
+# 0013. Send source files to independent Toolbox deployments
 
 - **Status:** Accepted
 - **Date:** 2026-10-26
@@ -33,7 +33,7 @@ Each direct extraction attempt/provider may transfer the source again. The
 initial source artifact ID is unset for multi-endpoint extraction, and the
 reported `use_artifact_store` configuration reflects actual use. The source
 file must remain available until the extraction calls finish. Output artifacts
-and later processing stages still need their own routing guarantees (ADR-0013).
+and later processing stages still need their own routing guarantees (ADR-0014).
 
 The policy logs when artifact storage is bypassed despite being enabled.
 Fusion and text-span calls may then send the full source again. Before rollout,

@@ -1,4 +1,4 @@
-# 0013. Search compatible endpoints for a missing artifact download
+# 0014. Search compatible endpoints for a missing artifact download
 
 - **Status:** Accepted
 - **Date:** 2026-10-26

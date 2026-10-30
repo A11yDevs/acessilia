@@ -1,4 +1,4 @@
-# 0012. Enviar arquivos de origem para implantações independentes da Toolbox
+# 0013. Enviar arquivos de origem para implantações independentes da Toolbox
 
 - **Status:** Accepted (aceito após a revisão e o merge)
 - **Data:** 26/10/2026
@@ -39,7 +39,7 @@ Cada tentativa/provedor pode transferir o arquivo novamente. Na extração com
 múltiplos endpoints, o identificador inicial da origem fica vazio, e
 `use_artifact_store` registra o uso efetivo. O arquivo precisa continuar disponível
 até o término das chamadas. Downloads de saída e etapas posteriores ainda exigem
-suas próprias garantias de roteamento, como no B05.
+suas próprias garantias de roteamento (ADR-0014).
 
 Os testes reproduzem a escolha independente dos clientes e verificam envio direto
 normal/com falha do primário, ausência de cliente de upload desnecessário,
