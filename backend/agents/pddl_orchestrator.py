@@ -38,7 +38,7 @@ from docstruct.text.inline_math import (
     splice_inline_math,
 )
 from docstruct.text.latex import has_latex_markup, latex_text_agreement
-from docstruct.text.math_spans import inline_math_sources, mask_inline_math
+from docstruct.text.math_spans import block_prose, inline_math_sources, mask_inline_math
 from docstruct.text.norm_fix import norm_fix
 from docstruct.text.negation_overlay import (
     compose_negation,
@@ -186,11 +186,15 @@ def _implicit_product_variables(manifest: ProcessingManifest) -> frozenset[str]:
     """
     sources: list[str] = []
     for element in manifest.elements:
-        text = element.text or ""
-        if element.type == "formula":
-            sources.append(text)
-        else:
-            sources.extend(inline_math_sources(text))
+        blocks = [
+            _element_to_block(item)
+            for item in [element, *_text_kept_by_picture(element)]
+        ]
+        for block in blocks:
+            if block.get("type") == "math":
+                sources.append(str(block.get("text") or ""))
+            for text in block_prose(block):
+                sources.extend(inline_math_sources(text))
     return implicit_product_variables(sources)
 
 

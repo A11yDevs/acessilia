@@ -79,3 +79,34 @@ def test_variable_evidence(latex):
     found = implicit_product_variables([latex])
 
     assert found & {"x", "t", "a", "b", "h"}
+
+
+@pytest.mark.parametrize('command', ['text', 'mbox', 'mathrm', 'operatorname', 'operatorname*'])
+@pytest.mark.parametrize('content', [r'h(kg)', r'(h)', r'h = 0', r'h(t)', r'{nested} h(kg)', r'\{h(kg)\}'])
+def test_text_commands_are_ignored(command, content):
+    text = '\\' + command + '{' + content + '}'
+    assert implicit_product_variables([text]) == frozenset()
+    # Text-mode function-like content must not override real variable evidence.
+    assert implicit_product_variables([r'h \neq 0', text]) == frozenset({'h'})
+    assert mark_implicit_products(text + ' + h(1+h)', frozenset({'h'})) == (
+        text + ' + h' + IT + '(1+h)'
+    )
+
+
+def test_unclosed_text_group_is_left_alone():
+    latex = r'\text{h(kg)'
+    assert implicit_product_variables([latex]) == frozenset()
+    assert mark_implicit_products(latex, frozenset({'h'})) == latex
+
+
+def test_compound_only_function_with_variable_evidence_is_marked():
+    # Known ambiguity: without h(t) or h(2), the heuristic cannot identify
+    # a function applied only to compound arguments when h is also a variable.
+    variables = implicit_product_variables([r'h \neq 0', 'h(t+1)'])
+    assert variables == frozenset({'h'})
+    assert mark_implicit_products('h(t+1)', variables) == 'h' + IT + '(t+1)'
+
+
+@pytest.mark.parametrize('relation', [r'\equiv', r'\propto', r'\mapsto', r'\Rightarrow', r'\subseteq'])
+def test_less_common_relations_alone_do_not_establish_variables(relation):
+    assert implicit_product_variables(['h ' + relation + ' 0']) == frozenset()

@@ -407,7 +407,7 @@ def test_canonical_enrichment_reuses_what_the_plan_produced():
 
 # ── implicit products (#332) ──
 
-IT = "⁢"
+IT = "\u2062"
 
 
 def _manifest_with_formulas(*texts):
@@ -475,3 +475,54 @@ def test_canonical_build_marks_products_in_blocks_and_inline_spans(toolbox_math)
     assert r"\frac{h" + IT + "(12 + h)}{h}" in sent
     blocks = document["sections"][0]["blocks"]
     assert all(IT not in str(block.get("text")) for block in blocks)
+
+
+@pytest.mark.parametrize('kind', ['cell', 'caption', 'replaced_text', 'figure_labels', 'described_picture', 'code'])
+@pytest.mark.parametrize(('handler', 'capability'), [
+    ('_handle_mathml_method', 'convert'),
+    ('_handle_latex_verbalizer_method', 'verbalize'),
+])
+def test_plan_and_canonical_use_the_same_variable_sources(toolbox_math, kind, handler, capability):
+    from copy import deepcopy
+    from backend.agents import pddl_orchestrator as orchestrator
+    from backend.core.manifest.models import ManifestElement
+    from docstruct.canonical import _math_sources
+    from docstruct.text.implicit_products import implicit_product_variables
+
+    evidence = r'$h \neq 0$'
+    metadata = {}
+    element_type = 'picture'
+    text = None
+    if kind in {'cell', 'caption'}:
+        element_type = 'table'
+        metadata = {'table_ast': {
+            'caption': evidence if kind == 'caption' else '',
+            'body': [{'cells': [{'text': evidence if kind == 'cell' else 'value'}]}],
+        }}
+    elif kind == 'code':
+        element_type, text = 'code', evidence
+    elif kind == 'figure_labels':
+        metadata = {'figure_labels': [evidence]}
+    else:
+        metadata = {'replaced_text': evidence}
+        if kind == 'described_picture':
+            metadata['vision_description_complete'] = True
+            text = 'Description'
+    manifest = _manifest_with_formulas('h(1+h)')
+    manifest.elements.append(ManifestElement(
+        id='evidence', type=element_type, raw_label=element_type,
+        reading_order=2, hierarchy_level=1, text=text,
+        page_number=1, metadata=metadata,
+    ))
+    before = deepcopy(manifest)
+    blocks = []
+    for element in manifest.elements:
+        blocks.append(orchestrator._element_to_block(element))
+        blocks.extend(orchestrator._element_to_block(kept)
+                      for kept in orchestrator._text_kept_by_picture(element))
+    expected = frozenset() if kind in {'described_picture', 'code'} else frozenset({'h'})
+    assert implicit_product_variables(_math_sources([{'blocks': blocks}])) == expected
+    assert orchestrator._implicit_product_variables(manifest) == expected
+    assert manifest == before
+    assert getattr(orchestrator, handler)(manifest, 'o-f').success
+    assert toolbox_math[capability] == ['h' + (IT if expected else '') + '(1+h)']
