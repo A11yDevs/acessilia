@@ -88,7 +88,10 @@ async def submit_job(
     source: str = Form("api"),
     object_markers: bool | None = Form(None),
 ):
-    filename = Path(document_file.filename or "documento").name
+    filename = (
+        Path((document_file.filename or "documento").replace("\\", "/")).name
+        or "documento"
+    )
     valid, error_msg = validate_file(filename, settings.max_file_size_bytes)
     if not valid:
         raise HTTPException(status_code=400, detail=error_msg)

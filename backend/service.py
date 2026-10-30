@@ -160,7 +160,9 @@ async def process(
     """
     external_task_id = task_id is not None
     # Only the name, never a path the client sent.
-    shown_name = Path(display_filename).name if display_filename else file_path.name
+    shown_name = (
+        Path(display_filename.replace("\\", "/")).name if display_filename else ""
+    ) or file_path.name
     if task_id is None:
         task_id = state_manager.criar_tarefa(file_path)
     elif state_manager.obter(task_id) is None:
