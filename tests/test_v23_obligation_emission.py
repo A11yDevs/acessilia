@@ -319,7 +319,9 @@ def test_toolbox_table_obligation_uses_the_core_methods(tmp_path: Path):
     assert len(manifest.observations) == manifest.summary.observation_count
 
 
-def _reading_order_manifest(tmp_path: Path, *, secondary_path: Path | None = None):
+def _reading_order_manifest(
+    tmp_path: Path, *, secondary_path: Path | None = None, remove_secondary: bool = False
+):
     source = tmp_path / "reading-order.pdf"
     source.write_bytes(b"%PDF-test")
     timestamp = datetime(2026, 1, 1, tzinfo=timezone.utc)
@@ -376,6 +378,8 @@ def _reading_order_manifest(tmp_path: Path, *, secondary_path: Path | None = Non
             "path": str(secondary_path),
             "sha256": hashlib.sha256(secondary_bytes).hexdigest(),
         }
+        if remove_secondary:
+            secondary_path.unlink()
     extraction = SimpleNamespace(
         document=extraction_document,
         version="1",
@@ -416,3 +420,15 @@ def test_skeleton_order_is_planned_only_when_secondary_extraction_is_recorded(
         "human-review",
     ]
     assert dual_manifest.artifacts[0].kind == "provider-extraction"
+
+
+def test_skeleton_order_is_not_planned_when_the_recorded_file_is_gone(tmp_path: Path):
+    secondary = tmp_path / "secondary.json"
+    manifest = _reading_order_manifest(tmp_path, secondary_path=secondary, remove_secondary=True)
+
+    [obligation] = [
+        item for item in manifest.obligations if item.kind == "refine-reading-order"
+    ]
+    assert obligation.admissible_methods == ["xycut-order", "human-review"]
+    # The record is kept, so the handler can still say what went missing.
+    assert manifest.artifacts[0].path == str(secondary)

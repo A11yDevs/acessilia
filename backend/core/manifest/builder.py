@@ -291,6 +291,12 @@ def _build_from_toolbox_json(
         else ""
     )
     has_secondary_extraction = bool(secondary_path.strip())
+    # skeleton-order reads the file, so it is planned only while the file the
+    # extractor wrote is still there; a recorded path alone would plan a
+    # method that fails and forces a replan (#298).
+    secondary_extraction_readable = (
+        has_secondary_extraction and Path(secondary_path).is_file()
+    )
     if presentation:
         split_across_slides(manifest)
     if refine_reading_order:
@@ -317,7 +323,7 @@ def _build_from_toolbox_json(
         },
         fusion_evidence=extraction.document.get("fusion_evidence"),
         fusion_stats=extraction.document.get("fusion_stats"),
-        secondary_extraction_available=has_secondary_extraction,
+        secondary_extraction_available=secondary_extraction_readable,
     )
     observations.extend(v23_observations)
     obligations.extend(v23_obligations)
@@ -629,8 +635,8 @@ def _derive_v23_processing_needs(
     (FUSION_JUDGE_MAX_PAGES when None). ``legacy_unicode_repair`` is
     ``off``/``detect``/``repair`` (LEGACY_UNICODE_REPAIR when None); only
     ``repair`` emits the obligation, while ``detect`` keeps the observation.
-    ``skeleton-order`` is admissible only when the secondary extraction is
-    recorded for this document.
+    ``skeleton-order`` is admissible only when the secondary extraction file
+    the extractor recorded for this document can be read.
     """
     from docstruct.fusion.line_numbers import extract_line_numbers
     from docstruct.fusion.tailjoin import join_tail, page_number_position, tailjoin3
