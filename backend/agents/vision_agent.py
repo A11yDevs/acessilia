@@ -5,11 +5,11 @@ import functools
 import hashlib
 import json
 import re
+
 from docstruct.fusion.repetition import collapse
 from pydantic import ValidationError
 
 from backend.config.settings import settings
-from backend.tools.vision_payload import downscale_image
 from backend.i18n import active_locale, t
 from backend.log_messages import (
     LOG_VISION_AGENT_CONTEXT_RETRY,
@@ -24,6 +24,7 @@ from backend.log_messages import (
     MSG_VISION_TRUNCATION_NOTICE,
 )
 from backend.tools.region_classifier import region_prompt_key
+from backend.tools.vision_payload import downscale_image
 from backend.tools.logger import logger
 
 from backend.tools.prompt_tools import (
@@ -338,7 +339,7 @@ async def _run_with_retry(
             )
         )
         model_options = {"max_tokens": max_tokens, "max_retries": 0}
-        if context_retries and label.startswith("full_page"):
+        if context_retries and _is_whole_page(label):
             # A small recovery cap must leave tokens for the actual answer.
             model_options["reasoning_enabled"] = False
         agent = Agent(
@@ -463,9 +464,19 @@ async def _downscale_image(image_bytes: bytes) -> bytes | None:
     return await downscale_image(image_bytes, _CONTEXT_RETRY_IMAGE_SCALE)
 
 
+def _is_whole_page(label: str) -> bool:
+    """Whether the request sends a whole page: a full-page region or a page inspection."""
+    return label.startswith("full_page") or label == "page_inspection"
+
+
 def _context_retry_max_tokens(label: str, max_tokens: int | None) -> int | None:
-    """Bound the output budget only for full-page regions on context retry."""
-    if not label.startswith("full_page"):
+    """Bound the output budget only for whole-page requests on context retry.
+
+    A whole page is the request that gets the full output budget (a page
+    inspection gets the provider default), so its overflow is the one the
+    budget can cause; a smaller region keeps its own cap.
+    """
+    if not _is_whole_page(label):
         return None
     configured = settings.vision_region_max_tokens
     return configured if max_tokens is None else min(configured, max_tokens)

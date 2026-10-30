@@ -9,6 +9,8 @@ from pathlib import Path
 from acessilia_sdk.toolbox import ToolboxError
 from acessilia_sdk.toolbox.clients import ToolboxPdfClient
 
+from backend.i18n import t
+from backend.log_messages import LOG_VISION_CONTEXT_DOWNSCALE_FAILED
 from backend.tools.logger import logger
 from backend.tools.toolbox_client import make_toolbox_client
 
@@ -44,6 +46,12 @@ def _image_size(payload: bytes) -> tuple[int, int, str] | None:
 
 
 async def downscale_image(payload: bytes, scale: float = 0.5) -> bytes | None:
+    """``payload`` rendered by the Toolbox with its longest side times ``scale``.
+
+    ``None`` when the image is not a PNG/JPEG whose size can be read, when it
+    would not get smaller, or when the Toolbox cannot render it: the caller
+    then lets the original context error stand.
+    """
     size = _image_size(payload)
     if size is None:
         return None
@@ -51,15 +59,17 @@ async def downscale_image(payload: bytes, scale: float = 0.5) -> bytes | None:
     max_side = max(1, int(max(width, height) * scale))
     if max_side >= max(width, height):
         return None
-    client = make_toolbox_client(ToolboxPdfClient)
+    client = None
     try:
+        client = make_toolbox_client(ToolboxPdfClient)
         with tempfile.TemporaryDirectory(prefix="vision-context-") as directory:
             source = Path(directory) / f"region{suffix}"
             source.write_bytes(payload)
             rendered = await client.render(file_path=source, max_side=max_side)
         return rendered.image
     except (ToolboxError, OSError, ValueError) as error:
-        logger.warning("Vision context recovery could not resize its image: {}", error)
+        logger.warning(t(LOG_VISION_CONTEXT_DOWNSCALE_FAILED).format(error=error))
         return None
     finally:
-        await client.close()
+        if client is not None:
+            await client.close()

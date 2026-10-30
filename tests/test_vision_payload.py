@@ -29,3 +29,40 @@ async def test_invalid_or_unshrinkable_images_do_not_call_the_toolbox(fake_toolb
     assert await downscale_image(b"not an image") is None
     assert await downscale_image(source.getvalue()) is None
     assert fake_toolbox_render.requests == []
+
+
+@pytest.mark.asyncio
+async def test_a_toolbox_failure_returns_none_and_closes_the_client(monkeypatch):
+    from acessilia_sdk.toolbox import ToolboxProviderUnavailable
+
+    from backend.tools import vision_payload
+
+    closed = []
+
+    class FailingClient:
+        async def render(self, **_kwargs):
+            raise ToolboxProviderUnavailable("pdf.render is down")
+
+        async def close(self):
+            closed.append(True)
+
+    monkeypatch.setattr(vision_payload, "make_toolbox_client", lambda _cls: FailingClient())
+    source = BytesIO()
+    Image.new("RGB", (400, 240), "white").save(source, format="PNG")
+
+    assert await downscale_image(source.getvalue()) is None
+    assert closed == [True]
+
+
+@pytest.mark.asyncio
+async def test_a_client_that_cannot_be_built_returns_none(monkeypatch):
+    from backend.tools import vision_payload
+
+    def invalid_configuration(_cls):
+        raise ValueError("Toolbox base_url must be an absolute http(s) URL")
+
+    monkeypatch.setattr(vision_payload, "make_toolbox_client", invalid_configuration)
+    source = BytesIO()
+    Image.new("RGB", (400, 240), "white").save(source, format="PNG")
+
+    assert await downscale_image(source.getvalue()) is None
