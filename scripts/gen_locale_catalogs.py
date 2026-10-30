@@ -81,6 +81,8 @@ from backend.log_messages import (
     LOG_API_INTERFACE_ENABLED,
     LOG_API_JOB_ENQUEUED,
     LOG_API_STARTED,
+    LOG_ARTIFACT_STORE_DIRECT_INPUT,
+    LOG_ARTIFACT_UPLOAD_DEGRADED,
     LOG_AUDIO_EXPORTED,
     LOG_AUDIO_EXPORT_ERROR,
     LOG_AUDIO_EXPORT_PROGRESS,
@@ -100,6 +102,7 @@ from backend.log_messages import (
     LOG_DATA_AGENT_PROMPT_NOT_FOUND,
     LOG_DATA_AGENT_PROCESSING_REGION,
     LOG_DATA_AGENT_REGION_ERROR,
+    LOG_VISION_AGENT_CONTEXT_RETRY,
     LOG_VISION_AGENT_DESCRIPTION_TRUNCATED,
     LOG_VISION_AGENT_RATE_LIMIT_RETRY,
     LOG_VISION_AGENT_TIMEOUT_RETRY,
@@ -109,6 +112,7 @@ from backend.log_messages import (
     LOG_VISION_AGENT_REGION_SALVAGED,
     LOG_MANIFEST_STRUCTURAL_CONTAINER_SKIPPED,
     LOG_VISION_AGENT_SENDING_REGION,
+    LOG_VISION_CONTEXT_DOWNSCALE_FAILED,
     LOG_VISION_ELEMENT_DESCRIPTION,
     LOG_CLEANUP_ITEM_FAILED,
     LOG_CLEANUP_OUTPUT_FAILED,
@@ -116,6 +120,7 @@ from backend.log_messages import (
     LOG_DOWNLOAD_TOKEN_CREATED,
     LOG_DOWNLOAD_TOKEN_DIR_MISSING,
     LOG_DOWNLOAD_TOKEN_NOT_FOUND,
+    LOG_DUAL_FUSION_SKIPPED_IDENTICAL_PROVIDERS,
     LOG_EMAIL_SEND_ERROR,
     LOG_EMAIL_SENT,
     LOG_EXPORT_DOCX_START,
@@ -152,6 +157,7 @@ from backend.log_messages import (
     LOG_PDDL_VISION_RETRY_PASS_PICTURES,
     LOG_PDDL_VISION_RETRY_PASS_TABLES,
     LOG_PDDL_ELEMENT_CROP_FAILED,
+    LOG_PDDL_EMPTY_LIST_ITEMS_DROPPED,
     LOG_PDDL_PREFERRED_PLAN_MISSING,
     LOG_PDDL_PROBLEM_HASH_MISMATCH,
     LOG_PDDL_DOMAIN_HASH_MISMATCH,
@@ -182,6 +188,7 @@ from backend.log_messages import (
     LOG_STATUS_EDIT_UNEXPECTED,
     LOG_STATUS_MESSAGE_EDIT_FAILED,
     LOG_STATUS_MESSAGE_SEND_FAILED,
+    LOG_STRUCTURAL_PROVIDER_DEGRADED,
     LOG_TASK_CANCELLED_BY_USER,
     LOG_TEMP_DIR_REMOVED,
     LOG_TEMP_FILE_REMOVED,
@@ -218,6 +225,7 @@ from backend.log_messages import (
     MSG_OBLIGATION_UNKNOWN,
     MSG_SLIDE_HEADING,
     MSG_SLIDE_HEADING_WITH_TITLE,
+    MSG_STRUCTURAL_EXTRACTION_DEGRADED,
     MSG_OBLIGATION_UNSTRUCTURED_PAGE,
     MSG_OBSERVATION_PAGE_WITHOUT_STRUCTURE,
     MSG_HEADING_GAP,
@@ -796,6 +804,8 @@ MESSAGES: tuple[str, ...] = (
     LOG_WORKER_TASK_ERROR,
     LOG_WORKER_TASK_COMPLETED,
     LOG_API_STARTED,
+    LOG_ARTIFACT_STORE_DIRECT_INPUT,
+    LOG_ARTIFACT_UPLOAD_DEGRADED,
     LOG_API_ERROR,
     LOG_API_JOB_ENQUEUED,
     LOG_CLEANUP_ITEM_FAILED,
@@ -835,6 +845,7 @@ MESSAGES: tuple[str, ...] = (
     LOG_PDDL_TABLE_REREAD_REJECTED,
     LOG_PROVIDER_BREAKER_OPEN,
     LOG_PDDL_ELEMENT_CROP_FAILED,
+    LOG_PDDL_EMPTY_LIST_ITEMS_DROPPED,
     LOG_PDDL_PREFERRED_PLAN_MISSING,
     LOG_PDDL_PROBLEM_HASH_MISMATCH,
     LOG_PDDL_DOMAIN_HASH_MISMATCH,
@@ -882,6 +893,7 @@ MESSAGES: tuple[str, ...] = (
     LOG_DATA_AGENT_PROMPT_NOT_FOUND,
     LOG_DATA_AGENT_PROCESSING_REGION,
     LOG_DATA_AGENT_REGION_ERROR,
+    LOG_VISION_AGENT_CONTEXT_RETRY,
     LOG_VISION_AGENT_DESCRIPTION_TRUNCATED,
     LOG_VISION_AGENT_RATE_LIMIT_RETRY,
     LOG_VISION_AGENT_TIMEOUT_RETRY,
@@ -891,6 +903,7 @@ MESSAGES: tuple[str, ...] = (
     LOG_VISION_AGENT_REGION_SALVAGED,
     LOG_MANIFEST_STRUCTURAL_CONTAINER_SKIPPED,
     LOG_VISION_AGENT_SENDING_REGION,
+    LOG_VISION_CONTEXT_DOWNSCALE_FAILED,
     LOG_VISION_ELEMENT_DESCRIPTION,
     LOG_CACHE_HIT,
     LOG_CACHE_DEBUG_HIT,
@@ -914,6 +927,8 @@ MESSAGES: tuple[str, ...] = (
     LOG_WEB_RATE_LIMIT_EXCEEDED,
     LOG_WEB_API_UPLOAD_ERROR,
     LOG_STATUS_MESSAGE_SEND_FAILED,
+    LOG_STRUCTURAL_PROVIDER_DEGRADED,
+    LOG_DUAL_FUSION_SKIPPED_IDENTICAL_PROVIDERS,
     LOG_STATUS_MESSAGE_EDIT_FAILED,
     LOG_STATUS_EDIT_UNEXPECTED,
     LOG_AUDIO_EXPORTED,
@@ -934,6 +949,7 @@ MESSAGES: tuple[str, ...] = (
     MSG_DUPLICATE_PAGE_NUMBERS,
     MSG_PAGE_UNKNOWN_ELEMENTS,
     MSG_CHAR_RANGE_REVERSED,
+    MSG_STRUCTURAL_EXTRACTION_DEGRADED,
 )
 
 #: msgid -> localized text mappings per non-default locale; every id in MESSAGES must appear for each such locale.
@@ -1453,7 +1469,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         ),
         WEB_INDEX_EMAIL_LABEL: "Seu E-mail",
         WEB_INDEX_EMAIL_HELP: "Enviaremos o arquivo final para este endereço.",
-        WEB_INDEX_DOC_LABEL: "Anexar Documento (PDF ou Imagem)",
+        WEB_INDEX_DOC_LABEL: "Anexar Documento (PDF, HTML ou Imagem)",
         WEB_INDEX_SUBMIT_BUTTON: "Tornar Acessível",
         WEB_DOWNLOAD_TITLE: "Download - Acessilia",
         WEB_DOWNLOAD_HEADLINE: "Download",
@@ -1626,6 +1642,10 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "{failures} chamadas de visão seguidas sem resposta utilizável; "
             "as chamadas restantes deste job serão puladas"
         ),
+        # List items with no text left out of the document; {count}, {page}, {element_ids}.
+        LOG_PDDL_EMPTY_LIST_ITEMS_DROPPED: (
+            "PDDL: {count} item(ns) de lista sem texto deixado(s) fora da página {page}: {element_ids}"
+        ),
         LOG_PDDL_ELEMENT_CROP_FAILED: (
             "Falha ao extrair recorte de imagem para elemento {element_id}"
         ),
@@ -1666,6 +1686,22 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         LOG_MEDIA_INSPECT_FAILED: (
             "Inspeção de mídia indisponível para {filename}; seguindo sem o "
             "sinal de imagem isolada: {error}"
+        ),
+        # One structural provider failed; {provider} identifies it and {error} its error class.
+        LOG_STRUCTURAL_PROVIDER_DEGRADED: "O provedor estrutural {provider} falhou ({error}); a extração está degradada.",
+        # FUSION_MODE=dual with the same provider on both sides; {provider} names it.
+        LOG_DUAL_FUSION_SKIPPED_IDENTICAL_PROVIDERS: "Fusão dual ignorada: os provedores primário e secundário são ambos {provider}.",
+        # Upload failed transiently; {error} is the error class, direct input remains available.
+        LOG_ARTIFACT_UPLOAD_DEGRADED: "Upload do artefato indisponível ({error}); extraindo a partir do arquivo original.",
+        # Independent URLs cannot share artifact IDs; the source is sent again for later stages.
+        LOG_ARTIFACT_STORE_DIRECT_INPUT: (
+            "Armazenamento de artefatos contornado para endpoints independentes da Toolbox; "
+            "o arquivo original será reenviado para extração, fusão e text spans."
+        ),
+        # Delivered warning: {provider} supplied the only available structural extraction.
+        MSG_STRUCTURAL_EXTRACTION_DEGRADED: (
+            "A extração estrutural usou apenas {provider} porque o outro provedor falhou. "
+            "O documento exige revisão; a comparação entre dois provedores não estava disponível."
         ),
         # TXT export wrapper debug line; {output_path} the destination file path.
         LOG_TXT_EXPORTED: "TXT exportado: {output_path}",
@@ -1762,6 +1798,16 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "[página {page_num}] O provedor do modelo limitou a taxa da região {type}; "
             "aguardando {delay}s antes de tentar de novo "
             "(reintenção por limite de taxa {retry}/{retries})"
+        ),
+        # Context overflow: one retry with a smaller image; {size_before}/{size_after} are byte sizes.
+        LOG_VISION_AGENT_CONTEXT_RETRY: (
+            "[página {page_num}] Limite de contexto excedido na região {type}; tentando uma vez "
+            "com uma imagem menor ({size_before} -> {size_after} bytes) e "
+            "max_tokens={max_tokens}: {error}"
+        ),
+        # The Toolbox could not render the smaller image; the original context error stands.
+        LOG_VISION_CONTEXT_DOWNSCALE_FAILED: (
+            "A recuperação de contexto da visão não conseguiu reduzir a imagem: {error}"
         ),
         LOG_VISION_AGENT_TIMEOUT_RETRY: (
             "[página {page_num}] A região {type} não teve resposta a tempo ({error}); "

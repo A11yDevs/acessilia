@@ -25,6 +25,7 @@ from docstruct.tables.ast import (
     raw_rows_from_table_ast as _rows_from_table_ast,
 )
 from docstruct.tables.garble import table_garble_reason
+from docstruct.text.equations import preserve_equation_number, split_equation_number
 from docstruct.text.inline_math import (
     InlineMathDetection,
     TextSpan,
@@ -61,9 +62,11 @@ from backend.core.execution.models import ExecutionReport, MethodResult
 from backend.core.execution.messages import EXE_COMPLETED_OBLIGATIONS_UNSATISFIED
 from backend.core.manifest.builder import (
     SECONDARY_EXTRACTION_KIND,
+    TYPE_BOUND_V23_KINDS,
     _derive_processing_needs,
     is_unstructured_page_placeholder,
     reconcile_reclassified_element_processing_needs,
+    separate_equation_number,
     unicode_repair_text,
 )
 from backend.core.manifest.models import (
@@ -83,6 +86,7 @@ from backend.i18n import locale_for_user, n, reset_request_locale, set_request_l
 from backend.log_messages import (
     LOG_MEDIA_INSPECT_FAILED,
     LOG_PDDL_ELEMENT_CROP_FAILED,
+    LOG_PDDL_EMPTY_LIST_ITEMS_DROPPED,
     LOG_PDDL_EMPTY_VISION_DESCRIPTION,
     LOG_PDDL_FORMULA_RECOGNIZE_EMPTY,
     LOG_PDDL_FORMULA_RECOGNIZE_UNAVAILABLE,
@@ -97,6 +101,7 @@ from backend.log_messages import (
     LOG_PDDL_TABLE_REREAD_ACCEPTED,
     LOG_PDDL_TABLE_REREAD_REJECTED,
     LOG_VISION_ELEMENT_DESCRIPTION,
+    MSG_STRUCTURAL_EXTRACTION_DEGRADED,
 )
 from backend.stage_messages import (
     STAGE_ANALYZING_STRUCTURAL,
@@ -255,7 +260,7 @@ def _handle_latex_verbalizer_method(
 
 
 def _run_extract_fused(
-    source_path: Path, *, artifact_id: str | None = None
+    source_path: Path, *, artifact_id: str | None = None, policy=None
 ) -> dict:
     """Executa ``extract_fused`` respeitando o contexto de event loop.
 
@@ -279,14 +284,14 @@ def _run_extract_fused(
     except RuntimeError:
         # Contexto síncrono (executor determinístico, CLI, testes):
         # não existe event loop ativo neste thread.
-        return asyncio.run(extract_fused(source_path, artifact_id=artifact_id))
+        return asyncio.run(extract_fused(source_path, artifact_id=artifact_id, policy=policy))
 
     # Já existe um event loop neste thread; como o handler é síncrono,
     # a coroutine é executada em um thread dedicado com seu próprio loop.
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
         return pool.submit(
             lambda: asyncio.run(
-                extract_fused(source_path, artifact_id=artifact_id)
+                extract_fused(source_path, artifact_id=artifact_id, policy=policy)
             )
         ).result()
 
@@ -2361,6 +2366,34 @@ DETERMINISTIC_METHOD_HANDLERS: dict[
 }
 
 
+def _reusable_fusion_payload(manifest: ProcessingManifest) -> dict | None:
+    from dataclasses import asdict
+
+    from docstruct.policy import FusionPolicy
+
+    from backend.services.cache import processing_cache_configuration
+
+    ref = manifest.extractor.configuration.get("fusion_reuse") or {}
+    try:
+        content = Path(ref["path"]).read_bytes()
+        if hashlib.sha256(content).hexdigest() != ref["sha256"]:
+            return None
+        record = json.loads(content)
+        if record["source_sha256"] != manifest.source.sha256:
+            return None
+        expected_policy = manifest.extractor.configuration.get("fusion_policy")
+        if expected_policy is None:
+            expected_policy = asdict(FusionPolicy())
+        if record.get("policy") != expected_policy:
+            return None
+        if json.dumps(record["configuration"], sort_keys=True) != json.dumps(processing_cache_configuration(), sort_keys=True):
+            return None
+        payload = record["payload"]
+        return payload if isinstance(payload, dict) else None
+    except (OSError, KeyError, TypeError, ValueError):
+        return None
+
+
 def _handle_dual_provider_fusion_method(
     manifest: ProcessingManifest, obligation_id: str
 ) -> MethodResult:
@@ -2375,14 +2408,8 @@ def _handle_dual_provider_fusion_method(
     Em modo single (FUSION_MODE=single) o método não é admissível e não
     deve ser selecionado pelo compilador.
 
-    Custo: a fusão reextrai o documento inteiro nos dois providers, sem
-    reutilizar a evidência que o ``ToolboxManifestExtractor`` já coletou em
-    ``FUSION_MODE=dual``. Cada passo ``fuse-providers`` paga, portanto, uma
-    extração dual completa (cache remoto da Toolbox à parte). Em regra o
-    documento não é reenviado: os dois providers leem o ``artifact_id`` que o
-    extrator registrou em ``manifest.extractor.configuration``. Se a Toolbox
-    não tiver mais esse artefato (expirado/removido), ``extract_fused`` faz o
-    upload do arquivo como fallback.
+    Reutiliza a fusão inicial quando hash, documento e configuração coincidem.
+    Evidência ausente, corrompida ou incompatível provoca reextração dual.
     """
     obligation = next(
         (o for o in manifest.obligations if o.id == obligation_id), None
@@ -2397,7 +2424,16 @@ def _handle_dual_provider_fusion_method(
     # Reuse the document the structure extractor already stored in the Toolbox.
     artifact_id = _source_artifact_id(manifest)
     try:
-        payload = _run_extract_fused(source_path, artifact_id=artifact_id)
+        payload = _reusable_fusion_payload(manifest)
+        if payload is None:
+            from docstruct.policy import FusionPolicy
+
+            policy_config = manifest.extractor.configuration.get("fusion_policy")
+            policy = FusionPolicy.from_dict(policy_config) if policy_config else None
+            if policy is None:
+                payload = _run_extract_fused(source_path, artifact_id=artifact_id)
+            else:
+                payload = _run_extract_fused(source_path, artifact_id=artifact_id, policy=policy)
     except Exception as exc:  # noqa: BLE001
         return MethodResult(
             success=False,
@@ -2622,27 +2658,49 @@ class DocumentTooLargeError(ValueError):
     """The document has more pages than ``MAX_PAGES`` (job-level failure)."""
 
 
-def _check_page_limit(manifest: ProcessingManifest) -> None:
-    """Refuses a document with more pages than ``MAX_PAGES``.
+def _check_page_count(page_count: int) -> None:
+    """Reject an oversized document as a whole with a user-facing message.
 
-    It runs right after the structural extraction, the first point where the
-    page count is always known, and before planning and the vision-model
-    calls. Only ``media.inspect`` runs before it, since whether the source is
-    a slide deck decides how it is extracted. Nothing is processed partially, and the message, which reaches the
-    end user, names the page count and the limit.
+    A verified PDF count may be checked before costly extraction. The
+    authoritative manifest count is checked afterwards for every format,
+    including those without a reliable preflight count. Neither check allows
+    partial processing beyond MAX_PAGES.
 
     Raises:
-        DocumentTooLargeError: When the manifest has more pages than the limit.
+        DocumentTooLargeError: When the page count exceeds MAX_PAGES.
     """
     from backend.config.settings import settings
 
-    page_count = len(manifest.pages)
     if page_count > settings.max_pages:
         raise DocumentTooLargeError(
             t(STAGE_DOCUMENT_TOO_MANY_PAGES).format(
                 page_count=page_count, max_pages=settings.max_pages
             )
         )
+
+
+def _check_page_limit_before_extraction(inspection: dict[str, Any] | None) -> None:
+    """Reject only PDF counts verified by the existing remote PDF parser.
+
+    Scanned content streams, unknown counts and non-PDF formats are not a
+    reliable early limit. They retain the authoritative post-extraction check.
+    No local operational parser is introduced (ADR-0003).
+    """
+    if not isinstance(inspection, dict):
+        return
+    count = inspection.get("page_count")
+    if (
+        inspection.get("is_pdf") is True
+        and inspection.get("page_count_source") == "pymupdf"
+        and type(count) is int
+        and count > 0
+    ):
+        _check_page_count(count)
+
+
+def _check_page_limit(manifest: ProcessingManifest) -> None:
+    """Authoritative limit after extraction, including formats without preflight."""
+    _check_page_count(len(manifest.pages))
 
 
 class PddlAccessibilityOrchestrator:
@@ -2743,6 +2801,7 @@ class PddlAccessibilityOrchestrator:
         # media.inspect runs first: a slide deck is extracted and structured
         # slide by slide, which has to be decided before extraction.
         media_inspection, media_configuration = await _inspect_media(source_path)
+        _check_page_limit_before_extraction(media_inspection)
         presentation = _is_presentation(media_inspection)
 
         if status_callback:
@@ -2778,6 +2837,9 @@ class PddlAccessibilityOrchestrator:
         from backend.config.settings import settings
 
         breaker = ProviderBreaker(settings.vision_breaker_threshold)
+        await _classify_formula_regions(
+            manifest, source_path, mode=effective_mode, breaker=breaker,
+        )
         await _enrich_picture_descriptions(
             manifest,
             source_path,
@@ -3623,6 +3685,143 @@ def _claim_negation_overlay(
             return
 
 
+def _reclassify_formula_picture(
+    manifest: ProcessingManifest,
+    element: ManifestElement,
+    output: VisionOutput,
+    image: bytes,
+    *,
+    source: str,
+) -> None:
+    """Keep the source evidence and reuse a non-mathematical description.
+
+    The crop the model read becomes the picture (``metadata.src``), as for a
+    region inspection, so the export shows the drawing it describes.
+    ``source`` records which call reclassified it: the candidate inspection
+    or the vision fallback of the formula recognition.
+    """
+    element.metadata["original_type"] = element.type
+    element.metadata["original_text"] = element.text
+    element.metadata["original_raw_label"] = element.raw_label
+    element.type = "picture"
+    element.raw_label = "picture"
+    element.text = output.description
+    element.metadata["vision_description_complete"] = True
+    element.metadata["vision_language"] = output.language
+    element.metadata["vision_confidence"] = output.confidence
+    element.metadata["vision_elements"] = list(output.mentioned_elements)
+    element.metadata["vision_warnings"] = list(output.warnings)
+    element.metadata["src"] = "data:image/png;base64," + base64.b64encode(image).decode("ascii")
+    element.metadata["formula_classification"] = {
+        "status": "picture",
+        "reason": source,
+        "confidence": output.confidence,
+        "warnings": list(output.warnings),
+    }
+    reconcile_reclassified_element_processing_needs(manifest, element, previous_type="formula")
+
+
+def _escalate_unresolved_formula(
+    manifest: ProcessingManifest, element: ManifestElement
+) -> None:
+    """Hand a region the model could not classify to a person, not to the math path.
+
+    Its ``verbalize-formula`` goes to ``human-review``; ``normalize-formula``
+    is dropped, since normalizing LaTeX the model could not tell is a formula
+    would treat it as one.
+    """
+    retained = []
+    for obligation in manifest.obligations:
+        if obligation.target_ids == [element.id]:
+            if obligation.kind in TYPE_BOUND_V23_KINDS["formula"]:
+                continue
+            if obligation.kind == "verbalize-formula":
+                obligation.admissible_methods = ["human-review"]
+                obligation.method_costs = {"human-review": 100}
+        retained.append(obligation)
+    manifest.obligations = retained
+    manifest.summary.obligation_count = len(manifest.obligations)
+
+
+async def _classify_formula_regions(
+    manifest: ProcessingManifest,
+    source_file: Path,
+    *,
+    mode: str,
+    breaker: ProviderBreaker,
+) -> None:
+    """Check extractor formula labels before a mathematical recognizer sees them.
+
+    A drawing is described once and reconciled as a picture before planning.
+    A candidate the model explicitly cannot classify (``classification_uncertain``)
+    keeps its source content and goes to human review. A call that gives no
+    answer (open breaker, no crop, model failure, empty description) is no
+    evidence against mathematics: the candidate stays ``unclassified`` and
+    takes the formula path it took before this check, whose vision fallback
+    can still reclassify it.
+    """
+    from backend.config.settings import settings
+
+    if manifest.source.media_type not in _RENDERABLE_MEDIA_TYPES:
+        return
+    candidates = [
+        element for element in manifest.elements
+        if element.type == "formula"
+        and not has_latex_markup(element.text)
+        and not element.metadata.get("latex_markup")
+    ]
+    if not candidates:
+        return
+    slots = asyncio.Semaphore(max(1, settings.vision_concurrency))
+    vision = VisionAgent(mode=mode)
+
+    async def classify(element: ManifestElement) -> None:
+        async with slots:
+            output = None
+            errors: list[str] = []
+            reason = "provider_blocked"
+            if not breaker.open:
+                reason = "crop_unavailable"
+                image, page = await run_blocking(
+                    _formula_recognition_crop, source_file, element,
+                    artifact_id=_source_artifact_id(manifest),
+                    media_type=manifest.source.media_type,
+                )
+                if image:
+                    reason = "model_failed"
+                    output = await vision.describe_region(
+                        image_bytes=image, classification="formula_candidate",
+                        page_num=page, total_pages=len(manifest.pages), mode=mode,
+                        full_budget=True, errors=errors,
+                    )
+                    breaker.record(isinstance(output, VisionOutput))
+            status = "unclassified"
+            if isinstance(output, VisionOutput):
+                if output.classification_uncertain:
+                    status, reason = "unresolved", "classification_uncertain"
+                elif output.kind == "formula":
+                    status, reason = "math", None
+                elif output.description.strip():
+                    _reclassify_formula_picture(
+                        manifest, element, output, image, source="candidate_inspection"
+                    )
+                    return
+                else:
+                    reason = "empty_description"
+            element.metadata["formula_classification"] = {
+                "status": status,
+                "reason": reason,
+                "confidence": output.confidence if output is not None else None,
+                "warnings": list(output.warnings) if output is not None else errors,
+            }
+            if status == "unresolved":
+                _escalate_unresolved_formula(manifest, element)
+
+    async with asyncio.TaskGroup() as group:
+        for element in candidates:
+            group.create_task(classify(element))
+
+
 async def _enrich_formula_latex(
     manifest: ProcessingManifest,
     source_file: Path,
@@ -3697,10 +3896,15 @@ async def _enrich_formula_latex(
 
     from backend.config.settings import settings
 
+    for element in manifest.elements:
+        separate_equation_number(element)
     formulas = [
         element
         for element in manifest.elements
-        if element.type == "formula" and not has_latex_markup(element.text)
+        if element.type == "formula"
+        and not has_latex_markup(element.text)
+        and not element.metadata.get("latex_markup")
+        and element.metadata.get("formula_classification", {}).get("status") != "unresolved"
     ]
     if not formulas:
         return
@@ -3803,7 +4007,8 @@ async def _enrich_formula_latex(
                 nonlocal agreement
                 if not latex or not text_layer:
                     return latex
-                score = latex_text_agreement(latex, text_layer)
+                expression, _ = split_equation_number(latex)
+                score = latex_text_agreement(expression, text_layer)
                 if score is None or score < settings.formula_text_agreement_min:
                     rejected[method] = None if score is None else round(score, 3)
                     return ""
@@ -3857,9 +4062,16 @@ async def _enrich_formula_latex(
                         mode=mode,
                         full_budget=True,
                     )
-                    # An answer the job cannot use (a description, a formula
-                    # without LaTeX) still counts as the model working.
+                    # A non-mathematical description can also correct the label.
                     breaker.record(output is not None)
+                if (
+                    output is not None and output.kind == "description"
+                    and output.description.strip() and not output.classification_uncertain
+                ):
+                    _reclassify_formula_picture(
+                        manifest, element, output, image_bytes, source="recognition_fallback"
+                    )
+                    return False
                 if output is not None and output.kind == "formula":
                     latex = accept(method, normalize_latex(output.formula_latex or ""))
                     confidence = output.confidence
@@ -3886,7 +4098,7 @@ async def _enrich_formula_latex(
             recognition["text_agreement"] = agreement
         if rejected:
             recognition["rejected"] = rejected
-        element.text = latex
+        element.text = preserve_equation_number(latex, element.metadata)
         element.metadata["formula_recognition"] = recognition
         return True
 
@@ -4824,6 +5036,8 @@ def build_pddl_structured_payload(
     text_output = _render_text_from_pages(pages_payload)
     configuration = manifest.extractor.configuration
     media_inspection_status = configuration.get("media_inspection")
+    fusion_status = configuration.get("fusion") or {}
+    unsatisfied_obligations = _unsatisfied_obligations(manifest)
 
     technical_warnings: list[str] = []
     if execution_report is None:
@@ -4832,7 +5046,7 @@ def build_pddl_structured_payload(
         )
     elif execution_report.status in {
         "failed", "replan-required",
-    } or _unsatisfied_selected_obligations(manifest):
+    } or unsatisfied_obligations:
         # A replan that leaves an exhausted refinement out can still report
         # `completed`; the open obligation must reach the document anyway. The
         # ids are in `pddl_unsatisfied_obligations`, so the warning stays short.
@@ -4865,6 +5079,16 @@ def build_pddl_structured_payload(
             "reparo desabilitado (LEGACY_UNICODE_REPAIR=detect)."
         )
 
+    extraction_degraded = records_extraction_degradation(
+        configuration.get("extraction_degraded")
+    )
+    if extraction_degraded:
+        technical_warnings.append(
+            t(MSG_STRUCTURAL_EXTRACTION_DEGRADED).format(
+                provider=configuration.get("toolbox_provider", manifest.extractor.name)
+            )
+        )
+
     return {
         "text": text_output,
         "pages": pages_payload,
@@ -4889,13 +5113,21 @@ def build_pddl_structured_payload(
             "pddl_comparison_verdict": comparison.comparison.verdict
             if comparison
             else None,
-            "pddl_unsatisfied_obligations": _unsatisfied_obligations(manifest),
+            "pddl_unsatisfied_obligations": unsatisfied_obligations,
             # The open obligations a delivered document still has, for the
             # result e-mail: the job page and e-mail show no technical warning.
             "pddl_unsatisfied_summary": _unsatisfied_summary(manifest)
-            if _unsatisfied_selected_obligations(manifest)
+            if unsatisfied_obligations
             else None,
             "pddl_toolbox_availability": toolbox_availability,
+            "pddl_fusion": fusion_status or None,
+            **(
+                {
+                    "pddl_extraction_degraded": True,
+                    "pddl_extraction_failures": configuration.get("extraction_failures", {}),
+                }
+                if extraction_degraded else {}
+            ),
             # Pictures and tables left undescribed or unread, by reason; a rerun
             # once the model provider or the Toolbox is back may deliver them.
             "pddl_visual_failures": visual_failures,
@@ -4912,8 +5144,17 @@ def build_pddl_structured_payload(
         "technical_warnings": technical_warnings,
         # A step degraded by a Toolbox or model failure must not be replayed
         # from the cache once the service is back.
-        "cacheable": media_inspection_status != "failed"
-        and not records_visual_failures(visual_failures),
+        "cacheable": (
+            media_inspection_status != "failed"
+            and fusion_status.get("status") != "degraded"
+            and execution_report is not None
+            and execution_report.status in {"completed", "dry-run-completed"}
+            and not any(
+                item["recovery"] != "human-review" for item in unsatisfied_obligations
+            )
+            and not records_visual_failures(visual_failures)
+            and not extraction_degraded
+        ),
     }
 
 
@@ -4959,6 +5200,16 @@ def records_visual_failures(failures: Any) -> bool:
     )
 
 
+def records_extraction_degradation(flag: Any) -> bool:
+    """Whether the structural extraction came from one provider of a dual run.
+
+    ``flag`` is the extractor's ``extraction_degraded`` or, on a cached entry,
+    ``canonical_metadata.pddl_extraction_degraded``. A run that records it is
+    not cached, and a cached entry that does is not replayed.
+    """
+    return flag is True
+
+
 def _unsatisfied_obligations(manifest: ProcessingManifest) -> list[dict[str, Any]]:
     """Selected obligations the execution left unsatisfied.
 
@@ -4980,6 +5231,10 @@ def _unsatisfied_obligations(manifest: ProcessingManifest) -> list[dict[str, Any
                 "last_method": last.method if last else None,
                 "last_message": last.message if last else None,
                 "escalated": bool(last and last.method == "human-review"),
+                "recovery": (
+                    "human-review" if last and last.method == "human-review"
+                    and obligation.kind in NON_CRITICAL_OBLIGATION_KINDS else "retry"
+                ),
             }
         )
     return unsatisfied
@@ -5304,6 +5559,7 @@ def _elements_to_blocks(
     callout_titles = _callout_titles(elements)
     recovered_items, consumed_text, preambles = _recover_empty_lettered_list_items(elements)
     blocks: list[dict[str, Any]] = []
+    dropped_empty_items: list[ManifestElement] = []
     for element in elements:
         if element.id in replacements:
             blocks.append(replacements[element.id])
@@ -5328,12 +5584,26 @@ def _elements_to_blocks(
             for item in block.get("items", [])
         ):
             blocks.append(block)
+        else:
+            dropped_empty_items.append(element)
         blocks.extend(_element_to_block(kept) for kept in _text_kept_by_picture(element))
+    if dropped_empty_items:
+        # The extractor found list items it could not read; the document
+        # goes without them, which the operator should be able to see.
+        logger.warning(
+            t(LOG_PDDL_EMPTY_LIST_ITEMS_DROPPED).format(
+                count=len(dropped_empty_items),
+                page=dropped_empty_items[0].page_number,
+                element_ids=", ".join(item.id for item in dropped_empty_items),
+            )
+        )
     return _merge_list_blocks(blocks)
 
 
+#: ``a)`` at the start of the text or after whitespace: a letter after any
+#: other character (``(a)``, ``x(a)``) is an enumeration inside prose.
 _LETTERED_LIST_SOURCE_MARKER = re.compile(
-    r"(?<![\w])(?P<marker>[A-Za-z])\)(?=\s)"
+    r"(?:^|(?<=\s))(?P<marker>[A-Za-z])\)(?=\s)"
 )
 
 
@@ -5353,6 +5623,10 @@ def _recover_empty_lettered_list_items(
     paragraph's list text is consumed once, avoiding duplicate output. A
     preamble after the first item moves before it, keeping the exercise's
     introduction ahead of its questions.
+
+    The last item runs to the end of the paragraph: a sentence after it (a
+    closing remark) stays in that item, since a question can itself span
+    several sentences and no marker says where it ends.
     """
     sections: dict[str, int] = {}
     section = 0

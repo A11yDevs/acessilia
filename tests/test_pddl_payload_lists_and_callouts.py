@@ -316,6 +316,49 @@ def test_empty_items_without_markers_can_recover_text_in_their_section() -> None
     assert page["blocks"][2]["numbering"] == "lower-alpha"
 
 
+def test_parenthesized_letters_in_prose_are_not_list_markers() -> None:
+    source_text = "The options (a) x and (b) y are given."
+    page = _page([
+        _item(1, "", "a)", "exercise-list"),
+        _item(2, "", "b)", "exercise-list"),
+        _element(3, "paragraph", source_text),
+    ])
+
+    assert [block["type"] for block in page["blocks"]] == ["paragraph"]
+    assert page["blocks"][0]["text"] == source_text
+
+
+def test_a_sentence_after_the_last_question_stays_in_it() -> None:
+    """No marker says where the last question ends, and a question can span
+    sentences: the paragraph's tail stays in the last item, nothing is lost."""
+    page = _page([
+        _item(1, "", "a)", "exercise-list"),
+        _item(2, "", "b)", "exercise-list"),
+        _element(3, "paragraph", "a) First b) Second. This sentence closes the paragraph."),
+    ])
+
+    [list_block] = page["blocks"]
+    assert list_block["items"] == ["First", "Second. This sentence closes the paragraph."]
+
+
+def test_dropped_empty_list_items_are_logged() -> None:
+    from backend.tools.logger import logger
+
+    warnings: list[str] = []
+    sink = logger.add(warnings.append, level="WARNING", format="{message}")
+    try:
+        blocks = _blocks([
+            _item(1, "  ", "a)", "exercise-list"),
+            _item(2, "", "b)", "exercise-list"),
+        ])
+    finally:
+        logger.remove(sink)
+
+    assert not any(block.get("type") == "list" for block in blocks)
+    [message] = warnings
+    assert message.strip() == "PDDL: 2 list item(s) without text left out of page 1: el-1, el-2"
+
+
 def test_page_text_numbers_an_ordered_list() -> None:
     page = _page([
         _item(1, "Rewrite the expression", "i.", "group-a"),

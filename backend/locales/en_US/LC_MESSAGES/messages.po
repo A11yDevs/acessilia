@@ -1064,8 +1064,8 @@ msgstr "Your E-mail"
 msgid "We will send the final files to this address."
 msgstr "We will send the final files to this address."
 
-msgid "Attach a Document (PDF or Image)"
-msgstr "Attach a Document (PDF or Image)"
+msgid "Attach a Document (PDF, HTML or Image)"
+msgstr "Attach a Document (PDF, HTML or Image)"
 
 msgid "Make Accessible"
 msgstr "Make Accessible"
@@ -1258,6 +1258,17 @@ msgstr "Worker: task completed: {filename}. Waiting for the next..."
 msgid "Acessilia API started (queue worker + cleanup active)"
 msgstr "Acessilia API started (queue worker + cleanup active)"
 
+msgid ""
+"Artifact storage bypassed for independent Toolbox endpoints; the source "
+"file will be sent again for extraction, fusion and text spans."
+msgstr ""
+"Artifact storage bypassed for independent Toolbox endpoints; the source "
+"file will be sent again for extraction, fusion and text spans."
+
+#, python-brace-format
+msgid "Artifact upload unavailable ({error}); extracting from the source file."
+msgstr "Artifact upload unavailable ({error}); extracting from the source file."
+
 #, python-brace-format
 msgid "Error in the API: {error} | Path: {path}"
 msgstr "Error in the API: {error} | Path: {path}"
@@ -1441,6 +1452,14 @@ msgstr ""
 #, python-brace-format
 msgid "Failed to extract the image clip for element {element_id}"
 msgstr "Failed to extract the image clip for element {element_id}"
+
+#, python-brace-format
+msgid ""
+"PDDL: {count} list item(s) without text left out of page {page}: "
+"{element_ids}"
+msgstr ""
+"PDDL: {count} list item(s) without text left out of page {page}: "
+"{element_ids}"
 
 #, python-brace-format
 msgid ""
@@ -1713,6 +1732,16 @@ msgstr ""
 
 #, python-brace-format
 msgid ""
+"[page {page_num}] Context limit exceeded for region {type}; retrying once"
+" with a smaller image ({size_before} -> {size_after} bytes) and "
+"max_tokens={max_tokens}: {error}"
+msgstr ""
+"[page {page_num}] Context limit exceeded for region {type}; retrying once"
+" with a smaller image ({size_before} -> {size_after} bytes) and "
+"max_tokens={max_tokens}: {error}"
+
+#, python-brace-format
+msgid ""
 "[page {page_num}] Vision description for region {type} exceeded the "
 "{limit}-token budget and was truncated ({chars} characters kept)"
 msgstr ""
@@ -1780,6 +1809,10 @@ msgstr ""
 #, python-brace-format
 msgid "[page {page_num}] Sending region to vision ({size} bytes, type={type})"
 msgstr "[page {page_num}] Sending region to vision ({size} bytes, type={type})"
+
+#, python-brace-format
+msgid "Vision context recovery could not reduce its image: {error}"
+msgstr "Vision context recovery could not reduce its image: {error}"
 
 #, python-brace-format
 msgid ""
@@ -1876,6 +1909,18 @@ msgid "Failed to send the status message: {error}"
 msgstr "Failed to send the status message: {error}"
 
 #, python-brace-format
+msgid "Structural provider {provider} failed ({error}); extraction is degraded."
+msgstr "Structural provider {provider} failed ({error}); extraction is degraded."
+
+#, python-brace-format
+msgid ""
+"Dual fusion skipped: the primary and secondary providers are both "
+"{provider}."
+msgstr ""
+"Dual fusion skipped: the primary and secondary providers are both "
+"{provider}."
+
+#, python-brace-format
 msgid "Failed to edit the status message: {error}"
 msgstr "Failed to edit the status message: {error}"
 
@@ -1939,6 +1984,16 @@ msgstr "Page {page_number} references unknown elements: {element_ids}"
 #, python-brace-format
 msgid "{path} ends at {char_end}, before its start {char_start}"
 msgstr "{path} ends at {char_end}, before its start {char_start}"
+
+#, python-brace-format
+msgid ""
+"Structural extraction used only {provider} because the other provider "
+"failed. The document requires review; dual-provider comparison was not "
+"available."
+msgstr ""
+"Structural extraction used only {provider} because the other provider "
+"failed. The document requires review; dual-provider comparison was not "
+"available."
 
 msgid "document"
 msgid_plural "documents"

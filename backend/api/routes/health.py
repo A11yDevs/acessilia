@@ -6,13 +6,43 @@ from datetime import UTC, datetime
 
 import httpx
 from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
 
+from acessilia_sdk.toolbox import vlm_provider_healthy
+from backend.ai.models.ai_client import active_model_name
 from backend.api.limiter import limiter
 from backend.api.schemas import HealthResponse
 from backend.config.settings import settings
 from backend.services.queue_service import unified_queue
+from backend.tools.toolbox_client import toolbox_endpoints, toolbox_vlm_endpoint
 
 router = APIRouter(tags=["health"])
+
+
+@router.get("/ready")
+async def ready() -> JSONResponse:
+    """Readiness follows the mandatory extraction chain, without inference.
+
+    Ready when one Toolbox endpoint reports every structural provider the
+    extraction needs healthy (``/v1/providers/{provider}/health``, the probe
+    the VLM health check uses too).
+    """
+    providers = {settings.toolbox_provider}
+    if settings.fusion_mode == "dual":
+        providers.add(settings.fusion_secondary_provider)
+    for endpoint in toolbox_endpoints():
+        for provider in sorted(providers):
+            if not await vlm_provider_healthy(
+                endpoint,
+                provider,
+                api_key=settings.toolbox_api_key,
+                timeout_seconds=3.0,
+            ):
+                break
+        else:
+            return JSONResponse({"status": "ready"})
+    return JSONResponse({"status": "unavailable", "dependency": "toolbox"}, status_code=503)
+
 
 #: The auto-update timer runs every 300 s (UPDATE_INTERVAL in scripts/ops.sh);
 #: like `ops.sh auto-update check`, a last check older than three intervals means
@@ -20,6 +50,12 @@ router = APIRouter(tags=["health"])
 #: If UPDATE_INTERVAL changes in ops.sh, update this too, or /health reports
 #: false staleness between legitimate checks.
 UPDATE_CHECK_STALE_SECONDS = 3 * 300
+
+#: The Toolbox gives the VLM server 10 s to answer its own health probe, so the
+#: 3 s of the other clients would report a slow but healthy model as down. The
+#: container's healthcheck gives this whole route 10 s (docker-compose*.yml),
+#: which caps the wait below the Toolbox's.
+TOOLBOX_VLM_HEALTH_TIMEOUT_SECONDS = 8.0
 
 
 def _get_container_id() -> str:
@@ -71,6 +107,13 @@ def _update_check_is_stale(last_check: str, now: datetime | None = None) -> bool
 
 
 async def _check_model_reachable() -> bool:
+    if settings.ai_client == "toolbox":
+        return await vlm_provider_healthy(
+            toolbox_vlm_endpoint(),
+            settings.toolbox_vlm_provider,
+            api_key=settings.toolbox_api_key,
+            timeout_seconds=TOOLBOX_VLM_HEALTH_TIMEOUT_SECONDS,
+        )
     try:
         async with httpx.AsyncClient(timeout=3.0) as http:
             if settings.ai_client == "ollama":
@@ -87,11 +130,7 @@ async def _check_model_reachable() -> bool:
 @router.get("/health", response_model=HealthResponse)
 @limiter.limit("30/minute")
 async def health(request: Request):
-    model_name = (
-        settings.ollama_model
-        if settings.ai_client == "ollama"
-        else settings.openrouter_model
-    )
+    model_name = active_model_name()
     staging = _read_staging_status()
     ghcr_latest = _staging_str(staging, "latest_digest")
     running_digest = _staging_str(staging, "running_digest") or settings.image_digest

@@ -167,6 +167,11 @@ class Settings:
         default_factory=lambda: os.getenv("INLINE_MATH_DETECTION", "fonts").strip().lower()
     )
 
+    # Bump on remote model deployments that retain the same URL/model name.
+    processing_model_revision: str = field(
+        default_factory=lambda: os.getenv("PROCESSING_MODEL_REVISION", "")
+    )
+
     # Fusão multi-provider (Fase 4 do plano docstruct)
     # "single": comportamento atual (um provider, fallback PyMuPDF).
     # "dual": extrai com dois providers e funde via docstruct.fusion.
@@ -205,6 +210,13 @@ class Settings:
     # only, which should point at the load balancer in front of the replicas.
     toolbox_base_urls: str = field(
         default_factory=lambda: os.getenv("TOOLBOX_BASE_URLS", "")
+    )
+    # With AI_CLIENT=toolbox, the Toolbox VLM provider that serves the agents'
+    # chats through the Toolbox VLM gateway (docs/adr/0012).
+    toolbox_vlm_provider: str = field(
+        default_factory=lambda: os.getenv(
+            "TOOLBOX_VLM_PROVIDER", provider_default("toolbox_vlm_provider")
+        )
     )
     # Structural extraction keeps the historical TOOLBOX_PROVIDER variable for
     # backward compatibility. Specialized capabilities use providers bound to
@@ -574,9 +586,6 @@ def _default_extensions() -> set[str]:
         ".jpeg",
         ".tiff",
         ".tif",
-        ".bmp",
-        ".gif",
-        ".webp",
         ".docx",
         ".html",
     }

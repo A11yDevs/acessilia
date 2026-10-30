@@ -138,8 +138,11 @@ LOCALE=pt_BR
 LOG_LEVEL=DEBUG
 ```
 
-Duas observações:
+Três observações:
 
+- `AI_CLIENT=openrouter` não vale mais: o `docker-compose.staging.yml` fixa
+  `AI_CLIENT=toolbox` (#331, [ADR-0012](adr/0012-agents-reach-the-vlm-through-the-toolbox.pt-br.md)),
+  que vence o `.env`, então `OPENROUTER_MODEL` também não é lido.
 - `STRUCTURER` aparece duas vezes. O valor efetivo é `toolbox`, correto para o pipeline
   PDDL, mas a duplicata é uma armadilha latente para quem editar o arquivo depois.
 - `TOOLBOX_BASE_URL` aponta para a URL pública do proxy reverso

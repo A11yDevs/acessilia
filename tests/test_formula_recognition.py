@@ -161,6 +161,98 @@ def _capture_logs(level: str) -> tuple[list[tuple[str, str]], int]:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("suffix", [r"\tag{1}", r"\quad(1)", " (1)"])
+async def test_recognition_separates_equation_number(monkeypatch, cropped, suffix):
+    manifest = _formula_manifest()
+    monkeypatch.setattr(
+        pddl, "toolbox_recognize_formula",
+        lambda image, **kwargs: [{"latex": r"x=\frac{a}{b}" + suffix}],
+    )
+    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+    element = manifest.elements[0]
+    assert element.text == r"x=\frac{a}{b}"
+    assert element.metadata["equation_number"] == "1"
+
+
+@pytest.mark.asyncio
+async def test_source_equation_number_survives_unlabelled_recognition(monkeypatch, cropped):
+    manifest = _formula_manifest("x = a / b (7)")
+    monkeypatch.setattr(
+        pddl, "toolbox_recognize_formula",
+        lambda image, **kwargs: [{"latex": r"x=\frac{a}{b}"}],
+    )
+    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+    element = manifest.elements[0]
+    assert element.text == r"x=\frac{a}{b}"
+    assert element.metadata["equation_number"] == "7"
+    assert element.metadata["formula_recognition"]["method"] == "math.recognize"
+
+
+@pytest.mark.asyncio
+async def test_vision_equation_number_is_preserved(monkeypatch, cropped):
+    manifest = _formula_manifest()
+    monkeypatch.setattr(pddl, "toolbox_recognize_formula", lambda image, **kwargs: [])
+    FakeVision.output = VisionOutput(
+        kind="formula", formula_latex=r"x=\frac{a}{b}\tag{2}",
+        language="und", confidence=0.8,
+    )
+    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+    element = manifest.elements[0]
+    assert element.text == r"x=\frac{a}{b}"
+    assert element.metadata["equation_number"] == "2"
+    assert element.metadata["formula_recognition"]["method"] == "vision"
+
+
+@pytest.mark.asyncio
+async def test_existing_latex_separates_label_without_recognition(monkeypatch):
+    manifest = _formula_manifest(r"x=\frac{a}{b}\tag{3}")
+
+    def unexpected(*args, **kwargs):
+        pytest.fail("Existing LaTeX must not invoke recognition")
+
+    monkeypatch.setattr(pddl, "toolbox_recognize_formula", unexpected)
+    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+    assert manifest.elements[0].text == r"x=\frac{a}{b}"
+    assert manifest.elements[0].metadata["equation_number"] == "3"
+
+
+@pytest.mark.asyncio
+async def test_a_latex_label_alone_still_marks_the_formula_as_latex(monkeypatch):
+    """``x=y\\tag{1}`` came as LaTeX; without its label nothing else is a
+    command, but the extractor's LaTeX is kept and no recognition is paid."""
+    from types import SimpleNamespace
+
+    from backend.core.manifest.builder import separate_equation_number
+
+    element = SimpleNamespace(type="formula", text=r"x=y\tag{1}", metadata={})
+    separate_equation_number(element)
+    assert (element.text, element.metadata) == (
+        "x=y", {"equation_number": "1", "latex_markup": True}
+    )
+
+    manifest = _formula_manifest(r"x=y\tag{1}")
+
+    def unexpected(*args, **kwargs):
+        pytest.fail("Existing LaTeX must not invoke recognition")
+
+    monkeypatch.setattr(pddl, "toolbox_recognize_formula", unexpected)
+    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+    assert manifest.elements[0].text == "x=y"
+    assert manifest.elements[0].metadata["equation_number"] == "1"
+
+
+@pytest.mark.asyncio
+async def test_a_plain_text_label_does_not_mark_the_formula_as_latex():
+    from types import SimpleNamespace
+
+    from backend.core.manifest.builder import separate_equation_number
+
+    element = SimpleNamespace(type="formula", text="x = y (1)", metadata={})
+    separate_equation_number(element)
+    assert (element.text, element.metadata) == ("x = y", {"equation_number": "1"})
+
+
+@pytest.mark.asyncio
 async def test_a_recognizer_answering_without_latex_is_logged(monkeypatch, cropped):
     """A page-level provider (docling-math) finds nothing in a chip and is not
     an outage: each fallback is a DEBUG line and the document gets one INFO
@@ -342,7 +434,7 @@ async def test_a_formula_without_a_crop_is_skipped(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_a_vision_description_does_not_fill_the_formula(monkeypatch, cropped):
+async def test_a_vision_description_reclassifies_the_formula(monkeypatch, cropped):
     manifest = _formula_manifest()
     FakeVision.output = VisionOutput(
         kind="description", description="A chart", language="en", confidence=0.9
@@ -356,7 +448,10 @@ async def test_a_vision_description_does_not_fill_the_formula(monkeypatch, cropp
 
     await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
 
-    assert manifest.elements[0].text is None
+    assert manifest.elements[0].text == "A chart"
+    assert manifest.elements[0].type == "picture"
+    assert manifest.elements[0].metadata["vision_description_complete"] is True
+    assert manifest.obligations[0].kind == "describe-image"
     assert "formula_recognition" not in manifest.elements[0].metadata
 
 

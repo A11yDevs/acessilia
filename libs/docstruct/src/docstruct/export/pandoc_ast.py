@@ -13,6 +13,10 @@ from docstruct.sections import section_body_blocks, section_title_alias
 from docstruct.tables.ast import effective_section_width, row_header_column_count
 from docstruct.tables.ast import split_header_and_body
 from docstruct.tables.ast import table_ast_from_block
+from docstruct.text.equations import equation_number
+from docstruct.text.equations import numbered_latex
+from docstruct.text.equations import numbered_speech
+from docstruct.text.equations import split_equation_number
 from docstruct.text.math_spans import inline_math_entries
 from docstruct.text.math_spans import split_inline_math
 
@@ -69,10 +73,11 @@ def _has_unsafe_latex_macro(latex: str) -> bool:
     )
 
 
-def build_pandoc_ast(document: dict[str, Any]) -> dict[str, Any]:
+def build_pandoc_ast(document: dict[str, Any], *, target_format: str = "latex") -> dict[str, Any]:
+    """Build math tags for LaTeX, or portable equation labels for DOCX."""
     blocks = []
     for section in document.get("sections", []):
-        blocks.extend(_section_to_blocks(section))
+        blocks.extend(_section_to_blocks(section, target_format=target_format))
     return {
         "pandoc-api-version": [1, 23, 1],
         "meta": {
@@ -91,7 +96,7 @@ def build_pandoc_ast(document: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _section_to_blocks(section: dict[str, Any]) -> list[dict[str, Any]]:
+def _section_to_blocks(section: dict[str, Any], *, target_format: str = "latex") -> list[dict[str, Any]]:
     # An untitled section (the text before the first heading) gets no Header:
     # an empty one is tagged as an empty H1, as the HTML and text exports skip it.
     blocks = (
@@ -112,13 +117,13 @@ def _section_to_blocks(section: dict[str, Any]) -> list[dict[str, Any]]:
     if alias:
         blocks.insert(0, {"t": "Div", "c": [[alias, [], []], []]})
     for block in section_body_blocks(section):
-        blocks.extend(_block_to_ast(block))
+        blocks.extend(_block_to_ast(block, target_format=target_format))
     for child in section.get("children", []):
-        blocks.extend(_section_to_blocks(child))
+        blocks.extend(_section_to_blocks(child, target_format=target_format))
     return blocks
 
 
-def _block_to_ast(block: dict[str, Any]) -> list[dict[str, Any]]:
+def _block_to_ast(block: dict[str, Any], *, target_format: str = "latex") -> list[dict[str, Any]]:
     block_type = block.get("type")
     if block_type == "heading":
         return [
@@ -166,15 +171,17 @@ def _block_to_ast(block: dict[str, Any]) -> list[dict[str, Any]]:
             }
         ]
     if block_type == "math":
-        latex = str(block.get("text", ""))
+        metadata = block.get("metadata") or {}
+        latex = numbered_latex(str(block.get("text", "")), metadata, use_tag=target_format != "docx")
         if _has_unsafe_latex_macro(latex):
-            return [{"t": "Para", "c": _meta_inlines(latex)}]
+            return [{"t": "Para", "c": _meta_inlines(_math_as_text(latex))}]
         # A math block is a formula of its own, so it is display math. This
         # reaches every Pandoc writer: DOCX typesets it as a display equation
         # (oMathPara) where it used to be inline. (The HTML export does not go
         # through this AST.)
         math = {"t": "Math", "c": [{"t": "DisplayMath"}, latex]}
-        alt_text = str(block.get("alt_text") or "").strip()
+        speech = block.get("alt_text") or (block.get("text", "") if equation_number(metadata) else "")
+        alt_text = numbered_speech(str(speech).strip(), metadata)
         if alt_text:
             # The PDF/UA renderer gives a formula in this span its spoken form
             # as the Formula element's alternate text, instead of the LaTeX
@@ -292,7 +299,7 @@ def _degrade_node(node: Any) -> Any:
                 latex = ""
                 if isinstance(item.get("c"), list) and len(item["c"]) > 1:
                     latex = str(item["c"][1])
-                rebuilt.extend(_meta_inlines(latex))
+                rebuilt.extend(_meta_inlines(_math_as_text(latex)))
             elif _is_formula_span(item):
                 rebuilt.extend(_degrade_node(item["c"][1]))
             else:
@@ -301,6 +308,16 @@ def _degrade_node(node: Any) -> Any:
     if isinstance(node, dict) and "c" in node:
         return {**node, "c": _degrade_node(node["c"])}
     return node
+
+
+def _math_as_text(latex: str) -> str:
+    """A formula shown as text: its equation label as the reader sees it, ``(1)``.
+
+    ``\\tag{1}`` (or the DOCX ``\\qquad\\text{(1)}``) is a command only the math
+    renderer reads; left in text it would be read out as a backslash and a word.
+    """
+    expression, number = split_equation_number(latex)
+    return f"{expression} ({number})" if number else latex
 
 
 def _is_formula_span(node: Any) -> bool:

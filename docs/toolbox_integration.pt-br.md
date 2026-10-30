@@ -59,7 +59,7 @@ falha, o core recebe `ToolboxCapabilityError` ou `ToolboxContractViolation`.
 
 Todas herdam de `ToolboxError` (definida no SDK, `acessilia_sdk.toolbox.errors`, e re-exportada por `backend/tools/toolbox_client.py`):
 
-- `ToolboxProviderUnavailable` — serviço/provedor indisponível (ex.: HTTP 503)
+- `ToolboxProviderUnavailable` — serviço/provedor indisponível (HTTP 502, 503)
 - `ToolboxTimeout` — excedeu `toolbox_timeout_seconds`
 - `ToolboxUnsupportedMediaType` — tipo de mídia não suportado
 - `ToolboxArtifactNotFound` — artefato inexistente
@@ -303,7 +303,7 @@ A capacidade `media.inspect` (provider `pure-media-inspect`, PR
   `TOOLBOX_MEDIA_INSPECT_ENABLED=false` ele devolve `None` sem chamar a Toolbox,
   e uma falha na Toolbox levanta `ToolboxError`.
 - **Integração:** `backend/agents/pddl_orchestrator.py` chama
-  `inspect_source_media()` **antes** da extração e usa dois sinais:
+  `inspect_source_media()` **antes** da extração e usa três sinais:
   - `document_genre` (`pure-media-inspect` 1.1.0+): um PDF informado como
     `presentation` é extraído só pelo provider configurado (sem fusão dual) e
     estruturado slide a slide (`backend/core/manifest/slides.py`): um H1 para a
@@ -347,6 +347,12 @@ A capacidade `media.inspect` (provider `pure-media-inspect`, PR
   - `requires_visual_inspection`, para injetar um elemento `picture` de página
     inteira quando a entrada é imagem isolada sem blocos visuais — garantindo a
     audiodescrição pelo VisionAgent.
+  - `page_count` com `page_count_source` (`artifact/media-inspection@1`,
+    `pure-media-inspect` 1.0.0+): um PDF cuja contagem veio do `pymupdf` e
+    passa de `MAX_PAGES` é recusado antes da extração estrutural. Qualquer
+    outra origem (`content_stream_scan`, `pillow`, `null`), um campo ausente ou
+    uma inspeção que falhou pula essa checagem antecipada; o limite continua
+    aplicado sobre o manifesto extraído.
 
   O sinal só alimenta essa heurística, então uma falha da etapa (qualquer
   exceção, não só `ToolboxError`) não derruba o job: o processamento segue sem
@@ -409,9 +415,9 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 | `TOOLBOX_CATALOG_REFRESH_SECONDS` | `60` | Por quanto tempo um snapshot do catálogo é reutilizado |
 | `TOOLBOX_CATALOG_STALE_SECONDS` | `900` | Por quanto tempo o último snapshot válido é servido quando o catálogo não pode ser lido |
 | `TOOLBOX_TIMEOUT_SECONDS` | `3600` | Timeout das requisições |
-| `TOOLBOX_RETRIES` | `1` | Novas tentativas no mesmo endpoint após timeout ou instância indisponível (503/504), em todo cliente de capacidade; `0` as desliga (ADR-0006). O timeout também é retentado, então o pior caso de uma chamada pendurada é `TOOLBOX_TIMEOUT_SECONDS × (TOOLBOX_RETRIES + 1)` por endpoint de `TOOLBOX_BASE_URLS` (2 h por endpoint com os padrões) |
+| `TOOLBOX_RETRIES` | `1` | Novas tentativas no mesmo endpoint após timeout ou instância indisponível (502/503/504), em todo cliente de capacidade; `0` as desliga (ADR-0006). O timeout também é retentado, então o pior caso de uma chamada pendurada é `TOOLBOX_TIMEOUT_SECONDS × (TOOLBOX_RETRIES + 1)` por endpoint de `TOOLBOX_BASE_URLS` (2 h por endpoint com os padrões) |
 | `TOOLBOX_RETRY_BACKOFF_SECONDS` | `0.5` | Base do backoff exponencial entre as tentativas, com jitter |
-| `TOOLBOX_USE_ARTIFACT_STORE` | `true` | Envia o arquivo para `/v1/artifacts` antes de extrair |
+| `TOOLBOX_USE_ARTIFACT_STORE` | `true` | Envia o arquivo para `/v1/artifacts` antes de extrair, quando os clientes compartilham uma implantação. Com endpoints independentes em `TOOLBOX_BASE_URLS`, o arquivo vai diretamente em cada chamada (ADR-0013); uma falha transitória do upload (timeout, indisponibilidade) também recai no envio direto |
 | `TOOLBOX_USE_REMOTE_CACHE` | `true` | Usa o cache remoto (`no_cache=false`) |
 | `TOOLBOX_MEDIA_INSPECT_PROVIDER` | `pure-media-inspect` | Provider da capacidade `media.inspect` |
 | `TOOLBOX_MEDIA_INSPECT_ENABLED` | `true` | Executa `media.inspect` na Toolbox ou pula a etapa. Não há fallback local: com `false`, a etapa é pulada; uma falha na Toolbox é registrada no log e no manifesto, o processamento segue sem o sinal de imagem isolada e o resultado degradado não é cacheado |
@@ -440,9 +446,19 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 | `FUSION_APPLY_PAGE_ROUTES` | `true` | Em `FUSION_MODE=dual`, usa a página do provider secundário onde o roteador determinístico a prefere (tabelas, fórmulas, página primária quase vazia); o texto corrido fica com `TOOLBOX_PROVIDER`. `false` mantém todas as páginas do provider primário |
 
 > `TOOLBOX_USE_ARTIFACT_STORE` e `TOOLBOX_USE_REMOTE_CACHE` afetam diretamente o
-> fluxo de extração: com o artifact store ativo, o core envia o arquivo uma vez e
-> reutiliza o `artifact_id`; com o cache remoto ativo, a Toolbox pode responder a
-> partir do `cache_key` sem reprocessar.
+> fluxo de extração: com o artifact store ativo e uma única implantação, o core
+> envia o arquivo uma vez e reutiliza o `artifact_id`; com vários endpoints
+> independentes, ou após uma falha transitória do upload, ele envia o arquivo em
+> cada chamada de extração, então o `artifact_id` fica `null` e as etapas
+> seguintes (fusão, text spans) reenviam o arquivo. Com o cache remoto ativo, a
+> Toolbox pode responder a partir do `cache_key` sem reprocessar.
+>
+> Em `FUSION_MODE=dual`, uma falha de provider (timeout, indisponibilidade ou um
+> erro HTTP não mapeado, como 500) de qualquer um dos dois degrada a extração
+> para o outro: o documento leva um aviso técnico (`extraction_degraded`,
+> `extraction_failures`) e não é cacheado. Uma recusa do próprio documento
+> (mídia não suportada, entrada inválida, contrato, autenticação) pelo primário
+> derruba o job; pelo secundário, só degrada.
 
 ---
 
@@ -452,8 +468,10 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 service.py: _build_orchestrator()
   └─ PddlAccessibilityOrchestrator(extractor_backend="toolbox")
        └─ ToolboxManifestExtractor (backend/core/manifest/toolbox_extractor.py)
-            ├─ [artifact store] upload_artifact() → /v1/artifacts
-            └─ extract_structure(artifact_id=..., use_remote_cache=...)
+            ├─ [artifact store, uma implantação] upload_artifact() → /v1/artifacts
+            │    (falha transitória → envio direto)
+            ├─ extract_structure(artifact_id=... | file_path=..., use_remote_cache=...)
+            └─ [dual] extract_structure() secundário → fusão, ou degrada para um provider
                  → POST /v1/capabilities/document.structure.extract:execute
                  → ToolboxExtraction (configuration: toolbox_base_url, provider, artifact_id, cache_key)
        └─ InformationalStructuralAgent.process() → manifest
