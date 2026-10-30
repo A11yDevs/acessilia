@@ -6,6 +6,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from backend.agents.pddl_orchestrator import build_pddl_structured_payload
 from backend.core.manifest.models import (
     ExtractorRun,
@@ -110,6 +112,33 @@ def test_callout_title_comes_from_the_repaired_title_text() -> None:
     assert note["title"] == "Notes on the r\u00e9sum\u00e9:"
 
 
+@pytest.mark.parametrize("slide_role,level", [("slide_heading", 2), ("deck_title", 1)])
+@pytest.mark.parametrize("callout_type", ["note", "warning"])
+def test_slide_heading_takes_precedence_over_inherited_callout(
+    slide_role: str, level: int, callout_type: str
+) -> None:
+    heading = _element(
+        1, "title" if level == 1 else "heading", "Slide 37 of 42: vitamin C",
+        slide_role=slide_role, callout_id="callout-auto-000045",
+        callout_role="content", callout_type=callout_type, callout_title="OH",
+    )
+    heading.hierarchy_level = level
+    page = _page([
+        heading,
+        _element(2, "paragraph", "A real callout.", callout_id="callout-auto-000045",
+                 callout_role="content", callout_type=callout_type, callout_title="OH"),
+    ])
+
+    assert page["blocks"][0]["type"] == "heading"
+    assert page["blocks"][0]["level"] == level
+    assert page["blocks"][1]["type"] == callout_type
+    assert page["blocks"][1]["title"] == "OH"
+    ast = build_pandoc_ast({"title": "Deck", "language": "en", "sections": [
+        {"id": "slide-37", "blocks": page["blocks"]},
+    ]})
+    assert any(block["t"] == "Header" and block["c"][0] == level for block in ast["blocks"])
+
+
 def test_numbered_items_of_one_list_become_one_ordered_list() -> None:
     blocks = _blocks([
         _item(1, "First remark.", "1.", "group-a"),
@@ -146,6 +175,188 @@ def test_a_lettered_item_after_a_formula_keeps_its_letter() -> None:
 
     assert blocks[0]["numbering"] == "lower-alpha" and "start" not in blocks[0]
     assert blocks[2]["numbering"] == "lower-alpha" and blocks[2]["start"] == 2
+
+
+def test_empty_lettered_items_recover_text_from_a_sibling_paragraph() -> None:
+    heading = _element(
+        1,
+        "heading",
+        "Slide 37 of 42: vitamin C",
+        slide_role="slide_heading",
+    )
+    heading.hierarchy_level = 2
+    items = [
+        _item(3, "", "a)", "exercise-list"),
+        _item(4, "", "b)", "exercise-list"),
+        _item(5, "", "c)", "exercise-list"),
+    ]
+    item_text = (
+        "a) minimum formula of vitamin C "
+        "b) mass percent composition of the minimum formula "
+        "c) mass percent composition of the molecular formula"
+    )
+    page = _page(
+        [
+            heading,
+            _element(2, "paragraph", "Calculate the following for vitamin C:"),
+            *items,
+            _element(6, "paragraph", item_text),
+            _element(7, "picture", "Structure of the vitamin C molecule"),
+            _element(8, "caption", "Structural formula"),
+        ]
+    )
+
+    blocks = page["blocks"]
+    assert blocks[0]["type"] == "heading"
+    assert blocks[0]["level"] == 2
+    assert blocks[0]["text"] == "Slide 37 of 42: vitamin C"
+    [list_block] = [block for block in blocks if block["type"] == "list"]
+    assert list_block["numbering"] == "lower-alpha"
+    assert list_block["items"] == [
+        "minimum formula of vitamin C",
+        "mass percent composition of the minimum formula",
+        "mass percent composition of the molecular formula",
+    ]
+    assert not any(
+        block.get("type") == "list"
+        and not any(str(item).strip() for item in block.get("items", []))
+        for block in blocks
+    )
+    for item in list_block["items"]:
+        assert page["text"].count(item) == 1
+    assert "Calculate the following for vitamin C:" in page["text"]
+    assert "a) minimum formula" not in page["text"]
+
+
+def test_an_empty_list_item_without_recoverable_text_is_not_exported() -> None:
+    blocks = _blocks([_item(1, "  ", "a)", "exercise-list")])
+
+    assert not any(block.get("type") == "list" for block in blocks)
+
+
+@pytest.mark.parametrize("source_order", [2, 4, 7], ids=["before", "between", "after"])
+def test_recovered_exercise_keeps_its_preamble_before_its_questions(source_order: int) -> None:
+    heading = _element(1, "heading", "Slide 37 of 42: vitamin C", slide_role="slide_heading")
+    heading.hierarchy_level = 2
+    source = _element(
+        source_order,
+        "paragraph",
+        "Calculate the following: a) First question b) Second question c) Third question",
+    )
+    elements = [
+        heading,
+        _item(3, "", "a)", "exercise-list"),
+        _item(5, "", "b)", "exercise-list"),
+        _item(6, "", "c)", "exercise-list"),
+        source,
+        _element(8, "picture", "Structural formula"),
+    ]
+    original = [element.model_dump() for element in elements]
+
+    page = _page(elements)
+
+    assert [element.model_dump() for element in elements] == original
+    assert [block["type"] for block in page["blocks"]] == [
+        "heading", "paragraph", "list", "image"
+    ]
+    assert page["blocks"][0]["level"] == 2
+    assert page["blocks"][1]["id"] == source.id
+    assert page["blocks"][1]["text"] == "Calculate the following:"
+    assert page["blocks"][2]["items"] == ["First question", "Second question", "Third question"]
+    for text in ["Calculate the following:", "First question", "Second question", "Third question"]:
+        assert page["text"].count(text) == 1
+
+
+@pytest.mark.parametrize(
+    "markers",
+    [("-",) * 3, ("•",) * 3, ("1.",) * 3, ("i.",) * 3, ("?",) * 3, ("a)", "b)", "-")],
+    ids=["dashes", "bullets", "decimal", "roman", "unsupported", "mixed"],
+)
+def test_empty_items_with_incompatible_markers_leave_sibling_text_alone(markers) -> None:
+    items = [
+        _item(index, "", marker, "unrelated-list")
+        for index, marker in enumerate(markers, start=1)
+    ]
+    source_text = "Reference examples: a) Alpha b) Beta c) Gamma"
+
+    page = _page([*items, _element(4, "paragraph", source_text)])
+
+    assert [block["type"] for block in page["blocks"]] == ["paragraph"]
+    assert page["blocks"][0]["text"] == source_text
+
+
+@pytest.mark.parametrize("markers", [("a)", "b)", "c)"), ("", "", "")])
+def test_empty_items_do_not_take_text_from_another_section(markers) -> None:
+    items = [
+        _item(index, "", marker, "exercise-list")
+        for index, marker in enumerate(markers, start=2)
+    ]
+    source_text = "Reference examples: a) Alpha b) Beta c) Gamma"
+    page = _page([
+        _element(1, "heading", "Exercise"),
+        *items,
+        _element(5, "heading", "Reference examples"),
+        _element(6, "paragraph", source_text),
+    ])
+
+    assert [block["type"] for block in page["blocks"]] == ["heading", "heading", "paragraph"]
+    assert page["blocks"][-1]["text"] == source_text
+
+
+def test_empty_items_without_markers_can_recover_text_in_their_section() -> None:
+    page = _page([
+        _element(1, "heading", "Exercise"),
+        *[_item(index, "", "", "exercise-list") for index in (2, 3, 4)],
+        _element(5, "paragraph", "Calculate: a) Alpha b) Beta c) Gamma"),
+    ])
+
+    assert [block["type"] for block in page["blocks"]] == ["heading", "paragraph", "list"]
+    assert page["blocks"][1]["text"] == "Calculate:"
+    assert page["blocks"][2]["items"] == ["Alpha", "Beta", "Gamma"]
+    assert page["blocks"][2]["numbering"] == "lower-alpha"
+
+
+def test_parenthesized_letters_in_prose_are_not_list_markers() -> None:
+    source_text = "The options (a) x and (b) y are given."
+    page = _page([
+        _item(1, "", "a)", "exercise-list"),
+        _item(2, "", "b)", "exercise-list"),
+        _element(3, "paragraph", source_text),
+    ])
+
+    assert [block["type"] for block in page["blocks"]] == ["paragraph"]
+    assert page["blocks"][0]["text"] == source_text
+
+
+def test_a_sentence_after_the_last_question_stays_in_it() -> None:
+    """No marker says where the last question ends, and a question can span
+    sentences: the paragraph's tail stays in the last item, nothing is lost."""
+    page = _page([
+        _item(1, "", "a)", "exercise-list"),
+        _item(2, "", "b)", "exercise-list"),
+        _element(3, "paragraph", "a) First b) Second. This sentence closes the paragraph."),
+    ])
+
+    [list_block] = page["blocks"]
+    assert list_block["items"] == ["First", "Second. This sentence closes the paragraph."]
+
+
+def test_dropped_empty_list_items_are_logged() -> None:
+    from backend.tools.logger import logger
+
+    warnings: list[str] = []
+    sink = logger.add(warnings.append, level="WARNING", format="{message}")
+    try:
+        blocks = _blocks([
+            _item(1, "  ", "a)", "exercise-list"),
+            _item(2, "", "b)", "exercise-list"),
+        ])
+    finally:
+        logger.remove(sink)
+
+    assert not any(block.get("type") == "list" for block in blocks)
+    [message] = warnings
+    assert message.strip() == "PDDL: 2 list item(s) without text left out of page 1: el-1, el-2"
 
 
 def test_page_text_numbers_an_ordered_list() -> None:

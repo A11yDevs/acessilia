@@ -157,6 +157,7 @@ from backend.log_messages import (
     LOG_PDDL_VISION_RETRY_PASS_PICTURES,
     LOG_PDDL_VISION_RETRY_PASS_TABLES,
     LOG_PDDL_ELEMENT_CROP_FAILED,
+    LOG_PDDL_EMPTY_LIST_ITEMS_DROPPED,
     LOG_PDDL_PREFERRED_PLAN_MISSING,
     LOG_PDDL_PROBLEM_HASH_MISMATCH,
     LOG_PDDL_DOMAIN_HASH_MISMATCH,
@@ -844,6 +845,7 @@ MESSAGES: tuple[str, ...] = (
     LOG_PDDL_TABLE_REREAD_REJECTED,
     LOG_PROVIDER_BREAKER_OPEN,
     LOG_PDDL_ELEMENT_CROP_FAILED,
+    LOG_PDDL_EMPTY_LIST_ITEMS_DROPPED,
     LOG_PDDL_PREFERRED_PLAN_MISSING,
     LOG_PDDL_PROBLEM_HASH_MISMATCH,
     LOG_PDDL_DOMAIN_HASH_MISMATCH,
@@ -1639,6 +1641,10 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         LOG_PROVIDER_BREAKER_OPEN: (
             "{failures} chamadas de visão seguidas sem resposta utilizável; "
             "as chamadas restantes deste job serão puladas"
+        ),
+        # List items with no text left out of the document; {count}, {page}, {element_ids}.
+        LOG_PDDL_EMPTY_LIST_ITEMS_DROPPED: (
+            "PDDL: {count} item(ns) de lista sem texto deixado(s) fora da página {page}: {element_ids}"
         ),
         LOG_PDDL_ELEMENT_CROP_FAILED: (
             "Falha ao extrair recorte de imagem para elemento {element_id}"

@@ -1455,6 +1455,14 @@ msgstr "Failed to extract the image clip for element {element_id}"
 
 #, python-brace-format
 msgid ""
+"PDDL: {count} list item(s) without text left out of page {page}: "
+"{element_ids}"
+msgstr ""
+"PDDL: {count} list item(s) without text left out of page {page}: "
+"{element_ids}"
+
+#, python-brace-format
+msgid ""
 "Preferred planner backend {backend} did not produce a valid plan in both "
 "mode"
 msgstr ""

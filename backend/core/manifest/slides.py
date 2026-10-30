@@ -423,6 +423,9 @@ def _fold_figure_labels(
     Handing the labels to the model was tried on 006.pdf and made it worse: a
     structural formula's atom letters ("H", "O", "SOH") pushed it to transcribe
     the drawing as a formula, garbled or cut off.
+
+    Text split back from another page stays as text: its provenance can span
+    separate pictures, so its first box cannot assign it to one of them.
     """
     pictures = _content_pictures(body, page_fractions)
     if not pictures:
@@ -440,6 +443,7 @@ def _fold_figure_labels(
             not text
             or not hosts
             or element.raw_label in _DECORATION
+            or element.metadata.get("split_from")
             or not _reads_as_label(text)
         ):
             kept.append(element)
@@ -491,6 +495,7 @@ def _absorb_near_pictures(
                 or box is None
                 or element.type not in _NEAR_LABEL_TYPES | {"caption"}
                 or element.raw_label in _DECORATION
+                or element.metadata.get("split_from")
             ):
                 continue
             label = _reads_as_label(text)

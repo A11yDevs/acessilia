@@ -457,6 +457,10 @@ LOG_PDDL_VISION_RETRY_PASS_TABLES: tuple[str, str] = (
     "{count} tables without a usable reading from the model; "
     "trying again in {delay}s",
 )
+#: Warning logged when list items with no text are left out of the delivered document; {count} items, the {page} they are on and their {element_ids}.
+LOG_PDDL_EMPTY_LIST_ITEMS_DROPPED: str = (
+    "PDDL: {count} list item(s) without text left out of page {page}: {element_ids}"
+)
 #: Exception logged when extracting an element's image clip from the source PDF for the PDDL pipeline fails; {element_id} is the failing element's id.
 LOG_PDDL_ELEMENT_CROP_FAILED: str = (
     "Failed to extract the image clip for element {element_id}"
