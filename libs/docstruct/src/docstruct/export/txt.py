@@ -11,6 +11,7 @@ from docstruct.blocks.lists import item_label, list_numbering, list_start
 from docstruct.profiles import filter_blocks_for_profile
 from docstruct.sections import section_body_blocks
 from docstruct.tables.ast import linearize_table_for_text, table_ast_from_block
+from docstruct.text.equations import numbered_speech
 from docstruct.text.math_spans import inline_math_entries, split_inline_math
 
 DEFAULT_FORMULA_LABEL = "Fórmula: {text}"
@@ -79,7 +80,8 @@ def _render_block(block: dict[str, Any], formula_label: str = DEFAULT_FORMULA_LA
     if block_type == "image":
         return [block.get("alt_text") or block.get("text", "")]
     if block_type == "math":
-        return [block.get("alt_text") or formula_label.format(text=block.get('text', ''))]
+        speech = block.get("alt_text") or formula_label.format(text=block.get('text', ''))
+        return [numbered_speech(speech, block.get("metadata") or {})]
     if block_type in {"details", "note", "warning", "quote"}:
         return [_prose_text(block.get("text", ""), block)]
     return [block.get("text", "")]

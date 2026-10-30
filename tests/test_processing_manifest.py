@@ -93,6 +93,24 @@ def test_obligations_come_from_the_core_policy_not_the_payload(tmp_path: Path):
     assert all(o.kind != "toolbox-only" for o in manifest.obligations)
 
 
+@pytest.mark.parametrize("suffix", [r"\tag{1}", r"\quad(1)", " (1)"])
+def test_formula_number_is_preserved_before_planning(tmp_path, suffix):
+    from backend.agents.pddl_orchestrator import _element_to_block
+    from docstruct.canonical import build_canonical_document
+    from docstruct.export.markdown import document_to_markdown
+
+    response = json.loads(TOOLBOX_RESPONSE.read_text(encoding="utf-8"))
+    formula = next(e for e in response["document"]["elements"] if e["type"] == "formula")
+    formula["text"] = r"x=\frac{a}{b}" + suffix
+    manifest = _build_from_response(tmp_path, response)
+    built = next(e for e in manifest.elements if e.id == formula["id"])
+    assert built.text == r"x=\frac{a}{b}"
+    assert built.metadata["equation_number"] == "1"
+    block = _element_to_block(built)
+    document = build_canonical_document({"pages": [{"blocks": [block]}]})
+    assert r"x=\frac{a}{b}\tag{1}" in document_to_markdown(document)
+
+
 def test_callout_metadata_from_the_toolbox_passes_through(tmp_path: Path):
     # The PDDL orchestrator turns these fields into note/warning blocks.
     callout = {

@@ -25,6 +25,7 @@ from docstruct.tables.ast import (
     raw_rows_from_table_ast as _rows_from_table_ast,
 )
 from docstruct.tables.garble import table_garble_reason
+from docstruct.text.equations import preserve_equation_number, split_equation_number
 from docstruct.text.inline_math import (
     InlineMathDetection,
     TextSpan,
@@ -64,6 +65,7 @@ from backend.core.manifest.builder import (
     _derive_processing_needs,
     is_unstructured_page_placeholder,
     reconcile_reclassified_element_processing_needs,
+    separate_equation_number,
     unicode_repair_text,
 )
 from backend.core.manifest.models import (
@@ -3752,10 +3754,14 @@ async def _enrich_formula_latex(
 
     from backend.config.settings import settings
 
+    for element in manifest.elements:
+        separate_equation_number(element)
     formulas = [
         element
         for element in manifest.elements
-        if element.type == "formula" and not has_latex_markup(element.text)
+        if element.type == "formula"
+        and not has_latex_markup(element.text)
+        and not element.metadata.get("latex_markup")
     ]
     if not formulas:
         return
@@ -3858,7 +3864,8 @@ async def _enrich_formula_latex(
                 nonlocal agreement
                 if not latex or not text_layer:
                     return latex
-                score = latex_text_agreement(latex, text_layer)
+                expression, _ = split_equation_number(latex)
+                score = latex_text_agreement(expression, text_layer)
                 if score is None or score < settings.formula_text_agreement_min:
                     rejected[method] = None if score is None else round(score, 3)
                     return ""
@@ -3941,7 +3948,7 @@ async def _enrich_formula_latex(
             recognition["text_agreement"] = agreement
         if rejected:
             recognition["rejected"] = rejected
-        element.text = latex
+        element.text = preserve_equation_number(latex, element.metadata)
         element.metadata["formula_recognition"] = recognition
         return True
 

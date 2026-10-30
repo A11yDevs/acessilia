@@ -206,6 +206,7 @@ trabalho de benchmark produziu, todas como funções puras:
 | `docstruct.text.negation_overlay` | reattaches a detached negation slash to its relation by position (unambiguous cases only) |
 | `docstruct.text.latex` | LaTeX normalization |
 | `docstruct.text.math_spans` | inline math spans in prose |
+| `docstruct.text.equations` | display equation labels (`\tag{1}`, `\quad(1)`, `(1)`) split into `metadata.equation_number` and restored per export |
 | `docstruct.text.inline_math` | inline math from text-layer fonts and baselines |
 | `docstruct.imaging.policy` | pure upscale/orientation decisions (no PIL/cv2) |
 | `docstruct.evaluation.holdout` | the tune/holdout split and the acceptance criteria |
@@ -350,7 +351,45 @@ ou decidir re-inferência sem passar pelo planejador PDDL.
 
 ---
 
-## 6. Documentação relacionada
+## 6. Números de equações em destaque
+
+`docstruct.text.equations` separa um sufixo `\tag{1}`, `\quad(1)` ou `(1)`
+não ambíguo de uma fórmula em destaque. O core aplica isso ao construir o
+manifesto de processamento e ao aceitar reconhecimento por OCR ou visão.
+O construtor canônico aplica a mesma regra aos blocos matemáticos estruturados.
+
+A expressão permanece em `text`; o identificador original fica em
+`metadata.equation_number`. Um identificador existente e válido tem prioridade
+sobre o resultado do reconhecimento. Conversores e verbalizadores recebem a
+expressão sem o rótulo, e a concordância do reconhecimento compara expressões
+sem o rótulo.
+
+A AST Pandoc do PDF/UA e o Markdown do benchmark restauram `\tag{1}`.
+O DOCX usa `\qquad\text{(1)}`, pois o conversor de matemática do Word do
+Pandoc não aceita `\tag` isolado. O HTML mostra o número ao lado da fórmula
+e o inclui no rótulo acessível do elemento `<math>`; o número visual
+(`.equation-number`, à direita da fórmula) fica oculto da tecnologia assistiva
+para evitar a repetição desse rótulo. O TXT e seus consumidores de áudio
+mantêm o número na representação falada. Quando o PDF/UA recai nas fórmulas
+como texto, o rótulo aparece como `(1)`, e não como `\tag{1}`. Renderizações
+repetidas não duplicam o rótulo: `\qquad\text{(1)}` é lido de volta como as
+outras formas.
+
+Uma fórmula cujo único comando LaTeX era o rótulo (`x=y\tag{1}`) recebe
+`metadata.latex_markup`, e o reconhecimento continua a tratá-la como LaTeX
+entregue pelo extrator.
+
+A detecção de sufixos é conservadora, sem interpretar TeX arbitrário. Ela não
+cria números ausentes, renumera equações nem transforma referências em links.
+Parênteses que podem completar uma operação, como `x = (1)` e `x = y + (1)`,
+continuam na expressão. Um `(1)` solto só é rótulo depois de uma relação
+(`=`, `<`, `>`, `\neq`, `\le`, `\approx`, `\sim`, `\propto`, `\to`, `\in` e
+afins); uma expressão que termina numa delas o mantém. `f(1)` sem separação
+também fica intacto. Os
+identificadores aceitam dígitos com componentes separados por pontos e sufixo
+de letra ou prefixo de apêndice, como `1`, `2.3`, `4a` e `A.1`.
+
+## 7. Documentação relacionada
 
 - [libs/docstruct/README.md](../../libs/docstruct/README.md) — API pública.
 - [pmv_agno_pddl.md](pmv_agno_pddl.md) — orquestração PDDL e o método

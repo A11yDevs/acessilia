@@ -16,6 +16,7 @@ from docstruct.export.filters import apply_output_profile_filter
 from docstruct.profiles import normalize_profile
 from docstruct.sections import section_body_blocks, section_title_alias
 from docstruct.tables.ast import split_header_and_body, table_ast_from_block
+from docstruct.text.equations import equation_number, numbered_speech
 from docstruct.text.math_spans import inline_math_entries, split_inline_math
 
 
@@ -215,17 +216,25 @@ def _render_block(
         )
         return f'<figure id="{block_id}"><img alt="{alt}" src="{escape(block.get("metadata", {}).get("src", ""))}">{details}</figure>'
     if block_type == "math":
-        alt = escape(block.get("alt_text", ""))
+        metadata = block.get("metadata") or {}
+        number = equation_number(metadata)
+        speech = block.get("alt_text") or (block.get("text", "") if number else "")
+        label = numbered_speech(str(speech), metadata)
+        alt = escape(label)
+        number_html = (
+            f'<span class="equation-number" aria-hidden="true">({escape(number)})</span>'
+            if number else ""
+        )
         mathml = _safe_mathml(
-            (block.get("metadata") or {}).get("mathml", ""),
-            aria_label=block.get("alt_text", ""),
-            display="block",
+            metadata.get("mathml", ""), aria_label=label, display="block"
         )
         if mathml:
-            return f'<div id="{block_id}">{mathml}</div>'
+            # A numbered equation is a row: the formula, its number on the right.
+            css_class = ' class="equation"' if number_html else ""
+            return f'<div id="{block_id}"{css_class}>{mathml}{number_html}</div>'
         return (
             f'<p id="{block_id}" role="math" aria-label="{alt}">'
-            f'{escape(block.get("text", ""))}</p>'
+            f'{escape(block.get("text", ""))}{number_html}</p>'
         )
     if block_type in {"details", "note", "warning", "quote"}:
         summary = escape(block.get("title", block_type.title()))
@@ -374,6 +383,9 @@ def document_to_html(
         "table{border-collapse:collapse;background:#fff}",
         "th,td{border:1px solid #999;padding:.35rem .75rem;text-align:left;vertical-align:top}",
         "th{background:#f3f4f6}",
+        ".equation{display:flex;align-items:center}",
+        ".equation>math{flex:1 1 auto}",
+        ".equation-number{margin-left:1em;white-space:nowrap}",
         "</style>",
         "</head>",
         "<body>",
