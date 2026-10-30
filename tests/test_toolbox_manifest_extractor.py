@@ -628,11 +628,16 @@ def test_dual_extraction_handles_each_provider_independently(
         if not primary_ok:
             assert result.cache_key == "secondary-key"
             assert result.version == "secondary-version"
+        fusion = result.configuration["fusion"]
         if not (primary_ok and secondary_ok):
             assert result.configuration["extraction_degraded"] is True
             assert "fusion_evidence" not in result.document
+            assert fusion["status"] == "degraded"
+            assert fusion["providers"] == ["docling" if primary_ok else "mineru"]
+            assert fusion["failed_providers"] == ["mineru" if primary_ok else "docling"]
         else:
             assert "fusion_evidence" in result.document
+            assert fusion["status"] == "complete"
     mock_client.extract_structure.assert_awaited_once()
     secondary.extract_structure.assert_awaited_once()
     secondary.close.assert_awaited_once()
