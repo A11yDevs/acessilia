@@ -11,8 +11,8 @@ from docstruct.blocks.lists import item_label, list_numbering, list_start
 from docstruct.profiles import filter_blocks_for_profile
 from docstruct.sections import section_body_blocks
 from docstruct.tables.ast import linearize_table_for_text, table_ast_from_block
-from docstruct.text.math_spans import inline_math_entries, split_inline_math
 from docstruct.text.equations import numbered_speech
+from docstruct.text.math_spans import inline_math_entries, split_inline_math
 
 DEFAULT_FORMULA_LABEL = "Fórmula: {text}"
 

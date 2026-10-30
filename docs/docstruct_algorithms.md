@@ -197,6 +197,7 @@ benchmark work produced, all as pure functions:
 | `docstruct.text.negation_overlay` | reattaches a detached negation slash to its relation by position (unambiguous cases only) |
 | `docstruct.text.latex` | LaTeX normalization |
 | `docstruct.text.math_spans` | inline math spans in prose |
+| `docstruct.text.equations` | display equation labels (`\tag{1}`, `\quad(1)`, `(1)`) split into `metadata.equation_number` and restored per export |
 | `docstruct.text.inline_math` | inline math from text-layer fonts and baselines |
 | `docstruct.imaging.policy` | pure upscale/orientation decisions (no PIL/cv2) |
 | `docstruct.evaluation.holdout` | the tune/holdout split and the acceptance criteria |
@@ -354,16 +355,24 @@ its label, and recognition agreement compares expressions without the label.
 PDF/UA's Pandoc AST and benchmark Markdown restore an explicit `\tag{1}`.
 DOCX uses `\qquad\text{(1)}` instead, because Pandoc's Word math converter
 does not accept a standalone `\tag`. HTML shows the number beside the formula
-and includes it in the accessible label; the visible number is hidden from
-assistive technology to avoid announcing that label twice. TXT and its audio
-consumers retain the number in the spoken representation. Repeated rendering
-does not duplicate a label.
+and includes it in the `<math>` element's accessible label; the visible number
+(`.equation-number`, right of the formula) is hidden from assistive technology
+to avoid announcing that label twice. TXT and its audio consumers retain the
+number in the spoken representation. When PDF/UA falls back to formulas as
+text, the label shows as `(1)`, not as `\tag{1}`. Repeated rendering does not
+duplicate a label: `\qquad\text{(1)}` is read back like the other forms.
+
+A formula whose label was its only LaTeX command (`x=y\tag{1}`) keeps
+`metadata.latex_markup`, so recognition still treats it as LaTeX the extractor
+delivered.
 
 This is conservative suffix recognition, not arbitrary TeX parsing. It does
 not create missing numbers, renumber equations, or resolve references into
 hyperlinks. Parentheses that could complete an operation, such as `x = (1)`
-or `x = y + (1)`, remain part of the expression. Unseparated `f(1)` also stays
-unchanged. Identifiers are limited to digits with optional dotted components
+or `x = y + (1)`, remain part of the expression. A bare `(1)` is a label only
+after a relation (`=`, `<`, `>`, `\neq`, `\le`, `\approx`, `\sim`, `\propto`,
+`\to`, `\in` and the like); an expression ending on one keeps it. Unseparated
+`f(1)` also stays unchanged. Identifiers are limited to digits with optional dotted components
 and letter suffixes or an appendix prefix, such as `1`, `2.3`, `4a` and `A.1`.
 
 ## 7. Related documentation

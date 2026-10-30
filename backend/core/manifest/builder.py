@@ -6,6 +6,9 @@ from collections import Counter
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from docstruct.text.equations import preserve_equation_number
+from docstruct.text.latex import has_latex_markup
+
 from backend.i18n import t
 from backend.log_messages import (
     LOG_MANIFEST_STRUCTURAL_CONTAINER_SKIPPED,
@@ -19,7 +22,6 @@ from backend.log_messages import (
     MSG_OBSERVATION_PAGE_WITHOUT_STRUCTURE,
 )
 from backend.tools.logger import logger
-from docstruct.text.equations import preserve_equation_number
 
 from backend.core.manifest.models import (
     Artifact,
@@ -225,6 +227,26 @@ def build_processing_manifest(
     )
 
 
+def separate_equation_number(element: ManifestElement) -> None:
+    """Move a formula's trailing equation label into ``metadata.equation_number``.
+
+    A label written as LaTeX (``x=y\\tag{1}``) proves the extractor already
+    delivered LaTeX, even when nothing else in the expression is a command:
+    ``metadata.latex_markup`` keeps that, so formula recognition still skips
+    it once the label is gone.
+    """
+    if element.type != "formula" or not element.text:
+        return
+    original = element.text
+    element.text = preserve_equation_number(original, element.metadata)
+    if (
+        element.text != original
+        and has_latex_markup(original)
+        and not has_latex_markup(element.text)
+    ):
+        element.metadata["latex_markup"] = True
+
+
 def _build_from_toolbox_json(
     source_path: Path,
     extraction: ToolboxExtraction,
@@ -286,8 +308,7 @@ def _build_from_toolbox_json(
 
     manifest = ProcessingManifest.model_validate(data)
     for element in manifest.elements:
-        if element.type == "formula" and element.text:
-            element.text = preserve_equation_number(element.text, element.metadata)
+        separate_equation_number(element)
     secondary = extraction.document.get("secondary_extraction")
     secondary_path = (
         str(secondary["path"])

@@ -16,8 +16,8 @@ from docstruct.export.filters import apply_output_profile_filter
 from docstruct.profiles import normalize_profile
 from docstruct.sections import section_body_blocks, section_title_alias
 from docstruct.tables.ast import split_header_and_body, table_ast_from_block
-from docstruct.text.math_spans import inline_math_entries, split_inline_math
 from docstruct.text.equations import equation_number, numbered_speech
+from docstruct.text.math_spans import inline_math_entries, split_inline_math
 
 
 @dataclass
@@ -229,7 +229,9 @@ def _render_block(
             metadata.get("mathml", ""), aria_label=label, display="block"
         )
         if mathml:
-            return f'<div id="{block_id}">{mathml}{number_html}</div>'
+            # A numbered equation is a row: the formula, its number on the right.
+            css_class = ' class="equation"' if number_html else ""
+            return f'<div id="{block_id}"{css_class}>{mathml}{number_html}</div>'
         return (
             f'<p id="{block_id}" role="math" aria-label="{alt}">'
             f'{escape(block.get("text", ""))}{number_html}</p>'
@@ -381,6 +383,9 @@ def document_to_html(
         "table{border-collapse:collapse;background:#fff}",
         "th,td{border:1px solid #999;padding:.35rem .75rem;text-align:left;vertical-align:top}",
         "th{background:#f3f4f6}",
+        ".equation{display:flex;align-items:center}",
+        ".equation>math{flex:1 1 auto}",
+        ".equation-number{margin-left:1em;white-space:nowrap}",
         "</style>",
         "</head>",
         "<body>",

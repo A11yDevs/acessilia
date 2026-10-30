@@ -204,7 +204,13 @@ def _enrich_math_blocks(
             if block.get("type") != "math":
                 continue
             metadata = block.get("metadata") or {}
-            block["text"] = preserve_equation_number(str(block.get("text") or ""), metadata)
+            original = str(block.get("text") or "")
+            block["text"] = preserve_equation_number(original, metadata)
+            if block["text"] != original:
+                # A conversion carried in (a promoted span's) described the
+                # labelled text, so the number would show twice: redo it.
+                metadata.pop("mathml", None)
+                metadata.pop("verbalization", None)
             if metadata:
                 block["metadata"] = metadata
             latex = block.get("text", "")

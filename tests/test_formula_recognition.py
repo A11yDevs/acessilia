@@ -217,6 +217,42 @@ async def test_existing_latex_separates_label_without_recognition(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_a_latex_label_alone_still_marks_the_formula_as_latex(monkeypatch):
+    """``x=y\\tag{1}`` came as LaTeX; without its label nothing else is a
+    command, but the extractor's LaTeX is kept and no recognition is paid."""
+    from types import SimpleNamespace
+
+    from backend.core.manifest.builder import separate_equation_number
+
+    element = SimpleNamespace(type="formula", text=r"x=y\tag{1}", metadata={})
+    separate_equation_number(element)
+    assert (element.text, element.metadata) == (
+        "x=y", {"equation_number": "1", "latex_markup": True}
+    )
+
+    manifest = _formula_manifest(r"x=y\tag{1}")
+
+    def unexpected(*args, **kwargs):
+        pytest.fail("Existing LaTeX must not invoke recognition")
+
+    monkeypatch.setattr(pddl, "toolbox_recognize_formula", unexpected)
+    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+    assert manifest.elements[0].text == "x=y"
+    assert manifest.elements[0].metadata["equation_number"] == "1"
+
+
+@pytest.mark.asyncio
+async def test_a_plain_text_label_does_not_mark_the_formula_as_latex():
+    from types import SimpleNamespace
+
+    from backend.core.manifest.builder import separate_equation_number
+
+    element = SimpleNamespace(type="formula", text="x = y (1)", metadata={})
+    separate_equation_number(element)
+    assert (element.text, element.metadata) == ("x = y", {"equation_number": "1"})
+
+
+@pytest.mark.asyncio
 async def test_a_recognizer_answering_without_latex_is_logged(monkeypatch, cropped):
     """A page-level provider (docling-math) finds nothing in a chip and is not
     an outage: each fallback is a DEBUG line and the document gets one INFO

@@ -8,11 +8,22 @@ from docstruct.text.latex import bare_latex
 
 _NUMBER = r"(?:[A-Za-z]\.)?[0-9]+(?:\.[0-9]+)*[A-Za-z]?"
 _TAG = re.compile(rf"(?<!\\)\\tag\s*\{{\s*({_NUMBER})\s*\}}\s*$")
-_SPACED = re.compile(rf"(?<!\\)\\(?:qquad|quad)\s*\(\s*({_NUMBER})\s*\)\s*$")
+#: ``\quad(1)``, and ``\qquad\text{(1)}``, the label the DOCX export writes.
+_SPACED = re.compile(
+    rf"(?<!\\)\\(?:qquad|quad)\s*"
+    rf"(?:\(\s*({_NUMBER})\s*\)|\\text\s*\{{\s*\(\s*({_NUMBER})\s*\)\s*\}})\s*$"
+)
 _PLAIN = re.compile(rf"(?P<separator>\s+|(?<=[.;]))\(\s*({_NUMBER})\s*\)\s*$")
 _VALID_NUMBER = re.compile(rf"{_NUMBER}\Z")
+#: Relations that make the left side a complete equation, so a bare ``(n)``
+#: after it is a label. Each also ends an expression that is still open.
+_RELATION = (
+    r"=|<|>|\\(?:equiv|approx|leq?|geq?|neq?|lt|gt|ll|gg|sim|simeq|cong|propto"
+    r"|to|rightarrow|Rightarrow|leftrightarrow|iff|in|subset|subseteq)(?![A-Za-z])"
+)
 _TRAILING_OPERATOR = re.compile(
-    r"(?:[=+*/<>:,\-]|\\(?:times|cdot|div|pm|mp|sin|cos|tan|log|ln|exp|sqrt|sum|prod|int|lim))\s*$"
+    rf"(?:[=+*/<>:,\-]|{_RELATION}"
+    r"|\\(?:times|cdot|div|pm|mp|sin|cos|tan|log|ln|exp|sqrt|sum|prod|int|lim)(?![A-Za-z]))\s*$"
 )
 
 
@@ -33,9 +44,9 @@ def split_equation_number(latex: str) -> tuple[str, str | None]:
             return latex, None
         if r"\tag" in expression:
             return latex, None
-        if pattern is _PLAIN and not re.search(r"=|\\(?:equiv|approx|leq?|geq?)\b", expression):
+        if pattern is _PLAIN and not re.search(_RELATION, expression):
             return latex, None
-        return expression, match.group(match.lastindex or 1)
+        return expression, next(group for group in match.groups()[::-1] if group)
     return latex, None
 
 

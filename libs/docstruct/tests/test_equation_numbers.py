@@ -16,6 +16,12 @@ from docstruct.export.txt import document_to_txt_lines
     ("x = 28h.(1)", "x = 28h.", "1"),
     (r"$$x=y\tag{01}$$", "x=y", "01"),
     (r"x=y\tag{A.1}", "x=y", "A.1"),
+    (r"x=y\qquad\text{(4)}", "x=y", "4"),
+    (r"x=y\quad\text{ (5) }", "x=y", "5"),
+    ("a < b (6)", "a < b", "6"),
+    (r"x \neq 0 (7)", r"x \neq 0", "7"),
+    (r"f \propto g (8)", r"f \propto g", "8"),
+    (r"x \to \infty (9)", r"x \to \infty", "9"),
 ])
 def test_split_label(source, expression, number):
     assert split_equation_number(source) == (expression, number)
@@ -25,6 +31,11 @@ def test_split_label(source, expression, number):
     "f(x) = (1)", "f(x) = (x + 1)", "x = y + (1)", "x(1)", "x + (1)",
     r"x = y \times (1)", r"x=\frac{1}{(2)}", r"x=y\tag{a}\tag{2}",
     r"x=y\tag{\input{file}}", "(1)", r"x=\sin (1)",
+    # An expression still open on a relation keeps its parentheses, whichever
+    # relation it is.
+    "x < (1)", r"x \le (1)", r"x \neq (1)",
+    # Without a relation there is no equation to number.
+    r"\sinh (1)", r"a \times b (1)",
 ])
 def test_ambiguous_or_unsafe_input_is_unchanged(source):
     assert split_equation_number(source) == (source, None)
@@ -37,6 +48,10 @@ def test_existing_number_and_idempotence():
     assert metadata["equation_number"] == "7"
     assert preserve_equation_number(expression, metadata) == expression
     assert numbered_latex(numbered_latex(expression, metadata), metadata) == r"x=y\tag{7}"
+    # The DOCX label is read back too, so rendering it twice adds no second one.
+    docx = numbered_latex(expression, metadata, use_tag=False)
+    assert docx == r"x=y\qquad\text{(7)}"
+    assert numbered_latex(docx, metadata, use_tag=False) == docx
 
 
 @pytest.mark.parametrize("value", [None, "", r"\input{file}"])
@@ -86,8 +101,15 @@ def test_number_survives_canonical_and_all_export_boundaries():
     assert enricher.converted == ["x=y"]
     assert enricher.spoken == ["x=y"]
     html = document_to_html(document)
-    assert 'aria-label="(1) x equals y"' in html
-    assert 'class="equation-number" aria-hidden="true">(1)</span>' in html
+    # The numbered speech labels the <math> itself (#321); the visible number
+    # sits beside it, hidden from the reader that already heard it.
+    assert (
+        '<div id="eq-1" class="equation"><math xmlns="http://www.w3.org/1998/Math/MathML" '
+        'aria-label="(1) x equals y" display="block">' in html
+    )
+    assert 'class="equation-number" aria-hidden="true">(1)</span></div>' in html
+    assert ".equation-number{margin-left:1em;white-space:nowrap}" in html
+    assert 'role="math"' not in html
     assert r"\tag{1}" not in html
     assert "(1) x equals y" in document_to_txt_lines(document)
     assert r"x=y\tag{1}" in document_to_markdown(document)
@@ -117,3 +139,38 @@ def test_unnumbered_block_is_unchanged_without_an_enricher():
 def test_numbered_formula_without_speech_keeps_expression_in_accessible_label():
     document = build_canonical_document({"pages": [{"blocks": [{"type": "math", "text": r"x=y\tag{1}"}]}]})
     assert 'aria-label="(1) x=y"' in document_to_html(document)
+
+
+def test_a_promoted_numbered_span_is_converted_without_its_label():
+    entry = {
+        "source": r"x=y \tag{1}",
+        "latex": r"x=y \tag{1}",
+        "mathml": "<math><mtext>labelled</mtext></math>",
+        "speech": "labelled speech",
+    }
+    enricher = RecordingMath()
+    document = build_canonical_document(
+        {"pages": [{"blocks": [{
+            "id": "p1", "type": "paragraph", "text": r"$x=y \tag{1}$",
+            "metadata": {"inline_math": [entry]},
+        }]}]},
+        math_enricher=enricher,
+    )
+
+    block = document["sections"][0]["blocks"][0]
+    assert (block["type"], block["text"]) == ("math", "x=y")
+    assert block["metadata"]["equation_number"] == "1"
+    assert enricher.converted == ["x=y"]
+    assert block["alt_text"] == "(1) x equals y"
+
+
+def test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag():
+    from docstruct.export.pandoc_ast import degrade_math_to_text
+
+    document, _ = numbered_document()
+
+    degraded = degrade_math_to_text(build_pandoc_ast(document))["blocks"]
+
+    assert degraded == [{"t": "Para", "c": [
+        {"t": "Str", "c": "x=y"}, {"t": "Space"}, {"t": "Str", "c": "(1)"},
+    ]}]

@@ -25,6 +25,7 @@ from docstruct.tables.ast import (
     raw_rows_from_table_ast as _rows_from_table_ast,
 )
 from docstruct.tables.garble import table_garble_reason
+from docstruct.text.equations import preserve_equation_number, split_equation_number
 from docstruct.text.inline_math import (
     InlineMathDetection,
     TextSpan,
@@ -33,7 +34,6 @@ from docstruct.text.inline_math import (
     splice_inline_math,
 )
 from docstruct.text.latex import has_latex_markup, latex_text_agreement
-from docstruct.text.equations import preserve_equation_number, split_equation_number
 from docstruct.text.math_spans import mask_inline_math
 from docstruct.text.norm_fix import norm_fix
 from docstruct.text.negation_overlay import (
@@ -65,6 +65,7 @@ from backend.core.manifest.builder import (
     _derive_processing_needs,
     is_unstructured_page_placeholder,
     reconcile_reclassified_element_processing_needs,
+    separate_equation_number,
     unicode_repair_text,
 )
 from backend.core.manifest.models import (
@@ -3754,12 +3755,13 @@ async def _enrich_formula_latex(
     from backend.config.settings import settings
 
     for element in manifest.elements:
-        if element.type == "formula" and element.text:
-            element.text = preserve_equation_number(element.text, element.metadata)
+        separate_equation_number(element)
     formulas = [
         element
         for element in manifest.elements
-        if element.type == "formula" and not has_latex_markup(element.text)
+        if element.type == "formula"
+        and not has_latex_markup(element.text)
+        and not element.metadata.get("latex_markup")
     ]
     if not formulas:
         return
