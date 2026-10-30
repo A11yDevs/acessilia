@@ -12,6 +12,7 @@ from pydantic import ValidationError
 from backend.config.settings import settings
 from backend.i18n import active_locale, t
 from backend.log_messages import (
+    LOG_VISION_AGENT_CONTEXT_RETRY,
     LOG_VISION_AGENT_DESCRIPTION_TRUNCATED,
     LOG_VISION_AGENT_RATE_LIMIT_RETRY,
     LOG_VISION_AGENT_TIMEOUT_RETRY,
@@ -23,6 +24,7 @@ from backend.log_messages import (
     MSG_VISION_TRUNCATION_NOTICE,
 )
 from backend.tools.region_classifier import region_prompt_key
+from backend.tools.vision_payload import downscale_image
 from backend.tools.logger import logger
 
 from backend.tools.prompt_tools import (
@@ -68,6 +70,10 @@ from agno.media import Image
 #: RETRY_INSTRUCTION; that changes the prompt and therefore the sampled tokens,
 #: but a loop that does not depend on the prompt will still fail twice.
 REGION_ATTEMPTS = 2
+
+#: A context overflow gets one recovery call with half-size image dimensions.
+_CONTEXT_OVERFLOW_RETRIES = 1
+_CONTEXT_RETRY_IMAGE_SCALE = 0.5
 
 #: Regions whose answer may be a description get the chemistry rules: a drawn
 #: molecule is described, not transcribed as a formula (006.pdf slides 25-26).
@@ -171,7 +177,13 @@ class VisionAgent:
             else settings.vision_region_max_tokens
         )
 
-        cache_extra = _region_cache_extra(prompt, effective_mode, max_tokens)
+        context_retry_max_tokens = _context_retry_max_tokens(classification, max_tokens)
+        cache_extra = _region_cache_extra(
+            prompt,
+            effective_mode,
+            max_tokens,
+            context_retry_max_tokens=context_retry_max_tokens,
+        )
         if settings.vision_region_cache_enabled:
             cached = await get_cached_bytes(
                 image_bytes, extra=cache_extra, ttl=VISION_CACHE_TTL_SECONDS
@@ -268,8 +280,9 @@ async def _run_with_retry(
 ) -> OutputModel:
     """Ask the vision model for ``schema``, retrying answers that fail validation.
 
-    A region gets ``REGION_ATTEMPTS`` tries; a rate-limit rejection does not
-    consume one of them — it says the provider is busy, nothing about the
+    A region gets ``REGION_ATTEMPTS`` answer tries; a context overflow gets one
+    smaller-image retry without consuming an answer try. A rate-limit rejection
+    does not consume one of them — it says the provider is busy, nothing about the
     answer — and gets its own smaller budget of backed-off retries instead. A
     call that runs out of time gets ``_TIMEOUT_RETRIES`` more, on the same
     grounds: a stalled provider says nothing about the image. Any other error
@@ -281,6 +294,40 @@ async def _run_with_retry(
     attempt = 0
     rate_limit_retries = 0
     timeout_retries = 0
+    context_retries = 0
+
+    async def retry_after_context_overflow(error: BaseException) -> bool:
+        nonlocal attempt, context_retries, image_bytes, max_tokens
+        if (
+            context_retries >= _CONTEXT_OVERFLOW_RETRIES
+            or not _is_context_overflow(error)
+        ):
+            return False
+        smaller_image = await _downscale_image(image_bytes)
+        if smaller_image is None:
+            return False
+
+        size_before = len(image_bytes)
+        image_bytes = smaller_image
+        fallback_max_tokens = _context_retry_max_tokens(label, max_tokens)
+        if fallback_max_tokens is not None:
+            max_tokens = fallback_max_tokens
+        context_retries += 1
+        attempt -= 1  # a context rejection says nothing about the answer
+        logger.warning(
+            t(LOG_VISION_AGENT_CONTEXT_RETRY).format(
+                page_num=page_num,
+                type=label,
+                size_before=size_before,
+                size_after=len(image_bytes),
+                max_tokens=(
+                    max_tokens if max_tokens is not None else "provider default"
+                ),
+                error=_failure_summary(error),
+            )
+        )
+        return True
+
     while attempt < REGION_ATTEMPTS:
         attempt += 1
         attempt_prompt = prompt if attempt == 1 else f"{prompt}\n\n{RETRY_INSTRUCTION}"
@@ -291,9 +338,13 @@ async def _run_with_retry(
                 type=label,
             )
         )
+        model_options = {"max_tokens": max_tokens, "max_retries": 0}
+        if context_retries and _is_whole_page(label):
+            # A small recovery cap must leave tokens for the actual answer.
+            model_options["reasoning_enabled"] = False
         agent = Agent(
             name="VisionAgent",
-            model=get_agno_model(max_tokens=max_tokens, max_retries=0),
+            model=get_agno_model(**model_options),
             output_schema=schema,
             telemetry=False,
         )
@@ -329,6 +380,8 @@ async def _run_with_retry(
                 raise
             raise timeout from error
         except Exception as error:
+            if await retry_after_context_overflow(error):
+                continue
             if _is_rate_limited(error) and rate_limit_retries < _RATE_LIMIT_RETRIES:
                 rate_limit_retries += 1
                 attempt -= 1  # a rate limit says nothing about the answer
@@ -351,10 +404,16 @@ async def _run_with_retry(
             )
             continue
         except RunIncompleteError as error:
+            if await retry_after_context_overflow(error):
+                continue
             if _is_rate_limited(error) and rate_limit_retries < _RATE_LIMIT_RETRIES:
                 rate_limit_retries += 1
                 attempt -= 1  # a rate limit says nothing about the answer
                 await _wait_out_rate_limit(page_num, label, error, rate_limit_retries)
+                continue
+            raise
+        except Exception as error:
+            if await retry_after_context_overflow(error):
                 continue
             raise
         if attempt > 1:
@@ -374,6 +433,12 @@ async def _run_with_retry(
 #: text an incomplete run carries — the provider's own error message, not
 #: model content, which never reaches this check.
 _RATE_LIMIT_PATTERN = re.compile(r"\b429\b|rate[ _-]?limit", re.IGNORECASE)
+_CONTEXT_OVERFLOW_PATTERN = re.compile(
+    r"context\s+size\b.{0,80}\b(?:exceed|maximum|limit)|"
+    r"context\s+length\b|maximum\s+context\b|context[_ ]window\b|"
+    r"context_length_exceeded",
+    re.IGNORECASE,
+)
 
 #: Extra tries granted to rate-limit rejections, on top of ``REGION_ATTEMPTS``:
 #: a 429 says the provider is busy, nothing about the image, so it should not
@@ -388,6 +453,33 @@ _RATE_LIMIT_RETRY_SECONDS = 20
 #: ``REGION_ATTEMPTS``. Kept at one: each try may wait the whole call deadline,
 #: so a provider that stays stalled costs a picture two deadlines, not more.
 _TIMEOUT_RETRIES = 1
+
+
+def _is_context_overflow(error: BaseException) -> bool:
+    """Whether the provider rejected the request because it exceeded context."""
+    return bool(_CONTEXT_OVERFLOW_PATTERN.search(str(error)))
+
+
+async def _downscale_image(image_bytes: bytes) -> bytes | None:
+    return await downscale_image(image_bytes, _CONTEXT_RETRY_IMAGE_SCALE)
+
+
+def _is_whole_page(label: str) -> bool:
+    """Whether the request sends a whole page: a full-page region or a page inspection."""
+    return label.startswith("full_page") or label == "page_inspection"
+
+
+def _context_retry_max_tokens(label: str, max_tokens: int | None) -> int | None:
+    """Bound the output budget only for whole-page requests on context retry.
+
+    A whole page is the request that gets the full output budget (a page
+    inspection gets the provider default), so its overflow is the one the
+    budget can cause; a smaller region keeps its own cap.
+    """
+    if not _is_whole_page(label):
+        return None
+    configured = settings.vision_region_max_tokens
+    return configured if max_tokens is None else min(configured, max_tokens)
 
 
 def _is_rate_limited(error: BaseException) -> bool:
@@ -520,7 +612,13 @@ def _cacheable(output: VisionOutput, truncated: bool) -> bool:
 VISION_CACHE_TTL_SECONDS = 7 * 24 * 3600
 
 
-def _region_cache_extra(prompt: str, mode: str, max_tokens: int | None) -> str:
+def _region_cache_extra(
+    prompt: str,
+    mode: str,
+    max_tokens: int | None,
+    *,
+    context_retry_max_tokens: int | None = None,
+) -> str:
     """Cache variant covering everything the answer depends on besides the image.
 
     The final prompt (system prompt, region instructions, schema instruction,
@@ -535,15 +633,21 @@ def _region_cache_extra(prompt: str, mode: str, max_tokens: int | None) -> str:
     which this key cannot see. When the weights behind the same provider id
     change, bump ``version`` here too (docs/adr/0012).
     """
+    recovery_options = (
+        {"context_retry_reasoning": False} if context_retry_max_tokens is not None else {}
+    )
     return options_cache_key(
         "vision_region",
-        version="v1",
+        version="v2",
         ai_client=settings.ai_client,
         model=active_model_name(),
         mode=mode,
         budget=max_tokens,
+        context_retry_image_scale=_CONTEXT_RETRY_IMAGE_SCALE,
+        context_retry_max_tokens=context_retry_max_tokens,
         locale=active_locale(),
         prompt_sha256=hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
+        **recovery_options,
     )
 
 

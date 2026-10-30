@@ -102,6 +102,7 @@ from backend.log_messages import (
     LOG_DATA_AGENT_PROMPT_NOT_FOUND,
     LOG_DATA_AGENT_PROCESSING_REGION,
     LOG_DATA_AGENT_REGION_ERROR,
+    LOG_VISION_AGENT_CONTEXT_RETRY,
     LOG_VISION_AGENT_DESCRIPTION_TRUNCATED,
     LOG_VISION_AGENT_RATE_LIMIT_RETRY,
     LOG_VISION_AGENT_TIMEOUT_RETRY,
@@ -111,6 +112,7 @@ from backend.log_messages import (
     LOG_VISION_AGENT_REGION_SALVAGED,
     LOG_MANIFEST_STRUCTURAL_CONTAINER_SKIPPED,
     LOG_VISION_AGENT_SENDING_REGION,
+    LOG_VISION_CONTEXT_DOWNSCALE_FAILED,
     LOG_VISION_ELEMENT_DESCRIPTION,
     LOG_CLEANUP_ITEM_FAILED,
     LOG_CLEANUP_OUTPUT_FAILED,
@@ -889,6 +891,7 @@ MESSAGES: tuple[str, ...] = (
     LOG_DATA_AGENT_PROMPT_NOT_FOUND,
     LOG_DATA_AGENT_PROCESSING_REGION,
     LOG_DATA_AGENT_REGION_ERROR,
+    LOG_VISION_AGENT_CONTEXT_RETRY,
     LOG_VISION_AGENT_DESCRIPTION_TRUNCATED,
     LOG_VISION_AGENT_RATE_LIMIT_RETRY,
     LOG_VISION_AGENT_TIMEOUT_RETRY,
@@ -898,6 +901,7 @@ MESSAGES: tuple[str, ...] = (
     LOG_VISION_AGENT_REGION_SALVAGED,
     LOG_MANIFEST_STRUCTURAL_CONTAINER_SKIPPED,
     LOG_VISION_AGENT_SENDING_REGION,
+    LOG_VISION_CONTEXT_DOWNSCALE_FAILED,
     LOG_VISION_ELEMENT_DESCRIPTION,
     LOG_CACHE_HIT,
     LOG_CACHE_DEBUG_HIT,
@@ -1788,6 +1792,16 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "[página {page_num}] O provedor do modelo limitou a taxa da região {type}; "
             "aguardando {delay}s antes de tentar de novo "
             "(reintenção por limite de taxa {retry}/{retries})"
+        ),
+        # Context overflow: one retry with a smaller image; {size_before}/{size_after} are byte sizes.
+        LOG_VISION_AGENT_CONTEXT_RETRY: (
+            "[página {page_num}] Limite de contexto excedido na região {type}; tentando uma vez "
+            "com uma imagem menor ({size_before} -> {size_after} bytes) e "
+            "max_tokens={max_tokens}: {error}"
+        ),
+        # The Toolbox could not render the smaller image; the original context error stands.
+        LOG_VISION_CONTEXT_DOWNSCALE_FAILED: (
+            "A recuperação de contexto da visão não conseguiu reduzir a imagem: {error}"
         ),
         LOG_VISION_AGENT_TIMEOUT_RETRY: (
             "[página {page_num}] A região {type} não teve resposta a tempo ({error}); "

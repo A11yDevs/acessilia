@@ -25,6 +25,7 @@ def test_openrouter_model_receives_configured_max_tokens(monkeypatch) -> None:
     ai_client.get_agno_model()
 
     assert captured["max_tokens"] == 4096
+    assert "extra_body" not in captured
 
 
 def test_openrouter_model_receives_agent_specific_max_tokens(monkeypatch) -> None:
@@ -84,6 +85,28 @@ def test_ollama_model_receives_agent_specific_prediction_limit(monkeypatch) -> N
     ai_client.get_agno_model(max_tokens=8192)
 
     assert captured["options"]["num_predict"] == 8192
+
+
+def test_openrouter_recovery_can_disable_reasoning(monkeypatch) -> None:
+    captured = {}
+    monkeypatch.setattr(openrouter, "OpenRouter", lambda **kwargs: captured.update(kwargs))
+    monkeypatch.setattr(settings, "ai_client", "openrouter")
+
+    ai_client.get_agno_model(max_tokens=2000, reasoning_enabled=False)
+
+    assert captured["extra_body"] == {"reasoning": {"enabled": False}}
+    assert captured["max_tokens"] == 2000
+
+
+def test_ollama_recovery_can_disable_thinking(monkeypatch) -> None:
+    captured = {}
+    monkeypatch.setattr(ollama, "Ollama", lambda **kwargs: captured.update(kwargs))
+    monkeypatch.setattr(settings, "ai_client", "ollama")
+
+    ai_client.get_agno_model(max_tokens=2000, reasoning_enabled=False)
+
+    assert captured["request_params"] == {"think": False}
+    assert captured["options"]["num_predict"] == 2000
 
 
 def _capture_openai_like(monkeypatch) -> dict[str, object]:

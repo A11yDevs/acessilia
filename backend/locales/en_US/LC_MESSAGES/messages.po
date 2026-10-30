@@ -1724,6 +1724,16 @@ msgstr ""
 
 #, python-brace-format
 msgid ""
+"[page {page_num}] Context limit exceeded for region {type}; retrying once"
+" with a smaller image ({size_before} -> {size_after} bytes) and "
+"max_tokens={max_tokens}: {error}"
+msgstr ""
+"[page {page_num}] Context limit exceeded for region {type}; retrying once"
+" with a smaller image ({size_before} -> {size_after} bytes) and "
+"max_tokens={max_tokens}: {error}"
+
+#, python-brace-format
+msgid ""
 "[page {page_num}] Vision description for region {type} exceeded the "
 "{limit}-token budget and was truncated ({chars} characters kept)"
 msgstr ""
@@ -1791,6 +1801,10 @@ msgstr ""
 #, python-brace-format
 msgid "[page {page_num}] Sending region to vision ({size} bytes, type={type})"
 msgstr "[page {page_num}] Sending region to vision ({size} bytes, type={type})"
+
+#, python-brace-format
+msgid "Vision context recovery could not reduce its image: {error}"
+msgstr "Vision context recovery could not reduce its image: {error}"
 
 #, python-brace-format
 msgid ""

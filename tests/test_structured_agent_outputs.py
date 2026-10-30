@@ -380,6 +380,39 @@ def _scripted_vision_agent(monkeypatch, answers: list[object]):
     return vision_module, calls
 
 
+def _context_retry_vision(monkeypatch, answers: list[object]):
+    from backend.agents import vision_agent as vision_module
+
+    calls: list[dict] = []
+    model_budgets: list[int | None] = []
+
+    class FakeAgent:
+        def __init__(self, **_kwargs):
+            pass
+
+        def run(self, **kwargs):
+            calls.append(kwargs)
+            answer = answers[len(calls) - 1]
+            if isinstance(answer, Exception):
+                raise answer
+            if hasattr(answer, "status"):
+                # An Agno run as the provider ends it: no exception, a status.
+                return answer
+            return type("Response", (), {"content": answer})()
+
+    def fake_model(**kwargs):
+        model_budgets.append(kwargs["max_tokens"])
+        return object()
+
+    async def run_inline(function, *args):
+        return function(*args)
+
+    monkeypatch.setattr(vision_module, "Agent", FakeAgent)
+    monkeypatch.setattr(vision_module, "get_agno_model", fake_model)
+    monkeypatch.setattr(vision_module.asyncio, "to_thread", run_inline)
+    return vision_module, calls, model_budgets
+
+
 VALID_FORMULA = {
     "kind": "formula",
     "formula_latex": "x = y",
@@ -469,6 +502,253 @@ async def test_vision_agent_does_not_retry_a_provider_failure(monkeypatch) -> No
 
     assert result is None
     assert len(calls) == 1
+
+
+def _png_bytes(width: int, height: int) -> bytes:
+    from io import BytesIO
+
+    from PIL import Image as PILImage
+
+    output = BytesIO()
+    PILImage.new("RGB", (width, height), color="white").save(output, format="PNG")
+    return output.getvalue()
+
+
+@pytest.mark.asyncio
+async def test_context_overflow_retries_full_page_with_smaller_image_and_token_cap(
+    monkeypatch, fake_toolbox_render,
+):
+    from io import BytesIO
+
+    from PIL import Image as PILImage
+
+    from backend.agents.run_helpers import AgentRunError
+    from backend.config.settings import settings
+    from backend.tools.logger import logger
+
+    vision_module, calls, budgets = _context_retry_vision(
+        monkeypatch,
+        [
+            AgentRunError("model run failed: Context size has been exceeded"),
+            VALID_FORMULA,
+        ],
+    )
+    monkeypatch.setattr(settings, "vision_region_cache_enabled", False)
+    monkeypatch.setattr(settings, "vision_region_max_tokens", 1234)
+    model_options = []
+    model_factory = vision_module.get_agno_model
+
+    def capture_model(**kwargs):
+        model_options.append(kwargs)
+        return model_factory(**kwargs)
+
+    monkeypatch.setattr(vision_module, "get_agno_model", capture_model)
+    warnings: list[str] = []
+    critical: list[str] = []
+    sinks = [
+        logger.add(
+            warnings.append,
+            level="WARNING",
+            format="{message}",
+            filter=lambda record: record["level"].name == "WARNING",
+        ),
+        logger.add(critical.append, level="CRITICAL", format="{message}"),
+    ]
+    image = _png_bytes(400, 240)
+    try:
+        result = await vision_module.VisionAgent().describe_region(
+            image, "full_page_image", page_num=14, total_pages=14
+        )
+    finally:
+        for sink in sinks:
+            logger.remove(sink)
+
+    assert isinstance(result, VisionOutput)
+    assert len(calls) == 2
+    first_image = calls[0]["images"][0].content
+    retry_image = calls[1]["images"][0].content
+    with PILImage.open(BytesIO(first_image)) as first, PILImage.open(
+        BytesIO(retry_image)
+    ) as retry:
+        assert first.size == (400, 240)
+        assert retry.size == (200, 120)
+    assert budgets == [None, 1234]
+    assert fake_toolbox_render.parameters[0]["max_side"] == 200
+    assert "reasoning_enabled" not in model_options[0]
+    assert model_options[1]["reasoning_enabled"] is False
+    assert calls[0]["input"] == calls[1]["input"]
+    assert len(warnings) == 1 and "Context limit exceeded" in warnings[0]
+    assert critical == []
+
+
+@pytest.mark.asyncio
+async def test_context_retry_does_not_consume_a_region_answer_attempt(monkeypatch, fake_toolbox_render):
+    from backend.agents.run_helpers import AgentRunError
+    from backend.config.settings import settings
+
+    vision_module, calls, budgets = _context_retry_vision(
+        monkeypatch,
+        [
+            AgentRunError("Context size has been exceeded"),
+            {},  # invalid answer consumes the first answer attempt
+            VALID_FORMULA,
+        ],
+    )
+    monkeypatch.setattr(settings, "vision_region_cache_enabled", False)
+    monkeypatch.setattr(settings, "vision_region_max_tokens", 1234)
+
+    result = await vision_module.VisionAgent().describe_region(
+        _png_bytes(400, 240), "full_page_image", page_num=14, total_pages=14
+    )
+
+    assert isinstance(result, VisionOutput)
+    assert len(calls) == 3
+    assert calls[0]["images"][0].content != calls[1]["images"][0].content
+    assert calls[1]["images"][0].content == calls[2]["images"][0].content
+    assert calls[0]["input"] == calls[1]["input"]
+    assert calls[2]["input"].endswith(vision_module.RETRY_INSTRUCTION)
+    assert budgets == [None, 1234, 1234]
+
+
+@pytest.mark.asyncio
+async def test_context_overflow_is_critical_only_after_the_smaller_request_fails(
+    monkeypatch, fake_toolbox_render,
+):
+    from backend.agents.run_helpers import AgentRunError
+    from backend.config.settings import settings
+    from backend.tools.logger import logger
+
+    error = AgentRunError("model run failed: maximum context length exceeded")
+    vision_module, calls, _ = _context_retry_vision(monkeypatch, [error, error])
+    monkeypatch.setattr(settings, "vision_region_cache_enabled", False)
+    warnings: list[str] = []
+    critical: list[str] = []
+    sinks = [
+        logger.add(
+            warnings.append,
+            level="WARNING",
+            format="{message}",
+            filter=lambda record: record["level"].name == "WARNING",
+        ),
+        logger.add(critical.append, level="CRITICAL", format="{message}"),
+    ]
+    try:
+        result = await vision_module.VisionAgent().describe_region(
+            _png_bytes(400, 240), "full_page_image", page_num=11, total_pages=14
+        )
+    finally:
+        for sink in sinks:
+            logger.remove(sink)
+
+    assert result is None
+    assert len(calls) == 2
+    assert len(warnings) == 1 and "Context limit exceeded" in warnings[0]
+    assert len(critical) == 1 and "maximum context length exceeded" in critical[0]
+
+
+def _errored_run(status, content):
+    from types import SimpleNamespace
+
+    return SimpleNamespace(status=status, content=content)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "first_answer",
+    [
+        # Agno does not raise on a provider error: the run ends with status
+        # error, and validate_structured_run raises AgentRunError (#319).
+        "error",
+        # A run that stopped without completing carries the provider message.
+        "cancelled",
+    ],
+)
+async def test_context_overflow_from_the_run_status_is_recovered(
+    monkeypatch, fake_toolbox_render, first_answer
+):
+    from agno.run.base import RunStatus
+
+    from backend.config.settings import settings
+
+    status = "error" if first_answer == "error" else RunStatus.cancelled
+    vision_module, calls, budgets = _context_retry_vision(
+        monkeypatch,
+        [
+            _errored_run(status, "Context size has been exceeded."),
+            VALID_FORMULA,
+        ],
+    )
+    monkeypatch.setattr(settings, "vision_region_cache_enabled", False)
+    monkeypatch.setattr(settings, "vision_region_max_tokens", 1234)
+
+    result = await vision_module.VisionAgent().describe_region(
+        _png_bytes(400, 240), "full_page_image", page_num=14, total_pages=14
+    )
+
+    assert isinstance(result, VisionOutput)
+    assert len(calls) == 2
+    assert calls[0]["images"][0].content != calls[1]["images"][0].content
+    assert budgets == [None, 1234]
+
+
+@pytest.mark.asyncio
+async def test_page_inspection_recovers_with_the_whole_page_budget(
+    monkeypatch, fake_toolbox_render
+):
+    from backend.agents.output_schemas import PageInspectionOutput
+    from backend.config.settings import settings
+
+    vision_module, calls, budgets = _context_retry_vision(
+        monkeypatch,
+        [_errored_run("error", "Context size has been exceeded."), BLANK_PAGE],
+    )
+    monkeypatch.setattr(settings, "vision_region_max_tokens", 1234)
+    model_options = []
+    model_factory = vision_module.get_agno_model
+
+    def capture_model(**kwargs):
+        model_options.append(kwargs)
+        return model_factory(**kwargs)
+
+    monkeypatch.setattr(vision_module, "get_agno_model", capture_model)
+
+    output = await vision_module.VisionAgent().inspect_page(
+        _png_bytes(400, 240), page_num=11, total_pages=14
+    )
+
+    assert isinstance(output, PageInspectionOutput) and output.kind == "blank"
+    assert budgets == [None, 1234]
+    assert "reasoning_enabled" not in model_options[0]
+    assert model_options[1]["reasoning_enabled"] is False
+
+
+@pytest.mark.asyncio
+async def test_a_failed_toolbox_render_lets_the_context_error_stand(monkeypatch):
+    from backend.config.settings import settings
+    from backend.tools import vision_payload
+    from backend.tools.logger import logger
+
+    def unreachable_toolbox(*_args, **_kwargs):
+        raise ValueError("Toolbox base_url must be an absolute http(s) URL")
+
+    monkeypatch.setattr(vision_payload, "make_toolbox_client", unreachable_toolbox)
+    vision_module, calls, _ = _context_retry_vision(
+        monkeypatch,
+        [_errored_run("error", "Context size has been exceeded."), VALID_FORMULA],
+    )
+    monkeypatch.setattr(settings, "vision_region_cache_enabled", False)
+    critical: list[str] = []
+    sink = logger.add(critical.append, level="CRITICAL", format="{message}")
+    try:
+        result = await vision_module.VisionAgent().describe_region(
+            _png_bytes(400, 240), "full_page_image", page_num=11, total_pages=14
+        )
+    finally:
+        logger.remove(sink)
+
+    assert result is None
+    assert len(calls) == 1
+    assert len(critical) == 1 and "Context size has been exceeded" in critical[0]
 
 
 #: 006.pdf, page 23 (a periodic table): the description was whole and
@@ -881,6 +1161,13 @@ def test_the_region_cache_key_varies_with_what_the_answer_depends_on(monkeypatch
     localized = _region_cache_extra("a prompt", "medio", 2000)
     reset_request_locale(token)
     assert localized != base
+
+    full_page_key = _region_cache_extra(
+        "a prompt", "medio", None, context_retry_max_tokens=2000
+    )
+    assert _region_cache_extra(
+        "a prompt", "medio", None, context_retry_max_tokens=1500
+    ) != full_page_key
 
 
 BLANK_PAGE = {"kind": "blank", "language": "und", "confidence": 0.9}
