@@ -134,7 +134,10 @@ def test_degrading_removes_inline_math():
 def test_html_renders_inline_mathml_labelled_by_its_speech():
     html = document_to_html(_enriched("seja $s(t)$ &"))
 
-    assert f'seja <span role="math" aria-label="s de t">{MATHML}</span>' in html
+    assert (
+        'seja <math xmlns="http://www.w3.org/1998/Math/MathML" '
+        'aria-label="s de t"><mi>t</mi></math>' in html
+    )
     assert "$" not in html
     assert "&amp;" in html
 
@@ -217,7 +220,10 @@ def test_the_canonical_build_wires_each_prose_type_to_its_own_formula():
     assert "nota fala d" in txt
     html = document_to_html(document)
     for letter in "abcd":
-        assert f'<span role="math" aria-label="fala {letter}"><math xmlns="http://www.w3.org/1998/Math/MathML"><mi>{letter}</mi>' in html
+        assert (
+            f'<math xmlns="http://www.w3.org/1998/Math/MathML" '
+            f'aria-label="fala {letter}"><mi>{letter}</mi>' in html
+        )
     ast = json.dumps(build_pandoc_ast(document)["blocks"])
     for latex in ("a+1", "b+2", "c+3", "d+4"):
         assert json.dumps({"t": "Math", "c": [{"t": "InlineMath"}, latex]}) in ast
@@ -259,3 +265,70 @@ def test_a_sentence_with_inline_math_is_not_a_math_block(line, block_type):
 
     assert block["type"] == block_type
 
+
+def _payload(*blocks):
+    return {"pages": [{"page_number": 1, "blocks": list(blocks)}]}
+
+
+def _blocks(document):
+    return [block for section in document["sections"] for block in section["blocks"]]
+
+
+def test_a_paragraph_of_one_span_becomes_display_math_in_the_html():
+    payload = _payload({"id": "p1", "type": "paragraph", "text": "$s(t) = t^3$"})
+
+    document = build_canonical_document(payload, title="t", math_enricher=_Enricher())
+
+    (block,) = _blocks(document)
+    assert block["type"] == "math"
+    assert block["text"] == "s(t)=t^3"
+    assert block["metadata"]["inline_math_promoted"] is True
+    html = document_to_html(document)
+    assert (
+        '<div id="p1"><math xmlns="http://www.w3.org/1998/Math/MathML" '
+        'aria-label="Formula: s(t)=t^3" display="block">' in html
+    )
+    assert "$" not in html
+
+
+def test_promotion_reuses_the_conversion_the_span_already_carries():
+    entry = {"source": "s(t)", "latex": "s(t)", "mathml": MATHML, "speech": "s de t"}
+    payload = _payload(
+        {"id": "p1", "type": "paragraph", "text": "$s(t)$", "metadata": {"inline_math": [entry]}}
+    )
+    enricher = _Enricher()
+
+    document = build_canonical_document(payload, title="t", math_enricher=enricher)
+
+    (block,) = _blocks(document)
+    assert (block["type"], block["text"], block["alt_text"]) == ("math", "s(t)", "s de t")
+    assert block["metadata"]["mathml"] == MATHML
+    assert "inline_math" not in block["metadata"]
+    assert enricher.calls == []
+
+
+@pytest.mark.parametrize(
+    "block",
+    [
+        {"id": "p1", "type": "paragraph", "text": "$s(t)$."},
+        {"id": "p1", "type": "paragraph", "text": "let $s(t)$"},
+        {"id": "p1", "type": "paragraph", "text": "costs R$ 10,00"},
+        {"id": "p1", "type": "list", "items": ["$s(t)$"], "text": "$s(t)$"},
+    ],
+)
+def test_only_a_paragraph_made_of_one_span_is_promoted(block):
+    document = build_canonical_document(_payload(block), title="t", math_enricher=_Enricher())
+
+    assert _blocks(document)[0]["type"] == block["type"]
+
+
+def test_promotion_can_be_turned_off():
+    payload = _payload({"id": "p1", "type": "paragraph", "text": "$s(t)$"})
+
+    document = build_canonical_document(
+        payload, title="t", math_enricher=_Enricher(), inline_math_promote=False
+    )
+
+    (block,) = _blocks(document)
+    assert block["type"] == "paragraph"
+    assert block["metadata"]["inline_math"][0]["source"] == "s(t)"

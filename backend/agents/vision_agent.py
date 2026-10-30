@@ -32,7 +32,7 @@ from backend.tools.prompt_tools import (
     load_region_prompt,
     load_system_prompt,
 )
-from backend.ai.models.ai_client import get_agno_model
+from backend.ai.models.ai_client import active_model_name, get_agno_model
 from backend.services.cache import get_cached_bytes, options_cache_key, set_cache_bytes
 from backend.agents.output_schemas import (
     PAGE_INSPECTION_INSTRUCTION,
@@ -616,12 +616,12 @@ def _region_cache_extra(
     stored text reads; the version marks the truncation/salvage behavior, so a
     change there starts fresh entries instead of serving answers stored under
     the old rules. Calls that agree on all of these may share an answer.
+
+    With ``AI_CLIENT=toolbox`` the model is the Toolbox provider id, not the
+    weights it serves: the Toolbox names those in the provider's ``version``,
+    which this key cannot see. When the weights behind the same provider id
+    change, bump ``version`` here too (docs/adr/0012).
     """
-    model = (
-        settings.openrouter_model
-        if settings.ai_client == "openrouter"
-        else settings.ollama_model
-    )
     recovery_options = (
         {"context_retry_reasoning": False} if context_retry_max_tokens is not None else {}
     )
@@ -629,7 +629,7 @@ def _region_cache_extra(
         "vision_region",
         version="v2",
         ai_client=settings.ai_client,
-        model=model,
+        model=active_model_name(),
         mode=mode,
         budget=max_tokens,
         context_retry_image_scale=_CONTEXT_RETRY_IMAGE_SCALE,

@@ -1064,8 +1064,8 @@ msgstr "Your E-mail"
 msgid "We will send the final files to this address."
 msgstr "We will send the final files to this address."
 
-msgid "Attach a Document (PDF or Image)"
-msgstr "Attach a Document (PDF or Image)"
+msgid "Attach a Document (PDF, HTML or Image)"
+msgstr "Attach a Document (PDF, HTML or Image)"
 
 msgid "Make Accessible"
 msgstr "Make Accessible"
@@ -1257,6 +1257,17 @@ msgstr "Worker: task completed: {filename}. Waiting for the next..."
 
 msgid "Acessilia API started (queue worker + cleanup active)"
 msgstr "Acessilia API started (queue worker + cleanup active)"
+
+msgid ""
+"Artifact storage bypassed for independent Toolbox endpoints; the source "
+"file will be sent again for extraction, fusion and text spans."
+msgstr ""
+"Artifact storage bypassed for independent Toolbox endpoints; the source "
+"file will be sent again for extraction, fusion and text spans."
+
+#, python-brace-format
+msgid "Artifact upload unavailable ({error}); extracting from the source file."
+msgstr "Artifact upload unavailable ({error}); extracting from the source file."
 
 #, python-brace-format
 msgid "Error in the API: {error} | Path: {path}"
@@ -1876,6 +1887,18 @@ msgid "Failed to send the status message: {error}"
 msgstr "Failed to send the status message: {error}"
 
 #, python-brace-format
+msgid "Structural provider {provider} failed ({error}); extraction is degraded."
+msgstr "Structural provider {provider} failed ({error}); extraction is degraded."
+
+#, python-brace-format
+msgid ""
+"Dual fusion skipped: the primary and secondary providers are both "
+"{provider}."
+msgstr ""
+"Dual fusion skipped: the primary and secondary providers are both "
+"{provider}."
+
+#, python-brace-format
 msgid "Failed to edit the status message: {error}"
 msgstr "Failed to edit the status message: {error}"
 
@@ -1939,6 +1962,16 @@ msgstr "Page {page_number} references unknown elements: {element_ids}"
 #, python-brace-format
 msgid "{path} ends at {char_end}, before its start {char_start}"
 msgstr "{path} ends at {char_end}, before its start {char_start}"
+
+#, python-brace-format
+msgid ""
+"Structural extraction used only {provider} because the other provider "
+"failed. The document requires review; dual-provider comparison was not "
+"available."
+msgstr ""
+"Structural extraction used only {provider} because the other provider "
+"failed. The document requires review; dual-provider comparison was not "
+"available."
 
 msgid "document"
 msgid_plural "documents"

@@ -88,7 +88,8 @@ def read_core_contract() -> CoreContract:
         )
         contract.versions[capability.id] = capability.contract_version
 
-    for setting, default in registry.PROVIDER_DEFAULTS.items():
+    defaults = {**registry.PROVIDER_DEFAULTS, **registry.ROUTE_PROVIDER_DEFAULTS}
+    for setting, default in defaults.items():
         contract.providers.setdefault(default, set()).add(setting.upper())
 
     return contract

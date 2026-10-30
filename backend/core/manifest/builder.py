@@ -52,30 +52,32 @@ if TYPE_CHECKING:
     from backend.core.manifest.toolbox_extractor import ToolboxExtraction
 
 
+# Store message IDs here; translate only while building the current request.
+# Translation at import time freezes the server locale for all later requests.
 OBLIGATION_BY_TYPE = {
     "picture": (
         "describe-image",
-        t(MSG_OBLIGATION_IMAGE),
+        MSG_OBLIGATION_IMAGE,
         ["vision-description", "human-review"],
     ),
     "table": (
         "linearize-table",
-        t(MSG_OBLIGATION_TABLE),
+        MSG_OBLIGATION_TABLE,
         ["pandoc-table", "human-review"],
     ),
     "formula": (
         "verbalize-formula",
-        t(MSG_OBLIGATION_FORMULA),
+        MSG_OBLIGATION_FORMULA,
         ["mathml", "latex-verbalizer", "human-review"],
     ),
     "code": (
         "preserve-code-semantics",
-        t(MSG_OBLIGATION_CODE),
+        MSG_OBLIGATION_CODE,
         ["pandoc-code", "human-review"],
     ),
     "unknown": (
         "review-structure",
-        t(MSG_OBLIGATION_UNKNOWN),
+        MSG_OBLIGATION_UNKNOWN,
         ["pymupdf-region", "human-review"],
     ),
 }
@@ -500,7 +502,8 @@ def _derive_processing_needs(
         spec = OBLIGATION_BY_TYPE.get(element.type)
         if spec is None:
             continue
-        kind, rationale, methods = spec
+        kind, msgid, methods = spec
+        rationale = t(msgid)
         suffix = element.id.removeprefix("element-")
         observations.append(
             Observation(
@@ -925,6 +928,8 @@ def _needs_vlm_judge(stats: dict[str, Any]) -> bool:
     route = stats.get("route")
     if route is None:
         return bool(stats.get("text_divergence"))
+    if stats.get("route_reason") == "structure_ambiguous":
+        return True
     return (
         bool(stats.get("provider_divergence"))
         and route != "docling"
@@ -971,6 +976,13 @@ def _add_fusion_observations(
             targets,
             {"page_number": page_number, "fusion_stats": stats},
             VLM_JUDGE_METHODS,
+        )
+    elif stats.get("route_reason") == "structure_ambiguous":
+        add(
+            "adjudicate-page",
+            targets,
+            {"page_number": page_number, "fusion_stats": stats},
+            ["human-review"],
         )
     if any(key.startswith("dropped-") and value for key, value in stats.items()):
         add("rescue-omitted-block", targets, {"page_number": page_number, "fusion_stats": stats})
@@ -1047,7 +1059,8 @@ def reconcile_reclassified_element_processing_needs(
     if current_spec is None:
         return
 
-    current_kind, rationale, methods = current_spec
+    current_kind, msgid, methods = current_spec
+    rationale = t(msgid)
     previous_kind = previous_spec[0] if previous_spec is not None else None
     previous_observation_kind = (
         f"{previous_type}-requires-processing" if previous_spec is not None else None

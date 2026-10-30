@@ -232,7 +232,9 @@ def test_payload_records_the_status_and_skips_the_cache_on_failure(
 
     payload = pddl.build_pddl_structured_payload(
         file_path=IMAGE, manifest=manifest, plan=plan,
-        planner_backend="internal", execution_report=None, comparison=None,
+        planner_backend="internal",
+        execution_report=SimpleNamespace(status="completed", execution_id="test"),
+        comparison=None,
     )
 
     expected = (

@@ -163,6 +163,51 @@ def _sample_manifest_without_page_element_ids() -> ProcessingManifest:
     )
 
 
+def test_degraded_extraction_warns_in_delivered_document_and_is_not_cached():
+    from backend.i18n import reset_request_locale, set_request_locale
+    from backend.log_messages import MSG_STRUCTURAL_EXTRACTION_DEGRADED
+    from backend.i18n import t
+
+    manifest = _sample_manifest()
+    manifest.extractor.configuration.update(
+        extraction_degraded=True, extraction_failures={"docling": "ToolboxTimeout"},
+        toolbox_provider="mineru",
+        fusion={
+            "status": "degraded", "providers": ["mineru"],
+            "failed_providers": ["docling"], "reason": "ToolboxTimeout",
+        },
+    )
+    token = set_request_locale("en_US")
+    try:
+        expected = t(MSG_STRUCTURAL_EXTRACTION_DEGRADED).format(provider="mineru")
+        payload = build_pddl_structured_payload(
+            file_path=Path("/tmp/sample.pdf"), manifest=manifest, plan=_sample_plan(),
+            planner_backend="internal", execution_report=None, comparison=None,
+        )
+    finally:
+        reset_request_locale(token)
+    assert expected in payload["technical_warnings"]
+    # The fusion status records the same event; it adds no second warning.
+    del manifest.extractor.configuration["fusion"]
+    token = set_request_locale("en_US")
+    try:
+        without_fusion = build_pddl_structured_payload(
+            file_path=Path("/tmp/sample.pdf"), manifest=manifest, plan=_sample_plan(),
+            planner_backend="internal", execution_report=None, comparison=None,
+        )
+    finally:
+        reset_request_locale(token)
+    assert payload["technical_warnings"] == without_fusion["technical_warnings"]
+    assert payload["canonical_metadata"]["pddl_fusion"]["status"] == "degraded"
+    assert payload["cacheable"] is False
+    assert payload["canonical_metadata"]["pddl_extraction_degraded"] is True
+    canonical = build_canonical_document(
+        payload, title="Test", source_name="sample.pdf", source_path="/tmp/sample.pdf",
+        metadata=payload["canonical_metadata"], technical_warnings=payload["technical_warnings"],
+    )
+    assert expected in str(canonical)
+
+
 def test_build_pddl_structured_payload_is_compatible_with_canonical_builder():
     payload = build_pddl_structured_payload(
         file_path=Path("/tmp/amostra.pdf"),

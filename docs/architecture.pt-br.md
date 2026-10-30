@@ -21,7 +21,7 @@ O antigo motor **`legacy`** (`AccessibilityOrchestrator`: Reader → Vision/Data
 - [backend/agents/state_manager.py](../backend/agents/state_manager.py): máquina de estados em memória para tarefas com suporte a cancelamento cooperativo.
 
 #### 0.2. Integração do Cliente de IA (`backend/ai/`)
-- [backend/ai/models/ai_client.py](../backend/ai/models/ai_client.py): inicializador central `get_agno_model()` que instancia envelopes de Model do Agno para Ollama ou OpenRouter com base nas configurações de ambiente.
+- [backend/ai/models/ai_client.py](../backend/ai/models/ai_client.py): inicializador central `get_agno_model()` que instancia envelopes de Model do Agno para Ollama, OpenRouter ou o gateway VLM da Toolbox (`AI_CLIENT=toolbox`, [ADR-0012](adr/0012-agents-reach-the-vlm-through-the-toolbox.pt-br.md)) com base nas configurações de ambiente.
 
 #### 0.3. Serviços de Infraestrutura (`backend/services/`)
 - [backend/services/cache.py](../backend/services/cache.py): cache de texto por hash de arquivo em `var/temp/cache`.
@@ -141,7 +141,7 @@ O runtime AgentOS não faz parte de `ENABLED_INTERFACES`; ele é iniciado separa
 ## Dependências Externas
 
 - **Framework Agno:** orquestração multiagente e interface unificada de LLM multimodal.
-- **Provedores de IA:** API Ollama (modelos locais como LLaVA/Qwen-VL) ou API OpenRouter (modelos em nuvem como Claude/GPT-4o).
+- **Provedores de IA:** API Ollama (modelos locais como LLaVA/Qwen-VL), API OpenRouter (modelos em nuvem como Claude/GPT-4o) ou o gateway VLM da Toolbox, que repassa os chats a um provider VLM da Toolbox sob o limite de concorrência dele.
 - **Bibliotecas de Processamento:** edge-tts, aiogram, FastAPI.
 - **Não restam executores locais** ([ADR-0003](adr/0003-remote-only-operational-capabilities.pt-br.md), [#150](https://github.com/A11yDevs/acessilia/issues/150)): o manifesto é extraído só pelo `ToolboxManifestExtractor`, e o PyMuPDF é uma dependência de desenvolvimento, usada pelos testes para gerar PDFs. O `tests/test_architecture_layers.py` falha se `backend/` ou `frontend/` importar uma biblioteca operacional (PyMuPDF, Pillow, OpenCV, Docling, pypdf, python-docx, RapidOCR). Pandoc, TeX Live, veraPDF e as bibliotecas de OCR e de mídia já saíram da imagem, porque o DOCX e o PDF/UA só são renderizados na Toolbox; o NumPy e o OpenCV saíram das dependências junto com os scripts de experimento do Dr.DocBench (tag `drbench-2026-snapshot`); o Pillow e o pypdf saíram das dependências de execução junto com o reportlab e o renderizador PDF local, e o Pillow ficou só no extra `dev`, para as imagens de página que os testes ponta a ponta da Toolbox enviam.
 
