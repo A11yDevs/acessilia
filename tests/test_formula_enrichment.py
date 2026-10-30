@@ -192,9 +192,11 @@ def _math_block() -> dict:
 
 def test_html_renderer_embeds_mathml_with_aria_label():
     html = render_html_block(_math_block(), {})
-    assert 'role="math"' in html
-    assert 'aria-label="Fórmula: E igual a m c elevado a 2"' in html
-    assert '<math xmlns="http://www.w3.org/1998/Math/MathML">' in html
+    assert (
+        '<div id="blk-1"><math xmlns="http://www.w3.org/1998/Math/MathML" '
+        'aria-label="Fórmula: E igual a m c elevado a 2" display="block">' in html
+    )
+    assert 'role="math"' not in html
     assert "&lt;math" not in html
 
 

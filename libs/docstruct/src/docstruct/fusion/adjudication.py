@@ -26,6 +26,8 @@ import re
 from collections import Counter
 from typing import Optional
 
+from docstruct.text.math_spans import inline_math_sources
+
 TABLE_RE = re.compile(r"<table", re.IGNORECASE)
 FORMULA_RE = re.compile(r"\$\$|\\\[|\\\(")
 IMG_RE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
@@ -97,7 +99,7 @@ def decide_v0(doc: str, min_: str) -> tuple[str, str]:
     """
     if TABLE_RE.search(min_):
         return "mineru", "mineru_has_table"
-    if FORMULA_RE.search(min_):
+    if FORMULA_RE.search(min_) or inline_math_sources(min_):
         return "mineru", "mineru_has_formula"
     ld, lm = len(useful_text(doc)), len(useful_text(min_))
     if ld < NEAR_EMPTY <= lm:
@@ -129,7 +131,8 @@ def decide_v1(
         return ("docling", "only_docling_table") if td else ("mineru", "only_mineru_table")
     if td and tm:
         return table_pref, f"both_table->{table_pref}"
-    fd, fm = bool(FORMULA_RE.search(doc)), bool(FORMULA_RE.search(min_))
+    fd = bool(FORMULA_RE.search(doc) or inline_math_sources(doc))
+    fm = bool(FORMULA_RE.search(min_) or inline_math_sources(min_))
     if fd != fm:
         return ("docling", "only_docling_formula") if fd else ("mineru", "only_mineru_formula")
     if fd and fm:
