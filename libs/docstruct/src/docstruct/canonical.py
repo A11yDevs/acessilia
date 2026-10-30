@@ -7,7 +7,7 @@ enrichment is injected via the ``MathEnricher`` protocol and ids via
 from __future__ import annotations
 
 
-from typing import Any, Callable
+from typing import Any, Callable, Iterator
 
 
 import re
@@ -62,6 +62,8 @@ from docstruct.text.math_spans import inline_math_sources
 from docstruct.text.equations import equation_number
 from docstruct.text.equations import numbered_speech
 from docstruct.text.equations import preserve_equation_number
+from docstruct.text.implicit_products import implicit_product_variables
+from docstruct.text.implicit_products import mark_implicit_products
 from docstruct.text.math_spans import whole_inline_math
 
 
@@ -173,6 +175,7 @@ def _enrich_math_blocks(
     sections: list[dict[str, Any]],
     math_enricher: "MathEnricher | None" = None,
     inline_cache: dict[str, dict[str, str]] | None = None,
+    variables: frozenset[str] | None = None,
 ) -> None:
     """Normalize LaTeX and add MathML + accessible verbalization to math blocks.
 
@@ -192,15 +195,22 @@ def _enrich_math_blocks(
     the same text). Nothing ties them to the text afterwards, so a producer
     that converts another form of the LaTeX would ship MathML or speech that
     does not match the formula.
+
+    The LaTeX sent for MathML and speech marks the implicit products of the
+    document's variables (``mark_implicit_products``), so ``h(12 + h)`` is
+    spoken "h vezes", not "h de"; the block keeps its text unmarked.
+    ``variables`` are read once from every formula of the document.
     """
     if not sections:
         return
     if inline_cache is None:
         inline_cache = {}
+    if variables is None:
+        variables = implicit_product_variables(_math_sources(sections))
     for section in sections:
         for block in section.get("blocks", []):
             if math_enricher is not None:
-                _enrich_inline_math(block, math_enricher, inline_cache)
+                _enrich_inline_math(block, math_enricher, inline_cache, variables)
             if block.get("type") != "math":
                 continue
             metadata = block.get("metadata") or {}
@@ -218,23 +228,38 @@ def _enrich_math_blocks(
                 latex = math_enricher.normalize(latex)
                 block["text"] = latex
                 metadata = block.get("metadata") or {}
+                marked = mark_implicit_products(latex, variables)
                 if not metadata.get("mathml"):
-                    mathml = math_enricher.to_mathml(latex)
+                    mathml = math_enricher.to_mathml(marked)
                     if mathml:
                         block.setdefault("metadata", {})["mathml"] = mathml
                 if not block.get("alt_text"):
                     block["alt_text"] = (
-                        metadata.get("verbalization") or math_enricher.verbalize(latex)
+                        metadata.get("verbalization") or math_enricher.verbalize(marked)
                     )
             if equation_number(metadata):
                 block["alt_text"] = numbered_speech(str(block.get("alt_text") or latex), metadata)
-        _enrich_math_blocks(section.get("children", []), math_enricher, inline_cache)
+        _enrich_math_blocks(
+            section.get("children", []), math_enricher, inline_cache, variables
+        )
+
+
+def _math_sources(sections: list[dict[str, Any]]) -> Iterator[str]:
+    """The LaTeX of every math block and inline span of these sections."""
+    for section in sections:
+        for block in section.get("blocks", []):
+            if block.get("type") == "math":
+                yield str(block.get("text") or "")
+            for text in block_prose(block):
+                yield from inline_math_sources(text)
+        yield from _math_sources(section.get("children", []))
 
 
 def _enrich_inline_math(
     block: dict[str, Any],
     math_enricher: "MathEnricher",
     cache: dict[str, dict[str, str]],
+    variables: frozenset[str] = frozenset(),
 ) -> None:
     """Convert the inline math spans of a prose block into ``metadata["inline_math"]``.
 
@@ -255,11 +280,12 @@ def _enrich_inline_math(
         if source not in cache:
             latex = math_enricher.normalize(source)
             entry = {"source": source, "latex": latex}
-            mathml = math_enricher.to_mathml(latex)
+            marked = mark_implicit_products(latex, variables)
+            mathml = math_enricher.to_mathml(marked)
             if mathml:
                 entry["mathml"] = mathml
             verbalize_inline = getattr(math_enricher, "verbalize_inline", None)
-            speech = verbalize_inline(latex) if verbalize_inline else ""
+            speech = verbalize_inline(marked) if verbalize_inline else ""
             if speech:
                 entry["speech"] = speech
             cache[source] = entry
