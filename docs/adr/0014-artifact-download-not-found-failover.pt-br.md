@@ -18,7 +18,9 @@ produtor. A mudança corrige o contrato público do SDK.
 
 Somente no download de artefatos por identificador, um 404 avança ao próximo
 endpoint compatível, sem repetir a busca no mesmo endpoint. Se todos retornarem
-404, o erro continua `ToolboxArtifactNotFound`. Falhas mistas preservam os erros
+404, o erro continua `ToolboxArtifactNotFound`, com o detalhe de cada endpoint;
+um endpoint que não publica `artifact.retrieve` fica fora dessa decisão, pois
+não diz nada sobre o artefato. Falhas mistas preservam os erros
 combinados existentes. Outras operações e códigos 4xx permanecem iguais.
 
 Em particular, 404 seguido de timeout gera `ToolboxUnavailable`, preservando

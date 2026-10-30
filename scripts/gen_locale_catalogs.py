@@ -81,6 +81,8 @@ from backend.log_messages import (
     LOG_API_INTERFACE_ENABLED,
     LOG_API_JOB_ENQUEUED,
     LOG_API_STARTED,
+    LOG_ARTIFACT_STORE_DIRECT_INPUT,
+    LOG_ARTIFACT_UPLOAD_DEGRADED,
     LOG_AUDIO_EXPORTED,
     LOG_AUDIO_EXPORT_ERROR,
     LOG_AUDIO_EXPORT_PROGRESS,
@@ -166,10 +168,6 @@ from backend.log_messages import (
     LOG_MEDIA_INSPECT_SKIPPED_DISABLED,
     LOG_MEDIA_INSPECT_TOOLBOX_FINISHED,
     LOG_MEDIA_INSPECT_FAILED,
-    LOG_ARTIFACT_UPLOAD_DEGRADED,
-    LOG_STRUCTURAL_PROVIDER_DEGRADED,
-    LOG_ARTIFACT_STORE_DIRECT_INPUT,
-    MSG_STRUCTURAL_EXTRACTION_DEGRADED,
     LOG_PDF_UA_TOOLBOX_EXPORTED,
     LOG_PDF_UA_MATH_DEGRADED,
     LOG_TXT_EXPORTED,
@@ -186,6 +184,7 @@ from backend.log_messages import (
     LOG_STATUS_EDIT_UNEXPECTED,
     LOG_STATUS_MESSAGE_EDIT_FAILED,
     LOG_STATUS_MESSAGE_SEND_FAILED,
+    LOG_STRUCTURAL_PROVIDER_DEGRADED,
     LOG_TASK_CANCELLED_BY_USER,
     LOG_TEMP_DIR_REMOVED,
     LOG_TEMP_FILE_REMOVED,
@@ -222,6 +221,7 @@ from backend.log_messages import (
     MSG_OBLIGATION_UNKNOWN,
     MSG_SLIDE_HEADING,
     MSG_SLIDE_HEADING_WITH_TITLE,
+    MSG_STRUCTURAL_EXTRACTION_DEGRADED,
     MSG_OBLIGATION_UNSTRUCTURED_PAGE,
     MSG_OBSERVATION_PAGE_WITHOUT_STRUCTURE,
     MSG_HEADING_GAP,
@@ -800,6 +800,8 @@ MESSAGES: tuple[str, ...] = (
     LOG_WORKER_TASK_ERROR,
     LOG_WORKER_TASK_COMPLETED,
     LOG_API_STARTED,
+    LOG_ARTIFACT_STORE_DIRECT_INPUT,
+    LOG_ARTIFACT_UPLOAD_DEGRADED,
     LOG_API_ERROR,
     LOG_API_JOB_ENQUEUED,
     LOG_CLEANUP_ITEM_FAILED,
@@ -852,10 +854,6 @@ MESSAGES: tuple[str, ...] = (
     LOG_MEDIA_INSPECT_SKIPPED_DISABLED,
     LOG_MEDIA_INSPECT_TOOLBOX_FINISHED,
     LOG_MEDIA_INSPECT_FAILED,
-    LOG_ARTIFACT_UPLOAD_DEGRADED,
-    LOG_STRUCTURAL_PROVIDER_DEGRADED,
-    LOG_ARTIFACT_STORE_DIRECT_INPUT,
-    MSG_STRUCTURAL_EXTRACTION_DEGRADED,
     LOG_PDF_UA_TOOLBOX_EXPORTED,
     LOG_PDF_UA_MATH_DEGRADED,
     LOG_TXT_EXPORTED,
@@ -922,6 +920,7 @@ MESSAGES: tuple[str, ...] = (
     LOG_WEB_RATE_LIMIT_EXCEEDED,
     LOG_WEB_API_UPLOAD_ERROR,
     LOG_STATUS_MESSAGE_SEND_FAILED,
+    LOG_STRUCTURAL_PROVIDER_DEGRADED,
     LOG_STATUS_MESSAGE_EDIT_FAILED,
     LOG_STATUS_EDIT_UNEXPECTED,
     LOG_AUDIO_EXPORTED,
@@ -942,6 +941,7 @@ MESSAGES: tuple[str, ...] = (
     MSG_DUPLICATE_PAGE_NUMBERS,
     MSG_PAGE_UNKNOWN_ELEMENTS,
     MSG_CHAR_RANGE_REVERSED,
+    MSG_STRUCTURAL_EXTRACTION_DEGRADED,
 )
 
 #: msgid -> localized text mappings per non-default locale; every id in MESSAGES must appear for each such locale.
@@ -1675,7 +1675,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "Inspeção de mídia indisponível para {filename}; seguindo sem o "
             "sinal de imagem isolada: {error}"
         ),
-        # One structural provider is unavailable; {provider} identifies it and {error} its error class.
+        # One structural provider failed; {provider} identifies it and {error} its error class.
         LOG_STRUCTURAL_PROVIDER_DEGRADED: "O provedor estrutural {provider} falhou ({error}); a extração está degradada.",
         # Upload failed transiently; {error} is the error class, direct input remains available.
         LOG_ARTIFACT_UPLOAD_DEGRADED: "Upload do artefato indisponível ({error}); extraindo a partir do arquivo original.",
@@ -1686,7 +1686,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         ),
         # Delivered warning: {provider} supplied the only available structural extraction.
         MSG_STRUCTURAL_EXTRACTION_DEGRADED: (
-            "A extração estrutural usou apenas {provider} porque outro provedor estava indisponível. "
+            "A extração estrutural usou apenas {provider} porque o outro provedor falhou. "
             "O documento exige revisão; a comparação entre dois provedores não estava disponível."
         ),
         # TXT export wrapper debug line; {output_path} the destination file path.

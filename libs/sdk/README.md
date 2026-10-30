@@ -51,7 +51,7 @@ instead of looking like an outage later.
 On top of that, the client offers:
 
 - **`retries`**: re-sends a request to the same endpoint after
-  `ToolboxTimeout` or `ToolboxProviderUnavailable` (network error, 503, 504),
+  `ToolboxTimeout` or `ToolboxProviderUnavailable` (network error, 502, 503, 504),
   waiting `retry_backoff_seconds * 2**attempt` with jitter. Off by default;
   enable it only for idempotent capabilities.
 - **`endpoints=`** (secondary mechanism): for *independent* Toolbox

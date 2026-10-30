@@ -660,18 +660,14 @@ def test_dual_mode_preserves_permanent_primary_error(mock_client, monkeypatch, f
     secondary.extract_structure.assert_not_awaited()
 
 
-@pytest.mark.parametrize("primary_available", [False, True])
-def test_dual_mode_preserves_permanent_secondary_error(mock_client, monkeypatch, primary_available):
+def test_dual_mode_preserves_permanent_secondary_error_without_primary(mock_client, monkeypatch):
     from acessilia_sdk.toolbox.errors import ToolboxTimeout, ToolboxUnsupportedMediaType
     from backend.config.settings import settings
 
     monkeypatch.setattr(settings, "fusion_mode", "dual")
     monkeypatch.setattr(settings, "fusion_secondary_provider", "mineru")
     primary_error = ToolboxTimeout("primary unavailable")
-    if primary_available:
-        mock_client.extract_structure.return_value = SAMPLE_TOOLBOX_RESPONSE
-    else:
-        mock_client.extract_structure.side_effect = primary_error
+    mock_client.extract_structure.side_effect = primary_error
     secondary = AsyncMock(spec=ToolboxStructureClient)
     secondary.provider = "mineru"
     secondary.extract_structure.side_effect = ToolboxUnsupportedMediaType("unsupported document")
@@ -680,8 +676,58 @@ def test_dual_mode_preserves_permanent_secondary_error(mock_client, monkeypatch,
     )
     with pytest.raises(ToolboxUnsupportedMediaType) as caught:
         ToolboxManifestExtractor(client=mock_client, use_artifact_store=False).extract(FIXTURE_PDF)
-    assert caught.value.__cause__ is (None if primary_available else primary_error)
+    assert caught.value.__cause__ is primary_error
     secondary.close.assert_awaited_once()
+
+
+@pytest.mark.parametrize("failure_name", [
+    "ToolboxUnsupportedMediaType", "ToolboxInvalidInput",
+    "ToolboxAuthenticationError", "ToolboxContractViolation",
+])
+def test_permanent_secondary_error_keeps_the_primary_extraction(mock_client, monkeypatch, failure_name):
+    from acessilia_sdk.toolbox import errors
+    from backend.config.settings import settings
+
+    monkeypatch.setattr(settings, "fusion_mode", "dual")
+    monkeypatch.setattr(settings, "fusion_secondary_provider", "mineru")
+    mock_client.extract_structure.return_value = SAMPLE_TOOLBOX_RESPONSE
+    secondary = AsyncMock(spec=ToolboxStructureClient)
+    secondary.provider = "mineru"
+    secondary.extract_structure.side_effect = getattr(errors, failure_name)("rejected")
+    monkeypatch.setattr(
+        "backend.core.manifest.toolbox_extractor.make_toolbox_client", lambda *a, **kw: secondary
+    )
+    result = ToolboxManifestExtractor(client=mock_client, use_artifact_store=False).extract(FIXTURE_PDF)
+    assert result.configuration["toolbox_provider"] == "docling"
+    assert result.configuration["extraction_degraded"] is True
+    assert result.configuration["extraction_failures"] == {"mineru": failure_name}
+    assert "fusion_evidence" not in result.document
+    secondary.close.assert_awaited_once()
+
+
+def test_dual_mode_falls_back_on_a_primary_http_500(mock_client, monkeypatch):
+    import httpx
+    from acessilia_sdk.toolbox.errors import ToolboxError
+    from acessilia_sdk.toolbox.transport import raise_for_error
+    from backend.config.settings import settings
+
+    monkeypatch.setattr(settings, "fusion_mode", "dual")
+    monkeypatch.setattr(settings, "fusion_secondary_provider", "mineru")
+    with pytest.raises(ToolboxError) as server_error:
+        raise_for_error(httpx.Response(500, json={"detail": "boom"}), "structure")
+    mock_client.extract_structure.side_effect = server_error.value
+    secondary_payload = deepcopy(SAMPLE_TOOLBOX_RESPONSE)
+    secondary_payload["provider"] = "mineru"
+    secondary = AsyncMock(spec=ToolboxStructureClient)
+    secondary.provider = "mineru"
+    secondary.base_url = "http://localhost:8002"
+    secondary.extract_structure.return_value = secondary_payload
+    monkeypatch.setattr(
+        "backend.core.manifest.toolbox_extractor.make_toolbox_client", lambda *a, **kw: secondary
+    )
+    result = ToolboxManifestExtractor(client=mock_client, use_artifact_store=False).extract(FIXTURE_PDF)
+    assert result.configuration["toolbox_provider"] == "mineru"
+    assert result.configuration["extraction_failures"] == {"docling": "ToolboxError"}
 
 
 def test_independent_endpoints_log_the_direct_input_policy_once(mock_client, mock_artifact_client, monkeypatch):

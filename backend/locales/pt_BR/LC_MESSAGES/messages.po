@@ -1274,6 +1274,20 @@ msgstr "Worker: tarefa concluída: {filename}. Aguardando pela próxima..."
 msgid "Acessilia API started (queue worker + cleanup active)"
 msgstr "Acessilia API iniciada (worker da fila + limpeza ativos)"
 
+msgid ""
+"Artifact storage bypassed for independent Toolbox endpoints; the source "
+"file will be sent again for extraction, fusion and text spans."
+msgstr ""
+"Armazenamento de artefatos contornado para endpoints independentes da "
+"Toolbox; o arquivo original será reenviado para extração, fusão e text "
+"spans."
+
+#, python-brace-format
+msgid "Artifact upload unavailable ({error}); extracting from the source file."
+msgstr ""
+"Upload do artefato indisponível ({error}); extraindo a partir do arquivo "
+"original."
+
 #, python-brace-format
 msgid "Error in the API: {error} | Path: {path}"
 msgstr "Erro na API: {error} | Caminho: {path}"
@@ -1510,36 +1524,6 @@ msgid ""
 msgstr ""
 "Inspeção de mídia indisponível para {filename}; seguindo sem o sinal de "
 "imagem isolada: {error}"
-
-#, python-brace-format
-msgid "Artifact upload unavailable ({error}); extracting from the source file."
-msgstr ""
-"Upload do artefato indisponível ({error}); extraindo a partir do arquivo "
-"original."
-
-#, python-brace-format
-msgid "Structural provider {provider} failed ({error}); extraction is degraded."
-msgstr ""
-"O provedor estrutural {provider} falhou ({error}); a extração está "
-"degradada."
-
-msgid ""
-"Artifact storage bypassed for independent Toolbox endpoints; the source "
-"file will be sent again for extraction, fusion and text spans."
-msgstr ""
-"Armazenamento de artefatos contornado para endpoints independentes da "
-"Toolbox; o arquivo original será reenviado para extração, fusão e text "
-"spans."
-
-#, python-brace-format
-msgid ""
-"Structural extraction used only {provider} because another provider was "
-"unavailable. The document requires review; dual-provider comparison was "
-"not available."
-msgstr ""
-"A extração estrutural usou apenas {provider} porque outro provedor estava"
-" indisponível. O documento exige revisão; a comparação entre dois "
-"provedores não estava disponível."
 
 #, python-brace-format
 msgid "PDF/UA rendered by the Toolbox: {output_path}"
@@ -1927,6 +1911,12 @@ msgid "Failed to send the status message: {error}"
 msgstr "Falha ao enviar a mensagem de status: {error}"
 
 #, python-brace-format
+msgid "Structural provider {provider} failed ({error}); extraction is degraded."
+msgstr ""
+"O provedor estrutural {provider} falhou ({error}); a extração está "
+"degradada."
+
+#, python-brace-format
 msgid "Failed to edit the status message: {error}"
 msgstr "Falha ao editar a mensagem de status: {error}"
 
@@ -1992,6 +1982,16 @@ msgstr "Página {page_number} referencia elementos inexistentes: {element_ids}"
 #, python-brace-format
 msgid "{path} ends at {char_end}, before its start {char_start}"
 msgstr "{path} termina em {char_end}, antes do início {char_start}"
+
+#, python-brace-format
+msgid ""
+"Structural extraction used only {provider} because the other provider "
+"failed. The document requires review; dual-provider comparison was not "
+"available."
+msgstr ""
+"A extração estrutural usou apenas {provider} porque o outro provedor "
+"falhou. O documento exige revisão; a comparação entre dois provedores não"
+" estava disponível."
 
 msgid "document"
 msgid_plural "documents"

@@ -4889,7 +4889,9 @@ def build_pddl_structured_payload(
             "reparo desabilitado (LEGACY_UNICODE_REPAIR=detect)."
         )
 
-    extraction_degraded = configuration.get("extraction_degraded") is True
+    extraction_degraded = records_extraction_degradation(
+        configuration.get("extraction_degraded")
+    )
     if extraction_degraded:
         technical_warnings.append(
             t(MSG_STRUCTURAL_EXTRACTION_DEGRADED).format(
@@ -4997,6 +4999,16 @@ def records_visual_failures(failures: Any) -> bool:
         and any(isinstance(count, int) and count > 0 for count in by_reason.values())
         for by_reason in failures.values()
     )
+
+
+def records_extraction_degradation(flag: Any) -> bool:
+    """Whether the structural extraction came from one provider of a dual run.
+
+    ``flag`` is the extractor's ``extraction_degraded`` or, on a cached entry,
+    ``canonical_metadata.pddl_extraction_degraded``. A run that records it is
+    not cached, and a cached entry that does is not replayed.
+    """
+    return flag is True
 
 
 def _unsatisfied_obligations(manifest: ProcessingManifest) -> list[dict[str, Any]]:

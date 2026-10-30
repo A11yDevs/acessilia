@@ -291,14 +291,23 @@ class ToolboxCapabilityClient:
                 self._record_failover(causes, endpoint, exc)
                 continue
             return http, result
-        if (
-            missing_artifact_failover
-            and causes
-            and all(isinstance(error, ToolboxArtifactNotFound) for _, error in causes)
-        ):
-            raise ToolboxArtifactNotFound(
-                "Artifact not found on any configured endpoint"
-            ) from causes[-1][1]
+        if missing_artifact_failover:
+            # An endpoint that cannot serve the download says nothing about
+            # the artifact, so only the endpoints that answered decide.
+            answered = [
+                (url, error)
+                for url, error in causes
+                if not isinstance(error, ToolboxIncompatibleEndpoint)
+            ]
+            if answered and all(
+                isinstance(error, ToolboxArtifactNotFound) for _, error in answered
+            ):
+                if len(answered) == 1:
+                    raise answered[0][1]
+                details = "; ".join(f"{url}: {error}" for url, error in answered)
+                raise ToolboxArtifactNotFound(
+                    f"Artifact not found on any configured endpoint ({details})"
+                ) from answered[-1][1]
         raise _combined(causes)
 
     async def _with_retries(self, attempt_call: Callable[[], Awaitable[T]]) -> T:

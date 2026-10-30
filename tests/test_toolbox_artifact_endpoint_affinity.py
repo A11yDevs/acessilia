@@ -1,4 +1,4 @@
-"""B07 characterization through the real core orchestrator and SDK HTTP clients."""
+"""Artifact endpoint affinity (ADR-0013) through the real orchestrator and SDK clients."""
 
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ async def test_upload_and_extraction_choose_endpoints_independently(
     tmp_path: Path, shared_store: bool, upload_fails_on_a: bool
 ) -> None:
     source = tmp_path / "b07.pdf"
-    payload = b"%PDF-B07 simulated document"
+    payload = b"%PDF-simulated document"
     source.write_bytes(payload)
     artifact_id = "sha256:" + hashlib.sha256(payload).hexdigest()
     stored_a: set[str] = set()
@@ -128,7 +128,7 @@ async def test_direct_file_extraction_does_not_require_shared_artifact_storage(
     tmp_path: Path, primary_unavailable: bool, use_artifact_store: bool
 ) -> None:
     source = tmp_path / "b07.pdf"
-    payload = b"%PDF-B07 direct extraction"
+    payload = b"%PDF-direct extraction"
     source.write_bytes(payload)
     artifacts = ToolboxArtifactClient(endpoints=[A, B], retries=0)
     structure = ToolboxStructureClient(endpoints=[A, B], provider="docling", retries=0)

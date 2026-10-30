@@ -550,6 +550,6 @@ LOG_ARTIFACT_STORE_DIRECT_INPUT: str = (
 
 #: Delivered document warning when only one structural provider succeeded; {provider} is its identifier.
 MSG_STRUCTURAL_EXTRACTION_DEGRADED: str = (
-    "Structural extraction used only {provider} because another provider was unavailable. "
+    "Structural extraction used only {provider} because the other provider failed. "
     "The document requires review; dual-provider comparison was not available."
 )

@@ -19,7 +19,9 @@ the public SDK contract, not an existing Core download call site.
 
 For artifact downloads by ID only, a 404 advances to the next compatible
 endpoint without retrying that same missing object on the same endpoint.
-All-404 attempts remain `ToolboxArtifactNotFound`. Mixed availability failures
+All-404 attempts remain `ToolboxArtifactNotFound`, keeping each endpoint's
+detail; an endpoint that does not publish `artifact.retrieve` is left out of
+that decision, since it says nothing about the artifact. Mixed availability failures
 retain the existing combined errors. Other operations and 4xx codes are unchanged.
 
 In particular, 404 followed by a timeout raises `ToolboxUnavailable`, with

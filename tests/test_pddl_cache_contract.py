@@ -254,8 +254,16 @@ def test_a_refused_reading_of_a_misread_table_is_cacheable(monkeypatch):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("rerun_cacheable", [True, False], ids=["clean-rerun", "degraded-rerun"])
-async def test_cached_entry_with_visual_failures_is_ignored(
-    isolated_runtime, monkeypatch, tmp_path, rerun_cacheable
+@pytest.mark.parametrize(
+    "degraded_metadata",
+    [
+        {"pddl_visual_failures": {"pictures": {"model_failed": 10}}},
+        {"pddl_extraction_degraded": True},
+    ],
+    ids=["visual-failures", "single-provider-extraction"],
+)
+async def test_cached_degraded_entry_is_ignored(
+    isolated_runtime, monkeypatch, tmp_path, rerun_cacheable, degraded_metadata
 ):
     """A degraded entry is not replayed; a clean rerun replaces it, a degraded one drops it."""
     from backend import service
@@ -267,7 +275,7 @@ async def test_cached_entry_with_visual_failures_is_ignored(
     async def degraded_cache(*args):
         return {
             "text": "Cached content",
-            "canonical_metadata": {"pddl_visual_failures": {"pictures": {"model_failed": 10}}},
+            "canonical_metadata": degraded_metadata,
         }
 
     async def execute(*args, **kwargs):

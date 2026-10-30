@@ -201,8 +201,8 @@ class ToolboxManifestExtractor:
                 language="pt-BR",
                 use_remote_cache=self.use_remote_cache,
             )
-        except (ToolboxTimeout, ToolboxProviderUnavailable) as exc:
-            if not dual_enabled:
+        except ToolboxError as exc:
+            if not dual_enabled or not _provider_failure(exc):
                 raise
             primary_error = exc
             extraction_failures[structure.provider] = type(exc).__name__
@@ -245,11 +245,12 @@ class ToolboxManifestExtractor:
                         use_remote_cache=self.use_remote_cache,
                     )
                 except ToolboxError as exc:
-                    if not isinstance(exc, (ToolboxTimeout, ToolboxProviderUnavailable)):
-                        if primary_error is not None:
-                            raise exc from primary_error
-                        raise
+                    # With the primary's result in hand the comparison is only
+                    # a gain, so any secondary failure degrades instead of
+                    # discarding a complete extraction.
                     if primary_error is not None:
+                        if not _provider_failure(exc):
+                            raise exc from primary_error
                         raise ToolboxUnavailable(
                             [
                                 (
@@ -337,6 +338,18 @@ class ToolboxManifestExtractor:
             artifact_id=artifact_id,
             cache_key=cache_key,
         )
+
+
+def _provider_failure(exc: ToolboxError) -> bool:
+    """Whether ``exc`` is a provider failure another provider may not share.
+
+    Timeouts and unavailability, plus the bare ``ToolboxError`` the SDK raises
+    for unmapped statuses such as 500. A rejection of the document itself
+    (media type, invalid input, contract, authentication) is permanent.
+    """
+    return isinstance(exc, (ToolboxTimeout, ToolboxProviderUnavailable)) or (
+        type(exc) is ToolboxError
+    )
 
 
 def _persist_secondary_extraction(
