@@ -241,12 +241,22 @@ def fuse_extraction_payloads(
         evidence_stats["text_similarity"] = round(text_similarity, 4)
         structure_d = _structure_signature(pages_d.get(page_key, []))
         structure_m = _structure_signature(pages_m.get(page_key, []))
+        primary_structure_counts = Counter(dict(structure_d))
+        secondary_structure_counts = Counter(dict(structure_m))
+        # Only a structure the secondary found and the primary did not is
+        # worth acting on: the primary's page is kept by default, so one the
+        # primary alone found is already in the document.
+        secondary_adds_structure = bool(
+            secondary_structure_counts - primary_structure_counts
+        )
         evidence_stats["structure_divergence"] = structure_d != structure_m
         evidence_stats["structure_counts"] = {
-            primary_provider: dict(Counter(b["type"] for b in pages_d.get(page_key, []) if b["type"] in STRUCTURAL_TYPES)),
-            secondary_provider: dict(Counter(b["type"] for b in pages_m.get(page_key, []) if b["type"] in STRUCTURAL_TYPES)),
+            primary_provider: dict(primary_structure_counts),
+            secondary_provider: dict(secondary_structure_counts),
         }
-        evidence_stats["provider_divergence"] = similarity < DEFAULT_MAX_RATIO or structure_d != structure_m
+        evidence_stats["provider_divergence"] = (
+            similarity < DEFAULT_MAX_RATIO or secondary_adds_structure
+        )
         evidence_stats["text_divergence"] = text_similarity < DEFAULT_MAX_RATIO
         # Deterministic adjudication (docstruct's v1 page router), recorded with
         # the evidence so the manifest builder can leave the VLM judge for the
@@ -256,7 +266,7 @@ def fuse_extraction_payloads(
         # rules; it must not override their near-empty or explicit table/formula
         # decisions. Bounding boxes are provider-specific, so compare type and
         # normalized content instead of exact coordinates.
-        if structure_d != structure_m and route_reason == "default_docling":
+        if secondary_adds_structure and route_reason == "default_docling":
             def structure_content(blocks: list[dict]) -> Counter:
                 return Counter(
                     (b["type"], " ".join((b.get("text") or "").split()))
@@ -265,18 +275,8 @@ def fuse_extraction_payloads(
 
             primary_content = structure_content(pages_d.get(page_key, []))
             secondary_content = structure_content(pages_m.get(page_key, []))
-            primary_structure_counts = Counter(
-                b["type"] for b in pages_d.get(page_key, []) if b["type"] in STRUCTURAL_TYPES
-            )
-            secondary_structure_counts = Counter(
-                b["type"] for b in pages_m.get(page_key, []) if b["type"] in STRUCTURAL_TYPES
-            )
-            secondary_adds_structure = bool(
-                secondary_structure_counts - primary_structure_counts
-            )
             if (
-                secondary_adds_structure
-                and not primary_content - secondary_content
+                not primary_content - secondary_content
                 and text_similarity >= DEFAULT_MAX_RATIO
             ):
                 route, route_reason = "mineru", "secondary_structure_superset"

@@ -11,6 +11,8 @@ test_noncritical_obligations.py).
 
 from __future__ import annotations
 
+import pytest
+
 from docstruct.fusion.judge import should_judge
 from docstruct.fusion.page_select import page_norm, ratio
 
@@ -528,6 +530,31 @@ def test_bbox_precision_does_not_create_structural_divergence():
     assert stats['structure_divergence'] is False
     assert stats['provider_divergence'] is False
     assert stats['route_reason'] == 'default_docling'
+
+
+@pytest.mark.parametrize('primary_pictures,secondary_pictures', [(1, 0), (2, 1)])
+def test_structure_only_the_primary_found_keeps_the_page_without_review(
+    primary_pictures, secondary_pictures
+):
+    def pictures(count):
+        return [
+            {'type': 'picture', 'text': '', 'page': 0, 'bbox': [0, 20 * i, 10, 20 * i + 10]}
+            for i in range(count)
+        ]
+
+    primary = _payload(PROSE)
+    primary['document']['elements'].extend(pictures(primary_pictures))
+    secondary = _payload(PROSE)
+    secondary['document']['elements'].extend(pictures(secondary_pictures))
+
+    [stats] = _evidence(primary, secondary)
+
+    assert stats['structure_divergence'] is True
+    assert stats['provider_divergence'] is False
+    assert (stats['route'], stats['route_reason']) == ('docling', 'default_docling')
+    evidence = [{'page_number': 1, 'stats': stats}]
+    for budget in (0, 1):
+        assert not [o for o in _obligations(evidence, budget) if o.kind == 'adjudicate-page']
 
 
 def test_structural_superset_preserves_near_empty_decide_v1_route():
