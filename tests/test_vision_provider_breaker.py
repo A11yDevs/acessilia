@@ -8,7 +8,9 @@ deadlines before it degraded.
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -369,12 +371,19 @@ async def test_the_second_pass_waits_the_configured_delay(monkeypatch, tmp_path)
     async def record_sleep(seconds):
         waits.append(seconds)
 
-    monkeypatch.setattr("backend.agents.pddl_orchestrator.asyncio.sleep", record_sleep)
+    # Keep other tasks' sleeps intact while recording the retry's delay.
+    monkeypatch.setattr(
+        pddl, "asyncio", SimpleNamespace(**(vars(asyncio) | {"sleep": record_sleep}))
+    )
     monkeypatch.setattr(settings, "vision_retry_pass_delay_seconds", 5)
     calls = _vision(monkeypatch, [_DESCRIPTION, None, _DESCRIPTION])
     manifest = _pictures(2)
 
-    await _enrich_picture_descriptions(manifest, tmp_path / "doc.pdf", mode="medio")
+    unrelated_sleep = asyncio.create_task(asyncio.sleep(0))
+    try:
+        await _enrich_picture_descriptions(manifest, tmp_path / "doc.pdf", mode="medio")
+    finally:
+        await unrelated_sleep
 
     assert waits == [5]
     assert len(calls) == 3

@@ -51,7 +51,11 @@ def require_toolbox() -> None:
 
 
 def _get_pdf() -> Path:
-    pdfs = sorted(FIXTURES_DIR.rglob("*.pdf"))
+    pdfs = sorted(
+        (p for p in FIXTURES_DIR.rglob("*.pdf")
+         if "failures" not in p.relative_to(FIXTURES_DIR).parts and p.stat().st_size > 0),
+        key=lambda p: (p.stat().st_size, str(p)),
+    )
     if not pdfs:
         pytest.skip("No PDF fixtures found under tests/fixtures/")
     for pdf in pdfs:
@@ -64,12 +68,14 @@ def _get_pdf() -> Path:
 def _make_formula_image() -> bytes:
     """Create a small PNG image with a formula-like drawing."""
     try:
-        from PIL import Image, ImageDraw  # type: ignore[import-untyped]
+        from PIL import Image, ImageDraw, ImageFont  # type: ignore[import-untyped]
     except ImportError:
         pytest.skip("Pillow not available — cannot create test image")
     img = Image.new("RGB", (400, 100), color="white")
     draw = ImageDraw.Draw(img)
-    draw.text((10, 30), "E = mc^2", fill="black")
+    draw.text((10, 30), "E = mc", fill="black", font=ImageFont.load_default(size=36))
+    right = draw.textbbox((10, 30), "E = mc", font=ImageFont.load_default(size=36))[2]
+    draw.text((right, 20), "2", fill="black", font=ImageFont.load_default(size=22))
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     return buf.getvalue()

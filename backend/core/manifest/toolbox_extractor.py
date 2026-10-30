@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from time import perf_counter
@@ -14,6 +14,7 @@ from backend.i18n import t
 from backend.log_messages import (
     LOG_ARTIFACT_UPLOAD_DEGRADED,
     LOG_ARTIFACT_STORE_DIRECT_INPUT,
+    LOG_DUAL_FUSION_SKIPPED_IDENTICAL_PROVIDERS,
     LOG_STRUCTURAL_PROVIDER_DEGRADED,
 )
 from backend.tools.logger import logger
@@ -215,9 +216,14 @@ class ToolboxManifestExtractor:
         if settings.fusion_mode == "dual" and dual_fusion:
             secondary_provider = settings.fusion_secondary_provider
             if secondary_provider == structure.provider:
+                result = {**result, "fusion": {
+                    "status": "skipped", "providers": [structure.provider],
+                    "failed_providers": [], "reason": "identical-providers",
+                }}
                 logger.warning(
-                    "Fusão dual ignorada: provider primário e secundário são ambos {}",
-                    secondary_provider,
+                    t(LOG_DUAL_FUSION_SKIPPED_IDENTICAL_PROVIDERS).format(
+                        provider=secondary_provider
+                    )
                 )
             else:
                 from backend.pipeline.fusion import (
@@ -265,6 +271,12 @@ class ToolboxManifestExtractor:
                             ]
                         ) from exc
                     extraction_failures[secondary_provider] = type(exc).__name__
+                    result = {**result, "fusion": {
+                        "status": "degraded",
+                        "providers": [structure.provider],
+                        "failed_providers": [secondary_provider],
+                        "reason": type(exc).__name__,
+                    }}
                     logger.warning(
                         t(LOG_STRUCTURAL_PROVIDER_DEGRADED).format(
                             provider=secondary_provider, error=type(exc).__name__
@@ -272,7 +284,12 @@ class ToolboxManifestExtractor:
                     )
                 else:
                     if result is None:
-                        result = secondary_result
+                        result = {**secondary_result, "fusion": {
+                            "status": "degraded",
+                            "providers": [secondary_provider],
+                            "failed_providers": [structure.provider],
+                            "reason": type(primary_error).__name__,
+                        }}
                         final_provider = secondary_provider
                         final_base_url = secondary_client.base_url
                     else:
@@ -282,6 +299,9 @@ class ToolboxManifestExtractor:
                             primary_provider=structure.provider,
                             secondary_provider=secondary_provider,
                             policy=self.fusion_policy,
+                        )
+                        reuse = _persist_fusion_reuse(
+                            source_path, fusion, self.fusion_policy
                         )
                         replaced: dict[int, list[dict[str, Any]]] = {}
                         if settings.fusion_apply_page_routes:
@@ -293,6 +313,8 @@ class ToolboxManifestExtractor:
                             )
                         result = {
                             **result,
+                            "fusion_reuse": reuse,
+                            "fusion": {"status": "complete", "providers": [structure.provider, secondary_provider], "failed_providers": []},
                             "fusion_stats": fusion["fusion_stats"],
                             "fusion_evidence": fusion["fusion_evidence"],
                             "secondary_extraction": _persist_secondary_extraction(
@@ -316,6 +338,9 @@ class ToolboxManifestExtractor:
             duration_ms=duration_ms,
             version=provenance.get("provider_version", "unknown"),
             configuration={
+                "fusion": result.get("fusion"),
+                "fusion_reuse": result.get("fusion_reuse"),
+                "fusion_policy": asdict(self.fusion_policy) if self.fusion_policy else None,
                 "ocr": self.enable_ocr,
                 "table_structure": True,
                 "remote_services": True,
@@ -338,6 +363,33 @@ class ToolboxManifestExtractor:
             artifact_id=artifact_id,
             cache_key=cache_key,
         )
+
+
+def _persist_fusion_reuse(
+    source_path: Path, payload: dict,
+    policy: FusionPolicy | None,
+) -> dict:
+    from dataclasses import asdict
+
+    from docstruct.policy import FusionPolicy
+
+    from backend.services.cache import _file_hash, processing_cache_configuration
+
+    content = json.dumps({
+        "source_sha256": _file_hash(source_path),
+        "configuration": processing_cache_configuration(),
+        "policy": asdict(policy or FusionPolicy()),
+        "payload": payload,
+    }, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    digest = hashlib.sha256(content).hexdigest()
+    path = settings.data_dir / "artifacts" / "fusion" / f"inputs-{digest}.json"
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+    except OSError:
+        logger.warning("Could not persist fusion evidence; extraction will need to run again")
+        return {}
+    return {"path": str(path), "sha256": digest}
 
 
 def _provider_failure(exc: ToolboxError) -> bool:

@@ -15,7 +15,7 @@ from backend.services import cache
 async def test_concurrent_writes_to_same_key_publish_complete_payload(tmp_path, monkeypatch):
     monkeypatch.setattr(cache, "CACHE_DIR", tmp_path)
     original_open = cache.aiofiles.open
-    original_replace = cache.aiofiles.os.replace
+    original_replace = cache._replace_cached
     both_open = asyncio.Event()
     first_written = asyncio.Event()
     second_written = asyncio.Event()
@@ -61,7 +61,7 @@ async def test_concurrent_writes_to_same_key_publish_complete_payload(tmp_path, 
 
     with monkeypatch.context() as writes:
         writes.setattr(cache.aiofiles, "open", coordinated_open)
-        writes.setattr(cache.aiofiles.os, "replace", coordinated_replace)
+        writes.setattr(cache, "_replace_cached", coordinated_replace)
         await asyncio.wait_for(
             asyncio.gather(
                 cache.set_cache_bytes(b"same image", long_payload),
@@ -140,8 +140,43 @@ async def test_failed_replace_preserves_previous_cache_and_removes_temporary(tmp
     async def fail_replace(*args):
         raise OSError("replacement unavailable")
 
-    monkeypatch.setattr(cache.aiofiles.os, "replace", fail_replace)
+    monkeypatch.setattr(cache, "_replace_cached", fail_replace)
     await cache.set_cache_bytes(b"image", {"answer": "new"})
 
     assert await cache.get_cached_bytes(b"image") == {"answer": "previous"}
     assert not list(tmp_path.glob("*.tmp"))
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("snapshot", ["expired", "corrupt", "invalid-timestamp"])
+async def test_stale_reader_does_not_delete_a_concurrent_refresh(
+    tmp_path, monkeypatch, snapshot
+):
+    monkeypatch.setattr(cache, "CACHE_DIR", tmp_path)
+    content = b"same document"
+    path = cache._cache_path(cache._content_key(content))
+    if snapshot == "corrupt":
+        path.write_text("{", encoding="utf-8")
+    else:
+        timestamp = time.time() - 7200 if snapshot == "expired" else "invalid"
+        path.write_text(json.dumps({"timestamp": timestamp, "payload": "old"}))
+    original_open = cache.aiofiles.open
+    refreshed = False
+
+    @asynccontextmanager
+    async def refresh_after_read(path_arg, mode, **kwargs):
+        nonlocal refreshed
+        async with original_open(path_arg, mode, **kwargs) as stream:
+            yield stream
+        if mode == "r" and not refreshed:
+            refreshed = True
+            # Publish through the real atomic writer after the reader captured
+            # its old snapshot, but before it decides the snapshot is unusable.
+            await cache.set_cache_bytes(content, {"answer": "fresh"})
+
+    with monkeypatch.context() as reader:
+        reader.setattr(cache.aiofiles, "open", refresh_after_read)
+        assert await asyncio.wait_for(cache.get_cached_bytes(content), 10) is None
+
+    assert refreshed
+    assert await cache.get_cached_bytes(content) == {"answer": "fresh"}

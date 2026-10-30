@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 
 import httpx
 from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
 
 from acessilia_sdk.toolbox import vlm_provider_healthy
 from backend.ai.models.ai_client import active_model_name
@@ -13,9 +14,35 @@ from backend.api.limiter import limiter
 from backend.api.schemas import HealthResponse
 from backend.config.settings import settings
 from backend.services.queue_service import unified_queue
-from backend.tools.toolbox_client import toolbox_vlm_endpoint
+from backend.tools.toolbox_client import toolbox_endpoints, toolbox_vlm_endpoint
 
 router = APIRouter(tags=["health"])
+
+
+@router.get("/ready")
+async def ready() -> JSONResponse:
+    """Readiness follows the mandatory extraction chain, without inference.
+
+    Ready when one Toolbox endpoint reports every structural provider the
+    extraction needs healthy (``/v1/providers/{provider}/health``, the probe
+    the VLM health check uses too).
+    """
+    providers = {settings.toolbox_provider}
+    if settings.fusion_mode == "dual":
+        providers.add(settings.fusion_secondary_provider)
+    for endpoint in toolbox_endpoints():
+        for provider in sorted(providers):
+            if not await vlm_provider_healthy(
+                endpoint,
+                provider,
+                api_key=settings.toolbox_api_key,
+                timeout_seconds=3.0,
+            ):
+                break
+        else:
+            return JSONResponse({"status": "ready"})
+    return JSONResponse({"status": "unavailable", "dependency": "toolbox"}, status_code=503)
+
 
 #: The auto-update timer runs every 300 s (UPDATE_INTERVAL in scripts/ops.sh);
 #: like `ops.sh auto-update check`, a last check older than three intervals means

@@ -495,8 +495,8 @@ def _derive_processing_needs(
         spec = OBLIGATION_BY_TYPE.get(element.type)
         if spec is None:
             continue
-        kind, rationale, methods = spec
-        rationale = t(rationale)
+        kind, msgid, methods = spec
+        rationale = t(msgid)
         suffix = element.id.removeprefix("element-")
         observations.append(
             Observation(
@@ -916,6 +916,8 @@ def _needs_vlm_judge(stats: dict[str, Any]) -> bool:
     route = stats.get("route")
     if route is None:
         return bool(stats.get("text_divergence"))
+    if stats.get("route_reason") == "structure_ambiguous":
+        return True
     return (
         bool(stats.get("provider_divergence"))
         and route != "docling"
@@ -962,6 +964,13 @@ def _add_fusion_observations(
             targets,
             {"page_number": page_number, "fusion_stats": stats},
             VLM_JUDGE_METHODS,
+        )
+    elif stats.get("route_reason") == "structure_ambiguous":
+        add(
+            "adjudicate-page",
+            targets,
+            {"page_number": page_number, "fusion_stats": stats},
+            ["human-review"],
         )
     if any(key.startswith("dropped-") and value for key, value in stats.items()):
         add("rescue-omitted-block", targets, {"page_number": page_number, "fusion_stats": stats})
@@ -1038,8 +1047,8 @@ def reconcile_reclassified_element_processing_needs(
     if current_spec is None:
         return
 
-    current_kind, rationale, methods = current_spec
-    rationale = t(rationale)
+    current_kind, msgid, methods = current_spec
+    rationale = t(msgid)
     previous_kind = previous_spec[0] if previous_spec is not None else None
     previous_observation_kind = (
         f"{previous_type}-requires-processing" if previous_spec is not None else None

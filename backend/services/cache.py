@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import json
 import time
@@ -16,6 +17,7 @@ from backend.log_messages import (
     LOG_CACHE_SAVE_FAILED,
 )
 from backend.tools.logger import logger
+from backend.services.cache_lock import cache_directory_lock
 
 CACHE_DIR = Path("var/temp/cache")
 # Match the periodic sweep's retention; fresh temporaries may belong to
@@ -59,6 +61,7 @@ def processing_cache_configuration() -> dict[str, Any]:
         "ai_client", "ollama_model", "ollama_base_url", "openrouter_model",
         "openrouter_base_url", "openrouter_max_tokens", "pipeline_engine",
         "fusion_mode", "fusion_secondary_provider", "fusion_hybrid_provider",
+        "fusion_apply_page_routes", "fusion_judge_max_pages", "processing_model_revision",
         "legacy_unicode_repair", "inline_math_detection", "formula_text_agreement_min",
         "toolbox_base_url", "toolbox_base_urls", "toolbox_vlm_provider",
         "toolbox_provider", "toolbox_layout_provider",
@@ -106,6 +109,12 @@ async def get_cached_bytes(content: bytes, extra: str = "", ttl: int = 3600) -> 
 
 
 async def _read_cached(key: str, ttl: int) -> Any:
+    """Read a snapshot; leave removal to the periodic cleanup.
+
+    A writer may replace the path after this reader captured its contents.
+    Expired or corrupt snapshots are misses, never grounds to unlink a path
+    that may already refer to a newer entry, including from another process.
+    """
     _ensure_cache_dir()
     cp = _cache_path(key)
     try:
@@ -118,17 +127,12 @@ async def _read_cached(key: str, ttl: int) -> Any:
     try:
         data = json.loads(content)
         if time.time() - data["timestamp"] > ttl:
-            await aiofiles.os.remove(str(cp))
             return None
         logger.debug(t(LOG_CACHE_DEBUG_HIT).format(key=key))
         if "payload" in data:
             return data["payload"]
         return data.get("text")
     except Exception:
-        try:
-            await aiofiles.os.remove(str(cp))
-        except OSError:
-            pass
         return None
 
 
@@ -169,7 +173,7 @@ async def _write_cached(key: str, payload: Any) -> None:
         # Replacing the entry publishes one complete JSON even when another
         # writer is saving the same key. A process killed mid-write leaves
         # only its temporary file, which the periodic sweep removes by age.
-        await aiofiles.os.replace(str(tmp), str(cp))
+        await _replace_cached(tmp, cp)
         logger.debug(t(LOG_CACHE_DEBUG_SET).format(key=key))
     except Exception as e:
         logger.warning(t(LOG_CACHE_SAVE_FAILED).format(error=e))
@@ -184,6 +188,19 @@ async def _write_cached(key: str, payload: Any) -> None:
                     logger.warning(t(LOG_CACHE_SAVE_FAILED).format(error=e))
         finally:
             _active_cache_writes.discard(active_path)
+
+
+def _publish_cache(source: Path, destination: Path) -> None:
+    import os
+
+    with cache_directory_lock(destination.parent):
+        os.replace(source, destination)
+
+
+async def _replace_cached(source: Path, destination: Path) -> None:
+    # Acquire the process-shared lock off the event loop. Keep acquisition,
+    # replacement and release in one worker even if the caller is cancelled.
+    await asyncio.to_thread(_publish_cache, source, destination)
 
 
 async def clear_cache() -> int:

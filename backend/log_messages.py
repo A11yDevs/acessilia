@@ -539,6 +539,11 @@ LOG_AGNO_NOT_INSTALLED: str = (
 #: Upload persistence failed transiently; extraction will receive the source file.
 LOG_ARTIFACT_UPLOAD_DEGRADED: str = "Artifact upload unavailable ({error}); extracting from the source file."
 
+#: FUSION_MODE=dual names the primary provider as its secondary too; fusion is skipped.
+LOG_DUAL_FUSION_SKIPPED_IDENTICAL_PROVIDERS: str = (
+    "Dual fusion skipped: the primary and secondary providers are both {provider}."
+)
+
 #: One structural provider failed; use the other provider when available.
 LOG_STRUCTURAL_PROVIDER_DEGRADED: str = "Structural provider {provider} failed ({error}); extraction is degraded."
 

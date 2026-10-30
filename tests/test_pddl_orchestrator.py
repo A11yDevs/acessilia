@@ -172,6 +172,10 @@ def test_degraded_extraction_warns_in_delivered_document_and_is_not_cached():
     manifest.extractor.configuration.update(
         extraction_degraded=True, extraction_failures={"docling": "ToolboxTimeout"},
         toolbox_provider="mineru",
+        fusion={
+            "status": "degraded", "providers": ["mineru"],
+            "failed_providers": ["docling"], "reason": "ToolboxTimeout",
+        },
     )
     token = set_request_locale("en_US")
     try:
@@ -183,6 +187,18 @@ def test_degraded_extraction_warns_in_delivered_document_and_is_not_cached():
     finally:
         reset_request_locale(token)
     assert expected in payload["technical_warnings"]
+    # The fusion status records the same event; it adds no second warning.
+    del manifest.extractor.configuration["fusion"]
+    token = set_request_locale("en_US")
+    try:
+        without_fusion = build_pddl_structured_payload(
+            file_path=Path("/tmp/sample.pdf"), manifest=manifest, plan=_sample_plan(),
+            planner_backend="internal", execution_report=None, comparison=None,
+        )
+    finally:
+        reset_request_locale(token)
+    assert payload["technical_warnings"] == without_fusion["technical_warnings"]
+    assert payload["canonical_metadata"]["pddl_fusion"]["status"] == "degraded"
     assert payload["cacheable"] is False
     assert payload["canonical_metadata"]["pddl_extraction_degraded"] is True
     canonical = build_canonical_document(

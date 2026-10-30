@@ -1078,8 +1078,8 @@ msgstr "Seu E-mail"
 msgid "We will send the final files to this address."
 msgstr "Enviaremos o arquivo final para este endereço."
 
-msgid "Attach a Document (PDF or Image)"
-msgstr "Anexar Documento (PDF ou Imagem)"
+msgid "Attach a Document (PDF, HTML or Image)"
+msgstr "Anexar Documento (PDF, HTML ou Imagem)"
 
 msgid "Make Accessible"
 msgstr "Tornar Acessível"
@@ -1915,6 +1915,14 @@ msgid "Structural provider {provider} failed ({error}); extraction is degraded."
 msgstr ""
 "O provedor estrutural {provider} falhou ({error}); a extração está "
 "degradada."
+
+#, python-brace-format
+msgid ""
+"Dual fusion skipped: the primary and secondary providers are both "
+"{provider}."
+msgstr ""
+"Fusão dual ignorada: os provedores primário e secundário são ambos "
+"{provider}."
 
 #, python-brace-format
 msgid "Failed to edit the status message: {error}"
