@@ -74,5 +74,5 @@ include = ["backend*", "frontend*"]
 testpaths = ["tests"]
 addopts = "--strict-config --strict-markers -ra"
 markers = [
-    "e2e: requires a running Acessilia Toolbox instance at TOOLBOX_BASE_URL",
+    "e2e: requires a running Acessilia Toolbox at TOOLBOX_BASE_URL or Core API at CORE_BASE_URL",
 ]
