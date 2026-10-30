@@ -6,6 +6,7 @@ from typing import Any, Callable, Coroutine
 
 from backend.agents.pddl_orchestrator import (
     PddlAccessibilityOrchestrator,
+    records_extraction_degradation,
     records_visual_failures,
 )
 from backend.agents.state_manager import TaskCancelledError, state_manager
@@ -184,6 +185,7 @@ async def process(
                 or (not settings.pddl_execute_dry_run and execution_status == "dry-run-completed")
                 or media_inspection_failed
                 or records_visual_failures(metadata.get("pddl_visual_failures"))
+                or records_extraction_degradation(metadata.get("pddl_extraction_degraded"))
             ):
                 cached = None
         if cached is not None:

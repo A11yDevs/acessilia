@@ -1018,15 +1018,21 @@ msgstr "Unsupported export format: {format_name}"
 msgid "Contents"
 msgstr "Contents"
 
-msgid "Technical metadata"
-msgstr "Technical metadata"
-
 msgid "Image without a text description."
 msgstr "Image without a text description."
 
 #, python-brace-format
 msgid "Logo. {lines}."
 msgstr "Logo. {lines}."
+
+msgid "image"
+msgstr "image"
+
+msgid "table"
+msgstr "table"
+
+msgid "formula"
+msgstr "formula"
 
 msgid "Image description"
 msgstr "Image description"
@@ -1252,6 +1258,17 @@ msgstr "Worker: task completed: {filename}. Waiting for the next..."
 msgid "Acessilia API started (queue worker + cleanup active)"
 msgstr "Acessilia API started (queue worker + cleanup active)"
 
+msgid ""
+"Artifact storage bypassed for independent Toolbox endpoints; the source "
+"file will be sent again for extraction, fusion and text spans."
+msgstr ""
+"Artifact storage bypassed for independent Toolbox endpoints; the source "
+"file will be sent again for extraction, fusion and text spans."
+
+#, python-brace-format
+msgid "Artifact upload unavailable ({error}); extracting from the source file."
+msgstr "Artifact upload unavailable ({error}); extracting from the source file."
+
 #, python-brace-format
 msgid "Error in the API: {error} | Path: {path}"
 msgstr "Error in the API: {error} | Path: {path}"
@@ -1423,6 +1440,14 @@ msgid ""
 msgstr ""
 "Table {element_id} (page {page}) looked misread ({reason}); the reading "
 "from its image was not used ({why})"
+
+#, python-brace-format
+msgid ""
+"{failures} vision calls in a row got no usable answer; skipping the "
+"remaining calls of this job"
+msgstr ""
+"{failures} vision calls in a row got no usable answer; skipping the "
+"remaining calls of this job"
 
 #, python-brace-format
 msgid "Failed to extract the image clip for element {element_id}"
@@ -1862,6 +1887,10 @@ msgid "Failed to send the status message: {error}"
 msgstr "Failed to send the status message: {error}"
 
 #, python-brace-format
+msgid "Structural provider {provider} failed ({error}); extraction is degraded."
+msgstr "Structural provider {provider} failed ({error}); extraction is degraded."
+
+#, python-brace-format
 msgid "Failed to edit the status message: {error}"
 msgstr "Failed to edit the status message: {error}"
 
@@ -1926,6 +1955,16 @@ msgstr "Page {page_number} references unknown elements: {element_ids}"
 msgid "{path} ends at {char_end}, before its start {char_start}"
 msgstr "{path} ends at {char_end}, before its start {char_start}"
 
+#, python-brace-format
+msgid ""
+"Structural extraction used only {provider} because the other provider "
+"failed. The document requires review; dual-provider comparison was not "
+"available."
+msgstr ""
+"Structural extraction used only {provider} because the other provider "
+"failed. The document requires review; dual-provider comparison was not "
+"available."
+
 msgid "document"
 msgid_plural "documents"
 msgstr[0] "document"
@@ -1942,4 +1981,32 @@ msgid "{count} table could not be read."
 msgid_plural "{count} tables could not be read."
 msgstr[0] "{count} table could not be read."
 msgstr[1] "{count} tables could not be read."
+
+#, python-brace-format
+msgid ""
+"{count} picture without a usable description from the model; trying again"
+" in {delay}s"
+msgid_plural ""
+"{count} pictures without a usable description from the model; trying "
+"again in {delay}s"
+msgstr[0] ""
+"{count} picture without a usable description from the model; trying again"
+" in {delay}s"
+msgstr[1] ""
+"{count} pictures without a usable description from the model; trying "
+"again in {delay}s"
+
+#, python-brace-format
+msgid ""
+"{count} table without a usable reading from the model; trying again in "
+"{delay}s"
+msgid_plural ""
+"{count} tables without a usable reading from the model; trying again in "
+"{delay}s"
+msgstr[0] ""
+"{count} table without a usable reading from the model; trying again in "
+"{delay}s"
+msgstr[1] ""
+"{count} tables without a usable reading from the model; trying again in "
+"{delay}s"
 

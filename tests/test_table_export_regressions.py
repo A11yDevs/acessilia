@@ -134,22 +134,6 @@ def test_explicit_unmarked_header_row_still_uses_column_header_cells() -> None:
     )
 
 
-def test_header_row_with_every_cell_flagged_false_uses_column_headers() -> None:
-    # Providers that do not detect header cells flag every cell header=False;
-    # a <thead> row like that must still render <th scope="col"> for screen readers.
-    document = _document_with_table({
-        "header": [{"cells": [{"text": "Curso", "header": False}, {"text": "2026", "header": False}]}],
-        "body": [{"cells": [{"text": "Letras", "header": False}, {"text": "71", "header": False}]}],
-    })
-
-    assert _render_table(document) == (
-        '<table id="table-1">'
-        '<thead><tr><th scope="col">Curso</th><th scope="col">2026</th></tr></thead>'
-        '<tbody><tr><td>Letras</td><td>71</td></tr></tbody>'
-        '</table>'
-    )
-
-
 def test_explicit_data_cell_in_header_row_remains_data() -> None:
     document = _document_with_table({
         "header": [{"cells": [
@@ -252,6 +236,36 @@ def test_benchmark_renderers_keep_unmarked_header_cells() -> None:
     )
 
 
+def test_markdown_header_row_with_every_cell_flagged_false_uses_column_headers() -> None:
+    from docstruct.export.markdown import render_table as _render_table
+
+    # Providers that do not detect header cells flag every cell header=False
+    # (BHS 0.2.0); the <thead> row must still carry column headers.
+    table_ast = {
+        "header": [{"cells": [{"text": "Curso", "header": False}, {"text": "2026", "header": False}]}],
+        "body": [{"cells": [{"text": "Letras", "header": False}, {"text": "71", "header": False}]}],
+    }
+
+    assert _render_table({"table_ast": table_ast}) == (
+        '<table><thead><tr><th scope="col">Curso</th><th scope="col">2026</th></tr></thead>'
+        '<tbody><tr><td>Letras</td><td>71</td></tr></tbody></table>'
+    )
+
+
+def test_markdown_explicit_data_cell_in_marked_header_row_remains_data() -> None:
+    from docstruct.export.markdown import render_table as _render_table
+
+    table_ast = {
+        "header": [{"cells": [{"text": "Curso", "header": 1}, {"text": "nota", "header": False}]}],
+        "body": [{"cells": [{"text": "Letras"}, {"text": "71"}]}],
+    }
+
+    assert _render_table({"table_ast": table_ast}) == (
+        '<table><thead><tr><th scope="col">Curso</th><td>nota</td></tr></thead>'
+        '<tbody><tr><td>Letras</td><td>71</td></tr></tbody></table>'
+    )
+
+
 def test_explicit_full_row_replaces_conflicting_rowspan():
     from docstruct.tables.ast import linearize_table_for_text
     table = {"header": [{"cells": [{"text": "H1"}, {"text": "H2"}]}], "body": [
@@ -262,3 +276,55 @@ def test_explicit_full_row_replaces_conflicting_rowspan():
     assert linearize_table_for_text({"table_ast": table}) == [
         "Row 1: H1: A; H2: B", "Row 2: H1: C; H2: D", "Row 3: H1: E; H2: F",
     ]
+
+
+def test_promoted_header_row_with_default_cell_flags_uses_column_headers() -> None:
+    """The normalizer's ``header: False``/``scope: none`` defaults are not marks.
+
+    A Docling table without header flags has its first row promoted to the
+    header; its cells still carry the defaults and must come out as column
+    headers, not data cells inside <thead> (the calculus reference document).
+    """
+    default = {"header": False, "scope": "none"}
+    document = _document_with_table({
+        "body": [
+            {"cells": [{"text": "h", **default}, {"text": "t", **default}]},
+            {"cells": [{"text": "2", **default}, {"text": "4", **default}]},
+        ],
+    })
+
+    assert _render_table(document) == (
+        '<table id="table-1">'
+        '<thead><tr><th scope="col">h</th><th scope="col">t</th></tr></thead>'
+        '<tbody><tr><td>2</td><td>4</td></tr></tbody>'
+        '</table>'
+    )
+
+
+def test_header_row_with_only_invalid_scopes_uses_column_headers() -> None:
+    """An unknown ``scope`` is not a header mark, so it cannot leave <td> in <thead>."""
+    document = _document_with_table({
+        "header": [{"cells": [
+            {"text": "Month", "scope": "banana"}, {"text": "Value", "scope": "banana"},
+        ]}],
+        "body": [{"cells": [{"text": "January"}, {"text": "10"}]}],
+    })
+
+    assert _render_table(document) == (
+        '<table id="table-1">'
+        '<thead><tr><th scope="col">Month</th><th scope="col">Value</th></tr></thead>'
+        '<tbody><tr><td>January</td><td>10</td></tr></tbody>'
+        '</table>'
+    )
+
+
+def test_html_table_has_cell_borders_and_scrolls_on_narrow_screens() -> None:
+    html = document_to_html(
+        _document_with_table({"body": [{"cells": [{"text": "a"}, {"text": "b"}]}]}),
+        profile="html",
+    )
+
+    assert "th,td{border:1px solid" in html
+    assert "\nth{background:" in html
+    assert '<div class="table-wrap"><table id="table-1">' in html
+    assert ".table-wrap{overflow-x:auto" in html

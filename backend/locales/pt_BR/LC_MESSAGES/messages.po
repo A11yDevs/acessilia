@@ -1032,15 +1032,21 @@ msgstr "Formato de exportação não suportado: {format_name}"
 msgid "Contents"
 msgstr "Sumário"
 
-msgid "Technical metadata"
-msgstr "Metadados técnicos"
-
 msgid "Image without a text description."
 msgstr "Imagem sem descrição textual."
 
 #, python-brace-format
 msgid "Logo. {lines}."
 msgstr "Logotipo. {lines}."
+
+msgid "image"
+msgstr "imagem"
+
+msgid "table"
+msgstr "tabela"
+
+msgid "formula"
+msgstr "fórmula"
 
 msgid "Image description"
 msgstr "Descrição da imagem"
@@ -1268,6 +1274,20 @@ msgstr "Worker: tarefa concluída: {filename}. Aguardando pela próxima..."
 msgid "Acessilia API started (queue worker + cleanup active)"
 msgstr "Acessilia API iniciada (worker da fila + limpeza ativos)"
 
+msgid ""
+"Artifact storage bypassed for independent Toolbox endpoints; the source "
+"file will be sent again for extraction, fusion and text spans."
+msgstr ""
+"Armazenamento de artefatos contornado para endpoints independentes da "
+"Toolbox; o arquivo original será reenviado para extração, fusão e text "
+"spans."
+
+#, python-brace-format
+msgid "Artifact upload unavailable ({error}); extracting from the source file."
+msgstr ""
+"Upload do artefato indisponível ({error}); extraindo a partir do arquivo "
+"original."
+
 #, python-brace-format
 msgid "Error in the API: {error} | Path: {path}"
 msgstr "Erro na API: {error} | Caminho: {path}"
@@ -1439,6 +1459,14 @@ msgid ""
 msgstr ""
 "A tabela {element_id} (página {page}) parecia mal lida ({reason}); a "
 "leitura da sua imagem não foi usada ({why})"
+
+#, python-brace-format
+msgid ""
+"{failures} vision calls in a row got no usable answer; skipping the "
+"remaining calls of this job"
+msgstr ""
+"{failures} chamadas de visão seguidas sem resposta utilizável; as "
+"chamadas restantes deste job serão puladas"
 
 #, python-brace-format
 msgid "Failed to extract the image clip for element {element_id}"
@@ -1883,6 +1911,12 @@ msgid "Failed to send the status message: {error}"
 msgstr "Falha ao enviar a mensagem de status: {error}"
 
 #, python-brace-format
+msgid "Structural provider {provider} failed ({error}); extraction is degraded."
+msgstr ""
+"O provedor estrutural {provider} falhou ({error}); a extração está "
+"degradada."
+
+#, python-brace-format
 msgid "Failed to edit the status message: {error}"
 msgstr "Falha ao editar a mensagem de status: {error}"
 
@@ -1949,6 +1983,16 @@ msgstr "Página {page_number} referencia elementos inexistentes: {element_ids}"
 msgid "{path} ends at {char_end}, before its start {char_start}"
 msgstr "{path} termina em {char_end}, antes do início {char_start}"
 
+#, python-brace-format
+msgid ""
+"Structural extraction used only {provider} because the other provider "
+"failed. The document requires review; dual-provider comparison was not "
+"available."
+msgstr ""
+"A extração estrutural usou apenas {provider} porque o outro provedor "
+"falhou. O documento exige revisão; a comparação entre dois provedores não"
+" estava disponível."
+
 msgid "document"
 msgid_plural "documents"
 msgstr[0] "documento"
@@ -1965,4 +2009,32 @@ msgid "{count} table could not be read."
 msgid_plural "{count} tables could not be read."
 msgstr[0] "{count} tabela não pôde ser lida."
 msgstr[1] "{count} tabelas não puderam ser lidas."
+
+#, python-brace-format
+msgid ""
+"{count} picture without a usable description from the model; trying again"
+" in {delay}s"
+msgid_plural ""
+"{count} pictures without a usable description from the model; trying "
+"again in {delay}s"
+msgstr[0] ""
+"{count} imagem sem descrição utilizável do modelo; nova tentativa em "
+"{delay}s"
+msgstr[1] ""
+"{count} imagens sem descrição utilizável do modelo; nova tentativa em "
+"{delay}s"
+
+#, python-brace-format
+msgid ""
+"{count} table without a usable reading from the model; trying again in "
+"{delay}s"
+msgid_plural ""
+"{count} tables without a usable reading from the model; trying again in "
+"{delay}s"
+msgstr[0] ""
+"{count} tabela sem leitura utilizável do modelo; nova tentativa em "
+"{delay}s"
+msgstr[1] ""
+"{count} tabelas sem leitura utilizável do modelo; nova tentativa em "
+"{delay}s"
 

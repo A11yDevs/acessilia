@@ -52,30 +52,32 @@ if TYPE_CHECKING:
     from backend.core.manifest.toolbox_extractor import ToolboxExtraction
 
 
+# Store message IDs here; translate only while building the current request.
+# Translation at import time freezes the server locale for all later requests.
 OBLIGATION_BY_TYPE = {
     "picture": (
         "describe-image",
-        t(MSG_OBLIGATION_IMAGE),
+        MSG_OBLIGATION_IMAGE,
         ["vision-description", "human-review"],
     ),
     "table": (
         "linearize-table",
-        t(MSG_OBLIGATION_TABLE),
+        MSG_OBLIGATION_TABLE,
         ["pandoc-table", "human-review"],
     ),
     "formula": (
         "verbalize-formula",
-        t(MSG_OBLIGATION_FORMULA),
+        MSG_OBLIGATION_FORMULA,
         ["mathml", "latex-verbalizer", "human-review"],
     ),
     "code": (
         "preserve-code-semantics",
-        t(MSG_OBLIGATION_CODE),
+        MSG_OBLIGATION_CODE,
         ["pandoc-code", "human-review"],
     ),
     "unknown": (
         "review-structure",
-        t(MSG_OBLIGATION_UNKNOWN),
+        MSG_OBLIGATION_UNKNOWN,
         ["pymupdf-region", "human-review"],
     ),
 }
@@ -494,6 +496,7 @@ def _derive_processing_needs(
         if spec is None:
             continue
         kind, rationale, methods = spec
+        rationale = t(rationale)
         suffix = element.id.removeprefix("element-")
         observations.append(
             Observation(
@@ -1036,6 +1039,7 @@ def reconcile_reclassified_element_processing_needs(
         return
 
     current_kind, rationale, methods = current_spec
+    rationale = t(rationale)
     previous_kind = previous_spec[0] if previous_spec is not None else None
     previous_observation_kind = (
         f"{previous_type}-requires-processing" if previous_spec is not None else None

@@ -147,7 +147,8 @@ LOGS_DIR=var/logs
 # Logging
 LOG_LEVEL=INFO
 
-# AI Client (pick one)
+# AI Client (pick one: ollama, openrouter, or toolbox to reach the vision
+# model through the Toolbox below; see docs/adr/0012)
 AI_CLIENT=ollama
 OLLAMA_BASE_URL=http://host.docker.internal:11434/v1/chat/completions
 OLLAMA_MODEL=llama3.2-vision

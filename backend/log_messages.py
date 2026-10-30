@@ -428,6 +428,25 @@ LOG_PDDL_TABLE_REREAD_REJECTED: str = (
     "Table {element_id} (page {page}) looked misread ({reason}); "
     "the reading from its image was not used ({why})"
 )
+#: Warning logged when {failures} vision calls in a row got no usable answer and the remaining vision calls of the job are skipped.
+LOG_PROVIDER_BREAKER_OPEN: str = (
+    "{failures} vision calls in a row got no usable answer; "
+    "skipping the remaining calls of this job"
+)
+#: Warning logged before the picture stage tries again what failed; {count} is how many pictures (empty answers included), {delay} the seconds waited first.
+LOG_PDDL_VISION_RETRY_PASS_PICTURES: tuple[str, str] = (
+    "{count} picture without a usable description from the model; "
+    "trying again in {delay}s",
+    "{count} pictures without a usable description from the model; "
+    "trying again in {delay}s",
+)
+#: Warning logged before the table stage tries again what failed; {count} is how many tables, {delay} the seconds waited first.
+LOG_PDDL_VISION_RETRY_PASS_TABLES: tuple[str, str] = (
+    "{count} table without a usable reading from the model; "
+    "trying again in {delay}s",
+    "{count} tables without a usable reading from the model; "
+    "trying again in {delay}s",
+)
 #: Exception logged when extracting an element's image clip from the source PDF for the PDDL pipeline fails; {element_id} is the failing element's id.
 LOG_PDDL_ELEMENT_CROP_FAILED: str = (
     "Failed to extract the image clip for element {element_id}"
@@ -515,4 +534,22 @@ LOG_DOCX_SKIPPED_DISABLED: str = "DOCX skipped: TOOLBOX_DOCX_ENABLED is false"
 #: Error raised when the optional Agno agent stack is absent and a workflow class import is required; no placeholders.
 LOG_AGNO_NOT_INSTALLED: str = (
     "Agno is not installed. Run `uv sync` before using the workflow Executor."
+)
+
+#: Upload persistence failed transiently; extraction will receive the source file.
+LOG_ARTIFACT_UPLOAD_DEGRADED: str = "Artifact upload unavailable ({error}); extracting from the source file."
+
+#: One structural provider failed; use the other provider when available.
+LOG_STRUCTURAL_PROVIDER_DEGRADED: str = "Structural provider {provider} failed ({error}); extraction is degraded."
+
+#: Multiple independent Toolbox URLs require direct input; configured artifact storage is bypassed.
+LOG_ARTIFACT_STORE_DIRECT_INPUT: str = (
+    "Artifact storage bypassed for independent Toolbox endpoints; "
+    "the source file will be sent again for extraction, fusion and text spans."
+)
+
+#: Delivered document warning when only one structural provider succeeded; {provider} is its identifier.
+MSG_STRUCTURAL_EXTRACTION_DEGRADED: str = (
+    "Structural extraction used only {provider} because the other provider failed. "
+    "The document requires review; dual-provider comparison was not available."
 )

@@ -23,15 +23,22 @@ A run:
 - stops at a text-font word, and at a ``,`` or ``;`` outside brackets
   (``s(t), v(t)`` is two runs, ``[-2, 0)`` one), unless what precedes has no
   relation and what follows has one (``s_0, a \in \mathbb{R}``) or the ``,``
-  is a decimal separator between digits (``x = 3,5``);
+  is a decimal separator between digits (``x = 3,5``, ``$-0,0833$``);
 - drops the punctuation, spaces and unmatched brackets at its ends.
+
+Two lines that are each one run, smaller than the text around them and
+stacked on each other's centre, are the numerator and denominator of a
+fraction (a ``\frac`` set in a table cell) and become one ``\frac`` run.
+
+A table's cells carry no boxes; ``assign_runs_to_cells`` gives each run of
+the table's lines to the cell whose text holds it (#260).
 """
 from __future__ import annotations
 
 import difflib
 import re
 import unicodedata
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Iterable, Sequence
 
 from docstruct.text.latex import _COMMAND_GLYPHS, _FUNCTION_ALIASES, _FUNCTION_NAMES
@@ -48,6 +55,15 @@ MATH_FONT_PREFIXES = (
 SCRIPT_SIZE_RATIO = 0.85
 #: A baseline this fraction of the body size away from the body's is a script.
 SCRIPT_SHIFT_RATIO = 0.1
+#: A numerator and its denominator are centred within this fraction of the
+#: wider one's width, and their baselines at most this many sizes apart.
+FRACTION_CENTRE_RATIO = 0.25
+FRACTION_GAP_RATIO = 2.0
+#: A math-font decimal comma is at most this fraction of its size away from
+#: each digit. TeX's space after a math comma is a sixth of an em, but glyph
+#: boxes split a span's width evenly, so the space before ``0833`` in
+#: ``−0, 0833`` measures about 0.43 of the size.
+DECIMAL_GAP_RATIO = 0.5
 
 _NEGATION = "̸"
 _PUNCTUATION = frozenset(",.;:")
@@ -113,6 +129,8 @@ class InlineMathRun:
     bbox: tuple[float, float, float, float]
     #: Boxes of the negation slashes the run composed into its relation.
     negations: tuple[tuple[float, float, float, float], ...] = ()
+    #: The page the run was read on, for a caller that reads several (0: unset).
+    page: int = 0
 
 
 @dataclass
@@ -127,6 +145,18 @@ class SpliceResult:
     text: str
     marked: list[InlineMathRun] = field(default_factory=list)
     unmatched: list[InlineMathRun] = field(default_factory=list)
+
+
+@dataclass
+class _Line:
+    glyphs: list["_Glyph"]
+    body: float
+    baseline: float
+    #: ``[start, end)`` of the line's folded characters in the detection.
+    start: int
+    end: int
+    #: Index of the line's first run in the detection's runs.
+    first_run: int
 
 
 @dataclass
@@ -156,6 +186,7 @@ def detect_inline_math(lines: Iterable[Sequence[TextSpan]]) -> InlineMathDetecti
     """The inline math runs of ``lines`` (in reading order) and their folded text."""
     detection = InlineMathDetection()
     flat: list[str] = []
+    read: list[_Line] = []
     for line in lines:
         glyphs = _glyphs(line)
         if not glyphs:
@@ -168,6 +199,7 @@ def detect_inline_math(lines: Iterable[Sequence[TextSpan]]) -> InlineMathDetecti
             offsets.append(len(flat))
             flat.extend(fold(glyph.char))
         offsets.append(len(flat))
+        read.append(_Line(glyphs, body, baseline, offsets[0], offsets[-1], len(detection.runs)))
         for first, last in _runs(glyphs):
             run = _build_run(glyphs[first : last + 1], body, baseline)
             if run is None:
@@ -195,7 +227,47 @@ def detect_inline_math(lines: Iterable[Sequence[TextSpan]]) -> InlineMathDetecti
             )
         # Lines are joined by a space in the text; folding drops it anyway.
     detection.flat = "".join(flat)
+    detection.runs = _stack_fractions(detection.runs, read)
     return detection
+
+
+def assign_runs_to_cells(
+    detection: InlineMathDetection, cells: Sequence[str]
+) -> tuple[list[InlineMathDetection], list[InlineMathRun]]:
+    """Each cell's detection, and the runs no cell takes, for the lines of a table.
+
+    A table's cells carry no boxes, so a run goes to the cell whose folded
+    text holds it, a cell that is exactly the run first (``h`` goes to the
+    ``h`` cell, not to ``2 + h``). Cells with the same text take the run's
+    occurrences in reading order; a run that cells with different texts both
+    hold is left out rather than guessed. Once a cell is exactly the run, only
+    such cells take it: with cells ``h`` and ``2 + h``, a second ``h`` run is
+    left out, not given to ``2 + h``, which a run of its own (``2+h``) would
+    have taken whole. Each cell's detection carries only its runs, so
+    ``splice_inline_math`` aligns them with the cell alone.
+    """
+    folded = ["".join(fold(char) for char in cell) for cell in cells]
+    taken: list[list[InlineMathRun]] = [[] for _ in cells]
+    placed: dict[str, int] = {}
+    left_out: list[InlineMathRun] = []
+    for run in detection.runs:
+        holding = [index for index, text in enumerate(folded) if run.flat in text]
+        pool = [index for index in holding if folded[index] == run.flat] or holding
+        occurrence = placed.get(run.flat, 0)
+        if len({folded[index] for index in pool}) != 1 or occurrence >= len(pool):
+            left_out.append(run)
+            continue
+        placed[run.flat] = occurrence + 1
+        taken[pool[occurrence]].append(run)
+    detections = []
+    for runs in taken:
+        cell = InlineMathDetection()
+        for run in runs:
+            start = len(cell.flat)
+            cell.flat += run.flat
+            cell.runs.append(replace(run, start=start, end=len(cell.flat)))
+        detections.append(cell)
+    return detections, left_out
 
 
 def splice_inline_math(text: str, detection: InlineMathDetection) -> SpliceResult:
@@ -269,6 +341,79 @@ def _glyphs(line: Sequence[TextSpan]) -> list[_Glyph]:
         if glyphs and glyphs[-1].char != " ":
             glyphs.append(_Glyph(" ", span, (right, top, right, bottom)))
     return glyphs
+
+
+def _stack_fractions(runs: list[InlineMathRun], lines: list[_Line]) -> list[InlineMathRun]:
+    r"""``runs`` with each numerator line and the denominator line below it as one ``\frac``.
+
+    TeX sets a fraction inside text (``\frac`` in a table cell) at a script
+    size, numerator and denominator on two baselines; the text layer has no
+    rule for the bar, so the two lines are recognized by their geometry: each
+    is one run and nothing else, both are smaller than the text around them
+    (the most common size of all the lines), they overlap on each other's
+    centre, and the second lies just below the first. The run's folded
+    characters are the numerator's followed by the denominator's, as the
+    extractor writes them.
+    """
+    body = _body_size([glyph for line in lines for glyph in line.glyphs])
+    whole: list[InlineMathRun | None] = []
+    for index, line in enumerate(lines):
+        end = lines[index + 1].first_run if index + 1 < len(lines) else len(runs)
+        own = runs[line.first_run : end]
+        alone = len(own) == 1 and own[0].start == line.start and own[0].end == line.end
+        whole.append(own[0] if alone else None)
+    stacked: list[InlineMathRun] = []
+    denominators: set[int] = set()  # line indexes
+    consumed: set[int] = set()  # ids of the runs a fraction replaces
+    for index, line in enumerate(lines[:-1]):
+        upper, lower = whole[index], whole[index + 1]
+        if index in denominators or upper is None or lower is None:
+            continue
+        if not _is_fraction(line, lines[index + 1], upper, lower, body):
+            continue
+        denominators.add(index + 1)
+        consumed.update({id(upper), id(lower)})
+        stacked.append(
+            InlineMathRun(
+                latex=rf"\frac{{{upper.latex}}}{{{lower.latex}}}",
+                flat=upper.flat + lower.flat,
+                start=upper.start,
+                end=lower.end,
+                bbox=(
+                    min(upper.bbox[0], lower.bbox[0]),
+                    min(upper.bbox[1], lower.bbox[1]),
+                    max(upper.bbox[2], lower.bbox[2]),
+                    max(upper.bbox[3], lower.bbox[3]),
+                ),
+                negations=upper.negations + lower.negations,
+            )
+        )
+    if not stacked:
+        return runs
+    kept = [run for run in runs if id(run) not in consumed]
+    return sorted(kept + stacked, key=lambda run: run.start)
+
+
+def _is_fraction(
+    upper_line: _Line,
+    lower_line: _Line,
+    upper: InlineMathRun,
+    lower: InlineMathRun,
+    body: float,
+) -> bool:
+    small = body * SCRIPT_SIZE_RATIO
+    if not (0 < upper_line.body <= small and 0 < lower_line.body <= small):
+        return False
+    if upper.end != lower.start:
+        return False
+    (left_a, _, right_a, _), (left_b, _, right_b, _) = upper.bbox, lower.bbox
+    if min(right_a, right_b) <= max(left_a, left_b):
+        return False
+    width = max(right_a - left_a, right_b - left_b)
+    if abs((left_a + right_a) - (left_b + right_b)) / 2 > width * FRACTION_CENTRE_RATIO:
+        return False
+    gap = lower_line.baseline - upper_line.baseline
+    return 0 < gap <= FRACTION_GAP_RATIO * max(upper_line.body, lower_line.body)
 
 
 def _body_size(glyphs: list[_Glyph]) -> float:
@@ -355,12 +500,36 @@ def _runs(glyphs: list[_Glyph]) -> list[tuple[int, int]]:
 
 
 def _is_decimal_separator(glyphs: list[_Glyph], index: int) -> bool:
-    """Whether the glyph is a ``,`` between two digits (``3,5``, ``1.000,50``)."""
+    """Whether the glyph is a ``,`` between two digits (``3,5``, ``1.000,50``).
+
+    TeX sets a math ``,`` as punctuation, with a space after it, so a math-font
+    comma may have spaces between it and its digits (``$-0,0833$``); a
+    text-font comma followed by a space is the prose's (``2, 3``). Spaces
+    count only up to ``DECIMAL_GAP_RATIO``, so a comma does not reach a digit
+    of the next column. Callers ask outside brackets only, where ``[-2, 0)``
+    is an interval. A math list right after a relation (``$x = 1, 2$``) is set
+    like a decimal and still reads as one.
+    """
+    if glyphs[index].char != ",":
+        return False
+    before, after = index - 1, index + 1
+    if is_math_font(glyphs[index].span.font):
+        while before >= 0 and glyphs[before].kind == "space":
+            before -= 1
+        while after < len(glyphs) and glyphs[after].kind == "space":
+            after += 1
+    if not (
+        before >= 0
+        and after < len(glyphs)
+        and glyphs[before].char.isdigit()
+        and glyphs[after].char.isdigit()
+    ):
+        return False
+    # A digit in the next column is not the comma's (``x = 1,`` … ``2``).
+    gap = DECIMAL_GAP_RATIO * glyphs[index].span.size
     return (
-        glyphs[index].char == ","
-        and 0 < index < len(glyphs) - 1
-        and glyphs[index - 1].char.isdigit()
-        and glyphs[index + 1].char.isdigit()
+        glyphs[index].box[0] - glyphs[before].box[2] <= gap
+        and glyphs[after].box[0] - glyphs[index].box[2] <= gap
     )
 
 
@@ -394,8 +563,12 @@ def _trimmed(glyphs: list[_Glyph], first: int, last: int) -> list[tuple[int, int
         closed = sum(char in _CLOSE for char in chars)
         if opened > closed and glyphs[first].char in _OPEN:
             first += 1
+        elif opened > closed and glyphs[last].char in _OPEN:
+            last -= 1  # "-0,0833 (aproximadamente)": the run stops at the word
         elif closed > opened and glyphs[last].char in _CLOSE:
             last -= 1
+        elif closed > opened and glyphs[first].char in _CLOSE:
+            first += 1
         else:
             break
         while first <= last and glyphs[first].kind in {"space", "punct"}:
@@ -507,6 +680,7 @@ __all__ = [
     "InlineMathRun",
     "SpliceResult",
     "TextSpan",
+    "assign_runs_to_cells",
     "detect_inline_math",
     "fold",
     "is_math_font",

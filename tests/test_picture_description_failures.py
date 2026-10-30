@@ -84,8 +84,9 @@ async def test_a_failed_call_records_the_reason_and_the_error(monkeypatch, tmp_p
 
     picture = await _enrich(manifest, tmp_path)
 
-    # One call: retrying is the vision agent's job, not this caller's.
-    assert len(calls) == 1
+    # The call, and one more after the stage's wait: retrying within a call
+    # is the vision agent's job, not this caller's.
+    assert len(calls) == 2
     assert picture.metadata["vision_failure_reason"] == "model_failed"
     assert picture.metadata["vision_failure_detail"] == "TimeoutError: provider gave up"
     assert "vision_description_complete" not in picture.metadata

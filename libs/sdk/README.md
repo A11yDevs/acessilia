@@ -27,7 +27,7 @@ core (backend)  →  acessilia-sdk  →  Toolbox HTTP contract
 
 | Module | Symbols |
 |---|---|
-| `acessilia_sdk.toolbox.capabilities` | `TOOLBOX_CAPABILITIES`, `ToolboxCapability`, `PROVIDER_DEFAULTS`, `provider_default` — the allowlist of Toolbox contracts (pure data) |
+| `acessilia_sdk.toolbox.capabilities` | `TOOLBOX_CAPABILITIES`, `ToolboxCapability`, `PROVIDER_DEFAULTS`, `ROUTE_PROVIDER_DEFAULTS`, `provider_default` — the allowlist of Toolbox contracts and the default providers (pure data) |
 | `acessilia_sdk.toolbox.transport` | `execute_capability` — the only path to `POST /v1/capabilities/{id}:execute`; `require_capability`, `raise_for_error`, `auth_headers`, `media_type_for` |
 | `acessilia_sdk.toolbox.client` | `ToolboxCapabilityClient` — base for per-capability clients (connections, Bearer header, provider, failover, `health`, `close`); `FailoverHook` |
 | `acessilia_sdk.toolbox.clients` | `ToolboxAdjudicateClient`, `ToolboxArtifactClient`, `ToolboxDatasetClient`, `ToolboxDocxClient`, `ToolboxLayoutClient`, `ToolboxMathClient`, `ToolboxMediaInspectClient`, `ToolboxOcrClient`, `ToolboxOrientationClient`, `ToolboxPageOcrClient`, `ToolboxPdfClient`, `ToolboxPdfUaClient`, `ToolboxStructureClient`, `ToolboxTableClient` — one client per capability family; no settings, no logging |
@@ -35,6 +35,7 @@ core (backend)  →  acessilia-sdk  →  Toolbox HTTP contract
 | `acessilia_sdk.toolbox.clients.pdf` | `RenderedPage` (the PNG of `ToolboxPdfClient.render`, the clip applied and the `image@2` result), `ClipOrigin` |
 | `acessilia_sdk.toolbox.artifacts` | `ArtifactRef`, `download_artifact`, `read_artifact` — content-addressed artifacts, their verified, atomic download to a file, and their verified, size-bounded read into memory |
 | `acessilia_sdk.toolbox.catalog` | `fetch_catalog`, `CatalogSnapshot`, `Requirement`, `missing_requirements`, `CatalogCache` — the published catalogue, checks against it (it only restricts) and the last-good cache |
+| `acessilia_sdk.toolbox.vlm` | `vlm_gateway_base_url`, `vlm_provider_healthy`, `VLM_GATEWAY_PATH` — the Toolbox VLM gateway, an OpenAI-compatible chat route that is not a capability, and its provider health ([ADR-0012](../../docs/adr/0012-agents-reach-the-vlm-through-the-toolbox.md)) |
 | `acessilia_sdk.toolbox.errors` | `ToolboxError` and its subclasses, including `ToolboxUnavailable` (every endpoint failed; `causes` lists each one) |
 | `acessilia_sdk.runtime` | `run_sync` — run a coroutine from sync code, inside or outside an event loop |
 
@@ -50,7 +51,7 @@ instead of looking like an outage later.
 On top of that, the client offers:
 
 - **`retries`**: re-sends a request to the same endpoint after
-  `ToolboxTimeout` or `ToolboxProviderUnavailable` (network error, 503, 504),
+  `ToolboxTimeout` or `ToolboxProviderUnavailable` (network error, 502, 503, 504),
   waiting `retry_backoff_seconds * 2**attempt` with jitter. Off by default;
   enable it only for idempotent capabilities.
 - **`endpoints=`** (secondary mechanism): for *independent* Toolbox
@@ -103,3 +104,8 @@ until the Toolbox publishes `artifact-ref@1`.
 ```bash
 cd libs/sdk && python -m pytest
 ```
+
+Artifact downloads by ID also try the next compatible endpoint after a 404.
+This exception is limited to `ToolboxArtifactClient.download`: other 4xx errors
+and capability calls keep their existing behavior. When every endpoint returns
+404, the SDK raises `ToolboxArtifactNotFound`; integrity failures are not retried.

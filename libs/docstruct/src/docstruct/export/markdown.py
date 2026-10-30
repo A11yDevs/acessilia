@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from docstruct.blocks.lists import list_start
 from docstruct.tables.ast import table_ast_from_block
 from docstruct.text.latex import bare_latex
 
@@ -63,7 +64,15 @@ def _render_block(block: dict[str, Any]) -> str:
     if btype == "table":
         return render_table(block)
     if btype == "list":
-        return "\n".join(f"- {str(i).strip()}" for i in block.get("items", []) if str(i).strip())
+        # Numbered by source position, so an empty item dropped here leaves
+        # the same numbers as in the other exports; CommonMark lists are
+        # decimal only, so a lettered or roman list keeps its numbers.
+        lines = []
+        for number, item in enumerate(block.get("items", []), start=list_start(block)):
+            marker = f"{number}." if block.get("ordered") else "-"
+            if str(item).strip():
+                lines.append(f"{marker} {str(item).strip()}")
+        return "\n".join(lines)
     if btype == "image":
         return ""
     return (block.get("text") or "").strip()
@@ -93,11 +102,16 @@ def render_table(block: dict[str, Any]) -> str:
 
 def _render_row(row: dict[str, Any], *, header: bool) -> str:
     row_cells = row.get("cells", [])
-    # Only a positive mark (header=True or a header scope) makes a <thead> row
-    # follow per-cell metadata; ``header: False`` on every cell means "not detected".
+    # A <thead> row with no cell marked as a header (``header: True`` or a
+    # header scope) uses column headers, so the ``header: False`` defaults a
+    # promoted first row carries do not turn it into data cells; marked rows
+    # follow each cell's own metadata, as in the HTML exporter.
     unmarked_header_row = header and not any(
         isinstance(cell, dict)
-        and (cell.get("header") is True or str(cell.get("scope", "")).strip().lower() in _HEADER_SCOPES)
+        and (
+            bool(cell.get("header"))
+            or str(cell.get("scope", "")).strip().lower() in _HEADER_SCOPES
+        )
         for cell in row_cells
     )
     cells = []
