@@ -26,6 +26,10 @@ from docstruct.tables.ast import (
 )
 from docstruct.tables.garble import table_garble_reason
 from docstruct.text.equations import preserve_equation_number, split_equation_number
+from docstruct.text.implicit_products import (
+    implicit_product_variables,
+    mark_implicit_products,
+)
 from docstruct.text.inline_math import (
     InlineMathDetection,
     TextSpan,
@@ -34,7 +38,7 @@ from docstruct.text.inline_math import (
     splice_inline_math,
 )
 from docstruct.text.latex import has_latex_markup, latex_text_agreement
-from docstruct.text.math_spans import mask_inline_math
+from docstruct.text.math_spans import inline_math_sources, mask_inline_math
 from docstruct.text.norm_fix import norm_fix
 from docstruct.text.negation_overlay import (
     compose_negation,
@@ -173,6 +177,23 @@ def _formula_elements_for_obligation(
     ]
 
 
+def _implicit_product_variables(manifest: ProcessingManifest) -> frozenset[str]:
+    """The letters the document uses as variables, from all its formulas.
+
+    Read from every formula element and every inline span of the manifest, the
+    same sources the canonical build reads, so a formula converted here and
+    one converted there mark the same products.
+    """
+    sources: list[str] = []
+    for element in manifest.elements:
+        text = element.text or ""
+        if element.type == "formula":
+            sources.append(text)
+        else:
+            sources.extend(inline_math_sources(text))
+    return implicit_product_variables(sources)
+
+
 def _handle_mathml_method(
     manifest: ProcessingManifest, obligation_id: str
 ) -> MethodResult:
@@ -189,8 +210,9 @@ def _handle_mathml_method(
             message="Nenhuma fórmula encontrada para a obrigação",
         )
     converted = 0
+    variables = _implicit_product_variables(manifest)
     for element in elements:
-        latex = normalize_latex(element.text or "")
+        latex = mark_implicit_products(normalize_latex(element.text or ""), variables)
         try:
             mathml = toolbox_convert_latex(latex) if latex else ""
         except MathCapabilityUnavailable as exc:
@@ -232,8 +254,9 @@ def _handle_latex_verbalizer_method(
             message="Nenhuma fórmula encontrada para a obrigação",
         )
     verbalized = 0
+    variables = _implicit_product_variables(manifest)
     for element in elements:
-        latex = normalize_latex(element.text or "")
+        latex = mark_implicit_products(normalize_latex(element.text or ""), variables)
         try:
             spoken = label_spoken_formula(toolbox_verbalize_latex(latex)) if latex else ""
         except MathCapabilityUnavailable as exc:

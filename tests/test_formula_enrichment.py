@@ -403,3 +403,75 @@ def test_canonical_enrichment_reuses_what_the_plan_produced():
     assert unplanned["metadata"]["mathml"] == "<math/>"
     assert unplanned["alt_text"] == "Formula: new"
     assert enricher.calls == [("to_mathml", "y^2"), ("verbalize", "y^2")]
+
+
+# ── implicit products (#332) ──
+
+IT = "⁢"
+
+
+def _manifest_with_formulas(*texts):
+    from backend.core.manifest.models import ManifestElement
+
+    manifest = _manifest_with_formula()
+    manifest.elements = [
+        ManifestElement(
+            id=f"el-f{index}",
+            type="formula",
+            raw_label="formula",
+            reading_order=index,
+            hierarchy_level=1,
+            text=text,
+            page_number=1,
+        )
+        for index, text in enumerate(texts, start=1)
+    ]
+    manifest.obligations[0].target_ids = [element.id for element in manifest.elements]
+    return manifest
+
+
+@pytest.mark.parametrize(
+    ("handler", "capability"),
+    [
+        ("_handle_mathml_method", "convert"),
+        ("_handle_latex_verbalizer_method", "verbalize"),
+    ],
+)
+def test_pddl_handlers_send_a_variable_product_as_a_product(toolbox_math, handler, capability):
+    """h is a variable of the document (h \\neq 0), s a function (s(t)): only
+    h( gets U+2062, so MathCAT says "h vezes", not "h de"."""
+    from backend.agents import pddl_orchestrator
+
+    texts = (r"h \neq 0", r"\frac{h(12 + 6h + h^2)}{h}", r"s(t) = t^3")
+    manifest = _manifest_with_formulas(*texts)
+
+    assert getattr(pddl_orchestrator, handler)(manifest, "o-f").success
+
+    assert toolbox_math[capability] == [
+        r"h \neq 0", r"\frac{h" + IT + r"(12 + 6h + h^2)}{h}", r"s(t) = t^3"
+    ]
+    # The document keeps the source's LaTeX.
+    assert [element.text for element in manifest.elements] == list(texts)
+
+
+def test_canonical_build_marks_products_in_blocks_and_inline_spans(toolbox_math):
+    from backend.pipeline.canonical_builder import build_canonical_document
+
+    payload = {
+        "pages": [
+            {
+                "blocks": [
+                    {"type": "paragraph", "text": r"Quando $h \to 0$, $s(t)$ e $h(1 + h)$."},
+                    {"type": "math", "text": r"\frac{h(12 + h)}{h}"},
+                ]
+            }
+        ]
+    }
+
+    document = build_canonical_document(payload, title="t")
+
+    sent = toolbox_math["convert"] + toolbox_math["verbalize"]
+    assert "h" + IT + "(1 + h)" in sent and "s(t)" in sent
+    assert r"\frac{h" + IT + "(12 + h)}{h}" in sent
+    blocks = document["sections"][0]["blocks"]
+    assert all(IT not in str(block.get("text")) for block in blocks)
