@@ -364,6 +364,7 @@ class JobExecutor:
                 custom_prompt=job.custom_prompt,
                 thinking_mode=job.thinking_mode,
                 task_id=task_id,
+                display_filename=job.filename,
             )
             state_manager.verificar_cancelamento(task_id)
 

@@ -149,8 +149,18 @@ async def process(
     custom_prompt: str | None = None,
     thinking_mode: bool = False,
     task_id: str | None = None,
+    display_filename: str | None = None,
 ) -> dict[str, Any]:
+    """Process one document and return its canonical document.
+
+    ``display_filename`` is the name the user uploaded. The API stores the
+    upload under a random name (``<uuid>.pdf``), so without it a document
+    with no heading would take that UUID as its title and source name, in
+    every export (#333).
+    """
     external_task_id = task_id is not None
+    # Only the name, never a path the client sent.
+    shown_name = Path(display_filename).name if display_filename else file_path.name
     if task_id is None:
         task_id = state_manager.criar_tarefa(file_path)
     elif state_manager.obter(task_id) is None:
@@ -159,7 +169,7 @@ async def process(
     inicio = time.time()
     await registrar_conversao(
         task_id=task_id,
-        arquivo=file_path.name,
+        arquivo=shown_name,
         extensao=file_path.suffix,
         tamanho_bytes=file_path.stat().st_size,
         modo=mode,
@@ -199,10 +209,10 @@ async def process(
             canonical_metadata, technical_warnings = _canonical_details(cached)
             canonical_document = build_canonical_document(
                 cached,
-                title=file_path.stem,
+                title=Path(shown_name).stem,
                 language="pt-BR",
                 verbosity=verbosity_for_mode(mode),
-                source_name=file_path.name,
+                source_name=shown_name,
                 source_path=str(file_path),
                 audience=["reader"],
                 metadata=canonical_metadata,
@@ -278,10 +288,10 @@ async def process(
 
         canonical_document = build_canonical_document(
             processed_result,
-            title=file_path.stem,
+            title=Path(shown_name).stem,
             language="pt-BR",
             verbosity=verbosity_for_mode(mode),
-            source_name=file_path.name,
+            source_name=shown_name,
             source_path=str(file_path),
             audience=["reader"],
             metadata=canonical_metadata,
