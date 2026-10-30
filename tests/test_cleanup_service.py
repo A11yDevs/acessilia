@@ -109,6 +109,23 @@ def test_output_cleanup_removes_results_older_than_seven_days(monkeypatch, tmp_p
     assert not job_dir.exists()
 
 
+def test_fusion_artifact_cleanup_uses_cache_retention(monkeypatch, tmp_path):
+    monkeypatch.setattr(settings, "data_dir", tmp_path)
+    artifact_dir = tmp_path / "artifacts" / "fusion"
+    artifact_dir.mkdir(parents=True)
+    expired = artifact_dir / "inputs-expired.json"
+    recent = artifact_dir / "secondary-recent.json"
+    expired.write_text("expired", encoding="utf-8")
+    recent.write_text("recent", encoding="utf-8")
+    old_timestamp = time.time() - cleanup_service.CACHE_MAX_AGE - 60
+    os.utime(expired, (old_timestamp, old_timestamp))
+
+    cleanup_service._clean_fusion_artifact_directory()
+
+    assert not expired.exists()
+    assert recent.exists()
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("reference", ["same", "alias", "child", "parent"])
 async def test_age_cleanup_preserves_valid_download_references(monkeypatch, tmp_path, reference):

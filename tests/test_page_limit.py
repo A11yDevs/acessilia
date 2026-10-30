@@ -1,14 +1,16 @@
 """MAX_PAGES refuses a document that is too long, before any costly step.
 
-The limit is checked right after the structural extraction, the first point
-where the page count is always known. A refused document fails the job with a
-localized message that names the page count and the limit; nothing is planned
-or described. Only ``media.inspect`` runs before it, since whether the source
-is a slide deck decides how it is extracted.
+A PDF whose page count ``media.inspect`` verified with pymupdf is refused
+before the structural extraction. Every document is checked again right after
+it, the first point where the page count is always known. A refused document
+fails the job with a localized message that names the page count and the
+limit; nothing is planned or described.
 """
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -17,6 +19,14 @@ from backend import i18n
 from backend.agents import pddl_orchestrator as pddl
 from backend.config.settings import settings
 from tests.pddl_support import build_orchestrator
+
+# The Toolbox's ``media.inspect`` document (``artifact/media-inspection@1``,
+# pure-media-inspect 1.1.0) for tests/fixtures/tutorials/java-oo-3pgs.pdf.
+TOOLBOX_INSPECTION = json.loads(
+    (Path(__file__).parent / "fixtures" / "toolbox-media-inspection.json").read_text(
+        encoding="utf-8"
+    )
+)
 
 
 def _orchestrator_with_pages(count: int):
@@ -99,3 +109,45 @@ async def test_the_message_is_translated_with_both_numbers(monkeypatch, tmp_path
         i18n.reset_request_locale(token)
 
     assert str(info.value) == "O documento tem 120 páginas, mais que o limite de 50."
+
+
+@pytest.mark.asyncio
+async def test_verified_pdf_over_limit_is_rejected_before_structural_extraction(monkeypatch, tmp_path):
+    from unittest.mock import Mock
+
+    monkeypatch.setattr(settings, "max_pages", 2)
+    async def inspect(*args, **kwargs):
+        return {"is_pdf": True, "page_count": 3, "page_count_source": "pymupdf"}
+    monkeypatch.setattr(pddl, "inspect_source_media", inspect)
+    orchestrator = build_orchestrator()
+    process = Mock(side_effect=AssertionError("expensive extraction was called"))
+    orchestrator.information_structural = SimpleNamespace(process=process)
+    with pytest.raises(pddl.DocumentTooLargeError):
+        await orchestrator.executar(tmp_path / "large.pdf", tmp_path)
+    process.assert_not_called()
+
+
+@pytest.mark.parametrize("inspection", [
+    None, {}, {"is_pdf": True, "page_count": 100, "page_count_source": "content_stream_scan"},
+    {"is_pdf": False, "page_count": 100, "page_count_source": "pymupdf"},
+    {"is_pdf": True, "page_count": "100", "page_count_source": "pymupdf"},
+    {"is_pdf": True, "page_count": True, "page_count_source": "pymupdf"},
+])
+def test_unreliable_preflight_does_not_reject(monkeypatch, inspection):
+    monkeypatch.setattr(settings, "max_pages", 2)
+    pddl._check_page_limit_before_extraction(inspection)
+
+
+def test_verified_pdf_at_limit_passes_preflight(monkeypatch):
+    monkeypatch.setattr(settings, "max_pages", 2)
+    pddl._check_page_limit_before_extraction({"is_pdf": True, "page_count": 2, "page_count_source": "pymupdf"})
+
+
+@pytest.mark.parametrize("max_pages,rejected", [(2, True), (3, False)])
+def test_preflight_reads_the_toolbox_inspection_document(monkeypatch, max_pages, rejected):
+    monkeypatch.setattr(settings, "max_pages", max_pages)
+    if rejected:
+        with pytest.raises(pddl.DocumentTooLargeError):
+            pddl._check_page_limit_before_extraction(TOOLBOX_INSPECTION)
+    else:
+        pddl._check_page_limit_before_extraction(TOOLBOX_INSPECTION)

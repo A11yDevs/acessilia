@@ -41,6 +41,11 @@ def _element_to_canonical_block(el: dict, page_index: int) -> dict:
     etype = str(el.get("type", "")).lower()
     text = (el.get("text") or "").strip()
     bbox = el.get("bbox")
+    provenance = el.get("provenance") or []
+    if not bbox and provenance:
+        bbox = provenance[0].get("bbox")
+    if isinstance(bbox, dict):
+        bbox = [bbox.get(key) for key in ("left", "top", "right", "bottom")]
     block: dict[str, Any] = {
         "type": etype or "paragraph",
         "text": text,
@@ -193,13 +198,16 @@ def fuse_extraction_payloads(
     from docstruct.fusion.repetition import guard_page
 
     for page_key in sorted(set(pages_d) | set(pages_m)):
-        d_blocks = [_canonical_to_diff(b) for b in pages_d.get(page_key, [])]
-        m_blocks = [_canonical_to_diff(b) for b in pages_m.get(page_key, [])]
+        # Text alignment and structural presence are separate evidence. Empty
+        # figures/tables must survive comparison without becoming paragraphs.
+        d_blocks = [_canonical_to_diff(b) for b in pages_d.get(page_key, []) if b["text"]]
+        m_blocks = [_canonical_to_diff(b) for b in pages_m.get(page_key, []) if b["text"]]
         page_stats: Counter = Counter()
         m_pics = [
-            b["bbox"]
+            diff.box
             for b in pages_m.get(page_key, [])
             if b["type"] == "picture" and "bbox" in b
+            if (diff := _canonical_to_diff(b)).box is not None
         ]
         out, page_stats = merge_blocks(
             d_blocks, m_blocks, policy, min_len=0, m_pics=m_pics, stats=page_stats
@@ -231,17 +239,56 @@ def fuse_extraction_payloads(
         )
         evidence_stats["similarity"] = round(similarity, 4)
         evidence_stats["text_similarity"] = round(text_similarity, 4)
-        evidence_stats["provider_divergence"] = similarity < DEFAULT_MAX_RATIO
+        structure_d = _structure_signature(pages_d.get(page_key, []))
+        structure_m = _structure_signature(pages_m.get(page_key, []))
+        primary_structure_counts = Counter(dict(structure_d))
+        secondary_structure_counts = Counter(dict(structure_m))
+        # Only a structure the secondary found and the primary did not is
+        # worth acting on: the primary's page is kept by default, so one the
+        # primary alone found is already in the document.
+        secondary_adds_structure = bool(
+            secondary_structure_counts - primary_structure_counts
+        )
+        evidence_stats["structure_divergence"] = structure_d != structure_m
+        evidence_stats["structure_counts"] = {
+            primary_provider: dict(primary_structure_counts),
+            secondary_provider: dict(secondary_structure_counts),
+        }
+        evidence_stats["provider_divergence"] = (
+            similarity < DEFAULT_MAX_RATIO or secondary_adds_structure
+        )
         evidence_stats["text_divergence"] = text_similarity < DEFAULT_MAX_RATIO
         # Deterministic adjudication (docstruct's v1 page router), recorded with
         # the evidence so the manifest builder can leave the VLM judge for the
         # pages the rule cannot settle.
         route, route_reason = decide_v1(docling_text, mineru_text)
+        # Structural evidence complements the deterministic text/table/formula
+        # rules; it must not override their near-empty or explicit table/formula
+        # decisions. Bounding boxes are provider-specific, so compare type and
+        # normalized content instead of exact coordinates.
+        if secondary_adds_structure and route_reason == "default_docling":
+            def structure_content(blocks: list[dict]) -> Counter:
+                return Counter(
+                    (b["type"], " ".join((b.get("text") or "").split()))
+                    for b in blocks if b["type"] in STRUCTURAL_TYPES
+                )
+
+            primary_content = structure_content(pages_d.get(page_key, []))
+            secondary_content = structure_content(pages_m.get(page_key, []))
+            if (
+                not primary_content - secondary_content
+                and text_similarity >= DEFAULT_MAX_RATIO
+            ):
+                route, route_reason = "mineru", "secondary_structure_superset"
+            else:
+                route, route_reason = "docling", "structure_ambiguous"
         evidence_stats["route"] = route
         evidence_stats["route_reason"] = route_reason
         evidence_stats["table_divergence"] = (
             _page_content_signature(d_blocks, kinds={"table"})
             != _page_content_signature(m_blocks, kinds={"table"})
+            or _structure_signature(pages_d.get(page_key, []), kinds={"table"})
+            != _structure_signature(pages_m.get(page_key, []), kinds={"table"})
         )
         if repetition_tokens_cut:
             evidence_stats["repetition_tokens_cut"] = repetition_tokens_cut
@@ -544,12 +591,22 @@ def _canon_kwargs(block: dict) -> dict:
     }
 
 
+STRUCTURAL_TYPES = {"picture", "table", "formula"}
+
+
+def _structure_signature(
+    blocks: list[dict], *, kinds: set[str] = STRUCTURAL_TYPES
+) -> list[tuple[str, int]]:
+    """Count structural elements by kind without comparing provider-specific boxes."""
+    return sorted(Counter(b["type"] for b in blocks if b["type"] in kinds).items())
+
+
 def _group_by_page(payload: dict) -> dict[int, list[dict]]:
     """Group payload elements by page (default: page 0)."""
     doc = payload.get("document", payload)
     groups: dict[int, list[dict]] = {}
     for el in doc.get("elements") or []:
-        if not (el.get("text") or "").strip():
+        if not (el.get("text") or "").strip() and el.get("type") not in STRUCTURAL_TYPES:
             continue
         if el.get("page_number") is not None:
             page = max(0, int(el["page_number"]) - 1)

@@ -57,7 +57,7 @@ class FusionPolicy:
 
     # --- Fórmulas ---
     formula_text: bool = True  # fórmulas sem operador matemático → texto
-    inline_math_promote: bool = True  # parágrafo inteiro com math → display
+    inline_math_promote: bool = True  # parágrafo inteiro com math → display (build canônico)
 
     # --- Rotação ---
     orientation_min_confidence: float = 0.85

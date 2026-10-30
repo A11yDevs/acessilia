@@ -59,7 +59,10 @@ from docstruct.tables.ast import raw_rows_from_table_ast
 from docstruct.text.math_spans import block_prose
 from docstruct.text.math_spans import inline_math_entries
 from docstruct.text.math_spans import inline_math_sources
-from docstruct.text.equations import equation_number, numbered_speech, preserve_equation_number
+from docstruct.text.equations import equation_number
+from docstruct.text.equations import numbered_speech
+from docstruct.text.equations import preserve_equation_number
+from docstruct.text.math_spans import whole_inline_math
 
 
 def build_canonical_document(
@@ -75,7 +78,14 @@ def build_canonical_document(
     technical_warnings: list[str] | None = None,
     math_enricher: MathEnricher | None = None,
     id_factory: Callable[[str], str] | None = None,
+    inline_math_promote: bool = True,
 ) -> dict[str, Any]:
+    """Build the canonical document from a structured payload or plain text.
+
+    ``inline_math_promote`` (``FusionPolicy.inline_math_promote``) turns a
+    paragraph whose whole text is one inline math span into a display
+    ``math`` block (#296).
+    """
     if isinstance(source_text, dict):
         source_payload: dict[str, Any] = source_text
     else:
@@ -83,6 +93,8 @@ def build_canonical_document(
     raw_text = source_payload.get("text", source_text)
     cleaned = sanitize_text(str(raw_text))
     parsed_blocks = _parse_structured_blocks(source_payload, cleaned)
+    if inline_math_promote:
+        _promote_whole_inline_math(parsed_blocks)
     _normalize_heading_levels(parsed_blocks)
     inferred_title = _infer_title(parsed_blocks).strip()
     sections = _build_sections(parsed_blocks)
@@ -125,6 +137,36 @@ def build_canonical_document(
         },
         "sections": sections,
     }
+
+
+def _promote_whole_inline_math(blocks: list[dict[str, Any]]) -> None:
+    """Turn each paragraph made of one inline math span into a ``math`` block.
+
+    ``$s(t) = t^3$`` alone on its line is a displayed equation, not a fragment
+    of a sentence; read inline, a screen reader and PDF/UA announce it as one.
+    A span with any text around it (even a final period) stays inline, as does
+    every other block type. The span's conversion, when the block already
+    carries it (``metadata["inline_math"]``), becomes the math block's MathML
+    and verbalization, so it is not converted again.
+    """
+    for block in blocks:
+        if block.get("type") != "paragraph" or not isinstance(block.get("text"), str):
+            continue
+        source = whole_inline_math(block["text"])
+        if source is None:
+            continue
+        metadata = block.get("metadata")
+        metadata = dict(metadata) if isinstance(metadata, dict) else {}
+        entry = inline_math_entries(block).get(source, {})
+        metadata.pop("inline_math", None)
+        metadata["inline_math_promoted"] = True
+        if entry.get("mathml"):
+            metadata["mathml"] = entry["mathml"]
+        if entry.get("speech"):
+            metadata["verbalization"] = entry["speech"]
+        block["type"] = "math"
+        block["text"] = entry.get("latex") or source
+        block["metadata"] = metadata
 
 
 def _enrich_math_blocks(

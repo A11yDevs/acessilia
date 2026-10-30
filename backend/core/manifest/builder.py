@@ -53,30 +53,32 @@ if TYPE_CHECKING:
     from backend.core.manifest.toolbox_extractor import ToolboxExtraction
 
 
+# Store message IDs here; translate only while building the current request.
+# Translation at import time freezes the server locale for all later requests.
 OBLIGATION_BY_TYPE = {
     "picture": (
         "describe-image",
-        t(MSG_OBLIGATION_IMAGE),
+        MSG_OBLIGATION_IMAGE,
         ["vision-description", "human-review"],
     ),
     "table": (
         "linearize-table",
-        t(MSG_OBLIGATION_TABLE),
+        MSG_OBLIGATION_TABLE,
         ["pandoc-table", "human-review"],
     ),
     "formula": (
         "verbalize-formula",
-        t(MSG_OBLIGATION_FORMULA),
+        MSG_OBLIGATION_FORMULA,
         ["mathml", "latex-verbalizer", "human-review"],
     ),
     "code": (
         "preserve-code-semantics",
-        t(MSG_OBLIGATION_CODE),
+        MSG_OBLIGATION_CODE,
         ["pandoc-code", "human-review"],
     ),
     "unknown": (
         "review-structure",
-        t(MSG_OBLIGATION_UNKNOWN),
+        MSG_OBLIGATION_UNKNOWN,
         ["pymupdf-region", "human-review"],
     ),
 }
@@ -286,6 +288,19 @@ def _build_from_toolbox_json(
     for element in manifest.elements:
         if element.type == "formula" and element.text:
             element.text = preserve_equation_number(element.text, element.metadata)
+    secondary = extraction.document.get("secondary_extraction")
+    secondary_path = (
+        str(secondary["path"])
+        if isinstance(secondary, dict) and secondary.get("path")
+        else ""
+    )
+    has_secondary_extraction = bool(secondary_path.strip())
+    # skeleton-order reads the file, so it is planned only while the file the
+    # extractor wrote is still there; a recorded path alone would plan a
+    # method that fails and forces a replan (#298).
+    secondary_extraction_readable = (
+        has_secondary_extraction and Path(secondary_path).is_file()
+    )
     if presentation:
         split_across_slides(manifest)
     if refine_reading_order:
@@ -312,18 +327,18 @@ def _build_from_toolbox_json(
         },
         fusion_evidence=extraction.document.get("fusion_evidence"),
         fusion_stats=extraction.document.get("fusion_stats"),
+        secondary_extraction_available=secondary_extraction_readable,
     )
     observations.extend(v23_observations)
     obligations.extend(v23_obligations)
     _append_processing_needs(manifest, observations, obligations)
     append_unstructured_page_needs(manifest)
-    secondary = extraction.document.get("secondary_extraction")
-    if isinstance(secondary, dict) and secondary.get("path"):
+    if has_secondary_extraction:
         manifest.artifacts.append(
             Artifact(
                 id=SECONDARY_EXTRACTION_ARTIFACT_ID,
                 kind=SECONDARY_EXTRACTION_KIND,
-                path=str(secondary["path"]),
+                path=secondary_path,
                 media_type="application/json",
                 sha256=secondary.get("sha256"),
             )
@@ -497,7 +512,8 @@ def _derive_processing_needs(
         spec = OBLIGATION_BY_TYPE.get(element.type)
         if spec is None:
             continue
-        kind, rationale, methods = spec
+        kind, msgid, methods = spec
+        rationale = t(msgid)
         suffix = element.id.removeprefix("element-")
         observations.append(
             Observation(
@@ -615,6 +631,7 @@ def _derive_v23_processing_needs(
     fusion_stats: Any = None,
     fusion_judge_max_pages: int | None = None,
     legacy_unicode_repair: str | None = None,
+    secondary_extraction_available: bool = False,
 ) -> tuple[list[Observation], list[Obligation]]:
     """Emit v2.3 needs only when deterministic checks or fusion evidence support them.
 
@@ -622,6 +639,8 @@ def _derive_v23_processing_needs(
     (FUSION_JUDGE_MAX_PAGES when None). ``legacy_unicode_repair`` is
     ``off``/``detect``/``repair`` (LEGACY_UNICODE_REPAIR when None); only
     ``repair`` emits the obligation, while ``detect`` keeps the observation.
+    ``skeleton-order`` is admissible only when the secondary extraction file
+    the extractor recorded for this document can be read.
     """
     from docstruct.fusion.line_numbers import extract_line_numbers
     from docstruct.fusion.tailjoin import join_tail, page_number_position, tailjoin3
@@ -850,8 +869,10 @@ def _derive_v23_processing_needs(
         if key in seen:
             continue
         seen.add(key)
-        rationale, methods = V23_OBLIGATION_BY_KIND[kind]
-        methods = methods_override or methods
+        rationale, default_methods = V23_OBLIGATION_BY_KIND[kind]
+        methods = list(methods_override or default_methods)
+        if kind == "refine-reading-order" and not secondary_extraction_available:
+            methods = [method for method in methods if method != "skeleton-order"]
         suffix = _obligation_suffix(target_ids)
         observations.append(
             Observation(
@@ -917,6 +938,8 @@ def _needs_vlm_judge(stats: dict[str, Any]) -> bool:
     route = stats.get("route")
     if route is None:
         return bool(stats.get("text_divergence"))
+    if stats.get("route_reason") == "structure_ambiguous":
+        return True
     return (
         bool(stats.get("provider_divergence"))
         and route != "docling"
@@ -963,6 +986,13 @@ def _add_fusion_observations(
             targets,
             {"page_number": page_number, "fusion_stats": stats},
             VLM_JUDGE_METHODS,
+        )
+    elif stats.get("route_reason") == "structure_ambiguous":
+        add(
+            "adjudicate-page",
+            targets,
+            {"page_number": page_number, "fusion_stats": stats},
+            ["human-review"],
         )
     if any(key.startswith("dropped-") and value for key, value in stats.items()):
         add("rescue-omitted-block", targets, {"page_number": page_number, "fusion_stats": stats})
@@ -1039,7 +1069,8 @@ def reconcile_reclassified_element_processing_needs(
     if current_spec is None:
         return
 
-    current_kind, rationale, methods = current_spec
+    current_kind, msgid, methods = current_spec
+    rationale = t(msgid)
     previous_kind = previous_spec[0] if previous_spec is not None else None
     previous_observation_kind = (
         f"{previous_type}-requires-processing" if previous_spec is not None else None

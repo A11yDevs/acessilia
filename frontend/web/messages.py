@@ -41,7 +41,7 @@ WEB_INDEX_EMAIL_LABEL: str = "Your E-mail"
 #: Helper text under the e-mail field explaining the deliver-to address.
 WEB_INDEX_EMAIL_HELP: str = "We will send the final files to this address."
 #: Form-field label for the document attachment control.
-WEB_INDEX_DOC_LABEL: str = "Attach a Document (PDF or Image)"
+WEB_INDEX_DOC_LABEL: str = "Attach a Document (PDF, HTML or Image)"
 #: Primary action button text on the upload form.
 WEB_INDEX_SUBMIT_BUTTON: str = "Make Accessible"
 #: Copyright footer line rendered on every panel page.

@@ -218,6 +218,9 @@ EXEMPT_STRINGS: list[tuple[str, str]] = [
     ("schemas/nominal_plan.schema.json", "Acessilia"),
     ("schemas/planning_comparison.schema.json", "Acessilia"),
     ("schemas/processing_manifest.schema.json", "Acessilia"),
+    # Non-ASCII fixtures exercise HTTP header rejection and Unicode URL encoding.
+    ("tests/test_n05_n09_n10_regressions.py", '"inválido".encode()'),
+    ("libs/sdk/tests/clients/test_dataset.py", '"input/álgebra.pdf"'),
     # Legacy Unicode repair — user-facing execution messages and observations
     ("backend/agents/pddl_orchestrator.py", "Nenhum texto elegível para reparo Unicode"),
     ("backend/agents/pddl_orchestrator.py", "Reparo Unicode aplicado em"),

@@ -90,8 +90,15 @@ _MATHML_ATTRIBUTES = frozenset(
 )
 
 
-def _safe_mathml(value: Any) -> str | None:
-    """Accept a bounded MathML tree without active markup, URLs or entities."""
+def _safe_mathml(
+    value: Any, *, aria_label: str = "", display: str = ""
+) -> str | None:
+    """Accept a bounded MathML tree without active markup, URLs or entities.
+
+    ``aria_label`` (the formula's speech) and ``display`` (``"block"`` for a
+    math block) are set on the ``<math>`` root itself, so the speech belongs to
+    the MathML and is announced once while its tree stays navigable (#321).
+    """
     if not isinstance(value, str) or len(value) > 100000 or "<!" in value:
         return None
     try:
@@ -117,6 +124,10 @@ def _safe_mathml(value: Any) -> str | None:
             return None
         node.tag = tag
     root.set("xmlns", namespace[1:-1])
+    if aria_label:
+        root.set("aria-label", aria_label)
+    if display:
+        root.set("display", display)
     return ElementTree.tostring(root, encoding="unicode")
 
 
@@ -208,14 +219,17 @@ def _render_block(
         metadata = block.get("metadata") or {}
         number = equation_number(metadata)
         speech = block.get("alt_text") or (block.get("text", "") if number else "")
-        alt = escape(numbered_speech(str(speech), metadata))
+        label = numbered_speech(str(speech), metadata)
+        alt = escape(label)
         number_html = (
             f'<span class="equation-number" aria-hidden="true">({escape(number)})</span>'
             if number else ""
         )
-        mathml = _safe_mathml((block.get("metadata") or {}).get("mathml", ""))
+        mathml = _safe_mathml(
+            metadata.get("mathml", ""), aria_label=label, display="block"
+        )
         if mathml:
-            return f'<div id="{block_id}" role="math" aria-label="{alt}">{mathml}{number_html}</div>'
+            return f'<div id="{block_id}">{mathml}{number_html}</div>'
         return (
             f'<p id="{block_id}" role="math" aria-label="{alt}">'
             f'{escape(block.get("text", ""))}{number_html}</p>'
@@ -233,11 +247,12 @@ def _render_block(
 def _prose_html(text: str, block: dict[str, Any]) -> str:
     """Escaped prose whose ``$…$`` spans are rendered as inline math.
 
-    Each span is a ``role="math"`` element labelled with its speech, as a math
-    block is: the MathML when the enrichment produced it, else the
-    (normalized) LaTeX without delimiters. A document that did not go through
-    the canonical enrichment has no entries, and its spans keep the LaTeX,
-    still marked as math.
+    Each span is its MathML, labelled with its speech on the ``<math>`` element,
+    as a math block is, when the enrichment produced it; else a
+    ``role="math"`` span labelled with the speech around the (normalized)
+    LaTeX without delimiters. A document that did not go through the canonical
+    enrichment has no entries, and its spans keep the LaTeX, still marked as
+    math.
     """
     entries = inline_math_entries(block)
     parts: list[str] = []
@@ -247,11 +262,13 @@ def _prose_html(text: str, block: dict[str, Any]) -> str:
             continue
         entry = entries.get(piece, {})
         speech = str(entry.get("speech") or "")
-        label = f' aria-label="{escape(speech)}"' if speech else ""
-        content = _safe_mathml(entry.get("mathml", "")) or escape(
-            str(entry.get("latex") or piece)
-        )
-        parts.append(f'<span role="math"{label}>{content}</span>')
+        mathml = _safe_mathml(entry.get("mathml", ""), aria_label=speech)
+        if mathml:
+            parts.append(mathml)
+        else:
+            label = f' aria-label="{escape(speech)}"' if speech else ""
+            content = escape(str(entry.get("latex") or piece))
+            parts.append(f'<span role="math"{label}>{content}</span>')
     return "".join(parts)
 
 

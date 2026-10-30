@@ -236,6 +236,36 @@ def test_benchmark_renderers_keep_unmarked_header_cells() -> None:
     )
 
 
+def test_markdown_header_row_with_every_cell_flagged_false_uses_column_headers() -> None:
+    from docstruct.export.markdown import render_table as _render_table
+
+    # Providers that do not detect header cells flag every cell header=False
+    # (BHS 0.2.0); the <thead> row must still carry column headers.
+    table_ast = {
+        "header": [{"cells": [{"text": "Curso", "header": False}, {"text": "2026", "header": False}]}],
+        "body": [{"cells": [{"text": "Letras", "header": False}, {"text": "71", "header": False}]}],
+    }
+
+    assert _render_table({"table_ast": table_ast}) == (
+        '<table><thead><tr><th scope="col">Curso</th><th scope="col">2026</th></tr></thead>'
+        '<tbody><tr><td>Letras</td><td>71</td></tr></tbody></table>'
+    )
+
+
+def test_markdown_explicit_data_cell_in_marked_header_row_remains_data() -> None:
+    from docstruct.export.markdown import render_table as _render_table
+
+    table_ast = {
+        "header": [{"cells": [{"text": "Curso", "header": 1}, {"text": "nota", "header": False}]}],
+        "body": [{"cells": [{"text": "Letras"}, {"text": "71"}]}],
+    }
+
+    assert _render_table({"table_ast": table_ast}) == (
+        '<table><thead><tr><th scope="col">Curso</th><td>nota</td></tr></thead>'
+        '<tbody><tr><td>Letras</td><td>71</td></tr></tbody></table>'
+    )
+
+
 def test_explicit_full_row_replaces_conflicting_rowspan():
     from docstruct.tables.ast import linearize_table_for_text
     table = {"header": [{"cells": [{"text": "H1"}, {"text": "H2"}]}], "body": [

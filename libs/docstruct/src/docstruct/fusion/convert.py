@@ -7,6 +7,7 @@ from typing import Optional
 from docstruct.fusion.similarity import PAGENUM_RE
 from docstruct.fusion.types import DiffBlock
 from docstruct.types import BBox, CanonicalBlock
+from docstruct.text.math_spans import whole_inline_math
 
 TABLE_RE = re.compile(r"<table", re.IGNORECASE)
 FORMULA_RE = re.compile(r"\$\$")
@@ -40,7 +41,9 @@ def classify_kind(type_: str, md: str) -> str:
     t = (type_ or "unknown").lower()
     if t == "table" or TABLE_RE.search(md):
         return "table"
-    if t == "formula" or FORMULA_RE.search(md):
+    # A block made of one inline span is a formula; prose that only contains
+    # one stays text, so the text criteria (length, quality) still pick it.
+    if t == "formula" or FORMULA_RE.search(md) or whole_inline_math(md) is not None:
         return "formula"
     if t in ("heading", "title", "section_header"):
         return "heading"

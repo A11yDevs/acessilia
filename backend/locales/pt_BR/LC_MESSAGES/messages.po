@@ -1078,8 +1078,8 @@ msgstr "Seu E-mail"
 msgid "We will send the final files to this address."
 msgstr "Enviaremos o arquivo final para este endereço."
 
-msgid "Attach a Document (PDF or Image)"
-msgstr "Anexar Documento (PDF ou Imagem)"
+msgid "Attach a Document (PDF, HTML or Image)"
+msgstr "Anexar Documento (PDF, HTML ou Imagem)"
 
 msgid "Make Accessible"
 msgstr "Tornar Acessível"
@@ -1273,6 +1273,20 @@ msgstr "Worker: tarefa concluída: {filename}. Aguardando pela próxima..."
 
 msgid "Acessilia API started (queue worker + cleanup active)"
 msgstr "Acessilia API iniciada (worker da fila + limpeza ativos)"
+
+msgid ""
+"Artifact storage bypassed for independent Toolbox endpoints; the source "
+"file will be sent again for extraction, fusion and text spans."
+msgstr ""
+"Armazenamento de artefatos contornado para endpoints independentes da "
+"Toolbox; o arquivo original será reenviado para extração, fusão e text "
+"spans."
+
+#, python-brace-format
+msgid "Artifact upload unavailable ({error}); extracting from the source file."
+msgstr ""
+"Upload do artefato indisponível ({error}); extraindo a partir do arquivo "
+"original."
 
 #, python-brace-format
 msgid "Error in the API: {error} | Path: {path}"
@@ -1734,6 +1748,16 @@ msgstr ""
 
 #, python-brace-format
 msgid ""
+"[page {page_num}] Context limit exceeded for region {type}; retrying once"
+" with a smaller image ({size_before} -> {size_after} bytes) and "
+"max_tokens={max_tokens}: {error}"
+msgstr ""
+"[página {page_num}] Limite de contexto excedido na região {type}; "
+"tentando uma vez com uma imagem menor ({size_before} -> {size_after} "
+"bytes) e max_tokens={max_tokens}: {error}"
+
+#, python-brace-format
+msgid ""
 "[page {page_num}] Vision description for region {type} exceeded the "
 "{limit}-token budget and was truncated ({chars} characters kept)"
 msgstr ""
@@ -1801,6 +1825,10 @@ msgstr ""
 #, python-brace-format
 msgid "[page {page_num}] Sending region to vision ({size} bytes, type={type})"
 msgstr "[página {page_num}] Enviando região para visão ({size} bytes, tipo={type})"
+
+#, python-brace-format
+msgid "Vision context recovery could not reduce its image: {error}"
+msgstr "A recuperação de contexto da visão não conseguiu reduzir a imagem: {error}"
 
 #, python-brace-format
 msgid ""
@@ -1897,6 +1925,20 @@ msgid "Failed to send the status message: {error}"
 msgstr "Falha ao enviar a mensagem de status: {error}"
 
 #, python-brace-format
+msgid "Structural provider {provider} failed ({error}); extraction is degraded."
+msgstr ""
+"O provedor estrutural {provider} falhou ({error}); a extração está "
+"degradada."
+
+#, python-brace-format
+msgid ""
+"Dual fusion skipped: the primary and secondary providers are both "
+"{provider}."
+msgstr ""
+"Fusão dual ignorada: os provedores primário e secundário são ambos "
+"{provider}."
+
+#, python-brace-format
 msgid "Failed to edit the status message: {error}"
 msgstr "Falha ao editar a mensagem de status: {error}"
 
@@ -1962,6 +2004,16 @@ msgstr "Página {page_number} referencia elementos inexistentes: {element_ids}"
 #, python-brace-format
 msgid "{path} ends at {char_end}, before its start {char_start}"
 msgstr "{path} termina em {char_end}, antes do início {char_start}"
+
+#, python-brace-format
+msgid ""
+"Structural extraction used only {provider} because the other provider "
+"failed. The document requires review; dual-provider comparison was not "
+"available."
+msgstr ""
+"A extração estrutural usou apenas {provider} porque o outro provedor "
+"falhou. O documento exige revisão; a comparação entre dois provedores não"
+" estava disponível."
 
 msgid "document"
 msgid_plural "documents"
