@@ -17,6 +17,7 @@ from pathlib import Path
 
 import pytest
 
+from backend import i18n
 from backend.core.manifest.builder import (
     UNSTRUCTURED_PAGE_LABEL,
     _element_bbox,
@@ -40,6 +41,16 @@ PAGE_HEIGHT = 800.0
 
 #: Set to regenerate the golden manifests after an intended change.
 UPDATE_GOLDEN = os.environ.get("UPDATE_MANIFEST_GOLDEN") == "1"
+
+
+@pytest.fixture(autouse=True)
+def _canonical_manifest_locale():
+    """Golden files have a canonical locale, independent of the test host."""
+    token = i18n.set_request_locale("en_US")
+    try:
+        yield
+    finally:
+        i18n.reset_request_locale(token)
 
 
 def _element(

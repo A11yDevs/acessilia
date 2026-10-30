@@ -49,6 +49,16 @@ def toolbox_endpoints() -> tuple[ToolboxEndpoint, ...]:
     return parse_endpoints(base_urls or settings.toolbox_base_url)
 
 
+def toolbox_vlm_endpoint() -> ToolboxEndpoint:
+    """The endpoint that receives the agents' VLM chats with ``AI_CLIENT=toolbox``.
+
+    The first of :func:`toolbox_endpoints`: an Agno model takes one base URL,
+    so these chats do not fail over (docs/adr/0012). The health route probes
+    this same endpoint, so it reports what the agents will meet.
+    """
+    return toolbox_endpoints()[0]
+
+
 def _log_failover(endpoint: ToolboxEndpoint, error: ToolboxError) -> None:
     logger.warning(
         "Toolbox endpoint {} failed ({}: {}); trying the next one",

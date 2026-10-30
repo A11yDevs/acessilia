@@ -102,8 +102,17 @@ def render_table(block: dict[str, Any]) -> str:
 
 def _render_row(row: dict[str, Any], *, header: bool) -> str:
     row_cells = row.get("cells", [])
+    # A <thead> row with no cell marked as a header (``header: True`` or a
+    # header scope) uses column headers, so the ``header: False`` defaults a
+    # promoted first row carries do not turn it into data cells; marked rows
+    # follow each cell's own metadata, as in the HTML exporter.
     unmarked_header_row = header and not any(
-        isinstance(cell, dict) and ("header" in cell or "scope" in cell) for cell in row_cells
+        isinstance(cell, dict)
+        and (
+            bool(cell.get("header"))
+            or str(cell.get("scope", "")).strip().lower() in _HEADER_SCOPES
+        )
+        for cell in row_cells
     )
     cells = []
     for cell in row_cells:

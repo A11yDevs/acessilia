@@ -52,6 +52,8 @@ if TYPE_CHECKING:
     from backend.core.manifest.toolbox_extractor import ToolboxExtraction
 
 
+# Store message IDs here; translate only while building the current request.
+# Translation at import time freezes the server locale for all later requests.
 OBLIGATION_BY_TYPE = {
     "picture": (
         "describe-image",
