@@ -68,8 +68,8 @@ async def test_untitled_document_takes_the_uploaded_name(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("filename", [
-    "../../etc/relatório.pdf", r"..\..\etc\relatório.pdf", r"C:\fakepath\relatório.pdf",
-    r"..\etc/relatório.pdf",
+    '../../etc/relat\xf3rio.pdf', '..\\..\\etc\\relat\xf3rio.pdf', 'C:\\fakepath\\relat\xf3rio.pdf',
+    '..\\etc/relat\xf3rio.pdf',
 ])
 async def test_a_client_path_in_the_uploaded_name_is_reduced_to_the_name(
     isolated_runtime, monkeypatch, tmp_path, filename
@@ -146,7 +146,7 @@ async def test_the_worker_passes_the_uploaded_name_to_the_pipeline(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize('filename', [
-    '../../etc/relatório.pdf', r'..\..\etc\relatório.pdf', r'C:\fakepath\relatório.pdf',
+    '../../etc/relat\xf3rio.pdf', '..\\..\\etc\\relat\xf3rio.pdf', 'C:\\fakepath\\relat\xf3rio.pdf',
 ])
 async def test_api_keeps_only_the_uploaded_basename(isolated_runtime, filename):
     import httpx
@@ -161,7 +161,7 @@ async def test_api_keeps_only_the_uploaded_basename(isolated_runtime, filename):
         })
     assert response.status_code == 202
     record = load_record(response.json()['task_id'])
-    assert record['request']['filename'] == 'relatório.pdf'
+    assert record['request']['filename'] == 'relat\xf3rio.pdf'
     stored_name = Path(record['request']['file_path']).name
     assert stored_name != record['request']['filename']
     assert stored_name.endswith('.pdf')
