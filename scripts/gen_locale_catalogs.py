@@ -118,6 +118,7 @@ from backend.log_messages import (
     LOG_DOWNLOAD_TOKEN_CREATED,
     LOG_DOWNLOAD_TOKEN_DIR_MISSING,
     LOG_DOWNLOAD_TOKEN_NOT_FOUND,
+    LOG_DUAL_FUSION_SKIPPED_IDENTICAL_PROVIDERS,
     LOG_EMAIL_SEND_ERROR,
     LOG_EMAIL_SENT,
     LOG_EXPORT_DOCX_START,
@@ -921,6 +922,7 @@ MESSAGES: tuple[str, ...] = (
     LOG_WEB_API_UPLOAD_ERROR,
     LOG_STATUS_MESSAGE_SEND_FAILED,
     LOG_STRUCTURAL_PROVIDER_DEGRADED,
+    LOG_DUAL_FUSION_SKIPPED_IDENTICAL_PROVIDERS,
     LOG_STATUS_MESSAGE_EDIT_FAILED,
     LOG_STATUS_EDIT_UNEXPECTED,
     LOG_AUDIO_EXPORTED,
@@ -1677,6 +1679,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         ),
         # One structural provider failed; {provider} identifies it and {error} its error class.
         LOG_STRUCTURAL_PROVIDER_DEGRADED: "O provedor estrutural {provider} falhou ({error}); a extração está degradada.",
+        # FUSION_MODE=dual with the same provider on both sides; {provider} names it.
+        LOG_DUAL_FUSION_SKIPPED_IDENTICAL_PROVIDERS: "Fusão dual ignorada: os provedores primário e secundário são ambos {provider}.",
         # Upload failed transiently; {error} is the error class, direct input remains available.
         LOG_ARTIFACT_UPLOAD_DEGRADED: "Upload do artefato indisponível ({error}); extraindo a partir do arquivo original.",
         # Independent URLs cannot share artifact IDs; the source is sent again for later stages.

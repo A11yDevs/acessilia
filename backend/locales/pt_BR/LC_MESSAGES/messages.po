@@ -1917,6 +1917,14 @@ msgstr ""
 "degradada."
 
 #, python-brace-format
+msgid ""
+"Dual fusion skipped: the primary and secondary providers are both "
+"{provider}."
+msgstr ""
+"Fusão dual ignorada: os provedores primário e secundário são ambos "
+"{provider}."
+
+#, python-brace-format
 msgid "Failed to edit the status message: {error}"
 msgstr "Falha ao editar a mensagem de status: {error}"
 

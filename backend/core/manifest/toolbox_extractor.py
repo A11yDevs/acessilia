@@ -14,6 +14,7 @@ from backend.i18n import t
 from backend.log_messages import (
     LOG_ARTIFACT_UPLOAD_DEGRADED,
     LOG_ARTIFACT_STORE_DIRECT_INPUT,
+    LOG_DUAL_FUSION_SKIPPED_IDENTICAL_PROVIDERS,
     LOG_STRUCTURAL_PROVIDER_DEGRADED,
 )
 from backend.tools.logger import logger
@@ -220,8 +221,9 @@ class ToolboxManifestExtractor:
                     "failed_providers": [], "reason": "identical-providers",
                 }}
                 logger.warning(
-                    "Fusão dual ignorada por configuração duplicada: provider {}",
-                    secondary_provider,
+                    t(LOG_DUAL_FUSION_SKIPPED_IDENTICAL_PROVIDERS).format(
+                        provider=secondary_provider
+                    )
                 )
             else:
                 from backend.pipeline.fusion import (

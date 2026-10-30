@@ -1891,6 +1891,14 @@ msgid "Structural provider {provider} failed ({error}); extraction is degraded."
 msgstr "Structural provider {provider} failed ({error}); extraction is degraded."
 
 #, python-brace-format
+msgid ""
+"Dual fusion skipped: the primary and secondary providers are both "
+"{provider}."
+msgstr ""
+"Dual fusion skipped: the primary and secondary providers are both "
+"{provider}."
+
+#, python-brace-format
 msgid "Failed to edit the status message: {error}"
 msgstr "Failed to edit the status message: {error}"
 
