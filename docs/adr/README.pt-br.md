@@ -28,6 +28,8 @@ ADRs apontam para os daqui em vez de repeti-los.
 | [0010](0010-word-internal-spacing-diacritics.pt-br.md) | Acentos espaçadores internos à palavra são reparados; os isolados exigem evidência no documento | Aceito |
 | [0011](0011-inline-math-from-font-runs.pt-br.md) | Math inline viaja como `$…$` na prosa e é detectado pelas fontes matemáticas do PDF | Aceito |
 | [0012](0012-agents-reach-the-vlm-through-the-toolbox.pt-br.md) | Os agentes podem chegar ao modelo de visão pelo gateway VLM da Toolbox | Aceito |
+| [0013](0013-source-files-for-independent-toolboxes.pt-br.md) | Arquivos de origem para implantações independentes da Toolbox | Aceito |
+| [0014](0014-artifact-download-not-found-failover.pt-br.md) | Buscar downloads ausentes em outros endpoints | Aceito |
 
 ## Processo
 

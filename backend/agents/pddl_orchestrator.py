@@ -97,6 +97,7 @@ from backend.log_messages import (
     LOG_PDDL_TABLE_REREAD_ACCEPTED,
     LOG_PDDL_TABLE_REREAD_REJECTED,
     LOG_VISION_ELEMENT_DESCRIPTION,
+    MSG_STRUCTURAL_EXTRACTION_DEGRADED,
 )
 from backend.stage_messages import (
     STAGE_ANALYZING_STRUCTURAL,
@@ -2622,27 +2623,49 @@ class DocumentTooLargeError(ValueError):
     """The document has more pages than ``MAX_PAGES`` (job-level failure)."""
 
 
-def _check_page_limit(manifest: ProcessingManifest) -> None:
-    """Refuses a document with more pages than ``MAX_PAGES``.
+def _check_page_count(page_count: int) -> None:
+    """Reject an oversized document as a whole with a user-facing message.
 
-    It runs right after the structural extraction, the first point where the
-    page count is always known, and before planning and the vision-model
-    calls. Only ``media.inspect`` runs before it, since whether the source is
-    a slide deck decides how it is extracted. Nothing is processed partially, and the message, which reaches the
-    end user, names the page count and the limit.
+    A verified PDF count may be checked before costly extraction. The
+    authoritative manifest count is checked afterwards for every format,
+    including those without a reliable preflight count. Neither check allows
+    partial processing beyond MAX_PAGES.
 
     Raises:
-        DocumentTooLargeError: When the manifest has more pages than the limit.
+        DocumentTooLargeError: When the page count exceeds MAX_PAGES.
     """
     from backend.config.settings import settings
 
-    page_count = len(manifest.pages)
     if page_count > settings.max_pages:
         raise DocumentTooLargeError(
             t(STAGE_DOCUMENT_TOO_MANY_PAGES).format(
                 page_count=page_count, max_pages=settings.max_pages
             )
         )
+
+
+def _check_page_limit_before_extraction(inspection: dict[str, Any] | None) -> None:
+    """Reject only PDF counts verified by the existing remote PDF parser.
+
+    Scanned content streams, unknown counts and non-PDF formats are not a
+    reliable early limit. They retain the authoritative post-extraction check.
+    No local operational parser is introduced (ADR-0003).
+    """
+    if not isinstance(inspection, dict):
+        return
+    count = inspection.get("page_count")
+    if (
+        inspection.get("is_pdf") is True
+        and inspection.get("page_count_source") == "pymupdf"
+        and type(count) is int
+        and count > 0
+    ):
+        _check_page_count(count)
+
+
+def _check_page_limit(manifest: ProcessingManifest) -> None:
+    """Authoritative limit after extraction, including formats without preflight."""
+    _check_page_count(len(manifest.pages))
 
 
 class PddlAccessibilityOrchestrator:
@@ -2743,6 +2766,7 @@ class PddlAccessibilityOrchestrator:
         # media.inspect runs first: a slide deck is extracted and structured
         # slide by slide, which has to be decided before extraction.
         media_inspection, media_configuration = await _inspect_media(source_path)
+        _check_page_limit_before_extraction(media_inspection)
         presentation = _is_presentation(media_inspection)
 
         if status_callback:
@@ -4865,6 +4889,16 @@ def build_pddl_structured_payload(
             "reparo desabilitado (LEGACY_UNICODE_REPAIR=detect)."
         )
 
+    extraction_degraded = records_extraction_degradation(
+        configuration.get("extraction_degraded")
+    )
+    if extraction_degraded:
+        technical_warnings.append(
+            t(MSG_STRUCTURAL_EXTRACTION_DEGRADED).format(
+                provider=configuration.get("toolbox_provider", manifest.extractor.name)
+            )
+        )
+
     return {
         "text": text_output,
         "pages": pages_payload,
@@ -4896,6 +4930,13 @@ def build_pddl_structured_payload(
             if _unsatisfied_selected_obligations(manifest)
             else None,
             "pddl_toolbox_availability": toolbox_availability,
+            **(
+                {
+                    "pddl_extraction_degraded": True,
+                    "pddl_extraction_failures": configuration.get("extraction_failures", {}),
+                }
+                if extraction_degraded else {}
+            ),
             # Pictures and tables left undescribed or unread, by reason; a rerun
             # once the model provider or the Toolbox is back may deliver them.
             "pddl_visual_failures": visual_failures,
@@ -4913,7 +4954,8 @@ def build_pddl_structured_payload(
         # A step degraded by a Toolbox or model failure must not be replayed
         # from the cache once the service is back.
         "cacheable": media_inspection_status != "failed"
-        and not records_visual_failures(visual_failures),
+        and not records_visual_failures(visual_failures)
+        and not extraction_degraded,
     }
 
 
@@ -4957,6 +4999,16 @@ def records_visual_failures(failures: Any) -> bool:
         and any(isinstance(count, int) and count > 0 for count in by_reason.values())
         for by_reason in failures.values()
     )
+
+
+def records_extraction_degradation(flag: Any) -> bool:
+    """Whether the structural extraction came from one provider of a dual run.
+
+    ``flag`` is the extractor's ``extraction_degraded`` or, on a cached entry,
+    ``canonical_metadata.pddl_extraction_degraded``. A run that records it is
+    not cached, and a cached entry that does is not replayed.
+    """
+    return flag is True
 
 
 def _unsatisfied_obligations(manifest: ProcessingManifest) -> list[dict[str, Any]]:

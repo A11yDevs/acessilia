@@ -52,7 +52,7 @@ vez de parecer uma indisponibilidade depois.
 Além disso, o cliente oferece:
 
 - **`retries`**: reenvia a requisição ao mesmo endpoint após `ToolboxTimeout`
-  ou `ToolboxProviderUnavailable` (erro de rede, 503, 504), esperando
+  ou `ToolboxProviderUnavailable` (erro de rede, 502, 503, 504), esperando
   `retry_backoff_seconds * 2**attempt` com jitter. Desligado por padrão; ligar
   só para capacidades idempotentes.
 - **`endpoints=`** (mecanismo secundário): para deploys *independentes* da
@@ -106,3 +106,8 @@ provisório até a Toolbox publicar `artifact-ref@1`.
 ```bash
 cd libs/sdk && python -m pytest
 ```
+
+Downloads por identificador também procuram no próximo endpoint compatível após
+um 404. Essa exceção vale somente para `ToolboxArtifactClient.download`: outros
+erros 4xx e chamadas de capacidade mantêm seu comportamento. Se todos retornarem
+404, o SDK lança `ToolboxArtifactNotFound`; falhas de integridade não são repetidas.

@@ -535,3 +535,21 @@ LOG_DOCX_SKIPPED_DISABLED: str = "DOCX skipped: TOOLBOX_DOCX_ENABLED is false"
 LOG_AGNO_NOT_INSTALLED: str = (
     "Agno is not installed. Run `uv sync` before using the workflow Executor."
 )
+
+#: Upload persistence failed transiently; extraction will receive the source file.
+LOG_ARTIFACT_UPLOAD_DEGRADED: str = "Artifact upload unavailable ({error}); extracting from the source file."
+
+#: One structural provider failed; use the other provider when available.
+LOG_STRUCTURAL_PROVIDER_DEGRADED: str = "Structural provider {provider} failed ({error}); extraction is degraded."
+
+#: Multiple independent Toolbox URLs require direct input; configured artifact storage is bypassed.
+LOG_ARTIFACT_STORE_DIRECT_INPUT: str = (
+    "Artifact storage bypassed for independent Toolbox endpoints; "
+    "the source file will be sent again for extraction, fusion and text spans."
+)
+
+#: Delivered document warning when only one structural provider succeeded; {provider} is its identifier.
+MSG_STRUCTURAL_EXTRACTION_DEGRADED: str = (
+    "Structural extraction used only {provider} because the other provider failed. "
+    "The document requires review; dual-provider comparison was not available."
+)

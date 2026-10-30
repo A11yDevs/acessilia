@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from pathlib import Path
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
@@ -448,3 +448,305 @@ def test_extract_builds_and_closes_its_own_clients(monkeypatch):
     ]
     for _, client in built:
         client.close.assert_awaited_once()
+
+
+def test_multi_endpoint_extraction_builds_no_artifact_upload_client(monkeypatch):
+    from acessilia_sdk.toolbox import ToolboxEndpoint
+
+    built = []
+
+    def factory(client_cls, **kwargs):
+        assert client_cls is ToolboxStructureClient
+        client = AsyncMock(spec=client_cls)
+        client.base_url = "http://toolbox-a.test"
+        client.endpoints = (
+            ToolboxEndpoint(client.base_url),
+            ToolboxEndpoint("http://toolbox-b.test"),
+        )
+        client.provider = "docling"
+        client.extract_structure.return_value = SAMPLE_TOOLBOX_RESPONSE
+        built.append(client)
+        return client
+
+    monkeypatch.setattr(
+        "backend.core.manifest.toolbox_extractor.make_toolbox_client", factory
+    )
+    result = ToolboxManifestExtractor(use_artifact_store=True).extract(
+        FIXTURE_PDF, dual_fusion=False
+    )
+    assert len(built) == 1
+    built[0].extract_structure.assert_awaited_once_with(
+        file_path=FIXTURE_PDF.resolve(),
+        artifact_id=None,
+        language="pt-BR",
+        use_remote_cache=True,
+    )
+    built[0].close.assert_awaited_once()
+    assert result.configuration["use_artifact_store"] is False
+
+
+@pytest.mark.parametrize("artifact_url", ["http://toolbox-a.test", "http://toolbox-b.test"])
+def test_created_upload_client_must_share_the_structure_endpoint(
+    mock_client, mock_artifact_client, monkeypatch, artifact_url
+):
+    from acessilia_sdk.toolbox import ToolboxEndpoint
+
+    mock_client.endpoints = (ToolboxEndpoint("http://toolbox-a.test"),)
+    mock_client.extract_structure.return_value = SAMPLE_TOOLBOX_RESPONSE
+    mock_artifact_client.endpoints = (ToolboxEndpoint(artifact_url),)
+    mock_artifact_client.upload.return_value = "sha256:stored"
+    factory = Mock(return_value=mock_artifact_client)
+    monkeypatch.setattr("backend.core.manifest.toolbox_extractor.make_toolbox_client", factory)
+
+    result = ToolboxManifestExtractor(client=mock_client, use_artifact_store=True).extract(
+        FIXTURE_PDF, dual_fusion=False
+    )
+
+    factory.assert_called_once_with(ToolboxArtifactClient)
+    same_deployment = artifact_url == "http://toolbox-a.test"
+    if same_deployment:
+        mock_artifact_client.upload.assert_awaited_once_with(FIXTURE_PDF.resolve())
+    else:
+        mock_artifact_client.upload.assert_not_awaited()
+    assert result.configuration["use_artifact_store"] is same_deployment
+    assert result.artifact_id == ("sha256:stored" if same_deployment else None)
+    mock_client.extract_structure.assert_awaited_once_with(
+        file_path=None if same_deployment else FIXTURE_PDF.resolve(),
+        artifact_id=result.artifact_id, language="pt-BR", use_remote_cache=True,
+    )
+    mock_artifact_client.close.assert_awaited_once()
+    mock_client.close.assert_not_awaited()
+
+
+def test_secondary_on_another_deployment_receives_source_not_primary_artifact(
+    mock_client, mock_artifact_client, monkeypatch
+):
+    from acessilia_sdk.toolbox import ToolboxEndpoint
+    from backend.config.settings import settings
+
+    monkeypatch.setattr(settings, "fusion_mode", "dual")
+    monkeypatch.setattr(settings, "fusion_secondary_provider", "mineru")
+    mock_client.endpoints = (ToolboxEndpoint("http://toolbox-a.test"),)
+    mock_artifact_client.endpoints = mock_client.endpoints
+    mock_artifact_client.upload.return_value = "sha256:primary"
+    mock_client.extract_structure.return_value = SAMPLE_TOOLBOX_RESPONSE
+    secondary = AsyncMock(spec=ToolboxStructureClient)
+    secondary.provider = "mineru"
+    secondary.endpoints = (ToolboxEndpoint("http://toolbox-b.test"),)
+    secondary.extract_structure.return_value = deepcopy(SAMPLE_TOOLBOX_RESPONSE)
+    monkeypatch.setattr(
+        "backend.core.manifest.toolbox_extractor.make_toolbox_client",
+        lambda client_cls, **kwargs: secondary,
+    )
+    result = ToolboxManifestExtractor(
+        client=mock_client,
+        artifact_client=mock_artifact_client,
+        use_artifact_store=True,
+    ).extract(FIXTURE_PDF)
+    assert result.artifact_id == "sha256:primary"
+    assert (
+        mock_client.extract_structure.call_args.kwargs["artifact_id"]
+        == "sha256:primary"
+    )
+    secondary.extract_structure.assert_awaited_once_with(
+        file_path=FIXTURE_PDF.resolve(),
+        artifact_id=None,
+        language="pt-BR",
+        use_remote_cache=True,
+    )
+    secondary.close.assert_awaited_once()
+
+
+@pytest.mark.parametrize("failure_name", ["ToolboxTimeout", "ToolboxProviderUnavailable"])
+def test_transient_upload_failure_uses_direct_extraction(
+    mock_client, mock_artifact_client, failure_name
+):
+    from acessilia_sdk.toolbox import errors
+
+    mock_artifact_client.upload.side_effect = getattr(errors, failure_name)("upload unavailable")
+    mock_client.extract_structure.return_value = SAMPLE_TOOLBOX_RESPONSE
+    result = ToolboxManifestExtractor(
+        client=mock_client, artifact_client=mock_artifact_client, use_artifact_store=True,
+    ).extract(FIXTURE_PDF, dual_fusion=False)
+    mock_client.extract_structure.assert_awaited_once_with(
+        file_path=FIXTURE_PDF.resolve(), artifact_id=None, language="pt-BR", use_remote_cache=True,
+    )
+    assert result.artifact_id is None
+    assert result.configuration["use_artifact_store"] is False
+    assert result.configuration["artifact_upload_error"] == failure_name
+
+
+@pytest.mark.parametrize("failure_name", [
+    "ToolboxAuthenticationError", "ToolboxInvalidInput", "ToolboxContractViolation",
+])
+def test_permanent_upload_failure_is_not_bypassed(mock_client, mock_artifact_client, failure_name):
+    from acessilia_sdk.toolbox import errors
+
+    failure = getattr(errors, failure_name)("permanent failure")
+    mock_artifact_client.upload.side_effect = failure
+    with pytest.raises(type(failure)):
+        ToolboxManifestExtractor(
+            client=mock_client, artifact_client=mock_artifact_client, use_artifact_store=True,
+        ).extract(FIXTURE_PDF, dual_fusion=False)
+    mock_client.extract_structure.assert_not_awaited()
+
+
+@pytest.mark.parametrize("primary_ok,secondary_ok", [(True, True), (True, False), (False, True), (False, False)])
+def test_dual_extraction_handles_each_provider_independently(
+    mock_client, monkeypatch, primary_ok, secondary_ok
+):
+    from backend.config.settings import settings
+    from acessilia_sdk.toolbox.errors import ToolboxProviderUnavailable, ToolboxUnavailable
+
+    monkeypatch.setattr(settings, "fusion_mode", "dual")
+    monkeypatch.setattr(settings, "fusion_secondary_provider", "mineru")
+    primary = deepcopy(SAMPLE_TOOLBOX_RESPONSE)
+    secondary_payload = deepcopy(SAMPLE_TOOLBOX_RESPONSE)
+    secondary_payload["provider"] = "mineru"
+    secondary_payload["provenance"]["cache_key"] = "secondary-key"
+    secondary_payload["provenance"]["provider_version"] = "secondary-version"
+    if primary_ok:
+        mock_client.extract_structure.return_value = primary
+    else:
+        mock_client.extract_structure.side_effect = ToolboxProviderUnavailable("primary down")
+    secondary = AsyncMock(spec=ToolboxStructureClient)
+    secondary.provider = "mineru"
+    secondary.base_url = "http://localhost:8002"
+    if secondary_ok:
+        secondary.extract_structure.return_value = secondary_payload
+    else:
+        secondary.extract_structure.side_effect = ToolboxProviderUnavailable("secondary down")
+    monkeypatch.setattr("backend.core.manifest.toolbox_extractor.make_toolbox_client", lambda *a, **k: secondary)
+    extractor = ToolboxManifestExtractor(client=mock_client, use_artifact_store=False)
+    if not primary_ok and not secondary_ok:
+        with pytest.raises(ToolboxUnavailable) as info:
+            extractor.extract(FIXTURE_PDF)
+        assert len(info.value.causes) == 2
+    else:
+        result = extractor.extract(FIXTURE_PDF)
+        assert result.configuration["toolbox_provider"] == ("docling" if primary_ok else "mineru")
+        if not primary_ok:
+            assert result.cache_key == "secondary-key"
+            assert result.version == "secondary-version"
+        if not (primary_ok and secondary_ok):
+            assert result.configuration["extraction_degraded"] is True
+            assert "fusion_evidence" not in result.document
+        else:
+            assert "fusion_evidence" in result.document
+    mock_client.extract_structure.assert_awaited_once()
+    secondary.extract_structure.assert_awaited_once()
+    secondary.close.assert_awaited_once()
+
+
+@pytest.mark.parametrize("failure_name", [
+    "ToolboxUnsupportedMediaType", "ToolboxInvalidInput",
+    "ToolboxAuthenticationError", "ToolboxContractViolation",
+])
+def test_dual_mode_preserves_permanent_primary_error(mock_client, monkeypatch, failure_name):
+    from acessilia_sdk.toolbox import errors
+    from backend.config.settings import settings
+
+    monkeypatch.setattr(settings, "fusion_mode", "dual")
+    monkeypatch.setattr(settings, "fusion_secondary_provider", "mineru")
+    failure = getattr(errors, failure_name)("permanent rejection")
+    mock_client.extract_structure.side_effect = failure
+    secondary = AsyncMock(spec=ToolboxStructureClient)
+    secondary.extract_structure.side_effect = failure
+    factory = lambda *a, **kw: secondary
+    monkeypatch.setattr("backend.core.manifest.toolbox_extractor.make_toolbox_client", factory)
+    with pytest.raises(type(failure)) as caught:
+        ToolboxManifestExtractor(client=mock_client, use_artifact_store=False).extract(FIXTURE_PDF)
+    assert caught.value is failure
+    secondary.extract_structure.assert_not_awaited()
+
+
+def test_dual_mode_preserves_permanent_secondary_error_without_primary(mock_client, monkeypatch):
+    from acessilia_sdk.toolbox.errors import ToolboxTimeout, ToolboxUnsupportedMediaType
+    from backend.config.settings import settings
+
+    monkeypatch.setattr(settings, "fusion_mode", "dual")
+    monkeypatch.setattr(settings, "fusion_secondary_provider", "mineru")
+    primary_error = ToolboxTimeout("primary unavailable")
+    mock_client.extract_structure.side_effect = primary_error
+    secondary = AsyncMock(spec=ToolboxStructureClient)
+    secondary.provider = "mineru"
+    secondary.extract_structure.side_effect = ToolboxUnsupportedMediaType("unsupported document")
+    monkeypatch.setattr(
+        "backend.core.manifest.toolbox_extractor.make_toolbox_client", lambda *a, **kw: secondary
+    )
+    with pytest.raises(ToolboxUnsupportedMediaType) as caught:
+        ToolboxManifestExtractor(client=mock_client, use_artifact_store=False).extract(FIXTURE_PDF)
+    assert caught.value.__cause__ is primary_error
+    secondary.close.assert_awaited_once()
+
+
+@pytest.mark.parametrize("failure_name", [
+    "ToolboxUnsupportedMediaType", "ToolboxInvalidInput",
+    "ToolboxAuthenticationError", "ToolboxContractViolation",
+])
+def test_permanent_secondary_error_keeps_the_primary_extraction(mock_client, monkeypatch, failure_name):
+    from acessilia_sdk.toolbox import errors
+    from backend.config.settings import settings
+
+    monkeypatch.setattr(settings, "fusion_mode", "dual")
+    monkeypatch.setattr(settings, "fusion_secondary_provider", "mineru")
+    mock_client.extract_structure.return_value = SAMPLE_TOOLBOX_RESPONSE
+    secondary = AsyncMock(spec=ToolboxStructureClient)
+    secondary.provider = "mineru"
+    secondary.extract_structure.side_effect = getattr(errors, failure_name)("rejected")
+    monkeypatch.setattr(
+        "backend.core.manifest.toolbox_extractor.make_toolbox_client", lambda *a, **kw: secondary
+    )
+    result = ToolboxManifestExtractor(client=mock_client, use_artifact_store=False).extract(FIXTURE_PDF)
+    assert result.configuration["toolbox_provider"] == "docling"
+    assert result.configuration["extraction_degraded"] is True
+    assert result.configuration["extraction_failures"] == {"mineru": failure_name}
+    assert "fusion_evidence" not in result.document
+    secondary.close.assert_awaited_once()
+
+
+def test_dual_mode_falls_back_on_a_primary_http_500(mock_client, monkeypatch):
+    import httpx
+    from acessilia_sdk.toolbox.errors import ToolboxError
+    from acessilia_sdk.toolbox.transport import raise_for_error
+    from backend.config.settings import settings
+
+    monkeypatch.setattr(settings, "fusion_mode", "dual")
+    monkeypatch.setattr(settings, "fusion_secondary_provider", "mineru")
+    with pytest.raises(ToolboxError) as server_error:
+        raise_for_error(httpx.Response(500, json={"detail": "boom"}), "structure")
+    mock_client.extract_structure.side_effect = server_error.value
+    secondary_payload = deepcopy(SAMPLE_TOOLBOX_RESPONSE)
+    secondary_payload["provider"] = "mineru"
+    secondary = AsyncMock(spec=ToolboxStructureClient)
+    secondary.provider = "mineru"
+    secondary.base_url = "http://localhost:8002"
+    secondary.extract_structure.return_value = secondary_payload
+    monkeypatch.setattr(
+        "backend.core.manifest.toolbox_extractor.make_toolbox_client", lambda *a, **kw: secondary
+    )
+    result = ToolboxManifestExtractor(client=mock_client, use_artifact_store=False).extract(FIXTURE_PDF)
+    assert result.configuration["toolbox_provider"] == "mineru"
+    assert result.configuration["extraction_failures"] == {"docling": "ToolboxError"}
+
+
+def test_independent_endpoints_log_the_direct_input_policy_once(mock_client, mock_artifact_client, monkeypatch):
+    from acessilia_sdk.toolbox import ToolboxEndpoint
+    from backend.core.manifest import toolbox_extractor as module
+    from backend.i18n import t
+    from backend.log_messages import LOG_ARTIFACT_STORE_DIRECT_INPUT
+
+    mock_client.endpoints = (
+        ToolboxEndpoint("http://toolbox-a.test"), ToolboxEndpoint("http://toolbox-b.test"),
+    )
+    mock_artifact_client.endpoints = mock_client.endpoints
+    mock_client.extract_structure.return_value = SAMPLE_TOOLBOX_RESPONSE
+    info = Mock()
+    monkeypatch.setattr(module.logger, "info", info)
+    result = ToolboxManifestExtractor(
+        client=mock_client, artifact_client=mock_artifact_client, use_artifact_store=True,
+    ).extract(FIXTURE_PDF, dual_fusion=False)
+    info.assert_called_once_with(t(LOG_ARTIFACT_STORE_DIRECT_INPUT))
+    mock_artifact_client.upload.assert_not_awaited()
+    assert result.artifact_id is None
+    assert result.configuration["use_artifact_store"] is False
