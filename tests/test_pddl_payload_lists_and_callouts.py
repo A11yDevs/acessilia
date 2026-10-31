@@ -342,16 +342,20 @@ def test_a_sentence_after_the_last_question_stays_in_it() -> None:
 
 
 def test_dropped_empty_list_items_are_logged() -> None:
+    from backend import i18n
     from backend.tools.logger import logger
 
     warnings: list[str] = []
     sink = logger.add(warnings.append, level="WARNING", format="{message}")
+    # Pinned, so the expected English message holds on a pt_BR machine too.
+    token = i18n.set_request_locale("en_US")
     try:
         blocks = _blocks([
             _item(1, "  ", "a)", "exercise-list"),
             _item(2, "", "b)", "exercise-list"),
         ])
     finally:
+        i18n.reset_request_locale(token)
         logger.remove(sink)
 
     assert not any(block.get("type") == "list" for block in blocks)
