@@ -333,9 +333,15 @@ async def test_restart_finishes_requested_cancellation(isolated_runtime, tmp_pat
     path = tmp_path / "cancelled.pdf"
     path.write_bytes(b"%PDF")
     job_store.save_request("cancel-restart", "secret", {"file_path": str(path)},
-        {"task_id": "cancel-restart", "status": "cancelling"})
+        {"task_id": "cancel-restart", "status": "cancelling",
+         "cancellation_requested_at": 100, "cancellation_elapsed_seconds": 10})
     await worker.recover_pending_jobs()
-    assert job_store.load_record("cancel-restart")["status"]["status"] == "cancelled"
+    status = job_store.load_record("cancel-restart")["status"]
+    assert status["status"] == "cancelled"
+    assert status["cancellation_requested_at"] == 100
+    recovered = await worker.get_job_status_async("cancel-restart")
+    assert recovered["cancellation_requested_at"] == 100
+    assert "cancellation_elapsed_seconds" not in recovered
     assert not path.exists()
     assert isolated_runtime[0].qsize() == 0
 

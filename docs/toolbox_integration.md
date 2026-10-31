@@ -520,14 +520,22 @@ thread before removing files it may still use. While the job is `cancelling`,
 its upload remains protected and its terminal state waits for the blocking
 operation to finish. The queue can start a replacement without waiting for
 that thread.
-Normal concurrency remains one job; at most one extra cancelling job can
-remain active. If both jobs are cancelled, further work waits for one to
-finish, bounding active operations instead of creating an unlimited backlog.
-Deployments must budget memory for this bounded overlap.
+Normal concurrency stays at the configured value N (one by default). While
+cancelled work drains, a replacement may run, but total active callbacks
+(including cancelling ones) never exceed N+1. The extra active callback may
+be a normal replacement, not necessarily a cancelled job. When the N+1 cap
+is reached, further work waits for a callback to finish, even if another job
+is cancelled. Deployments must budget memory for this bounded overlap.
 
 `GET /api/v1/jobs/{task_id}` reports `cancellation_requested_at` (Unix seconds),
 `cancellation_elapsed_seconds` while waiting, and a localized stage explaining
 the wait. The web status page displays that stage on its normal refresh.
+The API persists `cancelling` and the request timestamp before acknowledging
+the cancellation; after a restart, recovery marks that durable request
+`cancelled` and preserves the timestamp. The elapsed counter is derived on
+reads and cleared for terminal jobs. Direct use of the internal synchronous
+cancel helper changes memory only; its caller owns persistence. A crash
+before the API acknowledges a cancellation is not covered by this guarantee.
 Cancelling does not send an abort command to the Toolbox; remote work may
 continue until it finishes or times out. Queue shutdown still joins active
 operations, and no cancelled result is published. This change does not alter

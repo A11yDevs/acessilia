@@ -70,6 +70,11 @@ async def test_cancelled_extraction_advances_queue_and_reports_wait(isolated_run
             response = await client.post("/api/v1/jobs/long/cancel", headers={"X-Job-Token": "test-token"})
             assert response.status_code == 200
             assert response.json()["status"] == "cancelling"
+            persisted = job_store.load_record("long")["status"]
+            assert persisted["status"] == "cancelling"
+            assert persisted["cancellation_requested_at"] == manager.obter("long")["cancellation_requested_at"]
+            assert persisted["cancellation_elapsed_seconds"] >= 0
+            assert not finished.is_set()
             await asyncio.wait_for(advanced.wait(), 2)
             assert not finished.is_set()
             assert source.exists()
@@ -102,10 +107,12 @@ async def test_cancelled_extraction_advances_queue_and_reports_wait(isolated_run
 
 
 @pytest.mark.asyncio
-async def test_repeated_cancellations_cannot_start_unbounded_threads(tmp_path):
-    queue = UnifiedQueue()
-    entered = [threading.Event() for _ in range(3)]
-    release = [threading.Event() for _ in range(3)]
+@pytest.mark.parametrize("max_concurrent", [1, 2])
+async def test_repeated_cancellations_cannot_start_unbounded_threads(tmp_path, max_concurrent):
+    queue = UnifiedQueue(max_concurrent=max_concurrent)
+    count = max_concurrent + 2
+    entered = [threading.Event() for _ in range(count)]
+    release = [threading.Event() for _ in range(count)]
 
     def block(index):
         entered[index].set()
@@ -114,22 +121,24 @@ async def test_repeated_cancellations_cannot_start_unbounded_threads(tmp_path):
     async def callback(index):
         await run_blocking(block, index)
 
-    for index in range(3):
+    for index in range(count):
         await queue.enqueue(QueueItem(tmp_path / f"{index}.pdf", f"{index}.pdf", "test",
             callback, {"index": index}, task_id=str(index)))
     queue.start_worker()
     try:
-        await wait_until(entered[0].is_set)
+        await wait_until(lambda: all(event.is_set() for event in entered[:max_concurrent]))
+        assert not entered[max_concurrent].is_set()
         assert queue.cancel("0")
-        await wait_until(entered[1].is_set)
-        assert queue.cancel("1")
+        await wait_until(entered[max_concurrent].is_set)
+        # At N+1 active operations, another cancellation cannot dispatch N+2.
+        assert queue.cancel(str(max_concurrent))
         await asyncio.sleep(0.15)
-        assert not entered[2].is_set()
-        assert queue._processing_count == 2
+        assert not entered[max_concurrent + 1].is_set()
+        assert queue._processing_count == max_concurrent + 1
         assert queue.qsize() == 1
         release[0].set()
-        await wait_until(entered[2].is_set)
-        assert queue._processing_count <= 2
+        await wait_until(entered[max_concurrent + 1].is_set)
+        assert queue._processing_count <= max_concurrent + 1
     finally:
         for event in release:
             event.set()
@@ -139,28 +148,27 @@ async def test_repeated_cancellations_cannot_start_unbounded_threads(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_normal_jobs_keep_the_configured_concurrency(tmp_path):
-    queue = UnifiedQueue()
-    started, advanced = asyncio.Event(), asyncio.Event()
+@pytest.mark.parametrize("max_concurrent", [1, 2])
+async def test_normal_jobs_keep_the_configured_concurrency(tmp_path, max_concurrent):
+    queue = UnifiedQueue(max_concurrent=max_concurrent)
+    started = [asyncio.Event() for _ in range(max_concurrent + 1)]
     release = asyncio.Event()
 
-    async def first():
-        started.set()
+    async def callback(index):
+        started[index].set()
         await release.wait()
 
-    async def second():
-        advanced.set()
-
-    await queue.enqueue(QueueItem(tmp_path / "first", "first", "test", first))
-    await queue.enqueue(QueueItem(tmp_path / "second", "second", "test", second))
+    for index in range(max_concurrent + 1):
+        await queue.enqueue(QueueItem(tmp_path / str(index), str(index), "test",
+            callback, {"index": index}))
     queue.start_worker()
     try:
-        await asyncio.wait_for(started.wait(), 2)
+        await wait_until(lambda: all(event.is_set() for event in started[:max_concurrent]))
         await asyncio.sleep(0.15)
-        assert not advanced.is_set()
-        assert queue._processing_count == 1
+        assert not started[max_concurrent].is_set()
+        assert queue._processing_count == max_concurrent
         release.set()
-        await asyncio.wait_for(advanced.wait(), 2)
+        await asyncio.wait_for(started[max_concurrent].wait(), 2)
     finally:
         release.set()
         await stop_queue(queue)

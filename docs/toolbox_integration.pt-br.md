@@ -522,15 +522,23 @@ O cancelamento pela API continua cooperativo: `run_blocking` aguarda a thread
 em execução antes de remover arquivos que ela ainda pode usar. Enquanto o job
 está em `cancelling`, o upload permanece protegido e o estado terminal aguarda
 o fim da operação bloqueante. A fila pode iniciar um substituto sem aguardar essa
-thread. A concorrência normal continua em um job; no máximo um job cancelado
-adicional pode permanecer ativo. Se ambos forem cancelados, novos trabalhos
-aguardam a conclusão de um deles, limitando as operações ativas em vez de criar
-uma fila ilimitada em segundo plano. O ambiente deve reservar memória para essa
+thread. A concorrência normal mantém o valor configurado N (um por padrão).
+Durante a conclusão do trabalho cancelado, um substituto pode executar, mas o
+total de callbacks ativos, incluindo os em cancelamento, nunca ultrapassa N+1.
+O callback adicional pode ser um substituto normal, não necessariamente um job
+cancelado. Ao atingir N+1, novos trabalhos aguardam um callback terminar,
+mesmo que outro job seja cancelado. O ambiente deve reservar memória para essa
 sobreposição limitada.
 
 `GET /api/v1/jobs/{task_id}` informa `cancellation_requested_at` (segundos Unix),
 `cancellation_elapsed_seconds` durante a espera e uma etapa localizada que
 explica o motivo. A página web mostra essa etapa na atualização normal.
+A API persiste `cancelling` e o instante da solicitação antes de confirmar o
+cancelamento; após reiniciar, a recuperação marca esse registro durável como
+`cancelled` e preserva o timestamp. O contador é derivado na leitura e removido
+para jobs terminais. O helper síncrono interno altera apenas a memória; seu
+chamador é responsável pela persistência. Uma queda antes da confirmação da
+API não está coberta por essa garantia.
 Cancelar não envia um comando de interrupção à Toolbox; o trabalho remoto pode
 continuar até terminar ou atingir o timeout. O encerramento da fila continua
 aguardando as operações ativas e nenhum resultado cancelado é publicado. Essa
