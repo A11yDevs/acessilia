@@ -34,6 +34,21 @@ class TestSanitize:
     def test_block_code_preserved(self):
         assert sanitize_block_text("x = 1;\r\ny = 2;", block_type="code") == "x = 1;\ny = 2;"
 
+    def test_tabs_replaced_in_prose(self):
+        # Regression for #338: tabs in docling prose normalized to spaces
+        assert sanitize_block_text("CAPÍTULO\t9", "heading") == "CAPÍTULO 9"
+        assert sanitize_block_text("a\tb\tc", "paragraph") == "a b c"
+        assert sanitize_block_text("item\t1", "list_item") == "item 1"
+        assert sanitize_block_text("quote\ttext", "quote") == "quote text"
+        assert sanitize_block_text("note\ttext", "note") == "note text"
+        assert sanitize_block_text("caption\ttext", "caption") == "caption text"
+        assert sanitize_block_text("cell\t1", "table_cell") == "cell 1"
+
+    def test_tabs_preserved_in_code(self):
+        # Regression for #338: tabs in code blocks preserved for indentation
+        assert sanitize_block_text("if (a)\treturn;", "code") == "if (a)\treturn;"
+        assert sanitize_block_text("\t\tx = 1;", "code") == "\t\tx = 1;"
+
     def test_block_markdown_stripped(self):
         assert sanitize_block_text("**bold** and `code`") == "bold and code"
 
@@ -179,3 +194,45 @@ class TestLeadingMarkerSanitize:
     def test_list_marker_before_a_word_still_stripped(self):
         for marker in ("-", "*", "+", "1.", "2)", "(3)"):
             assert sanitize_block_text(f"{marker} item") == "item"
+
+
+def test_sanitize_text_keeps_tabs_for_untyped_source_text():
+    assert sanitize_text("first\tsecond\n\tindented") == "first\tsecond\n\tindented"
+
+
+def test_canonical_tab_sanitization_is_recursive_and_does_not_mutate_input():
+    from copy import deepcopy
+    from docstruct.canonical import sanitize_canonical_document
+
+    document = {
+        "title": "Document\ttitle",
+        "sections": [{
+            "title": "Section\ttitle",
+            "blocks": [{
+                "type": "note", "text": "Note\ttext", "title": "Note\ttitle",
+                "alt_text": "Alt\ttext", "long_description": "Long\tdescription",
+                "children": [{"type": "code", "text": "\treturn;"}],
+            }],
+            "children": [{"title": "Child\ttitle", "blocks": [
+                {"type": "list", "items": ["List\titem"]},
+                {"type": "table", "rows": [["Cell\ttext"]]},
+            ]}],
+        }],
+    }
+    original = deepcopy(document)
+    clean = sanitize_canonical_document(document)
+    assert document == original
+    assert clean["title"] == "Document title"
+    section = clean["sections"][0]
+    assert section["title"] == "Section title"
+    note = section["blocks"][0]
+    assert note["text"] == "Note text"
+    assert note["title"] == "Note title"
+    assert note["alt_text"] == "Alt text"
+    assert note["long_description"] == "Long description"
+    assert note["children"][0]["text"] == "\treturn;"
+    child = section["children"][0]
+    assert child["title"] == "Child title"
+    assert child["blocks"][0]["items"] == ["List item"]
+    assert child["blocks"][1]["rows"] == [["Cell text"]]
+    assert sanitize_canonical_document(clean) == clean

@@ -54,6 +54,9 @@ def sanitize_block_text(text: str, block_type: str | None = None) -> str:
     if block_type == "code":
         return text.replace("\r\n", "\n").replace("\r", "\n")
     cleaned = sanitize_text(text)
+    # Extraction providers can use TABs as word separators in prose (#338).
+    # Code returns above so indentation remains intact.
+    cleaned = cleaned.replace("\t", " ")
     cleaned = re.sub(r"(?<!`)`([^`]+)`(?!`)", r"\1", cleaned)
     cleaned = re.sub(r"\*\*(.+?)\*\*", r"\1", cleaned)
     cleaned = re.sub(r"(?<!\*)\*(?!\s)(.+?)(?<!\s)\*(?!\*)", r"\1", cleaned)

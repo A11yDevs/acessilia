@@ -98,6 +98,127 @@ def test_build_canonical_document_prefers_composed_heading_title_over_filename()
     assert document["title"] == "CAPÍTULO 9 - HERANÇA, REESCRITA E POLIMORFISMO"
 
 
+def test_build_canonical_document_normalizes_docling_tabs_in_prose():
+    # Regression for #338: docling extraction produces tabs between words
+    # in prose, which should be normalized to spaces across TXT/HTML/canonical export.
+    payload = {
+        "text": (
+            "CAPÍTULO\t9\n"
+            "HERANÇA,\tREESCRITA\tE\tPOLIMORFISMO\n"
+            "First\tprose\tparagraph\twith\ttabs.\n"
+            "Second\tprose\tparagraph\twith\ttabs.\n"
+        ),
+        "page_count": 1,
+        "mode": "docling",
+        "pages": [
+            {
+                "page_number": 1,
+                "blocks": [
+                    {"type": "heading", "level": 1, "text": "CAPÍTULO\t9"},
+                    {
+                        "type": "heading",
+                        "level": 2,
+                        "text": "HERANÇA,\tREESCRITA\tE\tPOLIMORFISMO",
+                    },
+                    {
+                        "type": "paragraph",
+                        "text": "First\tprose\tparagraph\twith\ttabs.",
+                    },
+                    {
+                        "type": "paragraph",
+                        "text": "Second\tprose\tparagraph\twith\ttabs.",
+                    },
+                    {
+                        "type": "list",
+                        "ordered": False,
+                        "items": ["First\tlist\titem", "Second\tlist\titem"],
+                    },
+                    {
+                        "type": "table",
+                        "rows": [["Col\t1", "Col\t2"], ["Val\tA", "Val\tB"]],
+                    },
+                    {
+                        "type": "code",
+                        "text": "class Funcionario {\n\tdouble salario;\n\tvoid setSalario() {}\n}",
+                    },
+                ],
+            }
+        ],
+    }
+
+    document = build_canonical_document(payload, title="java-oo-3pgs")
+
+    # Document title and section titles
+    assert document["title"] == "CAPÍTULO 9 - HERANÇA, REESCRITA E POLIMORFISMO"
+    assert "\t" not in document["title"]
+
+    # Export to TXT
+    from docstruct.export.txt import document_to_txt_lines
+
+    txt_lines = document_to_txt_lines(document)
+    for line in txt_lines:
+        if "double salario" in line or "void setSalario" in line:
+            # Code block preserves its indentation tabs
+            assert "\t" in line
+        else:
+            # Prose lines, list items, table text must not contain tabs
+            assert "\t" not in line, f"Tab found in prose line: {line!r}"
+
+    # Export to HTML
+    from docstruct.export.html import document_to_html
+
+    html = document_to_html(document)
+    assert "CAPÍTULO 9" in html
+    assert "HERANÇA, REESCRITA E POLIMORFISMO" in html
+    assert "First list item" in html
+    assert "Second list item" in html
+
+    from html.parser import HTMLParser
+    from docstruct.export.pandoc_ast import build_pandoc_ast
+
+    class TextCollector(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.in_code = False
+            self.code = []
+            self.prose = []
+
+        def handle_starttag(self, tag, attrs):
+            if tag == "pre":
+                self.in_code = True
+
+        def handle_endtag(self, tag):
+            if tag == "pre":
+                self.in_code = False
+
+        def handle_data(self, data):
+            (self.code if self.in_code else self.prose).append(data)
+
+    rendered = TextCollector()
+    rendered.feed(html)
+    assert "\t" not in "".join(rendered.prose)
+    assert "\tdouble salario;" in "".join(rendered.code)
+
+    # DOCX receives this Pandoc AST; only CodeBlock may retain literal TABs.
+    ast = build_pandoc_ast(document, target_format="docx")
+
+    def assert_prose_has_no_tabs(node):
+        if isinstance(node, dict):
+            if node.get("t") == "CodeBlock":
+                assert "\tdouble salario;" in node["c"][1]
+                return
+            for value in node.values():
+                assert_prose_has_no_tabs(value)
+        elif isinstance(node, list):
+            for value in node:
+                assert_prose_has_no_tabs(value)
+        elif isinstance(node, str):
+            assert "\t" not in node
+
+    for key in ("meta", "blocks"):
+        assert_prose_has_no_tabs(ast[key])
+
+
 def test_build_canonical_document_creates_fallback_for_non_textual_payload():
     payload = {
         "text": "",
