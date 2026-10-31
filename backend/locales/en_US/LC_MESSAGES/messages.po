@@ -92,6 +92,14 @@ msgstr "Email delivery could not be confirmed. You can download your files here.
 msgid "Cancellation requested; finishing the current operation safely"
 msgstr "Cancellation requested; finishing the current operation safely"
 
+#, python-brace-format
+msgid ""
+"Cancellation requested {seconds}s ago; waiting for the current operation "
+"to finish safely"
+msgstr ""
+"Cancellation requested {seconds}s ago; waiting for the current operation "
+"to finish safely"
+
 msgid "Cancelled during restart"
 msgstr "Cancelled during restart"
 

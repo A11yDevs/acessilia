@@ -70,6 +70,11 @@ STAGE_GENERATING_PDDL_PLAN: str = "Generating the nominal PDDL plan..."
 #: PDDL-pipeline stage while the generated plan is validated in dry-run mode before execution.
 STAGE_VALIDATING_PLAN_DRY_RUN: str = "Validating the plan in dry-run mode..."
 
+#: Waiting stage for a cancelled job joining a blocking operation; {seconds} is elapsed time.
+STAGE_CANCELLATION_WAITING: str = (
+    "Cancellation requested {seconds}s ago; waiting for the current operation to finish safely"
+)
+
 STAGE_CANCELLATION_REQUESTED: str = "Cancellation requested; finishing the current operation safely"
 
 STAGE_RESTART_CANCELLED = 'Cancelled during restart'

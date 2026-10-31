@@ -28,6 +28,8 @@ class JobStatus(BaseModel):
     email_delivery: str | None = None
     criado_em: float | None = None
     fim: float | None = None
+    cancellation_requested_at: float | None = None
+    cancellation_elapsed_seconds: int | None = None
 
 
 class DownloadFormat(BaseModel):

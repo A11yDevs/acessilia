@@ -186,6 +186,8 @@ async def job_status(request: Request, task_id: str):
         criado_em=job.get("inicio"),
         fim=job.get("fim"),
         email_delivery=job.get("email_delivery"),
+        cancellation_requested_at=job.get("cancellation_requested_at"),
+        cancellation_elapsed_seconds=job.get("cancellation_elapsed_seconds"),
     )
 
 

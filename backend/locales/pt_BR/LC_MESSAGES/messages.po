@@ -100,6 +100,14 @@ msgstr ""
 msgid "Cancellation requested; finishing the current operation safely"
 msgstr "Cancelamento solicitado; concluindo a operação atual com segurança"
 
+#, python-brace-format
+msgid ""
+"Cancellation requested {seconds}s ago; waiting for the current operation "
+"to finish safely"
+msgstr ""
+"Cancelamento solicitado há {seconds}s; aguardando a operação atual "
+"terminar com segurança"
+
 msgid "Cancelled during restart"
 msgstr "Cancelado durante a reinicialização"
 

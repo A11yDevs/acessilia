@@ -515,3 +515,24 @@ provider de `document.structure.extract` / `document.layout.analyze` /
 (`differ-v15-hyb`, EvalAI 70.37): o ganho real no test veio da ordem de leitura
 (+16.4) com essa fonte, não do TEDS. Adote-o explicitamente com
 `FUSION_SECONDARY_PROVIDER=mineru-hyb`; o default da fusão dual continua `mineru`.
+
+## Cancelamento durante a extração remota
+
+O cancelamento pela API continua cooperativo: `run_blocking` aguarda a thread
+em execução antes de remover arquivos que ela ainda pode usar. Enquanto o job
+está em `cancelling`, o upload permanece protegido e o estado terminal aguarda
+o fim da operação bloqueante. A fila pode iniciar um substituto sem aguardar essa
+thread. A concorrência normal continua em um job; no máximo um job cancelado
+adicional pode permanecer ativo. Se ambos forem cancelados, novos trabalhos
+aguardam a conclusão de um deles, limitando as operações ativas em vez de criar
+uma fila ilimitada em segundo plano. O ambiente deve reservar memória para essa
+sobreposição limitada.
+
+`GET /api/v1/jobs/{task_id}` informa `cancellation_requested_at` (segundos Unix),
+`cancellation_elapsed_seconds` durante a espera e uma etapa localizada que
+explica o motivo. A página web mostra essa etapa na atualização normal.
+Cancelar não envia um comando de interrupção à Toolbox; o trabalho remoto pode
+continuar até terminar ou atingir o timeout. O encerramento da fila continua
+aguardando as operações ativas e nenhum resultado cancelado é publicado. Essa
+mudança não altera os timeouts dos providers nem a verificação antecipada de
+`MAX_PAGES` já existente.

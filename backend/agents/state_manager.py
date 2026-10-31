@@ -111,6 +111,7 @@ class StateManager:
         task = self._tasks.get(task_id)
         if task and task.get("status") == "processing":
             task["status"] = "cancelling" if pending else "cancelled"
+            task["cancellation_requested_at"] = time.time()
             task["etapa_atual"] = t(STAGE_CANCELLATION_REQUESTED if pending else STAGE_CANCELLED_BY_USER)
             task["fim"] = None if pending else time.time()
             event = self._cancel_events.get(task_id)

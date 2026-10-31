@@ -512,3 +512,23 @@ provider. It is the B source of the best submission within the paper's method
 (`differ-v15-hyb`, EvalAI 70.37): the real test gain came from reading order
 (+16.4) with this source, not from TEDS. Adopt it explicitly with
 `FUSION_SECONDARY_PROVIDER=mineru-hyb`; the dual-fusion default stays `mineru`.
+
+## Cancelling a job during remote extraction
+
+API cancellation remains cooperative: `run_blocking` waits for a running
+thread before removing files it may still use. While the job is `cancelling`,
+its upload remains protected and its terminal state waits for the blocking
+operation to finish. The queue can start a replacement without waiting for
+that thread.
+Normal concurrency remains one job; at most one extra cancelling job can
+remain active. If both jobs are cancelled, further work waits for one to
+finish, bounding active operations instead of creating an unlimited backlog.
+Deployments must budget memory for this bounded overlap.
+
+`GET /api/v1/jobs/{task_id}` reports `cancellation_requested_at` (Unix seconds),
+`cancellation_elapsed_seconds` while waiting, and a localized stage explaining
+the wait. The web status page displays that stage on its normal refresh.
+Cancelling does not send an abort command to the Toolbox; remote work may
+continue until it finishes or times out. Queue shutdown still joins active
+operations, and no cancelled result is published. This change does not alter
+provider timeouts or the existing early `MAX_PAGES` check.
