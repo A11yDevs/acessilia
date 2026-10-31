@@ -142,6 +142,8 @@ def obter_info_token(token: str) -> dict | None:
         file_path = output_dir / f"{base}{separator}{suffix}"
         if file_path.exists():
             size_bytes = file_path.stat().st_size
+            # Choose the unit before rounding: 1 MB minus one byte remains
+            # in the KB range and rounds to "1024 KB".
             if size_bytes < 1024:
                 size_str = f"{size_bytes} B"
             elif size_bytes < 1024 * 1024:

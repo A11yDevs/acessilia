@@ -172,7 +172,7 @@ def test_cleanup_only_removes_expired_owned_subdirectories(tmp_path, location):
         (1536 * 1024, "1.5 MB"),
     ],
 )
-def test_download_sizes_preserve_bytes_below_one_kilobyte(tmp_path, size_bytes, expected):
+def test_download_size_formatting(tmp_path, size_bytes, expected):
     output_dir = tmp_path / "output" / "small-file"
     output_dir.mkdir(parents=True)
     (output_dir / "doc.txt").write_bytes(b"x" * size_bytes)
