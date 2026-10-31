@@ -556,6 +556,7 @@ async def test_context_overflow_retries_full_page_with_smaller_image_and_token_c
         logger.add(critical.append, level="CRITICAL", format="{message}"),
     ]
     image = _png_bytes(400, 240)
+    # Pinned, so the expected English message holds on a pt_BR machine too.
     token = set_request_locale("en_US")
     try:
         result = await vision_module.VisionAgent().describe_region(
@@ -636,6 +637,7 @@ async def test_context_overflow_is_critical_only_after_the_smaller_request_fails
         ),
         logger.add(critical.append, level="CRITICAL", format="{message}"),
     ]
+    # Pinned, so the expected English message holds on a pt_BR machine too.
     token = set_request_locale("en_US")
     try:
         result = await vision_module.VisionAgent().describe_region(

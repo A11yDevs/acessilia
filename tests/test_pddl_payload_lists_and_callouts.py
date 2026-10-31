@@ -347,6 +347,7 @@ def test_dropped_empty_list_items_are_logged() -> None:
 
     warnings: list[str] = []
     sink = logger.add(warnings.append, level="WARNING", format="{message}")
+    # Pinned, so the expected English message holds on a pt_BR machine too.
     token = i18n.set_request_locale("en_US")
     try:
         blocks = _blocks([
