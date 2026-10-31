@@ -67,3 +67,10 @@ def test_math_reference_case(monkeypatch):
     assert summary["display_found"] == 100.0
     assert summary["display_with_mathml"] == 100.0
     assert summary["display_with_speech"] == 100.0
+
+    structure = {check.id: check for check in card.structure}
+    for name in ("ordered-list:p4", "ordered-list:p5"):
+        assert structure[name].passed, structure[name].detail
+    for target in ("txt", "pdf_ua"):
+        check = text[f"{target}:negative-velocity"]
+        assert check.passed, check.detail

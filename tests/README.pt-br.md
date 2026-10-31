@@ -6,6 +6,8 @@ A suíte de testes unitários do projeto cobre o pipeline canônico, o motor PDD
 
 Por constituição, o portão é o container: os testes devem passar dentro do Docker (equivalente à produção) antes de um merge. A execução nativa é a verificação secundária.
 
+As regressões da issue #342 cobrem continuações de listas após parágrafos e tabelas com numeração explicitamente consecutiva. O scorecard separa sequências quando o grupo de origem muda sem numeração de continuação correspondente, a numeração reinicia explicitamente, muda de estilo, pula um número, cruza títulos ou páginas ou encontra blocos diferentes de parágrafos, tabelas ou fórmulas. Blocos adjacentes antigos sem metadados de grupo mantêm seu agrupamento. TXT/MP3 continuam usando a fala enriquecida conforme o ADR-0011; use as expectativas atuais do dataset, que aceitam o sinal negativo falado.
+
 ## Execução
 
 ```bash
