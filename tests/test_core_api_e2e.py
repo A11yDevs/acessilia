@@ -291,10 +291,6 @@ def test_full_job_delivers_every_advertised_format(
         assert report.get("compliant") is True, report
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason="issue #333: an untitled document uses the upload temp UUID as its title",
-)
 def test_untitled_document_uses_the_uploaded_filename_as_title(
     client: httpx.Client, completed_job: dict
 ) -> None:
