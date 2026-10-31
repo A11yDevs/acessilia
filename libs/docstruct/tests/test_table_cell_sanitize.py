@@ -103,3 +103,22 @@ def test_markdown_line_with_negative_number_is_not_a_list():
     assert blocks[0]["text"] == "- 0,08 (aprox.)"
     assert blocks[-1]["type"] == "list"
     assert blocks[-1]["items"] == ["item"]
+
+
+def test_table_cells_normalize_tabs_to_spaces():
+    # Regression for #338: table cells and caption normalize tabs to spaces
+    block = {
+        "id": "t1",
+        "type": "table",
+        "table_ast": {
+            "caption": "Tabela\t1",
+            "body": [
+                {"cells": [{"text": "header\t1"}, {"text": "header\t2"}]},
+                {"cells": [{"text": "valor\tA"}, {"text": "valor\tB"}]},
+            ],
+        },
+    }
+    sanitized = sanitize_canonical_document(_document(block))
+    table = _block(sanitized)
+    assert table["table_ast"]["caption"] == "Tabela 1"
+    assert _cells(sanitized) == ["header 1", "header 2", "valor A", "valor B"]

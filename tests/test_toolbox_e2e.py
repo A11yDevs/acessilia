@@ -24,6 +24,7 @@ from acessilia_sdk.toolbox.clients import (
     ToolboxMathClient,
     ToolboxOcrClient,
     ToolboxPdfClient,
+    ToolboxStructureClient,
 )
 from backend.tools.toolbox_client import make_toolbox_client
 from backend.tools.toolbox_math_tools import recognized_formulas
@@ -373,3 +374,72 @@ class TestWorkflowE2E:
             assert len(verbalize_result["document"]["verbalized"]) > 0
         finally:
             await math_client.close()
+
+
+# ---------------------------------------------------------------------------
+# StructureClient
+# ---------------------------------------------------------------------------
+
+
+class TestStructureClientE2E:
+    @pytest.mark.e2e
+    @pytest.mark.asyncio
+    async def test_extract_structure_no_tabs_in_prose_export(self, tmp_path) -> None:
+        """Extract the issue's PDF and verify prose in TXT, HTML and DOCX."""
+        from datetime import datetime, timezone
+        from zipfile import ZipFile
+        from xml.etree import ElementTree
+
+        from acessilia_sdk.toolbox.clients import ToolboxDocxClient
+        from backend.agents.pddl_orchestrator import _manifest_pages_to_payload
+        from backend.core.manifest.builder import build_processing_manifest
+        from backend.core.manifest.toolbox_extractor import ToolboxExtraction
+        from backend.pipeline.canonical_builder import build_canonical_document
+        from docstruct.export.html import document_to_html
+        from docstruct.export.pandoc_ast import build_pandoc_ast
+        from docstruct.export.txt import document_to_txt_lines
+
+        structure = make_toolbox_client(
+            ToolboxStructureClient, base_url=TOOLBOX_BASE_URL,
+            provider="docling", timeout_seconds=300,
+        )
+        docx = make_toolbox_client(ToolboxDocxClient, base_url=TOOLBOX_BASE_URL)
+        try:
+            pdf = FIXTURES_DIR / "tutorials" / "java-oo-3pgs.pdf"
+            assert pdf.is_file()
+            result = await structure.extract_structure(file_path=pdf)
+            assert result["status"] == "succeeded"
+            now = datetime.now(timezone.utc)
+            extraction = ToolboxExtraction(
+                document=result, started_at=now, completed_at=now,
+                duration_ms=0, version="e2e", configuration={},
+            )
+            manifest = build_processing_manifest(pdf, extraction)
+            pages = _manifest_pages_to_payload(manifest)
+            # Limit this assertion to prose; code TABs are valid and tested separately.
+            prose_pages = [
+                {**page, "blocks": [b for b in page["blocks"] if b["type"] != "code"]}
+                for page in pages
+            ]
+            canonical = build_canonical_document(
+                {"pages": prose_pages}, title="java-oo-3pgs"
+            )
+            txt = "\n".join(document_to_txt_lines(canonical))
+            assert "CAPÍTULO 9" in txt
+            assert "\t" not in txt
+            html = document_to_html(canonical)
+            assert "CAPÍTULO 9" in html
+            assert "\t" not in html
+
+            output = tmp_path / "prose.docx"
+            await docx.export(build_pandoc_ast(canonical, target_format="docx"), output)
+            with ZipFile(output) as archive:
+                root = ElementTree.fromstring(archive.read("word/document.xml"))
+            ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+            texts = [node.text or "" for node in root.findall(".//w:t", ns)]
+            assert "CAPÍTULO 9" in " ".join(texts)
+            assert all("\t" not in text for text in texts)
+            assert not root.findall(".//w:tab", ns)
+        finally:
+            await structure.close()
+            await docx.close()

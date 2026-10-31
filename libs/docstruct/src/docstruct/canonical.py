@@ -54,6 +54,7 @@ def _source_type(source_path: str) -> str:
 
 from docstruct.text.sanitize import sanitize_block_text
 from docstruct.text.sanitize import sanitize_text
+from docstruct.text.sanitize import sanitize_title_text
 from docstruct.blocks.parser import parse_text_to_blocks
 from docstruct.tables.ast import raw_rows_from_table_ast
 from docstruct.text.math_spans import block_prose
@@ -385,6 +386,8 @@ def sanitize_canonical_document(
     document: dict[str, Any],
 ) -> dict[str, Any]:
     sanitized = deepcopy(document)
+    if isinstance(sanitized.get("title"), str):
+        sanitized["title"] = sanitize_title_text(sanitized["title"])
     sections = sanitized.get("sections", [])
     if isinstance(sections, list):
         sanitized["sections"] = _sanitize_sections(sections)
@@ -395,6 +398,8 @@ def _sanitize_sections(sections: list[dict[str, Any]]) -> list[dict[str, Any]]:
     sanitized_sections: list[dict[str, Any]] = []
     for section in sections:
         clean_section = deepcopy(section)
+        if isinstance(clean_section.get("title"), str):
+            clean_section["title"] = sanitize_title_text(clean_section["title"])
         blocks = clean_section.get("blocks", [])
         if isinstance(blocks, list):
             clean_section["blocks"] = _sanitize_structured_blocks(blocks)
@@ -414,27 +419,38 @@ def _sanitize_structured_blocks(
         block_type = clean.get("type")
 
         if isinstance(clean.get("text"), str) and block_type != "code":
-            clean["text"] = sanitize_block_text(
-                clean["text"],
-                block_type=block_type,
-            )
+            if block_type == "heading":
+                clean["text"] = sanitize_title_text(clean["text"])
+            else:
+                clean["text"] = sanitize_block_text(
+                    clean["text"],
+                    block_type=block_type,
+                )
 
         if isinstance(clean.get("title"), str):
-            clean["title"] = sanitize_block_text(clean["title"])
+            clean["title"] = sanitize_title_text(clean["title"])
         if isinstance(clean.get("alt_text"), str):
-            clean["alt_text"] = sanitize_block_text(clean["alt_text"])
+            clean["alt_text"] = sanitize_block_text(clean["alt_text"], block_type="caption")
         if isinstance(clean.get("long_description"), str):
-            clean["long_description"] = sanitize_block_text(clean["long_description"])
+            clean["long_description"] = sanitize_block_text(
+                clean["long_description"], block_type="paragraph"
+            )
 
         if block_type == "list" and isinstance(clean.get("items"), list):
-            clean["items"] = [sanitize_block_text(str(item)) for item in clean["items"]]
+            clean["items"] = [
+                sanitize_block_text(str(item), block_type="list_item")
+                for item in clean["items"]
+            ]
 
         if block_type == "table" and isinstance(clean.get("rows"), list):
             rows: list[list[str]] = []
             for row in clean["rows"]:
                 if not isinstance(row, list):
                     continue
-                rows.append([sanitize_block_text(str(cell)) for cell in row])
+                rows.append([
+                    sanitize_block_text(str(cell), block_type="table_cell")
+                    for cell in row
+                ])
             clean["rows"] = rows
             if rows and not isinstance(clean.get("table_ast"), dict):
                 clean["table_ast"] = _table_ast_from_rows(rows)
@@ -459,7 +475,7 @@ def _sanitize_table_ast(raw: dict[str, Any]) -> dict[str, Any]:
 
     caption = raw.get("caption")
     if isinstance(caption, str) and caption.strip():
-        table_ast["caption"] = sanitize_block_text(caption)
+        table_ast["caption"] = sanitize_block_text(caption, block_type="caption")
 
     for section_name in ("header", "body", "footer"):
         section = raw.get(section_name)
@@ -476,7 +492,9 @@ def _sanitize_table_ast(raw: dict[str, Any]) -> dict[str, Any]:
             for cell in cells:
                 if not isinstance(cell, dict) or "text" not in cell:
                     continue
-                text = sanitize_block_text(str(cell.get("text", "")))
+                text = sanitize_block_text(
+                    str(cell.get("text", "")), block_type="table_cell"
+                )
                 normalized_cell: dict[str, Any] = {"text": text}
                 if isinstance(cell.get("header"), bool):
                     normalized_cell["header"] = cell["header"]

@@ -48,12 +48,39 @@ def sanitize_text(text: str) -> str:
     return cleaned.strip()
 
 
+def normalize_prose_tabs(text: str) -> str:
+    """Collapse whitespace runs containing a TAB, preserving all other text.
+
+    Only horizontal spaces adjoining TABs are included; line breaks and runs
+    of ordinary spaces without a TAB keep their original form. This does not
+    strip Markdown or numbering from already-canonical title metadata.
+    """
+    return re.sub(
+        r"[ \t]+",
+        lambda match: " " if "\t" in match.group(0) else match.group(0),
+        text,
+    )
+
+
+def sanitize_title_text(text: str) -> str:
+    """Sanitize a title without stripping Markdown or list numbering.
+
+    Titles are not prose blocks: a leading ``1.`` or ``#`` is content, not a
+    list/heading artifact. Control characters and prompt leaks are removed by
+    :func:`sanitize_text`; TAB runs are normalized like prose.
+    """
+    return normalize_prose_tabs(sanitize_text(text))
+
+
 def sanitize_block_text(text: str, block_type: str | None = None) -> str:
     if not text:
         return ""
     if block_type == "code":
         return text.replace("\r\n", "\n").replace("\r", "\n")
     cleaned = sanitize_text(text)
+    # Extraction providers can use TABs as word separators in prose (#338).
+    # Code returns above so indentation remains intact.
+    cleaned = normalize_prose_tabs(cleaned)
     cleaned = re.sub(r"(?<!`)`([^`]+)`(?!`)", r"\1", cleaned)
     cleaned = re.sub(r"\*\*(.+?)\*\*", r"\1", cleaned)
     cleaned = re.sub(r"(?<!\*)\*(?!\s)(.+?)(?<!\s)\*(?!\*)", r"\1", cleaned)
