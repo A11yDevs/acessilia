@@ -141,8 +141,13 @@ def obter_info_token(token: str) -> dict | None:
         separator = "" if suffix.startswith("_") else "."
         file_path = output_dir / f"{base}{separator}{suffix}"
         if file_path.exists():
-            size_kb = file_path.stat().st_size / 1024
-            size_str = f"{size_kb:.0f} KB" if size_kb < 1024 else f"{size_kb / 1024:.1f} MB"
+            size_bytes = file_path.stat().st_size
+            if size_bytes < 1024:
+                size_str = f"{size_bytes} B"
+            elif size_bytes < 1024 * 1024:
+                size_str = f"{size_bytes / 1024:.0f} KB"
+            else:
+                size_str = f"{size_bytes / (1024 * 1024):.1f} MB"
             formats.append({
                 "ext": ext,
                 "label": label,

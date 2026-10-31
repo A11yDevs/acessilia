@@ -157,3 +157,29 @@ def test_cleanup_only_removes_expired_owned_subdirectories(tmp_path, location):
     asyncio.run(token_service.limpar_tokens_expirados())
 
     assert output.exists() == (location != "owned")
+
+
+@pytest.mark.parametrize(
+    ("size_bytes", "expected"),
+    [
+        (0, "0 B"),
+        (116, "116 B"),
+        (500, "500 B"),
+        (1023, "1023 B"),
+        (1024, "1 KB"),
+        (1024 * 1024 - 1, "1024 KB"),
+        (1024 * 1024, "1.0 MB"),
+        (1536 * 1024, "1.5 MB"),
+    ],
+)
+def test_download_sizes_preserve_bytes_below_one_kilobyte(tmp_path, size_bytes, expected):
+    output_dir = tmp_path / "output" / "small-file"
+    output_dir.mkdir(parents=True)
+    (output_dir / "doc.txt").write_bytes(b"x" * size_bytes)
+    token = asyncio.run(token_service.criar_token(output_dir, "doc", formats=["txt"]))
+
+    info = asyncio.run(token_service.obter_info_token(token))
+
+    assert info is not None
+    assert len(info["formats"]) == 1
+    assert info["formats"][0]["size"] == expected
