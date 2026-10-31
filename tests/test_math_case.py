@@ -220,3 +220,52 @@ def test_the_scorecard_says_which_outputs_it_scored():
     assert txt_only.summary()["outputs"] == ["txt"]
     assert both.summary()["outputs"] == ["txt", "pdf_ua"]
     assert "| Outputs scored | txt, pdf_ua |" in both.to_markdown()
+
+
+@pytest.mark.parametrize("continuation", ["paragraph", "table"])
+def test_numbered_list_continues_across_item_content(continuation):
+    document = _document([
+        _block("l1", "list", 2, ordered=True, items=["First item"]),
+        _block("content", continuation, 2, text="Content of the first item"),
+        _block("l2", "list", 2, ordered=True, start=2, items=["Second item"]),
+    ])
+    card = math_case.score_case([], {"structure": EXPECTATIONS["structure"]}, document, txt="")
+    check = next(c for c in card.structure if c.id == "ordered-list:p2")
+    assert check.passed, check.detail
+
+
+@pytest.mark.parametrize("next_fields", [
+    {"ordered": True},
+    {"ordered": True, "start": 3},
+    {"ordered": False, "start": 2},
+    {"ordered": True, "start": 2, "numbering": "lower-alpha"},
+])
+def test_list_content_does_not_join_an_unrelated_list(next_fields):
+    blocks = [
+        _block("l1", "list", 2, ordered=True, items=["First item"]),
+        _block("p", "paragraph", 2, text="After the list"),
+        _block("l2", "list", 2, items=["Unrelated item"], **next_fields),
+    ]
+    assert len(math_case._list_runs(blocks, 2)) == 2
+
+
+@pytest.mark.parametrize("boundary,page", [("heading", 2), ("paragraph", 3)])
+def test_numbered_list_continuation_stops_at_a_heading_or_page(boundary, page):
+    blocks = [
+        _block("l1", "list", 2, ordered=True, items=["First item"]),
+        _block("boundary", boundary, page, text="New section or page"),
+        _block("l2", "list", 2, ordered=True, start=2, items=["Second item"]),
+    ]
+    assert len(math_case._list_runs(blocks, 2)) == 2
+
+
+def test_explicit_continuation_follows_multiple_legacy_item_blocks():
+    blocks = [
+        _block("l1", "list", 2, ordered=True, items=["First"]),
+        _block("l2", "list", 2, ordered=True, items=["Second"]),
+        _block("t", "table", 2),
+        _block("l3", "list", 2, ordered=True, start=3, items=["Third"]),
+    ]
+    assert math_case._list_runs(blocks, 2) == [
+        {"ordered": True, "items": ["First", "Second", "Third"]}
+    ]

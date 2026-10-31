@@ -2,11 +2,17 @@
 import json
 import re
 
-from backend.pipeline.pandoc_ast_builder import build_pandoc_ast, degrade_math_to_text
-from docstruct.canonical import _enrich_math_blocks, build_canonical_document, sanitize_canonical_document
+import pytest
+from docstruct.canonical import (
+    _enrich_math_blocks,
+    build_canonical_document,
+    sanitize_canonical_document,
+)
 from docstruct.export.html import document_to_html
 from docstruct.export.txt import document_to_txt_lines
 from docstruct.text.math_spans import block_prose
+
+from backend.pipeline.pandoc_ast_builder import build_pandoc_ast, degrade_math_to_text
 
 MATHML = '<math xmlns="http://www.w3.org/1998/Math/MathML"><mi>h</mi></math>'
 FRACTION = r"\frac{s(3+h)-s(3)}{(3+h)-3}"
@@ -136,7 +142,7 @@ def test_txt_reads_the_cells_math():
 
     assert "h not equal to zero" in text
     assert "mean speed a fraction" in text
-    assert "minus zero point zero eight three three (approximately)" in text
+    assert "-0,0833 (approximately)" in text
     assert "$" not in text
 
 
@@ -194,7 +200,7 @@ def test_sanitized_canonical_document_still_renders_the_cells_math():
 def test_txt_without_enrichment_drops_the_delimiters():
     text = "\n".join(document_to_txt_lines(_document(_table())))
 
-    assert "-0{,}0833 (approximately)" in text
+    assert "-0,0833 (approximately)" in text
     assert "$" not in text
 
 
@@ -203,3 +209,15 @@ def test_table_from_rows_also_renders_math():
 
     assert '<span role="math">-2</span>' in document_to_html(_document(block))
     assert "$" not in "\n".join(document_to_txt_lines(_document(block)))
+
+
+@pytest.mark.parametrize("source,expected", [
+    ("-0{,}0833", "-0,0833"), ("- 0 , 0833", "-0,0833"),
+    ("\u22120,0833", "\u22120,0833"), ("+1.25", "+1.25"), ("42", "42"),
+])
+def test_txt_keeps_numeric_cell_values_and_signs(source, expected):
+    block = _table(inline_math=[{"source": source, "latex": source, "speech": "spoken value"}])
+    block["table_ast"]["body"][0]["cells"][1]["text"] = f"${source}$ (approximately)"
+    text = "\n".join(document_to_txt_lines(_document(block)))
+    assert f"{expected} (approximately)" in text
+    assert "spoken value" not in text

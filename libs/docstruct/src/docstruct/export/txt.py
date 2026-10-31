@@ -5,6 +5,7 @@ stays in the backend; this module produces the lines only.
 """
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from docstruct.blocks.lists import item_label, list_numbering, list_start
@@ -121,5 +122,17 @@ def _spoken_table(block: dict[str, Any]) -> dict[str, Any]:
     return {**block, "table_ast": table_ast}
 
 
+# Plain numeric literals already have a readable text representation. Keep
+# their signs and digits (including decimal commas) instead of replacing data
+# with verbalizer prose. Expressions still use their enriched speech.
+_NUMERIC_LITERAL = re.compile(
+    r"\s*([+\-\u2212]?)\s*(\d+)(?:\s*(?:([.,])|\{([.,])\})\s*(\d+))?\s*"
+)
+
+
 def _spoken(entry: dict[str, Any], source: str) -> str:
+    literal = _NUMERIC_LITERAL.fullmatch(source)
+    if literal:
+        sign, integer, separator, braced_separator, fraction = literal.groups()
+        return sign + integer + ((separator or braced_separator) + fraction if fraction else "")
     return str(entry.get("speech") or entry.get("latex") or source)

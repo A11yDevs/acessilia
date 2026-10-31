@@ -82,7 +82,10 @@ The PDDL domain lives under `backend/core/planning/domains/`. The JSON schemas (
 - [backend/pipeline/validators.py](../backend/pipeline/validators.py): validates schema, heading hierarchy, links, and output text; `audit_canonical_document` classifies structural and accessibility issues as `BLOCKER` or `WARNING`.
 - [backend/export/pandoc_exporter.py](../backend/export/pandoc_exporter.py): single export coordinator for validation, filtering, AST build, and renderer dispatch; acts as a deterministic gatekeeper that halts export when the audit returns any `BLOCKER`.
 - [backend/export/renderers/](../backend/export/renderers/): renderers for TXT and HTML (DOCX and PDF/UA render on the Toolbox).
+
 - [backend/export/exporters/](../backend/export/exporters/): the export adapters called by the worker, including `audio_exporter.py`, which produces the MP3 via edge-tts, and `pdf_exporter.py`, which produces the PDF/UA, the only PDF. [backend/tools/pdf_ua_audit.py](../backend/tools/pdf_ua_audit.py) audits it with veraPDF on the Toolbox (`pdf.validate.pdf_ua`) for the result e-mail.
+
+List item structure takes precedence over inherited callout metadata in the PDDL payload. TXT renders numeric inline literals as signed digits, while expressions retain enriched speech; HTML and PDF/UA keep their math rendering.
 
 ---
 
