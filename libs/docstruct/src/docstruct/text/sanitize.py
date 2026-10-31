@@ -62,6 +62,16 @@ def normalize_prose_tabs(text: str) -> str:
     )
 
 
+def sanitize_title_text(text: str) -> str:
+    """Sanitize a title without stripping Markdown or list numbering.
+
+    Titles are not prose blocks: a leading ``1.`` or ``#`` is content, not a
+    list/heading artifact. Control characters and prompt leaks are removed by
+    :func:`sanitize_text`; TAB runs are normalized like prose.
+    """
+    return normalize_prose_tabs(sanitize_text(text))
+
+
 def sanitize_block_text(text: str, block_type: str | None = None) -> str:
     if not text:
         return ""

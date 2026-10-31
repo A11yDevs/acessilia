@@ -52,9 +52,9 @@ def _source_type(source_path: str) -> str:
     return ""
 
 
-from docstruct.text.sanitize import normalize_prose_tabs
 from docstruct.text.sanitize import sanitize_block_text
 from docstruct.text.sanitize import sanitize_text
+from docstruct.text.sanitize import sanitize_title_text
 from docstruct.blocks.parser import parse_text_to_blocks
 from docstruct.tables.ast import raw_rows_from_table_ast
 from docstruct.text.math_spans import block_prose
@@ -387,7 +387,7 @@ def sanitize_canonical_document(
 ) -> dict[str, Any]:
     sanitized = deepcopy(document)
     if isinstance(sanitized.get("title"), str):
-        sanitized["title"] = normalize_prose_tabs(sanitized["title"])
+        sanitized["title"] = sanitize_title_text(sanitized["title"])
     sections = sanitized.get("sections", [])
     if isinstance(sections, list):
         sanitized["sections"] = _sanitize_sections(sections)
@@ -399,7 +399,7 @@ def _sanitize_sections(sections: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for section in sections:
         clean_section = deepcopy(section)
         if isinstance(clean_section.get("title"), str):
-            clean_section["title"] = normalize_prose_tabs(clean_section["title"])
+            clean_section["title"] = sanitize_title_text(clean_section["title"])
         blocks = clean_section.get("blocks", [])
         if isinstance(blocks, list):
             clean_section["blocks"] = _sanitize_structured_blocks(blocks)
@@ -419,13 +419,16 @@ def _sanitize_structured_blocks(
         block_type = clean.get("type")
 
         if isinstance(clean.get("text"), str) and block_type != "code":
-            clean["text"] = sanitize_block_text(
-                clean["text"],
-                block_type=block_type,
-            )
+            if block_type == "heading":
+                clean["text"] = sanitize_title_text(clean["text"])
+            else:
+                clean["text"] = sanitize_block_text(
+                    clean["text"],
+                    block_type=block_type,
+                )
 
         if isinstance(clean.get("title"), str):
-            clean["title"] = sanitize_block_text(clean["title"], block_type="heading")
+            clean["title"] = sanitize_title_text(clean["title"])
         if isinstance(clean.get("alt_text"), str):
             clean["alt_text"] = sanitize_block_text(clean["alt_text"], block_type="caption")
         if isinstance(clean.get("long_description"), str):
