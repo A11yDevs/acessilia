@@ -9,6 +9,8 @@ ended in error.
 
 from __future__ import annotations
 
+import io
+
 from PIL import Image
 
 from backend.agents.pddl_orchestrator import _PICTURE_MAX_SIDE, _extract_picture_bytes
@@ -53,3 +55,9 @@ def test_a_large_standalone_image_is_rendered_below_the_pixel_limit(
     assert image is not None
     assert image.startswith(b"\x89PNG")
     assert fake_toolbox_render.parameters[-1]["max_side"] == _PICTURE_MAX_SIDE
+
+    with Image.open(io.BytesIO(image)) as rendered:
+        longest_side = max(rendered.size)
+    assert longest_side <= _PICTURE_MAX_SIDE
+    # The renderer scales the crop to the bound and rounds the other side.
+    assert longest_side >= _PICTURE_MAX_SIDE - 1
