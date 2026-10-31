@@ -524,6 +524,7 @@ async def test_context_overflow_retries_full_page_with_smaller_image_and_token_c
 
     from backend.agents.run_helpers import AgentRunError
     from backend.config.settings import settings
+    from backend.i18n import reset_request_locale, set_request_locale
     from backend.tools.logger import logger
 
     vision_module, calls, budgets = _context_retry_vision(
@@ -555,11 +556,13 @@ async def test_context_overflow_retries_full_page_with_smaller_image_and_token_c
         logger.add(critical.append, level="CRITICAL", format="{message}"),
     ]
     image = _png_bytes(400, 240)
+    token = set_request_locale("en_US")
     try:
         result = await vision_module.VisionAgent().describe_region(
             image, "full_page_image", page_num=14, total_pages=14
         )
     finally:
+        reset_request_locale(token)
         for sink in sinks:
             logger.remove(sink)
 
@@ -616,6 +619,7 @@ async def test_context_overflow_is_critical_only_after_the_smaller_request_fails
 ):
     from backend.agents.run_helpers import AgentRunError
     from backend.config.settings import settings
+    from backend.i18n import reset_request_locale, set_request_locale
     from backend.tools.logger import logger
 
     error = AgentRunError("model run failed: maximum context length exceeded")
@@ -632,11 +636,13 @@ async def test_context_overflow_is_critical_only_after_the_smaller_request_fails
         ),
         logger.add(critical.append, level="CRITICAL", format="{message}"),
     ]
+    token = set_request_locale("en_US")
     try:
         result = await vision_module.VisionAgent().describe_region(
             _png_bytes(400, 240), "full_page_image", page_num=11, total_pages=14
         )
     finally:
+        reset_request_locale(token)
         for sink in sinks:
             logger.remove(sink)
 
