@@ -419,7 +419,7 @@ def _sanitize_structured_blocks(
         block_type = clean.get("type")
 
         if isinstance(clean.get("text"), str) and block_type != "code":
-            if block_type == "heading":
+            if block_type in {"heading", "title"}:
                 clean["text"] = sanitize_title_text(clean["text"])
             else:
                 clean["text"] = sanitize_block_text(
