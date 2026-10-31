@@ -40,6 +40,11 @@ CORE_EXPECT_BUILD_INFO=1 \
 uv run pytest -m e2e -v
 ```
 
+O `tests/test_core_api_e2e.py` só é pulado enquanto `CORE_BASE_URL` não estiver
+definido. Depois de definido, um core inalcançável ou um `/health` doente
+reprovam a execução: uma suíte pulada não pode passar durante uma indisponibilidade
+real. Um job que não chega a estado terminal é cancelado ao fim da espera.
+
 Alguns testes E2E usam o corpus opcional do
 [A11yDevs/acessilia-dataset](https://github.com/A11yDevs/acessilia-dataset).
 Ele é um clone separado, ignorado pelo Git, colocado em `tests/dataset/`; use

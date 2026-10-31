@@ -23,6 +23,7 @@ import re
 import time
 import zipfile
 from pathlib import Path
+from xml.etree import ElementTree
 
 import httpx
 import pytest
@@ -55,14 +56,21 @@ def _require_core() -> str:
 
 @pytest.fixture(scope="module")
 def client() -> httpx.Client:
+    """A client for the configured core; an unhealthy one is a failure.
+
+    ``CORE_BASE_URL`` is the switch that turns this suite on, so only its
+    absence skips. Once an environment is configured, a connection error or an
+    unhealthy ``/health`` is exactly what this smoke test exists to report.
+    """
     base = _require_core()
     with httpx.Client(base_url=base, timeout=60.0) as http:
         try:
             response = http.get("/health")
         except httpx.HTTPError as exc:
-            pytest.skip(f"Core API is not reachable at {base}: {exc}")
-        if response.status_code != 200:
-            pytest.skip(f"Core API health returned {response.status_code} at {base}")
+            pytest.fail(f"Core API is not reachable at {base}: {exc!r}")
+        assert response.status_code == 200, (
+            f"Core API health returned {response.status_code} at {base}: {response.text}"
+        )
         yield http
 
 
@@ -97,19 +105,47 @@ def _upload(
     return response
 
 
+def _cancel_job(client: httpx.Client, task_id: str, token: str) -> None:
+    """Best-effort cancellation of a job the suite stopped waiting for.
+
+    A ``202`` already put real work on the server, and a stuck extraction can
+    hold the only worker slot (#339). The request is short and never replaces
+    the error that ended the wait; the suite does not wait for ``cancelled``.
+    """
+    try:
+        client.post(
+            f"/jobs/{task_id}/cancel",
+            headers={"X-Job-Token": token},
+            timeout=10.0,
+        )
+    except httpx.HTTPError:
+        pass
+
+
 def _poll(client: httpx.Client, task_id: str, token: str) -> dict:
-    """Wait for a terminal job state; fail with the last status on timeout."""
+    """Wait for a terminal job state; cancel it if the wait does not end.
+
+    A deadline, a failed status request or an interrupted test all leave the
+    job running on the server, so the cleanup runs for every exit that did not
+    observe a terminal state.
+    """
     headers = {"X-Job-Token": token}
     deadline = time.monotonic() + JOB_TIMEOUT
     last: dict = {}
-    while time.monotonic() < deadline:
-        response = client.get(f"/jobs/{task_id}", headers=headers)
-        assert response.status_code == 200, response.text
-        last = response.json()
-        if last.get("status") in {"done", "error", "cancelled"}:
-            return last
-        time.sleep(2)
-    pytest.fail(f"Job {task_id} did not finish in {JOB_TIMEOUT:.0f}s: {last}")
+    terminal = False
+    try:
+        while time.monotonic() < deadline:
+            response = client.get(f"/jobs/{task_id}", headers=headers)
+            assert response.status_code == 200, response.text
+            last = response.json()
+            if last.get("status") in {"done", "error", "cancelled"}:
+                terminal = True
+                return last
+            time.sleep(2)
+        pytest.fail(f"Job {task_id} did not finish in {JOB_TIMEOUT:.0f}s: {last}")
+    finally:
+        if not terminal:
+            _cancel_job(client, task_id, token)
 
 
 def _make_untitled_pdf(path: Path) -> None:
@@ -301,6 +337,17 @@ def test_untitled_document_uses_the_uploaded_filename_as_title(
     assert title is not None
     assert title.group(1).strip() == completed_job["stem"]
     assert not _UUID.match(title.group(1).strip())
+
+    docx = client.get(f"/download/{token}/docx")
+    assert docx.status_code == 200, docx.text
+    with zipfile.ZipFile(io.BytesIO(docx.content)) as archive:
+        core = ElementTree.fromstring(archive.read("docProps/core.xml"))
+    docx_titles = [
+        element.text
+        for element in core.iter()
+        if element.tag.rsplit("}", 1)[-1] == "title"
+    ]
+    assert docx_titles == [completed_job["stem"]], docx_titles
 
     pymupdf = pytest.importorskip("pymupdf")
     pdf = client.get(f"/download/{token}/pdf_ua")

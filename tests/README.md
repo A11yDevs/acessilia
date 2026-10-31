@@ -40,6 +40,11 @@ CORE_EXPECT_BUILD_INFO=1 \
 uv run pytest -m e2e -v
 ```
 
+`tests/test_core_api_e2e.py` skips only while `CORE_BASE_URL` is unset. Once it
+is set, an unreachable core or an unhealthy `/health` fails the run: a skipped
+suite must not pass during a real outage. A job left without a terminal state
+is cancelled at the end of the wait.
+
 Some E2E tests need the optional corpus from
 [A11yDevs/acessilia-dataset](https://github.com/A11yDevs/acessilia-dataset).
 It is a separate clone, ignored by Git, placed at `tests/dataset/`; point
