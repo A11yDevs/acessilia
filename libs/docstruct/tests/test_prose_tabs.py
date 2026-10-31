@@ -47,6 +47,7 @@ def test_canonical_titles_only_normalize_tabs(title, expected):
     assert text == expected
 
 
+@pytest.mark.parametrize("block_type", ["heading", "title"])
 @pytest.mark.parametrize(
     ("title", "expected"),
     [
@@ -62,12 +63,12 @@ def test_canonical_titles_only_normalize_tabs(title, expected):
         ("Title\t", "Title"),
     ],
 )
-def test_block_titles_only_normalize_tabs(title, expected):
+def test_block_titles_only_normalize_tabs(title, expected, block_type):
     document = {
         "title": "Document",
         "sections": [{
             "title": "Section",
-            "blocks": [{"type": "heading", "title": title, "text": title}],
+            "blocks": [{"type": block_type, "title": title, "text": title}],
         }],
     }
 
