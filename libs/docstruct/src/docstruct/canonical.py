@@ -52,6 +52,7 @@ def _source_type(source_path: str) -> str:
     return ""
 
 
+from docstruct.text.sanitize import normalize_prose_tabs
 from docstruct.text.sanitize import sanitize_block_text
 from docstruct.text.sanitize import sanitize_text
 from docstruct.blocks.parser import parse_text_to_blocks
@@ -386,9 +387,7 @@ def sanitize_canonical_document(
 ) -> dict[str, Any]:
     sanitized = deepcopy(document)
     if isinstance(sanitized.get("title"), str):
-        sanitized["title"] = sanitize_block_text(
-            sanitized["title"], block_type="heading"
-        )
+        sanitized["title"] = normalize_prose_tabs(sanitized["title"])
     sections = sanitized.get("sections", [])
     if isinstance(sections, list):
         sanitized["sections"] = _sanitize_sections(sections)
@@ -400,9 +399,7 @@ def _sanitize_sections(sections: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for section in sections:
         clean_section = deepcopy(section)
         if isinstance(clean_section.get("title"), str):
-            clean_section["title"] = sanitize_block_text(
-                clean_section["title"], block_type="heading"
-            )
+            clean_section["title"] = normalize_prose_tabs(clean_section["title"])
         blocks = clean_section.get("blocks", [])
         if isinstance(blocks, list):
             clean_section["blocks"] = _sanitize_structured_blocks(blocks)
