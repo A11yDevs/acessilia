@@ -186,6 +186,8 @@ async def job_status(request: Request, task_id: str):
         criado_em=job.get("inicio"),
         fim=job.get("fim"),
         email_delivery=job.get("email_delivery"),
+        cancellation_requested_at=job.get("cancellation_requested_at"),
+        cancellation_elapsed_seconds=job.get("cancellation_elapsed_seconds"),
     )
 
 
@@ -205,5 +207,7 @@ async def cancel_job(request: Request, task_id: str):
             detail=t(API_CANCEL_STATE_INVALID).format(status=job["status"]),
         )
     status = await get_job_status_async(task_id)
+    # Acknowledge only after cancelling + request timestamp are durable, even
+    # while a shielded extraction is still running. The sync helper is live-only.
     await run_blocking(save_status, task_id, status)
     return CancelResponse(task_id=task_id, status=status["status"])

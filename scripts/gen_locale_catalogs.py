@@ -305,6 +305,7 @@ from backend.pipeline.table_ast import (
 )
 from backend.stage_messages import (
     STAGE_CANCELLATION_REQUESTED,
+    STAGE_CANCELLATION_WAITING,
     STAGE_RESTART_CANCELLED,
     STAGE_RESTART_INTERRUPTED,
     STAGE_RESTART_RESUBMIT,
@@ -514,6 +515,7 @@ MESSAGES: tuple[str, ...] = (
     WEB_JOB_HOME,
     WEB_JOB_EMAIL_UNKNOWN,
     STAGE_CANCELLATION_REQUESTED,
+    STAGE_CANCELLATION_WAITING,
     STAGE_RESTART_CANCELLED,
     STAGE_RESTART_INTERRUPTED,
     STAGE_RESTART_RESUBMIT,
@@ -979,6 +981,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             'Não foi possível enviar o e-mail sobre esta falha; os avisos abaixo mostram o que aconteceu.'
         ),
         STAGE_CANCELLATION_REQUESTED: 'Cancelamento solicitado; concluindo a operação atual com segurança',
+        STAGE_CANCELLATION_WAITING: 'Cancelamento solicitado há {seconds}s; aguardando a operação atual terminar com segurança',
         STAGE_RESTART_CANCELLED: 'Cancelado durante a reinicialização',
         STAGE_RESTART_INTERRUPTED: 'Processamento interrompido pela reinicialização',
         STAGE_RESTART_RESUBMIT: 'Processamento interrompido pela reinicialização; envie novamente',

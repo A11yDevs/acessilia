@@ -74,6 +74,9 @@ async def test_active_cancel_interrupts_pipeline_and_advances_queue(isolated_run
         assert response.status_code == 200
         assert response.json()["status"] in {"cancelling", "cancelled"}
         await asyncio.wait_for(advanced.wait(), 2)
+        async with asyncio.timeout(2):
+            while "active" in queue._active_tasks:
+                await asyncio.sleep(0.01)
         assert manager.obter("active")["status"] == "cancelled"
         assert job_store.load_record("active")["status"]["status"] == "cancelled"
         assert not source.exists()
@@ -116,9 +119,13 @@ async def test_thread_operation_finishes_before_cancel_cleanup(isolated_runtime,
         assert worker.cancel_job_status("thread-job")
         assert manager.obter("thread-job")["status"] == "cancelling"
         assert manager.obter("thread-job")["fim"] is None
-        assert not advanced.is_set()
-        release.set()
         await asyncio.wait_for(advanced.wait(), 2)
+        assert manager.obter("thread-job")["status"] == "cancelling"
+        assert not destination.exists()
+        release.set()
+        async with asyncio.timeout(2):
+            while "thread-job" in queue._active_tasks:
+                await asyncio.sleep(0.01)
         assert not destination.exists()
         assert manager.obter("thread-job")["status"] == "cancelled"
     finally:
@@ -326,9 +333,15 @@ async def test_restart_finishes_requested_cancellation(isolated_runtime, tmp_pat
     path = tmp_path / "cancelled.pdf"
     path.write_bytes(b"%PDF")
     job_store.save_request("cancel-restart", "secret", {"file_path": str(path)},
-        {"task_id": "cancel-restart", "status": "cancelling"})
+        {"task_id": "cancel-restart", "status": "cancelling",
+         "cancellation_requested_at": 100, "cancellation_elapsed_seconds": 10})
     await worker.recover_pending_jobs()
-    assert job_store.load_record("cancel-restart")["status"]["status"] == "cancelled"
+    status = job_store.load_record("cancel-restart")["status"]
+    assert status["status"] == "cancelled"
+    assert status["cancellation_requested_at"] == 100
+    recovered = await worker.get_job_status_async("cancel-restart")
+    assert recovered["cancellation_requested_at"] == 100
+    assert "cancellation_elapsed_seconds" not in recovered
     assert not path.exists()
     assert isolated_runtime[0].qsize() == 0
 

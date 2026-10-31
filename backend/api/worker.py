@@ -37,6 +37,7 @@ from backend.stage_messages import (
     STAGE_RESTART_RESUBMIT,
     STAGE_PENDING_UPLOAD_MISSING,
     STAGE_CANCELLED_IN_QUEUE,
+    STAGE_CANCELLATION_WAITING,
     STAGE_AUDITING_PDF_UA,
     STAGE_CANCELLED_BY_USER,
     STAGE_EXPORTING_DOCX,
@@ -158,16 +159,27 @@ def register_queued_job(
     }
 
 
+def _cancellation_progress(status: dict[str, Any]) -> dict[str, Any]:
+    status = dict(status)
+    requested = status.get("cancellation_requested_at")
+    status.pop("cancellation_elapsed_seconds", None)
+    if status.get("status") == "cancelling" and requested is not None:
+        elapsed = max(0, int(time.time() - requested))
+        status["cancellation_elapsed_seconds"] = elapsed
+        status["etapa_atual"] = t(STAGE_CANCELLATION_WAITING).format(seconds=elapsed)
+    return status
+
+
 def get_job_status(task_id: str, *, durable: bool = True) -> dict[str, Any] | None:
     task = state_manager.obter(task_id)
     if task is not None:
-        return dict(task)
+        return _cancellation_progress(task)
     queued = queued_jobs.get(task_id)
     if not queued:
         if not durable:
             return None
         record = load_record(task_id)
-        return record["status"] if record else None
+        return _cancellation_progress(record["status"]) if record else None
     status = dict(queued)
     if status.get("status") == "queued":
         from backend.services.queue_service import unified_queue
@@ -175,7 +187,7 @@ def get_job_status(task_id: str, *, durable: bool = True) -> dict[str, Any] | No
         position = unified_queue.get_position(task_id)
         if position > 0:
             status["etapa_atual"] = t(STAGE_QUEUE_WAITING_POSITION).format(position=position)
-    return status
+    return _cancellation_progress(status)
 
 
 async def get_job_status_async(task_id: str) -> dict[str, Any] | None:
@@ -189,7 +201,7 @@ async def get_job_status_async(task_id: str) -> dict[str, Any] | None:
     if status.get("email_delivery") == "pending":
         # No in-memory task owns delivery after a restart.
         status["email_delivery"] = "unknown"
-    return status
+    return _cancellation_progress(status)
 
 
 def cancel_job_status(task_id: str) -> bool:
