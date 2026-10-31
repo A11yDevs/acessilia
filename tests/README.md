@@ -6,7 +6,7 @@ The project's unit test suite covers the canonical pipeline, PDDL engine, API an
 
 By constitution, the gate is the container: tests must pass inside Docker (production equivalent) before a merge. The native run is secondary verification.
 
-Issue #342 regressions cover numbered items inside callouts, list continuations across paragraphs and tables with explicit consecutive numbering, and signed numeric table cells in TXT. The math scorecard keeps separate lists when numbering restarts, changes style, skips a number, or crosses a heading or page.
+Issue #342 regressions cover list continuations across paragraphs and tables with explicit consecutive numbering. The math scorecard separates runs at changes of source parent without matching continuation numbering, explicit restarts, style changes, numbering gaps, headings, page boundaries, and blocks other than paragraphs, tables or formulas. Legacy adjacent blocks without parent metadata retain their grouping. TXT/MP3 continue to use enriched speech under ADR-0011; use the current dataset expectations, which accept the spoken negative sign.
 
 ## Running
 

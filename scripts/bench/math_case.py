@@ -479,13 +479,16 @@ def _list_runs(blocks: list[dict[str, Any]], page: int) -> list[dict[str, Any]]:
     Extraction can split a list around an item's formula, paragraph or table,
     and give the next run a different parent. Across prose or tables, only an
     explicit matching next number and style establish continuation. A heading
-    or page boundary always ends a run; a numbering restart starts a new one.
+    or page boundary always ends a run. Explicit restarts and changes of source
+    parent without matching continuation numbering start separate runs.
+    Legacy blocks without parent metadata retain adjacency-based grouping.
     """
     runs: list[dict[str, Any]] = []
     current: dict[str, Any] | None = None
     interrupted = False
     expected_start = 1
     numbering = "decimal"
+    previous_parent = None
     for block in blocks:
         kind = block.get("type")
         if _page(block) != page or kind == "heading":
@@ -496,6 +499,7 @@ def _list_runs(blocks: list[dict[str, Any]], page: int) -> list[dict[str, Any]]:
             ordered = bool(block.get("ordered"))
             style = block.get("numbering", "decimal")
             start = block.get("start", 1)
+            parent = (block.get("metadata") or {}).get("parent_id")
             explicit_continuation = (
                 current is not None and current["ordered"] and ordered
                 and style == numbering and "start" in block and start == expected_start
@@ -506,17 +510,25 @@ def _list_runs(blocks: list[dict[str, Any]], page: int) -> list[dict[str, Any]]:
                 current["ordered"] != ordered or style != numbering
             ) or (
                 "start" in block and start != expected_start
+            ) or (
+                parent != previous_parent and not explicit_continuation
             )
             if new_run:
                 current = {"ordered": ordered, "items": []}
                 runs.append(current)
             items = [str(i) for i in block.get("items") or [] if isinstance(i, str)]
             current["items"].extend(items)
-            expected_start = (start if new_run or "start" in block else expected_start) + len(items)
+            if new_run or "start" in block:
+                expected_start = start
+            expected_start += len(items)
+            previous_parent = parent
             numbering = style
             interrupted = False
-        elif kind != "math":
+        elif kind in {"paragraph", "table"}:
             interrupted = True
+        elif kind != "math":
+            current = None
+            interrupted = False
     return runs
 
 

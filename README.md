@@ -19,8 +19,6 @@ The project follows the *Domain → Application → Interface* layering:
 
 The **API** (`http://localhost:8000`) is the core: it receives files, enqueues them, processes them with LLMs, exports the accessible formats (TXT, DOCX, PDF/UA, HTML, MP3, ZIP), and makes downloads available via a token. All frontends (web, Telegram, CLI) consume it over HTTP using the shared client `frontend.clients.api_client.ApiClient`.
 
-TXT keeps numeric inline math as signed digits (for example, `-0,0833`); other inline formulas use their spoken form. List items retain their numbering inside callouts.
-
 Main endpoints (`/api/v1`):
 
 | Method | Route | Description |

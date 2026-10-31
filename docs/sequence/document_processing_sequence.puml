@@ -45,10 +45,6 @@ note over Orchestrator, Toolbox
 end note
 
 Orchestrator -> Builder: build_canonical_document()
-note over Orchestrator, Builder
-  List items retain their structure inside callouts.
-  TXT keeps numeric inline values as signed digits.
-end note
 Builder --> Orchestrator: validated canonical document
 
 Orchestrator -> Export: render formats

@@ -19,8 +19,6 @@ O projeto segue a camada *Domínio → Aplicação → Interface*:
 
 A **API** (`http://localhost:8000`) é o núcleo: recebe o arquivo, coloca na fila, processa com o LLM, exporta os formatos acessíveis (TXT, DOCX, PDF/UA, HTML, MP3, ZIP) e disponibiliza o download via token. Os frontends (web, Telegram, CLI) consomem tudo por HTTP usando o cliente compartilhado `frontend.clients.api_client.ApiClient`.
 
-O TXT mantém números em matemática inline como algarismos com sinal (por exemplo, `-0,0833`); outras fórmulas inline usam sua forma falada. Itens de lista preservam a numeração dentro de notas.
-
 Principais endpoints (`/api/v1`):
 
 | Método | Rota | Descrição |

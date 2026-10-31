@@ -5899,8 +5899,6 @@ def _element_to_block(
     if (
         callout_id
         and callout_role != "title"
-        # A callout can contain a list; its items keep their numbering.
-        and element.type != "list_item"
         and metadata.get("slide_role") not in {"slide_heading", "deck_title"}
     ):
         block.update(

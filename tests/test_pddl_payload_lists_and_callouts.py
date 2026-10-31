@@ -428,17 +428,3 @@ def test_markdown_numbers_items_by_their_position() -> None:
     with_gap = {**ORDERED, "items": ["b", "", "d"]}
 
     assert "2. b\n4. d" in document_to_markdown(_document(with_gap))
-
-
-@pytest.mark.parametrize("callout_type", ["note", "warning"])
-def test_list_items_keep_their_structure_inside_a_callout(callout_type: str) -> None:
-    blocks = _blocks([
-        _item(index, text, f"{index}.", "remarks", callout_id="callout-1",
-              callout_role="content", callout_type=callout_type)
-        for index, text in enumerate(["First remark", "Second remark", "Third remark"], 1)
-    ])
-
-    assert [block["type"] for block in blocks] == ["list"]
-    assert blocks[0]["ordered"] is True
-    assert blocks[0]["items"] == ["First remark", "Second remark", "Third remark"]
-    assert blocks[0]["metadata"]["callout_id"] == "callout-1"

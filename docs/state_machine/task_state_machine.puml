@@ -34,9 +34,4 @@ note bottom of processing
   o histórico de transições de modelos (Ollama <-> OpenRouter).
 end note
 
-note bottom of processing
-  List items keep numbering inside callouts.
-  TXT keeps signed numeric inline values.
-end note
-
 @enduml

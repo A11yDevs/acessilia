@@ -269,3 +269,38 @@ def test_explicit_continuation_follows_multiple_legacy_item_blocks():
     assert math_case._list_runs(blocks, 2) == [
         {"ordered": True, "items": ["First", "Second", "Third"]}
     ]
+
+
+@pytest.mark.parametrize("second_start", [None, 1])
+def test_adjacent_lists_with_different_parents_do_not_hide_a_restart(second_start):
+    second = _block("l2", "list", 2, ordered=True, items=["C"],
+                    metadata={"parent_id": "second-list"})
+    if second_start is not None:
+        second["start"] = second_start
+    blocks = [
+        _block("l1", "list", 2, ordered=True, items=["A", "B"],
+               metadata={"parent_id": "first-list"}),
+        second,
+    ]
+    assert [run["items"] for run in math_case._list_runs(blocks, 2)] == [["A", "B"], ["C"]]
+
+
+@pytest.mark.parametrize("content", [None, "math", "paragraph", "table"])
+def test_explicit_continuation_can_change_source_parent(content):
+    blocks = [_block("l1", "list", 2, ordered=True, items=["A"],
+                     metadata={"parent_id": "first-list"})]
+    if content:
+        blocks.append(_block("content", content, 2))
+    blocks.append(_block("l2", "list", 2, ordered=True, start=2, items=["B"],
+                         metadata={"parent_id": "second-list"}))
+    assert [run["items"] for run in math_case._list_runs(blocks, 2)] == [["A", "B"]]
+
+
+@pytest.mark.parametrize("boundary", ["code", "image", "note", "warning", "details", "quote", "unknown"])
+def test_non_item_content_ends_a_list_run(boundary):
+    blocks = [
+        _block("l1", "list", 2, ordered=True, items=["A"]),
+        _block("boundary", boundary, 2),
+        _block("l2", "list", 2, ordered=True, start=2, items=["B"]),
+    ]
+    assert [run["items"] for run in math_case._list_runs(blocks, 2)] == [["A"], ["B"]]
