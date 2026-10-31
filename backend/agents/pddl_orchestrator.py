@@ -4660,6 +4660,14 @@ def _rows_look_like_placeholder(rows: list[list[str]]) -> bool:
     return rows[0][0].strip().lower() == "tabela detectada"
 
 
+#: Longest side of a picture crop sent to the vision model. The render runs at
+#: 160 dpi and the Toolbox refuses more than 20 MP, so an unbounded crop of a
+#: large standalone image (its page is sized in pixels) is rejected before the
+#: model sees it. Bounding the side keeps every source renderable, and the
+#: vision model's 8192-token slot would downscale it further anyway.
+_PICTURE_MAX_SIDE = 2000
+
+
 def _extract_picture_bytes(
     source_file: Path,
     element: ManifestElement,
@@ -4683,7 +4691,8 @@ def _extract_picture_bytes(
 
     def render(clip=None, origin: ClipOrigin = "TOPLEFT") -> RenderedPage:
         return _toolbox_render(
-            source_file, page_number, media_type=media_type, dpi=160, clip=clip,
+            source_file, page_number, media_type=media_type, dpi=160,
+            max_side=_PICTURE_MAX_SIDE, clip=clip,
             clip_origin=origin, artifact_id=artifact_id,
         )
 
