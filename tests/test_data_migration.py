@@ -62,7 +62,7 @@ def test_dry_run_preserves_source_and_creates_no_destination(legacy, capsys):
     assert migration.main(["--source-var", str(source), "--destination-var", str(destination)]) == 0
     report = json.loads(capsys.readouterr().out)
     assert report["mode"] == "dry-run"
-    assert report["rows"]["download_tokens"] == {"retained": 1, "excluded": 0}
+    assert report["rows"]["download_tokens"] == {"retained": 1, "excluded": 0, "invalid_timestamps": 0}
     assert not destination.exists()
     assert before == {str(p.relative_to(source)): p.read_bytes() for p in source.rglob("*") if p.is_file()}
 
@@ -84,7 +84,7 @@ def test_apply_filters_by_token_expiry_not_file_mtime_and_keeps_dependencies(leg
     (source / "data/output/orphan/new.txt").write_text("unreferenced")
     report = migration.migrate(source, destination, apply=True, at=NOW)
     assert report["files_to_copy"] == 4
-    assert report["rows"]["download_tokens"] == {"retained": 1, "excluded": 1}
+    assert report["rows"]["download_tokens"] == {"retained": 1, "excluded": 1, "invalid_timestamps": 0}
     token = rows(destination, "download_tokens")[0]
     assert token["token"] == "keep-secret"
     assert token["owner"] == "owner@example.test"
@@ -171,6 +171,106 @@ def test_old_schema_without_optional_token_columns_is_supported(legacy):
     token = rows(destination, "download_tokens")[0]
     assert (token["owner"], token["task_id"], token["formats"]) == ("", "", "[]")
     assert (destination / "data/output/job/document.pdf").exists()
+
+
+@pytest.mark.parametrize("apply", [False, True])
+@pytest.mark.parametrize("status", ["queued", "processing", "cancelling"])
+@pytest.mark.parametrize("days", [2, 10 / (24 * 60)])
+def test_orphaned_history_is_reported_and_only_repaired_in_destination(legacy, apply, status, days):
+    source, destination = legacy
+    asset(source)
+    history(source, task_id="orphan", days=days, status=status)
+    insert(source, "UPDATE conversoes SET concluido_em=NULL WHERE task_id='orphan'")
+    insert(source, "INSERT INTO ocr_raw (task_id, page_number, text) VALUES ('orphan', 1, 'recognized')")
+    before = (source / "data/history.db").read_bytes()
+
+    report = migration.migrate(source, destination, apply=apply, at=NOW)
+
+    assert report["rows"]["conversoes"] == {
+        "retained": 1, "excluded": 0, "invalid_timestamps": 0, "interrupted": 1,
+    }
+    assert (source / "data/history.db").read_bytes() == before
+    assert rows(source, "conversoes")[0]["status"] == status
+    if apply:
+        repaired = rows(destination, "conversoes")[0]
+        assert repaired["status"] == "error"
+        assert repaired["erro"] == "Stale: process interrupted"
+        assert repaired["criado_em"] == migration.sql_timestamp(NOW - timedelta(days=days))
+        assert repaired["concluido_em"] == migration.sql_timestamp(NOW)
+        assert rows(destination, "download_tokens")[0]["token"] == "keep-secret"
+        assert rows(destination, "ocr_raw")[0]["task_id"] == "orphan"
+        assert rows(destination, "api_jobs") == []
+        assert migration.verify(destination)["verified"]
+    else:
+        assert not destination.exists()
+
+
+@pytest.mark.parametrize("apply", [False, True])
+@pytest.mark.parametrize("value", [None, "", "0000-invalid", "2020-01-01-invalid", 123])
+def test_ineligible_token_dates_are_excluded_without_breaking_live_links(legacy, apply, value):
+    source, destination = legacy
+    asset(source)
+    asset(source, token="invalid-secret", directory="data/output/invalid", task_id="invalid")
+    insert(source, "UPDATE download_tokens SET criado_em=? WHERE token='invalid-secret'", (value,))
+    with sqlite3.connect(source / "data/history.db") as conn:
+        # Exercise the actual legacy column predicate, including SQL NULL.
+        assert not conn.execute(
+            "SELECT criado_em >= datetime(?, '-7 days') FROM download_tokens WHERE token='invalid-secret'",
+            (migration.sql_timestamp(NOW),),
+        ).fetchone()[0]
+    before = (source / "data/history.db").read_bytes()
+
+    report = migration.migrate(source, destination, apply=apply, at=NOW)
+
+    assert report["rows"]["download_tokens"] == {"retained": 1, "excluded": 1, "invalid_timestamps": 1}
+    assert (source / "data/history.db").read_bytes() == before
+    if apply:
+        assert [row["token"] for row in rows(destination, "download_tokens")] == ["keep-secret"]
+        assert not (destination / "data/output/invalid").exists()
+    else:
+        assert not destination.exists()
+
+
+@pytest.mark.parametrize("apply", [False, True])
+@pytest.mark.parametrize("value", [None, "not-a-date"])
+def test_unreferenced_invalid_history_dates_are_counted_and_excluded(legacy, apply, value):
+    source, destination = legacy
+    asset(source)
+    history(source, task_id="invalid")
+    insert(source, "UPDATE conversoes SET criado_em=? WHERE task_id='invalid'", (value,))
+    insert(source, "INSERT INTO ocr_raw (task_id, page_number, text) VALUES ('invalid', 1, 'recognized')")
+    report = migration.migrate(source, destination, apply=apply, at=NOW)
+    assert report["rows"]["conversoes"] == {
+        "retained": 0, "excluded": 1, "invalid_timestamps": 1, "interrupted": 0,
+    }
+    if apply:
+        assert rows(destination, "conversoes") == []
+        assert rows(destination, "ocr_raw") == []
+
+
+@pytest.mark.parametrize("value", [None, "not-a-date"])
+def test_invalid_history_supporting_a_live_download_still_blocks_publication(legacy, value):
+    source, destination = legacy
+    asset(source)
+    history(source)
+    insert(source, "UPDATE conversoes SET criado_em=?", (value,))
+    with pytest.raises(migration.MigrationError, match="history with an invalid timestamp"):
+        migration.migrate(source, destination, apply=True, at=NOW)
+    assert not destination.exists()
+
+
+def test_invalid_date_accepted_by_legacy_sql_is_not_silently_discarded(legacy):
+    source, destination = legacy
+    asset(source)
+    insert(source, "UPDATE download_tokens SET criado_em='not-a-date'")
+    with sqlite3.connect(source / "data/history.db") as conn:
+        assert conn.execute(
+            "SELECT criado_em >= datetime(?, '-7 days') FROM download_tokens",
+            (migration.sql_timestamp(NOW),),
+        ).fetchone()[0] == 1
+    with pytest.raises(migration.MigrationError, match="source expiry predicate"):
+        migration.migrate(source, destination, apply=True, at=NOW)
+    assert not destination.exists()
 
 
 @pytest.mark.parametrize("change", ["missing-file", "symlink-file", "symlink-directory", "escape", "filename", "formats",

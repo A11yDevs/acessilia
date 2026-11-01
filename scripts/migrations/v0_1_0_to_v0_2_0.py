@@ -147,12 +147,29 @@ def _read_tables(snapshot: sqlite3.Connection) -> dict[str, list[dict]]:
 
 
 def _select(tables: dict, source: Path, source_runtime: Path, destination_runtime: Path,
-            now: datetime) -> tuple[dict, dict]:
+            now: datetime) -> tuple[dict, dict, dict]:
     cutoff = now - timedelta(days=RETENTION_DAYS)
     selected = {table: [] for table in TABLES}
     files = {}
+    adjustments = {
+        "download_tokens": {"invalid_timestamps": 0},
+        "conversoes": {"invalid_timestamps": 0, "interrupted": 0},
+    }
     for number, token in enumerate(tables["download_tokens"], 1):
-        created = timestamp(token["criado_em"])
+        try:
+            created = timestamp(token["criado_em"])
+        except MigrationError as exc:
+            # The runtime uses a textual SQL comparison, not date parsing.
+            # NULL/old invalid dates cannot yield a live link, but strings such
+            # as "not-a-date" can: do not silently remove an accessible token.
+            with closing(sqlite3.connect(":memory:")) as conn:
+                eligible = conn.execute(
+                    "SELECT ? >= datetime(?)", (token["criado_em"], sql_timestamp(cutoff)),
+                ).fetchone()[0]
+            if eligible:
+                raise MigrationError("Invalid timestamp on a download accepted by the source expiry predicate; investigate a working copy.") from exc
+            adjustments["download_tokens"]["invalid_timestamps"] += 1
+            continue
         if created > now:
             raise MigrationError("A download timestamp is in the future; check the source clock.")
         if created < cutoff:
@@ -193,17 +210,33 @@ def _select(tables: dict, source: Path, source_runtime: Path, destination_runtim
         })
     referenced = {row["task_id"] for row in selected["download_tokens"] if row["task_id"]}
     for row in tables["conversoes"]:
-        created = timestamp(row["criado_em"])
+        linked = row["task_id"] in referenced
+        try:
+            created = timestamp(row["criado_em"])
+        except MigrationError as exc:
+            if linked:
+                raise MigrationError("A retained download references history with an invalid timestamp; investigate a working copy.") from exc
+            adjustments["conversoes"]["invalid_timestamps"] += 1
+            continue
         if created > now:
             raise MigrationError("A history timestamp is in the future; check the source clock.")
-        if created >= cutoff or row["task_id"] in referenced:
+        if created >= cutoff or linked:
             if row["status"] not in {"done", "error", "cancelled"}:
-                raise MigrationError("History has nonterminal jobs to migrate; drain processing before applying.")
+                if linked:
+                    raise MigrationError("A retained download references nonterminal history; investigate a working copy.")
+                if row["status"] not in {"queued", "processing", "cancelling"}:
+                    raise MigrationError("A retained history row has an unsupported status.")
+                # Source writers must be stopped. An unfinished, unreferenced
+                # row is interrupted history, not a request to resume work.
+                # Repair only the exported row; keep the rollback source intact.
+                row = {**row, "status": "error", "erro": "Stale: process interrupted",
+                       "concluido_em": sql_timestamp(now)}
+                adjustments["conversoes"]["interrupted"] += 1
             selected["conversoes"].append(row)
     task_ids = referenced | {row["task_id"] for row in selected["conversoes"]}
     for table in TABLES[2:]:
         selected[table] = [row for row in tables[table] if row["task_id"] in task_ids]
-    return selected, files
+    return selected, files, adjustments
 
 
 def _write_database(path: Path, selected: dict, now: datetime) -> None:
@@ -249,7 +282,7 @@ def migrate(source_var: Path, destination_var: Path, *, apply: bool = False,
     signature = _database_signature(database)
     with closing(_snapshot(database)) as snapshot:
         tables = _read_tables(snapshot)
-    selected, files = _select(tables, source, source_runtime_var, destination_runtime_var, now)
+    selected, files, adjustments = _select(tables, source, source_runtime_var, destination_runtime_var, now)
     if _database_signature(database) != signature:
         raise MigrationError("The source database changed; stop the application and retry.")
     summary = {
@@ -258,7 +291,8 @@ def migrate(source_var: Path, destination_var: Path, *, apply: bool = False,
         "as_of_utc": sql_timestamp(now),
         "retention_days": RETENTION_DAYS,
         "cutoff_utc": sql_timestamp(now - timedelta(days=RETENTION_DAYS)),
-        "rows": {table: {"retained": len(selected[table]), "excluded": len(tables[table]) - len(selected[table])}
+        "rows": {table: {"retained": len(selected[table]), "excluded": len(tables[table]) - len(selected[table]),
+                         **adjustments.get(table, {})}
                  for table in TABLES},
         "files_to_copy": len(files),
         "file_bytes_to_copy": sum(item["bytes"] for item in files.values()),
