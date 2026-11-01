@@ -1,6 +1,6 @@
 # Production preparation, activation and updater
 
-Português: [production-systemd.pt-br.md](production-systemd.pt-br.md).
+Brazilian Portuguese: [production-systemd.pt-br.md](production-systemd.pt-br.md).
 
 Production configuration and data must be reviewed before the 0.1.0 → 0.2.0
 migration. Passing `docker compose config` validates configuration, not model
