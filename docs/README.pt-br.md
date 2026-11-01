@@ -27,6 +27,7 @@ O sistema opera com o motor de pipeline `pddl` (o fluxo manifest → plan → ex
 14. [Registros de Decisão Arquitetural](adr/README.pt-br.md) — decisões que atravessam componentes (responsabilidades, execução remota, contratos, referências de artefatos, disponibilidade, modelo do manifesto e conversão para MathML e verbalização de fórmulas) e como propor uma nova. (English: [English version](adr/README.md))
 15. [Auditoria de arquitetura, outubro de 2026](architecture/audit-2026-10.pt-br.md) — o que ainda está implementado duas vezes entre os componentes, as dependências operacionais restantes, as proteções arquiteturais e as métricas iniciais, com dono e destino para cada achado. (English: [English version](architecture/audit-2026-10.md))
 16. [Inventário do modelo do processing manifest](architecture/manifest-model-inventory.pt-br.md) — cada classe e campo do manifesto classificados em documento, origem, processo e envelope, com os invariantes e as diferenças entre as cópias do core e da Toolbox (#203, etapa 5). (English: [English version](architecture/manifest-model-inventory.md))
+17. [Migração dos dados do core, 0.1.0 para 0.2.0](data-migration-0.1.0-to-0.2.0.pt-br.md) — preservação de downloads não expirados e seus registros, com simulação, adaptação de caminhos, verificação por checksums e rollback. (English: [English version](data-migration-0.1.0-to-0.2.0.md))
 
 ---
 

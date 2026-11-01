@@ -110,6 +110,12 @@ systemctl --user enable --now acessilia-production-update.timer
 
 ## Promocao de release
 
+Para a passagem de 0.1.0 para 0.2.0, siga primeiro a
+[migracao versionada de dados](data-migration-0.1.0-to-0.2.0.pt-br.md).
+Ela preserva downloads ainda validos na janela original de sete dias, adapta
+caminhos e registros e publica um novo diretorio de dados sem alterar a origem.
+Conclua simulacao, aplicacao e verificacao antes de iniciar a nova versao.
+
 Depois que o PR `release/x.y.z` for mesclado em `main`, aguarde o workflow de CI
 e Delivery publicar a imagem `main`. Em seguida, execute uma atualizacao manual
 ou aguarde o timer:
