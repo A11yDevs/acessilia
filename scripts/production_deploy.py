@@ -103,7 +103,8 @@ def check_config(config: dict, directory: Path, *, require_data: bool) -> str:
         raise ValueError("The runtime bind must reference this deployment's var directory")
     if require_data and not (directory / "var").is_dir():
         raise ValueError("Runtime var is missing; migrate and verify data before activation")
-    for key in ("MODEL_CALL_TIMEOUT_SECONDS", "DATA_AGENT_TIMEOUT_SECONDS"):
+    # Covers the environment Toolbox's 120 s slot wait + 2700 s gateway call.
+    for key in ("MODEL_CALL_TIMEOUT_SECONDS", "DATA_AGENT_TIMEOUT_SECONDS", "TOOLBOX_TIMEOUT_SECONDS"):
         if int(environment.get(key, "0")) < 3000:
             raise ValueError(f"{key} must cover the Toolbox/gateway timeout chain (at least 3000 s)")
     if service.get("container_name") != "acessilia-production" or config.get("name") != "production":

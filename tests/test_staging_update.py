@@ -333,7 +333,11 @@ exit 0
     assert "compose -f docker-compose.staging.yml up -d --no-deps acessilia" in docker_calls
 
 
-@pytest.mark.parametrize("mode", ["success", "pinned", "unhealthy", "github-down", "wrong-revision", "wrong-image"])
+@pytest.mark.parametrize("mode", [
+    "success", "pinned", "unhealthy", "compose-failed", "github-down", "wrong-revision", "wrong-image",
+    "cached", "cached-vlm-down", "cached-drift", "cached-stopped", "cached-missing-status",
+    "cached-wrong-sha", "cached-bad-digest", "cached-other-branch",
+])
 def test_production_update_accepts_only_verified_healthy_commit_images(tmp_path, mode):
     production_dir = tmp_path / "production"
     scripts_dir = tmp_path / "scripts"
@@ -346,6 +350,15 @@ def test_production_update_accepts_only_verified_healthy_commit_images(tmp_path,
     status = production_dir / "var/data/production-status.json"
     cache.write_text("previous")
     status.write_text('{"previous":true}')
+    if mode.startswith("cached"):
+        cache.write_text(("develop " if mode == "cached-other-branch" else "main ") + "a" * 40)
+        status.write_text(json.dumps({
+            "running_sha": "c" * 40 if mode == "cached-wrong-sha" else "a" * 40,
+            "running_digest": "invalid" if mode == "cached-bad-digest" else "sha256:" + "a" * 64,
+            "last_update": "2026-10-30T10:00:00Z", "last_check": "2026-10-30T10:00:00Z",
+        }))
+        if mode == "cached-missing-status":
+            status.unlink()
     pin = "ghcr.io/a11ydevs/acessilia@sha256:" + "a" * 64
     (production_dir / ".deploy.env").write_text(
         "PRODUCTION_IMAGE=" + (pin if mode == "pinned" else "") + "\n"
@@ -359,6 +372,7 @@ def test_production_update_accepts_only_verified_healthy_commit_images(tmp_path,
         "API_HOST": "0.0.0.0", "API_PORT": "8000",
         "TEMP_DIR": "/app/var/temp", "DATA_DIR": "/app/var/data", "LOGS_DIR": "/app/var/logs",
         "MODEL_CALL_TIMEOUT_SECONDS": "3000", "DATA_AGENT_TIMEOUT_SECONDS": "3600",
+        "TOOLBOX_TIMEOUT_SECONDS": "3600",
     }
     service["volumes"][0]["source"] = str(production_dir / "var")
     (production_dir / "resolved.json").write_text(json.dumps(compose))
@@ -377,22 +391,31 @@ root = pathlib.Path(os.environ["DEPLOY_DIR"])
 with (root / "docker-args.txt").open("a") as output:
     output.write(" ".join(args) + "\n")
 mode = os.environ["TEST_MODE"]
+started = (root / "started").exists()
 if args[0] == "compose" and "config" in args:
     config = json.loads((root / "resolved.json").read_text())
     config["services"]["acessilia"]["image"] = os.environ.get("PRODUCTION_IMAGE") or "ghcr.io/a11ydevs/acessilia:main"
     print(json.dumps(config))
+elif args[0] == "compose" and "up" in args:
+    (root / "started").touch()
+    sys.exit(1 if mode == "compose-failed" else 0)
 elif args[:2] == ["image", "inspect"]:
     if "org.opencontainers.image.revision" in args[-1]:
         print("wrong" if mode == "wrong-revision" else "a" * 40)
     elif args[-1] == "{{.Id}}":
         print("sha256:" + "b" * 64)
     else:
-        print("[ghcr.io/a11ydevs/acessilia@sha256:" + "a" * 64 + "]")
+        digest = "c" if args[2] == "sha256:" + "c" * 64 else "a"
+        print("[ghcr.io/a11ydevs/acessilia@sha256:" + digest * 64 + "]")
 elif args[0] == "inspect":
-    print("sha256:" + ("c" if mode == "wrong-image" else "b") * 64)
+    if args[-1] == "{{.State.Running}}":
+        print("false" if mode == "cached-stopped" and not started else "true")
+    else:
+        changed = mode == "wrong-image" or (mode in {"cached-drift", "unhealthy"} and not started)
+        print("sha256:" + ("c" if changed else "b") * 64)
 elif args[0] == "exec":
     sys.stdin.read()
-    sys.exit(1 if mode == "unhealthy" else 0)
+    sys.exit(1 if mode in {"unhealthy", "cached-vlm-down"} else 0)
 """)
     env = os.environ | {"PATH": f"{bin_dir}:{os.environ['PATH']}",
                        "PRODUCTION_DIR": str(production_dir), "TEST_MODE": mode}
@@ -401,7 +424,20 @@ elif args[0] == "exec":
                             capture_output=True, text=True)
     calls_file = production_dir / "docker-args.txt"
     calls = calls_file.read_text() if calls_file.exists() else ""
-    if mode == "success":
+    if mode in {"cached", "cached-vlm-down"}:
+        assert result.returncode == 0, result.stderr
+        assert "pull " not in calls
+        assert "manifest inspect" not in calls
+        assert "up -d" not in calls
+        assert "exec " not in calls
+        assert calls.count("config --format json") == 1
+        assert "Novo commit detectado" not in result.stdout
+        assert cache.read_text() == "main " + "a" * 40
+        current_status = json.loads(status.read_text())
+        assert current_status["last_update"] == "2026-10-30T10:00:00Z"
+        assert current_status["last_check"] != "2026-10-30T10:00:00Z"
+        assert current_status["running_digest"] == "sha256:" + "a" * 64
+    elif mode == "success" or mode.startswith("cached"):
         assert result.returncode == 0, result.stderr
         assert "/commits/main" in (production_dir / "curl-args.txt").read_text()
         assert "pull ghcr.io/a11ydevs/acessilia:sha-aaaaaaa" in calls
@@ -417,6 +453,13 @@ elif args[0] == "exec":
         if mode in {"pinned", "github-down"}:
             assert "pull " not in calls
             assert "up -d" not in calls
+        if mode in {"unhealthy", "compose-failed", "wrong-image"}:
+            assert "new image may already be serving traffic" in result.stderr
+            assert "manual rollback" in result.stderr
+            assert "Previous image ID: sha256:" in result.stderr
+            assert calls.count("up -d") == 1
+        if mode == "unhealthy":
+            assert "Previous image ID: sha256:" + "c" * 64 in result.stderr
 
 
 def test_setup_producao_help_is_available():

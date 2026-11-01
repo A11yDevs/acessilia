@@ -32,8 +32,10 @@ Os modelos estão em `deploy/production.runtime.env.example` e
 
 Edite os arquivos privadamente. `.env` contém apenas configurações da aplicação:
 preserve bot, SMTP, URLs públicas da API/downloads e observabilidade reais da
-produção antiga; `.env.example` é a referência completa. Configure
-`TOOLBOX_API_KEY` com a chave da Toolbox de produção. Os padrões selecionam fusão
+produção antiga; `.env.example` é a referência completa. Confira
+os endpoints que ainda usam `host.docker.internal` durante a transferência;
+o Compose de produção preserva o mapeamento `host-gateway` por compatibilidade.
+Configure `TOOLBOX_API_KEY` com a chave da Toolbox de produção. Os padrões selecionam fusão
 dual Docling/MinerU, execução PDDL e timeout de modelo de 3000 segundos.
 
 `.deploy.env` contém `PRODUCTION_IMAGE=ghcr.io/a11ydevs/acessilia@sha256:...`
@@ -71,6 +73,9 @@ python3 /opt/acessilia/core/ops/production_deploy.py check
 A verificação resolve o Compose sem imprimir credenciais e rejeita imagens
 mutáveis, variáveis de implantação na aplicação, chaves ausentes, execução
 simulada, caminhos/portas incompatíveis e timeouts insuficientes para o gateway.
+`MODEL_CALL_TIMEOUT_SECONDS`, `DATA_AGENT_TIMEOUT_SECONDS` e
+`TOOLBOX_TIMEOUT_SECONDS` devem ter pelo menos 3000 s, cobrindo a espera local
+de 120 s da Toolbox mais a chamada de 2700 s ao gateway.
 Medir picos de memória/CPU com documentos representativos em fusão dual antes
 de escolher limites. O core tem rotação dos logs Docker, prazo de parada de
 60 segundos e processo init; isso não implementa drenagem. Testar parada/reinício
@@ -102,6 +107,16 @@ HTTP 200 isoladamente não comprova prontidão do modelo. Completar com document
 real, interfaces/exportações, downloads preservados e rejeição de expirados.
 Evitar imprimir tokens ou o Compose completo com credenciais resolvidas.
 
+Essas verificações são **posteriores à inicialização, não bloqueiam previamente
+a troca de tráfego**. `up -d` substitui o container antigo antes de verificar
+as dependências. Se `--wait` ou `verify-running` falhar, a imagem nova pode
+continuar executando e atendendo tráfego. Manter as entradas bloqueadas durante
+o aceite da migração; parar o timer, inspecionar o container efetivo e executar
+o rollback manual abaixo quando necessário. O atualizador informa o ID da
+imagem anterior quando ativação/verificação falha. Não restaura automaticamente
+imagem ou dados: reverter somente a imagem pode ser incompatível com mudanças
+no banco ou novas escritas.
+
 ## Timer existente e rastreamento automático futuro
 
 Manter o timer de usuário desabilitado durante migração, aceite e fixação manual
@@ -125,11 +140,25 @@ dependências são verificadas antes de registrar sucesso em cache/status;
 imagens de rollback são preservadas. Seleção de branch e fallback da homologação
 continuam como antes.
 
+Quando branch/commit em cache ainda coincidem com GitHub, produção confere se
+o container está executando o digest registrado no último deploy aceito. Se
+coincidir, atualiza apenas `last_check`, preserva `last_update` e não baixa
+imagens, executa Compose `up` ou testa dependências. Uma indisponibilidade
+temporária da VLM não causa falha dessa checagem sem alterações; monitoramento
+de dependências permanece separado. Status ausente/inconsistente, container
+parado ou digest diferente levam ao fluxo completo. A consulta do commit GitHub
+continua em cada execução para detectar mudanças.
+
 Rastreamento automático futuro exige limpar explicitamente `PRODUCTION_IMAGE`,
 manter `TRACK_BRANCH=main` revisada, ambiente e rede válidos e uma política de
 drenagem/manutenção. O atualizador não drena jobs nem coordena migrações. Não
 reativá-lo apenas porque o PR foi mesclado ou o BHS terminou; promoção de
 produção e mudança da branch de homologação são operações separadas.
+
+O workflow `Production deployment validation` executa as suítes completas do
+core, docstruct e SDK dentro da imagem de execução quando seus filtros de
+arquivos de implantação correspondem, ou por disparo manual. Não executa em
+todo PR. O CI normal continua executando as suítes em todos os PRs suportados.
 
 ## Rollback
 

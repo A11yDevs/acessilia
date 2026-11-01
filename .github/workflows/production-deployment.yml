@@ -45,6 +45,10 @@ jobs:
               assert service['environment']['ENABLED_INTERFACES'] == 'api'
               assert 'echo "web"' not in service['healthcheck']['test'][1]
               assert 'GHCR_TOKEN' not in service['environment']
+              hosts = service['extra_hosts']
+              if isinstance(hosts, list):
+                  hosts = dict(entry.split('=' if '=' in entry else ':', 1) for entry in hosts)
+              assert hosts['host.docker.internal'] == 'host-gateway'
               deploy.check_config(config, directory, require_data=False)
               assert not (directory / 'var').exists()
           PY

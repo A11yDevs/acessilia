@@ -125,12 +125,41 @@ _start_container() {
     local helper
     helper="$(cd "$(dirname "$0")" && pwd)/production_deploy.py"
     python3 "$helper" check --directory "$STAGING_DIR" --require-data
-    docker compose "${COMPOSE_ARGS[@]}" up -d --no-deps --wait \
-      --wait-timeout "${PRODUCTION_WAIT_TIMEOUT:-120}" acessilia
-    python3 "$helper" verify-running --image "$PRODUCTION_IMAGE" --container "$CONTAINER_NAME"
+    PREVIOUS_PRODUCTION_IMAGE=$(docker inspect "$CONTAINER_NAME" --format '{{.Image}}' 2>/dev/null || true)
+    if ! docker compose "${COMPOSE_ARGS[@]}" up -d --no-deps --wait \
+      --wait-timeout "${PRODUCTION_WAIT_TIMEOUT:-120}" acessilia; then
+      _production_activation_failed
+      return 1
+    fi
+    if ! python3 "$helper" verify-running --image "$PRODUCTION_IMAGE" --container "$CONTAINER_NAME"; then
+      _production_activation_failed
+      return 1
+    fi
   else
     docker compose "${COMPOSE_ARGS[@]}" up -d --no-deps acessilia
   fi
+}
+
+_production_activation_failed() {
+  echo "Production activation/verification failed; the new image may already be serving traffic." >&2
+  echo "Stop the production timer, inspect the running container and perform manual rollback if required." >&2
+  echo "Previous image ID: ${PREVIOUS_PRODUCTION_IMAGE:-unavailable}. No automatic rollback was performed." >&2
+}
+
+_production_already_current() {
+  # A cached commit alone cannot detect a manual image change or stopped container.
+  local accepted_digest running_id running_digest last_update
+  accepted_digest=$(jq -er --arg sha "$LATEST_SHA" \
+    'select(.running_sha == $sha) | .running_digest // empty' "$STATUS_FILE" 2>/dev/null) || return 1
+  [[ "$accepted_digest" =~ ^sha256:[a-f0-9]{64}$ ]] || return 1
+  [ "$(docker inspect "$CONTAINER_NAME" --format '{{.State.Running}}' 2>/dev/null)" = true ] || return 1
+  running_id=$(docker inspect "$CONTAINER_NAME" --format '{{.Image}}' 2>/dev/null) || return 1
+  [ -n "$running_id" ] || return 1
+  running_digest=$(_image_digest "$running_id")
+  [ "$running_digest" = "$accepted_digest" ] || return 1
+  last_update=$(jq -r '.last_update // ""' "$STATUS_FILE" 2>/dev/null) || return 1
+  _write_status "$LATEST_SHA" "$LATEST_SHA" "$last_update" "$accepted_digest" "$running_digest" || exit 1
+  echo "Production already runs the accepted commit/digest; no deployment or dependency probe needed."
 }
 
 # Digests for the status file. /api/v1/health compares the published digest
@@ -258,6 +287,9 @@ fi
 CACHE_KEY="$GITHUB_BRANCH $LATEST_SHA"
 if [ -f "$CACHE_FILE" ]; then
   CACHED_KEY=$(cat "$CACHE_FILE")
+  if [ "$CACHED_KEY" = "$CACHE_KEY" ] && [ "$DEPLOY_ENV" = production ] && _production_already_current; then
+    exit 0
+  fi
   if [ "$CACHED_KEY" = "$CACHE_KEY" ] && [ "$DEPLOY_ENV" != production ]; then
     # Record the running and published digests even when there is nothing to
     # update: /api/v1/health derives `up_to_date` from them, and leaving them
@@ -326,6 +358,7 @@ if [ "$DEPLOY_ENV" = production ]; then
   RUNNING_DIGEST=$(_image_digest "$RUNNING_ID")
   if [ "$RUNNING_DIGEST" != "$LATEST_DIGEST" ]; then
     echo "Running production digest differs; deployment was not accepted." >&2
+    _production_activation_failed
     exit 1
   fi
 else

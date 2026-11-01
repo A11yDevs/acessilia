@@ -80,6 +80,8 @@ def test_check_requires_verified_data_before_activation(config, tmp_path):
     ({"environment": {"TOOLBOX_API_KEY": ""}}, "Toolbox API key"),
     ({"environment": {"PDDL_EXECUTE_DRY_RUN": "true"}}, "DRY_RUN"),
     ({"environment": {"MODEL_CALL_TIMEOUT_SECONDS": "600"}}, "timeout chain"),
+    ({"environment": {"TOOLBOX_TIMEOUT_SECONDS": "2700"}}, "TOOLBOX_TIMEOUT_SECONDS"),
+    ({"environment": {"TOOLBOX_TIMEOUT_SECONDS": "2819"}}, "TOOLBOX_TIMEOUT_SECONDS"),
     ({"environment": {"DATA_DIR": "/tmp/data"}}, "DATA_DIR"),
     ({"environment": {"API_PORT": "9000"}}, "0.0.0.0:8000"),
 ])
@@ -97,6 +99,11 @@ def test_check_refuses_automatic_empty_volume_creation(config, tmp_path):
     config["services"]["acessilia"]["volumes"][0]["bind"]["create_host_path"] = True
     with pytest.raises(ValueError, match="empty data"):
         deploy.check_config(config, tmp_path, require_data=False)
+
+
+def test_check_accepts_toolbox_timeout_covering_gateway_wait(config, tmp_path):
+    config["services"]["acessilia"]["environment"]["TOOLBOX_TIMEOUT_SECONDS"] = "3000"
+    assert deploy.check_config(config, tmp_path, require_data=False) == PIN
 
 
 @pytest.mark.parametrize("ready, reachable, succeeds", [(True, True, True), (False, True, False), (True, False, False)])

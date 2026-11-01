@@ -19,6 +19,9 @@ services:
       AI_CLIENT: toolbox
       TOOLBOX_BASE_URL: ${PRODUCTION_TOOLBOX_BASE_URL:-http://toolbox-production:8002}
       TOOLBOX_BASE_URLS: ""
+    # Preserve legacy runtime endpoints that still address services on this host.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - toolbox
     init: true

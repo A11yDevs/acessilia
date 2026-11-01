@@ -34,6 +34,8 @@ The templates are `deploy/production.runtime.env.example` and
 Edit both files privately. `.env` contains only application settings: preserve
 the real production bot, SMTP, public API/download URLs and observability
 settings from the old environment, using `.env.example` as the full reference.
+Review endpoints that still use `host.docker.internal` when transferring settings;
+the production Compose preserves its `host-gateway` mapping for compatibility.
 Set `TOOLBOX_API_KEY` to the new production Toolbox's key. Its defaults enable
 dual Docling/MinerU fusion, PDDL execution and 3000-second model timeout.
 
@@ -71,7 +73,10 @@ python3 /opt/acessilia/core/ops/production_deploy.py check
 
 This resolves Compose without printing credentials and rejects mutable images,
 deployment variables in runtime, missing keys, dry-run execution, incompatible
-paths/ports or short gateway timeouts. Measure peak memory/CPU with representative
+paths/ports or short gateway timeouts. `MODEL_CALL_TIMEOUT_SECONDS`,
+`DATA_AGENT_TIMEOUT_SECONDS` and `TOOLBOX_TIMEOUT_SECONDS` must each be at least
+3000 s, covering the environment Toolbox's 120 s wait plus 2700 s gateway call.
+Measure peak memory/CPU with representative
 dual-fusion documents before choosing resource caps. Core has bounded Docker
 logs, a 60-second stop grace and an init process; none implements job draining.
 Test shutdown/restart in staging. Preserve image/configuration/automation backups
@@ -102,6 +107,15 @@ the container. HTTP 200 alone does not prove model readiness. Finish with a real
 document, all interfaces/exports, valid retained downloads and expired-token
 rejection. Avoid printing tokens or full resolved Compose output.
 
+These are **post-start checks, not a gate before traffic switches**. `up -d`
+replaces the old container before dependency verification. If `--wait` or
+`verify-running` fails, the new image may remain running and serving traffic.
+Keep ingress blocked during migration acceptance; stop the production timer,
+inspect the actual container and perform the manual rollback below when needed.
+The updater reports the previous image ID on activation/verification failure.
+It does not automatically restore that image or any data: reverting an image
+alone may be incompatible with database changes or new writes.
+
 ## Existing timer and future automatic tracking
 
 Keep the existing user timer disabled during migration, acceptance and manual
@@ -124,12 +138,26 @@ check its OCI revision and select its digest. They verify image/dependencies
 before recording cache/status success and preserve rollback images. Staging's
 existing branch selection and fallback behavior remain unchanged.
 
+When the cached branch/commit still matches GitHub, production checks that the
+container is running the digest recorded by the last accepted deployment. If it
+matches, the updater only refreshes `last_check`, preserves `last_update`, and
+does not pull, run Compose `up` or probe dependencies. A transient VLM outage
+therefore does not fail an unchanged deployment check; dependency monitoring
+remains separate. A missing/inconsistent status, stopped container or different
+running digest takes the full deployment path. The GitHub commit lookup still
+runs each tick to detect changes.
+
 Future automatic tracking requires explicitly clearing `PRODUCTION_IMAGE`,
 keeping reviewed `TRACK_BRANCH=main`, valid runtime settings and the shared
 network, and an operational drain/maintenance policy. The updater does not drain
 jobs or coordinate database migrations. Do not re-enable it merely because this
 PR merges or BHS ends; production promotion and staging branch switching are
 separate operations.
+
+The `Production deployment validation` workflow runs the complete core,
+docstruct and SDK suites inside the runtime image when its deployment-related
+path filters match, or via manual dispatch. It does not run on every PR. The
+regular CI workflow continues to run the suites on all supported PRs.
 
 ## Rollback
 
