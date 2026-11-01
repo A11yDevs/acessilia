@@ -18,7 +18,7 @@ The system runs the `pddl` pipeline engine (the manifest → plan → execution 
 5. [Endpoints & APIs](endpoints.md) — the REST API, the Web panel, and the AgentOS runtime.
 6. [Automated Test Suite](../tests/README.md) — test strategy and coverage.
 7. [Docker Compose](docker-compose.md) — local execution, GHCR images, staging and production update paths.
-8. [Production systemd timer](producao-systemd.md) — production setup, promotion and rollback procedure.
+8. [Production systemd timer](production-systemd.md) — production setup, promotion and rollback procedure.
 9. [Internationalization (i18n)](i18n.md) — what is localized, where the locale strings files live, and step-by-step guides for adding strings, internationalizing a file, and adding a new locale.
 10. [Benchmark harness](bench.md) — run and score the core on Dr.DocBench (and other datasets) with `python -m scripts.bench`.
 11. [Dr.DocBench benchmark](drbench.md) — structure-extraction provider benchmark (Docling vs MinerU), metrics and results.

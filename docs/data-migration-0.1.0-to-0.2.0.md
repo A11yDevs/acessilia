@@ -129,69 +129,17 @@ the database checksum afterward. It verifies local consistency, not proxy routin
 
 ## Switch Compose and the updater to the new directory
 
-Keep the timer disabled and the old container stopped. From the root of the
-approved 0.2.0 checkout, run as root to install the new Compose and updater
-scripts, and copy the original environment without moving the rollback source:
+Prepare the reviewed configuration **before** the offline migration, following
+[production preparation and activation](production-systemd.md). The setup script
+only prepares files, uses a separate `.deploy.env`, and never creates `core/var`.
+Preserve the real production runtime credentials and public routes; do not copy
+staging credentials or inject registry/update secrets into the application.
 
-```bash
-install -m 600 docker-compose.production.yml /opt/acessilia/core/docker-compose.production.yml
-install -m 600 /opt/acessilia/production/.env /opt/acessilia/core/.env
-chown --reference=/opt/acessilia/production /opt/acessilia/core/docker-compose.production.yml
-chown --reference=/opt/acessilia/production/.env /opt/acessilia/core/.env
-install -d -m 755 /opt/acessilia/scripts
-install -m 755 scripts/production-update.sh /opt/acessilia/scripts/production-update.sh
-install -m 755 scripts/staging-update.sh /opt/acessilia/scripts/staging-update.sh
-```
-
-Review `/opt/acessilia/core/.env` against the 0.2.0 example, configure the production
-Toolbox and `AI_CLIENT=toolbox`, and keep each setting declared only once. Set
-`COMPOSE_PROJECT_NAME=production` to retain MV1's existing project identity; use
-the recorded original project name on other platforms. For the standard
-production branch policy use `TRACK_BRANCH=main` and `TRACK_TAG=main`. Remove
-stale deployment-directory/cache/status overrides from the copied environment.
-Select the approved 0.2.0 image digest in the new Compose before starting it;
-`main` must not accidentally select the old release before promotion.
-
-As the existing production timer owner (`acessilia` on MV1), in a session with
-access to that user's systemd bus, create this override:
-
-```bash
-mkdir -p ~/.config/systemd/user/acessilia-production-update.service.d
-cat > ~/.config/systemd/user/acessilia-production-update.service.d/migrated-core.conf <<'UNIT'
-[Service]
-WorkingDirectory=/opt/acessilia/core
-ExecStart=
-ExecStart=/opt/acessilia/scripts/production-update.sh
-Environment=PRODUCTION_DIR=/opt/acessilia/core
-Environment=STAGING_UPDATE_CACHE=/opt/acessilia/core/var/data/.last_production_sha
-Environment=STAGING_STATUS_FILE=/opt/acessilia/core/var/data/production-status.json
-UNIT
-systemctl --user daemon-reload
-systemctl --user show acessilia-production-update.service -p DropInPaths
-```
-
-This changes both the updater's working directory and its deployment/cache/status
-paths. Repeated updates will use the new `.env` and `core/var`, rather than the
-old `production/var`. Keep the override with the deployment configuration backups.
-
-Back as root, start only the approved core from the new directory. The original
-container belongs to project `production`; retaining that name lets Compose
-recreate it with the new bind mount instead of creating a competing project:
-
-```bash
-cd /opt/acessilia/core
-docker compose -p production --env-file .env -f docker-compose.production.yml config --quiet
-docker compose -p production --env-file .env -f docker-compose.production.yml up -d --no-deps acessilia
-docker inspect acessilia-production --format '{{.Config.Image}}'
-docker inspect acessilia-production --format '{{range .Mounts}}{{println .Source "->" .Destination}}{{end}}'
-```
-
-Confirm the image is the approved one and the bind mount is
-`/opt/acessilia/core/var -> /app/var` before accepting traffic. Keep the timer
-disabled during acceptance and while the Compose image is pinned. If automatic
-`main` tracking is adopted later, restore its image interpolation and re-enable
-`acessilia-production-update.timer` as its owner only after acceptance; the
-directory override must remain in place.
+After applying and verifying migration and UID permissions, follow that guide's
+activation commands with `--env-file .deploy.env`, the approved image digest and
+project `production`. It also describes the new updater drop-in and readiness/
+model checks. Keep the timer disabled. Do not use the old installer to start
+`main` or manually create a runtime directory before migration.
 
 ## Acceptance and rollback
 

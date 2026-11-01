@@ -136,69 +136,17 @@ sem testar o roteamento do proxy.
 
 ## Apontar Compose e atualizador para o novo diretório
 
-Mantenha o timer desabilitado e o container antigo parado. Na raiz do checkout
-0.2.0 aprovado, execute como root para instalar o Compose e os scripts novos e
-copiar o ambiente original, preservando a origem para rollback:
+Preparar a configuração revisada **antes** da migração offline, seguindo
+[preparação e ativação de produção](production-systemd.pt-br.md). O instalador
+somente prepara arquivos, usa `.deploy.env` separado e não cria `core/var`.
+Preservar credenciais reais e rotas públicas de produção; não copiar credenciais
+da homologação nem injetar segredos de registro/atualização na aplicação.
 
-```bash
-install -m 600 docker-compose.production.yml /opt/acessilia/core/docker-compose.production.yml
-install -m 600 /opt/acessilia/production/.env /opt/acessilia/core/.env
-chown --reference=/opt/acessilia/production /opt/acessilia/core/docker-compose.production.yml
-chown --reference=/opt/acessilia/production/.env /opt/acessilia/core/.env
-install -d -m 755 /opt/acessilia/scripts
-install -m 755 scripts/production-update.sh /opt/acessilia/scripts/production-update.sh
-install -m 755 scripts/staging-update.sh /opt/acessilia/scripts/staging-update.sh
-```
-
-Revise `/opt/acessilia/core/.env` com o exemplo da 0.2.0, configure a Toolbox de
-produção e `AI_CLIENT=toolbox` e mantenha cada variável declarada uma única vez.
-Defina `COMPOSE_PROJECT_NAME=production` para conservar a identidade atual do
-projeto na MV1; em outras plataformas, use o nome original registrado. Para a
-política padrão de produção, use `TRACK_BRANCH=main` e `TRACK_TAG=main`. Remova
-do ambiente copiado sobrescritas antigas de diretório de implantação/cache/status.
-Selecione no Compose novo o digest da imagem 0.2.0 aprovada antes de iniciar;
-`main` não deve selecionar acidentalmente a versão antiga antes da promoção.
-
-Como o usuário do timer existente de produção (`acessilia` na MV1), numa sessão
-com acesso ao barramento systemd desse usuário, crie esta sobrescrita:
-
-```bash
-mkdir -p ~/.config/systemd/user/acessilia-production-update.service.d
-cat > ~/.config/systemd/user/acessilia-production-update.service.d/migrated-core.conf <<'UNIT'
-[Service]
-WorkingDirectory=/opt/acessilia/core
-ExecStart=
-ExecStart=/opt/acessilia/scripts/production-update.sh
-Environment=PRODUCTION_DIR=/opt/acessilia/core
-Environment=STAGING_UPDATE_CACHE=/opt/acessilia/core/var/data/.last_production_sha
-Environment=STAGING_STATUS_FILE=/opt/acessilia/core/var/data/production-status.json
-UNIT
-systemctl --user daemon-reload
-systemctl --user show acessilia-production-update.service -p DropInPaths
-```
-
-Isso altera o diretório de trabalho e os caminhos de implantação/cache/status
-do atualizador. Atualizações futuras usarão o `.env` novo e `core/var`, em vez
-do antigo `production/var`. Preserve a sobrescrita nos backups da configuração.
-
-De volta ao root, inicie somente o core aprovado a partir do diretório novo.
-O container original pertence ao projeto `production`; manter esse nome permite
-ao Compose recriá-lo com o novo volume, sem criar outro projeto concorrente:
-
-```bash
-cd /opt/acessilia/core
-docker compose -p production --env-file .env -f docker-compose.production.yml config --quiet
-docker compose -p production --env-file .env -f docker-compose.production.yml up -d --no-deps acessilia
-docker inspect acessilia-production --format '{{.Config.Image}}'
-docker inspect acessilia-production --format '{{range .Mounts}}{{println .Source "->" .Destination}}{{end}}'
-```
-
-Confira se a imagem é a aprovada e o volume corresponde a
-`/opt/acessilia/core/var -> /app/var` antes de aceitar tráfego. Mantenha o timer
-desabilitado durante o aceite e enquanto a imagem estiver fixada por digest.
-Se adotar atualização automática da `main` posteriormente, restaure a
-interpolação da imagem e reabilite `acessilia-production-update.timer` como seu
-usuário somente após o aceite; mantenha a sobrescrita do diretório.
+Após aplicar e verificar a migração e permissões de UID, seguir os comandos de
+ativação desse guia com `--env-file .deploy.env`, digest aprovado e projeto
+`production`. O guia descreve também o novo drop-in e as verificações de
+prontidão/modelo. Manter o timer desabilitado. Não usar o instalador antigo para
+iniciar `main` nem criar manualmente o diretório de dados antes da migração.
 
 ## Aceite e rollback
 

@@ -46,6 +46,14 @@ cd "$STAGING_DIR"
 DEPLOY_ENV="${DEPLOY_ENV:-staging}"
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.staging.yml}"
 CONTAINER_NAME="${CONTAINER_NAME:-acessilia-staging}"
+COMPOSE_ARGS=(-f "$COMPOSE_FILE")
+if [ "$DEPLOY_ENV" = production ]; then
+  if [ ! -f "$STAGING_DIR/.deploy.env" ]; then
+    echo "Production requires .deploy.env separate from runtime .env; keep the timer disabled." >&2
+    exit 1
+  fi
+  COMPOSE_ARGS=(-p production --env-file "$STAGING_DIR/.deploy.env" -f "$COMPOSE_FILE")
+fi
 GITHUB_REPO="A11yDevs/acessilia"
 # Cache e status ficam dentro do volume ./var (visivel ao container via /app/var)
 CACHE_FILE="${STAGING_UPDATE_CACHE:-$STAGING_DIR/var/data/.last_sha}"
@@ -112,6 +120,19 @@ _pull_image() {
   return 1
 }
 
+_start_container() {
+  if [ "$DEPLOY_ENV" = production ]; then
+    local helper
+    helper="$(cd "$(dirname "$0")" && pwd)/production_deploy.py"
+    python3 "$helper" check --directory "$STAGING_DIR" --require-data
+    docker compose "${COMPOSE_ARGS[@]}" up -d --no-deps --wait \
+      --wait-timeout "${PRODUCTION_WAIT_TIMEOUT:-120}" acessilia
+    python3 "$helper" verify-running --image "$PRODUCTION_IMAGE" --container "$CONTAINER_NAME"
+  else
+    docker compose "${COMPOSE_ARGS[@]}" up -d --no-deps acessilia
+  fi
+}
+
 # Digests for the status file. /api/v1/health compares the published digest
 # against the running one to decide `update_available`/`up_to_date`, so both
 # have to be written on every check, not only when an update happens.
@@ -146,8 +167,13 @@ _collect_digests() {
 #   3. Arquivo /opt/acessilia/scripts/.env (layout antigo)
 ENV_GHCR_TOKEN="${GHCR_TOKEN:-}"
 ENV_TRACK_BRANCH="${TRACK_BRANCH:-}"
+ENV_PRODUCTION_IMAGE="${PRODUCTION_IMAGE:-}"
 
-for env_file in "$STAGING_DIR/.env" /opt/acessilia/scripts/.env; do
+ENV_FILES=("$STAGING_DIR/.env" /opt/acessilia/scripts/.env)
+if [ "$DEPLOY_ENV" = production ]; then
+  ENV_FILES=("$STAGING_DIR/.deploy.env")
+fi
+for env_file in "${ENV_FILES[@]}"; do
   if [ -f "$env_file" ]; then
     set -a
     # shellcheck disable=SC1090
@@ -164,6 +190,9 @@ fi
 if [ -n "$ENV_TRACK_BRANCH" ]; then
   TRACK_BRANCH="$ENV_TRACK_BRANCH"
 fi
+if [ -n "$ENV_PRODUCTION_IMAGE" ]; then
+  PRODUCTION_IMAGE="$ENV_PRODUCTION_IMAGE"
+fi
 
 # Branch/tag rastreada: DEFAULT_TRACK_BRANCH por padrao, ou TRACK_BRANCH
 # (env ou .env) durante o ciclo de BHS (ex: release/0.0.1)
@@ -173,6 +202,18 @@ GITHUB_BRANCH="${TRACK_BRANCH:-$DEFAULT_TRACK_BRANCH}"
 TRACK_TAG="${GITHUB_BRANCH//\//-}"
 IMAGE_TAG="ghcr.io/a11ydevs/acessilia:${TRACK_TAG}"
 export TRACK_TAG
+
+if [ "$DEPLOY_ENV" = production ]; then
+  if [ -n "${PRODUCTION_IMAGE:-}" ]; then
+    echo "Production image is pinned for manual promotion; keep the updater disabled." >&2
+    exit 1
+  fi
+  CONFIGURED_IMAGE=$(docker compose "${COMPOSE_ARGS[@]}" config --format json | jq -r '.services.acessilia.image')
+  if [ "$CONFIGURED_IMAGE" != "$IMAGE_TAG" ]; then
+    echo "Compose selects a custom production image; refusing a branch-tag update." >&2
+    exit 1
+  fi
+fi
 
 # ──────────────────────────────────────────────
 # 1. Checar SHA do último commit via GitHub API
@@ -194,12 +235,16 @@ LATEST_DIGEST=""
 
 # Se não conseguiu obter o SHA, faz pull direto (fallback seguro)
 if [ -z "$LATEST_SHA" ] || [ "$LATEST_SHA" = "null" ]; then
+  if [ "$DEPLOY_ENV" = production ]; then
+    echo "Cannot resolve the production commit; refusing an unverified tag fallback." >&2
+    exit 1
+  fi
   echo "[staging-update] ⚠️  Falha ao consultar GitHub API. Fazendo pull direto..."
   _pull_image "$IMAGE_TAG" || {
     echo "[staging-update] ❌ Falha ao puxar $IMAGE_TAG"
     exit 1
   }
-  docker compose -f "$COMPOSE_FILE" up -d --no-deps acessilia
+  _start_container
   docker image prune -f
   _write_status "" "" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "" ""
   echo "[staging-update] Container atualizado (fallback)."
@@ -213,7 +258,7 @@ fi
 CACHE_KEY="$GITHUB_BRANCH $LATEST_SHA"
 if [ -f "$CACHE_FILE" ]; then
   CACHED_KEY=$(cat "$CACHE_FILE")
-  if [ "$CACHED_KEY" = "$CACHE_KEY" ]; then
+  if [ "$CACHED_KEY" = "$CACHE_KEY" ] && [ "$DEPLOY_ENV" != production ]; then
     # Record the running and published digests even when there is nothing to
     # update: /api/v1/health derives `up_to_date` from them, and leaving them
     # empty made the check structurally unable to report "up to date".
@@ -243,6 +288,11 @@ fi
 # ──────────────────────────────────────────────
 echo "[staging-update] 🔄 Novo commit detectado: $SHA7. Atualizando..."
 
+# Production pulls the verified commit artifact, not a branch tag that can move.
+if [ "$DEPLOY_ENV" = production ]; then
+  IMAGE_TAG="$SHA_TAG"
+fi
+
 # One pull is enough: the sha tag above only proves the build for this commit
 # finished, and the delivery workflow publishes it together with the branch tag
 # that compose uses. Pulling both sent the same manifest to the registry twice;
@@ -260,15 +310,34 @@ LATEST_DIGEST=$(_image_digest "$IMAGE_TAG")
 if [ -z "$LATEST_DIGEST" ]; then
   LATEST_DIGEST=$(_registry_digest "$SHA_TAG")
 fi
-RUNNING_DIGEST="$LATEST_DIGEST"
+if [ "$DEPLOY_ENV" = production ]; then
+  IMAGE_REVISION=$(docker image inspect "$IMAGE_TAG" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')
+  if [ "$IMAGE_REVISION" != "$LATEST_SHA" ] || [[ ! "$LATEST_DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+    echo "Published production image does not identify the requested commit/digest." >&2
+    exit 1
+  fi
+  export PRODUCTION_IMAGE="ghcr.io/a11ydevs/acessilia@$LATEST_DIGEST"
+fi
 
 echo "[staging-update] 🚀 Reiniciando container..."
-docker compose -f "$COMPOSE_FILE" up -d --no-deps acessilia
+_start_container
+if [ "$DEPLOY_ENV" = production ]; then
+  RUNNING_ID=$(docker inspect "$CONTAINER_NAME" --format '{{.Image}}')
+  RUNNING_DIGEST=$(_image_digest "$RUNNING_ID")
+  if [ "$RUNNING_DIGEST" != "$LATEST_DIGEST" ]; then
+    echo "Running production digest differs; deployment was not accepted." >&2
+    exit 1
+  fi
+else
+  RUNNING_DIGEST="$LATEST_DIGEST"
+fi
 
 # so grava o cache apos o restart ter sucesso (set -e aborta antes em caso de falha)
 echo "$CACHE_KEY" > "$CACHE_FILE"
 
-docker image prune -f
+if [ "$DEPLOY_ENV" != production ]; then
+  docker image prune -f
+fi
 
 _write_status "$LATEST_SHA" "$LATEST_SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$LATEST_DIGEST" "$RUNNING_DIGEST"
 
