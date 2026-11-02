@@ -14,7 +14,7 @@ def test_document_cache_key_changes_with_each_processing_option(monkeypatch):
 
     base = service._cache_version("normal", None, False)
 
-    assert "-v10_" in base
+    assert "-v12_" in base
     assert service._cache_version("detailed", None, False) != base
     assert service._cache_version("normal", "Describe charts", False) != base
     assert service._cache_version("normal", None, True) != base
@@ -112,12 +112,16 @@ async def _async_noop(*_args, **_kwargs):
     return None
 
 
-@pytest.mark.parametrize("name", ["pdf_split_dpi", "pddl_max_replans"])
+@pytest.mark.parametrize(
+    "name",
+    ["pdf_split_dpi", "pddl_max_replans", "slide_fold_figure_labels", "table_visual_review"],
+)
 def test_output_affecting_settings_invalidate_processing_cache(monkeypatch, name):
     from backend.config.settings import settings
     from backend.services.cache import processing_cache_configuration, options_cache_key
     before = options_cache_key("document", configuration=processing_cache_configuration())
-    monkeypatch.setattr(settings, name, getattr(settings, name) + 1)
+    value = getattr(settings, name)
+    monkeypatch.setattr(settings, name, not value if isinstance(value, bool) else value + 1)
     assert options_cache_key("document", configuration=processing_cache_configuration()) != before
 
 
@@ -126,4 +130,15 @@ def test_toolbox_endpoints_invalidate_processing_cache(monkeypatch):
     from backend.services.cache import processing_cache_configuration, options_cache_key
     before = options_cache_key("document", configuration=processing_cache_configuration())
     monkeypatch.setattr(settings, "toolbox_base_urls", "http://a.test,http://b.test")
+    assert options_cache_key("document", configuration=processing_cache_configuration()) != before
+
+
+def test_inline_math_detection_invalidates_processing_cache(monkeypatch):
+    """Turning the detection off must not serve a result that has its $…$ (#265)."""
+    from backend.config.settings import settings
+    from backend.services.cache import processing_cache_configuration, options_cache_key
+
+    monkeypatch.setattr(settings, "inline_math_detection", "fonts")
+    before = options_cache_key("document", configuration=processing_cache_configuration())
+    monkeypatch.setattr(settings, "inline_math_detection", "off")
     assert options_cache_key("document", configuration=processing_cache_configuration()) != before

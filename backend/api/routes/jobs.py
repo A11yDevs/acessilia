@@ -26,6 +26,7 @@ from backend.stage_messages import STAGE_QUEUE_WAITING_POSITION
 from backend.log_messages import (
     API_CANCEL_STATE_INVALID,
     API_JOB_QUEUED,
+    API_OPTIONS_UNAVAILABLE,
     API_PROMPT_TOO_LONG,
     API_TASK_NOT_FOUND,
     LOG_API_JOB_ENQUEUED,
@@ -34,7 +35,12 @@ from backend.services.job_store import delete_request, save_request, save_status
 from backend.services.blocking import run_blocking
 from backend.services.queue_service import QueueItem, unified_queue
 from backend.tools.logger import logger
-from backend.tools.validators import MSG_FILE_TOO_LARGE, validate_file
+from backend.tools.validators import (
+    MSG_FILE_TOO_LARGE,
+    MSG_INVALID_EMAIL_ADDRESS,
+    is_email_address_allowed,
+    validate_file,
+)
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -62,6 +68,8 @@ def _save_upload(upload: UploadFile) -> Path:
                         ),
                     )
                 buffer.write(chunk)
+        if total == 0:
+            raise HTTPException(status_code=400, detail=t("Empty file"))
     except Exception:
         file_path.unlink(missing_ok=True)
         raise
@@ -78,8 +86,12 @@ async def submit_job(
     thinking_mode: bool = Form(False),
     email: str = Form(""),
     source: str = Form("api"),
+    object_markers: bool | None = Form(None),
 ):
-    filename = Path(document_file.filename or "documento").name
+    filename = (
+        Path((document_file.filename or "documento").replace("\\", "/")).name
+        or "documento"
+    )
     valid, error_msg = validate_file(filename, settings.max_file_size_bytes)
     if not valid:
         raise HTTPException(status_code=400, detail=error_msg)
@@ -94,8 +106,12 @@ async def submit_job(
     if prompt or thinking_mode:
         raise HTTPException(
             status_code=422,
-            detail="Custom instructions and thinking mode are unavailable for this pipeline",
+            detail=t(API_OPTIONS_UNAVAILABLE),
         )
+
+    email = (email or "").strip()
+    if email and not is_email_address_allowed(email):
+        raise HTTPException(status_code=422, detail=t(MSG_INVALID_EMAIL_ADDRESS))
 
     file_path = await run_in_threadpool(_save_upload, document_file)
     task_id = uuid.uuid4().hex
@@ -109,6 +125,7 @@ async def submit_job(
         thinking_mode=thinking_mode,
         email=email or None,
         source=source,
+        object_markers=object_markers,
     )
     item = QueueItem(
         file_path=file_path,
@@ -169,6 +186,8 @@ async def job_status(request: Request, task_id: str):
         criado_em=job.get("inicio"),
         fim=job.get("fim"),
         email_delivery=job.get("email_delivery"),
+        cancellation_requested_at=job.get("cancellation_requested_at"),
+        cancellation_elapsed_seconds=job.get("cancellation_elapsed_seconds"),
     )
 
 
@@ -188,5 +207,7 @@ async def cancel_job(request: Request, task_id: str):
             detail=t(API_CANCEL_STATE_INVALID).format(status=job["status"]),
         )
     status = await get_job_status_async(task_id)
+    # Acknowledge only after cancelling + request timestamp are durable, even
+    # while a shielded extraction is still running. The sync helper is live-only.
     await run_blocking(save_status, task_id, status)
     return CancelResponse(task_id=task_id, status=status["status"])

@@ -86,6 +86,10 @@ LOG_SMTP_NOT_CONFIGURED: str = (
 LOG_EMAIL_SENT: str = "E-mail sent successfully to {to_email}."
 #: Error logged after a notification email delivery attempt failed; {to_email} is the recipient, {error} the reason.
 LOG_EMAIL_SEND_ERROR: str = "Error sending e-mail to {to_email}: {error}"
+#: Warning logged when the failure-notification path raises before the mailer can report a delivery result; {task_id} identifies the job, {error} the reason.
+LOG_FAILURE_EMAIL_FAILED: str = "Failure e-mail for job {task_id} could not be sent: {error}"
+#: Warning logged when the mailer reports a failure notification was not delivered; {task_id} identifies the job.
+LOG_FAILURE_EMAIL_NOT_SENT: str = "Failure e-mail for job {task_id} was not sent"
 #: Subject line of the confirmation email sent when a source document has been received.
 EMAIL_CONFIRMATION_SUBJECT: str = "We received your file - Acessilia"
 #: Body of the confirmation email sent when a source document has been received; {filename} is the submitted file name.
@@ -118,14 +122,23 @@ EMAIL_RESULT_BODY_ATTACHED: str = (
     "{warnings}\n\n"
     "Best regards,\nThe Acessilia Team"
 )
+#: Subject line of the email sent when a job fails or is interrupted.
+EMAIL_FAILURE_SUBJECT: str = "Your file could not be processed - Acessilia"
+#: Body of the failure email; {filename} is the source file name and {error} the job error, which names the stage it failed in.
+EMAIL_FAILURE_BODY: str = (
+    "Hello!\n\n"
+    "Unfortunately, the processing of the file '{filename}' could not be completed.\n\n"
+    "Reason: {error}\n\n"
+    "You can submit the file again. If the problem persists, forward this message "
+    "to the Acessilia team so we can investigate.\n\n"
+    "Best regards,\nThe Acessilia Team"
+)
 #: Localized display name of the plain-text (TXT) output artifact, listed in the result email's completed-formats block.
 EMAIL_FORMAT_TXT: str = "Plain Text (TXT)"
 #: Localized display name of the Word (DOCX) output artifact, listed in the result email's completed-formats block.
 EMAIL_FORMAT_DOCX: str = "Word Document (DOCX)"
-#: Localized display name of the non-tagged PDF output artifact, listed in the result email's completed-formats block.
-EMAIL_FORMAT_PDF: str = "PDF"
 #: Localized display name of the tagged PDF/UA output artifact, listed in the result email's completed-formats block.
-EMAIL_FORMAT_PDF_UA: str = "PDF/UA"
+EMAIL_FORMAT_PDF_UA: str = "Accessible PDF (PDF/UA)"
 #: Localized display name of the web-page (HTML) output artifact, listed in the result email's completed-formats block.
 EMAIL_FORMAT_HTML: str = "Web Page (HTML)"
 #: Localized display name of the spoken-audio (MP3) output artifact, listed in the result email's completed-formats block.
@@ -134,6 +147,18 @@ EMAIL_FORMAT_MP3: str = "Audio Description (MP3)"
 EMAIL_FORMAT_ZIP: str = "ZIP Package"
 #: Intro line of the optional warning block appended to the result email body when one or more optional export formats failed; has no placeholders.
 EMAIL_RESULT_WARNINGS_HEADER: str = "Some optional formats were not generated:"
+#: Header of the result email's section with the veraPDF audit of the PDF/UA.
+EMAIL_RESULT_AUDIT_HEADER: str = "Accessibility audit of the PDF (veraPDF):"
+#: Audit verdict line of a compliant PDF/UA; {profile} names the profile (PDF/UA-1).
+EMAIL_AUDIT_COMPLIANT: str = "{profile}: compliant"
+#: Audit verdict line of a non-compliant PDF/UA; {profile} the profile, {rules} failed rules, {checks} failing objects in all.
+EMAIL_AUDIT_NON_COMPLIANT: str = "{profile}: {rules} rule(s) not met ({checks} occurrence(s))"
+#: One failed rule of the audit; {specification}, {clause} and {test} locate it in ISO 14289, {description} is veraPDF's (English), {checks} its failing objects.
+EMAIL_AUDIT_RULE: str = "{specification}, clause {clause} (test {test}): {description} ({checks} occurrence(s))"
+#: Last audit line when more rules failed than the e-mail lists; {count} is how many are left out.
+EMAIL_AUDIT_MORE_RULES: str = "... and {count} more rule(s), listed in the report in the ZIP package"
+#: Audit line when the PDF/UA could not be validated; {error} is the short cause.
+EMAIL_AUDIT_UNAVAILABLE: str = "Audit unavailable: {error}"
 #: Info logged when a canonical-JSON persistence attempt raised; the exception text follows.
 LOG_CANONICAL_JSON_SAVE_FAILED: str = "Could not save the canonical JSON: {error}"
 #: Info logged when a processing job is cancelled by the user; {task_id} identifies the job.
@@ -254,6 +279,8 @@ API_TASK_NOT_FOUND: str = "Task not found"
 API_JOB_QUEUED: str = "File queued (Position: {position})."
 #: HTTP 400 detail body returned by the API when a custom prompt exceeds the accepted length; {limit} carries the character count.
 API_PROMPT_TOO_LONG: str = "The custom prompt exceeds the limit of {limit} characters."
+#: HTTP 422 detail body returned by the API when a submission asks for a custom prompt or thinking mode, which the active pipeline does not support.
+API_OPTIONS_UNAVAILABLE: str = "Custom instructions and thinking mode are unavailable for this pipeline"
 #: HTTP 404 detail body returned by the API download endpoints when a download token lookup misses.
 API_LINK_INVALID: str = "The download link is invalid or has expired"
 #: HTTP 400 detail body returned by the API download endpoints when a request names a format the service cannot produce.
@@ -286,6 +313,10 @@ MSG_OBLIGATION_FORMULA: str = (
 MSG_OBLIGATION_CODE: str = "The code block must preserve indentation, language and literal reading."
 #: Manifest processing-needs rationale for unknown/unrecognized elements, used as the LLM prompt obligation text per element type.
 MSG_OBLIGATION_UNKNOWN: str = "Unrecognized elements require structural inspection."
+#: Heading that opens a slide of a presentation that has a title; {number} is the slide, {total} the slides in the deck, {title} the slide title.
+MSG_SLIDE_HEADING_WITH_TITLE: str = "Slide {number} of {total}: {title}"
+#: Heading that opens a slide of a presentation without a title; {number} is the slide, {total} the slides in the deck.
+MSG_SLIDE_HEADING: str = "Slide {number} of {total}"
 #: Observation message for a page the structural extractor returned without any element; {page_number} is the page.
 MSG_OBSERVATION_PAGE_WITHOUT_STRUCTURE: str = (
     "Page {page_number} has no extracted structure; it may be blank or purely visual."
@@ -320,12 +351,64 @@ LOG_VISION_AGENT_SENDING_REGION: str = (
 LOG_VISION_AGENT_REGION_ERROR: str = (
     "[page {page_num}] VisionAgent error in region {type}: {error} | Traceback:\n{tb}"
 )
+#: Warning logged when the vision model's answer is unusable and the region is asked again; {page_num}, {type}, {attempt}/{attempts} and {error} describe the failed try.
+LOG_VISION_AGENT_REGION_RETRY: str = (
+    "[page {page_num}] Unusable answer from the vision model for region {type}; "
+    "trying again ({attempt}/{attempts}): {error}"
+)
+#: Warning logged when the provider rejects a region for exceeding its context window; {page_num} and {type} name the region, {size_before}/{size_after} are the image byte sizes, {max_tokens} is the reduced output cap or provider default, and {error} is the provider failure.
+LOG_VISION_AGENT_CONTEXT_RETRY: str = (
+    "[page {page_num}] Context limit exceeded for region {type}; retrying once "
+    "with a smaller image ({size_before} -> {size_after} bytes) and "
+    "max_tokens={max_tokens}: {error}"
+)
+#: Warning logged when the Toolbox cannot render the smaller image a context recovery needs; {error} is the cause, and the original context error stands.
+LOG_VISION_CONTEXT_DOWNSCALE_FAILED: str = (
+    "Vision context recovery could not reduce its image: {error}"
+)
+#: Info logged when a vision answer validates only after a retry; {page_num}, {type} and {attempt}/{attempts} name the region and the try that worked, so the retry rate can be measured.
+LOG_VISION_AGENT_REGION_RECOVERED: str = (
+    "[page {page_num}] Vision model answered region {type} on try {attempt}/{attempts}"
+)
+#: Debug logged when the manifest builder derives no processing need for an unknown element that only groups others and has no region (a Docling key_value_area); {element_id} and {raw_label} name it.
+LOG_MANIFEST_STRUCTURAL_CONTAINER_SKIPPED: str = (
+    "Manifest: no review-structure for {element_id} ({raw_label}): "
+    "it groups other elements and has no region"
+)
+#: Warning logged when every try of a region came back cut off and its description was recovered from the last one; {page_num} and {type} name the region, {chars} is the recovered length.
+LOG_VISION_AGENT_REGION_SALVAGED: str = (
+    "[page {page_num}] Vision answer for region {type} was cut off before its end; "
+    "description recovered ({chars} characters)"
+)
+#: Warning logged when the model provider rate-limits a region call and the agent waits before trying again; {page_num} and {type} name the region, {retry}/{retries} the rate-limit retry budget, {delay} the wait in seconds.
+LOG_VISION_AGENT_RATE_LIMIT_RETRY: str = (
+    "[page {page_num}] The model provider rate-limited region {type}; "
+    "waiting {delay}s before trying again (rate-limit retry {retry}/{retries})"
+)
+#: Warning logged when a region call runs out of time and the agent tries it once more; {page_num} and {type} name the region, {retry}/{retries} the timeout retry budget, {error} the timeout.
+LOG_VISION_AGENT_TIMEOUT_RETRY: str = (
+    "[page {page_num}] Region {type} got no answer in time ({error}); "
+    "trying again (timeout retry {retry}/{retries})"
+)
+#: Warning logged when a vision description is longer than the region token budget and was cut to it; {page_num} and {type} name the region, {limit} the budget in tokens, {chars} the kept character count.
+LOG_VISION_AGENT_DESCRIPTION_TRUNCATED: str = (
+    "[page {page_num}] Vision description for region {type} exceeded the "
+    "{limit}-token budget and was truncated ({chars} characters kept)"
+)
+#: Debug logged by the orchestrator with a picture element's whole vision description; {element_id} identifies the element, {page_num} its page, {chars} the description length and {description} the full text, so an unusually long description can be traced to its source.
+LOG_VISION_ELEMENT_DESCRIPTION: str = (
+    "[page {page_num}] Vision description of element {element_id} "
+    "({chars} characters): {description}"
+)
+#: Notice appended to the end of a vision description that was truncated to the region budget, so the reader of the alt text knows the description is bounded and many details were left out. This is document content, not a log line; it is resolved through t() so it follows the user's locale.
+MSG_VISION_TRUNCATION_NOTICE: str = (
+    "Note: this image is informationally very extensive; the description was "
+    "limited to the available budget and many details were not described."
+)
 #: Debug logged by the exporters adapter wrapper just before a plain-text export runs; {path} is the output file path.
 LOG_EXPORT_TXT_START: str = "Exporting TXT to {path}"
 #: Debug logged by the exporters adapter wrapper just before a DOCX export runs; {path} is the output file path.
 LOG_EXPORT_DOCX_START: str = "Exporting DOCX to {path}"
-#: Debug logged by the exporters adapter wrapper just before a PDF export runs; {path} is the output file path.
-LOG_EXPORT_PDF_START: str = "Exporting PDF to {path}"
 #: Debug logged by the exporters adapter wrapper just before a PDF/UA export runs; {path} is the output file path.
 LOG_EXPORT_PDF_UA_START: str = "Exporting PDF/UA to {path}"
 #: Debug logged by the exporters adapter wrapper just before an MP3 audio export runs; {path} is the output file path.
@@ -345,6 +428,39 @@ LOG_PDDL_IMAGES_ENRICHED: str = (
 LOG_PDDL_TABLES_ENRICHED: str = (
     "Pipeline PDDL: {count} table(s) enriched with OCR/reconstruction"
 )
+#: Info logged when a table that looked misread was read again from its image and the new reading replaced it; {element_id} and {page} name it, {reason} the misreading.
+LOG_PDDL_TABLE_REREAD_ACCEPTED: str = (
+    "Table {element_id} (page {page}) looked misread ({reason}); "
+    "replaced with the reading from its image"
+)
+#: Warning logged when a table that looked misread was read again from its image but the new reading was not used; {element_id}, {page} and {reason} as above, {why} what disqualified the new reading.
+LOG_PDDL_TABLE_REREAD_REJECTED: str = (
+    "Table {element_id} (page {page}) looked misread ({reason}); "
+    "the reading from its image was not used ({why})"
+)
+#: Warning logged when {failures} vision calls in a row got no usable answer and the remaining vision calls of the job are skipped.
+LOG_PROVIDER_BREAKER_OPEN: str = (
+    "{failures} vision calls in a row got no usable answer; "
+    "skipping the remaining calls of this job"
+)
+#: Warning logged before the picture stage tries again what failed; {count} is how many pictures (empty answers included), {delay} the seconds waited first.
+LOG_PDDL_VISION_RETRY_PASS_PICTURES: tuple[str, str] = (
+    "{count} picture without a usable description from the model; "
+    "trying again in {delay}s",
+    "{count} pictures without a usable description from the model; "
+    "trying again in {delay}s",
+)
+#: Warning logged before the table stage tries again what failed; {count} is how many tables, {delay} the seconds waited first.
+LOG_PDDL_VISION_RETRY_PASS_TABLES: tuple[str, str] = (
+    "{count} table without a usable reading from the model; "
+    "trying again in {delay}s",
+    "{count} tables without a usable reading from the model; "
+    "trying again in {delay}s",
+)
+#: Warning logged when list items with no text are left out of the delivered document; {count} items, the {page} they are on and their {element_ids}.
+LOG_PDDL_EMPTY_LIST_ITEMS_DROPPED: str = (
+    "PDDL: {count} list item(s) without text left out of page {page}: {element_ids}"
+)
 #: Exception logged when extracting an element's image clip from the source PDF for the PDDL pipeline fails; {element_id} is the failing element's id.
 LOG_PDDL_ELEMENT_CROP_FAILED: str = (
     "Failed to extract the image clip for element {element_id}"
@@ -352,6 +468,27 @@ LOG_PDDL_ELEMENT_CROP_FAILED: str = (
 #: Warning logged when the vision model answered with an empty description for a picture element, leaving the `describe-image` obligation unsatisfiable. {element_id} is the element without a usable description.
 LOG_PDDL_EMPTY_VISION_DESCRIPTION: str = (
     "Vision model returned an empty description for element {element_id}"
+)
+#: Warning logged once per document when math.recognize is unavailable during formula enrichment; {error} is the full failure message, naming the provider and its HTTP status.
+LOG_PDDL_FORMULA_RECOGNIZE_UNAVAILABLE: str = (
+    "math.recognize unavailable during formula enrichment ({error}); "
+    "falling back to the vision model"
+)
+#: Debug logged per formula when math.recognize answered without LaTeX; {element_id} is the formula, {page} its page and {provider} the recognition provider asked.
+LOG_PDDL_FORMULA_RECOGNIZE_EMPTY: str = (
+    "Formula {element_id} (page {page}): math.recognize ({provider}) returned no LaTeX; "
+    "falling back to the vision model"
+)
+#: Info logged when every recognition of a formula was refused for disagreeing with its text layer; {element_id} is the formula, {page} its page and {rejected} the refused readings with their agreement.
+LOG_PDDL_FORMULA_TEXT_LAYER_DISAGREES: str = (
+    "Formula {element_id} (page {page}): recognition disagrees with the text layer {rejected}"
+)
+#: Info logged after formula enrichment; {count} is the number of formulas that received LaTeX by any method.
+LOG_PDDL_FORMULAS_RECOGNIZED: str = "LaTeX recognized for {count} formula(s)"
+#: Info logged once per document when math.recognize answered without LaTeX for some formulas; {count} of {total} formulas fell back to vision and {provider} is the recognition provider asked.
+LOG_PDDL_FORMULAS_FELL_BACK_TO_VISION: str = (
+    "{count} of {total} formula(s) fell back to the vision model after "
+    "math.recognize ({provider}) returned no LaTeX"
 )
 #: Error raised when the preferred planner backend produced no valid plan in both mode; {backend} is the preferred backend's name.
 LOG_PDDL_PREFERRED_PLAN_MISSING: str = (
@@ -373,12 +510,22 @@ LOG_PDDL_DOMAIN_DESCRIPTION_HASH_MISMATCH: str = (
 LOG_PDDL_SELECTED_CLOSURE_MISMATCH: str = (
     "The selected closure diverges from the compiled problem"
 )
-LOG_PDF_EXPORTED: str = "PDF exported with bookmarks and page numbering: {output_path}"
 LOG_PDF_UA_EXPORTED: str = "PDF/UA exported: {output_path}"
 #: Info logged when the Toolbox rendered the PDF/UA; {output_path} the destination file path.
 LOG_PDF_UA_TOOLBOX_EXPORTED: str = "PDF/UA rendered by the Toolbox: {output_path}"
+#: Warning logged when the Toolbox rejected the PDF/UA AST's math and the export retries with the
+#: formulas as literal text; {error} is the Toolbox's rejection cause.
+LOG_PDF_UA_MATH_DEGRADED: str = (
+    "The Toolbox rejected the PDF/UA math; retrying with formulas as literal text: {error}"
+)
 #: Info logged when the worker skips PDF/UA because TOOLBOX_PDF_UA_ENABLED is false.
 LOG_PDF_UA_SKIPPED_DISABLED: str = "PDF/UA skipped: TOOLBOX_PDF_UA_ENABLED is false"
+#: Info logged when the PDF/UA audit is skipped because TOOLBOX_PDF_VALIDATE_ENABLED is false.
+LOG_PDF_UA_AUDIT_SKIPPED_DISABLED: str = "PDF/UA audit skipped: TOOLBOX_PDF_VALIDATE_ENABLED is false"
+#: Info logged when veraPDF validated the PDF/UA; {compliant} is the verdict, {rules} the failed rules.
+LOG_PDF_UA_AUDIT_FINISHED: str = "PDF/UA audit finished (compliant={compliant}, failed rules={rules})"
+#: Warning logged when the PDF/UA audit failed; {error} is the reason. The job is still delivered.
+LOG_PDF_UA_AUDIT_FAILED: str = "PDF/UA audit failed: {error}"
 #: Info logged when media.inspect is skipped because TOOLBOX_MEDIA_INSPECT_ENABLED is false.
 LOG_MEDIA_INSPECT_SKIPPED_DISABLED: str = (
     "Media inspection skipped: TOOLBOX_MEDIA_INSPECT_ENABLED is false"
@@ -401,4 +548,27 @@ LOG_DOCX_SKIPPED_DISABLED: str = "DOCX skipped: TOOLBOX_DOCX_ENABLED is false"
 #: Error raised when the optional Agno agent stack is absent and a workflow class import is required; no placeholders.
 LOG_AGNO_NOT_INSTALLED: str = (
     "Agno is not installed. Run `uv sync` before using the workflow Executor."
+)
+
+#: Upload persistence failed transiently; extraction will receive the source file.
+LOG_ARTIFACT_UPLOAD_DEGRADED: str = "Artifact upload unavailable ({error}); extracting from the source file."
+
+#: FUSION_MODE=dual names the primary provider as its secondary too; fusion is skipped.
+LOG_DUAL_FUSION_SKIPPED_IDENTICAL_PROVIDERS: str = (
+    "Dual fusion skipped: the primary and secondary providers are both {provider}."
+)
+
+#: One structural provider failed; use the other provider when available.
+LOG_STRUCTURAL_PROVIDER_DEGRADED: str = "Structural provider {provider} failed ({error}); extraction is degraded."
+
+#: Multiple independent Toolbox URLs require direct input; configured artifact storage is bypassed.
+LOG_ARTIFACT_STORE_DIRECT_INPUT: str = (
+    "Artifact storage bypassed for independent Toolbox endpoints; "
+    "the source file will be sent again for extraction, fusion and text spans."
+)
+
+#: Delivered document warning when only one structural provider succeeded; {provider} is its identifier.
+MSG_STRUCTURAL_EXTRACTION_DEGRADED: str = (
+    "Structural extraction used only {provider} because the other provider failed. "
+    "The document requires review; dual-provider comparison was not available."
 )

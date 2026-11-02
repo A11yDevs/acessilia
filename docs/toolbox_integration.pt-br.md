@@ -59,7 +59,7 @@ falha, o core recebe `ToolboxCapabilityError` ou `ToolboxContractViolation`.
 
 Todas herdam de `ToolboxError` (definida no SDK, `acessilia_sdk.toolbox.errors`, e re-exportada por `backend/tools/toolbox_client.py`):
 
-- `ToolboxProviderUnavailable` — serviço/provedor indisponível (ex.: HTTP 503)
+- `ToolboxProviderUnavailable` — serviço/provedor indisponível (HTTP 502, 503)
 - `ToolboxTimeout` — excedeu `toolbox_timeout_seconds`
 - `ToolboxUnsupportedMediaType` — tipo de mídia não suportado
 - `ToolboxArtifactNotFound` — artefato inexistente
@@ -303,10 +303,56 @@ A capacidade `media.inspect` (provider `pure-media-inspect`, PR
   `TOOLBOX_MEDIA_INSPECT_ENABLED=false` ele devolve `None` sem chamar a Toolbox,
   e uma falha na Toolbox levanta `ToolboxError`.
 - **Integração:** `backend/agents/pddl_orchestrator.py` chama
-  `inspect_source_media()` após a extração e usa o sinal
-  `requires_visual_inspection` para injetar um elemento `picture` de página
-  inteira quando a entrada é imagem isolada sem blocos visuais — garantindo a
-  audiodescrição pelo VisionAgent.
+  `inspect_source_media()` **antes** da extração e usa três sinais:
+  - `document_genre` (`pure-media-inspect` 1.1.0+): um PDF informado como
+    `presentation` é extraído só pelo provider configurado (sem fusão dual) e
+    estruturado slide a slide (`backend/core/manifest/slides.py`): um H1 para a
+    apresentação, um H2 "Slide N de T: <título>" (ou "Slide N de T") por slide,
+    ordem de leitura restrita a cada slide. Um slide cujas imagens cobrem ao
+    menos `SLIDE_VISUAL_COVERAGE` (0,5) dele (a união delas, sem contar um fundo
+    de página inteira) e cujo texto está sobre essas imagens (o texto ao lado
+    cobre no máximo 5% do slide) vira uma imagem do slide inteiro, descrita com o
+    prompt de página em vez de lida como texto; o texto substituído fica em
+    `metadata.replaced_text`. Um slide do qual nada foi extraído também vira uma.
+    Um elemento que o extrator leu atravessando dois slides é antes separado
+    em um elemento por slide, nas posições de caractere da sua proveniência,
+    antes do refinamento da ordem de leitura, de modo que cada parte é
+    ordenada pela sua própria caixa no seu slide. Só elementos de texto sem
+    filhos são separados, e só quando as posições cobrem todo o texto; caso
+    contrário o elemento fica inteiro. Um slide cujo único texto, fora o
+    título e os cabeçalhos e rodapés, veio dessa separação também é lido como
+    uma imagem, com o texto separado guardado em `replaced_text`.
+    Num slide lido como texto, um rótulo cujo centro está sobre uma imagem que
+    cobre menos de 95% do slide (uma maior é o fundo) é incorporado a ela: sai
+    do texto corrido, fica em `metadata.figure_labels` da imagem (ids em
+    `metadata.figure_label_ids`) e a descrição da imagem o transcreve no lugar.
+    Um rótulo é um parágrafo, cabeçalho ou título com no máximo três palavras de
+    três letras ou mais que não se lê como frase (terminando em `.`, `!` ou `?`,
+    ou com `: `); legendas, fórmulas, tabelas e itens de lista ficam. Um rótulo
+    extraído como parágrafo a até 8% do slide em volta de uma imagem (de
+    qualquer lado, medido da caixa original da imagem) também é incorporado, e
+    a caixa da imagem cresce para cobri-lo, de modo que o recorte descrito pelo
+    modelo de visão o mostra; um cabeçalho só é incorporado quando está sobre a
+    imagem. Um rótulo ou legenda que atravessa várias imagens lado a lado (uma
+    linha de legenda lida através das colunas delas) as funde na primeira
+    (`metadata.merged_picture_ids`); uma frase fica. Uma legenda só é
+    incorporada nesse caso, ou quando está sobre ou ao lado de uma imagem
+    fundida e atravessa a largura dela (`SLIDE_FOLD_FIGURE_LABELS`). Se a
+    imagem ficar sem descrição, seus rótulos voltam ao slide como parágrafos
+    depois dela. O texto que uma imagem do slide inteiro substituiu volta do
+    mesmo modo, independentemente dessa configuração. Em qualquer caso, o
+    cabeçalho do slide fica fora do refinamento da ordem de leitura, para que
+    nenhuma imagem passe à frente dele.
+    Uma Toolbox sem o campo, ou uma inspeção que falhou, significa documento.
+  - `requires_visual_inspection`, para injetar um elemento `picture` de página
+    inteira quando a entrada é imagem isolada sem blocos visuais — garantindo a
+    audiodescrição pelo VisionAgent.
+  - `page_count` com `page_count_source` (`artifact/media-inspection@1`,
+    `pure-media-inspect` 1.0.0+): um PDF cuja contagem veio do `pymupdf` e
+    passa de `MAX_PAGES` é recusado antes da extração estrutural. Qualquer
+    outra origem (`content_stream_scan`, `pillow`, `null`), um campo ausente ou
+    uma inspeção que falhou pula essa checagem antecipada; o limite continua
+    aplicado sobre o manifesto extraído.
 
   O sinal só alimenta essa heurística, então uma falha da etapa (qualquer
   exceção, não só `ToolboxError`) não derruba o job: o processamento segue sem
@@ -314,12 +360,40 @@ A capacidade `media.inspect` (provider `pure-media-inspect`, PR
   `manifest.extractor.configuration` (`media_inspection`: `toolbox`, `disabled`,
   `source_missing` ou `failed`, mais `media_inspection_error` com a causa). O
   status e a causa também chegam ao documento em
-  `canonical_metadata.pddl_media_inspection` (`{"status": ..., "error": ...}`).
+  `canonical_metadata.pddl_media_inspection` (`{"status": ..., "error": ...,
+  "document_genre": ..., "genre_signals": [...]}`).
 
   Uma execução degradada por falha **não é cacheada** (o payload leva
   `cacheable: false`): do contrário, uma indisponibilidade transitória da
   Toolbox repetiria uma imagem isolada sem audiodescrição depois que a Toolbox
   voltasse.
+
+  O mesmo vale para as imagens e tabelas que uma falha deixou sem descrição ou
+  sem leitura. Elas são contadas por motivo em
+  `canonical_metadata.pddl_visual_failures`
+  (`{"pictures": {"model_failed": 1, "crop_unavailable": 2}, "tables": {"model_failed": 1}}`,
+  `null` quando nada falhou): `model_failed` quando o modelo de visão ou o
+  agente de dados não respondeu, `crop_unavailable` quando a Toolbox não
+  conseguiu renderizar o recorte. Uma imagem conta qualquer que seja o tipo do
+  elemento, já que os placeholders de um documento majoritariamente visual
+  também são descritos; o motivo fica em `metadata.vision_failure_reason`, e o
+  de uma tabela em `metadata.table_read_failure`. O documento informa quantas
+  imagens não puderam ser descritas e quantas tabelas não puderam ser lidas.
+  Uma descrição vazia e uma leitura de tabela recusada por ser pior que a
+  tabela são respostas do modelo, então não contam nem impedem o cache. Uma
+  entrada em cache que registra falha não é reaproveitada, e uma nova execução
+  ainda degradada a descarta.
+
+  Antes de uma imagem ou tabela ficar assim, o seu estágio tenta mais uma vez:
+  depois de `VISION_RETRY_PASS_DELAY_SECONDS` (60), os objetos sem descrição ou
+  leitura utilizável (e as imagens que o modelo respondeu vazias) são enviados
+  de novo, um de cada vez. Um provedor que continua falhando não é chamado para
+  cada objeto: depois de `VISION_BREAKER_THRESHOLD` (3) chamadas seguidas sem
+  resposta utilizável, as demais chamadas de imagem, fórmula e tabela do job
+  são puladas e registradas como `model_failed`, com
+  `metadata.vision_failure_detail` informando que foram puladas. A primeira
+  chamada da segunda passada passa mesmo assim, para testar se o provedor
+  voltou.
 
 Os predicados PDDL `media_inspected`/`media_profile_classified` pertencem ao
 domínio da Toolbox; no core o sinal é consumido apenas como heurística de
@@ -341,15 +415,23 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 | `TOOLBOX_CATALOG_REFRESH_SECONDS` | `60` | Por quanto tempo um snapshot do catálogo é reutilizado |
 | `TOOLBOX_CATALOG_STALE_SECONDS` | `900` | Por quanto tempo o último snapshot válido é servido quando o catálogo não pode ser lido |
 | `TOOLBOX_TIMEOUT_SECONDS` | `3600` | Timeout das requisições |
-| `TOOLBOX_RETRIES` | `1` | Novas tentativas no mesmo endpoint após timeout ou instância indisponível (503/504), em todo cliente de capacidade; `0` as desliga (ADR-0006). O timeout também é retentado, então o pior caso de uma chamada pendurada é `TOOLBOX_TIMEOUT_SECONDS × (TOOLBOX_RETRIES + 1)` por endpoint de `TOOLBOX_BASE_URLS` (2 h por endpoint com os padrões) |
+| `TOOLBOX_RETRIES` | `1` | Novas tentativas no mesmo endpoint após timeout ou instância indisponível (502/503/504), em todo cliente de capacidade; `0` as desliga (ADR-0006). O timeout também é retentado, então o pior caso de uma chamada pendurada é `TOOLBOX_TIMEOUT_SECONDS × (TOOLBOX_RETRIES + 1)` por endpoint de `TOOLBOX_BASE_URLS` (2 h por endpoint com os padrões) |
 | `TOOLBOX_RETRY_BACKOFF_SECONDS` | `0.5` | Base do backoff exponencial entre as tentativas, com jitter |
-| `TOOLBOX_USE_ARTIFACT_STORE` | `true` | Envia o arquivo para `/v1/artifacts` antes de extrair |
+| `TOOLBOX_USE_ARTIFACT_STORE` | `true` | Envia o arquivo para `/v1/artifacts` antes de extrair, quando os clientes compartilham uma implantação. Com endpoints independentes em `TOOLBOX_BASE_URLS`, o arquivo vai diretamente em cada chamada (ADR-0013); uma falha transitória do upload (timeout, indisponibilidade) também recai no envio direto |
 | `TOOLBOX_USE_REMOTE_CACHE` | `true` | Usa o cache remoto (`no_cache=false`) |
 | `TOOLBOX_MEDIA_INSPECT_PROVIDER` | `pure-media-inspect` | Provider da capacidade `media.inspect` |
 | `TOOLBOX_MEDIA_INSPECT_ENABLED` | `true` | Executa `media.inspect` na Toolbox ou pula a etapa. Não há fallback local: com `false`, a etapa é pulada; uma falha na Toolbox é registrada no log e no manifesto, o processamento segue sem o sinal de imagem isolada e o resultado degradado não é cacheado |
+| `SLIDE_VISUAL_COVERAGE` | `0.5` | Fração do slide que as imagens precisam cobrir para um slide de apresentação (`document_genre=presentation`) ser descrito como uma imagem em vez de lido como texto |
+| `SLIDE_FOLD_FIGURE_LABELS` | `true` | Num slide de apresentação lido como texto, incorpora à imagem o texto curto sobre ela ou logo em volta (fundindo as imagens que uma linha de legenda atravessa), cuja descrição o transcreve no lugar |
+| `TABLE_VISUAL_REVIEW` | `true` | Relê a partir da imagem uma tabela que voltou com a forma errada (linhas colapsadas em uma célula por coluna, ou todas as células duplicadas) e usa a nova leitura quando ela é a mesma tabela mais bem lida |
+| `OBJECT_MARKERS_ENABLED` | `false` | Envolve cada imagem descrita, tabela e fórmula dos formatos entregues (HTML, TXT e seu áudio, DOCX, PDF/UA) em parágrafos `[rótulo]` … `[/rótulo]`, com rótulos no locale do servidor; um job pode sobrescrever pelo campo `object_markers` do `POST /api/v1/jobs` |
 | `TOOLBOX_PDF_UA_PROVIDER` | `pandoc-pdf-ua` | Provider da capacidade `document.export.pdf_ua` |
 | `TOOLBOX_PDF_UA_ENABLED` | `true` | Renderiza o PDF/UA na Toolbox (Pandoc + TeX Live fixados) ou pula a etapa. Não há fallback local: com `false`, o worker pula o formato sem erro; uma falha na Toolbox é reportada como erro de exportação opcional |
 | `TOOLBOX_PDF_UA_TIMEOUT_SECONDS` | `300` | Tempo máximo de espera pela renderização na Toolbox antes de reportar erro de exportação opcional |
+| `TOOLBOX_PDF_VALIDATE_PROVIDER` | `verapdf` | Provider da capacidade `pdf.validate.pdf_ua` |
+| `TOOLBOX_PDF_VALIDATE_ENABLED` | `true` | Audita o PDF/UA com o veraPDF (PDF/UA-1) na Toolbox. O e-mail de resultado resume as regras não atendidas e o relatório completo vai no pacote ZIP; com `false`, não há auditoria; uma falha na Toolbox não impede a entrega e o e-mail diz que a auditoria ficou indisponível |
+| `TOOLBOX_PDF_VALIDATE_TIMEOUT_SECONDS` | `330` | Tempo máximo de espera pela validação, acima do `timeout_hint_seconds` da capacidade (300) |
+| `PDF_UA_AUDIT_MAX_RULES` | `10` | Regras não atendidas listadas no e-mail; as demais ficam só no relatório do pacote |
 | `TOOLBOX_DOCX_PROVIDER` | `pandoc-docx` | Provider da capacidade `document.export.docx` |
 | `TOOLBOX_DOCX_ENABLED` | `true` | Renderiza o DOCX na Toolbox (Pandoc fixado) ou pula a etapa. Não há fallback local: com `false`, o worker pula o formato sem erro; uma falha da Toolbox é reportada como erro de exportação opcional |
 | `TOOLBOX_DOCX_TIMEOUT_SECONDS` | `300` | Tempo máximo de espera pela renderização na Toolbox antes de reportar erro de exportação opcional |
@@ -360,11 +442,23 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 | `TOOLBOX_TABLE_PROVIDER` | `qwen3-vl-8b` | Regeração de tabelas para o especialista de tabelas (`table.recognize`) |
 | `TOOLBOX_ORIENTATION_PROVIDER` | `rapidocr-orient` | Detecção de rotação (`image.page.orient`) |
 | `FUSION_HYBRID_PROVIDER` | `mineru-hyb` | Id do provider MinerU hybrid-VLM (a fonte B da melhor submissão dentro do método do artigo) |
+| `FUSION_JUDGE_MAX_PAGES` | `5` | Páginas por documento que o juiz VLM pode verificar em `FUSION_MODE=dual`: só as que o roteador determinístico não decide (os dois providers acharam tabela ou fórmula) e que divergem, das menos similares para as mais. O veredito é registrado, não aplicado; uma discordância é um aviso técnico. `0` desliga o juiz |
+| `FUSION_APPLY_PAGE_ROUTES` | `true` | Em `FUSION_MODE=dual`, usa a página do provider secundário onde o roteador determinístico a prefere (tabelas, fórmulas, página primária quase vazia); o texto corrido fica com `TOOLBOX_PROVIDER`. `false` mantém todas as páginas do provider primário |
 
 > `TOOLBOX_USE_ARTIFACT_STORE` e `TOOLBOX_USE_REMOTE_CACHE` afetam diretamente o
-> fluxo de extração: com o artifact store ativo, o core envia o arquivo uma vez e
-> reutiliza o `artifact_id`; com o cache remoto ativo, a Toolbox pode responder a
-> partir do `cache_key` sem reprocessar.
+> fluxo de extração: com o artifact store ativo e uma única implantação, o core
+> envia o arquivo uma vez e reutiliza o `artifact_id`; com vários endpoints
+> independentes, ou após uma falha transitória do upload, ele envia o arquivo em
+> cada chamada de extração, então o `artifact_id` fica `null` e as etapas
+> seguintes (fusão, text spans) reenviam o arquivo. Com o cache remoto ativo, a
+> Toolbox pode responder a partir do `cache_key` sem reprocessar.
+>
+> Em `FUSION_MODE=dual`, uma falha de provider (timeout, indisponibilidade ou um
+> erro HTTP não mapeado, como 500) de qualquer um dos dois degrada a extração
+> para o outro: o documento leva um aviso técnico (`extraction_degraded`,
+> `extraction_failures`) e não é cacheado. Uma recusa do próprio documento
+> (mídia não suportada, entrada inválida, contrato, autenticação) pelo primário
+> derruba o job; pelo secundário, só degrada.
 
 ---
 
@@ -374,8 +468,10 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 service.py: _build_orchestrator()
   └─ PddlAccessibilityOrchestrator(extractor_backend="toolbox")
        └─ ToolboxManifestExtractor (backend/core/manifest/toolbox_extractor.py)
-            ├─ [artifact store] upload_artifact() → /v1/artifacts
-            └─ extract_structure(artifact_id=..., use_remote_cache=...)
+            ├─ [artifact store, uma implantação] upload_artifact() → /v1/artifacts
+            │    (falha transitória → envio direto)
+            ├─ extract_structure(artifact_id=... | file_path=..., use_remote_cache=...)
+            └─ [dual] extract_structure() secundário → fusão, ou degrada para um provider
                  → POST /v1/capabilities/document.structure.extract:execute
                  → ToolboxExtraction (configuration: toolbox_base_url, provider, artifact_id, cache_key)
        └─ InformationalStructuralAgent.process() → manifest
@@ -419,3 +515,32 @@ provider de `document.structure.extract` / `document.layout.analyze` /
 (`differ-v15-hyb`, EvalAI 70.37): o ganho real no test veio da ordem de leitura
 (+16.4) com essa fonte, não do TEDS. Adote-o explicitamente com
 `FUSION_SECONDARY_PROVIDER=mineru-hyb`; o default da fusão dual continua `mineru`.
+
+## Cancelamento durante a extração remota
+
+O cancelamento pela API continua cooperativo: `run_blocking` aguarda a thread
+em execução antes de remover arquivos que ela ainda pode usar. Enquanto o job
+está em `cancelling`, o upload permanece protegido e o estado terminal aguarda
+o fim da operação bloqueante. A fila pode iniciar um substituto sem aguardar essa
+thread. A concorrência normal mantém o valor configurado N (um por padrão).
+Durante a conclusão do trabalho cancelado, um substituto pode executar, mas o
+total de callbacks ativos, incluindo os em cancelamento, nunca ultrapassa N+1.
+O callback adicional pode ser um substituto normal, não necessariamente um job
+cancelado. Ao atingir N+1, novos trabalhos aguardam um callback terminar,
+mesmo que outro job seja cancelado. O ambiente deve reservar memória para essa
+sobreposição limitada.
+
+`GET /api/v1/jobs/{task_id}` informa `cancellation_requested_at` (segundos Unix),
+`cancellation_elapsed_seconds` durante a espera e uma etapa localizada que
+explica o motivo. A página web mostra essa etapa na atualização normal.
+A API persiste `cancelling` e o instante da solicitação antes de confirmar o
+cancelamento; após reiniciar, a recuperação marca esse registro durável como
+`cancelled` e preserva o timestamp. O contador é derivado na leitura e removido
+para jobs terminais. O helper síncrono interno altera apenas a memória; seu
+chamador é responsável pela persistência. Uma queda antes da confirmação da
+API não está coberta por essa garantia.
+Cancelar não envia um comando de interrupção à Toolbox; o trabalho remoto pode
+continuar até terminar ou atingir o timeout. O encerramento da fila continua
+aguardando as operações ativas e nenhum resultado cancelado é publicado. Essa
+mudança não altera os timeouts dos providers nem a verificação antecipada de
+`MAX_PAGES` já existente.

@@ -26,7 +26,8 @@ def require_observability_token(
         )
 
     if credentials is None or not compare_digest(
-        credentials.credentials, settings.observability_api_token
+        credentials.credentials.encode("utf-8"),
+        settings.observability_api_token.encode("utf-8"),
     ):
         raise HTTPException(
             status_code=401,

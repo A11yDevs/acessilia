@@ -46,7 +46,6 @@ EXPECTED_UNCONSUMED = frozenset(
         "chem.recognize",
         "code.normalize",
         "music.omr",
-        "pdf.validate.pdf_ua",
         "text.postprocess",
     }
 )

@@ -21,6 +21,7 @@ from docstruct.fusion.similarity import (
     union_box,
 )
 from docstruct.fusion.types import DiffBlock
+from docstruct.text.math_spans import inline_math_sources
 
 DECOR_TYPES = {"page_header": "header", "page_footer": "footer"}
 DECOR_ORDER = {"header": 0, "footer": 1, "page_number": 2}
@@ -97,9 +98,9 @@ def latex_to_text(md: str) -> str:
 
 
 def demote_formulas(blocks: list[DiffBlock], stats: Counter, tag: str) -> list[DiffBlock]:
-    """Fórmulas sem operador matemático real (química, tabelas de treino) → texto."""
+    """Fórmulas sem operador real viram texto; spans inline explícitos permanecem math."""
     for b in blocks:
-        if b.kind != "formula":
+        if b.kind != "formula" or inline_math_sources(b.md):
             continue
         txt = latex_to_text(b.md)
         chem = (

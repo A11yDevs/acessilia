@@ -115,80 +115,98 @@ Após o merge de um PR na `develop`, a **esteira de CD** (`.github/workflows/del
 constrói automaticamente uma imagem Docker e a publica no GHCR com as tags
 `develop` e `sha-<commit>`.
 
-O ambiente de homologação usa um **timer systemd** (`staging-update.timer`) que
-verifica a cada 60s se há uma nova imagem e reinicia o container automaticamente.
-Veja [docs/homologacao-systemd.md](docs/homologacao-systemd.md) para instruções
-detalhadas de instalação e gerenciamento.
-
-O setup completo do ambiente de homologação está em:
+O servidor de homologação roda a partir de um clone deste repositório e de um user timer
+do systemd (`acessilia-staging-update.timer`) que consulta a branch rastreada a cada
+5 minutos e atualiza o container quando a imagem de um commit novo está no GHCR. O
+`scripts/ops.sh` instala e opera esse ambiente; veja
+[docs/homologacao-systemd.pt-br.md](docs/homologacao-systemd.pt-br.md).
 
 - `docker-compose.staging.yml` — define o container
-- `scripts/staging-update.sh` — script de atualização
-- `scripts/setup-homologacao.sh` — script de configuração inicial
+- `scripts/ops.sh` — `auto-update setup|status|start|migrate`, `track` e os comandos de BHS
+- `scripts/staging-update.sh` — a atualização em si, rodada pelo `ops.sh auto-update start`
 
 ```bash
 # Consultar qual imagem está no ar (via API de health)
 curl http://homologacao:8000/api/v1/health | jq .
 
-# Ou puxar manualmente uma imagem específica para testar
- docker pull ghcr.io/a11ydevs/acessilia:sha-abc1234
-
-# Verificar qual tag está rodando no container
-docker inspect acessilia-staging | jq '.[0].Config.Image'
+# Ou, no servidor, o quadro completo
+./scripts/ops.sh auto-update status
 ```
-
-O setup completo do ambiente de homologação está em:
-
-- `docker-compose.staging.yml` — define o container + Watchtower
-- `scripts/setup-homologacao.sh` — script de configuração inicial
 
 ### 5.1 Bug Hunting/Squashing (BHS)
 
 Antes de cada release, há um ciclo de **Bug Hunting/Squashing (BHS)**: um período em
 que o staging testa exatamente o candidato a release, sem misturar features ainda
-em desenvolvimento. Para isso, criamos uma branch efêmera `release/x.y.z` a partir
-da `develop`.
+em desenvolvimento. Para isso, derivamos da `develop` uma branch efêmera
+`release/x.y.z`, que passa a ser a candidata a substituir a `main`.
 
-1. **Cut** — no início do BHS, corte a branch de release a partir da `develop`:
+A acessilia e o [Toolbox](https://github.com/A11yDevs/acessilia-toolbox) fazem o
+BHS juntos, com a mesma versão. **Corte o Toolbox primeiro**: o CI confere uma
+`release/x.y.z` contra o contrato de capabilities da `release/x.y.z` do Toolbox.
+
+1. **Cut** — no início do BHS:
 
    ```bash
-   git checkout develop && git pull
-   git checkout -b release/0.0.1 origin/develop
-   git push origin release/0.0.1
+   ./scripts/ops.sh bhs start 0.2.0
    ```
+
+   O script deriva `release/0.2.0` de `origin/develop`, faz nela o commit do
+   aumento de versão (`pyproject.toml` e `uv.lock`) e a publica, num worktree
+   temporário: o seu checkout não é tocado. Ele recusa uma versão cuja branch
+   ou tag `v` já existe.
 
 2. **Durante o BHS**:
-   - PRs `fix/*` que corrigem bugs encontrados no staging vão para `release/0.0.1`
-     (em vez de `develop`).
-   - PRs `feat/*` continuam mirando `develop` normalmente — a `develop` nunca é
-     bloqueada, pois o escopo da release já foi travado no cut.
+   - PRs `fix/*` (ou `hotfix/*`) que corrigem bugs encontrados no staging vão
+     para `release/0.2.0` (em vez de `develop`). O job de CI `release-scope`
+     rejeita PRs de qualquer outra branch.
+   - PRs `feat/*`, `refactor/*` e demais continuam mirando `develop`
+     normalmente — a `develop` nunca é bloqueada, pois o escopo da release já
+     foi travado no cut.
    - A **esteira de CI** (`ci.yml`) roda os mesmos testes em PRs para `release/**`.
-   - A **esteira de CD** (`delivery.yml`) publica a imagem da `release/0.0.1` no
-     GHCR com as tags `release-0.0.1` e `sha-<commit>`.
+   - A **esteira de CD** (`delivery.yml`) publica a imagem da `release/0.2.0` no
+     GHCR com as tags `release-0.2.0` e `sha-<commit>`.
 
-3. **Staging aponta para a release** — defina `TRACK_BRANCH=release/0.0.1` no
-   `.env` do servidor de homologação para que `scripts/staging-update.sh` passe
-   a rastrear a branch de release (tag de imagem `release-0.0.1`) em vez da
-   `develop`:
+3. **Staging aponta para a release** — no servidor de homologação, dentro do
+   clone (o Toolbox primeiro):
 
    ```bash
-   echo "TRACK_BRANCH=release/0.0.1" >> .env
+   ./scripts/ops.sh track release/0.2.0
    ```
 
-4. **Fechamento do BHS** — quando a release estiver estável:
+   Ele faz checkout e pull da `release/0.2.0`, grava `TRACK_BRANCH` (e
+   `TRACK_TAG`) no `.env` e atualiza, e o staging passa a rodar a imagem
+   `release-0.2.0`. Rode `./scripts/ops.sh bhs status` na sua máquina para ver
+   o CI, a imagem e os PRs da release.
+
+4. **Fechamento do BHS** — quando a release estiver estável (feche o Toolbox
+   primeiro: o CI da `main` confere o contrato da `main` do Toolbox):
 
    ```bash
-   # Merge para main (gera a release oficial, ver seção 6)
-   # Abra um PR de release/0.0.1 → main e mescle após aprovação
-
-   # Propaga as correções para develop
-   # Abra um PR de release/0.0.1 → develop e mescle após aprovação
-
-   git push origin --delete release/0.0.1
+   ./scripts/ops.sh bhs finish 0.2.0            # abre release/0.2.0 → main e chore/sync-release-0.2.0 → develop
+   # revise e mescle OS DOIS PRs com "Create a merge commit" (sem squash/rebase)
+   # na homologação, depois do merge da sync: ./scripts/ops.sh track develop
+   ./scripts/ops.sh bhs finish 0.2.0 --cleanup  # cria a tag v0.2.0 no merge da main e apaga as branches
    ```
 
-   Depois, remova (ou reverta) `TRACK_BRANCH` do `.env` de homologação para que
-   o staging volte a rastrear a `develop`.
+   As correções chegam à `develop` por `chore/sync-release-0.2.0`, derivada da
+   release: resolva os conflitos com a `develop` nela, nunca em
+   `release/0.2.0`, que vai para a `main`. Rodar o script de novo leva para a
+   sync os fixes mesclados depois.
+
+   Os dois PRs usam **Create a merge commit**, nunca squash ou rebase: `main` e
+   `develop` precisam compartilhar os commits da release e a ancestralidade
+   deles. Mescle os últimos fixes da release antes do PR de sync, ou rode
+   `bhs finish` de novo e revise/mescle o PR de sync atualizado. O cleanup se
+   recusa a criar a tag ou apagar branches enquanto o head atual da release não
+   estiver contido na `develop`, na `main` e no merge registrado da `main`; dois
+   PRs mesclados antes não bastam.
+
+   Antes do cleanup, no servidor de homologação, `./scripts/ops.sh track develop`
+   volta a rastrear a `develop` (só depois do merge do PR de sync: o `track`
+   recusa uma branch sem `scripts/ops.sh`). Confirme que a homologação
+   atualizou e só então faça o cleanup: ele apaga a branch de release que a
+   homologação rastreava. A produção continua fixada; veja
+   [Preparação e ativação da produção](docs/production-systemd.pt-br.md).
 
 ### 5.2 Bibliotecas em `libs/` (docstruct e SDK)
 
@@ -219,25 +237,24 @@ Apenas mantenedores ([@marceloakira](https://github.com/marceloakira),
 [@jhonata192](https://github.com/jhonata192) e
 [@fragaeduardo](https://github.com/fragaeduardo)) podem mesclar uma release na `main`.
 
-1. **QA homologou?** → siga em frente.
-2. Abra um Pull Request de `release/x.y.z` para `main` no GitHub.
+1. **QA homologou o BHS?** → siga em frente.
+2. Rode `./scripts/ops.sh bhs finish x.y.z`, que abre o Pull Request de
+   `release/x.y.z` para `main`.
 3. Solicite revisão de outro mantenedor.
-4. Após aprovação, faça o merge (preferencialmente "Create a merge commit").
+4. Após aprovação, faça o merge com **"Create a merge commit"**: a release
+   substitui a `main`, e squash ou rebase descartariam a história dela.
 5. A **esteira de CD** na `main` publica as tags `main`, `latest` e `sha-<commit>`.
-6. Promova o ambiente produtivo conforme [docs/producao-systemd.md](docs/producao-systemd.md).
+6. O merge e a tag não promovem a produção: promova-a manualmente, com o
+   digest de imagem aprovado, conforme [docs/production-systemd.pt-br.md](docs/production-systemd.pt-br.md).
 
-Para criar uma **Release oficial** com versão semântica:
+A versão já foi atualizada na branch de release no cut. Para criar a
+**Release oficial** com versão semântica:
 
 ```bash
-# 1. Garanta que a versão no pyproject.toml foi atualizada na branch de release
-#    (ex: 0.1.0 para a branch release/0.1.0)
-git checkout main && git pull
+# 1. Crie a tag no merge da main (também apaga release/x.y.z e a branch de sync)
+./scripts/ops.sh bhs finish 0.2.0 --cleanup
 
-# 2. Crie a tag semântica
-git tag v0.1.0
-git push origin v0.1.0
-
-# 3. O workflow Release (release.yml) builda e publica 0.1.0, 0.1 e 0
+# 2. O workflow Release (release.yml) builda e publica 0.2.0, 0.2 e 0
 #    no GHCR, e cria a GitHub Release com changelog automático
 ```
 

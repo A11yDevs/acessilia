@@ -60,6 +60,18 @@ depois de detectar um commit novo. No caminho "nenhum commit novo" (linha ~162) 
 grava o status com digests vazios. Como a comparação de digest não funciona sem o lado
 do GHCR ser buscado, a checagem é estruturalmente incapaz de reportar "atualizado".
 
+Desdobramento: o `/health` agora também reporta `update_check_stale`, verdadeiro
+quando `last_check` tem mais de três intervalos do timer (15 min) ou é ilegível, e
+`up_to_date` fica falso enquanto isso valer. Ressalvas para consumidores:
+
+- `up_to_date: false` não implica mais `update_available: true`: com o updater
+  parado, ambos são falsos. Monitores que alertam só em `update_available` não
+  disparam nesse caso; alerte também em `update_check_stale`.
+- Detecta o updater que **parou** de checar, não o que checa mas **falha** (por
+  exemplo, GHCR inacessível enquanto o timer continua gravando `last_check`).
+- `last_check` é gravado com o relógio do host e comparado com o do container; um
+  desvio acima de 15 min reporta stale falso.
+
 ### S3 — A imagem da Toolbox não reporta identidade de build (médio)
 
 ```json
@@ -126,8 +138,11 @@ LOCALE=pt_BR
 LOG_LEVEL=DEBUG
 ```
 
-Duas observações:
+Três observações:
 
+- `AI_CLIENT=openrouter` não vale mais: o `docker-compose.staging.yml` fixa
+  `AI_CLIENT=toolbox` (#331, [ADR-0012](adr/0012-agents-reach-the-vlm-through-the-toolbox.pt-br.md)),
+  que vence o `.env`, então `OPENROUTER_MODEL` também não é lido.
 - `STRUCTURER` aparece duas vezes. O valor efetivo é `toolbox`, correto para o pipeline
   PDDL, mas a duplicata é uma armadilha latente para quem editar o arquivo depois.
 - `TOOLBOX_BASE_URL` aponta para a URL pública do proxy reverso

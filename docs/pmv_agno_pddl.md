@@ -318,7 +318,7 @@ The domain v2.3 adds the matching obligation kinds (`adjudicate-page`,
 `fuse-providers`, `refine-reading-order`, `normalize-formula`,
 `rescue-omitted-block`, `guard-repetition`, `join-tail-blocks`,
 `select-table-source`, `chunk-verse`, `extract-line-numbers`,
-`normalize-text`). The PDDL structure is unchanged: each is an ordinary
+`normalize-text`, `repair-legacy-unicode`). The PDDL structure is unchanged: each is an ordinary
 `obligationkind` symbol with its own `supports`/`admissible`/`execution-cost`.
 Deterministic methods cost 5–15; model-consuming methods cost 40–60, so the
 planner only reaches for them when the deterministic path is unavailable.

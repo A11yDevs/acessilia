@@ -18,7 +18,7 @@ The system runs the `pddl` pipeline engine (the manifest → plan → execution 
 5. [Endpoints & APIs](endpoints.md) — the REST API, the Web panel, and the AgentOS runtime.
 6. [Automated Test Suite](../tests/README.md) — test strategy and coverage.
 7. [Docker Compose](docker-compose.md) — local execution, GHCR images, staging and production update paths.
-8. [Production systemd timer](producao-systemd.md) — production setup, promotion and rollback procedure.
+8. [Production systemd timer](production-systemd.md) — production setup, promotion and rollback procedure.
 9. [Internationalization (i18n)](i18n.md) — what is localized, where the locale strings files live, and step-by-step guides for adding strings, internationalizing a file, and adding a new locale.
 10. [Benchmark harness](bench.md) — run and score the core on Dr.DocBench (and other datasets) with `python -m scripts.bench`.
 11. [Dr.DocBench benchmark](drbench.md) — structure-extraction provider benchmark (Docling vs MinerU), metrics and results.
@@ -26,6 +26,7 @@ The system runs the `pddl` pipeline engine (the manifest → plan → execution 
 13. [Architecture Decision Records](adr/README.md) — cross-component decisions (responsibilities, remote-only execution, contracts, artifact references, availability, the manifest model and MathML conversion and verbalization of formulas) and how to propose a new one. (Brazilian Portuguese: [versão em pt-BR](adr/README.pt-br.md))
 14. [Architecture audit, October 2026](architecture/audit-2026-10.md) — what is still implemented twice across the components, the remaining operational dependencies, the architectural guards and the initial metrics, with an owner and a destination for each finding. (Brazilian Portuguese: [versão em pt-BR](architecture/audit-2026-10.pt-br.md))
 15. [Processing manifest model inventory](architecture/manifest-model-inventory.md) — every class and field of the manifest sorted into document, origin, process and envelope, with the invariants and the differences between the core's and the Toolbox's copies (#203, stage 5). (Brazilian Portuguese: [pt-BR version](architecture/manifest-model-inventory.pt-br.md))
+16. [Core data migration, 0.1.0 to 0.2.0](data-migration-0.1.0-to-0.2.0.md) — migrate unexpired download assets and supporting records with simulation, path adaptation, checksum verification and rollback. (Brazilian Portuguese: [pt-BR version](data-migration-0.1.0-to-0.2.0.pt-br.md))
 
 ---
 

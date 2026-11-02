@@ -4,9 +4,14 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Coroutine
 
-from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
+from backend.agents.pddl_orchestrator import (
+    PddlAccessibilityOrchestrator,
+    records_extraction_degradation,
+    records_visual_failures,
+)
 from backend.agents.state_manager import TaskCancelledError, state_manager
 from backend.services.cache import (
+    drop_cache,
     get_cached,
     options_cache_key,
     processing_cache_configuration,
@@ -80,7 +85,7 @@ def _cache_version(
 ) -> str:
     engine = _normalized_engine()
     return options_cache_key(
-        f"{settings.ai_client}-{engine}-v10",
+        f"{settings.ai_client}-{engine}-v12",
         mode=mode,
         custom_prompt=custom_prompt or "",
         thinking_mode=thinking_mode,
@@ -144,8 +149,20 @@ async def process(
     custom_prompt: str | None = None,
     thinking_mode: bool = False,
     task_id: str | None = None,
+    display_filename: str | None = None,
 ) -> dict[str, Any]:
+    """Process one document and return its canonical document.
+
+    ``display_filename`` is the name the user uploaded. The API stores the
+    upload under a random name (``<uuid>.pdf``), so without it a document
+    with no heading would take that UUID as its title and source name, in
+    every export (#333).
+    """
     external_task_id = task_id is not None
+    # Only the name, never a path the client sent.
+    shown_name = (
+        Path(display_filename.replace("\\", "/")).name if display_filename else ""
+    ) or file_path.name
     if task_id is None:
         task_id = state_manager.criar_tarefa(file_path)
     elif state_manager.obter(task_id) is None:
@@ -154,7 +171,7 @@ async def process(
     inicio = time.time()
     await registrar_conversao(
         task_id=task_id,
-        arquivo=file_path.name,
+        arquivo=shown_name,
         extensao=file_path.suffix,
         tamanho_bytes=file_path.stat().st_size,
         modo=mode,
@@ -169,7 +186,9 @@ async def process(
                 metadata = {}
             execution_status = metadata.get("pddl_execution_status")
             media_inspection = metadata.get("pddl_media_inspection")
-            # A run degraded by a Toolbox failure is marked `cacheable: false`
+            fusion = metadata.get("pddl_fusion") or {}
+            open_obligations = metadata.get("pddl_unsatisfied_obligations") or []
+            # A run degraded by a Toolbox or model failure is marked `cacheable: false`
             # and never written (see below); the check here keeps that
             # invariant explicit for entries written before the flag existed.
             media_inspection_failed = (
@@ -179,6 +198,11 @@ async def process(
                 execution_status in {"failed", "replan-required"}
                 or (not settings.pddl_execute_dry_run and execution_status == "dry-run-completed")
                 or media_inspection_failed
+                or cached.get("cacheable") is False
+                or fusion.get("status") == "degraded"
+                or any(item.get("recovery") != "human-review" for item in open_obligations)
+                or records_visual_failures(metadata.get("pddl_visual_failures"))
+                or records_extraction_degradation(metadata.get("pddl_extraction_degraded"))
             ):
                 cached = None
         if cached is not None:
@@ -187,10 +211,10 @@ async def process(
             canonical_metadata, technical_warnings = _canonical_details(cached)
             canonical_document = build_canonical_document(
                 cached,
-                title=file_path.stem,
+                title=Path(shown_name).stem,
                 language="pt-BR",
                 verbosity=verbosity_for_mode(mode),
-                source_name=file_path.name,
+                source_name=shown_name,
                 source_path=str(file_path),
                 audience=["reader"],
                 metadata=canonical_metadata,
@@ -266,10 +290,10 @@ async def process(
 
         canonical_document = build_canonical_document(
             processed_result,
-            title=file_path.stem,
+            title=Path(shown_name).stem,
             language="pt-BR",
             verbosity=verbosity_for_mode(mode),
-            source_name=file_path.name,
+            source_name=shown_name,
             source_path=str(file_path),
             audience=["reader"],
             metadata=canonical_metadata,
@@ -279,6 +303,9 @@ async def process(
         if not isinstance(processed_result, dict) or processed_result.get("cacheable", True):
             await set_cache(file_path, processed_result, cache_variant)
         else:
+            # An entry refused above would otherwise be read and refused again
+            # on every request while the reruns stay degraded.
+            await drop_cache(file_path, cache_variant)
             logger.debug("Resultado degradado nao cacheado para {}", file_path.name)
         _salvar_json_canonico(canonical_document, file_path.name)
 
@@ -311,12 +338,12 @@ async def process(
 
     except Exception as e:
         logger.error(t(LOG_PIPELINE_ERROR).format(error_type=type(e).__name__, error=e))
-        state_manager.errar(task_id, str(e))
+        erro = state_manager.errar(task_id, str(e) or type(e).__name__)
 
         await finalizar_conversao(
             task_id=task_id,
             status="error",
-            erro=str(e),
+            erro=erro,
             tempo_segundos=time.time() - inicio,
         )
 

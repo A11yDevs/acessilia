@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import quote
 
 from acessilia_sdk.toolbox.client import ToolboxCapabilityClient
 from acessilia_sdk.toolbox.errors import ToolboxContractViolation
@@ -86,9 +87,10 @@ class ToolboxDatasetClient(ToolboxCapabilityClient):
         revision: str | None = None,
     ) -> bytes:
         """The raw bytes of an item's artifact."""
+        encoded_path = quote(artifact_path, safe="/")
         _, response = await self._request_on(
             "GET",
-            f"/v1/datasets/{dataset_id}/splits/{split}/items/{item_id}/artifacts/{artifact_path}",
+            f"/v1/datasets/{dataset_id}/splits/{split}/items/{item_id}/artifacts/{encoded_path}",
             capability_id=GET_ARTIFACT_CAPABILITY,
             params=_revision(revision),
         )

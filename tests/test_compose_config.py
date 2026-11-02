@@ -20,7 +20,7 @@ def test_production_compose_uses_main_image_and_production_container():
 
     service = compose["services"]["acessilia"]
 
-    assert service["image"] == "ghcr.io/a11ydevs/acessilia:${TRACK_TAG:-main}"
+    assert service["image"] == "${PRODUCTION_IMAGE:-ghcr.io/a11ydevs/acessilia:${TRACK_TAG:-main}}"
     assert service["container_name"] == "acessilia-production"
     assert service["restart"] == "unless-stopped"
 

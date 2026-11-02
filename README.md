@@ -17,7 +17,7 @@ The project follows the *Domain → Application → Interface* layering:
 
 ### Standalone API
 
-The **API** (`http://localhost:8000`) is the core: it receives files, enqueues them, processes them with LLMs, exports the accessible formats (TXT, DOCX, PDF, PDF/UA, HTML, MP3, ZIP), and makes downloads available via a token. All frontends (web, Telegram, CLI) consume it over HTTP using the shared client `frontend.clients.api_client.ApiClient`.
+The **API** (`http://localhost:8000`) is the core: it receives files, enqueues them, processes them with LLMs, exports the accessible formats (TXT, DOCX, PDF/UA, HTML, MP3, ZIP), and makes downloads available via a token. All frontends (web, Telegram, CLI) consume it over HTTP using the shared client `frontend.clients.api_client.ApiClient`.
 
 Main endpoints (`/api/v1`):
 
@@ -44,6 +44,8 @@ The repository pins Python 3.11 in `.python-version`, the same version CI and th
 uv sync
 cp .env.example .env   # configure the keys (AI, SMTP, Telegram)
 ```
+
+After pulling, `uv run python scripts/sync_env.py` appends the keys added to `.env.example` since your `.env` was created and lists the keys of your `.env` that look deprecated (`--check` only reports).
 
 ## Running It
 

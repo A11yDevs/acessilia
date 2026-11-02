@@ -12,9 +12,12 @@ from types import SimpleNamespace
 import pytest
 
 from backend.agents import pddl_orchestrator as pddl
+from backend.core.execution.messages import EXE_COMPLETED_OBLIGATIONS_UNSATISFIED
 from backend.core.execution.models import MethodResult
 from backend.core.manifest.builder import _derive_processing_needs
 from backend.core.manifest.models import Obligation
+from backend.i18n import t
+from backend.stage_messages import STAGE_PAGE, STAGE_PAGE_UNKNOWN, STAGE_PAGES
 from backend.tools.logger import logger
 from tests.pddl_support import build_element, build_manifest, build_orchestrator
 
@@ -174,14 +177,92 @@ async def test_job_finishes_with_warning_when_only_refinements_remain(
     assert payload["canonical_metadata"]["pddl_execution_status"] in {
         "failed", "replan-required",
     }
-    assert any("o-refine" in warning for warning in payload["technical_warnings"])
+    assert any("normalize-text" in warning for warning in payload["technical_warnings"])
     assert _open_ids(payload) == ["o-refine"]
     assert _heading_levels(payload) == [1, 2, 2]
 
 
 @pytest.mark.asyncio
+async def test_an_omitted_block_with_no_rescue_method_does_not_fail_the_job(
+    monkeypatch, tmp_path
+):
+    """`rescue-omitted` has no handler, so only human review was left to fail."""
+    rescue = _open_obligation(
+        "o-rescue", "rescue-omitted-block", ["rescue-omitted", "human-review"]
+    )
+
+    payload = await _run(
+        _orchestrator(max_replans=2), _headings_manifest(rescue), monkeypatch, tmp_path
+    )
+
+    assert _open_ids(payload) == ["o-rescue"]
+    # Delivered, not dropped silently: the omitted block is reported, and the
+    # summary the result e-mail carries names it.
+    assert any(
+        "rescue-omitted-block" in warning for warning in payload["technical_warnings"]
+    )
+    assert "rescue-omitted-block" in (
+        payload["canonical_metadata"]["pddl_unsatisfied_summary"]
+    )
+
+
+def test_the_job_error_groups_open_obligations_by_kind_and_page():
+    """006.pdf's e-mail listed every obligation id with all its target elements."""
+    order = _reading_order()
+    # A second obligation of the same kind: its page merges into the group.
+    second_order = _open_obligation(
+        "o-order-2", "refine-reading-order", ["xycut-order", "human-review"]
+    )
+    second_order.target_ids = ["heading-1"]
+    describe = _describe_image(["human-review"], {"human-review": 100})
+    for obligation in (order, second_order, describe):
+        obligation.status = "failed"
+    manifest = _headings_manifest(
+        order,
+        second_order,
+        describe,
+        extra_elements=[build_element("image", "picture", reading_order=10)],
+    )
+    open_ids = {"o-order", "o-order-2", "o-describe"}
+    for obligation in manifest.obligations:
+        obligation.selected = obligation.id in open_ids
+    elements = {element.id: element for element in manifest.elements}
+    elements["heading-1"].page_number = 2
+    elements["image"].page_number = None
+
+    summary = pddl._unsatisfied_summary(manifest)
+
+    expected = "; ".join([
+        f"refine-reading-order ({t(STAGE_PAGES).format(pages='1, 2')})",
+        f"describe-image ({t(STAGE_PAGE_UNKNOWN)})",
+    ])
+    assert summary == t(EXE_COMPLETED_OBLIGATIONS_UNSATISFIED).format(
+        unsatisfied=expected
+    )
+
+
+@pytest.mark.asyncio
+async def test_a_judge_verdict_for_the_secondary_provider_does_not_fail_the_job(
+    monkeypatch, tmp_path
+):
+    """The page swap is not applied, so the verdict is a warning, not a failure."""
+    orchestrator = _orchestrator(max_replans=2)
+    orchestrator.executor.registry.register("vlm-pairwise-judge", _failing)
+    adjudication = _open_obligation(
+        "o-adjudicate", "adjudicate-page", ["vlm-pairwise-judge", "human-review"]
+    )
+
+    payload = await _run(
+        orchestrator, _headings_manifest(adjudication), monkeypatch, tmp_path
+    )
+
+    assert _open_ids(payload) == ["o-adjudicate"]
+    assert any("adjudicate-page" in warning for warning in payload["technical_warnings"])
+
+
+@pytest.mark.asyncio
 async def test_open_reading_order_still_fails_the_job(monkeypatch, tmp_path):
-    with pytest.raises(RuntimeError, match="o-order"):
+    with pytest.raises(RuntimeError, match="refine-reading-order"):
         await _run(
             _orchestrator(max_replans=2),
             _headings_manifest(_reading_order()),
@@ -194,18 +275,179 @@ async def test_open_reading_order_still_fails_the_job(monkeypatch, tmp_path):
 async def test_job_still_fails_when_a_critical_obligation_remains(
     monkeypatch, tmp_path
 ):
+    table = Obligation(
+        id="o-table",
+        kind="linearize-table",
+        target_ids=["table"],
+        admissible_methods=["human-review"],
+        method_costs={"human-review": 100},
+        rationale="Linearizar a tabela",
+    )
     manifest = _headings_manifest(
         _text_refinement(),
-        _describe_image(["human-review"], {"human-review": 100}),
-        extra_elements=[build_element("image", "picture", reading_order=10)],
+        table,
+        extra_elements=[build_element("table", "table", reading_order=10)],
     )
 
-    with pytest.raises(RuntimeError, match="o-describe"):
+    with pytest.raises(RuntimeError, match="linearize-table"):
         await _run(_orchestrator(max_replans=2), manifest, monkeypatch, tmp_path)
 
 
+def _two_images_manifest():
+    """A picture on page 23 and one on page 24, each with its own obligation."""
+    images = []
+    obligations = []
+    for name, page in (("image", 23), ("other", 24)):
+        image = build_element(name, "picture", reading_order=page)
+        image.page_number = page
+        images.append(image)
+        obligation = _describe_image(
+            ["vision-description", "human-review"],
+            {"vision-description": 20, "human-review": 100},
+        )
+        obligation.id = f"o-describe-{name}"
+        obligation.target_ids = [name]
+        obligations.append(obligation)
+    return _headings_manifest(*obligations, extra_elements=images)
+
+
+def _describes(*described_ids):
+    def handler(manifest, obligation_id):
+        if obligation_id in described_ids:
+            return _succeeding(manifest, obligation_id)
+        return _failing(manifest, obligation_id)
+
+    return handler
+
+
 @pytest.mark.asyncio
-async def test_replan_skips_exhausted_refinement_and_rescues_critical_one(
+async def test_an_image_the_model_could_not_describe_does_not_fail_the_job(
+    monkeypatch, tmp_path
+):
+    """006.pdf: two degenerate vision answers out of 40 failed 42 pages."""
+    orchestrator = _orchestrator(max_replans=2)
+    orchestrator.executor.registry.register(
+        "vision-description", _describes("o-describe-other")
+    )
+
+    payload = await _run(orchestrator, _two_images_manifest(), monkeypatch, tmp_path)
+
+    assert _open_ids(payload) == ["o-describe-image"]
+    alt_texts = [
+        block["alt_text"]
+        for page in payload["pages"]
+        for block in page["blocks"]
+        if block["type"] == "image"
+    ]
+    assert len(alt_texts) == 2 and all(alt_texts)
+    summary = payload["canonical_metadata"]["pddl_unsatisfied_summary"]
+    assert f"describe-image ({t(STAGE_PAGE).format(page=23)})" in summary
+
+
+@pytest.mark.asyncio
+async def test_a_document_with_no_image_described_still_fails(monkeypatch, tmp_path):
+    """No description at all is a broken model or key, not sampling."""
+    orchestrator = _orchestrator(max_replans=2)
+    orchestrator.executor.registry.register("vision-description", _describes())
+
+    with pytest.raises(RuntimeError, match="describe-image"):
+        await _run(orchestrator, _two_images_manifest(), monkeypatch, tmp_path)
+
+
+FORMULA_OBLIGATION_METHODS = {
+    "verbalize-formula": ["mathml", "latex-verbalizer", "human-review"],
+    "normalize-formula": ["latex-normalizer", "mathml", "human-review"],
+}
+
+
+def _formula_manifest(text, kind="verbalize-formula"):
+    """A formula-target obligation whose automatic methods all fail."""
+    formula = build_element("formula", "formula", text=text)
+    formula.page_number = 26
+    methods = FORMULA_OBLIGATION_METHODS[kind]
+    obligation = Obligation(
+        id="o-formula",
+        kind=kind,
+        target_ids=["formula"],
+        admissible_methods=methods,
+        method_costs={
+            method: 100 if method == "human-review" else 10 for method in methods
+        },
+        rationale="Formula must be accessible",
+    )
+    return build_manifest([formula], [obligation])
+
+
+def _failing_formula_methods(orchestrator):
+    for method in ("mathml", "latex-verbalizer", "latex-normalizer"):
+        orchestrator.executor.registry.register(method, _failing)
+
+
+@pytest.mark.asyncio
+async def test_an_unverbalized_formula_keeps_its_latex_and_does_not_fail_the_job(
+    monkeypatch, tmp_path
+):
+    """006.pdf, page 26: chemical structures the Toolbox cannot verbalize.
+
+    Both automatic methods fail and human review is the only option left. The
+    formula is still exported as LaTeX, so the job delivers with a warning
+    instead of failing the whole 42-page document.
+    """
+    orchestrator = _orchestrator(max_replans=2)
+    _failing_formula_methods(orchestrator)
+
+    payload = await _run(
+        orchestrator, _formula_manifest("$E=mc^2$"), monkeypatch, tmp_path
+    )
+
+    assert _open_ids(payload) == ["o-formula"]
+    assert any(
+        "verbalize-formula" in warning for warning in payload["technical_warnings"]
+    )
+    summary = payload["canonical_metadata"]["pddl_unsatisfied_summary"]
+    assert f"verbalize-formula ({t(STAGE_PAGE).format(page=26)})" in summary
+
+
+@pytest.mark.asyncio
+async def test_an_unnormalized_formula_keeps_its_latex_and_does_not_fail_the_job(
+    monkeypatch, tmp_path
+):
+    """`normalize-formula` is the same degradation: the element keeps its text."""
+    orchestrator = _orchestrator(max_replans=2)
+    _failing_formula_methods(orchestrator)
+
+    payload = await _run(
+        orchestrator,
+        _formula_manifest("$E=mc^2$", kind="normalize-formula"),
+        monkeypatch,
+        tmp_path,
+    )
+
+    assert _open_ids(payload) == ["o-formula"]
+    assert any(
+        "normalize-formula" in warning for warning in payload["technical_warnings"]
+    )
+    summary = payload["canonical_metadata"]["pddl_unsatisfied_summary"]
+    assert f"normalize-formula ({t(STAGE_PAGE).format(page=26)})" in summary
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["verbalize-formula", "normalize-formula"])
+async def test_a_formula_with_no_readable_content_still_fails(
+    monkeypatch, tmp_path, kind
+):
+    """With no LaTeX, MathML or speech there is nothing to deliver."""
+    orchestrator = _orchestrator(max_replans=2)
+    _failing_formula_methods(orchestrator)
+
+    with pytest.raises(RuntimeError, match=kind):
+        await _run(
+            orchestrator, _formula_manifest(None, kind=kind), monkeypatch, tmp_path
+        )
+
+
+@pytest.mark.asyncio
+async def test_replan_skips_exhausted_refinement_and_rescues_another_one(
     monkeypatch, tmp_path
 ):
     # One execution exhausts the refinement (human review only) while the image
@@ -227,8 +469,8 @@ async def test_replan_skips_exhausted_refinement_and_rescues_critical_one(
     payload = await _run(orchestrator, manifest, monkeypatch, tmp_path)
 
     assert payload["canonical_metadata"]["pddl_execution_status"] == "completed"
-    assert any("o-refine" in warning for warning in payload["technical_warnings"])
+    assert any("normalize-text" in warning for warning in payload["technical_warnings"])
     assert not any(
-        "o-describe" in warning for warning in payload["technical_warnings"]
+        "describe-image" in warning for warning in payload["technical_warnings"]
     )
     assert _open_ids(payload) == ["o-refine"]

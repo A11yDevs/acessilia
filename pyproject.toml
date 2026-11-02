@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "acessilia"
-version = "0.1.0"
+version = "0.2.0"
 description = "Extração, classificação e conversão de documentos (PDF, DOCX, imagens) em formatos acessíveis com LLMs, servidas por API REST, painel web, bot do Telegram e CLI."
 authors = [{name = "Jhonata"}]
 license = {text = "MIT"}
@@ -13,15 +13,12 @@ requires-python = ">=3.11,<3.14"
 dependencies = [
     "loguru>=0.7.3,<0.8",
     "aiosmtplib>=5.1.2,<6",
-    "edge-tts>=7.2.8,<8",
+    "edge-tts>=7.3.1,<8",
     "fastapi>=0.115,<0.116",
     "pydantic>=2.10,<3",
     "uvicorn>=0.30,<0.31",
     "aiogram>=3.13,<4",
     "httpx>=0.27,<0.28",
-    "reportlab>=4.2,<5",
-    # Hard requirement of reportlab; pinned here so the image and CI resolve the same major.
-    "pillow>=10.4,<11",
     "python-dotenv>=1.0,<2",
     "slowapi>=0.1.10,<0.2",
     "python-multipart>=0.0.32,<0.1",
@@ -32,6 +29,10 @@ dependencies = [
     "ollama>=0.6.2,<0.7",
     "sqlalchemy>=2.0.51,<3",
     "babel>=2.18.0,<3",
+    # Character similarity of the two providers' pages in dual fusion, on the
+    # scale of the VLM judge's gate (docstruct's pure-Python ratio takes ~2 s a
+    # page). Also docstruct's text_ed accelerator for `scripts.bench score`.
+    "rapidfuzz>=3.9,<4",
     # Núcleo puro de processamento estrutural (libs/docstruct, instalado editável)
     "acessilia-docstruct",
     # Acesso às capacidades da Toolbox pelo contrato HTTP (libs/sdk, instalado editável)
@@ -48,11 +49,8 @@ dev = [
     "pytest>=9.1.1,<10",
     "respx>=0.23.1,<0.24",
     "pytest-asyncio>=1.4.0,<2",
-    # Levenshtein accelerator of docstruct's text_ed; `scripts.bench score`
-    # falls back to pure Python without it (~20 s for a 3,000-character page).
-    "rapidfuzz>=3.9,<4",
-    # Reads the PDFs the renderer tests produce.
-    "pypdf>=6.14.2,<7",
+    # Builds the page images the Toolbox end-to-end tests send.
+    "pillow>=10.4,<11",
     # Builds and renders test PDFs (tests/toolbox_render_fake.py and fixtures);
     # the application renders and extracts only on the Toolbox.
     "pymupdf>=1.24,<2",
@@ -76,5 +74,5 @@ include = ["backend*", "frontend*"]
 testpaths = ["tests"]
 addopts = "--strict-config --strict-markers -ra"
 markers = [
-    "e2e: requires a running Acessilia Toolbox instance at TOOLBOX_BASE_URL",
+    "e2e: requires a running Acessilia Toolbox at TOOLBOX_BASE_URL or Core API at CORE_BASE_URL",
 ]

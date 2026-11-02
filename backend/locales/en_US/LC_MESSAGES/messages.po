@@ -64,6 +64,16 @@ msgstr "The email could not be sent. You can download your files here."
 msgid "The result email was sent. You can also download your files here."
 msgstr "The result email was sent. You can also download your files here."
 
+msgid ""
+"We could not send the email about this failure; the notices below show "
+"what happened."
+msgstr ""
+"We could not send the email about this failure; the notices below show "
+"what happened."
+
+msgid "We sent you an email about this failure."
+msgstr "We sent you an email about this failure."
+
 msgid "Job status is temporarily unavailable. Refresh this page to try again."
 msgstr "Job status is temporarily unavailable. Refresh this page to try again."
 
@@ -81,6 +91,14 @@ msgstr "Email delivery could not be confirmed. You can download your files here.
 
 msgid "Cancellation requested; finishing the current operation safely"
 msgstr "Cancellation requested; finishing the current operation safely"
+
+#, python-brace-format
+msgid ""
+"Cancellation requested {seconds}s ago; waiting for the current operation "
+"to finish safely"
+msgstr ""
+"Cancellation requested {seconds}s ago; waiting for the current operation "
+"to finish safely"
 
 msgid "Cancelled during restart"
 msgstr "Cancelled during restart"
@@ -117,6 +135,9 @@ msgstr ""
 msgid "File too large. Limit: {limit} MB."
 msgstr "File too large. Limit: {limit} MB."
 
+msgid "Invalid email address"
+msgstr "Invalid email address"
+
 #, python-brace-format
 msgid "Waiting in the queue (Position: {position})"
 msgstr "Waiting in the queue (Position: {position})"
@@ -148,11 +169,11 @@ msgstr "Exporting the plain text version (TXT)..."
 msgid "Exporting the accessible Word document (DOCX)..."
 msgstr "Exporting the accessible Word document (DOCX)..."
 
-msgid "Exporting the PDF..."
-msgstr "Exporting the PDF..."
-
 msgid "Exporting the tagged accessible PDF/UA..."
 msgstr "Exporting the tagged accessible PDF/UA..."
+
+msgid "Auditing the PDF/UA with veraPDF..."
+msgstr "Auditing the PDF/UA with veraPDF..."
 
 msgid "Exporting the semantic HTML version..."
 msgstr "Exporting the semantic HTML version..."
@@ -191,6 +212,9 @@ msgstr "Structural extraction failed on the Toolbox ({capability}): {error}"
 msgid "The document has {page_count} pages, more than the limit of {max_pages}."
 msgstr "The document has {page_count} pages, more than the limit of {max_pages}."
 
+msgid "Enriching the formulas..."
+msgstr "Enriching the formulas..."
+
 msgid "Enriching the image descriptions..."
 msgstr "Enriching the image descriptions..."
 
@@ -205,6 +229,49 @@ msgstr "Validating the plan in dry-run mode..."
 
 msgid "Executing the plan..."
 msgstr "Executing the plan..."
+
+#, python-brace-format
+msgid "Describing image {current} of {total} (this image is on {pages})..."
+msgstr "Describing image {current} of {total} (this image is on {pages})..."
+
+#, python-brace-format
+msgid "Recognizing formula {current} of {total} (this formula is on {pages})..."
+msgstr "Recognizing formula {current} of {total} (this formula is on {pages})..."
+
+#, python-brace-format
+msgid "Recognizing table {current} of {total} (this table is on {pages})..."
+msgstr "Recognizing table {current} of {total} (this table is on {pages})..."
+
+#, python-brace-format
+msgid "Executing the plan: step {current} of {total} ({pages})..."
+msgstr "Executing the plan: step {current} of {total} ({pages})..."
+
+#, python-brace-format
+msgid "page {page}"
+msgstr "page {page}"
+
+#, python-brace-format
+msgid "page {page} of {total_pages}"
+msgstr "page {page} of {total_pages}"
+
+#, python-brace-format
+msgid "pages {pages}"
+msgstr "pages {pages}"
+
+msgid "page not identified"
+msgstr "page not identified"
+
+#, python-brace-format
+msgid "{error} (failed during: {stage})"
+msgstr "{error} (failed during: {stage})"
+
+#, python-brace-format
+msgid ""
+"Processing was interrupted by a server restart during: {stage}. Submit "
+"the file again."
+msgstr ""
+"Processing was interrupted by a server restart during: {stage}. Submit "
+"the file again."
 
 msgid "Please provide an e-mail address: /email you@example.com"
 msgstr "Please provide an e-mail address: /email you@example.com"
@@ -565,6 +632,14 @@ msgstr "The code block must preserve indentation, language and literal reading."
 msgid "Unrecognized elements require structural inspection."
 msgstr "Unrecognized elements require structural inspection."
 
+#, python-brace-format
+msgid "Slide {number} of {total}"
+msgstr "Slide {number} of {total}"
+
+#, python-brace-format
+msgid "Slide {number} of {total}: {title}"
+msgstr "Slide {number} of {total}: {title}"
+
 msgid ""
 "The page must be inspected visually: described when it has content, or "
 "accepted as blank."
@@ -674,6 +749,13 @@ msgstr "The trial ended before starting"
 
 msgid "Timestamps of an interval must all have a timezone or all lack one"
 msgstr "Timestamps of an interval must all have a timezone or all lack one"
+
+msgid ""
+"Note: this image is informationally very extensive; the description was "
+"limited to the available budget and many details were not described."
+msgstr ""
+"Note: this image is informationally very extensive; the description was "
+"limited to the available budget and many details were not described."
 
 msgid ""
 "The execute-obligation action requires obligation_id, obligation_kind and"
@@ -944,17 +1026,24 @@ msgstr "Unsupported export format: {format_name}"
 msgid "Contents"
 msgstr "Contents"
 
-msgid "Technical metadata"
-msgstr "Technical metadata"
+msgid "Image without a text description."
+msgstr "Image without a text description."
+
+#, python-brace-format
+msgid "Logo. {lines}."
+msgstr "Logo. {lines}."
+
+msgid "image"
+msgstr "image"
+
+msgid "table"
+msgstr "table"
+
+msgid "formula"
+msgstr "formula"
 
 msgid "Image description"
 msgstr "Image description"
-
-msgid "Note"
-msgstr "Note"
-
-msgid "Warning"
-msgstr "Warning"
 
 #, python-brace-format
 msgid "Table: {caption}"
@@ -983,43 +1072,11 @@ msgstr "Your E-mail"
 msgid "We will send the final files to this address."
 msgstr "We will send the final files to this address."
 
-msgid "Attach a Document (PDF or Image)"
-msgstr "Attach a Document (PDF or Image)"
+msgid "Attach a Document (PDF, HTML or Image)"
+msgstr "Attach a Document (PDF, HTML or Image)"
 
 msgid "Make Accessible"
 msgstr "Make Accessible"
-
-msgid "Advanced Mode"
-msgstr "Advanced Mode"
-
-msgid "Advanced Mode - Acessilia"
-msgstr "Advanced Mode - Acessilia"
-
-msgid "Custom Prompt"
-msgstr "Custom Prompt"
-
-msgid "Customize the prompt sent to the AI model."
-msgstr "Customize the prompt sent to the AI model."
-
-msgid ""
-"Type your custom prompt here. It will completely replace the system's "
-"default prompt."
-msgstr ""
-"Type your custom prompt here. It will completely replace the system's "
-"default prompt."
-
-msgid ""
-"Up to 6000 characters. Plain text only (no formatting). This prompt "
-"replaces the system's default prompt on every page."
-msgstr ""
-"Up to 6000 characters. Plain text only (no formatting). This prompt "
-"replaces the system's default prompt on every page."
-
-msgid "Enable Thinking Mode (the model's internal reasoning)"
-msgstr "Enable Thinking Mode (the model's internal reasoning)"
-
-msgid "Back to normal mode"
-msgstr "Back to normal mode"
 
 msgid "Download - Acessilia"
 msgstr "Download - Acessilia"
@@ -1044,6 +1101,9 @@ msgstr "Word Document (DOCX)"
 
 msgid "Accessible PDF"
 msgstr "Accessible PDF"
+
+msgid "Accessible PDF (PDF/UA)"
+msgstr "Accessible PDF (PDF/UA)"
 
 msgid "Web Page (HTML)"
 msgstr "Web Page (HTML)"
@@ -1111,9 +1171,6 @@ msgstr "API error ({status_code}): {detail}"
 
 msgid "An error occurred sending the file to the API. Please try again."
 msgstr "An error occurred sending the file to the API. Please try again."
-
-msgid "The custom prompt exceeds the limit of 6000 characters."
-msgstr "The custom prompt exceeds the limit of 6000 characters."
 
 msgid "The download service is temporarily unavailable"
 msgstr "The download service is temporarily unavailable"
@@ -1209,6 +1266,17 @@ msgstr "Worker: task completed: {filename}. Waiting for the next..."
 msgid "Acessilia API started (queue worker + cleanup active)"
 msgstr "Acessilia API started (queue worker + cleanup active)"
 
+msgid ""
+"Artifact storage bypassed for independent Toolbox endpoints; the source "
+"file will be sent again for extraction, fusion and text spans."
+msgstr ""
+"Artifact storage bypassed for independent Toolbox endpoints; the source "
+"file will be sent again for extraction, fusion and text spans."
+
+#, python-brace-format
+msgid "Artifact upload unavailable ({error}); extracting from the source file."
+msgstr "Artifact upload unavailable ({error}); extracting from the source file."
+
 #, python-brace-format
 msgid "Error in the API: {error} | Path: {path}"
 msgstr "Error in the API: {error} | Path: {path}"
@@ -1291,16 +1359,20 @@ msgid "Error sending e-mail to {to_email}: {error}"
 msgstr "Error sending e-mail to {to_email}: {error}"
 
 #, python-brace-format
+msgid "Failure e-mail for job {task_id} could not be sent: {error}"
+msgstr "Failure e-mail for job {task_id} could not be sent: {error}"
+
+#, python-brace-format
+msgid "Failure e-mail for job {task_id} was not sent"
+msgstr "Failure e-mail for job {task_id} was not sent"
+
+#, python-brace-format
 msgid "Exporting TXT to {path}"
 msgstr "Exporting TXT to {path}"
 
 #, python-brace-format
 msgid "Exporting DOCX to {path}"
 msgstr "Exporting DOCX to {path}"
-
-#, python-brace-format
-msgid "Exporting PDF to {path}"
-msgstr "Exporting PDF to {path}"
 
 #, python-brace-format
 msgid "Exporting PDF/UA to {path}"
@@ -1322,12 +1394,80 @@ msgid "Pipeline PDDL: {count} image(s) enriched with visual description"
 msgstr "Pipeline PDDL: {count} image(s) enriched with visual description"
 
 #, python-brace-format
+msgid ""
+"math.recognize unavailable during formula enrichment ({error}); falling "
+"back to the vision model"
+msgstr ""
+"math.recognize unavailable during formula enrichment ({error}); falling "
+"back to the vision model"
+
+#, python-brace-format
+msgid ""
+"Formula {element_id} (page {page}): math.recognize ({provider}) returned "
+"no LaTeX; falling back to the vision model"
+msgstr ""
+"Formula {element_id} (page {page}): math.recognize ({provider}) returned "
+"no LaTeX; falling back to the vision model"
+
+#, python-brace-format
+msgid ""
+"Formula {element_id} (page {page}): recognition disagrees with the text "
+"layer {rejected}"
+msgstr ""
+"Formula {element_id} (page {page}): recognition disagrees with the text "
+"layer {rejected}"
+
+#, python-brace-format
+msgid "LaTeX recognized for {count} formula(s)"
+msgstr "LaTeX recognized for {count} formula(s)"
+
+#, python-brace-format
+msgid ""
+"{count} of {total} formula(s) fell back to the vision model after "
+"math.recognize ({provider}) returned no LaTeX"
+msgstr ""
+"{count} of {total} formula(s) fell back to the vision model after "
+"math.recognize ({provider}) returned no LaTeX"
+
+#, python-brace-format
 msgid "Pipeline PDDL: {count} table(s) enriched with OCR/reconstruction"
 msgstr "Pipeline PDDL: {count} table(s) enriched with OCR/reconstruction"
 
 #, python-brace-format
+msgid ""
+"Table {element_id} (page {page}) looked misread ({reason}); replaced with"
+" the reading from its image"
+msgstr ""
+"Table {element_id} (page {page}) looked misread ({reason}); replaced with"
+" the reading from its image"
+
+#, python-brace-format
+msgid ""
+"Table {element_id} (page {page}) looked misread ({reason}); the reading "
+"from its image was not used ({why})"
+msgstr ""
+"Table {element_id} (page {page}) looked misread ({reason}); the reading "
+"from its image was not used ({why})"
+
+#, python-brace-format
+msgid ""
+"{failures} vision calls in a row got no usable answer; skipping the "
+"remaining calls of this job"
+msgstr ""
+"{failures} vision calls in a row got no usable answer; skipping the "
+"remaining calls of this job"
+
+#, python-brace-format
 msgid "Failed to extract the image clip for element {element_id}"
 msgstr "Failed to extract the image clip for element {element_id}"
+
+#, python-brace-format
+msgid ""
+"PDDL: {count} list item(s) without text left out of page {page}: "
+"{element_ids}"
+msgstr ""
+"PDDL: {count} list item(s) without text left out of page {page}: "
+"{element_ids}"
 
 #, python-brace-format
 msgid ""
@@ -1350,15 +1490,22 @@ msgid "The selected closure diverges from the compiled problem"
 msgstr "The selected closure diverges from the compiled problem"
 
 #, python-brace-format
-msgid "PDF exported with bookmarks and page numbering: {output_path}"
-msgstr "PDF exported with bookmarks and page numbering: {output_path}"
-
-#, python-brace-format
 msgid "PDF/UA exported: {output_path}"
 msgstr "PDF/UA exported: {output_path}"
 
 msgid "PDF/UA skipped: TOOLBOX_PDF_UA_ENABLED is false"
 msgstr "PDF/UA skipped: TOOLBOX_PDF_UA_ENABLED is false"
+
+msgid "PDF/UA audit skipped: TOOLBOX_PDF_VALIDATE_ENABLED is false"
+msgstr "PDF/UA audit skipped: TOOLBOX_PDF_VALIDATE_ENABLED is false"
+
+#, python-brace-format
+msgid "PDF/UA audit finished (compliant={compliant}, failed rules={rules})"
+msgstr "PDF/UA audit finished (compliant={compliant}, failed rules={rules})"
+
+#, python-brace-format
+msgid "PDF/UA audit failed: {error}"
+msgstr "PDF/UA audit failed: {error}"
 
 msgid "Media inspection skipped: TOOLBOX_MEDIA_INSPECT_ENABLED is false"
 msgstr "Media inspection skipped: TOOLBOX_MEDIA_INSPECT_ENABLED is false"
@@ -1378,6 +1525,14 @@ msgstr ""
 #, python-brace-format
 msgid "PDF/UA rendered by the Toolbox: {output_path}"
 msgstr "PDF/UA rendered by the Toolbox: {output_path}"
+
+#, python-brace-format
+msgid ""
+"The Toolbox rejected the PDF/UA math; retrying with formulas as literal "
+"text: {error}"
+msgstr ""
+"The Toolbox rejected the PDF/UA math; retrying with formulas as literal "
+"text: {error}"
 
 #, python-brace-format
 msgid "TXT exported: {output_path}"
@@ -1436,6 +1591,37 @@ msgstr "Your accessible file is ready! - Acessilia"
 msgid ""
 "Hello!\n"
 "\n"
+"Unfortunately, the processing of the file '{filename}' could not be "
+"completed.\n"
+"\n"
+"Reason: {error}\n"
+"\n"
+"You can submit the file again. If the problem persists, forward this "
+"message to the Acessilia team so we can investigate.\n"
+"\n"
+"Best regards,\n"
+"The Acessilia Team"
+msgstr ""
+"Hello!\n"
+"\n"
+"Unfortunately, the processing of the file '{filename}' could not be "
+"completed.\n"
+"\n"
+"Reason: {error}\n"
+"\n"
+"You can submit the file again. If the problem persists, forward this "
+"message to the Acessilia team so we can investigate.\n"
+"\n"
+"Best regards,\n"
+"The Acessilia Team"
+
+msgid "Your file could not be processed - Acessilia"
+msgstr "Your file could not be processed - Acessilia"
+
+#, python-brace-format
+msgid ""
+"Hello!\n"
+"\n"
 "The processing of the file '{filename}' has completed successfully.\n"
 "\n"
 "Access the link below to view and download the available formats:\n"
@@ -1487,17 +1673,38 @@ msgstr ""
 msgid "Plain Text (TXT)"
 msgstr "Plain Text (TXT)"
 
-msgid "PDF"
-msgstr "PDF"
-
-msgid "PDF/UA"
-msgstr "PDF/UA"
-
 msgid "ZIP Package"
 msgstr "ZIP Package"
 
 msgid "Some optional formats were not generated:"
 msgstr "Some optional formats were not generated:"
+
+msgid "Accessibility audit of the PDF (veraPDF):"
+msgstr "Accessibility audit of the PDF (veraPDF):"
+
+#, python-brace-format
+msgid "{profile}: compliant"
+msgstr "{profile}: compliant"
+
+#, python-brace-format
+msgid "{profile}: {rules} rule(s) not met ({checks} occurrence(s))"
+msgstr "{profile}: {rules} rule(s) not met ({checks} occurrence(s))"
+
+#, python-brace-format
+msgid ""
+"{specification}, clause {clause} (test {test}): {description} ({checks} "
+"occurrence(s))"
+msgstr ""
+"{specification}, clause {clause} (test {test}): {description} ({checks} "
+"occurrence(s))"
+
+#, python-brace-format
+msgid "... and {count} more rule(s), listed in the report in the ZIP package"
+msgstr "... and {count} more rule(s), listed in the report in the ZIP package"
+
+#, python-brace-format
+msgid "Audit unavailable: {error}"
+msgstr "Audit unavailable: {error}"
 
 #, python-brace-format
 msgid "Could not save the canonical JSON: {error}"
@@ -1533,6 +1740,40 @@ msgstr ""
 
 #, python-brace-format
 msgid ""
+"[page {page_num}] Context limit exceeded for region {type}; retrying once"
+" with a smaller image ({size_before} -> {size_after} bytes) and "
+"max_tokens={max_tokens}: {error}"
+msgstr ""
+"[page {page_num}] Context limit exceeded for region {type}; retrying once"
+" with a smaller image ({size_before} -> {size_after} bytes) and "
+"max_tokens={max_tokens}: {error}"
+
+#, python-brace-format
+msgid ""
+"[page {page_num}] Vision description for region {type} exceeded the "
+"{limit}-token budget and was truncated ({chars} characters kept)"
+msgstr ""
+"[page {page_num}] Vision description for region {type} exceeded the "
+"{limit}-token budget and was truncated ({chars} characters kept)"
+
+#, python-brace-format
+msgid ""
+"[page {page_num}] The model provider rate-limited region {type}; waiting "
+"{delay}s before trying again (rate-limit retry {retry}/{retries})"
+msgstr ""
+"[page {page_num}] The model provider rate-limited region {type}; waiting "
+"{delay}s before trying again (rate-limit retry {retry}/{retries})"
+
+#, python-brace-format
+msgid ""
+"[page {page_num}] Region {type} got no answer in time ({error}); trying "
+"again (timeout retry {retry}/{retries})"
+msgstr ""
+"[page {page_num}] Region {type} got no answer in time ({error}); trying "
+"again (timeout retry {retry}/{retries})"
+
+#, python-brace-format
+msgid ""
 "[page {page_num}] VisionAgent error in region {type}: {error} | "
 "Traceback:\n"
 "{tb}"
@@ -1542,8 +1783,52 @@ msgstr ""
 "{tb}"
 
 #, python-brace-format
+msgid ""
+"[page {page_num}] Vision model answered region {type} on try "
+"{attempt}/{attempts}"
+msgstr ""
+"[page {page_num}] Vision model answered region {type} on try "
+"{attempt}/{attempts}"
+
+#, python-brace-format
+msgid ""
+"[page {page_num}] Unusable answer from the vision model for region "
+"{type}; trying again ({attempt}/{attempts}): {error}"
+msgstr ""
+"[page {page_num}] Unusable answer from the vision model for region "
+"{type}; trying again ({attempt}/{attempts}): {error}"
+
+#, python-brace-format
+msgid ""
+"[page {page_num}] Vision answer for region {type} was cut off before its "
+"end; description recovered ({chars} characters)"
+msgstr ""
+"[page {page_num}] Vision answer for region {type} was cut off before its "
+"end; description recovered ({chars} characters)"
+
+#, python-brace-format
+msgid ""
+"Manifest: no review-structure for {element_id} ({raw_label}): it groups "
+"other elements and has no region"
+msgstr ""
+"Manifest: no review-structure for {element_id} ({raw_label}): it groups "
+"other elements and has no region"
+
+#, python-brace-format
 msgid "[page {page_num}] Sending region to vision ({size} bytes, type={type})"
 msgstr "[page {page_num}] Sending region to vision ({size} bytes, type={type})"
+
+#, python-brace-format
+msgid "Vision context recovery could not reduce its image: {error}"
+msgstr "Vision context recovery could not reduce its image: {error}"
+
+#, python-brace-format
+msgid ""
+"[page {page_num}] Vision description of element {element_id} ({chars} "
+"characters): {description}"
+msgstr ""
+"[page {page_num}] Vision description of element {element_id} ({chars} "
+"characters): {description}"
 
 #, python-brace-format
 msgid "Cache hit for {name}"
@@ -1632,6 +1917,18 @@ msgid "Failed to send the status message: {error}"
 msgstr "Failed to send the status message: {error}"
 
 #, python-brace-format
+msgid "Structural provider {provider} failed ({error}); extraction is degraded."
+msgstr "Structural provider {provider} failed ({error}); extraction is degraded."
+
+#, python-brace-format
+msgid ""
+"Dual fusion skipped: the primary and secondary providers are both "
+"{provider}."
+msgstr ""
+"Dual fusion skipped: the primary and secondary providers are both "
+"{provider}."
+
+#, python-brace-format
 msgid "Failed to edit the status message: {error}"
 msgstr "Failed to edit the status message: {error}"
 
@@ -1696,8 +1993,58 @@ msgstr "Page {page_number} references unknown elements: {element_ids}"
 msgid "{path} ends at {char_end}, before its start {char_start}"
 msgstr "{path} ends at {char_end}, before its start {char_start}"
 
+#, python-brace-format
+msgid ""
+"Structural extraction used only {provider} because the other provider "
+"failed. The document requires review; dual-provider comparison was not "
+"available."
+msgstr ""
+"Structural extraction used only {provider} because the other provider "
+"failed. The document requires review; dual-provider comparison was not "
+"available."
+
 msgid "document"
 msgid_plural "documents"
 msgstr[0] "document"
 msgstr[1] "documents"
+
+#, python-brace-format
+msgid "{count} image could not be described."
+msgid_plural "{count} images could not be described."
+msgstr[0] "{count} image could not be described."
+msgstr[1] "{count} images could not be described."
+
+#, python-brace-format
+msgid "{count} table could not be read."
+msgid_plural "{count} tables could not be read."
+msgstr[0] "{count} table could not be read."
+msgstr[1] "{count} tables could not be read."
+
+#, python-brace-format
+msgid ""
+"{count} picture without a usable description from the model; trying again"
+" in {delay}s"
+msgid_plural ""
+"{count} pictures without a usable description from the model; trying "
+"again in {delay}s"
+msgstr[0] ""
+"{count} picture without a usable description from the model; trying again"
+" in {delay}s"
+msgstr[1] ""
+"{count} pictures without a usable description from the model; trying "
+"again in {delay}s"
+
+#, python-brace-format
+msgid ""
+"{count} table without a usable reading from the model; trying again in "
+"{delay}s"
+msgid_plural ""
+"{count} tables without a usable reading from the model; trying again in "
+"{delay}s"
+msgstr[0] ""
+"{count} table without a usable reading from the model; trying again in "
+"{delay}s"
+msgstr[1] ""
+"{count} tables without a usable reading from the model; trying again in "
+"{delay}s"
 

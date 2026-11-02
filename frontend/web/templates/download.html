@@ -110,7 +110,7 @@
                             <span class="icon">
                                 {% if f.ext == "txt" %}📝
                                 {% elif f.ext == "docx" %}📘
-                                {% elif f.ext == "pdf" %}📕
+                                {% elif f.ext in ("pdf", "pdf_ua") %}📕
                                 {% elif f.ext == "html" %}🌐
                                 {% elif f.ext == "mp3" %}🎵
                                 {% elif f.ext == "zip" %}📦
@@ -121,6 +121,7 @@
                                 <span class="name">
                                     {% if f.ext == "txt" %}{{ format_txt }}
                                     {% elif f.ext == "docx" %}{{ format_docx }}
+                                    {% elif f.ext == "pdf_ua" %}{{ format_pdf_ua }}
                                     {% elif f.ext == "pdf" %}{{ format_pdf }}
                                     {% elif f.ext == "html" %}{{ format_html }}
                                     {% elif f.ext == "mp3" %}{{ format_mp3 }}

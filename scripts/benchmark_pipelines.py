@@ -131,13 +131,7 @@ def _export_outputs(
     for fmt in export_formats:
         output_path = output_dir / f"{engine_name}.{output_suffix.get(fmt, fmt)}"
         try:
-            if fmt == "pdf":
-                export_pdf = getattr(
-                    import_module("backend.export.exporters.pdf_exporter"),
-                    "export_pdf",
-                )
-                export_pdf(canonical, output_path, title=canonical.get("title", engine_name))
-            elif fmt == "pdf_ua":
+            if fmt == "pdf_ua":
                 export_pdf_ua = getattr(
                     import_module("backend.export.exporters.pdf_exporter"),
                     "export_pdf_ua",
@@ -159,6 +153,9 @@ def _export_outputs(
                     "export_docx",
                 )
                 export_docx(canonical, output_path, filename=canonical.get("title", engine_name))
+            elif fmt == "pdf":
+                export_errors.append("Formato pdf removido: use pdf_ua, o unico PDF exportado")
+                continue
             else:
                 export_errors.append(f"Formato nao suportado no benchmark: {fmt}")
                 continue
@@ -248,8 +245,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--export-formats",
-        default="pdf",
-        help="Formatos de saida por metodo, separados por virgula (ex.: pdf,pdf_ua,txt,docx).",
+        default="pdf_ua",
+        help="Formatos de saida por metodo, separados por virgula (ex.: pdf_ua,txt,docx).",
     )
     return parser.parse_args()
 
@@ -267,7 +264,7 @@ def main() -> int:
         if item.strip()
     ]
     if not export_formats:
-        export_formats = ["pdf"]
+        export_formats = ["pdf_ua"]
 
     report_path = asyncio.run(
         run_benchmark(

@@ -24,6 +24,12 @@ ones here instead of restating them.
 | [0006](0006-availability-and-failover.md) | Availability through replicas; SDK failover as a secondary mechanism | Accepted |
 | [0007](0007-manifest-model-and-mathml-conversion.md) | Canonical manifest model, and MathML conversion and verbalization of formulas | Accepted |
 | [0008](0008-math-capabilities-on-mathjax-and-mathcat.md) | The math capabilities run on MathJax and MathCAT | Accepted |
+| [0009](0009-legacy-unicode-repair.md) | Legacy PDF Unicode repair is a pure docstruct stage orchestrated by the core | Accepted |
+| [0010](0010-word-internal-spacing-diacritics.md) | Word-internal spacing diacritics are repaired; standalone ones require document evidence | Accepted |
+| [0011](0011-inline-math-from-font-runs.md) | Inline math is carried as `$…$` in prose and detected from the PDF's math fonts | Accepted |
+| [0012](0012-agents-reach-the-vlm-through-the-toolbox.md) | The agents can reach their vision model through the Toolbox VLM gateway | Accepted |
+| [0013](0013-source-files-for-independent-toolboxes.md) | Source files for independent Toolbox deployments | Accepted |
+| [0014](0014-artifact-download-not-found-failover.md) | Search endpoints for missing artifact downloads | Accepted |
 
 ## Process
 

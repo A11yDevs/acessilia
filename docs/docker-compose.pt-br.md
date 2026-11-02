@@ -145,7 +145,8 @@ LOGS_DIR=var/logs
 # Log
 LOG_LEVEL=INFO
 
-# AI Client (escolha um)
+# AI Client (escolha um: ollama, openrouter, ou toolbox para chegar ao modelo
+# de visão pela Toolbox abaixo; ver docs/adr/0012)
 AI_CLIENT=ollama
 OLLAMA_BASE_URL=http://host.docker.internal:11434/v1/chat/completions
 OLLAMA_MODEL=llama3.2-vision
@@ -191,12 +192,12 @@ automático** via systemd timer. O script consulta a **GitHub API** a cada
 **5 minutos** e só executa `docker pull` quando há um commit novo na `develop`.
 
 ```bash
-# Setup completo (recomendado)
-./scripts/setup-homologacao.sh
-
-# Ou fazer manualmente
-# Consulte docs/homologacao-systemd.md para instruções manuais
+# Num clone do repositório, com o .env preenchido
+./scripts/ops.sh auto-update setup
 ```
+
+Veja [homologacao-systemd.pt-br.md](homologacao-systemd.pt-br.md) para migrar uma instalação
+antiga e para o gerenciamento do dia a dia.
 
 Para producao, use [producao-systemd.md](producao-systemd.md) ou rode
 `./scripts/setup-producao.sh`. O ambiente rastreia `main` por padrao com

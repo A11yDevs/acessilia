@@ -20,6 +20,7 @@ import respx
 
 from acessilia_sdk.toolbox.capabilities import (
     PROVIDER_DEFAULTS,
+    ROUTE_PROVIDER_DEFAULTS,
     TOOLBOX_CAPABILITIES,
 )
 from backend.config import settings as settings_module
@@ -131,7 +132,7 @@ def _code_string_literals(path: Path) -> list[tuple[int, str]]:
 
 def test_provider_settings_default_to_the_registry() -> None:
     fields = settings_module.Settings.__dataclass_fields__
-    for setting, default in PROVIDER_DEFAULTS.items():
+    for setting, default in {**PROVIDER_DEFAULTS, **ROUTE_PROVIDER_DEFAULTS}.items():
         assert setting in fields, f"Settings has no attribute {setting}"
         if setting.upper() in os.environ:
             continue  # overridden by the environment running the tests

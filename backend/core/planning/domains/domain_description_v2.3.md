@@ -46,9 +46,9 @@ permanece idêntica.
 
 | Obrigação | Métodos | Custo | Origem |
 |---|---|---|---|
-| `adjudicate-page` | `vlm-pairwise-judge`, `agreement-rule`, `human-review` | 40 / 5 / 100 | juiz pareado por VLM (LOOP #25/#29/#44/#45) |
+| `adjudicate-page` | `vlm-pairwise-judge`, `human-review` | 40 / 100 | juiz pareado por VLM (LOOP #25/#29/#44/#45) |
 | `fuse-providers` | `dual-provider-fusion`, `single-provider`, `human-review` | 60 / 20 / 100 | fusão multi-provider (`docstruct.fusion`) |
-| `refine-reading-order` | `xycut-order`, `skeleton-order`, `human-review` | 10 / 5 / 100 | XY-cut e ordem do skeleton |
+| `refine-reading-order` | `xycut-order`, `skeleton-order` (se houver extração secundária), `human-review` | 10 / 5 / 100 | XY-cut e ordem do skeleton |
 | `normalize-formula` | `latex-normalizer`, `mathml`, `human-review` | 10 / 10 / 100 | `docstruct.text.latex` |
 | `rescue-omitted-block` | `rescue-omitted`, `human-review` | 15 / 100 | `rescue_omitted` do differ |
 | `guard-repetition` | `rep-guard`, `human-review` | 5 / 100 | `docstruct.fusion.repetition` |
@@ -57,19 +57,33 @@ permanece idêntica.
 | `chunk-verse` | `verse-chunker`, `human-review` | 5 / 100 | `docstruct.fusion.verse` |
 | `extract-line-numbers` | `line-number-extractor`, `human-review` | 5 / 100 | `docstruct.fusion.line_numbers` |
 | `normalize-text` | `norm-fix`, `human-review` | 5 / 100 | `docstruct.text.norm_fix` |
+| `repair-legacy-unicode` | `unicode-repair`, `human-review` | 5 / 100 | `docstruct.text.unicode_repair` (NFD, i sem ponto, acentos espaçadores, cabeçalhos e células de tabela) |
 | `inspect-unstructured-page` | `vision-page-inspection`, `human-review` | 25 / 100 | página sem estrutura extraída (#150 F5c) |
 
 Regras de compilação:
 
 - as obrigações determinísticas (`guard-repetition`, `join-tail-blocks`,
-  `chunk-verse`, `extract-line-numbers`, `normalize-text`, `normalize-formula`,
+  `chunk-verse`, `extract-line-numbers`, `normalize-text`,
+  `repair-legacy-unicode`, `normalize-formula`,
   `refine-reading-order`) têm custo baixo e devem ser preferidas pelo planner
   sempre que admissíveis;
 - as obrigações que consomem modelo (`adjudicate-page`, `select-table-source`
   via `table-specialist`) têm custo alto e só devem ser emitidas como
   admissíveis quando a política correspondente estiver ativa
   (`page_judge`, `table_specialist`);
-- `fuse-providers` só é admissível quando `FUSION_MODE=dual`, como na v2.2;
+- `adjudicate-page` não admite `agreement-rule`: o roteador determinístico
+  (`decide_v1`) já roda na extração e grava `route`/`route_reason` na
+  evidência, e repeti-lo como método só repetiria a resposta. O builder emite a
+  obrigação apenas nas páginas que o roteador não decide (`both_table`,
+  `both_formula`) e que divergem (`provider_divergence`, similaridade de
+  caracteres abaixo de 0,97, a mesma régua de `should_judge`), limitadas às
+  `FUSION_JUDGE_MAX_PAGES` menos similares. A obrigação não é crítica: o
+  veredito é registrado em `page_judgement`, mas a troca de página não é
+  aplicada;
+- `fuse-providers` só é admissível quando `FUSION_MODE=dual`, como na v2.2, e
+  é emitida uma vez por documento, com as páginas divergentes na evidência. O
+  método `single-provider` a satisfaz com a extração que o manifesto já traz,
+  sem extrair de novo;
 - `join-tail-blocks` deve preferir `tailjoin-positioned` quando a posição do
   número de página for conhecida, e `tailjoin` caso contrário;
 - cada obrigação nova depende de `extract` (a extração do provider), exceto

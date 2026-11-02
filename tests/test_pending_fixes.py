@@ -74,6 +74,9 @@ async def test_active_cancel_interrupts_pipeline_and_advances_queue(isolated_run
         assert response.status_code == 200
         assert response.json()["status"] in {"cancelling", "cancelled"}
         await asyncio.wait_for(advanced.wait(), 2)
+        async with asyncio.timeout(2):
+            while "active" in queue._active_tasks:
+                await asyncio.sleep(0.01)
         assert manager.obter("active")["status"] == "cancelled"
         assert job_store.load_record("active")["status"]["status"] == "cancelled"
         assert not source.exists()
@@ -116,9 +119,13 @@ async def test_thread_operation_finishes_before_cancel_cleanup(isolated_runtime,
         assert worker.cancel_job_status("thread-job")
         assert manager.obter("thread-job")["status"] == "cancelling"
         assert manager.obter("thread-job")["fim"] is None
-        assert not advanced.is_set()
-        release.set()
         await asyncio.wait_for(advanced.wait(), 2)
+        assert manager.obter("thread-job")["status"] == "cancelling"
+        assert not destination.exists()
+        release.set()
+        async with asyncio.timeout(2):
+            while "thread-job" in queue._active_tasks:
+                await asyncio.sleep(0.01)
         assert not destination.exists()
         assert manager.obter("thread-job")["status"] == "cancelled"
     finally:
@@ -187,7 +194,9 @@ async def test_failed_enqueue_removes_durable_request_and_upload(isolated_runtim
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("sent", [True, False, None])
-async def test_email_delivery_status_does_not_lose_download(isolated_runtime, monkeypatch, tmp_path, sent):
+async def test_email_delivery_status_does_not_lose_download(
+    isolated_runtime, monkeypatch, tmp_path, sent, fake_pdf_ua_audit
+):
     _, manager = isolated_runtime
     source = tmp_path / "doc.pdf"
     source.write_bytes(b"%PDF")
@@ -211,7 +220,7 @@ async def test_email_delivery_status_does_not_lose_download(isolated_runtime, mo
         return sent
 
     monkeypatch.setattr("backend.service.process", process)
-    for name in ["export_txt", "export_docx", "export_pdf", "export_pdf_ua", "export_drbench_md", "export_accessible_document"]:
+    for name in ["export_txt", "export_docx", "export_pdf_ua", "export_drbench_md", "export_accessible_document"]:
         monkeypatch.setattr(worker, name, export)
     monkeypatch.setattr(worker, "export_mp3", audio)
     monkeypatch.setattr(worker, "send_confirmation_email", confirmation)
@@ -229,6 +238,52 @@ async def test_email_delivery_status_does_not_lose_download(isolated_runtime, mo
     assert durable["download_url"] == status["download_url"]
     assert durable["email_delivery"] == status["email_delivery"]
     assert (settings.data_dir / "output/delivery/doc_acessivel.zip").is_file()
+
+
+@pytest.mark.asyncio
+async def test_result_email_reports_open_obligations_of_a_delivered_document(
+    isolated_runtime, monkeypatch, tmp_path, fake_pdf_ua_audit
+):
+    """A block dropped by fusion is delivered without it; the e-mail says so."""
+    source = tmp_path / "doc.pdf"
+    source.write_bytes(b"%PDF")
+    job_store.save_request("open", "capability", {}, {"status": "queued"})
+    summary = "Open obligations: rescue-omitted-block (page 3)"
+
+    async def process(*a, **kw):
+        return {
+            "title": "Example",
+            "sections": [],
+            "metadata": {"pddl_unsatisfied_summary": summary},
+        }
+
+    def export(document, destination, *a, **kw):
+        destination.write_text("output")
+
+    async def audio(text, destination, **kw):
+        destination.write_bytes(b"audio")
+
+    async def confirmation(*a):
+        return False
+
+    warnings: list[str] = []
+
+    async def result(*a, **kw):
+        warnings.extend(kw["warnings"])
+        return True
+
+    monkeypatch.setattr("backend.service.process", process)
+    for name in ["export_txt", "export_docx", "export_pdf_ua", "export_drbench_md", "export_accessible_document"]:
+        monkeypatch.setattr(worker, name, export)
+    monkeypatch.setattr(worker, "export_mp3", audio)
+    monkeypatch.setattr(worker, "send_confirmation_email", confirmation)
+    monkeypatch.setattr(worker, "send_result_email", result)
+    executor = worker.JobExecutor()
+    try:
+        await executor.run(worker.ApiJob("open", source, "doc.pdf", email="test@example.invalid"))
+    finally:
+        executor._executor.shutdown(wait=True)
+    assert warnings == [summary]
 
 
 def test_terminal_job_is_not_overwritten_by_delayed_cancel(isolated_runtime):
@@ -278,9 +333,15 @@ async def test_restart_finishes_requested_cancellation(isolated_runtime, tmp_pat
     path = tmp_path / "cancelled.pdf"
     path.write_bytes(b"%PDF")
     job_store.save_request("cancel-restart", "secret", {"file_path": str(path)},
-        {"task_id": "cancel-restart", "status": "cancelling"})
+        {"task_id": "cancel-restart", "status": "cancelling",
+         "cancellation_requested_at": 100, "cancellation_elapsed_seconds": 10})
     await worker.recover_pending_jobs()
-    assert job_store.load_record("cancel-restart")["status"]["status"] == "cancelled"
+    status = job_store.load_record("cancel-restart")["status"]
+    assert status["status"] == "cancelled"
+    assert status["cancellation_requested_at"] == 100
+    recovered = await worker.get_job_status_async("cancel-restart")
+    assert recovered["cancellation_requested_at"] == 100
+    assert "cancellation_elapsed_seconds" not in recovered
     assert not path.exists()
     assert isolated_runtime[0].qsize() == 0
 

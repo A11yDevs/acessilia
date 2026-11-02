@@ -539,6 +539,58 @@ class TestVlmPairwiseJudge:
         judgement = manifest.elements[0].metadata["page_judgement"]
         assert judgement["choice"] == "docling" and judgement["pB"] == 0.1
 
+    def _routed_manifest(self, tmp_path):
+        """Page 1 was taken from MinerU; docling's version is kept in the artifact."""
+        import hashlib
+
+        manifest = self._manifest(tmp_path, primary=self.TEXT + " (mineru)")
+        manifest.elements[0].metadata["provider"] = "mineru"
+        [artifact] = [a for a in manifest.artifacts if a.kind == "provider-extraction"]
+        stored = json.loads(Path(artifact.path).read_bytes())
+        stored["replaced_primary_pages"] = {"1": [_raw("paragraph", self.TEXT, LEFT, 1)]}
+        content = json.dumps(stored).encode()
+        Path(artifact.path).write_bytes(content)
+        artifact.sha256 = hashlib.sha256(content).hexdigest()
+        return manifest
+
+    @pytest.mark.parametrize(("p_b", "confirmed"), [(0.1, True), (0.9, False)])
+    def test_a_page_taken_from_mineru_is_judged_against_docling(
+        self, tmp_path, monkeypatch, p_b, confirmed
+    ) -> None:
+        from backend.agents.pddl_orchestrator import _handle_vlm_pairwise_judge_method
+
+        manifest = self._routed_manifest(tmp_path)
+        seen = self._fake_judge(monkeypatch, p_b)
+
+        result = _handle_vlm_pairwise_judge_method(manifest, "o-1")
+
+        assert seen["a"] == self.TEXT + " (mineru)" and seen["b"] == self.TEXT
+        judgement = manifest.elements[0].metadata["page_judgement"]
+        assert judgement["content"] == "mineru"
+        assert judgement["choice"] == ("mineru" if confirmed else "docling")
+        assert result.success is confirmed
+
+    def test_a_taken_page_without_the_replaced_docling_page_is_not_judged(
+        self, tmp_path, monkeypatch
+    ) -> None:
+        """The element provenance, not the artifact, says where the page came from.
+
+        Without the replaced docling page the only alternative would be the
+        MinerU page itself, and comparing it with itself would report a
+        confirmation.
+        """
+        from backend.agents.pddl_orchestrator import _handle_vlm_pairwise_judge_method
+
+        manifest = self._manifest(tmp_path, primary=self.TEXT + " (mineru)")
+        manifest.elements[0].metadata["provider"] = "mineru"
+        seen = self._fake_judge(monkeypatch, 0.1)
+
+        result = _handle_vlm_pairwise_judge_method(manifest, "o-1")
+
+        assert not result.success and not result.validated
+        assert not seen
+        assert "page_judgement" not in manifest.elements[0].metadata
+
     def test_preferred_secondary_is_recorded_and_escalated(self, tmp_path, monkeypatch) -> None:
         from backend.agents.pddl_orchestrator import _handle_vlm_pairwise_judge_method
 
@@ -600,7 +652,9 @@ class TestVlmPairwiseJudge:
         assert result.success and result.validated
         assert not seen
         judgement = manifest.elements[0].metadata["page_judgement"]
-        assert judgement == {"choice": "docling", "pB": None, "reason": "agree"}
+        assert judgement == {
+            "content": "docling", "choice": "docling", "pB": None, "reason": "agree",
+        }
 
     def test_page_without_both_transcriptions_is_not_judged(self, tmp_path, monkeypatch) -> None:
         from backend.agents.pddl_orchestrator import _handle_vlm_pairwise_judge_method

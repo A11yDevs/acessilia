@@ -5,12 +5,13 @@ pytest.importorskip("fastapi.testclient")
 
 from backend.i18n import t  # noqa: E402
 from backend.services.download_token_service import TOKEN_EXPIRY_DAYS  # noqa: E402
+from backend.tools.validators import MSG_FILE_TOO_LARGE  # noqa: E402
 from frontend.clients.api_client import ApiError  # noqa: E402
 from frontend.web import app as web_module  # noqa: E402
 from frontend.web.messages import (  # noqa: E402
-    WEB_ADVANCED_HEADLINE,
     WEB_ERROR_INTERNAL,
     WEB_INDEX_HEADLINE,
+    WEB_INDEX_TITLE,
     WEB_JOB_CLOSE_INFO,
     WEB_JOB_PENDING,
 )
@@ -102,15 +103,16 @@ def test_index_page(web_client):
     assert t(WEB_INDEX_HEADLINE) in resp.text
 
 
-def test_advanced_page(web_client):
-    """The advanced panel page must render its localized headline text.
-
-    Same reason as test_index_page: assert on the localized WEB_ADVANCED_HEADLINE
-    constant so the check survives locale switches.
-    """
-    resp = web_client.get("/advanced")
-    assert resp.status_code == 200
-    assert t(WEB_ADVANCED_HEADLINE) in resp.text
+def test_advanced_mode_is_gone(web_client):
+    """The retired advanced panel is not linked, and its old URLs land on the home page."""
+    home = web_client.get("/")
+    assert home.status_code == 200
+    assert "/advanced" not in home.text
+    for path in ("/advanced", "/advanced/process"):
+        resp = web_client.get(path, follow_redirects=False)
+        assert resp.status_code == 303
+        assert resp.headers["location"] == "/"
+    assert web_client.post("/advanced/process").status_code == 405
 
 
 def test_upload_submits_via_api(web_client):
@@ -149,35 +151,10 @@ def test_upload_rejects_oversized_file_before_api_submission(web_client, monkeyp
     )
 
     assert resp.status_code == 413
-    assert "limite de 1 MB" in resp.text
+    assert t(MSG_FILE_TOO_LARGE).format(limit=1) in resp.text
+    assert f"<title>{t(WEB_INDEX_TITLE)}</title>" in resp.text
     assert web_client.fake.submitted == []
     assert list(web_module.WEB_UPLOAD_DIR.iterdir()) == []
-
-
-def test_advanced_upload_rejects_unsupported_options(web_client):
-    resp = web_client.post(
-        "/advanced/process",
-        files={"document_file": ("doc.pdf", _fake_pdf_bytes(), "application/pdf")},
-        data={
-            "email": "test@example.com",
-            "custom_prompt": "Explique em detalhes",
-            "thinking_mode": "true",
-        },
-    )
-    assert resp.status_code == 422
-    assert 'action="/advanced/process"' in resp.text
-    assert web_client.fake.submitted == []
-
-
-def test_advanced_upload_oversized_prompt(web_client):
-    resp = web_client.post(
-        "/advanced/process",
-        files={"document_file": ("doc.pdf", _fake_pdf_bytes(), "application/pdf")},
-        data={"email": "test@example.com", "custom_prompt": "x" * 6001},
-    )
-    assert resp.status_code == 200
-    assert "6000" in resp.text
-    assert web_client.fake.submitted == []
 
 
 def test_download_page_delegates_to_api(web_client):
@@ -317,6 +294,38 @@ def test_receipt_recovers_result_after_refresh(web_client, monkeypatch, delivery
         assert page.headers["referrer-policy"] == "no-referrer"
         assert "private-web-token" not in page.text
         assert 'http-equiv="refresh"' not in page.text
+
+
+@pytest.mark.parametrize("delivery", ["sent", "failed"])
+def test_receipt_explains_the_failure_email(web_client, monkeypatch, delivery):
+    """A failed job must not promise a result e-mail: the failure copy is different."""
+    from frontend.web.messages import (
+        WEB_JOB_EMAIL_FAILED,
+        WEB_JOB_EMAIL_SENT,
+        WEB_JOB_FAILURE_EMAIL_FAILED,
+        WEB_JOB_FAILURE_EMAIL_SENT,
+    )
+
+    web_client.post("/process", files={"document_file": ("doc.pdf", _fake_pdf_bytes(), "application/pdf")},
+        data={"email": "test@example.com"})
+
+    async def status(task_id, job_token=None):
+        return {"arquivo": "doc.pdf", "status": "error", "email_delivery": delivery,
+            "download_url": None, "erros": ["pipeline failed"]}
+
+    monkeypatch.setattr(web_client.fake, "get_job_status", status)
+    page = web_client.get("/jobs/web12345")
+
+    expected = t(
+        WEB_JOB_FAILURE_EMAIL_SENT if delivery == "sent" else WEB_JOB_FAILURE_EMAIL_FAILED
+    )
+    assert expected in page.text
+    # Neither result-mail copy may render: the ``failed`` one offers downloads
+    # that do not exist here, and the ``sent`` one promises a result e-mail.
+    assert t(WEB_JOB_EMAIL_SENT) not in page.text
+    assert t(WEB_JOB_EMAIL_FAILED) not in page.text
+    assert 'href="/download/' not in page.text
+    assert "pipeline failed" in page.text
 
 
 @pytest.mark.parametrize(("status_value", "delivery", "shows_close_info", "shows_pending"), [

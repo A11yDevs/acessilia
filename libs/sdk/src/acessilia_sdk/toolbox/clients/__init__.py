@@ -18,6 +18,7 @@ from acessilia_sdk.toolbox.clients.orientation import ToolboxOrientationClient
 from acessilia_sdk.toolbox.clients.page_ocr import ToolboxPageOcrClient
 from acessilia_sdk.toolbox.clients.pdf import ToolboxPdfClient
 from acessilia_sdk.toolbox.clients.pdf_ua import ToolboxPdfUaClient
+from acessilia_sdk.toolbox.clients.pdf_validate import ToolboxPdfValidateClient
 from acessilia_sdk.toolbox.clients.structure import ToolboxStructureClient
 from acessilia_sdk.toolbox.clients.table import ToolboxTableClient
 
@@ -34,6 +35,7 @@ __all__ = [
     "ToolboxPageOcrClient",
     "ToolboxPdfClient",
     "ToolboxPdfUaClient",
+    "ToolboxPdfValidateClient",
     "ToolboxStructureClient",
     "ToolboxTableClient",
 ]

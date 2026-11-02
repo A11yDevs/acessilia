@@ -201,3 +201,10 @@ class TestValidation:
         findings = validate_canonical_document({"sections": []})
         for f in findings:
             assert isinstance(f, tuple) and len(f) == 2
+
+
+def test_normalize_table_ast_keeps_null_cell_as_blank():
+    """A null cell text is a blank cell; dropping it would shift the row."""
+    ast = normalize_table_ast({"body": [{"cells": [{"text": "A"}, {"text": None}]}]})
+
+    assert [cell["text"] for cell in ast["body"][0]["cells"]] == ["A", ""]

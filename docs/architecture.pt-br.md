@@ -21,7 +21,7 @@ O antigo motor **`legacy`** (`AccessibilityOrchestrator`: Reader → Vision/Data
 - [backend/agents/state_manager.py](../backend/agents/state_manager.py): máquina de estados em memória para tarefas com suporte a cancelamento cooperativo.
 
 #### 0.2. Integração do Cliente de IA (`backend/ai/`)
-- [backend/ai/models/ai_client.py](../backend/ai/models/ai_client.py): inicializador central `get_agno_model()` que instancia envelopes de Model do Agno para Ollama ou OpenRouter com base nas configurações de ambiente.
+- [backend/ai/models/ai_client.py](../backend/ai/models/ai_client.py): inicializador central `get_agno_model()` que instancia envelopes de Model do Agno para Ollama, OpenRouter ou o gateway VLM da Toolbox (`AI_CLIENT=toolbox`, [ADR-0012](adr/0012-agents-reach-the-vlm-through-the-toolbox.pt-br.md)) com base nas configurações de ambiente.
 
 #### 0.3. Serviços de Infraestrutura (`backend/services/`)
 - [backend/services/cache.py](../backend/services/cache.py): cache de texto por hash de arquivo em `var/temp/cache`.
@@ -81,8 +81,8 @@ O domínio PDDL vive em `backend/core/planning/domains/`. Os esquemas JSON (mani
 - [backend/pipeline/sanitizer.py](../backend/pipeline/sanitizer.py): limpa o texto bruto, remove vazamentos de prompt e artefatos de Markdown.
 - [backend/pipeline/validators.py](../backend/pipeline/validators.py): valida esquema, hierarquia de títulos, links e texto de saída; `audit_canonical_document` classifica problemas estruturais e de acessibilidade como `BLOCKER` ou `WARNING`.
 - [backend/export/pandoc_exporter.py](../backend/export/pandoc_exporter.py): coordenador único de exportação para validação, filtragem, criação do AST e despacho de renderizador; atua como guardiã determinística que interrompe a exportação quando a auditoria retorna qualquer `BLOCKER`.
-- [backend/export/renderers/](../backend/export/renderers/): renderizadores para TXT, DOCX, PDF e HTML.
-- [backend/export/exporters/](../backend/export/exporters/): os adaptadores de exportação chamados pelo worker, incluindo `audio_exporter.py`, que produz o MP3 via edge-tts, e `pdf_exporter.py`, que produz tanto o PDF comum quanto a variante PDF/UA.
+- [backend/export/renderers/](../backend/export/renderers/): renderizadores para TXT e HTML (DOCX e PDF/UA são renderizados na Toolbox).
+- [backend/export/exporters/](../backend/export/exporters/): os adaptadores de exportação chamados pelo worker, incluindo `audio_exporter.py`, que produz o MP3 via edge-tts, e `pdf_exporter.py`, que produz o PDF/UA, o único PDF. [backend/tools/pdf_ua_audit.py](../backend/tools/pdf_ua_audit.py) o audita com o veraPDF na Toolbox (`pdf.validate.pdf_ua`) para o e-mail de resultado.
 
 ---
 
@@ -118,11 +118,11 @@ Os modelos pesados rodam num serviço separado, a [Acessilia Toolbox](https://gi
 3. O arquivo é salvo e colocado na `ProcessingQueue`.
 4. O worker retira a tarefa da fila; `backend/service.py::process` a registra no `StateManager` e consulta o cache de processamento.
 5. Se não houver cache, executa o orquestrador PDDL (`PddlAccessibilityOrchestrator.executar()`):
-    - Extrai o manifesto de processamento pela Toolbox (`document.structure.extract`) e inspeciona a mídia de origem (`media.inspect`).
+    - Inspeciona a mídia de origem (`media.inspect`) e extrai o manifesto de processamento pela Toolbox (`document.structure.extract`); uma apresentação é extraída sem fusão dual e estruturada slide a slide.
     - Enriquece imagens e tabelas, monta e valida um plano PDDL para as obrigações do manifesto e o executa, replanejando quando um método falha.
     - Constrói o documento canônico a partir do manifesto executado.
 6. Os validadores canônicos verificam a adesão ao esquema, a hierarquia de títulos e a segurança da saída.
-7. Os renderizadores e adaptadores de exportação constroem os artefatos de saída (TXT, DOCX, PDF, PDF/UA, HTML, MP3).
+7. Os renderizadores e adaptadores de exportação constroem os artefatos de saída (TXT, DOCX, PDF/UA, HTML, MP3).
 8. Os arquivos de saída são empacotados e entregues ao usuário (via mensagem Telegram, link de download na Web ou e-mail).
 
 ---
@@ -141,9 +141,9 @@ O runtime AgentOS não faz parte de `ENABLED_INTERFACES`; ele é iniciado separa
 ## Dependências Externas
 
 - **Framework Agno:** orquestração multiagente e interface unificada de LLM multimodal.
-- **Provedores de IA:** API Ollama (modelos locais como LLaVA/Qwen-VL) ou API OpenRouter (modelos em nuvem como Claude/GPT-4o).
-- **Bibliotecas de Processamento:** reportlab, edge-tts, aiogram, FastAPI.
-- **Não restam executores locais** ([ADR-0003](adr/0003-remote-only-operational-capabilities.pt-br.md), [#150](https://github.com/A11yDevs/acessilia/issues/150)): o manifesto é extraído só pelo `ToolboxManifestExtractor`, e o PyMuPDF é uma dependência de desenvolvimento, usada pelos testes para gerar PDFs. O `tests/test_architecture_layers.py` falha se `backend/` ou `frontend/` importar uma biblioteca operacional (PyMuPDF, Pillow, OpenCV, Docling, pypdf, python-docx, RapidOCR). Pandoc, TeX Live, veraPDF e as bibliotecas de OCR e de mídia já saíram da imagem, porque o DOCX e o PDF/UA só são renderizados na Toolbox; o NumPy e o OpenCV saíram das dependências junto com os scripts de experimento do Dr.DocBench (tag `drbench-2026-snapshot`); o Pillow segue na imagem como requisito do reportlab.
+- **Provedores de IA:** API Ollama (modelos locais como LLaVA/Qwen-VL), API OpenRouter (modelos em nuvem como Claude/GPT-4o) ou o gateway VLM da Toolbox, que repassa os chats a um provider VLM da Toolbox sob o limite de concorrência dele.
+- **Bibliotecas de Processamento:** edge-tts, aiogram, FastAPI.
+- **Não restam executores locais** ([ADR-0003](adr/0003-remote-only-operational-capabilities.pt-br.md), [#150](https://github.com/A11yDevs/acessilia/issues/150)): o manifesto é extraído só pelo `ToolboxManifestExtractor`, e o PyMuPDF é uma dependência de desenvolvimento, usada pelos testes para gerar PDFs. O `tests/test_architecture_layers.py` falha se `backend/` ou `frontend/` importar uma biblioteca operacional (PyMuPDF, Pillow, OpenCV, Docling, pypdf, python-docx, RapidOCR). Pandoc, TeX Live, veraPDF e as bibliotecas de OCR e de mídia já saíram da imagem, porque o DOCX e o PDF/UA só são renderizados na Toolbox; o NumPy e o OpenCV saíram das dependências junto com os scripts de experimento do Dr.DocBench (tag `drbench-2026-snapshot`); o Pillow e o pypdf saíram das dependências de execução junto com o reportlab e o renderizador PDF local, e o Pillow ficou só no extra `dev`, para as imagens de página que os testes ponta a ponta da Toolbox enviam.
 
 ---
 

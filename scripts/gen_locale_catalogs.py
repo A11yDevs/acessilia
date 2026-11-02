@@ -10,6 +10,7 @@ project i18n goal of requiring zero or minimal code changes per added language.
 from __future__ import annotations
 
 import argparse
+import string
 import sys
 from collections.abc import Sequence
 from datetime import datetime, timedelta, timezone
@@ -49,6 +50,7 @@ from backend.log_messages import (
     API_LINK_INVALID,
     API_LOG_FILE_NOT_FOUND,
     API_OBSERVABILITY_NOT_CONFIGURED,
+    API_OPTIONS_UNAVAILABLE,
     API_PROMPT_TOO_LONG,
     API_RATE_LIMIT_DETAIL,
     API_TASK_NOT_FOUND,
@@ -59,19 +61,28 @@ from backend.log_messages import (
     EMAIL_FORMAT_DOCX,
     EMAIL_FORMAT_HTML,
     EMAIL_FORMAT_MP3,
-    EMAIL_FORMAT_PDF,
     EMAIL_FORMAT_PDF_UA,
     EMAIL_FORMAT_TXT,
     EMAIL_FORMAT_ZIP,
     EMAIL_RESULT_BODY_ATTACHED,
     EMAIL_RESULT_BODY_WITH_LINK,
     EMAIL_RESULT_SUBJECT,
+    EMAIL_FAILURE_BODY,
+    EMAIL_FAILURE_SUBJECT,
     EMAIL_RESULT_WARNINGS_HEADER,
+    EMAIL_RESULT_AUDIT_HEADER,
+    EMAIL_AUDIT_COMPLIANT,
+    EMAIL_AUDIT_NON_COMPLIANT,
+    EMAIL_AUDIT_RULE,
+    EMAIL_AUDIT_MORE_RULES,
+    EMAIL_AUDIT_UNAVAILABLE,
     LOG_AGNO_NOT_INSTALLED,
     LOG_API_ERROR,
     LOG_API_INTERFACE_ENABLED,
     LOG_API_JOB_ENQUEUED,
     LOG_API_STARTED,
+    LOG_ARTIFACT_STORE_DIRECT_INPUT,
+    LOG_ARTIFACT_UPLOAD_DEGRADED,
     LOG_AUDIO_EXPORTED,
     LOG_AUDIO_EXPORT_ERROR,
     LOG_AUDIO_EXPORT_PROGRESS,
@@ -91,21 +102,33 @@ from backend.log_messages import (
     LOG_DATA_AGENT_PROMPT_NOT_FOUND,
     LOG_DATA_AGENT_PROCESSING_REGION,
     LOG_DATA_AGENT_REGION_ERROR,
+    LOG_VISION_AGENT_CONTEXT_RETRY,
+    LOG_VISION_AGENT_DESCRIPTION_TRUNCATED,
+    LOG_VISION_AGENT_RATE_LIMIT_RETRY,
+    LOG_VISION_AGENT_TIMEOUT_RETRY,
     LOG_VISION_AGENT_REGION_ERROR,
+    LOG_VISION_AGENT_REGION_RECOVERED,
+    LOG_VISION_AGENT_REGION_RETRY,
+    LOG_VISION_AGENT_REGION_SALVAGED,
+    LOG_MANIFEST_STRUCTURAL_CONTAINER_SKIPPED,
     LOG_VISION_AGENT_SENDING_REGION,
+    LOG_VISION_CONTEXT_DOWNSCALE_FAILED,
+    LOG_VISION_ELEMENT_DESCRIPTION,
     LOG_CLEANUP_ITEM_FAILED,
     LOG_CLEANUP_OUTPUT_FAILED,
     LOG_CLEANUP_PERIODIC_ERROR,
     LOG_DOWNLOAD_TOKEN_CREATED,
     LOG_DOWNLOAD_TOKEN_DIR_MISSING,
     LOG_DOWNLOAD_TOKEN_NOT_FOUND,
+    LOG_DUAL_FUSION_SKIPPED_IDENTICAL_PROVIDERS,
     LOG_EMAIL_SEND_ERROR,
     LOG_EMAIL_SENT,
     LOG_EXPORT_DOCX_START,
     LOG_EXPORT_MP3_START,
-    LOG_EXPORT_PDF_START,
     LOG_EXPORT_PDF_UA_START,
     LOG_EXPORT_TXT_START,
+    LOG_FAILURE_EMAIL_FAILED,
+    LOG_FAILURE_EMAIL_NOT_SENT,
     LOG_FATAL_ERROR_IN_BOT,
     LOG_JOB_CANCELLED,
     LOG_JOB_COMPLETED,
@@ -120,23 +143,37 @@ from backend.log_messages import (
     LOG_ORPHAN_TASKS_CLEANED,
     LOG_ORPHAN_TASKS_CLEANUP_FAILED,
     LOG_OUTPUT_DIR_REMOVED,
+    LOG_PDDL_FORMULA_RECOGNIZE_EMPTY,
+    LOG_PDDL_FORMULA_RECOGNIZE_UNAVAILABLE,
+    LOG_PDDL_FORMULA_TEXT_LAYER_DISAGREES,
+    LOG_PDDL_FORMULAS_FELL_BACK_TO_VISION,
+    LOG_PDDL_FORMULAS_RECOGNIZED,
     LOG_PDDL_IGNORED_OPTIONS,
     LOG_PDDL_IMAGES_ENRICHED,
     LOG_PDDL_TABLES_ENRICHED,
+    LOG_PDDL_TABLE_REREAD_ACCEPTED,
+    LOG_PDDL_TABLE_REREAD_REJECTED,
+    LOG_PROVIDER_BREAKER_OPEN,
+    LOG_PDDL_VISION_RETRY_PASS_PICTURES,
+    LOG_PDDL_VISION_RETRY_PASS_TABLES,
     LOG_PDDL_ELEMENT_CROP_FAILED,
+    LOG_PDDL_EMPTY_LIST_ITEMS_DROPPED,
     LOG_PDDL_PREFERRED_PLAN_MISSING,
     LOG_PDDL_PROBLEM_HASH_MISMATCH,
     LOG_PDDL_DOMAIN_HASH_MISMATCH,
     LOG_PDDL_DOMAIN_DESCRIPTION_HASH_MISMATCH,
     LOG_PDDL_SELECTED_CLOSURE_MISMATCH,
     LOG_PDF_UA_GENERATION_FAILED,
-    LOG_PDF_EXPORTED,
     LOG_PDF_UA_EXPORTED,
     LOG_PDF_UA_SKIPPED_DISABLED,
+    LOG_PDF_UA_AUDIT_SKIPPED_DISABLED,
+    LOG_PDF_UA_AUDIT_FINISHED,
+    LOG_PDF_UA_AUDIT_FAILED,
     LOG_MEDIA_INSPECT_SKIPPED_DISABLED,
     LOG_MEDIA_INSPECT_TOOLBOX_FINISHED,
     LOG_MEDIA_INSPECT_FAILED,
     LOG_PDF_UA_TOOLBOX_EXPORTED,
+    LOG_PDF_UA_MATH_DEGRADED,
     LOG_TXT_EXPORTED,
     LOG_DOCX_EXPORTED,
     LOG_DOCX_GENERATION_FAILED,
@@ -151,6 +188,7 @@ from backend.log_messages import (
     LOG_STATUS_EDIT_UNEXPECTED,
     LOG_STATUS_MESSAGE_EDIT_FAILED,
     LOG_STATUS_MESSAGE_SEND_FAILED,
+    LOG_STRUCTURAL_PROVIDER_DEGRADED,
     LOG_TASK_CANCELLED_BY_USER,
     LOG_TEMP_DIR_REMOVED,
     LOG_TEMP_FILE_REMOVED,
@@ -179,11 +217,15 @@ from backend.log_messages import (
     LOG_WORKER_TASK_STARTING,
     MSG_PLANNER_NOT_STARTED,
     MSG_TIMESTAMPS_MIXED_TIMEZONES,
+    MSG_VISION_TRUNCATION_NOTICE,
     MSG_OBLIGATION_CODE,
     MSG_OBLIGATION_FORMULA,
     MSG_OBLIGATION_IMAGE,
     MSG_OBLIGATION_TABLE,
     MSG_OBLIGATION_UNKNOWN,
+    MSG_SLIDE_HEADING,
+    MSG_SLIDE_HEADING_WITH_TITLE,
+    MSG_STRUCTURAL_EXTRACTION_DEGRADED,
     MSG_OBLIGATION_UNSTRUCTURED_PAGE,
     MSG_OBSERVATION_PAGE_WITHOUT_STRUCTURE,
     MSG_HEADING_GAP,
@@ -241,15 +283,20 @@ from backend.export.pandoc_exporter import (
     MSG_PDF_UA_DISABLED,
     MSG_UNSUPPORTED_EXPORT_FORMAT,
 )
+from backend.agents.pddl_orchestrator import (
+    MSG_PICTURES_NOT_DESCRIBED,
+    MSG_LETTERHEAD_TEXT,
+    MSG_TABLES_NOT_READ,
+    MSG_UNDESCRIBED_PICTURE_ALT,
+)
+from backend.export.markers import (
+    MSG_OBJECT_MARKER_FORMULA,
+    MSG_OBJECT_MARKER_IMAGE,
+    MSG_OBJECT_MARKER_TABLE,
+)
 from backend.export.renderers.html_renderer import (
     MSG_HTML_IMAGE_DESCRIPTION,
     MSG_HTML_TABLE_OF_CONTENTS,
-    MSG_HTML_TECHNICAL_METADATA,
-)
-from backend.export.renderers.pdf_renderer import (
-    MSG_PDF_NOTE_LABEL,
-    MSG_PDF_TABLE_OF_CONTENTS,
-    MSG_PDF_WARNING_LABEL,
 )
 from backend.pipeline.table_ast import (
     MSG_TABLE_TEXT_CAPTION,
@@ -258,6 +305,7 @@ from backend.pipeline.table_ast import (
 )
 from backend.stage_messages import (
     STAGE_CANCELLATION_REQUESTED,
+    STAGE_CANCELLATION_WAITING,
     STAGE_RESTART_CANCELLED,
     STAGE_RESTART_INTERRUPTED,
     STAGE_RESTART_RESUBMIT,
@@ -270,12 +318,13 @@ from backend.stage_messages import (
     STAGE_CANCELLED_BY_USER,
     STAGE_CANCELLED_IN_QUEUE,
     STAGE_ENQUEUED_WAITING,
+    STAGE_ENRICHING_FORMULAS,
     STAGE_ENRICHING_IMAGE_DESCRIPTIONS,
     STAGE_ENRICHING_TABLES_OCR,
     STAGE_EXPORTING_DOCX,
     STAGE_EXPORTING_HTML,
-    STAGE_EXPORTING_PDF,
     STAGE_EXPORTING_PDF_UA,
+    STAGE_AUDITING_PDF_UA,
     STAGE_EXPORTING_TXT,
     STAGE_GENERATING_AUDIO,
     STAGE_GENERATING_PDDL_PLAN,
@@ -291,6 +340,16 @@ from backend.stage_messages import (
     STAGE_SPLITTING_PDF_PAGES,
     STAGE_VALIDATING_PLAN_DRY_RUN,
     STAGE_EXECUTING_PLAN,
+    STAGE_DESCRIBING_IMAGE,
+    STAGE_RECOGNIZING_FORMULA,
+    STAGE_RECOGNIZING_TABLE,
+    STAGE_EXECUTING_PLAN_STEP,
+    STAGE_PAGE,
+    STAGE_PAGE_OF,
+    STAGE_PAGES,
+    STAGE_PAGE_UNKNOWN,
+    STAGE_FAILED_DURING,
+    STAGE_RESTART_INTERRUPTED_DURING,
 )
 from backend.tools.toolbox_math_tools import (
     MSG_MATHML_REJECTED,
@@ -298,7 +357,7 @@ from backend.tools.toolbox_math_tools import (
     MSG_SPEECH_REJECTED,
     MSG_SPEECH_UNAVAILABLE,
 )
-from backend.tools.validators import MSG_FILE_TOO_LARGE, MSG_UNSUPPORTED_FORMAT
+from backend.tools.validators import MSG_FILE_TOO_LARGE, MSG_INVALID_EMAIL_ADDRESS, MSG_UNSUPPORTED_FORMAT
 from frontend.web.messages import (
     WEB_JOB_TITLE,
     WEB_JOB_PENDING,
@@ -306,6 +365,8 @@ from frontend.web.messages import (
     WEB_JOB_DOWNLOAD,
     WEB_JOB_EMAIL_FAILED,
     WEB_JOB_EMAIL_SENT,
+    WEB_JOB_FAILURE_EMAIL_FAILED,
+    WEB_JOB_FAILURE_EMAIL_SENT,
     WEB_JOB_UNAVAILABLE,
     WEB_JOB_STATUS,
     WEB_JOB_ERRORS,
@@ -316,15 +377,6 @@ from frontend.web.messages import (
     WEB_AGENT_DATA_INSTRUCTIONS_FALLBACK,
     WEB_AGENT_OS_DESCRIPTION,
     WEB_AGENT_VISION_DESCRIPTION,
-    WEB_ADVANCED_BACK_LINK,
-    WEB_ADVANCED_HEADLINE,
-    WEB_ADVANCED_INTRO,
-    WEB_ADVANCED_PROMPT_HELP,
-    WEB_ADVANCED_PROMPT_LABEL,
-    WEB_ADVANCED_PROMPT_PLACEHOLDER,
-    WEB_ADVANCED_SUBHEAD,
-    WEB_ADVANCED_THINKING_LABEL,
-    WEB_ADVANCED_TITLE,
     WEB_DOWNLOAD_HEADLINE,
     WEB_DOWNLOAD_NO_FORMATS,
     WEB_DOWNLOAD_SUBHEAD,
@@ -334,16 +386,15 @@ from frontend.web.messages import (
     WEB_ERROR_DOWNLOAD_INVALID,
     WEB_ERROR_DOWNLOAD_UNAVAILABLE,
     WEB_ERROR_INTERNAL,
-    WEB_ERROR_PROMPT_TOO_LONG,
     WEB_ERROR_UPLOAD_GENERIC,
     WEB_FORMAT_DOCX,
     WEB_FORMAT_HTML,
     WEB_FORMAT_MP3,
     WEB_FORMAT_PDF,
+    WEB_FORMAT_PDF_UA,
     WEB_FORMAT_TXT,
     WEB_FORMAT_ZIP,
     WEB_FOOTER,
-    WEB_INDEX_ADVANCED_LINK,
     WEB_INDEX_DOC_LABEL,
     WEB_INDEX_EMAIL_HELP,
     WEB_INDEX_EMAIL_LABEL,
@@ -456,22 +507,26 @@ MESSAGES: tuple[str, ...] = (
     WEB_JOB_DOWNLOAD,
     WEB_JOB_EMAIL_FAILED,
     WEB_JOB_EMAIL_SENT,
+    WEB_JOB_FAILURE_EMAIL_FAILED,
+    WEB_JOB_FAILURE_EMAIL_SENT,
     WEB_JOB_UNAVAILABLE,
     WEB_JOB_STATUS,
     WEB_JOB_ERRORS,
     WEB_JOB_HOME,
     WEB_JOB_EMAIL_UNKNOWN,
     STAGE_CANCELLATION_REQUESTED,
+    STAGE_CANCELLATION_WAITING,
     STAGE_RESTART_CANCELLED,
     STAGE_RESTART_INTERRUPTED,
     STAGE_RESTART_RESUBMIT,
     STAGE_PENDING_UPLOAD_MISSING,
     WEB_ERROR_INVALID_RECEIPT,
-    "Custom instructions and thinking mode are unavailable for this pipeline",
+    API_OPTIONS_UNAVAILABLE,
     "Processing your document…",
     "Job complete: your file is ready for download",
     MSG_UNSUPPORTED_FORMAT,
     MSG_FILE_TOO_LARGE,
+    MSG_INVALID_EMAIL_ADDRESS,
     # Pipeline processing-stage labels surfaced to end users as live progress
     # (backend/service.py, backend/agents/*, backend/api/worker.py).
     STAGE_QUEUE_WAITING_POSITION,
@@ -484,8 +539,8 @@ MESSAGES: tuple[str, ...] = (
     STAGE_PROCESSING_FAILED_LABEL,
     STAGE_EXPORTING_TXT,
     STAGE_EXPORTING_DOCX,
-    STAGE_EXPORTING_PDF,
     STAGE_EXPORTING_PDF_UA,
+    STAGE_AUDITING_PDF_UA,
     STAGE_EXPORTING_HTML,
     STAGE_GENERATING_AUDIO,
     STAGE_PROCESSING_COMPLETED,
@@ -497,11 +552,22 @@ MESSAGES: tuple[str, ...] = (
     STAGE_ANALYZING_STRUCTURAL,
     STAGE_STRUCTURAL_EXTRACTION_FAILED,
     STAGE_DOCUMENT_TOO_MANY_PAGES,
+    STAGE_ENRICHING_FORMULAS,
     STAGE_ENRICHING_IMAGE_DESCRIPTIONS,
     STAGE_ENRICHING_TABLES_OCR,
     STAGE_GENERATING_PDDL_PLAN,
     STAGE_VALIDATING_PLAN_DRY_RUN,
     STAGE_EXECUTING_PLAN,
+    STAGE_DESCRIBING_IMAGE,
+    STAGE_RECOGNIZING_FORMULA,
+    STAGE_RECOGNIZING_TABLE,
+    STAGE_EXECUTING_PLAN_STEP,
+    STAGE_PAGE,
+    STAGE_PAGE_OF,
+    STAGE_PAGES,
+    STAGE_PAGE_UNKNOWN,
+    STAGE_FAILED_DURING,
+    STAGE_RESTART_INTERRUPTED_DURING,
     # Telegram bot command responses (frontend/telegram/handlers/start.py).
     MSG_EMAIL_HINT,
     MSG_EMAIL_CONFIGURED,
@@ -567,6 +633,8 @@ MESSAGES: tuple[str, ...] = (
     MSG_OBLIGATION_FORMULA,
     MSG_OBLIGATION_CODE,
     MSG_OBLIGATION_UNKNOWN,
+    MSG_SLIDE_HEADING,
+    MSG_SLIDE_HEADING_WITH_TITLE,
     MSG_OBLIGATION_UNSTRUCTURED_PAGE,
     MSG_OBSERVATION_PAGE_WITHOUT_STRUCTURE,
     MSG_HEADING_GAP,
@@ -597,6 +665,7 @@ MESSAGES: tuple[str, ...] = (
     EXE_PREDECESSORS_UNSATISFIED,
     MSG_PLANNER_NOT_STARTED,
     MSG_TIMESTAMPS_MIXED_TIMEZONES,
+    MSG_VISION_TRUNCATION_NOTICE,
     MSG_EXECUTE_OBLIGATION_MISSING_FIELDS,
     MSG_ACTION_REJECTS_EXECUTION_PARAMETERS,
     MSG_PLAN_INDICES_CONSECUTIVE_FROM_ZERO,
@@ -667,12 +736,12 @@ MESSAGES: tuple[str, ...] = (
     MSG_UNSUPPORTED_EXPORT_FORMAT,
     # HTML renderer UI chrome (backend/export/renderers/html_renderer.py).
     MSG_HTML_TABLE_OF_CONTENTS,
-    MSG_HTML_TECHNICAL_METADATA,
+    MSG_UNDESCRIBED_PICTURE_ALT,
+    MSG_LETTERHEAD_TEXT,
+    MSG_OBJECT_MARKER_IMAGE,
+    MSG_OBJECT_MARKER_TABLE,
+    MSG_OBJECT_MARKER_FORMULA,
     MSG_HTML_IMAGE_DESCRIPTION,
-    # PDF renderer UI chrome (backend/export/renderers/pdf_renderer.py).
-    MSG_PDF_TABLE_OF_CONTENTS,
-    MSG_PDF_NOTE_LABEL,
-    MSG_PDF_WARNING_LABEL,
     # TXT table line templates (backend/pipeline/table_ast.py).
     MSG_TABLE_TEXT_CAPTION,
     MSG_TABLE_TEXT_ROW,
@@ -685,16 +754,6 @@ MESSAGES: tuple[str, ...] = (
     WEB_INDEX_EMAIL_HELP,
     WEB_INDEX_DOC_LABEL,
     WEB_INDEX_SUBMIT_BUTTON,
-    WEB_INDEX_ADVANCED_LINK,
-    WEB_ADVANCED_TITLE,
-    WEB_ADVANCED_HEADLINE,
-    WEB_ADVANCED_SUBHEAD,
-    WEB_ADVANCED_INTRO,
-    WEB_ADVANCED_PROMPT_LABEL,
-    WEB_ADVANCED_PROMPT_PLACEHOLDER,
-    WEB_ADVANCED_PROMPT_HELP,
-    WEB_ADVANCED_THINKING_LABEL,
-    WEB_ADVANCED_BACK_LINK,
     WEB_DOWNLOAD_TITLE,
     WEB_DOWNLOAD_HEADLINE,
     WEB_DOWNLOAD_SUBHEAD,
@@ -703,6 +762,7 @@ MESSAGES: tuple[str, ...] = (
     WEB_FORMAT_TXT,
     WEB_FORMAT_DOCX,
     WEB_FORMAT_PDF,
+    WEB_FORMAT_PDF_UA,
     WEB_FORMAT_HTML,
     WEB_FORMAT_MP3,
     WEB_FORMAT_ZIP,
@@ -715,7 +775,6 @@ MESSAGES: tuple[str, ...] = (
     WEB_ERROR_INTERNAL,
     WEB_ERROR_API_UPLOAD,
     WEB_ERROR_UPLOAD_GENERIC,
-    WEB_ERROR_PROMPT_TOO_LONG,
     WEB_ERROR_DOWNLOAD_INVALID,
     WEB_ERROR_DOWNLOAD_UNAVAILABLE,
     WEB_RATE_LIMIT_EXCEEDED,
@@ -747,6 +806,8 @@ MESSAGES: tuple[str, ...] = (
     LOG_WORKER_TASK_ERROR,
     LOG_WORKER_TASK_COMPLETED,
     LOG_API_STARTED,
+    LOG_ARTIFACT_STORE_DIRECT_INPUT,
+    LOG_ARTIFACT_UPLOAD_DEGRADED,
     LOG_API_ERROR,
     LOG_API_JOB_ENQUEUED,
     LOG_CLEANUP_ITEM_FAILED,
@@ -768,27 +829,40 @@ MESSAGES: tuple[str, ...] = (
     LOG_SMTP_NOT_CONFIGURED,
     LOG_EMAIL_SENT,
     LOG_EMAIL_SEND_ERROR,
+    LOG_FAILURE_EMAIL_FAILED,
+    LOG_FAILURE_EMAIL_NOT_SENT,
     LOG_EXPORT_TXT_START,
     LOG_EXPORT_DOCX_START,
-    LOG_EXPORT_PDF_START,
     LOG_EXPORT_PDF_UA_START,
     LOG_EXPORT_MP3_START,
     LOG_PDDL_IGNORED_OPTIONS,
     LOG_PDDL_IMAGES_ENRICHED,
+    LOG_PDDL_FORMULA_RECOGNIZE_UNAVAILABLE,
+    LOG_PDDL_FORMULA_RECOGNIZE_EMPTY,
+    LOG_PDDL_FORMULA_TEXT_LAYER_DISAGREES,
+    LOG_PDDL_FORMULAS_RECOGNIZED,
+    LOG_PDDL_FORMULAS_FELL_BACK_TO_VISION,
     LOG_PDDL_TABLES_ENRICHED,
+    LOG_PDDL_TABLE_REREAD_ACCEPTED,
+    LOG_PDDL_TABLE_REREAD_REJECTED,
+    LOG_PROVIDER_BREAKER_OPEN,
     LOG_PDDL_ELEMENT_CROP_FAILED,
+    LOG_PDDL_EMPTY_LIST_ITEMS_DROPPED,
     LOG_PDDL_PREFERRED_PLAN_MISSING,
     LOG_PDDL_PROBLEM_HASH_MISMATCH,
     LOG_PDDL_DOMAIN_HASH_MISMATCH,
     LOG_PDDL_DOMAIN_DESCRIPTION_HASH_MISMATCH,
     LOG_PDDL_SELECTED_CLOSURE_MISMATCH,
-    LOG_PDF_EXPORTED,
     LOG_PDF_UA_EXPORTED,
     LOG_PDF_UA_SKIPPED_DISABLED,
+    LOG_PDF_UA_AUDIT_SKIPPED_DISABLED,
+    LOG_PDF_UA_AUDIT_FINISHED,
+    LOG_PDF_UA_AUDIT_FAILED,
     LOG_MEDIA_INSPECT_SKIPPED_DISABLED,
     LOG_MEDIA_INSPECT_TOOLBOX_FINISHED,
     LOG_MEDIA_INSPECT_FAILED,
     LOG_PDF_UA_TOOLBOX_EXPORTED,
+    LOG_PDF_UA_MATH_DEGRADED,
     LOG_TXT_EXPORTED,
     LOG_DOCX_EXPORTED,
     LOG_DOCX_GENERATION_FAILED,
@@ -797,16 +871,23 @@ MESSAGES: tuple[str, ...] = (
     EMAIL_CONFIRMATION_SUBJECT,
     EMAIL_CONFIRMATION_BODY,
     EMAIL_RESULT_SUBJECT,
+    EMAIL_FAILURE_BODY,
+    EMAIL_FAILURE_SUBJECT,
     EMAIL_RESULT_BODY_WITH_LINK,
     EMAIL_RESULT_BODY_ATTACHED,
     EMAIL_FORMAT_TXT,
     EMAIL_FORMAT_DOCX,
-    EMAIL_FORMAT_PDF,
     EMAIL_FORMAT_PDF_UA,
     EMAIL_FORMAT_HTML,
     EMAIL_FORMAT_MP3,
     EMAIL_FORMAT_ZIP,
     EMAIL_RESULT_WARNINGS_HEADER,
+    EMAIL_RESULT_AUDIT_HEADER,
+    EMAIL_AUDIT_COMPLIANT,
+    EMAIL_AUDIT_NON_COMPLIANT,
+    EMAIL_AUDIT_RULE,
+    EMAIL_AUDIT_MORE_RULES,
+    EMAIL_AUDIT_UNAVAILABLE,
     LOG_CANONICAL_JSON_SAVE_FAILED,
     LOG_TASK_CANCELLED_BY_USER,
     LOG_PIPELINE_ERROR,
@@ -814,8 +895,18 @@ MESSAGES: tuple[str, ...] = (
     LOG_DATA_AGENT_PROMPT_NOT_FOUND,
     LOG_DATA_AGENT_PROCESSING_REGION,
     LOG_DATA_AGENT_REGION_ERROR,
+    LOG_VISION_AGENT_CONTEXT_RETRY,
+    LOG_VISION_AGENT_DESCRIPTION_TRUNCATED,
+    LOG_VISION_AGENT_RATE_LIMIT_RETRY,
+    LOG_VISION_AGENT_TIMEOUT_RETRY,
     LOG_VISION_AGENT_REGION_ERROR,
+    LOG_VISION_AGENT_REGION_RECOVERED,
+    LOG_VISION_AGENT_REGION_RETRY,
+    LOG_VISION_AGENT_REGION_SALVAGED,
+    LOG_MANIFEST_STRUCTURAL_CONTAINER_SKIPPED,
     LOG_VISION_AGENT_SENDING_REGION,
+    LOG_VISION_CONTEXT_DOWNSCALE_FAILED,
+    LOG_VISION_ELEMENT_DESCRIPTION,
     LOG_CACHE_HIT,
     LOG_CACHE_DEBUG_HIT,
     LOG_CACHE_DEBUG_SET,
@@ -838,6 +929,8 @@ MESSAGES: tuple[str, ...] = (
     LOG_WEB_RATE_LIMIT_EXCEEDED,
     LOG_WEB_API_UPLOAD_ERROR,
     LOG_STATUS_MESSAGE_SEND_FAILED,
+    LOG_STRUCTURAL_PROVIDER_DEGRADED,
+    LOG_DUAL_FUSION_SKIPPED_IDENTICAL_PROVIDERS,
     LOG_STATUS_MESSAGE_EDIT_FAILED,
     LOG_STATUS_EDIT_UNEXPECTED,
     LOG_AUDIO_EXPORTED,
@@ -858,6 +951,7 @@ MESSAGES: tuple[str, ...] = (
     MSG_DUPLICATE_PAGE_NUMBERS,
     MSG_PAGE_UNKNOWN_ELEMENTS,
     MSG_CHAR_RANGE_REVERSED,
+    MSG_STRUCTURAL_EXTRACTION_DEGRADED,
 )
 
 #: msgid -> localized text mappings per non-default locale; every id in MESSAGES must appear for each such locale.
@@ -882,18 +976,24 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         WEB_JOB_ERRORS: 'Avisos do processamento',
         WEB_JOB_HOME: 'Enviar outro documento',
         WEB_JOB_EMAIL_UNKNOWN: 'Não foi possível confirmar a entrega do e-mail. Você pode baixar seus arquivos aqui.',
+        WEB_JOB_FAILURE_EMAIL_SENT: 'Enviamos um e-mail sobre esta falha.',
+        WEB_JOB_FAILURE_EMAIL_FAILED: (
+            'Não foi possível enviar o e-mail sobre esta falha; os avisos abaixo mostram o que aconteceu.'
+        ),
         STAGE_CANCELLATION_REQUESTED: 'Cancelamento solicitado; concluindo a operação atual com segurança',
+        STAGE_CANCELLATION_WAITING: 'Cancelamento solicitado há {seconds}s; aguardando a operação atual terminar com segurança',
         STAGE_RESTART_CANCELLED: 'Cancelado durante a reinicialização',
         STAGE_RESTART_INTERRUPTED: 'Processamento interrompido pela reinicialização',
         STAGE_RESTART_RESUBMIT: 'Processamento interrompido pela reinicialização; envie novamente',
         STAGE_PENDING_UPLOAD_MISSING: 'O arquivo pendente não existe mais',
         WEB_ERROR_INVALID_RECEIPT: 'Recibo de processamento inválido retornado pela API',
-        "Custom instructions and thinking mode are unavailable for this pipeline": "Instruções personalizadas e modo de raciocínio estão indisponíveis neste pipeline",
+        API_OPTIONS_UNAVAILABLE: "Instruções personalizadas e modo de raciocínio estão indisponíveis neste pipeline",
         "Processing your document…": "Processando seu documento…",
         "Job complete: your file is ready for download": "Tarefa concluída: o arquivo está pronto para download",
         MSG_UNSUPPORTED_FORMAT: ("Formato de arquivo não suportado. Envie PDF, DOCX, HTML, PNG, JPG, " +
                                 "TIFF, BMP ou WEBP."),
         MSG_FILE_TOO_LARGE: "Arquivo muito grande. Limite: {limit} MB.",
+        MSG_INVALID_EMAIL_ADDRESS: "Endereço de e-mail inválido",
         # Pipeline processing-stage labels (pt-BR mirrors of the stage msgids
         # declared above), surfaced as the live progress text of each job.
         STAGE_QUEUE_WAITING_POSITION: "Aguardando na fila (Posição: {position})",
@@ -906,8 +1006,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         STAGE_PROCESSING_FAILED_LABEL: "❌ Não foi possível processar o arquivo.",
         STAGE_EXPORTING_TXT: ("Exportando a versão em texto puro (TXT)..."),
         STAGE_EXPORTING_DOCX: ("Exportando o documento Word acessível (DOCX)..."),
-        STAGE_EXPORTING_PDF: "Exportando o PDF...",
         STAGE_EXPORTING_PDF_UA: ("Exportando o PDF/UA acessível com marcações..."),
+        STAGE_AUDITING_PDF_UA: "Auditando o PDF/UA com o veraPDF...",
         STAGE_EXPORTING_HTML: ("Exportando a versão em HTML semântico..."),
         STAGE_GENERATING_AUDIO: (
             "Gerando a versão em áudio falado... {percent}%"
@@ -927,6 +1027,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         STAGE_DOCUMENT_TOO_MANY_PAGES: (
             "O documento tem {page_count} páginas, mais que o limite de {max_pages}."
         ),
+        STAGE_ENRICHING_FORMULAS: "Enriquecendo as fórmulas...",
         STAGE_ENRICHING_IMAGE_DESCRIPTIONS: ("Enriquecendo as descrições de imagens..."),
         STAGE_ENRICHING_TABLES_OCR: ("Enriquecendo as tabelas com OCR (fallback)..."),
         STAGE_GENERATING_PDDL_PLAN: ("Gerando o plano nominal com PDDL..."),
@@ -934,6 +1035,28 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "Validando o plano em modo dry-run..."
         ),
         STAGE_EXECUTING_PLAN: "Executando o plano...",
+        STAGE_DESCRIBING_IMAGE: "Descrevendo a imagem {current} de {total} (esta imagem está na {pages})...",
+        STAGE_RECOGNIZING_FORMULA: "Reconhecendo a fórmula {current} de {total} (esta fórmula está na {pages})...",
+        STAGE_RECOGNIZING_TABLE: "Reconhecendo a tabela {current} de {total} (esta tabela está na {pages})...",
+        STAGE_EXECUTING_PLAN_STEP: "Executando o plano: passo {current} de {total} ({pages})...",
+        STAGE_PAGE: "página {page}",
+        STAGE_PAGE_OF: "página {page} de {total_pages}",
+        STAGE_PAGES: "páginas {pages}",
+        STAGE_PAGE_UNKNOWN: "página não identificada",
+        STAGE_FAILED_DURING: "{error} (falhou durante: {stage})",
+        STAGE_RESTART_INTERRUPTED_DURING: (
+            "O processamento foi interrompido por uma reinicialização do servidor durante: "
+            "{stage}. Envie o arquivo novamente."
+        ),
+        EMAIL_FAILURE_SUBJECT: "Não foi possível processar o seu arquivo - Acessilia",
+        EMAIL_FAILURE_BODY: (
+            "Olá!\n\n"
+            "Infelizmente, o processamento do arquivo '{filename}' não pôde ser concluído.\n\n"
+            "Motivo: {error}\n\n"
+            "Você pode enviar o arquivo novamente. Se o problema persistir, encaminhe esta "
+            "mensagem para a equipe Acessilia para que possamos investigar.\n\n"
+            "Atenciosamente,\nA equipe Acessilia"
+        ),
         MSG_EMAIL_HINT: "Por favor, informe o e-mail: /email seu@email.com",
         MSG_EMAIL_CONFIGURED:
             "E-mail {email} configurado! Agora envie o documento para ser enviado para este e-mail.",
@@ -1131,6 +1254,10 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         API_TOKEN_READ_ONLY: "Token permite somente leitura",
         # Manifest processing-needs rationale texts used in LLM prompt obligations per element type.
         MSG_OBLIGATION_IMAGE: ("A imagem deve receber descrição ou ser marcada como decorativa."),
+        MSG_VISION_TRUNCATION_NOTICE: (
+            "Observação: esta imagem é informativamente muito extensa; a descrição "
+            "foi limitada ao orçamento disponível e muitos detalhes não foram descritos."
+        ),
         MSG_OBLIGATION_TABLE: (
             "A tabela deve ter cabeçalhos e ordem de leitura verificáveis."
         ),
@@ -1141,6 +1268,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "O bloco de código deve preservar indentação, linguagem e leitura literal."
         ),
         MSG_OBLIGATION_UNKNOWN: ("O elemento não classificado requer inspeção estrutural."),
+        MSG_SLIDE_HEADING: "Slide {number} de {total}",
+        MSG_SLIDE_HEADING_WITH_TITLE: "Slide {number} de {total}: {title}",
         MSG_OBLIGATION_UNSTRUCTURED_PAGE: (
             "A página deve ser inspecionada visualmente: descrita quando tiver conteúdo, "
             "ou aceita como em branco."
@@ -1325,12 +1454,12 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         ),
         # HTML renderer UI chrome (pt-BR mirrors of the MSG_HTML_* ids above).
         MSG_HTML_TABLE_OF_CONTENTS: "Sumário",
-        MSG_HTML_TECHNICAL_METADATA: "Metadados técnicos",
+        MSG_UNDESCRIBED_PICTURE_ALT: "Imagem sem descrição textual.",
+        MSG_LETTERHEAD_TEXT: "Logotipo. {lines}.",
+        MSG_OBJECT_MARKER_IMAGE: "imagem",
+        MSG_OBJECT_MARKER_TABLE: "tabela",
+        MSG_OBJECT_MARKER_FORMULA: "fórmula",
         MSG_HTML_IMAGE_DESCRIPTION: "Descrição da imagem",
-        # PDF renderer UI chrome (pt-BR mirrors of the MSG_PDF_* ids above).
-        MSG_PDF_TABLE_OF_CONTENTS: "Sumário",
-        MSG_PDF_NOTE_LABEL: "Nota",
-        MSG_PDF_WARNING_LABEL: "Aviso",
         # TXT table line templates (pt-BR mirrors of the MSG_TABLE_TEXT_* ids above).
         MSG_TABLE_TEXT_CAPTION: "Tabela: {caption}",
         MSG_TABLE_TEXT_ROW: "Linha {row_index}: {joined}",
@@ -1343,25 +1472,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         ),
         WEB_INDEX_EMAIL_LABEL: "Seu E-mail",
         WEB_INDEX_EMAIL_HELP: "Enviaremos o arquivo final para este endereço.",
-        WEB_INDEX_DOC_LABEL: "Anexar Documento (PDF ou Imagem)",
+        WEB_INDEX_DOC_LABEL: "Anexar Documento (PDF, HTML ou Imagem)",
         WEB_INDEX_SUBMIT_BUTTON: "Tornar Acessível",
-        WEB_INDEX_ADVANCED_LINK: "Modo Avançado",
-        WEB_ADVANCED_TITLE: "Modo Avançado - Acessilia",
-        WEB_ADVANCED_HEADLINE: "Modo Avançado",
-        WEB_ADVANCED_SUBHEAD: "Prompt personalizado",
-        WEB_ADVANCED_INTRO: "Personalize o prompt enviado ao modelo de IA.",
-        WEB_ADVANCED_PROMPT_LABEL: "Prompt Personalizado",
-        WEB_ADVANCED_PROMPT_PLACEHOLDER: (
-            "Digite seu prompt personalizado aqui. Ele substituirá completamente o prompt padrão do sistema."
-        ),
-        WEB_ADVANCED_PROMPT_HELP: (
-            "Máximo de 6000 caracteres. Texto puro apenas (sem formatação). "
-            "Este prompt substitui o prompt padrão do sistema para todas as páginas."
-        ),
-        WEB_ADVANCED_THINKING_LABEL: (
-            "Ativar Modo Pensamento (raciocínio interno do modelo)"
-        ),
-        WEB_ADVANCED_BACK_LINK: "Voltar ao modo normal",
         WEB_DOWNLOAD_TITLE: "Download - Acessilia",
         WEB_DOWNLOAD_HEADLINE: "Download",
         WEB_DOWNLOAD_SUBHEAD: "Escolha o formato desejado",
@@ -1372,6 +1484,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         WEB_FORMAT_TXT: "Texto (TXT)",
         WEB_FORMAT_DOCX: "Documento Word (DOCX)",
         WEB_FORMAT_PDF: "PDF Acessível",
+        WEB_FORMAT_PDF_UA: "PDF Acessível (PDF/UA)",
         WEB_FORMAT_HTML: "Página Web (HTML)",
         WEB_FORMAT_MP3: "Audiodescrição (MP3)",
         WEB_FORMAT_ZIP: "Pacote completo (ZIP)",
@@ -1395,9 +1508,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         WEB_ERROR_API_UPLOAD: "Erro da API ({status_code}): {detail}",
         WEB_ERROR_UPLOAD_GENERIC: (
             "Ocorreu um erro ao enviar o arquivo para a API. Tente novamente."
-        ),
-        WEB_ERROR_PROMPT_TOO_LONG: (
-            "Prompt personalizado excede o limite de 6000 caracteres."
         ),
         WEB_ERROR_DOWNLOAD_INVALID: "Link inválido ou expirado",
         WEB_ERROR_DOWNLOAD_UNAVAILABLE: "Serviço de download indisponível",
@@ -1487,9 +1597,14 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         ),
         LOG_EMAIL_SENT: "E-mail enviado com sucesso para {to_email}.",
         LOG_EMAIL_SEND_ERROR: "Erro ao enviar e-mail para {to_email}: {error}",
+        LOG_FAILURE_EMAIL_FAILED: (
+            "Não foi possível enviar o e-mail de falha do job {task_id}: {error}"
+        ),
+        LOG_FAILURE_EMAIL_NOT_SENT: (
+            "O e-mail de falha do job {task_id} não foi enviado"
+        ),
         LOG_EXPORT_TXT_START: "Exportando TXT para {path}",
         LOG_EXPORT_DOCX_START: "Exportando DOCX para {path}",
-        LOG_EXPORT_PDF_START: "Exportando PDF para {path}",
         LOG_EXPORT_PDF_UA_START: "Exportando PDF/UA para {path}",
         LOG_EXPORT_MP3_START: "Exportando MP3 para {path}",
         LOG_PDDL_IGNORED_OPTIONS: (
@@ -1499,8 +1614,40 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         LOG_PDDL_IMAGES_ENRICHED: (
             "Pipeline PDDL: {count} imagem(ns) enriquecida(s) com descrição visual"
         ),
+        LOG_PDDL_FORMULA_RECOGNIZE_UNAVAILABLE: (
+            "math.recognize indisponível no enriquecimento de fórmulas ({error}); "
+            "usando o modelo de visão"
+        ),
+        LOG_PDDL_FORMULA_RECOGNIZE_EMPTY: (
+            "Fórmula {element_id} (página {page}): math.recognize ({provider}) não retornou LaTeX; "
+            "usando o modelo de visão"
+        ),
+        LOG_PDDL_FORMULA_TEXT_LAYER_DISAGREES: (
+            "Fórmula {element_id} (página {page}): o reconhecimento diverge da camada de texto {rejected}"
+        ),
+        LOG_PDDL_FORMULAS_RECOGNIZED: "LaTeX reconhecido para {count} fórmula(s)",
+        LOG_PDDL_FORMULAS_FELL_BACK_TO_VISION: (
+            "{count} de {total} fórmula(s) recorreram ao modelo de visão porque "
+            "math.recognize ({provider}) não retornou LaTeX"
+        ),
         LOG_PDDL_TABLES_ENRICHED: (
             "Pipeline PDDL: {count} tabela(s) enriquecida(s) com OCR/reconstrução"
+        ),
+        LOG_PDDL_TABLE_REREAD_ACCEPTED: (
+            "A tabela {element_id} (página {page}) parecia mal lida ({reason}); "
+            "substituída pela leitura da sua imagem"
+        ),
+        LOG_PDDL_TABLE_REREAD_REJECTED: (
+            "A tabela {element_id} (página {page}) parecia mal lida ({reason}); "
+            "a leitura da sua imagem não foi usada ({why})"
+        ),
+        LOG_PROVIDER_BREAKER_OPEN: (
+            "{failures} chamadas de visão seguidas sem resposta utilizável; "
+            "as chamadas restantes deste job serão puladas"
+        ),
+        # List items with no text left out of the document; {count}, {page}, {element_ids}.
+        LOG_PDDL_EMPTY_LIST_ITEMS_DROPPED: (
+            "PDDL: {count} item(ns) de lista sem texto deixado(s) fora da página {page}: {element_ids}"
         ),
         LOG_PDDL_ELEMENT_CROP_FAILED: (
             "Falha ao extrair recorte de imagem para elemento {element_id}"
@@ -1521,16 +1668,19 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         LOG_PDDL_SELECTED_CLOSURE_MISMATCH: (
             "Fechamento selecionado diverge do problema compilado"
         ),
-        # PDF export wrapper debug line; {output_path} the destination file path.
-        LOG_PDF_EXPORTED: (
-            "PDF exportado com marcadores e numeração de páginas: {output_path}"
-        ),
         # PDF/UA export wrapper debug line; {output_path} the destination file path.
         LOG_PDF_UA_EXPORTED: "PDF/UA exportado: {output_path}",
         # Toolbox-first PDF/UA rendering; {output_path} the destination file path.
         LOG_PDF_UA_TOOLBOX_EXPORTED: "PDF/UA renderizado pela Toolbox: {output_path}",
+        # The Toolbox rejected the AST's math and the export retries with the formulas as text; {error} the cause.
+        LOG_PDF_UA_MATH_DEGRADED: (
+            "A Toolbox rejeitou a matemática do PDF/UA; tentando de novo com as fórmulas como texto: {error}"
+        ),
         # Worker skips PDF/UA because the Toolbox capability is switched off.
         LOG_PDF_UA_SKIPPED_DISABLED: "PDF/UA ignorado: TOOLBOX_PDF_UA_ENABLED está desativado",
+        LOG_PDF_UA_AUDIT_SKIPPED_DISABLED: "Auditoria do PDF/UA ignorada: TOOLBOX_PDF_VALIDATE_ENABLED está desativado",
+        LOG_PDF_UA_AUDIT_FINISHED: "Auditoria do PDF/UA concluída (conforme={compliant}, regras não atendidas={rules})",
+        LOG_PDF_UA_AUDIT_FAILED: "Falha na auditoria do PDF/UA: {error}",
         # media.inspect skipped because the Toolbox capability is switched off.
         LOG_MEDIA_INSPECT_SKIPPED_DISABLED: "Inspeção de mídia ignorada: TOOLBOX_MEDIA_INSPECT_ENABLED está desativado",
         # Toolbox finished media.inspect; {nature} the artifact nature, {visual} whether it needs visual inspection.
@@ -1539,6 +1689,22 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         LOG_MEDIA_INSPECT_FAILED: (
             "Inspeção de mídia indisponível para {filename}; seguindo sem o "
             "sinal de imagem isolada: {error}"
+        ),
+        # One structural provider failed; {provider} identifies it and {error} its error class.
+        LOG_STRUCTURAL_PROVIDER_DEGRADED: "O provedor estrutural {provider} falhou ({error}); a extração está degradada.",
+        # FUSION_MODE=dual with the same provider on both sides; {provider} names it.
+        LOG_DUAL_FUSION_SKIPPED_IDENTICAL_PROVIDERS: "Fusão dual ignorada: os provedores primário e secundário são ambos {provider}.",
+        # Upload failed transiently; {error} is the error class, direct input remains available.
+        LOG_ARTIFACT_UPLOAD_DEGRADED: "Upload do artefato indisponível ({error}); extraindo a partir do arquivo original.",
+        # Independent URLs cannot share artifact IDs; the source is sent again for later stages.
+        LOG_ARTIFACT_STORE_DIRECT_INPUT: (
+            "Armazenamento de artefatos contornado para endpoints independentes da Toolbox; "
+            "o arquivo original será reenviado para extração, fusão e text spans."
+        ),
+        # Delivered warning: {provider} supplied the only available structural extraction.
+        MSG_STRUCTURAL_EXTRACTION_DEGRADED: (
+            "A extração estrutural usou apenas {provider} porque o outro provedor falhou. "
+            "O documento exige revisão; a comparação entre dois provedores não estava disponível."
         ),
         # TXT export wrapper debug line; {output_path} the destination file path.
         LOG_TXT_EXPORTED: "TXT exportado: {output_path}",
@@ -1579,14 +1745,19 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         ),
         EMAIL_FORMAT_TXT: "Texto Puro (TXT)",
         EMAIL_FORMAT_DOCX: "Documento Word (DOCX)",
-        EMAIL_FORMAT_PDF: "PDF Acessível",
-        EMAIL_FORMAT_PDF_UA: "PDF/UA",
+        EMAIL_FORMAT_PDF_UA: "PDF Acessível (PDF/UA)",
         EMAIL_FORMAT_HTML: "Página Web (HTML)",
         EMAIL_FORMAT_MP3: "Audiodescrição (MP3)",
         EMAIL_FORMAT_ZIP: "Pacote ZIP",
         EMAIL_RESULT_WARNINGS_HEADER: (
             "Alguns formatos opcionais não foram gerados:"
         ),
+        EMAIL_RESULT_AUDIT_HEADER: "Auditoria de acessibilidade do PDF (veraPDF):",
+        EMAIL_AUDIT_COMPLIANT: "{profile}: conforme",
+        EMAIL_AUDIT_NON_COMPLIANT: "{profile}: {rules} regra(s) não atendida(s) ({checks} ocorrência(s))",
+        EMAIL_AUDIT_RULE: "{specification}, cláusula {clause} (teste {test}): {description} ({checks} ocorrência(s))",
+        EMAIL_AUDIT_MORE_RULES: "... e mais {count} regra(s), listadas no relatório do pacote ZIP",
+        EMAIL_AUDIT_UNAVAILABLE: "Auditoria indisponível: {error}",
         LOG_CANONICAL_JSON_SAVE_FAILED: (
             "Não foi possível salvar o JSON canônico: {error}"
         ),
@@ -1609,6 +1780,49 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         ),
         LOG_VISION_AGENT_REGION_ERROR: (
             "[página {page_num}] Erro na região {type}: {error} | Traceback:\n{tb}"
+        ),
+        LOG_VISION_AGENT_REGION_RETRY: (
+            "[página {page_num}] Resposta inutilizável do modelo de visão para a região {type}; "
+            "tentando de novo ({attempt}/{attempts}): {error}"
+        ),
+        LOG_VISION_AGENT_REGION_RECOVERED: (
+            "[página {page_num}] O modelo de visão respondeu a região {type} na "
+            "tentativa {attempt}/{attempts}"
+        ),
+        LOG_MANIFEST_STRUCTURAL_CONTAINER_SKIPPED: (
+            "Manifesto: sem review-structure para {element_id} ({raw_label}): "
+            "ele agrupa outros elementos e não tem região"
+        ),
+        LOG_VISION_AGENT_REGION_SALVAGED: (
+            "[página {page_num}] Resposta do modelo de visão para a região {type} "
+            "cortada antes do fim; descrição recuperada ({chars} caracteres)"
+        ),
+        LOG_VISION_AGENT_RATE_LIMIT_RETRY: (
+            "[página {page_num}] O provedor do modelo limitou a taxa da região {type}; "
+            "aguardando {delay}s antes de tentar de novo "
+            "(reintenção por limite de taxa {retry}/{retries})"
+        ),
+        # Context overflow: one retry with a smaller image; {size_before}/{size_after} are byte sizes.
+        LOG_VISION_AGENT_CONTEXT_RETRY: (
+            "[página {page_num}] Limite de contexto excedido na região {type}; tentando uma vez "
+            "com uma imagem menor ({size_before} -> {size_after} bytes) e "
+            "max_tokens={max_tokens}: {error}"
+        ),
+        # The Toolbox could not render the smaller image; the original context error stands.
+        LOG_VISION_CONTEXT_DOWNSCALE_FAILED: (
+            "A recuperação de contexto da visão não conseguiu reduzir a imagem: {error}"
+        ),
+        LOG_VISION_AGENT_TIMEOUT_RETRY: (
+            "[página {page_num}] A região {type} não teve resposta a tempo ({error}); "
+            "tentando de novo (reintenção por tempo esgotado {retry}/{retries})"
+        ),
+        LOG_VISION_AGENT_DESCRIPTION_TRUNCATED: (
+            "[página {page_num}] A descrição da visão para a região {type} passou do "
+            "orçamento de {limit} tokens e foi truncada ({chars} caracteres mantidos)"
+        ),
+        LOG_VISION_ELEMENT_DESCRIPTION: (
+            "[página {page_num}] Descrição de visão do elemento {element_id} "
+            "({chars} caracteres): {description}"
         ),
         LOG_CACHE_HIT: "Cache: item existente para {name}",
         LOG_CACHE_DEBUG_HIT: "Cache: item existente: {key}",
@@ -1689,10 +1903,35 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
     },
 }
 
-#: Canonical English singular/plural msgid pair, then a per-locale mapping of localized pairs with the same index ordering.
-PLURAL_MESSAGES: tuple[tuple[str, str], dict[str, tuple[str, str]]] = (
-    ("document", "documents"),
-    {"pt_BR": ("documento", "documentos")},
+#: Each entry: a canonical English singular/plural msgid pair, then a per-locale mapping of localized pairs with the same index ordering.
+PLURAL_MESSAGES: tuple[tuple[tuple[str, str], dict[str, tuple[str, str]]], ...] = (
+    (("document", "documents"), {"pt_BR": ("documento", "documentos")}),
+    (
+        MSG_PICTURES_NOT_DESCRIBED,
+        {"pt_BR": ("{count} imagem não pôde ser descrita.", "{count} imagens não puderam ser descritas.")},
+    ),
+    (
+        MSG_TABLES_NOT_READ,
+        {"pt_BR": ("{count} tabela não pôde ser lida.", "{count} tabelas não puderam ser lidas.")},
+    ),
+    (
+        LOG_PDDL_VISION_RETRY_PASS_PICTURES,
+        {
+            "pt_BR": (
+                "{count} imagem sem descrição utilizável do modelo; nova tentativa em {delay}s",
+                "{count} imagens sem descrição utilizável do modelo; nova tentativa em {delay}s",
+            )
+        },
+    ),
+    (
+        LOG_PDDL_VISION_RETRY_PASS_TABLES,
+        {
+            "pt_BR": (
+                "{count} tabela sem leitura utilizável do modelo; nova tentativa em {delay}s",
+                "{count} tabelas sem leitura utilizável do modelo; nova tentativa em {delay}s",
+            )
+        },
+    ),
 )
 
 
@@ -1704,7 +1943,7 @@ def _validate(translations: dict[str, dict[str, str]], locales: tuple[str, ...])
         locales (tuple): Every supported locale identifier under validation, e.g. the default :data:`SUPPORTED_LOCALES` or an alternate tuple injected by tests.
 
     Returns:
-        list: Problem descriptions, empty when every non-default locale covers all MESSAGES ids with non-blank values.
+        list: Problem descriptions, empty when every non-default locale covers all MESSAGES ids with non-blank values that keep the msgid's ``{name}`` placeholders.
     """
     problems: list[str] = []
     for locale in locales:
@@ -1717,7 +1956,26 @@ def _validate(translations: dict[str, dict[str, str]], locales: tuple[str, ...])
             else [msgid for msgid in MESSAGES if msgid not in table or not str(table[msgid]).strip()]
         )
         problems.extend(f"missing or blank entry: {x!r}" for x in missing)
+        if isinstance(table, dict):
+            problems.extend(
+                f"placeholders differ from the msgid: {msgid!r}"
+                for msgid in MESSAGES
+                if str(table.get(msgid) or "").strip()
+                and _placeholders(table[msgid]) != _placeholders(msgid)
+            )
     return problems
+
+
+def _placeholders(text: str) -> set[str] | None:
+    """The ``{name}`` fields of ``text``, or ``None`` when its braces do not parse.
+
+    A translation that drops or renames a field the caller fills with
+    ``.format(...)`` would raise at run time, not when the catalog is built.
+    """
+    try:
+        return {field for _, field, _, _ in string.Formatter().parse(text) if field is not None}
+    except ValueError:
+        return None
 
 
 def _write_catalog(locale: str, catalog, locales_dir: Path) -> tuple[Path, Path]:
@@ -1764,14 +2022,14 @@ def build_locales(locales_dir: Path = DEFAULT_LOCALES_DIR) -> dict[str, tuple[Pa
         if locale == DEFAULT_LOCALE:
             for msgid in MESSAGES:
                 catalog.add(msgid, msgid)
-            (singular_en, plural_en) = PLURAL_MESSAGES[0]
-            catalog.add((singular_en, plural_en), [singular_en, plural_en])
+            for pair, _localized in PLURAL_MESSAGES:
+                catalog.add(pair, list(pair))
         else:
             table = TRANSLATIONS[locale]
             for msgid in MESSAGES:
                 catalog.add(msgid, table[msgid])
-            (localized_sing, localized_plur) = PLURAL_MESSAGES[1][locale]
-            catalog.add(PLURAL_MESSAGES[0], [localized_sing, localized_plur])
+            for pair, localized in PLURAL_MESSAGES:
+                catalog.add(pair, list(localized[locale]))
         result[locale] = _write_catalog(locale, catalog, locales_dir)
     return result
 

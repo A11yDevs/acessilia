@@ -44,8 +44,11 @@ class ToolboxMathClient(ToolboxCapabilityClient):
     ) -> dict[str, Any]:
         """``POST /v1/capabilities/math.recognize:execute``.
 
-        Returns the response envelope; its ``document`` holds ``formulas``
-        ({latex, confidence, page, bbox}), ``formula_count`` and ``raw_text``.
+        Returns the response envelope. Its ``document`` depends on the
+        provider: ``artifact/latex@1`` (``pp-formulanet``, ``rapid-latex-ocr``)
+        holds one expression, ``{latex, confidence?, bbox?}``; ``docling-math``
+        holds ``formulas`` ({latex, confidence, page, bbox}), ``formula_count``
+        and ``raw_text``.
         """
         return await self._execute(
             RECOGNIZE_CAPABILITY,

@@ -24,8 +24,10 @@ from acessilia_sdk.toolbox.clients import (
     ToolboxMathClient,
     ToolboxOcrClient,
     ToolboxPdfClient,
+    ToolboxStructureClient,
 )
 from backend.tools.toolbox_client import make_toolbox_client
+from backend.tools.toolbox_math_tools import recognized_formulas
 
 TOOLBOX_BASE_URL = os.getenv("TOOLBOX_BASE_URL", "").strip()
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -50,7 +52,11 @@ def require_toolbox() -> None:
 
 
 def _get_pdf() -> Path:
-    pdfs = sorted(FIXTURES_DIR.rglob("*.pdf"))
+    pdfs = sorted(
+        (p for p in FIXTURES_DIR.rglob("*.pdf")
+         if "failures" not in p.relative_to(FIXTURES_DIR).parts and p.stat().st_size > 0),
+        key=lambda p: (p.stat().st_size, str(p)),
+    )
     if not pdfs:
         pytest.skip("No PDF fixtures found under tests/fixtures/")
     for pdf in pdfs:
@@ -63,12 +69,14 @@ def _get_pdf() -> Path:
 def _make_formula_image() -> bytes:
     """Create a small PNG image with a formula-like drawing."""
     try:
-        from PIL import Image, ImageDraw  # type: ignore[import-untyped]
+        from PIL import Image, ImageDraw, ImageFont  # type: ignore[import-untyped]
     except ImportError:
         pytest.skip("Pillow not available — cannot create test image")
     img = Image.new("RGB", (400, 100), color="white")
     draw = ImageDraw.Draw(img)
-    draw.text((10, 30), "E = mc^2", fill="black")
+    draw.text((10, 30), "E = mc", fill="black", font=ImageFont.load_default(size=36))
+    right = draw.textbbox((10, 30), "E = mc", font=ImageFont.load_default(size=36))[2]
+    draw.text((right, 20), "2", fill="black", font=ImageFont.load_default(size=22))
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     return buf.getvalue()
@@ -287,10 +295,13 @@ class TestMathClientE2E:
         try:
             result = await math_client.recognize(file_path=tmp)
             assert result["status"] == "succeeded"
-            doc = result.get("document", {})
-            assert doc.get("formula_count", 0) >= 0
-            if doc["formula_count"] > 0:
-                assert doc["formulas"][0].get("latex")
+            # The document shape depends on the provider (artifact/latex@1 or
+            # a docling formula list); the core reads both the same way. The
+            # image holds a formula, so recognizing none is a regression.
+            recognized = recognized_formulas(result.get("document"))
+            assert recognized, f"no formula recognized (provider: {result.get('provider')})"
+            for formula in recognized:
+                assert formula.get("latex")
         finally:
             tmp.unlink(missing_ok=True)
 
@@ -363,3 +374,72 @@ class TestWorkflowE2E:
             assert len(verbalize_result["document"]["verbalized"]) > 0
         finally:
             await math_client.close()
+
+
+# ---------------------------------------------------------------------------
+# StructureClient
+# ---------------------------------------------------------------------------
+
+
+class TestStructureClientE2E:
+    @pytest.mark.e2e
+    @pytest.mark.asyncio
+    async def test_extract_structure_no_tabs_in_prose_export(self, tmp_path) -> None:
+        """Extract the issue's PDF and verify prose in TXT, HTML and DOCX."""
+        from datetime import datetime, timezone
+        from zipfile import ZipFile
+        from xml.etree import ElementTree
+
+        from acessilia_sdk.toolbox.clients import ToolboxDocxClient
+        from backend.agents.pddl_orchestrator import _manifest_pages_to_payload
+        from backend.core.manifest.builder import build_processing_manifest
+        from backend.core.manifest.toolbox_extractor import ToolboxExtraction
+        from backend.pipeline.canonical_builder import build_canonical_document
+        from docstruct.export.html import document_to_html
+        from docstruct.export.pandoc_ast import build_pandoc_ast
+        from docstruct.export.txt import document_to_txt_lines
+
+        structure = make_toolbox_client(
+            ToolboxStructureClient, base_url=TOOLBOX_BASE_URL,
+            provider="docling", timeout_seconds=300,
+        )
+        docx = make_toolbox_client(ToolboxDocxClient, base_url=TOOLBOX_BASE_URL)
+        try:
+            pdf = FIXTURES_DIR / "tutorials" / "java-oo-3pgs.pdf"
+            assert pdf.is_file()
+            result = await structure.extract_structure(file_path=pdf)
+            assert result["status"] == "succeeded"
+            now = datetime.now(timezone.utc)
+            extraction = ToolboxExtraction(
+                document=result, started_at=now, completed_at=now,
+                duration_ms=0, version="e2e", configuration={},
+            )
+            manifest = build_processing_manifest(pdf, extraction)
+            pages = _manifest_pages_to_payload(manifest)
+            # Limit this assertion to prose; code TABs are valid and tested separately.
+            prose_pages = [
+                {**page, "blocks": [b for b in page["blocks"] if b["type"] != "code"]}
+                for page in pages
+            ]
+            canonical = build_canonical_document(
+                {"pages": prose_pages}, title="java-oo-3pgs"
+            )
+            txt = "\n".join(document_to_txt_lines(canonical))
+            assert "CAPÍTULO 9" in txt
+            assert "\t" not in txt
+            html = document_to_html(canonical)
+            assert "CAPÍTULO 9" in html
+            assert "\t" not in html
+
+            output = tmp_path / "prose.docx"
+            await docx.export(build_pandoc_ast(canonical, target_format="docx"), output)
+            with ZipFile(output) as archive:
+                root = ElementTree.fromstring(archive.read("word/document.xml"))
+            ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+            texts = [node.text or "" for node in root.findall(".//w:t", ns)]
+            assert "CAPÍTULO 9" in " ".join(texts)
+            assert all("\t" not in text for text in texts)
+            assert not root.findall(".//w:tab", ns)
+        finally:
+            await structure.close()
+            await docx.close()

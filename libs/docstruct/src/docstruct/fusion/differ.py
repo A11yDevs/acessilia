@@ -32,6 +32,7 @@ from docstruct.fusion.similarity import PAGENUM_RE, center, contain_frac, iou, i
 from docstruct.fusion.types import DiffBlock
 from docstruct.fusion.xycut import reorder as xycut_reorder
 from docstruct.policy import FusionPolicy
+from docstruct.text.math_spans import inline_math_sources
 
 
 def _is_spurious_text_pair(d: DiffBlock, m: DiffBlock) -> bool:
@@ -80,6 +81,12 @@ def _pick_text(
     if ld < 0.6 * lm:
         stats["pair-text-auto->mineru(longer)"] += 1
         return m.md
+    # Comparable lengths: the side that kept its formulas as inline math
+    # (``$…$``) is the one the exporters can render as math (#297).
+    hd, hm = bool(inline_math_sources(d.md)), bool(inline_math_sources(m.md))
+    if hd != hm:
+        stats[f"pair-text-auto->{'docling' if hd else 'mineru'}(inline-math)"] += 1
+        return d.md if hd else m.md
     qd, qm = quality(d.md), quality(m.md)
     if qd > qm + 0.05:
         stats["pair-text-auto->docling(quality)"] += 1

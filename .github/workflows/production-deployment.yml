@@ -1,0 +1,72 @@
+name: Production deployment validation
+
+on:
+  pull_request:
+    branches: [main, develop, 'release/**']
+    paths:
+      - 'docker-compose*.yml'
+      - 'deploy/**'
+      - 'scripts/*production*'
+      - 'scripts/setup-producao.sh'
+      - 'scripts/staging-update.sh'
+      - 'tests/test_production*'
+      - 'tests/test_staging_update.py'
+      - 'tests/test_compose_config.py'
+      - '.github/workflows/production-deployment.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  container-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Resolve production Compose with isolated test credentials
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess, tempfile
+          from pathlib import Path
+          from scripts import production_deploy as deploy
+          with tempfile.TemporaryDirectory() as temporary:
+              directory = Path(temporary) / 'core'
+              deploy.prepare(directory, Path.cwd())
+              runtime = directory / '.env'
+              runtime.write_text(runtime.read_text().replace('ENABLED_INTERFACES=telegram,web,api', 'ENABLED_INTERFACES=api').replace('TOOLBOX_API_KEY=', 'TOOLBOX_API_KEY=test-only'))
+              settings = directory / '.deploy.env'
+              settings.write_text(settings.read_text().replace('PRODUCTION_IMAGE=', 'PRODUCTION_IMAGE=ghcr.io/a11ydevs/acessilia@sha256:' + 'a' * 64).replace('GHCR_TOKEN=', 'GHCR_TOKEN=registry-test-only'))
+              result = subprocess.run(deploy.compose_command(directory) + ['config', '--format', 'json'], env=os.environ | {'ENABLED_INTERFACES': 'web'}, check=True, capture_output=True, text=True)
+              config = json.loads(result.stdout)
+              service = config['services']['acessilia']
+              assert service['environment']['ENABLED_INTERFACES'] == 'api'
+              assert 'echo "web"' not in service['healthcheck']['test'][1]
+              assert 'GHCR_TOKEN' not in service['environment']
+              hosts = service['extra_hosts']
+              if isinstance(hosts, list):
+                  hosts = dict(entry.split('=' if '=' in entry else ':', 1) for entry in hosts)
+              assert hosts['host.docker.internal'] == 'host-gateway'
+              deploy.check_config(config, directory, require_data=False)
+              assert not (directory / 'var').exists()
+          PY
+      - name: Build the production runtime
+        run: docker build -f infra/Dockerfile -t acessilia-production-checks .
+      - name: Run all core, docstruct and SDK tests inside the runtime image
+        run: |
+          docker run --rm \
+            -e CHECK_UID="$(id -u)" -e CHECK_GID="$(id -g)" \
+            -v "$GITHUB_WORKSPACE:/workspace" -w /workspace \
+            acessilia-production-checks sh -ec '
+              apt-get update
+              apt-get install -y --no-install-recommends git jq
+              python -m pip install ".[dev]" PyYAML
+              groupadd --gid "$CHECK_GID" checks
+              useradd --uid "$CHECK_UID" --gid "$CHECK_GID" --create-home checks
+              runuser -u checks -- python -m pytest -m "not e2e" --junitxml=/tmp/core-results.xml
+              runuser -u checks -- python -m pytest libs/docstruct/tests --junitxml=/tmp/docstruct-results.xml
+              runuser -u checks -- python -m pytest libs/sdk/tests --junitxml=/tmp/sdk-results.xml
+              python -c "from xml.etree import ElementTree as E; from pathlib import Path; reports = list(Path(\"/tmp\").glob(\"*-results.xml\")); assert len(reports) == 3; assert sum(int(s.get(\"skipped\", 0)) for p in reports for s in E.parse(p).iter(\"testsuite\")) == 0"
+            '

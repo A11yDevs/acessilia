@@ -32,7 +32,8 @@ class ToolboxMediaInspectClient(ToolboxCapabilityClient):
 
         Returns the response's ``document`` (``artifact/media-inspection@1``):
         ``media_type``, ``is_image``, ``is_pdf``, ``page_count``,
-        ``dimensions``, ``artifact_nature``, ``requires_visual_inspection``…
+        ``page_count_source`` (``pymupdf``, ``content_stream_scan``,
+        ``pillow`` or ``None``), ``dimensions``, ``artifact_nature``, ``requires_visual_inspection``…
         """
         result = await self._execute(
             CAPABILITY,

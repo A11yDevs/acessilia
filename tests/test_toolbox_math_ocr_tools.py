@@ -14,6 +14,7 @@ import respx
 from backend.config.settings import settings
 from backend.tools.toolbox_math_tools import (
     MathCapabilityUnavailable,
+    recognized_formulas,
     toolbox_convert_latex,
     toolbox_recognize_formula,
     toolbox_verbalize_latex,
@@ -118,6 +119,54 @@ class TestMathTools:
         respx.route().mock(side_effect=httpx.ConnectError("synthetic offline provider"))
         result = toolbox_recognize_formula(b"not-a-real-image")
         assert result == []
+
+    @respx.mock
+    def test_recognize_unavailable_can_be_explicit(self):
+        """Batch callers opt into the error so an outage costs one timeout."""
+        respx.route().mock(side_effect=httpx.ConnectError("synthetic offline provider"))
+        with pytest.raises(MathCapabilityUnavailable) as excinfo:
+            toolbox_recognize_formula(b"not-a-real-image", raise_on_unavailable=True)
+        assert excinfo.value.capability == "math.recognize"
+        assert excinfo.value.reason == "ToolboxProviderUnavailable"
+
+    @respx.mock
+    def test_recognize_reads_a_latex_document(self):
+        """pp-formulanet and rapid-latex-ocr answer with one artifact/latex@1 expression."""
+        respx.post(f"{TOOLBOX_URL}/v1/capabilities/math.recognize:execute").mock(
+            return_value=httpx.Response(200, json={
+                "status": "succeeded",
+                "capability": "math.recognize@1",
+                "provider": "pp-formulanet",
+                "document": {"latex": r"\frac{1}{2}a t^{2}", "bbox": [0, 0, 438, 78]},
+            })
+        )
+        assert toolbox_recognize_formula(b"png", raise_on_unavailable=True) == [
+            {"latex": r"\frac{1}{2}a t^{2}", "bbox": [0, 0, 438, 78]}
+        ]
+
+    @respx.mock
+    def test_recognize_reads_a_formula_list(self):
+        """docling-math lists the formulas of a page."""
+        formulas = [{"latex": "x^2", "confidence": 0.9, "page": 1, "bbox": [0, 0, 1, 1]}]
+        respx.post(f"{TOOLBOX_URL}/v1/capabilities/math.recognize:execute").mock(
+            return_value=httpx.Response(200, json={
+                "status": "succeeded",
+                "capability": "math.recognize@1",
+                "provider": "docling-math",
+                "document": {"formulas": formulas, "formula_count": 1, "raw_text": "x2"},
+            })
+        )
+        assert toolbox_recognize_formula(b"png") == formulas
+
+    def test_recognized_formulas_without_latex_is_empty(self):
+        assert recognized_formulas({"latex": "  "}) == []
+        assert recognized_formulas({"formulas": [], "formula_count": 0}) == []
+        assert recognized_formulas(None) == []
+
+    def test_listed_entries_without_latex_are_left_out(self):
+        """Both shapes apply the same rule: no LaTeX, no formula."""
+        document = {"formulas": [{"latex": "  "}, {"page": 1}, "x", {"latex": "y^2", "page": 2}]}
+        assert recognized_formulas(document) == [{"latex": "y^2", "page": 2}]
 
 
 class TestOcrTools:

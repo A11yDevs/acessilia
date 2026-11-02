@@ -5,14 +5,16 @@ from backend.i18n import t
 from backend.log_messages import (
     EMAIL_CONFIRMATION_BODY,
     EMAIL_CONFIRMATION_SUBJECT,
+    EMAIL_FAILURE_BODY,
+    EMAIL_FAILURE_SUBJECT,
     EMAIL_FORMAT_DOCX,
     EMAIL_FORMAT_HTML,
     EMAIL_FORMAT_MP3,
-    EMAIL_FORMAT_PDF,
     EMAIL_FORMAT_PDF_UA,
     EMAIL_FORMAT_TXT,
     EMAIL_FORMAT_ZIP,
     EMAIL_RESULT_BODY_ATTACHED,
+    EMAIL_RESULT_AUDIT_HEADER,
     EMAIL_RESULT_BODY_WITH_LINK,
     EMAIL_RESULT_SUBJECT,
     EMAIL_RESULT_WARNINGS_HEADER,
@@ -28,7 +30,6 @@ from backend.config.settings import settings
 FORMAT_LABELS = {
     "txt": EMAIL_FORMAT_TXT,
     "docx": EMAIL_FORMAT_DOCX,
-    "pdf": EMAIL_FORMAT_PDF,
     "pdf_ua": EMAIL_FORMAT_PDF_UA,
     "html": EMAIL_FORMAT_HTML,
     "mp3": EMAIL_FORMAT_MP3,
@@ -43,23 +44,23 @@ async def send_email_notification(
         logger.warning(t(LOG_SMTP_NOT_CONFIGURED).format(to_email=to_email))
         return False
 
-    message = EmailMessage()
-    message["From"] = f"{settings.smtp_name} <{settings.smtp_from}>"
-    message["To"] = to_email
-    message["Subject"] = subject
-    message.set_content(body)
-
-    if attachment_path and attachment_path.exists():
-        with open(attachment_path, "rb") as f:
-            file_data = f.read()
-            message.add_attachment(
-                file_data,
-                maintype="application",
-                subtype="zip",
-                filename=attachment_path.name,
-            )
-
     try:
+        message = EmailMessage()
+        message["From"] = f"{settings.smtp_name} <{settings.smtp_from}>"
+        message["To"] = to_email
+        message["Subject"] = subject
+        message.set_content(body)
+
+        if attachment_path and attachment_path.exists():
+            with open(attachment_path, "rb") as f:
+                file_data = f.read()
+                message.add_attachment(
+                    file_data,
+                    maintype="application",
+                    subtype="zip",
+                    filename=attachment_path.name,
+                )
+
         await aiosmtplib.send(
             message,
             hostname=settings.smtp_server,
@@ -82,6 +83,12 @@ async def send_confirmation_email(to_email: str, filename: str) -> bool:
     return await send_email_notification(to_email, subject, body)
 
 
+async def send_failure_email(to_email: str, filename: str, error: str) -> bool:
+    subject = t(EMAIL_FAILURE_SUBJECT)
+    body = t(EMAIL_FAILURE_BODY).format(filename=filename, error=error)
+    return await send_email_notification(to_email, subject, body)
+
+
 async def send_result_email(
     to_email: str,
     filename: str,
@@ -89,16 +96,26 @@ async def send_result_email(
     download_url: str | None = None,
     completed_formats: list[str] | None = None,
     warnings: list[str] | None = None,
+    audit: list[str] | None = None,
 ) -> bool:
+    """Send the result e-mail: the formats, the PDF/UA audit and any warnings.
+
+    ``audit`` is ``summarize_audit``'s lines, the verdict first and then one
+    line per failed rule, or the single line saying the audit is unavailable.
+    """
     subject = t(EMAIL_RESULT_SUBJECT)
     labels = [
         t(FORMAT_LABELS[format_name])
-        for format_name in (completed_formats or ["txt", "docx", "pdf", "pdf_ua", "html", "mp3"])
+        for format_name in (completed_formats or ["txt", "docx", "pdf_ua", "html", "mp3"])
         if format_name in FORMAT_LABELS
     ]
     warnings_text = ""
+    if audit:
+        verdict, *rules = audit
+        warnings_text += "\n\n" + t(EMAIL_RESULT_AUDIT_HEADER) + "\n" + verdict
+        warnings_text += "".join(f"\n- {rule}" for rule in rules)
     if warnings:
-        warnings_text = "\n\n" + t(EMAIL_RESULT_WARNINGS_HEADER) + "\n"
+        warnings_text += "\n\n" + t(EMAIL_RESULT_WARNINGS_HEADER) + "\n"
         warnings_text += "\n".join(f"- {warning}" for warning in warnings)
     if download_url:
         body = t(EMAIL_RESULT_BODY_WITH_LINK).format(

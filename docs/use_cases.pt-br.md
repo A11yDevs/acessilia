@@ -14,7 +14,7 @@ Também disponível em **inglês (EUA)**: [English version](use_cases.md)
 - Ator principal: Usuário final.
 - Objetivo: converter PDF/imagem/documento em saídas acessíveis.
 - Entrada: arquivo suportado.
-- Saída: TXT, DOCX, PDF, PDF/UA, HTML e MP3, entregues no chat, como link de download ou por e-mail.
+- Saída: TXT, DOCX, PDF/UA, HTML e MP3, entregues no chat, como link de download ou por e-mail.
 - Implementação:
   - entrada/validação: [frontend/telegram/handlers/document.py](../frontend/telegram/handlers/document.py), [backend/tools/validators.py](../backend/tools/validators.py)
   - processamento: [backend/service.py](../backend/service.py) executa o orquestrador PDDL [backend/agents/pddl_orchestrator.py](../backend/agents/pddl_orchestrator.py) (`PIPELINE_ENGINE=pddl`; o motor legado está desativado), que alimenta o [backend/pipeline/canonical_builder.py](../backend/pipeline/canonical_builder.py)

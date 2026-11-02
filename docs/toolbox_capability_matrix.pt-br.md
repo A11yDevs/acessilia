@@ -53,13 +53,14 @@ Legenda de **Caminho de chamada**: como o core alcança a capacidade.
 | `document.structure.extract` | `acessilia_sdk/toolbox/clients/structure.py` | `TOOLBOX_PROVIDER=docling` | `docling`, `mineru`, `nougat`, `teleocr` | `ToolboxManifestExtractor` → extração do PDDL; com `FUSION_MODE=dual`, também compara o provider secundário e repassa evidências por página ao builder do manifesto |
 | `document.layout.analyze` | `acessilia_sdk/toolbox/clients/layout.py` | `TOOLBOX_LAYOUT_PROVIDER=docling-layout` | `docling-layout`, `mineru-layout` | sem chamador no core desde a remoção do pipeline legacy; o cliente do SDK e os testes E2E dele permanecem |
 | `document.ocr` | `acessilia_sdk/toolbox/clients/ocr.py` | `TOOLBOX_OCR_PROVIDER=docling-ocr` | `docling-ocr`, `mineru-ocr` | `toolbox_ocr_tools.py` (wrapper Agno) |
-| `math.recognize` | `acessilia_sdk/toolbox/clients/math.py` | `TOOLBOX_MATH_RECOGNIZE_PROVIDER=docling-math` | `docling-math`, `rapid-latex-ocr` | `toolbox_math_tools.py` |
+| `math.recognize` | `acessilia_sdk/toolbox/clients/math.py` | `TOOLBOX_MATH_RECOGNIZE_PROVIDER=pp-formulanet` | `pp-formulanet`, `docling-math`, `rapid-latex-ocr` | `toolbox_math_tools.py` → `_enrich_formula_latex` antes do planejamento (recortes de fórmula que o extrator deixou sem LaTeX; o modelo de visão é o fallback). O core envia recortes com uma única fórmula, então o provedor precisa ser um modelo de recorte (`pp-formulanet`, `rapid-latex-ocr`): o `docling-math` detecta fórmulas na página inteira, responde a um recorte sem nenhuma fórmula e manda todas para a visão; o log então mostra `N de M fórmula(s) recorreram ao modelo de visão` |
 | `math.convert` | `acessilia_sdk/toolbox/clients/math.py` | `TOOLBOX_MATH_PROVIDER=math-speech` | `math-speech` | `toolbox_math_tools.py` → builder canônico (MathML das fórmulas) e o handler `mathml` do PDDL |
 | `math.verbalize` | `acessilia_sdk/toolbox/clients/math.py` | `TOOLBOX_MATH_PROVIDER=math-speech` | `math-speech` | `toolbox_math_tools.py` → builder canônico (texto alternativo das fórmulas) e o handler `latex-verbalizer` do PDDL |
 | `pdf.split` | `acessilia_sdk/toolbox/clients/pdf.py` | `TOOLBOX_PDF_PROVIDER=pymupdf-pdf` | `pymupdf-pdf` | sem chamador no core; o motor PDDL lê as páginas por `pdf.render` |
 | `pdf.render` | `acessilia_sdk/toolbox/clients/pdf.py` | `TOOLBOX_PDF_PROVIDER=pymupdf-pdf` | `pymupdf-pdf` | versão 2 (clip, `max_side`, PNG/JPEG, PNG por referência): métodos PDDL `vision-page-inspection`, `pymupdf-region` (recorte de região) e `vlm-pairwise-judge` (página com tamanho limitado), e o enriquecimento de imagens anterior ao plano; sem renderização local no orquestrador |
 | `media.inspect` | `acessilia_sdk/toolbox/clients/media_inspect.py` | `TOOLBOX_MEDIA_INSPECT_PROVIDER=pure-media-inspect` | `pure-media-inspect` | `backend/tools/media_inspect.py` (só na Toolbox; sem fallback local, ADR-0003), pulado quando `TOOLBOX_MEDIA_INSPECT_ENABLED=false` |
 | `document.export.pdf_ua` | `acessilia_sdk/toolbox/clients/pdf_ua.py` | `TOOLBOX_PDF_UA_PROVIDER=pandoc-pdf-ua` | `pandoc-pdf-ua` (sidecar `pdf-ua-render`) | `backend/export/pandoc_exporter.py` (só na Toolbox, PDF baixado e verificado de `/v1/artifacts`; sem fallback local, ADR-0003), pulado quando `TOOLBOX_PDF_UA_ENABLED=false` |
+| `pdf.validate.pdf_ua` | `acessilia_sdk/toolbox/clients/pdf_validate.py` | `TOOLBOX_PDF_VALIDATE_PROVIDER=verapdf` | `verapdf` (sidecar `verapdf-validate`) | `backend/tools/pdf_ua_audit.py`: o worker audita o PDF/UA exportado (PDF/UA-1), resume no e-mail de resultado e empacota o relatório; uma falha não derruba o job; pulado quando `TOOLBOX_PDF_VALIDATE_ENABLED=false`. Todo deploy precisa rodar o `verapdf-validate`: sem ele, todo e-mail de resultado traz "Auditoria indisponível" |
 | `document.export.docx` | `acessilia_sdk/toolbox/clients/docx.py` | `TOOLBOX_DOCX_PROVIDER=pandoc-docx` | `pandoc-docx` (rota `/render/docx` do sidecar `pdf-ua-render`) | `backend/export/pandoc_exporter.py` (só na Toolbox, DOCX baixado e verificado de `/v1/artifacts`; sem fallback local, ADR-0003), pulado quando `TOOLBOX_DOCX_ENABLED=false` |
 | `artifact.store` / `artifact.retrieve` | `acessilia_sdk/toolbox/clients/artifact.py` (REST `/v1/artifacts`) | — | `minio`, `filesystem` | upload antes da extração |
 | `dataset.*` (8 capacidades) | `acessilia_sdk/toolbox/clients/dataset.py` (REST `/v1/datasets`) | — | `dataset-github`, `dataset-huggingface` | `toolbox_dataset_tools.py` (scripts do Dr.DocBench) |
@@ -74,7 +75,6 @@ Legenda de **Caminho de chamada**: como o core alcança a capacidade.
 | `code.normalize` | **ausente** | — | `pure-code` | pendente: cliente e obrigação/método/handler acionados por evidência |
 | `text.postprocess` | **ausente** | — | `pure-text` | pendente: cliente e obrigação/método/handler acionados por evidência |
 | `music.omr` | **ausente** | — | `homr`, `audiveris` | pendente: cliente e obrigação/método/handler acionados por evidência |
-| `pdf.validate.pdf_ua` | **ausente** | — | `verapdf` | pendente: o core poderia validar suas exportações PDF/UA antes de entregá-las |
 | `cache.get` / `cache.put` | — (interno) | — | `valkey` | cache interno da Toolbox; não é capacidade pública |
 
 ## Deriva confirmada (no momento da revisão)
@@ -149,10 +149,11 @@ saudável; desligá-lo pulava a execução em vez de expor a lacuna.
   registrado ou é reportado ao planejador como indisponível;
   `tests/test_pddl_actionability.py` falha para qualquer método que não seja nenhum
   dos dois.
-- **18 handlers registrados** (antes: 3 reais + 8 no-op): os 3 com modelo,
-  `single-provider` como fallback executável e 13 handlers determinísticos
+- **19 handlers registrados** (antes: 3 reais + 8 no-op): os 3 com modelo,
+  `single-provider` como fallback executável e 14 handlers determinísticos
   cobrindo `vision-description`, `pandoc-table`,
-  `pandoc-code`, `pymupdf-region`, `latex-normalizer`, `norm-fix`, `rep-guard`,
+  `pandoc-code`, `pymupdf-region`, `latex-normalizer`, `norm-fix`,
+  `unicode-repair`, `rep-guard`,
   `line-number-extractor`, `verse-chunker`, `tailjoin`, `tailjoin-positioned`,
   `xycut-order` e `deterministic-heading-repair`; `human-review` é o handler
   explícito de escalonamento terminal.

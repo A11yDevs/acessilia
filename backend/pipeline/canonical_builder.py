@@ -41,6 +41,11 @@ def verbalize_latex(latex: str) -> str:
     return label_spoken_formula(toolbox_verbalize_latex(latex))
 
 
+def verbalize_inline_latex(latex: str) -> str:
+    """pt-BR speech of a formula inside a sentence, without the formula label."""
+    return toolbox_verbalize_latex(latex).strip()
+
+
 class _ToolboxMathEnricher(MathEnricher):
     """Backend enricher: MathML and speech from the Toolbox capabilities.
 
@@ -69,6 +74,9 @@ class _ToolboxMathEnricher(MathEnricher):
 
     def verbalize(self, latex: str) -> str:
         return self._call("math.verbalize", verbalize_latex, latex)
+
+    def verbalize_inline(self, latex: str) -> str:
+        return self._call("math.verbalize", verbalize_inline_latex, latex)
 
     def _call(self, capability: str, function: Any, latex: str) -> str:
         if not latex or capability in self.unavailable:

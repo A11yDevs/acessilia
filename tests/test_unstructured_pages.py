@@ -314,7 +314,7 @@ def test_inspect_page_asks_for_the_page_inspection_schema(monkeypatch):
             )
 
     monkeypatch.setattr(vision_agent, "Agent", FakeAgent)
-    monkeypatch.setattr(vision_agent, "get_agno_model", lambda: None)
+    monkeypatch.setattr(vision_agent, "get_agno_model", lambda **_kwargs: None)
 
     output = asyncio.run(
         vision_agent.VisionAgent().inspect_page(image_bytes=PNG, page_num=2, total_pages=3)
@@ -345,7 +345,7 @@ def test_a_model_answer_of_content_without_description_is_refused(monkeypatch):
             )
 
     monkeypatch.setattr(vision_agent, "Agent", FakeAgent)
-    monkeypatch.setattr(vision_agent, "get_agno_model", lambda: None)
+    monkeypatch.setattr(vision_agent, "get_agno_model", lambda **_kwargs: None)
 
     from pydantic import ValidationError
 
@@ -511,8 +511,8 @@ def test_the_plan_inspects_the_page_and_the_document_keeps_it(
 
 
 def test_a_failed_inspection_fails_the_job(monkeypatch, source_pdf, isolated_artifacts, tmp_path):
-    manifest, obligation_id, _ = _planned_manifest(source_pdf)
+    manifest, _, _ = _planned_manifest(source_pdf)
     _answer(monkeypatch, error=RuntimeError("vision model unavailable"))
 
-    with pytest.raises(RuntimeError, match=obligation_id):
+    with pytest.raises(RuntimeError, match=r"inspect-unstructured-page \("):
         _run(monkeypatch, tmp_path, manifest, max_replans=1)

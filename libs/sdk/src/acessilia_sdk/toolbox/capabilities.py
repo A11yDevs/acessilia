@@ -48,7 +48,7 @@ PROVIDER_DEFAULTS: dict[str, str] = {
     "toolbox_provider": "docling",
     "toolbox_layout_provider": "docling-layout",
     "toolbox_pdf_provider": "pymupdf-pdf",
-    "toolbox_math_recognize_provider": "docling-math",
+    "toolbox_math_recognize_provider": "pp-formulanet",
     "toolbox_math_provider": "math-speech",
     "toolbox_ocr_provider": "docling-ocr",
     "toolbox_page_ocr_provider": "qwen3-vl-8b",
@@ -57,7 +57,15 @@ PROVIDER_DEFAULTS: dict[str, str] = {
     "toolbox_orientation_provider": "rapidocr-orient",
     "toolbox_media_inspect_provider": "pure-media-inspect",
     "toolbox_pdf_ua_provider": "pandoc-pdf-ua",
+    "toolbox_pdf_validate_provider": "verapdf",
     "toolbox_docx_provider": "pandoc-docx",
+}
+
+#: Default provider for each provider key of a Toolbox route that is not a
+#: capability: the VLM chat gateway (:mod:`acessilia_sdk.toolbox.vlm`). The
+#: core's contract check verifies these ids like ``PROVIDER_DEFAULTS``.
+ROUTE_PROVIDER_DEFAULTS: dict[str, str] = {
+    "toolbox_vlm_provider": "qwen3-vl-8b",
 }
 
 
@@ -82,6 +90,12 @@ _CAPABILITIES: tuple[ToolboxCapability, ...] = (
         "pdf.render", 2, "Renderização de PDF",
         provider_key="toolbox_pdf_provider",
         output_schema="image@2",
+    ),
+    # The text layer with fonts and baselines, read for inline math (#265).
+    ToolboxCapability(
+        "document.text.spans", 1, "Text spans",
+        provider_key="toolbox_pdf_provider",
+        output_schema="text-spans@1",
     ),
     ToolboxCapability(
         "math.recognize", 1, "Reconhecimento de fórmula",
@@ -118,6 +132,12 @@ _CAPABILITIES: tuple[ToolboxCapability, ...] = (
         "document.export.pdf_ua", 1, "Exportação PDF/UA",
         provider_key="toolbox_pdf_ua_provider",
         output_schema="pdf-export@1",
+    ),
+    # veraPDF; a non-compliant PDF is a successful result listing failed rules.
+    ToolboxCapability(
+        "pdf.validate.pdf_ua", 1, "PDF/UA validation",
+        provider_key="toolbox_pdf_validate_provider",
+        output_schema="pdf-validation-report@1",
     ),
     # The DOCX also comes back as a stored artifact.
     ToolboxCapability(
@@ -184,11 +204,14 @@ for _capability in _CAPABILITIES:
 
 def provider_default(key: str) -> str:
     """Default provider id for a provider key."""
+    if key in ROUTE_PROVIDER_DEFAULTS:
+        return ROUTE_PROVIDER_DEFAULTS[key]
     return PROVIDER_DEFAULTS[key]
 
 
 __all__ = [
     "PROVIDER_DEFAULTS",
+    "ROUTE_PROVIDER_DEFAULTS",
     "TOOLBOX_CAPABILITIES",
     "ToolboxCapability",
     "provider_default",

@@ -55,3 +55,5 @@ scripts/drbench/builds
 # sob demanda. Sem esta regra o diretorio aparece como untracked no workspace
 # e entra em `git add .` por engano.
 tests/dataset/
+.mypy_cache/
+.ruff_cache/

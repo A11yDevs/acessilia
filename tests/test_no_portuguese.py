@@ -91,6 +91,11 @@ EXEMPT_STRINGS: list[tuple[str, str]] = [
     ("backend/ai/prompts/vision_agent.py", "capítulos"),
     ("backend/ai/prompts/vision_agent.py", "seções"),
     ("backend/ai/prompts/vision_agent.py", "títulos"),
+    # Vision retry instruction — an AI prompt, in the language of the region prompts
+    ("backend/agents/vision_agent.py", "Responda com um objeto JSON completo e válido"),
+    ("backend/agents/vision_agent.py", "Não repita tokens nem preencha campos"),
+    # Vision schema instruction — an AI prompt, allowed by constitution
+    ("backend/agents/output_schemas.py", "molécula é kind='description'"),
     # Data agent prompts — user-facing content
     ("backend/ai/prompts/data_agent.py", "tabela"),
     ("backend/ai/prompts/data_agent.py", "fórmula"),
@@ -213,6 +218,25 @@ EXEMPT_STRINGS: list[tuple[str, str]] = [
     ("schemas/nominal_plan.schema.json", "Acessilia"),
     ("schemas/planning_comparison.schema.json", "Acessilia"),
     ("schemas/processing_manifest.schema.json", "Acessilia"),
+    # Non-ASCII fixtures exercise HTTP header rejection and Unicode URL encoding.
+    ("tests/test_n05_n09_n10_regressions.py", '"inválido".encode()'),
+    ("libs/sdk/tests/clients/test_dataset.py", '"input/álgebra.pdf"'),
+    # Legacy Unicode repair — user-facing execution messages and observations
+    ("backend/agents/pddl_orchestrator.py", "Nenhum texto elegível para reparo Unicode"),
+    ("backend/agents/pddl_orchestrator.py", "Reparo Unicode aplicado em"),
+    ("backend/agents/pddl_orchestrator.py", "para revisão"),
+    ("backend/agents/pddl_orchestrator.py", "Texto com sinais de Unicode legado"),
+    ("backend/core/manifest/builder.py", "Texto extraído de PDF legado contém Unicode"),
+    # Text-layer formula agreement — Portuguese function names (máx, mín) that
+    # pt-BR material prints, matched as a detection pattern
+    ("libs/docstruct/src/docstruct/text/latex.py", "máx"),
+    ("libs/docstruct/tests/test_latex.py", "máx"),
+    # Legacy TeX repair — the Portuguese crase (à) is what the grave-crase
+    # rule produces, so its code, docs and tests carry it
+    ("libs/docstruct/src/docstruct/text/unicode_repair.py", "à"),
+    ("libs/docstruct/tests/test_unicode_repair.py", "à"),
+    ("tests/test_legacy_unicode_repair.py", "à medida"),
+    ("docs/docstruct_algorithms.md", "→ `à`"),
 ]
 
 # Build the exempt set from strings so we can check quickly.

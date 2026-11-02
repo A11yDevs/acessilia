@@ -60,7 +60,7 @@ receives `ToolboxCapabilityError` or `ToolboxContractViolation`.
 
 All exceptions inherit from `ToolboxError` (defined in the SDK, `acessilia_sdk.toolbox.errors`, and re-exported by `backend/tools/toolbox_client.py`):
 
-- `ToolboxProviderUnavailable` — service/provider unavailable (e.g. HTTP 503)
+- `ToolboxProviderUnavailable` — service/provider unavailable (HTTP 502, 503)
 - `ToolboxTimeout` — exceeded `toolbox_timeout_seconds`
 - `ToolboxUnsupportedMediaType` — unsupported media type
 - `ToolboxArtifactNotFound` — artifact does not exist
@@ -302,9 +302,56 @@ The `media.inspect` capability (provider `pure-media-inspect`, PR
   `TOOLBOX_MEDIA_INSPECT_ENABLED=false` it returns `None` without calling the
   Toolbox, and a Toolbox failure raises `ToolboxError`.
 - **Integration:** `backend/agents/pddl_orchestrator.py` calls
-  `inspect_source_media()` after extraction and uses the `requires_visual_inspection`
-  signal to inject a full-page `picture` element when the input is a standalone image
-  with no visual blocks — ensuring the VisionAgent audiodescribes it.
+  `inspect_source_media()` **before** extraction and uses three signals:
+  - `document_genre` (`pure-media-inspect` 1.1.0+): a PDF reported as a
+    `presentation` is extracted by the configured provider alone (no
+    dual-provider fusion) and structured slide by slide
+    (`backend/core/manifest/slides.py`): one H1 for the deck, an H2
+    "Slide N of T: <title>" (or "Slide N of T") per slide, reading order kept
+    within each slide. A slide whose pictures cover at least
+    `SLIDE_VISUAL_COVERAGE` (0.5) of it (their union, a full-page background
+    left out) and whose text lies on those pictures (text beside them covers at
+    most 5% of the slide) becomes one picture of the whole slide, described with
+    the page prompt instead of read as text; the replaced text is kept in
+    `metadata.replaced_text`. A slide nothing was extracted from becomes one too.
+    An element the extractor read across two slides is first split into one
+    element per slide at the character offsets of its provenance, before the
+    reading order is refined, so each part is ordered by its own box on its
+    slide. Only text elements without children are split, and only when the
+    offsets cover all of the text; otherwise the element stays whole. A slide
+    whose only text, its title and running headers and footers aside, came
+    from such a split is read as one picture as well, the split text kept in
+    `replaced_text`.
+    On a slide read as text, a label whose centre lies on a picture covering
+    less than 95% of the slide (a larger one is the background) is folded into
+    that picture: it leaves the running text and is kept in the picture's
+    `metadata.figure_labels` (ids in `metadata.figure_label_ids`), and the
+    picture's description transcribes it in place. A label is a paragraph,
+    heading or title of at most three words of three letters or more that does
+    not read as a sentence (ending in `.`, `!` or `?`, or with `: `); captions,
+    formulas, tables and list items stay. A label extracted as a paragraph
+    within 8% of the slide around a picture (on any side, measured from the
+    picture's own box) is taken in too, and the picture's box grows to cover
+    it, so the crop the vision model describes shows it; a heading is taken in
+    only when it lies on the picture. A label or caption spanning several
+    pictures side by side (a caption row read through their columns) merges
+    them into the first one (`metadata.merged_picture_ids`); a sentence stays.
+    A caption is taken in only then, or when it lies on or beside such a
+    merged picture and across its width (`SLIDE_FOLD_FIGURE_LABELS`). If the
+    picture is left undescribed, its labels go back to the slide as paragraphs
+    after it. The text a whole-slide picture replaced goes back the same way,
+    whatever that setting. Either way, the slide heading is left out of
+    reading-order refinement, so a picture never moves before it.
+    A Toolbox without the field, or a failed inspection, means a document.
+  - `requires_visual_inspection`, to inject a full-page `picture` element when the
+    input is a standalone image with no visual blocks — ensuring the VisionAgent
+    audiodescribes it.
+  - `page_count` with `page_count_source` (`artifact/media-inspection@1`,
+    `pure-media-inspect` 1.0.0+): a PDF whose count came from `pymupdf` and
+    exceeds `MAX_PAGES` is rejected before structural extraction. Any other
+    source (`content_stream_scan`, `pillow`, `null`), a missing field or a
+    failed inspection skips this early check; the limit is still enforced on
+    the extracted manifest.
 
   The signal only feeds this heuristic, so a failure of the step (any
   exception, not only `ToolboxError`) does not fail the job: the run continues
@@ -312,11 +359,38 @@ The `media.inspect` capability (provider `pure-media-inspect`, PR
   `manifest.extractor.configuration` (`media_inspection`: `toolbox`, `disabled`,
   `source_missing` or `failed`, plus `media_inspection_error` with the cause).
   The status and the cause also reach the document as
-  `canonical_metadata.pddl_media_inspection` (`{"status": ..., "error": ...}`).
+  `canonical_metadata.pddl_media_inspection` (`{"status": ..., "error": ...,
+  "document_genre": ..., "genre_signals": [...]}`).
 
   A run degraded by a failure is **not cached** (the payload carries
   `cacheable: false`): otherwise a transient Toolbox outage would replay a
   standalone image without its audio description after the Toolbox recovers.
+
+  The same holds for the pictures and tables a failure left without a
+  description or a reading. They are counted by reason in
+  `canonical_metadata.pddl_visual_failures`
+  (`{"pictures": {"model_failed": 1, "crop_unavailable": 2}, "tables": {"model_failed": 1}}`,
+  `null` when nothing failed): `model_failed` when the vision model or the
+  data agent gave no answer, `crop_unavailable` when the Toolbox could not
+  render the crop. A picture counts whatever its element type, since the
+  placeholders of a mostly visual document are described too; the reason sits
+  in `metadata.vision_failure_reason`, and a table's in
+  `metadata.table_read_failure`. The document says how many images could not
+  be described and how many tables could not be read. An empty description
+  and a table reading refused as worse than the table are the model's answers,
+  so they neither count nor keep the run uncached. A cached entry that records
+  a failure is not replayed, and a rerun that is still degraded drops it.
+
+  Before a picture or table is left that way, its stage tries it once more:
+  after `VISION_RETRY_PASS_DELAY_SECONDS` (60), the objects left without a
+  usable description or reading (and pictures the model answered empty) are
+  sent again, one at a time. A provider that keeps failing is not called for
+  every object: after `VISION_BREAKER_THRESHOLD` (3) calls in a row without a
+  usable answer, the rest of the job's picture, formula and table calls are
+  skipped and recorded as `model_failed`, with
+  `metadata.vision_failure_detail` saying they were skipped. The first
+  call of the second pass gets through anyway, to test whether the provider
+  came back.
 
 The PDDL predicates `media_inspected`/`media_profile_classified` belong to the Toolbox
 domain; the core consumes the signal only as an enrichment heuristic and it does not
@@ -338,15 +412,23 @@ Defined in `backend/config/settings.py` and documented in `.env.example`:
 | `TOOLBOX_CATALOG_REFRESH_SECONDS` | `60` | How long a catalogue snapshot is reused |
 | `TOOLBOX_CATALOG_STALE_SECONDS` | `900` | How long the last good snapshot is served when the catalogue cannot be read |
 | `TOOLBOX_TIMEOUT_SECONDS` | `3600` | Request timeout |
-| `TOOLBOX_RETRIES` | `1` | Retries on the same endpoint after a timeout or an unavailable instance (503/504), for every capability client; `0` disables them (ADR-0006). A timeout is retried too, so the worst case for a hung call is `TOOLBOX_TIMEOUT_SECONDS × (TOOLBOX_RETRIES + 1)` per endpoint in `TOOLBOX_BASE_URLS` (2 h per endpoint with the defaults) |
+| `TOOLBOX_RETRIES` | `1` | Retries on the same endpoint after a timeout or an unavailable instance (502/503/504), for every capability client; `0` disables them (ADR-0006). A timeout is retried too, so the worst case for a hung call is `TOOLBOX_TIMEOUT_SECONDS × (TOOLBOX_RETRIES + 1)` per endpoint in `TOOLBOX_BASE_URLS` (2 h per endpoint with the defaults) |
 | `TOOLBOX_RETRY_BACKOFF_SECONDS` | `0.5` | Base of the exponential backoff between retries, with jitter |
-| `TOOLBOX_USE_ARTIFACT_STORE` | `true` | Upload the file to `/v1/artifacts` before extracting |
+| `TOOLBOX_USE_ARTIFACT_STORE` | `true` | Upload the file to `/v1/artifacts` before extracting, when the clients share one deployment. With independent endpoints in `TOOLBOX_BASE_URLS` the file is sent directly on each call instead (ADR-0013); a transient upload failure (timeout, unavailable) also falls back to direct input |
 | `TOOLBOX_USE_REMOTE_CACHE` | `true` | Use the remote cache (`no_cache=false`) |
 | `TOOLBOX_MEDIA_INSPECT_PROVIDER` | `pure-media-inspect` | Provider for the `media.inspect` capability |
 | `TOOLBOX_MEDIA_INSPECT_ENABLED` | `true` | Run `media.inspect` on the Toolbox or skip it. There is no local fallback: when `false`, the step is skipped; a Toolbox failure is logged and recorded in the manifest, the run continues without the standalone-image signal, and the degraded result is not cached |
+| `SLIDE_VISUAL_COVERAGE` | `0.5` | Share of a slide its pictures must cover for a presentation slide (`document_genre=presentation`) to be described as one image instead of read as text |
+| `SLIDE_FOLD_FIGURE_LABELS` | `true` | On a presentation slide read as text, fold the short text lying on or just around a picture into it (merging pictures a caption row spans), whose description transcribes it in place |
+| `TABLE_VISUAL_REVIEW` | `true` | Read again from its image a table that came back in the wrong shape (rows collapsed into one cell per column, or every cell doubled), and use the new reading when it is the same table read better |
+| `OBJECT_MARKERS_ENABLED` | `false` | Enclose each described picture, table and formula of the delivered formats (HTML, TXT and its audio, DOCX, PDF/UA) in `[label]` … `[/label]` paragraphs, labels in the server locale; a job may override it with the `object_markers` form field of `POST /api/v1/jobs` |
 | `TOOLBOX_PDF_UA_PROVIDER` | `pandoc-pdf-ua` | Provider for the `document.export.pdf_ua` capability |
 | `TOOLBOX_PDF_UA_ENABLED` | `true` | Render PDF/UA on the Toolbox (pinned Pandoc + TeX Live) or skip it. There is no local fallback: when `false`, the worker skips the format without an error; a Toolbox failure is reported as an optional export error |
 | `TOOLBOX_PDF_UA_TIMEOUT_SECONDS` | `300` | How long to wait for the Toolbox render before the export is reported as an optional error |
+| `TOOLBOX_PDF_VALIDATE_PROVIDER` | `verapdf` | Provider for the `pdf.validate.pdf_ua` capability |
+| `TOOLBOX_PDF_VALIDATE_ENABLED` | `true` | Audit the PDF/UA with veraPDF (PDF/UA-1) on the Toolbox. The result e-mail summarizes the failed rules and the full report goes in the ZIP package; when `false`, there is no audit; a Toolbox failure leaves the job delivered and the e-mail says the audit is unavailable |
+| `TOOLBOX_PDF_VALIDATE_TIMEOUT_SECONDS` | `330` | How long to wait for the validation, above the capability's `timeout_hint_seconds` (300) |
+| `PDF_UA_AUDIT_MAX_RULES` | `10` | Failed rules the result e-mail lists; the others are only in the packaged report |
 | `TOOLBOX_DOCX_PROVIDER` | `pandoc-docx` | Provider for the `document.export.docx` capability |
 | `TOOLBOX_DOCX_ENABLED` | `true` | Render DOCX on the Toolbox (pinned Pandoc) or skip it. There is no local fallback: when `false`, the worker skips the format without an error; a Toolbox failure is reported as an optional export error |
 | `TOOLBOX_DOCX_TIMEOUT_SECONDS` | `300` | How long to wait for the Toolbox render before the export is reported as an optional error |
@@ -357,11 +439,24 @@ Defined in `backend/config/settings.py` and documented in `.env.example`:
 | `TOOLBOX_TABLE_PROVIDER` | `qwen3-vl-8b` | Table re-generation for the table specialist (`table.recognize`) |
 | `TOOLBOX_ORIENTATION_PROVIDER` | `rapidocr-orient` | Rotation detection (`image.page.orient`) |
 | `FUSION_HYBRID_PROVIDER` | `mineru-hyb` | MinerU hybrid-VLM provider id (the B source of the best submission within the paper's method) |
+| `FUSION_JUDGE_MAX_PAGES` | `5` | Pages per document the VLM judge may check in `FUSION_MODE=dual`: only the ones the deterministic router cannot settle (both providers found a table or a formula) and that diverge, least similar first. The verdict is recorded, not applied; a disagreement is a technical warning. `0` turns the judge off |
+| `FUSION_APPLY_PAGE_ROUTES` | `true` | In `FUSION_MODE=dual`, take the secondary provider's page where the deterministic router prefers it (tables, formulas, a nearly empty primary page); running text stays with `TOOLBOX_PROVIDER`. `false` keeps every page from the primary provider |
 
 > `TOOLBOX_USE_ARTIFACT_STORE` and `TOOLBOX_USE_REMOTE_CACHE` directly affect the
-> extraction flow: with the artifact store on, the core uploads the file once and
-> reuses the `artifact_id`; with the remote cache on, the Toolbox can answer from
-> `cache_key` without reprocessing.
+> extraction flow: with the artifact store on and a single deployment, the core
+> uploads the file once and reuses the `artifact_id`; with several independent
+> endpoints, or after a transient upload failure, it sends the file with each
+> extraction call, so the `artifact_id` is `null` and later stages (fusion, text
+> spans) send the file again. With the remote cache on, the Toolbox can answer
+> from `cache_key` without reprocessing.
+>
+> In `FUSION_MODE=dual`, a provider failure (timeout, unavailable, or an unmapped
+> HTTP error such as 500) of either provider degrades the extraction to the
+> other one: the document carries a technical warning
+> (`extraction_degraded`, `extraction_failures`) and is not cached. A rejection
+> of the document itself (unsupported media, invalid input, contract,
+> authentication) by the primary fails the job; by the secondary, it only
+> degrades.
 
 ---
 
@@ -371,8 +466,10 @@ Defined in `backend/config/settings.py` and documented in `.env.example`:
 service.py: _build_orchestrator()
   └─ PddlAccessibilityOrchestrator(extractor_backend="toolbox")
        └─ ToolboxManifestExtractor (backend/core/manifest/toolbox_extractor.py)
-            ├─ [artifact store] upload_artifact() → /v1/artifacts
-            └─ extract_structure(artifact_id=..., use_remote_cache=...)
+            ├─ [artifact store, one deployment] upload_artifact() → /v1/artifacts
+            │    (transient failure → direct input)
+            ├─ extract_structure(artifact_id=... | file_path=..., use_remote_cache=...)
+            └─ [dual] secondary extract_structure() → fusion, or degrade to one provider
                  → POST /v1/capabilities/document.structure.extract:execute
                  → ToolboxExtraction (configuration: toolbox_base_url, provider, artifact_id, cache_key)
        └─ InformationalStructuralAgent.process() → manifest
@@ -415,3 +512,31 @@ provider. It is the B source of the best submission within the paper's method
 (`differ-v15-hyb`, EvalAI 70.37): the real test gain came from reading order
 (+16.4) with this source, not from TEDS. Adopt it explicitly with
 `FUSION_SECONDARY_PROVIDER=mineru-hyb`; the dual-fusion default stays `mineru`.
+
+## Cancelling a job during remote extraction
+
+API cancellation remains cooperative: `run_blocking` waits for a running
+thread before removing files it may still use. While the job is `cancelling`,
+its upload remains protected and its terminal state waits for the blocking
+operation to finish. The queue can start a replacement without waiting for
+that thread.
+Normal concurrency stays at the configured value N (one by default). While
+cancelled work drains, a replacement may run, but total active callbacks
+(including cancelling ones) never exceed N+1. The extra active callback may
+be a normal replacement, not necessarily a cancelled job. When the N+1 cap
+is reached, further work waits for a callback to finish, even if another job
+is cancelled. Deployments must budget memory for this bounded overlap.
+
+`GET /api/v1/jobs/{task_id}` reports `cancellation_requested_at` (Unix seconds),
+`cancellation_elapsed_seconds` while waiting, and a localized stage explaining
+the wait. The web status page displays that stage on its normal refresh.
+The API persists `cancelling` and the request timestamp before acknowledging
+the cancellation; after a restart, recovery marks that durable request
+`cancelled` and preserves the timestamp. The elapsed counter is derived on
+reads and cleared for terminal jobs. Direct use of the internal synchronous
+cancel helper changes memory only; its caller owns persistence. A crash
+before the API acknowledges a cancellation is not covered by this guarantee.
+Cancelling does not send an abort command to the Toolbox; remote work may
+continue until it finishes or times out. Queue shutdown still joins active
+operations, and no cancelled result is published. This change does not alter
+provider timeouts or the existing early `MAX_PAGES` check.

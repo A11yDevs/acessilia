@@ -18,10 +18,12 @@ from backend.config.settings import settings
 from backend.export.filters.pandoc_filters import strip_internal_audit_blocks
 from backend.i18n import t
 from backend.log_messages import LOG_DOCX_TOOLBOX_EXPORTED
+from backend.log_messages import LOG_PDF_UA_MATH_DEGRADED
 from backend.log_messages import LOG_PDF_UA_TOOLBOX_EXPORTED
 from backend.pipeline.canonical_builder import build_canonical_document
 from backend.pipeline.canonical_builder import sanitize_canonical_document
 from backend.pipeline.pandoc_ast_builder import build_pandoc_ast
+from backend.pipeline.pandoc_ast_builder import degrade_math_to_text
 from backend.pipeline.validators import audit_canonical_document
 from backend.pipeline.validators import validate_export_profile
 from backend.tools.logger import logger
@@ -137,12 +139,32 @@ def _render_pdf_ua(
 
     Raises:
         RuntimeError: When TOOLBOX_PDF_UA_ENABLED is false.
-        acessilia_sdk.toolbox.errors.ToolboxError: When the Toolbox cannot render or deliver the PDF.
+        acessilia_sdk.toolbox.errors.ToolboxError: When the Toolbox cannot render or deliver the PDF. An input
+            rejection (``ToolboxInvalidInput``) gets one retry with the math exported as literal text, so a
+            formula the LaTeX compiler rejects cannot lose the whole document; a second rejection propagates.
     """
     if not settings.toolbox_pdf_ua_enabled:
         raise RuntimeError(t(MSG_PDF_UA_DISABLED))
+    from acessilia_sdk.toolbox.errors import ToolboxInvalidInput
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    toolbox_export_pdf_ua(ast, output_path, lang=lang)
+    try:
+        toolbox_export_pdf_ua(ast, output_path, lang=lang)
+    except ToolboxInvalidInput as exc:
+        # ToolboxInvalidInput means the request reached a healthy renderer and
+        # the AST itself is the problem — but not every rejection is about
+        # math. When the AST carries no Math inline left (the builder guard
+        # already exports the dangerous ones as text), the degradation changes
+        # nothing and a retry would resend the identical request, so the
+        # rejection propagates instead.
+        degraded = degrade_math_to_text(ast)
+        if degraded == ast:
+            raise
+        # Math the renderer's LaTeX compiler rejects, e.g. \chemfig from a
+        # chemical structure a vision model classified as a formula. The retry
+        # is a deterministic degradation, not a failover — the formulas go as
+        # literal text, the way the HTML and TXT renderers already show them.
+        logger.warning(t(LOG_PDF_UA_MATH_DEGRADED).format(error=exc))
+        toolbox_export_pdf_ua(degraded, output_path, lang=lang)
     logger.info(t(LOG_PDF_UA_TOOLBOX_EXPORTED).format(output_path=output_path))
     return output_path
 
@@ -160,7 +182,7 @@ def export_accessible_document(
     Args:
         source_text_or_document (str | dict): Raw markdown/text or an already-built canonical document mapping to export.
         output_path (Path): Destination file path for the rendered output.
-        format_name (str): Target format key: "html", "docx", "pdf", "pdf_ua" or "txt".
+        format_name (str): Target format key: "html", "docx", "pdf_ua" or "txt".
         title (str | None): Document title override; when None the localized default title from MSG_DEFAULT_ACCESSIBLE_TITLE is used.
         profile_name (str | None): Export verbosity profile applied to block filtering and validation; falls back to format_name when None.
 
@@ -192,19 +214,10 @@ def export_accessible_document(
         from backend.export.renderers.html_renderer import render_html
 
         return render_html(filtered, output_path, profile_name=profile)
-    ast = build_pandoc_ast(filtered)
+    ast = build_pandoc_ast(filtered, target_format=format_name)
     lang = filtered.get("language") or DEFAULT_EXPORT_LANG
     if format_name == "docx":
         return _render_docx(ast, output_path, lang=lang)
-    if format_name == "pdf":
-        from backend.export.renderers.pdf_renderer import render_pdf
-
-        return render_pdf(
-            filtered,
-            output_path,
-            profile_name=profile,
-            title=title or "",
-        )
     if format_name == "pdf_ua":
         return _render_pdf_ua(ast, output_path, lang=lang)
     if format_name == "txt":

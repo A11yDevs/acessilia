@@ -7,13 +7,15 @@ from typing import Any, Literal, TypeVar
 from agno.run.base import RunStatus
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from backend.agents.run_helpers import run_content
+from backend.agents.run_helpers import RunIncompleteError, run_content
 
 VISION_SCHEMA_INSTRUCTION = (
     "Retorne somente o objeto estruturado solicitado: use kind='description' e "
     "description para conteúdo visual/textual, ou kind='formula' e formula_latex "
-    "quando a região for predominantemente uma fórmula. Sempre informe language, "
-    "confidence, mentioned_elements e warnings."
+    "quando a região for predominantemente uma fórmula matemática (um desenho de "
+    "molécula é kind='description'). Não preencha formula_latex "
+    "quando kind='description'. Sempre informe language, confidence, "
+    "mentioned_elements e warnings."
 )
 
 PAGE_INSPECTION_INSTRUCTION = (
@@ -41,8 +43,13 @@ class AgentOutput(BaseModel):
 class VisionOutput(AgentOutput):
     """Structured visual description, optionally representing a formula."""
 
+    classification_uncertain: bool = Field(
+        default=False,
+        description="For formula-candidate inspection only: true when the region cannot be reliably classified as mathematics or described as non-mathematical content.",
+    )
+
     kind: Literal["description", "formula"] = Field(
-        description="Whether the region is a visual description or a mathematical formula."
+        description="Whether the region is a visual description or a mathematical formula; a drawn molecule is a description."
     )
     description: str = Field(
         default="",
@@ -70,7 +77,7 @@ class VisionOutput(AgentOutput):
     )
     formula_latex: str | None = Field(
         default=None,
-        description="LaTeX when the region contains predominantly a mathematical formula.",
+        description="LaTeX when the region contains predominantly a mathematical formula, never for a drawn molecule or a written chemical formula.",
     )
     warnings: list[str] = Field(
         default_factory=list,
@@ -87,6 +94,29 @@ class VisionOutput(AgentOutput):
 
     @model_validator(mode="after")
     def validate_content(self) -> "VisionOutput":
+        # Models sometimes label a region 'description' and fill formula_latex as
+        # well (006.pdf, page 29: a description plus formula_latex='NaCl'). The
+        # answer is usable, so it is reconciled instead of discarded: consumers
+        # read only the field that matches kind. With a description, the region
+        # stays a description and the LaTeX is dropped; with only the LaTeX, the
+        # region becomes a formula, so the element is built as type='formula'.
+        # Either way a warning keeps the model's original answer in the evidence,
+        # which records the reconciled object. The reconciled object no longer
+        # meets the condition, so revalidating it changes nothing.
+        # The inverse, kind='formula' with a description and no formula_latex, is
+        # still rejected: there the content kind asks for is missing, not extra.
+        if self.kind == "description" and self.formula_latex is not None:
+            if self.description:
+                self.warnings.append(
+                    f"formula_latex dropped because kind is 'description': {self.formula_latex}"
+                )
+                self.formula_latex = None
+            else:
+                self.warnings.append(
+                    "kind changed from 'description' to 'formula': "
+                    "only formula_latex was provided"
+                )
+                self.kind = "formula"
         if self.kind == "description" and not self.description:
             raise ValueError("description is required when kind is 'description'")
         if self.kind == "formula" and not self.formula_latex:
@@ -291,7 +321,7 @@ def validate_structured_run(response: Any, schema: type[OutputModel]) -> OutputM
     content = run_content(response)
     status = getattr(response, "status", None)
     if status is not None and status != RunStatus.completed:
-        raise RuntimeError(f"Agent run did not complete ({status}): {content}")
+        raise RunIncompleteError(status, content)
     return validate_structured_content(content, schema)
 
 

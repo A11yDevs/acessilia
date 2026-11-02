@@ -1,10 +1,8 @@
 """Legacy section titles render once while both anchor identities survive."""
 from copy import deepcopy
 
-import fitz
 import pytest
 
-from backend.export.renderers.pdf_renderer import render_pdf
 from backend.pipeline.canonical_builder import build_canonical_document
 from docstruct.export.html import document_to_html
 from docstruct.export.pandoc_ast import build_pandoc_ast
@@ -54,16 +52,6 @@ def test_legacy_titles_render_once_and_keep_aliases(field, nested, same_id):
         assert lines.count(title) == 1
         assert (section["id"] + "-legacy" in aliases) == (not same_id)
     assert document == before
-
-
-def test_legacy_title_deduplication_reaches_pdf(tmp_path):
-    # DOCX renders on the Toolbox from the Pandoc AST, whose headers are
-    # checked above.
-    document, _ = _legacy_document()
-    pdf = render_pdf(document, tmp_path / "result.pdf", title="Document")
-    with fitz.open(pdf) as rendered:
-        text = "\n".join(page.get_text() for page in rendered)
-    assert text.splitlines().count("Heading") == 2  # one TOC entry + one body heading
 
 
 @pytest.mark.parametrize("change", ["text", "level", "position"])

@@ -175,6 +175,10 @@ benchmark work produced, all as pure functions:
 | `fusion.hf_end` | the ground-truth header/footer-at-end convention |
 | `fusion.table_specialist` | the generate-compare-adjudicate table medoid |
 | `text.normalize`, `text.norm_fix`, `text.latex` | text normalization primitives |
+| `text.unicode_repair` | conservative NFC, dotless-i and spacing repair for legacy TeX PDFs (prose, headers and table cells); with document-level evidence, also the crase (`` ` a`` → `à`) and split ligatures (`fi ca` → `fica`) |
+| `text.math_spans` | splits prose into text and inline `$…$` / `\(…\)` math pieces (Pandoc's `tex_math_dollars` rule; `R$ 10,00` stays text) |
+| `text.inline_math` | finds inline math in a PDF text layer from its math fonts (`CMMI`, `CMSY`, `MSBM`…) and script baselines, rebuilds its LaTeX, and splices it into the extracted text as `$…$` where both character sequences align (ADR 0011) |
+| `text.negation_overlay` | gives a detached `≠` slash (U+0338 extracted as its own element) back to the relation it negates, from its position; only when the choice is unambiguous |
 | `imaging.policy` | pure upscale/orientation decisions (no PIL/cv2) |
 | `docstruct.fusion.verse` | chunk verse/record blocks so the evaluator can re-group them |
 | `docstruct.fusion.line_numbers` | pull marginal verse line numbers into their own blocks |
@@ -189,7 +193,12 @@ benchmark work produced, all as pure functions:
 | `docstruct.fusion.table_specialist` | the generate-compare-adjudicate table medoid |
 | `docstruct.text.normalize` | the shared comparison normalizer |
 | `docstruct.text.norm_fix` | deterministic text cleanups (ligatures, hyphen, NBSP) |
+| `docstruct.text.unicode_repair` | conservative NFC, dotless-i, spacing, crase and split-ligature repair for legacy TeX PDFs |
+| `docstruct.text.negation_overlay` | reattaches a detached negation slash to its relation by position (unambiguous cases only) |
 | `docstruct.text.latex` | LaTeX normalization |
+| `docstruct.text.math_spans` | inline math spans in prose |
+| `docstruct.text.equations` | display equation labels (`\tag{1}`, `\quad(1)`, `(1)`) split into `metadata.equation_number` and restored per export |
+| `docstruct.text.inline_math` | inline math from text-layer fonts and baselines |
 | `docstruct.imaging.policy` | pure upscale/orientation decisions (no PIL/cv2) |
 | `docstruct.evaluation.holdout` | the tune/holdout split and the acceptance criteria |
 
@@ -331,7 +340,42 @@ without going through the PDDL planner.
 
 ---
 
-## 6. Related documentation
+## 6. Display-equation numbers
+
+`docstruct.text.equations` separates a trailing `\tag{1}`, `\quad(1)` or
+unambiguous `(1)` from a display formula. The core applies this when building
+the processing manifest and when accepting OCR or vision recognition. The
+canonical builder applies the same rule to structured math blocks.
+
+The expression stays in `text`; the original identifier stays in
+`metadata.equation_number`. A valid existing identifier takes precedence over
+recognition output. Converters and verbalizers receive the expression without
+its label, and recognition agreement compares expressions without the label.
+
+PDF/UA's Pandoc AST and benchmark Markdown restore an explicit `\tag{1}`.
+DOCX uses `\qquad\text{(1)}` instead, because Pandoc's Word math converter
+does not accept a standalone `\tag`. HTML shows the number beside the formula
+and includes it in the `<math>` element's accessible label; the visible number
+(`.equation-number`, right of the formula) is hidden from assistive technology
+to avoid announcing that label twice. TXT and its audio consumers retain the
+number in the spoken representation. When PDF/UA falls back to formulas as
+text, the label shows as `(1)`, not as `\tag{1}`. Repeated rendering does not
+duplicate a label: `\qquad\text{(1)}` is read back like the other forms.
+
+A formula whose label was its only LaTeX command (`x=y\tag{1}`) keeps
+`metadata.latex_markup`, so recognition still treats it as LaTeX the extractor
+delivered.
+
+This is conservative suffix recognition, not arbitrary TeX parsing. It does
+not create missing numbers, renumber equations, or resolve references into
+hyperlinks. Parentheses that could complete an operation, such as `x = (1)`
+or `x = y + (1)`, remain part of the expression. A bare `(1)` is a label only
+after a relation (`=`, `<`, `>`, `\neq`, `\le`, `\approx`, `\sim`, `\propto`,
+`\to`, `\in` and the like); an expression ending on one keeps it. Unseparated
+`f(1)` also stays unchanged. Identifiers are limited to digits with optional dotted components
+and letter suffixes or an appendix prefix, such as `1`, `2.3`, `4a` and `A.1`.
+
+## 7. Related documentation
 
 - [libs/docstruct/README.md](../../libs/docstruct/README.md) — public API.
 - [pmv_agno_pddl.md](pmv_agno_pddl.md) — PDDL orchestration and the

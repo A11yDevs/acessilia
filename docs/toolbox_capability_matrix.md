@@ -53,13 +53,14 @@ Legend for **Call path**: how the core reaches the capability.
 | `document.structure.extract` | `acessilia_sdk/toolbox/clients/structure.py` | `TOOLBOX_PROVIDER=docling` | `docling`, `mineru`, `nougat`, `teleocr` | `ToolboxManifestExtractor` → PDDL extraction; with `FUSION_MODE=dual`, also compares the secondary provider and passes page evidence to the manifest builder |
 | `document.layout.analyze` | `acessilia_sdk/toolbox/clients/layout.py` | `TOOLBOX_LAYOUT_PROVIDER=docling-layout` | `docling-layout`, `mineru-layout` | no core caller since the legacy pipeline was removed; the SDK client and its E2E tests remain |
 | `document.ocr` | `acessilia_sdk/toolbox/clients/ocr.py` | `TOOLBOX_OCR_PROVIDER=docling-ocr` | `docling-ocr`, `mineru-ocr` | `toolbox_ocr_tools.py` (Agno wrapper) |
-| `math.recognize` | `acessilia_sdk/toolbox/clients/math.py` | `TOOLBOX_MATH_RECOGNIZE_PROVIDER=docling-math` | `docling-math`, `rapid-latex-ocr` | `toolbox_math_tools.py` |
+| `math.recognize` | `acessilia_sdk/toolbox/clients/math.py` | `TOOLBOX_MATH_RECOGNIZE_PROVIDER=pp-formulanet` | `pp-formulanet`, `docling-math`, `rapid-latex-ocr` | `toolbox_math_tools.py` → `_enrich_formula_latex` before planning (formula crops the extractor left without LaTeX; the vision model is the fallback). The core sends single-formula crops, so the provider must be a chip model (`pp-formulanet`, `rapid-latex-ocr`): `docling-math` detects formulas on a whole page, answers a crop with no formula, and sends every formula to vision; the log then reports `N of M formula(s) fell back to the vision model` |
 | `math.convert` | `acessilia_sdk/toolbox/clients/math.py` | `TOOLBOX_MATH_PROVIDER=math-speech` | `math-speech` | `toolbox_math_tools.py` → canonical builder (formula MathML) and the PDDL `mathml` handler |
 | `math.verbalize` | `acessilia_sdk/toolbox/clients/math.py` | `TOOLBOX_MATH_PROVIDER=math-speech` | `math-speech` | `toolbox_math_tools.py` → canonical builder (formula alt text) and the PDDL `latex-verbalizer` handler |
 | `pdf.split` | `acessilia_sdk/toolbox/clients/pdf.py` | `TOOLBOX_PDF_PROVIDER=pymupdf-pdf` | `pymupdf-pdf` | no core caller; the PDDL engine reads pages through `pdf.render` |
 | `pdf.render` | `acessilia_sdk/toolbox/clients/pdf.py` | `TOOLBOX_PDF_PROVIDER=pymupdf-pdf` | `pymupdf-pdf` | version 2 (clip, `max_side`, PNG/JPEG, PNG by reference): PDDL methods `vision-page-inspection`, `pymupdf-region` (region crop) and `vlm-pairwise-judge` (bounded page), and the picture enrichment before planning; no local rendering in the orchestrator |
 | `media.inspect` | `acessilia_sdk/toolbox/clients/media_inspect.py` | `TOOLBOX_MEDIA_INSPECT_PROVIDER=pure-media-inspect` | `pure-media-inspect` | `backend/tools/media_inspect.py` (Toolbox only; no local fallback, ADR-0003), skipped when `TOOLBOX_MEDIA_INSPECT_ENABLED=false` |
 | `document.export.pdf_ua` | `acessilia_sdk/toolbox/clients/pdf_ua.py` | `TOOLBOX_PDF_UA_PROVIDER=pandoc-pdf-ua` | `pandoc-pdf-ua` (sidecar `pdf-ua-render`) | `backend/export/pandoc_exporter.py` (Toolbox only, PDF downloaded and verified from `/v1/artifacts`; no local fallback, ADR-0003), skipped when `TOOLBOX_PDF_UA_ENABLED=false` |
+| `pdf.validate.pdf_ua` | `acessilia_sdk/toolbox/clients/pdf_validate.py` | `TOOLBOX_PDF_VALIDATE_PROVIDER=verapdf` | `verapdf` (sidecar `verapdf-validate`) | `backend/tools/pdf_ua_audit.py`: the worker audits the exported PDF/UA (PDF/UA-1), summarizes it in the result e-mail and packages the report; a failure does not fail the job; skipped when `TOOLBOX_PDF_VALIDATE_ENABLED=false`. Every deployment must run `verapdf-validate`: without it, every result e-mail reads "Audit unavailable" |
 | `document.export.docx` | `acessilia_sdk/toolbox/clients/docx.py` | `TOOLBOX_DOCX_PROVIDER=pandoc-docx` | `pandoc-docx` (route `/render/docx` of sidecar `pdf-ua-render`) | `backend/export/pandoc_exporter.py` (Toolbox only, DOCX downloaded and verified from `/v1/artifacts`; no local fallback, ADR-0003), skipped when `TOOLBOX_DOCX_ENABLED=false` |
 | `artifact.store` / `artifact.retrieve` | `acessilia_sdk/toolbox/clients/artifact.py` (REST `/v1/artifacts`) | — | `minio`, `filesystem` | upload before extraction |
 | `dataset.*` (8 capabilities) | `acessilia_sdk/toolbox/clients/dataset.py` (REST `/v1/datasets`) | — | `dataset-github`, `dataset-huggingface` | `toolbox_dataset_tools.py` (Dr.DocBench scripts) |
@@ -74,7 +75,6 @@ Legend for **Call path**: how the core reaches the capability.
 | `code.normalize` | **absent** | — | `pure-code` | pending: evidence-driven client and obligation/method/handler |
 | `text.postprocess` | **absent** | — | `pure-text` | pending: evidence-driven client and obligation/method/handler |
 | `music.omr` | **absent** | — | `homr`, `audiveris` | pending: evidence-driven client and obligation/method/handler |
-| `pdf.validate.pdf_ua` | **absent** | — | `verapdf` | pending: the core could validate its PDF/UA exports before delivering them |
 | `cache.get` / `cache.put` | — (internal) | — | `valkey` | Toolbox-internal cache; not a public capability |
 
 ## Confirmed drift (as of the review)
@@ -150,10 +150,11 @@ gap.
 - **Every admissible method is accounted for.** Each one now resolves to a
   registered handler or is reported to the planner as unavailable;
   `tests/test_pddl_actionability.py` fails on any method that is neither.
-- **18 handlers registered** (was 3 real + 8 no-op): the 3 model-backed ones,
+- **19 handlers registered** (was 3 real + 8 no-op): the 3 model-backed ones,
   the single-provider fallback, the
-  13 deterministic handlers covering `vision-description`, `pandoc-table`,
-  `pandoc-code`, `pymupdf-region`, `latex-normalizer`, `norm-fix`, `rep-guard`,
+  14 deterministic handlers covering `vision-description`, `pandoc-table`,
+  `pandoc-code`, `pymupdf-region`, `latex-normalizer`, `norm-fix`,
+  `unicode-repair`, `rep-guard`,
   `line-number-extractor`, `verse-chunker`, `tailjoin`, `tailjoin-positioned`,
   `xycut-order`, and `deterministic-heading-repair`; `human-review` is the
   explicit terminal escalation handler.

@@ -18,10 +18,6 @@ WEB_SUCCESS_QUEUED: str = (
     "Success! Your file has been added to the queue (Position: {position}). "
     "The result will be sent to {email}."
 )
-#: Shown when a custom prompt on the advanced panel exceeds the accepted length.
-WEB_ERROR_PROMPT_TOO_LONG: str = (
-    "The custom prompt exceeds the limit of 6000 characters."
-)
 #: Shown when a download link is unknown, already expired, or otherwise invalid.
 WEB_ERROR_DOWNLOAD_INVALID: str = "The download link is invalid or has expired"
 #: Shown when a download link is well-formed but the download service cannot be reached.
@@ -45,11 +41,9 @@ WEB_INDEX_EMAIL_LABEL: str = "Your E-mail"
 #: Helper text under the e-mail field explaining the deliver-to address.
 WEB_INDEX_EMAIL_HELP: str = "We will send the final files to this address."
 #: Form-field label for the document attachment control.
-WEB_INDEX_DOC_LABEL: str = "Attach a Document (PDF or Image)"
+WEB_INDEX_DOC_LABEL: str = "Attach a Document (PDF, HTML or Image)"
 #: Primary action button text on the upload form.
 WEB_INDEX_SUBMIT_BUTTON: str = "Make Accessible"
-#: Secondary link navigating to the advanced panel.
-WEB_INDEX_ADVANCED_LINK: str = "Advanced Mode"
 #: Copyright footer line rendered on every panel page.
 WEB_FOOTER: str = "Technology for Inclusion"
 #: Accessible alt text describing the brand logo rendered in the panel headers.
@@ -66,33 +60,6 @@ WEB_LOGO_ALT: str = (
     "dashes: a square with six raised dots (a braille-like symbol), a loudspeaker, a stylized "
     "eye, and a rectangle representing a document or page."
 )
-
-# --- Advanced panel (templates/advanced.html) ---
-#: Browser tab title for the advanced panel.
-WEB_ADVANCED_TITLE: str = "Advanced Mode - Acessilia"
-#: Card heading for the advanced panel.
-WEB_ADVANCED_HEADLINE: str = "Advanced Mode"
-#: Sub-heading under the card heading explaining the purpose.
-WEB_ADVANCED_SUBHEAD: str = "Custom Prompt"
-#: Intro paragraph for the advanced panel.
-WEB_ADVANCED_INTRO: str = "Customize the prompt sent to the AI model."
-#: Form-field label for the custom prompt textarea.
-WEB_ADVANCED_PROMPT_LABEL: str = "Custom Prompt"
-#: Placeholder text inside the custom prompt textarea.
-WEB_ADVANCED_PROMPT_PLACEHOLDER: str = (
-    "Type your custom prompt here. It will completely replace the system's default prompt."
-)
-#: Helper text under the prompt field describing limits and effect.
-WEB_ADVANCED_PROMPT_HELP: str = (
-    "Up to 6000 characters. Plain text only (no formatting). "
-    "This prompt replaces the system's default prompt on every page."
-)
-#: Checkbox label enabling the model's internal reasoning mode.
-WEB_ADVANCED_THINKING_LABEL: str = (
-    "Enable Thinking Mode (the model's internal reasoning)"
-)
-#: Link returning to the normal upload panel.
-WEB_ADVANCED_BACK_LINK: str = "Back to normal mode"
 
 # --- Download page (templates/download.html) ---
 #: Browser tab title for the download page.
@@ -111,8 +78,10 @@ WEB_DOWNLOAD_VALID_NOTE: str = "Link valid for 7 days."
 WEB_FORMAT_TXT: str = "Text (TXT)"
 #: File-type label for the accessible Word document (DOCX) rendition.
 WEB_FORMAT_DOCX: str = "Word Document (DOCX)"
-#: File-type label for the accessible PDF rendition.
+#: File-type label for the PDF a job made before PDF/UA became the only PDF; download links stay valid for TOKEN_EXPIRY_DAYS.
 WEB_FORMAT_PDF: str = "Accessible PDF"
+#: File-type label for the tagged accessible PDF/UA rendition.
+WEB_FORMAT_PDF_UA: str = "Accessible PDF (PDF/UA)"
 #: File-type label for the semantic HTML page rendition.
 WEB_FORMAT_HTML: str = "Web Page (HTML)"
 #: File-type label for the audio-description (MP3) rendition.
@@ -151,6 +120,10 @@ WEB_JOB_CLOSE_INFO = (
 WEB_JOB_DOWNLOAD = "Download your files"
 WEB_JOB_EMAIL_FAILED = "The email could not be sent. You can download your files here."
 WEB_JOB_EMAIL_SENT = "The result email was sent. You can also download your files here."
+WEB_JOB_FAILURE_EMAIL_SENT = "We sent you an email about this failure."
+WEB_JOB_FAILURE_EMAIL_FAILED = (
+    "We could not send the email about this failure; the notices below show what happened."
+)
 WEB_JOB_UNAVAILABLE = "Job status is temporarily unavailable. Refresh this page to try again."
 WEB_JOB_STATUS = "Status"
 WEB_JOB_ERRORS = "Processing notices"

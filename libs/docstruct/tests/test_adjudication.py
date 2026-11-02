@@ -68,6 +68,9 @@ class TestDecideV0:
     def test_mineru_com_formula(self):
         assert decide_v0("text", "$$ x $$") == ("mineru", "mineru_has_formula")
 
+    def test_mineru_com_formula_inline(self):
+        assert decide_v0("text", "Formula $x+1$") == ("mineru", "mineru_has_formula")
+
     def test_docling_quase_vazio(self):
         assert decide_v0("", "a" * 100) == ("mineru", "docling_near_empty")
 
@@ -95,6 +98,11 @@ class TestDecideV1:
 
     def test_so_mineru_tem_formula(self):
         assert decide_v1("a" * 200, "$$ " + "x" * 200 + " $$") == ("mineru", "only_mineru_formula")
+
+    def test_so_mineru_tem_formula_inline(self):
+        doc = "Docling has enough body text to avoid the near-empty rule. " * 2
+        min_ = "MinerU has enough body text to avoid the near-empty rule $x+1$. " * 2
+        assert decide_v1(doc, min_) == ("mineru", "only_mineru_formula")
 
     def test_ambos_tem_formula_usa_preferencia(self):
         f = "$$ " + "x" * 200 + " $$"

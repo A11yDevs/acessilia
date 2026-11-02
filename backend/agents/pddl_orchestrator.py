@@ -10,33 +10,68 @@ import re
 import tempfile
 from collections import Counter
 from collections.abc import Callable, Coroutine, Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from docstruct.blocks.callouts import dedupe_callout_titles as _dedupe_callout_titles
+from docstruct.blocks.lists import item_label, list_numbering, list_start, marker_numbering
+from docstruct.fusion.similarity import PAGENUM_RE
 from docstruct.fusion.tailjoin import is_page_number as _is_page_number
+from docstruct.geometry import reading_role
 from docstruct.tables.ast import (
     effective_section_width,
     linearize_table_for_text,
     raw_rows_from_table_ast as _rows_from_table_ast,
 )
+from docstruct.tables.garble import table_garble_reason
+from docstruct.text.equations import preserve_equation_number, split_equation_number
+from docstruct.text.implicit_products import (
+    implicit_product_variables,
+    mark_implicit_products,
+)
+from docstruct.text.inline_math import (
+    InlineMathDetection,
+    TextSpan,
+    assign_runs_to_cells,
+    detect_inline_math,
+    splice_inline_math,
+)
+from docstruct.text.latex import has_latex_markup, latex_text_agreement
+from docstruct.text.math_spans import block_prose, inline_math_sources, mask_inline_math
 from docstruct.text.norm_fix import norm_fix
+from docstruct.text.negation_overlay import (
+    compose_negation,
+    is_detached_overlay,
+    locate_in_grid,
+    locate_in_text,
+    negates,
+)
+from docstruct.text.unicode_repair import (
+    Detection,
+    UnicodeRepairContext,
+    detect_legacy_unicode,
+    repair_legacy_unicode,
+)
 
 from backend.services.blocking import run_blocking
 from backend.agents.data_agent import DataAgent
 from backend.agents.output_schemas import DataOutput, PageInspectionOutput, VisionOutput
+from backend.agents.provider_breaker import ProviderBreaker
 from backend.agents.vision_agent import VisionAgent
 from backend.core.agents.fusion_agent import FusionAgent
 from backend.core.agents.informational_structural import InformationalStructuralAgent
-from backend.core.execution.executor import ExecutorAgent, MethodRegistry
+from backend.core.execution.executor import ExecutorAgent, MethodRegistry, StepProgress
 from backend.core.execution.models import ExecutionReport, MethodResult
 from backend.core.execution.messages import EXE_COMPLETED_OBLIGATIONS_UNSATISFIED
 from backend.core.manifest.builder import (
     SECONDARY_EXTRACTION_KIND,
+    TYPE_BOUND_V23_KINDS,
     _derive_processing_needs,
     is_unstructured_page_placeholder,
     reconcile_reclassified_element_processing_needs,
+    separate_equation_number,
+    unicode_repair_text,
 )
 from backend.core.manifest.models import (
     Artifact,
@@ -48,27 +83,48 @@ from backend.core.manifest.models import (
 )
 from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
 from backend.core.planning.domain_bundle import DomainBundle
-from backend.core.planning.models import NominalPlan, PlanningComparison
+from backend.core.planning.models import NominalPlan, PlanningComparison, PlanStep
 from backend.core.planning import toolbox_gate
 from backend.core.planning.planner_agent import PlannerAgent
-from backend.i18n import t
+from backend.i18n import locale_for_user, n, reset_request_locale, set_request_locale, t
 from backend.log_messages import (
     LOG_MEDIA_INSPECT_FAILED,
     LOG_PDDL_ELEMENT_CROP_FAILED,
+    LOG_PDDL_EMPTY_LIST_ITEMS_DROPPED,
     LOG_PDDL_EMPTY_VISION_DESCRIPTION,
+    LOG_PDDL_FORMULA_RECOGNIZE_EMPTY,
+    LOG_PDDL_FORMULA_RECOGNIZE_UNAVAILABLE,
+    LOG_PDDL_FORMULA_TEXT_LAYER_DISAGREES,
+    LOG_PDDL_FORMULAS_FELL_BACK_TO_VISION,
+    LOG_PDDL_FORMULAS_RECOGNIZED,
     LOG_PDDL_IMAGES_ENRICHED,
     LOG_PDDL_PREFERRED_PLAN_MISSING,
     LOG_PDDL_TABLES_ENRICHED,
+    LOG_PDDL_VISION_RETRY_PASS_PICTURES,
+    LOG_PDDL_VISION_RETRY_PASS_TABLES,
+    LOG_PDDL_TABLE_REREAD_ACCEPTED,
+    LOG_PDDL_TABLE_REREAD_REJECTED,
+    LOG_VISION_ELEMENT_DESCRIPTION,
+    MSG_STRUCTURAL_EXTRACTION_DEGRADED,
 )
 from backend.stage_messages import (
     STAGE_ANALYZING_STRUCTURAL,
     STAGE_STRUCTURAL_EXTRACTION_FAILED,
     STAGE_DOCUMENT_TOO_MANY_PAGES,
+    STAGE_ENRICHING_FORMULAS,
     STAGE_ENRICHING_IMAGE_DESCRIPTIONS,
     STAGE_ENRICHING_TABLES_OCR,
     STAGE_GENERATING_PDDL_PLAN,
     STAGE_VALIDATING_PLAN_DRY_RUN,
     STAGE_EXECUTING_PLAN,
+    STAGE_DESCRIBING_IMAGE,
+    STAGE_RECOGNIZING_FORMULA,
+    STAGE_RECOGNIZING_TABLE,
+    STAGE_EXECUTING_PLAN_STEP,
+    STAGE_PAGE,
+    STAGE_PAGE_OF,
+    STAGE_PAGES,
+    STAGE_PAGE_UNKNOWN,
 )
 from backend.tools.code_tools import normalize_code_text
 from backend.tools.formula_tools import label_spoken_formula, normalize_latex
@@ -79,12 +135,32 @@ from backend.tools.toolbox_math_tools import (
     MSG_SPEECH_UNAVAILABLE,
     MathCapabilityUnavailable,
     toolbox_convert_latex,
+    toolbox_recognize_formula,
     toolbox_verbalize_latex,
 )
 from backend.tools.toolbox_client import ToolboxError
 
 if TYPE_CHECKING:
     from acessilia_sdk.toolbox.clients.pdf import ClipOrigin, RenderedPage
+
+#: Canonical English msgid for the alt text of a picture the vision model left
+#: undescribed; why it was left so goes to the operator, not the reader.
+MSG_UNDESCRIBED_PICTURE_ALT: str = "Image without a text description."
+
+#: Canonical English msgid for an institutional header read as one paragraph:
+#: the logo, then its header lines; {lines} is substituted by callers after lookup.
+MSG_LETTERHEAD_TEXT: str = "Logo. {lines}."
+
+#: Canonical English singular/plural msgids for the document's warning on the
+#: pictures and tables a failure left without a description or a reading.
+MSG_PICTURES_NOT_DESCRIBED: tuple[str, str] = (
+    "{count} image could not be described.",
+    "{count} images could not be described.",
+)
+MSG_TABLES_NOT_READ: tuple[str, str] = (
+    "{count} table could not be read.",
+    "{count} tables could not be read.",
+)
 
 
 def _formula_elements_for_obligation(
@@ -99,6 +175,27 @@ def _formula_elements_for_obligation(
     return [
         el for el in manifest.elements if el.id in targets and el.type == "formula"
     ]
+
+
+def _implicit_product_variables(manifest: ProcessingManifest) -> frozenset[str]:
+    """The letters the document uses as variables, from all its formulas.
+
+    Read from every formula element and every inline span of the manifest, the
+    same sources the canonical build reads, so a formula converted here and
+    one converted there mark the same products.
+    """
+    sources: list[str] = []
+    for element in manifest.elements:
+        blocks = [
+            _element_to_block(item)
+            for item in [element, *_text_kept_by_picture(element)]
+        ]
+        for block in blocks:
+            if block.get("type") == "math":
+                sources.append(str(block.get("text") or ""))
+            for text in block_prose(block):
+                sources.extend(inline_math_sources(text))
+    return implicit_product_variables(sources)
 
 
 def _handle_mathml_method(
@@ -117,8 +214,9 @@ def _handle_mathml_method(
             message="Nenhuma fórmula encontrada para a obrigação",
         )
     converted = 0
+    variables = _implicit_product_variables(manifest)
     for element in elements:
-        latex = normalize_latex(element.text or "")
+        latex = mark_implicit_products(normalize_latex(element.text or ""), variables)
         try:
             mathml = toolbox_convert_latex(latex) if latex else ""
         except MathCapabilityUnavailable as exc:
@@ -160,8 +258,9 @@ def _handle_latex_verbalizer_method(
             message="Nenhuma fórmula encontrada para a obrigação",
         )
     verbalized = 0
+    variables = _implicit_product_variables(manifest)
     for element in elements:
-        latex = normalize_latex(element.text or "")
+        latex = mark_implicit_products(normalize_latex(element.text or ""), variables)
         try:
             spoken = label_spoken_formula(toolbox_verbalize_latex(latex)) if latex else ""
         except MathCapabilityUnavailable as exc:
@@ -188,7 +287,7 @@ def _handle_latex_verbalizer_method(
 
 
 def _run_extract_fused(
-    source_path: Path, *, artifact_id: str | None = None
+    source_path: Path, *, artifact_id: str | None = None, policy=None
 ) -> dict:
     """Executa ``extract_fused`` respeitando o contexto de event loop.
 
@@ -212,43 +311,16 @@ def _run_extract_fused(
     except RuntimeError:
         # Contexto síncrono (executor determinístico, CLI, testes):
         # não existe event loop ativo neste thread.
-        return asyncio.run(extract_fused(source_path, artifact_id=artifact_id))
+        return asyncio.run(extract_fused(source_path, artifact_id=artifact_id, policy=policy))
 
     # Já existe um event loop neste thread; como o handler é síncrono,
     # a coroutine é executada em um thread dedicado com seu próprio loop.
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
         return pool.submit(
             lambda: asyncio.run(
-                extract_fused(source_path, artifact_id=artifact_id)
+                extract_fused(source_path, artifact_id=artifact_id, policy=policy)
             )
         ).result()
-
-
-def _run_extract_single_provider(source_path: Path) -> dict[str, Any]:
-    """Extract through the configured Toolbox provider for the PDDL fallback."""
-    import concurrent.futures
-
-    from acessilia_sdk.toolbox.clients import ToolboxStructureClient
-    from backend.tools.toolbox_client import make_toolbox_client
-
-    async def extract() -> dict[str, Any]:
-        client = make_toolbox_client(ToolboxStructureClient)
-        try:
-            return await client.extract_structure(
-                file_path=source_path,
-                language="pt-BR",
-                use_remote_cache=False,
-            )
-        finally:
-            await client.close()
-
-    try:
-        asyncio.get_running_loop()
-    except RuntimeError:
-        return asyncio.run(extract())
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-        return pool.submit(lambda: asyncio.run(extract())).result()
 
 
 def _fusion_agent() -> FusionAgent:
@@ -323,10 +395,10 @@ def _handle_vision_description_method(
     """Require every picture target to already carry a description.
 
     The description itself is produced before planning (`_enrich_picture_descriptions`
-    tries the vision model and falls back to a deterministic description), so this
-    method validates that the work the planner is asking for actually happened
-    instead of pretending to perform it. A picture that is still undescribed is a
-    real failure and keeps the next admissible method available.
+    asks the vision model), so this method validates that the work the planner is
+    asking for actually happened instead of pretending to perform it. A picture
+    that is still undescribed is a real failure and keeps the next admissible
+    method available; `describe-image` is non-critical, so it does not fail the job.
     """
     elements = [
         el
@@ -354,7 +426,12 @@ def _handle_vision_description_method(
             validated=False,
             message=(
                 "Imagem sem descrição textual: "
-                + ", ".join(el.id for el in undescribed)
+                + ", ".join(
+                    f"{el.id} ({reason})"
+                    if (reason := el.metadata.get("vision_failure_reason"))
+                    else el.id
+                    for el in undescribed
+                )
             ),
         )
     return MethodResult(
@@ -517,6 +594,369 @@ def _handle_norm_fix_method(
     )
 
 
+#: Manifest element type -> block type accepted by the Unicode repair. Types
+#: absent here (formula, code, table, picture) are never rewritten.
+_UNICODE_REPAIR_BLOCK_TYPES = {
+    "paragraph": "prose",
+    "heading": "heading",
+    "title": "heading",
+    "list_item": "prose",
+    "caption": "prose",
+    "footnote": "prose",
+    "page_header": "prose",
+    "page_footer": "prose",
+}
+
+#: Sections of a table AST whose cells carry text.
+_TABLE_SECTIONS = ("header", "body", "footer")
+
+#: Word-internal spaced accents needed before standalone ones (an accent
+#: separated from its word) are treated as the same extraction defect. A
+#: document that merely mentions an accent has none of the word-internal shape,
+#: so it keeps its text; a legacy TeX extraction has hundreds.
+_UNICODE_STANDALONE_SPACING_MIN = 5
+
+
+def _repair_table_cells(
+    element: ManifestElement, context: UnicodeRepairContext
+) -> tuple[bool, set[str], int, bool]:
+    """Repair a table caption and every cell in place.
+
+    Returns ``(edited, rules, edits, needs_review)``. The table keeps its
+    structure; only the text of the caption and of the cells changes.
+    """
+    table_ast = element.metadata.get("table_ast")
+    if not isinstance(table_ast, dict):
+        return False, set(), 0, False
+
+    edited = False
+    rules: set[str] = set()
+    edits = 0
+    review = False
+
+    def repair_text(current: str) -> str:
+        nonlocal edited, edits, review
+        decision = repair_legacy_unicode(current, context=context)
+        if decision.repaired != current:
+            edited = True
+        rules.update(edit.rule for edit in decision.edits)
+        edits += len(decision.edits)
+        review = review or decision.needs_review
+        return decision.repaired
+
+    caption = table_ast.get("caption")
+    if isinstance(caption, str) and caption:
+        table_ast["caption"] = repair_text(caption)
+    for section_name in _TABLE_SECTIONS:
+        section = table_ast.get(section_name)
+        if not isinstance(section, list):
+            continue
+        for row in section:
+            if not isinstance(row, dict):
+                continue
+            cells = row.get("cells")
+            if not isinstance(cells, list):
+                continue
+            for cell in cells:
+                if not isinstance(cell, dict):
+                    continue
+                text = cell.get("text")
+                if isinstance(text, str) and text:
+                    cell["text"] = repair_text(text)
+    return edited, rules, edits, review
+
+
+#: Slack, in PDF points, when finding the element a negation slash lies in.
+_OVERLAY_HOST_TOLERANCE = 1.5
+#: A text line is about this many slash heights tall (glyph plus leading).
+_OVERLAY_LINE_HEIGHTS = 1.25
+
+
+def _bbox(element: ManifestElement, page: int | None = None) -> tuple[int, Any] | None:
+    """``(page, box)`` of the element: on ``page`` when given, else the first boxed one.
+
+    An element can carry provenances on more than one page; a slash is only
+    compared with the part of an element that lies on the slash's own page.
+    """
+    for provenance in element.provenance or []:
+        if provenance.bbox is not None and page in (None, provenance.page_number):
+            return provenance.page_number, provenance.bbox
+    return None
+
+
+def _vertical(box: Any) -> tuple[float, float]:
+    """``(upper, lower)`` edges in a downward axis, whatever the box's origin."""
+    if box.coord_origin == "BOTTOMLEFT":
+        return -box.top, -box.bottom
+    return min(box.top, box.bottom), max(box.top, box.bottom)
+
+
+def _table_grid(element: ManifestElement) -> list[list[tuple[str, dict[str, Any] | None]]]:
+    """The table's rows on its visual column grid: a cell spanning ``n`` columns
+    takes ``n`` slots, its text in the first, so a slash's column position
+    matches the cell under it. Row spans are not expanded (the slash's row is
+    estimated from the AST rows), and every column is taken as equally wide —
+    the AST carries no widths; ``locate_in_grid``'s margin refuses close calls.
+    """
+    table_ast = element.metadata.get("table_ast")
+    if not isinstance(table_ast, dict):
+        return []
+    grid: list[list[tuple[str, dict[str, Any] | None]]] = []
+    for section in _TABLE_SECTIONS:
+        for row in table_ast.get(section) or []:
+            if not isinstance(row, dict):
+                continue
+            slots: list[tuple[str, dict[str, Any] | None]] = []
+            for cell in row.get("cells") or []:
+                if not isinstance(cell, dict):
+                    continue
+                span = max(1, int(cell.get("colspan") or 1))
+                slots.append((str(cell.get("text") or ""), cell))
+                slots.extend(("", None) for _ in range(span - 1))
+            grid.append(slots)
+    return grid
+
+
+def _reattach_negation_overlays(manifest: ProcessingManifest) -> dict[str, int]:
+    """Give each detached ``≠`` slash back to the relation it negates.
+
+    A legacy TeX text layer may extract the slash TeX lays over ``=`` as its own
+    element (``U+0338`` alone), leaving ``h = 0`` where the page says
+    ``h ≠ 0``. The slash's box is the only link back: the element containing it
+    is found on the same page, the slash's position inside it is estimated, and
+    ``docstruct.text.negation_overlay`` picks the relation only when the choice
+    is unambiguous — composing the wrong ``=`` would invert a true statement.
+    A formula whose text is already LaTeX (recognized, #253) is not touched.
+
+    Every slash element is then left out of the payload (``negation_overlay``
+    metadata, with the outcome: ``composed``, ``host-is-latex``, ``ambiguous``,
+    ``no-candidate``, ``ambiguous-host`` or ``no-host``), since a lone
+    combining mark says nothing to a reader. A slash already recorded is
+    skipped, so running the handler again (a plan retry) keeps the first
+    outcome instead of re-reading a host whose text it already changed.
+    Returns the count per outcome.
+
+    This runs only with the repair obligation (``LEGACY_UNICODE_REPAIR=repair``).
+    ``detect`` keeps its meaning — report, deliver as extracted — so there the
+    slash elements stay in the outputs, like every other legacy artifact.
+    """
+    outcomes: dict[str, int] = {}
+    overlays = [
+        element
+        for element in manifest.elements
+        if is_detached_overlay(element.text) and "negation_overlay" not in element.metadata
+    ]
+    for overlay in overlays:
+        located = _bbox(overlay)
+        outcome, host_id = "no-host", None
+        if located is not None:
+            page, box = located
+            x = (box.left + box.right) / 2
+            upper, lower = _vertical(box)
+            y = (upper + lower) / 2
+            slash_height = (lower - upper) or 12.0
+            hosts = []
+            for element in manifest.elements:
+                if element is overlay or is_detached_overlay(element.text):
+                    continue
+                other = _bbox(element, page)
+                if other is None:
+                    continue
+                top, bottom = _vertical(other[1])
+                if (
+                    other[1].left - _OVERLAY_HOST_TOLERANCE <= x <= other[1].right + _OVERLAY_HOST_TOLERANCE
+                    and top - _OVERLAY_HOST_TOLERANCE <= y <= bottom + _OVERLAY_HOST_TOLERANCE
+                ):
+                    hosts.append((element, other[1], top, bottom))
+            if len(hosts) > 1:
+                outcome = "ambiguous-host"
+            elif hosts:
+                host, host_box, top, bottom = hosts[0]
+                host_id = host.id
+                height = max(bottom - top, 1e-6)
+                width = max(host_box.right - host_box.left, 1e-6)
+                # The host tolerance lets a slash sit just outside the box:
+                # clamp once, so the text and the grid paths see the same span.
+                y_fraction = min(max((y - top) / height, 0.0), 1.0)
+                x_fraction = min(max((x - host_box.left) / width, 0.0), 1.0)
+                outcome = _compose_in_host(host, x_fraction, y_fraction, height, slash_height)
+                if outcome == "composed":
+                    host.metadata["negation_overlays"] = host.metadata.get("negation_overlays", 0) + 1
+        overlay.metadata["negation_overlay"] = {"outcome": outcome, "host": host_id}
+        outcomes[outcome] = outcomes.get(outcome, 0) + 1
+    if outcomes:
+        logger.info("Detached negation slashes: {}", outcomes)
+    return outcomes
+
+
+def _compose_in_host(
+    host: ManifestElement,
+    x_fraction: float,
+    y_fraction: float,
+    height: float,
+    slash_height: float,
+) -> str:
+    """Negate the relation under the slash in ``host``; returns the outcome.
+
+    A relation inside an inline ``$…$`` span is not a candidate: the font
+    detection built that span from the text layer, slash included (#260).
+    """
+    if host.type == "table":
+        grid = _table_grid(host)
+        texts = [[mask_inline_math(text) for text, _ in row] for row in grid]
+        if not any(negates(char) for row in texts for text in row for char in text):
+            return "no-candidate"
+        columns = max((len(row) for row in grid), default=0)
+        found = locate_in_grid(
+            texts,
+            row_position=y_fraction * len(grid),
+            column_position=x_fraction * columns,
+        )
+        if found is None:
+            return "ambiguous"
+        row, column, index = found
+        cell = grid[row][column][1]
+        if cell is None:
+            return "ambiguous"
+        cell["text"] = compose_negation(str(cell["text"]), index)
+        return "composed"
+    if host.type == "formula" and has_latex_markup(host.text):
+        return "host-is-latex"
+    text = host.text or ""
+    prose = mask_inline_math(text)
+    if not any(negates(char) for char in prose):
+        return "no-candidate"
+    lines = max(1, round(height / (slash_height * _OVERLAY_LINE_HEIGHTS)))
+    index = locate_in_text(
+        prose, lines=lines, line_position=y_fraction * lines, x_fraction=x_fraction
+    )
+    if index is None:
+        return "ambiguous"
+    host.text = compose_negation(text, index)
+    return "composed"
+
+
+def _handle_unicode_repair_method(
+    manifest: ProcessingManifest, obligation_id: str
+) -> MethodResult:
+    """Repair legacy Unicode: NFD, dotless i, spacing diacritics, the crase and split ligatures.
+
+    Only selected, prose-like elements are touched. Word-internal spacing
+    accents are repaired whenever the element shows them; standalone accents
+    are only repaired when the document has enough word-internal evidence
+    (recorded in the manifest observation). The decision metadata records the
+    edits and keeps ``needs_review`` for signals that remain, without copying
+    the whole text into the manifest.
+    """
+    elements = _target_elements(manifest, obligation_id)
+    if not elements:
+        return _missing_obligation(obligation_id)
+
+    # Before the per-element repair, so the reattached ``≠`` is in the text
+    # the repair reads, and the slash elements are not counted for review.
+    _reattach_negation_overlays(manifest)
+
+    language = manifest.language or "pt-BR"
+    eligible: list[tuple[ManifestElement, str]] = []
+    detections: dict[str, Detection] = {}
+    for element in elements:
+        text = unicode_repair_text(element)
+        if not text or is_detached_overlay(element.text):
+            continue
+        if element.type == "table":
+            block_type = "table"
+        else:
+            block_type = _UNICODE_REPAIR_BLOCK_TYPES.get(element.type)
+            if block_type is None:
+                continue
+        eligible.append((element, block_type))
+        detections[element.id] = detect_legacy_unicode(text)
+
+    if not eligible:
+        return MethodResult(
+            success=False,
+            validated=False,
+            message="Nenhum texto elegível para reparo Unicode",
+        )
+
+    # The threshold is document-level. The builder emits one obligation for all
+    # eligible elements, and records the count in its observation; read it from
+    # there so a future split of the obligation cannot change the decision.
+    observation = next(
+        (
+            item
+            for item in getattr(manifest, "observations", [])
+            if item.kind == "repair-legacy-unicode-detected"
+        ),
+        None,
+    )
+    if observation is not None and "spacing_word_internal" in observation.evidence:
+        word_internal = int(observation.evidence["spacing_word_internal"])
+    else:
+        word_internal = sum(
+            detection.spacing_word_internal for detection in detections.values()
+        )
+    allow_standalone = word_internal >= _UNICODE_STANDALONE_SPACING_MIN
+    inspected = len(eligible)
+    repaired = 0
+    review = 0
+    for element, block_type in eligible:
+        detection = detections[element.id]
+        original = element.text or ""
+        # A word-internal spacing accent (``C´ alculo``) is legacy extraction
+        # evidence. Standalone accents (separated from their word) are only
+        # included when the document has enough of the word-internal shape;
+        # the lib never touches protected spans. The crase and split-ligature
+        # rules rest on that same document-level evidence alone: an element
+        # may carry ``` a`` or ``fi ca`` without any spaced accent of its own.
+        allow_spacing = detection.spacing_diacritics > 0
+        context = UnicodeRepairContext(
+            language=language,
+            block_type="prose" if block_type == "table" else block_type,
+            page=element.page_number,
+            allow_spacing_diacritics=allow_spacing,
+            allow_standalone_spacing_diacritics=allow_spacing and allow_standalone,
+            allow_legacy_tex_artifacts=allow_standalone,
+        )
+        if block_type == "table":
+            edited, rules, edits, needs_review = _repair_table_cells(
+                element, context
+            )
+            if edited:
+                repaired += 1
+            if needs_review:
+                review += 1
+            element.metadata["unicode_repair"] = {
+                "edited": edited,
+                "rules": sorted(rules),
+                "edits": edits,
+                "needs_review": needs_review,
+                "confidence": None,
+            }
+            continue
+        decision = repair_legacy_unicode(original, context=context)
+        if decision.repaired != original:
+            element.text = decision.repaired
+            repaired += 1
+        element.metadata["unicode_repair"] = {
+            "edited": decision.repaired != original,
+            "rules": sorted({edit.rule for edit in decision.edits}),
+            "edits": len(decision.edits),
+            "needs_review": decision.needs_review,
+            "confidence": decision.confidence,
+        }
+        if decision.needs_review:
+            review += 1
+    return MethodResult(
+        success=True,
+        validated=True,
+        message=(
+            f"Reparo Unicode aplicado em {repaired}/{inspected} elemento(s); "
+            f"{review} para revisão"
+        ),
+    )
+
+
 def _render_inspection_region(
     source: Path,
     element: ManifestElement,
@@ -562,7 +1002,7 @@ def _inspect_region(image: bytes, number: int, total_pages: int, mode: str) -> V
     async def inspect():
         return await VisionAgent(mode=mode).describe_region(
             image_bytes=image, classification="embedded_image", page_num=number,
-            total_pages=total_pages, mode=mode,
+            total_pages=total_pages, mode=mode, full_budget=True,
         )
 
     try:
@@ -1115,6 +1555,9 @@ class _SecondaryExtraction:
     #: page number -> raw elements of the secondary provider, in reading order.
     pages: dict[int, list[dict[str, Any]]]
     sizes: dict[int, tuple[float, float]]
+    #: page number -> primary elements of a page the manifest took from the
+    #: secondary provider (fusion.apply_page_routes), in reading order.
+    replaced_primary: dict[int, list[dict[str, Any]]] = field(default_factory=dict)
 
     def bbox(self, element: dict[str, Any]) -> _Box | None:
         """Normalized box of a raw Toolbox element (same frame as _element_bbox)."""
@@ -1200,7 +1643,18 @@ def _load_secondary_extraction(
         page = _page_number(element.get("page_number"))
         if page is not None:
             pages.setdefault(page, []).append(element)
-    return _SecondaryExtraction(str(data.get("provider") or ""), pages, sizes), ""
+    replaced: dict[int, list[dict[str, Any]]] = {}
+    for key, rows in (data.get("replaced_primary_pages") or {}).items():
+        page = _page_number(key)
+        if page is not None and isinstance(rows, list):
+            replaced[page] = sorted(
+                (row for row in rows if isinstance(row, dict)),
+                key=lambda row: row.get("reading_order") or 0,
+            )
+    return (
+        _SecondaryExtraction(str(data.get("provider") or ""), pages, sizes, replaced),
+        "",
+    )
 
 
 def _provider_pair_problem(
@@ -1595,15 +2049,20 @@ def _handle_vlm_pairwise_judge_method(
 
     The Toolbox (``document.adjudicate.page``) returns the position-debiased
     probability that the secondary page is the more faithful transcription.
-    Only pages where the two transcriptions diverge are judged
-    (``should_judge``); the others keep the primary page without a call. Of
+    Candidate A is the page the manifest carries and B the other provider's:
+    the secondary page, or, on a page the deterministic router already took
+    from the secondary provider (its elements carry that ``metadata.provider``),
+    the primary elements it replaced. Such a page without the replaced elements
+    in the artifact is skipped: comparing it with the secondary page would
+    compare MinerU with itself and report a confirmation. Only pages
+    where the two transcriptions diverge are judged (``should_judge``). Of
     docstruct's two-threshold rule (``decide_pair``) only the ``p_new >
     DEFAULT_NEW_THR`` branch applies: there is no previous judge to consult
-    here. As with ``agreement-rule``, a kept primary page satisfies the
-    obligation, and a preferred secondary page is recorded in
-    ``page_judgement`` but not swapped in: the method fails and the obligation
-    goes to ``human-review``. An answer without a valid ``pB`` fails the method
-    instead of counting as a kept primary.
+    here. A confirmed page satisfies the obligation; a preferred alternative is
+    recorded in ``page_judgement`` but not swapped in (that would reopen the
+    manifest mid-plan), so the method fails and the non-critical obligation
+    becomes a technical warning. An answer without a valid ``pB`` fails the
+    method instead of counting as a confirmation.
     """
     from docstruct.fusion.judge import DEFAULT_NEW_THR, should_judge
 
@@ -1624,14 +2083,36 @@ def _handle_vlm_pairwise_judge_method(
     source_path = Path(manifest.source.path)
     judgements: dict[int, dict[str, Any]] = {}
     for page_number in sorted({e.page_number for e in elements if e.page_number}):
-        primary_md = _page_markdown(
-            (element.type, element.text)
+        page_elements = [
+            element
             for element in sorted(manifest.elements, key=lambda e: e.reading_order)
             if element.page_number == page_number
+        ]
+        adopted = any(
+            element.metadata.get("provider") == secondary.provider
+            for element in page_elements
+        )
+        if adopted:
+            if page_number not in secondary.replaced_primary:
+                logger.warning(
+                    "vlm-pairwise-judge: page {} came from {}, but the artifact does not "
+                    "keep the {} page it replaced; skipped",
+                    page_number,
+                    secondary.provider,
+                    primary_name,
+                )
+                continue
+            content, other = secondary.provider, primary_name
+            other_blocks = secondary.replaced_primary[page_number]
+        else:
+            content, other = primary_name, secondary.provider
+            other_blocks = secondary.pages.get(page_number, [])
+        primary_md = _page_markdown(
+            (element.type, element.text) for element in page_elements
         )
         secondary_md = _page_markdown(
             (str(block.get("type") or ""), block.get("text"))
-            for block in secondary.pages.get(page_number, [])
+            for block in other_blocks
         )
         if not primary_md.strip() or not secondary_md.strip():
             logger.info(
@@ -1639,7 +2120,9 @@ def _handle_vlm_pairwise_judge_method(
             )
             continue
         if not should_judge(primary_md, secondary_md):
-            judgements[page_number] = {"choice": primary_name, "pB": None, "reason": "agree"}
+            judgements[page_number] = {
+                "content": content, "choice": content, "pB": None, "reason": "agree",
+            }
             continue
 
         try:
@@ -1690,7 +2173,8 @@ def _handle_vlm_pairwise_judge_method(
                 ),
             )
         judgements[page_number] = {
-            "choice": secondary.provider if p_b > DEFAULT_NEW_THR else primary_name,
+            "content": content,
+            "choice": other if p_b > DEFAULT_NEW_THR else content,
             "pB": p_b,
             "pB_ab": document.get("pB_ab"),
             "pA_ba": document.get("pA_ba"),
@@ -1711,24 +2195,29 @@ def _handle_vlm_pairwise_judge_method(
     preferred = {
         page: judgement
         for page, judgement in judgements.items()
-        if judgement["choice"] != primary_name
+        if judgement["choice"] != judgement["content"]
     }
     if preferred:
         return MethodResult(
             success=False,
             validated=False,
             message=(
-                "Juiz VLM prefere o provider secundário ("
-                + ", ".join(f"p{page}: pB={j['pB']:.2f}" for page, j in sorted(preferred.items()))
+                "Juiz VLM prefere o outro provider ("
+                + ", ".join(
+                    f"p{page}: {j['choice']} pB={j['pB']:.2f}"
+                    for page, j in sorted(preferred.items())
+                )
                 + "); a troca de página não é aplicada automaticamente"
             ),
         )
     return MethodResult(
         success=True,
         validated=True,
-        message="Juiz VLM mantém o provider primário nas páginas "
+        message="Juiz VLM confirma a página aplicada: "
         + ", ".join(
-            f"{page} (pB={j['pB']:.2f})" if j["pB"] is not None else f"{page} (concordam)"
+            f"{page} ({j['content']}, pB={j['pB']:.2f})"
+            if j["pB"] is not None
+            else f"{page} ({j['content']}, concordam)"
             for page, j in sorted(judgements.items())
         ),
     )
@@ -1890,6 +2379,7 @@ DETERMINISTIC_METHOD_HANDLERS: dict[
     "vision-page-inspection": _handle_vision_page_inspection_method,
     "latex-normalizer": _handle_latex_normalizer_method,
     "norm-fix": _handle_norm_fix_method,
+    "unicode-repair": _handle_unicode_repair_method,
     "rep-guard": _handle_repetition_guard_method,
     "line-number-extractor": _handle_extract_line_numbers_method,
     "verse-chunker": _handle_chunk_verse_method,
@@ -1901,6 +2391,34 @@ DETERMINISTIC_METHOD_HANDLERS: dict[
     "agreement-rule": _handle_agreement_rule_method,
     "deterministic-heading-repair": _handle_deterministic_heading_repair_method,
 }
+
+
+def _reusable_fusion_payload(manifest: ProcessingManifest) -> dict | None:
+    from dataclasses import asdict
+
+    from docstruct.policy import FusionPolicy
+
+    from backend.services.cache import processing_cache_configuration
+
+    ref = manifest.extractor.configuration.get("fusion_reuse") or {}
+    try:
+        content = Path(ref["path"]).read_bytes()
+        if hashlib.sha256(content).hexdigest() != ref["sha256"]:
+            return None
+        record = json.loads(content)
+        if record["source_sha256"] != manifest.source.sha256:
+            return None
+        expected_policy = manifest.extractor.configuration.get("fusion_policy")
+        if expected_policy is None:
+            expected_policy = asdict(FusionPolicy())
+        if record.get("policy") != expected_policy:
+            return None
+        if json.dumps(record["configuration"], sort_keys=True) != json.dumps(processing_cache_configuration(), sort_keys=True):
+            return None
+        payload = record["payload"]
+        return payload if isinstance(payload, dict) else None
+    except (OSError, KeyError, TypeError, ValueError):
+        return None
 
 
 def _handle_dual_provider_fusion_method(
@@ -1917,14 +2435,8 @@ def _handle_dual_provider_fusion_method(
     Em modo single (FUSION_MODE=single) o método não é admissível e não
     deve ser selecionado pelo compilador.
 
-    Custo: a fusão reextrai o documento inteiro nos dois providers, sem
-    reutilizar a evidência que o ``ToolboxManifestExtractor`` já coletou em
-    ``FUSION_MODE=dual``. Cada passo ``fuse-providers`` paga, portanto, uma
-    extração dual completa (cache remoto da Toolbox à parte). Em regra o
-    documento não é reenviado: os dois providers leem o ``artifact_id`` que o
-    extrator registrou em ``manifest.extractor.configuration``. Se a Toolbox
-    não tiver mais esse artefato (expirado/removido), ``extract_fused`` faz o
-    upload do arquivo como fallback.
+    Reutiliza a fusão inicial quando hash, documento e configuração coincidem.
+    Evidência ausente, corrompida ou incompatível provoca reextração dual.
     """
     obligation = next(
         (o for o in manifest.obligations if o.id == obligation_id), None
@@ -1939,7 +2451,16 @@ def _handle_dual_provider_fusion_method(
     # Reuse the document the structure extractor already stored in the Toolbox.
     artifact_id = _source_artifact_id(manifest)
     try:
-        payload = _run_extract_fused(source_path, artifact_id=artifact_id)
+        payload = _reusable_fusion_payload(manifest)
+        if payload is None:
+            from docstruct.policy import FusionPolicy
+
+            policy_config = manifest.extractor.configuration.get("fusion_policy")
+            policy = FusionPolicy.from_dict(policy_config) if policy_config else None
+            if policy is None:
+                payload = _run_extract_fused(source_path, artifact_id=artifact_id)
+            else:
+                payload = _run_extract_fused(source_path, artifact_id=artifact_id, policy=policy)
     except Exception as exc:  # noqa: BLE001
         return MethodResult(
             success=False,
@@ -2063,7 +2584,19 @@ def _fused_text_elements(
 def _handle_single_provider_method(
     manifest: ProcessingManifest, obligation_id: str
 ) -> MethodResult:
-    """Run the configured provider as a real fallback after dual fusion fails."""
+    """Satisfy ``fuse-providers`` with the extraction the manifest already carries.
+
+    There is nothing to re-run: the manifest's elements are the configured
+    provider's extraction, with the pages the deterministic router took from
+    the secondary provider in dual mode (``fusion.apply_page_routes``). The
+    method does not claim a single-provider document; it checks only that the
+    manifest was extracted by the configured provider and has content. It used
+    to extract the whole document again, uploaded anew and with the Toolbox
+    cache off, once per ``fuse-providers`` step, and changed nothing in the
+    manifest: a full extraction of cost for no content.
+    """
+    from backend.config.settings import settings
+
     obligation = next(
         (item for item in manifest.obligations if item.id == obligation_id), None
     )
@@ -2076,44 +2609,35 @@ def _handle_single_provider_method(
             message="single-provider só é válido para fuse-providers",
         )
 
-    source_path = Path(manifest.source.path)
-    if not source_path.is_file():
+    provider = str(manifest.extractor.configuration.get("toolbox_provider") or "")
+    if not provider:
         return MethodResult(
             success=False,
             validated=False,
-            message=f"Documento-fonte indisponível: {source_path}",
+            message="The manifest does not record the provider it was extracted by",
         )
-    try:
-        payload = _run_extract_single_provider(source_path)
-    except Exception as exc:  # noqa: BLE001
+    if provider != settings.toolbox_provider:
         return MethodResult(
             success=False,
             validated=False,
             message=(
-                "Extração single-provider falhou: "
-                f"{type(exc).__name__}: {exc}"
+                f"The manifest was extracted by {provider}, not by the configured "
+                f"provider ({settings.toolbox_provider})"
             ),
         )
-
-    provider = str(payload.get("provider") or "")
-    if payload.get("status") != "succeeded" or not provider or "+" in provider:
+    if not manifest.elements:
         return MethodResult(
             success=False,
             validated=False,
-            message="A Toolbox não confirmou uma extração de provider único",
+            message="The manifest extraction has no elements",
         )
-
-    artifact = _persist_fusion_payload(
-        manifest,
-        payload,
-        obligation_id,
-        kind="single-provider-payload",
-    )
     return MethodResult(
         success=True,
         validated=True,
-        message=f"Fallback single-provider concluído ({provider})",
-        artifacts=[artifact],
+        message=(
+            f"The manifest already carries the extraction ({provider}); "
+            "nothing to re-extract"
+        ),
     )
 
 
@@ -2161,26 +2685,49 @@ class DocumentTooLargeError(ValueError):
     """The document has more pages than ``MAX_PAGES`` (job-level failure)."""
 
 
-def _check_page_limit(manifest: ProcessingManifest) -> None:
-    """Refuses a document with more pages than ``MAX_PAGES``.
+def _check_page_count(page_count: int) -> None:
+    """Reject an oversized document as a whole with a user-facing message.
 
-    It runs right after the structural extraction, the first point where the
-    page count is always known, and before planning and the vision-model
-    calls. Nothing is processed partially, and the message, which reaches the
-    end user, names the page count and the limit.
+    A verified PDF count may be checked before costly extraction. The
+    authoritative manifest count is checked afterwards for every format,
+    including those without a reliable preflight count. Neither check allows
+    partial processing beyond MAX_PAGES.
 
     Raises:
-        DocumentTooLargeError: When the manifest has more pages than the limit.
+        DocumentTooLargeError: When the page count exceeds MAX_PAGES.
     """
     from backend.config.settings import settings
 
-    page_count = len(manifest.pages)
     if page_count > settings.max_pages:
         raise DocumentTooLargeError(
             t(STAGE_DOCUMENT_TOO_MANY_PAGES).format(
                 page_count=page_count, max_pages=settings.max_pages
             )
         )
+
+
+def _check_page_limit_before_extraction(inspection: dict[str, Any] | None) -> None:
+    """Reject only PDF counts verified by the existing remote PDF parser.
+
+    Scanned content streams, unknown counts and non-PDF formats are not a
+    reliable early limit. They retain the authoritative post-extraction check.
+    No local operational parser is introduced (ADR-0003).
+    """
+    if not isinstance(inspection, dict):
+        return
+    count = inspection.get("page_count")
+    if (
+        inspection.get("is_pdf") is True
+        and inspection.get("page_count_source") == "pymupdf"
+        and type(count) is int
+        and count > 0
+    ):
+        _check_page_count(count)
+
+
+def _check_page_limit(manifest: ProcessingManifest) -> None:
+    """Authoritative limit after extraction, including formats without preflight."""
+    _check_page_count(len(manifest.pages))
 
 
 class PddlAccessibilityOrchestrator:
@@ -2266,7 +2813,7 @@ class PddlAccessibilityOrchestrator:
         self,
         file_path: Path,
         tmpdir: Path,
-        status_callback: Callable[[str], Coroutine] | None = None,
+        status_callback: Callable[[str], Coroutine[Any, Any, None]] | None = None,
         mode: str | None = None,
         structured_output: bool = False,
         custom_prompt: str | None = None,
@@ -2277,13 +2824,21 @@ class PddlAccessibilityOrchestrator:
         if custom_prompt or thinking_mode:
             raise ValueError("Custom instructions and thinking mode are unavailable for this pipeline")
 
+        source_path = file_path.resolve()
+        # media.inspect runs first: a slide deck is extracted and structured
+        # slide by slide, which has to be decided before extraction.
+        media_inspection, media_configuration = await _inspect_media(source_path)
+        _check_page_limit_before_extraction(media_inspection)
+        presentation = _is_presentation(media_inspection)
+
         if status_callback:
             await status_callback(t(STAGE_ANALYZING_STRUCTURAL))
         try:
             manifest = await run_blocking(
                 self.information_structural.process,
-                file_path.resolve(),
+                source_path,
                 language="pt-BR",
+                presentation=presentation,
             )
         except ToolboxError as exc:
             # The SDK already retried and failed over; there is no local
@@ -2299,17 +2854,35 @@ class PddlAccessibilityOrchestrator:
             ) from exc
         _check_page_limit(manifest)
         manifest.extractor.configuration["region_inspection_mode"] = effective_mode
-
-        source_path = file_path.resolve()
-        media_inspection = await _inspect_media_or_degrade(manifest, source_path)
+        manifest.extractor.configuration.update(media_configuration)
 
         if status_callback:
             await status_callback(t(STAGE_ENRICHING_IMAGE_DESCRIPTIONS))
+        # Pictures, formulas and tables reach the vision provider from the
+        # same pipeline, so one that went down does not get called again for
+        # every remaining object.
+        from backend.config.settings import settings
+
+        breaker = ProviderBreaker(settings.vision_breaker_threshold)
+        await _classify_formula_regions(
+            manifest, source_path, mode=effective_mode, breaker=breaker,
+        )
         await _enrich_picture_descriptions(
             manifest,
             source_path,
             mode=effective_mode,
             media_inspection=media_inspection,
+            status_callback=status_callback,
+            breaker=breaker,
+        )
+        text_spans = _TextSpanReader(manifest, source_path)
+        await _mark_inline_math(manifest, source_path, text_spans)
+        await _enrich_formula_latex(
+            manifest,
+            source_path,
+            mode=effective_mode,
+            status_callback=status_callback,
+            breaker=breaker,
         )
 
         if status_callback:
@@ -2317,7 +2890,11 @@ class PddlAccessibilityOrchestrator:
         await _enrich_table_structures(
             manifest,
             file_path.resolve(),
+            status_callback=status_callback,
+            breaker=breaker,
         )
+        # After the table enrichment, which can replace a table's cells.
+        await _mark_table_inline_math(manifest, source_path, text_spans)
 
         if status_callback:
             await status_callback(t(STAGE_GENERATING_PDDL_PLAN))
@@ -2341,11 +2918,13 @@ class PddlAccessibilityOrchestrator:
         # whether the executor ran at all, so setting it to false produced a plan
         # that was never executed and a report of None. Real execution is now the
         # other branch instead of silence.
+        loop = asyncio.get_running_loop()
         manifest, execution_report = await run_blocking(
             self.executor.execute,
             plan,
             manifest,
             dry_run=self.execute_dry_run,
+            progress=_plan_progress(manifest, status_callback, loop),
         )
 
         # A `replan-required` report means the executor recorded `(tried ?o ?m)`
@@ -2367,10 +2946,7 @@ class PddlAccessibilityOrchestrator:
                 obligation for obligation in manifest.obligations
                 if obligation.status == "failed"
             ]
-            if any(
-                obligation.kind not in NON_CRITICAL_OBLIGATION_KINDS
-                for obligation in exhausted
-            ):
+            if any(_blocks_delivery(obligation, manifest) for obligation in exhausted):
                 break
             roots = _replannable_obligation_ids(manifest)
             if not roots:
@@ -2393,16 +2969,24 @@ class PddlAccessibilityOrchestrator:
                 plan,
                 manifest,
                 dry_run=False,
+                progress=_plan_progress(manifest, status_callback, loop),
             )
 
         if execution_report.status not in {"completed", "dry-run-completed"}:
             unsatisfied = _unsatisfied_selected_obligations(manifest)
             critical = [
                 obligation for obligation in unsatisfied
-                if obligation.kind not in NON_CRITICAL_OBLIGATION_KINDS
+                if _blocks_delivery(obligation, manifest)
             ]
             if not unsatisfied or critical:
-                raise RuntimeError(_unsatisfied_execution_message(manifest))
+                # The ids name every target element and run to kilobytes on a
+                # long document, so they go to the log; the job error, which
+                # reaches the user by e-mail, says what is open and where.
+                logger.warning(
+                    "PDDL: unsatisfied obligations: {}",
+                    ", ".join(obligation.id for obligation in unsatisfied),
+                )
+                raise RuntimeError(_unsatisfied_summary(manifest))
             # Only refinements are left open; the extracted content is still
             # complete, so the document is delivered with a technical warning.
             logger.warning(
@@ -2484,13 +3068,35 @@ class PddlAccessibilityOrchestrator:
         return sorted(requested - registered)
 
 
+#: Why a picture was left undescribed, recorded in metadata["vision_failure_reason"]
+#: for the operator: the crop could not be rendered, the vision call failed (its
+#: error goes to metadata["vision_failure_detail"]), or the answer had no text.
+VisionFailureReason = Literal["crop_unavailable", "model_failed", "empty_description"]
+
+
+def _record_vision_failure(
+    element: ManifestElement, reason: VisionFailureReason, detail: str | None = None
+) -> None:
+    """Mark ``element`` as undescribed and say why, so a later pass describes it again."""
+    element.metadata.pop("vision_description_complete", None)
+    element.metadata["vision_failure_reason"] = reason
+    if detail:
+        element.metadata["vision_failure_detail"] = detail
+    else:
+        element.metadata.pop("vision_failure_detail", None)
+
+
 async def _enrich_picture_descriptions(
     manifest: ProcessingManifest,
     source_file: Path,
     *,
     mode: str,
     media_inspection: dict[str, Any] | None = None,
+    status_callback: Callable[[str], Coroutine[Any, Any, None]] | None = None,
+    breaker: ProviderBreaker | None = None,
 ) -> None:
+    from backend.config.settings import settings
+
     _inject_full_page_picture(manifest, media_inspection)
 
     pictures = [
@@ -2521,103 +3127,1050 @@ async def _enrich_picture_descriptions(
         return
 
     vision = VisionAgent(mode=mode)
+    breaker = breaker or ProviderBreaker(settings.vision_breaker_threshold)
     total_pages = len(manifest.pages)
-    enriched = 0
 
-    for element in pictures:
+    # Descriptions are independent, so they run concurrently, bounded by
+    # VISION_CONCURRENCY to stay inside what the model provider accepts (a
+    # rate-limited hosted API, or a local Ollama that queues beyond its own
+    # parallelism). The progress callback is serialized separately: two
+    # admitted tasks would otherwise interleave the state writes behind it
+    # (the API's status persistence, the Telegram progress message), and even
+    # serialized the emission order may vary with completion, so nothing here
+    # promises FIFO delivery.
+    slots = asyncio.Semaphore(max(1, settings.vision_concurrency))
+    progress_lock = asyncio.Lock()
+
+    async def describe_one(position: int, element: ManifestElement) -> bool:
+        """Describe one picture and fold the answer into it; True when enriched."""
         fallback_page_number = element.page_number
         if fallback_page_number is None and len(manifest.pages) == 1:
             fallback_page_number = manifest.pages[0].page_number
 
-        image_bytes, page_number = await run_blocking(
-            _extract_picture_bytes,
-            source_file,
-            element,
-            fallback_page_number,
-            _source_artifact_id(manifest),
-            manifest.source.media_type,
-        )
-        if not image_bytes:
-            continue
+        async with slots:
+            if status_callback:
+                async with progress_lock:
+                    await status_callback(
+                        t(STAGE_DESCRIBING_IMAGE).format(
+                            current=position,
+                            total=len(pictures),
+                            pages=_pages_label([fallback_page_number], len(manifest.pages)),
+                        )
+                    )
+            if breaker.open:
+                _record_vision_failure(element, "model_failed", breaker.skip_detail())
+                return False
+            image_bytes, page_number = await run_blocking(
+                _extract_picture_bytes,
+                source_file,
+                element,
+                fallback_page_number,
+                _source_artifact_id(manifest),
+                manifest.source.media_type,
+            )
+            if not image_bytes:
+                _record_vision_failure(element, "crop_unavailable")
+                return False
 
-        vision_output = await vision.describe_region(
-            image_bytes=image_bytes,
-            classification="embedded_image",
-            page_num=page_number,
-            total_pages=total_pages,
-            mode=mode,
-        )
-        if isinstance(vision_output, VisionOutput):
-            element.metadata["vision_description_complete"] = True
-            element.metadata["vision_language"] = vision_output.language
-            element.metadata["vision_confidence"] = vision_output.confidence
-            element.metadata["vision_elements"] = list(vision_output.mentioned_elements)
-            if vision_output.warnings:
-                element.metadata["vision_warnings"] = list(vision_output.warnings)
+            errors: list[str] = []
+            vision_output = await vision.describe_region(
+                image_bytes=image_bytes,
+                # A whole presentation slide gets the page prompt and budget.
+                classification=(
+                    "full_page_image" if element.metadata.get("slide_visual") else "embedded_image"
+                ),
+                page_num=page_number,
+                total_pages=total_pages,
+                mode=mode,
+                errors=errors,
+            )
+            breaker.record(isinstance(vision_output, VisionOutput))
 
-            if vision_output.kind == "formula":
-                element.text = vision_output.formula_latex or ""
-                if element.type != "formula":
-                    previous_type = element.type
-                    element.metadata["original_type"] = element.type
-                    element.type = "formula"
-                    element.raw_label = "formula"
-                    reconcile_reclassified_element_processing_needs(
-                        manifest,
-                        element,
-                        previous_type=previous_type,
-                    )
-            else:
-                element.text = vision_output.description
-                if element.type != "picture":
-                    previous_type = element.type
-                    element.metadata["original_type"] = element.type
-                    element.type = "picture"
-                    element.raw_label = "picture"
-                    reconcile_reclassified_element_processing_needs(
-                        manifest,
-                        element,
-                        previous_type=previous_type,
-                    )
-            if element.page_number is None and page_number >= 1:
-                element.page_number = page_number
-            # A model that answers with an empty description used to be counted as
-            # an enrichment, producing an element that still had no text and an
-            # obligation that could not be satisfied. Report it so the operator
-            # sees the model refused instead of a silent gap.
-            if _has_meaningful_text(element):
-                enriched += 1
-            else:
-                logger.warning(
-                    t(LOG_PDDL_EMPTY_VISION_DESCRIPTION).format(
-                        element_id=element.id
-                    )
+        if not isinstance(vision_output, VisionOutput):
+            _record_vision_failure(element, "model_failed", errors[-1] if errors else None)
+            return False
+
+        logger.debug(
+            t(LOG_VISION_ELEMENT_DESCRIPTION).format(
+                element_id=element.id,
+                page_num=page_number,
+                chars=len(vision_output.description),
+                description=vision_output.description,
+            )
+        )
+        element.metadata["vision_language"] = vision_output.language
+        element.metadata["vision_confidence"] = vision_output.confidence
+        element.metadata["vision_elements"] = list(vision_output.mentioned_elements)
+        if vision_output.warnings:
+            element.metadata["vision_warnings"] = list(vision_output.warnings)
+
+        if vision_output.kind == "formula":
+            element.text = vision_output.formula_latex or ""
+            answered = bool(element.text.strip())
+            if element.type != "formula":
+                previous_type = element.type
+                element.metadata["original_type"] = element.type
+                element.type = "formula"
+                element.raw_label = "formula"
+                reconcile_reclassified_element_processing_needs(
+                    manifest,
+                    element,
+                    previous_type=previous_type,
                 )
+        else:
+            # An empty answer keeps text the extractor already had; whether
+            # that text is worth keeping is decided below.
+            answered = bool(vision_output.description.strip())
+            if answered:
+                element.text = vision_output.description
+            if element.type != "picture":
+                previous_type = element.type
+                element.metadata["original_type"] = element.type
+                element.type = "picture"
+                element.raw_label = "picture"
+                reconcile_reclassified_element_processing_needs(
+                    manifest,
+                    element,
+                    previous_type=previous_type,
+                )
+        if element.page_number is None and page_number >= 1:
+            element.page_number = page_number
+        # The model's own text stands however short ("Logo" is a description);
+        # text left over from the extractor after an empty answer must still be
+        # meaningful. Otherwise the picture is reported as undescribed, so the
+        # operator sees the model refused instead of a silent gap, and stays
+        # eligible for a later pass.
+        if answered or _has_meaningful_text(element):
+            element.metadata["vision_description_complete"] = True
+            element.metadata.pop("vision_failure_reason", None)
+            element.metadata.pop("vision_failure_detail", None)
+            return True
+        # What is left is an extractor placeholder ("body") or OCR noise, which
+        # must not become the alt text.
+        element.text = ""
+        _record_vision_failure(element, "empty_description")
+        logger.warning(
+            t(LOG_PDDL_EMPTY_VISION_DESCRIPTION).format(
+                element_id=element.id
+            )
+        )
+        return False
+
+    # The fold above touches only its own element and runs without awaits, so
+    # concurrent folds cannot interleave. The TaskGroup cancels the sibling
+    # descriptions when one of them fails and re-raises as an ExceptionGroup,
+    # matching the sequential stage this replaced — the first failure aborted
+    # the stage — without leaving tasks mutating the manifest after it failed.
+    async with asyncio.TaskGroup() as group:
+        tasks = [
+            group.create_task(describe_one(position, element))
+            for position, element in enumerate(pictures, start=1)
+        ]
+    enriched = sum(task.result() for task in tasks)
+    enriched += await _retry_failed(
+        [
+            (position, element)
+            for position, element in enumerate(pictures, start=1)
+            if element.metadata.get("vision_failure_reason") in _RETRIED_VISION_FAILURES
+        ],
+        describe_one,
+        kind="pictures",
+        breaker=breaker,
+    )
 
     if enriched:
         logger.info(t(LOG_PDDL_IMAGES_ENRICHED).format(count=enriched))
 
 
-async def _inspect_media_or_degrade(
-    manifest: ProcessingManifest,
-    source_path: Path,
-) -> dict[str, Any] | None:
-    """Runs ``media.inspect`` and degrades visibly when it fails.
+#: Picture failures a second try may fix: the provider gave no answer, or an
+#: empty one (empty answers are never cached, so the try reaches the model). A
+#: crop that could not be rendered will not render the second time either.
+_RETRIED_VISION_FAILURES = frozenset({"model_failed", "empty_description"})
 
-    The inspection only feeds the standalone-image heuristic, so no failure of
-    the step fails the job: any ``Exception`` (a ``ToolboxError``, but also an
-    SDK bug or a client configuration error) makes the run continue without
-    the signal, logs a warning and records the cause. Cancellation is not
-    caught, since ``asyncio.CancelledError`` derives from ``BaseException``.
 
-    The outcome goes to ``manifest.extractor.configuration``:
-    ``media_inspection`` is ``toolbox``, ``disabled`` (by
-    ``TOOLBOX_MEDIA_INSPECT_ENABLED``), ``source_missing`` or ``failed``, plus
-    ``media_inspection_error`` on failure.
+async def _retry_failed(
+    failed: list[tuple[int, ManifestElement]],
+    attempt: Callable[[int, ManifestElement], Coroutine[Any, Any, bool]],
+    *,
+    kind: str,
+    breaker: ProviderBreaker,
+) -> int:
+    """Try once more, one at a time, what a vision stage left without a
+    usable answer: the calls the model failed, and the pictures it answered
+    empty.
+
+    A provider that failed for a while (006.pdf v5 lost every picture after
+    slide 10) may be back after a wait. The breaker lets the first try through
+    even when open, and a failure of it opens the breaker again, so a provider
+    that is still down costs one call, not one per object. Returns how many
+    objects the pass enriched.
     """
     from backend.config.settings import settings
 
-    configuration = manifest.extractor.configuration
+    if not failed:
+        return 0
+    delay = max(0, settings.vision_retry_pass_delay_seconds)
+    kind_msgids = (
+        LOG_PDDL_VISION_RETRY_PASS_PICTURES
+        if kind == "pictures"
+        else LOG_PDDL_VISION_RETRY_PASS_TABLES
+    )
+    logger.warning(
+        n(*kind_msgids, len(failed)).format(count=len(failed), delay=delay)
+    )
+    await asyncio.sleep(delay)
+    breaker.probe()
+    enriched = 0
+    for position, element in failed:
+        enriched += await attempt(position, element)
+    return enriched
+
+
+def _formula_recognition_crop(
+    source_file: Path,
+    element: ManifestElement,
+    *,
+    artifact_id: str | None = None,
+    media_type: str | None = None,
+) -> tuple[bytes | None, int]:
+    """Crop to feed the formula recognizer, or ``None`` when there is no usable box.
+
+    A whole page is deliberately not a fallback: the chip models expect a
+    formula and would invent one from a page of prose. A saved
+    ``region_crop`` is reused when present, so a restored or resumed manifest
+    does not pay another render; in the normal flow region inspection runs
+    after planning, so a formula reaches this function without one (unless
+    its text normalizes to empty). Everything else is rendered from the
+    element's provenance box.
+    """
+    provenance = element.provenance[0] if element.provenance else None
+    page_number = (
+        provenance.page_number if provenance is not None else (element.page_number or 0)
+    )
+
+    saved = element.metadata.get("region_crop")
+    if isinstance(saved, str) and saved:
+        try:
+            return Path(saved).read_bytes(), page_number
+        except OSError:
+            logger.warning("Formula crop unreadable for {}: {}", element.id, saved)
+
+    if page_number < 1:
+        return None, 0
+    clip, origin = _picture_clip(provenance)
+    if clip is None:
+        return None, page_number
+    try:
+        page = _toolbox_render(
+            source_file,
+            page_number,
+            media_type=media_type,
+            dpi=200,
+            clip=clip,
+            clip_origin=origin,
+            artifact_id=artifact_id,
+        )
+    except Exception as exc:
+        # A DOCX has no page to render, and the Toolbox may refuse the box;
+        # both leave the formula without a crop instead of failing the job.
+        logger.warning(
+            "Formula crop failed for {} ({}): {}", element.id, type(exc).__name__, exc
+        )
+        return None, page_number
+    left, top, right, bottom = page.clip
+    if right - left < 4 or bottom - top < 4:
+        return None, page_number
+    return page.image, page_number
+
+
+def _ranked_formula_candidates(candidates: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Candidates with LaTeX, normalized, by decreasing confidence.
+
+    ``math.recognize`` returns one entry per detected expression; a chip should
+    hold one, but a provider may return several. A confidence that is not a
+    finite number (missing, a bool, NaN, infinity) becomes ``None`` in the
+    candidate and ranks as 0, so the order stays total and no such value
+    reaches the manifest; ties keep the provider's order.
+    """
+    ranked: list[tuple[float, dict[str, Any]]] = []
+    for candidate in candidates:
+        latex = normalize_latex(str(candidate.get("latex") or ""))
+        if not latex:
+            continue
+        confidence = candidate.get("confidence")
+        if (
+            isinstance(confidence, bool)
+            or not isinstance(confidence, (int, float))
+            or not math.isfinite(confidence)
+        ):
+            confidence = None
+        score = 0.0 if confidence is None else float(confidence)
+        ranked.append((score, {**candidate, "latex": latex, "confidence": confidence}))
+    ranked.sort(key=lambda pair: -pair[0])
+    return [candidate for _, candidate in ranked]
+
+
+#: Element types whose text the exporters render as prose with inline math.
+_INLINE_MATH_ELEMENT_TYPES = frozenset({"paragraph", "list_item", "caption", "footnote"})
+#: Points a span's centre may lie outside its element's box.
+_INLINE_MATH_BOX_TOLERANCE = 2.0
+
+
+class _TextSpanReader:
+    """The text layer's spans of one document, each page fetched once (#260).
+
+    The prose and table steps of the inline math detection run at different
+    points of the pipeline; reading through one reader, a page is requested
+    from the Toolbox once, and a capability that failed is not asked again.
+    """
+
+    def __init__(self, manifest: ProcessingManifest, source_path: Path) -> None:
+        self._manifest = manifest
+        self._source_path = source_path
+        self._pages: dict[int, dict[str, Any]] = {}
+        self._failed = False
+
+    async def pages(self, wanted: Iterable[int]) -> dict[int, dict[str, Any]] | None:
+        """The spans of every page read so far, ``wanted`` included; ``None`` when
+        the Toolbox cannot read them (recorded as ``unavailable``)."""
+        from acessilia_sdk.toolbox.errors import ToolboxError
+
+        from backend.tools.text_spans import fetch_text_spans
+
+        if self._failed:
+            return None
+        missing = sorted(set(wanted) - set(self._pages))
+        if missing:
+            try:
+                self._pages.update(
+                    await fetch_text_spans(
+                        self._source_path, missing, artifact_id=_source_artifact_id(self._manifest)
+                    )
+                )
+            except ToolboxError as exc:
+                logger.info("Inline math detection skipped: document.text.spans failed ({})", exc)
+                self._manifest.extractor.configuration["inline_math_detection"] = "unavailable"
+                self._failed = True
+                return None
+        return self._pages
+
+
+def _inline_math_enabled(manifest: ProcessingManifest) -> bool:
+    from backend.config.settings import settings
+
+    return (
+        settings.inline_math_detection == "fonts"
+        and manifest.source.media_type == "application/pdf"
+    )
+
+
+def _boxed_pages(elements: Iterable[ManifestElement]) -> list[int]:
+    return sorted(
+        {
+            provenance.page_number
+            for element in elements
+            for provenance in element.provenance
+            if provenance.bbox is not None
+        }
+    )
+
+
+async def _mark_inline_math(
+    manifest: ProcessingManifest,
+    source_path: Path,
+    text_spans: _TextSpanReader | None = None,
+) -> dict[str, int]:
+    """Write the inline math of PDF prose as ``$…$``, from the text layer's fonts (#265).
+
+    Docling reports no inline formula region for a typeset PDF, so
+    ``s(t) = t³`` arrives as ``s ( t ) = t 3``. The text layer still has the
+    fonts and baselines (ADR 0011): the Toolbox's ``document.text.spans``
+    returns them, ``docstruct.text.inline_math`` finds each run of math in an
+    element's lines and rebuilds its LaTeX, and splices it into the element's
+    text where both character sequences align. The canonical enrichment then
+    converts each span (MathML, speech).
+
+    A negation slash the run composed into its relation (``h \neq 0``) is
+    recorded on its detached-slash element (``negation_overlay`` outcome
+    ``inline-math``), so the later reattachment does not compose another
+    ``=`` of the paragraph. Returns ``{elements, marked, unmatched}``; the
+    detection is skipped for other media, with ``INLINE_MATH_DETECTION=off``
+    and when the Toolbox cannot read the spans.
+    """
+    counts = {"elements": 0, "marked": 0, "unmatched": 0}
+    if not _inline_math_enabled(manifest):
+        return counts
+    candidates = [
+        element
+        for element in manifest.elements
+        if element.type in _INLINE_MATH_ELEMENT_TYPES
+        and (element.text or "").strip()
+        and "inline_math_detection" not in element.metadata
+        and any(provenance.bbox is not None for provenance in element.provenance)
+    ]
+    pages = _boxed_pages(candidates)
+    if not pages:
+        return counts
+    spans = await (text_spans or _TextSpanReader(manifest, source_path)).pages(pages)
+    if spans is None:
+        return counts
+
+    heights = {page.page_number: page.height for page in manifest.pages}
+    overlays = [element for element in manifest.elements if is_detached_overlay(element.text)]
+    for element in candidates:
+        detection = _detect_by_page(element, spans, heights)
+        if not detection.runs:
+            continue
+        result = splice_inline_math(element.text or "", detection)
+        counts["elements"] += 1
+        counts["marked"] += len(result.marked)
+        counts["unmatched"] += len(result.unmatched)
+        element.metadata["inline_math_detection"] = {
+            "marked": len(result.marked),
+            "unmatched": len(result.unmatched),
+        }
+        if not result.marked:
+            continue
+        element.text = result.text
+        for run in result.marked:
+            for slash in run.negations:
+                _claim_negation_overlay(overlays, element, slash, run.page, spans, heights)
+    manifest.extractor.configuration["inline_math_detection"] = "fonts"
+    if counts["elements"]:
+        logger.info("Inline math from the text layer's fonts: {}", counts)
+    return counts
+
+
+async def _mark_table_inline_math(
+    manifest: ProcessingManifest,
+    source_path: Path,
+    text_spans: _TextSpanReader | None = None,
+) -> dict[str, int]:
+    """Write the inline math of PDF table cells as ``$…$`` (#260).
+
+    The prose step's detection over the table's text-layer lines, run after
+    the table enrichment so a table read again keeps its marks. A table's
+    cells carry no boxes: ``assign_runs_to_cells`` gives each run to the cell
+    whose text holds it, and each cell is spliced on its own. A fraction set
+    in a header cell (two stacked script-size lines) becomes ``\\frac``.
+    Returns ``{elements, marked, unmatched}``, skipping as the prose step does.
+    """
+    counts = {"elements": 0, "marked": 0, "unmatched": 0}
+    if not _inline_math_enabled(manifest):
+        return counts
+    tables = [
+        element
+        for element in manifest.elements
+        if element.type == "table"
+        and isinstance(element.metadata.get("table_ast"), dict)
+        and "inline_math_detection" not in element.metadata
+        and any(provenance.bbox is not None for provenance in element.provenance)
+    ]
+    pages = _boxed_pages(tables)
+    if not pages:
+        return counts
+    spans = await (text_spans or _TextSpanReader(manifest, source_path)).pages(pages)
+    if spans is None:
+        return counts
+
+    heights = {page.page_number: page.height for page in manifest.pages}
+    overlays = [element for element in manifest.elements if is_detached_overlay(element.text)]
+    for table in tables:
+        detection = _detect_by_page(table, spans, heights)
+        if not detection.runs:
+            continue
+        cells = [
+            cell
+            for section in _TABLE_SECTIONS
+            for row in table.metadata["table_ast"].get(section) or []
+            if isinstance(row, dict)
+            for cell in row.get("cells") or []
+            if isinstance(cell, dict) and isinstance(cell.get("text"), str)
+        ]
+        detections, left_out = assign_runs_to_cells(detection, [cell["text"] for cell in cells])
+        marked, unmatched = [], list(left_out)
+        for cell, cell_detection in zip(cells, detections):
+            if not cell_detection.runs:
+                continue
+            result = splice_inline_math(cell["text"], cell_detection)
+            cell["text"] = result.text
+            marked.extend(result.marked)
+            unmatched.extend(result.unmatched)
+        counts["elements"] += 1
+        counts["marked"] += len(marked)
+        counts["unmatched"] += len(unmatched)
+        table.metadata["inline_math_detection"] = {
+            "marked": len(marked),
+            "unmatched": len(unmatched),
+        }
+        for run in marked:
+            for slash in run.negations:
+                _claim_negation_overlay(overlays, table, slash, run.page, spans, heights)
+    if counts["elements"]:
+        logger.info("Inline math of table cells from the text layer's fonts: {}", counts)
+    return counts
+
+
+def _top_left_box(
+    box: Any, page: int, spans: dict[int, dict[str, Any]], heights: dict[int, float | None]
+) -> tuple[float, float, float, float] | None:
+    """``(left, top, right, bottom)`` of a manifest box, top-left origin, in points."""
+    if box.coord_origin == "BOTTOMLEFT":
+        height = (spans.get(page) or {}).get("height") or heights.get(page)
+        if not height:
+            return None
+        return box.left, height - box.top, box.right, height - box.bottom
+    if box.coord_origin == "TOPLEFT":
+        return box.left, box.top, box.right, box.bottom
+    return None
+
+
+def _detect_by_page(
+    element: ManifestElement,
+    spans: dict[int, dict[str, Any]],
+    heights: dict[int, float | None],
+) -> InlineMathDetection:
+    """``detect_inline_math`` over the element's lines, page by page, as one detection.
+
+    Each page is read on its own, so a fraction never pairs lines of two pages
+    (baselines are per-page coordinates), and each run carries its page, where
+    its negation slashes are claimed: a table is the element that spans pages.
+    """
+    detection = InlineMathDetection()
+    pages = dict.fromkeys(p.page_number for p in element.provenance if p.bbox is not None)
+    for page in pages:
+        read = detect_inline_math(_element_span_lines(element, spans, heights, page))
+        offset = len(detection.flat)
+        detection.flat += read.flat
+        detection.runs.extend(
+            replace(run, start=run.start + offset, end=run.end + offset, page=page)
+            for run in read.runs
+        )
+    return detection
+
+
+def _element_span_lines(
+    element: ManifestElement,
+    spans: dict[int, dict[str, Any]],
+    heights: dict[int, float | None],
+    page_number: int,
+) -> list[list[TextSpan]]:
+    """The element's text-layer lines on a page, in order: spans whose centre lies in its boxes.
+
+    A rotated page is left out: its spans are in the unrotated space, which the
+    element's box may not be.
+    """
+    lines: list[list[TextSpan]] = []
+    for provenance in element.provenance:
+        if provenance.page_number != page_number:
+            continue
+        page = spans.get(provenance.page_number)
+        if provenance.bbox is None or page is None or page.get("rotation"):
+            continue
+        box = _top_left_box(provenance.bbox, provenance.page_number, spans, heights)
+        if box is None:
+            continue
+        left, top, right, bottom = box
+        top, bottom = min(top, bottom), max(top, bottom)
+        margin = _INLINE_MATH_BOX_TOLERANCE
+        for line in page.get("lines") or []:
+            inside = []
+            for span in line.get("spans") or []:
+                x0, y0, x1, y1 = span["bbox"]
+                x, y = (x0 + x1) / 2, (y0 + y1) / 2
+                if left - margin <= x <= right + margin and top - margin <= y <= bottom + margin:
+                    inside.append(TextSpan.from_dict(span))
+            if inside:
+                lines.append(inside)
+    return lines
+
+
+def _claim_negation_overlay(
+    overlays: list[ManifestElement],
+    host: ManifestElement,
+    slash: tuple[float, float, float, float],
+    page: int,
+    spans: dict[int, dict[str, Any]],
+    heights: dict[int, float | None],
+) -> None:
+    """Record the detached slash at ``slash`` as composed by the inline math of ``host``."""
+    x, y = (slash[0] + slash[2]) / 2, (slash[1] + slash[3]) / 2
+    for overlay in overlays:
+        if "negation_overlay" in overlay.metadata:
+            continue
+        located = _bbox(overlay, page)
+        if located is None:
+            continue
+        box = _top_left_box(located[1], page, spans, heights)
+        if box is None:
+            continue
+        left, top, right, bottom = box
+        top, bottom = min(top, bottom), max(top, bottom)
+        margin = _OVERLAY_HOST_TOLERANCE * 2
+        if left - margin <= x <= right + margin and top - margin <= y <= bottom + margin:
+            overlay.metadata["negation_overlay"] = {"outcome": "inline-math", "host": host.id}
+            return
+
+
+def _reclassify_formula_picture(
+    manifest: ProcessingManifest,
+    element: ManifestElement,
+    output: VisionOutput,
+    image: bytes,
+    *,
+    source: str,
+) -> None:
+    """Keep the source evidence and reuse a non-mathematical description.
+
+    The crop the model read becomes the picture (``metadata.src``), as for a
+    region inspection, so the export shows the drawing it describes.
+    ``source`` records which call reclassified it: the candidate inspection
+    or the vision fallback of the formula recognition.
+    """
+    element.metadata["original_type"] = element.type
+    element.metadata["original_text"] = element.text
+    element.metadata["original_raw_label"] = element.raw_label
+    element.type = "picture"
+    element.raw_label = "picture"
+    element.text = output.description
+    element.metadata["vision_description_complete"] = True
+    element.metadata["vision_language"] = output.language
+    element.metadata["vision_confidence"] = output.confidence
+    element.metadata["vision_elements"] = list(output.mentioned_elements)
+    element.metadata["vision_warnings"] = list(output.warnings)
+    element.metadata["src"] = "data:image/png;base64," + base64.b64encode(image).decode("ascii")
+    element.metadata["formula_classification"] = {
+        "status": "picture",
+        "reason": source,
+        "confidence": output.confidence,
+        "warnings": list(output.warnings),
+    }
+    reconcile_reclassified_element_processing_needs(manifest, element, previous_type="formula")
+
+
+def _escalate_unresolved_formula(
+    manifest: ProcessingManifest, element: ManifestElement
+) -> None:
+    """Hand a region the model could not classify to a person, not to the math path.
+
+    Its ``verbalize-formula`` goes to ``human-review``; ``normalize-formula``
+    is dropped, since normalizing LaTeX the model could not tell is a formula
+    would treat it as one.
+    """
+    retained = []
+    for obligation in manifest.obligations:
+        if obligation.target_ids == [element.id]:
+            if obligation.kind in TYPE_BOUND_V23_KINDS["formula"]:
+                continue
+            if obligation.kind == "verbalize-formula":
+                obligation.admissible_methods = ["human-review"]
+                obligation.method_costs = {"human-review": 100}
+        retained.append(obligation)
+    manifest.obligations = retained
+    manifest.summary.obligation_count = len(manifest.obligations)
+
+
+async def _classify_formula_regions(
+    manifest: ProcessingManifest,
+    source_file: Path,
+    *,
+    mode: str,
+    breaker: ProviderBreaker,
+) -> None:
+    """Check extractor formula labels before a mathematical recognizer sees them.
+
+    A drawing is described once and reconciled as a picture before planning.
+    A candidate the model explicitly cannot classify (``classification_uncertain``)
+    keeps its source content and goes to human review. A call that gives no
+    answer (open breaker, no crop, model failure, empty description) is no
+    evidence against mathematics: the candidate stays ``unclassified`` and
+    takes the formula path it took before this check, whose vision fallback
+    can still reclassify it.
+    """
+    from backend.config.settings import settings
+
+    if manifest.source.media_type not in _RENDERABLE_MEDIA_TYPES:
+        return
+    candidates = [
+        element for element in manifest.elements
+        if element.type == "formula"
+        and not has_latex_markup(element.text)
+        and not element.metadata.get("latex_markup")
+    ]
+    if not candidates:
+        return
+    slots = asyncio.Semaphore(max(1, settings.vision_concurrency))
+    vision = VisionAgent(mode=mode)
+
+    async def classify(element: ManifestElement) -> None:
+        async with slots:
+            output = None
+            errors: list[str] = []
+            reason = "provider_blocked"
+            if not breaker.open:
+                reason = "crop_unavailable"
+                image, page = await run_blocking(
+                    _formula_recognition_crop, source_file, element,
+                    artifact_id=_source_artifact_id(manifest),
+                    media_type=manifest.source.media_type,
+                )
+                if image:
+                    reason = "model_failed"
+                    output = await vision.describe_region(
+                        image_bytes=image, classification="formula_candidate",
+                        page_num=page, total_pages=len(manifest.pages), mode=mode,
+                        full_budget=True, errors=errors,
+                    )
+                    breaker.record(isinstance(output, VisionOutput))
+            status = "unclassified"
+            if isinstance(output, VisionOutput):
+                if output.classification_uncertain:
+                    status, reason = "unresolved", "classification_uncertain"
+                elif output.kind == "formula":
+                    status, reason = "math", None
+                elif output.description.strip():
+                    _reclassify_formula_picture(
+                        manifest, element, output, image, source="candidate_inspection"
+                    )
+                    return
+                else:
+                    reason = "empty_description"
+            element.metadata["formula_classification"] = {
+                "status": status,
+                "reason": reason,
+                "confidence": output.confidence if output is not None else None,
+                "warnings": list(output.warnings) if output is not None else errors,
+            }
+            if status == "unresolved":
+                _escalate_unresolved_formula(manifest, element)
+
+    async with asyncio.TaskGroup() as group:
+        for element in candidates:
+            group.create_task(classify(element))
+
+
+async def _enrich_formula_latex(
+    manifest: ProcessingManifest,
+    source_file: Path,
+    *,
+    mode: str,
+    status_callback: Callable[[str], Coroutine[Any, Any, None]] | None = None,
+    breaker: ProviderBreaker | None = None,
+) -> None:
+    """Give LaTeX to formulas the extractor delivered without it.
+
+    That covers formulas with no text and, in born-digital PDFs, formulas
+    whose text is the PDF text layer (``s(t) = s0 + v0t + 1 2 at2``): it
+    keeps the symbols but not the fractions, exponents and limits, so MathML
+    and speech built from it lose the structure. ``has_latex_markup`` tells
+    the two apart.
+
+    ``math.recognize`` (PP-FormulaNet) runs first; the vision model is the
+    fallback, so a Toolbox outage degrades to the behavior the pipeline had
+    before instead of leaving the formula without content. Recognition runs
+    before planning, like the picture descriptions, so the ``mathml`` and
+    ``latex-verbalizer`` methods then work on real LaTeX.
+
+    When the formula has text-layer text, a recognition must agree with it
+    (``latex_text_agreement`` ≥ ``FORMULA_TEXT_AGREEMENT_MIN``): PP-FormulaNet
+    reports no confidence, and the text layer is the only independent reading
+    of the same formula. A recognition below it is a misread; the next one is
+    tried, and when none agrees the formula keeps its text-layer version, which
+    is flat but faithful. The text layer is the reference, not the truth: a
+    garbled one can refuse a correct reading, which ``formula_text_layer`` and
+    ``rejected`` leave on record.
+
+    During a ``math.recognize`` outage, text-layer formulas also go to the
+    vision model, so an outage now costs one vision call per formula that has
+    text, not only per empty one. That is deliberate: on the reference case the
+    vision readings took the structure of 16 flat formulas from nothing to a
+    98.4 structure-token recall. When vision disagrees with the text layer too,
+    the call bought nothing and the formula stays flat.
+
+    A provider can also answer without LaTeX, which is not an outage: a
+    page-level one such as ``docling-math`` finds no formula in a chip, so
+    every formula goes to vision. Each such fallback is logged at DEBUG, and
+    one INFO line per document counts them and names the provider, so the
+    misconfiguration reads in one line instead of one per formula.
+
+    The vision fallback shares the job's provider breaker with the picture
+    and table stages: a provider those stages declared down gets no call
+    from here and each formula degrades to its text-layer text at once.
+
+    Each recognized formula records ``metadata["formula_recognition"]``:
+    ``method`` (the capability that gave the LaTeX: ``math.recognize`` or
+    ``vision``; ``text-layer`` when nothing agreed), ``confidence``,
+    ``text_agreement`` when there was text-layer text, ``rank`` when a
+    ``math.recognize`` candidate other than the best-ranked one was used, and
+    ``rejected``: refused readings keyed by method, with ``#n`` for the n-th
+    ranked candidate (``math.recognize#2``), valued by their agreement
+    (``None`` for no evidence). Consumers must read those keys as
+    ``method`` or ``method#rank`` strings.
+
+    Crops are independent, so they run concurrently, bounded by
+    ``VISION_CONCURRENCY`` for the same reason as the picture descriptions:
+    the vision fallback shares that provider budget. An outage is still paid
+    once per document: the first ``MathCapabilityUnavailable`` sets a flag the
+    remaining formulas read before calling recognition, and the probe itself
+    is serialized so concurrent crops cannot each pay the same timeout.
+
+    Two formulas on the same page still pay two renders: the Toolbox applies
+    the clip, and caching a whole page to crop it locally would move pixel
+    work into the core (ADR-0003), so page-level render reuse stays a
+    follow-up.
+    """
+    from acessilia_sdk.toolbox.capabilities import provider_default
+
+    from backend.config.settings import settings
+
+    for element in manifest.elements:
+        separate_equation_number(element)
+    formulas = [
+        element
+        for element in manifest.elements
+        if element.type == "formula"
+        and not has_latex_markup(element.text)
+        and not element.metadata.get("latex_markup")
+        and element.metadata.get("formula_classification", {}).get("status") != "unresolved"
+    ]
+    if not formulas:
+        return
+    # Without a page to render there is no crop to recognize. DOCX/PPTX
+    # formulas stay as the extractor delivered them instead of paying one
+    # failed render per formula.
+    if manifest.source.media_type not in _RENDERABLE_MEDIA_TYPES:
+        return
+
+    if status_callback:
+        await status_callback(t(STAGE_ENRICHING_FORMULAS))
+
+    vision = VisionAgent(mode=mode)
+    breaker = breaker or ProviderBreaker(settings.vision_breaker_threshold)
+    total_pages = len(manifest.pages)
+    artifact_id = _source_artifact_id(manifest)
+    slots = asyncio.Semaphore(max(1, settings.vision_concurrency))
+    progress_lock = asyncio.Lock()
+    math_probe = asyncio.Lock()
+    math_ready = asyncio.Event()
+    math_available = True
+    # Resolved like ``ToolboxCapabilityClient``: an empty setting means the
+    # registry default, which is the provider the request actually asked.
+    recognize_provider = settings.toolbox_math_recognize_provider or provider_default(
+        "toolbox_math_recognize_provider"
+    )
+    empty_answers = 0
+
+    async def call(image_bytes: bytes) -> list[dict[str, Any]]:
+        """One recognition call; an outage turns the flag off and means no LaTeX."""
+        nonlocal math_available
+        try:
+            return await run_blocking(
+                toolbox_recognize_formula,
+                image_bytes,
+                raise_on_unavailable=True,
+            )
+        except MathCapabilityUnavailable as exc:
+            math_available = False
+            # The full message names the provider and its HTTP status; the
+            # class alone ("ToolboxError") hides a failing sidecar.
+            logger.warning(t(LOG_PDDL_FORMULA_RECOGNIZE_UNAVAILABLE).format(error=exc))
+            return []
+
+    async def recognize(image_bytes: bytes) -> list[dict[str, Any]]:
+        """Recognize one crop, unless the document already found the outage.
+
+        The first call is serialized and every other crop waits for its
+        answer, so a batch that starts with the capability down pays the
+        outage once instead of once per crop; after it succeeds, the remaining
+        calls only read the flag and run concurrently.
+        """
+        if not math_ready.is_set():
+            async with math_probe:
+                if not math_ready.is_set():
+                    try:
+                        return await call(image_bytes)
+                    finally:
+                        math_ready.set()
+        if not math_available:
+            return []
+        return await call(image_bytes)
+
+    async def enrich_one(position: int, element: ManifestElement) -> bool:
+        """Recognize one formula and fold the answer into it; True when filled."""
+        nonlocal empty_answers
+        async with slots:
+            if status_callback:
+                async with progress_lock:
+                    await status_callback(
+                        t(STAGE_RECOGNIZING_FORMULA).format(
+                            current=position,
+                            total=len(formulas),
+                            pages=_pages_label([element.page_number], total_pages),
+                        )
+                    )
+            image_bytes, page_number = await run_blocking(
+                _formula_recognition_crop,
+                source_file,
+                element,
+                artifact_id=artifact_id,
+                media_type=manifest.source.media_type,
+            )
+            if not image_bytes:
+                return False
+
+            original_text = element.text or ""
+            text_layer = normalize_latex(original_text)
+            # None records a recognition refused for lack of evidence.
+            rejected: dict[str, float | None] = {}
+            agreement: float | None = None
+
+            def accept(method: str, latex: str) -> str:
+                """``latex`` when it agrees with the text layer, else ``""``.
+
+                With text-layer text but no visible symbol on either side
+                (``()``), there is no evidence the recognition read the same
+                formula, so it is refused like a disagreement.
+                """
+                nonlocal agreement
+                if not latex or not text_layer:
+                    return latex
+                expression, _ = split_equation_number(latex)
+                score = latex_text_agreement(expression, text_layer)
+                if score is None or score < settings.formula_text_agreement_min:
+                    rejected[method] = None if score is None else round(score, 3)
+                    return ""
+                agreement = round(score, 3)
+                return latex
+
+            # Every candidate gets its turn at the gate before vision is paid:
+            # a lower-ranked one that agrees with the text layer is still a
+            # recognition of this crop. Refusals are recorded per rank
+            # ("math.recognize", "math.recognize#2", ...).
+            method = "math.recognize"
+            latex = ""
+            confidence = None
+            accepted_rank = 1
+            candidates = _ranked_formula_candidates(await recognize(image_bytes))
+            if not candidates and math_available:
+                # An outage already warned once and skips this. An empty list
+                # is usually an answer without LaTeX, which nothing else
+                # records; a rejected crop or a transport error reaches it too,
+                # but those were logged by ``toolbox_recognize_formula``. No
+                # await separates ``recognize`` from this check, so the flag
+                # and the counter cannot race with sibling crops.
+                empty_answers += 1
+                logger.debug(
+                    t(LOG_PDDL_FORMULA_RECOGNIZE_EMPTY).format(
+                        element_id=element.id, page=page_number, provider=recognize_provider,
+                    )
+                )
+            for rank, candidate in enumerate(candidates, start=1):
+                latex = accept(method if rank == 1 else f"{method}#{rank}", candidate["latex"])
+                if latex:
+                    confidence = candidate["confidence"]
+                    accepted_rank = rank
+                    break
+
+            if not latex:
+                method = "vision"
+                # The pictures and tables share the breaker, and they run
+                # around this stage: once the provider is declared down, the
+                # formula keeps its text-layer version (the behavior before
+                # the fallback) instead of paying two more 600 s deadlines.
+                # Only the vision fallback is gated; ``math.recognize`` is
+                # probed once per document through its own flag above.
+                output: VisionOutput | None = None
+                if not breaker.open:
+                    output = await vision.describe_region(
+                        image_bytes=image_bytes,
+                        classification="formula",
+                        page_num=page_number,
+                        total_pages=total_pages,
+                        mode=mode,
+                        full_budget=True,
+                    )
+                    # A non-mathematical description can also correct the label.
+                    breaker.record(output is not None)
+                if (
+                    output is not None and output.kind == "description"
+                    and output.description.strip() and not output.classification_uncertain
+                ):
+                    _reclassify_formula_picture(
+                        manifest, element, output, image_bytes, source="recognition_fallback"
+                    )
+                    return False
+                if output is not None and output.kind == "formula":
+                    latex = accept(method, normalize_latex(output.formula_latex or ""))
+                    confidence = output.confidence
+
+        if rejected:
+            logger.info(
+                t(LOG_PDDL_FORMULA_TEXT_LAYER_DISAGREES).format(
+                    element_id=element.id, page=page_number, rejected=rejected,
+                )
+            )
+        if not latex:
+            if rejected:
+                element.metadata["formula_recognition"] = {
+                    "method": "text-layer",
+                    "rejected": rejected,
+                }
+            return False
+        recognition: dict[str, Any] = {"method": method, "confidence": confidence}
+        if method == "math.recognize" and accepted_rank > 1:
+            recognition["rank"] = accepted_rank
+        if text_layer:
+            # The replaced text exactly as the extractor delivered it.
+            element.metadata["formula_text_layer"] = original_text
+            recognition["text_agreement"] = agreement
+        if rejected:
+            recognition["rejected"] = rejected
+        element.text = preserve_equation_number(latex, element.metadata)
+        element.metadata["formula_recognition"] = recognition
+        return True
+
+    # The fold above touches only its own element and runs without awaits, so
+    # concurrent folds cannot interleave. The TaskGroup cancels the sibling
+    # crops when one of them fails and re-raises as an ExceptionGroup, like the
+    # picture descriptions; no task keeps mutating the manifest after it failed.
+    async with asyncio.TaskGroup() as group:
+        tasks = [
+            group.create_task(enrich_one(position, element))
+            for position, element in enumerate(formulas, start=1)
+        ]
+    recognized = sum(task.result() for task in tasks)
+
+    if recognized:
+        logger.info(t(LOG_PDDL_FORMULAS_RECOGNIZED).format(count=recognized))
+    if empty_answers:
+        logger.info(
+            t(LOG_PDDL_FORMULAS_FELL_BACK_TO_VISION).format(
+                count=empty_answers, total=len(formulas), provider=recognize_provider,
+            )
+        )
+
+
+async def _inspect_media(
+    source_path: Path,
+) -> tuple[dict[str, Any] | None, dict[str, Any]]:
+    """Runs ``media.inspect`` and degrades visibly when it fails.
+
+    The inspection feeds the standalone-image heuristic and the presentation
+    decision, and neither is required, so no failure of the step fails the
+    job: any ``Exception`` (a ``ToolboxError``, but also an SDK bug or a client
+    configuration error) makes the run continue without the signal, logs a
+    warning and records the cause. Cancellation is not caught, since
+    ``asyncio.CancelledError`` derives from ``BaseException``.
+
+    Returns the inspection and the outcome for
+    ``manifest.extractor.configuration``, since it runs before the manifest
+    exists: ``media_inspection`` is ``toolbox``, ``disabled`` (by
+    ``TOOLBOX_MEDIA_INSPECT_ENABLED``), ``source_missing`` or ``failed``, plus
+    ``media_inspection_error`` on failure, and ``document_genre`` with its
+    ``genre_signals`` when the Toolbox reports them.
+    """
+    from backend.config.settings import settings
+
     try:
         media_inspection = await inspect_source_media(source_path)
     except Exception as exc:  # noqa: BLE001 - the step degrades, never fails the job
@@ -2627,17 +4180,30 @@ async def _inspect_media_or_degrade(
                 filename=source_path.name, error=cause
             )
         )
-        configuration["media_inspection"] = "failed"
-        configuration["media_inspection_error"] = cause
-        return None
+        return None, {"media_inspection": "failed", "media_inspection_error": cause}
     if media_inspection is not None:
         status = "toolbox"
     elif not settings.toolbox_media_inspect_enabled:
         status = "disabled"
     else:
         status = "source_missing"
-    configuration["media_inspection"] = status
-    return media_inspection
+    configuration: dict[str, Any] = {"media_inspection": status}
+    if isinstance(media_inspection, dict) and media_inspection.get("document_genre"):
+        configuration["document_genre"] = media_inspection["document_genre"]
+        configuration["genre_signals"] = list(media_inspection.get("genre_signals") or [])
+    return media_inspection, configuration
+
+
+def _is_presentation(media_inspection: dict[str, Any] | None) -> bool:
+    """Whether ``media.inspect`` reported a slide deck.
+
+    A Toolbox older than pure-media-inspect 1.1.0 reports no genre, and a
+    failed inspection reports nothing: both are treated as a document.
+    """
+    return (
+        isinstance(media_inspection, dict)
+        and media_inspection.get("document_genre") == "presentation"
+    )
 
 
 def _inject_full_page_picture(
@@ -2712,26 +4278,68 @@ def _inject_full_page_picture(
 async def _enrich_table_structures(
     manifest: ProcessingManifest,
     source_file: Path,
+    *,
+    status_callback: Callable[[str], Coroutine[Any, Any, None]] | None = None,
+    breaker: ProviderBreaker | None = None,
 ) -> None:
+    from backend.config.settings import settings
+
+    # A table read in the wrong shape (rows collapsed into one, cells doubled)
+    # has structure but not the right one; it is read again from its image.
+    garbled: dict[str, str] = {}
+    if settings.table_visual_review:
+        for element in manifest.elements:
+            if element.type == "table" and _table_element_has_structured_content(element):
+                reason = table_garble_reason(
+                    _rows_from_table_ast(element.metadata["table_ast"])
+                )
+                if reason:
+                    garbled[element.id] = reason
     table_elements = [
         element
         for element in manifest.elements
-        if element.type == "table" and not _table_element_has_structured_content(element)
+        if element.type == "table"
+        and (element.id in garbled or not _table_element_has_structured_content(element))
     ]
     if not table_elements:
         return
 
     data_agent = DataAgent()
-    enriched = 0
-    for element in table_elements:
-        if _backfill_table_from_existing_text(element):
-            enriched += 1
-            continue
+    breaker = breaker or ProviderBreaker(settings.vision_breaker_threshold)
+
+    async def read_one(position: int, element: ManifestElement) -> bool:
+        """Read one table from its image, or keep it as it is; True when enriched."""
+        reason = garbled.get(element.id)
+        if reason is None and _backfill_table_from_existing_text(element):
+            return True
 
         fallback_page_number = element.page_number
         if fallback_page_number is None and len(manifest.pages) == 1:
             fallback_page_number = manifest.pages[0].page_number
 
+        if status_callback:
+            await status_callback(
+                t(STAGE_RECOGNIZING_TABLE).format(
+                    current=position,
+                    total=len(table_elements),
+                    pages=_pages_label([fallback_page_number], len(manifest.pages)),
+                )
+            )
+        # The breaker is consulted before the crop: a provider the pictures
+        # declared down must not cost one Toolbox render per remaining table.
+        # The second pass calls this anyway for its probe, because the probe
+        # is let through before any `read_one` sees the breaker.
+        if breaker.open:
+            if reason is not None:
+                _keep_misread_table(
+                    element,
+                    fallback_page_number or 0,
+                    reason,
+                    breaker.skip_detail(),
+                    _table_review_attempts(element, 0),
+                )
+            _record_table_read_failure(element, "model_failed")
+            return False
         image_bytes, page_number = await run_blocking(
             _extract_picture_bytes,
             source_file,
@@ -2741,19 +4349,76 @@ async def _enrich_table_structures(
             manifest.source.media_type,
         )
         if not image_bytes:
-            continue
+            _record_table_read_failure(element, "crop_unavailable")
+            if reason is not None:
+                _keep_misread_table(
+                    element, page_number, reason, "no image of the table",
+                    _table_review_attempts(element, 0),
+                )
+            return False
 
-        table_output = await data_agent.process_region(
-            image_bytes=image_bytes,
-            classification="table",
-            page_num=page_number,
-            fallback_text=element.text or "",
-        )
-        if not isinstance(table_output, DataOutput) or table_output.kind != "table":
-            continue
+        # A misread table gets a few readings: the model may drop columns or
+        # rows on one try and read the table whole on the next.
+        attempts = _TABLE_REREAD_ATTEMPTS if reason is not None else 1
+        table_output = None
+        answered = False
+        why = "no table was read"
+        attempt = 0
+        for attempt in range(1, attempts + 1):
+            if breaker.open:
+                why = breaker.skip_detail()
+                attempt -= 1  # this try was not made
+                break
+            candidate = await data_agent.process_region(
+                image_bytes=image_bytes,
+                classification="table",
+                page_num=page_number,
+                fallback_text=element.text or "",
+            )
+            # The data agent returns None for any failure, an unusable answer
+            # included, so the breaker may count one of those too.
+            breaker.record(candidate is not None)
+            answered = answered or isinstance(candidate, DataOutput)
+            if not isinstance(candidate, DataOutput) or candidate.kind != "table":
+                continue
+            if reason is not None:
+                why = _table_reread_disqualified(
+                    element.metadata["table_ast"], candidate.table_rows()
+                )
+                if why:
+                    continue
+            table_output = candidate
+            break
+        if table_output is None:
+            # A reading refused as worse than the table, or an answer that it
+            # is not a table, is the model's answer; only no answer at all is
+            # a failure a rerun may not repeat.
+            if answered:
+                # The provider is up and answered; a failure an earlier pass
+                # recorded on this element is no longer true.
+                element.metadata.pop("table_read_failure", None)
+            else:
+                _record_table_read_failure(element, "model_failed")
+            if reason is not None:
+                _keep_misread_table(
+                    element, page_number, reason, why, _table_review_attempts(element, attempt)
+                )
+            return False
 
+        element.metadata.pop("table_read_failure", None)
         rows = table_output.table_rows()
         table_ast = table_output.table_ast()
+        if reason is not None:
+            element.metadata["table_ast_replaced"] = element.metadata["table_ast"]
+            element.metadata["table_review"] = {
+                "reason": reason, "outcome": "replaced",
+                "attempts": _table_review_attempts(element, attempt),
+            }
+            logger.info(
+                t(LOG_PDDL_TABLE_REREAD_ACCEPTED).format(
+                    element_id=element.id, page=page_number, reason=reason,
+                )
+            )
 
         element.metadata["table_ast"] = table_ast
         element.metadata["table_linearization_hint"] = "data-agent-structured"
@@ -2771,10 +4436,100 @@ async def _enrich_table_structures(
         element.text = ""
         if element.page_number is None and page_number >= 1:
             element.page_number = page_number
-        enriched += 1
+        return True
+
+    enriched = 0
+    for position, element in enumerate(table_elements, start=1):
+        enriched += await read_one(position, element)
+    enriched += await _retry_failed(
+        [
+            (position, element)
+            for position, element in enumerate(table_elements, start=1)
+            if element.metadata.get("table_read_failure") == "model_failed"
+        ],
+        read_one,
+        kind="tables",
+        breaker=breaker,
+    )
 
     if enriched:
         logger.info(t(LOG_PDDL_TABLES_ENRICHED).format(count=enriched))
+
+
+#: Why a table was left unread, recorded in metadata["table_read_failure"]: the
+#: crop could not be rendered, or the data agent returned no answer at all.
+TableReadFailure = Literal["crop_unavailable", "model_failed"]
+
+
+def _record_table_read_failure(element: ManifestElement, reason: TableReadFailure) -> None:
+    """Mark ``element`` as a table no reading came back for, and say why."""
+    element.metadata["table_read_failure"] = reason
+
+
+def _table_review_attempts(element: ManifestElement, attempts: int) -> int:
+    """How many readings a table has had, with ``attempts`` more.
+
+    Every pass that reads a table again stores the count it made, so the
+    metadata says how many readings the table got in total (3 on one pass, 1
+    more on the next), not only the last pass's.
+    """
+    review = element.metadata.get("table_review")
+    previous = review.get("attempts", 0) if isinstance(review, dict) else 0
+    return previous + attempts
+
+
+def _keep_misread_table(
+    element: ManifestElement, page_number: int, reason: str, why: str, attempts: int
+) -> None:
+    """Record that a misread table stays as it was read, and why."""
+    element.metadata["table_review"] = {
+        "reason": reason, "outcome": "kept", "why": why, "attempts": attempts,
+    }
+    logger.warning(
+        t(LOG_PDDL_TABLE_REREAD_REJECTED).format(
+            element_id=element.id, page=page_number, reason=reason, why=why,
+        )
+    )
+
+
+#: Share of the words two readings of a table must share, each way, for the
+#: new one to replace the misread one: it is the same table read better, so
+#: most of its words were there, misplaced (a crop of the wrong region, or an
+#: invented table, shares few), and it must keep most of the misread one's
+#: words (on 006.pdf the model once returned only the header row).
+_TABLE_REREAD_MIN_SHARED = 0.5
+
+#: Readings asked for a misread table before it is kept as it is.
+_TABLE_REREAD_ATTEMPTS = 3
+
+_TABLE_WORD = re.compile(r"\w{2,}")
+
+
+def _table_reread_disqualified(
+    misread_ast: dict[str, Any], rows: list[list[str]]
+) -> str | None:
+    """Why a new reading of a misread table must not replace it, or None."""
+    reason = table_garble_reason(rows)
+    if reason:
+        return f"the new reading is misread too: {reason}"
+    misread_rows = _rows_from_table_ast(misread_ast)
+    width = max((len(row) for row in rows), default=0)
+    misread_width = max((len(row) for row in misread_rows), default=0)
+    if width < misread_width:
+        return f"the new reading has {width} column(s), the table {misread_width}"
+    words = {word for row in rows for cell in row for word in _TABLE_WORD.findall(cell.casefold())}
+    if not words:
+        return "the new reading has no text"
+    misread = {
+        word for row in misread_rows for cell in row for word in _TABLE_WORD.findall(cell.casefold())
+    }
+    shared = len(words & misread) / len(words)
+    if shared < _TABLE_REREAD_MIN_SHARED:
+        return f"only {shared:.0%} of its words are in the table it would replace"
+    kept = len(words & misread) / len(misread) if misread else 1.0
+    if kept < _TABLE_REREAD_MIN_SHARED:
+        return f"it keeps only {kept:.0%} of the words of the table it would replace"
+    return None
 
 
 def _table_element_has_structured_content(element: ManifestElement) -> bool:
@@ -2905,6 +4660,14 @@ def _rows_look_like_placeholder(rows: list[list[str]]) -> bool:
     return rows[0][0].strip().lower() == "tabela detectada"
 
 
+#: Longest side of a picture crop sent to the vision model. The render runs at
+#: 160 dpi and the Toolbox refuses more than 20 MP, so an unbounded crop of a
+#: large standalone image (its page is sized in pixels) is rejected before the
+#: model sees it. Bounding the side keeps every source renderable, and the
+#: vision model's 8192-token slot would downscale it further anyway.
+_PICTURE_MAX_SIDE = 2000
+
+
 def _extract_picture_bytes(
     source_file: Path,
     element: ManifestElement,
@@ -2928,7 +4691,8 @@ def _extract_picture_bytes(
 
     def render(clip=None, origin: ClipOrigin = "TOPLEFT") -> RenderedPage:
         return _toolbox_render(
-            source_file, page_number, media_type=media_type, dpi=160, clip=clip,
+            source_file, page_number, media_type=media_type, dpi=160,
+            max_side=_PICTURE_MAX_SIDE, clip=clip,
             clip_origin=origin, artifact_id=artifact_id,
         )
 
@@ -3044,13 +4808,79 @@ def _has_meaningful_text(element: ManifestElement) -> bool:
 #: a screen reader user hits first, so an open one still fails the job.
 NON_CRITICAL_OBLIGATION_KINDS = frozenset(
     {
+        # The adjudication verdict is recorded but cannot be applied (a page
+        # swap would reopen the manifest mid-plan), and the extracted content
+        # is complete either way, so a verdict for the secondary provider must
+        # not fail the job.
+        "adjudicate-page",
         "repair-heading-hierarchy",
         "join-tail-blocks",
         "normalize-text",
+        "repair-legacy-unicode",
         "chunk-verse",
         "extract-line-numbers",
+        # No handler implements `rescue-omitted` yet, so its only path is
+        # human review: as a critical kind it failed every dual-fusion job
+        # with an omitted block. The content the primary provider extracted
+        # is delivered and the result e-mail names the pages of the omitted
+        # block. Remove the kind from here once the handler lands (#236).
+        "rescue-omitted-block",
+        # The vision model is the only automatic method, and a degenerate
+        # answer repeats on every try: in 006.pdf two images out of 40 failed
+        # a 42-page document. The picture is exported with the generic alt
+        # text and the result e-mail names its page. Unless no picture at all
+        # was described: see _blocks_delivery.
+        "describe-image",
     }
 )
+
+
+def _formula_has_readable_content(
+    obligation: Obligation, manifest: ProcessingManifest
+) -> bool:
+    """Whether every target formula still carries something readable.
+
+    A formula the Toolbox could not verbalize or normalize is exported as its
+    LaTeX: the canonical builder and the renderers fall back to it when
+    ``math.verbalize`` is unavailable or rejects the input, so the document
+    keeps the content. That is a degradation, not a lost document. A formula
+    with neither LaTeX, a normalized LaTeX, MathML nor a verbalization has
+    nothing to deliver, so its obligation stays critical.
+    """
+    targets = _formula_elements_for_obligation(manifest, obligation.id)
+    return bool(targets) and all(
+        bool(normalize_latex(element.text or ""))
+        or bool(str(element.metadata.get("latex_normalized") or "").strip())
+        or bool(str(element.metadata.get("mathml") or "").strip())
+        or bool(str(element.metadata.get("verbalization") or "").strip())
+        for element in targets
+    )
+
+
+def _blocks_delivery(obligation: Obligation, manifest: ProcessingManifest) -> bool:
+    """Whether an open obligation fails the job instead of leaving a warning.
+
+    ``describe-image`` is non-critical while some picture was described: a few
+    degenerate answers are sampling (2 of 40 in 006.pdf). With none described,
+    the model is unreachable or misconfigured (``describe_region`` turns a
+    timeout or an auth error into ``None``), and every picture would silently
+    get the generic alt text, so the job fails. A document with a single
+    picture its one description failed on fails too.
+
+    ``verbalize-formula`` and ``normalize-formula`` are non-critical while the
+    target formulas keep their LaTeX: without MathML or spoken text the exported
+    document still shows the formula source, and the result e-mail names the
+    page. With no readable content at all there is nothing to deliver, so the
+    obligation fails the job.
+    """
+    if obligation.kind == "describe-image":
+        return not any(
+            other.kind == "describe-image" and other.status == "satisfied"
+            for other in manifest.obligations
+        )
+    if obligation.kind in {"verbalize-formula", "normalize-formula"}:
+        return not _formula_has_readable_content(obligation, manifest)
+    return obligation.kind not in NON_CRITICAL_OBLIGATION_KINDS
 
 
 def _is_open_obligation(obligation: Obligation) -> bool:
@@ -3096,13 +4926,115 @@ def _replannable_obligation_ids(manifest: ProcessingManifest) -> list[str]:
     ]
 
 
-def _unsatisfied_execution_message(manifest: ProcessingManifest) -> str:
-    return t(EXE_COMPLETED_OBLIGATIONS_UNSATISFIED).format(
-        unsatisfied=", ".join(
-            obligation.id
-            for obligation in _unsatisfied_selected_obligations(manifest)
-        )
+def _unsatisfied_summary(manifest: ProcessingManifest) -> str:
+    """The open obligations grouped by kind with their pages.
+
+    "refine-reading-order (pages 1, 7, 11); describe-image (page 18)" instead of
+    one id per obligation, each listing every target element.
+    """
+    pages: dict[str, set[int]] = {}
+    unknown: set[str] = set()
+    for obligation in _unsatisfied_selected_obligations(manifest):
+        numbers = {
+            page for page in _obligation_pages(manifest, obligation.id) if page
+        }
+        pages.setdefault(obligation.kind, set()).update(numbers)
+        if not numbers:
+            unknown.add(obligation.kind)
+    groups = []
+    for kind, numbers in pages.items():
+        labels = [_pages_label(numbers)] if numbers else []
+        if kind in unknown:
+            labels.append(t(STAGE_PAGE_UNKNOWN))
+        groups.append(f"{kind} ({', '.join(labels)})")
+    return t(EXE_COMPLETED_OBLIGATIONS_UNSATISFIED).format(unsatisfied="; ".join(groups))
+
+
+def _pages_label(
+    pages: Iterable[int | None], total_pages: int | None = None
+) -> str:
+    """Localized location of a unit of work, e.g. "page 3" or "pages 3, 4".
+
+    When the document's page count is known and the work sits on a single page,
+    the label also names the total, e.g. "page 3 of 12": progress messages pair
+    that with image or step counters ("image 11 of 37 (page 18 of 42)"), and
+    without the total users could read 37 as the page count. Single-page
+    documents keep the plain "page 1" label because "of 1" adds nothing.
+    """
+    numbers = sorted({page for page in pages if page})
+    if not numbers:
+        return t(STAGE_PAGE_UNKNOWN)
+    if len(numbers) == 1:
+        if total_pages is not None and total_pages > 1:
+            return t(STAGE_PAGE_OF).format(page=numbers[0], total_pages=total_pages)
+        return t(STAGE_PAGE).format(page=numbers[0])
+    return t(STAGE_PAGES).format(pages=", ".join(str(page) for page in numbers))
+
+
+def _obligation_pages(manifest: ProcessingManifest, obligation_id: str) -> list[int | None]:
+    obligation = next(
+        (item for item in manifest.obligations if item.id == obligation_id), None
     )
+    if obligation is None:
+        return []
+    page_by_element = {element.id: element.page_number for element in manifest.elements}
+    return [page_by_element.get(target) for target in obligation.target_ids]
+
+
+def _plan_progress(
+    manifest: ProcessingManifest,
+    status_callback: Callable[[str], Coroutine[Any, Any, None]] | None,
+    loop: asyncio.AbstractEventLoop,
+) -> StepProgress | None:
+    """Report each obligation step, with its pages, through ``status_callback``.
+
+    The executor runs on a worker thread while the callback is a coroutine of
+    the event loop, so the report is scheduled on ``loop`` and awaited from the
+    thread: the step only starts once its stage is recorded, which is what lets
+    a job killed mid-step still say which step and page it was on. A failing
+    report, including a broken translation of the label, is logged and never
+    fails the step.
+
+    The user sees only the step and its pages; the obligation kind and method
+    are internal names, so they go to the debug log.
+    """
+    if status_callback is None:
+        return None
+    page_by_element = {element.id: element.page_number for element in manifest.elements}
+    pages_by_obligation = {
+        obligation.id: [page_by_element.get(target) for target in obligation.target_ids]
+        for obligation in manifest.obligations
+    }
+
+    def report(step: PlanStep, position: int, total: int) -> None:
+        if step.action != "execute-obligation" or step.obligation_id is None:
+            return
+        pages = pages_by_obligation.get(step.obligation_id, [])
+        logger.debug(
+            "PDDL: step {}/{} {} via {}, pages {}",
+            position,
+            total,
+            step.obligation_id,
+            step.method,
+            pages,
+        )
+        try:
+            message = t(STAGE_EXECUTING_PLAN_STEP).format(
+                current=position,
+                total=total,
+                pages=_pages_label(pages, len(manifest.pages)),
+            )
+            asyncio.run_coroutine_threadsafe(status_callback(message), loop).result(
+                timeout=_PROGRESS_REPORT_TIMEOUT_SECONDS
+            )
+        except Exception as exc:  # noqa: BLE001 - progress must not fail the plan
+            logger.warning("PDDL: progress of step {} not recorded: {}", position, exc)
+
+    return report
+
+
+#: Upper bound on how long a plan step waits for its progress to be recorded.
+_PROGRESS_REPORT_TIMEOUT_SECONDS = 10.0
 
 
 def _log_availability(availability: toolbox_gate.AvailabilityDecision) -> None:
@@ -3140,6 +5072,8 @@ def build_pddl_structured_payload(
     text_output = _render_text_from_pages(pages_payload)
     configuration = manifest.extractor.configuration
     media_inspection_status = configuration.get("media_inspection")
+    fusion_status = configuration.get("fusion") or {}
+    unsatisfied_obligations = _unsatisfied_obligations(manifest)
 
     technical_warnings: list[str] = []
     if execution_report is None:
@@ -3148,14 +5082,47 @@ def build_pddl_structured_payload(
         )
     elif execution_report.status in {
         "failed", "replan-required",
-    } or _unsatisfied_selected_obligations(manifest):
+    } or unsatisfied_obligations:
         # A replan that leaves an exhausted refinement out can still report
-        # `completed`; the open obligation must reach the document anyway.
-        technical_warnings.append(_unsatisfied_execution_message(manifest))
+        # `completed`; the open obligation must reach the document anyway. The
+        # ids are in `pddl_unsatisfied_obligations`, so the warning stays short.
+        technical_warnings.append(_unsatisfied_summary(manifest))
 
     if comparison is not None:
         technical_warnings.append(
             f"Comparacao de planners: {comparison.comparison.verdict}."
+        )
+
+    visual_failures = _visual_failures(manifest)
+    for kind, msgids in (("pictures", MSG_PICTURES_NOT_DESCRIBED), ("tables", MSG_TABLES_NOT_READ)):
+        if count := sum((visual_failures or {}).get(kind, {}).values()):
+            technical_warnings.append(n(*msgids, count).format(count=count))
+
+    observations = getattr(manifest, "observations", [])
+    obligations = getattr(manifest, "obligations", [])
+    if any(
+        observation.kind == "repair-legacy-unicode-detected"
+        for observation in observations
+    ) and not any(
+        obligation.kind == "repair-legacy-unicode"
+        for obligation in obligations
+    ):
+        # Only the observation exists: LEGACY_UNICODE_REPAIR=detect. The
+        # warning names the switch because the job delivers the text as
+        # extracted, NFD and dotless-i included.
+        technical_warnings.append(
+            "Texto com sinais de Unicode legado (NFD, i sem ponto ou acento espaçador); "
+            "reparo desabilitado (LEGACY_UNICODE_REPAIR=detect)."
+        )
+
+    extraction_degraded = records_extraction_degradation(
+        configuration.get("extraction_degraded")
+    )
+    if extraction_degraded:
+        technical_warnings.append(
+            t(MSG_STRUCTURAL_EXTRACTION_DEGRADED).format(
+                provider=configuration.get("toolbox_provider", manifest.extractor.name)
+            )
         )
 
     return {
@@ -3182,20 +5149,101 @@ def build_pddl_structured_payload(
             "pddl_comparison_verdict": comparison.comparison.verdict
             if comparison
             else None,
-            "pddl_unsatisfied_obligations": _unsatisfied_obligations(manifest),
+            "pddl_unsatisfied_obligations": unsatisfied_obligations,
+            # The open obligations a delivered document still has, for the
+            # result e-mail: the job page and e-mail show no technical warning.
+            "pddl_unsatisfied_summary": _unsatisfied_summary(manifest)
+            if unsatisfied_obligations
+            else None,
             "pddl_toolbox_availability": toolbox_availability,
+            "pddl_fusion": fusion_status or None,
+            **(
+                {
+                    "pddl_extraction_degraded": True,
+                    "pddl_extraction_failures": configuration.get("extraction_failures", {}),
+                }
+                if extraction_degraded else {}
+            ),
+            # Pictures and tables left undescribed or unread, by reason; a rerun
+            # once the model provider or the Toolbox is back may deliver them.
+            "pddl_visual_failures": visual_failures,
             "pddl_media_inspection": {
                 "status": media_inspection_status,
                 "error": configuration.get("media_inspection_error"),
+                # Why a deck was structured slide by slide (or not).
+                "document_genre": configuration.get("document_genre"),
+                "genre_signals": configuration.get("genre_signals", []),
             }
             if media_inspection_status is not None
             else None,
         },
         "technical_warnings": technical_warnings,
-        # A step degraded by a Toolbox failure must not be replayed from the
-        # cache once the Toolbox is back.
-        "cacheable": media_inspection_status != "failed",
+        # A step degraded by a Toolbox or model failure must not be replayed
+        # from the cache once the service is back.
+        "cacheable": (
+            media_inspection_status != "failed"
+            and fusion_status.get("status") != "degraded"
+            and execution_report is not None
+            and execution_report.status in {"completed", "dry-run-completed"}
+            and not any(
+                item["recovery"] != "human-review" for item in unsatisfied_obligations
+            )
+            and not records_visual_failures(visual_failures)
+            and not extraction_degraded
+        ),
     }
+
+
+#: Why a picture or table left without a description or a reading may come
+#: out differently on a rerun: the model provider or the Toolbox was down. An
+#: empty description is the model's answer, as is a refused table reading, and
+#: would come back the same, so it neither counts nor keeps a run uncached.
+_RETRYABLE_VISUAL_FAILURES = frozenset({"crop_unavailable", "model_failed"})
+
+
+def _visual_failures(manifest: ProcessingManifest) -> dict[str, dict[str, int]] | None:
+    """Pictures left undescribed and tables left unread, counted by reason.
+
+    A picture counts whatever its type: the vision stage also describes the
+    placeholders of a mostly visual document, and an element becomes a
+    ``picture`` only once the model answers. None when nothing failed.
+    """
+    elements = getattr(manifest, "elements", [])
+    counts = {
+        "pictures": Counter(
+            reason for element in elements
+            if (reason := element.metadata.get("vision_failure_reason")) in _RETRYABLE_VISUAL_FAILURES
+        ),
+        "tables": Counter(
+            reason for element in elements
+            if (reason := element.metadata.get("table_read_failure")) in _RETRYABLE_VISUAL_FAILURES
+        ),
+    }
+    failures = {kind: dict(by_reason) for kind, by_reason in counts.items() if by_reason}
+    return failures or None
+
+
+def records_visual_failures(failures: Any) -> bool:
+    """Whether ``canonical_metadata.pddl_visual_failures`` records any failure.
+
+    A run that does is not cached, and a cached entry that does is not
+    replayed; both sides read the record through this one check.
+    """
+    return isinstance(failures, dict) and any(
+        isinstance(by_reason, dict)
+        and any(isinstance(count, int) and count > 0 for count in by_reason.values())
+        for by_reason in failures.values()
+    )
+
+
+def records_extraction_degradation(flag: Any) -> bool:
+    """Whether the structural extraction came from one provider of a dual run.
+
+    ``flag`` is the extractor's ``extraction_degraded`` or, on a cached entry,
+    ``canonical_metadata.pddl_extraction_degraded``. A run that records it is
+    not cached, and a cached entry that does is not replayed.
+    """
+    return flag is True
 
 
 def _unsatisfied_obligations(manifest: ProcessingManifest) -> list[dict[str, Any]]:
@@ -3219,6 +5267,10 @@ def _unsatisfied_obligations(manifest: ProcessingManifest) -> list[dict[str, Any
                 "last_method": last.method if last else None,
                 "last_message": last.message if last else None,
                 "escalated": bool(last and last.method == "human-review"),
+                "recovery": (
+                    "human-review" if last and last.method == "human-review"
+                    and obligation.kind in NON_CRITICAL_OBLIGATION_KINDS else "retry"
+                ),
             }
         )
     return unsatisfied
@@ -3227,15 +5279,245 @@ def _unsatisfied_obligations(manifest: ProcessingManifest) -> list[dict[str, Any
 def _is_left_out_of_payload(element: ManifestElement) -> bool:
     """A page accepted as blank, or a placeholder not yet inspected, adds nothing.
 
+    Nor does a detached negation slash: it was given back to its relation, or
+    could not be, and alone it says nothing to a reader.
+
     An inspected page with content is a ``picture``, no longer a placeholder.
     A placeholder still present means the inspection did not run (dry-run), so
     the page contributes no block rather than its raw label.
     """
-    return bool(element.metadata.get("blank_page")) or is_unstructured_page_placeholder(element)
+    return (
+        bool(element.metadata.get("blank_page"))
+        or bool(element.metadata.get("negation_overlay"))
+        or is_unstructured_page_placeholder(element)
+    )
+
+
+#: Types a page number can arrive as. A number inside a table, list, heading
+#: or formula is content, wherever it sits on the page.
+_PAGE_NUMBER_TYPES = frozenset({"paragraph", "page_header", "page_footer", "unknown"})
+#: Share of the page height at the top and at the bottom where a lone number
+#: is read as a page number (the margin `docstruct.fusion.noise.decor_role`
+#: uses for the same decision).
+_PAGE_NUMBER_MARGIN = 0.12
+#: Longest furniture text read as a decorated page number (``- 5 -``,
+#: ``Page 5``), as in `decor_role`.
+_PAGE_NUMBER_MAX_LEN = 16
+
+
+def _is_decorated_page_number(text: str) -> bool:
+    """A page number with the decoration or repetition extractors leave on it.
+
+    Accepts ``- 5 -``, ``5.`` and ``Page 5`` (``PAGENUM_RE``, the matcher of
+    `decor_role`) and the same number repeated (``281 281``), but only digits
+    and the Roman letters `is_page_number` knows, so ``mid`` is not a number.
+    """
+    text = text.strip()
+    match = PAGENUM_RE.match(text) if len(text) <= _PAGE_NUMBER_MAX_LEN else None
+    if match and _is_page_number(match.group(1)):
+        return True
+    tokens = set(text.split())
+    return len(tokens) == 1 and _is_page_number(tokens.pop())
+
+
+def _is_marked_furniture(element: ManifestElement) -> bool:
+    """Whether the extractor marked ``element`` as page header/footer.
+
+    Read from the type, the raw label (an element typed ``paragraph`` may keep
+    ``page_footer`` there) or Docling's ``content_layer``.
+    """
+    return (
+        _element_role(element) in {"header", "footer", "page_number"}
+        or reading_role(str(element.type), str(element.raw_label)) != "body"
+        or element.metadata.get("content_layer") == "furniture"
+    )
+
+
+def _is_page_number_in_margin(
+    element: ManifestElement, manifest: ProcessingManifest
+) -> bool:
+    """A bare number in the top or bottom margin, which may be a page number.
+
+    A single uppercase Roman letter (``I``, ``V``, ``X``...) is read as text.
+    """
+    text = (element.text or "").strip()
+    if not _is_page_number(text) or (len(text) == 1 and text.isupper()):
+        return False
+    bbox = _element_bbox(element, manifest)
+    if bbox is None:
+        return False
+    center = (bbox[1] + bbox[3]) / 2
+    return not _PAGE_NUMBER_MARGIN <= center <= 1 - _PAGE_NUMBER_MARGIN
+
+
+def _page_number_ids(manifest: ProcessingManifest) -> set[str]:
+    """Elements that are page numbers rather than body text.
+
+    A screen reader would announce them in the middle of the text. A number
+    the extractor marked as furniture is one. Otherwise only its position in
+    the top or bottom margin tells it apart from a number of the body, and a
+    page has one page number: the margin decides only on a page without a
+    marked one and with a single candidate, so chart axis labels or a footnote
+    marker next to the page number stay.
+    """
+    marked: set[str] = set()
+    #: page number -> its page number candidates, marked or in the margin.
+    candidates: dict[int, list[str]] = {}
+    for element in manifest.elements:
+        if element.type not in _PAGE_NUMBER_TYPES:
+            continue
+        page = element.page_number or 1
+        if _is_marked_furniture(element):
+            if _is_decorated_page_number(element.text or ""):
+                marked.add(element.id)
+                candidates.setdefault(page, []).append(element.id)
+        elif _is_page_number_in_margin(element, manifest):
+            candidates.setdefault(page, []).append(element.id)
+    for ids in candidates.values():
+        if len(ids) == 1:
+            marked.update(ids)
+    return marked
+
+
+#: Height share of the page by which a picture may miss a header line and
+#: still sit beside it (the line's box is tighter than the logo's).
+_LETTERHEAD_TOLERANCE = 0.01
+#: Width share of the page a header line may stand away from the picture and
+#: still be beside it; a running header across the page is not.
+_LETTERHEAD_MAX_GAP = 0.05
+#: Tallest picture, as a share of the page height, read as a logo: a figure
+#: crossing the header band is content, and keeps its description.
+_LETTERHEAD_MAX_HEIGHT = _PAGE_NUMBER_MARGIN
+
+
+def _is_page_header_line(
+    element: ManifestElement, bbox: tuple[float, ...]
+) -> bool:
+    """A non-empty line the extractor marked as page header.
+
+    Read from the type and raw label, like the page number filter. Docling's
+    ``content_layer`` does not tell header from footer, so a ``furniture``
+    line counts only in the top margin.
+    """
+    if not (element.text or "").strip():
+        return False
+    if (
+        _element_role(element) == "header"
+        or reading_role(str(element.type), str(element.raw_label)) == "header"
+    ):
+        return True
+    return (
+        element.metadata.get("content_layer") == "furniture"
+        and (bbox[1] + bbox[3]) / 2 < _PAGE_NUMBER_MARGIN
+    )
+
+
+def _is_beside(picture_box: tuple[float, ...], line_box: tuple[float, ...]) -> bool:
+    """Whether a header line overlaps the picture's height and stands next to it."""
+    horizontal_gap = max(line_box[0] - picture_box[2], picture_box[0] - line_box[2])
+    return (
+        line_box[1] <= picture_box[3] + _LETTERHEAD_TOLERANCE
+        and picture_box[1] <= line_box[3] + _LETTERHEAD_TOLERANCE
+        and horizontal_gap <= _LETTERHEAD_MAX_GAP
+    )
+
+
+def _letterhead_groups(
+    manifest: ProcessingManifest, page_numbers: set[str]
+) -> dict[str, list[ManifestElement]]:
+    """Logos and the page header lines beside them, keyed by the first in reading order.
+
+    An institutional header ("University of X / Department of Y" next to the
+    logo) reaches the manifest as page_header lines and an unrelated picture,
+    so the reader got the lines apart and a long description of a logo that
+    repeats them. A logo-sized picture joins the header lines beside it; two
+    pictures form one group only when they share a line, so two institutions'
+    headers on a page stay apart. A page header without a picture is left as is.
+    """
+    #: page number -> its header lines and logo-sized pictures, with their boxes.
+    lines: dict[int, list[tuple[ManifestElement, tuple[float, ...]]]] = {}
+    pictures: dict[int, list[tuple[ManifestElement, tuple[float, ...]]]] = {}
+    for element in manifest.elements:
+        if _is_left_out_of_payload(element) or element.id in page_numbers:
+            continue
+        bbox = _element_bbox(element, manifest)
+        if bbox is None:
+            continue
+        page = element.page_number or 1
+        if element.type == "picture":
+            if bbox[3] - bbox[1] <= _LETTERHEAD_MAX_HEIGHT:
+                pictures.setdefault(page, []).append((element, bbox))
+        elif _is_page_header_line(element, bbox):
+            lines.setdefault(page, []).append((element, bbox))
+
+    groups: dict[str, list[ManifestElement]] = {}
+    for page, page_pictures in pictures.items():
+        components: list[dict[str, ManifestElement]] = []
+        for picture, picture_box in page_pictures:
+            beside = [
+                line
+                for line, line_box in lines.get(page, [])
+                if _is_beside(picture_box, line_box)
+            ]
+            if not beside:
+                continue
+            component = {picture.id: picture}
+            component.update((line.id, line) for line in beside)
+            for other in [item for item in components if item.keys() & component.keys()]:
+                component.update(other)
+                components.remove(other)
+            components.append(component)
+        for component in components:
+            ordered = sorted(component.values(), key=lambda item: item.reading_order)
+            groups[ordered[0].id] = ordered
+    return groups
+
+
+def _letterhead_block(
+    members: list[ManifestElement], language: str | None
+) -> dict[str, Any]:
+    """One paragraph for a logo and its header lines, in place of the first of them.
+
+    The paragraph replaces the picture too: the outputs never showed the
+    logo's pixels (Pandoc writes an image block as a paragraph of its alt
+    text), only the description this paragraph stands for. The text is in
+    the document's language, not the interface's. ``role`` and
+    ``letterhead_members`` record the merge for audit; no renderer reads
+    them, so the PDF/UA tag stays ``P``.
+    """
+    block = _element_to_block(members[0])
+    lines = [
+        (member.text or "").strip().rstrip(".,;")
+        for member in members
+        if member.type != "picture"
+    ]
+    token = set_request_locale(locale_for_user(language))
+    try:
+        template = t(MSG_LETTERHEAD_TEXT)
+    finally:
+        reset_request_locale(token)
+    block["type"] = "paragraph"
+    block["text"] = template.format(lines=", ".join(lines))
+    block.pop("alt_text", None)
+    block["metadata"]["role"] = "header"
+    block["metadata"]["letterhead_members"] = [member.id for member in members]
+    return block
 
 
 def _manifest_pages_to_payload(manifest: ProcessingManifest) -> list[dict[str, Any]]:
     elements_by_id = {element.id: element for element in manifest.elements}
+    page_numbers = _page_number_ids(manifest)
+    letterheads = _letterhead_groups(manifest, page_numbers)
+    #: Letterhead members other than the first, which carries the whole group.
+    merged = {
+        member.id
+        for members in letterheads.values()
+        for member in members[1:]
+    }
+    letterhead_blocks = {
+        key: _letterhead_block(members, manifest.language)
+        for key, members in letterheads.items()
+    }
     pages: list[dict[str, Any]] = []
 
     if manifest.pages:
@@ -3255,10 +5537,14 @@ def _manifest_pages_to_payload(manifest: ProcessingManifest) -> list[dict[str, A
                     if (element.page_number or 1) == page.page_number
                 ]
             block_elements = [
-                item for item in block_elements if not _is_left_out_of_payload(item)
+                item
+                for item in block_elements
+                if not _is_left_out_of_payload(item)
+                and item.id not in page_numbers
+                and item.id not in merged
             ]
             block_elements.sort(key=lambda item: item.reading_order)
-            blocks = [_element_to_block(item) for item in block_elements]
+            blocks = _elements_to_blocks(block_elements, letterhead_blocks)
             _dedupe_callout_titles(blocks)
             pages.append(
                 {
@@ -3271,7 +5557,11 @@ def _manifest_pages_to_payload(manifest: ProcessingManifest) -> list[dict[str, A
 
     grouped: dict[int, list[ManifestElement]] = {}
     for element in manifest.elements:
-        if _is_left_out_of_payload(element):
+        if (
+            _is_left_out_of_payload(element)
+            or element.id in page_numbers
+            or element.id in merged
+        ):
             continue
         page_number = element.page_number or 1
         grouped.setdefault(page_number, []).append(element)
@@ -3281,7 +5571,7 @@ def _manifest_pages_to_payload(manifest: ProcessingManifest) -> list[dict[str, A
             grouped[page_number],
             key=lambda item: item.reading_order,
         )
-        blocks = [_element_to_block(item) for item in page_elements]
+        blocks = _elements_to_blocks(page_elements, letterhead_blocks)
         _dedupe_callout_titles(blocks)
         pages.append(
             {
@@ -3294,7 +5584,290 @@ def _manifest_pages_to_payload(manifest: ProcessingManifest) -> list[dict[str, A
     return pages
 
 
-def _element_to_block(element: ManifestElement) -> dict[str, Any]:
+def _elements_to_blocks(
+    elements: list[ManifestElement], replacements: dict[str, dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Blocks of ``elements`` in order, with the text an undescribed picture held.
+
+    An element in ``replacements`` (the first member of a letterhead) gives
+    way to its block, which already stands for the picture's text.
+    """
+    callout_titles = _callout_titles(elements)
+    recovered_items, consumed_text, preambles = _recover_empty_lettered_list_items(elements)
+    blocks: list[dict[str, Any]] = []
+    dropped_empty_items: list[ManifestElement] = []
+    for element in elements:
+        if element.id in replacements:
+            blocks.append(replacements[element.id])
+            continue
+        if preamble := preambles.get(element.id):
+            blocks.append(_element_to_block(preamble, callout_titles))
+        text = consumed_text.get(element.id)
+        if text is not None:
+            if not text:
+                continue
+            element = element.model_copy(update={"text": text})
+        recovered = recovered_items.get(element.id)
+        if recovered is not None:
+            item_text, marker = recovered
+            metadata = {**element.metadata, "enumerated": True, "marker": marker}
+            element = element.model_copy(
+                update={"text": item_text, "metadata": metadata}
+            )
+        block = _element_to_block(element, callout_titles)
+        if block.get("type") != "list" or any(
+            isinstance(item, str) and item.strip()
+            for item in block.get("items", [])
+        ):
+            blocks.append(block)
+        else:
+            dropped_empty_items.append(element)
+        blocks.extend(_element_to_block(kept) for kept in _text_kept_by_picture(element))
+    if dropped_empty_items:
+        # The extractor found list items it could not read; the document
+        # goes without them, which the operator should be able to see.
+        logger.warning(
+            t(LOG_PDDL_EMPTY_LIST_ITEMS_DROPPED).format(
+                count=len(dropped_empty_items),
+                page=dropped_empty_items[0].page_number,
+                element_ids=", ".join(item.id for item in dropped_empty_items),
+            )
+        )
+    return _merge_list_blocks(blocks)
+
+
+#: ``a)`` at the start of the text or after whitespace: a letter after any
+#: other character (``(a)``, ``x(a)``) is an enumeration inside prose.
+_LETTERED_LIST_SOURCE_MARKER = re.compile(
+    r"(?:^|(?<=\s))(?P<marker>[A-Za-z])\)(?=\s)"
+)
+
+
+def _recover_empty_lettered_list_items(
+    elements: list[ManifestElement],
+) -> tuple[dict[str, tuple[str, str]], dict[str, str], dict[str, ManifestElement]]:
+    """Recover a fully extracted lettered list from a sibling text element.
+
+    Some extractors emit empty ``list_item`` elements while leaving the actual
+    ``a) ... b) ... c)`` text in a paragraph on the same page. Move that text
+    only when one paragraph in the same heading section has the exact marker
+    sequence of one fully empty list group. Explicit non-alphabetic markers,
+    ambiguous matches and partial matches stay untouched.
+
+    Returns item-id -> (text, marker) and source-paragraph-id -> remaining
+    prefix, and first-item-id -> preamble to emit before that item. The
+    paragraph's list text is consumed once, avoiding duplicate output. A
+    preamble after the first item moves before it, keeping the exercise's
+    introduction ahead of its questions.
+
+    The last item runs to the end of the paragraph: a sentence after it (a
+    closing remark) stays in that item, since a question can itself span
+    several sentences and no marker says where it ends.
+    """
+    sections: dict[str, int] = {}
+    section = 0
+    groups: dict[str, list[ManifestElement]] = {}
+    for element in elements:
+        if element.type in {"title", "heading"}:
+            section += 1
+        sections[element.id] = section
+        if element.type == "list_item" and element.parent_id:
+            groups.setdefault(element.parent_id, []).append(element)
+
+    empty_groups = {
+        parent_id: sorted(items, key=lambda item: item.reading_order)
+        for parent_id, items in groups.items()
+        if len(items) >= 2
+        and all(not (item.text or "").strip() for item in items)
+        and len({sections[item.id] for item in items}) == 1
+    }
+    if not empty_groups:
+        return {}, {}, {}
+
+    sources = [
+        element
+        for element in elements
+        if element.type in {"paragraph", "unknown"} and (element.text or "").strip()
+    ]
+    matches_by_group: dict[
+        str, list[tuple[ManifestElement, list[tuple[str, str]], str]]
+    ] = {parent_id: [] for parent_id in empty_groups}
+
+    for parent_id, items in empty_groups.items():
+        known_markers: list[tuple[int, str] | None] = []
+        for item in items:
+            marker = str(item.metadata.get("marker") or "").strip()
+            parsed = marker_numbering(marker) if marker else None
+            if marker and (parsed is None or not parsed[1].endswith("-alpha")):
+                known_markers = []
+                break
+            known_markers.append(parsed)
+        if not known_markers:
+            continue
+
+        for source in sources:
+            if sections[source.id] != sections[items[0].id]:
+                continue
+            source_text = source.text or ""
+            markers = list(_LETTERED_LIST_SOURCE_MARKER.finditer(source_text))
+            if len(markers) != len(items):
+                continue
+            parsed_markers = [
+                marker_numbering(f"{match.group('marker')})") for match in markers
+            ]
+            if any(
+                marker is None or not marker[1].endswith("-alpha")
+                for marker in parsed_markers
+            ):
+                continue
+            typed_markers = [marker for marker in parsed_markers if marker is not None]
+            style = typed_markers[0][1]
+            first_number = typed_markers[0][0]
+            if any(marker[1] != style for marker in typed_markers) or [
+                marker[0] for marker in typed_markers
+            ] != list(range(first_number, first_number + len(items))):
+                continue
+            if any(
+                known is not None and known != actual
+                for known, actual in zip(known_markers, typed_markers, strict=True)
+            ):
+                continue
+
+            item_texts = []
+            for index, match in enumerate(markers):
+                end = markers[index + 1].start() if index + 1 < len(markers) else len(source_text)
+                item_texts.append(source_text[match.end() : end].strip())
+            if not all(item_texts):
+                continue
+            prefix = source_text[: markers[0].start()].strip()
+            marker_texts = [match.group("marker") + ")" for match in markers]
+            matches_by_group[parent_id].append(
+                (source, list(zip(marker_texts, item_texts, strict=True)), prefix)
+            )
+
+    group_counts: dict[str, int] = {}
+    source_counts: dict[str, int] = {}
+    for parent_id, matches in matches_by_group.items():
+        group_counts[parent_id] = len(matches)
+        for source, _, _ in matches:
+            source_counts[source.id] = source_counts.get(source.id, 0) + 1
+
+    recovered: dict[str, tuple[str, str]] = {}
+    consumed: dict[str, str] = {}
+    preambles: dict[str, ManifestElement] = {}
+    positions = {element.id: index for index, element in enumerate(elements)}
+    for parent_id, matches in matches_by_group.items():
+        if group_counts[parent_id] != 1:
+            continue
+        source, marked_texts, prefix = matches[0]
+        if source_counts[source.id] != 1:
+            continue
+        for item, (marker, text) in zip(
+            empty_groups[parent_id], marked_texts, strict=True
+        ):
+            recovered[item.id] = (text, marker)
+        first_item = empty_groups[parent_id][0]
+        if prefix and positions[source.id] > positions[first_item.id]:
+            preambles[first_item.id] = source.model_copy(update={"text": prefix})
+            prefix = ""
+        consumed[source.id] = prefix
+
+    return recovered, consumed, preambles
+
+
+def _callout_titles(elements: list[ManifestElement]) -> dict[str, str]:
+    """Each callout's title, read from its title element's text as it stands now.
+
+    The Toolbox copies the title into ``metadata.callout_title`` when it groups
+    the callout, before any repair; the text-repair methods then fix the
+    title element's text only, so the copy keeps the broken accents
+    ("observa¸ c˜ oes").
+
+    Read per page: the Toolbox groups callouts page by page, so a callout's
+    title and content never sit on different pages.
+    """
+    return {
+        str(element.metadata["callout_id"]): (element.text or "").strip()
+        for element in elements
+        if element.metadata.get("callout_id")
+        and str(element.metadata.get("callout_role", "")).lower() == "title"
+        and (element.text or "").strip()
+    }
+
+
+def _merge_list_blocks(blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Blocks with each run of items from one source list joined into one list.
+
+    Each list item becomes a list block of its own. Consecutive ones that share
+    their Docling list (``parent_id``) and kind are one list; an item kept
+    apart by a formula or a paragraph stays a list of its own, whose ``start``
+    carries the numbering on.
+
+    The joined list keeps the first item's identity and provenance (``id``,
+    ``manifest_element_id``, ``source_location``); the later items lend it
+    their text only. Nothing reads provenance per item.
+    """
+    merged: list[dict[str, Any]] = []
+    for block in blocks:
+        previous = merged[-1] if merged else None
+        parent_id = (block.get("metadata") or {}).get("parent_id")
+        if (
+            previous is not None
+            and parent_id
+            and block.get("type") == previous.get("type") == "list"
+            and block.get("ordered") == previous.get("ordered")
+            and (previous.get("metadata") or {}).get("parent_id") == parent_id
+        ):
+            previous["items"].extend(block.get("items", []))
+            continue
+        merged.append(block)
+    return merged
+
+
+def _text_kept_by_picture(element: ManifestElement) -> list[ManifestElement]:
+    """The text a picture took from the slide, as paragraphs, when it went undescribed.
+
+    Slide structuring hands text to a picture: a slide read as one picture
+    keeps the text it replaced (``replaced_text``), a text slide's labels are
+    folded into the picture they lie on or beside (``figure_labels``). Its
+    description was to carry that text; without one, the text goes back to
+    the slide after the picture, as it stood before, instead of being lost or
+    listed as the picture's alt text (006.pdf v5, slides 16 and 31).
+
+    Only the vision model's description carries that text: an alt the
+    extractor gave the picture, which a failed call leaves in place, does not.
+    The paragraphs carry the picture's source location; the labels' own boxes
+    left with the elements they were folded from.
+    """
+    if element.type != "picture" or (
+        element.metadata.get("vision_description_complete") and (element.text or "").strip()
+    ):
+        return []
+    replaced = element.metadata.get("replaced_text")
+    texts = (
+        [line for line in replaced.splitlines() if line.strip()]
+        if isinstance(replaced, str) and replaced.strip()
+        else list(element.metadata.get("figure_labels") or [])
+    )
+    return [
+        ManifestElement(
+            id=f"{element.id}-kept-{index:03d}",
+            type="paragraph",
+            raw_label="paragraph",
+            reading_order=element.reading_order,
+            hierarchy_level=element.hierarchy_level,
+            text=text,
+            page_number=element.page_number,
+            provenance=list(element.provenance),
+            metadata={"kept_from_undescribed_picture": element.id},
+        )
+        for index, text in enumerate(texts, start=1)
+    ]
+
+
+def _element_to_block(
+    element: ManifestElement, callout_titles: dict[str, str] | None = None
+) -> dict[str, Any]:
     provenance = element.provenance[0] if element.provenance else None
     metadata: dict[str, Any] = {
         "raw_label": element.raw_label,
@@ -3322,7 +5895,9 @@ def _element_to_block(element: ManifestElement) -> dict[str, Any]:
     callout_id = metadata.get("callout_id")
     callout_role = str(metadata.get("callout_role", "")).lower()
     callout_type = str(metadata.get("callout_type", "note")).lower()
-    callout_title = str(metadata.get("callout_title", "")).strip()
+    callout_title = (callout_titles or {}).get(str(callout_id)) or str(
+        metadata.get("callout_title", "")
+    ).strip()
     callout_block_type = "warning" if callout_type in {"warning", "aviso", "importante", "caution"} else "note"
     block: dict[str, Any] = {
         "id": element.id,
@@ -3330,7 +5905,11 @@ def _element_to_block(element: ManifestElement) -> dict[str, Any]:
         "metadata": metadata,
     }
 
-    if callout_id and callout_role != "title":
+    if (
+        callout_id
+        and callout_role != "title"
+        and metadata.get("slide_role") not in {"slide_heading", "deck_title"}
+    ):
         block.update(
             {
                 "type": callout_block_type,
@@ -3349,13 +5928,21 @@ def _element_to_block(element: ManifestElement) -> dict[str, Any]:
             }
         )
     elif element.type == "list_item":
+        ordered = bool(metadata.get("enumerated"))
         block.update(
             {
                 "type": "list",
-                "ordered": False,
+                "ordered": ordered,
                 "items": [text] if text else [],
             }
         )
+        numbering = marker_numbering(metadata.get("marker")) if ordered else None
+        if numbering is not None:
+            start, style = numbering
+            if start > 1:
+                block["start"] = start
+            if style != "decimal":
+                block["numbering"] = style
     elif element.type == "table":
         table_ast = _table_ast_from_metadata(metadata)
         rows = _rows_from_table_ast(table_ast) if table_ast else None
@@ -3374,7 +5961,7 @@ def _element_to_block(element: ManifestElement) -> dict[str, Any]:
         block.update(
             {
                 "type": "image",
-                "alt_text": text or "Imagem detectada sem descricao textual.",
+                "alt_text": text or t(MSG_UNDESCRIBED_PICTURE_ALT),
             }
         )
     elif element.type == "code":
@@ -3412,8 +5999,10 @@ def _render_text_from_blocks(blocks: list[dict[str, Any]]) -> str:
             prefix = "#" * max(1, min(level, 6))
             lines.append(f"{prefix} {block.get('text', '').strip()}")
         elif block_type == "list":
-            for item in block.get("items", []):
-                lines.append(f"- {str(item).strip()}")
+            numbering = list_numbering(block)
+            for number, item in enumerate(block.get("items", []), start=list_start(block)):
+                marker = f"{item_label(number, numbering)}." if block.get("ordered") else "-"
+                lines.append(f"{marker} {str(item).strip()}")
         elif block_type == "table":
             rows = block.get("rows")
             if not rows and isinstance(block.get("table_ast"), dict):

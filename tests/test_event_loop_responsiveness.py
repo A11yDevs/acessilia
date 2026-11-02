@@ -63,7 +63,7 @@ async def test_vision_inference_does_not_block_event_loop(monkeypatch):
     import backend.agents.vision_agent as vision_module
 
     monkeypatch.setattr(vision_module, "Agent", _BlockingAgent)
-    monkeypatch.setattr(vision_module, "get_agno_model", lambda: object())
+    monkeypatch.setattr(vision_module, "get_agno_model", lambda **_kwargs: object())
     agent = VisionAgent()
 
     await _assert_event_loop_is_responsive(

@@ -239,6 +239,8 @@ class ToolboxCapabilityClient:
         self,
         capability_id: str,
         call: Callable[[httpx.AsyncClient], Awaitable[T]],
+        *,
+        missing_artifact_failover: bool = False,
     ) -> tuple[httpx.AsyncClient, T]:
         """Run ``call`` against a REST capability with failover and retries.
 
@@ -257,12 +259,16 @@ class ToolboxCapabilityClient:
         async def check(catalog: CatalogCache) -> None:
             await _require_published(catalog, capability_id)
 
-        return await self._with_failover(call, check)
+        return await self._with_failover(
+            call, check, missing_artifact_failover=missing_artifact_failover
+        )
 
     async def _with_failover(
         self,
         call: Callable[[httpx.AsyncClient], Awaitable[T]],
         check: Callable[[CatalogCache], Awaitable[None]],
+        *,
+        missing_artifact_failover: bool = False,
     ) -> tuple[httpx.AsyncClient, T]:
         """Run ``call`` on each endpoint in turn, with retries on each one.
 
@@ -270,15 +276,38 @@ class ToolboxCapabilityClient:
         :class:`ToolboxIncompatibleEndpoint` to skip it.
         """
         causes: list[tuple[str, ToolboxError]] = []
+        errors: tuple[type[ToolboxError], ...] = (
+            *FAILOVER_ERRORS,
+            ToolboxIncompatibleEndpoint,
+        )
+        if missing_artifact_failover:
+            errors = (*errors, ToolboxArtifactNotFound)
         for endpoint, http, catalog in zip(self.endpoints, self._clients, self._catalogs):
             try:
                 if catalog is not None:
                     await check(catalog)
                 result = await self._with_retries(lambda: call(http))
-            except (*FAILOVER_ERRORS, ToolboxIncompatibleEndpoint) as exc:
+            except errors as exc:
                 self._record_failover(causes, endpoint, exc)
                 continue
             return http, result
+        if missing_artifact_failover:
+            # An endpoint that cannot serve the download says nothing about
+            # the artifact, so only the endpoints that answered decide.
+            answered = [
+                (url, error)
+                for url, error in causes
+                if not isinstance(error, ToolboxIncompatibleEndpoint)
+            ]
+            if answered and all(
+                isinstance(error, ToolboxArtifactNotFound) for _, error in answered
+            ):
+                if len(answered) == 1:
+                    raise answered[0][1]
+                details = "; ".join(f"{url}: {error}" for url, error in answered)
+                raise ToolboxArtifactNotFound(
+                    f"Artifact not found on any configured endpoint ({details})"
+                ) from answered[-1][1]
         raise _combined(causes)
 
     async def _with_retries(self, attempt_call: Callable[[], Awaitable[T]]) -> T:

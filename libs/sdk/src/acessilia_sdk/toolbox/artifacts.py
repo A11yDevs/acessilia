@@ -11,6 +11,7 @@ import contextlib
 import hashlib
 import os
 import re
+import tempfile
 from collections.abc import Callable, Iterator
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
@@ -46,7 +47,7 @@ class ArtifactRef:
 
     @classmethod
     def parse(cls, artifact_id: str) -> ArtifactRef:
-        match = ARTIFACT_ID_RE.match(artifact_id or "")
+        match = ARTIFACT_ID_RE.fullmatch(artifact_id or "")
         if match is None:
             raise ToolboxContractViolation(
                 f"Malformed Toolbox artifact_id {artifact_id!r}"
@@ -74,21 +75,30 @@ async def download_artifact(
     errors (for instance a missing destination directory) are the caller's
     and propagate as ``OSError``.
     """
-    partial = destination.with_name(f".{destination.name}.part")
+    # Concurrent verified downloads use independent files; the last completed
+    # atomic replacement wins. A failed download cannot remove another's file.
+    partial: Path | None = None
     try:
 
         @contextlib.contextmanager
         def to_partial() -> Iterator[Callable[[bytes], object]]:
-            with open(partial, "wb") as file:
+            nonlocal partial
+            fd, name = tempfile.mkstemp(
+                dir=destination.parent, prefix=f".{destination.name}.", suffix=".part"
+            )
+            partial = Path(name)
+            with os.fdopen(fd, "wb") as file:
                 yield file.write
                 file.flush()
                 os.fsync(file.fileno())
 
         digest, head = await _stream(http, ref, to_partial, len(magic or b""))
         _verify(ref, digest, head, magic)
+        assert partial is not None
         os.replace(partial, destination)
     except BaseException:
-        partial.unlink(missing_ok=True)
+        if partial is not None:
+            partial.unlink(missing_ok=True)
         raise
     _sync_directory(destination.parent)
 

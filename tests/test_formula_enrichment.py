@@ -192,9 +192,11 @@ def _math_block() -> dict:
 
 def test_html_renderer_embeds_mathml_with_aria_label():
     html = render_html_block(_math_block(), {})
-    assert 'role="math"' in html
-    assert 'aria-label="Fórmula: E igual a m c elevado a 2"' in html
-    assert '<math xmlns="http://www.w3.org/1998/Math/MathML">' in html
+    assert (
+        '<div id="blk-1"><math xmlns="http://www.w3.org/1998/Math/MathML" '
+        'aria-label="Fórmula: E igual a m c elevado a 2" display="block">' in html
+    )
+    assert 'role="math"' not in html
     assert "&lt;math" not in html
 
 
@@ -363,3 +365,164 @@ def test_html_renderer_mathml_sanitizado():
     assert "&lt;script&gt;" not in html
     assert ">x=1</p>" in html
     assert "<script>" not in html
+
+
+class _CountingEnricher:
+    """A MathEnricher that records every call."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str]] = []
+
+    def normalize(self, latex: str) -> str:
+        return latex
+
+    def to_mathml(self, latex: str) -> str:
+        self.calls.append(("to_mathml", latex))
+        return "<math/>"
+
+    def verbalize(self, latex: str) -> str:
+        self.calls.append(("verbalize", latex))
+        return "Formula: new"
+
+
+def test_canonical_enrichment_reuses_what_the_plan_produced():
+    """The plan already called math.convert/math.verbalize; the canonical build
+    must not call them again for the same formula (#257)."""
+    from docstruct.canonical import _enrich_math_blocks
+
+    planned = {"type": "math", "text": "x^2", "metadata": {
+        "mathml": "<math>planned</math>", "verbalization": "Formula: x squared"}}
+    unplanned = {"type": "math", "text": "y^2", "metadata": {}}
+    sections = [{"blocks": [planned, unplanned], "children": []}]
+    enricher = _CountingEnricher()
+
+    _enrich_math_blocks(sections, enricher)
+
+    assert planned["metadata"]["mathml"] == "<math>planned</math>"
+    assert planned["alt_text"] == "Formula: x squared"
+    assert unplanned["metadata"]["mathml"] == "<math/>"
+    assert unplanned["alt_text"] == "Formula: new"
+    assert enricher.calls == [("to_mathml", "y^2"), ("verbalize", "y^2")]
+
+
+# ── implicit products (#332) ──
+
+IT = "\u2062"
+
+
+def _manifest_with_formulas(*texts):
+    from backend.core.manifest.models import ManifestElement
+
+    manifest = _manifest_with_formula()
+    manifest.elements = [
+        ManifestElement(
+            id=f"el-f{index}",
+            type="formula",
+            raw_label="formula",
+            reading_order=index,
+            hierarchy_level=1,
+            text=text,
+            page_number=1,
+        )
+        for index, text in enumerate(texts, start=1)
+    ]
+    manifest.obligations[0].target_ids = [element.id for element in manifest.elements]
+    return manifest
+
+
+@pytest.mark.parametrize(
+    ("handler", "capability"),
+    [
+        ("_handle_mathml_method", "convert"),
+        ("_handle_latex_verbalizer_method", "verbalize"),
+    ],
+)
+def test_pddl_handlers_send_a_variable_product_as_a_product(toolbox_math, handler, capability):
+    """h is a variable of the document (h \\neq 0), s a function (s(t)): only
+    h( gets U+2062, so MathCAT says "h vezes", not "h de"."""
+    from backend.agents import pddl_orchestrator
+
+    texts = (r"h \neq 0", r"\frac{h(12 + 6h + h^2)}{h}", r"s(t) = t^3")
+    manifest = _manifest_with_formulas(*texts)
+
+    assert getattr(pddl_orchestrator, handler)(manifest, "o-f").success
+
+    assert toolbox_math[capability] == [
+        r"h \neq 0", r"\frac{h" + IT + r"(12 + 6h + h^2)}{h}", r"s(t) = t^3"
+    ]
+    # The document keeps the source's LaTeX.
+    assert [element.text for element in manifest.elements] == list(texts)
+
+
+def test_canonical_build_marks_products_in_blocks_and_inline_spans(toolbox_math):
+    from backend.pipeline.canonical_builder import build_canonical_document
+
+    payload = {
+        "pages": [
+            {
+                "blocks": [
+                    {"type": "paragraph", "text": r"Quando $h \to 0$, $s(t)$ e $h(1 + h)$."},
+                    {"type": "math", "text": r"\frac{h(12 + h)}{h}"},
+                ]
+            }
+        ]
+    }
+
+    document = build_canonical_document(payload, title="t")
+
+    sent = toolbox_math["convert"] + toolbox_math["verbalize"]
+    assert "h" + IT + "(1 + h)" in sent and "s(t)" in sent
+    assert r"\frac{h" + IT + "(12 + h)}{h}" in sent
+    blocks = document["sections"][0]["blocks"]
+    assert all(IT not in str(block.get("text")) for block in blocks)
+
+
+@pytest.mark.parametrize('kind', ['cell', 'caption', 'replaced_text', 'figure_labels', 'described_picture', 'code'])
+@pytest.mark.parametrize(('handler', 'capability'), [
+    ('_handle_mathml_method', 'convert'),
+    ('_handle_latex_verbalizer_method', 'verbalize'),
+])
+def test_plan_and_canonical_use_the_same_variable_sources(toolbox_math, kind, handler, capability):
+    from copy import deepcopy
+    from backend.agents import pddl_orchestrator as orchestrator
+    from backend.core.manifest.models import ManifestElement
+    from docstruct.canonical import _math_sources
+    from docstruct.text.implicit_products import implicit_product_variables
+
+    evidence = r'$h \neq 0$'
+    metadata = {}
+    element_type = 'picture'
+    text = None
+    if kind in {'cell', 'caption'}:
+        element_type = 'table'
+        metadata = {'table_ast': {
+            'caption': evidence if kind == 'caption' else '',
+            'body': [{'cells': [{'text': evidence if kind == 'cell' else 'value'}]}],
+        }}
+    elif kind == 'code':
+        element_type, text = 'code', evidence
+    elif kind == 'figure_labels':
+        metadata = {'figure_labels': [evidence]}
+    else:
+        metadata = {'replaced_text': evidence}
+        if kind == 'described_picture':
+            metadata['vision_description_complete'] = True
+            text = 'Description'
+    manifest = _manifest_with_formulas('h(1+h)')
+    manifest.elements.append(ManifestElement(
+        id='evidence', type=element_type, raw_label=element_type,
+        reading_order=2, hierarchy_level=1, text=text,
+        page_number=1, metadata=metadata,
+    ))
+    before = deepcopy(manifest)
+    blocks = []
+    for element in manifest.elements:
+        blocks.append(orchestrator._element_to_block(element))
+        blocks.extend(orchestrator._element_to_block(kept)
+                      for kept in orchestrator._text_kept_by_picture(element))
+    expected = frozenset() if kind in {'described_picture', 'code'} else frozenset({'h'})
+    assert implicit_product_variables(_math_sources([{'blocks': blocks}])) == expected
+    assert orchestrator._implicit_product_variables(manifest) == expected
+    assert manifest == before
+    assert getattr(orchestrator, handler)(manifest, 'o-f').success
+    assert toolbox_math[capability] == ['h' + (IT if expected else '') + '(1+h)']

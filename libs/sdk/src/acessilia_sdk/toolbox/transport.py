@@ -72,7 +72,9 @@ def raise_for_error(response: httpx.Response, context: str) -> None:
     except Exception:
         detail = response.text[:500]
 
-    if status == 503:
+    # 502 is the gateway failing to reach the provider; a 500 may be the
+    # provider failing on this input, so it stays a plain ToolboxError.
+    if status in (502, 503):
         raise ToolboxProviderUnavailable(
             f"Provedor indisponível ({context}): {detail}"
         )

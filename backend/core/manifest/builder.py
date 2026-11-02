@@ -6,8 +6,12 @@ from collections import Counter
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from docstruct.text.equations import preserve_equation_number
+from docstruct.text.latex import has_latex_markup
+
 from backend.i18n import t
 from backend.log_messages import (
+    LOG_MANIFEST_STRUCTURAL_CONTAINER_SKIPPED,
     MSG_HEADING_GAP,
     MSG_OBLIGATION_CODE,
     MSG_OBLIGATION_FORMULA,
@@ -17,6 +21,7 @@ from backend.log_messages import (
     MSG_OBLIGATION_UNSTRUCTURED_PAGE,
     MSG_OBSERVATION_PAGE_WITHOUT_STRUCTURE,
 )
+from backend.tools.logger import logger
 
 from backend.core.manifest.models import (
     Artifact,
@@ -25,6 +30,13 @@ from backend.core.manifest.models import (
     Obligation,
     Observation,
     ProcessingManifest,
+)
+from backend.core.manifest.slides import (
+    DEFAULT_FOLD_FIGURE_LABELS,
+    DEFAULT_VISUAL_COVERAGE,
+    is_slide_heading,
+    split_across_slides,
+    structure_as_slides,
 )
 from docstruct.placeholders import (
     UNSTRUCTURED_PAGE_FLAG,
@@ -37,35 +49,38 @@ from docstruct.geometry import (
     order_reading_items,
     reading_role,
 )
+from docstruct.tables.ast import raw_rows_from_table_ast as _rows_from_table_ast
 
 if TYPE_CHECKING:
     from backend.core.manifest.toolbox_extractor import ToolboxExtraction
 
 
+# Store message IDs here; translate only while building the current request.
+# Translation at import time freezes the server locale for all later requests.
 OBLIGATION_BY_TYPE = {
     "picture": (
         "describe-image",
-        t(MSG_OBLIGATION_IMAGE),
+        MSG_OBLIGATION_IMAGE,
         ["vision-description", "human-review"],
     ),
     "table": (
         "linearize-table",
-        t(MSG_OBLIGATION_TABLE),
+        MSG_OBLIGATION_TABLE,
         ["pandoc-table", "human-review"],
     ),
     "formula": (
         "verbalize-formula",
-        t(MSG_OBLIGATION_FORMULA),
+        MSG_OBLIGATION_FORMULA,
         ["mathml", "latex-verbalizer", "human-review"],
     ),
     "code": (
         "preserve-code-semantics",
-        t(MSG_OBLIGATION_CODE),
+        MSG_OBLIGATION_CODE,
         ["pandoc-code", "human-review"],
     ),
     "unknown": (
         "review-structure",
-        t(MSG_OBLIGATION_UNKNOWN),
+        MSG_OBLIGATION_UNKNOWN,
         ["pymupdf-region", "human-review"],
     ),
 }
@@ -92,6 +107,7 @@ DEFAULT_METHOD_COSTS = {
     "verse-chunker": 5,
     "line-number-extractor": 5,
     "norm-fix": 5,
+    "unicode-repair": 5,
     "rescue-omitted": 15,
     "table-smart-fusion": 20,
     "single-provider": 20,
@@ -103,6 +119,13 @@ DEFAULT_METHOD_COSTS = {
 
 # Obrigações introduzidas na versão 2.3 do domínio PDDL (PR #125).
 # kind -> (rationale, métodos admissíveis)
+#: v2.3 needs the builder emits only for an element of this type, on its own
+#: text: once the element is another type they no longer apply, and their
+#: methods (``latex-normalizer`` filters formulas) would find no target.
+TYPE_BOUND_V23_KINDS: dict[str, frozenset[str]] = {
+    "formula": frozenset({"normalize-formula"}),
+}
+
 V23_OBLIGATION_BY_KIND = {
     "adjudicate-page": (
         "Página com divergência entre providers exige adjudicação.",
@@ -148,6 +171,10 @@ V23_OBLIGATION_BY_KIND = {
         "Texto exige limpezas determinísticas (ligaduras, hífen, NBSP).",
         ["norm-fix", "human-review"],
     ),
+    "repair-legacy-unicode": (
+        "Texto extraído de PDF legado contém Unicode mal composto (NFD ou i sem ponto).",
+        ["unicode-repair", "human-review"],
+    ),
     "inspect-unstructured-page": (
         "Página sem estrutura extraída exige inspeção visual.",
         ["vision-page-inspection", "human-review"],
@@ -173,12 +200,17 @@ def build_processing_manifest(
     *,
     language: str = "pt-BR",
     refine_reading_order: bool = False,
+    presentation: bool = False,
+    slide_visual_coverage: float = DEFAULT_VISUAL_COVERAGE,
+    slide_fold_figure_labels: bool = DEFAULT_FOLD_FIGURE_LABELS,
 ) -> ProcessingManifest:
     """Builds the processing manifest from the Toolbox structural extraction.
 
     The Toolbox is the only extractor (docs/adr/0003): ``extraction.document``
     is its JSON response, whose elements already carry callouts, code text and
-    table structure. This core adds its own planning policy on top.
+    table structure. This core adds its own planning policy on top. A
+    ``presentation`` is structured slide by slide (``slides.structure_as_slides``)
+    before its processing needs are derived.
 
     Raises:
         TypeError: When the extraction is not a Toolbox JSON response.
@@ -196,7 +228,30 @@ def build_processing_manifest(
         digest=_sha256(source_path),
         language=language,
         refine_reading_order=refine_reading_order,
+        presentation=presentation,
+        slide_visual_coverage=slide_visual_coverage,
+        slide_fold_figure_labels=slide_fold_figure_labels,
     )
+
+
+def separate_equation_number(element: ManifestElement) -> None:
+    """Move a formula's trailing equation label into ``metadata.equation_number``.
+
+    A label written as LaTeX (``x=y\\tag{1}``) proves the extractor already
+    delivered LaTeX, even when nothing else in the expression is a command:
+    ``metadata.latex_markup`` keeps that, so formula recognition still skips
+    it once the label is gone.
+    """
+    if element.type != "formula" or not element.text:
+        return
+    original = element.text
+    element.text = preserve_equation_number(original, element.metadata)
+    if (
+        element.text != original
+        and has_latex_markup(original)
+        and not has_latex_markup(element.text)
+    ):
+        element.metadata["latex_markup"] = True
 
 
 def _build_from_toolbox_json(
@@ -206,6 +261,9 @@ def _build_from_toolbox_json(
     digest: str,
     language: str,
     refine_reading_order: bool = False,
+    presentation: bool = False,
+    slide_visual_coverage: float = DEFAULT_VISUAL_COVERAGE,
+    slide_fold_figure_labels: bool = DEFAULT_FOLD_FIGURE_LABELS,
 ) -> ProcessingManifest:
     """Build a ProcessingManifest from a pre-built Toolbox JSON response.
 
@@ -256,6 +314,23 @@ def _build_from_toolbox_json(
         }
 
     manifest = ProcessingManifest.model_validate(data)
+    for element in manifest.elements:
+        separate_equation_number(element)
+    secondary = extraction.document.get("secondary_extraction")
+    secondary_path = (
+        str(secondary["path"])
+        if isinstance(secondary, dict) and secondary.get("path")
+        else ""
+    )
+    has_secondary_extraction = bool(secondary_path.strip())
+    # skeleton-order reads the file, so it is planned only while the file the
+    # extractor wrote is still there; a recorded path alone would plan a
+    # method that fails and forces a replan (#298).
+    secondary_extraction_readable = (
+        has_secondary_extraction and Path(secondary_path).is_file()
+    )
+    if presentation:
+        split_across_slides(manifest)
     if refine_reading_order:
         manifest.elements = _refine_reading_order(manifest.elements)
         by_page: dict[int, list[str]] = {}
@@ -264,6 +339,14 @@ def _build_from_toolbox_json(
                 by_page.setdefault(elem.page_number, []).append(elem.id)
         for page in manifest.pages:
             page.element_ids = by_page.get(page.page_number, [])
+    if presentation:
+        page_sizes = {page.page_number: (page.width, page.height) for page in manifest.pages}
+        structure_as_slides(
+            manifest,
+            visual_coverage=slide_visual_coverage,
+            fold_figure_labels=slide_fold_figure_labels,
+            page_fractions=lambda element: _normalized_element_bbox(element, page_sizes),
+        )
     observations, obligations = _derive_processing_needs(manifest.elements)
     v23_observations, v23_obligations = _derive_v23_processing_needs(
         manifest.elements,
@@ -272,18 +355,18 @@ def _build_from_toolbox_json(
         },
         fusion_evidence=extraction.document.get("fusion_evidence"),
         fusion_stats=extraction.document.get("fusion_stats"),
+        secondary_extraction_available=secondary_extraction_readable,
     )
     observations.extend(v23_observations)
     obligations.extend(v23_obligations)
     _append_processing_needs(manifest, observations, obligations)
     append_unstructured_page_needs(manifest)
-    secondary = extraction.document.get("secondary_extraction")
-    if isinstance(secondary, dict) and secondary.get("path"):
+    if has_secondary_extraction:
         manifest.artifacts.append(
             Artifact(
                 id=SECONDARY_EXTRACTION_ARTIFACT_ID,
                 kind=SECONDARY_EXTRACTION_KIND,
-                path=str(secondary["path"]),
+                path=secondary_path,
                 media_type="application/json",
                 sha256=secondary.get("sha256"),
             )
@@ -415,20 +498,50 @@ def append_unstructured_page_needs(manifest: ProcessingManifest) -> None:
     )
 
 
+def _is_structural_container(
+    element: ManifestElement, parent_ids: set[str]
+) -> bool:
+    """An unknown element that only groups others and has no region of its own.
+
+    The Toolbox maps Docling's group labels other than lists (``key_value_area``,
+    ``form_area``) to ``unknown`` instead of ``group``. Such a node has no
+    provenance, so region inspection cannot render it and its review-structure
+    obligation could only be escalated, failing the job; its children carry the
+    content and get their own obligations. An unknown leaf, or one with a
+    region, is still reviewed.
+    """
+    return (
+        element.type == "unknown"
+        and not element.provenance
+        and element.id in parent_ids
+    )
+
+
 def _derive_processing_needs(
     elements: list[ManifestElement],
 ) -> tuple[list[Observation], list[Obligation]]:
     observations: list[Observation] = []
     obligations: list[Obligation] = []
+    parent_ids: set[str] = {
+        element.parent_id for element in elements if element.parent_id
+    }
 
     for element in elements:
         if is_unstructured_page_placeholder(element):
             # Planned by append_unstructured_page_needs, not as an unknown region.
             continue
+        if _is_structural_container(element, parent_ids):
+            logger.debug(
+                t(LOG_MANIFEST_STRUCTURAL_CONTAINER_SKIPPED).format(
+                    element_id=element.id, raw_label=element.raw_label
+                )
+            )
+            continue
         spec = OBLIGATION_BY_TYPE.get(element.type)
         if spec is None:
             continue
-        kind, rationale, methods = spec
+        kind, msgid, methods = spec
+        rationale = t(msgid)
         suffix = element.id.removeprefix("element-")
         observations.append(
             Observation(
@@ -498,14 +611,65 @@ def _derive_processing_needs(
     return observations, obligations
 
 
+#: Element types whose text the Unicode repair may rewrite. Tables carry their
+#: content in the cell AST and are read through ``unicode_repair_text``.
+UNICODE_REPAIR_ELEMENT_TYPES = frozenset(
+    {
+        "paragraph",
+        "heading",
+        "title",
+        "list_item",
+        "caption",
+        "footnote",
+        "page_header",
+        "page_footer",
+        "table",
+    }
+)
+
+
+def unicode_repair_text(element: ManifestElement) -> str:
+    """Text the Unicode detection/repair sees for ``element``.
+
+    Page headers/footers are ordinary prose. A table has no ``element.text``:
+    its content lives in the cell AST (plus an optional caption).
+    """
+    if element.type == "table":
+        table_ast = element.metadata.get("table_ast")
+        if not isinstance(table_ast, dict):
+            return ""
+        parts = [
+            value
+            for row in _rows_from_table_ast(table_ast)
+            for value in row
+            if value
+        ]
+        caption = table_ast.get("caption")
+        if isinstance(caption, str) and caption.strip():
+            parts.append(caption)
+        return " ".join(parts)
+    return element.text or ""
+
+
 def _derive_v23_processing_needs(
     elements: list[ManifestElement],
     *,
     page_sizes: dict[int, tuple[float | None, float | None]] | None = None,
     fusion_evidence: Any = None,
     fusion_stats: Any = None,
+    fusion_judge_max_pages: int | None = None,
+    legacy_unicode_repair: str | None = None,
+    secondary_extraction_available: bool = False,
 ) -> tuple[list[Observation], list[Obligation]]:
-    """Emit v2.3 needs only when deterministic checks or fusion evidence support them."""
+    """Emit v2.3 needs only when deterministic checks or fusion evidence support them.
+
+    ``fusion_judge_max_pages`` caps how many pages get the VLM judge
+    (FUSION_JUDGE_MAX_PAGES when None). ``legacy_unicode_repair`` is
+    ``off``/``detect``/``repair`` (LEGACY_UNICODE_REPAIR when None); only
+    ``repair`` emits the obligation, while ``detect`` keeps the observation.
+    ``skeleton-order`` is admissible only when the secondary extraction file
+    the extractor recorded for this document can be read.
+    """
     from docstruct.fusion.line_numbers import extract_line_numbers
     from docstruct.fusion.tailjoin import join_tail, page_number_position, tailjoin3
     from docstruct.fusion.types import DiffBlock
@@ -513,8 +677,11 @@ def _derive_v23_processing_needs(
     from docstruct.fusion.xycut import xycut_order
     from docstruct.text.latex import normalize_latex
     from docstruct.text.norm_fix import norm_fix
+    from docstruct.text.unicode_repair import detect_legacy_unicode
 
-    candidates: list[tuple[str, list[ManifestElement], dict[str, Any]]] = []
+    candidates: list[
+        tuple[str, list[ManifestElement], dict[str, Any], list[str] | None, bool]
+    ] = []
     by_page: dict[int | None, list[ManifestElement]] = {}
     for element in elements:
         by_page.setdefault(element.page_number, []).append(element)
@@ -523,10 +690,13 @@ def _derive_v23_processing_needs(
         kind: str,
         targets: list[ManifestElement],
         evidence: dict[str, Any],
+        methods: list[str] | None = None,
+        *,
+        obligation: bool = True,
     ) -> None:
         valid_targets = [item for item in targets if item.id]
         if valid_targets:
-            candidates.append((kind, valid_targets, evidence))
+            candidates.append((kind, valid_targets, evidence, methods, obligation))
 
     for element in elements:
         text = element.text or ""
@@ -539,10 +709,62 @@ def _derive_v23_processing_needs(
             if normalized != text:
                 add("normalize-text", [element], {"before": text, "after": normalized})
 
+    if legacy_unicode_repair is None:
+        from backend.config.settings import settings
+
+        legacy_unicode_repair = settings.legacy_unicode_repair
+    unicode_mode = str(legacy_unicode_repair or "off").strip().lower()
+    if unicode_mode not in {"off", "detect", "repair"}:
+        unicode_mode = "off"
+    if unicode_mode != "off":
+        legacy_targets: list[ManifestElement] = []
+        legacy_evidence: Counter = Counter()
+        for element in elements:
+            if element.type not in UNICODE_REPAIR_ELEMENT_TYPES:
+                continue
+            text = unicode_repair_text(element)
+            if not text:
+                continue
+            detection = detect_legacy_unicode(text)
+            if not detection.has_signal:
+                continue
+            repairable = bool(
+                detection.combining_runs
+                or detection.dotless
+                or detection.spacing_diacritics
+            )
+            # Phase B rewrites NFC, dotless-i and spacing diacritics; the
+            # handler limits standalone accents to documents with enough
+            # word-internal evidence. Replacement characters stay report-only.
+            if unicode_mode == "repair" and not repairable:
+                continue
+            legacy_targets.append(element)
+            legacy_evidence["elements"] += 1
+            legacy_evidence["combining_runs"] += detection.combining_runs
+            legacy_evidence["combining_marks"] += detection.combining_marks
+            legacy_evidence["dotless"] += detection.dotless
+            legacy_evidence["spacing_diacritics"] += detection.spacing_diacritics
+            legacy_evidence["spacing_word_internal"] += detection.spacing_word_internal
+            legacy_evidence["replacement_characters"] += (
+                detection.replacement_characters
+            )
+        if legacy_targets:
+            add(
+                "repair-legacy-unicode",
+                legacy_targets,
+                dict(legacy_evidence),
+                obligation=unicode_mode == "repair",
+            )
+
     for page_number, page_elements in by_page.items():
+        # A slide's own heading opens the slide whatever its box, folding on
+        # or off: a picture whose crop grew above-left of it would otherwise
+        # be read first (slides.py, _absorb_near_pictures). The deck title has
+        # no box, so it is never positioned.
         positioned = [
             item for item in page_elements
             if _normalized_element_bbox(item, page_sizes) is not None
+            and not is_slide_heading(item)
         ]
         if len(positioned) > 1:
             current = sorted(positioned, key=lambda item: item.reading_order)
@@ -618,9 +840,14 @@ def _derive_v23_processing_needs(
     stats = fusion_stats
     if not isinstance(stats, dict) and isinstance(fusion_evidence, dict):
         stats = fusion_evidence.get("stats")
+    if fusion_judge_max_pages is None:
+        from backend.config.settings import settings
+
+        fusion_judge_max_pages = settings.fusion_judge_max_pages
     if isinstance(fusion_evidence, dict):
         pages = fusion_evidence.get("pages")
         if isinstance(pages, list):
+            entries: list[tuple[int, dict[str, Any], list[ManifestElement]]] = []
             for page_data in pages:
                 if not isinstance(page_data, dict):
                     continue
@@ -629,23 +856,52 @@ def _derive_v23_processing_needs(
                 page_targets = by_page.get(page_number, [])
                 if not isinstance(page_stats, dict) or not page_targets:
                     continue
-                _add_fusion_observations(add, page_targets, page_stats, page_number)
+                entries.append((page_number, page_stats, page_targets))
+            judged = _pages_for_vlm_judge(entries, fusion_judge_max_pages)
+            fused_targets: list[ManifestElement] = []
+            fused_pages: list[int] = []
+            for page_number, page_stats, page_targets in entries:
+                _add_fusion_observations(
+                    add,
+                    page_targets,
+                    page_stats,
+                    page_number,
+                    judge=page_number in judged,
+                )
+                if page_stats.get("provider_divergence"):
+                    fused_targets.extend(page_targets)
+                    fused_pages.append(page_number)
+            # One obligation per document: each fuse-providers step works on the
+            # whole document, so one per page repeated the same extraction.
+            if fused_targets:
+                add("fuse-providers", fused_targets, {"pages": fused_pages})
     elif isinstance(stats, dict):
         targets = [element for element in elements if element.text]
         if targets:
-            _add_fusion_observations(add, targets, stats, None)
+            _add_fusion_observations(
+                add,
+                targets,
+                stats,
+                None,
+                judge=fusion_judge_max_pages > 0 and _needs_vlm_judge(stats),
+            )
+            if stats.get("provider_divergence"):
+                add("fuse-providers", targets, {"page_number": None, "fusion_stats": stats})
 
     observations: list[Observation] = []
     obligations: list[Obligation] = []
     seen: set[tuple[str, tuple[str, ...]]] = set()
-    for kind, targets, evidence in candidates:
+    for kind, targets, evidence, methods_override, emit_obligation in candidates:
         target_ids = list(dict.fromkeys(item.id for item in targets))
         key = (kind, tuple(target_ids))
         if key in seen:
             continue
         seen.add(key)
-        rationale, methods = V23_OBLIGATION_BY_KIND[kind]
-        suffix = "-".join(item.removeprefix("element-") for item in target_ids)
+        rationale, default_methods = V23_OBLIGATION_BY_KIND[kind]
+        methods = list(methods_override or default_methods)
+        if kind == "refine-reading-order" and not secondary_extraction_available:
+            methods = [method for method in methods if method != "skeleton-order"]
+        suffix = _obligation_suffix(target_ids)
         observations.append(
             Observation(
                 id=f"observation-{kind}-{suffix}",
@@ -656,6 +912,8 @@ def _derive_v23_processing_needs(
                 evidence=evidence,
             )
         )
+        if not emit_obligation:
+            continue
         obligations.append(
             Obligation(
                 id=f"obligation-{kind}-{suffix}",
@@ -672,18 +930,98 @@ def _derive_v23_processing_needs(
     return observations, obligations
 
 
+#: Longest id suffix spelled out from the target ids; past it the suffix is a
+#: digest, since a document-level obligation targets every element of every
+#: divergent page and its id goes into the manifest, the PDDL problem and plan.
+MAX_ID_SUFFIX = 80
+
+
+def _obligation_suffix(target_ids: list[str]) -> str:
+    suffix = "-".join(item.removeprefix("element-") for item in target_ids)
+    if len(suffix) <= MAX_ID_SUFFIX:
+        return suffix
+    digest = hashlib.sha256("\n".join(target_ids).encode("utf-8")).hexdigest()
+    return f"{len(target_ids)}-targets-{digest[:12]}"
+
+
+#: Methods of an adjudicate-page obligation. The deterministic router already
+#: ran on the evidence (``route``), and re-running it as agreement-rule would
+#: only repeat its answer, so the obligation goes straight to the VLM judge.
+VLM_JUDGE_METHODS = ["vlm-pairwise-judge", "human-review"]
+
+
+def _needs_vlm_judge(stats: dict[str, Any]) -> bool:
+    """Whether the deterministic router leaves the page to the VLM judge.
+
+    ``decide_v1`` settles a page from a structural fact (one side nearly empty,
+    a table or formula only one provider found) or keeps docling by default;
+    only its preference rules, where both providers have a table or a formula
+    (``both_table->mineru``, ``both_formula->mineru``), are worth a model call,
+    and only when the two pages differ (``provider_divergence``, over all the
+    page's content: ``text_divergence`` leaves tables and formulas out, so a
+    page whose prose matches and whose tables differ would never be judged).
+    Evidence recorded before the router ran has no ``route`` and stays eligible
+    on ``text_divergence``, as before.
+    """
+    route = stats.get("route")
+    if route is None:
+        return bool(stats.get("text_divergence"))
+    if stats.get("route_reason") == "structure_ambiguous":
+        return True
+    return (
+        bool(stats.get("provider_divergence"))
+        and route != "docling"
+        and str(stats.get("route_reason", "")).startswith("both_")
+    )
+
+
+def _pages_for_vlm_judge(
+    entries: list[tuple[int, dict[str, Any], list[ManifestElement]]],
+    budget: int,
+) -> set[int]:
+    """The ``budget`` ambiguous pages the providers disagree on the most.
+
+    Ranked by ``similarity``, the measure ``_needs_vlm_judge`` gates on
+    (``text_similarity`` for evidence recorded before the router ran).
+    """
+    ambiguous = sorted(
+        (
+            float(
+                stats.get("similarity" if "route" in stats else "text_similarity", 0.0)
+            ),
+            page_number,
+        )
+        for page_number, stats, _ in entries
+        if isinstance(page_number, int) and _needs_vlm_judge(stats)
+    )
+    return {page_number for _, page_number in ambiguous[: max(budget, 0)]}
+
+
 def _add_fusion_observations(
     add: Any,
     targets: list[ManifestElement],
     stats: dict[str, Any],
     page_number: int | None,
+    *,
+    judge: bool,
 ) -> None:
+    """Per-page fusion needs; ``fuse-providers`` is emitted once by the caller."""
     if not stats:
         return
-    if stats.get("text_divergence"):
-        add("adjudicate-page", targets, {"page_number": page_number, "fusion_stats": stats})
-    if stats.get("provider_divergence"):
-        add("fuse-providers", targets, {"page_number": page_number, "fusion_stats": stats})
+    if judge:
+        add(
+            "adjudicate-page",
+            targets,
+            {"page_number": page_number, "fusion_stats": stats},
+            VLM_JUDGE_METHODS,
+        )
+    elif stats.get("route_reason") == "structure_ambiguous":
+        add(
+            "adjudicate-page",
+            targets,
+            {"page_number": page_number, "fusion_stats": stats},
+            ["human-review"],
+        )
     if any(key.startswith("dropped-") and value for key, value in stats.items()):
         add("rescue-omitted-block", targets, {"page_number": page_number, "fusion_stats": stats})
     if stats.get("table_divergence"):
@@ -746,10 +1084,12 @@ def reconcile_reclassified_element_processing_needs(
 ) -> None:
     """Reconcile derived observations/obligations after an element changes type.
 
-    Only the standard processing need associated with the reclassified element
-    is replaced; every other observation/obligation (e.g. the v2.3 needs
-    derived from dual-provider fusion evidence) is kept untouched instead of
-    rebuilding the complete list.
+    The standard processing need associated with the reclassified element is
+    replaced, and the v2.3 needs bound to its previous type
+    (``TYPE_BOUND_V23_KINDS``, such as ``normalize-formula``) are dropped;
+    every other observation/obligation (e.g. the v2.3 needs derived from
+    dual-provider fusion evidence) is kept untouched instead of rebuilding the
+    complete list.
     """
     if previous_type == element.type:
         return
@@ -759,12 +1099,15 @@ def reconcile_reclassified_element_processing_needs(
     if current_spec is None:
         return
 
-    current_kind, rationale, methods = current_spec
+    current_kind, msgid, methods = current_spec
+    rationale = t(msgid)
     previous_kind = previous_spec[0] if previous_spec is not None else None
     previous_observation_kind = (
         f"{previous_type}-requires-processing" if previous_spec is not None else None
     )
     current_observation_kind = f"{element.type}-requires-processing"
+    bound_kinds = TYPE_BOUND_V23_KINDS.get(previous_type, frozenset())
+    bound_observation_kinds = {f"{kind}-detected" for kind in bound_kinds}
     suffix = element.id.removeprefix("element-")
     current_obligation_id = f"obligation-{current_kind}-{suffix}"
     current_observation_id = f"observation-{current_kind}-{suffix}"
@@ -776,10 +1119,9 @@ def reconcile_reclassified_element_processing_needs(
         targets_only_element = obligation.target_ids == [element.id]
         if targets_only_element and obligation.kind == current_kind:
             has_current_obligation = True
-        if (
-            targets_only_element
-            and previous_kind is not None
-            and obligation.kind == previous_kind
+        if targets_only_element and (
+            (previous_kind is not None and obligation.kind == previous_kind)
+            or obligation.kind in bound_kinds
         ):
             removed_obligation_ids.add(obligation.id)
             continue
@@ -822,10 +1164,12 @@ def reconcile_reclassified_element_processing_needs(
         targets_only_element = observation.target_ids == [element.id]
         if targets_only_element and observation.kind == current_observation_kind:
             has_current_observation = True
-        if (
-            targets_only_element
-            and previous_observation_kind is not None
-            and observation.kind == previous_observation_kind
+        if targets_only_element and (
+            (
+                previous_observation_kind is not None
+                and observation.kind == previous_observation_kind
+            )
+            or observation.kind in bound_observation_kinds
         ):
             continue
         retained_observations.append(observation)

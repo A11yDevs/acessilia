@@ -14,7 +14,7 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 - Primary actor: End user.
 - Goal: convert PDF/image/document into accessible outputs.
 - Input: supported file.
-- Output: TXT, DOCX, PDF, PDF/UA, HTML and MP3, delivered in chat, as a download link, or by email.
+- Output: TXT, DOCX, PDF/UA, HTML and MP3, delivered in chat, as a download link, or by email.
 - Implementation:
   - input/validation: [frontend/telegram/handlers/document.py](../frontend/telegram/handlers/document.py), [backend/tools/validators.py](../backend/tools/validators.py)
   - processing: [backend/service.py](../backend/service.py) runs the PDDL orchestrator [backend/agents/pddl_orchestrator.py](../backend/agents/pddl_orchestrator.py) (`PIPELINE_ENGINE=pddl`; the legacy engine is disabled), which feeds [backend/pipeline/canonical_builder.py](../backend/pipeline/canonical_builder.py)

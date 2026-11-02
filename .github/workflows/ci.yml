@@ -22,6 +22,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # During BHS a release branch only takes bug fixes (CONTRIBUTING.md, 5.1);
+  # features, improvements and refactorings keep going to develop.
+  release-scope:
+    name: release accepts only fixes
+    if: github.event_name == 'pull_request' && startsWith(github.base_ref, 'release/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Reject branches that are not fixes
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          case "$HEAD_REF" in
+            fix/*|hotfix/*) echo "${HEAD_REF} -> ${BASE_REF}: ok" ;;
+            *)
+              echo "::error::${BASE_REF} only accepts fix/* and hotfix/* branches during BHS; target develop with ${HEAD_REF}."
+              exit 1
+              ;;
+          esac
+
   tests:
     name: tests (Python 3.11)
     runs-on: ubuntu-latest
@@ -34,7 +56,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up Python 3.11
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: "3.11"
 
@@ -54,16 +76,17 @@ jobs:
           python -m pip install ".[dev]" --no-cache-dir
 
       # The SDK registry must match the contract the Toolbox publishes on the
-      # branch this code is deployed with: main and release/** run against the
-      # Toolbox's main, everything else against its develop (#186).
+      # branch this code is deployed with (#186): main runs against the
+      # Toolbox's main, release/x.y.z against the Toolbox's release/x.y.z
+      # while its BHS is open and its vx.y.z tag once the Toolbox closed the
+      # cycle (both are cut together, the Toolbox first), and everything else
+      # against its develop. See scripts/toolbox_contract_ref.py.
       - name: Check the Toolbox capability contract
         env:
           TARGET_BRANCH: ${{ github.base_ref || github.ref_name }}
         run: |
-          case "$TARGET_BRANCH" in
-            main|release/*) TOOLBOX_REF=main ;;
-            *) TOOLBOX_REF=develop ;;
-          esac
+          # Fails (bash -e) when a release has neither ref: no fallback.
+          TOOLBOX_REF=$(python scripts/toolbox_contract_ref.py "$TARGET_BRANCH")
           # Same URL as PUBLISHED_URL in scripts/capture_toolbox_contract.py.
           # curl stays here for --retry, which the script's urllib fetch lacks.
           url="https://raw.githubusercontent.com/A11yDevs/acessilia-toolbox/${TOOLBOX_REF}/contract/toolbox-contract.json"

@@ -164,6 +164,107 @@ async def test_interrupted_work_is_terminal_instead_of_replayed(
     assert isolated.qsize() == 0
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("email", ["invalid\nrecipient@example.test", "invalid\rrecipient@example.test", "not-an-address", "a@example.test,b@example.test", "a@[", "a@[x"])
+async def test_invalid_recipient_is_rejected_before_upload(isolated, email):
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(create_app()), base_url="http://test"
+    ) as client:
+        response = await client.post(
+            "/api/v1/jobs",
+            files={"document_file": ("doc.pdf", b"%PDF", "application/pdf")},
+            data={"email": email},
+        )
+    assert response.status_code == 422
+    assert isolated.qsize() == 0
+    assert not (settings.temp_dir / "uploads").exists()
+    assert not settings.db_path.exists()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "locale,expected",
+    [
+        ("en_US", "Invalid email address"),
+        ("pt_BR", "Endere\u00e7o de e-mail inv\u00e1lido"),
+    ],
+)
+async def test_invalid_recipient_error_is_localized(isolated, monkeypatch, tmp_path, locale, expected):
+    from backend import i18n
+    from scripts.gen_locale_catalogs import build_locales
+
+    catalogs = tmp_path / "locales"
+    build_locales(catalogs)
+    monkeypatch.setattr(i18n, "LOCALE_CATALOGS_DIR", catalogs)
+    i18n._catalog_for.cache_clear()
+    token = i18n.set_request_locale(locale)
+    try:
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(create_app()), base_url="http://test"
+        ) as client:
+            response = await client.post(
+                "/api/v1/jobs",
+                files={"document_file": ("doc.pdf", b"%PDF", "application/pdf")},
+                data={"email": "a@["},
+            )
+        assert response.status_code == 422
+        assert response.json() == {"detail": expected}
+        assert isolated.qsize() == 0
+        assert not (settings.temp_dir / "uploads").exists()
+    finally:
+        i18n.reset_request_locale(token)
+        i18n._catalog_for.cache_clear()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("email", ["", "   ", "reader@example.test", "reader+tag@example.test", " reader@example.test "])
+async def test_valid_or_optional_recipient_is_accepted(isolated, email):
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(create_app()), base_url="http://test"
+    ) as client:
+        response = await client.post(
+            "/api/v1/jobs",
+            files={"document_file": ("doc.pdf", b"%PDF", "application/pdf")},
+            data={"email": email},
+        )
+    assert response.status_code == 202
+    assert isolated.qsize() == 1
+
+    record = load_record(response.json()["task_id"])
+    assert record["request"]["email"] == (email.strip() or None)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("unexpected_failure", [False, True])
+async def test_notification_failure_does_not_stop_recovery(isolated, monkeypatch, tmp_path, unexpected_failure):
+    from unittest.mock import AsyncMock
+    from backend.api import worker
+    from backend.services import email_service
+
+    monkeypatch.setattr(worker, "finalizar_conversao", AsyncMock())
+    monkeypatch.setattr(settings, "smtp_user", "audit@example.test")
+    monkeypatch.setattr(settings, "smtp_password", "fake-password")
+    smtp = AsyncMock()
+    monkeypatch.setattr(email_service.aiosmtplib, "send", smtp)
+    if unexpected_failure:
+        notification = AsyncMock(side_effect=ValueError("Invalid legacy email header"))
+        monkeypatch.setattr(worker, "send_failure_email", notification)
+    for task_id, status in [("interrupted-email", "processing"), ("next-job", "queued")]:
+        path = tmp_path / f"{task_id}.pdf"
+        path.write_bytes(b"%PDF")
+        payload = asdict(ApiJob(task_id, path, "doc.pdf", email="invalid\nrecipient@example.test"))
+        payload["file_path"] = str(path)
+        save_request(task_id, "capability", payload, {"task_id": task_id, "status": status})
+
+    await recover_pending_jobs()
+
+    smtp.assert_not_awaited()
+    if unexpected_failure:
+        notification.assert_awaited_once()
+    assert load_record("interrupted-email")["status"]["status"] == "error"
+    assert isolated.get_position("next-job") == 1
+
+
 def test_second_worker_cannot_claim_same_data_directory(isolated):
     from backend.services.runtime_lease import runtime_lease
 

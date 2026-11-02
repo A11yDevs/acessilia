@@ -96,11 +96,24 @@ class UnifiedQueue:
             self._finish_item(item.task_id)
             logger.info(t(LOG_WORKER_TASK_COMPLETED).format(filename=item.filename))
 
+    def _can_start_item(self) -> bool:
+        # Retain cancelling tasks (and their protected files) until they join
+        # blocking work, but allow one replacement to run in the meantime.
+        # The total cap prevents repeated cancellations spawning unbounded work.
+        cancelling = sum(
+            bool(task.cancelling())
+            for task in self._active_tasks.values() if not task.done()
+        )
+        return (
+            self._processing_count < self._max_concurrent + 1
+            and self._processing_count - cancelling < self._max_concurrent
+        )
+
     async def _worker(self):
         try:
             while True:
                 async with self._lock:
-                    while self._queue and self._processing_count < self._max_concurrent:
+                    while self._queue and self._can_start_item():
                         item = self._queue.popleft()
                         self._processing_count += 1
                         self._active_items[item.task_id] = item

@@ -3,6 +3,7 @@
 from acessilia_sdk.toolbox.artifacts import ArtifactRef, download_artifact, read_artifact
 from acessilia_sdk.toolbox.capabilities import (
     PROVIDER_DEFAULTS,
+    ROUTE_PROVIDER_DEFAULTS,
     TOOLBOX_CAPABILITIES,
     ToolboxCapability,
     provider_default,
@@ -41,6 +42,11 @@ from acessilia_sdk.toolbox.transport import (
     raise_for_error,
     require_capability,
 )
+from acessilia_sdk.toolbox.vlm import (
+    VLM_GATEWAY_PATH,
+    vlm_gateway_base_url,
+    vlm_provider_healthy,
+)
 
 __all__ = [
     "ArtifactRef",
@@ -49,6 +55,7 @@ __all__ = [
     "FAILOVER_ERRORS",
     "FailoverHook",
     "PROVIDER_DEFAULTS",
+    "ROUTE_PROVIDER_DEFAULTS",
     "Requirement",
     "TOOLBOX_CAPABILITIES",
     "ToolboxArtifactNotFound",
@@ -65,6 +72,7 @@ __all__ = [
     "ToolboxTimeout",
     "ToolboxUnavailable",
     "ToolboxUnsupportedMediaType",
+    "VLM_GATEWAY_PATH",
     "auth_headers",
     "download_artifact",
     "execute_capability",
@@ -77,4 +85,6 @@ __all__ = [
     "read_artifact",
     "require_capability",
     "snapshot_from_payloads",
+    "vlm_gateway_base_url",
+    "vlm_provider_healthy",
 ]

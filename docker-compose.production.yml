@@ -1,23 +1,44 @@
 services:
   acessilia:
-    # TRACK_TAG e definido pelo production-update.sh. Use main por padrao.
-    image: ghcr.io/a11ydevs/acessilia:${TRACK_TAG:-main}
+    # Manual promotion pins PRODUCTION_IMAGE; the updater resolves a commit image.
+    image: ${PRODUCTION_IMAGE:-ghcr.io/a11ydevs/acessilia:${TRACK_TAG:-main}}
     container_name: acessilia-production
     ports:
       - "8000:8000"
       - "8001:8001"
     volumes:
-      - ./var:/app/var
+      - type: bind
+        source: ./var
+        target: /app/var
+        bind:
+          create_host_path: false
     env_file:
       - .env
     environment:
       PIPELINE_ENGINE: pddl
+      AI_CLIENT: toolbox
+      TOOLBOX_BASE_URL: ${PRODUCTION_TOOLBOX_BASE_URL:-http://toolbox-production:8002}
+      TOOLBOX_BASE_URLS: ""
+    # Preserve legacy runtime endpoints that still address services on this host.
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    networks:
+      - toolbox
+    init: true
     restart: unless-stopped
+    stop_grace_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     healthcheck:
-      test: ["CMD-SHELL", "if echo \"$ENABLED_INTERFACES\" | grep -q 'api'; then curl -fsS http://localhost:8000/api/v1/health; else curl -fsS http://localhost:8001/; fi"]
+      test: ["CMD-SHELL", "if echo \"$$ENABLED_INTERFACES\" | grep -q 'api'; then curl -fsS http://localhost:8000/api/v1/health; else curl -fsS http://localhost:8001/; fi"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
+networks:
+  toolbox:
+    external: true
+    name: ${PRODUCTION_TOOLBOX_NETWORK:-acessilia-production-backplane}

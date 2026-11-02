@@ -17,7 +17,7 @@ O projeto segue a camada *Domínio → Aplicação → Interface*:
 
 ### API standalone
 
-A **API** (`http://localhost:8000`) é o núcleo: recebe o arquivo, coloca na fila, processa com o LLM, exporta os formatos acessíveis (TXT, DOCX, PDF, PDF/UA, HTML, MP3, ZIP) e disponibiliza o download via token. Os frontends (web, Telegram, CLI) consomem tudo por HTTP usando o cliente compartilhado `frontend.clients.api_client.ApiClient`.
+A **API** (`http://localhost:8000`) é o núcleo: recebe o arquivo, coloca na fila, processa com o LLM, exporta os formatos acessíveis (TXT, DOCX, PDF/UA, HTML, MP3, ZIP) e disponibiliza o download via token. Os frontends (web, Telegram, CLI) consomem tudo por HTTP usando o cliente compartilhado `frontend.clients.api_client.ApiClient`.
 
 Principais endpoints (`/api/v1`):
 
@@ -44,6 +44,8 @@ O repositório fixa o Python 3.11 em `.python-version`, a mesma versão usada pe
 uv sync
 cp .env.example .env   # configure as chaves (IA, SMTP, Telegram)
 ```
+
+Depois de um `git pull`, `uv run python scripts/sync_env.py` acrescenta as chaves adicionadas ao `.env.example` desde a criação do seu `.env` e lista as chaves do seu `.env` que parecem depreciadas (`--check` apenas relata).
 
 ## Execução
 

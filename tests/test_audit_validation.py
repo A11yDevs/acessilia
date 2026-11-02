@@ -192,3 +192,74 @@ def test_audit_warns_when_only_one_body_row_has_a_partial_header() -> None:
     assert any(
         "table-partial-row-header" in warning for warning in report["WARNING"]
     )
+
+
+# ── Empty table cells (hotfix #116 on main) ──────────────────────────────
+
+
+def test_audit_table_with_empty_cells_allowed():
+    """A schedule-style table_ast with blank cells is valid, not a blocker."""
+    doc = _sample_valid_document()
+    doc["sections"][0]["blocks"].append(
+        {
+            "id": "blk-tbl-1",
+            "type": "table",
+            "table_ast": {
+                "header": [
+                    {
+                        "cells": [
+                            {"text": "Task", "header": True},
+                            {"text": "Week 1", "header": True},
+                            {"text": "Week 2", "header": True},
+                        ]
+                    }
+                ],
+                "body": [
+                    {"cells": [{"text": "Planning"}, {"text": "X"}, {"text": ""}]},
+                    {"cells": [{"text": "Execution"}, {"text": ""}, {"text": "X"}]},
+                ],
+            },
+        }
+    )
+
+    report = audit_canonical_document(doc)
+
+    assert report["BLOCKER"] == []
+
+
+def test_audit_table_legacy_rows_with_empty_cells_allowed():
+    """Legacy ``rows`` tables may hold blank cells too."""
+    doc = _sample_valid_document()
+    doc["sections"][0]["blocks"].append(
+        {
+            "id": "blk-tbl-legacy",
+            "type": "table",
+            "rows": [
+                ["Step", "Week 1", "Week 2"],
+                ["Survey", "OK", ""],
+                ["Analysis", "", "OK"],
+            ],
+        }
+    )
+
+    report = audit_canonical_document(doc)
+
+    assert report["BLOCKER"] == []
+
+
+def test_audit_table_detects_invalid_text_type():
+    """A non-string cell text is still a blocker."""
+    doc = _sample_valid_document()
+    doc["sections"][0]["blocks"].append(
+        {
+            "id": "blk-tbl-invalid",
+            "type": "table",
+            "table_ast": {"body": [{"cells": [{"text": 12345}]}]},
+        }
+    )
+
+    report = audit_canonical_document(doc)
+
+    assert any(
+        "table_ast cell without text in blk-tbl-invalid" in err for err in report["BLOCKER"]
+    )

@@ -21,7 +21,6 @@ from docstruct.export.html import (  # noqa: F401
 
 # Canonical msgids (kept here: consumed by scripts/gen_locale_catalogs)
 MSG_HTML_TABLE_OF_CONTENTS = "Contents"
-MSG_HTML_TECHNICAL_METADATA = "Technical metadata"
 MSG_HTML_IMAGE_DESCRIPTION = "Image description"
 
 
@@ -33,7 +32,6 @@ def render_html(
     labels = HtmlLabels(
         default_title=document.get("title") or t(MSG_DEFAULT_ACCESSIBLE_TITLE),
         table_of_contents=t(MSG_HTML_TABLE_OF_CONTENTS),
-        technical_metadata=t(MSG_HTML_TECHNICAL_METADATA),
         image_description=t(MSG_HTML_IMAGE_DESCRIPTION),
     )
     html = document_to_html(document, profile=profile_name, labels=labels)

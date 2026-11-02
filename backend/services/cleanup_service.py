@@ -24,6 +24,52 @@ CLEANUP_INTERVAL = 3600
 FILE_MAX_AGE = 7200
 OUTPUT_MAX_AGE = TOKEN_EXPIRY_DAYS * 24 * 60 * 60
 IN_MEMORY_STATUS_MAX_AGE = FILE_MAX_AGE
+#: Cache entries older than this are swept: entries are expired on read, but
+#: ones never read again would otherwise live on disk forever. Matches the
+#: longest TTL in the codebase (the vision region answers).
+CACHE_MAX_AGE = 7 * 24 * 60 * 60
+
+
+def _clean_cache_directory() -> None:
+    """Remove cache entries (and leftover temp writes) older than ``CACHE_MAX_AGE``."""
+    from backend.services.cache import CACHE_DIR, _active_cache_writes
+    from backend.services.cache_lock import cache_directory_lock
+
+    if not CACHE_DIR.exists():
+        return
+    now = time.time()
+    removed = 0
+    with cache_directory_lock(CACHE_DIR):
+        for item in CACHE_DIR.iterdir():
+            try:
+                if item.resolve() in _active_cache_writes:
+                    continue
+                if item.is_file() and now - item.stat().st_mtime > CACHE_MAX_AGE:
+                    item.unlink()
+                    removed += 1
+            except OSError as exc:
+                logger.warning("Falha ao remover {}: {}", item.name, exc)
+    if removed:
+        logger.debug("Entradas de cache expiradas removidas: {}", removed)
+
+
+def _clean_fusion_artifact_directory() -> None:
+    """Remove persisted fusion inputs after the cache retention period."""
+    artifact_dir = settings.data_dir / "artifacts" / "fusion"
+    if not artifact_dir.exists():
+        return
+
+    now = time.time()
+    removed = 0
+    for item in artifact_dir.iterdir():
+        try:
+            if item.is_file() and now - item.stat().st_mtime > CACHE_MAX_AGE:
+                item.unlink()
+                removed += 1
+        except OSError as exc:
+            logger.warning("Could not remove fusion artifact {}: {}", item.name, exc)
+    if removed:
+        logger.debug("Expired fusion artifacts removed: {}", removed)
 
 
 async def periodic_cleanup() -> None:
@@ -32,6 +78,8 @@ async def periodic_cleanup() -> None:
             protected_paths = unified_queue.protected_file_paths()
             await run_blocking(_clean_temp_directory, protected_paths)
             await run_blocking(_clean_output_directory)
+            await run_blocking(_clean_cache_directory)
+            await run_blocking(_clean_fusion_artifact_directory)
             _clean_in_memory_statuses()
             await limpar_tokens_expirados()
         except Exception:

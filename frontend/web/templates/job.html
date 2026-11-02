@@ -73,9 +73,15 @@
                     {{ job_close_info }}
                 </div>
                 {% elif refresh %}<p>{{ job_pending }}</p>{% endif %}
+                {% if job.status == 'error' and job.email_delivery == 'sent' %}
+                <div class="alert alert-info" role="status">{{ job_failure_email_sent }}</div>
+                {% elif job.status == 'error' and job.email_delivery == 'failed' %}
+                <div class="alert alert-warning" role="alert">{{ job_failure_email_failed }}</div>
+                {% elif job.status != 'error' %}
                 {% if job.email_delivery == 'failed' %}<div class="alert alert-warning" role="alert">{{ job_email_failed }}</div>{% endif %}
                 {% if job.email_delivery == 'unknown' %}<div class="alert alert-warning" role="alert">{{ job_email_unknown }}</div>{% endif %}
                 {% if job.email_delivery == 'sent' %}<div class="alert alert-success" role="status">{{ job_email_sent }}</div>{% endif %}
+                {% endif %}
                 {% if download_path %}
                 <div class="d-grid gap-2 mt-4">
                     <a href="{{ download_path }}" class="btn btn-primary btn-lg">{{ job_download }}</a>

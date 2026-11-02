@@ -16,7 +16,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 @dataclass
 class Settings:
     bot_token: str = field(default_factory=lambda: os.getenv("BOT_TOKEN", ""))
-    max_file_size_mb: int = 50
+    max_file_size_mb: int = field(
+        default_factory=lambda: int(os.getenv("MAX_FILE_SIZE_MB", "50"))
+    )
     # Documents with more pages are refused after structural extraction,
     # before planning and the vision-model calls. The limit is always enforced,
     # so it must be positive.
@@ -73,6 +75,66 @@ class Settings:
     data_agent_max_tokens: int = field(
         default_factory=lambda: int(os.getenv("DATA_AGENT_MAX_TOKENS", "8192"))
     )
+    # Table transcription on a local Ollama can run long with the 8192-token
+    # budget, so the DataAgent keeps the historical 1h ceiling instead of the
+    # tighter MODEL_CALL_TIMEOUT_SECONDS: long but legitimate generations
+    # survive there, while vision regions degrade fast.
+    data_agent_timeout_seconds: int = field(
+        default_factory=lambda: int(os.getenv("DATA_AGENT_TIMEOUT_SECONDS", "3600"))
+    )
+    vision_region_max_tokens: int = field(
+        default_factory=lambda: int(os.getenv("VISION_REGION_MAX_TOKENS", "2000"))
+    )
+    # How many picture descriptions run concurrently inside one job. The
+    # UnifiedQueue already serializes jobs, so this bounds the load on the
+    # model provider: 2 is safe for rate-limited hosted APIs and for a local
+    # Ollama (whose server queues anything beyond its own parallelism). The
+    # formula recognition stage shares the bound because its fallback is the
+    # same vision model.
+    vision_concurrency: int = field(
+        default_factory=lambda: int(os.getenv("VISION_CONCURRENCY", "2"))
+    )
+    # Vision calls that fail in a row before the rest of the job's vision
+    # calls (pictures and tables) are skipped and degrade at once, so a
+    # provider that went down does not cost every remaining object up to two
+    # call deadlines. 0 never skips.
+    vision_breaker_threshold: int = field(
+        default_factory=lambda: int(os.getenv("VISION_BREAKER_THRESHOLD", "3"))
+    )
+    # Seconds a vision stage waits before trying once more, one at a time,
+    # the pictures or tables left without a usable description or reading
+    # (an empty answer included). The first of those calls tests the
+    # provider: when it fails again, the rest are skipped.
+    vision_retry_pass_delay_seconds: int = field(
+        default_factory=lambda: int(os.getenv("VISION_RETRY_PASS_DELAY_SECONDS", "60"))
+    )
+    # Minimum agreement (0-1 F1 of letters, digits and math symbols) between
+    # a recognized formula and the text-layer text it replaces. Below it the
+    # recognition is taken as a misread and the formula keeps its text; the
+    # correct LaTeX of the reference case scores 0.87-1.0 against its text
+    # layer, a formula read from the wrong crop around 0.3.
+    formula_text_agreement_min: float = field(
+        default_factory=lambda: float(os.getenv("FORMULA_TEXT_AGREEMENT_MIN", "0.75"))
+    )
+    # Per-call HTTP timeout for the model clients (OpenRouter/Ollama), far
+    # below REQUEST_TIMEOUT: a normal region answer takes 45-90s and a
+    # legitimate full-budget generation stays under ~7 minutes, so a call
+    # still running after this bound is hung, and the region degrades instead
+    # of stalling the job for up to REQUEST_TIMEOUT. Callers with longer
+    # legitimate answers override it (DATA_AGENT_TIMEOUT_SECONDS for tables).
+    model_call_timeout_seconds: int = field(
+        default_factory=lambda: int(os.getenv("MODEL_CALL_TIMEOUT_SECONDS", "600"))
+    )
+    # Reuse a stored vision answer for identical region content (same image
+    # bytes, prompt, model and budget), so retries and restarted jobs do not
+    # pay for descriptions again. Keyed on content, so it also deduplicates
+    # identical images across pages.
+    vision_region_cache_enabled: bool = field(
+        default_factory=lambda: (
+            os.getenv("VISION_REGION_CACHE_ENABLED", "true").strip().lower()
+            in {"1", "true", "yes", "on", "sim"}
+        ),
+    )
     openrouter_base_url: str = field(
         default_factory=lambda: os.getenv(
             "OPENROUTER_BASE_URL",
@@ -91,6 +153,24 @@ class Settings:
     pipeline_engine: str = field(
         default_factory=lambda: os.getenv("PIPELINE_ENGINE", "pddl")
     )
+    # Legacy PDF Unicode repair (phase B): "off", "detect" or "repair".
+    # "detect" only records the observation and the warning; "repair" applies
+    # NFC, the dotless-i rule and spacing diacritics to prose, headers/footers
+    # and table cells. The default preserves the previous behavior.
+    legacy_unicode_repair: str = field(
+        default_factory=lambda: os.getenv("LEGACY_UNICODE_REPAIR", "off").strip().lower()
+    )
+    # Inline math in the prose of a PDF (#265, ADR 0011): "fonts" reads the text
+    # layer's math fonts and baselines through the Toolbox's document.text.spans
+    # and writes each expression as $…$; "off" leaves the text as extracted.
+    inline_math_detection: str = field(
+        default_factory=lambda: os.getenv("INLINE_MATH_DETECTION", "fonts").strip().lower()
+    )
+
+    # Bump on remote model deployments that retain the same URL/model name.
+    processing_model_revision: str = field(
+        default_factory=lambda: os.getenv("PROCESSING_MODEL_REVISION", "")
+    )
 
     # Fusão multi-provider (Fase 4 do plano docstruct)
     # "single": comportamento atual (um provider, fallback PyMuPDF).
@@ -106,6 +186,20 @@ class Settings:
     fusion_hybrid_provider: str = field(
         default_factory=lambda: os.getenv("FUSION_HYBRID_PROVIDER", "mineru-hyb")
     )
+    # Pages per document the VLM judge may adjudicate in dual fusion: the
+    # deterministic router settles the rest, and 0 turns the judge off.
+    fusion_judge_max_pages: int = field(
+        default_factory=lambda: int(os.getenv("FUSION_JUDGE_MAX_PAGES", "5"))
+    )
+    # Take the secondary provider's page where the deterministic router prefers
+    # it (tables, formulas, a nearly empty primary page); false keeps every page
+    # from the primary provider, as before.
+    fusion_apply_page_routes: bool = field(
+        default_factory=lambda: (
+            os.getenv("FUSION_APPLY_PAGE_ROUTES", "true").strip().lower()
+            in {"1", "true", "yes", "on", "sim"}
+        )
+    )
 
     # Acessilia Toolbox settings
     toolbox_base_url: str = field(
@@ -116,6 +210,13 @@ class Settings:
     # only, which should point at the load balancer in front of the replicas.
     toolbox_base_urls: str = field(
         default_factory=lambda: os.getenv("TOOLBOX_BASE_URLS", "")
+    )
+    # With AI_CLIENT=toolbox, the Toolbox VLM provider that serves the agents'
+    # chats through the Toolbox VLM gateway (docs/adr/0012).
+    toolbox_vlm_provider: str = field(
+        default_factory=lambda: os.getenv(
+            "TOOLBOX_VLM_PROVIDER", provider_default("toolbox_vlm_provider")
+        )
     )
     # Structural extraction keeps the historical TOOLBOX_PROVIDER variable for
     # backward compatibility. Specialized capabilities use providers bound to
@@ -195,6 +296,60 @@ class Settings:
     # hung renderer is reported as an optional export error within minutes.
     toolbox_pdf_ua_timeout_seconds: int = field(
         default_factory=lambda: int(os.getenv("TOOLBOX_PDF_UA_TIMEOUT_SECONDS", "300"))
+    )
+    toolbox_pdf_validate_provider: str = field(
+        default_factory=lambda: os.getenv(
+            "TOOLBOX_PDF_VALIDATE_PROVIDER",
+            provider_default("toolbox_pdf_validate_provider"),
+        )
+    )
+    # The PDF/UA is audited with veraPDF on the Toolbox (pdf.validate.pdf_ua)
+    # and the result e-mail summarizes it. When false, no audit is made.
+    toolbox_pdf_validate_enabled: bool = field(
+        default_factory=lambda: (
+            os.getenv("TOOLBOX_PDF_VALIDATE_ENABLED", "true").strip().lower()
+            in {"1", "true", "yes", "on", "sim"}
+        ),
+    )
+    # Above the capability's timeout_hint_seconds (300), like the exports.
+    toolbox_pdf_validate_timeout_seconds: int = field(
+        default_factory=lambda: int(os.getenv("TOOLBOX_PDF_VALIDATE_TIMEOUT_SECONDS", "330"))
+    )
+    # Failed rules the result e-mail lists; the rest are in the report packaged
+    # with the files.
+    pdf_ua_audit_max_rules: int = field(
+        default_factory=lambda: int(os.getenv("PDF_UA_AUDIT_MAX_RULES", "10"))
+    )
+    # Share of a slide its pictures must cover for a presentation slide to be
+    # described by the vision model as one image instead of read as text.
+    slide_visual_coverage: float = field(
+        default_factory=lambda: float(os.getenv("SLIDE_VISUAL_COVERAGE", "0.5"))
+    )
+    # On a slide read as text, fold the short text lying on or just around a
+    # picture (its labels) into that picture, whose description transcribes
+    # them in place, and merge the pictures a caption row spans.
+    slide_fold_figure_labels: bool = field(
+        default_factory=lambda: (
+            os.getenv("SLIDE_FOLD_FIGURE_LABELS", "true").strip().lower()
+            in {"1", "true", "yes", "on", "sim"}
+        )
+    )
+    # Enclose each described picture, table and formula of the delivered
+    # formats in "[label]" … "[/label]" paragraphs; a job may override it.
+    object_markers_enabled: bool = field(
+        default_factory=lambda: (
+            os.getenv("OBJECT_MARKERS_ENABLED", "false").strip().lower()
+            in {"1", "true", "yes", "on", "sim"}
+        )
+    )
+    # Read again from its image a table that came back in the wrong shape
+    # (rows collapsed into one, cells doubled), and use the new reading when it
+    # is the same table read better.
+    table_visual_review: bool = field(
+        default_factory=lambda: (
+            os.getenv("TABLE_VISUAL_REVIEW", "true").strip().lower()
+            in {"1", "true", "yes", "on", "sim"}
+        )
     )
     toolbox_docx_provider: str = field(
         default_factory=lambda: os.getenv(
@@ -372,6 +527,15 @@ class Settings:
                 "TOOLBOX_RETRY_BACKOFF_SECONDS must be zero or positive, "
                 f"got {self.toolbox_retry_backoff_seconds}"
             )
+        if self.pdf_ua_audit_max_rules < 0:
+            raise ValueError(
+                f"PDF_UA_AUDIT_MAX_RULES must be zero or positive, got {self.pdf_ua_audit_max_rules}"
+            )
+        if not 0 < self.slide_visual_coverage <= 1:
+            raise ValueError(
+                "SLIDE_VISUAL_COVERAGE must be greater than 0 and at most 1, "
+                f"got {self.slide_visual_coverage}"
+            )
         self.temp_dir.mkdir(parents=True, exist_ok=True)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.logs_dir.mkdir(parents=True, exist_ok=True)
@@ -422,9 +586,6 @@ def _default_extensions() -> set[str]:
         ".jpeg",
         ".tiff",
         ".tif",
-        ".bmp",
-        ".gif",
-        ".webp",
         ".docx",
         ".html",
     }

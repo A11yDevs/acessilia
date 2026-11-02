@@ -28,6 +28,8 @@ class JobStatus(BaseModel):
     email_delivery: str | None = None
     criado_em: float | None = None
     fim: float | None = None
+    cancellation_requested_at: float | None = None
+    cancellation_elapsed_seconds: int | None = None
 
 
 class DownloadFormat(BaseModel):
@@ -80,4 +82,7 @@ class HealthResponse(BaseModel):
     last_check: str = ""
     last_update: str = ""
     update_available: bool = False
+    #: True when the auto-updater's last check is too old to trust; up_to_date is
+    #: then false, since nothing confirms the running image is still the latest.
+    update_check_stale: bool = False
     up_to_date: bool = False

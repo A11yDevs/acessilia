@@ -26,6 +26,8 @@ TOKEN_EXPIRY_DAYS = 7
 FORMAT_EXTENSIONS = {
     "txt": "texto",
     "docx": "word",
+    # Only PDF/UA is produced now; "pdf" lists the files of jobs made before
+    # that, whose links stay valid for TOKEN_EXPIRY_DAYS.
     "pdf": "pdf",
     "pdf_ua": "pdf/ua",
     "html": "html",
@@ -139,8 +141,15 @@ def obter_info_token(token: str) -> dict | None:
         separator = "" if suffix.startswith("_") else "."
         file_path = output_dir / f"{base}{separator}{suffix}"
         if file_path.exists():
-            size_kb = file_path.stat().st_size / 1024
-            size_str = f"{size_kb:.0f} KB" if size_kb < 1024 else f"{size_kb / 1024:.1f} MB"
+            size_bytes = file_path.stat().st_size
+            # Choose the unit before rounding: 1 MB minus one byte remains
+            # in the KB range and rounds to "1024 KB".
+            if size_bytes < 1024:
+                size_str = f"{size_bytes} B"
+            elif size_bytes < 1024 * 1024:
+                size_str = f"{size_bytes / 1024:.0f} KB"
+            else:
+                size_str = f"{size_bytes / (1024 * 1024):.1f} MB"
             formats.append({
                 "ext": ext,
                 "label": label,

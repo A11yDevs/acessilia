@@ -577,3 +577,117 @@ async def test_download_into_a_missing_directory_is_a_local_error(
                 await download_artifact(
                     http, ArtifactRef.parse(PDF_ID), tmp_path / "missing" / "out.pdf"
                 )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("secondary_status", [200, 404, 503, "timeout"])
+async def test_artifact_download_searches_another_endpoint_after_not_found(
+    tmp_path, secondary_status
+):
+    from acessilia_sdk.toolbox.clients import ToolboxArtifactClient
+
+    client = ToolboxArtifactClient(endpoints=[PRIMARY, SECONDARY], retries=0)
+    destination = tmp_path / "result.pdf"
+    destination.write_bytes(b"previous complete file")
+    try:
+        with respx.mock() as router:
+            router.get(SECONDARY + "/v1/capabilities").respond(
+                200,
+                json=[{"id": "artifact.retrieve", "version": 1}],
+            )
+            router.get(SECONDARY + "/v1/providers").respond(200, json=[])
+            first = router.get(f"{PRIMARY}/v1/artifacts/{PDF_ID}").respond(
+                404, json={"code": "artifact_not_found"}
+            )
+            second = router.get(f"{SECONDARY}/v1/artifacts/{PDF_ID}")
+            if secondary_status == 200:
+                second.respond(200, content=PDF)
+                await client.download(PDF_ID, destination, magic=b"%PDF-")
+                assert destination.read_bytes() == PDF
+            else:
+                if secondary_status == "timeout":
+                    second.mock(side_effect=httpx.ReadTimeout("secondary timed out"))
+                else:
+                    second.respond(secondary_status, json={"code": "artifact_not_found"})
+                error = (
+                    ToolboxArtifactNotFound
+                    if secondary_status == 404
+                    else ToolboxUnavailable
+                )
+                with pytest.raises(error) as caught:
+                    await client.download(PDF_ID, destination, magic=b"%PDF-")
+                if secondary_status == "timeout":
+                    assert isinstance(caught.value.causes[0][1], ToolboxArtifactNotFound)
+                    assert isinstance(caught.value.causes[1][1], ToolboxTimeout)
+                assert destination.read_bytes() == b"previous complete file"
+            assert first.call_count == second.call_count == 1
+            assert list(tmp_path.iterdir()) == [destination]
+    finally:
+        await client.close()
+
+
+@pytest.mark.asyncio
+async def test_not_found_beside_an_incompatible_endpoint_stays_not_found(tmp_path):
+    from acessilia_sdk.toolbox.clients import ToolboxArtifactClient
+
+    client = ToolboxArtifactClient(endpoints=[PRIMARY, SECONDARY], retries=0)
+    try:
+        with respx.mock() as router:
+            router.get(SECONDARY + "/v1/capabilities").respond(200, json=[])
+            router.get(SECONDARY + "/v1/providers").respond(200, json=[])
+            router.get(f"{PRIMARY}/v1/artifacts/{PDF_ID}").respond(
+                404, json={"detail": "no such artifact"}
+            )
+            with pytest.raises(ToolboxArtifactNotFound, match="no such artifact"):
+                await client.download(PDF_ID, tmp_path / "out.pdf", magic=b"%PDF-")
+    finally:
+        await client.close()
+
+
+@pytest.mark.asyncio
+async def test_not_found_everywhere_keeps_each_endpoint_detail(tmp_path):
+    from acessilia_sdk.toolbox.clients import ToolboxArtifactClient
+
+    client = ToolboxArtifactClient(endpoints=[PRIMARY, SECONDARY], retries=0)
+    try:
+        with respx.mock() as router:
+            router.get(SECONDARY + "/v1/capabilities").respond(
+                200, json=[{"id": "artifact.retrieve", "version": 1}]
+            )
+            router.get(SECONDARY + "/v1/providers").respond(200, json=[])
+            router.get(f"{PRIMARY}/v1/artifacts/{PDF_ID}").respond(
+                404, json={"detail": "missing on a"}
+            )
+            router.get(f"{SECONDARY}/v1/artifacts/{PDF_ID}").respond(
+                404, json={"detail": "missing on b"}
+            )
+            with pytest.raises(ToolboxArtifactNotFound) as caught:
+                await client.download(PDF_ID, tmp_path / "out.pdf", magic=b"%PDF-")
+        assert "missing on a" in str(caught.value)
+        assert "missing on b" in str(caught.value)
+    finally:
+        await client.close()
+
+
+@pytest.mark.asyncio
+async def test_successful_but_corrupt_download_is_not_retried_on_another_endpoint(
+    tmp_path,
+):
+    from acessilia_sdk.toolbox.clients import ToolboxArtifactClient
+
+    client = ToolboxArtifactClient(endpoints=[PRIMARY, SECONDARY], retries=0)
+    destination = tmp_path / "result.pdf"
+    try:
+        with respx.mock(assert_all_called=False) as router:
+            router.get(f"{PRIMARY}/v1/artifacts/{PDF_ID}").respond(
+                200, content=b"corrupt"
+            )
+            second = router.get(f"{SECONDARY}/v1/artifacts/{PDF_ID}").respond(
+                200, content=PDF
+            )
+            with pytest.raises(ToolboxContractViolation):
+                await client.download(PDF_ID, destination)
+            assert not second.called
+            assert not destination.exists()
+    finally:
+        await client.close()

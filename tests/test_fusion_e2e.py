@@ -250,7 +250,11 @@ def _require_fusion_providers() -> None:
 
 
 def _get_small_pdf() -> Path:
-    pdfs = sorted(FIXTURES_DIR.rglob("*.pdf"))
+    pdfs = sorted(
+        (p for p in FIXTURES_DIR.rglob("*.pdf")
+         if "failures" not in p.relative_to(FIXTURES_DIR).parts and p.stat().st_size > 0),
+        key=lambda p: (p.stat().st_size, str(p)),
+    )
     if not pdfs:
         pytest.skip("No PDF fixtures found under tests/fixtures/")
     for pdf in pdfs:

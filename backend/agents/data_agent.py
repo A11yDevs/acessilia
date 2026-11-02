@@ -74,7 +74,8 @@ class DataAgent:
                         settings.data_agent_max_tokens
                         if classification == "table"
                         else None
-                    )
+                    ),
+                    timeout_seconds=settings.data_agent_timeout_seconds,
                 ),
                 output_schema=DataOutput,
                 telemetry=False,

@@ -103,6 +103,47 @@ Predições e pontuação são compartilhadas: quando o ground truth do dataset 
 for markdown, converta-o para markdown no `download`, para que o `score` se
 aplique sem mudanças.
 
+## Caso de referência de matemática
+
+`python -m scripts.bench.math_case` pontua um documento inteiro em vez de um
+dataset de páginas: `velocidade-instantanea.pdf` (id `036` no
+[acessilia-dataset](https://github.com/A11yDevs/acessilia-dataset), em
+`input/math-reference/`), uma apostila de cálculo de cinco páginas em pdfTeX,
+com matemática inline e display, uma equação numerada e matemática nos
+cabeçalhos de tabela. O ground truth lista o LaTeX esperado de cada fórmula
+(`ground_truth.csv`) e as verificações de texto, estrutura e fala que as
+fórmulas não cobrem (`expectations.json`).
+
+```bash
+# Processa o PDF no core e pontua (precisa do Toolbox e do provedor de modelo)
+uv run python -m scripts.bench.math_case run --out var/bench/math-reference/<run>
+
+# Pontua saídas que você já tem: o JSON do documento canônico e o TXT,
+# opcionalmente o PDF/UA (precisa do pdftotext)
+uv run python -m scripts.bench.math_case score --canonical doc.json --txt doc.txt --pdf-ua doc.pdf_ua.pdf
+```
+
+O clone do dataset é lido de `tests/dataset` ou de `ACESSILIA_TEST_DATASET_DIR`.
+O placar (`scorecard.md`, `scorecard.json`) informa:
+
+- fórmulas display, pareadas com o ground truth da mesma página: CDM, o recall
+  dos tokens estruturais (`\frac`, `^`, `_`, `\lim`, `\mathbb`...), MathML, forma
+  falada e de onde veio o LaTeX (`extractor`, `math.recognize`, `vision`). O
+  recall estrutural é o número a acompanhar: uma fórmula achatada a partir da
+  camada de texto do PDF mantém as letras, então sua CDM de saco de tokens
+  continua alta, mas perde todos os tokens estruturais;
+- expressões inline e cabeçalhos/células de tabela entregues como matemática;
+- as verificações de texto, estrutura e fala, com cada falha listada.
+
+Com `--pdf-ua` (e no `run`, a não ser com `--no-pdf-ua`), as verificações de texto rodam nas duas
+saídas e entra a verificação de títulos auto-numerados; por isso o placar
+começa pelas saídas que pontuou: compare dois placares só quando essa linha
+for igual.
+
+Uma PR que muda como matemática, reparo de texto ou estrutura chegam às saídas
+cola o placar antes e depois na descrição. `tests/test_math_case_e2e.py`
+(`-m e2e`) roda o caso e trava o que já passa.
+
 ## Snapshot dos experimentos do Dr.DocBench
 
 O código dos experimentos da shared task (variantes de fusão, jobs Slurm,

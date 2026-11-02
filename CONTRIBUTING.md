@@ -113,76 +113,97 @@ git branch -d feat/my-feature
 
 After a PR merges into `develop`, the **CD pipeline** (`.github/workflows/delivery.yml`) automatically builds a Docker image and publishes it to GHCR with tags `develop` and `sha-<commit>`.
 
-The staging environment uses a systemd timer (`staging-update.timer`) that checks every 60s for a new image and restarts the container automatically. See [docs/homologacao-systemd.md](docs/homologacao-systemd.md) for detailed install and management instructions.
+The staging server runs from a clone of this repository and a systemd user timer
+(`acessilia-staging-update.timer`) that checks the tracked branch every 5 minutes and
+updates the container once the image of a new commit is on GHCR. `scripts/ops.sh` installs
+and operates it; see [docs/homologacao-systemd.md](docs/homologacao-systemd.md).
 
-The full staging environment setup lives in:
-
-- `docker-compose.staging.yml` — defines the container + Watchtower
-- `scripts/staging-update.sh` — upgrade script
-- `scripts/setup-homologacao.sh` — initial configuration script
+- `docker-compose.staging.yml` — defines the container
+- `scripts/ops.sh` — `auto-update setup|status|start|migrate`, `track` and the BHS commands
+- `scripts/staging-update.sh` — the update itself, run by `ops.sh auto-update start`
 
 ```bash
 # Check which image is live (via the health API)
 curl http://homologacao:8000/api/v1/health | jq .
 
-# Or manually pull a specific image to test it
- docker pull ghcr.io/a11ydevs/acessilia:sha-abc1234
-
-# Verify which tag is running in the container
-docker inspect acessilia-staging | jq '.[0].Config.Image'
+# Or, on the server, the full picture
+./scripts/ops.sh auto-update status
 ```
-
-The complete staging environment setup lives in:
-
-- `docker-compose.staging.yml` — defines the container + Watchtower
-- `scripts/setup-homologacao.sh` — initial configuration script
 
 ### 5.1 Bug Hunting/Squashing (BHS)
 
 Before each release, there is a **Bug Hunting/Squashing (BHS)** cycle:
 a period during which the staging environment tests the specific release candidate,
-without mixing in features still under development. To achieve this, we create an
-ephemeral `release/x.y.z` branch based on `develop`.
+without mixing in features still under development. To achieve this, we fork an
+ephemeral `release/x.y.z` branch from `develop`; it becomes the candidate to
+replace `main`.
 
-1. **Cut** — at the start of the BHS, cut the release branch from `develop`:
+Acessilia and the [Toolbox](https://github.com/A11yDevs/acessilia-toolbox) run BHS
+together, with the same version. **Cut the Toolbox first**: CI checks a
+`release/x.y.z` branch against the capability contract of the Toolbox's
+`release/x.y.z`.
+
+1. **Cut** — at the start of the BHS:
 
    ```bash
-   git checkout develop && git pull
-   git checkout -b release/0.0.1 origin/develop
-   git push origin release/0.0.1
+   ./scripts/ops.sh bhs start 0.2.0
    ```
+
+   The script forks `release/0.2.0` from `origin/develop`, commits the version
+   bump (`pyproject.toml` and `uv.lock`) on it and pushes it, in a temporary
+   worktree, so your checkout is left untouched. It refuses a version whose
+   branch or `v` tag already exists.
 
 2. **During BHS**:
-   - `fix/*` PRs that address bugs found in staging are targeted at `release/0.0.1`
-     (instead of `develop`).
-   - `feat/*` PRs continue targeting `develop` as usual—`develop` is never blocked,
-     since the release scope was locked at the time of the cut.
+   - `fix/*` (or `hotfix/*`) PRs that address bugs found in staging are targeted
+     at `release/0.2.0` (instead of `develop`). The `release-scope` CI job
+     rejects PRs from any other branch.
+   - `feat/*`, `refactor/*` and other PRs continue targeting `develop` as
+     usual—`develop` is never blocked, since the release scope was locked at the
+     time of the cut.
    - The **CI pipeline** (`ci.yml`) runs the same tests on PRs to `release/**`.
-   - The **CD pipeline** (`delivery.yml`) publishes the `release/0.0.1` image to GHCR
-     with the tags `release-0.0.1` and `sha-<commit>`.
+   - The **CD pipeline** (`delivery.yml`) publishes the `release/0.2.0` image to GHCR
+     with the tags `release-0.2.0` and `sha-<commit>`.
 
-3. **Point Staging to the release** — set `TRACK_BRANCH=release/0.0.1` in the
-   staging server's `.env` file so that `scripts/staging-update.sh` starts tracking
-   the release branch (image tag `release-0.0.1`) instead of `develop`:
-
-   ```bash
-   echo "TRACK_BRANCH=release/0.0.1" >> .env
-   ```
-
-4. **Closing the BHS** — once the release is stable:
+3. **Point Staging to the release** — on the staging server, in the clone
+   (Toolbox first):
 
    ```bash
-   # Merge into main (generates the official release; see section 6)
-   # Open a PR from release/0.0.1 to main and merge after approval
-
-   # Propagate fixes to develop
-   # Open a PR from release/0.0.1 to develop and merge after approval
-
-   git push origin --delete release/0.0.1
+   ./scripts/ops.sh track release/0.2.0
    ```
 
-   Then, remove (or revert) `TRACK_BRANCH` from the staging `.env` file so that staging
-   goes back to tracking `develop`.
+   It checks out and pulls `release/0.2.0`, sets `TRACK_BRANCH` (and `TRACK_TAG`)
+   in `.env` and updates, so staging runs the `release-0.2.0` image. Run
+   `./scripts/ops.sh bhs status` from your machine to see the release's CI,
+   image and PRs.
+
+4. **Closing the BHS** — once the release is stable (close the Toolbox first:
+   CI on `main` checks the Toolbox's `main` contract):
+
+   ```bash
+   ./scripts/ops.sh bhs finish 0.2.0            # opens release/0.2.0 → main and chore/sync-release-0.2.0 → develop
+   # review and merge BOTH PRs with "Create a merge commit" (no squash/rebase)
+   # on staging, after the sync is merged: ./scripts/ops.sh track develop
+   ./scripts/ops.sh bhs finish 0.2.0 --cleanup  # tags v0.2.0 on the merge into main, deletes the branches
+   ```
+
+   Fixes reach `develop` through `chore/sync-release-0.2.0`, forked from the
+   release: resolve conflicts with `develop` there, never on `release/0.2.0`,
+   which goes to `main`. Running the script again carries fixes merged
+   afterwards over to the sync branch.
+
+   Both PRs must use **Create a merge commit**, not squash or rebase: `main`
+   and `develop` must share the release commits and their ancestry. Merge final
+   release fixes before the sync PR, or rerun `bhs finish` and review/merge its
+   updated sync PR. Cleanup refuses to tag or delete branches until the current
+   release head is contained in `develop`, `main`, and the recorded main merge;
+   two previously merged PRs are not enough.
+
+   Before cleanup, on the staging server, `./scripts/ops.sh track develop` goes
+   back to tracking `develop` (only once the sync PR is merged: `track` refuses
+   a branch without `scripts/ops.sh`). Confirm staging updated, then clean up:
+   cleanup deletes the release branch staging was tracking. Production stays
+   pinned; see [Production preparation and activation](docs/production-systemd.md).
 
 ### 5.2 Libraries in `libs/` (docstruct and SDK)
 
@@ -213,25 +234,24 @@ Only maintainers ([@marceloakira](https://github.com/marceloakira),
 [@jhonata192](https://github.com/jhonata192) and
 [@fragaeduardo](https://github.com/fragaeduardo)) may merge a release into `main`.
 
-1. **Did QA sign off?** → proceed.
-2. Open a Pull Request from `release/x.y.z` to `main` on GitHub.
+1. **Did QA sign off on the BHS?** → proceed.
+2. Run `./scripts/ops.sh bhs finish x.y.z`, which opens the Pull Request from
+   `release/x.y.z` to `main`.
 3. Ask another maintainer for review.
-4. After approval, merge it (preferably "Create a merge commit").
+4. After approval, merge it with **"Create a merge commit"**: the release
+   replaces `main`, and squash or rebase would discard its history.
 5. The **CD pipeline** on `main` publishes tags `main`, `latest`, and `sha-<commit>`.
-6. Promote the production environment as described in [docs/producao-systemd.md](docs/producao-systemd.md).
+6. Production is not promoted by the merge or the tag: promote it manually,
+   with an approved image digest, as described in [docs/production-systemd.md](docs/production-systemd.md).
 
-To cut an **official release** with a semantic version:
+The version was already bumped on the release branch when it was cut. To cut
+the **official release** with a semantic version:
 
 ```bash
-# 1. Ensure the version in pyproject.toml has been updated on the release branch
-#    (ex: 0.1.0 for branch release/0.1.0)
-git checkout main && git pull
+# 1. Tag the merge into main (also deletes release/x.y.z and its sync branch)
+./scripts/ops.sh bhs finish 0.2.0 --cleanup
 
-# 2. Create the semantic tag
-git tag v0.1.0
-git push origin v0.1.0
-
-# 3. The Release workflow (release.yml) builds and publishes 0.1.0, 0.1 and 0
+# 2. The Release workflow (release.yml) builds and publishes 0.2.0, 0.2 and 0
 #    to the GHCR, and creates a GitHub Release with an automatic changelog
 ```
 

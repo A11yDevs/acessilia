@@ -24,6 +24,12 @@ ADRs apontam para os daqui em vez de repeti-los.
 | [0006](0006-availability-and-failover.pt-br.md) | Disponibilidade por réplicas; failover no SDK como mecanismo secundário | Aceito |
 | [0007](0007-manifest-model-and-mathml-conversion.pt-br.md) | Modelo canônico do manifesto, e conversão para MathML e verbalização de fórmulas | Aceito |
 | [0008](0008-math-capabilities-on-mathjax-and-mathcat.pt-br.md) | As capacidades de matemática rodam sobre MathJax e MathCAT | Aceito |
+| [0009](0009-legacy-unicode-repair.pt-br.md) | A reparação Unicode de PDFs legados é um estágio puro da docstruct orquestrado pelo core | Aceito |
+| [0010](0010-word-internal-spacing-diacritics.pt-br.md) | Acentos espaçadores internos à palavra são reparados; os isolados exigem evidência no documento | Aceito |
+| [0011](0011-inline-math-from-font-runs.pt-br.md) | Math inline viaja como `$…$` na prosa e é detectado pelas fontes matemáticas do PDF | Aceito |
+| [0012](0012-agents-reach-the-vlm-through-the-toolbox.pt-br.md) | Os agentes podem chegar ao modelo de visão pelo gateway VLM da Toolbox | Aceito |
+| [0013](0013-source-files-for-independent-toolboxes.pt-br.md) | Arquivos de origem para implantações independentes da Toolbox | Aceito |
+| [0014](0014-artifact-download-not-found-failover.pt-br.md) | Buscar downloads ausentes em outros endpoints | Aceito |
 
 ## Processo
 

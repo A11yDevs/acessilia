@@ -329,7 +329,7 @@ O domínio v2.3 adiciona as obrigações correspondentes (`adjudicate-page`,
 `fuse-providers`, `refine-reading-order`, `normalize-formula`,
 `rescue-omitted-block`, `guard-repetition`, `join-tail-blocks`,
 `select-table-source`, `chunk-verse`, `extract-line-numbers`,
-`normalize-text`). A estrutura PDDL não muda: cada uma é um símbolo comum de
+`normalize-text`, `repair-legacy-unicode`). A estrutura PDDL não muda: cada uma é um símbolo comum de
 `obligationkind` com `supports`/`admissible`/`execution-cost` próprios. Métodos
 determinísticos custam 5–15; os que consomem modelo custam 40–60, então o
 planner só recorre a eles quando o caminho determinístico não está disponível.
