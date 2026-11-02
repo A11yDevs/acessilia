@@ -746,6 +746,9 @@ def _normalize_cell(raw_cell: Any) -> dict[str, Any] | None:
         return None
 
     text = cell_obj.get("text")
+    if text is None:
+        # A blank cell still occupies its grid position.
+        text = ""
     if not isinstance(text, str):
         return None
 

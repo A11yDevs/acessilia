@@ -492,8 +492,10 @@ def _sanitize_table_ast(raw: dict[str, Any]) -> dict[str, Any]:
             for cell in cells:
                 if not isinstance(cell, dict) or "text" not in cell:
                     continue
+                # A null text is a blank cell: keep it for the grid, never as "None".
+                raw_text = cell.get("text")
                 text = sanitize_block_text(
-                    str(cell.get("text", "")), block_type="table_cell"
+                    "" if raw_text is None else str(raw_text), block_type="table_cell"
                 )
                 normalized_cell: dict[str, Any] = {"text": text}
                 if isinstance(cell.get("header"), bool):

@@ -51,7 +51,7 @@ requires-dist = [
     { name = "aiogram", specifier = ">=3.13,<4" },
     { name = "aiosmtplib", specifier = ">=5.1.2,<6" },
     { name = "babel", specifier = ">=2.18.0,<3" },
-    { name = "edge-tts", specifier = ">=7.2.8,<8" },
+    { name = "edge-tts", specifier = ">=7.3.1,<8" },
     { name = "fastapi", specifier = ">=0.115,<0.116" },
     { name = "httpx", specifier = ">=0.27,<0.28" },
     { name = "jinja2", specifier = ">=3.1.6,<4" },
