@@ -238,6 +238,20 @@ _bhs_finish() {
     fi
 
     merge_sha=$(_pr_field "$branch" main '.mergeCommit.oid')
+    # A single-branch clone may not have main/develop remote-tracking refs.
+    # Recheck the current release head, not only the state of older merged PRs.
+    git fetch origin --quiet \
+      "refs/heads/main:refs/remotes/origin/main" \
+      "refs/heads/develop:refs/remotes/origin/develop" \
+      "refs/heads/${branch}:refs/remotes/origin/${branch}"
+    git merge-base --is-ancestor "origin/${branch}" origin/develop \
+      || _die "develop lacks fixes from ${branch}; run bhs finish ${version} again and merge the updated sync PR."
+    git merge-base --is-ancestor "origin/${branch}" origin/main \
+      || _die "main lacks fixes from ${branch}; review and merge the updated release PR before cleanup."
+    git merge-base --is-ancestor "origin/${branch}" "$merge_sha" \
+      || _die "the recorded main merge lacks fixes from ${branch}; do not tag an older release merge."
+    git merge-base --is-ancestor "$merge_sha" origin/main \
+      || _die "the recorded release merge is not in main; inspect its history before cleanup."
     parents=$(gh api "repos/$REPO/commits/$merge_sha" --jq '.parents | length')
     if [ "$parents" != "2" ]; then
       _die "${branch} reached main without a merge commit (squash/rebase); tag and delete the branch yourself after checking main."
@@ -259,8 +273,8 @@ _bhs_finish() {
 
     echo ""
     echo "Last manual steps:"
-    echo "  1. On the staging server, in the clone: ./scripts/ops.sh track ${DEFAULT_BRANCH}"
-    echo "  2. Promote production as described in docs/producao-systemd.md (the ${tag} tag triggers the Release workflow)."
+    echo "  1. Staging must already track ${DEFAULT_BRANCH} before deleting the release branches."
+    echo "  2. Production stays pinned: follow docs/production-systemd.md; publishing ${tag} does not promote it."
     return 0
   fi
 
@@ -270,9 +284,19 @@ _bhs_finish() {
 
   _info "Opening the BHS closing PRs for ${branch}..."
 
-  if [ "$(_pr_field "$branch" main '.state // "NONE"')" = "OPEN" ]; then
+  local main_state create_main_pr=true
+  main_state=$(_pr_field "$branch" main '.state // "NONE"')
+  if [ "$main_state" = "OPEN" ]; then
     echo "  PR ${branch} -> main already open."
-  else
+    create_main_pr=false
+  elif [ "$main_state" = "MERGED" ]; then
+    git fetch origin --quiet "refs/heads/main:refs/remotes/origin/main"
+    if git merge-base --is-ancestor "origin/${branch}" origin/main; then
+      echo "  main already contains ${branch}; only the sync may need reopening."
+      create_main_pr=false
+    fi
+  fi
+  if [ "$create_main_pr" = true ]; then
     gh pr create -R "$REPO" \
       --head "$branch" --base main \
       --title "release: ${version}" \
@@ -295,6 +319,8 @@ Merge with **Create a merge commit** (not squash/rebase). After the merge, \`./s
       --head "$sync_branch" --base develop \
       --title "chore(release): carry ${branch} fixes over to develop" \
       --body "Carries the fixes accumulated during the \`${branch}\` BHS over to \`develop\`.
+
+Merge with **Create a merge commit** (not squash/rebase): \`develop\` and \`main\` must share the release commits so future releases retain their common ancestry.
 
 Resolve conflicts on this branch (\`${sync_branch}\`), never on \`${branch}\`: the release goes to \`main\` and must not take in \`develop\`."
   fi
