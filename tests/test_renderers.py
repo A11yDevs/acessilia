@@ -203,5 +203,3 @@ def test_render_html_treats_explicit_scope_as_header_semantics():
     assert '<th scope="row">Janeiro</th><td>10</td>' in html
     assert '<th scope="row">Fevereiro</th><td>12</td>' in html
     assert "<thead>" not in html
-
-
