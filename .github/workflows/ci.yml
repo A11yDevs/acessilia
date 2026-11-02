@@ -78,17 +78,15 @@ jobs:
       # The SDK registry must match the contract the Toolbox publishes on the
       # branch this code is deployed with (#186): main runs against the
       # Toolbox's main, release/x.y.z against the Toolbox's release/x.y.z
-      # (both are cut together for BHS, the Toolbox first) and everything else
-      # against its develop.
+      # while its BHS is open and its vx.y.z tag once the Toolbox closed the
+      # cycle (both are cut together, the Toolbox first), and everything else
+      # against its develop. See scripts/toolbox_contract_ref.py.
       - name: Check the Toolbox capability contract
         env:
           TARGET_BRANCH: ${{ github.base_ref || github.ref_name }}
         run: |
-          case "$TARGET_BRANCH" in
-            main) TOOLBOX_REF=main ;;
-            release/*) TOOLBOX_REF="$TARGET_BRANCH" ;;
-            *) TOOLBOX_REF=develop ;;
-          esac
+          # Fails (bash -e) when a release has neither ref: no fallback.
+          TOOLBOX_REF=$(python scripts/toolbox_contract_ref.py "$TARGET_BRANCH")
           # Same URL as PUBLISHED_URL in scripts/capture_toolbox_contract.py.
           # curl stays here for --retry, which the script's urllib fetch lacks.
           url="https://raw.githubusercontent.com/A11yDevs/acessilia-toolbox/${TOOLBOX_REF}/contract/toolbox-contract.json"
