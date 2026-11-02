@@ -182,7 +182,8 @@ together, with the same version. **Cut the Toolbox first**: CI checks a
 
    ```bash
    ./scripts/ops.sh bhs finish 0.2.0            # opens release/0.2.0 → main and chore/sync-release-0.2.0 → develop
-   # review and merge both PRs (release → main with "Create a merge commit")
+   # review and merge BOTH PRs with "Create a merge commit" (no squash/rebase)
+   # on staging, after the sync is merged: ./scripts/ops.sh track develop
    ./scripts/ops.sh bhs finish 0.2.0 --cleanup  # tags v0.2.0 on the merge into main, deletes the branches
    ```
 
@@ -191,9 +192,18 @@ together, with the same version. **Cut the Toolbox first**: CI checks a
    which goes to `main`. Running the script again carries fixes merged
    afterwards over to the sync branch.
 
-   Then, on the staging server, `./scripts/ops.sh track develop` goes back to
-   tracking `develop` (only once the sync PR is merged: `track` refuses a branch
-   without `scripts/ops.sh`).
+   Both PRs must use **Create a merge commit**, not squash or rebase: `main`
+   and `develop` must share the release commits and their ancestry. Merge final
+   release fixes before the sync PR, or rerun `bhs finish` and review/merge its
+   updated sync PR. Cleanup refuses to tag or delete branches until the current
+   release head is contained in `develop`, `main`, and the recorded main merge;
+   two previously merged PRs are not enough.
+
+   Before cleanup, on the staging server, `./scripts/ops.sh track develop` goes
+   back to tracking `develop` (only once the sync PR is merged: `track` refuses
+   a branch without `scripts/ops.sh`). Confirm staging updated, then clean up:
+   cleanup deletes the release branch staging was tracking. Production stays
+   pinned; see [Production preparation and activation](docs/production-systemd.md).
 
 ### 5.2 Libraries in `libs/` (docstruct and SDK)
 
@@ -231,7 +241,8 @@ Only maintainers ([@marceloakira](https://github.com/marceloakira),
 4. After approval, merge it with **"Create a merge commit"**: the release
    replaces `main`, and squash or rebase would discard its history.
 5. The **CD pipeline** on `main` publishes tags `main`, `latest`, and `sha-<commit>`.
-6. Promote the production environment as described in [docs/producao-systemd.md](docs/producao-systemd.md).
+6. Production is not promoted by the merge or the tag: promote it manually,
+   with an approved image digest, as described in [docs/production-systemd.md](docs/production-systemd.md).
 
 The version was already bumped on the release branch when it was cut. To cut
 the **official release** with a semantic version:

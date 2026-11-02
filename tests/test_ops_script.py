@@ -608,3 +608,114 @@ def test_bhs_rejects_an_invalid_version(server):
 
     assert result.returncode == 1
     assert "expected a version x.y.z" in result.stderr
+
+
+@pytest.mark.parametrize("missing", ["develop", "main", "recorded-merge", None])
+def test_bhs_cleanup_requires_current_release_ancestry_before_tagging_or_deleting(server, missing):
+    seed, origin = server["seed"], server["origin"]
+
+    def git(*args):
+        return subprocess.run(
+            ["git", *args],
+            cwd=seed,
+            env=server["env"],
+            check=True,
+            text=True,
+            capture_output=True,
+        ).stdout.strip()
+
+    base = git("rev-parse", "HEAD")
+    git("checkout", "-b", "main")
+    git("checkout", "-b", "release/0.2.0")
+    (seed / "last-fix").write_text("release fix")
+    git("add", "last-fix")
+    git("commit", "-m", "fix: last release correction")
+    git("checkout", "main")
+    git("merge", "--no-ff", "-m", "release: 0.2.0", "release/0.2.0")
+    recorded = git("rev-parse", "HEAD")
+
+    if missing == "recorded-merge":
+        git("checkout", "release/0.2.0")
+        (seed / "last-fix").write_text("later release fix")
+        git("commit", "-am", "fix: later release correction")
+        git("checkout", "main")
+        git("merge", "--no-ff", "-m", "release: later fix", "release/0.2.0")
+    git("checkout", "develop")
+    if missing != "develop":
+        git("merge", "--ff-only", "release/0.2.0")
+    if missing == "main":
+        git("branch", "-f", "main", base)
+    git(
+        "push",
+        "origin",
+        "main",
+        "develop",
+        "release/0.2.0",
+        "release/0.2.0:chore/sync-release-0.2.0",
+    )
+
+    gh = server["home"].parent / "bin" / "gh"
+    gh.write_text("""#!/usr/bin/env bash
+case "$*" in
+  *mergeCommit.oid*) echo "$BHS_MERGE_SHA" ;;
+  "pr list"*) echo MERGED ;;
+  "api "*) echo 2 ;;
+  *) exit 99 ;;
+esac
+""")
+
+    result = server["run"](
+        "bhs", "finish", "0.2.0", "--cleanup", check=False, BHS_MERGE_SHA=recorded
+    )
+    tags = _git("tag", "--list", cwd=origin)
+    branches = _git("for-each-ref", "--format=%(refname)", "refs/heads", cwd=origin)
+    if missing:
+        assert result.returncode != 0
+        assert "lacks fixes" in result.stderr
+        assert tags == ""
+        assert "refs/heads/release/0.2.0" in branches
+        assert "refs/heads/chore/sync-release-0.2.0" in branches
+    else:
+        assert result.returncode == 0, result.stderr
+        assert _git("rev-parse", "v0.2.0", cwd=origin) == recorded
+        assert "refs/heads/release/0.2.0" not in branches
+        assert "refs/heads/chore/sync-release-0.2.0" not in branches
+
+
+def test_bhs_sync_pr_description_requires_preserving_release_history(server):
+    gh = server["home"].parent / "bin" / "gh"
+    gh.write_text("""#!/usr/bin/env bash
+case "$*" in
+  "pr list"*) echo NONE ;;
+  "pr create"*) printf '%s\\n' "$@" >> "$OPS_LOG" ;;
+  *) exit 99 ;;
+esac
+""")
+    server["run"]("bhs", "finish", "0.2.0")
+    description = server["log"].read_text()
+    assert description.count("Create a merge commit") == 2
+    assert "develop` and `main` must share the release commits" in description
+
+
+def test_bhs_finish_can_reopen_sync_after_main_was_already_merged(server):
+    seed = server["seed"]
+    subprocess.run(
+        ["git", "push", "origin", "develop:main"],
+        cwd=seed,
+        env=server["env"],
+        check=True,
+        capture_output=True,
+    )
+    gh = server["home"].parent / "bin" / "gh"
+    gh.write_text("""#!/usr/bin/env bash
+case "$*" in
+  "pr list"*) echo MERGED ;;
+  "pr create"*) printf '%s\\n' "$@" >> "$OPS_LOG" ;;
+  *) exit 99 ;;
+esac
+""")
+    result = server["run"]("bhs", "finish", "0.2.0")
+    assert "main already contains" in result.stdout
+    description = server["log"].read_text()
+    assert "--base\ndevelop\n" in description
+    assert "--base\nmain\n" not in description

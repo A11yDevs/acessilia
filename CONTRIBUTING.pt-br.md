@@ -183,7 +183,8 @@ BHS juntos, com a mesma versão. **Corte o Toolbox primeiro**: o CI confere uma
 
    ```bash
    ./scripts/ops.sh bhs finish 0.2.0            # abre release/0.2.0 → main e chore/sync-release-0.2.0 → develop
-   # revise e mescle os dois PRs (release → main com "Create a merge commit")
+   # revise e mescle OS DOIS PRs com "Create a merge commit" (sem squash/rebase)
+   # na homologação, depois do merge da sync: ./scripts/ops.sh track develop
    ./scripts/ops.sh bhs finish 0.2.0 --cleanup  # cria a tag v0.2.0 no merge da main e apaga as branches
    ```
 
@@ -192,9 +193,20 @@ BHS juntos, com a mesma versão. **Corte o Toolbox primeiro**: o CI confere uma
    `release/0.2.0`, que vai para a `main`. Rodar o script de novo leva para a
    sync os fixes mesclados depois.
 
-   Depois, no servidor de homologação, `./scripts/ops.sh track develop` volta a
-   rastrear a `develop` (só depois do merge do PR de sync: o `track` recusa uma
-   branch sem `scripts/ops.sh`).
+   Os dois PRs usam **Create a merge commit**, nunca squash ou rebase: `main` e
+   `develop` precisam compartilhar os commits da release e a ancestralidade
+   deles. Mescle os últimos fixes da release antes do PR de sync, ou rode
+   `bhs finish` de novo e revise/mescle o PR de sync atualizado. O cleanup se
+   recusa a criar a tag ou apagar branches enquanto o head atual da release não
+   estiver contido na `develop`, na `main` e no merge registrado da `main`; dois
+   PRs mesclados antes não bastam.
+
+   Antes do cleanup, no servidor de homologação, `./scripts/ops.sh track develop`
+   volta a rastrear a `develop` (só depois do merge do PR de sync: o `track`
+   recusa uma branch sem `scripts/ops.sh`). Confirme que a homologação
+   atualizou e só então faça o cleanup: ele apaga a branch de release que a
+   homologação rastreava. A produção continua fixada; veja
+   [Preparação e ativação da produção](docs/production-systemd.pt-br.md).
 
 ### 5.2 Bibliotecas em `libs/` (docstruct e SDK)
 
@@ -232,7 +244,8 @@ Apenas mantenedores ([@marceloakira](https://github.com/marceloakira),
 4. Após aprovação, faça o merge com **"Create a merge commit"**: a release
    substitui a `main`, e squash ou rebase descartariam a história dela.
 5. A **esteira de CD** na `main` publica as tags `main`, `latest` e `sha-<commit>`.
-6. Promova o ambiente produtivo conforme [docs/producao-systemd.md](docs/producao-systemd.md).
+6. O merge e a tag não promovem a produção: promova-a manualmente, com o
+   digest de imagem aprovado, conforme [docs/production-systemd.pt-br.md](docs/production-systemd.pt-br.md).
 
 A versão já foi atualizada na branch de release no cut. Para criar a
 **Release oficial** com versão semântica:
