@@ -1,9 +1,9 @@
-"""Testes de regressão para a seleção de engine e orquestrador em backend/service.py.
+"""Regression tests for engine and orchestrator selection in backend/service.py.
 
-Cobre:
-- _normalized_engine(): mapeamento de valores de PIPELINE_ENGINE
-- _build_orchestrator(): tipo correto de orquestrador por engine
-- Settings PDDL: defaults e aliases PMV_* retroativos
+Covers:
+- _normalized_engine(): mapping of PIPELINE_ENGINE values
+- _build_orchestrator(): the correct orchestrator type per engine
+- PDDL settings: defaults and backward-compatible PMV_* aliases
 """
 from __future__ import annotations
 
@@ -29,8 +29,14 @@ def _reimport_service(monkeypatch, engine_value: str):
 
 
 def test_normalized_engine_legacy(monkeypatch):
-    svc = _reimport_service(monkeypatch, "legacy")
-    assert svc._normalized_engine() == "legacy"
+    # Import first: importing backend.service builds the orchestrator, which
+    # would itself raise if the engine were already "legacy".
+    from backend.service import _normalized_engine
+
+    monkeypatch.setattr(settings, "pipeline_engine", "legacy")
+
+    with pytest.raises(RuntimeError, match="desativado"):
+        _normalized_engine()
 
 
 def test_normalized_engine_pddl(monkeypatch):
@@ -50,8 +56,11 @@ def test_normalized_engine_case_insensitive(monkeypatch):
 
 
 def test_normalized_engine_unknown_defaults_to_legacy(monkeypatch):
-    svc = _reimport_service(monkeypatch, "unknown-engine")
-    assert svc._normalized_engine() == "legacy"
+    monkeypatch.setattr(settings, "pipeline_engine", "unknown-engine")
+    from backend.service import _normalized_engine
+
+    with pytest.raises(RuntimeError, match="desativado"):
+        _normalized_engine()
 
 
 # ---------------------------------------------------------------------------
@@ -60,11 +69,11 @@ def test_normalized_engine_unknown_defaults_to_legacy(monkeypatch):
 
 
 def test_build_orchestrator_returns_legacy_by_default(monkeypatch):
-    from backend.agents.orchestrator import AccessibilityOrchestrator
+    monkeypatch.setattr(settings, "pipeline_engine", "legacy")
+    from backend.service import _build_orchestrator
 
-    svc = _reimport_service(monkeypatch, "legacy")
-    orchestrator = svc._build_orchestrator()
-    assert isinstance(orchestrator, AccessibilityOrchestrator)
+    with pytest.raises(RuntimeError, match="desativado"):
+        _build_orchestrator()
 
 
 def test_build_orchestrator_returns_pddl_when_configured(monkeypatch):
@@ -77,51 +86,66 @@ def test_build_orchestrator_returns_pddl_when_configured(monkeypatch):
     assert isinstance(orchestrator, PddlAccessibilityOrchestrator)
 
 
-def test_build_orchestrator_pddl_with_docling_enables_ocr(monkeypatch):
+# ---------------------------------------------------------------------------
+# Toolbox backend
+# ---------------------------------------------------------------------------
+
+
+def test_build_orchestrator_pddl_with_toolbox_uses_toolbox_extractor(monkeypatch):
+    """PIPELINE_ENGINE=pddl always extracts through ToolboxManifestExtractor."""
     from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
-    from backend.core.manifest.docling_extractor import DoclingManifestExtractor
+    from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
 
-    monkeypatch.setattr(settings, "structurer", "docling")
-    monkeypatch.setattr(settings, "pddl_fast_downward", "")
-    monkeypatch.setattr(settings, "pddl_fast_downward_alias", "")
-    svc = _reimport_service(monkeypatch, "pddl")
-    monkeypatch.setattr(svc, "DOCLING_AVAILABLE", True)
-    orchestrator = svc._build_orchestrator()
-    assert isinstance(orchestrator, PddlAccessibilityOrchestrator)
-    extractor = orchestrator.information_structural.extractor
-    assert isinstance(extractor, DoclingManifestExtractor)
-    assert extractor.enable_ocr is True
-
-
-def test_build_orchestrator_pddl_with_structurer_pymupdf_uses_pymupdf_extractor(monkeypatch):
-    from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
-    from backend.core.manifest.pymupdf_extractor import PyMuPDFManifestExtractor
-
-    monkeypatch.setattr(settings, "structurer", "pymupdf")
     monkeypatch.setattr(settings, "pddl_fast_downward", "")
     monkeypatch.setattr(settings, "pddl_fast_downward_alias", "")
     svc = _reimport_service(monkeypatch, "pddl")
     orchestrator = svc._build_orchestrator()
     assert isinstance(orchestrator, PddlAccessibilityOrchestrator)
     extractor = orchestrator.information_structural.extractor
-    assert isinstance(extractor, PyMuPDFManifestExtractor)
-    assert orchestrator.extractor_backend == "pymupdf"
+    assert isinstance(extractor, ToolboxManifestExtractor)
+    assert orchestrator.extractor_backend == "toolbox"
 
 
-def test_build_orchestrator_pddl_without_docling_falls_back_to_pymupdf(monkeypatch):
-    from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
-    from backend.core.manifest.pymupdf_extractor import PyMuPDFManifestExtractor
+def test_toolbox_settings_defaults():
+    """Settings da Toolbox carregam defaults corretos."""
+    import os
 
-    monkeypatch.setattr(settings, "structurer", "docling")
-    monkeypatch.setattr(settings, "pddl_fast_downward", "")
-    monkeypatch.setattr(settings, "pddl_fast_downward_alias", "")
-    svc = _reimport_service(monkeypatch, "pddl")
-    monkeypatch.setattr(svc, "DOCLING_AVAILABLE", False)
-    orchestrator = svc._build_orchestrator()
-    assert isinstance(orchestrator, PddlAccessibilityOrchestrator)
-    extractor = orchestrator.information_structural.extractor
-    assert isinstance(extractor, PyMuPDFManifestExtractor)
-    assert orchestrator.extractor_backend == "pymupdf"
+    for key in (
+        "TOOLBOX_BASE_URL",
+        "TOOLBOX_BASE_URLS",
+        "TOOLBOX_RETRIES",
+        "TOOLBOX_RETRY_BACKOFF_SECONDS",
+        "TOOLBOX_PROVIDER",
+        "TOOLBOX_TIMEOUT_SECONDS",
+        "TOOLBOX_USE_ARTIFACT_STORE",
+        "TOOLBOX_USE_REMOTE_CACHE",
+    ):
+        os.environ.pop(key, None)
+
+    import backend.config.settings as cfg_mod
+
+    fresh = cfg_mod.Settings()
+
+    assert fresh.toolbox_base_url == "http://localhost:8002"
+    assert fresh.toolbox_base_urls == ""
+    assert fresh.toolbox_retries == 1
+    assert fresh.toolbox_retry_backoff_seconds == 0.5
+    assert fresh.toolbox_provider == "docling"
+    assert fresh.toolbox_timeout_seconds == 3600
+    assert fresh.toolbox_use_artifact_store is True
+    assert fresh.toolbox_use_remote_cache is True
+
+
+@pytest.mark.parametrize(
+    "key", ["TOOLBOX_RETRIES", "TOOLBOX_RETRY_BACKOFF_SECONDS"]
+)
+def test_negative_toolbox_retry_settings_fail_at_load(monkeypatch, key):
+    """Um valor negativo falha ao carregar os settings, não no primeiro job."""
+    import backend.config.settings as cfg_mod
+
+    monkeypatch.setenv(key, "-1")
+    with pytest.raises(ValueError, match=key):
+        cfg_mod.Settings()
 
 
 # ---------------------------------------------------------------------------
@@ -132,7 +156,7 @@ def test_build_orchestrator_pddl_without_docling_falls_back_to_pymupdf(monkeypat
 def test_settings_pddl_defaults():
     import os
 
-    # Garantir que as envvars não estão setadas no ambiente de teste
+    # Ensure the env vars are not set in the test environment.
     for key in (
         "PIPELINE_ENGINE",
         "PDDL_EXECUTE_DRY_RUN",
@@ -145,12 +169,11 @@ def test_settings_pddl_defaults():
     ):
         os.environ.pop(key, None)
 
-    from dataclasses import fields
     import backend.config.settings as cfg_mod
 
     fresh = cfg_mod.Settings()
 
-    assert fresh.pipeline_engine == "legacy"
+    assert fresh.pipeline_engine == "pddl"
     assert fresh.pddl_execute_dry_run is True
     assert fresh.pddl_planner_backend == "internal"
     assert fresh.pddl_preferred_plan == "internal"

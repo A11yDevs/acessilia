@@ -1,3 +1,5 @@
+import json
+
 import httpx
 import pytest
 import respx
@@ -88,3 +90,59 @@ async def test_history():
     respx.get(f"{BASE}/api/v1/history?limit=5").mock(return_value=httpx.Response(200, json=[]))
     client = ApiClient(base_url=BASE)
     assert await client.history(limit=5) == []
+
+
+@respx.mock
+async def test_job_token_retention_is_bounded_and_terminal_jobs_remain_accessible(tmp_path):
+    client = ApiClient(base_url=BASE)
+    client._job_tokens.update((f"old-{i}", "token") for i in range(256))
+    respx.post(f"{BASE}/api/v1/jobs").mock(return_value=httpx.Response(
+        202, json={"task_id": "new", "job_token": "new-token"}))
+    path = tmp_path / "doc.pdf"
+    path.write_bytes(b"%PDF")
+    await client.submit_job(path, "doc.pdf")
+    assert len(client._job_tokens) == 256
+    assert "old-0" not in client._job_tokens
+    route = respx.get(f"{BASE}/api/v1/jobs/new").mock(return_value=httpx.Response(
+        200, json={"task_id": "new", "status": "done"}))
+    await client.get_job_status("new")
+    await client.get_job_status("new")
+    assert all(call.request.headers["X-Job-Token"] == "new-token" for call in route.calls)
+
+
+@pytest.mark.parametrize("payload", [["upstream unavailable"], "upstream unavailable", None, 42])
+@respx.mock
+async def test_non_object_http_error_preserves_api_error_status(payload):
+    respx.get(f"{BASE}/api/v1/jobs/example").mock(
+        return_value=httpx.Response(502, content=json.dumps(payload))
+    )
+    with pytest.raises(ApiError) as raised:
+        await ApiClient(base_url=BASE).get_job_status("example")
+    assert raised.value.status_code == 502
+
+
+@pytest.mark.parametrize("content", [b"[]", b"null", b"not json"])
+@respx.mock
+async def test_invalid_successful_job_status_is_reported_as_bad_gateway(content):
+    respx.get(f"{BASE}/api/v1/jobs/example").mock(
+        return_value=httpx.Response(200, content=content)
+    )
+    with pytest.raises(ApiError) as raised:
+        await ApiClient(base_url=BASE).get_job_status("example")
+    assert raised.value.status_code == 502
+
+
+@pytest.mark.parametrize("receipt", [
+    [], {"job_token": "token"}, {"task_id": None}, {"task_id": "invalid/path"},
+    {"task_id": "example", "job_token": ["invalid"]},
+])
+@respx.mock
+async def test_invalid_submission_receipt_does_not_enter_token_cache(tmp_path, receipt):
+    respx.post(f"{BASE}/api/v1/jobs").mock(return_value=httpx.Response(202, json=receipt))
+    source = tmp_path / "doc.pdf"
+    source.write_bytes(b"%PDF")
+    client = ApiClient(base_url=BASE)
+    with pytest.raises(ApiError) as raised:
+        await client.submit_job(source, "doc.pdf")
+    assert raised.value.status_code == 502
+    assert not client._job_tokens

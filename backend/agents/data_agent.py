@@ -1,15 +1,27 @@
-"""DataAgent – Conversão de tabelas e fórmulas matemáticas em texto estruturado."""
+"""DataAgent – Extração validada de tabelas e fórmulas matemáticas."""
 
 import asyncio
 
+from backend.i18n import t
+from backend.log_messages import (
+    LOG_DATA_AGENT_PROCESSING_REGION,
+    LOG_DATA_AGENT_PROMPT_NOT_FOUND,
+    LOG_DATA_AGENT_REGION_ERROR,
+)
 from backend.tools.logger import logger
 from backend.tools.prompt_tools import load_region_prompt
 from backend.ai.models.ai_client import get_agno_model
+from backend.config.settings import settings
+from backend.agents.output_schemas import (
+    DATA_SCHEMA_INSTRUCTION,
+    DataOutput,
+    validate_structured_run,
+)
 from agno.agent import Agent
 from agno.media import Image
 
 
-# Mapeamento de classificação → chave de prompt de região
+# Region classification to region prompt key mapping.
 DATA_PROMPT_KEY_MAP = {
     "table": "regiao_tabela",
     "formula": "regiao_formula",
@@ -25,55 +37,73 @@ class DataAgent:
         classification: str,
         page_num: int = 0,
         fallback_text: str = "",
-    ) -> str:
-        """Processa uma região de tabela ou fórmula."""
+    ) -> DataOutput | None:
+        """Extract a table or formula into a validated Pydantic model.
+
+        ``fallback_text`` remains in the public signature for compatibility;
+        the orchestrator applies that trusted extractor text only when this
+        method returns ``None``.
+        """
         prompt_key = DATA_PROMPT_KEY_MAP.get(classification, "")
         prompt = load_region_prompt(prompt_key)
 
         if not prompt:
             logger.warning(
-                "[pag {}] Prompt nao encontrado para tipo={}, usando fallback",
-                page_num,
-                classification,
+                t(LOG_DATA_AGENT_PROMPT_NOT_FOUND).format(
+                    page_num=page_num,
+                    type=classification,
+                )
             )
-            return fallback_text
+            return None
+
+        prompt = f"{prompt}\n\n{DATA_SCHEMA_INSTRUCTION}"
 
         try:
             logger.debug(
-                "[pag {}] DataAgent processando regiao ({} bytes, tipo={})",
-                page_num,
-                len(image_bytes),
-                classification,
+                t(LOG_DATA_AGENT_PROCESSING_REGION).format(
+                    page_num=page_num,
+                    size=len(image_bytes),
+                    type=classification,
+                )
             )
 
             agent = Agent(
                 name="DataAgent",
-                model=get_agno_model(),
+                model=get_agno_model(
+                    max_tokens=(
+                        settings.data_agent_max_tokens
+                        if classification == "table"
+                        else None
+                    ),
+                    timeout_seconds=settings.data_agent_timeout_seconds,
+                ),
+                output_schema=DataOutput,
                 telemetry=False,
             )
 
             def _run_data():
-                loop = asyncio.new_event_loop()
-                try:
-                    return loop.run_until_complete(
-                        agent.arun(
-                            input=prompt,
-                            images=[Image(content=image_bytes)],
-                        )
-                    ).content
-                finally:
-                    loop.close()
+                return agent.run(
+                    input=prompt,
+                    images=[Image(content=image_bytes)],
+                )
 
-            return (await asyncio.to_thread(_run_data)).strip()
+            response = await asyncio.to_thread(_run_data)
+            result = validate_structured_run(response, DataOutput)
+            if result.kind != classification:
+                raise ValueError(
+                    f"DataAgent returned kind={result.kind!r} for classification={classification!r}"
+                )
+            return result
 
         except Exception as error:
             import traceback
             tb = traceback.format_exc()
             logger.critical(
-                "[pag {}] DataAgent erro na regiao {}: {} | Traceback:\n{}",
-                page_num,
-                classification,
-                error,
-                tb,
+                t(LOG_DATA_AGENT_REGION_ERROR).format(
+                    page_num=page_num,
+                    type=classification,
+                    error=error,
+                    tb=tb,
+                )
             )
-            return fallback_text
+            return None

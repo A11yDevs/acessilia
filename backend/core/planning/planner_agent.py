@@ -32,10 +32,10 @@ _SANDBOX_BASE = (Path(__file__).resolve().parent.parent.parent.parent / "temp" /
 
 
 def _sandbox_path(user_path: str) -> Path:
-    """Resolve um caminho fornecido pelo modelo dentro do diretório sandbox.
+    """Resolve a model-supplied path inside the sandbox directory.
 
-    O diretório sandbox é <repo>/temp/pddl-sandbox/. Qualquer tentativa de
-    escapar para fora do sandbox levanta ValueError.
+    The sandbox directory is <repo>/temp/pddl-sandbox/. Any attempt to
+    escape outside the sandbox raises ValueError.
     """
     resolved = (Path(user_path).expanduser()).resolve()
     try:

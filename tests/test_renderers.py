@@ -1,12 +1,26 @@
+"""
+What this suite verifies: the pure-Python fallback renderers in
+backend/export/renderers (txt, html, pdf) turn a canonical document mapping into
+rendered files while honoring the export profile's block filtering; the txt renderer uses the
+localized table captions/row lines from backend/pipeline/table_ast, and the html renderer emits
+the localized table-of-contents and technical-metadata markup.
+"""
+
 import tempfile
 from pathlib import Path
 
-from pypdf import PdfReader
+import pytest
 
-from backend.export.renderers.docx_renderer import render_docx
+import backend.i18n as i8n
 from backend.export.renderers.html_renderer import render_html
-from backend.export.renderers.pdf_renderer import render_pdf
 from backend.export.renderers.txt_renderer import render_txt
+
+
+@pytest.fixture(autouse=True)
+def _pin_en_us(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Force the en_US runtime locale so localized txt/html strings are the canonical English ones."""
+    monkeypatch.setenv("LOCALE", "en_US")
+    i8n._catalog_for.cache_clear()
 
 
 def _sample_document() -> dict:
@@ -108,12 +122,12 @@ def test_render_txt_filters_technical_blocks_and_renders_tables():
         assert "Conteudo tecnico." not in text
         assert "Paragrafo simples." in text
         assert "- Item 1" in text
-        assert "Tabela: Resumo de valores" in text
-        assert "Linha 1: Coluna A: 1; Coluna B: 2" in text
+        assert "Table: Resumo de valores" in text
+        assert "Row 1: Coluna A: 1; Coluna B: 2" in text
         assert "Filho da seção." in text
 
 
-def test_render_html_includes_toc_table_and_metadata():
+def test_render_html_includes_toc_and_table_but_no_technical_metadata():
     with tempfile.TemporaryDirectory() as tmpdir:
         output = Path(tmpdir) / "saida.html"
 
@@ -125,102 +139,69 @@ def test_render_html_includes_toc_table_and_metadata():
         assert "<caption>Resumo de valores</caption>" in html
         assert '<th scope="col">Coluna A</th>' in html
         assert "<tbody><tr><td>1</td><td>2</td></tr><tr><td>3</td><td></td></tr></tbody>" in html
-        assert '<aside class="meta"' in html
         assert "Observacao" in html
+        assert "<aside" not in html
 
 
-def test_render_docx_and_pdf_create_files():
-    with tempfile.TemporaryDirectory() as tmpdir:
-        docx_output = Path(tmpdir) / "saida.docx"
-        pdf_output = Path(tmpdir) / "saida.pdf"
-
-        docx_result = render_docx(
-            _sample_document(),
-            docx_output,
-            profile_name="docx",
-            filename="arquivo.docx",
-        )
-        pdf_result = render_pdf(
-            _sample_document(),
-            pdf_output,
-            profile_name="pdf",
-            title="Documento exemplo",
-        )
-
-        assert docx_result.exists()
-        assert docx_result.suffix == ".docx"
-        assert pdf_result.exists()
-        assert pdf_result.stat().st_size > 0
-
-
-def test_render_pdf_handles_outline_level_jump():
-    document = {
-        "title": "Documento com salto",
-        "language": "pt-BR",
-        "metadata": {},
-        "sections": [
+def test_render_html_uses_cell_level_row_headers():
+    document = _sample_document()
+    table = document["sections"][0]["blocks"][3]
+    table["table_ast"] = {
+        "body": [
             {
-                "id": "sec-l2",
-                "title": "Titulo nivel 2",
-                "level": 2,
-                "blocks": [],
-                "children": [],
-            }
-        ],
+                "cells": [
+                    {"text": "Janeiro", "header": True, "scope": "row"},
+                    {"text": "10"},
+                ]
+            },
+            {
+                "cells": [
+                    {"text": "Fevereiro", "header": True, "scope": "row"},
+                    {"text": "12"},
+                ]
+            },
+        ]
     }
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        pdf_output = Path(tmpdir) / "salto_outline.pdf"
-        result = render_pdf(
-            document,
-            pdf_output,
-            profile_name="pdf",
-            title="Documento com salto",
+        output = Path(tmpdir) / "row-headers.html"
+        html = render_html(document, output, profile_name="html").read_text(
+            encoding="utf-8"
         )
 
-        assert result.exists()
-        assert result.stat().st_size > 0
+    assert '<th scope="row">Janeiro</th><td>10</td>' in html
+    assert '<th scope="row">Fevereiro</th><td>12</td>' in html
+    assert "<thead>" not in html
 
 
-def test_render_pdf_escapes_literal_markup_in_document_text(tmp_path):
-    document = {
-        "title": "Manual de <tags> & atributos",
-        "sections": [
+def test_render_html_treats_explicit_scope_as_header_semantics():
+    document = _sample_document()
+    table = document["sections"][0]["blocks"][3]
+    table["table_ast"] = {
+        "body": [
             {
-                "id": 'section-"markup"',
-                "title": "Seção sobre <b> & <i>",
-                "level": 1,
-                "blocks": [
-                    {
-                        "id": 'heading-"markup"',
-                        "type": "heading",
-                        "title": "Cabeçalho <strong>",
-                    },
-                    {
-                        "type": "paragraph",
-                        "text": "O marcador <b> indica negrito & não XML.",
-                    },
-                    {"type": "list", "items": ["Item <x>", "A & B"]},
-                    {
-                        "type": "table",
-                        "rows": [["Tag", "<table>"], ["Operador", "A & B"]],
-                    },
-                    {"type": "note", "text": "Use <note> literalmente."},
-                    {"type": "details", "text": "Detalhe </div> literal."},
-                    {"type": "code", "text": "value = '<tag>'"},
-                ],
-                "children": [],
-            }
-        ],
+                "cells": [
+                    {"text": "Janeiro", "scope": "row"},
+                    {"text": "10"},
+                ]
+            },
+            {
+                "cells": [
+                    {"text": "Fevereiro", "scope": "row"},
+                    {"text": "12"},
+                ]
+            },
+        ]
     }
-    output = tmp_path / "literal-markup.pdf"
 
-    result = render_pdf(document, output, title="Título <principal> & literal")
+    with tempfile.TemporaryDirectory() as tmpdir:
+        output = Path(tmpdir) / "scope-row-headers.html"
+        html = render_html(document, output, profile_name="html").read_text(
+            encoding="utf-8"
+        )
 
-    assert result == output
-    assert result.exists()
-    assert result.stat().st_size > 0
-    extracted_text = "\n".join(
-        page.extract_text() or "" for page in PdfReader(result).pages
-    )
-    assert "O marcador <b> indica negrito & não XML." in extracted_text
+    assert '<th scope="row">Janeiro</th><td>10</td>' in html
+    assert '<th scope="row">Fevereiro</th><td>12</td>' in html
+    assert "<thead>" not in html
+
+

@@ -2,6 +2,9 @@ from aiogram import BaseMiddleware
 from aiogram.types import Message, TelegramObject
 from typing import Any, Awaitable, Callable, Dict
 
+from backend.i18n import t
+from frontend.telegram.messages import MSG_BOT_PAUSED
+
 _paused_chats: set[int] = set()
 
 
@@ -21,12 +24,13 @@ class PauseMiddleware(BaseMiddleware):
 
         if event.chat.id in _paused_chats:
             text = event.text or ""
-            if text.strip().lower() == "/ativar":
+            # Allow the resume command (Portuguese and English aliases) to
+            # reach its handler so a paused chat can un-pause itself.
+            first_token = text.split(maxsplit=1)[0].strip().lower() if text.strip() else ""
+            if first_token in {"/ativar", "/activate"}:
                 return await handler(event, data)
 
-            await event.answer(
-                "Bot está desativado neste chat. Use /ativar para reativar."
-            )
+            await event.answer(t(MSG_BOT_PAUSED))
             return None
 
         return await handler(event, data)

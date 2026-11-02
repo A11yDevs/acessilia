@@ -10,7 +10,7 @@ from typing import Any
 
 from backend.core.agents.informational_structural import InformationalStructuralAgent
 from backend.core.execution.executor import ExecutorAgent, MethodRegistry
-from backend.core.manifest.docling_extractor import DoclingManifestExtractor
+from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
 from backend.core.manifest.models import ProcessingManifest
 from backend.core.manifest.schema import validate_manifest
 from backend.core.planning.domain_bundle import (
@@ -31,7 +31,7 @@ DEFAULT_MANIFEST_SCHEMA = (
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="a11y-pmv",
-        description="PMV Agno + Docling + PDDL para processamento acessível.",
+        description="PMV Agno + Toolbox + PDDL para processamento acessível.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -171,7 +171,7 @@ def _run_manifest(
     no_ocr: bool,
 ) -> ProcessingManifest:
     agent = InformationalStructuralAgent(
-        DoclingManifestExtractor(enable_ocr=not no_ocr)
+        ToolboxManifestExtractor(enable_ocr=not no_ocr)
     )
     manifest = agent.process(document.resolve(), language=language)
     payload = manifest.model_dump(mode="json", by_alias=True)

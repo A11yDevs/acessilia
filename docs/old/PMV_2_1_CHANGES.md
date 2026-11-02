@@ -1,15 +1,17 @@
 # PMV 2.1
 
-Mudanças sobre o PMV 2.0:
+You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](PMV_2_1_CHANGES.pt-br.md)
 
-- seleção `--planner internal|fast-downward|both`;
-- compilação única do manifesto no modo `both`;
-- planos separados por backend e plano preferido compatível com o Executor;
-- comparação estrutural, causal, de métodos, custo e ordem;
-- vereditos `identical`, `equivalent`, `different` e `inconclusive`;
-- preservação do plano disponível quando o outro backend falha;
-- métricas de tempo e estatísticas publicadas pelo Fast Downward;
-- validação nominal fortalecida para ambos os backends;
-- novo `planning_comparison.schema.json`;
-- testes com adaptador Fast Downward controlado e CLI completa;
-- compatibilidade preservada com Agno 2.8.5, Docling 2.0.0 e macOS.
+Changes over PMV 2.0:
+
+- `--planner internal|fast-downward|both` selection;
+- single manifest compilation in `both` mode;
+- separate plans per backend and a preferred plan compatible with the Executor;
+- structural, causal, method, cost, and order comparison;
+- `identical`, `equivalent`, `different`, and `inconclusive` verdicts;
+- preservation of the available plan when the other backend fails;
+- time metrics and statistics published by Fast Downward;
+- strengthened nominal validation for both backends;
+- new `planning_comparison.schema.json`;
+- tests with a controlled Fast Downward adapter and the full CLI;
+- compatibility preserved with Agno 2.8.5, Docling 2.0.0, and macOS.

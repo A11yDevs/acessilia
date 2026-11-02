@@ -447,6 +447,40 @@ Além disso:
 
 Um problema que falhe nessas verificações deve ser rejeitado antes de chamar o planner, com diagnóstico voltado ao compilador ou ao runtime.
 
+### 14.4 Método `dual-provider-fusion`
+
+O método `dual-provider-fusion` representa a extração fundida de dois
+providers (por padrão `docling` + `mineru`) via `docstruct.fusion`
+(Fase 4/5 do plano docstruct). Ele é um método **remoto e de custo mais
+alto** que a extração de um único provider, porque consome dois serviços
+e executa o Tree Differ.
+
+Regras de compilação:
+
+- o método só deve ser emitido como admissível quando `FUSION_MODE=dual`;
+- em `FUSION_MODE=single` o compilador não deve incluir o par
+  `(admissible dual-provider-fusion <obrigação>)`;
+- o custo deve ser maior que o do método single-provider equivalente
+  (ex.: `dual-provider-fusion` > `docling`), para que o planner só o
+  escolha quando a qualidade do texto for crítica ou quando o método
+  single não estiver disponível/admissível;
+- o handler registrado no executor chama
+  `backend.pipeline.fusion.extract_fused`, persiste o payload fundido em
+  `data_dir/artifacts/fusion/<escopo-sha256>/<conteudo-sha256>.json`
+  com escrita atômica e SHA-256 registrado no artefato, e o retorna em
+  `MethodResult.artifacts` — o `ExecutorAgent` é quem o incorpora ao
+  manifesto e associa o `artifact_id` à tentativa (proveniência);
+- o handler é **estrito**: se apenas um provider participou da extração
+  (fallback single-provider de `extract_fused`), a ação planejada
+  `dual-provider-fusion` é considerada **falha**, registrando `(tried ...)`
+  e permitindo replanning para um método single-provider. Isso preserva a
+  semântica planejada vs. executada.
+
+O domínio PDDL em si não muda: `dual-provider-fusion` é apenas mais um
+símbolo de `method` emitido pelo compilador, com `supports`, `admissible`
+e `execution-cost` próprios. A semântica nominal de `execute-obligation`
+permanece idêntica.
+
 ## 15. Compatibilidade com predicados derivados
 
 Os predicados derivados foram mantidos. Fast Downward suporta axiomas e predicados derivados, embora nem todas as heurísticas sejam compatíveis.
@@ -496,3 +530,28 @@ A arquitetura da versão 2.2 é:
 > **Manifesto canônico multicamada + seleção externa de raízes + fechamento causal determinístico + PDDL operacional mínimo + execução monitorada com confirmação e replanejamento.**
 
 O PDDL não decide o conteúdo do documento nem inventa resultados perceptuais. Ele recebe um conjunto operacional coerente e decide a ordem e o método de tratamento, sob dependências, admissibilidade, tentativas anteriores e custo.
+
+
+### Limites dos adaptadores de execução
+
+`line-number-extractor`, `verse-chunker`, `tailjoin` e `tailjoin-positioned`
+continuam disponíveis na biblioteca docstruct, mas não possuem adaptação
+executável para ProcessingManifest. O orquestrador os declara indisponíveis
+ao planner; a falha da revisão humana é terminal quando não existem outras
+alternativas registradas.
+
+A aplicação de `dual-provider-fusion` ao manifesto aceita somente uma obrigação
+que cubra todos os parágrafos de um documento exclusivamente textual. O resultado
+precisa manter a identidade de página e permitir preservar todos os IDs de
+elementos existentes. Novos blocos recuperados recebem IDs próprios. Documentos
+estruturados, subconjuntos e mapeamentos ambíguos falham explicitamente; não são
+substituídos por texto achatado nem certificados como processados.
+
+
+`pymupdf-region` está disponível para inspeção real: valida a identidade SHA-256
+da fonte, página e coordenadas, renderiza a região com PyMuPDF e solicita análise
+estruturada ao VisionAgent. Atualiza o elemento como imagem descrita ou fórmula
+e registra PNG/JSON de evidência com hashes em `data_dir/artifacts/regions/`.
+Metadados `region_crop` recebidos do extrator não substituem essa execução.
+Fonte ausente/alterada, página/recorte inválido ou análise inválida retornam falha
+e permitem a alternativa de revisão humana. Dry-run continua sendo simulação.

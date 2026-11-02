@@ -1,0 +1,649 @@
+"""Canonical document builder.
+
+Ported from backend/pipeline/canonical_builder.py. Pure: LaTeX
+enrichment is injected via the ``MathEnricher`` protocol and ids via
+``id_factory`` — no uuid, no subprocess, no settings.
+"""
+from __future__ import annotations
+
+
+from typing import Any, Callable, Iterator
+
+
+import re
+from copy import deepcopy
+
+
+
+class MathEnricher:
+    """Protocol for LaTeX enrichment (normalize / MathML / two verbalizations).
+
+    The lib stays pure: the backend injects an implementation (the core's
+    calls the Toolbox's ``math.convert`` and ``math.verbalize``). ``verbalize``
+    speaks a math block, labelled as a formula; ``verbalize_inline`` speaks a
+    formula read inside a sentence. Implementations are duck-typed, so
+    ``verbalize_inline`` is optional: without it inline spans get no speech.
+    """
+
+    def normalize(self, latex: str) -> str:
+        return latex
+
+    def to_mathml(self, latex: str) -> str:
+        return ""
+
+    def verbalize(self, latex: str) -> str:
+        return ""
+
+    def verbalize_inline(self, latex: str) -> str:
+        """Speech of a formula read inside a sentence, without the formula label."""
+        return ""
+
+
+def _default_doc_id() -> str:
+    """Deterministic default document id (backend injects uuid-based)."""
+    return "doc-default"
+
+
+def _source_type(source_path: str) -> str:
+    """Source type from a path string (pure string parsing, no Path I/O)."""
+    name = str(source_path).replace("\\", "/").rsplit("/", 1)[-1]
+    if "." in name:
+        return name.rsplit(".", 1)[-1].lower()
+    return ""
+
+
+from docstruct.text.sanitize import sanitize_block_text
+from docstruct.text.sanitize import sanitize_text
+from docstruct.text.sanitize import sanitize_title_text
+from docstruct.blocks.parser import parse_text_to_blocks
+from docstruct.tables.ast import raw_rows_from_table_ast
+from docstruct.text.math_spans import block_prose
+from docstruct.text.math_spans import inline_math_entries
+from docstruct.text.math_spans import inline_math_sources
+from docstruct.text.equations import equation_number
+from docstruct.text.equations import numbered_speech
+from docstruct.text.equations import preserve_equation_number
+from docstruct.text.implicit_products import implicit_product_variables
+from docstruct.text.implicit_products import mark_implicit_products
+from docstruct.text.math_spans import whole_inline_math
+
+
+def build_canonical_document(
+    source_text: str | dict[str, Any],
+    *,
+    title: str = "Documento acessível",
+    language: str = "pt-BR",
+    verbosity: str = "detailed",
+    audience: list[str] | None = None,
+    source_name: str = "",
+    source_path: str = "",
+    metadata: dict[str, Any] | None = None,
+    technical_warnings: list[str] | None = None,
+    math_enricher: MathEnricher | None = None,
+    id_factory: Callable[[str], str] | None = None,
+    inline_math_promote: bool = True,
+) -> dict[str, Any]:
+    """Build the canonical document from a structured payload or plain text.
+
+    ``inline_math_promote`` (``FusionPolicy.inline_math_promote``) turns a
+    paragraph whose whole text is one inline math span into a display
+    ``math`` block (#296).
+    """
+    if isinstance(source_text, dict):
+        source_payload: dict[str, Any] = source_text
+    else:
+        source_payload = {}
+    raw_text = source_payload.get("text", source_text)
+    cleaned = sanitize_text(str(raw_text))
+    parsed_blocks = _parse_structured_blocks(source_payload, cleaned)
+    if inline_math_promote:
+        _promote_whole_inline_math(parsed_blocks)
+    _normalize_heading_levels(parsed_blocks)
+    inferred_title = _infer_title(parsed_blocks).strip()
+    sections = _build_sections(parsed_blocks)
+    _enrich_math_blocks(sections, math_enricher)
+    technical_warnings_list = list(technical_warnings or [])
+    if not sections and _is_non_textual_structured_payload(source_payload, cleaned):
+        sections = _build_minimal_non_textual_sections(title=title)
+        technical_warnings_list.append(
+            "Documento sem texto extraivel; seção mínima gerada para manter exportação acessível."
+        )
+    source_type = _source_type(source_path) if source_path else ""
+    source_metadata = {
+        "page_count": source_payload.get("page_count"),
+        "mode": source_payload.get("mode"),
+        "pages": source_payload.get("pages", []),
+    }
+    return {
+        "schema_version": "1.0.0",
+        "id": (id_factory or _default_doc_id)() if id_factory else _default_doc_id(),
+        "title": inferred_title or title or "Documento acessível",
+        "language": language,
+        "verbosity": verbosity,
+        "audience": audience or ["reader"],
+        "metadata": {**(metadata or {}), **source_metadata},
+        "source": {
+            "name": source_name,
+            "path": source_path,
+            "type": source_type,
+        },
+        "accessibility": {
+            "navigation": True,
+            "semantic_headings": True,
+            "internal_links": True,
+        },
+        "technical_warnings": technical_warnings_list,
+        "audit": {
+            "generated_by": "canonical_builder",
+            "input_length": len(source_text),
+            "block_count": len(parsed_blocks),
+        },
+        "sections": sections,
+    }
+
+
+def _promote_whole_inline_math(blocks: list[dict[str, Any]]) -> None:
+    """Turn each paragraph made of one inline math span into a ``math`` block.
+
+    ``$s(t) = t^3$`` alone on its line is a displayed equation, not a fragment
+    of a sentence; read inline, a screen reader and PDF/UA announce it as one.
+    A span with any text around it (even a final period) stays inline, as does
+    every other block type. The span's conversion, when the block already
+    carries it (``metadata["inline_math"]``), becomes the math block's MathML
+    and verbalization, so it is not converted again.
+    """
+    for block in blocks:
+        if block.get("type") != "paragraph" or not isinstance(block.get("text"), str):
+            continue
+        source = whole_inline_math(block["text"])
+        if source is None:
+            continue
+        metadata = block.get("metadata")
+        metadata = dict(metadata) if isinstance(metadata, dict) else {}
+        entry = inline_math_entries(block).get(source, {})
+        metadata.pop("inline_math", None)
+        metadata["inline_math_promoted"] = True
+        if entry.get("mathml"):
+            metadata["mathml"] = entry["mathml"]
+        if entry.get("speech"):
+            metadata["verbalization"] = entry["speech"]
+        block["type"] = "math"
+        block["text"] = entry.get("latex") or source
+        block["metadata"] = metadata
+
+
+def _enrich_math_blocks(
+    sections: list[dict[str, Any]],
+    math_enricher: "MathEnricher | None" = None,
+    inline_cache: dict[str, dict[str, str]] | None = None,
+    variables: frozenset[str] | None = None,
+) -> None:
+    """Normalize LaTeX and add MathML + accessible verbalization to math blocks.
+
+    Prose blocks get the same for their inline ``$…$`` spans
+    (``_enrich_inline_math``).
+
+    Uses the injected ``math_enricher``; without one, only normalization is
+    applied when available. What a block already carries is not computed
+    again: ``metadata["mathml"]`` skips the conversion, and an empty
+    ``alt_text`` is filled from ``metadata["verbalization"]`` before asking
+    the enricher. A caller that produced them earlier (the core's PDDL plan
+    does) so pays one conversion and one verbalization per formula, not two.
+
+    Invariant for those callers: ``metadata["mathml"]`` and
+    ``metadata["verbalization"]`` must describe the block's text after the
+    enricher's ``normalize`` (the core's plan converts ``normalize_latex`` of
+    the same text). Nothing ties them to the text afterwards, so a producer
+    that converts another form of the LaTeX would ship MathML or speech that
+    does not match the formula.
+
+    The LaTeX sent for MathML and speech marks the implicit products of the
+    document's variables (``mark_implicit_products``), so ``h(12 + h)`` is
+    spoken "h vezes", not "h de"; the block keeps its text unmarked.
+    ``variables`` are read once from every formula of the document.
+    """
+    if not sections:
+        return
+    if inline_cache is None:
+        inline_cache = {}
+    if variables is None:
+        variables = implicit_product_variables(_math_sources(sections))
+    for section in sections:
+        for block in section.get("blocks", []):
+            if math_enricher is not None:
+                _enrich_inline_math(block, math_enricher, inline_cache, variables)
+            if block.get("type") != "math":
+                continue
+            metadata = block.get("metadata") or {}
+            original = str(block.get("text") or "")
+            block["text"] = preserve_equation_number(original, metadata)
+            if block["text"] != original:
+                # A conversion carried in (a promoted span's) described the
+                # labelled text, so the number would show twice: redo it.
+                metadata.pop("mathml", None)
+                metadata.pop("verbalization", None)
+            if metadata:
+                block["metadata"] = metadata
+            latex = block.get("text", "")
+            if math_enricher is not None:
+                latex = math_enricher.normalize(latex)
+                block["text"] = latex
+                metadata = block.get("metadata") or {}
+                marked = mark_implicit_products(latex, variables)
+                if not metadata.get("mathml"):
+                    mathml = math_enricher.to_mathml(marked)
+                    if mathml:
+                        block.setdefault("metadata", {})["mathml"] = mathml
+                if not block.get("alt_text"):
+                    block["alt_text"] = (
+                        metadata.get("verbalization") or math_enricher.verbalize(marked)
+                    )
+            if equation_number(metadata):
+                block["alt_text"] = numbered_speech(str(block.get("alt_text") or latex), metadata)
+        _enrich_math_blocks(
+            section.get("children", []), math_enricher, inline_cache, variables
+        )
+
+
+def _math_sources(sections: list[dict[str, Any]]) -> Iterator[str]:
+    """The LaTeX of every math block and inline span of these sections."""
+    for section in sections:
+        for block in section.get("blocks", []):
+            if block.get("type") == "math":
+                yield str(block.get("text") or "")
+            for text in block_prose(block):
+                yield from inline_math_sources(text)
+        yield from _math_sources(section.get("children", []))
+
+
+def _enrich_inline_math(
+    block: dict[str, Any],
+    math_enricher: "MathEnricher",
+    cache: dict[str, dict[str, str]],
+    variables: frozenset[str] = frozenset(),
+) -> None:
+    """Convert the inline math spans of a prose block into ``metadata["inline_math"]``.
+
+    Each entry is ``{source, latex, mathml?, speech?}``, keyed by the span's
+    LaTeX as written in the text (the exporters look it up there). The same
+    formula repeats a lot in a text (``s(t)``), so conversions are cached for
+    the whole document; spans the block already carries are kept.
+    """
+    sources = [
+        source for text in block_prose(block) for source in inline_math_sources(text)
+    ]
+    if not sources:
+        return
+    entries = inline_math_entries(block)
+    for source in sources:
+        if source in entries:
+            continue
+        if source not in cache:
+            latex = math_enricher.normalize(source)
+            entry = {"source": source, "latex": latex}
+            marked = mark_implicit_products(latex, variables)
+            mathml = math_enricher.to_mathml(marked)
+            if mathml:
+                entry["mathml"] = mathml
+            verbalize_inline = getattr(math_enricher, "verbalize_inline", None)
+            speech = verbalize_inline(marked) if verbalize_inline else ""
+            if speech:
+                entry["speech"] = speech
+            cache[source] = entry
+        entries[source] = dict(cache[source])
+    metadata = block.get("metadata")
+    if not isinstance(metadata, dict):
+        metadata = block["metadata"] = {}
+    metadata["inline_math"] = list(entries.values())
+
+
+
+def _is_non_textual_structured_payload(
+    source_payload: dict[str, Any],
+    cleaned_text: str,
+) -> bool:
+    pages = source_payload.get("pages")
+    if not isinstance(pages, list) or not pages:
+        return False
+    if cleaned_text.strip():
+        return False
+    return True
+
+
+def _build_minimal_non_textual_sections(*, title: str) -> list[dict[str, Any]]:
+    section_id = "section-fallback-1"
+    block_id = "blk-fallback-1"
+    section_title = title or "Conteúdo visual"
+    return [
+        {
+            "id": section_id,
+            "title": section_title,
+            "level": 1,
+            "source_location": {},
+            "metadata": {
+                "generated": True,
+                "reason": "non_textual_payload",
+            },
+            "blocks": [
+                {
+                    "id": block_id,
+                    "type": "paragraph",
+                    "text": (
+                        "Este documento não possui texto extraível. "
+                        "O conteúdo é predominantemente visual e pode requerer "
+                        "audiodescrição manual."
+                    ),
+                }
+            ],
+            "children": [],
+        }
+    ]
+
+
+def _infer_title(blocks: list[dict[str, Any]]) -> str:
+    headings = [
+        {
+            "level": int(block.get("level", 1)),
+            "text": str(block.get("text", "")).strip(),
+        }
+        for block in blocks
+        if block.get("type") == "heading" and str(block.get("text", "")).strip()
+    ]
+    if not headings:
+        return ""
+    first_heading = headings[0]["text"]
+    if _looks_like_chapter_heading(first_heading):
+        for candidate in headings[1:]:
+            if candidate["level"] <= 2:
+                return f"{first_heading} - {candidate['text']}"
+    return first_heading
+
+
+def _looks_like_chapter_heading(text: str) -> bool:
+    normalized = text.strip().upper()
+    return bool(re.match(r"^CAP[ÍI]TULO\s+\d+", normalized))
+
+
+def _parse_structured_blocks(
+    source_payload: dict[str, Any],
+    cleaned_text: str,
+) -> list[dict[str, Any]]:
+    pages = source_payload.get("pages", [])
+    page_blocks: list[dict[str, Any]] = []
+    if isinstance(pages, list):
+        for page in pages:
+            blocks = page.get("blocks", []) if isinstance(page, dict) else []
+            if blocks:
+                page_blocks.extend(blocks)
+
+    if page_blocks:
+        return _attach_ids(_sanitize_structured_blocks(page_blocks))
+
+    return parse_text_to_blocks(cleaned_text)
+
+
+def sanitize_canonical_document(
+    document: dict[str, Any],
+) -> dict[str, Any]:
+    sanitized = deepcopy(document)
+    if isinstance(sanitized.get("title"), str):
+        sanitized["title"] = sanitize_title_text(sanitized["title"])
+    sections = sanitized.get("sections", [])
+    if isinstance(sections, list):
+        sanitized["sections"] = _sanitize_sections(sections)
+    return sanitized
+
+
+def _sanitize_sections(sections: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    sanitized_sections: list[dict[str, Any]] = []
+    for section in sections:
+        clean_section = deepcopy(section)
+        if isinstance(clean_section.get("title"), str):
+            clean_section["title"] = sanitize_title_text(clean_section["title"])
+        blocks = clean_section.get("blocks", [])
+        if isinstance(blocks, list):
+            clean_section["blocks"] = _sanitize_structured_blocks(blocks)
+        children = clean_section.get("children", [])
+        if isinstance(children, list):
+            clean_section["children"] = _sanitize_sections(children)
+        sanitized_sections.append(clean_section)
+    return sanitized_sections
+
+
+def _sanitize_structured_blocks(
+    blocks: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    sanitized_blocks: list[dict[str, Any]] = []
+    for block in blocks:
+        clean = deepcopy(block)
+        block_type = clean.get("type")
+
+        if isinstance(clean.get("text"), str) and block_type != "code":
+            if block_type in {"heading", "title"}:
+                clean["text"] = sanitize_title_text(clean["text"])
+            else:
+                clean["text"] = sanitize_block_text(
+                    clean["text"],
+                    block_type=block_type,
+                )
+
+        if isinstance(clean.get("title"), str):
+            clean["title"] = sanitize_title_text(clean["title"])
+        if isinstance(clean.get("alt_text"), str):
+            clean["alt_text"] = sanitize_block_text(clean["alt_text"], block_type="caption")
+        if isinstance(clean.get("long_description"), str):
+            clean["long_description"] = sanitize_block_text(
+                clean["long_description"], block_type="paragraph"
+            )
+
+        if block_type == "list" and isinstance(clean.get("items"), list):
+            clean["items"] = [
+                sanitize_block_text(str(item), block_type="list_item")
+                for item in clean["items"]
+            ]
+
+        if block_type == "table" and isinstance(clean.get("rows"), list):
+            rows: list[list[str]] = []
+            for row in clean["rows"]:
+                if not isinstance(row, list):
+                    continue
+                rows.append([
+                    sanitize_block_text(str(cell), block_type="table_cell")
+                    for cell in row
+                ])
+            clean["rows"] = rows
+            if rows and not isinstance(clean.get("table_ast"), dict):
+                clean["table_ast"] = _table_ast_from_rows(rows)
+
+        if block_type == "table" and isinstance(clean.get("table_ast"), dict):
+            table_ast = _sanitize_table_ast(clean["table_ast"])
+            if table_ast:
+                clean["table_ast"] = table_ast
+                if not clean.get("rows"):
+                    clean["rows"] = raw_rows_from_table_ast(table_ast)
+
+        children = clean.get("children")
+        if isinstance(children, list):
+            clean["children"] = _sanitize_structured_blocks(children)
+
+        sanitized_blocks.append(clean)
+    return sanitized_blocks
+
+
+def _sanitize_table_ast(raw: dict[str, Any]) -> dict[str, Any]:
+    table_ast: dict[str, Any] = {}
+
+    caption = raw.get("caption")
+    if isinstance(caption, str) and caption.strip():
+        table_ast["caption"] = sanitize_block_text(caption, block_type="caption")
+
+    for section_name in ("header", "body", "footer"):
+        section = raw.get(section_name)
+        if not isinstance(section, list):
+            continue
+        normalized_rows: list[dict[str, Any]] = []
+        for row in section:
+            if not isinstance(row, dict):
+                continue
+            cells = row.get("cells")
+            if not isinstance(cells, list):
+                continue
+            normalized_cells: list[dict[str, Any]] = []
+            for cell in cells:
+                if not isinstance(cell, dict) or "text" not in cell:
+                    continue
+                # A null text is a blank cell: keep it for the grid, never as "None".
+                raw_text = cell.get("text")
+                text = sanitize_block_text(
+                    "" if raw_text is None else str(raw_text), block_type="table_cell"
+                )
+                normalized_cell: dict[str, Any] = {"text": text}
+                if isinstance(cell.get("header"), bool):
+                    normalized_cell["header"] = cell["header"]
+                scope = cell.get("scope")
+                if isinstance(scope, str) and scope in {
+                    "none",
+                    "row",
+                    "col",
+                    "rowgroup",
+                    "colgroup",
+                }:
+                    normalized_cell["scope"] = scope
+                for span_key in ("rowspan", "colspan"):
+                    span_value = cell.get(span_key)
+                    if isinstance(span_value, int) and span_value >= 1:
+                        normalized_cell[span_key] = span_value
+                normalized_cells.append(normalized_cell)
+            if normalized_cells:
+                normalized_rows.append({"cells": normalized_cells})
+        if normalized_rows:
+            table_ast[section_name] = normalized_rows
+
+    metadata = raw.get("metadata")
+    if isinstance(metadata, dict):
+        table_ast["metadata"] = metadata
+
+    return table_ast
+
+
+def _table_ast_from_rows(rows: list[list[str]]) -> dict[str, Any]:
+    """Build a table AST from rows the caller has already sanitized."""
+    body = []
+    for row in rows:
+        cells = [{"text": str(cell)} for cell in row]
+        if cells:
+            body.append({"cells": cells})
+    return {"body": body}
+
+
+def _make_id(prefix: str, text: str, counter: int) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+    if not slug:
+        slug = prefix
+    return f"{prefix}-{slug[:40]}-{counter}"
+
+
+def _attach_ids(blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    seen: dict[str, int] = {}
+    for index, block in enumerate(blocks, start=1):
+        base_id = block.get("id") or _make_id(
+            block["type"],
+            block.get("text", ""),
+            index,
+        )
+        count = seen.get(base_id, 0) + 1
+        seen[base_id] = count
+        block["id"] = base_id if count == 1 else f"{base_id}-{count}"
+    return blocks
+
+
+def _normalize_heading_levels(blocks: list[dict[str, Any]]) -> None:
+    """Rewrite heading levels in place into a sequence the validator accepts.
+
+    Extractors often report every section header as level 1. The first
+    heading becomes the single H1; each later heading becomes at least H2 and
+    at most one level deeper than the previous one. Levels are always stored
+    as ``int``; a level that changed, or could not be read as a number, is kept
+    in ``metadata.original_heading_level``.
+
+    Trade-off: a genuinely flat source (every heading a top-level sibling)
+    becomes one H1 with the remaining headings nested under it as H2. That
+    changes the section tree, not only the numbers, but the audit requires a
+    single H1 and the source gives no better parent to choose.
+    """
+    previous = 0
+    for block in blocks:
+        if block.get("type") != "heading":
+            continue
+        original = block.get("level", 1)
+        try:
+            level = int(original)
+            readable = True
+        except (TypeError, ValueError):
+            level, readable = 1, False
+        normalized = 1 if not previous else max(2, min(level, previous + 1, 6))
+        if normalized != level or not readable:
+            metadata = block.get("metadata")
+            if not isinstance(metadata, dict):
+                metadata = {}
+                block["metadata"] = metadata
+            metadata.setdefault("original_heading_level", original)
+        block["level"] = normalized
+        previous = normalized
+
+
+def _build_sections(blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    root: list[dict[str, Any]] = []
+    stack: list[dict[str, Any]] = []
+    preamble: dict[str, Any] | None = None
+    generated_count = 0
+
+    def new_section(heading: dict[str, Any]) -> dict[str, Any]:
+        nonlocal generated_count
+        generated_count += 1
+        return {
+            "id": heading.get("id", f"section-{generated_count}"),
+            "title": heading.get("text", ""),
+            "level": heading.get("level", 1),
+            "source_location": deepcopy(heading.get("source_location", {})),
+            "metadata": deepcopy(heading.get("metadata", {})),
+            "blocks": [],
+            "children": [],
+        }
+
+    for block in blocks:
+        if block.get("type") == "heading":
+            section = new_section(block)
+            level = block.get("level", 1)
+            while stack and stack[-1]["level"] >= level:
+                stack.pop()
+            if stack:
+                stack[-1]["children"].append(section)
+            else:
+                root.append(section)
+            stack.append(section)
+            preamble = None  # only blocks before the first heading go there
+            continue
+
+        if stack:
+            stack[-1]["blocks"].append(block)
+        elif preamble is not None:
+            preamble["blocks"].append(block)
+        else:
+            # Blocks before the first heading share one untitled section; one
+            # section per block became one empty, numbered heading per block.
+            # It spans several blocks, so it borrows neither the first block's
+            # id nor its location; each block keeps its own.
+            generated_count += 1
+            preamble = {
+                "id": f"sectionless-{generated_count}",
+                "title": "",
+                "level": 1,
+                "source_location": {},
+                "metadata": {},
+                "blocks": [block],
+                "children": [],
+            }
+            root.append(preamble)
+
+    return root

@@ -3,6 +3,25 @@ import time
 import uuid
 from pathlib import Path
 
+from backend.i18n import t
+from backend.log_messages import LOG_TASK_CANCELLED_BY_USER
+from backend.stage_messages import (
+    STAGE_CANCELLED_BY_USER,
+    STAGE_CANCELLATION_REQUESTED,
+    STAGE_FAILED_DURING,
+)
+
+
+def trim_stage(stage: str | None) -> str:
+    """A live stage label ready to quote in a sentence (no trailing ellipsis)."""
+    return (stage or "").strip().rstrip(".…").strip()
+
+
+def describe_failure(error: str, stage: str | None) -> str:
+    """The job error with the stage it failed in, when one is known."""
+    stage = trim_stage(stage)
+    return t(STAGE_FAILED_DURING).format(error=error, stage=stage) if stage else error
+
 
 class StateManager:
     def __init__(self):
@@ -36,11 +55,14 @@ class StateManager:
         status: str | None = None,
         erro: str | None = None,
         resultado: str | None = None,
+        email_delivery: str | None = None,
     ) -> None:
         task = self._tasks.get(task_id)
         if not task:
             return
         if task.get("status") == "cancelled":
+            return
+        if task.get("status") == "cancelling" and status != "cancelled":
             return
         if progresso is not None:
             task["progresso"] = progresso
@@ -52,7 +74,9 @@ class StateManager:
             task["erros"].append(erro)
         if resultado is not None:
             task["resultado"] = resultado
-        if status in ("done", "error"):
+        if email_delivery is not None:
+            task["email_delivery"] = email_delivery
+        if status in ("done", "error", "cancelled"):
             task["fim"] = time.time()
 
     def obter(self, task_id: str) -> dict | None:
@@ -64,11 +88,18 @@ class StateManager:
             return
         self.atualizar(task_id, progresso=1.0, status="done", resultado=resultado)
 
-    def errar(self, task_id: str, erro: str) -> None:
+    def errar(self, task_id: str, erro: str) -> str:
+        """Mark the task failed, naming the stage it was in; returns the recorded error.
+
+        The stage is read before anything overwrites it with a failure label,
+        so the error says which page or plan step the job was on.
+        """
         task = self._tasks.get(task_id)
         if not task or task.get("status") == "cancelled":
-            return
+            return erro
+        erro = describe_failure(erro, task.get("etapa_atual"))
         self.atualizar(task_id, status="error", erro=erro)
+        return erro
 
     def listar_tarefas(self) -> list[dict]:
         return list(self._tasks.values())
@@ -76,12 +107,13 @@ class StateManager:
     def listar_tarefas_processing(self) -> list[dict]:
         return [t for t in self._tasks.values() if t.get("status") == "processing"]
 
-    def cancelar(self, task_id: str) -> bool:
+    def cancelar(self, task_id: str, *, pending: bool = False) -> bool:
         task = self._tasks.get(task_id)
         if task and task.get("status") == "processing":
-            task["status"] = "cancelled"
-            task["etapa_atual"] = "Cancelado pelo usuario"
-            task["fim"] = time.time()
+            task["status"] = "cancelling" if pending else "cancelled"
+            task["cancellation_requested_at"] = time.time()
+            task["etapa_atual"] = t(STAGE_CANCELLATION_REQUESTED if pending else STAGE_CANCELLED_BY_USER)
+            task["fim"] = None if pending else time.time()
             event = self._cancel_events.get(task_id)
             if event:
                 event.set()
@@ -92,9 +124,20 @@ class StateManager:
         event = self._cancel_events.get(task_id)
         return event is not None and event.is_set()
 
+    def evento_cancelamento(self, task_id: str) -> asyncio.Event | None:
+        """The event set when the task is cancelled, so a long wait can end on it; None for an unknown task."""
+        return self._cancel_events.get(task_id)
+
     def verificar_cancelamento(self, task_id: str) -> None:
+        """Check whether the given task was cancelled, raising a localized cancellation error when it was.
+
+        Args:
+            task_id (str): Task identifier whose cancellation event is inspected; no default (required).
+        """
         if self.foi_cancelada(task_id):
-            raise TaskCancelledError(f"Tarefa {task_id} cancelada pelo usuario")
+            raise TaskCancelledError(
+                t(LOG_TASK_CANCELLED_BY_USER).format(task_id=task_id)
+            )
 
     def registrar_download_url(self, task_id: str, url: str) -> None:
         task = self._tasks.get(task_id)

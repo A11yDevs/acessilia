@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -10,26 +10,53 @@ from slowapi.errors import RateLimitExceeded
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from backend.api.limiter import limiter
-from backend.api.routes import download, health, history, jobs
+from backend.api.routes import download, health, history, jobs, logs
+from backend.i18n import t
+from backend.log_messages import (
+    API_INTERNAL_ERROR_DETAIL,
+    API_RATE_LIMIT_DETAIL,
+    LOG_API_ERROR,
+    LOG_API_STARTED,
+)
 from backend.services.cleanup_service import periodic_cleanup
 from backend.services.download_token_service import limpar_tokens_expirados
 from backend.services.queue_service import unified_queue
+from backend.tools.access_log_filter import AccessLogFilter
 from backend.tools.logger import logger, setup_logger
 
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
-    setup_logger()
-    unified_queue.start_worker()
-    await limpar_tokens_expirados()
-    cleanup_task = asyncio.create_task(periodic_cleanup())
-    logger.info("API Acessilia iniciada (worker da fila + cleanup ativos)")
-    yield
-    cleanup_task.cancel()
-    try:
-        await cleanup_task
-    except asyncio.CancelledError:
-        pass
+    from backend.services.runtime_lease import runtime_lease
+    with runtime_lease():
+        setup_logger()
+        from backend.services.blocking import run_blocking
+        from backend.services.history_service import limpar_orfas
+        await run_blocking(limpar_orfas)
+        from backend.api.worker import recover_pending_jobs
+        await recover_pending_jobs()
+        unified_queue.start_worker()
+        await limpar_tokens_expirados()
+        cleanup_task = asyncio.create_task(periodic_cleanup())
+        logger.info(t(LOG_API_STARTED))
+        access_logger = logging.getLogger("uvicorn.access")
+        access_filter = AccessLogFilter()
+        access_logger.addFilter(access_filter)
+        try:
+            yield
+        finally:
+            access_logger.removeFilter(access_filter)
+            if unified_queue._worker_task is not None:
+                unified_queue._worker_task.cancel()
+                try:
+                    await unified_queue._worker_task
+                except asyncio.CancelledError:
+                    pass
+            cleanup_task.cancel()
+            try:
+                await cleanup_task
+            except asyncio.CancelledError:
+                pass
 
 
 def create_app() -> FastAPI:
@@ -40,25 +67,28 @@ def create_app() -> FastAPI:
     async def _rate_limit_handler(request: Request, exc: RateLimitExceeded):
         return JSONResponse(
             status_code=429,
-            content={"detail": "Muitas requisições. Aguarde um momento antes de tentar novamente."},
+            content={"detail": t(API_RATE_LIMIT_DETAIL)},
         )
 
     @app.exception_handler(StarletteHTTPException)
     async def _http_exception_handler(request: Request, exc: StarletteHTTPException):
-        return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+        return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail}, headers=exc.headers)
 
     @app.exception_handler(Exception)
     async def _global_exception_handler(request: Request, exc: Exception):
-        logger.exception("Erro na API: {} | Path: {}", exc, request.url.path)
+        route = request.scope.get("route")
+        path = getattr(route, "path", "<unmatched>")
+        logger.exception(t(LOG_API_ERROR).format(error=exc, path=path))
         return JSONResponse(
             status_code=500,
-            content={"detail": "Erro interno no servidor"},
+            content={"detail": t(API_INTERNAL_ERROR_DETAIL)},
         )
 
     app.include_router(jobs.router, prefix="/api/v1")
     app.include_router(download.router, prefix="/api/v1")
     app.include_router(history.router, prefix="/api/v1")
     app.include_router(health.router, prefix="/api/v1")
+    app.include_router(logs.router, prefix="/api/v1")
     return app
 
 

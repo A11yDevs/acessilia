@@ -1,5 +1,7 @@
 # Use Cases
 
+You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](use_cases.pt-br.md)
+
 ## Actors
 1. End user, via the REST API directly or through the Telegram bot or Web panel (both clients of the API). The Telegram-specific commands below (status, cancel, pause, feedback) apply to the bot interface.
 2. Operator/Architect (environment setup and diagnostics).
@@ -12,10 +14,10 @@
 - Primary actor: End user.
 - Goal: convert PDF/image/document into accessible outputs.
 - Input: supported file.
-- Output: TXT, DOCX, PDF, PDF/UA, HTML and MP3, delivered in chat, as a download link, or by email.
+- Output: TXT, DOCX, PDF/UA, HTML and MP3, delivered in chat, as a download link, or by email.
 - Implementation:
   - input/validation: [frontend/telegram/handlers/document.py](../frontend/telegram/handlers/document.py), [backend/tools/validators.py](../backend/tools/validators.py)
-  - processing: [backend/service.py](../backend/service.py) selects the engine (`PIPELINE_ENGINE`): the legacy orchestrator [backend/agents/orchestrator.py](../backend/agents/orchestrator.py) or the PDDL orchestrator [backend/agents/pddl_orchestrator.py](../backend/agents/pddl_orchestrator.py); both feed [backend/pipeline/canonical_builder.py](../backend/pipeline/canonical_builder.py)
+  - processing: [backend/service.py](../backend/service.py) runs the PDDL orchestrator [backend/agents/pddl_orchestrator.py](../backend/agents/pddl_orchestrator.py) (`PIPELINE_ENGINE=pddl`; the legacy engine is disabled), which feeds [backend/pipeline/canonical_builder.py](../backend/pipeline/canonical_builder.py)
   - export: [backend/export/pandoc_exporter.py](../backend/export/pandoc_exporter.py), [backend/export/exporters](../backend/export/exporters), [backend/export/renderers](../backend/export/renderers)
 
 ## UC-02 Select description level
@@ -66,7 +68,7 @@
 - Goal: avoid repeated file/page processing.
 - Implementation:
   - cache service: [backend/services/cache.py](../backend/services/cache.py)
-  - usage in flow: [backend/service.py](../backend/service.py) and [backend/agents/orchestrator.py](../backend/agents/orchestrator.py)
+  - usage in flow: [backend/service.py](../backend/service.py)
 
 ## UC-09 Safe single-instance operation
 - Primary actor: Operator.

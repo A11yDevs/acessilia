@@ -1,0 +1,442 @@
+"""Column-aware reading order refinement and marginal isolation.
+
+Pure: zero external dependencies, standard library only.
+
+Two orderings live here until #203 (D6) settles on one, with metrics:
+
+- ``refine_reading_order`` orders loose blocks (dicts or objects). It detects
+  2 and 3 columns from the median block width.
+- ``order_reading_items`` is the processing manifest's ordering. It works on
+  ``ReadingItem`` values that keep the box origin, puts ``group`` elements
+  first, detects 2 and 3 columns and breaks ties by the incoming order.
+"""
+from __future__ import annotations
+
+import statistics
+from collections.abc import Hashable, Sequence
+from dataclasses import dataclass
+from typing import Any
+
+from docstruct.geometry.boxes import OrientedBox
+from docstruct.types import BBox
+
+_HEADER_TYPES = frozenset({"page_header", "header", "running_header", "running_head"})
+_FOOTER_TYPES = frozenset({"page_footer", "footer", "running_footer", "page_number"})
+
+
+def _extract_bbox(item: Any) -> BBox | None:
+    """Extract (x0, y0, x1, y1) bounding box from dict or object."""
+    if isinstance(item, dict):
+        raw = item.get("bbox")
+    else:
+        raw = getattr(item, "bbox", None)
+
+    if raw is None:
+        prov = getattr(item, "provenance", None)
+        if isinstance(prov, (list, tuple)) and len(prov) > 0:
+            first_prov = prov[0]
+            if hasattr(first_prov, "bbox"):
+                b = getattr(first_prov, "bbox", None)
+                if b is not None:
+                    if hasattr(b, "l") and hasattr(b, "t") and hasattr(b, "r") and hasattr(b, "b"):
+                        return (float(b.l), float(b.t), float(b.r), float(b.b))
+                    if hasattr(b, "left") and hasattr(b, "top") and hasattr(b, "right") and hasattr(b, "bottom"):
+                        return (float(b.left), float(b.top), float(b.right), float(b.bottom))
+
+    if isinstance(raw, (list, tuple)) and len(raw) == 4:
+        return (float(raw[0]), float(raw[1]), float(raw[2]), float(raw[3]))
+    return None
+
+
+def _extract_type(item: Any) -> str:
+    """Extract block type from dict or object."""
+    if isinstance(item, dict):
+        return str(item.get("type") or item.get("raw_label") or "").lower()
+    return str(getattr(item, "type", None) or getattr(item, "raw_label", "") or "").lower()
+
+
+def _extract_page(item: Any) -> int | None:
+    """Extract page number from dict or object."""
+    if isinstance(item, dict):
+        page = item.get("page_index")
+        if page is None:
+            page = item.get("page_number")
+        if page is None:
+            page = item.get("page_no")
+        return int(page) if page is not None else None
+    page = getattr(item, "page_index", None)
+    if page is None:
+        page = getattr(item, "page_number", None)
+    return int(page) if page is not None else None
+
+
+def _top_left_key(item: Any) -> tuple[float, float]:
+    """Sort key using bounding box top (y0) then left (x0)."""
+    bbox = _extract_bbox(item)
+    if bbox is not None:
+        return (bbox[1], bbox[0])
+    return (0.0, 0.0)
+
+
+def _column_bounds(candidates: list[BBox], min_left: float, page_width: float) -> list[float]:
+    """X boundaries that split candidate boxes into two or three columns.
+
+    Candidates are the narrow boxes of one page body; full-width banners are
+    not candidates. Three columns need at least two candidates inside each
+    third of the content width (5% tolerance) and the three groups pairwise
+    x-disjoint in column order — short items from a wider column do not make
+    a middle column (review of #214). Otherwise two columns need at least two
+    candidates on each side of the midline. Without columns, returns [].
+    """
+    tol = 0.05 * page_width
+    third_1 = min_left + page_width / 3.0
+    third_2 = min_left + 2.0 * page_width / 3.0
+    first = [box for box in candidates if box[2] <= third_1 + tol]
+    middle = [
+        box for box in candidates
+        if third_1 - tol <= box[0] and box[2] <= third_2 + tol
+    ]
+    last = [box for box in candidates if box[0] >= third_2 - tol]
+    if (
+        len(first) >= 2
+        and len(middle) >= 2
+        and len(last) >= 2
+        and max(box[2] for box in first) <= min(box[0] for box in middle)
+        and max(box[2] for box in middle) <= min(box[0] for box in last)
+    ):
+        return [third_1, third_2]
+
+    mid_x = min_left + 0.5 * page_width
+    left = [box for box in candidates if box[2] <= mid_x + tol]
+    right = [box for box in candidates if box[0] >= mid_x - tol]
+    if len(left) >= 2 and len(right) >= 2:
+        return [mid_x]
+    return []
+
+
+def _order_body_columns(body_elements: list[Any]) -> list[Any]:
+    """Order page body elements respecting 2- or 3-column gutters and full-width banners."""
+    elements_with_bbox = [e for e in body_elements if _extract_bbox(e) is not None]
+    if len(elements_with_bbox) < 2:
+        return sorted(body_elements, key=_top_left_key)
+
+    min_left = min(_extract_bbox(e)[0] for e in elements_with_bbox)  # type: ignore[index]
+    max_right = max(_extract_bbox(e)[2] for e in elements_with_bbox)  # type: ignore[index]
+    page_width = max(1.0, max_right - min_left)
+
+    widths = [_extract_bbox(e)[2] - _extract_bbox(e)[0] for e in elements_with_bbox]  # type: ignore[index]
+    median_width = statistics.median(widths)
+
+    # Multi-column candidates have median width reduced relative to page content width
+    if median_width >= 0.65 * page_width:
+        return sorted(body_elements, key=_top_left_key)
+
+    # Separate full-width banners (titles, wide figures/tables spanning >= 75% of content width)
+    narrow_elements: list[Any] = []
+    narrow_boxes: list[BBox] = []
+    for element in elements_with_bbox:
+        bbox = _extract_bbox(element)
+        if bbox is not None and bbox[2] - bbox[0] < (0.75 * page_width):
+            narrow_elements.append(element)
+            narrow_boxes.append(bbox)
+
+    bounds = _column_bounds(narrow_boxes, min_left, page_width)
+    if not bounds:
+        return sorted(body_elements, key=_top_left_key)
+
+    full_width = [
+        e for e in elements_with_bbox if (_extract_bbox(e)[2] - _extract_bbox(e)[0]) >= (0.75 * page_width)  # type: ignore[index]
+    ]
+    full_width.sort(key=_top_left_key)
+
+    ordered: list[Any] = []
+    seen_ids: set[int] = set()
+    prev_top = -1.0
+
+    def partition_and_append(segment: list[Any]) -> None:
+        for index in range(len(bounds) + 1):
+            low = bounds[index - 1] if index else float("-inf")
+            high = bounds[index] if index < len(bounds) else float("inf")
+            column = [
+                e for e in segment
+                if low <= (_extract_bbox(e)[0] + _extract_bbox(e)[2]) / 2.0 < high  # type: ignore[index]
+            ]
+            column.sort(key=lambda e: (_extract_bbox(e)[1], _extract_bbox(e)[0]))  # type: ignore[index]
+            for el in column:
+                ordered.append(el)
+                seen_ids.add(id(el))
+
+    for fw in full_width:
+        fw_top = _extract_bbox(fw)[1]  # type: ignore[index]
+        segment = [
+            e for e in narrow_elements
+            if prev_top < _extract_bbox(e)[1] < fw_top and id(e) not in seen_ids  # type: ignore[index]
+        ]
+        partition_and_append(segment)
+        ordered.append(fw)
+        seen_ids.add(id(fw))
+        prev_top = _extract_bbox(fw)[3]  # type: ignore[index]
+
+    remainder = [
+        e for e in narrow_elements
+        if _extract_bbox(e)[1] > prev_top and id(e) not in seen_ids  # type: ignore[index]
+    ]
+    partition_and_append(remainder)
+
+    # Any elements without bbox or unassigned
+    for e in body_elements:
+        if id(e) not in seen_ids:
+            ordered.append(e)
+            seen_ids.add(id(e))
+
+    return ordered
+
+
+def refine_reading_order(blocks: list[Any]) -> list[Any]:
+    """Refine document blocks with column-aware gutter partitioning and marginals isolation.
+
+    - Isolates headers at page tops and footers/page numbers at page bottoms.
+    - Detects 2- and 3-column layouts and orders blocks column-by-column (top-to-bottom).
+    - Preserves full-width banners as section dividers.
+    - Handles multiple pages independently, preserving document-level root elements at index 0.
+    """
+    if not blocks:
+        return blocks
+
+    by_page: dict[int | None, list[Any]] = {}
+    for block in blocks:
+        page = _extract_page(block)
+        by_page.setdefault(page, []).append(block)
+
+    refined: list[Any] = []
+
+    # Sort pages: document-level containers (None) come first
+    for page_no, page_blocks in sorted(
+        by_page.items(),
+        key=lambda pair: (0 if pair[0] is None else 1, pair[0] or 0),
+    ):
+        if page_no is None or len(page_blocks) <= 1:
+            refined.extend(page_blocks)
+            continue
+
+        headers: list[Any] = []
+        footers: list[Any] = []
+        body: list[Any] = []
+
+        for b in page_blocks:
+            b_type = _extract_type(b)
+            if b_type in _HEADER_TYPES:
+                headers.append(b)
+            elif b_type in _FOOTER_TYPES:
+                footers.append(b)
+            else:
+                body.append(b)
+
+        headers.sort(key=_top_left_key)
+        footers.sort(key=_top_left_key)
+
+        ordered_body = _order_body_columns(body)
+        refined.extend(headers)
+        refined.extend(ordered_body)
+        refined.extend(footers)
+
+    return refined
+
+
+# --- Processing manifest ordering ---------------------------------------------
+
+GROUP = "group"
+HEADER = "header"
+FOOTER = "footer"
+BODY = "body"
+
+_MANIFEST_HEADERS = frozenset({"header", "page_header"})
+_MANIFEST_FOOTERS = frozenset({"footer", "page_footer", "page_number"})
+
+
+@dataclass(frozen=True)
+class ReadingItem:
+    """What the ordering needs to know about one element, and nothing else.
+
+    ``key`` identifies the element to the caller and must be unique. ``rank``
+    is its incoming reading order, which breaks ties.
+    """
+
+    key: Hashable
+    page: int | None
+    role: str
+    box: OrientedBox | None
+    rank: int
+
+
+def reading_role(element_type: str, raw_label: str) -> str:
+    """Role of a manifest element: ``group``, ``header``, ``footer`` or ``body``.
+
+    Headers and footers are recognized by their type or their raw label.
+    """
+    element_type, raw_label = element_type.lower(), raw_label.lower()
+    if element_type == GROUP:
+        return GROUP
+    if element_type in _MANIFEST_HEADERS or raw_label in _MANIFEST_HEADERS:
+        return HEADER
+    if element_type in _MANIFEST_FOOTERS or raw_label in _MANIFEST_FOOTERS:
+        return FOOTER
+    return BODY
+
+
+def order_reading_items(items: Sequence[ReadingItem]) -> list[Hashable]:
+    """Keys of ``items`` in reading order.
+
+    Items without a page come first, then pages in ascending order. A page
+    with a single item keeps it as is. Otherwise a page reads its groups (in
+    incoming order), its headers and footers sorted top to bottom and left
+    to right, and between them its body in column order (see
+    ``_order_manifest_body``). Boxes are compared in their top-down frame, so
+    every coordinate origin orders the same way.
+    """
+    by_page: dict[int | None, list[ReadingItem]] = {}
+    for item in items:
+        by_page.setdefault(item.page, []).append(item)
+
+    ordered: list[ReadingItem] = []
+    for page, page_items in sorted(
+        by_page.items(),
+        key=lambda pair: (0 if pair[0] is None else 1, pair[0] or 0),
+    ):
+        if page is None or len(page_items) <= 1:
+            ordered.extend(page_items)
+            continue
+        roles: dict[str, list[ReadingItem]] = {GROUP: [], HEADER: [], FOOTER: [], BODY: []}
+        for item in page_items:
+            roles[item.role].append(item)
+        for marginal in (roles[HEADER], roles[FOOTER]):
+            marginal.sort(key=lambda item: (*_top_left(item), item.rank))
+        ordered.extend(
+            roles[GROUP] + roles[HEADER] + _order_manifest_body(roles[BODY]) + roles[FOOTER]
+        )
+    return [item.key for item in ordered]
+
+
+def _box(item: ReadingItem) -> BBox | None:
+    return item.box.top_down() if item.box is not None else None
+
+
+def _top_left(item: ReadingItem) -> tuple[float, float]:
+    box = _box(item)
+    return (box[1], box[0]) if box is not None else (0.0, 0.0)
+
+
+def _order_manifest_body(body: list[ReadingItem]) -> list[ReadingItem]:
+    """Order body items around column gutters and full-width banners.
+
+    An item narrower than 75% of the content width is a column candidate.
+    ``_column_bounds`` (shared with ``refine_reading_order``) returns the
+    column boundaries: three columns when at least two candidates fit inside
+    each third of the content width (5% tolerance) and the three groups are
+    x-disjoint in column order, two columns when at least two candidates sit
+    on each side of the midline. On a three-column page each bound then moves
+    into the empty gutter between the two columns it separates, so the
+    boundaries follow unequal column widths. Then each band between
+    separators is read column by column, left first, each top to bottom;
+    items without a box go last. A page without columns reads top to bottom,
+    left to right.
+
+    Separators are the full-width banners and — on a three-column page — the
+    narrow items crossing a column bound: they span two columns, so reading
+    them inside the column their centre lands in takes them out of place
+    (review of #214). Two-column pages keep the centre bucketing they already
+    had.
+    """
+    boxed = [(item, box) for item in body if (box := _box(item)) is not None]
+    if len(boxed) < 2:
+        return sorted(body, key=lambda item: (_top_left(item)[0], item.rank))
+
+    min_left = min(box[0] for _, box in boxed)
+    max_right = max(box[2] for _, box in boxed)
+    page_width = max(1.0, max_right - min_left)
+    narrow = [(item, box) for item, box in boxed if box[2] - box[0] < 0.75 * page_width]
+
+    bounds = _column_bounds([box for _, box in narrow], min_left, page_width)
+    if not bounds:
+        return sorted(body, key=lambda item: (*_top_left(item), item.rank))
+
+    is_three_col = len(bounds) == 2
+    if is_three_col:
+        # The detected bounds sit at the thirds of the content width, which
+        # only matches the gutters of equal-width columns. Move each bound
+        # into the empty gutter between the two columns it separates, so
+        # full-width-of-column items do not count as crossing it; when the
+        # buckets overlap there is no gutter — a spanning item hides it, and
+        # the nominal bound stays so the spanning item reads as a separator.
+        buckets: list[list[BBox]] = [[] for _ in range(len(bounds) + 1)]
+        for _, box in narrow:
+            for index in range(len(bounds) + 1):
+                low = bounds[index - 1] if index else float("-inf")
+                high = bounds[index] if index < len(bounds) else float("inf")
+                if low <= (box[0] + box[2]) / 2.0 < high:
+                    buckets[index].append(box)
+                    break
+        for index in range(len(bounds)):
+            left_bucket, right_bucket = buckets[index], buckets[index + 1]
+            if left_bucket and right_bucket:
+                gutter_start = max(box[2] for box in left_bucket)
+                gutter_end = min(box[0] for box in right_bucket)
+                if gutter_start < gutter_end:
+                    bounds[index] = (gutter_start + gutter_end) / 2.0
+
+    full_width = sorted(
+        ((item, box) for item, box in boxed if box[2] - box[0] >= 0.75 * page_width),
+        key=lambda pair: pair[1][1],
+    )
+    separators = full_width
+    if is_three_col:
+        separators = sorted(
+            full_width
+            + [
+                (item, box)
+                for item, box in narrow
+                if any(box[0] < bound < box[2] for bound in bounds)
+            ],
+            key=lambda pair: pair[1][1],
+        )
+
+    ordered: list[ReadingItem] = []
+    seen: set[Hashable] = set()
+
+    def read_band(band: list[tuple[ReadingItem, BBox]]) -> None:
+        for index in range(len(bounds) + 1):
+            low = bounds[index - 1] if index else float("-inf")
+            high = bounds[index] if index < len(bounds) else float("inf")
+            column = [
+                (item, box)
+                for item, box in band
+                if low <= (box[0] + box[2]) / 2.0 < high
+            ]
+            for item, _ in sorted(column, key=lambda pair: (pair[1][1], pair[1][0])):
+                ordered.append(item)
+                seen.add(item.key)
+
+    # Starts at -inf: a mirrored (negative) bottom-left top is a real
+    # position, so the first band must reach it (see ``OrientedBox.top_down``:
+    # never compare a mirrored coordinate with a fixed position). The former
+    # ``-1.0`` start, inherited from top-left-only code, read pages without a
+    # full-width banner in input order (#214).
+    prev_top = float("-inf")
+    for separator, separator_box in separators:
+        read_band(
+            [
+                (item, box)
+                for item, box in narrow
+                if prev_top < box[1] < separator_box[1] and item.key not in seen
+            ]
+        )
+        ordered.append(separator)
+        seen.add(separator.key)
+        prev_top = separator_box[3]
+    read_band([(item, box) for item, box in narrow if box[1] > prev_top and item.key not in seen])
+
+    for item in body:
+        if item.key not in seen:
+            ordered.append(item)
+            seen.add(item.key)
+    return ordered

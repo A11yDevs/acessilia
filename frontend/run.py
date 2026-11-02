@@ -4,8 +4,23 @@ import os
 import subprocess
 import sys
 
+from backend.i18n import t
 from backend.tools.logger import setup_logger, logger
 from backend.config.settings import settings
+from backend.log_messages import (
+    LOG_API_INTERFACE_ENABLED,
+    LOG_BOT_ALREADY_RUNNING,
+    LOG_BOT_INTERRUPTED_BY_USER,
+    LOG_FATAL_ERROR_IN_BOT,
+    LOG_LOCK_ACQUIRED,
+    LOG_LOCK_FILE_STALE,
+    LOG_LOCK_RELEASED,
+    LOG_NO_INTERFACE_ENABLED,
+    LOG_STARTING_INTERFACES,
+    LOG_TELEGRAM_INTERFACE_ENABLED,
+    LOG_TELEGRAM_INTERFACE_NO_TOKEN,
+    LOG_WEB_INTERFACE_ENABLED,
+)
 
 LOCK_FILE = os.path.join(os.path.dirname(__file__), "bot.lock")
 
@@ -32,28 +47,26 @@ def acquire_lock() -> None:
                 pid = int(f.read().strip())
             if _is_process_running(pid):
                 logger.critical(
-                    "Outra instancia do bot ja esta rodando (PID={})",
-                    pid,
+                    t(LOG_BOT_ALREADY_RUNNING).format(pid=pid)
                 )
                 sys.exit(1)
             else:
                 logger.warning(
-                    "Lock file stale (PID {} nao existe), removendo...",
-                    pid,
+                    t(LOG_LOCK_FILE_STALE).format(pid=pid)
                 )
                 os.remove(LOCK_FILE)
         except ValueError:
             os.remove(LOCK_FILE)
     with open(LOCK_FILE, "w") as f:
         f.write(str(os.getpid()))
-    logger.info("Lock acquired (PID={})", os.getpid())
+    logger.info(t(LOG_LOCK_ACQUIRED).format(pid=os.getpid()))
 
 
 def release_lock() -> None:
     try:
         if os.path.exists(LOCK_FILE):
             os.remove(LOCK_FILE)
-            logger.info("Lock released")
+            logger.info(t(LOG_LOCK_RELEASED))
     except OSError:
         pass
 
@@ -77,17 +90,16 @@ async def startup():
         api_server = uvicorn.Server(api_config)
         tasks.append(api_server.serve())
         logger.info(
-            "Interface API habilitada (http://localhost:{})",
-            settings.api_port,
+            t(LOG_API_INTERFACE_ENABLED).format(port=settings.api_port)
         )
 
     if "telegram" in enabled and settings.bot_token_valid:
         from frontend.telegram.bot import start_polling
 
         tasks.append(start_polling())
-        logger.info("Interface Telegram habilitada")
+        logger.info(t(LOG_TELEGRAM_INTERFACE_ENABLED))
     elif "telegram" in enabled and not settings.bot_token_valid:
-        logger.warning("Interface Telegram habilitada mas BOT_TOKEN nao configurado")
+        logger.warning(t(LOG_TELEGRAM_INTERFACE_NO_TOKEN))
 
     if "web" in enabled:
         from frontend.web.app import app
@@ -99,17 +111,14 @@ async def startup():
         server = uvicorn.Server(config)
         tasks.append(server.serve())
         logger.info(
-            "Interface Web habilitada (http://localhost:{})",
-            settings.web_port,
+            t(LOG_WEB_INTERFACE_ENABLED).format(port=settings.web_port)
         )
 
     if not tasks:
-        logger.critical(
-            "Nenhuma interface habilitada. Configure ENABLED_INTERFACES no .env"
-        )
+        logger.critical(t(LOG_NO_INTERFACE_ENABLED))
         sys.exit(1)
 
-    logger.info("Iniciando com interfaces: {}", settings.enabled_interfaces)
+    logger.info(t(LOG_STARTING_INTERFACES).format(interfaces=settings.enabled_interfaces))
     await asyncio.gather(*tasks)
 
 
@@ -118,9 +127,9 @@ if __name__ == "__main__":
     try:
         asyncio.run(startup())
     except KeyboardInterrupt:
-        logger.info("Bot interrompido pelo usuario")
+        logger.info(t(LOG_BOT_INTERRUPTED_BY_USER))
     except Exception:
-        logger.exception("Erro fatal no bot")
+        logger.exception(t(LOG_FATAL_ERROR_IN_BOT))
         sys.exit(1)
     finally:
         release_lock()

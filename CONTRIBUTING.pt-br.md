@@ -1,0 +1,407 @@
+# Contribuindo para acessilia
+
+Obrigado por considerar contribuir! Este documento define as diretrizes do projeto baseadas em um **Git Flow simplificado**, pensado para manter a agilidade típica de projetos open source. Você também pode ler estas diretrizes em **inglês**: [English](CONTRIBUTING.md)
+
+## Modelo de branches
+
+```
+main  ──────────────●──────────────────●──  (versões estáveis)
+   \              /  \                /
+    develop ─────●─── release/x.y.z ─●────  (integração / BHS)
+        \        /  \       |       /
+         feat/* ──   fix/* ─┴──────
+```
+
+### Branches eternas
+
+| Branch | Finalidade |
+|--------|------------|
+| `main` | **Produção.** Código estável e revisado. Apenas merges vindos de `develop` ou `hotfix/*`. |
+| `develop` | **Integração.** Onde as funcionalidades em desenvolvimento se encontram. Branch padrão para colaboração. |
+
+### Papéis e permissões
+
+| Papel | Quem | Permissões |
+|-------|------|------------|
+| **Mantenedores** | [@marceloakira](https://github.com/marceloakira), [@jhonata192](https://github.com/jhonata192) e [@fragaeduardo](https://github.com/fragaeduardo) | Únicos autorizados a mesclar branches de release na `main` e criar releases. |
+| **Colaboradores** | Todos os demais | Podem abrir PRs para `develop` e revisar. |
+
+> **Importante:** branches temporárias devem ser deletadas após o merge.
+
+### Branches temporárias
+
+| Prefixo | Finalidade | Nasce de | Mergeia em |
+|---------|------------|----------|------------|
+| `feat/*` | Nova funcionalidade | `develop` | `develop` |
+| `fix/*` | Correção de bug | `develop` | `develop` (ou `release/*` durante o BHS, ver [seção 5.1](#51-bug-huntingsquashing-bhs)) |
+| `docs/*` | Documentação | `develop` | `develop` |
+| `refactor/*` | Refatoração | `develop` | `develop` |
+| `chore/*` | Manutenção (deps, CI, config) | `develop` | `develop` |
+| `release/*` | Estabilização de uma release (ciclo de BHS) | `develop` | `main` e `develop` |
+| `hotfix/*` | Correção crítica em produção | `main` | `main` e `develop` |
+
+> **Importante:** Branches temporárias devem ser deletadas após o merge.
+
+## Executar localmente com Docker
+
+Para instruções detalhadas sobre como subir a Acessília com Docker — tanto com
+build local quanto com imagens pré-publicadas do GHCR (sem precisar do código-fonte) —
+consulte o guia dedicado:
+
+📄 [`docs/docker-compose.md`](docs/docker-compose.md)
+
+## Fluxo de trabalho diário
+
+### 1. Iniciar uma tarefa
+
+```bash
+# Sincronizar com a develop
+git checkout develop
+git pull
+
+# Criar branch para a tarefa
+git checkout -b feat/minha-feature
+```
+
+### 2. Desenvolver
+
+Antes de mudar responsabilidades ou dependências entre o core, o SDK, a
+docstruct e a Toolbox, consulte a
+[constituição](docs/constitution.pt-br.md#7-princípios-arquiteturais-do-ecossistema)
+e os [Registros de Decisão Arquitetural](docs/adr/README.pt-br.md). Uma mudança
+desse tipo, um novo contrato público ou uma exceção a um princípio exige um ADR.
+
+Faça commits atômicos seguindo a [convenção de commits](#convenção-de-commits).
+
+```bash
+git add .
+git commit -m "feat(api): adiciona endpoint de exportação EPUB"
+```
+
+### 3. Manter sincronizado
+
+Sempre faça rebase com a `develop` para evitar conflitos grandes:
+
+```bash
+git fetch origin
+git rebase origin/develop
+```
+
+### 4. Enviar para revisão
+
+Antes de abrir o Pull Request, garanta que os testes estão passando:
+
+```bash
+uv run pytest tests/ -v
+```
+
+A esteira de CI rodará automaticamente os testes no GitHub. O PR só poderá ser revisado se **todos os testes estiverem verdes**.
+
+```bash
+# Opção A — via GitHub (recomendado)
+git push origin feat/minha-feature
+# Abra um Pull Request de feat/minha-feature → develop
+
+# Opção B — merge local (para mudanças simples)
+git checkout develop
+git merge feat/minha-feature
+git push origin develop
+git branch -d feat/minha-feature
+```
+
+### 5. Homologação (QA)
+
+Após o merge de um PR na `develop`, a **esteira de CD** (`.github/workflows/delivery.yml`)
+constrói automaticamente uma imagem Docker e a publica no GHCR com as tags
+`develop` e `sha-<commit>`.
+
+O servidor de homologação roda a partir de um clone deste repositório e de um user timer
+do systemd (`acessilia-staging-update.timer`) que consulta a branch rastreada a cada
+5 minutos e atualiza o container quando a imagem de um commit novo está no GHCR. O
+`scripts/ops.sh` instala e opera esse ambiente; veja
+[docs/homologacao-systemd.pt-br.md](docs/homologacao-systemd.pt-br.md).
+
+- `docker-compose.staging.yml` — define o container
+- `scripts/ops.sh` — `auto-update setup|status|start|migrate`, `track` e os comandos de BHS
+- `scripts/staging-update.sh` — a atualização em si, rodada pelo `ops.sh auto-update start`
+
+```bash
+# Consultar qual imagem está no ar (via API de health)
+curl http://homologacao:8000/api/v1/health | jq .
+
+# Ou, no servidor, o quadro completo
+./scripts/ops.sh auto-update status
+```
+
+### 5.1 Bug Hunting/Squashing (BHS)
+
+Antes de cada release, há um ciclo de **Bug Hunting/Squashing (BHS)**: um período em
+que o staging testa exatamente o candidato a release, sem misturar features ainda
+em desenvolvimento. Para isso, derivamos da `develop` uma branch efêmera
+`release/x.y.z`, que passa a ser a candidata a substituir a `main`.
+
+A acessilia e o [Toolbox](https://github.com/A11yDevs/acessilia-toolbox) fazem o
+BHS juntos, com a mesma versão. **Corte o Toolbox primeiro**: o CI confere uma
+`release/x.y.z` contra o contrato de capabilities da `release/x.y.z` do Toolbox.
+
+1. **Cut** — no início do BHS:
+
+   ```bash
+   ./scripts/ops.sh bhs start 0.2.0
+   ```
+
+   O script deriva `release/0.2.0` de `origin/develop`, faz nela o commit do
+   aumento de versão (`pyproject.toml` e `uv.lock`) e a publica, num worktree
+   temporário: o seu checkout não é tocado. Ele recusa uma versão cuja branch
+   ou tag `v` já existe.
+
+2. **Durante o BHS**:
+   - PRs `fix/*` (ou `hotfix/*`) que corrigem bugs encontrados no staging vão
+     para `release/0.2.0` (em vez de `develop`). O job de CI `release-scope`
+     rejeita PRs de qualquer outra branch.
+   - PRs `feat/*`, `refactor/*` e demais continuam mirando `develop`
+     normalmente — a `develop` nunca é bloqueada, pois o escopo da release já
+     foi travado no cut.
+   - A **esteira de CI** (`ci.yml`) roda os mesmos testes em PRs para `release/**`.
+   - A **esteira de CD** (`delivery.yml`) publica a imagem da `release/0.2.0` no
+     GHCR com as tags `release-0.2.0` e `sha-<commit>`.
+
+3. **Staging aponta para a release** — no servidor de homologação, dentro do
+   clone (o Toolbox primeiro):
+
+   ```bash
+   ./scripts/ops.sh track release/0.2.0
+   ```
+
+   Ele faz checkout e pull da `release/0.2.0`, grava `TRACK_BRANCH` (e
+   `TRACK_TAG`) no `.env` e atualiza, e o staging passa a rodar a imagem
+   `release-0.2.0`. Rode `./scripts/ops.sh bhs status` na sua máquina para ver
+   o CI, a imagem e os PRs da release.
+
+4. **Fechamento do BHS** — quando a release estiver estável (feche o Toolbox
+   primeiro: o CI da `main` confere o contrato da `main` do Toolbox):
+
+   ```bash
+   ./scripts/ops.sh bhs finish 0.2.0            # abre release/0.2.0 → main e chore/sync-release-0.2.0 → develop
+   # revise e mescle os dois PRs (release → main com "Create a merge commit")
+   ./scripts/ops.sh bhs finish 0.2.0 --cleanup  # cria a tag v0.2.0 no merge da main e apaga as branches
+   ```
+
+   As correções chegam à `develop` por `chore/sync-release-0.2.0`, derivada da
+   release: resolva os conflitos com a `develop` nela, nunca em
+   `release/0.2.0`, que vai para a `main`. Rodar o script de novo leva para a
+   sync os fixes mesclados depois.
+
+   Depois, no servidor de homologação, `./scripts/ops.sh track develop` volta a
+   rastrear a `develop` (só depois do merge do PR de sync: o `track` recusa uma
+   branch sem `scripts/ops.sh`).
+
+### 5.2 Bibliotecas em `libs/` (docstruct e SDK)
+
+`libs/docstruct` (algoritmos puros de estrutura de documentos) e `libs/sdk`
+(acesso à Toolbox pelo contrato HTTP) são pacotes separados que vivem neste
+repositório. Eles seguem as camadas descritas em
+[architecture.pt-br.md](docs/architecture.pt-br.md#bibliotecas-e-a-toolbox-libs):
+
+- **Nada de imports para cima.** A `docstruct` não importa nada de `backend`, do
+  SDK nem de `acessilia_toolbox`; o SDK não importa `backend` nem
+  `acessilia_toolbox`. O `tests/test_purity.py` de cada biblioteca garante isso, e
+  o `tests/test_architecture_layers.py` impede o `backend` de importar o pacote da
+  Toolbox.
+- **Rode as suítes delas**, que o CI também roda:
+  `cd libs/docstruct && python -m pytest` e `cd libs/sdk && python -m pytest`.
+- **Mantenha os READMEs nos dois idiomas.** O
+  `tests/test_docstruct_readme_sync.py` confere o par da docstruct.
+- **A docstruct é publicada para outros repositórios.** Uma mudança que a
+  Toolbox deve receber precisa aumentar a versão e criar a tag
+  `docstruct-vX.Y.Z` depois do merge; veja
+  [Releases](libs/docstruct/README.pt-br.md#releases). A Toolbox passa para a
+  versão nova num PR próprio. O release da aplicação (seção 6) não publica a
+  docstruct, e um release da docstruct não mexe na aplicação.
+
+### 6. Release (`release/*` → `main`)
+
+Apenas mantenedores ([@marceloakira](https://github.com/marceloakira),
+[@jhonata192](https://github.com/jhonata192) e
+[@fragaeduardo](https://github.com/fragaeduardo)) podem mesclar uma release na `main`.
+
+1. **QA homologou o BHS?** → siga em frente.
+2. Rode `./scripts/ops.sh bhs finish x.y.z`, que abre o Pull Request de
+   `release/x.y.z` para `main`.
+3. Solicite revisão de outro mantenedor.
+4. Após aprovação, faça o merge com **"Create a merge commit"**: a release
+   substitui a `main`, e squash ou rebase descartariam a história dela.
+5. A **esteira de CD** na `main` publica as tags `main`, `latest` e `sha-<commit>`.
+6. Promova o ambiente produtivo conforme [docs/producao-systemd.md](docs/producao-systemd.md).
+
+A versão já foi atualizada na branch de release no cut. Para criar a
+**Release oficial** com versão semântica:
+
+```bash
+# 1. Crie a tag no merge da main (também apaga release/x.y.z e a branch de sync)
+./scripts/ops.sh bhs finish 0.2.0 --cleanup
+
+# 2. O workflow Release (release.yml) builda e publica 0.2.0, 0.2 e 0
+#    no GHCR, e cria a GitHub Release com changelog automático
+```
+
+Depois do release, mergeie `main` de volta para `develop`:
+
+```bash
+git checkout develop
+git merge main
+git push origin develop
+```
+
+### 7. Hotfix (correção crítica)
+
+Hotfixes seguem o mesmo fluxo de PR, não push direto. A CI cria a tag e release automaticamente.
+
+```bash
+git checkout main
+git checkout -b hotfix/crash-upload
+# faz a correção
+git commit -m "fix: corrige crash ao fazer upload de PDF corrompido"
+git push origin hotfix/crash-upload
+# Abra um Pull Request de hotfix/crash-upload → main no GitHub
+# Após aprovação e merge, a CI cria a imagem main + sha-xxx
+
+# Se for crítica a ponto de merecer release imediata:
+git tag v0.3.1 && git push origin v0.3.1
+
+# Propaga para develop
+git checkout develop
+git merge main
+git push origin develop
+git branch -d hotfix/crash-upload
+```
+
+## Convenção de commits
+
+Usamos [Conventional Commits](https://www.conventionalcommits.org/):
+
+```
+<tipo>(<escopo opcional>): <descrição>
+
+[corpo opcional]
+```
+
+### Tipos
+
+| Tipo | Uso |
+|------|-----|
+| `feat` | Nova funcionalidade |
+| `fix` | Correção de bug |
+| `docs` | Documentação |
+| `refactor` | Refatoração sem mudar comportamento |
+| `test` | Testes |
+| `chore` | Manutenção (deps, CI, config) |
+| `style` | Formatação, lint |
+| `perf` | Melhoria de performance |
+
+### Exemplos
+
+```
+feat(api): adiciona endpoint de exportação em EPUB
+fix(telegram): corrige timeout em arquivos grandes (>10MB)
+docs(readme): atualiza exemplos de uso da API
+refactor(agents): extrai lógica de OCR para serviço separado
+test(pipeline): adiciona teste para fluxo PDDL com Docling
+chore(deps): atualiza fastapi para 0.115
+perf(ocr): reduz uso de memória no RapidOCR
+```
+
+## Versionamento
+
+Seguimos [Semantic Versioning](https://semver.org/):
+
+```
+vMAJOR.MINOR.PATCH
+```
+
+- **MAJOR**: mudança incompatível na API pública
+- **MINOR**: nova funcionalidade compatível com versões anteriores
+- **PATCH**: correção de bug compatível
+
+## Regras do time
+
+1. **Nunca commitar direto na `main`** — sempre usar branches + PR.
+2. **Nunca commitar direto na `develop`** — exceto merges de branches temporárias.
+3. **Sempre fazer rebase** antes do merge para manter histórico linear.
+4. **Branches são temporárias** — duram apenas o necessário para a tarefa.
+5. **PRs pequenos e focados** — mais fáceis de revisar e com menos conflitos.
+6. **Commits atômicos** — um commit = uma mudança lógica completa.
+7. **Testes obrigatórios** — toda `feat` ou `fix` deve incluir ou atualizar testes.
+8. **Rodar `pytest` antes do push** — garantir que nada está quebrado.
+
+## Rulesets (proteção de branches)
+
+O repositório utiliza **GitHub Rulesets** para proteger a branch `main` contra deleção, force-push e merges sem revisão. Rulesets são configurados **via API REST**, não por arquivos no repositório.
+
+O arquivo `.github/rulesets/main.json.example` contém o modelo da configuração atual. Para aplicar ou atualizar os rulesets, execute:
+
+```bash
+# Aplica/atualiza os rulesets via GitHub API
+./scripts/setup-rulesets.sh
+
+# Apenas visualiza o payload sem modificar nada
+DRY_RUN=1 ./scripts/setup-rulesets.sh
+```
+
+> **Importante:** O ruleset permite bypass para administradores do repositório (`RepositoryRole`), para que mantenedores possam gerenciar a branch sem bloqueios.
+
+## Setup do ambiente
+
+```bash
+# Clone e instale dependências
+git clone git@github.com:A11yDevs/acessilia.git
+cd acessilia
+uv sync --extra dev   # usa o Python 3.11 fixado em .python-version
+
+# Configure as variáveis de ambiente
+cp .env.example .env
+
+# Execute os testes para verificar se está tudo ok
+uv run pytest
+```
+
+## Pull Requests
+
+1. Certifique-se de que sua branch está atualizada com a `develop` (`git rebase origin/develop`).
+2. Execute `uv run pytest` e veja se todos os testes passam. Código, documentação e o PR são escritos em inglês (constituição, princípio 2.8): o `tests/test_no_portuguese.py` falha com texto novo em português em qualquer ponto do repositório. Português intencional (strings para o usuário, padrões de detecção, espelhos `*.pt-br.md`) recebe uma isenção nesse teste. Ao limpar um arquivo listado em `tests/fixtures/portuguese_allowlist.json`, reduza a contagem dele ali.
+3. Preencha o [template de pull request](.github/pull_request_template.md): por que, o que muda, como você verificou e o **checklist de conformidade arquitetural** (princípios P1–P9 da [constituição](docs/constitution.pt-br.md)).
+4. Referencie as issues relacionadas. `Closes #42` só fecha a issue quando o PR é mesclado na `main`, a branch padrão; num PR para a `develop`, feche a issue à mão depois do merge.
+5. Aguarde a revisão e ajuste se necessário.
+
+## Integração contínua (CI/CD)
+
+A esteira de CI/CD está definida em três workflows:
+
+- **`.github/workflows/ci.yml`** — em todo PR para `main`, `develop` ou `release/**`, e após pushes nessas branches, roda as suítes de teste do core, da docstruct e do SDK no Python 3.11 e rejeita testes pulados inesperados.
+- **`.github/workflows/delivery.yml`** — depois que o CI passa num push, constrói a imagem, roda um smoke test de saúde e uma verificação de tamanho, e a publica no GHCR.
+- **`.github/workflows/release.yml`** — quando um mantenedor cria uma tag `v*`, builda, publica e cria a GitHub Release.
+
+| Workflow | Evento | Ação |
+|----------|--------|------|
+| **CI** | PR para `main`, `develop` ou `release/**` | Suítes de teste do core, da docstruct e do SDK |
+| **CI** | Push na `main`, `develop` ou `release/**` | As mesmas suítes, e depois a Delivery |
+| **Delivery** | CI concluído na `main` | Build, smoke test + push: `main`, `latest`, `sha-xxx` |
+| **Delivery** | CI concluído na `develop` | Build, smoke test + push: `develop`, `sha-xxx` |
+| **Delivery** | CI concluído na `release/x.y.z` | Build, smoke test + push: `release-x.y.z`, `sha-xxx` |
+| **Release** | Tag `v*` criada no git | Build, smoke test + push: `X.Y.Z`, `X.Y`, `X` + GitHub Release |
+
+São publicadas as seguintes referências no `ghcr.io/a11ydevs/acessilia`:
+
+| Tag | Branch de origem | Finalidade |
+|-----|-----------------|------------|
+| `develop` | `develop` | Homologação (atualizada via systemd timer) |
+| `main` | `main` | Produção (CD) |
+| `latest` | `main` | Produção (aponta pro último) |
+| `sha-<commit>` | `main` ou `develop` | Referência imutável |
+| `X.Y.Z` | Tag git `v*` | Release oficial versionada |
+| `X.Y`, `X` | Tag git `v*` | Alias semântico da release mais recente nessa linha |
+
+## Dúvidas?
+
+Abra uma [issue](https://github.com/A11yDevs/acessilia/issues) ou inicie uma [discussão](https://github.com/A11yDevs/acessilia/discussions).
+

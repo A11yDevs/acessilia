@@ -1,92 +1,94 @@
-# Relatorio de Revisao Tecnica - PR #14
+# Technical Review Report — PR #14
 
-## Contexto
-Este relatorio consolida a revisao tecnica do PR #14, que introduz uma arquitetura de API REST standalone com clientes web e Telegram consumindo processamento via HTTP.
+You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](pr-14-review.pt-br.md)
 
-## Escopo da revisao
-- Validacao de riscos funcionais (bugs e regressao de comportamento)
-- Analise de consistencia entre contratos de API e implementacao
-- Verificacao de cobertura de testes para cenarios criticos
+## Context
+This report consolidates the technical review of PR #14, which introduces a standalone REST API architecture in which the Web and Telegram clients consume processing over HTTP.
 
-## Resumo executivo
-A proposta arquitetural do PR e positiva e segue uma direcao consistente de separacao entre nucleo de processamento e interfaces cliente.
+## Review scope
+- Validation of functional risks (bugs and behavior regressions)
+- Consistency analysis between API contracts and their implementation
+- Verification of test coverage for critical scenarios
 
-Entretanto, foram identificados 2 pontos relevantes:
-- 1 achado de severidade alta (bloqueador para merge)
-- 1 achado de severidade media (deve ser corrigido no mesmo PR)
+## Executive summary
+The PR's architectural proposal is positive and follows a consistent direction that separates the processing core from the client interfaces.
 
-## Achados
+However, two relevant findings were identified:
+- 1 high-severity finding (blocks merging)
+- 1 medium-severity finding (must be fixed in the same PR)
 
-### 1) Alto - Cancelamento em fila nao impede execucao real
-**Severidade:** Alta  
-**Tipo:** Regressao funcional / quebra de contrato de API  
-**Status recomendado:** Bloquear merge ate correcao
+## Findings
 
-**Descricao**
-Quando uma tarefa ainda esta na fila e o usuario solicita cancelamento, o status e marcado como cancelado no estado exposto pela API. Porem, a entrada correspondente nao e removida da fila efetiva de execucao.
+### 1) High — Canceling a queued task does not prevent real execution
+**Severity:** High  
+**Type:** Functional regression / API contract break  
+**Recommended status:** Block merging until fixed
 
-Com isso, quando o worker consome a fila, a tarefa pode ser processada normalmente, incluindo exportacao e possivel envio de resultado.
+**Description**
+When a task is still in the queue and the user requests cancellation, the status is marked as cancelled in the state exposed by the API. However, the corresponding entry is not removed from the effective execution queue.
 
-**Impacto**
-- Usuario recebe resposta de cancelamento, mas o processamento pode continuar
-- Custo indevido de computacao e operacao
-- Inconsistencia entre o contrato do endpoint de cancelamento e o comportamento real
+As a result, when the worker consumes the queue the task may be processed normally, including export and possible delivery of the result.
 
-**Causa provavel**
-- Cancelamento altera apenas estado observado, sem remover item pendente na estrutura da fila
-- Ausencia de guarda adicional no inicio da execucao para abortar tarefa previamente cancelada
+**Impact**
+- The user receives a cancellation response, but processing may continue
+- Unnecessary compute and operations cost
+- Inconsistency between the cancel endpoint's contract and the actual behavior
 
-**Recomendacao tecnica**
-- Implementar remocao por task_id na fila unificada
-- No endpoint de cancelamento, tentar remover da fila antes de responder sucesso
-- Adicionar check defensivo no inicio da execucao do worker para interromper tarefas canceladas antes do processamento
+**Likely cause**
+- Cancellation changes only the observed state without removing the pending item in the queue structure
+- Missing additional guard at the start of execution to abort a previously cancelled task
+
+**Technical recommendation**
+- Implement removal by task_id in the unified queue
+- In the cancel endpoint, attempt removal from the queue before responding with success
+- Add a defensive check at the start of the worker's execution to stop cancelled tasks before processing
 
 ---
 
-### 2) Medio - Abertura redundante de arquivo no cliente HTTP
-**Severidade:** Media  
-**Tipo:** Defeito de recurso / estabilidade  
-**Status recomendado:** Corrigir no mesmo PR
+### 2) Medium — Redundant file open in the HTTP client
+**Severity:** Medium  
+**Type:** Resource defect / stability  
+**Recommended status:** Fix in the same PR
 
-**Descricao**
-No envio de arquivo para a API, ha abertura redundante de handle de arquivo. Um handle e criado e sobrescrito por outro dentro do contexto de envio.
+**Description**
+In the file upload to the API, the file handle is opened redundantly. One handle is created and overwritten by another within the upload context.
 
-**Impacto**
-- Risco de vazamento de descritor de arquivo em carga continua
-- Pode evoluir para erro operacional por limite de arquivos abertos
+**Impact**
+- Risk of a file descriptor leak under sustained load
+- Can escalate into an operational error from hitting the open-file limit
 
-**Recomendacao tecnica**
-- Manter apenas uma abertura de arquivo dentro de bloco de contexto
-- Montar o payload multipart somente com o handle controlado pelo contexto
+**Technical recommendation**
+- Keep a single file open within the context block
+- Build the multipart payload only with the context-managed handle
 
-## Cobertura de testes - lacunas
-Foi identificada lacuna de teste para o cenario mais critico do PR.
+## Test coverage — gaps
+A test gap was identified for the most critical scenario of the PR.
 
-### Lacuna principal
-- Nao ha teste garantindo que uma tarefa cancelada enquanto ainda esta em fila nunca chega a executar.
+### Main gap
+- There is no test guaranteeing that a task cancelled while still in the queue never reaches execution.
 
-### Teste recomendado
-Adicionar teste de integracao que:
-1. Enfileira uma tarefa
-2. Cancela antes do inicio de execucao
-3. Verifica que o callback de processamento nao foi executado
-4. Verifica status final cancelado sem artefatos de processamento
+### Recommended test
+Add an integration test that:
+1. Enqueues a task
+2. Cancels it before execution begins
+3. Verifies that the processing callback was not executed
+4. Verifies the final status is cancelled with no processing artifacts
 
-## Risco residual se aprovado sem ajustes
-- Alto risco de comportamento inesperado para cancelamento
-- Potencial custo operacional desnecessario
-- Potencial desgaste de confianca para usuarios que dependem de controle de fila
+## Residual risk if approved without changes
+- High risk of unexpected behavior for cancellation
+- Potential unnecessary operational cost
+- Potential erosion of user trust among those relying on queue control
 
-## Decisao de review
-**Recomendacao:** Solicitar alteracoes (changes requested).
+## Review decision
+**Recommendation:** Request changes.
 
-## Checklist de correcao sugerido
-- [ ] Remocao de tarefa por identificador na fila unificada
-- [ ] Integracao do cancelamento com remocao real da fila
-- [ ] Guarda defensiva no inicio da execucao do worker
-- [ ] Ajuste de abertura de arquivo no cliente HTTP
-- [ ] Novo teste de integracao para cancelamento em fila
-- [ ] Execucao da suite de testes apos ajustes
+## Suggested fix checklist
+- [ ] Remove a task by identifier in the unified queue
+- [ ] Wire cancellation to real queue removal
+- [ ] Defensive guard at the start of worker execution
+- [ ] Fix the file open in the HTTP client
+- [ ] New integration test for queue cancellation
+- [ ] Run the test suite after the adjustments
 
-## Conclusao
-A direcao arquitetural do PR e boa e moderniza o projeto ao centralizar o processamento na API. Com as correcoes acima, a mudanca tende a ficar solida em termos de contrato funcional, observabilidade e confiabilidade operacional.
+## Conclusion
+The PR's architectural direction is good and modernizes the project by centralizing processing in the API. With the fixes above, the change is likely to be solid in terms of functional contract, observability, and operational reliability.

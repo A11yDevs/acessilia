@@ -1,10 +1,17 @@
-import asyncio
+from backend.services.blocking import offload
+import threading
 import sqlite3
+from backend.i18n import t
+from backend.log_messages import (
+    LOG_ORPHAN_TASKS_CLEANED,
+    LOG_ORPHAN_TASKS_CLEANUP_FAILED,
+    LOG_STALE_PROCESS_INTERRUPTED,
+)
 from backend.tools.logger import logger
 from backend.config.settings import settings
 
 _connection: sqlite3.Connection | None = None
-_connection_lock = asyncio.Lock()
+_connection_lock = threading.RLock()
 
 
 def _criar_tabelas(conn: sqlite3.Connection) -> None:
@@ -82,27 +89,34 @@ def init_db():
     get_connection()
 
 
-def limpar_orfas():
+def limpar_orfas() -> None:
+    """Mark stale processing records (stuck over one hour) as errors so the UI does not show them as running.
+
+    Args:
+        None: no parameters.
+    """
     conn = get_connection()
     try:
         conn.execute(
-            "UPDATE conversoes SET status='error', erro='Stale: process interrupted' "
-            "WHERE status='processing' AND criado_em < datetime('now', '-1 hours')"
+            "UPDATE conversoes SET status='error', erro=? "
+            "WHERE status='processing' AND criado_em < datetime('now', '-1 hours')",
+            (t(LOG_STALE_PROCESS_INTERRUPTED),),
         )
         conn.commit()
-        logger.info("Tarefas orfas limpas")
+        logger.info(t(LOG_ORPHAN_TASKS_CLEANED))
     except Exception as e:
-        logger.warning("Falha ao limpar tarefas orfas: {}", e)
+        logger.warning(t(LOG_ORPHAN_TASKS_CLEANUP_FAILED).format(error=e))
 
 
-async def registrar_conversao(
+@offload
+def registrar_conversao(
     task_id: str,
     arquivo: str,
     extensao: str,
     tamanho_bytes: int = 0,
     modo: str = "normal",
 ):
-    async with _connection_lock:
+    with _connection_lock:
         conn = get_connection()
         conn.execute(
             """INSERT OR IGNORE INTO conversoes
@@ -113,7 +127,8 @@ async def registrar_conversao(
         conn.commit()
 
 
-async def finalizar_conversao(
+@offload
+def finalizar_conversao(
     task_id: str,
     status: str,
     pipeline: str = "",
@@ -121,7 +136,7 @@ async def finalizar_conversao(
     resultado_resumo: str = "",
     tempo_segundos: float = 0,
 ):
-    async with _connection_lock:
+    with _connection_lock:
         conn = get_connection()
         conn.execute(
             """UPDATE conversoes SET
@@ -134,8 +149,9 @@ async def finalizar_conversao(
         conn.commit()
 
 
-async def listar_historico(limite: int = 10) -> list[dict]:
-    async with _connection_lock:
+@offload
+def listar_historico(limite: int = 10) -> list[dict]:
+    with _connection_lock:
         conn = get_connection()
         rows = conn.execute(
             """SELECT * FROM conversoes
@@ -145,8 +161,9 @@ async def listar_historico(limite: int = 10) -> list[dict]:
         return [dict(r) for r in rows]
 
 
-async def salvar_ocr_raw(task_id: str, page_number: int, text: str):
-    async with _connection_lock:
+@offload
+def salvar_ocr_raw(task_id: str, page_number: int, text: str):
+    with _connection_lock:
         conn = get_connection()
         conn.execute(
             "INSERT INTO ocr_raw (task_id, page_number, text) VALUES (?, ?, ?)",
@@ -155,8 +172,9 @@ async def salvar_ocr_raw(task_id: str, page_number: int, text: str):
         conn.commit()
 
 
-async def listar_ocr_raw(task_id: str) -> list[dict]:
-    async with _connection_lock:
+@offload
+def listar_ocr_raw(task_id: str) -> list[dict]:
+    with _connection_lock:
         conn = get_connection()
         rows = conn.execute(
             "SELECT * FROM ocr_raw WHERE task_id = ? ORDER BY page_number", (task_id,)
@@ -164,10 +182,11 @@ async def listar_ocr_raw(task_id: str) -> list[dict]:
         return [dict(r) for r in rows]
 
 
-async def salvar_ocr_revised(
+@offload
+def salvar_ocr_revised(
     task_id: str, page_number: int, text: str, modelo: str = "qwen2.5:3b"
 ):
-    async with _connection_lock:
+    with _connection_lock:
         conn = get_connection()
         conn.execute(
             "INSERT INTO ocr_revised (task_id, page_number, text, modelo) VALUES (?, ?, ?, ?)",
@@ -176,8 +195,9 @@ async def salvar_ocr_revised(
         conn.commit()
 
 
-async def listar_ocr_revised(task_id: str) -> list[dict]:
-    async with _connection_lock:
+@offload
+def listar_ocr_revised(task_id: str) -> list[dict]:
+    with _connection_lock:
         conn = get_connection()
         rows = conn.execute(
             "SELECT * FROM ocr_revised WHERE task_id = ? ORDER BY page_number",
@@ -186,10 +206,11 @@ async def listar_ocr_revised(task_id: str) -> list[dict]:
         return [dict(r) for r in rows]
 
 
-async def salvar_ocr_translated(
+@offload
+def salvar_ocr_translated(
     task_id: str, page_number: int, text: str, modelo: str = "qwen2.5:1.5b"
 ):
-    async with _connection_lock:
+    with _connection_lock:
         conn = get_connection()
         conn.execute(
             "INSERT INTO ocr_translated (task_id, page_number, text, modelo) VALUES (?, ?, ?, ?)",
@@ -198,8 +219,9 @@ async def salvar_ocr_translated(
         conn.commit()
 
 
-async def listar_ocr_translated(task_id: str) -> list[dict]:
-    async with _connection_lock:
+@offload
+def listar_ocr_translated(task_id: str) -> list[dict]:
+    with _connection_lock:
         conn = get_connection()
         rows = conn.execute(
             "SELECT * FROM ocr_translated WHERE task_id = ? ORDER BY page_number",
@@ -208,8 +230,9 @@ async def listar_ocr_translated(task_id: str) -> list[dict]:
         return [dict(r) for r in rows]
 
 
-async def limpar_ocr_data(task_id: str):
-    async with _connection_lock:
+@offload
+def limpar_ocr_data(task_id: str):
+    with _connection_lock:
         conn = get_connection()
         conn.execute("DELETE FROM ocr_raw WHERE task_id = ?", (task_id,))
         conn.execute("DELETE FROM ocr_revised WHERE task_id = ?", (task_id,))
@@ -217,8 +240,9 @@ async def limpar_ocr_data(task_id: str):
         conn.commit()
 
 
-async def estatisticas() -> dict:
-    async with _connection_lock:
+@offload
+def estatisticas() -> dict:
+    with _connection_lock:
         conn = get_connection()
         total = conn.execute("SELECT COUNT(*) FROM conversoes").fetchone()[0]
         sucesso = conn.execute(

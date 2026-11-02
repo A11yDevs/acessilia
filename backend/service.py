@@ -4,18 +4,40 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Coroutine
 
-from backend.agents.orchestrator import AccessibilityOrchestrator
-from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
+from backend.agents.pddl_orchestrator import (
+    PddlAccessibilityOrchestrator,
+    records_extraction_degradation,
+    records_visual_failures,
+)
 from backend.agents.state_manager import TaskCancelledError, state_manager
-from backend.services.cache import get_cached, options_cache_key, set_cache
+from backend.services.cache import (
+    drop_cache,
+    get_cached,
+    options_cache_key,
+    processing_cache_configuration,
+    set_cache,
+)
 from backend.services.history_service import (
     finalizar_conversao,
-    limpar_orfas,
     registrar_conversao,
 )
 from backend.config.settings import settings
+from backend.i18n import t
+from backend.log_messages import (
+    LOG_CANONICAL_JSON_SAVE_FAILED,
+    LOG_ORCHESTRATOR_EMPTY_AGENT_RESPONSE,
+    LOG_PIPELINE_ERROR,
+    LOG_TASK_CANCELLED_BY_USER,
+)
+from backend.stage_messages import (
+    STAGE_ANALYZING_FILE,
+    STAGE_CANCELLED_BY_USER,
+    STAGE_PROCESSING_FAILED_LABEL,
+    STAGE_PROCESSING_FINISHED,
+    STAGE_PROCESSING_WITH_AI,
+    STAGE_PREPARING_FILE,
+)
 from backend.tools.logger import logger
-from backend.tools.structurer import DOCLING_AVAILABLE
 from backend.tools.text_processor import merge_broken_paragraphs
 from backend.pipeline.canonical_builder import build_canonical_document
 from backend.pipeline.verbosity_manager import verbosity_for_mode
@@ -25,22 +47,14 @@ def _normalized_engine() -> str:
     engine = settings.pipeline_engine.strip().lower()
     if engine in {"pddl", "pmv"}:
         return "pddl"
-    return "legacy"
-
-
-def _resolved_structurer() -> str:
-    structurer = settings.structurer.strip().lower()
-    if structurer == "docling" and not DOCLING_AVAILABLE:
-        logger.warning(
-            "STRUCTURER=docling mas docling nao instalado. Usando PyMuPDF."
-        )
-        return "pymupdf"
-    return structurer
+    raise RuntimeError(
+        f"Pipeline legado ({engine}) foi desativado. "
+        f"Use PIPELINE_ENGINE=pddl para o pipeline PDDL+Toolbox."
+    )
 
 
 def _build_orchestrator():
     if _normalized_engine() == "pddl":
-        structurer = _resolved_structurer()
         fast_downward = (
             Path(settings.pddl_fast_downward).expanduser()
             if settings.pddl_fast_downward.strip()
@@ -54,10 +68,11 @@ def _build_orchestrator():
             fast_downward=fast_downward,
             fast_downward_alias=alias,
             fast_downward_search=settings.pddl_fast_downward_search,
-            enable_ocr=structurer == "docling",
-            extractor_backend=structurer,
+            enable_ocr=False,
+            extractor_backend="toolbox",
+            max_replans=settings.pddl_max_replans,
         )
-    return AccessibilityOrchestrator()
+    raise RuntimeError("Pipeline legado desativado — use PIPELINE_ENGINE=pddl")
 
 
 agente = _build_orchestrator()
@@ -70,18 +85,12 @@ def _cache_version(
 ) -> str:
     engine = _normalized_engine()
     return options_cache_key(
-        f"{settings.ai_client}-{engine}-v2",
+        f"{settings.ai_client}-{engine}-v12",
         mode=mode,
         custom_prompt=custom_prompt or "",
         thinking_mode=thinking_mode,
+        configuration=processing_cache_configuration(),
     )
-
-
-def _limpar_tarefas_orfas():
-    limpar_orfas()
-
-
-_limpar_tarefas_orfas()
 
 
 def _salvar_json_canonico(canonical_document: dict, source_name: str) -> None:
@@ -97,7 +106,7 @@ def _salvar_json_canonico(canonical_document: dict, source_name: str) -> None:
             encoding="utf-8",
         )
     except Exception as e:
-        logger.warning("Nao foi possivel salvar JSON canonico: {}", e)
+        logger.warning(t(LOG_CANONICAL_JSON_SAVE_FAILED).format(error=e))
 
 
 def _payload_for_source(payload: Any, file_path: Path) -> Any:
@@ -140,8 +149,20 @@ async def process(
     custom_prompt: str | None = None,
     thinking_mode: bool = False,
     task_id: str | None = None,
+    display_filename: str | None = None,
 ) -> dict[str, Any]:
+    """Process one document and return its canonical document.
+
+    ``display_filename`` is the name the user uploaded. The API stores the
+    upload under a random name (``<uuid>.pdf``), so without it a document
+    with no heading would take that UUID as its title and source name, in
+    every export (#333).
+    """
     external_task_id = task_id is not None
+    # Only the name, never a path the client sent.
+    shown_name = (
+        Path(display_filename.replace("\\", "/")).name if display_filename else ""
+    ) or file_path.name
     if task_id is None:
         task_id = state_manager.criar_tarefa(file_path)
     elif state_manager.obter(task_id) is None:
@@ -150,7 +171,7 @@ async def process(
     inicio = time.time()
     await registrar_conversao(
         task_id=task_id,
-        arquivo=file_path.name,
+        arquivo=shown_name,
         extensao=file_path.suffix,
         tamanho_bytes=file_path.stat().st_size,
         modo=mode,
@@ -159,16 +180,41 @@ async def process(
     try:
         cache_variant = _cache_version(mode, custom_prompt, thinking_mode)
         cached = await get_cached(file_path, cache_variant)
+        if isinstance(cached, dict):
+            metadata = cached.get("canonical_metadata")
+            if not isinstance(metadata, dict):
+                metadata = {}
+            execution_status = metadata.get("pddl_execution_status")
+            media_inspection = metadata.get("pddl_media_inspection")
+            fusion = metadata.get("pddl_fusion") or {}
+            open_obligations = metadata.get("pddl_unsatisfied_obligations") or []
+            # A run degraded by a Toolbox or model failure is marked `cacheable: false`
+            # and never written (see below); the check here keeps that
+            # invariant explicit for entries written before the flag existed.
+            media_inspection_failed = (
+                isinstance(media_inspection, dict) and media_inspection.get("status") == "failed"
+            )
+            if (
+                execution_status in {"failed", "replan-required"}
+                or (not settings.pddl_execute_dry_run and execution_status == "dry-run-completed")
+                or media_inspection_failed
+                or cached.get("cacheable") is False
+                or fusion.get("status") == "degraded"
+                or any(item.get("recovery") != "human-review" for item in open_obligations)
+                or records_visual_failures(metadata.get("pddl_visual_failures"))
+                or records_extraction_degradation(metadata.get("pddl_extraction_degraded"))
+            ):
+                cached = None
         if cached is not None:
             logger.info("Cache hit para {}", file_path.name)
             cached = _payload_for_source(cached, file_path)
             canonical_metadata, technical_warnings = _canonical_details(cached)
             canonical_document = build_canonical_document(
                 cached,
-                title=file_path.stem,
+                title=Path(shown_name).stem,
                 language="pt-BR",
                 verbosity=verbosity_for_mode(mode),
-                source_name=file_path.name,
+                source_name=shown_name,
                 source_path=str(file_path),
                 audience=["reader"],
                 metadata=canonical_metadata,
@@ -192,17 +238,17 @@ async def process(
 
         state_manager.atualizar(
             task_id,
-            etapa="Preparando arquivo",
+            etapa=t(STAGE_PREPARING_FILE),
             progresso=0.1,
         )
         state_manager.verificar_cancelamento(task_id)
 
         if status_callback:
-            await status_callback("📄 Analisando arquivo...")
+            await status_callback(t(STAGE_ANALYZING_FILE))
 
         state_manager.atualizar(
             task_id,
-            etapa="Processando com IA",
+            etapa=t(STAGE_PROCESSING_WITH_AI),
             progresso=0.3,
         )
         state_manager.verificar_cancelamento(task_id)
@@ -240,21 +286,27 @@ async def process(
 
         state_manager.verificar_cancelamento(task_id)
         if not raw_text.strip():
-            raise RuntimeError("Resposta vazia do agente")
+            raise RuntimeError(t(LOG_ORCHESTRATOR_EMPTY_AGENT_RESPONSE))
 
         canonical_document = build_canonical_document(
             processed_result,
-            title=file_path.stem,
+            title=Path(shown_name).stem,
             language="pt-BR",
             verbosity=verbosity_for_mode(mode),
-            source_name=file_path.name,
+            source_name=shown_name,
             source_path=str(file_path),
             audience=["reader"],
             metadata=canonical_metadata,
             technical_warnings=technical_warnings,
         )
 
-        await set_cache(file_path, processed_result, cache_variant)
+        if not isinstance(processed_result, dict) or processed_result.get("cacheable", True):
+            await set_cache(file_path, processed_result, cache_variant)
+        else:
+            # An entry refused above would otherwise be read and refused again
+            # on every request while the reruns stay degraded.
+            await drop_cache(file_path, cache_variant)
+            logger.debug("Resultado degradado nao cacheado para {}", file_path.name)
         _salvar_json_canonico(canonical_document, file_path.name)
 
         if not external_task_id:
@@ -271,30 +323,31 @@ async def process(
             )
 
         if status_callback:
-            await status_callback("✅ Processamento finalizado com sucesso!")
+            await status_callback(t(STAGE_PROCESSING_FINISHED))
         return canonical_document
 
     except TaskCancelledError:
-        logger.info("Tarefa {} cancelada pelo usuario", task_id)
+        logger.info(t(LOG_TASK_CANCELLED_BY_USER).format(task_id=task_id))
         await finalizar_conversao(
             task_id=task_id,
             status="cancelled",
-            erro="Cancelado pelo usuario",
+            erro=t(STAGE_CANCELLED_BY_USER),
             tempo_segundos=time.time() - inicio,
         )
         raise
 
     except Exception as e:
-        logger.error("Erro no pipeline: {}: {}", type(e).__name__, e)
-        state_manager.errar(task_id, str(e))
+        logger.error(t(LOG_PIPELINE_ERROR).format(error_type=type(e).__name__, error=e))
+        erro = state_manager.errar(task_id, str(e) or type(e).__name__)
 
         await finalizar_conversao(
             task_id=task_id,
             status="error",
-            erro=str(e),
+            erro=erro,
             tempo_segundos=time.time() - inicio,
         )
 
         if status_callback:
+            await status_callback(t(STAGE_PROCESSING_FAILED_LABEL))
             await status_callback("❌ Nao foi possivel processar o arquivo.")
         raise

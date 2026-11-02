@@ -1,6 +1,7 @@
 import asyncio
 import tempfile
 import time
+import uuid
 from pathlib import Path
 
 from aiogram import Router, F
@@ -13,9 +14,33 @@ from frontend.clients import default_client
 from frontend.telegram import user_context
 
 from backend.tools.logger import logger
+from backend.i18n import t
+from backend.log_messages import (
+    LOG_TELEGRAM_API_JOB_REJECTED,
+    LOG_TELEGRAM_API_CONTACT_FAILED,
+    LOG_TELEGRAM_FILE_PROCESSING_ERROR,
+    LOG_PDF_UA_GENERATION_FAILED,
+    LOG_TELEGRAM_JOB_STATUS_QUERY_FAILED,
+    LOG_TELEGRAM_RATE_LIMIT_WAIT,
+    LOG_TELEGRAM_SEND_FAILED_AFTER_RETRIES,
+)
 from backend.tools.validators import validate_file
 from frontend.telegram.adapters.status_tracker import StatusTracker
 from backend.config.settings import settings
+from frontend.telegram.messages import (
+    MSG_CONTACT_SERVER_FAILED,
+    MSG_DOWNLOADING_FILE,
+    MSG_FILE_RECEIVED,
+    MSG_PHOTO_RECEIVED,
+    MSG_PROCESS_FAILED_BASE,
+    MSG_PROCESSING_ERROR_GENERIC,
+    MSG_PROCESSING_TIMEOUT,
+    MSG_QUEUE_POSITION,
+    MSG_SUBMIT_FAILED,
+    MSG_TASK_CANCELLED,
+    MSG_TASK_ENQUEUED,
+    MSG_WAITING_IN_QUEUE,
+)
 
 router = Router()
 
@@ -32,6 +57,16 @@ async def _send_with_retry(
     reply_to_message_id: int | None = None,
     max_retries: int = 3,
 ) -> None:
+    """Send a Telegram message, retrying on rate-limit backoffs until successful or retries are exhausted.
+
+    Args:
+        bot (Bot): Aiogram Bot instance used for sending; no default (required).
+        chat_id (int): Numeric id of the target chat; no default (required).
+        msg (str): Full message text already localized by the caller via backend.i18n.t(); no default (required).
+        message_thread_id (int|None): Forum-topic thread identifier or None for top-level chats (default: None).
+        reply_to_message_id (int|None): Optional message identifier to reply directly to (default: None).
+        max_retries (int): Number of send attempts before giving up (default: 3).
+    """
     for attempt in range(max_retries):
         try:
             kwargs = {}
@@ -44,21 +79,28 @@ async def _send_with_retry(
         except TelegramRetryAfter as e:
             wait = e.retry_after + attempt * 5
             logger.warning(
-                "Telegram rate limit, aguardando {}s: {}",
-                wait,
-                msg[:50],
+                t(LOG_TELEGRAM_RATE_LIMIT_WAIT).format(
+                    wait=wait, preview=msg[:50]
+                )
             )
             await asyncio.sleep(wait)
-    logger.error("Falha apos {} tentativas para enviar mensagem", max_retries)
+    logger.error(
+        t(LOG_TELEGRAM_SEND_FAILED_AFTER_RETRIES).format(attempts=max_retries)
+    )
 
 
 @router.message(F.document)
 async def handle_document(message: Message) -> None:
+    """Incoming document file handler; acknowledges receipt in the active locale then starts processing.
+
+    Args:
+        message (Message): Aiogram Message containing the user-sent Document attachment; no default (required).
+    """
     document: Document | None = message.document
     if document is None:
         return
 
-    filename = document.file_name or "documento"
+    filename = Path((document.file_name or "document").replace("\\", "/")).name
     file_size = document.file_size or 0
 
     valid, error_msg = validate_file(filename, file_size)
@@ -68,20 +110,25 @@ async def handle_document(message: Message) -> None:
 
     state_key = user_context.get_user_state_key(message)
     mode = user_context.user_modes.pop(state_key, "normal")
-    await message.answer("📄 Arquivo recebido!")
+    await message.answer(t(MSG_FILE_RECEIVED))
     await process_file(message, document.file_id, filename, mode=mode)
 
 
 @router.message(F.photo)
 async def handle_photo(message: Message) -> None:
+    """Incoming photo handler; acknowledges receipt in the active locale then starts processing as image.png.
+
+    Args:
+        message (Message): Aiogram Message containing one or more PhotoSize entries; no default (required).
+    """
     photo: PhotoSize | None = message.photo[-1] if message.photo else None
     if photo is None:
         return
 
     state_key = user_context.get_user_state_key(message)
     mode = user_context.user_modes.pop(state_key, "normal")
-    await message.answer("📷 Foto recebida!")
-    await process_file(message, photo.file_id, "imagem.png", mode=mode)
+    await message.answer(t(MSG_PHOTO_RECEIVED))
+    await process_file(message, photo.file_id, "image.png", mode=mode)
 
 
 async def process_file(
@@ -90,6 +137,15 @@ async def process_file(
     filename: str,
     mode: str = "normal",
 ) -> None:
+    """Download a remote file locally, submit it to the processing API and wait for completion.
+
+    Args:
+        message (Message): Aiogram Message triggering the job; provides the sender-scoped state and chat context; no default (required).
+        file_id (str): Telegram unique file identifier of the received attachment; no default (required).
+        filename (str): Original filename to store and report inside the job; no default (required).
+        mode (str): Description-detail preset requested by the user's last /detalhado|/medio|/baixo command (default: "normal").
+    """
+    filename = Path(filename.replace("\\", "/")).name or "document"
     message_thread_id = message.message_thread_id
     tracker = StatusTracker(
         message.bot, message.chat.id, filename, message_thread_id=message_thread_id
@@ -98,9 +154,10 @@ async def process_file(
     email = user_context.user_emails.get(state_key)
 
     try:
+        settings.temp_dir.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(dir=settings.temp_dir) as tmpdir:
-            input_path = Path(tmpdir) / filename
-            await tracker("Baixando arquivo...")
+            input_path = Path(tmpdir) / f"{uuid.uuid4().hex}{Path(filename).suffix.lower()}"
+            await tracker(t(MSG_DOWNLOADING_FILE))
             await download_file(message.bot, file_id, input_path)
 
             try:
@@ -113,19 +170,19 @@ async def process_file(
                 )
             except ApiError as e:
                 logger.warning(
-                    "API recusou job do Telegram: {} - {}", e.status_code, e.detail
+                    t(LOG_TELEGRAM_API_JOB_REJECTED).format(
+                        status_code=e.status_code, detail=e.detail
+                    )
                 )
                 await tracker.finish(success=False)
                 await message.answer(
-                    f"❌ Erro ao enviar o arquivo para processamento ({e.status_code}): {e.detail}"
+                    t(MSG_SUBMIT_FAILED).format(status_code=e.status_code, detail=e.detail)
                 )
                 return
-            except Exception as e:
-                logger.exception("Falha ao contactar API pelo Telegram")
+            except Exception:
+                logger.exception(t(LOG_TELEGRAM_API_CONTACT_FAILED))
                 await tracker.finish(success=False)
-                await message.answer(
-                    "❌ Não foi possível contatar o servidor de processamento. Tente novamente."
-                )
+                await message.answer(t(MSG_CONTACT_SERVER_FAILED))
                 return
 
         user_context.user_emails.pop(state_key, None)
@@ -133,15 +190,17 @@ async def process_file(
         position = result.get("position", 1)
         user_context.user_task_ids[state_key] = task_id
 
-        await tracker(f"Tarefa {task_id} enfileirada...")
+        await tracker(t(MSG_TASK_ENQUEUED).format(task_id=task_id))
         if position > 1:
-            await message.answer(f"⏳ Você está na fila única (Posição: {position}).")
+            await message.answer(
+                t(MSG_QUEUE_POSITION).format(position=position)
+            )
 
         await _poll_job(message, tracker, task_id, email)
-    except Exception as e:
-        logger.exception("Erro ao processar arquivo via Telegram")
+    except Exception:
+        logger.exception(t(LOG_TELEGRAM_FILE_PROCESSING_ERROR))
         await tracker.finish(success=False)
-        await message.answer("❌ Erro ao processar o arquivo. Tente novamente.")
+        await message.answer(t(MSG_PROCESSING_ERROR_GENERIC))
 
 
 async def _poll_job(
@@ -150,6 +209,14 @@ async def _poll_job(
     task_id: str,
     email: str | None,
 ) -> None:
+    """Poll the API for a task's status until it completes, fails or the request timeout elapses.
+
+    Args:
+        message (Message): Aiogram Message used to deliver thread-scoped replies; no default (required).
+        tracker (StatusTracker): Status message updater bound to the chat and file already initialized by the caller; no default (required).
+        task_id (str): Task identifier returned by the API at submit time; no default (required).
+        email (str|None): Deliver-to e-mail stored via /email or None when the user has not configured one yet; no default (required at callers).
+    """
     message_thread_id = message.message_thread_id
     deadline = time.time() + max(settings.request_timeout, 60)
     last_etapa = ""
@@ -159,7 +226,9 @@ async def _poll_job(
         try:
             status = await client.get_job_status(task_id)
         except Exception as e:
-            logger.warning("Erro ao consultar status do job {}: {}", task_id, e)
+            logger.warning(
+                t(LOG_TELEGRAM_JOB_STATUS_QUERY_FAILED).format(task_id=task_id, error=e)
+            )
             await asyncio.sleep(POLL_INTERVAL_SECONDS)
             continue
 
@@ -169,7 +238,7 @@ async def _poll_job(
 
         if etapa != last_etapa or pct != last_pct:
             if st == "queued":
-                await tracker(f"Aguardando na fila... {etapa}")
+                await tracker(t(MSG_WAITING_IN_QUEUE).format(step=etapa))
             elif etapa:
                 await tracker(etapa)
             last_etapa = etapa
@@ -180,8 +249,10 @@ async def _poll_job(
             url = status.get("download_url")
             if url:
                 msg = f"✅ Pacote acessível gerado!\n\n📥 Link para download (válido por 7 dias):\n{url}"
-                if any("Falha ao gerar PDF/UA:" in erro for erro in status.get("erros", [])):
-                    msg += "\n\n⚠️ Não foi possível gerar o PDF/UA. Esse formato não está incluído no pacote."
+                # The worker records the failure in the server locale.
+                pdf_ua_failed = t(LOG_PDF_UA_GENERATION_FAILED).split("{error}")[0]
+                if any(erro.startswith(pdf_ua_failed) for erro in status.get("erros", [])):
+                    msg += "\n\n⚠️ Não foi possível gerar o PDF/UA, o único PDF do pacote: o pacote segue sem PDF."
                 if email:
                     msg += f"\n\nE-mail configurado: {email}"
                 await _send_with_retry(
@@ -196,9 +267,11 @@ async def _poll_job(
         if st == "error":
             await tracker.finish(success=False)
             erros = status.get("erros") or []
-            msg = "❌ Erro no processamento."
+            msg = t(MSG_PROCESS_FAILED_BASE)
             if erros:
-                msg += f"\n{erros[0]}"
+                # The fatal error is the last one; earlier entries are optional
+                # export warnings recorded before it.
+                msg += f"\n{erros[-1]}"
             await _send_with_retry(
                 message.bot,
                 message.chat.id,
@@ -213,7 +286,7 @@ async def _poll_job(
             await _send_with_retry(
                 message.bot,
                 message.chat.id,
-                "🚫 Tarefa cancelada.",
+                t(MSG_TASK_CANCELLED),
                 message_thread_id=message_thread_id,
                 reply_to_message_id=message.message_id,
             )
@@ -225,7 +298,7 @@ async def _poll_job(
     await _send_with_retry(
         message.bot,
         message.chat.id,
-        "⏰ O processamento demorou mais que o esperado. Use /status para acompanhar.",
+        t(MSG_PROCESSING_TIMEOUT),
         message_thread_id=message_thread_id,
         reply_to_message_id=message.message_id,
     )

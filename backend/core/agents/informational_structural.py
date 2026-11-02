@@ -5,8 +5,8 @@ from typing import Any
 
 from backend.core.agno_support import build_agent
 from backend.core.manifest.builder import build_processing_manifest
-from backend.core.manifest.docling_extractor import DoclingManifestExtractor
 from backend.core.manifest.models import ProcessingManifest
+from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
 
 
 class InformationalStructuralAgent:
@@ -18,7 +18,7 @@ class InformationalStructuralAgent:
         *,
         model: Any | None = None,
     ) -> None:
-        self.extractor = extractor or DoclingManifestExtractor()
+        self.extractor = extractor or ToolboxManifestExtractor()
         self.agent = build_agent(
             name="Agente Informacional-Estrutural",
             instructions=(
@@ -45,10 +45,23 @@ class InformationalStructuralAgent:
         source_path: Path,
         *,
         language: str = "pt-BR",
+        presentation: bool = False,
     ) -> ProcessingManifest:
-        extraction = self.extractor.extract(source_path)
+        """Extract ``source_path`` and build its manifest.
+
+        A ``presentation`` is extracted by the configured provider alone (no
+        dual-provider fusion, which compares running text across pages) and
+        structured slide by slide.
+        """
+        from backend.config.settings import settings
+
+        extraction = self.extractor.extract(source_path, dual_fusion=not presentation)
         return build_processing_manifest(
             source_path,
             extraction,
             language=language,
+            refine_reading_order=True,
+            presentation=presentation,
+            slide_visual_coverage=settings.slide_visual_coverage,
+            slide_fold_figure_labels=settings.slide_fold_figure_labels,
         )

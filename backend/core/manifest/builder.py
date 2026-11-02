@@ -2,508 +2,519 @@ from __future__ import annotations
 
 import hashlib
 import mimetypes
-import re
 from collections import Counter
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from backend.pipeline.sanitizer import sanitize_text
-from backend.pipeline.table_ast import normalize_table_ast
-from backend.pipeline.table_ast import rows_from_table_ast
+from docstruct.text.equations import preserve_equation_number
+from docstruct.text.latex import has_latex_markup
 
-from backend.core.manifest.docling_extractor import DoclingExtraction
+from backend.i18n import t
+from backend.log_messages import (
+    LOG_MANIFEST_STRUCTURAL_CONTAINER_SKIPPED,
+    MSG_HEADING_GAP,
+    MSG_OBLIGATION_CODE,
+    MSG_OBLIGATION_FORMULA,
+    MSG_OBLIGATION_IMAGE,
+    MSG_OBLIGATION_TABLE,
+    MSG_OBLIGATION_UNKNOWN,
+    MSG_OBLIGATION_UNSTRUCTURED_PAGE,
+    MSG_OBSERVATION_PAGE_WITHOUT_STRUCTURE,
+)
+from backend.tools.logger import logger
+
 from backend.core.manifest.models import (
+    Artifact,
     BoundingBox,
-    ExtractorRun,
     ManifestElement,
-    ManifestSummary,
     Obligation,
     Observation,
-    PageDescriptor,
     ProcessingManifest,
-    Provenance,
-    SourceDocument,
 )
+from backend.core.manifest.slides import (
+    DEFAULT_FOLD_FIGURE_LABELS,
+    DEFAULT_VISUAL_COVERAGE,
+    is_slide_heading,
+    split_across_slides,
+    structure_as_slides,
+)
+from docstruct.placeholders import (
+    UNSTRUCTURED_PAGE_FLAG,
+    UNSTRUCTURED_PAGE_LABEL,
+    is_unstructured_page_placeholder as _is_placeholder,
+)
+from docstruct.geometry import (
+    OrientedBox,
+    ReadingItem,
+    order_reading_items,
+    reading_role,
+)
+from docstruct.tables.ast import raw_rows_from_table_ast as _rows_from_table_ast
+
+if TYPE_CHECKING:
+    from backend.core.manifest.toolbox_extractor import ToolboxExtraction
 
 
-LABEL_TO_TYPE = {
-    "title": "title",
-    "section_header": "heading",
-    "heading": "heading",
-    "text": "paragraph",
-    "paragraph": "paragraph",
-    "list_item": "list_item",
-    "table": "table",
-    "picture": "picture",
-    "image": "picture",
-    "formula": "formula",
-    "equation": "formula",
-    "code": "code",
-    "caption": "caption",
-    "footnote": "footnote",
-    "page_header": "page_header",
-    "page_footer": "page_footer",
-    "checkbox_selected": "checkbox",
-    "checkbox_unselected": "checkbox",
-    "key_value_region": "key_value",
-    "form": "form",
-}
-
+# Store message IDs here; translate only while building the current request.
+# Translation at import time freezes the server locale for all later requests.
 OBLIGATION_BY_TYPE = {
     "picture": (
         "describe-image",
-        "A imagem deve receber descrição ou ser marcada como decorativa.",
+        MSG_OBLIGATION_IMAGE,
         ["vision-description", "human-review"],
     ),
     "table": (
         "linearize-table",
-        "A tabela deve ter cabeçalhos e ordem de leitura verificáveis.",
-        ["docling-table", "pandoc-table", "human-review"],
+        MSG_OBLIGATION_TABLE,
+        ["pandoc-table", "human-review"],
     ),
     "formula": (
         "verbalize-formula",
-        "A fórmula deve possuir representação matemática acessível e verbalização.",
+        MSG_OBLIGATION_FORMULA,
         ["mathml", "latex-verbalizer", "human-review"],
     ),
     "code": (
         "preserve-code-semantics",
-        "O bloco de código deve preservar indentação, linguagem e leitura literal.",
+        MSG_OBLIGATION_CODE,
         ["pandoc-code", "human-review"],
     ),
     "unknown": (
         "review-structure",
-        "O elemento não classificado requer inspeção estrutural.",
-        ["docling-retry", "pymupdf-region", "human-review"],
+        MSG_OBLIGATION_UNKNOWN,
+        ["pymupdf-region", "human-review"],
     ),
 }
 
 DEFAULT_METHOD_COSTS = {
     "vision-description": 20,
-    "docling-table": 10,
     "pandoc-table": 15,
     "mathml": 10,
     "latex-verbalizer": 20,
     "pandoc-code": 10,
-    "docling-retry": 25,
     "pymupdf-region": 30,
+    "vision-page-inspection": 25,
     "deterministic-heading-repair": 5,
     "human-review": 100,
+    # --- Capacidades da PR #125 (domínio v2.3) ---
+    # Determinísticas: custo baixo, o planner deve preferi-las.
+    "agreement-rule": 5,
+    "xycut-order": 10,
+    "skeleton-order": 5,
+    "latex-normalizer": 10,
+    "rep-guard": 5,
+    "tailjoin": 5,
+    "tailjoin-positioned": 5,
+    "verse-chunker": 5,
+    "line-number-extractor": 5,
+    "norm-fix": 5,
+    "unicode-repair": 5,
+    "rescue-omitted": 15,
+    "table-smart-fusion": 20,
+    "single-provider": 20,
+    # Consomem modelo: custo alto, só admissíveis com a política ativa.
+    "vlm-pairwise-judge": 40,
+    "table-specialist": 45,
+    "dual-provider-fusion": 60,
 }
 
-CALL_OUT_MIN_GROUP_SIZE = 3
-CALL_OUT_MIN_INDENT_PX = 8.0
-CALL_OUT_MIN_INDENT_RATIO = 0.015
-CALL_OUT_MAX_WIDTH_RATIO = 0.9
-CALL_OUT_MAX_VERTICAL_GAP = 28.0
-KNOWN_CALLOUT_TITLES = {
-    "precisamos mesmo de outra classe?",
-    "super e sub classe",
+# Obrigações introduzidas na versão 2.3 do domínio PDDL (PR #125).
+# kind -> (rationale, métodos admissíveis)
+#: v2.3 needs the builder emits only for an element of this type, on its own
+#: text: once the element is another type they no longer apply, and their
+#: methods (``latex-normalizer`` filters formulas) would find no target.
+TYPE_BOUND_V23_KINDS: dict[str, frozenset[str]] = {
+    "formula": frozenset({"normalize-formula"}),
 }
+
+V23_OBLIGATION_BY_KIND = {
+    "adjudicate-page": (
+        "Página com divergência entre providers exige adjudicação.",
+        ["vlm-pairwise-judge", "agreement-rule", "human-review"],
+    ),
+    "fuse-providers": (
+        "Extração fundida de dois providers melhora a fidelidade do texto.",
+        ["dual-provider-fusion", "single-provider", "human-review"],
+    ),
+    "refine-reading-order": (
+        "Ordem de leitura precisa seguir as colunas da página.",
+        ["xycut-order", "skeleton-order", "human-review"],
+    ),
+    "normalize-formula": (
+        "Fórmula exige normalização de delimitadores e símbolos.",
+        ["latex-normalizer", "mathml", "human-review"],
+    ),
+    "rescue-omitted-block": (
+        "Bloco presente em um provider foi omitido na fusão.",
+        ["rescue-omitted", "human-review"],
+    ),
+    "guard-repetition": (
+        "Saída degenerada por repetição precisa ser cortada.",
+        ["rep-guard", "human-review"],
+    ),
+    "join-tail-blocks": (
+        "Blocos curtos finais (cabeçalho/rodapé/número) devem ser unidos.",
+        ["tailjoin-positioned", "tailjoin", "human-review"],
+    ),
+    "select-table-source": (
+        "Tabela exige escolha da melhor fonte entre os providers.",
+        ["table-smart-fusion", "table-specialist", "human-review"],
+    ),
+    "chunk-verse": (
+        "Bloco de verso/registro excede o limite de reagrupamento do avaliador.",
+        ["verse-chunker", "human-review"],
+    ),
+    "extract-line-numbers": (
+        "Números de linha marginais devem virar blocos próprios.",
+        ["line-number-extractor", "human-review"],
+    ),
+    "normalize-text": (
+        "Texto exige limpezas determinísticas (ligaduras, hífen, NBSP).",
+        ["norm-fix", "human-review"],
+    ),
+    "repair-legacy-unicode": (
+        "Texto extraído de PDF legado contém Unicode mal composto (NFD ou i sem ponto).",
+        ["unicode-repair", "human-review"],
+    ),
+    "inspect-unstructured-page": (
+        "Página sem estrutura extraída exige inspeção visual.",
+        ["vision-page-inspection", "human-review"],
+    ),
+}
+
+#: Artifact holding the secondary provider's extraction when FUSION_MODE=dual;
+#: the v2.3 methods that choose between providers read it.
+#: A page the extractor returned without any element gets a placeholder element
+#: (``docstruct.placeholders``), an observation and a critical obligation: the
+#: page is inspected visually and either described or accepted as blank.
+UNSTRUCTURED_PAGE_OBSERVATION_KIND = "page-without-structure"
+UNSTRUCTURED_PAGE_OBLIGATION_KIND = "inspect-unstructured-page"
+UNSTRUCTURED_PAGE_METHODS = V23_OBLIGATION_BY_KIND[UNSTRUCTURED_PAGE_OBLIGATION_KIND][1]
+
+SECONDARY_EXTRACTION_KIND = "provider-extraction"
+SECONDARY_EXTRACTION_ARTIFACT_ID = "artifact-secondary-extraction"
 
 
 def build_processing_manifest(
     source_path: Path,
-    extraction: DoclingExtraction,
+    extraction: ToolboxExtraction,
     *,
     language: str = "pt-BR",
+    refine_reading_order: bool = False,
+    presentation: bool = False,
+    slide_visual_coverage: float = DEFAULT_VISUAL_COVERAGE,
+    slide_fold_figure_labels: bool = DEFAULT_FOLD_FIGURE_LABELS,
 ) -> ProcessingManifest:
+    """Builds the processing manifest from the Toolbox structural extraction.
+
+    The Toolbox is the only extractor (docs/adr/0003): ``extraction.document``
+    is its JSON response, whose elements already carry callouts, code text and
+    table structure. This core adds its own planning policy on top. A
+    ``presentation`` is structured slide by slide (``slides.structure_as_slides``)
+    before its processing needs are derived.
+
+    Raises:
+        TypeError: When the extraction is not a Toolbox JSON response.
+    """
+    document = getattr(extraction, "document", None)
+    if not isinstance(document, dict):
+        raise TypeError(
+            "build_processing_manifest expects the Toolbox JSON extraction, "
+            f"got {type(document).__name__}"
+        )
     source_path = source_path.resolve()
-    digest = _sha256(source_path)
-    extractor_name = str(extraction.configuration.get("extractor", "")).strip().lower()
-    enable_callouts = extractor_name != "pymupdf"
-    elements = _build_elements(extraction.document, enable_callouts=enable_callouts)
-    pages = _build_pages(extraction.document, elements)
-    title = _infer_title(source_path, elements)
-    observations, obligations = _derive_processing_needs(elements)
-    element_types = dict(sorted(Counter(e.type for e in elements).items()))
-
-    source = SourceDocument(
-        document_id=f"doc-{digest[:16]}",
-        filename=source_path.name,
-        path=str(source_path),
-        media_type=mimetypes.guess_type(source_path.name)[0]
-        or "application/octet-stream",
-        byte_size=source_path.stat().st_size,
-        sha256=digest,
-    )
-    extractor = ExtractorRun(
-        version=extraction.version,
-        started_at=extraction.started_at,
-        completed_at=extraction.completed_at,
-        duration_ms=extraction.duration_ms,
-        configuration=extraction.configuration,
-    )
-    return ProcessingManifest(
-        manifest_id=f"manifest-{digest[:16]}-r1",
-        created_at=extraction.completed_at,
-        source=source,
-        extractor=extractor,
-        title=title,
+    return _build_from_toolbox_json(
+        source_path,
+        extraction,
+        digest=_sha256(source_path),
         language=language,
-        pages=pages,
-        elements=elements,
-        observations=observations,
-        obligations=obligations,
-        summary=ManifestSummary(
-            page_count=len(pages),
-            element_count=len(elements),
-            observation_count=len(observations),
-            obligation_count=len(obligations),
-            element_types=element_types,
-        ),
+        refine_reading_order=refine_reading_order,
+        presentation=presentation,
+        slide_visual_coverage=slide_visual_coverage,
+        slide_fold_figure_labels=slide_fold_figure_labels,
     )
 
 
-def _build_elements(document: Any, *, enable_callouts: bool = True) -> list[ManifestElement]:
-    elements: list[ManifestElement] = []
-    try:
-        iterator = document.iterate_items(with_groups=True, traverse_pictures=True)
-    except TypeError:
-        iterator = document.iterate_items(with_groups=True)
+def separate_equation_number(element: ManifestElement) -> None:
+    """Move a formula's trailing equation label into ``metadata.equation_number``.
 
-    for reading_order, (item, tree_level) in enumerate(iterator, start=1):
-        raw_label = _item_label(item)
-        element_type = LABEL_TO_TYPE.get(raw_label, _fallback_type(item, raw_label))
-        provenance = _provenance(item)
-        page_number = provenance[0].page_number if provenance else None
-        hierarchy_level = _hierarchy_level(item, element_type, tree_level)
-        metadata = _safe_metadata(item, element_type=element_type)
-        elements.append(
-            ManifestElement(
-                id=f"element-{reading_order:06d}",
-                type=element_type,
-                raw_label=raw_label,
-                reading_order=reading_order,
-                hierarchy_level=hierarchy_level,
-                text=_item_text(item, element_type),
-                source_ref=_reference(getattr(item, "self_ref", None)),
-                parent_ref=_reference(getattr(item, "parent", None)),
-                page_number=page_number,
-                confidence=_confidence(item),
-                provenance=provenance,
-                metadata=metadata,
+    A label written as LaTeX (``x=y\\tag{1}``) proves the extractor already
+    delivered LaTeX, even when nothing else in the expression is a command:
+    ``metadata.latex_markup`` keeps that, so formula recognition still skips
+    it once the label is gone.
+    """
+    if element.type != "formula" or not element.text:
+        return
+    original = element.text
+    element.text = preserve_equation_number(original, element.metadata)
+    if (
+        element.text != original
+        and has_latex_markup(original)
+        and not has_latex_markup(element.text)
+    ):
+        element.metadata["latex_markup"] = True
+
+
+def _build_from_toolbox_json(
+    source_path: Path,
+    extraction: ToolboxExtraction,
+    *,
+    digest: str,
+    language: str,
+    refine_reading_order: bool = False,
+    presentation: bool = False,
+    slide_visual_coverage: float = DEFAULT_VISUAL_COVERAGE,
+    slide_fold_figure_labels: bool = DEFAULT_FOLD_FIGURE_LABELS,
+) -> ProcessingManifest:
+    """Build a ProcessingManifest from a pre-built Toolbox JSON response.
+
+    The Toolbox already returns a complete ProcessingManifest-compatible JSON
+    payload inside ``extraction.document["document"]``, so we parse it directly.
+    """
+    data: dict[str, Any] = dict(extraction.document["document"])
+
+    data["manifest_id"] = data.get("manifest_id") or f"manifest-{digest[:16]}-r1"
+
+    # Override source with local file info
+    data["source"] = {
+        "document_id": f"doc-{digest[:16]}",
+        "filename": source_path.name,
+        "path": str(source_path.resolve()),
+        "media_type": mimetypes.guess_type(source_path.name)[0]
+        or "application/octet-stream",
+        "byte_size": source_path.stat().st_size,
+        "sha256": digest,
+    }
+
+    # Override extractor metadata with this run
+    data["extractor"] = {
+        "name": data.get("extractor", {}).get(
+            "name", extraction.configuration.get("toolbox_provider") or "toolbox"
+        ),
+        "version": extraction.version,
+        "started_at": extraction.started_at.isoformat(),
+        "completed_at": extraction.completed_at.isoformat(),
+        "duration_ms": extraction.duration_ms,
+        "configuration": extraction.configuration,
+    }
+
+    data.setdefault("language", language)
+    data.setdefault("created_at", extraction.completed_at.isoformat())
+
+    # The Toolbox is a capability layer: deciding what a document needs and which
+    # methods may satisfy it is this core's planning policy. Whatever processing
+    # needs the payload carries (older Toolbox images derive their own, with
+    # methods the core does not implement) are discarded and derived below.
+    data["observations"] = []
+    data["obligations"] = []
+    if isinstance(data.get("summary"), dict):
+        data["summary"] = {
+            **data["summary"],
+            "observation_count": 0,
+            "obligation_count": 0,
+        }
+
+    manifest = ProcessingManifest.model_validate(data)
+    for element in manifest.elements:
+        separate_equation_number(element)
+    secondary = extraction.document.get("secondary_extraction")
+    secondary_path = (
+        str(secondary["path"])
+        if isinstance(secondary, dict) and secondary.get("path")
+        else ""
+    )
+    has_secondary_extraction = bool(secondary_path.strip())
+    # skeleton-order reads the file, so it is planned only while the file the
+    # extractor wrote is still there; a recorded path alone would plan a
+    # method that fails and forces a replan (#298).
+    secondary_extraction_readable = (
+        has_secondary_extraction and Path(secondary_path).is_file()
+    )
+    if presentation:
+        split_across_slides(manifest)
+    if refine_reading_order:
+        manifest.elements = _refine_reading_order(manifest.elements)
+        by_page: dict[int, list[str]] = {}
+        for elem in manifest.elements:
+            if elem.page_number is not None:
+                by_page.setdefault(elem.page_number, []).append(elem.id)
+        for page in manifest.pages:
+            page.element_ids = by_page.get(page.page_number, [])
+    if presentation:
+        page_sizes = {page.page_number: (page.width, page.height) for page in manifest.pages}
+        structure_as_slides(
+            manifest,
+            visual_coverage=slide_visual_coverage,
+            fold_figure_labels=slide_fold_figure_labels,
+            page_fractions=lambda element: _normalized_element_bbox(element, page_sizes),
+        )
+    observations, obligations = _derive_processing_needs(manifest.elements)
+    v23_observations, v23_obligations = _derive_v23_processing_needs(
+        manifest.elements,
+        page_sizes={
+            page.page_number: (page.width, page.height) for page in manifest.pages
+        },
+        fusion_evidence=extraction.document.get("fusion_evidence"),
+        fusion_stats=extraction.document.get("fusion_stats"),
+        secondary_extraction_available=secondary_extraction_readable,
+    )
+    observations.extend(v23_observations)
+    obligations.extend(v23_obligations)
+    _append_processing_needs(manifest, observations, obligations)
+    append_unstructured_page_needs(manifest)
+    if has_secondary_extraction:
+        manifest.artifacts.append(
+            Artifact(
+                id=SECONDARY_EXTRACTION_ARTIFACT_ID,
+                kind=SECONDARY_EXTRACTION_KIND,
+                path=secondary_path,
+                media_type="application/json",
+                sha256=secondary.get("sha256"),
             )
         )
-    by_source_ref = {
-        element.source_ref: element.id
-        for element in elements
-        if element.source_ref is not None
-    }
-    for element in elements:
-        if element.parent_ref is not None:
-            element.parent_id = by_source_ref.get(element.parent_ref)
-    if enable_callouts:
-        _normalize_callout_groups(elements)
-    return elements
+    return manifest
 
 
-def _normalize_callout_groups(elements: list[ManifestElement]) -> None:
-    by_page: dict[int, list[ManifestElement]] = {}
-    for element in elements:
-        if element.page_number is None:
-            continue
-        by_page.setdefault(element.page_number, []).append(element)
-
-    for page_elements in by_page.values():
-        _normalize_page_callouts(page_elements)
+def _raw_bbox(element: ManifestElement) -> BoundingBox | None:
+    if not element.provenance:
+        return None
+    return element.provenance[0].bbox
 
 
-def _normalize_page_callouts(page_elements: list[ManifestElement]) -> None:
-    _tag_known_title_callouts(page_elements)
-
-    text_like = [
-        element
-        for element in page_elements
-        if element.type in {"heading", "paragraph", "list_item", "group", "unknown"}
-        and _element_bbox(element) is not None
-        and (element.text or "").strip()
-        and not element.metadata.get("callout_id")
-    ]
-    if len(text_like) < CALL_OUT_MIN_GROUP_SIZE:
-        return
-
-    main_left, main_right = _estimate_main_text_band(text_like)
-    if main_right <= main_left:
-        return
-
-    band_width = main_right - main_left
-    indent_threshold = max(CALL_OUT_MIN_INDENT_PX, band_width * CALL_OUT_MIN_INDENT_RATIO)
-
-    candidates: list[ManifestElement] = []
-    for element in sorted(text_like, key=lambda item: item.reading_order):
-        bbox = _element_bbox(element)
-        if bbox is None:
-            continue
-        left, top, right, bottom = bbox
-        width = max(1.0, right - left)
-        left_indent = left - main_left
-        right_indent = main_right - right
-
-        combined_indent = max(0.0, left_indent) + max(0.0, right_indent)
-        if (
-            max(left_indent, right_indent) < indent_threshold
-            and combined_indent < (indent_threshold * 1.35)
-        ):
-            continue
-        if width > band_width * CALL_OUT_MAX_WIDTH_RATIO:
-            continue
-        if top >= bottom:
-            continue
-        candidates.append(element)
-
-    if len(candidates) < CALL_OUT_MIN_GROUP_SIZE:
-        return
-
-    groups: list[list[ManifestElement]] = []
-    current: list[ManifestElement] = [candidates[0]]
-    for element in candidates[1:]:
-        prev = current[-1]
-        if _is_same_callout_cluster(prev, element):
-            current.append(element)
-        else:
-            groups.append(current)
-            current = [element]
-    groups.append(current)
-
-    for group_index, group in enumerate(groups, start=1):
-        if len(group) < CALL_OUT_MIN_GROUP_SIZE:
-            continue
-        title = group[0]
-        if not _is_callout_title_candidate(title):
-            continue
-        body_count = sum(
-            1
-            for item in group[1:]
-            if item.type in {"paragraph", "list_item", "group", "unknown"}
-            and (item.text or "").strip()
-        )
-        min_body_count = 1 if _is_known_callout_title(title.text or "") else 2
-        if body_count < min_body_count:
-            continue
-
-        _apply_callout_group(title, group, callout_id=f"callout-p{title.page_number}-g{group_index}")
-
-
-def _tag_known_title_callouts(page_elements: list[ManifestElement]) -> None:
-    ordered = sorted(page_elements, key=lambda item: item.reading_order)
-    main_left, main_right = _estimate_main_text_band(ordered)
-    band_width = max(0.0, main_right - main_left)
-    indent_threshold = max(CALL_OUT_MIN_INDENT_PX, band_width * CALL_OUT_MIN_INDENT_RATIO)
-    anchor_count = 0
-    for index, title in enumerate(ordered):
-        if title.metadata.get("callout_id"):
-            continue
-        if not _is_known_callout_title(title.text or ""):
-            continue
-        title_bbox = _element_bbox(title)
-        if title_bbox is None:
-            continue
-
-        group: list[ManifestElement] = [title]
-        previous = title
-        for candidate in ordered[index + 1 :]:
-            if candidate.metadata.get("callout_id"):
-                continue
-            if candidate.type in {"heading", "title"} and not _is_known_callout_title(candidate.text or ""):
-                break
-            if candidate.type not in {"paragraph", "list_item", "group", "unknown"}:
-                if candidate.type == "code":
-                    break
-                continue
-            if not (candidate.text or "").strip():
-                continue
-            if not _is_known_callout_body_candidate(
-                candidate,
-                main_left,
-                main_right,
-                indent_threshold,
-            ):
-                break
-            if not _is_same_callout_cluster(previous, candidate):
-                break
-            group.append(candidate)
-            previous = candidate
-            if len(group) >= 8:
-                break
-
-        if len(group) < 2:
-            continue
-
-        anchor_count += 1
-        _apply_callout_group(
-            title,
-            group,
-            callout_id=f"callout-p{title.page_number}-anchor{anchor_count}",
-        )
-
-
-def _apply_callout_group(
-    title: ManifestElement,
-    group: list[ManifestElement],
-    *,
-    callout_id: str,
-) -> None:
-    if title.type == "heading":
-        original_type = title.type
-        title.type = "paragraph"
-        title.metadata["original_type"] = original_type
-        title.metadata["demoted_from_heading"] = True
-    title.metadata["is_callout_title"] = True
-    title.metadata["callout_id"] = callout_id
-    title.metadata["callout_role"] = "title"
-    title.metadata["callout_type"] = "note"
-    title.metadata["callout_title"] = title.text or ""
-
-    for item in group[1:]:
-        item.metadata["callout_id"] = callout_id
-        item.metadata["callout_role"] = "content"
-        item.metadata.setdefault("callout_type", "note")
-        item.metadata.setdefault("callout_title", title.text or "")
-
-
-def _estimate_main_text_band(elements: list[ManifestElement]) -> tuple[float, float]:
-    wide = []
-    all_boxes = []
-    for element in elements:
-        bbox = _element_bbox(element)
-        if bbox is None:
-            continue
-        left, _, right, _ = bbox
-        width = right - left
-        all_boxes.append((left, right, width))
-
-    if not all_boxes:
-        return (0.0, 0.0)
-
-    max_width = max(width for _, _, width in all_boxes)
-    for left, right, width in all_boxes:
-        if width >= max_width * 0.75:
-            wide.append((left, right))
-
-    reference = wide or [(left, right) for left, right, _ in all_boxes]
-    main_left = min(left for left, _ in reference)
-    main_right = max(right for _, right in reference)
-    return (main_left, main_right)
-
-
-def _is_same_callout_cluster(previous: ManifestElement, current: ManifestElement) -> bool:
-    prev_bbox = _element_bbox(previous)
-    curr_bbox = _element_bbox(current)
-    if prev_bbox is None or curr_bbox is None:
-        return False
-
-    _, prev_top, _, prev_bottom = prev_bbox
-    _, curr_top, _, _ = curr_bbox
-    vertical_gap = curr_top - prev_bottom
-    if vertical_gap > CALL_OUT_MAX_VERTICAL_GAP:
-        return False
-
-    prev_left, _, prev_right, _ = prev_bbox
-    curr_left, _, curr_right, _ = curr_bbox
-    overlap_left = max(prev_left, curr_left)
-    overlap_right = min(prev_right, curr_right)
-    overlap_width = max(0.0, overlap_right - overlap_left)
-    min_width = max(1.0, min(prev_right - prev_left, curr_right - curr_left))
-    return (overlap_width / min_width) >= 0.55
+def _oriented_bbox(element: ManifestElement) -> OrientedBox | None:
+    bbox = _raw_bbox(element)
+    if bbox is None:
+        return None
+    return OrientedBox(bbox.left, bbox.top, bbox.right, bbox.bottom, bbox.coord_origin)
 
 
 def _element_bbox(element: ManifestElement) -> tuple[float, float, float, float] | None:
-    if not element.provenance:
-        return None
-    bbox = element.provenance[0].bbox
-    if bbox is None:
-        return None
-    return (bbox.left, bbox.top, bbox.right, bbox.bottom)
+    """Element box with the y axis growing downwards, whatever the source origin.
+
+    See ``docstruct.geometry.OrientedBox.top_down``: only differences and
+    orderings are meaningful. ``_normalized_element_bbox`` gives page
+    fractions instead.
+    """
+    box = _oriented_bbox(element)
+    return box.top_down() if box is not None else None
 
 
-def _is_callout_title_candidate(element: ManifestElement) -> bool:
-    if element.type == "heading":
-        return True
-    if element.type != "paragraph":
-        return False
-    text = (element.text or "").strip()
-    if not text:
-        return False
-    if _is_known_callout_title(text):
-        return True
-    if len(text) > 95:
-        return False
-    upper_ratio = _uppercase_ratio(text)
-    if upper_ratio >= 0.55:
-        return True
-    return text.endswith(("?", ":"))
+def _refine_reading_order(elements: list[ManifestElement]) -> list[ManifestElement]:
+    """Reorder elements as ``docstruct.geometry.order_reading_items`` reads them.
+
+    Headers stay at the top of their page, footers and page numbers at the
+    bottom, and the body follows its columns. ``reading_order`` is renumbered
+    from 1. The same element objects are returned.
+    """
+    if not elements:
+        return elements
+
+    by_id = {element.id: element for element in elements}
+    order = order_reading_items(
+        [
+            ReadingItem(
+                key=element.id,
+                page=element.page_number,
+                role=reading_role(str(element.type), str(element.raw_label)),
+                box=_oriented_bbox(element),
+                rank=element.reading_order,
+            )
+            for element in elements
+        ]
+    )
+    refined = [by_id[key] for key in order]
+    for index, element in enumerate(refined, start=1):
+        element.reading_order = index
+    return refined
 
 
-def _uppercase_ratio(text: str) -> float:
-    letters = [ch for ch in text if ch.isalpha()]
-    if not letters:
-        return 0.0
-    uppers = [ch for ch in letters if ch.isupper()]
-    return len(uppers) / len(letters)
+def is_unstructured_page_placeholder(element: ManifestElement) -> bool:
+    """Whether ``element`` stands for a page the extractor left without structure."""
+    return _is_placeholder(element.raw_label, element.metadata)
 
 
-def _normalize_text_key(text: str) -> str:
-    normalized = re.sub(r"\s+", " ", text.strip().lower())
-    return normalized
+def append_unstructured_page_needs(manifest: ProcessingManifest) -> None:
+    """Give every page without elements a placeholder and a visual-inspection obligation.
 
-
-def _is_known_callout_title(text: str) -> bool:
-    return _normalize_text_key(text) in KNOWN_CALLOUT_TITLES
-
-
-def _is_known_callout_body_candidate(
-    element: ManifestElement,
-    main_left: float,
-    main_right: float,
-    indent_threshold: float,
-) -> bool:
-    bbox = _element_bbox(element)
-    if bbox is None:
-        return False
-    left, _, right, bottom = bbox
-    width = right - left
-    band_width = max(1.0, main_right - main_left)
-    left_indent = left - main_left
-    right_indent = main_right - right
-    if bottom <= 0:
-        return False
-    if width > band_width * 0.98:
-        return False
-    if right_indent < 4.0:
-        return False
-    return (left_indent >= indent_threshold) or (right_indent >= indent_threshold)
-
-
-def _build_pages(document: Any, elements: list[ManifestElement]) -> list[PageDescriptor]:
-    by_page: dict[int, list[str]] = {}
-    for element in elements:
-        if element.page_number is not None:
-            by_page.setdefault(element.page_number, []).append(element.id)
-
-    pages: list[PageDescriptor] = []
-    raw_pages = getattr(document, "pages", {}) or {}
-    for page_number, page in sorted(raw_pages.items(), key=lambda pair: int(pair[0])):
-        number = int(page_number)
-        size = getattr(page, "size", None)
-        pages.append(
-            PageDescriptor(
-                page_number=number,
-                width=_optional_float(getattr(size, "width", None)),
-                height=_optional_float(getattr(size, "height", None)),
-                element_ids=by_page.get(number, []),
+    An extractor can return a page with no element when it is blank, or when its
+    content is purely visual (a scan, a photo, a diagram). Telling them apart
+    needs a look at the page, so the page becomes an explicit planning need:
+    the critical ``inspect-unstructured-page`` obligation, satisfied by
+    describing the page or by accepting it as blank. Without it, the content of
+    such a page would be lost silently.
+    """
+    known = {element.id for element in manifest.elements}
+    # Same rule as the payload builder: a page without element_ids still has
+    # structure when elements point at it by page_number.
+    numbered = {element.page_number or 1 for element in manifest.elements}
+    next_order = max((element.reading_order for element in manifest.elements), default=0)
+    for page in sorted(manifest.pages, key=lambda item: item.page_number):
+        if page.element_ids or page.page_number in numbered:
+            continue
+        number = page.page_number
+        element_id = f"element-unstructured-page-{number:04d}"
+        if element_id in known:
+            continue
+        next_order += 1
+        element = ManifestElement(
+            id=element_id,
+            type="unknown",
+            raw_label=UNSTRUCTURED_PAGE_LABEL,
+            reading_order=next_order,
+            hierarchy_level=0,
+            text=None,
+            page_number=number,
+            metadata={UNSTRUCTURED_PAGE_FLAG: True},
+        )
+        manifest.elements.append(element)
+        page.element_ids.append(element_id)
+        manifest.observations.append(
+            Observation(
+                id=f"observation-{UNSTRUCTURED_PAGE_OBSERVATION_KIND}-{number:04d}",
+                kind=UNSTRUCTURED_PAGE_OBSERVATION_KIND,
+                severity="warning",
+                message=t(MSG_OBSERVATION_PAGE_WITHOUT_STRUCTURE).format(page_number=number),
+                target_ids=[element_id],
+                evidence={"page_number": number},
             )
         )
-
-    if not pages:
-        page_count = _page_count(document)
-        for number in range(1, page_count + 1):
-            pages.append(
-                PageDescriptor(
-                    page_number=number,
-                    element_ids=by_page.get(number, []),
-                )
+        manifest.obligations.append(
+            Obligation(
+                id=f"obligation-{UNSTRUCTURED_PAGE_OBLIGATION_KIND}-{number:04d}",
+                kind=UNSTRUCTURED_PAGE_OBLIGATION_KIND,
+                target_ids=[element_id],
+                admissible_methods=list(UNSTRUCTURED_PAGE_METHODS),
+                method_costs={
+                    method: DEFAULT_METHOD_COSTS.get(method, 50)
+                    for method in UNSTRUCTURED_PAGE_METHODS
+                },
+                rationale=t(MSG_OBLIGATION_UNSTRUCTURED_PAGE),
             )
-    return pages
+        )
+    manifest.summary.element_count = len(manifest.elements)
+    manifest.summary.observation_count = len(manifest.observations)
+    manifest.summary.obligation_count = len(manifest.obligations)
+    manifest.summary.element_types = dict(
+        sorted(Counter(item.type for item in manifest.elements).items())
+    )
+
+
+def _is_structural_container(
+    element: ManifestElement, parent_ids: set[str]
+) -> bool:
+    """An unknown element that only groups others and has no region of its own.
+
+    The Toolbox maps Docling's group labels other than lists (``key_value_area``,
+    ``form_area``) to ``unknown`` instead of ``group``. Such a node has no
+    provenance, so region inspection cannot render it and its review-structure
+    obligation could only be escalated, failing the job; its children carry the
+    content and get their own obligations. An unknown leaf, or one with a
+    region, is still reviewed.
+    """
+    return (
+        element.type == "unknown"
+        and not element.provenance
+        and element.id in parent_ids
+    )
 
 
 def _derive_processing_needs(
@@ -511,12 +522,26 @@ def _derive_processing_needs(
 ) -> tuple[list[Observation], list[Obligation]]:
     observations: list[Observation] = []
     obligations: list[Obligation] = []
+    parent_ids: set[str] = {
+        element.parent_id for element in elements if element.parent_id
+    }
 
     for element in elements:
+        if is_unstructured_page_placeholder(element):
+            # Planned by append_unstructured_page_needs, not as an unknown region.
+            continue
+        if _is_structural_container(element, parent_ids):
+            logger.debug(
+                t(LOG_MANIFEST_STRUCTURAL_CONTAINER_SKIPPED).format(
+                    element_id=element.id, raw_label=element.raw_label
+                )
+            )
+            continue
         spec = OBLIGATION_BY_TYPE.get(element.type)
         if spec is None:
             continue
-        kind, rationale, methods = spec
+        kind, msgid, methods = spec
+        rationale = t(msgid)
         suffix = element.id.removeprefix("element-")
         observations.append(
             Observation(
@@ -546,18 +571,17 @@ def _derive_processing_needs(
         )
 
     heading_levels = [
-        (element.id, element.hierarchy_level)
-        for element in elements
-        if element.type == "heading"
+        (element.id, 1 if element.type == "title" else element.hierarchy_level)
+        for element in sorted(elements, key=lambda item: item.reading_order)
+        if element.type in {"title", "heading"}
     ]
     previous = 0
     for element_id, level in heading_levels:
-        if previous and level > previous + 1:
+        invalid_first = not previous and level != 1
+        invalid_successor = previous and (level < 2 or level > min(previous + 1, 6))
+        if invalid_first or invalid_successor:
             suffix = element_id.removeprefix("element-")
-            message = (
-                f"A hierarquia de títulos salta do nível {previous} para o nível "
-                f"{level}."
-            )
+            message = t(MSG_HEADING_GAP).format(previous=previous, level=level)
             observations.append(
                 Observation(
                     id=f"observation-heading-gap-{suffix}",
@@ -587,227 +611,590 @@ def _derive_processing_needs(
     return observations, obligations
 
 
-def _item_label(item: Any) -> str:
-    label = getattr(item, "label", None)
-    if label is None:
-        label = getattr(item, "name", None)
-    value = getattr(label, "value", label)
-    text = str(value or item.__class__.__name__).strip().lower()
-    text = text.removeprefix("docitemlabel.").removeprefix("grouplabel.")
-    return re.sub(r"[^a-z0-9]+", "_", text).strip("_") or "unknown"
+#: Element types whose text the Unicode repair may rewrite. Tables carry their
+#: content in the cell AST and are read through ``unicode_repair_text``.
+UNICODE_REPAIR_ELEMENT_TYPES = frozenset(
+    {
+        "paragraph",
+        "heading",
+        "title",
+        "list_item",
+        "caption",
+        "footnote",
+        "page_header",
+        "page_footer",
+        "table",
+    }
+)
 
 
-def _fallback_type(item: Any, raw_label: str) -> str:
-    class_name = item.__class__.__name__.lower()
-    if "group" in class_name or raw_label in {
-        "list",
-        "ordered_list",
-        "chapter",
-        "section",
-        "sheet",
-        "body",
-        "unspecified",
-    }:
-        return "group"
-    return "unknown"
+def unicode_repair_text(element: ManifestElement) -> str:
+    """Text the Unicode detection/repair sees for ``element``.
+
+    Page headers/footers are ordinary prose. A table has no ``element.text``:
+    its content lives in the cell AST (plus an optional caption).
+    """
+    if element.type == "table":
+        table_ast = element.metadata.get("table_ast")
+        if not isinstance(table_ast, dict):
+            return ""
+        parts = [
+            value
+            for row in _rows_from_table_ast(table_ast)
+            for value in row
+            if value
+        ]
+        caption = table_ast.get("caption")
+        if isinstance(caption, str) and caption.strip():
+            parts.append(caption)
+        return " ".join(parts)
+    return element.text or ""
 
 
-def _item_text(item: Any, element_type: str) -> str | None:
-    for attribute in ("text", "orig", "name"):
-        value = getattr(item, attribute, None)
-        if isinstance(value, str) and value.strip():
-            if element_type == "code":
-                return value.replace("\r\n", "\n").replace("\r", "\n")
-            cleaned = sanitize_text(value)
-            return cleaned or None
-    return None
+def _derive_v23_processing_needs(
+    elements: list[ManifestElement],
+    *,
+    page_sizes: dict[int, tuple[float | None, float | None]] | None = None,
+    fusion_evidence: Any = None,
+    fusion_stats: Any = None,
+    fusion_judge_max_pages: int | None = None,
+    legacy_unicode_repair: str | None = None,
+    secondary_extraction_available: bool = False,
+) -> tuple[list[Observation], list[Obligation]]:
+    """Emit v2.3 needs only when deterministic checks or fusion evidence support them.
 
+    ``fusion_judge_max_pages`` caps how many pages get the VLM judge
+    (FUSION_JUDGE_MAX_PAGES when None). ``legacy_unicode_repair`` is
+    ``off``/``detect``/``repair`` (LEGACY_UNICODE_REPAIR when None); only
+    ``repair`` emits the obligation, while ``detect`` keeps the observation.
+    ``skeleton-order`` is admissible only when the secondary extraction file
+    the extractor recorded for this document can be read.
+    """
+    from docstruct.fusion.line_numbers import extract_line_numbers
+    from docstruct.fusion.tailjoin import join_tail, page_number_position, tailjoin3
+    from docstruct.fusion.types import DiffBlock
+    from docstruct.fusion.verse import verse_blocks
+    from docstruct.fusion.xycut import xycut_order
+    from docstruct.text.latex import normalize_latex
+    from docstruct.text.norm_fix import norm_fix
+    from docstruct.text.unicode_repair import detect_legacy_unicode
 
-def _hierarchy_level(item: Any, element_type: str, tree_level: int) -> int:
-    if element_type == "title":
-        return 1
-    if element_type == "heading":
-        explicit = getattr(item, "level", None)
-        if isinstance(explicit, int) and explicit >= 1:
-            return explicit
-        return max(1, int(tree_level))
-    return max(0, int(tree_level))
+    candidates: list[
+        tuple[str, list[ManifestElement], dict[str, Any], list[str] | None, bool]
+    ] = []
+    by_page: dict[int | None, list[ManifestElement]] = {}
+    for element in elements:
+        by_page.setdefault(element.page_number, []).append(element)
 
+    def add(
+        kind: str,
+        targets: list[ManifestElement],
+        evidence: dict[str, Any],
+        methods: list[str] | None = None,
+        *,
+        obligation: bool = True,
+    ) -> None:
+        valid_targets = [item for item in targets if item.id]
+        if valid_targets:
+            candidates.append((kind, valid_targets, evidence, methods, obligation))
 
-def _provenance(item: Any) -> list[Provenance]:
-    records: list[Provenance] = []
-    for raw in getattr(item, "prov", None) or []:
-        page_number = getattr(raw, "page_no", None)
-        if not isinstance(page_number, int) or page_number < 1:
+    for element in elements:
+        text = element.text or ""
+        if element.type == "formula" and text:
+            normalized = normalize_latex(text)
+            if normalized != text:
+                add("normalize-formula", [element], {"before": text, "after": normalized})
+        elif element.type in {"paragraph", "heading", "title", "list_item", "caption"} and text:
+            normalized = norm_fix(text)
+            if normalized != text:
+                add("normalize-text", [element], {"before": text, "after": normalized})
+
+    if legacy_unicode_repair is None:
+        from backend.config.settings import settings
+
+        legacy_unicode_repair = settings.legacy_unicode_repair
+    unicode_mode = str(legacy_unicode_repair or "off").strip().lower()
+    if unicode_mode not in {"off", "detect", "repair"}:
+        unicode_mode = "off"
+    if unicode_mode != "off":
+        legacy_targets: list[ManifestElement] = []
+        legacy_evidence: Counter = Counter()
+        for element in elements:
+            if element.type not in UNICODE_REPAIR_ELEMENT_TYPES:
+                continue
+            text = unicode_repair_text(element)
+            if not text:
+                continue
+            detection = detect_legacy_unicode(text)
+            if not detection.has_signal:
+                continue
+            repairable = bool(
+                detection.combining_runs
+                or detection.dotless
+                or detection.spacing_diacritics
+            )
+            # Phase B rewrites NFC, dotless-i and spacing diacritics; the
+            # handler limits standalone accents to documents with enough
+            # word-internal evidence. Replacement characters stay report-only.
+            if unicode_mode == "repair" and not repairable:
+                continue
+            legacy_targets.append(element)
+            legacy_evidence["elements"] += 1
+            legacy_evidence["combining_runs"] += detection.combining_runs
+            legacy_evidence["combining_marks"] += detection.combining_marks
+            legacy_evidence["dotless"] += detection.dotless
+            legacy_evidence["spacing_diacritics"] += detection.spacing_diacritics
+            legacy_evidence["spacing_word_internal"] += detection.spacing_word_internal
+            legacy_evidence["replacement_characters"] += (
+                detection.replacement_characters
+            )
+        if legacy_targets:
+            add(
+                "repair-legacy-unicode",
+                legacy_targets,
+                dict(legacy_evidence),
+                obligation=unicode_mode == "repair",
+            )
+
+    for page_number, page_elements in by_page.items():
+        # A slide's own heading opens the slide whatever its box, folding on
+        # or off: a picture whose crop grew above-left of it would otherwise
+        # be read first (slides.py, _absorb_near_pictures). The deck title has
+        # no box, so it is never positioned.
+        positioned = [
+            item for item in page_elements
+            if _normalized_element_bbox(item, page_sizes) is not None
+            and not is_slide_heading(item)
+        ]
+        if len(positioned) > 1:
+            current = sorted(positioned, key=lambda item: item.reading_order)
+            boxes = [_normalized_element_bbox(item, page_sizes) for item in current]
+            order = xycut_order([box for box in boxes if box is not None])
+            if order != list(range(len(current))):
+                reordered_ids = [current[index].id for index in order]
+                add(
+                    "refine-reading-order",
+                    current,
+                    {
+                        "page_number": page_number,
+                        "order_before": [item.id for item in current],
+                        "order_after": reordered_ids,
+                    },
+                )
+
+        text_elements = [
+            item for item in page_elements
+            if item.text and item.type not in {"formula", "table", "picture"}
+        ]
+        if not text_elements:
             continue
-        bbox = _bbox(getattr(raw, "bbox", None))
-        charspan = getattr(raw, "charspan", None)
-        char_start = char_end = None
-        if isinstance(charspan, (tuple, list)) and len(charspan) == 2:
-            char_start, char_end = int(charspan[0]), int(charspan[1])
-        records.append(
-            Provenance(
-                page_number=page_number,
-                bbox=bbox,
-                char_start=char_start,
-                char_end=char_end,
+        blocks = [
+            DiffBlock(
+                md=item.text or "",
+                kind="text",
+                box=_normalized_element_bbox(item, page_sizes),
+                text=item.text or "",
+                type=item.type,
+                role=(
+                    "header" if item.type == "page_header"
+                    else "footer" if item.type == "page_footer"
+                    else "page_number" if item.type == "page_number"
+                    else None
+                ),
+            )
+            for item in text_elements
+        ]
+
+        verse_stats: Counter = Counter()
+        verse_blocks(blocks, verse_stats, "manifest", 300, "records")
+        if verse_stats.get("verse-manifest-split", 0):
+            add(
+                "chunk-verse",
+                text_elements,
+                {"chunks": verse_stats["verse-manifest-chunks"]},
+            )
+
+        line_stats: Counter = Counter()
+        extract_line_numbers(blocks, line_stats, "manifest")
+        if line_stats.get("line-numbers-manifest-count", 0):
+            add(
+                "extract-line-numbers",
+                text_elements,
+                {"count": line_stats["line-numbers-manifest-count"]},
+            )
+
+        page_text = [item.text or "" for item in text_elements]
+        position = page_number_position(blocks)
+        if position is not None:
+            joined = tailjoin3(page_text, position, 50, 3, "keep")
+        else:
+            joined = join_tail(page_text, "end", 50, 3)
+        if joined != page_text:
+            tail_targets = text_elements[len(text_elements) - (len(page_text) - len(joined) + 1):]
+            add(
+                "join-tail-blocks",
+                tail_targets,
+                {"position": position, "before_count": len(page_text), "after_count": len(joined)},
+            )
+
+    stats = fusion_stats
+    if not isinstance(stats, dict) and isinstance(fusion_evidence, dict):
+        stats = fusion_evidence.get("stats")
+    if fusion_judge_max_pages is None:
+        from backend.config.settings import settings
+
+        fusion_judge_max_pages = settings.fusion_judge_max_pages
+    if isinstance(fusion_evidence, dict):
+        pages = fusion_evidence.get("pages")
+        if isinstance(pages, list):
+            entries: list[tuple[int, dict[str, Any], list[ManifestElement]]] = []
+            for page_data in pages:
+                if not isinstance(page_data, dict):
+                    continue
+                page_stats = page_data.get("stats")
+                page_number = page_data.get("page_number")
+                page_targets = by_page.get(page_number, [])
+                if not isinstance(page_stats, dict) or not page_targets:
+                    continue
+                entries.append((page_number, page_stats, page_targets))
+            judged = _pages_for_vlm_judge(entries, fusion_judge_max_pages)
+            fused_targets: list[ManifestElement] = []
+            fused_pages: list[int] = []
+            for page_number, page_stats, page_targets in entries:
+                _add_fusion_observations(
+                    add,
+                    page_targets,
+                    page_stats,
+                    page_number,
+                    judge=page_number in judged,
+                )
+                if page_stats.get("provider_divergence"):
+                    fused_targets.extend(page_targets)
+                    fused_pages.append(page_number)
+            # One obligation per document: each fuse-providers step works on the
+            # whole document, so one per page repeated the same extraction.
+            if fused_targets:
+                add("fuse-providers", fused_targets, {"pages": fused_pages})
+    elif isinstance(stats, dict):
+        targets = [element for element in elements if element.text]
+        if targets:
+            _add_fusion_observations(
+                add,
+                targets,
+                stats,
+                None,
+                judge=fusion_judge_max_pages > 0 and _needs_vlm_judge(stats),
+            )
+            if stats.get("provider_divergence"):
+                add("fuse-providers", targets, {"page_number": None, "fusion_stats": stats})
+
+    observations: list[Observation] = []
+    obligations: list[Obligation] = []
+    seen: set[tuple[str, tuple[str, ...]]] = set()
+    for kind, targets, evidence, methods_override, emit_obligation in candidates:
+        target_ids = list(dict.fromkeys(item.id for item in targets))
+        key = (kind, tuple(target_ids))
+        if key in seen:
+            continue
+        seen.add(key)
+        rationale, default_methods = V23_OBLIGATION_BY_KIND[kind]
+        methods = list(methods_override or default_methods)
+        if kind == "refine-reading-order" and not secondary_extraction_available:
+            methods = [method for method in methods if method != "skeleton-order"]
+        suffix = _obligation_suffix(target_ids)
+        observations.append(
+            Observation(
+                id=f"observation-{kind}-{suffix}",
+                kind=f"{kind}-detected",
+                severity="warning",
+                message=rationale,
+                target_ids=target_ids,
+                evidence=evidence,
             )
         )
-    return records
-
-
-def _bbox(raw: Any) -> BoundingBox | None:
-    if raw is None:
-        return None
-    try:
-        origin = getattr(getattr(raw, "coord_origin", None), "value", None)
-        origin_text = str(origin or "UNKNOWN").upper()
-        if origin_text not in {"TOPLEFT", "BOTTOMLEFT"}:
-            origin_text = "UNKNOWN"
-        return BoundingBox(
-            left=float(getattr(raw, "l")),
-            top=float(getattr(raw, "t")),
-            right=float(getattr(raw, "r")),
-            bottom=float(getattr(raw, "b")),
-            coord_origin=origin_text,
+        if not emit_obligation:
+            continue
+        obligations.append(
+            Obligation(
+                id=f"obligation-{kind}-{suffix}",
+                kind=kind,
+                target_ids=target_ids,
+                admissible_methods=methods,
+                method_costs={
+                    method: DEFAULT_METHOD_COSTS.get(method, 50)
+                    for method in methods
+                },
+                rationale=rationale,
+            )
         )
-    except (AttributeError, TypeError, ValueError):
-        return None
+    return observations, obligations
 
 
-def _reference(raw: Any) -> str | None:
-    if raw is None:
-        return None
-    value = getattr(raw, "cref", raw)
-    if isinstance(value, dict):
-        value = value.get("$ref") or value.get("cref")
-    text = str(value).strip()
-    return text or None
+#: Longest id suffix spelled out from the target ids; past it the suffix is a
+#: digest, since a document-level obligation targets every element of every
+#: divergent page and its id goes into the manifest, the PDDL problem and plan.
+MAX_ID_SUFFIX = 80
 
 
-def _confidence(item: Any) -> float | None:
-    for attribute in ("confidence", "score"):
-        value = getattr(item, attribute, None)
-        if isinstance(value, (int, float)) and 0 <= float(value) <= 1:
-            return float(value)
-    return None
+def _obligation_suffix(target_ids: list[str]) -> str:
+    suffix = "-".join(item.removeprefix("element-") for item in target_ids)
+    if len(suffix) <= MAX_ID_SUFFIX:
+        return suffix
+    digest = hashlib.sha256("\n".join(target_ids).encode("utf-8")).hexdigest()
+    return f"{len(target_ids)}-targets-{digest[:12]}"
 
 
-def _safe_metadata(item: Any, *, element_type: str | None = None) -> dict[str, Any]:
-    metadata: dict[str, Any] = {"docling_class": item.__class__.__name__}
-    content_layer = getattr(item, "content_layer", None)
-    if content_layer is not None:
-        metadata["content_layer"] = str(getattr(content_layer, "value", content_layer))
-    enumerated = getattr(item, "enumerated", None)
-    if isinstance(enumerated, bool):
-        metadata["enumerated"] = enumerated
-    marker = getattr(item, "marker", None)
-    if isinstance(marker, str) and marker:
-        metadata["marker"] = marker
-
-    if element_type == "table":
-        table_ast = _extract_table_ast(item)
-        if table_ast is not None:
-            metadata["table_ast"] = table_ast
-            rows = rows_from_table_ast(table_ast)
-            if rows:
-                metadata["table_row_count"] = len(rows)
-                metadata["table_column_count"] = max((len(row) for row in rows), default=0)
-            metadata["table_has_header"] = bool(table_ast.get("header"))
-            metadata["table_linearization_hint"] = "docling-structured"
-    return metadata
+#: Methods of an adjudicate-page obligation. The deterministic router already
+#: ran on the evidence (``route``), and re-running it as agreement-rule would
+#: only repeat its answer, so the obligation goes straight to the VLM judge.
+VLM_JUDGE_METHODS = ["vlm-pairwise-judge", "human-review"]
 
 
-def _extract_table_ast(item: Any) -> dict[str, Any] | None:
-    raw_candidates: list[Any] = []
-    for attr_name in (
-        "table_ast",
-        "table",
-        "table_data",
-        "grid",
-        "rows",
-        "cells",
-    ):
-        value = getattr(item, attr_name, None)
-        if value is not None:
-            raw_candidates.append(value)
+def _needs_vlm_judge(stats: dict[str, Any]) -> bool:
+    """Whether the deterministic router leaves the page to the VLM judge.
 
-    for method_name in ("model_dump", "to_dict", "export_to_dict"):
-        method = getattr(item, method_name, None)
-        if not callable(method):
+    ``decide_v1`` settles a page from a structural fact (one side nearly empty,
+    a table or formula only one provider found) or keeps docling by default;
+    only its preference rules, where both providers have a table or a formula
+    (``both_table->mineru``, ``both_formula->mineru``), are worth a model call,
+    and only when the two pages differ (``provider_divergence``, over all the
+    page's content: ``text_divergence`` leaves tables and formulas out, so a
+    page whose prose matches and whose tables differ would never be judged).
+    Evidence recorded before the router ran has no ``route`` and stays eligible
+    on ``text_divergence``, as before.
+    """
+    route = stats.get("route")
+    if route is None:
+        return bool(stats.get("text_divergence"))
+    if stats.get("route_reason") == "structure_ambiguous":
+        return True
+    return (
+        bool(stats.get("provider_divergence"))
+        and route != "docling"
+        and str(stats.get("route_reason", "")).startswith("both_")
+    )
+
+
+def _pages_for_vlm_judge(
+    entries: list[tuple[int, dict[str, Any], list[ManifestElement]]],
+    budget: int,
+) -> set[int]:
+    """The ``budget`` ambiguous pages the providers disagree on the most.
+
+    Ranked by ``similarity``, the measure ``_needs_vlm_judge`` gates on
+    (``text_similarity`` for evidence recorded before the router ran).
+    """
+    ambiguous = sorted(
+        (
+            float(
+                stats.get("similarity" if "route" in stats else "text_similarity", 0.0)
+            ),
+            page_number,
+        )
+        for page_number, stats, _ in entries
+        if isinstance(page_number, int) and _needs_vlm_judge(stats)
+    )
+    return {page_number for _, page_number in ambiguous[: max(budget, 0)]}
+
+
+def _add_fusion_observations(
+    add: Any,
+    targets: list[ManifestElement],
+    stats: dict[str, Any],
+    page_number: int | None,
+    *,
+    judge: bool,
+) -> None:
+    """Per-page fusion needs; ``fuse-providers`` is emitted once by the caller."""
+    if not stats:
+        return
+    if judge:
+        add(
+            "adjudicate-page",
+            targets,
+            {"page_number": page_number, "fusion_stats": stats},
+            VLM_JUDGE_METHODS,
+        )
+    elif stats.get("route_reason") == "structure_ambiguous":
+        add(
+            "adjudicate-page",
+            targets,
+            {"page_number": page_number, "fusion_stats": stats},
+            ["human-review"],
+        )
+    if any(key.startswith("dropped-") and value for key, value in stats.items()):
+        add("rescue-omitted-block", targets, {"page_number": page_number, "fusion_stats": stats})
+    if stats.get("table_divergence"):
+        table_targets = [item for item in targets if item.type == "table"]
+        if table_targets:
+            add(
+                "select-table-source",
+                table_targets,
+                {"page_number": page_number, "fusion_stats": stats},
+            )
+    cut_count = stats.get("repetition_tokens_cut", 0)
+    if cut_count:
+        add(
+            "guard-repetition",
+            targets,
+            {"page_number": page_number, "tokens_cut": cut_count},
+        )
+
+
+def _normalized_element_bbox(
+        element: ManifestElement,
+        page_sizes: dict[int, tuple[float | None, float | None]] | None,
+) -> tuple[float, float, float, float] | None:
+        box = _oriented_bbox(element)
+        if box is None or element.page_number is None or page_sizes is None:
+            return None
+        size = page_sizes.get(element.page_number)
+        if size is None:
+            return None
+        return box.page_fractions(*size)
+
+
+def _append_processing_needs(
+    manifest: ProcessingManifest,
+    observations: list[Observation],
+    obligations: list[Obligation],
+) -> None:
+    existing_observations = {item.id for item in manifest.observations}
+    existing_obligations = {item.id for item in manifest.obligations}
+    existing_pairs = {
+        (item.kind, tuple(item.target_ids)) for item in manifest.obligations
+    }
+    manifest.observations.extend(
+        item for item in observations if item.id not in existing_observations
+    )
+    for item in obligations:
+        pair = (item.kind, tuple(item.target_ids))
+        if item.id not in existing_obligations and pair not in existing_pairs:
+            manifest.obligations.append(item)
+            existing_pairs.add(pair)
+    manifest.summary.observation_count = len(manifest.observations)
+    manifest.summary.obligation_count = len(manifest.obligations)
+
+
+def reconcile_reclassified_element_processing_needs(
+    manifest: ProcessingManifest,
+    element: ManifestElement,
+    *,
+    previous_type: str,
+) -> None:
+    """Reconcile derived observations/obligations after an element changes type.
+
+    The standard processing need associated with the reclassified element is
+    replaced, and the v2.3 needs bound to its previous type
+    (``TYPE_BOUND_V23_KINDS``, such as ``normalize-formula``) are dropped;
+    every other observation/obligation (e.g. the v2.3 needs derived from
+    dual-provider fusion evidence) is kept untouched instead of rebuilding the
+    complete list.
+    """
+    if previous_type == element.type:
+        return
+
+    previous_spec = OBLIGATION_BY_TYPE.get(previous_type)
+    current_spec = OBLIGATION_BY_TYPE.get(element.type)
+    if current_spec is None:
+        return
+
+    current_kind, msgid, methods = current_spec
+    rationale = t(msgid)
+    previous_kind = previous_spec[0] if previous_spec is not None else None
+    previous_observation_kind = (
+        f"{previous_type}-requires-processing" if previous_spec is not None else None
+    )
+    current_observation_kind = f"{element.type}-requires-processing"
+    bound_kinds = TYPE_BOUND_V23_KINDS.get(previous_type, frozenset())
+    bound_observation_kinds = {f"{kind}-detected" for kind in bound_kinds}
+    suffix = element.id.removeprefix("element-")
+    current_obligation_id = f"obligation-{current_kind}-{suffix}"
+    current_observation_id = f"observation-{current_kind}-{suffix}"
+
+    removed_obligation_ids: set[str] = set()
+    retained_obligations: list[Obligation] = []
+    has_current_obligation = False
+    for obligation in manifest.obligations:
+        targets_only_element = obligation.target_ids == [element.id]
+        if targets_only_element and obligation.kind == current_kind:
+            has_current_obligation = True
+        if targets_only_element and (
+            (previous_kind is not None and obligation.kind == previous_kind)
+            or obligation.kind in bound_kinds
+        ):
+            removed_obligation_ids.add(obligation.id)
             continue
-        try:
-            payload = method()
-        except TypeError:
-            try:
-                payload = method(mode="json")
-            except Exception:
-                continue
-        except Exception:
+        retained_obligations.append(obligation)
+
+    if not has_current_obligation:
+        retained_obligations.append(
+            Obligation(
+                id=current_obligation_id,
+                kind=current_kind,
+                target_ids=[element.id],
+                admissible_methods=list(methods),
+                method_costs={
+                    method: DEFAULT_METHOD_COSTS.get(method, 50)
+                    for method in methods
+                },
+                rationale=rationale,
+            )
+        )
+
+    replacement_id = next(
+        (
+            obligation.id
+            for obligation in retained_obligations
+            if obligation.target_ids == [element.id]
+            and obligation.kind == current_kind
+        ),
+        current_obligation_id,
+    )
+    for obligation in retained_obligations:
+        obligation.dependencies = [
+            replacement_id if dependency in removed_obligation_ids else dependency
+            for dependency in obligation.dependencies
+        ]
+    manifest.obligations = retained_obligations
+
+    retained_observations: list[Observation] = []
+    has_current_observation = False
+    for observation in manifest.observations:
+        targets_only_element = observation.target_ids == [element.id]
+        if targets_only_element and observation.kind == current_observation_kind:
+            has_current_observation = True
+        if targets_only_element and (
+            (
+                previous_observation_kind is not None
+                and observation.kind == previous_observation_kind
+            )
+            or observation.kind in bound_observation_kinds
+        ):
             continue
-        if isinstance(payload, dict):
-            raw_candidates.append(payload)
-            for nested_key in (
-                "table_ast",
-                "table",
-                "table_data",
-                "grid",
-                "rows",
-                "cells",
-            ):
-                nested = payload.get(nested_key)
-                if nested is not None:
-                    raw_candidates.append(nested)
+        retained_observations.append(observation)
 
-    for candidate in raw_candidates:
-        table_ast = normalize_table_ast(candidate)
-        if table_ast is not None:
-            return table_ast
-    return None
+    if not has_current_observation:
+        retained_observations.append(
+            Observation(
+                id=current_observation_id,
+                kind=current_observation_kind,
+                severity="warning" if element.type != "code" else "info",
+                message=rationale,
+                target_ids=[element.id],
+                evidence={
+                    "raw_label": element.raw_label,
+                    "page_number": element.page_number,
+                },
+            )
+        )
+    manifest.observations = retained_observations
 
-
-def _infer_title(source_path: Path, elements: list[ManifestElement]) -> str:
-    titles = [
-        (element.text or "").strip()
-        for element in elements
-        if element.type == "title" and (element.text or "").strip()
-    ]
-    if titles:
-        return titles[0]
-
-    headings = [
-        (element.text or "").strip()
-        for element in elements
-        if element.type == "heading" and (element.text or "").strip()
-    ]
-    if len(headings) >= 2 and _looks_like_chapter_heading(headings[0]):
-        return f"{headings[0]} - {headings[1]}"
-    if headings:
-        return headings[0]
-    return source_path.stem
-
-
-def _looks_like_chapter_heading(text: str) -> bool:
-    normalized = text.strip().upper()
-    return bool(re.match(r"^CAP[ÍI]TULO\s+\d+", normalized))
-
-
-def _page_count(document: Any) -> int:
-    num_pages = getattr(document, "num_pages", None)
-    if callable(num_pages):
-        try:
-            return max(0, int(num_pages()))
-        except (TypeError, ValueError):
-            pass
-    return 0
-
-
-def _optional_float(value: Any) -> float | None:
-    try:
-        result = float(value)
-    except (TypeError, ValueError):
-        return None
-    return result if result > 0 else None
+    manifest.summary.observation_count = len(manifest.observations)
+    manifest.summary.obligation_count = len(manifest.obligations)
+    manifest.summary.element_types = dict(
+        sorted(Counter(item.type for item in manifest.elements).items())
+    )
 
 
 def _sha256(path: Path) -> str:

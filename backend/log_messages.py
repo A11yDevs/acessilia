@@ -1,0 +1,574 @@
+"""Canonical English msgids for runtime log messages.
+
+These constants hold the canonical English texts emitted by the server's own
+loggers (startup, queue worker, cleanup, cache, API lifespan, email). Callers
+resolve them at log time through :func:`backend.i18n.t` so the log output is
+displayed in the server-side locale detected from the shell environment
+(then the .env LOCALE value, then en_US), while the msgids themselves stay
+stable English identifiers across every supported locale.
+"""
+
+#: Emitted by setup_logger once the root logger sinks are registered; {level} is the active level name.
+LOG_LOGGER_CONFIGURED: str = "Logger configured - level: {level}"
+#: Critical message logged when the startup lock file names a live PID already running the bot.
+LOG_BOT_ALREADY_RUNNING: str = "Another instance of the bot is already running (PID={pid})"
+#: Warning logged when a stale lock file whose PID no longer exists is detected and removed.
+LOG_LOCK_FILE_STALE: str = "Lock file stale (PID {pid} does not exist), removing..."
+#: Info logged once the startup lock file is written with the current process PID.
+LOG_LOCK_ACQUIRED: str = "Lock acquired (PID={pid})"
+#: Info logged when the startup lock file is removed during graceful shutdown.
+LOG_LOCK_RELEASED: str = "Lock released"
+#: Info logged when the API interface is enabled at startup; {port} is the bound listen port.
+LOG_API_INTERFACE_ENABLED: str = "API interface enabled (http://localhost:{port})"
+#: Info logged when the Telegram interface is enabled at startup.
+LOG_TELEGRAM_INTERFACE_ENABLED: str = "Telegram interface enabled"
+#: Warning logged when the Telegram interface is enabled in settings but no bot token has been configured.
+LOG_TELEGRAM_INTERFACE_NO_TOKEN: str = (
+    "Telegram interface enabled but BOT_TOKEN not configured"
+)
+#: Info logged when the Web interface is enabled at startup; {port} is the bound listen port.
+LOG_WEB_INTERFACE_ENABLED: str = "Web interface enabled (http://localhost:{port})"
+#: Critical message logged when no interface is enabled in ENABLED_INTERFACES; process exits.
+LOG_NO_INTERFACE_ENABLED: str = (
+    "No interface enabled. Configure ENABLED_INTERFACES in the .env file"
+)
+#: Info logged just before the started interface tasks are run; {interfaces} lists the enabled names.
+LOG_STARTING_INTERFACES: str = "Starting with interfaces: {interfaces}"
+#: Info logged when the startup run loop is interrupted by the user (Ctrl+C).
+LOG_BOT_INTERRUPTED_BY_USER: str = "Bot interrupted by the user"
+#: Exception-level message logged for any unexpected fatal error in the bot run loop.
+LOG_FATAL_ERROR_IN_BOT: str = "Fatal error in the bot"
+#: Info logged by the Telegram bot once it has started and registered its routers.
+LOG_BOT_STARTED: str = "Bot started (Acessilia API client)"
+#: Info logged while the Telegram bot dispatcher tears down on shutdown.
+LOG_BOT_SHUTTING_DOWN: str = "Bot shutting down"
+#: Critical message logged when the bot token is missing or invalid, before the process exits.
+LOG_BOT_TOKEN_NOT_CONFIGURED: str = "BOT_TOKEN not configured"
+#: Info logged just before the Telegram bot begins long-polling.
+LOG_BOT_STARTING_POLLING: str = "Starting polling"
+#: Info logged by the Unified Queue worker task when it begins servicing the queue.
+LOG_WORKER_STARTED: str = "Unified Queue worker started."
+#: Info logged by the Unified Queue when an item is enqueued; {filename} is the source file name, {source} the channel, {position} the queue slot.
+LOG_QUEUE_ITEM_ENQUEUED: str = (
+    "Unified Queue: {filename} enqueued from {source} (Position: {position})"
+)
+#: Info logged by the Unified Queue worker when it dequeues an item and processing begins.
+LOG_WORKER_TASK_STARTING: str = "Worker: starting task {filename} from {source}"
+#: Error logged by the Unified Queue worker when a task callback raised an exception.
+LOG_WORKER_TASK_ERROR: str = "Worker error while processing {filename}: {error}"
+#: Info logged by the Unified Queue worker once a task finishes, before waiting for the next item.
+LOG_WORKER_TASK_COMPLETED: str = (
+    "Worker: task completed: {filename}. Waiting for the next..."
+)
+#: Info logged by the API lifespan once the queue worker and periodic cleanup tasks are active.
+LOG_API_STARTED: str = "Acessilia API started (queue worker + cleanup active)"
+#: Exception-level message logged by the API global exception handler; {error} is the exception, {path} the request path.
+LOG_API_ERROR: str = "Error in the API: {error} | Path: {path}"
+#: Info logged by the API jobs route once an uploaded file has been accepted and placed in the unified queue; {task_id} is the new job id, {source} the submitting channel.
+LOG_API_JOB_ENQUEUED: str = "API: job {task_id} enqueued (source={source})"
+#: Warning logged by the periodic cleanup when an item could not be removed; {name} is the item name, {error} the reason.
+LOG_CLEANUP_ITEM_FAILED: str = "Failed to remove {name}: {error}"
+#: Exception-level message logged by the periodic cleanup loop on an unexpected failure.
+LOG_CLEANUP_PERIODIC_ERROR: str = "Error in the periodic cleanup"
+#: Debug logged by the periodic cleanup when a temporary file is removed; {name} is the file name.
+LOG_TEMP_FILE_REMOVED: str = "Temporary file removed: {name}"
+#: Debug logged by the periodic cleanup when a temporary directory is removed; {name} is the directory name.
+LOG_TEMP_DIR_REMOVED: str = "Temporary directory removed: {name}"
+#: Debug logged by the output cleanup when an expired output directory is removed; {name} is the directory name.
+LOG_OUTPUT_DIR_REMOVED: str = "Output directory removed: {name}"
+#: Warning logged by the output cleanup when an output directory could not be removed; {name} is the name, {error} the reason.
+LOG_CLEANUP_OUTPUT_FAILED: str = "Failed to remove output {name}: {error}"
+#: Warning logged when SMTP credentials are missing, so a pending notification email is not sent; {to_email} is the recipient.
+LOG_SMTP_NOT_CONFIGURED: str = (
+    "SMTP not configured. E-mail to {to_email} not sent."
+)
+#: Info logged after a notification email has been delivered; {to_email} is the recipient.
+LOG_EMAIL_SENT: str = "E-mail sent successfully to {to_email}."
+#: Error logged after a notification email delivery attempt failed; {to_email} is the recipient, {error} the reason.
+LOG_EMAIL_SEND_ERROR: str = "Error sending e-mail to {to_email}: {error}"
+#: Warning logged when the failure-notification path raises before the mailer can report a delivery result; {task_id} identifies the job, {error} the reason.
+LOG_FAILURE_EMAIL_FAILED: str = "Failure e-mail for job {task_id} could not be sent: {error}"
+#: Warning logged when the mailer reports a failure notification was not delivered; {task_id} identifies the job.
+LOG_FAILURE_EMAIL_NOT_SENT: str = "Failure e-mail for job {task_id} was not sent"
+#: Subject line of the confirmation email sent when a source document has been received.
+EMAIL_CONFIRMATION_SUBJECT: str = "We received your file - Acessilia"
+#: Body of the confirmation email sent when a source document has been received; {filename} is the submitted file name.
+EMAIL_CONFIRMATION_BODY: str = (
+    "Hello!\n\n"
+    "We received the file '{filename}' and we are already working to make it accessible.\n"
+    "This process involves analysis by artificial intelligence and generation of an audio description.\n\n"
+    "As soon as it is ready, you will receive a new e-mail with the accessible package attached.\n\n"
+    "Best regards,\nThe Acessilia Team"
+)
+#: Subject line of the result email sent when the accessible package is ready.
+EMAIL_RESULT_SUBJECT: str = "Your accessible file is ready! - Acessilia"
+#: Body of the result email when a download link is available; {filename} the source file name, {download_url} the URL, {formats} the localized comma-separated list of completed formats, {warnings} the optional localized warning block (or empty text when there are no warnings).
+EMAIL_RESULT_BODY_WITH_LINK: str = (
+    "Hello!\n\n"
+    "The processing of the file '{filename}' has completed successfully.\n\n"
+    "Access the link below to view and download the available formats:\n\n"
+    "{download_url}\n\n"
+    "Available formats: {formats}."
+    "{warnings}\n\n"
+    "The link expires in 7 days.\n\n"
+    "Best regards,\nThe Acessilia Team"
+)
+#: Body of the result email when the accessible package is attached as a ZIP; {filename} the source file name, {formats} the localized newline-separated bullet list of completed formats, {warnings} the optional localized warning block (or empty text when there are no warnings).
+EMAIL_RESULT_BODY_ATTACHED: str = (
+    "Hello!\n\n"
+    "The processing of the file '{filename}' has completed successfully.\n"
+    "Attached, you will find a ZIP package containing the following formats:\n"
+    "{formats}"
+    "{warnings}\n\n"
+    "Best regards,\nThe Acessilia Team"
+)
+#: Subject line of the email sent when a job fails or is interrupted.
+EMAIL_FAILURE_SUBJECT: str = "Your file could not be processed - Acessilia"
+#: Body of the failure email; {filename} is the source file name and {error} the job error, which names the stage it failed in.
+EMAIL_FAILURE_BODY: str = (
+    "Hello!\n\n"
+    "Unfortunately, the processing of the file '{filename}' could not be completed.\n\n"
+    "Reason: {error}\n\n"
+    "You can submit the file again. If the problem persists, forward this message "
+    "to the Acessilia team so we can investigate.\n\n"
+    "Best regards,\nThe Acessilia Team"
+)
+#: Localized display name of the plain-text (TXT) output artifact, listed in the result email's completed-formats block.
+EMAIL_FORMAT_TXT: str = "Plain Text (TXT)"
+#: Localized display name of the Word (DOCX) output artifact, listed in the result email's completed-formats block.
+EMAIL_FORMAT_DOCX: str = "Word Document (DOCX)"
+#: Localized display name of the tagged PDF/UA output artifact, listed in the result email's completed-formats block.
+EMAIL_FORMAT_PDF_UA: str = "Accessible PDF (PDF/UA)"
+#: Localized display name of the web-page (HTML) output artifact, listed in the result email's completed-formats block.
+EMAIL_FORMAT_HTML: str = "Web Page (HTML)"
+#: Localized display name of the spoken-audio (MP3) output artifact, listed in the result email's completed-formats block.
+EMAIL_FORMAT_MP3: str = "Audio Description (MP3)"
+#: Localized display name of the bundled ZIP package output artifact, listed in the result email's completed-formats block.
+EMAIL_FORMAT_ZIP: str = "ZIP Package"
+#: Intro line of the optional warning block appended to the result email body when one or more optional export formats failed; has no placeholders.
+EMAIL_RESULT_WARNINGS_HEADER: str = "Some optional formats were not generated:"
+#: Header of the result email's section with the veraPDF audit of the PDF/UA.
+EMAIL_RESULT_AUDIT_HEADER: str = "Accessibility audit of the PDF (veraPDF):"
+#: Audit verdict line of a compliant PDF/UA; {profile} names the profile (PDF/UA-1).
+EMAIL_AUDIT_COMPLIANT: str = "{profile}: compliant"
+#: Audit verdict line of a non-compliant PDF/UA; {profile} the profile, {rules} failed rules, {checks} failing objects in all.
+EMAIL_AUDIT_NON_COMPLIANT: str = "{profile}: {rules} rule(s) not met ({checks} occurrence(s))"
+#: One failed rule of the audit; {specification}, {clause} and {test} locate it in ISO 14289, {description} is veraPDF's (English), {checks} its failing objects.
+EMAIL_AUDIT_RULE: str = "{specification}, clause {clause} (test {test}): {description} ({checks} occurrence(s))"
+#: Last audit line when more rules failed than the e-mail lists; {count} is how many are left out.
+EMAIL_AUDIT_MORE_RULES: str = "... and {count} more rule(s), listed in the report in the ZIP package"
+#: Audit line when the PDF/UA could not be validated; {error} is the short cause.
+EMAIL_AUDIT_UNAVAILABLE: str = "Audit unavailable: {error}"
+#: Info logged when a canonical-JSON persistence attempt raised; the exception text follows.
+LOG_CANONICAL_JSON_SAVE_FAILED: str = "Could not save the canonical JSON: {error}"
+#: Info logged when a processing job is cancelled by the user; {task_id} identifies the job.
+LOG_TASK_CANCELLED_BY_USER: str = "Task {task_id} cancelled by the user"
+#: Error logged when the processing pipeline raised an unhandled exception; {error_type} is the class name, {error} the text.
+LOG_PIPELINE_ERROR: str = "Pipeline error: {error_type}: {error}"
+#: Info logged when a canonical-document lookup in the cache hit; {name} is the source file name.
+LOG_CACHE_HIT: str = "Cache hit for {name}"
+#: Debug logged when the structured-output cache lookup hit; {key} is the cache key.
+LOG_CACHE_DEBUG_HIT: str = "Cache hit: {key}"
+#: Debug logged when a new cache entry is stored; {key} is the cache key.
+LOG_CACHE_DEBUG_SET: str = "Cache set: {key}"
+#: Warning logged when writing a cache entry failed; {error} is the reason.
+LOG_CACHE_SAVE_FAILED: str = "Failed to save cache: {error}"
+#: Info logged once the cache is emptied; {count} is the number of entries removed.
+LOG_CACHE_CLEARED: str = "Cache cleared: {count} files removed"
+#: Info logged when stale processing records are marked as errors; the message has no placeholders.
+LOG_ORPHAN_TASKS_CLEANED: str = "Orphan tasks cleaned"
+#: Warning logged when cleaning stale processing records failed; {error} is the reason.
+LOG_ORPHAN_TASKS_CLEANUP_FAILED: str = "Failed to clean orphan tasks: {error}"
+#: User-facing error value stored in the conversion-history record of a stale task that cleanup marked as failed; no placeholders.
+LOG_STALE_PROCESS_INTERRUPTED: str = "Stale: process interrupted"
+#: Debug logged when a download token is created; {filename} is its source file name.
+LOG_DOWNLOAD_TOKEN_CREATED: str = "Download token created for {filename}"
+#: Warning logged when a download token lookup misses; no token value is logged.
+LOG_DOWNLOAD_TOKEN_NOT_FOUND: str = "Download token not found"
+#: Warning logged when a known token's stored output directory no longer exists on disk; {output_dir} is its path.
+LOG_DOWNLOAD_TOKEN_DIR_MISSING: str = (
+    "Download token output directory missing: {output_dir}"
+)
+#: Debug logged by the Telegram file service while downloading an uploaded file; {file_path} is the Telegram file path, {filename} the destination file name.
+LOG_TELEGRAM_FILE_DOWNLOADING: str = "Downloading file: {file_path} -> {filename}"
+#: Info logged by the Telegram file service once the uploaded file finished downloading; {filename} the file name, {size} its size in bytes.
+LOG_TELEGRAM_FILE_DOWNLOADED: str = "File downloaded: {filename} ({size} bytes)"
+#: Warning logged by the API worker when PDF/UA export failed; {error} is the reason.
+LOG_PDF_UA_GENERATION_FAILED: str = "Failed to generate PDF/UA: {error}"
+#: Warning logged (and reported as an optional export error) when the Toolbox cannot render the DOCX; {error} is the cause.
+LOG_DOCX_GENERATION_FAILED: str = "Failed to generate DOCX: {error}"
+#: Error logged by the API worker when MP3 audio export failed; {error} is the reason.
+LOG_MP3_GENERATION_FAILED: str = "Failed to generate MP3: {error}"
+#: Info logged when a job has finished processing and exporting; {task_id} identifies the job, {source} the channel.
+LOG_JOB_COMPLETED: str = "Job {task_id} completed (source={source})"
+#: Info logged when a job was cancelled before finishing; {task_id} identifies the job.
+LOG_JOB_CANCELLED: str = "Job {task_id} cancelled"
+#: Exception-level message logged by the API worker when a job raised unexpectedly; {task_id} identifies the job.
+LOG_JOB_EXECUTOR_ERROR: str = "Error in JobExecutor for {task_id}"
+#: Exception-level message logged by the Telegram error handler for any unhandled exception; {error} is the exception.
+LOG_TELEGRAM_UNHANDLED_ERROR: str = "Unhandled error: {error}"
+#: Info logged when a user submits feedback on processing quality via Telegram; {user_info} the user's id or username, {feedback} the free text.
+LOG_TELEGRAM_FEEDBACK_RECEIVED: str = "FEEDBACK from {user_info}: {feedback}"
+#: Warning logged when a Telegram send is throttled and the handler waits before retrying; {wait} the seconds to wait, {preview} a short preview of the message text.
+LOG_TELEGRAM_RATE_LIMIT_WAIT: str = "Telegram rate limit, waiting {wait}s: {preview}"
+#: Error logged when sending a Telegram message still failed after all retry attempts; {attempts} the number of attempts made.
+LOG_TELEGRAM_SEND_FAILED_AFTER_RETRIES: str = (
+    "Failed after {attempts} attempts to send message"
+)
+#: Warning logged when the API rejected a job submitted from Telegram; {status_code} the HTTP code, {detail} the server detail.
+LOG_TELEGRAM_API_JOB_REJECTED: str = (
+    "API rejected the Telegram job: {status_code} - {detail}"
+)
+#: Exception-level message logged when contacting the API from the Telegram handler raised unexpectedly.
+LOG_TELEGRAM_API_CONTACT_FAILED: str = "Failure contacting API via Telegram"
+#: Exception-level message logged when an unexpected error aborted a file submission from Telegram.
+LOG_TELEGRAM_FILE_PROCESSING_ERROR: str = "Error processing file via Telegram"
+#: Warning logged when a poll of a Telegram job's status from the API failed; {task_id} the job id, {error} the reason.
+LOG_TELEGRAM_JOB_STATUS_QUERY_FAILED: str = (
+    "Error querying job {task_id} status: {error}"
+)
+#: Error logged by the web panel global exception handler; {error} the exception, {path} the request path.
+LOG_WEB_GLOBAL_ERROR: str = "Global error in the Web Panel: {error} | Path: {path}"
+#: Error logged when a web upload fails; {error} is the reason.
+LOG_WEB_UPLOAD_ERROR: str = "Error in the web upload: {error}"
+#: Warning logged when the web panel query for download info on the API failed; {status_code} the HTTP code, {detail} the server detail.
+LOG_WEB_DOWNLOAD_QUERY_FAILED: str = (
+    "Failed to query the API for the download: {status_code} - {detail}"
+)
+#: Warning logged by the web panel HTTP exception handler for non-global HTTP errors; {error} is the detail text, {path} the request path.
+LOG_WEB_HTTP_EXCEPTION: str = (
+    "HTTP exception in the Web Panel: {error} | Path: {path}"
+)
+#: Warning logged by the web panel rate-limit handler when a client exceeds its request budget; {ip} is the client address, {path} the request path.
+LOG_WEB_RATE_LIMIT_EXCEEDED: str = (
+    "Rate limit exceeded in the Web Panel: ip={ip} | Path: {path}"
+)
+#: Warning logged by the web panel upload path when the API submit job call rejected the file with an HTTP error; {status_code} the HTTP code, {detail} the API detail text.
+LOG_WEB_API_UPLOAD_ERROR: str = (
+    "API upload error in the Web Panel: {status_code} - {detail}"
+)
+#: Warning logged when sending a job status message to Telegram failed; {error} is the reason.
+LOG_STATUS_MESSAGE_SEND_FAILED: str = "Failed to send the status message: {error}"
+#: Debug logged when editing a previously sent status message to Telegram failed; {error} is the reason.
+LOG_STATUS_MESSAGE_EDIT_FAILED: str = (
+    "Failed to edit the status message: {error}"
+)
+#: Warning logged for an unexpected error while editing a status message; {error} is the reason.
+LOG_STATUS_EDIT_UNEXPECTED: str = (
+    "Unexpected error while editing the status: {error}"
+)
+#: Info logged when the granular MP3 audio export finished; {path} is the output file path.
+LOG_AUDIO_EXPORTED: str = "Spoken audio (MP3) granularly exported successfully: {path}"
+#: Audio MP3 export failed; {error} is the reason.
+LOG_AUDIO_EXPORT_ERROR: str = "Error exporting granular MP3: {error}"
+#: Debug logged before the granular MP3 audio export begins TTS generation; {voice} is the TTS voice name, {path} the output file path.
+LOG_AUDIO_EXPORT_START: str = "Starting granular audio (TTS) generation: {voice} -> {path}"
+#: Info logged each time one TTS chunk finishes during the granular MP3 export; {completed} and {total} are the finished and total chunk counts, {percent} the finished percentage.
+LOG_AUDIO_EXPORT_PROGRESS: str = (
+    "Generating audio (TTS): {completed}/{total} chunks done ({percent}%)"
+)
+#: Rate limit (HTTP 429) detail body returned by the API when too many requests arrive in a window.
+API_RATE_LIMIT_DETAIL: str = (
+    "Too many requests. Please wait a moment and try again."
+)
+#: HTTP 500 detail body returned by the API global exception handler.
+API_INTERNAL_ERROR_DETAIL: str = "Internal server error"
+#: HTTP 404 detail body returned by the API jobs endpoints when a task lookup misses; surfaced verbatim to clients as ApiError.detail.
+API_TASK_NOT_FOUND: str = "Task not found"
+#: HTTP 202 upload receipt body returned by the API when a job has been accepted and placed in the processing queue; {position} is the queue slot.
+API_JOB_QUEUED: str = "File queued (Position: {position})."
+#: HTTP 400 detail body returned by the API when a custom prompt exceeds the accepted length; {limit} carries the character count.
+API_PROMPT_TOO_LONG: str = "The custom prompt exceeds the limit of {limit} characters."
+#: HTTP 422 detail body returned by the API when a submission asks for a custom prompt or thinking mode, which the active pipeline does not support.
+API_OPTIONS_UNAVAILABLE: str = "Custom instructions and thinking mode are unavailable for this pipeline"
+#: HTTP 404 detail body returned by the API download endpoints when a download token lookup misses.
+API_LINK_INVALID: str = "The download link is invalid or has expired"
+#: HTTP 400 detail body returned by the API download endpoints when a request names a format the service cannot produce.
+API_FORMAT_INVALID: str = "Invalid format"
+#: HTTP 404 detail body returned by the API download endpoints when a known token's artifact file is missing on disk.
+API_FILE_NOT_FOUND: str = "File not found"
+#: HTTP 409 detail body returned by the API job cancel endpoint when the task is in a state that does not accept cancellation; {status} is the task's current status.
+API_CANCEL_STATE_INVALID: str = "Task cannot be cancelled in its current state: {status}"
+#: HTTP 404 detail body returned by the API logs endpoints when a log file lookup misses.
+API_LOG_FILE_NOT_FOUND: str = "Log file not found"
+#: HTTP 503 detail body returned when observability access is not configured.
+API_OBSERVABILITY_NOT_CONFIGURED: str = "Observability access not configured"
+#: HTTP 401 detail body returned by observability endpoints when the bearer token is missing or invalid.
+API_TOKEN_INVALID: str = "Invalid token"
+#: HTTP 403 detail body returned by observability endpoints when write access is attempted with a read-only token.
+API_TOKEN_READ_ONLY: str = "Token allows read-only access"
+#: ValueError text raised by the manifest planner model when a planner outcome is recorded before execution actually began; no placeholders.
+MSG_PLANNER_NOT_STARTED: str = "The trial ended before starting"
+#: ValueError text raised by the manifest models when an interval mixes a timezone-aware and a naive timestamp, which cannot be compared; no placeholders.
+MSG_TIMESTAMPS_MIXED_TIMEZONES: str = "Timestamps of an interval must all have a timezone or all lack one"
+#: Manifest processing-needs rationale for picture elements, used as the LLM prompt obligation text per element type.
+MSG_OBLIGATION_IMAGE: str = "The image must receive a description or be marked decorative."
+#: Manifest processing-needs rationale for table elements, used as the LLM prompt obligation text per element type.
+MSG_OBLIGATION_TABLE: str = "The table must have verifiable headers and reading order."
+#: Manifest processing-needs rationale for formula elements, used as the LLM prompt obligation text per element type.
+MSG_OBLIGATION_FORMULA: str = (
+    "The formula must carry an accessible mathematical representation plus verbalization."
+)
+#: Manifest processing-needs rationale for code elements, used as the LLM prompt obligation text per element type.
+MSG_OBLIGATION_CODE: str = "The code block must preserve indentation, language and literal reading."
+#: Manifest processing-needs rationale for unknown/unrecognized elements, used as the LLM prompt obligation text per element type.
+MSG_OBLIGATION_UNKNOWN: str = "Unrecognized elements require structural inspection."
+#: Heading that opens a slide of a presentation that has a title; {number} is the slide, {total} the slides in the deck, {title} the slide title.
+MSG_SLIDE_HEADING_WITH_TITLE: str = "Slide {number} of {total}: {title}"
+#: Heading that opens a slide of a presentation without a title; {number} is the slide, {total} the slides in the deck.
+MSG_SLIDE_HEADING: str = "Slide {number} of {total}"
+#: Observation message for a page the structural extractor returned without any element; {page_number} is the page.
+MSG_OBSERVATION_PAGE_WITHOUT_STRUCTURE: str = (
+    "Page {page_number} has no extracted structure; it may be blank or purely visual."
+)
+#: Manifest processing-needs rationale for a page without extracted structure.
+MSG_OBLIGATION_UNSTRUCTURED_PAGE: str = (
+    "The page must be inspected visually: described when it has content, or accepted as blank."
+)
+#: Observation message for heading-level skips found while validating the manifest; {previous} is the previous heading level and {level} the current one.
+MSG_HEADING_GAP: str = "Title hierarchy jumps from level {previous} to level {level}."
+#: Warning logged when a mode prompt file is missing on disk and the loader falls back to the medio prompt; {path} is the missing prompt file path.
+LOG_PROMPT_FILE_NOT_FOUND: str = (
+    "Prompt file not found at {path}, falling back to medio"
+)
+#: Warning logged by the data agent when a region prompt key has no matching prompt, so the region falls back to the previously extracted text; {page_num} is the page number, {type} the region classification.
+LOG_DATA_AGENT_PROMPT_NOT_FOUND: str = (
+    "[page {page_num}] Prompt not found for type={type}, using fallback"
+)
+#: Debug logged by the data agent just before the vision model processes a region; {page_num} is the page number, {size} the region image size in bytes, {type} the region classification.
+LOG_DATA_AGENT_PROCESSING_REGION: str = (
+    "[page {page_num}] DataAgent processing region ({size} bytes, type={type})"
+)
+#: Critical error logged by the data agent when an unhandled exception occurs while processing a region; {page_num} is the page number, {type} the region classification, {error} the exception.
+LOG_DATA_AGENT_REGION_ERROR: str = (
+    "[page {page_num}] DataAgent error in region {type}: {error} | Traceback:\n{tb}"
+)
+#: Debug logged by the vision agent just before it sends a region image to the vision model; {page_num} is the page number, {size} the region image size in bytes, {type} the region classification.
+LOG_VISION_AGENT_SENDING_REGION: str = (
+    "[page {page_num}] Sending region to vision ({size} bytes, type={type})"
+)
+#: Critical error logged by the vision agent when an unhandled exception occurs while describing a region; {page_num} is the page number, {type} the region classification, {error} the exception, {tb} the traceback text.
+LOG_VISION_AGENT_REGION_ERROR: str = (
+    "[page {page_num}] VisionAgent error in region {type}: {error} | Traceback:\n{tb}"
+)
+#: Warning logged when the vision model's answer is unusable and the region is asked again; {page_num}, {type}, {attempt}/{attempts} and {error} describe the failed try.
+LOG_VISION_AGENT_REGION_RETRY: str = (
+    "[page {page_num}] Unusable answer from the vision model for region {type}; "
+    "trying again ({attempt}/{attempts}): {error}"
+)
+#: Warning logged when the provider rejects a region for exceeding its context window; {page_num} and {type} name the region, {size_before}/{size_after} are the image byte sizes, {max_tokens} is the reduced output cap or provider default, and {error} is the provider failure.
+LOG_VISION_AGENT_CONTEXT_RETRY: str = (
+    "[page {page_num}] Context limit exceeded for region {type}; retrying once "
+    "with a smaller image ({size_before} -> {size_after} bytes) and "
+    "max_tokens={max_tokens}: {error}"
+)
+#: Warning logged when the Toolbox cannot render the smaller image a context recovery needs; {error} is the cause, and the original context error stands.
+LOG_VISION_CONTEXT_DOWNSCALE_FAILED: str = (
+    "Vision context recovery could not reduce its image: {error}"
+)
+#: Info logged when a vision answer validates only after a retry; {page_num}, {type} and {attempt}/{attempts} name the region and the try that worked, so the retry rate can be measured.
+LOG_VISION_AGENT_REGION_RECOVERED: str = (
+    "[page {page_num}] Vision model answered region {type} on try {attempt}/{attempts}"
+)
+#: Debug logged when the manifest builder derives no processing need for an unknown element that only groups others and has no region (a Docling key_value_area); {element_id} and {raw_label} name it.
+LOG_MANIFEST_STRUCTURAL_CONTAINER_SKIPPED: str = (
+    "Manifest: no review-structure for {element_id} ({raw_label}): "
+    "it groups other elements and has no region"
+)
+#: Warning logged when every try of a region came back cut off and its description was recovered from the last one; {page_num} and {type} name the region, {chars} is the recovered length.
+LOG_VISION_AGENT_REGION_SALVAGED: str = (
+    "[page {page_num}] Vision answer for region {type} was cut off before its end; "
+    "description recovered ({chars} characters)"
+)
+#: Warning logged when the model provider rate-limits a region call and the agent waits before trying again; {page_num} and {type} name the region, {retry}/{retries} the rate-limit retry budget, {delay} the wait in seconds.
+LOG_VISION_AGENT_RATE_LIMIT_RETRY: str = (
+    "[page {page_num}] The model provider rate-limited region {type}; "
+    "waiting {delay}s before trying again (rate-limit retry {retry}/{retries})"
+)
+#: Warning logged when a region call runs out of time and the agent tries it once more; {page_num} and {type} name the region, {retry}/{retries} the timeout retry budget, {error} the timeout.
+LOG_VISION_AGENT_TIMEOUT_RETRY: str = (
+    "[page {page_num}] Region {type} got no answer in time ({error}); "
+    "trying again (timeout retry {retry}/{retries})"
+)
+#: Warning logged when a vision description is longer than the region token budget and was cut to it; {page_num} and {type} name the region, {limit} the budget in tokens, {chars} the kept character count.
+LOG_VISION_AGENT_DESCRIPTION_TRUNCATED: str = (
+    "[page {page_num}] Vision description for region {type} exceeded the "
+    "{limit}-token budget and was truncated ({chars} characters kept)"
+)
+#: Debug logged by the orchestrator with a picture element's whole vision description; {element_id} identifies the element, {page_num} its page, {chars} the description length and {description} the full text, so an unusually long description can be traced to its source.
+LOG_VISION_ELEMENT_DESCRIPTION: str = (
+    "[page {page_num}] Vision description of element {element_id} "
+    "({chars} characters): {description}"
+)
+#: Notice appended to the end of a vision description that was truncated to the region budget, so the reader of the alt text knows the description is bounded and many details were left out. This is document content, not a log line; it is resolved through t() so it follows the user's locale.
+MSG_VISION_TRUNCATION_NOTICE: str = (
+    "Note: this image is informationally very extensive; the description was "
+    "limited to the available budget and many details were not described."
+)
+#: Debug logged by the exporters adapter wrapper just before a plain-text export runs; {path} is the output file path.
+LOG_EXPORT_TXT_START: str = "Exporting TXT to {path}"
+#: Debug logged by the exporters adapter wrapper just before a DOCX export runs; {path} is the output file path.
+LOG_EXPORT_DOCX_START: str = "Exporting DOCX to {path}"
+#: Debug logged by the exporters adapter wrapper just before a PDF/UA export runs; {path} is the output file path.
+LOG_EXPORT_PDF_UA_START: str = "Exporting PDF/UA to {path}"
+#: Debug logged by the exporters adapter wrapper just before an MP3 audio export runs; {path} is the output file path.
+LOG_EXPORT_MP3_START: str = "Exporting MP3 to {path}"
+#: Error raised when the language-agent returns an empty result for a document; no placeholders.
+LOG_ORCHESTRATOR_EMPTY_AGENT_RESPONSE: str = "Empty response from the agent"
+#: Warning logged by the PDDL pipeline when a caller passes custom_prompt or thinking_mode, which the deterministic manifest/planning/execution flow does not use.
+LOG_PDDL_IGNORED_OPTIONS: str = (
+    "PDDL pipeline ignores custom_prompt/thinking_mode; only the deterministic "
+    "manifest/planning/execution flow runs"
+)
+#: Info logged by the PDDL pipeline after enriching manifest elements with AI-generated visual descriptions; {count} is the number of elements enriched.
+LOG_PDDL_IMAGES_ENRICHED: str = (
+    "Pipeline PDDL: {count} image(s) enriched with visual description"
+)
+#: Info logged by the PDDL pipeline after enriching manifest table elements via OCR/reconstruction; {count} is the number of tables enriched.
+LOG_PDDL_TABLES_ENRICHED: str = (
+    "Pipeline PDDL: {count} table(s) enriched with OCR/reconstruction"
+)
+#: Info logged when a table that looked misread was read again from its image and the new reading replaced it; {element_id} and {page} name it, {reason} the misreading.
+LOG_PDDL_TABLE_REREAD_ACCEPTED: str = (
+    "Table {element_id} (page {page}) looked misread ({reason}); "
+    "replaced with the reading from its image"
+)
+#: Warning logged when a table that looked misread was read again from its image but the new reading was not used; {element_id}, {page} and {reason} as above, {why} what disqualified the new reading.
+LOG_PDDL_TABLE_REREAD_REJECTED: str = (
+    "Table {element_id} (page {page}) looked misread ({reason}); "
+    "the reading from its image was not used ({why})"
+)
+#: Warning logged when {failures} vision calls in a row got no usable answer and the remaining vision calls of the job are skipped.
+LOG_PROVIDER_BREAKER_OPEN: str = (
+    "{failures} vision calls in a row got no usable answer; "
+    "skipping the remaining calls of this job"
+)
+#: Warning logged before the picture stage tries again what failed; {count} is how many pictures (empty answers included), {delay} the seconds waited first.
+LOG_PDDL_VISION_RETRY_PASS_PICTURES: tuple[str, str] = (
+    "{count} picture without a usable description from the model; "
+    "trying again in {delay}s",
+    "{count} pictures without a usable description from the model; "
+    "trying again in {delay}s",
+)
+#: Warning logged before the table stage tries again what failed; {count} is how many tables, {delay} the seconds waited first.
+LOG_PDDL_VISION_RETRY_PASS_TABLES: tuple[str, str] = (
+    "{count} table without a usable reading from the model; "
+    "trying again in {delay}s",
+    "{count} tables without a usable reading from the model; "
+    "trying again in {delay}s",
+)
+#: Warning logged when list items with no text are left out of the delivered document; {count} items, the {page} they are on and their {element_ids}.
+LOG_PDDL_EMPTY_LIST_ITEMS_DROPPED: str = (
+    "PDDL: {count} list item(s) without text left out of page {page}: {element_ids}"
+)
+#: Exception logged when extracting an element's image clip from the source PDF for the PDDL pipeline fails; {element_id} is the failing element's id.
+LOG_PDDL_ELEMENT_CROP_FAILED: str = (
+    "Failed to extract the image clip for element {element_id}"
+)
+#: Warning logged when the vision model answered with an empty description for a picture element, leaving the `describe-image` obligation unsatisfiable. {element_id} is the element without a usable description.
+LOG_PDDL_EMPTY_VISION_DESCRIPTION: str = (
+    "Vision model returned an empty description for element {element_id}"
+)
+#: Warning logged once per document when math.recognize is unavailable during formula enrichment; {error} is the full failure message, naming the provider and its HTTP status.
+LOG_PDDL_FORMULA_RECOGNIZE_UNAVAILABLE: str = (
+    "math.recognize unavailable during formula enrichment ({error}); "
+    "falling back to the vision model"
+)
+#: Debug logged per formula when math.recognize answered without LaTeX; {element_id} is the formula, {page} its page and {provider} the recognition provider asked.
+LOG_PDDL_FORMULA_RECOGNIZE_EMPTY: str = (
+    "Formula {element_id} (page {page}): math.recognize ({provider}) returned no LaTeX; "
+    "falling back to the vision model"
+)
+#: Info logged when every recognition of a formula was refused for disagreeing with its text layer; {element_id} is the formula, {page} its page and {rejected} the refused readings with their agreement.
+LOG_PDDL_FORMULA_TEXT_LAYER_DISAGREES: str = (
+    "Formula {element_id} (page {page}): recognition disagrees with the text layer {rejected}"
+)
+#: Info logged after formula enrichment; {count} is the number of formulas that received LaTeX by any method.
+LOG_PDDL_FORMULAS_RECOGNIZED: str = "LaTeX recognized for {count} formula(s)"
+#: Info logged once per document when math.recognize answered without LaTeX for some formulas; {count} of {total} formulas fell back to vision and {provider} is the recognition provider asked.
+LOG_PDDL_FORMULAS_FELL_BACK_TO_VISION: str = (
+    "{count} of {total} formula(s) fell back to the vision model after "
+    "math.recognize ({provider}) returned no LaTeX"
+)
+#: Error raised when the preferred planner backend produced no valid plan in both mode; {backend} is the preferred backend's name.
+LOG_PDDL_PREFERRED_PLAN_MISSING: str = (
+    "Preferred planner backend {backend} did not produce a valid plan in both mode"
+)
+#: Error raised when validating a nominal plan whose problem.pddl hash does not match the compiled problem; no placeholders.
+LOG_PDDL_PROBLEM_HASH_MISMATCH: str = (
+    "The problem.pddl hash diverges from the plan"
+)
+#: Error raised when validating a nominal plan whose domain.pddl hash does not match the domain bundle; no placeholders.
+LOG_PDDL_DOMAIN_HASH_MISMATCH: str = (
+    "The domain.pddl hash diverges from the plan"
+)
+#: Error raised when validating a nominal plan whose domain description hash does not match the domain bundle; no placeholders.
+LOG_PDDL_DOMAIN_DESCRIPTION_HASH_MISMATCH: str = (
+    "The domain description hash diverges from the plan"
+)
+#: Error raised when validating a nominal plan whose selected obligation closure does not match the compiled problem's; no placeholders.
+LOG_PDDL_SELECTED_CLOSURE_MISMATCH: str = (
+    "The selected closure diverges from the compiled problem"
+)
+LOG_PDF_UA_EXPORTED: str = "PDF/UA exported: {output_path}"
+#: Info logged when the Toolbox rendered the PDF/UA; {output_path} the destination file path.
+LOG_PDF_UA_TOOLBOX_EXPORTED: str = "PDF/UA rendered by the Toolbox: {output_path}"
+#: Warning logged when the Toolbox rejected the PDF/UA AST's math and the export retries with the
+#: formulas as literal text; {error} is the Toolbox's rejection cause.
+LOG_PDF_UA_MATH_DEGRADED: str = (
+    "The Toolbox rejected the PDF/UA math; retrying with formulas as literal text: {error}"
+)
+#: Info logged when the worker skips PDF/UA because TOOLBOX_PDF_UA_ENABLED is false.
+LOG_PDF_UA_SKIPPED_DISABLED: str = "PDF/UA skipped: TOOLBOX_PDF_UA_ENABLED is false"
+#: Info logged when the PDF/UA audit is skipped because TOOLBOX_PDF_VALIDATE_ENABLED is false.
+LOG_PDF_UA_AUDIT_SKIPPED_DISABLED: str = "PDF/UA audit skipped: TOOLBOX_PDF_VALIDATE_ENABLED is false"
+#: Info logged when veraPDF validated the PDF/UA; {compliant} is the verdict, {rules} the failed rules.
+LOG_PDF_UA_AUDIT_FINISHED: str = "PDF/UA audit finished (compliant={compliant}, failed rules={rules})"
+#: Warning logged when the PDF/UA audit failed; {error} is the reason. The job is still delivered.
+LOG_PDF_UA_AUDIT_FAILED: str = "PDF/UA audit failed: {error}"
+#: Info logged when media.inspect is skipped because TOOLBOX_MEDIA_INSPECT_ENABLED is false.
+LOG_MEDIA_INSPECT_SKIPPED_DISABLED: str = (
+    "Media inspection skipped: TOOLBOX_MEDIA_INSPECT_ENABLED is false"
+)
+#: Info logged when the Toolbox finished media.inspect; {nature} is the artifact nature, {visual} whether it requires visual inspection.
+LOG_MEDIA_INSPECT_TOOLBOX_FINISHED: str = (
+    "Toolbox: media.inspect finished (nature={nature}, visual={visual})"
+)
+#: Warning logged when media.inspect fails on the Toolbox and the run continues without the standalone-image signal; {filename} is the source file name, {error} the error class and message.
+LOG_MEDIA_INSPECT_FAILED: str = (
+    "Media inspection unavailable for {filename}; continuing without the "
+    "standalone-image signal: {error}"
+)
+LOG_TXT_EXPORTED: str = "TXT exported: {output_path}"
+LOG_DOCX_EXPORTED: str = "DOCX exported: {output_path}"
+#: Info logged when the Toolbox rendered the DOCX; {output_path} is the written file.
+LOG_DOCX_TOOLBOX_EXPORTED: str = "DOCX rendered by the Toolbox: {output_path}"
+#: Info logged when the DOCX export is skipped because TOOLBOX_DOCX_ENABLED is false; no placeholders.
+LOG_DOCX_SKIPPED_DISABLED: str = "DOCX skipped: TOOLBOX_DOCX_ENABLED is false"
+#: Error raised when the optional Agno agent stack is absent and a workflow class import is required; no placeholders.
+LOG_AGNO_NOT_INSTALLED: str = (
+    "Agno is not installed. Run `uv sync` before using the workflow Executor."
+)
+
+#: Upload persistence failed transiently; extraction will receive the source file.
+LOG_ARTIFACT_UPLOAD_DEGRADED: str = "Artifact upload unavailable ({error}); extracting from the source file."
+
+#: FUSION_MODE=dual names the primary provider as its secondary too; fusion is skipped.
+LOG_DUAL_FUSION_SKIPPED_IDENTICAL_PROVIDERS: str = (
+    "Dual fusion skipped: the primary and secondary providers are both {provider}."
+)
+
+#: One structural provider failed; use the other provider when available.
+LOG_STRUCTURAL_PROVIDER_DEGRADED: str = "Structural provider {provider} failed ({error}); extraction is degraded."
+
+#: Multiple independent Toolbox URLs require direct input; configured artifact storage is bypassed.
+LOG_ARTIFACT_STORE_DIRECT_INPUT: str = (
+    "Artifact storage bypassed for independent Toolbox endpoints; "
+    "the source file will be sent again for extraction, fusion and text spans."
+)
+
+#: Delivered document warning when only one structural provider succeeded; {provider} is its identifier.
+MSG_STRUCTURAL_EXTRACTION_DEGRADED: str = (
+    "Structural extraction used only {provider} because the other provider failed. "
+    "The document requires review; dual-provider comparison was not available."
+)

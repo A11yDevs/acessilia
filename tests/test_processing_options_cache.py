@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 import asyncio
 from pathlib import Path
 
@@ -8,65 +10,15 @@ def test_document_cache_key_changes_with_each_processing_option(monkeypatch):
     from backend import service
 
     monkeypatch.setattr(service.settings, "ai_client", "fake")
-    monkeypatch.setattr(service.settings, "pipeline_engine", "legacy")
+    monkeypatch.setattr(service.settings, "pipeline_engine", "pddl")
 
     base = service._cache_version("normal", None, False)
 
+    assert "-v12_" in base
     assert service._cache_version("detailed", None, False) != base
     assert service._cache_version("normal", "Describe charts", False) != base
     assert service._cache_version("normal", None, True) != base
     assert service._cache_version("normal", None, False) == base
-
-
-def test_page_cache_key_changes_with_prompt_and_thinking_mode(monkeypatch, tmp_path):
-    from backend.agents import orchestrator as orchestrator_module
-    from backend.agents.orchestrator import AccessibilityOrchestrator
-
-    observed_keys: list[str] = []
-
-    async def cache_miss(_path, extra, **_kwargs):
-        observed_keys.append(extra)
-        return None
-
-    async def ignore_cache_write(*_args, **_kwargs):
-        return None
-
-    async def run_inline(function, *args):
-        return function(*args)
-
-    class Reader:
-        structurer = type("Structurer", (), {"name": "fake"})()
-
-        def analyse_page(self, *_args):
-            return []
-
-    class Editor:
-        def consolidate_page(self, _tasks, _results):
-            return "page result"
-
-    monkeypatch.setattr(orchestrator_module, "get_cached", cache_miss)
-    monkeypatch.setattr(orchestrator_module, "set_cache", ignore_cache_write)
-    monkeypatch.setattr(orchestrator_module.asyncio, "to_thread", run_inline)
-
-    orchestrator = AccessibilityOrchestrator.__new__(AccessibilityOrchestrator)
-    orchestrator.mode = "medio"
-    orchestrator.reader = Reader()
-    orchestrator.editor = Editor()
-    orchestrator._reader_lock = asyncio.Lock()
-
-    image = tmp_path / "page.png"
-    image.write_bytes(b"same image")
-
-    async def exercise_options():
-        await orchestrator.executar(image, tmp_path, custom_prompt="first")
-        await orchestrator.executar(image, tmp_path, custom_prompt="second")
-        await orchestrator.executar(
-            image, tmp_path, custom_prompt="first", thinking_mode=True
-        )
-
-    asyncio.run(exercise_options())
-
-    assert len(set(observed_keys)) == 3
 
 
 def test_cached_payload_rebuilds_current_submission_metadata(monkeypatch, tmp_path):
@@ -158,3 +110,35 @@ def test_cache_key_sha256_full_hash_and_file_size(tmp_path):
 
 async def _async_noop(*_args, **_kwargs):
     return None
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["pdf_split_dpi", "pddl_max_replans", "slide_fold_figure_labels", "table_visual_review"],
+)
+def test_output_affecting_settings_invalidate_processing_cache(monkeypatch, name):
+    from backend.config.settings import settings
+    from backend.services.cache import processing_cache_configuration, options_cache_key
+    before = options_cache_key("document", configuration=processing_cache_configuration())
+    value = getattr(settings, name)
+    monkeypatch.setattr(settings, name, not value if isinstance(value, bool) else value + 1)
+    assert options_cache_key("document", configuration=processing_cache_configuration()) != before
+
+
+def test_toolbox_endpoints_invalidate_processing_cache(monkeypatch):
+    from backend.config.settings import settings
+    from backend.services.cache import processing_cache_configuration, options_cache_key
+    before = options_cache_key("document", configuration=processing_cache_configuration())
+    monkeypatch.setattr(settings, "toolbox_base_urls", "http://a.test,http://b.test")
+    assert options_cache_key("document", configuration=processing_cache_configuration()) != before
+
+
+def test_inline_math_detection_invalidates_processing_cache(monkeypatch):
+    """Turning the detection off must not serve a result that has its $…$ (#265)."""
+    from backend.config.settings import settings
+    from backend.services.cache import processing_cache_configuration, options_cache_key
+
+    monkeypatch.setattr(settings, "inline_math_detection", "fonts")
+    before = options_cache_key("document", configuration=processing_cache_configuration())
+    monkeypatch.setattr(settings, "inline_math_detection", "off")
+    assert options_cache_key("document", configuration=processing_cache_configuration()) != before

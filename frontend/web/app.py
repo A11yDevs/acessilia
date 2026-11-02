@@ -1,6 +1,11 @@
+import logging
 import traceback
 import uuid
+from contextlib import asynccontextmanager
 from pathlib import Path
+from urllib.parse import urlsplit
+import re
+from starlette.concurrency import run_in_threadpool
 
 from fastapi import (
     FastAPI,
@@ -21,11 +26,79 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 from backend.config.settings import settings
+from backend.i18n import t, active_locale
+from backend.services.download_token_service import TOKEN_EXPIRY_DAYS
+from backend.log_messages import (
+    LOG_WEB_API_UPLOAD_ERROR,
+    LOG_WEB_DOWNLOAD_QUERY_FAILED,
+    LOG_WEB_GLOBAL_ERROR,
+    LOG_WEB_HTTP_EXCEPTION,
+    LOG_WEB_RATE_LIMIT_EXCEEDED,
+    LOG_WEB_UPLOAD_ERROR,
+)
+from backend.tools.access_log_filter import AccessLogFilter
 from backend.tools.logger import logger
-from frontend.clients.api_client import ApiClient, ApiError
+from backend.tools.validators import MSG_FILE_TOO_LARGE
+from frontend.clients.api_client import ApiError
 from frontend.clients import default_client
+from frontend.web.messages import (
+    WEB_ERROR_INVALID_RECEIPT,
+    WEB_DOWNLOAD_HEADLINE,
+    WEB_DOWNLOAD_NO_FORMATS,
+    WEB_DOWNLOAD_SUBHEAD,
+    WEB_DOWNLOAD_TITLE,
+    WEB_DOWNLOAD_VALID_NOTE,
+    WEB_ERROR_API_UPLOAD,
+    WEB_ERROR_DOWNLOAD_INVALID,
+    WEB_ERROR_DOWNLOAD_UNAVAILABLE,
+    WEB_ERROR_INTERNAL,
+    WEB_ERROR_UPLOAD_GENERIC,
+    WEB_FORMAT_DOCX,
+    WEB_FORMAT_HTML,
+    WEB_FORMAT_MP3,
+    WEB_FORMAT_PDF,
+    WEB_FORMAT_PDF_UA,
+    WEB_FORMAT_TXT,
+    WEB_FORMAT_ZIP,
+    WEB_FOOTER,
+    WEB_INDEX_DOC_LABEL,
+    WEB_INDEX_EMAIL_HELP,
+    WEB_INDEX_EMAIL_LABEL,
+    WEB_INDEX_HEADLINE,
+    WEB_INDEX_INTRO,
+    WEB_INDEX_SUBMIT_BUTTON,
+    WEB_INDEX_TITLE,
+    WEB_LOGO_ALT,
+    WEB_RATE_LIMIT_EXCEEDED,
+    WEB_SUCCESS_QUEUED,
+    WEB_JOB_TITLE,
+    WEB_JOB_PENDING,
+    WEB_JOB_CLOSE_INFO,
+    WEB_JOB_DOWNLOAD,
+    WEB_JOB_EMAIL_FAILED,
+    WEB_JOB_EMAIL_SENT,
+    WEB_JOB_EMAIL_UNKNOWN,
+    WEB_JOB_FAILURE_EMAIL_FAILED,
+    WEB_JOB_FAILURE_EMAIL_SENT,
+    WEB_JOB_UNAVAILABLE,
+    WEB_JOB_STATUS,
+    WEB_JOB_ERRORS,
+    WEB_JOB_HOME,
+)
 
-app = FastAPI(title="Bot Acess Web Panel")
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    access_logger = logging.getLogger("uvicorn.access")
+    access_filter = AccessLogFilter()
+    access_logger.addFilter(access_filter)
+    try:
+        yield
+    finally:
+        access_logger.removeFilter(access_filter)
+
+
+app = FastAPI(title="Bot Acess Web Panel", lifespan=_lifespan)
 
 limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
 app.state.limiter = limiter
@@ -39,10 +112,11 @@ client = default_client
 WEB_UPLOAD_DIR = settings.temp_dir / "web_uploads"
 WEB_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-MAX_CUSTOM_PROMPT_CHARS = 6000
 DOWNLOAD_MEDIA_TYPES = {
     "txt": "text/plain; charset=utf-8",
     "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    # Only PDF/UA is produced now; "pdf" serves links issued before that,
+    # which stay valid for TOKEN_EXPIRY_DAYS.
     "pdf": "application/pdf",
     "pdf_ua": "application/pdf",
     "html": "text/html; charset=utf-8",
@@ -55,14 +129,29 @@ DOWNLOAD_SUFFIXES = {
 }
 
 
+def _route_path(request: Request) -> str:
+    return getattr(request.scope.get("route"), "path", "<unmatched>")
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    logger.error("Erro Global no Painel Web: {} | Path: {}", exc, request.url.path)
+    """Catch-all handler for unexpected errors in the Web Panel.
+
+    Args:
+        request (Request): The in-flight HTTP request that triggered the error.
+        exc (Exception): The unhandled exception raised while processing the request.
+
+    Returns:
+        TemplateResponse: The rendered index page with the localized internal-error message and HTTP status 500.
+    """
+    logger.error(
+        t(LOG_WEB_GLOBAL_ERROR).format(error=str(exc), path=_route_path(request))
+    )
     logger.error(traceback.format_exc())
     return templates.TemplateResponse(
         request=request,
         name="index.html",
-        context={"error": f"Erro interno no servidor: {str(exc)}"},
+        context={**_web_strings(), "error": t(WEB_ERROR_INTERNAL)},
         status_code=500,
     )
 
@@ -70,12 +159,12 @@ async def global_exception_handler(request: Request, exc: Exception):
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     logger.warning(
-        "HTTP Exception no Painel Web: {} | Path: {}", exc.detail, request.url.path
+        t(LOG_WEB_HTTP_EXCEPTION).format(error=str(exc.detail), path=_route_path(request))
     )
     return templates.TemplateResponse(
         request=request,
         name="index.html",
-        context={"error": exc.detail},
+        context={**_web_strings(), "error": exc.detail},
         status_code=exc.status_code,
     )
 
@@ -83,16 +172,49 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
 @app.exception_handler(RateLimitExceeded)
 async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
     logger.warning(
-        "Rate limit excedido | IP: {} | Path: {}",
-        request.client.host if request.client else "unknown",
-        request.url.path,
+        t(LOG_WEB_RATE_LIMIT_EXCEEDED).format(
+            ip=request.client.host if request.client else "unknown",
+            path=_route_path(request),
+        )
     )
     return templates.TemplateResponse(
         request=request,
         name="index.html",
-        context={"error": "Muitas requisições. Aguarde um momento antes de tentar novamente."},
+        context={**_web_strings(), "error": t(WEB_RATE_LIMIT_EXCEEDED)},
         status_code=429,
     )
+
+
+def _web_strings() -> dict:
+    """Assemble localized UI strings for the web panel templates in the active locale.
+
+    Returns:
+        dict: Mapping of template context keys to translated strings; templates merge this with per-request values.
+    """
+    return {
+        "locale": active_locale().replace("_", "-"),
+        "index_title": t(WEB_INDEX_TITLE),
+        "index_headline": t(WEB_INDEX_HEADLINE),
+        "index_intro": t(WEB_INDEX_INTRO),
+        "index_email_label": t(WEB_INDEX_EMAIL_LABEL),
+        "index_email_help": t(WEB_INDEX_EMAIL_HELP),
+        "index_doc_label": t(WEB_INDEX_DOC_LABEL),
+        "index_submit": t(WEB_INDEX_SUBMIT_BUTTON),
+        "footer": t(WEB_FOOTER),
+        "logo_alt": t(WEB_LOGO_ALT),
+        "download_title": t(WEB_DOWNLOAD_TITLE),
+        "download_headline": t(WEB_DOWNLOAD_HEADLINE),
+        "download_subhead": t(WEB_DOWNLOAD_SUBHEAD),
+        "download_no_formats": t(WEB_DOWNLOAD_NO_FORMATS),
+        "download_valid_note": t(WEB_DOWNLOAD_VALID_NOTE),
+        "format_txt": t(WEB_FORMAT_TXT),
+        "format_docx": t(WEB_FORMAT_DOCX),
+        "format_pdf": t(WEB_FORMAT_PDF),
+        "format_pdf_ua": t(WEB_FORMAT_PDF_UA),
+        "format_html": t(WEB_FORMAT_HTML),
+        "format_mp3": t(WEB_FORMAT_MP3),
+        "format_zip": t(WEB_FORMAT_ZIP),
+    }
 
 
 def _save_upload(upload: UploadFile) -> Path:
@@ -107,7 +229,7 @@ def _save_upload(upload: UploadFile) -> Path:
                 if total_size > settings.max_file_size_bytes:
                     raise HTTPException(
                         status_code=413,
-                        detail=f"Arquivo excede o limite de {settings.max_file_size_mb} MB.",
+                        detail=t(MSG_FILE_TOO_LARGE).format(limit=settings.max_file_size_mb),
                     )
                 buffer.write(chunk)
     except Exception:
@@ -125,27 +247,43 @@ def _remove_file(file_path: Path) -> None:
 
 @app.get("/", response_class=HTMLResponse)
 @limiter.limit("30/minute")
-async def index(request: Request, position: int | None = Query(None, ge=1)):
+async def index(
+    request: Request,
+    position: int | None = Query(None, ge=1),
+    email: str | None = Query(None),
+):
+    """Render the main upload panel, optionally with the post-queue success notice.
+
+    Args:
+        request (Request): The in-flight HTTP request, used to resolve templates and the active locale.
+        position (int | None): Queue position carried by a success redirect; defaults to None.
+        email (str | None): Deliver-to e-mail carried by a success redirect; defaults to None.
+
+    Returns:
+        TemplateResponse: The rendered index page with localized strings and the success notice when present.
+    """
     return templates.TemplateResponse(
-        request=request, name="index.html", context=_submission_context(position)
+        request=request,
+        name="index.html",
+        context={**_web_strings(), **_submission_context(position, email)},
     )
 
 
-@app.get("/advanced", response_class=HTMLResponse)
-@limiter.limit("30/minute")
-async def advanced_page(request: Request, position: int | None = Query(None, ge=1)):
-    return templates.TemplateResponse(
-        request=request, name="advanced.html", context=_submission_context(position)
-    )
+def _submission_context(position: int | None, email: str | None) -> dict[str, str]:
+    """Build the localized success notice shown after a file is added to the queue.
 
+    Args:
+        position (int | None): The queue position reported by the API; None disables the notice.
+        email (str | None): The deliver-to e-mail address shown in the notice; None renders an empty address.
 
-def _submission_context(position: int | None) -> dict[str, str]:
+    Returns:
+        dict[str, str]: Empty when no position is present; otherwise a mapping with a "message" key holding the localized notice.
+    """
     if position is None:
         return {}
-    return {"message": (
-        f"Sucesso! Seu arquivo entrou na fila (Posição no envio: {position}). "
-        "O resultado será enviado para o e-mail informado."
-    )}
+    return {
+        "message": t(WEB_SUCCESS_QUEUED).format(position=position, email=email or "")
+    }
 
 
 @app.get("/process", include_in_schema=False)
@@ -153,27 +291,27 @@ async def upload_page():
     return RedirectResponse(url="/", status_code=303)
 
 
+# The advanced panel was retired in 0.2.0; keep old bookmarks landing on the
+# home page for one release. Remove in 0.3.0.
+@app.get("/advanced", include_in_schema=False)
 @app.get("/advanced/process", include_in_schema=False)
-async def advanced_upload_page():
-    return RedirectResponse(url="/advanced", status_code=303)
+async def retired_advanced_page():
+    return RedirectResponse(url="/", status_code=303)
 
 
 async def _submit_via_api(
     request: Request,
-    template_name: str,
     document_file: UploadFile,
     email: str,
     mode: str,
-    custom_prompt: str | None = None,
-    thinking_mode: bool = False,
 ):
     try:
-        file_path = _save_upload(document_file)
+        file_path = await run_in_threadpool(_save_upload, document_file)
     except HTTPException as e:
         return templates.TemplateResponse(
             request=request,
-            name=template_name,
-            context={"error": e.detail},
+            name="index.html",
+            context={**_web_strings(), "error": e.detail},
             status_code=e.status_code,
         )
     try:
@@ -181,35 +319,78 @@ async def _submit_via_api(
             file_path,
             document_file.filename or "documento",
             mode=mode,
-            custom_prompt=custom_prompt,
-            thinking_mode=thinking_mode,
             email=email,
             source="web",
         )
     except ApiError as e:
         logger.warning(
-            "API retornou erro no upload web: {} - {}", e.status_code, e.detail
+            t(LOG_WEB_API_UPLOAD_ERROR).format(
+                status_code=e.status_code, detail=e.detail
+            )
         )
         return templates.TemplateResponse(
             request=request,
-            name=template_name,
-            context={"error": f"Erro da API ({e.status_code}): {e.detail}"},
+            name="index.html",
+            context={**_web_strings(), "error": t(WEB_ERROR_API_UPLOAD).format(status_code=e.status_code, detail=e.detail)},
         )
     except Exception as e:
-        logger.error("Erro no upload via web: {}", e)
+        logger.error(t(LOG_WEB_UPLOAD_ERROR).format(error=str(e)))
         return templates.TemplateResponse(
             request=request,
-            name=template_name,
-            context={
-                "error": "Ocorreu um erro ao enviar o arquivo para a API. Tente novamente."
-            },
+            name="index.html",
+            context={**_web_strings(), "error": t(WEB_ERROR_UPLOAD_GENERIC)}
         )
     finally:
         _remove_file(file_path)
 
-    page = "/advanced" if template_name == "advanced.html" else "/"
-    return RedirectResponse(
-        url=f"{page}?position={int(result['position'])}", status_code=303
+    task_id = str(result["task_id"])
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", task_id) or not result.get("job_token"):
+        raise HTTPException(status_code=502, detail=t(WEB_ERROR_INVALID_RECEIPT))
+    receipt_path = f"/jobs/{task_id}"
+    response = RedirectResponse(url=receipt_path, status_code=303)
+    response.set_cookie(
+        "acessilia_job", result["job_token"], path=receipt_path,
+        max_age=TOKEN_EXPIRY_DAYS * 24 * 60 * 60, httponly=True, samesite="lax",
+        secure=request.url.scheme == "https",
+    )
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    return response
+
+
+@app.get("/jobs/{task_id}", response_class=HTMLResponse)
+@limiter.limit("60/minute")
+async def job_receipt(request: Request, task_id: str):
+    token = request.cookies.get("acessilia_job")
+    if not token:
+        raise HTTPException(status_code=404, detail="Job not found")
+    unavailable = False
+    try:
+        job = await client.get_job_status(task_id, job_token=token)
+    except ApiError as exc:
+        if exc.status_code in {401, 403, 404}:
+            raise HTTPException(status_code=404, detail="Job not found") from None
+        job, unavailable = {}, True
+    except Exception:
+        job, unavailable = {}, True
+    download_path = urlsplit(job.get("download_url") or "").path
+    if not re.fullmatch(r"/download/[A-Za-z0-9_-]+", download_path):
+        download_path = None
+    refresh = unavailable or job.get("status") in {"queued", "processing", "cancelling"}
+    refresh = refresh or job.get("email_delivery") == "pending"
+    return templates.TemplateResponse(
+        request=request, name="job.html", status_code=503 if unavailable else 200,
+        headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"},
+        context={**_web_strings(), "job": job, "download_path": download_path,
+            "refresh": refresh, "unavailable": unavailable,
+            "job_title": t(WEB_JOB_TITLE), "job_pending": t(WEB_JOB_PENDING),
+            "job_close_info": t(WEB_JOB_CLOSE_INFO).format(days=TOKEN_EXPIRY_DAYS),
+            "job_download": t(WEB_JOB_DOWNLOAD), "job_email_failed": t(WEB_JOB_EMAIL_FAILED),
+            "job_email_sent": t(WEB_JOB_EMAIL_SENT), "job_email_unknown": t(WEB_JOB_EMAIL_UNKNOWN), "job_unavailable": t(WEB_JOB_UNAVAILABLE),
+            "job_failure_email_sent": t(WEB_JOB_FAILURE_EMAIL_SENT),
+            "job_failure_email_failed": t(WEB_JOB_FAILURE_EMAIL_FAILED),
+            "job_status": t(WEB_JOB_STATUS), "job_errors": t(WEB_JOB_ERRORS),
+            "job_home": t(WEB_JOB_HOME)},
     )
 
 
@@ -220,39 +401,9 @@ async def handle_upload(
 ):
     return await _submit_via_api(
         request,
-        template_name="index.html",
         document_file=document_file,
         email=email,
         mode="normal",
-    )
-
-
-@app.post("/advanced/process", response_class=HTMLResponse)
-@limiter.limit("5/minute")
-async def handle_advanced_upload(
-    request: Request,
-    email: str = Form(...),
-    document_file: UploadFile = File(...),
-    custom_prompt: str = Form(""),
-    thinking_mode: bool = Form(False),
-):
-    prompt = custom_prompt.strip()
-    if len(prompt) > MAX_CUSTOM_PROMPT_CHARS:
-        return templates.TemplateResponse(
-            request=request,
-            name="advanced.html",
-            context={
-                "error": "Prompt personalizado excede o limite de 6000 caracteres."
-            },
-        )
-    return await _submit_via_api(
-        request,
-        template_name="advanced.html",
-        document_file=document_file,
-        email=email,
-        mode="normal",
-        custom_prompt=prompt or None,
-        thinking_mode=thinking_mode,
     )
 
 
@@ -263,15 +414,19 @@ async def download_page(request: Request, token: str):
         info = await client.get_download_info(token)
     except ApiError as e:
         if e.status_code == 404:
-            raise HTTPException(status_code=404, detail="Link inválido ou expirado")
-        logger.warning("Falha ao consultar download na API: {} - {}", e.status_code, e.detail)
-        raise HTTPException(status_code=502, detail="Serviço de download indisponível")
+            raise HTTPException(status_code=404, detail=t(WEB_ERROR_DOWNLOAD_INVALID))
+        logger.warning(
+            t(LOG_WEB_DOWNLOAD_QUERY_FAILED).format(
+                status_code=e.status_code, detail=e.detail
+            )
+        )
+        raise HTTPException(status_code=502, detail=t(WEB_ERROR_DOWNLOAD_UNAVAILABLE))
     for f in info["formats"]:
         f["url"] = f"/api/v1{f['url']}"
     return templates.TemplateResponse(
         request=request,
         name="download.html",
-        context={"filename": info["filename"], "formats": info["formats"]},
+        context={**_web_strings(), "filename": info["filename"], "formats": info["formats"]},
     )
 
 

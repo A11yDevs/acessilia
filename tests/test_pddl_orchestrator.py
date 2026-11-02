@@ -1,10 +1,17 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 from pathlib import Path
 
+import pytest
+
+from backend.agents.output_schemas import DataOutput, VisionOutput
+from backend.agents.pddl_orchestrator import _enrich_table_structures
+from backend.agents.pddl_orchestrator import _enrich_picture_descriptions
 from backend.agents.pddl_orchestrator import build_pddl_structured_payload
 from backend.agents.pddl_orchestrator import _rows_from_visual_table_text
+from backend.agents.pddl_orchestrator import _table_ast_from_metadata
 from backend.agents.pddl_orchestrator import _table_element_has_structured_content
 from backend.pipeline.canonical_builder import build_canonical_document
 from backend.core.manifest.models import (
@@ -12,6 +19,7 @@ from backend.core.manifest.models import (
     ManifestElement,
     ManifestSummary,
     Obligation,
+    Observation,
     PageDescriptor,
     ProcessingManifest,
     SourceDocument,
@@ -155,6 +163,51 @@ def _sample_manifest_without_page_element_ids() -> ProcessingManifest:
     )
 
 
+def test_degraded_extraction_warns_in_delivered_document_and_is_not_cached():
+    from backend.i18n import reset_request_locale, set_request_locale
+    from backend.log_messages import MSG_STRUCTURAL_EXTRACTION_DEGRADED
+    from backend.i18n import t
+
+    manifest = _sample_manifest()
+    manifest.extractor.configuration.update(
+        extraction_degraded=True, extraction_failures={"docling": "ToolboxTimeout"},
+        toolbox_provider="mineru",
+        fusion={
+            "status": "degraded", "providers": ["mineru"],
+            "failed_providers": ["docling"], "reason": "ToolboxTimeout",
+        },
+    )
+    token = set_request_locale("en_US")
+    try:
+        expected = t(MSG_STRUCTURAL_EXTRACTION_DEGRADED).format(provider="mineru")
+        payload = build_pddl_structured_payload(
+            file_path=Path("/tmp/sample.pdf"), manifest=manifest, plan=_sample_plan(),
+            planner_backend="internal", execution_report=None, comparison=None,
+        )
+    finally:
+        reset_request_locale(token)
+    assert expected in payload["technical_warnings"]
+    # The fusion status records the same event; it adds no second warning.
+    del manifest.extractor.configuration["fusion"]
+    token = set_request_locale("en_US")
+    try:
+        without_fusion = build_pddl_structured_payload(
+            file_path=Path("/tmp/sample.pdf"), manifest=manifest, plan=_sample_plan(),
+            planner_backend="internal", execution_report=None, comparison=None,
+        )
+    finally:
+        reset_request_locale(token)
+    assert payload["technical_warnings"] == without_fusion["technical_warnings"]
+    assert payload["canonical_metadata"]["pddl_fusion"]["status"] == "degraded"
+    assert payload["cacheable"] is False
+    assert payload["canonical_metadata"]["pddl_extraction_degraded"] is True
+    canonical = build_canonical_document(
+        payload, title="Test", source_name="sample.pdf", source_path="/tmp/sample.pdf",
+        metadata=payload["canonical_metadata"], technical_warnings=payload["technical_warnings"],
+    )
+    assert expected in str(canonical)
+
+
 def test_build_pddl_structured_payload_is_compatible_with_canonical_builder():
     payload = build_pddl_structured_payload(
         file_path=Path("/tmp/amostra.pdf"),
@@ -184,6 +237,36 @@ def test_build_pddl_structured_payload_is_compatible_with_canonical_builder():
     assert canonical["metadata"]["pipeline_engine"] == "pddl"
     block_metadata = payload["pages"][0]["blocks"][0].get("metadata", {})
     assert block_metadata.get("source_ref") == "/texts/0"
+
+
+def test_build_pddl_structured_payload_reports_the_toolbox_gate_decision():
+    """The observe mode is only useful if its verdict reaches the output."""
+    decision = {
+        "mode": "observe",
+        "catalog_revision": "abc123",
+        "catalog_error": None,
+        "blocked_methods": {"dual-provider-fusion": ["reason"]},
+        "applied": False,
+    }
+    payload = build_pddl_structured_payload(
+        file_path=Path("/tmp/amostra.pdf"),
+        manifest=_sample_manifest(),
+        plan=_sample_plan(),
+        planner_backend="internal",
+        execution_report=None,
+        comparison=None,
+        toolbox_availability=decision,
+    )
+
+    canonical = build_canonical_document(
+        payload,
+        title="Documento",
+        source_name="amostra.pdf",
+        source_path="/tmp/amostra.pdf",
+        metadata=payload["canonical_metadata"],
+        technical_warnings=payload["technical_warnings"],
+    )
+    assert canonical["metadata"]["pddl_toolbox_availability"] == decision
 
 
 def test_build_pddl_structured_payload_falls_back_to_page_number_when_element_ids_missing():
@@ -542,3 +625,298 @@ def test_table_element_has_structured_content_rejects_placeholder_table_ast() ->
     )
 
     assert _table_element_has_structured_content(element) is False
+
+
+def test_table_ast_from_metadata_preserves_empty_structural_cells() -> None:
+    table_ast = _table_ast_from_metadata(
+        {
+            "table_ast": {
+                "body": [
+                    {
+                        "cells": [
+                            {"text": "A"},
+                            {"text": ""},
+                            {"text": "C"},
+                        ]
+                    }
+                ]
+            }
+        }
+    )
+
+    assert table_ast is not None
+    assert [cell["text"] for cell in table_ast["body"][0]["cells"]] == [
+        "A",
+        "",
+        "C",
+    ]
+
+
+def test_table_enrichment_metadata_uses_ast_spans_and_scope_headers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from backend.agents import pddl_orchestrator as pddl_module
+
+    manifest = _sample_manifest()
+    element = manifest.elements[1]
+    element.type = "table"
+    element.raw_label = "table"
+    element.text = None
+    element.metadata = {}
+
+    class FakeDataAgent:
+        async def process_region(self, **_kwargs):
+            return DataOutput(
+                kind="table",
+                rows=[
+                    {
+                        "cells": [
+                            {
+                                "text": "Resumo",
+                                "scope": "col",
+                                "colspan": 2,
+                            }
+                        ]
+                    },
+                    {"cells": [{"text": "Total", "colspan": 2}]},
+                ],
+                language="pt-BR",
+                confidence=0.95,
+            )
+
+    monkeypatch.setattr(pddl_module, "DataAgent", FakeDataAgent)
+    monkeypatch.setattr(
+        pddl_module,
+        "_extract_picture_bytes",
+        lambda *_args: (b"image", 1),
+    )
+
+    async def run_inline(function, *args):
+        return function(*args)
+
+    monkeypatch.setattr(pddl_module.asyncio, "to_thread", run_inline)
+
+    asyncio.run(
+        _enrich_table_structures(
+            manifest,
+            Path("/tmp/amostra.pdf"),
+        )
+    )
+
+    assert element.metadata["table_column_count"] == 2
+    assert element.metadata["table_has_header"] is True
+
+
+def test_picture_reclassified_as_formula_reconciles_processing_needs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from backend.agents import pddl_orchestrator as pddl_module
+
+    manifest = _sample_manifest()
+    element = manifest.elements[1]
+    element.type = "picture"
+    element.raw_label = "picture"
+    element.text = None
+    manifest.observations = [
+        Observation(
+            id="observation-describe-image-2",
+            kind="picture-requires-processing",
+            severity="warning",
+            message="Descrever imagem",
+            target_ids=[element.id],
+        )
+    ]
+    manifest.obligations[0] = Obligation(
+        id="obligation-describe-image-2",
+        kind="describe-image",
+        target_ids=[element.id],
+        admissible_methods=["vision-description", "human-review"],
+        method_costs={"vision-description": 20, "human-review": 100},
+        rationale="Descrever imagem",
+    )
+    manifest.summary.observation_count = 1
+    manifest.summary.element_types = {"heading": 1, "picture": 1}
+
+    class FakeVisionAgent:
+        def __init__(self, **_kwargs):
+            pass
+
+        async def describe_region(self, **_kwargs):
+            return VisionOutput(
+                kind="formula",
+                formula_latex=r"E=mc^2",
+                language="und",
+                confidence=0.98,
+                mentioned_elements=["equação"],
+            )
+
+    monkeypatch.setattr(pddl_module, "VisionAgent", FakeVisionAgent)
+    monkeypatch.setattr(
+        pddl_module,
+        "_extract_picture_bytes",
+        lambda *_args: (b"image", 1),
+    )
+
+    async def run_inline(function, *args):
+        return function(*args)
+
+    monkeypatch.setattr(pddl_module.asyncio, "to_thread", run_inline)
+
+    asyncio.run(
+        _enrich_picture_descriptions(
+            manifest,
+            Path("/tmp/amostra.pdf"),
+            mode="medio",
+        )
+    )
+
+    assert element.type == "formula"
+    assert element.text == r"E=mc^2"
+    assert manifest.summary.element_types == {"formula": 1, "heading": 1}
+    assert [obligation.kind for obligation in manifest.obligations] == [
+        "verbalize-formula"
+    ]
+    assert manifest.obligations[0].admissible_methods == [
+        "mathml",
+        "latex-verbalizer",
+        "human-review",
+    ]
+    assert [observation.kind for observation in manifest.observations] == [
+        "formula-requires-processing"
+    ]
+
+    payload = build_pddl_structured_payload(
+        file_path=Path("/tmp/amostra.pdf"),
+        manifest=manifest,
+        plan=_sample_plan(),
+        planner_backend="internal",
+        execution_report=None,
+        comparison=None,
+    )
+    formula_block = payload["pages"][0]["blocks"][1]
+    assert formula_block["type"] == "math"
+
+    # MathML comes from the Toolbox's math.convert (ADR-0007); simulate it so
+    # the test needs no running Toolbox.
+    from backend.pipeline import canonical_builder
+
+    converted: list[str] = []
+    monkeypatch.setattr(
+        canonical_builder,
+        "toolbox_convert_latex",
+        lambda latex: converted.append(latex) or "<math><mi>E</mi></math>",
+    )
+    monkeypatch.setattr(canonical_builder, "toolbox_verbalize_latex", lambda latex: "E")
+
+    document = build_canonical_document(payload)
+    canonical_formula = document["sections"][0]["blocks"][0]
+    assert canonical_formula["type"] == "math"
+    assert canonical_formula["text"] == r"E=mc^2"
+    assert converted == [r"E=mc^2"]
+    assert canonical_formula["metadata"]["mathml"] == "<math><mi>E</mi></math>"
+
+
+def test_standalone_image_injects_full_page_picture_for_vision(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regressão do bug do mapa-múndi político.
+
+    O extrator estrutural (Docling) classificou uma imagem isolada como dois
+    parágrafos de OCR, sem nenhum bloco `picture`. Com o sinal de
+    media.inspect (is_image + requires_visual_inspection), o orquestrador deve
+    injetar um elemento `picture` de página inteira e acionar o VisionAgent.
+    """
+    from backend.agents import pddl_orchestrator as pddl_module
+
+    manifest = _sample_manifest()
+    # Simula o Docling: só texto curto de OCR, sem elementos visuais.
+    manifest.elements = [
+        ManifestElement(
+            id="el-1",
+            type="paragraph",
+            raw_label="paragraph",
+            reading_order=1,
+            hierarchy_level=1,
+            text="BM",
+            page_number=1,
+        ),
+        ManifestElement(
+            id="el-2",
+            type="paragraph",
+            raw_label="paragraph",
+            reading_order=2,
+            hierarchy_level=1,
+            text="Planiatorio Pottico",
+            page_number=1,
+        ),
+    ]
+    manifest.pages = [PageDescriptor(page_number=1, element_ids=["el-1", "el-2"])]
+    manifest.obligations = []
+    manifest.summary.element_count = 2
+    manifest.summary.obligation_count = 0
+    manifest.summary.observation_count = 0
+    manifest.summary.element_types = {"paragraph": 2}
+
+    media_inspection = {
+        "media_type": "image/jpeg",
+        "is_image": True,
+        "is_pdf": False,
+        "page_count": 1,
+        "artifact_nature": "standalone_image",
+        "requires_visual_inspection": True,
+        "dimensions": {"width": 400, "height": 250, "aspect_ratio": 1.6},
+    }
+
+    class FakeVisionAgent:
+        def __init__(self, **_kwargs):
+            pass
+
+        async def describe_region(self, **_kwargs):
+            return VisionOutput(
+                kind="description",
+                description=(
+                    "Mapa-múndi político com divisão geopolítica por cores, "
+                    "oceanos identificados e um mapa detalhado da Europa."
+                ),
+                language="pt-BR",
+                confidence=0.95,
+                mentioned_elements=["mapa", "oceanos", "Europa"],
+            )
+
+    monkeypatch.setattr(pddl_module, "VisionAgent", FakeVisionAgent)
+    monkeypatch.setattr(
+        pddl_module,
+        "_extract_picture_bytes",
+        lambda *_args: (b"image", 1),
+    )
+
+    async def run_inline(function, *args):
+        return function(*args)
+
+    monkeypatch.setattr(pddl_module.asyncio, "to_thread", run_inline)
+
+    asyncio.run(
+        _enrich_picture_descriptions(
+            manifest,
+            Path("/tmp/planisferio_politico.jpg"),
+            mode="medio",
+            media_inspection=media_inspection,
+        )
+    )
+
+    # Um elemento picture foi injetado e descrito.
+    picture = next(e for e in manifest.elements if e.type == "picture")
+    assert picture.metadata["injected_picture"] is True
+    assert "Mapa-múndi político" in picture.text
+    assert picture.id in manifest.pages[0].element_ids
+
+    # A obrigação describe-image foi derivada para o elemento injetado.
+    assert any(
+        obligation.kind == "describe-image"
+        and obligation.target_ids == [picture.id]
+        for obligation in manifest.obligations
+    )
+
+    # O resumo foi atualizado para refletir o elemento injetado.
+    assert manifest.summary.element_types["picture"] == 1
+    assert manifest.summary.element_count == 3

@@ -1,31 +1,33 @@
-# Agente Informacional-Estrutural — PMV 1.0.0
+# Informational-Structural Agent — PMV 1.0.0
 
-Este pacote deriva de
+You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](MVP_CHANGES.pt-br.md)
+
+This package derives from
 [`jhonata192/a11y-devs-describer`](https://github.com/jhonata192/a11y-devs-describer/)
-no commit `f22e9ce02ed5f11fe3c6e6be10ceacb4157c2321`. O projeto original declara
-licença MIT no `README.md`.
+at commit `f22e9ce02ed5f11fe3c6e6be10ceacb4157c2321`. The original project
+declares the MIT license in its `README.md`.
 
-## Alterações do PMV
+## PMV Changes
 
-- conversão Docling única e reutilizável por documento;
+- single, reusable Docling conversion per document;
 - `InformationalStructuralAgent`;
-- normalização de páginas, elementos, hierarquia, ordem de leitura,
-  coordenadas e proveniência;
-- geração determinística de observações e obrigações candidatas;
-- modelo executável `ProcessingManifest` em Pydantic 2;
-- JSON Schema Draft 2020-12 gerado do modelo;
-- validação estrutural e semântica antes da gravação;
+- normalization of pages, elements, hierarchy, reading order,
+  coordinates, and provenance;
+- deterministic generation of candidate observations and obligations;
+- executable `ProcessingManifest` model in Pydantic 2;
+- JSON Schema Draft 2020-12 generated from the model;
+- structural and semantic validation before writing;
 - CLI `a11y-manifest`;
-- testes unitários e documentação de arquitetura.
+- unit tests and architecture documentation.
 
-## Validação realizada
+## Validation performed
 
-- 53 testes do repositório aprovados;
-- JSON Schema válido em Draft 2020-12;
-- ensaio ponta a ponta com Docling 2.115.0 em PDF de 8 páginas;
-- resultado do ensaio: 145 elementos, 139 elementos com caixas de
-  proveniência, 144 vínculos hierárquicos resolvidos e 5 obrigações candidatas;
-- manifesto resultante validado sem erros pelo Pydantic e pelo arquivo de
-  JSON Schema.
+- 53 repository tests passing;
+- JSON Schema valid in Draft 2020-12;
+- end-to-end trial with Docling 2.115.0 on an 8-page PDF;
+- trial result: 145 elements, 139 elements with provenance boxes,
+  144 resolved hierarchical links, and 5 candidate obligations;
+- resulting manifest validated without errors by Pydantic and by the
+  JSON Schema file.
 
-O PDF usado no ensaio e o manifesto derivado não estão incluídos no pacote.
+The PDF used in the trial and the derived manifest are not included in the package.

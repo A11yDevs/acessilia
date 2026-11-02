@@ -5,7 +5,13 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from backend.core.manifest.models import Artifact
+from backend.core.manifest.models import Artifact  # noqa: E402
+from backend.i18n import t  # noqa: E402
+from frontend.telegram.messages import (  # noqa: E402
+    MSG_EXECUTION_REPORT_SCHEMA_DESCRIPTION,
+    MSG_METHOD_RESULT_DUPLICATE_ARTIFACT_IDS,
+    MSG_METHOD_RESULT_SUCCESS_REQUIRES_VALIDATION,
+)
 
 
 EXECUTION_SCHEMA_VERSION = "1.0.0"
@@ -25,10 +31,10 @@ class MethodResult(StrictModel):
     @model_validator(mode="after")
     def success_requires_validation(self) -> "MethodResult":
         if self.success and not self.validated:
-            raise ValueError("Um resultado bem-sucedido deve estar validado")
+            raise ValueError(t(MSG_METHOD_RESULT_SUCCESS_REQUIRES_VALIDATION))
         artifact_ids = [artifact.id for artifact in self.artifacts]
         if len(artifact_ids) != len(set(artifact_ids)):
-            raise ValueError("O resultado contém IDs de artefatos duplicados")
+            raise ValueError(t(MSG_METHOD_RESULT_DUPLICATE_ARTIFACT_IDS))
         return self
 
 
@@ -72,8 +78,6 @@ class ExecutionReport(StrictModel):
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "$id": EXECUTION_SCHEMA_ID,
             "title": "ExecutionReport",
-            "description": (
-                "Relatório da execução confirmada ou simulada de um plano nominal."
-            ),
+            "description": t(MSG_EXECUTION_REPORT_SCHEMA_DESCRIPTION),
         },
     )

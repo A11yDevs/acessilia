@@ -1,168 +1,130 @@
-# Homologação com systemd timer
+# Staging environment with a systemd timer
 
-O ambiente de homologação usa um **timer systemd** para verificar periodicamente
-se há novos commits na branch `develop` (via GitHub API) e, quando detectados,
-atualizar o container automaticamente com a imagem mais recente.
+You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](homologacao-systemd.pt-br.md)
 
-**Vantagem:** zero requisições desnecessárias ao GHCR. A API do GitHub (com token
-autenticado, 5.000 req/h) é consultada a cada 5 min. O `docker pull` só acontece
-quando há um commit novo.
+The staging (homologation) server runs from a **clone of this repository**. The clone holds
+the scripts, `docker-compose.staging.yml`, `.env` and `var/`; the containers run the images
+CI publishes on GHCR. A **systemd user timer** checks the tracked branch every 5 minutes via
+the GitHub API and updates the container once the image of a new commit is published.
 
-## Visão geral
+Everything goes through `scripts/ops.sh`:
 
-O timer roda no **escopo do usuário** (`systemctl --user`), com units em
-`~/.config/systemd/user/`. Isso evita depender de `sudo` para o agendamento e
-permite que o usuário gerencie o timer sem privilégios.
+| Command | What it does |
+|---------|--------------|
+| `./scripts/ops.sh auto-update setup` | Starts the stack and installs the timer |
+| `./scripts/ops.sh auto-update status` | Clone branch, tracked branch, timer, last check, health, recent runs |
+| `./scripts/ops.sh auto-update check` | Verifies the timer (installed for this clone, enabled, old timer gone), its recent runs (last one succeeded, last check recent, latest commit deployed) and the deployment (branch, container, image, health); exit status 1 on a problem |
+| `./scripts/ops.sh auto-update start` | Updates now (what the timer runs) |
+| `./scripts/ops.sh track [<branch>]` | Follows a branch: `git pull` of the clone and `TRACK_BRANCH` in `.env`, then updates; without a branch, pulls the tracked one |
+| `./scripts/ops.sh auto-update migrate <dir>` | Moves an install made by the former `setup-homologacao.sh` into the clone |
+
+## Overview
 
 ```
-A cada 5 minutos → staging-update.timer (user)
-                       ↓
-                  staging-update-wrapper.sh
-                       ↓
-                  carrega GHCR_TOKEN de $STAGING_DIR/.env
-                       ↓
-                  staging-update.sh
-                       ↓
-                  GitHub API → SHA do último commit em develop
-                       ↓
-                  SHA mudou? → docker pull + docker compose up -d
-                                    ↓
-                               container reiniciado 🚀
+Every 5 minutes → acessilia-staging-update.timer (user)
+                    ↓
+<clone>/scripts/ops.sh auto-update start
+                    ↓
+staging-update.sh: GitHub API → SHA of the last commit on the tracked branch
+                    ↓
+SHA changed and sha-<7> image on GHCR? → docker compose pull + up -d
+                    ↓
+container restarted 🚀
 ```
 
-## Pré-requisitos
+The tracked branch is `develop`, or `TRACK_BRANCH` from `.env` during the BHS cycle
+(`release/x.y.z`). The clone's branch and `TRACK_BRANCH` always move together through
+`ops.sh track`: the scripts and the compose file come from the clone, the image from
+`TRACK_BRANCH`. `auto-update status` warns when they differ.
 
-- Docker + Docker Compose instalados
-- `jq` instalado (`sudo apt install jq`)
-- Token GitHub com escopo `read:packages`
-  (criar em: https://github.com/settings/tokens/new?scopes=read:packages)
-- `docker login ghcr.io` configurado
-- **Linger habilitado** para o usuário (`sudo loginctl enable-linger $USER`) —
-  sem isso, o user timer morre quando o usuário faz logout
-- **Usuário no grupo `docker`** (`sudo usermod -aG docker $USER`) — o user timer
-  roda sem `sudo` e precisa do grupo para acessar o daemon
+## Prerequisites
 
-## Instalação
+- Docker and Docker Compose, `git`, `curl` and `jq` (`sudo apt install jq`)
+- `docker login ghcr.io` with a token with the `read:packages` scope (create it at
+  https://github.com/settings/tokens/new?scopes=read:packages)
+- The user that runs the timer needs, granted once by an administrator:
+  - membership in the **`docker` group** (`usermod -aG docker <user>`, then log in again):
+    `setup` and `migrate` refuse to run without access to the Docker daemon;
+  - **linger** (`loginctl enable-linger <user>`), so the timer keeps running after logout:
+    `setup` warns when it is off.
 
-### Automática (recomendada)
+  `ops.sh` never calls `sudo`; if something must run as root, run that command (or
+  `ops.sh` itself) as root.
+
+  A session opened with `su` has no `XDG_RUNTIME_DIR`; `ops.sh` then uses
+  `/run/user/<uid>` by itself. When that does not exist either (no linger, no login),
+  `setup` and `migrate` stop and say so.
+
+## First install
 
 ```bash
-# Modo interativo
-./scripts/setup-homologacao.sh
-
-# Modo não interativo (via argumentos)
-./scripts/setup-homologacao.sh --github-user marceloakira --token ghp_exemplo
-
-# Modo não interativo (via variáveis de ambiente)
-GITHUB_USER=marceloakira GHCR_TOKEN=ghp_exemplo ./scripts/setup-homologacao.sh
+git clone https://github.com/A11yDevs/acessilia.git
+cd acessilia
+cp .env.example .env              # fill in the credentials (AI, Telegram, SMTP...)
+./scripts/ops.sh auto-update setup
 ```
 
-O script:
-1. Verifica dependências (Docker, Compose, `jq`)
-2. Configura `docker login ghcr.io` com o token
-3. Cria `.env` a partir de `.env.example` (se não existir)
-4. Sobe o container com a imagem mais recente
-5. Instala o **user timer** (`systemctl --user`), habilita linger e o grupo
-   `docker`, e persiste o token em `$STAGING_DIR/.env` (ex.: `/opt/acessilia/staging/.env`)
+`setup` sets `COMPOSE_PROJECT_NAME=acessilia-staging` in `.env`, so the containers belong
+to the same compose project whatever the clone's directory is called, then starts the stack
+and enables `acessilia-staging-update.timer`.
 
-### Manual
+## Migrating from `/opt/acessilia/staging`
+
+Installs made by the former `setup-homologacao.sh` copied the scripts to
+`/opt/acessilia/scripts` and kept `.env` and `var/` in `/opt/acessilia/staging`. To move
+one into a clone:
 
 ```bash
-# 1. Criar diretório para os scripts
-sudo mkdir -p /opt/acessilia/scripts
-
-# 2. Copiar o script de update e o wrapper (versionados no repositório)
-sudo cp scripts/staging-update.sh /opt/acessilia/scripts/
-sudo cp scripts/staging-update-wrapper.sh /opt/acessilia/scripts/
-sudo chmod +x /opt/acessilia/scripts/staging-update.sh /opt/acessilia/scripts/staging-update-wrapper.sh
-
-# 3. Persistir o token GHCR no .env do staging
-#    (o wrapper e o staging-update.sh carregam de $STAGING_DIR/.env)
-sudo tee /opt/acessilia/staging/.env > /dev/null << 'ENV'
-GHCR_TOKEN=seu_token_aqui
-ENV
-sudo chmod 600 /opt/acessilia/staging/.env
-
-# 4. Pré-requisitos do user timer
-sudo loginctl enable-linger "$USER"          # timer sobrevive ao logout
-sudo usermod -aG docker "$USER"              # user timer acessa o docker
-# relogue (logout/login) para o grupo docker valer
-
-# 5. Criar o service unit (user)
-mkdir -p ~/.config/systemd/user
-cat > ~/.config/systemd/user/staging-update.service << 'SERVICE'
-[Unit]
-Description=Update acessilia staging container
-
-[Service]
-Type=oneshot
-ExecStart=/opt/acessilia/scripts/staging-update-wrapper.sh
-Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-SERVICE
-
-# 6. Criar o timer unit (user, a cada 5 minutos)
-cat > ~/.config/systemd/user/staging-update.timer << 'TIMER'
-[Unit]
-Description=Check acessilia staging updates every 5 minutes
-
-[Timer]
-OnBootSec=30s
-OnUnitActiveSec=300s
-
-[Install]
-WantedBy=timers.target
-TIMER
-
-# 7. Ativar
-systemctl --user daemon-reload
-systemctl --user enable --now staging-update.timer
+git clone -b release/0.2.0 https://github.com/A11yDevs/acessilia.git ~/acessilia
+cd ~/acessilia
+./scripts/ops.sh auto-update migrate /opt/acessilia/staging
 ```
 
-## Gerenciamento
+`migrate` first checks everything it needs: that it can read the old `.env` and all of
+`var/` (it lists what it cannot read), that the clone has no different `.env`, that the
+branch in `TRACK_BRANCH` can be checked out, and that Docker and the user's systemd instance
+are reachable. Any failure stops it before anything changes, and a run interrupted later can
+simply be repeated. It then disables the old `staging-update` timer (stopping if it cannot),
+copies `.env` and `var/` (stopping the container meanwhile), moves staging to its own compose
+project `acessilia-staging` — replacing the old container, whose data is now in `./var` —
+checks out the branch in `TRACK_BRANCH` and runs `setup`. The old installs kept Acessilia
+and the Toolbox in one project named `staging`; leaving it means a `--remove-orphans` here
+can no longer delete the Toolbox's containers. `/opt/acessilia/staging` is left
+untouched; remove it once staging works.
 
-> Todos os comandos usam `systemctl --user` (o timer roda no escopo do usuário).
+## Updating the scripts
+
+`ops.sh track` without a branch runs `git pull` on the branch already tracked and updates:
 
 ```bash
-# Verificar status do timer
-systemctl --user status staging-update.timer
-
-# Verificar última execução
-systemctl --user status staging-update.service
-
-# Ver logs da última execução
-journalctl --user -u staging-update.service -n 50 --no-pager
-
-# Executar manualmente (forçar update)
-systemctl --user start staging-update.service
-
-# Desabilitar temporariamente
-systemctl --user stop staging-update.timer
-
-# Remover completamente
-systemctl --user disable --now staging-update.timer
-rm ~/.config/systemd/user/staging-update.{service,timer}
-systemctl --user daemon-reload
+./scripts/ops.sh track
 ```
+
+`track` refuses to run when tracked files in the clone have local changes, so the server
+never drifts from the repository.
+
+## Management
+
+```bash
+./scripts/ops.sh auto-update status          # overview
+./scripts/ops.sh auto-update check           # pass/fail verdict on the timer and its runs
+./scripts/ops.sh auto-update start           # update now
+journalctl --user -u acessilia-staging-update.service -n 50 --no-pager
+systemctl --user stop acessilia-staging-update.timer     # pause updates
+systemctl --user start acessilia-staging-update.timer    # resume them
+```
+
+To test a locally built image, stop the timer first: otherwise the next update pulls the
+GHCR image over it.
 
 ## Troubleshooting
 
-### O container não reiniciou
-
-Verifique o log do serviço:
-
-```bash
-journalctl --user -u staging-update.service -n 50 --no-pager
-```
-
-Causas comuns:
-
-| Sintoma | Causa | Solução |
-|---------|-------|---------|
-| `pull access denied` | Token GHCR expirado | Rodar `setup-homologacao.sh` novamente |
-| `jq: command not found` | `jq` não instalado | `sudo apt install jq` |
-| `GHCR_TOKEN: parameter not set` | Token não persistido | Verificar `$STAGING_DIR/.env` (ex.: `/opt/acessilia/staging/.env`) |
-| `permission denied` no docker | Usuário fora do grupo `docker` | `sudo usermod -aG docker $USER` + relogar |
-| Timer não roda após logout | Linger desabilitado | `sudo loginctl enable-linger $USER` |
-| Nada acontece, SHA não muda | Sem commits novos na develop | Aguarde o próximo build |
-| Falha na API (fallback ativado) | GitHub API indisponível | Script faz `docker pull` direto |
-| `Container name already in use` | Container com nome diferente | `docker ps -a` e `docker rm` |
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `pull access denied` | GHCR token expired | `echo <token> \| docker login ghcr.io -u <user> --password-stdin` |
+| `jq: command not found` | `jq` is not installed | `sudo apt install jq` |
+| Docker gives `permission denied` | User is outside the `docker` group | log out and back in after `setup` |
+| Timer doesn't run after logout | Linger is disabled | `sudo loginctl enable-linger $USER` |
+| `image sha-xxxxxxx not yet published` | CI is still building the commit | wait for the next check |
+| API fails (fallback enabled) | GitHub API unavailable | the script falls back to a direct `docker pull` |
+| `acessilia-staging belongs to compose project '…' (dir)` | Another install owns the container | `./scripts/ops.sh auto-update migrate <dir>` |

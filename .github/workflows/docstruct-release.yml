@@ -1,0 +1,125 @@
+name: docstruct release
+
+# Publishes libs/docstruct as a wheel and sdist on a GitHub Release, so other
+# repositories (the Toolbox) can depend on a fixed, hash-verified artifact
+# instead of an archive of this repository.
+#
+# Release by pushing a tag that matches the version in
+# libs/docstruct/pyproject.toml:
+#   git tag docstruct-v0.1.0 && git push origin docstruct-v0.1.0
+#
+# The pattern does not overlap with the application release (tags 'v*').
+
+on:
+  push:
+    tags:
+      - 'docstruct-v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: docstruct-release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: build and publish docstruct
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.11'
+
+      - name: Check that the tag matches the package version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          python - <<'PY'
+          import os, tomllib
+          version = tomllib.load(open("libs/docstruct/pyproject.toml", "rb"))["project"]["version"]
+          tag = os.environ["TAG"]
+          if tag != f"docstruct-v{version}":
+              raise SystemExit(
+                  f"tag {tag} does not match libs/docstruct version {version}; "
+                  f"bump the version or tag docstruct-v{version}"
+              )
+          print(f"releasing acessilia-docstruct {version}")
+          PY
+
+      # The library must stand on its own: test it without the core installed.
+      - name: Run the docstruct test suite in isolation
+        run: |
+          python -m venv /tmp/docstruct-test
+          /tmp/docstruct-test/bin/pip install --upgrade pip
+          /tmp/docstruct-test/bin/pip install "./libs/docstruct[dev]"
+          cd libs/docstruct && /tmp/docstruct-test/bin/python -m pytest -q
+
+      # SOURCE_DATE_EPOCH makes the archives byte-reproducible from the commit.
+      - name: Build wheel and sdist
+        run: |
+          export SOURCE_DATE_EPOCH="$(git log -1 --format=%ct -- libs/docstruct)"
+          python -m pip install "build==1.2.2.post1"
+          python -m build libs/docstruct --outdir dist
+          cd dist && sha256sum * > SHA256SUMS && cat SHA256SUMS
+
+      - name: Install the wheel in a clean environment and import every module
+        run: |
+          python -m venv /tmp/docstruct-wheel
+          /tmp/docstruct-wheel/bin/pip install dist/*.whl
+          cd /tmp && /tmp/docstruct-wheel/bin/python -I - <<'PY'
+          import importlib, pkgutil
+          import docstruct
+
+          def broken(name):
+              # walk_packages swallows a subpackage's ImportError unless told
+              # otherwise, and then never lists the modules inside it.
+              raise SystemExit(f"cannot import {name} from the installed wheel")
+
+          names = [
+              m.name
+              for m in pkgutil.walk_packages(docstruct.__path__, "docstruct.", onerror=broken)
+          ]
+          for name in names:
+              importlib.import_module(name)
+          print(f"imported {len(names)} modules")
+          PY
+
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          wheel="$(basename dist/*.whl)"
+          sha="$(sha256sum "dist/$wheel" | cut -d' ' -f1)"
+          url="https://github.com/${REPOSITORY}/releases/download/${TAG}/${wheel}"
+          {
+            echo "Pure structural document algorithms (\`libs/docstruct\`), commit ${GITHUB_SHA}."
+            echo
+            echo "Pin it with the wheel hash, so pip verifies the download:"
+            echo
+            echo '```'
+            echo "acessilia-docstruct @ ${url}#sha256=${sha}"
+            echo '```'
+            echo
+            echo "SHA-256 of every asset:"
+            echo
+            echo '```'
+            cat dist/SHA256SUMS
+            echo '```'
+          } > notes.md
+          gh release create "$TAG" dist/* \
+            --repo "$REPOSITORY" \
+            --title "acessilia-docstruct ${TAG#docstruct-v}" \
+            --notes-file notes.md \
+            --verify-tag

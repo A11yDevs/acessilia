@@ -12,7 +12,7 @@ def test_local_compose_builds_runtime_stage():
     build_config = compose["services"]["acessilia"]["build"]
 
     assert build_config["dockerfile"] == "infra/Dockerfile"
-    assert build_config["target"] == "base"
+    assert "target" not in build_config
 
 
 def test_production_compose_uses_main_image_and_production_container():
@@ -20,7 +20,7 @@ def test_production_compose_uses_main_image_and_production_container():
 
     service = compose["services"]["acessilia"]
 
-    assert service["image"] == "ghcr.io/a11ydevs/acessilia:${TRACK_TAG:-main}"
+    assert service["image"] == "${PRODUCTION_IMAGE:-ghcr.io/a11ydevs/acessilia:${TRACK_TAG:-main}}"
     assert service["container_name"] == "acessilia-production"
     assert service["restart"] == "unless-stopped"
 
@@ -45,10 +45,47 @@ def test_delivery_is_reusable_with_explicit_commit_reference():
     assert "${{ inputs.sha }}" in workflow_text
 
 
-def test_release_workflow_publishes_slim_semver_tags_with_suffix():
+def test_release_workflow_publishes_semver_tags():
     workflow_text = (ROOT_DIR / ".github" / "workflows" / "release.yml").read_text()
 
-    assert "tag_suffix: -slim" in workflow_text
-    assert "type=semver,pattern={{version}},suffix=${{ matrix.tag_suffix }}" in workflow_text
-    assert "type=semver,pattern={{major}}.{{minor}},suffix=${{ matrix.tag_suffix }}" in workflow_text
-    assert "type=semver,pattern={{major}},suffix=${{ matrix.tag_suffix }}" in workflow_text
+    assert "type=semver,pattern={{version}}" in workflow_text
+    assert "type=semver,pattern={{major}}.{{minor}}" in workflow_text
+    assert "type=semver,pattern={{major}}" in workflow_text
+
+
+def test_staging_reaches_the_toolbox_without_public_dns():
+    """Staging must not depend on the host resolving its own public name.
+
+    The Toolbox runs on the same host and publishes 8002. When
+    TOOLBOX_BASE_URL pointed at the public reverse-proxy URL, every job failed
+    with "Temporary failure in name resolution" because split-horizon DNS does
+    not resolve the public name from inside the host, and no document was
+    processed at all.
+    """
+    compose = yaml.safe_load((ROOT_DIR / "docker-compose.staging.yml").read_text())
+    service = compose["services"]["acessilia"]
+
+    assert "host.docker.internal:host-gateway" in service["extra_hosts"]
+
+    base_url = service["environment"]["TOOLBOX_BASE_URL"]
+    assert "host.docker.internal" in base_url
+    assert "acessilia3.inf.ufg.br" not in base_url
+
+
+def test_staging_toolbox_url_survives_a_stale_env_file():
+    """The staging .env is also the env_file, so it must not win over the default.
+
+    Interpolating ``${TOOLBOX_BASE_URL:-...}`` reads the host shell env / project
+    .env, so a stale ``TOOLBOX_BASE_URL`` in the staging .env shadowed the
+    default and the container kept receiving the public URL. The override knob
+    is therefore a distinct name, and the literal default has to be what the
+    container actually gets.
+    """
+    compose = yaml.safe_load((ROOT_DIR / "docker-compose.staging.yml").read_text())
+    environment = compose["services"]["acessilia"]["environment"]
+
+    assert environment["TOOLBOX_BASE_URL"] == (
+        "${STAGING_TOOLBOX_BASE_URL:-http://host.docker.internal:8002}"
+    )
+    # Interpolating the same name the .env defines is what made the fix inert.
+    assert "${TOOLBOX_BASE_URL" not in environment["TOOLBOX_BASE_URL"]

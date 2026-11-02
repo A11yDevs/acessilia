@@ -1,0 +1,445 @@
+"""Testes de integração E2E contra uma instância real da Acessilia Toolbox.
+
+Requires:
+- TOOLBOX_BASE_URL environment variable pointing to a running Toolbox
+- A PDF under 500KB found via recursive glob under tests/fixtures/
+
+All tests are marked with @pytest.mark.e2e and excluded from CI
+via -m "not e2e".
+"""
+
+from __future__ import annotations
+
+import io
+import os
+from pathlib import Path
+
+import httpx
+import pytest
+import pytest_asyncio
+
+from acessilia_sdk.toolbox import ToolboxCapabilityError
+from acessilia_sdk.toolbox.clients import (
+    ToolboxLayoutClient,
+    ToolboxMathClient,
+    ToolboxOcrClient,
+    ToolboxPdfClient,
+    ToolboxStructureClient,
+)
+from backend.tools.toolbox_client import make_toolbox_client
+from backend.tools.toolbox_math_tools import recognized_formulas
+
+TOOLBOX_BASE_URL = os.getenv("TOOLBOX_BASE_URL", "").strip()
+FIXTURES_DIR = Path(__file__).parent / "fixtures"
+
+
+@pytest.fixture(scope="module", autouse=True)
+def require_toolbox() -> None:
+    """Skip E2E tests unless a Toolbox health endpoint is reachable."""
+    if not TOOLBOX_BASE_URL:
+        pytest.skip("TOOLBOX_BASE_URL not configured")
+
+    try:
+        response = httpx.get(
+            f"{TOOLBOX_BASE_URL.rstrip('/')}/v1/health", timeout=10
+        )
+        healthy = response.status_code == 200
+    except httpx.HTTPError:
+        healthy = False
+
+    if not healthy:
+        pytest.skip(f"Toolbox is not reachable at {TOOLBOX_BASE_URL}")
+
+
+def _get_pdf() -> Path:
+    pdfs = sorted(
+        (p for p in FIXTURES_DIR.rglob("*.pdf")
+         if "failures" not in p.relative_to(FIXTURES_DIR).parts and p.stat().st_size > 0),
+        key=lambda p: (p.stat().st_size, str(p)),
+    )
+    if not pdfs:
+        pytest.skip("No PDF fixtures found under tests/fixtures/")
+    for pdf in pdfs:
+        size = pdf.stat().st_size
+        if size < 500_000:
+            return pdf
+    return min(pdfs, key=lambda p: p.stat().st_size)
+
+
+def _make_formula_image() -> bytes:
+    """Create a small PNG image with a formula-like drawing."""
+    try:
+        from PIL import Image, ImageDraw, ImageFont  # type: ignore[import-untyped]
+    except ImportError:
+        pytest.skip("Pillow not available — cannot create test image")
+    img = Image.new("RGB", (400, 100), color="white")
+    draw = ImageDraw.Draw(img)
+    draw.text((10, 30), "E = mc", fill="black", font=ImageFont.load_default(size=36))
+    right = draw.textbbox((10, 30), "E = mc", font=ImageFont.load_default(size=36))[2]
+    draw.text((right, 20), "2", fill="black", font=ImageFont.load_default(size=22))
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+# ---------------------------------------------------------------------------
+# Fixtures with cleanup
+# ---------------------------------------------------------------------------
+
+
+@pytest_asyncio.fixture
+async def layout_client() -> ToolboxLayoutClient:
+    client = make_toolbox_client(ToolboxLayoutClient, base_url=TOOLBOX_BASE_URL, timeout_seconds=120)
+    yield client
+    await client.close()
+
+
+@pytest_asyncio.fixture
+async def pdf_client() -> ToolboxPdfClient:
+    client = make_toolbox_client(ToolboxPdfClient, base_url=TOOLBOX_BASE_URL, timeout_seconds=120)
+    yield client
+    await client.close()
+
+
+@pytest_asyncio.fixture
+async def math_client() -> ToolboxMathClient:
+    client = make_toolbox_client(ToolboxMathClient, base_url=TOOLBOX_BASE_URL, timeout_seconds=300)
+    yield client
+    await client.close()
+
+
+@pytest_asyncio.fixture
+async def ocr_client() -> ToolboxOcrClient:
+    client = make_toolbox_client(ToolboxOcrClient, base_url=TOOLBOX_BASE_URL, timeout_seconds=300)
+    yield client
+    await client.close()
+
+
+# ---------------------------------------------------------------------------
+# LayoutClient
+# ---------------------------------------------------------------------------
+
+
+class TestLayoutClientE2E:
+    @pytest.mark.e2e
+    @pytest.mark.asyncio
+    async def test_health(self, layout_client: ToolboxLayoutClient) -> None:
+        result = await layout_client.health()
+        assert result is not None
+
+    @pytest.mark.e2e
+    @pytest.mark.asyncio
+    async def test_analyze_pdf_direct_upload(
+        self, layout_client: ToolboxLayoutClient
+    ) -> None:
+        pdf = _get_pdf()
+        result = await layout_client.analyze(file_path=pdf)
+        assert result["status"] == "succeeded"
+        assert result["capability"] == "document.layout.analyze@1"
+        doc = result.get("document", {})
+        assert doc.get("page_count", 0) >= 1
+        assert doc.get("page_count") == len(doc.get("pages", []))
+        assert doc.get("region_count", 0) >= 0
+
+    @pytest.mark.e2e
+    @pytest.mark.asyncio
+    async def test_analyze_pages_returns_regions(
+        self, layout_client: ToolboxLayoutClient
+    ) -> None:
+        pdf = _get_pdf()
+        pages = await layout_client.analyze_pages(file_path=pdf)
+        assert len(pages) >= 1
+        first = pages[0]
+        assert "page_number" in first
+        assert "regions" in first
+        types = {r.get("type") for r in first["regions"]}
+        assert len(types) >= 1
+
+    @pytest.mark.e2e
+    @pytest.mark.asyncio
+    async def test_analyze_page_specific(
+        self, layout_client: ToolboxLayoutClient
+    ) -> None:
+        pdf = _get_pdf()
+        page = await layout_client.analyze_page(1, file_path=pdf)
+        assert page is not None
+        assert page["page_number"] == 1
+
+
+# ---------------------------------------------------------------------------
+# PdfClient
+# ---------------------------------------------------------------------------
+
+
+class TestPdfClientE2E:
+    @pytest.mark.e2e
+    @pytest.mark.asyncio
+    async def test_split_pdf(self, pdf_client: ToolboxPdfClient) -> None:
+        pdf = _get_pdf()
+        result = await pdf_client.split(file_path=pdf)
+        assert result["status"] == "succeeded"
+        assert result["capability"] == "pdf.split@1"
+        doc = result.get("document", {})
+        assert doc.get("page_count", 0) >= 1
+        assert len(doc.get("pages", [])) == doc["page_count"]
+        for page in doc["pages"]:
+            assert page.get("page_number", 0) >= 1
+
+    @pytest.mark.e2e
+    @pytest.mark.asyncio
+    async def test_render_page(self, pdf_client: ToolboxPdfClient) -> None:
+        pdf = _get_pdf()
+        page = await pdf_client.render(file_path=pdf, page_number=1, dpi=150)
+        assert page.image.startswith(b"\x89PNG")
+        assert page.document["page_number"] == 1
+        assert page.document["page_width"] > 0 and page.document["page_height"] > 0
+        assert page.document["size_bytes"] == len(page.image)
+
+    @pytest.mark.e2e
+    @pytest.mark.asyncio
+    async def test_render_with_custom_dpi(
+        self, pdf_client: ToolboxPdfClient
+    ) -> None:
+        pdf = _get_pdf()
+        page = await pdf_client.render(file_path=pdf, page_number=1, dpi=300)
+        assert page.document["dpi"] == 300
+
+    @pytest.mark.e2e
+    @pytest.mark.asyncio
+    async def test_render_a_bounded_region(self, pdf_client: ToolboxPdfClient) -> None:
+        pdf = _get_pdf()
+        page = await pdf_client.render(
+            file_path=pdf, page_number=1, dpi=300, max_side=200, clip=(0, 0, 100, 50)
+        )
+        assert page.clip == (0, 0, 100, 50)
+        assert max(page.document["width_px"], page.document["height_px"]) <= 200
+
+    # The core no longer converts, intersects or bounds a region itself; these
+    # pin, against the real provider, what it relies on the Toolbox to do.
+
+    @pytest.mark.e2e
+    @pytest.mark.asyncio
+    async def test_a_bottom_left_clip_is_reported_top_left(
+        self, pdf_client: ToolboxPdfClient
+    ) -> None:
+        pdf = _get_pdf()
+        height = (await pdf_client.render(file_path=pdf, dpi=72)).document["page_height"]
+        page = await pdf_client.render(
+            file_path=pdf, dpi=72, clip=(50, 200, 300, 100), clip_origin="BOTTOMLEFT"
+        )
+        assert page.clip == pytest.approx((50, height - 200, 300, height - 100))
+
+    @pytest.mark.e2e
+    @pytest.mark.asyncio
+    async def test_max_side_wins_over_a_larger_dpi(
+        self, pdf_client: ToolboxPdfClient
+    ) -> None:
+        pdf = _get_pdf()
+        page = await pdf_client.render(file_path=pdf, dpi=300, max_side=400)
+        assert max(page.document["width_px"], page.document["height_px"]) <= 400
+        assert page.document["dpi"] < 300
+
+    @pytest.mark.e2e
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "request_kwargs",
+        [
+            {"clip": (10_000, 10_000, 10_100, 10_100)},  # outside the page
+            {"dpi": 600},  # above the 20 MP render limit for a document page
+        ],
+    )
+    async def test_the_toolbox_refuses_an_invalid_render(
+        self, pdf_client: ToolboxPdfClient, request_kwargs
+    ) -> None:
+        # InvalidInputError, HTTP 400: the core falls back on this refusal.
+        with pytest.raises(ToolboxCapabilityError):
+            await pdf_client.render(file_path=_get_pdf(), **request_kwargs)
+
+
+# ---------------------------------------------------------------------------
+# MathClient
+# ---------------------------------------------------------------------------
+
+
+class TestMathClientE2E:
+    @pytest.mark.e2e
+    @pytest.mark.asyncio
+    async def test_convert_latex_to_mathml(
+        self, math_client: ToolboxMathClient
+    ) -> None:
+        result = await math_client.convert("E = mc^2", direction="latex-to-mathml")
+        assert result["status"] == "succeeded"
+        doc = result.get("document", {})
+        assert doc.get("direction") == "latex-to-mathml"
+        assert doc.get("latex") == "E = mc^2"
+        assert "<math " in doc.get("mathml", "")
+
+    @pytest.mark.e2e
+    @pytest.mark.asyncio
+    async def test_verbalize_latex(self, math_client: ToolboxMathClient) -> None:
+        result = await math_client.verbalize("E = mc^2", language="pt-BR")
+        assert result["status"] == "succeeded"
+        doc = result.get("document", {})
+        assert doc.get("language") == "pt-BR"
+        assert len(doc.get("verbalized", "")) > 0
+
+    @pytest.mark.e2e
+    @pytest.mark.asyncio
+    async def test_recognize_formula(self, math_client: ToolboxMathClient) -> None:
+        image = _make_formula_image()
+        from pathlib import Path as _Path
+        import tempfile
+
+        tmp = _Path(tempfile.mkdtemp()) / "formula.png"
+        tmp.write_bytes(image)
+        try:
+            result = await math_client.recognize(file_path=tmp)
+            assert result["status"] == "succeeded"
+            # The document shape depends on the provider (artifact/latex@1 or
+            # a docling formula list); the core reads both the same way. The
+            # image holds a formula, so recognizing none is a regression.
+            recognized = recognized_formulas(result.get("document"))
+            assert recognized, f"no formula recognized (provider: {result.get('provider')})"
+            for formula in recognized:
+                assert formula.get("latex")
+        finally:
+            tmp.unlink(missing_ok=True)
+
+
+# ---------------------------------------------------------------------------
+# OcrClient
+# ---------------------------------------------------------------------------
+
+
+class TestOcrClientE2E:
+    @pytest.mark.e2e
+    @pytest.mark.asyncio
+    async def test_ocr_pdf(self, ocr_client: ToolboxOcrClient) -> None:
+        pdf = _get_pdf()
+        result = await ocr_client.ocr(
+            file_path=pdf, language="pt-BR", force_ocr=True
+        )
+        assert result["status"] == "succeeded"
+        doc = result.get("document", {})
+        assert doc.get("item_count", 0) >= 0
+        assert doc.get("language") == "pt-BR"
+
+
+# ---------------------------------------------------------------------------
+# Multi-step workflow (integration scenario)
+# ---------------------------------------------------------------------------
+
+
+class TestWorkflowE2E:
+    """End-to-end workflow: split -> render -> layout."""
+
+    @pytest.mark.e2e
+    @pytest.mark.asyncio
+    async def test_pdf_split_then_render_first_page(self) -> None:
+        pdf_client = make_toolbox_client(ToolboxPdfClient, base_url=TOOLBOX_BASE_URL, timeout_seconds=120)
+        layout_client = make_toolbox_client(ToolboxLayoutClient, base_url=TOOLBOX_BASE_URL, timeout_seconds=120)
+        try:
+            pdf = _get_pdf()
+
+            split_result = await pdf_client.split(file_path=pdf)
+            page_count = split_result["document"]["page_count"]
+            assert page_count >= 1
+
+            rendered = await pdf_client.render(
+                file_path=pdf, page_number=1, dpi=150
+            )
+            assert rendered.document["page_number"] == 1
+
+            layout_result = await layout_client.analyze(file_path=pdf)
+            assert layout_result["document"]["page_count"] == page_count
+        finally:
+            await pdf_client.close()
+            await layout_client.close()
+
+    @pytest.mark.e2e
+    @pytest.mark.asyncio
+    async def test_math_convert_then_verbalize(self) -> None:
+        math_client = make_toolbox_client(ToolboxMathClient, base_url=TOOLBOX_BASE_URL, timeout_seconds=120)
+        try:
+            convert_result = await math_client.convert(
+                r"\frac{-b \pm \sqrt{b^2 - 4ac}}{2a}",
+                direction="latex-to-mathml",
+            )
+            assert "<mfrac>" in convert_result["document"]["mathml"]
+
+            verbalize_result = await math_client.verbalize(
+                r"\frac{-b \pm \sqrt{b^2 - 4ac}}{2a}",
+                language="pt-BR",
+            )
+            assert len(verbalize_result["document"]["verbalized"]) > 0
+        finally:
+            await math_client.close()
+
+
+# ---------------------------------------------------------------------------
+# StructureClient
+# ---------------------------------------------------------------------------
+
+
+class TestStructureClientE2E:
+    @pytest.mark.e2e
+    @pytest.mark.asyncio
+    async def test_extract_structure_no_tabs_in_prose_export(self, tmp_path) -> None:
+        """Extract the issue's PDF and verify prose in TXT, HTML and DOCX."""
+        from datetime import datetime, timezone
+        from zipfile import ZipFile
+        from xml.etree import ElementTree
+
+        from acessilia_sdk.toolbox.clients import ToolboxDocxClient
+        from backend.agents.pddl_orchestrator import _manifest_pages_to_payload
+        from backend.core.manifest.builder import build_processing_manifest
+        from backend.core.manifest.toolbox_extractor import ToolboxExtraction
+        from backend.pipeline.canonical_builder import build_canonical_document
+        from docstruct.export.html import document_to_html
+        from docstruct.export.pandoc_ast import build_pandoc_ast
+        from docstruct.export.txt import document_to_txt_lines
+
+        structure = make_toolbox_client(
+            ToolboxStructureClient, base_url=TOOLBOX_BASE_URL,
+            provider="docling", timeout_seconds=300,
+        )
+        docx = make_toolbox_client(ToolboxDocxClient, base_url=TOOLBOX_BASE_URL)
+        try:
+            pdf = FIXTURES_DIR / "tutorials" / "java-oo-3pgs.pdf"
+            assert pdf.is_file()
+            result = await structure.extract_structure(file_path=pdf)
+            assert result["status"] == "succeeded"
+            now = datetime.now(timezone.utc)
+            extraction = ToolboxExtraction(
+                document=result, started_at=now, completed_at=now,
+                duration_ms=0, version="e2e", configuration={},
+            )
+            manifest = build_processing_manifest(pdf, extraction)
+            pages = _manifest_pages_to_payload(manifest)
+            # Limit this assertion to prose; code TABs are valid and tested separately.
+            prose_pages = [
+                {**page, "blocks": [b for b in page["blocks"] if b["type"] != "code"]}
+                for page in pages
+            ]
+            canonical = build_canonical_document(
+                {"pages": prose_pages}, title="java-oo-3pgs"
+            )
+            txt = "\n".join(document_to_txt_lines(canonical))
+            assert "CAPÍTULO 9" in txt
+            assert "\t" not in txt
+            html = document_to_html(canonical)
+            assert "CAPÍTULO 9" in html
+            assert "\t" not in html
+
+            output = tmp_path / "prose.docx"
+            await docx.export(build_pandoc_ast(canonical, target_format="docx"), output)
+            with ZipFile(output) as archive:
+                root = ElementTree.fromstring(archive.read("word/document.xml"))
+            ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+            texts = [node.text or "" for node in root.findall(".//w:t", ns)]
+            assert "CAPÍTULO 9" in " ".join(texts)
+            assert all("\t" not in text for text in texts)
+            assert not root.findall(".//w:tab", ns)
+        finally:
+            await structure.close()
+            await docx.close()

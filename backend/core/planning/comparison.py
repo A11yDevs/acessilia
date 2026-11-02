@@ -25,7 +25,7 @@ def build_planning_comparison(
     plans: dict[str, NominalPlan],
     preferred_backend: str,
 ) -> PlanningComparison:
-    """Compara planos sem confundir ordens causais igualmente válidas."""
+    """Compares planner outputs without conflating equivalently valid causal orderings."""
     internal = plans.get("internal")
     fast_downward = plans.get("fast-downward")
     both_solved = internal is not None and fast_downward is not None

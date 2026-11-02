@@ -1,81 +1,108 @@
 #!/usr/bin/env python3
-"""AgentOS – Vitrine dos agentes do Acessília no painel do Agno (os.agno.com).
+"""AgentOS - Showcase of the Acessilia agents in the Agno panel (os.agno.com).
 
-Este arquivo é INDEPENDENTE do pipeline de acessibilidade (run.py). Ele apenas
-expõe os agentes de IA (visão e dados) como instâncias "de pé" para você
-conversar com eles pelo painel do AgentOS, monitorar sessões, memória e traces.
+This file is INDEPENDENT of the accessibility pipeline (run.py). It only exposes
+the AI agents (vision and data) as live instances so that you can converse with
+them through the AgentOS panel and monitor sessions, memory, and traces.
 
-Ele NÃO executa o pipeline completo (split de PDF -> classificação de regiões ->
-visão/dados -> editor). Esse fluxo continua no run.py.
+It does NOT execute the complete pipeline (PDF split -> region classification ->
+vision/data -> editor). That flow remains in run.py.
 
-Como usar:
-    1. Configure o .env (mesma key de LLM do projeto: OpenRouter ou Ollama).
-    2. Rode:   python agent_os.py
-       O runtime sobe em http://localhost:7777
-    3. Abra https://os.agno.com , faça login, clique em "Add new OS",
-       escolha Environment: Local, Endpoint URL: http://localhost:7777,
-       dê um nome e clique em CONNECT.
+How to use:
+    1. Configure the .env (same LLM key as the project: OpenRouter or Ollama).
+    2. Run:   python agent_os.py
+        The runtime starts on http://localhost:7777
+    3. Open https://os.agno.com, sign in, click "Add new OS",
+        choose Environment: Local, Endpoint URL: http://localhost:7777,
+        give it a name, and click CONNECT.
 """
 
 from agno.agent import Agent
 from agno.db.sqlite import SqliteDb
-from agno.media import Image  # noqa: F401  (disponível para testes multimodais no painel)
+from agno.media import Image  # noqa: F401  (available for multimodal tests in the panel)
 from agno.os import AgentOS
 
-from backend.config.settings import settings
 from backend.ai.models.ai_client import get_agno_model
+from backend.agents.output_schemas import (
+    DATA_SCHEMA_INSTRUCTION,
+    VISION_SCHEMA_INSTRUCTION,
+    DataOutput,
+    VisionOutput,
+)
+from backend.config.settings import settings
+from backend.i18n import t
 from backend.tools.prompt_tools import load_region_prompt, load_system_prompt
+from frontend.web.messages import (
+    WEB_AGENT_DATA_DESCRIPTION,
+    WEB_AGENT_DATA_INSTRUCTIONS_FALLBACK,
+    WEB_AGENT_OS_DESCRIPTION,
+    WEB_AGENT_VISION_DESCRIPTION,
+)
 
-# Banco de sessões/memória do AgentOS (fica no diretório de dados do projeto).
-_db = SqliteDb(db_file=str(settings.data_dir / "agentos.db"))
+# Session/memory database of the AgentOS (kept in the project data directory).
+_db_file = settings.data_dir / "agentos.db"
+_db = SqliteDb(db_file=str(_db_file))
+if _db_file.exists():
+    try:
+        from agno.db.migrations.manager import MigrationManager
+
+        MigrationManager(_db).up()
+    except Exception:
+        pass
 
 
 def _build_data_instructions() -> str:
-    """Instruções do agente de dados a partir dos prompts de tabela/fórmula."""
-    partes = [
+    """Build the data-agent instructions from the table/formula region prompts.
+
+    Returns:
+        str: The joined table and formula region prompts, or the localized
+        fallback instruction string when no region prompts are configured.
+    """
+    parts = [
         load_region_prompt("regiao_tabela"),
         load_region_prompt("regiao_formula"),
     ]
-    partes = [p for p in partes if p]
-    if partes:
-        return "\n\n---\n\n".join(partes)
-    return (
-        "Converta tabelas e fórmulas matemáticas de imagens em texto estruturado "
-        "acessível (Markdown para tabelas, LaTeX para fórmulas)."
-    )
+    parts = [p for p in parts if p]
+    if parts:
+        return "\n\n---\n\n".join(parts)
+    return t(WEB_AGENT_DATA_INSTRUCTIONS_FALLBACK)
 
 
 vision_agent = Agent(
     name="VisionAgent",
-    model=get_agno_model(),
-    instructions=load_system_prompt("medio"),
+    # Chat answers may legitimately run long on a local Ollama; keep the
+    # historical REQUEST_TIMEOUT ceiling instead of the tighter model default.
+    model=get_agno_model(timeout_seconds=settings.request_timeout),
+    instructions=f"{load_system_prompt('medio')}\n\n{VISION_SCHEMA_INSTRUCTION}",
+    output_schema=VisionOutput,
     db=_db,
     markdown=True,
     telemetry=False,
-    description="Gera audiodescrições acessíveis de imagens e páginas escaneadas.",
+    description=t(WEB_AGENT_VISION_DESCRIPTION),
 )
 
 data_agent = Agent(
     name="DataAgent",
-    model=get_agno_model(),
-    instructions=_build_data_instructions(),
+    model=get_agno_model(timeout_seconds=settings.request_timeout),
+    instructions=f"{_build_data_instructions()}\n\n{DATA_SCHEMA_INSTRUCTION}",
+    output_schema=DataOutput,
     db=_db,
     markdown=True,
     telemetry=False,
-    description="Converte tabelas e fórmulas matemáticas em texto estruturado.",
+    description=t(WEB_AGENT_DATA_DESCRIPTION),
 )
 
 agent_os = AgentOS(
     name="Acessilia OS",
-    description="Vitrine dos agentes de acessibilidade do Acessília.",
+    description=t(WEB_AGENT_OS_DESCRIPTION),
     agents=[vision_agent, data_agent],
     telemetry=False,
 )
 
-# Objeto FastAPI exposto para o uvicorn (ex.: uvicorn agent_os:app).
+# FastAPI object exposed for uvicorn (e.g., uvicorn agent_os:app).
 app = agent_os.get_app()
 
 
 if __name__ == "__main__":
-    # Passar o caminho como string ("agent_os:app") habilita reload em dev.
+    # Passing the path as a string ("agent_os:app") enables dev reload.
     agent_os.serve(app="frontend.agent_os:app", host="localhost", port=7777, reload=True)

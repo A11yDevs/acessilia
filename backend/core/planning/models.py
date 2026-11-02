@@ -4,6 +4,24 @@ from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from backend.i18n import t  # noqa: E402
+from frontend.telegram.messages import (  # noqa: E402
+    MSG_ACTION_REJECTS_EXECUTION_PARAMETERS,
+    MSG_PLANNING_COMPARISON_SCHEMA_DESCRIPTION,
+    MSG_COMPARISON_OUTCOME_KEY_MISMATCH,
+    MSG_COMPARISON_REQUIRES_BOTH_BACKENDS,
+    MSG_EXECUTE_OBLIGATION_MISSING_FIELDS,
+    MSG_EXPECTED_TOTAL_COST_MISMATCH,
+    MSG_NOMINAL_PLAN_SCHEMA_DESCRIPTION,
+    MSG_NOMINAL_PLAN_MUST_END_COMPLETE_JOB,
+    MSG_PLANNER_OUTCOME_FAILED_MUST_NOT_PASS_VALIDATION,
+    MSG_PLANNER_OUTCOME_FAILED_REQUIRES_ERROR,
+    MSG_PLANNER_OUTCOME_SOLVED_MUST_NOT_CARRY_ERROR,
+    MSG_PLANNER_OUTCOME_SOLVED_REQUIRES_FIELDS,
+    MSG_PLANNER_OUTCOME_MUST_PASS_VALIDATION,
+    MSG_PLAN_CONTAINS_UNSELECTED_OBLIGATION,
+    MSG_PLAN_INDICES_CONSECUTIVE_FROM_ZERO,
+)
 
 
 PLAN_SCHEMA_VERSION = "1.0.0"
@@ -42,12 +60,10 @@ class PlanStep(StrictModel):
         )
         if self.action == "execute-obligation":
             if any(value is None for value in execution_fields):
-                raise ValueError(
-                    "execute-obligation exige obligation_id, obligation_kind e method"
-                )
+                raise ValueError(t(MSG_EXECUTE_OBLIGATION_MISSING_FIELDS))
         elif any(value is not None for value in execution_fields):
             raise ValueError(
-                f"{self.action} não aceita parâmetros de obrigação ou método"
+                t(MSG_ACTION_REJECTS_EXECUTION_PARAMETERS).format(action=self.action)
             )
         return self
 
@@ -74,13 +90,16 @@ class NominalPlan(StrictModel):
     def validate_plan(self) -> "NominalPlan":
         indexes = [step.index for step in self.steps]
         if indexes != list(range(len(self.steps))):
-            raise ValueError("Índices do plano devem ser contíguos e iniciar em zero")
+            raise ValueError(t(MSG_PLAN_INDICES_CONSECUTIVE_FROM_ZERO))
         if not self.steps or self.steps[-1].action != "complete-job":
-            raise ValueError("O plano nominal deve terminar com complete-job")
+            raise ValueError(t(MSG_NOMINAL_PLAN_MUST_END_COMPLETE_JOB))
         calculated = sum(step.expected_cost for step in self.steps)
         if calculated != self.expected_total_cost:
             raise ValueError(
-                f"expected_total_cost={self.expected_total_cost}; esperado {calculated}"
+                t(MSG_EXPECTED_TOTAL_COST_MISMATCH).format(
+                    declared=self.expected_total_cost,
+                    calculated=calculated,
+                )
             )
         selected = set(self.selected_obligations)
         planned = {
@@ -89,7 +108,7 @@ class NominalPlan(StrictModel):
             if step.action == "execute-obligation"
         }
         if not planned.issubset(selected):
-            raise ValueError("O plano contém obrigação não selecionada")
+            raise ValueError(t(MSG_PLAN_CONTAINS_UNSELECTED_OBLIGATION))
         return self
 
     model_config = ConfigDict(
@@ -100,8 +119,7 @@ class NominalPlan(StrictModel):
             "$id": PLAN_SCHEMA_ID,
             "title": "NominalPlan",
             "description": (
-                "Plano nominal gerado a partir do manifesto e do domínio PDDL "
-                "Acessília. Efeitos só são confirmados pelo Executor."
+                t(MSG_NOMINAL_PLAN_SCHEMA_DESCRIPTION)
             ),
         },
     )
@@ -141,17 +159,17 @@ class PlannerOutcome(StrictModel):
         if self.status == "solved":
             if any(value is None for value in solved_fields):
                 raise ValueError(
-                    "Resultado solved exige arquivo, identidade, custo e contagens"
+                    t(MSG_PLANNER_OUTCOME_SOLVED_REQUIRES_FIELDS)
                 )
             if not self.validation_passed:
-                raise ValueError("Resultado solved deve ter validação aprovada")
+                raise ValueError(t(MSG_PLANNER_OUTCOME_MUST_PASS_VALIDATION))
             if self.error_type is not None or self.error_message is not None:
-                raise ValueError("Resultado solved não pode conter erro")
+                raise ValueError(t(MSG_PLANNER_OUTCOME_SOLVED_MUST_NOT_CARRY_ERROR))
         else:
             if self.error_type is None or self.error_message is None:
-                raise ValueError("Resultado failed exige tipo e mensagem de erro")
+                raise ValueError(t(MSG_PLANNER_OUTCOME_FAILED_REQUIRES_ERROR))
             if self.validation_passed:
-                raise ValueError("Resultado failed não pode passar na validação")
+                raise ValueError(t(MSG_PLANNER_OUTCOME_FAILED_MUST_NOT_PASS_VALIDATION))
         return self
 
 
@@ -171,7 +189,7 @@ class ComparisonDetails(StrictModel):
 
 
 class PlanningComparison(StrictModel):
-    """Relatório normalizado para estudos diferenciais entre planners."""
+    """Normalized comparison report used by differential planner studies."""
 
     schema_ref: str = Field(default=COMPARISON_SCHEMA_ID, alias="$schema")
     schema_version: Literal["1.0.0"] = COMPARISON_SCHEMA_VERSION
@@ -191,13 +209,14 @@ class PlanningComparison(StrictModel):
     @model_validator(mode="after")
     def validate_report(self) -> "PlanningComparison":
         if set(self.outcomes) != {"internal", "fast-downward"}:
-            raise ValueError(
-                "A comparação deve conter internal e fast-downward"
-            )
+            raise ValueError(t(MSG_COMPARISON_REQUIRES_BOTH_BACKENDS))
         for backend, outcome in self.outcomes.items():
             if backend != outcome.backend:
                 raise ValueError(
-                    f"Chave {backend} diverge do backend {outcome.backend}"
+                    t(MSG_COMPARISON_OUTCOME_KEY_MISMATCH).format(
+                        key=backend,
+                        backend=outcome.backend,
+                    )
                 )
         return self
 
@@ -209,8 +228,7 @@ class PlanningComparison(StrictModel):
             "$id": COMPARISON_SCHEMA_ID,
             "title": "PlanningComparison",
             "description": (
-                "Comparação normalizada das execuções do planejador interno "
-                "e do Fast Downward sobre o mesmo domínio e problem.pddl."
+                t(MSG_PLANNING_COMPARISON_SCHEMA_DESCRIPTION)
             ),
         },
     )

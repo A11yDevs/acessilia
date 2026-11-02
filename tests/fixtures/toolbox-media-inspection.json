@@ -1,0 +1,24 @@
+{
+  "media_type": "application/pdf",
+  "declared_media_type": "application/pdf",
+  "file_size_bytes": 193244,
+  "is_image": false,
+  "is_pdf": true,
+  "page_count": 3,
+  "page_count_source": "pymupdf",
+  "dimensions": {
+    "width": 595,
+    "height": 794,
+    "aspect_ratio": 0.7494
+  },
+  "dimensions_source": "pymupdf",
+  "color_mode": null,
+  "format": "PDF",
+  "artifact_nature": "paginated_document",
+  "document_genre": "document",
+  "genre_signals": [],
+  "requires_visual_inspection": false,
+  "metadata": {
+    "filename": "java-oo-3pgs.pdf"
+  }
+}

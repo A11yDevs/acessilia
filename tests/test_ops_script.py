@@ -1,0 +1,610 @@
+"""scripts/ops.sh against a local git origin and stubbed system commands."""
+
+import datetime
+import os
+import shutil
+import subprocess
+from pathlib import Path
+
+import pytest
+
+ROOT_DIR = Path(__file__).resolve().parents[1]
+
+# Stands in for scripts/staging-update.sh: records how ops.sh invoked it.
+_ENGINE = """#!/usr/bin/env bash
+printf 'STAGING_DIR=%s DEPLOY_DIR=%s\\n' "$STAGING_DIR" "${DEPLOY_DIR:-}" >> "$STAGING_DIR/engine-calls.txt"
+"""
+
+_LOGGING_STUB = """#!/usr/bin/env bash
+printf '%s %s\\n' "$(basename "$0")" "$*" >> "$OPS_LOG"
+"""
+
+_STUBS = {
+    # Remembers `docker rm -f`, so a later inspect no longer finds the container.
+    "docker": _LOGGING_STUB
+    + """case "$*" in
+  inspect*State.Running*)
+    [ -n "${DOCKER_PROJECT:-}" ] || exit 1
+    printf '%s\\n' "${DOCKER_RUNNING:-true}" ;;
+  inspect*Config.Image*)
+    [ -n "${DOCKER_PROJECT:-}" ] || exit 1
+    printf '%s\\n' "${DOCKER_IMAGE:-}" ;;
+  inspect*project.working_dir*)
+    [ -n "${DOCKER_PROJECT:-}" ] && [ ! -e "$OPS_LOG.rm" ] || exit 1
+    printf '%s\\n' "${DOCKER_DIR:-/old/install}" ;;
+  inspect*)
+    [ -n "${DOCKER_PROJECT:-}" ] && [ ! -e "$OPS_LOG.rm" ] || exit 1
+    printf '%s\\n' "$DOCKER_PROJECT" ;;
+  "rm -f"*) touch "$OPS_LOG.rm" ;;
+  info) [ -z "${DOCKER_DOWN:-}" ] || exit 1 ;;
+  "ps -a"*) printf '%b' "${DOCKER_PS:-}" ;;
+  *"config --services"*) printf '%s\\n' "${COMPOSE_SERVICES:-}" ;;
+  *) [ "$1" = compose ] && printf 'TRACK_TAG=%s\\n' "${TRACK_TAG:-}" >> "$OPS_LOG" ;;
+esac
+exit 0
+""",
+    # `--user <command> <unit> [-p <property> --value]`; SC_* variables set
+    # what the timer reports, the legacy staging-update.timer is gone unless
+    # SC_LEGACY_ACTIVE says otherwise.
+    "systemctl": _LOGGING_STUB
+    + """case "$2" in
+  show-environment)
+    [ -z "${SYSTEMD_DOWN:-}" ] || exit 1
+    [ -z "${REQUIRE_XDG:-}" ] || [ -n "${XDG_RUNTIME_DIR:-}" ] || exit 1 ;;
+  disable) [ -z "${LEGACY_FAIL:-}" ] || exit 1 ;;
+  is-enabled)
+    v="${SC_ENABLED:-enabled}"
+    [ "$3" = staging-update.timer ] && v=not-found
+    echo "$v"; [ "$v" = enabled ] || exit 1 ;;
+  is-active)
+    v="${SC_ACTIVE:-active}"
+    [ "$3" = staging-update.timer ] && v="${SC_LEGACY_ACTIVE:-inactive}"
+    echo "$v"; [ "$v" = active ] || exit 1 ;;
+  show)
+    case "${5:-}" in
+      Result) echo "${SC_RESULT:-success}" ;;
+      ExecMainStatus) echo "${SC_STATUS:-0}" ;;
+      ExecMainExitTimestamp) echo "${SC_EXIT_TS-Tue 2026-10-20 20:38:55 -03}" ;;
+      NextElapseUSecRealtime) echo "Tue 2026-10-20 20:43:55 -03" ;;
+      NeedDaemonReload) echo "${SC_RELOAD:-no}" ;;
+    esac ;;
+esac
+exit 0
+""",
+    "journalctl": _LOGGING_STUB + "exit 0\n",
+    "loginctl": '#!/usr/bin/env bash\necho "Linger=${LINGER:-yes}"\n',
+    # GitHub REST API fixtures for bhs status; anything else is unreachable.
+    "curl": _LOGGING_STUB
+    + """url="${*: -1}"
+case "$url" in
+  *api.github.com*actions/runs*) cat "$GH_FIXTURES/runs.json" ;;
+  *api.github.com*base=main*) cat "$GH_FIXTURES/main.json" ;;
+  *api.github.com*base=develop*) cat "$GH_FIXTURES/develop.json" ;;
+  *api.github.com*pulls*) cat "$GH_FIXTURES/open.json" ;;
+  *health*) [ -n "${HEALTH_UP:-}" ] || exit 7; echo '{"status": "healthy"}' ;;
+  *) exit 7 ;;
+esac
+""",
+    # ops.sh never escalates, and bhs status does not need the GitHub CLI.
+    "sudo": _LOGGING_STUB + "exit 99\n",
+    "gh": _LOGGING_STUB + "exit 99\n",
+}
+
+
+def _git(*args: str, cwd: Path) -> str:
+    return subprocess.run(
+        ["git", *args], cwd=cwd, check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+
+@pytest.fixture
+def server(tmp_path):
+    """A clone of a repository whose develop and release/0.2.0 carry ops.sh."""
+    home = tmp_path / "home"
+    bin_dir = tmp_path / "bin"
+    home.mkdir()
+    bin_dir.mkdir()
+    for name, content in _STUBS.items():
+        (bin_dir / name).write_text(content)
+        (bin_dir / name).chmod(0o755)
+
+    env = os.environ.copy()
+    env.pop("XDG_CONFIG_HOME", None)
+    env.pop("TRACK_BRANCH", None)
+    env.pop("XDG_RUNTIME_DIR", None)
+    env.pop("GITHUB_TOKEN", None)
+    env.update(
+        {
+            "HOME": str(home),
+            "PATH": f"{bin_dir}:{env['PATH']}",
+            "OPS_LOG": str(tmp_path / "ops.log"),
+            "OPS_RUN_USER_DIR": str(tmp_path / "run"),
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_AUTHOR_NAME": "t",
+            "GIT_AUTHOR_EMAIL": "t@example.com",
+            "GIT_COMMITTER_NAME": "t",
+            "GIT_COMMITTER_EMAIL": "t@example.com",
+        }
+    )
+
+    origin = tmp_path / "origin.git"
+    seed = tmp_path / "seed"
+    subprocess.run(["git", "init", "-q", "--bare", str(origin)], check=True, env=env)
+    subprocess.run(["git", "init", "-q", "-b", "develop", str(seed)], check=True, env=env)
+    (seed / "scripts").mkdir()
+    shutil.copy(ROOT_DIR / "scripts" / "ops.sh", seed / "scripts" / "ops.sh")
+    (seed / "scripts" / "staging-update.sh").write_text(_ENGINE)
+    (seed / "scripts" / "staging-update.sh").chmod(0o755)
+    (seed / ".gitignore").write_text(".env\nvar/\nengine-calls.txt\n")
+    (seed / "docker-compose.staging.yml").write_text("services: {}\n")
+    for args in (
+        ["add", "-A"],
+        ["commit", "-q", "-m", "seed"],
+        ["remote", "add", "origin", str(origin)],
+        ["push", "-q", "origin", "develop", "develop:release/0.2.0"],
+    ):
+        subprocess.run(["git", *args], cwd=seed, check=True, env=env)
+
+    clone = tmp_path / "clone"
+    subprocess.run(["git", "clone", "-q", "-b", "develop", str(origin), str(clone)], check=True, env=env)
+    (clone / ".env").write_text("GHCR_TOKEN=secret\nCOMPOSE_PROJECT_NAME=test-staging\n")
+
+    def run(*args: str, check: bool = True, **extra: str) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            [str(clone / "scripts" / "ops.sh"), *args],
+            env={**env, **extra},
+            check=check,
+            capture_output=True,
+            text=True,
+        )
+
+    return {"clone": clone, "origin": origin, "seed": seed, "home": home, "env": env, "run": run, "log": tmp_path / "ops.log"}
+
+
+def _env_lines(clone: Path) -> list[str]:
+    return (clone / ".env").read_text().splitlines()
+
+
+def test_track_release_moves_clone_and_env_together(server):
+    clone = server["clone"]
+
+    server["run"]("track", "release/0.2.0")
+
+    assert _git("rev-parse", "--abbrev-ref", "HEAD", cwd=clone) == "release/0.2.0"
+    lines = _env_lines(clone)
+    assert "TRACK_BRANCH=release/0.2.0" in lines
+    assert "TRACK_TAG=release-0.2.0" in lines
+    assert "GHCR_TOKEN=secret" in lines
+    assert (clone / "engine-calls.txt").read_text().strip() == f"STAGING_DIR={clone} DEPLOY_DIR="
+
+
+def test_track_develop_removes_the_override(server):
+    clone = server["clone"]
+    server["run"]("track", "release/0.2.0")
+
+    server["run"]("track", "develop")
+
+    assert _git("rev-parse", "--abbrev-ref", "HEAD", cwd=clone) == "develop"
+    assert _env_lines(clone) == ["GHCR_TOKEN=secret", "COMPOSE_PROJECT_NAME=test-staging"]
+
+
+def test_track_without_branch_pulls_the_tracked_one(server):
+    clone, seed, env = server["clone"], server["seed"], server["env"]
+    server["run"]("track", "release/0.2.0")
+    subprocess.run(["git", "checkout", "-q", "-b", "rel", "origin/release/0.2.0"], cwd=seed, check=True, env=env)
+    (seed / "NEW").write_text("x")
+    subprocess.run(["git", "add", "NEW"], cwd=seed, check=True, env=env)
+    subprocess.run(["git", "commit", "-q", "-m", "fix"], cwd=seed, check=True, env=env)
+    subprocess.run(["git", "push", "-q", "origin", "HEAD:release/0.2.0"], cwd=seed, check=True, env=env)
+
+    server["run"]("track")
+
+    assert (clone / "NEW").exists()
+    assert _git("rev-parse", "--abbrev-ref", "HEAD", cwd=clone) == "release/0.2.0"
+
+
+def test_track_refuses_local_changes_to_tracked_files(server):
+    clone = server["clone"]
+    (clone / "docker-compose.staging.yml").write_text("services: {edited: {}}\n")
+
+    result = server["run"]("track", "release/0.2.0", check=False)
+
+    assert result.returncode == 1
+    assert "local changes" in result.stderr
+    assert _git("rev-parse", "--abbrev-ref", "HEAD", cwd=clone) == "develop"
+
+
+def test_track_refuses_a_branch_without_ops(server):
+    seed, env = server["seed"], server["env"]
+    subprocess.run(["git", "checkout", "-q", "-b", "old"], cwd=seed, check=True, env=env)
+    subprocess.run(["git", "rm", "-q", "scripts/ops.sh"], cwd=seed, check=True, env=env)
+    subprocess.run(["git", "commit", "-q", "-m", "old"], cwd=seed, check=True, env=env)
+    subprocess.run(["git", "push", "-q", "origin", "old"], cwd=seed, check=True, env=env)
+
+    result = server["run"]("track", "old", check=False)
+
+    assert result.returncode == 1
+    assert "has no scripts/ops.sh" in result.stderr
+    assert _git("rev-parse", "--abbrev-ref", "HEAD", cwd=server["clone"]) == "develop"
+
+
+def test_status_warns_when_clone_and_tracked_branch_differ(server):
+    clone = server["clone"]
+    server["run"]("track", "release/0.2.0")
+    _git("checkout", "-q", "develop", cwd=clone)
+
+    result = server["run"]("auto-update", "status")
+
+    assert "Tracks:    release/0.2.0" in result.stdout
+    assert "differs from the clone's branch" in result.stdout
+    assert "(unreachable)" in result.stdout
+
+
+def test_setup_installs_units_that_run_from_the_clone(server):
+    clone, home = server["clone"], server["home"]
+    server["run"]("track", "release/0.2.0")
+    unit_dir = home / ".config" / "systemd" / "user"
+    unit_dir.mkdir(parents=True)
+    (unit_dir / "staging-update.service").write_text(
+        "[Unit]\nDescription=Update acessilia staging container\n"
+    )
+    (unit_dir / "staging-update.timer").write_text("[Timer]\n")
+    env_file = clone / ".env"
+    env_file.write_text(
+        "".join(f"{line}\n" for line in _env_lines(clone) if not line.startswith("COMPOSE_PROJECT_NAME="))
+    )
+
+    server["run"]("auto-update", "setup")
+
+    service = (unit_dir / "acessilia-staging-update.service").read_text()
+    assert f"ExecStart={clone}/scripts/ops.sh auto-update start" in service
+    assert (unit_dir / "acessilia-staging-update.timer").exists()
+    assert not (unit_dir / "staging-update.service").exists()
+    assert "COMPOSE_PROJECT_NAME=acessilia-staging" in _env_lines(clone)
+    log = server["log"].read_text()
+    assert "systemctl --user disable --now staging-update.timer" in log
+    assert "systemctl --user enable --now acessilia-staging-update.timer" in log
+    assert "docker compose -f docker-compose.staging.yml up -d\nTRACK_TAG=release-0.2.0" in log
+
+
+def test_setup_requires_an_env_file(server):
+    (server["clone"] / ".env").unlink()
+
+    result = server["run"]("auto-update", "setup", check=False)
+
+    assert result.returncode == 1
+    assert "cp .env.example .env" in result.stderr
+
+
+def test_migrate_moves_to_its_own_project_with_env_and_data(server, tmp_path):
+    clone = server["clone"]
+    (clone / ".env").unlink()
+    old = tmp_path / "opt-staging"
+    (old / "var" / "data").mkdir(parents=True)
+    (old / "var" / "data" / "jobs.db").write_text("data")
+    (old / ".env").write_text("GHCR_TOKEN=old-secret\nTRACK_BRANCH=release/0.2.0\n")
+
+    server["run"]("auto-update", "migrate", str(old), DOCKER_PROJECT="staging")
+
+    lines = _env_lines(clone)
+    assert "GHCR_TOKEN=old-secret" in lines
+    # Acessilia's data is in ./var: it leaves the shared project and replaces
+    # the old container instead of inheriting the project name.
+    assert "COMPOSE_PROJECT_NAME=acessilia-staging" in lines
+    assert "docker rm -f acessilia-staging" in server["log"].read_text()
+    assert "TRACK_TAG=release-0.2.0" in lines
+    assert (clone / "var" / "data" / "jobs.db").read_text() == "data"
+    assert _git("rev-parse", "--abbrev-ref", "HEAD", cwd=clone) == "release/0.2.0"
+    assert (server["home"] / ".config/systemd/user/acessilia-staging-update.service").exists()
+    assert (old / ".env").exists()
+
+
+def _old_install(tmp_path, track_branch="release/0.2.0"):
+    old = tmp_path / "opt-staging"
+    (old / "var" / "data").mkdir(parents=True)
+    (old / "var" / "data" / "jobs.db").write_text("data")
+    (old / ".env").write_text(f"GHCR_TOKEN=old-secret\nTRACK_BRANCH={track_branch}\n")
+    return old
+
+
+def _assert_nothing_changed(server):
+    assert not (server["clone"] / ".env").exists()
+    assert not (server["clone"] / "var").exists()
+    log = server["log"].read_text() if server["log"].exists() else ""
+    assert "docker stop" not in log
+    assert "disable --now" not in log
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root reads any file")
+def test_migrate_refuses_unreadable_files_before_changing_anything(server, tmp_path):
+    (server["clone"] / ".env").unlink()
+    old = _old_install(tmp_path)
+    secret = old / "var" / "data" / "jobs.db"
+    secret.chmod(0)
+    try:
+        result = server["run"]("auto-update", "migrate", str(old), check=False)
+    finally:
+        secret.chmod(0o644)
+
+    assert result.returncode == 1
+    assert str(secret) in result.stderr
+    assert "nothing was changed" in result.stderr
+    _assert_nothing_changed(server)
+
+
+def test_migrate_refuses_an_untrackable_branch_before_changing_anything(server, tmp_path):
+    (server["clone"] / ".env").unlink()
+    old = _old_install(tmp_path, track_branch="develop-without-ops")
+
+    result = server["run"]("auto-update", "migrate", str(old), check=False)
+
+    assert result.returncode == 1
+    assert "does not exist on origin" in result.stderr
+    _assert_nothing_changed(server)
+
+
+def test_migrate_resumes_after_a_partial_run(server, tmp_path):
+    clone = server["clone"]
+    old = _old_install(tmp_path)
+    # A previous run copied .env and part of var/, then stopped.
+    (clone / ".env").write_text((old / ".env").read_text())
+    (clone / "var").mkdir()
+
+    server["run"]("auto-update", "migrate", str(old))
+
+    assert (clone / "var" / "data" / "jobs.db").read_text() == "data"
+    assert "TRACK_TAG=release-0.2.0" in _env_lines(clone)
+
+
+def test_setup_warns_without_linger_and_never_escalates(server):
+    result = server["run"]("auto-update", "setup", LINGER="no")
+
+    assert "Linger is off" in result.stdout
+    assert "loginctl enable-linger" in result.stdout
+    assert "sudo" not in server["log"].read_text()
+
+
+def test_setup_requires_docker_access(server):
+    result = server["run"]("auto-update", "setup", check=False, DOCKER_DOWN="1")
+
+    assert result.returncode == 1
+    assert "cannot reach the Docker daemon" in result.stderr
+
+
+def _legacy_description() -> str:
+    script = (ROOT_DIR / "scripts" / "ops.sh").read_text()
+    return script.split('LEGACY_DESCRIPTION="', 1)[1].split('"', 1)[0]
+
+
+def test_track_refuses_a_container_of_another_project(server):
+    clone = server["clone"]
+
+    result = server["run"](
+        "track", "release/0.2.0", check=False, DOCKER_PROJECT="staging", DOCKER_DIR="/opt/x/staging"
+    )
+
+    assert result.returncode == 1
+    assert "belongs to compose project 'staging' (/opt/x/staging)" in result.stderr
+    assert "auto-update migrate /opt/x/staging" in result.stderr
+    assert _git("rev-parse", "--abbrev-ref", "HEAD", cwd=clone) == "develop"
+    assert not (clone / "engine-calls.txt").exists()
+
+
+def test_setup_refuses_a_container_of_another_project(server):
+    result = server["run"]("auto-update", "setup", check=False, DOCKER_PROJECT="staging")
+
+    assert result.returncode == 1
+    assert "belongs to compose project 'staging'" in result.stderr
+    assert "compose -f" not in server["log"].read_text()
+
+
+def test_setup_refuses_without_the_user_systemd_instance(server):
+    result = server["run"]("auto-update", "setup", check=False, SYSTEMD_DOWN="1")
+
+    assert result.returncode == 1
+    assert "cannot reach the systemd user instance" in result.stderr
+    assert "compose -f" not in server["log"].read_text()
+
+
+def test_setup_finds_the_user_systemd_instance_without_xdg(server, tmp_path):
+    (tmp_path / "run" / str(os.getuid())).mkdir(parents=True)
+
+    server["run"]("auto-update", "setup", REQUIRE_XDG="1")
+
+    assert "enable --now" in server["log"].read_text()
+
+
+def test_migrate_stops_when_the_old_timer_cannot_be_disabled(server, tmp_path):
+    (server["clone"] / ".env").unlink()
+    old = _old_install(tmp_path)
+    unit_dir = server["home"] / ".config" / "systemd" / "user"
+    unit_dir.mkdir(parents=True)
+    legacy = unit_dir / "staging-update.service"
+    legacy.write_text(f"[Unit]\nDescription={_legacy_description()}\n")
+
+    result = server["run"]("auto-update", "migrate", str(old), check=False, LEGACY_FAIL="1")
+
+    assert result.returncode == 1
+    assert "could not disable staging-update.timer" in result.stderr
+    assert legacy.exists()
+    assert "docker stop" not in server["log"].read_text()
+
+
+def test_bhs_status_uses_the_rest_api_without_gh(server, tmp_path):
+    fixtures = tmp_path / "gh"
+    fixtures.mkdir()
+    (fixtures / "runs.json").write_text(
+        '{"workflow_runs": [{"name": "CI", "status": "completed", "conclusion": "success"}]}'
+    )
+    (fixtures / "open.json").write_text('[{"number": 5, "title": "Fix x", "head": {"ref": "fix/x"}}]')
+    (fixtures / "main.json").write_text("[]")
+    (fixtures / "develop.json").write_text('[{"state": "closed", "merged_at": "2026-10-20T00:00:00Z"}]')
+
+    result = server["run"]("bhs", "status", GH_FIXTURES=str(fixtures))
+
+    assert "## release/0.2.0 @ " in result.stdout
+    assert "    CI: completed success" in result.stdout
+    assert "    #5 fix/x: Fix x" in result.stdout
+    assert "Closing PRs: main NONE, develop MERGED" in result.stdout
+    log = server["log"].read_text()
+    assert "Authorization: token secret" in log
+    assert "\ngh " not in f"\n{log}"
+
+
+def _healthy_install(server, **extra):
+    """A clone set up from origin, as `check` expects to find it."""
+    clone, home = server["clone"], server["home"]
+    server["run"]("track", "release/0.2.0")
+    unit_dir = home / ".config" / "systemd" / "user"
+    unit_dir.mkdir(parents=True, exist_ok=True)
+    (unit_dir / f"{_unit_name()}.service").write_text(
+        f"[Service]\nExecStart={clone}/scripts/ops.sh auto-update start\n"
+    )
+    sha = _git("rev-parse", "HEAD", cwd=clone)
+    now = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    status = clone / "var" / "data" / "staging-status.json"
+    status.parent.mkdir(parents=True, exist_ok=True)
+    status.write_text(
+        f'{{"latest_sha": "{sha}", "running_sha": "{sha}", "last_check": "{now}"}}'
+    )
+    env = {
+        "DOCKER_PROJECT": "test-staging",
+        "DOCKER_IMAGE": "ghcr.io/a11ydevs/acessilia:release-0.2.0",
+        "HEALTH_UP": "1",
+    }
+    env.update(extra)
+    return env
+
+
+def _unit_name() -> str:
+    script = (ROOT_DIR / "scripts" / "ops.sh").read_text()
+    return script.split('\nUNIT="', 1)[1].split('"', 1)[0]
+
+
+def test_check_passes_on_a_healthy_install(server):
+    env = _healthy_install(server)
+
+    result = server["run"]("auto-update", "check", **env)
+
+    assert "❌" not in result.stdout
+    assert "Auto-update OK" in result.stdout
+    assert "next run Tue 2026-10-20 20:43:55 -03" in result.stdout
+    assert "running the latest commit of release/0.2.0" in result.stdout
+
+
+@pytest.mark.parametrize(
+    ("extra", "expected"),
+    [
+        ({"SC_RESULT": "exit-code", "SC_STATUS": "1"}, "last run failed at"),
+        ({"SC_ENABLED": "disabled", "SC_ACTIVE": "inactive"}, "timer is disabled/inactive"),
+        ({"SC_LEGACY_ACTIVE": "active"}, "the old staging-update.timer is still active"),
+        ({"DOCKER_RUNNING": "false"}, "is not running"),
+        ({"DOCKER_IMAGE": "ghcr.io/a11ydevs/acessilia:develop"}, "expected ghcr.io/a11ydevs/acessilia:release-0.2.0"),
+        ({"DOCKER_PROJECT": "staging"}, "belongs to project 'staging', .env says 'test-staging'"),
+        ({"HEALTH_UP": ""}, "health endpoint does not answer"),
+        ({"SYSTEMD_DOWN": "1"}, "cannot reach the systemd user instance"),
+    ],
+)
+def test_check_reports_each_problem(server, extra, expected):
+    env = _healthy_install(server, **extra)
+
+    result = server["run"]("auto-update", "check", check=False, **env)
+
+    assert result.returncode == 1
+    assert expected in result.stdout
+
+
+def test_check_reports_a_stale_last_check(server):
+    env = _healthy_install(server)
+    status = server["clone"] / "var" / "data" / "staging-status.json"
+    status.write_text(status.read_text().replace('"last_check": "', '"last_check": "2020-01-01T00:00:00Z", "x": "'))
+
+    result = server["run"]("auto-update", "check", check=False, **env)
+
+    assert result.returncode == 1
+    assert "longer than three timer intervals" in result.stdout
+
+
+def test_check_reports_a_timer_running_another_clone(server):
+    env = _healthy_install(server)
+    unit = server["home"] / ".config" / "systemd" / "user" / f"{_unit_name()}.service"
+    unit.write_text("[Service]\nExecStart=/somewhere/else/scripts/ops.sh auto-update start\n")
+
+    result = server["run"]("auto-update", "check", check=False, **env)
+
+    assert result.returncode == 1
+    assert "runs /somewhere/else/scripts/ops.sh auto-update start, not this clone" in result.stdout
+
+
+def test_check_only_warns_while_the_latest_image_builds(server):
+    env = _healthy_install(server)
+    status = server["clone"] / "var" / "data" / "staging-status.json"
+    status.write_text(status.read_text().replace('"running_sha": "', '"running_sha": "old'))
+
+    result = server["run"]("auto-update", "check", **env)
+
+    assert "not deployed yet" in result.stdout
+    assert "Auto-update OK (1 warning(s))" in result.stdout
+
+
+def test_ops_never_calls_sudo():
+    assert "sudo" not in (ROOT_DIR / "scripts" / "ops.sh").read_text()
+
+
+def test_migrate_refuses_a_different_env_in_the_clone(server, tmp_path):
+    old = tmp_path / "opt-staging"
+    old.mkdir()
+    (old / ".env").write_text("GHCR_TOKEN=old-secret\n")
+
+    result = server["run"]("auto-update", "migrate", str(old), check=False)
+
+    assert result.returncode == 1
+    assert "differs from" in result.stderr
+    assert _env_lines(server["clone"]) == ["GHCR_TOKEN=secret", "COMPOSE_PROJECT_NAME=test-staging"]
+
+
+def test_bhs_start_cuts_the_release_with_the_version_bump(server, tmp_path):
+    seed, env = server["seed"], server["env"]
+    (seed / "pyproject.toml").write_text('[project]\nname = "acessilia"\nversion = "0.1.0"\n')
+    (seed / "uv.lock").write_text('[[package]]\nname = "acessilia"\nversion = "0.1.0"\n')
+    subprocess.run(["git", "add", "-A"], cwd=seed, check=True, env=env)
+    subprocess.run(["git", "commit", "-q", "-m", "project"], cwd=seed, check=True, env=env)
+    subprocess.run(["git", "push", "-q", "origin", "develop"], cwd=seed, check=True, env=env)
+
+    result = server["run"]("bhs", "start", "0.3.0", OPS_TOOLBOX_REPO=str(server["origin"]))
+
+    origin = server["origin"]
+    assert _git("log", "-1", "--format=%s", "release/0.3.0", cwd=origin) == "chore(release): bump to 0.3.0"
+    assert 'version = "0.3.0"' in _git("show", "release/0.3.0:pyproject.toml", cwd=origin)
+    assert 'version = "0.3.0"' in _git("show", "release/0.3.0:uv.lock", cwd=origin)
+    assert "ops.sh track release/0.3.0" in result.stdout
+
+    again = server["run"]("bhs", "start", "0.3.0", OPS_TOOLBOX_REPO=str(server["origin"]), check=False)
+    assert again.returncode == 1
+    assert "already exists" in again.stderr
+
+
+def test_bhs_start_removes_its_temp_dir_when_the_worktree_fails(server, tmp_path):
+    bin_dir = tmp_path / "bin"
+    real_git = shutil.which("git")
+    (bin_dir / "git").write_text(
+        f"""#!/usr/bin/env bash
+[ "$1 $2" = "worktree add" ] && exit 1
+exec {real_git} "$@"
+"""
+    )
+    (bin_dir / "git").chmod(0o755)
+    temp = tmp_path / "temp"
+    temp.mkdir()
+
+    result = server["run"]("bhs", "start", "0.3.0", check=False, TMPDIR=str(temp))
+
+    assert result.returncode != 0
+    assert list(temp.iterdir()) == []
+
+
+def test_bhs_rejects_an_invalid_version(server):
+    result = server["run"]("bhs", "start", "v0.3.0", check=False)
+
+    assert result.returncode == 1
+    assert "expected a version x.y.z" in result.stderr

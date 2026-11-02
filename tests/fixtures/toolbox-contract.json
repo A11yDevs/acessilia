@@ -1,0 +1,472 @@
+{
+  "_comment": "Copy of the Toolbox's published contract (contract/toolbox-contract.json at release/0.2.0). Refresh with scripts/capture_toolbox_contract.py --ref release/0.2.0; CI checks the SDK registry against the published file itself.",
+  "capabilities": [
+    {
+      "id": "accessibility.mark",
+      "version": 1,
+      "providers": [
+        "pure-accessibility"
+      ]
+    },
+    {
+      "id": "artifact.retrieve",
+      "version": 1,
+      "providers": [
+        "filesystem",
+        "minio"
+      ]
+    },
+    {
+      "id": "artifact.store",
+      "version": 1,
+      "providers": [
+        "filesystem",
+        "minio"
+      ]
+    },
+    {
+      "id": "chem.convert",
+      "version": 1,
+      "providers": [
+        "pure-chem"
+      ]
+    },
+    {
+      "id": "chem.recognize",
+      "version": 1,
+      "providers": [
+        "docling-chem"
+      ]
+    },
+    {
+      "id": "code.normalize",
+      "version": 1,
+      "providers": [
+        "pure-code"
+      ]
+    },
+    {
+      "id": "dataset.describe",
+      "version": 1,
+      "providers": [
+        "dataset-github",
+        "dataset-huggingface"
+      ]
+    },
+    {
+      "id": "dataset.get_artifact",
+      "version": 1,
+      "providers": [
+        "dataset-github",
+        "dataset-huggingface"
+      ]
+    },
+    {
+      "id": "dataset.get_item",
+      "version": 1,
+      "providers": [
+        "dataset-github",
+        "dataset-huggingface"
+      ]
+    },
+    {
+      "id": "dataset.list",
+      "version": 1,
+      "providers": [
+        "dataset-github",
+        "dataset-huggingface"
+      ]
+    },
+    {
+      "id": "dataset.list_items",
+      "version": 1,
+      "providers": [
+        "dataset-github",
+        "dataset-huggingface"
+      ]
+    },
+    {
+      "id": "dataset.list_splits",
+      "version": 1,
+      "providers": [
+        "dataset-github",
+        "dataset-huggingface"
+      ]
+    },
+    {
+      "id": "dataset.sample",
+      "version": 1,
+      "providers": [
+        "dataset-github",
+        "dataset-huggingface"
+      ]
+    },
+    {
+      "id": "dataset.sync",
+      "version": 1,
+      "providers": [
+        "dataset-github",
+        "dataset-huggingface"
+      ]
+    },
+    {
+      "id": "document.adjudicate.page",
+      "version": 1,
+      "providers": [
+        "qwen3-vl-8b"
+      ]
+    },
+    {
+      "id": "document.adjudicate.region",
+      "version": 1,
+      "providers": [
+        "qwen3-vl-8b"
+      ]
+    },
+    {
+      "id": "document.export.docx",
+      "version": 1,
+      "providers": [
+        "pandoc-docx"
+      ]
+    },
+    {
+      "id": "document.export.pdf_ua",
+      "version": 1,
+      "providers": [
+        "pandoc-pdf-ua"
+      ]
+    },
+    {
+      "id": "document.layout.analyze",
+      "version": 1,
+      "providers": [
+        "docling-layout",
+        "mineru-layout"
+      ]
+    },
+    {
+      "id": "document.ocr",
+      "version": 1,
+      "providers": [
+        "docling-ocr",
+        "mineru-ocr"
+      ]
+    },
+    {
+      "id": "document.ocr.page",
+      "version": 1,
+      "providers": [
+        "qwen3-vl-8b"
+      ]
+    },
+    {
+      "id": "document.structure.extract",
+      "version": 1,
+      "providers": [
+        "docling",
+        "mineru",
+        "nougat"
+      ]
+    },
+    {
+      "id": "document.text.spans",
+      "version": 1,
+      "providers": [
+        "pymupdf-pdf"
+      ]
+    },
+    {
+      "id": "image.page.orient",
+      "version": 1,
+      "providers": [
+        "rapidocr-orient"
+      ]
+    },
+    {
+      "id": "math.convert",
+      "version": 1,
+      "providers": [
+        "math-speech"
+      ]
+    },
+    {
+      "id": "math.recognize",
+      "version": 1,
+      "providers": [
+        "docling-math",
+        "pp-formulanet",
+        "rapid-latex-ocr"
+      ]
+    },
+    {
+      "id": "math.verbalize",
+      "version": 1,
+      "providers": [
+        "math-speech"
+      ]
+    },
+    {
+      "id": "media.inspect",
+      "version": 1,
+      "providers": [
+        "pure-media-inspect"
+      ]
+    },
+    {
+      "id": "music.omr",
+      "version": 1,
+      "providers": [
+        "audiveris",
+        "homr"
+      ]
+    },
+    {
+      "id": "pdf.render",
+      "version": 1,
+      "providers": [
+        "pymupdf-pdf"
+      ]
+    },
+    {
+      "id": "pdf.render",
+      "version": 2,
+      "providers": [
+        "pymupdf-pdf"
+      ]
+    },
+    {
+      "id": "pdf.split",
+      "version": 1,
+      "providers": [
+        "pymupdf-pdf"
+      ]
+    },
+    {
+      "id": "pdf.validate.pdf_ua",
+      "version": 1,
+      "providers": [
+        "verapdf"
+      ]
+    },
+    {
+      "id": "table.recognize",
+      "version": 1,
+      "providers": [
+        "qwen3-vl-8b"
+      ]
+    },
+    {
+      "id": "text.postprocess",
+      "version": 1,
+      "providers": [
+        "pure-text"
+      ]
+    }
+  ],
+  "providers": [
+    {
+      "id": "audiveris",
+      "capabilities": [
+        "music.omr"
+      ]
+    },
+    {
+      "id": "dataset-github",
+      "capabilities": [
+        "dataset.describe",
+        "dataset.get_artifact",
+        "dataset.get_item",
+        "dataset.list",
+        "dataset.list_items",
+        "dataset.list_splits",
+        "dataset.sample",
+        "dataset.sync"
+      ]
+    },
+    {
+      "id": "dataset-huggingface",
+      "capabilities": [
+        "dataset.describe",
+        "dataset.get_artifact",
+        "dataset.get_item",
+        "dataset.list",
+        "dataset.list_items",
+        "dataset.list_splits",
+        "dataset.sample",
+        "dataset.sync"
+      ]
+    },
+    {
+      "id": "docling",
+      "capabilities": [
+        "document.structure.extract"
+      ]
+    },
+    {
+      "id": "docling-chem",
+      "capabilities": [
+        "chem.recognize"
+      ]
+    },
+    {
+      "id": "docling-layout",
+      "capabilities": [
+        "document.layout.analyze"
+      ]
+    },
+    {
+      "id": "docling-math",
+      "capabilities": [
+        "math.recognize"
+      ]
+    },
+    {
+      "id": "docling-ocr",
+      "capabilities": [
+        "document.ocr"
+      ]
+    },
+    {
+      "id": "filesystem",
+      "capabilities": [
+        "artifact.retrieve",
+        "artifact.store"
+      ]
+    },
+    {
+      "id": "homr",
+      "capabilities": [
+        "music.omr"
+      ]
+    },
+    {
+      "id": "math-speech",
+      "capabilities": [
+        "math.convert",
+        "math.verbalize"
+      ]
+    },
+    {
+      "id": "mineru",
+      "capabilities": [
+        "document.structure.extract"
+      ]
+    },
+    {
+      "id": "mineru-layout",
+      "capabilities": [
+        "document.layout.analyze"
+      ]
+    },
+    {
+      "id": "mineru-ocr",
+      "capabilities": [
+        "document.ocr"
+      ]
+    },
+    {
+      "id": "minio",
+      "capabilities": [
+        "artifact.retrieve",
+        "artifact.store"
+      ]
+    },
+    {
+      "id": "nougat",
+      "capabilities": [
+        "document.structure.extract"
+      ]
+    },
+    {
+      "id": "pandoc-docx",
+      "capabilities": [
+        "document.export.docx"
+      ]
+    },
+    {
+      "id": "pandoc-pdf-ua",
+      "capabilities": [
+        "document.export.pdf_ua"
+      ]
+    },
+    {
+      "id": "pp-formulanet",
+      "capabilities": [
+        "math.recognize"
+      ]
+    },
+    {
+      "id": "pure-accessibility",
+      "capabilities": [
+        "accessibility.mark"
+      ]
+    },
+    {
+      "id": "pure-chem",
+      "capabilities": [
+        "chem.convert"
+      ]
+    },
+    {
+      "id": "pure-code",
+      "capabilities": [
+        "code.normalize"
+      ]
+    },
+    {
+      "id": "pure-media-inspect",
+      "capabilities": [
+        "media.inspect"
+      ]
+    },
+    {
+      "id": "pure-text",
+      "capabilities": [
+        "text.postprocess"
+      ]
+    },
+    {
+      "id": "pymupdf-pdf",
+      "capabilities": [
+        "document.text.spans",
+        "pdf.render",
+        "pdf.split"
+      ]
+    },
+    {
+      "id": "qwen3-vl-8b",
+      "capabilities": [
+        "document.adjudicate.page",
+        "document.adjudicate.region",
+        "document.ocr.page",
+        "table.recognize"
+      ]
+    },
+    {
+      "id": "rapid-latex-ocr",
+      "capabilities": [
+        "math.recognize"
+      ]
+    },
+    {
+      "id": "rapidocr-orient",
+      "capabilities": [
+        "image.page.orient"
+      ]
+    },
+    {
+      "id": "valkey",
+      "capabilities": [
+        "cache.get",
+        "cache.put"
+      ]
+    },
+    {
+      "id": "verapdf",
+      "capabilities": [
+        "pdf.validate.pdf_ua"
+      ]
+    }
+  ]
+}

@@ -1,4 +1,5 @@
-import asyncio
+from backend.services.blocking import offload
+from contextlib import contextmanager
 import json
 import sqlite3
 import uuid
@@ -6,6 +7,13 @@ import threading
 import shutil
 from pathlib import Path
 
+from backend.i18n import t
+from backend.log_messages import (
+    LOG_DOWNLOAD_TOKEN_CREATED,
+    LOG_DOWNLOAD_TOKEN_DIR_MISSING,
+    LOG_DOWNLOAD_TOKEN_NOT_FOUND,
+    LOG_OUTPUT_DIR_REMOVED,
+)
 from backend.tools.logger import logger
 from backend.config.settings import settings
 
@@ -18,6 +26,8 @@ TOKEN_EXPIRY_DAYS = 7
 FORMAT_EXTENSIONS = {
     "txt": "texto",
     "docx": "word",
+    # Only PDF/UA is produced now; "pdf" lists the files of jobs made before
+    # that, whose links stay valid for TOKEN_EXPIRY_DAYS.
     "pdf": "pdf",
     "pdf_ua": "pdf/ua",
     "html": "html",
@@ -70,7 +80,8 @@ def _get_connection():
     return _connection
 
 
-async def criar_token(
+@offload
+def criar_token(
     output_dir: Path,
     filename: str,
     formats: list = None,
@@ -90,11 +101,12 @@ async def criar_token(
             conn.commit()
         finally:
             cursor.close()
-    logger.debug("Token de download criado: {} -> {}", token, filename)
+    logger.debug(t(LOG_DOWNLOAD_TOKEN_CREATED).format(filename=filename))
     return token
 
 
-async def obter_info_token(token: str) -> dict | None:
+@offload
+def obter_info_token(token: str) -> dict | None:
     with _connection_lock:
         conn = _get_connection()
         cursor = conn.cursor()
@@ -110,14 +122,12 @@ async def obter_info_token(token: str) -> dict | None:
         finally:
             cursor.close()
     if row is None:
-        logger.warning("Token de download nao encontrado ou expirado: {}", token)
+        logger.warning(t(LOG_DOWNLOAD_TOKEN_NOT_FOUND))
         return None
     output_dir = Path(row["output_dir"])
     if not output_dir.exists():
         logger.warning(
-            "Diretorio do token de download nao existe: {} -> {}",
-            token,
-            output_dir,
+            t(LOG_DOWNLOAD_TOKEN_DIR_MISSING).format(output_dir=output_dir)
         )
         return None
     formats_list = json.loads(row["formats"]) if row["formats"] else []
@@ -131,8 +141,15 @@ async def obter_info_token(token: str) -> dict | None:
         separator = "" if suffix.startswith("_") else "."
         file_path = output_dir / f"{base}{separator}{suffix}"
         if file_path.exists():
-            size_kb = file_path.stat().st_size / 1024
-            size_str = f"{size_kb:.0f} KB" if size_kb < 1024 else f"{size_kb / 1024:.1f} MB"
+            size_bytes = file_path.stat().st_size
+            # Choose the unit before rounding: 1 MB minus one byte remains
+            # in the KB range and rounds to "1024 KB".
+            if size_bytes < 1024:
+                size_str = f"{size_bytes} B"
+            elif size_bytes < 1024 * 1024:
+                size_str = f"{size_bytes / 1024:.0f} KB"
+            else:
+                size_str = f"{size_bytes / (1024 * 1024):.1f} MB"
             formats.append({
                 "ext": ext,
                 "label": label,
@@ -151,28 +168,75 @@ async def obter_info_token(token: str) -> dict | None:
     }
 
 
-async def limpar_tokens_expirados(dias: int = TOKEN_EXPIRY_DAYS):
+@offload
+def limpar_tokens_expirados(dias: int = TOKEN_EXPIRY_DAYS):
     with _connection_lock:
         conn = _get_connection()
         cursor = conn.cursor()
         try:
+            conn.execute("BEGIN IMMEDIATE")
+            cutoff = f"-{dias} days"
             cursor.execute(
-                "SELECT output_dir FROM download_tokens WHERE criado_em < datetime('now', '-{} days')".format(dias)
+                "SELECT DISTINCT output_dir FROM download_tokens WHERE criado_em < datetime('now', ?)",
+                (cutoff,),
             )
-            rows = cursor.fetchall()
-        finally:
-            cursor.close()
-        for row in rows:
-            output_dir = Path(row["output_dir"])
-            if output_dir.exists():
-                if str(output_dir).startswith(str(settings.temp_dir)) or str(output_dir).startswith(str(settings.data_dir / "output")):
-                    shutil.rmtree(output_dir, ignore_errors=True)
-                    logger.debug("Diretório de output removido: {}", output_dir)
-        cursor = conn.cursor()
-        try:
+            expired_dirs = [Path(row["output_dir"]) for row in cursor.fetchall()]
             cursor.execute(
-                "DELETE FROM download_tokens WHERE criado_em < datetime('now', '-{} days')".format(dias)
+                "SELECT DISTINCT output_dir FROM download_tokens WHERE criado_em >= datetime('now', ?)",
+                (cutoff,),
+            )
+            active_dirs = {Path(row["output_dir"]).resolve() for row in cursor.fetchall()}
+            for output_dir in expired_dirs:
+                _remove_unreferenced_output_directory(output_dir, active_dirs)
+            cursor.execute(
+                "DELETE FROM download_tokens WHERE criado_em < datetime('now', ?)",
+                (cutoff,),
             )
             conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
         finally:
             cursor.close()
+
+
+def _remove_unreferenced_output_directory(output_dir: Path, active_dirs: set[Path]) -> bool:
+    resolved = output_dir.resolve()
+    roots = (settings.temp_dir.resolve(), (settings.data_dir / "output").resolve())
+    if output_dir.is_symlink() or not any(root in resolved.parents for root in roots):
+        return False
+    if any(
+        resolved == active or resolved in active.parents or active in resolved.parents
+        for active in active_dirs
+    ):
+        return False
+    if not output_dir.is_dir():
+        return False
+    shutil.rmtree(output_dir)
+    logger.debug(t(LOG_OUTPUT_DIR_REMOVED).format(name=output_dir))
+    return True
+
+
+@contextmanager
+def active_download_directories():
+    """Hold token creation and expiry while a caller checks and removes files."""
+    with _connection_lock:
+        conn = _get_connection()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            rows = conn.execute(
+                "SELECT DISTINCT output_dir FROM download_tokens WHERE criado_em >= datetime('now', ?)",
+                (f"-{TOKEN_EXPIRY_DAYS} days",),
+            ).fetchall()
+            active_dirs = {Path(row["output_dir"]).resolve() for row in rows}
+            yield active_dirs
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
+
+def remove_unreferenced_output_directory(output_dir: Path) -> bool:
+    """Serialize retention checks and deletion with token creation, including other processes."""
+    with active_download_directories() as active_dirs:
+        return _remove_unreferenced_output_directory(output_dir, active_dirs)

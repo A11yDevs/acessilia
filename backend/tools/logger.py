@@ -3,6 +3,8 @@ import sys
 from loguru import logger
 
 from backend.config.settings import settings
+from backend.i18n import t
+from backend.log_messages import LOG_LOGGER_CONFIGURED
 
 
 def setup_logger() -> None:
@@ -27,4 +29,4 @@ def setup_logger() -> None:
         compression="zip",
     )
 
-    logger.info("Logger configured - level: {}", settings.log_level)
+    logger.info(t(LOG_LOGGER_CONFIGURED).format(level=settings.log_level))

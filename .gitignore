@@ -38,5 +38,22 @@ temp/
 *.fls
 *.synctex.gz
 
+# Compiled Babel locale catalogs (build artifacts, regenerated from .po sources at import time)
+backend/locales/*/LC_MESSAGES/*.mo
+
 # PDFs temporarios gerados durante benchmark em fixtures
 tests/fixtures/tutorials/pagina_*.pdf
+
+# Agentes Copilot locais (nao devem ir para PR)
+.github/agents/
+
+*.egg-info
+.venv-1
+scripts/drbench/builds
+
+# Corpus de teste e2e: clone separado de A11yDevs/acessilia-dataset, baixado
+# sob demanda. Sem esta regra o diretorio aparece como untracked no workspace
+# e entra em `git add .` por engano.
+tests/dataset/
+.mypy_cache/
+.ruff_cache/

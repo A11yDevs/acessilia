@@ -1,0 +1,400 @@
+# Algoritmos de docstruct — Fusão, Auditoria, Classificação e Re-inferência
+
+Também disponível em **inglês (EUA)**: [English version](docstruct_algorithms.md)
+
+Este documento explica como funcionam os algoritmos determinísticos por trás
+da biblioteca `docstruct` e como os agentes de Acessilia os invocam. É o
+companheiro de [`libs/docstruct/README.md`](../../libs/docstruct/README.md)
+(API pública) e de [`pmv_agno_pddl.md`](pmv_agno_pddl.md) (orquestração PDDL).
+
+## Escopo
+
+A biblioteca `docstruct` (`libs/docstruct/`) é um núcleo **puro** de
+processamento estrutural de documentos: nenhuma função toca a rede, o sistema
+de arquivos, subprocessos, configuração, o logger ou i18n dinâmico. É a única
+fonte de verdade para os algoritmos descritos aqui. O backend (`backend/`)
+fornece as pontes de I/O, configuração e i18n, e os agentes Agno expõem os
+algoritmos como ferramentas.
+
+```
+backend (agentes Agno, PDDL, I/O, configuração, i18n)
+   │  depende de
+   ▼
+docstruct (algoritmos puros)
+```
+
+---
+
+## 1. Fusão multi-provider (Tree Differ)
+
+### 1.1 Objetivo
+
+Dois providers de extração de estrutura (por padrão **Docling** e **MinerU**)
+produzem listas de blocos independentes para o mesmo documento. Cada provider
+é bom em coisas distintas: Docling é forte em ordem de leitura e títulos;
+MinerU é forte em qualidade de texto e extração de fórmulas. A fusão os
+combina em uma única sequência de blocos de maior qualidade.
+
+### 1.2 Pipeline (`backend/pipeline/fusion.py`)
+
+`extract_fused()` orquestra os dois providers e chama o puro
+`docstruct.fusion.merge_blocks()`:
+
+1. Extrai com o provider **primário** (por padrão `docling`).
+2. Extrai com o provider **secundário** (por padrão `mineru`), em paralelo.
+3. Converte o payload de cada provider em blocos canônicos (com bbox).
+4. Agrupa os blocos por página.
+5. Para cada página, chama `merge_blocks(D, M, policy)` onde `D` = blocos de
+   Docling e `M` = blocos de MinerU.
+6. Serializa os blocos fundidos em markdown.
+
+**Fallback:** se o provider secundário falha, `extract_fused` usa
+silenciosamente só o primário. O handler PDDL `dual-provider-fusion` trata
+isso como **falha** (ver [§5](#5-como-os-agentes-invocam-os-algoritmos))
+porque a semântica dual planejada não foi realmente executada.
+
+### 1.3 O Tree Differ (`docstruct.fusion.differ.merge_blocks`)
+
+`merge_blocks(D, M, policy)` é a porta do Tree Differ v2 da PR #98
+(Dr.DocBench). É executado em etapas:
+
+#### Etapa A — Pré-processamento (redução de ruído)
+
+- **Rebaixamento de fórmulas** (`formula_text`): as fórmulas sem operador
+  matemático são rebaixadas a texto simples.
+- **Supressão de regiões** (`suppress_regions`): o texto de Docling que cai
+  dentro de uma tabela/figura de MinerU é suprimido (a menos que a página
+  quase não tenha texto).
+- **Decor-tail** (`decor_tail`): cabeçalhos/rodapés e números de página são
+  separados e movidos para o fim da página.
+- **Filtro de lixo** (`junk_filter`): os blocos que parecem lixo (p. ex.
+  tokens soltos) são descartados.
+- **Fusão de linhas** (`fuse_lines`): as sequências de linhas consecutivas são
+  fundidas.
+- **Re-fusão de parágrafos** (`merge_paragraphs`): os parágrafos divididos são
+  reagrupados.
+
+#### Etapa B — Alinhamento Húngaro
+
+O passo central de pareamento. Constrói-se uma matriz de custos em que cada
+célula é:
+
+```
+cost(i, j) = (1 - λ) * (1 - sim(texto_i, texto_j)) + λ * (1 - IoU(caixa_i, caixa_j))
+```
+
+- `sim(texto)` é uma similaridade de texto (sobreposição de tokens).
+- `IoU(caixa)` é a interseção-sobre-união das duas caixas delimitadoras.
+- `λ = policy.align_lambda` (por padrão `0.5`) pondera texto vs geometria.
+
+Uma atribuição pura **Kuhn–Munkres** (Húngara) (`_hungarian.py`, O(n³), sem
+scipy) encontra o pareamento um-para-um de custo mínimo. Os pares cujo custo
+supera `policy.align_tau` (por padrão `0.6`) ficam **sem pareamento**.
+
+#### Etapa C — Esqueleto de ordem de leitura
+
+A ordem de leitura segue o provider B (**MinerU**). Para cada bloco de
+MinerU:
+
+- se pareou com um bloco de Docling, o texto é escolhido com `_pick_text`
+  (ver abaixo);
+- se é unilateral (sem pareamento), mantém-se o próprio texto.
+
+#### Etapa D — Inserção de blocos Docling unilaterais
+
+Os blocos de Docling que não parearam são inseridos junto ao seu **vizinho
+geometricamente mais próximo** no esqueleto de MinerU (acima ou abaixo, de
+acordo com o centro vertical). Os blocos de texto curtos (`len < min_len`) são
+descartados, e os blocos que "engolem" vários blocos de MinerU também são
+descartados (`pick_guard`).
+
+#### Etapa E — Seleção de texto (`_pick_text`)
+
+Para um par pareado, o texto é escolhido conforme `policy.text_pick`:
+
+- `docling` → sempre Docling;
+- `mineru` → sempre MinerU;
+- `auto` (por padrão) → MinerU vence no corpo, a menos que tenha truncado o
+  texto ou tenha pior qualidade de OCR; Docling vence quando é
+  significativamente mais longo ou quando MinerU engoliu colunas.
+
+#### Etapa F — Reordenação XY-cut opcional (`policy.order_xycut`)
+
+Por padrão o esqueleto de MinerU é mantido. Com `order_xycut="multicol"` a
+página fundida é reordenada por um **XY-cut** recursivo
+(`docstruct.fusion.xycut`): a página é dividida nas calhas verticais (colunas
+lidas da esquerda para a direita), blocos de largura total (títulos, tabelas
+largas) funcionam como quebras de seção e cada região é lida de cima para baixo.
+O portão só age em páginas cujas caixas formam pelo menos `xycut_min_columns`
+(padrão 2) colunas no nível superior; Com `xycut_min_balance > 0` (ex.: 0,7) exige também que a coluna mais estreita tenha pelo menos essa fração da mais larga, de modo que uma coluna principal ao lado de uma barra lateral estreita não é tocada. páginas de coluna única mantêm a ordem do
+esqueleto, porque nelas a ordem do GT frequentemente foge de uma leitura
+puramente de cima para baixo (figuras, legendas, boxes laterais).
+`order_xycut="always"` reordena todas as páginas e existe só para comparação.
+
+A etapa muda apenas a sequência dos blocos que sobreviveram às etapas
+anteriores: nada é acrescentado, removido ou reescrito. Blocos sem caixa
+utilizável acompanham o bloco com caixa que os precede. Cabeçalho, rodapé e
+número de página continuam na cauda de decorativos. Contadores:
+`xycut-applied`, `xycut-moved`, `xycut-columns:<n>`, `xycut-skipped:<motivo>`.
+Padrão: `off` (inclusive nos presets `drbench_v12`/`drbench_v13`).
+
+Veja [Ordem de leitura por XY-cut em páginas multicoluna](reading_order_xycut.pt-br.md) para a
+motivação, o experimento e as limitações.
+
+### 1.4 `FusionPolicy`
+
+`FusionPolicy` é um dataclass congelado. Seus defaults são a política de
+**produção**: as capacidades determinísticas com evidência de ganho (ou que
+corrigem um defeito) ficam ligadas, e o que consome modelo fica desligado.
+
+| Capacidade | Default | Evidência |
+|---|---|---|
+| `verse_chunk` 300 / `verse_kind` records | ligado | determinístico; preserva verso real inteiro |
+| `line_numbers`, `table_eq`, `norm_text`, `hf_end` | ligado | determinístico, baixo risco |
+| `tailjoin` end / 50 / 3 / `hdr` | ligado | a regra `tj3`: Δtune +1.47, Δhold +0.79 |
+| `rep_guard`, `blank_pages` | ligado | corrige loops de geração degenerada |
+| `upscale`, `orientation` | ligado | maior ganho isolado da linha Tele (Δtune +1.59, Δhold +2.91) |
+| `page_judge` | **desligado** | consome modelo; ligue quando a Toolbox expuser `document.adjudicate.page` |
+
+Os presets ajustados ao benchmark (`drbench_v12`, `drbench_v13`, `drbench_v14`,
+`drbench_v15`, `drbench_best_method`) são classmethods nomeados, nunca defaults,
+porque foram sobreajustados ao split dev (gap dev→test ≈ 8 pontos).
+
+Os experimentos rejeitados (word_vote, dedup_blocks, medoide, juiz por bloco,
+mover cabeçalho, tabelas do dots, árbitro DeepSeek, seletor logístico, ensemble
+de prompts, reajuste de limiares) **não** entram nos defaults: mostraram
+Δtune ≤ 0 e Δhold ≤ 0.
+
+### 1.5 Pós-processamento determinístico (Dr.DocBench PR #125)
+
+Além do Tree Differ, a biblioteca expõe as políticas determinísticas que o
+trabalho de benchmark produziu, todas como funções puras:
+
+| Módulo | O que faz |
+|---|---|
+| `fusion.verse` | divide blocos de verso/registro para o avaliador reagrupar |
+| `fusion.line_numbers` | move números de linha marginais para blocos próprios |
+| `fusion.flood` | descarta blocos curtos quando um provider inunda a página |
+| `fusion.tailjoin` | junta blocos curtos finais (a regra `tj3`) |
+| `fusion.repetition` | corta loops de geração degenerada, detecta páginas brancas |
+| `fusion.page_select` | fusão de página inteira e a troca GT-free por baixa concordância |
+| `fusion.judge` | a regra do juiz pareado por VLM |
+| `fusion.adjudication` | o protocolo do adjudicador e seus filtros de segurança |
+| `fusion.oracle` | oráculo por bloco e folga (dimensionar antes de gastar GPU) |
+| `fusion.hf_end` | a convenção do GT de cabeçalho/rodapé no fim |
+| `fusion.table_specialist` | o medoide de tabela (gerar-comparar-adjudicar) |
+| `text.normalize`, `text.norm_fix`, `text.latex` | primitivas de normalização de texto |
+| `text.unicode_repair` | reparo conservador de NFC, i sem ponto e acentos espaçadores em PDFs TeX legados (prosa, cabeçalhos e células de tabela); com evidência no nível do documento, também a crase (`` ` a`` → `à`) e ligaduras partidas (`fi ca` → `fica`) |
+| `text.math_spans` | separa a prosa em pedaços de texto e de math inline `$…$` / `\(…\)` (regra `tex_math_dollars` do Pandoc; `R$ 10,00` continua texto) |
+| `text.inline_math` | acha math inline na camada de texto de um PDF pelas fontes matemáticas (`CMMI`, `CMSY`, `MSBM`…) e pelas linhas de base dos índices, remonta o LaTeX e o insere no texto extraído como `$…$` onde as duas sequências de caracteres se alinham (ADR 0011) |
+| `text.negation_overlay` | devolve a barra solta do `≠` (U+0338 extraído como elemento próprio) à relação que ela nega, pela posição; só quando a escolha é inequívoca |
+| `imaging.policy` | decisões puras de upscale/orientação (sem PIL/cv2) |
+| `docstruct.fusion.verse` | chunk verse/record blocks so the evaluator can re-group them |
+| `docstruct.fusion.line_numbers` | pull marginal verse line numbers into their own blocks |
+| `docstruct.fusion.flood` | drop short blocks when a provider floods the page |
+| `docstruct.fusion.tailjoin` | join trailing short blocks (the `tj3` rule) |
+| `docstruct.fusion.repetition` | cut degenerate generation loops, detect blank pages |
+| `docstruct.fusion.page_select` | whole-page fusion and the GT-free low-agreement swap |
+| `docstruct.fusion.judge` | the pairwise VLM judge rule |
+| `docstruct.fusion.adjudication` | the adjudicator protocol and its safety filters |
+| `docstruct.fusion.oracle` | per-block oracle and headroom (sizing before spending GPU) |
+| `docstruct.fusion.hf_end` | the ground-truth header/footer-at-end convention |
+| `docstruct.fusion.table_specialist` | the generate-compare-adjudicate table medoid |
+| `docstruct.text.normalize` | the shared comparison normalizer |
+| `docstruct.text.norm_fix` | deterministic text cleanups (ligatures, hyphen, NBSP) |
+| `docstruct.text.unicode_repair` | conservative NFC, dotless-i, spacing, crase and split-ligature repair for legacy TeX PDFs |
+| `docstruct.text.negation_overlay` | reattaches a detached negation slash to its relation by position (unambiguous cases only) |
+| `docstruct.text.latex` | LaTeX normalization |
+| `docstruct.text.math_spans` | inline math spans in prose |
+| `docstruct.text.equations` | display equation labels (`\tag{1}`, `\quad(1)`, `(1)`) split into `metadata.equation_number` and restored per export |
+| `docstruct.text.inline_math` | inline math from text-layer fonts and baselines |
+| `docstruct.imaging.policy` | pure upscale/orientation decisions (no PIL/cv2) |
+| `docstruct.evaluation.holdout` | the tune/holdout split and the acceptance criteria |
+
+---
+
+## 2. Auditoria do documento canônico
+
+### 2.1 Objetivo
+
+Validar um documento canônico e coletar achados estruturados para que os
+renderers e consumidores posteriores possam confiar em sua estrutura.
+
+### 2.2 `validate_canonical_document`
+
+Verifica os invariantes estruturais de um documento canônico:
+
+- campos obrigatórios (`schema_version`, `id`, `title`, `language`, `sections`);
+- ids de bloco duplicados;
+- hierarquia de títulos (exatamente um H1, sem níveis pulados, o primeiro
+  título é H1);
+- vazamentos de prompt e markdown solto no texto de parágrafos;
+- consistência de indentação de código;
+- estrutura de tabelas (linhas, colunas, células, `table_ast`);
+- links internos quebrados.
+
+### 2.3 `audit_canonical_document`
+
+Executa a validação base mais uma auditoria de acessibilidade e agrupa os
+achados por severidade:
+
+| Severidade | Significado |
+|---|---|
+| `BLOCKER` | Falhas estruturais (erros de validação base, seções ausentes). |
+| `WARNING` | Achados de acessibilidade (imagens sem alt-text, tabelas sem cabeçalhos explícitos). |
+
+Os achados são retornados como tuplas `(msgid, kwargs)` — o msgid canônico é
+a única fonte de verdade; o backend o resolve por meio de seu catálogo i18n.
+
+---
+
+## 3. Classificação de regiões
+
+### 3.1 Objetivo
+
+Classificar uma região de página em uma categoria de processamento para que o
+pipeline saiba como tratá-la (visão, OCR, linearização de tabelas,
+verbalização de fórmulas, ou ignorar).
+
+### 3.2 `classify_region`
+
+`docstruct.regions.classify.classify_region(region)` mapeia uma `Region` a uma
+categoria:
+
+| Tipo de região | Classificações possíveis |
+|---|---|
+| `image` | `embedded_image` (confiança alta + bytes), `unknown` (grande), `ignore` |
+| `table` | `table` (tem texto ou é grande), `ignore` |
+| `formula` | `formula` (grande), `ignore` |
+| `text` | `text_clean`, `text_scanned`, `code_block`, `list_block`, `unknown`, `ignore` |
+| `unknown` | `unknown` (grande), `ignore` |
+
+As regiões de Docling vêm pré-classificadas e são mapeadas por meio de
+`DOCLING_CLASSIFICATION`.
+
+### 3.3 `region_needs_vision`
+
+Retorna `True` para as categorias que exigem uma passada de visão/LLM:
+`text_scanned`, `embedded_image`, `unknown`, `table`, `formula`.
+
+### 3.4 `needs_reinfer`
+
+A ferramenta `FusionAgent.needs_reinfer` classifica a região e informa se ela
+precisa de re-inferência (visão ou correção de orientação). É o portão
+determinístico que decide se uma passada de LLM é necessária.
+
+---
+
+## 4. O `FusionAgent` (envelope de ferramentas Agno)
+
+`backend/core/agents/fusion_agent.py` expõe os algoritmos como ferramentas
+Agno, seguindo o padrão `InformationalStructuralAgent`: cada capacidade tem
+um método `process_*` puro (testável sem Agno) mais um envelope JSON fino.
+
+| Ferramenta | Núcleo determinístico | Propósito |
+|---|---|---|
+| `fuse_providers` | `process_fuse_providers` → `extract_fused` | Fundir dois providers de toolbox. |
+| `audit_document` | `process_audit_document` → `audit_canonical_document` | Auditar um documento canônico. |
+| `classify_block` | `process_classify_block` → `classify_region` | Classificar uma região. |
+| `needs_reinfer` | `process_needs_reinfer` → `classify_region` + `region_needs_vision` | Decidir se uma região precisa de re-inferência. |
+
+**Nota de design:** os envelopes de ferramentas intencionalmente **não**
+serializam `image_bytes` — reconstruem uma `Region` com `image_bytes=None`.
+Payloads binários não devem cruzar os limites das chamadas de ferramentas.
+Para decisões multimodais futuras, passe uma referência persistente
+(`artifact_id` / `image_ref` / `crop_path` / URI de object-storage) em vez de
+bytes crus.
+
+---
+
+## 5. Como os agentes invocam os algoritmos
+
+### 5.1 Fusão dirigida por PDDL (`dual-provider-fusion`)
+
+O planejador PDDL pode selecionar o método `dual-provider-fusion` para uma
+obrigação. O fluxo é:
+
+```
+Plano PDDL
+   │  seleciona dual-provider-fusion
+   ▼
+ExecutorAgent (Agno Workflow)
+   │  chama o handler registrado
+   ▼
+_handle_dual_provider_fusion_method (backend/agents/pddl_orchestrator.py)
+   │  chama extract_fused()
+   ▼
+backend.pipeline.fusion.extract_fused
+   │  extrai com docling + mineru (em paralelo)
+   ▼
+docstruct.fusion.merge_blocks (Tree Differ)
+   │  devolve blocos markdown fundidos
+   ▼
+o handler persiste o payload em data_dir/artifacts/fusion/<obligation_id>.json
+   │  devolve MethodResult(artifacts=[fusion_artifact])
+   ▼
+ExecutorAgent incorpora o artefato ao manifesto
+   e associa seu id à tentativa executada (proveniência)
+```
+
+O handler é **estrito**: se só um provider participou (o fallback
+single-provider dentro de `extract_fused`), a ação `dual-provider-fusion`
+planejada é tratada como **falha**, registrando `(tried ...)` e permitindo
+replanejamento para um método single-provider. Isso mantém a semântica
+planejada alinhada com o que realmente foi executado.
+
+### 5.2 Invocação direta de ferramentas
+
+As ferramentas do `FusionAgent` também podem ser invocadas diretamente (p. ex.
+por um agente LLM ou pelo runtime AgentOS) para fundir, auditar, classificar
+ou decidir re-inferência sem passar pelo planejador PDDL.
+
+---
+
+## 6. Números de equações em destaque
+
+`docstruct.text.equations` separa um sufixo `\tag{1}`, `\quad(1)` ou `(1)`
+não ambíguo de uma fórmula em destaque. O core aplica isso ao construir o
+manifesto de processamento e ao aceitar reconhecimento por OCR ou visão.
+O construtor canônico aplica a mesma regra aos blocos matemáticos estruturados.
+
+A expressão permanece em `text`; o identificador original fica em
+`metadata.equation_number`. Um identificador existente e válido tem prioridade
+sobre o resultado do reconhecimento. Conversores e verbalizadores recebem a
+expressão sem o rótulo, e a concordância do reconhecimento compara expressões
+sem o rótulo.
+
+A AST Pandoc do PDF/UA e o Markdown do benchmark restauram `\tag{1}`.
+O DOCX usa `\qquad\text{(1)}`, pois o conversor de matemática do Word do
+Pandoc não aceita `\tag` isolado. O HTML mostra o número ao lado da fórmula
+e o inclui no rótulo acessível do elemento `<math>`; o número visual
+(`.equation-number`, à direita da fórmula) fica oculto da tecnologia assistiva
+para evitar a repetição desse rótulo. O TXT e seus consumidores de áudio
+mantêm o número na representação falada. Quando o PDF/UA recai nas fórmulas
+como texto, o rótulo aparece como `(1)`, e não como `\tag{1}`. Renderizações
+repetidas não duplicam o rótulo: `\qquad\text{(1)}` é lido de volta como as
+outras formas.
+
+Uma fórmula cujo único comando LaTeX era o rótulo (`x=y\tag{1}`) recebe
+`metadata.latex_markup`, e o reconhecimento continua a tratá-la como LaTeX
+entregue pelo extrator.
+
+A detecção de sufixos é conservadora, sem interpretar TeX arbitrário. Ela não
+cria números ausentes, renumera equações nem transforma referências em links.
+Parênteses que podem completar uma operação, como `x = (1)` e `x = y + (1)`,
+continuam na expressão. Um `(1)` solto só é rótulo depois de uma relação
+(`=`, `<`, `>`, `\neq`, `\le`, `\approx`, `\sim`, `\propto`, `\to`, `\in` e
+afins); uma expressão que termina numa delas o mantém. `f(1)` sem separação
+também fica intacto. Os
+identificadores aceitam dígitos com componentes separados por pontos e sufixo
+de letra ou prefixo de apêndice, como `1`, `2.3`, `4a` e `A.1`.
+
+## 7. Documentação relacionada
+
+- [libs/docstruct/README.md](../../libs/docstruct/README.md) — API pública.
+- [pmv_agno_pddl.md](pmv_agno_pddl.md) — orquestração PDDL e o método
+  `dual-provider-fusion`.
+- [architecture.md](architecture.md) — arquitetura do sistema.
+- [patterns.md](patterns.md) — padrões de design (padrão 10: agente de fusão
+  determinístico).
+- [drbench.md](drbench.md) — o benchmark Dr.DocBench que motivou o Tree Differ.

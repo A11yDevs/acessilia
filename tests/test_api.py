@@ -1,12 +1,22 @@
 import asyncio
+import json
+import logging
 import zipfile
 from pathlib import Path
+from types import SimpleNamespace
 
+import httpx
 import pytest
+import respx
+from fastapi import HTTPException, Request
+from fastapi.security import HTTPAuthorizationCredentials
 from fastapi.testclient import TestClient
 
 from backend.api.limiter import limiter
+from backend.api.observability_auth import require_observability_token
 from backend.config.settings import settings
+from backend.tools.access_log_filter import AccessLogFilter
+from backend.tools.logger import logger
 
 pytest.importorskip("fastapi.testclient")
 
@@ -35,6 +45,10 @@ def _isolate_paths(api_paths, monkeypatch):
     dts._connection = None
     hs._connection = None
     limiter.enabled = False
+    # These tests exercise processing/export behavior; authorization is covered
+    # without overrides in test_v2_security.py.
+    from backend.api.job_auth import require_job_access
+    monkeypatch.setitem(app.dependency_overrides, require_job_access, lambda: None)
 
 
 @pytest.fixture(scope="session")
@@ -64,8 +78,244 @@ def test_health(client):
     assert "queue_size" in body
 
 
-def test_stats_empty(client):
-    resp = client.get("/api/v1/stats")
+def _write_staging_status(last_check: str) -> None:
+    digest = "sha256:" + "d" * 64
+    (settings.data_dir / "staging-status.json").write_text(
+        json.dumps(
+            {
+                "latest_sha": "79d9a0c",
+                "running_sha": "79d9a0c",
+                "last_check": last_check,
+                "last_update": "2026-10-22T17:41:54Z",
+                "latest_digest": digest,
+                "running_digest": digest,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+@pytest.mark.parametrize(
+    "last_check,stale",
+    [
+        ("", False),  # no updater reports here
+        ("2026-10-23T00:40:00Z", False),
+        ("2026-10-23T00:35:00Z", True),  # 15 min and 1 s before "now"
+        ("not a date", True),
+        ("2026-10-23T00:44:00", True),  # no timezone: cannot be compared
+    ],
+)
+def test_update_check_staleness(last_check, stale):
+    from datetime import UTC, datetime
+
+    from backend.api.routes.health import _update_check_is_stale
+
+    now = datetime(2026, 10, 23, 0, 50, 1, tzinfo=UTC)
+    assert _update_check_is_stale(last_check, now=now) is stale
+
+
+def test_health_is_not_up_to_date_when_the_updater_stopped_checking(client, monkeypatch):
+    """The staging timer failed for hours while /health kept saying up_to_date."""
+    from datetime import UTC, datetime, timedelta
+
+    async def reachable() -> bool:
+        return True
+
+    monkeypatch.setattr("backend.api.routes.health._check_model_reachable", reachable)
+
+    fresh = (datetime.now(UTC) - timedelta(minutes=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    _write_staging_status(fresh)
+    body = client.get("/api/v1/health").json()
+    assert (body["up_to_date"], body["update_check_stale"]) == (True, False)
+
+    _write_staging_status("2026-10-22T17:41:54Z")
+    body = client.get("/api/v1/health").json()
+    assert (body["up_to_date"], body["update_check_stale"]) == (False, True)
+    assert body["update_available"] is False
+
+
+def test_health_survives_a_malformed_staging_status(client, monkeypatch):
+    """A non-string last_check must not turn /health itself into a 500."""
+
+    async def reachable() -> bool:
+        return True
+
+    monkeypatch.setattr("backend.api.routes.health._check_model_reachable", reachable)
+
+    status_file = settings.data_dir / "staging-status.json"
+    status_file.write_text(json.dumps({"last_check": 12345, "latest_digest": 7}), encoding="utf-8")
+    response = client.get("/api/v1/health")
+    assert response.status_code == 200
+    body = response.json()
+    assert (body["last_check"], body["update_check_stale"], body["up_to_date"]) == ("12345", True, False)
+
+    status_file.write_text("[]", encoding="utf-8")
+    assert client.get("/api/v1/health").status_code == 200
+
+
+def test_health_access_filter_keeps_failures_and_other_requests():
+    def record(path, status):
+        return logging.LogRecord(
+            "uvicorn.access", logging.INFO, __file__, 0, "%s %s %s %s %d",
+            ("127.0.0.1", "GET", path, "1.1", status), None,
+        )
+
+    access_filter = AccessLogFilter()
+    assert not access_filter.filter(record("/api/v1/health", 200))
+    assert access_filter.filter(record("/api/v1/health", 503))
+    assert access_filter.filter(record("/api/v1/jobs", 200))
+
+
+def test_access_log_filter_redacts_download_tokens():
+    access_filter = AccessLogFilter()
+    for path in (
+        "/api/v1/download/private-token/pdf?preview=true",
+        "/download/private-token?preview=true",
+    ):
+        record = logging.LogRecord(
+            "uvicorn.access", logging.INFO, __file__, 0, '%s - "%s %s HTTP/%s" %d',
+            ("127.0.0.1", "GET", path, "1.1", 200), None,
+        )
+        assert access_filter.filter(record)
+        assert "private-token" not in record.getMessage()
+        assert "[redacted]" in record.getMessage()
+
+
+def test_logs_require_configured_token(client, monkeypatch):
+    monkeypatch.setattr(settings, "observability_api_token", "")
+    monkeypatch.setenv("LOCALE", "en_US")
+    resp_en = client.get("/api/v1/logs")
+    assert resp_en.status_code == 503
+    assert resp_en.json()["detail"] == "Observability access not configured"
+
+    monkeypatch.setenv("LOCALE", "pt_BR")
+    resp_pt = client.get("/api/v1/logs")
+    assert resp_pt.status_code == 503
+    assert resp_pt.json()["detail"] == "Acesso de observabilidade não configurado"
+
+
+def test_logs_declare_bearer_auth_in_openapi(client):
+    schema = client.get("/openapi.json").json()
+    assert schema["paths"]["/api/v1/logs"]["get"]["security"] == [
+        {"ObservabilityToken": []}
+    ]
+
+
+def test_observability_token_cannot_authorize_writes(monkeypatch):
+    monkeypatch.setattr(settings, "observability_api_token", "secret")
+    request = Request({"type": "http", "method": "POST"})
+    credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="secret")
+
+    monkeypatch.setenv("LOCALE", "en_US")
+    with pytest.raises(HTTPException) as exc_en:
+        require_observability_token(request, credentials)
+    assert exc_en.value.status_code == 403
+    assert exc_en.value.detail == "Token allows read-only access"
+
+    monkeypatch.setenv("LOCALE", "pt_BR")
+    with pytest.raises(HTTPException) as exc_pt:
+        require_observability_token(request, credentials)
+    assert exc_pt.value.status_code == 403
+    assert exc_pt.value.detail == "Token permite somente leitura"
+
+
+def test_api_error_log_uses_route_template_instead_of_download_token():
+    messages = []
+    sink = logger.add(messages.append, format="{message}")
+    try:
+        request = Request({
+            "type": "http",
+            "method": "GET",
+            "path": "/api/v1/download/private-token",
+            "headers": [],
+            "route": SimpleNamespace(path="/api/v1/download/{token}"),
+        })
+        response = asyncio.run(app.exception_handlers[Exception](request, RuntimeError("failed")))
+    finally:
+        logger.remove(sink)
+
+    assert response.status_code == 500
+    logged = "".join(str(message) for message in messages)
+    assert "/api/v1/download/{token}" in logged
+    assert "private-token" not in logged
+
+
+def test_logs_list_and_download_files_with_token(client, monkeypatch):
+    monkeypatch.setattr(settings, "observability_api_token", "secret")
+    monkeypatch.setattr(settings, "logs_dir", settings.logs_dir / "manual")
+    settings.logs_dir.mkdir(parents=True, exist_ok=True)
+    (settings.logs_dir / "bot_2020-01-01.log").write_text("first\nsecond\nthird\n", encoding="utf-8")
+    (settings.logs_dir / "bot_2019-12-31.log.zip").write_bytes(b"archive")
+    (settings.logs_dir / "other.log").write_text("hidden", encoding="utf-8")
+
+    monkeypatch.setenv("LOCALE", "en_US")
+    resp_401_en = client.get("/api/v1/logs")
+    assert resp_401_en.status_code == 401
+    assert resp_401_en.json()["detail"] == "Invalid token"
+    assert resp_401_en.headers["WWW-Authenticate"] == "Bearer"
+
+    monkeypatch.setenv("LOCALE", "pt_BR")
+    resp_401_pt = client.get("/api/v1/logs")
+    assert resp_401_pt.status_code == 401
+    assert resp_401_pt.json()["detail"] == "Token inválido"
+    assert resp_401_pt.headers["WWW-Authenticate"] == "Bearer"
+
+    assert client.get("/api/v1/logs", headers={"Authorization": "Bearer wrong"}).status_code == 401
+    assert client.get("/api/v1/logs", headers={"Authorization": "Basic secret"}).status_code == 401
+    assert client.get("/api/v1/logs/bot_2020-01-01.log").status_code == 401
+    headers = {"Authorization": "Bearer secret"}
+    response = client.get("/api/v1/logs", headers=headers)
+    assert response.status_code == 200
+    assert response.json() == {"files": [
+        {"name": "bot_2020-01-01.log", "size_bytes": 19},
+        {"name": "bot_2019-12-31.log.zip", "size_bytes": 7},
+    ]}
+    assert client.get("/api/v1/logs/bot_2020-01-01.log", headers=headers).text == "first\nsecond\nthird\n"
+    assert client.get("/api/v1/logs/bot_2019-12-31.log.zip", headers=headers).content == b"archive"
+
+    monkeypatch.setenv("LOCALE", "en_US")
+    resp_404_en = client.get("/api/v1/logs/other.log", headers=headers)
+    assert resp_404_en.status_code == 404
+    assert resp_404_en.json()["detail"] == "Log file not found"
+
+    monkeypatch.setenv("LOCALE", "pt_BR")
+    resp_404_pt = client.get("/api/v1/logs/other.log", headers=headers)
+    assert resp_404_pt.status_code == 404
+    assert resp_404_pt.json()["detail"] == "Log não encontrado"
+
+
+def test_logs_ignore_symlinks(client, monkeypatch):
+    monkeypatch.setattr(settings, "observability_api_token", "secret")
+    monkeypatch.setattr(settings, "logs_dir", settings.logs_dir / "symlink_test")
+    settings.logs_dir.mkdir(parents=True, exist_ok=True)
+    secret = settings.logs_dir.parent / "secret.log"
+    secret.write_text("private", encoding="utf-8")
+    try:
+        (settings.logs_dir / "bot_secret.log").symlink_to(secret)
+    except OSError as exc:
+        if getattr(exc, "winerror", None) == 1314:
+            pytest.skip("Symlink creation requires administrative privileges on Windows")
+        raise
+
+    headers = {"Authorization": "Bearer secret"}
+    response = client.get("/api/v1/logs", headers=headers)
+    assert response.status_code == 200
+    files = [f["name"] for f in response.json()["files"]]
+    assert "bot_secret.log" not in files
+    assert client.get("/api/v1/logs/bot_secret.log", headers=headers).status_code == 404
+
+
+def test_logs_return_empty_list_when_no_files_exist(client, monkeypatch):
+    monkeypatch.setattr(settings, "observability_api_token", "secret")
+    monkeypatch.setattr(settings, "logs_dir", settings.logs_dir / "missing")
+    response = client.get("/api/v1/logs", headers={"Authorization": "Bearer secret"})
+    assert response.status_code == 200
+    assert response.json() == {"files": []}
+
+
+def test_stats_empty(client, monkeypatch):
+    monkeypatch.setattr(settings, "observability_api_token", "audit-admin")
+    resp = client.get("/api/v1/stats", headers={"Authorization": "Bearer audit-admin"})
     assert resp.status_code == 200
     assert resp.json() == {
         "total": 0,
@@ -75,13 +325,16 @@ def test_stats_empty(client):
     }
 
 
-def test_history_empty(client):
-    resp = client.get("/api/v1/history")
+def test_history_empty(client, monkeypatch):
+    monkeypatch.setattr(settings, "observability_api_token", "audit-admin")
+    resp = client.get("/api/v1/history", headers={"Authorization": "Bearer audit-admin"})
     assert resp.status_code == 200
     assert resp.json() == []
 
 
-def test_upload_invalid_extension(client):
+def test_upload_invalid_extension(client, monkeypatch):
+    """Under pt_BR the API should reject unknown extensions with the localized unsupported-format detail."""
+    monkeypatch.setenv("LOCALE", "pt_BR")
     resp = client.post(
         "/api/v1/jobs",
         files={"document_file": ("script.exe", b"MZ...", "application/octet-stream")},
@@ -102,6 +355,8 @@ def test_upload_oversized_prompt(client):
 
 
 def test_upload_oversized_file(client, monkeypatch):
+    """Under pt_BR an over-limit upload should be rejected with the localized oversized-file detail."""
+    monkeypatch.setenv("LOCALE", "pt_BR")
     monkeypatch.setattr(settings, "max_file_size_mb", 0.000001)
     resp = client.post(
         "/api/v1/jobs",
@@ -130,7 +385,8 @@ def test_upload_ok_and_status_queued(client, monkeypatch):
     body = resp.json()
     assert body["position"] == 1
     task_id = body["task_id"]
-    assert len(task_id) == 8
+    assert len(task_id) == 32
+    assert body["job_token"]
 
     status = client.get(f"/api/v1/jobs/{task_id}")
     assert status.status_code == 200
@@ -173,7 +429,10 @@ def test_queued_position_is_recalculated(client, monkeypatch):
 
     status = client.get("/api/v1/jobs/queuedsecond")
     assert status.status_code == 200
-    assert status.json()["etapa_atual"] == "Aguardando na fila (Posicao: 1)"
+    from backend.i18n import t
+    from backend.stage_messages import STAGE_QUEUE_WAITING_POSITION
+
+    assert status.json()["etapa_atual"] == t(STAGE_QUEUE_WAITING_POSITION).format(position=1)
 
 
 def test_status_unknown(client):
@@ -520,7 +779,9 @@ async def test_process_preserves_existing_cancelled_state(api_paths):
 
 
 @pytest.mark.asyncio
-async def test_job_executor_keeps_original_filename_in_status(api_paths, monkeypatch):
+async def test_job_executor_keeps_original_filename_in_status(
+    api_paths, monkeypatch, fake_pdf_ua_audit
+):
     from backend.agents.state_manager import state_manager
     from backend.api.worker import ApiJob, JobExecutor
 
@@ -550,7 +811,6 @@ async def test_job_executor_keeps_original_filename_in_status(api_paths, monkeyp
     monkeypatch.setattr("backend.service.process", fake_process)
     monkeypatch.setattr("backend.api.worker.export_txt", write_file)
     monkeypatch.setattr("backend.api.worker.export_docx", write_file)
-    monkeypatch.setattr("backend.api.worker.export_pdf", write_file)
     monkeypatch.setattr("backend.api.worker.export_pdf_ua", write_file)
     monkeypatch.setattr("backend.api.worker.export_accessible_document", write_file)
     monkeypatch.setattr("backend.api.worker.export_mp3", write_mp3)
@@ -578,12 +838,24 @@ async def test_job_executor_keeps_original_filename_in_status(api_paths, monkeyp
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("failed_format", [None, "MP3", "PDF/UA"])
+@pytest.mark.parametrize(
+    "failed_format", [None, "MP3", "PDF/UA", "PDF/UA disabled", "DOCX", "DOCX disabled"]
+)
 async def test_job_executor_reports_optional_export_failure(
-    api_paths, monkeypatch, failed_format
+    api_paths, monkeypatch, failed_format, fake_pdf_ua_audit
 ):
     from backend.agents.state_manager import state_manager
     from backend.api.worker import ApiJob, JobExecutor
+    from backend.config.settings import settings
+
+    # PDF/UA and DOCX run only on the Toolbox; switched off, each is skipped
+    # without an error.
+    pdf_ua_disabled = failed_format == "PDF/UA disabled"
+    docx_disabled = failed_format == "DOCX disabled"
+    monkeypatch.setattr(settings, "toolbox_pdf_ua_enabled", not pdf_ua_disabled)
+    monkeypatch.setattr(settings, "toolbox_docx_enabled", not docx_disabled)
+    if pdf_ua_disabled or docx_disabled:
+        failed_format = None
 
     task_id = "bug0011"
     input_path = api_paths / "audio.pdf"
@@ -603,8 +875,16 @@ async def test_job_executor_reports_optional_export_failure(
         raise RuntimeError("tts offline")
 
     def fail_pdf_ua(_canonical, destination, _filename):
+        from acessilia_sdk.toolbox import ToolboxProviderUnavailable
+
         destination.write_bytes(b"partial pdf")
-        raise FileNotFoundError("pandoc indisponivel")
+        raise ToolboxProviderUnavailable("pdf-ua-render unavailable")
+
+    def fail_docx(_canonical, destination, _filename):
+        from acessilia_sdk.toolbox import ToolboxProviderUnavailable
+
+        destination.write_bytes(b"partial docx")
+        raise ToolboxProviderUnavailable("docx renderer unavailable")
 
     async def write_mp3(_text, destination, **_kwargs):
         destination.write_bytes(b"audio")
@@ -626,12 +906,14 @@ async def test_job_executor_reports_optional_export_failure(
 
     monkeypatch.setattr("backend.service.process", fake_process)
     monkeypatch.setattr("backend.api.worker.export_txt", write_file)
+    monkeypatch.setattr("backend.api.worker.export_drbench_md", write_file)
     monkeypatch.setattr("backend.api.worker.export_docx", write_file)
-    monkeypatch.setattr("backend.api.worker.export_pdf", write_file)
     monkeypatch.setattr("backend.api.worker.export_pdf_ua", write_file)
     monkeypatch.setattr("backend.api.worker.export_accessible_document", write_file)
     if failed_format == "PDF/UA":
         monkeypatch.setattr("backend.api.worker.export_pdf_ua", fail_pdf_ua)
+    if failed_format == "DOCX":
+        monkeypatch.setattr("backend.api.worker.export_docx", fail_docx)
     monkeypatch.setattr(
         "backend.api.worker.export_mp3",
         fail_mp3 if failed_format == "MP3" else write_mp3,
@@ -663,37 +945,58 @@ async def test_job_executor_reports_optional_export_failure(
     assert task is not None
     assert task["status"] == "done"
     assert task["download_url"]
-    expected_errors = {
-        None: [],
-        "MP3": ["Falha ao gerar MP3: tts offline"],
-        "PDF/UA": ["Falha ao gerar PDF/UA: pandoc indisponivel"],
-    }
-    assert task["erros"] == expected_errors[failed_format]
+    if failed_format is None:
+        expected_errors: list[str] = []
+    else:
+        assert len(task["erros"]) == 1
+        assert failed_format in task["erros"][0]
+        assert (
+            "tts offline" in task["erros"][0]
+            or "pdf-ua-render unavailable" in task["erros"][0]
+            or "docx renderer unavailable" in task["erros"][0]
+        )
+        expected_errors = task["erros"]
 
     if failed_format == "MP3":
         assert not (output_dir / "audio.mp3").exists()
-    if failed_format == "PDF/UA":
+    pdf_ua_produced = failed_format != "PDF/UA" and not pdf_ua_disabled
+    if not pdf_ua_produced:
         assert not (output_dir / "audio.pdf_ua.pdf").exists()
+    docx_produced = failed_format != "DOCX" and not docx_disabled
+    if not docx_produced:
+        assert not (output_dir / "audio.docx").exists()
 
-    expected_formats = {"txt", "docx", "pdf", "html", "zip"}
+    expected_formats = {"txt", "html", "zip"}
+    if docx_produced:
+        expected_formats.add("docx")
     if failed_format != "MP3":
         expected_formats.add("mp3")
-    if failed_format != "PDF/UA":
+    if pdf_ua_produced:
         expected_formats.add("pdf_ua")
     assert set(registered_formats) == expected_formats
 
+    assert (output_dir / "audio.drbench.md").is_file()
     with zipfile.ZipFile(output_dir / "audio_acessivel.zip") as archive:
-        expected_files = {"audio.txt", "audio.docx", "audio.pdf", "audio.html"}
+        expected_files = {"audio.txt", "audio.html"}
+        if docx_produced:
+            expected_files.add("audio.docx")
         if failed_format != "MP3":
             expected_files.add("audio.mp3")
-        if failed_format != "PDF/UA":
-            expected_files.add("audio.pdf_ua.pdf")
+        if pdf_ua_produced:
+            expected_files.update({"audio.pdf_ua.pdf", "audio.pdf_ua.verapdf.json"})
         assert set(archive.namelist()) == expected_files
 
     assert len(sent_emails) == 1
     assert sent_emails[0]["download_url"].endswith("/download/tok")
     assert sent_emails[0]["completed_formats"] == registered_formats
-    assert sent_emails[0]["warnings"] == expected_errors[failed_format]
+    assert sent_emails[0]["warnings"] == expected_errors
+    # Only a PDF/UA that exists is audited, and its verdict reaches the e-mail.
+    assert fake_pdf_ua_audit == ([output_dir / "audio.pdf_ua.pdf"] if pdf_ua_produced else [])
+    from backend.i18n import t
+    from backend.log_messages import EMAIL_AUDIT_COMPLIANT
+
+    compliant = t(EMAIL_AUDIT_COMPLIANT).format(profile="PDF/UA-1")
+    assert sent_emails[0]["audit"] == ([compliant] if pdf_ua_produced else [])
 
 
 @pytest.mark.asyncio
@@ -732,5 +1035,55 @@ async def test_job_executor_records_early_process_failure(api_paths, monkeypatch
     rows = await hs.listar_historico(10)
     [row] = [row for row in rows if row["task_id"] == task_id]
     assert row["status"] == "error"
-    assert row["erro"] == "cache inacessivel"
+    # The error names the stage the job was in, once, in both places.
+    assert row["erro"].startswith("cache inacessivel")
+    assert task["erros"] == [row["erro"]]
     assert row["concluido_em"] is not None
+
+
+@pytest.mark.parametrize(
+    "status, payload, reachable",
+    [
+        (200, {"healthy": True}, True),
+        (200, {"healthy": False}, False),
+        # A body that is not the Toolbox's ProviderHealth reads as unreachable.
+        (200, ["healthy"], False),
+        (200, {"status": "ok"}, False),
+        (401, {}, False),
+    ],
+)
+@respx.mock
+def test_toolbox_model_is_reachable_when_the_toolbox_reports_its_vlm_healthy(
+    monkeypatch, status, payload, reachable
+):
+    from backend.api.routes import health
+
+    route = respx.get("http://toolbox:8002/v1/providers/qwen3-vl-8b/health").mock(
+        return_value=httpx.Response(status, json=payload)
+    )
+    monkeypatch.setattr(settings, "ai_client", "toolbox")
+    monkeypatch.setattr(settings, "toolbox_base_url", "http://toolbox:8002")
+    monkeypatch.setattr(settings, "toolbox_base_urls", "")
+    monkeypatch.setattr(settings, "toolbox_api_key", "toolbox-key")
+    monkeypatch.setattr(settings, "toolbox_vlm_provider", "qwen3-vl-8b")
+
+    assert asyncio.run(health._check_model_reachable()) is reachable
+    assert route.calls.last.request.headers["authorization"] == "Bearer toolbox-key"
+
+
+@respx.mock
+def test_toolbox_model_health_probes_the_endpoint_the_agents_use(monkeypatch):
+    """No key means an anonymous Toolbox; with a failover list, its first entry."""
+    from backend.api.routes import health
+
+    route = respx.get("http://primary:8002/v1/providers/qwen3-vl-8b/health").mock(
+        return_value=httpx.Response(200, json={"healthy": True})
+    )
+    monkeypatch.setattr(settings, "ai_client", "toolbox")
+    monkeypatch.setattr(settings, "toolbox_base_url", "http://unused:8002")
+    monkeypatch.setattr(settings, "toolbox_base_urls", "http://primary:8002,http://secondary:8002")
+    monkeypatch.setattr(settings, "toolbox_api_key", "")
+    monkeypatch.setattr(settings, "toolbox_vlm_provider", "qwen3-vl-8b")
+
+    assert asyncio.run(health._check_model_reachable()) is True
+    assert "authorization" not in route.calls.last.request.headers

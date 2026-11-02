@@ -22,25 +22,32 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  variant-tests:
-    name: tests (${{ matrix.variant }}, Python 3.11)
+  # During BHS a release branch only takes bug fixes (CONTRIBUTING.md, 5.1);
+  # features, improvements and refactorings keep going to develop.
+  release-scope:
+    name: release accepts only fixes
+    if: github.event_name == 'pull_request' && startsWith(github.base_ref, 'release/')
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ matrix.variant == 'docling' && 60 || 30 }}
-    strategy:
-      fail-fast: false
-      matrix:
-        variant:
-          - slim
-          - docling
+    timeout-minutes: 5
 
-    env:
-      POETRY_VERSION: 1.8.3
-      POETRY_NO_INTERACTION: "1"
-      POETRY_VIRTUALENVS_IN_PROJECT: "1"
-      PYTHONDONTWRITEBYTECODE: "1"
-      PYTHONUNBUFFERED: "1"
-      HF_HOME: ${{ github.workspace }}/var/cache/huggingface
-      RAPIDOCR_CACHE_DIR: ${{ github.workspace }}/var/cache/rapidocr
+    steps:
+      - name: Reject branches that are not fixes
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          case "$HEAD_REF" in
+            fix/*|hotfix/*) echo "${HEAD_REF} -> ${BASE_REF}: ok" ;;
+            *)
+              echo "::error::${BASE_REF} only accepts fix/* and hotfix/* branches during BHS; target develop with ${HEAD_REF}."
+              exit 1
+              ;;
+          esac
+
+  tests:
+    name: tests (Python 3.11)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Check out repository
@@ -56,122 +63,54 @@ jobs:
       - name: Restore dependency cache
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
-          path: |
-            ~/.cache/pip
-            ~/.cache/pypoetry
-            .venv
-          key: poetry-${{ matrix.variant }}-${{ runner.os }}-py3.11-${{ hashFiles('poetry.lock') }}
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-py3.11-${{ hashFiles('pyproject.toml') }}
           restore-keys: |
-            poetry-${{ matrix.variant }}-${{ runner.os }}-py3.11-
-
-      - name: Restore Docling model cache
-        if: matrix.variant == 'docling'
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: var/cache
-          key: docling-models-${{ runner.os }}-py3.11-${{ hashFiles('poetry.lock') }}
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends \
-            build-essential \
-            ffmpeg \
-            fonts-dejavu-core \
-            libgl1 \
-            libglib2.0-0 \
-            libmagic1 \
-            pandoc \
-            poppler-utils \
-            tesseract-ocr \
-            texlive-xetex
-
-      - name: Install Poetry
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install "poetry==${POETRY_VERSION}"
-          poetry --version
-
-      - name: Validate dependency lock
-        run: poetry check --lock
+            pip-${{ runner.os }}-py3.11-
 
       - name: Install project dependencies
-        env:
-          VARIANT: ${{ matrix.variant }}
         run: |
-          if [ "$VARIANT" = "docling" ]; then
-            python -m pip install \
-              --index-url https://download.pytorch.org/whl/cpu \
-              "torch==2.7.1+cpu" \
-              "torchvision==0.22.1+cpu"
-            poetry export --with dev --extras docling \
-              --without-hashes --format requirements.txt \
-              --output /tmp/requirements.txt
-          else
-            poetry export --with dev \
-              --without-hashes --format requirements.txt \
-              --output /tmp/requirements.txt
+          python -m pip install --upgrade pip
+          python -m pip install ./libs/docstruct --no-cache-dir
+          python -m pip install "./libs/sdk[dev]" --no-cache-dir
+          python -m pip install ".[dev]" --no-cache-dir
+
+      # The SDK registry must match the contract the Toolbox publishes on the
+      # branch this code is deployed with (#186): main runs against the
+      # Toolbox's main, release/x.y.z against the Toolbox's release/x.y.z
+      # while its BHS is open and its vx.y.z tag once the Toolbox closed the
+      # cycle (both are cut together, the Toolbox first), and everything else
+      # against its develop. See scripts/toolbox_contract_ref.py.
+      - name: Check the Toolbox capability contract
+        env:
+          TARGET_BRANCH: ${{ github.base_ref || github.ref_name }}
+        run: |
+          # Fails (bash -e) when a release has neither ref: no fallback.
+          TOOLBOX_REF=$(python scripts/toolbox_contract_ref.py "$TARGET_BRANCH")
+          # Same URL as PUBLISHED_URL in scripts/capture_toolbox_contract.py.
+          # curl stays here for --retry, which the script's urllib fetch lacks.
+          url="https://raw.githubusercontent.com/A11yDevs/acessilia-toolbox/${TOOLBOX_REF}/contract/toolbox-contract.json"
+          echo "Toolbox contract: $url"
+          if ! curl --fail --silent --show-error --location --retry 3 \
+              --output "$RUNNER_TEMP/toolbox-contract.json" "$url"; then
+            echo "::error::Failed to download the Toolbox contract from ${TOOLBOX_REF} (missing file or network error; see the curl output above)."
+            exit 1
           fi
-          python scripts/filter_accelerator_requirements.py \
-            /tmp/requirements.txt /tmp/requirements-filtered.txt
-          python -m pip install --requirement /tmp/requirements-filtered.txt
-          python -m pip install --no-deps --editable .
-
-      - name: Verify variant dependencies
-        env:
-          VARIANT: ${{ matrix.variant }}
-        run: |
-          python - <<'PY'
-          import importlib.util
-          import os
-          from importlib.metadata import distributions
-
-          variant = os.environ["VARIANT"]
-          installed = {
-              distribution.metadata["Name"].lower().replace("_", "-")
-              for distribution in distributions()
-              if distribution.metadata["Name"]
-          }
-          if variant == "slim":
-              forbidden = {"docling", "rapidocr", "torch", "torchvision"}
-              unexpected = forbidden & installed
-              if unexpected:
-                  raise SystemExit(f"Pacotes inesperados na variante slim: {unexpected}")
-          else:
-              import torch
-
-              if torch.version.cuda is not None:
-                  raise SystemExit(f"Torch CUDA detectado: {torch.version.cuda}")
-              forbidden = {"triton"} & installed
-              forbidden |= {
-                  name for name in installed if name.startswith("nvidia-")
-              }
-              if forbidden:
-                  raise SystemExit(f"Aceleradores inesperados: {forbidden}")
-              if importlib.util.find_spec("docling") is None:
-                  raise SystemExit("Docling nao foi instalado")
-          print(f"Dependencias da variante {variant} validadas.")
-          PY
+          python scripts/check_capability_contract.py --snapshot "$RUNNER_TEMP/toolbox-contract.json"
 
       - name: Collect complete test suite
-        env:
-          VARIANT: ${{ matrix.variant }}
-        run: |
-          if [ "$VARIANT" = "slim" ]; then
-            python -m pytest --collect-only -q -m "not docling"
-          else
-            python -m pytest --collect-only -q
-          fi
+        run: python -m pytest --collect-only -q -m "not e2e"
 
       - name: Run complete test suite
-        env:
-          VARIANT: ${{ matrix.variant }}
-        run: |
-          if [ "$VARIANT" = "slim" ]; then
-            python -m pytest -m "not docling" --junitxml=test-results.xml
-          else
-            python -m pytest --junitxml=test-results.xml
-          fi
+        run: python -m pytest -m "not e2e" --junitxml=test-results.xml
+
+      - name: Run docstruct library test suite
+        working-directory: libs/docstruct
+        run: python -m pytest --junitxml=docstruct-test-results.xml
+
+      - name: Run SDK library test suite
+        working-directory: libs/sdk
+        run: python -m pytest --junitxml=sdk-test-results.xml
 
       - name: Reject unexpected skipped tests
         run: |
@@ -179,12 +118,18 @@ jobs:
           from pathlib import Path
           from xml.etree import ElementTree
 
-          report = Path("test-results.xml")
-          root = ElementTree.parse(report).getroot()
-          skipped = sum(
-              int(suite.attrib.get("skipped", "0"))
-              for suite in root.iter("testsuite")
-          )
+          reports = [
+              Path("test-results.xml"),
+              Path("libs/docstruct/docstruct-test-results.xml"),
+              Path("libs/sdk/sdk-test-results.xml"),
+          ]
+          skipped = 0
+          for report in reports:
+              root = ElementTree.parse(report).getroot()
+              skipped += sum(
+                  int(suite.attrib.get("skipped", "0"))
+                  for suite in root.iter("testsuite")
+              )
           if skipped:
               raise SystemExit(
                   f"CI incompleto: {skipped} teste(s) foram pulado(s). "
@@ -193,27 +138,9 @@ jobs:
           print("Relatorio JUnit validado: nenhum teste foi pulado.")
           PY
 
-  tests:
-    name: tests (Python 3.11)
-    if: always()
-    needs:
-      - variant-tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Require every CI variant
-        env:
-          VARIANT_RESULT: ${{ needs.variant-tests.result }}
-        run: |
-          if [ "$VARIANT_RESULT" != "success" ]; then
-            echo "Uma ou mais variantes falharam: $VARIANT_RESULT"
-            exit 1
-          fi
-          echo "As variantes slim e docling passaram."
-
   delivery:
     name: publish verified images
     if: >
-      needs.tests.result == 'success' &&
       github.event_name == 'push' &&
       (
         github.ref_name == 'main' ||

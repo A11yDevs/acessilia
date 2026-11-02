@@ -1,0 +1,121 @@
+{
+  "_comment": "Frozen result artifacts for the Dr.DocBench submissions. The run outputs live outside the repository (on the cluster scratch); this file preserves the numbers, the submission zip hashes and the composition of each run so the performance work can be resumed. No ground truth or predictions are stored here.",
+  "task": "DocInsights 2026 Dr.DocBench shared task",
+  "metric": "EvalAI Overall (per-page mean of the available components)",
+  "submissions": [
+    {
+      "run": "mineru",
+      "date": "2026-09-15",
+      "composition": "MinerU 2.1 single provider",
+      "zip_sha256": null,
+      "pages": 509,
+      "evalai": {
+        "text_ed": 0.3235,
+        "table_teds": 47.36,
+        "formula_cdm": 0.0,
+        "reading_order": 53.44,
+        "overall": 58.09
+      }
+    },
+    {
+      "run": "differ-v2-20260916",
+      "date": "2026-09-16",
+      "composition": "tree_differ_v2 lambda=0.5 tau=0.6 over docling-v3 + mineru-v3 (acessilia d6d1348, toolbox 6be3685)",
+      "zip_sha256": "34018a8a19efcd73521c2897de204ff39abb4911c234c2101f87b2bc6aefe46b",
+      "pages": 509,
+      "dev120": {"overall_no_cdm": 77.4, "overall_with_cdm": 77.5, "text": 80.8, "reading_order": 81.4, "teds": 58.2, "cdm": 78.0},
+      "evalai": {
+        "text_ed": 0.2786,
+        "text": 72.1,
+        "table_teds": 57.51,
+        "formula_cdm": 0.0,
+        "reading_order": 55.91,
+        "overall": 61.73
+      }
+    },
+    {
+      "run": "differ-v2-minlen0-20260916",
+      "date": "2026-09-16",
+      "composition": "differ-v2 + --min-len 0 (job 32672)",
+      "zip_sha256": "8b455c804cc17f1c9f0645464e47e6cb4160c910e3c9422b6750105ef89e5aa6",
+      "pages": 509,
+      "dev120": {"overall": 78.0, "text": 81.2, "reading_order": 82.3, "teds": 58.2, "cdm": 78.0},
+      "evalai": {
+        "text_ed": 0.2833,
+        "text": 71.7,
+        "table_teds": 57.51,
+        "formula_cdm": 0.0,
+        "reading_order": 60.81,
+        "overall": 63.15
+      }
+    },
+    {
+      "run": "differ-v15-hyb-20260922",
+      "date": "2026-09-22",
+      "composition": "tree_differ_v2 args v13-pnt over docling-v3+rot x mineru-hyb+rot (MinerU hybrid-VLM, 491 pages + 16 rot + 2 fallback)",
+      "zip_sha256": "db577d6dfab595ec5c68bdb1251b195f022b7f4d46e4b652a124636334936033",
+      "pages": 509,
+      "dev986_md2md": {"overall": 78.1, "text": 85.3, "reading_order": 80.0, "teds": 69.2},
+      "evalai": {
+        "text": 74.67,
+        "reading_order": 72.3,
+        "table_teds": 58.31,
+        "formula_cdm": 0.22,
+        "overall": 70.37
+      },
+      "note": "TEDS did NOT transfer: dev +5.9 -> test +0.2. The real test gain came from reading order (+16.4, 55.91 -> 72.3) with the MinerU hybrid-VLM + rotation source.",
+      "best_within_paper_method": true
+    },
+    {
+      "run": "differ-v20-vlmsel-20260927",
+      "date": "2026-09-27",
+      "composition": "v16-rec300 args + VLM adjudications-sel (job 33367)",
+      "zip_sha256": "71962a145a046e4535d13e68248638f97a33d4442a79cc07abf3f8c983029735",
+      "pages": 509,
+      "dev986_md2md": {"sel": 78.5, "tight": 78.5, "notab": 78.4},
+      "evalai": {
+        "text_ed": 0.2765,
+        "text": 72.35,
+        "table_teds": 58.18,
+        "formula_cdm": 0.08,
+        "reading_order": 74.96,
+        "overall": 70.35
+      },
+      "note": "-0.02 vs v15-hyb; better reading order (+2.66), slightly worse text/TEDS."
+    },
+    {
+      "run": "hyb-v29-judge2-televm-adf-tj3-20261009",
+      "date": "2026-10-09",
+      "composition": "differ-v29-adf x teleocr-up2m2-vm-fb-adf, page chosen by the Qwen3-VL-32B judge (judge-televm pB > 0.5, else judge-tele pB > 0.2; 87 Tele pages), then tail-join tj3. Beyond the paper's method: uses Qwen3-VL-32B, TeleOCR and dots.ocr.",
+      "zip_sha256": "08ec980d4bc9ec27acdd494c5c676830169c5506085f9f445bbc327470353a64",
+      "predictions_jsonl_sha256": "2b83be1409b50a4051e2081dffc401cf501631b018c7f56b2d31513a883b11e3",
+      "pages": 509,
+      "dev986_md2md": {"overall": 87.33, "tune": 90.6, "hold": 83.11},
+      "evalai": {
+        "text_ed": 0.2708,
+        "table_teds": 56.16,
+        "formula_cdm": 0.16,
+        "reading_order": 75.87,
+        "overall": 71.01
+      },
+      "best_submission": true,
+      "frozen_in": "scripts/drbench/submissions/best",
+      "note": "Best EvalAI Overall. The gain over differ-v15-hyb (+0.64) came from reading order (+3.57); TEDS dropped (-2.15)."
+    }
+  ],
+  "gap_dev_to_test": {
+    "best_submission": {
+      "run": "hyb-v29-judge2-televm-adf-tj3-20261009",
+      "dev986_md2md": 87.33,
+      "evalai": 71.01,
+      "delta": 16.32
+    },
+    "best_within_paper_method": {
+      "run": "differ-v15-hyb-20260922",
+      "dev986_md2md": 78.1,
+      "evalai": 70.37,
+      "delta": 7.73
+    },
+    "note": "The dev split evaluates isolated pages; the test split uses 34 documents x 15 contiguous pages. Part of the gap is the window, not the method; over differ-v15-hyb, the multi-source pipeline gained 9.2 points on dev and 0.6 on test."
+  }
+}

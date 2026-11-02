@@ -1,0 +1,343 @@
+"""Tree Differ — fusão block-level de dois providers (porta de merge_v2).
+
+Matching: atribuição bipartida (Húngaro) entre blocos A e B com
+cost = (1-lambda)*(1-sim_txt) + lambda*(1-IoU); pares com cost > tau ficam
+sem par. Esqueleto de leitura: ordem do provider B (MinerU), com blocos
+unilaterais de A (Docling) inseridos junto ao vizinho geometricamente
+mais próximo.
+
+Porta fiel do tree_differ_v2.py da PR #98, com:
+- scipy → _hungarian puro;
+- CLI flags → FusionPolicy;
+- stats acumulados em Counter retornado ao chamador.
+"""
+from __future__ import annotations
+
+import re
+from collections import Counter
+
+from docstruct.fusion._hungarian import linear_sum_assignment
+from docstruct.fusion.noise import (
+    decor_tail,
+    demote_formulas,
+    fuse_line_runs,
+    group_split_blocks,
+    is_decor_duplicate_of_heading,
+    is_junk,
+    quality,
+    split_decor,
+    suppress_in_regions,
+)
+from docstruct.fusion.similarity import PAGENUM_RE, center, contain_frac, iou, is_duplicate, sim, swallows
+from docstruct.fusion.types import DiffBlock
+from docstruct.fusion.xycut import reorder as xycut_reorder
+from docstruct.policy import FusionPolicy
+from docstruct.text.math_spans import inline_math_sources
+
+
+def _is_spurious_text_pair(d: DiffBlock, m: DiffBlock) -> bool:
+    """Descarta matches textuais com baixa similaridade, a menos que haja ancoragem geométrica forte."""
+    if d.kind != "text" or m.kind != "text" or len(d.text) < 20 or len(m.text) < 20:
+        return False
+    if sim(d.text, m.text) >= 0.15:
+        return False
+    if d.box and m.box and iou(d.box, m.box) >= 0.70:
+        return False
+    return True
+
+
+def _is_short_noise(text: str) -> bool:
+    """Descarta ruídos isolados de OCR com <= 2 chars que não sejam dígitos nem marcadores."""
+    core = re.sub(r"\s+", "", text)
+    return (
+        len(core) <= 2
+        and not core.isdigit()
+        and not (len(core) == 1 and core.lower() in ("a", "i"))
+        and not re.match(r"^[a-zA-Z0-9][\.\)\-]$", core)
+        and not PAGENUM_RE.match(text)
+    )
+
+
+def _pick_text(
+    d: DiffBlock, m: DiffBlock, M_texts: list[DiffBlock],
+    policy: FusionPolicy, stats: Counter,
+) -> str:
+    if policy.text_pick == "docling":
+        stats["pair-text->docling"] += 1
+        return d.md
+    if policy.text_pick == "mineru":
+        stats["pair-text->mineru"] += 1
+        return m.md
+    # auto: MinerU vence no corpo, a menos que tenha truncado ou OCR pior
+    ld, lm = len(d.text), len(m.text)
+    if lm < 0.6 * ld:
+        if policy.pick_guard and ld > policy.pick_guard * lm and swallows(
+            d.text, [o.text for o in M_texts if o is not m and o.kind == "text"]
+        ):
+            stats["pair-text-auto->mineru(docling-swallowed)"] += 1
+            return m.md
+        stats["pair-text-auto->docling(longer)"] += 1
+        return d.md
+    if ld < 0.6 * lm:
+        stats["pair-text-auto->mineru(longer)"] += 1
+        return m.md
+    # Comparable lengths: the side that kept its formulas as inline math
+    # (``$…$``) is the one the exporters can render as math (#297).
+    hd, hm = bool(inline_math_sources(d.md)), bool(inline_math_sources(m.md))
+    if hd != hm:
+        stats[f"pair-text-auto->{'docling' if hd else 'mineru'}(inline-math)"] += 1
+        return d.md if hd else m.md
+    qd, qm = quality(d.md), quality(m.md)
+    if qd > qm + 0.05:
+        stats["pair-text-auto->docling(quality)"] += 1
+        return d.md
+    stats["pair-text-auto->mineru"] += 1
+    return m.md
+
+
+def _pick(
+    d: DiffBlock, m: DiffBlock, M: list[DiffBlock],
+    policy: FusionPolicy, stats: Counter,
+) -> str:
+    if d.kind == "table" or m.kind == "table":
+        if d.kind != m.kind:
+            stats["pair-only-one-table"] += 1
+            return d.md if d.kind == "table" else m.md
+        stats["pair-table->docling"] += 1
+        return d.md
+    if d.kind == "formula" or m.kind == "formula":
+        if d.kind != m.kind:
+            stats["pair-only-one-formula"] += 1
+            return d.md if d.kind == "formula" else m.md
+        stats["pair-formula->docling"] += 1
+        return d.md
+    if d.kind == "heading" or m.kind == "heading":
+        if d.kind == "heading" and policy.pick_guard and swallows(
+            d.text, [o.text for o in M if o is not m and o.kind == "text"]
+        ):
+            stats["pair-heading-auto->mineru(docling-swallowed)"] += 1
+            return m.md
+        stats["pair-heading->docling"] += 1
+        return d.md if d.kind == "heading" else m.md
+    return _pick_text(d, m, M, policy, stats)
+
+
+def _finalize(
+    items: list[tuple[object, str]],
+    policy: FusionPolicy,
+    stats: Counter,
+) -> list[str]:
+    """Finaliza a ordem dos blocos ``(box, md)`` aplicando XY-cut quando ativo.
+
+    Centraliza a aplicação do XY-cut para que todos os caminhos de saída de
+    ``merge_blocks`` (normal e fallbacks) tenham comportamento consistente.
+    """
+    if policy.order_xycut != "off":
+        return xycut_reorder(
+            items,
+            mode=policy.order_xycut,
+            min_columns=policy.xycut_min_columns,
+            min_balance=policy.xycut_min_balance,
+            stats=stats,
+        )
+    return [md for _, md in items]
+
+
+def merge_blocks(
+    D: list[DiffBlock],
+    M: list[DiffBlock],
+    policy: FusionPolicy,
+    *,
+    min_len: int = 20,
+    garbage_frac: float | None = None,
+    m_pics: list | None = None,
+    running: frozenset[str] = frozenset(),
+    decor_wins: bool = False,
+    unilateral_dedup: bool = True,
+    stats: Counter | None = None,
+) -> tuple[list[str], Counter]:
+    """Funde os blocos dos dois providers. Retorna (markdowns ordenados, stats).
+
+    Args:
+        D: blocos do provider A (Docling).
+        M: blocos do provider B (MinerU) — esqueleto de ordem de leitura.
+        policy: FusionPolicy com as alavancas.
+        min_len: tamanho mínimo para manter bloco Docling unilateral.
+        garbage_frac: fallback para ordem Docling quando quase nada casa
+            (None = usa ``policy.garbage_frac``).
+        m_pics: bboxes de figuras do provider B (para suppress).
+        running: textos de running heads do documento (pré-computados).
+        decor_wins: body repetindo header/footer é descartado.
+        unilateral_dedup: permite desligar somente a deduplicação Docling unilateral.
+        stats: Counter opcional para acumular decisões.
+    """
+    stats = stats if stats is not None else Counter()
+    if garbage_frac is None:
+        garbage_frac = policy.garbage_frac
+    tail: list[str] = []
+
+    if policy.formula_text:
+        D = demote_formulas(D, stats, "docling")
+        M = demote_formulas(M, stats, "mineru")
+    if policy.suppress_regions:
+        mode = "both"
+        if policy.pic_need_text and sum(
+            m.kind in ("text", "heading") for m in M
+        ) <= 1:
+            stats["pic-suppress-skipped(mineru-no-text)"] += 1
+            mode = "tables"
+        D = suppress_in_regions(
+            D, M, m_pics or [], stats, mode=mode,
+            pic_min_blocks=policy.pic_min_blocks,
+            pic_max_quality=policy.pic_max_quality,
+            pic_full_page=policy.pic_full_page,
+            pic_rule=policy.pic_rule,
+            table_full_page=policy.table_full_page,
+            table_probe=policy.table_probe,
+        )
+    if policy.decor_tail:
+        pagenum_cap = 4 if policy.pagenum_cap else 0
+        D, dec_d = split_decor(D, stats, "docling", running, pagenum_cap)
+        M, dec_m = split_decor(M, stats, "mineru", running, pagenum_cap)
+        body_txt = {b.text for b in D + M if b.text}
+        kept = []
+        for b in dec_d + dec_m:
+            if b.role != "page_number" and b.text in body_txt and not decor_wins:
+                stats["decor-dup-of-body"] += 1
+            else:
+                kept.append(b)
+        if decor_wins:
+            headings = [b for b in D + M if b.kind == "heading"]
+            kept = [b for b in kept if not is_decor_duplicate_of_heading(b, headings)]
+            dec_txt = {b.text for b in kept if b.role != "page_number" and b.text}
+            nD, nM = len(D), len(M)
+            D = [
+                b for b in D
+                if not (b.kind == "text" and b.text in dec_txt)
+            ]
+            M = [
+                b for b in M
+                if not (b.kind == "text" and b.text in dec_txt)
+            ]
+            stats["body-dup-of-decor"] += (nD - len(D)) + (nM - len(M))
+        dec_d = [b for b in kept if b in dec_d]
+        dec_m = [b for b in kept if b in dec_m]
+        tail = decor_tail(dec_d, dec_m)
+    if policy.junk_filter:
+        D = [d for d in D if not (d.kind == "text" and is_junk(d.md))] or D
+        if len(D) == 0:
+            stats["junk-docling"] += 1
+        M = [m for m in M if not (m.kind == "text" and is_junk(m.md))] or M
+        if len(M) == 0:
+            stats["junk-mineru"] += 1
+    if policy.fuse_lines:
+        D = fuse_line_runs(
+            D, stats, "docling", h_ratio=policy.fuse_h_ratio,
+            short=policy.fuse_short, min_run=policy.fuse_min_run,
+            max_len=policy.fuse_max_len,
+        )
+        M = fuse_line_runs(
+            M, stats, "mineru", h_ratio=policy.fuse_h_ratio,
+            short=policy.fuse_short, min_run=policy.fuse_min_run,
+            max_len=policy.fuse_max_len,
+        )
+    if policy.merge_paragraphs:
+        D = group_split_blocks(
+            D, M, stats, "docling", frac=policy.merge_frac,
+            min_sim=policy.merge_min_sim,
+        )
+        M = group_split_blocks(
+            M, D, stats, "mineru", frac=policy.merge_frac,
+            min_sim=policy.merge_min_sim,
+        )
+
+    if not M:
+        stats["mineru_empty->docling"] += 1
+        return _finalize([(d.box, d.md) for d in D], policy, stats) + tail, stats
+    if not D:
+        stats["docling_empty->mineru"] += 1
+        return _finalize([(m.box, m.md) for m in M], policy, stats) + tail, stats
+
+    # --- alinhamento Húngaro ---
+    cost = [[1.0] * len(M) for _ in D]
+    for i, d in enumerate(D):
+        for j, m in enumerate(M):
+            geo = iou(d.box, m.box) if (d.box and m.box) else 0.0
+            cost[i][j] = (1 - policy.align_lambda) * (1 - sim(d.text, m.text)) + (
+                policy.align_lambda
+            ) * (1 - geo)
+    ri_ci = linear_sum_assignment(cost)
+    match_d2m = {
+        int(i): int(j)
+        for i, j in ri_ci
+        if cost[i][j] <= policy.align_tau and not _is_spurious_text_pair(D[int(i)], M[int(j)])
+    }
+
+    # esqueleto não confiável quando quase nada casa (scans rotacionados/lixo)
+    nd_txt = sum(d.kind == "text" for d in D)
+    nm_txt = sum(m.kind == "text" for m in M)
+    if (
+        garbage_frac > 0
+        and nd_txt >= 3
+        and nm_txt >= 3
+        and len(match_d2m) < garbage_frac * min(len(D), len(M))
+    ):
+        stats["garbage-mineru->docling"] += 1
+        return _finalize([(d.box, d.md) for d in D], policy, stats) + tail, stats
+
+    m2d = {j: i for i, j in match_d2m.items()}
+
+    # esqueleto: ordem do provider B (MinerU), pares resolvidos
+    seq: list[tuple[float, float, str, object]] = []  # (order key, sub key, md, box)
+    emitted_body: list[DiffBlock] = []
+    for j, m in enumerate(M):
+        md = _pick(D[m2d[j]], m, M, policy, stats) if j in m2d else m.md
+        if j not in m2d:
+            stats["unilateral-mineru"] += 1
+        box = m.box if m.box is not None else (D[m2d[j]].box if j in m2d else None)
+        seq.append((float(j), 0.0, md, box))
+        chosen = D[m2d[j]] if j in m2d and md == D[m2d[j]].md else m
+        if chosen.kind == "text":
+            emitted_body.append(chosen)
+
+    # insere blocos Docling unilaterais junto ao bloco MinerU mais próximo
+    centers = [center(m.box) for m in M]
+    for i, d in enumerate(D):
+        if i in match_d2m:
+            continue
+        if len(d.text) < min_len and d.kind == "text":
+            stats["dropped-docling-short"] += 1
+            continue
+        if _is_short_noise(d.text):
+            stats["dropped-docling-short-noise"] += 1
+            continue
+        if policy.pick_guard and d.kind == "text" and d.box is not None and (
+            sum(
+                m.kind == "text"
+                and m.box is not None
+                and contain_frac(m.box, d.box) >= 0.6
+                for m in M
+            ) >= 2
+            or (len(d.text) >= 200 and swallows(
+                d.text, [o.text for o in M if o.kind == "text"]
+            ))
+        ):
+            stats["dropped-docling-swallowing"] += 1
+            continue
+        # Drop only content represented by an emitted block in the same area.
+        # Missing coordinates or a discarded provider alternative are not evidence.
+        if unilateral_dedup and policy.pick_guard and d.kind == "text":
+            matched = [o.md for o in emitted_body if contain_frac(d.box, o.box) >= 0.6]
+            if matched and is_duplicate(d.md, matched):
+                stats["dropped-docling-duplicate"] += 1
+                continue
+        cx, cy = center(d.box)
+        j = min(
+            range(len(centers)),
+            key=lambda k: (1.5 * (cx - centers[k][0])) ** 2 + (cy - centers[k][1]) ** 2,
+        )
+        above = cy < centers[j][1]
+        seq.append((float(j) - 0.5 if above else float(j) + 0.5, cy, d.md, d.box))
+        stats["unilateral-docling"] += 1
+    seq.sort(key=lambda t: (t[0], t[1]))
+    return _finalize([(box, md) for _, _, md, box in seq], policy, stats) + tail, stats

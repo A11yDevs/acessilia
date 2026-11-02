@@ -7,6 +7,31 @@ from datetime import datetime, timezone
 from typing import Callable
 
 from backend.core.agno_support import require_workflow_classes
+from backend.core.execution.messages import (
+    EXE_COMPLETED_OBLIGATIONS_UNSATISFIED,
+    EXE_DRY_RUN_SIMULATED,
+    EXE_DOMAIN_DESCRIPTION_CHANGED,
+    EXE_DOMAIN_PDDL_CHANGED,
+    EXE_JOB_NOT_PROCESSING,
+    EXE_MANIFEST_CHANGED_AFTER_PLANNING,
+    EXE_METHOD_ALREADY_TRIED,
+    EXE_METHOD_NAME_REQUIRED,
+    EXE_METHOD_NOT_ADMISSIBLE,
+    EXE_NO_HANDLER_REGISTERED,
+    EXE_OBLIGATION_ALREADY_SATISFIED,
+    EXE_OBLIGATION_KIND_MISMATCH,
+    EXE_OBLIGATION_NOT_FOUND,
+    EXE_OBLIGATION_NOT_SELECTED,
+    EXE_PLAN_DIFFERENT_DOMAIN,
+    EXE_PLAN_DOMAIN_VERSION_INCOMPATIBLE,
+    EXE_PLAN_OTHER_MANIFEST,
+    EXE_PLAN_REVISION_MISMATCH,
+    EXE_PLAN_UNKNOWN_OBLIGATIONS,
+    EXE_PREDECESSORS_UNSATISFIED,
+    EXE_RESULT_REJECTED,
+    EXE_START_JOB_INVALID_STATE,
+    EXE_UNKNOWN_ACTION,
+)
 from backend.core.execution.models import (
     ExecutionReport,
     ExecutionStepResult,
@@ -18,18 +43,35 @@ from backend.core.manifest.models import (
 )
 from backend.core.planning.domain_bundle import DomainBundle
 from backend.core.planning.models import NominalPlan, PlanStep
+from backend.i18n import t
+from backend.tools.logger import logger
 
 
 MethodHandler = Callable[[ProcessingManifest, str], MethodResult]
+#: Called before each plan step runs, as ``progress(step, position, total)`` with a
+#: 1-based position. It runs on the executor's thread and before the step's
+#: handler, so the last call names the step a crash happened in.
+StepProgress = Callable[[PlanStep, int, int], None]
 
 
 class MethodRegistry:
+    """Registry mapping obligation method names to their executor handlers."""
+
     def __init__(self) -> None:
         self._handlers: dict[str, MethodHandler] = {}
 
     def register(self, method: str, handler: MethodHandler) -> None:
+        """Register a handler for a method name.
+
+        Args:
+            method (str): Obligation method name to register; must be non-empty.
+            handler (MethodHandler): Callable invoked as ``handler(manifest, obligation_id)``.
+
+        Raises:
+            ValueError: When ``method`` is empty, carrying the localized method-name-required message.
+        """
         if not method:
-            raise ValueError("O nome do método não pode ser vazio")
+            raise ValueError(t(EXE_METHOD_NAME_REQUIRED))
         self._handlers[method] = handler
 
     def get(self, method: str) -> MethodHandler | None:
@@ -46,10 +88,11 @@ class _ExecutionState:
     results: list[ExecutionStepResult]
     failed_step_index: int | None = None
     replan_required: bool = False
+    progress: StepProgress | None = None
 
 
 class ExecutorAgent:
-    """Executa cada ação nominal em um Step de um Workflow Agno."""
+    """Execute each nominal plan action in a Step of an Agno Workflow."""
 
     def __init__(
         self,
@@ -67,15 +110,24 @@ class ExecutorAgent:
     ):
         Workflow, Step, _, StepOutput = require_workflow_classes()
         workflow_steps = []
-        for plan_step in plan.steps:
-            def execute_step(_step_input, current: PlanStep = plan_step):
+        total = len(plan.steps)
+        for position, plan_step in enumerate(plan.steps, start=1):
+            def execute_step(
+                _step_input, current: PlanStep = plan_step, position: int = position
+            ):
+                if state.progress is not None:
+                    state.progress(current, position, total)
                 result = self._execute_step(current, plan, state)
                 failed = result.status == "failed"
+                # A failed obligation does not stop the workflow: the remaining
+                # independent obligations still run, and those depending on the
+                # failed one fail their own precondition check. complete-job
+                # still refuses to finish while any selected obligation is open.
                 return StepOutput(
                     content=result.model_dump(mode="json"),
                     success=not failed,
                     error=result.message if failed else None,
-                    stop=failed,
+                    stop=failed and current.action != "execute-obligation",
                 )
 
             workflow_steps.append(
@@ -83,7 +135,6 @@ class ExecutorAgent:
                     name=f"{plan_step.index:04d}-{plan_step.action}",
                     executor=execute_step,
                     max_retries=0,
-                    on_error="fail",
                 )
             )
         return Workflow(
@@ -98,6 +149,7 @@ class ExecutorAgent:
         manifest: ProcessingManifest,
         *,
         dry_run: bool = False,
+        progress: StepProgress | None = None,
     ) -> tuple[ProcessingManifest, ExecutionReport]:
         self._validate_binding(plan, manifest)
         working = deepcopy(manifest)
@@ -109,6 +161,7 @@ class ExecutorAgent:
             manifest=working,
             dry_run=dry_run,
             results=[],
+            progress=progress,
         )
         workflow = self.build_workflow(plan, state)
         workflow.run(
@@ -122,7 +175,7 @@ class ExecutorAgent:
 
         if dry_run:
             returned_manifest = deepcopy(manifest)
-            status = "dry-run-completed"
+            status = "failed" if state.failed_step_index is not None else "dry-run-completed"
             revision_after = manifest.revision
         else:
             returned_manifest = state.manifest
@@ -185,37 +238,46 @@ class ExecutorAgent:
         plan: NominalPlan,
         manifest: ProcessingManifest,
     ) -> None:
+        """Validate that the plan is bound to this manifest, domain, and revision.
+
+        Args:
+            plan (NominalPlan): Plan whose domain name/version/hashes and manifest
+                id/revision/sha are checked against the execution domain and manifest.
+            manifest (ProcessingManifest): Manifest whose identity and payload hash must
+                match what the plan captured at planning time.
+
+        Raises:
+            ValueError: When any binding check fails, carrying the localized message.
+        """
         if plan.domain.name != self.domain.name:
-            raise ValueError("O plano usa outro domínio PDDL")
+            raise ValueError(t(EXE_PLAN_DIFFERENT_DOMAIN))
         if plan.domain.version != self.domain.version:
-            raise ValueError("A versão do domínio do plano é incompatível")
+            raise ValueError(t(EXE_PLAN_DOMAIN_VERSION_INCOMPATIBLE))
         if plan.domain.domain_sha256 != self.domain.domain_sha256:
-            raise ValueError("O domain.pddl foi alterado depois do planejamento")
+            raise ValueError(t(EXE_DOMAIN_PDDL_CHANGED))
         if (
             plan.domain.description_sha256
             != self.domain.description_sha256
         ):
-            raise ValueError(
-                "A descrição do domínio foi alterada depois do planejamento"
-            )
+            raise ValueError(t(EXE_DOMAIN_DESCRIPTION_CHANGED))
         if plan.manifest_id != manifest.manifest_id:
-            raise ValueError("O plano pertence a outro manifesto")
+            raise ValueError(t(EXE_PLAN_OTHER_MANIFEST))
         if plan.manifest_revision != manifest.revision:
             raise ValueError(
-                "Revisão divergente entre plano e manifesto: "
-                f"{plan.manifest_revision} != {manifest.revision}"
+                t(EXE_PLAN_REVISION_MISMATCH).format(
+                    plan_revision=plan.manifest_revision,
+                    manifest_revision=manifest.revision,
+                )
             )
         payload = manifest.model_dump(mode="json", by_alias=True)
         actual_hash = _json_sha256(payload)
         if plan.manifest_sha256 != actual_hash:
-            raise ValueError(
-                "O manifesto foi alterado depois da geração do plano"
-            )
+            raise ValueError(t(EXE_MANIFEST_CHANGED_AFTER_PLANNING))
         known = {item.id for item in manifest.obligations}
         unknown = set(plan.selected_obligations) - known
         if unknown:
             raise ValueError(
-                f"O plano seleciona obrigações inexistentes: {sorted(unknown)}"
+                t(EXE_PLAN_UNKNOWN_OBLIGATIONS).format(unknown=sorted(unknown))
             )
 
     def _execute_step(
@@ -233,7 +295,9 @@ class ExecutorAgent:
             if step.action == "start-job":
                 if state.manifest.status not in {"extracted", "planned"}:
                     raise ValueError(
-                        f"start-job inválido no estado {state.manifest.status}"
+                        t(EXE_START_JOB_INVALID_STATE).format(
+                            status=state.manifest.status
+                        )
                     )
                 state.manifest.status = "processing"
             elif step.action == "execute-obligation":
@@ -250,7 +314,9 @@ class ExecutorAgent:
                 )
                 if obligation is None:
                     raise ValueError(
-                        f"Obrigação inexistente: {step.obligation_id}"
+                        t(EXE_OBLIGATION_NOT_FOUND).format(
+                            obligation_id=step.obligation_id
+                        )
                     )
                 self._check_obligation_preconditions(
                     obligation,
@@ -259,12 +325,14 @@ class ExecutorAgent:
                 )
                 if state.dry_run:
                     obligation.status = "satisfied"
-                    message = "Execução simulada; nenhum efeito foi persistido"
+                    message = t(EXE_DRY_RUN_SIMULATED)
                 else:
                     handler = self.registry.get(step.method)
                     if handler is None:
                         raise RuntimeError(
-                            f"Nenhum handler registrado para {step.method}"
+                            t(EXE_NO_HANDLER_REGISTERED).format(
+                                method=step.method
+                            )
                         )
                     attempt_started = datetime.now(timezone.utc)
                     try:
@@ -280,13 +348,13 @@ class ExecutorAgent:
                             message=f"{type(exc).__name__}: {exc}",
                             artifact_ids=[],
                         )
-                        alternatives = set(obligation.admissible_methods) - {
+                        alternatives = set(obligation.admissible_methods) & set(self.registry.names()) - {
                             attempt.method
                             for attempt in obligation.attempts
                             if attempt.status in {"failed", "rejected"}
                         }
                         obligation.status = "pending" if alternatives else "failed"
-                        state.replan_required = bool(alternatives)
+                        state.replan_required = state.replan_required or bool(alternatives)
                         raise RuntimeError(
                             f"{type(exc).__name__}: {exc}"
                         ) from exc
@@ -311,15 +379,15 @@ class ExecutorAgent:
                         if artifact.id not in existing_artifacts
                     )
                     if not result.success or not result.validated:
-                        alternatives = set(obligation.admissible_methods) - {
+                        alternatives = set(obligation.admissible_methods) & set(self.registry.names()) - {
                             attempt.method
                             for attempt in obligation.attempts
                             if attempt.status in {"failed", "rejected"}
                         }
                         obligation.status = "pending" if alternatives else "failed"
-                        state.replan_required = bool(alternatives)
+                        state.replan_required = state.replan_required or bool(alternatives)
                         raise RuntimeError(
-                            result.message or "Resultado rejeitado pelo validador"
+                            result.message or t(EXE_RESULT_REJECTED)
                         )
                     obligation.status = "satisfied"
                     message = result.message
@@ -336,15 +404,30 @@ class ExecutorAgent:
                 ]
                 if unsatisfied:
                     raise ValueError(
-                        f"Obrigações selecionadas não satisfeitas: {unsatisfied}"
+                        t(EXE_COMPLETED_OBLIGATIONS_UNSATISFIED).format(
+                            unsatisfied=unsatisfied
+                        )
                     )
                 state.manifest.status = "completed"
             else:
-                raise ValueError(f"Ação desconhecida: {step.action}")
+                raise ValueError(
+                    t(EXE_UNKNOWN_ACTION).format(action=step.action)
+                )
         except Exception as exc:
             status = "failed"
             message = f"{type(exc).__name__}: {exc}"
-            state.failed_step_index = step.index
+            if state.failed_step_index is None:
+                state.failed_step_index = step.index
+            # The report only reaches the caller as obligation ids, so the cause
+            # of each failed step is logged here.
+            logger.warning(
+                "PDDL: passo {} ({}) falhou; obrigação={} método={}: {}",
+                step.index,
+                step.action,
+                step.obligation_id,
+                step.method,
+                message,
+            )
 
         result = ExecutionStepResult(
             index=step.index,
@@ -366,23 +449,45 @@ class ExecutorAgent:
         step: PlanStep,
         manifest: ProcessingManifest,
     ) -> None:
+        """Check that an obligation may be executed by the given plan step.
+
+        Args:
+            obligation: Obligation instance targeted by the step (no type spec; duck-typed).
+            step (PlanStep): Nominal plan step whose action, method, and obligation id are checked.
+            manifest (ProcessingManifest): Manifest providing job status and obligation lookups.
+
+        Raises:
+            ValueError: When any precondition fails, carrying the localized message.
+        """
         if manifest.status != "processing":
-            raise ValueError("O job não está em processamento")
+            raise ValueError(t(EXE_JOB_NOT_PROCESSING))
         if not obligation.selected:
-            raise ValueError(f"Obrigação não selecionada: {obligation.id}")
+            raise ValueError(
+                t(EXE_OBLIGATION_NOT_SELECTED).format(
+                    obligation_id=obligation.id
+                )
+            )
         if obligation.status == "satisfied":
-            raise ValueError(f"Obrigação já satisfeita: {obligation.id}")
+            raise ValueError(
+                t(EXE_OBLIGATION_ALREADY_SATISFIED).format(
+                    obligation_id=obligation.id
+                )
+            )
         if obligation.kind != step.obligation_kind:
-            raise ValueError("Tipo da obrigação diverge do plano")
+            raise ValueError(t(EXE_OBLIGATION_KIND_MISMATCH))
         if step.method not in obligation.admissible_methods:
-            raise ValueError(f"Método não admissível: {step.method}")
+            raise ValueError(
+                t(EXE_METHOD_NOT_ADMISSIBLE).format(method=step.method)
+            )
         tried = {
             attempt.method
             for attempt in obligation.attempts
             if attempt.status in {"failed", "rejected"}
         }
         if step.method in tried:
-            raise ValueError(f"Método já tentado: {step.method}")
+            raise ValueError(
+                t(EXE_METHOD_ALREADY_TRIED).format(method=step.method)
+            )
         by_id = {item.id: item for item in manifest.obligations}
         unsatisfied = [
             dependency
@@ -391,7 +496,10 @@ class ExecutorAgent:
         ]
         if unsatisfied:
             raise ValueError(
-                f"Predecessoras não satisfeitas para {obligation.id}: {unsatisfied}"
+                t(EXE_PREDECESSORS_UNSATISFIED).format(
+                    obligation_id=obligation.id,
+                    unsatisfied=unsatisfied,
+                )
             )
 
 
