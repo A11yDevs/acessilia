@@ -122,3 +122,13 @@ def test_table_cells_normalize_tabs_to_spaces():
     table = _block(sanitized)
     assert table["table_ast"]["caption"] == "Tabela 1"
     assert _cells(sanitized) == ["header 1", "header 2", "valor A", "valor B"]
+
+
+def test_table_ast_null_cell_text_stays_blank():
+    """A null cell keeps its grid position as an empty cell, never as "None"."""
+    block = _table_block()
+    block["table_ast"]["body"][1]["cells"][1]["text"] = None
+
+    sanitized = sanitize_canonical_document(_document(block))
+
+    assert _cells(sanitized) == ["h", "velocidade", "1", ""]

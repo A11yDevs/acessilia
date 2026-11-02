@@ -381,3 +381,36 @@ def test_a_document_without_headings_gets_no_header():
     blocks = build_pandoc_ast(canonical)["blocks"]
     assert [block["t"] for block in blocks] == ["Para", "Para", "Para"]
     assert [_para_text(block) for block in blocks] == ["First", "Second", "Third"]
+
+
+# ── Empty table cells (hotfix #116 on main) ──────────────────────────────
+
+
+def test_build_pandoc_ast_preserves_empty_cells():
+    document = _document_with_table(
+        {
+            "caption": "Schedule",
+            "header": [
+                {"cells": [{"text": "Task"}, {"text": "Week 1"}, {"text": "Week 2"}]}
+            ],
+            "body": [{"cells": [{"text": "Step 1"}, {"text": "Active"}, {"text": ""}]}],
+        }
+    )
+
+    ast = build_pandoc_ast(document)
+    table_node = next(b for b in ast["blocks"] if b.get("t") == "Table")
+    body_rows = table_node["c"][4][0][3]
+
+    assert len(body_rows) == 1
+    assert len(body_rows[0][1]) == 3
+
+
+def test_build_pandoc_ast_cell_with_none_text():
+    """A cell whose text is None renders empty, never the literal "None"."""
+    document = _document_with_table({"body": [{"cells": [{"text": "A"}, {"text": None}]}]})
+
+    ast = build_pandoc_ast(document)
+    table_node = next(b for b in ast["blocks"] if b.get("t") == "Table")
+    cell = table_node["c"][4][0][3][0][1][1]
+
+    assert not any(inline.get("c") == "None" for inline in cell[4][0]["c"])

@@ -31,10 +31,10 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -56,7 +56,7 @@ jobs:
             org.opencontainers.image.version=${{ github.ref_name }}
 
       - name: Build production image for verification
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: infra/Dockerfile
@@ -88,7 +88,7 @@ jobs:
 
       - name: Publish verified release image
         id: publish
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: infra/Dockerfile
