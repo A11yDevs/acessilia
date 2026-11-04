@@ -378,6 +378,33 @@ cp .env.example .env
 uv run pytest
 ```
 
+## Triagem de issues
+
+Toda issue aberta tem exatamente um rótulo de **categoria** e um de **urgência**. `bug`, `enhancement` e `question` continuam dizendo o tipo da issue; estes dois dizem o que ela melhora e em quanto tempo importa.
+
+| Categoria | Use para |
+|-----------|----------|
+| `architecture` | Fronteiras entre componentes, duplicação, contratos, estrutura de módulos |
+| `performance` | Latência, vazão, uso de recursos |
+| `security` | Vulnerabilidades, segredos, proteção de dependências e da cadeia de suprimentos |
+| `reliability` | Timeouts, cancelamento, degradação, tratamento de falhas, monitoramento |
+| `code-quality` | Legibilidade, testes, lint, benchmark e ferramentas de desenvolvimento |
+| `documentation` | Guias, ADRs, a constituição |
+| `process` | Fluxos de trabalho, governança, templates de issue e PR |
+| `ci-cd` | Pipelines, imagens, versões de runtime e de build |
+| `product` | Mudança de comportamento para o usuário; fora de um ciclo de refatoração |
+
+| Urgência | Critério | Quando |
+|----------|----------|--------|
+| `urgency:critical` | Produção fora do ar, perda de dados ou falha explorável | Interrompe o trabalho em andamento |
+| `urgency:high` | Bloqueia outro trabalho ou traz risco real sem contorno | Primeiro no ciclo |
+| `urgency:medium` | Custo real, mas com contorno | Dentro do ciclo |
+| `urgency:low` | Sem pressão de prazo | Quando for conveniente; pode ir para o próximo ciclo |
+
+Escolha a categoria pelo efeito principal da mudança. Avalie a urgência pelo que acontece se a issue esperar, não pelo tamanho nem pela importância dela. Quando uma issue abranger várias categorias ou um plano longo, divida-a para que cada parte possa ser classificada sozinha.
+
+Durante um ciclo de refatoração, `is:open -label:product` mostra o backlog do ciclo e `is:open label:urgency:high` mostra o que vem primeiro.
+
 ## Pull Requests
 
 1. Certifique-se de que sua branch está atualizada com a `develop` (`git rebase origin/develop`).

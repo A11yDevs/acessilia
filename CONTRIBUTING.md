@@ -375,6 +375,33 @@ cp .env.example .env
 uv run pytest
 ```
 
+## Issue triage
+
+Every open issue carries exactly one **category** label and one **urgency** label. `bug`, `enhancement` and `question` still say what kind of issue it is; these two say what it improves and how soon it matters.
+
+| Category | Use it for |
+|----------|------------|
+| `architecture` | Component boundaries, duplication, contracts, module structure |
+| `performance` | Latency, throughput, resource use |
+| `security` | Vulnerabilities, secrets, dependency and supply-chain hardening |
+| `reliability` | Timeouts, cancellation, degradation, failure handling, monitoring |
+| `code-quality` | Readability, tests, linting, benchmark and developer tooling |
+| `documentation` | Guides, ADRs, the constitution |
+| `process` | Workflows, governance, issue and PR templates |
+| `ci-cd` | Pipelines, images, runtime and build versions |
+| `product` | User-facing behaviour change; outside a refactoring cycle |
+
+| Urgency | Criterion | When |
+|---------|-----------|------|
+| `urgency:critical` | Production down, data loss or an exploitable flaw | Interrupt current work |
+| `urgency:high` | Blocks other work, or carries real risk with no workaround | First in the cycle |
+| `urgency:medium` | Real cost, but a workaround exists | Within the cycle |
+| `urgency:low` | No time pressure | When convenient; may move to the next cycle |
+
+Pick the category by the main effect of the change. Judge urgency by what happens if the issue waits, not by its size or its importance. When an issue spans several categories or a long plan, split it so that each part can be classified on its own.
+
+During a refactoring cycle, `is:open -label:product` shows the cycle's backlog, and `is:open label:urgency:high` shows what comes first.
+
 ## Pull requests
 
 1. Make sure your branch is up to date with `develop` (`git rebase origin/develop`).
