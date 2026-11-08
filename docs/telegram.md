@@ -169,7 +169,7 @@ Each command has a Portuguese name and an English alias. Both work in any langua
 | `/ativar` | `/activate` | Lifts the pause. |
 | `/health` | — | Checks the API, model and disk. |
 | `/feedback` | — | Asks for free-text feedback and records it on the server. |
-| `/limpar` | `/clear` | Clears the **server's** processing cache, for every user. Operator use. |
+| `/limpar` | `/clear` | Clears the **server's** processing cache, for every user. Operator use; any user can run it today ([#395](https://github.com/A11yDevs/acessilia/issues/395)). |
 
 Notes:
 
@@ -266,10 +266,10 @@ If the file sent in the group **does not appear in the log at all**, it never re
 
 ## 5. Known limitations
 
-- **Files over 20 MB:** Telegram's public Bot API only lets bots download files up to 20 MB. Even with `MAX_FILE_SIZE_MB=50`, a file between 20 and 50 MB passes validation and then fails to download. Use the web panel for larger files.
-- **In-memory state:** modes, e-mails, tracked tasks and paused chats live in the process memory. Restarting or recreating the container resets them: paused chats answer again and `/status` no longer finds tasks sent before the restart. The tasks themselves remain in the API.
-- **Advertised vs accepted formats:** `/start` and `/formats` mention BMP and WEBP, which the validator rejects. They also advertise Markdown and "searchable PDF" outputs, while the current package holds TXT, DOCX, PDF/UA, HTML and MP3. The help (`/help`) does not list `/email`.
-- **Final message in Portuguese:** the message with the download link is in Portuguese whatever the user's language.
+- **Files over 20 MB:** Telegram's public Bot API only lets bots download files up to 20 MB. Even with `MAX_FILE_SIZE_MB=50`, a file between 20 and 50 MB passes validation and then fails to download. Use the web panel for larger files ([#392](https://github.com/A11yDevs/acessilia/issues/392)).
+- **In-memory state:** modes, e-mails, tracked tasks and paused chats live in the process memory. Restarting or recreating the container resets them: paused chats answer again and `/status` no longer finds tasks sent before the restart. The tasks themselves remain in the API ([#396](https://github.com/A11yDevs/acessilia/issues/396)).
+- **Advertised vs accepted formats:** `/start` and `/formats` mention BMP and WEBP, which the validator rejects. They also advertise Markdown and "searchable PDF" outputs, while the current package holds TXT, DOCX, PDF/UA, HTML and MP3. The help (`/help`) does not list `/email` ([#393](https://github.com/A11yDevs/acessilia/issues/393)).
+- **Final message in Portuguese:** the message with the download link is in Portuguese whatever the user's language ([#394](https://github.com/A11yDevs/acessilia/issues/394)).
 
 ## References
 
