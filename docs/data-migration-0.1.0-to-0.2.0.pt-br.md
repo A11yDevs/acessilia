@@ -2,8 +2,8 @@
 
 Inglês: [English](data-migration-0.1.0-to-0.2.0.md).
 
-> **Concluída.** A produção foi migrada antes da promoção para a 0.2.0, em
-> 2026-11-02, e não resta nenhuma instalação 0.1.0. O script, o esquema SQL e os
+> **Concluída.** A produção (MV1) foi migrada em 2026-11-01, antes da promoção
+> para a 0.2.0, em 2026-11-02, e não resta nenhuma instalação 0.1.0. O script, o esquema SQL e os
 > testes dele foram então removidos do repositório. Eles continuam na tag
 > `v0.2.0`, por exemplo `git show v0.2.0:scripts/migrations/v0_1_0_to_v0_2_0.py`.
 > Este guia fica como registro de como a migração foi feita.

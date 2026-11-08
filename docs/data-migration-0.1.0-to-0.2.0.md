@@ -2,8 +2,8 @@
 
 Brazilian Portuguese: [português brasileiro](data-migration-0.1.0-to-0.2.0.pt-br.md).
 
-> **Completed.** Production was migrated before the 0.2.0 promotion on
-> 2026-11-02, and no 0.1.0 installation remains. The script, its SQL schema and
+> **Completed.** Production (MV1) was migrated on 2026-11-01, before the 0.2.0
+> promotion on 2026-11-02, and no 0.1.0 installation remains. The script, its SQL schema and
 > its tests were then removed from the repository. They remain at tag `v0.2.0`,
 > for example `git show v0.2.0:scripts/migrations/v0_1_0_to_v0_2_0.py`. This guide
 > is kept as a record of how the migration was done.
