@@ -2,6 +2,12 @@
 
 Brazilian Portuguese: [português brasileiro](data-migration-0.1.0-to-0.2.0.pt-br.md).
 
+> **Completed.** Production (MV1) was migrated on 2026-11-01, before the 0.2.0
+> promotion on 2026-11-02, and no 0.1.0 installation remains. The script, its SQL schema and
+> its tests were then removed from the repository. They remain at tag `v0.2.0`,
+> for example `git show v0.2.0:scripts/migrations/v0_1_0_to_v0_2_0.py`. This guide
+> is kept as a record of how the migration was done.
+
 ## Contract
 
 `scripts/migrations/v0_1_0_to_v0_2_0.py` and its adjacent versioned SQL schema
@@ -149,15 +155,15 @@ download routes used by existing links. Validate several existing download pages
 and actual file downloads, including a plain PDF if one exists, then confirm an
 expired token is rejected. Test download access without exposing tokens in logs.
 
-The tests exercise the legacy schema, expiration boundary, path changes, failures,
-shared directories and actual 0.2.0 API downloads:
+The tests, at tag `v0.2.0`, exercised the legacy schema, expiration boundary, path
+changes, failures, shared directories and actual 0.2.0 API downloads:
 
 ```bash
 python -m pytest -q tests/test_data_migration.py \
   tests/test_download_token_service.py tests/test_cleanup_service.py
 ```
 
-Run these in the project's test container before merging, per the constitution.
+They were run in the project's test container before the migration.
 
 For rollback, stop 0.2.0 and restore the preserved 0.1.0 image, configuration and
 its original dataset. Do not point 0.1.0 at the migrated database. New 0.2.0 writes
