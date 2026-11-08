@@ -380,7 +380,15 @@ uv run pytest
 
 ## Triagem de issues
 
-Toda issue aberta tem exatamente um rótulo de **categoria** e um de **urgência**. `bug`, `enhancement` e `question` continuam dizendo o tipo da issue; estes dois dizem o que ela melhora e em quanto tempo importa.
+Toda issue aberta tem um **tipo** de issue e exatamente um rótulo de **categoria** e um de **urgência**. O tipo diz que espécie de issue ela é; os dois rótulos dizem o que ela melhora e em quanto tempo importa.
+
+| Tipo | Use para | Rótulo correspondente |
+|------|----------|-----------------------|
+| Bug | Algo que não funciona como documentado ou esperado | `bug` |
+| Feature | Uma capacidade nova para o usuário: algo que o sistema não fazia antes | `feature` |
+| Task | Todo o resto: refatoração, engenharia interna, documentação, pesquisa | `enhancement`, `documentation` ou nenhum |
+
+Defina o tipo na barra lateral da issue; Bug, Feature e Task são os tipos de issue da organização, comuns a todos os repositórios do Acessilia. Os rótulos `bug`, `feature` e `enhancement` espelham o tipo para buscas e ferramentas que não leem tipos de issue, então mantenha-os de acordo com ele. `enhancement` indica melhoria de um comportamento existente ou de engenharia interna; `feature` indica uma capacidade nova. Uma feature que o usuário vê costuma ser também `product`, mas nem toda issue `product` é feature: um bug que atinge o usuário é um Bug com `product`.
 
 | Categoria | Use para |
 |-----------|----------|
@@ -403,7 +411,7 @@ Toda issue aberta tem exatamente um rótulo de **categoria** e um de **urgência
 
 Escolha a categoria pelo efeito principal da mudança. Avalie a urgência pelo que acontece se a issue esperar, não pelo tamanho nem pela importância dela. Quando uma issue abranger várias categorias ou um plano longo, divida-a para que cada parte possa ser classificada sozinha.
 
-Durante um ciclo de refatoração, `is:open -label:product` mostra o backlog do ciclo e `is:open label:urgency:high` mostra o que vem primeiro.
+Durante um ciclo de refatoração, `is:open -label:product` mostra o backlog do ciclo e `is:open label:urgency:high` mostra o que vem primeiro. `is:open type:Feature` lista as capacidades novas que aguardam um ciclo de produto.
 
 ## Pull Requests
 
