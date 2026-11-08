@@ -1060,6 +1060,10 @@ msgid "Image description"
 msgstr "Descrição da imagem"
 
 #, python-brace-format
+msgid "Table {number}"
+msgstr "Tabela {number}"
+
+#, python-brace-format
 msgid "Table: {caption}"
 msgstr "Tabela: {caption}"
 

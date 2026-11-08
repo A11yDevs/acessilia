@@ -22,6 +22,8 @@ from docstruct.export.html import (  # noqa: F401
 # Canonical msgids (kept here: consumed by scripts/gen_locale_catalogs)
 MSG_HTML_TABLE_OF_CONTENTS = "Contents"
 MSG_HTML_IMAGE_DESCRIPTION = "Image description"
+# Accessible name of a scrollable table without a caption; docstruct fills {number}.
+MSG_HTML_TABLE_REGION = "Table {number}"
 
 
 def render_html(
@@ -33,6 +35,7 @@ def render_html(
         default_title=document.get("title") or t(MSG_DEFAULT_ACCESSIBLE_TITLE),
         table_of_contents=t(MSG_HTML_TABLE_OF_CONTENTS),
         image_description=t(MSG_HTML_IMAGE_DESCRIPTION),
+        extra={"table_region": t(MSG_HTML_TABLE_REGION)},
     )
     html = document_to_html(document, profile=profile_name, labels=labels)
     output_path.write_text(html, encoding="utf-8")
