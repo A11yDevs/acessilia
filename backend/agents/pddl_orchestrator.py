@@ -3069,9 +3069,13 @@ class PddlAccessibilityOrchestrator:
 
 
 #: Why a picture was left undescribed, recorded in metadata["vision_failure_reason"]
-#: for the operator: the crop could not be rendered, the vision call failed (its
-#: error goes to metadata["vision_failure_detail"]), or the answer had no text.
-VisionFailureReason = Literal["crop_unavailable", "model_failed", "empty_description"]
+#: for the operator: the crop could not be rendered, the source has no page to
+#: render and the extraction embedded no image in the picture (a DOCX or HTML
+#: picture, so the model was never asked), the vision call failed (its error
+#: goes to metadata["vision_failure_detail"]), or the answer had no text.
+VisionFailureReason = Literal[
+    "crop_unavailable", "image_unavailable", "model_failed", "empty_description"
+]
 
 
 def _record_vision_failure(
@@ -3169,7 +3173,10 @@ async def _enrich_picture_descriptions(
                 manifest.source.media_type,
             )
             if not image_bytes:
-                _record_vision_failure(element, "crop_unavailable")
+                _record_vision_failure(
+                    element,
+                    "crop_unavailable" if page_number >= 1 else "image_unavailable",
+                )
                 return False
 
             errors: list[str] = []
@@ -4667,6 +4674,44 @@ def _rows_look_like_placeholder(rows: list[list[str]]) -> bool:
 #: vision model's 8192-token slot would downscale it further anyway.
 _PICTURE_MAX_SIDE = 2000
 
+#: Largest image decoded from a picture's embedded ``src``. A DOCX or HTML
+#: image is the author's file, not a bounded render, so an oversized one is
+#: left undescribed instead of being held in memory and sent to the model.
+_EMBEDDED_PICTURE_MAX_BYTES = 20 * 1024 * 1024
+
+#: Embedded image types sent to the vision model as they are: the raster
+#: formats the providers read (and that ``pdf.render`` also accepts as input).
+#: A vector image (SVG) is not something the model can be shown.
+_EMBEDDED_PICTURE_TYPES = frozenset({"image/png", "image/jpeg", "image/jpg"})
+
+
+def _embedded_picture_bytes(element: ManifestElement) -> bytes | None:
+    """The image embedded in a picture as a base64 ``data:`` URI, or ``None``.
+
+    A DOCX or HTML source has no pages for the Toolbox to render, so the only
+    pixels of its picture are the ones the extraction carried in
+    ``metadata["src"]`` (the key the exporters read for the ``<img>``). Only a
+    raster data URI is decoded: a remote URL is never fetched, the core does
+    not reach out on a document's behalf.
+    """
+    src = element.metadata.get("src")
+    if not isinstance(src, str):
+        return None
+    header, separator, payload = src.partition(",")
+    if not separator:
+        return None
+    media_type, _, encoding = header.strip().lower().removeprefix("data:").partition(";")
+    if media_type not in _EMBEDDED_PICTURE_TYPES or encoding != "base64":
+        return None
+    payload = "".join(payload.split())
+    if len(payload) > (_EMBEDDED_PICTURE_MAX_BYTES * 4) // 3 + 4:
+        return None
+    try:
+        image = base64.b64decode(payload, validate=True)
+    except ValueError:  # binascii.Error
+        return None
+    return image or None
+
 
 def _extract_picture_bytes(
     source_file: Path,
@@ -4681,13 +4726,17 @@ def _extract_picture_bytes(
     picture, so the page is described instead. Any other failure, the Toolbox
     being unavailable included, is not retried with the page: it is logged
     with its cause and the element is left without an image.
+
+    A picture with no page (a DOCX or HTML source) has nothing to render; its
+    image is the one the extraction embedded in it, if any, returned with
+    page ``0``.
     """
     from acessilia_sdk.toolbox import ToolboxCapabilityError, ToolboxIncompatibleEndpoint
 
     provenance = element.provenance[0] if element.provenance else None
     page_number = provenance.page_number if provenance is not None else (fallback_page_number or 0)
     if page_number < 1:
-        return None, 0
+        return _embedded_picture_bytes(element), 0
 
     def render(clip=None, origin: ClipOrigin = "TOPLEFT") -> RenderedPage:
         return _toolbox_render(
@@ -4865,7 +4914,11 @@ def _blocks_delivery(obligation: Obligation, manifest: ProcessingManifest) -> bo
     the model is unreachable or misconfigured (``describe_region`` turns a
     timeout or an auth error into ``None``), and every picture would silently
     get the generic alt text, so the job fails. A document with a single
-    picture its one description failed on fails too.
+    picture its one description failed on fails too. A picture that was never
+    sent to the model, because its source has no page to render and the
+    extraction embedded no image (a DOCX or HTML picture), says nothing about
+    the model: it is left for human review with the generic alt text instead
+    of failing the document.
 
     ``verbalize-formula`` and ``normalize-formula`` are non-critical while the
     target formulas keep their LaTeX: without MathML or spoken text the exported
@@ -4874,6 +4927,8 @@ def _blocks_delivery(obligation: Obligation, manifest: ProcessingManifest) -> bo
     obligation fails the job.
     """
     if obligation.kind == "describe-image":
+        if _has_no_image_to_describe(obligation, manifest):
+            return False
         return not any(
             other.kind == "describe-image" and other.status == "satisfied"
             for other in manifest.obligations
@@ -4881,6 +4936,19 @@ def _blocks_delivery(obligation: Obligation, manifest: ProcessingManifest) -> bo
     if obligation.kind in {"verbalize-formula", "normalize-formula"}:
         return not _formula_has_readable_content(obligation, manifest)
     return obligation.kind not in NON_CRITICAL_OBLIGATION_KINDS
+
+
+def _has_no_image_to_describe(
+    obligation: Obligation, manifest: ProcessingManifest
+) -> bool:
+    """Whether every target of a ``describe-image`` had no image to send to the model."""
+    targets = [
+        element for element in manifest.elements if element.id in obligation.target_ids
+    ]
+    return bool(targets) and all(
+        element.metadata.get("vision_failure_reason") == "image_unavailable"
+        for element in targets
+    )
 
 
 def _is_open_obligation(obligation: Obligation) -> bool:
@@ -5195,10 +5263,14 @@ def build_pddl_structured_payload(
 
 
 #: Why a picture or table left without a description or a reading may come
-#: out differently on a rerun: the model provider or the Toolbox was down. An
+#: out differently on a rerun: the model provider or the Toolbox was down, or
+#: the extraction embedded no image in a pageless picture (a Toolbox that
+#: forwards it would get the picture described). An
 #: empty description is the model's answer, as is a refused table reading, and
 #: would come back the same, so it neither counts nor keeps a run uncached.
-_RETRYABLE_VISUAL_FAILURES = frozenset({"crop_unavailable", "model_failed"})
+_RETRYABLE_VISUAL_FAILURES = frozenset(
+    {"crop_unavailable", "image_unavailable", "model_failed"}
+)
 
 
 def _visual_failures(manifest: ProcessingManifest) -> dict[str, dict[str, int]] | None:
