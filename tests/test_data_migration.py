@@ -1,5 +1,6 @@
 """Migration regressions against the schema of the actual production image."""
 
+import functools
 import json
 import os
 import sqlite3
@@ -55,9 +56,12 @@ def rows(destination, table):
         return [dict(row) for row in conn.execute(f'SELECT * FROM "{table}"')]
 
 
-def test_dry_run_preserves_source_and_creates_no_destination(legacy, capsys):
+def test_dry_run_preserves_source_and_creates_no_destination(legacy, capsys, monkeypatch):
     source, destination = legacy
     asset(source)
+    # The CLI has no clock option; pin the reference time like the at=NOW tests
+    # so the 1-day-old token stays inside RETENTION_DAYS whatever today is.
+    monkeypatch.setattr(migration, "migrate", functools.partial(migration.migrate, at=NOW))
     before = {str(p.relative_to(source)): p.read_bytes() for p in source.rglob("*") if p.is_file()}
     assert migration.main(["--source-var", str(source), "--destination-var", str(destination)]) == 0
     report = json.loads(capsys.readouterr().out)
