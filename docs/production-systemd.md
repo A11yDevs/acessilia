@@ -82,7 +82,9 @@ logs, a 60-second stop grace and an init process; none implements job draining.
 Test shutdown/restart in staging. Preserve image/configuration/automation backups
 and validate a working gateway route for rollback before the maintenance window.
 
-Follow [the versioned migration guide](data-migration-0.1.0-to-0.2.0.md): block
+The 0.1.0 to 0.2.0 data migration is complete and its script was retired; a
+release that changes stored data ships its own guide. For the record, [that
+migration](data-migration-0.1.0-to-0.2.0.md) had to block
 every ingress including Telegram, drain queued and active jobs, stop the old core,
 back up all data offline, dry-run/apply/verify migration and check UID permissions.
 Do not manually create new `core/var` before migration. The bind refuses to create

@@ -82,7 +82,9 @@ de escolher limites. O core tem rotação dos logs Docker, prazo de parada de
 na homologação. Preservar backups de imagem, configuração e automação; validar
 a rota do gateway para rollback antes da janela.
 
-Seguir a [migração versionada](data-migration-0.1.0-to-0.2.0.pt-br.md): bloquear
+A migração de dados da 0.1.0 para a 0.2.0 está concluída e o script dela foi
+aposentado; uma versão que mude os dados armazenados traz o próprio guia. Como
+registro, [aquela migração](data-migration-0.1.0-to-0.2.0.pt-br.md) precisou bloquear
 todas as entradas, inclusive Telegram, drenar fila e jobs ativos, parar o core
 antigo, fazer backup offline completo, simular/aplicar/verificar a migração e
 conferir permissões de UID. Não criar `core/var` manualmente antes da migração.

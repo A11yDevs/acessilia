@@ -2,6 +2,12 @@
 
 Inglês: [English](data-migration-0.1.0-to-0.2.0.md).
 
+> **Concluída.** A produção foi migrada antes da promoção para a 0.2.0, em
+> 2026-11-02, e não resta nenhuma instalação 0.1.0. O script, o esquema SQL e os
+> testes dele foram então removidos do repositório. Eles continuam na tag
+> `v0.2.0`, por exemplo `git show v0.2.0:scripts/migrations/v0_1_0_to_v0_2_0.py`.
+> Este guia fica como registro de como a migração foi feita.
+
 ## Contrato
 
 `scripts/migrations/v0_1_0_to_v0_2_0.py` e o SQL versionado ao lado dele exportam
@@ -156,15 +162,15 @@ links já emitidos. Teste páginas de downloads existentes e a entrega dos arqui
 inclusive PDF comum se houver, e confira a rejeição de tokens expirados. Evite
 expor os tokens nos logs dos testes.
 
-Os testes cobrem o esquema antigo, corte da expiração, mudança de caminhos,
-falhas, diretórios compartilhados e downloads reais pela API da 0.2.0:
+Os testes, na tag `v0.2.0`, cobriam o esquema antigo, corte da expiração, mudança
+de caminhos, falhas, diretórios compartilhados e downloads reais pela API da 0.2.0:
 
 ```bash
 python -m pytest -q tests/test_data_migration.py \
   tests/test_download_token_service.py tests/test_cleanup_service.py
 ```
 
-Execute no container de testes do projeto antes do merge, conforme a constituição.
+Eles foram executados no container de testes do projeto antes da migração.
 
 Para rollback, pare a 0.2.0 e restaure imagem, configuração e dados originais da
 0.1.0. Não aponte a 0.1.0 para o banco migrado. O script não reverte escritas novas
