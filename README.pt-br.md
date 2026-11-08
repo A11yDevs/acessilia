@@ -59,7 +59,7 @@ uv run python -m frontend.run
 Inicia as interfaces listadas em `ENABLED_INTERFACES` (padrão: `api,telegram,web`):
 - API em `http://localhost:8000`
 - Painel web em `http://localhost:8001`
-- Telegram (requer `BOT_TOKEN`)
+- Telegram (requer `BOT_TOKEN`; configuração, testes e uso em grupos em [docs/telegram.pt-br.md](docs/telegram.pt-br.md))
 
 ### API isolada (para deploy de múltiplos processos)
 

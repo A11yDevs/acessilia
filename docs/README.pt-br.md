@@ -31,6 +31,8 @@ O sistema opera com o motor de pipeline `pddl` (o fluxo manifest → plan → ex
 
 18. [Preparação e ativação de produção](production-systemd.pt-br.md) — configuração, promoção por digest, prontidão e rollback. (English: [English guide](production-systemd.md))
 
+19. [Interface Telegram](telegram.pt-br.md) — criar e configurar o bot, testá-lo em conversa privada e fazê-lo responder em grupos e tópicos, incluindo o modo de privacidade. (English: [English guide](telegram.md))
+
 ---
 
 ## Arquitetura PDDL + Agno
