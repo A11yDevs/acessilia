@@ -34,7 +34,7 @@ O antigo motor **`legacy`** (`AccessibilityOrchestrator`: Reader → Vision/Data
 #### 0.4. Ferramentas e Utilitários de Domínio (`backend/tools/`)
 - [backend/tools/logger.py](../backend/tools/logger.py): configuração centralizada do logger loguru.
 - [backend/tools/validators.py](../backend/tools/validators.py): validação de extensão e tamanho de arquivo.
-- [backend/tools/text_processor.py](../backend/tools/text_processor.py): normalização de texto e parsing de Markdown.
+- [docstruct.text.paragraphs](../libs/docstruct/src/docstruct/text/paragraphs.py): normalização de texto e parsing de Markdown.
 - [backend/tools/prompt_tools.py](../backend/tools/prompt_tools.py): carregador de prompt e resolutor de templates.
 
 #### 0.5. Camada de Planejamento (`backend/core/`) — motor PDDL

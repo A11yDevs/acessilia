@@ -40,7 +40,7 @@ from backend.core.manifest.slides import (
 )
 from docstruct.placeholders import (
     UNSTRUCTURED_PAGE_FLAG,
-    UNSTRUCTURED_PAGE_LABEL,
+    UNSTRUCTURED_PAGE_LABEL as _UNSTRUCTURED_PAGE_LABEL,
     is_unstructured_page_placeholder as _is_placeholder,
 )
 from docstruct.geometry import (
@@ -458,7 +458,7 @@ def append_unstructured_page_needs(manifest: ProcessingManifest) -> None:
         element = ManifestElement(
             id=element_id,
             type="unknown",
-            raw_label=UNSTRUCTURED_PAGE_LABEL,
+            raw_label=_UNSTRUCTURED_PAGE_LABEL,
             reading_order=next_order,
             hierarchy_level=0,
             text=None,
