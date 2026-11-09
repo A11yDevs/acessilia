@@ -14,8 +14,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from docstruct.export.filters import strip_internal_audit_blocks
+
 from backend.config.settings import settings
-from backend.export.filters.pandoc_filters import strip_internal_audit_blocks
 from backend.i18n import t
 from backend.log_messages import LOG_DOCX_TOOLBOX_EXPORTED
 from backend.log_messages import LOG_PDF_UA_MATH_DEGRADED
