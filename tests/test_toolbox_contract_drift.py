@@ -289,7 +289,7 @@ def test_idempotency_is_compared_at_the_version_the_sdk_sends(checker) -> None:
     ]
 
 
-def test_the_capture_keeps_idempotent_as_published() -> None:
+def test_the_capture_keeps_idempotent_and_the_output_schema_as_published() -> None:
     spec = importlib.util.spec_from_file_location(
         "capture_toolbox_contract", REPO_ROOT / "scripts" / "capture_toolbox_contract.py"
     )
@@ -300,7 +300,8 @@ def test_the_capture_keeps_idempotent_as_published() -> None:
     normalized = capture._normalize(
         [
             {"id": "b", "version": 1, "providers": [], "execution": {"idempotent": False,
-                                                                   "cacheable": True}},
+                                                                   "cacheable": True},
+             "output": {"schema": "artifact/x@1", "media_types": ["application/json"]}},
             {"id": "a", "version": 1, "providers": [], "execution": {"idempotent": None}},
             {"id": "c", "version": 1, "providers": []},
         ],
@@ -309,6 +310,7 @@ def test_the_capture_keeps_idempotent_as_published() -> None:
 
     assert normalized["capabilities"] == [
         {"id": "a", "version": 1, "providers": [], "execution": {"idempotent": None}},
-        {"id": "b", "version": 1, "providers": [], "execution": {"idempotent": False}},
+        {"id": "b", "version": 1, "providers": [], "output": {"schema": "artifact/x@1"},
+         "execution": {"idempotent": False}},
         {"id": "c", "version": 1, "providers": []},
     ]

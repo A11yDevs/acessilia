@@ -8,7 +8,8 @@ of truth, and CI checks the SDK registry against it (#186).
 ``--ref`` copies the published file from a Toolbox branch or tag. ``--url``
 captures a running Toolbox instead, which also shows providers registered only
 in that deployment; when ``TOOLBOX_API_KEY`` is set it is sent as a Bearer
-token. Both paths keep only the fields the checker reads, with entries and
+token. Both paths keep only the fields the checker and the SDK binding
+generator (scripts/generate_sdk_bindings.py) read, with entries and
 lists sorted so repeated captures of the same state produce identical files.
 
 Usage:
@@ -52,6 +53,18 @@ def _fetch(url: str) -> object:
         raise SystemExit(f"cannot reach the Toolbox at {url}: {exc}")
 
 
+def _output(entry: dict) -> dict:
+    """The output schema the SDK binding generator reads, as published.
+
+    ``scripts/generate_sdk_bindings.py`` takes each selected capability's
+    output schema from here (#213). Copied as it is, missing or not.
+    """
+    output = entry.get("output")
+    if isinstance(output, dict) and "schema" in output:
+        return {"output": {"schema": output["schema"]}}
+    return {}
+
+
 def _execution(entry: dict) -> dict:
     """The execution flags the checker reads, as published.
 
@@ -66,8 +79,9 @@ def _execution(entry: dict) -> dict:
 
 
 def _normalize(capabilities: list, providers: list) -> dict:
-    """Only the fields the checker reads, sorted so repeated captures of the
-    same state produce identical files no matter which path produced them."""
+    """Only the fields the checker and the SDK binding generator read, sorted
+    so repeated captures of the same state produce identical files no matter
+    which path produced them."""
     return {
         # One entry per published version, as /v1/capabilities lists them: the
         # core checks the exact contract version it was written against.
@@ -76,6 +90,7 @@ def _normalize(capabilities: list, providers: list) -> dict:
                 "id": entry["id"],
                 "version": entry.get("version", 1),
                 "providers": sorted(entry.get("providers") or []),
+                **_output(entry),
                 **_execution(entry),
             }
             for entry in sorted(

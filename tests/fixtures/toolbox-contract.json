@@ -7,6 +7,9 @@
       "providers": [
         "pure-accessibility"
       ],
+      "output": {
+        "schema": "artifact/accessibility-report@1"
+      },
       "execution": {
         "idempotent": true
       }
@@ -18,6 +21,9 @@
         "filesystem",
         "minio"
       ],
+      "output": {
+        "schema": "artifact/binary@1"
+      },
       "execution": {
         "idempotent": true
       }
@@ -29,6 +35,9 @@
         "filesystem",
         "minio"
       ],
+      "output": {
+        "schema": "artifact/reference@1"
+      },
       "execution": {
         "idempotent": true
       }
@@ -39,6 +48,9 @@
       "providers": [
         "pure-chem"
       ],
+      "output": {
+        "schema": "artifact/mhchem@1"
+      },
       "execution": {
         "idempotent": true
       }
@@ -49,6 +61,9 @@
       "providers": [
         "docling-chem"
       ],
+      "output": {
+        "schema": "artifact/mhchem@1"
+      },
       "execution": {
         "idempotent": true
       }
@@ -59,6 +74,9 @@
       "providers": [
         "pure-code"
       ],
+      "output": {
+        "schema": "artifact/normalized-code@1"
+      },
       "execution": {
         "idempotent": true
       }
@@ -70,6 +88,9 @@
         "dataset-github",
         "dataset-huggingface"
       ],
+      "output": {
+        "schema": "artifact/dataset-info@1"
+      },
       "execution": {
         "idempotent": true
       }
@@ -81,6 +102,9 @@
         "dataset-github",
         "dataset-huggingface"
       ],
+      "output": {
+        "schema": "artifact/binary@1"
+      },
       "execution": {
         "idempotent": true
       }
@@ -92,6 +116,9 @@
         "dataset-github",
         "dataset-huggingface"
       ],
+      "output": {
+        "schema": "artifact/dataset-item@1"
+      },
       "execution": {
         "idempotent": true
       }
@@ -103,6 +130,9 @@
         "dataset-github",
         "dataset-huggingface"
       ],
+      "output": {
+        "schema": "artifact/dataset-list@1"
+      },
       "execution": {
         "idempotent": true
       }
@@ -114,6 +144,9 @@
         "dataset-github",
         "dataset-huggingface"
       ],
+      "output": {
+        "schema": "artifact/dataset-item-list@1"
+      },
       "execution": {
         "idempotent": true
       }
@@ -125,6 +158,9 @@
         "dataset-github",
         "dataset-huggingface"
       ],
+      "output": {
+        "schema": "artifact/dataset-splits@1"
+      },
       "execution": {
         "idempotent": true
       }
@@ -136,6 +172,9 @@
         "dataset-github",
         "dataset-huggingface"
       ],
+      "output": {
+        "schema": "artifact/dataset-item-list@1"
+      },
       "execution": {
         "idempotent": false
       }
@@ -147,6 +186,9 @@
         "dataset-github",
         "dataset-huggingface"
       ],
+      "output": {
+        "schema": "artifact/dataset-sync-report@1"
+      },
       "execution": {
         "idempotent": true
       }
@@ -157,6 +199,9 @@
       "providers": [
         "qwen3-vl-8b"
       ],
+      "output": {
+        "schema": "artifact/page-judgement@1"
+      },
       "execution": {
         "idempotent": true
       }
@@ -167,6 +212,9 @@
       "providers": [
         "qwen3-vl-8b"
       ],
+      "output": {
+        "schema": "artifact/region-transcription@1"
+      },
       "execution": {
         "idempotent": true
       }
@@ -177,6 +225,9 @@
       "providers": [
         "pandoc-docx"
       ],
+      "output": {
+        "schema": "artifact/docx-export@1"
+      },
       "execution": {
         "idempotent": true
       }
@@ -187,6 +238,9 @@
       "providers": [
         "pandoc-pdf-ua"
       ],
+      "output": {
+        "schema": "artifact/pdf-export@1"
+      },
       "execution": {
         "idempotent": true
       }
@@ -198,6 +252,9 @@
         "docling-layout",
         "mineru-layout"
       ],
+      "output": {
+        "schema": "artifact/layout-analysis@1"
+      },
       "execution": {
         "idempotent": true
       }
@@ -209,6 +266,9 @@
         "docling-ocr",
         "mineru-ocr"
       ],
+      "output": {
+        "schema": "artifact/ocr-result@1"
+      },
       "execution": {
         "idempotent": true
       }
@@ -219,6 +279,9 @@
       "providers": [
         "qwen3-vl-8b"
       ],
+      "output": {
+        "schema": "artifact/page-transcription@1"
+      },
       "execution": {
         "idempotent": true
       }
@@ -231,6 +294,9 @@
         "mineru",
         "nougat"
       ],
+      "output": {
+        "schema": "artifact/structured-document@1"
+      },
       "execution": {
         "idempotent": true
       }
@@ -241,6 +307,9 @@
       "providers": [
         "pymupdf-pdf"
       ],
+      "output": {
+        "schema": "artifact/text-spans@1"
+      },
       "execution": {
         "idempotent": true
       }
@@ -251,6 +320,9 @@
       "providers": [
         "rapidocr-orient"
       ],
+      "output": {
+        "schema": "artifact/page-orientation@1"
+      },
       "execution": {
         "idempotent": true
       }
@@ -261,6 +333,9 @@
       "providers": [
         "math-speech"
       ],
+      "output": {
+        "schema": "artifact/mathml@1"
+      },
       "execution": {
         "idempotent": true
       }
@@ -273,6 +348,9 @@
         "pp-formulanet",
         "rapid-latex-ocr"
       ],
+      "output": {
+        "schema": "artifact/latex@1"
+      },
       "execution": {
         "idempotent": true
       }
@@ -283,6 +361,9 @@
       "providers": [
         "math-speech"
       ],
+      "output": {
+        "schema": "artifact/verbalized@1"
+      },
       "execution": {
         "idempotent": true
       }
@@ -293,6 +374,9 @@
       "providers": [
         "pure-media-inspect"
       ],
+      "output": {
+        "schema": "artifact/media-inspection@1"
+      },
       "execution": {
         "idempotent": true
       }
@@ -304,6 +388,9 @@
         "audiveris",
         "homr"
       ],
+      "output": {
+        "schema": "artifact/music-score@1"
+      },
       "execution": {
         "idempotent": true
       }
@@ -314,6 +401,9 @@
       "providers": [
         "pymupdf-pdf"
       ],
+      "output": {
+        "schema": "artifact/image@1"
+      },
       "execution": {
         "idempotent": true
       }
@@ -324,6 +414,9 @@
       "providers": [
         "pymupdf-pdf"
       ],
+      "output": {
+        "schema": "artifact/image@2"
+      },
       "execution": {
         "idempotent": true
       }
@@ -334,6 +427,9 @@
       "providers": [
         "pymupdf-pdf"
       ],
+      "output": {
+        "schema": "artifact/page-collection@1"
+      },
       "execution": {
         "idempotent": true
       }
@@ -344,6 +440,9 @@
       "providers": [
         "verapdf"
       ],
+      "output": {
+        "schema": "artifact/pdf-validation-report@1"
+      },
       "execution": {
         "idempotent": true
       }
@@ -354,6 +453,9 @@
       "providers": [
         "qwen3-vl-8b"
       ],
+      "output": {
+        "schema": "artifact/table-candidates@1"
+      },
       "execution": {
         "idempotent": true
       }
@@ -364,6 +466,9 @@
       "providers": [
         "pure-text"
       ],
+      "output": {
+        "schema": "artifact/processed-text@1"
+      },
       "execution": {
         "idempotent": true
       }

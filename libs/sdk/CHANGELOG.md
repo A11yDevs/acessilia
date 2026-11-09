@@ -7,6 +7,11 @@ can see are recorded here, newest first.
 
 ## Unreleased
 
+- **Changed** The registry's `output_schema` and `idempotent` are generated
+  from the Toolbox's published contract by the core's
+  `scripts/generate_sdk_bindings.py` (#213); the allowed ids, versions,
+  transports, provider keys and labels stay hand-written in `_selected(...)`.
+  `TOOLBOX_CAPABILITIES` is unchanged, field by field.
 - **Changed** Retries and failover apply only to capabilities the registry
   marks `idempotent` (ADR-0006, #406). After a timeout or an unavailable
   instance, a call to `dataset.sample` gets one attempt on the first endpoint

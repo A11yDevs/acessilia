@@ -132,12 +132,16 @@ provisório até a Toolbox publicar `artifact/reference@1`.
 
 ## Adicionar uma capacidade
 
-1. Declarar em `TOOLBOX_CAPABILITIES` (id, versão do manifesto, rótulo de erro,
-   chave de provider, schema de saída e `idempotent`, copiado do
-   `execution.idempotent` do manifesto naquela versão; não tem valor padrão).
-   Uma chave de provider nova também precisa de uma entrada em
-   `PROVIDER_DEFAULTS`. O `scripts/check_capability_contract.py` do core falha
-   se `idempotent` divergir do contrato publicado.
+1. Selecioná-la em `_CAPABILITIES` com `_selected(id, versão, rótulo,
+   transport=..., provider_key=...)`: essas são as escolhas próprias do SDK.
+   Depois, rodar `python scripts/generate_sdk_bindings.py` no core, que escreve
+   o schema de saída e o `idempotent` da capacidade, a partir do contrato
+   publicado pela Toolbox (`tests/fixtures/toolbox-contract.json`, atualizado
+   com `scripts/capture_toolbox_contract.py --ref <ref>`), no bloco gerado de
+   `capabilities.py`. Esse bloco nunca é editado à mão (ADR-0004, #213); um
+   teste falha enquanto ele estiver desatualizado ou quando o contrato não
+   publicar a versão selecionada. Uma chave de provider nova também precisa de
+   uma entrada em `PROVIDER_DEFAULTS`.
 2. Acrescentar um cliente em `acessilia_sdk/toolbox/clients/`: subclasse de
    `ToolboxCapabilityClient`, com `provider_key` definido, chamando
    `self._execute(capability_id, ...)` (ou `_execute_on` quando o resultado é um
