@@ -7,6 +7,12 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
 ## Não lançado
 
+- **Alterado** Retries e failover valem só para capacidades que o registro
+  marca como `idempotent` (ADR-0006, #406). Após um timeout ou uma instância
+  indisponível, uma chamada a `dataset.sample` tem uma tentativa no primeiro
+  endpoint e levanta o erro dessa tentativa; antes ela era reenviada, ao mesmo
+  e a outro endpoint. As capacidades idempotentes mantêm retries, backoff e
+  failover.
 - **Alterado** `ToolboxCapability` tem um campo nomeado obrigatório `idempotent`,
   o `execution.idempotent` do manifesto na `contract_version`. Toda entrada do
   registro o define; só `dataset.sample` é `False` (#406). Quem monta o próprio

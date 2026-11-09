@@ -78,7 +78,12 @@ class ToolboxCapabilityClient:
 
     ``retries`` re-sends a request to the same endpoint after a timeout or an
     unavailable instance, waiting ``retry_backoff_seconds * 2**attempt`` with
-    jitter, before moving on. Enable it only for idempotent capabilities.
+    jitter, before moving on. Retries and failover apply only to capabilities
+    the registry marks ``idempotent`` (ADR-0006). A call to any other
+    capability gets one attempt on the first endpoint: after a timeout or an
+    unavailable instance the client cannot tell whether the operation ran, and
+    independent deployments share no deduplication, so its error is raised as
+    it is. The policy is decided per call, so one instance serves both kinds.
 
     ``resend_file_on_missing_artifact`` sends the file again when an endpoint
     does not know an ``artifact_id``. It only applies when the call passes
@@ -192,6 +197,7 @@ class ToolboxCapabilityClient:
         return await self._with_failover(
             lambda http: self._execute_once(http, capability_id, provider, kwargs),
             check,
+            idempotent=_idempotent(capability_id),
         )
 
     async def _request_on(
@@ -260,7 +266,10 @@ class ToolboxCapabilityClient:
             await _require_published(catalog, capability_id)
 
         return await self._with_failover(
-            call, check, missing_artifact_failover=missing_artifact_failover
+            call,
+            check,
+            idempotent=spec.idempotent,
+            missing_artifact_failover=missing_artifact_failover,
         )
 
     async def _with_failover(
@@ -268,12 +277,15 @@ class ToolboxCapabilityClient:
         call: Callable[[httpx.AsyncClient], Awaitable[T]],
         check: Callable[[CatalogCache], Awaitable[None]],
         *,
+        idempotent: bool,
         missing_artifact_failover: bool = False,
     ) -> tuple[httpx.AsyncClient, T]:
         """Run ``call`` on each endpoint in turn, with retries on each one.
 
         ``check`` runs first on a secondary endpoint and raises
-        :class:`ToolboxIncompatibleEndpoint` to skip it.
+        :class:`ToolboxIncompatibleEndpoint` to skip it. When ``idempotent`` is
+        false, a timeout or an unavailable instance ends the call: no retry,
+        no other endpoint, and the error of that attempt is raised as it is.
         """
         causes: list[tuple[str, ToolboxError]] = []
         errors: tuple[type[ToolboxError], ...] = (
@@ -286,8 +298,14 @@ class ToolboxCapabilityClient:
             try:
                 if catalog is not None:
                     await check(catalog)
-                result = await self._with_retries(lambda: call(http))
+                result = await self._with_retries(
+                    lambda: call(http), retries=self.retries if idempotent else 0
+                )
             except errors as exc:
+                if not idempotent and isinstance(exc, FAILOVER_ERRORS):
+                    # The request may have reached the Toolbox: repeating it,
+                    # here or on another deployment, could run it twice.
+                    raise
                 self._record_failover(causes, endpoint, exc)
                 continue
             return http, result
@@ -310,12 +328,19 @@ class ToolboxCapabilityClient:
                 ) from answered[-1][1]
         raise _combined(causes)
 
-    async def _with_retries(self, attempt_call: Callable[[], Awaitable[T]]) -> T:
-        for attempt in range(self.retries + 1):
+    async def _with_retries(
+        self, attempt_call: Callable[[], Awaitable[T]], *, retries: int
+    ) -> T:
+        """Call, re-sending after a timeout or an unavailable instance ``retries`` times.
+
+        ``retries`` is passed per call, never written to ``self.retries``,
+        so concurrent calls on one instance cannot change each other's policy.
+        """
+        for attempt in range(retries + 1):
             try:
                 return await attempt_call()
             except FAILOVER_ERRORS:
-                if attempt == self.retries:
+                if attempt == retries:
                     raise
             await _sleep(self._backoff(attempt))
         raise AssertionError("unreachable")
@@ -411,6 +436,16 @@ def _normalize_endpoints(
     if not normalized:
         raise ValueError("At least one Toolbox endpoint is required")
     return tuple(normalized)
+
+
+def _idempotent(capability_id: str) -> bool:
+    """The registry's ``idempotent`` for ``capability_id``.
+
+    An unregistered id counts as not idempotent; the transport refuses it
+    anyway (``require_capability``), before anything is sent.
+    """
+    spec = TOOLBOX_CAPABILITIES.get(capability_id)
+    return spec.idempotent if spec is not None else False
 
 
 def _combined(causes: list[tuple[str, ToolboxError]]) -> ToolboxError:

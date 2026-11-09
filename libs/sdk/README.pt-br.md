@@ -92,8 +92,14 @@ Além disso, o cliente oferece:
 
 - **`retries`**: reenvia a requisição ao mesmo endpoint após `ToolboxTimeout`
   ou `ToolboxProviderUnavailable` (erro de rede, 502, 503, 504), esperando
-  `retry_backoff_seconds * 2**attempt` com jitter. Desligado por padrão; ligar
-  só para capacidades idempotentes.
+  `retry_backoff_seconds * 2**attempt` com jitter. Desligado por padrão.
+- **Só capacidades idempotentes** (ADR-0006, #406): retries e failover para
+  outro endpoint valem só para capacidades que o registro marca como
+  `idempotent`. Após `ToolboxTimeout` ou `ToolboxProviderUnavailable`, uma
+  chamada a qualquer outra capacidade (`dataset.sample`) não é reenviada, nem
+  ali nem em outro endpoint, e o erro dessa tentativa sobe como está: o
+  cliente não sabe se a operação já rodou. A política é decidida por chamada,
+  então uma mesma instância atende os dois tipos.
 - **`endpoints=`** (mecanismo secundário): para deploys *independentes* da
   Toolbox, tentados em ordem. Aceita objetos `ToolboxEndpoint`, URLs ou uma
   string separada por vírgulas. Um endpoint secundário só é usado se o

@@ -116,7 +116,10 @@ def make_toolbox_client(client_cls: type[ClientT], **overrides: Any) -> ClientT:
     ignored, and passing ``base_url`` replaces the configured endpoints.
 
     Every client retries timeouts and unavailable instances on the same
-    endpoint, with backoff (``TOOLBOX_RETRIES``/``TOOLBOX_RETRY_BACKOFF_SECONDS``).
+    endpoint, with backoff (``TOOLBOX_RETRIES``/``TOOLBOX_RETRY_BACKOFF_SECONDS``),
+    and fails over between ``TOOLBOX_BASE_URLS``, for idempotent capabilities
+    only. The SDK decides per call from its registry (#406): a call to a
+    non-idempotent capability (``dataset.sample``) gets one attempt.
     """
     return make_client(client_cls, toolbox_client_config(), **overrides)
 

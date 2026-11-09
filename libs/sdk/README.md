@@ -90,8 +90,14 @@ On top of that, the client offers:
 
 - **`retries`**: re-sends a request to the same endpoint after
   `ToolboxTimeout` or `ToolboxProviderUnavailable` (network error, 502, 503, 504),
-  waiting `retry_backoff_seconds * 2**attempt` with jitter. Off by default;
-  enable it only for idempotent capabilities.
+  waiting `retry_backoff_seconds * 2**attempt` with jitter. Off by default.
+- **Idempotent capabilities only** (ADR-0006, #406): retries and failover to
+  another endpoint apply only to capabilities the registry marks
+  `idempotent`. After `ToolboxTimeout` or `ToolboxProviderUnavailable`, a call
+  to any other capability (`dataset.sample`) is not re-sent, here or
+  elsewhere, and that attempt's error is raised as it is: the client cannot
+  tell whether the operation already ran. The policy is decided per call, so
+  one client instance serves both kinds.
 - **`endpoints=`** (secondary mechanism): for *independent* Toolbox
   deployments, tried in order. It takes `ToolboxEndpoint` objects, URLs or a
   comma-separated string. A secondary endpoint is used only when its catalogue

@@ -7,6 +7,12 @@ can see are recorded here, newest first.
 
 ## Unreleased
 
+- **Changed** Retries and failover apply only to capabilities the registry
+  marks `idempotent` (ADR-0006, #406). After a timeout or an unavailable
+  instance, a call to `dataset.sample` gets one attempt on the first endpoint
+  and raises that attempt's error; it was re-sent before, to the same and to
+  another endpoint. Idempotent capabilities keep their retries, backoff and
+  failover.
 - **Changed** `ToolboxCapability` has a required keyword field `idempotent`,
   the manifest's `execution.idempotent` at `contract_version`. Every registry
   entry sets it; only `dataset.sample` is `False` (#406). A caller that builds
