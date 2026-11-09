@@ -78,7 +78,7 @@ O domínio PDDL vive em `backend/core/planning/domains/`. Os esquemas JSON (mani
 ### 2. Pipeline de Documento Canônico e Exportação (`backend/pipeline/`, `backend/export/`)
 
 - [backend/pipeline/canonical_builder.py](../backend/pipeline/canonical_builder.py): constrói o documento canônico e a árvore de seções.
-- [backend/pipeline/sanitizer.py](../backend/pipeline/sanitizer.py): limpa o texto bruto, remove vazamentos de prompt e artefatos de Markdown.
+- [docstruct.text.sanitize](../libs/docstruct/src/docstruct/text/sanitize.py): limpa o texto bruto, remove vazamentos de prompt e artefatos de Markdown.
 - [backend/pipeline/validators.py](../backend/pipeline/validators.py): valida esquema, hierarquia de títulos, links e texto de saída; `audit_canonical_document` classifica problemas estruturais e de acessibilidade como `BLOCKER` ou `WARNING`.
 - [backend/export/pandoc_exporter.py](../backend/export/pandoc_exporter.py): coordenador único de exportação para validação, filtragem, criação do AST e despacho de renderizador; atua como guardiã determinística que interrompe a exportação quando a auditoria retorna qualquer `BLOCKER`.
 - [backend/export/renderers/](../backend/export/renderers/): renderizadores para TXT e HTML (DOCX e PDF/UA são renderizados na Toolbox).
