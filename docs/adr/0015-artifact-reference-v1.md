@@ -81,10 +81,12 @@ The principles of ADR-0005 stay; the contract is published in two versions.
 ## Consequences
 
 - **Toolbox:** publishes `schemas/reference@1.json` and the
-  `storage_backend` → `store` adapter (a Toolbox issue), together with the
+  `storage_backend` → `store` adapter
+  ([acessilia-toolbox#145](https://github.com/A11yDevs/acessilia-toolbox/issues/145)), together with the
   other schemas its manifests cite without a file
   ([acessilia-toolbox#142](https://github.com/A11yDevs/acessilia-toolbox/issues/142)).
-  The per-reference scope check is a separate `security` issue.
+  The per-reference scope check is
+  [acessilia-toolbox#146](https://github.com/A11yDevs/acessilia-toolbox/issues/146).
 - **SDK:** `ArtifactRef` in `acessilia_sdk.toolbox.artifacts` stays
   provisional until a model is generated from `artifact/reference@1`
   ([#213](https://github.com/A11yDevs/acessilia/issues/213)), with standard

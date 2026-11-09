@@ -86,10 +86,12 @@ versões.
 ## Consequências
 
 - **Toolbox:** publica `schemas/reference@1.json` e o adapter
-  `storage_backend` → `store` (uma issue na Toolbox), junto com os outros
+  `storage_backend` → `store`
+  ([acessilia-toolbox#145](https://github.com/A11yDevs/acessilia-toolbox/issues/145)), junto com os outros
   schemas que os manifests citam sem arquivo
   ([acessilia-toolbox#142](https://github.com/A11yDevs/acessilia-toolbox/issues/142)).
-  A conferência de escopo por referência é uma issue de `security` à parte.
+  A conferência de escopo por referência é a
+  [acessilia-toolbox#146](https://github.com/A11yDevs/acessilia-toolbox/issues/146).
 - **SDK:** o `ArtifactRef` em `acessilia_sdk.toolbox.artifacts` continua
   provisório até que um modelo seja gerado a partir de `artifact/reference@1`
   ([#213](https://github.com/A11yDevs/acessilia/issues/213)), só com código da
