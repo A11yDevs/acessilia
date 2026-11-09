@@ -13,7 +13,10 @@ can see are recorded here, newest first.
   install. The core's `make_toolbox_client` now delegates to it; the clients it
   builds are unchanged (#402, step 1).
 - **Added** a test that fails if any SDK module reads the process environment
-  (`os.environ`, `os.getenv`), as ADR-0002 requires.
+  (`os.environ`, `os.getenv`, through any name `os` is imported as), as
+  ADR-0002 requires.
+- `acessilia_sdk.__version__` reports 0.2.0, and a test keeps it equal to the
+  version in `pyproject.toml`.
 
 ## 0.1.0
 

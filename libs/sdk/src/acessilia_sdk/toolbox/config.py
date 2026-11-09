@@ -34,15 +34,17 @@ class ToolboxClientConfig:
     """What a capability client needs, with every value explicit.
 
     ``endpoints`` lists one Toolbox (normally a load balancer) or several
-    independent deployments, tried in order (ADR-0006). A string is parsed as a
-    comma-separated list of URLs. ``providers`` maps a client's
+    independent deployments, tried in order (ADR-0006). It accepts a
+    comma-separated string of URLs, or a sequence of URLs and
+    ``ToolboxEndpoint`` objects; after construction it is always a tuple of
+    ``ToolboxEndpoint``. ``providers`` maps a client's
     ``provider_key`` (a key of ``PROVIDER_DEFAULTS``) to a provider id; a
     missing key leaves the SDK's default. ``timeouts`` maps a client's
     ``timeout_key`` to its own timeout; a missing key uses ``timeout_seconds``.
     ``on_failover`` is called when a call moves to the next endpoint.
     """
 
-    endpoints: tuple[ToolboxEndpoint, ...]
+    endpoints: tuple[ToolboxEndpoint, ...] | str | Sequence[str | ToolboxEndpoint]
     api_key: str = ""
     timeout_seconds: float | None = None
     retries: int = 0

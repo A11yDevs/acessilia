@@ -13,7 +13,10 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
   configurado, sem instalar o core. O `make_toolbox_client` do core passa a
   delegar a eles; os clientes que ele monta não mudam (#402, passo 1).
 - **Adicionado** um teste que falha se algum módulo do SDK ler o ambiente do
-  processo (`os.environ`, `os.getenv`), como pede a ADR-0002.
+  processo (`os.environ`, `os.getenv`, sob qualquer nome com que `os` seja
+  importado), como pede a ADR-0002.
+- `acessilia_sdk.__version__` informa 0.2.0, e um teste o mantém igual à
+  versão do `pyproject.toml`.
 
 ## 0.1.0
 
