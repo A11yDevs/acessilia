@@ -28,7 +28,6 @@ REEXPORT = "reexport"
 ADAPTER = "compatibility_adapter"
 
 BRIDGES = {
-    "backend/pipeline/pandoc_ast_builder.py": REEXPORT,
     "backend/pipeline/verbosity_manager.py": REEXPORT,
     "backend/tools/code_tools.py": REEXPORT,
     "backend/tools/region_classifier.py": REEXPORT,
