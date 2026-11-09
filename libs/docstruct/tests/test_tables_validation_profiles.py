@@ -143,6 +143,23 @@ class TestProfiles:
         blocks = [{"id": "a", "verbosity": "basic"}, {"id": "b", "verbosity": "technical"}]
         assert [b["id"] for b in filter_blocks_for_profile(blocks, "txt")] == ["a"]
 
+    # Moved from the core's tests/test_docstruct_bridges.py when the
+    # backend.pipeline.verbosity_manager bridge was removed (#191).
+
+    def test_pdf_profile_shows_basic_and_detailed(self):
+        assert normalize_profile("pdf")["verbosity"] == ["basic", "detailed"]
+
+    def test_normalize_returns_a_copy_the_caller_may_change(self):
+        normalize_profile("html")["verbosity"].clear()
+        assert OUTPUT_PROFILES["html"]["verbosity"] == ["basic", "detailed", "technical"]
+
+    def test_filter_keeps_blocks_without_verbosity(self):
+        blocks = [{"verbosity": "technical"}, {"verbosity": "basic"}, {}]
+        assert filter_blocks_for_profile(blocks, "txt") == [{"verbosity": "basic"}, {}]
+
+    def test_filter_of_no_blocks_is_empty(self):
+        assert filter_blocks_for_profile([], "html") == []
+
 
 class TestValidation:
     def _doc(self, blocks):

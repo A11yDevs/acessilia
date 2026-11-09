@@ -11,7 +11,7 @@ from typing import Any
 
 from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
 from backend.pipeline.canonical_builder import build_canonical_document
-from backend.pipeline.verbosity_manager import verbosity_for_mode
+from docstruct.profiles import verbosity_for_mode
 
 
 def _count_blocks(document: dict[str, Any]) -> int:

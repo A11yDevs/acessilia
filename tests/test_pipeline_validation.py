@@ -13,9 +13,9 @@ import backend.i18n as i8n
 from backend.pipeline.validators import validate_canonical_document
 from backend.pipeline.validators import validate_export_profile
 from backend.pipeline.validators import validate_output_text
-from backend.pipeline.verbosity_manager import filter_blocks_for_profile
-from backend.pipeline.verbosity_manager import normalize_profile
-from backend.pipeline.verbosity_manager import verbosity_for_mode
+from docstruct.profiles import filter_blocks_for_profile
+from docstruct.profiles import normalize_profile
+from docstruct.profiles import verbosity_for_mode
 
 
 @pytest.fixture(autouse=True)
