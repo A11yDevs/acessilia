@@ -16,7 +16,7 @@ HTTP client or anything else.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
 Transport = Literal["execute", "rest"]
@@ -40,6 +40,13 @@ class ToolboxCapability:
     #: Output schema reference from the manifest (``schemas/<ref>.json``), or
     #: ``None`` while the Toolbox does not publish the capability.
     output_schema: str | None = None
+    #: The manifest's ``execution.idempotent`` at ``contract_version``:
+    #: repeating the same operation has no effect beyond the first execution.
+    #: Required, with no default, so the retry policy of ADR-0006 (applied
+    #: by the client in #406) can never treat a capability as idempotent by
+    #: omission. ``scripts/check_capability_contract.py`` compares it with the
+    #: published contract.
+    idempotent: bool = field(kw_only=True)
 
 
 #: Default provider for each provider key. Several
@@ -74,76 +81,90 @@ _CAPABILITIES: tuple[ToolboxCapability, ...] = (
         "document.structure.extract", 1, "Extração",
         provider_key="toolbox_provider",
         output_schema="structured-document@1",
+        idempotent=True,
     ),
     ToolboxCapability(
         "document.layout.analyze", 1, "Análise de layout",
         provider_key="toolbox_layout_provider",
         output_schema="layout-analysis@1",
+        idempotent=True,
     ),
     ToolboxCapability(
         "pdf.split", 1, "Divisão de PDF",
         provider_key="toolbox_pdf_provider",
         output_schema="page-collection@1",
+        idempotent=True,
     ),
     # Version 2: clip, size bound, raster inputs, PNG by reference.
     ToolboxCapability(
         "pdf.render", 2, "Renderização de PDF",
         provider_key="toolbox_pdf_provider",
         output_schema="image@2",
+        idempotent=True,
     ),
     # The text layer with fonts and baselines, read for inline math (#265).
     ToolboxCapability(
         "document.text.spans", 1, "Text spans",
         provider_key="toolbox_pdf_provider",
         output_schema="text-spans@1",
+        idempotent=True,
     ),
     ToolboxCapability(
         "math.recognize", 1, "Reconhecimento de fórmula",
         provider_key="toolbox_math_recognize_provider",
         output_schema="latex@1",
+        idempotent=True,
     ),
     ToolboxCapability(
         "math.convert", 1, "Conversão de fórmula",
         provider_key="toolbox_math_provider",
         output_schema="mathml@1",
+        idempotent=True,
     ),
     ToolboxCapability(
         "math.verbalize", 1, "Verbalização de fórmula",
         provider_key="toolbox_math_provider",
         output_schema="verbalized@1",
+        idempotent=True,
     ),
     ToolboxCapability(
         "document.ocr", 1, "OCR",
         provider_key="toolbox_ocr_provider",
         output_schema="ocr-result@1",
+        idempotent=True,
     ),
     ToolboxCapability(
         "image.page.orient", 1, "Detecção de orientação",
         provider_key="toolbox_orientation_provider",
         output_schema="page-orientation@1",
+        idempotent=True,
     ),
     ToolboxCapability(
         "media.inspect", 1, "Inspeção de mídia",
         provider_key="toolbox_media_inspect_provider",
         output_schema="media-inspection@1",
+        idempotent=True,
     ),
     # The PDF comes back as a stored artifact; the result carries its id.
     ToolboxCapability(
         "document.export.pdf_ua", 1, "Exportação PDF/UA",
         provider_key="toolbox_pdf_ua_provider",
         output_schema="pdf-export@1",
+        idempotent=True,
     ),
     # veraPDF; a non-compliant PDF is a successful result listing failed rules.
     ToolboxCapability(
         "pdf.validate.pdf_ua", 1, "PDF/UA validation",
         provider_key="toolbox_pdf_validate_provider",
         output_schema="pdf-validation-report@1",
+        idempotent=True,
     ),
     # The DOCX also comes back as a stored artifact.
     ToolboxCapability(
         "document.export.docx", 1, "Exportação DOCX",
         provider_key="toolbox_docx_provider",
         output_schema="docx-export@1",
+        idempotent=True,
     ),
     # Vision-language capabilities (Dr.DocBench, PR #125), served by the
     # Toolbox's OpenAI-compatible VLM provider.
@@ -151,38 +172,49 @@ _CAPABILITIES: tuple[ToolboxCapability, ...] = (
         "document.ocr.page", 1, "OCR de página",
         provider_key="toolbox_page_ocr_provider",
         output_schema="page-transcription@1",
+        idempotent=True,
     ),
     ToolboxCapability(
         "document.adjudicate.page", 1, "Adjudicação",
         provider_key="toolbox_adjudicate_provider",
         output_schema="page-judgement@1",
+        idempotent=True,
     ),
     ToolboxCapability(
         "document.adjudicate.region", 1, "Adjudicação",
         provider_key="toolbox_adjudicate_provider",
         output_schema="region-transcription@1",
+        idempotent=True,
     ),
     ToolboxCapability(
         "table.recognize", 1, "Reconhecimento de tabela",
         provider_key="toolbox_table_provider",
         output_schema="table-candidates@1",
+        idempotent=True,
     ),
     # Reached through dedicated REST routes, not ":execute".
     *(
-        ToolboxCapability(capability_id, 1, "Dataset", transport="rest")
-        for capability_id in (
-            "dataset.list",
-            "dataset.describe",
-            "dataset.list_splits",
-            "dataset.list_items",
-            "dataset.get_item",
-            "dataset.get_artifact",
-            "dataset.sample",
-            "dataset.sync",
+        ToolboxCapability(
+            capability_id, 1, "Dataset", transport="rest", idempotent=idempotent
+        )
+        for capability_id, idempotent in (
+            ("dataset.list", True),
+            ("dataset.describe", True),
+            ("dataset.list_splits", True),
+            ("dataset.list_items", True),
+            ("dataset.get_item", True),
+            ("dataset.get_artifact", True),
+            # A new random sample on every call (execution.idempotent: false).
+            ("dataset.sample", False),
+            ("dataset.sync", True),
         )
     ),
-    ToolboxCapability("artifact.store", 1, "Armazenamento de artefato", transport="rest"),
-    ToolboxCapability("artifact.retrieve", 1, "Recuperação de artefato", transport="rest"),
+    ToolboxCapability(
+        "artifact.store", 1, "Armazenamento de artefato", transport="rest", idempotent=True
+    ),
+    ToolboxCapability(
+        "artifact.retrieve", 1, "Recuperação de artefato", transport="rest", idempotent=True
+    ),
 )
 
 TOOLBOX_CAPABILITIES: dict[str, ToolboxCapability] = {

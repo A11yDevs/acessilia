@@ -124,8 +124,11 @@ until the Toolbox publishes `artifact/reference@1`.
 ## Adding a capability
 
 1. Declare it in `TOOLBOX_CAPABILITIES` (id, manifest version, error label,
-   provider key, output schema). A new provider key also needs an entry in
-   `PROVIDER_DEFAULTS`.
+   provider key, output schema, and `idempotent`, copied from the manifest's
+   `execution.idempotent` at that version; it has no default). A new provider
+   key also needs an entry in `PROVIDER_DEFAULTS`. The core's
+   `scripts/check_capability_contract.py` fails if `idempotent` differs from
+   the published contract.
 2. Add a client in `acessilia_sdk/toolbox/clients/`: subclass
    `ToolboxCapabilityClient`, set `provider_key` and call
    `self._execute(capability_id, ...)` (or `_execute_on` when the result is an

@@ -5,6 +5,13 @@ Também disponível em **inglês (EUA)**: [English version](CHANGELOG.md)
 O SDK é uma API pública para scripts e benchmarks (#402). As mudanças visíveis
 para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
+## Não lançado
+
+- **Alterado** `ToolboxCapability` tem um campo nomeado obrigatório `idempotent`,
+  o `execution.idempotent` do manifesto na `contract_version`. Toda entrada do
+  registro o define; só `dataset.sample` é `False` (#406). Quem monta o próprio
+  `ToolboxCapability` precisa passá-lo.
+
 ## 0.2.0 (2026-11-09)
 
 - **Adicionados** `ToolboxClientConfig` e `make_client` (`acessilia_sdk.toolbox.config`,

@@ -52,6 +52,19 @@ def _fetch(url: str) -> object:
         raise SystemExit(f"cannot reach the Toolbox at {url}: {exc}")
 
 
+def _execution(entry: dict) -> dict:
+    """The execution flags the checker reads, as published.
+
+    The static contract and the catalogue publish ``execution.idempotent``
+    (acessilia-toolbox#142). The value is copied as it is, missing or not, so
+    the checker sees what the Toolbox published instead of a default.
+    """
+    execution = entry.get("execution")
+    if isinstance(execution, dict) and "idempotent" in execution:
+        return {"execution": {"idempotent": execution["idempotent"]}}
+    return {}
+
+
 def _normalize(capabilities: list, providers: list) -> dict:
     """Only the fields the checker reads, sorted so repeated captures of the
     same state produce identical files no matter which path produced them."""
@@ -63,6 +76,7 @@ def _normalize(capabilities: list, providers: list) -> dict:
                 "id": entry["id"],
                 "version": entry.get("version", 1),
                 "providers": sorted(entry.get("providers") or []),
+                **_execution(entry),
             }
             for entry in sorted(
                 capabilities, key=lambda item: (item["id"], item.get("version", 1))
