@@ -377,7 +377,15 @@ uv run pytest
 
 ## Issue triage
 
-Every open issue carries exactly one **category** label and one **urgency** label. `bug`, `enhancement` and `question` still say what kind of issue it is; these two say what it improves and how soon it matters.
+Every open issue has an issue **type** and carries exactly one **category** label and one **urgency** label. The type says what kind of issue it is; the two labels say what it improves and how soon it matters.
+
+| Type | Use it for | Matching label |
+|------|------------|----------------|
+| Bug | Something that does not work as documented or expected | `bug` |
+| Feature | A new capability for users: something the system could not do before | `feature` |
+| Task | Everything else: refactoring, internal engineering, documentation, research | `enhancement`, `documentation` or none |
+
+Set the type in the issue sidebar; Bug, Feature and Task are the organization's issue types, shared by every Acessilia repository. The `bug`, `feature` and `enhancement` labels mirror the type for searches and tools that do not read issue types, so keep them in step with it. `enhancement` means an improvement to existing behaviour or to internal engineering; `feature` means a new capability. The type does not replace the category: a new feature still gets the category of what it improves, usually `accessibility`.
 
 | Category | Use it for |
 |----------|------------|
@@ -389,7 +397,7 @@ Every open issue carries exactly one **category** label and one **urgency** labe
 | `documentation` | Guides, ADRs, the constitution |
 | `process` | Workflows, governance, issue and PR templates |
 | `ci-cd` | Pipelines, images, runtime and build versions |
-| `product` | User-facing behaviour change; outside a refactoring cycle |
+| `accessibility` | What people with disabilities get: the generated documents and the interfaces |
 
 | Urgency | Criterion | When |
 |---------|-----------|------|
@@ -400,7 +408,7 @@ Every open issue carries exactly one **category** label and one **urgency** labe
 
 Pick the category by the main effect of the change. Judge urgency by what happens if the issue waits, not by its size or its importance. When an issue spans several categories or a long plan, split it so that each part can be classified on its own.
 
-During a refactoring cycle, `is:open -label:product` shows the cycle's backlog, and `is:open label:urgency:high` shows what comes first.
+During a refactoring cycle, `is:open -type:Feature` shows the cycle's backlog, and `is:open label:urgency:high` shows what comes first. `is:open type:Feature` lists the new capabilities left for a later cycle.
 
 ## Pull requests
 

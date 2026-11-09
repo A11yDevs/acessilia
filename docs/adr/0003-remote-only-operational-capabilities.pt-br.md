@@ -59,18 +59,18 @@ ignora o idioma pedido.
   extratores locais de manifesto, saíram na
   [#176](https://github.com/A11yDevs/acessilia/pull/176), e o `pymupdf`
   virou uma dependência de desenvolvimento, usada pelos testes para gerar PDFs.
-- **Desvios conhecidos, registrados na [#203](https://github.com/A11yDevs/acessilia/issues/203):** restam dois executores
-  locais, então o `remote_only` ainda não está completo:
-  - `backend/export/renderers/pdf_renderer.py` renderiza PDF com `reportlab`;
-  - `backend/export/exporters/audio_exporter.py` sintetiza MP3 com
-    `edge-tts`.
-
-  Cada um é substituído por uma capacidade da Toolbox acessada pelo SDK.
-  Quando um caminho sai, sua biblioteca entra na lista abaixo e deixa as
-  dependências de runtime do core.
+- **Desvio conhecido, registrado na [acessilia-toolbox#73](https://github.com/A11yDevs/acessilia-toolbox/issues/73):** resta um
+  executor local, então o `remote_only` ainda não está completo:
+  `backend/export/exporters/audio_exporter.py` sintetiza MP3 com `edge-tts`.
+  Ele é substituído por uma capacidade da Toolbox acessada pelo SDK; então o
+  `edge_tts` entra na lista abaixo e deixa as dependências de runtime do core.
+- **O renderizador local de PDF saiu.** Desde o
+  [f424a75](https://github.com/A11yDevs/acessilia/commit/f424a75) ("PDF/UA is
+  the only PDF"), todo PDF é renderizado pelo `document.export.pdf_ua`, e o
+  `reportlab` saiu das dependências do core.
 - **Verificação (#152):** o `tests/test_architecture_layers.py` falha se
   `backend/` ou `frontend/` importar uma biblioteca operacional (`fitz`,
-  `PIL`, `cv2`, `docling`, `pypdf`, `docx`, `rapidocr`, `pypandoc`). Ele não
-  tem ofensores, então não mantém allowlist; `reportlab` e `edge_tts` ainda
-  não estão na lista. Ele não verifica chamadas
+  `PIL`, `cv2`, `docling`, `pypdf`, `docx`, `rapidocr`, `pypandoc`,
+  `reportlab`). Ele não tem ofensores, então não mantém allowlist; o
+  `edge_tts` ainda não está na lista. Ele não verifica chamadas
   `subprocess`; pandoc, TeX Live e veraPDF já não estão na imagem.

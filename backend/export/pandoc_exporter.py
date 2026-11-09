@@ -14,16 +14,17 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from docstruct.export.filters import strip_internal_audit_blocks
+from docstruct.export.pandoc_ast import build_pandoc_ast
+from docstruct.export.pandoc_ast import degrade_math_to_text
+
 from backend.config.settings import settings
-from backend.export.filters.pandoc_filters import strip_internal_audit_blocks
 from backend.i18n import t
 from backend.log_messages import LOG_DOCX_TOOLBOX_EXPORTED
 from backend.log_messages import LOG_PDF_UA_MATH_DEGRADED
 from backend.log_messages import LOG_PDF_UA_TOOLBOX_EXPORTED
 from backend.pipeline.canonical_builder import build_canonical_document
 from backend.pipeline.canonical_builder import sanitize_canonical_document
-from backend.pipeline.pandoc_ast_builder import build_pandoc_ast
-from backend.pipeline.pandoc_ast_builder import degrade_math_to_text
 from backend.pipeline.validators import audit_canonical_document
 from backend.pipeline.validators import validate_export_profile
 from backend.tools.logger import logger

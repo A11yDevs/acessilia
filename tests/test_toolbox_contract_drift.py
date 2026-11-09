@@ -129,3 +129,82 @@ def test_a_toolbox_without_the_sdk_contract_version_is_drift(checker) -> None:
     failures, _ = checker.compare(core, toolbox)
 
     assert "core sends pdf.render@2 but the Toolbox publishes pdf.render@1" in failures
+
+
+def _without_binding(toolbox, capability: str, provider: str) -> None:
+    """Unbind ``provider`` from ``capability`` on both sides of the snapshot."""
+    toolbox.capabilities[capability].discard(provider)
+    for key in [key for key in toolbox.bindings if key[0] == capability]:
+        toolbox.bindings[key].discard(provider)
+    toolbox.providers[provider].discard(capability)
+
+
+def test_a_default_provider_that_no_longer_serves_its_capability_is_drift(checker) -> None:
+    """Reproduces the gap found in the review of #324.
+
+    ``pp-formulanet`` stays registered (it is still a known provider id), but no
+    longer serves ``math.recognize``. Before the binding check, the comparison
+    still reported "capability contract holds" although every math recognition
+    call would fail with the default configuration.
+    """
+    core = checker.read_core_contract()
+    toolbox = checker.read_toolbox_snapshot(SNAPSHOT_PATH)
+    toolbox.providers["pp-formulanet"] = {"math.recognize", "chem.recognize"}
+    _without_binding(toolbox, "math.recognize", "pp-formulanet")
+
+    failures, _ = checker.compare(core, toolbox)
+
+    assert (
+        "core default for TOOLBOX_MATH_RECOGNIZE_PROVIDER points at provider "
+        "'pp-formulanet', which does not serve math.recognize@1"
+    ) in failures
+
+
+def test_a_default_provider_must_serve_the_version_the_sdk_sends(checker) -> None:
+    """A provider bound to another version of the capability is not enough."""
+    core = checker.read_core_contract()
+    toolbox = checker.read_toolbox_snapshot(SNAPSHOT_PATH)
+    toolbox.versions["pdf.render"] = {1, 2}
+    toolbox.bindings[("pdf.render", 1)] = {"pymupdf-pdf"}
+    toolbox.bindings[("pdf.render", 2)] = set()
+
+    failures, _ = checker.compare(core, toolbox)
+
+    assert (
+        "core default for TOOLBOX_PDF_PROVIDER points at provider "
+        "'pymupdf-pdf', which does not serve pdf.render@2"
+    ) in failures
+
+
+def test_every_default_binding_in_the_snapshot_holds(checker) -> None:
+    """Each provider default serves every capability version it is used for."""
+    core = checker.read_core_contract()
+    toolbox = checker.read_toolbox_snapshot(SNAPSHOT_PATH)
+
+    assert core.default_bindings, "the registry declares no provider defaults"
+    for capability, version, provider, _setting in core.default_bindings:
+        assert provider in toolbox.bindings[(capability, version)], (capability, version, provider)
+
+
+def test_a_capability_that_disappears_is_reported_once(checker) -> None:
+    """Review of #413: a missing capability must not also fail as a binding.
+
+    ``math.recognize`` disappears from the catalogue and from every provider,
+    while ``pp-formulanet`` stays registered for another capability. The only
+    finding about it is the missing capability.
+    """
+    core = checker.read_core_contract()
+    toolbox = checker.read_toolbox_snapshot(SNAPSHOT_PATH)
+    del toolbox.capabilities["math.recognize"]
+    del toolbox.versions["math.recognize"]
+    for key in [key for key in toolbox.bindings if key[0] == "math.recognize"]:
+        del toolbox.bindings[key]
+    for capabilities in toolbox.providers.values():
+        capabilities.discard("math.recognize")
+    toolbox.providers["pp-formulanet"] = {"chem.recognize"}
+
+    failures, _ = checker.compare(core, toolbox)
+
+    about_math = [failure for failure in failures if "math.recognize" in failure]
+    assert len(about_math) == 1, about_math
+    assert about_math[0].startswith("core consumes capability 'math.recognize'")

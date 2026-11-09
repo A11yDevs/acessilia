@@ -20,7 +20,7 @@ ones here instead of restating them.
 | [0002](0002-component-responsibilities.md) | Component responsibilities and dependency direction | Accepted |
 | [0003](0003-remote-only-operational-capabilities.md) | Operational capabilities run remotely, without local fallbacks | Accepted |
 | [0004](0004-single-source-of-truth-for-contracts.md) | One source of truth per contract | Accepted |
-| [0005](0005-artifact-references.md) | Reference-oriented processing with `ArtifactRef` | Accepted |
+| [0005](0005-artifact-references.md) | Reference-oriented processing with `ArtifactRef` | Superseded by [0015](0015-artifact-reference-v1.md) |
 | [0006](0006-availability-and-failover.md) | Availability through replicas; SDK failover as a secondary mechanism | Accepted |
 | [0007](0007-manifest-model-and-mathml-conversion.md) | Canonical manifest model, and MathML conversion and verbalization of formulas | Accepted |
 | [0008](0008-math-capabilities-on-mathjax-and-mathcat.md) | The math capabilities run on MathJax and MathCAT | Accepted |
@@ -30,6 +30,7 @@ ones here instead of restating them.
 | [0012](0012-agents-reach-the-vlm-through-the-toolbox.md) | The agents can reach their vision model through the Toolbox VLM gateway | Accepted |
 | [0013](0013-source-files-for-independent-toolboxes.md) | Source files for independent Toolbox deployments | Accepted |
 | [0014](0014-artifact-download-not-found-failover.md) | Search endpoints for missing artifact downloads | Accepted |
+| [0015](0015-artifact-reference-v1.md) | The artifact reference contract, `artifact/reference@1`, phased | Accepted |
 
 ## Process
 

@@ -79,9 +79,9 @@ provider).
 - **Planned in #152:**
   - a Toolbox test forbidding `acessilia_sdk` and `backend` imports.
 - **Known deviations, tracked in [#203](https://github.com/A11yDevs/acessilia/issues/203):**
-  - The core still runs two operational executors, the `reportlab` PDF
-    renderer and the `edge-tts` audio exporter (see
-    [ADR-0003](0003-remote-only-operational-capabilities.md)).
+  - The core still runs one operational executor, the `edge-tts` audio
+    exporter (see [ADR-0003](0003-remote-only-operational-capabilities.md)
+    and [acessilia-toolbox#73](https://github.com/A11yDevs/acessilia-toolbox/issues/73)).
   - Callout clustering is implemented both in the Toolbox's normalization
     builder and in `docstruct.regions.grouping`
     ([acessilia-toolbox#72](https://github.com/A11yDevs/acessilia-toolbox/issues/72)).

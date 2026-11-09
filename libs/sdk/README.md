@@ -30,6 +30,7 @@ core (backend)  →  acessilia-sdk  →  Toolbox HTTP contract
 | `acessilia_sdk.toolbox.capabilities` | `TOOLBOX_CAPABILITIES`, `ToolboxCapability`, `PROVIDER_DEFAULTS`, `ROUTE_PROVIDER_DEFAULTS`, `provider_default` — the allowlist of Toolbox contracts and the default providers (pure data) |
 | `acessilia_sdk.toolbox.transport` | `execute_capability` — the only path to `POST /v1/capabilities/{id}:execute`; `require_capability`, `raise_for_error`, `auth_headers`, `media_type_for` |
 | `acessilia_sdk.toolbox.client` | `ToolboxCapabilityClient` — base for per-capability clients (connections, Bearer header, provider, failover, `health`, `close`); `FailoverHook` |
+| `acessilia_sdk.toolbox.config` | `ToolboxClientConfig`, `make_client` — every client setting as an explicit value (endpoints, API key, timeouts, retries, providers by `provider_key`, export timeouts by `timeout_key`, failover hook), and the factory that builds a client from it |
 | `acessilia_sdk.toolbox.clients` | `ToolboxAdjudicateClient`, `ToolboxArtifactClient`, `ToolboxDatasetClient`, `ToolboxDocxClient`, `ToolboxLayoutClient`, `ToolboxMathClient`, `ToolboxMediaInspectClient`, `ToolboxOcrClient`, `ToolboxOrientationClient`, `ToolboxPageOcrClient`, `ToolboxPdfClient`, `ToolboxPdfUaClient`, `ToolboxStructureClient`, `ToolboxTableClient` — one client per capability family; no settings, no logging |
 | `acessilia_sdk.toolbox.endpoints` | `ToolboxEndpoint`, `parse_endpoints`, `FAILOVER_ERRORS` — the Toolbox instances a client tries, in order |
 | `acessilia_sdk.toolbox.clients.pdf` | `RenderedPage` (the PNG of `ToolboxPdfClient.render`, the clip applied and the `image@2` result), `ClipOrigin` |
@@ -38,6 +39,43 @@ core (backend)  →  acessilia-sdk  →  Toolbox HTTP contract
 | `acessilia_sdk.toolbox.vlm` | `vlm_gateway_base_url`, `vlm_provider_healthy`, `VLM_GATEWAY_PATH` — the Toolbox VLM gateway, an OpenAI-compatible chat route that is not a capability, and its provider health ([ADR-0012](../../docs/adr/0012-agents-reach-the-vlm-through-the-toolbox.md)) |
 | `acessilia_sdk.toolbox.errors` | `ToolboxError` and its subclasses, including `ToolboxUnavailable` (every endpoint failed; `causes` lists each one) |
 | `acessilia_sdk.runtime` | `run_sync` — run a coroutine from sync code, inside or outside an event loop |
+
+## Configuring a client
+
+A caller builds a `ToolboxClientConfig` from its own configuration source and
+passes it to `make_client`. The SDK reads no settings or environment, so a
+script needs nothing from the core:
+
+```python
+from pathlib import Path
+
+from acessilia_sdk.runtime import run_sync
+from acessilia_sdk.toolbox import ToolboxClientConfig, make_client
+from acessilia_sdk.toolbox.clients import ToolboxMediaInspectClient
+
+config = ToolboxClientConfig(
+    endpoints="https://toolbox.example.org",   # or a list of independent deployments
+    api_key="...",
+    timeout_seconds=600,
+    providers={"toolbox_media_inspect_provider": "pure-media-inspect"},
+)
+
+async def main():
+    client = make_client(ToolboxMediaInspectClient, config)
+    try:
+        return await client.inspect(Path("input.pdf"))
+    finally:
+        await client.close()
+
+print(run_sync(main()))
+```
+
+`providers` maps a client's `provider_key` to a provider id, and a missing key
+keeps the default in `PROVIDER_DEFAULTS`. `timeouts` maps an export client's
+`timeout_key` to its own timeout; without one, the shared `timeout_seconds`
+applies. Keyword arguments to `make_client` override the configuration;
+`None` is ignored, and `base_url` replaces the configured endpoints. The core
+builds the same object from its `settings` (`backend/tools/toolbox_client.py`).
 
 ## Availability and failover
 
@@ -81,7 +119,7 @@ check it against the SHA-256 (and an optional magic prefix). The download is
 synced to disk and renamed atomically, and local file system errors propagate
 as `OSError`; the read refuses a body above `max_bytes`
 (`READ_ARTIFACT_MAX_BYTES`, 64 MiB, by default). `ArtifactRef` is provisional
-until the Toolbox publishes `artifact-ref@1`.
+until the Toolbox publishes `artifact/reference@1`.
 
 ## Adding a capability
 

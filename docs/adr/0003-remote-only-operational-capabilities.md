@@ -58,18 +58,19 @@ language.
   local manifest extractors, went in
   [#176](https://github.com/A11yDevs/acessilia/pull/176), and `pymupdf`
   became a development dependency that tests use to build PDFs.
-- **Known deviations, tracked in [#203](https://github.com/A11yDevs/acessilia/issues/203):** two local executors remain, so
-  `remote_only` is not complete yet:
-  - `backend/export/renderers/pdf_renderer.py` renders PDF with `reportlab`;
-  - `backend/export/exporters/audio_exporter.py` synthesizes MP3 with
-    `edge-tts`.
-
-  Each is replaced by a Toolbox capability reached through the SDK. Once a
-  path is gone, its library joins the list below and leaves the core's
-  runtime dependencies.
+- **Known deviation, tracked in [acessilia-toolbox#73](https://github.com/A11yDevs/acessilia-toolbox/issues/73):** one local executor
+  remains, so `remote_only` is not complete yet:
+  `backend/export/exporters/audio_exporter.py` synthesizes MP3 with
+  `edge-tts`. It is replaced by a Toolbox capability reached through the SDK;
+  then `edge_tts` joins the list below and leaves the core's runtime
+  dependencies.
+- **The local PDF renderer is gone.** Since
+  [f424a75](https://github.com/A11yDevs/acessilia/commit/f424a75) ("PDF/UA is
+  the only PDF"), every PDF is rendered by `document.export.pdf_ua`, and
+  `reportlab` left the core's dependencies.
 - **Verification (#152):** `tests/test_architecture_layers.py` fails if
   `backend/` or `frontend/` imports an operational library (`fitz`, `PIL`,
-  `cv2`, `docling`, `pypdf`, `docx`, `rapidocr`, `pypandoc`). It has no
-  offenders, so it keeps no allowlist; `reportlab` and `edge_tts` are not on
-  the list yet. It does not check `subprocess` calls;
+  `cv2`, `docling`, `pypdf`, `docx`, `rapidocr`, `pypandoc`, `reportlab`).
+  It has no offenders, so it keeps no allowlist; `edge_tts` is not on the
+  list yet. It does not check `subprocess` calls;
   pandoc, TeX Live and veraPDF are no longer in the image.

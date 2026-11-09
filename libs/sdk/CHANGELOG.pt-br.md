@@ -1,0 +1,25 @@
+# Histórico de alterações
+
+Também disponível em **inglês (EUA)**: [English version](CHANGELOG.md)
+
+O SDK é uma API pública para scripts e benchmarks (#402). As mudanças visíveis
+para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
+
+## 0.2.0 (2026-11-09)
+
+- **Adicionados** `ToolboxClientConfig` e `make_client` (`acessilia_sdk.toolbox.config`,
+  também exportados por `acessilia_sdk.toolbox`). Quem chama monta toda a
+  configuração do cliente como valores explícitos e recebe um cliente
+  configurado, sem instalar o core. O `make_toolbox_client` do core passa a
+  delegar a eles; os clientes que ele monta não mudam (#402, passo 1).
+- **Adicionado** um teste que falha se algum módulo do SDK ler o ambiente do
+  processo (`os.environ`, `os.getenv`, sob qualquer nome com que `os` seja
+  importado), como pede a ADR-0002.
+- `acessilia_sdk.__version__` informa 0.2.0, e um teste o mantém igual à
+  versão do `pyproject.toml`.
+
+## 0.1.0
+
+A primeira versão, anterior a este histórico: o registro de capacidades, o
+transporte, os clientes por capacidade, endpoints e failover, artefatos, o
+catálogo, os helpers do gateway VLM e o `run_sync`.

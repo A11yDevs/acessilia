@@ -5,4 +5,5 @@ Toolbox only through its published HTTP contract and never imports the core
 (``backend``) or the Toolbox package (``acessilia_toolbox``).
 """
 
-__version__ = "0.1.0"
+#: Kept equal to ``project.version`` in ``pyproject.toml``; a test checks it.
+__version__ = "0.2.0"
