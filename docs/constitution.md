@@ -166,10 +166,12 @@ Toolbox executes operational capabilities.
 5. **P5 — Reference-oriented processing.**
    - **Rule:** persisted artifacts are processed where they are stored and
      passed as typed, opaque `ArtifactRef` references. Materialization is
-     explicit and verified; references are immutable and scoped.
-   - **Detail:** [ADR-0005](adr/0005-artifact-references.md).
+     explicit and verified; references are immutable, and scoped from
+     `artifact/reference@2`.
+   - **Detail:** [ADR-0015](adr/0015-artifact-reference-v1.md), which
+     supersedes ADR-0005.
    - **Checked by:** SDK tests (`libs/sdk/tests/test_failover.py`), and
-     contract tests once the Toolbox publishes `artifact-ref@1`.
+     contract tests once the Toolbox publishes `artifact/reference@1`.
 6. **P6 — Reliability without operational duplication.**
    - **Rule:** availability comes from redundant infrastructure (replicas
      behind a load balancer sharing storage), timeouts, bounded retries and

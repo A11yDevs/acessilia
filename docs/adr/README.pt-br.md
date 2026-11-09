@@ -20,7 +20,7 @@ ADRs apontam para os daqui em vez de repeti-los.
 | [0002](0002-component-responsibilities.pt-br.md) | Responsabilidades dos componentes e direção das dependências | Aceito |
 | [0003](0003-remote-only-operational-capabilities.pt-br.md) | Capacidades operacionais rodam remotamente, sem fallbacks locais | Aceito |
 | [0004](0004-single-source-of-truth-for-contracts.pt-br.md) | Uma fonte de verdade por contrato | Aceito |
-| [0005](0005-artifact-references.pt-br.md) | Processamento orientado a referências com `ArtifactRef` | Aceito |
+| [0005](0005-artifact-references.pt-br.md) | Processamento orientado a referências com `ArtifactRef` | Substituído pela [0015](0015-artifact-reference-v1.pt-br.md) |
 | [0006](0006-availability-and-failover.pt-br.md) | Disponibilidade por réplicas; failover no SDK como mecanismo secundário | Aceito |
 | [0007](0007-manifest-model-and-mathml-conversion.pt-br.md) | Modelo canônico do manifesto, e conversão para MathML e verbalização de fórmulas | Aceito |
 | [0008](0008-math-capabilities-on-mathjax-and-mathcat.pt-br.md) | As capacidades de matemática rodam sobre MathJax e MathCAT | Aceito |
@@ -30,6 +30,7 @@ ADRs apontam para os daqui em vez de repeti-los.
 | [0012](0012-agents-reach-the-vlm-through-the-toolbox.pt-br.md) | Os agentes podem chegar ao modelo de visão pelo gateway VLM da Toolbox | Aceito |
 | [0013](0013-source-files-for-independent-toolboxes.pt-br.md) | Arquivos de origem para implantações independentes da Toolbox | Aceito |
 | [0014](0014-artifact-download-not-found-failover.pt-br.md) | Buscar downloads ausentes em outros endpoints | Aceito |
+| [0015](0015-artifact-reference-v1.pt-br.md) | O contrato de referência de artefato, `artifact/reference@1`, em fases | Aceito |
 
 ## Processo
 

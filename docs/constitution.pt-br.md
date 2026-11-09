@@ -167,10 +167,12 @@ capacidades operacionais.
 5. **P5 — Processamento orientado a referências.**
    - **Regra:** artefatos persistidos são processados onde estão armazenados e
      trafegam como referências `ArtifactRef` tipadas e opacas. A materialização
-     é explícita e verificada; as referências são imutáveis e têm escopo.
-   - **Detalhe:** [ADR-0005](adr/0005-artifact-references.pt-br.md).
+     é explícita e verificada; as referências são imutáveis e têm escopo a
+     partir do `artifact/reference@2`.
+   - **Detalhe:** [ADR-0015](adr/0015-artifact-reference-v1.pt-br.md), que
+     substitui a ADR-0005.
    - **Verificado por:** testes do SDK (`libs/sdk/tests/test_failover.py`) e
-     testes de contrato quando a Toolbox publicar `artifact-ref@1`.
+     testes de contrato quando a Toolbox publicar `artifact/reference@1`.
 6. **P6 — Confiabilidade sem duplicação operacional.**
    - **Regra:** a disponibilidade vem de infraestrutura redundante (réplicas
      atrás de um balanceador, compartilhando o armazenamento), timeouts,
