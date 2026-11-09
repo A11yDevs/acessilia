@@ -38,8 +38,8 @@ class ArtifactRef:
     """An artifact id with the SHA-256 digest it promises.
 
     Provisional: the Toolbox owns the artifact reference contract. Once it
-    publishes ``artifact-ref@1``, this class is replaced by the model generated
-    from that schema.
+    publishes ``artifact/reference@1`` (ADR-0015), this class is replaced by
+    the model generated from that schema.
     """
 
     artifact_id: str

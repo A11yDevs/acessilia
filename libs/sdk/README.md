@@ -81,7 +81,7 @@ check it against the SHA-256 (and an optional magic prefix). The download is
 synced to disk and renamed atomically, and local file system errors propagate
 as `OSError`; the read refuses a body above `max_bytes`
 (`READ_ARTIFACT_MAX_BYTES`, 64 MiB, by default). `ArtifactRef` is provisional
-until the Toolbox publishes `artifact-ref@1`.
+until the Toolbox publishes `artifact/reference@1`.
 
 ## Adding a capability
 

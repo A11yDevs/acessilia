@@ -83,7 +83,7 @@ streaming e o conferem contra o SHA-256 (e um prefixo mágico opcional). O
 download é sincronizado em disco e renomeado de forma atômica, e erros do
 sistema de arquivos local se propagam como `OSError`; a leitura recusa um corpo
 acima de `max_bytes` (por padrão `READ_ARTIFACT_MAX_BYTES`, 64 MiB). `ArtifactRef` é
-provisório até a Toolbox publicar `artifact-ref@1`.
+provisório até a Toolbox publicar `artifact/reference@1`.
 
 ## Adicionar uma capacidade
 

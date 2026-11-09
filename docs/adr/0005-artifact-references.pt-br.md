@@ -2,7 +2,7 @@
 
 Também disponível em **inglês (EUA)**: [English version](0005-artifact-references.md)
 
-- **Status:** Aceito
+- **Status:** Substituído pela [0015](0015-artifact-reference-v1.pt-br.md)
 - **Data:** 2026-10-18
 - **Componentes:** core, SDK, Toolbox
 - **Issues:** [#152](https://github.com/A11yDevs/acessilia/issues/152) (P5)
