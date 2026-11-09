@@ -29,7 +29,6 @@ ADAPTER = "compatibility_adapter"
 
 BRIDGES = {
     "backend/tools/code_tools.py": REEXPORT,
-    "backend/tools/region_classifier.py": REEXPORT,
     "backend/tools/text_processor.py": REEXPORT,
     "backend/export/renderers/html_renderer.py": ADAPTER,
     "backend/export/renderers/txt_renderer.py": ADAPTER,
