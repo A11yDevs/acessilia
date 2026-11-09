@@ -13,6 +13,9 @@ from __future__ import annotations
 import inspect
 from typing import Any, TypeVar
 
+# Re-exported only for callers the stage-1 branch of #381 moves (the
+# orchestrator's handlers); new code imports acessilia_sdk.runtime directly.
+# The re-export goes once stage 1 has landed (#402, step 2).
 from acessilia_sdk.runtime import run_sync
 from acessilia_sdk.toolbox import (
     ToolboxArtifactNotFound,

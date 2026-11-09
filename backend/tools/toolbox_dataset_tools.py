@@ -12,14 +12,10 @@ from typing import Any
 
 from backend.tools.logger import logger
 from acessilia_sdk.toolbox.clients import ToolboxDatasetClient
-from backend.tools.toolbox_client import ToolboxError, make_toolbox_client, run_sync
+from acessilia_sdk.runtime import run_sync
+from backend.tools.toolbox_client import ToolboxError, make_toolbox_client
 
 DATASET_ID = "dr-docbench"
-
-
-def _run_async(coro) -> Any:
-    """Run an async coroutine from a sync context, even inside a running loop."""
-    return run_sync(coro)
 
 
 def toolbox_list_drbench_items(
@@ -30,7 +26,7 @@ def toolbox_list_drbench_items(
 ) -> list[dict[str, Any]]:
     """List Dr.DocBench items (1 page per item) in the given split."""
     try:
-        return _run_async(_list_items_async(DATASET_ID, split, limit, offset))
+        return run_sync(_list_items_async(DATASET_ID, split, limit, offset))
     except ToolboxError as e:
         logger.warning("Toolbox list_items failed: {}", e)
         return []
@@ -42,7 +38,7 @@ def toolbox_get_drbench_item(
 ) -> dict[str, Any] | None:
     """Get a full Dr.DocBench item (artifact refs + annotations)."""
     try:
-        return _run_async(_get_item_async(DATASET_ID, split, item_id))
+        return run_sync(_get_item_async(DATASET_ID, split, item_id))
     except ToolboxError as e:
         logger.warning("Toolbox get_item({}) failed: {}", item_id, e)
         return None
@@ -55,7 +51,7 @@ def toolbox_get_drbench_page_image(
 ) -> bytes | None:
     """Download the raw page image bytes for a Dr.DocBench item."""
     try:
-        return _run_async(
+        return run_sync(
             _get_artifact_async(DATASET_ID, split, item_id, artifact_path)
         )
     except ToolboxError as e:

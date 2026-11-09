@@ -54,7 +54,9 @@ def _toolbox_export(
     created and closed inside the coroutine: ``run_sync`` may run it on a fresh
     event loop, and the HTTP connections must not outlive it.
     """
-    from backend.tools.toolbox_client import make_toolbox_client, run_sync
+    from acessilia_sdk.runtime import run_sync
+
+    from backend.tools.toolbox_client import make_toolbox_client
 
     async def export() -> dict[str, Any]:
         client = make_toolbox_client(client_cls)
