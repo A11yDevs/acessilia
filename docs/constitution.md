@@ -2,7 +2,7 @@
 
 You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](constitution.pt-br.md)
 
-- **Version:** 2.0.4 (2026-11-09). See the [changelog](#9-changelog) for how
+- **Version:** 2.0.5 (2026-11-09). See the [changelog](#9-changelog) for how
   versions are numbered.
 
 ## 1. Purpose
@@ -71,7 +71,7 @@ Deliver document and image conversion to accessible formats through:
    - PDDL domain (v2.2+) encodes task dependencies and ordering constraints
    - Plan is deterministic output from planner (internal or fast-downward backend)
    - Execution report validates plan adherence and records task outcomes
-3. Processing mode changes prompt and verbosity behavior. The accepted values are `detalhado`, `medio` (with `normal` as an alias), `baixo` and `ocr`; an unknown value falls back to `medio`. They map to prompts in `backend/ai/prompts` and to verbosity profiles in `backend/pipeline/verbosity_manager.py`.
+3. Processing mode changes prompt and verbosity behavior. The accepted values are `detalhado`, `medio` (with `normal` as an alias), `baixo` and `ocr`; an unknown value falls back to `medio`. They map to prompts in `backend/ai/prompts` and to verbosity profiles in `docstruct.profiles`.
 4. Extraction is hybrid: deterministic text extraction first, then AI vision for scanned/no-text pages and image inputs (see principle 2.5).
 5. Page and file cache are optimizations, not source of truth.
 6. Renderers must only consume validated canonical data.
@@ -226,6 +226,9 @@ Versions follow `MAJOR.MINOR.PATCH`:
 
 The unversioned text before 2026-10-18 counts as **1.0.0**.
 
+- **2.0.5 (2026-11-09):** section 4.3 names `docstruct.profiles` for the
+  verbosity profiles, since the core's `verbosity_manager` re-export is
+  removed (#191). No principle changes.
 - **2.0.4 (2026-11-09):** section 3.1 names `docstruct.export.filters` for
   the Pandoc AST filters, since the core's `export/filters` re-export package
   is removed (#191). No principle changes.

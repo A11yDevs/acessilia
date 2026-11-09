@@ -28,7 +28,6 @@ REEXPORT = "reexport"
 ADAPTER = "compatibility_adapter"
 
 BRIDGES = {
-    "backend/pipeline/verbosity_manager.py": REEXPORT,
     "backend/tools/code_tools.py": REEXPORT,
     "backend/tools/region_classifier.py": REEXPORT,
     "backend/tools/text_processor.py": REEXPORT,
@@ -183,27 +182,3 @@ def test_core_holds_no_copy_of_a_docstruct_function() -> None:
     }
 
     assert copies == KNOWN_COPIES
-
-
-# --- Behaviour kept by the bridges -------------------------------------------
-
-
-def test_verbosity_manager_keeps_its_api_and_defaults() -> None:
-    from backend.pipeline import verbosity_manager
-
-    assert verbosity_manager.normalize_profile("pdf")["verbosity"] == ["basic", "detailed"]
-    # Unknown profiles fall back to txt; unknown modes to "detailed".
-    assert verbosity_manager.normalize_profile("epub") == verbosity_manager.OUTPUT_PROFILES["txt"]
-    assert verbosity_manager.verbosity_for_mode("detalhado") == "technical"
-    assert verbosity_manager.verbosity_for_mode("other") == "detailed"
-    # A caller may change the profile it gets without changing the table.
-    verbosity_manager.normalize_profile("html")["verbosity"].clear()
-    assert verbosity_manager.OUTPUT_PROFILES["html"]["verbosity"] == [
-        "basic", "detailed", "technical",
-    ]
-    blocks = [{"verbosity": "technical"}, {"verbosity": "basic"}, {}]
-    assert verbosity_manager.filter_blocks_for_profile(blocks, "txt") == [
-        {"verbosity": "basic"},
-        {},
-    ]
-    assert verbosity_manager.filter_blocks_for_profile([], "html") == []
