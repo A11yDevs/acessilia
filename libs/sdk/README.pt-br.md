@@ -30,6 +30,7 @@ core (backend)  →  acessilia-sdk  →  contrato HTTP da Toolbox
 | `acessilia_sdk.toolbox.capabilities` | `TOOLBOX_CAPABILITIES`, `ToolboxCapability`, `PROVIDER_DEFAULTS`, `ROUTE_PROVIDER_DEFAULTS`, `provider_default` — allowlist dos contratos da Toolbox e os providers padrão (só dados) |
 | `acessilia_sdk.toolbox.transport` | `execute_capability` — único caminho para `POST /v1/capabilities/{id}:execute`; `require_capability`, `raise_for_error`, `auth_headers`, `media_type_for` |
 | `acessilia_sdk.toolbox.client` | `ToolboxCapabilityClient` — base dos clientes por capacidade (conexões, header Bearer, provider, failover, `health`, `close`); `FailoverHook` |
+| `acessilia_sdk.toolbox.config` | `ToolboxClientConfig`, `make_client` — toda a configuração de um cliente como valores explícitos (endpoints, chave de API, timeouts, retries, providers por `provider_key`, timeouts de exportação por `timeout_key`, hook de failover) e a factory que monta um cliente a partir dela |
 | `acessilia_sdk.toolbox.clients` | `ToolboxAdjudicateClient`, `ToolboxArtifactClient`, `ToolboxDatasetClient`, `ToolboxDocxClient`, `ToolboxLayoutClient`, `ToolboxMathClient`, `ToolboxMediaInspectClient`, `ToolboxOcrClient`, `ToolboxOrientationClient`, `ToolboxPageOcrClient`, `ToolboxPdfClient`, `ToolboxPdfUaClient`, `ToolboxStructureClient`, `ToolboxTableClient` — um cliente por família de capacidades; sem settings e sem logs |
 | `acessilia_sdk.toolbox.endpoints` | `ToolboxEndpoint`, `parse_endpoints`, `FAILOVER_ERRORS` — as instâncias da Toolbox que um cliente tenta, em ordem |
 | `acessilia_sdk.toolbox.clients.pdf` | `RenderedPage` (o PNG de `ToolboxPdfClient.render`, o recorte aplicado e o resultado `image@2`), `ClipOrigin` |
@@ -38,6 +39,44 @@ core (backend)  →  acessilia-sdk  →  contrato HTTP da Toolbox
 | `acessilia_sdk.toolbox.vlm` | `vlm_gateway_base_url`, `vlm_provider_healthy`, `VLM_GATEWAY_PATH` — o gateway VLM da Toolbox, uma rota de chat compatível com OpenAI que não é capacidade, e a saúde do seu provider ([ADR-0012](../../docs/adr/0012-agents-reach-the-vlm-through-the-toolbox.pt-br.md)) |
 | `acessilia_sdk.toolbox.errors` | `ToolboxError` e subclasses, incluindo `ToolboxUnavailable` (todos os endpoints falharam; `causes` lista cada falha) |
 | `acessilia_sdk.runtime` | `run_sync` — executa uma coroutine a partir de código síncrono, dentro ou fora de um event loop |
+
+## Configurar um cliente
+
+Quem chama monta um `ToolboxClientConfig` a partir da própria fonte de
+configuração e o passa para `make_client`. O SDK não lê settings nem o
+ambiente, então um script não precisa de nada do core:
+
+```python
+from pathlib import Path
+
+from acessilia_sdk.runtime import run_sync
+from acessilia_sdk.toolbox import ToolboxClientConfig, make_client
+from acessilia_sdk.toolbox.clients import ToolboxMediaInspectClient
+
+config = ToolboxClientConfig(
+    endpoints="https://toolbox.example.org",   # ou uma lista de deploys independentes
+    api_key="...",
+    timeout_seconds=600,
+    providers={"toolbox_media_inspect_provider": "pure-media-inspect"},
+)
+
+async def main():
+    client = make_client(ToolboxMediaInspectClient, config)
+    try:
+        return await client.inspect(Path("input.pdf"))
+    finally:
+        await client.close()
+
+print(run_sync(main()))
+```
+
+`providers` liga a `provider_key` de um cliente a um ID de provider, e uma
+chave ausente mantém o padrão de `PROVIDER_DEFAULTS`. `timeouts` liga a
+`timeout_key` de um cliente de exportação ao timeout próprio dele; sem ela,
+vale o `timeout_seconds` compartilhado. Argumentos nomeados de `make_client`
+sobrepõem a configuração; `None` é ignorado, e `base_url` substitui os
+endpoints configurados. O core monta o mesmo objeto a partir dos seus
+`settings` (`backend/tools/toolbox_client.py`).
 
 ## Disponibilidade e failover
 

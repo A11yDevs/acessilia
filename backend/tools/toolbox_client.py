@@ -1,13 +1,16 @@
 """Core-side access to the Acessilia Toolbox.
 
-The transport, the capability registry and the per-capability clients live in
-the SDK (``libs/sdk``, package ``acessilia_sdk``). This module builds those
-clients from the core's ``settings`` (:func:`make_toolbox_client`) and keeps
-the names other modules import from here.
+The transport, the capability registry, the per-capability clients and the
+client factory live in the SDK (``libs/sdk``, package ``acessilia_sdk``). This
+module only maps the core's ``settings`` onto the SDK's
+:class:`~acessilia_sdk.toolbox.ToolboxClientConfig`
+(:func:`toolbox_client_config`, constitution 3.2), and keeps the names other
+modules import from here.
 """
 
 from __future__ import annotations
 
+import inspect
 from typing import Any, TypeVar
 
 from acessilia_sdk.runtime import run_sync
@@ -25,12 +28,15 @@ from acessilia_sdk.toolbox import (
     require_capability,
 )
 from acessilia_sdk.toolbox import (
+    PROVIDER_DEFAULTS,
     ToolboxCapabilityClient,
+    ToolboxClientConfig,
     ToolboxEndpoint,
     ToolboxUnavailable,
+    make_client,
     parse_endpoints,
 )
-from acessilia_sdk.toolbox.clients import ToolboxMathClient
+from acessilia_sdk.toolbox import clients as _sdk_clients
 from acessilia_sdk.toolbox.transport import media_type_for as _media_type
 from backend.config.settings import settings
 from backend.tools.logger import logger
@@ -68,47 +74,51 @@ def _log_failover(endpoint: ToolboxEndpoint, error: ToolboxError) -> None:
     )
 
 
-def _class_defaults(client_cls: type[ToolboxCapabilityClient]) -> dict[str, Any]:
-    """Settings that only some clients take."""
-    defaults: dict[str, Any] = {}
-    if issubclass(client_cls, ToolboxMathClient):
-        defaults["transform_provider"] = settings.toolbox_math_provider
-    if client_cls.timeout_key:
-        # Exports that render in seconds have their own timeout: the shared
-        # one (default one hour) is far too long for them.
-        defaults["timeout_seconds"] = getattr(settings, client_cls.timeout_key)
-    return defaults
+#: The ``timeout_key`` of every SDK client that has its own timeout (the
+#: exports): each names a ``settings`` attribute.
+TIMEOUT_KEYS: frozenset[str] = frozenset(
+    value.timeout_key
+    for value in vars(_sdk_clients).values()
+    if inspect.isclass(value)
+    and issubclass(value, ToolboxCapabilityClient)
+    and value.timeout_key
+)
+
+
+def toolbox_client_config() -> ToolboxClientConfig:
+    """The SDK client configuration, read from the core's ``settings``.
+
+    Read on every call, so a changed setting (or a test's monkeypatch) applies
+    to the next client. Providers come from the ``TOOLBOX_*_PROVIDER``
+    settings named by ``PROVIDER_DEFAULTS``, and export timeouts from the
+    settings named by each client's ``timeout_key``.
+    """
+    return ToolboxClientConfig(
+        endpoints=toolbox_endpoints(),
+        api_key=settings.toolbox_api_key,
+        timeout_seconds=settings.toolbox_timeout_seconds,
+        retries=settings.toolbox_retries,
+        retry_backoff_seconds=settings.toolbox_retry_backoff_seconds,
+        providers={key: getattr(settings, key) for key in PROVIDER_DEFAULTS},
+        timeouts={key: getattr(settings, key) for key in TIMEOUT_KEYS},
+        on_failover=_log_failover,
+    )
 
 
 def make_toolbox_client(client_cls: type[ClientT], **overrides: Any) -> ClientT:
     """Build an SDK capability client configured from the core's ``settings``.
 
-    The provider comes from the ``settings`` attribute named by the class's
-    ``provider_key``, so ``TOOLBOX_*_PROVIDER`` overrides keep working;
-    clients without a provider key (artifacts, datasets) get none.
-    ``overrides`` win over settings; ``None`` values are ignored, and passing
-    ``base_url`` replaces the configured endpoints.
+    Delegates to :func:`acessilia_sdk.toolbox.make_client` with
+    :func:`toolbox_client_config`. The provider comes from the ``settings``
+    attribute named by the class's ``provider_key``, so ``TOOLBOX_*_PROVIDER``
+    overrides keep working; clients without a provider key (artifacts,
+    datasets) get none. ``overrides`` win over settings; ``None`` values are
+    ignored, and passing ``base_url`` replaces the configured endpoints.
 
     Every client retries timeouts and unavailable instances on the same
     endpoint, with backoff (``TOOLBOX_RETRIES``/``TOOLBOX_RETRY_BACKOFF_SECONDS``).
     """
-    kwargs: dict[str, Any] = {
-        "endpoints": toolbox_endpoints(),
-        "provider": (
-            getattr(settings, client_cls.provider_key) if client_cls.provider_key else None
-        ),
-        "timeout_seconds": settings.toolbox_timeout_seconds,
-        "api_key": settings.toolbox_api_key,
-        "on_failover": _log_failover,
-        "retries": settings.toolbox_retries,
-        "retry_backoff_seconds": settings.toolbox_retry_backoff_seconds,
-        **_class_defaults(client_cls),
-    }
-    overrides = {key: value for key, value in overrides.items() if value is not None}
-    if "base_url" in overrides:
-        kwargs.pop("endpoints")
-    kwargs.update(overrides)
-    return client_cls(**kwargs)
+    return make_client(client_cls, toolbox_client_config(), **overrides)
 
 
 __all__ = [
@@ -127,5 +137,6 @@ __all__ = [
     "make_toolbox_client",
     "require_capability",
     "run_sync",
+    "toolbox_client_config",
     "toolbox_endpoints",
 ]
