@@ -249,7 +249,9 @@ um `base_url` explícito; testes de como o core o configura ficam em
 Entradas de texto usam `upload=(nome, bytes, media_type)` no lugar de
 `file_path` (veja `acessilia_sdk/toolbox/clients/math.py`). `scripts/check_capability_contract.py`
 lê o registro, então o novo ID é conferido contra o catálogo da Toolbox sem
-outras mudanças; `tests/test_toolbox_capability_registry.py` falha se um cliente
+outras mudanças. Ele também confere se o provider padrão da capacidade
+(`PROVIDER_DEFAULTS`) a atende na versão que o SDK envia.
+`tests/test_toolbox_capability_registry.py` falha se um cliente
 fixar uma rota `:execute` no código ou usar um ID não registrado.
 
 ### 4.2 Wrapper de tool Agno (opcional)

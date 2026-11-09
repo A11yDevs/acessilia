@@ -249,7 +249,9 @@ explicit `base_url`; tests of how the core configures it belong in
 Text inputs use `upload=(filename, content_bytes, media_type)` instead of
 `file_path` (see `acessilia_sdk/toolbox/clients/math.py`). `scripts/check_capability_contract.py`
 reads the registry, so the new id is checked against the Toolbox catalogue
-without further changes; `tests/test_toolbox_capability_registry.py` fails if a
+without further changes. It also checks that the capability's default provider
+(`PROVIDER_DEFAULTS`) serves it at the version the SDK sends.
+`tests/test_toolbox_capability_registry.py` fails if a
 client hard-codes an `:execute` route or uses an unregistered id.
 
 ### 4.2 Agno tool wrapper (optional)
