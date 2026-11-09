@@ -9,6 +9,12 @@ Capabilities are compared with their contract version too: the SDK sends the
 exact version it was written against on every execute, so a Toolbox that does
 not publish that version fails every call to it.
 
+Provider defaults are compared as bindings, not only as ids: every default in
+``PROVIDER_DEFAULTS`` must serve each capability version the SDK uses it for.
+A provider that is still registered, but no longer serves that capability,
+would otherwise pass while every call with the default configuration fails
+(review of #324).
+
 This script reads the core side from ``libs/sdk/src/acessilia_sdk/toolbox/capabilities.py``
 (the allowlist every Toolbox client goes through) and checks it against the
 Toolbox, either live (``--url``) or from a captured snapshot (``--snapshot``),
@@ -55,6 +61,9 @@ class CoreContract:
     versions: dict[str, int] = field(default_factory=dict)
     #: provider id -> settings attribute default that points at it
     providers: dict[str, set[str]] = field(default_factory=dict)
+    #: (capability id, contract version, default provider id, setting name)
+    #: for every capability whose provider comes from ``PROVIDER_DEFAULTS``
+    default_bindings: set[tuple[str, int, str, str]] = field(default_factory=set)
 
 
 @dataclass
@@ -63,6 +72,8 @@ class ToolboxContract:
     providers: dict[str, set[str]]
     #: capability id -> published versions; an entry without one is version 1
     versions: dict[str, set[int]] = field(default_factory=dict)
+    #: (capability id, version) -> providers that serve that version
+    bindings: dict[tuple[str, int], set[str]] = field(default_factory=dict)
 
 
 def _load_registry():
@@ -91,6 +102,20 @@ def read_core_contract() -> CoreContract:
     defaults = {**registry.PROVIDER_DEFAULTS, **registry.ROUTE_PROVIDER_DEFAULTS}
     for setting, default in defaults.items():
         contract.providers.setdefault(default, set()).add(setting.upper())
+
+    # Route defaults (the VLM gateway) serve an HTTP route, not a capability,
+    # so only capability provider keys have a binding to check.
+    for capability in registry.TOOLBOX_CAPABILITIES.values():
+        if capability.provider_key is None:
+            continue
+        contract.default_bindings.add(
+            (
+                capability.id,
+                capability.contract_version,
+                registry.PROVIDER_DEFAULTS[capability.provider_key],
+                capability.provider_key.upper(),
+            )
+        )
 
     return contract
 
@@ -121,13 +146,15 @@ def _fetch(url: str) -> object:
 def _from_payloads(capabilities: object, providers: object) -> ToolboxContract:
     caps: dict[str, set[str]] = {}
     versions: dict[str, set[int]] = {}
+    bindings: dict[tuple[str, int], set[str]] = {}
     for entry in capabilities or []:
         if isinstance(entry, dict) and entry.get("id"):
             capability = str(entry["id"])
-            caps.setdefault(capability, set()).update(
-                str(item) for item in (entry.get("providers") or [])
-            )
-            versions.setdefault(capability, set()).add(int(entry.get("version") or 1))
+            version = int(entry.get("version") or 1)
+            served_by = {str(item) for item in (entry.get("providers") or [])}
+            caps.setdefault(capability, set()).update(served_by)
+            versions.setdefault(capability, set()).add(version)
+            bindings.setdefault((capability, version), set()).update(served_by)
 
     provs: dict[str, set[str]] = {}
     for entry in providers or []:
@@ -135,7 +162,9 @@ def _from_payloads(capabilities: object, providers: object) -> ToolboxContract:
             provs[str(entry["id"])] = {
                 str(item) for item in (entry.get("capabilities") or [])
             }
-    return ToolboxContract(capabilities=caps, providers=provs, versions=versions)
+    return ToolboxContract(
+        capabilities=caps, providers=provs, versions=versions, bindings=bindings
+    )
 
 
 def compare(
@@ -168,6 +197,21 @@ def compare(
             f"core default for {settings} points at provider {provider!r} "
             f"which the Toolbox does not register"
         )
+
+    # Only bindings whose provider is registered and whose version is
+    # published: the two checks above already report the other cases once.
+    for capability, version, provider, setting in sorted(core.default_bindings):
+        if provider not in toolbox.providers:
+            continue
+        if version not in toolbox.versions.get(capability, {1}):
+            continue
+        serves_version = provider in toolbox.bindings.get((capability, version), set())
+        declares_capability = capability in toolbox.providers[provider]
+        if not (serves_version and declares_capability):
+            failures.append(
+                f"core default for {setting} points at provider {provider!r}, "
+                f"which does not serve {capability}@{version}"
+            )
 
     provider_caps = {
         capability
