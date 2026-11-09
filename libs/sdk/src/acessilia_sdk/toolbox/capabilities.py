@@ -42,9 +42,10 @@ class ToolboxCapability:
     output_schema: str | None = None
     #: The manifest's ``execution.idempotent`` at ``contract_version``:
     #: repeating the same operation has no effect beyond the first execution.
-    #: Required, with no default, so no capability is ever retried by
-    #: omission (ADR-0006, #406). ``scripts/check_capability_contract.py``
-    #: compares it with the published contract.
+    #: Required, with no default, so the retry policy of ADR-0006 (applied
+    #: by the client in #406) can never treat a capability as idempotent by
+    #: omission. ``scripts/check_capability_contract.py`` compares it with the
+    #: published contract.
     idempotent: bool = field(kw_only=True)
 
 

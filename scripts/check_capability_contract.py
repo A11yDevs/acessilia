@@ -9,11 +9,12 @@ Capabilities are compared with their contract version too: the SDK sends the
 exact version it was written against on every execute, so a Toolbox that does
 not publish that version fails every call to it.
 
-Idempotency is compared at the exact version too: the SDK retries a call
-only when its registry says the capability is idempotent (ADR-0006, #406), so
-a registry that disagrees with the manifest would repeat an operation that is
-not safe to repeat. A missing, null or non-boolean published value is a
-failure, never permission to repeat.
+Idempotency is compared at the exact version too. ADR-0006 allows retries and
+failover for idempotent calls only, and #406 makes the SDK client follow the
+registry's ``idempotent`` value. Until that client change lands, the registry
+records the value and this check keeps it equal to the manifest's, so the
+policy will start from the published contract. A missing, null or
+non-boolean published value is a failure, never permission to repeat.
 
 Provider defaults are compared as bindings, not only as ids: every default in
 ``PROVIDER_DEFAULTS`` must serve each capability version the SDK uses it for.
