@@ -1,10 +1,7 @@
 """Classification of Docling formula regions."""
 
-from backend.tools.region_classifier import (
-    Region,
-    classify_region,
-    formula_already_extracted,
-)
+from docstruct.regions.classify import classify_region, formula_already_extracted
+from docstruct.types import Region
 
 
 def _formula_region(text: str = "", enriched: bool = False) -> Region:
