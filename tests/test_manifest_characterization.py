@@ -17,9 +17,10 @@ from pathlib import Path
 
 import pytest
 
+from docstruct.placeholders import UNSTRUCTURED_PAGE_LABEL
+
 from backend import i18n
 from backend.core.manifest.builder import (
-    UNSTRUCTURED_PAGE_LABEL,
     _element_bbox,
     _normalized_element_bbox,
     _refine_reading_order,

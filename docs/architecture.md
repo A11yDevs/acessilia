@@ -34,7 +34,7 @@ The former **`legacy`** engine (`AccessibilityOrchestrator`: Reader → Vision/D
 #### 0.4. Domain Tools & Utilities (`backend/tools/`)
 - [backend/tools/logger.py](../backend/tools/logger.py): centralized loguru logger setup.
 - [backend/tools/validators.py](../backend/tools/validators.py): file extension and size validation.
-- [backend/tools/text_processor.py](../backend/tools/text_processor.py): text normalization and Markdown parsing.
+- [docstruct.text.paragraphs](../libs/docstruct/src/docstruct/text/paragraphs.py): text normalization and Markdown parsing.
 - [backend/tools/prompt_tools.py](../backend/tools/prompt_tools.py): prompt loader and template resolver.
 
 #### 0.5. Planning Layer (`backend/core/`) — PDDL engine

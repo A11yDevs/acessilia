@@ -29,7 +29,6 @@ ADAPTER = "compatibility_adapter"
 
 BRIDGES = {
     "backend/tools/code_tools.py": REEXPORT,
-    "backend/tools/text_processor.py": REEXPORT,
     "backend/export/renderers/html_renderer.py": ADAPTER,
     "backend/export/renderers/txt_renderer.py": ADAPTER,
     "backend/pipeline/canonical_builder.py": ADAPTER,
@@ -181,3 +180,16 @@ def test_core_holds_no_copy_of_a_docstruct_function() -> None:
     }
 
     assert copies == KNOWN_COPIES
+
+
+def test_the_builder_does_not_re_export_the_placeholder_label() -> None:
+    """``UNSTRUCTURED_PAGE_LABEL`` lives in docstruct.placeholders (#191, step 3).
+
+    The builder still uses it, under a private alias, to build the
+    unstructured-page placeholder; it no longer exposes it as its own name.
+    """
+    import docstruct.placeholders
+    from backend.core.manifest import builder
+
+    assert not hasattr(builder, "UNSTRUCTURED_PAGE_LABEL")
+    assert builder._UNSTRUCTURED_PAGE_LABEL is docstruct.placeholders.UNSTRUCTURED_PAGE_LABEL
