@@ -27,9 +27,18 @@ Rules for the generated data:
   ones, as the hand-written registry had it. Typed result models for REST
   outputs are a later step of #213.
 
+It also writes the SDK's result models from published schemas
+(``MODELS``): one module per schema, a frozen dataclass with standard-library
+code only, read from ``tests/fixtures/toolbox-schemas/`` (captured from the same
+ref as the contract by ``scripts/capture_toolbox_contract.py``). A model's
+``from_dict`` validates required properties, types, patterns, ``minLength``
+and ``minimum``, and ignores unknown properties, so a later schema version that
+only adds fields keeps being read (#185). Schema constructs it does not handle
+are refused rather than half-generated.
+
 Usage:
-    python scripts/generate_sdk_bindings.py           # rewrite the block
-    python scripts/generate_sdk_bindings.py --check   # exit 1 if it is stale
+    python scripts/generate_sdk_bindings.py           # rewrite the block and models
+    python scripts/generate_sdk_bindings.py --check   # exit 1 if one is stale
 """
 
 from __future__ import annotations
@@ -38,11 +47,28 @@ import argparse
 import ast
 import json
 import sys
+import textwrap
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 REGISTRY_PATH = REPO_ROOT / "libs" / "sdk" / "src" / "acessilia_sdk" / "toolbox" / "capabilities.py"
 CONTRACT_PATH = REPO_ROOT / "tests" / "fixtures" / "toolbox-contract.json"
+SCHEMAS_DIR = REPO_ROOT / "tests" / "fixtures" / "toolbox-schemas"
+SDK_TOOLBOX = REPO_ROOT / "libs" / "sdk" / "src" / "acessilia_sdk" / "toolbox"
+
+#: Published schema file -> (class name, generated module).
+MODELS: dict[str, tuple[str, Path]] = {
+    "reference@1.json": ("ArtifactReference", SDK_TOOLBOX / "reference.py"),
+}
+
+_JSON_TYPES = {
+    "string": ("str", "isinstance(value, str)"),
+    "integer": ("int", "isinstance(value, int) and not isinstance(value, bool)"),
+    "number": ("float", "isinstance(value, (int, float)) and not isinstance(value, bool)"),
+    "boolean": ("bool", "isinstance(value, bool)"),
+    "null": ("None", "value is None"),
+}
+_KEYWORDS = {"description", "type", "pattern", "minLength", "minimum"}
 
 BEGIN = "# BEGIN GENERATED BINDINGS\n"
 END = "# END GENERATED BINDINGS\n"
@@ -134,6 +160,153 @@ def regenerate(source: str, contract: dict) -> str:
     return head + BEGIN + block + END + tail
 
 
+def _escape_braces(text: str) -> str:
+    """``text`` as a literal inside a generated f-string."""
+    return text.replace("{", "{{").replace("}", "}}")
+
+
+def _field(name: str, spec: dict, required: bool) -> tuple[str, str]:
+    """The dataclass field line and the validation function for one property."""
+    unknown = sorted(set(spec) - _KEYWORDS)
+    if unknown:
+        raise BindingError(f"property {name!r} uses unsupported keywords {unknown}")
+    types = spec.get("type")
+    types = [types] if isinstance(types, str) else list(types or [])
+    if not types or any(kind not in _JSON_TYPES for kind in types):
+        raise BindingError(f"property {name!r} has an unsupported type {spec.get('type')!r}")
+    annotation = " | ".join(_JSON_TYPES[kind][0] for kind in types)
+    if not required and "null" not in types:
+        annotation += " | None"
+    checks = " or ".join(
+        f"({_JSON_TYPES[kind][1]})" if len(types) > 1 else _JSON_TYPES[kind][1]
+        for kind in types
+    )
+    lines = [
+        f"def _check_{name}(value: Any) -> {annotation}:",
+        f"    if not ({checks}):",
+        f'        raise ValueError(f"{name}: expected {" or ".join(types)}, got {{value!r}}")',
+    ]
+    if "pattern" in spec:
+        lines += [
+            f"    if isinstance(value, str) and re.fullmatch({spec['pattern']!r}, value) is None:",
+            f'        raise ValueError(f"{name}: {{value!r}} does not match {_escape_braces(spec["pattern"])}")',
+        ]
+    if "minLength" in spec:
+        lines += [
+            f"    if isinstance(value, str) and len(value) < {spec['minLength']}:",
+            f'        raise ValueError(f"{name}: shorter than {spec["minLength"]}")',
+        ]
+    if "minimum" in spec:
+        lines += [
+            "    if isinstance(value, (int, float)) and not isinstance(value, bool)"
+            f" and value < {spec['minimum']}:",
+            f'        raise ValueError(f"{name}: below {spec["minimum"]}")',
+        ]
+    lines.append("    return value")
+    default = "" if required else " = None"
+    return f"    {name}: {annotation}{default}", "\n".join(lines)
+
+
+def render_model(schema: dict, class_name: str, schema_file: str) -> str:
+    """A standard-library module with a frozen dataclass for a flat object schema."""
+    if schema.get("type") != "object" or not isinstance(schema.get("properties"), dict):
+        raise BindingError(f"{schema_file}: only flat object schemas are supported")
+    properties: dict[str, dict] = schema["properties"]
+    required = list(schema.get("required") or [])
+    missing = sorted(set(required) - set(properties))
+    if missing:
+        raise BindingError(f"{schema_file}: required properties not declared: {missing}")
+    # Required fields first: a dataclass field without default cannot follow one with.
+    ordered = [n for n in properties if n in required] + [
+        n for n in properties if n not in required
+    ]
+    fields, checks = [], []
+    for name in ordered:
+        if not name.isidentifier():
+            raise BindingError(f"{schema_file}: property {name!r} is not an identifier")
+        line, check = _field(name, properties[name], name in required)
+        fields.append(line)
+        checks.append(check)
+    description = textwrap.fill(schema.get("description", "").strip(), width=79)
+    reads = "\n".join(
+        f"            {name!r}: _check_{name}(data[{name!r}])," for name in required
+    )
+    optional = "\n".join(
+        f"        if {name!r} in data:\n"
+        f"            values[{name!r}] = _check_{name}(data[{name!r}])"
+        for name in ordered
+        if name not in required
+    )
+    missing_check = (
+        "        missing = [name for name in REQUIRED if name not in data]\n"
+        "        if missing:\n"
+        f'            raise ValueError(f"{class_name}: missing required properties {{missing}}")\n'
+    )
+    body = [
+        f'"""{schema.get("title", class_name)} ({schema["$id"]}).',
+        "",
+        "Generated by scripts/generate_sdk_bindings.py from the Toolbox's published",
+        f"schema (tests/fixtures/toolbox-schemas/{schema_file}); do not edit by hand.",
+        "",
+        description,
+        '"""',
+        "",
+        "from __future__ import annotations",
+        "",
+        "import re",
+        "from dataclasses import asdict, dataclass",
+        "from typing import Any",
+        "",
+        f"SCHEMA_ID = {schema['$id']!r}",
+        f"REQUIRED: tuple[str, ...] = {tuple(required)!r}",
+        "",
+        "",
+        "\n\n\n".join(checks),
+        "",
+        "",
+        "@dataclass(frozen=True)",
+        f"class {class_name}:",
+        f'    """{schema.get("title", class_name)}; build it with :meth:`from_dict`."""',
+        "",
+        *fields,
+        "",
+        "    @classmethod",
+        f"    def from_dict(cls, data: Any) -> {class_name}:",
+        '        """Validate ``data`` against the schema and build the model.',
+        "",
+        "        Unknown properties are ignored: a later schema version only adds",
+        "        fields. A missing required property, a wrong type or a value the",
+        "        schema refuses raises ``ValueError``.",
+        '        """',
+        "        if not isinstance(data, dict):",
+        f'            raise ValueError(f"{class_name}: expected an object, got {{data!r}}")',
+        missing_check.rstrip("\n"),
+        "        values: dict[str, Any] = {",
+        reads,
+        "        }",
+        *([optional] if optional else []),
+        "        return cls(**values)",
+        "",
+        "    def to_dict(self) -> dict[str, Any]:",
+        '        """The JSON object, with every field."""',
+        "        return asdict(self)",
+        "",
+        "",
+        f'__all__ = ["REQUIRED", "SCHEMA_ID", "{class_name}"]',
+        "",
+    ]
+    return "\n".join(body)
+
+
+def models() -> dict[Path, str]:
+    """Every generated model module and its content."""
+    generated: dict[Path, str] = {}
+    for schema_file, (class_name, target) in MODELS.items():
+        schema = json.loads((SCHEMAS_DIR / schema_file).read_text(encoding="utf-8"))
+        generated[target] = render_model(schema, class_name, schema_file)
+    return generated
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--check", action="store_true", help="exit 1 if the block is stale")
@@ -143,23 +316,30 @@ def main(argv: list[str] | None = None) -> int:
     source = REGISTRY_PATH.read_text(encoding="utf-8")
     contract = json.loads(args.contract.read_text(encoding="utf-8"))
     try:
-        generated = regenerate(source, contract)
+        outputs = {REGISTRY_PATH: regenerate(source, contract), **models()}
     except BindingError as exc:
         print(f"cannot generate the SDK bindings: {exc}", file=sys.stderr)
         return 1
 
     if args.check:
-        if generated != source:
+        stale = [
+            path
+            for path, text in outputs.items()
+            if not path.is_file() or path.read_text(encoding="utf-8") != text
+        ]
+        for path in stale:
             print(
-                f"{REGISTRY_PATH.relative_to(REPO_ROOT)} is stale: "
+                f"{path.relative_to(REPO_ROOT)} is stale: "
                 "run python scripts/generate_sdk_bindings.py",
                 file=sys.stderr,
             )
+        if stale:
             return 1
         print("SDK bindings are up to date")
         return 0
-    REGISTRY_PATH.write_text(generated, encoding="utf-8")
-    print(f"wrote {REGISTRY_PATH.relative_to(REPO_ROOT)}")
+    for path, text in outputs.items():
+        path.write_text(text, encoding="utf-8")
+        print(f"wrote {path.relative_to(REPO_ROOT)}")
     return 0
 
 

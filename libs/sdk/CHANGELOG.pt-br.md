@@ -7,6 +7,11 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
 ## Não lançado
 
+- **Adicionados** `ArtifactReference` (`acessilia_sdk.toolbox.reference`), o
+  `artifact/reference@1` publicado, gerado a partir do schema da Toolbox; o
+  `parse_reference`, que também confere `digest == artifact_id`; e o
+  `ToolboxArtifactClient.upload_reference`. `upload()` e `ArtifactRef.parse`
+  não mudam (#185).
 - **Alterado** O `output_schema` e o `idempotent` do registro são gerados a
   partir do contrato publicado pela Toolbox, pelo
   `scripts/generate_sdk_bindings.py` do core (#213); os ids permitidos,

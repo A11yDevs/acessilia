@@ -140,3 +140,54 @@ def test_the_registry_needs_exactly_one_generated_block(generator, source, contr
     twice = source + generator.BEGIN + generator.END
     with pytest.raises(generator.BindingError, match="exactly one generated block"):
         generator.regenerate(twice, copy.deepcopy(contract))
+
+
+# ── Result models generated from published schemas (#185) ──────────────────
+
+
+def _reference_schema(generator) -> dict:
+    return json.loads((generator.SCHEMAS_DIR / "reference@1.json").read_text(encoding="utf-8"))
+
+
+def test_the_generated_models_are_up_to_date(generator) -> None:
+    for path, text in generator.models().items():
+        assert path.read_text(encoding="utf-8") == text, (
+            f"{path.name} is stale: run python scripts/generate_sdk_bindings.py"
+        )
+
+
+def test_the_reference_model_comes_from_the_captured_schema(generator) -> None:
+    from acessilia_sdk.toolbox.reference import REQUIRED, SCHEMA_ID, ArtifactReference
+
+    schema = _reference_schema(generator)
+    assert SCHEMA_ID == schema["$id"]
+    assert REQUIRED == tuple(schema["required"])
+    assert list(ArtifactReference.__dataclass_fields__) == list(schema["properties"])
+
+
+def test_a_changed_schema_changes_the_generated_model(generator) -> None:
+    schema = _reference_schema(generator)
+    schema["properties"]["size"]["minimum"] = 1
+
+    module = generator.render_model(schema, "ArtifactReference", "reference@1.json")
+
+    assert "value < 1" in module
+    assert module != generator.models()[generator.MODELS["reference@1.json"][1]]
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        ({"type": "array"}, "only flat object schemas"),
+        ({"properties": {"nested": {"type": "object"}}}, "unsupported type"),
+        ({"properties": {"x": {"type": "string", "format": "uri"}}}, "unsupported keywords"),
+        ({"properties": {"x": {"type": "string"}}, "required": ["y"]}, "not declared"),
+        ({"properties": {"not-an-id": {"type": "string"}}, "required": []}, "not an identifier"),
+    ],
+)
+def test_the_model_generator_refuses_what_it_cannot_express(generator, change, message) -> None:
+    schema = {"$id": "urn:test:1", "type": "object", "properties": {}, "required": []}
+    schema.update(change)
+
+    with pytest.raises(generator.BindingError, match=message):
+        generator.render_model(schema, "Model", "test@1.json")

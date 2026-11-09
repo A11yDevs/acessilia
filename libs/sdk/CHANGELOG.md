@@ -7,6 +7,11 @@ can see are recorded here, newest first.
 
 ## Unreleased
 
+- **Added** `ArtifactReference` (`acessilia_sdk.toolbox.reference`), the
+  published `artifact/reference@1`, generated from the Toolbox's schema;
+  `parse_reference`, which also checks `digest == artifact_id`; and
+  `ToolboxArtifactClient.upload_reference`. `upload()` and `ArtifactRef.parse`
+  are unchanged (#185).
 - **Changed** The registry's `output_schema` and `idempotent` are generated
   from the Toolbox's published contract by the core's
   `scripts/generate_sdk_bindings.py` (#213); the allowed ids, versions,

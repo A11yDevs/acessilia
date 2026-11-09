@@ -2,7 +2,7 @@
 
 You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](constitution.pt-br.md)
 
-- **Version:** 2.0.5 (2026-11-09). See the [changelog](#9-changelog) for how
+- **Version:** 2.0.6 (2026-11-09). See the [changelog](#9-changelog) for how
   versions are numbered.
 
 ## 1. Purpose
@@ -171,8 +171,10 @@ Toolbox executes operational capabilities.
      supersedes ADR-0005. Per-reference scope is a recorded deviation until
      `artifact/reference@2`
      ([acessilia-toolbox#146](https://github.com/A11yDevs/acessilia-toolbox/issues/146)).
-   - **Checked by:** SDK tests (`libs/sdk/tests/test_failover.py`), and
-     contract tests once the Toolbox publishes `artifact/reference@1`.
+   - **Checked by:** SDK tests (`libs/sdk/tests/test_failover.py`,
+     `libs/sdk/tests/test_reference.py`), and the generated
+     `artifact/reference@1` model, checked against the published schema by
+     `tests/test_sdk_bindings.py`.
 6. **P6 — Reliability without operational duplication.**
    - **Rule:** availability comes from redundant infrastructure (replicas
      behind a load balancer sharing storage), timeouts, bounded retries and
@@ -226,6 +228,8 @@ Versions follow `MAJOR.MINOR.PATCH`:
 
 The unversioned text before 2026-10-18 counts as **1.0.0**.
 
+- **2.0.6 (2026-11-09):** P5's "Checked by" names the tests that now exist
+  for `artifact/reference@1` (#185). No principle changes.
 - **2.0.5 (2026-11-09):** section 4.3 names `docstruct.profiles` for the
   verbosity profiles, since the core's `verbosity_manager` re-export is
   removed (#191). No principle changes.

@@ -1,6 +1,12 @@
 """Access to the Acessilia Toolbox through its published HTTP contract."""
 
-from acessilia_sdk.toolbox.artifacts import ArtifactRef, download_artifact, read_artifact
+from acessilia_sdk.toolbox.artifacts import (
+    ArtifactRef,
+    ArtifactReference,
+    download_artifact,
+    parse_reference,
+    read_artifact,
+)
 from acessilia_sdk.toolbox.capabilities import (
     PROVIDER_DEFAULTS,
     ROUTE_PROVIDER_DEFAULTS,
@@ -51,6 +57,7 @@ from acessilia_sdk.toolbox.vlm import (
 
 __all__ = [
     "ArtifactRef",
+    "ArtifactReference",
     "CatalogCache",
     "CatalogSnapshot",
     "FAILOVER_ERRORS",
@@ -81,6 +88,7 @@ __all__ = [
     "fetch_catalog",
     "make_client",
     "missing_requirements",
+    "parse_reference",
     "media_type_for",
     "parse_endpoints",
     "provider_default",

@@ -2,7 +2,7 @@
 
 Também disponível em **inglês (EUA)**: [English version](constitution.md)
 
-- **Versão:** 2.0.5 (2026-11-09). Veja no [histórico de alterações](#9-histórico-de-alterações)
+- **Versão:** 2.0.6 (2026-11-09). Veja no [histórico de alterações](#9-histórico-de-alterações)
   como as versões são numeradas.
 
 ## 1. Propósito
@@ -172,8 +172,10 @@ capacidades operacionais.
      substitui a ADR-0005. O escopo por referência é um desvio registrado até
      o `artifact/reference@2`
      ([acessilia-toolbox#146](https://github.com/A11yDevs/acessilia-toolbox/issues/146)).
-   - **Verificado por:** testes do SDK (`libs/sdk/tests/test_failover.py`) e
-     testes de contrato quando a Toolbox publicar `artifact/reference@1`.
+   - **Verificado por:** testes do SDK (`libs/sdk/tests/test_failover.py`,
+     `libs/sdk/tests/test_reference.py`) e o modelo gerado do
+     `artifact/reference@1`, conferido contra o schema publicado por
+     `tests/test_sdk_bindings.py`.
 6. **P6 — Confiabilidade sem duplicação operacional.**
    - **Regra:** a disponibilidade vem de infraestrutura redundante (réplicas
      atrás de um balanceador, compartilhando o armazenamento), timeouts,
@@ -228,6 +230,8 @@ As versões seguem `MAJOR.MINOR.PATCH`:
 
 O texto sem versão anterior a 2026-10-18 conta como **1.0.0**.
 
+- **2.0.6 (2026-11-09):** o "Verificado por" da P5 passa a citar os testes que
+  agora existem para o `artifact/reference@1` (#185). Nenhum princípio muda.
 - **2.0.5 (2026-11-09):** a seção 4.3 passa a citar `docstruct.profiles`
   para os perfis de verbosidade, já que a reexportação `verbosity_manager`
   do core foi removida (#191). Nenhum princípio muda.

@@ -33,6 +33,13 @@ DEFAULT_OUT = REPO_ROOT / "tests" / "fixtures" / "toolbox-contract.json"
 PUBLISHED_URL = (
     "https://raw.githubusercontent.com/A11yDevs/acessilia-toolbox/{ref}/contract/toolbox-contract.json"
 )
+#: The published schemas the SDK generates models from (#185, #213), copied
+#: from the same ref as the contract so the two snapshots always agree.
+SDK_MODEL_SCHEMAS = ("reference@1.json",)
+SCHEMAS_OUT = REPO_ROOT / "tests" / "fixtures" / "toolbox-schemas"
+PUBLISHED_SCHEMA_URL = (
+    "https://raw.githubusercontent.com/A11yDevs/acessilia-toolbox/{ref}/schemas/{name}"
+)
 
 COMMENT = (
     "Toolbox capability/provider contract captured from a running toolbox. "
@@ -131,6 +138,17 @@ def published(ref: str) -> dict:
     }
 
 
+def published_schemas(ref: str) -> dict[str, dict]:
+    """The schemas in ``SDK_MODEL_SCHEMAS`` as the Toolbox publishes them at ``ref``."""
+    schemas: dict[str, dict] = {}
+    for name in SDK_MODEL_SCHEMAS:
+        schema = _fetch(PUBLISHED_SCHEMA_URL.format(ref=ref, name=name))
+        if not isinstance(schema, dict) or not schema.get("$id"):
+            raise SystemExit(f"the Toolbox schema {name} at {ref} is malformed")
+        schemas[name] = schema
+    return schemas
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     source = parser.add_mutually_exclusive_group(required=True)
@@ -149,6 +167,13 @@ def main(argv: list[str] | None = None) -> int:
         f"({len(payload['capabilities'])} capabilities, "
         f"{len(payload['providers'])} providers)"
     )
+    if args.ref:
+        SCHEMAS_OUT.mkdir(parents=True, exist_ok=True)
+        for name, schema in published_schemas(args.ref).items():
+            (SCHEMAS_OUT / name).write_text(
+                json.dumps(schema, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+            )
+            print(f"wrote {SCHEMAS_OUT / name}")
     return 0
 
 

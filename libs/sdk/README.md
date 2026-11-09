@@ -34,7 +34,8 @@ core (backend)  →  acessilia-sdk  →  Toolbox HTTP contract
 | `acessilia_sdk.toolbox.clients` | `ToolboxAdjudicateClient`, `ToolboxArtifactClient`, `ToolboxDatasetClient`, `ToolboxDocxClient`, `ToolboxLayoutClient`, `ToolboxMathClient`, `ToolboxMediaInspectClient`, `ToolboxOcrClient`, `ToolboxOrientationClient`, `ToolboxPageOcrClient`, `ToolboxPdfClient`, `ToolboxPdfUaClient`, `ToolboxStructureClient`, `ToolboxTableClient` — one client per capability family; no settings, no logging |
 | `acessilia_sdk.toolbox.endpoints` | `ToolboxEndpoint`, `parse_endpoints`, `FAILOVER_ERRORS` — the Toolbox instances a client tries, in order |
 | `acessilia_sdk.toolbox.clients.pdf` | `RenderedPage` (the PNG of `ToolboxPdfClient.render`, the clip applied and the `image@2` result), `ClipOrigin` |
-| `acessilia_sdk.toolbox.artifacts` | `ArtifactRef`, `download_artifact`, `read_artifact` — content-addressed artifacts, their verified, atomic download to a file, and their verified, size-bounded read into memory |
+| `acessilia_sdk.toolbox.artifacts` | `ArtifactRef`, `download_artifact`, `read_artifact` — content-addressed artifacts, their verified, atomic download to a file, and their verified, size-bounded read into memory; `parse_reference` reads an `artifact/reference@1` document |
+| `acessilia_sdk.toolbox.reference` | `ArtifactReference`, `SCHEMA_ID`, `REQUIRED` — the published `artifact/reference@1` (ADR-0015), **generated** from the Toolbox's schema by the core's `scripts/generate_sdk_bindings.py`; never edited by hand |
 | `acessilia_sdk.toolbox.catalog` | `fetch_catalog`, `CatalogSnapshot`, `Requirement`, `missing_requirements`, `CatalogCache` — the published catalogue, checks against it (it only restricts) and the last-good cache |
 | `acessilia_sdk.toolbox.vlm` | `vlm_gateway_base_url`, `vlm_provider_healthy`, `VLM_GATEWAY_PATH` — the Toolbox VLM gateway, an OpenAI-compatible chat route that is not a capability, and its provider health ([ADR-0012](../../docs/adr/0012-agents-reach-the-vlm-through-the-toolbox.md)) |
 | `acessilia_sdk.toolbox.errors` | `ToolboxError` and its subclasses, including `ToolboxUnavailable` (every endpoint failed; `causes` lists each one) |
@@ -124,8 +125,28 @@ writes it to a file, `read_artifact` reads a small one into memory (as
 check it against the SHA-256 (and an optional magic prefix). The download is
 synced to disk and renamed atomically, and local file system errors propagate
 as `OSError`; the read refuses a body above `max_bytes`
-(`READ_ARTIFACT_MAX_BYTES`, 64 MiB, by default). `ArtifactRef` is provisional
-until the Toolbox publishes `artifact/reference@1`.
+(`READ_ARTIFACT_MAX_BYTES`, 64 MiB, by default).
+
+### Artifact references
+
+`ArtifactReference` is the published `artifact/reference@1` (ADR-0015): the
+canonical `artifact_id`, its `digest`, `media_type`, `size` and `store`.
+`parse_reference` reads one: the generated model checks the schema, ignoring
+unknown fields so a later version that only adds fields is still read, and
+`parse_reference` adds the rule the schema cannot state, `digest ==
+artifact_id`. A document that is not a `reference@1` raises
+`ToolboxContractViolation`; missing fields are never invented.
+`ArtifactRef.parse` stays the helper for callers that only hold an id, with or
+without the `sha256:` prefix.
+
+| SDK | Toolbox | Behaviour |
+|---|---|---|
+| this version | answers `POST /v1/artifacts` with `reference@1` (acessilia-toolbox#151) | `upload()` returns the id; `upload_reference()` returns the `ArtifactReference` |
+| this version | earlier, answers with its stored record | `upload()` returns the id; `upload_reference()` raises `ToolboxContractViolation` saying the Toolbox predates `reference@1` |
+| earlier | either | `upload()` reads the id only, so it keeps working |
+
+Ids already stored, by the core or in documents, are plain ids: they keep
+going through `ArtifactRef.parse` and the verified download.
 
 ## Adding a capability
 
