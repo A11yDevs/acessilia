@@ -54,8 +54,12 @@ The principles of ADR-0005 stay; the contract is published in two versions.
   - `store`: the logical store that holds the artifact. The Toolbox's current
     `storage_backend` maps to it through an adapter, not as a second field.
 - **`@2` only adds fields.** It adds `scope`, which says who may read the
-  artifact, and provenance: the capability, provider and versions that
-  produced it, and the input references. No `@1` field is renamed or removed.
+  artifact. No `@1` field is renamed or removed.
+- **Provenance is planned for `@2`, but its place is not decided.**
+  Provenance is the capability, provider and versions that produced the
+  artifact, and the input references. Whether it is embedded in the reference
+  or kept in the artifact's metadata is decided with `@2`; if it goes into
+  the reference, it is an added field.
 - **Scope is checked before use, from `@2`.** Until then, access is granted by
   the deployment's API key, and the id is never treated as a credential.
 - **Documents with their own schemas stay separate.** `pdf-export@1` and
@@ -68,8 +72,10 @@ The principles of ADR-0005 stay; the contract is published in two versions.
   reference.
 - **Materialization is explicit.** A client downloads the bytes only when it
   needs them and verifies them against the digest. A digest mismatch is a
-  contract violation, never a "not found", so it does not trigger the resend
-  of [ADR-0014](0014-artifact-download-not-found-failover.md).
+  contract violation, never a "not found". So it triggers neither the search
+  of other endpoints for a missing download
+  ([ADR-0014](0014-artifact-download-not-found-failover.md)) nor the SDK's
+  resend of the input file (`resend_file_on_missing_artifact`).
 - **References stay valid across replicas.** Replicas of one Toolbox
   deployment share the store, so a reference is valid on all of them (see
   [ADR-0006](0006-availability-and-failover.md)). Across independent

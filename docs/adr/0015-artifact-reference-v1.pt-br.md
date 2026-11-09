@@ -56,9 +56,12 @@ versões.
     `storage_backend` atual da Toolbox é mapeado para ele por um adapter, e
     não vira um segundo campo.
 - **O `@2` só acrescenta campos.** Ele acrescenta o `scope`, que diz quem pode
-  ler o artefato, e a proveniência: a capacidade, o provider e as versões que
-  o produziram, e as referências de entrada. Nenhum campo do `@1` é renomeado
-  ou removido.
+  ler o artefato. Nenhum campo do `@1` é renomeado ou removido.
+- **A proveniência está prevista para o `@2`, mas o lugar dela não está
+  decidido.** Proveniência é a capacidade, o provider e as versões que
+  produziram o artefato, e as referências de entrada. Se ela fica embutida na
+  referência ou nos metadados do artefato é decidido junto com o `@2`; se for
+  para a referência, entra como campo acrescentado.
 - **O escopo é conferido antes do uso, a partir do `@2`.** Até lá, o acesso é
   concedido pela chave de API do deploy, e o id nunca é tratado como
   credencial.
@@ -72,8 +75,10 @@ versões.
   uma nova referência.
 - **A materialização é explícita.** Um cliente baixa os bytes só quando
   precisa deles e os verifica contra o digest. Um digest divergente é uma
-  violação de contrato, nunca um "não encontrado", e por isso não dispara o
-  reenvio da [ADR-0014](0014-artifact-download-not-found-failover.pt-br.md).
+  violação de contrato, nunca um "não encontrado". Por isso ele não dispara
+  nem a busca de um download ausente em outros endpoints
+  ([ADR-0014](0014-artifact-download-not-found-failover.pt-br.md)) nem o
+  reenvio do arquivo de entrada pelo SDK (`resend_file_on_missing_artifact`).
 - **As referências continuam válidas entre réplicas.** As réplicas de um mesmo
   deploy da Toolbox compartilham o armazenamento, então uma referência vale em
   todas elas (veja a [ADR-0006](0006-availability-and-failover.pt-br.md)).

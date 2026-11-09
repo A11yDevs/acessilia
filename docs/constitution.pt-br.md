@@ -2,7 +2,7 @@
 
 Também disponível em **inglês (EUA)**: [English version](constitution.md)
 
-- **Versão:** 2.0.2 (2026-10-20). Veja no [histórico de alterações](#9-histórico-de-alterações)
+- **Versão:** 2.0.3 (2026-11-09). Veja no [histórico de alterações](#9-histórico-de-alterações)
   como as versões são numeradas.
 
 ## 1. Propósito
@@ -167,10 +167,11 @@ capacidades operacionais.
 5. **P5 — Processamento orientado a referências.**
    - **Regra:** artefatos persistidos são processados onde estão armazenados e
      trafegam como referências `ArtifactRef` tipadas e opacas. A materialização
-     é explícita e verificada; as referências são imutáveis e têm escopo a
-     partir do `artifact/reference@2`.
+     é explícita e verificada; as referências são imutáveis e têm escopo.
    - **Detalhe:** [ADR-0015](adr/0015-artifact-reference-v1.pt-br.md), que
-     substitui a ADR-0005.
+     substitui a ADR-0005. O escopo por referência é um desvio registrado até
+     o `artifact/reference@2`
+     ([acessilia-toolbox#146](https://github.com/A11yDevs/acessilia-toolbox/issues/146)).
    - **Verificado por:** testes do SDK (`libs/sdk/tests/test_failover.py`) e
      testes de contrato quando a Toolbox publicar `artifact/reference@1`.
 6. **P6 — Confiabilidade sem duplicação operacional.**
@@ -227,6 +228,10 @@ As versões seguem `MAJOR.MINOR.PATCH`:
 
 O texto sem versão anterior a 2026-10-18 conta como **1.0.0**.
 
+- **2.0.3 (2026-11-09):** a P5 passa a apontar a ADR-0015, que substitui a
+  ADR-0005, o contrato passa a se chamar `artifact/reference@1`, e o escopo
+  por referência fica registrado como desvio até o `@2`. Nenhum princípio
+  muda.
 - **2.0.2 (2026-10-20):** a P1 e a P4 passam a apontar as verificações que
   agora existem: o checklist de conformidade do template de pull request, a
   auditoria de outubro de 2026 e o teste de imports operacionais. Nenhum

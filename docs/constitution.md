@@ -2,7 +2,7 @@
 
 You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](constitution.pt-br.md)
 
-- **Version:** 2.0.2 (2026-10-20). See the [changelog](#9-changelog) for how
+- **Version:** 2.0.3 (2026-11-09). See the [changelog](#9-changelog) for how
   versions are numbered.
 
 ## 1. Purpose
@@ -166,10 +166,11 @@ Toolbox executes operational capabilities.
 5. **P5 — Reference-oriented processing.**
    - **Rule:** persisted artifacts are processed where they are stored and
      passed as typed, opaque `ArtifactRef` references. Materialization is
-     explicit and verified; references are immutable, and scoped from
-     `artifact/reference@2`.
+     explicit and verified; references are immutable and scoped.
    - **Detail:** [ADR-0015](adr/0015-artifact-reference-v1.md), which
-     supersedes ADR-0005.
+     supersedes ADR-0005. Per-reference scope is a recorded deviation until
+     `artifact/reference@2`
+     ([acessilia-toolbox#146](https://github.com/A11yDevs/acessilia-toolbox/issues/146)).
    - **Checked by:** SDK tests (`libs/sdk/tests/test_failover.py`), and
      contract tests once the Toolbox publishes `artifact/reference@1`.
 6. **P6 — Reliability without operational duplication.**
@@ -225,6 +226,9 @@ Versions follow `MAJOR.MINOR.PATCH`:
 
 The unversioned text before 2026-10-18 counts as **1.0.0**.
 
+- **2.0.3 (2026-11-09):** P5 points at ADR-0015, which supersedes ADR-0005,
+  names the contract `artifact/reference@1`, and records per-reference scope
+  as a deviation until `@2`. No principle changes.
 - **2.0.2 (2026-10-20):** P1 and P4 point at the checks that now exist: the
   pull request template's conformance checklist, the October 2026 audit, and
   the operational-import test. No principle changes.
