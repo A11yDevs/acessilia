@@ -57,6 +57,7 @@ OPERATIONAL_LIBRARIES = (
     "pypandoc",
     "rapidocr",
     "rapidocr_onnxruntime",
+    "reportlab",
 )
 APPLICATION_DIRS = (BACKEND_DIR, REPO_ROOT / "frontend")
 

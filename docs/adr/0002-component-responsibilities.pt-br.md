@@ -80,9 +80,10 @@ num provider da Toolbox).
 - **Previsto na #152:**
   - um teste na Toolbox que proíba imports de `acessilia_sdk` e `backend`.
 - **Desvios conhecidos, registrados na [#203](https://github.com/A11yDevs/acessilia/issues/203):**
-  - O core ainda roda dois executores operacionais, o renderizador de PDF com
-    `reportlab` e o exportador de áudio com `edge-tts` (veja o
-    [ADR-0003](0003-remote-only-operational-capabilities.pt-br.md)).
+  - O core ainda roda um executor operacional, o exportador de áudio com
+    `edge-tts` (veja o
+    [ADR-0003](0003-remote-only-operational-capabilities.pt-br.md) e a
+    [acessilia-toolbox#73](https://github.com/A11yDevs/acessilia-toolbox/issues/73)).
   - O agrupamento de callouts está implementado no builder de normalização
     da Toolbox e em `docstruct.regions.grouping`
     ([acessilia-toolbox#72](https://github.com/A11yDevs/acessilia-toolbox/issues/72)).
