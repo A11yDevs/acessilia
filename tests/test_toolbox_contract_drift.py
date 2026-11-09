@@ -184,3 +184,27 @@ def test_every_default_binding_in_the_snapshot_holds(checker) -> None:
     assert core.default_bindings, "the registry declares no provider defaults"
     for capability, version, provider, _setting in core.default_bindings:
         assert provider in toolbox.bindings[(capability, version)], (capability, version, provider)
+
+
+def test_a_capability_that_disappears_is_reported_once(checker) -> None:
+    """Review of #413: a missing capability must not also fail as a binding.
+
+    ``math.recognize`` disappears from the catalogue and from every provider,
+    while ``pp-formulanet`` stays registered for another capability. The only
+    finding about it is the missing capability.
+    """
+    core = checker.read_core_contract()
+    toolbox = checker.read_toolbox_snapshot(SNAPSHOT_PATH)
+    del toolbox.capabilities["math.recognize"]
+    del toolbox.versions["math.recognize"]
+    for key in [key for key in toolbox.bindings if key[0] == "math.recognize"]:
+        del toolbox.bindings[key]
+    for capabilities in toolbox.providers.values():
+        capabilities.discard("math.recognize")
+    toolbox.providers["pp-formulanet"] = {"chem.recognize"}
+
+    failures, _ = checker.compare(core, toolbox)
+
+    about_math = [failure for failure in failures if "math.recognize" in failure]
+    assert len(about_math) == 1, about_math
+    assert about_math[0].startswith("core consumes capability 'math.recognize'")

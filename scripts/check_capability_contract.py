@@ -198,10 +198,12 @@ def compare(
             f"which the Toolbox does not register"
         )
 
-    # Only bindings whose provider is registered and whose version is
-    # published: the two checks above already report the other cases once.
+    # Only bindings whose capability is exposed, whose provider is registered
+    # and whose version is published: the checks above already report each of
+    # the other cases once. A missing capability is skipped explicitly, because
+    # ``toolbox.versions.get(capability, {1})`` would read it as version 1.
     for capability, version, provider, setting in sorted(core.default_bindings):
-        if provider not in toolbox.providers:
+        if capability in missing_caps or provider not in toolbox.providers:
             continue
         if version not in toolbox.versions.get(capability, {1}):
             continue
