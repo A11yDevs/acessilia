@@ -2,7 +2,7 @@
 
 Também disponível em **inglês (EUA)**: [English version](constitution.md)
 
-- **Versão:** 2.0.3 (2026-11-09). Veja no [histórico de alterações](#9-histórico-de-alterações)
+- **Versão:** 2.0.4 (2026-11-09). Veja no [histórico de alterações](#9-histórico-de-alterações)
   como as versões são numeradas.
 
 ## 1. Propósito
@@ -41,7 +41,7 @@ Entregar a conversão de documentos e imagens para formatos acessíveis por meio
 
    d. **Pipeline canônico:**
       - `pipeline/` – construção e validação do documento canônico
-      - `export/filters` – filtros de AST do Pandoc para acessibilidade (transformações puras da docstruct; o Pandoc em si roda na Toolbox)
+      - Filtros de AST do Pandoc para acessibilidade: transformações puras em `docstruct.export.filters`, aplicadas por `export/pandoc_exporter.py` (o Pandoc em si roda na Toolbox)
       - `export/renderers` – renderização determinística das saídas
       - `schemas/` – schemas JSON/PDDL de manifesto, plano e relatório de execução
 
@@ -228,6 +228,9 @@ As versões seguem `MAJOR.MINOR.PATCH`:
 
 O texto sem versão anterior a 2026-10-18 conta como **1.0.0**.
 
+- **2.0.4 (2026-11-09):** a seção 3.1 passa a citar `docstruct.export.filters`
+  para os filtros de AST do Pandoc, já que o pacote de reexportação
+  `export/filters` do core foi removido (#191). Nenhum princípio muda.
 - **2.0.3 (2026-11-09):** a P5 passa a apontar a ADR-0015, que substitui a
   ADR-0005, o contrato passa a se chamar `artifact/reference@1`, e o escopo
   por referência fica registrado como desvio até o `@2`. Nenhum princípio

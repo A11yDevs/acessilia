@@ -2,7 +2,7 @@
 
 You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](constitution.pt-br.md)
 
-- **Version:** 2.0.3 (2026-11-09). See the [changelog](#9-changelog) for how
+- **Version:** 2.0.4 (2026-11-09). See the [changelog](#9-changelog) for how
   versions are numbered.
 
 ## 1. Purpose
@@ -41,7 +41,7 @@ Deliver document and image conversion to accessible formats through:
    
    d. **Canonical Pipeline:**
       - `pipeline/` – canonical document construction and validation
-      - `export/filters` – Pandoc AST filters for accessibility (pure transforms from docstruct; Pandoc itself runs in the Toolbox)
+      - Pandoc AST filters for accessibility: pure transforms in `docstruct.export.filters`, applied by `export/pandoc_exporter.py` (Pandoc itself runs in the Toolbox)
       - `export/renderers` – deterministic output rendering
       - `schemas/` – JSON/PDDL schemas for manifesto, plan, execution report
    
@@ -226,6 +226,9 @@ Versions follow `MAJOR.MINOR.PATCH`:
 
 The unversioned text before 2026-10-18 counts as **1.0.0**.
 
+- **2.0.4 (2026-11-09):** section 3.1 names `docstruct.export.filters` for
+  the Pandoc AST filters, since the core's `export/filters` re-export package
+  is removed (#191). No principle changes.
 - **2.0.3 (2026-11-09):** P5 points at ADR-0015, which supersedes ADR-0005,
   names the contract `artifact/reference@1`, and records per-reference scope
   as a deviation until `@2`. No principle changes.
