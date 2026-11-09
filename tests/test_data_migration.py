@@ -4,6 +4,7 @@ import json
 import os
 import sqlite3
 from datetime import datetime, timedelta, timezone
+from functools import partial
 from pathlib import Path
 
 import pytest
@@ -55,9 +56,11 @@ def rows(destination, table):
         return [dict(row) for row in conn.execute(f'SELECT * FROM "{table}"')]
 
 
-def test_dry_run_preserves_source_and_creates_no_destination(legacy, capsys):
+def test_dry_run_preserves_source_and_creates_no_destination(legacy, capsys, monkeypatch):
     source, destination = legacy
     asset(source)
+    # Keep the CLI's expiry checks on the same clock as the fixture tokens.
+    monkeypatch.setattr(migration, "migrate", partial(migration.migrate, at=NOW))
     before = {str(p.relative_to(source)): p.read_bytes() for p in source.rglob("*") if p.is_file()}
     assert migration.main(["--source-var", str(source), "--destination-var", str(destination)]) == 0
     report = json.loads(capsys.readouterr().out)
