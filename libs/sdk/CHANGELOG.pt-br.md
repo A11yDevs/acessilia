@@ -7,6 +7,11 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
 ## Não lançado
 
+- **Alterado** O `output_schema` e o `idempotent` do registro são gerados a
+  partir do contrato publicado pela Toolbox, pelo
+  `scripts/generate_sdk_bindings.py` do core (#213); os ids permitidos,
+  versões, transportes, chaves de provider e rótulos continuam escritos à mão
+  em `_selected(...)`. O `TOOLBOX_CAPABILITIES` não muda, campo a campo.
 - **Alterado** Retries e failover valem só para capacidades que o registro
   marca como `idempotent` (ADR-0006, #406). Após um timeout ou uma instância
   indisponível, uma chamada a `dataset.sample` tem uma tentativa no primeiro

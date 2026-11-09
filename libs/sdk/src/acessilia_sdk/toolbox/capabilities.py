@@ -76,145 +76,134 @@ ROUTE_PROVIDER_DEFAULTS: dict[str, str] = {
 }
 
 
+# Generated: do not edit by hand.
+# What the Toolbox's published contract says about each selected capability
+# version: (output schema, idempotent). Written by
+# scripts/generate_sdk_bindings.py from tests/fixtures/toolbox-contract.json
+# (ADR-0004, #213); a test fails while it is out of date.
+# BEGIN GENERATED BINDINGS
+_BINDINGS: dict[tuple[str, int], tuple[str | None, bool]] = {
+    ('artifact.retrieve', 1): (None, True),
+    ('artifact.store', 1): (None, True),
+    ('dataset.describe', 1): (None, True),
+    ('dataset.get_artifact', 1): (None, True),
+    ('dataset.get_item', 1): (None, True),
+    ('dataset.list', 1): (None, True),
+    ('dataset.list_items', 1): (None, True),
+    ('dataset.list_splits', 1): (None, True),
+    ('dataset.sample', 1): (None, False),
+    ('dataset.sync', 1): (None, True),
+    ('document.adjudicate.page', 1): ('page-judgement@1', True),
+    ('document.adjudicate.region', 1): ('region-transcription@1', True),
+    ('document.export.docx', 1): ('docx-export@1', True),
+    ('document.export.pdf_ua', 1): ('pdf-export@1', True),
+    ('document.layout.analyze', 1): ('layout-analysis@1', True),
+    ('document.ocr', 1): ('ocr-result@1', True),
+    ('document.ocr.page', 1): ('page-transcription@1', True),
+    ('document.structure.extract', 1): ('structured-document@1', True),
+    ('document.text.spans', 1): ('text-spans@1', True),
+    ('image.page.orient', 1): ('page-orientation@1', True),
+    ('math.convert', 1): ('mathml@1', True),
+    ('math.recognize', 1): ('latex@1', True),
+    ('math.verbalize', 1): ('verbalized@1', True),
+    ('media.inspect', 1): ('media-inspection@1', True),
+    ('pdf.render', 2): ('image@2', True),
+    ('pdf.split', 1): ('page-collection@1', True),
+    ('pdf.validate.pdf_ua', 1): ('pdf-validation-report@1', True),
+    ('table.recognize', 1): ('table-candidates@1', True),
+}
+# END GENERATED BINDINGS
+
+
+def _selected(
+    capability_id: str,
+    contract_version: int,
+    label: str,
+    *,
+    transport: Transport = "execute",
+    provider_key: str | None = None,
+) -> ToolboxCapability:
+    """A capability the SDK allows, with its contract data from ``_BINDINGS``.
+
+    The arguments are the SDK's own choices, written by hand: which ids it may
+    call, at which exact version, through which transport, with which provider
+    key and error label. ``output_schema`` and ``idempotent`` come from the
+    published contract, never from here.
+    """
+    output_schema, idempotent = _BINDINGS[(capability_id, contract_version)]
+    return ToolboxCapability(
+        capability_id,
+        contract_version,
+        label,
+        transport=transport,
+        provider_key=provider_key,
+        output_schema=output_schema,
+        idempotent=idempotent,
+    )
+
+
+#: The capabilities SDK clients may call (the allowlist). Adding one here and
+#: running scripts/generate_sdk_bindings.py is all the registry needs.
 _CAPABILITIES: tuple[ToolboxCapability, ...] = (
-    ToolboxCapability(
-        "document.structure.extract", 1, "Extração",
-        provider_key="toolbox_provider",
-        output_schema="structured-document@1",
-        idempotent=True,
+    _selected("document.structure.extract", 1, "Extração", provider_key="toolbox_provider"),
+    _selected(
+        "document.layout.analyze", 1, "Análise de layout", provider_key="toolbox_layout_provider"
     ),
-    ToolboxCapability(
-        "document.layout.analyze", 1, "Análise de layout",
-        provider_key="toolbox_layout_provider",
-        output_schema="layout-analysis@1",
-        idempotent=True,
-    ),
-    ToolboxCapability(
-        "pdf.split", 1, "Divisão de PDF",
-        provider_key="toolbox_pdf_provider",
-        output_schema="page-collection@1",
-        idempotent=True,
-    ),
+    _selected("pdf.split", 1, "Divisão de PDF", provider_key="toolbox_pdf_provider"),
     # Version 2: clip, size bound, raster inputs, PNG by reference.
-    ToolboxCapability(
-        "pdf.render", 2, "Renderização de PDF",
-        provider_key="toolbox_pdf_provider",
-        output_schema="image@2",
-        idempotent=True,
-    ),
+    _selected("pdf.render", 2, "Renderização de PDF", provider_key="toolbox_pdf_provider"),
     # The text layer with fonts and baselines, read for inline math (#265).
-    ToolboxCapability(
-        "document.text.spans", 1, "Text spans",
-        provider_key="toolbox_pdf_provider",
-        output_schema="text-spans@1",
-        idempotent=True,
-    ),
-    ToolboxCapability(
+    _selected("document.text.spans", 1, "Text spans", provider_key="toolbox_pdf_provider"),
+    _selected(
         "math.recognize", 1, "Reconhecimento de fórmula",
         provider_key="toolbox_math_recognize_provider",
-        output_schema="latex@1",
-        idempotent=True,
     ),
-    ToolboxCapability(
-        "math.convert", 1, "Conversão de fórmula",
-        provider_key="toolbox_math_provider",
-        output_schema="mathml@1",
-        idempotent=True,
+    _selected("math.convert", 1, "Conversão de fórmula", provider_key="toolbox_math_provider"),
+    _selected(
+        "math.verbalize", 1, "Verbalização de fórmula", provider_key="toolbox_math_provider"
     ),
-    ToolboxCapability(
-        "math.verbalize", 1, "Verbalização de fórmula",
-        provider_key="toolbox_math_provider",
-        output_schema="verbalized@1",
-        idempotent=True,
-    ),
-    ToolboxCapability(
-        "document.ocr", 1, "OCR",
-        provider_key="toolbox_ocr_provider",
-        output_schema="ocr-result@1",
-        idempotent=True,
-    ),
-    ToolboxCapability(
+    _selected("document.ocr", 1, "OCR", provider_key="toolbox_ocr_provider"),
+    _selected(
         "image.page.orient", 1, "Detecção de orientação",
         provider_key="toolbox_orientation_provider",
-        output_schema="page-orientation@1",
-        idempotent=True,
     ),
-    ToolboxCapability(
-        "media.inspect", 1, "Inspeção de mídia",
-        provider_key="toolbox_media_inspect_provider",
-        output_schema="media-inspection@1",
-        idempotent=True,
+    _selected(
+        "media.inspect", 1, "Inspeção de mídia", provider_key="toolbox_media_inspect_provider"
     ),
     # The PDF comes back as a stored artifact; the result carries its id.
-    ToolboxCapability(
-        "document.export.pdf_ua", 1, "Exportação PDF/UA",
-        provider_key="toolbox_pdf_ua_provider",
-        output_schema="pdf-export@1",
-        idempotent=True,
+    _selected(
+        "document.export.pdf_ua", 1, "Exportação PDF/UA", provider_key="toolbox_pdf_ua_provider"
     ),
     # veraPDF; a non-compliant PDF is a successful result listing failed rules.
-    ToolboxCapability(
+    _selected(
         "pdf.validate.pdf_ua", 1, "PDF/UA validation",
         provider_key="toolbox_pdf_validate_provider",
-        output_schema="pdf-validation-report@1",
-        idempotent=True,
     ),
     # The DOCX also comes back as a stored artifact.
-    ToolboxCapability(
-        "document.export.docx", 1, "Exportação DOCX",
-        provider_key="toolbox_docx_provider",
-        output_schema="docx-export@1",
-        idempotent=True,
-    ),
+    _selected("document.export.docx", 1, "Exportação DOCX", provider_key="toolbox_docx_provider"),
     # Vision-language capabilities (Dr.DocBench, PR #125), served by the
     # Toolbox's OpenAI-compatible VLM provider.
-    ToolboxCapability(
-        "document.ocr.page", 1, "OCR de página",
-        provider_key="toolbox_page_ocr_provider",
-        output_schema="page-transcription@1",
-        idempotent=True,
+    _selected("document.ocr.page", 1, "OCR de página", provider_key="toolbox_page_ocr_provider"),
+    _selected(
+        "document.adjudicate.page", 1, "Adjudicação", provider_key="toolbox_adjudicate_provider"
     ),
-    ToolboxCapability(
-        "document.adjudicate.page", 1, "Adjudicação",
-        provider_key="toolbox_adjudicate_provider",
-        output_schema="page-judgement@1",
-        idempotent=True,
+    _selected(
+        "document.adjudicate.region", 1, "Adjudicação", provider_key="toolbox_adjudicate_provider"
     ),
-    ToolboxCapability(
-        "document.adjudicate.region", 1, "Adjudicação",
-        provider_key="toolbox_adjudicate_provider",
-        output_schema="region-transcription@1",
-        idempotent=True,
-    ),
-    ToolboxCapability(
-        "table.recognize", 1, "Reconhecimento de tabela",
-        provider_key="toolbox_table_provider",
-        output_schema="table-candidates@1",
-        idempotent=True,
+    _selected(
+        "table.recognize", 1, "Reconhecimento de tabela", provider_key="toolbox_table_provider"
     ),
     # Reached through dedicated REST routes, not ":execute".
-    *(
-        ToolboxCapability(
-            capability_id, 1, "Dataset", transport="rest", idempotent=idempotent
-        )
-        for capability_id, idempotent in (
-            ("dataset.list", True),
-            ("dataset.describe", True),
-            ("dataset.list_splits", True),
-            ("dataset.list_items", True),
-            ("dataset.get_item", True),
-            ("dataset.get_artifact", True),
-            # A new random sample on every call (execution.idempotent: false).
-            ("dataset.sample", False),
-            ("dataset.sync", True),
-        )
-    ),
-    ToolboxCapability(
-        "artifact.store", 1, "Armazenamento de artefato", transport="rest", idempotent=True
-    ),
-    ToolboxCapability(
-        "artifact.retrieve", 1, "Recuperação de artefato", transport="rest", idempotent=True
-    ),
+    _selected("dataset.list", 1, "Dataset", transport="rest"),
+    _selected("dataset.describe", 1, "Dataset", transport="rest"),
+    _selected("dataset.list_splits", 1, "Dataset", transport="rest"),
+    _selected("dataset.list_items", 1, "Dataset", transport="rest"),
+    _selected("dataset.get_item", 1, "Dataset", transport="rest"),
+    _selected("dataset.get_artifact", 1, "Dataset", transport="rest"),
+    _selected("dataset.sample", 1, "Dataset", transport="rest"),
+    _selected("dataset.sync", 1, "Dataset", transport="rest"),
+    _selected("artifact.store", 1, "Armazenamento de artefato", transport="rest"),
+    _selected("artifact.retrieve", 1, "Recuperação de artefato", transport="rest"),
 )
 
 TOOLBOX_CAPABILITIES: dict[str, ToolboxCapability] = {
