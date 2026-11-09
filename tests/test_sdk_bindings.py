@@ -191,3 +191,73 @@ def test_the_model_generator_refuses_what_it_cannot_express(generator, change, m
 
     with pytest.raises(generator.BindingError, match=message):
         generator.render_model(schema, "Model", "test@1.json")
+
+
+@pytest.mark.parametrize(
+    "keyword",
+    [
+        {"allOf": [{"properties": {"store": {"not": {"const": "failover"}}}}]},
+        {"oneOf": [{"required": ["store"]}]},
+        {"not": {"required": ["scope"]}},
+        {"if": {"required": ["store"]}, "then": {"required": ["size"]}},
+        {"dependencies": {"store": ["size"]}},
+    ],
+    ids=["allOf", "oneOf", "not", "if-then", "dependencies"],
+)
+def test_a_root_constraint_the_reader_would_not_enforce_is_refused(generator, keyword) -> None:
+    """Review of #425: a root constraint must fail generation, not vanish."""
+    schema = {**_reference_schema(generator), **keyword}
+
+    with pytest.raises(generator.BindingError, match="unsupported root keywords"):
+        generator.render_model(schema, "ArtifactReference", "reference@1.json")
+
+
+def test_check_fails_when_the_published_schema_gains_a_root_constraint(
+    generator, tmp_path, monkeypatch, capsys
+) -> None:
+    schema = _reference_schema(generator)
+    schema["allOf"] = [{"properties": {"store": {"not": {"const": "failover"}}}}]
+    (tmp_path / "reference@1.json").write_text(json.dumps(schema), encoding="utf-8")
+    monkeypatch.setattr(generator, "SCHEMAS_DIR", tmp_path)
+
+    assert generator.main(["--check"]) == 1
+    assert "unsupported root keywords ['allOf']" in capsys.readouterr().err
+
+
+def test_additional_properties_stays_allowed_for_the_tolerant_reader(generator) -> None:
+    schema = _reference_schema(generator)
+    assert schema["additionalProperties"] is False
+
+    generator.render_model(schema, "ArtifactReference", "reference@1.json")
+
+
+@pytest.mark.parametrize(
+    "size",
+    [0, 10, 0.0, 10.0, 1e3, 10.5, -1, -1.0, True, False, "10", None],
+    ids=lambda value: repr(value),
+)
+def test_the_size_reader_agrees_with_draft_7(generator, size) -> None:
+    """Review of #425: JSON Schema's integer includes 10.0 and 1e3 (Draft-07, 6.1.1)."""
+    import jsonschema
+
+    from acessilia_sdk.toolbox import ToolboxContractViolation, parse_reference
+
+    schema = _reference_schema(generator)
+    artifact_id = "sha256:" + "ab" * 32
+    document = {
+        "artifact_id": artifact_id,
+        "digest": artifact_id,
+        "media_type": "application/pdf",
+        "size": size,
+        "store": "s3",
+    }
+    valid = jsonschema.Draft7Validator(schema).is_valid(document)
+
+    try:
+        reference = parse_reference(document)
+    except ToolboxContractViolation:
+        accepted = False
+    else:
+        accepted = True
+        assert type(reference.size) is int and reference.size == size
+    assert accepted is valid, (size, valid)

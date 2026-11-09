@@ -69,6 +69,14 @@ _JSON_TYPES = {
     "null": ("None", "value is None"),
 }
 _KEYWORDS = {"description", "type", "pattern", "minLength", "minimum"}
+#: Keywords allowed at a schema's root. Anything else, such as allOf, oneOf,
+#: not or if/then/else, is a constraint the generated reader would not
+#: enforce, so it is refused instead of silently dropped. additionalProperties
+#: is allowed: the reader ignores unknown properties on purpose (#185).
+_ROOT_KEYWORDS = {
+    "$schema", "$id", "title", "description", "type", "properties", "required",
+    "additionalProperties",
+}
 
 BEGIN = "# BEGIN GENERATED BINDINGS\n"
 END = "# END GENERATED BINDINGS\n"
@@ -181,8 +189,15 @@ def _field(name: str, spec: dict, required: bool) -> tuple[str, str]:
         f"({_JSON_TYPES[kind][1]})" if len(types) > 1 else _JSON_TYPES[kind][1]
         for kind in types
     )
-    lines = [
-        f"def _check_{name}(value: Any) -> {annotation}:",
+    lines = [f"def _check_{name}(value: Any) -> {annotation}:"]
+    if "integer" in types:
+        # Draft-07 (6.1.1): a number with a zero fractional part is an integer,
+        # whatever its notation (10.0, 1e3). Normalize it; booleans stay out.
+        lines += [
+            "    if isinstance(value, float) and value.is_integer():",
+            "        value = int(value)",
+        ]
+    lines += [
         f"    if not ({checks}):",
         f'        raise ValueError(f"{name}: expected {" or ".join(types)}, got {{value!r}}")',
     ]
@@ -211,6 +226,9 @@ def render_model(schema: dict, class_name: str, schema_file: str) -> str:
     """A standard-library module with a frozen dataclass for a flat object schema."""
     if schema.get("type") != "object" or not isinstance(schema.get("properties"), dict):
         raise BindingError(f"{schema_file}: only flat object schemas are supported")
+    unsupported = sorted(set(schema) - _ROOT_KEYWORDS)
+    if unsupported:
+        raise BindingError(f"{schema_file}: unsupported root keywords {unsupported}")
     properties: dict[str, dict] = schema["properties"]
     required = list(schema.get("required") or [])
     missing = sorted(set(required) - set(properties))

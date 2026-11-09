@@ -45,6 +45,8 @@ def _check_media_type(value: Any) -> str:
 
 
 def _check_size(value: Any) -> int:
+    if isinstance(value, float) and value.is_integer():
+        value = int(value)
     if not (isinstance(value, int) and not isinstance(value, bool)):
         raise ValueError(f"size: expected integer, got {value!r}")
     if isinstance(value, (int, float)) and not isinstance(value, bool) and value < 0:
