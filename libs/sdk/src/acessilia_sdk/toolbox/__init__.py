@@ -17,6 +17,7 @@ from acessilia_sdk.toolbox.catalog import (
     snapshot_from_payloads,
 )
 from acessilia_sdk.toolbox.client import FailoverHook, ToolboxCapabilityClient
+from acessilia_sdk.toolbox.config import ToolboxClientConfig, make_client
 from acessilia_sdk.toolbox.endpoints import (
     FAILOVER_ERRORS,
     ToolboxEndpoint,
@@ -63,6 +64,7 @@ __all__ = [
     "ToolboxCapability",
     "ToolboxCapabilityClient",
     "ToolboxCapabilityError",
+    "ToolboxClientConfig",
     "ToolboxContractViolation",
     "ToolboxEndpoint",
     "ToolboxError",
@@ -77,6 +79,7 @@ __all__ = [
     "download_artifact",
     "execute_capability",
     "fetch_catalog",
+    "make_client",
     "missing_requirements",
     "media_type_for",
     "parse_endpoints",

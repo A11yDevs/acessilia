@@ -110,3 +110,32 @@ def test_imports_stay_within_the_standard_library_httpx_and_docstruct() -> None:
                 if name.split(".")[0] not in allowed
             ]
     assert not offenders, offenders
+
+
+#: Ways to read the process environment. ``os`` itself stays allowed: the
+#: artifact download uses ``os.fsync`` and ``os.replace``.
+_ENVIRONMENT_READS = {("os", "environ"), ("os", "getenv"), ("os", "environb"), ("os", "getenvb")}
+
+
+def test_the_sdk_reads_no_environment() -> None:
+    """The caller passes the configuration (ADR-0002); the SDK never reads it.
+
+    The import checks above allow the standard library, so they would not catch
+    an ``os.environ`` lookup; this one does (review of #402).
+    """
+    offenders = []
+    for path in sorted(SRC.rglob("*.py")):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if (
+                isinstance(node, ast.Attribute)
+                and isinstance(node.value, ast.Name)
+                and (node.value.id, node.attr) in _ENVIRONMENT_READS
+            ):
+                offenders.append(f"{path.relative_to(SRC)}:{node.lineno}: os.{node.attr}")
+            elif isinstance(node, ast.ImportFrom) and node.module == "os":
+                offenders += [
+                    f"{path.relative_to(SRC)}:{node.lineno}: from os import {alias.name}"
+                    for alias in node.names
+                    if ("os", alias.name) in _ENVIRONMENT_READS
+                ]
+    assert not offenders, offenders
