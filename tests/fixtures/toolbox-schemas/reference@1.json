@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:a11y-devs:schema:reference:1.0.0",
+  "title": "Artifact reference",
+  "description": "A reference to a stored artifact (ADR-0015 in the Acessilia core). The artifact's bytes are retrieved through the artifact API. digest always equals artifact_id; the Toolbox, the only producer, guarantees it, since Draft-07 cannot state equality between properties. scope and provenance come in reference@2.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_id",
+    "digest",
+    "media_type",
+    "size",
+    "store"
+  ],
+  "properties": {
+    "artifact_id": {
+      "description": "Content-addressed identifier, always in canonical form: sha256: followed by 64 lowercase hex digits. Opaque to clients, stable and immutable.",
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "digest": {
+      "description": "SHA-256 of the artifact's bytes, for clients to verify a download. Equal to artifact_id.",
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "media_type": {
+      "description": "Media type of the artifact's bytes.",
+      "type": "string",
+      "minLength": 1
+    },
+    "size": {
+      "description": "Size of the artifact's bytes.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "store": {
+      "description": "Kind of backend that served the reference (for example s3 or filesystem; never failover). It does not identify a deployment and is not used to route a download. null when the response claims no available, verified storage location: a result that was never stored, or a cache hit served inline while the store was unavailable. null is not proof that the artifact does not exist.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    }
+  }
+}

@@ -140,3 +140,124 @@ def test_the_registry_needs_exactly_one_generated_block(generator, source, contr
     twice = source + generator.BEGIN + generator.END
     with pytest.raises(generator.BindingError, match="exactly one generated block"):
         generator.regenerate(twice, copy.deepcopy(contract))
+
+
+# ── Result models generated from published schemas (#185) ──────────────────
+
+
+def _reference_schema(generator) -> dict:
+    return json.loads((generator.SCHEMAS_DIR / "reference@1.json").read_text(encoding="utf-8"))
+
+
+def test_the_generated_models_are_up_to_date(generator) -> None:
+    for path, text in generator.models().items():
+        assert path.read_text(encoding="utf-8") == text, (
+            f"{path.name} is stale: run python scripts/generate_sdk_bindings.py"
+        )
+
+
+def test_the_reference_model_comes_from_the_captured_schema(generator) -> None:
+    from acessilia_sdk.toolbox.reference import REQUIRED, SCHEMA_ID, ArtifactReference
+
+    schema = _reference_schema(generator)
+    assert SCHEMA_ID == schema["$id"]
+    assert REQUIRED == tuple(schema["required"])
+    assert list(ArtifactReference.__dataclass_fields__) == list(schema["properties"])
+
+
+def test_a_changed_schema_changes_the_generated_model(generator) -> None:
+    schema = _reference_schema(generator)
+    schema["properties"]["size"]["minimum"] = 1
+
+    module = generator.render_model(schema, "ArtifactReference", "reference@1.json")
+
+    assert "value < 1" in module
+    assert module != generator.models()[generator.MODELS["reference@1.json"][1]]
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        ({"type": "array"}, "only flat object schemas"),
+        ({"properties": {"nested": {"type": "object"}}}, "unsupported type"),
+        ({"properties": {"x": {"type": "string", "format": "uri"}}}, "unsupported keywords"),
+        ({"properties": {"x": {"type": "string"}}, "required": ["y"]}, "not declared"),
+        ({"properties": {"not-an-id": {"type": "string"}}, "required": []}, "not an identifier"),
+    ],
+)
+def test_the_model_generator_refuses_what_it_cannot_express(generator, change, message) -> None:
+    schema = {"$id": "urn:test:1", "type": "object", "properties": {}, "required": []}
+    schema.update(change)
+
+    with pytest.raises(generator.BindingError, match=message):
+        generator.render_model(schema, "Model", "test@1.json")
+
+
+@pytest.mark.parametrize(
+    "keyword",
+    [
+        {"allOf": [{"properties": {"store": {"not": {"const": "failover"}}}}]},
+        {"oneOf": [{"required": ["store"]}]},
+        {"not": {"required": ["scope"]}},
+        {"if": {"required": ["store"]}, "then": {"required": ["size"]}},
+        {"dependencies": {"store": ["size"]}},
+    ],
+    ids=["allOf", "oneOf", "not", "if-then", "dependencies"],
+)
+def test_a_root_constraint_the_reader_would_not_enforce_is_refused(generator, keyword) -> None:
+    """Review of #425: a root constraint must fail generation, not vanish."""
+    schema = {**_reference_schema(generator), **keyword}
+
+    with pytest.raises(generator.BindingError, match="unsupported root keywords"):
+        generator.render_model(schema, "ArtifactReference", "reference@1.json")
+
+
+def test_check_fails_when_the_published_schema_gains_a_root_constraint(
+    generator, tmp_path, monkeypatch, capsys
+) -> None:
+    schema = _reference_schema(generator)
+    schema["allOf"] = [{"properties": {"store": {"not": {"const": "failover"}}}}]
+    (tmp_path / "reference@1.json").write_text(json.dumps(schema), encoding="utf-8")
+    monkeypatch.setattr(generator, "SCHEMAS_DIR", tmp_path)
+
+    assert generator.main(["--check"]) == 1
+    assert "unsupported root keywords ['allOf']" in capsys.readouterr().err
+
+
+def test_additional_properties_stays_allowed_for_the_tolerant_reader(generator) -> None:
+    schema = _reference_schema(generator)
+    assert schema["additionalProperties"] is False
+
+    generator.render_model(schema, "ArtifactReference", "reference@1.json")
+
+
+@pytest.mark.parametrize(
+    "size",
+    [0, 10, 0.0, 10.0, 1e3, 10.5, -1, -1.0, True, False, "10", None],
+    ids=lambda value: repr(value),
+)
+def test_the_size_reader_agrees_with_draft_7(generator, size) -> None:
+    """Review of #425: JSON Schema's integer includes 10.0 and 1e3 (Draft-07, 6.1.1)."""
+    import jsonschema
+
+    from acessilia_sdk.toolbox import ToolboxContractViolation, parse_reference
+
+    schema = _reference_schema(generator)
+    artifact_id = "sha256:" + "ab" * 32
+    document = {
+        "artifact_id": artifact_id,
+        "digest": artifact_id,
+        "media_type": "application/pdf",
+        "size": size,
+        "store": "s3",
+    }
+    valid = jsonschema.Draft7Validator(schema).is_valid(document)
+
+    try:
+        reference = parse_reference(document)
+    except ToolboxContractViolation:
+        accepted = False
+    else:
+        accepted = True
+        assert type(reference.size) is int and reference.size == size
+    assert accepted is valid, (size, valid)
