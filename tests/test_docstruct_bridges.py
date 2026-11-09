@@ -30,8 +30,6 @@ ADAPTER = "compatibility_adapter"
 BRIDGES = {
     "backend/export/filters/pandoc_filters.py": REEXPORT,
     "backend/pipeline/pandoc_ast_builder.py": REEXPORT,
-    "backend/pipeline/sanitizer.py": REEXPORT,
-    "backend/pipeline/semantic_rules.py": REEXPORT,
     "backend/pipeline/verbosity_manager.py": REEXPORT,
     "backend/tools/code_tools.py": REEXPORT,
     "backend/tools/region_classifier.py": REEXPORT,

@@ -78,7 +78,7 @@ The PDDL domain lives under `backend/core/planning/domains/`. The JSON schemas (
 ### 2. Canonical Document & Export Pipeline (`backend/pipeline/`, `backend/export/`)
 
 - [backend/pipeline/canonical_builder.py](../backend/pipeline/canonical_builder.py): builds the canonical document and sections tree.
-- [backend/pipeline/sanitizer.py](../backend/pipeline/sanitizer.py): cleans raw text, removes prompt leaks and Markdown artifacts.
+- [docstruct.text.sanitize](../libs/docstruct/src/docstruct/text/sanitize.py): cleans raw text, removes prompt leaks and Markdown artifacts.
 - [backend/pipeline/validators.py](../backend/pipeline/validators.py): validates schema, heading hierarchy, links, and output text; `audit_canonical_document` classifies structural and accessibility issues as `BLOCKER` or `WARNING`.
 - [backend/export/pandoc_exporter.py](../backend/export/pandoc_exporter.py): single export coordinator for validation, filtering, AST build, and renderer dispatch; acts as a deterministic gatekeeper that halts export when the audit returns any `BLOCKER`.
 - [backend/export/renderers/](../backend/export/renderers/): renderers for TXT and HTML (DOCX and PDF/UA render on the Toolbox).
