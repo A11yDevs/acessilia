@@ -5,9 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from acessilia_sdk.runtime import run_sync
 from acessilia_sdk.toolbox.clients import ToolboxDatasetClient, ToolboxStructureClient
 
-from backend.tools.toolbox_client import make_toolbox_client, run_sync
+from backend.tools.toolbox_client import make_toolbox_client
 
 # The Toolbox caps a listing page at 1000 items.
 PAGE_SIZE = 1000

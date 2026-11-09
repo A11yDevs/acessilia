@@ -7,16 +7,11 @@ Toolbox document.ocr capability. Falls back to empty string on failure.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
 from backend.tools.logger import logger
 from acessilia_sdk.toolbox.clients import ToolboxOcrClient
-from backend.tools.toolbox_client import make_toolbox_client, run_sync
-
-
-def _run_async(coro) -> Any:
-    """Run an async coroutine from a sync context, even inside a running loop."""
-    return run_sync(coro)
+from acessilia_sdk.runtime import run_sync
+from backend.tools.toolbox_client import make_toolbox_client
 
 
 def toolbox_ocr_text(
@@ -27,7 +22,7 @@ def toolbox_ocr_text(
 ) -> str:
     """Extract OCR text from a document/image via Toolbox."""
     try:
-        return _run_async(_ocr_async(file_path, language, force_ocr))
+        return run_sync(_ocr_async(file_path, language, force_ocr))
     except Exception as e:
         logger.warning("Toolbox OCR failed ({}), returning empty", e)
         return ""
