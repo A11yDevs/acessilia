@@ -1,12 +1,15 @@
 {
-  "_comment": "Copy of the Toolbox's published contract (contract/toolbox-contract.json at release/0.2.0). Refresh with scripts/capture_toolbox_contract.py --ref release/0.2.0; CI checks the SDK registry against the published file itself.",
+  "_comment": "Copy of the Toolbox's published contract (contract/toolbox-contract.json at develop). Refresh with scripts/capture_toolbox_contract.py --ref develop; CI checks the SDK registry against the published file itself.",
   "capabilities": [
     {
       "id": "accessibility.mark",
       "version": 1,
       "providers": [
         "pure-accessibility"
-      ]
+      ],
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "artifact.retrieve",
@@ -14,7 +17,10 @@
       "providers": [
         "filesystem",
         "minio"
-      ]
+      ],
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "artifact.store",
@@ -22,28 +28,40 @@
       "providers": [
         "filesystem",
         "minio"
-      ]
+      ],
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "chem.convert",
       "version": 1,
       "providers": [
         "pure-chem"
-      ]
+      ],
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "chem.recognize",
       "version": 1,
       "providers": [
         "docling-chem"
-      ]
+      ],
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "code.normalize",
       "version": 1,
       "providers": [
         "pure-code"
-      ]
+      ],
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "dataset.describe",
@@ -51,7 +69,10 @@
       "providers": [
         "dataset-github",
         "dataset-huggingface"
-      ]
+      ],
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "dataset.get_artifact",
@@ -59,7 +80,10 @@
       "providers": [
         "dataset-github",
         "dataset-huggingface"
-      ]
+      ],
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "dataset.get_item",
@@ -67,7 +91,10 @@
       "providers": [
         "dataset-github",
         "dataset-huggingface"
-      ]
+      ],
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "dataset.list",
@@ -75,7 +102,10 @@
       "providers": [
         "dataset-github",
         "dataset-huggingface"
-      ]
+      ],
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "dataset.list_items",
@@ -83,7 +113,10 @@
       "providers": [
         "dataset-github",
         "dataset-huggingface"
-      ]
+      ],
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "dataset.list_splits",
@@ -91,7 +124,10 @@
       "providers": [
         "dataset-github",
         "dataset-huggingface"
-      ]
+      ],
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "dataset.sample",
@@ -99,7 +135,10 @@
       "providers": [
         "dataset-github",
         "dataset-huggingface"
-      ]
+      ],
+      "execution": {
+        "idempotent": false
+      }
     },
     {
       "id": "dataset.sync",
@@ -107,35 +146,50 @@
       "providers": [
         "dataset-github",
         "dataset-huggingface"
-      ]
+      ],
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "document.adjudicate.page",
       "version": 1,
       "providers": [
         "qwen3-vl-8b"
-      ]
+      ],
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "document.adjudicate.region",
       "version": 1,
       "providers": [
         "qwen3-vl-8b"
-      ]
+      ],
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "document.export.docx",
       "version": 1,
       "providers": [
         "pandoc-docx"
-      ]
+      ],
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "document.export.pdf_ua",
       "version": 1,
       "providers": [
         "pandoc-pdf-ua"
-      ]
+      ],
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "document.layout.analyze",
@@ -143,7 +197,10 @@
       "providers": [
         "docling-layout",
         "mineru-layout"
-      ]
+      ],
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "document.ocr",
@@ -151,14 +208,20 @@
       "providers": [
         "docling-ocr",
         "mineru-ocr"
-      ]
+      ],
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "document.ocr.page",
       "version": 1,
       "providers": [
         "qwen3-vl-8b"
-      ]
+      ],
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "document.structure.extract",
@@ -167,28 +230,40 @@
         "docling",
         "mineru",
         "nougat"
-      ]
+      ],
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "document.text.spans",
       "version": 1,
       "providers": [
         "pymupdf-pdf"
-      ]
+      ],
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "image.page.orient",
       "version": 1,
       "providers": [
         "rapidocr-orient"
-      ]
+      ],
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "math.convert",
       "version": 1,
       "providers": [
         "math-speech"
-      ]
+      ],
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "math.recognize",
@@ -197,21 +272,30 @@
         "docling-math",
         "pp-formulanet",
         "rapid-latex-ocr"
-      ]
+      ],
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "math.verbalize",
       "version": 1,
       "providers": [
         "math-speech"
-      ]
+      ],
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "media.inspect",
       "version": 1,
       "providers": [
         "pure-media-inspect"
-      ]
+      ],
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "music.omr",
@@ -219,49 +303,70 @@
       "providers": [
         "audiveris",
         "homr"
-      ]
+      ],
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "pdf.render",
       "version": 1,
       "providers": [
         "pymupdf-pdf"
-      ]
+      ],
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "pdf.render",
       "version": 2,
       "providers": [
         "pymupdf-pdf"
-      ]
+      ],
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "pdf.split",
       "version": 1,
       "providers": [
         "pymupdf-pdf"
-      ]
+      ],
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "pdf.validate.pdf_ua",
       "version": 1,
       "providers": [
         "verapdf"
-      ]
+      ],
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "table.recognize",
       "version": 1,
       "providers": [
         "qwen3-vl-8b"
-      ]
+      ],
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "text.postprocess",
       "version": 1,
       "providers": [
         "pure-text"
-      ]
+      ],
+      "execution": {
+        "idempotent": true
+      }
     }
   ],
   "providers": [

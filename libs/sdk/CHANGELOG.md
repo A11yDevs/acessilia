@@ -5,6 +5,13 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 The SDK is a public API for scripts and benchmarks (#402). Changes that a caller
 can see are recorded here, newest first.
 
+## Unreleased
+
+- **Changed** `ToolboxCapability` has a required keyword field `idempotent`,
+  the manifest's `execution.idempotent` at `contract_version`. Every registry
+  entry sets it; only `dataset.sample` is `False` (#406). A caller that builds
+  its own `ToolboxCapability` must pass it.
+
 ## 0.2.0 (2026-11-09)
 
 - **Added** `ToolboxClientConfig` and `make_client` (`acessilia_sdk.toolbox.config`,

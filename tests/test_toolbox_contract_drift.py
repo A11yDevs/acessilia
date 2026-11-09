@@ -208,3 +208,107 @@ def test_a_capability_that_disappears_is_reported_once(checker) -> None:
     about_math = [failure for failure in failures if "math.recognize" in failure]
     assert len(about_math) == 1, about_math
     assert about_math[0].startswith("core consumes capability 'math.recognize'")
+
+
+# ── Idempotency (#406) ─────────────────────────────────────────────────────
+
+
+def _snapshot_with(entries_for: dict[tuple[str, int], object], checker, *, drop=()):
+    """The fixture's contract with some published ``idempotent`` values replaced.
+
+    ``entries_for`` maps (capability, version) to the value to publish; ``drop``
+    lists versions whose ``execution`` block is removed altogether.
+    """
+    payload = json.loads(SNAPSHOT_PATH.read_text(encoding="utf-8"))
+    for entry in payload["capabilities"]:
+        key = (entry["id"], entry["version"])
+        if key in drop:
+            entry.pop("execution", None)
+        elif key in entries_for:
+            entry["execution"] = {"idempotent": entries_for[key]}
+    return checker._from_payloads(payload["capabilities"], payload["providers"])
+
+
+def test_the_snapshot_publishes_idempotent_for_every_sdk_capability(checker) -> None:
+    core = checker.read_core_contract()
+    toolbox = checker.read_toolbox_snapshot(SNAPSHOT_PATH)
+
+    for capability, version in core.versions.items():
+        assert isinstance(toolbox.idempotent[(capability, version)], bool), capability
+    assert core.idempotent["dataset.sample"] is False
+    assert toolbox.idempotent[("dataset.sample", 1)] is False
+    assert toolbox.idempotent[("dataset.sync", 1)] is True
+
+
+def test_a_registry_that_disagrees_with_the_toolbox_is_drift(checker) -> None:
+    core = checker.read_core_contract()
+    toolbox = _snapshot_with({("dataset.sample", 1): True}, checker)
+
+    failures, _ = checker.compare(core, toolbox)
+
+    assert failures == [
+        "the SDK registry has idempotent=False for dataset.sample@1, "
+        "but the Toolbox publishes True"
+    ]
+
+
+def test_a_missing_idempotent_is_drift_not_permission_to_repeat(checker) -> None:
+    core = checker.read_core_contract()
+    toolbox = _snapshot_with({}, checker, drop={("dataset.sync", 1)})
+
+    failures, _ = checker.compare(core, toolbox)
+
+    assert failures == ["the Toolbox publishes no execution.idempotent for dataset.sync@1"]
+
+
+@pytest.mark.parametrize("value", [None, "true", 1, 0])
+def test_a_non_boolean_idempotent_is_drift(checker, value) -> None:
+    core = checker.read_core_contract()
+    toolbox = _snapshot_with({("dataset.sync", 1): value}, checker)
+
+    failures, _ = checker.compare(core, toolbox)
+
+    assert failures == [
+        f"the Toolbox publishes execution.idempotent={value!r} for dataset.sync@1, "
+        "which is not a boolean"
+    ]
+
+
+def test_idempotency_is_compared_at_the_version_the_sdk_sends(checker) -> None:
+    """pdf.render is published as @1 and @2; the SDK sends @2."""
+    core = checker.read_core_contract()
+    assert core.versions["pdf.render"] == 2
+
+    other_version_differs = _snapshot_with({("pdf.render", 1): False}, checker)
+    assert checker.compare(core, other_version_differs)[0] == []
+
+    sent_version_differs = _snapshot_with({("pdf.render", 2): False}, checker)
+    assert checker.compare(core, sent_version_differs)[0] == [
+        "the SDK registry has idempotent=True for pdf.render@2, "
+        "but the Toolbox publishes False"
+    ]
+
+
+def test_the_capture_keeps_idempotent_as_published() -> None:
+    spec = importlib.util.spec_from_file_location(
+        "capture_toolbox_contract", REPO_ROOT / "scripts" / "capture_toolbox_contract.py"
+    )
+    capture = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(capture)
+
+    normalized = capture._normalize(
+        [
+            {"id": "b", "version": 1, "providers": [], "execution": {"idempotent": False,
+                                                                   "cacheable": True}},
+            {"id": "a", "version": 1, "providers": [], "execution": {"idempotent": None}},
+            {"id": "c", "version": 1, "providers": []},
+        ],
+        [],
+    )
+
+    assert normalized["capabilities"] == [
+        {"id": "a", "version": 1, "providers": [], "execution": {"idempotent": None}},
+        {"id": "b", "version": 1, "providers": [], "execution": {"idempotent": False}},
+        {"id": "c", "version": 1, "providers": []},
+    ]

@@ -9,6 +9,12 @@ Capabilities are compared with their contract version too: the SDK sends the
 exact version it was written against on every execute, so a Toolbox that does
 not publish that version fails every call to it.
 
+Idempotency is compared at the exact version too: the SDK retries a call
+only when its registry says the capability is idempotent (ADR-0006, #406), so
+a registry that disagrees with the manifest would repeat an operation that is
+not safe to repeat. A missing, null or non-boolean published value is a
+failure, never permission to repeat.
+
 Provider defaults are compared as bindings, not only as ids: every default in
 ``PROVIDER_DEFAULTS`` must serve each capability version the SDK uses it for.
 A provider that is still registered, but no longer serves that capability,
@@ -50,6 +56,9 @@ REGISTRY_MODULE = "acessilia_sdk.toolbox.capabilities"
 # never call directly: they belong to the Toolbox's own orchestration.
 INTERNAL_CAPABILITIES = frozenset({"cache.get", "cache.put"})
 
+#: Marks a capability version whose contract entry has no ``idempotent``.
+_MISSING = object()
+
 
 @dataclass
 class CoreContract:
@@ -61,6 +70,8 @@ class CoreContract:
     versions: dict[str, int] = field(default_factory=dict)
     #: provider id -> settings attribute default that points at it
     providers: dict[str, set[str]] = field(default_factory=dict)
+    #: capability id -> ``idempotent`` in the SDK registry
+    idempotent: dict[str, bool] = field(default_factory=dict)
     #: (capability id, contract version, default provider id, setting name)
     #: for every capability whose provider comes from ``PROVIDER_DEFAULTS``
     default_bindings: set[tuple[str, int, str, str]] = field(default_factory=set)
@@ -74,6 +85,9 @@ class ToolboxContract:
     versions: dict[str, set[int]] = field(default_factory=dict)
     #: (capability id, version) -> providers that serve that version
     bindings: dict[tuple[str, int], set[str]] = field(default_factory=dict)
+    #: (capability id, version) -> the published ``idempotent`` value, as is:
+    #: anything but a bool (missing, null, a string) is reported, not coerced
+    idempotent: dict[tuple[str, int], object] = field(default_factory=dict)
 
 
 def _load_registry():
@@ -98,6 +112,7 @@ def read_core_contract() -> CoreContract:
             REGISTRY_MODULE
         )
         contract.versions[capability.id] = capability.contract_version
+        contract.idempotent[capability.id] = capability.idempotent
 
     defaults = {**registry.PROVIDER_DEFAULTS, **registry.ROUTE_PROVIDER_DEFAULTS}
     for setting, default in defaults.items():
@@ -147,6 +162,7 @@ def _from_payloads(capabilities: object, providers: object) -> ToolboxContract:
     caps: dict[str, set[str]] = {}
     versions: dict[str, set[int]] = {}
     bindings: dict[tuple[str, int], set[str]] = {}
+    idempotent: dict[tuple[str, int], object] = {}
     for entry in capabilities or []:
         if isinstance(entry, dict) and entry.get("id"):
             capability = str(entry["id"])
@@ -155,6 +171,9 @@ def _from_payloads(capabilities: object, providers: object) -> ToolboxContract:
             caps.setdefault(capability, set()).update(served_by)
             versions.setdefault(capability, set()).add(version)
             bindings.setdefault((capability, version), set()).update(served_by)
+            execution = entry.get("execution")
+            if isinstance(execution, dict) and "idempotent" in execution:
+                idempotent[(capability, version)] = execution["idempotent"]
 
     provs: dict[str, set[str]] = {}
     for entry in providers or []:
@@ -163,7 +182,11 @@ def _from_payloads(capabilities: object, providers: object) -> ToolboxContract:
                 str(item) for item in (entry.get("capabilities") or [])
             }
     return ToolboxContract(
-        capabilities=caps, providers=provs, versions=versions, bindings=bindings
+        capabilities=caps,
+        providers=provs,
+        versions=versions,
+        bindings=bindings,
+        idempotent=idempotent,
     )
 
 
@@ -188,6 +211,28 @@ def compare(
             failures.append(
                 f"core sends {capability}@{expected} but the Toolbox publishes "
                 + ", ".join(f"{capability}@{version}" for version in sorted(published))
+            )
+
+    # At the version the SDK sends: another version's value never stands in.
+    for capability in sorted(set(core.capabilities) & set(toolbox.capabilities)):
+        version = core.versions.get(capability, 1)
+        if version not in toolbox.versions.get(capability, {1}):
+            continue
+        expected = core.idempotent[capability]
+        published = toolbox.idempotent.get((capability, version), _MISSING)
+        if published is _MISSING:
+            failures.append(
+                f"the Toolbox publishes no execution.idempotent for {capability}@{version}"
+            )
+        elif not isinstance(published, bool):
+            failures.append(
+                f"the Toolbox publishes execution.idempotent={published!r} for "
+                f"{capability}@{version}, which is not a boolean"
+            )
+        elif published != expected:
+            failures.append(
+                f"the SDK registry has idempotent={expected} for {capability}@{version}, "
+                f"but the Toolbox publishes {published}"
             )
 
     missing_providers = sorted(set(core.providers) - set(toolbox.providers))
