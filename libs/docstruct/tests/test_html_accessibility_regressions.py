@@ -148,3 +148,70 @@ def test_callout_prose_keeps_inline_math_and_escapes_markup():
     assert root.tag == "aside"
     assert root.find("p/span").attrib == {"role": "math", "aria-label": "x squared"}
     assert root.find("p").text == "A < B: "
+
+
+def _ids(html):
+    import re
+    return re.findall(r'\bid="([^"]+)"', html)
+
+
+def test_caption_ids_do_not_collide_with_existing_ids():
+    html = document_to_html({"sections": [{"blocks": [
+        {"type": "paragraph", "id": "t1-caption", "text": "Unrelated paragraph"},
+        {"type": "table", "id": "t1", "caption": "Actual caption", "rows": [["Header"], ["Value"]]},
+    ]}]})
+    fragment = html[html.index('<div class="table-wrap"'):html.index('</table></div>') + len('</table></div>')]
+    root = ET.fromstring(fragment)
+    caption_id = root.find("table/caption").attrib["id"]
+    assert caption_id != "t1-caption"
+    assert root.attrib["aria-labelledby"] == caption_id
+    ids = _ids(html)
+    assert len(ids) == len(set(ids))
+
+
+def test_a_numbered_caption_id_does_not_collide_with_another_tables_caption_id():
+    html = document_to_html({"sections": [{"blocks": [
+        {"type": "table", "caption": "First", "rows": [["A"], ["1"]]},
+        {"type": "table", "id": "table-1", "caption": "Second", "rows": [["B"], ["2"]]},
+    ]}]})
+    roots = [ET.fromstring(line) for line in html.splitlines()
+             if line.startswith('<div class="table-wrap"')]
+    labelled = [root.attrib["aria-labelledby"] for root in roots]
+    assert len(set(labelled)) == 2
+    for root in roots:
+        assert root.find("table/caption").attrib["id"] == root.attrib["aria-labelledby"]
+    ids = _ids(html)
+    assert len(ids) == len(set(ids))
+
+
+@pytest.mark.parametrize("kind", ["note", "warning"])
+def test_callouts_are_notes_named_by_their_title_not_unnamed_landmarks(kind):
+    html = document_to_html({"sections": [{"blocks": [
+        {"type": kind, "id": "c1", "title": "Watch out", "text": "First."},
+        {"type": kind, "id": "c2", "text": "Second, untitled."},
+        {"type": "paragraph", "id": "c1-title", "text": "Taken id."},
+    ]}]})
+    asides = [ET.fromstring(line) for line in html.splitlines() if line.startswith("<aside")]
+    assert len(asides) == 2
+    assert all(aside.attrib["role"] == "note" for aside in asides)
+    titled, untitled = asides
+    title = titled.find("p[@id]")
+    assert titled.attrib["aria-labelledby"] == title.attrib["id"] != "c1-title"
+    assert "".join(title.itertext()) == "Watch out"
+    assert "aria-labelledby" not in untitled.attrib
+    ids = _ids(html)
+    assert len(ids) == len(set(ids))
+
+
+def test_block_caption_fallback_is_sanitized_before_export_without_mutating_input():
+    from docstruct.canonical import sanitize_canonical_document
+
+    document = {"title": "Doc", "sections": [{"title": "S", "blocks": [{
+        "type": "table", "id": "t1", "caption": "Caption a\x02b",
+        "table_ast": {"body": [{"cells": [{"text": "Column"}]}, {"cells": [{"text": "Value"}]}]},
+    }]}]}
+    original = deepcopy(document)
+    html = document_to_html(sanitize_canonical_document(document))
+    assert "\x02" not in html
+    assert ">Caption ab</caption>" in html
+    assert document == original
