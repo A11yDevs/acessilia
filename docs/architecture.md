@@ -34,7 +34,7 @@ The former **`legacy`** engine (`AccessibilityOrchestrator`: Reader → Vision/D
 #### 0.4. Domain Tools & Utilities (`backend/tools/`)
 - [backend/tools/logger.py](../backend/tools/logger.py): centralized loguru logger setup.
 - [backend/tools/validators.py](../backend/tools/validators.py): file extension and size validation.
-- [backend/tools/text_processor.py](../backend/tools/text_processor.py): text normalization and Markdown parsing.
+- [docstruct.text.paragraphs](../libs/docstruct/src/docstruct/text/paragraphs.py): text normalization and Markdown parsing.
 - [backend/tools/prompt_tools.py](../backend/tools/prompt_tools.py): prompt loader and template resolver.
 
 #### 0.5. Planning Layer (`backend/core/`) — PDDL engine
@@ -78,7 +78,7 @@ The PDDL domain lives under `backend/core/planning/domains/`. The JSON schemas (
 ### 2. Canonical Document & Export Pipeline (`backend/pipeline/`, `backend/export/`)
 
 - [backend/pipeline/canonical_builder.py](../backend/pipeline/canonical_builder.py): builds the canonical document and sections tree.
-- [backend/pipeline/sanitizer.py](../backend/pipeline/sanitizer.py): cleans raw text, removes prompt leaks and Markdown artifacts.
+- [docstruct.text.sanitize](../libs/docstruct/src/docstruct/text/sanitize.py): cleans raw text, removes prompt leaks and Markdown artifacts.
 - [backend/pipeline/validators.py](../backend/pipeline/validators.py): validates schema, heading hierarchy, links, and output text; `audit_canonical_document` classifies structural and accessibility issues as `BLOCKER` or `WARNING`.
 - [backend/export/pandoc_exporter.py](../backend/export/pandoc_exporter.py): single export coordinator for validation, filtering, AST build, and renderer dispatch; acts as a deterministic gatekeeper that halts export when the audit returns any `BLOCKER`.
 - [backend/export/renderers/](../backend/export/renderers/): renderers for TXT and HTML (DOCX and PDF/UA render on the Toolbox).
@@ -103,7 +103,7 @@ The heavy models run in a separate service, the [Acessilia Toolbox](https://gith
 
 - **The core decides what to do and when; the SDK defines how to reach an operation; the Toolbox provides where and with which resources it runs.** Obligations, admissible methods and costs are the core's planning policy: the Toolbox reports what it found, and the core derives the obligations ([#138](https://github.com/A11yDevs/acessilia/pull/138)).
 - **Operational capabilities run only in the Toolbox.** The production policy is `remote_only`: the core keeps no local fallback for Pandoc, TeX Live, veraPDF, PyMuPDF rendering, media inspection or OCR, and the Toolbox does not depend on the SDK ([ADR-0002](adr/0002-component-responsibilities.md), [ADR-0003](adr/0003-remote-only-operational-capabilities.md)).
-- **Availability comes from Toolbox replicas** behind a load balancer that share the artifact store, with bounded SDK retries; the SDK's multi-endpoint failover is reserved for independent deployments ([ADR-0006](adr/0006-availability-and-failover.md)). Persisted artifacts travel as `ArtifactRef` references ([ADR-0005](adr/0005-artifact-references.md)).
+- **Availability comes from Toolbox replicas** behind a load balancer that share the artifact store, with bounded SDK retries; the SDK's multi-endpoint failover is reserved for independent deployments ([ADR-0006](adr/0006-availability-and-failover.md)). Persisted artifacts travel as `ArtifactRef` references ([ADR-0015](adr/0015-artifact-reference-v1.md)).
 - **One source of truth per contract:** docstruct owns the canonical document models; the Toolbox owns the operational API contracts; the SDK consumes them ([ADR-0004](adr/0004-single-source-of-truth-for-contracts.md)). Cross-component decisions are recorded in [docs/adr/](adr/README.md).
 - **The Toolbox catalogue only restricts.** Methods that call the Toolbox are checked against the live catalogue before a document is planned (`TOOLBOX_AVAILABILITY_GATE`); a capability outside the SDK allowlist is never made available. See [toolbox_integration.md](toolbox_integration.md).
 - **docstruct is distributed as a release wheel.** The core installs it from this checkout. The Toolbox pins the wheel of a `docstruct-vX.Y.Z` GitHub Release by URL and `#sha256=` ([Releases](../libs/docstruct/README.md#releases)). The SDK has a single consumer, the core, and is not published yet.
@@ -143,7 +143,7 @@ The AgentOS runtime is not part of `ENABLED_INTERFACES`; it is started separatel
 - **Agno Framework:** multi-agent orchestration and unified multimodal LLM interface.
 - **AI Providers:** Ollama API (local models like LLaVA/Qwen-VL), OpenRouter API (cloud models like Claude/GPT-4o), or the Toolbox VLM gateway, which relays the chats to a Toolbox VLM provider under its concurrency limit.
 - **Processing Libraries:** edge-tts, aiogram, FastAPI.
-- **No local executors remain** ([ADR-0003](adr/0003-remote-only-operational-capabilities.md), [#150](https://github.com/A11yDevs/acessilia/issues/150)): the manifest is extracted only through `ToolboxManifestExtractor`, and PyMuPDF is a development dependency used by tests to build PDFs. `tests/test_architecture_layers.py` fails if `backend/` or `frontend/` imports an operational library (PyMuPDF, Pillow, OpenCV, Docling, pypdf, python-docx, RapidOCR). Pandoc, TeX Live, veraPDF and the OCR and media libraries are no longer in the image, since DOCX and PDF/UA render only on the Toolbox; NumPy and OpenCV left the dependencies together with the Dr.DocBench experiment scripts (tag `drbench-2026-snapshot`); Pillow and pypdf left the runtime dependencies with reportlab and the local PDF renderer, and Pillow remains only in the `dev` extra, for the page images the Toolbox end-to-end tests send.
+- **One local executor remains,** the edge-tts audio exporter ([ADR-0003](adr/0003-remote-only-operational-capabilities.md), [acessilia-toolbox#73](https://github.com/A11yDevs/acessilia-toolbox/issues/73)); the others left with [#150](https://github.com/A11yDevs/acessilia/issues/150): the manifest is extracted only through `ToolboxManifestExtractor`, and PyMuPDF is a development dependency used by tests to build PDFs. `tests/test_architecture_layers.py` fails if `backend/` or `frontend/` imports an operational library (PyMuPDF, Pillow, OpenCV, Docling, pypdf, python-docx, RapidOCR, reportlab). Pandoc, TeX Live, veraPDF and the OCR and media libraries are no longer in the image, since DOCX and PDF/UA render only on the Toolbox; NumPy and OpenCV left the dependencies together with the Dr.DocBench experiment scripts (tag `drbench-2026-snapshot`); Pillow and pypdf left the runtime dependencies with reportlab and the local PDF renderer, and Pillow remains only in the `dev` extra, for the page images the Toolbox end-to-end tests send.
 
 ---
 

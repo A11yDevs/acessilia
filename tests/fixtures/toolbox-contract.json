@@ -1,12 +1,18 @@
 {
-  "_comment": "Copy of the Toolbox's published contract (contract/toolbox-contract.json at release/0.2.0). Refresh with scripts/capture_toolbox_contract.py --ref release/0.2.0; CI checks the SDK registry against the published file itself.",
+  "_comment": "Copy of the Toolbox's published contract (contract/toolbox-contract.json at develop). Refresh with scripts/capture_toolbox_contract.py --ref develop; CI checks the SDK registry against the published file itself.",
   "capabilities": [
     {
       "id": "accessibility.mark",
       "version": 1,
       "providers": [
         "pure-accessibility"
-      ]
+      ],
+      "output": {
+        "schema": "artifact/accessibility-report@1"
+      },
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "artifact.retrieve",
@@ -14,7 +20,13 @@
       "providers": [
         "filesystem",
         "minio"
-      ]
+      ],
+      "output": {
+        "schema": "artifact/binary@1"
+      },
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "artifact.store",
@@ -22,28 +34,52 @@
       "providers": [
         "filesystem",
         "minio"
-      ]
+      ],
+      "output": {
+        "schema": "artifact/reference@1"
+      },
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "chem.convert",
       "version": 1,
       "providers": [
         "pure-chem"
-      ]
+      ],
+      "output": {
+        "schema": "artifact/mhchem@1"
+      },
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "chem.recognize",
       "version": 1,
       "providers": [
         "docling-chem"
-      ]
+      ],
+      "output": {
+        "schema": "artifact/mhchem@1"
+      },
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "code.normalize",
       "version": 1,
       "providers": [
         "pure-code"
-      ]
+      ],
+      "output": {
+        "schema": "artifact/normalized-code@1"
+      },
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "dataset.describe",
@@ -51,7 +87,13 @@
       "providers": [
         "dataset-github",
         "dataset-huggingface"
-      ]
+      ],
+      "output": {
+        "schema": "artifact/dataset-info@1"
+      },
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "dataset.get_artifact",
@@ -59,7 +101,13 @@
       "providers": [
         "dataset-github",
         "dataset-huggingface"
-      ]
+      ],
+      "output": {
+        "schema": "artifact/binary@1"
+      },
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "dataset.get_item",
@@ -67,7 +115,13 @@
       "providers": [
         "dataset-github",
         "dataset-huggingface"
-      ]
+      ],
+      "output": {
+        "schema": "artifact/dataset-item@1"
+      },
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "dataset.list",
@@ -75,7 +129,13 @@
       "providers": [
         "dataset-github",
         "dataset-huggingface"
-      ]
+      ],
+      "output": {
+        "schema": "artifact/dataset-list@1"
+      },
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "dataset.list_items",
@@ -83,7 +143,13 @@
       "providers": [
         "dataset-github",
         "dataset-huggingface"
-      ]
+      ],
+      "output": {
+        "schema": "artifact/dataset-item-list@1"
+      },
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "dataset.list_splits",
@@ -91,7 +157,13 @@
       "providers": [
         "dataset-github",
         "dataset-huggingface"
-      ]
+      ],
+      "output": {
+        "schema": "artifact/dataset-splits@1"
+      },
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "dataset.sample",
@@ -99,7 +171,13 @@
       "providers": [
         "dataset-github",
         "dataset-huggingface"
-      ]
+      ],
+      "output": {
+        "schema": "artifact/dataset-item-list@1"
+      },
+      "execution": {
+        "idempotent": false
+      }
     },
     {
       "id": "dataset.sync",
@@ -107,35 +185,65 @@
       "providers": [
         "dataset-github",
         "dataset-huggingface"
-      ]
+      ],
+      "output": {
+        "schema": "artifact/dataset-sync-report@1"
+      },
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "document.adjudicate.page",
       "version": 1,
       "providers": [
         "qwen3-vl-8b"
-      ]
+      ],
+      "output": {
+        "schema": "artifact/page-judgement@1"
+      },
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "document.adjudicate.region",
       "version": 1,
       "providers": [
         "qwen3-vl-8b"
-      ]
+      ],
+      "output": {
+        "schema": "artifact/region-transcription@1"
+      },
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "document.export.docx",
       "version": 1,
       "providers": [
         "pandoc-docx"
-      ]
+      ],
+      "output": {
+        "schema": "artifact/docx-export@1"
+      },
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "document.export.pdf_ua",
       "version": 1,
       "providers": [
         "pandoc-pdf-ua"
-      ]
+      ],
+      "output": {
+        "schema": "artifact/pdf-export@1"
+      },
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "document.layout.analyze",
@@ -143,7 +251,13 @@
       "providers": [
         "docling-layout",
         "mineru-layout"
-      ]
+      ],
+      "output": {
+        "schema": "artifact/layout-analysis@1"
+      },
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "document.ocr",
@@ -151,14 +265,26 @@
       "providers": [
         "docling-ocr",
         "mineru-ocr"
-      ]
+      ],
+      "output": {
+        "schema": "artifact/ocr-result@1"
+      },
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "document.ocr.page",
       "version": 1,
       "providers": [
         "qwen3-vl-8b"
-      ]
+      ],
+      "output": {
+        "schema": "artifact/page-transcription@1"
+      },
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "document.structure.extract",
@@ -167,28 +293,52 @@
         "docling",
         "mineru",
         "nougat"
-      ]
+      ],
+      "output": {
+        "schema": "artifact/structured-document@1"
+      },
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "document.text.spans",
       "version": 1,
       "providers": [
         "pymupdf-pdf"
-      ]
+      ],
+      "output": {
+        "schema": "artifact/text-spans@1"
+      },
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "image.page.orient",
       "version": 1,
       "providers": [
         "rapidocr-orient"
-      ]
+      ],
+      "output": {
+        "schema": "artifact/page-orientation@1"
+      },
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "math.convert",
       "version": 1,
       "providers": [
         "math-speech"
-      ]
+      ],
+      "output": {
+        "schema": "artifact/mathml@1"
+      },
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "math.recognize",
@@ -197,21 +347,39 @@
         "docling-math",
         "pp-formulanet",
         "rapid-latex-ocr"
-      ]
+      ],
+      "output": {
+        "schema": "artifact/latex@1"
+      },
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "math.verbalize",
       "version": 1,
       "providers": [
         "math-speech"
-      ]
+      ],
+      "output": {
+        "schema": "artifact/verbalized@1"
+      },
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "media.inspect",
       "version": 1,
       "providers": [
         "pure-media-inspect"
-      ]
+      ],
+      "output": {
+        "schema": "artifact/media-inspection@1"
+      },
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "music.omr",
@@ -219,49 +387,91 @@
       "providers": [
         "audiveris",
         "homr"
-      ]
+      ],
+      "output": {
+        "schema": "artifact/music-score@1"
+      },
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "pdf.render",
       "version": 1,
       "providers": [
         "pymupdf-pdf"
-      ]
+      ],
+      "output": {
+        "schema": "artifact/image@1"
+      },
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "pdf.render",
       "version": 2,
       "providers": [
         "pymupdf-pdf"
-      ]
+      ],
+      "output": {
+        "schema": "artifact/image@2"
+      },
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "pdf.split",
       "version": 1,
       "providers": [
         "pymupdf-pdf"
-      ]
+      ],
+      "output": {
+        "schema": "artifact/page-collection@1"
+      },
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "pdf.validate.pdf_ua",
       "version": 1,
       "providers": [
         "verapdf"
-      ]
+      ],
+      "output": {
+        "schema": "artifact/pdf-validation-report@1"
+      },
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "table.recognize",
       "version": 1,
       "providers": [
         "qwen3-vl-8b"
-      ]
+      ],
+      "output": {
+        "schema": "artifact/table-candidates@1"
+      },
+      "execution": {
+        "idempotent": true
+      }
     },
     {
       "id": "text.postprocess",
       "version": 1,
       "providers": [
         "pure-text"
-      ]
+      ],
+      "output": {
+        "schema": "artifact/processed-text@1"
+      },
+      "execution": {
+        "idempotent": true
+      }
     }
   ],
   "providers": [

@@ -38,9 +38,9 @@ from backend.stage_messages import (
     STAGE_PREPARING_FILE,
 )
 from backend.tools.logger import logger
-from backend.tools.text_processor import merge_broken_paragraphs
+from docstruct.text.paragraphs import merge_broken_paragraphs
 from backend.pipeline.canonical_builder import build_canonical_document
-from backend.pipeline.verbosity_manager import verbosity_for_mode
+from docstruct.profiles import verbosity_for_mode
 
 
 def _normalized_engine() -> str:

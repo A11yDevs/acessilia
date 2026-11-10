@@ -249,7 +249,9 @@ um `base_url` explícito; testes de como o core o configura ficam em
 Entradas de texto usam `upload=(nome, bytes, media_type)` no lugar de
 `file_path` (veja `acessilia_sdk/toolbox/clients/math.py`). `scripts/check_capability_contract.py`
 lê o registro, então o novo ID é conferido contra o catálogo da Toolbox sem
-outras mudanças; `tests/test_toolbox_capability_registry.py` falha se um cliente
+outras mudanças. Ele também confere se o provider padrão da capacidade
+(`PROVIDER_DEFAULTS`) a atende na versão que o SDK envia.
+`tests/test_toolbox_capability_registry.py` falha se um cliente
 fixar uma rota `:execute` no código ou usar um ID não registrado.
 
 ### 4.2 Wrapper de tool Agno (opcional)
@@ -415,7 +417,7 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 | `TOOLBOX_CATALOG_REFRESH_SECONDS` | `60` | Por quanto tempo um snapshot do catálogo é reutilizado |
 | `TOOLBOX_CATALOG_STALE_SECONDS` | `900` | Por quanto tempo o último snapshot válido é servido quando o catálogo não pode ser lido |
 | `TOOLBOX_TIMEOUT_SECONDS` | `3600` | Timeout das requisições |
-| `TOOLBOX_RETRIES` | `1` | Novas tentativas no mesmo endpoint após timeout ou instância indisponível (502/503/504), em todo cliente de capacidade; `0` as desliga (ADR-0006). O timeout também é retentado, então o pior caso de uma chamada pendurada é `TOOLBOX_TIMEOUT_SECONDS × (TOOLBOX_RETRIES + 1)` por endpoint de `TOOLBOX_BASE_URLS` (2 h por endpoint com os padrões) |
+| `TOOLBOX_RETRIES` | `1` | Novas tentativas no mesmo endpoint após timeout ou instância indisponível (502/503/504), nas capacidades que o contrato da Toolbox marca como idempotentes (todas menos `dataset.sample`); uma chamada não idempotente tem uma tentativa e nenhum failover (#406). `0` as desliga (ADR-0006). O timeout também é retentado, então o pior caso de uma chamada pendurada é `TOOLBOX_TIMEOUT_SECONDS × (TOOLBOX_RETRIES + 1)` por endpoint de `TOOLBOX_BASE_URLS` (2 h por endpoint com os padrões) |
 | `TOOLBOX_RETRY_BACKOFF_SECONDS` | `0.5` | Base do backoff exponencial entre as tentativas, com jitter |
 | `TOOLBOX_USE_ARTIFACT_STORE` | `true` | Envia o arquivo para `/v1/artifacts` antes de extrair, quando os clientes compartilham uma implantação. Com endpoints independentes em `TOOLBOX_BASE_URLS`, o arquivo vai diretamente em cada chamada (ADR-0013); uma falha transitória do upload (timeout, indisponibilidade) também recai no envio direto |
 | `TOOLBOX_USE_REMOTE_CACHE` | `true` | Usa o cache remoto (`no_cache=false`) |

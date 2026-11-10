@@ -249,7 +249,9 @@ explicit `base_url`; tests of how the core configures it belong in
 Text inputs use `upload=(filename, content_bytes, media_type)` instead of
 `file_path` (see `acessilia_sdk/toolbox/clients/math.py`). `scripts/check_capability_contract.py`
 reads the registry, so the new id is checked against the Toolbox catalogue
-without further changes; `tests/test_toolbox_capability_registry.py` fails if a
+without further changes. It also checks that the capability's default provider
+(`PROVIDER_DEFAULTS`) serves it at the version the SDK sends.
+`tests/test_toolbox_capability_registry.py` fails if a
 client hard-codes an `:execute` route or uses an unregistered id.
 
 ### 4.2 Agno tool wrapper (optional)
@@ -412,7 +414,7 @@ Defined in `backend/config/settings.py` and documented in `.env.example`:
 | `TOOLBOX_CATALOG_REFRESH_SECONDS` | `60` | How long a catalogue snapshot is reused |
 | `TOOLBOX_CATALOG_STALE_SECONDS` | `900` | How long the last good snapshot is served when the catalogue cannot be read |
 | `TOOLBOX_TIMEOUT_SECONDS` | `3600` | Request timeout |
-| `TOOLBOX_RETRIES` | `1` | Retries on the same endpoint after a timeout or an unavailable instance (502/503/504), for every capability client; `0` disables them (ADR-0006). A timeout is retried too, so the worst case for a hung call is `TOOLBOX_TIMEOUT_SECONDS × (TOOLBOX_RETRIES + 1)` per endpoint in `TOOLBOX_BASE_URLS` (2 h per endpoint with the defaults) |
+| `TOOLBOX_RETRIES` | `1` | Retries on the same endpoint after a timeout or an unavailable instance (502/503/504), for the capabilities the Toolbox contract marks idempotent (all but `dataset.sample`); a non-idempotent call gets one attempt and no failover (#406). `0` disables them (ADR-0006). A timeout is retried too, so the worst case for a hung call is `TOOLBOX_TIMEOUT_SECONDS × (TOOLBOX_RETRIES + 1)` per endpoint in `TOOLBOX_BASE_URLS` (2 h per endpoint with the defaults) |
 | `TOOLBOX_RETRY_BACKOFF_SECONDS` | `0.5` | Base of the exponential backoff between retries, with jitter |
 | `TOOLBOX_USE_ARTIFACT_STORE` | `true` | Upload the file to `/v1/artifacts` before extracting, when the clients share one deployment. With independent endpoints in `TOOLBOX_BASE_URLS` the file is sent directly on each call instead (ADR-0013); a transient upload failure (timeout, unavailable) also falls back to direct input |
 | `TOOLBOX_USE_REMOTE_CACHE` | `true` | Use the remote cache (`no_cache=false`) |

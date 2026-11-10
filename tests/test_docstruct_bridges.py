@@ -28,14 +28,7 @@ REEXPORT = "reexport"
 ADAPTER = "compatibility_adapter"
 
 BRIDGES = {
-    "backend/export/filters/pandoc_filters.py": REEXPORT,
-    "backend/pipeline/pandoc_ast_builder.py": REEXPORT,
-    "backend/pipeline/sanitizer.py": REEXPORT,
-    "backend/pipeline/semantic_rules.py": REEXPORT,
-    "backend/pipeline/verbosity_manager.py": REEXPORT,
     "backend/tools/code_tools.py": REEXPORT,
-    "backend/tools/region_classifier.py": REEXPORT,
-    "backend/tools/text_processor.py": REEXPORT,
     "backend/export/renderers/html_renderer.py": ADAPTER,
     "backend/export/renderers/txt_renderer.py": ADAPTER,
     "backend/pipeline/canonical_builder.py": ADAPTER,
@@ -189,25 +182,14 @@ def test_core_holds_no_copy_of_a_docstruct_function() -> None:
     assert copies == KNOWN_COPIES
 
 
-# --- Behaviour kept by the bridges -------------------------------------------
+def test_the_builder_does_not_re_export_the_placeholder_label() -> None:
+    """``UNSTRUCTURED_PAGE_LABEL`` lives in docstruct.placeholders (#191, step 3).
 
+    The builder still uses it, under a private alias, to build the
+    unstructured-page placeholder; it no longer exposes it as its own name.
+    """
+    import docstruct.placeholders
+    from backend.core.manifest import builder
 
-def test_verbosity_manager_keeps_its_api_and_defaults() -> None:
-    from backend.pipeline import verbosity_manager
-
-    assert verbosity_manager.normalize_profile("pdf")["verbosity"] == ["basic", "detailed"]
-    # Unknown profiles fall back to txt; unknown modes to "detailed".
-    assert verbosity_manager.normalize_profile("epub") == verbosity_manager.OUTPUT_PROFILES["txt"]
-    assert verbosity_manager.verbosity_for_mode("detalhado") == "technical"
-    assert verbosity_manager.verbosity_for_mode("other") == "detailed"
-    # A caller may change the profile it gets without changing the table.
-    verbosity_manager.normalize_profile("html")["verbosity"].clear()
-    assert verbosity_manager.OUTPUT_PROFILES["html"]["verbosity"] == [
-        "basic", "detailed", "technical",
-    ]
-    blocks = [{"verbosity": "technical"}, {"verbosity": "basic"}, {}]
-    assert verbosity_manager.filter_blocks_for_profile(blocks, "txt") == [
-        {"verbosity": "basic"},
-        {},
-    ]
-    assert verbosity_manager.filter_blocks_for_profile([], "html") == []
+    assert not hasattr(builder, "UNSTRUCTURED_PAGE_LABEL")
+    assert builder._UNSTRUCTURED_PAGE_LABEL is docstruct.placeholders.UNSTRUCTURED_PAGE_LABEL

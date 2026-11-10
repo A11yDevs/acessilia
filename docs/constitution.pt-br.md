@@ -2,7 +2,7 @@
 
 Também disponível em **inglês (EUA)**: [English version](constitution.md)
 
-- **Versão:** 2.0.2 (2026-10-20). Veja no [histórico de alterações](#9-histórico-de-alterações)
+- **Versão:** 2.0.6 (2026-11-09). Veja no [histórico de alterações](#9-histórico-de-alterações)
   como as versões são numeradas.
 
 ## 1. Propósito
@@ -41,7 +41,7 @@ Entregar a conversão de documentos e imagens para formatos acessíveis por meio
 
    d. **Pipeline canônico:**
       - `pipeline/` – construção e validação do documento canônico
-      - `export/filters` – filtros de AST do Pandoc para acessibilidade (transformações puras da docstruct; o Pandoc em si roda na Toolbox)
+      - Filtros de AST do Pandoc para acessibilidade: transformações puras em `docstruct.export.filters`, aplicadas por `export/pandoc_exporter.py` (o Pandoc em si roda na Toolbox)
       - `export/renderers` – renderização determinística das saídas
       - `schemas/` – schemas JSON/PDDL de manifesto, plano e relatório de execução
 
@@ -71,7 +71,7 @@ Entregar a conversão de documentos e imagens para formatos acessíveis por meio
    - O domínio PDDL (v2.2+) codifica dependências e restrições de ordem entre tarefas
    - O plano é saída determinística do planejador (backend interno ou fast-downward)
    - O relatório de execução valida a aderência ao plano e registra o resultado das tarefas
-3. O modo de processamento muda o comportamento dos prompts e da verbosidade. Os valores aceitos são `detalhado`, `medio` (com `normal` como alias), `baixo` e `ocr`; um valor desconhecido cai para `medio`. Eles correspondem aos prompts em `backend/ai/prompts` e aos perfis de verbosidade em `backend/pipeline/verbosity_manager.py`.
+3. O modo de processamento muda o comportamento dos prompts e da verbosidade. Os valores aceitos são `detalhado`, `medio` (com `normal` como alias), `baixo` e `ocr`; um valor desconhecido cai para `medio`. Eles correspondem aos prompts em `backend/ai/prompts` e aos perfis de verbosidade em `docstruct.profiles`.
 4. A extração é híbrida: extração de texto determinística primeiro, depois visão por IA para páginas escaneadas ou sem texto e para entradas de imagem (veja o princípio 2.5).
 5. Os caches de página e de arquivo são otimizações, não fonte de verdade.
 6. Os renderizadores só devem consumir dados canônicos validados.
@@ -168,9 +168,14 @@ capacidades operacionais.
    - **Regra:** artefatos persistidos são processados onde estão armazenados e
      trafegam como referências `ArtifactRef` tipadas e opacas. A materialização
      é explícita e verificada; as referências são imutáveis e têm escopo.
-   - **Detalhe:** [ADR-0005](adr/0005-artifact-references.pt-br.md).
-   - **Verificado por:** testes do SDK (`libs/sdk/tests/test_failover.py`) e
-     testes de contrato quando a Toolbox publicar `artifact-ref@1`.
+   - **Detalhe:** [ADR-0015](adr/0015-artifact-reference-v1.pt-br.md), que
+     substitui a ADR-0005. O escopo por referência é um desvio registrado até
+     o `artifact/reference@2`
+     ([acessilia-toolbox#146](https://github.com/A11yDevs/acessilia-toolbox/issues/146)).
+   - **Verificado por:** testes do SDK (`libs/sdk/tests/test_failover.py`,
+     `libs/sdk/tests/test_reference.py`) e o modelo gerado do
+     `artifact/reference@1`, conferido contra o schema publicado por
+     `tests/test_sdk_bindings.py`.
 6. **P6 — Confiabilidade sem duplicação operacional.**
    - **Regra:** a disponibilidade vem de infraestrutura redundante (réplicas
      atrás de um balanceador, compartilhando o armazenamento), timeouts,
@@ -225,6 +230,18 @@ As versões seguem `MAJOR.MINOR.PATCH`:
 
 O texto sem versão anterior a 2026-10-18 conta como **1.0.0**.
 
+- **2.0.6 (2026-11-09):** o "Verificado por" da P5 passa a citar os testes que
+  agora existem para o `artifact/reference@1` (#185). Nenhum princípio muda.
+- **2.0.5 (2026-11-09):** a seção 4.3 passa a citar `docstruct.profiles`
+  para os perfis de verbosidade, já que a reexportação `verbosity_manager`
+  do core foi removida (#191). Nenhum princípio muda.
+- **2.0.4 (2026-11-09):** a seção 3.1 passa a citar `docstruct.export.filters`
+  para os filtros de AST do Pandoc, já que o pacote de reexportação
+  `export/filters` do core foi removido (#191). Nenhum princípio muda.
+- **2.0.3 (2026-11-09):** a P5 passa a apontar a ADR-0015, que substitui a
+  ADR-0005, o contrato passa a se chamar `artifact/reference@1`, e o escopo
+  por referência fica registrado como desvio até o `@2`. Nenhum princípio
+  muda.
 - **2.0.2 (2026-10-20):** a P1 e a P4 passam a apontar as verificações que
   agora existem: o checklist de conformidade do template de pull request, a
   auditoria de outubro de 2026 e o teste de imports operacionais. Nenhum

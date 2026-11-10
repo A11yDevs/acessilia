@@ -52,9 +52,11 @@ redefine it:
   schemas exists; the contract script keeps it honest meanwhile.
 - docstruct releases are coordinated: the Toolbox pins a docstruct wheel by
   version and hash. Today the core (editable, from `libs/docstruct`) and the
-  Toolbox (wheel and SHA-256 in `pyproject.toml` and `uv.lock`) both use
-  0.4.0. That release carries the manifest's document model
-  (`docstruct.manifest`). The core's and the Toolbox's wire models are
+  Toolbox's `develop` (wheel and SHA-256 in `pyproject.toml` and `uv.lock`,
+  since [acessilia-toolbox#134](https://github.com/A11yDevs/acessilia-toolbox/pull/134))
+  both use 0.5.0; a Toolbox release keeps the version it was accepted with
+  until its next promotion. The manifest's document model
+  (`docstruct.manifest`) has shipped since 0.4.0. The core's and the Toolbox's wire models are
   checked against it in each repository's contract test, and the two publish
   the same 1.1.0 schema
   ([#203](https://github.com/A11yDevs/acessilia/issues/203)).

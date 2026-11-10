@@ -15,6 +15,8 @@ import sys
 import tomllib
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 #: The only runtime dependencies the SDK may have (ADR-0002, P2): the HTTP
@@ -110,3 +112,91 @@ def test_imports_stay_within_the_standard_library_httpx_and_docstruct() -> None:
                 if name.split(".")[0] not in allowed
             ]
     assert not offenders, offenders
+
+
+#: Ways to read the process environment. ``os`` itself stays allowed: the
+#: artifact download uses ``os.fsync`` and ``os.replace``.
+_ENVIRONMENT_READS = {("os", "environ"), ("os", "getenv"), ("os", "environb"), ("os", "getenvb")}
+
+
+def _environment_reads(source: str) -> list[str]:
+    """Lines of ``source`` that read the environment through ``os``.
+
+    Resolves the names ``os`` is bound to (``import os``, ``import os as x``),
+    so ``x.getenv(...)`` is found as well as ``os.getenv(...)``, and the
+    ``from os import getenv [as y]`` forms.
+    """
+    tree = ast.parse(source)
+    os_names = {
+        alias.asname or alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Import)
+        for alias in node.names
+        if alias.name == "os"
+    }
+    found = []
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Attribute)
+            and isinstance(node.value, ast.Name)
+            and node.value.id in os_names
+            and ("os", node.attr) in _ENVIRONMENT_READS
+        ):
+            found.append(f"{node.lineno}: {node.value.id}.{node.attr}")
+        elif isinstance(node, ast.ImportFrom) and node.module == "os":
+            found += [
+                f"{node.lineno}: from os import {alias.name}"
+                for alias in node.names
+                if ("os", alias.name) in _ENVIRONMENT_READS
+            ]
+    return found
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "import os\nvalue = os.getenv('X')\n",
+        "import os\nvalue = os.environ['X']\n",
+        "import os as process_os\nvalue = process_os.getenv('X')\n",
+        "import os as process_os\nvalue = process_os.environ.get('X')\n",
+        "from os import getenv as lookup\nvalue = lookup('X')\n",
+        "from os import environ\nvalue = environ['X']\n",
+    ],
+)
+def test_the_environment_guard_finds_each_form(source: str) -> None:
+    assert _environment_reads(source), source
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "import os\nos.fsync(3)\nos.replace('a', 'b')\n",
+        "import os as process_os\nprocess_os.fsync(3)\n",
+        "environ = {}\nvalue = environ['X']\n",
+    ],
+)
+def test_the_environment_guard_allows_other_uses_of_os(source: str) -> None:
+    assert not _environment_reads(source), source
+
+
+def test_the_sdk_reads_no_environment() -> None:
+    """The caller passes the configuration (ADR-0002); the SDK never reads it.
+
+    The import checks above allow the standard library, so they would not catch
+    an ``os.environ`` lookup; this one does (review of #402).
+    """
+    offenders = [
+        f"{path.relative_to(SRC)}:{line}"
+        for path in sorted(SRC.rglob("*.py"))
+        for line in _environment_reads(path.read_text(encoding="utf-8"))
+    ]
+    assert not offenders, offenders
+
+
+def test_the_package_version_matches_the_project_version() -> None:
+    """``acessilia_sdk.__version__`` is what scripts and benchmarks record."""
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    namespace: dict[str, object] = {}
+    init = (SRC / "acessilia_sdk" / "__init__.py").read_text(encoding="utf-8")
+    exec(compile(ast.parse(init), "acessilia_sdk/__init__.py", "exec"), namespace)
+    assert namespace["__version__"] == project["project"]["version"]

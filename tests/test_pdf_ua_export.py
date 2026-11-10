@@ -67,7 +67,7 @@ def test_client_uses_the_pdf_ua_timeout_not_the_shared_one(monkeypatch):
 
 def test_same_document_yields_the_same_upload_so_the_toolbox_cache_hits():
     from backend.export.pandoc_exporter import _ensure_document
-    from backend.pipeline.pandoc_ast_builder import build_pandoc_ast
+    from docstruct.export.pandoc_ast import build_pandoc_ast
 
     markdown = "# Relatório\n\nParágrafo.\n"
     first, second = (

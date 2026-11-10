@@ -23,7 +23,7 @@ from backend.log_messages import (
     LOG_VISION_AGENT_SENDING_REGION,
     MSG_VISION_TRUNCATION_NOTICE,
 )
-from backend.tools.region_classifier import region_prompt_key
+from docstruct.regions.classify import region_prompt_key
 from backend.tools.vision_payload import downscale_image
 from backend.tools.logger import logger
 

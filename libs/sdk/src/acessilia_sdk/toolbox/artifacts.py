@@ -24,6 +24,7 @@ from acessilia_sdk.toolbox.errors import (
     ToolboxProviderUnavailable,
     ToolboxTimeout,
 )
+from acessilia_sdk.toolbox.reference import ArtifactReference
 from acessilia_sdk.toolbox.transport import raise_for_error
 
 #: Same pattern as ``artifact_id`` in the Toolbox artifact schemas.
@@ -35,11 +36,13 @@ READ_ARTIFACT_MAX_BYTES = 64 * 1024 * 1024
 
 @dataclass(frozen=True)
 class ArtifactRef:
-    """An artifact id with the SHA-256 digest it promises.
+    """An artifact id with the SHA-256 digest it promises: the id-parsing helper.
 
-    Provisional: the Toolbox owns the artifact reference contract. Once it
-    publishes ``artifact-ref@1``, this class is replaced by the model generated
-    from that schema.
+    It accepts an id with or without the ``sha256:`` prefix and needs nothing
+    but the id, so callers that only hold an id (a capability's
+    ``artifact_id``, a stored record) keep working. The published contract,
+    ``artifact/reference@1`` (ADR-0015), is :class:`ArtifactReference`,
+    generated from the schema; read it with :func:`parse_reference`.
     """
 
     artifact_id: str
@@ -53,6 +56,28 @@ class ArtifactRef:
                 f"Malformed Toolbox artifact_id {artifact_id!r}"
             )
         return cls(artifact_id, match["digest"])
+
+
+def parse_reference(data: object) -> ArtifactReference:
+    """Read an ``artifact/reference@1`` document, with the checks the schema cannot make.
+
+    The generated model validates the schema: every required field, the types,
+    the canonical ``sha256:`` id and digest. Unknown fields are ignored, so a
+    later version that only adds fields (``@2``) is still read. This adds the
+    rule Draft-07 cannot state: ``digest`` equals ``artifact_id``. Missing
+    fields are never invented; a document that is not a ``reference@1`` raises
+    :class:`ToolboxContractViolation`.
+    """
+    try:
+        reference = ArtifactReference.from_dict(data)
+    except ValueError as exc:
+        raise ToolboxContractViolation(f"Not an artifact/reference@1: {exc}") from exc
+    if reference.digest != reference.artifact_id:
+        raise ToolboxContractViolation(
+            f"artifact/reference@1 digest {reference.digest!r} differs from "
+            f"artifact_id {reference.artifact_id!r}"
+        )
+    return reference
 
 
 async def download_artifact(
@@ -196,6 +221,8 @@ __all__ = [
     "ARTIFACT_ID_RE",
     "READ_ARTIFACT_MAX_BYTES",
     "ArtifactRef",
+    "ArtifactReference",
     "download_artifact",
+    "parse_reference",
     "read_artifact",
 ]

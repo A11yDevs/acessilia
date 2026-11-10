@@ -21,12 +21,8 @@ from acessilia_sdk.toolbox.clients.math import (
     RECOGNIZE_CAPABILITY,
     VERBALIZE_CAPABILITY,
 )
-from backend.tools.toolbox_client import make_toolbox_client, run_sync
-
-
-def _run_async(coro) -> Any:
-    """Run an async coroutine from a sync context, even inside a running loop."""
-    return run_sync(coro)
+from acessilia_sdk.runtime import run_sync
+from backend.tools.toolbox_client import make_toolbox_client
 
 
 def toolbox_recognize_formula(
@@ -57,7 +53,7 @@ def toolbox_recognize_formula(
     tmp.parent.mkdir(parents=True, exist_ok=True)
     tmp.write_bytes(image_bytes)
     try:
-        return _run_async(_recognize_formula_async(tmp))
+        return run_sync(_recognize_formula_async(tmp))
     except ToolboxInvalidInput as exc:
         logger.info("{} rejected the image ({})", RECOGNIZE_CAPABILITY, exc)
         return []
@@ -161,7 +157,7 @@ def toolbox_convert_latex(latex: str, direction: str = "latex-to-mathml") -> str
         MathCapabilityUnavailable: the capability could not serve the request.
     """
     try:
-        return _run_async(_convert_latex_async(latex, direction))
+        return run_sync(_convert_latex_async(latex, direction))
     except ToolboxInvalidInput as exc:
         logger.info("{} rejected the input ({}): {!r}", CONVERT_CAPABILITY, exc, latex)
         return ""
@@ -193,7 +189,7 @@ def toolbox_verbalize_latex(latex: str, language: str = "pt-BR") -> str:
         MathCapabilityUnavailable: the capability could not serve the request.
     """
     try:
-        return _run_async(_verbalize_latex_async(latex, language))
+        return run_sync(_verbalize_latex_async(latex, language))
     except ToolboxInvalidInput as exc:
         logger.info("{} rejected the input ({}): {!r}", VERBALIZE_CAPABILITY, exc, latex)
         return ""

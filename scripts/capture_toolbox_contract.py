@@ -8,7 +8,8 @@ of truth, and CI checks the SDK registry against it (#186).
 ``--ref`` copies the published file from a Toolbox branch or tag. ``--url``
 captures a running Toolbox instead, which also shows providers registered only
 in that deployment; when ``TOOLBOX_API_KEY`` is set it is sent as a Bearer
-token. Both paths keep only the fields the checker reads, with entries and
+token. Both paths keep only the fields the checker and the SDK binding
+generator (scripts/generate_sdk_bindings.py) read, with entries and
 lists sorted so repeated captures of the same state produce identical files.
 
 Usage:
@@ -32,6 +33,13 @@ DEFAULT_OUT = REPO_ROOT / "tests" / "fixtures" / "toolbox-contract.json"
 PUBLISHED_URL = (
     "https://raw.githubusercontent.com/A11yDevs/acessilia-toolbox/{ref}/contract/toolbox-contract.json"
 )
+#: The published schemas the SDK generates models from (#185, #213), copied
+#: from the same ref as the contract so the two snapshots always agree.
+SDK_MODEL_SCHEMAS = ("reference@1.json",)
+SCHEMAS_OUT = REPO_ROOT / "tests" / "fixtures" / "toolbox-schemas"
+PUBLISHED_SCHEMA_URL = (
+    "https://raw.githubusercontent.com/A11yDevs/acessilia-toolbox/{ref}/schemas/{name}"
+)
 
 COMMENT = (
     "Toolbox capability/provider contract captured from a running toolbox. "
@@ -52,9 +60,35 @@ def _fetch(url: str) -> object:
         raise SystemExit(f"cannot reach the Toolbox at {url}: {exc}")
 
 
+def _output(entry: dict) -> dict:
+    """The output schema the SDK binding generator reads, as published.
+
+    ``scripts/generate_sdk_bindings.py`` takes each selected capability's
+    output schema from here (#213). Copied as it is, missing or not.
+    """
+    output = entry.get("output")
+    if isinstance(output, dict) and "schema" in output:
+        return {"output": {"schema": output["schema"]}}
+    return {}
+
+
+def _execution(entry: dict) -> dict:
+    """The execution flags the checker reads, as published.
+
+    The static contract and the catalogue publish ``execution.idempotent``
+    (acessilia-toolbox#142). The value is copied as it is, missing or not, so
+    the checker sees what the Toolbox published instead of a default.
+    """
+    execution = entry.get("execution")
+    if isinstance(execution, dict) and "idempotent" in execution:
+        return {"execution": {"idempotent": execution["idempotent"]}}
+    return {}
+
+
 def _normalize(capabilities: list, providers: list) -> dict:
-    """Only the fields the checker reads, sorted so repeated captures of the
-    same state produce identical files no matter which path produced them."""
+    """Only the fields the checker and the SDK binding generator read, sorted
+    so repeated captures of the same state produce identical files no matter
+    which path produced them."""
     return {
         # One entry per published version, as /v1/capabilities lists them: the
         # core checks the exact contract version it was written against.
@@ -63,6 +97,8 @@ def _normalize(capabilities: list, providers: list) -> dict:
                 "id": entry["id"],
                 "version": entry.get("version", 1),
                 "providers": sorted(entry.get("providers") or []),
+                **_output(entry),
+                **_execution(entry),
             }
             for entry in sorted(
                 capabilities, key=lambda item: (item["id"], item.get("version", 1))
@@ -102,6 +138,17 @@ def published(ref: str) -> dict:
     }
 
 
+def published_schemas(ref: str) -> dict[str, dict]:
+    """The schemas in ``SDK_MODEL_SCHEMAS`` as the Toolbox publishes them at ``ref``."""
+    schemas: dict[str, dict] = {}
+    for name in SDK_MODEL_SCHEMAS:
+        schema = _fetch(PUBLISHED_SCHEMA_URL.format(ref=ref, name=name))
+        if not isinstance(schema, dict) or not schema.get("$id"):
+            raise SystemExit(f"the Toolbox schema {name} at {ref} is malformed")
+        schemas[name] = schema
+    return schemas
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     source = parser.add_mutually_exclusive_group(required=True)
@@ -120,6 +167,13 @@ def main(argv: list[str] | None = None) -> int:
         f"({len(payload['capabilities'])} capabilities, "
         f"{len(payload['providers'])} providers)"
     )
+    if args.ref:
+        SCHEMAS_OUT.mkdir(parents=True, exist_ok=True)
+        for name, schema in published_schemas(args.ref).items():
+            (SCHEMAS_OUT / name).write_text(
+                json.dumps(schema, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+            )
+            print(f"wrote {SCHEMAS_OUT / name}")
     return 0
 
 

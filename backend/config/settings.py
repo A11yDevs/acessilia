@@ -383,9 +383,10 @@ class Settings:
         default_factory=lambda: int(os.getenv("TOOLBOX_TIMEOUT_SECONDS", "3600"))
     )
     # Bounded retries after a timeout or an unavailable instance, on the same
-    # endpoint, with exponential backoff and jitter (docs/adr/0006). Toolbox
-    # capabilities are idempotent: pure functions of their input, or
-    # content-addressed for the artifact store. 0 disables retries. A timeout
+    # endpoint, with exponential backoff and jitter (docs/adr/0006). They apply
+    # only to capabilities the SDK registry marks idempotent, as the Toolbox
+    # contract publishes them (#406); a call to any other capability gets one
+    # attempt and no failover. 0 disables retries. A timeout
     # is retried too, so a hung call can take up to
     # TOOLBOX_TIMEOUT_SECONDS * (TOOLBOX_RETRIES + 1) per endpoint.
     toolbox_retries: int = field(

@@ -2,7 +2,7 @@
 
 You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](0005-artifact-references.pt-br.md)
 
-- **Status:** Accepted
+- **Status:** Superseded by [0015](0015-artifact-reference-v1.md)
 - **Date:** 2026-10-18
 - **Components:** core, SDK, Toolbox
 - **Issues:** [#152](https://github.com/A11yDevs/acessilia/issues/152) (P5)

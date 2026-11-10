@@ -2,7 +2,7 @@
 
 You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](constitution.pt-br.md)
 
-- **Version:** 2.0.2 (2026-10-20). See the [changelog](#9-changelog) for how
+- **Version:** 2.0.6 (2026-11-09). See the [changelog](#9-changelog) for how
   versions are numbered.
 
 ## 1. Purpose
@@ -41,7 +41,7 @@ Deliver document and image conversion to accessible formats through:
    
    d. **Canonical Pipeline:**
       - `pipeline/` – canonical document construction and validation
-      - `export/filters` – Pandoc AST filters for accessibility (pure transforms from docstruct; Pandoc itself runs in the Toolbox)
+      - Pandoc AST filters for accessibility: pure transforms in `docstruct.export.filters`, applied by `export/pandoc_exporter.py` (Pandoc itself runs in the Toolbox)
       - `export/renderers` – deterministic output rendering
       - `schemas/` – JSON/PDDL schemas for manifesto, plan, execution report
    
@@ -71,7 +71,7 @@ Deliver document and image conversion to accessible formats through:
    - PDDL domain (v2.2+) encodes task dependencies and ordering constraints
    - Plan is deterministic output from planner (internal or fast-downward backend)
    - Execution report validates plan adherence and records task outcomes
-3. Processing mode changes prompt and verbosity behavior. The accepted values are `detalhado`, `medio` (with `normal` as an alias), `baixo` and `ocr`; an unknown value falls back to `medio`. They map to prompts in `backend/ai/prompts` and to verbosity profiles in `backend/pipeline/verbosity_manager.py`.
+3. Processing mode changes prompt and verbosity behavior. The accepted values are `detalhado`, `medio` (with `normal` as an alias), `baixo` and `ocr`; an unknown value falls back to `medio`. They map to prompts in `backend/ai/prompts` and to verbosity profiles in `docstruct.profiles`.
 4. Extraction is hybrid: deterministic text extraction first, then AI vision for scanned/no-text pages and image inputs (see principle 2.5).
 5. Page and file cache are optimizations, not source of truth.
 6. Renderers must only consume validated canonical data.
@@ -167,9 +167,14 @@ Toolbox executes operational capabilities.
    - **Rule:** persisted artifacts are processed where they are stored and
      passed as typed, opaque `ArtifactRef` references. Materialization is
      explicit and verified; references are immutable and scoped.
-   - **Detail:** [ADR-0005](adr/0005-artifact-references.md).
-   - **Checked by:** SDK tests (`libs/sdk/tests/test_failover.py`), and
-     contract tests once the Toolbox publishes `artifact-ref@1`.
+   - **Detail:** [ADR-0015](adr/0015-artifact-reference-v1.md), which
+     supersedes ADR-0005. Per-reference scope is a recorded deviation until
+     `artifact/reference@2`
+     ([acessilia-toolbox#146](https://github.com/A11yDevs/acessilia-toolbox/issues/146)).
+   - **Checked by:** SDK tests (`libs/sdk/tests/test_failover.py`,
+     `libs/sdk/tests/test_reference.py`), and the generated
+     `artifact/reference@1` model, checked against the published schema by
+     `tests/test_sdk_bindings.py`.
 6. **P6 — Reliability without operational duplication.**
    - **Rule:** availability comes from redundant infrastructure (replicas
      behind a load balancer sharing storage), timeouts, bounded retries and
@@ -223,6 +228,17 @@ Versions follow `MAJOR.MINOR.PATCH`:
 
 The unversioned text before 2026-10-18 counts as **1.0.0**.
 
+- **2.0.6 (2026-11-09):** P5's "Checked by" names the tests that now exist
+  for `artifact/reference@1` (#185). No principle changes.
+- **2.0.5 (2026-11-09):** section 4.3 names `docstruct.profiles` for the
+  verbosity profiles, since the core's `verbosity_manager` re-export is
+  removed (#191). No principle changes.
+- **2.0.4 (2026-11-09):** section 3.1 names `docstruct.export.filters` for
+  the Pandoc AST filters, since the core's `export/filters` re-export package
+  is removed (#191). No principle changes.
+- **2.0.3 (2026-11-09):** P5 points at ADR-0015, which supersedes ADR-0005,
+  names the contract `artifact/reference@1`, and records per-reference scope
+  as a deviation until `@2`. No principle changes.
 - **2.0.2 (2026-10-20):** P1 and P4 point at the checks that now exist: the
   pull request template's conformance checklist, the October 2026 audit, and
   the operational-import test. No principle changes.

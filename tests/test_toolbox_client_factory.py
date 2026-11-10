@@ -116,3 +116,123 @@ def test_retries_come_from_settings(monkeypatch):
 
     assert (client.retries, client.retry_backoff_seconds) == (3, 0.25)
     assert make_toolbox_client(ToolboxOcrClient, retries=0).retries == 0
+
+
+# ── Parity with the factory before the move to the SDK (#402, step 1) ──────
+#
+# ``_legacy_kwargs`` is the constructor-argument logic make_toolbox_client had
+# before it delegated to acessilia_sdk.toolbox.make_client, kept here verbatim
+# as the reference. Every SDK client class is built both ways, under settings
+# that cover the cases the review of #402 listed, and must come out the same.
+
+import inspect  # noqa: E402
+
+from acessilia_sdk.toolbox import PROVIDER_DEFAULTS, ToolboxCapabilityClient  # noqa: E402
+from acessilia_sdk.toolbox import clients as sdk_clients  # noqa: E402
+
+CLIENT_CLASSES = sorted(
+    (
+        value
+        for value in vars(sdk_clients).values()
+        if inspect.isclass(value) and issubclass(value, ToolboxCapabilityClient)
+    ),
+    key=lambda cls: cls.__name__,
+)
+
+
+def _legacy_kwargs(client_cls, **overrides):
+    kwargs = {
+        "endpoints": toolbox_endpoints(),
+        "provider": (
+            getattr(settings, client_cls.provider_key) if client_cls.provider_key else None
+        ),
+        "timeout_seconds": settings.toolbox_timeout_seconds,
+        "api_key": settings.toolbox_api_key,
+        "on_failover": toolbox_client._log_failover,
+        "retries": settings.toolbox_retries,
+        "retry_backoff_seconds": settings.toolbox_retry_backoff_seconds,
+    }
+    if issubclass(client_cls, ToolboxMathClient):
+        kwargs["transform_provider"] = settings.toolbox_math_provider
+    if client_cls.timeout_key:
+        kwargs["timeout_seconds"] = getattr(settings, client_cls.timeout_key)
+    overrides = {key: value for key, value in overrides.items() if value is not None}
+    if "base_url" in overrides:
+        kwargs.pop("endpoints")
+    kwargs.update(overrides)
+    return kwargs
+
+
+def _observable(client) -> dict:
+    state = {
+        name: value
+        for name, value in vars(client).items()
+        if name not in ("_clients", "_client", "_catalogs")
+    }
+    state["http"] = [
+        (str(http.base_url), repr(http.timeout), sorted(http.headers.items()))
+        for http in client._clients
+    ]
+    state["catalogs"] = [
+        None if cache is None else (cache.refresh_seconds, cache.stale_seconds)
+        for cache in client._catalogs
+    ]
+    return state
+
+
+SETTINGS_CASES = {
+    "defaults": {},
+    "base_urls_win": {"toolbox_base_urls": f"{PRIMARY}, {SECONDARY}"},
+    "providers": {key: f"custom-{key}" for key in PROVIDER_DEFAULTS},
+    "export_timeouts": {
+        "toolbox_docx_timeout_seconds": 11,
+        "toolbox_pdf_ua_timeout_seconds": 22,
+        "toolbox_pdf_validate_timeout_seconds": 33,
+    },
+    "retries": {"toolbox_retries": 3, "toolbox_retry_backoff_seconds": 0.25},
+    "no_api_key": {"toolbox_api_key": ""},
+}
+
+OVERRIDE_CASES = {
+    "none": {},
+    "none_values": {"provider": None, "timeout_seconds": None, "retries": None},
+    "base_url": {"base_url": "http://override.test"},
+    "explicit": {"provider": "explicit", "timeout_seconds": 7, "retries": 0},
+}
+
+
+@pytest.mark.parametrize("overrides", OVERRIDE_CASES.values(), ids=OVERRIDE_CASES)
+@pytest.mark.parametrize("values", SETTINGS_CASES.values(), ids=SETTINGS_CASES)
+@pytest.mark.parametrize("client_cls", CLIENT_CLASSES, ids=lambda cls: cls.__name__)
+def test_the_sdk_factory_builds_the_client_the_core_used_to_build(
+    monkeypatch, client_cls, values, overrides
+):
+    for key, value in values.items():
+        monkeypatch.setattr(settings, key, value)
+
+    built = make_toolbox_client(client_cls, **overrides)
+    reference = client_cls(**_legacy_kwargs(client_cls, **overrides))
+
+    assert _observable(built) == _observable(reference)
+
+
+def test_every_provider_key_and_timeout_key_is_a_setting():
+    """The config maps settings by name; a missing attribute would fail late."""
+    for key in PROVIDER_DEFAULTS:
+        assert hasattr(settings, key), key
+    assert toolbox_client.TIMEOUT_KEYS == {
+        "toolbox_docx_timeout_seconds",
+        "toolbox_pdf_ua_timeout_seconds",
+        "toolbox_pdf_validate_timeout_seconds",
+    }
+    for key in toolbox_client.TIMEOUT_KEYS:
+        assert hasattr(settings, key), key
+
+
+def test_the_config_is_read_from_settings_on_every_call(monkeypatch):
+    monkeypatch.setattr(settings, "toolbox_retries", 2)
+    before = toolbox_client.toolbox_client_config()
+    monkeypatch.setattr(settings, "toolbox_retries", 4)
+
+    assert before.retries == 2
+    assert toolbox_client.toolbox_client_config().retries == 4
