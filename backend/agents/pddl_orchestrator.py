@@ -4700,7 +4700,10 @@ def _embedded_picture_bytes(element: ManifestElement) -> bytes | None:
     header, separator, payload = src.partition(",")
     if not separator:
         return None
-    media_type, _, encoding = header.strip().lower().removeprefix("data:").partition(";")
+    header = header.strip().lower()
+    if not header.startswith("data:"):
+        return None
+    media_type, _, encoding = header[len("data:"):].partition(";")
     if media_type not in _EMBEDDED_PICTURE_TYPES or encoding != "base64":
         return None
     payload = "".join(payload.split())
@@ -4709,6 +4712,10 @@ def _embedded_picture_bytes(element: ManifestElement) -> bytes | None:
     try:
         image = base64.b64decode(payload, validate=True)
     except ValueError:  # binascii.Error
+        return None
+    # The length check above only bounds the encoded text; several decoded
+    # sizes share one encoded length, so the bound is checked again here.
+    if len(image) > _EMBEDDED_PICTURE_MAX_BYTES:
         return None
     return image or None
 

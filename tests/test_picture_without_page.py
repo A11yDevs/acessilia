@@ -126,8 +126,9 @@ def test_a_pageless_picture_without_an_embedded_image_has_no_bytes(
         "data:image/png;base64,***",
         "data:image/png;base64,",
         "data:text/html;base64," + base64.b64encode(b"<p>x</p>").decode(),
+        "image/png;base64," + base64.b64encode(_png()).decode(),
     ],
-    ids=["remote-url", "svg", "not-base64", "invalid-base64", "empty", "not-an-image"],
+    ids=["remote-url", "svg", "not-base64", "invalid-base64", "empty", "not-an-image", "no-data-prefix"],
 )
 def test_only_an_embedded_raster_image_is_decoded(fake_toolbox_render, tmp_path, src):
     """A remote URL is never fetched, and what a vision model cannot read is not sent."""
@@ -151,6 +152,31 @@ def test_an_embedded_image_above_the_size_bound_is_not_decoded(
     )
 
     assert image is None
+
+
+@pytest.mark.parametrize("size,accepted", [(16, True), (17, False), (18, False)])
+def test_the_size_bound_applies_to_the_decoded_bytes(
+    monkeypatch, fake_toolbox_render, tmp_path, size, accepted
+):
+    """17 and 18 bytes share the base64 length of 16, so the encoded length alone is not enough."""
+    monkeypatch.setattr(pddl, "_EMBEDDED_PICTURE_MAX_BYTES", 16)
+
+    image, _ = _extract_picture_bytes(
+        tmp_path / "qa_word.docx", _pageless_picture(src=_data_uri(b"x" * size)), None,
+        media_type=DOCX,
+    )
+
+    assert (image is not None) is accepted
+
+
+def test_the_data_uri_prefix_is_case_insensitive(fake_toolbox_render, tmp_path):
+    src = "DATA:IMAGE/PNG;BASE64," + base64.b64encode(_png()).decode()
+
+    image, _ = _extract_picture_bytes(
+        tmp_path / "qa_word.docx", _pageless_picture(src=src), None, media_type=DOCX,
+    )
+
+    assert image == _png()
 
 
 # --- _enrich_picture_descriptions --------------------------------------------
