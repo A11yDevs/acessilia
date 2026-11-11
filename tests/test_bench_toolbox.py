@@ -8,13 +8,23 @@ Toolbox errors reach the caller typed; nothing turns them into empty data.
 
 from __future__ import annotations
 
+import ast
+from pathlib import Path
+
 import httpx
 import pytest
 import respx
 
-from acessilia_sdk.toolbox import ToolboxProviderUnavailable
+from acessilia_sdk.toolbox import (
+    ToolboxEndpoint,
+    ToolboxProviderUnavailable,
+    ToolboxTimeout,
+    make_client,
+)
 from acessilia_sdk.toolbox.capabilities import provider_default
-from backend.config.settings import settings
+from acessilia_sdk.toolbox.clients import ToolboxDatasetClient, ToolboxStructureClient
+from backend.config.settings import Settings, settings
+from backend.tools import toolbox_client
 from scripts.bench import toolbox
 
 PRIMARY = "http://toolbox-a.test"
@@ -154,3 +164,92 @@ def test_extract_structure_uses_the_given_provider_or_the_configured_one(
 
     assert result["status"] == "succeeded"
     assert f'name="provider"\r\n\r\n{expected}'.encode() in route.calls.last.request.content
+
+
+# The harness's configuration equals the core's for the clients it uses: the
+# same environment gives the same endpoints, key, timeout, retries, backoff
+# and provider. The core's side is a fresh Settings(), read from that same
+# environment, so defaults are compared too.
+
+TOOLBOX_VARIABLES = (
+    "TOOLBOX_BASE_URL",
+    "TOOLBOX_BASE_URLS",
+    "TOOLBOX_API_KEY",
+    "TOOLBOX_TIMEOUT_SECONDS",
+    "TOOLBOX_RETRIES",
+    "TOOLBOX_RETRY_BACKOFF_SECONDS",
+    "TOOLBOX_PROVIDER",
+)
+
+ENVIRONMENTS = {
+    "defaults": {},
+    "single endpoint": {"TOOLBOX_BASE_URL": PRIMARY, "TOOLBOX_API_KEY": "k"},
+    "endpoints list wins": {
+        "TOOLBOX_BASE_URL": PRIMARY,
+        "TOOLBOX_BASE_URLS": f" {SECONDARY}, {PRIMARY}/ ",
+    },
+    "budgets": {
+        "TOOLBOX_TIMEOUT_SECONDS": "90",
+        "TOOLBOX_RETRIES": "3",
+        "TOOLBOX_RETRY_BACKOFF_SECONDS": "1.5",
+    },
+    "provider": {"TOOLBOX_PROVIDER": "mineru"},
+    "empty provider": {"TOOLBOX_PROVIDER": ""},
+}
+
+
+def _shape(client) -> dict:
+    return {
+        "endpoints": client.endpoints,
+        "provider": client.provider,
+        "api_key": client.api_key,
+        "timeout_seconds": client.timeout_seconds,
+        "retries": client.retries,
+        "retry_backoff_seconds": client.retry_backoff_seconds,
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("environment", ENVIRONMENTS.values(), ids=ENVIRONMENTS.keys())
+@pytest.mark.parametrize("client_cls", [ToolboxDatasetClient, ToolboxStructureClient])
+async def test_the_harness_configures_clients_like_the_core(
+    monkeypatch, environment, client_cls
+) -> None:
+    for variable in TOOLBOX_VARIABLES:
+        monkeypatch.delenv(variable, raising=False)
+    for variable, value in environment.items():
+        monkeypatch.setenv(variable, value)
+    monkeypatch.setattr(toolbox_client, "settings", Settings())
+
+    core = toolbox_client.make_toolbox_client(client_cls)
+    harness = make_client(client_cls, toolbox.client_config())
+    try:
+        assert _shape(harness) == _shape(core)
+    finally:
+        await core.close()
+        await harness.close()
+
+
+def test_a_failover_is_reported_on_stderr(capsys) -> None:
+    toolbox.client_config().on_failover(ToolboxEndpoint(PRIMARY), ToolboxTimeout("slow"))
+
+    assert f"Toolbox endpoint {PRIMARY} failed (ToolboxTimeout: slow)" in capsys.readouterr().err
+
+
+BENCH_DIR = Path(__file__).resolve().parents[1] / "scripts" / "bench"
+
+
+def test_the_harness_reaches_the_toolbox_without_the_core_s_toolbox_modules() -> None:
+    """#402 acceptance: scripts/bench imports no backend.tools.toolbox_* module."""
+    offenders = []
+    for path in BENCH_DIR.rglob("*.py"):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            names = (
+                [alias.name for alias in node.names] if isinstance(node, ast.Import)
+                else [node.module or ""] if isinstance(node, ast.ImportFrom) else []
+            )
+            offenders += [
+                f"{path.name}: {name}" for name in names
+                if name.startswith("backend.tools.toolbox_")
+            ]
+    assert offenders == []
