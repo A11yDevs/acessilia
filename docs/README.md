@@ -28,6 +28,7 @@ The system runs the `pddl` pipeline engine (the manifest → plan → execution 
 15. [Processing manifest model inventory](architecture/manifest-model-inventory.md) — every class and field of the manifest sorted into document, origin, process and envelope, with the invariants and the differences between the core's and the Toolbox's copies (#203, stage 5). (Brazilian Portuguese: [pt-BR version](architecture/manifest-model-inventory.pt-br.md))
 16. [Core data migration, 0.1.0 to 0.2.0](data-migration-0.1.0-to-0.2.0.md) — completed before the 0.2.0 promotion; kept as a record of how unexpired downloads and their records were migrated. (Brazilian Portuguese: [pt-BR version](data-migration-0.1.0-to-0.2.0.pt-br.md))
 17. [Telegram interface](telegram.md) — create and configure the bot, test it in a private chat and get it to answer in groups and topics, including privacy mode. (Brazilian Portuguese: [pt-BR version](telegram.pt-br.md))
+18. [Local test workflow](testing.md) — the supported `make` commands, baseline timings, timeouts and CI artifacts for the edit–test–fix loop. (Brazilian Portuguese: [pt-BR version](testing.pt-br.md))
 
 ---
 

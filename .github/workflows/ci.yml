@@ -112,6 +112,15 @@ jobs:
           print("No SDK test was skipped.")
           PY
 
+      - name: Upload SDK isolation report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sdk-isolated-report
+          path: libs/sdk/sdk-isolated-results.xml
+          if-no-files-found: ignore
+          retention-days: 7
+
   tests:
     name: tests (Python 3.11)
     runs-on: ubuntu-latest
@@ -170,15 +179,15 @@ jobs:
         run: python -m pytest --collect-only -q -m "not e2e"
 
       - name: Run complete test suite
-        run: python -m pytest -m "not e2e" --junitxml=test-results.xml
+        run: python -m pytest -m "not e2e" --durations=25 --junitxml=test-results.xml
 
       - name: Run docstruct library test suite
         working-directory: libs/docstruct
-        run: python -m pytest --junitxml=docstruct-test-results.xml
+        run: python -m pytest --durations=25 --junitxml=docstruct-test-results.xml
 
       - name: Run SDK library test suite
         working-directory: libs/sdk
-        run: python -m pytest --junitxml=sdk-test-results.xml
+        run: python -m pytest --durations=25 --junitxml=sdk-test-results.xml
 
       - name: Reject unexpected skipped tests
         run: |
@@ -205,6 +214,18 @@ jobs:
               )
           print("Relatorio JUnit validado: nenhum teste foi pulado.")
           PY
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: test-reports
+          path: |
+            test-results.xml
+            libs/docstruct/docstruct-test-results.xml
+            libs/sdk/sdk-test-results.xml
+          if-no-files-found: ignore
+          retention-days: 7
 
   delivery:
     name: publish verified images

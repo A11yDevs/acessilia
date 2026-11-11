@@ -10,6 +10,21 @@ As regressões da issue #342 cobrem continuações de listas após parágrafos e
 
 ## Execução
 
+O fluxo local suportado está descrito em [docs/testing.pt-br.md](../docs/testing.pt-br.md):
+
+```bash
+# Tudo o que a CI executa, sem E2E (core, docstruct e SDK)
+make test-all
+
+# Um arquivo ou um node id
+make test-file F=tests/test_pddl_planning.py
+
+# Reexecuta os testes que falharam na última vez
+make test-failed
+```
+
+Os comandos equivalentes do pytest:
+
 ```bash
 # Nativa
 uv run pytest
@@ -70,6 +85,7 @@ ACESSILIA_TEST_DATASET_DIR="$PWD/tests/dataset" uv run pytest -m e2e -v
 ```
 
 ## Documentação relacionada
+- [Fluxo local de testes](../docs/testing.pt-br.md) — comandos `make`, tempos de linha de base e timeouts
 - [Arquitetura](../docs/architecture.md)
 - [Pipeline PDDL + Agno](../docs/pmv_agno_pddl.md)
 - [Internacionalização (i18n)](../docs/i18n.pt-br.md) — veja a suíte de testes de internacionalização em [test_i18n.py](test_i18n.py)

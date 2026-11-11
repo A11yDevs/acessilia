@@ -92,8 +92,13 @@ git rebase origin/develop
 Antes de abrir o Pull Request, garanta que os testes estão passando:
 
 ```bash
-uv run pytest tests/ -v
+make test-all
 ```
+
+Durante o desenvolvimento, `make test-file F=tests/test_example.py` executa um
+arquivo ou node id e `make test-failed` reexecuta os testes que falharam na
+última vez. [docs/testing.pt-br.md](docs/testing.pt-br.md) descreve o fluxo, os
+tempos de linha de base e as regras de timeout.
 
 A esteira de CI rodará automaticamente os testes no GitHub. O PR só poderá ser revisado se **todos os testes estiverem verdes**.
 
@@ -345,7 +350,7 @@ vMAJOR.MINOR.PATCH
 5. **PRs pequenos e focados** — mais fáceis de revisar e com menos conflitos.
 6. **Commits atômicos** — um commit = uma mudança lógica completa.
 7. **Testes obrigatórios** — toda `feat` ou `fix` deve incluir ou atualizar testes.
-8. **Rodar `pytest` antes do push** — garantir que nada está quebrado.
+8. **Rodar `make test-all` antes do push** — garantir que nada está quebrado.
 
 ## Rulesets (proteção de branches)
 
@@ -375,7 +380,7 @@ uv sync --extra dev   # usa o Python 3.11 fixado em .python-version
 cp .env.example .env
 
 # Execute os testes para verificar se está tudo ok
-uv run pytest
+make test-all
 ```
 
 ## Triagem de issues

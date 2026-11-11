@@ -33,6 +33,8 @@ O sistema opera com o motor de pipeline `pddl` (o fluxo manifest → plan → ex
 
 19. [Interface Telegram](telegram.pt-br.md) — criar e configurar o bot, testá-lo em conversa privada e fazê-lo responder em grupos e tópicos, incluindo o modo de privacidade. (English: [English guide](telegram.md))
 
+20. [Fluxo local de testes](testing.pt-br.md) — os comandos `make` suportados, tempos de linha de base, timeouts e artefatos da CI para o ciclo de editar–testar–corrigir. (English: [English version](testing.md))
+
 ---
 
 ## Arquitetura PDDL + Agno
