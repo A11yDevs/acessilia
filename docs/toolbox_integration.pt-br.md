@@ -498,7 +498,6 @@ service.py: _build_orchestrator()
 - `clients/structure.py`, `clients/artifact.py`, `clients/dataset.py` — extração de estrutura, armazenamento de artefatos e as rotas de datasets
 - `backend/tools/toolbox_math_tools.py` — a política do core sobre o cliente de matemática: uma entrada rejeitada dá resultado vazio, uma capacidade indisponível levanta `MathCapabilityUnavailable` (ADR-0007); ler os dois formatos de documento do `math.recognize@1` é o `clients.math.recognized_formulas` do SDK
 - `backend/tools/media_inspect.py`, `backend/tools/pdf_ua_audit.py`, `backend/export/pandoc_exporter.py` (`_toolbox_export`) — quando chamar `media.inspect`, `pdf.validate.pdf_ua` e as exportações (flags de habilitação, cache remoto), logs e o resumo do e-mail; cada chamada é um método de cliente do SDK
-- `backend/tools/toolbox_ocr_tools.py` — sem chamador; a remoção é um passo da #402
 - `clients/page_ocr.py` — `document.ocr.page` (VLM de página inteira)
 - `clients/adjudicate.py` — `document.adjudicate.page` / `.region`
 - `clients/orientation.py` — `image.page.orient`
