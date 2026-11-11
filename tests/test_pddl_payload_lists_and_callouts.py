@@ -114,7 +114,7 @@ def test_callout_title_comes_from_the_repaired_title_text() -> None:
 
 def test_callout_titles_are_read_per_callout_from_their_title_elements() -> None:
     """Which elements give a callout its title (#402: characterized before the move)."""
-    from backend.agents.pddl_orchestrator import _callout_titles
+    from docstruct.blocks.callouts import callout_titles as _callout_titles
 
     elements = [
         _element(1, "paragraph", " Note ", callout_id="c1", callout_role="Title"),
