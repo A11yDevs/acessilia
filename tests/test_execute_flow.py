@@ -1,6 +1,6 @@
-"""The order of the steps ``executar`` runs, and what each one receives (#402).
+"""The order of the steps ``execute`` runs, and what each one receives (#402).
 
-Characterization written on develop before ``executar`` was split. Every
+Characterization written on develop before ``execute`` was split. Every
 enrichment step is replaced by a recorder; the plan and its execution are real.
 tests/test_noncritical_obligations.py, tests/test_pddl_audit_fixes.py and
 tests/test_structural_extraction_failure.py cover how a run ends.
@@ -45,7 +45,7 @@ async def _run(monkeypatch, tmp_path, **kwargs):
     async def status(message):
         statuses.append(message)
 
-    result = await orchestrator.executar(tmp_path / "doc.pdf", tmp_path, status_callback=status, **kwargs)
+    result = await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, status_callback=status, **kwargs)
     return result, calls, statuses, manifest
 
 
@@ -100,5 +100,5 @@ async def test_custom_instructions_are_refused_before_any_step(monkeypatch, tmp_
     calls = _recorders(monkeypatch)
 
     with pytest.raises(ValueError):
-        await build_orchestrator().executar(tmp_path / "doc.pdf", tmp_path, **kwargs)
+        await build_orchestrator().execute(tmp_path / "doc.pdf", tmp_path, **kwargs)
     assert calls == []

@@ -89,7 +89,7 @@ async def _run_pddl(file_path: Path, tmpdir: Path) -> dict[str, Any]:
         execute_dry_run=True,
         extractor_backend="toolbox",
     )
-    structured = await orchestrator.executar(
+    structured = await orchestrator.execute(
         file_path=file_path,
         tmpdir=tmpdir,
         structured_output=True,

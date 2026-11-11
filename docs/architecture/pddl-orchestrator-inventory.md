@@ -125,7 +125,7 @@ These are the functions #365 asked to split, at their current size. All stay in 
 
 | Function | Group | Lines |
 |---|---|---|
-| `PddlAccessibilityOrchestrator` (class) | N | 336; `executar` alone 198 |
+| `PddlAccessibilityOrchestrator` (class) | N | 336; `execute` alone 198 (renamed from `executar`, and split in step 5: 81, with `_extract_structure`, `_enrich_before_planning`, `_replan_until_done` and `_check_unsatisfied`) |
 | `_enrich_formula_latex` | P | 299 |
 | `_enrich_picture_descriptions` | O | 197 |
 | `_handle_vlm_pairwise_judge_method` | J | 179 |
@@ -166,7 +166,7 @@ It finds 63 keys, 17 of them written or read by more than one group.
 - the `elements` list by G, L and O;
 - the `obligations` list by O and P.
 
-**Order of `executar`.** Before planning it runs:
+**Order of `execute`.** Before planning it runs:
 1. P classifies formula regions;
 2. O describes pictures;
 3. Q marks inline math in prose;

@@ -45,7 +45,7 @@ async def test_cached_submission_is_recorded_in_history(tmp_path, monkeypatch, r
     class Agent:
         calls = 0
 
-        async def executar(self, *_args, **_kwargs):
+        async def execute(self, *_args, **_kwargs):
             self.calls += 1
             return cached_payload
 

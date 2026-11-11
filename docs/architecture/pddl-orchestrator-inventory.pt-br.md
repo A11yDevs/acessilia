@@ -125,7 +125,7 @@ São as funções que a #365 pediu para dividir, no tamanho atual. Todas ficam n
 
 | Função | Grupo | Linhas |
 |---|---|---|
-| `PddlAccessibilityOrchestrator` (classe) | N | 336; só o `executar`, 198 |
+| `PddlAccessibilityOrchestrator` (classe) | N | 336; só o `execute`, 198 (antes `executar`; dividido no passo 5: 81, com `_extract_structure`, `_enrich_before_planning`, `_replan_until_done` e `_check_unsatisfied`) |
 | `_enrich_formula_latex` | P | 299 |
 | `_enrich_picture_descriptions` | O | 197 |
 | `_handle_vlm_pairwise_judge_method` | J | 179 |
@@ -166,7 +166,7 @@ Ele encontra 63 chaves, 17 delas gravadas ou lidas por mais de um grupo.
 - a lista `elements` por G, L e O;
 - a lista `obligations` por O e P.
 
-**Ordem do `executar`.** Antes do planejamento ele roda:
+**Ordem do `execute`.** Antes do planejamento ele roda:
 1. P classifica regiões de fórmula;
 2. O descreve figuras;
 3. Q marca matemática inline na prosa;

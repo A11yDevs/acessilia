@@ -500,7 +500,7 @@ class TestReplanning:
 
     @staticmethod
     def _run_with_replan(orchestrator, manifest):
-        """Drive the same plan/execute/replan loop `executar()` performs.
+        """Drive the same plan/execute/replan loop `execute()` performs.
 
         Returns the final manifest, the final report, and every report produced
         (each `ExecutionReport` describes only its own execution).

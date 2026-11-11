@@ -488,7 +488,7 @@ def _run(monkeypatch, tmp_path, manifest, *, max_replans=0):
     import asyncio
 
     return asyncio.run(
-        orchestrator.executar(Path(manifest.source.path), tmp_path, structured_output=True)
+        orchestrator.execute(Path(manifest.source.path), tmp_path, structured_output=True)
     )
 
 

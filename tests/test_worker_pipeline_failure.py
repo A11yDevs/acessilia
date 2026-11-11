@@ -28,7 +28,7 @@ async def test_job_executor_does_not_export_pipeline_failure(tmp_path, monkeypat
     async def fail_if_token_created(*args, **kwargs):
         raise AssertionError("token should not be created after pipeline failure")
 
-    monkeypatch.setattr(service.agente, "executar", fail_pipeline)
+    monkeypatch.setattr(service.agente, "execute", fail_pipeline)
     monkeypatch.setattr("backend.api.worker.criar_token", fail_if_token_created)
 
     await JobExecutor().run(

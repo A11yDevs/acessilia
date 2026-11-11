@@ -174,7 +174,7 @@ async def _run_toolbox(
         enable_ocr=enable_ocr,
         extractor_backend="toolbox",
     )
-    structured = await orchestrator.executar(
+    structured = await orchestrator.execute(
         file_path=file_path,
         tmpdir=tmpdir,
         structured_output=True,
@@ -217,7 +217,7 @@ async def _run_toolbox(
         enable_ocr=enable_ocr,
         extractor_backend="toolbox",
     )
-    structured = await orchestrator.executar(
+    structured = await orchestrator.execute(
         file_path=file_path,
         tmpdir=tmpdir,
         structured_output=True,

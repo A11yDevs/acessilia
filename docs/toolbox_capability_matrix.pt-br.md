@@ -138,7 +138,7 @@ esgotadas": o `Executor` levanta `EXE_NO_HANDLER_REGISTERED` quando `handler is 
 e esse raise fica *fora* do `try/except` que calcula `alternatives` e liga a flag. A
 flag nunca era avaliada para um método não registrado.
 
-Além disso, `executar()` só invocava o executor dentro de `if self.execute_dry_run:`,
+Além disso, `execute()` só invocava o executor dentro de `if self.execute_dry_run:`,
 então `PDDL_EXECUTE_DRY_RUN=false` produzia **execução nenhuma** e
 `execution_report=None`. O default de dry-run era o que mantinha o pipeline parecendo
 saudável; desligá-lo pulava a execução em vez de expor a lacuna.
@@ -170,7 +170,7 @@ saudável; desligá-lo pulava a execução em vez de expor a lacuna.
   rejeita nomes desconhecidos), então `_validate_methods` falha cedo, em tempo de
   plano, em vez de deixar um passo inexequível chegar ao executor.
 - **`PDDL_EXECUTE_DRY_RUN` agora escolhe o modo, não se a execução acontece.**
-- **`replan-required` deixou de ser terminal.** `executar()` replaneja até
+- **`replan-required` deixou de ser terminal.** `execute()` replaneja até
   `PDDL_MAX_REPLANS` vezes (padrão 2), reutilizando o estado `(tried ?o ?m)` que o
   executor registrou, de modo que um método que falhou passa para o próximo
   admissível.

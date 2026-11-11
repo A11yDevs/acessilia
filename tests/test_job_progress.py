@@ -243,7 +243,7 @@ async def test_pipeline_failure_names_the_stage_once_and_emails_the_user(
         persisted_mid_run.append(load_record(task_id)["status"]["etapa_atual"])
         raise RuntimeError("vision model crashed")
 
-    monkeypatch.setattr(service.agente, "executar", fail_on_page_four)
+    monkeypatch.setattr(service.agente, "execute", fail_on_page_four)
 
     await JobExecutor().run(
         ApiJob(
@@ -317,7 +317,7 @@ async def test_a_broken_failure_email_keeps_the_job_error_and_records_the_failur
     async def broken_mailer(to_email, filename, error):
         raise OSError("smtp offline")
 
-    monkeypatch.setattr(service.agente, "executar", fail_pipeline)
+    monkeypatch.setattr(service.agente, "execute", fail_pipeline)
     monkeypatch.setattr("backend.api.worker.send_failure_email", broken_mailer)
 
     await JobExecutor().run(
@@ -437,7 +437,7 @@ async def test_failure_is_durable_before_the_email_and_history_does_not_block_it
     async def broken_history(*args, **kwargs):
         raise OSError("history database is locked")
 
-    monkeypatch.setattr(service.agente, "executar", fail_pipeline)
+    monkeypatch.setattr(service.agente, "execute", fail_pipeline)
     monkeypatch.setattr("backend.api.worker.send_failure_email", record_email)
     monkeypatch.setattr("backend.api.worker.finalizar_conversao", broken_history)
 

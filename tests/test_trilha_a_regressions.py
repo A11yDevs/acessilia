@@ -321,7 +321,7 @@ async def test_pddl_recovery_policy_controls_real_cache_replay(
     class Agent:
         calls = 0
 
-        async def executar(self, file_path, *args, **kwargs):
+        async def execute(self, file_path, *args, **kwargs):
             self.calls += 1
             manifest = _sample_manifest()
             manifest.obligations = []

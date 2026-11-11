@@ -410,7 +410,7 @@ async def test_media_inspection_decides_the_structure_before_extraction(
     monkeypatch.setattr(pddl, "_enrich_picture_descriptions", noop)
     monkeypatch.setattr(pddl, "_enrich_table_structures", noop)
 
-    payload = await orchestrator.executar(source, tmp_path, structured_output=True)
+    payload = await orchestrator.execute(source, tmp_path, structured_output=True)
 
     assert calls == ["media.inspect", ("extract", True)]
     assert payload["canonical_metadata"]["pddl_media_inspection"] == {

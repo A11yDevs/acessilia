@@ -253,7 +253,7 @@ async def process(
         )
         state_manager.verificar_cancelamento(task_id)
 
-        resultado = await agente.executar(
+        resultado = await agente.execute(
             file_path,
             file_path.parent,
             status_callback,
