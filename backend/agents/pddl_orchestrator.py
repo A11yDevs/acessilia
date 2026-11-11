@@ -16,13 +16,11 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from docstruct.blocks.callouts import dedupe_callout_titles as _dedupe_callout_titles
 from docstruct.blocks.lists import (
-    item_label,
-    list_numbering,
-    list_start,
     marker_numbering,
     merge_list_blocks,
     recover_empty_lettered_list_items,
 )
+from docstruct.export.page_text import blocks_text, pages_text
 from docstruct.fusion.similarity import PAGENUM_RE
 from docstruct.fusion.tailjoin import is_page_number as _is_page_number
 from docstruct.geometry import reading_role
@@ -5154,7 +5152,7 @@ def build_pddl_structured_payload(
     toolbox_availability: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     pages_payload = _manifest_pages_to_payload(manifest)
-    text_output = _render_text_from_pages(pages_payload)
+    text_output = pages_text(pages_payload)
     configuration = manifest.extractor.configuration
     media_inspection_status = configuration.get("media_inspection")
     fusion_status = configuration.get("fusion") or {}
@@ -5930,43 +5928,14 @@ def _normalize_metadata_links(metadata: dict[str, Any]) -> dict[str, Any]:
     return {key: normalize_value(value) for key, value in metadata.items()}
 
 
+#: What the payload's text says for an image without alt text. It is shown to
+#: the reader and fixed in Portuguese: localizing it is #410's work.
+_IMAGE_WITHOUT_TEXT = "Imagem"
+
+
 def _render_text_from_blocks(blocks: list[dict[str, Any]]) -> str:
-    lines: list[str] = []
-    for block in blocks:
-        block_type = block.get("type")
-        if block_type == "heading":
-            level = int(block.get("level", 1))
-            prefix = "#" * max(1, min(level, 6))
-            lines.append(f"{prefix} {block.get('text', '').strip()}")
-        elif block_type == "list":
-            numbering = list_numbering(block)
-            for number, item in enumerate(block.get("items", []), start=list_start(block)):
-                marker = f"{item_label(number, numbering)}." if block.get("ordered") else "-"
-                lines.append(f"{marker} {str(item).strip()}")
-        elif block_type == "table":
-            rows = block.get("rows")
-            if not rows and isinstance(block.get("table_ast"), dict):
-                rows = _rows_from_table_ast(block["table_ast"])
-            for row in rows or []:
-                if isinstance(row, list):
-                    lines.append(" | ".join(str(cell).strip() for cell in row))
-        elif block_type == "image":
-            lines.append(block.get("alt_text", "Imagem"))
-        else:
-            text = block.get("text", "")
-            if isinstance(text, str) and text.strip():
-                lines.append(text.strip())
-    return "\n".join(lines).strip()
-
-
-def _render_text_from_pages(pages: list[dict[str, Any]]) -> str:
-    chunks: list[str] = []
-    for page in pages:
-        page_number = page.get("page_number", "?")
-        text = str(page.get("text", "")).strip()
-        if text:
-            chunks.append(f"=== Pagina {page_number} ===\n{text}")
-    return "\n\n".join(chunks)
+    """One page's plain text: docstruct's ``blocks_text`` with the core's words."""
+    return blocks_text(blocks, image_text=_IMAGE_WITHOUT_TEXT)
 
 
 def _table_ast_from_metadata(metadata: dict[str, Any]) -> dict[str, Any] | None:

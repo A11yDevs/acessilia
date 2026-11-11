@@ -10,10 +10,8 @@ from __future__ import annotations
 
 import pytest
 
-from backend.agents.pddl_orchestrator import (
-    _render_text_from_blocks,
-    _render_text_from_pages,
-)
+from backend.agents.pddl_orchestrator import _render_text_from_blocks
+from docstruct.export.page_text import pages_text as _render_text_from_pages
 from docstruct.text.paragraphs import merge_broken_paragraphs
 
 
