@@ -172,19 +172,26 @@ def is_decorated_page_number(text: str) -> bool:
     return len(tokens) == 1 and is_page_number(tokens.pop())
 
 
+def is_bare_page_number(text: str | None) -> bool:
+    """Text that may be a page number on its own: digits or Roman letters.
+
+    A single uppercase Roman letter (``I``, ``V``, ``X``...) is read as text.
+    It needs no position, so a caller can check it before looking up a box.
+    """
+    text = (text or "").strip()
+    return is_page_number(text) and not (len(text) == 1 and text.isupper())
+
+
 def is_page_number_in_margin(
     text: str | None, box: tuple[float, float, float, float] | None
 ) -> bool:
     """A bare number in the top or bottom margin, which may be a page number.
 
     ``box`` is ``(left, top, right, bottom)`` on the unit page, measured from
-    the top; without one there is no position to judge. A single uppercase
-    Roman letter (``I``, ``V``, ``X``...) is read as text.
+    the top; without one there is no position to judge. The text must be a
+    :func:`is_bare_page_number`.
     """
-    text = (text or "").strip()
-    if not is_page_number(text) or (len(text) == 1 and text.isupper()):
-        return False
-    if box is None:
+    if not is_bare_page_number(text) or box is None:
         return False
     center = (box[1] + box[3]) / 2
     return not PAGE_NUMBER_MARGIN <= center <= 1 - PAGE_NUMBER_MARGIN

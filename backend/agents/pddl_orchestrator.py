@@ -23,6 +23,7 @@ from docstruct.blocks.lists import (
 from docstruct.export.page_text import blocks_text, pages_text
 from docstruct.fusion.noise import (
     PAGE_NUMBER_MARGIN,
+    is_bare_page_number,
     is_decorated_page_number,
     is_page_number_in_margin,
     select_page_numbers,
@@ -5422,7 +5423,10 @@ def _page_number_ids(manifest: ProcessingManifest) -> set[str]:
         if _is_marked_furniture(element):
             if is_decorated_page_number(element.text or ""):
                 candidates.append((element.id, page, True))
-        elif is_page_number_in_margin(element.text, _element_bbox(element, manifest)):
+        elif is_bare_page_number(element.text) and is_page_number_in_margin(
+            # The text is checked first: finding the box searches the pages.
+            element.text, _element_bbox(element, manifest)
+        ):
             candidates.append((element.id, page, False))
     return select_page_numbers(candidates)
 

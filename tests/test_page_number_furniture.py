@@ -184,3 +184,28 @@ def test_marked_furniture_word_of_roman_letters_is_kept():
 def test_lowercase_roman_number_in_the_margin_is_left_out():
     number = _placed("element-number", "paragraph", "iv", FOOTER_BOX, reading_order=2)
     assert _delivered_texts(BODY, number) == ["Body text."]
+
+
+def test_only_bare_numbers_have_their_box_looked_up(monkeypatch):
+    """Review of #445: finding a box searches the pages, so prose is filtered
+    by its text first, as before the move."""
+    from backend.agents import pddl_orchestrator
+
+    looked_up: list[str] = []
+    original = pddl_orchestrator._element_bbox
+
+    def counting(element, manifest):
+        looked_up.append(element.id)
+        return original(element, manifest)
+
+    monkeypatch.setattr(pddl_orchestrator, "_element_bbox", counting)
+    prose = [
+        _placed(f"element-prose-{i}", "paragraph", f"Sentence {i}.", BODY_BOX, reading_order=i)
+        for i in range(1, 6)
+    ]
+    number = _placed("element-number", "paragraph", "7", FOOTER_BOX, reading_order=6)
+    manifest = build_manifest([*prose, number], [])
+    manifest.pages[0].width, manifest.pages[0].height = WIDTH, HEIGHT
+
+    assert pddl_orchestrator._page_number_ids(manifest) == {"element-number"}
+    assert looked_up == ["element-number"]

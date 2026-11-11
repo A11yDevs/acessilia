@@ -12,6 +12,7 @@ from docstruct.fusion.noise import (
     PAGE_NUMBER_MARGIN,
     PAGE_NUMBER_MAX_LEN,
     decor_role,
+    is_bare_page_number,
     is_decorated_page_number,
     is_page_number_in_margin,
     select_page_numbers,
@@ -84,3 +85,12 @@ def test_decor_role_reads_the_same_margin_and_length() -> None:
     assert decor_role(block("12", 0.95)) == "page_number"
     assert decor_role(block("12", 0.5)) is None
     assert decor_role(block("Page" + " " * PAGE_NUMBER_MAX_LEN + "1", 0.95)) is None
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [("7", True), (" 12 ", True), ("iv", True), ("XII", True), ("V", False), ("I", False),
+     ("Page 7", False), ("", False), (None, False), ("7a", False)],
+)
+def test_a_bare_page_number_needs_no_position(text, expected) -> None:
+    assert is_bare_page_number(text) is expected
