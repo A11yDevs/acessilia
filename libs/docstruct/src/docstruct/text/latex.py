@@ -10,9 +10,12 @@ expression untouched); ``normalize_latex`` rewrites symbols and spacing.
 """
 from __future__ import annotations
 
+import math
 import re
 import unicodedata
 from collections import Counter
+from collections.abc import Iterable
+from typing import Any
 
 # Enclosing delimiter patterns for stripping
 _DISPLAY_DELIM_RE = re.compile(r"^\s*\$\$(.*)\$\$\s*$", re.DOTALL)
@@ -375,3 +378,31 @@ def latex_text_agreement(latex: str, text: str) -> float | None:
     if not total:
         return None
     return 2 * sum((left & right).values()) / total
+
+
+def ranked_latex_candidates(candidates: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Candidates with LaTeX, delimiters stripped (``bare_latex``), by decreasing confidence.
+
+    A formula recognizer returns one entry per detected expression; a chip
+    should hold one, but a provider may return several. An entry whose LaTeX
+    is empty once stripped is left out. A confidence that is not a finite
+    number (missing, a bool, NaN, infinity, text) becomes ``None`` in the
+    candidate and ranks as 0, so the order stays total; ties keep the
+    provider's order. The input is not changed: each candidate is copied.
+    """
+    ranked: list[tuple[float, dict[str, Any]]] = []
+    for candidate in candidates:
+        latex = bare_latex(str(candidate.get("latex") or ""))
+        if not latex:
+            continue
+        confidence = candidate.get("confidence")
+        if (
+            isinstance(confidence, bool)
+            or not isinstance(confidence, (int, float))
+            or not math.isfinite(confidence)
+        ):
+            confidence = None
+        score = 0.0 if confidence is None else float(confidence)
+        ranked.append((score, {**candidate, "latex": latex, "confidence": confidence}))
+    ranked.sort(key=lambda pair: -pair[0])
+    return [candidate for _, candidate in ranked]

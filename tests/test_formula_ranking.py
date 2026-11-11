@@ -1,7 +1,8 @@
 """Ranking the recognizer's formula candidates (#402).
 
 Characterization of the orchestrator's ``_ranked_formula_candidates``, written
-on develop before it moved to docstruct, next to ``normalize_latex``. The
+on develop before it moved to docstruct, as
+``docstruct.text.latex.ranked_latex_candidates``. The
 existing tests in tests/test_formula_recognition.py cover the main ranking;
 these pin the edges.
 """
@@ -10,7 +11,7 @@ from __future__ import annotations
 
 import copy
 
-from backend.agents.pddl_orchestrator import _ranked_formula_candidates as ranked
+from docstruct.text.latex import ranked_latex_candidates as ranked
 
 
 def test_a_confidence_keeps_its_type_and_other_keys_stay() -> None:

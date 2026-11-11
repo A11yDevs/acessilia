@@ -99,8 +99,8 @@ Only the groups marked "decompose" or with a docstruct or SDK part are listed. T
   - The heuristics `_is_ocr_noise`, `_is_placeholder_text`, `_is_placeholder_visual_element` and `_has_meaningful_text` are pure text and element tests, so they go to `docstruct.placeholders` (`is_ocr_noise`, `is_placeholder_text`, `is_placeholder_visual`, `has_meaningful_text`). `_is_mostly_visual_manifest` reads only the elements, so it moves too, as `is_mostly_visual`. They read an element through a read-only protocol that the core's `ManifestElement` satisfies, so the core needs no adapter.
   - `_inject_full_page_picture` changes the manifest, so it stays in the core.
 - **P: formula enrichment.**
-  - `_formula_recognition_crop` renders through G's adapter and crops (docstruct for the clip geometry).
-  - `_ranked_formula_candidates` normalizes LaTeX and ranks by confidence. It is pure and goes to docstruct, next to `docstruct.text.latex`.
+  - `_formula_recognition_crop` renders through G's adapter and crops (docstruct for the clip geometry). Its clip is `docstruct.geometry.boxes.best_effort_clip` since #459; what it keeps (the saved crop, the render, no crop for a sliver) is the core's.
+  - `_ranked_formula_candidates` normalizes LaTeX and ranks by confidence. It is pure and goes to docstruct, as `docstruct.text.latex.ranked_latex_candidates`. Its normalization is `bare_latex`, the conservative one, which the core imports as `normalize_latex` (`backend/tools/formula_tools.py`), not docstruct's `normalize_latex`.
   - `_reclassify_formula_picture` and `_escalate_unresolved_formula` change the manifest, so they stay in the core.
   - `_enrich_formula_latex`, at 299 lines the largest function in the file, stays in the core and is split there (#365).
 - **Q: inline math.**

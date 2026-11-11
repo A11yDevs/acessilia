@@ -43,7 +43,7 @@ Pure document-structure processing core for Acessilia.
 | `docstruct.fusion.table_specialist` | `extract_table`, `norm_table`, `select_table`, `select_greedy` |
 | `docstruct.text.negation_overlay` | `negates`, `is_detached_overlay`, `compose_negation`, `locate_in_text`, `locate_in_grid`, `table_grid`, `compose_in_text`, `compose_in_grid` — give a detached negation slash (U+0338) back to the relation it negates, only when the choice is unambiguous |
 | `docstruct.text.inline_math` | `detect_inline_math`, `detect_inline_math_by_page`, `span_lines_on_page`, `top_left_box`, `assign_runs_to_cells`, `splice_inline_math` — inline math found in a PDF text layer from its fonts and baselines (ADR 0011), placed on an element's boxes page by page and written into its text as `$…$` |
-| `docstruct.text.latex` | `bare_latex`, `ensure_math_delimiters`, `has_latex_markup`, `latex_text_agreement`, `strip_latex_delimiters`, `normalize_latex`, `wrap_latex` — canonical LaTeX formula normalization and standardization |
+| `docstruct.text.latex` | `bare_latex`, `ensure_math_delimiters`, `has_latex_markup`, `latex_text_agreement`, `strip_latex_delimiters`, `normalize_latex`, `wrap_latex` — canonical LaTeX formula normalization and standardization; `ranked_latex_candidates` — a recognizer's candidates, delimiters stripped, by decreasing confidence |
 | `docstruct.text.equations` | `split_equation_number`, `preserve_equation_number`, `equation_number`, `numbered_latex`, `numbered_speech` — display equation labels kept in `metadata.equation_number` and restored by each exporter |
 | `docstruct.text.normalize` | `norm` — deterministic text cleanups |
 | `docstruct.text.norm_fix` | `norm_fix` — post-normalization repairs |

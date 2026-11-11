@@ -18,6 +18,7 @@ import pytest
 from acessilia_sdk.toolbox import ToolboxProviderUnavailable
 
 from backend.agents import pddl_orchestrator as pddl
+from docstruct.text.latex import ranked_latex_candidates
 from backend.agents.output_schemas import VisionOutput
 from backend.core.manifest.models import BoundingBox, ManifestElement, Provenance
 from backend.i18n import t
@@ -456,7 +457,7 @@ async def test_a_vision_description_reclassifies_the_formula(monkeypatch, croppe
 
 
 def test_candidates_are_normalized_and_ranked_by_confidence():
-    ranked = pddl._ranked_formula_candidates(
+    ranked = ranked_latex_candidates(
         [
             {"latex": "$a$", "confidence": 0.4},
             {"latex": "$$b$$", "confidence": 0.9},
@@ -465,12 +466,12 @@ def test_candidates_are_normalized_and_ranked_by_confidence():
     )
 
     assert [c["latex"] for c in ranked] == ["b", "a"]
-    assert pddl._ranked_formula_candidates([]) == []
-    assert pddl._ranked_formula_candidates([{"latex": ""}]) == []
+    assert ranked_latex_candidates([]) == []
+    assert ranked_latex_candidates([{"latex": ""}]) == []
 
 
 def test_a_confidence_that_is_not_a_finite_number_ranks_as_none():
-    ranked = pddl._ranked_formula_candidates(
+    ranked = ranked_latex_candidates(
         [
             {"latex": "nan", "confidence": float("nan")},
             {"latex": "inf", "confidence": float("inf")},
@@ -830,7 +831,7 @@ async def test_vision_runs_only_when_no_candidate_agrees(monkeypatch, cropped):
 
 
 def test_candidates_rank_by_confidence_and_keep_ties_in_order():
-    ranked = pddl._ranked_formula_candidates([
+    ranked = ranked_latex_candidates([
         {"latex": "a"}, {"latex": "b", "confidence": 0.7}, {"latex": " "}, {"latex": "c"},
     ])
     assert [c["latex"] for c in ranked] == ["b", "a", "c"]

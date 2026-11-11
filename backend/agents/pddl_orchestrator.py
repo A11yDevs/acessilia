@@ -59,7 +59,7 @@ from docstruct.text.inline_math import (
     splice_inline_math,
     top_left_box,
 )
-from docstruct.text.latex import has_latex_markup, latex_text_agreement
+from docstruct.text.latex import has_latex_markup, latex_text_agreement, ranked_latex_candidates
 from docstruct.text.math_spans import block_prose, inline_math_sources
 from docstruct.text.norm_fix import norm_fix
 from docstruct.text.negation_overlay import (
@@ -3311,33 +3311,6 @@ def _formula_recognition_crop(
     return page.image, page_number
 
 
-def _ranked_formula_candidates(candidates: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Candidates with LaTeX, normalized, by decreasing confidence.
-
-    ``math.recognize`` returns one entry per detected expression; a chip should
-    hold one, but a provider may return several. A confidence that is not a
-    finite number (missing, a bool, NaN, infinity) becomes ``None`` in the
-    candidate and ranks as 0, so the order stays total and no such value
-    reaches the manifest; ties keep the provider's order.
-    """
-    ranked: list[tuple[float, dict[str, Any]]] = []
-    for candidate in candidates:
-        latex = normalize_latex(str(candidate.get("latex") or ""))
-        if not latex:
-            continue
-        confidence = candidate.get("confidence")
-        if (
-            isinstance(confidence, bool)
-            or not isinstance(confidence, (int, float))
-            or not math.isfinite(confidence)
-        ):
-            confidence = None
-        score = 0.0 if confidence is None else float(confidence)
-        ranked.append((score, {**candidate, "latex": latex, "confidence": confidence}))
-    ranked.sort(key=lambda pair: -pair[0])
-    return [candidate for _, candidate in ranked]
-
-
 #: Element types whose text the exporters render as prose with inline math.
 _INLINE_MATH_ELEMENT_TYPES = frozenset({"paragraph", "list_item", "caption", "footnote"})
 
@@ -3904,7 +3877,7 @@ async def _enrich_formula_latex(
             latex = ""
             confidence = None
             accepted_rank = 1
-            candidates = _ranked_formula_candidates(await recognize(image_bytes))
+            candidates = ranked_latex_candidates(await recognize(image_bytes))
             if not candidates and math_available:
                 # An outage already warned once and skips this. An empty list
                 # is usually an answer without LaTeX, which nothing else
