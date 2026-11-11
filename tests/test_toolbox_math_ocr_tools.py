@@ -14,7 +14,6 @@ import respx
 from backend.config.settings import settings
 from backend.tools.toolbox_math_tools import (
     MathCapabilityUnavailable,
-    recognized_formulas,
     toolbox_convert_latex,
     toolbox_recognize_formula,
     toolbox_verbalize_latex,
@@ -157,16 +156,6 @@ class TestMathTools:
             })
         )
         assert toolbox_recognize_formula(b"png") == formulas
-
-    def test_recognized_formulas_without_latex_is_empty(self):
-        assert recognized_formulas({"latex": "  "}) == []
-        assert recognized_formulas({"formulas": [], "formula_count": 0}) == []
-        assert recognized_formulas(None) == []
-
-    def test_listed_entries_without_latex_are_left_out(self):
-        """Both shapes apply the same rule: no LaTeX, no formula."""
-        document = {"formulas": [{"latex": "  "}, {"page": 1}, "x", {"latex": "y^2", "page": 2}]}
-        assert recognized_formulas(document) == [{"latex": "y^2", "page": 2}]
 
 
 class TestOcrTools:

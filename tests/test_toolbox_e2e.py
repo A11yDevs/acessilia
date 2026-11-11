@@ -27,7 +27,7 @@ from acessilia_sdk.toolbox.clients import (
     ToolboxStructureClient,
 )
 from backend.tools.toolbox_client import make_toolbox_client
-from backend.tools.toolbox_math_tools import recognized_formulas
+from acessilia_sdk.toolbox.clients.math import recognized_formulas
 
 TOOLBOX_BASE_URL = os.getenv("TOOLBOX_BASE_URL", "").strip()
 FIXTURES_DIR = Path(__file__).parent / "fixtures"

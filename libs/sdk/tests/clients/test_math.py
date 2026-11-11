@@ -12,7 +12,7 @@ import pytest
 from acessilia_sdk.toolbox import (
     ToolboxTimeout,
 )
-from acessilia_sdk.toolbox.clients.math import ToolboxMathClient
+from acessilia_sdk.toolbox.clients.math import ToolboxMathClient, recognized_formulas
 
 FIXTURE_IMAGE = Path(__file__).parent / "fixtures" / "sample.pdf"
 
@@ -273,3 +273,38 @@ async def test_auth_header_is_sent_when_configured(respx_mock):
     await client.recognize(file_path=FIXTURE_IMAGE)
 
     assert route.calls.last.request.headers["Authorization"] == "Bearer secret-key"
+
+# recognized_formulas: both math.recognize@1 document shapes as one list.
+# The first and last two cases were the core's tests of the same function
+# (tests/test_toolbox_math_ocr_tools.py) before it moved here (#402).
+
+
+def test_recognized_formulas_reads_one_latex_expression() -> None:
+    """pp-formulanet and rapid-latex-ocr answer with one artifact/latex@1 expression."""
+    document = {"latex": r"\frac{1}{2}", "confidence": 0.8, "bbox": [0, 0, 4, 2], "extra": 1}
+    assert recognized_formulas(document) == [
+        {"latex": r"\frac{1}{2}", "confidence": 0.8, "bbox": [0, 0, 4, 2]}
+    ]
+
+
+def test_recognized_formulas_reads_a_formula_list() -> None:
+    """docling-math lists the formulas of a page; each entry is kept as it is."""
+    formulas = [{"latex": "x^2", "confidence": 0.9, "page": 1, "bbox": [0, 0, 1, 1], "k": 2}]
+    assert recognized_formulas({"formulas": formulas, "formula_count": 1}) == formulas
+
+
+def test_the_formula_list_wins_over_a_top_level_expression() -> None:
+    document = {"formulas": [{"latex": "a"}], "latex": "b"}
+    assert recognized_formulas(document) == [{"latex": "a"}]
+
+
+def test_recognized_formulas_without_latex_is_empty() -> None:
+    assert recognized_formulas({"latex": "  "}) == []
+    assert recognized_formulas({"formulas": [], "formula_count": 0}) == []
+    assert recognized_formulas(None) == []
+
+
+def test_listed_entries_without_latex_are_left_out() -> None:
+    """Both shapes apply the same rule: no LaTeX, no formula."""
+    document = {"formulas": [{"latex": "  "}, {"page": 1}, "x", {"latex": "y^2", "page": 2}]}
+    assert recognized_formulas(document) == [{"latex": "y^2", "page": 2}]
