@@ -7,6 +7,11 @@ can see are recorded here, newest first.
 
 ## Unreleased
 
+- **Added** `page_judgement_probability(document)` in
+  `acessilia_sdk.toolbox.clients.adjudicate`: the `pB` of a
+  `document.adjudicate.page` answer as a float in [0, 1], or `None` when it is
+  missing, not a number, NaN or out of range. The core's reading moved here
+  (#402).
 - **Added** `RENDER_MEDIA_TYPES` in `acessilia_sdk.toolbox.clients.pdf`: the inputs
   `pdf.render@2` opens (PDF, PNG, JPEG), for a caller to check before it sends
   a file. `render` itself does not check it, as before (#402).

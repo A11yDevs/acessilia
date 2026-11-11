@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
+from acessilia_sdk.toolbox.clients.adjudicate import page_judgement_probability
 from acessilia_sdk.toolbox.clients.pdf import RENDER_MEDIA_TYPES
 from docstruct.blocks.callouts import callout_titles
 from docstruct.blocks.callouts import dedupe_callout_titles as _dedupe_callout_titles
@@ -1961,15 +1962,6 @@ def _judge_page(image: bytes, candidate_a: str, candidate_b: str) -> dict[str, A
 _JUDGE_MAX_CHARS = 6000
 
 
-def _judge_probability(document: dict[str, Any]) -> float | None:
-    """``pB`` of a judge answer, or ``None`` when absent or outside [0, 1]."""
-    try:
-        p_b = float(document["pB"])
-    except (KeyError, TypeError, ValueError):
-        return None
-    return p_b if 0.0 <= p_b <= 1.0 else None
-
-
 def _handle_vlm_pairwise_judge_method(
     manifest: ProcessingManifest, obligation_id: str
 ) -> MethodResult:
@@ -2090,7 +2082,7 @@ def _handle_vlm_pairwise_judge_method(
                 message=f"Juiz VLM indisponível: {type(exc).__name__}: {exc}",
             )
         document = result.get("document") or {}
-        p_b = _judge_probability(document)
+        p_b = page_judgement_probability(document)
         if p_b is None:
             return MethodResult(
                 success=False,

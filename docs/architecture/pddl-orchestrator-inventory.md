@@ -90,7 +90,7 @@ Only the groups marked "decompose" or with a docstruct or SDK part are listed. T
   - The calibrated pair, the preferences and the thresholds are policy: core.
 - **J: VLM pairwise judge.**
   - `_render_page_png` renders through G's adapter, so it stays in the core.
-  - `_judge_probability` reads `pB` from the `document.adjudicate.page` answer, which `ToolboxAdjudicateClient.judge_page` already documents. Reading a capability's answer is SDK work, as `math.recognize`'s shapes were in #434, so it moves next to that client. The move keeps today's behaviour: a missing, non-numeric or out-of-range `pB` gives `None`. What to do with `None` stays the handler's decision, in the core. Raising instead would be a separate behaviour change.
+  - `_judge_probability` reads `pB` from the `document.adjudicate.page` answer, which `ToolboxAdjudicateClient.judge_page` already documents. Reading a capability's answer is SDK work, as `math.recognize`'s shapes were in #434, so it moves next to that client. The move keeps today's behaviour: a missing, non-numeric or out-of-range `pB` gives `None`. What to do with `None` stays the handler's decision, in the core. Raising instead would be a separate behaviour change. It is now `acessilia_sdk.toolbox.clients.adjudicate.page_judgement_probability`.
   - `_judge_page` is the core's synchronous wrapper over `ToolboxAdjudicateClient`.
   - The handler (179 lines, the fourth largest function) stays in the core and is split there.
 - **O: picture enrichment.**
