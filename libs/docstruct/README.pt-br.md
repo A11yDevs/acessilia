@@ -32,6 +32,7 @@ Núcleo puro de processamento estrutural de documentos do Acessilia.
 | `docstruct.fusion.line_numbers` | `line_number_chain`, `extract_line_numbers` |
 | `docstruct.fusion.flood` | `flood_guard` |
 | `docstruct.fusion.tailjoin` | `is_page_number`, `join_tail`, `page_number_position`, `tailjoin3` |
+| `docstruct.fusion.similarity` | `iou`, `sim`, `ordered_box`, `pair_block`, `swallows`, `is_duplicate` — sobreposição de caixas e semelhança de texto entre blocos, e qual bloco candidato forma par com um bloco |
 | `docstruct.fusion.repetition` | `collapse`, `guard_page`, `is_blank_page`, `strip_comment` |
 | `docstruct.fusion.page_select` | `fuse`, `select_by_agreement`, `swap_low_agreement_pages`, `ratio` |
 | `docstruct.fusion.judge` | `debias`, `decide_pair`, `p2_from_logprobs`, `should_judge` |

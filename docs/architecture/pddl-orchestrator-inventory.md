@@ -82,7 +82,7 @@ Only the groups marked "decompose" or with a docstruct or SDK part are listed. T
   - The two handlers stay in the core.
 - **H: text handlers.** `_tailjoin_position` is pure and joins `docstruct.fusion.tailjoin`, which already holds `tail_start`, `join_tail` and `page_number_position`. The handlers use `FusionAgent` and stay in the core.
 - **I: calibrated provider choice.**
-  - `_ordered_box`, `_iou` and `_pair_block` are box geometry and go to docstruct. `_iou` duplicates `docstruct.geometry.intersection_area`; see "Findings".
+  - `_ordered_box`, `_iou` and `_pair_block` are box geometry and go to docstruct, as `docstruct.fusion.similarity.ordered_box` and `pair_block`. `_iou` gives the same value as the existing `docstruct.fusion.similarity.iou` for every input, so it is replaced by it; see "Findings". `_pair_block` stays in the core as the adapter that reads the element's and the candidates' boxes; the thresholds are policy and stay with it.
   - `_page_number` and `_page_markdown` are small document helpers.
   - `_load_secondary_extraction` reads a file and checks its digest, so it stays in the core.
   - The calibrated pair, the preferences and the thresholds are policy: core.
@@ -186,7 +186,7 @@ The plan's handlers (B, E–L) run next. T's status checks and the payload (V, W
 
 1. **Near-duplicates of docstruct functions** (constitution P1). Merging them means choosing one behaviour, so each needs its own decision, not a neutral move:
    - `_table_ast_from_rows` versus `docstruct.tables.ast.table_ast_from_rows`. The orchestrator's version returns `{"body": []}` when there are no rows and skips non-list rows. docstruct's returns `None` and normalizes mixed inputs.
-   - `_iou` versus `docstruct.geometry.intersection_area`. The intersection is the same; `_iou` adds the union. A docstruct `iou` built on `intersection_area` would serve both.
+   - `_iou` versus `docstruct.geometry.intersection_area`. The intersection is the same; `_iou` adds the union. **Resolved without a behaviour change:** `docstruct.fusion.similarity.iou` already computed the same value for every input (#402, Phase 3), and replaced `_iou`.
 2. **Dead aliases.** No module, script or test uses `PmvAccessibilityOrchestrator` or `build_pmv_structured_payload` (group Z). They can be removed in a small PR of their own.
 3. **Test patch points.** Tests replace **20 names** on the orchestrator module:
 

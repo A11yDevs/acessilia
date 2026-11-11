@@ -82,7 +82,7 @@ Só aparecem os grupos marcados para decompor ou com uma parte para o docstruct 
   - Os dois handlers ficam no core.
 - **H: handlers de texto.** `_tailjoin_position` é puro e se junta a `docstruct.fusion.tailjoin`, que já tem `tail_start`, `join_tail` e `page_number_position`. Os handlers usam o `FusionAgent` e ficam no core.
 - **I: escolha calibrada de provider.**
-  - `_ordered_box`, `_iou` e `_pair_block` são geometria de caixas e vão para o docstruct. `_iou` duplica `docstruct.geometry.intersection_area`; veja "Achados".
+  - `_ordered_box`, `_iou` e `_pair_block` são geometria de caixas e vão para o docstruct, como `docstruct.fusion.similarity.ordered_box` e `pair_block`. `_iou` dá o mesmo valor que o `docstruct.fusion.similarity.iou` já existente para qualquer entrada, então é substituído por ele; veja "Achados". `_pair_block` fica no core como o adaptador que lê as caixas do elemento e dos candidatos; os limiares são política e ficam com ele.
   - `_page_number` e `_page_markdown` são pequenos auxiliares de documento.
   - `_load_secondary_extraction` lê um arquivo e confere o digest, então fica no core.
   - O par calibrado, as preferências e os limiares são política: core.
@@ -186,7 +186,7 @@ Os handlers do plano (B, E–L) vêm em seguida. As checagens de situação de T
 
 1. **Quase duplicatas de funções do docstruct** (constituição P1). Unificá-las exige escolher um comportamento, então cada uma pede uma decisão própria, e não uma movimentação neutra:
    - `_table_ast_from_rows` contra `docstruct.tables.ast.table_ast_from_rows`. A versão do orquestrador devolve `{"body": []}` quando não há linhas e pula as que não são listas. A do docstruct devolve `None` e normaliza entradas mistas.
-   - `_iou` contra `docstruct.geometry.intersection_area`. A interseção é a mesma; `_iou` acrescenta a união. Um `iou` no docstruct, construído sobre `intersection_area`, serviria aos dois.
+   - `_iou` contra `docstruct.geometry.intersection_area`. A interseção é a mesma; `_iou` acrescenta a união. **Resolvido sem mudança de comportamento:** `docstruct.fusion.similarity.iou` já calculava o mesmo valor para qualquer entrada (#402, Fase 3) e substituiu `_iou`.
 2. **Aliases mortos.** Nenhum módulo, script ou teste usa `PmvAccessibilityOrchestrator` ou `build_pmv_structured_payload` (grupo Z). Podem sair num PR pequeno só para isso.
 3. **Pontos de substituição dos testes.** Os testes substituem **20 nomes** no módulo do orquestrador:
 

@@ -29,6 +29,7 @@ from docstruct.fusion.noise import (
     is_page_number_in_margin,
     select_page_numbers,
 )
+from docstruct.fusion.similarity import ordered_box, pair_block
 from docstruct.fusion.tailjoin import is_page_number as _is_page_number
 from docstruct.geometry import reading_role
 from docstruct.geometry.boxes import downward_edges, holds_point
@@ -1530,7 +1531,7 @@ class _SecondaryExtraction:
                 return None
             if is_bottom_left(box.get("coord_origin"), top, bottom):
                 top, bottom = height - top, height - bottom
-            return _ordered_box(
+            return ordered_box(
                 left / width, top / height, right / width, bottom / height
             )
         return None
@@ -1635,20 +1636,6 @@ def _secondary_or_failure(
     return secondary, None
 
 
-def _ordered_box(left: float, top: float, right: float, bottom: float) -> _Box:
-    return (min(left, right), min(top, bottom), max(left, right), max(top, bottom))
-
-
-def _iou(a: _Box, b: _Box) -> float:
-    width = min(a[2], b[2]) - max(a[0], b[0])
-    height = min(a[3], b[3]) - max(a[1], b[1])
-    if width <= 0 or height <= 0:
-        return 0.0
-    inter = width * height
-    union = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter
-    return inter / union if union > 0 else 0.0
-
-
 def _pair_block(
     element: ManifestElement,
     manifest: ProcessingManifest,
@@ -1656,44 +1643,25 @@ def _pair_block(
     secondary: _SecondaryExtraction,
     used: set[int],
 ) -> int | None:
-    """Index in ``candidates`` of the block that matches ``element``.
-
-    Greedy: each element takes its best free candidate in the current reading
-    order, while Dr.DocBench uses a global (Hungarian) assignment. The two can
-    differ only when blocks compete for the same candidate, which is rare above
-    the IoU / text thresholds and does not move the skeleton's 0.5 page gate.
-    """
-    import difflib
-
+    """Index in ``candidates`` of the block that matches ``element`` (``pair_block``)."""
     box = _element_bbox(element, manifest)
-    if box is not None:
-        box = _ordered_box(*box)
-        scored = [
-            (_iou(box, other), index)
+    boxes = (
+        []
+        if box is None
+        else [
+            None if index in used else secondary.bbox(candidate)
             for index, candidate in enumerate(candidates)
-            if index not in used and (other := secondary.bbox(candidate)) is not None
         ]
-        best = max(scored, default=(0.0, None))
-        if best[0] >= _MIN_BLOCK_IOU:
-            return best[1]
-    text = " ".join((element.text or "").split())
-    if not text:
-        return None
-    scored_text = [
-        (
-            difflib.SequenceMatcher(
-                None,
-                text,
-                " ".join(str(candidate["text"]).split()),
-                autojunk=False,
-            ).ratio(),
-            index,
-        )
-        for index, candidate in enumerate(candidates)
-        if index not in used and candidate.get("text")
-    ]
-    best_text = max(scored_text, default=(0.0, None))
-    return best_text[1] if best_text[0] >= _MIN_BLOCK_TEXT_RATIO else None
+    )
+    return pair_block(
+        box,
+        element.text or "",
+        boxes,
+        [candidate.get("text") for candidate in candidates],
+        used,
+        min_iou=_MIN_BLOCK_IOU,
+        min_text_ratio=_MIN_BLOCK_TEXT_RATIO,
+    )
 
 
 def _handle_table_smart_fusion_method(

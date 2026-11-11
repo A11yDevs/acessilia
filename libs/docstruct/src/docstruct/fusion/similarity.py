@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import difflib
 import re
-from typing import Optional
+from typing import Any, Optional, Sequence
 
 Box = tuple[float, float, float, float]
 
@@ -56,6 +56,57 @@ def sim(a: str, b: str) -> float:
     if not a or not b:
         return 0.0
     return difflib.SequenceMatcher(None, a, b, autojunk=False).ratio()
+
+
+def ordered_box(left: float, top: float, right: float, bottom: float) -> Box:
+    """The box with its edges in order: ``left <= right`` and ``top <= bottom``."""
+    return (min(left, right), min(top, bottom), max(left, right), max(top, bottom))
+
+
+def pair_block(
+    box: Optional[Box],
+    text: str,
+    candidate_boxes: Sequence[Optional[Box]],
+    candidate_texts: Sequence[Any],
+    used: set[int],
+    *,
+    min_iou: float,
+    min_text_ratio: float,
+) -> Optional[int]:
+    """Index of the candidate block that matches a block with ``box`` and ``text``.
+
+    The free candidate (not in ``used``) with the largest IoU wins when it
+    reaches ``min_iou``; otherwise the free candidate whose text, whitespace
+    folded, is most similar (``sim``) wins when it reaches ``min_text_ratio``.
+    Ties go to the later candidate. ``candidate_boxes`` may be shorter than
+    ``candidate_texts`` (empty when ``box`` is ``None``); a ``None`` entry
+    has no box.
+
+    Greedy: each block takes its best free candidate in the caller's order,
+    while Dr.DocBench uses a global (Hungarian) assignment. The two can differ
+    only when blocks compete for the same candidate, which is rare above the
+    thresholds.
+    """
+    if box is not None:
+        box = ordered_box(*box)
+        scored = [
+            (iou(box, other), index)
+            for index, other in enumerate(candidate_boxes)
+            if index not in used and other is not None
+        ]
+        best = max(scored, default=(0.0, None))
+        if best[0] >= min_iou:
+            return best[1]
+    text = " ".join(text.split())
+    if not text:
+        return None
+    scored_text = [
+        (sim(text, " ".join(str(candidate).split())), index)
+        for index, candidate in enumerate(candidate_texts)
+        if index not in used and candidate
+    ]
+    best_text = max(scored_text, default=(0.0, None))
+    return best_text[1] if best_text[0] >= min_text_ratio else None
 
 
 def _comparison_text(text: str) -> str:
