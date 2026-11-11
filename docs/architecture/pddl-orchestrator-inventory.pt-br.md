@@ -221,7 +221,7 @@ Cada passo é um PR sem mudança de comportamento. Os testes de caracterização
 4. **Decompor as funções mistas no core:** o `_extract_picture_bytes` do O, e o `_formula_recognition_crop` e o `_enrich_formula_latex` do P. As chamadas de render continuam passando pelo adaptador do grupo G.
 5. **Dividir as maiores funções** da tabela acima, uma por PR.
 6. **Reorganizar dentro do core** só o que ainda passar do limite de tamanho (decisão D4), por exemplo os handlers de execução em `backend/core/execution/handlers/`.
-   - **Revisado depois do passo 5:** os módulos vão para `backend/core/pipeline/`, com a estrutura que teria o pacote proposto na [ADR-0016](../adr/0016-processing-pipeline-package.pt-br.md). Se essa ADR for aceita, extrair o pacote é uma troca de caminho. Cada módulo fica abaixo de 900 linhas:
+   - **Revisado depois do passo 5:** os módulos vão para `backend/core/pipeline/`, com a estrutura que o `acessilia_core.pipeline` teria pela [ADR-0016](../adr/0016-core-package.pt-br.md). Se essa ADR for aceita, levá-los para `libs/core` é uma troca de caminho, e o `backend/core` some com ela. Cada módulo fica abaixo de 900 linhas:
 
      ```text
      backend/core/pipeline/
@@ -255,7 +255,7 @@ As quase duplicatas do achado 1 são decisões de comportamento, cada uma num PR
     - **Nenhum teste fazia a D4 valer ainda**, e o passo 5 aumentou o orquestrador de 5.531 para 5.823 linhas (#461–#466). Cada divisão encurtou a sua função, mas acrescentou assinaturas e docstrings. A allowlist começa com os tamanhos do dia em que o teste entrar.
     - **O teste entra com o passo 6**, antes da primeira movimentação: `tests/test_module_size.py`, com a allowlist em uma fixture.
     - **O que ele confere:**
-      - um módulo em `backend/agents/` e `backend/core/` (e depois o pacote do pipeline da [ADR-0016](../adr/0016-processing-pipeline-package.pt-br.md)) acima de 900 linhas falha, a menos que esteja na lista;
+      - um módulo em `backend/agents/` e `backend/core/` (e depois o `acessilia_core`, [ADR-0016](../adr/0016-core-package.pt-br.md)) acima de 900 linhas falha, a menos que esteja na lista;
       - um módulo da lista que cresce falha;
       - um módulo da lista que diminui falha até sua entrada ser reduzida, como faz a allowlist de português (`tests/test_no_portuguese.py`), para que o ganho fique registrado;
       - uma entrada com 900 ou menos é removida.

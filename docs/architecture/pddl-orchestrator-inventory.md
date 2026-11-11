@@ -221,7 +221,7 @@ Each step is one PR with no behaviour change. Characterization tests come first 
 4. **Decompose the mixed functions in the core:** O's `_extract_picture_bytes`, and P's `_formula_recognition_crop` and `_enrich_formula_latex`. Their render calls keep going through G's adapter.
 5. **Split the largest functions** in the table above, one per PR.
 6. **Reorganize inside the core** only what is still above the size limit (decision D4), for example the execution handlers into `backend/core/execution/handlers/`.
-   - **Revised after step 5:** the modules go under `backend/core/pipeline/`, with the layout the package proposed in [ADR-0016](../adr/0016-processing-pipeline-package.md) would have. If that ADR is accepted, extracting the package is a change of path. Each module stays under 900 lines:
+   - **Revised after step 5:** the modules go under `backend/core/pipeline/`, with the layout `acessilia_core.pipeline` would have under [ADR-0016](../adr/0016-core-package.md). If that ADR is accepted, moving them to `libs/core` is a change of path, and `backend/core` disappears with it. Each module stays under 900 lines:
 
      ```text
      backend/core/pipeline/
@@ -255,7 +255,7 @@ The near-duplicates in finding 1 are behaviour decisions, each in its own PR (P8
     - **No test enforced D4 yet**, and step 5 grew the orchestrator from 5,531 to 5,823 lines (#461–#466). Each split shortened its function, but added signatures and docstrings. The allowlist starts at the sizes of the day the test lands.
     - **The test lands with step 6**, before its first move: `tests/test_module_size.py`, with the allowlist in a fixture.
     - **What it checks:**
-      - a module under `backend/agents/` and `backend/core/` (and later the pipeline package of [ADR-0016](../adr/0016-processing-pipeline-package.md)) above 900 lines fails, unless it is listed;
+      - a module under `backend/agents/` and `backend/core/` (and later `acessilia_core`, [ADR-0016](../adr/0016-core-package.md)) above 900 lines fails, unless it is listed;
       - a listed module that grows fails;
       - a listed module that shrinks fails until its entry is lowered, as the Portuguese allowlist does (`tests/test_no_portuguese.py`), so a gain is kept;
       - an entry at 900 or below is removed.
