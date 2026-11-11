@@ -1,7 +1,7 @@
 """The fusion role of a manifest element (#402).
 
 Characterization of the orchestrator's ``_element_role``, written on develop
-before it moved to docstruct. The block adapter, the page-number position and
+before it moved to docstruct.fusion.noise.element_role. The block adapter, the page-number position and
 the furniture tests read it.
 """
 
@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from backend.agents.pddl_orchestrator import _element_role
+from docstruct.fusion.noise import element_role as _element_role
 from tests.pddl_support import build_element
 
 

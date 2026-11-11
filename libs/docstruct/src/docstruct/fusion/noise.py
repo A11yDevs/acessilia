@@ -7,8 +7,8 @@ from __future__ import annotations
 
 import re
 from collections import Counter
-from collections.abc import Iterable
-from typing import Callable, Optional
+from collections.abc import Iterable, Mapping
+from typing import Any, Callable, Optional, Protocol, cast
 
 from docstruct.fusion.similarity import (
     CJK_RE,
@@ -32,6 +32,31 @@ PAGE_NUMBER_MARGIN = 0.12
 PAGE_NUMBER_MAX_LEN = 16
 
 DECOR_TYPES = {"page_header": "header", "page_footer": "footer"}
+
+
+class RoledElement(Protocol):
+    """What :func:`element_role` reads of a document element (read-only)."""
+
+    @property
+    def type(self) -> str: ...
+
+    @property
+    def metadata(self) -> Mapping[str, Any]: ...
+
+
+def element_role(element: RoledElement) -> Optional[str]:
+    """Fusion block role of a document element.
+
+    A ``metadata["role"]`` that is set wins; otherwise the role comes from the
+    type (``DECOR_TYPES``): a manifest records page furniture in its element
+    type (``page_header``/``page_footer``), not in the metadata.
+    """
+    role = (element.metadata or {}).get("role")
+    if role:
+        # Metadata is untyped; the role is returned as stored, as before.
+        return cast(Optional[str], role)
+    return DECOR_TYPES.get(element.type)
+
 DECOR_ORDER = {"header": 0, "footer": 1, "page_number": 2}
 TRAIL_NUM_RE = re.compile(
     r"^(?:(.*?[A-Za-z].*?)\s+(\d{1,4})|(\d{1,4})\s+(.*?[A-Za-z].*?))$"
