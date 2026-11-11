@@ -40,6 +40,7 @@ core (backend)  →  acessilia-sdk  →  Toolbox HTTP contract
 | `acessilia_sdk.toolbox.vlm` | `vlm_gateway_base_url`, `vlm_provider_healthy`, `VLM_GATEWAY_PATH` — the Toolbox VLM gateway, an OpenAI-compatible chat route that is not a capability, and its provider health ([ADR-0012](../../docs/adr/0012-agents-reach-the-vlm-through-the-toolbox.md)) |
 | `acessilia_sdk.toolbox.errors` | `ToolboxError` and its subclasses, including `ToolboxUnavailable` (every endpoint failed; `causes` lists each one) |
 | `acessilia_sdk.runtime` | `run_sync` — run a coroutine from sync code, inside or outside an event loop |
+| `acessilia_sdk.cli` | `main` — the command line, `python -m acessilia_sdk` (see [Command line](#command-line)) |
 
 ## Configuring a client
 
@@ -147,6 +148,31 @@ without the `sha256:` prefix.
 
 Ids already stored, by the core or in documents, are plain ids: they keep
 going through `ArtifactRef.parse` and the verified download.
+
+## Command line
+
+`python -m acessilia_sdk` reads the Toolbox with the SDK alone: no core, no
+settings, no environment. Every value is an argument (ADR-0002); the API key
+is read from a file, or from standard input with `-`, so it never shows in the
+process list.
+
+```bash
+# The catalogue of the first endpoint, as JSON (revision, capabilities, providers)
+python -m acessilia_sdk --endpoint https://toolbox.example --api-key-file key.txt catalog
+
+# A stored artifact, checked against its digest and written atomically;
+# endpoints are tried in order, like the capability clients
+python -m acessilia_sdk --endpoint https://a.example --endpoint https://b.example \
+    download sha256:<64 hex> out.pdf
+```
+
+`--timeout` sets the per-request timeout (10 s by default). Exit status: 0 on
+success, 1 when the Toolbox or the file system fails (the typed error, such as
+`ToolboxTimeout`, is printed on standard error), 2 for invalid arguments,
+including an endpoint URL the HTTP client cannot use. Each endpoint a download
+leaves behind is reported on standard error as a `warning:` line, even when a
+later endpoint succeeds (ADR-0006).
+Calling capabilities from the command line comes next (#402).
 
 ## Adding a capability
 

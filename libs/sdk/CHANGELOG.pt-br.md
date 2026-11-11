@@ -7,6 +7,13 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
 ## Não lançado
 
+- **Adicionada** uma linha de comando, `python -m acessilia_sdk`
+  (`acessilia_sdk.cli`): `catalog` imprime o catálogo do primeiro endpoint em
+  JSON, e `download` baixa um artefato armazenado, conferido contra o digest e
+  gravado de forma atômica, tentando os endpoints em ordem. A configuração vem
+  só de argumentos (`--endpoint`, `--api-key-file`, `--timeout`); código de
+  saída 1 para falha da Toolbox ou do sistema de arquivos, 2 para argumentos
+  inválidos (#402).
 - **Adicionado** `recognized_formulas(document)` (`acessilia_sdk.toolbox.clients.math`):
   as fórmulas de um documento do `math.recognize@1` como uma lista, qualquer
   que seja o formato da resposta do provider (`artifact/latex@1` dos modelos de
