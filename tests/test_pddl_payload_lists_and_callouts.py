@@ -112,6 +112,24 @@ def test_callout_title_comes_from_the_repaired_title_text() -> None:
     assert note["title"] == "Notes on the r\u00e9sum\u00e9:"
 
 
+def test_callout_titles_are_read_per_callout_from_their_title_elements() -> None:
+    """Which elements give a callout its title (#402: characterized before the move)."""
+    from backend.agents.pddl_orchestrator import _callout_titles
+
+    elements = [
+        _element(1, "paragraph", " Note ", callout_id="c1", callout_role="Title"),
+        _element(2, "paragraph", "body", callout_id="c1", callout_role="content"),
+        _element(3, "paragraph", "   ", callout_id="c2", callout_role="title"),
+        _element(4, "paragraph", "Numbered", callout_id=7, callout_role="TITLE"),
+        _element(5, "paragraph", "No id", callout_role="title"),
+        _element(6, "paragraph", "First", callout_id="c3", callout_role="title"),
+        _element(7, "paragraph", "Second", callout_id="c3", callout_role="title"),
+        _element(8, "paragraph", "Empty id", callout_id="", callout_role="title"),
+    ]
+
+    assert _callout_titles(elements) == {"c1": "Note", "7": "Numbered", "c3": "Second"}
+
+
 @pytest.mark.parametrize("slide_role,level", [("slide_heading", 2), ("deck_title", 1)])
 @pytest.mark.parametrize("callout_type", ["note", "warning"])
 def test_slide_heading_takes_precedence_over_inherited_callout(
