@@ -35,7 +35,8 @@ from docstruct.fusion.noise import (
 from docstruct.fusion.similarity import ordered_box, pair_block
 from docstruct.fusion.tailjoin import page_number_position
 from docstruct.geometry import reading_role
-from docstruct.geometry.boxes import downward_edges, holds_point
+from docstruct.data_uri import decode_data_uri
+from docstruct.geometry.boxes import best_effort_clip, downward_edges, holds_point
 from docstruct.placeholders import has_meaningful_text, is_mostly_visual, is_placeholder_visual
 from docstruct.regions.letterhead import PlacedItem, letterhead_groups
 from docstruct.tables.ast import (
@@ -3284,7 +3285,7 @@ def _formula_recognition_crop(
 
     if page_number < 1:
         return None, 0
-    clip, origin = _picture_clip(provenance)
+    clip, origin = best_effort_clip(provenance.bbox if provenance is not None else None)
     if clip is None:
         return None, page_number
     try:
@@ -4454,41 +4455,6 @@ _EMBEDDED_PICTURE_MAX_BYTES = 20 * 1024 * 1024
 _EMBEDDED_PICTURE_TYPES = frozenset({"image/png", "image/jpeg", "image/jpg"})
 
 
-def _embedded_picture_bytes(element: ManifestElement) -> bytes | None:
-    """The image embedded in a picture as a base64 ``data:`` URI, or ``None``.
-
-    A DOCX or HTML source has no pages for the Toolbox to render, so the only
-    pixels of its picture are the ones the extraction carried in
-    ``metadata["src"]`` (the key the exporters read for the ``<img>``). Only a
-    raster data URI is decoded: a remote URL is never fetched, the core does
-    not reach out on a document's behalf.
-    """
-    src = element.metadata.get("src")
-    if not isinstance(src, str):
-        return None
-    header, separator, payload = src.partition(",")
-    if not separator:
-        return None
-    header = header.strip().lower()
-    if not header.startswith("data:"):
-        return None
-    media_type, _, encoding = header[len("data:"):].partition(";")
-    if media_type not in _EMBEDDED_PICTURE_TYPES or encoding != "base64":
-        return None
-    payload = "".join(payload.split())
-    if len(payload) > (_EMBEDDED_PICTURE_MAX_BYTES * 4) // 3 + 4:
-        return None
-    try:
-        image = base64.b64decode(payload, validate=True)
-    except ValueError:  # binascii.Error
-        return None
-    # The length check above only bounds the encoded text; several decoded
-    # sizes share one encoded length, so the bound is checked again here.
-    if len(image) > _EMBEDDED_PICTURE_MAX_BYTES:
-        return None
-    return image or None
-
-
 def _extract_picture_bytes(
     source_file: Path,
     element: ManifestElement,
@@ -4512,7 +4478,12 @@ def _extract_picture_bytes(
     provenance = element.provenance[0] if element.provenance else None
     page_number = provenance.page_number if provenance is not None else (fallback_page_number or 0)
     if page_number < 1:
-        return _embedded_picture_bytes(element), 0
+        image = decode_data_uri(
+            element.metadata.get("src"),
+            media_types=_EMBEDDED_PICTURE_TYPES,
+            max_bytes=_EMBEDDED_PICTURE_MAX_BYTES,
+        )
+        return image, 0
 
     def render(clip=None, origin: ClipOrigin = "TOPLEFT") -> RenderedPage:
         return _toolbox_render(
@@ -4521,7 +4492,7 @@ def _extract_picture_bytes(
             clip_origin=origin, artifact_id=artifact_id,
         )
 
-    clip, origin = _picture_clip(provenance)
+    clip, origin = best_effort_clip(provenance.bbox if provenance is not None else None)
     try:
         if clip is None:
             return render().image, page_number
@@ -4542,31 +4513,6 @@ def _extract_picture_bytes(
         )
         return None, page_number
 
-
-def _picture_clip(
-    provenance: Any,
-) -> tuple[tuple[float, float, float, float] | None, ClipOrigin]:
-    """The box of a picture to render, and its origin; ``None`` means the whole page.
-
-    Pictures are best effort, so a box that cannot be used (absent or with a
-    non-finite coordinate) degrades to the whole page instead of failing, and
-    the origin may be inferred (``is_bottom_left``). Region inspection, which
-    certifies its crop, refuses both instead.
-    """
-    bbox = getattr(provenance, "bbox", None)
-    if bbox is None:
-        return None, "TOPLEFT"
-    left, top, right, bottom = (
-        float(bbox.left), float(bbox.top), float(bbox.right), float(bbox.bottom)
-    )
-    if not all(math.isfinite(value) for value in (left, top, right, bottom)):
-        return None, "TOPLEFT"
-    origin: ClipOrigin = (
-        "BOTTOMLEFT"
-        if is_bottom_left(getattr(bbox, "coord_origin", None), top, bottom)
-        else "TOPLEFT"
-    )
-    return (left, top, right, bottom), origin
 
 #: Obligation kinds that only refine content the extraction already delivered.
 #: Leaving one open (every automatic method failed and it was escalated to
