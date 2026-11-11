@@ -1,0 +1,184 @@
+# PDDL orchestrator inventory
+
+> A Brazilian Portuguese translation is available in [pddl-orchestrator-inventory.pt-br.md](pddl-orchestrator-inventory.pt-br.md).
+
+This is Phase 2 of the plan in [#402](https://github.com/A11yDevs/acessilia/issues/402) (the "Plano complementar" comment). It sorts every top-level definition of `backend/agents/pddl_orchestrator.py` by responsibility and proposes a destination for each group: the core, docstruct, the SDK or the Toolbox. Code with mixed responsibilities is marked to be decomposed first. Phase 3 migrates the groups one PR at a time, following this table. The orchestrator gets smaller because it loses responsibilities that are not its own, not because it is cut into files. That was the approach of [#381](https://github.com/A11yDevs/acessilia/issues/381), now `status:blocked`.
+
+It also carries out the inventory tasks of [#365](https://github.com/A11yDevs/acessilia/issues/365), which #381 absorbed:
+- map the groups and the state they share;
+- check, for each group, whether it is a pure structural algorithm, which belongs in docstruct ([ADR-0002](../adr/0002-component-responsibilities.md));
+- list the largest functions.
+
+- **Snapshot:** `acessilia` `develop` at `a5ae2a8e`. `backend/agents/pddl_orchestrator.py` has **6,185 lines**, and 192 top-level definitions are assigned to the groups.
+- **How it was measured:** the file was parsed with `ast`. Each top-level function, class and constant is assigned to one group, and none is left unassigned. A group's "Depends on" lists the other groups whose names its code refers to. The groups cover 5,599 lines; the rest is imports, the module docstring and blank lines.
+
+## Destination rule
+
+Each definition is classified by what it does, not by the file it is in or by whether it calls an agent ([ADR-0002](../adr/0002-component-responsibilities.md), "Where does new code go?").
+
+| If the code… | Destination | Basis |
+|---|---|---|
+| decides what to do or when: policy, plan, recovery, degradation, flow, user-facing messages | **core** | ADR-0002; constitution P2, P6 |
+| is a deterministic structural algorithm, with no I/O | **docstruct** | ADR-0002, [ADR-0009](../adr/0009-legacy-unicode-repair.md), [ADR-0011](../adr/0011-inline-math-from-font-runs.md) |
+| says how to reach a capability or an artifact: client call, render request, artifact id | **SDK** | ADR-0002 (question 4), [ADR-0005](../adr/0005-artifact-references.md), [ADR-0015](../adr/0015-artifact-reference-v1.md) |
+| runs a model, OCR, VLM or a renderer | **Toolbox** | [ADR-0003](../adr/0003-remote-only-operational-capabilities.md), [ADR-0012](../adr/0012-agents-reach-the-vlm-through-the-toolbox.md) |
+| mixes more than one of these | **decompose first**, then move each part | Plan, principle 1 |
+
+**docstruct works on its own types.** The orchestrator's functions take the core's Pydantic models: `ManifestElement`, `ProcessingManifest`, `Obligation`. docstruct cannot import them. Since [#203](https://github.com/A11yDevs/acessilia/issues/203) the document part has its normative definition in `docstruct.manifest` (`DocumentElement`, `BoundingBox`, `Provenance`), and the core's models are adapters over it (see the [manifest model inventory](manifest-model-inventory.md), decision D1).
+
+So "docstruct" below means the algorithm moves and works on docstruct types or plain values: boxes as tuples, text, rows. A small core adapter keeps the current signature, converts, and calls it. The adapter is what stays patchable for the tests.
+
+No group goes to the Toolbox: the orchestrator already runs no model or renderer locally. #402 Phase 1 and ADR-0003 removed the last ones.
+
+## Inventory
+
+Groups are lettered as in the analysis that produced this table. "Lines" is the span of the group's definitions and "Size" their total length. "PT" counts lines with Portuguese text, which the language guard and [#410](https://github.com/A11yDevs/acessilia/issues/410) track when they move.
+
+| Id | Group | Lines | Size | Depends on | PT | Destination |
+|---|---|---|---|---|---|---|
+| A | User-facing message ids (`MSG_*`) | 148–163 | 10 | — | 0 | core |
+| B | Formula handlers: MathML and speech | 166–286 | 115 | X | 11 | core (execution handler) |
+| C | Fusion infrastructure (`_run_extract_fused`, `_fusion_agent`) | 289–334 | 44 | — | 8 | core |
+| D | Shared targeting and element geometry | 337–1409 | 93 | — | 1 | **decompose** |
+| E | Simple deterministic handlers | 392–594 | 195 | D, O, S | 12 | core (execution handlers) |
+| F | Unicode repair and negation overlays | 599–957 | 334 | D | 2 | **decompose**: geometry to docstruct |
+| G | Rendering, region and page inspection | 960–1327 | 350 | D | 0 | **decompose**: render to SDK |
+| H | FusionAgent-backed text handlers | 1330–1527 | 140 | C, D | 7 | core; `_tailjoin_position` to docstruct |
+| I | Calibrated provider choice | 1539–1979 | 410 | D, K | 12 | **decompose**: box geometry to docstruct |
+| J | VLM pairwise judge | 1984–2226 | 231 | D, G, I | 10 | **decompose**: render to SDK, probability to docstruct |
+| K | Order and review handlers, handler registry | 2229–2396 | 158 | C, D, E, F, G, H, I | 5 | core |
+| L | Dual- and single-provider fusion | 2399–2680 | 274 | C, D, G | 16 | core |
+| M | Errors and page limits | 2683–2733 | 43 | — | 0 | core |
+| N | `PddlAccessibilityOrchestrator` (pipeline, plan, executor) | 2736–3071 | 336 | B, J, K, L, M, O–V | 2 | core (orchestration) |
+| O | Picture enrichment | 3079–4961 | 483 | G, U | 15 | **decompose**: render to SDK, heuristics to docstruct |
+| P | Formula enrichment | 3339–4160 | 510 | G, O, U | 0 | **decompose**: render to SDK, ranking to docstruct |
+| Q | Inline math | 3424–3722 | 280 | F, G | 0 | **decompose**: span geometry to docstruct, span reader to SDK |
+| R | Media triage | 4163–4216 | 52 | — | 0 | core |
+| S | Table enrichment and table text | 4288–4670 | 343 | G, O, U, X | 0 | **decompose**: row parsing to docstruct |
+| T | Obligation status and replanning | 4868–5059 | 144 | B, O, U | 0 | core |
+| U | Progress, page labels, availability log | 5031–5136 | 89 | — | 4 | core |
+| V | Payload builder | 5139–5358 | 204 | A, T, W, X | 1 | core |
+| W | Page payload: page numbers and letterhead | 5361–5666 | 271 | A, D, X | 0 | **decompose**: detection rules to docstruct |
+| X | Blocks, lists, text and table AST | 5669–6180 | 488 | A | 0 | **decompose**: list, text and table algorithms to docstruct |
+| Z | Legacy aliases (`PmvAccessibilityOrchestrator`, `build_pmv_structured_payload`) | 6184–6185 | 2 | N, V | 0 | remove (no caller) |
+
+Ranges overlap where a group's definitions are spread through the file. For example, D's `_element_role` and `_block_kind` sit near line 1400, and O's pure heuristics sit after S.
+
+### What moves, group by group
+
+Only the groups marked "decompose" or with a docstruct or SDK part are listed. The others stay whole in the core.
+
+- **D: shared targeting and element geometry.**
+  - `_element_bbox` turns a manifest element into a box in one coordinate origin, using `docstruct.geometry.is_bottom_left`. It is an adapter and stays in the core.
+  - `_element_role` and `_block_kind` are document semantics and go to docstruct, next to `docstruct.geometry.reading_role`.
+  - `_target_elements` and `_missing_obligation` read obligations, which is process, so they stay in the core.
+- **F: Unicode repair and negation overlays.** ADR-0009 already put detection and repair in docstruct (`docstruct.text.unicode_repair`). The overlay geometry goes to `docstruct.text.negation_overlay`, which already has `compose_negation`, `locate_in_grid` and `locate_in_text`: that is `_vertical`, `_table_grid`, `_compose_in_host` and the box tolerances. `_reattach_negation_overlays` and `_repair_table_cells` walk manifest elements; they become adapters over docstruct functions. The handler stays in the core.
+- **G: rendering, region and page inspection.**
+  - `_toolbox_render` builds a render request, checks the media type, and uses the source artifact or the file. `_source_artifact_id` resolves which stored artifact belongs to the document. Both go to the SDK (render a page or a clip; the source artifact).
+  - `_save_region_artifact` writes evidence under `settings.data_dir`, so it stays in the core.
+  - `_inspect_region` and `_inspect_page` call `VisionAgent`, so they stay in the core.
+  - The two handlers stay in the core, rewritten over these parts.
+- **H: text handlers.** `_tailjoin_position` is pure and joins `docstruct.fusion.tailjoin`, which already holds `tail_start`, `join_tail` and `page_number_position`. The handlers use `FusionAgent` and stay in the core.
+- **I: calibrated provider choice.**
+  - `_ordered_box`, `_iou` and `_pair_block` are box geometry and go to docstruct. `_iou` duplicates `docstruct.geometry.intersection_area`; see "Findings".
+  - `_page_number` and `_page_markdown` are small document helpers.
+  - `_load_secondary_extraction` reads a file and checks its digest, so it stays in the core.
+  - The calibrated pair, the preferences and the thresholds are policy: core.
+- **J: VLM pairwise judge.**
+  - `_render_page_png` is a render (SDK, through G).
+  - `_judge_probability` is pure and joins `docstruct.fusion.judge`, which already has `should_judge` and `decide_pair`.
+  - `_judge_page` is the core's synchronous wrapper over `ToolboxAdjudicateClient`.
+  - The handler (179 lines, the fourth largest function) stays in the core and is split there.
+- **O: picture enrichment.**
+  - The flow, retries and breaker stay in the core (`_enrich_picture_descriptions`, 197 lines, and `_retry_failed`).
+  - `_extract_picture_bytes`, `_picture_clip` and `_embedded_picture_bytes` (#386) mix a render (SDK), clip geometry (docstruct) and a size limit (core policy).
+  - The heuristics `_is_ocr_noise`, `_is_placeholder_text`, `_is_placeholder_visual_element` and `_has_meaningful_text` are pure text and element tests, so they go to docstruct. `_is_mostly_visual_manifest` becomes their adapter.
+  - `_inject_full_page_picture` changes the manifest, so it stays in the core.
+- **P: formula enrichment.**
+  - `_formula_recognition_crop` is a render and a crop (SDK, with docstruct for the clip).
+  - `_ranked_formula_candidates` normalizes LaTeX and ranks by confidence. It is pure and goes to docstruct, next to `docstruct.text.latex`.
+  - `_reclassify_formula_picture` and `_escalate_unresolved_formula` change the manifest, so they stay in the core.
+  - `_enrich_formula_latex`, at 299 lines the largest function in the file, stays in the core and is split there (#365).
+- **Q: inline math.**
+  - The span geometry goes to `docstruct.text.inline_math`, which already detects and splices the runs (ADR-0011): `_top_left_box`, `_detect_by_page`, `_element_span_lines`, `_claim_negation_overlay` and `_boxed_pages`.
+  - `_TextSpanReader` fetches `document.text.spans`. The fetch goes to the SDK; its per-document cache stays in the core.
+  - `_mark_inline_math`, `_mark_table_inline_math` and the setting check stay in the core.
+- **S: table enrichment.**
+  - `_rows_from_visual_table_text`, `_rows_from_pipe_table`, `_rows_from_delimited_lines`, `_looks_like_markdown_separator`, `_score_rows`, `_rows_look_like_placeholder` and `_table_ast_column_count` parse text into rows, so they go to `docstruct.tables`.
+  - The re-read rules (`_table_reread_disqualified`, `_keep_misread_table`, attempts and thresholds) and `_enrich_table_structures`, which calls `DataAgent`, stay in the core.
+- **W: page numbers and letterhead.**
+  - The detection rules go to docstruct, next to `docstruct.fusion.tailjoin.is_page_number`: `_is_decorated_page_number`, `_is_page_number_in_margin`, `_page_number_ids`, `_is_page_header_line`, `_is_beside` and `_letterhead_groups`.
+  - `_letterhead_block` sets the request locale for its message, so it stays in the core.
+  - `_manifest_pages_to_payload` builds the core's payload, so it stays in the core.
+- **X: blocks, lists, text and table AST.**
+  - These are list and text algorithms and go to docstruct: `_recover_empty_lettered_list_items` (130 lines) and `_merge_list_blocks` join `docstruct.blocks.lists`; `_callout_titles` joins `docstruct.blocks.callouts`; `_render_text_from_blocks`, `_render_text_from_pages` and `_normalize_metadata_links` go to docstruct too.
+  - `_table_ast_from_rows` and `_table_ast_from_metadata` overlap with `docstruct.tables.ast`; see "Findings".
+  - `_elements_to_blocks`, `_element_to_block` and `_text_kept_by_picture` turn manifest elements into blocks and use the `MSG_*` messages. They are adapters and stay in the core; the pure part of `_element_to_block` (110 lines) is split out first.
+
+### Largest functions
+
+These are the functions #365 asked to split, at their current size. All stay in the core; Phase 3 splits them after their pure parts have moved out.
+
+| Function | Group | Lines |
+|---|---|---|
+| `PddlAccessibilityOrchestrator` (class) | N | 336; `executar` alone 198 |
+| `_enrich_formula_latex` | P | 299 |
+| `_enrich_picture_descriptions` | O | 197 |
+| `_handle_vlm_pairwise_judge_method` | J | 179 |
+| `_enrich_table_structures` | S | 179 |
+| `build_pddl_structured_payload` | V | 134 |
+| `_recover_empty_lettered_list_items` | X | 130 (moves to docstruct) |
+
+## Findings
+
+1. **Near-duplicates of docstruct functions** (constitution P1). Merging them means choosing one behaviour, so each needs its own decision, not a neutral move:
+   - `_table_ast_from_rows` versus `docstruct.tables.ast.table_ast_from_rows`. The orchestrator's version returns `{"body": []}` when there are no rows and skips non-list rows. docstruct's returns `None` and normalizes mixed inputs.
+   - `_iou` versus `docstruct.geometry.intersection_area`. The intersection is the same; `_iou` adds the union. A docstruct `iou` built on `intersection_area` would serve both.
+2. **Dead aliases.** No module, script or test uses `PmvAccessibilityOrchestrator` or `build_pmv_structured_payload` (group Z). They can be removed in a small PR of their own.
+3. **Test patch points.** Tests replace **20 names** on the orchestrator module:
+
+   `VisionAgent` (10 files), `_extract_picture_bytes` (9), `inspect_source_media` (9), `_enrich_picture_descriptions` (5), `_enrich_table_structures` (5), `DataAgent` (4), `_formula_recognition_crop` (3), `_run_extract_fused` (3), `toolbox_recognize_formula` (3), `_toolbox_render` (2), `_EMBEDDED_PICTURE_MAX_BYTES`, `_inspect_page`, `_judge_page`, `_manifest_pages_to_payload`, `_render_source_page`, `_save_region_artifact`, `asyncio`, `t`, `toolbox_convert_latex`, `toolbox_verbalize_latex` (1 each).
+
+   Code that looks these names up must either keep doing so through the module that tests patch, or have its tests changed to patch the module where it now lives. The second option is the one this plan recommends: #381's injected hooks were where its four inconsistencies came from.
+4. **Portuguese lines move with their code.** The groups hold 106 lines with Portuguese text, mostly docstrings and log messages in B, C, E, I, J, L and O. Each move must lower the orchestrator's count in `tests/fixtures/portuguese_allowlist.json` by the lines that leave, and a new file cannot get an allowlist entry. So the moved lines are either exempted per path in `tests/test_no_portuguese.py` (user-facing text) or translated in the same PR (docstrings). #410 tracks the translation.
+5. **No local operation is left.** The orchestrator imports no operational library (`tests/test_architecture_layers.py`). Rendering, OCR, the VLM and conversion all go through the Toolbox, so nothing here moves to the Toolbox.
+
+## Phase 3 order
+
+Each step is one PR with no behaviour change. Characterization tests come first and run on develop. The core imports the new location directly, with no bridge and no wrapper, and tests patch names where they are looked up. The parity checkpoints on cases 036 and 006 in staging are taken at the end of each destination, with the processing cache off: its key does not include the code revision, so a branch run would read develop's output.
+
+1. **Remove the dead aliases** (Z).
+2. **docstruct, leaves first:**
+   - X's list and text algorithms;
+   - W's detection rules;
+   - S's row parsing;
+   - F's overlay geometry;
+   - Q's span geometry;
+   - O's text heuristics, I's box geometry, `_tailjoin_position` and `_judge_probability`;
+   - `_element_role` and `_block_kind`.
+
+   Each moves with its tests into `libs/docstruct/tests`, and leaves an adapter in the core where the signature takes core models.
+3. **SDK:**
+   - a page and clip render (from G's `_toolbox_render`);
+   - the source artifact of a document (`_source_artifact_id`);
+   - the text spans fetch (from Q's `_TextSpanReader`).
+4. **Decompose the mixed functions in the core:** G's handlers, O's `_extract_picture_bytes`, and P's `_formula_recognition_crop` and `_enrich_formula_latex`.
+5. **Split the largest functions** in the table above, one per PR.
+6. **Reorganize inside the core** only what is still above the size limit (decision D4), for example the execution handlers into `backend/core/execution/handlers/`.
+
+The near-duplicates in finding 1 are behaviour decisions, each in its own PR (P8).
+
+## Decisions to take
+
+- **D1. Types for docstruct functions.**
+  - **The question:** should the moved algorithms take docstruct's `DocumentElement`, or plain values (box tuples, strings, rows)?
+  - **Proposal:** plain values for geometry and text, `DocumentElement` only where the algorithm needs the element's structure. That keeps adapters small and does not require the core to build docstruct elements on the hot path.
+- **D2. The two near-duplicates.**
+  - **The question:** which behaviour wins for the empty case of `table_ast_from_rows` (`None` or an empty body)? And should docstruct gain an `iou`?
+  - **Proposal:** decide each with its callers' tests in a behaviour PR, after the neutral moves.
+- **D3. Shape of the SDK render helper.**
+  - **The question:** should it be a client method (`ToolboxPdfClient.render_clip(...)`) or a composition function?
+  - **Proposal:** a client method now. A composition layer is what ADR A, in Phase 4 of the plan, decides, so it should not be assumed here.
+- **D4. Module size limit.**
+  - **The question:** #365 asked for an agreed limit on module size, checked by a test.
+  - **Proposal:** 900 lines for any module under `backend/agents/` and `backend/core/`. Two modules exceed it today: `pddl_orchestrator.py` (6,185) and `backend/core/manifest/builder.py` (1,205). Both enter the test's allowlist at their current size, which can only shrink; the next largest is `backend/agents/vision_agent.py` (758).
