@@ -656,6 +656,62 @@ class TestVlmPairwiseJudge:
             "content": "docling", "choice": "docling", "pB": None, "reason": "agree",
         }
 
+    # Characterization (#402), written on develop before the handler was split.
+
+    def test_a_page_that_cannot_be_rendered_fails_the_method(self, tmp_path, monkeypatch) -> None:
+        from backend.agents.pddl_orchestrator import _handle_vlm_pairwise_judge_method
+
+        manifest = self._manifest(tmp_path)
+        seen = self._fake_judge(monkeypatch, 0.1)
+
+        def broken(*args, **kwargs):
+            raise RuntimeError("broken source")
+
+        monkeypatch.setattr("backend.agents.pddl_orchestrator._render_page_png", broken)
+
+        result = _handle_vlm_pairwise_judge_method(manifest, "o-1")
+
+        assert not result.success and not result.validated
+        assert result.message.endswith(" 1 n\u00e3o p\u00f4de ser renderizada: broken source")
+        assert not seen
+        assert "page_judgement" not in manifest.elements[0].metadata
+
+    def test_the_confirmation_names_each_page_and_how_it_was_confirmed(self, tmp_path, monkeypatch) -> None:
+        from backend.agents.pddl_orchestrator import _handle_vlm_pairwise_judge_method
+
+        manifest = self._manifest(tmp_path)
+        second = manifest.elements[0].model_copy(deep=True)
+        second.id, second.page_number, second.reading_order = "p-2", 2, 2
+        second.provenance[0].page_number = 2
+        manifest.elements.append(second)
+        manifest.obligations[0].target_ids.append("p-2")
+        monkeypatch.setattr("backend.agents.pddl_orchestrator._render_page_png", lambda *a, **k: b"\x89PNG")
+        calls = []
+
+        def judge(image, candidate_a, candidate_b):
+            calls.append(candidate_a)
+            return {"document": {"pB": 0.25, "pB_ab": 0.2, "pA_ba": 0.7, "model": "m"}}
+
+        monkeypatch.setattr("backend.agents.pddl_orchestrator._judge_page", judge)
+        from backend.agents import pddl_orchestrator as pddl
+        secondary, _ = pddl._secondary_or_failure(manifest)
+        monkeypatch.setattr(
+            "backend.agents.pddl_orchestrator._secondary_or_failure",
+            lambda m: (pddl._SecondaryExtraction(secondary.provider, {1: secondary.pages[1], 2: [
+                {"type": "paragraph", "text": manifest.elements[1].text}]}, secondary.sizes), None),
+        )
+
+        result = _handle_vlm_pairwise_judge_method(manifest, "o-1")
+
+        assert result.success and result.validated
+        assert result.message.startswith("Juiz VLM confirma a p")
+        assert result.message.endswith(" aplicada: 1 (docling, pB=0.25), 2 (docling, concordam)")
+        assert len(calls) == 1
+        assert manifest.elements[0].metadata["page_judgement"] == {
+            "content": "docling", "choice": "docling", "pB": 0.25, "pB_ab": 0.2, "pA_ba": 0.7,
+            "model": "m", "truncated": False,
+        }
+
     def test_page_without_both_transcriptions_is_not_judged(self, tmp_path, monkeypatch) -> None:
         from backend.agents.pddl_orchestrator import _handle_vlm_pairwise_judge_method
 
