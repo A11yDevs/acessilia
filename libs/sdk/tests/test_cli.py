@@ -142,22 +142,85 @@ def test_download_writes_the_verified_artifact(tmp_path, key_file) -> None:
     assert route.calls.last.request.headers["Authorization"] == "Bearer secret-key"
 
 
+def _publish_retrieve(router: respx.MockRouter, base_url: str) -> None:
+    """A secondary is used only if its catalogue publishes the capability."""
+    router.get(f"{base_url}/v1/capabilities").mock(
+        return_value=httpx.Response(200, json=[{"id": "artifact.retrieve", "version": 1}])
+    )
+    router.get(f"{base_url}/v1/providers").mock(return_value=httpx.Response(200, json=[]))
+
+
 def test_download_moves_on_when_an_endpoint_does_not_have_the_artifact(tmp_path) -> None:
     output = tmp_path / "out.pdf"
     with respx.mock() as router:
         router.get(f"{A}/v1/artifacts/{DIGEST}").mock(return_value=httpx.Response(404))
-        # A secondary is used only if its catalogue publishes the capability.
-        router.get(f"{B}/v1/capabilities").mock(
-            return_value=httpx.Response(200, json=[{"id": "artifact.retrieve", "version": 1}])
-        )
-        router.get(f"{B}/v1/providers").mock(return_value=httpx.Response(200, json=[]))
+        _publish_retrieve(router, B)
         router.get(f"{B}/v1/artifacts/{DIGEST}").mock(
             return_value=httpx.Response(200, content=CONTENT)
         )
-        status, _, err = _run("--endpoint", A, "--endpoint", B, "download", DIGEST, str(output))
+        status, out, err = _run(
+            "--endpoint", A, "--endpoint", B, "download", DIGEST, str(output)
+        )
 
-    assert (status, err) == (0, "")
+    assert (status, out) == (0, f"{output}\n")
     assert output.read_bytes() == CONTENT
+    # The switch to another deployment is visible (ADR-0006, ADR-0014).
+    lines = err.splitlines()
+    assert len(lines) == 1
+    assert lines[0].startswith(f"warning: endpoint {A} failed: ToolboxArtifactNotFound: ")
+
+
+def test_a_timeout_on_the_primary_is_reported_when_the_secondary_succeeds(tmp_path) -> None:
+    output = tmp_path / "out.pdf"
+    with respx.mock() as router:
+        router.get(f"{A}/v1/artifacts/{ARTIFACT_ID}").mock(
+            side_effect=httpx.ReadTimeout("slow")
+        )
+        _publish_retrieve(router, B)
+        router.get(f"{B}/v1/artifacts/{ARTIFACT_ID}").mock(
+            return_value=httpx.Response(200, content=CONTENT)
+        )
+        status, out, err = _run(
+            "--endpoint", A, "--endpoint", B, "download", ARTIFACT_ID, str(output)
+        )
+
+    assert (status, out) == (0, f"{output}\n")
+    assert output.read_bytes() == CONTENT
+    lines = err.splitlines()
+    assert len(lines) == 1
+    assert lines[0].startswith(f"warning: endpoint {A} failed: ToolboxTimeout: ")
+
+
+def test_when_every_endpoint_fails_each_is_reported_then_the_error(tmp_path) -> None:
+    with respx.mock() as router:
+        router.get(f"{A}/v1/artifacts/{ARTIFACT_ID}").mock(
+            side_effect=httpx.ConnectError("refused")
+        )
+        _publish_retrieve(router, B)
+        router.get(f"{B}/v1/artifacts/{ARTIFACT_ID}").mock(
+            side_effect=httpx.ReadTimeout("slow")
+        )
+        status, out, err = _run(
+            "--endpoint", A, "--endpoint", B, "download", ARTIFACT_ID, str(tmp_path / "x")
+        )
+
+    assert (status, out) == (1, "")
+    lines = err.splitlines()
+    assert lines[0].startswith(f"warning: endpoint {A} failed: ToolboxProviderUnavailable: ")
+    assert lines[1].startswith(f"warning: endpoint {B} failed: ToolboxTimeout: ")
+    assert lines[2].startswith("error: ToolboxUnavailable: ")
+    assert len(lines) == 3
+
+
+def test_one_endpoint_reports_its_error_without_a_failover_line(tmp_path) -> None:
+    with respx.mock() as router:
+        router.get(f"{A}/v1/artifacts/{ARTIFACT_ID}").mock(
+            side_effect=httpx.ReadTimeout("slow")
+        )
+        status, _, err = _run("--endpoint", A, "download", ARTIFACT_ID, str(tmp_path / "x"))
+
+    assert status == 1
+    assert [line.split(":", 1)[0] for line in err.splitlines()] == ["error"]
 
 
 def test_a_digest_mismatch_fails_and_leaves_no_file(tmp_path) -> None:
@@ -211,10 +274,26 @@ def test_download_closes_its_client_on_success_and_on_failure(tmp_path, monkeypa
     "argv",
     [
         ["--endpoint", "not-a-url", "catalog"],
+        ["--endpoint", "http://toolbox.test:bad", "catalog"],
+        ["--endpoint", "http://toolbox.test:bad", "download", ARTIFACT_ID, "out"],
+        ["--endpoint", A, "--endpoint", "http://toolbox-b.test:99999", "catalog"],
+        ["--endpoint", A, "--endpoint", "ftp://toolbox-b.test", "download", ARTIFACT_ID, "out"],
         ["--endpoint", A, "--timeout", "0", "catalog"],
         ["--endpoint", A, "download", "not-an-id", "out"],
+        ["--endpoint", A, "download", "a" * 64 + "\n", "out"],
+        ["--endpoint", A, "download", ARTIFACT_ID + " ", "out"],
     ],
-    ids=["bad-url", "bad-timeout", "bad-id"],
+    ids=[
+        "no-scheme",
+        "bad-port-catalog",
+        "bad-port-download",
+        "bad-secondary-port",
+        "bad-secondary-scheme",
+        "bad-timeout",
+        "bad-id",
+        "id-with-trailing-newline",
+        "id-with-trailing-space",
+    ],
 )
 def test_invalid_arguments_exit_2_without_a_request(argv) -> None:
     with respx.mock() as router:
@@ -273,3 +352,16 @@ def test_an_unreachable_toolbox_is_typed_in_a_fresh_interpreter() -> None:
     )
     assert result.returncode == 1, result.stderr
     assert result.stderr.startswith("error: ToolboxProviderUnavailable: ")
+
+
+def test_an_invalid_port_is_a_usage_error_from_the_command_line_too() -> None:
+    """Before #437's review this ended in an httpx.InvalidURL traceback, exit 1."""
+    result = subprocess.run(
+        [sys.executable, "-c", _BLOCKED % str(SRC), "--endpoint", "http://toolbox.test:bad", "catalog"],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 2
+    assert result.stderr.startswith("error: unusable endpoint 'http://toolbox.test:bad'")
+    assert "Traceback" not in result.stderr

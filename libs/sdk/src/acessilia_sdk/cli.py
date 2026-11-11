@@ -10,7 +10,9 @@ Every value comes from the arguments: the SDK reads no settings and no
 environment (ADR-0002). The API key is read from a file (``-`` for standard
 input) so it never appears in the process list. ``catalog`` reads the first
 endpoint, the one every capability call goes to first; ``download`` tries the
-endpoints in order, like the capability clients (ADR-0006, ADR-0014).
+endpoints in order, like the capability clients (ADR-0006, ADR-0014), and
+reports each endpoint it leaves on standard error, so a failover is never
+silent even when the download succeeds.
 
 Exit status: 0 on success, 1 when the Toolbox or the file system fails
 (the typed error is printed on standard error), 2 for invalid arguments.
@@ -25,6 +27,9 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 from typing import TextIO
+from urllib.parse import urlsplit
+
+import httpx
 
 from acessilia_sdk.toolbox.artifacts import ARTIFACT_ID_RE
 from acessilia_sdk.toolbox.catalog import CatalogSnapshot, read_catalog
@@ -74,6 +79,24 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _endpoints(urls: Sequence[str]) -> tuple[ToolboxEndpoint, ...]:
+    """The endpoints, each also accepted by the HTTP client, or ``ValueError``.
+
+    ``ToolboxEndpoint`` checks the scheme and the host. A port that is not a
+    number makes httpx fail only when a client is built, and one out of range
+    (``:99999``) only when it connects. Checking both here keeps every unusable
+    URL an invalid argument, reported before any request.
+    """
+    endpoints = parse_endpoints(urls)
+    for endpoint in endpoints:
+        try:
+            httpx.URL(endpoint.base_url)
+            urlsplit(endpoint.base_url).port
+        except (httpx.InvalidURL, ValueError) as exc:
+            raise ValueError(f"unusable endpoint {endpoint.base_url!r}: {exc}") from exc
+    return endpoints
+
+
 def _read_api_key(path: str | None, stdin: TextIO) -> str:
     if path is None:
         return ""
@@ -109,9 +132,20 @@ async def _download(
     artifact_id: str,
     output: Path,
     stdout: TextIO,
+    stderr: TextIO,
 ) -> None:
+    def report_failover(endpoint: ToolboxEndpoint, error: ToolboxError) -> None:
+        # Called for each endpoint that failed, the last one included, so it
+        # does not promise another attempt: the final error, if any, follows.
+        stderr.write(
+            f"warning: endpoint {endpoint.base_url} failed: {type(error).__name__}: {error}\n"
+        )
+
     client = ToolboxArtifactClient(
-        endpoints=endpoints, api_key=api_key, timeout_seconds=timeout
+        endpoints=endpoints,
+        api_key=api_key,
+        timeout_seconds=timeout,
+        on_failover=report_failover,
     )
     try:
         await client.download(artifact_id, output)
@@ -135,16 +169,22 @@ def main(
     try:
         if args.timeout <= 0:
             raise ValueError("--timeout must be positive")
-        endpoints = parse_endpoints(args.endpoint)
+        endpoints = _endpoints(args.endpoint)
         api_key = _read_api_key(args.api_key_file, stdin)
-        if args.command == "download" and not ARTIFACT_ID_RE.match(args.artifact_id):
+        if args.command == "download" and not ARTIFACT_ID_RE.fullmatch(args.artifact_id):
             raise ValueError(f"not an artifact id: {args.artifact_id!r}")
         if args.command == "catalog":
             asyncio.run(_catalog(endpoints, api_key, args.timeout, stdout))
         else:
             asyncio.run(
                 _download(
-                    endpoints, api_key, args.timeout, args.artifact_id, args.output, stdout
+                    endpoints,
+                    api_key,
+                    args.timeout,
+                    args.artifact_id,
+                    args.output,
+                    stdout,
+                    stderr,
                 )
             )
     except ToolboxError as exc:

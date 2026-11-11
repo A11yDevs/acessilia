@@ -168,7 +168,10 @@ python -m acessilia_sdk --endpoint https://a.example --endpoint https://b.exampl
 
 `--timeout` sets the per-request timeout (10 s by default). Exit status: 0 on
 success, 1 when the Toolbox or the file system fails (the typed error, such as
-`ToolboxTimeout`, is printed on standard error), 2 for invalid arguments.
+`ToolboxTimeout`, is printed on standard error), 2 for invalid arguments,
+including an endpoint URL the HTTP client cannot use. Each endpoint a download
+leaves behind is reported on standard error as a `warning:` line, even when a
+later endpoint succeeds (ADR-0006).
 Calling capabilities from the command line comes next (#402).
 
 ## Adding a capability

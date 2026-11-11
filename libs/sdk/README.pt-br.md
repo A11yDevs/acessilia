@@ -172,7 +172,9 @@ python -m acessilia_sdk --endpoint https://a.example --endpoint https://b.exampl
 `--timeout` define o timeout por requisição (10 s por padrão). Código de saída:
 0 em sucesso, 1 quando a Toolbox ou o sistema de arquivos falha (o erro
 tipado, como `ToolboxTimeout`, sai na saída de erro), 2 para argumentos
-inválidos. Chamar capacidades pela linha de comando vem a seguir (#402).
+inválidos, inclusive uma URL de endpoint que o cliente HTTP não aceita. Cada
+endpoint que um download deixa para trás aparece na saída de erro numa linha
+`warning:`, mesmo quando um endpoint seguinte dá certo (ADR-0006). Chamar capacidades pela linha de comando vem a seguir (#402).
 
 ## Adicionar uma capacidade
 
