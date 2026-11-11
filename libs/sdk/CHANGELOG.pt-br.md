@@ -7,6 +7,9 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
 ## Não lançado
 
+- **Adicionado** `RENDER_MEDIA_TYPES` em `acessilia_sdk.toolbox.clients.pdf`: as
+  entradas que o `pdf.render@2` abre (PDF, PNG, JPEG), para quem chama conferir
+  antes de enviar um arquivo. O próprio `render` não confere, como antes (#402).
 - **Adicionado** `ToolboxPdfClient.text_spans_by_page(file_path, artifact_id, *, pages,
   use_remote_cache)`: a página `text-spans@1` de cada página pedida, por número
   de página. Pede cada página uma vez, em ordem, em chamadas de no máximo

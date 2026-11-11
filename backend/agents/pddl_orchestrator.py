@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
+from acessilia_sdk.toolbox.clients.pdf import RENDER_MEDIA_TYPES
 from docstruct.blocks.callouts import callout_titles
 from docstruct.blocks.callouts import dedupe_callout_titles as _dedupe_callout_titles
 from docstruct.blocks.lists import (
@@ -1075,9 +1076,8 @@ def _handle_pymupdf_region_method(manifest: ProcessingManifest, obligation_id: s
         )
 
 
-#: Inputs ``pdf.render@2`` opens. The pipeline also accepts TIFF, BMP, GIF and
-#: WebP; the Toolbox does not render those, and there is no local fallback.
-_RENDERABLE_MEDIA_TYPES = frozenset({"application/pdf", "image/png", "image/jpeg"})
+# The pipeline also accepts TIFF, BMP, GIF and WebP, which pdf.render@2 does not
+# open (RENDER_MEDIA_TYPES), and there is no local fallback.
 
 
 def _source_artifact_id(manifest: ProcessingManifest) -> str | None:
@@ -1119,8 +1119,8 @@ def _toolbox_render(
     instead of uploaded; the file is sent only if the Toolbox no longer has it.
 
     The upload is labelled from the file extension; ``media_type`` (the
-    manifest's) must agree with that label. Inputs outside
-    ``_RENDERABLE_MEDIA_TYPES`` are refused here with a ``ValueError``, before
+    manifest's) must agree with that label. Inputs outside the SDK's
+    ``RENDER_MEDIA_TYPES`` are refused here with a ``ValueError``, before
     any request, so the method fails with that reason and not a Toolbox error.
     """
     from acessilia_sdk.runtime import run_sync
@@ -1134,7 +1134,7 @@ def _toolbox_render(
         raise ValueError(
             f"Source is {media_type} in the manifest but would be sent as {sent_as}"
         )
-    if sent_as not in _RENDERABLE_MEDIA_TYPES:
+    if sent_as not in RENDER_MEDIA_TYPES:
         raise ValueError(
             f"pdf.render@2 renders PDF, PNG and JPEG inputs, not {sent_as}"
         )
@@ -3650,7 +3650,7 @@ async def _classify_formula_regions(
     """
     from backend.config.settings import settings
 
-    if manifest.source.media_type not in _RENDERABLE_MEDIA_TYPES:
+    if manifest.source.media_type not in RENDER_MEDIA_TYPES:
         return
     candidates = [
         element for element in manifest.elements
@@ -3799,7 +3799,7 @@ async def _enrich_formula_latex(
     # Without a page to render there is no crop to recognize. DOCX/PPTX
     # formulas stay as the extractor delivered them instead of paying one
     # failed render per formula.
-    if manifest.source.media_type not in _RENDERABLE_MEDIA_TYPES:
+    if manifest.source.media_type not in RENDER_MEDIA_TYPES:
         return
 
     if status_callback:
