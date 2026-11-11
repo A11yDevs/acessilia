@@ -18,9 +18,9 @@ from backend.log_messages import (
     LOG_STRUCTURAL_PROVIDER_DEGRADED,
 )
 from backend.tools.logger import logger
+from acessilia_sdk.toolbox import artifact_endpoint_urls, one_artifact_endpoint
 from acessilia_sdk.toolbox.clients import ToolboxArtifactClient, ToolboxStructureClient
 from backend.tools.toolbox_client import (
-    ToolboxCapabilityClient,
     ToolboxError,
     ToolboxProviderUnavailable,
     ToolboxTimeout,
@@ -30,31 +30,6 @@ from backend.tools.toolbox_client import (
 
 if TYPE_CHECKING:
     from docstruct.policy import FusionPolicy
-
-
-def _artifact_endpoint_urls(*clients: ToolboxCapabilityClient | None) -> set[str]:
-    """Collect deployment URLs, including the legacy single-base-url fallback."""
-    urls: set[str] = set()
-    for client in clients:
-        if client is None:
-            continue
-        endpoints = getattr(client, "endpoints", ())
-        client_urls = {endpoint.base_url for endpoint in endpoints}
-        base_url = getattr(client, "base_url", None)
-        if not client_urls and isinstance(base_url, str):
-            client_urls.add(base_url.rstrip("/"))
-        urls.update(client_urls)
-    return urls
-
-
-def _one_artifact_endpoint(*clients: ToolboxCapabilityClient | None) -> bool:
-    """IDs are reusable only within one configured Toolbox deployment.
-
-    Multiple URLs represent independent deployments (ADR-0006), so the source
-    must accompany extraction instead of relying on an upload client choosing
-    the same deployment. A single URL may address a shared-storage balancer.
-    """
-    return len(_artifact_endpoint_urls(*clients)) <= 1
 
 
 @dataclass(frozen=True)
@@ -132,14 +107,14 @@ class ToolboxManifestExtractor:
             # uses the actual upload client, which may differ from an injected
             # structure client even when each has only one endpoint.
             structure_urls = (
-                _artifact_endpoint_urls(structure) if self.use_artifact_store else set()
+                artifact_endpoint_urls(structure) if self.use_artifact_store else set()
             )
             if artifacts is None and self.use_artifact_store and len(structure_urls) <= 1:
                 artifacts = make_toolbox_client(ToolboxArtifactClient)
             use_artifact_store = (
                 self.use_artifact_store
                 and artifacts is not None
-                and len(structure_urls | _artifact_endpoint_urls(artifacts)) <= 1
+                and len(structure_urls | artifact_endpoint_urls(artifacts)) <= 1
             )
             return await self._extract_with(
                 structure, artifacts, source_path,
@@ -237,7 +212,7 @@ class ToolboxManifestExtractor:
                 try:
                     secondary_artifact_id = (
                         artifact_id
-                        if _one_artifact_endpoint(
+                        if one_artifact_endpoint(
                             structure, artifacts, secondary_client
                         )
                         else None

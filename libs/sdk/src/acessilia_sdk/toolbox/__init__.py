@@ -3,7 +3,9 @@
 from acessilia_sdk.toolbox.artifacts import (
     ArtifactRef,
     ArtifactReference,
+    artifact_endpoint_urls,
     download_artifact,
+    one_artifact_endpoint,
     parse_reference,
     read_artifact,
 )
@@ -83,6 +85,7 @@ __all__ = [
     "ToolboxUnavailable",
     "ToolboxUnsupportedMediaType",
     "VLM_GATEWAY_PATH",
+    "artifact_endpoint_urls",
     "auth_headers",
     "download_artifact",
     "execute_capability",
@@ -92,6 +95,7 @@ __all__ = [
     "read_catalog",
     "parse_reference",
     "media_type_for",
+    "one_artifact_endpoint",
     "parse_endpoints",
     "provider_default",
     "raise_for_error",

@@ -1,9 +1,10 @@
 """Which Toolbox deployments a set of clients addresses (#402, step 5).
 
 An artifact id is reusable only within one deployment (ADR-0006, ADR-0013):
-the extractor uploads once and passes the id to extraction only when every
-client involved addresses the same single URL. Characterization of the two
-helpers that answer that, before they move to the SDK.
+the core's extractor uploads once and passes the id to extraction only when
+every client involved addresses the same single URL. These cases were written
+against the extractor's private helpers on develop and pass unchanged here,
+apart from the import, since the helpers moved to the SDK.
 """
 
 from __future__ import annotations
@@ -13,12 +14,12 @@ from types import SimpleNamespace
 import pytest
 import pytest_asyncio
 
-from acessilia_sdk.toolbox import ToolboxEndpoint
-from acessilia_sdk.toolbox.clients import ToolboxArtifactClient, ToolboxStructureClient
-from backend.core.manifest.toolbox_extractor import (
-    _artifact_endpoint_urls as artifact_endpoint_urls,
-    _one_artifact_endpoint as one_artifact_endpoint,
+from acessilia_sdk.toolbox import (
+    ToolboxEndpoint,
+    artifact_endpoint_urls,
+    one_artifact_endpoint,
 )
+from acessilia_sdk.toolbox.clients import ToolboxArtifactClient, ToolboxStructureClient
 
 A = "http://toolbox-a.test"
 B = "http://toolbox-b.test"

@@ -7,6 +7,11 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
 ## Não lançado
 
+- **Adicionados** `artifact_endpoint_urls(*clients)` e `one_artifact_endpoint(*clients)`
+  (`acessilia_sdk.toolbox.artifacts`): as URLs que um conjunto de clientes pode
+  usar, e se um id de artefato pode ser compartilhado entre eles (no máximo uma
+  URL; ADR-0006, ADR-0013). Eram helpers privados do extrator do core, que
+  continua decidindo entre enviar por upload ou mandar o arquivo (#402).
 - **Adicionado** `read_catalog` aceita um `api_key` opcional, usado quando o
   endpoint não tem chave própria, como fazem os clientes de capacidade. O gate
   de disponibilidade do core passa a chave dos seus clientes com o endpoint
