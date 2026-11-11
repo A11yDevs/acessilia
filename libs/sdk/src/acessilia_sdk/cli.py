@@ -8,6 +8,8 @@
                                  call an ``execute`` capability; prints its envelope
     upload FILE                  store a file; prints its artifact id
     download ID OUTPUT           a stored artifact, checked against its digest
+    dataset list | describe | splits | items | item | artifact | sample | sync
+                                 the dataset routes; JSON, or the artifact's bytes
 
 Every value comes from the arguments: the SDK reads no settings and no
 environment (ADR-0002). The API key is read from a file (``-`` for standard
@@ -20,10 +22,11 @@ silent even when the call succeeds.
 ``run`` dispatches by transport. Capabilities in the SDK's registry with the
 ``execute`` transport go through ``POST /v1/capabilities/{id}:execute``, with
 the registry's provider unless ``--provider`` says otherwise. ``rest``
-capabilities have routes and arguments of their own: ``artifact.store`` and
-``artifact.retrieve`` are the ``upload`` and ``download`` commands, and the
-``dataset.*`` routes are the SDK's ``ToolboxDatasetClient``. A capability
-outside the registry is refused before any request.
+capabilities have routes and arguments of their own, so each has a command
+(``REST_COMMANDS``): ``artifact.store`` and ``artifact.retrieve`` are
+``upload`` and ``download``, and ``dataset.*`` are the ``dataset``
+subcommands, through the SDK's ``ToolboxDatasetClient``. ``run`` points to
+them. A capability outside the registry is refused before any request.
 
 Exit status: 0 on success, 1 when the Toolbox or the file system fails
 (the typed error is printed on standard error), 2 for invalid arguments.
@@ -34,7 +37,9 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import sys
+import tempfile
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, TextIO
@@ -51,6 +56,7 @@ from acessilia_sdk.toolbox.capabilities import (
 from acessilia_sdk.toolbox.catalog import CatalogSnapshot, read_catalog
 from acessilia_sdk.toolbox.client import ToolboxCapabilityClient
 from acessilia_sdk.toolbox.clients.artifact import ToolboxArtifactClient
+from acessilia_sdk.toolbox.clients.dataset import MAX_PAGE_SIZE, ToolboxDatasetClient
 from acessilia_sdk.toolbox.endpoints import ToolboxEndpoint, parse_endpoints
 from acessilia_sdk.toolbox.errors import ToolboxError
 
@@ -59,10 +65,18 @@ from acessilia_sdk.toolbox.errors import ToolboxError
 #: a capability such as an extraction can take minutes.
 CATALOG_TIMEOUT_SECONDS = 10.0
 
-#: The ``rest`` capabilities a command covers, and where the others are.
+#: The command that reaches each ``rest`` capability of the registry.
 REST_COMMANDS = {
-    "artifact.store": "the 'upload' command",
-    "artifact.retrieve": "the 'download' command",
+    "artifact.store": "upload",
+    "artifact.retrieve": "download",
+    "dataset.list": "dataset list",
+    "dataset.describe": "dataset describe",
+    "dataset.list_splits": "dataset splits",
+    "dataset.list_items": "dataset items",
+    "dataset.get_item": "dataset item",
+    "dataset.get_artifact": "dataset artifact",
+    "dataset.sample": "dataset sample",
+    "dataset.sync": "dataset sync",
 }
 
 EXIT_OK = 0
@@ -125,7 +139,57 @@ def _parser() -> argparse.ArgumentParser:
     )
     download.add_argument("artifact_id", help="sha256:<64 hex> or <64 hex>")
     download.add_argument("output", type=Path, help="file to write; its directory must exist")
+    _dataset_parser(commands)
     return parser
+
+
+def _count(minimum: int):
+    def parse(text: str) -> int:
+        value = int(text)
+        if value < minimum:
+            raise argparse.ArgumentTypeError(f"must be at least {minimum}")
+        return value
+
+    return parse
+
+
+def _dataset_parser(commands) -> None:
+    dataset = commands.add_parser(
+        "dataset", help="the dataset routes (/v1/datasets) through ToolboxDatasetClient"
+    )
+    routes = dataset.add_subparsers(dest="route", required=True)
+
+    def route(name: str, help_text: str, *, split: bool = False, revision: bool = True):
+        parser = routes.add_parser(name, help=help_text)
+        if name != "list":
+            parser.add_argument("dataset_id")
+        if split:
+            parser.add_argument("split")
+        if revision:
+            parser.add_argument("--revision", help="dataset revision (default: the current one)")
+        return parser
+
+    route("list", "every dataset the Toolbox mirrors", revision=False)
+    route("describe", "one dataset")
+    route("splits", "the splits of a dataset")
+    items = route("items", "the items of a split", split=True)
+    items.add_argument("--limit", type=_count(0), help="at most this many items")
+    items.add_argument("--offset", type=_count(0), default=0, help="skip this many items")
+    items.add_argument(
+        "--all",
+        action="store_true",
+        help=f"read every page ({MAX_PAGE_SIZE} items each), up to --limit if given",
+    )
+    item = route("item", "one item", split=True)
+    item.add_argument("item_id")
+    artifact = route("artifact", "write one artifact of an item to a file", split=True)
+    artifact.add_argument("item_id")
+    artifact.add_argument("path", help="the artifact's path in the item")
+    artifact.add_argument("output", type=Path, help="file to write; its directory must exist")
+    sample = route("sample", "a sample of a split (not retried: one attempt)", split=True)
+    sample.add_argument("--n", type=_count(1), default=5, help="sample size (default 5)")
+    sync = route("sync", "re-mirror a dataset's artifacts in the Toolbox")
+    sync.add_argument("--split", help="only this split")
 
 
 def _endpoints(urls: Sequence[str]) -> tuple[ToolboxEndpoint, ...]:
@@ -174,9 +238,9 @@ def executable_capability(capability_id: str) -> ToolboxCapability:
             "the SDK calls only the contracts it was written against"
         )
     if spec.transport != "execute":
-        where = REST_COMMANDS.get(capability_id, "the SDK's ToolboxDatasetClient")
         raise ValueError(
-            f"{capability_id} is a REST capability, not an :execute one; use {where}"
+            f"{capability_id} is a REST capability, not an :execute one; "
+            f"use the '{REST_COMMANDS[capability_id]}' command"
         )
     return spec
 
@@ -294,6 +358,69 @@ async def _upload(ctx: _Context, file_path: Path) -> None:
     ctx.stdout.write(f"{artifact_id}\n")
 
 
+def _write_atomically(output: Path, data: bytes) -> None:
+    """Write ``data`` next to ``output`` and move it in place; no partial file."""
+    fd, name = tempfile.mkstemp(dir=output.parent, prefix=f".{output.name}.", suffix=".part")
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(name, output)
+    except BaseException:
+        Path(name).unlink(missing_ok=True)
+        raise
+
+
+async def _dataset(ctx: _Context, args: argparse.Namespace) -> None:
+    client = ctx.client(ToolboxDatasetClient)
+    try:
+        if args.route == "list":
+            result: Any = await client.list_datasets()
+        elif args.route == "describe":
+            result = await client.describe_dataset(args.dataset_id, args.revision)
+        elif args.route == "splits":
+            result = await client.list_splits(args.dataset_id, args.revision)
+        elif args.route == "items" and args.all:
+            result = await client.list_all_items(
+                args.dataset_id, args.split, revision=args.revision, limit=args.limit
+            )
+        elif args.route == "items":
+            result = await client.list_items(
+                args.dataset_id,
+                args.split,
+                args.revision,
+                limit=100 if args.limit is None else args.limit,
+                offset=args.offset,
+            )
+        elif args.route == "item":
+            result = await client.get_item(
+                args.dataset_id, args.split, args.item_id, args.revision
+            )
+        elif args.route == "artifact":
+            data = await client.get_dataset_artifact(
+                args.dataset_id, args.split, args.item_id, args.path, args.revision
+            )
+            _write_atomically(args.output, data)
+            ctx.stdout.write(f"{args.output}\n")
+            return
+        elif args.route == "sample":
+            result = await client.sample_dataset(
+                args.dataset_id, args.split, args.revision, n=args.n
+            )
+        else:
+            result = await client.sync_dataset(
+                args.dataset_id,
+                args.revision,
+                split=args.split,
+                timeout_seconds=ctx.timeout,
+            )
+    finally:
+        await client.close()
+    json.dump(result, ctx.stdout, indent=2, ensure_ascii=False)
+    ctx.stdout.write("\n")
+
+
 async def _download(ctx: _Context, artifact_id: str, output: Path) -> None:
     client = ctx.client(ToolboxArtifactClient)
     try:
@@ -344,6 +471,10 @@ def main(
             )
         elif args.command == "upload":
             asyncio.run(_upload(ctx, _input_file(args.file)))
+        elif args.command == "dataset":
+            if args.route == "items" and args.all and args.offset:
+                raise ValueError("--offset does not apply with --all")
+            asyncio.run(_dataset(ctx, args))
         else:
             asyncio.run(_download(ctx, _artifact_id(args.artifact_id), args.output))
     except ToolboxError as exc:
@@ -358,4 +489,10 @@ def main(
     return EXIT_OK
 
 
-__all__ = ["CATALOG_TIMEOUT_SECONDS", "catalog_document", "executable_capability", "main"]
+__all__ = [
+    "CATALOG_TIMEOUT_SECONDS",
+    "REST_COMMANDS",
+    "catalog_document",
+    "executable_capability",
+    "main",
+]

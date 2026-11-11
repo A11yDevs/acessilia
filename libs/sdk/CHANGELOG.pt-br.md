@@ -13,10 +13,12 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
   do registro (a menos que `--provider` diga outro), uma entrada dada por
   `--file` ou `--artifact`, e `--language`, `--parameters` (um objeto JSON) e
   `--no-cache` opcionais; imprime o envelope da resposta. `upload ARQUIVO`
-  armazena um arquivo e imprime seu id de artefato. Uma capacidade `rest`
-  passada a `run` é recusada antes de qualquer requisição, indicando `upload`,
-  `download` ou `ToolboxDatasetClient`; o mesmo vale para uma capacidade fora
-  do registro. Todo comando informa na saída de erro cada endpoint do qual faz
+  armazena um arquivo e imprime seu id de artefato. `dataset list | describe
+  | splits | items | item | artifact | sample | sync` alcançam as oito rotas
+  `dataset.*` pelo `ToolboxDatasetClient`, então toda capacidade `rest` do
+  registro tem um comando; `run` recusa uma capacidade `rest` antes de
+  qualquer requisição e indica esse comando, e recusa uma capacidade fora do
+  registro. Todo comando informa na saída de erro cada endpoint do qual faz
   failover (#402).
 - **Alterado** `--timeout` sem valor: `catalog` mantém seus 10 s; `run`,
   `upload` e `download` usam o padrão dos clientes, porque uma capacidade pode

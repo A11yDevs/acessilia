@@ -13,10 +13,13 @@ can see are recorded here, newest first.
   contract version unless `--provider` says otherwise, an input given as
   `--file` or `--artifact`, and optional `--language`, `--parameters` (a JSON
   object) and `--no-cache`; it prints the response envelope. `upload FILE`
-  stores a file and prints its artifact id. A `rest` capability passed to
-  `run` is refused before any request, with a pointer to `upload`, `download`
-  or `ToolboxDatasetClient`; so is a capability outside the registry. Every
-  command reports each endpoint it fails over from on standard error (#402).
+  stores a file and prints its artifact id. `dataset list | describe | splits
+  | items | item | artifact | sample | sync` reach the eight `dataset.*`
+  routes through `ToolboxDatasetClient`, so every `rest` capability of the
+  registry has a command; `run` refuses a `rest` capability before any
+  request and names that command, and refuses a capability outside the
+  registry. Every command reports each endpoint it fails over from on
+  standard error (#402).
 - **Changed** `--timeout` without a value: `catalog` keeps its 10 s; `run`,
   `upload` and `download` use the clients' default, since a capability can run
   for minutes. Before this release `download` also defaulted to 10 s.

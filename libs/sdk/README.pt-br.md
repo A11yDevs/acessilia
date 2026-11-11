@@ -167,7 +167,7 @@ python -m acessilia_sdk $TB catalog
 
 # Chamar uma capacidade do registro; imprime o envelope da resposta
 python -m acessilia_sdk $TB run media.inspect --file doc.pdf
-python -m acessilia_sdk $TB run pdf.render --file doc.pdf --parameters '{"page": 1, "max_side": 1024}'
+python -m acessilia_sdk $TB run pdf.render --file doc.pdf --parameters '{"page_number": 2, "max_side": 1024}'
 python -m acessilia_sdk $TB run math.verbalize --file formula.txt --language pt-BR
 
 # Armazenar um arquivo uma vez e chamar capacidades sobre ele pelo id
@@ -176,15 +176,25 @@ python -m acessilia_sdk $TB run document.structure.extract --artifact "$ID" --pr
 
 # Um artefato armazenado (o de uma exportação, por exemplo), conferido contra o digest
 python -m acessilia_sdk $TB download sha256:<64 hex> out.pdf
+
+# As rotas de datasets
+python -m acessilia_sdk $TB dataset list
+python -m acessilia_sdk $TB dataset items dr-docbench dev --all --limit 50
+python -m acessilia_sdk $TB dataset artifact dr-docbench dev <item> images/page_1.jpg page_1.jpg
 ```
 
 **`run` despacha pelo transporte.** Chama as capacidades `execute` do registro
 por `POST /v1/capabilities/{id}:execute`, com o provider e a versão de contrato
 do registro, a menos que `--provider` diga outro. As capacidades `rest` têm
-rotas próprias: `artifact.store` e `artifact.retrieve` são `upload` e
-`download`, e as rotas `dataset.*` são o `ToolboxDatasetClient`. Uma
-capacidade fora do registro é recusada: o SDK só chama os contratos para os
-quais foi escrito. `--file` envia o arquivo com o tipo de mídia da extensão;
+rotas e argumentos próprios, então cada uma tem um comando, e `run` aponta
+para ele: `artifact.store` e `artifact.retrieve` são `upload` e `download`;
+`dataset.list`, `.describe`, `.list_splits`, `.list_items`, `.get_item`,
+`.get_artifact`, `.sample` e `.sync` são `dataset list`, `describe`, `splits`,
+`items` (`--limit`, `--offset`, ou `--all` para percorrer o split), `item`,
+`artifact` (gravado de forma atômica num arquivo), `sample` (`--n`; uma
+tentativa, porque não é idempotente) e `sync` (`--split`). Uma capacidade fora
+do registro é recusada: o SDK só chama os contratos para os quais foi
+escrito. `--file` envia o arquivo com o tipo de mídia da extensão;
 `--artifact` envia um id que a Toolbox já armazena.
 
 **Endpoints e timeouts.** Repita `--endpoint` para implantações independentes:

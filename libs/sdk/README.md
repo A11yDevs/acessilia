@@ -164,7 +164,7 @@ python -m acessilia_sdk $TB catalog
 
 # Call a capability of the registry; prints the response envelope
 python -m acessilia_sdk $TB run media.inspect --file doc.pdf
-python -m acessilia_sdk $TB run pdf.render --file doc.pdf --parameters '{"page": 1, "max_side": 1024}'
+python -m acessilia_sdk $TB run pdf.render --file doc.pdf --parameters '{"page_number": 2, "max_side": 1024}'
 python -m acessilia_sdk $TB run math.verbalize --file formula.txt --language pt-BR
 
 # Store a file once, then call capabilities on it by id
@@ -173,15 +173,25 @@ python -m acessilia_sdk $TB run document.structure.extract --artifact "$ID" --pr
 
 # A stored artifact (an export's, for example), checked against its digest
 python -m acessilia_sdk $TB download sha256:<64 hex> out.pdf
+
+# The dataset routes
+python -m acessilia_sdk $TB dataset list
+python -m acessilia_sdk $TB dataset items dr-docbench dev --all --limit 50
+python -m acessilia_sdk $TB dataset artifact dr-docbench dev <item> images/page_1.jpg page_1.jpg
 ```
 
 **`run` dispatches by transport.** It calls the registry's `execute`
 capabilities through `POST /v1/capabilities/{id}:execute`, with the
 registry's provider and contract version unless `--provider` says otherwise.
-`rest` capabilities have routes of their own: `artifact.store` and
-`artifact.retrieve` are `upload` and `download`, and the `dataset.*` routes are
-`ToolboxDatasetClient`. A capability outside the registry is refused: the SDK
-calls only the contracts it was written against. `--file` sends the file with
+`rest` capabilities have routes and arguments of their own, so each has a
+command, and `run` points to it: `artifact.store` and `artifact.retrieve` are
+`upload` and `download`; `dataset.list`, `.describe`, `.list_splits`,
+`.list_items`, `.get_item`, `.get_artifact`, `.sample` and `.sync` are
+`dataset list`, `describe`, `splits`, `items` (`--limit`, `--offset`, or
+`--all` to page through the split), `item`, `artifact` (written atomically to a
+file), `sample` (`--n`; one attempt, since it is not idempotent) and `sync`
+(`--split`). A capability outside the registry is refused: the SDK calls only
+the contracts it was written against. `--file` sends the file with
 the media type of its extension; `--artifact` sends an id the Toolbox already
 stores.
 
