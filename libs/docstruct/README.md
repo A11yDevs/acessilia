@@ -17,7 +17,7 @@ Pure document-structure processing core for Acessilia.
 |---|---|
 | `docstruct.types` | `BBox`, `CanonicalBlock`, `CanonicalDocument`, `Region`, `BlockPairing`, `OrientationResult` |
 | `docstruct.geometry` | `content_fingerprint`, `overlaps_clean`, `merge_bboxes`, `union`, `intersection_area` |
-| `docstruct.geometry.boxes` | `OrientedBox`, `is_bottom_left`, `downward_edges` — boxes that keep their coordinate origin (`TOPLEFT`, `BOTTOMLEFT`, `UNKNOWN`), with top-down and page-fraction conversions |
+| `docstruct.geometry.boxes` | `OrientedBox`, `PageBox`, `is_bottom_left`, `downward_edges`, `holds_point` — boxes that keep their coordinate origin (`TOPLEFT`, `BOTTOMLEFT`, `UNKNOWN`), with top-down and page-fraction conversions |
 | `docstruct.placeholders` | `is_unstructured_page_placeholder`, `UNSTRUCTURED_PAGE_LABEL`, `UNSTRUCTURED_PAGE_FLAG` — the placeholder element that stands for a page extracted without structure |
 | `docstruct.blocks.callouts` | `dedupe_callout_titles` — a callout split across blocks keeps its title on the first block only; `callout_titles` — each callout's title, read from its title element |
 | `docstruct.regions.letterhead` | `letterhead_groups`, `is_beside`, `is_logo_sized`, `PlacedItem` — a logo and the page header lines beside it, grouped per page (two logos join only through a shared line) |
@@ -40,6 +40,7 @@ Pure document-structure processing core for Acessilia.
 | `docstruct.fusion.hf_end` | `move_hf_to_end`, `move_body_hf_to_tail` |
 | `docstruct.fusion.table_specialist` | `extract_table`, `norm_table`, `select_table`, `select_greedy` |
 | `docstruct.text.negation_overlay` | `negates`, `is_detached_overlay`, `compose_negation`, `locate_in_text`, `locate_in_grid`, `table_grid`, `compose_in_text`, `compose_in_grid` — give a detached negation slash (U+0338) back to the relation it negates, only when the choice is unambiguous |
+| `docstruct.text.inline_math` | `detect_inline_math`, `detect_inline_math_by_page`, `span_lines_on_page`, `top_left_box`, `assign_runs_to_cells`, `splice_inline_math` — inline math found in a PDF text layer from its fonts and baselines (ADR 0011), placed on an element's boxes page by page and written into its text as `$…$` |
 | `docstruct.text.latex` | `bare_latex`, `ensure_math_delimiters`, `has_latex_markup`, `latex_text_agreement`, `strip_latex_delimiters`, `normalize_latex`, `wrap_latex` — canonical LaTeX formula normalization and standardization |
 | `docstruct.text.equations` | `split_equation_number`, `preserve_equation_number`, `equation_number`, `numbered_latex`, `numbered_speech` — display equation labels kept in `metadata.equation_number` and restored by each exporter |
 | `docstruct.text.normalize` | `norm` — deterministic text cleanups |
