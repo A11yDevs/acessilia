@@ -12,6 +12,11 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
   usar, e se um id de artefato pode ser compartilhado entre eles (no máximo uma
   URL; ADR-0006, ADR-0013). Eram helpers privados do extrator do core, que
   continua decidindo entre enviar por upload ou mandar o arquivo (#402).
+- **Adicionado** `ToolboxDatasetClient.list_all_items(dataset_id, split, *,
+  revision, limit, page_size)`: todos os itens de um split, ou os primeiros
+  `limit`, lidos página a página num só cliente (`MAX_PAGE_SIZE = 1000`, o
+  limite da Toolbox); uma página que falha levanta seu erro tipado, em vez de
+  devolver uma lista parcial. O harness de benchmark pagina com ele (#402).
 - **Adicionado** `read_catalog` aceita um `api_key` opcional, usado quando o
   endpoint não tem chave própria, como fazem os clientes de capacidade. O gate
   de disponibilidade do core passa a chave dos seus clientes com o endpoint

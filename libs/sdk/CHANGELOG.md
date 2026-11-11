@@ -12,6 +12,11 @@ can see are recorded here, newest first.
   and whether an artifact id can be shared among them (at most one URL;
   ADR-0006, ADR-0013). They were private helpers of the core's extractor,
   which keeps the decision to upload or send the file (#402).
+- **Added** `ToolboxDatasetClient.list_all_items(dataset_id, split, *,
+  revision, limit, page_size)`: every item of a split, or the first `limit`,
+  read page by page on one client (`MAX_PAGE_SIZE = 1000`, the Toolbox's cap);
+  a failed page raises its typed error rather than returning a partial list.
+  The benchmark harness pages with it (#402).
 - **Added** `read_catalog` takes an optional `api_key`, used when the endpoint
   has no key of its own, as the capability clients do. The core's
   availability gate passes its clients' key with their primary endpoint
