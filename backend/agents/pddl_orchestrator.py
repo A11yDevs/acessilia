@@ -24,6 +24,7 @@ from docstruct.blocks.lists import (
 from docstruct.export.page_text import blocks_text, pages_text
 from docstruct.fusion.noise import (
     PAGE_NUMBER_MARGIN,
+    element_role,
     is_bare_page_number,
     is_decorated_page_number,
     is_page_number_in_margin,
@@ -1333,24 +1334,11 @@ def _element_blocks(
                 "text": element.text or "",
                 "kind": _block_kind(element),
                 "type": element.type,
-                "role": _element_role(element),
+                "role": element_role(element),
                 "box": list(bbox) if bbox else None,
             }
         )
     return blocks
-
-
-def _element_role(element: ManifestElement) -> str | None:
-    """Fusion block role for an element.
-
-    The manifest builder records page furniture in `element.type`
-    (`page_header`/`page_footer`) and does not populate `metadata["role"]`, so the
-    role is derived from the type when the metadata does not carry one.
-    """
-    role = (element.metadata or {}).get("role")
-    if role:
-        return role
-    return {"page_header": "header", "page_footer": "footer"}.get(element.type)
 
 
 def _block_kind(element: ManifestElement) -> str:
@@ -1442,7 +1430,7 @@ class _FurnitureView:
 
     @property
     def role(self) -> str | None:
-        return _element_role(self._element)
+        return element_role(self._element)
 
     @property
     def md(self) -> str:
@@ -5117,7 +5105,7 @@ def _is_marked_furniture(element: ManifestElement) -> bool:
     ``page_footer`` there) or Docling's ``content_layer``.
     """
     return (
-        _element_role(element) in {"header", "footer", "page_number"}
+        element_role(element) in {"header", "footer", "page_number"}
         or reading_role(str(element.type), str(element.raw_label)) != "body"
         or element.metadata.get("content_layer") == "furniture"
     )
@@ -5162,7 +5150,7 @@ def _is_page_header_line(
     if not (element.text or "").strip():
         return False
     if (
-        _element_role(element) == "header"
+        element_role(element) == "header"
         or reading_role(str(element.type), str(element.raw_label)) == "header"
     ):
         return True

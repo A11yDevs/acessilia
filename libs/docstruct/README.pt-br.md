@@ -26,7 +26,7 @@ Núcleo puro de processamento estrutural de documentos do Acessilia.
 | `docstruct.manifest` | `StructuredDocument`, `DocumentElement`, `PageDescriptor`, `Provenance`, `BoundingBox`, `field_specs`, `validate_structured_document`, adaptadores de payload — a parte documental do processing manifest: tipos e invariantes normativos contra os quais os schemas de wire são verificados |
 | `docstruct.policy` | `FusionPolicy` (+ presets: `drbench_v12`, `drbench_v13`) |
 | `docstruct.fusion` | `merge_blocks`, `block_to_diff`, `DiffBlock`, `ProviderBlocks`, `quality`, `is_junk` |
-| `docstruct.fusion.noise` | `decor_role`, `split_decor` — mobiliário de página dos blocos extraídos; `is_decorated_page_number`, `is_bare_page_number`, `is_page_number_in_margin`, `select_page_numbers`, `PAGE_NUMBER_MARGIN`, `PAGE_NUMBER_MAX_LEN` — quais números são números de página, regras compartilhadas com o payload do core |
+| `docstruct.fusion.noise` | `decor_role`, `split_decor` — mobiliário de página dos blocos extraídos; `element_role` — o papel de um elemento do documento, pelos metadados ou pelo tipo; `is_decorated_page_number`, `is_bare_page_number`, `is_page_number_in_margin`, `select_page_numbers`, `PAGE_NUMBER_MARGIN`, `PAGE_NUMBER_MAX_LEN` — quais números são números de página, regras compartilhadas com o payload do core |
 | `docstruct.fusion.xycut` | `xycut_order`, `count_columns`, `column_balance`, `reorder` — ordem de leitura XY-cut opcional (`FusionPolicy.order_xycut`) |
 | `docstruct.fusion.verse` | `record_like`, `verse_lines`, `chunk_verse`, `split_box_rows`, `verse_blocks` |
 | `docstruct.fusion.line_numbers` | `line_number_chain`, `extract_line_numbers` |

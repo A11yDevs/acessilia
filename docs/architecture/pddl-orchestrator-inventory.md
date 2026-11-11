@@ -70,7 +70,9 @@ Only the groups marked "decompose" or with a docstruct or SDK part are listed. T
 
 - **D: shared targeting and element geometry.**
   - `_element_bbox` turns a manifest element into a box in one coordinate origin, using `docstruct.geometry.is_bottom_left`. It is an adapter and stays in the core.
-  - `_element_role` and `_block_kind` are document semantics and go to docstruct, next to `docstruct.geometry.reading_role`.
+  - `_element_role` and `_block_kind` are document semantics.
+    - `_element_role` maps page-furniture types to fusion roles with the same table as `docstruct.fusion.noise.DECOR_TYPES`, so it goes there as `element_role`.
+    - `_block_kind` stays in the core for now: docstruct's `fusion.convert.classify_kind` is a near-duplicate that decides differently. See "Findings".
   - `_target_elements` and `_missing_obligation` read obligations, which is process, so they stay in the core.
 - **F: Unicode repair and negation overlays.** ADR-0009 already put detection and repair in docstruct (`docstruct.text.unicode_repair`). The overlay geometry goes to `docstruct.text.negation_overlay`, which already has `compose_negation`, `locate_in_grid` and `locate_in_text`: that is `_vertical`, `_table_grid`, `_compose_in_host` and the box tolerances. `_reattach_negation_overlays` and `_repair_table_cells` walk manifest elements; they become adapters over docstruct functions. The handler stays in the core.
 - **G: rendering, region and page inspection.** The render itself is already in the SDK: `ToolboxPdfClient.render` takes a file or an artifact, a page, a clip and its origin, checks the answer and fetches the verified image. No new render binding is needed.
@@ -186,6 +188,7 @@ The plan's handlers (B, E–L) run next. T's status checks and the payload (V, W
 
 1. **Near-duplicates of docstruct functions** (constitution P1). Merging them means choosing one behaviour, so each needs its own decision, not a neutral move:
    - `_table_ast_from_rows` versus `docstruct.tables.ast.table_ast_from_rows`. The orchestrator's version returns `{"body": []}` when there are no rows and skips non-list rows. docstruct's returns `None` and normalizes mixed inputs.
+   - `_block_kind` versus `docstruct.fusion.convert.classify_kind`. Both give a block's `DiffBlock.kind`. The orchestrator's version reads only the element type. docstruct's also reads the text and the type's synonyms: a `title` is a heading there and text in the core, and a paragraph made of one inline span (`$x + y$`) is a formula there and text in the core. Moving `_block_kind` as it is would put two kind classifiers in docstruct. Choosing one changes the blocks the fusion handlers receive, so it needs its own decision.
    - `_iou` versus `docstruct.geometry.intersection_area`. The intersection is the same; `_iou` adds the union. **Resolved without a behaviour change:** `docstruct.fusion.similarity.iou` already computed the same value for every input (#402, Phase 3), and replaced `_iou`.
 2. **Dead aliases.** No module, script or test uses `PmvAccessibilityOrchestrator` or `build_pmv_structured_payload` (group Z). They can be removed in a small PR of their own.
 3. **Test patch points.** Tests replace **20 names** on the orchestrator module:
