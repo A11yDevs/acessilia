@@ -18,7 +18,7 @@ Pure document-structure processing core for Acessilia.
 | `docstruct.types` | `BBox`, `CanonicalBlock`, `CanonicalDocument`, `Region`, `BlockPairing`, `OrientationResult` |
 | `docstruct.geometry` | `content_fingerprint`, `overlaps_clean`, `merge_bboxes`, `union`, `intersection_area` |
 | `docstruct.geometry.boxes` | `OrientedBox`, `PageBox`, `is_bottom_left`, `downward_edges`, `holds_point` — boxes that keep their coordinate origin (`TOPLEFT`, `BOTTOMLEFT`, `UNKNOWN`), with top-down and page-fraction conversions |
-| `docstruct.placeholders` | `is_unstructured_page_placeholder`, `UNSTRUCTURED_PAGE_LABEL`, `UNSTRUCTURED_PAGE_FLAG` — the placeholder element that stands for a page extracted without structure |
+| `docstruct.placeholders` | `is_unstructured_page_placeholder`, `UNSTRUCTURED_PAGE_LABEL`, `UNSTRUCTURED_PAGE_FLAG` — the placeholder element that stands for a page extracted without structure; `is_placeholder_text`, `is_ocr_noise`, `has_meaningful_text`, `is_placeholder_visual`, `is_mostly_visual` — which extracted text counts as content |
 | `docstruct.blocks.callouts` | `dedupe_callout_titles` — a callout split across blocks keeps its title on the first block only; `callout_titles` — each callout's title, read from its title element |
 | `docstruct.regions.letterhead` | `letterhead_groups`, `is_beside`, `is_logo_sized`, `PlacedItem` — a logo and the page header lines beside it, grouped per page (two logos join only through a shared line) |
 | `docstruct.blocks.lists` | `list_start`, `list_numbering`, `marker_numbering`, `item_label` — list numbering; `recover_empty_lettered_list_items` — empty `a) b)` items filled from one sibling paragraph; `merge_list_blocks` — consecutive items of one source list as one list |
