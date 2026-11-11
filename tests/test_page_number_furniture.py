@@ -159,3 +159,28 @@ def test_number_without_position_is_kept():
     number = build_element("element-number", "paragraph", text="5", reading_order=2)
 
     assert _delivered_texts(BODY, number) == ["Body text.", "5"]
+
+
+# Characterized before the page-number rules moved to docstruct (#402).
+
+
+def test_a_page_word_and_number_in_the_footer_is_left_out():
+    footer = _placed("element-footer", "page_footer", "Page 12", FOOTER_BOX, reading_order=2)
+    assert _delivered_texts(BODY, footer) == ["Body text."]
+
+
+def test_marked_furniture_longer_than_a_decorated_number_is_kept():
+    footer = _placed(
+        "element-footer", "page_footer", "Chapter 3: Motion 12", FOOTER_BOX, reading_order=2
+    )
+    assert _delivered_texts(BODY, footer) == ["Body text.", "Chapter 3: Motion 12"]
+
+
+def test_marked_furniture_word_of_roman_letters_is_kept():
+    footer = _placed("element-footer", "page_footer", "mid", FOOTER_BOX, reading_order=2)
+    assert _delivered_texts(BODY, footer) == ["Body text.", "mid"]
+
+
+def test_lowercase_roman_number_in_the_margin_is_left_out():
+    number = _placed("element-number", "paragraph", "iv", FOOTER_BOX, reading_order=2)
+    assert _delivered_texts(BODY, number) == ["Body text."]
