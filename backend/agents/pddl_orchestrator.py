@@ -2811,7 +2811,7 @@ class PddlAccessibilityOrchestrator:
         manifest.extractor.configuration.update(media_configuration)
 
         await self._enrich_before_planning(
-            manifest, file_path, effective_mode, media_inspection, status_callback
+            manifest, file_path, source_path, effective_mode, media_inspection, status_callback
         )
 
         if status_callback:
@@ -2893,6 +2893,7 @@ class PddlAccessibilityOrchestrator:
         self,
         manifest: ProcessingManifest,
         file_path: Path,
+        source_path: Path,
         effective_mode: str,
         media_inspection: dict[str, Any] | None,
         status_callback: Callable[[str], Coroutine[Any, Any, None]] | None,
@@ -2900,9 +2901,9 @@ class PddlAccessibilityOrchestrator:
         """Describe pictures, recognize formulas and inline math, read tables.
 
         The steps run in this order and share one provider breaker; the inline
-        math of prose and of tables share one text-span reader.
+        math of prose and of tables share one text-span reader. ``source_path``
+        is ``file_path`` resolved.
         """
-        source_path = file_path.resolve()
         if status_callback:
             await status_callback(t(STAGE_ENRICHING_IMAGE_DESCRIPTIONS))
         # Pictures, formulas and tables reach the vision provider from the
