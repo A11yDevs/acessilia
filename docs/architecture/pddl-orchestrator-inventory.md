@@ -10,7 +10,7 @@ It also carries out the inventory tasks of [#365](https://github.com/A11yDevs/ac
 - list the largest functions.
 
 - **Snapshot:** `acessilia` `develop` at `a5ae2a8e`. `backend/agents/pddl_orchestrator.py` has **6,185 lines**, and 192 top-level definitions are assigned to the groups.
-- **How it was measured:** the file was parsed with `ast`. Each top-level function, class and constant is assigned to one group, and none is left unassigned. A group's "Depends on" lists the other groups whose names its code refers to. The groups cover 5,599 lines; the rest is imports, the module docstring and blank lines.
+- **How it was measured:** the file was parsed with `ast`. Each top-level function, class and constant is assigned to one group, and none is left unassigned. A group's "Depends on" lists the other groups whose names its code refers to; the state groups share through the manifest is mapped separately, in "Shared state". The groups cover 5,599 lines; the rest is imports, the module docstring and blank lines.
 
 ## Destination rule
 
@@ -42,17 +42,17 @@ Groups are lettered as in the analysis that produced this table. "Lines" is the 
 | D | Shared targeting and element geometry | 337–1409 | 93 | — | 1 | **decompose** |
 | E | Simple deterministic handlers | 392–594 | 195 | D, O, S | 12 | core (execution handlers) |
 | F | Unicode repair and negation overlays | 599–957 | 334 | D | 2 | **decompose**: geometry to docstruct |
-| G | Rendering, region and page inspection | 960–1327 | 350 | D | 0 | **decompose**: render to SDK |
+| G | Rendering, region and page inspection | 960–1327 | 350 | D | 0 | core, over the existing SDK render; accepted input types to SDK |
 | H | FusionAgent-backed text handlers | 1330–1527 | 140 | C, D | 7 | core; `_tailjoin_position` to docstruct |
 | I | Calibrated provider choice | 1539–1979 | 410 | D, K | 12 | **decompose**: box geometry to docstruct |
-| J | VLM pairwise judge | 1984–2226 | 231 | D, G, I | 10 | **decompose**: render to SDK, probability to docstruct |
+| J | VLM pairwise judge | 1984–2226 | 231 | D, G, I | 10 | **decompose**: `pB` reading to SDK |
 | K | Order and review handlers, handler registry | 2229–2396 | 158 | C, D, E, F, G, H, I | 5 | core |
 | L | Dual- and single-provider fusion | 2399–2680 | 274 | C, D, G | 16 | core |
 | M | Errors and page limits | 2683–2733 | 43 | — | 0 | core |
 | N | `PddlAccessibilityOrchestrator` (pipeline, plan, executor) | 2736–3071 | 336 | B, J, K, L, M, O–V | 2 | core (orchestration) |
-| O | Picture enrichment | 3079–4961 | 483 | G, U | 15 | **decompose**: render to SDK, heuristics to docstruct |
-| P | Formula enrichment | 3339–4160 | 510 | G, O, U | 0 | **decompose**: render to SDK, ranking to docstruct |
-| Q | Inline math | 3424–3722 | 280 | F, G | 0 | **decompose**: span geometry to docstruct, span reader to SDK |
+| O | Picture enrichment | 3079–4961 | 483 | G, U | 15 | **decompose**: heuristics and clip geometry to docstruct |
+| P | Formula enrichment | 3339–4160 | 510 | G, O, U | 0 | **decompose**: ranking to docstruct |
+| Q | Inline math | 3424–3722 | 280 | F, G | 0 | **decompose**: span geometry to docstruct, span batching to SDK |
 | R | Media triage | 4163–4216 | 52 | — | 0 | core |
 | S | Table enrichment and table text | 4288–4670 | 343 | G, O, U, X | 0 | **decompose**: row parsing to docstruct |
 | T | Obligation status and replanning | 4868–5059 | 144 | B, O, U | 0 | core |
@@ -73,11 +73,13 @@ Only the groups marked "decompose" or with a docstruct or SDK part are listed. T
   - `_element_role` and `_block_kind` are document semantics and go to docstruct, next to `docstruct.geometry.reading_role`.
   - `_target_elements` and `_missing_obligation` read obligations, which is process, so they stay in the core.
 - **F: Unicode repair and negation overlays.** ADR-0009 already put detection and repair in docstruct (`docstruct.text.unicode_repair`). The overlay geometry goes to `docstruct.text.negation_overlay`, which already has `compose_negation`, `locate_in_grid` and `locate_in_text`: that is `_vertical`, `_table_grid`, `_compose_in_host` and the box tolerances. `_reattach_negation_overlays` and `_repair_table_cells` walk manifest elements; they become adapters over docstruct functions. The handler stays in the core.
-- **G: rendering, region and page inspection.**
-  - `_toolbox_render` builds a render request, checks the media type, and uses the source artifact or the file. `_source_artifact_id` resolves which stored artifact belongs to the document. Both go to the SDK (render a page or a clip; the source artifact).
+- **G: rendering, region and page inspection.** The render itself is already in the SDK: `ToolboxPdfClient.render` takes a file or an artifact, a page, a clip and its origin, checks the answer and fetches the verified image. No new render binding is needed.
+  - `_toolbox_render` stays in the core as the adapter over that method. It builds the client with the core's factory (and so the core's configuration), checks that the manifest's media type agrees with the file's extension, and decides to resend the file when the stored artifact is gone. These are core concerns.
+  - The set of inputs `pdf.render@2` accepts (`_RENDERABLE_MEDIA_TYPES`: PDF, PNG, JPEG) is contract knowledge, so it moves to the SDK next to the render method, as a constant the adapter checks against.
+  - `_source_artifact_id` stays in the core. It reads the manifest (`extractor.configuration["artifact_id"]`) and decides to ignore an id that does not parse or whose digest is not the source's. The parsing it relies on is already the SDK's `ArtifactRef`.
   - `_save_region_artifact` writes evidence under `settings.data_dir`, so it stays in the core.
   - `_inspect_region` and `_inspect_page` call `VisionAgent`, so they stay in the core.
-  - The two handlers stay in the core, rewritten over these parts.
+  - The two handlers stay in the core.
 - **H: text handlers.** `_tailjoin_position` is pure and joins `docstruct.fusion.tailjoin`, which already holds `tail_start`, `join_tail` and `page_number_position`. The handlers use `FusionAgent` and stay in the core.
 - **I: calibrated provider choice.**
   - `_ordered_box`, `_iou` and `_pair_block` are box geometry and go to docstruct. `_iou` duplicates `docstruct.geometry.intersection_area`; see "Findings".
@@ -85,23 +87,23 @@ Only the groups marked "decompose" or with a docstruct or SDK part are listed. T
   - `_load_secondary_extraction` reads a file and checks its digest, so it stays in the core.
   - The calibrated pair, the preferences and the thresholds are policy: core.
 - **J: VLM pairwise judge.**
-  - `_render_page_png` is a render (SDK, through G).
-  - `_judge_probability` is pure and joins `docstruct.fusion.judge`, which already has `should_judge` and `decide_pair`.
+  - `_render_page_png` renders through G's adapter, so it stays in the core.
+  - `_judge_probability` reads `pB` from the `document.adjudicate.page` answer, which `ToolboxAdjudicateClient.judge_page` already documents. Reading a capability's answer is SDK work, as `math.recognize`'s shapes were in #434, so it moves next to that client. The move keeps today's behaviour: a missing, non-numeric or out-of-range `pB` gives `None`. What to do with `None` stays the handler's decision, in the core. Raising instead would be a separate behaviour change.
   - `_judge_page` is the core's synchronous wrapper over `ToolboxAdjudicateClient`.
   - The handler (179 lines, the fourth largest function) stays in the core and is split there.
 - **O: picture enrichment.**
   - The flow, retries and breaker stay in the core (`_enrich_picture_descriptions`, 197 lines, and `_retry_failed`).
-  - `_extract_picture_bytes`, `_picture_clip` and `_embedded_picture_bytes` (#386) mix a render (SDK), clip geometry (docstruct) and a size limit (core policy).
+  - `_extract_picture_bytes`, `_picture_clip` and `_embedded_picture_bytes` (#386) mix a render through G's adapter, clip geometry (docstruct) and a size limit (core policy).
   - The heuristics `_is_ocr_noise`, `_is_placeholder_text`, `_is_placeholder_visual_element` and `_has_meaningful_text` are pure text and element tests, so they go to docstruct. `_is_mostly_visual_manifest` becomes their adapter.
   - `_inject_full_page_picture` changes the manifest, so it stays in the core.
 - **P: formula enrichment.**
-  - `_formula_recognition_crop` is a render and a crop (SDK, with docstruct for the clip).
+  - `_formula_recognition_crop` renders through G's adapter and crops (docstruct for the clip geometry).
   - `_ranked_formula_candidates` normalizes LaTeX and ranks by confidence. It is pure and goes to docstruct, next to `docstruct.text.latex`.
   - `_reclassify_formula_picture` and `_escalate_unresolved_formula` change the manifest, so they stay in the core.
   - `_enrich_formula_latex`, at 299 lines the largest function in the file, stays in the core and is split there (#365).
 - **Q: inline math.**
   - The span geometry goes to `docstruct.text.inline_math`, which already detects and splices the runs (ADR-0011): `_top_left_box`, `_detect_by_page`, `_element_span_lines`, `_claim_negation_overlay` and `_boxed_pages`.
-  - `_TextSpanReader` fetches `document.text.spans`. The fetch goes to the SDK; its per-document cache stays in the core.
+  - `ToolboxPdfClient.text_spans` already reads `document.text.spans` and checks the answer. What is left is batching: `backend/tools/text_spans.fetch_text_spans` asks for at most `TEXT_SPANS_MAX_PAGES` pages per call, which is transport and moves to the SDK, as the dataset paging did in #432. `_TextSpanReader`'s per-document cache, and its record of a failure (`configuration["inline_math_detection"]`), stay in the core.
   - `_mark_inline_math`, `_mark_table_inline_math` and the setting check stay in the core.
 - **S: table enrichment.**
   - `_rows_from_visual_table_text`, `_rows_from_pipe_table`, `_rows_from_delimited_lines`, `_looks_like_markdown_separator`, `_score_rows`, `_rows_look_like_placeholder` and `_table_ast_column_count` parse text into rows, so they go to `docstruct.tables`.
@@ -129,6 +131,57 @@ These are the functions #365 asked to split, at their current size. All stay in 
 | `build_pddl_structured_payload` | V | 134 |
 | `_recover_empty_lettered_list_items` | X | 130 (moves to docstruct) |
 
+## Shared state
+
+"Depends on" counts names, so it misses the coupling that travels through the manifest: a group writes a key or a field that another group reads later. Moving either side without the other, or reordering them, changes behaviour while every name reference stays intact. This map was measured with `ast` on the same snapshot. It covers:
+- element and obligation `metadata["…"]`, through subscripts, `.get`, `.setdefault`, `.pop` and `in`;
+- `extractor.configuration["…"]`;
+- assignments to element and obligation fields.
+
+It finds 63 keys, 17 of them written or read by more than one group.
+
+| Key | Written by | Read by | What the current order guarantees |
+|---|---|---|---|
+| `metadata["negation_overlay"]` | F, Q | F, Q, W | Q, before planning, claims a detached negation bar for inline math only if no one has claimed it. F, during execution, skips claimed bars and marks the ones it composes. W leaves claimed bars out of the payload. Q's claim therefore wins, and F is idempotent. |
+| `metadata["vision_description_complete"]` | O, P | E, O, X | O sets it on a description and clears it when it records a failure. P sets it when a formula region turns out to be a described picture. E's vision handler skips complete pictures, and X uses it to decide which picture text the payload keeps. |
+| `metadata["vision_failure_reason"]` | O | E, O, V | O records the cause and its retry reads it. E's handler reads it. V reports it as a visible degradation (`records_visual_failures`). |
+| `metadata["vision_confidence" / "vision_elements" / "vision_language" / "vision_warnings"]` | O, P | — | Two writers of the same description fields: O for pictures, P for the vision fallback of formulas. They must keep one shape. |
+| `metadata["original_type"]` | K, O, P | — | Assigned, not set once. When an element is reclassified twice, the last writer decides which original type survives, so the order is part of the behaviour. |
+| `metadata["src"]` | G, P | O | Region and page inspection and the formula crop record the image source; picture enrichment reads it. |
+| `metadata["table_ast"]` | S | E, F, I, Q, S | S writes it before planning. Q's table pass runs after S, because S can replace a table's cells. E, F and I read it during execution. |
+| `metadata["table_read_failure"]` | S | S, V | S records why a table was not read, and V reports it as a degradation. |
+| `metadata["mathml"]`, `metadata["verbalization"]`, `metadata["latex_normalized"]` | B, B, E | T | T counts a formula as readable from these (`_formula_has_readable_content`), so its delivery check depends on the handlers having run first. |
+| `metadata["blank_page"]` | G | W | Page inspection marks blank pages, and the page payload uses the mark. |
+| `configuration["region_inspection_mode"]` | N | G | The pipeline chooses the inspection mode, and the region and page handlers read it. |
+| `configuration["toolbox_provider"]` | (the extractor) | I, L | Written outside the orchestrator; provider choice and fusion read it. |
+
+**Element and obligation fields.** These were measured by attribute name, so a few hits may be other objects with the same attribute; read them as an upper bound.
+- `text` is written by E, F, G, H, I, L, O, P, Q and S;
+- `type` by G, K, O and P;
+- `raw_label` by G, O and P;
+- `reading_order` by K and L;
+- `page_number` by G, L, O and S;
+- the `elements` list by G, L and O;
+- the `obligations` list by O and P.
+
+**Order of `executar`.** Before planning it runs:
+1. P classifies formula regions;
+2. O describes pictures;
+3. Q marks inline math in prose;
+4. P recognizes formulas;
+5. S reads tables;
+6. Q marks inline math in tables.
+
+The plan's handlers (B, E–L) run next. T's status checks and the payload (V, W, X) come last.
+
+**Characterization first.** Before a move touches either side of a shared key, a test should pin the pair end to end on one manifest, not each side alone:
+- F, Q and W on `negation_overlay`;
+- O, P, E and X on `vision_description_complete`;
+- S before Q on `table_ast`;
+- B and E before T on the readable-formula keys;
+- O and S into V on the failure records;
+- K, O and P on `original_type`.
+
 ## Findings
 
 1. **Near-duplicates of docstruct functions** (constitution P1). Merging them means choosing one behaviour, so each needs its own decision, not a neutral move:
@@ -154,15 +207,15 @@ Each step is one PR with no behaviour change. Characterization tests come first 
    - S's row parsing;
    - F's overlay geometry;
    - Q's span geometry;
-   - O's text heuristics, I's box geometry, `_tailjoin_position` and `_judge_probability`;
+   - O's text heuristics, I's box geometry and `_tailjoin_position`;
    - `_element_role` and `_block_kind`.
 
    Each moves with its tests into `libs/docstruct/tests`, and leaves an adapter in the core where the signature takes core models.
-3. **SDK:**
-   - a page and clip render (from G's `_toolbox_render`);
-   - the source artifact of a document (`_source_artifact_id`);
-   - the text spans fetch (from Q's `_TextSpanReader`).
-4. **Decompose the mixed functions in the core:** G's handlers, O's `_extract_picture_bytes`, and P's `_formula_recognition_crop` and `_enrich_formula_latex`.
+3. **SDK.** Rendering, artifact parsing and the text spans call already exist in the SDK, so this step is small and reuses them:
+   - the batched text spans read, from `backend/tools/text_spans.fetch_text_spans`, as a `ToolboxPdfClient` method;
+   - the input types `pdf.render@2` accepts, from `_RENDERABLE_MEDIA_TYPES`, as a constant next to `render`;
+   - the `pB` reading of `document.adjudicate.page`, from `_judge_probability`, next to `ToolboxAdjudicateClient`.
+4. **Decompose the mixed functions in the core:** O's `_extract_picture_bytes`, and P's `_formula_recognition_crop` and `_enrich_formula_latex`. Their render calls keep going through G's adapter.
 5. **Split the largest functions** in the table above, one per PR.
 6. **Reorganize inside the core** only what is still above the size limit (decision D4), for example the execution handlers into `backend/core/execution/handlers/`.
 
@@ -176,9 +229,9 @@ The near-duplicates in finding 1 are behaviour decisions, each in its own PR (P8
 - **D2. The two near-duplicates.**
   - **The question:** which behaviour wins for the empty case of `table_ast_from_rows` (`None` or an empty body)? And should docstruct gain an `iou`?
   - **Proposal:** decide each with its callers' tests in a behaviour PR, after the neutral moves.
-- **D3. Shape of the SDK render helper.**
-  - **The question:** should it be a client method (`ToolboxPdfClient.render_clip(...)`) or a composition function?
-  - **Proposal:** a client method now. A composition layer is what ADR A, in Phase 4 of the plan, decides, so it should not be assumed here.
+- **D3. What the SDK step adds.**
+  - **The question:** does the SDK need a new render or text spans binding?
+  - **Proposal:** no. `ToolboxPdfClient.render` and `ToolboxPdfClient.text_spans` already cover the calls, and `ArtifactRef` covers the id parsing. The SDK step adds only the three pieces listed in Phase 3, step 3, as client methods or constants. Composing several calls into one SDK function is what ADR A, in Phase 4, decides.
 - **D4. Module size limit.**
   - **The question:** #365 asked for an agreed limit on module size, checked by a test.
   - **Proposal:** 900 lines for any module under `backend/agents/` and `backend/core/`. Two modules exceed it today: `pddl_orchestrator.py` (6,185) and `backend/core/manifest/builder.py` (1,205). Both enter the test's allowlist at their current size, which can only shrink; the next largest is `backend/agents/vision_agent.py` (758).
