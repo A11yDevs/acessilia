@@ -15,10 +15,21 @@ def test_identical_pages_score_full():
     assert page.overall() == pytest.approx(100.0)
 
 
-def test_components_absent_on_either_side_are_not_scorable():
+def test_component_eligibility_depends_on_the_reference():
     page = score_markdown_page("p1", f"Text\n\n{TABLE}", "Text\n\n$$x$$")
     assert page.teds is None
+    assert page.cdm == 0.0
+
+    page = score_markdown_page("p1", "", TABLE)
+    assert page.teds == 0.0
     assert page.cdm is None
+
+
+def test_missing_expected_elements_keep_their_place_in_the_mean():
+    single = f"{TABLE}\n\n$$x$$"
+    page = score_markdown_page("p1", single, f"{single}\n\n{single}")
+    assert page.teds == pytest.approx(50.0)
+    assert page.cdm == pytest.approx(50.0)
 
 
 def test_tables_and_formulas_pair_by_order():
