@@ -1985,13 +1985,7 @@ def _handle_vlm_pairwise_judge_method(
     becomes a technical warning. An answer without a valid ``pB`` fails the
     method instead of counting as a confirmation.
     """
-    from docstruct.fusion.judge import DEFAULT_NEW_THR, should_judge
-
-    from backend.tools.toolbox_client import (
-        ToolboxAuthenticationError,
-        ToolboxContractViolation,
-        ToolboxError,
-    )
+    from docstruct.fusion.judge import should_judge
 
     elements = _target_elements(manifest, obligation_id)
     if not elements:
@@ -2000,109 +1994,166 @@ def _handle_vlm_pairwise_judge_method(
     if failure is not None:
         return failure
 
-    primary_name = _CALIBRATED_PAIR[0]
-    source_path = Path(manifest.source.path)
     judgements: dict[int, dict[str, Any]] = {}
     for page_number in sorted({e.page_number for e in elements if e.page_number}):
-        page_elements = [
-            element
-            for element in sorted(manifest.elements, key=lambda e: e.reading_order)
-            if element.page_number == page_number
-        ]
-        adopted = any(
-            element.metadata.get("provider") == secondary.provider
-            for element in page_elements
-        )
-        if adopted:
-            if page_number not in secondary.replaced_primary:
-                logger.warning(
-                    "vlm-pairwise-judge: page {} came from {}, but the artifact does not "
-                    "keep the {} page it replaced; skipped",
-                    page_number,
-                    secondary.provider,
-                    primary_name,
-                )
-                continue
-            content, other = secondary.provider, primary_name
-            other_blocks = secondary.replaced_primary[page_number]
-        else:
-            content, other = primary_name, secondary.provider
-            other_blocks = secondary.pages.get(page_number, [])
-        primary_md = _page_markdown(
-            (element.type, element.text) for element in page_elements
-        )
-        secondary_md = _page_markdown(
-            (str(block.get("type") or ""), block.get("text"))
-            for block in other_blocks
-        )
-        if not primary_md.strip() or not secondary_md.strip():
-            logger.info(
-                "vlm-pairwise-judge: página {} sem as duas transcrições; ignorada", page_number
-            )
+        texts = _judge_texts(manifest, secondary, page_number)
+        if texts is None:
             continue
+        content, other, primary_md, secondary_md = texts
         if not should_judge(primary_md, secondary_md):
             judgements[page_number] = {
                 "content": content, "choice": content, "pB": None, "reason": "agree",
             }
             continue
+        judgement, failure = _judge_one_page(
+            manifest, page_number, content, other, primary_md, secondary_md
+        )
+        if failure is not None:
+            return failure
+        judgements[page_number] = judgement
 
-        try:
-            image = _render_page_png(
-                source_path,
-                page_number,
-                _source_artifact_id(manifest),
-                manifest.source.media_type,
-            )
-        except Exception as exc:  # noqa: BLE001 - rendering a broken source
-            return MethodResult(
-                success=False,
-                validated=False,
-                message=f"Página {page_number} não pôde ser renderizada: {exc}",
-            )
-        truncated = max(len(primary_md), len(secondary_md)) > _JUDGE_MAX_CHARS
-        if truncated:
+    return _judgement_result(elements, judgements)
+
+
+def _judge_texts(
+    manifest: ProcessingManifest, secondary: _SecondaryExtraction, page_number: int
+) -> tuple[str, str, str, str] | None:
+    """``(content, other, candidate A, candidate B)`` of a page, or ``None`` to skip it.
+
+    Candidate A is the page the manifest carries and B the other provider's.
+    A page the router took from the secondary provider is skipped when the
+    artifact does not keep the primary page it replaced, and any page is
+    skipped when either transcription is empty.
+    """
+    primary_name = _CALIBRATED_PAIR[0]
+    page_elements = [
+        element
+        for element in sorted(manifest.elements, key=lambda e: e.reading_order)
+        if element.page_number == page_number
+    ]
+    adopted = any(
+        element.metadata.get("provider") == secondary.provider
+        for element in page_elements
+    )
+    if adopted:
+        if page_number not in secondary.replaced_primary:
             logger.warning(
-                "vlm-pairwise-judge: página {} passa de {} caracteres; "
-                "o juiz lê a transcrição truncada",
+                "vlm-pairwise-judge: page {} came from {}, but the artifact does not "
+                "keep the {} page it replaced; skipped",
                 page_number,
-                _JUDGE_MAX_CHARS,
+                secondary.provider,
+                primary_name,
             )
-        logger.info("vlm-pairwise-judge: julgando a página {}", page_number)
-        try:
-            result = _judge_page(image, primary_md, secondary_md)
-        except (ToolboxAuthenticationError, ToolboxContractViolation) as exc:
-            return MethodResult(
-                success=False,
-                validated=False,
-                message=f"Juiz VLM recusou a chamada: {type(exc).__name__}: {exc}",
-            )
-        except ToolboxError as exc:
-            return MethodResult(
-                success=False,
-                validated=False,
-                message=f"Juiz VLM indisponível: {type(exc).__name__}: {exc}",
-            )
-        document = result.get("document") or {}
-        p_b = page_judgement_probability(document)
-        if p_b is None:
-            return MethodResult(
-                success=False,
-                validated=False,
-                message=(
-                    f"Juiz VLM não devolveu pB válido para a página {page_number}: "
-                    f"{document.get('pB')!r}"
-                ),
-            )
-        judgements[page_number] = {
-            "content": content,
-            "choice": other if p_b > DEFAULT_NEW_THR else content,
-            "pB": p_b,
-            "pB_ab": document.get("pB_ab"),
-            "pA_ba": document.get("pA_ba"),
-            "model": document.get("model"),
-            "truncated": truncated,
-        }
+            return None
+        content, other = secondary.provider, primary_name
+        other_blocks = secondary.replaced_primary[page_number]
+    else:
+        content, other = primary_name, secondary.provider
+        other_blocks = secondary.pages.get(page_number, [])
+    primary_md = _page_markdown(
+        (element.type, element.text) for element in page_elements
+    )
+    secondary_md = _page_markdown(
+        (str(block.get("type") or ""), block.get("text"))
+        for block in other_blocks
+    )
+    if not primary_md.strip() or not secondary_md.strip():
+        logger.info(
+            "vlm-pairwise-judge: página {} sem as duas transcrições; ignorada", page_number
+        )
+        return None
+    return content, other, primary_md, secondary_md
 
+
+def _judge_one_page(
+    manifest: ProcessingManifest,
+    page_number: int,
+    content: str,
+    other: str,
+    primary_md: str,
+    secondary_md: str,
+) -> tuple[dict[str, Any] | None, MethodResult | None]:
+    """Render a page, ask the judge, and read its answer: ``(judgement, failure)``.
+
+    The judgement prefers ``other`` when ``pB > DEFAULT_NEW_THR``. A page
+    that cannot be rendered, a refused or failed call, and an answer without a
+    valid ``pB`` are failures of the method.
+    """
+    from docstruct.fusion.judge import DEFAULT_NEW_THR
+
+    from backend.tools.toolbox_client import (
+        ToolboxAuthenticationError,
+        ToolboxContractViolation,
+        ToolboxError,
+    )
+
+    source_path = Path(manifest.source.path)
+    try:
+        image = _render_page_png(
+            source_path,
+            page_number,
+            _source_artifact_id(manifest),
+            manifest.source.media_type,
+        )
+    except Exception as exc:  # noqa: BLE001 - rendering a broken source
+        return None, MethodResult(
+            success=False,
+            validated=False,
+            message=f"Página {page_number} não pôde ser renderizada: {exc}",
+        )
+    truncated = max(len(primary_md), len(secondary_md)) > _JUDGE_MAX_CHARS
+    if truncated:
+        logger.warning(
+            "vlm-pairwise-judge: página {} passa de {} caracteres; "
+            "o juiz lê a transcrição truncada",
+            page_number,
+            _JUDGE_MAX_CHARS,
+        )
+    logger.info("vlm-pairwise-judge: julgando a página {}", page_number)
+    try:
+        result = _judge_page(image, primary_md, secondary_md)
+    except (ToolboxAuthenticationError, ToolboxContractViolation) as exc:
+        return None, MethodResult(
+            success=False,
+            validated=False,
+            message=f"Juiz VLM recusou a chamada: {type(exc).__name__}: {exc}",
+        )
+    except ToolboxError as exc:
+        return None, MethodResult(
+            success=False,
+            validated=False,
+            message=f"Juiz VLM indisponível: {type(exc).__name__}: {exc}",
+        )
+    document = result.get("document") or {}
+    p_b = page_judgement_probability(document)
+    if p_b is None:
+        return None, MethodResult(
+            success=False,
+            validated=False,
+            message=(
+                f"Juiz VLM não devolveu pB válido para a página {page_number}: "
+                f"{document.get('pB')!r}"
+            ),
+        )
+    return {
+        "content": content,
+        "choice": other if p_b > DEFAULT_NEW_THR else content,
+        "pB": p_b,
+        "pB_ab": document.get("pB_ab"),
+        "pA_ba": document.get("pA_ba"),
+        "model": document.get("model"),
+        "truncated": truncated,
+    }, None
+
+
+def _judgement_result(
+    elements: list[ManifestElement], judgements: dict[int, dict[str, Any]]
+) -> MethodResult:
+    """Record each page's judgement on its elements and report the method's outcome.
+
+    A page whose judge prefers the other provider fails the method: the swap
+    is recorded, not applied. Otherwise the pages are confirmed.
+    """
     if not judgements:
         return MethodResult(
             success=False,
