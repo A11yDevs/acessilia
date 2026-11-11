@@ -2,7 +2,7 @@
 
 Characterization of the orchestrator's ``_judge_probability``, written on
 develop before the reading moved to the SDK, next to
-``ToolboxAdjudicateClient``. The VLM pairwise judge handler decides what to do
+``ToolboxAdjudicateClient``, as ``page_judgement_probability``. The VLM pairwise judge handler decides what to do
 with ``None`` (tests/test_provider_choice_methods.py).
 """
 
@@ -12,7 +12,9 @@ import math
 
 import pytest
 
-from backend.agents.pddl_orchestrator import _judge_probability
+from acessilia_sdk.toolbox.clients.adjudicate import (
+    page_judgement_probability as _judge_probability,
+)
 
 
 @pytest.mark.parametrize(

@@ -18,6 +18,21 @@ PAGE_CAPABILITY = "document.adjudicate.page"
 REGION_CAPABILITY = "document.adjudicate.region"
 
 
+def page_judgement_probability(document: Any) -> float | None:
+    """``pB`` of a ``document.adjudicate.page`` answer, or ``None`` when absent or outside [0, 1].
+
+    ``pB`` is the position-debiased probability that candidate B is the more
+    faithful transcription. Whatever ``float`` reads is taken (a numeric
+    string, a boolean); NaN and infinities are outside [0, 1]. What to do
+    with ``None`` is the caller's decision.
+    """
+    try:
+        p_b = float(document["pB"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    return p_b if 0.0 <= p_b <= 1.0 else None
+
+
 class ToolboxAdjudicateClient(ToolboxCapabilityClient):
     """VLM adjudication of pages and regions."""
 
@@ -37,7 +52,8 @@ class ToolboxAdjudicateClient(ToolboxCapabilityClient):
 
         ``prompt`` is the prompt variant (``base``, ``para`` or ``err``).
         Returns the response envelope; its ``document`` holds ``pB_ab``,
-        ``pA_ba`` and ``pB`` (probability that B is better, debiased).
+        ``pA_ba`` and ``pB`` (probability that B is better, debiased), which
+        ``page_judgement_probability`` reads.
         """
         return await self._execute(
             PAGE_CAPABILITY,
@@ -74,4 +90,9 @@ class ToolboxAdjudicateClient(ToolboxCapabilityClient):
         )
 
 
-__all__ = ["PAGE_CAPABILITY", "REGION_CAPABILITY", "ToolboxAdjudicateClient"]
+__all__ = [
+    "PAGE_CAPABILITY",
+    "REGION_CAPABILITY",
+    "ToolboxAdjudicateClient",
+    "page_judgement_probability",
+]

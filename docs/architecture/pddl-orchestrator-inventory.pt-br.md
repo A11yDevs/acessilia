@@ -90,7 +90,7 @@ Só aparecem os grupos marcados para decompor ou com uma parte para o docstruct 
   - O par calibrado, as preferências e os limiares são política: core.
 - **J: juiz VLM por pares.**
   - `_render_page_png` renderiza pelo adaptador do grupo G, então fica no core.
-  - `_judge_probability` lê o `pB` da resposta do `document.adjudicate.page`, que o `ToolboxAdjudicateClient.judge_page` já documenta. Ler a resposta de uma capacidade é trabalho do SDK, como foram os formatos do `math.recognize` no #434, então vai para perto desse cliente. A movimentação mantém o comportamento atual: um `pB` ausente, não numérico ou fora do intervalo dá `None`. O que fazer com `None` continua sendo decisão do handler, no core. Passar a levantar erro seria uma mudança de comportamento à parte.
+  - `_judge_probability` lê o `pB` da resposta do `document.adjudicate.page`, que o `ToolboxAdjudicateClient.judge_page` já documenta. Ler a resposta de uma capacidade é trabalho do SDK, como foram os formatos do `math.recognize` no #434, então vai para perto desse cliente. A movimentação mantém o comportamento atual: um `pB` ausente, não numérico ou fora do intervalo dá `None`. O que fazer com `None` continua sendo decisão do handler, no core. Passar a levantar erro seria uma mudança de comportamento à parte. Agora é `acessilia_sdk.toolbox.clients.adjudicate.page_judgement_probability`.
   - `_judge_page` é o wrapper síncrono do core sobre o `ToolboxAdjudicateClient`.
   - O handler (179 linhas, a quarta maior função) fica no core e é dividido lá.
 - **O: enriquecimento de figuras.**
