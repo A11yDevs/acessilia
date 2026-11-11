@@ -7,6 +7,12 @@ can see are recorded here, newest first.
 
 ## Unreleased
 
+- **Added** a command line, `python -m acessilia_sdk` (`acessilia_sdk.cli`):
+  `catalog` prints the first endpoint's catalogue as JSON, and `download`
+  fetches a stored artifact, checked against its digest and written
+  atomically, trying the endpoints in order. Configuration comes only from
+  arguments (`--endpoint`, `--api-key-file`, `--timeout`); exit status 1 for
+  a Toolbox or file-system failure, 2 for invalid arguments (#402).
 - **Added** `recognized_formulas(document)` (`acessilia_sdk.toolbox.clients.math`):
   the formulas of a `math.recognize@1` document as one list, whichever of its
   two shapes the provider answers with (`artifact/latex@1` from the chip

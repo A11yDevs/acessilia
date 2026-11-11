@@ -40,6 +40,7 @@ core (backend)  →  acessilia-sdk  →  contrato HTTP da Toolbox
 | `acessilia_sdk.toolbox.vlm` | `vlm_gateway_base_url`, `vlm_provider_healthy`, `VLM_GATEWAY_PATH` — o gateway VLM da Toolbox, uma rota de chat compatível com OpenAI que não é capacidade, e a saúde do seu provider ([ADR-0012](../../docs/adr/0012-agents-reach-the-vlm-through-the-toolbox.pt-br.md)) |
 | `acessilia_sdk.toolbox.errors` | `ToolboxError` e subclasses, incluindo `ToolboxUnavailable` (todos os endpoints falharam; `causes` lista cada falha) |
 | `acessilia_sdk.runtime` | `run_sync` — executa uma coroutine a partir de código síncrono, dentro ou fora de um event loop |
+| `acessilia_sdk.cli` | `main` — a linha de comando, `python -m acessilia_sdk` (veja [Linha de comando](#linha-de-comando)) |
 
 ## Configurar um cliente
 
@@ -150,6 +151,28 @@ com ou sem o prefixo `sha256:`.
 
 Ids já guardados, pelo core ou em documentos, são ids simples: continuam
 passando pelo `ArtifactRef.parse` e pelo download verificado.
+
+## Linha de comando
+
+`python -m acessilia_sdk` lê a Toolbox só com o SDK: sem core, sem settings,
+sem ambiente. Todo valor é um argumento (ADR-0002); a chave de API é lida de um
+arquivo, ou da entrada padrão com `-`, para nunca aparecer na lista de
+processos.
+
+```bash
+# O catálogo do primeiro endpoint, em JSON (revisão, capacidades, providers)
+python -m acessilia_sdk --endpoint https://toolbox.example --api-key-file key.txt catalog
+
+# Um artefato armazenado, conferido contra o digest e gravado de forma atômica;
+# os endpoints são tentados em ordem, como nos clientes de capacidade
+python -m acessilia_sdk --endpoint https://a.example --endpoint https://b.example \
+    download sha256:<64 hex> out.pdf
+```
+
+`--timeout` define o timeout por requisição (10 s por padrão). Código de saída:
+0 em sucesso, 1 quando a Toolbox ou o sistema de arquivos falha (o erro
+tipado, como `ToolboxTimeout`, sai na saída de erro), 2 para argumentos
+inválidos. Chamar capacidades pela linha de comando vem a seguir (#402).
 
 ## Adicionar uma capacidade
 
