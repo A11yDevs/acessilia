@@ -341,6 +341,36 @@ def test_a_sentence_after_the_last_question_stays_in_it() -> None:
     assert list_block["items"] == ["First", "Second. This sentence closes the paragraph."]
 
 
+def test_two_paragraphs_that_fit_one_empty_list_recover_neither() -> None:
+    """An ambiguous source is left alone: no paragraph gives its text away."""
+    first = "Set A: a) Alpha b) Beta"
+    second = "Set B: a) Gamma b) Delta"
+    page = _page([
+        _item(1, "", "a)", "exercise-list"),
+        _item(2, "", "b)", "exercise-list"),
+        _element(3, "paragraph", first),
+        _element(4, "paragraph", second),
+    ])
+
+    assert [block["type"] for block in page["blocks"]] == ["paragraph", "paragraph"]
+    assert [block["text"] for block in page["blocks"]] == [first, second]
+
+
+def test_one_paragraph_that_fits_two_empty_lists_feeds_neither() -> None:
+    """The paragraph's text is consumed at most once, so two takers get none."""
+    source_text = "Answer: a) Alpha b) Beta"
+    page = _page([
+        _item(1, "", "a)", "first-list"),
+        _item(2, "", "b)", "first-list"),
+        _item(3, "", "a)", "second-list"),
+        _item(4, "", "b)", "second-list"),
+        _element(5, "paragraph", source_text),
+    ])
+
+    assert [block["type"] for block in page["blocks"]] == ["paragraph"]
+    assert page["blocks"][0]["text"] == source_text
+
+
 def test_dropped_empty_list_items_are_logged() -> None:
     from backend import i18n
     from backend.tools.logger import logger
