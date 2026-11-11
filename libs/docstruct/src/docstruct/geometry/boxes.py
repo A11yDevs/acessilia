@@ -10,6 +10,7 @@ travels with its ``coord_origin`` (``TOPLEFT``, ``BOTTOMLEFT`` or
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Protocol
 
 from docstruct.types import BBox
 
@@ -68,4 +69,24 @@ class OrientedBox:
         return (self.left / width, top / height, self.right / width, bottom / height)
 
 
-__all__ = ["OrientedBox", "is_bottom_left"]
+class VerticalBox(Protocol):
+    """What :func:`downward_edges` reads of a box (read-only)."""
+
+    @property
+    def top(self) -> float: ...
+
+    @property
+    def bottom(self) -> float: ...
+
+    @property
+    def coord_origin(self) -> str: ...
+
+
+def downward_edges(box: VerticalBox) -> tuple[float, float]:
+    """``(upper, lower)`` edges in a downward axis, whatever the box's origin."""
+    if box.coord_origin == "BOTTOMLEFT":
+        return -box.top, -box.bottom
+    return min(box.top, box.bottom), max(box.top, box.bottom)
+
+
+__all__ = ["OrientedBox", "VerticalBox", "downward_edges", "is_bottom_left"]

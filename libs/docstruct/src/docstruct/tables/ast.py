@@ -16,6 +16,9 @@ from typing import Any
 ALLOWED_SCOPES = {"none", "row", "col", "rowgroup", "colgroup"}
 
 
+#: Sections of a table AST whose rows carry cells, in reading order.
+TABLE_SECTIONS = ("header", "body", "footer")
+
 class TableASTError(Exception):
     """Raised when TableAST conversion or validation encounters an error."""
 

@@ -31,11 +31,13 @@ from docstruct.fusion.noise import (
 )
 from docstruct.fusion.tailjoin import is_page_number as _is_page_number
 from docstruct.geometry import reading_role
+from docstruct.geometry.boxes import downward_edges
 from docstruct.regions.letterhead import PlacedItem, letterhead_groups
 from docstruct.tables.ast import (
     linearize_table_for_text,
     raw_rows_from_table_ast as _rows_from_table_ast,
     table_ast_column_count,
+    TABLE_SECTIONS,
 )
 from docstruct.tables.garble import table_garble_reason
 from docstruct.tables.text_rows import rows_from_visual_table_text
@@ -52,14 +54,12 @@ from docstruct.text.inline_math import (
     splice_inline_math,
 )
 from docstruct.text.latex import has_latex_markup, latex_text_agreement
-from docstruct.text.math_spans import block_prose, inline_math_sources, mask_inline_math
+from docstruct.text.math_spans import block_prose, inline_math_sources
 from docstruct.text.norm_fix import norm_fix
 from docstruct.text.negation_overlay import (
-    compose_negation,
+    compose_in_grid,
+    compose_in_text,
     is_detached_overlay,
-    locate_in_grid,
-    locate_in_text,
-    negates,
 )
 from docstruct.text.unicode_repair import (
     Detection,
@@ -621,8 +621,6 @@ _UNICODE_REPAIR_BLOCK_TYPES = {
     "page_footer": "prose",
 }
 
-#: Sections of a table AST whose cells carry text.
-_TABLE_SECTIONS = ("header", "body", "footer")
 
 #: Word-internal spaced accents needed before standalone ones (an accent
 #: separated from its word) are treated as the same extraction defect. A
@@ -661,7 +659,7 @@ def _repair_table_cells(
     caption = table_ast.get("caption")
     if isinstance(caption, str) and caption:
         table_ast["caption"] = repair_text(caption)
-    for section_name in _TABLE_SECTIONS:
+    for section_name in TABLE_SECTIONS:
         section = table_ast.get(section_name)
         if not isinstance(section, list):
             continue
@@ -682,8 +680,6 @@ def _repair_table_cells(
 
 #: Slack, in PDF points, when finding the element a negation slash lies in.
 _OVERLAY_HOST_TOLERANCE = 1.5
-#: A text line is about this many slash heights tall (glyph plus leading).
-_OVERLAY_LINE_HEIGHTS = 1.25
 
 
 def _bbox(element: ManifestElement, page: int | None = None) -> tuple[int, Any] | None:
@@ -696,39 +692,6 @@ def _bbox(element: ManifestElement, page: int | None = None) -> tuple[int, Any] 
         if provenance.bbox is not None and page in (None, provenance.page_number):
             return provenance.page_number, provenance.bbox
     return None
-
-
-def _vertical(box: Any) -> tuple[float, float]:
-    """``(upper, lower)`` edges in a downward axis, whatever the box's origin."""
-    if box.coord_origin == "BOTTOMLEFT":
-        return -box.top, -box.bottom
-    return min(box.top, box.bottom), max(box.top, box.bottom)
-
-
-def _table_grid(element: ManifestElement) -> list[list[tuple[str, dict[str, Any] | None]]]:
-    """The table's rows on its visual column grid: a cell spanning ``n`` columns
-    takes ``n`` slots, its text in the first, so a slash's column position
-    matches the cell under it. Row spans are not expanded (the slash's row is
-    estimated from the AST rows), and every column is taken as equally wide —
-    the AST carries no widths; ``locate_in_grid``'s margin refuses close calls.
-    """
-    table_ast = element.metadata.get("table_ast")
-    if not isinstance(table_ast, dict):
-        return []
-    grid: list[list[tuple[str, dict[str, Any] | None]]] = []
-    for section in _TABLE_SECTIONS:
-        for row in table_ast.get(section) or []:
-            if not isinstance(row, dict):
-                continue
-            slots: list[tuple[str, dict[str, Any] | None]] = []
-            for cell in row.get("cells") or []:
-                if not isinstance(cell, dict):
-                    continue
-                span = max(1, int(cell.get("colspan") or 1))
-                slots.append((str(cell.get("text") or ""), cell))
-                slots.extend(("", None) for _ in range(span - 1))
-            grid.append(slots)
-    return grid
 
 
 def _reattach_negation_overlays(manifest: ProcessingManifest) -> dict[str, int]:
@@ -766,7 +729,7 @@ def _reattach_negation_overlays(manifest: ProcessingManifest) -> dict[str, int]:
         if located is not None:
             page, box = located
             x = (box.left + box.right) / 2
-            upper, lower = _vertical(box)
+            upper, lower = downward_edges(box)
             y = (upper + lower) / 2
             slash_height = (lower - upper) or 12.0
             hosts = []
@@ -776,7 +739,7 @@ def _reattach_negation_overlays(manifest: ProcessingManifest) -> dict[str, int]:
                 other = _bbox(element, page)
                 if other is None:
                     continue
-                top, bottom = _vertical(other[1])
+                top, bottom = downward_edges(other[1])
                 if (
                     other[1].left - _OVERLAY_HOST_TOLERANCE <= x <= other[1].right + _OVERLAY_HOST_TOLERANCE
                     and top - _OVERLAY_HOST_TOLERANCE <= y <= bottom + _OVERLAY_HOST_TOLERANCE
@@ -812,42 +775,18 @@ def _compose_in_host(
 ) -> str:
     """Negate the relation under the slash in ``host``; returns the outcome.
 
-    A relation inside an inline ``$…$`` span is not a candidate: the font
-    detection built that span from the text layer, slash included (#260).
+    The composition is docstruct's (``compose_in_grid`` for a table,
+    ``compose_in_text`` otherwise); a formula whose text is already LaTeX is
+    not touched (``host-is-latex``).
     """
     if host.type == "table":
-        grid = _table_grid(host)
-        texts = [[mask_inline_math(text) for text, _ in row] for row in grid]
-        if not any(negates(char) for row in texts for text in row for char in text):
-            return "no-candidate"
-        columns = max((len(row) for row in grid), default=0)
-        found = locate_in_grid(
-            texts,
-            row_position=y_fraction * len(grid),
-            column_position=x_fraction * columns,
-        )
-        if found is None:
-            return "ambiguous"
-        row, column, index = found
-        cell = grid[row][column][1]
-        if cell is None:
-            return "ambiguous"
-        cell["text"] = compose_negation(str(cell["text"]), index)
-        return "composed"
+        return compose_in_grid(host.metadata.get("table_ast"), x_fraction, y_fraction)
     if host.type == "formula" and has_latex_markup(host.text):
         return "host-is-latex"
-    text = host.text or ""
-    prose = mask_inline_math(text)
-    if not any(negates(char) for char in prose):
-        return "no-candidate"
-    lines = max(1, round(height / (slash_height * _OVERLAY_LINE_HEIGHTS)))
-    index = locate_in_text(
-        prose, lines=lines, line_position=y_fraction * lines, x_fraction=x_fraction
-    )
-    if index is None:
-        return "ambiguous"
-    host.text = compose_negation(text, index)
-    return "composed"
+    outcome, text = compose_in_text(host.text or "", x_fraction, y_fraction, height, slash_height)
+    if text is not None:
+        host.text = text
+    return outcome
 
 
 def _handle_unicode_repair_method(
@@ -3605,7 +3544,7 @@ async def _mark_table_inline_math(
             continue
         cells = [
             cell
-            for section in _TABLE_SECTIONS
+            for section in TABLE_SECTIONS
             for row in table.metadata["table_ast"].get(section) or []
             if isinstance(row, dict)
             for cell in row.get("cells") or []

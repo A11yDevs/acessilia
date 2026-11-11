@@ -17,7 +17,7 @@ Pure document-structure processing core for Acessilia.
 |---|---|
 | `docstruct.types` | `BBox`, `CanonicalBlock`, `CanonicalDocument`, `Region`, `BlockPairing`, `OrientationResult` |
 | `docstruct.geometry` | `content_fingerprint`, `overlaps_clean`, `merge_bboxes`, `union`, `intersection_area` |
-| `docstruct.geometry.boxes` | `OrientedBox`, `is_bottom_left` — boxes that keep their coordinate origin (`TOPLEFT`, `BOTTOMLEFT`, `UNKNOWN`), with top-down and page-fraction conversions |
+| `docstruct.geometry.boxes` | `OrientedBox`, `is_bottom_left`, `downward_edges` — boxes that keep their coordinate origin (`TOPLEFT`, `BOTTOMLEFT`, `UNKNOWN`), with top-down and page-fraction conversions |
 | `docstruct.placeholders` | `is_unstructured_page_placeholder`, `UNSTRUCTURED_PAGE_LABEL`, `UNSTRUCTURED_PAGE_FLAG` — the placeholder element that stands for a page extracted without structure |
 | `docstruct.blocks.callouts` | `dedupe_callout_titles` — a callout split across blocks keeps its title on the first block only; `callout_titles` — each callout's title, read from its title element |
 | `docstruct.regions.letterhead` | `letterhead_groups`, `is_beside`, `is_logo_sized`, `PlacedItem` — a logo and the page header lines beside it, grouped per page (two logos join only through a shared line) |
@@ -39,12 +39,13 @@ Pure document-structure processing core for Acessilia.
 | `docstruct.fusion.oracle` | `oracle_page`, `best_score`, `summarize` |
 | `docstruct.fusion.hf_end` | `move_hf_to_end`, `move_body_hf_to_tail` |
 | `docstruct.fusion.table_specialist` | `extract_table`, `norm_table`, `select_table`, `select_greedy` |
+| `docstruct.text.negation_overlay` | `negates`, `is_detached_overlay`, `compose_negation`, `locate_in_text`, `locate_in_grid`, `table_grid`, `compose_in_text`, `compose_in_grid` — give a detached negation slash (U+0338) back to the relation it negates, only when the choice is unambiguous |
 | `docstruct.text.latex` | `bare_latex`, `ensure_math_delimiters`, `has_latex_markup`, `latex_text_agreement`, `strip_latex_delimiters`, `normalize_latex`, `wrap_latex` — canonical LaTeX formula normalization and standardization |
 | `docstruct.text.equations` | `split_equation_number`, `preserve_equation_number`, `equation_number`, `numbered_latex`, `numbered_speech` — display equation labels kept in `metadata.equation_number` and restored by each exporter |
 | `docstruct.text.normalize` | `norm` — deterministic text cleanups |
 | `docstruct.text.norm_fix` | `norm_fix` — post-normalization repairs |
 | `docstruct.adapters.mineru` | `clean_mineru_text`, `format_mineru_block_text`, `extract_mineru_blocks` — MinerU `middle_json` parsing, spacing, de-hyphenation, and formula/table formatting |
-| `docstruct.tables.ast` | `table_ast_from_docling_grid`, `analyze_table_complexity`, `raw_rows_from_table_ast`, `table_ast_column_count`, `TableAST`, `TableComplexityMetrics`, `TableASTError` |
+| `docstruct.tables.ast` | `TABLE_SECTIONS`, `table_ast_from_docling_grid`, `analyze_table_complexity`, `raw_rows_from_table_ast`, `table_ast_column_count`, `TableAST`, `TableComplexityMetrics`, `TableASTError` |
 | `docstruct.tables.text_rows` | `rows_from_visual_table_text`, `rows_from_pipe_table`, `rows_from_delimited_lines`, `looks_like_markdown_separator`, `score_rows` — rows of a table read from its plain text (pipes, tabs, `;` or `,`) |
 | `docstruct.text` | `sanitize_text`, `merge_broken_paragraphs`, `normalize_code_text`, `classify_text_block`; `docstruct.text.paragraphs.PAGE_HEADING` — the page header `merge_broken_paragraphs` never joins across |
 | `docstruct.imaging.policy` | `upscale_factor`, `decide_orientation` (no PIL/cv2) |

@@ -6,12 +6,21 @@ invert a true statement, so ambiguity must leave the text alone.
 """
 from __future__ import annotations
 
+from types import SimpleNamespace
+
+import pytest
+
+from docstruct.geometry.boxes import downward_edges
 from docstruct.text.negation_overlay import (
+    OVERLAY_LINE_HEIGHTS,
+    compose_in_grid,
+    compose_in_text,
     compose_negation,
     is_detached_overlay,
     locate_in_grid,
     locate_in_text,
     negates,
+    table_grid,
 )
 
 PARAGRAPH = (
@@ -86,3 +95,55 @@ def test_grid_refuses_ambiguous_columns_and_cells():
     assert locate_in_grid([["x = 1", "y = 2"]], row_position=0.2, column_position=1.0) is None
     assert locate_in_grid([["a = b = c", "x"]], row_position=0.2, column_position=0.4) is None
     assert locate_in_grid([["a = b"]], row_position=3.0, column_position=0.5) is None
+
+
+# Composition in a host and the table grid (moved from the core's PDDL
+# payload, #402; the core covers the same cases end to end).
+
+def test_compose_in_text_negates_the_relation_under_the_slash() -> None:
+    outcome, text = compose_in_text("h = 0 e t = 2", 0.15, 0.5, 12, 12 / OVERLAY_LINE_HEIGHTS)
+
+    assert (outcome, text) == ("composed", "h ≠ 0 e t = 2")
+
+
+@pytest.mark.parametrize(
+    ("text", "outcome"),
+    [("sem relacao", "no-candidate"), ("$a = b$ apenas", "no-candidate"), ("a = b = c", "ambiguous")],
+)
+def test_compose_in_text_leaves_the_text_when_it_cannot_choose(text, outcome) -> None:
+    assert compose_in_text(text, 0.5, 0.5, 12, 12) == (outcome, None)
+
+
+def test_the_grid_gives_a_spanning_cell_its_columns() -> None:
+    table_ast = {"header": [{"cells": [{"text": "a", "colspan": 2}, {"text": "b"}]}], "body": ["bad"]}
+
+    grid = table_grid(table_ast)
+
+    assert [[text for text, _ in row] for row in grid] == [["a", "", "b"]]
+    assert grid[0][1][1] is None
+    assert table_grid("not a table") == []
+
+
+def test_compose_in_grid_rewrites_the_cell_in_place() -> None:
+    cell = {"text": "h = 0"}
+    table_ast = {"body": [{"cells": [cell, {"text": "x"}]}, {"cells": [{"text": "1"}, {"text": "2"}]}]}
+
+    assert compose_in_grid(table_ast, 0.2, 0.2) == "composed"
+    assert cell["text"] == "h ≠ 0"
+
+
+@pytest.mark.parametrize(
+    ("table_ast", "outcome"),
+    [(None, "no-candidate"), ({"body": [{"cells": [{"text": "x"}]}]}, "no-candidate")],
+)
+def test_compose_in_grid_without_a_relation(table_ast, outcome) -> None:
+    assert compose_in_grid(table_ast, 0.5, 0.5) == outcome
+
+
+@pytest.mark.parametrize(
+    ("origin", "top", "bottom", "edges"),
+    [("BOTTOMLEFT", 700.0, 680.0, (-700.0, -680.0)), ("TOPLEFT", 100.0, 120.0, (100.0, 120.0)),
+     ("TOPLEFT", 120.0, 100.0, (100.0, 120.0))],
+)
+def test_downward_edges_whatever_the_origin(origin, top, bottom, edges) -> None:
+    assert downward_edges(SimpleNamespace(coord_origin=origin, top=top, bottom=bottom)) == edges

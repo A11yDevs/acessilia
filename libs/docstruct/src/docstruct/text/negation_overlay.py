@@ -16,6 +16,10 @@ ambiguous case is left alone.
 from __future__ import annotations
 
 import unicodedata
+from typing import Any
+
+from docstruct.tables.ast import TABLE_SECTIONS
+from docstruct.text.math_spans import mask_inline_math
 
 NEGATION_OVERLAY = "̸"
 
@@ -25,6 +29,9 @@ NEGATION_OVERLAY = "̸"
 _MARGIN = 2.0
 _MIN_TEXT_GAP = 3.0
 _MIN_COLUMN_GAP = 0.5
+
+#: A text line is about this many slash heights tall (glyph plus leading).
+OVERLAY_LINE_HEIGHTS = 1.25
 
 
 def negates(char: str) -> bool:
@@ -117,11 +124,90 @@ def locate_in_grid(
     return row, column, index
 
 
+def table_grid(table_ast: Any) -> list[list[tuple[str, dict[str, Any] | None]]]:
+    """The table's rows on its visual column grid: a cell spanning ``n`` columns
+    takes ``n`` slots, its text in the first, so a slash's column position
+    matches the cell under it. Row spans are not expanded (the slash's row is
+    estimated from the AST rows), and every column is taken as equally wide —
+    the AST carries no widths; ``locate_in_grid``'s margin refuses close calls.
+    """
+    if not isinstance(table_ast, dict):
+        return []
+    grid: list[list[tuple[str, dict[str, Any] | None]]] = []
+    for section in TABLE_SECTIONS:
+        for row in table_ast.get(section) or []:
+            if not isinstance(row, dict):
+                continue
+            slots: list[tuple[str, dict[str, Any] | None]] = []
+            for cell in row.get("cells") or []:
+                if not isinstance(cell, dict):
+                    continue
+                span = max(1, int(cell.get("colspan") or 1))
+                slots.append((str(cell.get("text") or ""), cell))
+                slots.extend(("", None) for _ in range(span - 1))
+            grid.append(slots)
+    return grid
+
+
+def compose_in_grid(table_ast: Any, x_fraction: float, y_fraction: float) -> str:
+    """Negate the relation under the slash in a table; returns the outcome.
+
+    ``x_fraction`` and ``y_fraction`` place the slash in the table's box. The
+    chosen cell's ``text`` is rewritten in place, in ``table_ast``. A relation
+    inside an inline ``$…$`` span is not a candidate (#260). Outcomes:
+    ``composed``, ``no-candidate`` or ``ambiguous``.
+    """
+    grid = table_grid(table_ast)
+    texts = [[mask_inline_math(text) for text, _ in row] for row in grid]
+    if not any(negates(char) for row in texts for text in row for char in text):
+        return "no-candidate"
+    columns = max((len(row) for row in grid), default=0)
+    found = locate_in_grid(
+        texts,
+        row_position=y_fraction * len(grid),
+        column_position=x_fraction * columns,
+    )
+    if found is None:
+        return "ambiguous"
+    row, column, index = found
+    cell = grid[row][column][1]
+    if cell is None:
+        return "ambiguous"
+    cell["text"] = compose_negation(str(cell["text"]), index)
+    return "composed"
+
+
+def compose_in_text(
+    text: str, x_fraction: float, y_fraction: float, height: float, slash_height: float
+) -> tuple[str, str | None]:
+    """Negate the relation under the slash in a text; ``(outcome, new text)``.
+
+    ``height`` is the text's box height and ``slash_height`` the slash's, in
+    the same unit, to estimate how many lines the text spans. The new text is
+    ``None`` unless the outcome is ``composed``. A relation inside an inline
+    ``$…$`` span is not a candidate (#260).
+    """
+    prose = mask_inline_math(text)
+    if not any(negates(char) for char in prose):
+        return "no-candidate", None
+    lines = max(1, round(height / (slash_height * OVERLAY_LINE_HEIGHTS)))
+    index = locate_in_text(
+        prose, lines=lines, line_position=y_fraction * lines, x_fraction=x_fraction
+    )
+    if index is None:
+        return "ambiguous", None
+    return "composed", compose_negation(text, index)
+
+
 __all__ = [
     "NEGATION_OVERLAY",
+    "OVERLAY_LINE_HEIGHTS",
+    "compose_in_grid",
+    "compose_in_text",
     "compose_negation",
     "is_detached_overlay",
     "locate_in_grid",
     "locate_in_text",
     "negates",
+    "table_grid",
 ]
