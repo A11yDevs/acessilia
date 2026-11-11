@@ -17,6 +17,36 @@ def _latex_upload(latex: str) -> tuple[str, bytes, str]:
     return ("formula.tex", latex.encode("utf-8"), "text/plain")
 
 
+def recognized_formulas(document: Any) -> list[dict[str, Any]]:
+    """The formulas of a ``math.recognize`` document, as a list.
+
+    ``math.recognize@1`` providers answer in two shapes. The chip models
+    (``pp-formulanet``, ``rapid-latex-ocr``) follow ``artifact/latex@1``: one
+    expression, ``{latex, confidence?, bbox?}``. ``docling-math`` lists the
+    formulas of a page, ``{formulas: [{latex, confidence, page, bbox}], ...}``.
+    Reading only the list made every chip-model answer look like "nothing
+    recognized", so both shapes become the list. In both, an entry without a
+    non-empty ``latex`` is not a formula and is left out.
+    """
+    if not isinstance(document, dict):
+        return []
+    formulas = document.get("formulas")
+    if isinstance(formulas, list):
+        return [f for f in formulas if isinstance(f, dict) and _has_latex(f)]
+    if _has_latex(document):
+        return [{
+            key: document[key]
+            for key in ("latex", "confidence", "page", "bbox")
+            if key in document
+        }]
+    return []
+
+
+def _has_latex(entry: dict[str, Any]) -> bool:
+    latex = entry.get("latex")
+    return isinstance(latex, str) and bool(latex.strip())
+
+
 class ToolboxMathClient(ToolboxCapabilityClient):
     """Formulas: recognize them in images (LaTeX), convert LaTeX and MathML,
     and verbalize LaTeX as natural language.
@@ -48,7 +78,7 @@ class ToolboxMathClient(ToolboxCapabilityClient):
         provider: ``artifact/latex@1`` (``pp-formulanet``, ``rapid-latex-ocr``)
         holds one expression, ``{latex, confidence?, bbox?}``; ``docling-math``
         holds ``formulas`` ({latex, confidence, page, bbox}), ``formula_count``
-        and ``raw_text``.
+        and ``raw_text``. :func:`recognized_formulas` reads both as a list.
         """
         return await self._execute(
             RECOGNIZE_CAPABILITY,
@@ -107,4 +137,5 @@ __all__ = [
     "RECOGNIZE_CAPABILITY",
     "VERBALIZE_CAPABILITY",
     "ToolboxMathClient",
+    "recognized_formulas",
 ]

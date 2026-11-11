@@ -7,6 +7,11 @@ can see are recorded here, newest first.
 
 ## Unreleased
 
+- **Added** `recognized_formulas(document)` (`acessilia_sdk.toolbox.clients.math`):
+  the formulas of a `math.recognize@1` document as one list, whichever of its
+  two shapes the provider answers with (`artifact/latex@1` from the chip
+  models, a `formulas` list from `docling-math`). It moved unchanged from the
+  core's `toolbox_math_tools`, which keeps what to do with the result (#402).
 - **Added** `artifact_endpoint_urls(*clients)` and `one_artifact_endpoint(*clients)`
   (`acessilia_sdk.toolbox.artifacts`): the URLs a set of clients may address,
   and whether an artifact id can be shared among them (at most one URL;
