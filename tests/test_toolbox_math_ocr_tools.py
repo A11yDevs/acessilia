@@ -158,6 +158,51 @@ class TestMathTools:
         assert toolbox_recognize_formula(b"png") == formulas
 
 
+class TestRecognizeUnexpectedErrors:
+    """An error that is not a Toolbox error is raised, never "no formula" (P6).
+
+    On develop both cases below returned ``[]`` with a warning (#402 step 7).
+    Toolbox errors keep their handling: a rejected image is no formula, and an
+    outage is ``[]`` or ``MathCapabilityUnavailable`` (tests above).
+    """
+
+    @pytest.mark.parametrize("raise_on_unavailable", [False, True])
+    def test_an_unusable_toolbox_url_is_raised(self, monkeypatch, raise_on_unavailable):
+        monkeypatch.setattr(settings, "toolbox_base_urls", "not-a-url")
+        with pytest.raises(ValueError, match="absolute http"):
+            toolbox_recognize_formula(b"png", raise_on_unavailable=raise_on_unavailable)
+
+    @pytest.mark.parametrize("raise_on_unavailable", [False, True])
+    def test_a_bug_is_raised(self, monkeypatch, raise_on_unavailable):
+        from backend.tools import toolbox_math_tools
+
+        async def broken(file_path):
+            raise TypeError("a bug in the call")
+
+        monkeypatch.setattr(toolbox_math_tools, "_recognize_formula_async", broken)
+        with pytest.raises(TypeError, match="a bug in the call"):
+            toolbox_recognize_formula(b"png", raise_on_unavailable=raise_on_unavailable)
+
+    def test_the_temporary_crop_is_removed_when_an_error_is_raised(
+        self, monkeypatch, tmp_path
+    ):
+        import tempfile
+
+        from backend.tools import toolbox_math_tools
+
+        made = tmp_path / "crop"
+        monkeypatch.setattr(tempfile, "mkdtemp", lambda: str(made))
+
+        async def broken(file_path):
+            assert file_path.read_bytes() == b"png"
+            raise TypeError("a bug in the call")
+
+        monkeypatch.setattr(toolbox_math_tools, "_recognize_formula_async", broken)
+        with pytest.raises(TypeError):
+            toolbox_recognize_formula(b"png")
+        assert not made.exists()
+
+
 class TestOcrTools:
     @respx.mock
     def test_ocr_fallback(self):

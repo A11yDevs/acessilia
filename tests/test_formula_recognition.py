@@ -863,3 +863,26 @@ async def test_latex_with_grouped_scripts_is_left_alone(monkeypatch, cropped):
 
     assert calls == []
     assert manifest.elements[0].text == "x^{2} + y_{1}"
+
+
+@pytest.mark.asyncio
+async def test_a_misconfigured_recognizer_fails_the_enrichment_visibly(monkeypatch, cropped):
+    """Not "no formula" (#402 step 7, P6).
+
+    With an unusable endpoint configuration, the real ``toolbox_recognize_formula``
+    raises instead of answering ``[]``. On develop the crop fell through to the
+    vision fallback as if nothing had been recognized, and the cause was only a
+    warning. Here the enrichment's TaskGroup re-raises it, like any other
+    failure of the formula, picture and table enrichments.
+    """
+    from backend.config.settings import settings
+
+    monkeypatch.setattr(settings, "toolbox_base_urls", "not-a-url")
+    manifest = _formula_manifest()
+
+    with pytest.raises(ExceptionGroup) as raised:
+        await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+
+    assert [type(error) for error in raised.value.exceptions] == [ValueError]
+    assert FakeVision.calls == []
+    assert "formula_recognition" not in manifest.elements[0].metadata
