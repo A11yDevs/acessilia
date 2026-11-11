@@ -3771,25 +3771,165 @@ async def _enrich_formula_latex(
     if status_callback:
         await status_callback(t(STAGE_ENRICHING_FORMULAS))
 
-    vision = VisionAgent(mode=mode)
-    breaker = breaker or ProviderBreaker(settings.vision_breaker_threshold)
-    total_pages = len(manifest.pages)
-    artifact_id = _source_artifact_id(manifest)
-    slots = asyncio.Semaphore(max(1, settings.vision_concurrency))
-    progress_lock = asyncio.Lock()
-    math_probe = asyncio.Lock()
-    math_ready = asyncio.Event()
-    math_available = True
     # Resolved like ``ToolboxCapabilityClient``: an empty setting means the
     # registry default, which is the provider the request actually asked.
     recognize_provider = settings.toolbox_math_recognize_provider or provider_default(
         "toolbox_math_recognize_provider"
     )
-    empty_answers = 0
+    enrichment = _FormulaEnrichment(
+        manifest=manifest,
+        source_file=source_file,
+        mode=mode,
+        status_callback=status_callback,
+        vision=VisionAgent(mode=mode),
+        breaker=breaker or ProviderBreaker(settings.vision_breaker_threshold),
+        slots=asyncio.Semaphore(max(1, settings.vision_concurrency)),
+        total=len(formulas),
+        recognize_provider=recognize_provider,
+    )
 
-    async def call(image_bytes: bytes) -> list[dict[str, Any]]:
+    # The fold touches only its own element and runs without awaits, so
+    # concurrent folds cannot interleave. The TaskGroup cancels the sibling
+    # crops when one of them fails and re-raises as an ExceptionGroup, like the
+    # picture descriptions; no task keeps mutating the manifest after it failed.
+    async with asyncio.TaskGroup() as group:
+        tasks = [
+            group.create_task(enrichment.enrich_one(position, element))
+            for position, element in enumerate(formulas, start=1)
+        ]
+    recognized = sum(task.result() for task in tasks)
+
+    if recognized:
+        logger.info(t(LOG_PDDL_FORMULAS_RECOGNIZED).format(count=recognized))
+    if enrichment.empty_answers:
+        logger.info(
+            t(LOG_PDDL_FORMULAS_FELL_BACK_TO_VISION).format(
+                count=enrichment.empty_answers, total=len(formulas), provider=recognize_provider,
+            )
+        )
+
+
+class _FormulaEnrichment:
+    """The state ``_enrich_formula_latex`` shares across one document's formulas."""
+
+    def __init__(
+        self,
+        *,
+        manifest: ProcessingManifest,
+        source_file: Path,
+        mode: str,
+        status_callback: Callable[[str], Coroutine[Any, Any, None]] | None,
+        vision: VisionAgent,
+        breaker: ProviderBreaker,
+        slots: asyncio.Semaphore,
+        total: int,
+        recognize_provider: str,
+    ) -> None:
+        self.manifest = manifest
+        self.source_file = source_file
+        self.mode = mode
+        self.status_callback = status_callback
+        self.vision = vision
+        self.breaker = breaker
+        self.slots = slots
+        self.total = total
+        self.recognize_provider = recognize_provider
+        self.total_pages = len(manifest.pages)
+        self.artifact_id = _source_artifact_id(manifest)
+        self.progress_lock = asyncio.Lock()
+        self.recognizer = _MathRecognizer()
+        #: Crops ``math.recognize`` answered without LaTeX, outside an outage.
+        self.empty_answers = 0
+
+    async def enrich_one(self, position: int, element: ManifestElement) -> bool:
+        """Recognize one formula and fold the answer into it; True when filled."""
+        async with self.slots:
+            if self.status_callback:
+                async with self.progress_lock:
+                    await self.status_callback(
+                        t(STAGE_RECOGNIZING_FORMULA).format(
+                            current=position,
+                            total=self.total,
+                            pages=_pages_label([element.page_number], self.total_pages),
+                        )
+                    )
+            image_bytes, page_number = await run_blocking(
+                _formula_recognition_crop,
+                self.source_file,
+                element,
+                artifact_id=self.artifact_id,
+                media_type=self.manifest.source.media_type,
+            )
+            if not image_bytes:
+                return False
+
+            original_text = element.text or ""
+            gate = _TextLayerGate(normalize_latex(original_text))
+
+            method = "math.recognize"
+            candidates = ranked_latex_candidates(await self.recognizer.recognize(image_bytes))
+            if not candidates and self.recognizer.available:
+                # An outage already warned once and skips this. An empty list
+                # is usually an answer without LaTeX, which nothing else
+                # records; a rejected crop or a transport error reaches it too,
+                # but those were logged by ``toolbox_recognize_formula``. No
+                # await separates ``recognize`` from this check, so the flag
+                # and the counter cannot race with sibling crops.
+                self.empty_answers += 1
+                logger.debug(
+                    t(LOG_PDDL_FORMULA_RECOGNIZE_EMPTY).format(
+                        element_id=element.id, page=page_number, provider=self.recognize_provider,
+                    )
+                )
+            latex, confidence, accepted_rank = _first_agreeing_candidate(candidates, gate, method)
+
+            if not latex:
+                method = "vision"
+                output = await _formula_by_vision(
+                    self.vision, self.breaker, image_bytes, page_number, self.total_pages, self.mode
+                )
+                if (
+                    output is not None and output.kind == "description"
+                    and output.description.strip() and not output.classification_uncertain
+                ):
+                    # A non-mathematical description corrects the label.
+                    _reclassify_formula_picture(
+                        self.manifest, element, output, image_bytes, source="recognition_fallback"
+                    )
+                    return False
+                if output is not None and output.kind == "formula":
+                    latex = gate.accept(method, normalize_latex(output.formula_latex or ""))
+                    confidence = output.confidence
+
+        return _record_formula_recognition(
+            element,
+            latex=latex,
+            method=method,
+            confidence=confidence,
+            rank=accepted_rank,
+            original_text=original_text,
+            gate=gate,
+            page_number=page_number,
+        )
+
+
+class _MathRecognizer:
+    """``math.recognize`` for one document, whose outage is paid once.
+
+    The first call is serialized and every other crop waits for its answer,
+    so a batch that starts with the capability down pays the outage once
+    instead of once per crop; after it succeeds, the remaining calls only read
+    the flag and run concurrently. The first ``MathCapabilityUnavailable``
+    turns ``available`` off for the rest of the document.
+    """
+
+    def __init__(self) -> None:
+        self.available = True
+        self._probe = asyncio.Lock()
+        self._ready = asyncio.Event()
+
+    async def _call(self, image_bytes: bytes) -> list[dict[str, Any]]:
         """One recognition call; an outage turns the flag off and means no LaTeX."""
-        nonlocal math_available
         try:
             return await run_blocking(
                 toolbox_recognize_formula,
@@ -3797,184 +3937,146 @@ async def _enrich_formula_latex(
                 raise_on_unavailable=True,
             )
         except MathCapabilityUnavailable as exc:
-            math_available = False
+            self.available = False
             # The full message names the provider and its HTTP status; the
             # class alone ("ToolboxError") hides a failing sidecar.
             logger.warning(t(LOG_PDDL_FORMULA_RECOGNIZE_UNAVAILABLE).format(error=exc))
             return []
 
-    async def recognize(image_bytes: bytes) -> list[dict[str, Any]]:
-        """Recognize one crop, unless the document already found the outage.
-
-        The first call is serialized and every other crop waits for its
-        answer, so a batch that starts with the capability down pays the
-        outage once instead of once per crop; after it succeeds, the remaining
-        calls only read the flag and run concurrently.
-        """
-        if not math_ready.is_set():
-            async with math_probe:
-                if not math_ready.is_set():
+    async def recognize(self, image_bytes: bytes) -> list[dict[str, Any]]:
+        """Recognize one crop, unless the document already found the outage."""
+        if not self._ready.is_set():
+            async with self._probe:
+                if not self._ready.is_set():
                     try:
-                        return await call(image_bytes)
+                        return await self._call(image_bytes)
                     finally:
-                        math_ready.set()
-        if not math_available:
+                        self._ready.set()
+        if not self.available:
             return []
-        return await call(image_bytes)
+        return await self._call(image_bytes)
 
-    async def enrich_one(position: int, element: ManifestElement) -> bool:
-        """Recognize one formula and fold the answer into it; True when filled."""
-        nonlocal empty_answers
-        async with slots:
-            if status_callback:
-                async with progress_lock:
-                    await status_callback(
-                        t(STAGE_RECOGNIZING_FORMULA).format(
-                            current=position,
-                            total=len(formulas),
-                            pages=_pages_label([element.page_number], total_pages),
-                        )
-                    )
-            image_bytes, page_number = await run_blocking(
-                _formula_recognition_crop,
-                source_file,
-                element,
-                artifact_id=artifact_id,
-                media_type=manifest.source.media_type,
-            )
-            if not image_bytes:
-                return False
 
-            original_text = element.text or ""
-            text_layer = normalize_latex(original_text)
-            # None records a recognition refused for lack of evidence.
-            rejected: dict[str, float | None] = {}
-            agreement: float | None = None
+class _TextLayerGate:
+    """Whether a recognition agrees with a formula's text layer, and what was refused.
 
-            def accept(method: str, latex: str) -> str:
-                """``latex`` when it agrees with the text layer, else ``""``.
+    ``rejected`` maps each refused method (``math.recognize#2``) to its
+    agreement, ``None`` for no evidence; ``agreement`` is the score of the
+    accepted reading.
+    """
 
-                With text-layer text but no visible symbol on either side
-                (``()``), there is no evidence the recognition read the same
-                formula, so it is refused like a disagreement.
-                """
-                nonlocal agreement
-                if not latex or not text_layer:
-                    return latex
-                expression, _ = split_equation_number(latex)
-                score = latex_text_agreement(expression, text_layer)
-                if score is None or score < settings.formula_text_agreement_min:
-                    rejected[method] = None if score is None else round(score, 3)
-                    return ""
-                agreement = round(score, 3)
-                return latex
+    def __init__(self, text_layer: str) -> None:
+        self.text_layer = text_layer
+        self.rejected: dict[str, float | None] = {}
+        self.agreement: float | None = None
 
-            # Every candidate gets its turn at the gate before vision is paid:
-            # a lower-ranked one that agrees with the text layer is still a
-            # recognition of this crop. Refusals are recorded per rank
-            # ("math.recognize", "math.recognize#2", ...).
-            method = "math.recognize"
-            latex = ""
-            confidence = None
-            accepted_rank = 1
-            candidates = ranked_latex_candidates(await recognize(image_bytes))
-            if not candidates and math_available:
-                # An outage already warned once and skips this. An empty list
-                # is usually an answer without LaTeX, which nothing else
-                # records; a rejected crop or a transport error reaches it too,
-                # but those were logged by ``toolbox_recognize_formula``. No
-                # await separates ``recognize`` from this check, so the flag
-                # and the counter cannot race with sibling crops.
-                empty_answers += 1
-                logger.debug(
-                    t(LOG_PDDL_FORMULA_RECOGNIZE_EMPTY).format(
-                        element_id=element.id, page=page_number, provider=recognize_provider,
-                    )
-                )
-            for rank, candidate in enumerate(candidates, start=1):
-                latex = accept(method if rank == 1 else f"{method}#{rank}", candidate["latex"])
-                if latex:
-                    confidence = candidate["confidence"]
-                    accepted_rank = rank
-                    break
+    def accept(self, method: str, latex: str) -> str:
+        """``latex`` when it agrees with the text layer, else ``""``.
 
-            if not latex:
-                method = "vision"
-                # The pictures and tables share the breaker, and they run
-                # around this stage: once the provider is declared down, the
-                # formula keeps its text-layer version (the behavior before
-                # the fallback) instead of paying two more 600 s deadlines.
-                # Only the vision fallback is gated; ``math.recognize`` is
-                # probed once per document through its own flag above.
-                output: VisionOutput | None = None
-                if not breaker.open:
-                    output = await vision.describe_region(
-                        image_bytes=image_bytes,
-                        classification="formula",
-                        page_num=page_number,
-                        total_pages=total_pages,
-                        mode=mode,
-                        full_budget=True,
-                    )
-                    # A non-mathematical description can also correct the label.
-                    breaker.record(output is not None)
-                if (
-                    output is not None and output.kind == "description"
-                    and output.description.strip() and not output.classification_uncertain
-                ):
-                    _reclassify_formula_picture(
-                        manifest, element, output, image_bytes, source="recognition_fallback"
-                    )
-                    return False
-                if output is not None and output.kind == "formula":
-                    latex = accept(method, normalize_latex(output.formula_latex or ""))
-                    confidence = output.confidence
+        With text-layer text but no visible symbol on either side (``()``),
+        there is no evidence the recognition read the same formula, so it is
+        refused like a disagreement.
+        """
+        from backend.config.settings import settings
 
-        if rejected:
-            logger.info(
-                t(LOG_PDDL_FORMULA_TEXT_LAYER_DISAGREES).format(
-                    element_id=element.id, page=page_number, rejected=rejected,
-                )
-            )
-        if not latex:
-            if rejected:
-                element.metadata["formula_recognition"] = {
-                    "method": "text-layer",
-                    "rejected": rejected,
-                }
-            return False
-        recognition: dict[str, Any] = {"method": method, "confidence": confidence}
-        if method == "math.recognize" and accepted_rank > 1:
-            recognition["rank"] = accepted_rank
-        if text_layer:
-            # The replaced text exactly as the extractor delivered it.
-            element.metadata["formula_text_layer"] = original_text
-            recognition["text_agreement"] = agreement
-        if rejected:
-            recognition["rejected"] = rejected
-        element.text = preserve_equation_number(latex, element.metadata)
-        element.metadata["formula_recognition"] = recognition
-        return True
+        if not latex or not self.text_layer:
+            return latex
+        expression, _ = split_equation_number(latex)
+        score = latex_text_agreement(expression, self.text_layer)
+        if score is None or score < settings.formula_text_agreement_min:
+            self.rejected[method] = None if score is None else round(score, 3)
+            return ""
+        self.agreement = round(score, 3)
+        return latex
 
-    # The fold above touches only its own element and runs without awaits, so
-    # concurrent folds cannot interleave. The TaskGroup cancels the sibling
-    # crops when one of them fails and re-raises as an ExceptionGroup, like the
-    # picture descriptions; no task keeps mutating the manifest after it failed.
-    async with asyncio.TaskGroup() as group:
-        tasks = [
-            group.create_task(enrich_one(position, element))
-            for position, element in enumerate(formulas, start=1)
-        ]
-    recognized = sum(task.result() for task in tasks)
 
-    if recognized:
-        logger.info(t(LOG_PDDL_FORMULAS_RECOGNIZED).format(count=recognized))
-    if empty_answers:
+def _first_agreeing_candidate(
+    candidates: list[dict[str, Any]], gate: _TextLayerGate, method: str
+) -> tuple[str, Any, int]:
+    """``(latex, confidence, rank)`` of the first ranked candidate the gate accepts.
+
+    Every candidate gets its turn at the gate before vision is paid: a
+    lower-ranked one that agrees with the text layer is still a recognition of
+    this crop. Refusals are recorded per rank (``math.recognize``,
+    ``math.recognize#2``...). ``("", None, 1)`` when none is accepted.
+    """
+    for rank, candidate in enumerate(candidates, start=1):
+        latex = gate.accept(method if rank == 1 else f"{method}#{rank}", candidate["latex"])
+        if latex:
+            return latex, candidate["confidence"], rank
+    return "", None, 1
+
+
+async def _formula_by_vision(
+    vision: VisionAgent,
+    breaker: ProviderBreaker,
+    image_bytes: bytes,
+    page_number: int,
+    total_pages: int,
+    mode: str,
+) -> VisionOutput | None:
+    """The vision model's reading of a formula crop, or ``None`` without one.
+
+    The pictures and tables share the breaker, and they run around this
+    stage: once the provider is declared down, the formula keeps its
+    text-layer version (the behavior before the fallback) instead of paying
+    two more 600 s deadlines. Only the vision fallback is gated;
+    ``math.recognize`` is probed once per document through its own flag.
+    """
+    if breaker.open:
+        return None
+    output = await vision.describe_region(
+        image_bytes=image_bytes,
+        classification="formula",
+        page_num=page_number,
+        total_pages=total_pages,
+        mode=mode,
+        full_budget=True,
+    )
+    breaker.record(output is not None)
+    return output
+
+
+def _record_formula_recognition(
+    element: ManifestElement,
+    *,
+    latex: str,
+    method: str,
+    confidence: Any,
+    rank: int,
+    original_text: str,
+    gate: _TextLayerGate,
+    page_number: int,
+) -> bool:
+    """Fold a formula's recognition into it, or record why there is none; True when filled.
+
+    ``_enrich_formula_latex`` documents ``metadata["formula_recognition"]``.
+    """
+    if gate.rejected:
         logger.info(
-            t(LOG_PDDL_FORMULAS_FELL_BACK_TO_VISION).format(
-                count=empty_answers, total=len(formulas), provider=recognize_provider,
+            t(LOG_PDDL_FORMULA_TEXT_LAYER_DISAGREES).format(
+                element_id=element.id, page=page_number, rejected=gate.rejected,
             )
         )
+    if not latex:
+        if gate.rejected:
+            element.metadata["formula_recognition"] = {
+                "method": "text-layer",
+                "rejected": gate.rejected,
+            }
+        return False
+    recognition: dict[str, Any] = {"method": method, "confidence": confidence}
+    if method == "math.recognize" and rank > 1:
+        recognition["rank"] = rank
+    if gate.text_layer:
+        # The replaced text exactly as the extractor delivered it.
+        element.metadata["formula_text_layer"] = original_text
+        recognition["text_agreement"] = gate.agreement
+    if gate.rejected:
+        recognition["rejected"] = gate.rejected
+    element.text = preserve_equation_number(latex, element.metadata)
+    element.metadata["formula_recognition"] = recognition
+    return True
 
 
 async def _inspect_media(
