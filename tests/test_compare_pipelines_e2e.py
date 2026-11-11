@@ -1,12 +1,11 @@
 """End-to-end tests for pipeline comparison (requires Toolbox and infrastructure).
 
-Compares PDDL+Toolbox output against pre-computed reference canonical documents
-from tests/dataset/intermediate/canonical-document/.
+Compares PDDL+Toolbox output against Core-owned historical canonical fixtures.
 
 Requires:
 - All backend dependencies installed
 - Toolbox service running and accessible via settings.toolbox_base_url
-- Dataset files at tests/dataset/input/ and tests/dataset/intermediate/
+- Local canonicals in tests/fixtures/pipeline-comparison/ and inputs from the Dataset (hash-checked, required)
 
 Marked with @pytest.mark.e2e so they can be skipped in CI:
     pytest tests/ -m e2e
@@ -15,7 +14,6 @@ Marked with @pytest.mark.e2e so they can be skipped in CI:
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 
 import pytest
@@ -28,66 +26,18 @@ from scripts.compare_pipelines import (
     _summarize_document,
     run_comparison,
 )
+from scripts.bench.dataset_reference import dataset_dir
+from scripts.bench.pipeline_fixtures import load_pipeline_fixtures, resolve_pipeline_input
 
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
 
-# Allow a shared versioned dataset without copying tests outside this checkout.
-DATASET_DIR = Path(
-    os.getenv(
-        "ACESSILIA_TEST_DATASET_DIR",
-        str(Path(__file__).resolve().parents[1] / "tests" / "dataset"),
-    )
-)
-
-REFERENCE_FIXTURES: list[tuple[str, str, Path, Path]] = [
-    (
-        "001-java-oo-3pgs",
-        "3-page Java OO tutorial",
-        DATASET_DIR / "input" / "001.pdf",
-        DATASET_DIR / "intermediate" / "canonical-document" / "001.json",
-    ),
-    (
-        "004-java-oo-tables",
-        "Single page with tables",
-        DATASET_DIR / "input" / "004.pdf",
-        DATASET_DIR / "intermediate" / "canonical-document" / "004.json",
-    ),
-    (
-        "005-sunset-skyline",
-        "Sunset photograph (JPEG)",
-        DATASET_DIR / "input" / "005.jpeg",
-        DATASET_DIR / "intermediate" / "canonical-document" / "005.json",
-    ),
-    (
-        "007-grandezas-formulas",
-        "Single page with formulas",
-        DATASET_DIR / "input" / "007.pdf",
-        DATASET_DIR / "intermediate" / "canonical-document" / "007.json",
-    ),
-    (
-        "008-grandezas-chart",
-        "Single page with bar chart",
-        DATASET_DIR / "input" / "008.pdf",
-        DATASET_DIR / "intermediate" / "canonical-document" / "008.json",
-    ),
-]
-
-
-def _resolve_pair(label: str, input_path: Path, ref_path: Path) -> tuple[Path, Path]:
-    if not input_path.exists():
-        pytest.skip(f"Input '{label}' not found: {input_path}")
-    if not ref_path.exists():
-        pytest.skip(f"Reference '{label}' not found: {ref_path}")
-    return (input_path, ref_path)
-
-
-@pytest.fixture(params=REFERENCE_FIXTURES, ids=[f[0] for f in REFERENCE_FIXTURES])
+@pytest.fixture(params=load_pipeline_fixtures(), ids=lambda case: f"{case['id']}-historical-canonical")
 def reference_pair(request: pytest.FixtureRequest) -> tuple[Path, Path]:
-    _label, _desc, input_path, ref_path = request.param
-    return _resolve_pair(_label, input_path, ref_path)
+    case = request.param
+    return resolve_pipeline_input(case, dataset_dir()), case["canonical_path"]
 
 
 @pytest.fixture

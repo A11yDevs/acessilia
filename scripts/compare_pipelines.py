@@ -1,16 +1,14 @@
 """Compare reference canonical document vs PDDL+Toolbox pipeline output.
 
-Loads a pre-computed reference canonical document (from tests/dataset/)
+Loads a pre-computed reference canonical document (from the Core-owned fixture tree)
 and compares it against the PDDL+Toolbox pipeline output on the same input.
+This is protocol ``historical-heuristic-v1`` over canonical schema 1.0.0; its
+verdict is not a proof of structural or content equivalence.
 
 Usage:
     # Single file with reference
     uv run python scripts/compare_pipelines.py tests/dataset/input/001.pdf \
-        --reference tests/dataset/intermediate/canonical-document/001.json
-
-    # Batch mode (all dataset inputs)
-    uv run python scripts/compare_pipelines.py tests/dataset/input/ --batch \
-        --reference-dir tests/dataset/intermediate/canonical-document/
+        --reference tests/fixtures/pipeline-comparison/canonical/001.json
 
     # With custom output directory
     uv run python scripts/compare_pipelines.py input.pdf -o temp/output/comparison \
@@ -21,7 +19,9 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import json
+import platform
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -30,6 +30,68 @@ from typing import Any
 from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
 from backend.pipeline.canonical_builder import build_canonical_document
 from docstruct.profiles import verbosity_for_mode
+from scripts.bench.dataset_reference import git_revision
+
+COMPARISON_PROTOCOL = "historical-heuristic-v1"
+COMPARISON_LIMITATIONS = [
+    "_extract_formulas recognizes formula blocks, not canonical math blocks",
+    "_extract_text reads table rows but not table_ast cells",
+    "word-set similarity and block-count tolerances do not prove full content or structural equivalence",
+]
+
+
+def _file_sha256(path: Path) -> str | None:
+    return hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
+
+
+def _fixture_source_revision(reference_path: Path) -> str | None:
+    """Return the source revision recorded for a Core-owned historical fixture."""
+    manifest_path = reference_path.parent.parent / "manifest.json"
+    if not manifest_path.is_file():
+        return None
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        relative = reference_path.resolve().relative_to(manifest_path.parent.resolve()).as_posix()
+        if any(case.get("canonical") == relative for case in manifest.get("cases", [])):
+            return manifest.get("source_revision")
+    except (OSError, ValueError, json.JSONDecodeError):
+        return None
+    return None
+
+
+def _evaluation_identity(file_path: Path, reference_path: Path, reference: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "protocol": COMPARISON_PROTOCOL,
+        "scope": "whole canonical document",
+        "input_sha256": _file_sha256(file_path),
+        "reference_sha256": _file_sha256(reference_path),
+        "reference_source_revision": _fixture_source_revision(reference_path),
+        "canonical_schema_version": reference.get("schema_version"),
+        "output_mode": "canonical-json",
+    }
+
+
+def _write_run_metadata(output_dir: Path, report: dict[str, Any], configuration: dict[str, Any]) -> None:
+    artifacts = sorted(
+        path.name for path in output_dir.iterdir()
+        if path.is_file() and path.name != "run-metadata.json"
+    )
+    engine_failed = any(
+        item.get("status") != "ok" for item in report.get("engines", {}).values()
+    )
+    (output_dir / "run-metadata.json").write_text(json.dumps({
+        "status": "execution_failure" if engine_failed else "completed",
+        "evaluation_identity": report.get("evaluation_identity"),
+        "configuration": configuration,
+        "runtime": {"python": platform.python_version()},
+        "core_revision": git_revision(Path(__file__).resolve().parents[1]),
+        "artifacts": sorted([*artifacts, "run-metadata.json"]),
+        "artifact_storage": {
+            "directory": str(output_dir.resolve()),
+            "retention": "operator-managed; artifacts remain until explicitly removed",
+            "observability_export": False,
+        },
+    }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------
@@ -432,6 +494,9 @@ async def run_comparison(
         "reference_file": str(reference_path.resolve()),
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "mode": mode,
+        "comparison_protocol": COMPARISON_PROTOCOL,
+        "comparison_limitations": COMPARISON_LIMITATIONS,
+        "evaluation_identity": _evaluation_identity(file_path, reference_path, reference),
         "engines": {},
         "comparison": {},
     }
@@ -482,6 +547,12 @@ async def run_comparison(
         json.dumps(report, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
+    _write_run_metadata(output_dir, report, {
+        "mode": mode,
+        "planner_backend": planner_backend,
+        "execute_plan": execute_plan,
+        "enable_ocr": enable_ocr,
+    })
 
     # Console summary
     print(_format_comparison_summary(
@@ -523,7 +594,7 @@ async def run_comparison_with_reference(
     """Run PDDL+Toolbox and compare against a reference canonical document.
 
     This is the fastest E2E validation: it loads a pre-computed reference
-    canonical document (from tests/dataset/intermediate/canonical-document/)
+        canonical document (from tests/fixtures/pipeline-comparison/canonical/)
     and compares it against the toolbox output, without running any local
     pipeline.
 
@@ -548,6 +619,9 @@ async def run_comparison_with_reference(
         "reference_file": str(reference_path.resolve()),
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "mode": mode,
+        "comparison_protocol": COMPARISON_PROTOCOL,
+        "comparison_limitations": COMPARISON_LIMITATIONS,
+        "evaluation_identity": _evaluation_identity(file_path, reference_path, reference),
         "engines": {},
         "comparison": {},
     }
@@ -598,6 +672,12 @@ async def run_comparison_with_reference(
         json.dumps(report, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
+    _write_run_metadata(output_dir, report, {
+        "mode": mode,
+        "planner_backend": planner_backend,
+        "execute_plan": execute_plan,
+        "enable_ocr": enable_ocr,
+    })
 
     # Console summary
     print(_format_comparison_summary(

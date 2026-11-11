@@ -47,28 +47,51 @@ is set, an unreachable core or an unhealthy `/health` fails the run: a skipped
 suite must not pass during a real outage. A job left without a terminal state
 is cancelled at the end of the wait.
 
-Some E2E tests need the optional corpus from
-[A11yDevs/acessilia-dataset](https://github.com/A11yDevs/acessilia-dataset).
-It is a separate clone, ignored by Git, placed at `tests/dataset/`; point
-`ACESSILIA_TEST_DATASET_DIR` elsewhere instead of copying it into the checkout.
+The Core owns five historical canonicals (`001`, `004`, `005`, `007`, `008`)
+in `tests/fixtures/pipeline-comparison/`, from Dataset revision
+`9ed07b28aeddb69721228f2dd66de6f9794c0001`, schema `1.0.0`. The offline
+integrity test checks the canonicals without Toolbox. The pinned Dataset smoke
+test and pipeline comparison E2E verify the hashes of the corresponding
+inputs in the Dataset checkout.
 
-- `test_compare_pipelines_e2e.py` reads `input/00{1,4,5,7,8}.*` and
-  `intermediate/canonical-document/*.json`; without the clone, its 25
-  reference-based cases are skipped.
-- `test_math_case_e2e.py` reads `input/math-reference/` from the dataset branch
-  `feat/036-velocidade-instantanea`; it is not on the dataset's `main`.
+The math and presentation readers use the Dataset `references/manifest.csv`
+contract (schema `1.2.0`). CI checks out the pinned consumer revision
+`c436966d4fd051a2287273e471b4a3565d64a27a` and runs a smoke test that validates
+the manifest, selectors, schemas, row counts, and both cases without a Toolbox.
+The expected revision and reference digest live in
+[`scripts/bench/dataset.lock.json`](../scripts/bench/dataset.lock.json).
 
-To run those cases against a clone kept in the main checkout:
+For local reader runs, `--dataset` and `ACESSILIA_TEST_DATASET_DIR` still accept
+any compatible directory, including an exported tree without `.git`. A valid
+new `references/manifest.csv` takes precedence over the legacy case layout; an
+invalid new manifest or missing required reference is an error and does not
+fall back to legacy files. To run the pinned math E2E case, clone the Dataset
+revision into `tests/dataset` or point the environment variable at that
+revision:
 
 ```bash
 git clone https://github.com/A11yDevs/acessilia-dataset.git tests/dataset
-git -C tests/dataset archive origin/feat/036-velocidade-instantanea \
-    input/math-reference | tar -x -C tests/dataset
+git -C tests/dataset checkout c436966d4fd051a2287273e471b4a3565d64a27a
 
 ACESSILIA_TEST_DATASET_DIR="$PWD/tests/dataset" uv run pytest -m e2e -v
 ```
 
+The historical pipeline comparator is a heuristic over canonical schema
+`1.0.0`, not a structural or content-fidelity proof. Its current protocol
+does not count canonical `math` blocks as formulas, does not read `table_ast`
+cells when extracting text, and uses word-set similarity plus block-count
+tolerances. Changes to this protocol need their own version and regression
+cases; moving the fixtures must not regenerate them.
+
+Generated evaluation artifacts stay together under the per-run directory in
+`var/bench/`. They include the input/output snapshots available to that run,
+scorecards, effective Dataset revision and digest, selection, protocol, and
+configuration. Retention is operator-managed: there is no automatic pruning
+or observability export. Artifacts may contain source documents and model
+responses, so retain them according to the storage policy for that data.
+
 ## Related documentation
 - [Architecture](../docs/architecture.md)
+- [Benchmark evaluation contracts](../docs/benchmark-evaluations.md)
 - [PDDL + Agno pipeline](../docs/pmv_agno_pddl.md)
 - [Internationalization (i18n)](../docs/i18n.md) — see the internationalization test suite in [test_i18n.py](test_i18n.py)

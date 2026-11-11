@@ -128,6 +128,26 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Read the Dataset lock
+        id: dataset-lock
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          from pathlib import Path
+
+          lock = json.loads(Path("scripts/bench/dataset.lock.json").read_text())
+          print(f"repository={lock['repository']}")
+          print(f"revision={lock['revision']}")
+          PY
+
+      - name: Check out pinned Dataset reference contract
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ steps.dataset-lock.outputs.repository }}
+          ref: ${{ steps.dataset-lock.outputs.revision }}
+          path: tests/dataset
+          persist-credentials: false
+
       - name: Restore dependency cache
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
@@ -142,6 +162,11 @@ jobs:
           python -m pip install ./libs/docstruct --no-cache-dir
           python -m pip install "./libs/sdk[dev]" --no-cache-dir
           python -m pip install ".[dev]" --no-cache-dir
+
+      - name: Smoke test pinned Dataset references (no Toolbox)
+        env:
+          ACESSILIA_TEST_DATASET_DIR: tests/dataset
+        run: python -m pytest -q tests/test_dataset_references.py::test_ci_dataset_contract_and_case_readers_when_checkout_is_provided
 
       # The SDK registry must match the contract the Toolbox publishes on the
       # branch this code is deployed with (#186): main runs against the
@@ -170,6 +195,8 @@ jobs:
         run: python -m pytest --collect-only -q -m "not e2e"
 
       - name: Run complete test suite
+        env:
+          ACESSILIA_TEST_DATASET_DIR: tests/dataset
         run: python -m pytest -m "not e2e" --junitxml=test-results.xml
 
       - name: Run docstruct library test suite

@@ -5,6 +5,9 @@ and are covered by E2E tests (pytest -m e2e).
 """
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 from scripts.compare_pipelines import (
     _compare_documents,
     _compute_verdict,
@@ -16,6 +19,7 @@ from scripts.compare_pipelines import (
     _jaccard_similarity,
     _summarize_document,
     _tokenize,
+    _write_run_metadata,
 )
 
 
@@ -28,6 +32,22 @@ def _make_canonical(title: str, blocks: list[dict], sections: list | None = None
         "metadata": {"page_count": 1},
         "sections": sections,
     }
+
+
+def test_pipeline_run_metadata_records_retention_and_reproduction_context(tmp_path: Path):
+    (tmp_path / "comparison_report.json").write_text("{}", encoding="utf-8")
+    _write_run_metadata(
+        tmp_path,
+        {"engines": {"pddl_toolbox": {"status": "ok"}}},
+        {"mode": "normal", "planner_backend": "internal", "execute_plan": False},
+    )
+
+    metadata = json.loads((tmp_path / "run-metadata.json").read_text(encoding="utf-8"))
+    assert metadata["status"] == "completed"
+    assert metadata["runtime"]["python"]
+    assert "run-metadata.json" in metadata["artifacts"]
+    assert metadata["artifact_storage"]["observability_export"] is False
+    assert metadata["configuration"]["planner_backend"] == "internal"
 
 
 SAMPLE_BLOCKS = [

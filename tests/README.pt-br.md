@@ -47,29 +47,52 @@ definido. Depois de definido, um core inalcançável ou um `/health` doente
 reprovam a execução: uma suíte pulada não pode passar durante uma indisponibilidade
 real. Um job que não chega a estado terminal é cancelado ao fim da espera.
 
-Alguns testes E2E usam o corpus opcional do
-[A11yDevs/acessilia-dataset](https://github.com/A11yDevs/acessilia-dataset).
-Ele é um clone separado, ignorado pelo Git, colocado em `tests/dataset/`; use
-`ACESSILIA_TEST_DATASET_DIR` para apontar para outro diretório sem copiar o
-corpus para o checkout.
+O Core mantém cinco canônicos históricos (`001`, `004`, `005`, `007`, `008`)
+em `tests/fixtures/pipeline-comparison/`, da revisão
+`9ed07b28aeddb69721228f2dd66de6f9794c0001` do Dataset e do schema `1.0.0`.
+O teste offline verifica os canônicos sem a Toolbox. O teste de fumaça com o
+Dataset fixado e o E2E de comparação verificam o hash das entradas
+correspondentes no checkout do Dataset.
 
-- `test_compare_pipelines_e2e.py` lê `input/00{1,4,5,7,8}.*` e
-  `intermediate/canonical-document/*.json`; sem o clone, os 25 casos
-  baseados em referência são pulados.
-- `test_math_case_e2e.py` lê `input/math-reference/` do branch
-  `feat/036-velocidade-instantanea` do dataset; ele não está na `main`.
+Os leitores de matemática e apresentação usam o contrato
+`references/manifest.csv` do Dataset (schema `1.2.0`). A CI confere a revisão
+de consumo fixada em
+`c436966d4fd051a2287273e471b4a3565d64a27a` com um teste de fumaça que valida o
+manifesto, seletores, schemas, contagens e os dois casos sem Toolbox. A revisão
+e o digest esperados ficam em
+[`scripts/bench/dataset.lock.json`](../scripts/bench/dataset.lock.json).
 
-Para rodar esses casos contra um clone mantido no checkout principal:
+Para uso local, `--dataset` e `ACESSILIA_TEST_DATASET_DIR` continuam aceitando
+qualquer diretório compatível, inclusive uma árvore exportada sem `.git`. Um
+`references/manifest.csv` novo e válido tem precedência sobre o layout legado;
+manifesto novo inválido ou referência obrigatória ausente gera erro, sem
+fallback para arquivos antigos. Para executar o E2E de matemática com a
+revisão fixada, clone o Dataset em `tests/dataset` ou aponte a variável de
+ambiente para essa revisão:
 
 ```bash
 git clone https://github.com/A11yDevs/acessilia-dataset.git tests/dataset
-git -C tests/dataset archive origin/feat/036-velocidade-instantanea \
-    input/math-reference | tar -x -C tests/dataset
+git -C tests/dataset checkout c436966d4fd051a2287273e471b4a3565d64a27a
 
 ACESSILIA_TEST_DATASET_DIR="$PWD/tests/dataset" uv run pytest -m e2e -v
 ```
 
+O comparador histórico é uma heurística sobre o schema canônico `1.0.0`, não
+uma prova estrutural nem de fidelidade do conteúdo. O protocolo atual não conta
+blocos canônicos `math` como fórmulas, não lê células de `table_ast` ao extrair
+texto e usa similaridade de conjuntos de palavras com tolerâncias na contagem
+de blocos. Mudanças nesse protocolo precisam de versão e regressões próprias;
+a simples movimentação das fixtures não deve regenerá-las.
+
+Artefatos gerados ficam juntos no diretório de cada execução em `var/bench/`.
+Incluem snapshots disponíveis, scorecards, revisão e digest efetivos do
+Dataset, seleção, protocolo e configuração. A retenção é controlada pelo
+operador: não há limpeza automática nem exportação para observabilidade. Os
+artefatos podem conter documentos de origem e respostas de modelos; aplique a
+política de armazenamento correspondente aos dados.
+
 ## Documentação relacionada
 - [Arquitetura](../docs/architecture.md)
+- [Contratos de avaliação do benchmark](../docs/benchmark-evaluations.md)
 - [Pipeline PDDL + Agno](../docs/pmv_agno_pddl.md)
 - [Internacionalização (i18n)](../docs/i18n.pt-br.md) — veja a suíte de testes de internacionalização em [test_i18n.py](test_i18n.py)
