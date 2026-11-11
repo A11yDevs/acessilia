@@ -14,10 +14,13 @@ from acessilia_sdk.toolbox import (
     ToolboxContractViolation,
     ToolboxProviderUnavailable,
     fetch_catalog,
+    ToolboxAuthenticationError,
     ToolboxEndpoint,
     ToolboxTimeout,
+    ToolboxUnavailable,
     missing_requirements,
     read_catalog,
+    read_first_catalog,
     snapshot_from_payloads,
 )
 
@@ -369,3 +372,117 @@ async def test_read_catalog_closes_its_client_when_cancelled(monkeypatch) -> Non
 
     assert len(opened) == 1
     assert opened[0].is_closed
+
+
+SECOND_URL = "http://toolbox-2.test"
+FEWER = [entry for entry in PROVIDERS if entry["id"] != "mineru"]
+
+
+def _serve(router: respx.MockRouter, base_url: str, providers=PROVIDERS) -> respx.Route:
+    router.get(f"{base_url}/v1/providers").mock(
+        return_value=httpx.Response(200, json=providers)
+    )
+    return router.get(f"{base_url}/v1/capabilities").mock(
+        return_value=httpx.Response(200, json=CAPABILITIES)
+    )
+
+
+def _two() -> list[ToolboxEndpoint]:
+    return [ToolboxEndpoint(BASE_URL), ToolboxEndpoint(SECOND_URL)]
+
+
+@pytest.mark.asyncio
+async def test_read_catalog_falls_back_to_the_callers_key() -> None:
+    with respx.mock() as router:
+        route = _serve(router, BASE_URL)
+        await read_catalog(ToolboxEndpoint(BASE_URL), timeout_seconds=1.0, api_key="shared")
+    assert route.calls.last.request.headers["Authorization"] == "Bearer shared"
+
+
+@pytest.mark.asyncio
+async def test_read_first_catalog_reads_the_first_endpoint_only_when_it_answers() -> None:
+    failovers: list = []
+    with respx.mock(assert_all_called=False) as router:
+        _serve(router, BASE_URL)
+        second = _serve(router, SECOND_URL, providers=FEWER)
+        snapshot = await read_first_catalog(
+            _two(), timeout_seconds=1.0, on_failover=lambda e, x: failovers.append(e)
+        )
+    assert snapshot.revision == _snapshot().revision
+    assert not second.called
+    assert failovers == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "failure",
+    [httpx.ConnectError("refused"), httpx.ReadTimeout("slow"), httpx.Response(503)],
+    ids=["unreachable", "timeout", "503"],
+)
+async def test_read_first_catalog_fails_over_when_an_endpoint_cannot_serve(failure) -> None:
+    failovers: list = []
+    with respx.mock() as router:
+        first = router.get(f"{BASE_URL}/v1/capabilities")
+        if isinstance(failure, Exception):
+            first.mock(side_effect=failure)
+        else:
+            first.mock(return_value=failure)
+        _serve(router, SECOND_URL, providers=FEWER)
+        snapshot = await read_first_catalog(
+            _two(),
+            timeout_seconds=1.0,
+            api_key="shared",
+            on_failover=lambda endpoint, error: failovers.append(endpoint.base_url),
+        )
+    assert snapshot.revision == _snapshot(providers=FEWER).revision
+    assert failovers == [BASE_URL]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("response", "error"),
+    [
+        (httpx.Response(401), ToolboxAuthenticationError),
+        (httpx.Response(200, text="not json"), ToolboxContractViolation),
+    ],
+    ids=["401", "invalid-json"],
+)
+async def test_read_first_catalog_raises_other_errors_at_once(response, error) -> None:
+    with respx.mock(assert_all_called=False) as router:
+        router.get(f"{BASE_URL}/v1/capabilities").mock(return_value=response)
+        second = _serve(router, SECOND_URL)
+        with pytest.raises(error):
+            await read_first_catalog(_two(), timeout_seconds=1.0)
+    assert not second.called
+
+
+@pytest.mark.asyncio
+async def test_read_first_catalog_reports_every_cause_when_all_fail() -> None:
+    with respx.mock() as router:
+        router.get(f"{BASE_URL}/v1/capabilities").mock(side_effect=httpx.ConnectError("x"))
+        router.get(f"{SECOND_URL}/v1/capabilities").mock(side_effect=httpx.ReadTimeout("y"))
+        with pytest.raises(ToolboxUnavailable) as raised:
+            await read_first_catalog(_two(), timeout_seconds=1.0)
+    assert [url for url, _ in raised.value.causes] == [BASE_URL, SECOND_URL]
+    assert isinstance(raised.value.causes[0][1], ToolboxProviderUnavailable)
+    assert isinstance(raised.value.causes[1][1], ToolboxTimeout)
+
+
+@pytest.mark.asyncio
+async def test_read_first_catalog_with_one_endpoint_raises_its_error_and_logs_nothing() -> None:
+    failovers: list = []
+    with respx.mock() as router:
+        router.get(f"{BASE_URL}/v1/capabilities").mock(side_effect=httpx.ReadTimeout("slow"))
+        with pytest.raises(ToolboxTimeout):
+            await read_first_catalog(
+                [ToolboxEndpoint(BASE_URL)],
+                timeout_seconds=1.0,
+                on_failover=lambda e, x: failovers.append(e),
+            )
+    assert failovers == []
+
+
+@pytest.mark.asyncio
+async def test_read_first_catalog_needs_an_endpoint() -> None:
+    with pytest.raises(ValueError):
+        await read_first_catalog([], timeout_seconds=1.0)

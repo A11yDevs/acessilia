@@ -7,6 +7,12 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
 ## Não lançado
 
+- **Adicionado** `read_first_catalog(endpoints, *, timeout_seconds, api_key,
+  on_failover)`: o catálogo do primeiro endpoint que consegue servi-lo, com a
+  regra de failover dos clientes de capacidade (ADR-0006) e o snapshot de uma
+  só implantação. `read_catalog` aceita um `api_key` opcional para endpoint sem
+  chave própria. O gate de disponibilidade do core passa a ler o catálogo com
+  eles onde seus clientes chamam (#402).
 - **Adicionado** `read_catalog(endpoint, *, timeout_seconds)`
   (`acessilia_sdk.toolbox.catalog`): lê o catálogo de um endpoint num cliente
   HTTP de vida curta, com o timeout por requisição do chamador e sem retries.
