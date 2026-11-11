@@ -109,7 +109,7 @@ Só aparecem os grupos marcados para decompor ou com uma parte para o docstruct 
   - `_mark_inline_math`, `_mark_table_inline_math` e a checagem da configuração ficam no core.
 - **S: enriquecimento de tabelas.**
   - `_rows_from_visual_table_text`, `_rows_from_pipe_table`, `_rows_from_delimited_lines`, `_looks_like_markdown_separator`, `_score_rows`, `_rows_look_like_placeholder` e `_table_ast_column_count` transformam texto em linhas, então vão para `docstruct.tables`.
-  - As regras de releitura (`_table_reread_disqualified`, `_keep_misread_table`, tentativas e limiares) e `_enrich_table_structures`, que chama o `DataAgent`, ficam no core.
+  - As regras de releitura (`_table_reread_disqualified`, `_keep_misread_table`, tentativas e limiares) e `_enrich_table_structures`, que chama o `DataAgent`, ficam no core. O passo 5 a dividiu lá: `_tables_to_read` escolhe as tabelas e por que cada uma mal lida é lida de novo, `_read_table` faz as leituras, `_record_unread_table` registra uma tabela para a qual nenhuma leitura foi mantida e `_fold_table_reading` grava uma leitura mantida; a função fica com o fluxo (91 linhas).
 - **W: números de página e timbre.**
   - As regras de detecção vão para o docstruct, ao lado de `docstruct.fusion.tailjoin.is_page_number`: `_is_decorated_page_number`, `_is_page_number_in_margin`, `_page_number_ids`, `_is_page_header_line`, `_is_beside` e `_letterhead_groups`.
   - `_letterhead_block` define o locale da requisição para a sua mensagem, então fica no core.

@@ -109,7 +109,7 @@ Only the groups marked "decompose" or with a docstruct or SDK part are listed. T
   - `_mark_inline_math`, `_mark_table_inline_math` and the setting check stay in the core.
 - **S: table enrichment.**
   - `_rows_from_visual_table_text`, `_rows_from_pipe_table`, `_rows_from_delimited_lines`, `_looks_like_markdown_separator`, `_score_rows`, `_rows_look_like_placeholder` and `_table_ast_column_count` parse text into rows, so they go to `docstruct.tables`.
-  - The re-read rules (`_table_reread_disqualified`, `_keep_misread_table`, attempts and thresholds) and `_enrich_table_structures`, which calls `DataAgent`, stay in the core.
+  - The re-read rules (`_table_reread_disqualified`, `_keep_misread_table`, attempts and thresholds) and `_enrich_table_structures`, which calls `DataAgent`, stay in the core. Step 5 split it there: `_tables_to_read` chooses the tables and why each misread one is read again, `_read_table` makes the readings, `_record_unread_table` records a table no reading was kept for, and `_fold_table_reading` writes a kept one; the function keeps the flow (91 lines).
 - **W: page numbers and letterhead.**
   - The detection rules go to docstruct, next to `docstruct.fusion.tailjoin.is_page_number`: `_is_decorated_page_number`, `_is_page_number_in_margin`, `_page_number_ids`, `_is_page_header_line`, `_is_beside` and `_letterhead_groups`.
   - `_letterhead_block` sets the request locale for its message, so it stays in the core.
