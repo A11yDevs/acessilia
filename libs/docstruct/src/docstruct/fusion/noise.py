@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import re
 from collections import Counter
+from collections.abc import Iterable
 from typing import Callable, Optional
 
 from docstruct.fusion.similarity import (
@@ -20,8 +21,15 @@ from docstruct.fusion.similarity import (
     sim,
     union_box,
 )
+from docstruct.fusion.tailjoin import is_page_number
 from docstruct.fusion.types import DiffBlock
 from docstruct.text.math_spans import inline_math_sources
+
+#: Share of the page height at the top and at the bottom where a lone number
+#: is read as a page number.
+PAGE_NUMBER_MARGIN = 0.12
+#: Longest text read as a decorated page number (``- 5 -``, ``Page 5``).
+PAGE_NUMBER_MAX_LEN = 16
 
 DECOR_TYPES = {"page_header": "header", "page_footer": "footer"}
 DECOR_ORDER = {"header": 0, "footer": 1, "page_number": 2}
@@ -136,8 +144,10 @@ def decor_role(b: DiffBlock, running: frozenset[str] = frozenset()) -> Optional[
     if b.kind in ("table", "formula", "heading"):
         return None
     cy = center(b.box)[1] if b.box else 0.5
-    if PAGENUM_RE.match(b.md) and len(b.md) <= 16:
-        if b.type in DECOR_TYPES or not (0.12 <= cy <= 0.88):
+    if PAGENUM_RE.match(b.md) and len(b.md) <= PAGE_NUMBER_MAX_LEN:
+        if b.type in DECOR_TYPES or not (
+            PAGE_NUMBER_MARGIN <= cy <= 1 - PAGE_NUMBER_MARGIN
+        ):
             return "page_number"
     if FORM_LABEL_RE.match(b.md) and not (0.08 <= cy <= 0.92):
         return "header" if cy < 0.5 else "footer"
@@ -145,6 +155,65 @@ def decor_role(b: DiffBlock, running: frozenset[str] = frozenset()) -> Optional[
     if role is None and running and b.text in running and b.box is not None:
         role = "header" if cy < 0.5 else "footer"
     return role
+
+
+def is_decorated_page_number(text: str) -> bool:
+    """A page number with the decoration or repetition extractors leave on it.
+
+    Accepts ``- 5 -``, ``5.`` and ``Page 5`` (``PAGENUM_RE``, the matcher of
+    :func:`decor_role`) and the same number repeated (``281 281``), but only digits
+    and the Roman letters `is_page_number` knows, so ``mid`` is not a number.
+    """
+    text = text.strip()
+    match = PAGENUM_RE.match(text) if len(text) <= PAGE_NUMBER_MAX_LEN else None
+    if match and is_page_number(match.group(1)):
+        return True
+    tokens = set(text.split())
+    return len(tokens) == 1 and is_page_number(tokens.pop())
+
+
+def is_bare_page_number(text: str | None) -> bool:
+    """Text that may be a page number on its own: digits or Roman letters.
+
+    A single uppercase Roman letter (``I``, ``V``, ``X``...) is read as text.
+    It needs no position, so a caller can check it before looking up a box.
+    """
+    text = (text or "").strip()
+    return is_page_number(text) and not (len(text) == 1 and text.isupper())
+
+
+def is_page_number_in_margin(
+    text: str | None, box: tuple[float, float, float, float] | None
+) -> bool:
+    """A bare number in the top or bottom margin, which may be a page number.
+
+    ``box`` is ``(left, top, right, bottom)`` on the unit page, measured from
+    the top; without one there is no position to judge. The text must be a
+    :func:`is_bare_page_number`.
+    """
+    if not is_bare_page_number(text) or box is None:
+        return False
+    center = (box[1] + box[3]) / 2
+    return not PAGE_NUMBER_MARGIN <= center <= 1 - PAGE_NUMBER_MARGIN
+
+
+def select_page_numbers(candidates: Iterable[tuple[str, int, bool]]) -> set[str]:
+    """The page numbers among ``(id, page, marked)`` candidates.
+
+    A candidate the extractor marked as furniture is one. A page has one page
+    number, so an unmarked candidate (found by its position) is one only when
+    it is its page's single candidate, marked ones included.
+    """
+    marked: set[str] = set()
+    by_page: dict[int, list[str]] = {}
+    for candidate_id, page, is_marked in candidates:
+        if is_marked:
+            marked.add(candidate_id)
+        by_page.setdefault(page, []).append(candidate_id)
+    for ids in by_page.values():
+        if len(ids) == 1:
+            marked.update(ids)
+    return marked
 
 
 def split_decor(
@@ -168,7 +237,7 @@ def split_decor(
             for i in nums:
                 bx = blocks[i].box
                 cy = center(bx)[1] if bx else 0.5
-                if 0.12 <= cy <= 0.88:
+                if PAGE_NUMBER_MARGIN <= cy <= 1 - PAGE_NUMBER_MARGIN:
                     demote.add(i)
             stats[f"pagenum-{tag}-demoted"] += len(demote)
     for i, b in enumerate(blocks):

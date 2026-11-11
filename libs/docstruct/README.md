@@ -25,6 +25,7 @@ Pure document-structure processing core for Acessilia.
 | `docstruct.manifest` | `StructuredDocument`, `DocumentElement`, `PageDescriptor`, `Provenance`, `BoundingBox`, `field_specs`, `validate_structured_document`, payload adapters — the processing manifest's document part: normative types and invariants that wire schemas are checked against |
 | `docstruct.policy` | `FusionPolicy` (+ presets: `drbench_v12`, `drbench_v13`) |
 | `docstruct.fusion` | `merge_blocks`, `block_to_diff`, `DiffBlock`, `ProviderBlocks`, `quality`, `is_junk` |
+| `docstruct.fusion.noise` | `decor_role`, `split_decor` — page furniture of extraction blocks; `is_decorated_page_number`, `is_bare_page_number`, `is_page_number_in_margin`, `select_page_numbers`, `PAGE_NUMBER_MARGIN`, `PAGE_NUMBER_MAX_LEN` — which numbers are page numbers, shared with the core's payload |
 | `docstruct.fusion.xycut` | `xycut_order`, `count_columns`, `column_balance`, `reorder` — optional XY-cut reading order (`FusionPolicy.order_xycut`) |
 | `docstruct.fusion.verse` | `record_like`, `verse_lines`, `chunk_verse`, `split_box_rows`, `verse_blocks` |
 | `docstruct.fusion.line_numbers` | `line_number_chain`, `extract_line_numbers` |
