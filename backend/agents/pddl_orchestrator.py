@@ -4293,23 +4293,7 @@ async def _enrich_table_structures(
 ) -> None:
     from backend.config.settings import settings
 
-    # A table read in the wrong shape (rows collapsed into one, cells doubled)
-    # has structure but not the right one; it is read again from its image.
-    garbled: dict[str, str] = {}
-    if settings.table_visual_review:
-        for element in manifest.elements:
-            if element.type == "table" and _table_element_has_structured_content(element):
-                reason = table_garble_reason(
-                    _rows_from_table_ast(element.metadata["table_ast"])
-                )
-                if reason:
-                    garbled[element.id] = reason
-    table_elements = [
-        element
-        for element in manifest.elements
-        if element.type == "table"
-        and (element.id in garbled or not _table_element_has_structured_content(element))
-    ]
+    table_elements, garbled = _tables_to_read(manifest)
     if not table_elements:
         return
 
@@ -4366,85 +4350,13 @@ async def _enrich_table_structures(
                 )
             return False
 
-        # A misread table gets a few readings: the model may drop columns or
-        # rows on one try and read the table whole on the next.
-        attempts = _TABLE_REREAD_ATTEMPTS if reason is not None else 1
-        table_output = None
-        answered = False
-        why = "no table was read"
-        attempt = 0
-        for attempt in range(1, attempts + 1):
-            if breaker.open:
-                why = breaker.skip_detail()
-                attempt -= 1  # this try was not made
-                break
-            candidate = await data_agent.process_region(
-                image_bytes=image_bytes,
-                classification="table",
-                page_num=page_number,
-                fallback_text=element.text or "",
-            )
-            # The data agent returns None for any failure, an unusable answer
-            # included, so the breaker may count one of those too.
-            breaker.record(candidate is not None)
-            answered = answered or isinstance(candidate, DataOutput)
-            if not isinstance(candidate, DataOutput) or candidate.kind != "table":
-                continue
-            if reason is not None:
-                why = _table_reread_disqualified(
-                    element.metadata["table_ast"], candidate.table_rows()
-                )
-                if why:
-                    continue
-            table_output = candidate
-            break
-        if table_output is None:
-            # A reading refused as worse than the table, or an answer that it
-            # is not a table, is the model's answer; only no answer at all is
-            # a failure a rerun may not repeat.
-            if answered:
-                # The provider is up and answered; a failure an earlier pass
-                # recorded on this element is no longer true.
-                element.metadata.pop("table_read_failure", None)
-            else:
-                _record_table_read_failure(element, "model_failed")
-            if reason is not None:
-                _keep_misread_table(
-                    element, page_number, reason, why, _table_review_attempts(element, attempt)
-                )
-            return False
-
-        element.metadata.pop("table_read_failure", None)
-        rows = table_output.table_rows()
-        table_ast = table_output.table_ast()
-        if reason is not None:
-            element.metadata["table_ast_replaced"] = element.metadata["table_ast"]
-            element.metadata["table_review"] = {
-                "reason": reason, "outcome": "replaced",
-                "attempts": _table_review_attempts(element, attempt),
-            }
-            logger.info(
-                t(LOG_PDDL_TABLE_REREAD_ACCEPTED).format(
-                    element_id=element.id, page=page_number, reason=reason,
-                )
-            )
-
-        element.metadata["table_ast"] = table_ast
-        element.metadata["table_linearization_hint"] = "data-agent-structured"
-        element.metadata["table_row_count"] = len(rows)
-        element.metadata["table_column_count"] = table_ast_column_count(table_ast)
-        element.metadata["table_has_header"] = any(
-            cell.header or cell.scope != "none"
-            for row in table_output.rows
-            for cell in row.cells
+        table_output, answered, why, attempt = await _read_table(
+            data_agent, breaker, element, image_bytes, page_number, reason
         )
-        element.metadata["data_language"] = table_output.language
-        element.metadata["data_confidence"] = table_output.confidence
-        if table_output.warnings:
-            element.metadata["data_warnings"] = list(table_output.warnings)
-        element.text = ""
-        if element.page_number is None and page_number >= 1:
-            element.page_number = page_number
+        if table_output is None:
+            _record_unread_table(element, page_number, reason, answered, why, attempt)
+            return False
+        _fold_table_reading(element, table_output, page_number, reason, attempt)
         return True
 
     enriched = 0
@@ -4463,6 +4375,151 @@ async def _enrich_table_structures(
 
     if enriched:
         logger.info(t(LOG_PDDL_TABLES_ENRICHED).format(count=enriched))
+
+
+def _tables_to_read(manifest: ProcessingManifest) -> tuple[list[ManifestElement], dict[str, str]]:
+    """The tables to read from their image, and why each misread one is read again.
+
+    A table without a usable structure is read. With ``TABLE_VISUAL_REVIEW``,
+    so is a table read in the wrong shape (rows collapsed into one, cells
+    doubled): it has structure but not the right one, and ``garbled`` maps
+    its id to the reason (``table_garble_reason``).
+    """
+    from backend.config.settings import settings
+
+    garbled: dict[str, str] = {}
+    if settings.table_visual_review:
+        for element in manifest.elements:
+            if element.type == "table" and _table_element_has_structured_content(element):
+                reason = table_garble_reason(
+                    _rows_from_table_ast(element.metadata["table_ast"])
+                )
+                if reason:
+                    garbled[element.id] = reason
+    table_elements = [
+        element
+        for element in manifest.elements
+        if element.type == "table"
+        and (element.id in garbled or not _table_element_has_structured_content(element))
+    ]
+    return table_elements, garbled
+
+
+async def _read_table(
+    data_agent: DataAgent,
+    breaker: ProviderBreaker,
+    element: ManifestElement,
+    image_bytes: bytes,
+    page_number: int,
+    reason: str | None,
+) -> tuple[DataOutput | None, bool, str, int]:
+    """Ask the data agent for a table: ``(reading, answered, why, attempts)``.
+
+    A misread table (``reason``) gets a few readings: the model may drop
+    columns or rows on one try and read the table whole on the next, and a
+    reading that is not the same table read better is refused
+    (``_table_reread_disqualified``). ``reading`` is ``None`` when none was
+    kept; ``answered`` says whether the model answered at all, ``why`` why
+    nothing was kept, and ``attempts`` how many readings were made.
+    """
+    attempts = _TABLE_REREAD_ATTEMPTS if reason is not None else 1
+    table_output = None
+    answered = False
+    why = "no table was read"
+    attempt = 0
+    for attempt in range(1, attempts + 1):
+        if breaker.open:
+            why = breaker.skip_detail()
+            attempt -= 1  # this try was not made
+            break
+        candidate = await data_agent.process_region(
+            image_bytes=image_bytes,
+            classification="table",
+            page_num=page_number,
+            fallback_text=element.text or "",
+        )
+        # The data agent returns None for any failure, an unusable answer
+        # included, so the breaker may count one of those too.
+        breaker.record(candidate is not None)
+        answered = answered or isinstance(candidate, DataOutput)
+        if not isinstance(candidate, DataOutput) or candidate.kind != "table":
+            continue
+        if reason is not None:
+            why = _table_reread_disqualified(
+                element.metadata["table_ast"], candidate.table_rows()
+            )
+            if why:
+                continue
+        table_output = candidate
+        break
+    return table_output, answered, why, attempt
+
+
+def _record_unread_table(
+    element: ManifestElement,
+    page_number: int,
+    reason: str | None,
+    answered: bool,
+    why: str,
+    attempt: int,
+) -> None:
+    """Record that no reading of a table was kept.
+
+    A reading refused as worse than the table, or an answer that it is not a
+    table, is the model's answer; only no answer at all is a failure a rerun
+    may not repeat. A misread table stays as it was, with why.
+    """
+    if answered:
+        # The provider is up and answered; a failure an earlier pass
+        # recorded on this element is no longer true.
+        element.metadata.pop("table_read_failure", None)
+    else:
+        _record_table_read_failure(element, "model_failed")
+    if reason is not None:
+        _keep_misread_table(
+            element, page_number, reason, why, _table_review_attempts(element, attempt)
+        )
+
+
+def _fold_table_reading(
+    element: ManifestElement,
+    table_output: DataOutput,
+    page_number: int,
+    reason: str | None,
+    attempt: int,
+) -> None:
+    """Write a kept table reading into ``element``, keeping a replaced misread AST."""
+    element.metadata.pop("table_read_failure", None)
+    rows = table_output.table_rows()
+    table_ast = table_output.table_ast()
+    if reason is not None:
+        element.metadata["table_ast_replaced"] = element.metadata["table_ast"]
+        element.metadata["table_review"] = {
+            "reason": reason, "outcome": "replaced",
+            "attempts": _table_review_attempts(element, attempt),
+        }
+        logger.info(
+            t(LOG_PDDL_TABLE_REREAD_ACCEPTED).format(
+                element_id=element.id, page=page_number, reason=reason,
+            )
+        )
+
+    element.metadata["table_ast"] = table_ast
+    element.metadata["table_linearization_hint"] = "data-agent-structured"
+    element.metadata["table_row_count"] = len(rows)
+    element.metadata["table_column_count"] = table_ast_column_count(table_ast)
+    element.metadata["table_has_header"] = any(
+        cell.header or cell.scope != "none"
+        for row in table_output.rows
+        for cell in row.cells
+    )
+    element.metadata["data_language"] = table_output.language
+    element.metadata["data_confidence"] = table_output.confidence
+    if table_output.warnings:
+        element.metadata["data_warnings"] = list(table_output.warnings)
+    element.text = ""
+    if element.page_number is None and page_number >= 1:
+        element.page_number = page_number
 
 
 #: Why a table was left unread, recorded in metadata["table_read_failure"]: the
