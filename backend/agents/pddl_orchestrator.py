@@ -21,7 +21,12 @@ from docstruct.blocks.lists import (
     recover_empty_lettered_list_items,
 )
 from docstruct.export.page_text import blocks_text, pages_text
-from docstruct.fusion.similarity import PAGENUM_RE
+from docstruct.fusion.noise import (
+    PAGE_NUMBER_MARGIN,
+    is_decorated_page_number,
+    is_page_number_in_margin,
+    select_page_numbers,
+)
 from docstruct.fusion.tailjoin import is_page_number as _is_page_number
 from docstruct.geometry import reading_role
 from docstruct.tables.ast import (
@@ -5383,28 +5388,6 @@ def _is_left_out_of_payload(element: ManifestElement) -> bool:
 #: Types a page number can arrive as. A number inside a table, list, heading
 #: or formula is content, wherever it sits on the page.
 _PAGE_NUMBER_TYPES = frozenset({"paragraph", "page_header", "page_footer", "unknown"})
-#: Share of the page height at the top and at the bottom where a lone number
-#: is read as a page number (the margin `docstruct.fusion.noise.decor_role`
-#: uses for the same decision).
-_PAGE_NUMBER_MARGIN = 0.12
-#: Longest furniture text read as a decorated page number (``- 5 -``,
-#: ``Page 5``), as in `decor_role`.
-_PAGE_NUMBER_MAX_LEN = 16
-
-
-def _is_decorated_page_number(text: str) -> bool:
-    """A page number with the decoration or repetition extractors leave on it.
-
-    Accepts ``- 5 -``, ``5.`` and ``Page 5`` (``PAGENUM_RE``, the matcher of
-    `decor_role`) and the same number repeated (``281 281``), but only digits
-    and the Roman letters `is_page_number` knows, so ``mid`` is not a number.
-    """
-    text = text.strip()
-    match = PAGENUM_RE.match(text) if len(text) <= _PAGE_NUMBER_MAX_LEN else None
-    if match and _is_page_number(match.group(1)):
-        return True
-    tokens = set(text.split())
-    return len(tokens) == 1 and _is_page_number(tokens.pop())
 
 
 def _is_marked_furniture(element: ManifestElement) -> bool:
@@ -5420,23 +5403,6 @@ def _is_marked_furniture(element: ManifestElement) -> bool:
     )
 
 
-def _is_page_number_in_margin(
-    element: ManifestElement, manifest: ProcessingManifest
-) -> bool:
-    """A bare number in the top or bottom margin, which may be a page number.
-
-    A single uppercase Roman letter (``I``, ``V``, ``X``...) is read as text.
-    """
-    text = (element.text or "").strip()
-    if not _is_page_number(text) or (len(text) == 1 and text.isupper()):
-        return False
-    bbox = _element_bbox(element, manifest)
-    if bbox is None:
-        return False
-    center = (bbox[1] + bbox[3]) / 2
-    return not _PAGE_NUMBER_MARGIN <= center <= 1 - _PAGE_NUMBER_MARGIN
-
-
 def _page_number_ids(manifest: ProcessingManifest) -> set[str]:
     """Elements that are page numbers rather than body text.
 
@@ -5445,25 +5411,20 @@ def _page_number_ids(manifest: ProcessingManifest) -> set[str]:
     the top or bottom margin tells it apart from a number of the body, and a
     page has one page number: the margin decides only on a page without a
     marked one and with a single candidate, so chart axis labels or a footnote
-    marker next to the page number stay.
+    marker next to the page number stay. The rules are docstruct's
+    (``docstruct.fusion.noise``); this reads the manifest's elements for them.
     """
-    marked: set[str] = set()
-    #: page number -> its page number candidates, marked or in the margin.
-    candidates: dict[int, list[str]] = {}
+    candidates: list[tuple[str, int, bool]] = []
     for element in manifest.elements:
         if element.type not in _PAGE_NUMBER_TYPES:
             continue
         page = element.page_number or 1
         if _is_marked_furniture(element):
-            if _is_decorated_page_number(element.text or ""):
-                marked.add(element.id)
-                candidates.setdefault(page, []).append(element.id)
-        elif _is_page_number_in_margin(element, manifest):
-            candidates.setdefault(page, []).append(element.id)
-    for ids in candidates.values():
-        if len(ids) == 1:
-            marked.update(ids)
-    return marked
+            if is_decorated_page_number(element.text or ""):
+                candidates.append((element.id, page, True))
+        elif is_page_number_in_margin(element.text, _element_bbox(element, manifest)):
+            candidates.append((element.id, page, False))
+    return select_page_numbers(candidates)
 
 
 #: Height share of the page by which a picture may miss a header line and
@@ -5474,7 +5435,7 @@ _LETTERHEAD_TOLERANCE = 0.01
 _LETTERHEAD_MAX_GAP = 0.05
 #: Tallest picture, as a share of the page height, read as a logo: a figure
 #: crossing the header band is content, and keeps its description.
-_LETTERHEAD_MAX_HEIGHT = _PAGE_NUMBER_MARGIN
+_LETTERHEAD_MAX_HEIGHT = PAGE_NUMBER_MARGIN
 
 
 def _is_page_header_line(
@@ -5495,7 +5456,7 @@ def _is_page_header_line(
         return True
     return (
         element.metadata.get("content_layer") == "furniture"
-        and (bbox[1] + bbox[3]) / 2 < _PAGE_NUMBER_MARGIN
+        and (bbox[1] + bbox[3]) / 2 < PAGE_NUMBER_MARGIN
     )
 
 
