@@ -7,6 +7,9 @@ can see are recorded here, newest first.
 
 ## Unreleased
 
+- **Added** `RENDER_MEDIA_TYPES` in `acessilia_sdk.toolbox.clients.pdf`: the inputs
+  `pdf.render@2` opens (PDF, PNG, JPEG), for a caller to check before it sends
+  a file. `render` itself does not check it, as before (#402).
 - **Added** `ToolboxPdfClient.text_spans_by_page(file_path, artifact_id, *, pages,
   use_remote_cache)`: the `text-spans@1` page of each requested page, by page
   number. It asks each page once, in order, in calls of at most

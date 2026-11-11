@@ -14,6 +14,9 @@ from acessilia_sdk.toolbox.errors import ToolboxContractViolation
 
 SPLIT_CAPABILITY = "pdf.split"
 RENDER_CAPABILITY = "pdf.render"
+#: Inputs ``pdf.render@2`` opens: PDF, PNG and JPEG. TIFF, BMP, GIF and WebP
+#: are not rendered, and the capability's contract does not list its inputs.
+RENDER_MEDIA_TYPES = frozenset({"application/pdf", "image/png", "image/jpeg"})
 TEXT_SPANS_CAPABILITY = "document.text.spans"
 #: Pages ``document.text.spans@1`` reads per call at most.
 TEXT_SPANS_MAX_PAGES = 200
@@ -256,6 +259,7 @@ def _check_text_spans_page(page: Any, context: str) -> None:
 
 __all__ = [
     "RENDER_CAPABILITY",
+    "RENDER_MEDIA_TYPES",
     "SPLIT_CAPABILITY",
     "TEXT_SPANS_CAPABILITY",
     "TEXT_SPANS_MAX_PAGES",
