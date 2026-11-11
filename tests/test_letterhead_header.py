@@ -148,3 +148,35 @@ def test_text_follows_the_document_language_not_the_interface():
     assert _letterhead_text("en", "pt_BR") == english
     assert _letterhead_text("pt-BR", "en_US") == _letterhead_text("pt-BR", "pt_BR")
     assert _letterhead_text("pt-BR", "en_US") != english
+
+
+# Characterized before the letterhead grouping moved to docstruct (#402).
+
+
+def test_two_logos_beside_one_shared_line_form_one_group():
+    """A line beside both pictures bridges them into one letterhead."""
+    elements = [
+        _placed("logo-a", "picture", "Left logo.", (64.0, 723.2, 180.0, 694.0), reading_order=1),
+        _placed("shared", "page_header", "Joint programme", (190.0, 722.4, 400.0, 711.0),
+                metadata=FURNITURE, reading_order=2),
+        _placed("logo-b", "picture", "Right logo.", (410.0, 723.2, 520.0, 694.0), reading_order=3),
+    ]
+
+    blocks = _blocks(*elements, BODY)
+
+    assert [block["metadata"].get("letterhead_members") for block in blocks] == [
+        ["logo-a", "shared", "logo-b"], None,
+    ]
+
+
+def test_an_element_another_step_marked_left_out_does_not_join():
+    """Shared state (inventory): ``negation_overlay`` (written by the overlay
+    and inline-math steps) keeps an element out of the payload and of any
+    letterhead."""
+    line_1, logo, line_2 = _letterhead()
+    line_2.metadata["negation_overlay"] = {"outcome": "inline-math", "host": "x"}
+
+    blocks = _blocks(line_1, logo, line_2, BODY)
+
+    assert blocks[0]["metadata"]["letterhead_members"] == ["line-1", "logo"]
+    assert "line-2" not in [block["id"] for block in blocks]
