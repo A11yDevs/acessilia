@@ -73,15 +73,29 @@ class ListSourceElement(Protocol):
     """What :func:`recover_empty_lettered_list_items` reads of an element.
 
     ``docstruct.manifest.DocumentElement`` has these attributes, and so does
-    the core's manifest element; neither needs converting.
+    the core's manifest element; neither needs converting. They are read-only
+    properties: a writable protocol attribute is invariant, so ``type: str``
+    would reject an element whose ``type`` is a ``Literal`` of kinds, and
+    ``metadata: Mapping`` one whose ``metadata`` is a ``dict``.
     """
 
-    id: str
-    type: str
-    text: str | None
-    parent_id: str | None
-    reading_order: int
-    metadata: Mapping[str, Any]
+    @property
+    def id(self) -> str: ...
+
+    @property
+    def type(self) -> str: ...
+
+    @property
+    def text(self) -> str | None: ...
+
+    @property
+    def parent_id(self) -> str | None: ...
+
+    @property
+    def reading_order(self) -> int: ...
+
+    @property
+    def metadata(self) -> Mapping[str, Any]: ...
 
 
 @dataclass(frozen=True)
