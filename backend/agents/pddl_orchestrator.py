@@ -31,6 +31,7 @@ from docstruct.fusion.noise import (
 )
 from docstruct.fusion.tailjoin import is_page_number as _is_page_number
 from docstruct.geometry import reading_role
+from docstruct.regions.letterhead import PlacedItem, letterhead_groups
 from docstruct.tables.ast import (
     effective_section_width,
     linearize_table_for_text,
@@ -5432,17 +5433,6 @@ def _page_number_ids(manifest: ProcessingManifest) -> set[str]:
     return select_page_numbers(candidates)
 
 
-#: Height share of the page by which a picture may miss a header line and
-#: still sit beside it (the line's box is tighter than the logo's).
-_LETTERHEAD_TOLERANCE = 0.01
-#: Width share of the page a header line may stand away from the picture and
-#: still be beside it; a running header across the page is not.
-_LETTERHEAD_MAX_GAP = 0.05
-#: Tallest picture, as a share of the page height, read as a logo: a figure
-#: crossing the header band is content, and keeps its description.
-_LETTERHEAD_MAX_HEIGHT = PAGE_NUMBER_MARGIN
-
-
 def _is_page_header_line(
     element: ManifestElement, bbox: tuple[float, ...]
 ) -> bool:
@@ -5465,65 +5455,37 @@ def _is_page_header_line(
     )
 
 
-def _is_beside(picture_box: tuple[float, ...], line_box: tuple[float, ...]) -> bool:
-    """Whether a header line overlaps the picture's height and stands next to it."""
-    horizontal_gap = max(line_box[0] - picture_box[2], picture_box[0] - line_box[2])
-    return (
-        line_box[1] <= picture_box[3] + _LETTERHEAD_TOLERANCE
-        and picture_box[1] <= line_box[3] + _LETTERHEAD_TOLERANCE
-        and horizontal_gap <= _LETTERHEAD_MAX_GAP
-    )
-
-
 def _letterhead_groups(
     manifest: ProcessingManifest, page_numbers: set[str]
 ) -> dict[str, list[ManifestElement]]:
     """Logos and the page header lines beside them, keyed by the first in reading order.
 
-    An institutional header ("University of X / Department of Y" next to the
-    logo) reaches the manifest as page_header lines and an unrelated picture,
-    so the reader got the lines apart and a long description of a logo that
-    repeats them. A logo-sized picture joins the header lines beside it; two
-    pictures form one group only when they share a line, so two institutions'
-    headers on a page stay apart. A page header without a picture is left as is.
+    The grouping is docstruct's ``letterhead_groups``; this reads the manifest
+    for it: which elements reach the payload, which are header lines
+    (:func:`_is_page_header_line`), and their boxes. A page header without a
+    picture is left as is.
     """
-    #: page number -> its header lines and logo-sized pictures, with their boxes.
-    lines: dict[int, list[tuple[ManifestElement, tuple[float, ...]]]] = {}
-    pictures: dict[int, list[tuple[ManifestElement, tuple[float, ...]]]] = {}
+    pictures: list[PlacedItem] = []
+    lines: list[PlacedItem] = []
+    elements: dict[str, ManifestElement] = {}
     for element in manifest.elements:
         if _is_left_out_of_payload(element) or element.id in page_numbers:
             continue
         bbox = _element_bbox(element, manifest)
         if bbox is None:
             continue
-        page = element.page_number or 1
+        item = PlacedItem(element.id, element.page_number or 1, element.reading_order, bbox)
         if element.type == "picture":
-            if bbox[3] - bbox[1] <= _LETTERHEAD_MAX_HEIGHT:
-                pictures.setdefault(page, []).append((element, bbox))
+            pictures.append(item)
         elif _is_page_header_line(element, bbox):
-            lines.setdefault(page, []).append((element, bbox))
-
-    groups: dict[str, list[ManifestElement]] = {}
-    for page, page_pictures in pictures.items():
-        components: list[dict[str, ManifestElement]] = []
-        for picture, picture_box in page_pictures:
-            beside = [
-                line
-                for line, line_box in lines.get(page, [])
-                if _is_beside(picture_box, line_box)
-            ]
-            if not beside:
-                continue
-            component = {picture.id: picture}
-            component.update((line.id, line) for line in beside)
-            for other in [item for item in components if item.keys() & component.keys()]:
-                component.update(other)
-                components.remove(other)
-            components.append(component)
-        for component in components:
-            ordered = sorted(component.values(), key=lambda item: item.reading_order)
-            groups[ordered[0].id] = ordered
-    return groups
+            lines.append(item)
+        else:
+            continue
+        elements[element.id] = element
+    return {
+        key: [elements[member] for member in members]
+        for key, members in letterhead_groups(pictures, lines).items()
+    }
 
 
 def _letterhead_block(
