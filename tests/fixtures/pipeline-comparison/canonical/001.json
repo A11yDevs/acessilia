@@ -1,0 +1,1447 @@
+{
+  "schema_version": "1.0.0",
+  "id": "doc-7f0e6d079954",
+  "title": "HERANÇA,\tREESCRITA\tE POLIMORFISMO",
+  "language": "pt-BR",
+  "verbosity": "detailed",
+  "audience": [
+    "reader"
+  ],
+  "metadata": {
+    "pipeline_engine": "pddl",
+    "pddl_manifest_id": "manifest-2ec8bda39e8d18df-r1",
+    "pddl_manifest_revision": 1,
+    "pddl_plan_id": "plan-7eee96e3f3fca5fe",
+    "pddl_planner": "internal-reference",
+    "pddl_expected_total_cost": 80,
+    "pddl_execution_id": null,
+    "pddl_execution_status": null,
+    "pddl_comparison_verdict": null,
+    "page_count": 3,
+    "mode": "pddl-internal",
+    "pages": [
+      {
+        "page_number": 1,
+        "text": "# HERANÇA,\tREESCRITA\tE POLIMORFISMO\n\"O\thomem\tabsurdo\té\taquele\tque\tnunca\tmuda.\"\t--\tGeorges\tClemenceau\nAo\tfinal\tdeste\tcapítulo,\tvocê\tserá\tcapaz\tde:\n- Dizer\to\tque\té\therança\te\tquando\tutilizá-la;\n- Reutilizar\tcódigo\tescrito\tanteriormente;\n- Criar\tclasses\tfilhas\te\treescrever\tmétodos;\n- Usar\ttodo\to\tpoder\tque\to\tpolimorfismo\toferece.\n# 9.1\tREPETINDO\tCÓDIGO?\nComo\ttoda\tempresa,\tnosso\tbanco\ttem\tfuncionários.\tModelemos\ta\tclasse Funcionario :\npublic class Funcionario {\n    private String nome;\n    private String cpf;\n    private double salario;\n    // métodos devem vir aqui\n}\nAlém\t de\t um\t funcionário\t comum,\t há\t também\t outros\t cargos,\t como\t os\t gerentes;\t estes\t guardam\t a mesma\tinformação\tque\tum\tfuncionário\tcomum,\tmas\ttambém\ttêm\toutros\tdados\te\tfuncionalidades\tum pouco\t diferentes.\t Por\t exemplo,\t um\t gerente\t no\t nosso\t banco\t tem\t uma\t senha\t numérica\t que\t permite\t o acesso\tao\tsistema\tinterno\tdo\tbanco,\talém\tdo\tnúmero\tde\tfuncionários\tos\tquais\tele\tgerencia:\npublic class Gerente {\n    private String nome;\n    private String cpf;\n    private double salario;\n    private int senha;\n    private int numeroDeFuncionariosGerenciados;\n    public boolean autentica(int senha) {\n        if (this.senha == senha) {\n            System.out.println(\"Acesso Permitido!\");\n            return true;\n        }\n        else {\n            System.out.println(\"Acesso Negado!\");\n            return false;\n        }",
+        "blocks": [
+          {
+            "id": "element-000002",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 56.0,
+                "top": 717.1539858070312,
+                "right": 345.8959008120001,
+                "bottom": 662.0990186070312
+              }
+            },
+            "metadata": {
+              "raw_label": "section_header",
+              "source_ref": "/texts/1",
+              "parent_id": "element-000001",
+              "confidence": null,
+              "manifest_element_id": "element-000002",
+              "docling_class": "SectionHeaderItem",
+              "content_layer": "body"
+            },
+            "type": "heading",
+            "level": 1,
+            "text": "HERANÇA,\tREESCRITA\tE POLIMORFISMO"
+          },
+          {
+            "id": "element-000003",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 56.0,
+                "top": 575.9528618070312,
+                "right": 385.6728865040001,
+                "bottom": 564.6134426070312
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/2",
+              "parent_id": "element-000001",
+              "confidence": null,
+              "manifest_element_id": "element-000003",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "\"O\thomem\tabsurdo\té\taquele\tque\tnunca\tmuda.\"\t--\tGeorges\tClemenceau"
+          },
+          {
+            "id": "element-000004",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 73.28558,
+                "top": 549.3040618070312,
+                "right": 272.80150622000014,
+                "bottom": 537.9646426070311
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/3",
+              "parent_id": "element-000001",
+              "confidence": null,
+              "manifest_element_id": "element-000004",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "Ao\tfinal\tdeste\tcapítulo,\tvocê\tserá\tcapaz\tde:"
+          },
+          {
+            "id": "element-000006",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 79.0473,
+                "top": 522.6558618070312,
+                "right": 271.2191594640002,
+                "bottom": 511.3164426070312
+              }
+            },
+            "metadata": {
+              "raw_label": "list_item",
+              "source_ref": "/texts/4",
+              "parent_id": "element-000005",
+              "confidence": null,
+              "manifest_element_id": "element-000006",
+              "docling_class": "ListItem",
+              "content_layer": "body",
+              "enumerated": false
+            },
+            "type": "list",
+            "ordered": false,
+            "items": [
+              "Dizer\to\tque\té\therança\te\tquando\tutilizá-la;"
+            ]
+          },
+          {
+            "id": "element-000007",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 79.0473,
+                "top": 505.3698618070312,
+                "right": 262.2686861400001,
+                "bottom": 494.0304426070312
+              }
+            },
+            "metadata": {
+              "raw_label": "list_item",
+              "source_ref": "/texts/5",
+              "parent_id": "element-000005",
+              "confidence": null,
+              "manifest_element_id": "element-000007",
+              "docling_class": "ListItem",
+              "content_layer": "body",
+              "enumerated": false
+            },
+            "type": "list",
+            "ordered": false,
+            "items": [
+              "Reutilizar\tcódigo\tescrito\tanteriormente;"
+            ]
+          },
+          {
+            "id": "element-000008",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 79.0473,
+                "top": 488.0838618070312,
+                "right": 269.29354585200014,
+                "bottom": 476.7444426070312
+              }
+            },
+            "metadata": {
+              "raw_label": "list_item",
+              "source_ref": "/texts/6",
+              "parent_id": "element-000005",
+              "confidence": null,
+              "manifest_element_id": "element-000008",
+              "docling_class": "ListItem",
+              "content_layer": "body",
+              "enumerated": false
+            },
+            "type": "list",
+            "ordered": false,
+            "items": [
+              "Criar\tclasses\tfilhas\te\treescrever\tmétodos;"
+            ]
+          },
+          {
+            "id": "element-000009",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 79.0473,
+                "top": 470.7978618070312,
+                "right": 295.2806868240001,
+                "bottom": 459.4584426070312
+              }
+            },
+            "metadata": {
+              "raw_label": "list_item",
+              "source_ref": "/texts/7",
+              "parent_id": "element-000005",
+              "confidence": null,
+              "manifest_element_id": "element-000009",
+              "docling_class": "ListItem",
+              "content_layer": "body",
+              "enumerated": false
+            },
+            "type": "list",
+            "ordered": false,
+            "items": [
+              "Usar\ttodo\to\tpoder\tque\to\tpolimorfismo\toferece."
+            ]
+          },
+          {
+            "id": "element-000010",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 56.0,
+                "top": 433.3170122070312,
+                "right": 231.91154563399988,
+                "bottom": 418.43401220703123
+              }
+            },
+            "metadata": {
+              "raw_label": "section_header",
+              "source_ref": "/texts/8",
+              "parent_id": "element-000001",
+              "confidence": null,
+              "manifest_element_id": "element-000010",
+              "docling_class": "SectionHeaderItem",
+              "content_layer": "body"
+            },
+            "type": "heading",
+            "level": 1,
+            "text": "9.1\tREPETINDO\tCÓDIGO?"
+          },
+          {
+            "id": "element-000011",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 73.28558,
+                "top": 405.2568618070312,
+                "right": 482.22729416000004,
+                "bottom": 393.6346895659748
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/9",
+              "parent_id": "element-000001",
+              "confidence": null,
+              "manifest_element_id": "element-000011",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "Como\ttoda\tempresa,\tnosso\tbanco\ttem\tfuncionários.\tModelemos\ta\tclasse Funcionario :"
+          },
+          {
+            "id": "element-000012",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 56.0,
+                "top": 378.94474360703117,
+                "right": 217.46564020799988,
+                "bottom": 316.95258433188116
+              }
+            },
+            "metadata": {
+              "raw_label": "code",
+              "source_ref": "/texts/10",
+              "parent_id": "element-000001",
+              "confidence": null,
+              "manifest_element_id": "element-000012",
+              "docling_class": "CodeItem",
+              "content_layer": "body"
+            },
+            "type": "code",
+            "text": "public class Funcionario {\n    private String nome;\n    private String cpf;\n    private double salario;\n    // métodos devem vir aqui\n}"
+          },
+          {
+            "id": "element-000013",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 56.00062,
+                "top": 302.9828618070312,
+                "right": 539.1409150640001,
+                "bottom": 239.78654260703115
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/11",
+              "parent_id": "element-000001",
+              "confidence": null,
+              "manifest_element_id": "element-000013",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "Além\t de\t um\t funcionário\t comum,\t há\t também\t outros\t cargos,\t como\t os\t gerentes;\t estes\t guardam\t a mesma\tinformação\tque\tum\tfuncionário\tcomum,\tmas\ttambém\ttêm\toutros\tdados\te\tfuncionalidades\tum pouco\t diferentes.\t Por\t exemplo,\t um\t gerente\t no\t nosso\t banco\t tem\t uma\t senha\t numérica\t que\t permite\t o acesso\tao\tsistema\tinterno\tdo\tbanco,\talém\tdo\tnúmero\tde\tfuncionários\tos\tquais\tele\tgerencia:"
+          },
+          {
+            "id": "element-000014",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 56.0,
+                "top": 226.25474360703117,
+                "right": 302.954312467,
+                "bottom": 67.03078433188114
+              }
+            },
+            "metadata": {
+              "raw_label": "code",
+              "source_ref": "/texts/12",
+              "parent_id": "element-000001",
+              "confidence": null,
+              "manifest_element_id": "element-000014",
+              "docling_class": "CodeItem",
+              "content_layer": "body"
+            },
+            "type": "code",
+            "text": "public class Gerente {\n    private String nome;\n    private String cpf;\n    private double salario;\n    private int senha;\n    private int numeroDeFuncionariosGerenciados;\n    public boolean autentica(int senha) {\n        if (this.senha == senha) {\n            System.out.println(\"Acesso Permitido!\");\n            return true;\n        }\n        else {\n            System.out.println(\"Acesso Negado!\");\n            return false;\n        }"
+          }
+        ]
+      },
+      {
+        "page_number": 2,
+        "text": "} // outros métodos }\nPRECISAMOS\tMESMO\tDE\tOUTRA\tCLASSE?\nPoderíamos\tter\tdeixado\ta\tclasse Funcionario mais\tgenérica,\tmantendo\tnela\ta\tsenha\tde\tacesso e\t o\t número\t de\t funcionários\t gerenciados.\t Caso\t o\t funcionário\t não\t fosse\t um\t gerente,\t deixaríamos esses\tatributos\tvazios.\nEssa\té\tuma\tpossibilidade,\tporém,\tcom\to\ttempo,\tpodemos\tpassar\ta\tter\tmuito\tatributos\topcionais, e\t a\t classe\t ficaria\t estranha.\t E\t em\t relação\t aos\t métodos?\t A\t classe Gerente tem\t o\t método autentica ,\tque\tnão\tfaz\tsentido\texistir\tem\tum\tfuncionário\to\tqual\tnão\té\tgerente.\nSe\t tivéssemos\t um\t outro\t tipo\t de\t funcionário\t que\t tem\t características\t diferentes\t do\t funcionário comum,\tprecisaríamos\tcriar\tuma\toutra\tclasse\te\tcopiar\to\tcódigo\tnovamente!\nAlém\t disso,\t se\t um\t dia\t precisarmos\t adicionar\t uma\t nova\t informação\t a\t todos\t os\t funcionários, precisaremos\tpassar\tpor\ttodas\tas\tclasses\tde\tfuncionário\te\tadicionar\tesse\tatributo.\tO\tproblema\tacontece novamente\tpor\tnão\tcentralizarmos\tos\tdados\tprincipais\tdo\tfuncionário\tem\tum\túnico\tlugar.\nExiste\tum\tjeito,\tem\tJava,\tde\trelacionarmos\tuma\tclasse\tde\ttal\tmaneira\tque\tuma\tdelas herda tudo\tque a\toutra\ttem.\tIsso\té\tuma\trelação\tde\tclasse\tmãe\te\tclasse\tfilha.\tNo\tnosso\tcaso,\tgostaríamos\tde\tfazer\tcom que\to Gerente tivesse\ttudo\tque\tum Funcionario tem,\tgostaríamos\tque\tela\tfosse\tuma extensão de Funcionario .\tFazemos\tisso\tpor\tmeio\tda\tpalavra-chave extends .\npublic class Gerente extends Funcionario {\n    private int senha;\n    private int numeroDeFuncionariosGerenciados;\n    public boolean autentica(int senha) {\n        if (this.senha == senha) {\n            System.out.println(\"Acesso Permitido!\");\n            return true;\n        }\n        else {\n            System.out.println(\"Acesso Negado!\");\n            return false;\n        }\n    }\n    // setter da senha omitido\n}\nEm\t todo\t momento\t que\t criarmos\t um\t objeto\t do\t tipo Gerente ,\t este\t terá\t também\t os\t atributos definidos\tna\tclasse Funcionario ,\tpois\tum Gerente é\tum Funcionario :",
+        "blocks": [
+          {
+            "id": "element-000015",
+            "source_location": {
+              "page_number": 2,
+              "bbox": {
+                "left": 56.0,
+                "top": 736.8127436070313,
+                "right": 160.49235228250012,
+                "bottom": 696.5185843318811
+              }
+            },
+            "metadata": {
+              "raw_label": "code",
+              "source_ref": "/texts/15",
+              "parent_id": "element-000001",
+              "confidence": null,
+              "manifest_element_id": "element-000015",
+              "docling_class": "CodeItem",
+              "content_layer": "body"
+            },
+            "type": "code",
+            "text": "} // outros métodos }"
+          },
+          {
+            "id": "element-000016",
+            "source_location": {
+              "page_number": 2,
+              "bbox": {
+                "left": 67.5238,
+                "top": 663.1018618070312,
+                "right": 243.64286,
+                "bottom": 651.7624426070312
+              }
+            },
+            "metadata": {
+              "raw_label": "section_header",
+              "source_ref": "/texts/16",
+              "parent_id": "element-000001",
+              "confidence": null,
+              "manifest_element_id": "element-000016",
+              "docling_class": "SectionHeaderItem",
+              "content_layer": "body",
+              "original_type": "heading",
+              "demoted_from_heading": true,
+              "is_callout_title": true,
+              "callout_id": "callout-p2-anchor1",
+              "callout_role": "title",
+              "callout_type": "note",
+              "callout_title": "PRECISAMOS\tMESMO\tDE\tOUTRA\tCLASSE?"
+            },
+            "type": "paragraph",
+            "text": "PRECISAMOS\tMESMO\tDE\tOUTRA\tCLASSE?"
+          },
+          {
+            "id": "element-000017",
+            "source_location": {
+              "page_number": 2,
+              "bbox": {
+                "left": 67.52377,
+                "top": 636.4530618070312,
+                "right": 527.5471065159994,
+                "bottom": 589.1013426070311
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/17",
+              "parent_id": "element-000001",
+              "confidence": null,
+              "manifest_element_id": "element-000017",
+              "docling_class": "TextItem",
+              "content_layer": "body",
+              "callout_id": "callout-p2-anchor1",
+              "callout_role": "content",
+              "callout_type": "note",
+              "callout_title": "PRECISAMOS\tMESMO\tDE\tOUTRA\tCLASSE?"
+            },
+            "type": "note",
+            "title": "PRECISAMOS\tMESMO\tDE\tOUTRA\tCLASSE?",
+            "text": "Poderíamos\tter\tdeixado\ta\tclasse Funcionario mais\tgenérica,\tmantendo\tnela\ta\tsenha\tde\tacesso e\t o\t número\t de\t funcionários\t gerenciados.\t Caso\t o\t funcionário\t não\t fosse\t um\t gerente,\t deixaríamos esses\tatributos\tvazios."
+          },
+          {
+            "id": "element-000018",
+            "source_location": {
+              "page_number": 2,
+              "bbox": {
+                "left": 67.52347,
+                "top": 574.5122618070312,
+                "right": 527.6382938560001,
+                "bottom": 526.8786895659748
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/18",
+              "parent_id": "element-000001",
+              "confidence": null,
+              "manifest_element_id": "element-000018",
+              "docling_class": "TextItem",
+              "content_layer": "body",
+              "callout_id": "callout-p2-anchor1",
+              "callout_role": "content",
+              "callout_type": "note",
+              "callout_title": "PRECISAMOS\tMESMO\tDE\tOUTRA\tCLASSE?"
+            },
+            "type": "note",
+            "text": "Essa\té\tuma\tpossibilidade,\tporém,\tcom\to\ttempo,\tpodemos\tpassar\ta\tter\tmuito\tatributos\topcionais, e\t a\t classe\t ficaria\t estranha.\t E\t em\t relação\t aos\t métodos?\t A\t classe Gerente tem\t o\t método autentica ,\tque\tnão\tfaz\tsentido\texistir\tem\tum\tfuncionário\to\tqual\tnão\té\tgerente."
+          },
+          {
+            "id": "element-000019",
+            "source_location": {
+              "page_number": 2,
+              "bbox": {
+                "left": 55.99958,
+                "top": 484.4828618070312,
+                "right": 538.804282364,
+                "bottom": 455.8579426070312
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/19",
+              "parent_id": "element-000001",
+              "confidence": null,
+              "manifest_element_id": "element-000019",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "Se\t tivéssemos\t um\t outro\t tipo\t de\t funcionário\t que\t tem\t características\t diferentes\t do\t funcionário comum,\tprecisaríamos\tcriar\tuma\toutra\tclasse\te\tcopiar\to\tcódigo\tnovamente!"
+          },
+          {
+            "id": "element-000020",
+            "source_location": {
+              "page_number": 2,
+              "bbox": {
+                "left": 55.99928,
+                "top": 440.5485618070312,
+                "right": 539.094371356,
+                "bottom": 394.6381426070312
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/20",
+              "parent_id": "element-000001",
+              "confidence": null,
+              "manifest_element_id": "element-000020",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "Além\t disso,\t se\t um\t dia\t precisarmos\t adicionar\t uma\t nova\t informação\t a\t todos\t os\t funcionários, precisaremos\tpassar\tpor\ttodas\tas\tclasses\tde\tfuncionário\te\tadicionar\tesse\tatributo.\tO\tproblema\tacontece novamente\tpor\tnão\tcentralizarmos\tos\tdados\tprincipais\tdo\tfuncionário\tem\tum\túnico\tlugar."
+          },
+          {
+            "id": "element-000021",
+            "source_location": {
+              "page_number": 2,
+              "bbox": {
+                "left": 56.0,
+                "top": 379.32876180703124,
+                "right": 539.1030866799999,
+                "bottom": 314.4086895659748
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/21",
+              "parent_id": "element-000001",
+              "confidence": null,
+              "manifest_element_id": "element-000021",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "Existe\tum\tjeito,\tem\tJava,\tde\trelacionarmos\tuma\tclasse\tde\ttal\tmaneira\tque\tuma\tdelas herda tudo\tque a\toutra\ttem.\tIsso\té\tuma\trelação\tde\tclasse\tmãe\te\tclasse\tfilha.\tNo\tnosso\tcaso,\tgostaríamos\tde\tfazer\tcom que\to Gerente tivesse\ttudo\tque\tum Funcionario tem,\tgostaríamos\tque\tela\tfosse\tuma extensão de Funcionario .\tFazemos\tisso\tpor\tmeio\tda\tpalavra-chave extends ."
+          },
+          {
+            "id": "element-000022",
+            "source_location": {
+              "page_number": 2,
+              "bbox": {
+                "left": 56.0,
+                "top": 299.7187436070312,
+                "right": 321.9501047225,
+                "bottom": 129.69158433188113
+              }
+            },
+            "metadata": {
+              "raw_label": "code",
+              "source_ref": "/texts/22",
+              "parent_id": "element-000001",
+              "confidence": null,
+              "manifest_element_id": "element-000022",
+              "docling_class": "CodeItem",
+              "content_layer": "body"
+            },
+            "type": "code",
+            "text": "public class Gerente extends Funcionario {\n    private int senha;\n    private int numeroDeFuncionariosGerenciados;\n    public boolean autentica(int senha) {\n        if (this.senha == senha) {\n            System.out.println(\"Acesso Permitido!\");\n            return true;\n        }\n        else {\n            System.out.println(\"Acesso Negado!\");\n            return false;\n        }\n    }\n    // setter da senha omitido\n}"
+          },
+          {
+            "id": "element-000023",
+            "source_location": {
+              "page_number": 2,
+              "bbox": {
+                "left": 56.00064,
+                "top": 116.44186180703116,
+                "right": 539.1296999959995,
+                "bottom": 86.0933895659748
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/23",
+              "parent_id": "element-000001",
+              "confidence": null,
+              "manifest_element_id": "element-000023",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "Em\t todo\t momento\t que\t criarmos\t um\t objeto\t do\t tipo Gerente ,\t este\t terá\t também\t os\t atributos definidos\tna\tclasse Funcionario ,\tpois\tum Gerente é\tum Funcionario :"
+          }
+        ]
+      },
+      {
+        "page_number": 3,
+        "text": "Imagem detectada sem descricao textual.\npublic class TestaGerente {\n    public static void main(String[] args) {\n        Gerente gerente = new Gerente();\n        // podemos chamar métodos do Funcionario: gerente.setNome(\"João da Silva\");\n        // e também métodos do Gerente! gerente.setSenha(4231);\n    }\n}\nDizemos\tque\ta\tclasse Gerente herda todos\tos\tatributos\te\tmétodos\tda\tclasse\tmãe,\tno\tnosso\tcaso,\ta Funcionario .\t Para\t ser\t mais\tpreciso,\tela\ttambém\therda\tos\tatributos\te\tmétodos\tprivados,\tporém\tnão consegue\t acessá-los\t diretamente.\t Para\t acessar\t um\t membro\t privado\t na\t filha\t indiretamente,\t seria necessário\tque\ta\tmãe\texpusesse\tum\toutro\tmétodo\tvisível\tque\tinvocasse\tesse\tatributo\tou\tmétodo\tprivado.\nSUPER\tE\tSUB\tCLASSE\nA\t nomenclatura\t mais\t encontrada\t é\t que Funcionario é\t a superclasse de Gerente ,\t e Gerente é\t a subclasse de Funcionario .\t Dizemos\t também\t que\t todo Gerente é\t um Funcionario .\tOutra\tforma\té\tdizer\tque Funcionario é\ta\tclasse mãe de Gerente ,\te Gerente é a\tclasse filha de Funcionario .\nE\t se\t precisamos\t acessar\t os\t atributos\t que\t herdamos?\t Não\t gostaríamos\t de\t deixar\t os\t atributos\t de Funcionario , public ,\t pois,\t dessa\t maneira,\t qualquer\t um\t poderia\t alterar\t os\t atributos\t dos\t objetos desse\ttipo.\tExiste\tum\toutro\tmodificador\tde\tacesso,\to protected ,\t o\t qual\t fica\t entre\to private e\t o public .\tUm\tatributo protected só\tpode\tser\tacessado\t(visível)\tpela\tprópria\tclasse,\tsuas\tsubclasses\te classes\tencontradas\tno\tmesmo\tpacote.\npublic class Funcionario {\n    protected String nome;\n    protected String cpf;\n    protected double salario;\n    // métodos devem vir aqui\n}",
+        "blocks": [
+          {
+            "id": "element-000024",
+            "source_location": {
+              "page_number": 3,
+              "bbox": {
+                "left": 261.13946533203125,
+                "top": 737.3574523925781,
+                "right": 332.79730224609375,
+                "bottom": 620.5592651367188
+              }
+            },
+            "metadata": {
+              "raw_label": "picture",
+              "source_ref": "/pictures/0",
+              "parent_id": "element-000001",
+              "confidence": null,
+              "manifest_element_id": "element-000024",
+              "docling_class": "PictureItem",
+              "content_layer": "body"
+            },
+            "type": "image",
+            "alt_text": "Imagem detectada sem descricao textual."
+          },
+          {
+            "id": "element-000025",
+            "source_location": {
+              "page_number": 3,
+              "bbox": {
+                "left": 56.0,
+                "top": 592.8557436070313,
+                "right": 307.72440190000003,
+                "bottom": 476.8455843318811
+              }
+            },
+            "metadata": {
+              "raw_label": "code",
+              "source_ref": "/texts/26",
+              "parent_id": "element-000001",
+              "confidence": null,
+              "manifest_element_id": "element-000025",
+              "docling_class": "CodeItem",
+              "content_layer": "body"
+            },
+            "type": "code",
+            "text": "public class TestaGerente {\n    public static void main(String[] args) {\n        Gerente gerente = new Gerente();\n        // podemos chamar métodos do Funcionario: gerente.setNome(\"João da Silva\");\n        // e também métodos do Gerente! gerente.setSenha(4231);\n    }\n}"
+          },
+          {
+            "id": "element-000026",
+            "source_location": {
+              "page_number": 3,
+              "bbox": {
+                "left": 56.0,
+                "top": 462.87586180703124,
+                "right": 539.0509687599999,
+                "bottom": 396.7987426070312
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/27",
+              "parent_id": "element-000001",
+              "confidence": null,
+              "manifest_element_id": "element-000026",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "Dizemos\tque\ta\tclasse Gerente herda todos\tos\tatributos\te\tmétodos\tda\tclasse\tmãe,\tno\tnosso\tcaso,\ta Funcionario .\t Para\t ser\t mais\tpreciso,\tela\ttambém\therda\tos\tatributos\te\tmétodos\tprivados,\tporém\tnão consegue\t acessá-los\t diretamente.\t Para\t acessar\t um\t membro\t privado\t na\t filha\t indiretamente,\t seria necessário\tque\ta\tmãe\texpusesse\tum\toutro\tmétodo\tvisível\tque\tinvocasse\tesse\tatributo\tou\tmétodo\tprivado."
+          },
+          {
+            "id": "element-000027",
+            "source_location": {
+              "page_number": 3,
+              "bbox": {
+                "left": 67.52422,
+                "top": 361.3225618070312,
+                "right": 158.8378508780001,
+                "bottom": 349.9831426070312
+              }
+            },
+            "metadata": {
+              "raw_label": "section_header",
+              "source_ref": "/texts/28",
+              "parent_id": "element-000001",
+              "confidence": null,
+              "manifest_element_id": "element-000027",
+              "docling_class": "SectionHeaderItem",
+              "content_layer": "body",
+              "original_type": "heading",
+              "demoted_from_heading": true,
+              "is_callout_title": true,
+              "callout_id": "callout-p3-anchor1",
+              "callout_role": "title",
+              "callout_type": "note",
+              "callout_title": "SUPER\tE\tSUB\tCLASSE"
+            },
+            "type": "paragraph",
+            "text": "SUPER\tE\tSUB\tCLASSE"
+          },
+          {
+            "id": "element-000028",
+            "source_location": {
+              "page_number": 3,
+              "bbox": {
+                "left": 67.5238,
+                "top": 334.67386180703124,
+                "right": 527.5010216800001,
+                "bottom": 266.8726895659747
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/29",
+              "parent_id": "element-000001",
+              "confidence": null,
+              "manifest_element_id": "element-000028",
+              "docling_class": "TextItem",
+              "content_layer": "body",
+              "callout_id": "callout-p3-anchor1",
+              "callout_role": "content",
+              "callout_type": "note",
+              "callout_title": "SUPER\tE\tSUB\tCLASSE"
+            },
+            "type": "note",
+            "title": "SUPER\tE\tSUB\tCLASSE",
+            "text": "A\t nomenclatura\t mais\t encontrada\t é\t que Funcionario é\t a superclasse de Gerente ,\t e Gerente é\t a subclasse de Funcionario .\t Dizemos\t também\t que\t todo Gerente é\t um Funcionario .\tOutra\tforma\té\tdizer\tque Funcionario é\ta\tclasse mãe de Gerente ,\te Gerente é a\tclasse filha de Funcionario ."
+          },
+          {
+            "id": "element-000029",
+            "source_location": {
+              "page_number": 3,
+              "bbox": {
+                "left": 56.0,
+                "top": 224.47686180703113,
+                "right": 539.2035517839998,
+                "bottom": 139.67424260703115
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/30",
+              "parent_id": "element-000001",
+              "confidence": null,
+              "manifest_element_id": "element-000029",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "E\t se\t precisamos\t acessar\t os\t atributos\t que\t herdamos?\t Não\t gostaríamos\t de\t deixar\t os\t atributos\t de Funcionario , public ,\t pois,\t dessa\t maneira,\t qualquer\t um\t poderia\t alterar\t os\t atributos\t dos\t objetos desse\ttipo.\tExiste\tum\toutro\tmodificador\tde\tacesso,\to protected ,\t o\t qual\t fica\t entre\to private e\t o public .\tUm\tatributo protected só\tpode\tser\tacessado\t(visível)\tpela\tprópria\tclasse,\tsuas\tsubclasses\te classes\tencontradas\tno\tmesmo\tpacote."
+          },
+          {
+            "id": "element-000030",
+            "source_location": {
+              "page_number": 3,
+              "bbox": {
+                "left": 56.0,
+                "top": 126.14174360703123,
+                "right": 212.7354543400002,
+                "bottom": 64.14988433188114
+              }
+            },
+            "metadata": {
+              "raw_label": "code",
+              "source_ref": "/texts/31",
+              "parent_id": "element-000001",
+              "confidence": null,
+              "manifest_element_id": "element-000030",
+              "docling_class": "CodeItem",
+              "content_layer": "body"
+            },
+            "type": "code",
+            "text": "public class Funcionario {\n    protected String nome;\n    protected String cpf;\n    protected double salario;\n    // métodos devem vir aqui\n}"
+          }
+        ]
+      }
+    ]
+  },
+  "source": {
+    "name": "001.pdf",
+    "path": "/app/tests/dataset/input/001.pdf",
+    "type": ".pdf"
+  },
+  "accessibility": {
+    "navigation": true,
+    "semantic_headings": true,
+    "internal_links": true
+  },
+  "technical_warnings": [
+    "Executor nao foi executado; somente manifesto e plano foram gerados."
+  ],
+  "audit": {
+    "generated_by": "canonical_builder",
+    "input_length": 7,
+    "block_count": 28
+  },
+  "sections": [
+    {
+      "id": "element-000002",
+      "title": "HERANÇA,\tREESCRITA\tE POLIMORFISMO",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 56.0,
+          "top": 717.1539858070312,
+          "right": 345.8959008120001,
+          "bottom": 662.0990186070312
+        }
+      },
+      "metadata": {
+        "raw_label": "section_header",
+        "source_ref": "/texts/1",
+        "parent_id": "element-000001",
+        "confidence": null,
+        "manifest_element_id": "element-000002",
+        "docling_class": "SectionHeaderItem",
+        "content_layer": "body"
+      },
+      "blocks": [
+        {
+          "id": "element-000003",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 56.0,
+              "top": 575.9528618070312,
+              "right": 385.6728865040001,
+              "bottom": 564.6134426070312
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/2",
+            "parent_id": "element-000001",
+            "confidence": null,
+            "manifest_element_id": "element-000003",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "\"O\thomem\tabsurdo\té\taquele\tque\tnunca\tmuda.\"\t--\tGeorges\tClemenceau"
+        },
+        {
+          "id": "element-000004",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 73.28558,
+              "top": 549.3040618070312,
+              "right": 272.80150622000014,
+              "bottom": 537.9646426070311
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/3",
+            "parent_id": "element-000001",
+            "confidence": null,
+            "manifest_element_id": "element-000004",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "Ao\tfinal\tdeste\tcapítulo,\tvocê\tserá\tcapaz\tde:"
+        },
+        {
+          "id": "element-000006",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 79.0473,
+              "top": 522.6558618070312,
+              "right": 271.2191594640002,
+              "bottom": 511.3164426070312
+            }
+          },
+          "metadata": {
+            "raw_label": "list_item",
+            "source_ref": "/texts/4",
+            "parent_id": "element-000005",
+            "confidence": null,
+            "manifest_element_id": "element-000006",
+            "docling_class": "ListItem",
+            "content_layer": "body",
+            "enumerated": false
+          },
+          "type": "list",
+          "ordered": false,
+          "items": [
+            "Dizer\to\tque\té\therança\te\tquando\tutilizá-la;"
+          ]
+        },
+        {
+          "id": "element-000007",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 79.0473,
+              "top": 505.3698618070312,
+              "right": 262.2686861400001,
+              "bottom": 494.0304426070312
+            }
+          },
+          "metadata": {
+            "raw_label": "list_item",
+            "source_ref": "/texts/5",
+            "parent_id": "element-000005",
+            "confidence": null,
+            "manifest_element_id": "element-000007",
+            "docling_class": "ListItem",
+            "content_layer": "body",
+            "enumerated": false
+          },
+          "type": "list",
+          "ordered": false,
+          "items": [
+            "Reutilizar\tcódigo\tescrito\tanteriormente;"
+          ]
+        },
+        {
+          "id": "element-000008",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 79.0473,
+              "top": 488.0838618070312,
+              "right": 269.29354585200014,
+              "bottom": 476.7444426070312
+            }
+          },
+          "metadata": {
+            "raw_label": "list_item",
+            "source_ref": "/texts/6",
+            "parent_id": "element-000005",
+            "confidence": null,
+            "manifest_element_id": "element-000008",
+            "docling_class": "ListItem",
+            "content_layer": "body",
+            "enumerated": false
+          },
+          "type": "list",
+          "ordered": false,
+          "items": [
+            "Criar\tclasses\tfilhas\te\treescrever\tmétodos;"
+          ]
+        },
+        {
+          "id": "element-000009",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 79.0473,
+              "top": 470.7978618070312,
+              "right": 295.2806868240001,
+              "bottom": 459.4584426070312
+            }
+          },
+          "metadata": {
+            "raw_label": "list_item",
+            "source_ref": "/texts/7",
+            "parent_id": "element-000005",
+            "confidence": null,
+            "manifest_element_id": "element-000009",
+            "docling_class": "ListItem",
+            "content_layer": "body",
+            "enumerated": false
+          },
+          "type": "list",
+          "ordered": false,
+          "items": [
+            "Usar\ttodo\to\tpoder\tque\to\tpolimorfismo\toferece."
+          ]
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000010",
+      "title": "9.1\tREPETINDO\tCÓDIGO?",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 56.0,
+          "top": 433.3170122070312,
+          "right": 231.91154563399988,
+          "bottom": 418.43401220703123
+        }
+      },
+      "metadata": {
+        "raw_label": "section_header",
+        "source_ref": "/texts/8",
+        "parent_id": "element-000001",
+        "confidence": null,
+        "manifest_element_id": "element-000010",
+        "docling_class": "SectionHeaderItem",
+        "content_layer": "body"
+      },
+      "blocks": [
+        {
+          "id": "element-000011",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 73.28558,
+              "top": 405.2568618070312,
+              "right": 482.22729416000004,
+              "bottom": 393.6346895659748
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/9",
+            "parent_id": "element-000001",
+            "confidence": null,
+            "manifest_element_id": "element-000011",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "Como\ttoda\tempresa,\tnosso\tbanco\ttem\tfuncionários.\tModelemos\ta\tclasse Funcionario :"
+        },
+        {
+          "id": "element-000012",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 56.0,
+              "top": 378.94474360703117,
+              "right": 217.46564020799988,
+              "bottom": 316.95258433188116
+            }
+          },
+          "metadata": {
+            "raw_label": "code",
+            "source_ref": "/texts/10",
+            "parent_id": "element-000001",
+            "confidence": null,
+            "manifest_element_id": "element-000012",
+            "docling_class": "CodeItem",
+            "content_layer": "body"
+          },
+          "type": "code",
+          "text": "public class Funcionario {\n    private String nome;\n    private String cpf;\n    private double salario;\n    // métodos devem vir aqui\n}"
+        },
+        {
+          "id": "element-000013",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 56.00062,
+              "top": 302.9828618070312,
+              "right": 539.1409150640001,
+              "bottom": 239.78654260703115
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/11",
+            "parent_id": "element-000001",
+            "confidence": null,
+            "manifest_element_id": "element-000013",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "Além\t de\t um\t funcionário\t comum,\t há\t também\t outros\t cargos,\t como\t os\t gerentes;\t estes\t guardam\t a mesma\tinformação\tque\tum\tfuncionário\tcomum,\tmas\ttambém\ttêm\toutros\tdados\te\tfuncionalidades\tum pouco\t diferentes.\t Por\t exemplo,\t um\t gerente\t no\t nosso\t banco\t tem\t uma\t senha\t numérica\t que\t permite\t o acesso\tao\tsistema\tinterno\tdo\tbanco,\talém\tdo\tnúmero\tde\tfuncionários\tos\tquais\tele\tgerencia:"
+        },
+        {
+          "id": "element-000014",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 56.0,
+              "top": 226.25474360703117,
+              "right": 302.954312467,
+              "bottom": 67.03078433188114
+            }
+          },
+          "metadata": {
+            "raw_label": "code",
+            "source_ref": "/texts/12",
+            "parent_id": "element-000001",
+            "confidence": null,
+            "manifest_element_id": "element-000014",
+            "docling_class": "CodeItem",
+            "content_layer": "body"
+          },
+          "type": "code",
+          "text": "public class Gerente {\n    private String nome;\n    private String cpf;\n    private double salario;\n    private int senha;\n    private int numeroDeFuncionariosGerenciados;\n    public boolean autentica(int senha) {\n        if (this.senha == senha) {\n            System.out.println(\"Acesso Permitido!\");\n            return true;\n        }\n        else {\n            System.out.println(\"Acesso Negado!\");\n            return false;\n        }"
+        },
+        {
+          "id": "element-000015",
+          "source_location": {
+            "page_number": 2,
+            "bbox": {
+              "left": 56.0,
+              "top": 736.8127436070313,
+              "right": 160.49235228250012,
+              "bottom": 696.5185843318811
+            }
+          },
+          "metadata": {
+            "raw_label": "code",
+            "source_ref": "/texts/15",
+            "parent_id": "element-000001",
+            "confidence": null,
+            "manifest_element_id": "element-000015",
+            "docling_class": "CodeItem",
+            "content_layer": "body"
+          },
+          "type": "code",
+          "text": "} // outros métodos }"
+        },
+        {
+          "id": "element-000016",
+          "source_location": {
+            "page_number": 2,
+            "bbox": {
+              "left": 67.5238,
+              "top": 663.1018618070312,
+              "right": 243.64286,
+              "bottom": 651.7624426070312
+            }
+          },
+          "metadata": {
+            "raw_label": "section_header",
+            "source_ref": "/texts/16",
+            "parent_id": "element-000001",
+            "confidence": null,
+            "manifest_element_id": "element-000016",
+            "docling_class": "SectionHeaderItem",
+            "content_layer": "body",
+            "original_type": "heading",
+            "demoted_from_heading": true,
+            "is_callout_title": true,
+            "callout_id": "callout-p2-anchor1",
+            "callout_role": "title",
+            "callout_type": "note",
+            "callout_title": "PRECISAMOS\tMESMO\tDE\tOUTRA\tCLASSE?"
+          },
+          "type": "paragraph",
+          "text": "PRECISAMOS\tMESMO\tDE\tOUTRA\tCLASSE?"
+        },
+        {
+          "id": "element-000017",
+          "source_location": {
+            "page_number": 2,
+            "bbox": {
+              "left": 67.52377,
+              "top": 636.4530618070312,
+              "right": 527.5471065159994,
+              "bottom": 589.1013426070311
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/17",
+            "parent_id": "element-000001",
+            "confidence": null,
+            "manifest_element_id": "element-000017",
+            "docling_class": "TextItem",
+            "content_layer": "body",
+            "callout_id": "callout-p2-anchor1",
+            "callout_role": "content",
+            "callout_type": "note",
+            "callout_title": "PRECISAMOS\tMESMO\tDE\tOUTRA\tCLASSE?"
+          },
+          "type": "note",
+          "title": "PRECISAMOS\tMESMO\tDE\tOUTRA\tCLASSE?",
+          "text": "Poderíamos\tter\tdeixado\ta\tclasse Funcionario mais\tgenérica,\tmantendo\tnela\ta\tsenha\tde\tacesso e\t o\t número\t de\t funcionários\t gerenciados.\t Caso\t o\t funcionário\t não\t fosse\t um\t gerente,\t deixaríamos esses\tatributos\tvazios."
+        },
+        {
+          "id": "element-000018",
+          "source_location": {
+            "page_number": 2,
+            "bbox": {
+              "left": 67.52347,
+              "top": 574.5122618070312,
+              "right": 527.6382938560001,
+              "bottom": 526.8786895659748
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/18",
+            "parent_id": "element-000001",
+            "confidence": null,
+            "manifest_element_id": "element-000018",
+            "docling_class": "TextItem",
+            "content_layer": "body",
+            "callout_id": "callout-p2-anchor1",
+            "callout_role": "content",
+            "callout_type": "note",
+            "callout_title": "PRECISAMOS\tMESMO\tDE\tOUTRA\tCLASSE?"
+          },
+          "type": "note",
+          "text": "Essa\té\tuma\tpossibilidade,\tporém,\tcom\to\ttempo,\tpodemos\tpassar\ta\tter\tmuito\tatributos\topcionais, e\t a\t classe\t ficaria\t estranha.\t E\t em\t relação\t aos\t métodos?\t A\t classe Gerente tem\t o\t método autentica ,\tque\tnão\tfaz\tsentido\texistir\tem\tum\tfuncionário\to\tqual\tnão\té\tgerente."
+        },
+        {
+          "id": "element-000019",
+          "source_location": {
+            "page_number": 2,
+            "bbox": {
+              "left": 55.99958,
+              "top": 484.4828618070312,
+              "right": 538.804282364,
+              "bottom": 455.8579426070312
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/19",
+            "parent_id": "element-000001",
+            "confidence": null,
+            "manifest_element_id": "element-000019",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "Se\t tivéssemos\t um\t outro\t tipo\t de\t funcionário\t que\t tem\t características\t diferentes\t do\t funcionário comum,\tprecisaríamos\tcriar\tuma\toutra\tclasse\te\tcopiar\to\tcódigo\tnovamente!"
+        },
+        {
+          "id": "element-000020",
+          "source_location": {
+            "page_number": 2,
+            "bbox": {
+              "left": 55.99928,
+              "top": 440.5485618070312,
+              "right": 539.094371356,
+              "bottom": 394.6381426070312
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/20",
+            "parent_id": "element-000001",
+            "confidence": null,
+            "manifest_element_id": "element-000020",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "Além\t disso,\t se\t um\t dia\t precisarmos\t adicionar\t uma\t nova\t informação\t a\t todos\t os\t funcionários, precisaremos\tpassar\tpor\ttodas\tas\tclasses\tde\tfuncionário\te\tadicionar\tesse\tatributo.\tO\tproblema\tacontece novamente\tpor\tnão\tcentralizarmos\tos\tdados\tprincipais\tdo\tfuncionário\tem\tum\túnico\tlugar."
+        },
+        {
+          "id": "element-000021",
+          "source_location": {
+            "page_number": 2,
+            "bbox": {
+              "left": 56.0,
+              "top": 379.32876180703124,
+              "right": 539.1030866799999,
+              "bottom": 314.4086895659748
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/21",
+            "parent_id": "element-000001",
+            "confidence": null,
+            "manifest_element_id": "element-000021",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "Existe\tum\tjeito,\tem\tJava,\tde\trelacionarmos\tuma\tclasse\tde\ttal\tmaneira\tque\tuma\tdelas herda tudo\tque a\toutra\ttem.\tIsso\té\tuma\trelação\tde\tclasse\tmãe\te\tclasse\tfilha.\tNo\tnosso\tcaso,\tgostaríamos\tde\tfazer\tcom que\to Gerente tivesse\ttudo\tque\tum Funcionario tem,\tgostaríamos\tque\tela\tfosse\tuma extensão de Funcionario .\tFazemos\tisso\tpor\tmeio\tda\tpalavra-chave extends ."
+        },
+        {
+          "id": "element-000022",
+          "source_location": {
+            "page_number": 2,
+            "bbox": {
+              "left": 56.0,
+              "top": 299.7187436070312,
+              "right": 321.9501047225,
+              "bottom": 129.69158433188113
+            }
+          },
+          "metadata": {
+            "raw_label": "code",
+            "source_ref": "/texts/22",
+            "parent_id": "element-000001",
+            "confidence": null,
+            "manifest_element_id": "element-000022",
+            "docling_class": "CodeItem",
+            "content_layer": "body"
+          },
+          "type": "code",
+          "text": "public class Gerente extends Funcionario {\n    private int senha;\n    private int numeroDeFuncionariosGerenciados;\n    public boolean autentica(int senha) {\n        if (this.senha == senha) {\n            System.out.println(\"Acesso Permitido!\");\n            return true;\n        }\n        else {\n            System.out.println(\"Acesso Negado!\");\n            return false;\n        }\n    }\n    // setter da senha omitido\n}"
+        },
+        {
+          "id": "element-000023",
+          "source_location": {
+            "page_number": 2,
+            "bbox": {
+              "left": 56.00064,
+              "top": 116.44186180703116,
+              "right": 539.1296999959995,
+              "bottom": 86.0933895659748
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/23",
+            "parent_id": "element-000001",
+            "confidence": null,
+            "manifest_element_id": "element-000023",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "Em\t todo\t momento\t que\t criarmos\t um\t objeto\t do\t tipo Gerente ,\t este\t terá\t também\t os\t atributos definidos\tna\tclasse Funcionario ,\tpois\tum Gerente é\tum Funcionario :"
+        },
+        {
+          "id": "element-000024",
+          "source_location": {
+            "page_number": 3,
+            "bbox": {
+              "left": 261.13946533203125,
+              "top": 737.3574523925781,
+              "right": 332.79730224609375,
+              "bottom": 620.5592651367188
+            }
+          },
+          "metadata": {
+            "raw_label": "picture",
+            "source_ref": "/pictures/0",
+            "parent_id": "element-000001",
+            "confidence": null,
+            "manifest_element_id": "element-000024",
+            "docling_class": "PictureItem",
+            "content_layer": "body"
+          },
+          "type": "image",
+          "alt_text": "Imagem detectada sem descricao textual."
+        },
+        {
+          "id": "element-000025",
+          "source_location": {
+            "page_number": 3,
+            "bbox": {
+              "left": 56.0,
+              "top": 592.8557436070313,
+              "right": 307.72440190000003,
+              "bottom": 476.8455843318811
+            }
+          },
+          "metadata": {
+            "raw_label": "code",
+            "source_ref": "/texts/26",
+            "parent_id": "element-000001",
+            "confidence": null,
+            "manifest_element_id": "element-000025",
+            "docling_class": "CodeItem",
+            "content_layer": "body"
+          },
+          "type": "code",
+          "text": "public class TestaGerente {\n    public static void main(String[] args) {\n        Gerente gerente = new Gerente();\n        // podemos chamar métodos do Funcionario: gerente.setNome(\"João da Silva\");\n        // e também métodos do Gerente! gerente.setSenha(4231);\n    }\n}"
+        },
+        {
+          "id": "element-000026",
+          "source_location": {
+            "page_number": 3,
+            "bbox": {
+              "left": 56.0,
+              "top": 462.87586180703124,
+              "right": 539.0509687599999,
+              "bottom": 396.7987426070312
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/27",
+            "parent_id": "element-000001",
+            "confidence": null,
+            "manifest_element_id": "element-000026",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "Dizemos\tque\ta\tclasse Gerente herda todos\tos\tatributos\te\tmétodos\tda\tclasse\tmãe,\tno\tnosso\tcaso,\ta Funcionario .\t Para\t ser\t mais\tpreciso,\tela\ttambém\therda\tos\tatributos\te\tmétodos\tprivados,\tporém\tnão consegue\t acessá-los\t diretamente.\t Para\t acessar\t um\t membro\t privado\t na\t filha\t indiretamente,\t seria necessário\tque\ta\tmãe\texpusesse\tum\toutro\tmétodo\tvisível\tque\tinvocasse\tesse\tatributo\tou\tmétodo\tprivado."
+        },
+        {
+          "id": "element-000027",
+          "source_location": {
+            "page_number": 3,
+            "bbox": {
+              "left": 67.52422,
+              "top": 361.3225618070312,
+              "right": 158.8378508780001,
+              "bottom": 349.9831426070312
+            }
+          },
+          "metadata": {
+            "raw_label": "section_header",
+            "source_ref": "/texts/28",
+            "parent_id": "element-000001",
+            "confidence": null,
+            "manifest_element_id": "element-000027",
+            "docling_class": "SectionHeaderItem",
+            "content_layer": "body",
+            "original_type": "heading",
+            "demoted_from_heading": true,
+            "is_callout_title": true,
+            "callout_id": "callout-p3-anchor1",
+            "callout_role": "title",
+            "callout_type": "note",
+            "callout_title": "SUPER\tE\tSUB\tCLASSE"
+          },
+          "type": "paragraph",
+          "text": "SUPER\tE\tSUB\tCLASSE"
+        },
+        {
+          "id": "element-000028",
+          "source_location": {
+            "page_number": 3,
+            "bbox": {
+              "left": 67.5238,
+              "top": 334.67386180703124,
+              "right": 527.5010216800001,
+              "bottom": 266.8726895659747
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/29",
+            "parent_id": "element-000001",
+            "confidence": null,
+            "manifest_element_id": "element-000028",
+            "docling_class": "TextItem",
+            "content_layer": "body",
+            "callout_id": "callout-p3-anchor1",
+            "callout_role": "content",
+            "callout_type": "note",
+            "callout_title": "SUPER\tE\tSUB\tCLASSE"
+          },
+          "type": "note",
+          "title": "SUPER\tE\tSUB\tCLASSE",
+          "text": "A\t nomenclatura\t mais\t encontrada\t é\t que Funcionario é\t a superclasse de Gerente ,\t e Gerente é\t a subclasse de Funcionario .\t Dizemos\t também\t que\t todo Gerente é\t um Funcionario .\tOutra\tforma\té\tdizer\tque Funcionario é\ta\tclasse mãe de Gerente ,\te Gerente é a\tclasse filha de Funcionario ."
+        },
+        {
+          "id": "element-000029",
+          "source_location": {
+            "page_number": 3,
+            "bbox": {
+              "left": 56.0,
+              "top": 224.47686180703113,
+              "right": 539.2035517839998,
+              "bottom": 139.67424260703115
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/30",
+            "parent_id": "element-000001",
+            "confidence": null,
+            "manifest_element_id": "element-000029",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "E\t se\t precisamos\t acessar\t os\t atributos\t que\t herdamos?\t Não\t gostaríamos\t de\t deixar\t os\t atributos\t de Funcionario , public ,\t pois,\t dessa\t maneira,\t qualquer\t um\t poderia\t alterar\t os\t atributos\t dos\t objetos desse\ttipo.\tExiste\tum\toutro\tmodificador\tde\tacesso,\to protected ,\t o\t qual\t fica\t entre\to private e\t o public .\tUm\tatributo protected só\tpode\tser\tacessado\t(visível)\tpela\tprópria\tclasse,\tsuas\tsubclasses\te classes\tencontradas\tno\tmesmo\tpacote."
+        },
+        {
+          "id": "element-000030",
+          "source_location": {
+            "page_number": 3,
+            "bbox": {
+              "left": 56.0,
+              "top": 126.14174360703123,
+              "right": 212.7354543400002,
+              "bottom": 64.14988433188114
+            }
+          },
+          "metadata": {
+            "raw_label": "code",
+            "source_ref": "/texts/31",
+            "parent_id": "element-000001",
+            "confidence": null,
+            "manifest_element_id": "element-000030",
+            "docling_class": "CodeItem",
+            "content_layer": "body"
+          },
+          "type": "code",
+          "text": "public class Funcionario {\n    protected String nome;\n    protected String cpf;\n    protected double salario;\n    // métodos devem vir aqui\n}"
+        }
+      ],
+      "children": []
+    }
+  ]
+}

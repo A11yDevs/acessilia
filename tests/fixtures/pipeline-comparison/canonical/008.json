@@ -1,0 +1,3507 @@
+{
+  "schema_version": "1.0.0",
+  "id": "doc-4ab359c62bbd",
+  "title": "008",
+  "language": "pt-BR",
+  "verbosity": "detailed",
+  "audience": [
+    "reader"
+  ],
+  "metadata": {
+    "pipeline_engine": "pddl",
+    "pddl_manifest_id": "manifest-6480e5093b894dd0-r1",
+    "pddl_manifest_revision": 1,
+    "pddl_plan_id": "plan-a63f58b10cafc00e",
+    "pddl_planner": "internal-reference",
+    "pddl_expected_total_cost": 20,
+    "pddl_execution_id": null,
+    "pddl_execution_status": null,
+    "pddl_comparison_verdict": null,
+    "page_count": 1,
+    "mode": "pddl-internal",
+    "pages": [
+      {
+        "page_number": 1,
+        "text": "Imagem detectada sem descricao textual.\nMetals: Density\n25.00\n22.50\n21.45\n19.25\n20.00\n19.30\n19.10\nicm3)\n17.50\n15.00\n13.53\n12.50\n11.34\n10.28\n10.49\nDensity\n10.00\n8.65\n8.90 8.96\n8.91\n7.87\n7.19\n7.21\n7.37\n7.14\n7.50\n4.51\n5.00\n2.70\n2.50\n1.74\n0.00\nAluminum\nCadmium\nChromium\nCobalt\nCopper\nIron\nLead\nMagnesium\nManganese\nMercury\nMolybdenum\nNickel\nPlatinum\nSilver\nm\nTitanlium\nTungsten\nUranium\nZinc\nMetal",
+        "blocks": [
+          {
+            "id": "element-000002",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 45.59795379638672,
+                "top": 475.5992889404297,
+                "right": 919.7005615234375,
+                "bottom": 29.903656005859375
+              }
+            },
+            "metadata": {
+              "raw_label": "picture",
+              "source_ref": "/pictures/0",
+              "parent_id": "element-000001",
+              "confidence": null,
+              "manifest_element_id": "element-000002",
+              "docling_class": "PictureItem",
+              "content_layer": "body"
+            },
+            "type": "image",
+            "alt_text": "Imagem detectada sem descricao textual."
+          },
+          {
+            "id": "element-000003",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 394.3548583984375,
+                "top": 472.5,
+                "right": 538.0645345052084,
+                "bottom": 448.875
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/0",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000003",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "Metals: Density"
+          },
+          {
+            "id": "element-000004",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 79.83871459960938,
+                "top": 444.05357869466144,
+                "right": 114.6774190266927,
+                "bottom": 428.1428629557292
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/1",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000004",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "25.00"
+          },
+          {
+            "id": "element-000005",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 79.83871459960938,
+                "top": 414.1607157389323,
+                "right": 114.6774190266927,
+                "bottom": 398.25
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/2",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000005",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "22.50"
+          },
+          {
+            "id": "element-000006",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 618.8709716796875,
+                "top": 413.67857869466144,
+                "right": 654.6774495442709,
+                "bottom": 396.3214314778646
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/3",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000006",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "21.45"
+          },
+          {
+            "id": "element-000007",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 773.225830078125,
+                "top": 394.875,
+                "right": 808.5484212239584,
+                "bottom": 377.51786295572913
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/4",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000007",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "19.25"
+          },
+          {
+            "id": "element-000008",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 79.83871459960938,
+                "top": 384.75,
+                "right": 114.6774190266927,
+                "bottom": 369.3214314778646
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/5",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000008",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "20.00"
+          },
+          {
+            "id": "element-000009",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 315.0,
+                "top": 387.16071573893225,
+                "right": 348.8709716796875,
+                "bottom": 373.1785786946615
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/6",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000009",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "19.30"
+          },
+          {
+            "id": "element-000010",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 814.3548990885416,
+                "top": 382.8214314778646,
+                "right": 849.193603515625,
+                "bottom": 365.46429443359375
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/7",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000010",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "19.10"
+          },
+          {
+            "id": "element-000011",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 54.19355265299479,
+                "top": 367.875,
+                "right": 73.06451924641927,
+                "bottom": 323.03572591145837
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/8",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000011",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "icm3)"
+          },
+          {
+            "id": "element-000012",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 80.3225809733073,
+                "top": 355.33929443359375,
+                "right": 114.6774190266927,
+                "bottom": 339.4285685221354
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/9",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000012",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "17.50"
+          },
+          {
+            "id": "element-000013",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 79.83871459960938,
+                "top": 325.9285685221354,
+                "right": 114.1935526529948,
+                "bottom": 310.01786295572913
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/10",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000013",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "15.00"
+          },
+          {
+            "id": "element-000014",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 505.6451822916667,
+                "top": 319.66072591145837,
+                "right": 540.48388671875,
+                "bottom": 303.75
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/11",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000014",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "13.53"
+          },
+          {
+            "id": "element-000015",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 79.83871459960938,
+                "top": 296.03572591145837,
+                "right": 114.6774190266927,
+                "bottom": 280.125
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/12",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000015",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "12.50"
+          },
+          {
+            "id": "element-000016",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 391.9355061848958,
+                "top": 293.14286295572913,
+                "right": 426.2903238932292,
+                "bottom": 277.71429443359375
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/13",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000016",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "11.34"
+          },
+          {
+            "id": "element-000017",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 543.3871256510416,
+                "top": 281.08929443359375,
+                "right": 578.7096761067709,
+                "bottom": 265.17856852213544
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/14",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000017",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "10.28"
+          },
+          {
+            "id": "element-000018",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 659.5161539713541,
+                "top": 283.0178629557292,
+                "right": 693.8710123697916,
+                "bottom": 267.10715738932294
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/15",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000018",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "10.49"
+          },
+          {
+            "id": "element-000019",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 54.19355265299479,
+                "top": 273.85715738932294,
+                "right": 73.5483907063802,
+                "bottom": 205.875
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/16",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000019",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "Density"
+          },
+          {
+            "id": "element-000020",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 80.3225809733073,
+                "top": 266.625,
+                "right": 114.6774190266927,
+                "bottom": 250.71429443359375
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/17",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000020",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "10.00"
+          },
+          {
+            "id": "element-000021",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 165.48387654622397,
+                "top": 261.32143147786456,
+                "right": 194.03226725260416,
+                "bottom": 245.41072591145831
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/18",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000021",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "8.65"
+          },
+          {
+            "id": "element-000022",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 240.9677530924479,
+                "top": 264.21429443359375,
+                "right": 308.22580973307294,
+                "bottom": 249.26786295572919
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/19",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000022",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "8.90 8.96"
+          },
+          {
+            "id": "element-000023",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 585.0,
+                "top": 263.73215738932294,
+                "right": 612.5806477864584,
+                "bottom": 249.26786295572919
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/20",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000023",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "8.91"
+          },
+          {
+            "id": "element-000024",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 355.1612955729167,
+                "top": 252.64286295572919,
+                "right": 384.1935628255208,
+                "bottom": 236.25
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/21",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000024",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "7.87"
+          },
+          {
+            "id": "element-000025",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 202.741943359375,
+                "top": 244.44643147786456,
+                "right": 231.77421061197916,
+                "bottom": 228.53572591145831
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/22",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000025",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "7.19"
+          },
+          {
+            "id": "element-000026",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 468.8709716796875,
+                "top": 245.89286295572919,
+                "right": 498.3871256510417,
+                "bottom": 228.0535888671875
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/23",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000026",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "7.21"
+          },
+          {
+            "id": "element-000027",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 698.709716796875,
+                "top": 247.33929443359375,
+                "right": 729.193603515625,
+                "bottom": 229.5
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/24",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000027",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "7.37"
+          },
+          {
+            "id": "element-000028",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 852.0967610677084,
+                "top": 243.96429443359375,
+                "right": 881.6129557291666,
+                "bottom": 227.57143147786456
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/25",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000028",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "7.14"
+          },
+          {
+            "id": "element-000029",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 86.12903849283855,
+                "top": 237.21429443359375,
+                "right": 115.16129557291667,
+                "bottom": 220.82143147786456
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/26",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000029",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "7.50"
+          },
+          {
+            "id": "element-000030",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 737.9032389322916,
+                "top": 212.625,
+                "right": 766.935546875,
+                "bottom": 196.71427408854169
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/27",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000030",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "4.51"
+          },
+          {
+            "id": "element-000031",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 86.12903849283855,
+                "top": 206.83929443359375,
+                "right": 115.64516194661458,
+                "bottom": 190.9285888671875
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/28",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000031",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "5.00"
+          },
+          {
+            "id": "element-000032",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 126.77420043945312,
+                "top": 191.41072591145831,
+                "right": 155.80645751953125,
+                "bottom": 175.01786295572919
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/29",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000032",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "2.70"
+          },
+          {
+            "id": "element-000033",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 86.61290486653645,
+                "top": 178.39286295572919,
+                "right": 115.16129557291667,
+                "bottom": 162.48213704427081
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/30",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000033",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "2.50"
+          },
+          {
+            "id": "element-000034",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 432.0968017578125,
+                "top": 179.35713704427081,
+                "right": 460.6451822916667,
+                "bottom": 166.33931477864581
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/31",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000034",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "1.74"
+          },
+          {
+            "id": "element-000035",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 86.12903849283855,
+                "top": 148.98213704427081,
+                "right": 115.16129557291667,
+                "bottom": 132.58931477864581
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/32",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000035",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "0.00"
+          },
+          {
+            "id": "element-000036",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 134.03226725260416,
+                "top": 131.625,
+                "right": 148.06452433268228,
+                "bottom": 73.76786295572919
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/33",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000036",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "Aluminum"
+          },
+          {
+            "id": "element-000037",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 171.7741902669271,
+                "top": 131.625,
+                "right": 187.741943359375,
+                "bottom": 76.66072591145831
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/34",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000037",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "Cadmium"
+          },
+          {
+            "id": "element-000038",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 210.48388671875,
+                "top": 131.625,
+                "right": 225.9677530924479,
+                "bottom": 72.32145182291669
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/35",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000038",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "Chromium"
+          },
+          {
+            "id": "element-000039",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 247.2580769856771,
+                "top": 132.10713704427081,
+                "right": 264.67742919921875,
+                "bottom": 92.57145182291669
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/36",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000039",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "Cobalt"
+          },
+          {
+            "id": "element-000040",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 287.41937255859375,
+                "top": 133.5535888671875,
+                "right": 302.9032389322917,
+                "bottom": 87.75
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/37",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000040",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "Copper"
+          },
+          {
+            "id": "element-000041",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 361.9355061848958,
+                "top": 133.07145182291669,
+                "right": 378.8709716796875,
+                "bottom": 105.58931477864581
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/38",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000041",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "Iron"
+          },
+          {
+            "id": "element-000042",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 400.1612955729167,
+                "top": 132.10713704427081,
+                "right": 416.6129150390625,
+                "bottom": 101.25
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/39",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000042",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "Lead"
+          },
+          {
+            "id": "element-000043",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 439.3548583984375,
+                "top": 132.58931477864581,
+                "right": 454.8387044270833,
+                "bottom": 66.53572591145831
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/40",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000043",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "Magnesium"
+          },
+          {
+            "id": "element-000044",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 478.0645345052083,
+                "top": 132.58931477864581,
+                "right": 493.0645345052083,
+                "bottom": 67.98213704427081
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/41",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000044",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "Manganese"
+          },
+          {
+            "id": "element-000045",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 516.2903238932291,
+                "top": 133.07145182291669,
+                "right": 531.2903238932291,
+                "bottom": 83.41072591145831
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/42",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000045",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "Mercury"
+          },
+          {
+            "id": "element-000046",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 552.5806477864584,
+                "top": 131.625,
+                "right": 568.5484212239584,
+                "bottom": 59.3035888671875
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/43",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000046",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "Molybdenum"
+          },
+          {
+            "id": "element-000047",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 590.3225911458334,
+                "top": 132.10713704427081,
+                "right": 607.741943359375,
+                "bottom": 94.01786295572919
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/44",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000047",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "Nickel"
+          },
+          {
+            "id": "element-000048",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 629.0322672526041,
+                "top": 132.10713704427081,
+                "right": 645.0000406901041,
+                "bottom": 80.03572591145831
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/45",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000048",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "Platinum"
+          },
+          {
+            "id": "element-000049",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 668.709716796875,
+                "top": 132.10713704427081,
+                "right": 683.709716796875,
+                "bottom": 96.91072591145831
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/46",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000049",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "Silver"
+          },
+          {
+            "id": "element-000050",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 705.9677734375,
+                "top": 132.58931477864581,
+                "right": 723.3871256510416,
+                "bottom": 109.44645182291669
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/47",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000050",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "m"
+          },
+          {
+            "id": "element-000051",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 746.6129557291666,
+                "top": 133.07145182291669,
+                "right": 760.1612955729166,
+                "bottom": 80.51786295572919
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/48",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000051",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "Titanlium"
+          },
+          {
+            "id": "element-000052",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 783.8710123697916,
+                "top": 132.58931477864581,
+                "right": 799.8387044270834,
+                "bottom": 79.07145182291669
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/49",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000052",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "Tungsten"
+          },
+          {
+            "id": "element-000053",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 820.1612955729166,
+                "top": 131.625,
+                "right": 837.0967610677084,
+                "bottom": 81.96431477864581
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/50",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000053",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "Uranium"
+          },
+          {
+            "id": "element-000054",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 858.8710123697916,
+                "top": 133.5535888671875,
+                "right": 875.3225911458334,
+                "bottom": 102.69645182291669
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/51",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000054",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "Zinc"
+          },
+          {
+            "id": "element-000055",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 475.6451822916667,
+                "top": 60.267862955729186,
+                "right": 532.2580973307291,
+                "bottom": 38.089314778645814
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/52",
+              "parent_id": "element-000002",
+              "confidence": null,
+              "manifest_element_id": "element-000055",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "Metal"
+          }
+        ]
+      }
+    ]
+  },
+  "source": {
+    "name": "008.pdf",
+    "path": "/app/tests/dataset/input/008.pdf",
+    "type": ".pdf"
+  },
+  "accessibility": {
+    "navigation": true,
+    "semantic_headings": true,
+    "internal_links": true
+  },
+  "technical_warnings": [
+    "Executor nao foi executado; somente manifesto e plano foram gerados."
+  ],
+  "audit": {
+    "generated_by": "canonical_builder",
+    "input_length": 7,
+    "block_count": 54
+  },
+  "sections": [
+    {
+      "id": "element-000002",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 45.59795379638672,
+          "top": 475.5992889404297,
+          "right": 919.7005615234375,
+          "bottom": 29.903656005859375
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000002",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 45.59795379638672,
+              "top": 475.5992889404297,
+              "right": 919.7005615234375,
+              "bottom": 29.903656005859375
+            }
+          },
+          "metadata": {
+            "raw_label": "picture",
+            "source_ref": "/pictures/0",
+            "parent_id": "element-000001",
+            "confidence": null,
+            "manifest_element_id": "element-000002",
+            "docling_class": "PictureItem",
+            "content_layer": "body"
+          },
+          "type": "image",
+          "alt_text": "Imagem detectada sem descricao textual."
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000003",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 394.3548583984375,
+          "top": 472.5,
+          "right": 538.0645345052084,
+          "bottom": 448.875
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000003",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 394.3548583984375,
+              "top": 472.5,
+              "right": 538.0645345052084,
+              "bottom": 448.875
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/0",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000003",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "Metals: Density"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000004",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 79.83871459960938,
+          "top": 444.05357869466144,
+          "right": 114.6774190266927,
+          "bottom": 428.1428629557292
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000004",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 79.83871459960938,
+              "top": 444.05357869466144,
+              "right": 114.6774190266927,
+              "bottom": 428.1428629557292
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/1",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000004",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "25.00"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000005",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 79.83871459960938,
+          "top": 414.1607157389323,
+          "right": 114.6774190266927,
+          "bottom": 398.25
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000005",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 79.83871459960938,
+              "top": 414.1607157389323,
+              "right": 114.6774190266927,
+              "bottom": 398.25
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/2",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000005",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "22.50"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000006",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 618.8709716796875,
+          "top": 413.67857869466144,
+          "right": 654.6774495442709,
+          "bottom": 396.3214314778646
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000006",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 618.8709716796875,
+              "top": 413.67857869466144,
+              "right": 654.6774495442709,
+              "bottom": 396.3214314778646
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/3",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000006",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "21.45"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000007",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 773.225830078125,
+          "top": 394.875,
+          "right": 808.5484212239584,
+          "bottom": 377.51786295572913
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000007",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 773.225830078125,
+              "top": 394.875,
+              "right": 808.5484212239584,
+              "bottom": 377.51786295572913
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/4",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000007",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "19.25"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000008",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 79.83871459960938,
+          "top": 384.75,
+          "right": 114.6774190266927,
+          "bottom": 369.3214314778646
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000008",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 79.83871459960938,
+              "top": 384.75,
+              "right": 114.6774190266927,
+              "bottom": 369.3214314778646
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/5",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000008",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "20.00"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000009",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 315.0,
+          "top": 387.16071573893225,
+          "right": 348.8709716796875,
+          "bottom": 373.1785786946615
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000009",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 315.0,
+              "top": 387.16071573893225,
+              "right": 348.8709716796875,
+              "bottom": 373.1785786946615
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/6",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000009",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "19.30"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000010",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 814.3548990885416,
+          "top": 382.8214314778646,
+          "right": 849.193603515625,
+          "bottom": 365.46429443359375
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000010",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 814.3548990885416,
+              "top": 382.8214314778646,
+              "right": 849.193603515625,
+              "bottom": 365.46429443359375
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/7",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000010",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "19.10"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000011",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 54.19355265299479,
+          "top": 367.875,
+          "right": 73.06451924641927,
+          "bottom": 323.03572591145837
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000011",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 54.19355265299479,
+              "top": 367.875,
+              "right": 73.06451924641927,
+              "bottom": 323.03572591145837
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/8",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000011",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "icm3)"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000012",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 80.3225809733073,
+          "top": 355.33929443359375,
+          "right": 114.6774190266927,
+          "bottom": 339.4285685221354
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000012",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 80.3225809733073,
+              "top": 355.33929443359375,
+              "right": 114.6774190266927,
+              "bottom": 339.4285685221354
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/9",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000012",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "17.50"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000013",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 79.83871459960938,
+          "top": 325.9285685221354,
+          "right": 114.1935526529948,
+          "bottom": 310.01786295572913
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000013",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 79.83871459960938,
+              "top": 325.9285685221354,
+              "right": 114.1935526529948,
+              "bottom": 310.01786295572913
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/10",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000013",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "15.00"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000014",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 505.6451822916667,
+          "top": 319.66072591145837,
+          "right": 540.48388671875,
+          "bottom": 303.75
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000014",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 505.6451822916667,
+              "top": 319.66072591145837,
+              "right": 540.48388671875,
+              "bottom": 303.75
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/11",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000014",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "13.53"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000015",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 79.83871459960938,
+          "top": 296.03572591145837,
+          "right": 114.6774190266927,
+          "bottom": 280.125
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000015",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 79.83871459960938,
+              "top": 296.03572591145837,
+              "right": 114.6774190266927,
+              "bottom": 280.125
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/12",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000015",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "12.50"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000016",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 391.9355061848958,
+          "top": 293.14286295572913,
+          "right": 426.2903238932292,
+          "bottom": 277.71429443359375
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000016",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 391.9355061848958,
+              "top": 293.14286295572913,
+              "right": 426.2903238932292,
+              "bottom": 277.71429443359375
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/13",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000016",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "11.34"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000017",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 543.3871256510416,
+          "top": 281.08929443359375,
+          "right": 578.7096761067709,
+          "bottom": 265.17856852213544
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000017",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 543.3871256510416,
+              "top": 281.08929443359375,
+              "right": 578.7096761067709,
+              "bottom": 265.17856852213544
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/14",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000017",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "10.28"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000018",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 659.5161539713541,
+          "top": 283.0178629557292,
+          "right": 693.8710123697916,
+          "bottom": 267.10715738932294
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000018",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 659.5161539713541,
+              "top": 283.0178629557292,
+              "right": 693.8710123697916,
+              "bottom": 267.10715738932294
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/15",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000018",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "10.49"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000019",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 54.19355265299479,
+          "top": 273.85715738932294,
+          "right": 73.5483907063802,
+          "bottom": 205.875
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000019",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 54.19355265299479,
+              "top": 273.85715738932294,
+              "right": 73.5483907063802,
+              "bottom": 205.875
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/16",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000019",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "Density"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000020",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 80.3225809733073,
+          "top": 266.625,
+          "right": 114.6774190266927,
+          "bottom": 250.71429443359375
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000020",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 80.3225809733073,
+              "top": 266.625,
+              "right": 114.6774190266927,
+              "bottom": 250.71429443359375
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/17",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000020",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "10.00"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000021",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 165.48387654622397,
+          "top": 261.32143147786456,
+          "right": 194.03226725260416,
+          "bottom": 245.41072591145831
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000021",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 165.48387654622397,
+              "top": 261.32143147786456,
+              "right": 194.03226725260416,
+              "bottom": 245.41072591145831
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/18",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000021",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "8.65"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000022",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 240.9677530924479,
+          "top": 264.21429443359375,
+          "right": 308.22580973307294,
+          "bottom": 249.26786295572919
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000022",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 240.9677530924479,
+              "top": 264.21429443359375,
+              "right": 308.22580973307294,
+              "bottom": 249.26786295572919
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/19",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000022",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "8.90 8.96"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000023",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 585.0,
+          "top": 263.73215738932294,
+          "right": 612.5806477864584,
+          "bottom": 249.26786295572919
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000023",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 585.0,
+              "top": 263.73215738932294,
+              "right": 612.5806477864584,
+              "bottom": 249.26786295572919
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/20",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000023",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "8.91"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000024",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 355.1612955729167,
+          "top": 252.64286295572919,
+          "right": 384.1935628255208,
+          "bottom": 236.25
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000024",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 355.1612955729167,
+              "top": 252.64286295572919,
+              "right": 384.1935628255208,
+              "bottom": 236.25
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/21",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000024",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "7.87"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000025",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 202.741943359375,
+          "top": 244.44643147786456,
+          "right": 231.77421061197916,
+          "bottom": 228.53572591145831
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000025",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 202.741943359375,
+              "top": 244.44643147786456,
+              "right": 231.77421061197916,
+              "bottom": 228.53572591145831
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/22",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000025",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "7.19"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000026",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 468.8709716796875,
+          "top": 245.89286295572919,
+          "right": 498.3871256510417,
+          "bottom": 228.0535888671875
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000026",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 468.8709716796875,
+              "top": 245.89286295572919,
+              "right": 498.3871256510417,
+              "bottom": 228.0535888671875
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/23",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000026",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "7.21"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000027",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 698.709716796875,
+          "top": 247.33929443359375,
+          "right": 729.193603515625,
+          "bottom": 229.5
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000027",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 698.709716796875,
+              "top": 247.33929443359375,
+              "right": 729.193603515625,
+              "bottom": 229.5
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/24",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000027",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "7.37"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000028",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 852.0967610677084,
+          "top": 243.96429443359375,
+          "right": 881.6129557291666,
+          "bottom": 227.57143147786456
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000028",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 852.0967610677084,
+              "top": 243.96429443359375,
+              "right": 881.6129557291666,
+              "bottom": 227.57143147786456
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/25",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000028",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "7.14"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000029",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 86.12903849283855,
+          "top": 237.21429443359375,
+          "right": 115.16129557291667,
+          "bottom": 220.82143147786456
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000029",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 86.12903849283855,
+              "top": 237.21429443359375,
+              "right": 115.16129557291667,
+              "bottom": 220.82143147786456
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/26",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000029",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "7.50"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000030",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 737.9032389322916,
+          "top": 212.625,
+          "right": 766.935546875,
+          "bottom": 196.71427408854169
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000030",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 737.9032389322916,
+              "top": 212.625,
+              "right": 766.935546875,
+              "bottom": 196.71427408854169
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/27",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000030",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "4.51"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000031",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 86.12903849283855,
+          "top": 206.83929443359375,
+          "right": 115.64516194661458,
+          "bottom": 190.9285888671875
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000031",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 86.12903849283855,
+              "top": 206.83929443359375,
+              "right": 115.64516194661458,
+              "bottom": 190.9285888671875
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/28",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000031",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "5.00"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000032",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 126.77420043945312,
+          "top": 191.41072591145831,
+          "right": 155.80645751953125,
+          "bottom": 175.01786295572919
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000032",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 126.77420043945312,
+              "top": 191.41072591145831,
+              "right": 155.80645751953125,
+              "bottom": 175.01786295572919
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/29",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000032",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "2.70"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000033",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 86.61290486653645,
+          "top": 178.39286295572919,
+          "right": 115.16129557291667,
+          "bottom": 162.48213704427081
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000033",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 86.61290486653645,
+              "top": 178.39286295572919,
+              "right": 115.16129557291667,
+              "bottom": 162.48213704427081
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/30",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000033",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "2.50"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000034",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 432.0968017578125,
+          "top": 179.35713704427081,
+          "right": 460.6451822916667,
+          "bottom": 166.33931477864581
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000034",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 432.0968017578125,
+              "top": 179.35713704427081,
+              "right": 460.6451822916667,
+              "bottom": 166.33931477864581
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/31",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000034",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "1.74"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000035",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 86.12903849283855,
+          "top": 148.98213704427081,
+          "right": 115.16129557291667,
+          "bottom": 132.58931477864581
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000035",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 86.12903849283855,
+              "top": 148.98213704427081,
+              "right": 115.16129557291667,
+              "bottom": 132.58931477864581
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/32",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000035",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "0.00"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000036",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 134.03226725260416,
+          "top": 131.625,
+          "right": 148.06452433268228,
+          "bottom": 73.76786295572919
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000036",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 134.03226725260416,
+              "top": 131.625,
+              "right": 148.06452433268228,
+              "bottom": 73.76786295572919
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/33",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000036",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "Aluminum"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000037",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 171.7741902669271,
+          "top": 131.625,
+          "right": 187.741943359375,
+          "bottom": 76.66072591145831
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000037",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 171.7741902669271,
+              "top": 131.625,
+              "right": 187.741943359375,
+              "bottom": 76.66072591145831
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/34",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000037",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "Cadmium"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000038",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 210.48388671875,
+          "top": 131.625,
+          "right": 225.9677530924479,
+          "bottom": 72.32145182291669
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000038",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 210.48388671875,
+              "top": 131.625,
+              "right": 225.9677530924479,
+              "bottom": 72.32145182291669
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/35",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000038",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "Chromium"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000039",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 247.2580769856771,
+          "top": 132.10713704427081,
+          "right": 264.67742919921875,
+          "bottom": 92.57145182291669
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000039",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 247.2580769856771,
+              "top": 132.10713704427081,
+              "right": 264.67742919921875,
+              "bottom": 92.57145182291669
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/36",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000039",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "Cobalt"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000040",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 287.41937255859375,
+          "top": 133.5535888671875,
+          "right": 302.9032389322917,
+          "bottom": 87.75
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000040",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 287.41937255859375,
+              "top": 133.5535888671875,
+              "right": 302.9032389322917,
+              "bottom": 87.75
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/37",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000040",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "Copper"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000041",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 361.9355061848958,
+          "top": 133.07145182291669,
+          "right": 378.8709716796875,
+          "bottom": 105.58931477864581
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000041",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 361.9355061848958,
+              "top": 133.07145182291669,
+              "right": 378.8709716796875,
+              "bottom": 105.58931477864581
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/38",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000041",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "Iron"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000042",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 400.1612955729167,
+          "top": 132.10713704427081,
+          "right": 416.6129150390625,
+          "bottom": 101.25
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000042",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 400.1612955729167,
+              "top": 132.10713704427081,
+              "right": 416.6129150390625,
+              "bottom": 101.25
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/39",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000042",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "Lead"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000043",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 439.3548583984375,
+          "top": 132.58931477864581,
+          "right": 454.8387044270833,
+          "bottom": 66.53572591145831
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000043",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 439.3548583984375,
+              "top": 132.58931477864581,
+              "right": 454.8387044270833,
+              "bottom": 66.53572591145831
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/40",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000043",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "Magnesium"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000044",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 478.0645345052083,
+          "top": 132.58931477864581,
+          "right": 493.0645345052083,
+          "bottom": 67.98213704427081
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000044",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 478.0645345052083,
+              "top": 132.58931477864581,
+              "right": 493.0645345052083,
+              "bottom": 67.98213704427081
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/41",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000044",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "Manganese"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000045",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 516.2903238932291,
+          "top": 133.07145182291669,
+          "right": 531.2903238932291,
+          "bottom": 83.41072591145831
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000045",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 516.2903238932291,
+              "top": 133.07145182291669,
+              "right": 531.2903238932291,
+              "bottom": 83.41072591145831
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/42",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000045",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "Mercury"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000046",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 552.5806477864584,
+          "top": 131.625,
+          "right": 568.5484212239584,
+          "bottom": 59.3035888671875
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000046",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 552.5806477864584,
+              "top": 131.625,
+              "right": 568.5484212239584,
+              "bottom": 59.3035888671875
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/43",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000046",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "Molybdenum"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000047",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 590.3225911458334,
+          "top": 132.10713704427081,
+          "right": 607.741943359375,
+          "bottom": 94.01786295572919
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000047",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 590.3225911458334,
+              "top": 132.10713704427081,
+              "right": 607.741943359375,
+              "bottom": 94.01786295572919
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/44",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000047",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "Nickel"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000048",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 629.0322672526041,
+          "top": 132.10713704427081,
+          "right": 645.0000406901041,
+          "bottom": 80.03572591145831
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000048",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 629.0322672526041,
+              "top": 132.10713704427081,
+              "right": 645.0000406901041,
+              "bottom": 80.03572591145831
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/45",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000048",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "Platinum"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000049",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 668.709716796875,
+          "top": 132.10713704427081,
+          "right": 683.709716796875,
+          "bottom": 96.91072591145831
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000049",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 668.709716796875,
+              "top": 132.10713704427081,
+              "right": 683.709716796875,
+              "bottom": 96.91072591145831
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/46",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000049",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "Silver"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000050",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 705.9677734375,
+          "top": 132.58931477864581,
+          "right": 723.3871256510416,
+          "bottom": 109.44645182291669
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000050",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 705.9677734375,
+              "top": 132.58931477864581,
+              "right": 723.3871256510416,
+              "bottom": 109.44645182291669
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/47",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000050",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "m"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000051",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 746.6129557291666,
+          "top": 133.07145182291669,
+          "right": 760.1612955729166,
+          "bottom": 80.51786295572919
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000051",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 746.6129557291666,
+              "top": 133.07145182291669,
+              "right": 760.1612955729166,
+              "bottom": 80.51786295572919
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/48",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000051",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "Titanlium"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000052",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 783.8710123697916,
+          "top": 132.58931477864581,
+          "right": 799.8387044270834,
+          "bottom": 79.07145182291669
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000052",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 783.8710123697916,
+              "top": 132.58931477864581,
+              "right": 799.8387044270834,
+              "bottom": 79.07145182291669
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/49",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000052",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "Tungsten"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000053",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 820.1612955729166,
+          "top": 131.625,
+          "right": 837.0967610677084,
+          "bottom": 81.96431477864581
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000053",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 820.1612955729166,
+              "top": 131.625,
+              "right": 837.0967610677084,
+              "bottom": 81.96431477864581
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/50",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000053",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "Uranium"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000054",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 858.8710123697916,
+          "top": 133.5535888671875,
+          "right": 875.3225911458334,
+          "bottom": 102.69645182291669
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000054",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 858.8710123697916,
+              "top": 133.5535888671875,
+              "right": 875.3225911458334,
+              "bottom": 102.69645182291669
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/51",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000054",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "Zinc"
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000055",
+      "title": "",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 475.6451822916667,
+          "top": 60.267862955729186,
+          "right": 532.2580973307291,
+          "bottom": 38.089314778645814
+        }
+      },
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000055",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 475.6451822916667,
+              "top": 60.267862955729186,
+              "right": 532.2580973307291,
+              "bottom": 38.089314778645814
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/52",
+            "parent_id": "element-000002",
+            "confidence": null,
+            "manifest_element_id": "element-000055",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "Metal"
+        }
+      ],
+      "children": []
+    }
+  ]
+}

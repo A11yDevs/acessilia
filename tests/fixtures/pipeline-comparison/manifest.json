@@ -1,0 +1,44 @@
+{
+  "purpose": "Historical regression snapshots copied before the Dataset reference migration. Do not regenerate them as part of moving the fixtures.",
+  "dataset_repository": "A11yDevs/acessilia-dataset",
+  "source_revision": "9ed07b28aeddb69721228f2dd66de6f9794c0001",
+  "canonical_schema_version": "1.0.0",
+  "protocol": "historical-heuristic-v1",
+  "cases": [
+    {
+      "id": "001",
+      "input": "input/001.pdf",
+      "input_sha256": "2ec8bda39e8d18df3e7e01900746eaff5b5998311d443a29b233d70dcdecbf56",
+      "canonical": "canonical/001.json",
+      "canonical_sha256": "7d38a5e9dd33fa71a63dc86526aae3350e1fc5752051e53312b7b85d94300220"
+    },
+    {
+      "id": "004",
+      "input": "input/004.pdf",
+      "input_sha256": "b5dbe02e17dd536e085fb0f24ededab28c583a970846d2191a4b5c090d0e8899",
+      "canonical": "canonical/004.json",
+      "canonical_sha256": "396fc1f3064e60fa1297ec41e14b2437954a8702251ec5003b7e233078a95bc3"
+    },
+    {
+      "id": "005",
+      "input": "input/005.jpeg",
+      "input_sha256": "efe4501b2bf0db2a264bbd6d4be42af504be2a5cd28501bf87d0a4cfe6a7b731",
+      "canonical": "canonical/005.json",
+      "canonical_sha256": "4b3b7b9460b047899b727b57f36b43458f2baed1a31290de50b9d285764ab687"
+    },
+    {
+      "id": "007",
+      "input": "input/007.pdf",
+      "input_sha256": "965a50c5055cb4f138f3962f16b0821e73314458e8e707883838e6771589b10b",
+      "canonical": "canonical/007.json",
+      "canonical_sha256": "b5d193b0163cf51703c5b3c983127535238d2285e71f43867ef15d83d5f2c9e9"
+    },
+    {
+      "id": "008",
+      "input": "input/008.pdf",
+      "input_sha256": "6480e5093b894dd0ed95061bf4c9e296e9b776d012242fc64cdc54464893ef33",
+      "canonical": "canonical/008.json",
+      "canonical_sha256": "5659c4fe4f9380ab7d43b349356a041d9234d21b05a032247a1c44bb501838e1"
+    }
+  ]
+}

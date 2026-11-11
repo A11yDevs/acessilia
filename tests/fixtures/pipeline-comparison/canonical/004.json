@@ -1,0 +1,537 @@
+{
+  "schema_version": "1.0.0",
+  "id": "doc-2ac0a9c5eaa2",
+  "title": "CASTINGS\tPOSSÍVEIS",
+  "language": "pt-BR",
+  "verbosity": "detailed",
+  "audience": [
+    "reader"
+  ],
+  "metadata": {
+    "pipeline_engine": "pddl",
+    "pddl_manifest_id": "manifest-b5dbe02e17dd536e-r1",
+    "pddl_manifest_revision": 1,
+    "pddl_plan_id": "plan-1335281818abc390",
+    "pddl_planner": "internal-reference",
+    "pddl_expected_total_cost": 30,
+    "pddl_execution_id": null,
+    "pddl_execution_status": null,
+    "pddl_comparison_verdict": null,
+    "page_count": 1,
+    "mode": "pddl-internal",
+    "pages": [
+      {
+        "page_number": 1,
+        "text": "# CASTINGS\tPOSSÍVEIS\nAbaixo\testão\trelacionados\ttodos\tos\tcasts\tpossíveis\tna\tlinguagem\tJava,\tmostrando\ta\tconversão de um\tvalor em outro.\tA\tindicação Impl. quer\tdizer\tque\taquele\tcast\té\timplícito\te\tautomático,\tou seja,\tvocê\tnão\tprecisa\tindicar\to\tcast\texplicitamente\t(lembrando\tque\to\ttipo\tboolean\tnão\tpode\tser convertido\tem\tnenhum\toutro\ttipo).\nTabela detectada\n# TAMANHO\tDOS\tTIPOS\nNa\ttabela\tabaixo,\testão\tos\ttamanhos\tde\tcada\ttipo\tprimitivo\tdo\tJava.\nTabela detectada\n# 3.6\tO\tIF\tE\tO\tELSE\nNo\tJava,\ta\tsintaxe\tdo if é\ta\tseguinte:\nif (condicaoBooleana) { codigo; }",
+        "blocks": [
+          {
+            "id": "element-000002",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 67.5238,
+                "top": 714.2388618070312,
+                "right": 156.22252723040012,
+                "bottom": 702.8994426070311
+              }
+            },
+            "metadata": {
+              "raw_label": "section_header",
+              "source_ref": "/texts/0",
+              "parent_id": "element-000001",
+              "confidence": null,
+              "manifest_element_id": "element-000002",
+              "docling_class": "SectionHeaderItem",
+              "content_layer": "body"
+            },
+            "type": "heading",
+            "level": 1,
+            "text": "CASTINGS\tPOSSÍVEIS"
+          },
+          {
+            "id": "element-000003",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 67.52412,
+                "top": 687.5898618070312,
+                "right": 527.6379377439999,
+                "bottom": 624.3935426070311
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/1",
+              "parent_id": "element-000001",
+              "confidence": null,
+              "manifest_element_id": "element-000003",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "Abaixo\testão\trelacionados\ttodos\tos\tcasts\tpossíveis\tna\tlinguagem\tJava,\tmostrando\ta\tconversão de um\tvalor em outro.\tA\tindicação Impl. quer\tdizer\tque\taquele\tcast\té\timplícito\te\tautomático,\tou seja,\tvocê\tnão\tprecisa\tindicar\to\tcast\texplicitamente\t(lembrando\tque\to\ttipo\tboolean\tnão\tpode\tser convertido\tem\tnenhum\toutro\ttipo)."
+          },
+          {
+            "id": "element-000004",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 135.92405700683594,
+                "top": 613.4859313964844,
+                "right": 458.8099060058594,
+                "bottom": 483.716064453125
+              }
+            },
+            "metadata": {
+              "raw_label": "table",
+              "source_ref": "/tables/0",
+              "parent_id": "element-000001",
+              "confidence": null,
+              "manifest_element_id": "element-000004",
+              "docling_class": "TableItem",
+              "content_layer": "body"
+            },
+            "type": "table",
+            "rows": [
+              [
+                "Tabela detectada"
+              ]
+            ],
+            "table_ast": {
+              "body": [
+                {
+                  "cells": [
+                    {
+                      "text": "Tabela detectada"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "element-000005",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 67.5238,
+                "top": 408.13786180703124,
+                "right": 159.32448876839993,
+                "bottom": 396.79844260703123
+              }
+            },
+            "metadata": {
+              "raw_label": "section_header",
+              "source_ref": "/texts/2",
+              "parent_id": "element-000001",
+              "confidence": null,
+              "manifest_element_id": "element-000005",
+              "docling_class": "SectionHeaderItem",
+              "content_layer": "body"
+            },
+            "type": "heading",
+            "level": 1,
+            "text": "TAMANHO\tDOS\tTIPOS"
+          },
+          {
+            "id": "element-000006",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 84.8094,
+                "top": 381.48886180703124,
+                "right": 396.6193681319999,
+                "bottom": 370.14944260703123
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/3",
+              "parent_id": "element-000001",
+              "confidence": null,
+              "manifest_element_id": "element-000006",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "Na\ttabela\tabaixo,\testão\tos\ttamanhos\tde\tcada\ttipo\tprimitivo\tdo\tJava."
+          },
+          {
+            "id": "element-000007",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 158.7457275390625,
+                "top": 359.2362060546875,
+                "right": 435.9425354003906,
+                "bottom": 209.8311767578125
+              }
+            },
+            "metadata": {
+              "raw_label": "table",
+              "source_ref": "/tables/1",
+              "parent_id": "element-000001",
+              "confidence": null,
+              "manifest_element_id": "element-000007",
+              "docling_class": "TableItem",
+              "content_layer": "body"
+            },
+            "type": "table",
+            "rows": [
+              [
+                "Tabela detectada"
+              ]
+            ],
+            "table_ast": {
+              "body": [
+                {
+                  "cells": [
+                    {
+                      "text": "Tabela detectada"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "element-000008",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 56.0,
+                "top": 149.5440122070312,
+                "right": 174.41125132100004,
+                "bottom": 134.66101220703126
+              }
+            },
+            "metadata": {
+              "raw_label": "section_header",
+              "source_ref": "/texts/4",
+              "parent_id": "element-000001",
+              "confidence": null,
+              "manifest_element_id": "element-000008",
+              "docling_class": "SectionHeaderItem",
+              "content_layer": "body"
+            },
+            "type": "heading",
+            "level": 1,
+            "text": "3.6\tO\tIF\tE\tO\tELSE"
+          },
+          {
+            "id": "element-000009",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 73.2855,
+                "top": 121.48386180703119,
+                "right": 253.50695428400007,
+                "bottom": 109.86168956597476
+              }
+            },
+            "metadata": {
+              "raw_label": "text",
+              "source_ref": "/texts/5",
+              "parent_id": "element-000001",
+              "confidence": null,
+              "manifest_element_id": "element-000009",
+              "docling_class": "TextItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "No\tJava,\ta\tsintaxe\tdo if é\ta\tseguinte:"
+          },
+          {
+            "id": "element-000010",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 56.0,
+                "top": 95.1717436070312,
+                "right": 165.24336745000016,
+                "bottom": 65.59058433188113
+              }
+            },
+            "metadata": {
+              "raw_label": "code",
+              "source_ref": "/texts/6",
+              "parent_id": "element-000001",
+              "confidence": null,
+              "manifest_element_id": "element-000010",
+              "docling_class": "CodeItem",
+              "content_layer": "body"
+            },
+            "type": "code",
+            "text": "if (condicaoBooleana) { codigo; }"
+          }
+        ]
+      }
+    ]
+  },
+  "source": {
+    "name": "004.pdf",
+    "path": "/app/tests/dataset/input/004.pdf",
+    "type": ".pdf"
+  },
+  "accessibility": {
+    "navigation": true,
+    "semantic_headings": true,
+    "internal_links": true
+  },
+  "technical_warnings": [
+    "Executor nao foi executado; somente manifesto e plano foram gerados."
+  ],
+  "audit": {
+    "generated_by": "canonical_builder",
+    "input_length": 7,
+    "block_count": 9
+  },
+  "sections": [
+    {
+      "id": "element-000002",
+      "title": "CASTINGS\tPOSSÍVEIS",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 67.5238,
+          "top": 714.2388618070312,
+          "right": 156.22252723040012,
+          "bottom": 702.8994426070311
+        }
+      },
+      "metadata": {
+        "raw_label": "section_header",
+        "source_ref": "/texts/0",
+        "parent_id": "element-000001",
+        "confidence": null,
+        "manifest_element_id": "element-000002",
+        "docling_class": "SectionHeaderItem",
+        "content_layer": "body"
+      },
+      "blocks": [
+        {
+          "id": "element-000003",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 67.52412,
+              "top": 687.5898618070312,
+              "right": 527.6379377439999,
+              "bottom": 624.3935426070311
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/1",
+            "parent_id": "element-000001",
+            "confidence": null,
+            "manifest_element_id": "element-000003",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "Abaixo\testão\trelacionados\ttodos\tos\tcasts\tpossíveis\tna\tlinguagem\tJava,\tmostrando\ta\tconversão de um\tvalor em outro.\tA\tindicação Impl. quer\tdizer\tque\taquele\tcast\té\timplícito\te\tautomático,\tou seja,\tvocê\tnão\tprecisa\tindicar\to\tcast\texplicitamente\t(lembrando\tque\to\ttipo\tboolean\tnão\tpode\tser convertido\tem\tnenhum\toutro\ttipo)."
+        },
+        {
+          "id": "element-000004",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 135.92405700683594,
+              "top": 613.4859313964844,
+              "right": 458.8099060058594,
+              "bottom": 483.716064453125
+            }
+          },
+          "metadata": {
+            "raw_label": "table",
+            "source_ref": "/tables/0",
+            "parent_id": "element-000001",
+            "confidence": null,
+            "manifest_element_id": "element-000004",
+            "docling_class": "TableItem",
+            "content_layer": "body"
+          },
+          "type": "table",
+          "rows": [
+            [
+              "Tabela detectada"
+            ]
+          ],
+          "table_ast": {
+            "body": [
+              {
+                "cells": [
+                  {
+                    "text": "Tabela detectada"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000005",
+      "title": "TAMANHO\tDOS\tTIPOS",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 67.5238,
+          "top": 408.13786180703124,
+          "right": 159.32448876839993,
+          "bottom": 396.79844260703123
+        }
+      },
+      "metadata": {
+        "raw_label": "section_header",
+        "source_ref": "/texts/2",
+        "parent_id": "element-000001",
+        "confidence": null,
+        "manifest_element_id": "element-000005",
+        "docling_class": "SectionHeaderItem",
+        "content_layer": "body"
+      },
+      "blocks": [
+        {
+          "id": "element-000006",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 84.8094,
+              "top": 381.48886180703124,
+              "right": 396.6193681319999,
+              "bottom": 370.14944260703123
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/3",
+            "parent_id": "element-000001",
+            "confidence": null,
+            "manifest_element_id": "element-000006",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "Na\ttabela\tabaixo,\testão\tos\ttamanhos\tde\tcada\ttipo\tprimitivo\tdo\tJava."
+        },
+        {
+          "id": "element-000007",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 158.7457275390625,
+              "top": 359.2362060546875,
+              "right": 435.9425354003906,
+              "bottom": 209.8311767578125
+            }
+          },
+          "metadata": {
+            "raw_label": "table",
+            "source_ref": "/tables/1",
+            "parent_id": "element-000001",
+            "confidence": null,
+            "manifest_element_id": "element-000007",
+            "docling_class": "TableItem",
+            "content_layer": "body"
+          },
+          "type": "table",
+          "rows": [
+            [
+              "Tabela detectada"
+            ]
+          ],
+          "table_ast": {
+            "body": [
+              {
+                "cells": [
+                  {
+                    "text": "Tabela detectada"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "element-000008",
+      "title": "3.6\tO\tIF\tE\tO\tELSE",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 56.0,
+          "top": 149.5440122070312,
+          "right": 174.41125132100004,
+          "bottom": 134.66101220703126
+        }
+      },
+      "metadata": {
+        "raw_label": "section_header",
+        "source_ref": "/texts/4",
+        "parent_id": "element-000001",
+        "confidence": null,
+        "manifest_element_id": "element-000008",
+        "docling_class": "SectionHeaderItem",
+        "content_layer": "body"
+      },
+      "blocks": [
+        {
+          "id": "element-000009",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 73.2855,
+              "top": 121.48386180703119,
+              "right": 253.50695428400007,
+              "bottom": 109.86168956597476
+            }
+          },
+          "metadata": {
+            "raw_label": "text",
+            "source_ref": "/texts/5",
+            "parent_id": "element-000001",
+            "confidence": null,
+            "manifest_element_id": "element-000009",
+            "docling_class": "TextItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "No\tJava,\ta\tsintaxe\tdo if é\ta\tseguinte:"
+        },
+        {
+          "id": "element-000010",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 56.0,
+              "top": 95.1717436070312,
+              "right": 165.24336745000016,
+              "bottom": 65.59058433188113
+            }
+          },
+          "metadata": {
+            "raw_label": "code",
+            "source_ref": "/texts/6",
+            "parent_id": "element-000001",
+            "confidence": null,
+            "manifest_element_id": "element-000010",
+            "docling_class": "CodeItem",
+            "content_layer": "body"
+          },
+          "type": "code",
+          "text": "if (condicaoBooleana) { codigo; }"
+        }
+      ],
+      "children": []
+    }
+  ]
+}
