@@ -1167,10 +1167,11 @@ def _toolbox_render(
     ``_RENDERABLE_MEDIA_TYPES`` are refused here with a ``ValueError``, before
     any request, so the method fails with that reason and not a Toolbox error.
     """
+    from acessilia_sdk.runtime import run_sync
     from acessilia_sdk.toolbox.clients import ToolboxPdfClient
     from acessilia_sdk.toolbox.transport import media_type_for
 
-    from backend.tools.toolbox_client import make_toolbox_client, run_sync
+    from backend.tools.toolbox_client import make_toolbox_client
 
     sent_as = media_type_for(source)
     if media_type is not None and media_type != sent_as:
@@ -1214,7 +1215,7 @@ def _render_source_page(
     ).image
 
 def _inspect_page(image: bytes, number: int, total_pages: int, mode: str) -> PageInspectionOutput:
-    from backend.tools.toolbox_client import run_sync
+    from acessilia_sdk.runtime import run_sync
 
     return run_sync(
         VisionAgent(mode=mode).inspect_page(
@@ -2006,8 +2007,10 @@ def _judge_page(image: bytes, candidate_a: str, candidate_b: str) -> dict[str, A
     """Call document.adjudicate.page through the Toolbox (sync wrapper)."""
     import tempfile
 
+    from acessilia_sdk.runtime import run_sync
     from acessilia_sdk.toolbox.clients import ToolboxAdjudicateClient
-    from backend.tools.toolbox_client import make_toolbox_client, run_sync
+
+    from backend.tools.toolbox_client import make_toolbox_client
 
     async def call(path: Path) -> dict[str, Any]:
         client = make_toolbox_client(ToolboxAdjudicateClient)

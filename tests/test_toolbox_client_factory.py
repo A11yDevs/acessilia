@@ -236,3 +236,9 @@ def test_the_config_is_read_from_settings_on_every_call(monkeypatch):
 
     assert before.retries == 2
     assert toolbox_client.toolbox_client_config().retries == 4
+
+
+def test_run_sync_is_imported_from_the_sdk_not_re_exported_here():
+    """#402 step 2: callers import acessilia_sdk.runtime.run_sync directly."""
+    assert not hasattr(toolbox_client, "run_sync")
+    assert "run_sync" not in toolbox_client.__all__
