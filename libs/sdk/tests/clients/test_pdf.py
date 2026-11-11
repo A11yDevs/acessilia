@@ -15,7 +15,7 @@ from acessilia_sdk.toolbox import (
     ToolboxProviderUnavailable,
     ToolboxTimeout,
 )
-from acessilia_sdk.toolbox.clients.pdf import ToolboxPdfClient
+from acessilia_sdk.toolbox.clients.pdf import TEXT_SPANS_MAX_PAGES, ToolboxPdfClient
 
 FIXTURE_PDF = Path(__file__).parent / "fixtures" / "sample.pdf"
 
@@ -157,10 +157,14 @@ def _mock_render(respx_mock, response=None):
 
 
 def _form_parameters(route) -> dict:
+    return _request_parameters(route.calls.last.request)
+
+
+def _request_parameters(request) -> dict:
     import json
     from urllib.parse import parse_qs
 
-    body = route.calls.last.request.content
+    body = request.content
     if b"Content-Disposition" in body:
         part = body.split(b'name="parameters"', 1)[1].split(b"\r\n\r\n", 1)[1]
         return json.loads(part.split(b"\r\n", 1)[0])
@@ -378,3 +382,51 @@ async def test_text_spans_refuses_another_coordinate_origin(respx_mock, client):
 
     with pytest.raises(ToolboxContractViolation):
         await client.text_spans(file_path=FIXTURE_PDF)
+
+
+def _spans_answer(pages, call):
+    return httpx.Response(200, json={**SAMPLE_SPANS_RESPONSE, "document": {
+        **SAMPLE_SPANS_RESPONSE["document"],
+        "pages": [{"page_number": page, "lines": [], "call": call} for page in pages],
+    }})
+
+
+def _answer_with_the_pages_asked(request):
+    pages = _request_parameters(request)["pages"]
+    return _spans_answer(pages, pages[0])
+
+
+@pytest.mark.asyncio
+async def test_text_spans_by_page_asks_each_page_once_in_batches(respx_mock, client):
+    route = respx_mock.post("http://localhost:8002/v1/capabilities/document.text.spans:execute")
+    route.side_effect = _answer_with_the_pages_asked
+    pages = [TEXT_SPANS_MAX_PAGES + 2, 3, 3, *range(1, TEXT_SPANS_MAX_PAGES + 2)]
+
+    by_page = await client.text_spans_by_page(file_path=FIXTURE_PDF, pages=pages)
+
+    asked = [_request_parameters(call.request)["pages"] for call in route.calls]
+    assert asked == [list(range(1, TEXT_SPANS_MAX_PAGES + 1)),
+                     [TEXT_SPANS_MAX_PAGES + 1, TEXT_SPANS_MAX_PAGES + 2]]
+    assert sorted(by_page) == list(range(1, TEXT_SPANS_MAX_PAGES + 3))
+    assert by_page[TEXT_SPANS_MAX_PAGES + 2]["call"] == TEXT_SPANS_MAX_PAGES + 1
+
+
+@pytest.mark.asyncio
+async def test_text_spans_by_page_without_pages_makes_no_call(respx_mock, client):
+    route = _mock_spans(respx_mock)
+
+    assert await client.text_spans_by_page(file_path=FIXTURE_PDF, pages=iter(())) == {}
+    assert not route.called
+
+
+@pytest.mark.asyncio
+async def test_text_spans_by_page_checks_every_answer(respx_mock, client):
+    route = respx_mock.post("http://localhost:8002/v1/capabilities/document.text.spans:execute")
+    route.side_effect = [
+        _spans_answer(range(1, TEXT_SPANS_MAX_PAGES + 1), 1),
+        httpx.Response(200, json={**SAMPLE_SPANS_RESPONSE, "document": {
+            **SAMPLE_SPANS_RESPONSE["document"], "coord_origin": "BOTTOMLEFT"}}),
+    ]
+
+    with pytest.raises(ToolboxContractViolation):
+        await client.text_spans_by_page(file_path=FIXTURE_PDF, pages=range(1, TEXT_SPANS_MAX_PAGES + 2))

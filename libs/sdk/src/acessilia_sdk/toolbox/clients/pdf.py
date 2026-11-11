@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
@@ -190,6 +191,33 @@ class ToolboxPdfClient(ToolboxCapabilityClient):
         for page in document["pages"]:
             _check_text_spans_page(page, context)
         return document
+
+    async def text_spans_by_page(
+        self,
+        file_path: Path | None = None,
+        artifact_id: str | None = None,
+        *,
+        pages: Iterable[int],
+        use_remote_cache: bool | None = None,
+    ) -> dict[int, dict[str, Any]]:
+        """The ``text-spans@1`` page of each of ``pages``, by page number.
+
+        The pages are asked once each, in order, in calls of at most
+        ``TEXT_SPANS_MAX_PAGES`` pages (``text_spans``); no page, no call. A
+        page an answer repeats replaces the one read before it.
+        """
+        wanted = sorted(set(pages))
+        by_page: dict[int, dict[str, Any]] = {}
+        for offset in range(0, len(wanted), TEXT_SPANS_MAX_PAGES):
+            document = await self.text_spans(
+                file_path=file_path,
+                artifact_id=artifact_id,
+                pages=wanted[offset : offset + TEXT_SPANS_MAX_PAGES],
+                use_remote_cache=use_remote_cache,
+            )
+            for page in document["pages"]:
+                by_page[int(page["page_number"])] = page
+        return by_page
 
 
 def _is_number(value: Any) -> bool:

@@ -5,6 +5,14 @@ Também disponível em **inglês (EUA)**: [English version](CHANGELOG.md)
 O SDK é uma API pública para scripts e benchmarks (#402). As mudanças visíveis
 para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
+## Não lançado
+
+- **Adicionado** `ToolboxPdfClient.text_spans_by_page(file_path, artifact_id, *, pages,
+  use_remote_cache)`: a página `text-spans@1` de cada página pedida, por número
+  de página. Pede cada página uma vez, em ordem, em chamadas de no máximo
+  `TEXT_SPANS_MAX_PAGES` páginas, e não faz chamada sem páginas; cada resposta é
+  conferida como `text_spans` confere. Os lotes do core vieram para cá (#402).
+
 ## 0.3.0 (2026-11-11)
 
 - **Adicionados** `run` e `upload` à linha de comando. `run CAPACIDADE` chama
