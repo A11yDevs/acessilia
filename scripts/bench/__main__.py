@@ -26,7 +26,7 @@ from pathlib import Path
 
 from docstruct.export.markdown import document_to_markdown
 
-from backend.tools.toolbox_client import ToolboxError
+from acessilia_sdk.toolbox.errors import ToolboxError
 from scripts.bench import core, toolbox
 from scripts.bench.datasets import DATASETS
 from scripts.bench.report import MANIFEST_FILE, compare_runs, score_run
