@@ -5,6 +5,14 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 The SDK is a public API for scripts and benchmarks (#402). Changes that a caller
 can see are recorded here, newest first.
 
+## Unreleased
+
+- **Added** `ToolboxPdfClient.text_spans_by_page(file_path, artifact_id, *, pages,
+  use_remote_cache)`: the `text-spans@1` page of each requested page, by page
+  number. It asks each page once, in order, in calls of at most
+  `TEXT_SPANS_MAX_PAGES` pages, and makes no call for no pages; every answer is
+  checked as `text_spans` checks it. The core's batching moved here (#402).
+
 ## 0.3.0 (2026-11-11)
 
 - **Added** `run`, `upload` to the command line. `run CAPABILITY` calls any
