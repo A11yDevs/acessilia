@@ -19,7 +19,8 @@ Núcleo puro de processamento estrutural de documentos do Acessilia.
 | `docstruct.geometry` | `content_fingerprint`, `overlaps_clean`, `merge_bboxes`, `union`, `intersection_area` |
 | `docstruct.geometry.boxes` | `OrientedBox`, `is_bottom_left` — caixas que mantêm a origem de coordenadas (`TOPLEFT`, `BOTTOMLEFT`, `UNKNOWN`), com conversões de cima para baixo e em frações da página |
 | `docstruct.placeholders` | `is_unstructured_page_placeholder`, `UNSTRUCTURED_PAGE_LABEL`, `UNSTRUCTURED_PAGE_FLAG` — o elemento substituto de uma página extraída sem estrutura |
-| `docstruct.blocks.callouts` | `dedupe_callout_titles` — um callout dividido em vários blocos mantém o título só no primeiro bloco |
+| `docstruct.blocks.callouts` | `dedupe_callout_titles` — um callout dividido em vários blocos mantém o título só no primeiro bloco; `callout_titles` — o título de cada callout, lido do seu elemento de título |
+| `docstruct.blocks.lists` | `list_start`, `list_numbering`, `marker_numbering`, `item_label` — numeração de listas; `recover_empty_lettered_list_items` — itens `a) b)` vazios preenchidos a partir de um parágrafo vizinho; `merge_list_blocks` — itens seguidos de uma mesma lista de origem viram uma lista só |
 | `docstruct.geometry.reading_order` | `refine_reading_order` — refinamento de ordem de leitura sensível a colunas com isolamento de marginais e particionamento em 2/3 colunas; `order_reading_items`, `ReadingItem`, `reading_role` — a ordem de leitura do processing manifest (grupos primeiro, cabeçalhos e rodapés isolados, 2–3 colunas entre banners de largura total), sobre caixas que mantêm a origem |
 | `docstruct.manifest` | `StructuredDocument`, `DocumentElement`, `PageDescriptor`, `Provenance`, `BoundingBox`, `field_specs`, `validate_structured_document`, adaptadores de payload — a parte documental do processing manifest: tipos e invariantes normativos contra os quais os schemas de wire são verificados |
 | `docstruct.policy` | `FusionPolicy` (+ presets: `drbench_v12`, `drbench_v13`) |
@@ -42,12 +43,13 @@ Núcleo puro de processamento estrutural de documentos do Acessilia.
 | `docstruct.text.norm_fix` | `norm_fix` — reparos pós-normalização |
 | `docstruct.adapters.mineru` | `clean_mineru_text`, `format_mineru_block_text`, `extract_mineru_blocks` — parsing de `middle_json` do MinerU, espaçamento, de-hifenização e formatação de fórmulas/tabelas |
 | `docstruct.tables.ast` | `table_ast_from_docling_grid`, `analyze_table_complexity`, `raw_rows_from_table_ast`, `TableAST`, `TableComplexityMetrics`, `TableASTError` |
-| `docstruct.text` | `sanitize_text`, `merge_broken_paragraphs`, `normalize_code_text`, `classify_text_block` |
+| `docstruct.text` | `sanitize_text`, `merge_broken_paragraphs`, `normalize_code_text`, `classify_text_block`; `docstruct.text.paragraphs.PAGE_HEADING` — o cabeçalho de página que `merge_broken_paragraphs` nunca atravessa |
 | `docstruct.imaging.policy` | `upscale_factor`, `decide_orientation` (sem PIL/cv2) |
 | `docstruct.evaluation.holdout` | `partition`, `score`, `evaluate_candidate` |
 | `docstruct.evaluation.metrics` | `text_ed`, `reading_order_score`, `teds_score`, `cdm_score`, `overall_score`, `PageScores` — métricas locais de parsing de documentos |
 | `docstruct.evaluation.markdown` | `score_markdown_page` — uma página de markdown predito contra o ground truth |
 | `docstruct.export.markdown` | `document_to_markdown`, `render_table`, `bare_latex` (de `docstruct.text.latex`) — documento canônico → markdown de benchmark (tabelas HTML, matemática `$$`) |
+| `docstruct.export.page_text` | `blocks_text`, `pages_text` — o texto simples do payload PDDL, página a página (quem chama dá o texto de uma imagem sem descrição) |
 | `docstruct.profiles` | `OUTPUT_PROFILES`, `filter_blocks_for_profile`, `normalize_profile` |
 | `docstruct.validation` | `validate_canonical_document`, `validate_output_text`, `Finding` |
 

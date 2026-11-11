@@ -14,6 +14,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
+from docstruct.blocks.callouts import callout_titles
 from docstruct.blocks.callouts import dedupe_callout_titles as _dedupe_callout_titles
 from docstruct.blocks.lists import (
     marker_numbering,
@@ -5679,7 +5680,7 @@ def _elements_to_blocks(
     An element in ``replacements`` (the first member of a letterhead) gives
     way to its block, which already stands for the picture's text.
     """
-    callout_titles = _callout_titles(elements)
+    titles = callout_titles(elements)
     recovered_items, consumed_text, preambles = _recover_empty_lettered_list_items(elements)
     blocks: list[dict[str, Any]] = []
     dropped_empty_items: list[ManifestElement] = []
@@ -5688,7 +5689,7 @@ def _elements_to_blocks(
             blocks.append(replacements[element.id])
             continue
         if preamble := preambles.get(element.id):
-            blocks.append(_element_to_block(preamble, callout_titles))
+            blocks.append(_element_to_block(preamble, titles))
         text = consumed_text.get(element.id)
         if text is not None:
             if not text:
@@ -5701,7 +5702,7 @@ def _elements_to_blocks(
             element = element.model_copy(
                 update={"text": item_text, "metadata": metadata}
             )
-        block = _element_to_block(element, callout_titles)
+        block = _element_to_block(element, titles)
         if block.get("type") != "list" or any(
             isinstance(item, str) and item.strip()
             for item in block.get("items", [])
@@ -5740,26 +5741,6 @@ def _recover_empty_lettered_list_items(
         for item_id, (source_id, text) in recovery.preambles.items()
     }
     return dict(recovery.items), dict(recovery.consumed), preambles
-
-
-def _callout_titles(elements: list[ManifestElement]) -> dict[str, str]:
-    """Each callout's title, read from its title element's text as it stands now.
-
-    The Toolbox copies the title into ``metadata.callout_title`` when it groups
-    the callout, before any repair; the text-repair methods then fix the
-    title element's text only, so the copy keeps the broken accents
-    ("observa¸ c˜ oes").
-
-    Read per page: the Toolbox groups callouts page by page, so a callout's
-    title and content never sit on different pages.
-    """
-    return {
-        str(element.metadata["callout_id"]): (element.text or "").strip()
-        for element in elements
-        if element.metadata.get("callout_id")
-        and str(element.metadata.get("callout_role", "")).lower() == "title"
-        and (element.text or "").strip()
-    }
 
 
 def _text_kept_by_picture(element: ManifestElement) -> list[ManifestElement]:

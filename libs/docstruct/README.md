@@ -19,7 +19,8 @@ Pure document-structure processing core for Acessilia.
 | `docstruct.geometry` | `content_fingerprint`, `overlaps_clean`, `merge_bboxes`, `union`, `intersection_area` |
 | `docstruct.geometry.boxes` | `OrientedBox`, `is_bottom_left` — boxes that keep their coordinate origin (`TOPLEFT`, `BOTTOMLEFT`, `UNKNOWN`), with top-down and page-fraction conversions |
 | `docstruct.placeholders` | `is_unstructured_page_placeholder`, `UNSTRUCTURED_PAGE_LABEL`, `UNSTRUCTURED_PAGE_FLAG` — the placeholder element that stands for a page extracted without structure |
-| `docstruct.blocks.callouts` | `dedupe_callout_titles` — a callout split across blocks keeps its title on the first block only |
+| `docstruct.blocks.callouts` | `dedupe_callout_titles` — a callout split across blocks keeps its title on the first block only; `callout_titles` — each callout's title, read from its title element |
+| `docstruct.blocks.lists` | `list_start`, `list_numbering`, `marker_numbering`, `item_label` — list numbering; `recover_empty_lettered_list_items` — empty `a) b)` items filled from one sibling paragraph; `merge_list_blocks` — consecutive items of one source list as one list |
 | `docstruct.geometry.reading_order` | `refine_reading_order` — column-aware reading order refinement with marginal isolation and 2-/3-column gutter partitioning; `order_reading_items`, `ReadingItem`, `reading_role` — the processing manifest's reading order (groups first, headers and footers isolated, 2–3 columns between full-width banners), on boxes that keep their origin |
 | `docstruct.manifest` | `StructuredDocument`, `DocumentElement`, `PageDescriptor`, `Provenance`, `BoundingBox`, `field_specs`, `validate_structured_document`, payload adapters — the processing manifest's document part: normative types and invariants that wire schemas are checked against |
 | `docstruct.policy` | `FusionPolicy` (+ presets: `drbench_v12`, `drbench_v13`) |
@@ -42,12 +43,13 @@ Pure document-structure processing core for Acessilia.
 | `docstruct.text.norm_fix` | `norm_fix` — post-normalization repairs |
 | `docstruct.adapters.mineru` | `clean_mineru_text`, `format_mineru_block_text`, `extract_mineru_blocks` — MinerU `middle_json` parsing, spacing, de-hyphenation, and formula/table formatting |
 | `docstruct.tables.ast` | `table_ast_from_docling_grid`, `analyze_table_complexity`, `raw_rows_from_table_ast`, `TableAST`, `TableComplexityMetrics`, `TableASTError` |
-| `docstruct.text` | `sanitize_text`, `merge_broken_paragraphs`, `normalize_code_text`, `classify_text_block` |
+| `docstruct.text` | `sanitize_text`, `merge_broken_paragraphs`, `normalize_code_text`, `classify_text_block`; `docstruct.text.paragraphs.PAGE_HEADING` — the page header `merge_broken_paragraphs` never joins across |
 | `docstruct.imaging.policy` | `upscale_factor`, `decide_orientation` (no PIL/cv2) |
 | `docstruct.evaluation.holdout` | `partition`, `score`, `evaluate_candidate` |
 | `docstruct.evaluation.metrics` | `text_ed`, `reading_order_score`, `teds_score`, `cdm_score`, `overall_score`, `PageScores` — local document-parsing metrics |
 | `docstruct.evaluation.markdown` | `score_markdown_page` — one predicted markdown page against its ground truth |
 | `docstruct.export.markdown` | `document_to_markdown`, `render_table`, `bare_latex` (from `docstruct.text.latex`) — canonical document → benchmark markdown (HTML tables, `$$` math) |
+| `docstruct.export.page_text` | `blocks_text`, `pages_text` — the PDDL payload's plain text, page by page (the caller names an image without alt text) |
 | `docstruct.profiles` | `OUTPUT_PROFILES`, `filter_blocks_for_profile`, `normalize_profile` |
 | `docstruct.validation` | `validate_canonical_document`, `validate_output_text`, `Finding` |
 
