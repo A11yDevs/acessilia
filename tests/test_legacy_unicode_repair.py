@@ -579,3 +579,34 @@ class TestNegationOverlays:
 
         cells = table.metadata["table_ast"]["body"][0]["cells"]
         assert [cell["text"] for cell in cells] == ["x = 1", "y = 2"]
+
+
+class TestNegationOverlayChain:
+    """The ``negation_overlay`` key across steps (orchestrator inventory, shared
+    state): written here, skipped on a second run, read by the payload.
+    Characterized before the overlay geometry moved to docstruct (#402)."""
+
+    PARAGRAPH = TestNegationOverlays.PARAGRAPH
+
+    def _composed(self):
+        host = _placed("element-1", "paragraph", (65, 488, 533, 442), text=self.PARAGRAPH)
+        slash = _slash(205, 480)
+        manifest = _repair(host, slash)
+        return manifest, host, slash
+
+    def test_a_second_run_keeps_the_first_outcome_and_the_host_text(self):
+        manifest, host, slash = self._composed()
+        text_after_first_run = host.text
+
+        assert pddl._reattach_negation_overlays(manifest) == {}
+        assert host.text == text_after_first_run
+        assert host.metadata["negation_overlays"] == 1
+        assert slash.metadata["negation_overlay"] == {"outcome": "composed", "host": "element-1"}
+
+    def test_the_payload_delivers_the_negated_relation_without_the_slash(self):
+        manifest, host, slash = self._composed()
+
+        [page] = pddl._manifest_pages_to_payload(manifest)
+
+        assert [block["id"] for block in page["blocks"]] == ["element-1"]
+        assert page["blocks"][0]["text"].startswith("para cada valor h ≠ 0,")
