@@ -9,10 +9,10 @@ from __future__ import annotations
 
 import pytest
 
-from backend.agents.pddl_orchestrator import (
-    _backfill_table_from_existing_text,
-    _rows_from_visual_table_text,
-    _table_ast_column_count,
+from backend.agents.pddl_orchestrator import _backfill_table_from_existing_text
+from docstruct.tables.ast import table_ast_column_count as _table_ast_column_count
+from docstruct.tables.text_rows import (
+    rows_from_visual_table_text as _rows_from_visual_table_text,
 )
 from backend.core.manifest.models import ManifestElement
 

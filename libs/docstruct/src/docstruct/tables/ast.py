@@ -430,6 +430,16 @@ def effective_section_width(rows: list[dict[str, Any]]) -> int:
     return max(effective_section_row_widths(rows), default=0)
 
 
+def table_ast_column_count(table_ast: dict[str, Any]) -> int:
+    """Return the widest logical section, including cell spans."""
+    widths: list[int] = []
+    for section_name in ("header", "body", "footer"):
+        section = table_ast.get(section_name)
+        if isinstance(section, list):
+            widths.append(effective_section_width(section))
+    return max(widths, default=0)
+
+
 def row_header_column_count(body_rows: list[dict[str, Any]]) -> int:
     """Return the common leading width carrying row-header semantics."""
     if not body_rows:

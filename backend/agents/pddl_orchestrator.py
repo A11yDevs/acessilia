@@ -32,11 +32,12 @@ from docstruct.fusion.noise import (
 from docstruct.fusion.tailjoin import is_page_number as _is_page_number
 from docstruct.geometry import reading_role
 from docstruct.tables.ast import (
-    effective_section_width,
     linearize_table_for_text,
     raw_rows_from_table_ast as _rows_from_table_ast,
+    table_ast_column_count,
 )
 from docstruct.tables.garble import table_garble_reason
+from docstruct.tables.text_rows import rows_from_visual_table_text
 from docstruct.text.equations import preserve_equation_number, split_equation_number
 from docstruct.text.implicit_products import (
     implicit_product_variables,
@@ -4445,7 +4446,7 @@ async def _enrich_table_structures(
         element.metadata["table_ast"] = table_ast
         element.metadata["table_linearization_hint"] = "data-agent-structured"
         element.metadata["table_row_count"] = len(rows)
-        element.metadata["table_column_count"] = _table_ast_column_count(table_ast)
+        element.metadata["table_column_count"] = table_ast_column_count(table_ast)
         element.metadata["table_has_header"] = any(
             cell.header or cell.scope != "none"
             for row in table_output.rows
@@ -4571,22 +4572,12 @@ def _table_element_has_structured_content(element: ManifestElement) -> bool:
     return not _rows_look_like_placeholder(rows)
 
 
-def _table_ast_column_count(table_ast: dict[str, Any]) -> int:
-    """Return the widest logical section, including cell spans."""
-    widths: list[int] = []
-    for section_name in ("header", "body", "footer"):
-        section = table_ast.get(section_name)
-        if isinstance(section, list):
-            widths.append(effective_section_width(section))
-    return max(widths, default=0)
-
-
 def _backfill_table_from_existing_text(element: ManifestElement) -> bool:
     text = (element.text or "").strip()
     if not text:
         return False
 
-    rows = _rows_from_visual_table_text(text)
+    rows = rows_from_visual_table_text(text)
     if not rows:
         return False
 
@@ -4603,83 +4594,16 @@ def _backfill_table_from_existing_text(element: ManifestElement) -> bool:
     return True
 
 
-def _rows_from_visual_table_text(raw_text: str) -> list[list[str]]:
-    text = raw_text.strip()
-    if not text:
-        return []
-
-    rows = _rows_from_pipe_table(text)
-    if rows:
-        return rows
-
-    rows = _rows_from_delimited_lines(text, delimiter="\t")
-    if rows:
-        return rows
-
-    semicolon_rows = _rows_from_delimited_lines(text, delimiter=";")
-    comma_rows = _rows_from_delimited_lines(text, delimiter=",")
-    if _score_rows(semicolon_rows) >= _score_rows(comma_rows):
-        return semicolon_rows
-    return comma_rows
-
-
-def _rows_from_pipe_table(text: str) -> list[list[str]]:
-    lines = [line.strip() for line in text.splitlines() if line.strip()]
-    rows: list[list[str]] = []
-    for line in lines:
-        if "|" not in line:
-            continue
-        if _looks_like_markdown_separator(line):
-            continue
-        cleaned = line.strip().strip("|")
-        cells = [cell.strip() for cell in cleaned.split("|")]
-        cells = [cell for cell in cells if cell]
-        if len(cells) >= 2:
-            rows.append(cells)
-    if _score_rows(rows) >= 4:
-        return rows
-    return []
-
-
-def _rows_from_delimited_lines(text: str, *, delimiter: str) -> list[list[str]]:
-    lines = [line.strip() for line in text.splitlines() if line.strip()]
-    rows: list[list[str]] = []
-    for line in lines:
-        if delimiter not in line:
-            continue
-        if "|" in line and delimiter != "|":
-            continue
-        cells = [cell.strip() for cell in line.split(delimiter)]
-        cells = [cell for cell in cells if cell]
-        if len(cells) >= 2:
-            rows.append(cells)
-    if _score_rows(rows) >= 4:
-        return rows
-    return []
-
-
-def _looks_like_markdown_separator(line: str) -> bool:
-    cleaned = line.strip().strip("|").replace(" ", "")
-    if not cleaned:
-        return False
-    parts = cleaned.split("|")
-    if not parts:
-        return False
-    return all(re.fullmatch(r":?-{2,}:?", part or "") for part in parts)
-
-
-def _score_rows(rows: list[list[str]]) -> int:
-    if not rows:
-        return 0
-    row_count = len(rows)
-    width = max((len(row) for row in rows), default=0)
-    return row_count * width
+#: The single cell of a table that reached the payload with no text. It is
+#: written by _element_to_block and recognized by _rows_look_like_placeholder,
+#: which must keep agreeing; the reader sees it, in Portuguese (#410).
+_TABLE_PLACEHOLDER_TEXT = "Tabela detectada"
 
 
 def _rows_look_like_placeholder(rows: list[list[str]]) -> bool:
     if len(rows) != 1 or len(rows[0]) != 1:
         return False
-    return rows[0][0].strip().lower() == "tabela detectada"
+    return rows[0][0].strip().lower() == _TABLE_PLACEHOLDER_TEXT.lower()
 
 
 #: Longest side of a picture crop sent to the vision model. The render runs at
@@ -5831,7 +5755,7 @@ def _element_to_block(
         table_ast = _table_ast_from_metadata(metadata)
         rows = _rows_from_table_ast(table_ast) if table_ast else None
         if not rows:
-            rows = [[text]] if text else [["Tabela detectada"]]
+            rows = [[text]] if text else [[_TABLE_PLACEHOLDER_TEXT]]
             if table_ast is None:
                 table_ast = _table_ast_from_rows(rows)
         block.update(
