@@ -1,5 +1,8 @@
 # Benchmark evaluation contracts
 
+[ADR-0016](adr/0016-dataset-reference-contract.md) records who owns the
+Dataset reference contract and how the consumers migrate to it.
+
 The math and presentation scorecards consume Dataset references through
 `references/manifest.csv` (contract `1.2.0`). A valid new manifest takes
 precedence over the old `input/*-reference/` case folders. The `references/`
@@ -12,8 +15,9 @@ CI and pinned E2E checks use the revision in
 [`scripts/bench/dataset.lock.json`](../scripts/bench/dataset.lock.json). The
 effective revision, references digest, task availability, coverage scope,
 selected criteria, and protocol are recorded in scorecards and per-run
-metadata. A pinned exported tree without `.git` is validated against the lock
-digest and records the locked source revision. Unpinned local trees without
+metadata. For an export without `.git`, the lock verifies reference content
+against the pinned digest. The scorecard records the lock commit as
+`expected_revision` and leaves `revision` null. Unpinned local trees without
 Git metadata are identified by their reference digest.
 
 When one task has more than one manifest row, scorecards preserve each
