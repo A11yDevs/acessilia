@@ -274,11 +274,19 @@ falha da tool. Não acrescente uma implementação local por trás dele (veja 2.
 
 Antes de planejar um documento, o orquestrador tira um snapshot do catálogo
 (`GET /v1/capabilities` + `/v1/providers`, em cache por
-`TOOLBOX_CATALOG_REFRESH_SECONDS`) e confere cada método pedido que esteja em
+`TOOLBOX_CATALOG_REFRESH_SECONDS`, 10 s por requisição e sem retries) e confere cada método pedido que esteja em
 `METHOD_TOOLBOX_REQUIREMENTS`: a capacidade precisa estar na allowlist do SDK, ser
 publicada com a versão exata do contrato, e o provider configurado precisa estar
 registrado e implementá-la. O catálogo só restringe; nunca torna um método
 disponível.
+
+O snapshot é lido do endpoint primário dos clientes de capacidade: o primeiro
+de `TOOLBOX_BASE_URLS`, ou então `TOOLBOX_BASE_URL`. Toda chamada de capacidade
+vai primeiro para ele, e os clientes não o conferem por conta própria; eles
+conferem o catálogo de um secundário antes de fazer failover para ele
+(ADR-0006). A leitura do catálogo não tem failover: o snapshot de um secundário
+admitiria métodos que a execução ainda manda para o primário. Quando o catálogo
+do primário não pode ser lido, o `enforce` falha fechado, como descrito abaixo.
 
 | `TOOLBOX_AVAILABILITY_GATE` | Efeito |
 |---|---|
@@ -410,7 +418,7 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 | Variável | Padrão | Descrição |
 |---|---|---|
 | `TOOLBOX_BASE_URL` | `http://localhost:8002` | URL base do serviço; em produção, o balanceador na frente das réplicas (ADR-0006) |
-| `TOOLBOX_BASE_URLS` | *(vazio)* | URLs, separadas por vírgula, de deploys independentes da Toolbox, tentadas em ordem pelos clientes de capacidade; vazio significa só `TOOLBOX_BASE_URL` |
+| `TOOLBOX_BASE_URLS` | *(vazio)* | URLs, separadas por vírgula, de deploys independentes da Toolbox, tentadas em ordem pelos clientes de capacidade; o gate de disponibilidade lê o catálogo da primeira; vazio significa só `TOOLBOX_BASE_URL` |
 | `TOOLBOX_PROVIDER` | `docling` | Provider principal de extração |
 | `TOOLBOX_API_KEY` | *(vazio)* | Chave para `Authorization: Bearer` |
 | `TOOLBOX_AVAILABILITY_GATE` | `observe` | Gate de disponibilidade: `observe`, `enforce` ou `off` (seção 4.3) |

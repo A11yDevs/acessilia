@@ -27,13 +27,14 @@ from acessilia_sdk.toolbox import (
     CatalogCache,
     CatalogSnapshot,
     Requirement,
-    ToolboxEndpoint,
+    ToolboxClientConfig,
     ToolboxProviderUnavailable,
     missing_requirements,
     read_catalog,
 )
 from backend.config.settings import settings
 from backend.core.manifest.models import ProcessingManifest
+from backend.tools.toolbox_client import toolbox_client_config
 
 GATE_MODES = ("observe", "enforce", "off")
 
@@ -132,17 +133,15 @@ def evaluate(
     )
 
 
-def _catalog_endpoint() -> ToolboxEndpoint:
-    """The endpoint the catalogue is read from: ``TOOLBOX_BASE_URL`` only.
+def _catalog_config() -> ToolboxClientConfig:
+    """The capability clients' configuration, so the gate checks where they call.
 
-    ``TOOLBOX_BASE_URLS`` is not consulted; reading the catalogue across the
-    configured endpoints is a separate change (#402). A URL the SDK cannot use
-    is reported as an unavailable Toolbox, which the cache records like any
-    failed read, so a misconfiguration degrades planning as before instead of
-    failing the document.
+    A URL the SDK cannot use is reported as an unavailable Toolbox, which the
+    cache records like any failed read, so a misconfiguration degrades
+    planning instead of failing the document.
     """
     try:
-        return ToolboxEndpoint(settings.toolbox_base_url, settings.toolbox_api_key)
+        return toolbox_client_config()
     except ValueError as exc:
         raise ToolboxProviderUnavailable(
             f"Toolbox catalogue endpoint is not usable: {exc}"
@@ -150,11 +149,24 @@ def _catalog_endpoint() -> ToolboxEndpoint:
 
 
 async def _fetch() -> CatalogSnapshot:
-    """One catalogue read on the catalogue's own budget, without retries.
+    """The catalogue of the clients' primary endpoint, on the catalogue's budget.
 
-    The cache's next refresh is the retry; see ``CATALOG_TIMEOUT_SECONDS``.
+    The primary is the first of ``TOOLBOX_BASE_URLS``, else
+    ``TOOLBOX_BASE_URL``: the deployment every capability call goes to first,
+    and the one the clients do not check themselves (they check a secondary's
+    catalogue before failing over to it). There is deliberately no failover
+    here: a secondary's snapshot would admit methods that execution still
+    sends to the primary (#429). If the primary's catalogue cannot be read,
+    the read fails and ``enforce`` fails closed. Each read has
+    ``CATALOG_TIMEOUT_SECONDS`` per request and no retries; the cache's next
+    refresh is the retry.
     """
-    return await read_catalog(_catalog_endpoint(), timeout_seconds=CATALOG_TIMEOUT_SECONDS)
+    config = _catalog_config()
+    return await read_catalog(
+        config.endpoints[0],
+        timeout_seconds=CATALOG_TIMEOUT_SECONDS,
+        api_key=config.api_key,
+    )
 
 
 _cache: CatalogCache | None = None

@@ -130,6 +130,7 @@ async def read_catalog(
     endpoint: ToolboxEndpoint,
     *,
     timeout_seconds: float,
+    api_key: str | None = None,
     clock: Callable[[], float] = time.monotonic,
 ) -> CatalogSnapshot:
     """Read one endpoint's catalogue on a short-lived HTTP client.
@@ -138,13 +139,15 @@ async def read_catalog(
     applies to each request, so a caller that plans can keep the catalogue on
     a budget of its own instead of the extraction timeout. There are no
     retries here: a caller that caches the catalogue (:class:`CatalogCache`)
-    retries on its next refresh. Errors are the ones :func:`fetch_catalog`
-    raises.
+    retries on its next refresh. ``api_key`` is used when the endpoint has no
+    key of its own, as the capability clients do. Errors are the ones
+    :func:`fetch_catalog` raises.
     """
+    key = endpoint.api_key if endpoint.api_key is not None else api_key
     async with httpx.AsyncClient(
         base_url=endpoint.base_url,
         timeout=httpx.Timeout(timeout_seconds),
-        headers=auth_headers(endpoint.api_key),
+        headers=auth_headers(key),
     ) as http:
         return await fetch_catalog(http, clock=clock)
 

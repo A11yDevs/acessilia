@@ -273,11 +273,19 @@ result. Do not add a local implementation behind it (see 2.3).
 
 Before planning a document the orchestrator takes one catalogue snapshot
 (`GET /v1/capabilities` + `/v1/providers`, cached for
-`TOOLBOX_CATALOG_REFRESH_SECONDS`) and checks every requested method listed in
+`TOOLBOX_CATALOG_REFRESH_SECONDS`, 10 s per request and no retries) and checks every requested method listed in
 `METHOD_TOOLBOX_REQUIREMENTS`: the capability must be in the SDK allowlist, be
 published with the exact contract version, and the configured provider must be
 registered and implement it. The catalogue only restricts; it never makes a method
 available.
+
+The snapshot is read from the capability clients' primary endpoint: the first
+of `TOOLBOX_BASE_URLS`, else `TOOLBOX_BASE_URL`. Every capability call goes
+there first, and the clients do not check it themselves; they check a
+secondary's catalogue before failing over to it (ADR-0006). The catalogue read
+has no failover: a secondary's snapshot would admit methods that execution
+still sends to the primary. When the primary's catalogue cannot be read,
+`enforce` fails closed as described below.
 
 | `TOOLBOX_AVAILABILITY_GATE` | Effect |
 |---|---|
@@ -407,7 +415,7 @@ Defined in `backend/config/settings.py` and documented in `.env.example`:
 | Variable | Default | Description |
 |---|---|---|
 | `TOOLBOX_BASE_URL` | `http://localhost:8002` | Service base URL; in production, the load balancer in front of the replicas (ADR-0006) |
-| `TOOLBOX_BASE_URLS` | *(empty)* | Comma-separated URLs of independent Toolbox deployments, tried in order by the capability clients; empty means `TOOLBOX_BASE_URL` only |
+| `TOOLBOX_BASE_URLS` | *(empty)* | Comma-separated URLs of independent Toolbox deployments, tried in order by the capability clients; the availability gate reads the first one's catalogue; empty means `TOOLBOX_BASE_URL` only |
 | `TOOLBOX_PROVIDER` | `docling` | Primary extraction provider |
 | `TOOLBOX_API_KEY` | *(empty)* | Key for `Authorization: Bearer` |
 | `TOOLBOX_AVAILABILITY_GATE` | `observe` | Availability gate: `observe`, `enforce` or `off` (section 4.3) |

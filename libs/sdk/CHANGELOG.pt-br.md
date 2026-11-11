@@ -7,6 +7,10 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
 ## Não lançado
 
+- **Adicionado** `read_catalog` aceita um `api_key` opcional, usado quando o
+  endpoint não tem chave própria, como fazem os clientes de capacidade. O gate
+  de disponibilidade do core passa a chave dos seus clientes com o endpoint
+  primário deles (#402).
 - **Adicionado** `read_catalog(endpoint, *, timeout_seconds)`
   (`acessilia_sdk.toolbox.catalog`): lê o catálogo de um endpoint num cliente
   HTTP de vida curta, com o timeout por requisição do chamador e sem retries.

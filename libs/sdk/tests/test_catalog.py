@@ -369,3 +369,31 @@ async def test_read_catalog_closes_its_client_when_cancelled(monkeypatch) -> Non
 
     assert len(opened) == 1
     assert opened[0].is_closed
+
+
+@pytest.mark.asyncio
+async def test_read_catalog_falls_back_to_the_callers_key() -> None:
+    with respx.mock() as router:
+        router.get(f"{BASE_URL}/v1/providers").mock(
+            return_value=httpx.Response(200, json=PROVIDERS)
+        )
+        route = router.get(f"{BASE_URL}/v1/capabilities").mock(
+            return_value=httpx.Response(200, json=CAPABILITIES)
+        )
+        await read_catalog(ToolboxEndpoint(BASE_URL), timeout_seconds=1.0, api_key="shared")
+    assert route.calls.last.request.headers["Authorization"] == "Bearer shared"
+
+
+@pytest.mark.asyncio
+async def test_read_catalog_prefers_the_endpoint_key() -> None:
+    with respx.mock() as router:
+        router.get(f"{BASE_URL}/v1/providers").mock(
+            return_value=httpx.Response(200, json=PROVIDERS)
+        )
+        route = router.get(f"{BASE_URL}/v1/capabilities").mock(
+            return_value=httpx.Response(200, json=CAPABILITIES)
+        )
+        await read_catalog(
+            ToolboxEndpoint(BASE_URL, "own"), timeout_seconds=1.0, api_key="shared"
+        )
+    assert route.calls.last.request.headers["Authorization"] == "Bearer own"
