@@ -39,7 +39,7 @@ def test_cached_payload_rebuilds_current_submission_metadata(monkeypatch, tmp_pa
     class Agent:
         calls = 0
 
-        async def executar(self, file_path, *_args, **_kwargs):
+        async def execute(self, file_path, *_args, **_kwargs):
             self.calls += 1
             return {
                 "text": "Accessible content",

@@ -289,7 +289,7 @@ async def _run(manifest, monkeypatch, tmp_path):
     monkeypatch.setattr(pddl, "inspect_source_media", noop)
     monkeypatch.setattr(pddl, "_enrich_picture_descriptions", noop)
     monkeypatch.setattr(pddl, "_enrich_table_structures", noop)
-    return await orchestrator.executar(
+    return await orchestrator.execute(
         tmp_path / "qa_word.docx", tmp_path, structured_output=True
     )
 

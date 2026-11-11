@@ -285,7 +285,7 @@ async def test_complete_orchestration_uses_region_method_and_requested_mode(insp
         return None
 
     monkeypatch.setattr(pddl, "inspect_source_media", no_media)
-    result = await orchestrator.executar(
+    result = await orchestrator.execute(
         Path(manifest.source.path), tmp_path, mode="baixo", structured_output=True,
     )
     assert result["canonical_metadata"]["pddl_execution_status"] == "completed"

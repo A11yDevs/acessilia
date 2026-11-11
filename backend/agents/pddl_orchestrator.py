@@ -2781,7 +2781,7 @@ class PddlAccessibilityOrchestrator:
 
         return ExecutorAgent(registry, domain=DomainBundle.load())
 
-    async def executar(
+    async def execute(
         self,
         file_path: Path,
         tmpdir: Path,
@@ -2805,8 +2805,72 @@ class PddlAccessibilityOrchestrator:
 
         if status_callback:
             await status_callback(t(STAGE_ANALYZING_STRUCTURAL))
+        manifest = await self._extract_structure(source_path, presentation)
+        _check_page_limit(manifest)
+        manifest.extractor.configuration["region_inspection_mode"] = effective_mode
+        manifest.extractor.configuration.update(media_configuration)
+
+        await self._enrich_before_planning(
+            manifest, file_path, source_path, effective_mode, media_inspection, status_callback
+        )
+
+        if status_callback:
+            await status_callback(t(STAGE_GENERATING_PDDL_PLAN))
+        # One catalogue snapshot per document, so the first plan and every replan
+        # see the same Toolbox.
+        availability = await toolbox_gate.decide(manifest)
+        _log_availability(availability)
+        gated = availability.unavailable_methods
+        plan, comparison = await run_blocking(
+            self._build_plan, manifest, extra_unavailable=gated
+        )
+
+        execution_report: ExecutionReport | None = None
+        if status_callback:
+            await status_callback(
+                t(STAGE_VALIDATING_PLAN_DRY_RUN)
+                if self.execute_dry_run
+                else t(STAGE_EXECUTING_PLAN)
+            )
+        # `execute_dry_run` selects the *mode* of execution; it used to also gate
+        # whether the executor ran at all, so setting it to false produced a plan
+        # that was never executed and a report of None. Real execution is now the
+        # other branch instead of silence.
+        loop = asyncio.get_running_loop()
+        manifest, execution_report = await run_blocking(
+            self.executor.execute,
+            plan,
+            manifest,
+            dry_run=self.execute_dry_run,
+            progress=_plan_progress(manifest, status_callback, loop),
+        )
+        manifest, execution_report, plan, comparison = await self._replan_until_done(
+            manifest, execution_report, plan, comparison, gated, status_callback, loop
+        )
+        self._check_unsatisfied(manifest, execution_report)
+
+        payload = build_pddl_structured_payload(
+            file_path=file_path,
+            manifest=manifest,
+            plan=plan,
+            planner_backend=self.planner_backend,
+            execution_report=execution_report,
+            comparison=comparison,
+            toolbox_availability=availability.to_metadata(),
+        )
+
+        if structured_output:
+            return payload
+        return payload["text"]
+
+    async def _extract_structure(self, source_path: Path, presentation: bool) -> ProcessingManifest:
+        """The document's manifest from ``document.structure.extract``.
+
+        A Toolbox failure becomes a ``StructuralExtractionError`` whose message
+        names only the capability and the kind of failure.
+        """
         try:
-            manifest = await run_blocking(
+            return await run_blocking(
                 self.information_structural.process,
                 source_path,
                 language="pt-BR",
@@ -2824,10 +2888,22 @@ class PddlAccessibilityOrchestrator:
                     capability="document.structure.extract", error=type(exc).__name__
                 )
             ) from exc
-        _check_page_limit(manifest)
-        manifest.extractor.configuration["region_inspection_mode"] = effective_mode
-        manifest.extractor.configuration.update(media_configuration)
 
+    async def _enrich_before_planning(
+        self,
+        manifest: ProcessingManifest,
+        file_path: Path,
+        source_path: Path,
+        effective_mode: str,
+        media_inspection: dict[str, Any] | None,
+        status_callback: Callable[[str], Coroutine[Any, Any, None]] | None,
+    ) -> None:
+        """Describe pictures, recognize formulas and inline math, read tables.
+
+        The steps run in this order and share one provider breaker; the inline
+        math of prose and of tables share one text-span reader. ``source_path``
+        is ``file_path`` resolved.
+        """
         if status_callback:
             await status_callback(t(STAGE_ENRICHING_IMAGE_DESCRIPTIONS))
         # Pictures, formulas and tables reach the vision provider from the
@@ -2868,37 +2944,20 @@ class PddlAccessibilityOrchestrator:
         # After the table enrichment, which can replace a table's cells.
         await _mark_table_inline_math(manifest, source_path, text_spans)
 
-        if status_callback:
-            await status_callback(t(STAGE_GENERATING_PDDL_PLAN))
-        # One catalogue snapshot per document, so the first plan and every replan
-        # see the same Toolbox.
-        availability = await toolbox_gate.decide(manifest)
-        _log_availability(availability)
-        gated = availability.unavailable_methods
-        plan, comparison = await run_blocking(
-            self._build_plan, manifest, extra_unavailable=gated
-        )
+    async def _replan_until_done(
+        self,
+        manifest: ProcessingManifest,
+        execution_report: ExecutionReport,
+        plan: Any,
+        comparison: Any,
+        gated: Any,
+        status_callback: Callable[[str], Coroutine[Any, Any, None]] | None,
+        loop: asyncio.AbstractEventLoop,
+    ) -> tuple[ProcessingManifest, ExecutionReport, Any, Any]:
+        """Plan and execute again while the report asks for it, up to ``max_replans``.
 
-        execution_report: ExecutionReport | None = None
-        if status_callback:
-            await status_callback(
-                t(STAGE_VALIDATING_PLAN_DRY_RUN)
-                if self.execute_dry_run
-                else t(STAGE_EXECUTING_PLAN)
-            )
-        # `execute_dry_run` selects the *mode* of execution; it used to also gate
-        # whether the executor ran at all, so setting it to false produced a plan
-        # that was never executed and a report of None. Real execution is now the
-        # other branch instead of silence.
-        loop = asyncio.get_running_loop()
-        manifest, execution_report = await run_blocking(
-            self.executor.execute,
-            plan,
-            manifest,
-            dry_run=self.execute_dry_run,
-            progress=_plan_progress(manifest, status_callback, loop),
-        )
-
+        Returns the last manifest, report, plan and comparison.
+        """
         # A `replan-required` report means the executor recorded `(tried ?o ?m)`
         # for a method that failed and left the obligation pending. Without this
         # loop the status was terminal in production: the pipeline returned a plan
@@ -2943,7 +3002,16 @@ class PddlAccessibilityOrchestrator:
                 dry_run=False,
                 progress=_plan_progress(manifest, status_callback, loop),
             )
+        return manifest, execution_report, plan, comparison
 
+    @staticmethod
+    def _check_unsatisfied(manifest: ProcessingManifest, execution_report: ExecutionReport) -> None:
+        """Fail the job when an obligation that blocks delivery is open.
+
+        A run that did not complete fails when nothing is open (the failure is
+        elsewhere) or a critical obligation is; with only refinements open, the
+        document is delivered with a technical warning.
+        """
         if execution_report.status not in {"completed", "dry-run-completed"}:
             unsatisfied = _unsatisfied_selected_obligations(manifest)
             critical = [
@@ -2965,20 +3033,6 @@ class PddlAccessibilityOrchestrator:
                 "PDDL: concluindo com obrigações não críticas pendentes: {}",
                 ", ".join(obligation.id for obligation in unsatisfied),
             )
-
-        payload = build_pddl_structured_payload(
-            file_path=file_path,
-            manifest=manifest,
-            plan=plan,
-            planner_backend=self.planner_backend,
-            execution_report=execution_report,
-            comparison=comparison,
-            toolbox_availability=availability.to_metadata(),
-        )
-
-        if structured_output:
-            return payload
-        return payload["text"]
 
     def _build_plan(
         self,

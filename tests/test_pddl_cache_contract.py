@@ -63,7 +63,7 @@ async def test_live_processing_rejects_incompatible_cached_execution(
     monkeypatch.setattr(service.settings, "pddl_execute_dry_run", False)
     monkeypatch.setattr(service, "get_cached", stale_cache)
     monkeypatch.setattr(service, "set_cache", forbidden)
-    monkeypatch.setattr(service, "agente", SimpleNamespace(executar=execute))
+    monkeypatch.setattr(service, "agente", SimpleNamespace(execute=execute))
     with pytest.raises(RuntimeError, match="Live validation"):
         await service.process(source, task_id="live-from-cache")
     assert calls == [True]
@@ -92,7 +92,7 @@ async def test_degraded_processing_is_not_cached(
 
     monkeypatch.setattr(service, "get_cached", no_cache)
     monkeypatch.setattr(service, "set_cache", record)
-    monkeypatch.setattr(service, "agente", SimpleNamespace(executar=execute))
+    monkeypatch.setattr(service, "agente", SimpleNamespace(execute=execute))
     await service.process(source, task_id=f"degraded-{cacheable}")
     assert cached == ([True] if cacheable else [])
 
@@ -125,7 +125,7 @@ async def test_cached_entry_with_failed_media_inspection_is_ignored(
 
     monkeypatch.setattr(service, "get_cached", degraded_cache)
     monkeypatch.setattr(service, "set_cache", record)
-    monkeypatch.setattr(service, "agente", SimpleNamespace(executar=execute))
+    monkeypatch.setattr(service, "agente", SimpleNamespace(execute=execute))
     await service.process(source, task_id="degraded-from-cache")
     assert calls == [True]
 
@@ -293,7 +293,7 @@ async def test_cached_degraded_entry_is_ignored(
     monkeypatch.setattr(service, "get_cached", degraded_cache)
     monkeypatch.setattr(service, "set_cache", record)
     monkeypatch.setattr(service, "drop_cache", drop)
-    monkeypatch.setattr(service, "agente", SimpleNamespace(executar=execute))
+    monkeypatch.setattr(service, "agente", SimpleNamespace(execute=execute))
     await service.process(source, task_id=f"visual-failures-from-cache-{rerun_cacheable}")
     assert calls == [True]
     assert cached == ([True] if rerun_cacheable else [])

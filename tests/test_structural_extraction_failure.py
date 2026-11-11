@@ -47,7 +47,7 @@ async def test_toolbox_failure_becomes_an_explicit_job_error(monkeypatch, tmp_pa
     monkeypatch.setattr(pddl, "inspect_source_media", must_not_run)
 
     with pytest.raises(pddl.StructuralExtractionError) as info:
-        await orchestrator.executar(tmp_path / "doc.pdf", tmp_path)
+        await orchestrator.execute(tmp_path / "doc.pdf", tmp_path)
 
     message = str(info.value)
     assert "document.structure.extract" in message
@@ -68,7 +68,7 @@ async def test_translated_message_keeps_both_placeholders(tmp_path):
     token = i18n.set_request_locale("pt_BR")
     try:
         with pytest.raises(pddl.StructuralExtractionError) as info:
-            await orchestrator.executar(tmp_path / "doc.pdf", tmp_path)
+            await orchestrator.execute(tmp_path / "doc.pdf", tmp_path)
     finally:
         i18n.reset_request_locale(token)
 
@@ -87,4 +87,4 @@ async def test_non_toolbox_errors_are_not_rewrapped(tmp_path):
     )
 
     with pytest.raises(FileNotFoundError, match="missing source"):
-        await orchestrator.executar(tmp_path / "doc.pdf", tmp_path)
+        await orchestrator.execute(tmp_path / "doc.pdf", tmp_path)

@@ -45,7 +45,7 @@ Este é o único motor ativo. Ele transforma a estrutura do documento em um plan
 - `backend/core/planning/`: o `PlannerAgent` compila o manifesto mais um domínio PDDL em um problema, gera um `nominal-plan.json` (planejador interno ou backend Fast Downward) e o valida. A geração do problema PDDL é determinística — nenhum LLM escreve PDDL.
 - `backend/core/execution/`: o Executor aplica o plano validado como um Agno Workflow, invocando os agentes Vision/Data onde o plano os exige, e produz um `execution-report.json`.
 - `backend/core/agents/fusion_agent.py`: o `FusionAgent` expõe ferramentas Agno determinísticas sobre a biblioteca pura `docstruct` — `fuse_providers`, `audit_document`, `classify_block` e `needs_reinfer`. O método PDDL `dual-provider-fusion` reutiliza `backend.pipeline.fusion.extract_fused` e só é admissível quando `FUSION_MODE=dual`. Veja [docstruct_algorithms.pt-br.md](docstruct_algorithms.pt-br.md) para saber como funcionam esses algoritmos.
-- `backend/agents/pddl_orchestrator.py`: `PddlAccessibilityOrchestrator.executar()` coordena as fases manifesto → plano → execução. Uma falha no planejamento faz a tarefa falhar; não há fallback para extração determinística. O [inventário](architecture/pddl-orchestrator-inventory.pt-br.md) dele atribui cada parte ao core, ao docstruct ou ao SDK (#402).
+- `backend/agents/pddl_orchestrator.py`: `PddlAccessibilityOrchestrator.execute()` coordena as fases manifesto → plano → execução. Uma falha no planejamento faz a tarefa falhar; não há fallback para extração determinística. O [inventário](architecture/pddl-orchestrator-inventory.pt-br.md) dele atribui cada parte ao core, ao docstruct ou ao SDK (#402).
 
 O domínio PDDL vive em `backend/core/planning/domains/`. Os esquemas JSON (manifesto, plano, comparação, relatório de execução) ficam em `schemas/` na raiz do repositório e são gerados por `scripts/generate_pmv_schemas.py`.
 
@@ -117,7 +117,7 @@ Os modelos pesados rodam num serviço separado, a [Acessilia Toolbox](https://gi
 2. O manipulador de interface valida a extensão e o tamanho do arquivo.
 3. O arquivo é salvo e colocado na `ProcessingQueue`.
 4. O worker retira a tarefa da fila; `backend/service.py::process` a registra no `StateManager` e consulta o cache de processamento.
-5. Se não houver cache, executa o orquestrador PDDL (`PddlAccessibilityOrchestrator.executar()`):
+5. Se não houver cache, executa o orquestrador PDDL (`PddlAccessibilityOrchestrator.execute()`):
     - Inspeciona a mídia de origem (`media.inspect`) e extrai o manifesto de processamento pela Toolbox (`document.structure.extract`); uma apresentação é extraída sem fusão dual e estruturada slide a slide.
     - Enriquece imagens e tabelas, monta e valida um plano PDDL para as obrigações do manifesto e o executa, replanejando quando um método falha.
     - Constrói o documento canônico a partir do manifesto executado.

@@ -98,7 +98,7 @@ async def _run(orchestrator, manifest, monkeypatch, tmp_path):
     monkeypatch.setattr(pddl, "inspect_source_media", noop)
     monkeypatch.setattr(pddl, "_enrich_picture_descriptions", noop)
     monkeypatch.setattr(pddl, "_enrich_table_structures", noop)
-    return await orchestrator.executar(
+    return await orchestrator.execute(
         tmp_path / "doc.pdf", tmp_path, structured_output=True
     )
 

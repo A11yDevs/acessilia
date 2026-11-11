@@ -15,7 +15,7 @@ participant "Canonical builder\nbackend/pipeline" as Builder
 participant "Renderers\nbackend/export" as Export
 
 User -> Front: Upload a document (PDF/image)
-Front -> Orchestrator: executar(file_path)
+Front -> Orchestrator: execute(file_path)
 
 Orchestrator -> Manifest: extract(document)
 Manifest -> Toolbox: structure extraction (regions, tables, OCR)

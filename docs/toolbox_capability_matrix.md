@@ -139,7 +139,7 @@ exhausted": `Executor` raises `EXE_NO_HANDLER_REGISTERED` when `handler is None`
 and that raise sits *outside* the `try/except` that computes `alternatives` and
 sets the flag. The flag was therefore never evaluated for an unregistered method.
 
-On top of that, `executar()` invoked the executor only inside
+On top of that, `execute()` invoked the executor only inside
 `if self.execute_dry_run:`, so `PDDL_EXECUTE_DRY_RUN=false` produced **no execution
 at all** and `execution_report=None`. The dry-run default is what kept the pipeline
 looking healthy; turning it off skipped execution entirely rather than exposing the
@@ -172,7 +172,7 @@ gap.
   unknown names), so `_validate_methods` fails early, at plan time, instead of
   letting an unexecutable step reach the executor.
 - **`PDDL_EXECUTE_DRY_RUN` now selects the mode, not whether execution happens.**
-- **`replan-required` is no longer terminal.** `executar()` replans up to
+- **`replan-required` is no longer terminal.** `execute()` replans up to
   `PDDL_MAX_REPLANS` (default 2) times, reusing the `(tried ?o ?m)` state the
   executor recorded, so a failed method moves to the next admissible one.
 

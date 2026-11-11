@@ -37,7 +37,7 @@ def _patch_pipeline(monkeypatch, *, cached=None):
     monkeypatch.setattr(service, "get_cached", get_cached)
     monkeypatch.setattr(service, "set_cache", ignore)
     monkeypatch.setattr(service, "drop_cache", ignore)
-    monkeypatch.setattr(service, "agente", SimpleNamespace(executar=execute))
+    monkeypatch.setattr(service, "agente", SimpleNamespace(execute=execute))
     monkeypatch.setattr(service, "_salvar_json_canonico", lambda *a, **k: None)
 
 
