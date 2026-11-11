@@ -44,7 +44,8 @@ Pure document-structure processing core for Acessilia.
 | `docstruct.text.normalize` | `norm` — deterministic text cleanups |
 | `docstruct.text.norm_fix` | `norm_fix` — post-normalization repairs |
 | `docstruct.adapters.mineru` | `clean_mineru_text`, `format_mineru_block_text`, `extract_mineru_blocks` — MinerU `middle_json` parsing, spacing, de-hyphenation, and formula/table formatting |
-| `docstruct.tables.ast` | `table_ast_from_docling_grid`, `analyze_table_complexity`, `raw_rows_from_table_ast`, `TableAST`, `TableComplexityMetrics`, `TableASTError` |
+| `docstruct.tables.ast` | `table_ast_from_docling_grid`, `analyze_table_complexity`, `raw_rows_from_table_ast`, `table_ast_column_count`, `TableAST`, `TableComplexityMetrics`, `TableASTError` |
+| `docstruct.tables.text_rows` | `rows_from_visual_table_text`, `rows_from_pipe_table`, `rows_from_delimited_lines`, `looks_like_markdown_separator`, `score_rows` — rows of a table read from its plain text (pipes, tabs, `;` or `,`) |
 | `docstruct.text` | `sanitize_text`, `merge_broken_paragraphs`, `normalize_code_text`, `classify_text_block`; `docstruct.text.paragraphs.PAGE_HEADING` — the page header `merge_broken_paragraphs` never joins across |
 | `docstruct.imaging.policy` | `upscale_factor`, `decide_orientation` (no PIL/cv2) |
 | `docstruct.evaluation.holdout` | `partition`, `score`, `evaluate_candidate` |

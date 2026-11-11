@@ -10,7 +10,7 @@ from backend.agents.output_schemas import DataOutput, VisionOutput
 from backend.agents.pddl_orchestrator import _enrich_table_structures
 from backend.agents.pddl_orchestrator import _enrich_picture_descriptions
 from backend.agents.pddl_orchestrator import build_pddl_structured_payload
-from backend.agents.pddl_orchestrator import _rows_from_visual_table_text
+from docstruct.tables.text_rows import rows_from_visual_table_text as _rows_from_visual_table_text
 from backend.agents.pddl_orchestrator import _table_ast_from_metadata
 from backend.agents.pddl_orchestrator import _table_element_has_structured_content
 from backend.pipeline.canonical_builder import build_canonical_document
