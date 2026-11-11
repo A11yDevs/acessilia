@@ -7,6 +7,11 @@ can see are recorded here, newest first.
 
 ## Unreleased
 
+- **Added** `artifact_endpoint_urls(*clients)` and `one_artifact_endpoint(*clients)`
+  (`acessilia_sdk.toolbox.artifacts`): the URLs a set of clients may address,
+  and whether an artifact id can be shared among them (at most one URL;
+  ADR-0006, ADR-0013). They were private helpers of the core's extractor,
+  which keeps the decision to upload or send the file (#402).
 - **Added** `ToolboxDatasetClient.list_all_items(dataset_id, split, *,
   revision, limit, page_size)`: every item of a split, or the first `limit`,
   read page by page on one client (`MAX_PAGE_SIZE = 1000`, the Toolbox's cap);

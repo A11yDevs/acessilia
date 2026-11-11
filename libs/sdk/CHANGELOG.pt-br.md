@@ -7,6 +7,11 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
 ## Não lançado
 
+- **Adicionados** `artifact_endpoint_urls(*clients)` e `one_artifact_endpoint(*clients)`
+  (`acessilia_sdk.toolbox.artifacts`): as URLs que um conjunto de clientes pode
+  usar, e se um id de artefato pode ser compartilhado entre eles (no máximo uma
+  URL; ADR-0006, ADR-0013). Eram helpers privados do extrator do core, que
+  continua decidindo entre enviar por upload ou mandar o arquivo (#402).
 - **Adicionado** `ToolboxDatasetClient.list_all_items(dataset_id, split, *,
   revision, limit, page_size)`: todos os itens de um split, ou os primeiros
   `limit`, lidos página a página num só cliente (`MAX_PAGE_SIZE = 1000`, o

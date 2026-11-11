@@ -16,6 +16,7 @@ from collections.abc import Callable, Iterator
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import httpx
 
@@ -203,6 +204,38 @@ async def _stream(
     return hasher.hexdigest(), head
 
 
+def artifact_endpoint_urls(*clients: Any) -> set[str]:
+    """The Toolbox URLs a set of capability clients may address.
+
+    Each client contributes every URL of its ``endpoints`` (it may fail over to
+    any of them); a client without endpoints contributes its ``base_url``
+    without a trailing slash, and ``None`` or a client with neither
+    contributes nothing.
+    """
+    urls: set[str] = set()
+    for client in clients:
+        if client is None:
+            continue
+        endpoints = getattr(client, "endpoints", ())
+        client_urls = {endpoint.base_url for endpoint in endpoints}
+        base_url = getattr(client, "base_url", None)
+        if not client_urls and isinstance(base_url, str):
+            client_urls.add(base_url.rstrip("/"))
+        urls.update(client_urls)
+    return urls
+
+
+def one_artifact_endpoint(*clients: Any) -> bool:
+    """Whether an artifact id can be shared among these clients.
+
+    An id is valid only within the deployment that stored it. Several URLs are
+    independent deployments (ADR-0006, ADR-0013), so the source has to go with
+    each call instead of an id; one URL may be a balancer over shared storage.
+    Choosing between an upload and the file itself stays with the caller.
+    """
+    return len(artifact_endpoint_urls(*clients)) <= 1
+
+
 def _sync_directory(directory: Path) -> None:
     """Persist the rename itself; best effort where directories cannot be opened."""
     try:
@@ -222,7 +255,9 @@ __all__ = [
     "READ_ARTIFACT_MAX_BYTES",
     "ArtifactRef",
     "ArtifactReference",
+    "artifact_endpoint_urls",
     "download_artifact",
+    "one_artifact_endpoint",
     "parse_reference",
     "read_artifact",
 ]
