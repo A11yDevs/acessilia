@@ -295,3 +295,77 @@ async def test_read_catalog_does_not_retry_a_timeout() -> None:
             await read_catalog(ToolboxEndpoint(BASE_URL), timeout_seconds=1.0)
 
     assert route.call_count == 1
+
+
+def _opened_clients(monkeypatch) -> list[httpx.AsyncClient]:
+    """Record every HTTP client read_catalog opens."""
+    from acessilia_sdk.toolbox import catalog
+
+    opened: list[httpx.AsyncClient] = []
+
+    class Recording(httpx.AsyncClient):
+        def __init__(self, *args, **kwargs) -> None:
+            super().__init__(*args, **kwargs)
+            opened.append(self)
+
+    monkeypatch.setattr(catalog.httpx, "AsyncClient", Recording)
+    return opened
+
+
+def _never_answers(sent: asyncio.Event):
+    async def wait(request: httpx.Request) -> httpx.Response:
+        sent.set()
+        await asyncio.Event().wait()
+        raise AssertionError("unreachable")
+
+    return wait
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("capabilities", "expected"),
+    [
+        (httpx.Response(200, json=CAPABILITIES), None),
+        (httpx.ReadTimeout("slow"), ToolboxTimeout),
+        (httpx.Response(200, text="not json"), ToolboxContractViolation),
+    ],
+    ids=["success", "timeout", "invalid-json"],
+)
+async def test_read_catalog_closes_its_client(monkeypatch, capabilities, expected) -> None:
+    opened = _opened_clients(monkeypatch)
+    with respx.mock(assert_all_called=False) as router:
+        route = router.get(f"{BASE_URL}/v1/capabilities")
+        if isinstance(capabilities, Exception):
+            route.mock(side_effect=capabilities)
+        else:
+            route.mock(return_value=capabilities)
+        router.get(f"{BASE_URL}/v1/providers").mock(
+            return_value=httpx.Response(200, json=PROVIDERS)
+        )
+        if expected is None:
+            await read_catalog(ToolboxEndpoint(BASE_URL), timeout_seconds=1.0)
+        else:
+            with pytest.raises(expected):
+                await read_catalog(ToolboxEndpoint(BASE_URL), timeout_seconds=1.0)
+
+    assert len(opened) == 1
+    assert opened[0].is_closed
+
+
+@pytest.mark.asyncio
+async def test_read_catalog_closes_its_client_when_cancelled(monkeypatch) -> None:
+    opened = _opened_clients(monkeypatch)
+    sent = asyncio.Event()
+    with respx.mock(assert_all_called=False) as router:
+        router.get(f"{BASE_URL}/v1/capabilities").mock(side_effect=_never_answers(sent))
+        task = asyncio.create_task(
+            read_catalog(ToolboxEndpoint(BASE_URL), timeout_seconds=30.0)
+        )
+        async with asyncio.timeout(5):
+            await sent.wait()
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    assert len(opened) == 1
+    assert opened[0].is_closed
