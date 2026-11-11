@@ -239,17 +239,66 @@ def test_a_failover_is_reported_on_stderr(capsys) -> None:
 BENCH_DIR = Path(__file__).resolve().parents[1] / "scripts" / "bench"
 
 
+FORBIDDEN_PREFIX = "backend.tools.toolbox_"
+
+
+def _forbidden_imports(source: str) -> list[str]:
+    """Modules under ``backend.tools.toolbox_*`` that ``source`` imports.
+
+    ``from backend.tools import toolbox_client`` names the module only through
+    the imported name, so a ``from`` import is checked both as its module and
+    as each ``module.name`` it imports; aliases do not matter.
+    """
+    found: list[str] = []
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Import):
+            names = [alias.name for alias in node.names]
+        elif isinstance(node, ast.ImportFrom) and node.module and not node.level:
+            names = [node.module] + [f"{node.module}.{alias.name}" for alias in node.names]
+        else:
+            continue
+        found += [name for name in names if name.startswith(FORBIDDEN_PREFIX)]
+    return found
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "import backend.tools.toolbox_client",
+        "import backend.tools.toolbox_client as tc",
+        "from backend.tools.toolbox_client import make_toolbox_client",
+        "from backend.tools.toolbox_client import make_toolbox_client as m",
+        "from backend.tools import toolbox_client",
+        "from backend.tools import toolbox_client as tc",
+        "from backend.tools import logger, toolbox_math_tools",
+        "def f():\n    from backend.tools import toolbox_client",
+    ],
+)
+def test_the_guard_sees_every_form_of_a_forbidden_import(source) -> None:
+    assert _forbidden_imports(source)
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "from backend.pipeline.canonical_builder import build_canonical_document",
+        "from backend.tools import logger",
+        "from backend.tools.logger import logger",
+        "import backend.service",
+        "from acessilia_sdk.toolbox import make_client",
+        "from . import toolbox",
+    ],
+)
+def test_the_guard_leaves_other_imports_alone(source) -> None:
+    """Removing every core dependency of the harness is out of scope (#432)."""
+    assert _forbidden_imports(source) == []
+
+
 def test_the_harness_reaches_the_toolbox_without_the_core_s_toolbox_modules() -> None:
     """#402 acceptance: scripts/bench imports no backend.tools.toolbox_* module."""
-    offenders = []
-    for path in BENCH_DIR.rglob("*.py"):
-        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
-            names = (
-                [alias.name for alias in node.names] if isinstance(node, ast.Import)
-                else [node.module or ""] if isinstance(node, ast.ImportFrom) else []
-            )
-            offenders += [
-                f"{path.name}: {name}" for name in names
-                if name.startswith("backend.tools.toolbox_")
-            ]
+    offenders = [
+        f"{path.relative_to(BENCH_DIR)}: {name}"
+        for path in sorted(BENCH_DIR.rglob("*.py"))
+        for name in _forbidden_imports(path.read_text(encoding="utf-8"))
+    ]
     assert offenders == []
