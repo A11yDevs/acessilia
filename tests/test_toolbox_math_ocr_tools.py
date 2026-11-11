@@ -169,6 +169,33 @@ class TestMathTools:
         assert recognized_formulas(document) == [{"latex": "y^2", "page": 2}]
 
 
+class TestRecognizeUnexpectedErrors:
+    """What toolbox_recognize_formula does with an error that is not a Toolbox error.
+
+    Characterization on develop: every such error, a bad configuration or a
+    bug alike, is logged and turned into "no formula" (P6, #402 step 7).
+    """
+
+    @pytest.mark.parametrize("raise_on_unavailable", [False, True])
+    def test_an_unusable_toolbox_url_is_swallowed(self, monkeypatch, raise_on_unavailable):
+        monkeypatch.setattr(settings, "toolbox_base_urls", "not-a-url")
+        assert toolbox_recognize_formula(
+            b"png", raise_on_unavailable=raise_on_unavailable
+        ) == []
+
+    @pytest.mark.parametrize("raise_on_unavailable", [False, True])
+    def test_a_bug_is_swallowed(self, monkeypatch, raise_on_unavailable):
+        from backend.tools import toolbox_math_tools
+
+        async def broken(file_path):
+            raise TypeError("a bug in the call")
+
+        monkeypatch.setattr(toolbox_math_tools, "_recognize_formula_async", broken)
+        assert toolbox_recognize_formula(
+            b"png", raise_on_unavailable=raise_on_unavailable
+        ) == []
+
+
 class TestOcrTools:
     @respx.mock
     def test_ocr_fallback(self):
