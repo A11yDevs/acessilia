@@ -80,7 +80,7 @@ Only the groups marked "decompose" or with a docstruct or SDK part are listed. T
   - `_save_region_artifact` writes evidence under `settings.data_dir`, so it stays in the core.
   - `_inspect_region` and `_inspect_page` call `VisionAgent`, so they stay in the core.
   - The two handlers stay in the core.
-- **H: text handlers.** `_tailjoin_position` is pure and joins `docstruct.fusion.tailjoin`, which already holds `tail_start`, `join_tail` and `page_number_position`. The handlers use `FusionAgent` and stay in the core.
+- **H: text handlers.** `_tailjoin_position` repeated `docstruct.fusion.tailjoin.page_number_position`, the rule the builder applies to fusion blocks, over manifest elements. It now calls that function through `_FurnitureView`, a read-only view that reads an element's box only when it is page-number furniture, as before. The handlers use `FusionAgent` and stay in the core.
 - **I: calibrated provider choice.**
   - `_ordered_box`, `_iou` and `_pair_block` are box geometry and go to docstruct, as `docstruct.fusion.similarity.ordered_box` and `pair_block`. `_iou` gives the same value as the existing `docstruct.fusion.similarity.iou` for every input, so it is replaced by it; see "Findings". `_pair_block` stays in the core as the adapter that reads the element's and the candidates' boxes; the thresholds are policy and stay with it.
   - `_page_number` and `_page_markdown` are small document helpers.

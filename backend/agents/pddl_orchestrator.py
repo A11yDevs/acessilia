@@ -30,7 +30,7 @@ from docstruct.fusion.noise import (
     select_page_numbers,
 )
 from docstruct.fusion.similarity import ordered_box, pair_block
-from docstruct.fusion.tailjoin import is_page_number as _is_page_number
+from docstruct.fusion.tailjoin import page_number_position
 from docstruct.geometry import reading_role
 from docstruct.geometry.boxes import downward_edges, holds_point
 from docstruct.regions.letterhead import PlacedItem, letterhead_groups
@@ -1428,6 +1428,30 @@ def _handle_chunk_verse_method(
     )
 
 
+class _FurnitureView:
+    """A manifest element as ``page_number_position`` reads it.
+
+    ``box`` is computed when read, so only the page-number furniture pays for
+    ``_element_bbox``.
+    """
+
+    def __init__(self, element: ManifestElement, manifest: ProcessingManifest) -> None:
+        self._element = element
+        self._manifest = manifest
+
+    @property
+    def role(self) -> str | None:
+        return _element_role(self._element)
+
+    @property
+    def md(self) -> str:
+        return self._element.text or ""
+
+    @property
+    def box(self) -> tuple[float, float, float, float] | None:
+        return _element_bbox(self._element, self._manifest)
+
+
 def _tailjoin_position(manifest: ProcessingManifest) -> str | None:
     """Vertical position ("top"/"bot") of the page number in the manifest.
 
@@ -1435,16 +1459,7 @@ def _tailjoin_position(manifest: ProcessingManifest) -> str | None:
     where the page number sits, which is the distinction between `tailjoin` and
     `tailjoin-positioned`.
     """
-    for element in manifest.elements:
-        role = _element_role(element)
-        if role in {"header", "footer", "page_number"} and _is_page_number(
-            element.text or ""
-        ):
-            bbox = _element_bbox(element, manifest)
-            if bbox is None:
-                continue
-            return "top" if (bbox[1] + bbox[3]) / 2 < 0.5 else "bot"
-    return None
+    return page_number_position(_FurnitureView(element, manifest) for element in manifest.elements)
 
 
 def _handle_tailjoin_method(

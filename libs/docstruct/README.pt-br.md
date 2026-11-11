@@ -31,7 +31,7 @@ Núcleo puro de processamento estrutural de documentos do Acessilia.
 | `docstruct.fusion.verse` | `record_like`, `verse_lines`, `chunk_verse`, `split_box_rows`, `verse_blocks` |
 | `docstruct.fusion.line_numbers` | `line_number_chain`, `extract_line_numbers` |
 | `docstruct.fusion.flood` | `flood_guard` |
-| `docstruct.fusion.tailjoin` | `is_page_number`, `join_tail`, `page_number_position`, `tailjoin3` |
+| `docstruct.fusion.tailjoin` | `is_page_number`, `join_tail`, `page_number_position`, `tailjoin3`, `FurnitureBlock` — `page_number_position` lê `DiffBlock`s ou qualquer visão somente leitura de `role`, `md` e `box`, como o payload do core |
 | `docstruct.fusion.similarity` | `iou`, `sim`, `ordered_box`, `pair_block`, `swallows`, `is_duplicate` — sobreposição de caixas e semelhança de texto entre blocos, e qual bloco candidato forma par com um bloco |
 | `docstruct.fusion.repetition` | `collapse`, `guard_page`, `is_blank_page`, `strip_comment` |
 | `docstruct.fusion.page_select` | `fuse`, `select_by_agreement`, `swap_low_agreement_pages`, `ratio` |
