@@ -3024,30 +3024,7 @@ async def _enrich_picture_descriptions(
 
     _inject_full_page_picture(manifest, media_inspection)
 
-    pictures = [
-        element
-        for element in manifest.elements
-        if element.type == "picture"
-        and not element.metadata.get("vision_description_complete")
-    ]
-    if not pictures and is_mostly_visual(manifest.elements):
-        pictures = [
-            element
-            for element in manifest.elements
-            if is_placeholder_visual(element)
-            and not element.metadata.get("vision_description_complete")
-        ]
-
-    if (
-        not pictures
-        and is_mostly_visual(manifest.elements)
-        and len(manifest.pages) == 1
-        and manifest.elements
-    ):
-        pictures = [element for element in manifest.elements
-                    if not element.metadata.get("vision_description_complete")
-                    and not is_unstructured_page_placeholder(element)][:1]
-
+    pictures = _pictures_to_describe(manifest)
     if not pictures:
         return
 
@@ -3117,72 +3094,7 @@ async def _enrich_picture_descriptions(
         if not isinstance(vision_output, VisionOutput):
             _record_vision_failure(element, "model_failed", errors[-1] if errors else None)
             return False
-
-        logger.debug(
-            t(LOG_VISION_ELEMENT_DESCRIPTION).format(
-                element_id=element.id,
-                page_num=page_number,
-                chars=len(vision_output.description),
-                description=vision_output.description,
-            )
-        )
-        element.metadata["vision_language"] = vision_output.language
-        element.metadata["vision_confidence"] = vision_output.confidence
-        element.metadata["vision_elements"] = list(vision_output.mentioned_elements)
-        if vision_output.warnings:
-            element.metadata["vision_warnings"] = list(vision_output.warnings)
-
-        if vision_output.kind == "formula":
-            element.text = vision_output.formula_latex or ""
-            answered = bool(element.text.strip())
-            if element.type != "formula":
-                previous_type = element.type
-                element.metadata["original_type"] = element.type
-                element.type = "formula"
-                element.raw_label = "formula"
-                reconcile_reclassified_element_processing_needs(
-                    manifest,
-                    element,
-                    previous_type=previous_type,
-                )
-        else:
-            # An empty answer keeps text the extractor already had; whether
-            # that text is worth keeping is decided below.
-            answered = bool(vision_output.description.strip())
-            if answered:
-                element.text = vision_output.description
-            if element.type != "picture":
-                previous_type = element.type
-                element.metadata["original_type"] = element.type
-                element.type = "picture"
-                element.raw_label = "picture"
-                reconcile_reclassified_element_processing_needs(
-                    manifest,
-                    element,
-                    previous_type=previous_type,
-                )
-        if element.page_number is None and page_number >= 1:
-            element.page_number = page_number
-        # The model's own text stands however short ("Logo" is a description);
-        # text left over from the extractor after an empty answer must still be
-        # meaningful. Otherwise the picture is reported as undescribed, so the
-        # operator sees the model refused instead of a silent gap, and stays
-        # eligible for a later pass.
-        if answered or has_meaningful_text(element):
-            element.metadata["vision_description_complete"] = True
-            element.metadata.pop("vision_failure_reason", None)
-            element.metadata.pop("vision_failure_detail", None)
-            return True
-        # What is left is an extractor placeholder ("body") or OCR noise, which
-        # must not become the alt text.
-        element.text = ""
-        _record_vision_failure(element, "empty_description")
-        logger.warning(
-            t(LOG_PDDL_EMPTY_VISION_DESCRIPTION).format(
-                element_id=element.id
-            )
-        )
-        return False
+        return _fold_picture_description(manifest, element, vision_output, page_number)
 
     # The fold above touches only its own element and runs without awaits, so
     # concurrent folds cannot interleave. The TaskGroup cancels the sibling
@@ -3208,6 +3120,123 @@ async def _enrich_picture_descriptions(
 
     if enriched:
         logger.info(t(LOG_PDDL_IMAGES_ENRICHED).format(count=enriched))
+
+
+def _pictures_to_describe(manifest: ProcessingManifest) -> list[ManifestElement]:
+    """The elements the vision step describes, none already described.
+
+    The pictures; without any, in a mostly visual document, the elements that
+    stand in for visual content (``is_placeholder_visual``); and without
+    those either, in a one-page mostly visual document, its first element
+    that is not an unstructured-page placeholder (a page inspection reads
+    that one).
+    """
+    pictures = [
+        element
+        for element in manifest.elements
+        if element.type == "picture"
+        and not element.metadata.get("vision_description_complete")
+    ]
+    if not pictures and is_mostly_visual(manifest.elements):
+        pictures = [
+            element
+            for element in manifest.elements
+            if is_placeholder_visual(element)
+            and not element.metadata.get("vision_description_complete")
+        ]
+
+    if (
+        not pictures
+        and is_mostly_visual(manifest.elements)
+        and len(manifest.pages) == 1
+        and manifest.elements
+    ):
+        pictures = [element for element in manifest.elements
+                    if not element.metadata.get("vision_description_complete")
+                    and not is_unstructured_page_placeholder(element)][:1]
+    return pictures
+
+
+def _fold_picture_description(
+    manifest: ProcessingManifest,
+    element: ManifestElement,
+    vision_output: VisionOutput,
+    page_number: int,
+) -> bool:
+    """Fold the vision model's answer into ``element``; True when it is now described.
+
+    A formula answer makes the element a formula; a description makes it a
+    picture. The element is marked described when the model answered, or
+    when its extractor text is still meaningful; otherwise its text is
+    cleared and it is recorded as an empty description.
+    """
+    logger.debug(
+        t(LOG_VISION_ELEMENT_DESCRIPTION).format(
+            element_id=element.id,
+            page_num=page_number,
+            chars=len(vision_output.description),
+            description=vision_output.description,
+        )
+    )
+    element.metadata["vision_language"] = vision_output.language
+    element.metadata["vision_confidence"] = vision_output.confidence
+    element.metadata["vision_elements"] = list(vision_output.mentioned_elements)
+    if vision_output.warnings:
+        element.metadata["vision_warnings"] = list(vision_output.warnings)
+
+    if vision_output.kind == "formula":
+        element.text = vision_output.formula_latex or ""
+        answered = bool(element.text.strip())
+        _retype_element(manifest, element, "formula")
+    else:
+        # An empty answer keeps text the extractor already had; whether
+        # that text is worth keeping is decided below.
+        answered = bool(vision_output.description.strip())
+        if answered:
+            element.text = vision_output.description
+        _retype_element(manifest, element, "picture")
+    if element.page_number is None and page_number >= 1:
+        element.page_number = page_number
+    # The model's own text stands however short ("Logo" is a description);
+    # text left over from the extractor after an empty answer must still be
+    # meaningful. Otherwise the picture is reported as undescribed, so the
+    # operator sees the model refused instead of a silent gap, and stays
+    # eligible for a later pass.
+    if answered or has_meaningful_text(element):
+        element.metadata["vision_description_complete"] = True
+        element.metadata.pop("vision_failure_reason", None)
+        element.metadata.pop("vision_failure_detail", None)
+        return True
+    # What is left is an extractor placeholder ("body") or OCR noise, which
+    # must not become the alt text.
+    element.text = ""
+    _record_vision_failure(element, "empty_description")
+    logger.warning(
+        t(LOG_PDDL_EMPTY_VISION_DESCRIPTION).format(
+            element_id=element.id
+        )
+    )
+    return False
+
+
+def _retype_element(
+    manifest: ProcessingManifest, element: ManifestElement, new_type: Literal["formula", "picture"]
+) -> None:
+    """Make ``element`` a ``new_type``, keeping its ``original_type``, and update its needs.
+
+    Nothing changes when it already is one.
+    """
+    if element.type == new_type:
+        return
+    previous_type = element.type
+    element.metadata["original_type"] = element.type
+    element.type = new_type
+    element.raw_label = new_type
+    reconcile_reclassified_element_processing_needs(
+        manifest,
+        element,
+        previous_type=previous_type,
+    )
 
 
 #: Picture failures a second try may fix: the provider gave no answer, or an
