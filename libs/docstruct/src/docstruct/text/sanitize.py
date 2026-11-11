@@ -28,11 +28,16 @@ MARKDOWN_ARTIFACT_PATTERNS = [
 ]
 
 
+def strip_forbidden_c0(text: str) -> str:
+    """Remove C0 controls other than TAB, LF and CR without changing syntax."""
+    return re.sub(r"[\u0000-\u0008\u000b\u000c\u000e-\u001f]", "", text)
+
+
 def sanitize_text(text: str) -> str:
     if not text:
         return ""
     cleaned = text.replace("\r\n", "\n").replace("\r", "\n")
-    cleaned = re.sub(r"[\u0000-\u0008\u000b\u000c\u000e-\u001f]", "", cleaned)
+    cleaned = strip_forbidden_c0(cleaned)
     cleaned = re.sub(
         r"(?im)^\s*\[(?:in[ií]cio|fim) da audiodescri[cç][aã]o\]\s*$",
         "",
@@ -76,7 +81,7 @@ def sanitize_block_text(text: str, block_type: str | None = None) -> str:
     if not text:
         return ""
     if block_type == "code":
-        return text.replace("\r\n", "\n").replace("\r", "\n")
+        return strip_forbidden_c0(text.replace("\r\n", "\n").replace("\r", "\n"))
     cleaned = sanitize_text(text)
     # Extraction providers can use TABs as word separators in prose (#338).
     # Code returns above so indentation remains intact.

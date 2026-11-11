@@ -136,7 +136,8 @@ def test_render_html_includes_toc_and_table_but_no_technical_metadata():
         html = result.read_text(encoding="utf-8")
         assert '<nav class="toc"' in html
         assert '<table id="blk-4">' in html
-        assert "<caption>Resumo de valores</caption>" in html
+        assert 'role="region" aria-labelledby="blk-4-caption"' in html
+        assert '<caption id="blk-4-caption">Resumo de valores</caption>' in html
         assert '<th scope="col">Coluna A</th>' in html
         assert "<tbody><tr><td>1</td><td>2</td></tr><tr><td>3</td><td></td></tr></tbody>" in html
         assert "Observacao" in html

@@ -326,5 +326,8 @@ def test_html_table_has_cell_borders_and_scrolls_on_narrow_screens() -> None:
 
     assert "th,td{border:1px solid" in html
     assert "\nth{background:" in html
-    assert '<div class="table-wrap"><table id="table-1">' in html
+    assert (
+        '<div class="table-wrap" tabindex="0" role="region" aria-label="Table 1">'
+        '<table id="table-1">'
+    ) in html
     assert ".table-wrap{overflow-x:auto" in html

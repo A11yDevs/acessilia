@@ -91,8 +91,10 @@ def test_enrichment_converts_the_cells_spans_on_the_block():
 def test_html_renders_cell_and_caption_math():
     html = document_to_html(_document(_table(inline_math=ENTRIES)))
 
+    assert 'role="region" aria-labelledby="t1-caption"' in html
+
     assert (
-        '<caption>Mean speed with <math xmlns="http://www.w3.org/1998/Math/MathML" '
+        '<caption id="t1-caption">Mean speed with <math xmlns="http://www.w3.org/1998/Math/MathML" '
         'aria-label="h not equal to zero"><mi>h</mi></math></caption>' in html
     )
     assert (

@@ -297,6 +297,7 @@ from backend.export.markers import (
 from backend.export.renderers.html_renderer import (
     MSG_HTML_IMAGE_DESCRIPTION,
     MSG_HTML_TABLE_OF_CONTENTS,
+    MSG_HTML_TABLE_REGION,
 )
 from backend.pipeline.table_ast import (
     MSG_TABLE_TEXT_CAPTION,
@@ -742,6 +743,7 @@ MESSAGES: tuple[str, ...] = (
     MSG_OBJECT_MARKER_TABLE,
     MSG_OBJECT_MARKER_FORMULA,
     MSG_HTML_IMAGE_DESCRIPTION,
+    MSG_HTML_TABLE_REGION,
     # TXT table line templates (backend/pipeline/table_ast.py).
     MSG_TABLE_TEXT_CAPTION,
     MSG_TABLE_TEXT_ROW,
@@ -1460,6 +1462,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         MSG_OBJECT_MARKER_TABLE: "tabela",
         MSG_OBJECT_MARKER_FORMULA: "fórmula",
         MSG_HTML_IMAGE_DESCRIPTION: "Descrição da imagem",
+        MSG_HTML_TABLE_REGION: "Tabela {number}",
         # TXT table line templates (pt-BR mirrors of the MSG_TABLE_TEXT_* ids above).
         MSG_TABLE_TEXT_CAPTION: "Tabela: {caption}",
         MSG_TABLE_TEXT_ROW: "Linha {row_index}: {joined}",

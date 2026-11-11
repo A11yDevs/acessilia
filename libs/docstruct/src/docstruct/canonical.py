@@ -418,7 +418,7 @@ def _sanitize_structured_blocks(
         clean = deepcopy(block)
         block_type = clean.get("type")
 
-        if isinstance(clean.get("text"), str) and block_type != "code":
+        if isinstance(clean.get("text"), str):
             if block_type in {"heading", "title"}:
                 clean["text"] = sanitize_title_text(clean["text"])
             else:
@@ -431,6 +431,8 @@ def _sanitize_structured_blocks(
             clean["title"] = sanitize_title_text(clean["title"])
         if isinstance(clean.get("alt_text"), str):
             clean["alt_text"] = sanitize_block_text(clean["alt_text"], block_type="caption")
+        if isinstance(clean.get("caption"), str):
+            clean["caption"] = sanitize_block_text(clean["caption"], block_type="caption")
         if isinstance(clean.get("long_description"), str):
             clean["long_description"] = sanitize_block_text(
                 clean["long_description"], block_type="paragraph"

@@ -22,7 +22,11 @@ from docstruct.text.math_spans import inline_math_entries, split_inline_math
 
 @dataclass
 class HtmlLabels:
-    """User-facing labels for the standalone HTML page (resolved by the consumer)."""
+    """User-facing labels for the standalone HTML page (resolved by the consumer).
+
+    ``extra["table_region"]`` names uncaptioned table regions; the optional
+    ``{number}`` placeholder is the table's one-based position in the document.
+    """
 
     default_title: str = "Accessible document"
     table_of_contents: str = "Contents"
@@ -131,17 +135,42 @@ def _safe_mathml(
     return ElementTree.tostring(root, encoding="unicode")
 
 
+def _allocate_id(base: str, reserved_ids: set[str] | None) -> str:
+    """Returns ``base``, or ``base-2``, ``base-3``... when that ID is already taken, and reserves it.
+
+    Args:
+        base (str): Preferred (already escaped) element ID.
+        reserved_ids (set|None): IDs already used in the page; updated in place. ``None`` skips the check.
+
+    Returns:
+        str: An ID not present in ``reserved_ids`` before the call.
+    """
+    if reserved_ids is None:
+        return base
+    candidate, suffix = base, 2
+    while candidate in reserved_ids:
+        candidate, suffix = f"{base}-{suffix}", suffix + 1
+    reserved_ids.add(candidate)
+    return candidate
+
+
 def _render_block(
     block: dict[str, Any],
     profile: dict[str, Any],
     image_description: str = "Image description",
+    table_region: str = "Table {number}",
+    table_number: int = 1,
+    reserved_ids: set[str] | None = None,
 ) -> str:
     """Renders one canonical block into its HTML fragment according to the block type and profile.
 
     Args:
         block (dict): Canonical block mapping with at least "type", "id" and the type-specific payload (text, items, table_ast, ...).
-        profile (dict): Normalized export profile mapping; "collapsible" controls whether note-like blocks render as <details> or <section>.
+        profile (dict): Normalized export profile mapping; "collapsible" controls whether explicit details blocks render as <details> or <section>; note, warning and quote blocks are never collapsed.
         image_description (str): Resolved label for image descriptions.
+        table_region (str): Resolved label template for uncaptioned tables, with optional {number}.
+        table_number (int): One-based table position in document order.
+        reserved_ids (set|None): IDs already used in the page; derived IDs (table captions, callout titles) are allocated outside it and added to it.
 
     Returns:
         str: The HTML fragment for the block (empty string when a table block carries no usable table_ast).
@@ -176,11 +205,24 @@ def _render_block(
             return ""
         header_rows, body_rows, footer_rows = split_header_and_body(table_ast)
 
-        caption = table_ast.get("caption")
+        caption = next((
+            value.strip() for value in (
+                table_ast.get("caption"), block.get("caption"), block.get("title"),
+            ) if isinstance(value, str) and value.strip()
+        ), "")
+        caption_id = (
+            _allocate_id(f"{block_id or f'table-{table_number}'}-caption", reserved_ids)
+            if caption else ""
+        )
         caption_html = (
-            f"<caption>{_prose_html(caption, block)}</caption>"
-            if isinstance(caption, str) and caption.strip()
+            f'<caption id="{caption_id}">{_prose_html(caption, block)}</caption>'
+            if caption
             else ""
+        )
+        region_name = (
+            f'aria-labelledby="{caption_id}"'
+            if caption
+            else f'aria-label="{escape(table_region.format(number=table_number))}"'
         )
 
         thead = ""
@@ -203,7 +245,8 @@ def _render_block(
             tfoot = f"<tfoot>{tfoot_rows}</tfoot>"
 
         return (
-            f'<div class="table-wrap"><table id="{block_id}">'
+            f'<div class="table-wrap" tabindex="0" role="region" {region_name}>'
+            f'<table id="{block_id}">'
             f"{caption_html}{thead}{tbody}{tfoot}</table></div>"
         )
     if block_type == "image":
@@ -236,7 +279,25 @@ def _render_block(
             f'<p id="{block_id}" role="math" aria-label="{alt}">'
             f'{escape(block.get("text", ""))}{number_html}</p>'
         )
-    if block_type in {"details", "note", "warning", "quote"}:
+    if block_type in {"note", "warning", "quote"}:
+        title = block.get("title")
+        has_title = isinstance(title, str) and bool(title.strip())
+        content = _prose_html(block.get("text", ""), block)
+        if block_type == "quote":
+            title_html = f"<p><strong>{escape(title)}</strong></p>" if has_title else ""
+            return f'<blockquote id="{block_id}" class="quote">{title_html}<p>{content}</p></blockquote>'
+        # role="note": several unnamed complementary landmarks inside <main>
+        # would be indistinguishable; a callout is a note, not a landmark.
+        title_html, name = "", ""
+        if has_title:
+            title_id = _allocate_id(f"{block_id or block_type}-title", reserved_ids)
+            title_html = f'<p id="{title_id}"><strong>{escape(title)}</strong></p>'
+            name = f' aria-labelledby="{title_id}"'
+        return (
+            f'<aside id="{block_id}" class="{block_type}" role="note"{name}>'
+            f"{title_html}<p>{content}</p></aside>"
+        )
+    if block_type == "details":
         summary = escape(block.get("title", block_type.title()))
         content = _prose_html(block.get("text", ""), block)
         if profile.get("collapsible"):
@@ -352,7 +413,12 @@ def document_to_html(
 
     toc = []
     body = []
+    table_number = 0
+    reserved_ids = {escape(str(block["id"])) for block in blocks if block.get("id")}
+    reserved_ids |= {escape(str(block["title_alias"])) for block in blocks if block.get("title_alias")}
     for block in blocks:
+        if block.get("type") == "table":
+            table_number += 1
         if block.get("type") == "heading":
             toc.append(
                 (
@@ -361,7 +427,11 @@ def document_to_html(
                     block.get("id", ""),
                 )
             )
-        body.append(_render_block(block, profile_dict, labels.image_description))
+        body.append(_render_block(
+            block, profile_dict, labels.image_description,
+            labels.extra.get("table_region", "Table {number}"), table_number,
+            reserved_ids,
+        ))
 
     title = escape(document.get("title") or labels.default_title)
     toc_label = escape(labels.table_of_contents)
@@ -378,7 +448,7 @@ def document_to_html(
         "nav.toc ul{margin:0;padding-left:1.2rem}",
         "pre{overflow:auto;background:#111;color:#f4f4f4;padding:1rem;border-radius:10px}",
         "code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}",
-        "details{background:#fff;border:1px solid #ddd;border-radius:10px;padding:.75rem 1rem;margin:1rem 0}",
+        "details,aside.note,aside.warning,blockquote.quote{background:#fff;border:1px solid #ddd;border-radius:10px;padding:.75rem 1rem;margin:1rem 0}",
         ".table-wrap{overflow-x:auto;margin:1rem 0}",
         "table{border-collapse:collapse;background:#fff}",
         "th,td{border:1px solid #999;padding:.35rem .75rem;text-align:left;vertical-align:top}",
