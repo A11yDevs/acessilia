@@ -10,7 +10,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from docstruct.geometry.boxes import downward_edges
+from docstruct.geometry.boxes import OrientedBox, VerticalBox, downward_edges
 from docstruct.text.negation_overlay import (
     OVERLAY_LINE_HEIGHTS,
     compose_in_grid,
@@ -147,3 +147,13 @@ def test_compose_in_grid_without_a_relation(table_ast, outcome) -> None:
 )
 def test_downward_edges_whatever_the_origin(origin, top, bottom, edges) -> None:
     assert downward_edges(SimpleNamespace(coord_origin=origin, top=top, bottom=bottom)) == edges
+
+
+@pytest.mark.parametrize(
+    ("origin", "edges"),
+    [("BOTTOMLEFT", (-100.0, -120.0)), ("TOPLEFT", (100.0, 120.0)), (None, (100.0, 120.0))],
+)
+def test_downward_edges_reads_the_module_s_own_box(origin, edges) -> None:
+    box: VerticalBox = OrientedBox(0.0, 100.0, 10.0, 120.0, origin)
+
+    assert downward_edges(box) == edges
