@@ -151,28 +151,62 @@ going through `ArtifactRef.parse` and the verified download.
 
 ## Command line
 
-`python -m acessilia_sdk` reads the Toolbox with the SDK alone: no core, no
+`python -m acessilia_sdk` reaches the Toolbox with the SDK alone: no core, no
 settings, no environment. Every value is an argument (ADR-0002); the API key
 is read from a file, or from standard input with `-`, so it never shows in the
 process list.
 
 ```bash
-# The catalogue of the first endpoint, as JSON (revision, capabilities, providers)
-python -m acessilia_sdk --endpoint https://toolbox.example --api-key-file key.txt catalog
+TB="--endpoint https://toolbox.example --api-key-file key.txt"
 
-# A stored artifact, checked against its digest and written atomically;
-# endpoints are tried in order, like the capability clients
-python -m acessilia_sdk --endpoint https://a.example --endpoint https://b.example \
-    download sha256:<64 hex> out.pdf
+# The catalogue of the first endpoint, as JSON (revision, capabilities, providers)
+python -m acessilia_sdk $TB catalog
+
+# Call a capability of the registry; prints the response envelope
+python -m acessilia_sdk $TB run media.inspect --file doc.pdf
+python -m acessilia_sdk $TB run pdf.render --file doc.pdf --parameters '{"page_number": 2, "max_side": 1024}'
+python -m acessilia_sdk $TB run math.verbalize --file formula.txt --language pt-BR
+
+# Store a file once, then call capabilities on it by id
+ID=$(python -m acessilia_sdk $TB upload doc.pdf)
+python -m acessilia_sdk $TB run document.structure.extract --artifact "$ID" --provider mineru
+
+# A stored artifact (an export's, for example), checked against its digest
+python -m acessilia_sdk $TB download sha256:<64 hex> out.pdf
+
+# The dataset routes
+python -m acessilia_sdk $TB dataset list
+python -m acessilia_sdk $TB dataset items dr-docbench dev --all --limit 50
+python -m acessilia_sdk $TB dataset artifact dr-docbench dev <item> images/page_1.jpg page_1.jpg
 ```
 
-`--timeout` sets the per-request timeout (10 s by default). Exit status: 0 on
-success, 1 when the Toolbox or the file system fails (the typed error, such as
-`ToolboxTimeout`, is printed on standard error), 2 for invalid arguments,
-including an endpoint URL the HTTP client cannot use. Each endpoint a download
-leaves behind is reported on standard error as a `warning:` line, even when a
-later endpoint succeeds (ADR-0006).
-Calling capabilities from the command line comes next (#402).
+**`run` dispatches by transport.** It calls the registry's `execute`
+capabilities through `POST /v1/capabilities/{id}:execute`, with the
+registry's provider and contract version unless `--provider` says otherwise.
+`rest` capabilities have routes and arguments of their own, so each has a
+command, and `run` points to it: `artifact.store` and `artifact.retrieve` are
+`upload` and `download`; `dataset.list`, `.describe`, `.list_splits`,
+`.list_items`, `.get_item`, `.get_artifact`, `.sample` and `.sync` are
+`dataset list`, `describe`, `splits`, `items` (`--limit`, `--offset`, or
+`--all` to page through the split), `item`, `artifact` (written atomically to a
+file), `sample` (`--n`; one attempt, since it is not idempotent) and `sync`
+(`--split`). A capability outside the registry is refused: the SDK calls only
+the contracts it was written against. `--file` sends the file with
+the media type of its extension; `--artifact` sends an id the Toolbox already
+stores.
+
+**Endpoints and timeouts.** Repeat `--endpoint` for independent deployments:
+`catalog` reads the first; the other commands try them in order, like the
+clients, and report each endpoint they leave on standard error as a
+`warning:` line, even when a later one succeeds (ADR-0006). `--timeout` sets
+the per-request timeout; without it, `catalog` uses 10 s and the other
+commands the clients' default, since a capability can run for minutes.
+
+**Exit status:** 0 on success; 1 when the Toolbox or the file system fails,
+with the typed error (such as `ToolboxTimeout`) on standard error; 2 for
+invalid arguments, checked before any request (an endpoint URL the HTTP client
+cannot use, an unknown or `rest` capability for `run`, a malformed id, a
+missing input file, `--parameters` that is not a JSON object).
 
 ## Adding a capability
 

@@ -154,27 +154,63 @@ passando pelo `ArtifactRef.parse` e pelo download verificado.
 
 ## Linha de comando
 
-`python -m acessilia_sdk` lê a Toolbox só com o SDK: sem core, sem settings,
-sem ambiente. Todo valor é um argumento (ADR-0002); a chave de API é lida de um
-arquivo, ou da entrada padrão com `-`, para nunca aparecer na lista de
-processos.
+`python -m acessilia_sdk` alcança a Toolbox só com o SDK: sem core, sem
+settings, sem ambiente. Todo valor é um argumento (ADR-0002); a chave de API é
+lida de um arquivo, ou da entrada padrão com `-`, para nunca aparecer na lista
+de processos.
 
 ```bash
-# O catálogo do primeiro endpoint, em JSON (revisão, capacidades, providers)
-python -m acessilia_sdk --endpoint https://toolbox.example --api-key-file key.txt catalog
+TB="--endpoint https://toolbox.example --api-key-file key.txt"
 
-# Um artefato armazenado, conferido contra o digest e gravado de forma atômica;
-# os endpoints são tentados em ordem, como nos clientes de capacidade
-python -m acessilia_sdk --endpoint https://a.example --endpoint https://b.example \
-    download sha256:<64 hex> out.pdf
+# O catálogo do primeiro endpoint, em JSON (revisão, capacidades, providers)
+python -m acessilia_sdk $TB catalog
+
+# Chamar uma capacidade do registro; imprime o envelope da resposta
+python -m acessilia_sdk $TB run media.inspect --file doc.pdf
+python -m acessilia_sdk $TB run pdf.render --file doc.pdf --parameters '{"page_number": 2, "max_side": 1024}'
+python -m acessilia_sdk $TB run math.verbalize --file formula.txt --language pt-BR
+
+# Armazenar um arquivo uma vez e chamar capacidades sobre ele pelo id
+ID=$(python -m acessilia_sdk $TB upload doc.pdf)
+python -m acessilia_sdk $TB run document.structure.extract --artifact "$ID" --provider mineru
+
+# Um artefato armazenado (o de uma exportação, por exemplo), conferido contra o digest
+python -m acessilia_sdk $TB download sha256:<64 hex> out.pdf
+
+# As rotas de datasets
+python -m acessilia_sdk $TB dataset list
+python -m acessilia_sdk $TB dataset items dr-docbench dev --all --limit 50
+python -m acessilia_sdk $TB dataset artifact dr-docbench dev <item> images/page_1.jpg page_1.jpg
 ```
 
-`--timeout` define o timeout por requisição (10 s por padrão). Código de saída:
-0 em sucesso, 1 quando a Toolbox ou o sistema de arquivos falha (o erro
-tipado, como `ToolboxTimeout`, sai na saída de erro), 2 para argumentos
-inválidos, inclusive uma URL de endpoint que o cliente HTTP não aceita. Cada
-endpoint que um download deixa para trás aparece na saída de erro numa linha
-`warning:`, mesmo quando um endpoint seguinte dá certo (ADR-0006). Chamar capacidades pela linha de comando vem a seguir (#402).
+**`run` despacha pelo transporte.** Chama as capacidades `execute` do registro
+por `POST /v1/capabilities/{id}:execute`, com o provider e a versão de contrato
+do registro, a menos que `--provider` diga outro. As capacidades `rest` têm
+rotas e argumentos próprios, então cada uma tem um comando, e `run` aponta
+para ele: `artifact.store` e `artifact.retrieve` são `upload` e `download`;
+`dataset.list`, `.describe`, `.list_splits`, `.list_items`, `.get_item`,
+`.get_artifact`, `.sample` e `.sync` são `dataset list`, `describe`, `splits`,
+`items` (`--limit`, `--offset`, ou `--all` para percorrer o split), `item`,
+`artifact` (gravado de forma atômica num arquivo), `sample` (`--n`; uma
+tentativa, porque não é idempotente) e `sync` (`--split`). Uma capacidade fora
+do registro é recusada: o SDK só chama os contratos para os quais foi
+escrito. `--file` envia o arquivo com o tipo de mídia da extensão;
+`--artifact` envia um id que a Toolbox já armazena.
+
+**Endpoints e timeouts.** Repita `--endpoint` para implantações independentes:
+`catalog` lê o primeiro; os outros comandos os tentam em ordem, como os
+clientes, e informam na saída de erro, numa linha `warning:`, cada endpoint
+que deixam para trás, mesmo quando um seguinte dá certo (ADR-0006).
+`--timeout` define o timeout por requisição; sem ele, `catalog` usa 10 s e os
+outros comandos o padrão dos clientes, porque uma capacidade pode rodar por
+minutos.
+
+**Código de saída:** 0 em sucesso; 1 quando a Toolbox ou o sistema de arquivos
+falha, com o erro tipado (como `ToolboxTimeout`) na saída de erro; 2 para
+argumentos inválidos, conferidos antes de qualquer requisição (uma URL de
+endpoint que o cliente HTTP não aceita, uma capacidade desconhecida ou `rest`
+em `run`, um id malformado, um arquivo de entrada ausente, `--parameters` que
+não é um objeto JSON).
 
 ## Adicionar uma capacidade
 
