@@ -20,6 +20,7 @@ from acessilia_sdk.toolbox.catalog import (
     Requirement,
     fetch_catalog,
     missing_requirements,
+    read_catalog,
     snapshot_from_payloads,
 )
 from acessilia_sdk.toolbox.client import FailoverHook, ToolboxCapabilityClient
@@ -88,6 +89,7 @@ __all__ = [
     "fetch_catalog",
     "make_client",
     "missing_requirements",
+    "read_catalog",
     "parse_reference",
     "media_type_for",
     "parse_endpoints",

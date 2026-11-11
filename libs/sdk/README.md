@@ -36,7 +36,7 @@ core (backend)  →  acessilia-sdk  →  Toolbox HTTP contract
 | `acessilia_sdk.toolbox.clients.pdf` | `RenderedPage` (the PNG of `ToolboxPdfClient.render`, the clip applied and the `image@2` result), `ClipOrigin` |
 | `acessilia_sdk.toolbox.artifacts` | `ArtifactRef`, `download_artifact`, `read_artifact` — content-addressed artifacts, their verified, atomic download to a file, and their verified, size-bounded read into memory; `parse_reference` reads an `artifact/reference@1` document |
 | `acessilia_sdk.toolbox.reference` | `ArtifactReference`, `SCHEMA_ID`, `REQUIRED` — the published `artifact/reference@1` (ADR-0015), **generated** from the Toolbox's schema by the core's `scripts/generate_sdk_bindings.py`; never edited by hand |
-| `acessilia_sdk.toolbox.catalog` | `fetch_catalog`, `CatalogSnapshot`, `Requirement`, `missing_requirements`, `CatalogCache` — the published catalogue, checks against it (it only restricts) and the last-good cache |
+| `acessilia_sdk.toolbox.catalog` | `fetch_catalog`, `read_catalog`, `CatalogSnapshot`, `Requirement`, `missing_requirements`, `CatalogCache` — the published catalogue, checks against it (it only restricts) and the last-good cache |
 | `acessilia_sdk.toolbox.vlm` | `vlm_gateway_base_url`, `vlm_provider_healthy`, `VLM_GATEWAY_PATH` — the Toolbox VLM gateway, an OpenAI-compatible chat route that is not a capability, and its provider health ([ADR-0012](../../docs/adr/0012-agents-reach-the-vlm-through-the-toolbox.md)) |
 | `acessilia_sdk.toolbox.errors` | `ToolboxError` and its subclasses, including `ToolboxUnavailable` (every endpoint failed; `causes` lists each one) |
 | `acessilia_sdk.runtime` | `run_sync` — run a coroutine from sync code, inside or outside an event loop |

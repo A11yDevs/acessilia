@@ -7,6 +7,11 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
 ## Não lançado
 
+- **Adicionado** `read_catalog(endpoint, *, timeout_seconds)`
+  (`acessilia_sdk.toolbox.catalog`): lê o catálogo de um endpoint num cliente
+  HTTP de vida curta, com o timeout por requisição do chamador e sem retries.
+  O gate de disponibilidade do core passa a usá-lo, em vez de montar o próprio
+  cliente (#402).
 - **Adicionados** `ArtifactReference` (`acessilia_sdk.toolbox.reference`), o
   `artifact/reference@1` publicado, gerado a partir do schema da Toolbox; o
   `parse_reference`, que também confere `digest == artifact_id`; e o

@@ -23,15 +23,14 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from typing import Any
 
-import httpx
-
 from acessilia_sdk.toolbox import (
     CatalogCache,
     CatalogSnapshot,
     Requirement,
-    auth_headers,
-    fetch_catalog,
+    ToolboxEndpoint,
+    ToolboxProviderUnavailable,
     missing_requirements,
+    read_catalog,
 )
 from backend.config.settings import settings
 from backend.core.manifest.models import ProcessingManifest
@@ -133,13 +132,29 @@ def evaluate(
     )
 
 
+def _catalog_endpoint() -> ToolboxEndpoint:
+    """The endpoint the catalogue is read from: ``TOOLBOX_BASE_URL`` only.
+
+    ``TOOLBOX_BASE_URLS`` is not consulted; reading the catalogue across the
+    configured endpoints is a separate change (#402). A URL the SDK cannot use
+    is reported as an unavailable Toolbox, which the cache records like any
+    failed read, so a misconfiguration degrades planning as before instead of
+    failing the document.
+    """
+    try:
+        return ToolboxEndpoint(settings.toolbox_base_url, settings.toolbox_api_key)
+    except ValueError as exc:
+        raise ToolboxProviderUnavailable(
+            f"Toolbox catalogue endpoint is not usable: {exc}"
+        ) from exc
+
+
 async def _fetch() -> CatalogSnapshot:
-    async with httpx.AsyncClient(
-        base_url=settings.toolbox_base_url.rstrip("/"),
-        timeout=httpx.Timeout(CATALOG_TIMEOUT_SECONDS),
-        headers=auth_headers(settings.toolbox_api_key),
-    ) as http:
-        return await fetch_catalog(http)
+    """One catalogue read on the catalogue's own budget, without retries.
+
+    The cache's next refresh is the retry; see ``CATALOG_TIMEOUT_SECONDS``.
+    """
+    return await read_catalog(_catalog_endpoint(), timeout_seconds=CATALOG_TIMEOUT_SECONDS)
 
 
 _cache: CatalogCache | None = None

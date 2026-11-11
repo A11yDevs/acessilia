@@ -73,3 +73,28 @@ def test_the_application_imports_no_operational_library() -> None:
         "operational libraries imported by the application "
         f"(call the Toolbox capability instead, docs/adr/0003): {offenders}"
     )
+
+
+#: Modules that may build an HTTP client themselves. The core reaches the
+#: Toolbox through the SDK's clients (#402); these reach services that are not
+#: the Toolbox. The list can only shrink.
+HTTP_CLIENT_EXCEPTIONS = {
+    # Health probes of Ollama and OpenRouter, which are not the Toolbox (#402).
+    "backend/api/routes/health.py",
+}
+
+
+def test_the_backend_builds_no_http_client_for_the_toolbox() -> None:
+    importers = {
+        str(path.relative_to(REPO_ROOT))
+        for path in BACKEND_DIR.rglob("*.py")
+        if "httpx" in _imported_roots(path)
+    }
+    assert importers <= HTTP_CLIENT_EXCEPTIONS, (
+        "backend modules importing httpx (reach the Toolbox through the SDK's "
+        f"clients instead, #402): {sorted(importers - HTTP_CLIENT_EXCEPTIONS)}"
+    )
+    assert HTTP_CLIENT_EXCEPTIONS <= importers, (
+        "remove exceptions that no longer import httpx: "
+        f"{sorted(HTTP_CLIENT_EXCEPTIONS - importers)}"
+    )

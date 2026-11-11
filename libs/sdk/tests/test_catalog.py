@@ -14,7 +14,10 @@ from acessilia_sdk.toolbox import (
     ToolboxContractViolation,
     ToolboxProviderUnavailable,
     fetch_catalog,
+    ToolboxEndpoint,
+    ToolboxTimeout,
     missing_requirements,
+    read_catalog,
     snapshot_from_payloads,
 )
 
@@ -242,3 +245,53 @@ async def test_concurrent_callers_share_a_failed_refresh() -> None:
 
     assert await asyncio.gather(*pending) == [None] * 5
     assert calls["n"] == 1
+
+
+@pytest.mark.asyncio
+async def test_read_catalog_uses_the_endpoint_key_and_its_own_timeout() -> None:
+    seen: list[httpx.Request] = []
+
+    def serve(payload):
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen.append(request)
+            return httpx.Response(200, json=payload)
+
+        return handler
+
+    with respx.mock() as router:
+        router.get(f"{BASE_URL}/v1/capabilities").mock(side_effect=serve(CAPABILITIES))
+        router.get(f"{BASE_URL}/v1/providers").mock(side_effect=serve(PROVIDERS))
+        snapshot = await read_catalog(
+            ToolboxEndpoint(f"{BASE_URL}/", "key"), timeout_seconds=7.0, clock=lambda: 3.0
+        )
+
+    assert snapshot.revision == _snapshot().revision
+    assert snapshot.fetched_at == 3.0
+    assert all(r.headers["Authorization"] == "Bearer key" for r in seen)
+    assert {v for r in seen for v in r.extensions["timeout"].values()} == {7.0}
+
+
+@pytest.mark.asyncio
+async def test_read_catalog_without_a_key_sends_no_authorization() -> None:
+    with respx.mock() as router:
+        route = router.get(f"{BASE_URL}/v1/capabilities").mock(
+            return_value=httpx.Response(200, json=CAPABILITIES)
+        )
+        router.get(f"{BASE_URL}/v1/providers").mock(
+            return_value=httpx.Response(200, json=PROVIDERS)
+        )
+        await read_catalog(ToolboxEndpoint(BASE_URL), timeout_seconds=1.0)
+
+    assert "Authorization" not in route.calls.last.request.headers
+
+
+@pytest.mark.asyncio
+async def test_read_catalog_does_not_retry_a_timeout() -> None:
+    with respx.mock() as router:
+        route = router.get(f"{BASE_URL}/v1/capabilities").mock(
+            side_effect=httpx.ReadTimeout("slow")
+        )
+        with pytest.raises(ToolboxTimeout):
+            await read_catalog(ToolboxEndpoint(BASE_URL), timeout_seconds=1.0)
+
+    assert route.call_count == 1

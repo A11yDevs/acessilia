@@ -30,7 +30,8 @@ from acessilia_sdk.toolbox.errors import (
     ToolboxProviderUnavailable,
     ToolboxTimeout,
 )
-from acessilia_sdk.toolbox.transport import raise_for_error
+from acessilia_sdk.toolbox.endpoints import ToolboxEndpoint
+from acessilia_sdk.toolbox.transport import auth_headers, raise_for_error
 
 
 @dataclass(frozen=True)
@@ -123,6 +124,29 @@ async def fetch_catalog(
     raise ToolboxContractViolation(
         "Catálogo da Toolbox mudou durante a leitura; tente novamente"
     )
+
+
+async def read_catalog(
+    endpoint: ToolboxEndpoint,
+    *,
+    timeout_seconds: float,
+    clock: Callable[[], float] = time.monotonic,
+) -> CatalogSnapshot:
+    """Read one endpoint's catalogue on a short-lived HTTP client.
+
+    The client is opened for this read and closed after it. ``timeout_seconds``
+    applies to each request, so a caller that plans can keep the catalogue on
+    a budget of its own instead of the extraction timeout. There are no
+    retries here: a caller that caches the catalogue (:class:`CatalogCache`)
+    retries on its next refresh. Errors are the ones :func:`fetch_catalog`
+    raises.
+    """
+    async with httpx.AsyncClient(
+        base_url=endpoint.base_url,
+        timeout=httpx.Timeout(timeout_seconds),
+        headers=auth_headers(endpoint.api_key),
+    ) as http:
+        return await fetch_catalog(http, clock=clock)
 
 
 def missing_requirements(
@@ -245,5 +269,6 @@ __all__ = [
     "Requirement",
     "fetch_catalog",
     "missing_requirements",
+    "read_catalog",
     "snapshot_from_payloads",
 ]
