@@ -6178,8 +6178,3 @@ def _table_ast_from_rows(rows: list[list[str]]) -> dict[str, Any]:
         if cells:
             body.append({"cells": cells})
     return {"body": body}
-
-
-# Backward compatibility with the PMV naming.
-PmvAccessibilityOrchestrator = PddlAccessibilityOrchestrator
-build_pmv_structured_payload = build_pddl_structured_payload
