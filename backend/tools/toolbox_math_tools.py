@@ -46,6 +46,10 @@ def toolbox_recognize_formula(
     Raises:
         MathCapabilityUnavailable: the capability could not serve the request
             and ``raise_on_unavailable`` is true.
+
+    Only Toolbox errors are handled here. Anything else, such as an unusable
+    endpoint configuration or a bug, propagates: turning it into "no formula"
+    would hide it (P6).
     """
     import tempfile
 
@@ -60,9 +64,6 @@ def toolbox_recognize_formula(
     except ToolboxError as exc:
         if raise_on_unavailable:
             raise MathCapabilityUnavailable(RECOGNIZE_CAPABILITY, exc) from exc
-        logger.warning("Toolbox Math recognize failed ({}), returning empty", exc)
-        return []
-    except Exception as exc:
         logger.warning("Toolbox Math recognize failed ({}), returning empty", exc)
         return []
     finally:
