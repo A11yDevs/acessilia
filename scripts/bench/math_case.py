@@ -345,9 +345,8 @@ def resolve_case(root: Path, *, require_pinned: bool = False) -> tuple[
             raise DatasetReferenceError(f"invalid math ground-truth row {row!r}: {error}") from error
     metadata = references.metadata()
     if pinned_identity is not None:
-        # An exported tree has no local Git SHA, but the lock digest proves
-        # which pinned revision its reference content came from.
         metadata["revision"] = pinned_identity["revision"]
+        metadata["expected_revision"] = pinned_identity["expected_revision"]
     return rows, expectations, metadata
 
 

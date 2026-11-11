@@ -220,6 +220,7 @@ def resolve_case(root: Path, *, require_pinned: bool = False) -> tuple[
     metadata = references.metadata()
     if pinned_identity is not None:
         metadata["revision"] = pinned_identity["revision"]
+        metadata["expected_revision"] = pinned_identity["expected_revision"]
     metadata["task_criterion_ids"] = {
         "presentation_slide_content": sorted(set(content_ids) - structure_id_set),
         "presentation_structure": sorted(structure_id_set),

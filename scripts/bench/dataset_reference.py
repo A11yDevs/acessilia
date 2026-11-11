@@ -390,7 +390,8 @@ def assert_pinned_dataset(root: Path, input_ids: Iterable[str] = ("036", "006"))
         )
     return {
         "repository": DATASET_REPOSITORY,
-        "revision": actual_revision or EXPECTED_DATASET_REVISION,
+        "revision": actual_revision,
+        "expected_revision": EXPECTED_DATASET_REVISION,
         "references_digest": digest,
         "references_schema_version": REFERENCES_SCHEMA_VERSION,
     }

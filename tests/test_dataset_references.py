@@ -69,6 +69,7 @@ def test_ci_dataset_contract_and_case_readers_when_checkout_is_provided(tmp_path
     slide_rows, slide_expectations, slide_meta = resolve_slide_case(root, require_pinned=True)
 
     assert identity["revision"] == EXPECTED_DATASET_REVISION
+    assert identity["expected_revision"] == EXPECTED_DATASET_REVISION
     assert identity["references_digest"] == EXPECTED_REFERENCES_DIGEST
     assert len(math_rows) == 91
     assert len(math_expectations["speech"]["formulas"]) == 8
@@ -164,8 +165,9 @@ def test_exported_dataset_tree_without_git_is_supported(tmp_path: Path) -> None:
     _slide_rows, _slide_expectations, slide_metadata = resolve_slide_case(
         exported, require_pinned=True
     )
-    assert math_metadata["revision"] == EXPECTED_DATASET_REVISION
-    assert slide_metadata["revision"] == EXPECTED_DATASET_REVISION
+    for metadata in (math_metadata, slide_metadata):
+        assert metadata["revision"] is None
+        assert metadata["expected_revision"] == EXPECTED_DATASET_REVISION
 
 
 def test_pinned_readers_reject_legacy_only_layout(tmp_path: Path) -> None:
