@@ -9,8 +9,9 @@ travels with its ``coord_origin`` (``TOPLEFT``, ``BOTTOMLEFT`` or
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Literal, Protocol
 
 from docstruct.types import BBox
 
@@ -110,9 +111,37 @@ def holds_point(box: BBox, x: float, y: float, margin: float) -> bool:
     return left - margin <= x <= right + margin and top - margin <= y <= bottom + margin
 
 
+def best_effort_clip(
+    bbox: PageBox | None,
+) -> tuple[BBox | None, Literal["TOPLEFT", "BOTTOMLEFT"]]:
+    """The region of ``bbox`` to render and its origin; ``None`` means the whole page.
+
+    For best-effort crops (a picture, a formula chip): a box that cannot be
+    used (absent, or with a non-finite coordinate) degrades to the whole page
+    instead of failing, and an unknown origin is inferred
+    (:func:`is_bottom_left`). The box is returned as it is, in its own frame:
+    the renderer converts it. A crop that certifies what it shows must refuse
+    both cases instead.
+    """
+    if bbox is None:
+        return None, "TOPLEFT"
+    left, top, right, bottom = (
+        float(bbox.left), float(bbox.top), float(bbox.right), float(bbox.bottom)
+    )
+    if not all(math.isfinite(value) for value in (left, top, right, bottom)):
+        return None, "TOPLEFT"
+    origin: Literal["TOPLEFT", "BOTTOMLEFT"] = (
+        "BOTTOMLEFT"
+        if is_bottom_left(bbox.coord_origin, top, bottom)
+        else "TOPLEFT"
+    )
+    return (left, top, right, bottom), origin
+
+
 __all__ = [
     "OrientedBox",
     "PageBox",
+    "best_effort_clip",
     "VerticalBox",
     "downward_edges",
     "holds_point",

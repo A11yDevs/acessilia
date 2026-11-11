@@ -17,8 +17,9 @@ Núcleo puro de processamento estrutural de documentos do Acessilia.
 |---|---|
 | `docstruct.types` | `BBox`, `CanonicalBlock`, `CanonicalDocument`, `Region`, `BlockPairing`, `OrientationResult` |
 | `docstruct.geometry` | `content_fingerprint`, `overlaps_clean`, `merge_bboxes`, `union`, `intersection_area` |
-| `docstruct.geometry.boxes` | `OrientedBox`, `PageBox`, `is_bottom_left`, `downward_edges`, `holds_point` — caixas que mantêm a origem de coordenadas (`TOPLEFT`, `BOTTOMLEFT`, `UNKNOWN`), com conversões de cima para baixo e em frações da página |
+| `docstruct.geometry.boxes` | `OrientedBox`, `PageBox`, `is_bottom_left`, `downward_edges`, `best_effort_clip`, `holds_point` — caixas que mantêm a origem de coordenadas (`TOPLEFT`, `BOTTOMLEFT`, `UNKNOWN`), com conversões de cima para baixo e em frações da página |
 | `docstruct.placeholders` | `is_unstructured_page_placeholder`, `UNSTRUCTURED_PAGE_LABEL`, `UNSTRUCTURED_PAGE_FLAG` — o elemento substituto de uma página extraída sem estrutura; `is_placeholder_text`, `is_ocr_noise`, `has_meaningful_text`, `is_placeholder_visual`, `is_mostly_visual` — qual texto extraído conta como conteúdo |
+| `docstruct.data_uri` | `decode_data_uri` — os bytes de uma imagem embutida como URI `data:` em base64, para os tipos de mídia e o tamanho que quem chama aceita; uma URL remota nunca é buscada |
 | `docstruct.blocks.callouts` | `dedupe_callout_titles` — um callout dividido em vários blocos mantém o título só no primeiro bloco; `callout_titles` — o título de cada callout, lido do seu elemento de título |
 | `docstruct.regions.letterhead` | `letterhead_groups`, `is_beside`, `is_logo_sized`, `PlacedItem` — um logo e as linhas de cabeçalho de página ao lado dele, agrupados por página (dois logos só se juntam por uma linha compartilhada) |
 | `docstruct.blocks.lists` | `list_start`, `list_numbering`, `marker_numbering`, `item_label` — numeração de listas; `recover_empty_lettered_list_items` — itens `a) b)` vazios preenchidos a partir de um parágrafo vizinho; `merge_list_blocks` — itens seguidos de uma mesma lista de origem viram uma lista só |

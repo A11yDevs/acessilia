@@ -2,7 +2,8 @@
 
 Characterization written on develop before ``_extract_picture_bytes`` was
 decomposed: the clip geometry and the ``data:`` URI decoding moved to
-docstruct, and the render fallbacks stayed in the core. The render itself is
+docstruct (``best_effort_clip``, ``decode_data_uri``), and the render
+fallbacks stayed in the core. The render itself is
 replaced here; tests/test_picture_crop_render.py and
 tests/test_picture_without_page.py run it against the fake Toolbox.
 """
@@ -18,6 +19,8 @@ from acessilia_sdk.toolbox import ToolboxCapabilityError, ToolboxIncompatibleEnd
 from acessilia_sdk.toolbox.clients.pdf import RenderedPage
 
 from backend.agents import pddl_orchestrator as pddl
+from docstruct.data_uri import decode_data_uri
+from docstruct.geometry.boxes import best_effort_clip
 from backend.core.manifest.models import BoundingBox, Provenance
 from tests.pddl_support import build_element
 
@@ -131,15 +134,15 @@ def test_without_any_page_the_embedded_image_is_read(monkeypatch) -> None:
     ],
 )
 def test_the_clip_and_its_origin(box, origin, expected) -> None:
-    assert pddl._picture_clip(_picture(box, origin).provenance[0]) == expected
+    assert best_effort_clip(_picture(box, origin).provenance[0].bbox) == expected
 
 
 def test_no_clip_without_a_usable_box() -> None:
-    assert pddl._picture_clip(None) == (None, "TOPLEFT")
-    assert pddl._picture_clip(_picture(None).provenance[0]) == (None, "TOPLEFT")
+    assert best_effort_clip(None) == (None, "TOPLEFT")
+    assert best_effort_clip(_picture(None).provenance[0].bbox) == (None, "TOPLEFT")
     element = _picture((10, 20, 110, 220))
     element.provenance[0].bbox.right = math.inf
-    assert pddl._picture_clip(element.provenance[0]) == (None, "TOPLEFT")
+    assert best_effort_clip(element.provenance[0].bbox) == (None, "TOPLEFT")
 
 
 @pytest.mark.parametrize(
@@ -153,4 +156,6 @@ def test_no_clip_without_a_usable_box() -> None:
     ],
 )
 def test_the_embedded_image(src, expected) -> None:
-    assert pddl._embedded_picture_bytes(_picture(page=None, src=src)) == expected
+    decoded = decode_data_uri(src, media_types=pddl._EMBEDDED_PICTURE_TYPES,
+                              max_bytes=pddl._EMBEDDED_PICTURE_MAX_BYTES)
+    assert decoded == expected

@@ -11,9 +11,9 @@ import pytest
 
 from backend.agents.pddl_orchestrator import (
     _element_bbox as orchestrator_bbox,
-    _picture_clip,
     _SecondaryExtraction,
 )
+from docstruct.geometry.boxes import best_effort_clip
 from backend.core.manifest.builder import (
     _normalized_element_bbox,
     _refine_reading_order,
@@ -191,7 +191,7 @@ def test_orchestrator_boxes_share_the_origin_rule(origin):
 
     # Picture crops run on the Toolbox (pdf.render@2), which converts the
     # origin; the core must send the box untouched with the same origin rule.
-    clip, clip_origin = _picture_clip(element.provenance[0])
+    clip, clip_origin = best_effort_clip(element.provenance[0].bbox)
     box = element.provenance[0].bbox
     assert clip == (box.left, box.top, box.right, box.bottom)
     assert clip_origin == "BOTTOMLEFT"

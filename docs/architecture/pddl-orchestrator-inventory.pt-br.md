@@ -95,7 +95,7 @@ Só aparecem os grupos marcados para decompor ou com uma parte para o docstruct 
   - O handler (179 linhas, a quarta maior função) fica no core e é dividido lá.
 - **O: enriquecimento de figuras.**
   - O fluxo, as novas tentativas e o disjuntor ficam no core (`_enrich_picture_descriptions`, com 197 linhas, e `_retry_failed`).
-  - `_extract_picture_bytes`, `_picture_clip` e `_embedded_picture_bytes` (#386) misturam um render pelo adaptador do grupo G, geometria de recorte (docstruct) e um limite de tamanho (política do core).
+  - `_extract_picture_bytes`, `_picture_clip` e `_embedded_picture_bytes` (#386) misturam um render pelo adaptador do grupo G, geometria de recorte (docstruct) e um limite de tamanho (política do core). Foram separadas: `_picture_clip` é `docstruct.geometry.boxes.best_effort_clip`, e a decodificação do URI `data:` de `_embedded_picture_bytes` é `docstruct.data_uri.decode_data_uri`, que recebe do core os tipos aceitos e o limite de tamanho. `_extract_picture_bytes` fica com as chamadas de render e seus fallbacks (a página para uma caixa recusada ou uma lasca, nenhuma imagem para qualquer outra falha).
   - As heurísticas `_is_ocr_noise`, `_is_placeholder_text`, `_is_placeholder_visual_element` e `_has_meaningful_text` são testes puros de texto e de elemento, então vão para `docstruct.placeholders` (`is_ocr_noise`, `is_placeholder_text`, `is_placeholder_visual`, `has_meaningful_text`). `_is_mostly_visual_manifest` só lê os elementos, então também vai, como `is_mostly_visual`. Elas leem um elemento por um protocolo somente leitura que o `ManifestElement` do core satisfaz, então o core não precisa de adaptador.
   - `_inject_full_page_picture` altera o manifesto, então fica no core.
 - **P: enriquecimento de fórmulas.**
