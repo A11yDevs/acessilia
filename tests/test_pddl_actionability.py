@@ -739,6 +739,61 @@ class TestTailjoinPosition:
         manifest = self._footer_manifest(metadata={"role": "body"})
         assert _tailjoin_position(manifest) is None
 
+    # Characterization (#402), written on develop before the rule moved to
+    # docstruct.fusion.tailjoin.page_number_position.
+
+    def _element(self, element_id, kind, text, top, bottom, *, order, box=True, metadata=None):
+        return ManifestElement(
+            id=element_id, type=kind, raw_label=kind, reading_order=order, hierarchy_level=1,
+            text=text, page_number=1, metadata=metadata or {},
+            provenance=[Provenance(page_number=1, bbox=BoundingBox(
+                left=280, top=top, right=320, bottom=bottom, coord_origin="TOPLEFT"))] if box else [],
+        )
+
+    def _position(self, *elements) -> str | None:
+        manifest = _manifest(list(elements), [])
+        manifest.pages[0].width = 600
+        manifest.pages[0].height = 800
+        return _tailjoin_position(manifest)
+
+    def test_a_page_header_number_is_at_the_top(self) -> None:
+        assert self._position(self._element("h", "page_header", "iv", 10, 30, order=1)) == "top"
+
+    def test_the_first_placed_page_number_decides(self) -> None:
+        assert self._position(
+            self._element("a", "page_footer", "Rodape do documento", 760, 780, order=1),
+            self._element("b", "page_header", "7", 10, 30, order=2, box=False),
+            self._element("c", "paragraph", "8", 760, 780, order=3, metadata={"role": "footer"}),
+            self._element("d", "page_header", "9", 10, 30, order=4),
+        ) == "bot"
+
+    def test_a_centre_on_the_middle_line_is_at_the_bottom(self) -> None:
+        assert self._position(self._element("m", "page_footer", "5", 390, 410, order=1)) == "bot"
+        assert self._position(self._element("m", "page_footer", "5", 389, 410, order=1)) == "top"
+
+    def test_body_text_has_no_position(self) -> None:
+        assert self._position(self._element("p", "paragraph", "12", 760, 780, order=1)) is None
+
+    def test_only_page_number_furniture_reads_a_box(self, monkeypatch) -> None:
+        from backend.agents import pddl_orchestrator
+
+        calls = []
+        original = pddl_orchestrator._element_bbox
+
+        def counting(element, manifest):
+            calls.append(element.id)
+            return original(element, manifest)
+
+        monkeypatch.setattr(pddl_orchestrator, "_element_bbox", counting)
+        self._position(
+            self._element("p", "paragraph", "texto", 100, 120, order=1),
+            self._element("r", "page_footer", "Rodape", 760, 780, order=2),
+            self._element("n", "page_footer", "3", 760, 780, order=3),
+            self._element("late", "page_header", "4", 10, 30, order=4),
+        )
+
+        assert calls == ["n"]
+
 
 class TestUnsatisfiedObligations:
     def _attempt(self, method: str, status: str, message: str) -> ObligationAttempt:
