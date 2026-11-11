@@ -5,8 +5,21 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 The SDK is a public API for scripts and benchmarks (#402). Changes that a caller
 can see are recorded here, newest first.
 
-## Unreleased
+## 0.3.0 (2026-11-11)
 
+- **Added** `run`, `upload` to the command line. `run CAPABILITY` calls any
+  `execute` capability of the registry through
+  `POST /v1/capabilities/{id}:execute`, with the registry's provider and
+  contract version unless `--provider` says otherwise, an input given as
+  `--file` or `--artifact`, and optional `--language`, `--parameters` (a JSON
+  object) and `--no-cache`; it prints the response envelope. `upload FILE`
+  stores a file and prints its artifact id. A `rest` capability passed to
+  `run` is refused before any request, with a pointer to `upload`, `download`
+  or `ToolboxDatasetClient`; so is a capability outside the registry. Every
+  command reports each endpoint it fails over from on standard error (#402).
+- **Changed** `--timeout` without a value: `catalog` keeps its 10 s; `run`,
+  `upload` and `download` use the clients' default, since a capability can run
+  for minutes. Before this release `download` also defaulted to 10 s.
 - **Added** a command line, `python -m acessilia_sdk` (`acessilia_sdk.cli`):
   `catalog` prints the first endpoint's catalogue as JSON, and `download`
   fetches a stored artifact, checked against its digest and written

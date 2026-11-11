@@ -6,4 +6,4 @@ Toolbox only through its published HTTP contract and never imports the core
 """
 
 #: Kept equal to ``project.version`` in ``pyproject.toml``; a test checks it.
-__version__ = "0.2.0"
+__version__ = "0.3.0"

@@ -76,7 +76,7 @@ def test_catalog_prints_the_first_endpoint_s_catalogue(key_file) -> None:
     assert len(document["revision"]) == 16
     request = route.calls.last.request
     assert request.headers["Authorization"] == "Bearer secret-key"
-    assert set(request.extensions["timeout"].values()) == {cli.DEFAULT_TIMEOUT_SECONDS}
+    assert set(request.extensions["timeout"].values()) == {cli.CATALOG_TIMEOUT_SECONDS}
     assert not other.called
 
 
@@ -267,6 +267,217 @@ def test_download_closes_its_client_on_success_and_on_failure(tmp_path, monkeypa
     assert closed == [True, True]
 
 
+# run
+
+
+EXECUTE = f"{A}/v1/capabilities/media.inspect:execute"
+ENVELOPE = {
+    "status": "succeeded",
+    "capability": "media.inspect",
+    "provider": "pure-media-inspect",
+    "document": {"media_type": "application/pdf", "page_count": 2},
+}
+
+
+def _form(request: httpx.Request) -> str:
+    return request.content.decode("utf-8", errors="replace")
+
+
+def _field(name: str, value: str) -> str:
+    return f'name="{name}"\r\n\r\n{value}\r\n'
+
+
+@pytest.fixture
+def pdf(tmp_path: Path) -> Path:
+    path = tmp_path / "source.pdf"
+    path.write_bytes(CONTENT)
+    return path
+
+
+def test_run_calls_an_execute_capability_and_prints_its_envelope(pdf, key_file) -> None:
+    with respx.mock() as router:
+        route = router.post(EXECUTE).mock(return_value=httpx.Response(200, json=ENVELOPE))
+        status, out, err = _run(
+            "--endpoint", A, "--api-key-file", str(key_file),
+            "run", "media.inspect", "--file", str(pdf),
+        )
+
+    assert (status, err) == (0, "")
+    assert json.loads(out) == ENVELOPE
+    request = route.calls.last.request
+    assert request.headers["Authorization"] == "Bearer secret-key"
+    body = _form(request)
+    # The registry's provider and contract version, and the file itself.
+    assert _field("provider", "pure-media-inspect") in body
+    assert _field("version", "1") in body
+    assert 'filename="source.pdf"' in body and "application/pdf" in body
+    # The clients' own timeout, not the catalogue's 10 s.
+    assert set(request.extensions["timeout"].values()) == {3600}
+
+
+def test_run_forwards_the_provider_language_parameters_and_cache_choice(pdf) -> None:
+    with respx.mock() as router:
+        route = router.post(f"{A}/v1/capabilities/pdf.render:execute").mock(
+            return_value=httpx.Response(200, json={**ENVELOPE, "capability": "pdf.render"})
+        )
+        status, _, err = _run(
+            "--endpoint", A, "--timeout", "30",
+            "run", "pdf.render", "--file", str(pdf),
+            "--provider", "other-pdf", "--language", "en",
+            "--parameters", '{"page": 2, "max_side": 512}', "--no-cache",
+        )
+
+    assert (status, err) == (0, "")
+    request = route.calls.last.request
+    body = _form(request)
+    assert _field("provider", "other-pdf") in body
+    assert _field("language", "en") in body
+    assert _field("version", "2") in body
+    assert json.loads(body.split('name="parameters"\r\n\r\n', 1)[1].split("\r\n", 1)[0]) == {
+        "page": 2, "max_side": 512,
+    }
+    assert 'name="no_cache"' in body
+    assert set(request.extensions["timeout"].values()) == {30.0}
+
+
+def test_a_formula_in_a_txt_file_goes_as_plain_text_to_the_math_provider(tmp_path) -> None:
+    """The README's math.verbalize example: the same media type the math client sends."""
+    formula = tmp_path / "formula.txt"
+    formula.write_text(r"\frac{a}{b}", encoding="utf-8")
+    with respx.mock() as router:
+        route = router.post(f"{A}/v1/capabilities/math.verbalize:execute").mock(
+            return_value=httpx.Response(
+                200, json={**ENVELOPE, "capability": "math.verbalize", "document": {}}
+            )
+        )
+        status, _, err = _run(
+            "--endpoint", A, "run", "math.verbalize", "--file", str(formula), "--language", "pt-BR"
+        )
+
+    assert (status, err) == (0, "")
+    body = _form(route.calls.last.request)
+    assert 'filename="formula.txt"' in body and "Content-Type: text/plain" in body
+    assert _field("provider", "math-speech") in body
+
+
+def test_run_with_a_stored_artifact_sends_its_id_and_no_file() -> None:
+    with respx.mock() as router:
+        route = router.post(EXECUTE).mock(return_value=httpx.Response(200, json=ENVELOPE))
+        status, _, _ = _run("--endpoint", A, "run", "media.inspect", "--artifact", ARTIFACT_ID)
+
+    assert status == 0
+    body = _form(route.calls.last.request)
+    assert f"artifact_id={ARTIFACT_ID.replace(':', '%3A')}" in body
+    assert "filename=" not in body
+
+
+@pytest.mark.parametrize(
+    ("response", "error"),
+    [
+        (httpx.Response(401, json={"detail": "no key"}), "ToolboxAuthenticationError"),
+        (httpx.Response(200, json={**ENVELOPE, "status": "failed"}), "ToolboxContractViolation"),
+        (httpx.ReadTimeout("slow"), "ToolboxTimeout"),
+    ],
+    ids=["401", "failed-envelope", "timeout"],
+)
+def test_a_failed_call_is_reported_typed_with_status_1(pdf, response, error) -> None:
+    with respx.mock() as router:
+        route = router.post(EXECUTE)
+        if isinstance(response, Exception):
+            route.mock(side_effect=response)
+        else:
+            route.mock(return_value=response)
+        status, out, err = _run("--endpoint", A, "run", "media.inspect", "--file", str(pdf))
+
+    assert (status, out) == (1, "")
+    assert err.startswith(f"error: {error}: ")
+
+
+def test_run_fails_over_to_a_secondary_that_publishes_the_capability(pdf) -> None:
+    with respx.mock() as router:
+        router.post(EXECUTE).mock(side_effect=httpx.ConnectError("refused"))
+        router.get(f"{B}/v1/capabilities").mock(
+            return_value=httpx.Response(200, json=[{"id": "media.inspect", "version": 1}])
+        )
+        router.get(f"{B}/v1/providers").mock(
+            return_value=httpx.Response(
+                200, json=[{"id": "pure-media-inspect", "capabilities": ["media.inspect"]}]
+            )
+        )
+        router.post(f"{B}/v1/capabilities/media.inspect:execute").mock(
+            return_value=httpx.Response(200, json=ENVELOPE)
+        )
+        status, out, err = _run(
+            "--endpoint", A, "--endpoint", B, "run", "media.inspect", "--file", str(pdf)
+        )
+
+    assert status == 0
+    assert json.loads(out) == ENVELOPE
+    lines = err.splitlines()
+    assert len(lines) == 1
+    assert lines[0].startswith(f"warning: endpoint {A} failed: ToolboxProviderUnavailable: ")
+
+
+def test_run_closes_its_client_on_success_and_on_failure(pdf, monkeypatch) -> None:
+    from acessilia_sdk.toolbox.client import ToolboxCapabilityClient
+
+    closed: list[bool] = []
+    original = ToolboxCapabilityClient.close
+
+    async def recording_close(self) -> None:
+        await original(self)
+        closed.append(True)
+
+    monkeypatch.setattr(ToolboxCapabilityClient, "close", recording_close)
+    with respx.mock() as router:
+        route = router.post(EXECUTE)
+        route.mock(return_value=httpx.Response(200, json=ENVELOPE))
+        assert _run("--endpoint", A, "run", "media.inspect", "--file", str(pdf))[0] == 0
+        route.mock(side_effect=httpx.ReadTimeout("slow"))
+        assert _run("--endpoint", A, "run", "media.inspect", "--file", str(pdf))[0] == 1
+
+    assert closed == [True, True]
+
+
+def test_every_capability_of_the_registry_is_either_run_or_pointed_elsewhere() -> None:
+    """Dispatch by transport covers the whole registry (#402, step 8)."""
+    from acessilia_sdk.toolbox.capabilities import TOOLBOX_CAPABILITIES
+
+    for capability_id, spec in TOOLBOX_CAPABILITIES.items():
+        if spec.transport == "execute":
+            assert cli.executable_capability(capability_id) is spec
+        else:
+            with pytest.raises(ValueError, match="is a REST capability") as raised:
+                cli.executable_capability(capability_id)
+            expected = cli.REST_COMMANDS.get(capability_id, "ToolboxDatasetClient")
+            assert expected in str(raised.value)
+
+
+# upload
+
+
+def test_upload_stores_a_file_and_prints_its_artifact_id(pdf, key_file) -> None:
+    with respx.mock() as router:
+        route = router.post(f"{A}/v1/artifacts").mock(
+            return_value=httpx.Response(201, json={"artifact_id": ARTIFACT_ID})
+        )
+        status, out, err = _run(
+            "--endpoint", A, "--api-key-file", str(key_file), "upload", str(pdf)
+        )
+
+    assert (status, out, err) == (0, f"{ARTIFACT_ID}\n", "")
+    assert route.calls.last.request.headers["Authorization"] == "Bearer secret-key"
+
+
+def test_a_failed_upload_is_reported_typed(pdf) -> None:
+    with respx.mock() as router:
+        router.post(f"{A}/v1/artifacts").mock(return_value=httpx.Response(401))
+        status, out, err = _run("--endpoint", A, "upload", str(pdf))
+
+    assert (status, out) == (1, "")
+    assert err.startswith("error: ToolboxAuthenticationError: ")
+
+
 # arguments
 
 
@@ -282,6 +493,14 @@ def test_download_closes_its_client_on_success_and_on_failure(tmp_path, monkeypa
         ["--endpoint", A, "download", "not-an-id", "out"],
         ["--endpoint", A, "download", "a" * 64 + "\n", "out"],
         ["--endpoint", A, "download", ARTIFACT_ID + " ", "out"],
+        ["--endpoint", A, "run", "no.such.capability", "--artifact", ARTIFACT_ID],
+        ["--endpoint", A, "run", "artifact.retrieve", "--artifact", ARTIFACT_ID],
+        ["--endpoint", A, "run", "dataset.list", "--artifact", ARTIFACT_ID],
+        ["--endpoint", A, "run", "media.inspect", "--artifact", "not-an-id"],
+        ["--endpoint", A, "run", "media.inspect", "--file", "/no/such/file.pdf"],
+        ["--endpoint", A, "run", "media.inspect", "--artifact", ARTIFACT_ID, "--parameters", "{"],
+        ["--endpoint", A, "run", "media.inspect", "--artifact", ARTIFACT_ID, "--parameters", "[1]"],
+        ["--endpoint", A, "upload", "/no/such/file.pdf"],
     ],
     ids=[
         "no-scheme",
@@ -293,6 +512,14 @@ def test_download_closes_its_client_on_success_and_on_failure(tmp_path, monkeypa
         "bad-id",
         "id-with-trailing-newline",
         "id-with-trailing-space",
+        "run-unknown-capability",
+        "run-rest-artifact",
+        "run-rest-dataset",
+        "run-bad-artifact",
+        "run-missing-file",
+        "run-bad-json",
+        "run-json-not-object",
+        "upload-missing-file",
     ],
 )
 def test_invalid_arguments_exit_2_without_a_request(argv) -> None:
@@ -302,6 +529,13 @@ def test_invalid_arguments_exit_2_without_a_request(argv) -> None:
 
     assert (status, out) == (2, "")
     assert err.startswith("error: ")
+
+
+def test_run_needs_exactly_one_input() -> None:
+    for extra in ([], ["--file", "a.pdf", "--artifact", ARTIFACT_ID]):
+        with pytest.raises(SystemExit) as raised:
+            cli.main(["--endpoint", A, "run", "media.inspect", *extra], stderr=io.StringIO())
+        assert raised.value.code == 2
 
 
 def test_an_endpoint_is_required() -> None:

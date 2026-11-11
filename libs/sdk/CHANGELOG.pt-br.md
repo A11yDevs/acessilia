@@ -5,8 +5,22 @@ Também disponível em **inglês (EUA)**: [English version](CHANGELOG.md)
 O SDK é uma API pública para scripts e benchmarks (#402). As mudanças visíveis
 para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
-## Não lançado
+## 0.3.0 (2026-11-11)
 
+- **Adicionados** `run` e `upload` à linha de comando. `run CAPACIDADE` chama
+  qualquer capacidade `execute` do registro por
+  `POST /v1/capabilities/{id}:execute`, com o provider e a versão de contrato
+  do registro (a menos que `--provider` diga outro), uma entrada dada por
+  `--file` ou `--artifact`, e `--language`, `--parameters` (um objeto JSON) e
+  `--no-cache` opcionais; imprime o envelope da resposta. `upload ARQUIVO`
+  armazena um arquivo e imprime seu id de artefato. Uma capacidade `rest`
+  passada a `run` é recusada antes de qualquer requisição, indicando `upload`,
+  `download` ou `ToolboxDatasetClient`; o mesmo vale para uma capacidade fora
+  do registro. Todo comando informa na saída de erro cada endpoint do qual faz
+  failover (#402).
+- **Alterado** `--timeout` sem valor: `catalog` mantém seus 10 s; `run`,
+  `upload` e `download` usam o padrão dos clientes, porque uma capacidade pode
+  rodar por minutos. Antes desta versão, `download` também usava 10 s.
 - **Adicionada** uma linha de comando, `python -m acessilia_sdk`
   (`acessilia_sdk.cli`): `catalog` imprime o catálogo do primeiro endpoint em
   JSON, e `download` baixa um artefato armazenado, conferido contra o digest e
