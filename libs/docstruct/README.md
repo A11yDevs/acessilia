@@ -31,7 +31,7 @@ Pure document-structure processing core for Acessilia.
 | `docstruct.fusion.verse` | `record_like`, `verse_lines`, `chunk_verse`, `split_box_rows`, `verse_blocks` |
 | `docstruct.fusion.line_numbers` | `line_number_chain`, `extract_line_numbers` |
 | `docstruct.fusion.flood` | `flood_guard` |
-| `docstruct.fusion.tailjoin` | `is_page_number`, `join_tail`, `page_number_position`, `tailjoin3` |
+| `docstruct.fusion.tailjoin` | `is_page_number`, `join_tail`, `page_number_position`, `tailjoin3`, `FurnitureBlock` — `page_number_position` reads `DiffBlock`s or any read-only view of `role`, `md` and `box`, like the core's payload |
 | `docstruct.fusion.similarity` | `iou`, `sim`, `ordered_box`, `pair_block`, `swallows`, `is_duplicate` — box overlap and text similarity between blocks, and which candidate block pairs with a block |
 | `docstruct.fusion.repetition` | `collapse`, `guard_page`, `is_blank_page`, `strip_comment` |
 | `docstruct.fusion.page_select` | `fuse`, `select_by_agreement`, `swap_low_agreement_pages`, `ratio` |

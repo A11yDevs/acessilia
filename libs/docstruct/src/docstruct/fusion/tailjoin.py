@@ -17,9 +17,26 @@ Funções puras, sem I/O e sem dependências pesadas.
 from __future__ import annotations
 
 import re
-from typing import Optional
+from typing import Iterable, Optional, Protocol
 
-from docstruct.fusion.types import DiffBlock
+from docstruct.types import BBox
+
+
+class FurnitureBlock(Protocol):
+    """What :func:`page_number_position` reads of a block (read-only).
+
+    ``DiffBlock`` fits; the core passes its elements through a view whose
+    ``box`` is read only for the blocks that are page numbers.
+    """
+
+    @property
+    def role(self) -> Optional[str]: ...
+
+    @property
+    def md(self) -> str: ...
+
+    @property
+    def box(self) -> Optional[BBox]: ...
 
 # Número de página: arábico ou romano, até 5 caracteres.
 PAGE_NUMBER_RE = re.compile(r"[\divxlcIVXLC]{1,5}")
@@ -77,17 +94,19 @@ def join_tail(blocks: list[str], mode: str, max_len: int, k: int) -> list[str]:
     return blocks[:j] + [" ".join(b.strip() for b in tail)]
 
 
-def page_number_position(blocks: list[DiffBlock]) -> Optional[str]:
-    """Posição vertical do número de página: ``"top"``, ``"bot"`` ou ``None``.
+def page_number_position(blocks: Iterable[FurnitureBlock]) -> Optional[str]:
+    """Vertical position of the page number: ``"top"``, ``"bot"`` or ``None``.
 
-    Usa o centro vertical do bbox normalizado (``< 0.5`` = topo). Blocos sem
-    bbox ou sem número de página são ignorados.
+    The first page-number furniture block with a box decides, by its box's
+    vertical centre on the unit page (``< 0.5`` is the top). A block's box is
+    read only when it is page-number furniture, and once.
     """
     for b in blocks:
         if b.role in ("header", "footer", "page_number") and is_page_number(b.md):
-            if b.box is None:
+            box = b.box
+            if box is None:
                 continue
-            cy = (b.box[1] + b.box[3]) / 2
+            cy = (box[1] + box[3]) / 2
             return "top" if cy < 0.5 else "bot"
     return None
 

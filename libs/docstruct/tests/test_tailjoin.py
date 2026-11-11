@@ -110,6 +110,34 @@ class TestPageNumberPosition:
     def test_role_irrelevante_e_ignorado(self):
         assert page_number_position([mk("42", box=(0.0, 0.0, 1.0, 0.1))]) is None
 
+    def test_the_first_placed_page_number_decides(self):
+        blocks = [mk("42", role="footer"), mk("Rodape", box=(0.0, 0.9, 1.0, 1.0), role="footer"),
+                  mk("7", box=(0.0, 0.9, 1.0, 1.0), role="header"), mk("8", box=(0.0, 0.0, 1.0, 0.1), role="header")]
+        assert page_number_position(blocks) == "bot"
+
+    def test_the_middle_line_is_the_bottom(self):
+        assert page_number_position([mk("5", box=(0.0, 0.4, 1.0, 0.6), role="footer")]) == "bot"
+
+    def test_a_view_s_box_is_read_once_and_only_for_page_numbers(self):
+        reads = []
+
+        class View:
+            def __init__(self, name, role, md, box):
+                self.name, self.role, self.md, self._box = name, role, md, box
+
+            @property
+            def box(self):
+                reads.append(self.name)
+                return self._box
+
+        views = [View("body", None, "12", (0.0, 0.0, 1.0, 0.1)),
+                 View("text", "footer", "Rodape", (0.0, 0.9, 1.0, 1.0)),
+                 View("number", "footer", "3", (0.0, 0.9, 1.0, 1.0)),
+                 View("late", "header", "4", (0.0, 0.0, 1.0, 0.1))]
+
+        assert page_number_position(iter(views)) == "bot"
+        assert reads == ["number"]
+
 
 class TestTailjoin3:
     def test_topo_junta_a_cauda(self):

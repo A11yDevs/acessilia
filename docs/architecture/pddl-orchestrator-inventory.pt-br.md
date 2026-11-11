@@ -80,7 +80,7 @@ Só aparecem os grupos marcados para decompor ou com uma parte para o docstruct 
   - `_save_region_artifact` grava evidência em `settings.data_dir`, então fica no core.
   - `_inspect_region` e `_inspect_page` chamam o `VisionAgent`, então ficam no core.
   - Os dois handlers ficam no core.
-- **H: handlers de texto.** `_tailjoin_position` é puro e se junta a `docstruct.fusion.tailjoin`, que já tem `tail_start`, `join_tail` e `page_number_position`. Os handlers usam o `FusionAgent` e ficam no core.
+- **H: handlers de texto.** `_tailjoin_position` repetia, sobre os elementos do manifesto, `docstruct.fusion.tailjoin.page_number_position`, a regra que o builder aplica aos blocos de fusão. Agora chama essa função através de `_FurnitureView`, uma visão somente leitura que lê a caixa de um elemento só quando ele é mobiliário com número de página, como antes. Os handlers usam o `FusionAgent` e ficam no core.
 - **I: escolha calibrada de provider.**
   - `_ordered_box`, `_iou` e `_pair_block` são geometria de caixas e vão para o docstruct, como `docstruct.fusion.similarity.ordered_box` e `pair_block`. `_iou` dá o mesmo valor que o `docstruct.fusion.similarity.iou` já existente para qualquer entrada, então é substituído por ele; veja "Achados". `_pair_block` fica no core como o adaptador que lê as caixas do elemento e dos candidatos; os limiares são política e ficam com ele.
   - `_page_number` e `_page_markdown` são pequenos auxiliares de documento.

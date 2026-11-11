@@ -72,7 +72,7 @@
     "libs/docstruct/src/docstruct/fusion/repetition.py": 19,
     "libs/docstruct/src/docstruct/fusion/similarity.py": 6,
     "libs/docstruct/src/docstruct/fusion/table_specialist.py": 23,
-    "libs/docstruct/src/docstruct/fusion/tailjoin.py": 26,
+    "libs/docstruct/src/docstruct/fusion/tailjoin.py": 24,
     "libs/docstruct/src/docstruct/fusion/types.py": 6,
     "libs/docstruct/src/docstruct/fusion/verse.py": 28,
     "libs/docstruct/src/docstruct/imaging/__init__.py": 1,
