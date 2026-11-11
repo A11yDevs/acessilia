@@ -887,3 +887,50 @@ async def test_a_misconfigured_recognizer_fails_the_enrichment_visibly(monkeypat
     assert [type(error) for error in raised.value.exceptions] == [ValueError]
     assert FakeVision.calls == []
     assert "formula_recognition" not in manifest.elements[0].metadata
+
+
+# Characterization of the vision fallback's other outcomes (#402), written on
+# develop before _enrich_formula_latex was split.
+
+
+@pytest.mark.asyncio
+async def test_a_failed_vision_fallback_leaves_the_formula_and_records_nothing(monkeypatch, cropped):
+    manifest = _formula_manifest()
+    FakeVision.output = None
+    monkeypatch.setattr(pddl, "toolbox_recognize_formula", lambda image, **kwargs: [])
+
+    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+
+    element = manifest.elements[0]
+    assert element.type == "formula" and element.text is None
+    assert "formula_recognition" not in element.metadata
+    assert len(FakeVision.calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_an_uncertain_description_does_not_reclassify(monkeypatch, cropped):
+    manifest = _formula_manifest()
+    FakeVision.output = VisionOutput(kind="description", description="A chart", language="en",
+                                     confidence=0.4, classification_uncertain=True)
+    monkeypatch.setattr(pddl, "toolbox_recognize_formula", lambda image, **kwargs: [])
+
+    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+
+    element = manifest.elements[0]
+    assert element.type == "formula" and element.text is None
+    assert "formula_recognition" not in element.metadata
+    assert [o.kind for o in manifest.obligations] == ["verbalize-formula"]
+
+
+@pytest.mark.asyncio
+async def test_a_vision_reading_records_its_method_and_confidence(monkeypatch, cropped):
+    manifest = _formula_manifest()
+    FakeVision.output = VisionOutput(kind="formula", formula_latex="$$x+1$$", language="en", confidence=0.6)
+    monkeypatch.setattr(pddl, "toolbox_recognize_formula", lambda image, **kwargs: [])
+
+    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+
+    element = manifest.elements[0]
+    assert element.text == "x+1"
+    assert element.metadata["formula_recognition"] == {"method": "vision", "confidence": 0.6}
+    assert "formula_text_layer" not in element.metadata
