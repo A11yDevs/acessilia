@@ -17,7 +17,7 @@ Núcleo puro de processamento estrutural de documentos do Acessilia.
 |---|---|
 | `docstruct.types` | `BBox`, `CanonicalBlock`, `CanonicalDocument`, `Region`, `BlockPairing`, `OrientationResult` |
 | `docstruct.geometry` | `content_fingerprint`, `overlaps_clean`, `merge_bboxes`, `union`, `intersection_area` |
-| `docstruct.geometry.boxes` | `OrientedBox`, `is_bottom_left`, `downward_edges` — caixas que mantêm a origem de coordenadas (`TOPLEFT`, `BOTTOMLEFT`, `UNKNOWN`), com conversões de cima para baixo e em frações da página |
+| `docstruct.geometry.boxes` | `OrientedBox`, `PageBox`, `is_bottom_left`, `downward_edges`, `holds_point` — caixas que mantêm a origem de coordenadas (`TOPLEFT`, `BOTTOMLEFT`, `UNKNOWN`), com conversões de cima para baixo e em frações da página |
 | `docstruct.placeholders` | `is_unstructured_page_placeholder`, `UNSTRUCTURED_PAGE_LABEL`, `UNSTRUCTURED_PAGE_FLAG` — o elemento substituto de uma página extraída sem estrutura |
 | `docstruct.blocks.callouts` | `dedupe_callout_titles` — um callout dividido em vários blocos mantém o título só no primeiro bloco; `callout_titles` — o título de cada callout, lido do seu elemento de título |
 | `docstruct.regions.letterhead` | `letterhead_groups`, `is_beside`, `is_logo_sized`, `PlacedItem` — um logo e as linhas de cabeçalho de página ao lado dele, agrupados por página (dois logos só se juntam por uma linha compartilhada) |
@@ -40,6 +40,7 @@ Núcleo puro de processamento estrutural de documentos do Acessilia.
 | `docstruct.fusion.hf_end` | `move_hf_to_end`, `move_body_hf_to_tail` |
 | `docstruct.fusion.table_specialist` | `extract_table`, `norm_table`, `select_table`, `select_greedy` |
 | `docstruct.text.negation_overlay` | `negates`, `is_detached_overlay`, `compose_negation`, `locate_in_text`, `locate_in_grid`, `table_grid`, `compose_in_text`, `compose_in_grid` — devolve uma barra de negação solta (U+0338) à relação que ela nega, só quando a escolha não é ambígua |
+| `docstruct.text.inline_math` | `detect_inline_math`, `detect_inline_math_by_page`, `span_lines_on_page`, `top_left_box`, `assign_runs_to_cells`, `splice_inline_math` — matemática inline encontrada na camada de texto de um PDF pelas fontes e linhas de base (ADR 0011), localizada nas caixas de um elemento página a página e escrita no seu texto como `$…$` |
 | `docstruct.text.latex` | `bare_latex`, `ensure_math_delimiters`, `has_latex_markup`, `latex_text_agreement`, `strip_latex_delimiters`, `normalize_latex`, `wrap_latex` — normalização canônica e padronização de fórmulas LaTeX |
 | `docstruct.text.equations` | `split_equation_number`, `preserve_equation_number`, `equation_number`, `numbered_latex`, `numbered_speech` — rótulos de equações em destaque guardados em `metadata.equation_number` e restaurados por cada exportador |
 | `docstruct.text.normalize` | `norm` — limpezas determinísticas de texto |

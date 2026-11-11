@@ -32,6 +32,11 @@ fraction (a ``\frac`` set in a table cell) and become one ``\frac`` run.
 
 A table's cells carry no boxes; ``assign_runs_to_cells`` gives each run of
 the table's lines to the cell whose text holds it (#260).
+
+``detect_inline_math_by_page`` places the spans first: an element's lines
+on a page are the spans whose centre lies in its boxes there
+(``SPAN_BOX_TOLERANCE`` points around them), with the boxes turned to the
+spans' top-left frame by ``top_left_box``. Each page is detected on its own.
 """
 from __future__ import annotations
 
@@ -39,8 +44,9 @@ import difflib
 import re
 import unicodedata
 from dataclasses import dataclass, field, replace
-from typing import Any, Iterable, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 
+from docstruct.geometry.boxes import PageBox, holds_point
 from docstruct.text.latex import _COMMAND_GLYPHS, _FUNCTION_ALIASES, _FUNCTION_NAMES
 from docstruct.text.math_spans import split_inline_math
 
@@ -64,6 +70,9 @@ FRACTION_GAP_RATIO = 2.0
 #: boxes split a span's width evenly, so the space before ``0833`` in
 #: ``−0, 0833`` measures about 0.43 of the size.
 DECIMAL_GAP_RATIO = 0.5
+
+#: Points a span's centre may lie outside its element's box.
+SPAN_BOX_TOLERANCE = 2.0
 
 _NEGATION = "̸"
 _PUNCTUATION = frozenset(",.;:")
@@ -674,15 +683,95 @@ def _protected_ranges(text: str) -> list[tuple[int, int]]:
     return ranges
 
 
+#: ``document.text.spans@1`` pages by page number.
+SpanPages = Mapping[int, Mapping[str, Any]]
+#: Page heights in points from another source, for spans pages without one.
+PageHeights = Mapping[int, float | None]
+#: Where an element lies: a page number and its box there (``None``: no box).
+Placement = tuple[int, PageBox | None]
+
+
+def top_left_box(
+    box: PageBox, page: int, spans: SpanPages, heights: PageHeights
+) -> tuple[float, float, float, float] | None:
+    """``(left, top, right, bottom)`` of a manifest box, top-left origin, in points."""
+    if box.coord_origin == "BOTTOMLEFT":
+        height = (spans.get(page) or {}).get("height") or heights.get(page)
+        if not height:
+            return None
+        return box.left, height - box.top, box.right, height - box.bottom
+    if box.coord_origin == "TOPLEFT":
+        return box.left, box.top, box.right, box.bottom
+    return None
+
+
+def detect_inline_math_by_page(
+    placements: Sequence[Placement], spans: SpanPages, heights: PageHeights
+) -> InlineMathDetection:
+    """``detect_inline_math`` over an element's lines, page by page, as one detection.
+
+    Each page is read on its own, so a fraction never pairs lines of two pages
+    (baselines are per-page coordinates), and each run carries its page, where
+    its negation slashes are claimed: a table is the element that spans pages.
+    """
+    detection = InlineMathDetection()
+    pages = dict.fromkeys(page for page, box in placements if box is not None)
+    for page in pages:
+        read = detect_inline_math(span_lines_on_page(placements, spans, heights, page))
+        offset = len(detection.flat)
+        detection.flat += read.flat
+        detection.runs.extend(
+            replace(run, start=run.start + offset, end=run.end + offset, page=page)
+            for run in read.runs
+        )
+    return detection
+
+
+def span_lines_on_page(
+    placements: Sequence[Placement], spans: SpanPages, heights: PageHeights, page_number: int
+) -> list[list[TextSpan]]:
+    """An element's text-layer lines on a page, in order: spans whose centre lies in its boxes.
+
+    A rotated page is left out: its spans are in the unrotated space, which the
+    element's box may not be.
+    """
+    lines: list[list[TextSpan]] = []
+    for placed_page, placed_box in placements:
+        if placed_page != page_number:
+            continue
+        page = spans.get(placed_page)
+        if placed_box is None or page is None or page.get("rotation"):
+            continue
+        box = top_left_box(placed_box, placed_page, spans, heights)
+        if box is None:
+            continue
+        for line in page.get("lines") or []:
+            inside = []
+            for span in line.get("spans") or []:
+                x0, y0, x1, y1 = span["bbox"]
+                if holds_point(box, (x0 + x1) / 2, (y0 + y1) / 2, SPAN_BOX_TOLERANCE):
+                    inside.append(TextSpan.from_dict(span))
+            if inside:
+                lines.append(inside)
+    return lines
+
+
 __all__ = [
     "MATH_FONT_PREFIXES",
+    "SPAN_BOX_TOLERANCE",
     "InlineMathDetection",
     "InlineMathRun",
+    "PageHeights",
+    "Placement",
+    "SpanPages",
     "SpliceResult",
     "TextSpan",
     "assign_runs_to_cells",
     "detect_inline_math",
+    "detect_inline_math_by_page",
     "fold",
     "is_math_font",
+    "span_lines_on_page",
     "splice_inline_math",
+    "top_left_box",
 ]

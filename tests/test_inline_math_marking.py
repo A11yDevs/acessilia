@@ -129,3 +129,62 @@ def test_other_media_are_skipped(spans):
     _run(manifest)
 
     assert spans == []
+
+
+# Characterization of the span geometry (#402), written on develop before it
+# moved to docstruct.text.inline_math.
+
+
+def _top_left(manifest):
+    for element in manifest.elements:
+        box = element.provenance[0].bbox
+        element.provenance[0].bbox = BoundingBox(
+            left=box.left, top=HEIGHT - box.top, right=box.right, bottom=HEIGHT - box.bottom,
+            coord_origin="TOPLEFT")
+    return manifest
+
+
+def test_a_top_left_box_reads_the_same_spans(spans):
+    manifest = _top_left(_manifest())
+
+    _run(manifest)
+
+    paragraph, slash, _ = manifest.elements
+    assert paragraph.text == r"inicial ´ e $s_0\in\mathbb{R}$, $h\neq0$"
+    assert slash.metadata["negation_overlay"] == {"outcome": "inline-math", "host": "p1"}
+
+
+def _fetch_page(monkeypatch, **changes):
+    async def fetch(source_path, pages, *, artifact_id=None, client=None):
+        return {1: {**_page(PARAGRAPH_LINE, DISPLAY_LINE), **changes}}
+
+    monkeypatch.setattr("backend.tools.text_spans.fetch_text_spans", fetch)
+
+
+def test_a_rotated_page_is_left_out(monkeypatch, spans):
+    _fetch_page(monkeypatch, rotation=90)
+    manifest = _manifest()
+
+    assert _run(manifest) == {"elements": 0, "marked": 0, "unmatched": 0}
+    assert "inline_math_detection" not in manifest.elements[0].metadata
+
+
+def test_a_bottom_left_box_takes_the_manifest_height_when_the_spans_have_none(monkeypatch, spans):
+    _fetch_page(monkeypatch, height=None)
+    manifest = _manifest()
+
+    assert _run(manifest)["marked"] == 2
+
+    _fetch_page(monkeypatch, height=None)
+    manifest = _manifest()
+    manifest.pages[0].height = None
+
+    assert _run(manifest)["marked"] == 0
+
+
+def test_a_box_of_unknown_origin_is_left_out(spans):
+    manifest = _manifest()
+    for element in manifest.elements:
+        element.provenance[0].bbox.coord_origin = "UNKNOWN"
+
+    assert _run(manifest)["marked"] == 0

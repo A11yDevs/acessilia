@@ -89,4 +89,32 @@ def downward_edges(box: VerticalBox) -> tuple[float, float]:
     return min(box.top, box.bottom), max(box.top, box.bottom)
 
 
-__all__ = ["OrientedBox", "VerticalBox", "downward_edges", "is_bottom_left"]
+class PageBox(VerticalBox, Protocol):
+    """A box on a page, with its four edges and origin (read-only)."""
+
+    @property
+    def left(self) -> float: ...
+
+    @property
+    def right(self) -> float: ...
+
+
+def holds_point(box: BBox, x: float, y: float, margin: float) -> bool:
+    """Whether ``(x, y)`` lies in ``box``, or within ``margin`` of it.
+
+    ``box`` is ``(left, top, right, bottom)`` in one frame with the point; its
+    vertical edges may come in either order.
+    """
+    left, top, right, bottom = box
+    top, bottom = min(top, bottom), max(top, bottom)
+    return left - margin <= x <= right + margin and top - margin <= y <= bottom + margin
+
+
+__all__ = [
+    "OrientedBox",
+    "PageBox",
+    "VerticalBox",
+    "downward_edges",
+    "holds_point",
+    "is_bottom_left",
+]

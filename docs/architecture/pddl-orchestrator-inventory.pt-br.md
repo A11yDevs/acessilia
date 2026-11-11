@@ -102,7 +102,7 @@ Só aparecem os grupos marcados para decompor ou com uma parte para o docstruct 
   - `_reclassify_formula_picture` e `_escalate_unresolved_formula` alteram o manifesto, então ficam no core.
   - `_enrich_formula_latex`, com 299 linhas a maior função do arquivo, fica no core e é dividida lá (#365).
 - **Q: matemática inline.**
-  - A geometria de spans vai para `docstruct.text.inline_math`, que já detecta e encaixa os trechos (ADR-0011): `_top_left_box`, `_detect_by_page`, `_element_span_lines`, `_claim_negation_overlay` e `_boxed_pages`.
+  - A geometria de spans vai para `docstruct.text.inline_math`, que já detecta e encaixa os trechos (ADR-0011): `_top_left_box`, `_detect_by_page` e `_element_span_lines`, que leem as caixas de um elemento como posições `(página, caixa)`. O teste de pertinência que elas dividem com `_claim_negation_overlay` é `docstruct.geometry.boxes.holds_point`. `_claim_negation_overlay` grava a reivindicação e acha a caixa da barra com o `_bbox` de F, e `_boxed_pages` lê os elementos do core, por isso os dois ficam no core.
   - `ToolboxPdfClient.text_spans` já lê o `document.text.spans` e confere a resposta. O que sobra são os lotes: `backend/tools/text_spans.fetch_text_spans` pede no máximo `TEXT_SPANS_MAX_PAGES` páginas por chamada, o que é transporte e vai para o SDK, como a paginação de datasets foi no #432. O cache por documento do `_TextSpanReader`, e o registro de uma falha (`configuration["inline_math_detection"]`), ficam no core.
   - `_mark_inline_math`, `_mark_table_inline_math` e a checagem da configuração ficam no core.
 - **S: enriquecimento de tabelas.**

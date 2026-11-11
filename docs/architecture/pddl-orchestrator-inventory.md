@@ -102,7 +102,7 @@ Only the groups marked "decompose" or with a docstruct or SDK part are listed. T
   - `_reclassify_formula_picture` and `_escalate_unresolved_formula` change the manifest, so they stay in the core.
   - `_enrich_formula_latex`, at 299 lines the largest function in the file, stays in the core and is split there (#365).
 - **Q: inline math.**
-  - The span geometry goes to `docstruct.text.inline_math`, which already detects and splices the runs (ADR-0011): `_top_left_box`, `_detect_by_page`, `_element_span_lines`, `_claim_negation_overlay` and `_boxed_pages`.
+  - The span geometry goes to `docstruct.text.inline_math`, which already detects and splices the runs (ADR-0011): `_top_left_box`, `_detect_by_page` and `_element_span_lines`, which read an element's boxes as `(page, box)` placements. The containment test they share with `_claim_negation_overlay` is `docstruct.geometry.boxes.holds_point`. `_claim_negation_overlay` writes the claim and finds the slash's box with F's `_bbox`, and `_boxed_pages` reads the core's elements, so both stay in the core.
   - `ToolboxPdfClient.text_spans` already reads `document.text.spans` and checks the answer. What is left is batching: `backend/tools/text_spans.fetch_text_spans` asks for at most `TEXT_SPANS_MAX_PAGES` pages per call, which is transport and moves to the SDK, as the dataset paging did in #432. `_TextSpanReader`'s per-document cache, and its record of a failure (`configuration["inline_math_detection"]`), stay in the core.
   - `_mark_inline_math`, `_mark_table_inline_math` and the setting check stay in the core.
 - **S: table enrichment.**

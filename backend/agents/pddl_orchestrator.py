@@ -10,7 +10,7 @@ import re
 import tempfile
 from collections import Counter
 from collections.abc import Callable, Coroutine, Iterable
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -31,7 +31,7 @@ from docstruct.fusion.noise import (
 )
 from docstruct.fusion.tailjoin import is_page_number as _is_page_number
 from docstruct.geometry import reading_role
-from docstruct.geometry.boxes import downward_edges
+from docstruct.geometry.boxes import downward_edges, holds_point
 from docstruct.regions.letterhead import PlacedItem, letterhead_groups
 from docstruct.tables.ast import (
     linearize_table_for_text,
@@ -47,11 +47,11 @@ from docstruct.text.implicit_products import (
     mark_implicit_products,
 )
 from docstruct.text.inline_math import (
-    InlineMathDetection,
-    TextSpan,
+    Placement,
     assign_runs_to_cells,
-    detect_inline_math,
+    detect_inline_math_by_page,
     splice_inline_math,
+    top_left_box,
 )
 from docstruct.text.latex import has_latex_markup, latex_text_agreement
 from docstruct.text.math_spans import block_prose, inline_math_sources
@@ -3375,8 +3375,6 @@ def _ranked_formula_candidates(candidates: Iterable[dict[str, Any]]) -> list[dic
 
 #: Element types whose text the exporters render as prose with inline math.
 _INLINE_MATH_ELEMENT_TYPES = frozenset({"paragraph", "list_item", "caption", "footnote"})
-#: Points a span's centre may lie outside its element's box.
-_INLINE_MATH_BOX_TOLERANCE = 2.0
 
 
 class _TextSpanReader:
@@ -3481,7 +3479,7 @@ async def _mark_inline_math(
     heights = {page.page_number: page.height for page in manifest.pages}
     overlays = [element for element in manifest.elements if is_detached_overlay(element.text)]
     for element in candidates:
-        detection = _detect_by_page(element, spans, heights)
+        detection = detect_inline_math_by_page(_placements(element), spans, heights)
         if not detection.runs:
             continue
         result = splice_inline_math(element.text or "", detection)
@@ -3539,7 +3537,7 @@ async def _mark_table_inline_math(
     heights = {page.page_number: page.height for page in manifest.pages}
     overlays = [element for element in manifest.elements if is_detached_overlay(element.text)]
     for table in tables:
-        detection = _detect_by_page(table, spans, heights)
+        detection = detect_inline_math_by_page(_placements(table), spans, heights)
         if not detection.runs:
             continue
         cells = [
@@ -3574,78 +3572,9 @@ async def _mark_table_inline_math(
     return counts
 
 
-def _top_left_box(
-    box: Any, page: int, spans: dict[int, dict[str, Any]], heights: dict[int, float | None]
-) -> tuple[float, float, float, float] | None:
-    """``(left, top, right, bottom)`` of a manifest box, top-left origin, in points."""
-    if box.coord_origin == "BOTTOMLEFT":
-        height = (spans.get(page) or {}).get("height") or heights.get(page)
-        if not height:
-            return None
-        return box.left, height - box.top, box.right, height - box.bottom
-    if box.coord_origin == "TOPLEFT":
-        return box.left, box.top, box.right, box.bottom
-    return None
-
-
-def _detect_by_page(
-    element: ManifestElement,
-    spans: dict[int, dict[str, Any]],
-    heights: dict[int, float | None],
-) -> InlineMathDetection:
-    """``detect_inline_math`` over the element's lines, page by page, as one detection.
-
-    Each page is read on its own, so a fraction never pairs lines of two pages
-    (baselines are per-page coordinates), and each run carries its page, where
-    its negation slashes are claimed: a table is the element that spans pages.
-    """
-    detection = InlineMathDetection()
-    pages = dict.fromkeys(p.page_number for p in element.provenance if p.bbox is not None)
-    for page in pages:
-        read = detect_inline_math(_element_span_lines(element, spans, heights, page))
-        offset = len(detection.flat)
-        detection.flat += read.flat
-        detection.runs.extend(
-            replace(run, start=run.start + offset, end=run.end + offset, page=page)
-            for run in read.runs
-        )
-    return detection
-
-
-def _element_span_lines(
-    element: ManifestElement,
-    spans: dict[int, dict[str, Any]],
-    heights: dict[int, float | None],
-    page_number: int,
-) -> list[list[TextSpan]]:
-    """The element's text-layer lines on a page, in order: spans whose centre lies in its boxes.
-
-    A rotated page is left out: its spans are in the unrotated space, which the
-    element's box may not be.
-    """
-    lines: list[list[TextSpan]] = []
-    for provenance in element.provenance:
-        if provenance.page_number != page_number:
-            continue
-        page = spans.get(provenance.page_number)
-        if provenance.bbox is None or page is None or page.get("rotation"):
-            continue
-        box = _top_left_box(provenance.bbox, provenance.page_number, spans, heights)
-        if box is None:
-            continue
-        left, top, right, bottom = box
-        top, bottom = min(top, bottom), max(top, bottom)
-        margin = _INLINE_MATH_BOX_TOLERANCE
-        for line in page.get("lines") or []:
-            inside = []
-            for span in line.get("spans") or []:
-                x0, y0, x1, y1 = span["bbox"]
-                x, y = (x0 + x1) / 2, (y0 + y1) / 2
-                if left - margin <= x <= right + margin and top - margin <= y <= bottom + margin:
-                    inside.append(TextSpan.from_dict(span))
-            if inside:
-                lines.append(inside)
-    return lines
+def _placements(element: ManifestElement) -> list[Placement]:
+    """The element's pages and boxes, as ``docstruct.text.inline_math`` reads them."""
+    return [(provenance.page_number, provenance.bbox) for provenance in element.provenance]
 
 
 def _claim_negation_overlay(
@@ -3664,13 +3593,10 @@ def _claim_negation_overlay(
         located = _bbox(overlay, page)
         if located is None:
             continue
-        box = _top_left_box(located[1], page, spans, heights)
+        box = top_left_box(located[1], page, spans, heights)
         if box is None:
             continue
-        left, top, right, bottom = box
-        top, bottom = min(top, bottom), max(top, bottom)
-        margin = _OVERLAY_HOST_TOLERANCE * 2
-        if left - margin <= x <= right + margin and top - margin <= y <= bottom + margin:
+        if holds_point(box, x, y, _OVERLAY_HOST_TOLERANCE * 2):
             overlay.metadata["negation_overlay"] = {"outcome": "inline-math", "host": host.id}
             return
 
