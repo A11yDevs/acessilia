@@ -17,7 +17,7 @@ import asyncio
 import hashlib
 import json
 import time
-from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -29,9 +29,8 @@ from acessilia_sdk.toolbox.errors import (
     ToolboxError,
     ToolboxProviderUnavailable,
     ToolboxTimeout,
-    ToolboxUnavailable,
 )
-from acessilia_sdk.toolbox.endpoints import FAILOVER_ERRORS, ToolboxEndpoint
+from acessilia_sdk.toolbox.endpoints import ToolboxEndpoint
 from acessilia_sdk.toolbox.transport import auth_headers, raise_for_error
 
 
@@ -151,43 +150,6 @@ async def read_catalog(
         headers=auth_headers(key),
     ) as http:
         return await fetch_catalog(http, clock=clock)
-
-
-async def read_first_catalog(
-    endpoints: Sequence[ToolboxEndpoint],
-    *,
-    timeout_seconds: float,
-    api_key: str | None = None,
-    on_failover: Callable[[ToolboxEndpoint, ToolboxError], None] | None = None,
-    clock: Callable[[], float] = time.monotonic,
-) -> CatalogSnapshot:
-    """The catalogue of the first endpoint that can serve it, tried in order.
-
-    The order and the failover rule are the capability clients' (ADR-0006):
-    the next endpoint is tried only when one could not serve the read
-    (``FAILOVER_ERRORS``: a timeout or an unavailable instance); any other
-    error, such as a contract violation or a 4xx, is raised at once. The
-    snapshot comes whole from one deployment: capabilities and providers are
-    never mixed across endpoints. When every endpoint fails, the only failure
-    is raised as it is, or :class:`ToolboxUnavailable` with every cause.
-    ``on_failover`` is called for each endpoint left behind when there is more
-    than one. Each read is :func:`read_catalog`, with its budget and no retries.
-    """
-    if not endpoints:
-        raise ValueError("At least one Toolbox endpoint is required")
-    causes: list[tuple[str, ToolboxError]] = []
-    for endpoint in endpoints:
-        try:
-            return await read_catalog(
-                endpoint, timeout_seconds=timeout_seconds, api_key=api_key, clock=clock
-            )
-        except FAILOVER_ERRORS as exc:
-            causes.append((endpoint.base_url, exc))
-            if on_failover is not None and len(endpoints) > 1:
-                on_failover(endpoint, exc)
-    if len(causes) == 1:
-        raise causes[0][1]
-    raise ToolboxUnavailable(causes)
 
 
 def missing_requirements(
@@ -311,6 +273,5 @@ __all__ = [
     "fetch_catalog",
     "missing_requirements",
     "read_catalog",
-    "read_first_catalog",
     "snapshot_from_payloads",
 ]

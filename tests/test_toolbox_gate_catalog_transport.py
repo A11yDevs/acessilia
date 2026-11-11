@@ -1,12 +1,13 @@
 """How the availability gate reads the Toolbox catalogue (#402, step 3).
 
-The catalogue is read where the capability clients call: the endpoints of
-``TOOLBOX_BASE_URLS`` in order, else ``TOOLBOX_BASE_URL``, with the core's API
-key. Each read has a 10 s budget per request instead of the extraction timeout,
-and no retries. The next endpoint is tried only when one is unreachable or
-times out (ADR-0006), and the snapshot comes whole from one deployment. A
-failed read never raises out of the gate: the cache records it and the gate
-reports it as ``catalog_error``.
+The catalogue is read from the capability clients' primary endpoint: the first
+of ``TOOLBOX_BASE_URLS``, else ``TOOLBOX_BASE_URL``, with the core's API key.
+That is the deployment every capability call goes to first. There is no
+failover for the catalogue: a secondary's snapshot would admit methods that
+execution still sends to the primary (#429). Each read has a 10 s budget per
+request instead of the extraction timeout, and no retries. A failed read
+never raises out of the gate: the cache records it and the gate reports it as
+``catalog_error``.
 """
 
 from __future__ import annotations
@@ -18,15 +19,13 @@ import httpx
 import pytest
 import respx
 
-from acessilia_sdk.toolbox import (
-    ToolboxContractViolation,
-    ToolboxProviderUnavailable,
-    ToolboxTimeout,
-    snapshot_from_payloads,
-)
+from acessilia_sdk.toolbox import ToolboxCapabilityError, ToolboxProviderUnavailable, ToolboxTimeout
+from acessilia_sdk.toolbox.clients import ToolboxStructureClient
 from backend.config.settings import settings
 from backend.core.planning import toolbox_gate
 from backend.tools import toolbox_client
+from backend.tools.toolbox_client import make_toolbox_client
+from tests.pddl_support import build_element, build_manifest, build_obligation
 
 PRIMARY = "http://toolbox-a.test"
 SECONDARY = "http://toolbox-b.test"
@@ -61,10 +60,6 @@ def _serve(
     router.get(f"{base_url}/v1/capabilities").mock(side_effect=record(CONTRACT["capabilities"]))
     router.get(f"{base_url}/v1/providers").mock(side_effect=record(providers))
     return seen
-
-
-def _refuse(request: httpx.Request) -> httpx.Response:
-    raise httpx.ConnectError("refused", request=request)
 
 
 @pytest.fixture
@@ -104,80 +99,6 @@ async def test_toolbox_base_urls_sets_the_catalogue_endpoint_like_the_clients(
     assert secondary
     assert primary == []
     assert failovers == []
-
-
-def _without(provider_id: str) -> list[dict]:
-    return [entry for entry in CONTRACT["providers"] if entry["id"] != provider_id]
-
-
-@pytest.mark.asyncio
-async def test_an_unreachable_primary_moves_the_read_to_the_next_endpoint(
-    monkeypatch, failovers
-) -> None:
-    monkeypatch.setattr(settings, "toolbox_base_urls", f"{PRIMARY},{SECONDARY}")
-    fewer = _without(CONTRACT["providers"][0]["id"])
-    with respx.mock(assert_all_called=False) as router:
-        router.get(f"{PRIMARY}/v1/capabilities").mock(side_effect=_refuse)
-        secondary = _serve(router, SECONDARY, providers=fewer)
-        snapshot = await toolbox_gate._fetch()
-
-    expected = snapshot_from_payloads(CONTRACT["capabilities"], fewer, fetched_at=0.0)
-    assert snapshot.revision == expected.revision
-    assert all(r.headers["Authorization"] == "Bearer core-key" for r in secondary)
-    assert failovers == [(PRIMARY, "ToolboxProviderUnavailable")]
-
-
-@pytest.mark.asyncio
-async def test_a_snapshot_never_mixes_two_deployments(monkeypatch, failovers) -> None:
-    """The primary's capabilities are dropped when its providers read times out."""
-    monkeypatch.setattr(settings, "toolbox_base_urls", f"{PRIMARY},{SECONDARY}")
-    fewer = _without(CONTRACT["providers"][0]["id"])
-    with respx.mock(assert_all_called=False) as router:
-        router.get(f"{PRIMARY}/v1/capabilities").mock(
-            return_value=httpx.Response(200, json=CONTRACT["capabilities"])
-        )
-        router.get(f"{PRIMARY}/v1/providers").mock(side_effect=httpx.ReadTimeout("slow"))
-        secondary = _serve(router, SECONDARY, providers=fewer)
-        snapshot = await toolbox_gate._fetch()
-
-    assert [r.url.path for r in secondary][:2] == ["/v1/capabilities", "/v1/providers"]
-    expected = snapshot_from_payloads(CONTRACT["capabilities"], fewer, fetched_at=0.0)
-    assert snapshot.revision == expected.revision
-    assert failovers == [(PRIMARY, "ToolboxTimeout")]
-
-
-@pytest.mark.asyncio
-async def test_a_malformed_primary_catalogue_is_not_failed_over(
-    monkeypatch, failovers
-) -> None:
-    monkeypatch.setattr(settings, "toolbox_base_urls", f"{PRIMARY},{SECONDARY}")
-    with respx.mock(assert_all_called=False) as router:
-        router.get(f"{PRIMARY}/v1/capabilities").mock(
-            return_value=httpx.Response(200, text="not json")
-        )
-        secondary = _serve(router, SECONDARY)
-        with pytest.raises(ToolboxContractViolation):
-            await toolbox_gate._fetch()
-
-    assert secondary == []
-    assert failovers == []
-
-
-@pytest.mark.asyncio
-async def test_when_every_endpoint_fails_the_cache_records_every_cause(
-    monkeypatch, failovers
-) -> None:
-    monkeypatch.setattr(settings, "toolbox_base_urls", f"{PRIMARY},{SECONDARY}")
-    with respx.mock() as router:
-        router.get(f"{PRIMARY}/v1/capabilities").mock(side_effect=_refuse)
-        router.get(f"{SECONDARY}/v1/capabilities").mock(side_effect=httpx.ReadTimeout("slow"))
-        cache = toolbox_gate.catalog_cache()
-        snapshot = await cache.get()
-
-    assert snapshot is None
-    assert cache.last_error.startswith("ToolboxUnavailable: ")
-    assert PRIMARY in cache.last_error and SECONDARY in cache.last_error
-    assert [url for url, _ in failovers] == [PRIMARY, SECONDARY]
 
 
 @pytest.mark.asyncio
@@ -250,3 +171,92 @@ async def test_an_unusable_url_is_recorded_by_the_cache_not_raised(
     assert snapshot is None
     assert cache.last_error is not None
     assert cache.last_error.startswith("ToolboxProviderUnavailable: ")
+
+
+@pytest.mark.asyncio
+async def test_the_catalogue_never_fails_over_to_a_secondary(monkeypatch, failovers) -> None:
+    monkeypatch.setattr(settings, "toolbox_base_urls", f"{PRIMARY},{SECONDARY}")
+    with respx.mock(assert_all_called=False) as router:
+        router.get(f"{PRIMARY}/v1/capabilities").mock(side_effect=httpx.ReadTimeout("slow"))
+        secondary = _serve(router, SECONDARY)
+        with pytest.raises(ToolboxTimeout):
+            await toolbox_gate._fetch()
+
+    assert secondary == []
+    assert failovers == []
+
+
+# The gate and the call it admits, end to end (review of #429): the deployment
+# whose catalogue decided must be the one the capability client calls.
+
+EXTRACT_ON = "/v1/capabilities/document.structure.extract:execute"
+
+
+def _single_provider_manifest():
+    return build_manifest(
+        [build_element("el-1", "paragraph")],
+        [build_obligation("fuse-providers", ["el-1"], ["single-provider", "human-review"])],
+    )
+
+
+@pytest.fixture
+def enforce_with_two_endpoints(monkeypatch):
+    monkeypatch.setattr(settings, "toolbox_base_urls", f"{PRIMARY},{SECONDARY}")
+    monkeypatch.setattr(settings, "toolbox_availability_gate", "enforce")
+    monkeypatch.setattr(settings, "toolbox_provider", "docling")
+    monkeypatch.setattr(settings, "toolbox_retries", 0)
+
+
+async def _extract(tmp_path) -> None:
+    source = tmp_path / "doc.pdf"
+    source.write_bytes(b"%PDF-1.4\n")
+    client = make_toolbox_client(ToolboxStructureClient)
+    try:
+        await client.extract_structure(file_path=source)
+    finally:
+        await client.close()
+
+
+@pytest.mark.asyncio
+async def test_an_unreadable_primary_catalogue_blocks_what_would_run_there(
+    enforce_with_two_endpoints, tmp_path
+) -> None:
+    """The reviewer's case: A's catalogue times out, B publishes the provider.
+
+    A secondary's snapshot must not admit the method, because execution still
+    starts on A, where nothing was checked. The decision stays conservative.
+    """
+    with respx.mock(assert_all_called=False) as router:
+        router.get(f"{PRIMARY}/v1/capabilities").mock(side_effect=httpx.ReadTimeout("slow"))
+        secondary = _serve(router, SECONDARY)
+        execute_on_primary = router.post(f"{PRIMARY}{EXTRACT_ON}").mock(
+            return_value=httpx.Response(400, json={"detail": "unsupported provider"})
+        )
+        decision = await toolbox_gate.decide(_single_provider_manifest())
+
+    assert "single-provider" in decision.blocked
+    assert decision.catalog_error is not None
+    assert decision.catalog_error.startswith("ToolboxTimeout: ")
+    assert secondary == []
+    assert not execute_on_primary.called
+
+
+@pytest.mark.asyncio
+async def test_an_admitted_method_executes_on_the_deployment_that_was_checked(
+    enforce_with_two_endpoints, tmp_path
+) -> None:
+    with respx.mock(assert_all_called=False) as router:
+        primary = _serve(router, PRIMARY)
+        secondary = _serve(router, SECONDARY)
+        execute_on_primary = router.post(f"{PRIMARY}{EXTRACT_ON}").mock(
+            return_value=httpx.Response(400, json={"detail": "rejected"})
+        )
+        execute_on_secondary = router.post(f"{SECONDARY}{EXTRACT_ON}")
+        decision = await toolbox_gate.decide(_single_provider_manifest())
+        with pytest.raises(ToolboxCapabilityError):
+            await _extract(tmp_path)
+
+    assert decision.blocked == {}
+    assert primary and secondary == []
+    assert execute_on_primary.called
+    assert not execute_on_secondary.called

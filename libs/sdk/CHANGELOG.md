@@ -7,12 +7,10 @@ can see are recorded here, newest first.
 
 ## Unreleased
 
-- **Added** `read_first_catalog(endpoints, *, timeout_seconds, api_key,
-  on_failover)`: the catalogue of the first endpoint that can serve it, with
-  the capability clients' failover rule (ADR-0006) and the snapshot from one
-  deployment. `read_catalog` takes an optional `api_key` for an endpoint
-  without its own key. The core's availability gate reads the catalogue with
-  them where its clients call (#402).
+- **Added** `read_catalog` takes an optional `api_key`, used when the endpoint
+  has no key of its own, as the capability clients do. The core's
+  availability gate passes its clients' key with their primary endpoint
+  (#402).
 - **Added** `read_catalog(endpoint, *, timeout_seconds)`
   (`acessilia_sdk.toolbox.catalog`): reads one endpoint's catalogue on a
   short-lived HTTP client, with the caller's per-request timeout and no
