@@ -20,6 +20,9 @@ SYNC_CAPABILITY = "dataset.sync"
 #: ``dataset.sync`` re-mirrors whole datasets; it gets at least this timeout.
 SYNC_MIN_TIMEOUT_SECONDS = 1800
 
+#: The Toolbox caps a listing page at this many items.
+MAX_PAGE_SIZE = 1000
+
 
 class ToolboxDatasetClient(ToolboxCapabilityClient):
     """Datasets mirrored by the Toolbox: listing, items, artifacts, samples."""
@@ -62,6 +65,37 @@ class ToolboxDatasetClient(ToolboxCapabilityClient):
             LIST_ITEMS_CAPABILITY,
             {"limit": limit, "offset": offset, **_revision(revision)},
         )
+
+    async def list_all_items(
+        self,
+        dataset_id: str,
+        split: str,
+        *,
+        revision: str | None = None,
+        limit: int | None = None,
+        page_size: int = MAX_PAGE_SIZE,
+    ) -> list[dict[str, Any]]:
+        """Every item of a split, or the first ``limit``, read page by page.
+
+        Pages of ``page_size`` items (at most :data:`MAX_PAGE_SIZE`) are read
+        on this client until a page comes back short; the last page asks only
+        for what ``limit`` still needs. A failed page raises its typed error:
+        no partial list is returned.
+        """
+        if not 1 <= page_size <= MAX_PAGE_SIZE:
+            raise ValueError(f"page_size must be between 1 and {MAX_PAGE_SIZE}")
+        if limit is not None and limit < 0:
+            raise ValueError("limit must be zero or positive")
+        items: list[dict[str, Any]] = []
+        while limit is None or len(items) < limit:
+            size = page_size if limit is None else min(page_size, limit - len(items))
+            batch = await self.list_items(
+                dataset_id, split, revision=revision, limit=size, offset=len(items)
+            )
+            items.extend(batch)
+            if len(batch) < size:
+                break
+        return items
 
     async def get_item(
         self,
@@ -171,6 +205,7 @@ __all__ = [
     "LIST_CAPABILITY",
     "LIST_ITEMS_CAPABILITY",
     "LIST_SPLITS_CAPABILITY",
+    "MAX_PAGE_SIZE",
     "SAMPLE_CAPABILITY",
     "SYNC_CAPABILITY",
     "SYNC_MIN_TIMEOUT_SECONDS",

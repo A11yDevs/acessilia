@@ -24,7 +24,11 @@ benchmark sobre as predições.
 
 ## Fluxo
 
-A Toolbox precisa estar acessível (valem as configurações `TOOLBOX_*` do core).
+A Toolbox precisa estar acessível. O harness configura os próprios clientes do
+SDK (`scripts/bench/toolbox.py`), a partir do ambiente ou do `.env`, com os
+mesmos nomes de variáveis e padrões do core: `TOOLBOX_BASE_URLS` (ou então
+`TOOLBOX_BASE_URL`), `TOOLBOX_API_KEY`, `TOOLBOX_TIMEOUT_SECONDS`,
+`TOOLBOX_RETRIES`, `TOOLBOX_RETRY_BACKOFF_SECONDS` e `TOOLBOX_PROVIDER`.
 
 ```bash
 # 1. Materializa um split localmente: var/bench/<dataset>/<split>/data

@@ -13,7 +13,7 @@ from acessilia_sdk.toolbox import (
     ToolboxUnavailable,
 )
 from acessilia_sdk.toolbox.clients import ToolboxDatasetClient
-from acessilia_sdk.toolbox.clients.dataset import SYNC_MIN_TIMEOUT_SECONDS
+from acessilia_sdk.toolbox.clients.dataset import MAX_PAGE_SIZE, SYNC_MIN_TIMEOUT_SECONDS
 
 BASE_URL = "http://localhost:8002"
 SECONDARY = "http://toolbox-b.test"
@@ -155,3 +155,85 @@ async def test_dataset_artifact_path_is_encoded_without_changing_filename(respx_
     assert request.url.path == "/v1/datasets/dr-docbench/splits/dev/items/p1/artifacts/" + path
     assert not request.url.query
     assert not request.url.fragment
+
+
+def _serve_items(respx_mock, total: int):
+    def handler(request: httpx.Request) -> httpx.Response:
+        limit = int(request.url.params["limit"])
+        offset = int(request.url.params["offset"])
+        size = max(0, min(limit, total - offset))
+        return httpx.Response(200, json=[{"id": str(n)} for n in range(offset, offset + size)])
+
+    return respx_mock.get(ITEMS).mock(side_effect=handler)
+
+
+def _pages(route) -> list[tuple[str, str]]:
+    return [
+        (call.request.url.params["limit"], call.request.url.params["offset"])
+        for call in route.calls
+    ]
+
+
+@pytest.mark.asyncio
+async def test_list_all_items_reads_pages_until_a_short_one(respx_mock, client):
+    route = _serve_items(respx_mock, total=2 * MAX_PAGE_SIZE + 5)
+
+    items = await client.list_all_items("dr-docbench", "dev")
+
+    assert [item["id"] for item in items] == [str(n) for n in range(2 * MAX_PAGE_SIZE + 5)]
+    assert _pages(route) == [("1000", "0"), ("1000", "1000"), ("1000", "2000")]
+
+
+@pytest.mark.asyncio
+async def test_list_all_items_asks_only_for_what_the_limit_needs(respx_mock, client):
+    route = _serve_items(respx_mock, total=50)
+
+    items = await client.list_all_items("dr-docbench", "dev", limit=25, page_size=10)
+
+    assert len(items) == 25
+    assert _pages(route) == [("10", "0"), ("10", "10"), ("5", "20")]
+
+
+@pytest.mark.asyncio
+async def test_list_all_items_sends_the_revision_on_every_page(respx_mock, client):
+    route = _serve_items(respx_mock, total=15)
+
+    await client.list_all_items("dr-docbench", "dev", revision="r1", page_size=10)
+
+    assert [call.request.url.params["revision"] for call in route.calls] == ["r1", "r1"]
+
+
+@pytest.mark.asyncio
+async def test_list_all_items_with_a_zero_limit_reads_nothing(respx_mock, client):
+    route = _serve_items(respx_mock, total=5)
+
+    assert await client.list_all_items("dr-docbench", "dev", limit=0) == []
+    assert not route.called
+
+
+@pytest.mark.asyncio
+async def test_list_all_items_raises_a_failed_page_instead_of_a_partial_list(
+    respx_mock, client
+):
+    calls = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            return httpx.Response(400, json={"detail": "bad page"})
+        return httpx.Response(200, json=[{"id": str(n)} for n in range(10)])
+
+    respx_mock.get(ITEMS).mock(side_effect=handler)
+
+    with pytest.raises(ToolboxCapabilityError):
+        await client.list_all_items("dr-docbench", "dev", page_size=10)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "kwargs", [{"page_size": 0}, {"page_size": MAX_PAGE_SIZE + 1}, {"limit": -1}]
+)
+async def test_list_all_items_rejects_bad_bounds(client, kwargs):
+    with pytest.raises(ValueError):
+        await client.list_all_items("dr-docbench", "dev", **kwargs)

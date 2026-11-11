@@ -23,7 +23,11 @@ number you report, run the benchmark's official evaluator on the predictions.
 
 ## Workflow
 
-The Toolbox must be reachable (the core's `TOOLBOX_*` settings apply).
+The Toolbox must be reachable. The harness configures its SDK clients itself
+(`scripts/bench/toolbox.py`), from the environment or `.env`, with the core's
+variable names and defaults: `TOOLBOX_BASE_URLS` (else `TOOLBOX_BASE_URL`),
+`TOOLBOX_API_KEY`, `TOOLBOX_TIMEOUT_SECONDS`, `TOOLBOX_RETRIES`,
+`TOOLBOX_RETRY_BACKOFF_SECONDS` and `TOOLBOX_PROVIDER`.
 
 ```bash
 # 1. Materialize a split locally: var/bench/<dataset>/<split>/data
