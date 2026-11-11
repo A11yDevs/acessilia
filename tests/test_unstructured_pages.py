@@ -32,6 +32,7 @@ from backend.core.manifest.builder import (
 from backend.core.manifest.models import PageDescriptor
 from backend.core.manifest.toolbox_extractor import ToolboxExtraction
 from backend.core.planning import toolbox_gate
+from docstruct.placeholders import is_placeholder_visual
 from tests.pddl_support import build_element, build_manifest
 from tests.test_toolbox_manifest_extractor import SAMPLE_TOOLBOX_RESPONSE
 
@@ -460,7 +461,7 @@ def test_the_heuristics_leave_the_placeholder_to_the_plan(source_pdf):
     placeholder = next(e for e in manifest.elements if e.id == target)
     obligations_before = len(manifest.obligations)
 
-    assert not pddl._is_placeholder_visual_element(placeholder)
+    assert not is_placeholder_visual(placeholder)
     pddl._inject_full_page_picture(
         manifest, {"is_image": True, "requires_visual_inspection": True}
     )

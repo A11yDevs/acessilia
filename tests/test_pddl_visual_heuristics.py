@@ -1,15 +1,22 @@
 """Which text counts as content, for the picture enrichment (#402).
 
 Characterization of the orchestrator's text heuristics, written on develop
-before they moved to docstruct: OCR noise, placeholder texts and labels,
-meaningful text, and a manifest that is mostly visual.
+before they moved to docstruct.placeholders: OCR noise, placeholder texts and
+labels, meaningful text, and a manifest that is mostly visual. They run here on
+the core's models, as the orchestrator calls them.
 """
 
 from __future__ import annotations
 
 import pytest
 
-from backend.agents import pddl_orchestrator as pddl
+from docstruct.placeholders import (
+    has_meaningful_text,
+    is_mostly_visual,
+    is_ocr_noise,
+    is_placeholder_text,
+    is_placeholder_visual,
+)
 from tests.pddl_support import build_element, build_manifest
 
 
@@ -22,7 +29,7 @@ from tests.pddl_support import build_element, build_manifest
     ],
 )
 def test_ocr_noise(text, expected) -> None:
-    assert pddl._is_ocr_noise(text) is expected
+    assert is_ocr_noise(text) is expected
 
 
 @pytest.mark.parametrize(
@@ -31,7 +38,7 @@ def test_ocr_noise(text, expected) -> None:
      ("group", True), ("groups", False), ("", False), ("body text", False)],
 )
 def test_placeholder_text(text, expected) -> None:
-    assert pddl._is_placeholder_text(text) is expected
+    assert is_placeholder_text(text) is expected
 
 
 @pytest.mark.parametrize(
@@ -40,7 +47,7 @@ def test_placeholder_text(text, expected) -> None:
      ("Logotipo", False), ("Uma figura com legenda", True), ("abcdefghi", True)],
 )
 def test_meaningful_text(text, expected) -> None:
-    assert pddl._has_meaningful_text(build_element("p", "picture", text=text)) is expected
+    assert has_meaningful_text(build_element("p", "picture", text=text)) is expected
 
 
 def _element(kind, text=None, raw_label=None, metadata=None):
@@ -70,7 +77,7 @@ def _element(kind, text=None, raw_label=None, metadata=None):
     ],
 )
 def test_placeholder_visual_element(element, expected) -> None:
-    assert pddl._is_placeholder_visual_element(element) is expected
+    assert is_placeholder_visual(element) is expected
 
 
 @pytest.mark.parametrize(
@@ -89,4 +96,4 @@ def test_mostly_visual_manifest(elements, expected) -> None:
     manifest = build_manifest(
         [build_element(f"e{i}", kind, text=text) for i, (kind, text) in enumerate(elements)], []
     )
-    assert pddl._is_mostly_visual_manifest(manifest) is expected
+    assert is_mostly_visual(manifest.elements) is expected

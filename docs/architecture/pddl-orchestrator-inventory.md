@@ -94,7 +94,7 @@ Only the groups marked "decompose" or with a docstruct or SDK part are listed. T
 - **O: picture enrichment.**
   - The flow, retries and breaker stay in the core (`_enrich_picture_descriptions`, 197 lines, and `_retry_failed`).
   - `_extract_picture_bytes`, `_picture_clip` and `_embedded_picture_bytes` (#386) mix a render through G's adapter, clip geometry (docstruct) and a size limit (core policy).
-  - The heuristics `_is_ocr_noise`, `_is_placeholder_text`, `_is_placeholder_visual_element` and `_has_meaningful_text` are pure text and element tests, so they go to docstruct. `_is_mostly_visual_manifest` becomes their adapter.
+  - The heuristics `_is_ocr_noise`, `_is_placeholder_text`, `_is_placeholder_visual_element` and `_has_meaningful_text` are pure text and element tests, so they go to `docstruct.placeholders` (`is_ocr_noise`, `is_placeholder_text`, `is_placeholder_visual`, `has_meaningful_text`). `_is_mostly_visual_manifest` reads only the elements, so it moves too, as `is_mostly_visual`. They read an element through a read-only protocol that the core's `ManifestElement` satisfies, so the core needs no adapter.
   - `_inject_full_page_picture` changes the manifest, so it stays in the core.
 - **P: formula enrichment.**
   - `_formula_recognition_crop` renders through G's adapter and crops (docstruct for the clip geometry).
