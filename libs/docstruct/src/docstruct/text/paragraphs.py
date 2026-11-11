@@ -6,6 +6,13 @@ from __future__ import annotations
 
 import re
 
+#: The line that opens each page of the PDDL payload's plain text, written by
+#: :func:`docstruct.export.page_text.pages_text`. It is also a marker:
+#: :func:`merge_broken_paragraphs` never joins a line across it, so the text
+#: and the reader must keep agreeing (a test checks they do).
+PAGE_HEADING = "=== Pagina {page_number} ==="
+_PAGE_HEADING_LINE = re.compile(r"^=== Pagina \d+ ===$")
+
 
 def merge_broken_paragraphs(text: str) -> str:
     lines = text.split("\n")
@@ -15,7 +22,7 @@ def merge_broken_paragraphs(text: str) -> str:
     while i < len(lines):
         line = lines[i].rstrip()
 
-        if re.match(r"^=== Pagina \d+ ===$", line):
+        if _PAGE_HEADING_LINE.match(line):
             processed_lines.append(line)
             i += 1
             continue
@@ -30,7 +37,7 @@ def merge_broken_paragraphs(text: str) -> str:
             next_line = lines[i + 1].lstrip()
             if (
                 next_line
-                and not re.match(r"^=== Pagina \d+ ===$", next_line)
+                and not _PAGE_HEADING_LINE.match(next_line)
                 and next_line[0].islower()
             ):
                 line = line + " " + next_line
