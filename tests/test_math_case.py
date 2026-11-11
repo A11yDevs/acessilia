@@ -9,6 +9,7 @@ import json
 import pytest
 
 from scripts.bench import math_case
+from scripts.bench.dataset_reference import EvaluationSelection
 
 ROWS = [
     {"id": "p1-d01", "page": "1", "kind": "display", "expected_latex": r"s(t) = \frac{1}{2} a t^2"},
@@ -157,11 +158,11 @@ def test_structure_recall_ignores_formulas_without_structure():
 
 
 def test_load_case_names_the_missing_clone(tmp_path):
-    with pytest.raises(FileNotFoundError, match="acessilia-dataset"):
+    with pytest.raises(math_case.DatasetReferenceError, match="acessilia-dataset"):
         math_case.load_case(tmp_path)
 
 
-def test_score_command_writes_the_scorecard(tmp_path, capsys):
+def test_score_command_clears_previous_scorecards_when_retry_fails(tmp_path, capsys):
     case = tmp_path / "dataset" / "input" / "math-reference"
     case.mkdir(parents=True)
     with open(case / "ground_truth.csv", "w", encoding="utf-8", newline="") as fh:
@@ -173,16 +174,32 @@ def test_score_command_writes_the_scorecard(tmp_path, capsys):
     txt = tmp_path / "doc.txt"
     txt.write_text("x", encoding="utf-8")
 
-    code = math_case.main([
+    out = tmp_path / "out"
+    args = [
         "--dataset", str(tmp_path / "dataset"), "score",
-        "--canonical", str(canonical), "--txt", str(txt), "--out", str(tmp_path / "out"),
-    ])
+        "--canonical", str(canonical), "--txt", str(txt), "--out", str(out),
+    ]
+    code = math_case.main(args)
 
     assert code == 0
     assert "| Display CDM (mean) | 100.0 |" in capsys.readouterr().out
-    report = json.loads((tmp_path / "out" / "scorecard.json").read_text(encoding="utf-8"))
+    report = json.loads((out / "scorecard.json").read_text(encoding="utf-8"))
     assert report["summary"]["display_formulas"] == 1
-    assert (tmp_path / "out" / "scorecard.md").exists()
+    assert (out / "scorecard.md").exists()
+    metadata = json.loads((out / "run-metadata.json").read_text(encoding="utf-8"))
+    assert metadata["runtime"]["python"]
+    assert {"scorecard.json", "scorecard.md", "run-metadata.json"} <= set(metadata["artifacts"])
+    assert metadata["artifact_storage"]["observability_export"] is False
+
+    canonical.unlink()
+    (out / "saved-output.txt").write_text("previous artifact", encoding="utf-8")
+    assert math_case.main(args) == 1
+    assert not (out / "scorecard.json").exists()
+    assert not (out / "scorecard.md").exists()
+    assert (out / "saved-output.txt").exists()
+    metadata = json.loads((out / "run-metadata.json").read_text(encoding="utf-8"))
+    assert metadata["status"] == "missing_artifact"
+    assert metadata["stage"] == "artifact_read"
 
 
 def test_structure_recall_sees_set_braces():
@@ -247,6 +264,56 @@ def test_list_content_does_not_join_an_unrelated_list(next_fields):
         _block("l2", "list", 2, items=["Unrelated item"], **next_fields),
     ]
     assert len(math_case._list_runs(blocks, 2)) == 2
+
+
+def test_page_selection_filters_rows_and_their_expectation_dependencies():
+    card = math_case.score_case(
+        ROWS,
+        EXPECTATIONS,
+        GOOD,
+        txt="",
+        selection=EvaluationSelection(pages=(1,)),
+    )
+
+    assert {item["id"] for item in card.display} == {"p1-d01", "p1-d02"}
+    assert {item["id"] for item in card.inline} == {"p1-i01", "p1-i02"}
+    assert card.speech == []  # the only lexical rule is attached to page 2
+    assert "p2-d01" not in card.criteria_ids
+    assert any(item["id"] == "speech:p2-d01" for item in card.not_evaluated)
+
+
+def test_page_selection_unknown_to_reference_is_an_error():
+    with pytest.raises(math_case.DatasetReferenceError, match="absent from the reference"):
+        math_case.score_case(
+            ROWS, EXPECTATIONS, GOOD, txt="",
+            selection=EvaluationSelection(pages=(3,)),
+        )
+
+
+def test_object_and_task_selection_report_only_executed_criterion_ids():
+    object_card = math_case.score_case(
+        ROWS, EXPECTATIONS, GOOD, txt="",
+        selection=EvaluationSelection(object_ids=("p1-d01",)),
+    )
+    assert object_card.criteria_ids == ["p1-d01", "speech-presence:p1-d01"]
+    assert {item["id"] for item in object_card.display} == {"p1-d01"}
+
+    speech_card = math_case.score_case(
+        ROWS, EXPECTATIONS, GOOD, txt="",
+        selection=EvaluationSelection(tasks=("math_formula_speech",)),
+    )
+    assert [check.id for check in speech_card.speech] == ["speech:p2-d01"]
+    assert speech_card.criteria_ids == ["speech-presence:p1-d01", "speech-presence:p1-d02", "speech-presence:p2-d01", "speech:p2-d01"]
+    assert speech_card.summary()["speech_presence"] == {
+        "passed": 2,
+        "total": 3,
+        "criterion_ids": ["speech-presence:p1-d01", "speech-presence:p1-d02", "speech-presence:p2-d01"],
+        "unit": "display formulas with a non-empty spoken form",
+        "status": "evaluated",
+    }
+    assert speech_card.summary()["speech_lexical_checks"]["total"] == 1
+    assert speech_card.summary()["speech_lexical_checks"]["eligible_formulas_in_selection"] == 3
+    assert speech_card.summary()["text_checks"] == "not evaluated"
 
 
 @pytest.mark.parametrize("boundary,page", [("heading", 2), ("paragraph", 3)])

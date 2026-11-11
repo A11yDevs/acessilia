@@ -52,8 +52,14 @@ uv run python -m scripts.bench submit --dataset drdocbench --split test --run ba
 in `pages.txt`; `score` scores only those pages, so a `--sample` run is not
 scored against the whole split. `score` exits 1 when no page has ground truth
 (the `test` split, for instance). `--resume` continues an interrupted run
-instead: earlier predictions stay and `pages.txt` keeps covering every page the
-selection included.
+with the recorded provider, Core revision, and `--save-raw` setting. Earlier
+predictions stay and `pages.txt` keeps covering every page the selection
+included. Use a new run name to extend a run that has predictions but lacks
+extraction metadata. Existing predictions can still be scored.
+
+`extraction.json` records the configuration used for inference. Scoring carries
+that configuration into `run-metadata.json` and records the provider and model
+versions reported by Toolbox for each page in `pages.jsonl`.
 
 Scoring computes two Levenshtein distances per page. Without `rapidfuzz`
 (installed by the `dev` extra) docstruct falls back to pure Python, which takes
@@ -68,8 +74,9 @@ the base has no value in the candidate (for example, it stopped emitting
 tables): the metric would otherwise leave the mean and count as a gain. Values
 that cannot be computed are printed as `null`.
 
-A metric that disappears only on some pages still leaves those pages out of
-its mean; in `drilldown.csv` that component is blank on those pages.
+The command exits 2 if the runs differ in verified source images, references,
+selection or evaluation protocol. Rescore older reports to add the input digest.
+For predictions without recorded source identities, rerun extraction and scoring.
 
 ## On a Slurm cluster
 

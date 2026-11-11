@@ -1,0 +1,91 @@
+{
+  "schema_version": "1.0.0",
+  "id": "doc-5889cf749a02",
+  "title": "005",
+  "language": "pt-BR",
+  "verbosity": "detailed",
+  "audience": [
+    "reader"
+  ],
+  "metadata": {
+    "pipeline_engine": "pddl",
+    "pddl_manifest_id": "manifest-efe4501b2bf0db2a-r1",
+    "pddl_manifest_revision": 1,
+    "pddl_plan_id": "plan-08422dadf7ba6e0a",
+    "pddl_planner": "internal-reference",
+    "pddl_expected_total_cost": 0,
+    "pddl_execution_id": null,
+    "pddl_execution_status": null,
+    "pddl_comparison_verdict": null,
+    "page_count": 1,
+    "mode": "pddl-internal",
+    "pages": [
+      {
+        "page_number": 1,
+        "text": "_root_",
+        "blocks": [
+          {
+            "id": "element-000001",
+            "source_location": {},
+            "metadata": {
+              "raw_label": "unspecified",
+              "source_ref": "/body",
+              "parent_id": null,
+              "confidence": null,
+              "manifest_element_id": "element-000001",
+              "docling_class": "GroupItem",
+              "content_layer": "body"
+            },
+            "type": "paragraph",
+            "text": "_root_"
+          }
+        ]
+      }
+    ]
+  },
+  "source": {
+    "name": "005.jpeg",
+    "path": "/app/tests/dataset/input/005.jpeg",
+    "type": ".jpeg"
+  },
+  "accessibility": {
+    "navigation": true,
+    "semantic_headings": true,
+    "internal_links": true
+  },
+  "technical_warnings": [
+    "Executor nao foi executado; somente manifesto e plano foram gerados."
+  ],
+  "audit": {
+    "generated_by": "canonical_builder",
+    "input_length": 7,
+    "block_count": 1
+  },
+  "sections": [
+    {
+      "id": "element-000001",
+      "title": "",
+      "level": 1,
+      "source_location": {},
+      "metadata": {},
+      "blocks": [
+        {
+          "id": "element-000001",
+          "source_location": {},
+          "metadata": {
+            "raw_label": "unspecified",
+            "source_ref": "/body",
+            "parent_id": null,
+            "confidence": null,
+            "manifest_element_id": "element-000001",
+            "docling_class": "GroupItem",
+            "content_layer": "body"
+          },
+          "type": "paragraph",
+          "text": "_root_"
+        }
+      ],
+      "children": []
+    }
+  ]
+}

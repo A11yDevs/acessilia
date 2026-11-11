@@ -26,8 +26,9 @@ DISPLAY_FORMULA_RE = re.compile(r"\$\$(.+?)\$\$", re.DOTALL)
 def score_markdown_page(item_id: str, pred_md: str, gt_md: str) -> PageScores:
     """Text, reading order, TEDS and CDM of one page.
 
-    Tables and formulas are paired by order of appearance; a component is
-    non-scorable (``None``) when either side has none of that element.
+    Tables and formulas are paired by order of appearance. Each reference
+    element contributes to the mean, with zero for a missing prediction.
+    A page without a reference element has no score for that component.
     """
     return PageScores(
         item_id=item_id,
@@ -53,10 +54,9 @@ def _formulas(md: str) -> list[str]:
 def _pairwise_mean(
     preds: list[str], gts: list[str], metric: Callable[[str, str], float | None]
 ) -> float | None:
-    if not preds or not gts:
+    if not gts:
         return None
-    valid = [v for v in (metric(p, g) for p, g in zip(preds, gts)) if v is not None]
-    return sum(valid) / len(valid) if valid else None
+    return sum(metric(pred, gt) or 0.0 for pred, gt in zip(preds, gts)) / len(gts)
 
 
 __all__ = ["score_markdown_page"]

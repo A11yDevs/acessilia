@@ -1,6 +1,5 @@
 """Regressions for observability auth, periodic cache cleanup and artifact IDs."""
 
-import asyncio
 import json
 import multiprocessing
 import os
@@ -81,15 +80,14 @@ def test_artifact_id_accepts_exact_digest(prefix):
 
 
 def _publish_in_process(directory, attempting, finished):
-    cache.CACHE_DIR = Path(directory)
-    original = cache._publish_cache
-
-    def publish(*args):
-        attempting.set()
-        original(*args)
-
-    cache._publish_cache = publish
-    asyncio.run(cache._write_cached("entry", "fresh"))
+    source = Path(directory) / "writer.tmp"
+    destination = Path(directory) / "entry.json"
+    source.write_text('{"payload": "fresh"}')
+    # Exercise the same process-shared lock used by _write_cached, without
+    # involving aiofiles' event loop in the spawned process. Signal directly
+    # before the lock acquisition so the parent can assert it is blocked.
+    attempting.set()
+    cache._publish_cache(source, destination)
     finished.set()
 
 

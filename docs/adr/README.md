@@ -31,6 +31,7 @@ ones here instead of restating them.
 | [0013](0013-source-files-for-independent-toolboxes.md) | Source files for independent Toolbox deployments | Accepted |
 | [0014](0014-artifact-download-not-found-failover.md) | Search endpoints for missing artifact downloads | Accepted |
 | [0015](0015-artifact-reference-v1.md) | The artifact reference contract, `artifact/reference@1`, phased | Accepted |
+| [0016](0016-dataset-reference-contract.md) | Dataset reference contract ownership and migration | Accepted |
 
 ## Process
 

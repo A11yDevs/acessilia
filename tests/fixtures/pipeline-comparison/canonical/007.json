@@ -1,0 +1,177 @@
+{
+  "schema_version": "1.0.0",
+  "id": "doc-f61758cf0edd",
+  "title": "SISTEMA INTERNACIONAL DE UNIDADES (SI) Grandezas e Unidades de Base",
+  "language": "pt-BR",
+  "verbosity": "detailed",
+  "audience": [
+    "reader"
+  ],
+  "metadata": {
+    "pipeline_engine": "pddl",
+    "pddl_manifest_id": "manifest-965a50c5055cb4f1-r1",
+    "pddl_manifest_revision": 1,
+    "pddl_plan_id": "plan-ebd34b3d3a10af5e",
+    "pddl_planner": "internal-reference",
+    "pddl_expected_total_cost": 10,
+    "pddl_execution_id": null,
+    "pddl_execution_status": null,
+    "pddl_comparison_verdict": null,
+    "page_count": 1,
+    "mode": "pddl-internal",
+    "pages": [
+      {
+        "page_number": 1,
+        "text": "# SISTEMA INTERNACIONAL DE UNIDADES (SI) Grandezas e Unidades de Base\nTabela detectada",
+        "blocks": [
+          {
+            "id": "element-000002",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 284.51613362630206,
+                "top": 521.196428934733,
+                "right": 649.8387451171875,
+                "bottom": 472.9821421305339
+              }
+            },
+            "metadata": {
+              "raw_label": "section_header",
+              "source_ref": "/texts/0",
+              "parent_id": "element-000001",
+              "confidence": null,
+              "manifest_element_id": "element-000002",
+              "docling_class": "SectionHeaderItem",
+              "content_layer": "body"
+            },
+            "type": "heading",
+            "level": 1,
+            "text": "SISTEMA INTERNACIONAL DE UNIDADES (SI) Grandezas e Unidades de Base"
+          },
+          {
+            "id": "element-000003",
+            "source_location": {
+              "page_number": 1,
+              "bbox": {
+                "left": 84.5426254272461,
+                "top": 445.30982208251953,
+                "right": 856.9712524414062,
+                "bottom": 35.4071044921875
+              }
+            },
+            "metadata": {
+              "raw_label": "table",
+              "source_ref": "/tables/0",
+              "parent_id": "element-000001",
+              "confidence": null,
+              "manifest_element_id": "element-000003",
+              "docling_class": "TableItem",
+              "content_layer": "body"
+            },
+            "type": "table",
+            "rows": [
+              [
+                "Tabela detectada"
+              ]
+            ],
+            "table_ast": {
+              "body": [
+                {
+                  "cells": [
+                    {
+                      "text": "Tabela detectada"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "source": {
+    "name": "007.pdf",
+    "path": "/app/tests/dataset/input/007.pdf",
+    "type": ".pdf"
+  },
+  "accessibility": {
+    "navigation": true,
+    "semantic_headings": true,
+    "internal_links": true
+  },
+  "technical_warnings": [
+    "Executor nao foi executado; somente manifesto e plano foram gerados."
+  ],
+  "audit": {
+    "generated_by": "canonical_builder",
+    "input_length": 7,
+    "block_count": 2
+  },
+  "sections": [
+    {
+      "id": "element-000002",
+      "title": "SISTEMA INTERNACIONAL DE UNIDADES (SI) Grandezas e Unidades de Base",
+      "level": 1,
+      "source_location": {
+        "page_number": 1,
+        "bbox": {
+          "left": 284.51613362630206,
+          "top": 521.196428934733,
+          "right": 649.8387451171875,
+          "bottom": 472.9821421305339
+        }
+      },
+      "metadata": {
+        "raw_label": "section_header",
+        "source_ref": "/texts/0",
+        "parent_id": "element-000001",
+        "confidence": null,
+        "manifest_element_id": "element-000002",
+        "docling_class": "SectionHeaderItem",
+        "content_layer": "body"
+      },
+      "blocks": [
+        {
+          "id": "element-000003",
+          "source_location": {
+            "page_number": 1,
+            "bbox": {
+              "left": 84.5426254272461,
+              "top": 445.30982208251953,
+              "right": 856.9712524414062,
+              "bottom": 35.4071044921875
+            }
+          },
+          "metadata": {
+            "raw_label": "table",
+            "source_ref": "/tables/0",
+            "parent_id": "element-000001",
+            "confidence": null,
+            "manifest_element_id": "element-000003",
+            "docling_class": "TableItem",
+            "content_layer": "body"
+          },
+          "type": "table",
+          "rows": [
+            [
+              "Tabela detectada"
+            ]
+          ],
+          "table_ast": {
+            "body": [
+              {
+                "cells": [
+                  {
+                    "text": "Tabela detectada"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "children": []
+    }
+  ]
+}

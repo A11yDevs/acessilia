@@ -25,6 +25,7 @@ import pytest
 
 from backend.config.settings import settings
 from scripts.bench import math_case
+from scripts.bench.dataset_reference import assert_pinned_dataset
 
 OUT = math_case.REPO / "var" / "bench" / "math-reference" / "e2e"
 
@@ -38,10 +39,13 @@ LOCKED_TEXT_CHECKS = (
 @pytest.mark.e2e
 def test_math_reference_case(monkeypatch):
     root = math_case.dataset_dir()
+    if not root.is_dir():
+        pytest.skip(f"pinned Dataset checkout is not configured: {root}")
+    assert_pinned_dataset(root)
     pdf = root / math_case.CASE_DIR / math_case.CASE_PDF
     if not pdf.exists():
-        pytest.skip(f"math reference case not found: {pdf}")
-    rows, expectations = math_case.load_case(root)
+        raise FileNotFoundError(f"required math-reference input is missing from pinned Dataset: {pdf}")
+    rows, expectations, dataset_metadata = math_case.resolve_case(root, require_pinned=True)
     monkeypatch.setattr(settings, "legacy_unicode_repair", "repair")
     monkeypatch.setattr(settings, "pddl_execute_dry_run", False)
 
@@ -52,6 +56,7 @@ def test_math_reference_case(monkeypatch):
         json.loads(canonical_path.read_text(encoding="utf-8")),
         txt_path.read_text(encoding="utf-8"),
         math_case.pdf_text(pdf_ua_path),
+        dataset_metadata=dataset_metadata,
     )
     math_case._write(card, OUT)
     summary = card.summary()

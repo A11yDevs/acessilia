@@ -1,14 +1,22 @@
-"""Prevent two API processes from recovering/executing the same local queue."""
+"""Coordinate exclusive access to a file-backed runtime."""
 
 from contextlib import contextmanager
+from pathlib import Path
 
 from backend.config.settings import settings
 
 
-@contextmanager
 def runtime_lease():
-    settings.data_dir.mkdir(parents=True, exist_ok=True)
-    path = settings.data_dir / "api-worker.lock"
+    """Prevent two API processes from recovering/executing the same queue."""
+    return file_lease(
+        settings.data_dir / "api-worker.lock",
+        "Only one API worker may use a data directory",
+    )
+
+
+@contextmanager
+def file_lease(path: Path, busy_message: str):
+    path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a+b") as lock:
         try:
             import fcntl
@@ -25,13 +33,8 @@ def runtime_lease():
             try:
                 msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
             except OSError as exc:
-                raise RuntimeError(
-                    "Only one API worker may use a data directory"
-                ) from exc
+                raise RuntimeError(busy_message) from exc
         except BlockingIOError as exc:
-            raise RuntimeError("Only one API worker may use a data directory") from exc
-        try:
-            yield
-        finally:
-            # Closing the handle releases the OS lease, including on crashes.
-            lock.close()
+            raise RuntimeError(busy_message) from exc
+        # Closing the handle releases the OS lease, including on crashes.
+        yield

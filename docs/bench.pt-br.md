@@ -53,8 +53,15 @@ uv run python -m scripts.bench submit --dataset drdocbench --split test --run ba
 em `pages.txt`; `score` pontua só essas páginas, então uma run com `--sample`
 não é pontuada contra o split inteiro. `score` sai com 1 quando nenhuma página
 tem ground truth (o split `test`, por exemplo). Já `--resume` continua uma run
-interrompida: as predições anteriores ficam e o `pages.txt` segue cobrindo todas
-as páginas da seleção.
+interrompida com o provider, a revisão do Core e a opção `--save-raw` registrados.
+As predições anteriores ficam e o `pages.txt` segue cobrindo todas as páginas
+da seleção. Use outro nome de execução para ampliar uma rodada que tem
+predições mas carece de metadados de extração. As predições existentes ainda
+podem ser pontuadas.
+
+`extraction.json` registra a configuração de inferência. A pontuação inclui
+essa configuração em `run-metadata.json` e registra em `pages.jsonl` as versões
+do provider e dos modelos que a Toolbox informou para cada página.
 
 A pontuação calcula duas distâncias de Levenshtein por página. Sem o `rapidfuzz`
 (instalado pelo extra `dev`), o docstruct usa Python puro, que leva cerca de
@@ -69,8 +76,10 @@ base não tem nenhum valor no candidato (por exemplo, ele parou de emitir
 tabelas): sem isso a métrica sairia da média e contaria como ganho. Valores que
 não podem ser calculados saem como `null`.
 
-Uma métrica que some só em algumas páginas ainda deixa essas páginas fora da
-sua média; no `drilldown.csv` esse componente fica em branco nessas páginas.
+O comando sai com 2 se as rodadas diferirem nas imagens verificadas, nas
+referências, na seleção ou no protocolo de avaliação. Recalcule relatórios
+antigos para incluir o hash das entradas. Para predições sem identidade de
+origem registrada, execute novamente a extração e a pontuação.
 
 ## Em um cluster Slurm
 
