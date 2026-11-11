@@ -234,6 +234,7 @@ Each step is one PR with no behaviour change. Characterization tests come first 
      ```
 
    - **Order:** the leaves first (payload, adapters), then the handlers group by group, the enrichment stages, and the class last. Each pull request is neutral, with characterization and a differential test. Tests that patch a name on `pddl_orchestrator` (finding 3) move to the module where the name now lives.
+   - **The rest of the core** (the agents and their prompts, the fusion, the Toolbox adapters, the exporters, the messages and their catalogs) gathers under `backend/core/` after this step, following step 2 of [ADR-0016](../adr/0016-core-package.md)'s roadmap. A boundary test there must pass before the modules move to `libs/core`.
 
 The near-duplicates in finding 1 are behaviour decisions, each in its own PR (P8).
 

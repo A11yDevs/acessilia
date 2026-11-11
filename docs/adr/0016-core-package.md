@@ -38,11 +38,20 @@ core without the service.
 Measured on develop at fd7f7152, over the modules listed as core above (about
 18,000 lines):
 
-- **The framework dependencies are already on the right side.**
-  - FastAPI is imported only in `backend/api`.
-  - Agno is imported only in three files of `backend/agents`
-    (`vision_agent.py`, `data_agent.py`, `output_schemas.py`).
-  - `backend/core` imports neither.
+- **FastAPI is already on the service's side.** It is imported only in
+  `backend/api`, at module level or inside a function.
+- **Agno is in the core, not only in its agents.**
+  - At module level: three files of `backend/agents` (`vision_agent.py`,
+    `data_agent.py`, `output_schemas.py`).
+  - Inside functions:
+    - `backend/core/agno_support.py` imports `agno.agent`, `agno.tools` and
+      `agno.workflow`; the executor, the planner and the six agents of
+      `backend/core/agents` use it;
+    - `backend/ai/models/ai_client.py` imports the three Agno model classes.
+  - **Planning and execution need Agno at run time.** `ExecutorAgent.execute`
+    always builds an Agno workflow (`build_workflow`), and
+    `require_workflow_classes` raises `RuntimeError` when Agno is missing,
+    even for a plan with no steps.
 - **The core reaches the service in two places.**
   - `backend.config`: 34 imports, and 59 distinct `settings` keys read at
     107 points. The orchestrator alone reads 12 keys, and the exporters 3.
@@ -132,19 +141,45 @@ Proposed: option 2.
   the way blocking calls are run, reach the core as arguments that follow the
   protocols in `acessilia_core.ports`. The core does not own the service's
   storage.
-- **Agno is a required dependency** for now. Only `acessilia_core.agents`
-  imports it, but the orchestrator imports the agents when it loads. Making
-  Agno an optional extra is left for later.
+- **Agno is a required dependency** for now. The agents need it, and so do
+  planning and execution: the executor runs every plan as an Agno workflow.
+  Making Agno optional would take more than moving the agents into a package
+  of their own: execution would need a path that does not build the workflow.
+  That is left for later.
 - **The move is gradual and neutral**, one responsibility per pull request, as
-  in phase 3 of #402:
+  in phase 3 of #402. Every module of the core first gathers under
+  `backend/core/`, with the package's layout, so that the extraction is a
+  change of path only. Extraction comes last:
   1. **Step 6 of phase 3** reorganizes the orchestrator under
      `backend/core/pipeline/`, with the layout `acessilia_core.pipeline` will
      have (see [the inventory](../architecture/pddl-orchestrator-inventory.md)).
-  2. The `settings` reads are replaced by `CoreConfig`, one stage at a time.
-  3. The caches and `run_blocking` are injected through `ports`.
-  4. The modules move to `libs/core`, with an install-and-import check in CI
-     like the SDK's isolated job. The folder `backend/core` disappears with
-     this step; until then, it is where the core's modules gather.
+  2. **The rest of the core gathers under `backend/core/`**, one group per
+     pull request. Each resource moves with the code that loads it.
+
+     | Today | Gathers in | Resources that move with it |
+     |---|---|---|
+     | `backend/core/{manifest,planning,execution}` | already in place | `planning/domains/`: the PDDL domains and their descriptions |
+     | `backend/pipeline` | `backend/core/pipeline/` | |
+     | `backend/agents/{vision_agent,data_agent,output_schemas,provider_breaker,run_helpers}.py`, `backend/ai`, `backend/core/agents`, `backend/core/agno_support.py` | `backend/core/agents/` | `backend/ai/prompts/` (10 prompts) → `backend/core/agents/prompts/` |
+     | `backend/tools` (Toolbox adapters, formula and code tools, prompt loading, logger) | `backend/core/toolbox/` and helpers | |
+     | `backend/export`, `backend/adapters` | `backend/core/export/` | |
+     | `backend/i18n.py`, `log_messages.py`, `stage_messages.py` | `backend/core/i18n/` | `backend/locales/` (the `.po` catalogs) → `backend/core/i18n/locales/` |
+
+     The job state (`backend/agents/state_manager.py`) stays in the service.
+  3. The `settings` reads are replaced by `CoreConfig`, one stage at a time.
+  4. The caches and `run_blocking` are injected through `ports`.
+  5. **A boundary test** checks `backend/core/`: it imports nothing from
+     `backend` outside `backend/core`, and nothing besides the SDK,
+     docstruct, Agno, pydantic, loguru and the standard library; and it reads
+     no environment variable. It must pass before the extraction.
+  6. **The extraction:**
+     - the modules move to `libs/core`, and `backend/core` disappears;
+     - the PDDL domains, the prompts and the catalogs are declared as package
+       data;
+     - a CI job installs the package in a clean environment, outside the
+       checkout, and runs a smoke test from there: it plans and executes a
+       fixture manifest (dry run), loads the PDDL domain, a prompt and both
+       catalogs. Importing the modules alone would not load these resources.
 - **Acceptance evidence** for this ADR: a proof of concept in which one
   enrichment stage (for example, the table structures) runs from a script with
   an explicit `CoreConfig`, with neither FastAPI nor `backend.config` imported,
@@ -157,11 +192,15 @@ Proposed: option 2.
   - the service is left with delivery: the API, jobs and caches;
   - the core's boundary becomes a package dependency, which a test checks, as
     `libs/sdk/tests/test_purity.py` checks the SDK's;
+  - the resources the core loads (PDDL domains, prompts, catalogs) live with
+    the code that loads them;
   - the ADRs' word "core" names one package. "The core depends only on the
     SDK's public API" (ADR B of #402) becomes checkable at the package
     boundary.
 - **Harder:**
   - every stage that reads `settings` changes its signature (107 reads);
+  - the paths of the modules the service and the tests import change twice:
+    once when they gather under `backend/core/`, once at the extraction;
   - tests that set `settings` attributes will build a `CoreConfig` instead;
   - the service depends on the core's message catalogs, since the API uses
     them too;
@@ -172,9 +211,11 @@ Proposed: option 2.
   - the caches stay in `backend/services`;
   - the core's modules stay under `backend/`.
 - **Compliance:**
-  - a test that `acessilia_core` imports nothing from `backend` and reads no
-    environment variable;
-  - an isolated install job in CI.
+  - before the extraction, the boundary test of step 5;
+  - after it, a test that `acessilia_core` imports nothing from `backend` and
+    reads no environment variable;
+  - the isolated install job with its planning and execution smoke test
+    (step 6).
 
   Until then, step 6 is checked by the module size limit (decision D4 of the
   inventory).
