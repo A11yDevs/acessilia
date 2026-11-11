@@ -31,6 +31,7 @@ ADRs apontam para os daqui em vez de repeti-los.
 | [0013](0013-source-files-for-independent-toolboxes.pt-br.md) | Arquivos de origem para implantações independentes da Toolbox | Aceito |
 | [0014](0014-artifact-download-not-found-failover.pt-br.md) | Buscar downloads ausentes em outros endpoints | Aceito |
 | [0015](0015-artifact-reference-v1.pt-br.md) | O contrato de referência de artefato, `artifact/reference@1`, em fases | Aceito |
+| [0016](0016-processing-pipeline-package.pt-br.md) | O pipeline de processamento como um pacote próprio | Proposto |
 
 ## Processo
 
