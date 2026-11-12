@@ -6,6 +6,7 @@ from backend.core.pipeline import payload as pipeline_payload
 import pytest
 
 from backend.agents import pddl_orchestrator as pddl
+from backend.core.pipeline.handlers import content as content_handlers
 from tests.pddl_support import (
     build_element as _element,
     build_manifest as _manifest,
@@ -25,10 +26,10 @@ def test_completed_short_vision_description_is_valid(text):
     manifest = _manifest(
         [element], [_obligation("describe-image", ["image"], ["vision-description"])]
     )
-    result = pddl._handle_vision_description_method(manifest, "o-1")
+    result = content_handlers._handle_vision_description_method(manifest, "o-1")
     assert result.success and result.validated
     element.metadata.clear()
-    assert not pddl._handle_vision_description_method(manifest, "o-1").success
+    assert not content_handlers._handle_vision_description_method(manifest, "o-1").success
 
 
 @pytest.mark.parametrize("text", [None, "", "   "])
@@ -39,7 +40,7 @@ def test_completed_flag_does_not_certify_empty_description(text):
     manifest = _manifest(
         [element], [_obligation("describe-image", ["image"], ["vision-description"])]
     )
-    assert not pddl._handle_vision_description_method(manifest, "o-1").success
+    assert not content_handlers._handle_vision_description_method(manifest, "o-1").success
 
 
 @pytest.mark.parametrize("ast", [

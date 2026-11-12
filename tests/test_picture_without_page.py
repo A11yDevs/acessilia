@@ -26,8 +26,8 @@ from backend.core.pipeline.elements import MSG_UNDESCRIBED_PICTURE_ALT, _element
 from backend.agents.pddl_orchestrator import (
     _enrich_picture_descriptions,
     _extract_picture_bytes,
-    _handle_vision_description_method,
 )
+from backend.core.pipeline.handlers.content import _handle_vision_description_method
 from backend.core.manifest.models import Obligation
 from backend.i18n import t
 from tests.pddl_support import build_element, build_manifest, build_orchestrator

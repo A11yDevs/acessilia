@@ -235,12 +235,17 @@ EXEMPT_STRINGS: list[tuple[str, str]] = [
     ("backend/core/pipeline/handlers/text.py", "Nenhum bloco de cauda elegível para união"),
     ("backend/core/pipeline/handlers/text.py", "Nenhum título encontrado para a obrigação"),
     ("backend/core/pipeline/handlers/text.py", "Hierarquia de títulos verificada"),
+    ("backend/core/pipeline/handlers/content.py", "Nenhuma imagem encontrada para a obrigação"),
+    ("backend/core/pipeline/handlers/content.py", "Imagem sem descrição textual"),
+    ("backend/core/pipeline/handlers/content.py", "Descrição validada para"),
+    ("backend/core/pipeline/handlers/content.py", "Nenhuma tabela encontrada para a obrigação"),
+    ("backend/core/pipeline/handlers/content.py", "Nenhum bloco de código encontrado para a obrigação"),
+    ("backend/core/pipeline/handlers/content.py", "Código normalizado em"),
+    ("backend/core/pipeline/handlers/review.py", "Escalonado para revisão humana"),
     # Legacy Unicode repair — user-facing execution messages and observations
     ("backend/core/pipeline/handlers/text.py", "Nenhum texto elegível para reparo Unicode"),
     ("backend/core/pipeline/handlers/text.py", "Reparo Unicode aplicado em"),
     ("backend/core/pipeline/handlers/text.py", "para revisão"),
-    # The same substring also exempts the human review escalation message.
-    ("backend/agents/pddl_orchestrator.py", "para revisão"),
     ("backend/core/pipeline/payload.py", "Texto com sinais de Unicode legado"),
     ("backend/core/manifest/builder.py", "Texto extraído de PDF legado contém Unicode"),
     # Text-layer formula agreement — Portuguese function names (máx, mín) that

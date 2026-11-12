@@ -24,7 +24,9 @@ import pytest
 from backend.agents.pddl_orchestrator import (
     DETERMINISTIC_METHOD_HANDLERS,
     PddlAccessibilityOrchestrator,
-    _handle_human_review_method,
+)
+from backend.core.pipeline.handlers.review import _handle_human_review_method
+from backend.core.pipeline.handlers.content import (
     _handle_pandoc_code_method,
     _handle_pandoc_table_method,
     _handle_vision_description_method,

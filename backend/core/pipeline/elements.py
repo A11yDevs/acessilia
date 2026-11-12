@@ -318,3 +318,26 @@ def _bbox(element: ManifestElement, page: int | None = None) -> tuple[int, Any] 
         if provenance.bbox is not None and page in (None, provenance.page_number):
             return provenance.page_number, provenance.bbox
     return None
+
+
+def _table_element_has_structured_content(element: ManifestElement) -> bool:
+    metadata = element.metadata or {}
+    table_ast = metadata.get("table_ast")
+    if not isinstance(table_ast, dict):
+        return False
+
+    rows = _rows_from_table_ast(table_ast)
+    if not rows:
+        return False
+
+    width = max((len(row) for row in rows), default=0)
+    if len(rows) >= 2 and width >= 2:
+        return True
+
+    return not _rows_look_like_placeholder(rows)
+
+
+def _rows_look_like_placeholder(rows: list[list[str]]) -> bool:
+    if len(rows) != 1 or len(rows[0]) != 1:
+        return False
+    return rows[0][0].strip().lower() == _TABLE_PLACEHOLDER_TEXT.lower()

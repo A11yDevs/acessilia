@@ -11,10 +11,8 @@ import pytest
 
 from backend.agents.output_schemas import VisionOutput
 from backend.core.pipeline.elements import MSG_UNDESCRIBED_PICTURE_ALT, _element_to_block
-from backend.agents.pddl_orchestrator import (
-    _enrich_picture_descriptions,
-    _handle_vision_description_method,
-)
+from backend.agents.pddl_orchestrator import _enrich_picture_descriptions
+from backend.core.pipeline.handlers.content import _handle_vision_description_method
 from backend.i18n import t
 from tests.pddl_support import (
     build_element as _element,

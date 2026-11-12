@@ -21,7 +21,6 @@ from docstruct.data_uri import decode_data_uri
 from docstruct.geometry.boxes import best_effort_clip, holds_point
 from docstruct.placeholders import has_meaningful_text, is_mostly_visual, is_placeholder_visual
 from docstruct.tables.ast import (
-    linearize_table_for_text,
     raw_rows_from_table_ast as _rows_from_table_ast,
     table_ast_column_count,
     TABLE_SECTIONS,
@@ -108,7 +107,6 @@ from backend.stage_messages import (
     STAGE_RECOGNIZING_TABLE,
     STAGE_EXECUTING_PLAN_STEP,
 )
-from backend.tools.code_tools import normalize_code_text
 from backend.tools.formula_tools import label_spoken_formula, normalize_latex
 from backend.tools.logger import logger
 from backend.tools.media_inspect import inspect_source_media
@@ -131,11 +129,11 @@ from backend.core.pipeline.obligations import (
 )
 from backend.core.pipeline.elements import (
     _OVERLAY_HOST_TOLERANCE,
-    _TABLE_PLACEHOLDER_TEXT,
     _bbox,
     _element_bbox,
     _element_to_block,
     _table_ast_from_rows,
+    _table_element_has_structured_content,
     _text_kept_by_picture,
 )
 from backend.core.pipeline.payload import (
@@ -154,6 +152,14 @@ from backend.core.pipeline.handlers.text import (
     _handle_repetition_guard_method,
     _handle_tailjoin_method,
     _handle_unicode_repair_method,
+)
+from backend.core.pipeline.handlers.content import (
+    _handle_pandoc_code_method,
+    _handle_pandoc_table_method,
+    _handle_vision_description_method,
+)
+from backend.core.pipeline.handlers.review import (
+    _handle_human_review_method,
 )
 
 if TYPE_CHECKING:
@@ -304,140 +310,6 @@ def _run_extract_fused(
                 extract_fused(source_path, artifact_id=artifact_id, policy=policy)
             )
         ).result()
-
-
-def _handle_vision_description_method(
-    manifest: ProcessingManifest, obligation_id: str
-) -> MethodResult:
-    """Require every picture target to already carry a description.
-
-    The description itself is produced before planning (`_enrich_picture_descriptions`
-    asks the vision model), so this method validates that the work the planner is
-    asking for actually happened instead of pretending to perform it. A picture
-    that is still undescribed is a real failure and keeps the next admissible
-    method available; `describe-image` is non-critical, so it does not fail the job.
-    """
-    elements = [
-        el
-        for el in _target_elements(manifest, obligation_id)
-        if el.type == "picture"
-    ]
-    if not elements:
-        return MethodResult(
-            success=False,
-            validated=False,
-            message="Nenhuma imagem encontrada para a obrigação",
-        )
-
-    undescribed = [
-        el for el in elements
-        if not (
-            bool((el.text or "").strip())
-            if el.metadata.get("vision_description_complete")
-            else has_meaningful_text(el)
-        )
-    ]
-    if undescribed:
-        return MethodResult(
-            success=False,
-            validated=False,
-            message=(
-                "Imagem sem descrição textual: "
-                + ", ".join(
-                    f"{el.id} ({reason})"
-                    if (reason := el.metadata.get("vision_failure_reason"))
-                    else el.id
-                    for el in undescribed
-                )
-            ),
-        )
-    return MethodResult(
-        success=True,
-        validated=True,
-        message=f"Descrição validada para {len(elements)} imagem(ns)",
-    )
-
-
-def _handle_pandoc_table_method(
-    manifest: ProcessingManifest, obligation_id: str
-) -> MethodResult:
-    """Require the table targets to carry a structured AST."""
-    elements = [
-        el for el in _target_elements(manifest, obligation_id) if el.type == "table"
-    ]
-    if not elements:
-        return MethodResult(
-            success=False,
-            validated=False,
-            message="Nenhuma tabela encontrada para a obrigação",
-        )
-
-    missing = []
-    for element in elements:
-        try:
-            usable = _table_element_has_structured_content(element)
-            table_ast = element.metadata.get("table_ast")
-            if usable:
-                usable = any(
-                    value.strip() for row in _rows_from_table_ast(table_ast) for value in row
-                )
-                linearize_table_for_text({"table_ast": table_ast})
-        except (TypeError, ValueError, AttributeError):
-            usable = False
-        if not usable:
-            missing.append(element)
-    if missing:
-        return MethodResult(
-            success=False,
-            validated=False,
-            message=(
-                "Tabela sem estrutura tabular: "
-                + ", ".join(el.id for el in missing)
-            ),
-        )
-    return MethodResult(
-        success=True,
-        validated=True,
-        message=f"Estrutura tabular validada para {len(elements)} tabela(s)",
-    )
-
-
-def _handle_pandoc_code_method(
-    manifest: ProcessingManifest, obligation_id: str
-) -> MethodResult:
-    """Normalize code targets in place and record the normalized language."""
-    elements = [
-        el for el in _target_elements(manifest, obligation_id) if el.type == "code"
-    ]
-    if not elements:
-        return MethodResult(
-            success=False,
-            validated=False,
-            message="Nenhum bloco de código encontrado para a obrigação",
-        )
-
-    normalized = 0
-    for element in elements:
-        text = normalize_code_text(element.text or "")
-        if not text:
-            continue
-        element.text = text
-        element.metadata["code_normalized"] = True
-        normalized += 1
-
-    if normalized != len(elements):
-        return MethodResult(
-            success=False,
-            validated=False,
-            message=(
-                f"Código normalizado em {normalized}/{len(elements)} bloco(s)"
-            ),
-        )
-    return MethodResult(
-        success=True,
-        validated=True,
-        message=f"Código normalizado em {normalized} bloco(s)",
-    )
 
 
 def _handle_latex_normalizer_method(
@@ -1627,33 +1499,6 @@ def _handle_xycut_order_method(
         message=(
             "Ordem de leitura XY-cut aplicada nas páginas "
             + ", ".join(map(str, sorted(reordered_pages)))
-        ),
-    )
-
-
-def _handle_human_review_method(
-    manifest: ProcessingManifest, obligation_id: str
-) -> MethodResult:
-    """Record the obligation as escalated to a human reviewer.
-
-    `human-review` is the terminal method every obligation lists as its last
-    admissible option. It is not an automated method that can succeed on its own,
-    so resolving it must be an explicit decision: an obligation reaching this
-    handler is escalated and stays visible in the execution report, instead of
-    being marked satisfied by a handler that did nothing.
-    """
-    obligation = next(
-        (o for o in manifest.obligations if o.id == obligation_id), None
-    )
-    if obligation is None:
-        return _missing_obligation(obligation_id)
-
-    return MethodResult(
-        success=False,
-        validated=False,
-        message=(
-            "Escalonado para revisão humana: nenhum método automático satisfez "
-            f"{obligation.kind} ({obligation_id})"
         ),
     )
 
@@ -3973,23 +3818,6 @@ def _table_reread_disqualified(
     return None
 
 
-def _table_element_has_structured_content(element: ManifestElement) -> bool:
-    metadata = element.metadata or {}
-    table_ast = metadata.get("table_ast")
-    if not isinstance(table_ast, dict):
-        return False
-
-    rows = _rows_from_table_ast(table_ast)
-    if not rows:
-        return False
-
-    width = max((len(row) for row in rows), default=0)
-    if len(rows) >= 2 and width >= 2:
-        return True
-
-    return not _rows_look_like_placeholder(rows)
-
-
 def _backfill_table_from_existing_text(element: ManifestElement) -> bool:
     text = (element.text or "").strip()
     if not text:
@@ -4010,12 +3838,6 @@ def _backfill_table_from_existing_text(element: ManifestElement) -> bool:
     element.metadata["table_has_header"] = bool(rows and len(rows[0]) >= 2)
     element.text = ""
     return True
-
-
-def _rows_look_like_placeholder(rows: list[list[str]]) -> bool:
-    if len(rows) != 1 or len(rows[0]) != 1:
-        return False
-    return rows[0][0].strip().lower() == _TABLE_PLACEHOLDER_TEXT.lower()
 
 
 #: Longest side of a picture crop sent to the vision model. The render runs at
