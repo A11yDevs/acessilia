@@ -28,13 +28,15 @@ def api_paths(tmp_path_factory):
     return tmp_path_factory.mktemp("api_paths")
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="module", autouse=True)
 def _worker_runtime_paths(api_paths):
     """Point the app at this worker's tree before its lifespan takes the lease.
 
     ``tmp_path_factory`` is per xdist worker. Without this, every worker starts
-    the session client against the shared ``var/data`` and only one can hold
-    ``runtime_lease()``.
+    the client against the shared ``var/data`` and only one can hold
+    ``runtime_lease()``. Module scope restores the original paths (after the
+    client releases the lease) when this module finishes, so they do not leak
+    into later modules on the same worker.
     """
     from backend.config.settings import settings
 
@@ -73,7 +75,7 @@ def _isolate_paths(api_paths, monkeypatch):
     monkeypatch.setitem(app.dependency_overrides, require_job_access, lambda: None)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def client(_worker_runtime_paths):
     with TestClient(app) as c:
         yield c

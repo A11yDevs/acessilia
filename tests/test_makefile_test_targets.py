@@ -62,6 +62,13 @@ def test_test_all_lets_the_core_worker_count_be_overridden() -> None:
     assert "-n 4" not in completed.stdout
 
 
+def test_test_all_lets_the_core_distribution_be_overridden() -> None:
+    completed = _dry_run("test-all", "CORE_DIST=load")
+    assert completed.returncode == 0, completed.stderr
+    assert "--dist load" in completed.stdout
+    assert "--dist worksteal" not in completed.stdout
+
+
 def test_test_file_without_a_path_is_refused() -> None:
     completed = subprocess.run(
         ["make", "test-file"],
