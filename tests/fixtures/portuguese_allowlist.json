@@ -17,8 +17,6 @@
     "backend/core/manifest/builder.py": 15,
     "backend/core/manifest/models.py": 13,
     "backend/core/manifest/toolbox_extractor.py": 9,
-    "backend/core/pipeline/handlers/common.py": 1,
-    "backend/core/pipeline/handlers/text.py": 11,
     "backend/core/planning/__init__.py": 1,
     "backend/core/planning/comparison.py": 6,
     "backend/core/planning/domain_bundle.py": 15,
