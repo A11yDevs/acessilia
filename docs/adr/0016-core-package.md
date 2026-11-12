@@ -91,10 +91,12 @@ Options considered:
 2. **The core as a package of its own** (`libs/core`, `acessilia_core`), which
    the service depends on. Its configuration is passed explicitly, as the SDK
    takes `ToolboxClientConfig`.
-3. **Put the core in the SDK.** Rejected. The SDK is transport, with
-   `httpx` as its only dependency and no decisions (ADR-0002; enforced by
-   `libs/sdk/tests/test_purity.py` and the isolated SDK job). The core decides,
-   and it depends on Agno.
+3. **Put the core in the SDK.** Rejected. The SDK takes no decisions
+   (ADR-0002). [ADR-0017](0017-operational-sdk-and-agentic-core.md) widens
+   it from transport to deterministic operations, but not to decisions. Its
+   base installation stays light: `httpx`, and docstruct once it composes
+   docstruct algorithms (enforced by `libs/sdk/tests/test_purity.py` and the
+   isolated SDK job). The core decides, and it depends on Agno.
 4. **Split the repository** into a service repository and a core repository.
    This goes further than the problem needs; option 2 can lead to it later.
 
@@ -190,6 +192,16 @@ Proposed: option 2.
      descriptions and validation messages of `planning/models.py` and
      `execution/models.py`) move to the core's messages in the same step. If
      the frontend still uses them, it imports them from the core.
+
+     **Operations that may go to the SDK stay where they are** until
+     [ADR-0017](0017-operational-sdk-and-agentic-core.md) decides their
+     split into mechanism (SDK) and policy (core), so they do not move twice.
+     These are the render and judge adapters, `backend/tools`' Toolbox
+     adapters, and the formula chain; the
+     [inventory of #470](../architecture/operational-boundaries-inventory.md)
+     lists them. What stays in the core after the split (the policy, and the
+     binding of `CoreConfig` to each operation's parameters) then gathers
+     here.
   3. The `settings` reads are replaced by `CoreConfig`, one stage at a time.
   4. The caches and `run_blocking` are injected through `ports`.
   5. **A boundary test** checks `backend/core/`, imports inside functions

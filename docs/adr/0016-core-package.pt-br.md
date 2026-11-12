@@ -92,8 +92,11 @@ Opções consideradas:
 2. **O core como um pacote próprio** (`libs/core`, `acessilia_core`), do qual o
    serviço depende. A configuração é passada de forma explícita, como o SDK
    recebe o `ToolboxClientConfig`.
-3. **Colocar o core no SDK.** Rejeitada. O SDK é transporte, tem o `httpx` como
-   única dependência e não toma decisões (ADR-0002; garantido pelo
+3. **Colocar o core no SDK.** Rejeitada. O SDK não toma decisões (ADR-0002).
+   A [ADR-0017](0017-operational-sdk-and-agentic-core.pt-br.md) o amplia do
+   transporte para operações determinísticas, mas não para decisões. A
+   instalação-base dele continua leve: o `httpx`, e o docstruct quando ele
+   compuser algoritmos do docstruct (garantido pelo
    `libs/sdk/tests/test_purity.py` e pelo job isolado do SDK). O core decide, e
    depende do Agno.
 4. **Dividir o repositório** em um repositório do serviço e um do core. Vai
@@ -191,6 +194,16 @@ Proposta: a opção 2.
      descrições de schema e as mensagens de validação de `planning/models.py`
      e `execution/models.py`) vão para as mensagens do core no mesmo passo. Se
      o frontend ainda as usar, passa a importá-las do core.
+
+     **As operações que podem ir para o SDK ficam onde estão** até que a
+     [ADR-0017](0017-operational-sdk-and-agentic-core.pt-br.md) decida a
+     divisão delas em mecanismo (SDK) e política (core), para que não mudem
+     de lugar duas vezes. São os adaptadores de render e do juiz, os
+     adaptadores da Toolbox em `backend/tools` e a cadeia de fórmula; o
+     [inventário da #470](../architecture/operational-boundaries-inventory.pt-br.md)
+     os lista. O que ficar no core depois da divisão (a política, e a ligação
+     do `CoreConfig` aos parâmetros de cada operação) se reúne aqui em
+     seguida.
   3. As leituras do `settings` são trocadas pelo `CoreConfig`, uma etapa por
      vez.
   4. Os caches e o `run_blocking` passam a ser injetados pelos `ports`.
