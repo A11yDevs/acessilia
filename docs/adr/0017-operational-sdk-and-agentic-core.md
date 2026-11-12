@@ -1,0 +1,176 @@
+# 0017. Operational SDK and agentic core boundaries
+
+You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](0017-operational-sdk-and-agentic-core.pt-br.md)
+
+- **Status:** Proposed
+- **Date:** 2026-11-12
+- **Components:** core, SDK, docstruct, Toolbox
+- **Issues:** [#470](https://github.com/A11yDevs/acessilia/issues/470), [#402](https://github.com/A11yDevs/acessilia/issues/402)
+- **Amends, once accepted:** [ADR-0002](0002-component-responsibilities.md) (the SDK's row and the "where does new code go?" questions); it clarifies [ADR-0003](0003-remote-only-operational-capabilities.md) and complements [ADR-0016](0016-core-package.md)
+
+## Context
+
+ADR-0002 gives the SDK "contracts as consumed by clients, Toolbox clients and
+transport, artifact references, availability and failover rules, in-process
+access to docstruct's pure algorithms". Its fourth question sends to the SDK
+only what is about *how* to reach a capability. So a sequence of capability
+calls with explicit parameters has no home but the core. The formula chain is
+one example: render a region, then `math.recognize`, `math.convert` and
+`math.verbalize`. In the core it is mixed with the policy that decides when to
+run it. A script, a benchmark or another front end cannot run that sequence
+without the core.
+
+[#470](https://github.com/A11yDevs/acessilia/issues/470) proposes:
+- the SDK offers reusable operations and deterministic workflows;
+- the core keeps the authority to decide strategies and goals;
+- docstruct's portability and its role as the shared structural contract
+  become explicit, testable principles.
+
+The [inventory of #470, phase 1](../architecture/operational-boundaries-inventory.md)
+measured where things stand:
+
+- **Much of #470 is already decided and enforced.**
+  - Docstruct is standard library only, with one guarded optional
+    accelerator, `rapidfuzz`; `libs/docstruct/tests/test_purity.py` checks
+    this. It does not check that docstruct stays away from the network, the
+    environment, files and subprocesses: it allows the whole standard
+    library.
+  - `docstruct.manifest` is the normative document model (ADR-0007), with the
+    Pydantic models kept as checked wire models.
+  - ADR-0002 already allows SDK → docstruct.
+  - The Toolbox test forbids imports of the SDK and the core.
+- **Four gaps remain:**
+  - the SDK does not depend on docstruct, and its isolated CI job refuses it;
+  - docstruct has no isolated install job;
+  - nothing tests docstruct's independence from infrastructure;
+  - nothing checks that the Toolbox's docstruct pin follows the core's. The
+    branches agree today (0.4.0 on both `main`s, 0.5.0 on both `develop`s),
+    but only by convention.
+- **The core holds six deterministic operations next to the policy that runs
+  them:**
+  - the formula chain;
+  - the page judge;
+  - media inspection;
+  - the PDF/UA audit;
+  - text spans (already in the SDK, #455);
+  - the exports.
+
+Options considered:
+
+1. **Keep the SDK at transport.** Every composition stays in the core, and
+   every user of a composition carries the core.
+2. **The SDK offers deterministic operations and workflows; the core keeps
+   every decision** (#470).
+3. **The SDK executes operational plans** given as data. Rejected for now:
+   it is the shortest path to a second orchestrator, the risk #470 lists
+   first.
+
+## Decision
+
+Proposed: option 2.
+
+- **The criterion is the authority to decide, not the presence of AI or of
+  conditionals.**
+  - **Mechanism:** a function that runs capabilities and docstruct
+    algorithms in a fixed order with explicit parameters, and reports what
+    happened. It goes in the SDK.
+  - **Policy:** a function that chooses goals, strategies, providers,
+    thresholds, retries or what a result is worth. It stays in the core.
+  - **Mixed code:** a function that does both is split along that line.
+- **What the SDK may offer**, in addition to ADR-0002's list:
+  - reusable operations and deterministic workflows composed of Toolbox
+    capabilities and docstruct algorithms;
+  - validation of their inputs and outputs, typed errors and the provenance
+    of each step (P10 of #470): the capability and version, the effective
+    parameters, the provider, the input and output references.
+
+  An operation may call a probabilistic capability through the Toolbox (a
+  model), provided its steps and parameters are explicit.
+- **What the SDK must not do**, in addition to ADR-0002's list:
+  - plan, choose goals, replan, or hold a policy;
+  - depend on the core;
+  - run locally a heavy capability that belongs to the Toolbox
+    ([ADR-0003](0003-remote-only-operational-capabilities.md)).
+
+  Composing remote capabilities does not change the `remote_only` policy.
+- **docstruct's principles**, as tested rules:
+  - **standard library only:** optional accelerators are allowed only when
+    guarded by `except ImportError`, listed in the purity test, and backed by
+    an equivalent standard library implementation. This is #470's
+    alternative A, already in place;
+  - **docstruct is the normative source of the structural models and
+    invariants** (ADR-0007). Shared Python models do not replace versioned
+    wire contracts: REST and MCP schemas keep their own versions and contract
+    tests;
+  - **no infrastructure:** no network, environment, files, subprocesses or
+    imports of the core, the SDK or the Toolbox. Today only the imports are
+    tested; the rest needs the test listed under follow-up work.
+- **Dependencies:** unchanged from ADR-0002.
+  - The SDK may depend on docstruct, and does once its first operation
+    composes a docstruct algorithm.
+  - The SDK's base installation stays light: no agent framework and no heavy
+    operational library.
+- **Where new code goes**, replacing ADR-0002's four questions:
+
+  | Question | Component |
+  |---|---|
+  | A pure structural algorithm, independent of infrastructure? | docstruct |
+  | A reusable operation or composition, with explicit parameters? | SDK |
+  | Needs a model, a converter, a sidecar or a heavy operational library? | Toolbox |
+  | Decides goals, strategies, quality or replanning? | core |
+  | Manages the API, jobs, authentication or the service's infrastructure? | the service (`backend/`, ADR-0016) |
+
+  When code answers more than one question, it is split.
+- **The first operation is the formula chain**, as the acceptance evidence for
+  this ADR:
+  - the SDK runs it from a script without the core or the service;
+  - the core's formula enrichment reuses it, keeping its decisions;
+  - the manifests of case 036 match before and after.
+
+## Consequences
+
+- **Easier:**
+  - scripts, benchmarks and other front ends run the operations without the
+    core;
+  - the core keeps only decisions;
+  - the boundary between mechanism and policy has one written criterion.
+- **Harder:**
+  - an SDK operation is a public API: it needs versioning, a changelog and
+    deprecation;
+  - the SDK's isolated CI job changes when the SDK starts depending on
+    docstruct.
+- **Follow-up work**, in its own pull requests:
+  - a CI job that installs docstruct alone in a clean environment;
+  - a test that no docstruct module reads the environment or files, opens a
+    socket or starts a subprocess (phase 2 of #470). The isolated install job
+    does not check this;
+  - a check that the Toolbox's docstruct pin follows the core's release, or
+    shared fixtures both test against (#470's P8);
+  - the formula chain in the SDK (the acceptance evidence above);
+  - the other operations of the inventory, one per pull request, each with
+    characterization and a comparison of the manifests before and after.
+- **Interaction with ADR-0016.** Phase 3, step 6 of #402 does not move into
+  `backend/core/` the modules that hold these operations, so they do not move
+  twice: the render and judge adapters, `backend/tools`' Toolbox adapters, and
+  the formula chain. Each moves once its split into mechanism (SDK) and
+  policy (core) is decided. The core keeps the binding of its configuration
+  (`CoreConfig`) to each operation's explicit parameters.
+- **Still open:**
+  - which operations follow the formula chain, and in which order;
+  - what docstruct's stable public API is. The proposal is: what each module
+    lists in `__all__` and the README tables;
+  - an operational plan contract, deferred.
+- **Compliance:**
+  - `libs/docstruct/tests/test_purity.py` and `libs/sdk/tests/test_purity.py`
+    (they exist);
+  - the Toolbox's architecture test (it exists);
+  - the isolated install jobs of docstruct (new) and of the SDK (adjusted);
+  - the infrastructure test of docstruct (new);
+  - a review item: an SDK operation has no decision it could take differently
+    for another caller.
+- **On acceptance:**
+  - ADR-0002 gets an "Amended by ADR-0017" line, and its SDK row and its four
+    questions point here;
+  - ADR-0003 gets a "Clarified by ADR-0017" line.
+
+  Neither is rewritten (process of the [ADR index](README.md)).

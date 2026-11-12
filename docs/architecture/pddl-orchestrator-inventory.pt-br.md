@@ -235,6 +235,7 @@ Cada passo é um PR sem mudança de comportamento. Os testes de caracterização
 
    - **Ordem:** primeiro as folhas (payload, adaptadores), depois os handlers grupo a grupo, as etapas de enriquecimento e, por último, a classe. Cada pull request é neutro, com caracterização e teste diferencial. Os testes que substituem um nome em `pddl_orchestrator` (achado 3) passam para o módulo onde o nome agora está.
    - **O resto do core** (os agentes e seus prompts, a fusão, os adaptadores da Toolbox, os exportadores, as mensagens e seus catálogos) se reúne em `backend/core/` depois deste passo, seguindo o passo 2 do roteiro da [ADR-0016](../adr/0016-core-package.pt-br.md). Ali, um teste de fronteira precisa passar antes que os módulos vão para `libs/core`.
+   - **Aguardam a [ADR-0017](../adr/0017-operational-sdk-and-agentic-core.pt-br.md)** (#470): o `toolbox.py` (render, artefato de origem, juiz) e a cadeia de fórmula de `enrichment/formulas`. O mecanismo deles pode ir para o SDK, então mudam de lugar quando a divisão for decidida. Os outros módulos da estrutura seguem como previsto. A primeira movimentação, `obligations.py` e `elements.py`, foi a #469 (mergeada).
 
 As quase duplicatas do achado 1 são decisões de comportamento, cada uma num PR próprio (P8).
 
