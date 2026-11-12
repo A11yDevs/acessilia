@@ -22,9 +22,8 @@ from PIL import Image
 
 from backend.agents import pddl_orchestrator as pddl
 from backend.agents.output_schemas import VisionOutput
+from backend.core.pipeline.elements import MSG_UNDESCRIBED_PICTURE_ALT, _element_to_block
 from backend.agents.pddl_orchestrator import (
-    MSG_UNDESCRIBED_PICTURE_ALT,
-    _element_to_block,
     _enrich_picture_descriptions,
     _extract_picture_bytes,
     _handle_vision_description_method,

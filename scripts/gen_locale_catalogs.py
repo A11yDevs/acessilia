@@ -287,8 +287,8 @@ from backend.agents.pddl_orchestrator import (
     MSG_PICTURES_NOT_DESCRIBED,
     MSG_LETTERHEAD_TEXT,
     MSG_TABLES_NOT_READ,
-    MSG_UNDESCRIBED_PICTURE_ALT,
 )
+from backend.core.pipeline.elements import MSG_UNDESCRIBED_PICTURE_ALT
 from backend.export.markers import (
     MSG_OBJECT_MARKER_FORMULA,
     MSG_OBJECT_MARKER_IMAGE,

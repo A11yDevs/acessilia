@@ -16,6 +16,7 @@ from backend.core.execution.messages import EXE_COMPLETED_OBLIGATIONS_UNSATISFIE
 from backend.core.execution.models import MethodResult
 from backend.core.manifest.builder import _derive_processing_needs
 from backend.core.manifest.models import Obligation
+from backend.core.pipeline.obligations import _unsatisfied_summary
 from backend.i18n import t
 from backend.stage_messages import STAGE_PAGE, STAGE_PAGE_UNKNOWN, STAGE_PAGES
 from backend.tools.logger import logger
@@ -230,7 +231,7 @@ def test_the_job_error_groups_open_obligations_by_kind_and_page():
     elements["heading-1"].page_number = 2
     elements["image"].page_number = None
 
-    summary = pddl._unsatisfied_summary(manifest)
+    summary = _unsatisfied_summary(manifest)
 
     expected = "; ".join([
         f"refine-reading-order ({t(STAGE_PAGES).format(pages='1, 2')})",
