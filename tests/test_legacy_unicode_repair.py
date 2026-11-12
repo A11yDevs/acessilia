@@ -6,7 +6,6 @@ deterministic method that fixes NFD and dotless-i without touching formulas.
 """
 from __future__ import annotations
 
-from backend.agents import pddl_orchestrator as pddl
 from backend.core.pipeline.handlers import text as text_handlers
 from backend.core.pipeline import payload as pipeline_payload
 from backend.config.settings import settings
