@@ -486,6 +486,7 @@ def test_plan_and_canonical_use_the_same_variable_sources(toolbox_math, kind, ha
     from copy import deepcopy
     from backend.agents import pddl_orchestrator as orchestrator
     from backend.core.manifest.models import ManifestElement
+    from backend.core.pipeline.elements import _element_to_block, _text_kept_by_picture
     from docstruct.canonical import _math_sources
     from docstruct.text.implicit_products import implicit_product_variables
 
@@ -517,9 +518,9 @@ def test_plan_and_canonical_use_the_same_variable_sources(toolbox_math, kind, ha
     before = deepcopy(manifest)
     blocks = []
     for element in manifest.elements:
-        blocks.append(orchestrator._element_to_block(element))
-        blocks.extend(orchestrator._element_to_block(kept)
-                      for kept in orchestrator._text_kept_by_picture(element))
+        blocks.append(_element_to_block(element))
+        blocks.extend(_element_to_block(kept)
+                      for kept in _text_kept_by_picture(element))
     expected = frozenset() if kind in {'described_picture', 'code'} else frozenset({'h'})
     assert implicit_product_variables(_math_sources([{'blocks': blocks}])) == expected
     assert orchestrator._implicit_product_variables(manifest) == expected
