@@ -28,6 +28,28 @@ def api_paths(tmp_path_factory):
     return tmp_path_factory.mktemp("api_paths")
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _worker_runtime_paths(api_paths):
+    """Point the app at this worker's tree before its lifespan takes the lease.
+
+    ``tmp_path_factory`` is per xdist worker. Without this, every worker starts
+    the session client against the shared ``var/data`` and only one can hold
+    ``runtime_lease()``.
+    """
+    from backend.config.settings import settings
+
+    original = settings.temp_dir, settings.data_dir, settings.logs_dir
+    temp_dir = api_paths / "temp"
+    data_dir = api_paths / "data"
+    temp_dir.mkdir(parents=True, exist_ok=True)
+    data_dir.mkdir(parents=True, exist_ok=True)
+    settings.temp_dir = temp_dir
+    settings.data_dir = data_dir
+    settings.logs_dir = api_paths / "logs"
+    yield api_paths
+    settings.temp_dir, settings.data_dir, settings.logs_dir = original
+
+
 @pytest.fixture(autouse=True)
 def _isolate_paths(api_paths, monkeypatch):
     import backend.services.download_token_service as dts
@@ -52,7 +74,7 @@ def _isolate_paths(api_paths, monkeypatch):
 
 
 @pytest.fixture(scope="session")
-def client():
+def client(_worker_runtime_paths):
     with TestClient(app) as c:
         yield c
 
@@ -837,12 +859,15 @@ async def test_job_executor_keeps_original_filename_in_status(
     assert task["arquivo"] == "relatorio-final.pdf"
 
 
+# ``None`` leaves ``audio.docx`` in the output directory; the disabled case must
+# not see it. Keep them adjacent so the shared-directory regression fails in the
+# default order, not only under a different test selection.
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "failed_format", [None, "MP3", "PDF/UA", "PDF/UA disabled", "DOCX", "DOCX disabled"]
+    "failed_format", [None, "DOCX disabled", "MP3", "PDF/UA", "PDF/UA disabled", "DOCX"]
 )
 async def test_job_executor_reports_optional_export_failure(
-    api_paths, monkeypatch, failed_format, fake_pdf_ua_audit
+    tmp_path, monkeypatch, failed_format, fake_pdf_ua_audit
 ):
     from backend.agents.state_manager import state_manager
     from backend.api.worker import ApiJob, JobExecutor
@@ -858,8 +883,8 @@ async def test_job_executor_reports_optional_export_failure(
         failed_format = None
 
     task_id = "bug0011"
-    input_path = api_paths / "audio.pdf"
-    output_dir = api_paths / "output" / task_id
+    input_path = tmp_path / "audio.pdf"
+    output_dir = tmp_path / "output" / task_id
     input_path.write_bytes(_fake_pdf_bytes())
     state_manager._tasks.clear()
     state_manager._cancel_events.clear()

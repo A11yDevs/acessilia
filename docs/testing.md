@@ -5,8 +5,9 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 This page describes the supported local edit–test–fix loop. The commands are
 thin wrappers around pytest; CI keeps running the complete suites before a
 merge. Issue [#448](https://github.com/A11yDevs/acessilia/issues/448) tracks the
-remaining work: bounded parallel execution (PR 2), the optional test-impact
-experiment (PR 3), CI optimization (PR 4) and monitoring (PR 5).
+remaining work: the optional test-impact experiment (PR 3), CI optimization
+(PR 4) and monitoring (PR 5). Bounded parallel execution (PR 2) is available in
+`make test-all`.
 
 ## Baseline
 
@@ -32,13 +33,32 @@ tests on every run, so a fresh baseline is one command away:
 uv run pytest -m "not e2e" --durations=25
 ```
 
+### Parallel baseline
+
+After the isolation fixes in PR 2, with about 2920 core tests on the same
+machine (2026-11-12):
+
+| Run | Wall time |
+|---|---|
+| Core serial | 143s |
+| Core `-n 4 --dist worksteal` | 74s (1.9x) |
+| Core `-n 2 --dist worksteal` | 124s |
+| Core `-n auto --dist worksteal` | 96s |
+| Core `-n 4 --dist load` | 178s |
+
+`worksteal` wins because a few long tests dominate the tail; `load` assigns
+whole modules and leaves workers idle. `-n auto` (12 workers here) was slower
+than four: the slowest test cannot be split, and the extra processes contend
+for the same cores. The slowest test alone takes roughly 20–80s depending on
+load, so it caps the gain. These numbers are a reference, not a guarantee.
+
 ## Commands
 
 | Command | What it runs |
 |---|---|
 | `make test-file F=tests/test_example.py` | One file or one node id (`tests/test_api.py::test_health`), non-E2E |
 | `make test-failed` | The failures recorded in the core, docstruct and SDK caches |
-| `make test-all` | The non-E2E core, docstruct and SDK suites, sequentially |
+| `make test-all` | The non-E2E core suite with four workers, then docstruct and SDK sequentially |
 
 `make` with no target prints the same list.
 
@@ -53,20 +73,45 @@ failure, or the only recorded failures are E2E tests, it prints a message and
 exits successfully.
 
 `test-all` stops at no suite: it runs all three and returns the last non-zero
-exit status, so a failing library does not hide the core result. It is
-sequential today; PR 2 of #448 adds bounded parallelism (`-n 4 --dist
-worksteal`) after the isolation fixes.
+exit status, so a failing library does not hide the core result. The core suite
+uses `-n 4 --dist worksteal`; docstruct and SDK stay sequential.
 
 The core suite runs with `-m "not e2e"`; use `uv run pytest -m e2e` directly to
 reach a live environment, as described in
 [tests/README.md](../tests/README.md).
 
+## Parallel execution
+
+`make test-all` passes `-n 4 --dist worksteal` to the core suite. Override the
+bound or the distribution without editing the Makefile:
+
+```bash
+make test-all CORE_JOBS=2
+make test-all CORE_DIST=load
+```
+
+The suite is parallel-safe because tests that used to share runtime paths now
+use per-worker paths:
+
+- `tests/test_api.py` points `settings.temp_dir`, `settings.data_dir` and
+  `settings.logs_dir` at the worker's `tmp_path_factory` directory before the
+  session `TestClient` starts the app. Without that, the second worker fails
+  `runtime_lease()` with `RuntimeError: Only one API worker may use a data
+  directory`.
+- the optional-export test writes its input and output under `tmp_path`, so an
+  `audio.docx` left by one parametrization cannot leak into the next.
+
+`-n auto` is not enabled. It passed in the validation run but was slower (96s)
+than four workers (74s) and uses more memory. Keep it as an experimental local
+option; CI and `make test-all` stay bounded.
+
 ## Timeouts
 
 `pytest-timeout` fails a hung test with its name instead of letting it consume
-the 30-minute CI job timeout. The core suite uses a 180-second limit, far above
-the slowest current test (about 11s). A test that legitimately needs longer
-overrides the limit locally:
+the 30-minute CI job timeout. The core suite uses a 180-second limit. The
+CPU-heavy VLM judge test raises its own limit to 300 seconds because four
+workers can stretch it to 60–80s on a busy machine. A test that legitimately
+needs longer overrides the limit locally:
 
 ```python
 import pytest
@@ -94,7 +139,9 @@ and `sdk-isolated-report` for the SDK-only job.
   and is present on common Linux distributions.
 - **`uv`** must be installed ([docs](https://docs.astral.sh/uv/)). The commands
   run from the repository root; the libraries are separate packages and are
-  invoked with `uv run --extra dev pytest` from their own directories.
+  invoked with `uv run --extra dev pytest` from their own directories. The dev
+  extra includes `pytest-xdist`, so `uv sync --extra dev` is enough for
+  `make test-all`.
 
 ## Scope and related work
 
