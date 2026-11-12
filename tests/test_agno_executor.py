@@ -8,7 +8,7 @@ from backend.core.execution.executor import ExecutorAgent, MethodRegistry
 from backend.core.execution.models import MethodResult
 from backend.core.planning.planner_agent import PlannerAgent
 from tests.test_pddl_planning import make_manifest
-from backend.agents.pddl_orchestrator import _handle_human_review_method
+from backend.core.pipeline.handlers.review import _handle_human_review_method
 
 
 @pytest.mark.skipif(find_spec("agno") is None, reason="Agno não instalado")

@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from backend.agents import pddl_orchestrator as pddl
+from backend.core.pipeline.handlers import review as review_handlers
 from backend.agents.output_schemas import VisionOutput
 from backend.core.pipeline.elements import _element_to_block
 from tests.pddl_support import build_element, build_manifest, build_obligation
@@ -100,7 +101,7 @@ async def test_unresolved_classification_keeps_source_and_requires_review(monkey
         "unresolved", "classification_uncertain"
     )
     assert manifest.obligations[0].admissible_methods == ["human-review"]
-    result = pddl._handle_human_review_method(manifest, manifest.obligations[0].id)
+    result = review_handlers._handle_human_review_method(manifest, manifest.obligations[0].id)
     assert result.success is False
     assert result.validated is False
 
