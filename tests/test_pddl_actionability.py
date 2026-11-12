@@ -27,8 +27,10 @@ from backend.agents.pddl_orchestrator import (
     _handle_human_review_method,
     _handle_pandoc_code_method,
     _handle_pandoc_table_method,
-    _handle_repetition_guard_method,
     _handle_vision_description_method,
+)
+from backend.core.pipeline.handlers.text import (
+    _handle_repetition_guard_method,
     _tailjoin_position,
 )
 from backend.core.execution.models import MethodResult
@@ -775,16 +777,16 @@ class TestTailjoinPosition:
         assert self._position(self._element("p", "paragraph", "12", 760, 780, order=1)) is None
 
     def test_only_page_number_furniture_reads_a_box(self, monkeypatch) -> None:
-        from backend.agents import pddl_orchestrator
+        from backend.core.pipeline.handlers import text as text_handlers
 
         calls = []
-        original = pddl_orchestrator._element_bbox
+        original = text_handlers._element_bbox
 
         def counting(element, manifest):
             calls.append(element.id)
             return original(element, manifest)
 
-        monkeypatch.setattr(pddl_orchestrator, "_element_bbox", counting)
+        monkeypatch.setattr(text_handlers, "_element_bbox", counting)
         self._position(
             self._element("p", "paragraph", "texto", 100, 120, order=1),
             self._element("r", "page_footer", "Rodape", 760, 780, order=2),

@@ -221,9 +221,25 @@ EXEMPT_STRINGS: list[tuple[str, str]] = [
     # Non-ASCII fixtures exercise HTTP header rejection and Unicode URL encoding.
     ("tests/test_n05_n09_n10_regressions.py", '"inválido".encode()'),
     ("libs/sdk/tests/clients/test_dataset.py", '"input/álgebra.pdf"'),
+    # Method results of the deterministic handlers — user-facing execution
+    # messages, moved with their handlers (#402, step 6); #410 translates them.
+    ("backend/core/pipeline/handlers/common.py", "Obrigação não encontrada"),
+    ("backend/core/pipeline/handlers/text.py", "Nenhum texto elegível para normalização"),
+    ("backend/core/pipeline/handlers/text.py", "Normalização determinística aplicada em"),
+    ("backend/core/pipeline/handlers/text.py", "Nenhuma repetição degenerada encontrada nos alvos"),
+    ("backend/core/pipeline/handlers/text.py", "Guarda de repetição removeu"),
+    ("backend/core/pipeline/handlers/text.py", "Nenhum número de linha marginal encontrado"),
+    ("backend/core/pipeline/handlers/text.py", "número(s) de linha extraído(s)"),
+    ("backend/core/pipeline/handlers/text.py", "Nenhum bloco de verso elegível para fragmentação"),
+    ("backend/core/pipeline/handlers/text.py", "Verso fragmentado em"),
+    ("backend/core/pipeline/handlers/text.py", "Nenhum bloco de cauda elegível para união"),
+    ("backend/core/pipeline/handlers/text.py", "Nenhum título encontrado para a obrigação"),
+    ("backend/core/pipeline/handlers/text.py", "Hierarquia de títulos verificada"),
     # Legacy Unicode repair — user-facing execution messages and observations
-    ("backend/agents/pddl_orchestrator.py", "Nenhum texto elegível para reparo Unicode"),
-    ("backend/agents/pddl_orchestrator.py", "Reparo Unicode aplicado em"),
+    ("backend/core/pipeline/handlers/text.py", "Nenhum texto elegível para reparo Unicode"),
+    ("backend/core/pipeline/handlers/text.py", "Reparo Unicode aplicado em"),
+    ("backend/core/pipeline/handlers/text.py", "para revisão"),
+    # The same substring also exempts the human review escalation message.
     ("backend/agents/pddl_orchestrator.py", "para revisão"),
     ("backend/core/pipeline/payload.py", "Texto com sinais de Unicode legado"),
     ("backend/core/manifest/builder.py", "Texto extraído de PDF legado contém Unicode"),
