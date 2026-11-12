@@ -95,7 +95,7 @@ def test_obligations_come_from_the_core_policy_not_the_payload(tmp_path: Path):
 
 @pytest.mark.parametrize("suffix", [r"\tag{1}", r"\quad(1)", " (1)"])
 def test_formula_number_is_preserved_before_planning(tmp_path, suffix):
-    from backend.agents.pddl_orchestrator import _element_to_block
+    from backend.core.pipeline.elements import _element_to_block
     from docstruct.canonical import build_canonical_document
     from docstruct.export.markdown import document_to_markdown
 

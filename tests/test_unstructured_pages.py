@@ -32,6 +32,7 @@ from backend.core.manifest.builder import (
 from backend.core.manifest.models import PageDescriptor
 from backend.core.manifest.toolbox_extractor import ToolboxExtraction
 from backend.core.planning import toolbox_gate
+from backend.core.pipeline.obligations import NON_CRITICAL_OBLIGATION_KINDS
 from docstruct.placeholders import is_placeholder_visual
 from tests.pddl_support import build_element, build_manifest
 from tests.test_toolbox_manifest_extractor import SAMPLE_TOOLBOX_RESPONSE
@@ -143,7 +144,7 @@ def test_the_obligation_kind_is_in_the_v23_catalog():
 
 
 def test_the_obligation_is_critical():
-    assert UNSTRUCTURED_PAGE_OBLIGATION_KIND not in pddl.NON_CRITICAL_OBLIGATION_KINDS
+    assert UNSTRUCTURED_PAGE_OBLIGATION_KIND not in NON_CRITICAL_OBLIGATION_KINDS
 
 
 def test_the_method_requires_pdf_render_on_the_toolbox():

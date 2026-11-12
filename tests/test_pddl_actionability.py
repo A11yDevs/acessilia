@@ -30,9 +30,9 @@ from backend.agents.pddl_orchestrator import (
     _handle_repetition_guard_method,
     _handle_vision_description_method,
     _tailjoin_position,
-    _unsatisfied_obligations,
 )
 from backend.core.execution.models import MethodResult
+from backend.core.pipeline.obligations import _unsatisfied_obligations
 from backend.core.manifest.builder import DEFAULT_METHOD_COSTS
 from backend.core.manifest.models import (
     BoundingBox,

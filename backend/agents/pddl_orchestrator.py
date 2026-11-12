@@ -19,7 +19,6 @@ from acessilia_sdk.toolbox.clients.pdf import RENDER_MEDIA_TYPES
 from docstruct.blocks.callouts import callout_titles
 from docstruct.blocks.callouts import dedupe_callout_titles as _dedupe_callout_titles
 from docstruct.blocks.lists import (
-    marker_numbering,
     merge_list_blocks,
     recover_empty_lettered_list_items,
 )
@@ -83,7 +82,6 @@ from backend.core.agents.fusion_agent import FusionAgent
 from backend.core.agents.informational_structural import InformationalStructuralAgent
 from backend.core.execution.executor import ExecutorAgent, MethodRegistry, StepProgress
 from backend.core.execution.models import ExecutionReport, MethodResult
-from backend.core.execution.messages import EXE_COMPLETED_OBLIGATIONS_UNSATISFIED
 from backend.core.manifest.builder import (
     SECONDARY_EXTRACTION_KIND,
     TYPE_BOUND_V23_KINDS,
@@ -96,7 +94,6 @@ from backend.core.manifest.builder import (
 from backend.core.manifest.models import (
     Artifact,
     ManifestElement,
-    Obligation,
     PageDescriptor,
     ProcessingManifest,
     is_bottom_left,
@@ -141,10 +138,6 @@ from backend.stage_messages import (
     STAGE_RECOGNIZING_FORMULA,
     STAGE_RECOGNIZING_TABLE,
     STAGE_EXECUTING_PLAN_STEP,
-    STAGE_PAGE,
-    STAGE_PAGE_OF,
-    STAGE_PAGES,
-    STAGE_PAGE_UNKNOWN,
 )
 from backend.tools.code_tools import normalize_code_text
 from backend.tools.formula_tools import label_spoken_formula, normalize_latex
@@ -159,13 +152,25 @@ from backend.tools.toolbox_math_tools import (
     toolbox_verbalize_latex,
 )
 from backend.tools.toolbox_client import ToolboxError
+from backend.core.pipeline.obligations import (
+    _blocks_delivery,
+    _formula_elements_for_obligation,
+    _pages_label,
+    _replannable_obligation_ids,
+    _unsatisfied_obligations,
+    _unsatisfied_selected_obligations,
+    _unsatisfied_summary,
+)
+from backend.core.pipeline.elements import (
+    _TABLE_PLACEHOLDER_TEXT,
+    _element_bbox,
+    _element_to_block,
+    _table_ast_from_rows,
+    _text_kept_by_picture,
+)
 
 if TYPE_CHECKING:
     from acessilia_sdk.toolbox.clients.pdf import ClipOrigin, RenderedPage
-
-#: Canonical English msgid for the alt text of a picture the vision model left
-#: undescribed; why it was left so goes to the operator, not the reader.
-MSG_UNDESCRIBED_PICTURE_ALT: str = "Image without a text description."
 
 #: Canonical English msgid for an institutional header read as one paragraph:
 #: the logo, then its header lines; {lines} is substituted by callers after lookup.
@@ -181,20 +186,6 @@ MSG_TABLES_NOT_READ: tuple[str, str] = (
     "{count} table could not be read.",
     "{count} tables could not be read.",
 )
-
-
-def _formula_elements_for_obligation(
-    manifest: ProcessingManifest, obligation_id: str
-) -> list[ManifestElement]:
-    obligation = next(
-        (o for o in manifest.obligations if o.id == obligation_id), None
-    )
-    if obligation is None:
-        return []
-    targets = set(obligation.target_ids)
-    return [
-        el for el in manifest.elements if el.id in targets and el.type == "formula"
-    ]
 
 
 def _implicit_product_variables(manifest: ProcessingManifest) -> frozenset[str]:
@@ -352,37 +343,6 @@ def _fusion_agent() -> FusionAgent:
     otherwise have to guess.
     """
     return FusionAgent()
-
-
-def _element_bbox(
-    element: ManifestElement,
-    manifest: ProcessingManifest,
-) -> tuple[float, float, float, float] | None:
-    """Element bounding box normalized to the unit page expected by docstruct."""
-    for item in element.provenance:
-        box = getattr(item, "bbox", None)
-        if box is None:
-            continue
-        page = next(
-            (
-                page
-                for page in manifest.pages
-                if page.page_number == item.page_number
-            ),
-            None,
-        )
-        if page is None or not page.width or not page.height:
-            return None
-        top, bottom = box.top, box.bottom
-        if is_bottom_left(box.coord_origin, top, bottom):
-            top, bottom = page.height - top, page.height - bottom
-        return (
-            box.left / page.width,
-            top / page.height,
-            box.right / page.width,
-            bottom / page.height,
-        )
-    return None
 
 
 def _target_elements(
@@ -4691,12 +4651,6 @@ def _backfill_table_from_existing_text(element: ManifestElement) -> bool:
     return True
 
 
-#: The single cell of a table that reached the payload with no text. It is
-#: written by _element_to_block and recognized by _rows_look_like_placeholder,
-#: which must keep agreeing; the reader sees it, in Portuguese (#410).
-_TABLE_PLACEHOLDER_TEXT = "Tabela detectada"
-
-
 def _rows_look_like_placeholder(rows: list[list[str]]) -> bool:
     if len(rows) != 1 or len(rows[0]) != 1:
         return False
@@ -4778,207 +4732,6 @@ def _extract_picture_bytes(
             t(LOG_PDDL_ELEMENT_CROP_FAILED).format(element_id=element.id)
         )
         return None, page_number
-
-
-#: Obligation kinds that only refine content the extraction already delivered.
-#: Leaving one open (every automatic method failed and it was escalated to
-#: human review) does not lose content, so the job finishes with a warning
-#: instead of failing. Heading levels are also normalized by the canonical
-#: builder, which keeps the exported document valid without the repair.
-#: `refine-reading-order` is deliberately absent: a wrong reading order is what
-#: a screen reader user hits first, so an open one still fails the job.
-NON_CRITICAL_OBLIGATION_KINDS = frozenset(
-    {
-        # The adjudication verdict is recorded but cannot be applied (a page
-        # swap would reopen the manifest mid-plan), and the extracted content
-        # is complete either way, so a verdict for the secondary provider must
-        # not fail the job.
-        "adjudicate-page",
-        "repair-heading-hierarchy",
-        "join-tail-blocks",
-        "normalize-text",
-        "repair-legacy-unicode",
-        "chunk-verse",
-        "extract-line-numbers",
-        # No handler implements `rescue-omitted` yet, so its only path is
-        # human review: as a critical kind it failed every dual-fusion job
-        # with an omitted block. The content the primary provider extracted
-        # is delivered and the result e-mail names the pages of the omitted
-        # block. Remove the kind from here once the handler lands (#236).
-        "rescue-omitted-block",
-        # The vision model is the only automatic method, and a degenerate
-        # answer repeats on every try: in 006.pdf two images out of 40 failed
-        # a 42-page document. The picture is exported with the generic alt
-        # text and the result e-mail names its page. Unless no picture at all
-        # was described: see _blocks_delivery.
-        "describe-image",
-    }
-)
-
-
-def _formula_has_readable_content(
-    obligation: Obligation, manifest: ProcessingManifest
-) -> bool:
-    """Whether every target formula still carries something readable.
-
-    A formula the Toolbox could not verbalize or normalize is exported as its
-    LaTeX: the canonical builder and the renderers fall back to it when
-    ``math.verbalize`` is unavailable or rejects the input, so the document
-    keeps the content. That is a degradation, not a lost document. A formula
-    with neither LaTeX, a normalized LaTeX, MathML nor a verbalization has
-    nothing to deliver, so its obligation stays critical.
-    """
-    targets = _formula_elements_for_obligation(manifest, obligation.id)
-    return bool(targets) and all(
-        bool(normalize_latex(element.text or ""))
-        or bool(str(element.metadata.get("latex_normalized") or "").strip())
-        or bool(str(element.metadata.get("mathml") or "").strip())
-        or bool(str(element.metadata.get("verbalization") or "").strip())
-        for element in targets
-    )
-
-
-def _blocks_delivery(obligation: Obligation, manifest: ProcessingManifest) -> bool:
-    """Whether an open obligation fails the job instead of leaving a warning.
-
-    ``describe-image`` is non-critical while some picture was described: a few
-    degenerate answers are sampling (2 of 40 in 006.pdf). With none described,
-    the model is unreachable or misconfigured (``describe_region`` turns a
-    timeout or an auth error into ``None``), and every picture would silently
-    get the generic alt text, so the job fails. A document with a single
-    picture its one description failed on fails too. A picture that was never
-    sent to the model, because its source has no page to render and the
-    extraction embedded no image (a DOCX or HTML picture), says nothing about
-    the model: it is left for human review with the generic alt text instead
-    of failing the document.
-
-    ``verbalize-formula`` and ``normalize-formula`` are non-critical while the
-    target formulas keep their LaTeX: without MathML or spoken text the exported
-    document still shows the formula source, and the result e-mail names the
-    page. With no readable content at all there is nothing to deliver, so the
-    obligation fails the job.
-    """
-    if obligation.kind == "describe-image":
-        if _has_no_image_to_describe(obligation, manifest):
-            return False
-        return not any(
-            other.kind == "describe-image" and other.status == "satisfied"
-            for other in manifest.obligations
-        )
-    if obligation.kind in {"verbalize-formula", "normalize-formula"}:
-        return not _formula_has_readable_content(obligation, manifest)
-    return obligation.kind not in NON_CRITICAL_OBLIGATION_KINDS
-
-
-def _has_no_image_to_describe(
-    obligation: Obligation, manifest: ProcessingManifest
-) -> bool:
-    """Whether every target of a ``describe-image`` had no image to send to the model."""
-    targets = [
-        element for element in manifest.elements if element.id in obligation.target_ids
-    ]
-    return bool(targets) and all(
-        element.metadata.get("vision_failure_reason") == "image_unavailable"
-        for element in targets
-    )
-
-
-def _is_open_obligation(obligation: Obligation) -> bool:
-    """Whether the job selected the obligation and left it unsatisfied.
-
-    An exhausted obligation is left out of later replans, which clears its
-    `selected` flag; its `failed` status keeps it open.
-    """
-    return obligation.status != "satisfied" and (
-        obligation.selected or obligation.status == "failed"
-    )
-
-
-def _unsatisfied_selected_obligations(manifest: ProcessingManifest) -> list:
-    return [
-        obligation for obligation in manifest.obligations
-        if _is_open_obligation(obligation)
-    ]
-
-
-def _replannable_obligation_ids(manifest: ProcessingManifest) -> list[str]:
-    """Open selected obligations that a new plan can still satisfy.
-
-    Exhausted obligations, and those depending on one, are excluded: the planner
-    rejects an obligation without an untried admissible method.
-    """
-    by_id = {obligation.id: obligation for obligation in manifest.obligations}
-
-    def blocked(obligation_id: str, seen: set[str]) -> bool:
-        if obligation_id in seen:
-            return False
-        seen.add(obligation_id)
-        obligation = by_id[obligation_id]
-        if obligation.status == "failed":
-            return True
-        return any(blocked(dependency, seen) for dependency in obligation.dependencies)
-
-    return [
-        obligation.id for obligation in manifest.obligations
-        if obligation.selected
-        and obligation.status != "satisfied"
-        and not blocked(obligation.id, set())
-    ]
-
-
-def _unsatisfied_summary(manifest: ProcessingManifest) -> str:
-    """The open obligations grouped by kind with their pages.
-
-    "refine-reading-order (pages 1, 7, 11); describe-image (page 18)" instead of
-    one id per obligation, each listing every target element.
-    """
-    pages: dict[str, set[int]] = {}
-    unknown: set[str] = set()
-    for obligation in _unsatisfied_selected_obligations(manifest):
-        numbers = {
-            page for page in _obligation_pages(manifest, obligation.id) if page
-        }
-        pages.setdefault(obligation.kind, set()).update(numbers)
-        if not numbers:
-            unknown.add(obligation.kind)
-    groups = []
-    for kind, numbers in pages.items():
-        labels = [_pages_label(numbers)] if numbers else []
-        if kind in unknown:
-            labels.append(t(STAGE_PAGE_UNKNOWN))
-        groups.append(f"{kind} ({', '.join(labels)})")
-    return t(EXE_COMPLETED_OBLIGATIONS_UNSATISFIED).format(unsatisfied="; ".join(groups))
-
-
-def _pages_label(
-    pages: Iterable[int | None], total_pages: int | None = None
-) -> str:
-    """Localized location of a unit of work, e.g. "page 3" or "pages 3, 4".
-
-    When the document's page count is known and the work sits on a single page,
-    the label also names the total, e.g. "page 3 of 12": progress messages pair
-    that with image or step counters ("image 11 of 37 (page 18 of 42)"), and
-    without the total users could read 37 as the page count. Single-page
-    documents keep the plain "page 1" label because "of 1" adds nothing.
-    """
-    numbers = sorted({page for page in pages if page})
-    if not numbers:
-        return t(STAGE_PAGE_UNKNOWN)
-    if len(numbers) == 1:
-        if total_pages is not None and total_pages > 1:
-            return t(STAGE_PAGE_OF).format(page=numbers[0], total_pages=total_pages)
-        return t(STAGE_PAGE).format(page=numbers[0])
-    return t(STAGE_PAGES).format(pages=", ".join(str(page) for page in numbers))
-
-
-def _obligation_pages(manifest: ProcessingManifest, obligation_id: str) -> list[int | None]:
-    obligation = next(
-        (item for item in manifest.obligations if item.id == obligation_id), None
-    )
-    if obligation is None:
-        return []
-    page_by_element = {element.id: element.page_number for element in manifest.elements}
-    return [page_by_element.get(target) for target in obligation.target_ids]
 
 
 def _plan_progress(
@@ -5248,36 +5001,6 @@ def records_extraction_degradation(flag: Any) -> bool:
     not cached, and a cached entry that does is not replayed.
     """
     return flag is True
-
-
-def _unsatisfied_obligations(manifest: ProcessingManifest) -> list[dict[str, Any]]:
-    """Selected obligations the execution left unsatisfied.
-
-    `pddl_execution_status` alone does not say which obligations were exhausted
-    or escalated, so each one is reported with its last attempt. An obligation
-    whose last attempt is `human-review` is a pending escalation.
-    """
-    unsatisfied: list[dict[str, Any]] = []
-    for obligation in manifest.obligations:
-        if not _is_open_obligation(obligation):
-            continue
-        last = obligation.attempts[-1] if obligation.attempts else None
-        unsatisfied.append(
-            {
-                "id": obligation.id,
-                "kind": obligation.kind,
-                "status": obligation.status,
-                "target_ids": list(obligation.target_ids),
-                "last_method": last.method if last else None,
-                "last_message": last.message if last else None,
-                "escalated": bool(last and last.method == "human-review"),
-                "recovery": (
-                    "human-review" if last and last.method == "human-review"
-                    and obligation.kind in NON_CRITICAL_OBLIGATION_KINDS else "retry"
-                ),
-            }
-        )
-    return unsatisfied
 
 
 def _is_left_out_of_payload(element: ManifestElement) -> bool:
@@ -5579,172 +5302,6 @@ def _recover_empty_lettered_list_items(
     return dict(recovery.items), dict(recovery.consumed), preambles
 
 
-def _text_kept_by_picture(element: ManifestElement) -> list[ManifestElement]:
-    """The text a picture took from the slide, as paragraphs, when it went undescribed.
-
-    Slide structuring hands text to a picture: a slide read as one picture
-    keeps the text it replaced (``replaced_text``), a text slide's labels are
-    folded into the picture they lie on or beside (``figure_labels``). Its
-    description was to carry that text; without one, the text goes back to
-    the slide after the picture, as it stood before, instead of being lost or
-    listed as the picture's alt text (006.pdf v5, slides 16 and 31).
-
-    Only the vision model's description carries that text: an alt the
-    extractor gave the picture, which a failed call leaves in place, does not.
-    The paragraphs carry the picture's source location; the labels' own boxes
-    left with the elements they were folded from.
-    """
-    if element.type != "picture" or (
-        element.metadata.get("vision_description_complete") and (element.text or "").strip()
-    ):
-        return []
-    replaced = element.metadata.get("replaced_text")
-    texts = (
-        [line for line in replaced.splitlines() if line.strip()]
-        if isinstance(replaced, str) and replaced.strip()
-        else list(element.metadata.get("figure_labels") or [])
-    )
-    return [
-        ManifestElement(
-            id=f"{element.id}-kept-{index:03d}",
-            type="paragraph",
-            raw_label="paragraph",
-            reading_order=element.reading_order,
-            hierarchy_level=element.hierarchy_level,
-            text=text,
-            page_number=element.page_number,
-            provenance=list(element.provenance),
-            metadata={"kept_from_undescribed_picture": element.id},
-        )
-        for index, text in enumerate(texts, start=1)
-    ]
-
-
-def _element_to_block(
-    element: ManifestElement, callout_titles: dict[str, str] | None = None
-) -> dict[str, Any]:
-    provenance = element.provenance[0] if element.provenance else None
-    metadata: dict[str, Any] = {
-        "raw_label": element.raw_label,
-        "source_ref": element.source_ref,
-        "parent_id": element.parent_id,
-        "confidence": element.confidence,
-        "manifest_element_id": element.id,
-    }
-    if element.metadata:
-        metadata.update(element.metadata)
-    metadata = _normalize_metadata_links(metadata)
-
-    source_location: dict[str, Any] = {}
-    if provenance is not None:
-        source_location["page_number"] = provenance.page_number
-        if provenance.bbox is not None:
-            source_location["bbox"] = {
-                "left": provenance.bbox.left,
-                "top": provenance.bbox.top,
-                "right": provenance.bbox.right,
-                "bottom": provenance.bbox.bottom,
-            }
-
-    text = element.text or ""
-    callout_id = metadata.get("callout_id")
-    callout_role = str(metadata.get("callout_role", "")).lower()
-    callout_type = str(metadata.get("callout_type", "note")).lower()
-    callout_title = (callout_titles or {}).get(str(callout_id)) or str(
-        metadata.get("callout_title", "")
-    ).strip()
-    callout_block_type = "warning" if callout_type in {"warning", "aviso", "importante", "caution"} else "note"
-    block: dict[str, Any] = {
-        "id": element.id,
-        "source_location": source_location,
-        "metadata": metadata,
-    }
-
-    if (
-        callout_id
-        and callout_role != "title"
-        and metadata.get("slide_role") not in {"slide_heading", "deck_title"}
-    ):
-        block.update(
-            {
-                "type": callout_block_type,
-                "title": callout_title,
-                "text": text,
-            }
-        )
-        return block
-
-    if element.type in {"title", "heading"}:
-        block.update(
-            {
-                "type": "heading",
-                "level": 1 if element.type == "title" else max(1, element.hierarchy_level),
-                "text": text or element.raw_label,
-            }
-        )
-    elif element.type == "list_item":
-        ordered = bool(metadata.get("enumerated"))
-        block.update(
-            {
-                "type": "list",
-                "ordered": ordered,
-                "items": [text] if text else [],
-            }
-        )
-        numbering = marker_numbering(metadata.get("marker")) if ordered else None
-        if numbering is not None:
-            start, style = numbering
-            if start > 1:
-                block["start"] = start
-            if style != "decimal":
-                block["numbering"] = style
-    elif element.type == "table":
-        table_ast = _table_ast_from_metadata(metadata)
-        rows = _rows_from_table_ast(table_ast) if table_ast else None
-        if not rows:
-            rows = [[text]] if text else [[_TABLE_PLACEHOLDER_TEXT]]
-            if table_ast is None:
-                table_ast = _table_ast_from_rows(rows)
-        block.update(
-            {
-                "type": "table",
-                "rows": rows,
-                "table_ast": table_ast,
-            }
-        )
-    elif element.type == "picture":
-        block.update(
-            {
-                "type": "image",
-                "alt_text": text or t(MSG_UNDESCRIBED_PICTURE_ALT),
-            }
-        )
-    elif element.type == "code":
-        block.update({"type": "code", "text": normalize_code_text(text)})
-    elif element.type == "formula":
-        if text:
-            block.update({"type": "math", "text": text})
-        else:
-            block.update({"type": "paragraph", "text": "Formula detectada."})
-    else:
-        block.update({"type": "paragraph", "text": text or element.raw_label})
-
-    return block
-
-
-def _normalize_metadata_links(metadata: dict[str, Any]) -> dict[str, Any]:
-    def normalize_value(value: Any) -> Any:
-        if isinstance(value, str) and value.startswith("#/"):
-            return value[1:]
-        if isinstance(value, list):
-            return [normalize_value(item) for item in value]
-        if isinstance(value, dict):
-            return {key: normalize_value(item) for key, item in value.items()}
-        return value
-
-    return {key: normalize_value(value) for key, value in metadata.items()}
-
-
 #: What the payload's text says for an image without alt text. It is shown to
 #: the reader and fixed in Portuguese: localizing it is #410's work.
 _IMAGE_WITHOUT_TEXT = "Imagem"
@@ -5753,72 +5310,3 @@ _IMAGE_WITHOUT_TEXT = "Imagem"
 def _render_text_from_blocks(blocks: list[dict[str, Any]]) -> str:
     """One page's plain text: docstruct's ``blocks_text`` with the core's words."""
     return blocks_text(blocks, image_text=_IMAGE_WITHOUT_TEXT)
-
-
-def _table_ast_from_metadata(metadata: dict[str, Any]) -> dict[str, Any] | None:
-    raw = metadata.get("table_ast")
-    if not isinstance(raw, dict):
-        return None
-
-    table_ast: dict[str, Any] = {}
-    caption = raw.get("caption")
-    if isinstance(caption, str) and caption.strip():
-        table_ast["caption"] = caption.strip()
-
-    for section_name in ("header", "body", "footer"):
-        section = raw.get(section_name)
-        if not isinstance(section, list):
-            continue
-        normalized_rows: list[dict[str, Any]] = []
-        for row in section:
-            if not isinstance(row, dict):
-                continue
-            cells = row.get("cells")
-            if not isinstance(cells, list):
-                continue
-            normalized_cells: list[dict[str, Any]] = []
-            for cell in cells:
-                if not isinstance(cell, dict) or "text" not in cell:
-                    continue
-                text = str(cell.get("text", "")).strip()
-                normalized_cell: dict[str, Any] = {"text": text}
-                if isinstance(cell.get("header"), bool):
-                    normalized_cell["header"] = cell["header"]
-                scope = cell.get("scope")
-                if isinstance(scope, str) and scope in {
-                    "none",
-                    "row",
-                    "col",
-                    "rowgroup",
-                    "colgroup",
-                }:
-                    normalized_cell["scope"] = scope
-                for span_key in ("rowspan", "colspan"):
-                    span = cell.get(span_key)
-                    if isinstance(span, int) and span >= 1:
-                        normalized_cell[span_key] = span
-                normalized_cells.append(normalized_cell)
-            if normalized_cells:
-                normalized_rows.append({"cells": normalized_cells})
-        if normalized_rows:
-            table_ast[section_name] = normalized_rows
-
-    metadata_obj = raw.get("metadata")
-    if isinstance(metadata_obj, dict):
-        table_ast["metadata"] = metadata_obj
-
-    return table_ast if table_ast.get("body") else None
-
-
-def _table_ast_from_rows(rows: list[list[str]]) -> dict[str, Any]:
-    body: list[dict[str, Any]] = []
-    for row in rows:
-        if not isinstance(row, list):
-            continue
-        cells = []
-        for cell in row:
-            text = str(cell).strip()
-            cells.append({"text": text})
-        if cells:
-            body.append({"cells": cells})
-    return {"body": body}

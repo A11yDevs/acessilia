@@ -12,7 +12,8 @@ import asyncio
 
 import pytest
 
-from backend.agents.pddl_orchestrator import _pages_label, _plan_progress
+from backend.agents.pddl_orchestrator import _plan_progress
+from backend.core.pipeline.obligations import _pages_label
 from backend.agents.state_manager import describe_failure, state_manager
 from backend.config.settings import settings
 from backend.core.planning.models import PlanStep

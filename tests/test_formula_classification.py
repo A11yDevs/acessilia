@@ -5,6 +5,7 @@ import pytest
 
 from backend.agents import pddl_orchestrator as pddl
 from backend.agents.output_schemas import VisionOutput
+from backend.core.pipeline.elements import _element_to_block
 from tests.pddl_support import build_element, build_manifest, build_obligation
 
 
@@ -55,7 +56,7 @@ async def test_drawing_is_reclassified_and_description_is_not_requested_twice(mo
     assert element.metadata["vision_description_complete"] is True
     assert [o.kind for o in manifest.obligations] == ["describe-image"]
     assert len(calls) == 1
-    assert pddl._element_to_block(element)["alt_text"] == element.text
+    assert _element_to_block(element)["alt_text"] == element.text
 
 
 @pytest.mark.asyncio
@@ -236,7 +237,7 @@ async def test_the_recognition_fallback_records_its_own_reclassification(monkeyp
 def _html_of(element):
     from docstruct.export.html import document_to_html
 
-    block = pddl._element_to_block(element)
+    block = _element_to_block(element)
     return document_to_html({"sections": [{"blocks": [block]}]})
 
 

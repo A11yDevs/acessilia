@@ -559,10 +559,8 @@ def test_an_undescribed_picture_gives_its_labels_back_as_paragraphs(source):
     006.pdf v5 listed them as the picture's alt text ("Aquecedor para vaporizar
     a; amostra; ..."); they go back to the slide after the picture instead.
     """
-    from backend.agents.pddl_orchestrator import (
-        MSG_UNDESCRIBED_PICTURE_ALT,
-        _manifest_pages_to_payload,
-    )
+    from backend.agents.pddl_orchestrator import _manifest_pages_to_payload
+    from backend.core.pipeline.elements import MSG_UNDESCRIBED_PICTURE_ALT
 
     manifest = _build_edited(
         source,
@@ -629,10 +627,8 @@ async def test_a_failed_description_gives_the_labels_back_past_the_extractor_alt
 
 def test_an_undescribed_slide_picture_gives_back_the_text_it_replaced(source):
     """A slide read as one picture keeps its text when the picture goes undescribed."""
-    from backend.agents.pddl_orchestrator import (
-        MSG_UNDESCRIBED_PICTURE_ALT,
-        _manifest_pages_to_payload,
-    )
+    from backend.agents.pddl_orchestrator import _manifest_pages_to_payload
+    from backend.core.pipeline.elements import MSG_UNDESCRIBED_PICTURE_ALT
 
     manifest = _build(source)
     [picture] = [e for e in manifest.elements if e.metadata.get("slide_visual")]

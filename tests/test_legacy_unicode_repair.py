@@ -10,6 +10,7 @@ from backend.agents import pddl_orchestrator as pddl
 from backend.config.settings import settings
 from backend.core.manifest.builder import _derive_v23_processing_needs
 from backend.core.manifest.models import BoundingBox, Observation, Obligation, Provenance
+from backend.core.pipeline.obligations import NON_CRITICAL_OBLIGATION_KINDS
 from tests.pddl_support import build_element, build_manifest, build_orchestrator
 
 BRASILIA = "Bras\u0131\u0301lia"
@@ -396,7 +397,7 @@ class TestDetectModeTechnicalWarning:
 
 
 def test_kind_is_not_critical():
-    assert "repair-legacy-unicode" in pddl.NON_CRITICAL_OBLIGATION_KINDS
+    assert "repair-legacy-unicode" in NON_CRITICAL_OBLIGATION_KINDS
 
 
 
